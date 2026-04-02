@@ -2784,6 +2784,16 @@ Gdi_GetTextExtentExPoint(hDC, p_String, p_MaxW, ByRef l_Fit, ByRef W, ByRef H) {
     Return E
 }
 
+Gdi_GetScreenScaleFactor() {
+   ; gets the screen scale factor on Windows 10 and 11
+   hdc := Gdi_GetDC()
+   sx := Gdi_GetDeviceCaps(hdc, 88)
+   sy := Gdi_GetDeviceCaps(hdc, 90)
+   sf :=  ((sx+sy) / 2 ) / 96
+   Gdi_ReleaseDC(hdc)
+   return sf
+}
+
 Gdi_GetDeviceCaps(hDC, index) {
    ; The GetDeviceCaps function retrieves device-specific information for the specified hDC.
    ; Device Parameters [general]
@@ -3002,7 +3012,7 @@ calcFntHeightFromPtsSize(ptsSize) {
 }
 
 Gdi_GetLibVersion() {
-  return 1.31 ; mercredi samedi 21 janvier 2023; 21/01/2023
+  return 1.31 ; samedi, 21 janvier 2023; 21/01/2023
 }
 
 

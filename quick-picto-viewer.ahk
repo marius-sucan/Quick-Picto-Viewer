@@ -258,7 +258,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
 
 Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0, PasteInPlaceLight := 0
    , EllipseSelectMode := 0, thumbsListViewMode := 1, userimgGammaCorrect := 0, FillAreaGradientAngle := 0
-   , adjustCanvasCentered := 1, adjustCanvasMode := 1, adjustCanvasDoBgr := 1, LimitSelectBoundsImg := 1, FillAreaDoContour := 0
+   , adjustCanvasCentered := 1, adjustCanvasMode := 1, adjustCanvasDoBgr := 1, LimitSelectBoundsImg := 1
    , DrawLineAreaColor := "ff3366", DrawLineAreaDashStyle := 1, DrawLineAreaContourAlign := 1
    , DrawLineAreaContourThickness := 20, DrawLineAreaOpacity := 255, DrawLineAreaBorderTop := 1, DrawLineAreaBorderBottom := 0
    , DrawLineAreaBorderLeft := 1, DrawLineAreaBorderRight := 0, DrawLineAreaBorderCenter := 1, DrawLineAreaBorderArcA := 0
@@ -990,9 +990,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
            func2Call := ["flipSelectionWH"]
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
-
         ; testWicLoader()
         ; testPDFLoader()
+        ; SetTimer, testKeysStuff, 50
     } Else If (givenKey="+^n")
     {
         If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -17758,7 +17758,7 @@ FillSelectedArea() {
 
     coreFillSelectedArea("kill", 0)
     currIMGdetails.HasAlpha := hasAlpha
-    wrapRecordUndoLevelNow(newBitmap, !FillAreaDoContour)
+    wrapRecordUndoLevelNow(newBitmap)
     zeitOperation := A_TickCount - startZeit
     addJournalEntry("Fill selected area operation. Elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
     dummyTimerDelayiedImageDisplay(50)
@@ -17769,12 +17769,6 @@ FillSelectedArea() {
        restorePreviousSelections(currentSelUndoLevel)
        dummyRefreshImgSelectionWindow()
        ; ToolTip, % totalSelUndos "=" currentSelUndoLevel , , , 2
-    }
-
-    If (FillAreaDoContour=1)
-    {
-       fn := Func("DrawLinesInSelectedArea").Bind(2)
-       SetTimer, % fn, -100
     }
 }
 
@@ -18675,8 +18669,7 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0, ByRef hasAlph
    Gdip_DeletePath(invertPath)
    If validBMP(glassBitmap)
       trGdip_DisposeImage(glassBitmap, 1)
-   If (FillAreaDoContour=1 && previewMode=1)
-      coreDrawLinesStuffTool("shapes")
+
    Return rz
 }
 
@@ -23019,9 +23012,11 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        addJournalEntry("Failed to draw lines: " A_ThisFunc "(). Code=" rz ". " modus)
 
     Gdip_ResetClip(G2)
+    If (previewMode=2)
+       Gdip_DeleteGraphics(G2)
+
     If (previewMode=2 && !rz)
     {
-       Gdip_DeleteGraphics(G2)
        rza := QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
@@ -43305,7 +43300,7 @@ PanelSaveImg() {
     oldTimes := lastZeitIMGsaved[1]
     FormatTime, timea, % oldTimes , HH:mm
     If oldTimes
-       InfosPreviousSave := "Last time saved: " timea "`n" PathCompact(lastZeitIMGsaved[5] "\" lastZeitIMGsaved[4], 47) "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
+       InfosPreviousSave := "Last saved at: " timea "`n" PathCompact(lastZeitIMGsaved[5] "\" lastZeitIMGsaved[4], 47) "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
 
     QPV_FileGetSizeTime(imgPath, "R", currentFileIndex)
     ofileSizu := resultedFilesList[currentFileIndex, 6]
@@ -43355,8 +43350,12 @@ PanelSaveImg() {
        GuiControl, Disable, userDestinationFolder
 
     btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBTNsaveImgPanel, &Save image
-    Gui, Add, Button, x+0 h%thisBtnHeight% w35 gBTNsaveBrowseImgPanel, &AS
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBTNsaveImgPanel +hwndhTemp, &Save image
+    imgPath := getIMGsaveDestination(currentFileIndex)
+    imgPath := FileExist(imgPath) ? PathCompact(imgPath, 65) : "TO BE DECIDED"
+    ToolTip2ctrl(hTemp, "File save destination:`n" imgPath)
+    Gui, Add, Button, x+0 h%thisBtnHeight% w35 gBTNsaveImgPanel +hwndhTemp, &AS
+    ToolTip2ctrl(hTemp, "Save image file as...")
     Gui, Add, Button, x+15 hp w%btnWid% gBtnCopyImageClip, &Copy to clipboard
     btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+5 hp w%btnWid2% gBtnCloseWindow, C&ancel
@@ -44754,11 +44753,13 @@ TglUsePrevSaveFoderu() {
    RegAction(1, "usePrevSaveFolder")
 }
 
-BTNsaveImgPanel() {
+BTNsaveImgPanel(hwnd:=0,b:=0,c:=0) {
    If (AnyWindowOpen!=35)
       Return
 
    Gui, SettingsGUIA: Default
+   ControlGetText, txt, , ahk_id %hwnd%
+   ; ToolTip, % txt "|" a "|" b "|" c , , , 2
    GuiControlGet, usePrevSaveFolder
    GuiControlGet, PreserveDateTimeOnSave
    GuiControlGet, userDestinationFolder
@@ -44767,26 +44768,11 @@ BTNsaveImgPanel() {
    RegAction(1, "usePrevSaveFolder")
    RegAction(1, "PreserveDateTimeOnSave")
    imgPath := getIDimage(currentFileIndex)
+   saveMode := InStr(txt, "&as") ? 0 : 1
    If InStr(imgPath, "Q:\temporary memory object\")
       SaveClipboardImage(userDestinationFolder, 0)
    Else
-      SaveClipboardImage("current", 1)
-}
-
-BTNsaveBrowseImgPanel() {
-   Gui, SettingsGUIA: Default
-   GuiControlGet, usePrevSaveFolder
-   GuiControlGet, PreserveDateTimeOnSave
-   GuiControlGet, userDestinationFolder
-   GuiControlGet, userSaveBitsDepth
-   userJpegQuality := clampInRange(userJpegQuality, 1, 100)
-   RegAction(1, "usePrevSaveFolder")
-   RegAction(1, "PreserveDateTimeOnSave")
-   imgPath := getIDimage(currentFileIndex)
-   If (usePrevSaveFolder=1 || InStr(imgPath, "Q:\temporary memory object\"))
-      SaveClipboardImage(userDestinationFolder, 0)
-   Else
-      SaveClipboardImage("current", 0)
+      SaveClipboardImage("current", saveMode)
 }
 
 BtnCopyImageClip() {
@@ -46586,7 +46572,6 @@ ReadSettingsFillAreaPanel(act:=0) {
     RegAction(act, "FillAreaGradientWrapped", 2, 1, 5)
     RegAction(act, "FillAreaInverted",, 1)
     RegAction(act, "FillAreaRemBGR",, 1)
-    RegAction(act, "FillAreaDoContour",, 1)
     RegAction(act, "FillAreaApplyColorFX",, 1)
     RegAction(act, "freeHandSelectionMode",, 1)
     RegAction(act, "DrawLineAreaColor",, 3)
@@ -48890,7 +48875,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
 
     If (viewportQPVimage.imgHandle)
     {
-       FillAreaDoContour := 0
        FillAreaEllipseSection := 1440
        FillAreaGlassy := alphaMaskingMode := 1
     } Else FillAreaDoBehind := 0
@@ -48902,7 +48886,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
     ha := (PrefsLargeFonts=1) ? 27 : 18
-    bonusTabs := !(viewportQPVimage.imgHandle) ? "|Border|Alpha mask|Paint mask" : ""
+    bonusTabs := !(viewportQPVimage.imgHandle) ? "|Alpha mask|Paint mask" : ""
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, Main|Fill|Adjust colors%bonusTabs%
 
     Gui, Tab, 1 ; main options
@@ -48972,27 +48956,7 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
        Gui, Add, Text, xs y+10 Section, These only apply with blending modes.
 
     If !(viewportQPVimage.imgHandle)
-    {
-       Gui, Tab, 4 ; draw border
-       tml := (PrefsLargeFonts=1) ? 60 : 45
-       Gui, Add, Checkbox, x+10 y+10 Section Checked%FillAreaDoContour% vFillAreaDoContour gupdateUIfillPanel, &Draw shape outline
-       Gui, Add, Checkbox, x+15 hp gupdateUIfillPanel Checked%FillAreaClosedPath% vFillAreaClosedPath, &Closed path
-       Gui, Add, Text, xs y+15 h%ha% +0x200 vtxtLine5, Border color
-       GuiAddPickerColor("x+10 hp w25", "DrawLineAreaColor")
-       GuiAddColor("x+5 hp w" tml, "DrawLineAreaColor", "Line color")
-       GuiAddSlider("DrawLineAreaOpacity", 3,255, 255, "Opacity", "updateUIfillPanel", 1, "x+5 w" btnWid " hp")
-       GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIfillPanel AltSubmit Choose" DrawLineAreaBlendMode " vDrawLineAreaBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
-
-       Gui, Add, Text, xs y+15 w%btnWid% vtxtLine3, Pen clipping
-       Gui, Add, Text, x+10 wp vtxtLine4, Styling
-       GuiAddDropDownList("xs y+7 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIfillPanel", "Inside|None|Outside", "Clip pen to shape")
-       GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaDashStyle " vDrawLineAreaDashStyle gupdateUIfillPanel", "Continous|Dashes|Dots|Dashes and dots", "Line style")
-       Gui, Add, Checkbox, xs y+5 w%btnWid% h%btnHeight% Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIfillPanel, &Double line
-       GuiAddDropDownList("x+10 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIfillPanel", "No caps|Square caps|Round caps", "Line ends style")
-       GuiAddSlider("DrawLineAreaContourThickness", 1,450, 5, "Contour thickness: $€ pixels", "updateUIfillPanel", 1, "xs y+15 w" txtWid - 25 " h" ha)
-
-       uiADDalphaMaskTabs(5, 6, "updateUIfillPanel")
-    }
+       uiADDalphaMaskTabs(4, 5, "updateUIfillPanel")
 
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 80 : 60
@@ -54224,29 +54188,6 @@ updateUIfillPanel(actionu:=0) {
 
        actu := (FillAreaColorMode=6) ? "&Set texture source" : "&Reset gradient center"
        GuiControl, SettingsGUIA: , btnFldr5, % actu
-    } Else If (CurrentPanelTab=4)
-    {
-       actu2 := (FillAreaDoContour=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-       GuiControl, % actu2, DrawLineAreaColor
-
-       actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-       GuiControl, % actu, FillAreaClosedPath
-
-       actu2 := (FillAreaDoContour=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-       GuiControl, % actu2, PickuDrawLineAreaColor
-       GuiControl, % actu2, DrawLineAreaCapsStyle
-       GuiControl, % actu2, DrawLineAreaDoubles
-       GuiControl, % actu2, DrawLineAreaContourAlign
-       GuiControl, % actu2, DrawLineAreaDashStyle
-       GuiControl, % actu2, DrawLineAreaBlendMode
-       GuiControl, % actu2, FillAreaClosedPath
-       GuiControl, % actu2, txtLine3
-       GuiControl, % actu2, txtLine4
-       GuiControl, % actu2, txtLine5
-       uiSlidersArray["DrawLineAreaContourThickness", 10] := (FillAreaDoContour=1) ? 1 : 0
-       uiSlidersArray["DrawLineAreaOpacity", 10] := (FillAreaDoContour=1) ? 1 : 0
-       If (viewportQPVimage.imgHandle)
-          GuiControl, SettingsGUIA: Disable, FillAreaDoContour
     } Else If (CurrentPanelTab=3)
     {
        actu := (FillAreaApplyColorFX=1 && InStr(actuFX, "enable")) ? 1 : 0
@@ -54254,10 +54195,10 @@ updateUIfillPanel(actionu:=0) {
        uiSlidersArray["PasteInPlaceGamma", 10] := actu
        uiSlidersArray["PasteInPlaceHue", 10] := actu
        uiSlidersArray["PasteInPlaceSaturation", 10] := actu
-    } Else If (CurrentPanelTab=5)
+    } Else If (CurrentPanelTab=4)
     {
        updateUIalphaMaskStuff(1)
-    } Else If (CurrentPanelTab=6)
+    } Else If (CurrentPanelTab=5)
        updateUIalphaMaskStuff(2)
 
     EllipseSelectMode := (FillAreaShape=7) ? 2 : 0
@@ -56760,9 +56701,15 @@ testWasImageEditedInVP() {
    huge := (viewportQPVimage.imgHandle) ? 1 : 0
    If ( (huge=1 && !viewportQPVimage.actions && currentImgModified!=1 && vpIMGrotation=0)
    || (huge=0 && !undoLevelsRecorded && imgFxMode=1 && usrColorDepth<2 && currentImgModified!=1 && vpIMGrotation=0) )
-      return 1
-   else
-      return 0
+      Return 1
+   Else
+      Return 0
+}
+
+getIMGsaveDestination(indexu) {
+   imgPath := getIDimage(indexu)
+   imgPath := (indexu=lastZeitIMGsaved[6] && imgPath=lastZeitIMGsaved[7]) ? lastZeitIMGsaved[5] "\" lastZeitIMGsaved[4] : imgPath
+   Return imgPath
 }
 
 SaveClipboardImage(dummy:=0, noDialog:=0) {
@@ -56792,7 +56739,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
    thisDialogSavePtrns := (extendedMode=1) ? StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)") : dialogSaveFptrn
    thisRegEXsaveFmts := (extendedMode=1) ? StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$") : saveTypesRegEX
    If (noDialog=1)
-      file2save := imgPath
+      file2save := getIMGsaveDestination(currentFileIndex)
    Else
       file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save image as...", thisDialogSavePtrns, dialogFmtIndex, defFMTindex)
 
@@ -56855,7 +56802,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
             Return
       }
 
-      If (FileExist(file2save) && imgPath!=file2save)
+      If (FileExist(file2save) && noDialog!=1 && imgPath!=file2save)
       {
          zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite it?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
@@ -56980,11 +56927,12 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          sOutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
          showTOOLtip("Image file succesfully saved`n" OutFileName "`n" sOutDir "\" friendly)
          testMem := getIDimage(currentFileIndex)
-         lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex]
+         lastZeitIMGsaved := [A_Now, currentUndoLevel, undoLevelsRecorded, OutFileName, OutDir, currentFileIndex, testMem]
          If (currentFileIndex=0 && maxFilesIndex<1) || (InStr(testMem, "Q:\temporary memory object\") && maxFilesIndex<1)
          {
             currentFileIndex := maxFilesIndex := 1
             resultedFilesList[1, 1] := file2save
+            lastZeitIMGsaved[7] := file2save
             DynamicFoldersList := OutDir "`n"
             prevOpenFolderPath := OutDir
             CurrentSLD := "|" OutDir
@@ -57055,6 +57003,8 @@ BtnCpyMvStrctrdChooseFilesSrc() {
 }
 
 zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=0, ByRef fileEXT:=0) {
+    fileNamuNoEXT := fileNamu := ""
+    fileEXT := folderu := ""
     If (fastMode=0)
     {
        inputu := Trimmer(StrReplace(inputu, "|"))
@@ -57066,7 +57016,6 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
        ; fnOutputDebug("hmm = " OutputVar "||" OutputAttribs)
        ; SoundBeep , 300, 100
        folderu := inputu
-       fileEXT := fileNamuNoEXT := fileNamu := ""
        fileParentFolder := SubStr(folderu, 1, InStr(folderu, "\", 0, -1) - 1)
     } Else
     {
@@ -63449,7 +63398,7 @@ InvokeMenuBarFile(manuID) {
       {
          If validBMP(UserMemBMP)
          {
-            kMenu("pvMenuBarFile", "Add", "&Save image`tCtrl+S", "PanelSaveImg", "image edit")
+            kMenu("pvMenuBarFile", "Add", "&Save image (as)`tCtrl+S", "PanelSaveImg", "image edit")
             If FileExist(resultedFilesList[currentFileIndex, 1])
                kMenu("pvMenuBarFile", "Add", "&Revert changes...`tF5", "RefreshImageFileAction", "reload refresh")
          } Else
@@ -66489,7 +66438,7 @@ BuildSecondMenu(givenCoords:=0) {
 
    isWelcomeScreenu := (isImgEditingNow()=1 || (maxFilesIndex>0 && CurrentSLD)) ? 0 : 1
    ; zt := (thumbsDisplaying=1) ? "file(s) to" : ""
-   zt2 := (thumbsDisplaying=1) ? "list" : "image"
+   zt2 := (thumbsDisplaying=1) ? "list" : "image (as)"
    kMenu("PVmenu", "Add", "Main menu`tAppsKey", "InitGuiContextForcedMenu")
    Menu, PVmenu, Add,
    kMenu("PVmenu", "Add", "&Open image`tCtrl+O", "OpenDialogFiles")
@@ -66723,7 +66672,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
             kMenu("PVmenu", "Add", "&Redo image (4 steps)`tCtrl+Alt+Y", "MenuRedoImgJumpy")
          }
       }
-      kMenu("PVmenu", "Add", "&Save image`tCtrl+S", "PanelSaveImg", "image edit")
+      kMenu("PVmenu", "Add", "&Save image (as)`tCtrl+S", "PanelSaveImg", "image edit")
    } Else If (validBMP(UserMemBMP) && thumbsDisplaying=1)
       kMenu("PVmenu", "Add", "&Return to image editing", "MenuReturnIMGedit", "back")
 
@@ -71618,6 +71567,10 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
 
        trGdip_GetImageDimensions(useGdiBitmap(), w, h)
        infoRes := "`nResolution: " groupDigits(w) " x " groupDigits(h) " px (" Round(w/h, 2) ") | " Round((w * h)/1000000,2) " MPx"
+       saveDest := getIMGsaveDestination(currentFileIndex)
+       If (saveDest!=imgPath)
+          infoRes := "`nDestination on file save: " PathCompact(saveDest, "a", 1, OSDfontSize//1.1, 0, 45) infoRes
+
        If (currIMGdetails.TooLargeGDI=1)
           infoRes .= "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " px | " Round((currIMGdetails.Width * currIMGdetails.Height)/1000000,2) " MPx"
     } Else
@@ -74013,9 +73966,10 @@ toggleBrushDoubleSize() {
       GuiControl, SettingsGUIA:, BrushToolDoubleSize, % BrushToolDoubleSize
       theSizeLabel := (BrushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
       uiSlidersArray["BrushToolSize", 5] := theSizeLabel
-      GuiUpdateSliders("brushToolSize")
+      GuiUpdateSliders("BrushToolSize")
    }
 
+   RegAction(1, "BrushToolDoubleSize",, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -74034,6 +73988,7 @@ toggleBrushAirMode() {
    If isVarEqualTo(AnyWindowOpen, 64, 24, 31)
       GuiControl, SettingsGUIA:, BrushToolOverDraw, % BrushToolOverDraw
 
+   RegAction(1, "BrushToolOverDraw",, 1)
    showTOOLtip(labelu friendly moreinfos, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -74723,6 +74678,8 @@ changeBrushOpacity(keyu, isKeyu:=0) {
        showTOOLtip("Brush opacity: " Round((newOpacity / 255) * 100) "%", "dummyChangeBrushOpacity", 2, newOpacity/255)
     }
 
+    RegAction(1, "BrushToolAopacity",, 2, 1, 255)
+    RegAction(1, "BrushToolBopacity",, 2, 1, 255)
     If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
     {
        If (isKeyu=1)
@@ -74778,16 +74735,20 @@ changeBrushColorPicker() {
 changeBrushSize(dir) {
    liveDrawingBrushTool := 1
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-   factoru := (brushToolSize>50) ? 10 : 5
+   factoru := (BrushToolSize>50) ? 10 : 5
+   If (BrushToolSize<15)
+      factoru := 1
+
    If (dir=1)
-      brushToolSize += factoru
+      BrushToolSize += factoru
    Else
-      brushToolSize -= factoru
+      BrushToolSize -= factoru
 
    endCaptureCloneBrush()
-   BrushToolSize := clampInRange(brushToolSize, 1, 950)
+   BrushToolSize := clampInRange(BrushToolSize, 1, 950)
    friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
-   showTOOLtip("Brush " friendly " size: " groupDigits(brushToolSize) " px", A_ThisFunc, 2, brushToolSize/950)
+   RegAction(1, "BrushToolSize",, 2, 2, 950)
+   showTOOLtip("Brush " friendly " size: " groupDigits(BrushToolSize) " px", A_ThisFunc, 2, BrushToolSize/950)
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
       theSize := (BrushToolDoubleSize!=1) ? "Diameter: $€ px." : "Radius: $€ px."
@@ -74818,6 +74779,7 @@ changeBrushRatioAngle(dir, what) {
          GuiUpdateSliders("BrushToolAspectRatio")
 
       showTOOLtip("Brush aspect ratio: " BrushToolAspectRatio, 0, 0, (BrushToolAspectRatio + 100)/201)
+      RegAction(1, "BrushToolAspectRatio",, 2, -100, 100)
    } Else
    {
       BrushToolAutoAngle := 0
@@ -74826,6 +74788,7 @@ changeBrushRatioAngle(dir, what) {
          GuiUpdateSliders("BrushToolAngle")
 
       showTOOLtip("Brush angle: " BrushToolAngle "° ", 0, 0, (BrushToolAngle + 180)/361)
+      RegAction(1, "BrushToolAngle",, 2, -180, 180)
    }
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -74843,6 +74806,8 @@ MenuResetBrushAsRatio() {
       GuiUpdateSliders("BrushToolAngle")
    }
 
+   RegAction(1, "BrushToolAngle",, 2, -180, 180)
+   RegAction(1, "BrushToolAspectRatio",, 2, -100, 100)
    showTOOLtip("Brush aspect ratio: RESET")
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, MouseMoveResponder, -25
@@ -74861,6 +74826,7 @@ toggleBrushMouseAngle() {
    }
 
    friendly := (BrushToolAutoAngle=1) ? "Alter brush angle based on mouse movements" : "Fixed brush angle: " BrushToolAngle "° "
+   RegAction(1, "BrushToolAutoAngle",, 1)
    showTOOLtip(friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, MouseMoveResponder, -25
@@ -74879,6 +74845,7 @@ changeBrushSoftness(dir) {
    liveDrawingBrushTool := 1
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    BrushToolSoftness := clampInRange(BrushToolSoftness, 1, 99)
+   RegAction(1, "BrushToolSoftness",, 2, 1, 100)
    showTOOLtip("Brush softness: " BrushToolSoftness "%", A_ThisFunc, 2, BrushToolSoftness/100)
    If (AnyWindowOpen=64 || AnyWindowOpen=24 || AnyWindowOpen=31)
       GuiUpdateSliders("BrushToolSoftness")
@@ -74901,6 +74868,7 @@ changeBrushWetness(dir) {
    BrushToolWetness := clampInRange(BrushToolWetness, 0, 22)
    friendly := (BrushToolType>6) ? "deform intensity" : "wetness"
    showTOOLtip("Brush " friendly ": " BrushToolWetness, A_ThisFunc, 2, BrushToolWetness/22)
+   RegAction(1, "BrushToolWetness",, 2, 0, 22)
    If (AnyWindowOpen=64)
       GuiUpdateSliders("BrushToolWetness")
 
@@ -101086,7 +101054,7 @@ tlbrDecideTooltips(hwnd) {
          oldTimes := lastZeitIMGsaved[1]
          FormatTime, timea, % oldTimes , HH:mm
          If oldTimes
-            InfosPreviousSave := "`n `nLast time saved: " timea "`n" lastZeitIMGsaved[4] "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
+            InfosPreviousSave := "`n `nLast saved at: " timea "`n" lastZeitIMGsaved[4] "`nUndo levels state: " lastZeitIMGsaved[2] "/" lastZeitIMGsaved[3]
 
          If !FileExist(imgPath)
             fileStatus := "`n `nImage bitmap UNSAVED to disk"
@@ -102077,4 +102045,23 @@ dummyAutoScroller() {
       restartAppu()
    Return
 #If
+
+
+testKeysStuff() {
+   ; Static fMods := {0x10:"Shift",0x11:"Ctrl",0x12:"Alt",0xA0:"LShift"
+   Static fMods := {0xA0:"LShift"
+   ,0xA1:"RShift",0xA2:"LCtrl",0xA3:"RCtrl",0xA4:"LAlt",0xA5:"RAlt"
+   ,0x5B:"LWin",0x5C:"RWin"}
+   ppA := ppB := "|"
+   For Key, Value in fmods
+   {
+        b := DllCall("user32\GetAsyncKeyState", "uint", Key)
+        If b
+           ppA .= Value "|"
+        If (b & 0x01)
+           ppB .= Value "|"
+   }
+
+   ToolTip, % ppA "`n" ppB , , , 2
+}
 

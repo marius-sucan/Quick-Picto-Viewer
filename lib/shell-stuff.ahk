@@ -1744,11 +1744,13 @@ GetScreenResInfos(disp:=0) {
 ; function by Masonjar13
 ; screenObj := GetScreenResInfos()
 ; msgbox % screenObj.w "x" screenObj.h "@" screenObj.hz ", orientation: " screenObj.o
-; orientations:
-; 0=landscape, 1=portrait, 2=landscape (flipped), 3=portrait (flipped)
+    Static kk := {0:"Landscape", 1:"Portrait", 2:"Landscape (flipped)", 3:"Portrait (flipped)"}
+
     local dm,n:=varSetCapacity(dm,220,0)
     dllCall("EnumDisplaySettingsW",(disp=0?"Ptr":"WStr"),disp,"Int",-1,"Ptr",&dm)
-    p := {w:numGet(dm,172,"UInt"),h:numGet(dm,176,"UInt"),hz:numGet(dm,184,"UInt"),o:numGet(dm,84,"UShort")}
+    orr := numGet(dm,84,"UShort")
+    ll := kk[orr]
+    p := {w:numGet(dm,172,"UInt"),h:numGet(dm,176,"UInt"),hz:numGet(dm,184,"UInt"),o:orr,l:ll}
     dm := 0
     return p
 }
@@ -1912,7 +1914,7 @@ TabCtrl_GetCurSel(HWND) {
    ; source: https://www.autohotkey.com/board/topic/79783-how-to-get-the-current-tab-name/
    ; Returns the 1-based index of the currently selected tab
    Static TCM_GETCURSEL := 0x130B
-   SendMessage, TCM_GETCURSEL, 0, 0, , ahk_id %HWND%
+   SendMessage, % TCM_GETCURSEL, 0, 0, , ahk_id %HWND%
    Return (ErrorLevel + 1)
 }
 
@@ -2098,7 +2100,7 @@ EM_SETCUEBANNER(handle, string, option := true) {
 ; ===============================================================================================================================
    static ECM_FIRST       := 0x1500 
         , EM_SETCUEBANNER := ECM_FIRST + 1
-   if (DllCall("user32\SendMessage", "ptr", handle, "uint", EM_SETCUEBANNER, "int", option, "str", string, "int"))
+   if (DllCall("user32\SendMessage", "Ptr", handle, "UInt", EM_SETCUEBANNER, "Int", option, "Str", string, "Int"))
       return 1
    return 0
 }
@@ -2398,11 +2400,11 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
            DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
         ;-- Set the maximum width for the tooltip window
         ;   Note: This message makes multi-line tooltips possible
-        SendMessage, TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%
+        SendMessage, % TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%
         If (largeFont=1)
         {
            hFont := Gdi_CreateFontByName("MS Shell Dlg 2", 20, 400, 0, 0, 0, 4)
-           SendMessage, 0x30, hFont, 1,,ahk_id %hTT% ; WM_SETFONT
+           SendMessage, 0x30, % hFont, 1,,ahk_id %hTT% ; WM_SETFONT
         }
     }
 
@@ -2410,13 +2412,12 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
     if p1 is not Integer
     {
         if (p1="Activate")
-            SendMessage, TTM_ACTIVATE, True, 0,, ahk_id %hTT%
-
-        if (p1="Deactivate")
-            SendMessage, TTM_ACTIVATE, False, 0,, ahk_id %hTT%
+            SendMessage, % TTM_ACTIVATE, True, 0,, ahk_id %hTT%
+        else if (p1="Deactivate")
+            SendMessage, % TTM_ACTIVATE, False, 0,, ahk_id %hTT%
 
         if (InStr(p1,"AutoPop")=1)  ;-- Starts with "AutoPop"
-            SendMessage, TTM_SETDELAYTIME, TTDT_AUTOPOP, p2*1000,, ahk_id %hTT%
+            SendMessage, % TTM_SETDELAYTIME, % TTDT_AUTOPOP, % p2*1000,, ahk_id %hTT%
 
         if (p1="Title")
         {
@@ -2429,7 +2430,8 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
                 p3 := TTI_NONE
 
             ;-- Set title
-            SendMessage A_IsUnicode ? TTM_SETTITLEW : TTM_SETTITLEA, p3, &p2,, ahk_id %hTT%
+            msgu := A_IsUnicode ? TTM_SETTITLEW : TTM_SETTITLEA
+            SendMessage, % msgu, % p3, &p2,, ahk_id %hTT%
         }
 
         ;-- Restore DetectHiddenWindows
@@ -2449,9 +2451,8 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
         ;-- uId
 
     ;-- Check to see if tool has already been registered for the control
-    SendMessage, A_IsUnicode ? TTM_GETTOOLINFOW : TTM_GETTOOLINFOA
-               , 0, &TOOLINFO,, ahk_id %hTT%
-
+    msgu := A_IsUnicode ? TTM_GETTOOLINFOW : TTM_GETTOOLINFOA
+    SendMessage, % msgu, 0, &TOOLINFO,, ahk_id %hTT%
     l_RegisteredTool := ErrorLevel
 
     ;-- Update the TOOLTIP structure
@@ -2539,7 +2540,7 @@ Win_ShowSysMenu(Hwnd, x, y) {
   If (r=0)
      Return
 
-  SendMessage, WM_SYSCOMMAND, r,,,ahk_id %Hwnd%
+  SendMessage, % WM_SYSCOMMAND, % r,,,ahk_id %Hwnd%
   Return 1
 }
 
@@ -2820,12 +2821,14 @@ GetWindowInfo(hWnd) {
 }
 
 Edit_ShowBalloonTip(hEdit, Text, Title := "", Icon := 0) {
+    Static EM_SHOWBALLOONTIP := 0x1503
+
     Local EDITBALLOONTIP
     NumPut(VarSetCapacity(EDITBALLOONTIP, 4 * A_PtrSize, 0), EDITBALLOONTIP)
     NumPut(&Title, EDITBALLOONTIP, A_PtrSize, "Ptr")
     NumPut(&Text, EDITBALLOONTIP, A_PtrSize * 2, "Ptr")
     NumPut(Icon, EDITBALLOONTIP, A_PtrSize * 3, "UInt")
-    SendMessage 0x1503, 0, &EDITBALLOONTIP,, ahk_id %hEdit% ; EM_SHOWBALLOONTIP
+    SendMessage, % EM_SHOWBALLOONTIP, 0, &EDITBALLOONTIP,, ahk_id %hEdit%
     Return ErrorLevel
 }
 
@@ -2990,4 +2993,108 @@ Return values:
       Return -1
 
    Return foundFile
+}
+
+GetSystemMetrics(index) {
+; Possible index values:
+/*
+    SM_ARRANGE  =  56
+    SM_CLEANBOOT  =  67
+    SM_CMONITORS  =  80
+    SM_CMOUSEBUTTONS  =  43
+    SM_CONVERTIBLESLATEMODE  =  0x2003
+    SM_CXBORDER  =  5
+    SM_CXCURSOR  =  13
+    SM_CXDLGFRAME  =  7
+    SM_CXDOUBLECLK  =  36
+    SM_CXDRAG  =  68
+    SM_CXEDGE  =  45
+    SM_CXFIXEDFRAME  =  7
+    SM_CXFOCUSBORDER  =  83
+    SM_CXFRAME  =  32
+    SM_CXFULLSCREEN  =  16
+    SM_CXHSCROLL  =  21
+    SM_CXHTHUMB  =  10
+    SM_CXICON  =  11
+    SM_CXICONSPACING  =  38
+    SM_CXMAXIMIZED  =  61
+    SM_CXMAXTRACK  =  59
+    SM_CXMENUCHECK  =  71
+    SM_CXMENUSIZE  =  54
+    SM_CXMIN  =  28
+    SM_CXMINIMIZED  =  57
+    SM_CXMINSPACING  =  47
+    SM_CXMINTRACK  =  34
+    SM_CXPADDEDBORDER  =  92
+    SM_CXSCREEN  =  0
+    SM_CXSIZE  =  30
+    SM_CXSIZEFRAME  =  32
+    SM_CXSMICON  =  49
+    SM_CXSMSIZE  =  52
+    SM_CXVIRTUALSCREEN  =  78
+    SM_CXVSCROLL  =  2
+    SM_CYBORDER  =  6
+    SM_CYCAPTION  =  4
+    SM_CYCURSOR  =  14
+    SM_CYDLGFRAME  =  8
+    SM_CYDOUBLECLK  =  37
+    SM_CYDRAG  =  69
+    SM_CYEDGE  =  46
+    SM_CYFIXEDFRAME  =  8
+    SM_CYFOCUSBORDER  =  84
+    SM_CYFRAME  =  33
+    SM_CYFULLSCREEN  =  17
+    SM_CYHSCROLL  =  3
+    SM_CYICON  =  12
+    SM_CYICONSPACING  =  39
+    SM_CYKANJIWINDOW  =  18
+    SM_CYMAXIMIZED  =  62
+    SM_CYMAXTRACK  =  60
+    SM_CYMENU  =  15
+    SM_CYMENUCHECK  =  72
+    SM_CYMENUSIZE  =  55
+    SM_CYMIN  =  29
+    SM_CYMINIMIZED  =  58
+    SM_CYMINSPACING  =  48
+    SM_CYMINTRACK  =  35
+    SM_CYSCREEN  =  1
+    SM_CYSIZE  =  31
+    SM_CYSIZEFRAME  =  33
+    SM_CYSMCAPTION  =  51
+    SM_CYSMICON  =  50
+    SM_CYSMSIZE  =  53
+    SM_CYVIRTUALSCREEN  =  79
+    SM_CYVSCROLL  =  20
+    SM_CYVTHUMB  =  9
+    SM_DBCSENABLED  =  42
+    SM_DEBUG  =  22
+    SM_DIGITIZER  =  94
+    SM_IMMENABLED  =  82
+    SM_MAXIMUMTOUCHES  =  95
+    SM_MEDIACENTER  =  87
+    SM_MENUDROPALIGNMENT  =  40
+    SM_MIDEASTENABLED  =  74
+    SM_MOUSEPRESENT  =  19
+    SM_MOUSEHORIZONTALWHEELPRESENT  =  91
+    SM_MOUSEWHEELPRESENT  =  75
+    SM_NETWORK  =  63
+    SM_PENWINDOWS  =  41
+    SM_REMOTECONTROL  =  0x2001
+    SM_REMOTESESSION  =  0x1000
+    SM_SAMEDISPLAYFORMAT  =  81
+    SM_SECURE  =  44
+    SM_SERVERR2  =  89
+    SM_SHOWSOUNDS  =  70
+    SM_SHUTTINGDOWN  =  0x2000
+    SM_SLOWMACHINE  =  73
+    SM_STARTER  =  88
+    SM_SWAPBUTTON  =  23
+    SM_SYSTEMDOCKED  =  0x2004
+    SM_TABLETPC  =  86
+    SM_XVIRTUALSCREEN  =  76
+    SM_YVIRTUALSCREEN  =  77
+*/
+
+  p := DllCall("GetSystemMetrics", "int", index)
+  Return p
 }

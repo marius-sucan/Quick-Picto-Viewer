@@ -9350,6 +9350,19 @@ Gdip_BitmapApplyHSL(pBitmap, hue, saturation, lightness) {
     Return E
 }
 
+Gdip_BitmapApplyInvert(pBitmap) {
+    If (pBitmap="")
+       Return -2
+
+    pEffect := Gdip_CreateEffect(7, 0, 0, 100)
+    If !pEffect
+       Return -1
+
+    E := Gdip_BitmapApplyEffect(pBitmap, pEffect)
+    Gdip_DisposeEffect(pEffect)
+    Return E
+}
+
 Gdip_BitmapApplyTint(pBitmap, hue, amount) {
 ; hue [-180, 180]
 ; amount [0, 100]
