@@ -44,9 +44,9 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.75
-;@Ahk2Exe-SetProductVersion 6.1.75
-;@Ahk2Exe-SetCopyright Marius Şucan (2019-2025)
+;@Ahk2Exe-SetVersion 6.1.76
+;@Ahk2Exe-SetProductVersion 6.1.76
+;@Ahk2Exe-SetCopyright Marius Şucan (2019-2026)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
 ;___________ Auto Execute Section ____
@@ -222,7 +222,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.75", vReleaseDate := "2025/04/23" ; yyyy-mm-dd
+   , appVersion := "6.1.76", vReleaseDate := "2026/04/02" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -384,6 +384,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
+   , autoApplyVPcolors := 1
 
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
@@ -16530,8 +16531,11 @@ coreChangeImgUndoLevel(levelu) {
    calcRelativeSelCoords(pBitmap)
    currIMGdetails.HasAlpha := undoLevelsArray[levelu, 5]
    vpIMGrotation := 0
-   imgFxMode := usrColorDepth := 1
+   usrColorDepth := 1
    defineColorDepth()
+   pp := (AnyWindowOpen=64 && autoApplyVPcolors!=1) ? 1 : 0
+   If !pp
+      imgFxMode := 1
    discardViewPortCaches()
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "vpIMGrotation", "General")
@@ -43490,6 +43494,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Checkbox, y+5 w%sml% hp gupdateUIbrushTool Checked%BrushToolSymmetryX% vBrushToolSymmetryX, X
     Gui, Add, Checkbox, x+5 wp hp gupdateUIbrushTool Checked%BrushToolSymmetryY% vBrushToolSymmetryY, Y
     Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry, S&et center
+    Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport color effects on image
 
     Gui, Tab, 3 ; randomize
     GuiAddSlider("BrushToolRandomSize", 0,200, 0, "Brush size", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa)
@@ -46682,6 +46687,7 @@ ReadSettingsBrushPanel(act:=0) {
    ; If (ShowAdvToolbar=1)
       delayedWriteTlbrColors(act)
 
+   RegAction(act, "autoApplyVPcolors",, 1)
    RegAction(act, "BrushToolSize",, 2, 2, 950)
    RegAction(act, "BrushToolAutoAngle",, 1)
    RegAction(act, "BrushToolDoubleSize",, 1)
@@ -75498,8 +75504,11 @@ ActPaintBrushNow() {
       Return
    }
 
-   If mergeViewPortEffectsImgEditing(A_ThisFunc, 0, 0, 0)
-      Return
+   If (autoApplyVPcolors=1)
+   {
+      If mergeViewPortEffectsImgEditing(A_ThisFunc, 0, 0, 0)
+         Return
+   }
 
    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -100187,10 +100196,17 @@ GuiSlidersResponder(a, m_event, keyu) {
    {
       ; fnOutputDebug(A_ThisFunc " == A // start")
       Sleep, -1
+      If (A_TickCount - clickStarted>14500)
+      {
+         SoundBeep 900, 100
+         skipped := 1
+         Break
+      }
       ; if m_event = "uiLabel" , it is a keyboard call
       GetPhysicalCursorPos(mX, mY)
       If (isGivenKey!=1 && mouseMode=1)
       {
+         Sleep, 5
          If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2) && A_Index>1)
             Continue
       }
@@ -100277,13 +100293,6 @@ GuiSlidersResponder(a, m_event, keyu) {
       ; fnOutputDebug(A_ThisFunc " == E // finish")
       If (sk && !isGivenKey)
          Break
-      Sleep, -1
-      If (A_TickCount - clickStarted>14500)
-      {
-         SoundBeep 900, 100
-         skipped := 1
-         Break
-      }
    }
 
    If (isGivenKey && !InStr(uiSlidersArray[hwnd], "@"))
