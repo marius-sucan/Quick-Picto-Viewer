@@ -12,10 +12,10 @@
    k) Vector shapes drawing mode
    l) List view and thumbnails list (soon)
    m) Image duplicates identification (soon)
-   n) How to add a new panel/tool (soon)
+   n) How to add a new panel/tool
 
 
-Deniere mise à jour: dimanche 24 mars 2024
+Deniere mise à jour: samedi 30 mai 2026.
 =====================================================================
 
 -) Introduction
@@ -500,9 +500,9 @@ g) Windows, AHK GUIs, Menus, Toolbar
    in the main thread, draw what and on which window(s).
    All the windows are owned by the "PVhwnd" window.
    These are created in the interface thread, from BuildGUI().
-   
-   0. PVhwnd - main window frame of QPV
-      various text controls are added
+
+   0. PVhwnd - the variable holding the handle of the main window of QPV
+      where various text controls are added
 
    1. hGDIthumbsWin - glPG         - layered window
       QPV_listThumbnailsGridMode() - thumbnails grid for the list mode
@@ -908,11 +908,10 @@ k) Vector shapes drawing mode
 =====================================================================
 
    When users start drawing a vector shape, startDrawingShape() is 
-   invoked. The function prepares a bunch of things. 
-   The global variable named "drawingShapeNow" is set to 1. If the 
-   selection area has a vector shape already defined,
-   resumeCustomShapeSelection() is invoked to convert the points 
-   data to the edit mode data.
+   invoked. The function prepares a bunch of things. The global 
+   variable named "drawingShapeNow" is set to 1. If the selection
+   area has a vector shape already defined, resumeCustomShapeSelection()
+   is invoked to convert the points data to the edit mode data.
 
    At every mouse move drawLiveCreateCustomShape() is invoked by 
    additionalHUDelements() to refresh the window. The function
@@ -920,8 +919,8 @@ k) Vector shapes drawing mode
    by drawVisibleVectorPoints() invoked from drawLiveCreateCustomShape(). 
 
    When the user clicks in the viewport, WinClickAction() invokes 
-   PerformVectorShapeActions(). This function is also called by
-   some context menu options listed by 
+   PerformVectorShapeActions(). It can add, move or delete points. This
+   function is also called by some context menu options listed by
    createContextMenuCustomShapeDrawing().
 
    When the user exits the tool, stopDrawingShape() is called.
@@ -934,28 +933,24 @@ k) Vector shapes drawing mode
 
    \\Technicalities:
    
-   The points in edit mode are stored in an array object:
+   The points in are stored in an array object:
    customShapePoints[index] := [x, y]
 
-   X and Y values are floating points based on the dimensions of the
-   image painted in the viewport, at current zoom level. The values 
-   are not capped in the range of 0 to 1.
+   The data is held in pixels units when user edits the shape, but
+   outside the edit mode, the values are relative to a rect bound box
+   with values from 0 to 1. In both cases X and Y are floating points.
 
-   The top/left corner is defined by "prevDestPosX" and "prevDestPosY".
-   These two variables designate where in the viewport was last painted 
-   the image according to the current zoom level and panning.
+   "prevDestPosX" and "prevDestPosY" define where the image was last
+   painted in the viewport. It is the top/left anchor point of the image.
 
    Please see getVectorCoordsFromVPpoint() and getVPcoordsVectorPoint()
    to find out the exact formulas.
 
    Outside edit mode:
-   The vector points are stored as floating points from 0 to 1 in the same
-   array object: customShapePoints. The values are used to calculate the
-   coordinates of the points for GDI+, based on the width and height of
-   the viewport selectionn area bounding box. When one draws on screen with
-   GDI+, one must use the viewport coordinates to match with client window. 
-   One of the relevant functions is convertCustomShape2givenArea() called 
-   by createImgSelPath().
+   The vector points are used to calculate the coordinates of the points
+   for GDI+, based on the width and height of the viewport selectionn area
+   bounding box. One of the relevant functions is 
+   convertCustomShape2givenArea() called by createImgSelPath().
 
    In the same format, the points are stored when a user chooses to save
    to disk a vector shape via saveCurrentVectorShape().
@@ -975,7 +970,20 @@ l) List view and thumbnails list (soon)
 m) Image duplicates identification (soon)
 =====================================================================
 
-   PanelFindDupes()
+   QPV can identify identical or similar images by comparing file properties, aspect
+   ratios, histogram data, or perceptual content hashes (dHash, pHash, lHash). It
+   requires saving the current files list as an SQLite database, a SLD file.
+
+   PanelFindDupes() creates and displays the panel for managing duplicate detection.
+   It lets users configure detection presets, hashing precision, threshold distances,
+   Mean-Squared Error (MSE) filters, and more.
+
+   PanelAutoSelectDupes() launches a GUI panel allowing users to automatically
+   mark duplicates for removal based on rules (e.g. smallest file size, smallest
+   resolution, or folder path keyword matches). This panel is accessible only if
+   a list of duplicates is opened, via testIsDupesList().
+
+   autoSelectDupesInGroups()
    retrieveDupesByProperties()
    OpenSLDBdataBase()
    collectImageInfosNow()
@@ -985,16 +993,53 @@ m) Image duplicates identification (soon)
    corefilterDupeResultsByHdist()
    changeHdistLevelCached()
    sortDupeGroups()
-   PanelAutoSelectDupes()
-   autoSelectDupesInGroups()
-   testIsDupesList()
 
    resultedFilesList[A_Index, 23] is dupeID.
    If testIsDupesList() returns true, QPV_ListViewGridHUDoverlay() will display
    specific information about the focused duplicate item.
 
 
-
-n) How to add a new panel/tool (soon)
+n) How to add a new panel/tool
 =====================================================================
 
+   Assign a unique window ID for the new panel (e.g., IDwin := 99). This value
+   represents the active panel ID and is assigned to "AnyWindowOpen" variable.
+   You must also add the ID to BTNopenPrevPanel().
+
+   Create the panel function, such as PanelMyNewTool(). Inside this function you must
+   call createSettingsGUI(IDwin, A_ThisFunc) to initialize UI font configurations.
+
+   Add the user interface elements inside the AHK GUI named "SettingsGUIA". You can
+   add custom controls I created by calling functions such as GuiAddEdit(), 
+   GuiAddDropDownList(), GuiAddCheckBox(), GuiAddButton() or GuiAddSlider().
+   At the end of the PanelMyNewTool() function, to center and display the window
+   invoke repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Panel title").
+   "hSetWinGui" is a global variable, the handle of the panel window.
+   Read g) for more details regarding windows and GUIs.
+
+   Each interactive control should have a gLabel associated with one function
+   (e.g., updateUIMyNewTool() ) that handles toggling controls based on user 
+   interactions. The same function should also invoke viewport updates if it is a live
+   image editing tool. In the main AHK file, there are several updateUI*() functions 
+   you can look at.
+
+   If the panel is a live image editing tool, it must be registered as such, when invoking
+   createSettingsGUI(), by passing 1 to the "isImgLiveEditor" function parameter. You
+   should also create a new function, such as livePreviewMyNewTool() and register it in 
+   corelivePreviewsImageEditing() based on the value of "AnyWindowOpen" associated with 
+   the newly created panel. If alpha masking is to be supported, add the same ID to
+   isAlphaMaskWindow() and in PanelMyNewTool() invoke uiADDalphaMaskTabs() to add 
+   the panel alpha masking settings.
+
+   The image data processing should happen inside C/C++ functions, inside the qpvmain.dll
+   or via GDI+. Most of the image editing tools in Quick Picto Viewer rely on the DLL.
+
+   To store settings, create corresponding functions: ReadSettingsMyNewToolPanel()
+   and WriteSettingsMyNewToolPanel(). It is recommended to store the data to the
+   registry for settings that do not pertain to the image viewer functions.
+   Call for each global variable RegAction() or IniAction() to store or load it.
+
+   You can register a keyboard shortcut to the panel in processDefaultKbdCombos().
+   You can add a menu item to open the panel in one of the many functions that begin
+   with createMenu*(). Use the kMenu() helper function to have it automatically indexed 
+   by the search menu options panel.
