@@ -8471,13 +8471,34 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                             int startBlockY = cy << 7;
                             int copyW = min(128, imgW - startBlockX);
                             int copyH = min(128, imgH - startBlockY);
+                            
+                            int safeMemX1 = (lockW > 0) ? lockX : 0;
+                            int safeMemX2 = (lockW > 0) ? (lockX + lockW - 1) : (imgW - 1);
+                            int safeMemY1 = (lockH > 0) ? lockY : 0;
+                            int safeMemY2 = (lockH > 0) ? (lockY + lockH - 1) : (imgH - 1);
+
                             for (int by = 0; by < copyH; ++by)
                             {
                                 int py = startBlockY + by;
                                 int iy = imgH - 1 - py;
-                                unsigned char* srcRow = imgData + (INT64)iy * pitch + startBlockX * bytesPerPixel;
-                                unsigned char* dstRow = origBuf + by * 128 * bytesPerPixel;
-                                memcpy(dstRow, srcRow, copyW * bytesPerPixel);
+
+                                if (iy < safeMemY1 || iy > safeMemY2)
+                                    continue;
+
+                                int chunkStartX = startBlockX;
+                                int chunkEndX = startBlockX + copyW - 1;
+                                
+                                int validStartX = max(chunkStartX, safeMemX1);
+                                int validEndX = min(chunkEndX, safeMemX2);
+                                
+                                if (validStartX <= validEndX) {
+                                    int validCopyW = validEndX - validStartX + 1;
+                                    int offsetX = validStartX - startBlockX;
+                                    
+                                    unsigned char* srcRow = imgData + (INT64)iy * pitch + validStartX * bytesPerPixel;
+                                    unsigned char* dstRow = origBuf + by * 128 * bytesPerPixel + offsetX * bytesPerPixel;
+                                    memcpy(dstRow, srcRow, validCopyW * bytesPerPixel);
+                                }
                             }
                         }
                     } catch (const std::bad_alloc&) {
