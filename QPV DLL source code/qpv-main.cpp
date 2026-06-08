@@ -8220,6 +8220,11 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
        return 0;
     }
 
+    int useLockX = (lockW > 0) ? lockX : 0;
+    int useLockY = (lockH > 0) ? lockY : 0;
+    int useLockW = (lockW > 0) ? lockW : imgW;
+    int useLockH = (lockH > 0) ? lockH : imgH;
+
     if (brushType <= 5 && brushOverDraw == 0)
     {
         int numChunksX = (imgW + 127) >> 7;
@@ -8240,21 +8245,31 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             try {
                 brushOriginalPixels.resize((size_t)imgW * imgH * 3);
                 #pragma omp parallel for schedule(static)
-                for (int y = 0; y < imgH; ++y)
+                for (int y = useLockY; y < useLockY + useLockH; ++y)
                 {
-                    unsigned char* srcRow = imgData + (INT64)y * pitch;
-                    unsigned char* dstRow = brushOriginalPixels.data() + (INT64)y * imgW * 3;
-                    if (bytesPerPixel == 3)
+                    if (y >= 0 && y < imgH)
                     {
-                        memcpy(dstRow, srcRow, (size_t)imgW * 3);
-                    }
-                    else if (bytesPerPixel == 4)
-                    {
-                        for (int x = 0; x < imgW; ++x)
+                        unsigned char* srcRow = imgData + (INT64)y * pitch;
+                        unsigned char* dstRow = brushOriginalPixels.data() + (INT64)y * imgW * 3;
+                        if (bytesPerPixel == 3)
                         {
-                            dstRow[x * 3]     = srcRow[x * 4];     // B
-                            dstRow[x * 3 + 1] = srcRow[x * 4 + 1]; // G
-                            dstRow[x * 3 + 2] = srcRow[x * 4 + 2]; // R
+                            int startCol = clamp(useLockX, 0, imgW);
+                            int endCol = clamp(useLockX + useLockW, 0, imgW);
+                            if (endCol > startCol)
+                            {
+                                memcpy(dstRow + startCol * 3, srcRow + startCol * 3, (size_t)(endCol - startCol) * 3);
+                            }
+                        }
+                        else if (bytesPerPixel == 4)
+                        {
+                            int startCol = clamp(useLockX, 0, imgW - 1);
+                            int endCol = clamp(useLockX + useLockW - 1, 0, imgW - 1);
+                            for (int x = startCol; x <= endCol; ++x)
+                            {
+                                dstRow[x * 3]     = srcRow[x * 4];     // B
+                                dstRow[x * 3 + 1] = srcRow[x * 4 + 1]; // G
+                                dstRow[x * 3 + 2] = srcRow[x * 4 + 2]; // R
+                            }
                         }
                     }
                 }
@@ -8266,10 +8281,17 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
     int halfW = (texData && texW > 0) ? (texW / 2 + abs(bulgePinchFactor)) : (brushSize / 2 + abs(bulgePinchFactor));
     int halfH = (texData && texH > 0) ? (texH / 2 + abs(bulgePinchFactor)) : (brushSize / 2 + abs(bulgePinchFactor));
-    int startX = clamp((int)(tkX - halfW), 0, imgW - 1);
-    int endX = clamp((int)(tkX + halfW), 0, imgW - 1);
-    int startY = clamp((int)(tkY - halfH), 0, imgH - 1);
-    int endY = clamp((int)(tkY + halfH), 0, imgH - 1);
+
+    // Clamp coordinates to GDI+ locked boundaries to prevent out-of-bounds reads/writes on partially locked buffers
+    int clampMinX = useLockX;
+    int clampMaxX = useLockX + useLockW - 1;
+    int clampMinY = imgH - 1 - (useLockY + useLockH - 1);
+    int clampMaxY = imgH - 1 - useLockY;
+
+    int startX = clamp((int)(tkX - halfW), clampMinX, clampMaxX);
+    int endX = clamp((int)(tkX + halfW), clampMinX, clampMaxX);
+    int startY = clamp((int)(tkY - halfH), clampMinY, clampMaxY);
+    int endY = clamp((int)(tkY + halfH), clampMinY, clampMaxY);
 
     int cloneStartX = startX;
     int cloneEndX = endX;
@@ -8309,9 +8331,21 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 {
                     int img_py = cloneStartY + ry;
                     int img_iy = imgH - 1 - img_py;
-                    unsigned char* srcRow = imgData + (INT64)img_iy * pitch + cloneStartX * bytesPerPixel;
                     unsigned char* dstRow = localClone.data() + (INT64)ry * localPitch;
-                    memcpy(dstRow, srcRow, localPitch);
+
+                    if (img_iy >= useLockY && img_iy < useLockY + useLockH)
+                    {
+                        int startCol = clamp(cloneStartX, useLockX, useLockX + useLockW);
+                        int endCol = clamp(cloneStartX + cloneW, useLockX, useLockX + useLockW);
+                        if (endCol > startCol)
+                        {
+                            unsigned char* srcRow = imgData + (INT64)img_iy * pitch;
+                            int destOffset = (startCol - cloneStartX) * bytesPerPixel;
+                            int srcOffset = startCol * bytesPerPixel;
+                            int copyBytes = (endCol - startCol) * bytesPerPixel;
+                            memcpy(dstRow + destOffset, srcRow + srcOffset, copyBytes);
+                        }
+                    }
                 }
             }
         } catch (...) {
