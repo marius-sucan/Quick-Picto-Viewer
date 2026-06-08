@@ -585,15 +585,37 @@ FreeImage_SetPixelIndex(hImage, xPos, yPos, nIndex) {
    Return DllCall(getFIMfunc("SetPixelIndex"), "uptr", hImage, "Uint", xPos, "Uint", yPos, "Uint", &IndexNum)
 }
 
-FreeImage_GetPixelColor(hImage, xPos, yPos) {
+FreeImage_GetPixelColor(hImage, xPos, yPos, format:=0) {
 ; It works only with 16, 24 and 32 bit images.
-
    VarSetCapacity(RGBQUAD, 4, 0)
    RetValue := DllCall(getFIMfunc("GetPixelColor") , "uptr", hImage, "Uint", xPos, "Uint", yPos, "Uint", &RGBQUAD)
    If RetValue
-      return NumGet(RGBQUAD, 2, "Uchar") "," NumGet(RGBQUAD, 1, "Uchar") "," NumGet(RGBQUAD, 0, "Uchar") "," NumGet(RGBQUAD, 3, "Uchar")
-   else
-      return RetValue
+   {
+      R := NumGet(RGBQUAD, 2, "Uchar")
+      G := NumGet(RGBQUAD, 1, "Uchar")
+      B := NumGet(RGBQUAD, 0, "Uchar") 
+      A := NumGet(RGBQUAD, 3, "Uchar")
+      If format
+         ARGBdec := (A << 24) | (R << 16) | (G << 8) | B
+      If (format=1)  ; in ARGB [HEX; 00-FF] with 0x prefix
+      {
+         Return Format("{1:#x}", ARGBdec)
+      } Else If (format=2)  ; in RGBA [0-255], returns an object
+      {
+         Return [R, G, B, A]
+      } Else If (format=3)  ; in BGR [HEX; 00-FF] with 0x prefix
+      {
+         clr := Format("{1:#x}", ARGBdec)
+         Return "0x" SubStr(clr, -1) SubStr(clr, 7, 2) SubStr(clr, 5, 2)
+      } Else If (format=4)  ; in RGB [HEX; 00-FF] with no prefix
+      {
+         Return SubStr(Format("{1:#x}", ARGBdec), 5)
+      } Else If (format=5)
+      {
+         Return ARGBdec
+      } Else Return R "," G "," B "," A 
+   } Else
+      Return RetValue
 }
 
 FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray:="255,255,255,0") {

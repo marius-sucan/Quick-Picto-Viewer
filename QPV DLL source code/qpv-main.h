@@ -49,14 +49,131 @@ INT64 polyOffYa = 0;
 INT64 polyOffYb = 0;
 INT64 blahImgH = 0;
 
+std::vector<float*> brushOpacityChunks;
+std::vector<unsigned char> brushOriginalPixels;
+int chunkGridW = 0;
+int chunkGridH = 0;
+
 IWICBitmapDecoder      *pWICclassDecoder;
 IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
 IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
+class MaskBitMap {
+private:
+    std::vector<uint64_t> data;
+    size_t num_bits = 0;
+
+public:
+    void resize(size_t size) {
+        num_bits = size;
+        data.assign((size + 63) / 64, 0ULL);
+    }
+
+    void clear() {
+        data.clear();
+        num_bits = 0;
+    }
+
+    void shrink_to_fit() {
+        data.shrink_to_fit();
+    }
+
+    size_t size() const {
+        return num_bits;
+    }
+
+    struct Reference {
+        uint64_t* word;
+        uint64_t mask;
+
+        Reference(uint64_t* w, uint64_t m) : word(w), mask(m) {}
+
+        Reference& operator=(bool val) {
+            auto* atomic_word = reinterpret_cast<std::atomic<uint64_t>*>(word);
+            if (val) {
+                atomic_word->fetch_or(mask, std::memory_order_relaxed);
+            } else {
+                atomic_word->fetch_and(~mask, std::memory_order_relaxed);
+            }
+            return *this;
+        }
+
+        Reference& operator=(const Reference& other) {
+            return operator=(bool(other));
+        }
+
+        operator bool() const {
+            return (*word & mask) != 0;
+        }
+    };
+
+    Reference operator[](size_t idx) {
+        return Reference(&data[idx / 64], 1ULL << (idx % 64));
+    }
+
+    bool operator[](size_t idx) const {
+        return (data[idx / 64] & (1ULL << (idx % 64))) != 0;
+    }
+
+    void fill_zero() {
+        std::fill(data.begin(), data.end(), 0ULL);
+    }
+
+    void fill_zero(size_t start, size_t end) {
+        if (start >= end) return;
+        size_t start_word = start / 64;
+        size_t end_word = (end - 1) / 64;
+
+        if (start_word == end_word) {
+            uint64_t mask = (~0ULL << (start % 64)) & (~0ULL >> (63 - ((end - 1) % 64)));
+            auto* atomic_word = reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word]);
+            atomic_word->fetch_and(~mask, std::memory_order_relaxed);
+        } else {
+            // First word (partial)
+            uint64_t start_mask = (~0ULL << (start % 64));
+            reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word])->fetch_and(~start_mask, std::memory_order_relaxed);
+
+            // Middle words (full)
+            for (size_t w = start_word + 1; w < end_word; ++w) {
+                data[w] = 0ULL;
+            }
+
+            // Last word (partial)
+            uint64_t end_mask = (~0ULL >> (63 - ((end - 1) % 64)));
+            reinterpret_cast<std::atomic<uint64_t>*>(&data[end_word])->fetch_and(~end_mask, std::memory_order_relaxed);
+        }
+    }
+
+    void set_range_to_1(size_t start, size_t end) {
+        if (start > end) return;
+        size_t start_word = start / 64;
+        size_t end_word = end / 64;
+
+        if (start_word == end_word) {
+            uint64_t mask = (~0ULL << (start % 64)) & (~0ULL >> (63 - (end % 64)));
+            auto* atomic_word = reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word]);
+            atomic_word->fetch_or(mask, std::memory_order_relaxed);
+        } else {
+            // First word (partial)
+            uint64_t start_mask = (~0ULL << (start % 64));
+            reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word])->fetch_or(start_mask, std::memory_order_relaxed);
+
+            // Middle words (full)
+            for (size_t w = start_word + 1; w < end_word; ++w) {
+                data[w] = ~0ULL;
+            }
+
+            // Last word (partial)
+            uint64_t end_mask = (~0ULL >> (63 - (end % 64)));
+            reinterpret_cast<std::atomic<uint64_t>*>(&data[end_word])->fetch_or(end_mask, std::memory_order_relaxed);
+        }
+    }
+};
+
 std::vector<unsigned char>  highDephMaskMap;
-std::vector<bool>  polygonMaskMap;
-std::vector<bool>  polygonOtherMaskMap;
+MaskBitMap  polygonMaskMap;
+MaskBitMap  polygonOtherMaskMap;
 // std::vector<std::vector<short>> DrawLineCapsGrid;
 vector<pair<float, float>> DrawLineCapsGrid;
 // vector<pair<int, int>> DrawLineGrid;
@@ -89,13 +206,13 @@ struct RGBColorI {
 struct HSLColor {
     double h, s, l;
 
-    double inline ConvertHueToRGB(const double &v1, const double &v2, double vH) {
-           vH = ((vH<0) ? ++vH : vH);
-           vH = ((vH>1) ? --vH : vH);
-           return ((6.0f * vH) < 1) ? (v1 + (v2 - v1) * 6.0f * vH)
-                  : ((2.0f * vH) < 1) ? (v2)
-                  : ((3.0f * vH) < 2) ? (v1 + (v2 - v1) * ((2.0f / 3.0f) - vH) * 6.0f)
-                  : v1;
+    double inline ConvertHueToRGB(double v1, double v2, double vH) {
+        if (vH < 0.0) vH += 1.0;
+        if (vH > 1.0) vH -= 1.0;
+        if (6.0 * vH < 1.0) return v1 + (v2 - v1) * 6.0 * vH;
+        if (2.0 * vH < 1.0) return v2;
+        if (3.0 * vH < 2.0) return v1 + (v2 - v1) * (div2s3 - vH) * 6.0;
+        return v1;
     }
 
     RGBColorI ConvertHSLtoRGB() {
@@ -104,7 +221,7 @@ struct HSLColor {
        double fH = h/360.0f;
        double var_1, var_2;
        RGBColorI newColor;
-       if (s == 0)
+       if (s <= 0.0)
        {
           newColor.r = clamp((float)l*255.0f, 0.0f, 255.0f);
           newColor.g = clamp((float)l*255.0f, 0.0f, 255.0f);
@@ -130,7 +247,7 @@ struct HSLColor {
        const double fH = h/360.0f;
        double var_1, var_2;
        RGBColorI newColor;
-       if (s == 0)
+       if (s <= 0)
        {
           newColor.r = clamp((float)l*65535.0f, 0.0f, 65535.0f);
           newColor.g = clamp((float)l*65535.0f, 0.0f, 65535.0f);
@@ -154,55 +271,50 @@ struct HSLColor {
 struct RGBAColor {
     int b, g, r, a;
     HSLColor ConvertRGBtoHSL() {
-       const double rf = char_to_float[r];
-       const double gf = char_to_float[g];
-       const double bf = char_to_float[b];
-       const double minu    = min(rf, min(gf, bf));
-       const double maxu    = max(rf, max(gf, bf));
-       const double del_Max = maxu - minu;
-       const double L       = (maxu + minu) / 2.0f;
-       double H, S, del_R, del_G, del_B;
+        const double rf = char_to_float[r];
+        const double gf = char_to_float[g];
+        const double bf = char_to_float[b];
+        const double minu    = min(rf, min(gf, bf));
+        const double maxu    = max(rf, max(gf, bf));
+        const double del_Max = maxu - minu;
+        const double L       = (maxu + minu) / 2.0f;
+        double H = 0.0, S = 0.0;
 
-       if (del_Max == 0)
-       {
-          H = S = 0;
-       } else
-       {
-          if (L < 0.5)
-             S = del_Max / (maxu + minu);
-          else
-             S = del_Max / (2.0f - del_Max);
+        if (del_Max > 0.0)
+        {
+            if (L < 0.5)
+                S = del_Max / (maxu + minu);
+            else
+                S = del_Max / (2.0 - del_Max);
 
-          del_R = (((maxu - rf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          del_G = (((maxu - gf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          del_B = (((maxu - bf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          if (rf == maxu)
-          {
-             H = del_B - del_G;
-          } else
-          {
-             if (gf == maxu)
+            const double del_R = (((maxu - rf) / 6.0) + (del_Max / 2.0)) / del_Max;
+            const double del_G = (((maxu - gf) / 6.0) + (del_Max / 2.0)) / del_Max;
+            const double del_B = (((maxu - bf) / 6.0) + (del_Max / 2.0)) / del_Max;
+
+            if (rf == maxu)
+                H = del_B - del_G;
+            else if (gf == maxu)
                 H = div1s3 + del_R - del_B;
-             else if (bf == maxu)
+            else
                 H = div2s3 + del_G - del_R;
-          }
-          if (H < 0)
-             H += 1.0f;
-          if (H > 1)
-             H -= 1.0f;
-       }
 
-       return {abs(H*360.0f), abs(S), abs(L)};
+            if (H < 0.0)
+                H += 1.0;
+            if (H > 1.0)
+                H -= 1.0;
+        }
+
+        return {H * 360.0, S, L};
     }
 
-    void channelOffset(const int &ao, const int &ro, const int &go, const int &bo) {
+    void channelOffset(int ao, int ro, int go, int bo) {
         a = clamp(a + ao, 0, 255);
         r = clamp(r + ro, 0, 255);
         g = clamp(g + go, 0, 255);
         b = clamp(b + bo, 0, 255);
     }
 
-    void threshold(const int &ao, const int &ro, const int &go, const int &bo, const int &seeThrough) {
+    void threshold(int ao, int ro, int go, int bo, int seeThrough) {
         if (seeThrough==2)
         {
            if (ao>=0)
@@ -242,21 +354,31 @@ struct RGBAColor {
         b = 255 - b;
     }
 
-    void blackPoint(const int &level, const int &noise) {
-        const int rando = (noise==1) ? rand() % 10 : 0;
+    void blackPoint(int level, int noise) {
+        int rando = 0;
+        if (noise == 1) {
+            thread_local unsigned int seed = 123456789U;
+            seed = seed * 1103515245U + 12345U;
+            rando = (int)((seed / 65536U) % 10U);
+        }
         r = max(r, level + rando);
         g = max(g, level + rando);
         b = max(b, level + rando);
     }
 
-    void whitePoint(const int &level, const int &noise) {
-        const int rando = (noise==1) ? rand() % 10 : 0;
+    void whitePoint(int level, int noise) {
+        int rando = 0;
+        if (noise == 1) {
+            thread_local unsigned int seed = 123456789U;
+            seed = seed * 1103515245U + 12345U;
+            rando = (int)((seed / 65536U) % 10U);
+        }
         r = min(r, level - rando);
         g = min(g, level - rando);
         b = min(b, level - rando);
     }
 
-    void brightness(const int &level, const int &altMode) {
+    void brightness(int level, int altMode) {
         if (altMode==0)
         {
            if (level<0)
@@ -276,7 +398,7 @@ struct RGBAColor {
        }
     }
 
-    void shadows(const int &altMode, const int &linearGamma, int gray) {
+    void shadows(int altMode, int linearGamma, int gray) {
        int nr, ng, nb;
        if (altMode==1)
           gray = clamp(255 - gray, 0, 255);
@@ -301,7 +423,7 @@ struct RGBAColor {
        }
     }
 
-    void highlights(const int &altMode, const int &linearGamma, const float &factor, int gray) {
+    void highlights(int altMode, int linearGamma, float factor, int gray) {
        int nr, ng, nb;
        if (altMode==1)
           gray = contraMaths(gray*1.5f, factor, 128);
@@ -331,7 +453,7 @@ struct RGBAColor {
         b = LUTgamma[b];
     }
 
-    void contrast(const int &level, const int &altContra, const int &linearGamma, const float &fintensity) {
+    void contrast(int level, int altContra, int linearGamma, float fintensity) {
         if (altContra==1)
         {
            a = LUTcontra[a];
@@ -359,7 +481,7 @@ struct RGBAColor {
         b = LUTcontra[b];
     }
 
-    void saturation(const int &level, const int &altMode, const int &linearGamma, float saturation) {
+    void saturation(int level, int altMode, int linearGamma, float saturation) {
         if (altMode>1)
         {
            int gray = (altMode==2) ? r : g;
@@ -371,10 +493,10 @@ struct RGBAColor {
         } else if (altMode==1)
         {
             HSLColor HSLu = ConvertRGBtoHSL();
-            saturation = (level<0) ? 0.001 : saturation;
+            saturation = (level<0) ? 0.001f : saturation;
             HSLColor newHSL = {HSLu.h, saturation, HSLu.l};
             RGBColorI newRGB = newHSL.ConvertHSLtoRGB();
-            float fi;
+            float fi = 0.0f;
             if (inRange(0, 16384, level))
                fi = level/16384.0f;
             else if (inRange(-65535, 0, level))
@@ -422,15 +544,15 @@ struct RGBAColor {
         };
     }
 
-    void hueRotate(const int &degrees, const float &saturation, const int &altMode, const int &level) {
+    void hueRotate(int degrees, float saturation, int altMode, int level) {
         HSLColor HSLu = ConvertRGBtoHSL();
         float hue = HSLu.h + (float)degrees;
-        if (hue>360)
-           hue -= 360.0f;
+        while (hue > 360.0f) hue -= 360.0f;
+        while (hue < 0.0f) hue += 360.0f;
 
         HSLColor newHSL = {hue, HSLu.s + 0.01, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGB();
-        float fi;
+        float fi = 0.0f;
         if (inRange(0, 15, degrees))
            fi = degrees/15.0f;
         else if (inRange(-15, 0, degrees))
@@ -449,7 +571,7 @@ struct RGBAColor {
         }
     }
 
-    void tinto(const int &degrees, const int &level, const int &linearGamma) {
+    void tinto(int degrees, int level, int linearGamma) {
         HSLColor HSLu = ConvertRGBtoHSL();
         HSLColor newHSL = {degrees, 0.5, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGB();
@@ -467,17 +589,20 @@ struct RGBAColor {
         }
     }
 
-    void tint(const float &hue, int &level, int &altMode, int &linearGamma) {
+    void tint(float hue, int level, int altMode, int linearGamma) {
         if (altMode==1)
            return tinto(hue, level, linearGamma);
 
         int z = getGrayscale(r, g, b);
         float gray = char_to_float[z];
-        const int hi = (int)(floor(hue / 60.0f)) % 6;
-        const float f = hue / 60.0f - floor(hue / 60.0f);
+        float normalized_hue = hue;
+        while (normalized_hue > 360.0f) normalized_hue -= 360.0f;
+        while (normalized_hue < 0.0f) normalized_hue += 360.0f;
+        const int hi = (int)(floor(normalized_hue / 60.0f)) % 6;
+        const float f = normalized_hue / 60.0f - floor(normalized_hue / 60.0f);
         const float q = gray * (1.0f - f);
         const float t = gray * (1.0f - (1.0f - f));
-        int nr, ng, nb;
+        int nr = 0, ng = 0, nb = 0;
         switch (hi) {
             case 0:
                 nr = z;
@@ -542,48 +667,43 @@ struct RGBA16color {
        const double maxu    = max(rf, max(gf, bf));
        const double del_Max = maxu - minu;
        const double L       = (maxu + minu) / 2.0f;
-       double H, S;
+       double H = 0.0, S = 0.0;
 
-       if (del_Max == 0)
-       {
-          H = S = 0;
-       } else
-       {
-          if (L < 0.5)
-             S = del_Max / (maxu + minu);
-          else
-             S = del_Max / (2.0f - del_Max);
+        if (del_Max > 0.0)
+        {
+            if (L < 0.5)
+                S = del_Max / (maxu + minu);
+            else
+                S = del_Max / (2.0 - del_Max);
 
-          const double del_R = (((maxu - rf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          const double del_G = (((maxu - gf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          const double del_B = (((maxu - bf) / 6.0f) + (del_Max / 2.0f)) / del_Max;
-          if (rf == maxu)
-          {
-             H = del_B - del_G;
-          } else
-          {
-             if (gf == maxu)
+            const double del_R = (((maxu - rf) / 6.0) + (del_Max / 2.0)) / del_Max;
+            const double del_G = (((maxu - gf) / 6.0) + (del_Max / 2.0)) / del_Max;
+            const double del_B = (((maxu - bf) / 6.0) + (del_Max / 2.0)) / del_Max;
+
+            if (rf == maxu)
+                H = del_B - del_G;
+            else if (gf == maxu)
                 H = div1s3 + del_R - del_B;
-             else if (bf == maxu)
+            else
                 H = div2s3 + del_G - del_R;
-          }
-          if (H < 0)
-             H += 1.0f;
-          if (H > 1)
-             H -= 1.0f;
-       }
 
-       return {abs(H*360.0f), abs(S), abs(L)};
+            if (H < 0.0)
+                H += 1.0;
+            if (H > 1.0)
+                H -= 1.0;
+        }
+
+        return {H * 360.0, S, L};
     }
 
-    void channelOffset(const int &ao, const int &ro, const int &go, const int &bo, const int &noClamping) {
+    void channelOffset(int ao, int ro, int go, int bo, int noClamping) {
         a = clamp(a + ao, 0, 65535);
         r = (noClamping==1) ? r + ro : clamp(r + ro, 0, 65535);
         g = (noClamping==1) ? g + go : clamp(g + go, 0, 65535);
         b = (noClamping==1) ? b + bo : clamp(b + bo, 0, 65535);
     }
 
-    void threshold(const int &ao, const int &ro, const int &go, const int &bo, const int &seeThrough) {
+    void threshold(int ao, int ro, int go, int bo, int seeThrough) {
         if (seeThrough==2)
         {
            if (ao>=0)
@@ -623,21 +743,31 @@ struct RGBA16color {
         b = 65535 - b;
     }
 
-    void blackPoint(const int &level, const int &noise) {
-        const int rando = (noise==1) ? rand() % 2600 : 0;
+    void blackPoint(int level, int noise) {
+        int rando = 0;
+        if (noise == 1) {
+            thread_local unsigned int seed = 123456789U;
+            seed = seed * 1103515245U + 12345U;
+            rando = (int)((seed / 65536U) % 2600U);
+        }
         r = max(r, level + rando);
         g = max(g, level + rando);
         b = max(b, level + rando);
     }
 
-    void whitePoint(const int &level, const int &noise) {
-        const int rando = (noise==1) ? rand() % 2600 : 0;
+    void whitePoint(int level, int noise) {
+        int rando = 0;
+        if (noise == 1) {
+            thread_local unsigned int seed = 123456789U;
+            seed = seed * 1103515245U + 12345U;
+            rando = (int)((seed / 65536U) % 2600U);
+        }
         r = min(r, level - rando);
         g = min(g, level - rando);
         b = min(b, level - rando);
     }
 
-    void brightness(const int &level, const int &altMode, const int &noClamping, const float &fintensity) {
+    void brightness(int level, int altMode, int noClamping, float fintensity) {
         if (altMode==0)
         {
            if (level<0 && noClamping==0)
@@ -674,10 +804,11 @@ struct RGBA16color {
        float nb = b;
        if (minu<0)
        {
-          nr = r + minu;
-          ng = g + minu;
-          nb = b + minu;
+          nr = r - minu;
+          ng = g - minu;
+          nb = b - minu;
        }
+
        if (maxu<65535)
           maxu = 65535.0f;
 
@@ -691,7 +822,7 @@ struct RGBA16color {
        return gray;
     }
 
-    void shadows(const int &level, const int &altMode, const int &linearGamma, int gray, const int &noClamping, const float &fi) {
+    void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -737,7 +868,7 @@ struct RGBA16color {
        }
     }
 
-    void highlights(const int &level, const int &altMode, const int &linearGamma, const float &factor, int gray, const int &noClamping, const float &fi) {
+    void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -783,51 +914,50 @@ struct RGBA16color {
        }
     }
 
-    void gamma(const int &level, const int &bright, const int &altMode, const int &noClamping) {
+    void gamma(int level, int bright, int altMode, int noClamping) {
       if (noClamping==0)
       {
-         r = LUTgamma[r];
-         g = LUTgamma[g];
-         b = LUTgamma[b];
+          r = LUTgamma[r];
+          g = LUTgamma[g];
+          b = LUTgamma[b];
       } else
       {
-         const float minu = min(r, min(g, b));
-         float maxu = max(r, max(g, b));
-         float nr = r;
-         float ng = g;
-         float nb = b;
-         float offset = 0;
-         if (minu<0)
-         {
-            nr = r + minu;
-            ng = g + minu;
-            nb = b + minu;
-            offset = minu;
-         }
-         if (maxu<65535)
-            maxu = 65535.0f;  
+          const float minu = min(r, min(g, b));
+          float maxu = max(r, max(g, b));
+          float nr = r;
+          float ng = g;
+          float nb = b;
+          float offset = 0.0f;
+          if (minu < 0.0f)
+          {
+              nr = r - minu;
+              ng = g - minu;
+              nb = b - minu;
+              offset = minu;
+          }
 
-         nr = (float)nr / maxu;
-         ng = (float)ng / maxu;
-         nb = (float)nb / maxu;
+          float denominator = (maxu < 65535.0f ? 65535.0f : maxu) - offset;
+          if (denominator <= 0.0f)
+             denominator = 1.0f;
 
-         const int thisLevel = (bright<0 && altMode==0 && level>300) ? level + abs(bright)/300 : level;
-         const double gamma = 1.0f / ((float)thisLevel/300.0f);
-         r = (maxu - offset) * pow(nr, gamma);
-         if (r<-165535 && bright<0 && altMode==0)
-            r = -165535;
-
-         g = (maxu - offset) * pow(ng, gamma);
-         if (g<-165535 && bright<0 && altMode==0)
-            g = -165535;
-
-         b = (maxu - offset) * pow(nb, gamma);
-         if (b<-165535 && bright<0 && altMode==0)
-            b = -165535;
+          nr = clamp(nr / denominator, 0.0f, 1.0f);
+          ng = clamp(ng / denominator, 0.0f, 1.0f);
+          nb = clamp(nb / denominator, 0.0f, 1.0f);
+          const int thisLevel = (bright < 0 && altMode == 0 && level > 300) ? level + abs(bright) / 300 : level;
+          const double gamma_val = 300.0 / (double)thisLevel;
+          r = (int)round(denominator * pow((double)nr, gamma_val) + offset);
+          g = (int)round(denominator * pow((double)ng, gamma_val) + offset);
+          b = (int)round(denominator * pow((double)nb, gamma_val) + offset);
+          if (bright < 0 && altMode == 0)
+          {
+              if (r < -165535) r = -165535;
+              if (g < -165535) g = -165535;
+              if (b < -165535) b = -165535;
+          }
       }
     }
 
-    void contrast(const int &level, const int &altContra, const int &linearGamma, const float &fintensity, const int &noClamping, const float &fip) {
+    void contrast(int level, int altContra, int linearGamma, float fintensity, int noClamping, float fip) {
         if (altContra==1)
         {
            a = LUTcontra[a];
@@ -925,7 +1055,7 @@ struct RGBA16color {
         }
     }
 
-    void saturation(const int &level, const int &altMode, const int &linearGamma, float saturation) {
+    void saturation(int level, int altMode, int linearGamma, float saturation) {
         if (altMode>1)
         {
            int gray = (altMode==2) ? r : g;
@@ -937,10 +1067,10 @@ struct RGBA16color {
         } else if (altMode==1)
         {
             HSLColor HSLu = ConvertRGBtoHSL();
-            saturation = (level<0) ? 0.001 : saturation;
+            saturation = (level<0) ? 0.001f : saturation;
             HSLColor newHSL = {HSLu.h, saturation, HSLu.l};
             RGBColorI newRGB = newHSL.ConvertHSLtoRGBint16();
-            float fi;
+            float fi = 0.0f;
             if (inRange(0, 16384, level))
                fi = level/16384.0f;
             else if (inRange(-65535, 0, level))
@@ -988,15 +1118,15 @@ struct RGBA16color {
         };
     }
 
-    void hueRotate(const int &degrees, const float &saturation, const int &altMode, const int &level) {
+    void hueRotate(int degrees, float saturation, int altMode, int level) {
         HSLColor HSLu = ConvertRGBtoHSL();
         float hue = HSLu.h + (float)degrees;
-        if (hue>360)
-           hue -= 360.0f;
+        while (hue > 360.0f) hue -= 360.0f;
+        while (hue < 0.0f) hue += 360.0f;
 
         HSLColor newHSL = {hue, HSLu.s + 0.01, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGBint16();
-        float fi;
+        float fi = 0.0f;
         if (inRange(0, 15, degrees))
            fi = degrees/15.0f;
         else if (inRange(-15, 0, degrees))
@@ -1015,7 +1145,7 @@ struct RGBA16color {
         }
     }
 
-    void tinto(const int &degrees, const int &level, const int &linearGamma) {
+    void tinto(int degrees, int level, int linearGamma) {
         HSLColor HSLu = ConvertRGBtoHSL();
         HSLColor newHSL = {degrees, 0.5, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGBint16();
@@ -1033,17 +1163,20 @@ struct RGBA16color {
         }
     }
 
-    void tint(const float &hue, const int &level, const int &altMode, const int &linearGamma) {
+    void tint(float hue, int level, int altMode, int linearGamma) {
         if (altMode==1)
            return tinto(hue, level, linearGamma);
 
         int z = getInt16grayscale(r, g, b);
         const float gray = int_to_float[z];
-        const int hi = (int)(floor(hue / 60.0f)) % 6;
-        const float f = hue / 60.0f - floor(hue / 60.0f);
+        float normalized_hue = hue;
+        while (normalized_hue > 360.0f) normalized_hue -= 360.0f;
+        while (normalized_hue < 0.0f) normalized_hue += 360.0f;
+        const int hi = (int)(floor(normalized_hue / 60.0f)) % 6;
+        const float f = normalized_hue / 60.0f - floor(normalized_hue / 60.0f);
         const float q = gray * (1.0f - f);
         const float t = gray * (1.0f - (1.0f - f));
-        int nr, ng, nb;
+        int nr = 0, ng = 0, nb = 0;
         switch (hi) {
             case 0:
                 nr = z;
@@ -1095,4 +1228,3 @@ struct RGBA16color {
         }
     }
 };
-

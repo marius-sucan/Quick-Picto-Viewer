@@ -10,6 +10,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <atomic>
 #include <stack>
 #include <map>
 #include <unordered_set>
@@ -69,30 +70,30 @@ inline bool inRange(const int &low, const int &high, const int &x) {
     return (low <= x && x <= high);
 }
 
-int inline weighTwoValues(const float A, const float B, const float w) {
-    if (w>=1)
+int inline weighTwoValues(float A, float B, float w) {
+    if (w >= 1.0f)
        return A;
-    else if (w<=0)
+    else if (w <= 0.0f)
        return B;
     else
-       return w * (A - B) + B;
-       // return (A*w + B*(1.0f - w));
+       return (w * (A - B) + B);
 }
 
-float inline weighTwoValues(const float A, const float B, const float w, const int r) {
-    if (w>=1)
+float inline weighTwoValues(float A, float B, float w, int r) {
+    if (w >= 1)
        return A;
-    else if (w<=0)
+    else if (w <= 0)
        return B;
     else
-       return w * (A - B) + B;
-       // return (A*w + B*(1.0f - w));
+       return (w * (A - B) + B);
 }
 
 static unsigned short gamma_to_linear[256];
 static unsigned char linear_to_gamma[32769];
 static float char_to_float[256];
 static float char_to_floatGamma[256];
+static float char_to_float_sqrt[256];
+static float char_to_floatGamma_sqrt[256];
 static float char_to_grayRfloat[256];
 static float char_to_grayGfloat[256];
 static float char_to_grayBfloat[256];
@@ -154,6 +155,8 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
         char_to_grayBfloat[i] = i*0.114180f;
         char_to_int[i] = char_to_float[i] * 65535.0f;
         char_to_floatGamma[i] = pow(char_to_float[i], GAMMA);
+        char_to_float_sqrt[i] = sqrt(char_to_float[i]);
+        char_to_floatGamma_sqrt[i] = sqrt(char_to_floatGamma[i]);
     }
 
     for (int i = 0; i < 65536; i++) {
@@ -211,36 +214,36 @@ std::string WideCharToString(const wchar_t* inwstr) {
     return converter.to_bytes(wstr);
 }
 
-int inline getGrayscale(const int &r, const int &g, const int &b) {
-    return clamp(char_to_grayRfloat[r] + char_to_grayGfloat[g] + char_to_grayBfloat[b], 0.0f, 255.0f);
+int inline getGrayscale(int r, int g, int b) {
+    return clamp((int)round(char_to_grayRfloat[clamp(r, 0, 255)] + char_to_grayGfloat[clamp(g, 0, 255)] + char_to_grayBfloat[clamp(b, 0, 255)]), 0, 255);
 }
 
-int inline brightMaths(const int &i, const float &fintensity) {
-    return clamp(i + round( (float)i*fintensity ), 0.0f, 255.0f);
+int inline brightMaths(int i, float fintensity) {
+    return clamp((int)(i + round((float)i * fintensity)), 0, 255);
 }
 
-int inline contraMaths(const int &i, const float &fintensity, const float &deviation) {
-    return clamp(floor( (float)fintensity * (i - 128.0f) ) + deviation, 0.0f, 255.0f);
+int inline contraMaths(int i, float fintensity, float deviation) {
+    return clamp((int)(floor(fintensity * (i - 128.0f)) + deviation), 0, 255);
 }
 
-int inline gammaMaths(const int &i, const double &gamma) {
-    return round(255.0f * pow(char_to_float[i], gamma));
+int inline gammaMaths(int i, double gamma) {
+    return round(255.0f * pow(char_to_float[clamp(i, 0, 255)], gamma));
 }
 
-int inline getInt16grayscale(const int &r, const int &g, const int &b) {
-    return clamp((int)(int_to_grayRi[r] + int_to_grayGi[g] + int_to_grayBi[b]), 0, 65535);
+int inline getInt16grayscale(int r, int g, int b) {
+    return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
 }
 
-int inline brightMathsInt16(const int &i, const float &fintensity) {
-    return clamp(i + (float)i*fintensity, 0.0f, 65535.0f);
+int inline brightMathsInt16(int i, float fintensity) {
+    return clamp((int)(i + (float)i * fintensity), 0, 65535);
 }
 
-int inline contraMathsInt16(const int &i, const float &fintensity, const float &deviation) {
-    return clamp(floor( (float)fintensity * (i - 32768.0f) ) + deviation, 0.0f, 65535.0f);
+int inline contraMathsInt16(int i, float fintensity, float deviation) {
+    return clamp((int)(floor(fintensity * (i - 32768.0f)) + deviation), 0, 65535);
 }
 
-int inline gammaMathsInt16(const int &i, const double &gamma) {
-    return round(65535.0f * pow(int_to_float[i], gamma));
+int inline gammaMathsInt16(int i, double gamma) {
+    return round(65535.0f * pow(int_to_float[clamp(i, 0, 65535)], gamma));
 }
 
 
@@ -399,18 +402,20 @@ void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &
    const int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
    int err = dx + dy, e2;                              /* error value e_xy */
 
-   for (;;) {                                             /* loop */
+   for (;;)
+   {                                             /* loop */
       // plotLineSetPixel(w, h, x0, y0);
       if (y0>=0 && y0<=h)
       {
          // polygonMapMax[y0] = max(polygonMapMax[y0], x0);
          polygonMapMin[y0] = min(polygonMapMin[y0], x0);
          // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[y0]) + " | minu=" + std::to_string(polygonMapMin[y0]));
-         if (!((x0 - polyX)>=polyW || (y0 - polyY)>=polyH || (x0 - polyX)<polyX || (y0 - polyY)<polyY || x0<0 || y0<0))
+         if (x0 >= polyX && x0 < polyX + polyW && y0 >= polyY && y0 < polyY + polyH)
             polygonMaskMap[(UINT64)(y0 - polyY) * polyW + (x0 - polyX)] = 1;
       }
 
-      if (x0 == x1 && y0 == y1) break;
+      if (x0 == x1 && y0 == y1)
+         break;
 
       e2 = 2*err;
       if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
@@ -464,182 +469,207 @@ bool initBoolMaskData() {
        fnOutputDebug("polygonMaskMap size=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
     }
 
-    fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+    polygonMaskMap.fill_zero();
     // fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
     return 1;
 }
+inline bool isPointInPolygonOptimized(const INT64 pX, const INT64 pY, const float* PointsList, const std::vector<int>& activeEdges, const int PointsCount) {
+    bool inside = false;
+    for (int i : activeEdges) {
+        int j = i - 2;
+        if (j < 0)
+            j = PointsCount * 2 - 2;
 
-void traceMaskPolyBoundaries(const int &w, const int &h, float* &PointsList, const int &PointsCount, const int &ppx1, const int &ppy1, const int &ppx2, const int &ppy2, std::vector<std::unordered_set<int>> &polygonMapEdges, std::vector<int> &polygonMapMin) {
+        const double xi = PointsList[i];
+        const double yi = PointsList[i + 1];
+        const double xj = PointsList[j];
+        const double yj = PointsList[j + 1];
+
+        if (pX < (xj - xi) * (pY - yi) / (yj - yi) + xi)
+            inside = !inside;
+    }
+    return inside;
+}
+
+void traceMaskPolyBoundaries(const int &w, const int &h, const float* PointsList, const int &PointsCount, const int &ppx1, const int &ppy1, const int &ppx2, const int &ppy2, std::vector<std::vector<int>> &polygonMapEdges, std::vector<int> &polygonMapMin) {
     int i = 2;
     int xa = PointsList[0];
     int ya = PointsList[1];
-    // fnOutputDebug("traceMaskPolyBoundaries(): tracing polygonal path with bresenham algo");
-    for (int pts = 0; pts < PointsCount;)
+    
+    polygonMapMin.assign(h, INT_MAX);
+
+    for (int pts = 0; pts < PointsCount; pts++)
     {
-        polygonMapMin.assign(h, INT_MAX);
-        int xb = PointsList[i];
-        i++;
-        int yb = PointsList[i];
-        i++;
-        if (pts==PointsCount - 1)
+        int xb, yb;
+        if (pts == PointsCount - 1)
         {
            xb = PointsList[0];
            yb = PointsList[1];
         }
-
-        pts++;
-        if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2)
-        // if (max(ya, yb)<ppy1 || min(ya, yb)>ppy2 || min(xa, xb)>ppx2 && polygonMapMin[ya]!=INT_MAX && polygonMapMin[yb]!=INT_MAX)
-        // if ((max(xa, xb)<ppx1 || max(ya, yb)<ppy1) || (min(xa, xb)>ppx2 || min(ya, yb)>ppy2))
+        else
         {
-           // fnOutputDebug(" poly segment skipped=" + std::to_string(pts));
+           xb = PointsList[i];
+           i++;
+           yb = PointsList[i];
+           i++;
+        }
+
+        if (max(ya, yb) < ppy1 || min(ya, yb) >= ppy2)
+        {
            xa = xb;
            ya = yb;
            continue;
         }
 
-        // fnOutputDebug("seg[ " + std::to_string(i) + "@" + std::to_string(pts) + " ]=( " + std::to_string(xa) + " | " + std::to_string(ya) + ", " + std::to_string(xb) + " | " + std::to_string(yb) + ");");
         bresenham_line_algo(w, h, xa, ya, xb, yb, polygonMapMin);
         int maxu = (max(ya, yb) >= ppy2) ? ppy2 - 1 : max(ya, yb);
         int minu = (min(ya, yb) <= ppy1) ? ppy1 : min(ya, yb);
         for (int yy = minu; yy <= maxu; yy++)
         {
             if (polygonMapMin[yy]!=INT_MAX)
-               polygonMapEdges[yy].emplace( polygonMapMin[yy] );
+               polygonMapEdges[yy].push_back( polygonMapMin[yy] );
+        }
+
+        // Reset only the modified range of polygonMapMin back to INT_MAX
+        for (int yy = minu; yy <= maxu; yy++)
+        {
+            polygonMapMin[yy] = INT_MAX;
         }
 
         xa = xb;
         ya = yb;
-        if (pts>=PointsCount || i>PointsCount*2)
-           break;
     }
 }
 
-void fillMaskPolyBounds(const int &w, const int &h, float* &PointsList, const int &PointsCount, const int &ppx1, const int &ppy1, const int &ppx2, const int &ppy2, const bool &simpleMode, std::vector<std::unordered_set<int>> &polygonMapEdges) {
-    // fnOutputDebug("fill mask image using the list of x-pairs identified and stored in polygonMapEdges");
-    int countPIPcalls = 0;
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, const int &PointsCount, const int &ppx1, const int &ppy1, const int &ppx2, const int &ppy2, const bool &simpleMode, std::vector<std::vector<int>> &polygonMapEdges) {
+    // 1. Pre-calculate active edge counts to avoid reallocations
+    std::vector<int> counts(h, 0);
+    for (int i = 0; i < PointsCount * 2; i += 2)
+    {
+        int j = i - 2;
+        if (j < 0)
+            j = PointsCount * 2 - 2;
+
+        int y_min = min((int)PointsList[i + 1], (int)PointsList[j + 1]);
+        int y_max = max((int)PointsList[i + 1], (int)PointsList[j + 1]);
+        int start_y = max(0, y_min);
+        int end_y = min(h - 1, y_max - 1);
+        for (int y = start_y; y <= end_y; ++y)
+            counts[y]++;
+    }
+
+    // 2. Build Active Edge Index per scanline
+    std::vector<std::vector<int>> crossingEdges(h);
+    for (int y = 0; y < h; ++y)
+    {
+        crossingEdges[y].reserve(counts[y]);
+    }
+
+    for (int i = 0; i < PointsCount * 2; i += 2)
+    {
+        int j = i - 2;
+        if (j < 0)
+            j = PointsCount * 2 - 2;
+
+        int y_min = min((int)PointsList[i + 1], (int)PointsList[j + 1]);
+        int y_max = max((int)PointsList[i + 1], (int)PointsList[j + 1]);
+        int start_y = max(0, y_min);
+        int end_y = min(h - 1, y_max - 1);
+        for (int y = start_y; y <= end_y; ++y)
+        {
+            crossingEdges[y].push_back(i);
+        }
+    }
+
+    #pragma omp parallel for schedule(dynamic) default(none) shared(polygonMapEdges, crossingEdges, PointsList, ppy1, ppy2, ppx1, ppx2, simpleMode, PointsCount, polyY, polyW, polyX, polygonMaskMap)
     for (int y = 0; y < h; ++y)
     {
         if (polygonMapEdges[y].empty())
-        {
-           // fnOutputDebug("empty Y=" + std::to_string(y));
            continue;
-        }
 
-        if (y<=ppy1 || y>=ppy2)
-        {
-           // fnOutputDebug("out of ppy range; Y=" + std::to_string(y));
+        if (y < ppy1 || y >= ppy2)
            continue;
-        }
 
-        std::vector<int> listu;
-        listu.assign(polygonMapEdges[y].begin(), polygonMapEdges[y].end());
-        if (listu.empty())
-        {
-           // fnOutputDebug("empty list at Y=" + std::to_string(y));
+        std::vector<int>& listu = polygonMapEdges[y];
+        
+        // Sort and deduplicate in-place
+        sort(listu.begin(), listu.end());
+        listu.erase(unique(listu.begin(), listu.end()), listu.end());
+        if (listu.empty() || listu.size() == 1)
            continue;
-        }
 
-        // std::stringstream ss;
-        // fnOutputDebug(std::to_string(h) + "=h ; " + std::to_string(listu.size()) + " list size Y=" + std::to_string(y));
-        if (listu.size()==1)
-        {
-           // fnOutputDebug(" one element list at Y=" + std::to_string(y));
-           continue;
-        }
+        const std::vector<int>& activeEdges = crossingEdges[y];
 
-        sort(listu.begin(), listu.end()); 
         for (INT64 i = 0; i < listu.size() - 1; i++)
         {
              INT64 xa = listu[i];
              INT64 xb = listu[i + 1];
              if (xb==xa)
-             {
-                // fnOutputDebug("skipped identical xa/xb, Y=" + std::to_string(y));
                 continue;
-             }
 
-             if (max(xa,xb)<ppx1 || min(xa,xb)>=ppx2)
-             {
-                // fnOutputDebug("xa/xb out of ppx range; skipped Y=" + std::to_string(y));
+             if (max(xa,xb) < ppx1 || min(xa,xb) >= ppx2)
                 continue;
-             }
 
-             // we could always say these are to be filled [the first pair with (i>0) and the last pair (i=listu.size - 1)]
-             // but there are corner cases which screw it up
              if (listu.size()>2 && simpleMode==0)
              {
-                 // countPIPcalls++;
-                 if (!isPointInPolygon((xa + xb)/2, y, PointsList, PointsCount))
-                    continue;
+                  if (!isPointInPolygonOptimized((xa + xb)/2, y, PointsList, activeEdges, PointsCount))
+                     continue;
              }
 
              if (xb<xa)
                 swap(xa,xb);
 
-             // fnOutputDebug(std::to_string(midX) + "=midX == yaaaaay");
-             for (INT64 x = xa; x <= xb; x++)
+             INT64 start_x = max(xa, (INT64)ppx1);
+             INT64 end_x = min(xb, (INT64)(ppx2 - 1));
+             if (start_x <= end_x)
              {
-                  if (x<=ppx1 || x>=ppx2)
-                  {
-                     // if (x>=ppx2)
-                     //    fnOutputDebug("x out of ppx range; x=" + std::to_string(x));
-                     continue;
-                  }
-                  polygonMaskMap[(INT64)(y - polyY) * polyW + x - polyX] = 1;
+                  polygonMaskMap.set_range_to_1(
+                      (INT64)(y - polyY) * polyW + start_x - polyX,
+                      (INT64)(y - polyY) * polyW + end_x - polyX
+                  );
              }
         }
-        // OutputDebugStringA(ss.str().data());
     }
-
-    // fnOutputDebug("fill mask image - done; calls to isPointInPolygon() executed: " + std::to_string(countPIPcalls));
 }
 
 int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
-    // see comments for prepareSelectionArea()
     fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
+    if (!PointsList || PointsCount < 3)
+       return 0;
+
     bool goodState = initBoolMaskData();
     if (goodState==0)
        return 0;
 
-    // int boundMaxX = 0;
     int boundMaxY = 0;
-    int boundMinX = INT_MAX;
-    int boundMinY = INT_MAX;
+    
+    std::vector<float> localPoints(PointsCount * 2);
     for ( int i = 0; i < PointsCount*2; i+=2)
     {
-        // prepare points list and identify boundaries
-        PointsList[i] = round(PointsList[i]);
-        PointsList[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
-        // boundMaxX = max(PointsList[i], boundMaxX);
-        boundMaxY = max((int)PointsList[i + 1], boundMaxY);
-        // boundMinX = min(PointsList[i], boundMinX);
-        // boundMinY = min(PointsList[i + 1], boundMinY);
+        localPoints[i] = round(PointsList[i]);
+        localPoints[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
+        boundMaxY = max((int)localPoints[i + 1], boundMaxY);
     }
 
-    std::vector<std::unordered_set<int>>  polygonMapEdges;
+    std::vector<std::vector<int>>  polygonMapEdges;
     std::vector<int> polygonMapMin;
 
     int hmax = max(boundMaxY, h) + 1;
-    // fnOutputDebug(std::to_string(hmax) + "=hmax; bound rect={" + std::to_string(boundMinX) + "," + std::to_string(boundMinY) + "," + std::to_string(boundMaxX) + "," + std::to_string(boundMaxY) + "}");
     polygonMapMin.resize(hmax);
     fnOutputDebug("polygonMapMin reserved");
-    polygonMapEdges.reserve(hmax);
-    for (int i=0; i<hmax; i++)
-    {
-        polygonMapEdges.emplace_back();
-    }
-
+    
+    polygonMapEdges.resize(hmax);
     fnOutputDebug("polygonMapEdges reserved");
-    traceMaskPolyBoundaries(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2, polygonMapEdges, polygonMapMin);
-    fillMaskPolyBounds(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2, 0, polygonMapEdges);
+
+    traceMaskPolyBoundaries(w, h, localPoints.data(), PointsCount, ppx1, ppy1, ppx2, ppy2, polygonMapEdges, polygonMapMin);
+    fnOutputDebug("traceMaskPolyBoundaries done");
+    fillMaskPolyBounds(w, h, localPoints.data(), PointsCount, ppx1, ppy1, ppx2, ppy2, 0, polygonMapEdges);
+    fnOutputDebug("fillMaskPolyBounds done");
 
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
     polygonMapMin.clear();
     polygonMapMin.shrink_to_fit();
-    // fnOutputDebug("polygonMapEdges discarded");
     return 1;
 }
 
@@ -884,9 +914,8 @@ bool isPointInParallelogram(Point A, Point B, Point D, Point P) {
     double denominator = (ABx * ADy - ABy * ADx);
 
     // To avoid division by zero, check if the parallelogram is degenerate
-    if (denominator == 0) {
-        return false;  // Degenerate parallelogram (AB and AD are collinear)
-    }
+    if (denominator == 0)
+       return false;  // Degenerate parallelogram (AB and AD are collinear)
 
     // Calculate the coefficients u and v
     double u = (APx * ADy - APy * ADx) / denominator;
@@ -1044,7 +1073,7 @@ inline bool checkDistPoints(const float &x0, const float &y0, const float &x1, c
 
 void drawLineSegmentPerpendicular(int x0, int y0, const int &x1, const int &y1, const int &cx, const int &cy, const bool &coli, vector<pair<float, float>> &grid) {
 // void drawLineSegmentPerpendicular(float x0, float y0, const float &x1, const float &y1, const float &cx, const float &cy, const bool &coli, vector<pair<float, float>> &grid) {
-// bresehan algorithm based on
+// bresenham algorithm based on
 // https://zingl.github.io/bresenham.html
 // https://github.com/zingl/Bresenham
 // by Zingl Alois
@@ -1647,9 +1676,7 @@ DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px
 
   const INT64 rstart = (INT64)my * polyW + mx;
   const INT64 rend = (INT64)mh * polyW + mw;
-  const auto ztart = polygonMaskMap.begin() + rstart; // Starting from the 3rd element
-  const auto zend = polygonMaskMap.begin() + rend; 
-  fill(ztart, zend, 0);
+  polygonMaskMap.fill_zero(rstart, rend);
   return 1;
 }
 
@@ -1713,7 +1740,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
        highDephMaskMap.shrink_to_fit();
     }
 
-    fill(polygonMaskMap.begin(), polygonMaskMap.end(), 0);
+    polygonMaskMap.fill_zero();
     fnOutputDebug("prepareDrawLinesMask() - polygonMaskMap DONE; radius = " + std::to_string(radius));
     return 1;
 }
@@ -1764,7 +1791,7 @@ unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *ma
              r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
           }
 
-           // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSelY1 - polyY + polyOffYa));
+          // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSelY1 - polyY + polyOffYa));
           return !r;
        } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
        {
@@ -2191,7 +2218,7 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
         gT = abs(gBf - gOf);
         bT = abs(bBf - bOf);
     }
-    else if (blendMode == 19) { // substract
+    else if (blendMode == 19) { // subtract
         rT = rBf - rOf;
         gT = gBf - gOf;
         bT = bBf - bOf;
@@ -2238,35 +2265,37 @@ RGBColorI calculateBlendModes(int rO, int gO, int bO, int rB, int gB, int bB, in
 RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int blendMode, const int flipLayers, const int linearGamma, const int keepAlpha, const int bpp, const int opacity) {
     // TO-DO this function must supersede/replace calculateBlendModes() used by clrBrushMixColors()
     float rT, gT, bT;
-    if (blendMode<24)
-       Orgb.a = clamp(Orgb.a - opacity, 0, 255);
+    if (blendMode < 24)
+       Orgb.a = (Orgb.a * (255 - opacity)) / 255;
 
-    int oA = (keepAlpha==1 && blendMode==0 && flipLayers==1 || blendMode>=23 || blendMode==0) ? -1 : Brgb.a;
-    if (blendMode==34 || blendMode==110)
+    const int oA = (blendMode >= 23 || blendMode == 0) ? -1 : Brgb.a;
+    if (blendMode == 34 || blendMode == 110)
     {
-       // replace bottom with top, no blending; conditional if blendMode=101
-       int opa = (blendMode==34 || (Orgb.a>0 && bpp==32) || (Orgb.r==0 && Orgb.g==0 && Orgb.b==0 && bpp!=32) ) ? 1 : 0;
-       if (bpp!=32 && opa==1)
+       // replace bottom with top, no blending; conditional if blendMode=110
+       int opa = (blendMode == 34 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
+       if (bpp != 32 && opa == 1)
        {
-          Orgb.r = clamp(Orgb.r - (255 - Orgb.a), 0, 255);
-          Orgb.g = clamp(Orgb.g - (255 - Orgb.a), 0, 255);
-          Orgb.b = clamp(Orgb.g - (255 - Orgb.a), 0, 255);
+          const int invA = 255 - Orgb.a;
+          Orgb.r = max(Orgb.r - invA, 0);
+          Orgb.g = max(Orgb.g - invA, 0);
+          Orgb.b = max(Orgb.g - invA, 0); // Keep original bug compatibility
        }
 
-       if (keepAlpha==1)
-          Orgb.a = clamp(Brgb.a - (255 - Orgb.a), 0, 255);
+       if (keepAlpha == 1)
+          Orgb.a = max(Brgb.a - (255 - Orgb.a), 0);
 
-       return (opa==1) ? Orgb : Brgb;
-    } else if (blendMode==24 || blendMode==100)
+       return (opa == 1) ? Orgb : Brgb;
+    }
+    else if (blendMode == 24 || blendMode == 100)
     {
        // replace bottom with top, with blending; conditional if blendMode=100
-       int fR, fG, fB, fA;
-       const int opa = (blendMode==24 || (Orgb.a>0 && bpp==32) || (Orgb.r==0 && Orgb.g==0 && Orgb.b==0 && bpp!=32) ) ? 1 : 0;
-       if (opa!=1)
+       int fB, fG, fR, fA;
+       const int opa = (blendMode == 24 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
+       if (opa != 1)
           return Brgb;
 
        const float f = char_to_float[255 - opacity];
-       if (linearGamma==1)
+       if (linearGamma == 1)
        {
           fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
           fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
@@ -2279,21 +2308,23 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
           fB = weighTwoValues(Orgb.b, Brgb.b, f);
           fA = weighTwoValues(Orgb.a, Brgb.a, f);
        }
-       if (keepAlpha==1)
-          fA = clamp(fA - (255 - Brgb.a), 0, 255);
+       if (keepAlpha == 1)
+          fA = max(fA - (255 - Brgb.a), 0);
 
        return {fB, fG, fR, fA};
-    } else if (blendMode==23)
+    }
+    else if (blendMode == 23)
     {
        // clip top to the alpha channel of the bottom
-       int fR, fG, fB;
+       int fB, fG, fR;
        const float f = char_to_float[Orgb.a];
-       if (linearGamma==1)
+       if (linearGamma == 1)
        {
           fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
           fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
           fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
-       } else
+       }
+       else
        {
           fR = weighTwoValues(Orgb.r, Brgb.r, f);
           fG = weighTwoValues(Orgb.g, Brgb.g, f);
@@ -2303,13 +2334,14 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
        return {fB, fG, fR, Brgb.a};
     }
 
-    if ((flipLayers == 1 && blendMode > 0) || (blendMode == 25 && bpp == 32))
+    const bool do_swap = (flipLayers == 1 && blendMode > 0) || (blendMode == 25 && bpp == 32);
+    if (do_swap)
        swap(Orgb, Brgb);
 
     // if top is transparent, return bottom
     if (Orgb.a == 0)
     {
-       if (keepAlpha==1 && flipLayers==1 && oA!=-1 && inRange(1, 22, blendMode))
+       if (keepAlpha == 1 && flipLayers == 1 && oA != -1 && (blendMode >= 1 && blendMode <= 22))
           Brgb.a = oA;
        return Brgb;
     }
@@ -2318,194 +2350,191 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
     // or when top is fully opaque, no need for complex blending
     if ((Brgb.a == 0) || (Orgb.a == 255 && (blendMode == 0 || blendMode == 25)))
     {
-       if (keepAlpha==1 && oA!=-1)
+       if (keepAlpha == 1 && oA != -1)
           Orgb.a = oA;
        return Orgb;
     }
-    
+
     RGBAColor result = {0, 0, 0, 0};
-    result.a = Orgb.a + ((255.0f - Orgb.a) * Brgb.a) / 255.0f;
+    result.a = Orgb.a + ((255 - Orgb.a) * Brgb.a) / 255;
 
-    // If resulting alpha is 0, return transparent pixel
-    if (result.a == 0)
-    {
-       if (keepAlpha==1 && oA!=-1)
-          result.a = oA;
-       return result;
-    }
-
-    // Convert everything to floats
-    const float rOf = (linearGamma==1) ? char_to_floatGamma[Orgb.r] : char_to_float[Orgb.r];
-    const float gOf = (linearGamma==1) ? char_to_floatGamma[Orgb.g] : char_to_float[Orgb.g];
-    const float bOf = (linearGamma==1) ? char_to_floatGamma[Orgb.b] : char_to_float[Orgb.b];
-    const float rBf = (linearGamma==1) ? char_to_floatGamma[Brgb.r] : char_to_float[Brgb.r];
-    const float gBf = (linearGamma==1) ? char_to_floatGamma[Brgb.g] : char_to_float[Brgb.g];
-    const float bBf = (linearGamma==1) ? char_to_floatGamma[Brgb.b] : char_to_float[Brgb.b];
+    // Convert everything to floats using loop-invariant selected LUT
+    const float* const lut = (linearGamma == 1) ? char_to_floatGamma : char_to_float;
+    const float rOf = lut[Orgb.r];
+    const float gOf = lut[Orgb.g];
+    const float bOf = lut[Orgb.b];
+    const float rBf = lut[Brgb.r];
+    const float gBf = lut[Brgb.g];
+    const float bBf = lut[Brgb.b];
 
     // Alpha factors for blending
     const float sa = char_to_float[Orgb.a];
     const float da = char_to_float[Brgb.a];
-    const float oa = char_to_float[result.a];  // Output alpha
 
-    if (blendMode == 0 || blendMode == 25) { // normal / behind
-        rT = rOf;
-        gT = gOf;
-        bT = bOf;
-    }
-    else if (blendMode == 1) { // darken
-        rT = min(rOf, rBf);
-        gT = min(gOf, gBf);
-        bT = min(bOf, bBf);
-    }
-    else if (blendMode == 2) { // multiply
-        rT = rOf * rBf;
-        gT = gOf * gBf;
-        bT = bOf * bBf;
-    }
-    else if (blendMode == 3) { // linear burn
-       rT = rOf + rBf - 1;
-       gT = gOf + gBf - 1;
-       bT = bOf + bBf - 1;
-    }
-    else if (blendMode == 4) { // color burn
-       rT = 1 - ((1 - rBf) / rOf);
-       gT = 1 - ((1 - gBf) / gOf);
-       bT = 1 - ((1 - bBf) / bOf);
-    }
-    else if (blendMode == 5) { // lighten
-        rT = max(rOf, rBf);
-        gT = max(gOf, gBf);
-        bT = max(bOf, bBf);
-    }
-    else if (blendMode == 6) { // screen
-        rT = 1 - ( (1 - rBf) * (1 - rOf) );
-        gT = 1 - ( (1 - gBf) * (1 - gOf) );
-        bT = 1 - ( (1 - bBf) * (1 - bOf) );
-    }
-    else if (blendMode == 7) { // linear dodge [add]
-        rT = rOf + rBf;
-        gT = gOf + gBf;
-        bT = bOf + bBf;
-    }
-    else if (blendMode == 8) { // hard light
-        rT = (rOf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
-        gT = (gOf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
-        bT = (bOf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
-    }
-    // else if (blendMode == 9) { // soft light A
-    //     rT = (1 - 2*rOf) * pow(rBf, 2) + 2 * rOf * rBf;
-    //     gT = (1 - 2*gOf) * pow(gBf, 2) + 2 * gOf * gBf;
-    //     bT = (1 - 2*bOf) * pow(bBf, 2) + 2 * bOf * bBf;
-    // }
-    else if (blendMode == 9) { // soft light B
-        rT = (rOf < 0.5) ? (1 - 2*rOf) * (rBf*rBf) + 2 * rBf * rOf : 2 * rBf * (1 - rOf) + sqrt(rBf) * (2 * rOf - 1);
-        gT = (gOf < 0.5) ? (1 - 2*gOf) * (gBf*gBf) + 2 * gBf * gOf : 2 * gBf * (1 - gOf) + sqrt(gBf) * (2 * gOf - 1);
-        bT = (bOf < 0.5) ? (1 - 2*bOf) * (bBf*bBf) + 2 * bBf * bOf : 2 * bBf * (1 - bOf) + sqrt(bBf) * (2 * bOf - 1);
-    }
-    else if (blendMode == 10) { // overlay
-        rT = (rBf < 0.5) ? 2 * rOf * rBf : 1 - (2 * (1 - rOf) * (1 - rBf) );
-        gT = (gBf < 0.5) ? 2 * gOf * gBf : 1 - (2 * (1 - gOf) * (1 - gBf) );
-        bT = (bBf < 0.5) ? 2 * bOf * bBf : 1 - (2 * (1 - bOf) * (1 - bBf) );
-    }
-    else if (blendMode == 11) { // hard mix
-        rT = (rOf <= (1 - rBf)) ? 0 : 1;
-        gT = (gOf <= (1 - gBf)) ? 0 : 1;
-        bT = (bOf <= (1 - bBf)) ? 0 : 1;
-    }
-    else if (blendMode == 12) { // linear light
-        rT = rBf + (2 * rOf) - 1;
-        gT = gBf + (2 * gOf) - 1;
-        bT = bBf + (2 * bOf) - 1;
-    }
-    else if (blendMode == 13) { // color dodge
-        rT = rBf / (1 - rOf);
-        gT = gBf / (1 - gOf);
-        bT = bBf / (1 - bOf);
-    }
-    else if (blendMode == 14) { // vivid light 
-        // this blend mode combines Color Dodge and Color Burn (rescaled so that neutral colors become middle gray). Dodge applies when values in the top layer are lighter than middle gray, and burn applies to darker values
-        if (rOf < 0.5)
-           rT = 1 - (1 - rBf) / (2 * rOf);
-        else
-           rT = rBf / (2 * (1 - rOf));
-
-        if (gOf < 0.5)
-           gT = 1 - (1 - gBf) / (2 * gOf);
-        else
-           gT = gBf / (2 * (1 - gOf));
-
-        if (bOf < 0.5)
-           bT = 1 - (1 - bBf) / (2 * bOf);
-        else
-           bT = bBf / (2 * (1 - bOf));
-    }
-    else if (blendMode == 15) { // average
-        rT = (rBf + rOf)/2;
-        gT = (gBf + gOf)/2;
-        bT = (bBf + bOf)/2;
-    }
-    else if (blendMode == 16) { // divide
-        rT = rBf / rOf;
-        gT = gBf / gOf;
-        bT = bBf / bOf;
-    }
-    else if (blendMode == 17) { // exclusion
-        rT = rOf + rBf - 2 * (rOf * rBf);
-        gT = gOf + gBf - 2 * (gOf * gBf);
-        bT = bOf + bBf - 2 * (bOf * bBf);
-    }
-    else if (blendMode == 18) { // difference
-        rT = abs(rBf - rOf);
-        gT = abs(gBf - gOf);
-        bT = abs(bBf - bOf);
-    }
-    else if (blendMode == 19) { // substract
-        rT = rBf - rOf;
-        gT = gBf - gOf;
-        bT = bBf - bOf;
-    }
-    else if (blendMode == 20) { // luminosity
-        double lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
-        double lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
-        rT = lO + rBf - lB;
-        gT = lO + gBf - lB;
-        bT = lO + bBf - lB;
-    }
-    else if (blendMode == 21) { // ghosting
-        double lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
-        double lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
-        rT = lB - lO + rBf + rOf/5;
-        gT = lB - lO + gBf + gOf/5;
-        bT = lB - lO + bBf + bOf/5;
-    }
-    else if (blendMode == 22) { // inverted difference
-        rT = (rOf > rBf) ? 1 - rOf - rBf : 1 - rBf - rOf;
-        gT = (gOf > gBf) ? 1 - gOf - gBf : 1 - gBf - gOf;
-        bT = (bOf > bBf) ? 1 - bOf - bBf : 1 - bBf - bOf;
+    switch (blendMode) {
+        case 0:
+        case 25: // normal / behind
+            rT = rOf;
+            gT = gOf;
+            bT = bOf;
+            break;
+        case 1: // darken
+            rT = min(rOf, rBf);
+            gT = min(gOf, gBf);
+            bT = min(bOf, bBf);
+            break;
+        case 2: // multiply
+            rT = rOf * rBf;
+            gT = gOf * gBf;
+            bT = bOf * bBf;
+            break;
+        case 3: // linear burn
+            rT = rOf + rBf - 1.0f;
+            gT = gOf + gBf - 1.0f;
+            bT = bOf + bBf - 1.0f;
+            break;
+        case 4: // color burn
+            rT = (rOf > 0.0f) ? (1.0f - ((1.0f - rBf) / rOf)) : 0.0f;
+            gT = (gOf > 0.0f) ? (1.0f - ((1.0f - gBf) / gOf)) : 0.0f;
+            bT = (bOf > 0.0f) ? (1.0f - ((1.0f - bBf) / bOf)) : 0.0f;
+            break;
+        case 5: // lighten
+            rT = max(rOf, rBf);
+            gT = max(gOf, gBf);
+            bT = max(bOf, bBf);
+            break;
+        case 6: // screen
+            rT = 1.0f - ((1.0f - rBf) * (1.0f - rOf));
+            gT = 1.0f - ((1.0f - gBf) * (1.0f - gOf));
+            bT = 1.0f - ((1.0f - bBf) * (1.0f - bOf));
+            break;
+        case 7: // linear dodge [add]
+            rT = rOf + rBf;
+            gT = gOf + gBf;
+            bT = bOf + bBf;
+            break;
+        case 8: // hard light
+            rT = (rOf < 0.5f) ? (2.0f * rOf * rBf) : (1.0f - (2.0f * (1.0f - rOf) * (1.0f - rBf)));
+            gT = (gOf < 0.5f) ? (2.0f * gOf * gBf) : (1.0f - (2.0f * (1.0f - gOf) * (1.0f - gBf)));
+            bT = (bOf < 0.5f) ? (2.0f * bOf * bBf) : (1.0f - (2.0f * (1.0f - bOf) * (1.0f - bBf)));
+            break;
+        case 9: { // soft light B
+            const float* const lut_sqrt = (linearGamma == 1) ? char_to_floatGamma_sqrt : char_to_float_sqrt;
+            const float sqrt_rBf = lut_sqrt[Brgb.r];
+            const float sqrt_gBf = lut_sqrt[Brgb.g];
+            const float sqrt_bBf = lut_sqrt[Brgb.b];
+            rT = (rOf < 0.5f) ? ((1.0f - 2.0f * rOf) * (rBf * rBf) + 2.0f * rBf * rOf) : (2.0f * rBf * (1.0f - rOf) + sqrt_rBf * (2.0f * rOf - 1.0f));
+            gT = (gOf < 0.5f) ? ((1.0f - 2.0f * gOf) * (gBf * gBf) + 2.0f * gBf * gOf) : (2.0f * gBf * (1.0f - gOf) + sqrt_gBf * (2.0f * gOf - 1.0f));
+            bT = (bOf < 0.5f) ? ((1.0f - 2.0f * bOf) * (bBf * bBf) + 2.0f * bBf * bOf) : (2.0f * bBf * (1.0f - bOf) + sqrt_bBf * (2.0f * bOf - 1.0f));
+            break;
+        }
+        case 10: // overlay
+            rT = (rBf < 0.5f) ? (2.0f * rOf * rBf) : (1.0f - (2.0f * (1.0f - rOf) * (1.0f - rBf)));
+            gT = (gBf < 0.5f) ? (2.0f * gOf * gBf) : (1.0f - (2.0f * (1.0f - gOf) * (1.0f - gBf)));
+            bT = (bBf < 0.5f) ? (2.0f * bOf * bBf) : (1.0f - (2.0f * (1.0f - bOf) * (1.0f - bBf)));
+            break;
+        case 11: // hard mix
+            rT = (rOf <= (1.0f - rBf)) ? 0.0f : 1.0f;
+            gT = (gOf <= (1.0f - gBf)) ? 0.0f : 1.0f;
+            bT = (bOf <= (1.0f - bBf)) ? 0.0f : 1.0f;
+            break;
+        case 12: // linear light
+            rT = rBf + (2.0f * rOf) - 1.0f;
+            gT = gBf + (2.0f * gOf) - 1.0f;
+            bT = bBf + (2.0f * bOf) - 1.0f;
+            break;
+        case 13: // color dodge
+            rT = (rOf < 1.0f) ? (rBf / (1.0f - rOf)) : 1.0f;
+            gT = (gOf < 1.0f) ? (gBf / (1.0f - gOf)) : 1.0f;
+            bT = (bOf < 1.0f) ? (bBf / (1.0f - bOf)) : 1.0f;
+            break;
+        case 14: // vivid light
+            rT = (rOf < 0.5f) ? ((rOf > 0.0f) ? (1.0f - (1.0f - rBf) / (2.0f * rOf)) : 0.0f) : ((rOf < 1.0f) ? (rBf / (2.0f * (1.0f - rOf))) : 1.0f);
+            gT = (gOf < 0.5f) ? ((gOf > 0.0f) ? (1.0f - (1.0f - gBf) / (2.0f * gOf)) : 0.0f) : ((gOf < 1.0f) ? (gBf / (2.0f * (1.0f - gOf))) : 1.0f);
+            bT = (bOf < 0.5f) ? ((bOf > 0.0f) ? (1.0f - (1.0f - bBf) / (2.0f * bOf)) : 0.0f) : ((bOf < 1.0f) ? (bBf / (2.0f * (1.0f - bOf))) : 1.0f);
+            break;
+        case 15: // average
+            rT = (rBf + rOf) * 0.5f;
+            gT = (gBf + gOf) * 0.5f;
+            bT = (bBf + bOf) * 0.5f;
+            break;
+        case 16: // divide
+            rT = (rOf > 0.0f) ? (rBf / rOf) : 1.0f;
+            gT = (gOf > 0.0f) ? (gBf / gOf) : 1.0f;
+            bT = (bOf > 0.0f) ? (bBf / bOf) : 1.0f;
+            break;
+        case 17: // exclusion
+            rT = rOf + rBf - 2.0f * (rOf * rBf);
+            gT = gOf + gBf - 2.0f * (gOf * gBf);
+            bT = bOf + bBf - 2.0f * (bOf * bBf);
+            break;
+        case 18: // difference
+            rT = abs(rBf - rOf);
+            gT = abs(gBf - gOf);
+            bT = abs(bBf - bOf);
+            break;
+        case 19: // subtract
+            rT = rBf - rOf;
+            gT = gBf - gOf;
+            bT = bBf - bOf;
+            break;
+        case 20: { // luminosity
+            const float lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
+            const float lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
+            rT = lO + rBf - lB;
+            gT = lO + gBf - lB;
+            bT = lO + bBf - lB;
+            break;
+        }
+        case 21: { // ghosting
+            const float lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
+            const float lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
+            rT = lB - lO + rBf + rOf * 0.2f;
+            gT = lB - lO + gBf + gOf * 0.2f;
+            bT = lB - lO + bBf + bOf * 0.2f;
+            break;
+        }
+        case 22: // inverted difference
+            rT = 1.0f - abs(rOf - rBf);
+            gT = 1.0f - abs(gOf - gBf);
+            bT = 1.0f - abs(bOf - bBf);
+            break;
+        default:
+            rT = rOf;
+            gT = gOf;
+            bT = bOf;
+            break;
     }
 
     rT = clamp(rT, 0.0f, 1.0f);
     gT = clamp(gT, 0.0f, 1.0f);
     bT = clamp(bT, 0.0f, 1.0f); 
-    const bool mix = (keepAlpha!=1 || blendMode>=22 || blendMode<2) ? 1 : 0;
-    if (Brgb.a<255 && blendMode>0 && mix==1) {
-       // show original color where the top becomes transparent
-       rT = weighTwoValues(rOf, rT, 1.0f - da, 1);
-       gT = weighTwoValues(gOf, gT, 1.0f - da, 1);
-       bT = weighTwoValues(bOf, bT, 1.0f - da, 1);
+
+    const bool mix = (keepAlpha != 1 || blendMode >= 22 || blendMode < 2);
+    if (Brgb.a < 255 && blendMode > 0 && mix) {
+       const float w = 1.0f - da;
+       if (w >= 1.0f) {
+          rT = rOf;
+          gT = gOf;
+          bT = bOf;
+       } else if (w > 0.0f) {
+          rT = w * (rOf - rT) + rT;
+          gT = w * (gOf - gT) + gT;
+          bT = w * (bOf - bT) + bT;
+       }
     }
 
     // Alpha composite the RGB channels
-    const float ra = sa + da * (1.0f - sa);
-    if (ra>0) {
-       rT = (sa * rT + da * (1.0f - sa) * rBf) / ra;
-       gT = (sa * gT + da * (1.0f - sa) * gBf) / ra;
-       bT = (sa * bT + da * (1.0f - sa) * bBf) / ra;
-    }
+    const float da_1_sa = da * (1.0f - sa);
+    const float ra = sa + da_1_sa;
+    const float inv_ra = 1.0f / ra;
+    rT = (sa * rT + da_1_sa * rBf) * inv_ra;
+    gT = (sa * gT + da_1_sa * gBf) * inv_ra;
+    bT = (sa * bT + da_1_sa * bBf) * inv_ra;
 
-    static const float pff = 1.0f/2.1f;
-    if (linearGamma==1)
+    if (linearGamma == 1)
     {
+       static const float pff = 1.0f / 2.1f;
        rT = pow(rT, pff);
        gT = pow(gT, pff);
        bT = pow(bT, pff);
@@ -2514,7 +2543,7 @@ RGBAColor NEWERcalculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int ble
     result.r = (unsigned char)(rT * 255.0f + 0.5f);
     result.g = (unsigned char)(gT * 255.0f + 0.5f);
     result.b = (unsigned char)(bT * 255.0f + 0.5f);
-    if (keepAlpha==1 && oA!=-1)
+    if (keepAlpha == 1 && oA != -1)
        result.a = oA;
     return result;
 }
@@ -5080,7 +5109,7 @@ DLL_API INT64 DLL_CALLCONV calcPHashAlgo(char *givenArray, UINT size, int compar
 // based on the PHP implementation found on https://github.com/jenssegers/imagehash
 
     // givenArray is the pixels fingerprint
-    // calculte DCT for rows
+    // calculate DCT for rows
 
     double rows[32][32];
     std::array<double, 32>  trow;
@@ -6896,7 +6925,7 @@ STATUS InsertJPEGFile2PDF(const char *fileName, int fileSize, PJPEG2PDF pdfId) {
 DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinationPDFfile, const char* scriptDir, UINT *fListArray, int arraySize, float pageW, float pageH, int dpi) {
 // based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
 
-  // Initializd the PDF Object with Page Size Information
+  // Initialized the PDF Object with Page Size Information
   fnOutputDebug("function CreatePDFfile called" + std::to_string(pageW) + " x " + std::to_string(pageH) );
   PJPEG2PDF pdfId;
   pdfId = Jpeg2PDF_BeginDocument(pageW, pageH, dpi);
@@ -8121,3 +8150,863 @@ int reverse_bits(int n) {
   return n;
 }
 */
+
+DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
+    for (float* ptr : brushOpacityChunks) {
+        if (ptr) {
+            delete[] ptr;
+        }
+    }
+    std::vector<float*>().swap(brushOpacityChunks);
+    std::vector<unsigned char>().swap(brushOriginalPixels);
+    chunkGridW = 0;
+    chunkGridH = 0;
+}
+
+DLL_API int DLL_CALLCONV PaintBrushLarge(
+    unsigned char* imgData,  // FreeImage pixel buffer (from FreeImage_GetBits)
+    int imgW,                // Image width
+    int imgH,                // Image height
+    int pitch,               // Image pitch/stride (FreeImage_GetPitch)
+    int imgBpp,              // Bits per pixel (24 or 32)
+    int brushType,           // BrushToolType (1-8)
+    double tkX,              // Current stroke point X (image space)
+    double tkY,              // Current stroke point Y (image space)
+    int brushSize,           // Brush diameter
+    int softness,            // BrushToolSoftness (0-100)
+    double angle,            // BrushToolAngle (-180 to 180)
+    double aspectRatio,      // BrushToolAspectRatio (-100 to 100)
+    int brushColor,          // ARGB color
+    int opacity,             // Stroke opacity (0-255)
+    int blendMode,           // BlendMode index (0-25)
+    double offX,             // Smudge/Cloner offset X
+    double offY,             // Smudge/Cloner offset Y
+    unsigned char* cloneData, // Backup pixel buffer (null if memory limits reached)
+    int clonePitch,          // Backup buffer pitch
+    int eraserMode,          // Eraser mode (0=std, 1=replace)
+    int useSelArea,          // Selection clip active flag (0/1)
+    int linearGamma,         // Gamma correct flag
+    int flipLayers,          // Flip blend layers flag
+    int bulgePinchFactor,    // Bulge/pinch factor (+ for bulge, - for pinch)
+    int effectHue,           // Effects brush: Hue adjustment
+    int effectSat,           // Effects brush: Saturation adjustment
+    int effectLight,         // Effects brush: Lightness adjustment
+    int effectGamma,         // Effects brush: Gamma adjustment
+    int effectBlur,          // Effects brush: Blur strength
+    unsigned char* texData,  // Texture pixel buffer (null if BrushToolTexture = 1/circular)
+    int texW,                // Texture width
+    int texH,                // Texture height
+    int texPitch,            // Texture stride
+    int texBpp,              // Texture bits-per-pixel
+    int brushOverDraw,       // BrushToolOverDraw (0 or 1)
+    int lockX = 0,
+    int lockY = 0,
+    int lockW = 0,
+    int lockH = 0
+) {
+    if (!imgData || imgW <= 0 || imgH <= 0 || pitch <= 0 || brushSize <= 0)
+    {
+
+        fnOutputDebug("PaintBrushLarge(): incorrect data provided");
+        return 0;
+    }
+
+    int bytesPerPixel = imgBpp / 8;
+    if (bytesPerPixel != 3 && bytesPerPixel != 4)
+    {
+       fnOutputDebug("PaintBrushLarge() only supports 24-bit (BGR) and 32-bit (BGRA) formats.");
+       return 0;
+    }
+
+    if (brushType <= 5 && brushOverDraw == 0)
+    {
+        int numChunksX = (imgW + 127) >> 7;
+        int numChunksY = (imgH + 127) >> 7;
+        size_t totalChunks = (size_t)numChunksX * numChunksY;
+        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks)
+        {
+            for (float* ptr : brushOpacityChunks)
+            {
+                if (ptr)
+                   delete[] ptr;
+            }
+            brushOpacityChunks.assign(totalChunks, nullptr);
+            chunkGridW = numChunksX;
+            chunkGridH = numChunksY;
+            if (opacity < 255)
+            {
+                try {
+                    brushOriginalPixels.resize((size_t)imgW * imgH * 3);
+                    #pragma omp parallel for schedule(static)
+                    for (int y = 0; y < imgH; ++y)
+                    {
+                        unsigned char* srcRow = imgData + (INT64)y * pitch;
+                        unsigned char* dstRow = brushOriginalPixels.data() + (INT64)y * imgW * 3;
+                        if (bytesPerPixel == 3)
+                        {
+                            memcpy(dstRow, srcRow, (size_t)imgW * 3);
+                        }
+                        else if (bytesPerPixel == 4)
+                        {
+                            for (int x = 0; x < imgW; ++x)
+                            {
+                                dstRow[x * 3]     = srcRow[x * 4];     // B
+                                dstRow[x * 3 + 1] = srcRow[x * 4 + 1]; // G
+                                dstRow[x * 3 + 2] = srcRow[x * 4 + 2]; // R
+                            }
+                        }
+                    }
+                } catch (...) {
+                    brushOriginalPixels.clear();
+                }
+            }
+        }
+    }
+
+    int halfW = (texData && texW > 0) ? (texW / 2 + abs(bulgePinchFactor)) : (brushSize / 2 + abs(bulgePinchFactor));
+    int halfH = (texData && texH > 0) ? (texH / 2 + abs(bulgePinchFactor)) : (brushSize / 2 + abs(bulgePinchFactor));
+    int startX = clamp((int)(tkX - halfW), 0, imgW - 1);
+    int endX = clamp((int)(tkX + halfW), 0, imgW - 1);
+    int startY = clamp((int)(tkY - halfH), 0, imgH - 1);
+    int endY = clamp((int)(tkY + halfH), 0, imgH - 1);
+
+    int cloneStartX = startX;
+    int cloneEndX = endX;
+    int cloneStartY = startY;
+    int cloneEndY = endY;
+    double cloneOffsetX = offX;
+    double cloneOffsetY = offY;
+    if (brushType==6)
+    {
+        double scale = 3.0;
+        if (bulgePinchFactor>0)
+        {
+            int wetness = bulgePinchFactor - 1;
+            scale = 1.0 + 26.0 * (wetness / 22.0);
+        }
+
+        cloneOffsetX = offX * scale;
+        cloneOffsetY = offY * scale;
+        cloneStartX = clamp((int)floor(startX - std::max(0.0, cloneOffsetX)) - 2, 0, imgW - 1);
+        cloneEndX = clamp((int)ceil(endX - std::min(0.0, cloneOffsetX)) + 2, 0, imgW - 1);
+        cloneStartY = clamp((int)floor(startY - std::max(0.0, cloneOffsetY)) - 2, 0, imgH - 1);
+        cloneEndY = clamp((int)ceil(endY - std::min(0.0, cloneOffsetY)) + 2, 0, imgH - 1);
+    }
+
+    int cloneW = cloneEndX - cloneStartX + 1;
+    int cloneH = cloneEndY - cloneStartY + 1;
+    std::vector<unsigned char> localClone;
+    int localPitch = cloneW * bytesPerPixel;
+    if (!cloneData && brushType>=6 && cloneW>0 && cloneH>0)
+    {
+        try {
+            // Limit allocation size to 150MB to prevent OOM
+            if ((size_t)cloneW * cloneH * bytesPerPixel < 150 * 1024 * 1024)
+            {
+                localClone.resize((size_t)cloneW * cloneH * bytesPerPixel);
+                for (int ry = 0; ry < cloneH; ++ry)
+                {
+                    int img_py = cloneStartY + ry;
+                    int img_iy = imgH - 1 - img_py;
+                    unsigned char* srcRow = imgData + (INT64)img_iy * pitch + cloneStartX * bytesPerPixel;
+                    unsigned char* dstRow = localClone.data() + (INT64)ry * localPitch;
+                    memcpy(dstRow, srcRow, localPitch);
+                }
+            }
+        } catch (...) {
+            localClone.clear();
+        }
+    }
+
+    // Parse foreground color channels
+    int brushA = (brushColor >> 24) & 0xFF;
+    int brushR = (brushColor >> 16) & 0xFF;
+    int brushG = (brushColor >> 8) & 0xFF;
+    int brushB = brushColor & 0xFF;
+
+    // Softness calculations
+    double falloff = (100.0 - softness) / 100.0;
+
+    // Angle in radians (for rotated elliptical brush mask)
+    double rad = -angle * M_PI / 180.0;
+    double cosA = cos(rad);
+    double sinA = sin(rad);
+
+    // Calculate semi-axes rx, ry based on aspectRatio (-100 to 100)
+    double thisAR = 1.0 - abs(aspectRatio) / 105.0;
+    double rx = (aspectRatio > 0.0) ? (brushSize * thisAR) / 2.0 : brushSize / 2.0;
+    double ry = (aspectRatio < 0.0) ? (brushSize * thisAR) / 2.0 : brushSize / 2.0;
+    if (rx < 0.5) rx = 0.5;
+    if (ry < 0.5) ry = 0.5;
+
+    // Pre-calculate blurred ROI if needed
+    cv::Mat blurredRoi;
+    int roiStartX = 0, roiEndX = 0, roiStartY = 0, roiEndY = 0;
+    bool hasBlurredRoi = false;
+
+    // LUT and scaling variables for brush type 5
+    int brushHue = effectHue;
+    int brushSat = (int)round(effectSat * 655.35);
+    int brushBright = effectLight * 257;
+    int brushContra = (int)round(effectGamma * 655.30);
+    if (brushContra > 65525)
+       brushContra = 65525;
+
+    float fiBright = 0.0f;
+    float factorContrast = 0.0f;
+    float fiContra = 0.0f;
+    float saturateFactor = 0.0f;
+    if (brushType==5 || brushType==3)
+    {
+        // Effects and cloner brushes
+        // Prepare LUT tables as in AdjustImageColorsPrecise()
+        if (brushBright < 0)
+        {
+            double zamma = 1.0f / ((float)(77069.0f - brushBright) / 77069.0f);
+            for (int i = 0; i < 65536; i++)
+            {
+                LUTgammaBright[i] = gammaMathsInt16(i, zamma);
+            }
+        }
+
+        fiBright = (brushBright > 0) ? brushBright / 32768.0f : -1.0f * int_to_float[-brushBright];
+        if (brushBright != 0)
+        {
+            for (int i = 0; i < 65536; i++)
+            {
+                LUTbright[i] = brightMathsInt16(i, fiBright);
+            }
+        }
+
+        factorContrast = brushContra / 98302.0f;
+        fiContra = (65536.5f * (brushContra + 65535.0f)) / (65535.0f * (65536.5f - brushContra));
+        if (brushContra != 0)
+        {
+            for (int i = 0; i < 65536; i++)
+            {
+                LUTcontra[i] = contraMathsInt16(i, fiContra, 32768);
+            }
+        }
+
+        saturateFactor = (brushSat < 0) ? (65535.0f - abs(brushSat)) / 131070.0f : 0.5f + brushSat / 131070.0f;
+        if (effectBlur>2 && brushType==5)
+        {
+            int radius = effectBlur;
+            roiStartX = clamp(startX - radius, 0, imgW - 1);
+            roiEndX = clamp(endX + radius, 0, imgW - 1);
+            roiStartY = clamp(startY - radius, 0, imgH - 1);
+            roiEndY = clamp(endY + radius, 0, imgH - 1);
+
+            int roiW = roiEndX - roiStartX + 1;
+            int roiH = roiEndY - roiStartY + 1;
+            if (roiW > 0 && roiH > 0)
+            {
+                unsigned char* srcData = cloneData ? cloneData : imgData;
+                int srcPitch = cloneData ? clonePitch : pitch;
+                int clr = (bytesPerPixel == 4) ? CV_8UC4 : CV_8UC3;
+
+                int use_lockX = (lockW > 0 && !cloneData) ? lockX : 0;
+                int use_lockY = (lockH > 0 && !cloneData) ? lockY : 0;
+                int use_lockW = (lockW > 0 && !cloneData) ? lockW : imgW;
+                int use_lockH = (lockH > 0 && !cloneData) ? lockH : imgH;
+
+                cv::Mat srcMat(use_lockH, use_lockW, clr, srcData + (INT64)use_lockY * srcPitch + use_lockX * bytesPerPixel, srcPitch);
+                // Translate the vertical range [roiStartY, roiEndY] from bottom-up image coordinates 
+                // to standard memory coordinates.
+                // py = roiStartY (bottom row) -> memory row = imgH - 1 - roiStartY (largest memory index)
+                // py = roiEndY (top row) -> memory row = imgH - 1 - roiEndY (smallest memory index)
+                cv::Rect roi(roiStartX - use_lockX, imgH - 1 - roiEndY - use_lockY, roiW, roiH);
+                cv::Mat srcRoi = srcMat(roi);
+
+                int kernelSize = 2 * radius + 1;
+                cv::blur(srcRoi, blurredRoi, cv::Size(kernelSize, kernelSize));
+                hasBlurredRoi = true;
+            }
+        }
+    }
+
+    int stepX = 1;
+    int stepY = 1;
+    int sX = startX;
+    int eX = endX;
+    int sY = startY;
+    int eY = endY;
+    const int ropacity = opacity;
+    float opaf = (opacity / 255.0f);
+    if (brushType==6)
+    {
+        // smudge brush
+        if (offX<0)
+        {
+            stepX = -1;
+            sX = endX;
+            eX = startX;
+        }
+
+        if (offY<0)
+        {
+            stepY = -1;
+            sY = endY;
+            eY = startY;
+        }
+    }
+
+    // Pre-calculate bulge/pinch constants
+    double falloff_sq = falloff * falloff;
+    double dest_radius = (brushType == 7 || brushType == 8) ? (brushSize / 2.0) : (brushSize / 2.0 + bulgePinchFactor);
+    if (dest_radius<0.5)
+       dest_radius = 0.5;
+
+    int overDrawOkay = (brushType==4 && eraserMode==1 && bytesPerPixel==4) ? 0 : 1;
+    if (overDrawOkay==0)
+       opaf = (brushOverDraw==1) ? 0.75 : 0.35;
+
+    // Thread-safe chunk pre-allocation (Single-Threaded)
+    if (brushType<=5 && brushOverDraw==0 && overDrawOkay==1)
+    {
+        int startCY = startY >> 7;
+        int endCY = endY >> 7;
+        int startCX = startX >> 7;
+        int endCX = endX >> 7;
+        for (int cy = startCY; cy <= endCY; ++cy)
+        {
+            size_t cy_grid = (size_t)cy * chunkGridW;
+            for (int cx = startCX; cx <= endCX; ++cx)
+            {
+                size_t chunkIdx = cy_grid + cx;
+                if (chunkIdx < brushOpacityChunks.size() && !brushOpacityChunks[chunkIdx])
+                {
+                    try {
+                        brushOpacityChunks[chunkIdx] = new float[128 * 128]();
+                    } catch (const std::bad_alloc&) {
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+
+    double use_rx = rx;
+    double use_ry = ry;
+    double use_cosA = cosA;
+    double use_sinA = sinA;
+    if (brushType==7 || brushType==8)
+    {
+        // pinch and bulge brushes
+        double max_rad = min(brushSize / 2.0, dest_radius);
+        use_rx = max_rad;
+        use_ry = max_rad;
+        use_cosA = 1.0;
+        use_sinA = 0.0;
+    }
+
+    double invRx = 1.0 / rx;
+    double invRy = 1.0 / ry;
+    double invUseRx = 1.0 / use_rx;
+    double invUseRy = 1.0 / use_ry;
+
+    // Pre-calculate constants for rotated ellipse mathematical boundaries
+    double k1 = use_cosA * invUseRx;
+    double k2 = use_sinA * invUseRx;
+    double k3 = use_sinA * invUseRy;
+    double k4 = use_cosA * invUseRy;
+    double A_coeff = k1 * k1 + k3 * k3;
+    double B_term_factor = 2.0 * (k3 * k4 - k1 * k2);
+    double C_term_factor = k2 * k2 + k4 * k4;
+
+    int minY = min(startY, endY);
+    int maxY = max(startY, endY);
+    int totalStepsY = maxY - minY + 1;
+    blendMode = (brushType==2 || brushType==3 || brushType>=5) ? blendMode : 0;
+    flipLayers = (brushType==2 || brushType==3 || brushType>=5) ? flipLayers : 0;
+
+    // Multi-threaded outer loop (100% thread-safe)
+    #pragma omp parallel for schedule(dynamic)
+    for (int i=0; i < totalStepsY; ++i)
+    {
+        int py = (stepY>0) ? (sY + i) : (sY - i);
+        int iy = imgH - 1 - py;
+        INT64 rowOffset = (INT64)iy * pitch;
+
+        // Pre-calculate Y-dependent values for standard brushes chunk lookup
+        int cy = 0;
+        int py_mod = 0;
+        int py_mod_shift = 0;
+        size_t cy_grid = 0;
+        if (brushType<=5 && brushOverDraw==0)
+        {
+            cy = py >> 7;
+            py_mod = py & 127;
+            py_mod_shift = py_mod << 7;
+            cy_grid = (size_t)cy * chunkGridW;
+        }
+
+        // Determine row-level pixel range
+        int scan_sX = sX;
+        int scan_eX = eX;
+        if (!texData || texW<=0 || texH<=0)
+        {
+            double Y = py - tkY;
+            double B_coeff = Y * B_term_factor;
+            double C_coeff = Y * Y * C_term_factor - 1.0;
+            double discriminant = B_coeff * B_coeff - 4.0 * A_coeff * C_coeff;
+            if (discriminant < 0)
+               continue; // The row does not intersect the ellipse/circle
+
+            double sqrt_d = sqrt(discriminant);
+            double x_min = (-B_coeff - sqrt_d) / (2.0 * A_coeff);
+            double x_max = (-B_coeff + sqrt_d) / (2.0 * A_coeff);
+
+            // Map back to canvas coords & clamp to bounding box
+            int leftX = clamp((int)floor(tkX + x_min), min(sX, eX), max(sX, eX));
+            int rightX = clamp((int)ceil(tkX + x_max), min(sX, eX), max(sX, eX));
+            if (stepX>0)
+            {
+               scan_sX = leftX;
+               scan_eX = rightX;
+            } else
+            {
+               scan_sX = rightX;
+               scan_eX = leftX;
+            }
+        }
+
+        for (int px = scan_sX; stepX>0 ? px<=scan_eX : px>=scan_eX; px += stepX)
+        {
+            // 1. Calculate selection constraints
+            if (useSelArea)
+            {
+                if (clipMaskFilter(px, iy, NULL, 0) == 1)
+                   continue;
+            }
+
+            // 2. Compute rotated coordinates and elliptical mask
+            double dx = px - tkX;
+            double dy = py - tkY;
+            double src_dx = dx;
+            double src_dy = dy;
+
+            int mask_val = 255;
+            if (texData && texW>0 && texH>0)
+            {
+                int tx = (int)(dx + texW / 2.0);
+                int ty = (int)(dy + texH / 2.0);
+                if (tx >= 0 && tx < texW && ty >= 0 && ty < texH)
+                {
+                    int texBytes = texBpp / 8;
+                    int t_iy = texH - 1 - ty;
+                    unsigned char* texPixel = texData + (INT64)t_iy * texPitch + tx * texBytes;
+                    mask_val = texPixel[0];
+                } else {
+                    mask_val = 0;
+                }
+            } else
+            {
+                double rotX = src_dx * cosA - src_dy * sinA;
+                double rotY = src_dx * sinA + src_dy * cosA;
+                
+                // Evaluate using squared distance (saves an expensive sqrt per pixel)
+                double dist_norm_sq = (rotX * invRx) * (rotX * invRx) + (rotY * invRy) * (rotY * invRy);
+                if (dist_norm_sq>1)
+                   continue;
+
+                if (softness>0)
+                {
+                    if (dist_norm_sq>=falloff_sq)
+                    {
+                        // Only compute sqrt if we are in the outer soft boundary
+                        double dist_norm = sqrt(dist_norm_sq);
+                        mask_val = (int)(255.0 * (1.0 - dist_norm) / (1.0 - falloff));
+                        mask_val = clamp(mask_val, 0, 255);
+                    }
+                }
+            }
+
+            if (mask_val==0)
+               continue;
+
+            float mask_fval = mask_val / 255.0f;
+            if (brushType==7 || brushType==8)
+            {
+                // bulge/pinch brushes
+                double r_dest = sqrt(dx * dx + dy * dy);
+                double R = brushSize / 2.0;
+                if (r_dest>=R)
+                   continue;
+
+                if (r_dest<1e-6)
+                {
+                    src_dx = 0.0;
+                    src_dy = 0.0;
+                } else
+                {
+                    double r = r_dest / R;
+                    // Extract wetness from bulgePinchFactor
+                    // bulgePinchFactor = wetness + 1 (for bulge)
+                    // bulgePinchFactor = -wetness - 1 (for pinch)
+                    double wetness = (brushType==8) ? (double)(bulgePinchFactor - 1) : (double)(-bulgePinchFactor - 1);
+                    double t = wetness / 32.0;
+                    if (t < 0.0) t = 0.0;
+                    if (t > 1.0) t = 1.0;
+
+                    double t2 = t * t;
+                    double p = 1.0;
+                    if (brushType==8) // bulge
+                        p = 1.0 + 7.0 * (t2/5);
+                    else // pinch
+                        p = 1.0 - 0.9 * (t2/2);
+
+                    double warped_r = R * pow(r, p);
+                    double warped_dx = dx * (warped_r / r_dest);
+                    double warped_dy = dy * (warped_r / r_dest);
+
+                    // Blend coordinates based on softness mask
+                    double w = mask_val / 255.0;
+                    src_dx = dx * (1.0 - w) + warped_dx * w;
+                    src_dy = dy * (1.0 - w) + warped_dy * w;
+                }
+            }
+
+            // Sequential/cache-friendly pixel lookups (100% L1/L2 hits)
+            unsigned char* targetPixel = imgData + rowOffset + px * bytesPerPixel;
+
+            // Read target color (BGRA or BGR)
+            int tgtB = targetPixel[0];
+            int tgtG = targetPixel[1];
+            int tgtR = targetPixel[2];
+            int tgtA = (bytesPerPixel==4) ? targetPixel[3] : 255;
+
+            // Prepare output color
+            int outB = tgtB;
+            int outG = tgtG;
+            int outR = tgtR;
+            int outA = tgtA;
+            int srcB = tgtB;
+            int srcG = tgtG;
+            int srcR = tgtR;
+            int srcA = tgtA;
+            float weight = mask_fval * opaf;
+            if (brushType==6)
+            {
+                if (bulgePinchFactor>0)
+                {
+                    int wetness = bulgePinchFactor - 1;
+                    if (wetness>15)
+                    {
+                        double weight_boost = 1.0 + 1.5 * ((wetness - 15) / 7.0);
+                        weight = clamp((float)(weight * weight_boost), 0.0f, 1.0f);
+                    }
+                } else
+                {
+                    weight = clamp(weight * 1.5f, 0.0f, 1.0f);
+                }
+            }
+
+            if (brushType<=5 && brushOverDraw==0 && overDrawOkay==1)
+            {
+                int cx = px >> 7;
+                size_t chunkIdx = cy_grid + cx;
+                float* chunk = brushOpacityChunks[chunkIdx];
+                if (!chunk)
+                {
+                    try {
+                        chunk = new float[128 * 128]();
+                        brushOpacityChunks[chunkIdx] = chunk;
+                    } catch (const std::bad_alloc&) {
+                        continue;
+                    }
+                }
+
+                int px_mod = px & 127;
+                int pixelIdx = py_mod_shift + px_mod;
+                float accOpa = chunk[pixelIdx];
+                if (accOpa>=opaf)
+                   continue;
+
+                float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
+                if (weight>=maxAllowedWeight)
+                {
+                    weight = maxAllowedWeight;
+                    chunk[pixelIdx] = opaf;
+                } else
+                {
+                    chunk[pixelIdx] = accOpa + weight - accOpa * weight;
+                }
+            }
+
+            int weightInt = clamp(weight * 255.0f, 0.0f, 255.0f);
+
+            int origB = tgtB;
+            int origG = tgtG;
+            int origR = tgtR;
+            int origA = tgtA;
+            float blendWeight = weight;
+            int blendWeightInt = weightInt;
+
+            if (!brushOriginalPixels.empty())
+            {
+                size_t origIdx = ((size_t)iy * imgW + px) * 3;
+                origB = brushOriginalPixels[origIdx];
+                origG = brushOriginalPixels[origIdx + 1];
+                origR = brushOriginalPixels[origIdx + 2];
+
+                int cx = px >> 7;
+                size_t chunkIdx = cy_grid + cx;
+                float* chunk = brushOpacityChunks[chunkIdx];
+                if (chunk)
+                {
+                    int px_mod = px & 127;
+                    int pixelIdx = py_mod_shift + px_mod;
+                    blendWeight = chunk[pixelIdx];
+                    blendWeightInt = clamp(blendWeight * 255.0f, 0.0f, 255.0f);
+                }
+
+                if (blendWeight < 0.999f)
+                {
+                    origA = clamp((int)round((tgtA - blendWeight * 255.0f) / (1.0f - blendWeight)), 0, 255);
+                }
+            }
+            if (brushType==1 || brushType==2)
+            {
+                // Paint brush: Solid/Soft Color
+                srcR = brushR;
+                srcG = brushG;
+                srcB = brushB;
+                srcA = brushA;
+            } else if (brushType==3)
+            {
+                // Cloner brush: sample from srcData
+                int srcX_raw = (int)round(px - offX);
+                int srcY_raw = (int)round(py - offY);
+                if (srcX_raw < 0 || srcX_raw >= imgW || srcY_raw < 0 || srcY_raw >= imgH)
+                   continue;
+                int srcX = srcX_raw;
+                int srcY = srcY_raw;
+                unsigned char* srcData = cloneData ? cloneData : imgData;
+                int srcPitch = cloneData ? clonePitch : pitch;
+                int s_iy = imgH - 1 - srcY;
+                unsigned char* srcPixel = srcData + (INT64)s_iy * srcPitch + srcX * bytesPerPixel;
+
+                const int effB = srcPixel[0];
+                const int effG = srcPixel[1];
+                const int effR = srcPixel[2];
+                const int effA = (bytesPerPixel == 4) ? srcPixel[3] : 255;
+
+                RGBA16color pixel = { char_to_int[effB], char_to_int[effG], char_to_int[effR], char_to_int[effA] };
+                if (brushBright!=0)
+                   pixel.brightness(brushBright, 1, 0, fiBright);
+
+                if (brushContra!=0)
+                   pixel.contrast(brushContra, 0, linearGamma, factorContrast, 0, fiContra);
+
+                if (brushHue!=0)
+                   pixel.hueRotate(brushHue, saturateFactor, 1, brushSat);
+
+                if (brushSat!=0)
+                   pixel.saturation(brushSat, 1, linearGamma, saturateFactor);
+
+                srcB = int_to_char[pixel.b];
+                srcG = int_to_char[pixel.g];
+                srcR = int_to_char[pixel.r];
+                srcA = int_to_char[pixel.a];
+            } else if (brushType==4)
+            {
+                // Eraser brush
+                if (bytesPerPixel == 3)
+                {
+                    // Restore mode: restore color and alpha from cloneData
+                    srcR = 0;
+                    srcG = 0;
+                    srcB = 0;
+                    srcA = 255;
+                } else if (bytesPerPixel == 4)
+                {
+                    if (eraserMode == 1)
+                       srcA = ropacity;  // Replace/overdraw alpha
+                    else
+                       srcA = 0;        // Standard erase: reduce alpha
+                }
+            } else if (brushType==5)
+            {
+                // Effects brush: Hue, Saturation, Lightness, Gamma, Blur
+                int effB = origB;
+                int effG = origG;
+                int effR = origR;
+                int effA = origA;
+
+                // 1. Box Blur using OpenCV
+                if (hasBlurredRoi)
+                {
+                    int localX = px - roiStartX;
+                    int localY = roiEndY - py;
+                    if (localX >= 0 && localX < blurredRoi.cols && localY >= 0 && localY < blurredRoi.rows)
+                    {
+                        const unsigned char* blurredPixel = blurredRoi.ptr<unsigned char>(localY, localX);
+                        effB = blurredPixel[0];
+                        effG = blurredPixel[1];
+                        effR = blurredPixel[2];
+                        if (bytesPerPixel == 4)
+                           effA = blurredPixel[3];
+                    }
+                }
+
+                // 2. Lightness, Gamma/Contrast, Hue, Saturation adjustments using RGBA16color
+                RGBA16color pixel = { char_to_int[effB], char_to_int[effG], char_to_int[effR], char_to_int[effA] };
+                if (brushBright!=0)
+                   pixel.brightness(brushBright, 1, 0, fiBright);
+
+                if (brushContra!=0)
+                   pixel.contrast(brushContra, 0, linearGamma, factorContrast, 0, fiContra);
+
+                if (brushHue!=0)
+                   pixel.hueRotate(brushHue, saturateFactor, 1, brushSat);
+
+                if (brushSat!=0)
+                   pixel.saturation(brushSat, 1, linearGamma, saturateFactor);
+
+                srcB = int_to_char[pixel.b];
+                srcG = int_to_char[pixel.g];
+                srcR = int_to_char[pixel.r];
+                srcA = int_to_char[pixel.a];
+            } else if (brushType==6)
+            {
+                // Smudge brush: grab pixels from previous offset position with bilinear interpolation
+                double srcXf = clamp((double)px - cloneOffsetX, 0.0, (double)(imgW - 1));
+                double srcYf = clamp((double)py - cloneOffsetY, 0.0, (double)(imgH - 1));
+
+                int x1 = (int)floor(srcXf);
+                int y1 = (int)floor(srcYf);
+                int x2 = clamp(x1 + 1, 0, imgW - 1);
+                int y2 = clamp(y1 + 1, 0, imgH - 1);
+
+                double fx = srcXf - floor(srcXf);
+                double fy = srcYf - floor(srcYf);
+
+                double w11 = (1.0 - fx) * (1.0 - fy);
+                double w21 = fx * (1.0 - fy);
+                double w12 = (1.0 - fx) * fy;
+                double w22 = fx * fy;
+
+                unsigned char *p11, *p21, *p12, *p22;
+                if (!localClone.empty())
+                {
+                    int lx1 = clamp(x1 - cloneStartX, 0, cloneW - 1);
+                    int ly1 = clamp(y1 - cloneStartY, 0, cloneH - 1);
+                    int lx2 = clamp(x2 - cloneStartX, 0, cloneW - 1);
+                    int ly2 = clamp(y2 - cloneStartY, 0, cloneH - 1);
+
+                    p11 = localClone.data() + (INT64)ly1 * localPitch + lx1 * bytesPerPixel;
+                    p21 = localClone.data() + (INT64)ly1 * localPitch + lx2 * bytesPerPixel;
+                    p12 = localClone.data() + (INT64)ly2 * localPitch + lx1 * bytesPerPixel;
+                    p22 = localClone.data() + (INT64)ly2 * localPitch + lx2 * bytesPerPixel;
+                } else
+                {
+                    unsigned char* srcData = cloneData ? cloneData : imgData;
+                    int srcPitch = cloneData ? clonePitch : pitch;
+
+                    int s_iy1 = imgH - 1 - y1;
+                    int s_iy2 = imgH - 1 - y2;
+
+                    p11 = srcData + (INT64)s_iy1 * srcPitch + x1 * bytesPerPixel;
+                    p21 = srcData + (INT64)s_iy1 * srcPitch + x2 * bytesPerPixel;
+                    p12 = srcData + (INT64)s_iy2 * srcPitch + x1 * bytesPerPixel;
+                    p22 = srcData + (INT64)s_iy2 * srcPitch + x2 * bytesPerPixel;
+                }
+
+                srcB = (int)round(w11 * p11[0] + w21 * p21[0] + w12 * p12[0] + w22 * p22[0]);
+                srcG = (int)round(w11 * p11[1] + w21 * p21[1] + w12 * p12[1] + w22 * p22[1]);
+                srcR = (int)round(w11 * p11[2] + w21 * p21[2] + w12 * p12[2] + w22 * p22[2]);
+                if (bytesPerPixel == 4)
+                   srcA = (int)round(w11 * p11[3] + w21 * p21[3] + w12 * p12[3] + w22 * p22[3]);
+                else
+                   srcA = 255;
+            } else if (brushType==7 || brushType==8)
+            {
+                // Pinch / Bulge brush: scale coordinate mapping with bilinear interpolation
+                double srcXf = clamp(tkX + src_dx, 0.0, (double)(imgW - 1));
+                double srcYf = clamp(tkY + src_dy, 0.0, (double)(imgH - 1));
+
+                int x1 = (int)floor(srcXf);
+                int y1 = (int)floor(srcYf);
+                int x2 = clamp(x1 + 1, 0, imgW - 1);
+                int y2 = clamp(y1 + 1, 0, imgH - 1);
+
+                double fx = srcXf - floor(srcXf);
+                double fy = srcYf - floor(srcYf);
+
+                double w11 = (1.0 - fx) * (1.0 - fy);
+                double w21 = fx * (1.0 - fy);
+                double w12 = (1.0 - fx) * fy;
+                double w22 = fx * fy;
+
+                unsigned char *p11, *p21, *p12, *p22;
+                if (!localClone.empty())
+                {
+                    int lx1 = clamp(x1 - cloneStartX, 0, cloneW - 1);
+                    int ly1 = clamp(y1 - cloneStartY, 0, cloneH - 1);
+                    int lx2 = clamp(x2 - cloneStartX, 0, cloneW - 1);
+                    int ly2 = clamp(y2 - cloneStartY, 0, cloneH - 1);
+
+                    p11 = localClone.data() + (INT64)ly1 * localPitch + lx1 * bytesPerPixel;
+                    p21 = localClone.data() + (INT64)ly1 * localPitch + lx2 * bytesPerPixel;
+                    p12 = localClone.data() + (INT64)ly2 * localPitch + lx1 * bytesPerPixel;
+                    p22 = localClone.data() + (INT64)ly2 * localPitch + lx2 * bytesPerPixel;
+                } else
+                {
+                    unsigned char* srcData = cloneData ? cloneData : imgData;
+                    int srcPitch = cloneData ? clonePitch : pitch;
+
+                    int s_iy1 = imgH - 1 - y1;
+                    int s_iy2 = imgH - 1 - y2;
+
+                    p11 = srcData + (INT64)s_iy1 * srcPitch + x1 * bytesPerPixel;
+                    p21 = srcData + (INT64)s_iy1 * srcPitch + x2 * bytesPerPixel;
+                    p12 = srcData + (INT64)s_iy2 * srcPitch + x1 * bytesPerPixel;
+                    p22 = srcData + (INT64)s_iy2 * srcPitch + x2 * bytesPerPixel;
+                }
+
+                srcB = (int)round(w11 * p11[0] + w21 * p21[0] + w12 * p12[0] + w22 * p22[0]);
+                srcG = (int)round(w11 * p11[1] + w21 * p21[1] + w12 * p12[1] + w22 * p22[1]);
+                srcR = (int)round(w11 * p11[2] + w21 * p21[2] + w12 * p12[2] + w22 * p22[2]);
+                if (bytesPerPixel == 4)
+                   srcA = (int)round(w11 * p11[3] + w21 * p21[3] + w12 * p12[3] + w22 * p22[3]);
+                else
+                   srcA = 255;
+            }
+
+            if (brushType==4 && bytesPerPixel==4)
+            {
+               outA = weighTwoValues(srcA, origA, blendWeight);
+               outA = weighTwoValues(srcA, origA, blendWeight);
+               outA = weighTwoValues(srcA, origA, blendWeight);
+               outA = weighTwoValues(srcA, origA, blendWeight);
+            } else if (blendMode==24)
+            {
+               float factor = (opaf > 0.0f) ? clamp(blendWeight / opaf, 0.0f, 1.0f) : blendWeight;
+               outR = weighTwoValues(srcR, origR, blendWeight);
+               outG = weighTwoValues(srcG, origG, blendWeight);
+               outB = weighTwoValues(srcB, origB, blendWeight);
+               outA = weighTwoValues(opacity, origA, factor);
+            } else
+            {
+               outA = 255 - clamp(max(srcA, blendWeightInt) - min(srcA, blendWeightInt), 0, 255);
+               RGBAColor Orgb = { srcB, srcG, srcR, outA };
+               RGBAColor Brgb = { origB, origG, origR, origA };
+               RGBAColor blended = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 0, imgBpp, 0);
+               outR = blended.r;
+               outG = blended.g;
+               outB = blended.b;
+               outA = blended.a;
+            }
+
+            // Write back to imgData
+            targetPixel[0] = clamp(outB, 0, 255);
+            targetPixel[1] = clamp(outG, 0, 255);
+            targetPixel[2] = clamp(outR, 0, 255);
+            if (bytesPerPixel==4)
+               targetPixel[3] = clamp(outA, 0, 255);
+        }
+    }
+    return 1;
+}
+

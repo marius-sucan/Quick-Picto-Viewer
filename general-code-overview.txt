@@ -1034,6 +1034,9 @@ n) How to add a new panel/tool
    The image data processing should happen inside C/C++ functions, inside the qpvmain.dll
    or via GDI+. Most of the image editing tools in Quick Picto Viewer rely on the DLL.
 
+   The image processing function meant to be executed on Apply, should be registered
+   in applyIMGeditFunction().
+
    To store settings, create corresponding functions: ReadSettingsMyNewToolPanel()
    and WriteSettingsMyNewToolPanel(). It is recommended to store the data to the
    registry for settings that do not pertain to the image viewer functions.
@@ -1043,3 +1046,5 @@ n) How to add a new panel/tool
    You can add a menu item to open the panel in one of the many functions that begin
    with createMenu*(). Use the kMenu() helper function to have it automatically indexed 
    by the search menu options panel.
+
+   

@@ -1,4 +1,4 @@
-#Persistent
+﻿#Persistent
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
 #HotkeyInterval, 50

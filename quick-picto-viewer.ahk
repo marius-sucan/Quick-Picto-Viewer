@@ -34,7 +34,7 @@
 ; on this repository: https://github.com/marius-sucan/FreeImage-library/tree/qpv
 ; I fixed and improved various things, compared to the original version.
 ;
-; Original Licence: GPL. Please reffer to this page for more information. http://www.gnu.org/licenses/gpl.html
+; Original Licence: GPL. Please refer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ; Current licence: I do not know, I do not care. Licences are for obedient entities.
 ;
 ;@Ahk2Exe-AddResource Lib\module-interface.ahk
@@ -44,8 +44,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.1.76
-;@Ahk2Exe-SetProductVersion 6.1.76
+;@Ahk2Exe-SetVersion 6.1.79
+;@Ahk2Exe-SetProductVersion 6.1.79
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2026)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -68,7 +68,7 @@ CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
 CoordMode, Menu, Screen
 SetWorkingDir, %A_ScriptDir%
-#Include %A_ScriptDir%\Lib\Gdip_All.ahk           ; graphics display interface plus v1.1, extended compilation editon
+#Include %A_ScriptDir%\Lib\Gdip_All.ahk           ; graphics display interface plus v1.1, extended compilation edition
 #Include %A_ScriptDir%\Lib\Gdi.ahk                ; graphics display interface written by Marius Șucan
 #Include %A_ScriptDir%\Lib\SGdiPrint.ahk
 #Include %A_ScriptDir%\Lib\freeimage-wrapper.ahk  ; used to load exotic file formats, written by Marius Șucan
@@ -222,7 +222,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.1.76", vReleaseDate := "2026/04/02" ; yyyy-mm-dd
+   , appVersion := "6.1.79", vReleaseDate := "2026/06/08" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -385,7 +385,6 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
    , autoApplyVPcolors := 1
-
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -2343,8 +2342,9 @@ initQPVmainDLL(modus:=0) {
    }
 
    Static srcDll := "e:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\qpv-main\x64\Release\qpvmain.dll"
+   Static AIsrcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\_github\isucan-Quick-Picto-Viewer\QPV DLL source code\x64\Release\qpvmain.dll"
    If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && FileExist(srcDll))
-      DllPath := srcDll
+      DllPath := (InStr(A_ScriptDir, "\isucan-") && FileExist(AIsrcDll)) ?  AIsrcDll : srcDll
 
    qpvMainDll := DllCall("LoadLibraryW", "WStr", DllPath, "UPtr")
    addJournalEntry("INIT main QPV dll: " A_LastError "==" qpvMainDll "==" DllPath)
@@ -2613,7 +2613,8 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 endCaptureCloneBrush() {
    mustCaptureCloneBrush := 0
    interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
-   SetTimer, createGUItoolbar, -150
+   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVmenu")
+   createGUItoolbar()
 }
 
 resetMainWin2Welcome() {
@@ -5161,8 +5162,9 @@ panIMGonScrollBar(doX, doY) {
          prevState := thisState
          dummyResizeImageGDIwin()
       }
+
       If (thisIndex<4)
-        Sleep, 70
+         Sleep, 70
    }
 
    setWhileLoopExec(0)
@@ -5622,9 +5624,9 @@ vpWinClientSize(ByRef w, ByRef h, hwnd:=0, mode:=0) {
 }
 
 BtnSetBrushSymmetryCoords() {
-   If (BrushToolType>5)
+   If !isPaintSymmetryModeAllowed()
    {
-      showTOOLtip("WARNING: Symmetry painting not available for the current brush type")
+      showTOOLtip("WARNING: Symmetry painting mode not available for the current brush mode.")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -5661,8 +5663,8 @@ setNewBrushSymmetryPoints() {
       MouseCoords2Image(mX, mY, 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
       ; tinyPrevAreaCoordX := kX, tinyPrevAreaCoordY := kY
       showTOOLtip("Symmetry point coordinates set to`n" kX " / " kY)
-      BrushToolSymmetryPointX := Round(kX/imgW, 5)
-      BrushToolSymmetryPointY := Round(kY/imgH, 5)
+      BrushToolSymmetryPointX := Round(kX/imgW, 8)
+      BrushToolSymmetryPointY := Round(kY/imgH, 8)
       If (A_TickCount - thisZeit>90)
       {
          dummyRefreshImgSelectionWindow()
@@ -5738,7 +5740,10 @@ MouseMoveResponder(actu:=0) {
      SetTimer, dummyRefreshImgSelectionWindow, -2
   } Else If (liveDrawingBrushTool=1 && AnyWindowOpen && AnyWindowOpen!=66)
   {
-     brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+     brushSize := (BrushToolDoubleSize=1) ? BrushToolSize*2 : BrushToolSize
+     If (viewportQPVimage.imgHandle && BrushToolDoubleSize=1)
+        brushSize := BrushToolSize*4
+
      thisSize := (AnyWindowOpen=64) ? brushSize * zoomLevel : brushSize * viewportDynamicOBJcoords.zl
      Gdip_ResetClip(2NDglPG)
      vpWinClientSize(mainWidth, mainHeight)
@@ -5764,7 +5769,7 @@ MouseMoveResponder(actu:=0) {
         }
 
         GetMouseCoord2wind(PVhwnd, mX, mY)
-        If ((A_TickCount - lastInvoked > 90) && BrushToolAutoAngle=1)
+        If ((A_TickCount - lastInvoked > 90) && BrushToolAutoAngle=1 && BrushToolType<=6)
         {
            If (prevMouseCoords[1] && prevMouseCoords[2]
            && !isDotInRect(mX, mY, prevMouseCoords[1] - 10, prevMouseCoords[1] + 10, prevMouseCoords[2] - 10, prevMouseCoords[2] + 10))
@@ -5790,10 +5795,10 @@ MouseMoveResponder(actu:=0) {
  
         mX := (FlipImgH=1) ? mainWidth - mX : mX
         mY := (FlipImgV=1) ? mainHeight - mY : mY
-        tmpPath := createBrushShapePath(thisSize, mX, mY, BrushToolAspectRatio, BrushToolAngle + 180)
+        thisAR := (BrushToolType>6) ? 0 : BrushToolAspectRatio
+        tmpPath := createBrushShapePath(thisSize, mX, mY, thisAR, BrushToolAngle + 180)
         Gdip_SetPenWidth(pPen1d, SelDotsSize/3 + 1)
         Gdip_SetPenWidth(pPen2, SelDotsSize/5 + 1)
-
         Gdip_ResetWorldTransform(2NDglPG)
         If (showHUDnavIMG=1)
            Gdip_SetClipRect(2NDglPG, HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[5], HUDobjNavBoxu[6], 4)
@@ -5818,7 +5823,7 @@ MouseMoveResponder(actu:=0) {
         brushSize := (brushSize*brushSofty)*zoomLevel
         If (BrushToolType!=1 && isInRange(BrushToolSoftness, 2, 98) && brushSize>9)
         {
-           tmpPath2 := createBrushShapePath(brushSize, mX, mY, BrushToolAspectRatio, BrushToolAngle + 180)
+           tmpPath2 := createBrushShapePath(brushSize, mX, mY, thisAR, BrushToolAngle + 180)
            ; Gdip_DrawPath(2NDglPG, pPen2, tmpPath2)
            Gdip_DrawPath(2NDglPG, pPen1d, tmpPath2)
            Gdip_DeletePath(tmpPath2)
@@ -6064,7 +6069,8 @@ corelivePreviewsImageEditing(modus:=0) {
          livePreviewSimpleColorsAdjustImage()
    }
 
-   fnOutputDebug("redraw: " A_ThisFunc)
+   If (liveDrawingBrushTool!=1)
+      fnOutputDebug("redraw: " A_ThisFunc)
    If (showViewPortGrid=1 && imgEditPanelOpened=1)
       drawVPgridsNow(mainWidth, mainHeight, 2NDglPG)
 
@@ -9722,7 +9728,10 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    } Else If (AnyWindowOpen=64 && spaceState!=1 && imgEditPanelOpened=1 && liveDrawingBrushTool=1)
    {
       ; respond to clicks when drawing with the brush tools
-      SetTimer, ActPaintBrushNow, -5
+      If (viewportQPVimage.imgHandle)
+         SetTimer, ActPaintBrushLargeNow, -5
+      Else
+         SetTimer, ActPaintBrushNow, -5
       Return
    } Else If (AnyWindowOpen=66 && spaceState!=1 && imgEditPanelOpened=1 && FloodFillSelectionAdj=0)
    {
@@ -16536,6 +16545,7 @@ coreChangeImgUndoLevel(levelu) {
    pp := (AnyWindowOpen=64 && autoApplyVPcolors!=1) ? 1 : 0
    If !pp
       imgFxMode := 1
+
    discardViewPortCaches()
    INIaction(1, "usrColorDepth", "General")
    INIaction(1, "vpIMGrotation", "General")
@@ -16844,6 +16854,9 @@ alertReduceSaveColorDepth() {
 
 downscaleHugeImagesForEditing() {
     If !(viewportQPVimage.imgHandle)
+       Return 0
+
+    If (AnyWindowOpen=64 || liveDrawingBrushTool=1)
        Return 0
 
    trGdip_GetImageDimensions(useGdiBitmap(), w, h)
@@ -19942,7 +19955,7 @@ dummyDrawImage(pEffect, clrMatrix, zBitmap, G2, funcu) {
 }
 
 recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0, doAsk:=1) {
-   Static lastu := [], hFIFimgA
+   Static lastu := [], hFIFimgA, lastImg
    If (imgSelPx="get-bmp")
    {
       Return lastu
@@ -19987,6 +20000,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       }
 
       showTOOLtip("Recording undo level...", "nully")
+      sTime := A_TickCount
       calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
       hFIFimgA := FreeImage_Copy(viewportQPVimage.imgHandle, 0, 0, imgW, imgH)
       If !hFIFimgA
@@ -19997,6 +20011,12 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
          lastu := [hFIFimgA, "entire-vp", 0, 0, imgW, imgH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
       ; ToolTip, % imgSelPx "|" invertArea , , , 2
       showTOOLtip("nully")
+      loadTime := Round((A_TickCount - sTime)/60, 1)
+      If (loadTime>30 && lastImg!=getIDimage(currentFileIndex))
+      {
+         lastImg := getIDimage(currentFileIndex)
+         preventUndoLevels := 1
+      }
       Return hFIFimgA ? 1 : 0
    }
 
@@ -20010,12 +20030,19 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
       }
 
       showTOOLtip("Recording undo level...", "nully")
+      sTime := A_tickcount
       y1 := imgH - imgSelH - imgSelPy
       hFIFimgA := FreeImage_Crop(viewportQPVimage.imgHandle, imgSelPx, y1, imgSelW, imgSelH)
       If !hFIFimgA
          addJournalEntry("Failed to extract subsection of the main bitmap. Unable to record undo level.")
       lastu := [hFIFimgA, flastu, imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
       showTOOLtip("nully")
+      loadTime := Round((A_TickCount - sTime)/60, 1)
+      If (loadTime>30 && lastImg!=getIDimage(currentFileIndex))
+      {
+         lastImg := getIDimage(currentFileIndex)
+         preventUndoLevels := 1
+      }
    } Else
    {
       ; undoable actions that do not rely on a bitmap, because they are bidirectional actions, eg. flip, invert
@@ -20125,12 +20152,13 @@ undoRedoHugeImagesAct() {
          Return
       }
 
+      sTime := A_TickCount
       tFrames := frameu := 1
       imgPath := viewportQPVimage.ImgFile
       viewportQPVimage.DiscardImage()
       killQPVscreenImgSection()
       Sleep, 1
-      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
+      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, 0, sTime], 1)
       SoundBeep 900, 100
       RemoveTooltip()
       currentImgModified := 1
@@ -20348,6 +20376,7 @@ MenuPerformTeleportToFIM() {
 
 convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
    Critical, on
+   sTime := A_TickCount
    whichBitmap := useGdiBitmap()
    If !validBMP(whichBitmap)
    {
@@ -20389,7 +20418,7 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
    killQPVscreenImgSection()
    currentImgModified := 1
    imgIndexEditing := currentFileIndex
-   r := viewportQPVimage.LoadImage(imgPath, 1, 0, 1, [hFIFimgA, 1], 1)
+   r := viewportQPVimage.LoadImage(imgPath, 1, 0, 1, [hFIFimgA, 1, 0, sTime], 1)
    If r
    {
       modus := (quality>=8) ? "new-image" : "resize"
@@ -20408,6 +20437,7 @@ HugeImagesConvertClrDepth(modus) {
    If warnHugeImageNotFIM()
       Return
 
+   sTime := A_TickCount
    hFIFimgX := viewportQPVimage.imgHandle
    oimgBPP := FreeImage_GetBPP(hFIFimgX)
    imgBPP := Trimmer(StrReplace(oimgBPP, "-"))
@@ -20478,7 +20508,7 @@ HugeImagesConvertClrDepth(modus) {
       viewportQPVimage.DiscardImage()
       killQPVscreenImgSection()
       Sleep, 1
-      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
+      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, 0, sTime], 1)
       SoundBeep 900, 100
       currIMGdetails.HasAlpha := InStr(ColorsType, "rgba") ? 1 : 0
       currIMGdetails.RawFormat := fileType " | " imgType
@@ -21824,6 +21854,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
    If warnHugeImageNotFIM()
       Return
 
+   sTime := A_TickCount
    xx := (modus="resize") ? Ceil(w*1.5) : zw
    yy := (modus="resize") ? Ceil(h*1.5) : zh
    If (modus="new-image")
@@ -21885,7 +21916,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       viewportQPVimage.DiscardImage()
       killQPVscreenImgSection()
       Sleep, 1
-      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
+      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, 0, sTime], 1)
       If isVarEqualTo(modus,"resize", "new-image","rotate90")
       {
          oimgBPP := FreeImage_GetBPP(hFIFimgA)
@@ -27307,7 +27338,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
           Return
        }
 
-       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 30, 31, 32, 55, 65, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
+       rzx := isVarEqualTo(IDwin, 12, 23, 24, 25, 30, 31, 32, 55, 64, 65, 66, 70, 89) ? 0 : downscaleHugeImagesForEditing()
        If (rzx<0 || rzx=1)
        {
           openingPanelNow := 0
@@ -43441,9 +43472,9 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects options|Randomize
     Gui, Tab, 1 ; general
     GuiAddDropDownList("x+15 y+15 w" slideWid " Section AltSubmit gupdateUIbrushTool Choose" BrushToolType " vBrushToolType", "Simple solid color|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge", "Brush type")
-    Gui, Add, Checkbox, x+10 hp wp +0x1000 gupdateUIbrushTool Checked%BrushToolEraserRestore% vBrushToolEraserRestore , Restore pixels opacity
-    wo := (PrefsLargeFonts=1) ? slideWid // 2 + 40 : slideWid // 2 + 5
-    Gui, Add, Button, xp yp hp w%wo% gBtnSetClonerBrushSource vuiBtnSetCloner, &Define source
+    wo := (PrefsLargeFonts=1) ? slideWid // 2 + 75 : slideWid // 2 + 30
+    Gui, Add, Checkbox, x+10 hp w%wo% +0x1000 gupdateUIbrushTool Checked%BrushToolEraserRestore% vBrushToolEraserRestore , Redefine opacity
+    Gui, Add, Button, xp yp hp wp gBtnSetClonerBrushSource vuiBtnSetCloner, &Define source
     Gui, Add, Text, xs y+10 h%hasa% w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop +hwndhBtnTglClrA, [X]
     ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolAcolor")
@@ -43457,9 +43488,10 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolBcolor")
     GuiAddColor("x+5 hp w60", "BrushToolBcolor")
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × 2
+    kk := (viewportQPVimage.imgHandle) ? 4 : 2
+    Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × %kk%
 
-    GuiAddSlider("BrushToolSize", 1,950, 25, "Brush size: $€", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
+    GuiAddSlider("BrushToolSize", 1,980, 25, ".updateLabelBrushSize", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", "updateUIbrushTool", 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", "updateUIbrushTool", 2, "xs y+10 wp hp")
     GuiAddSlider("BrushToolAngle", -180,180, 0, "Angle: $€°", "updateUIbrushTool", 2, "x+10 wp hp")
@@ -43994,6 +44026,13 @@ updateLabelBrushStep() {
    Return "Steps interpolation: " stepu
 }
 
+updateLabelBrushSize() {
+   theSizeLabel := (BrushToolDoubleSize!=1) ? "Diameter: " BrushToolSize " px" : "Radius: " BrushToolSize " px"
+   If (viewportQPVimage.imgHandle && BrushToolDoubleSize=1)
+      theSizeLabel := "Diameter: " BrushToolSize*4 " px"
+   Return theSizeLabel
+}
+
 updateLabelSlidesSpeed() {
    If (slideShowDelay>=1000)
       p := Round(slideShowDelay/1000, 1) " s"
@@ -44070,35 +44109,32 @@ updateUIbrushTool() {
          }
       }
 
-      actu := (BrushToolType=3) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      actu := (BrushToolType>6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
       GuiControl, % actu, BrushToolOverDraw
 
-      tehLabel := (BrushToolType>=6) ? "&Auto-scale deformer" : "&Airbrush mode"
+      tehLabel := (BrushToolType=6) ? "&Auto-scale deformer" : "&Airbrush mode"
       GuiControl, SettingsGUIA: Text, BrushToolOverDraw, %tehLabel%
       uiSlidersArray["BrushToolStepping", 10] :=  (BrushToolType>=7) ? 0 : 1
-      uiSlidersArray["BrushToolSoftness", 10] := (BrushToolTexture>1 || BrushToolType=1) ? 0 : 1
-      uiSlidersArray["BrushToolAspectRatio", 10] := (BrushToolTexture>1 && BrushToolType>1) ? 0 : 1
+      uiSlidersArray["BrushToolSoftness", 10] := (BrushToolTexture>1 && BrushToolType<=6 || BrushToolType=1) ? 0 : 1
+      uiSlidersArray["BrushToolAspectRatio", 10] := (BrushToolTexture>1 && BrushToolType>1 || BrushToolType>6) ? 0 : 1
 
-      actu := (BrushToolType=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      actu := !isInRange(BrushToolType, 2, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
       GuiControl, % actu, BrushToolTexture
 
       actu := (BrushToolType=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
       GuiControl, % actu, uiBtnSetCloner
 
-      actu := (BrushToolType=3 || BrushToolType=8) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-      GuiControl, % actu, BrushToolDynamicCloner
+      actu := (BrushToolType>6) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
+      GuiControl, % actu, BrushToolAutoAngle
 
-      tehLabel := (BrushToolType=8) ? "Bulge out&wards more" : "D&ynamic X/Y source coordinates"
-      GuiControl, SettingsGUIA: Text, BrushToolDynamicCloner, %tehLabel%
+      actu := (BrushToolType=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      GuiControl, % actu, BrushToolDynamicCloner
 
       actu := (BrushToolType=4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
       GuiControl, % actu, BrushToolEraserRestore
 
-      theSizeLabel := (BrushToolDoubleSize!=1) ? "Diameter: $€ px" : "Radius: $€ px"
-      uiSlidersArray["BrushToolAngle", 10] := !BrushToolAutoAngle
-      uiSlidersArray["BrushToolSize", 5] := theSizeLabel
-
-      If (BrushToolType=1 && BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
+      uiSlidersArray["BrushToolAngle", 10] := (BrushToolType>6) ? 0 : !BrushToolAutoAngle
+      If (BrushToolType=1 && BrushToolSymmetryX=1 && BrushToolSymmetryY=1 && !viewportQPVimage.imgHandle)
          GuiControl, SettingsGUIA: Disable, BrushToolOverDraw
       Else If (BrushToolType=1 || BrushToolType=2)
          GuiControl, SettingsGUIA: Enable, BrushToolOverDraw
@@ -44107,9 +44143,9 @@ updateUIbrushTool() {
    } Else If (CurrentPanelTab=2)
    {
       uiSlidersArray["BrushToolWetness", 10] := (BrushToolType<=2 || BrushToolType>=6) ? 1 : 0
-      uiSlidersArray["BrushToolBlurStrength", 10] := (BrushToolType=3 || BrushToolType=5) ? 1 : 0
+      uiSlidersArray["BrushToolBlurStrength", 10] := (BrushToolType=5) ? 1 : 0
 
-      actu := (BrushToolType=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      actu := (BrushToolType=2 || BrushToolType=3 || BrushToolType>=5) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, BrushToolBlendMode
       GuiControl, % actu, BlendModesFlipped
 
@@ -44125,7 +44161,10 @@ updateUIbrushTool() {
       wetLabel := (BrushToolType>=6) ? "Deform intensity" : "Wetness"
       uiSlidersArray["BrushToolWetness", 5] := wetLabel
 
-      actu := (BrushToolType<6) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      actu := (viewportQPVimage.imgHandle) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      GuiControl, % actu, autoApplyVPcolors
+
+      actu := isPaintSymmetryModeAllowed() ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, infoSymmetryLabel
       GuiControl, % actu, BTNuiSetLabelSymmetry
       GuiControl, % actu, BrushToolSymmetryX
@@ -44236,14 +44275,14 @@ createLivePreviewBrush() {
     }
 
     Gdip_GraphicsClear(G, "0xFF888888")
-    brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
     whichBitmap := useGdiBitmap()
-    If ((BrushToolType=3 || BrushToolType=5) && CurrentPanelTab=2)
+    brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+    If ((BrushToolType=3 || BrushToolType=5) && CurrentPanelTab=2 && !viewportQPVimage.imgHandle)
     {
        brushu := createClonedBrushBitmap(brushSize, 101 - BrushToolSoftness, BrushToolAngle, BrushToolAspectRatio, whichBitmap, 0, 0, 1, 1, 1)
        applyPersonalizedColorsBMP(brushu, 1, BrushToolBlurStrength, BrushToolApplyColorFX)
        thisMainOpacity := 1
-    } Else If (BrushToolType=3 && CurrentPanelTab=1)
+    } Else If (BrushToolType=3 && CurrentPanelTab=1 && !viewportQPVimage.imgHandle)
     {
        brushu := createClonedBrushBitmap(brushSize, 101 - BrushToolSoftness, BrushToolAngle, BrushToolAspectRatio, whichBitmap, 0, 0, 1, 0, 1)
        thisMainOpacity := BrushToolAopacity / 255
@@ -46688,7 +46727,7 @@ ReadSettingsBrushPanel(act:=0) {
       delayedWriteTlbrColors(act)
 
    RegAction(act, "autoApplyVPcolors",, 1)
-   RegAction(act, "BrushToolSize",, 2, 2, 950)
+   RegAction(act, "BrushToolSize",, 2, 2, 990)
    RegAction(act, "BrushToolAutoAngle",, 1)
    RegAction(act, "BrushToolDoubleSize",, 1)
    RegAction(act, "BrushToolSoftness",, 2, 1, 100)
@@ -52270,7 +52309,7 @@ BtnCreateNewImage() {
        superLarge := 1
        SoundBeep, 300, 100
        msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed 536 MPx. Some image editing tools are not yet implemented for such large images and only one undo level will be available if sufficient system memory is accessible.`n`nTo lower the memory consumption, choose 24-bits RGBA.`n`nDo you want to create the new image?", "&32-bits RGBA|&24-bits RGB|&Abandon", 1, "exclamation")
-       ; msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannnot exceed 536 MPx.`n`nWould you like to adapt the dimensions and create the new image?", "&Yes|&No", 1, "exclamation")
+       ; msgResult := msgBoxWrapper(appTitle ": WARNING", "The image dimensions exceed the maximum limits. Width and height cannot exceed 199000 pixels, and total image size cannot exceed 536 MPx.`n`nWould you like to adapt the dimensions and create the new image?", "&Yes|&No", 1, "exclamation")
        If InStr(msgResult, "-bits")
           Sleep, -1 ; capIMGdimensionsGDIPlimits(UserNewWidth, UserNewHeight)
        Else
@@ -55282,7 +55321,7 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
 
     ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
     ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
-    GuiAddSlider("BrushToolSize", 2,950, 25, "Brush size: $€", labelu, 1, "xs y+15 w" slideWid " hp")
+    GuiAddSlider("BrushToolSize", 2,980, 25, "Brush size: $€", labelu, 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", labelu, 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", labelu, 2, "xs y+10 wp hp")
     GuiAddSlider("BrushToolAngle", -180,180, 0, "Angle: $€°", labelu, 2, "x+10 wp hp")
@@ -56433,7 +56472,7 @@ DefineSlidesRate() {
    slidesDuration := slideShowDelay
    ; slidesDuration := (slideShowDelay<drawModeCzeit) ? Round((drawModeCzeit*0.7+slideShowDelay)//2) : slideShowDelay
   ; If (slidesDuration<1995 && slidesDuration!=1000)
-  ;    miliSec := slidesDuration " milisec."
+  ;    miliSec := slidesDuration " millisec."
    ; Else
       duration := SecToHHMMSS(Round(slidesDuration/1000, 3))
    Return miliSec ? miliSec : duration
@@ -60150,7 +60189,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
    NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
    _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
    ; this call fails, I do not know why; err-code = 2 ; invalid parameter; 
-   ; however the file is created succesfully
+   ; however the file is created successfully
    ; fnOutputDebug("TIFF end: " _E)
    trGdip_DisposeImage(multiBitmap)
    encoderParameters := ""
@@ -62343,6 +62382,9 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
    hudBTNfuncu := ""
    If (msg="nully" && prevMsg)
       msg := prevMsg
+
+   If (msg="nully")
+      Return
 
    If (funcu!="nully")
       prevMsg := msg
@@ -66845,7 +66887,7 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
       menuCustomNames := []
       funcListu := []
       objuA := [] ; menu items by index with properties objuA[menuIndex] := [prop1, prop2,... etc]
-      objuC := [] ; menu names and their properties objuC[mena] := [menu-name, container-menu, accelatorkey]
+      objuC := [] ; menu names and their properties objuC[mena] := [menu-name, container-menu, acceleratorkey]
       objuB := "" ; maps menu/menu items pairs to indexexes of objuA; objuB[mena "-" labelu] := menuIndex
       objuB := new hashtable()
       Return
@@ -66891,7 +66933,7 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
          menuCustomNames[mena "." oLabelu] := labelu
       } Else If (InStr(labelu, "`t") && InStr(actu, "Add"))
       {
-         ; when the added menu item has a default keyboard shorcut but the functions are not the same
+         ; when the added menu item has a default keyboard shortcut but the functions are not the same
          ; assume this default keyboard shortcut is disabled
 
          c := defineKBDcontexts(0)
@@ -70024,7 +70066,7 @@ coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 
        }
     } Else If (modelu=6)
     {
-       ; Maurer Rose; based on the implemention by Hellbent - found on AHK Forums
+       ; Maurer Rose; based on the implementation by Hellbent - found on AHK Forums
        If (startMode!=1)
           iterations := Ceil(iterations/10)
        Else
@@ -72317,7 +72359,9 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      ; r := viewportQPVimage.LoadImage(imgPath, frameu)
      w := viewportQPVimage.Width, h := viewportQPVimage.Height
      calcIMGdimensions(w, h, 300, 300, newW, newH)
-     ; ToolTip, % w "|" h , , , 2
+     If (viewportQPVimage.LoadTime>256)
+        preventUndoLevels := 1
+
      oBitmap := trGdip_CreateBitmap(A_ThisFunc, newW, newH)
      currIMGdetails := []
      currIMGdetails.ImgFile := viewportQPVimage.ImgFile
@@ -73939,30 +73983,6 @@ wrapResizeImageGDIwin() {
    }
 }
 
-getPixelColorAvg(pBitmap, kX, kY, startToolColor) {
-   If !validBMP(pBitmap)
-      Return
-
-   coloruA := Gdip_GetPixelColor(pBitmap, kX, kY, 1)
-   coloruB := Gdip_GetPixelColor(pBitmap, kX + 2, kY + 2, 1)
-   coloruD := Gdip_GetPixelColor(pBitmap, kX - 2, kY - 2, 1)
-   coloruC := Gdip_GetPixelColor(pBitmap, kX + 2, kY - 2, 1)
-   If (coloruA && coloruB)
-      coloruZ := MixARGB(coloruA, coloruB, 0.5)
-   If (coloruC && coloruD)
-      coloruX := MixARGB(coloruC, coloruD, 0.5)
-   If (coloruZ && coloruX)
-      coloruY := MixARGB(coloruZ, coloruX, 0.5)
-   Else If coloruZ
-      coloruY := coloruZ
-   Else If coloruX
-      coloruY := coloruX
-   Else
-      coloruY := startToolColor
-
-   Return coloruY
-}
-
 toggleBrushDoubleSize() {
    BrushToolDoubleSize := !BrushToolDoubleSize
    friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
@@ -74753,7 +74773,7 @@ changeBrushSize(dir) {
    endCaptureCloneBrush()
    BrushToolSize := clampInRange(BrushToolSize, 1, 950)
    friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
-   RegAction(1, "BrushToolSize",, 2, 2, 950)
+   RegAction(1, "BrushToolSize",, 2, 2, 980)
    showTOOLtip("Brush " friendly " size: " groupDigits(BrushToolSize) " px", A_ThisFunc, 2, BrushToolSize/950)
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
@@ -74899,12 +74919,12 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
     thisColorB := "0x00" brushColor
     rImgW := rImgH :=  brushSize
     ; ToolTip, % thisColorA "`n" thisColorB, , , 2
-    thisAR := 1 - Abs(bAR)/105
+    thisAR := (BrushToolType>6) ? 1 : 1 - Abs(bAR)/105
     brImgSelW := (bAR>0) ? brushSize * thisAR : brushSize
     brImgSelH := (bAR<0) ? brushSize * thisAR : brushSize
     brimgSelPx := 0 - (brImgSelW - rImgW)//2
     brimgSelPy := 0 - (brImgSelH - rImgH)//2
-    thisState := "a" bgr brImgSelW brImgSelH brimgSelPx brimgSelPy thisAR bAR brushSize thisColorA thisColorB grPosA grAngle offsetX offsetY BrushToolTexture
+    thisState := "a" bgr brImgSelW brImgSelH brimgSelPx brimgSelPy thisAR bAR brushSize thisColorA thisColorB grPosA grAngle offsetX offsetY BrushToolTexture BrushToolType
     If (thisState!=prevState || !validBMP(prevBrushu))
     {
        brushBitmap := trGdip_CreateBitmap(A_ThisFunc, brushSize, brushSize, highDesiredPixFmt)
@@ -74914,7 +74934,7 @@ createGradientBrushBitmap(brushColor, grPosA, brushSize, grAngle, bAR, opacity:=
        prevBrushu := trGdip_DisposeImage(prevBrushu, 1)
        Ga := trGdip_GraphicsFromImage(A_ThisFunc, brushBitmap, 3)
        Gdip_SetPixelOffsetMode(Ga, 2)
-       If (BrushToolTexture=1)
+       If (BrushToolTexture=1 || BrushToolType>6)
        {
           grpPath := Gdip_CreatePath()
           If grpPath
@@ -75460,40 +75480,9 @@ calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, ByRef skX, ByRef skY) {
       skY := tkY
 }
 
-performClrEffectsBrush(whichBitmap, clonescu, tkX, tkY, brushSize, brushu, thisFloatOpacity, Gu) {
-   thisBMP := (BrushToolOverDraw=0 && clonescu) ? clonescu : whichBitmap
-   brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, thisBMP, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 0, 0, 1)
-   applyPersonalizedColorsBMP(brushImg, 1, BrushToolBlurStrength, BrushToolApplyColorFX)
-   QPV_SetBitmapAsAlphaChannel(brushImg, brushu, 0)
-   tzGdip_DrawImage(Gu, brushImg, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
-   trGdip_DisposeImage(brushImg, 1)
-}
-
-performEraserBrush(tkX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, whichBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu) {
-   If thisSelectionConstrain
-   {
-      ; ToolTip, % testuz "=" otestPos , , , 2
-      brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 0, 0, 1)
-      QPV_EraserBrush(brushImg, brushu, 0, thisEraserMode, thisEraseOpacity, 0, 0, 0)
-      ; redraw erased area
-      Gdip_SetClipRect(Gu, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 1)
-      Gdip_GraphicsClear(Gu)
-      tzGdip_DrawImage(Gu, brushImg, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 0, 0, brushSize, brushSize)
-      brushImg := trGdip_DisposeImage(brushImg, 1)
-      Gdip_ResetClip(Gu)
-      modus := (thisSelectionConstrain=1) ? 0 : 4
-      If ImgSelPath
-         Gdip_SetClipPath(Gu, ImgSelPath, modus)
-   } Else
-      QPV_EraserBrush(whichBitmap, brushu, 0, thisEraserMode, thisEraseOpacity, tkX - brushSize/2, tkY - brushSize/2, clonescu)
-
-   currIMGdetails.HasAlpha := 1
-}
-
 ActPaintBrushNow() {
    Critical, on
-   Static lastInvoked := 1, prevMX, prevMY, countClicks, HasTested
-
+   Static lastInvoked := 1, prevMX, prevMY
    If (A_TickCount - lastOtherWinClose<450)
       Return
 
@@ -75529,8 +75518,6 @@ ActPaintBrushNow() {
       Return
    }
 
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    vpWinClientSize(mainWidth, mainHeight)
    createGDIPcanvas(mainWidth, mainHeight)
    GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -75539,56 +75526,57 @@ ActPaintBrushNow() {
    imgPath := getIDimage(currentFileIndex)
    thisZeit := A_TickCount - 100
    thisIndex := 0
-   Random, randomFactor, -950, 950
    randomFactor := Randomizer(-950, 950, 2, 1)
    prevState := "a"
-   liveDrawingBrushTool := 1
    whichBitmap := useGdiBitmap()
-   If (whichBitmap=UserMemBMP)
+   imgBits := imgPitch := 0
+   trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
+   If validBMP(whichBitmap)
    {
-      ; it has to be gdiBitmap... otherwise no live preview
-      If (UserMemBMP=gdiBitmap)
-         addJournalEntry(A_ThisFunc "(): ERROR. Illegal inequality. UserMemBMP=gdiBitmap" )
-
-      If validBMP(gdiBitmap)
+      E1 := trGdip_LockBits(whichBitmap, 0, 0, 1, 1, imgPitch, imgBits, imgData, 3, "0x26200A")
+      If E1
       {
-         addJournalEntry(A_ThisFunc "(): ERROR. Illogical context. useGdiBitmap() returns UserMemBMP when gdiBitmap is valid!?" )
-         trGdip_DisposeImage(gdiBitmap)
+         showTOOLtip("ERROR: Unable to lock bitmap data. Failure occured in " A_ThisFunc "()")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
       }
-
-      gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-      UserMemBMP := trGdip_DisposeImage(UserMemBMP)
-      whichBitmap := gdiBitmap
+      Gdip_UnlockBits(whichBitmap, imgData)
+      imgBits := 0
    }
 
-   trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
+   liveDrawingBrushTool := 1
+   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
    kpi := (BrushToolType < 3) ? 1 : 0
    thisUseSecondaryColor := (kpi=1) ? BrushToolUseSecondaryColor : 0
    If (GetKeyState("Ctrl", "P") && kpi=1)
       thisUseSecondaryColor := !BrushToolUseSecondaryColor
 
    o_startToolColor := startToolColor := (thisUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
-   o_startToolColor := startToolColor := RandomizeBrushColor(startToolColor)
-   thisMainOpacity := (thisUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
-   thisHexOpacity := Format("{1:#x}", thisMainOpacity)
    MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
-   If (BrushToolWetness=21)
+   If (BrushToolWetness=21 && BrushToolType<3)
    {
       coloruA := Gdip_GetPixelColor(whichBitmap, kX, kY, 1)
       startToolColor := SubStr(MixARGB(coloruA, "0xFF" startToolColor, 0.5), 5)
       thisWetness := 20
-   } Else If (BrushToolWetness=22)
+   } Else If (BrushToolWetness=22 && BrushToolType<3)
    {
       coloruA := Gdip_GetPixelColor(whichBitmap, kX, kY, 1)
       startToolColor := SubStr(MixARGB(coloruA, "0xFF" startToolColor, 0.2), 5)
       thisWetness := 20
    } Else thisWetness := BrushToolWetness
 
+   thisBulgePinchFactor := BrushToolWetness + 1
+   If (BrushToolType=7)
+      thisBulgePinchFactor := -BrushToolWetness - 1
+   Else If (BrushToolType=6)
+      thisBulgePinchFactor := BrushToolWetness
+
    oMx := kX, oMy := kY
-   thisSelectionConstrain := (editingSelectionNow=1) ? BrushToolOutsideSelection - 1 : 0
-   o_brushSize := brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
-   If (BrushToolType>=6 && brushSize<5)
-      brushSize := 5
+   o_brushSize := brushSize := (BrushToolDoubleSize=1) ? BrushToolSize*2 : brushToolSize
+   If (BrushToolType>=6 && brushSize<10)
+      brushSize := 10
 
    If (BrushToolRandomSize>0)
    {
@@ -75597,17 +75585,15 @@ ActPaintBrushNow() {
       brushSize := clampInRange(brushSize + gR, brushSize//3 + 2, brushSize + Abs(gR))
    }
 
-   thisBulgePinchFactor := (BrushToolType=6) ? BrushToolWetness*2 + 1 :  BrushToolWetness + 1
-   If (BrushToolType=7)
-      thisBulgePinchFactor := -BrushToolWetness - 1
-
-   thisToolSoftness := BrushToolSoftness
-   If (BrushToolRandomSoftness>0)
+   thisToolSoftness := (BrushToolType>1) ? BrushToolSoftness : 1
+   If (BrushToolRandomSoftness>0 && BrushToolType>1)
    {
       gR := BrushToolRandomSoftness
       gR := Randomizer(-gR, gR, 2, 3)
       thisToolSoftness := clampInRange(BrushToolSoftness + gR, 1, 100)
    }
+   If (BrushToolType=6)
+      thisToolSoftness := clampInRange(BrushToolSoftness, 50, 90)
 
    thisToolAngle := BrushToolAngle + 180
    If (BrushToolRandomAngle>0)
@@ -75624,124 +75610,99 @@ ActPaintBrushNow() {
       gR := Randomizer(-gR, gR, 2, 5)
       thisToolAspectRatio := clampInRange(BrushToolAspectRatio + gR, -100, 100)
    }
+   If (BrushToolType>6)
+      thisToolAspectRatio := 0
 
-   advancedSoftBrush := (BrushToolType=2 && (BrushToolOverDraw=0 || BrushToolBlendMode>1)) ? 1 : 0
+   useSelArea := 0
    thisOpacity := (thisUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
-   thisFloatOpacity := thisOpacity/255
-   ppiu := isVarEqualTo(BrushToolType, 1, 4, 5)
-   If (ppiu=1 && BrushToolOverDraw=1 || ppiu!=1) && (advancedSoftBrush!=1)
+   If (editingSelectionNow=1 && BrushToolOutsideSelection>1)
    {
-      thisMainOpacity := clampInRange(Round(thisMainOpacity/2.5 + 1 + BrushToolDryingRate*1.5), 1, 255)
-      thisOpacity := clampInRange(Round(thisOpacity/2.5 + 1 + BrushToolDryingRate*1.5), 1, 255)
+      useSelArea := 1
+      thisInvert := (BrushToolOutsideSelection=3) ? 1 : 0
+      showTOOLtip("Preparing selection area...")
+      defineRelativeSelCoords(imgW, imgH)
+      objuSel := InitHugeImgSelPath(0, imgW, imgH)
+      QPV_PrepareHugeImgSelectionArea(objuSel.x1, objuSel.y1, objuSel.x2 - 1, objuSel.y2 - 1, objuSel.imgSelW, objuSel.imgSelH, EllipseSelectMode, VPselRotation, 0, thisInvert, "a", "a", 1)
+      RemoveTooltip()
    }
 
-   ; create base brush element / bitmap
-   hmzu := (BrushToolType=5) ? Format("{1:#x}", Round(thisOpacity)) : 0
-   If (BrushToolType=3) ; cloner
-      brushu := createClonedBrushBitmap(brushSize, 100 - thisToolSoftness, thisToolAngle, thisToolAspectRatio, whichBitmap, 0, 0, 1)
-   Else If (advancedSoftBrush=1 || isVarEqualTo(BrushToolType, 4, 5, 7, 8)) ; eraser, effects, pinch and bulge brushes
-      brushu := createGradientBrushBitmap("ffFFff", 100 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio, hmzu, "0xff000000")
-   Else If (BrushToolType=6) ; smudge/pinch/bulge
-      brushu := createGradientBrushBitmap("ffFFff", 100 - thisToolSoftness, brushSize + thisBulgePinchFactor, thisToolAngle, thisToolAspectRatio, 0, "0xff000000")
-   Else If (BrushToolType>1) ; soft edges
-      brushu := createGradientBrushBitmap(startToolColor, 100 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio)
-   Else ; simple solid
-      gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
-
-   If (!validBMP(brushu) && BrushToolType>1)
+   thisWet := 0.79 + (21 - thisWetness)/100
+   hFIFtex := texBits := 0
+   texPitch := texBpp := 0
+   texW := texH := 0
+   If (BrushToolTexture>1 && isInRange(BrushToolType, 2, 6) && brushSize>3)
    {
-      ; liveDrawingBrushTool := 0
-      showTOOLtip("ERROR: no brush image. Failure occured in " A_ThisFunc "()")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      texPath := mainExecPath "\resources\brush-texture-" BrushToolTexture ".png"
+      hFIFtex := FreeImage_Load(texPath)
+      If hFIFtex
+      {
+         brImgSelW := brImgSelH := brushSize
+         If (brImgSelW < 1)
+            brImgSelW := 1
+         If (brImgSelH < 1)
+            brImgSelH := 1
 
-   If ((BrushToolType=4 && !thisSelectionConstrain) || (BrushToolType=5 && BrushToolOverDraw=0) || (BrushToolType=3 && BrushToolDynamicCloner=1) || (advancedSoftBrush=1))
-      clonescu := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-
-   imgIndexEditing := currentFileIndex
-   thisQuality := (BrushToolType>5) ? 6 : 5
-   compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
-   ; we need a live view in the viewport of the bitmap; so we work with it directly [ useGdiBitmap == whichBitmap ]
-   metaBitmap := whichBitmap ; trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-   If validBMP(metaBitmap)
-      Gu := trGdip_GraphicsFromImage(A_ThisFunc, metaBitmap, thisQuality,,, compositingQuality)
-
-   If !Gu
-   {
-      ; liveDrawingBrushTool := 0
-      trGdip_DisposeImage(brushu, 1)
-      trGdip_DisposeImage(brushImg, 1)
-      trGdip_DisposeImage(clonescu, 1)
-      If gdipbrushu
-         Gdip_DeleteBrush(gdipbrushu)
-
-      showTOOLtip(A_ThisFunc "(). Failed to create GDI+ Graphics Object on bitmap = " whichBitmap)
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+         hFIFtexRescaled := trFreeImage_Rescale(hFIFtex, brImgSelW, brImgSelH, 3)
+         FreeImage_UnLoad(hFIFtex)
+         hFIFtex := hFIFtexRescaled
+         If (thisToolAngle!=0 && thisToolAngle!=360)
+         {
+            hFIFtexRotated := FreeImage_Rotate(hFIFtex, thisToolAngle)
+            If hFIFtexRotated
+            {
+               FreeImage_UnLoad(hFIFtex)
+               hFIFtex := hFIFtexRotated
+            }
+         }
+         
+         If hFIFtex
+         {
+            texBits := FreeImage_GetBits(hFIFtex)
+            texPitch := FreeImage_GetStride(hFIFtex)
+            texBpp := FreeImage_GetBPP(hFIFtex)
+            FreeImage_GetImageDimensions(hFIFtex, texW, texH)
+         }
+      }
    }
 
    If ((A_TickCount - lastInvoked>350) && undoLevelsRecorded<2 && preventUndoLevels!=1)
       recordUndoLevelNow("init", 0)
 
-   Gdip_SetPixelOffsetMode(Gu, 2)
-   If thisSelectionConstrain
-   {
-      calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-      ImgSelPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
-      modus := (thisSelectionConstrain=1) ? 0 : 4
-      Gdip_SetClipPath(Gu, ImgSelPath, modus)
-   } 
-
-   If (advancedSoftBrush=1)
-   {
-      opacityBMPmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, highDesiredPixFmt)
-      pgu := Gdip_GraphicsFromImage(opacityBMPmap)
-      Gdip_GraphicsClear(pgu, "0xFF000000")
-      If thisSelectionConstrain
-      {
-         modus := (thisSelectionConstrain=1) ? 4 : 0
-         Gdip_SetClipPath(pgu, ImgSelPath, modus)
-         Gdip_GraphicsClear(pgu, "0x00000000")
-         Gdip_ResetClip(pgu)
-         Gdip_DeletePath(ImgSelPath)
-         thisSelectionConstrain := 0
-      }
-      Gdip_DeleteGraphics(pgu)
-   }
-
-   thisEraserMode := (BrushToolOverDraw=1) ? 2 : 1
-   If (BrushToolEraserRestore=1)
-      thisEraserMode := 3
-
-   thisEraseOpacity := (thisEraserMode=1) ? 255 - thisEraseOpacity : thisOpacity
-   thisWet := 0.79 + (21 - thisWetness)/100
-   Gdip_GraphicsClear(2NDglPG, "0x00" WindowBgrColor)
-   r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
    dryZeit := A_TickCount
-   dryRateZeit := 50 + BrushToolDryingRate*4
+   dryRateZeit := (BrushToolOverDraw=1) ? 50 + BrushToolDryingRate//4 : 10 + BrushToolDryingRate
    thisDryRate := clampInRange(BrushToolDryingRate/4, 0.5, 20)
    isUserStepu := (brushToolStepping=1 || brushToolStepping=2 || brushToolStepping=251) ? 0 : 1
    If (brushSize<2)
       isUserStepu := 0
 
    stepu := (isUserStepu=0 || brushSize<2) ? Ceil(brushSize * 0.2)**1.09 : brushToolStepping
-   If (BrushToolType>6 || BrushToolType=5) && (isUserStepu=1 && stepu<brushSize/4 && isInRange(BrushToolAspectRatio, -5, 5) && isInRange(thisToolAngle, 0, 5))
+   If (BrushToolType=5 && (isUserStepu=1 && stepu<brushSize/4 && isInRange(BrushToolAspectRatio, -5, 5) && isInRange(thisToolAngle, 0, 5)))
       stepu := brushSize//4 + 1
 
-   If (!stepu || BrushToolType>=7 || brushToolStepping=0 && brushSize>1)
+   If (!stepu || brushToolStepping=0 && brushSize>1)
       stepu := 1
 
-   ; ToolTip, % stepu "|" isUserStepu "|" brushSize , , , 2
+   If (BrushToolType>=7)
+      stepu := 2
+
    If !GetKeyState("Shift", "P")
       prevMX := prevMY := 0
 
    offX := offY := 0
+   smudgeAccDist := 0
+   pdx := pdy := 0
    ShowTheImage("set-prev", imgPath)
+   DllCall("qpvmain.dll\ResetBrushOpacityMap")
+   If (BrushToolType=4 || BrushToolBlendMode=25) ; eraser brush
+      currIMGdetails.HasAlpha := 1
+
+   thisEffectHue   := (BrushToolApplyColorFX=1) ? PasteInPlaceHue : 0
+   thisEffectSat   := (BrushToolApplyColorFX=1) ? PasteInPlaceSaturation : 0
+   thisEffectLight := (BrushToolApplyColorFX=1) ? PasteInPlaceLight : 0
+   thisEffectGamma := (BrushToolApplyColorFX=1) ? PasteInPlaceGamma : 0
+   thisEffectBlur  := BrushToolBlurStrength
+   plza := A_TickCount
    setWhileLoopExec(1)
-   Static plopa := 0
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<1)
@@ -75752,21 +75713,21 @@ ActPaintBrushNow() {
       }
 
       GetMouseCoord2wind(PVhwnd, mX, mY)
-      If (BrushToolRandomPosX>0)
+      If (BrushToolRandomPosX>0 && BrushToolType<6)
       {
          gR := Ceil(brushSize*(BrushToolRandomPosX/100))
-         gR := Randomizer(-gR, gR, 3, 6)
+         gR := Ceil(Randomizer(-gR, gR, 3, 6) * zoomLevel)
          mX += gR
       }
 
-      If (BrushToolRandomPosY>0)
+      If (BrushToolRandomPosY>0 && BrushToolType<6)
       {
          gR := Ceil(brushSize*(BrushToolRandomPosY/100))
-         gR := Randomizer(-gR, gR, 3, 7)
+         gR := Ceil(Randomizer(-gR, gR, 3, 7) * zoomLevel)
          mY += gR
       }
 
-      If (BrushToolType<3 && BrushToolWetness>0) || (BrushToolType=3 && BrushToolDynamicCloner=1)
+      If (BrushToolType<3 || BrushToolType=4 || BrushToolType=5)
       {
          If (BrushToolRandomSize>0)
          {
@@ -75775,7 +75736,7 @@ ActPaintBrushNow() {
             brushSize := clampInRange(o_brushSize + gR, o_brushSize//3 + 2, o_brushSize + Abs(gR))
          }
 
-         If (BrushToolRandomSoftness>0)
+         If (BrushToolRandomSoftness>0 && BrushToolType>1)
          {
             gR := BrushToolRandomSoftness
             gR := Randomizer(-gR, gR, 2, 3)
@@ -75799,9 +75760,7 @@ ActPaintBrushNow() {
 
       mX := (FlipImgH=1) ? mainWidth - mX : mX
       mY := (FlipImgV=1) ? mainHeight - mY : mY
-      MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, metaBitmap, 1, imgW, imgH)
-      ; ToolTip, % offX "-" offY "`n" kX "-" kY "`n" oMx "-" oMy , , , 2
-      ; fnOutputDebug("size=" brushSize "|img coords: " kX "/" kY "|" plopa "|" mX "/" mY)
+      MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
       If (brushSize>1)
       {
          If isDotInRect(kX, kY, prevMX - stepu, prevMX + stepu, prevMY - stepu, prevMY + stepu)
@@ -75810,16 +75769,14 @@ ActPaintBrushNow() {
       }
 
       thisState := "a" mX mY kX kY randomFactor
-      ; ToolTip, % thisState , , , 2
       If (prevState!=thisState && (A_TickCount - thisZeit>5))
       {
-         ; calculate coords for the brush
          If !prevMX
             prevMX := kX 
          If !prevMY
             prevMY := kY
-         distX := Abs(kX - prevMX) ; max(kX, prevMX) - min(kX, prevMX)
-         distY := Abs(kY - prevMY) ; max(kY, prevMY) - min(kX, prevMY)
+         distX := Abs(kX - prevMX)
+         distY := Abs(kY - prevMY)
          If (distX<1)
             distX := 1
          If (distY<1)
@@ -75829,32 +75786,40 @@ ActPaintBrushNow() {
          maxDistuV := (distX>=distY) ? distX : distY
          steps2cover := maxDistuV/stepu
          otherStepu := min(distX, distY)/steps2cover
-         dirX := (kX>=prevMX) ? 1 : -1
-         dirY := (kY>=prevMY) ? 1 : -1
+         dirX := (kX>prevMX) ? 1 : ((kX<prevMX) ? -1 : 0)
+         dirY := (kY>prevMY) ? 1 : ((kY<prevMY) ? -1 : 0)
+         If (BrushToolType=6) ; smudge brush tool
+         {
+            cdx := kX - prevMX
+            cdy := kY - prevMY
+            currDist := Sqrt(cdx*cdx + cdy*cdy)
+            prevDist := Sqrt(pdx*pdx + pdy*pdy)
+            If (currDist > 0.1 && prevDist > 0.1)
+            {
+               dot := cdx * pdx + cdy * pdy
+               cos_angle := dot / (currDist * prevDist)
+               If (cos_angle < 0.5)
+                  smudgeAccDist := 0
+            }
+            pdx := cdx
+            pdy := cdy
+         }
+
          distStepX := (maxDistuK=1) ? stepu : otherStepu
          distStepY := (maxDistuK=2) ? stepu : otherStepu
          tkX := prevMX
          tkY := prevMY
          thisIndex++
-         avgDistX := (distX + distStepX)//2
-         avgDistY := (distY + distStepY)//2
-         ; ToolTip, % "l=" distX "=" distY "||" dirX "=" dirY "||" distStepX "=" distStepY "||" steps2cover , , , 2
-         Loop ; , % loops2do
+         Loop
          {
-            ; loop interim brush steps
             Xgood := Ygood := 0
-            zeitSillyPrevent := A_TickCount
             If (dirX=1)
             {
-               smudgeX := clampInRange(avgDistX//2, 0, thisBulgePinchFactor)
-               ; smudgeX := Ceil(thisBulgePinchFactor/2)
                tkX := clampInRange(tkX + distStepX, prevMX, kX)
                If (tkX>=kX)
                   Xgood := 1
             } Else
             {
-               smudgeX := - clampInRange(avgDistX//2, 0, thisBulgePinchFactor)
-               ; smudgeX := - Ceil(thisBulgePinchFactor/2)
                tkX := clampInRange(tkX - distStepX, kX, prevMX)
                If (tkX<=kX)
                   Xgood := 1
@@ -75862,279 +75827,840 @@ ActPaintBrushNow() {
 
             If (dirY=1)
             {
-               smudgeY := clampInRange(avgDistY//2, 0, thisBulgePinchFactor)
-               ; smudgeY := Ceil(thisBulgePinchFactor/2)
                tkY := clampInRange(tkY + distStepY, prevMY, kY)
                If (tkY>=kY)
                   Ygood := 1
             } Else
             {
-               smudgeY := - clampInRange(avgDistY//2, 0, thisBulgePinchFactor)
-               ; smudgeY := - Ceil(thisBulgePinchFactor/2)
                tkY := clampInRange(tkY - distStepY, kY, prevMY)
                If (tkY<=kY)
                   Ygood := 1
             }
 
-            offX := oMx - tkX, offY := oMy - tkY
-            ; [re]create dynamic brushes
+            offX := oMx - tkX
+            offY := oMy - tkY
+            If (BrushToolType<3 && BrushToolWetness>0)
+            {
+               coloruY := getPixelColorAvg(whichBitmap, tkX, tkY, "0xFF" o_startToolColor)
+               startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
+               startToolColor := RandomizeBrushColor(startToolColor)
+            } Else If (BrushToolType<3)
+               startToolColor := RandomizeBrushColor(o_startToolColor)
+
+            cur_tkX := tkX
+            cur_tkY := tkY
             If (BrushToolType=6)
             {
-               ; smudge brush
-               brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, Round(tkX - brushSize/2 - smudgeX/2), Round(tkY - brushSize/2 - smudgeY/2), brushSize + thisBulgePinchFactor, brushSize + thisBulgePinchFactor, 0, 0, 1)
-               QPV_SetBitmapAsAlphaChannel(brushImg, brushu, 0)
-            } Else If (BrushToolType>=7)
-            {
-               ; pinch/bulge brush
-               brushImg := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, Round(tkX - brushSize/2), Round(tkY - brushSize/2), brushSize, brushSize, 0, 0, 1)
-               QPV_SetBitmapAsAlphaChannel(brushImg, brushu, 0)
-            } Else If (BrushToolType=5)
-            {
-               ; effects brush
-               performClrEffectsBrush(metaBitmap, clonescu, tkX, tkY, brushSize, brushu, thisFloatOpacity, Gu)
-               If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
-               {
-                  calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  performClrEffectsBrush(metaBitmap, clonescu, skX, skY, brushSize, brushu, thisFloatOpacity, Gu)
-                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
-                  {
-                     performClrEffectsBrush(metaBitmap, clonescu, tkX, skY, brushSize, brushu, thisFloatOpacity, Gu)
-                     performClrEffectsBrush(metaBitmap, clonescu, skX, tkY, brushSize, brushu, thisFloatOpacity, Gu)
-                  }
-               }
-            } Else If (BrushToolType=4)
-            {
-               ; eraser brush
-               performEraserBrush(tkX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
-               If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
-               {
-                  calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  performEraserBrush(skX, skY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
-                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
-                  {
-                     performEraserBrush(tkX, skY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
-                     performEraserBrush(skX, tkY, brushSize, brushu, thisEraseOpacity, thisEraserMode, metaBitmap, Gu, thisSelectionConstrain, ImgSelPath, clonescu)
-                  }
-               }
-            } Else If (advancedSoftBrush=1) ; BrushToolType=2
-            {
-               ; soft color brush with blending modes or air-brush off
-               ofpx := tkX - brushSize/2
-               ofpy := tkY - brushSize/2
-               If (BrushToolWetness>0)
-               {
-                  coloruY := getPixelColorAvg(metaBitmap, tkX, tkY, "0xFF" o_startToolColor)
-                  startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
-                  g_startToolColor := RandomizeBrushColor(startToolColor)
-                  overDraw := 1
-               } Else
-               {
-                  g_startToolColor := RandomizeBrushColor(o_startToolColor)
-                  overDraw := (BrushToolRandomDark>0 || BrushToolRandomLight>0 || BrushToolRandomSat>0 || BrushToolRandomHue>0) ? 1 : BrushToolOverDraw
-               }
+               t_wet := thisWetness / 22.0
+               smudgeStrength := clampInRange(brushSize * (0.05 + 0.95 * t_wet), 5, brushSize)
+               cur_offX := dirX * clampInRange(distStepX, 1, smudgeStrength)
+               cur_offY := dirY * clampInRange(distStepY, 1, smudgeStrength)
 
-               QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, ofpx, ofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
-               If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
+               stepDist := Sqrt(distStepX*distStepX + distStepY*distStepY)
+               smudgeAccDist += stepDist
+               If (thisWetness = 22)
+                  maxSmudgeDist := 99999999
+               Else
+                  maxSmudgeDist := brushSize * (0.5 + 10.0 * (thisWetness/21)**3)
+               fadeFactor := 1.0 - (smudgeAccDist / maxSmudgeDist)
+               If (fadeFactor < 0.01)
+                  fadeFactor := 0.01
+
+               cur_opacity := Floor(thisOpacity * (0.05 + 0.95 * t_wet) * fadeFactor)
+               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - plza>450) && BrushToolOverDraw=1)
                {
-                  calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  sofpx := skX - brushSize/2
-                  sofpy := skY - brushSize/2
-                  QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, sofpx, sofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
-                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
-                  {
-                     QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, ofpx, sofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
-                     QPV_ColourBrush(metaBitmap, brushu, 0, "0xFF" g_startToolColor, 0, thisMainOpacity, BrushToolBlendMode - 1, sofpx, ofpy, clonescu, opacityBMPmap, overDraw, BlendModesFlipped)
-                  }
+                  plza := A_TickCount
+                  brushSize -= Ceil(BrushToolSize*0.05) + 1
                }
-            } Else If (BrushToolDynamicCloner=1 && BrushToolType=3) ; dynamic cloner mode
-            {
-               brushu := trGdip_DisposeImage(brushu, 1)
-               brushu := createClonedBrushBitmap(brushSize, 100.1 - thisToolSoftness, thisToolAngle, thisToolAspectRatio, clonescu, offX, offY, 1)
-            } Else If (BrushToolWetness>0 && BrushToolType=2)
-            {
-               ; wet soft edges brush
-               brushu := trGdip_DisposeImage(brushu, 1)
-               coloruY := getPixelColorAvg(metaBitmap, kX, kY, "0xFF" o_startToolColor)
-               startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
-               g_startToolColor := RandomizeBrushColor(startToolColor)
-               brushu := createGradientBrushBitmap(g_startToolColor, 101 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio)
-            } Else If (BrushToolWetness>0 && BrushToolType=1)
-            {
-               ; wet simple brush
-               Gdip_DeleteBrush(gdipbrushu)
-               coloruY := getPixelColorAvg(metaBitmap, kX, kY, "0xFF" o_startToolColor)
-               startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
-               thisHexOpacity := Format("{1:#x}", thisOpacity)
-               g_startToolColor := RandomizeBrushColor(startToolColor)
-               gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity g_startToolColor)
-            }
-
-            ; draw the brushes into main image [ metaBitmap - Gu ]
-            If (BrushToolType=1)
-            {
-               ; draw simple brush
-               allowBrushOverDraw := (BrushToolSymmetryX=1 && BrushToolSymmetryY=1) ? 1 : BrushToolOverDraw
-               tmpPath := createBrushShapePath(brushSize, tkX, tkY, thisToolAspectRatio, thisToolAngle)
-               Gdip_FillPath(Gu, gdipbrushu, tmpPath)
-               If (allowBrushOverDraw=0)
-                  Gdip_SetClipPath(Gu, tmpPath, 4)
-
-               Gdip_DeletePath(tmpPath)
-               If (BrushToolSymmetryX=1 || BrushToolSymmetryY=1)
-               {
-                  calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  tmpPath := createBrushShapePath(brushSize, skX, skY, thisToolAspectRatio, thisToolAngle)
-                  Gdip_FillPath(Gu, gdipbrushu, tmpPath)
-                  If (allowBrushOverDraw=0)
-                      Gdip_SetClipPath(Gu, tmpPath, 4)
-
-                  Gdip_DeletePath(tmpPath)
-                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
-                  {
-                     tmpPath := createBrushShapePath(brushSize, tkX, skY, thisToolAspectRatio, thisToolAngle)
-                     Gdip_FillPath(Gu, gdipbrushu, tmpPath)
-                     Gdip_DeletePath(tmpPath)
-                     tmpPath := createBrushShapePath(brushSize, skX, tkY, thisToolAspectRatio, thisToolAngle)
-                     Gdip_FillPath(Gu, gdipbrushu, tmpPath)
-                     Gdip_DeletePath(tmpPath)
-                  }
-               }
-            } Else If (BrushToolType=4)
-            {
-               Sleep, -1
             } Else
             {
-               ; draw any «generic» brush
-               thisBrushu := (BrushToolType>5) ? brushImg : brushu
-               thisFloatOpacity := thisOpacity/255
-               If (BrushToolType>=7)
+               cur_offX := offX
+               cur_offY := offY
+               cur_opacity := thisOpacity
+            }
+
+            Gosub, DrawPaintBrushNowStep
+            okaySymmetry := isPaintSymmetryModeAllowed()
+            If ((BrushToolSymmetryX=1 || BrushToolSymmetryY=1) && okaySymmetry=1)
+            {
+               calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
+               cur_tkX := skX
+               cur_tkY := skY
+               cur_offX := oMx - skX
+               cur_offY := oMy - skY
+               Gosub, DrawPaintBrushNowStep
+
+               If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
                {
-                  ; pinch/bulge brushes
-                  tzGdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2 - thisBulgePinchFactor, tkY - brushSize//2 - thisBulgePinchFactor, brushSize + thisBulgePinchFactor*2, brushSize + thisBulgePinchFactor*2, 0, 0, brushSize, brushSize, thisFloatOpacity)
-                  If (thisBulgePinchFactor>3 && BrushToolType=8 && BrushToolDynamicCloner=1)
-                     tzGdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2 - thisBulgePinchFactor//2, tkY - brushSize/2 - thisBulgePinchFactor/2, brushSize + thisBulgePinchFactor, brushSize + thisBulgePinchFactor, 0, 0, brushSize, brushSize, thisFloatOpacity)
-               } Else If (advancedSoftBrush!=1 && BrushToolType!=5)
-                  tzGdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+                  cur_tkX := tkX
+                  cur_tkY := skY
+                  cur_offX := oMx - tkX
+                  cur_offY := oMy - skY
+                  Gosub, DrawPaintBrushNowStep
 
-               If ((BrushToolSymmetryX=1 || BrushToolSymmetryY=1) && (BrushToolType=2 && advancedSoftBrush!=1 || BrushToolType=3))
-               {
-                  calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
-                  imgOp := (BrushToolSymmetryX=1) ? 4 : 0
-                  If (BrushToolSymmetryX=0 && BrushToolSymmetryY=1)
-                     imgOp := 6
-                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
-                     imgOp := 2
-                  If (BrushToolDynamicCloner=1 && BrushToolType=3)
-                     Gdip_ImageRotateFlip(thisBrushu, imgOp)
-
-                  tzGdip_DrawImage(Gu, thisBrushu, skX - brushSize//2, skY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
-                  If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
-                  {
-                     If (BrushToolDynamicCloner=1 && BrushToolType=3)
-                        Gdip_ImageRotateFlip(thisBrushu, 4)
-
-                     tzGdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2, skY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
-                     If (BrushToolDynamicCloner=1 && BrushToolType=3)
-                        Gdip_ImageRotateFlip(thisBrushu, 2)
-                     tzGdip_DrawImage(Gu, thisBrushu, skX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
-                  }
-               }
-
-               If (BrushToolType>5)
-                  brushImg := trGdip_DisposeImage(brushImg, 1)
-
-               If (BrushToolType>=6 && BrushToolOverDraw=1)
-               {
-                  ; smudge/pinch/bulge brushes
-                  f := (BrushToolType=7) ? BrushToolWetness*2 + 2 : BrushToolWetness + 2
-                  If (BrushToolType=6)
-                     f := BrushToolWetness//2 + 2
-                  brushSize -= f
-                  If (brushSize>2)
-                  {
-                     If (BrushToolType=6)
-                        brusha := trGdip_ResizeBitmap(A_ThisFunc, brushu, brushSize + thisBulgePinchFactor, brushSize + thisBulgePinchFactor, 0, 3)
-                     Else
-                        brusha := trGdip_ResizeBitmap(A_ThisFunc, brushu, brushSize, brushSize, 0, 3)
-                     brushu := trGdip_DisposeImage(brushu, 1)
-                     brushu := brusha
-                  }
+                  cur_tkX := skX
+                  cur_tkY := tkY
+                  cur_offX := oMx - skX
+                  cur_offY := oMy - tkY
+                  Gosub, DrawPaintBrushNowStep
                }
             }
 
-            ; tzGdip_DrawImageFast(Gu, brushu[1], tkX - brushToolSize//2, tkY - brushToolSize//2)
             If (BrushToolDryingRate>0) && (A_TickCount - dryZeit>dryRateZeit)
             {
                dryZeit := A_TickCount
                thisOpacity -= thisDryRate
-               If (BrushToolType=1)
-               {
-                  Gdip_DeleteBrush(gdipbrushu)
-                  thisHexOpacity := Format("{1:#x}", Round(thisOpacity))
-                  gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
-               } Else If (advancedSoftBrush=1 || BrushToolType=4 || BrushToolType=5)
-               {
-                  brushu := trGdip_DisposeImage(brushu, 1)
-                  thisHexOpacity := Format("{1:#x}", Round(thisOpacity))
-                  brushu := createGradientBrushBitmap("ffFFff", 101 - thisToolSoftness, brushSize, thisToolAngle, thisToolAspectRatio, thisHexOpacity, "0xff000000")
-               }
             }
+
             thisZeit := A_TickCount
-            ; ToolTip, % A_TickCount - thisZeit , , , 2
-            If (Xgood=1 && Ygood=1 && A_index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
+            If (Xgood=1 && Ygood=1 && A_Index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
                Break
-         } ; inner-loop end
+         }
+         If (A_Index<3)
+            clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
          prevState := thisState
-         prevMX := kX, prevMY := kY
          zeitSillyPrevent := A_TickCount
+         prevMX := kX
+         prevMY := kY
          If (thisIndex=1)
             oMx := tkX, oMy := tkY
 
+         killQPVscreenImgSection()
+         ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
          dummyResizeImageGDIwin()
       }
-   } ; while-loop end
-
-   ; fnOutputDebug(gdiBitmap " | " whichBitmap " | " metaBitmap)
-   If (advancedSoftBrush=1 && validBMP(opacityBMPmap))
-   {
-      ; tzGdip_DrawImageFast(2NDglPG, opacityBMPmap, 20, 20)
-      ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-      ; Sleep, 2000
-      trGdip_DisposeImage(opacityBMPmap)
    }
 
-   Gdip_DeleteGraphics(Gu)
-   If validBMP(brushu)
-      trGdip_DisposeImage(brushu, 1)
-   If validBMP(brushImg)
-      trGdip_DisposeImage(brushImg, 1)
-   If validBMP(clonescu)
-      trGdip_DisposeImage(clonescu, 1)
-   If gdipbrushu
-      Gdip_DeleteBrush(gdipbrushu)
-
-   MouseMoveResponder()
-   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1) && validBMP(metaBitmap))
+   If (thisIndex>0)
    {
-      ; fnOutputDebug(A_ThisFunc ": recorded bitmap?")
-      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
-      UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, metaBitmap)
-      recordUndoLevelNow(0, metaBitmap)
-   } Else If !validBMP(metaBitmap)
-      fnOutputDebug(A_ThisFunc ": no bitmap to record")
+      dummyTimerDelayiedImageDisplay(500)
+      SoundBeep, 900, 100
+   }
 
    setWhileLoopExec(0)
-   ; liveDrawingBrushTool := 0
+   DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
+   DllCall("qpvmain.dll\ResetBrushOpacityMap")
+   If hFIFtex
+      FreeImage_UnLoad(hFIFtex)
+
+   MouseMoveResponder()
+   If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1) && validBMP(whichBitmap))
+   {
+      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
+      UserMemBMP := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
+      recordUndoLevelNow(0, whichBitmap)
+   } Else If !validBMP(whichBitmap)
+      fnOutputDebug(A_ThisFunc ": no bitmap to record")
+
    If (thisIndex>10 || lastWasLowQuality=1)
       SetTimer, wrapResizeImageGDIwin, -60
    SetTimer, ResetImgLoadStatus, -100
    lastInvoked := A_TickCount
+   Return
+
+DrawPaintBrushNowStep:
+   cloneBits := clonePitch := cloneBMP := 0
+   colorARGB := "0x" Format("{1:x}", 255) startToolColor
+   dllRad := (texW>0) ? texW // 2 + 2 : brushSize // 2 + 2
+   If (BrushToolType=6)
+      dllRad += Abs(thisBulgePinchFactor) * 2 + 10
+   Else If (BrushToolType>=7)
+      dllRad += Abs(thisBulgePinchFactor) + 10
+   Else If (BrushToolType=5)
+      dllRad += thisEffectBlur + 10
+
+   If (BrushToolType=3)
+   {
+      ; Cloner brush
+      If (BrushToolDynamicCloner=1)
+      {
+         cur_offX := cur_tkX - tkX + oMx - tinyPrevAreaCoordX
+         cur_offY := cur_tkY - tkY + oMy - tinyPrevAreaCoordY
+      } Else
+      {
+         cur_offX := cur_tkX - tinyPrevAreaCoordX
+         cur_offY := cur_tkY - tinyPrevAreaCoordY
+      }
+
+      src_tkX := cur_tkX - cur_offX
+      src_tkY := cur_tkY - cur_offY
+      dstX1 := clampInRange(Round(cur_tkX - dllRad), 0, imgW - 1)
+      dstX2 := clampInRange(Round(cur_tkX + dllRad), 0, imgW - 1)
+      dstY1 := clampInRange(Round(cur_tkY - dllRad), 0, imgH - 1)
+      dstY2 := clampInRange(Round(cur_tkY + dllRad), 0, imgH - 1)
+      srcX_min := clampInRange(Round(dstX1 - cur_offX) - 3, 0, imgW - 1)
+      srcX_max := clampInRange(Round(dstX2 - cur_offX) + 3, 0, imgW - 1)
+      srcY_min := clampInRange(Round(dstY1 - cur_offY) - 3, 0, imgH - 1)
+      srcY_max := clampInRange(Round(dstY2 - cur_offY) + 3, 0, imgH - 1)
+      src_lockX := srcX_min
+      src_lockY := srcY_min
+      src_lockW := srcX_max - srcX_min + 1
+      src_lockH := srcY_max - srcY_min + 1
+      If (src_lockW>0 && src_lockH>0)
+      {
+         cloneBMP := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, src_lockX, src_lockY, src_lockW, src_lockH, "0x26200A")
+         If validBMP(cloneBMP)
+         {
+            E2 := trGdip_LockBits(cloneBMP, 0, 0, src_lockW, src_lockH, cPitch, cBits, cData, 3, "0x26200A")
+            If !E2
+            {
+               clonePitch := cPitch
+               cloneBits := Round(cBits - src_lockY * cPitch - src_lockX * 4)
+            }
+         }
+      }
+   }
+
+   dll_tkY := imgH - 1 - cur_tkY
+   dll_offY := -cur_offY
+   overDraw := (blendMode=25) ? 0 : BrushToolOverDraw
+   lockX := Round(Max(0, Floor(cur_tkX - dllRad)))
+   lockY := Round(Max(0, Floor(cur_tkY - dllRad)))
+   lockW := Round(Min(imgW - lockX, Ceil(dllRad * 2)))
+   lockH := Round(Min(imgH - lockY, Ceil(dllRad * 2)))
+   If (lockW>0 && lockH>0)
+   {
+      E1 := trGdip_LockBits(whichBitmap, lockX, lockY, lockW, lockH, imgPitch, imgBits, imgData, 3, "0x26200A")
+      If !E1
+      {
+         dll_imgBits := Round(imgBits - lockY * imgPitch - lockX * 4)
+         rr := DllCall("qpvmain.dll\PaintBrushLarge"
+            , "UPtr", dll_imgBits
+            , "int", imgW
+            , "int", imgH
+            , "int", imgPitch
+            , "int", 32
+            , "int", BrushToolType
+            , "double", cur_tkX
+            , "double", dll_tkY
+            , "int", brushSize
+            , "int", thisToolSoftness
+            , "double", thisToolAngle
+            , "double", thisToolAspectRatio
+            , "int", colorARGB
+            , "int", cur_opacity
+            , "int", BrushToolBlendMode - 1
+            , "double", cur_offX
+            , "double", dll_offY
+            , "UPtr", cloneBits
+            , "int", clonePitch
+            , "int", BrushToolEraserRestore
+            , "int", useSelArea
+            , "int", userimgGammaCorrect
+            , "int", BlendModesFlipped
+            , "int", thisBulgePinchFactor
+            , "int", thisEffectHue
+            , "int", thisEffectSat
+            , "int", thisEffectLight
+            , "int", thisEffectGamma
+            , "int", thisEffectBlur
+            , "UPtr", texBits
+            , "int", texW
+            , "int", texH
+            , "int", texPitch
+            , "int", texBpp
+            , "int", overDraw
+            , "int", lockX
+            , "int", lockY
+            , "int", lockW
+            , "int", lockH)
+         If !rr
+            fnOutputDebug("An error occured in calling PaintBrushLarge() from the QPV DLL.")
+         Gdip_UnlockBits(whichBitmap, imgData)
+      }
+   }
+
+   If validBMP(cloneBMP)
+   {
+      If !E2
+         Gdip_UnlockBits(cloneBMP, cData)
+      trGdip_DisposeImage(cloneBMP, 1)
+   }
+   Return
 } ; // ActPaintBrushNow()
+
+getPixelColorAvg(pBitmap, kX, kY, startToolColor) {
+   If !validBMP(pBitmap)
+      Return
+
+   coloruA := Gdip_GetPixelColor(pBitmap, kX, kY, 1)
+   coloruB := Gdip_GetPixelColor(pBitmap, kX + 2, kY + 2, 1)
+   coloruD := Gdip_GetPixelColor(pBitmap, kX - 2, kY - 2, 1)
+   coloruC := Gdip_GetPixelColor(pBitmap, kX + 2, kY - 2, 1)
+   If (coloruA && coloruB)
+      coloruZ := MixARGB(coloruA, coloruB, 0.5)
+   If (coloruC && coloruD)
+      coloruX := MixARGB(coloruC, coloruD, 0.5)
+   If (coloruZ && coloruX)
+      coloruY := MixARGB(coloruZ, coloruX, 0.5)
+   Else If coloruZ
+      coloruY := coloruZ
+   Else If coloruX
+      coloruY := coloruX
+   Else
+      coloruY := startToolColor
+
+   Return coloruY
+}
+
+ActPaintBrushLargeNow() {
+   Critical, on
+   Static lastInvoked := 1, prevMX, prevMY
+   If (A_TickCount - lastOtherWinClose<450)
+      Return
+
+   If (!viewportQPVimage.imgHandle)
+   {
+      showTOOLtip("ERROR: FreeImage handle seems to be inexistent. Failure occured in " A_ThisFunc "()")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
+   If (!imgW || !imgH)
+   {
+      showTOOLtip("ERROR: Main FreeImage bitmap seems to be invalid. Failure occured in " A_ThisFunc "()")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   vpWinClientSize(mainWidth, mainHeight)
+   GetMouseCoord2wind(PVhwnd, mX, mY)
+   mX := (FlipImgH=1) ? mainWidth - mX : mX
+   mY := (FlipImgV=1) ? mainHeight - mY : mY
+   imgPath := getIDimage(currentFileIndex)
+   thisZeit := A_TickCount - 100
+   thisIndex := 0
+   liveDrawingBrushTool := 1
+   kpi := (BrushToolType < 3) ? 1 : 0
+   thisUseSecondaryColor := (kpi=1) ? BrushToolUseSecondaryColor : 0
+   If (GetKeyState("Ctrl", "P") && kpi=1)
+      thisUseSecondaryColor := !BrushToolUseSecondaryColor
+
+   o_startToolColor := startToolColor := (thisUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
+   ; o_startToolColor := startToolColor := RandomizeBrushColor(startToolColor)
+   MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, 0, 1, imgW, imgH)
+   If (BrushToolWetness=21 && BrushToolType<3)
+   {
+      coloruA := FreeImage_GetPixelColor(viewportQPVimage.imgHandle, kX, kY, 1)
+      startToolColor := SubStr(MixARGB(coloruA, "0xFF" startToolColor, 0.5), 5)
+      thisWetness := 20
+   } Else If (BrushToolWetness=22 && BrushToolType<3)
+   {
+      coloruA := FreeImage_GetPixelColor(viewportQPVimage.imgHandle, kX, kY, 1)
+      startToolColor := SubStr(MixARGB(coloruA, "0xFF" startToolColor, 0.2), 5)
+      thisWetness := 20
+   } Else thisWetness := BrushToolWetness
+
+   oMx := kX, oMy := kY
+   o_brushSize := brushSize := (BrushToolDoubleSize=1) ? brushToolSize*4 : brushToolSize
+   If (BrushToolType>=6 && brushSize<10)
+      brushSize := 10
+
+   If (BrushToolRandomSize>0)
+   {
+      gR := Ceil(brushSize * (BrushToolRandomSize/100)) + 1
+      gR := Randomizer(-gR, gR, 2, 2)
+      brushSize := clampInRange(brushSize + gR, brushSize//3 + 2, brushSize + Abs(gR))
+   }
+
+   thisBulgePinchFactor := BrushToolWetness + 1
+   If (BrushToolType=7)
+      thisBulgePinchFactor := -BrushToolWetness - 1
+   Else If (BrushToolType=6)
+      thisBulgePinchFactor := BrushToolWetness
+
+   thisToolSoftness := (BrushToolType>1) ? BrushToolSoftness : 1
+   If (BrushToolRandomSoftness>0 && BrushToolType>1)
+   {
+      gR := BrushToolRandomSoftness
+      gR := Randomizer(-gR, gR, 2, 3)
+      thisToolSoftness := clampInRange(BrushToolSoftness + gR, 1, 100)
+   }
+
+   If (BrushToolType=6)
+      thisToolSoftness := clampInRange(BrushToolSoftness, 50, 90)
+
+   thisToolAngle := BrushToolAngle + 180
+   If (BrushToolRandomAngle>0)
+   {
+      gR := BrushToolRandomAngle
+      gR := Randomizer(-gR, gR, 2, 4)
+      thisToolAngle := clampInRange(thisToolAngle + gR, 0, 180)
+   }
+
+   thisToolAspectRatio := BrushToolAspectRatio
+   If (BrushToolRandomAspectRatio>0)
+   {
+      gR := BrushToolRandomAspectRatio
+      gR := Randomizer(-gR, gR, 2, 5)
+      thisToolAspectRatio := clampInRange(BrushToolAspectRatio + gR, -100, 100)
+   }
+   If (BrushToolType>6)
+      thisToolAspectRatio := 0
+
+   thisOpacity := (thisUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
+   useSelArea := 0
+   cloneBits := clonePitch := 0
+   defineRelativeSelCoords(imgW, imgH)
+   objuSel := InitHugeImgSelPath(0, imgW, imgH)
+   recordUndoLevelHugeImagesNow(objuSel.bX1, objuSel.bY1, objuSel.bImgSelW, objuSel.bImgSelH)
+   If (editingSelectionNow=1 && BrushToolOutsideSelection>1)
+   {
+      useSelArea := 1
+      thisInvert := (BrushToolOutsideSelection=3) ? 1 : 0
+      showTOOLtip("Preparing selection area...")
+      QPV_PrepareHugeImgSelectionArea(objuSel.x1, objuSel.y1, objuSel.x2 - 1, objuSel.y2 - 1, objuSel.imgSelW, objuSel.imgSelH, EllipseSelectMode, VPselRotation, 0, thisInvert, "a", "a", 1)
+      RemoveTooltip()
+   }
+
+   thisWet := 0.79 + (21 - thisWetness)/100
+   hFIFtex := texBits := 0
+   texPitch := texBpp := 0
+   texW := texH := 0
+   If (BrushToolTexture>1 && isInRange(BrushToolType, 2, 6) && brushSize>3)
+   {
+      texPath := mainExecPath "\resources\brush-texture-" BrushToolTexture ".png"
+      hFIFtex := FreeImage_Load(texPath)
+      If hFIFtex
+      {
+         brImgSelW := brImgSelH := brushSize
+         If (brImgSelW < 1)
+            brImgSelW := 1
+         If (brImgSelH < 1)
+            brImgSelH := 1
+
+         hFIFtexRescaled := trFreeImage_Rescale(hFIFtex, brImgSelW, brImgSelH, 3)
+         FreeImage_UnLoad(hFIFtex)
+         hFIFtex := hFIFtexRescaled
+         If (thisToolAngle!=0 && thisToolAngle!=360)
+         {
+            hFIFtexRotated := FreeImage_Rotate(hFIFtex, thisToolAngle)
+            If hFIFtexRotated
+            {
+               FreeImage_UnLoad(hFIFtex)
+               hFIFtex := hFIFtexRotated
+            }
+         }
+         
+         If hFIFtex
+         {
+            texBits := FreeImage_GetBits(hFIFtex)
+            texPitch := FreeImage_GetStride(hFIFtex)
+            texBpp := FreeImage_GetBPP(hFIFtex)
+            FreeImage_GetImageDimensions(hFIFtex, texW, texH)
+         }
+      }
+   }
+
+   dryZeit := A_TickCount
+   dryRateZeit := (BrushToolOverDraw=1) ? 50 + BrushToolDryingRate//4 : 10 + BrushToolDryingRate
+   thisDryRate := clampInRange(BrushToolDryingRate/4, 0.5, 20)
+   isUserStepu := (brushToolStepping=1 || brushToolStepping=2 || brushToolStepping=251) ? 0 : 1
+   If (brushSize<2)
+      isUserStepu := 0
+
+   stepu := (isUserStepu=0 || brushSize<2) ? Ceil(brushSize * 0.2)**1.09 : brushToolStepping
+   If (BrushToolType=5 && (isUserStepu=1 && stepu<brushSize/4 && isInRange(BrushToolAspectRatio, -5, 5) && isInRange(thisToolAngle, 0, 5)))
+      stepu := brushSize//4 + 1
+
+   If (!stepu || brushToolStepping=0 && brushSize>1)
+      stepu := 1
+
+   If (BrushToolType>=7)
+      stepu := 2
+
+   If !GetKeyState("Shift", "P")
+      prevMX := prevMY := 0
+
+   offX := offY := 0
+   smudgeAccDist := 0
+   pdx := pdy := 0
+   ShowTheImage("set-prev", imgPath)
+   setWhileLoopExec(1)
+   DllCall("qpvmain.dll\ResetBrushOpacityMap")
+
+   imgBits := FreeImage_GetBits(viewportQPVimage.imgHandle)
+   imgPitch := FreeImage_GetStride(viewportQPVimage.imgHandle)
+   imgBpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+   If (imgBpp=32 && BrushToolType=4) ; eraser brush
+      currIMGdetails.HasAlpha := 1
+
+   thisEffectHue   := (BrushToolApplyColorFX=1) ? PasteInPlaceHue : 0
+   thisEffectSat   := (BrushToolApplyColorFX=1) ? PasteInPlaceSaturation : 0
+   thisEffectLight := (BrushToolApplyColorFX=1) ? PasteInPlaceLight : 0
+   thisEffectGamma := (BrushToolApplyColorFX=1) ? PasteInPlaceGamma : 0
+   thisEffectBlur  := BrushToolBlurStrength
+   CreateOSDinfoLine(0, 1)
+   plza := A_TickCount
+   While, (determineLClickState()=1 || A_Index<2)
+   {
+      If (thisOpacity<0.005 || brushSize<1)
+      {
+         If (BrushToolDryingRate>1)
+            SoundBeep , 900, 100
+         Break
+      }
+
+      GetMouseCoord2wind(PVhwnd, mX, mY)
+      If (BrushToolRandomPosX>0 && BrushToolType<6)
+      {
+         gR := Ceil(brushSize*(BrushToolRandomPosX/100))
+         gR := Ceil(Randomizer(-gR, gR, 3, 6) * zoomLevel)
+         mX += gR
+      }
+
+      If (BrushToolRandomPosY>0 && BrushToolType<6)
+      {
+         gR := Ceil(brushSize*(BrushToolRandomPosY/100))
+         gR := Ceil(Randomizer(-gR, gR, 3, 7) * zoomLevel)
+         mY += gR
+      }
+
+      If (BrushToolType<3 || BrushToolType=4 || BrushToolType=5)
+      {
+         If (BrushToolRandomSize>0)
+         {
+            gR := Ceil(o_brushSize * (BrushToolRandomSize/100)) + 1
+            gR := Randomizer(-gR, gR, 2, 2)
+            brushSize := clampInRange(o_brushSize + gR, o_brushSize//3 + 2, o_brushSize + Abs(gR))
+         }
+
+         If (BrushToolRandomSoftness>0 && BrushToolType>1)
+         {
+            gR := BrushToolRandomSoftness
+            gR := Randomizer(-gR, gR, 2, 3)
+            thisToolSoftness := clampInRange(BrushToolSoftness + gR, 1, 100)
+         }
+
+         If (BrushToolRandomAngle>0)
+         {
+            gR := BrushToolRandomAngle
+            gR := Randomizer(-gR, gR, 2, 4)
+            thisToolAngle := clampInRange(BrushToolAngle + 180 + gR, 0, 180)
+         }
+
+         If (BrushToolRandomAspectRatio>0)
+         {
+            gR := BrushToolRandomAspectRatio
+            gR := Randomizer(-gR, gR, 2, 5)
+            thisToolAspectRatio := clampInRange(BrushToolAspectRatio + gR, -100, 100)
+         }
+      }
+
+      mX := (FlipImgH=1) ? mainWidth - mX : mX
+      mY := (FlipImgV=1) ? mainHeight - mY : mY
+      MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY, 0, 1, imgW, imgH)
+      If (brushSize>1)
+      {
+         If isDotInRect(kX, kY, prevMX - stepu, prevMX + stepu, prevMY - stepu, prevMY + stepu)
+         || !isDotInRect(kX, kY, 0 - brushSize//2, imgW + brushSize//2, 0 - brushSize//2, imgH + brushSize//2)
+            Continue
+      }
+
+      thisState := "a" mX mY kX kY randomFactor
+      If (prevState!=thisState && (A_TickCount - thisZeit>5))
+      {
+         If !prevMX
+            prevMX := kX 
+         If !prevMY
+            prevMY := kY
+         distX := Abs(kX - prevMX)
+         distY := Abs(kY - prevMY)
+         If (distX<1)
+            distX := 1
+         If (distY<1)
+            distY := 1
+
+         maxDistuK := (distX>=distY) ? 1 : 2
+         maxDistuV := (distX>=distY) ? distX : distY
+         steps2cover := maxDistuV/stepu
+         otherStepu := min(distX, distY)/steps2cover
+         dirX := (kX>prevMX) ? 1 : ((kX<prevMX) ? -1 : 0)
+         dirY := (kY>prevMY) ? 1 : ((kY<prevMY) ? -1 : 0)
+         If (BrushToolType=6) ; smudge brush tool
+         {
+            cdx := kX - prevMX
+            cdy := kY - prevMY
+            currDist := Sqrt(cdx*cdx + cdy*cdy)
+            prevDist := Sqrt(pdx*pdx + pdy*pdy)
+            If (currDist > 0.1 && prevDist > 0.1)
+            {
+               dot := cdx * pdx + cdy * pdy
+               cos_angle := dot / (currDist * prevDist)
+               If (cos_angle < 0.5)
+                  smudgeAccDist := 0
+            }
+            pdx := cdx
+            pdy := cdy
+         }
+         distStepX := (maxDistuK=1) ? stepu : otherStepu
+         distStepY := (maxDistuK=2) ? stepu : otherStepu
+         tkX := prevMX
+         tkY := prevMY
+         thisIndex++
+         Loop
+         {
+            ; loop interim brush steps
+            Xgood := Ygood := 0
+            If (dirX=1)
+            {
+               tkX := clampInRange(tkX + distStepX, prevMX, kX)
+               If (tkX>=kX)
+                  Xgood := 1
+            } Else
+            {
+               tkX := clampInRange(tkX - distStepX, kX, prevMX)
+               If (tkX<=kX)
+                  Xgood := 1
+            }
+
+            If (dirY=1)
+            {
+               tkY := clampInRange(tkY + distStepY, prevMY, kY)
+               If (tkY>=kY)
+                  Ygood := 1
+            } Else
+            {
+               tkY := clampInRange(tkY - distStepY, kY, prevMY)
+               If (tkY<=kY)
+                  Ygood := 1
+            }
+
+            offX := oMx - tkX
+            offY := oMy - tkY
+            If (BrushToolType<3 && BrushToolWetness>0)
+            {
+               coloruY := getPixelColorAvgFreeImage(viewportQPVimage.imgHandle, tkX, imgH - tkY, "0xFF" o_startToolColor)
+               startToolColor := SubStr(MixARGB(coloruY, "0xFF" startToolColor, thisWet), 5)
+               startToolColor := RandomizeBrushColor(startToolColor)
+            } Else If (BrushToolType<3)
+               startToolColor := RandomizeBrushColor(o_startToolColor)
+
+            cur_tkX := tkX
+            cur_tkY := tkY
+            If (BrushToolType=6)
+            {
+               ; Smudge brush: offset = step displacement in the movement direction,
+               ; scaled by wetness-based smudge strength factor.
+               t_wet := thisWetness / 22.0
+               smudgeStrength := clampInRange(brushSize * (0.05 + 0.95 * t_wet), 5, brushSize)
+               cur_offX := dirX * clampInRange(distStepX, 1, smudgeStrength)
+               cur_offY := dirY * clampInRange(distStepY, 1, smudgeStrength)
+
+               stepDist := Sqrt(distStepX*distStepX + distStepY*distStepY)
+               smudgeAccDist += stepDist
+               If (thisWetness = 22)
+                  maxSmudgeDist := 99999999
+               Else
+                  maxSmudgeDist := brushSize * (0.5 + 10.0 * (thisWetness/21)**4)
+               fadeFactor := 1.0 - (smudgeAccDist / maxSmudgeDist)
+               If (fadeFactor < 0.01)
+                  fadeFactor := 0.01
+
+               cur_opacity := Floor(thisOpacity * (0.05 + 0.95 * t_wet) * fadeFactor)
+               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - plza>450) && BrushToolOverDraw=1)
+               {
+                  plza := A_TickCount
+                  brushSize -= Ceil(BrushToolSize*0.05) + 1
+               }
+               ;ToolTip, % cur_opacity "|" brushSize "|" BrushToolTexture "|" BrushToolSize "|" thisIndex , , , 2
+            } Else
+            {
+               cur_offX := offX
+               cur_offY := offY
+               cur_opacity := thisOpacity
+            }
+
+            Gosub, DrawPaintBrushLargeStep
+            okaySymmetry := isPaintSymmetryModeAllowed()
+            If ((BrushToolSymmetryX=1 || BrushToolSymmetryY=1) && okaySymmetry=1)
+            {
+               calcBrushSymmetryCoords(tkX, tkY, imgW, imgH, skX, skY)
+               cur_tkX := skX
+               cur_tkY := skY
+               cur_offX := oMx - skX
+               cur_offY := oMy - skY
+               Gosub, DrawPaintBrushLargeStep
+
+               If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
+               {
+                  cur_tkX := tkX
+                  cur_tkY := skY
+                  cur_offX := oMx - tkX
+                  cur_offY := oMy - skY
+                  Gosub, DrawPaintBrushLargeStep
+
+                  cur_tkX := skX
+                  cur_tkY := tkY
+                  cur_offX := oMx - skX
+                  cur_offY := oMy - tkY
+                  Gosub, DrawPaintBrushLargeStep
+               }
+            }
+
+            If (BrushToolDryingRate>0) && (A_TickCount - dryZeit>dryRateZeit)
+            {
+               dryZeit := A_TickCount
+               thisOpacity -= thisDryRate
+            }
+            thisZeit := A_TickCount
+            If (Xgood=1 && Ygood=1 && A_Index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
+               Break
+         }
+
+         If (A_Index<3)
+            clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
+         prevState := thisState
+         prevMX := kX
+         prevMY := kY
+         zeitSillyPrevent := A_TickCount
+         If (thisIndex=1)
+            oMx := tkX, oMy := tkY
+
+         killQPVscreenImgSection()
+         ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
+         dummyResizeImageGDIwin()
+      }
+   }
+
+   If (thisIndex>0)
+   {
+      killQPVscreenImgSection()
+      setHugeImageActionsCount(viewportQPVimage.actions + 1)
+      dummyTimerDelayiedImageDisplay(500)
+      SoundBeep, 900, 100
+   } Else
+      recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
+ 
+   setWhileLoopExec(0)
+   DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
+   DllCall("qpvmain.dll\ResetBrushOpacityMap")
+   If (thisIndex>10 || lastWasLowQuality=1)
+      SetTimer, wrapResizeImageGDIwin, -60
+   SetTimer, ResetImgLoadStatus, -100
+   lastInvoked := A_TickCount
+   If hFIFtex
+      FreeImage_UnLoad(hFIFtex)
+   Return
+
+DrawPaintBrushLargeStep:
+   cloneBits :=  clonePitch := cloneBMP := 0
+   If (BrushToolType=3)
+   {
+      If (BrushToolDynamicCloner=1)
+      {
+         cur_offX := cur_tkX - tkX + oMx - tinyPrevAreaCoordX
+         cur_offY := cur_tkY - tkY + oMy - tinyPrevAreaCoordY
+      } Else
+      {
+         cur_offX := cur_tkX - tinyPrevAreaCoordX
+         cur_offY := cur_tkY - tinyPrevAreaCoordY
+      }
+
+      dllRad := (texW>0) ? texW // 2 + 2 : brushSize // 2 + 2
+      src_tkX := cur_tkX - cur_offX
+      src_tkY := cur_tkY - cur_offY
+      dstX1 := clampInRange(Round(cur_tkX - dllRad), 0, imgW - 1)
+      dstX2 := clampInRange(Round(cur_tkX + dllRad), 0, imgW - 1)
+      dstY1 := clampInRange(Round(cur_tkY - dllRad), 0, imgH - 1)
+      dstY2 := clampInRange(Round(cur_tkY + dllRad), 0, imgH - 1)
+      srcX_min := clampInRange(Round(dstX1 - cur_offX) - 3, 0, imgW - 1)
+      srcX_max := clampInRange(Round(dstX2 - cur_offX) + 3, 0, imgW - 1)
+      srcY_min := clampInRange(Round(dstY1 - cur_offY) - 3, 0, imgH - 1)
+      srcY_max := clampInRange(Round(dstY2 - cur_offY) + 3, 0, imgH - 1)
+      src_lockX := srcX_min
+      src_lockY := srcY_min
+      src_lockW := srcX_max - srcX_min + 1
+      src_lockH := srcY_max - srcY_min + 1
+      If (src_lockW>0 && src_lockH>0)
+      {
+         cloneBMP := FreeImage_Copy(viewportQPVimage.imgHandle, src_lockX, src_lockY, src_lockX + src_lockW, src_lockY + src_lockH)
+         If cloneBMP
+         {
+            cBits := FreeImage_GetBits(cloneBMP)
+            cPitch := FreeImage_GetStride(cloneBMP)
+            If (cBits && cPitch)
+            {
+               clonePitch := cPitch
+               cloneBits := Round(cBits + (src_lockH + src_lockY - imgH) * cPitch - src_lockX * (imgBpp // 8))
+            }
+         }
+      }
+   }
+
+   colorARGB := "0x" Format("{1:x}", 255) startToolColor
+   rr := DllCall("qpvmain.dll\PaintBrushLarge"
+      , "UPtr", imgBits
+      , "int", imgW
+      , "int", imgH
+      , "int", imgPitch
+      , "int", imgBpp
+      , "int", BrushToolType
+      , "double", cur_tkX
+      , "double", cur_tkY
+      , "int", brushSize
+      , "int", thisToolSoftness
+      , "double", thisToolAngle
+      , "double", thisToolAspectRatio
+      , "int", colorARGB
+      , "int", cur_opacity
+      , "int", BrushToolBlendMode - 1
+      , "double", cur_offX
+      , "double", cur_offY
+      , "UPtr", cloneBits
+      , "int", clonePitch
+      , "int", BrushToolEraserRestore
+      , "int", useSelArea
+      , "int", userimgGammaCorrect
+      , "int", BlendModesFlipped
+      , "int", thisBulgePinchFactor
+      , "int", thisEffectHue
+      , "int", thisEffectSat
+      , "int", thisEffectLight
+      , "int", thisEffectGamma
+      , "int", thisEffectBlur
+      , "UPtr", texBits
+      , "int", texW
+      , "int", texH
+      , "int", texPitch
+      , "int", texBpp
+      , "int", BrushToolOverDraw
+      , "int", 0, "int", 0, "int", 0, "int", 0)
+  If !rr 
+     fnOutputDebug("An error occured in calling PaintBrushLarge() from the QPV DLL.")
+  If cloneBMP
+     FreeImage_UnLoad(cloneBMP)
+  Return
+} ; // ActPaintBrushLargeNow()
+
+getPixelColorAvgFreeImage(hFIF, kX, kY, startToolColor) {
+   coloruA := FreeImage_GetPixelColor(hFIF, kX, kY, 1)
+   coloruB := FreeImage_GetPixelColor(hFIF, kX + 2, kY + 2, 1)
+   coloruD := FreeImage_GetPixelColor(hFIF, kX - 2, kY - 2, 1)
+   coloruC := FreeImage_GetPixelColor(hFIF, kX + 2, kY - 2, 1)
+   If (coloruA!="" && coloruB!="")
+      coloruZ := MixARGB(coloruA, coloruB, 0.5)
+   If (coloruC!="" && coloruD!="")
+      coloruX := MixARGB(coloruC, coloruD, 0.5)
+   If (coloruZ!="" && coloruX!="")
+      coloruY := MixARGB(coloruZ, coloruX, 0.5)
+   Else If (coloruZ!="")
+      coloruY := coloruZ
+   Else If (coloruX!="")
+      coloruY := coloruX
+   Else
+      coloruY := startToolColor
+   Return coloruY
+}
 
 ActDrawAlphaMaskBrushNow() {
    Critical, on
    Static lastInvoked := 1, prevMX, prevMY, countClicks
-
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    If (!imgW || !imgH)
    {
@@ -77913,6 +78439,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
     If (AnyWindowOpen=64 && BrushToolType=3) || (AnyWindowOpen=23 && FillAreaColorMode=6) 
     || isVarEqualTo(AnyWindowOpen, 69, 44, 43, 26, 78, 81)
     {
+       ; highlight brush cloner source point
        ImageCoords2Window(tinyPrevAreaCoordX, tinyPrevAreaCoordY, prevDestPosX, prevDestPosY, SelDotsSize, outX, outY)
        Gdip_FillRectangle(2NDglPG, pBrushE, outX, outY, SelDotsSize, SelDotsSize)
        Gdip_DrawRectangle(2NDglPG, pPen1d, outX, outY, SelDotsSize, SelDotsSize)
@@ -77941,9 +78468,10 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        hasDrawnImageMap := 0
     }
 
+    ; highlight image editing each symmetry axis
     thisThick := imgHUDbaseUnit/11
     Gdip_SetPenWidth(pPen4, thisThick)
-    isSymmetryAllowed := (AnyWindowOpen=64 && BrushToolType<4 && liveDrawingBrushTool=1) || (drawingShapeNow=1 && !AnyWindowOpen) ? 1 : 0
+    isSymmetryAllowed := (drawingShapeNow=1 && !AnyWindowOpen) ? 1 : isPaintSymmetryModeAllowed()
     ccX := (drawingShapeNow=1) ? Round(vpSymmetryPointXdp) : prevDestPosX + Round(prevResizedVPimgW * BrushToolSymmetryPointX)
     ccY := (drawingShapeNow=1) ? Round(vpSymmetryPointYdp) : prevDestPosY + Round(prevResizedVPimgH * BrushToolSymmetryPointY)
     If ((BrushToolSymmetryX=1 || CustomShapeSymmetry=1) && isSymmetryAllowed=1)
@@ -77953,6 +78481,12 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
 
     Gdip_ResetWorldTransform(2NDglPG)
     r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
+}
+
+isPaintSymmetryModeAllowed() {
+    okaySymmetry := (BrushToolType=6 || BrushToolType=3 && BrushToolDynamicCloner=1) ? 0 : 1
+    isSymmetryAllowed := (AnyWindowOpen=64 && okaySymmetry=1 && liveDrawingBrushTool=1) ? 1 : 0
+    Return isSymmetryAllowed
 }
 
 toggleLiveEditObject(dummy:=0) {
@@ -79023,7 +79557,11 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
     brickIMGw := brickIMGxz - brickIMGx
     brickIMGh := brickIMGyz - brickIMGy
     If (simpleMode=1)
-       Return trGdip_DrawImage(A_ThisFunc, Gu, whichBitmap, brickVPx, brickVPy, brickVPw, brickVPh, brickIMGx, brickIMGy, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
+    {
+       r1 := trGdip_DrawImage(A_ThisFunc, Gu, whichBitmap, brickVPx, brickVPy, brickVPw, brickVPh, brickIMGx, brickIMGy, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
+       if r1
+          fnOutputDebug("an error occured drawing bitmap in " A_ThisFunc)
+    }
 
     ; kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, brickIMGx, brickIMGy, brickIMGw, brickIMGh, 0, 0, 1, 0)
     If (brickVPx<dpX)
@@ -79071,7 +79609,11 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
           r1 := trGdip_DrawImage(A_ThisFunc, Gu, kBitmap, brickVPx, brickVPy, brickVPw, brickVPh, 0, 0, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
           trGdip_DisposeImage(kBitmap)
        }
-    }
+       if r1
+          fnOutputDebug("an error occured drawing bitmap in " A_ThisFunc)
+    } else 
+       fnOutputDebug("invalid bitmap after resize, an error occured in " A_ThisFunc)
+
     ; ToolTip, % brickVPx "=" brickVPy "`n" brickVPw "==" brickVPh , , , 2
 }
 
@@ -79459,7 +80001,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        wasVPcached := 1
     }
 
-    ; ToolTip, % "l=" r2 "=" kBitmap "=" ViewPortBMPcache "=" gdipLastError "=" glHbitmap , , , 2
+    ; ToolTip, % wasVPcached "l=" r2 "=" kBitmap "=" ViewPortBMPcache "=" gdipLastError "=" glHbitmap , , , 2
     confirmTexBGR := isVarEqualTo(vpIMGrotation, 0, 90, 180, 270) && (usrTextureBGR=1 && gdiAmbientalTexBrush && (IMGentirelylargerThanVP!=1 || allowFreeIMGpanning=1 && IMGresizingMode=4)) ? 1 : 0
     If (FlipImgV=1 || FlipImgH=1 || pEffect || imageAttribs || wasVPcached=1 || isVarEqualTo(UserVPalphaBgrStyle, 2, 4, 5) && currIMGdetails.HasAlpha=1)
     {
@@ -81944,7 +82486,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       mustDoMultiCore := 0
    }
 
-   ; how much time in miliseconds can an image take to load and not be cached
+   ; how much time in milliseconds can an image take to load and not be cached
    timePerImg := 1550//imgsNotCached
    If (timePerImg<25 || modus="all")
       timePerImg := 25
@@ -89003,7 +89545,7 @@ invokePanelReviewSelContextMenu() {
 }
 
 BtnHelpStaticFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify per folder missing files, already seen images or favourited images [if these were selected using the appropiate tools before opening this panel]`n `nFolders marked with (*) are changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index»», the files indexed pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify per folder missing files, already seen images or favourited images [if these were selected using the appropriate tools before opening this panel]`n `nFolders marked with (*) are changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index», the files indexed pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
@@ -95776,7 +96318,7 @@ initFIMGmodule() {
 
 LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newBitmap:=0, nofall:=0, screenMode:=0) {
   Critical, on
-  sTime := A_tickcount  
+  sTime := A_TickCount
   initFIMGmodule()
   forceWic := (RegExMatch(imgPath, "i)(.\.(tiff|tif|gif))$") && noBMP=1) ? 1 : 0
   If (!wasInitFIMlib || forceWic=1)
@@ -95883,7 +96425,9 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
 
   If (isImgSizeTooLarge(imgW, imgH) && screenMode=1)
   {
-     viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames], 1)
+     viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, 0, sTime], 1)
+     If (viewportQPVimage.LoadTime>256)
+        preventUndoLevels := 1
      Return "very-large"
   }
 
@@ -96877,7 +97421,7 @@ convertSVGunitsToPixels(ByRef length) {
        Return Round(StrReplace(length, "pc")*16)
     Else If InStr(length, "cm")   ; centimeters
        Return Round(StrReplace(length, "cm")*37.795275591)
-    Else If InStr(length, "mm")   ; milimeters
+    Else If InStr(length, "mm")   ; millimeters
        Return Round(StrReplace(length, "mm")*3.7795275591)
     Else If InStr(length, "in")   ; inches
        Return Round(StrReplace(length, "in")*96)
@@ -97227,7 +97771,8 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
    If memoryUsageWarning(imgW, imgH, bitsDepth, 1)
       Return 0
 
-   ; the stride is aligned to a multiple of 4 bytes (32 bits) for efficient memory access.
+   ; the stride is aligned to a multiple of 4 bytes (32 bits) for efficient memory access
+   sTime := A_TickCount
    bytesPerPixel := bitsDepth / 8
    widthBytes := imgW * bytesPerPixel
    Stride := Ceil(((widthBytes + 3) // 4) * 4)
@@ -97300,7 +97845,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
       OpenedWith := viewportQPVimage.OpenedWith
       viewportQPVimage.DiscardImage()
       DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 1, "Int")
-      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, buffer], 1)
+      viewportQPVimage.LoadImage(imgPath, frameu, 0, 1, [hFIFimgA, tFrames, buffer, sTime], 1)
       ; ToolTip, % "teleported=" hFIFimgA "|" zw "|" zh "|" bufferSize , , , 2
       If !InStr(viewportQPVimage.PixelFormat, "tone-map")
          viewportQPVimage.PixelFormat := PixelFormat
@@ -100196,19 +100741,17 @@ GuiSlidersResponder(a, m_event, keyu) {
    {
       ; fnOutputDebug(A_ThisFunc " == A // start")
       Sleep, -1
-      If (A_TickCount - clickStarted>14500)
-      {
-         SoundBeep 900, 100
-         skipped := 1
-         Break
-      }
       ; if m_event = "uiLabel" , it is a keyboard call
       GetPhysicalCursorPos(mX, mY)
       If (isGivenKey!=1 && mouseMode=1)
       {
-         Sleep, 5
          If (isInRange(mX, zX - 2, zX + 2) && isInRange(mY, zY - 2, zY + 2) && A_Index>1)
+         {
+            Sleep, 10
+            If (A_TickCount - clickStarted>14500)
+               Break
             Continue
+         }
       }
 
       Sleep, -1
@@ -100293,6 +100836,13 @@ GuiSlidersResponder(a, m_event, keyu) {
       ; fnOutputDebug(A_ThisFunc " == E // finish")
       If (sk && !isGivenKey)
          Break
+      Sleep, -1
+      If (A_TickCount - clickStarted>14500)
+      {
+         SoundBeep 900, 100
+         skipped := 1
+         Break
+      }
    }
 
    If (isGivenKey && !InStr(uiSlidersArray[hwnd], "@"))
@@ -102073,4 +102623,3 @@ testKeysStuff() {
 
    ToolTip, % ppA "`n" ppB , , , 2
 }
-
