@@ -8444,6 +8444,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     if (overDrawOkay==0)
        opaf = (brushOverDraw==1) ? 0.75 : 0.35;
 
+    int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) ? blendMode : 0;
     // Thread-safe chunk pre-allocation (Single-Threaded)
     if (brushType<=5 && brushOverDraw==0 && overDrawOkay==1)
     {
@@ -8461,8 +8462,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 {
                     try {
                         brushOpacityChunks[chunkIdx] = new float[128 * 128]();
-                        int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) ? blendMode : 0;
-                        if (useBlendMode > 0) {
+                        if (useBlendMode>0)
+                        {
                             unsigned char* origBuf = new unsigned char[128 * 128 * bytesPerPixel]();
                             brushOriginalPixelChunks[chunkIdx] = origBuf;
                             
@@ -8551,7 +8552,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             double B_coeff = Y * B_term_factor;
             double C_coeff = Y * Y * C_term_factor - 1.0;
             double discriminant = B_coeff * B_coeff - 4.0 * A_coeff * C_coeff;
-            if (discriminant < 0)
+            if (discriminant<0)
                continue; // The row does not intersect the ellipse/circle
 
             double sqrt_d = sqrt(discriminant);
@@ -8725,20 +8726,25 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                    continue;
 
                 float newAccOpa = accOpa + weight - accOpa * weight;
-                if (blendMode > 0) {
-                    if (newAccOpa >= opaf) newAccOpa = opaf;
+                if (useBlendMode>0)
+                {
+                    if (newAccOpa >= opaf)
+                       newAccOpa = opaf;
+
                     chunk[pixelIdx] = newAccOpa;
                     weight = newAccOpa;
-
                     unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
-                    if (origBuf) {
+                    if (origBuf)
+                    {
                         int localOffset = pixelIdx * bytesPerPixel;
                         tgtB = origBuf[localOffset + 0];
                         tgtG = origBuf[localOffset + 1];
                         tgtR = origBuf[localOffset + 2];
-                        if (bytesPerPixel == 4) tgtA = origBuf[localOffset + 3];
+                        if (bytesPerPixel==4)
+                           tgtA = origBuf[localOffset + 3];
                     }
-                } else {
+                } else
+                {
                     float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
                     if (weight>=maxAllowedWeight)
                     {

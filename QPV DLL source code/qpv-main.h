@@ -51,6 +51,8 @@ INT64 blahImgH = 0;
 
 std::vector<float*> brushOpacityChunks;
 std::vector<unsigned char*> brushOriginalPixelChunks;
+int chunkGridW = 0;
+int chunkGridH = 0;
 IWICBitmapDecoder      *pWICclassDecoder;
 IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
