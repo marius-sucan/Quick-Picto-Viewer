@@ -50,6 +50,7 @@ INT64 polyOffYb = 0;
 INT64 blahImgH = 0;
 
 std::vector<float*> brushOpacityChunks;
+std::vector<unsigned char*> brushOriginalPixelChunks;
 IWICBitmapDecoder      *pWICclassDecoder;
 IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;

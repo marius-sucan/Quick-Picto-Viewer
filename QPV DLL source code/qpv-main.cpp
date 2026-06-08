@@ -8157,6 +8157,12 @@ DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
         }
     }
     std::vector<float*>().swap(brushOpacityChunks);
+    for (unsigned char* ptr : brushOriginalPixelChunks) {
+        if (ptr) {
+            delete[] ptr;
+        }
+    }
+    std::vector<unsigned char*>().swap(brushOriginalPixelChunks);
     chunkGridW = 0;
     chunkGridH = 0;
 }
@@ -8229,6 +8235,12 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                    delete[] ptr;
             }
             brushOpacityChunks.assign(totalChunks, nullptr);
+            for (unsigned char* ptr : brushOriginalPixelChunks)
+            {
+                if (ptr)
+                   delete[] ptr;
+            }
+            brushOriginalPixelChunks.assign(totalChunks, nullptr);
             chunkGridW = numChunksX;
             chunkGridH = numChunksY;
         }
@@ -8449,6 +8461,24 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 {
                     try {
                         brushOpacityChunks[chunkIdx] = new float[128 * 128]();
+                        int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) ? blendMode : 0;
+                        if (useBlendMode > 0) {
+                            unsigned char* origBuf = new unsigned char[128 * 128 * bytesPerPixel]();
+                            brushOriginalPixelChunks[chunkIdx] = origBuf;
+                            
+                            int startBlockX = cx << 7;
+                            int startBlockY = cy << 7;
+                            int copyW = min(128, imgW - startBlockX);
+                            int copyH = min(128, imgH - startBlockY);
+                            for (int by = 0; by < copyH; ++by)
+                            {
+                                int py = startBlockY + by;
+                                int iy = imgH - 1 - py;
+                                unsigned char* srcRow = imgData + (INT64)iy * pitch + startBlockX * bytesPerPixel;
+                                unsigned char* dstRow = origBuf + by * 128 * bytesPerPixel;
+                                memcpy(dstRow, srcRow, copyW * bytesPerPixel);
+                            }
+                        }
                     } catch (const std::bad_alloc&) {
                         return 0;
                     }
@@ -8694,14 +8724,30 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 if (accOpa>=opaf)
                    continue;
 
-                float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
-                if (weight>=maxAllowedWeight)
-                {
-                    weight = maxAllowedWeight;
-                    chunk[pixelIdx] = opaf;
-                } else
-                {
-                    chunk[pixelIdx] = accOpa + weight - accOpa * weight;
+                float newAccOpa = accOpa + weight - accOpa * weight;
+                if (blendMode > 0) {
+                    if (newAccOpa >= opaf) newAccOpa = opaf;
+                    chunk[pixelIdx] = newAccOpa;
+                    weight = newAccOpa;
+
+                    unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
+                    if (origBuf) {
+                        int localOffset = pixelIdx * bytesPerPixel;
+                        tgtB = origBuf[localOffset + 0];
+                        tgtG = origBuf[localOffset + 1];
+                        tgtR = origBuf[localOffset + 2];
+                        if (bytesPerPixel == 4) tgtA = origBuf[localOffset + 3];
+                    }
+                } else {
+                    float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
+                    if (weight>=maxAllowedWeight)
+                    {
+                        weight = maxAllowedWeight;
+                        chunk[pixelIdx] = opaf;
+                    } else
+                    {
+                        chunk[pixelIdx] = newAccOpa;
+                    }
                 }
             }
 
