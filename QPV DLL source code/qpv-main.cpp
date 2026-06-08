@@ -8596,6 +8596,9 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
         for (int px = scan_sX; stepX>0 ? px<=scan_eX : px>=scan_eX; px += stepX)
         {
+            if (lockW > 0 && (px < lockX || px >= lockX + lockW || iy < lockY || iy >= lockY + lockH))
+                continue;
+
             // 1. Calculate selection constraints
             if (useSelArea)
             {
