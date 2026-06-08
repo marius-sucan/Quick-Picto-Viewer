@@ -8157,11 +8157,8 @@ DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
         }
     }
     std::vector<float*>().swap(brushOpacityChunks);
-    std::vector<unsigned char>().swap(brushOriginalPixels);
     chunkGridW = 0;
     chunkGridH = 0;
-    brushOriginalW = 0;
-    brushOriginalH = 0;
 }
 
 DLL_API int DLL_CALLCONV PaintBrushLarge(
@@ -8219,17 +8216,12 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
        return 0;
     }
 
-    int useLockX = (lockW > 0) ? lockX : 0;
-    int useLockY = (lockH > 0) ? lockY : 0;
-    int useLockW = (lockW > 0) ? lockW : imgW;
-    int useLockH = (lockH > 0) ? lockH : imgH;
-
     if (brushType<=5 && brushOverDraw==0)
     {
         int numChunksX = (imgW + 127) >> 7;
         int numChunksY = (imgH + 127) >> 7;
         size_t totalChunks = (size_t)numChunksX * numChunksY;
-        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks || brushOriginalW != imgW || brushOriginalH != imgH)
+        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks)
         {
             for (float* ptr : brushOpacityChunks)
             {
@@ -8237,91 +8229,17 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                    delete[] ptr;
             }
             brushOpacityChunks.assign(totalChunks, nullptr);
-            std::vector<unsigned char>().swap(brushOriginalPixels);
             chunkGridW = numChunksX;
             chunkGridH = numChunksY;
-            brushOriginalW = imgW;
-            brushOriginalH = imgH;
-        }
-
-        try {
-            if (brushOriginalPixels.size() != (size_t)imgW * imgH * 3)
-            {
-                brushOriginalPixels.resize((size_t)imgW * imgH * 3);
-            }
-
-            #pragma omp parallel for schedule(static)
-            for (int y = useLockY; y < useLockY + useLockH; ++y)
-            {
-                if (y >= 0 && y < imgH)
-                {
-                    unsigned char* srcRow = imgData + (INT64)y * pitch;
-                    unsigned char* dstRow = brushOriginalPixels.data() + (INT64)y * imgW * 3;
-                    
-                    int cy = y >> 7;
-                    size_t cy_grid = (size_t)cy * chunkGridW;
-                    
-                    int startCol = clamp(useLockX, 0, imgW - 1);
-                    int endCol = clamp(useLockX + useLockW - 1, 0, imgW - 1);
-                    
-                    for (int x = startCol; x <= endCol; ++x)
-                    {
-                        bool modified = false;
-                        int cx = x >> 7;
-                        size_t chunkIdx = cy_grid + cx;
-                        if (chunkIdx < brushOpacityChunks.size())
-                        {
-                            float* chunk = brushOpacityChunks[chunkIdx];
-                            if (chunk)
-                            {
-                                int px_mod = x & 127;
-                                int py_mod = y & 127;
-                                if (chunk[(py_mod << 7) + px_mod] > 0.0f)
-                                {
-                                    modified = true;
-                                }
-                            }
-                        }
-                        
-                        if (!modified)
-                        {
-                            size_t dstIdx = x * 3;
-                            if (bytesPerPixel == 3)
-                            {
-                                size_t srcIdx = x * 3;
-                                dstRow[dstIdx]     = srcRow[srcIdx];
-                                dstRow[dstIdx + 1] = srcRow[srcIdx + 1];
-                                dstRow[dstIdx + 2] = srcRow[srcIdx + 2];
-                            }
-                            else if (bytesPerPixel == 4)
-                            {
-                                size_t srcIdx = x * 4;
-                                dstRow[dstIdx]     = srcRow[srcIdx];
-                                dstRow[dstIdx + 1] = srcRow[srcIdx + 1];
-                                dstRow[dstIdx + 2] = srcRow[srcIdx + 2];
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (...) {
-            brushOriginalPixels.clear();
         }
     }
 
     int halfW = (texData && texW > 0) ? (texW / 2 + abs(bulgePinchFactor)) : (brushSize / 2 + abs(bulgePinchFactor));
     int halfH = (texData && texH > 0) ? (texH / 2 + abs(bulgePinchFactor)) : (brushSize / 2 + abs(bulgePinchFactor));
-
-    // Clamp coordinates to GDI+ locked boundaries to prevent out-of-bounds reads/writes on partially locked buffers
-    int clampMinX = useLockX;
-    int clampMaxX = useLockX + useLockW - 1;
-    int clampMinY = imgH - 1 - (useLockY + useLockH - 1);
-    int clampMaxY = imgH - 1 - useLockY;
-
-    int startX = clamp((int)(tkX - halfW), clampMinX, clampMaxX);
-    int endX = clamp((int)(tkX + halfW), clampMinX, clampMaxX);
-    int startY = clamp((int)(tkY - halfH), clampMinY, clampMaxY);
-    int endY = clamp((int)(tkY + halfH), clampMinY, clampMaxY);
+    int startX = clamp((int)(tkX - halfW), 0, imgW - 1);
+    int endX = clamp((int)(tkX + halfW), 0, imgW - 1);
+    int startY = clamp((int)(tkY - halfH), 0, imgH - 1);
+    int endY = clamp((int)(tkY + halfH), 0, imgH - 1);
 
     int cloneStartX = startX;
     int cloneEndX = endX;
@@ -8361,21 +8279,9 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 {
                     int img_py = cloneStartY + ry;
                     int img_iy = imgH - 1 - img_py;
+                    unsigned char* srcRow = imgData + (INT64)img_iy * pitch + cloneStartX * bytesPerPixel;
                     unsigned char* dstRow = localClone.data() + (INT64)ry * localPitch;
-
-                    if (img_iy >= useLockY && img_iy < useLockY + useLockH)
-                    {
-                        int startCol = clamp(cloneStartX, useLockX, useLockX + useLockW);
-                        int endCol = clamp(cloneStartX + cloneW, useLockX, useLockX + useLockW);
-                        if (endCol > startCol)
-                        {
-                            unsigned char* srcRow = imgData + (INT64)img_iy * pitch;
-                            int destOffset = (startCol - cloneStartX) * bytesPerPixel;
-                            int srcOffset = startCol * bytesPerPixel;
-                            int copyBytes = (endCol - startCol) * bytesPerPixel;
-                            memcpy(dstRow + destOffset, srcRow + srcOffset, copyBytes);
-                        }
-                    }
+                    memcpy(dstRow, srcRow, localPitch);
                 }
             }
         } catch (...) {
@@ -8740,31 +8646,6 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             int tgtG = targetPixel[1];
             int tgtR = targetPixel[2];
             int tgtA = (bytesPerPixel==4) ? targetPixel[3] : 255;
-            if (brushType <= 5 && brushOverDraw == 0 && !brushOriginalPixels.empty())
-            {
-                size_t origIdx = ((size_t)iy * imgW + px) * 3;
-                if (origIdx + 2 < brushOriginalPixels.size())
-                {
-                    tgtB = brushOriginalPixels[origIdx];
-                    tgtG = brushOriginalPixels[origIdx + 1];
-                    tgtR = brushOriginalPixels[origIdx + 2];
-
-                    int cx = px >> 7;
-                    size_t chunkIdx = cy_grid + cx;
-                    if (chunkIdx < brushOpacityChunks.size())
-                    {
-                        float* chunk = brushOpacityChunks[chunkIdx];
-                        if (chunk)
-                        {
-                            int px_mod = px & 127;
-                            int pixelIdx = py_mod_shift + px_mod;
-                            float blendWeight = chunk[pixelIdx];
-                            if (blendWeight < 0.999f)
-                               tgtA = clamp((int)round((tgtA - blendWeight * 255.0f) / (1.0f - blendWeight)), 0, 255);
-                        }
-                    }
-                }
-            }
 
             // Prepare output color
             int outB = tgtB;
@@ -8796,34 +8677,31 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             {
                 int cx = px >> 7;
                 size_t chunkIdx = cy_grid + cx;
-                if (chunkIdx < brushOpacityChunks.size())
+                float* chunk = brushOpacityChunks[chunkIdx];
+                if (!chunk)
                 {
-                    float* chunk = brushOpacityChunks[chunkIdx];
-                    if (!chunk)
-                    {
-                        try {
-                            chunk = new float[128 * 128]();
-                            brushOpacityChunks[chunkIdx] = chunk;
-                        } catch (const std::bad_alloc&) {
-                            continue;
-                        }
+                    try {
+                        chunk = new float[128 * 128]();
+                        brushOpacityChunks[chunkIdx] = chunk;
+                    } catch (const std::bad_alloc&) {
+                        continue;
                     }
+                }
 
-                    int px_mod = px & 127;
-                    int pixelIdx = py_mod_shift + px_mod;
-                    float accOpa = chunk[pixelIdx];
-                    if (accOpa>=opaf)
-                       continue;
+                int px_mod = px & 127;
+                int pixelIdx = py_mod_shift + px_mod;
+                float accOpa = chunk[pixelIdx];
+                if (accOpa>=opaf)
+                   continue;
 
-                    float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
-                    if (weight>=maxAllowedWeight)
-                    {
-                        weight = maxAllowedWeight;
-                        chunk[pixelIdx] = opaf;
-                    } else
-                    {
-                        chunk[pixelIdx] = accOpa + weight - accOpa * weight;
-                    }
+                float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
+                if (weight>=maxAllowedWeight)
+                {
+                    weight = maxAllowedWeight;
+                    chunk[pixelIdx] = opaf;
+                } else
+                {
+                    chunk[pixelIdx] = accOpa + weight - accOpa * weight;
                 }
             }
 
