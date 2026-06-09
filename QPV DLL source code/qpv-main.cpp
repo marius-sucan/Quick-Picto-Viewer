@@ -3207,116 +3207,7 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
       }
    }
    // fnOutputDebug(std::to_string(whichLoop) + " fc" + std::to_string(*fcoord)  + " x" + std::to_string(x) + " y" + std::to_string(y) + " prev=" + std::to_string(prevR4) );
-
    return 1;
-}
-
-DLL_API int DLL_CALLCONV EraserBrush(int *imageData, int *maskData, int w, int h, int invertMask, int replaceMode, int levelAlpha, int *clonedData, int useClone) {
-
-    // #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < w; x++)
-    {
-        // int px;
-        for (int y = 0; y < h; y++)
-        {
-            const int px = x * h + y;
-            int alpha2;
-            int a = (imageData[px] >> 24) & 0xFF;
-            int intensity = (maskData[px] >> 8) & 0xff;
-            if (invertMask == 1)
-               intensity = 255 - intensity;
-
-            float fintensity = char_to_float[intensity];
-            if (a==0)
-               continue;
-
-            if (replaceMode == 1)
-               alpha2 = min(levelAlpha, a);
-            else if (replaceMode == 2)
-               alpha2 = max(0, (int)a - levelAlpha);
-            else
-               alpha2 = levelAlpha;
-
-            alpha2 = (alpha2==a) ? a : ceil(alpha2*fintensity + a*max(0.0f, 1.0f - fintensity));  // Formula: A*w + B*(1 – w)
-            // int haha = (alpha2!=a) ? 1 : 0;
-            if (alpha2!=a)
-            {
-                if (useClone==1)
-                   imageData[px] = (alpha2 << 24) | (clonedData[px] & 0x00ffffff);
-                else
-                   imageData[px] = (alpha2 << 24) | (imageData[px] & 0x00ffffff);
-            }
-            // std::stringstream ss;
-            // ss << "qpv: alpha2 = " << alpha2;
-            // ss << " var a = " << a;
-            // ss << " var haha = " << haha;
-            // OutputDebugStringA(ss.str().data());
-        }
-    }
- 
-    // fnOutputDebug("eraser alpha = " + std::to_string(levelAlpha));
-    return 1;
-}
-
-DLL_API int DLL_CALLCONV ColourBrush(int *opacityImgData, int *imageData, int *maskData, int newColor, int w, int h, int invertMask, int replaceMode, int brushAlpha, int blendMode, int *clonedData, int useClone, int overDraw, int linearGamma, int wa, int ha, int offX, int offY, int flipLayers) {
-    // only works with 32-PARGB bitmaps 
-    float nC[4];
-    nC[0] = (replaceMode==1) ? brushAlpha : (newColor >> 24) & 0xFF;
-    nC[1] = (newColor >> 16) & 0xFF;
-    nC[2] = (newColor >> 8) & 0xFF;
-    nC[3] = newColor & 0xFF;
-    int apx = (w/2) * h + h/2;
-    int centerLevel = (maskData[apx] >> 8) & 0xff;
-
-    float pK[4];
-    pK[0] = 255;
-    pK[1] = centerLevel;
-    pK[2] = centerLevel;
-    pK[3] = centerLevel;
-    float fr = 2.5f;
-    if (overDraw==1 && blendMode>0)
-    {
-       brushAlpha = clamp(brushAlpha + 128, 0, 255);
-       fr = 3.25f;
-    }
-
-    float fb = (255.0f - brushAlpha)/255.0f;
-    for (int y = 0; y < h; y++)
-    {
-        for (int x = 0; x < w; x++)
-        {
-            int px = x * h + y;
-            int bgrColor = (overDraw==0) ? clonedData[px] : imageData[px];
-            int intensity = (maskData[px] >> 8) & 0xff;
-            int clipFlag = (opacityImgData[px] >> 24) & 0xff;
-            if (invertMask==1)
-               intensity = 255 - intensity;
-
-            float fintensity = char_to_float[intensity];
-            if (overDraw==1)
-            {
-               fintensity -= fb;
-            } else
-            {
-               int altoAlpha = (opacityImgData[px] >> 8) & 0xff;
-               int tL = weighTwoValues(255, altoAlpha, fintensity/fr);
-               fintensity = char_to_float[tL] - fb;
-               if (clipFlag<2)
-                  tL = 0;
-
-               if (overDraw==0 || blendMode>0)
-                  opacityImgData[px] = (clipFlag << 24) | ((tL & 0xFF) << 16) | ((tL & 0xFF) << 8) | (tL & 0xFF);
-            }
-    
-            if (fintensity<0 || clipFlag<2)
-               fintensity = 0;
-
-            imageData[px] = clrBrushMixColors(bgrColor, nC, fintensity, blendMode, linearGamma, flipLayers);
-        }
-    }
- 
-    // fnOutputDebug("alles gut");
-    return 1;
 }
 
 DLL_API int DLL_CALLCONV FillImageHoles(int *imageData, int w, int h, int newColor) {
@@ -9075,7 +8966,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                outA = 255 - clamp(max(srcA, weightInt) - min(srcA, weightInt), 0, 255);
                RGBAColor Orgb = { srcB, srcG, srcR, outA };
                RGBAColor Brgb = { tgtB, tgtG, tgtR, tgtA };
-               RGBAColor blended = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 0, imgBpp, 0);
+               RGBAColor blended = NEWERcalculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, eraserMode, imgBpp, 0);
                outR = blended.r;
                outG = blended.g;
                outB = blended.b;

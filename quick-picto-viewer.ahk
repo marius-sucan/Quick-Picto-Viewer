@@ -14376,105 +14376,6 @@ QPV_ColorizeGrayImage(pBitmap, thisColorA, thisColorB, linearu) {
   return r
 }
 
-QPV_EraserBrush(pBitmap, pBitmapMask, invertAlphaMask, replaceMode, levelAlpha, offsetX, offsetY, clonescu) {
-  ; thisStartZeit := A_TickCount
-  thisStartZeit := A_TickCount
-  trGdip_GetImageDimensions(pBitmap, w, h)
-  trGdip_GetImageDimensions(pBitmapMask, w2, h2)
-  If (!validBMP(pBitmap) || !validBMP(pBitmapMask))
-     Return 0
-
-  w3 := (offsetX<0) ? w2 - Abs(offsetX) : w2
-  h3 := (offsetY<0) ? h2 - Abs(offsetY) : h2
-  offX := (offsetX<0) ? Abs(offsetX) : 0
-  offY := (offsetY<0) ? Abs(offsetY) : 0
-  offsetX := (offsetX<0) ? 0 : offsetX
-  offsetY := (offsetY<0) ? 0 : offsetY
-  If (offsetX + w3>=w)
-     w3 -= (offsetX + w3 - w)
-  If (offsetY + h2>=h)
-     h3 -= (offsetY + h3 - h)
-
-  initQPVmainDLL()
-  If (w3<1 || h3<1 || !qpvMainDll)
-     Return 0
-
-  E1 := trGdip_LockBits(pBitmap, offsetX, offsetY, w3, h3, strideA, iScan, iData)
-  E2 := trGdip_LockBits(pBitmapMask, offX, offY, w3, h3, strideB, mScan, mData, 1)
-  If clonescu
-     E3 := trGdip_LockBits(clonescu, offsetX, offsetY, w3, h3, strideC, cScan, cData)
-
-  If (!E1 && !E2)
-  {
-     useClone := (!E3 && clonescu) ? 1 : 0
-     r := DllCall("qpvmain.dll\EraserBrush", "UPtr", iScan, "UPtr", mScan, "Int", w3, "Int", h3, "Int", invertAlphaMask, "Int", replaceMode, "Int", levelAlpha, "UPtr", cScan, "int", useClone)
-     ; ToolTip, % r "=" ErrorLevel "=" A_LastError "`n" klop "`n" klopa "`n" kloxa "`n" "=" iScan "=" mScan "=" w2 "=" h2 "=" invertAlphaMask "=" replaceMode "=" levelAlpha "=" countClicks , , , 2
-   }
-
-  If !E1
-     Gdip_UnlockBits(pBitmap, iData)
-  If !E2
-     Gdip_UnlockBits(pBitmapMask, mData)
-  If (!E3 && clonescu)
-     Gdip_UnlockBits(clonescu, cData)
-  ; ToolTip, % "qpv_" r "=" e1 "=" e "`n" offsetX "=" offsetY "`n" w2 "=" h2, , , 2
-  return r
-}
-
-QPV_ColourBrush(pBitmap, pBitmapMask, invertAlphaMask, newColor, replaceMode, levelAlpha, blendMode, offsetX, offsetY, clonescu, ByRef opacityBMPmap, overDraw, flipLayers) {
-  ; thisStartZeit := A_TickCount
-  thisStartZeit := A_TickCount
-  trGdip_GetImageDimensions(pBitmap, w, h)
-  trGdip_GetImageDimensions(opacityBMPmap, wa, ha)
-  trGdip_GetImageDimensions(pBitmapMask, w2, h2)
-  If (!validBMP(pBitmap) || !validBMP(pBitmapMask) || !validBMP(opacityBMPmap))
-     Return 0
-
-  w3 := (offsetX<0) ? w2 - Abs(offsetX) : w2
-  h3 := (offsetY<0) ? h2 - Abs(offsetY) : h2
-  offX := (offsetX<0) ? Abs(offsetX) : 0
-  offY := (offsetY<0) ? Abs(offsetY) : 0
-  offsetX := (offsetX<0) ? 0 : offsetX
-  offsetY := (offsetY<0) ? 0 : offsetY
-  If (offsetX + w3>=w)
-     w3 -= (offsetX + w3 - w)
-  If (offsetY + h2>=h)
-     h3 -= (offsetY + h3 - h)
-
-  initQPVmainDLL()
-  If (w3<1 || h3<1 || !qpvMainDll)
-     Return 0
-
-  E1 := trGdip_LockBits(pBitmap, offsetX, offsetY, w3, h3, strideA, iScan, iData)
-  E2 := trGdip_LockBits(pBitmapMask, offX, offY, w3, h3, strideB, mScan, mData, 1)
-  E4 := trGdip_LockBits(opacityBMPmap, offsetX, offsetY, w3, h3, strideD, kScan, kData, 3)
-  ; ToolTip, % opacityBMPmap "===" wa "/" ha "`n" w "/" h , , , 2
-
-  If validBMP(clonescu)
-     E3 := trGdip_LockBits(clonescu, offsetX, offsetY, w3, h3, strideC, cScan, cData)
-
-  If (!E1 && !E2)
-  {
-     Gdip_FromARGB(newColor, A, R, G, B)
-     newColor := Gdip_ToARGB(A, R, G, B)
-     useClone := (!E3 && clonescu) ? 1 : 0
-     ; ToolTip, % levelAlpha "|" blendMode "`n" offsetX "|" offsetY "`n" rImgW "|" rImgH , , , 2
-     r := DllCall("qpvmain.dll\ColourBrush", "UPtr", kScan, "UPtr", iScan, "UPtr", mScan, "int", newColor, "Int", w3, "Int", h3, "Int", invertAlphaMask, "Int", replaceMode, "Int", levelAlpha, "int", blendMode, "UPtr", cScan, "int", useClone, "int", overDraw, "int", userimgGammaCorrect, "int", w, "int", h, "int", offsetX, "int", offsetY, "int", flipLayers)
-     ; ToolTip, % r "=" ErrorLevel "=" A_LastError "`n" klop "`n" klopa "`n" kloxa "`n" "=" iScan "=" mScan "=" w2 "=" h2 "=" invertAlphaMask "=" replaceMode "=" levelAlpha "=" countClicks , , , 2
-  }
-
-  If !E1
-     Gdip_UnlockBits(pBitmap, iData)
-  If !E2
-     Gdip_UnlockBits(pBitmapMask, mData)
-  If !E4
-     Gdip_UnlockBits(opacityBMPmap, kData)
-  If (!E3 && validBMP(clonescu))
-     Gdip_UnlockBits(clonescu, cData)
-  ; ToolTip, % "qpv_" r "=" e1 "=" e "`n" offsetX "=" offsetY "`n" w2 "=" h2, , , 2
-  return r
-}
-
 QPV_PrepareAlphaChannelBlur(pBitmap, givenLevel, fillMissingOnly) {
 ; this function fills / replaces black pixels [and opacity 0] with surrounding colors
 ; this helps mitigate the dark hallows that emerge when applying blur on images with areas that are fully transparent 
@@ -43503,14 +43404,16 @@ PanelBrushTool(dummy:=0, modus:=0) {
     gW := gH := (PrefsLargeFonts=1) ? 60 : 45
     Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
     Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic gUIresponderPanelsLivePreview +TabStop, Brush preview
-    Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw , &Airbrush mode / deformer option
+    Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw +hwndhTemp, &Airbrush mode / deformer option
+    ToolTip2ctrl(hTemp, "When airbrush mode is activated, the paint gradually accumulates.`nIt allows the user to overdraw regions in a single stroke.")
     Gui, Add, Checkbox, y+10 gupdateUIbrushTool Checked%BrushToolDynamicCloner% vBrushToolDynamicCloner , D&ynamic X/Y source coordinates
 
     Gui, Tab, 2 ; FX
     GuiAddSlider("BrushToolBlurStrength", 0,99, 0, "Blur strength", "updateUIbrushTool", 1, "x+15 y+15 w" slideWid " h" hasa)
-    GuiAddSlider("BrushToolWetness", 0,22, 0, "Wetness", "updateUIbrushTool", 1, "x+10 wp hp")
+    GuiAddSlider("BrushToolWetness", 0,22, 0, "Wetness", "updateUIbrushTool", 1, "x+10 wp-27 hp")
+    GuiAddCheckbox("x+1 hp w26 gupdateUIbrushTool Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
 
-    Gui, Add, Checkbox, xs y+10 wp gupdateUIbrushTool Checked%BrushToolApplyColorFX% vBrushToolApplyColorFX, Color adjustments
+    Gui, Add, Checkbox, xs y+10 w%slideWid% gupdateUIbrushTool Checked%BrushToolApplyColorFX% vBrushToolApplyColorFX, Color adjustments
     GuiAddDropDownList("x+10 wp-27 gupdateUIbrushTool AltSubmit Choose" BrushToolBlendMode " vBrushToolBlendMode", "No blend mode|" userBlendModesList, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIbrushTool")
 
@@ -44145,9 +44048,10 @@ updateUIbrushTool() {
       uiSlidersArray["BrushToolWetness", 10] := (BrushToolType<=2 || BrushToolType>=6) ? 1 : 0
       uiSlidersArray["BrushToolBlurStrength", 10] := (BrushToolType=5) ? 1 : 0
 
-      actu := (BrushToolType=2 || BrushToolType=3 || BrushToolType>=5) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      actu := (BrushToolType=2 || BrushToolType=3 || BrushToolType>=5) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
       GuiControl, % actu, BrushToolBlendMode
       GuiControl, % actu, BlendModesFlipped
+      GuiControl, % actu, BlendModesPreserveAlpha
 
       actu := (BrushToolType=3 || BrushToolType=5) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, BrushToolApplyColorFX
@@ -44280,7 +44184,8 @@ createLivePreviewBrush() {
     If ((BrushToolType=3 || BrushToolType=5) && CurrentPanelTab=2 && !viewportQPVimage.imgHandle)
     {
        brushu := createClonedBrushBitmap(brushSize, 101 - BrushToolSoftness, BrushToolAngle, BrushToolAspectRatio, whichBitmap, 0, 0, 1, 1, 1)
-       applyPersonalizedColorsBMP(brushu, 1, BrushToolBlurStrength, BrushToolApplyColorFX)
+       blurr := (BrushToolType=5) ? BrushToolBlurStrength : 0
+       applyPersonalizedColorsBMP(brushu, 1, blurr, BrushToolApplyColorFX)
        thisMainOpacity := 1
     } Else If (BrushToolType=3 && CurrentPanelTab=1 && !viewportQPVimage.imgHandle)
     {
@@ -76615,7 +76520,7 @@ DrawPaintBrushLargeStep:
       , "double", cur_offY
       , "UPtr", cloneBits
       , "int", clonePitch
-      , "int", BrushToolEraserRestore
+      , "int", (BrushToolType=4) ? BrushToolEraserRestore : BlendModesPreserveAlpha
       , "int", useSelArea
       , "int", userimgGammaCorrect
       , "int", BlendModesFlipped
