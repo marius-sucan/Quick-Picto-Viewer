@@ -8240,7 +8240,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
        return 0;
     }
 
-    int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) && (blendMode>1) ? 1 : 0;
+    int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) && (blendMode>=8) ? 1 : 0;
+    if (blendMode==13 || blendMode==14 || blendMode==23)
+       useBlendMode = 0;
+
     if (brushType<=5 && brushOverDraw==0)
     {
         int numChunksX = (imgW + 127) >> 7;
@@ -8259,11 +8262,14 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx])
                    delete[] brushOriginalPixelChunks[idx];
             }
+
             activeBrushChunks.clear();
             brushOpacityChunks.assign(totalChunks, nullptr);
             if (useBlendMode == 1)
+            {
                 brushOriginalPixelChunks.assign(totalChunks, nullptr);
-            else if (!brushOriginalPixelChunks.empty()) {
+            } else if (!brushOriginalPixelChunks.empty())
+            {
                 brushOriginalPixelChunks.clear();
                 brushOriginalPixelChunks.shrink_to_fit();
             }
@@ -8490,7 +8496,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     try
                     {
                         brushOpacityChunks[chunkIdx] = new float[128 * 128]();
-                        if (useBlendMode==1) {
+                        if (useBlendMode==1)
+                        {
                            brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
                            activeBrushChunks.push_back(chunkIdx);
                         }
