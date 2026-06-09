@@ -8705,18 +8705,20 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
                 int px_mod = px & 127;
                 int pixelIdx = py_mod_shift + px_mod;
-                float accOpa = chunk[pixelIdx] / 255.0f;
-                if (accOpa>=opaf)
+                unsigned char accOpa = chunk[pixelIdx];
+                int targetOpa = (int)(opaf * 255.0f);
+                if (accOpa >= targetOpa)
                    continue;
 
-                float newAccOpa = accOpa + weight - accOpa * weight;
+                int wInt = (int)(weight * 255.0f);
+                int newAccOpa = accOpa + wInt - (accOpa * wInt) / 255;
                 if (useBlendMode==1)
                 {
-                    if (newAccOpa>=opaf)
-                       newAccOpa = opaf;
+                    if (newAccOpa >= targetOpa)
+                       newAccOpa = targetOpa;
 
-                    chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
-                    weight = newAccOpa;
+                    chunk[pixelIdx] = (unsigned char)newAccOpa;
+                    weight = newAccOpa / 255.0f;
                     unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
                     if (origBuf)
                     {
@@ -8729,14 +8731,14 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     }
                 } else
                 {
-                    float maxAllowedWeight = (opaf - accOpa) / (1.0f - accOpa);
-                    if (weight>=maxAllowedWeight)
+                    int maxAllowedWeight = ((targetOpa - accOpa) * 255) / (255 - accOpa);
+                    if (wInt >= maxAllowedWeight)
                     {
-                        weight = maxAllowedWeight;
-                        chunk[pixelIdx] = (unsigned char)clamp(opaf * 255.0f, 0.0f, 255.0f);
+                        weight = maxAllowedWeight / 255.0f;
+                        chunk[pixelIdx] = (unsigned char)targetOpa;
                     } else
                     {
-                        chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
+                        chunk[pixelIdx] = (unsigned char)newAccOpa;
                     }
                 }
             }
