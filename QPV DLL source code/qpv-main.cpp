@@ -8458,51 +8458,72 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             for (int cx = startCX; cx <= endCX; ++cx)
             {
                 size_t chunkIdx = cy_grid + cx;
+                bool chunkCreated = false;
                 if (chunkIdx < brushOpacityChunks.size() && !brushOpacityChunks[chunkIdx])
                 {
                     try {
                         brushOpacityChunks[chunkIdx] = new float[128 * 128]();
                         if (useBlendMode>0)
                         {
-                            unsigned char* origBuf = new unsigned char[128 * 128 * bytesPerPixel]();
-                            brushOriginalPixelChunks[chunkIdx] = origBuf;
+                            brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
+                        }
+                        chunkCreated = true;
+                    } catch (const std::bad_alloc&) {
+                        return 0;
+                    }
+                }
+
+                if (useBlendMode > 0 && chunkIdx < brushOpacityChunks.size())
+                {
+                    unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
+                    float* opaChunk = brushOpacityChunks[chunkIdx];
+                    if (origBuf && opaChunk)
+                    {
+                        int startBlockX = cx << 7;
+                        int startBlockY = cy << 7;
+                        int copyW = min(128, imgW - startBlockX);
+                        int copyH = min(128, imgH - startBlockY);
+                        
+                        int safeMemX1 = (lockW > 0) ? lockX : 0;
+                        int safeMemX2 = (lockW > 0) ? (lockX + lockW - 1) : (imgW - 1);
+                        int safeMemY1 = (lockH > 0) ? lockY : 0;
+                        int safeMemY2 = (lockH > 0) ? (lockY + lockH - 1) : (imgH - 1);
+
+                        for (int by = 0; by < copyH; ++by)
+                        {
+                            int py = startBlockY + by;
+                            int iy = imgH - 1 - py;
+
+                            if (iy < safeMemY1 || iy > safeMemY2)
+                                continue;
+
+                            int chunkStartX = startBlockX;
+                            int chunkEndX = startBlockX + copyW - 1;
                             
-                            int startBlockX = cx << 7;
-                            int startBlockY = cy << 7;
-                            int copyW = min(128, imgW - startBlockX);
-                            int copyH = min(128, imgH - startBlockY);
+                            int validStartX = max(chunkStartX, safeMemX1);
+                            int validEndX = min(chunkEndX, safeMemX2);
                             
-                            int safeMemX1 = (lockW > 0) ? lockX : 0;
-                            int safeMemX2 = (lockW > 0) ? (lockX + lockW - 1) : (imgW - 1);
-                            int safeMemY1 = (lockH > 0) ? lockY : 0;
-                            int safeMemY2 = (lockH > 0) ? (lockY + lockH - 1) : (imgH - 1);
-
-                            for (int by = 0; by < copyH; ++by)
-                            {
-                                int py = startBlockY + by;
-                                int iy = imgH - 1 - py;
-
-                                if (iy < safeMemY1 || iy > safeMemY2)
-                                    continue;
-
-                                int chunkStartX = startBlockX;
-                                int chunkEndX = startBlockX + copyW - 1;
+                            if (validStartX <= validEndX) {
+                                int validCopyW = validEndX - validStartX + 1;
+                                int offsetX = validStartX - startBlockX;
                                 
-                                int validStartX = max(chunkStartX, safeMemX1);
-                                int validEndX = min(chunkEndX, safeMemX2);
+                                unsigned char* srcRow = imgData + (INT64)iy * pitch + validStartX * bytesPerPixel;
+                                unsigned char* dstRow = origBuf + by * 128 * bytesPerPixel + offsetX * bytesPerPixel;
                                 
-                                if (validStartX <= validEndX) {
-                                    int validCopyW = validEndX - validStartX + 1;
-                                    int offsetX = validStartX - startBlockX;
-                                    
-                                    unsigned char* srcRow = imgData + (INT64)iy * pitch + validStartX * bytesPerPixel;
-                                    unsigned char* dstRow = origBuf + by * 128 * bytesPerPixel + offsetX * bytesPerPixel;
+                                if (chunkCreated) {
                                     memcpy(dstRow, srcRow, validCopyW * bytesPerPixel);
+                                } else {
+                                    float* opaRow = opaChunk + by * 128 + offsetX;
+                                    for (int p = 0; p < validCopyW; ++p) {
+                                        if (opaRow[p] == 0.0f) {
+                                            for (int b = 0; b < bytesPerPixel; ++b) {
+                                                dstRow[p * bytesPerPixel + b] = srcRow[p * bytesPerPixel + b];
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                    } catch (const std::bad_alloc&) {
-                        return 0;
                     }
                 }
             }
