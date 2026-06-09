@@ -8368,7 +8368,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
     int overDrawOkay = (brushType==4 && eraserMode==1 && bytesPerPixel==4) ? 0 : 1;
     if (overDrawOkay==0)
+    {
        opaf = (brushOverDraw==1) ? 0.75 : 0.35;
+       opacity = (brushOverDraw==1) ? 191 : 89;
+    }
 
     // Thread-safe chunk pre-allocation (Single-Threaded)
     if (brushType<=5 && brushOverDraw==0 && overDrawOkay==1)
@@ -8705,18 +8708,18 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
                 int px_mod = px & 127;
                 int pixelIdx = py_mod_shift + px_mod;
-                float accOpa = chunk[pixelIdx] / 255.0f;
-                if (accOpa>=opaf)
+                if (chunk[pixelIdx]>=opacity)
                    continue;
 
+                float accOpa = chunk[pixelIdx] / 255.0f;
                 float newAccOpa = accOpa + weight - accOpa * weight;
                 if (useBlendMode==1)
                 {
                     if (newAccOpa>=opaf)
                        newAccOpa = opaf;
 
-                    chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
                     weight = newAccOpa;
+                    chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
                     unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
                     if (origBuf)
                     {
@@ -8733,7 +8736,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     if (weight>=maxAllowedWeight)
                     {
                         weight = maxAllowedWeight;
-                        chunk[pixelIdx] = (unsigned char)clamp(opaf * 255.0f, 0.0f, 255.0f);
+                        chunk[pixelIdx] = opacity;
                     } else
                     {
                         chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
