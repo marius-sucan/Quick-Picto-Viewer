@@ -8243,7 +8243,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         int numChunksX = (imgW + 127) >> 7;
         int numChunksY = (imgH + 127) >> 7;
         size_t totalChunks = (size_t)numChunksX * numChunksY;
-        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks)
+        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks || (useBlendMode == 1 && brushOriginalPixelChunks.size() != totalChunks))
         {
             for (size_t idx : activeBrushChunks)
             {
@@ -8254,7 +8254,12 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             }
             activeBrushChunks.clear();
             brushOpacityChunks.assign(totalChunks, nullptr);
-            brushOriginalPixelChunks.assign(totalChunks, nullptr);
+            if (useBlendMode == 1)
+                brushOriginalPixelChunks.assign(totalChunks, nullptr);
+            else if (!brushOriginalPixelChunks.empty()) {
+                brushOriginalPixelChunks.clear();
+                brushOriginalPixelChunks.shrink_to_fit();
+            }
             chunkGridW = numChunksX;
             chunkGridH = numChunksY;
         }
