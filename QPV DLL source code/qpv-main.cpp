@@ -8151,20 +8151,17 @@ int reverse_bits(int n) {
 */
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
-    for (float* ptr : brushOpacityChunks) {
-        if (ptr) {
-            delete[] ptr;
+    for (size_t idx : activeBrushChunks) {
+        if (idx < brushOpacityChunks.size() && brushOpacityChunks[idx]) {
+            delete[] brushOpacityChunks[idx];
+            brushOpacityChunks[idx] = nullptr;
+        }
+        if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx]) {
+            delete[] brushOriginalPixelChunks[idx];
+            brushOriginalPixelChunks[idx] = nullptr;
         }
     }
-    std::vector<float*>().swap(brushOpacityChunks);
-    for (unsigned char* ptr : brushOriginalPixelChunks) {
-        if (ptr) {
-            delete[] ptr;
-        }
-    }
-    std::vector<unsigned char*>().swap(brushOriginalPixelChunks);
-    chunkGridW = 0;
-    chunkGridH = 0;
+    activeBrushChunks.clear();
 }
 
 DLL_API int DLL_CALLCONV PaintBrushLarge(
@@ -8229,17 +8226,15 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         size_t totalChunks = (size_t)numChunksX * numChunksY;
         if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks)
         {
-            for (float* ptr : brushOpacityChunks)
+            for (size_t idx : activeBrushChunks)
             {
-                if (ptr)
-                   delete[] ptr;
+                if (idx < brushOpacityChunks.size() && brushOpacityChunks[idx])
+                   delete[] brushOpacityChunks[idx];
+                if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx])
+                   delete[] brushOriginalPixelChunks[idx];
             }
+            activeBrushChunks.clear();
             brushOpacityChunks.assign(totalChunks, nullptr);
-            for (unsigned char* ptr : brushOriginalPixelChunks)
-            {
-                if (ptr)
-                   delete[] ptr;
-            }
             brushOriginalPixelChunks.assign(totalChunks, nullptr);
             chunkGridW = numChunksX;
             chunkGridH = numChunksY;
@@ -8467,6 +8462,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                         {
                             brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
                         }
+                        activeBrushChunks.push_back(chunkIdx);
                         chunkCreated = true;
                     } catch (const std::bad_alloc&) {
                         return 0;
@@ -8758,7 +8754,16 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 {
                     try {
                         chunk = new float[128 * 128]();
-                        brushOpacityChunks[chunkIdx] = chunk;
+                        #pragma omp critical
+                        {
+                            if (!brushOpacityChunks[chunkIdx]) {
+                                brushOpacityChunks[chunkIdx] = chunk;
+                                activeBrushChunks.push_back(chunkIdx);
+                            } else {
+                                delete[] chunk;
+                                chunk = brushOpacityChunks[chunkIdx];
+                            }
+                        }
                     } catch (const std::bad_alloc&) {
                         continue;
                     }
