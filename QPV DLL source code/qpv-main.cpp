@@ -451,18 +451,20 @@ bool initBoolMaskData() {
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
     {
-       try {
+       try
+       {
           polygonMaskMap.resize(s);
-       } catch(const std::bad_alloc& e) {
+       } catch(const std::bad_alloc& e)
+       {
           EllipseSelectMode = 0;
           fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
           return 0;
-       } catch(const std::length_error& e) {
+       } catch(const std::length_error& e)
+       {
           EllipseSelectMode = 0;
           fnOutputDebug("polygonMaskMap failed. length_error =" + std::to_string(s));
           return 0;
        }
-
        fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
     } else
     {
@@ -1690,12 +1692,15 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
      fnOutputDebug("prepareDrawLinesMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; size=" + std::to_string(s));
      if (clipMode!=2)
      {
-        try {
+        try
+        {
            polygonOtherMaskMap.resize(s);
-        } catch(const std::bad_alloc& e) {
+        } catch(const std::bad_alloc& e)
+        {
            fnOutputDebug("polygonOtherMaskMap failed. bad_alloc");
            return 0;
-        } catch(const std::length_error& e) {
+        } catch(const std::length_error& e)
+        {
            fnOutputDebug("polygonOtherMaskMap failed. length_error");
            return 0;
         }
@@ -1707,12 +1712,15 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
 
     if (s!=polygonMaskMap.size())
     {
-       try {
+       try
+       {
           polygonMaskMap.resize(s);
-       } catch(const std::bad_alloc& e) {
+       } catch(const std::bad_alloc& e)
+       {
           fnOutputDebug("polygonMaskMap failed. bad_alloc");
           return 0;
-       } catch(const std::length_error& e) {
+       } catch(const std::length_error& e)
+       {
           fnOutputDebug("polygonMaskMap failed. length_error");
           return 0;
        }
@@ -1722,12 +1730,15 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
 
     if (s!=highDephMaskMap.size() && highDepthModeMask==1)
     {
-       try {
+       try
+       {
           highDephMaskMap.resize(s);
-       } catch(const std::bad_alloc& e) {
+       } catch(const std::bad_alloc& e)
+       {
           fnOutputDebug("highDephMaskMap failed. bad_alloc");
           return 0;
-       } catch(const std::length_error& e) {
+       } catch(const std::length_error& e)
+       {
           fnOutputDebug("highDephMaskMap failed. length_error");
           return 0;
        }
@@ -4559,10 +4570,12 @@ DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned c
 
   cv::Mat other(rh, rw, clr, otherData, mStride);
 
-  try {
+  try
+  {
       // cv::resize(image, other, cv::Size(rw, rh), 0, 0, interpolation);
       cv::resize(image, other, other.size(), 0, 0, interpolation);
-  } catch (const cv::Exception &e) {
+  } catch (const cv::Exception &e)
+  {
       fnOutputDebug("OpenCV: error attempting to resize bitmap in openCVresizeBitmap: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
       fnOutputDebug( e.what() );
       return 0;
@@ -4596,9 +4609,11 @@ DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, un
   subRect.height = min(subRect.height, image.rows - subRect.y);
   cv::Mat cropped = image(subRect);
 
-  try {
+  try
+  {
       cv::resize(cropped, other, cv::Size(nw, nh), 0, 0, interpolation);
-  } catch (const cv::Exception &e) {
+  } catch (const cv::Exception &e)
+  {
       fnOutputDebug("OpenCV: error attempting to resize bitmap in openCVresizeBitmapExtended: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
       fnOutputDebug( e.what() );
       return 0;
@@ -5904,9 +5919,11 @@ bool IsFileExtension(const wchar_t* szFileName, const wchar_t* extension) {
 DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFrame, UINT *resultsArray, int isFIMokay) {
   // WIC factory initialized in initWICnow() 
   HRESULT hr = S_OK;
-  try {
+  try
+  {
       hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pWICclassDecoder);
-  } catch (const char* message) {
+  } catch (const char* message)
+  {
       WICdestroyPreloadedImage(1);
       fnOutputDebug("WICpreLoadImage: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
       return 0;
@@ -6532,10 +6549,12 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
     UINT owidth = 0, oheight = 0, mustResize = 0;
     if (szFileName)
     {
-        try {
+        try
+        {
             // Create a decoder; Decode the source image to IWICBitmapSource
             hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
-        } catch (const char* message) {
+        } catch (const char* message)
+        {
             fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
             return myBitmap;
         }
@@ -8207,9 +8226,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 ) {
     if (!imgData || imgW<=0 || imgH<=0 || pitch<=0 || brushSize<=0)
     {
-
-        fnOutputDebug("PaintBrushLarge(): incorrect data provided");
-        return 0;
+       fnOutputDebug("PaintBrushLarge(): incorrect data provided");
+       return 0;
     }
 
     int bytesPerPixel = imgBpp / 8;
@@ -8219,6 +8237,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
        return 0;
     }
 
+    int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) && (blendMode>1) ? 1 : 0;
     if (brushType<=5 && brushOverDraw==0)
     {
         int numChunksX = (imgW + 127) >> 7;
@@ -8277,7 +8296,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     int localPitch = cloneW * bytesPerPixel;
     if (!cloneData && brushType>=6 && cloneW>0 && cloneH>0)
     {
-        try {
+        try
+        {
             // Limit allocation size to 150MB to prevent OOM
             if ((size_t)cloneW * cloneH * bytesPerPixel < 150 * 1024 * 1024)
             {
@@ -8327,7 +8347,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     int brushSat = (int)round(effectSat * 655.35);
     int brushBright = effectLight * 257;
     int brushContra = (int)round(effectGamma * 655.30);
-    if (brushContra > 65525)
+    if (brushContra>65525)
        brushContra = 65525;
 
     float fiBright = 0.0f;
@@ -8338,7 +8358,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     {
         // Effects and cloner brushes
         // Prepare LUT tables as in AdjustImageColorsPrecise()
-        if (brushBright < 0)
+        if (brushBright<0)
         {
             double zamma = 1.0f / ((float)(77069.0f - brushBright) / 77069.0f);
             for (int i = 0; i < 65536; i++)
@@ -8348,7 +8368,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         }
 
         fiBright = (brushBright > 0) ? brushBright / 32768.0f : -1.0f * int_to_float[-brushBright];
-        if (brushBright != 0)
+        if (brushBright!=0)
         {
             for (int i = 0; i < 65536; i++)
             {
@@ -8358,7 +8378,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
         factorContrast = brushContra / 98302.0f;
         fiContra = (65536.5f * (brushContra + 65535.0f)) / (65535.0f * (65536.5f - brushContra));
-        if (brushContra != 0)
+        if (brushContra!=0)
         {
             for (int i = 0; i < 65536; i++)
             {
@@ -8377,7 +8397,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
             int roiW = roiEndX - roiStartX + 1;
             int roiH = roiEndY - roiStartY + 1;
-            if (roiW > 0 && roiH > 0)
+            if (roiW>0 && roiH>0)
             {
                 unsigned char* srcData = cloneData ? cloneData : imgData;
                 int srcPitch = cloneData ? clonePitch : pitch;
@@ -8416,22 +8436,22 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         // smudge brush
         if (offX<0)
         {
-            stepX = -1;
-            sX = endX;
-            eX = startX;
+           stepX = -1;
+           sX = endX;
+           eX = startX;
         }
 
         if (offY<0)
         {
-            stepY = -1;
-            sY = endY;
-            eY = startY;
+           stepY = -1;
+           sY = endY;
+           eY = startY;
         }
     }
 
     // Pre-calculate bulge/pinch constants
     double falloff_sq = falloff * falloff;
-    double dest_radius = (brushType == 7 || brushType == 8) ? (brushSize / 2.0) : (brushSize / 2.0 + bulgePinchFactor);
+    double dest_radius = (brushType==7 || brushType==8) ? (brushSize / 2.0) : (brushSize / 2.0 + bulgePinchFactor);
     if (dest_radius<0.5)
        dest_radius = 0.5;
 
@@ -8439,7 +8459,6 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     if (overDrawOkay==0)
        opaf = (brushOverDraw==1) ? 0.75 : 0.35;
 
-    int useBlendMode = (brushType==2 || brushType==3 || brushType>=5) ? blendMode : 0;
     // Thread-safe chunk pre-allocation (Single-Threaded)
     if (brushType<=5 && brushOverDraw==0 && overDrawOkay==1)
     {
@@ -8456,12 +8475,12 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 bool chunkCreated = false;
                 if (chunkIdx < brushOpacityChunks.size() && !brushOpacityChunks[chunkIdx])
                 {
-                    try {
+                    try
+                    {
                         brushOpacityChunks[chunkIdx] = new float[128 * 128]();
-                        if (useBlendMode>0)
-                        {
-                            brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
-                        }
+                        if (useBlendMode==1)
+                           brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
+
                         activeBrushChunks.push_back(chunkIdx);
                         chunkCreated = true;
                     } catch (const std::bad_alloc&) {
@@ -8469,7 +8488,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     }
                 }
 
-                if (useBlendMode > 0 && chunkIdx < brushOpacityChunks.size())
+                if (useBlendMode==1 && chunkIdx<brushOpacityChunks.size())
                 {
                     unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
                     float* opaChunk = brushOpacityChunks[chunkIdx];
@@ -8484,34 +8503,34 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                         int safeMemX2 = (lockW > 0) ? (lockX + lockW - 1) : (imgW - 1);
                         int safeMemY1 = (lockH > 0) ? lockY : 0;
                         int safeMemY2 = (lockH > 0) ? (lockY + lockH - 1) : (imgH - 1);
-
                         for (int by = 0; by < copyH; ++by)
                         {
                             int py = startBlockY + by;
                             int iy = imgH - 1 - py;
-
-                            if (iy < safeMemY1 || iy > safeMemY2)
-                                continue;
+                            if (iy<safeMemY1 || iy>safeMemY2)
+                               continue;
 
                             int chunkStartX = startBlockX;
                             int chunkEndX = startBlockX + copyW - 1;
-                            
                             int validStartX = max(chunkStartX, safeMemX1);
                             int validEndX = min(chunkEndX, safeMemX2);
-                            
-                            if (validStartX <= validEndX) {
+                            if (validStartX <= validEndX)
+                            {
                                 int validCopyW = validEndX - validStartX + 1;
                                 int offsetX = validStartX - startBlockX;
                                 
                                 unsigned char* srcRow = imgData + (INT64)iy * pitch + validStartX * bytesPerPixel;
                                 unsigned char* dstRow = origBuf + by * 128 * bytesPerPixel + offsetX * bytesPerPixel;
-                                
-                                if (chunkCreated) {
+                                if (chunkCreated)
+                                {
                                     memcpy(dstRow, srcRow, validCopyW * bytesPerPixel);
-                                } else {
+                                } else
+                                {
                                     float* opaRow = opaChunk + by * 128 + offsetX;
-                                    for (int p = 0; p < validCopyW; ++p) {
-                                        if (opaRow[p] == 0.0f) {
+                                    for (int p = 0; p < validCopyW; ++p)
+                                    {
+                                        if (opaRow[p]==0.0f)
+                                        {
                                             for (int b = 0; b < bytesPerPixel; ++b) {
                                                 dstRow[p * bytesPerPixel + b] = srcRow[p * bytesPerPixel + b];
                                             }
@@ -8613,8 +8632,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
         for (int px = scan_sX; stepX>0 ? px<=scan_eX : px>=scan_eX; px += stepX)
         {
-            if (lockW > 0 && (px < lockX || px >= lockX + lockW || iy < lockY || iy >= lockY + lockH))
-                continue;
+            if (lockW>0 && (px<lockX || px>=lockX+lockW || iy<lockY || iy>=lockY+lockH))
+               continue;
 
             // 1. Calculate selection constraints
             if (useSelArea)
@@ -8752,14 +8771,17 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 float* chunk = brushOpacityChunks[chunkIdx];
                 if (!chunk)
                 {
-                    try {
+                    try
+                    {
                         chunk = new float[128 * 128]();
                         #pragma omp critical
                         {
-                            if (!brushOpacityChunks[chunkIdx]) {
+                            if (!brushOpacityChunks[chunkIdx])
+                            {
                                 brushOpacityChunks[chunkIdx] = chunk;
                                 activeBrushChunks.push_back(chunkIdx);
-                            } else {
+                            } else
+                            {
                                 delete[] chunk;
                                 chunk = brushOpacityChunks[chunkIdx];
                             }
@@ -8773,15 +8795,12 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 int pixelIdx = py_mod_shift + px_mod;
                 float accOpa = chunk[pixelIdx];
                 if (accOpa>=opaf)
-                {
-                   // discard brushOriginalPixelChunks[chunkIdx];
                    continue;
-                }
 
                 float newAccOpa = accOpa + weight - accOpa * weight;
-                if (useBlendMode>0)
+                if (useBlendMode==1)
                 {
-                    if (newAccOpa >= opaf)
+                    if (newAccOpa>=opaf)
                        newAccOpa = opaf;
 
                     chunk[pixelIdx] = newAccOpa;
