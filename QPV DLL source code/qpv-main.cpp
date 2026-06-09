@@ -8773,7 +8773,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 int pixelIdx = py_mod_shift + px_mod;
                 float accOpa = chunk[pixelIdx];
                 if (accOpa>=opaf)
+                {
+                   // discard brushOriginalPixelChunks[chunkIdx];
                    continue;
+                }
 
                 float newAccOpa = accOpa + weight - accOpa * weight;
                 if (useBlendMode>0)
