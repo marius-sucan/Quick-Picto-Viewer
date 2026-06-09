@@ -8774,28 +8774,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 float accOpa = chunk[pixelIdx];
                 if (accOpa>=opaf)
                 {
-                   unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
-                   if (origBuf)
-                   {
-                       bool canDiscard = true;
-                       for (int k = 0; k < 16384; ++k)
-                       {
-                           if (chunk[k] < opaf) {
-                               canDiscard = false;
-                               break;
-                           }
-                       }
-                       if (canDiscard)
-                       {
-                           #pragma omp critical
-                           {
-                               if (brushOriginalPixelChunks[chunkIdx]) {
-                                   delete[] brushOriginalPixelChunks[chunkIdx];
-                                   brushOriginalPixelChunks[chunkIdx] = nullptr;
-                               }
-                           }
-                       }
-                   }
+                   // discard brushOriginalPixelChunks[chunkIdx];
                    continue;
                 }
 
