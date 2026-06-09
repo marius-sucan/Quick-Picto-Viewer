@@ -76013,7 +76013,7 @@ DrawPaintBrushNowStep:
 
    dll_tkY := imgH - 1 - cur_tkY
    dll_offY := -cur_offY
-   overDraw := (BrushToolBlendMode=25) ? 0 : BrushToolOverDraw
+   overDraw := (BrushToolBlendMode=25) ? 1 : BrushToolOverDraw
    lockX := Round(Max(0, Floor(cur_tkX - dllRad)))
    lockY := Round(Max(0, Floor(cur_tkY - dllRad)))
    lockW := Round(Min(imgW - lockX, Ceil(dllRad * 2)))
@@ -76593,7 +76593,7 @@ DrawPaintBrushLargeStep:
       }
    }
 
-   overDraw := (BrushToolBlendMode=25) ? 0 : BrushToolOverDraw
+   overDraw := (BrushToolBlendMode=25) ? 1 : BrushToolOverDraw
    colorARGB := "0x" Format("{1:x}", 255) startToolColor
    rr := DllCall("qpvmain.dll\PaintBrushLarge"
       , "UPtr", imgBits
