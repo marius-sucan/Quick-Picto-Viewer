@@ -8170,11 +8170,14 @@ int reverse_bits(int n) {
 */
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
-    for (size_t idx : activeBrushChunks) {
-        if (idx < brushOpacityChunks.size() && brushOpacityChunks[idx]) {
-            delete[] brushOpacityChunks[idx];
-            brushOpacityChunks[idx] = nullptr;
+    for (float* ptr : brushOpacityChunks) {
+        if (ptr) {
+            delete[] ptr;
         }
+    }
+    std::vector<float*>().swap(brushOpacityChunks);
+
+    for (size_t idx : activeBrushChunks) {
         if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx]) {
             delete[] brushOriginalPixelChunks[idx];
             brushOriginalPixelChunks[idx] = nullptr;
@@ -8245,10 +8248,14 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         size_t totalChunks = (size_t)numChunksX * numChunksY;
         if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks || (useBlendMode == 1 && brushOriginalPixelChunks.size() != totalChunks))
         {
+            for (float* ptr : brushOpacityChunks)
+            {
+                if (ptr)
+                   delete[] ptr;
+            }
+
             for (size_t idx : activeBrushChunks)
             {
-                if (idx < brushOpacityChunks.size() && brushOpacityChunks[idx])
-                   delete[] brushOpacityChunks[idx];
                 if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx])
                    delete[] brushOriginalPixelChunks[idx];
             }
@@ -8483,10 +8490,11 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     try
                     {
                         brushOpacityChunks[chunkIdx] = new float[128 * 128]();
-                        if (useBlendMode==1)
+                        if (useBlendMode==1) {
                            brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
+                           activeBrushChunks.push_back(chunkIdx);
+                        }
 
-                        activeBrushChunks.push_back(chunkIdx);
                         chunkCreated = true;
                     } catch (const std::bad_alloc&) {
                         return 0;
@@ -8784,7 +8792,6 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                             if (!brushOpacityChunks[chunkIdx])
                             {
                                 brushOpacityChunks[chunkIdx] = chunk;
-                                activeBrushChunks.push_back(chunkIdx);
                             } else
                             {
                                 delete[] chunk;
