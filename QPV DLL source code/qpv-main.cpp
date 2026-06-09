@@ -8061,15 +8061,17 @@ int reverse_bits(int n) {
 */
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
-    for (float* ptr : brushOpacityChunks) {
-        if (ptr) {
-            delete[] ptr;
-        }
+    for (float* ptr : brushOpacityChunks)
+    {
+        if (ptr)
+           delete[] ptr;
     }
-    std::vector<float*>().swap(brushOpacityChunks);
 
-    for (size_t idx : activeBrushChunks) {
-        if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx]) {
+    std::vector<float*>().swap(brushOpacityChunks);
+    for (size_t idx : activeBrushChunks)
+    {
+        if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx])
+        {
             delete[] brushOriginalPixelChunks[idx];
             brushOriginalPixelChunks[idx] = nullptr;
         }
