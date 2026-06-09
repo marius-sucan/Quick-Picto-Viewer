@@ -8061,13 +8061,13 @@ int reverse_bits(int n) {
 */
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
-    for (float* ptr : brushOpacityChunks)
+    for (unsigned char* ptr : brushOpacityChunks)
     {
         if (ptr)
            delete[] ptr;
     }
 
-    std::vector<float*>().swap(brushOpacityChunks);
+    std::vector<unsigned char*>().swap(brushOpacityChunks);
     for (size_t idx : activeBrushChunks)
     {
         if (idx < brushOriginalPixelChunks.size() && brushOriginalPixelChunks[idx])
@@ -8144,7 +8144,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         size_t totalChunks = (size_t)numChunksX * numChunksY;
         if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks || (useBlendMode == 1 && brushOriginalPixelChunks.size() != totalChunks))
         {
-            for (float* ptr : brushOpacityChunks)
+            for (unsigned char* ptr : brushOpacityChunks)
             {
                 if (ptr)
                    delete[] ptr;
@@ -8388,7 +8388,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 {
                     try
                     {
-                        brushOpacityChunks[chunkIdx] = new float[128 * 128]();
+                        brushOpacityChunks[chunkIdx] = new unsigned char[128 * 128]();
                         if (useBlendMode==1)
                         {
                            brushOriginalPixelChunks[chunkIdx] = new unsigned char[128 * 128 * bytesPerPixel]();
@@ -8404,7 +8404,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 if (useBlendMode==1 && chunkIdx<brushOpacityChunks.size())
                 {
                     unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
-                    float* opaChunk = brushOpacityChunks[chunkIdx];
+                    unsigned char* opaChunk = brushOpacityChunks[chunkIdx];
                     if (origBuf && opaChunk)
                     {
                         int startBlockX = cx << 7;
@@ -8439,10 +8439,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                                     memcpy(dstRow, srcRow, validCopyW * bytesPerPixel);
                                 } else
                                 {
-                                    float* opaRow = opaChunk + by * 128 + offsetX;
+                                    unsigned char* opaRow = opaChunk + by * 128 + offsetX;
                                     for (int p = 0; p < validCopyW; ++p)
                                     {
-                                        if (opaRow[p]==0.0f)
+                                        if (opaRow[p]==0)
                                         {
                                             for (int b = 0; b < bytesPerPixel; ++b) {
                                                 dstRow[p * bytesPerPixel + b] = srcRow[p * bytesPerPixel + b];
@@ -8681,12 +8681,12 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             {
                 int cx = px >> 7;
                 size_t chunkIdx = cy_grid + cx;
-                float* chunk = brushOpacityChunks[chunkIdx];
+                unsigned char* chunk = brushOpacityChunks[chunkIdx];
                 if (!chunk)
                 {
                     try
                     {
-                        chunk = new float[128 * 128]();
+                        chunk = new unsigned char[128 * 128]();
                         #pragma omp critical
                         {
                             if (!brushOpacityChunks[chunkIdx])
@@ -8705,7 +8705,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
                 int px_mod = px & 127;
                 int pixelIdx = py_mod_shift + px_mod;
-                float accOpa = chunk[pixelIdx];
+                float accOpa = chunk[pixelIdx] / 255.0f;
                 if (accOpa>=opaf)
                    continue;
 
@@ -8715,7 +8715,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     if (newAccOpa>=opaf)
                        newAccOpa = opaf;
 
-                    chunk[pixelIdx] = newAccOpa;
+                    chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
                     weight = newAccOpa;
                     unsigned char* origBuf = brushOriginalPixelChunks[chunkIdx];
                     if (origBuf)
@@ -8733,10 +8733,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     if (weight>=maxAllowedWeight)
                     {
                         weight = maxAllowedWeight;
-                        chunk[pixelIdx] = opaf;
+                        chunk[pixelIdx] = (unsigned char)clamp(opaf * 255.0f, 0.0f, 255.0f);
                     } else
                     {
-                        chunk[pixelIdx] = newAccOpa;
+                        chunk[pixelIdx] = (unsigned char)clamp(newAccOpa * 255.0f, 0.0f, 255.0f);
                     }
                 }
             }

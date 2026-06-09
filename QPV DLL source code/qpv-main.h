@@ -49,7 +49,7 @@ INT64 polyOffYa = 0;
 INT64 polyOffYb = 0;
 INT64 blahImgH = 0;
 
-std::vector<float*> brushOpacityChunks;
+std::vector<unsigned char*> brushOpacityChunks;
 std::vector<unsigned char*> brushOriginalPixelChunks;
 std::vector<size_t> activeBrushChunks;
 int chunkGridW = 0;
