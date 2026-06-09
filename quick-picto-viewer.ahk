@@ -75949,7 +75949,7 @@ DrawPaintBrushNowStep:
             , "double", dll_offY
             , "UPtr", cloneBits
             , "int", clonePitch
-            , "int", BrushToolEraserRestore
+            , "int", (BrushToolType=4) ? BrushToolEraserRestore : BlendModesPreserveAlpha
             , "int", useSelArea
             , "int", userimgGammaCorrect
             , "int", BlendModesFlipped
