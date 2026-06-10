@@ -2593,9 +2593,18 @@ int wrapRGBtoGray(int color, int mode) {
     return index;
 }
 
-void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp, int keepAlpha) {
+void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp, int keepAlpha, int simpleMode) {
   RGBAColor thisColor = {0, 0, 0, 0};
-  if (tolerance>=0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
+  if (simpleMode==1)
+  {
+     imageData[pix] = newColor.b;
+     imageData[pix + 1] = newColor.g;
+     imageData[pix + 2] = newColor.r;
+     if (bpp==32 && keepAlpha==0)
+        imageData[pix + 3] = newColor.a;
+     // imageData[pix] = newColor;
+     // second element , the colour, will be used to mix colours; to-do
+  } else
   {
      int tcA = (bpp==32) ? imageData[pix + 3] : 255;
      RGBAColor prevColor = {imageData[pix], imageData[pix + 1], imageData[pix + 2], tcA};
@@ -2609,15 +2618,6 @@ void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RG
      imageData[pix + 2] = thisColor.r;
      if (bpp==32 && keepAlpha==0)
         imageData[pix + 3] = thisColor.a;
-  } else
-  {
-     imageData[pix] = newColor.b;
-     imageData[pix + 1] = newColor.g;
-     imageData[pix + 2] = newColor.r;
-     if (bpp==32 && keepAlpha==0)
-        imageData[pix + 3] = newColor.a;
-     // imageData[pix] = newColor;
-     // second element , the colour, will be used to mix colours; to-do
   }
 }
 
@@ -2642,6 +2642,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   std::stack<int> starkX;
   std::stack<int> starkY;
 
+  int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
   INT64 px = CalcPixOffset(x, y, Stride, bpp);
   pixelzMap[px] = 1;
   starkX.push(x);
@@ -2682,7 +2683,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
            if (thisColor.r==oldColor.r && thisColor.g==oldColor.g && thisColor.b==oldColor.b)
            {
               pixelzMap[tpx] = 1;
-              goPixelFloodFill8Stack(imageData, tpx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha);
+              goPixelFloodFill8Stack(imageData, tpx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
               starkX.push(nx);
               starkY.push(ny);
               suchDeviations++;
@@ -2691,7 +2692,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
               if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
               {
                  pixelzMap[tpx] = 1;
-                 goPixelFloodFill8Stack(imageData, tpx, index, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha);
+                 goPixelFloodFill8Stack(imageData, tpx, index, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
                  starkX.push(nx);
                  starkY.push(ny);
                  suchDeviations++;
@@ -2805,6 +2806,8 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
        return 0;
 
     int loopsOccured = 0;
+    int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
+    fnOutputDebug("ReplaceGivenColor: simpleMode=" + std::to_string(simpleMode) + " ; o=" + std::to_string(opacity) + " ; t=" + std::to_string(tolerance) + " ; b=" + std::to_string(blendMode) + " ; c=" + std::to_string(cartoonMode));
     #pragma omp parallel for schedule(static) default(none) shared(loopsOccured)  // num_threads(3)
     for (int zx = 0; zx < w; zx++)
     {
@@ -2831,7 +2834,14 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
 
             if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
             {
-               if (tolerance>=0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
+               if (simpleMode==1)
+               {
+                  if (bpp==32 && keepAlpha==0)
+                     imageData[3 + o] = newColor.a;
+                  imageData[2 + o] = newColor.r;
+                  imageData[1 + o] = newColor.g;
+                  imageData[o] = newColor.b;
+               } else
                {
                   if (cartoonMode==1)
                      thisColor = oldColor;
@@ -2843,13 +2853,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
                   imageData[2 + o] = thisColor.r;
                   imageData[1 + o] = thisColor.g;
                   imageData[o] = thisColor.b;
-               } else
-               {
-                  if (bpp==32 && keepAlpha==0)
-                     imageData[3 + o] = newColor.a;
-                  imageData[2 + o] = newColor.r;
-                  imageData[1 + o] = newColor.g;
-                  imageData[o] = newColor.b;
+
                }
                loopsOccured++;
             }
@@ -2885,14 +2889,14 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     RGBAColor newColorI = {nC[3], nC[2], nC[1], nC[0]};
 
     float opacity = fillOpacity / 255.0f;
-    if (modus!=1 && toleranza==0 && (opacity<1 || blendMode>=0))
+    if (modus!=1 && toleranza<=2 && (opacity<1 || blendMode>0))
        newColorI = mixColorsFloodFill(prevColor, newColorI, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma, flipLayers);
-fnOutputDebug("fill opacity: " + std::to_string(opacity) + " | " + std::to_string(fillOpacity) + " | " + std::to_string(newColorI.a));
 
+    // fnOutputDebug("fill opacity: " + std::to_string(opacity) + " | " + std::to_string(fillOpacity) + " | " + std::to_string(newColorI.a));
     int r;
     if (modus==1)
        r = ReplaceGivenColor(imageData, w, h, x, y, newColorI, newColorI, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, nC, flipLayers, Stride, bpp, useSelArea, keepAlpha);
-    else if (toleranza>0)
+    else if (toleranza>2)
        r = FloodFill8Stack(imageData, w, h, x, y, newColorI, nC, prevColor, toleranza, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma, flipLayers, Stride, bpp, useSelArea, keepAlpha);
     else
        r = FloodFillScanlineStack(imageData, w, h, x, y, newColorI, prevColor, Stride, bpp, useSelArea, keepAlpha);

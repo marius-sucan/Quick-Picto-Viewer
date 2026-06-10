@@ -43791,10 +43791,10 @@ updateUIfloodFillPanel() {
    actu := (FloodFillCartoonMode=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
    GuiControl, % actu, FloodFillColor
 
-   If (FloodFillTolerance>1 && FloodFillCartoonMode!=1)
+   If (FloodFillTolerance>2 && FloodFillCartoonMode!=1)
       GuiControl, SettingsGUIA: Enable, FloodFillDynamicOpacity
 
-   actu := (FloodFillModus!=1 && FloodFillTolerance>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (FloodFillModus!=1 && FloodFillTolerance>2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, FloodFillEightWays
 
    GuiRefreshSliders()
