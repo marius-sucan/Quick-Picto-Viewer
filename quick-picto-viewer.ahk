@@ -1,4 +1,4 @@
-; Script details:
+﻿; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -75435,46 +75435,19 @@ ActPaintBrushNow() {
    prevState := "a"
    whichBitmap := useGdiBitmap()
    imgBits := imgPitch := 0
-   lockEntireImage := 0
-   imgBits_global := 0
-   imgPitch_global := 0
-   imgData_global := 0
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    If validBMP(whichBitmap)
    {
-      lockTimeStart := A_TickCount
-      E1 := trGdip_LockBits(whichBitmap, 0, 0, imgW, imgH, imgPitch_global, imgBits_global, imgData_global, 3, "0x26200A")
-      lockTime := A_TickCount - lockTimeStart
-
-      If (!E1)
+      E1 := trGdip_LockBits(whichBitmap, 0, 0, 1, 1, imgPitch, imgBits, imgData, 3, "0x26200A")
+      If E1
       {
-         fnOutputDebug(A_ThisFunc " image fully locked in " lockTime " ms")
-         If (imgW * imgH < 10000000 || lockTime <= 3000)
-         {
-            lockEntireImage := 1
-         }
-         Else
-         {
-            Gdip_UnlockBits(whichBitmap, imgData_global)
-            imgBits_global := 0
-            imgData_global := 0
-            imgPitch_global := 0
-         }
+         showTOOLtip("ERROR: Unable to lock bitmap data. Failure occured in " A_ThisFunc "()")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
       }
-
-      If (!lockEntireImage)
-      {
-         E1 := trGdip_LockBits(whichBitmap, 0, 0, 1, 1, imgPitch, imgBits, imgData, 3, "0x26200A")
-         If E1
-         {
-            showTOOLtip("ERROR: Unable to lock bitmap data. Failure occured in " A_ThisFunc "()")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
-         Gdip_UnlockBits(whichBitmap, imgData)
-         imgBits := 0
-      }
+      Gdip_UnlockBits(whichBitmap, imgData)
+      imgBits := 0
    }
 
    liveDrawingBrushTool := 1
@@ -75875,9 +75848,6 @@ ActPaintBrushNow() {
    If hFIFtex
       FreeImage_UnLoad(hFIFtex)
 
-   If (lockEntireImage=1)
-      Gdip_UnlockBits(whichBitmap, imgData_global)
-
    MouseMoveResponder()
    If (((A_TickCount - lastInvoked>350) || preventUndoLevels=1) && validBMP(whichBitmap))
    {
@@ -75955,10 +75925,10 @@ DrawPaintBrushNowStep:
    lockH := Round(Min(imgH - lockY, Ceil(dllRad * 2)))
    If (lockW>0 && lockH>0)
    {
-      If (lockEntireImage=1)
+      E1 := trGdip_LockBits(whichBitmap, lockX, lockY, lockW, lockH, imgPitch, imgBits, imgData, 3, "0x26200A")
+      If !E1
       {
-         dll_imgBits := imgBits_global
-         imgPitch := imgPitch_global
+         dll_imgBits := Round(imgBits - lockY * imgPitch - lockX * 4)
          rr := DllCall("qpvmain.dll\PaintBrushLarge"
             , "UPtr", dll_imgBits
             , "int", imgW
@@ -76001,57 +75971,7 @@ DrawPaintBrushNowStep:
             , "int", lockH)
          If !rr
             fnOutputDebug("An error occured in calling PaintBrushLarge() from the QPV DLL.")
-      }
-      Else
-      {
-         E1 := trGdip_LockBits(whichBitmap, lockX, lockY, lockW, lockH, imgPitch, imgBits, imgData, 3, "0x26200A")
-         If !E1
-         {
-            dll_imgBits := Round(imgBits - lockY * imgPitch - lockX * 4)
-            rr := DllCall("qpvmain.dll\PaintBrushLarge"
-               , "UPtr", dll_imgBits
-               , "int", imgW
-               , "int", imgH
-               , "int", imgPitch
-               , "int", 32
-               , "int", BrushToolType
-               , "double", cur_tkX
-               , "double", dll_tkY
-               , "int", brushSize
-               , "int", thisToolSoftness
-               , "double", thisToolAngle
-               , "double", thisToolAspectRatio
-               , "int", colorARGB
-               , "int", cur_opacity
-               , "int", BrushToolBlendMode - 1
-               , "double", cur_offX
-               , "double", dll_offY
-               , "UPtr", cloneBits
-               , "int", clonePitch
-               , "int", (BrushToolType=4) ? BrushToolEraserRestore : BlendModesPreserveAlpha
-               , "int", useSelArea
-               , "int", userimgGammaCorrect
-               , "int", BlendModesFlipped
-               , "int", thisBulgePinchFactor
-               , "int", thisEffectHue
-               , "int", thisEffectSat
-               , "int", thisEffectLight
-               , "int", thisEffectGamma
-               , "int", thisEffectBlur
-               , "UPtr", texBits
-               , "int", texW
-               , "int", texH
-               , "int", texPitch
-               , "int", texBpp
-               , "int", overDraw
-               , "int", lockX
-               , "int", lockY
-               , "int", lockW
-               , "int", lockH)
-            If !rr
-               fnOutputDebug("An error occured in calling PaintBrushLarge() from the QPV DLL.")
-            Gdip_UnlockBits(whichBitmap, imgData)
-         }
+         Gdip_UnlockBits(whichBitmap, imgData)
       }
    }
 
