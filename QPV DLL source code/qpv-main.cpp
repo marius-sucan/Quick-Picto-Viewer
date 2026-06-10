@@ -2113,7 +2113,15 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   return Lab;
 }
 
-RGBAColor calculateBlendModes(RGBAColor Orgb, RGBAColor Brgb, const int blendMode, const int flipLayers, const int linearGamma, const int keepAlpha, const int bpp, const int opacity) {
+RGBAColor calculateBlendModes(
+  RGBAColor Orgb,
+  RGBAColor Brgb,
+  const int blendMode,
+  const int flipLayers,
+  const int linearGamma,
+  const int keepAlpha,
+  const int bpp,
+  const int opacity) {
     float rT, gT, bT;
     if (blendMode < 24)
        Orgb.a = (Orgb.a * (255 - opacity)) / 255;
@@ -2457,7 +2465,17 @@ RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float fillOpaci
   return calculateBlendModes(colorA, colorB, blendMode, flipLayers, linearGamma, 0, 32, opacity);
 }
 
-DLL_API int DLL_CALLCONV prepareSelectionArea(int x1, int y1, int x2, int y2, int w, int h, float xf, float yf, float angle, int mode, int flip, float exclusion, int invertArea, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2, int useCache, int ppofYa, int ppofYb) {
+DLL_API int DLL_CALLCONV prepareSelectionArea(
+  int x1, int y1,
+  int x2, int y2,
+  int w, int h,
+  float xf, float yf,
+  float angle, int mode, int flip,
+  float exclusion, int invertArea,
+  float* PointsList, int PointsCount,
+  int ppx1, int ppy1,
+  int ppx2, int ppy2,
+  int useCache, int ppofYa, int ppofYb) {
 /*
 This function is called from AHK, from QPV_PrepareHugeImgSelectionArea().
 The AHK wrapper function calculates the coordinates this function receives.
@@ -2870,9 +2888,10 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     // auto LabB = RGBtoLAB(rB, gB, bB);
     // float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     // float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
-    float opacity = char_to_float[fillOpacity];
+    float opacity = fillOpacity / 255.0f;
     if (tolerance==0 && (opacity<1 || blendMode>=0))
        newColorI = mixColorsFloodFill(prevColor, newColorI, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma, flipLayers);
+fnOutputDebug("fill opacity: " + std::to_string(opacity) + " | " + std::to_string(fillOpacity) + " | " + std::to_string(newColorI.a));
 
     int r;
     if (modus==1)
