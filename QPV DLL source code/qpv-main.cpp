@@ -2820,7 +2820,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
             RGBAColor oldColor = prevColor;
             RGBAColor thisColor = {0, 0, 0, 0};
             INT64 o = CalcPixOffset(zx, zy, Stride, bpp);
-            int oA = (bpp==32) ? 255 : imageData[3 + o];
+            int oA = (bpp==32) ? imageData[3 + o] : 255;
             int oR = imageData[2 + o];
             int oG = imageData[1 + o];
             int oB = imageData[o];
