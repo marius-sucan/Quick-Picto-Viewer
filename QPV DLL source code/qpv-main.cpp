@@ -2595,7 +2595,7 @@ int wrapRGBtoGray(int color, int mode) {
 
 void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp, int keepAlpha) {
   RGBAColor thisColor = {0, 0, 0, 0};
-  if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
+  if (tolerance>=0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
   {
      int tcA = (bpp==32) ? imageData[pix + 3] : 255;
      RGBAColor prevColor = {imageData[pix], imageData[pix + 1], imageData[pix + 2], tcA};
@@ -2831,7 +2831,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
 
             if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
             {
-               if (tolerance>0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
+               if (tolerance>=0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
                {
                   RGBAColor prevColor = clr;
                   if (cartoonMode==1)
@@ -2866,7 +2866,7 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     invertSelection = invertSel;
     float toleranza = (alternateMode==3) ? (float)tolerance/10.0 + 1 : tolerance;
     INT64 oc = CalcPixOffset(x, y, Stride, bpp);
-    int aB = (bpp==32) ? 255 : imageData[oc + 3];
+    int aB = (bpp==32) ? imageData[oc + 3] : 255;
     int rB = imageData[oc + 2];
     int gB = imageData[oc + 1];
     int bB = imageData[oc];
@@ -2885,11 +2885,8 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     nC[6] = LabA[2];
     RGBAColor newColorI = {nC[3], nC[2], nC[1], nC[0]};
 
-    // auto LabB = RGBtoLAB(rB, gB, bB);
-    // float CIE = CIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
-    // float CIE2 = testCIEdeltaE2000(LabA[0], LabA[1], LabA[2], LabB[0], LabB[1], LabB[2], 1, 1, 1);
     float opacity = fillOpacity / 255.0f;
-    if (tolerance==0 && (opacity<1 || blendMode>=0))
+    if (modus!=1 && toleranza==0 && (opacity<1 || blendMode>=0))
        newColorI = mixColorsFloodFill(prevColor, newColorI, opacity, 0, blendMode, 0, 0, 0, 0, linearGamma, flipLayers);
 fnOutputDebug("fill opacity: " + std::to_string(opacity) + " | " + std::to_string(fillOpacity) + " | " + std::to_string(newColorI.a));
 
