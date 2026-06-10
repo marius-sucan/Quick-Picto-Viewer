@@ -2833,11 +2833,10 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
             {
                if (tolerance>=0 && (opacity<1 || dynamicOpacity==1 || blendMode>=0 || cartoonMode==1))
                {
-                  RGBAColor prevColor = clr;
                   if (cartoonMode==1)
                      thisColor = oldColor;
                   else
-                     thisColor = mixColorsFloodFill(prevColor, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma, flipLayers);
+                     thisColor = mixColorsFloodFill(clr, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma, flipLayers);
 
                   if (bpp==32 && keepAlpha==0)
                      imageData[3 + o] = thisColor.a;
