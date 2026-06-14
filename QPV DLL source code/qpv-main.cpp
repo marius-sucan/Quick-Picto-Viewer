@@ -2624,80 +2624,117 @@ void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RG
 int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, float *nC, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
 // based on https://lodev.org/cgtutor/floodfill.html
 // by Lode Vandevenne
-// to-do: parallelize the algorithm? make it faster?
 
   if (newColor.r==oldColor.r && newColor.g==oldColor.g && newColor.b==oldColor.b)
      return 0; //avoid infinite loop
 
-  static const int dx[8] = {0, 1, 1, 1, 0, -1, -1, -1}; // relative neighbor x coordinates
-  static const int dy[8] = {-1, -1, 0, 1, 1, 1, 0, -1}; // relative neighbor y coordinates
-  static const int gx[4] = {0, 1, 0, -1}; // relative neighbor x coordinates
-  static const int gy[4] = {-1, 0, 1, 0}; // relative neighbor y coordinates
+  // --- Optimisation: select direction arrays once, outside the loop ---
+  // This avoids a runtime ternary branch per neighbour per iteration.
+  static const int dx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+  static const int dy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+  static const int gx[4] = {0, 1, 0, -1};
+  static const int gy[4] = {-1, 0, 1, 0};
+  const int *dirX = (eightWay==1) ? dx : gx;
+  const int *dirY = (eightWay==1) ? dy : gy;
+  const int k = (eightWay==1) ? 8 : 4;
 
-  INT64 maxPixels = CalcPixOffset(w - 1, h - 1, Stride, bpp);;
-  UINT loopsOccured = 0;
-  UINT suchDeviations = 0;
-  int suchAppliedDeviations = 0;
-  std::vector<bool> pixelzMap(maxPixels, 0);
-  std::stack<int> starkX;
-  std::stack<int> starkY;
+  // --- Optimisation: visited map indexed by pixel index, not byte offset ---
+  // std::vector<bool> is bit-packed and slow for random access.
+  // Using uint8_t and a flat pixel-index (y*w+x) is cache-friendlier and
+  // avoids calling CalcPixOffset() for every visited-map read/write.
+  const INT64 totalPixels = (INT64)w * h;
+  std::vector<uint8_t> pixelzMap(totalPixels, 0);
 
-  int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
-  INT64 px = CalcPixOffset(x, y, Stride, bpp);
-  pixelzMap[px] = 1;
-  starkX.push(x);
-  starkY.push(y);
-  int k = (eightWay==1) ? 8 : 4;
-  float defIndex = (alternateMode==3) ? 0 : prevCLRindex;
-  float index;
-  fnOutputDebug("FloodFill8Stack(); blendMode=" + std::to_string(blendMode));
-  while (starkX.size())
+  // --- Optimisation: single stack of coordinate pairs ---
+  // Two separate std::stack<int> cause two heap-indirected push/pop per pixel
+  // and poor locality. A single std::vector<pair> reserves memory up-front and
+  // keeps x,y together in the same cache line.
+  std::vector<std::pair<int,int>> coordStack;
+  coordStack.reserve(std::min(totalPixels, (INT64)65536));
+
+  const int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
+  const int bytesPerPix = bpp / 8;
+  const float defIndex = (alternateMode==3) ? 0.0f : prevCLRindex;
+
+  // Seed the fill
+  pixelzMap[(INT64)y * w + x] = 1;
+  coordStack.push_back({x, y});
+
+  // Pre-paint the seed pixel (matches original behaviour)
   {
-     if (maxPixels<loopsOccured)
-        break;
+     INT64 seedPx = CalcPixOffset(x, y, Stride, bpp);
+     goPixelFloodFill8Stack(imageData, seedPx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
+  }
 
-     loopsOccured++;
-     int x = starkX.top();
-     int y = starkY.top();
-     starkX.pop();
-     starkY.pop();
-     // #pragma omp parallel for schedule(static) default(none) num_threads(3)
+  UINT suchDeviations = 0;
+  float index;
+
+  fnOutputDebug("FloodFill8Stack(); blendMode=" + std::to_string(blendMode));
+
+  while (!coordStack.empty())
+  {
+     auto [cx, cy] = coordStack.back();
+     coordStack.pop_back();
+
      for (int i = 0; i < k; i++)
      {
-        int nx = (eightWay==1) ? x + dx[i] : x + gx[i] ;
-        int ny = (eightWay==1) ? y + dy[i] : y + gy[i];
-        if (nx>=0 && nx<w && ny>=0 && ny<h)
+        const int nx = cx + dirX[i];
+        const int ny = cy + dirY[i];
+
+        if ((unsigned)nx >= (unsigned)w || (unsigned)ny >= (unsigned)h)
+           continue;  // bounds check using unsigned trick (handles negative too)
+
+        // --- Visited-map check using flat pixel index (no CalcPixOffset) ---
+        const INT64 pixIdx = (INT64)ny * w + nx;
+        if (pixelzMap[pixIdx])
+           continue;
+
+        if (useSelArea==1 && clipMaskFilter(nx, ny, NULL, 0)==1)
+           continue;
+
+        // Byte offset into imageData for this neighbour
+        const INT64 tpx = (INT64)ny * Stride + (INT64)nx * bytesPerPix;
+
+        const int tcA = (bpp==32) ? imageData[tpx + 3] : 255;
+        const RGBAColor thisColor = {imageData[tpx], imageData[tpx + 1], imageData[tpx + 2], tcA};
+
+        bool matched = false;
+        float usedIndex = defIndex;
+
+        if (thisColor.r==oldColor.r && thisColor.g==oldColor.g && thisColor.b==oldColor.b)
         {
-           if (useSelArea==1)
+           matched = true;
+           // usedIndex stays defIndex
+        }
+        else if (tolerance > 0)
+        {
+           if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
            {
-              if (clipMaskFilter(nx, ny, NULL, 0)==1)
-                 continue;
+              matched = true;
+              usedIndex = index;
+           }
+        }
+
+        if (matched)
+        {
+           pixelzMap[pixIdx] = 1;
+
+           // --- Optimisation: inline simpleMode paint to avoid 17-arg call overhead ---
+           if (simpleMode == 1)
+           {
+              imageData[tpx]     = newColor.b;
+              imageData[tpx + 1] = newColor.g;
+              imageData[tpx + 2] = newColor.r;
+              if (bpp==32 && keepAlpha==0)
+                 imageData[tpx + 3] = newColor.a;
+           }
+           else
+           {
+              goPixelFloodFill8Stack(imageData, tpx, usedIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
            }
 
-           INT64 tpx = CalcPixOffset(nx, ny, Stride, bpp);
-           if (pixelzMap[tpx]==1)
-              continue;
-
-           int tcA = (bpp==32) ? imageData[tpx + 3] : 255;
-           RGBAColor thisColor = {imageData[tpx], imageData[tpx + 1], imageData[tpx + 2], tcA};
-           if (thisColor.r==oldColor.r && thisColor.g==oldColor.g && thisColor.b==oldColor.b)
-           {
-              pixelzMap[tpx] = 1;
-              goPixelFloodFill8Stack(imageData, tpx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
-              starkX.push(nx);
-              starkY.push(ny);
-              suchDeviations++;
-           } else if (tolerance>0)
-           {
-              if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
-              {
-                 pixelzMap[tpx] = 1;
-                 goPixelFloodFill8Stack(imageData, tpx, index, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
-                 starkX.push(nx);
-                 starkY.push(ny);
-                 suchDeviations++;
-              }
-           }
+           coordStack.push_back({nx, ny});
+           suchDeviations++;
         }
      }
   }
