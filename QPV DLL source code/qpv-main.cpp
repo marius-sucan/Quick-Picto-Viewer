@@ -1933,22 +1933,20 @@ float testCIEdeltaE2000(double Lab1_L, double Lab1_a, double Lab1_b, double Lab2
     C1        = sqrt(pow(Lab1_a, 2) + pow(Lab1_b, 2));
     C2        = sqrt(pow(Lab2_a, 2) + pow(Lab2_b, 2));
     CBar      = (C1 + C2) / 2;
-    g = (1 - sqrt(pow(CBar, 7) / (pow(CBar, 7) + pow(25, 7)))) / 2;
+    g = (1 - sqrt(pow(CBar, 7) / (pow(CBar, 7) + pow(25.0, 7)))) / 2;
     aPrime1   = Lab1_a * (1 + g);
     aPrime2   = Lab2_a * (1 + g);
     CPrime1   = sqrt(pow(aPrime1, 2) + pow(Lab1_b, 2));
     CPrime2   = sqrt(pow(aPrime2, 2) + pow(Lab2_b, 2));
     CBarPrime = (CPrime1 + CPrime2) / 2;
 
-    hPrime1 = rad2deg(atan2(aPrime1, Lab1_b));
-    if (hPrime1<0)
-       hPrime1 += 360;
+    hPrime1 = rad2deg(atan2(Lab1_b, aPrime1));
+    if (hPrime1 < 0) hPrime1 += 360;
 
-    hPrime2 = rad2deg(atan2(aPrime2, Lab2_b));
-    if (hPrime2 < 0)
-       hPrime2 += 360;
+    hPrime2 = rad2deg(atan2(Lab2_b, aPrime2));
+    if (hPrime2 < 0) hPrime2 += 360;
 
-    if (abs(hPrime1 - hPrime2) > 180)
+    if (fabs(hPrime1 - hPrime2) > 180)
        HBarPrime = (hPrime1 + hPrime2 + 360) / 2;
     else
        HBarPrime = (hPrime1 + hPrime2) / 2;
@@ -1956,7 +1954,7 @@ float testCIEdeltaE2000(double Lab1_L, double Lab1_a, double Lab1_b, double Lab2
     Tvar = 1 - 0.17 * cos(deg2rad(HBarPrime - 30)) + 0.24 * cos(deg2rad(2 * HBarPrime)) + 0.32 * cos(deg2rad(3 * HBarPrime + 6)) - 0.2 * cos(deg2rad(4 * HBarPrime - 63));
 
     deltahPrime = hPrime2 - hPrime1;
-    if (abs(deltahPrime) > 180)
+    if (fabs(deltahPrime) > 180)
     {
        if (hPrime2 <= hPrime1) 
           deltahPrime += 360;
@@ -1973,7 +1971,7 @@ float testCIEdeltaE2000(double Lab1_L, double Lab1_a, double Lab1_b, double Lab2
 
     // compute R sub T (RT)
     deltaRO = 30 * exp(-(pow((HBarPrime - 275) / 25, 2)));
-    RsubC = 2 * sqrt(pow(CBarPrime, 7) / (pow(CBarPrime, 7) + pow(25, 7)));
+    RsubC = 2 * sqrt(pow(CBarPrime, 7) / (pow(CBarPrime, 7) + pow(25.0, 7)));
     RsubT = -RsubC * sin(2 * deg2rad(deltaRO));
 
     deltaE00 = sqrt(pow(deltaLPrime / (SsubL * k_L), 2) + pow(deltaCPrime / (SsubC * k_C), 2) + pow(deltahPrime / (SsubH * k_H), 2) + RsubT * (deltaCPrime / (SsubC * k_C)) * (deltahPrime / (SsubH * k_H)));
@@ -1985,93 +1983,100 @@ float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double C
 // Cl_2,  Ca_2,  Cb_2   - Color #2 CIE-L*ab values
 // WHT_L, WHT_C, WHT_H  - Weight factors: luminance, chroma and hue
 // tested against http://www.brucelindbloom.com/index.html?ColorDifferenceCalc.html
-// https://getreuer.info/posts/colorspace/index.html
-// https://www.easyrgb.com/en/math.php
-// https://zschuessler.github.io/DeltaE/demos/
 
-  const double pwr = 6103515625; // 25^7;
+  const double pwr = 6103515625.0; // 25^7;
   double xC1 = sqrt( Ca_1*Ca_1 + Cb_1*Cb_1 );
   double xC2 = sqrt( Ca_2*Ca_2 + Cb_2*Cb_2 );
-  double xCX = ( xC1 + xC2 ) / 2.0;   // C-bar
-  double zpx = xCX*xCX*xCX*xCX*xCX*xCX*xCX; // xCX^7
+  double xCX = ( xC1 + xC2 ) * 0.5;   // C-bar
+  
+  double xCX2 = xCX * xCX;
+  double xCX4 = xCX2 * xCX2;
+  double zpx = xCX4 * xCX2 * xCX; // xCX^7
+  
   double xGX = 0.5 * ( 1.0 - sqrt( zpx / ( zpx + pwr ) ) );
 
-  double xNN = ( 1.0 + xGX ) * Ca_1;            // A-Prime 1
-  xC1 = sqrt( xNN*xNN + Cb_1*Cb_1 );   // C-Prime 1
-  double xH1 = CieLab2Hue( xNN, Cb_1 );       // H-Prime 1
+  double xNN1 = ( 1.0 + xGX ) * Ca_1;            // A-Prime 1
+  double xCPrime1 = sqrt( xNN1*xNN1 + Cb_1*Cb_1 );   // C-Prime 1
+  double xH1 = (xNN1 == 0.0 && Cb_1 == 0.0) ? 0.0 : atan2(Cb_1, xNN1) * (180.0 / M_PI);
+  if (xH1 < 0.0) xH1 += 360.0;
  
-  xNN = ( 1.0 + xGX ) * Ca_2;                   // A-Prime 2
-  xC2 = sqrt( xNN*xNN + Cb_2*Cb_2 );   // C-Prime 2
-  double xH2 = CieLab2Hue( xNN, Cb_2 );       // H-Prime 2
+  double xNN2 = ( 1.0 + xGX ) * Ca_2;                   // A-Prime 2
+  double xCPrime2 = sqrt( xNN2*xNN2 + Cb_2*Cb_2 );   // C-Prime 2
+  double xH2 = (xNN2 == 0.0 && Cb_2 == 0.0) ? 0.0 : atan2(Cb_2, xNN2) * (180.0 / M_PI);
+  if (xH2 < 0.0) xH2 += 360.0;
 
   // compute Delta H-Prime based on H-Primes
   double xDH; 
-  if ( ( xC1 * xC2 ) == 0 )
+  if ( ( xCPrime1 * xCPrime2 ) == 0.0 )
   {
-     xDH = 0;
+     xDH = 0.0;
   } else 
   {
-     xNN = xH2 - xH1;   // the diff between the H-Primes
-     if ( abs( xNN ) <= 180 ) {
-        xDH = xNN;
+     double diff = xH2 - xH1;
+     if ( fabs( diff ) <= 180.0 ) {
+        xDH = diff;
      }
      else {
-        if ( xNN > 180 )         // if (hPrime2 <= hPrime1) ???
-           xDH = xNN - 360;
+        if ( diff > 180.0 )
+           xDH = diff - 360.0;
         else
-           xDH = xNN + 360;
+           xDH = diff + 360.0;
      }
   }
 
-  xDH = 2 * sqrt( xC1 * xC2 ) * sin( deg2rad( xDH / 2 ) ); // Delta H-Prime
+  xDH = 2.0 * sqrt( xCPrime1 * xCPrime2 ) * sin( (xDH * 0.5) * (M_PI / 180.0) ); // Delta H-Prime
 
   double xHX;  // compute the H-Bar Prime
-  if ( ( xC1 *  xC2 ) == 0 )
+  if ( ( xCPrime1 *  xCPrime2 ) == 0.0 )
   {
      xHX = xH1 + xH2;
   } else
   {
-     xNN = abs(xH1 - xH2);
-     if ( xNN > 180 )
+     double diff = fabs(xH1 - xH2);
+     if ( diff > 180.0 )
      {
-        if ( ( xH2 + xH1 ) < 360 )
-           xHX = xH1 + xH2 + 360;
+        if ( ( xH2 + xH1 ) < 360.0 )
+           xHX = xH1 + xH2 + 360.0;
         else
-           xHX = xH1 + xH2 - 360;
+           xHX = xH1 + xH2 - 360.0;
      } else
      {
         xHX = xH1 + xH2;
      }
-     xHX /= 2; // the H-Bar Prime
+     xHX *= 0.5; // the H-Bar Prime
   }
 
   // xTX, the T variable, based on H-Bar Prime
-  double xTX = 1.0 - 0.17 * cos( deg2rad(xHX - 30.0) ) + 0.24
-                          * cos( deg2rad(2.0 * xHX ) ) + 0.32
-                          * cos( deg2rad(3.0 * xHX + 6.0 ) ) - 0.20
-                          * cos( deg2rad(4.0 * xHX - 63.0) );
+  double hxRad = xHX * (M_PI / 180.0);
+  double xTX = 1.0 - 0.17 * cos( hxRad - (30.0 * M_PI / 180.0) ) + 0.24
+                          * cos( 2.0 * hxRad ) + 0.32
+                          * cos( 3.0 * hxRad + (6.0 * M_PI / 180.0) ) - 0.20
+                          * cos( 4.0 * hxRad - (63.0 * M_PI / 180.0) );
 
-  double xCY = ( xC1 + xC2 ) / 2.0;        // C-Bar Prime based on C-Primes
-  double ytp = xCY*xCY*xCY*xCY*xCY*xCY*xCY; // xCY^7
+  double xCY = ( xCPrime1 + xCPrime2 ) * 0.5;        // C-Bar Prime based on C-Primes
+  double xCY2 = xCY * xCY;
+  double xCY4 = xCY2 * xCY2;
+  double ytp = xCY4 * xCY2 * xCY; // xCY^7
+
   // compute R sub T
-  double grp = ( xHX - 275.0 ) / 25.0;
-  double xPH = 60.0 * exp(-1*(grp*grp));           // based on H-Bar Prime
+  double grp = ( xHX - 275.0 ) * 0.04; // / 25.0
+  double xPH = 60.0 * exp(-1.0*(grp*grp));           // based on H-Bar Prime
   double xRC = 2.0 * sqrt( ytp / ( ytp + pwr ) );   // based on C-Bar Prime
-  double xRT = - sin( deg2rad(xPH) ) * xRC;  // R sub T
+  double xRT = - sin( xPH * (M_PI / 180.0) ) * xRC;  // R sub T
 
-  double xLX = ( Cl_1 + Cl_2 ) / 2.0 - 50.0; // L-Bar
-  double xSL = 1.0 + ( 0.015 * (xLX*xLX) ) / sqrt( 20.0 + (xLX*xLX) );   // S sub L based on L-Bar
+  double xLX = ( Cl_1 + Cl_2 ) * 0.5 - 50.0; // L-Bar
+  double xLX2 = xLX * xLX;
+  double xSL = 1.0 + ( 0.015 * xLX2 ) / sqrt( 20.0 + xLX2 );   // S sub L based on L-Bar
   double xSC = 1.0 + 0.045 * xCY;       // S sub C - based on C-Bar Prime
   double xSH = 1.0 + 0.015 * xCY * xTX; // S sub H - based on C-Bar Prime and T-var
 
   double xDL = Cl_2 - Cl_1;              // Delta L-Prime
-  double xDC = xC2 - xC1;                // Delta C-Prime based on C-Primes
+  double xDC = xCPrime2 - xCPrime1;                // Delta C-Prime based on C-Primes
   xDL = xDL / ( WHT_L * xSL );
   xDC = xDC / ( WHT_C * xSC );
   xDH = xDH / ( WHT_H * xSH );
 
-  double DeltaE = sqrt(xDL*xDL + xDC*xDC + xDH*xDH + xRT * xDC * xDH);
-  return DeltaE;
+  return sqrt(xDL*xDL + xDC*xDC + xDH*xDH + xRT * xDC * xDH);
 }
 
 auto RGBtoLAB(int sR, int sG, int sB) {
