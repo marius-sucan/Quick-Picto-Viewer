@@ -112,6 +112,16 @@ static int int_to_grayBi[65536];
 static int linear_to_gammaInt16[65536];
 static int gamma_to_linearInt16[65536];
 
+static double LUT_X_R[256];
+static double LUT_X_G[256];
+static double LUT_X_B[256];
+static double LUT_Y_R[256];
+static double LUT_Y_G[256];
+static double LUT_Y_B[256];
+static double LUT_Z_R[256];
+static double LUT_Z_G[256];
+static double LUT_Z_B[256];
+
 IWICImagingFactory *m_pIWICFactory;
 ID2D1Factory       *pD2D1Factory;
 
@@ -157,6 +167,26 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
         char_to_floatGamma[i] = pow(char_to_float[i], GAMMA);
         char_to_float_sqrt[i] = sqrt(char_to_float[i]);
         char_to_floatGamma_sqrt[i] = sqrt(char_to_floatGamma[i]);
+
+        double val = char_to_float[i];
+        if (val > 0.0404482362771076)
+            val = pow((val + 0.055)/1.055, 2.4);
+        else
+            val = val / 12.92;
+
+        double val100 = val * 100.0;
+        
+        LUT_X_R[i] = val100 * 0.4123955889674142161 / 95.047;
+        LUT_X_G[i] = val100 * 0.3575834307637148171 / 95.047;
+        LUT_X_B[i] = val100 * 0.1804926473817015735 / 95.047;
+
+        LUT_Y_R[i] = val100 * 0.2125862307855955516 / 100.000;
+        LUT_Y_G[i] = val100 * 0.7151703037034108499 / 100.000;
+        LUT_Y_B[i] = val100 * 0.07220049864333622685 / 100.000;
+
+        LUT_Z_R[i] = val100 * 0.01929721549174694484 / 108.883;
+        LUT_Z_G[i] = val100 * 0.1191838645808485318 / 108.883;
+        LUT_Z_B[i] = val100 * 0.9504971251315797660 / 108.883;
     }
 
     for (int i = 0; i < 65536; i++) {
@@ -1824,7 +1854,7 @@ double inverseGamma(double X) {
 
 double toLABf(double Y) {
   if (Y >= 0.00885645167903563082e-3)
-     Y = pow(Y, 0.333333333333333);  // 1/3
+     Y = cbrt(Y);  // 1/3
   else
      Y = (841.0/108.0) * Y + (4.0/29.0);
 
@@ -1833,7 +1863,7 @@ double toLABf(double Y) {
 
 double toLABfx(double Y) {
   if (Y >= 8.88564517)
-     Y = pow(Y, 0.3333333);  // 1/3
+     Y = cbrt(Y);  // 1/3
   else
      Y = 7.7870370 * Y + 0.1379310; // (841.0/108.0) * Y + ( 4.0 / 29.0 );
 
@@ -1867,27 +1897,10 @@ int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
   if (alternateMode==1)
      return round(char_to_grayRfloat[sR] + char_to_grayGfloat[sG] + char_to_grayBfloat[sB]); // weighted grayscale conversion
 
-  // convert RGB to XYZ color space
-  double var_R = char_to_float[sR];
-  double var_G = char_to_float[sG];
-  double var_B = char_to_float[sB];
-
-  // Inverse sRGB gamma correction
-  var_R = inverseGamma(var_R);
-  var_G = inverseGamma(var_G);
-  var_B = inverseGamma(var_B);
-
-  double Y = var_R * 0.2125862 + var_G * 0.7151704 + var_B * 0.0722005;
-  // if (alternateMode==2)
-  //    return round(Y); // return derived luminosity in XYZ color space
+  double Y = LUT_Y_R[sR] + LUT_Y_G[sG] + LUT_Y_B[sB];
 
   Y = toLABfx(Y);
   double L = 116.0*Y - 16.0;
-  // if (L>499)
-  //     L = 499;
-  // else if (L<0)
-  //     L = 1;
-  // https://zschuessler.github.io/DeltaE/demos/
   return round(L/2); // return derived luminosity in pseudo-LAB color space
 }
 
@@ -2069,47 +2082,19 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   // https://zschuessler.github.io/DeltaE/demos/
   // tested against ColorMine.org
 
-  // convert RGB to XYZ color space
-  double var_R = char_to_float[sR];
-  double var_G = char_to_float[sG];
-  double var_B = char_to_float[sB];
-
-  // Inverse sRGB gamma correction
-  var_R = inverseGamma(var_R);
-  var_G = inverseGamma(var_G);
-  var_B = inverseGamma(var_B);
-
-  var_R = var_R * 100;
-  var_G = var_G * 100;
-  var_B = var_B * 100;
-
-  // compute XYZ color space values for given sRGB
-  double X = var_R * 0.4123955889674142161 + var_G * 0.3575834307637148171 + var_B * 0.1804926473817015735;
-  double Y = var_R * 0.2125862307855955516 + var_G * 0.7151703037034108499 + var_B * 0.07220049864333622685;
-  double Z = var_R * 0.01929721549174694484 + var_G * 0.1191838645808485318 + var_B * 0.9504971251315797660;
-  // std::stringstream ss;
-  // ss << "qpv: color in XYZ - X=" << X;
-  // ss << " Y=" << Y;
-  // ss << " Z=" << Z;
-
-  // compute XYZ according to the D65 reference illuminant specific to Daylight, sRGB and Adobe-RGB
-  X /= 95.047;
-  Y /= 100.000;
-  Z /= 108.883;
+  double X = LUT_X_R[sR] + LUT_X_G[sG] + LUT_X_B[sB];
+  double Y = LUT_Y_R[sR] + LUT_Y_G[sG] + LUT_Y_B[sB];
+  double Z = LUT_Z_R[sR] + LUT_Z_G[sG] + LUT_Z_B[sB];
 
   X = toLABf(X);
   Y = toLABf(Y);
   Z = toLABf(Z);
 
   std::array<double, 3> Lab;
-  Lab[0] = 116*Y - 16;
-  Lab[1] = 500*(X - Y);
-  Lab[2] = 200*(Y - Z);
+  Lab[0] = 116.0*Y - 16.0;
+  Lab[1] = 500.0*(X - Y);
+  Lab[2] = 200.0*(Y - Z);
 
-  // ss << " | in LAB - L=" << Lab[0];
-  // ss << " a=" << Lab[1];
-  // ss << " b=" << Lab[2];
-  // OutputDebugStringA(ss.str().data());
   return Lab;
 }
 
@@ -2671,6 +2656,10 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
 
   fnOutputDebug("FloodFill8Stack(); blendMode=" + std::to_string(blendMode));
 
+  std::vector<uint32_t> cacheTags(8192, 0xFFFFFFFF);
+  std::vector<float> cacheIndices(8192, 0.0f);
+  std::vector<uint8_t> cacheMatched(8192, 0);
+
   while (!coordStack.empty())
   {
      auto [cx, cy] = coordStack.back();
@@ -2708,10 +2697,20 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
         }
         else if (tolerance > 0)
         {
-           if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
-           {
-              matched = true;
-              usedIndex = index;
+           uint32_t colorTag = (thisColor.r << 16) | (thisColor.g << 8) | thisColor.b;
+           uint32_t hash = ((thisColor.r * 73856093) ^ (thisColor.g * 19349663) ^ (thisColor.b * 83492791)) & 8191;
+           if (cacheTags[hash] == colorTag) {
+               matched = cacheMatched[hash];
+               usedIndex = cacheIndices[hash];
+           } else {
+               if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
+               {
+                  matched = true;
+                  usedIndex = index;
+               }
+               cacheTags[hash] = colorTag;
+               cacheMatched[hash] = matched;
+               cacheIndices[hash] = usedIndex;
            }
         }
 
