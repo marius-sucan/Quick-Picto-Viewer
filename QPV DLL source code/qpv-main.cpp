@@ -2629,11 +2629,11 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   const int k = (eightWay==1) ? 8 : 4;
 
   // --- Optimisation: visited map indexed by pixel index, not byte offset ---
-  // std::vector<bool> is bit-packed and slow for random access.
-  // Using uint8_t and a flat pixel-index (y*w+x) is cache-friendlier and
+  // Using MaskBitMap for bit-packed storage while maintaining performance.
   // avoids calling CalcPixOffset() for every visited-map read/write.
   const INT64 totalPixels = (INT64)w * h;
-  std::vector<uint8_t> pixelzMap(totalPixels, 0);
+  MaskBitMap pixelzMap;
+  pixelzMap.resize(totalPixels);
 
   // --- Optimisation: single stack of coordinate pairs ---
   // Two separate std::stack<int> cause two heap-indirected push/pop per pixel
