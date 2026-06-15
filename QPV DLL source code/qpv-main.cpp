@@ -1380,7 +1380,7 @@ void stampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &r
       }
 }
 
-DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY, int tempus) {
+DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY) {
     fnOutputDebug(std::to_string(clipMode) + " drawLineAllSegmentsMask() invoked; PointsCount=" + std::to_string(PointsCount));
     INT64 s = (INT64)polyW * polyH + 2;
     if (s!=polygonMaskMap.size())
@@ -1552,9 +1552,6 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
             // intersection point handle out of bounds, parallel lines/infinity
             // square/round caps option
             // allow this mode only for Rects, Triangles and custom shapes 
-
-            // if (pts!=tempus && tempus>=0)
-            //    continue;
             if (pts==0 && closed==0)
                continue;
 

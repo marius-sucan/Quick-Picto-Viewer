@@ -20824,12 +20824,12 @@ HugeImagesDrawLineShapes() {
             ; if (DrawLineAreaBlendMode>1)
             ; zzpo:=0
 
-            rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", tempCrapValue)
+            rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
                DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
                DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
             }
 
@@ -20838,11 +20838,11 @@ HugeImagesDrawLineShapes() {
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0, "int", -1)
+               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
                   DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
-                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick, "int", -1)
+                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
                }
                Gdip_DeletePath(clonedPath)
             }
@@ -21075,12 +21075,12 @@ HugeImagesDrawParametricLines() {
                If (outlier=0)
                {
                   rect := processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF, DrawLineAreaAtomizedGrid)
-                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0, "int", tempCrapValue)
+                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0)
                   If (rzb=1 && DrawLineAreaDoubles=1)
                   {
                      DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                      kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-                     rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick, "int", -1)
+                     rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick)
                      DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
                   }
 
