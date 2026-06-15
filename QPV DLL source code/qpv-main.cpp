@@ -1265,14 +1265,11 @@ void prepareTranslatedLineSegments(const float &thickness, vector<double> &offse
    for (int pts = 0; pts < PointsCount; pts++)
    {
        const int i = pts*2;
+       const int N = PointsCount * 2;
        Point a = {PointsList[i], PointsList[i + 1]};
-       Point b = {PointsList[i + 2], PointsList[i + 3]};
-       Point c = {PointsList[i + 4], PointsList[i + 5]};   // it is meant as a backup, if A and B are too close, the AC segment will be used
-       if (pts==pci)
-       {
-          b = {PointsList[0], PointsList[1]};
-          c = {PointsList[2], PointsList[3]};
-       }
+       Point b = {PointsList[(i + 2) % N], PointsList[(i + 3) % N]};
+       Point c = {PointsList[(i + 4) % N], PointsList[(i + 5) % N]};   // it is meant as a backup, if A and B are too close, the AC segment will be used
+
 
       double dx = b.x - a.x;
       double dy = b.y - a.y;
@@ -1366,7 +1363,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     const int pci = PointsCount - 1;
     const int pcd = PointsCount*2;
     // fnOutputDebug("tracing polygonal path with bresenham algo; points=" + std::to_string(PointsCount));
-    #pragma omp parallel for schedule(static) default(none) num_threads(4)
+    #pragma omp parallel for schedule(static) num_threads(4)
     for (int pts = 0; pts < PointsCount; pts++)
     {
         int i = pts*2;
@@ -1491,7 +1488,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         // drawTestPath(PointsList, PointsCount, thickness, closed, offsetY, offsetPointsListA, offsetPointsListB);
         // fnOutputDebug("drawLineAllSegmentsMask() - drawing line miter joins");
         // fnOutputDebug(std::to_string(offsetPointsListA.size()) + " preparing line thickness adjusted paths; SECOND ROUND; points=" + std::to_string(PointsCount));
-        #pragma omp parallel for schedule(static) default(none) num_threads(4)
+        #pragma omp parallel for schedule(static) num_threads(4)
         for (int pts = 0; pts < PointsCount; pts++)
         {
             // intersection point handle out of bounds, parallel lines/infinity
@@ -1560,6 +1557,12 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
                 float nx, ny;
                 bool p = findLinesIntersection(a, az, b, bz, nx, ny);
+                if (p == 1) {
+                    float distSq = (nx - c.x) * (nx - c.x) + (ny - c.y) * (ny - c.y);
+                    if (distSq > thickness * thickness * 9.0f) {
+                        p = 0; // Fallback to bevel join to prevent massive miter spikes
+                    }
+                }
                 // bool p = (pts==0 || pts==pci) ? 0 : findLinesIntersection(a, az, b, bz, nx, ny);
                 short kk = (p==1) ? 4 : 3;
 
@@ -1630,8 +1633,8 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
 DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoins) {
     int diameter = 2 * radius + 1;
-    DrawLineCapsGrid.resize(diameter + 2);
-    // DrawLineCapsGrid.resize(diameter + 2, std::vector<short>(diameter + 2, 0));
+    DrawLineCapsGrid.clear();
+    DrawLineCapsGrid.reserve(diameter * diameter);
     // std::vector<std::vector<short>> DrawLineCapsGrid(diameter, std::vector<short>(diameter, 0));
     int centerX = radius;
     int centerY = radius;
@@ -1718,6 +1721,25 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
      highDepthModeMask = highDepth;
      INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
      fnOutputDebug("prepareDrawLinesMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; size=" + std::to_string(s));
+
+    if (s!=polygonMaskMap.size())
+    {
+       try
+       {
+          polygonMaskMap.resize(s);
+       } catch(const std::bad_alloc& e)
+       {
+          fnOutputDebug("polygonMaskMap failed. bad_alloc");
+          return 0;
+       } catch(const std::length_error& e)
+       {
+          fnOutputDebug("polygonMaskMap failed. length_error");
+          return 0;
+       }
+
+       fnOutputDebug("polygonMaskMap RESIZED");
+    }
+
      if (clipMode!=2)
      {
         try
@@ -1736,24 +1758,6 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
         polygonOtherMaskMap = polygonMaskMap;
         bool pp = (polygonMaskMap.size()==s) ? 1 : 0;
         fnOutputDebug(std::to_string(clipMode) + "polygonOtherMaskMap RESIZED " + std::to_string(pp) + " size = " + std::to_string(polygonMaskMap.size()));
-    }
-
-    if (s!=polygonMaskMap.size())
-    {
-       try
-       {
-          polygonMaskMap.resize(s);
-       } catch(const std::bad_alloc& e)
-       {
-          fnOutputDebug("polygonMaskMap failed. bad_alloc");
-          return 0;
-       } catch(const std::length_error& e)
-       {
-          fnOutputDebug("polygonMaskMap failed. length_error");
-          return 0;
-       }
-
-       fnOutputDebug("polygonMaskMap RESIZED");
     }
 
     if (s!=highDephMaskMap.size() && highDepthModeMask==1)
