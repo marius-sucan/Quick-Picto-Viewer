@@ -1997,12 +1997,6 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 
                     float nx_f, ny_f;
                     bool hasIntersection = findLinesIntersection(a, az, b, bz, nx_f, ny_f);
-                    if (hasIntersection)
-                    {
-                        float distSq = (nx_f - c.x) * (nx_f - c.x) + (ny_f - c.y) * (ny_f - c.y);
-                        if (distSq > thickness * thickness * 9.0f)
-                            hasIntersection = false; // Prevent massive miter spikes
-                    }
 
                     if (hasIntersection)
                     {
