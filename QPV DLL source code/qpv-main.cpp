@@ -1142,7 +1142,7 @@ short inline testPointsOrientation(Point p, Point q, Point r) {
 // 1 -> Clockwise
 // 2 -> Counterclockwise
     float val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-    if (val == 0)
+    if (fabs(val) < 1e-4f)
        return 0;               // collinear
 
     return (val > 0) ? 1 : 2;  // clock or counterclockwise
@@ -1161,7 +1161,7 @@ bool findLinesIntersection(Point A, Point B, Point C, Point D, float &x, float &
     float c2 = a2 * (C.x) + b2 * (C.y);
 
     float determinant = a1 * b2 - a2 * b1;
-    if (determinant == 0)
+    if (fabs(determinant) < 1e-4f)
        return 0; // The lines are parallel
 
     x = (b2 * c1 - b1 * c2) / determinant;
@@ -1219,34 +1219,57 @@ void drawLineSegmentMask(int x0, int y0, int x1, int y1, const bool &p, const in
    const int dy = -abs(y1-y0), sy = (y0<y1) ? 1 : -1;
    int err = dx + dy, e2, gx, gy;
    auto &currentGrid = (roundedJoins==1) ? DrawLineCapsGrid : lineGrid;
-   const int kl = currentGrid.size() - 15;
+   const int kl = max(0, (int)currentGrid.size() - 15);
    const int kr = 15;
    for (;;) {
-      int loops = 0;
-      for (auto &point : currentGrid)
-      {
-          bool okay = 1;
-          if (roundedJoins!=1 && rectu!=NULL)
-          {
-             loops++;
-             if (loops<kr || loops>kl) {
-                okay = isPointInPolygon(x0 + point.first, y0 + point.second, rectu, 4);
-             } else {
-                okay = 1;
-             }
-          }
+      int bx = x0 - polyX;
+      int by = y0 - polyY + offsetY;
 
-          if (okay==1)
+      if (clipMode != 2) {
+          int loops = 0;
+          for (auto &point : currentGrid)
           {
-              gx = x0 + point.first - polyX;
-              gy = y0 + point.second - polyY + offsetY;
-              if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+              bool okay = 1;
+              if (roundedJoins!=1 && rectu!=NULL)
               {
-                 if (clipMode!=2)
-                    okay = isPointInOtherMask(gx, gy, clipMode);
+                 loops++;
+                 if (loops<kr || loops>kl) {
+                    okay = isPointInPolygon(x0 + point.first, y0 + point.second, rectu, 4);
+                 }
+              }
 
-                 if (okay==1)
-                    polygonMaskMap[(INT64)gy * polyW + gx] = p;
+              if (okay==1)
+              {
+                  gx = bx + point.first;
+                  gy = by + point.second;
+                  if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+                  {
+                     if (isPointInOtherMask(gx, gy, clipMode) == 1)
+                        polygonMaskMap[(INT64)gy * polyW + gx] = p;
+                  }
+              }
+          }
+      } else {
+          int loops = 0;
+          for (auto &point : currentGrid)
+          {
+              bool okay = 1;
+              if (roundedJoins!=1 && rectu!=NULL)
+              {
+                 loops++;
+                 if (loops<kr || loops>kl) {
+                    okay = isPointInPolygon(x0 + point.first, y0 + point.second, rectu, 4);
+                 }
+              }
+
+              if (okay==1)
+              {
+                  gx = bx + point.first;
+                  gy = by + point.second;
+                  if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+                  {
+                     polygonMaskMap[(INT64)gy * polyW + gx] = p;
+                  }
               }
           }
       }
@@ -1273,18 +1296,22 @@ void prepareTranslatedLineSegments(const float &thickness, vector<double> &offse
 
       double dx = b.x - a.x;
       double dy = b.y - a.y;
-      if (fabs(dx) < 0.1 && fabs(dy) < 0.1)
+      if (fabs(dx) < 0.01f && fabs(dy) < 0.01f)
       {
          dx = c.x - a.x;
          dy = c.y - a.y;
          b = c;
          // fnOutputDebug("segment too short: AB");
-         if (fabs(dx) < 0.1 && fabs(dy) < 0.1)
+         if (fabs(dx) < 0.01f && fabs(dy) < 0.01f)
             fnOutputDebug("segment too short: AC");
       }
 
        Point np1, np2, np3, np4;
-       translateLine(a, b, dx, dy, thickness, np1, np2, np3, np4);
+       if (fabs(dx) < 0.01f && fabs(dy) < 0.01f) {
+           np1 = np2 = np3 = np4 = a;
+       } else {
+           translateLine(a, b, dx, dy, thickness, np1, np2, np3, np4);
+       }
        // dummyDrawPixelMask(np1, offsetY, 2, 1);
        // dummyDrawPixelMask(np2, offsetY, 2, 1);
        // dummyDrawPixelMask(np3, offsetY, 2, 1);
@@ -1309,18 +1336,28 @@ void prepareTranslatedLineSegments(const float &thickness, vector<double> &offse
 }
 
 void stampCircleMaskAt(const int &dx, const int &dy, const int &tt, const int &rr, const int &offsetY, const int &clipMode, const bool &fillMode) {
-      for (auto &point : DrawLineCapsGrid)
-      {
-          bool okay = 1;
-          int gx = dx + point.first - polyX;
-          int gy = dy + point.second - polyY + offsetY;
-          if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+      int bx = dx - polyX;
+      int by = dy - polyY + offsetY;
+      if (clipMode != 2) {
+          for (auto &point : DrawLineCapsGrid)
           {
-             if (clipMode!=2)
-                okay = isPointInOtherMask(gx, gy, clipMode);
-
-             if (okay==1)
-                polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+              int gx = bx + point.first;
+              int gy = by + point.second;
+              if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+              {
+                 if (isPointInOtherMask(gx, gy, clipMode) == 1)
+                    polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+              }
+          }
+      } else {
+          for (auto &point : DrawLineCapsGrid)
+          {
+              int gx = bx + point.first;
+              int gy = by + point.second;
+              if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
+              {
+                 polygonMaskMap[(INT64)gy * polyW + gx] = fillMode;
+              }
           }
       }
 }
@@ -1369,8 +1406,7 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
         int i = pts*2;
         float xa = PointsList[i];
         float ya = PointsList[i + 1];
-        float xb = PointsList[i + 2];
-        float yb = PointsList[i + 3];
+        float xb, yb;
         if (pts==pci)
         {
            if (closed!=1)
@@ -1378,6 +1414,9 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
 
            xb = PointsList[0];
            yb = PointsList[1];
+        } else {
+           xb = PointsList[i + 2];
+           yb = PointsList[i + 3];
         }
 
         if (roundedJoins==1)
@@ -1385,32 +1424,30 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
            drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, NULL, clipMode);
         } else
         {
-           Point npA, npB, np1, np2, np3, np4;
-           extendLine({xa, ya}, {xb, yb}, 1.0f, npA, npB);
-           const double dx = npB.x - npA.x;
-           const double dy = npB.y - npA.y;
-           translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
+           const double orig_dx = xb - xa;
+           const double orig_dy = yb - ya;
+           if (fabs(orig_dx) < 0.01f && fabs(orig_dy) < 0.01f) {
+               stampCircleMaskAt(xa, ya, thickness, pow(thickness, 2), offsetY, clipMode, fillMode);
+           } else {
+               Point npA, npB, np1, np2, np3, np4;
+               extendLine({xa, ya}, {xb, yb}, 1.0f, npA, npB);
+               const double dx = npB.x - npA.x;
+               const double dy = npB.y - npA.y;
+               translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
 
-           float* dynamicArray = new float[8];
-           dynamicArray[0] = np1.x; // zxa
-           dynamicArray[1] = np1.y; // zya
-           dynamicArray[2] = np3.x; // zxb
-           dynamicArray[3] = np3.y; // zyb
-           dynamicArray[4] = np4.x; // zdxb
-           dynamicArray[5] = np4.y; // zdyb
-           dynamicArray[6] = np2.x; // zdxa
-           dynamicArray[7] = np2.y; // zdya
-           // fnOutputDebug("xa/ya=" + std::to_string(xa) + " / " + std::to_string(ya));
-           // fnOutputDebug("npA.x/y=" + std::to_string(npA.x) + " / " + std::to_string(npA.y));
-           // fnOutputDebug("xb/yb=" + std::to_string(xb) + " / " + std::to_string(yb));
-           // fnOutputDebug("npB.x/y=" + std::to_string(npB.x) + " / " + std::to_string(npB.y));
-           
-           // drawLineSegmentMask(npA.x, npA.y, npB.x, npB.y, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
-           // drawLineSegmentMask(xa, ya, xb, yb, fillMode, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray, PointsList, PointsCount, clipMode);
-           drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, fillMode, offsetY, roundedJoins, dynamicArray, clipMode); // good
-           // FillSimpleMaskPolygon(polyW, polyH, dynamicArray, 4, offsetY, fillMode, PointsList, PointsCount, clipMode);
-           // drawLineSegmentMask(xa, ya, xb, yb, doubles, offsetY, roundedJoins, thickness, zxa, zya, zxb, zyb, dynamicArray);
-           delete[] dynamicArray;
+               float* dynamicArray = new float[8];
+               dynamicArray[0] = np1.x; // zxa
+               dynamicArray[1] = np1.y; // zya
+               dynamicArray[2] = np3.x; // zxb
+               dynamicArray[3] = np3.y; // zyb
+               dynamicArray[4] = np4.x; // zdxb
+               dynamicArray[5] = np4.y; // zdyb
+               dynamicArray[6] = np2.x; // zdxa
+               dynamicArray[7] = np2.y; // zdya
+               
+               drawLineSegmentMask(np1.x, np1.y, np2.x, np2.y, fillMode, offsetY, roundedJoins, dynamicArray, clipMode); // good
+               delete[] dynamicArray;
+           }
         }
 
         if (closed==0 && PointsCount>2 && (pts==0 || pts==pci-1))
