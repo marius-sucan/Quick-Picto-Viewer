@@ -1,4 +1,4 @@
-﻿; Script details:
+; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -20793,8 +20793,8 @@ HugeImagesDrawLineShapes() {
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign, "int", 0)
-      rza := DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
-      If (rza=1 && rzq=1)
+      rza := rzq
+      If (rzq=1)
       {
          otherThick := Round(thisThick*0.34)
          diffThick := (imgSelY1<0) ? imgSelY1 : 0
@@ -20824,13 +20824,11 @@ HugeImagesDrawLineShapes() {
             ; if (DrawLineAreaBlendMode>1)
             ; zzpo:=0
 
-            rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
+            rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
             If (rzb=1 && DrawLineAreaDoubles=1)
             {
-               DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
                kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
-               DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
             }
 
             Gdip_DeletePath(pPath)
@@ -20838,11 +20836,10 @@ HugeImagesDrawLineShapes() {
             {
                Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
-               rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
+               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
                If (rzb=1 && DrawLineAreaDoubles=1)
                {
-                  DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
-                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
+                  rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
                }
                Gdip_DeletePath(clonedPath)
             }
