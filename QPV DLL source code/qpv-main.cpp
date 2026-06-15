@@ -537,8 +537,7 @@ void traceMaskPolyBoundaries(const int &w, const int &h, const float* PointsList
         {
            xb = PointsList[0];
            yb = PointsList[1];
-        }
-        else
+        } else
         {
            xb = PointsList[i];
            i++;
@@ -631,7 +630,6 @@ void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, con
            continue;
 
         const std::vector<int>& activeEdges = crossingEdges[y];
-
         for (INT64 i = 0; i < listu.size() - 1; i++)
         {
              INT64 xa = listu[i];
@@ -2619,7 +2617,6 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
      return 0; //avoid infinite loop
 
   // --- Optimisation: select direction arrays once, outside the loop ---
-  // This avoids a runtime ternary branch per neighbour per iteration.
   static const int dx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
   static const int dy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
   static const int gx[4] = {0, 1, 0, -1};
@@ -2628,17 +2625,11 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   const int *dirY = (eightWay==1) ? dy : gy;
   const int k = (eightWay==1) ? 8 : 4;
 
-  // --- Optimisation: visited map indexed by pixel index, not byte offset ---
-  // Using MaskBitMap for bit-packed storage while maintaining performance.
-  // avoids calling CalcPixOffset() for every visited-map read/write.
+  // Using MaskBitMap for bit-packed storage for performance.and minimal memory usage
   const INT64 totalPixels = (INT64)w * h;
   MaskBitMap pixelzMap;
   pixelzMap.resize(totalPixels);
 
-  // --- Optimisation: single stack of coordinate pairs ---
-  // Two separate std::stack<int> cause two heap-indirected push/pop per pixel
-  // and poor locality. A single std::vector<pair> reserves memory up-front and
-  // keeps x,y together in the same cache line.
   std::vector<std::pair<int,int>> coordStack;
   coordStack.reserve(std::min(totalPixels, (INT64)65536));
 
@@ -2650,17 +2641,13 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   pixelzMap[(INT64)y * w + x] = 1;
   coordStack.push_back({x, y});
 
-  // Pre-paint the seed pixel (matches original behaviour)
-  {
-     INT64 seedPx = CalcPixOffset(x, y, Stride, bpp);
-     goPixelFloodFill8Stack(imageData, seedPx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
-  }
+  INT64 seedPx = CalcPixOffset(x, y, Stride, bpp);
+  goPixelFloodFill8Stack(imageData, seedPx, defIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
 
   UINT suchDeviations = 0;
   float index;
 
   fnOutputDebug("FloodFill8Stack(); blendMode=" + std::to_string(blendMode));
-
   std::vector<uint32_t> cacheTags(8192, 0xFFFFFFFF);
   std::vector<float> cacheIndices(8192, 0.0f);
   std::vector<uint8_t> cacheMatched(8192, 0);
@@ -2699,15 +2686,16 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
         {
            matched = true;
            // usedIndex stays defIndex
-        }
-        else if (tolerance > 0)
+        } else if (tolerance>0)
         {
            uint32_t colorTag = (thisColor.r << 16) | (thisColor.g << 8) | thisColor.b;
            uint32_t hash = ((thisColor.r * 73856093) ^ (thisColor.g * 19349663) ^ (thisColor.b * 83492791)) & 8191;
-           if (cacheTags[hash] == colorTag) {
+           if (cacheTags[hash] == colorTag)
+           {
                matched = cacheMatched[hash];
                usedIndex = cacheIndices[hash];
-           } else {
+           } else
+           {
                if (decideColorsEqual(thisColor, oldColor, tolerance, prevCLRindex, alternateMode, nC, index))
                {
                   matched = true;
@@ -2722,17 +2710,14 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
         if (matched)
         {
            pixelzMap[pixIdx] = 1;
-
-           // --- Optimisation: inline simpleMode paint to avoid 17-arg call overhead ---
-           if (simpleMode == 1)
+           if (simpleMode==1)
            {
               imageData[tpx]     = newColor.b;
               imageData[tpx + 1] = newColor.g;
               imageData[tpx + 2] = newColor.r;
               if (bpp==32 && keepAlpha==0)
                  imageData[tpx + 3] = newColor.a;
-           }
-           else
+           } else
            {
               goPixelFloodFill8Stack(imageData, tpx, usedIndex, newColor, oldColor, tolerance, prevCLRindex, opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, flipLayers, bpp, keepAlpha, simpleMode);
            }
