@@ -1686,6 +1686,389 @@ DLL_API int DLL_CALLCONV drawLineAllSegmentsMask(float* PointsList, int PointsCo
     return 1;
 }
 
+DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY) {
+    // Uses OpenCV drawing functions to render thick polylines onto polygonMaskMap.
+    // Unlike drawLineSegmentMask() which uses a Bresenham walk + stamp grid approach,
+    // this function renders onto a temporary cv::Mat using OpenCV's optimized line
+    // rasterizer, then transfers the result into the bit-packed polygonMaskMap.
+    //
+    // Parameters (same as drawLineAllSegmentsMask):
+    //   PointsList    - flat array of float [x0,y0, x1,y1, ...] in image-space
+    //   PointsCount   - number of points (PointsList has PointsCount*2 floats)
+    //   thickness     - half-thickness (radius) of the line stroke
+    //   closed        - 1 = close the polyline (last point -> first point)
+    //   roundedJoins  - 1 = round joins, otherwise = miter joins
+    //   fillMode      - value to write into the mask (1 = draw, 0 = erase)
+    //   roundCaps     - 2 = box/square caps, 3 = round caps (only for open paths)
+    //   clipMode      - 2 = no clipping, 1/3 = clip against polygonOtherMaskMap
+    //   offsetY       - vertical pixel offset applied during drawing
+
+    fnOutputDebug(std::to_string(clipMode) + " NewDrawLinesOnMask() invoked; PointsCount=" + std::to_string(PointsCount));
+
+    if (PointsCount < 2)
+       return 0;
+
+    // Validate polygonMaskMap size
+    INT64 s = (INT64)polyW * polyH + 2;
+    if (s != polygonMaskMap.size())
+    {
+       fnOutputDebug("NewDrawLinesOnMask: polygonMaskMap[] incorrect size=" + std::to_string(s) + " != " + std::to_string(polygonMaskMap.size()));
+       return 0;
+    }
+
+    if (polyW < 1 || polyH < 1)
+       return 0;
+
+    // Adjust Y-coordinates by polyOffYa - polyOffYb (same as drawLineAllSegmentsMask)
+    for (int i = 0; i < PointsCount * 2; i += 2)
+    {
+        PointsList[i + 1] = PointsList[i + 1] + polyOffYa - polyOffYb;
+    }
+
+    // OpenCV thickness is the full diameter; the input 'thickness' is a radius.
+    // OpenCV minimum thickness for a visible line is 1.
+    const int cvThickness = max(1, thickness * 2 + 1);
+
+    // Convert points from image-space to mask-local coordinates.
+    // In mask-local coords: localX = imageX - polyX, localY = imageY - polyY + offsetY
+    std::vector<cv::Point> cvPoints;
+    cvPoints.reserve(PointsCount);
+    for (int i = 0; i < PointsCount; i++)
+    {
+        int lx = (int)round(PointsList[i * 2]     - polyX);
+        int ly = (int)round(PointsList[i * 2 + 1]  - polyY + offsetY);
+        cvPoints.push_back(cv::Point(lx, ly));
+    }
+
+    // Create a temporary single-channel mask (8-bit) initialized to zero
+    cv::Mat maskMat = cv::Mat::zeros((int)polyH, (int)polyW, CV_8UC1);
+    const cv::Scalar drawColor(255);
+
+    if (roundedJoins == 1)
+    {
+        // Round joins mode: cv::polylines gives us round joins natively.
+        // OpenCV's thick lines also produce round endpoints by default.
+        cv::polylines(maskMat, cvPoints, (closed == 1), drawColor, cvThickness, cv::LINE_8);
+
+        // For an open path, handle cap styles at the two endpoints
+        if (closed != 1 && PointsCount > 2)
+        {
+            if (roundCaps == 2)
+            {
+                // Box/square caps: extend the line at each endpoint by 'thickness' pixels
+                // and draw a filled rectangle for the cap
+                for (int capIdx = 0; capIdx < 2; capIdx++)
+                {
+                    cv::Point pA, pB;
+                    if (capIdx == 0)
+                    {
+                       pA = cvPoints[0];
+                       pB = cvPoints[1];
+                    } else
+                    {
+                       pA = cvPoints[PointsCount - 1];
+                       pB = cvPoints[PointsCount - 2];
+                    }
+
+                    // Direction from the interior toward the endpoint
+                    double dx = (double)(pA.x - pB.x);
+                    double dy = (double)(pA.y - pB.y);
+                    double len = sqrt(dx * dx + dy * dy);
+                    if (len < 0.01)
+                       continue;
+
+                    // Normalize direction
+                    double nx = dx / len;
+                    double ny = dy / len;
+                    // Perpendicular
+                    double px = -ny;
+                    double py = nx;
+
+                    // Cap extends 'thickness' pixels beyond the endpoint
+                    double extX = pA.x + nx * thickness;
+                    double extY = pA.y + ny * thickness;
+
+                    // Build the 4 corners of the box cap rectangle
+                    cv::Point capRect[4];
+                    capRect[0] = cv::Point((int)round(pA.x + px * thickness), (int)round(pA.y + py * thickness));
+                    capRect[1] = cv::Point((int)round(pA.x - px * thickness), (int)round(pA.y - py * thickness));
+                    capRect[2] = cv::Point((int)round(extX - px * thickness),  (int)round(extY - py * thickness));
+                    capRect[3] = cv::Point((int)round(extX + px * thickness),  (int)round(extY + py * thickness));
+
+                    std::vector<std::vector<cv::Point>> capContour = { {capRect[0], capRect[1], capRect[2], capRect[3]} };
+                    cv::fillPoly(maskMat, capContour, drawColor);
+                }
+            }
+            // roundCaps == 3 (round caps): OpenCV's thick lines already produce round ends,
+            // so no additional work is needed.
+        }
+    } else
+    {
+        // Miter joins mode: draw each segment as a filled rectangle (the thick line body),
+        // then fill the miter join regions between consecutive segments.
+
+        const int pci = PointsCount - 1;
+
+        // Prepare translated (offset) line segments for miter join computation
+        // Reuse the same prepareTranslatedLineSegments() function
+        std::vector<double> offsetPointsListA;
+        std::vector<double> offsetPointsListB;
+        offsetPointsListA.reserve(PointsCount * 4 + 5);
+        offsetPointsListB.reserve(PointsCount * 4 + 5);
+        prepareTranslatedLineSegments(thickness, offsetPointsListA, offsetPointsListB, PointsList, PointsCount, closed, 0, offsetY);
+
+        // Draw each line segment as a filled rectangle
+        for (int pts = 0; pts < PointsCount; pts++)
+        {
+            int i = pts * 2;
+            float xa = PointsList[i];
+            float ya = PointsList[i + 1];
+            float xb, yb;
+            if (pts == pci)
+            {
+                if (closed != 1)
+                   break;
+                xb = PointsList[0];
+                yb = PointsList[1];
+            } else
+            {
+                xb = PointsList[i + 2];
+                yb = PointsList[i + 3];
+            }
+
+            double orig_dx = xb - xa;
+            double orig_dy = yb - ya;
+            if (fabs(orig_dx) < 0.01f && fabs(orig_dy) < 0.01f)
+            {
+                // Degenerate segment: stamp a circle
+                int cx = (int)round(xa - polyX);
+                int cy = (int)round(ya - polyY + offsetY);
+                cv::circle(maskMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
+                continue;
+            }
+
+            // Compute the 4 corners of the thick rectangle for this segment
+            Point npA, npB, np1, np2, np3, np4;
+            extendLine({xa, ya}, {xb, yb}, 1.0f, npA, npB);
+            double dx = npB.x - npA.x;
+            double dy = npB.y - npA.y;
+            translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
+
+            // Convert to mask-local coordinates and draw as filled polygon
+            cv::Point rectPts[4];
+            rectPts[0] = cv::Point((int)round(np1.x - polyX), (int)round(np1.y - polyY + offsetY));
+            rectPts[1] = cv::Point((int)round(np3.x - polyX), (int)round(np3.y - polyY + offsetY));
+            rectPts[2] = cv::Point((int)round(np4.x - polyX), (int)round(np4.y - polyY + offsetY));
+            rectPts[3] = cv::Point((int)round(np2.x - polyX), (int)round(np2.y - polyY + offsetY));
+            std::vector<std::vector<cv::Point>> segContour = { {rectPts[0], rectPts[1], rectPts[2], rectPts[3]} };
+            cv::fillPoly(maskMat, segContour, drawColor);
+        }
+
+        // Handle open-path caps
+        if (closed == 0 && PointsCount > 2)
+        {
+            for (int capIdx = 0; capIdx < 2; capIdx++)
+            {
+                int pts = (capIdx == 0) ? 0 : pci - 1;
+                int i = pts * 2;
+                float xa = PointsList[i];
+                float ya = PointsList[i + 1];
+                float xb = PointsList[i + 2];
+                float yb = PointsList[i + 3];
+
+                if (roundCaps == 3)
+                {
+                    // Round cap: draw a filled circle at the endpoint
+                    float ex = (capIdx == 0) ? xa : xb;
+                    float ey = (capIdx == 0) ? ya : yb;
+                    int cx = (int)round(ex - polyX);
+                    int cy = (int)round(ey - polyY + offsetY);
+                    cv::circle(maskMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
+                } else if (roundCaps == 2)
+                {
+                    // Box/square cap: extend the line and fill a rectangle
+                    Point pA = {xa, ya};
+                    Point pB = {xb, yb};
+                    Point npA, npB, np1, np2, np3, np4;
+                    extendLine(pA, pB, 0.1f, npA, npB);
+                    double dx = npB.x - npA.x;
+                    double dy = npB.y - npA.y;
+                    translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
+                    double zxa = np1.x;
+                    double zya = np1.y;
+                    double zxb = np3.x;
+                    double zyb = np3.y;
+
+                    double cxa, cxb, cya, cyb;
+                    extendLine(pA, pB, thickness * 1.40f, np1, np2);
+                    if (capIdx == 0)
+                    {
+                        cxa = xa - np1.x;       cya = ya - np1.y;
+                        cxb = xb - np2.x;       cyb = yb - np2.y;
+                        cxa = zxa - cxa;         cya = zya - cya;
+                        cxb = zxb + cxb;         cyb = zyb + cyb;
+
+                        cv::Point capPts[4];
+                        capPts[0] = cv::Point((int)round(zxa - polyX),  (int)round(zya - polyY + offsetY));
+                        capPts[1] = cv::Point((int)round(zxb - polyX),  (int)round(zyb - polyY + offsetY));
+                        capPts[2] = cv::Point((int)round(cxb - polyX),  (int)round(cyb - polyY + offsetY));
+                        capPts[3] = cv::Point((int)round(cxa - polyX),  (int)round(cya - polyY + offsetY));
+                        std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
+                        cv::fillPoly(maskMat, capContour, drawColor);
+                    } else
+                    {
+                        cxa = xb - np1.x;       cya = yb - np1.y;
+                        cxb = xa - np2.x;       cyb = ya - np2.y;
+                        cxa = zxa + cxa;         cya = zya + cya;
+                        cxb = zxb - cxb;         cyb = zyb - cyb;
+                        double dxa = cxa - (xa - np1.x);
+                        double dya = cya - (ya - np1.y);
+                        double dxb = cxb + xb - np2.x;
+                        double dyb = cyb + yb - np2.y;
+
+                        cv::Point capPts[4];
+                        capPts[0] = cv::Point((int)round(dxa - polyX),  (int)round(dya - polyY + offsetY));
+                        capPts[1] = cv::Point((int)round(dxb - polyX),  (int)round(dyb - polyY + offsetY));
+                        capPts[2] = cv::Point((int)round(cxb - polyX),  (int)round(cyb - polyY + offsetY));
+                        capPts[3] = cv::Point((int)round(cxa - polyX),  (int)round(cya - polyY + offsetY));
+                        std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
+                        cv::fillPoly(maskMat, capContour, drawColor);
+                    }
+                }
+            }
+        }
+
+        // Fill miter join regions between consecutive segments
+        if (PointsCount > 2)
+        {
+            for (int pts = 0; pts < PointsCount; pts++)
+            {
+                if (pts == 0 && closed == 0)
+                   continue;
+
+                if (pts == pci)
+                {
+                   if (closed != 1)
+                      break;
+                }
+
+                int i = pts * 2;
+                int z = (pts == 0) ? (PointsCount - 1) * 4 : (pts - 1) * 4;
+                int k = (pts == 0) ? (PointsCount - 1) * 2 : (pts - 1) * 2;
+                int n = (pts == pci) ? 0 : (pts + 1) * 2;
+                Point c  = {PointsList[i], PointsList[i + 1]};
+                Point cp = {PointsList[k], PointsList[k + 1]};
+                Point cn = {PointsList[n], PointsList[n + 1]};
+                Point a, b, az, bz;
+                short orientation = testPointsOrientation(cp, c, cn);
+
+                if (orientation == 2)
+                {
+                    a = (pts == 0) ? Point{offsetPointsListB[0], offsetPointsListB[1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
+                    b = {offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
+                } else if (orientation == 1)
+                {
+                    a = (pts == 0) ? Point{offsetPointsListA[0], offsetPointsListA[1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
+                    b = {offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
+                } else
+                {
+                    // Colinear: stamp a circle at the vertex
+                    if (pts == 0 || pts == pci)
+                    {
+                        int cx = (int)round(c.x - polyX);
+                        int cy = (int)round(c.y - polyY + offsetY);
+                        cv::circle(maskMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
+                    }
+                }
+
+                if (orientation == 2 || orientation == 1)
+                {
+                    z = (pts == 0) ? (PointsCount - 1) * 4 : (pts - 2) * 4;
+                    if (orientation == 2)
+                       bz = (pts == 0) ? Point{offsetPointsListB[z], offsetPointsListB[z + 1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
+                    else
+                       bz = (pts == 0) ? Point{offsetPointsListA[z], offsetPointsListA[z + 1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
+
+                    z = pts * 4;
+                    if (orientation == 2)
+                       az = (pts == 0) ? Point{offsetPointsListB[2], offsetPointsListB[3]} : Point{offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
+                    else
+                       az = (pts == 0) ? Point{offsetPointsListA[2], offsetPointsListA[3]} : Point{offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
+
+                    float nx_f, ny_f;
+                    bool hasIntersection = findLinesIntersection(a, az, b, bz, nx_f, ny_f);
+                    if (hasIntersection)
+                    {
+                        float distSq = (nx_f - c.x) * (nx_f - c.x) + (ny_f - c.y) * (ny_f - c.y);
+                        if (distSq > thickness * thickness * 9.0f)
+                            hasIntersection = false; // Prevent massive miter spikes
+                    }
+
+                    if (hasIntersection)
+                    {
+                        // Miter join: 4-point polygon (a, intersection, b, center)
+                        cv::Point joinPts[4];
+                        joinPts[0] = cv::Point((int)round(a.x - polyX),    (int)round(a.y - polyY + offsetY));
+                        joinPts[1] = cv::Point((int)round(nx_f - polyX),   (int)round(ny_f - polyY + offsetY));
+                        joinPts[2] = cv::Point((int)round(b.x - polyX),    (int)round(b.y - polyY + offsetY));
+                        joinPts[3] = cv::Point((int)round(c.x - polyX),    (int)round(c.y - polyY + offsetY));
+                        std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2], joinPts[3]} };
+                        cv::fillPoly(maskMat, joinContour, drawColor);
+                    } else
+                    {
+                        // Bevel join fallback: 3-point triangle (a, b, center)
+                        cv::Point joinPts[3];
+                        joinPts[0] = cv::Point((int)round(a.x - polyX),  (int)round(a.y - polyY + offsetY));
+                        joinPts[1] = cv::Point((int)round(b.x - polyX),  (int)round(b.y - polyY + offsetY));
+                        joinPts[2] = cv::Point((int)round(c.x - polyX),  (int)round(c.y - polyY + offsetY));
+                        std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2]} };
+                        cv::fillPoly(maskMat, joinContour, drawColor);
+                    }
+                }
+            }
+        }
+    }
+
+    // Transfer the cv::Mat result into polygonMaskMap, respecting fillMode and clipMode.
+    // maskMat pixels with value > 0 correspond to drawn areas.
+    const bool useFill = (fillMode != 0);
+    if (clipMode == 2)
+    {
+        // No clipping: fastest path
+        #pragma omp parallel for schedule(static) num_threads(4)
+        for (int y = 0; y < (int)polyH; y++)
+        {
+            const unsigned char* row = maskMat.ptr<unsigned char>(y);
+            const INT64 rowStart = (INT64)y * polyW;
+            for (int x = 0; x < (int)polyW; x++)
+            {
+                if (row[x] > 0)
+                   polygonMaskMap[rowStart + x] = useFill;
+            }
+        }
+    } else
+    {
+        // Clipping against polygonOtherMaskMap
+        #pragma omp parallel for schedule(static) num_threads(4)
+        for (int y = 0; y < (int)polyH; y++)
+        {
+            const unsigned char* row = maskMat.ptr<unsigned char>(y);
+            const INT64 rowStart = (INT64)y * polyW;
+            for (int x = 0; x < (int)polyW; x++)
+            {
+                if (row[x] > 0)
+                {
+                    if (isPointInOtherMask(x, y, clipMode) == 1)
+                       polygonMaskMap[rowStart + x] = useFill;
+                }
+            }
+        }
+    }
+
+    // fnOutputDebug("NewDrawLinesOnMask() - done");
+    return 1;
+}
+
 DLL_API int DLL_CALLCONV prepareDrawLinesCapsGridMask(int radius, int roundedJoins) {
     int diameter = 2 * radius + 1;
     DrawLineCapsGrid.clear();
