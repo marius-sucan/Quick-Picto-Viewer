@@ -1,4 +1,4 @@
-; Script details:
+﻿; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -221,8 +221,8 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
-   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := ""
-   , appVersion := "6.2.00", vReleaseDate := "2026/06/11" ; yyyy-mm-dd
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := (A_IsCompiled) ? "" : "(dev) "
+   , appVersion := "6.2.01", vReleaseDate := "2026/06/11" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -20780,6 +20780,8 @@ HugeImagesDrawLineShapes() {
       roundCaps := DrawLineAreaCapsStyle
       If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
          roundCaps := (DrawLineAreaCapsStyle=3) ? 3 : 0
+      If (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1 && DrawLineAreaDoubles=1)
+         roundCaps := 0
 
       if (DrawLineAreaContourAlign!=2)
       {
@@ -20838,9 +20840,8 @@ HugeImagesDrawLineShapes() {
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
                rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
                If (rzb=1 && DrawLineAreaDoubles=1)
-               {
                   rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
-               }
+
                Gdip_DeletePath(clonedPath)
             }
          }
