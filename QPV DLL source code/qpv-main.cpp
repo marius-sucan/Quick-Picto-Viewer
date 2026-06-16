@@ -1877,68 +1877,48 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
         {
             for (int capIdx = 0; capIdx < 2; capIdx++)
             {
-                int pts = (capIdx == 0) ? 0 : pci - 1;
-                int i = pts * 2;
-                float xa = PointsList[i];
-                float ya = PointsList[i + 1];
-                float xb = PointsList[i + 2];
-                float yb = PointsList[i + 3];
+                float pxA, pyA, pxB, pyB;
+                if (capIdx == 0)
+                {
+                    pxA = PointsList[0];
+                    pyA = PointsList[1];
+                    pxB = PointsList[2];
+                    pyB = PointsList[3];
+                } else
+                {
+                    pxA = PointsList[(PointsCount - 1) * 2];
+                    pyA = PointsList[(PointsCount - 1) * 2 + 1];
+                    pxB = PointsList[(PointsCount - 2) * 2];
+                    pyB = PointsList[(PointsCount - 2) * 2 + 1];
+                }
 
                 if (roundCaps == 3)
                 {
                     // Round cap: draw a filled circle at the endpoint
-                    float ex = (capIdx == 0) ? xa : xb;
-                    float ey = (capIdx == 0) ? ya : yb;
-                    int cx = (int)round(ex - polyX);
-                    int cy = (int)round(ey - polyY + offsetY);
+                    int cx = (int)round(pxA - polyX);
+                    int cy = (int)round(pyA - polyY + offsetY);
                     cv::circle(maskMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
                 } else if (roundCaps == 2)
                 {
                     // Box/square cap: extend the line and fill a rectangle
-                    Point pA = {xa, ya};
-                    Point pB = {xb, yb};
-                    Point npA, npB, np1, np2, np3, np4;
-                    extendLine(pA, pB, 0.1f, npA, npB);
-                    double dx = npB.x - npA.x;
-                    double dy = npB.y - npA.y;
-                    translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
-                    double zxa = np1.x;
-                    double zya = np1.y;
-                    double zxb = np3.x;
-                    double zyb = np3.y;
-
-                    double cxa, cxb, cya, cyb;
-                    extendLine(pA, pB, thickness * 1.40f, np1, np2);
-                    if (capIdx == 0)
+                    double dx = pxA - pxB;
+                    double dy = pyA - pyB;
+                    double len = sqrt(dx * dx + dy * dy);
+                    if (len >= 0.01)
                     {
-                        cxa = xa - np1.x;       cya = ya - np1.y;
-                        cxb = xb - np2.x;       cyb = yb - np2.y;
-                        cxa = zxa - cxa;         cya = zya - cya;
-                        cxb = zxb + cxb;         cyb = zyb + cyb;
+                        double nx = dx / len;
+                        double ny = dy / len;
+                        double px = -ny;
+                        double py = nx;
+                        double extX = pxA + nx * thickness;
+                        double extY = pyA + ny * thickness;
 
                         cv::Point capPts[4];
-                        capPts[0] = cv::Point((int)round(zxa - polyX),  (int)round(zya - polyY + offsetY));
-                        capPts[1] = cv::Point((int)round(zxb - polyX),  (int)round(zyb - polyY + offsetY));
-                        capPts[2] = cv::Point((int)round(cxb - polyX),  (int)round(cyb - polyY + offsetY));
-                        capPts[3] = cv::Point((int)round(cxa - polyX),  (int)round(cya - polyY + offsetY));
-                        std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
-                        cv::fillPoly(maskMat, capContour, drawColor);
-                    } else
-                    {
-                        cxa = xb - np1.x;       cya = yb - np1.y;
-                        cxb = xa - np2.x;       cyb = ya - np2.y;
-                        cxa = zxa + cxa;         cya = zya + cya;
-                        cxb = zxb - cxb;         cyb = zyb - cyb;
-                        double dxa = cxa - (xa - np1.x);
-                        double dya = cya - (ya - np1.y);
-                        double dxb = cxb + xb - np2.x;
-                        double dyb = cyb + yb - np2.y;
+                        capPts[0] = cv::Point((int)round(pxA + px * thickness - polyX), (int)round(pyA + py * thickness - polyY + offsetY));
+                        capPts[1] = cv::Point((int)round(pxA - px * thickness - polyX), (int)round(pyA - py * thickness - polyY + offsetY));
+                        capPts[2] = cv::Point((int)round(extX - px * thickness - polyX), (int)round(extY - py * thickness - polyY + offsetY));
+                        capPts[3] = cv::Point((int)round(extX + px * thickness - polyX), (int)round(extY + py * thickness - polyY + offsetY));
 
-                        cv::Point capPts[4];
-                        capPts[0] = cv::Point((int)round(dxa - polyX),  (int)round(dya - polyY + offsetY));
-                        capPts[1] = cv::Point((int)round(dxb - polyX),  (int)round(dyb - polyY + offsetY));
-                        capPts[2] = cv::Point((int)round(cxb - polyX),  (int)round(cyb - polyY + offsetY));
-                        capPts[3] = cv::Point((int)round(cxa - polyX),  (int)round(cya - polyY + offsetY));
                         std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
                         cv::fillPoly(maskMat, capContour, drawColor);
                     }
