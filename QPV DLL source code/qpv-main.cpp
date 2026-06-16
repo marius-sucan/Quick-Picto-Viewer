@@ -1748,10 +1748,11 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     {
         // Round joins mode: cv::polylines gives us round joins natively.
         // OpenCV's thick lines also produce round endpoints by default.
-        cv::polylines(maskMat, cvPoints, (closed == 1), drawColor, cvThickness, cv::LINE_8);
+        std::vector<std::vector<cv::Point>> polyContours = { cvPoints };
+        cv::polylines(maskMat, polyContours, (closed == 1), drawColor, cvThickness, cv::LINE_8);
 
         // For an open path, handle cap styles at the two endpoints
-        if (closed != 1 && PointsCount > 2)
+        if (closed != 1 && PointsCount >= 2)
         {
             if (roundCaps == 2)
             {
@@ -1799,8 +1800,15 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                     cv::fillPoly(maskMat, capContour, drawColor);
                 }
             }
-            // roundCaps == 3 (round caps): OpenCV's thick lines already produce round ends,
-            // so no additional work is needed.
+            else if (roundCaps == 3)
+            {
+                // Round caps: draw a filled circle at the endpoints
+                for (int capIdx = 0; capIdx < 2; capIdx++)
+                {
+                    cv::Point pEnd = (capIdx == 0) ? cvPoints[0] : cvPoints[PointsCount - 1];
+                    cv::circle(maskMat, pEnd, thickness, drawColor, cv::FILLED, cv::LINE_8);
+                }
+            }
         }
     } else
     {
@@ -1865,7 +1873,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
         }
 
         // Handle open-path caps
-        if (closed == 0 && PointsCount > 2)
+        if (closed == 0 && PointsCount >= 2)
         {
             for (int capIdx = 0; capIdx < 2; capIdx++)
             {
