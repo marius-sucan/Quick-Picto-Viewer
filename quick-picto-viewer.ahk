@@ -1,4 +1,4 @@
-﻿; Script details:
+; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -20780,8 +20780,7 @@ HugeImagesDrawLineShapes() {
       roundCaps := DrawLineAreaCapsStyle
       If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
          roundCaps := (DrawLineAreaCapsStyle=3) ? 3 : 0
-      If (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1 && DrawLineAreaDoubles=1)
-         roundCaps := 0
+
 
       if (DrawLineAreaContourAlign!=2)
       {
