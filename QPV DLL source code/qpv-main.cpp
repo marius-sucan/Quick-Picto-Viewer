@@ -1786,14 +1786,19 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                     double px = -ny;
                     double py = nx;
 
-                    // Cap extends 'thickness' pixels beyond the endpoint
-                    double extX = pA.x + nx * thickness;
-                    double extY = pA.y + ny * thickness;
+                    // Start the cap 2 pixels earlier (overlap with the line) to prevent seams
+                    double startX = pA.x - nx * 2.0;
+                    double startY = pA.y - ny * 2.0;
+
+                    // Cap extends 'thickness' + 2 pixels beyond the endpoint,
+                    // making it 2 pixels longer
+                    double extX = pA.x + nx * (thickness + 2.0);
+                    double extY = pA.y + ny * (thickness + 2.0);
 
                     // Build the 4 corners of the box cap rectangle
                     cv::Point capRect[4];
-                    capRect[0] = cv::Point((int)round(pA.x + px * thickness), (int)round(pA.y + py * thickness));
-                    capRect[1] = cv::Point((int)round(pA.x - px * thickness), (int)round(pA.y - py * thickness));
+                    capRect[0] = cv::Point((int)round(startX + px * thickness), (int)round(startY + py * thickness));
+                    capRect[1] = cv::Point((int)round(startX - px * thickness), (int)round(startY - py * thickness));
                     capRect[2] = cv::Point((int)round(extX - px * thickness), (int)round(extY - py * thickness));
                     capRect[3] = cv::Point((int)round(extX + px * thickness), (int)round(extY + py * thickness));
 
