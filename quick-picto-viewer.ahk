@@ -20778,9 +20778,6 @@ HugeImagesDrawLineShapes() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
-      If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
-         roundCaps := (DrawLineAreaCapsStyle=3) ? 3 : 0
-
       if (DrawLineAreaContourAlign!=2)
       {
          opza := FillAreaEllipseSection
@@ -20818,12 +20815,6 @@ HugeImagesDrawLineShapes() {
             If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
                closed := 0
 
-            ; tempCrapValue := (zzpo=1) ? PointsCount - 1 : 0
-            ; fnOutputDebug("loooooooooool == " tempCrapValue)
-            ; zzpo := !zzpo
-            ; if (DrawLineAreaBlendMode>1)
-            ; zzpo:=0
-
             rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
             If (rzb=1 && DrawLineAreaDoubles=1)
                rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
@@ -20844,6 +20835,7 @@ HugeImagesDrawLineShapes() {
       }
 
       thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
+      fnOutputDebug("Draw lines in mask finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
          rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha)
@@ -49304,6 +49296,7 @@ ReadSettingsDrawLinesArea(act:=0) {
     RegAction(act, "DrawLineAreaBorderArcB",, 1)
     RegAction(act, "DrawLineAreaBorderArcC",, 1)
     RegAction(act, "DrawLineAreaBorderArcD",, 1)
+    RegAction(act, "DrawLineAreaJoinsStyle",, 1)
     RegAction(act, "DrawLineAreaBorderConnector",, 1)
     RegAction(act, "DrawLineAreaBorderCenter",, 2, 1, 8)
     RegAction(act, "DrawLineAreaSpiralCenterMode",, 2, 1, 3)
@@ -49340,7 +49333,7 @@ PanelDrawParametricLines() {
 
     If (viewportQPVimage.imgHandle)
     {
-       DrawLineAreaJoinsStyle :=  DrawLineAreaDashStyle := 1
+       DrawLineAreaDashStyle := 1
        DrawLineAreaContourAlign := 2
     }
 
