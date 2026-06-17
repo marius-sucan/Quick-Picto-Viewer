@@ -1699,7 +1699,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     //   closed        - 1 = close the polyline (last point -> first point)
     //   roundedJoins  - 1 = round joins, otherwise = miter joins
     //   fillMode      - value to write into the mask (1 = draw, 0 = erase)
-    //   roundCaps     - 2 = box/square caps, 3 = round caps (only for open paths)
+    //   roundCaps     - 1 = no caps; 2 = box/square caps, 3 = round caps (only for open paths)
     //   clipMode      - 2 = no clipping, 1/3 = clip against polygonOtherMaskMap
     //   offsetY       - vertical pixel offset applied during drawing
 
@@ -1743,6 +1743,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     // Create a temporary single-channel mask (8-bit) initialized to zero
     cv::Mat maskMat = cv::Mat::zeros((int)polyH, (int)polyW, CV_8UC1);
     const cv::Scalar drawColor(255);
+    const cv::Scalar drawBlackColor(0);
 
     if (roundedJoins == 1)
     {
@@ -1754,7 +1755,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
         // For an open path, handle cap styles at the two endpoints
         if (closed != 1 && PointsCount >= 2)
         {
-            if (roundCaps == 2)
+            if (roundCaps <= 2)
             {
                 // Box/square caps: extend the line at each endpoint by 'thickness' pixels
                 // and draw a filled rectangle for the cap
@@ -1793,14 +1794,16 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                     cv::Point capRect[4];
                     capRect[0] = cv::Point((int)round(pA.x + px * thickness), (int)round(pA.y + py * thickness));
                     capRect[1] = cv::Point((int)round(pA.x - px * thickness), (int)round(pA.y - py * thickness));
-                    capRect[2] = cv::Point((int)round(extX - px * thickness),  (int)round(extY - py * thickness));
-                    capRect[3] = cv::Point((int)round(extX + px * thickness),  (int)round(extY + py * thickness));
+                    capRect[2] = cv::Point((int)round(extX - px * thickness), (int)round(extY - py * thickness));
+                    capRect[3] = cv::Point((int)round(extX + px * thickness), (int)round(extY + py * thickness));
 
                     std::vector<std::vector<cv::Point>> capContour = { {capRect[0], capRect[1], capRect[2], capRect[3]} };
-                    cv::fillPoly(maskMat, capContour, drawColor);
+                    if (roundCaps == 2)
+                       cv::fillPoly(maskMat, capContour, drawColor);
+                    else
+                       cv::fillPoly(maskMat, capContour, drawBlackColor);
                 }
-            }
-            else if (roundCaps == 3)
+            } else if (roundCaps == 3)
             {
                 // Round caps: draw a filled circle at the endpoints
                 for (int capIdx = 0; capIdx < 2; capIdx++)

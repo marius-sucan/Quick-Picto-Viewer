@@ -1,4 +1,4 @@
-; Script details:
+﻿; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -20781,7 +20781,6 @@ HugeImagesDrawLineShapes() {
       If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
          roundCaps := (DrawLineAreaCapsStyle=3) ? 3 : 0
 
-
       if (DrawLineAreaContourAlign!=2)
       {
          opza := FillAreaEllipseSection
@@ -20827,10 +20826,7 @@ HugeImagesDrawLineShapes() {
 
             rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
             If (rzb=1 && DrawLineAreaDoubles=1)
-            {
-               kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
-            }
+               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
 
             Gdip_DeletePath(pPath)
             If (doClone=1 && rzb=1)
