@@ -1787,8 +1787,8 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                     double py = nx;
 
                     // Start the cap 2 pixels earlier (overlap with the line) to prevent seams
-                    double startX = pA.x - nx * 2.0;
-                    double startY = pA.y - ny * 2.0;
+                    double startX = (roundCaps == 2) ? pA.x - nx : pA.x - nx * 4.0;
+                    double startY = (roundCaps == 2) ? pA.y - ny : pA.y - ny * 4.0;
 
                     // Cap extends 'thickness' + 2 pixels beyond the endpoint,
                     // making it 2 pixels longer
@@ -1797,10 +1797,11 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 
                     // Build the 4 corners of the box cap rectangle
                     cv::Point capRect[4];
-                    capRect[0] = cv::Point((int)round(startX + px * thickness), (int)round(startY + py * thickness));
-                    capRect[1] = cv::Point((int)round(startX - px * thickness), (int)round(startY - py * thickness));
-                    capRect[2] = cv::Point((int)round(extX - px * thickness), (int)round(extY - py * thickness));
-                    capRect[3] = cv::Point((int)round(extX + px * thickness), (int)round(extY + py * thickness));
+                    int tk = (roundCaps == 2) ? thickness : thickness + 1;
+                    capRect[0] = cv::Point((int)round(startX + px * tk), (int)round(startY + py * tk));
+                    capRect[1] = cv::Point((int)round(startX - px * tk), (int)round(startY - py * tk));
+                    capRect[2] = cv::Point((int)round(extX - px * tk), (int)round(extY - py * tk));
+                    capRect[3] = cv::Point((int)round(extX + px * tk), (int)round(extY + py * tk));
 
                     std::vector<std::vector<cv::Point>> capContour = { {capRect[0], capRect[1], capRect[2], capRect[3]} };
                     if (roundCaps == 2)

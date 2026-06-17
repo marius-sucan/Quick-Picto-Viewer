@@ -20761,7 +20761,7 @@ HugeImagesDrawLineShapes() {
       o_imgSelX1 := imgSelX1,       o_imgSelY1 := imgSelY1
       o_imgSelX2 := imgSelX2,       o_imgSelY2 := imgSelY2
       tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
-      tk := Round(tk * 1.25) + 2
+      tk := Round(tk * 1.5) + 2
 
       pfcX := (imgSelX1 - tk<0) ? imgSelX1 - tk : 0
       pfcY := (imgSelY1 - tk<0) ? imgSelY1 - tk : 0
