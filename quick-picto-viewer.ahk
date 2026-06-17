@@ -20790,7 +20790,6 @@ HugeImagesDrawLineShapes() {
 
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign, "int", 0)
-      rza := rzq
       If (rzq=1)
       {
          otherThick := Round(thisThick*0.34)
@@ -20856,7 +20855,7 @@ HugeImagesDrawLineShapes() {
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         If (rza!=1)
+         If (rzq!=1)
             showTOOLtip("ERROR: Failed to draw the shape.`nLines mask preparation failed.")
          Else If (rzb!=1)
             showTOOLtip("ERROR: Failed to draw the shape.`nAn error occurred drawing the line segments.")
@@ -21002,8 +21001,8 @@ HugeImagesDrawParametricLines() {
       doCrop := (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7)) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
-      rza := DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
-      If (rza=1 && rzq=1)
+      ; rza := DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
+      If (rzq=1)
       {
          ppzX := ppzY := 0
          If (pfcY!=0)
@@ -21060,14 +21059,9 @@ HugeImagesDrawParametricLines() {
                If (outlier=0)
                {
                   rect := processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF, DrawLineAreaAtomizedGrid)
-                  rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0)
+                  rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0)
                   If (rzb=1 && DrawLineAreaDoubles=1)
-                  {
-                     DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", otherThick, "int", DrawLineAreaJoinsStyle)
-                     kThick := (DrawLineAreaCapsStyle=3 && DrawLineAreaJoinsStyle=1) ? thisThick : otherThick
-                     rzb := DllCall("qpvmain.dll\drawLineAllSegmentsMask", "UPtr", &PointsF, "int", PointsCount, "int", kThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick)
-                     DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
-                  }
+                     rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick)
 
                   If (DrawLineAreaAtomizedGrid=1 && rzb=1)
                      rzc := rzq := DllCall("qpvmain.dll\mergePolyMaskIntoHighDepthMask", "int", rect.x, "int", rect.y, "int", rect.x + rect.w, "int", rect.y + rect.h, "int", imgW, "int", imgH, "int", thisThick + 1)
@@ -21101,6 +21095,7 @@ HugeImagesDrawParametricLines() {
          }
       }
 
+      fnOutputDebug("Draw parametric lines in mask finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1 && DrawLineAreaAtomizedGrid=0 && abandonAll=1)
          rzc := 1

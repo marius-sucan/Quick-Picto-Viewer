@@ -1771,8 +1771,8 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     const int roiW = bbMaxX - bbMinX + 1;
     const int roiH = bbMaxY - bbMinY + 1;
 
-    // Keep each tile under 32 MB to limit peak temporary memory
-    const INT64 maxTileBytes = 32LL * 1024 * 1024;
+    // Keep each tile under 64 MB to limit peak temporary memory
+    const INT64 maxTileBytes = 64LL * 1024 * 1024;
     const int bandHeight = (roiW > 0)
         ? max(64, (int)min((INT64)roiH, maxTileBytes / (INT64)roiW))
         : roiH;
