@@ -2597,6 +2597,7 @@ RGBAColor calculateBlendModes(
   const int keepAlpha,
   const int bpp,
   const int opacity) {
+
     float rT, gT, bT;
     if (blendMode < 24)
        Orgb.a = (Orgb.a * (255 - opacity)) / 255;
@@ -2618,8 +2619,7 @@ RGBAColor calculateBlendModes(
           Orgb.a = max(Brgb.a - (255 - Orgb.a), 0);
 
        return (opa == 1) ? Orgb : Brgb;
-    }
-    else if (blendMode == 24 || blendMode == 100)
+    } else if (blendMode == 24 || blendMode == 100)
     {
        // replace bottom with top, with blending; conditional if blendMode=100
        int fB, fG, fR, fA;

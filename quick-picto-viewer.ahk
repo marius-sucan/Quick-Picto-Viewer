@@ -14226,7 +14226,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
          ppofYb += abs(imgSelY1)
          ppy1 := 0
       }
-   } else
+   } Else
    {
       ppofYa := ppofYb := ppx1 := ppy1 := 0
       ppx2 := w
@@ -20825,7 +20825,7 @@ HugeImagesDrawLineShapes() {
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
                rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
                If (rzb=1 && DrawLineAreaDoubles=1)
-                  rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
+                  rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
 
                Gdip_DeletePath(clonedPath)
             }
@@ -21001,7 +21001,6 @@ HugeImagesDrawParametricLines() {
       doCrop := (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7)) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
-      ; rza := DllCall("qpvmain.dll\prepareDrawLinesCapsGridMask", "int", thisThick, "int", DrawLineAreaJoinsStyle)
       If (rzq=1)
       {
          ppzX := ppzY := 0
