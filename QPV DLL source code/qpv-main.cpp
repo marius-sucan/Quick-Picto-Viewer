@@ -70,7 +70,7 @@ inline bool inRange(const int &low, const int &high, const int &x) {
     return (low <= x && x <= high);
 }
 
-int inline weighTwoValues(float A, float B, float w) {
+int inline weighTwoValues(const float &A, const float &B, const float &w) {
     if (w >= 1.0f)
        return A;
     else if (w <= 0.0f)
@@ -79,7 +79,7 @@ int inline weighTwoValues(float A, float B, float w) {
        return (w * (A - B) + B);
 }
 
-float inline weighTwoValues(float A, float B, float w, int r) {
+float inline weighTwoValues(const float &A, const float &B, const float &w, int &r) {
     if (w >= 1)
        return A;
     else if (w <= 0)
@@ -2372,7 +2372,7 @@ int fastRGBtoGray(int n) {
    // return (n&0xf0f0f0)*133637>>20&255;
 }
 
-int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
+int RGBtoGray(int &sR, int &sG, int &sB, int &alternateMode) {
   // https://getreuer.info/posts/colorspace/index.html
   // http://www.easyrgb.com/en/math.php
   // sR, sG and sB (Standard RGB) input range [0, 255]
@@ -2389,7 +2389,7 @@ int RGBtoGray(int sR, int sG, int sB, int alternateMode) {
   return round(L/2); // return derived luminosity in pseudo-LAB color space
 }
 
-double CieLab2Hue(double var_a, double var_b ) {
+double CieLab2Hue(double &var_a, double &var_b ) {
 // Function returns CIE-H° value
    double var_bias = 0;
    if ( var_a >= 0 && var_b == 0 ) return 0;
@@ -2564,7 +2564,7 @@ float CIEdeltaE2000(double Cl_1, double Ca_1, double Cb_1, double Cl_2, double C
   return sqrt(xDL*xDL + xDC*xDC + xDH*xDH + xRT * xDC * xDH);
 }
 
-auto RGBtoLAB(int sR, int sG, int sB) {
+auto RGBtoLAB(int &sR, int &sG, int &sB) {
   // https://getreuer.info/posts/colorspace/index.html
   // http://www.easyrgb.com/en/math.php
   // sR, sG and sB (Standard RGB) input range = 0 ÷ 255
@@ -2584,19 +2584,18 @@ auto RGBtoLAB(int sR, int sG, int sB) {
   Lab[0] = 116.0*Y - 16.0;
   Lab[1] = 500.0*(X - Y);
   Lab[2] = 200.0*(Y - Z);
-
   return Lab;
 }
 
 RGBAColor calculateBlendModes(
-  RGBAColor Orgb,
-  RGBAColor Brgb,
-  const int blendMode,
-  const int flipLayers,
-  const int linearGamma,
-  const int keepAlpha,
-  const int bpp,
-  const int opacity) {
+  RGBAColor &Orgb,
+  RGBAColor &Brgb,
+  const int &blendMode,
+  const int &flipLayers,
+  const int &linearGamma,
+  const int &keepAlpha,
+  const int &bpp,
+  const int &opacity) {
 
     float rT, gT, bT;
     if (blendMode < 24)
@@ -2920,7 +2919,7 @@ RGBAColor blendRGBAcolors(const RGBAColor &c1, const RGBAColor &c2) {
     return {outB, outG, outR, outA};
 }
 
-RGBAColor mixColorsFloodFill(RGBAColor colorB, RGBAColor colorA, float fillOpacity, int dynamicOpacity, int blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
+RGBAColor mixColorsFloodFill(RGBAColor &colorB, RGBAColor &colorA, float &fillOpacity, int dynamicOpacity, int &blendMode, float prevCLRindex, float tolerance, int alternateMode, float thisCLRindex, int linearGamma, int flipLayers) {
   int opacity = 0;
   if (dynamicOpacity==1)
   {
