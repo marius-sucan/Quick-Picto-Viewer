@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <numeric>
 #include <algorithm>
+#include <emmintrin.h> // SSE2 intrinsics for CalculateNewBlendModes
 #include <d2d1.h>
 #include <d2d1_3.h>
 #include <wincodec.h>
@@ -112,6 +113,12 @@ static int int_to_grayBi[65536];
 static int linear_to_gammaInt16[65536];
 static int gamma_to_linearInt16[65536];
 
+// LUTs for CalculateNewBlendModes (initialized in initWICnow)
+static unsigned char blend_degamma_lut[65536]; // maps fixed16 [0..65535] -> degamma'd byte [0..255]
+static float blend_gray_R_float[256];          // r -> grayscale contribution as float [0..1]
+static float blend_gray_G_float[256];          // g -> grayscale contribution as float [0..1]
+static float blend_gray_B_float[256];          // b -> grayscale contribution as float [0..1]
+
 static double LUT_X_R[256];
 static double LUT_X_G[256];
 static double LUT_X_B[256];
@@ -200,6 +207,19 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
         linear_to_gammaInt16[i] = result;
         result = (int)(pow(int_to_float[i], GAMMA)*65535.0f + 0.5f);
         gamma_to_linearInt16[i] = result;
+    }
+
+    // Initialize LUTs for CalculateNewBlendModes
+    static const float invGAMMA = 1.0f / GAMMA;
+    for (int i = 0; i < 65536; i++) {
+        float v = (float)i / 65535.0f;
+        blend_degamma_lut[i] = (unsigned char)(pow(v, invGAMMA) * 255.0f + 0.5f);
+    }
+    for (int i = 0; i < 256; i++) {
+        float f = i / 255.0f;
+        blend_gray_R_float[i] = f * 0.299701f;
+        blend_gray_G_float[i] = f * 0.587130f;
+        blend_gray_B_float[i] = f * 0.114180f;
     }
 
     return (SUCCEEDED(hr)) ? 1 : 0;
@@ -2875,6 +2895,423 @@ RGBAColor calculateBlendModes(
     result.r = (unsigned char)(rT * 255.0f + 0.5f);
     result.g = (unsigned char)(gT * 255.0f + 0.5f);
     result.b = (unsigned char)(bT * 255.0f + 0.5f);
+    if (keepAlpha == 1 && oA != -1)
+       result.a = oA;
+    return result;
+}
+
+// ============================================================================
+// CalculateNewBlendModes - Optimized blend mode computation
+// Written from scratch with the same logic as calculateBlendModes, but with:
+//   1. SSE2 SIMD for parallel RGB channel processing
+//   2. pow() eliminated via precomputed blend_degamma_lut[]
+//   3. Integer-only fast path for Normal blend (mode 0/25) without linear gamma
+//   4. Combined grayscale float LUTs for luminosity/ghosting
+//   5. Parameters by value to avoid pointer indirection
+//   6. Branchless clamp via SSE2 min/max intrinsics
+//   7. Reciprocal approximation instead of float division
+// ============================================================================
+
+
+// Helper: pack 3 floats into __m128 with zero in lane 3
+static inline __m128 blend_pack3(float r, float g, float b) {
+    return _mm_set_ps(0.0f, b, g, r);
+}
+
+// Helper: clamp __m128 to [0, 1]
+static inline __m128 blend_clamp01(__m128 v) {
+    v = _mm_max_ps(v, _mm_setzero_ps());
+    v = _mm_min_ps(v, _mm_set1_ps(1.0f));
+    return v;
+}
+
+// Helper: extract float from lane 0, 1, 2
+static inline float blend_lane0(__m128 v) { float r; _mm_store_ss(&r, v); return r; }
+static inline float blend_lane1(__m128 v) { float r; __m128 s = _mm_shuffle_ps(v, v, _MM_SHUFFLE(1,1,1,1)); _mm_store_ss(&r, s); return r; }
+static inline float blend_lane2(__m128 v) { float r; __m128 s = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2,2,2,2)); _mm_store_ss(&r, s); return r; }
+
+// Helper: convert __m128 float [0..1] channels to bytes, using degamma LUT if needed
+static inline void blend_to_bytes(__m128 v, int linearGamma, int &outR, int &outG, int &outB) {
+    if (linearGamma == 1) {
+        // Use precomputed degamma LUT: float [0,1] -> fixed16 index -> byte
+        float rr = blend_lane0(v);
+        float gg = blend_lane1(v);
+        float bb = blend_lane2(v);
+        int ir = (int)(rr * 65535.0f + 0.5f);
+        int ig = (int)(gg * 65535.0f + 0.5f);
+        int ib = (int)(bb * 65535.0f + 0.5f);
+        ir = (ir < 0) ? 0 : (ir > 65535) ? 65535 : ir;
+        ig = (ig < 0) ? 0 : (ig > 65535) ? 65535 : ig;
+        ib = (ib < 0) ? 0 : (ib > 65535) ? 65535 : ib;
+        outR = blend_degamma_lut[ir];
+        outG = blend_degamma_lut[ig];
+        outB = blend_degamma_lut[ib];
+    } else {
+        outR = (int)(blend_lane0(v) * 255.0f + 0.5f);
+        outG = (int)(blend_lane1(v) * 255.0f + 0.5f);
+        outB = (int)(blend_lane2(v) * 255.0f + 0.5f);
+    }
+}
+
+// Helper: compute grayscale luminance as a float in [0..1]
+static inline float blend_grayscale_float(int r, int g, int b) {
+    return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
+}
+
+RGBAColor CalculateNewBlendModes(
+  RGBAColor Orgb,
+  RGBAColor Brgb,
+  int blendMode,
+  int flipLayers,
+  int linearGamma,
+  int keepAlpha,
+  int bpp,
+  int opacity) {
+
+    // ---------- Special modes: Replace / Replace-with-blend / Alpha-clip ----------
+    // These modes exit early and don't go through the normal blend pipeline.
+
+    if (blendMode < 24)
+       Orgb.a = (Orgb.a * (255 - opacity)) / 255;
+
+    const int oA = (blendMode >= 23 || blendMode == 0) ? -1 : Brgb.a;
+
+    if (blendMode == 34 || blendMode == 110) {
+       // Replace bottom with top, no blending; conditional if blendMode=110
+       int opa = (blendMode == 34 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
+       if (bpp != 32 && opa == 1) {
+          const int invA = 255 - Orgb.a;
+          Orgb.r = max(Orgb.r - invA, 0);
+          Orgb.g = max(Orgb.g - invA, 0);
+          Orgb.b = max(Orgb.g - invA, 0); // Keep original compatibility
+       }
+       if (keepAlpha == 1)
+          Orgb.a = max(Brgb.a - (255 - Orgb.a), 0);
+
+       return (opa == 1) ? Orgb : Brgb;
+    }
+    else if (blendMode == 24 || blendMode == 100) {
+       // Replace bottom with top, with blending; conditional if blendMode=100
+       const int opa = (blendMode == 24 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
+       if (opa != 1)
+          return Brgb;
+
+       const float f = char_to_float[255 - opacity];
+       int fR, fG, fB, fA;
+       if (linearGamma == 1) {
+          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
+          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
+          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
+          fA = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.a], gamma_to_linear[Brgb.a], f)];
+       } else {
+          fR = weighTwoValues(Orgb.r, Brgb.r, f);
+          fG = weighTwoValues(Orgb.g, Brgb.g, f);
+          fB = weighTwoValues(Orgb.b, Brgb.b, f);
+          fA = weighTwoValues(Orgb.a, Brgb.a, f);
+       }
+       if (keepAlpha == 1)
+          fA = max(fA - (255 - Brgb.a), 0);
+
+       return {fB, fG, fR, fA};
+    }
+    else if (blendMode == 23) {
+       // Clip top to alpha channel of bottom
+       const float f = char_to_float[Orgb.a];
+       int fR, fG, fB;
+       if (linearGamma == 1) {
+          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
+          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
+          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
+       } else {
+          fR = weighTwoValues(Orgb.r, Brgb.r, f);
+          fG = weighTwoValues(Orgb.g, Brgb.g, f);
+          fB = weighTwoValues(Orgb.b, Brgb.b, f);
+       }
+       return {fB, fG, fR, Brgb.a};
+    }
+
+    // ---------- Layer swap for flip / behind mode ----------
+    const bool do_swap = (flipLayers == 1 && blendMode > 0) || (blendMode == 25 && bpp == 32);
+    if (do_swap) {
+       RGBAColor tmp = Orgb;
+       Orgb = Brgb;
+       Brgb = tmp;
+    }
+
+    // ---------- Early exits for fully transparent layers ----------
+    if (Orgb.a == 0) {
+       if (keepAlpha == 1 && flipLayers == 1 && oA != -1 && (blendMode >= 1 && blendMode <= 22))
+          Brgb.a = oA;
+       return Brgb;
+    }
+
+    if ((Brgb.a == 0) || (Orgb.a == 255 && (blendMode == 0 || blendMode == 25))) {
+       if (keepAlpha == 1 && oA != -1)
+          Orgb.a = oA;
+       return Orgb;
+    }
+
+    // ---------- INTEGER FAST PATH: Normal blend (mode 0/25), no linear gamma ----------
+    // This is the most common path. Pure integer math, no floats at all.
+    if ((blendMode == 0 || blendMode == 25) && linearGamma == 0) {
+       // Porter-Duff "source over" in integer arithmetic
+       // result.a = sa + da*(1-sa)/255
+       // result.c = (sa*Oc + da*(255-sa)*Bc/255) / result.a
+       const int sa = Orgb.a;
+       const int da = Brgb.a;
+       const int resultA = sa + ((da * (255 - sa)) / 255);
+
+       if (resultA == 0)
+          return {0, 0, 0, 0};
+
+       // Use (sa * 256 / resultA) as a fixed-point weight to avoid division per-channel
+       // Multiply by 65536 for precision, then shift down
+       const int sa_scaled = (sa * 65536) / resultA;
+       const int da_1_sa_scaled = 65536 - sa_scaled;
+
+       int rR = (sa_scaled * Orgb.r + da_1_sa_scaled * Brgb.r + 32768) >> 16;
+       int rG = (sa_scaled * Orgb.g + da_1_sa_scaled * Brgb.g + 32768) >> 16;
+       int rB = (sa_scaled * Orgb.b + da_1_sa_scaled * Brgb.b + 32768) >> 16;
+
+       RGBAColor result;
+       result.r = (rR < 0) ? 0 : (rR > 255) ? 255 : rR;
+       result.g = (rG < 0) ? 0 : (rG > 255) ? 255 : rG;
+       result.b = (rB < 0) ? 0 : (rB > 255) ? 255 : rB;
+       result.a = resultA;
+       if (keepAlpha == 1 && oA != -1)
+          result.a = oA;
+       return result;
+    }
+
+    // ---------- SIMD BLEND PATH for all other modes ----------
+    // Compute result alpha (shared across all modes)
+    RGBAColor result = {0, 0, 0, 0};
+    result.a = Orgb.a + ((255 - Orgb.a) * Brgb.a) / 255;
+
+    // Select the correct LUT for gamma mode
+    const float* const lut = (linearGamma == 1) ? char_to_floatGamma : char_to_float;
+
+    // Load source and destination as SIMD floats: {R, G, B, 0}
+    const __m128 vO = blend_pack3(lut[Orgb.r], lut[Orgb.g], lut[Orgb.b]);
+    const __m128 vB = blend_pack3(lut[Brgb.r], lut[Brgb.g], lut[Brgb.b]);
+
+    // Precompute common SIMD constants
+    const __m128 vOne  = _mm_set1_ps(1.0f);
+    const __m128 vHalf = _mm_set1_ps(0.5f);
+    const __m128 vTwo  = _mm_set1_ps(2.0f);
+    const __m128 vZero = _mm_setzero_ps();
+
+    __m128 vT; // blended result
+
+    switch (blendMode) {
+        case 0:
+        case 25: // normal / behind
+            vT = vO;
+            break;
+
+        case 1: // darken
+            vT = _mm_min_ps(vO, vB);
+            break;
+
+        case 2: // multiply
+            vT = _mm_mul_ps(vO, vB);
+            break;
+
+        case 3: // linear burn: O + B - 1
+            vT = _mm_sub_ps(_mm_add_ps(vO, vB), vOne);
+            break;
+
+        case 4: { // color burn: (O > 0) ? 1 - (1-B)/O : 0
+            // Compute 1 - (1-B)/O for all lanes
+            __m128 numer = _mm_sub_ps(vOne, vB);
+            __m128 quot  = _mm_div_ps(numer, _mm_max_ps(vO, _mm_set1_ps(1e-10f)));
+            __m128 raw   = _mm_sub_ps(vOne, quot);
+            // Where O == 0, result is 0
+            __m128 mask = _mm_cmpgt_ps(vO, vZero);
+            vT = _mm_and_ps(raw, mask);
+            break;
+        }
+
+        case 5: // lighten
+            vT = _mm_max_ps(vO, vB);
+            break;
+
+        case 6: // screen: 1 - (1-B)(1-O)
+            vT = _mm_sub_ps(vOne, _mm_mul_ps(_mm_sub_ps(vOne, vB), _mm_sub_ps(vOne, vO)));
+            break;
+
+        case 7: // linear dodge (add): O + B
+            vT = _mm_add_ps(vO, vB);
+            break;
+
+        case 8: { // hard light: O<0.5 ? 2*O*B : 1-2*(1-O)*(1-B)
+            __m128 lo = _mm_mul_ps(vTwo, _mm_mul_ps(vO, vB));
+            __m128 hi = _mm_sub_ps(vOne, _mm_mul_ps(vTwo, _mm_mul_ps(_mm_sub_ps(vOne, vO), _mm_sub_ps(vOne, vB))));
+            __m128 mask = _mm_cmplt_ps(vO, vHalf);
+            vT = _mm_or_ps(_mm_and_ps(mask, lo), _mm_andnot_ps(mask, hi));
+            break;
+        }
+
+        case 9: { // soft light B
+            const float* const lut_sqrt = (linearGamma == 1) ? char_to_floatGamma_sqrt : char_to_float_sqrt;
+            __m128 vBsqrt = blend_pack3(lut_sqrt[Brgb.r], lut_sqrt[Brgb.g], lut_sqrt[Brgb.b]);
+            // lo: (1-2O)*B^2 + 2*B*O
+            __m128 twoO = _mm_mul_ps(vTwo, vO);
+            __m128 lo = _mm_add_ps(
+                _mm_mul_ps(_mm_sub_ps(vOne, twoO), _mm_mul_ps(vB, vB)),
+                _mm_mul_ps(vTwo, _mm_mul_ps(vB, vO))
+            );
+            // hi: 2*B*(1-O) + sqrt(B)*(2*O-1)
+            __m128 hi = _mm_add_ps(
+                _mm_mul_ps(vTwo, _mm_mul_ps(vB, _mm_sub_ps(vOne, vO))),
+                _mm_mul_ps(vBsqrt, _mm_sub_ps(twoO, vOne))
+            );
+            __m128 mask = _mm_cmplt_ps(vO, vHalf);
+            vT = _mm_or_ps(_mm_and_ps(mask, lo), _mm_andnot_ps(mask, hi));
+            break;
+        }
+
+        case 10: { // overlay: B<0.5 ? 2*O*B : 1-2*(1-O)*(1-B)
+            __m128 lo = _mm_mul_ps(vTwo, _mm_mul_ps(vO, vB));
+            __m128 hi = _mm_sub_ps(vOne, _mm_mul_ps(vTwo, _mm_mul_ps(_mm_sub_ps(vOne, vO), _mm_sub_ps(vOne, vB))));
+            __m128 mask = _mm_cmplt_ps(vB, vHalf); // Note: test on B, not O (difference from hard light)
+            vT = _mm_or_ps(_mm_and_ps(mask, lo), _mm_andnot_ps(mask, hi));
+            break;
+        }
+
+        case 11: { // hard mix: O <= (1-B) ? 0 : 1
+            __m128 mask = _mm_cmpgt_ps(_mm_add_ps(vO, vB), vOne);
+            vT = _mm_and_ps(mask, vOne);
+            break;
+        }
+
+        case 12: // linear light: B + 2*O - 1
+            vT = _mm_sub_ps(_mm_add_ps(vB, _mm_mul_ps(vTwo, vO)), vOne);
+            break;
+
+        case 13: { // color dodge: O < 1 ? B/(1-O) : 1
+            __m128 denom = _mm_sub_ps(vOne, vO);
+            __m128 raw = _mm_div_ps(vB, _mm_max_ps(denom, _mm_set1_ps(1e-10f)));
+            __m128 mask = _mm_cmplt_ps(vO, vOne);
+            vT = _mm_or_ps(_mm_and_ps(mask, raw), _mm_andnot_ps(mask, vOne));
+            break;
+        }
+
+        case 14: { // vivid light
+            // O < 0.5:  (O > 0) ? 1-(1-B)/(2*O) : 0
+            // O >= 0.5: (O < 1) ? B/(2*(1-O)) : 1
+            __m128 twoO = _mm_mul_ps(vTwo, vO);
+            __m128 twoInvO = _mm_mul_ps(vTwo, _mm_sub_ps(vOne, vO));
+            __m128 small_eps = _mm_set1_ps(1e-10f);
+
+            // Low half: 1 - (1-B)/(2*O)
+            __m128 lo_raw = _mm_sub_ps(vOne, _mm_div_ps(_mm_sub_ps(vOne, vB), _mm_max_ps(twoO, small_eps)));
+            __m128 lo_valid = _mm_cmpgt_ps(vO, vZero);
+            __m128 lo = _mm_and_ps(lo_raw, lo_valid);
+
+            // High half: B/(2*(1-O))
+            __m128 hi_raw = _mm_div_ps(vB, _mm_max_ps(twoInvO, small_eps));
+            __m128 hi_valid = _mm_cmplt_ps(vO, vOne);
+            __m128 hi = _mm_or_ps(_mm_and_ps(hi_valid, hi_raw), _mm_andnot_ps(hi_valid, vOne));
+
+            __m128 mask = _mm_cmplt_ps(vO, vHalf);
+            vT = _mm_or_ps(_mm_and_ps(mask, lo), _mm_andnot_ps(mask, hi));
+            break;
+        }
+
+        case 15: // average: (B + O) * 0.5
+            vT = _mm_mul_ps(_mm_add_ps(vB, vO), vHalf);
+            break;
+
+        case 16: { // divide: O > 0 ? B/O : 1
+            __m128 raw = _mm_div_ps(vB, _mm_max_ps(vO, _mm_set1_ps(1e-10f)));
+            __m128 mask = _mm_cmpgt_ps(vO, vZero);
+            vT = _mm_or_ps(_mm_and_ps(mask, raw), _mm_andnot_ps(mask, vOne));
+            break;
+        }
+
+        case 17: // exclusion: O + B - 2*O*B
+            vT = _mm_sub_ps(_mm_add_ps(vO, vB), _mm_mul_ps(vTwo, _mm_mul_ps(vO, vB)));
+            break;
+
+        case 18: { // difference: |B - O|
+            __m128 diff = _mm_sub_ps(vB, vO);
+            // SSE2 abs: max(x, -x) since there's no _mm_abs_ps in SSE2
+            vT = _mm_max_ps(diff, _mm_sub_ps(vZero, diff));
+            break;
+        }
+
+        case 19: // subtract: B - O
+            vT = _mm_sub_ps(vB, vO);
+            break;
+
+        case 20: { // luminosity: lO + B - lB
+            const float lO = blend_grayscale_float(Orgb.r, Orgb.g, Orgb.b);
+            const float lB = blend_grayscale_float(Brgb.r, Brgb.g, Brgb.b);
+            __m128 vDelta = _mm_set1_ps(lO - lB);
+            vT = _mm_add_ps(vB, vDelta);
+            break;
+        }
+
+        case 21: { // ghosting: lB - lO + B + O*0.2
+            const float lO = blend_grayscale_float(Orgb.r, Orgb.g, Orgb.b);
+            const float lB = blend_grayscale_float(Brgb.r, Brgb.g, Brgb.b);
+            __m128 vDelta = _mm_set1_ps(lB - lO);
+            vT = _mm_add_ps(_mm_add_ps(vDelta, vB), _mm_mul_ps(vO, _mm_set1_ps(0.2f)));
+            break;
+        }
+
+        case 22: { // inverted difference: 1 - |O - B|
+            __m128 diff = _mm_sub_ps(vO, vB);
+            __m128 absDiff = _mm_max_ps(diff, _mm_sub_ps(vZero, diff));
+            vT = _mm_sub_ps(vOne, absDiff);
+            break;
+        }
+
+        default:
+            vT = vO;
+            break;
+    }
+
+    // ---------- Clamp to [0, 1] (branchless via SSE2) ----------
+    vT = blend_clamp01(vT);
+
+    // ---------- Mix back with bottom when bottom is semi-transparent ----------
+    const float sa = char_to_float[Orgb.a];
+    const float da = char_to_float[Brgb.a];
+
+    const bool mix = (keepAlpha != 1 || blendMode >= 22 || blendMode < 2);
+    if (Brgb.a < 255 && blendMode > 0 && mix) {
+       const float w = 1.0f - da;
+       if (w >= 1.0f) {
+          vT = vO;
+       } else if (w > 0.0f) {
+          __m128 vW = _mm_set1_ps(w);
+          vT = _mm_add_ps(vT, _mm_mul_ps(vW, _mm_sub_ps(vO, vT)));
+       }
+    }
+
+    // ---------- Alpha composite the RGB channels (SIMD) ----------
+    const float da_1_sa = da * (1.0f - sa);
+    const float ra = sa + da_1_sa;
+    // Use SSE2 reciprocal approximation (1 Newton-Raphson iteration for accuracy)
+    __m128 vRa = _mm_set_ss(ra);
+    __m128 vInvRa_approx = _mm_rcp_ss(vRa);
+    // One NR iteration: inv = inv * (2 - ra * inv)
+    __m128 vRefine = _mm_mul_ss(vRa, vInvRa_approx);
+    vRefine = _mm_sub_ss(_mm_set_ss(2.0f), vRefine);
+    vInvRa_approx = _mm_mul_ss(vInvRa_approx, vRefine);
+    float inv_ra;
+    _mm_store_ss(&inv_ra, vInvRa_approx);
+
+    __m128 vSa    = _mm_set1_ps(sa);
+    __m128 vDa1Sa = _mm_set1_ps(da_1_sa);
+    __m128 vInvRa = _mm_set1_ps(inv_ra);
+    vT = _mm_mul_ps(_mm_add_ps(_mm_mul_ps(vSa, vT), _mm_mul_ps(vDa1Sa, vB)), vInvRa);
+
+    // ---------- Convert to bytes (with degamma LUT if linear gamma) ----------
+    blend_to_bytes(vT, linearGamma, result.r, result.g, result.b);
+
     if (keepAlpha == 1 && oA != -1)
        result.a = oA;
     return result;
