@@ -419,13 +419,15 @@ For best results, pBitmapMask should be grayscale.
 */
 
 DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel) {
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        unsigned char alpha, alpha2;
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
-            INT64 px = CalcPixOffset(x, y, Stride, bpp);
+            unsigned char alpha, alpha2;
+            INT64 px = ky + (INT64)x * bpc;
             if (whichChannel==2)
                alpha = maskData[px + 1]; // green
             else if (whichChannel==3)
@@ -451,12 +453,13 @@ DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsig
 }
 
 DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int newColor, int invert) {
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * w;
+        for (int x = 0; x < w; x++)
         {
-            INT64 px = x + y * w;
+            INT64 px = x + ky;
             unsigned char alpha1 = (imageData[px] >> 16) & 0xFF; // red
             alpha1 = (invert==1) ? 255 - alpha1 : alpha1;
             unsigned char alpha2 = (newColor >> 24) & 0xFF; // alpha
@@ -468,12 +471,14 @@ DLL_API int DLL_CALLCONV SetColorAlphaChannel(int *imageData, int w, int h, int 
 }
 
 DLL_API int DLL_CALLCONV AlterBitmapAlphaChannel(unsigned char *imageData, int w, int h, int Stride, int bpp, int level, int replaceAlpha) {
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
-            INT64 px = CalcPixOffset(x, y, Stride, bpp);
+            INT64 px = ky + (INT64)x * bpc;
             if (imageData[px + 3]==0)
                continue;
 
@@ -3078,10 +3083,12 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
     int loopsOccured = 0;
     int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
     fnOutputDebug("ReplaceGivenColor: simpleMode=" + std::to_string(simpleMode) + " ; o=" + std::to_string(opacity) + " ; t=" + std::to_string(tolerance) + " ; b=" + std::to_string(blendMode) + " ; c=" + std::to_string(cartoonMode));
-    #pragma omp parallel for schedule(static) default(none) shared(loopsOccured)  // num_threads(3)
-    for (int zx = 0; zx < w; zx++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(static) shared(loopsOccured)
+    for (int zy = 0; zy < h; zy++)
     {
-        for (int zy = 0; zy < h; zy++)
+        INT64 ky = (INT64)zy * Stride;
+        for (int zx = 0; zx < w; zx++)
         {
             if (useSelArea==1)
             {
@@ -3092,7 +3099,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
             float index = -4100;
             RGBAColor oldColor = prevColor;
             RGBAColor thisColor = {0, 0, 0, 0};
-            INT64 o = CalcPixOffset(zx, zy, Stride, bpp);
+            INT64 o = ky + (INT64)zx * bpc;
             int oA = (bpp==32) ? imageData[3 + o] : 255;
             int oR = imageData[2 + o];
             int oG = imageData[1 + o];
@@ -3279,12 +3286,13 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
 
 DLL_API int DLL_CALLCONV FillImageHoles(int *imageData, int w, int h, int newColor) {
     // fnOutputDebug("FillImageHoles newColor = " + std::to_string(newColor));
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * w;
+        for (int x = 0; x < w; x++)
         {
-            const int px = x * h + y;
+            INT64 px = x + ky;
             int a = (imageData[px] >> 24) & 0xFF;
             if (a<2)
                imageData[px] = newColor;
@@ -3298,18 +3306,18 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
     // this helps mitigate the dark hallows that emerge when applying blur on images with areas that are fully transparent 
     // the function can also be used to specify an opacity/alpha level of the image
 
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        INT64 px, y = 0;
+        INT64 ky = (INT64)y * w;
         int defaultColor = 0;
-        UINT bgrColor = imageData[x + y * w];
+        UINT bgrColor = imageData[ky];
         if (bgrColor!=0x0)
            defaultColor = bgrColor & 0x00ffffff;
 
-        for (y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
         {
-            px = x + y * w;
+            INT64 px = x + ky;
             bgrColor = imageData[px];
             if (bgrColor==0x0 && defaultColor)
                imageData[px] = (givenLevel << 24) | defaultColor;
@@ -3321,18 +3329,18 @@ DLL_API int DLL_CALLCONV PrepareAlphaChannelBlur(int *imageData, int w, int h, i
         }
     }
 
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = w - 1; x >= 0; x--)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = h - 1; y >= 0; y--)
     {
-        int px, y = h - 1;
+        INT64 ky = (INT64)y * w;
         int defaultColor = 0;
-        UINT bgrColor = imageData[x + y * w];
+        UINT bgrColor = imageData[(w - 1) + ky];
         if (bgrColor!=0x0)
            defaultColor = bgrColor & 0x00ffffff;
 
-        for (y = h - 1; y >= 0; y--)
+        for (int x = w - 1; x >= 0; x--)
         {
-            px = x + y * w;
+            INT64 px = x + ky;
             bgrColor = imageData[px];
             if (bgrColor==0x0 && defaultColor)
                imageData[px] = (givenLevel << 24) | defaultColor;
@@ -3347,12 +3355,14 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
     // pBitmap and pBitmap2Blend must be the same width and height
     // and in 32-ARGB or 24-RGB format.
 
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = ky + (INT64)x * bpc;
             int aB = (bpp==32) ? bgrImageData[3 + o] : 255;
             int aO = (bpp==32) ? otherData[3 + o] : 255;
             RGBAColor Brgb = {bgrImageData[o], bgrImageData[o + 1], bgrImageData[o + 2], aB};
@@ -3375,16 +3385,18 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
     // #pragma omp parallel for default(none) num_threads(threadz)
     time_t nTime;
     srand((unsigned) time(&nTime));
-    for (int x = 0; x < w; x++)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * w;
+        for (int x = 0; x < w; x++)
         {
+            INT64 px = x + ky;
             unsigned char aT = 255;
             unsigned char z = rand() % 101;
             if (z<intensity)
             {
                // unsigned char rT = 0;
-               bgrImageData[x + (y * w)] = (fillBgr!=1) ? 0 : (255 << 24) | (0 << 16) | (0 << 8) | 0;
+               bgrImageData[px] = (fillBgr!=1) ? 0 : (255 << 24) | (0 << 16) | (0 << 8) | 0;
                continue;
             }
 
@@ -3393,11 +3405,11 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
                unsigned char rT = rand() % 256;
                unsigned char gT = rand() % 256;
                unsigned char bT = rand() % 256;
-               bgrImageData[x + (y * w)] = (aT << 24) | (rT << 16) | (gT << 8) | bT;
+               bgrImageData[px] = (aT << 24) | (rT << 16) | (gT << 8) | bT;
             } else
             {
                unsigned char rT = rand() % 256;
-               bgrImageData[x + (y * w)] = (aT << 24) | (rT << 16) | (rT << 8) | rT;
+               bgrImageData[px] = (aT << 24) | (rT << 16) | (rT << 8) | rT;
             }
         }
     }
@@ -3425,14 +3437,15 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)h), 0.0f, (float)mh - 1.0f);
 
         // fnOutputDebug("add noise step 0");
-        #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-        for (int x = 0; x < mw; x++)
+        #pragma omp parallel for schedule(dynamic)
+        for (int y = 0; y < mh; y++)
         {
+            INT64 ky = (INT64)y * StrideMini;
             // prepare the noise bitmap
-            for (int y = 0; y < mh; y++)
+            for (int x = 0; x < mw; x++)
             {
                 unsigned char z = rand() % 101;
-                INT64 o = CalcPixOffset(x, y, StrideMini, 24);
+                INT64 o = ky + (INT64)x * 3;
                 if (z<intensity)
                 {
                    newBitmap[2 + o] = 128;
@@ -3457,23 +3470,28 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         }
 
         // fnOutputDebug("add noise step 1");
-        #pragma omp parallel for schedule(dynamic) default(none)
-        for (int x = 0; x < w; x++)
+        const int bpc = bpp / 8;
+        #pragma omp parallel for schedule(dynamic)
+        for (int y = 0; y < h; y++)
         {
-            for (int y = 0; y < h; y++)
+            INT64 ky = (INT64)y * Stride;
+            int py = pixelzMapH[y];
+            INT64 ky_mini = (INT64)py * StrideMini;
+            for (int x = 0; x < w; x++)
             {
                 if (clipMaskFilter(x, y, NULL, 0)==1)
                    continue;
 
-                if (pixelzMapW[x]>=mw || pixelzMapH[y]>=mh || pixelzMapW[x]<0 || pixelzMapH[y]<0)
+                int px = pixelzMapW[x];
+                if (px>=mw || py>=mh || px<0 || py<0)
                    continue;
 
-                INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, 24);
+                INT64 on = ky_mini + (INT64)px * 3;
                 RGBAColor Orgb = {newBitmap[2 + on], newBitmap[1 + on], newBitmap[on], 255};
                 if (Orgb.r==128 && Orgb.g==128 && Orgb.b==128)
                    continue;
      
-                INT64 o = CalcPixOffset(x, y, Stride, bpp);
+                INT64 o = ky + (INT64)x * bpc;
                 int oA = (bpp==32) ? bgrImageData[3 + o] : 255;
                 RGBAColor Brgb = {bgrImageData[o], bgrImageData[1 + o], bgrImageData[2 + o], oA};
                 RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 1, bpp, opacity);
@@ -3490,10 +3508,12 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
     }
 
     // fnOutputDebug("add noise step 3");
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
             unsigned char nR, nG, nB;
             unsigned char z = rand() % 101;
@@ -3503,7 +3523,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             if (clipMaskFilter(x, y, NULL, 0)==1)
                continue;
 
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = ky + (INT64)x * bpc;
             if (doGrayScale==1)
             {
                unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
@@ -3525,7 +3545,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             bgrImageData[1 + o] = newColor.g;
             bgrImageData[o]     = newColor.b;
             if (bpp==32)
-               bgrImageData[o] = newColor.a;
+               bgrImageData[3 + o] = newColor.a;
         }
     }
 
@@ -3767,16 +3787,18 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
 // r := 0.29970, g := 0.587130, b := 0.114180
 
     const float fintensity = intensity/100.0f;
-    #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
             int G;
             if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
                continue;
 
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = ky + (INT64)x * bpc;
             int zR = BitmapData[2 + o];
             int zG = BitmapData[1 + o];
             int zB = BitmapData[o];
@@ -3962,11 +3984,11 @@ DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int
     time_t nTime;
     srand((unsigned) time(&nTime));
 
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
-    for (int x = 0; x < w; x++)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        INT64 kx = (INT64)x * bpc;
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
             int oA = 255;
             int oR, oG, oB;
@@ -3974,7 +3996,7 @@ DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int
                continue;
 
             // INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            INT64 o = (INT64)y * Stride + kx;
+            INT64 o = ky + (INT64)x * bpc;
             if (bpp==32)
             {
                oA = BitmapData[3 + o];
@@ -4141,11 +4163,11 @@ DLL_API int DLL_CALLCONV AdjustImageColors(unsigned char *BitmapData, int w, int
     srand((unsigned) time(&nTime));
     float saturateFactor = (saturation<0) ? (65535.0f - abs(saturation))/131070.0f : 0.5f + saturation/131070.0f;
     float fintensity = char_to_float[opacity];
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(8)
-    for (int x = 0; x < w; x++)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        INT64 kx = (INT64)x * bpc;
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
             int oA = 255;
             int oR, oG, oB;
@@ -4153,7 +4175,7 @@ DLL_API int DLL_CALLCONV AdjustImageColors(unsigned char *BitmapData, int w, int
                continue;
 
             // INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            INT64 o = (INT64)y * Stride + kx;
+            INT64 o = ky + (INT64)x * bpc;
             if (bpp==32)
             {
                oA = BitmapData[3 + o];
@@ -4217,15 +4239,17 @@ DLL_API int DLL_CALLCONV AdjustImageColors(unsigned char *BitmapData, int w, int
 }
 
 DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsigned char *newBitmap, unsigned char *maskBitmap, int invert, int w, int h, int maskOpacity, int invertMaskOpacity, int Stride, int bpp, int linearGamma, int whichChannel) {
-    #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
             int nA = 1;
             int oA = 1;
             int intensity = 0;
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = ky + (INT64)x * bpc;
             if (maskBitmap!=NULL)
             {
                intensity = (invert==1) ? 255 - maskBitmap[o + whichChannel] : maskBitmap[o + whichChannel];
@@ -4704,19 +4728,24 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
     // fnOutputDebug("PixelateHugeBitmap step 1; min = " + std::to_string( pixelzMapW[0] ) + " x " + std::to_string( pixelzMapH[0] ));
     // fnOutputDebug("PixelateHugeBitmap step 1; max = " + std::to_string( pixelzMapW[w] ) + " x " + std::to_string( pixelzMapH[h] ));
     maskOpacity = 255 - maskOpacity;
-    #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        int py = pixelzMapH[y];
+        INT64 ky_mini = (INT64)py * StrideMini;
+        for (int x = 0; x < w; x++)
         {
             if (clipMaskFilter(x, y, NULL, 0)==1)
                continue;
 
-            if (pixelzMapW[x]>=mw || pixelzMapH[y]>=mh)
+            int px = pixelzMapW[x];
+            if (px>=mw || py>=mh)
                continue;
 
-            INT64 on = CalcPixOffset(pixelzMapW[x], pixelzMapH[y], StrideMini, bpp);
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 on = ky_mini + (INT64)px * bpc;
+            INT64 o = ky + (INT64)x * bpc;
             int nA = (bpp==32) ? newBitmap[3 + on] : 255;
             int oA = (bpp==32) ? originalData[3 + o] : 255;
             RGBAColor Orgb = {newBitmap[on], newBitmap[1 + on], newBitmap[2 + on], nA};
@@ -4740,21 +4769,25 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
 
     const INT64 data = CalcPixOffset(w - 1, h - 1, Stride, bpp);
     // fnOutputDebug("yay DrawTextBitmapInPlace; y = " + std::to_string(imgY));
-    #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < imgW; x++)
+    const int bpc = bpp / 8;
+    const int nbpc = nbpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < imgH; y++)
     {
-        for (int y = 0; y < imgH; y++)
+        INT64 ky_mini = (INT64)y * StrideMini;
+        INT64 ky = (INT64)(h - imgY + y - imgH) * Stride;
+        for (int x = 0; x < imgW; x++)
         {
             int nR, nG, nB;
             int nA = 255;
             int oA = 255;
-            INT64 o = CalcPixOffset(imgX + x, h - imgY + y - imgH, Stride, bpp);
+            INT64 o = ky + (INT64)(imgX + x) * bpc;
             if (o>=data || o<0)
                continue;
 
             if (newBitmap!=NULL)
             {
-                INT64 on = CalcPixOffset(x, y, StrideMini, nbpp);
+                INT64 on = ky_mini + (INT64)x * nbpc;
                 if (nbpp==32)
                    nA = newBitmap[on + 3];
 
@@ -4825,12 +4858,14 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     const int gA = (colorA >> 8) & 0xFF;
     const int bA = colorA & 0xFF;
 
-    #pragma omp parallel for schedule(dynamic) default(none)
-    for (int x = 0; x < w; x++)
+    const int bpc = bpp / 8;
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
     {
-        for (int y = 0; y < h; y++)
+        INT64 ky = (INT64)y * Stride;
+        for (int x = 0; x < w; x++)
         {
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
+            INT64 o = ky + (INT64)x * bpc;
             float fintensity = char_to_float[originalData[o]];
             if (linearGamma==1)
             {
