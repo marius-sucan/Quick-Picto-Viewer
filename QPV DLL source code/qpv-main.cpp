@@ -3076,6 +3076,7 @@ inline RGBAColor CalculateNewBlendModes(
     // ---------- NEW LUT PATH for all other modes ----------
     RGBAColor result = {0, 0, 0, 0};
     const bool mix = (keepAlpha != 1 || blendMode >= 22 || blendMode < 2);
+    const int blend65k = blendMode * 65536;
     unsigned int sa_scaled = (sa * 65536U) / resultA;
     unsigned int da_1_sa_scaled = 65536U - sa_scaled;
 
@@ -3084,7 +3085,7 @@ inline RGBAColor CalculateNewBlendModes(
        const float lO = blend_grayscale_float(Orgb.r, Orgb.g, Orgb.b);
        const float lB = blend_grayscale_float(Brgb.r, Brgb.g, Brgb.b);
        const float* const lut = (linearGamma == 1) ? char_to_floatGamma : char_to_float;
-       
+
        float rT, gT, bT;
        if (blendMode == 20) {
            rT = lO + lut[Brgb.r] - lB;
@@ -3096,9 +3097,9 @@ inline RGBAColor CalculateNewBlendModes(
            bT = lB - lO + lut[Brgb.b] + lut[Orgb.b] * 0.2f;
        }
        
-       rT = rT < 0.0f ? 0.0f : (rT > 1.0f ? 1.0f : rT);
-       gT = gT < 0.0f ? 0.0f : (gT > 1.0f ? 1.0f : gT);
-       bT = bT < 0.0f ? 0.0f : (bT > 1.0f ? 1.0f : bT);
+       rT = (rT < 0.0f) ? 0.0f : (rT > 1.0f ? 1.0f : rT);
+       gT = (gT < 0.0f) ? 0.0f : (gT > 1.0f ? 1.0f : gT);
+       bT = (bT < 0.0f) ? 0.0f : (bT > 1.0f ? 1.0f : bT);
 
        if (Brgb.a < 255 && mix) {
            float w = 1.0f - (Brgb.a / 255.0f);
@@ -3116,9 +3117,12 @@ inline RGBAColor CalculateNewBlendModes(
        bT = (saF * bT + da_1_saF * lut[Brgb.b]) * inv_ra;
 
        if (linearGamma == 1) {
-           int iR = (int)(rT * 65535.0f + 0.5f); iR = iR < 0 ? 0 : (iR > 65535 ? 65535 : iR);
-           int iG = (int)(gT * 65535.0f + 0.5f); iG = iG < 0 ? 0 : (iG > 65535 ? 65535 : iG);
-           int iB = (int)(bT * 65535.0f + 0.5f); iB = iB < 0 ? 0 : (iB > 65535 ? 65535 : iB);
+           int iR = (int)(rT * 65535.0f + 0.5f);
+           iR = (iR < 0) ? 0 : ( (iR > 65535) ? 65535 : iR);
+           int iG = (int)(gT * 65535.0f + 0.5f);
+           iG = (iG < 0) ? 0 : ( (iG > 65535) ? 65535 : iG);
+           int iB = (int)(bT * 65535.0f + 0.5f);
+           iB = (iB < 0) ? 0 : ( (iB > 65535) ? 65535 : iB);
            result.r = blend_degamma_lut[iR];
            result.g = blend_degamma_lut[iG];
            result.b = blend_degamma_lut[iB];
@@ -3130,9 +3134,9 @@ inline RGBAColor CalculateNewBlendModes(
     } else {
         // CHANNELS INDEPENDENT: modes 0-19, 22
         if (linearGamma == 0) {
-            int idxR = blendMode * 65536 + Orgb.r * 256 + Brgb.r;
-            int idxG = blendMode * 65536 + Orgb.g * 256 + Brgb.g;
-            int idxB = blendMode * 65536 + Orgb.b * 256 + Brgb.b;
+            int idxR = blend65k + Orgb.r * 256 + Brgb.r;
+            int idxG = blend65k + Orgb.g * 256 + Brgb.g;
+            int idxB = blend65k + Orgb.b * 256 + Brgb.b;
             
             int rT = (blendMode == 0 || blendMode == 25) ? Orgb.r : blend_lut_srgb[idxR];
             int gT = (blendMode == 0 || blendMode == 25) ? Orgb.g : blend_lut_srgb[idxG];
@@ -3148,9 +3152,9 @@ inline RGBAColor CalculateNewBlendModes(
             result.g = (sa_scaled * gT + da_1_sa_scaled * Brgb.g + 32768U) >> 16;
             result.b = (sa_scaled * bT + da_1_sa_scaled * Brgb.b + 32768U) >> 16;
         } else {
-            int idxR = blendMode * 65536 + Orgb.r * 256 + Brgb.r;
-            int idxG = blendMode * 65536 + Orgb.g * 256 + Brgb.g;
-            int idxB = blendMode * 65536 + Orgb.b * 256 + Brgb.b;
+            int idxR = blend65k + Orgb.r * 256 + Brgb.r;
+            int idxG = blend65k + Orgb.g * 256 + Brgb.g;
+            int idxB = blend65k + Orgb.b * 256 + Brgb.b;
 
             int o_r_lin = gamma_to_linear_16[Orgb.r];
             int o_g_lin = gamma_to_linear_16[Orgb.g];
