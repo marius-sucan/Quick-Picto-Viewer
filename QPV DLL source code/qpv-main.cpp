@@ -2438,7 +2438,6 @@ inline RGBAColor CalculateNewBlendModes(
        Orgb.a = (Orgb.a * (255 - opacity)) / 255;
 
     const int oA = (blendMode >= 23 || blendMode == 0) ? -1 : Brgb.a;
-
     if (blendMode == 34 || blendMode == 110)
     {
        int opa = (blendMode == 34 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
@@ -2523,12 +2522,11 @@ inline RGBAColor CalculateNewBlendModes(
     if (resultA == 0)
        return {0, 0, 0, 0};
 
+    const unsigned int sa_scaled = (sa * 65536U) / resultA;
+    const unsigned int da_1_sa_scaled = 65536U - sa_scaled;
     // ---------- FAST PATH: Normal blend (mode 0/25), no linear gamma ----------
     if ((blendMode == 0 || blendMode == 25) && linearGamma == 0)
     {
-       const unsigned int sa_scaled = (sa * 65536U) / resultA;
-       const unsigned int da_1_sa_scaled = 65536U - sa_scaled;
-
        int rR = (sa_scaled * Orgb.r + da_1_sa_scaled * Brgb.r + 32768U) >> 16;
        int rG = (sa_scaled * Orgb.g + da_1_sa_scaled * Brgb.g + 32768U) >> 16;
        int rB = (sa_scaled * Orgb.b + da_1_sa_scaled * Brgb.b + 32768U) >> 16;
@@ -2538,7 +2536,8 @@ inline RGBAColor CalculateNewBlendModes(
        result.g = (rG < 0) ? 0 : (rG > 255) ? 255 : rG;
        result.b = (rB < 0) ? 0 : (rB > 255) ? 255 : rB;
        result.a = resultA;
-       if (keepAlpha == 1 && oA != -1) result.a = oA;
+       if (keepAlpha == 1 && oA != -1)
+          result.a = oA;
        return result;
     }
 
@@ -2546,9 +2545,6 @@ inline RGBAColor CalculateNewBlendModes(
     RGBAColor result = {0, 0, 0, 0};
     const bool mix = (keepAlpha != 1 || blendMode >= 22 || blendMode < 2);
     const int blend65k = blendMode * 65536;
-    unsigned int sa_scaled = (sa * 65536U) / resultA;
-    unsigned int da_1_sa_scaled = 65536U - sa_scaled;
-
     if (blendMode == 20 || blendMode == 21)
     {
        // Luminosity and ghosting (scalar float fallback)
