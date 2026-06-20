@@ -2963,6 +2963,10 @@ RGBAColor calculateBlendModes(
 // CalculateNewBlendModes - Optimized blend mode computation
 // ============================================================================
 
+static inline float blend_grayscale_float(int r, int g, int b) {
+    return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
+}
+
 RGBAColor CalculateNewBlendModes(
   RGBAColor Orgb,
   RGBAColor Brgb,
