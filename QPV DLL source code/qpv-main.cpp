@@ -2966,8 +2966,7 @@ RGBAColor calculateBlendModes(
 static inline float blend_grayscale_float(int r, int g, int b) {
     return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
 }
-
-RGBAColor CalculateNewBlendModes(
+inline RGBAColor CalculateNewBlendModes(
   RGBAColor Orgb,
   RGBAColor Brgb,
   int blendMode,
@@ -4367,13 +4366,15 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int my = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
     // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
     // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
-    #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-    for (int x = mx; x <= mw; x++)
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = my; y <= mh; y++)
     {
-        INT64 kx = (INT64)x * bpc;
-        INT64 kzx = (INT64)(x - bmpX) * gbpc;
-        for (int y = my; y <= mh; y++)
+        INT64 ky = (INT64)y * Stride;
+        INT64 kzy = (INT64)(y - bmpY) * gStride;
+        for (int x = mx; x <= mw; x++)
         {
+            INT64 kx = (INT64)x * bpc;
+            INT64 kzx = (INT64)(x - bmpX) * gbpc;
             float opacityDepth = clipMaskFilter(x, y, NULL, 0);
             if (opacityDepth==1 && highDepthModeMask==0 || opacityDepth==0 && highDepthModeMask==1)
                continue;
@@ -4381,7 +4382,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             if (opacityDepth>1)
                opacityDepth *= 0.825f;
             // INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            INT64 o = (INT64)y * Stride + kx;
+            INT64 o = ky + kx;
             RGBAColor userColor;
             if (colorBitmap!=NULL)
             {
@@ -4389,7 +4390,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW)
                   continue;
 
-               INT64 oz = (INT64)(y - bmpY) * gStride + kzx;
+               INT64 oz = kzy + kzx;
                // fnOutputDebug("y=" + std::to_string(y - bmpY));
                int thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
                if (opacityMultiplier>0 && gBpp==32)
@@ -4426,7 +4427,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             int oA = (bpp==32) ? BitmapData[3 + o] : 255;
             RGBAColor Orgb = {userColor.b, userColor.g, userColor.r, userColor.a};
             RGBAColor Brgb = {BitmapData[o], BitmapData[1 + o], BitmapData[2 + o], oA};
-            RGBAColor newColor = calculateBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, 0);
+            RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, 0);
             BitmapData[2 + o] = newColor.r;
             BitmapData[1 + o] = newColor.g;
             BitmapData[o]     = newColor.b;
