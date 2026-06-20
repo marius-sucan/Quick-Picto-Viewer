@@ -2439,9 +2439,11 @@ inline RGBAColor CalculateNewBlendModes(
 
     const int oA = (blendMode >= 23 || blendMode == 0) ? -1 : Brgb.a;
 
-    if (blendMode == 34 || blendMode == 110) {
+    if (blendMode == 34 || blendMode == 110)
+    {
        int opa = (blendMode == 34 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
-       if (bpp != 32 && opa == 1) {
+       if (bpp != 32 && opa == 1)
+       {
           const int invA = 255 - Orgb.a;
           Orgb.r = max(Orgb.r - invA, 0);
           Orgb.g = max(Orgb.g - invA, 0);
@@ -2451,35 +2453,41 @@ inline RGBAColor CalculateNewBlendModes(
           Orgb.a = max(Brgb.a - (255 - Orgb.a), 0);
 
        return (opa == 1) ? Orgb : Brgb;
-    }
-    else if (blendMode == 24 || blendMode == 100) {
+    } else if (blendMode == 24 || blendMode == 100)
+    {
        const int opa = (blendMode == 24 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
-       if (opa != 1) return Brgb;
+       if (opa != 1)
+          return Brgb;
 
        const float f = char_to_float[255 - opacity];
        int fR, fG, fB, fA;
-       if (linearGamma == 1) {
+       if (linearGamma == 1)
+       {
           fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
           fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
           fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
           fA = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.a], gamma_to_linear[Brgb.a], f)];
-       } else {
+       } else
+       {
           fR = weighTwoValues(Orgb.r, Brgb.r, f);
           fG = weighTwoValues(Orgb.g, Brgb.g, f);
           fB = weighTwoValues(Orgb.b, Brgb.b, f);
           fA = weighTwoValues(Orgb.a, Brgb.a, f);
        }
-       if (keepAlpha == 1) fA = max(fA - (255 - Brgb.a), 0);
+       if (keepAlpha == 1)
+          fA = max(fA - (255 - Brgb.a), 0);
        return {fB, fG, fR, fA};
-    }
-    else if (blendMode == 23) {
+    } else if (blendMode == 23)
+    {
        const float f = char_to_float[Orgb.a];
        int fR, fG, fB;
-       if (linearGamma == 1) {
+       if (linearGamma == 1)
+       {
           fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
           fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
           fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
-       } else {
+       } else
+       {
           fR = weighTwoValues(Orgb.r, Brgb.r, f);
           fG = weighTwoValues(Orgb.g, Brgb.g, f);
           fB = weighTwoValues(Orgb.b, Brgb.b, f);
@@ -2489,13 +2497,15 @@ inline RGBAColor CalculateNewBlendModes(
 
     // ---------- Layer swap for flip / behind mode ----------
     const bool do_swap = (flipLayers == 1 && blendMode > 0) || (blendMode == 25 && bpp == 32);
-    if (do_swap) {
+    if (do_swap)
+    {
        RGBAColor tmp = Orgb;
        Orgb = Brgb;
        Brgb = tmp;
     }
 
-    if (Orgb.a == 0) {
+    if (Orgb.a == 0)
+    {
        if (keepAlpha == 1 && flipLayers == 1 && oA != -1 && (blendMode >= 1 && blendMode <= 22))
           Brgb.a = oA;
        return Brgb;
@@ -2510,10 +2520,12 @@ inline RGBAColor CalculateNewBlendModes(
     const int sa = Orgb.a;
     const int da = Brgb.a;
     const int resultA = sa + ((da * (255 - sa)) / 255);
-    if (resultA == 0) return {0, 0, 0, 0};
+    if (resultA == 0)
+       return {0, 0, 0, 0};
 
     // ---------- FAST PATH: Normal blend (mode 0/25), no linear gamma ----------
-    if ((blendMode == 0 || blendMode == 25) && linearGamma == 0) {
+    if ((blendMode == 0 || blendMode == 25) && linearGamma == 0)
+    {
        const unsigned int sa_scaled = (sa * 65536U) / resultA;
        const unsigned int da_1_sa_scaled = 65536U - sa_scaled;
 
@@ -2537,18 +2549,21 @@ inline RGBAColor CalculateNewBlendModes(
     unsigned int sa_scaled = (sa * 65536U) / resultA;
     unsigned int da_1_sa_scaled = 65536U - sa_scaled;
 
-    if (blendMode == 20 || blendMode == 21) {
+    if (blendMode == 20 || blendMode == 21)
+    {
        // Luminosity and ghosting (scalar float fallback)
        const float lO = blend_grayscale_float(Orgb.r, Orgb.g, Orgb.b);
        const float lB = blend_grayscale_float(Brgb.r, Brgb.g, Brgb.b);
        const float* const lut = (linearGamma == 1) ? char_to_floatGamma : char_to_float;
 
        float rT, gT, bT;
-       if (blendMode == 20) {
+       if (blendMode == 20)
+       {
            rT = lO + lut[Brgb.r] - lB;
            gT = lO + lut[Brgb.g] - lB;
            bT = lO + lut[Brgb.b] - lB;
-       } else {
+       } else
+       {
            rT = lB - lO + lut[Brgb.r] + lut[Orgb.r] * 0.2f;
            gT = lB - lO + lut[Brgb.g] + lut[Orgb.g] * 0.2f;
            bT = lB - lO + lut[Brgb.b] + lut[Orgb.b] * 0.2f;
@@ -2557,8 +2572,8 @@ inline RGBAColor CalculateNewBlendModes(
        rT = (rT < 0.0f) ? 0.0f : (rT > 1.0f ? 1.0f : rT);
        gT = (gT < 0.0f) ? 0.0f : (gT > 1.0f ? 1.0f : gT);
        bT = (bT < 0.0f) ? 0.0f : (bT > 1.0f ? 1.0f : bT);
-
-       if (Brgb.a < 255 && mix) {
+       if (Brgb.a < 255 && mix)
+       {
            float w = 1.0f - (Brgb.a / 255.0f);
            rT = w * (lut[Orgb.r] - rT) + rT;
            gT = w * (lut[Orgb.g] - gT) + gT;
@@ -2573,24 +2588,28 @@ inline RGBAColor CalculateNewBlendModes(
        gT = (saF * gT + da_1_saF * lut[Brgb.g]) * inv_ra;
        bT = (saF * bT + da_1_saF * lut[Brgb.b]) * inv_ra;
 
-       if (linearGamma == 1) {
+       if (linearGamma == 1)
+       {
            int iR = (int)(rT * 65535.0f + 0.5f);
-           iR = (iR < 0) ? 0 : ( (iR > 65535) ? 65535 : iR);
            int iG = (int)(gT * 65535.0f + 0.5f);
-           iG = (iG < 0) ? 0 : ( (iG > 65535) ? 65535 : iG);
            int iB = (int)(bT * 65535.0f + 0.5f);
+           iR = (iR < 0) ? 0 : ( (iR > 65535) ? 65535 : iR);
+           iG = (iG < 0) ? 0 : ( (iG > 65535) ? 65535 : iG);
            iB = (iB < 0) ? 0 : ( (iB > 65535) ? 65535 : iB);
            result.r = blend_degamma_lut[iR];
            result.g = blend_degamma_lut[iG];
            result.b = blend_degamma_lut[iB];
-       } else {
+       } else
+       {
            result.r = (int)(rT * 255.0f + 0.5f);
            result.g = (int)(gT * 255.0f + 0.5f);
            result.b = (int)(bT * 255.0f + 0.5f);
        }
-    } else {
+    } else
+    {
         // CHANNELS INDEPENDENT: modes 0-19, 22
-        if (linearGamma == 0) {
+        if (linearGamma == 0)
+        {
             int idxR = blend65k + Orgb.r * 256 + Brgb.r;
             int idxG = blend65k + Orgb.g * 256 + Brgb.g;
             int idxB = blend65k + Orgb.b * 256 + Brgb.b;
@@ -2599,7 +2618,8 @@ inline RGBAColor CalculateNewBlendModes(
             int gT = (blendMode == 0 || blendMode == 25) ? Orgb.g : blend_lut_srgb[idxG];
             int bT = (blendMode == 0 || blendMode == 25) ? Orgb.b : blend_lut_srgb[idxB];
 
-            if (da < 255 && blendMode > 0 && mix) {
+            if (da < 255 && blendMode > 0 && mix)
+            {
                 rT = ((255 - da) * Orgb.r + da * rT + 127) / 255;
                 gT = ((255 - da) * Orgb.g + da * gT + 127) / 255;
                 bT = ((255 - da) * Orgb.b + da * bT + 127) / 255;
@@ -2608,7 +2628,8 @@ inline RGBAColor CalculateNewBlendModes(
             result.r = (sa_scaled * rT + da_1_sa_scaled * Brgb.r + 32768U) >> 16;
             result.g = (sa_scaled * gT + da_1_sa_scaled * Brgb.g + 32768U) >> 16;
             result.b = (sa_scaled * bT + da_1_sa_scaled * Brgb.b + 32768U) >> 16;
-        } else {
+        } else
+        {
             int idxR = blend65k + Orgb.r * 256 + Brgb.r;
             int idxG = blend65k + Orgb.g * 256 + Brgb.g;
             int idxB = blend65k + Orgb.b * 256 + Brgb.b;
@@ -2621,7 +2642,8 @@ inline RGBAColor CalculateNewBlendModes(
             int gT = (blendMode == 0 || blendMode == 25) ? o_g_lin : blend_lut_linear[idxG];
             int bT = (blendMode == 0 || blendMode == 25) ? o_b_lin : blend_lut_linear[idxB];
 
-            if (da < 255 && blendMode > 0 && mix) {
+            if (da < 255 && blendMode > 0 && mix)
+            {
                 rT = ((255 - da) * o_r_lin + da * rT + 127) / 255;
                 gT = ((255 - da) * o_g_lin + da * gT + 127) / 255;
                 bT = ((255 - da) * o_b_lin + da * bT + 127) / 255;
