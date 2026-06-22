@@ -22514,11 +22514,11 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLi
     } Else If (DrawLineAreaSpiralCenterMode=2)
     {
        fx := imgSelW * (alphaMaskOffsetX/rp), fy := imgSelH * (alphaMaskOffsetY/rp)
-       rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
+       rw := imgSelW - Abs(fx)*2,             rh := imgSelH - Abs(fy)*2
     } Else
     {
-       fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
-       rw := imgSelW,                    rh := imgSelH
+       fx := imgSelW * alphaMaskOffsetX,      fy := imgSelH * alphaMaskOffsetY
+       rw := imgSelW,                         rh := imgSelH
     }
 
     angle := -272
@@ -22530,7 +22530,7 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLi
     cX := ocX := imgSelPx + imgSelW/2
     cY := ocY := imgSelPy + imgSelH/2
     spx := imgSelPx, spy := imgSelPy
-    lengthu := Round(DrawLineAreaSpiralLength**1.1)
+    lengthu := Round(DrawLineAreaSpiralLength**1.15)
     zfx := imgSelW/(lengthu + 2)
     zfy := imgSelH/(lengthu + 2)
     ppr := 1 - Round(DrawLineAreaCenterCut/400, 1)
@@ -49081,7 +49081,7 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     {
        Gui, Add, Checkbox, xs y+7 w%btnWid% hp +0x1000 Checked%DrawLineAreaDoubles% vDrawLineAreaDoubles gupdateUIdrawShapesPanel, &Double line
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaContourAlign " vDrawLineAreaContourAlign gupdateUIdrawShapesPanel", "Inside|No clipping|Outside", "Pen clipping to shape")
-       Gui, Add, Checkbox, xs y+7 wp +0x1000 hp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel, &Round joins
+       Gui, Add, Checkbox, xs y+7 wp +0x1000 hp Checked%DrawLineAreaJoinsStyle% vDrawLineAreaJoinsStyle gupdateUIdrawShapesPanel +hwndhTemp, &Round joins
        GuiAddDropDownList("x+5 wp AltSubmit Choose" DrawLineAreaCapsStyle " vDrawLineAreaCapsStyle gupdateUIdrawShapesPanel", "No caps|Square caps|Round caps", "Line ends style")
        ; Gui, Add, Checkbox, x+5 Checked%FillAreaDoBehind% vFillAreaDoBehind gupdateUIdrawShapesPanel, &Fill behind the image
     }
@@ -49097,7 +49097,8 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     } Else
     {
        GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 w" slideWid - 2 " hp")
-       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp")
+       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp", "Acute angles can cause miters to exceed the bounding box.`nIncrease miters boundary to avoid the clipping of miters.`nNo live preview.")
+       ToolTip2ctrl(hTemp, "Line segments will be connected with rounded joins.`nNo live preview.")
     }
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
@@ -52471,6 +52472,9 @@ updateUIdrawShapesPanel(actionu:=0, b:=0) {
 
     actu := (FillAreaEllipseSection<1440) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, FillAreaEllipsePie
+
+    actu := (FillAreaShape=7 && FillAreaClosedPath=0  || FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, DrawLineAreaCapsStyle
 
     actu := (FillAreaShape=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, btn1
