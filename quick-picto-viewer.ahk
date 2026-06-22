@@ -1,4 +1,4 @@
-﻿; Script details:
+; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -22508,13 +22508,12 @@ coreDrawParametricLinesSpiral(x1, y1, x2, y2, imgSelW, imgSelH, ByRef straightLi
     rp := (DrawLineAreaSpiralCenterMode=2) ? 350 : 50
     If (DrawLineAreaSpiralCenterMode=1)
     {
-       vpWinClientSize(mw, mh)
-       fx := mw * (alphaMaskOffsetX/rp),      fy := mh * (alphaMaskOffsetY/rp)
-       rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
+       fx := alphaMaskOffsetX/rp,             fy := alphaMaskOffsetY/rp
+       rw := imgSelW / (1 + Abs(fx)),         rh := imgSelH / (1 + Abs(fy))
     } Else If (DrawLineAreaSpiralCenterMode=2)
     {
        fx := imgSelW * (alphaMaskOffsetX/rp), fy := imgSelH * (alphaMaskOffsetY/rp)
-       rw := imgSelW - fx*2,                  rh := imgSelH - fy*2
+       rw := imgSelW - Abs(fx)*2,             rh := imgSelH - Abs(fy)*2
     } Else
     {
        fx := imgSelW * alphaMaskOffsetX, fy := imgSelH * alphaMaskOffsetY
