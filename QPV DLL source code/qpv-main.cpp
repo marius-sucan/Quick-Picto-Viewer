@@ -3904,6 +3904,9 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                INT64 oz = kzy + kzx;
                // fnOutputDebug("y=" + std::to_string(y - bmpY));
                int thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
+               if (color==-1 && thisOpacity>0)
+                  thisOpacity = clamp(thisOpacity - (255 - opacity), 0, 255);
+
                if (opacityMultiplier>0 && gBpp==32)
                   thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
 
@@ -3914,6 +3917,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                userColor.r = colorBitmap[2 + oz];
                userColor.g = colorBitmap[1 + oz];
                userColor.b = colorBitmap[oz];
+               if (color==-1 && userColor.r==0 && userColor.g==0 && userColor.b==0 && colorBitmap[3 + oz]==0)
+                  userColor.a = 0;
             } else
             {
                userColor = initialColor;

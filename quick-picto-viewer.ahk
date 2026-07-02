@@ -15446,7 +15446,9 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     If ((thisBlendMode>1 && allowPreviewThis=1) || (userimgGammaCorrect=1 && previewMode=1 && PasteInPlaceEraseInitial=0 && allowPreviewThis=1))
     {
-       If (currIMGdetails.HasAlpha=1 && previewMode=1 && thisBlendMode>1 && !viewportQPVimage.imgHandle)
+       If (thisBlendMode=25)
+          o_bgrBMP := ""
+       Else If (currIMGdetails.HasAlpha=1 && previewMode=1 && thisBlendMode>1 && !viewportQPVimage.imgHandle)
           o_bgrBMP := getImgOriginalSelectedAreaEdit(2, imgSelPx, imgSelPy, ResizedW, ResizedH, mainWidth, mainHeight, 1)
        Else If (previewMode=1)
           o_bgrBMP := getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, ResizedW, ResizedH, 0, ResizedW, ResizedH)
@@ -15455,7 +15457,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     }
 
     thisImgQuality := (userimgQuality=1 && previewMode!=1) ? 3 : 5
-    If (thisBlendMode>1 && allowPreviewThis=1)
+    If (thisBlendMode>1 && allowPreviewThis=1 && thisBlendMode!=25)
     {
        clipBMP := resizeBitmapToGivenRef(clipBMP, 0, ResizedW, ResizedH, thisImgQuality)
        o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
@@ -15486,7 +15488,8 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           If (previewMode!=1)
              setWindowTitle("Applying blending mode")
           thisStartZeit := A_TickCount
-          zr := QPV_BlendBitmaps(bgrBMP, clipBMP, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
+          zopa := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
+          zr := QPV_BlendBitmaps(bgrBMP, clipBMP, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, zopa)
        }
     }
 
@@ -15498,7 +15501,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If (alphaMaskingMode>1 && !viewportQPVimage.imgHandle && (thisBlendMode>1 || brushingMode=1 && previewMode=1))
     {
        thisStartZeit := A_TickCount
-       If (thisBlendMode=1)
+       If (thisBlendMode=1 || thisBlendMode=25)
           thisBMP := resizeBitmapToGivenRef(thisBMP, 0, ResizedW, ResizedH, thisImgQuality)
 
        thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra thisImgCall thisFXstate BlendModesPreserveAlpha BlendModesFlipped userimgGammaCorrect brushZeitung
@@ -15533,10 +15536,12 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           o_bgrBMP := resizeBitmapToGivenRef(o_bgrBMP, 0, ResizedW, ResizedH, thisImgQuality)
           ; trGdip_GetImageDimensions(o_bgrBMP, kw, kh)
           ; trGdip_GetImageDimensions(thisBMP, mw, mh)
-          thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
+          ; thisOpacity := (PasteInPlaceOpacity>255) ? 0 : 255 - PasteInPlaceOpacity
           ; r1 := QPV_MergeBitmapsWithMask(thisBMP, o_bgrBMP, 0, 0, thisOpacity)
           ; ToolTip, % "hmm="  "|" kw "|" kh "`n" mw "|" mh "`n" ResizedW "|" ResizedH , , , 2
-          r1 := trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy)
+          If (thisBlendMode!=25)
+             r1 := trGdip_DrawImage(A_ThisFunc, G2, o_bgrBMP, imgSelPx, imgSelPy)
+
           thisOpacity := (PasteInPlaceOpacity>255) ? 1 : PasteInPlaceOpacity/255
           r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy,,,,,,, thisOpacity)
           trGdip_DisposeImage(thisBMP)
@@ -15547,11 +15552,20 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
 
     setWindowTitle("Scaling image to selection area")
     thisOpacity := (PasteInPlaceOpacity>255) ? (PasteInPlaceOpacity - 245)/10 : PasteInPlaceOpacity/255
-    If (viewportQPVimage.imgHandle && previewMode=1 && PasteInPlaceOpacity>255 || !viewportQPVimage.imgHandle && PasteInPlaceOpacity>255)
+    If (viewportQPVimage.imgHandle && previewMode=1 && PasteInPlaceOpacity>255 || !viewportQPVimage.imgHandle && PasteInPlaceOpacity>255 || thisBlendMode>1 && thisBlendMode!=25)
        thisOpacity := 1
 
     If (validBMP(thisBMP) && G2 && allowPreviewThis=1 && hasPainted=0)
     {
+       If (thisBlendMode=25 && previewMode!=1)
+       {
+          currIMGdetails.HasAlpha := 1
+          Gdip_SetClipRect(G2, imgSelPx, imgSelPy, ResizedW, ResizedH, 1)
+          Gdip_GraphicsClear(G2)
+       } Else If (thisBlendMode=25 && previewMode=1)
+       {
+          Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx, imgSelPy, ResizedW, ResizedH)
+       }
        ; ToolTip, % validBMP(o_bgrBMP) " | " hasPainted  " opacity=" thisOpacity , , , 2
        r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, ResizedW, ResizedH, , , , , thisOpacity)
     } Else If (allowPreviewThis!=1 && previewMode=1)
@@ -21149,6 +21163,8 @@ HugeImagesApplyPasteInPlace() {
 ; to-do; to do; possible optimization: if PasteInPlaceCropDo=1 and / or PasteInPlaceEraseInitial=1 and / or PasteInPlaceApplyColorFX=1
 ; and PasteInPlaceCropSel=7 [vector polygonal shape] is used, do not recreate the clip mask by reinvoking 
 ; QPV_PrepareHugeImgSelectionArea() in-between operations; keep the cache
+; this is no longer as relevant as before, because vector shapes are much more efficiently handled since v6.20
+
       If warnHugeImageNotFIM()
       {
          terminatePasteInPlace()
@@ -21515,24 +21531,26 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : 255
          } else
          {
-            newColor := "0xFF" FillAreaColor
+            newColor := (transformTool=1) ? -1 : "0xFF" FillAreaColor
             thisOpacity := (transformTool=1) ? clampInRange(PasteInPlaceOpacity, 0, 255) : FillAreaOpacity
          }
 
          opacityExtra := (transformTool=1 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255) : 0
-         eraser := (!InStr(modus, "behind") && FillAreaRemBGR=1 && fillTool=1) ? -1 : 0
+         eraser := (!InStr(modus, "behind") && FillAreaRemBGR=1 && fillTool=1 || PasteInPlaceBlendMode=25 && transformTool=1) ? -1 : 0
          thisBlendMode := (fillTool=1) ? FillAreaBlendMode - 1 : PasteInPlaceBlendMode - 1
          doBehind := (fillTool=1) ? FillAreaDoBehind : 0
          thisInvert := (fillTool=1) ? FillAreaInverted : 0
          shapeu := (fillTool=1) ? 3 : EllipseSelectMode
          thisKeepAlpha := (transformTool=1) ? BlendModesPreserveAlpha : FillAreaCutGlass
          thisModesFlipped := BlendModesFlipped
-         If (doBehind=1) {
+         If (doBehind=1)
+         {
             thisKeepAlpha := thisBlendMode := eraser := 25
          } Else If (eraser=-1)
          {
             thisModesFlipped := eraser := thisKeepAlpha := 0
             thisBlendMode := 24
+            ; thisBlendMode := (PasteInPlaceBlendMode=25 && transformTool=1) ? 0 : 24
          }
 
          ; ToolTip, % thisOpacity "|" transformTool "|" opacityExtra , , , 2
