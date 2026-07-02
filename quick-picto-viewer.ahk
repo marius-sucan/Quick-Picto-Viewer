@@ -21550,7 +21550,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          {
             thisModesFlipped := eraser := thisKeepAlpha := 0
             thisBlendMode := 24
-            ; thisBlendMode := (PasteInPlaceBlendMode=25 && transformTool=1) ? 0 : 24
          }
 
          ; ToolTip, % thisOpacity "|" transformTool "|" opacityExtra , , , 2
