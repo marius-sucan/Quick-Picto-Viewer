@@ -14503,7 +14503,7 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   return r
 }
 
-QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, gamma:=0, specialReplace:=0, opacity:=0, replaceModeBlending:=1, alphaMaskGray:=0, invertAlphaMask:=0) {
+QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, linearGamma:=0, specialReplace:=0, opacity:=0, advancedReplaceMode:=1, alphaMaskGray:=0, invertAlphaMask:=0) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -14532,14 +14532,16 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      addJournalEntry(A_ThisFunc "(): failed to apply alpha mask; incorrect bitmap dimensions")
   }
 
+  oblm := blendMode
   If (specialReplace=1 && blendMode=24) ; replace mode 
      blendMode := 100
-  If (replaceModeBlending!=1 && (blendMode=24 || blendMode=100)) ; no alpha mask should be passed to this function when replaceModeBlending==0
+  If (advancedReplaceMode!=1 && (blendMode=24 || blendMode=100)) ; no alpha mask should be passed to this function when advancedReplaceMode==0
      blendMode += 10
 
   If (allowAlphaMasking=1 && blendMode=24)
      xBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
 
+  fnOutputDebug(A_ThisFunc "(): blendMode = " blendMode " | " oblm " | alpha mask = " allowAlphaMasking "|" xBitmap)
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   E2 := trGdip_LockBits(pBitmap2Blend, 0, 0, w, h, stride, mScan, mData, 1)
   E3 := (allowAlphaMasking=1) ? trGdip_LockBits(alphaMaskGray, 0, 0, w, h, stride, gScan, gData, 1) : -1
@@ -14547,7 +14549,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      ra := DllCall("qpvmain.dll\SetBitmapAsAlphaChannel", "UPtr", mScan, "UPtr", gScan, "Int", w, "Int", h, "Int", stride, "int", 32, "Int", invertAlphaMask, "Int", 0, "Int", 1)
 
   If (!E1 && !E2)
-     r := DllCall("qpvmain.dll\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", protectAlpha, "int", gamma, "int", opacity)
+     r := DllCall("qpvmain.dll\BlendBitmaps", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", blendMode, "int", flipLayers, "int", protectAlpha, "int", linearGamma, "int", opacity)
 
   If (!E1 && !E3 && blendMode=24 && validBMP(xBitmap))
   {
@@ -15484,8 +15486,6 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
           If (previewMode!=1)
              setWindowTitle("Applying blending mode")
           thisStartZeit := A_TickCount
-          factoru := (previewMode=1) ? 2 : 3
-          delayu := (previewMode=1) ? -1 : 2
           zr := QPV_BlendBitmaps(bgrBMP, clipBMP, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
        }
     }
@@ -22902,13 +22902,16 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
              Gdip_FillRectangle(G2, GDIPbrushHatch, imgSelPx - tkx, imgSelPy - tky, dw, dh)
           trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, imgSelPx - tkx, imgSelPy - tky, dw, dh)
           Gdip_SetCompositingQuality(G2, 2)
-          imgSelPx := o_imgSelPx,        imgSelPy := o_imgSelPy
+          imgSelPx := o_imgSelPx
+          imgSelPy := o_imgSelPy
        } Else
        {
-          imgSelPx := o_imgSelPx,        imgSelPy := o_imgSelPy
+          imgSelPx := o_imgSelPx
+          imgSelPy := o_imgSelPy
        }
 
-       imgSelW  := o_imgSelW,         imgSelH  := o_imgSelH
+       imgSelW  := o_imgSelW
+       imgSelH  := o_imgSelH
     }
 
     Gdip_ResetClip(G2)
@@ -45890,7 +45893,7 @@ ReadSettingsPasteInPlace(act:=0) {
     
     RegAction(act, "FillAreaRectRoundness",, 2, 4, 98)
     RegAction(act, "PasteInPlaceGlassy",, 2, 1, 6)
-    RegAction(act, "PasteInPlaceBlendMode",, 2, 1, 24)
+    RegAction(act, "PasteInPlaceBlendMode",, 2, 1, 26)
     RegAction(act, "PasteInPlaceAdaptMode",, 2, 1, 3)
     RegAction(act, "alphaMaskClrAintensity",, 2, 0, 255)
     RegAction(act, "alphaMaskClrBintensity",, 2, 0, 255)
@@ -46290,7 +46293,8 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     GuiAddCheckbox("x+2 yp hp wp gupdateUIpastePanel Checked" PasteInPlaceOrientFlipY " vPasteInPlaceOrientFlipY", "Flip vertically", "Y")
     bpp := (viewportQPVimage.imgHandle) ? FreeImage_GetBPP(viewportQPVimage.imgHandle) : 32
     bppz := (bpp!=32 && PasteInPlaceToolMode=1) ? "initial area (must be a RGBA image)" : "the initially selected area "
-    Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceEraseInitial% vPasteInPlaceEraseInitial +hwndhTemp, &Erase %bppz%
+    thu := (PasteInPlaceToolMode!=1) ? " w1 h1 " : " hp "
+    Gui, Add, Checkbox, xs y+7 %thu% gupdateUIpastePanel Checked%PasteInPlaceEraseInitial% vPasteInPlaceEraseInitial +hwndhTemp, &Erase %bppz%
     ToolTip2ctrl(hTemp, "The preview will be inaccurate for the erased area when using blending modes or alpha masks.")
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceQuality% vPasteInPlaceQuality, &High quality image resampling
     Gui, Add, Checkbox, xs y+7 hp gupdateUIpastePanel Checked%PasteInPlaceAutoExpandIMG% vPasteInPlaceAutoExpandIMG, &Auto-expand canvas to fit image object
@@ -75590,7 +75594,7 @@ ActPaintBrushNow() {
    thisEffectLight := (BrushToolApplyColorFX=1) ? PasteInPlaceLight : 0
    thisEffectGamma := (BrushToolApplyColorFX=1) ? PasteInPlaceGamma : 0
    thisEffectBlur  := BrushToolBlurStrength
-   plza := A_TickCount
+   lastBrushDecreaseZeit := A_TickCount
    setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index<2)
    {
@@ -75658,7 +75662,7 @@ ActPaintBrushNow() {
       }
 
       thisState := "a" mX mY kX kY randomFactor
-      If (prevState!=thisState && (A_TickCount - thisZeit>5))
+      If (prevState!=thisState && (A_TickCount - thisZeit>15))
       {
          If !prevMX
             prevMX := kX 
@@ -75740,6 +75744,7 @@ ActPaintBrushNow() {
             cur_tkY := tkY
             If (BrushToolType=6)
             {
+               ; smudge brush
                t_wet := thisWetness / 22.0
                smudgeStrength := clampInRange(brushSize * (0.05 + 0.95 * t_wet), 5, brushSize)
                cur_offX := dirX * clampInRange(distStepX, 1, smudgeStrength)
@@ -75756,9 +75761,9 @@ ActPaintBrushNow() {
                   fadeFactor := 0.01
 
                cur_opacity := Floor(thisOpacity * (0.05 + 0.95 * t_wet) * fadeFactor)
-               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - plza>450) && BrushToolOverDraw=1)
+               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - lastBrushDecreaseZeit>450) && BrushToolOverDraw=1)
                {
-                  plza := A_TickCount
+                  lastBrushDecreaseZeit := A_TickCount
                   brushSize -= Ceil(BrushToolSize*0.05) + 1
                }
             } Else
@@ -76089,6 +76094,7 @@ ActPaintBrushLargeNow() {
       gR := Randomizer(-gR, gR, 2, 5)
       thisToolAspectRatio := clampInRange(BrushToolAspectRatio + gR, -100, 100)
    }
+
    If (BrushToolType>6)
       thisToolAspectRatio := 0
 
@@ -76185,7 +76191,7 @@ ActPaintBrushLargeNow() {
    thisEffectGamma := (BrushToolApplyColorFX=1) ? PasteInPlaceGamma : 0
    thisEffectBlur  := BrushToolBlurStrength
    CreateOSDinfoLine(0, 1)
-   plza := A_TickCount
+   lastBrushDecreaseZeit := A_TickCount
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<1)
@@ -76252,7 +76258,7 @@ ActPaintBrushLargeNow() {
       }
 
       thisState := "a" mX mY kX kY randomFactor
-      If (prevState!=thisState && (A_TickCount - thisZeit>5))
+      If (prevState!=thisState && (A_TickCount - thisZeit>15))
       {
          If !prevMX
             prevMX := kX 
@@ -76352,9 +76358,9 @@ ActPaintBrushLargeNow() {
                   fadeFactor := 0.01
 
                cur_opacity := Floor(thisOpacity * (0.05 + 0.95 * t_wet) * fadeFactor)
-               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - plza>450) && BrushToolOverDraw=1)
+               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - lastBrushDecreaseZeit>450) && BrushToolOverDraw=1)
                {
-                  plza := A_TickCount
+                  lastBrushDecreaseZeit := A_TickCount
                   brushSize -= Ceil(BrushToolSize*0.05) + 1
                }
                ;ToolTip, % cur_opacity "|" brushSize "|" BrushToolTexture "|" BrushToolSize "|" thisIndex , , , 2

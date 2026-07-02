@@ -135,7 +135,8 @@ static unsigned short gamma_to_linear_16[256];
 
 static inline float compute_blend_float(int mode, float rOf, float rBf) {
     float rT = rOf;
-    switch (mode) {
+    switch (mode)
+    {
         case 1: rT = min(rOf, rBf); break;
         case 2: rT = rOf * rBf; break;
         case 3: rT = rOf + rBf - 1.0f; break;
@@ -193,12 +194,14 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     // source https://www.teamten.com/lawrence/graphics/gamma/
     static const float GAMMA = 2.1;
     int result;
-    for (int i = 0; i < 32769; i++) {
+    for (int i = 0; i < 32769; i++)
+    {
         result = (int)(pow(i/32768.0, 1/GAMMA)*255.0 + 0.5);
         linear_to_gamma[i] = (unsigned char)result;
     }
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i++)
+    {
         char_to_float[i] = i/255.0f;
         result = (int)(pow(char_to_float[i], GAMMA)*32768.0f + 0.5f);
         gamma_to_linear[i] = (unsigned short)result;
@@ -231,7 +234,8 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
         LUT_Z_B[i] = val100 * 0.9504971251315797660 / 108.883;
     }
 
-    for (int i = 0; i < 65536; i++) {
+    for (int i = 0; i < 65536; i++)
+    {
         int_to_float[i] = (float)i/65535.0f;
         int_to_char[i] = int_to_float[i] * 255.0f;
         int_to_grayRi[i] = i*0.299701f;
@@ -246,28 +250,38 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
 
     // Initialize LUTs for CalculateNewBlendModes
     static const float invGAMMA = 1.0f / GAMMA;
-    for (int i = 0; i < 65536; i++) {
+    for (int i = 0; i < 65536; i++)
+    {
         float v = (float)i / 65535.0f;
         blend_degamma_lut[i] = (unsigned char)(pow(v, invGAMMA) * 255.0f + 0.5f);
     }
-    for (int i = 0; i < 256; i++) {
+
+    for (int i = 0; i < 256; i++)
+    {
         float f = i / 255.0f;
         blend_gray_R_float[i] = f * 0.299701f;
         blend_gray_G_float[i] = f * 0.587130f;
         blend_gray_B_float[i] = f * 0.114180f;
     }
 
-    if (!blend_lut_srgb) blend_lut_srgb = new unsigned char[23 * 256 * 256];
-    if (!blend_lut_linear) blend_lut_linear = new unsigned short[23 * 256 * 256];
+    if (!blend_lut_srgb)
+       blend_lut_srgb = new unsigned char[23 * 256 * 256];
+    if (!blend_lut_linear)
+       blend_lut_linear = new unsigned short[23 * 256 * 256];
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i++){
         gamma_to_linear_16[i] = (unsigned short)(pow(i / 255.0f, 2.1f) * 65535.0f + 0.5f);
     }
 
-    for (int mode = 1; mode <= 22; mode++) {
-        if (mode == 20 || mode == 21) continue;
-        for (int t = 0; t < 256; t++) {
-            for (int b = 0; b < 256; b++) {
+    for (int mode = 1; mode <= 22; mode++)
+    {
+        if (mode == 20 || mode == 21)
+           continue;
+
+        for (int t = 0; t < 256; t++)
+        {
+            for (int b = 0; b < 256; b++)
+            {
                 float rOf = t / 255.0f;
                 float rBf = b / 255.0f;
                 float rT = compute_blend_float(mode, rOf, rBf);
@@ -290,20 +304,22 @@ std::string ucs2_to_utf8(const unsigned short* ucs2_data, std::size_t length) {
     // Reserve some estimated space to improve performance
     utf8_result.reserve(length * 3);  // worst-case each UCS2 char becomes 3 bytes
     
-    for (std::size_t i = 0; i < length; ++i) {
+    for (std::size_t i = 0; i < length; ++i)
+    {
         unsigned short code_point = ucs2_data[i];
         
         // For UCS2, code_point is guaranteed to be in the range [0, 0xFFFF]
-        if (code_point < 0x80) {
+        if (code_point < 0x80)
+        {
             // 1-byte sequence: 0xxxxxxx
             utf8_result.push_back(static_cast<char>(code_point));
-        }
-        else if (code_point < 0x800) {
+        } else if (code_point < 0x800)
+        {
             // 2-byte sequence: 110xxxxx 10xxxxxx
             utf8_result.push_back(static_cast<char>(0xC0 | (code_point >> 6)));
             utf8_result.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
-        }
-        else {
+        } else
+        {
             // 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx
             utf8_result.push_back(static_cast<char>(0xE0 | (code_point >> 12)));
             utf8_result.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)));
@@ -2178,8 +2194,7 @@ RGBAColor calculateBlendModes(
           fA = max(fA - (255 - Brgb.a), 0);
 
        return {fB, fG, fR, fA};
-    }
-    else if (blendMode == 23)
+    } else if (blendMode == 23)
     {
        // clip top to the alpha channel of the bottom
        int fB, fG, fR;
