@@ -2916,7 +2916,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   UINT suchDeviations = 0;
   float index;
 
-  fnOutputDebug("FloodFill8Stack (Span); blendMode=" + std::to_string(blendMode));
+  fnOutputDebug(std::to_string(useSelArea) + "=sel FloodFill8Stack (Span); blendMode=" + std::to_string(blendMode));
   std::vector<uint32_t> cacheTags(8192, 0xFFFFFFFF);
   std::vector<float> cacheIndices(8192, 0.0f);
   std::vector<uint8_t> cacheMatched(8192, 0);

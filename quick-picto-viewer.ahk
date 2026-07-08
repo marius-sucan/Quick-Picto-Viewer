@@ -21666,9 +21666,9 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          r := DllCall("qpvmain.dll\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "flood")
       {
-         inverter := (BrushToolOutsideSelection=3) ? 1 : 0
-         use := (BrushToolOutsideSelection>1 && editingSelectionNow=1) ? 1 : 0
-         allView := (BrushToolOutsideSelection!=2 && editingSelectionNow=1) ? 1 : 0
+         inverter := (FloodFillSelectionMode=3) ? 1 : 0
+         use := (FloodFillSelectionMode>1 && editingSelectionNow=1) ? 1 : 0
+         allView := (FloodFillSelectionMode!=2 && editingSelectionNow=1) ? 1 : 0
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, allView)
          newColor := "0xff" FloodFillColor
          Gdip_FromARGB(newColor, A, R, G, B)
@@ -49687,7 +49687,8 @@ PanelFloodFillTool() {
     pw := (PrefsLargeFonts=1) ? xCol - 42 : xCol - 42
     Gui, Add, Checkbox, xs+15 y+15 w%pw% hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Keep alpha channel intact
     ; GuiAddSlider("FloodFillOpacity", 3,255, 255, "Flooding opacity", "updateUIfloodFillPanel", 1, "xs+15 y+15 w" pw " hp")
-    GuiAddDropDownList("x" xCol " yp+0 wp-25 gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" StrReplace(userBlendModesList, "*"), "Blending mode")
+    blends := StrReplace(userBlendModesList, "|Clip to alpha*|Replace*|Behind*")
+    GuiAddDropDownList("x" xCol " yp+0 wp-25 gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" blends, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
     Gui, Add, Checkbox, xs+14 y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Reduce flooding opacity based on color similarity
 

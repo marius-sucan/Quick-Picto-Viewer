@@ -4,6 +4,12 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
+- v6.2.01 (2026-07-**)
+  - much faster lines drawing on images above 536 megapixels
+  - faster blend mode functions
+  - faster flood fill / bucket tool
+  - bug fixes related to paste in place / transform tool
+
 - v6.2.00 (2026-06-11)
   - new brush system with substantial performance improvements; it now also works with images of 8000 megapixels or larger
   - substantial performance improvements when drawing vector shapes with many points on large images
