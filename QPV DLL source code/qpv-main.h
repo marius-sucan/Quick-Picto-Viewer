@@ -116,6 +116,10 @@ public:
         return (data[idx / 64] & (1ULL << (idx % 64))) != 0;
     }
 
+    void set_unsafe(size_t idx) {
+        data[idx / 64] |= (1ULL << (idx % 64));
+    }
+
     void fill_zero() {
         std::fill(data.begin(), data.end(), 0ULL);
     }

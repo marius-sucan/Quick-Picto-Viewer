@@ -2921,14 +2921,13 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
   std::vector<float> cacheIndices(8192, 0.0f);
   std::vector<uint8_t> cacheMatched(8192, 0);
 
-  auto checkPixel = [&](int nx, int ny, bool& matched, float& usedIndex) {
+  auto checkPixel = [&](int nx, int ny, INT64 tpx, bool& matched, float& usedIndex) {
       matched = false;
       usedIndex = defIndex;
 
       if (useSelArea==1 && clipMaskFilter(nx, ny, NULL, 0)==1)
           return;
 
-      const INT64 tpx = (INT64)ny * Stride + (INT64)nx * bytesPerPix;
       const int tcA = (bpp==32) ? imageData[tpx + 3] : 255;
       const RGBAColor thisColor = {imageData[tpx], imageData[tpx + 1], imageData[tpx + 2], tcA};
 
@@ -2961,22 +2960,26 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
       int x1 = startX;
       int x2 = startX;
       
+      const INT64 rowOffset = (INT64)startY * w;
+      const INT64 rowStrideOffset = (INT64)startY * Stride;
+
       // Scan left from startX
       int cx = startX;
+      INT64 pixIdx = rowOffset + cx;
+      INT64 tpx = rowStrideOffset + (INT64)cx * bytesPerPix;
+
       while (cx >= 0) {
-          const INT64 pixIdx = (INT64)startY * w + cx;
           if (pixelzMap[pixIdx]) break;
           
           bool matched; float usedIndex;
-          checkPixel(cx, startY, matched, usedIndex);
+          checkPixel(cx, startY, tpx, matched, usedIndex);
           if (!matched && cx == startX) {
              matched = true; // force match for seed or guaranteed start point
              usedIndex = defIndex;
           }
           if (!matched) break;
 
-          pixelzMap[pixIdx] = 1;
-          const INT64 tpx = (INT64)startY * Stride + (INT64)cx * bytesPerPix;
+          pixelzMap.set_unsafe(pixIdx);
           if (simpleMode==1) {
              imageData[tpx]     = newColor.b;
              imageData[tpx + 1] = newColor.g;
@@ -2989,20 +2992,23 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
           suchDeviations++;
           x1 = cx;
           cx--;
+          pixIdx--;
+          tpx -= bytesPerPix;
       }
 
       // Scan right from startX + 1
       cx = startX + 1;
+      pixIdx = rowOffset + cx;
+      tpx = rowStrideOffset + (INT64)cx * bytesPerPix;
+
       while (cx < w) {
-          const INT64 pixIdx = (INT64)startY * w + cx;
           if (pixelzMap[pixIdx]) break;
           
           bool matched; float usedIndex;
-          checkPixel(cx, startY, matched, usedIndex);
+          checkPixel(cx, startY, tpx, matched, usedIndex);
           if (!matched) break;
 
-          pixelzMap[pixIdx] = 1;
-          const INT64 tpx = (INT64)startY * Stride + (INT64)cx * bytesPerPix;
+          pixelzMap.set_unsafe(pixIdx);
           if (simpleMode==1) {
              imageData[tpx]     = newColor.b;
              imageData[tpx + 1] = newColor.g;
@@ -3015,6 +3021,8 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
           suchDeviations++;
           x2 = cx;
           cx++;
+          pixIdx++;
+          tpx += bytesPerPix;
       }
 
       spanStack.push_back({startY, x1, x2});
@@ -3038,29 +3046,49 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
 
       // Check row above
       if (s.y > 0) {
+          const INT64 rowOffset = (INT64)(s.y - 1) * w;
+          const INT64 rowStrideOffset = (INT64)(s.y - 1) * Stride;
+          INT64 pixIdx = rowOffset + minX;
+          INT64 tpx = rowStrideOffset + (INT64)minX * bytesPerPix;
+
           for (int i = minX; i <= maxX; i++) {
-              if (!pixelzMap[(INT64)(s.y - 1) * w + i]) {
+              if (!pixelzMap[pixIdx]) {
                   bool matched; float usedIndex;
-                  checkPixel(i, s.y - 1, matched, usedIndex);
+                  checkPixel(i, s.y - 1, tpx, matched, usedIndex);
                   if (matched) {
                       int rightEdge = fillSpan(i, s.y - 1);
+                      int jump = rightEdge - i;
                       i = rightEdge; // skip over the newly filled span
+                      pixIdx += jump;
+                      tpx += (INT64)jump * bytesPerPix;
                   }
               }
+              pixIdx++;
+              tpx += bytesPerPix;
           }
       }
 
       // Check row below
       if (s.y < h - 1) {
+          const INT64 rowOffset = (INT64)(s.y + 1) * w;
+          const INT64 rowStrideOffset = (INT64)(s.y + 1) * Stride;
+          INT64 pixIdx = rowOffset + minX;
+          INT64 tpx = rowStrideOffset + (INT64)minX * bytesPerPix;
+
           for (int i = minX; i <= maxX; i++) {
-              if (!pixelzMap[(INT64)(s.y + 1) * w + i]) {
+              if (!pixelzMap[pixIdx]) {
                   bool matched; float usedIndex;
-                  checkPixel(i, s.y + 1, matched, usedIndex);
+                  checkPixel(i, s.y + 1, tpx, matched, usedIndex);
                   if (matched) {
                       int rightEdge = fillSpan(i, s.y + 1);
+                      int jump = rightEdge - i;
                       i = rightEdge; // skip over the newly filled span
+                      pixIdx += jump;
+                      tpx += (INT64)jump * bytesPerPix;
                   }
               }
+              pixIdx++;
+              tpx += bytesPerPix;
           }
       }
   }
