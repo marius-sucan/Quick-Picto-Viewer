@@ -1,4 +1,4 @@
-﻿; Script details:
+; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -24856,6 +24856,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     defineColorDepth()
     dropFilesSelection(1)
     RemoveTooltip()
+    global forceImgLoadOnNextDisplay := (isImgOpen>0) ? 1 : 0
     dummyTimerDelayiedImageDisplay(5)
     SetTimer, createGUItoolbar, -100
     SetTimer, ResetImgLoadStatus, -55
@@ -25193,9 +25194,12 @@ filterDelayiedImageDisplay() {
 }
 
 DelayiedImageDisplay() {
+   global forceImgLoadOnNextDisplay
    If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP) || isImgEditingNow())
    {
-      r := IDshowImage(currentFileIndex)
+      opentehFile := (forceImgLoadOnNextDisplay = 1) ? 3 : 0
+      r := IDshowImage(currentFileIndex, opentehFile)
+      forceImgLoadOnNextDisplay := 0
       If !r
          informUserFileMissing(1)
    }
