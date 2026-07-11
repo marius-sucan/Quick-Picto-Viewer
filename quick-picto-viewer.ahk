@@ -1,4 +1,4 @@
-; Script details:
+﻿; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -24788,6 +24788,8 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
 
     If !validBMP(clipBMP)
     {
+       showTOOLtip("ERROR: Invalid bitmap in " A_ThisFunc "(). " clipBMP "|" modus)
+       SoundBeep 300, 100
        ResetImgLoadStatus()
        SetTimer, RemoveTooltip, -500
        Return
@@ -24815,6 +24817,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        disposeCacheIMGs()
        terminateIMGediting()
        isImgOpen := 1
+       wasHuge := 1
     }
 
     clippyCount++
@@ -24826,7 +24829,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     {
        maxFilesIndex := currentFileIndex := 0
        labelu := (modus="scanner") ? "WIA-Acquired-" : "Clipboard-"
-       resultedFilesList[currentFileIndex, 1] := "Q:\Temporary Memory Object\" labelu "-" clippyCount ".img"
+       resultedFilesList[currentFileIndex, 1] := "Q:\Temporary Memory Object\" labelu clippyCount ".img"
     }
 
     zoomLevel := IMGresizingMode := 1
@@ -24839,6 +24842,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     } Else currIMGdetails.HasAlpha := 0
 
     ; ToolTip, % currIMGdetails.HasAlpha " = lol" , , , 2
+    fnOutputDebug(A_ThisFunc "(): " modus " | " isImgOpen "|" currentFileIndex "|" maxFilesIndex "|" currentSib)
     imgIndexEditing := currentFileIndex
     vpIMGrotation := FlipImgH := FlipImgV := 0
     currentImgModified := usrColorDepth := imgFxMode := 1
@@ -24852,11 +24856,12 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        wrapRecordUndoLevelNow(clipBMP)
     Else 
        gdiBitmap := trGdip_CloneBitmap(A_ThisFunc, clipBMP)
-
+   
+    If !wasHuge
+       ShowTheImage("set-prev", imgPath)
     defineColorDepth()
     dropFilesSelection(1)
     RemoveTooltip()
-    global forceImgLoadOnNextDisplay := (isImgOpen>0) ? 1 : 0
     dummyTimerDelayiedImageDisplay(5)
     SetTimer, createGUItoolbar, -100
     SetTimer, ResetImgLoadStatus, -55
@@ -25194,12 +25199,9 @@ filterDelayiedImageDisplay() {
 }
 
 DelayiedImageDisplay() {
-   global forceImgLoadOnNextDisplay
    If ((CurrentSLD && maxFilesIndex>0) || validBMP(UserMemBMP) || isImgEditingNow())
    {
-      opentehFile := (forceImgLoadOnNextDisplay = 1) ? 3 : 0
-      r := IDshowImage(currentFileIndex, opentehFile)
-      forceImgLoadOnNextDisplay := 0
+      r := IDshowImage(currentFileIndex)
       If !r
          informUserFileMissing(1)
    }
@@ -70999,8 +71001,10 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
      ; SetTimer, dummyFastImageChangePlaceHolder, -15
      dummyTimerReloadThisPicture(550)
      prevImgPath := imgPath
+     ; fnOutputDebug(A_ThisFunc "(): full reload")
   } Else
   {
+     ; fnOutputDebug(A_ThisFunc "(): other mode")
      If (animGIFplaying=1)
         usePrevious := 0
 
@@ -71171,6 +71175,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
       pVwinTitle := winPrefix winTitle
       setWindowTitle(pVwinTitle, 1)
       delayu := (A_TickCount - prevFastDisplay < 500) ? 110 : 325
+      ; fnOutputDebug(A_ThisFunc "(): full reload")
       dummyFastImageChangePlaceHolder(OutFileName, OutDir)
       dummyTimerReloadThisPicture(delayu)
    }
