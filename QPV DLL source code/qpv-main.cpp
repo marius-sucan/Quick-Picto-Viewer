@@ -7696,84 +7696,154 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned c
       return 1;
 }
 
-DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
-// inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
-// backward (gather) mapping: for each destination pixel, its angle/radius relative to
-// (cx,cy) locates the source pixel to pull from, so every destination is filled in a
-// single pass with no gaps.
+// Bilinear tap into a 32bpp buffer of stride Width*4, added into acc[] with the given weight.
+// Colours are weighted by their own alpha before being mixed, so a fully transparent pixel
+// cannot bleed its RGB into its neighbours; resolveSampleAccum() divides that back out.
+// wrapX makes the x axis periodic, which is what keeps the 0/360 seam of a polar strip
+// continuous instead of pinning it against a clamped edge.
+inline void accumBilinearSample(const int *data, int W, int H, double fx, double fy, bool wrapX, double weight, double *acc) {
+      double fx0 = floor(fx), fy0 = floor(fy);
+      double tx = fx - fx0, ty = fy - fy0;
+      int x0 = (int)fx0, y0 = (int)fy0;
+      int x1 = x0 + 1, y1 = y0 + 1;
 
-      double minBoundary = min(Width, Height);
-      double desiredRadius = minBoundary/2;
-
-      // distance-from-a-point is convex, so its max over the pixel grid is always at
-      // one of the 4 corners -- no need to scan every pixel to find it
-      double c1x = 0-cx,           c1y = 0-cy;
-      double c2x = (Width-1)-cx,   c2y = 0-cy;
-      double c3x = 0-cx,           c3y = (Height-1)-cy;
-      double c4x = (Width-1)-cx,   c4y = (Height-1)-cy;
-      double maxuRadius = sqrt(max(max(c1x*c1x + c1y*c1y, c2x*c2x + c2y*c2y), max(c3x*c3x + c3y*c3y, c4x*c4x + c4y*c4y)));
-
-      const double angleToCol = Width / 360.0;
-      const double radiusToRow = (Height * userScale) / desiredRadius;
-
-      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, Width, Height, cx, cy, angleToCol, radiusToRow)
-      for (int y = 0; y < Height; y++)
+      if (wrapX)
       {
-         for (int x = 0; x < Width; x++)
-         {
-            double px = x - cx;     double py = y - cy;
-            double r = sqrt(px*px + py*py);
-            double angle = rad2deg(atan2(py, px)) + 90;
-            if (angle<0)
-               angle += 360;
-
-            int dx = (int)(angle * angleToCol);
-            int dy = (int)(r * radiusToRow);
-            dx = clamp(dx, 0, Width - 1);
-            dy = clamp(dy, 0, Height - 1);
-            newData[x + y*Width] = imageData[dx + (dy * Width)];
-        }
+         x0 = ((x0 % W) + W) % W;
+         x1 = ((x1 % W) + W) % W;
+      } else
+      {
+         x0 = clamp(x0, 0, W - 1);
+         x1 = clamp(x1, 0, W - 1);
       }
-      return (int)maxuRadius;
+      y0 = clamp(y0, 0, H - 1);
+      y1 = clamp(y1, 0, H - 1);
+
+      const double wq[4] = { weight*(1.0 - tx)*(1.0 - ty), weight*tx*(1.0 - ty), weight*(1.0 - tx)*ty, weight*tx*ty };
+      const INT64 idx[4] = { (INT64)y0*W + x0, (INT64)y0*W + x1, (INT64)y1*W + x0, (INT64)y1*W + x1 };
+      for (int i = 0; i < 4; i++)
+      {
+         const unsigned int p = (unsigned int)data[idx[i]];
+         const double aw = wq[i] * (double)((p >> 24) & 255);
+         acc[0] += aw;
+         acc[1] += aw * (double)((p >> 16) & 255);
+         acc[2] += aw * (double)((p >> 8) & 255);
+         acc[3] += aw * (double)(p & 255);
+      }
 }
 
-DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
-// backward (gather) mapping: the analytical inverse of the forward angle/radius
-// formula used by rect2polarIMG, so every destination pixel is computed directly
-// from its source location -- no scatter, no supersampling passes, no gap-filling.
+inline int resolveSampleAccum(const double *acc) {
+      if (acc[0]<0.5)
+         return 0;
+
+      const int a = clamp((int)round(acc[0]), 0, 255);
+      const int r = clamp((int)round(acc[1]/acc[0]), 0, 255);
+      const int g = clamp((int)round(acc[2]/acc[0]), 0, 255);
+      const int b = clamp((int)round(acc[3]/acc[0]), 0, 255);
+      return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale, int superSamples) {
+// Wraps a polar strip (column = angle 0..360, row = radius) back onto a rectangular bitmap.
 // inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
+//
+// Backward (gather) mapping: each destination pixel's angle/radius around (cx,cy) locates the
+// strip pixel to pull from, so every destination is filled in one pass with no gaps.
+// The destination is addressed in normalized elliptical coordinates -- radius 1 is the ellipse
+// inscribed in the WxH destination, not a circle of radius min(W,H)/2 -- so the whole bitmap is
+// covered whatever its aspect ratio. That is what the caller used to buy by cropping the disk
+// out of the result and stretching it back up. Beyond radius 1 the strip's last row keeps being
+// pulled, which is what fills the corners.
+// The horizontal mirror the caller used to apply afterwards is folded into the coordinate, and
+// superSamples (NxN) replaces the 2x upscale it used to run the transform through.
 
-      double minBoundary = min(Width, Height);
-      double desiredRadius = minBoundary/2;
-      double invScale = (userScale!=0) ? 1.0/userScale : 0.0;
+      if (!imageData || !newData || Width<1 || Height<1)
+         return 0;
 
-      // maximum distance from (cx,cy) to a corner of the image; only needed for
-      // the return value, so found directly instead of by scanning every pixel
-      double c1 = (0-cx)*(0-cx)         + (0-cy)*(0-cy);
-      double c2 = (Width-cx)*(Width-cx) + (0-cy)*(0-cy);
-      double c3 = (0-cx)*(0-cx)         + (Height-cy)*(Height-cy);
-      double c4 = (Width-cx)*(Width-cx) + (Height-cy)*(Height-cy);
-      double maxuRadius = sqrt(max(max(c1, c2), max(c3, c4)));
+      // semi-axes of the covered ellipse; Width/2 and Height/2 for a centred origin, and far
+      // enough to still reach every edge if the origin is moved off centre
+      const double rx = max(cx, Width - cx);
+      const double ry = max(cy, Height - cy);
+      if (rx<=0 || ry<=0)
+         return 0;
 
-      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, Width, Height, cx, cy, desiredRadius, invScale)
+      const int ss = clamp(superSamples, 1, 4);
+      const double ssStep = 1.0 / ss;
+      const double ssWeight = 1.0 / (ss*ss);
+      const double angleToCol = Width / 360.0;
+      const double radiusToRow = Height * userScale;
+
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, Width, Height, cx, cy, rx, ry, ss, ssStep, ssWeight, angleToCol, radiusToRow)
       for (int y = 0; y < Height; y++)
       {
          for (int x = 0; x < Width; x++)
          {
-            double angle = (x / (double)Width) * 360.0;
-            double r = (y / (double)Height) * desiredRadius * invScale;
-            double angleRad = deg2rad(angle - 90.0);
+            double acc[4] = { 0.0, 0.0, 0.0, 0.0 };
+            for (int sy = 0; sy < ss; sy++)
+            {
+               const double v = ((y + (sy + 0.5)*ssStep - 0.5) - cy) / ry;
+               for (int sx = 0; sx < ss; sx++)
+               {
+                  // mirrored horizontally, as the caller used to do to the finished bitmap
+                  const double u = ((Width - 1 - (x + (sx + 0.5)*ssStep - 0.5)) - cx) / rx;
+                  double angle = rad2deg(atan2(v, u)) + 90.0;
+                  if (angle<0)
+                     angle += 360.0;
 
-            int sx = (int)(cx + r*cos(angleRad));
-            int sy = (int)(cy + r*sin(angleRad));
-            sx = clamp(sx, 0, Width - 1);
-            sy = clamp(sy, 0, Height - 1);
-
-            newData[x + y*Width] = imageData[sx + sy*Width];
+                  accumBilinearSample(imageData, Width, Height, angle*angleToCol, sqrt(u*u + v*v)*radiusToRow, true, ssWeight, acc);
+               }
+            }
+            newData[x + y*Width] = resolveSampleAccum(acc);
         }
       }
+      return 1;
+}
 
-      return (int)maxuRadius;
+DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale, int superSamples) {
+// Unrolls a rectangular bitmap into a polar strip (column = angle 0..360, row = radius): the
+// analytical inverse of rect2polarIMG, so every destination pixel is computed directly from its
+// source location -- no scatter, no gap-filling.
+// inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
+//
+// The source is swept in normalized elliptical coordinates -- radius 1 is the ellipse inscribed
+// in the WxH source, not a circle of radius min(W,H)/2 -- so the whole bitmap is read whatever
+// its aspect ratio. That is what the caller used to buy by squashing the image into a centred
+// square first; sweeping the ellipse here reads the original pixels once instead of resampling
+// them twice. The angular mirror the caller used to apply afterwards is folded into the angle.
+
+      if (!imageData || !newData || Width<1 || Height<1)
+         return 0;
+
+      const double rx = max(cx, Width - cx);
+      const double ry = max(cy, Height - cy);
+      const double invScale = (userScale!=0) ? 1.0/userScale : 0.0;
+      const int ss = clamp(superSamples, 1, 4);
+      const double ssStep = 1.0 / ss;
+      const double ssWeight = 1.0 / (ss*ss);
+      const double colToAngle = 360.0 / Width;
+      const double rowToRadius = invScale / Height;
+
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, Width, Height, cx, cy, rx, ry, ss, ssStep, ssWeight, colToAngle, rowToRadius)
+      for (int y = 0; y < Height; y++)
+      {
+         for (int x = 0; x < Width; x++)
+         {
+            double acc[4] = { 0.0, 0.0, 0.0, 0.0 };
+            for (int sy = 0; sy < ss; sy++)
+            {
+               const double r = max(0.0, (y + (sy + 0.5)*ssStep - 0.5)) * rowToRadius;
+               for (int sx = 0; sx < ss; sx++)
+               {
+                  // mirrored angle, as the caller used to flip the finished strip
+                  const double angle = (Width - 1 - (x + (sx + 0.5)*ssStep - 0.5)) * colToAngle;
+                  const double angleRad = deg2rad(angle - 90.0);
+                  accumBilinearSample(imageData, Width, Height, cx + r*rx*cos(angleRad), cy + r*ry*sin(angleRad), false, ssWeight, acc);
+               }
+            }
+            newData[x + y*Width] = resolveSampleAccum(acc);
+        }
+      }
+      return 1;
 }
 
 DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {

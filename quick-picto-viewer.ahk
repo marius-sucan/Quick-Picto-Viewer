@@ -19289,57 +19289,7 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
 } ; // EraseOrInvertOrGraySelectedArea()
 
 QPV_rect2polar(pBitmap) {
-  initQPVmainDLL()
-  If !qpvMainDll
-  {
-     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
-     Return 
-  }
-
-  trGdip_GetImageDimensions(pBitmap, ow, oh)
-  ; kBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, ow*2, oh*2, 0, 5, -1, 1)
-  If !validBMP(kBitmap)
-     pBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
-  ; Else
-  ;    pBitmap := kBitmap
-
-  If !validBMP(pBitmap)
-     Return
-
-  trGdip_GetImageDimensions(pBitmap, w, h)
-  If (!w || !h)
-     Return
-
-  newBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
-  If !validBMP(newBitmap)
-     Return
-
-  Static orbScale := 1
-  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
-  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
-  cx := w/2 , cy := h/2
-  If (!E1 && !E2)
-     r := DllCall("qpvmain.dll\rect2polarIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "int")
-
-  If !E1
-     Gdip_UnlockBits(pBitmap, iData)
-  If !E2
-     Gdip_UnlockBits(newBitmap, mData)
-
-  If (r>2)
-  {
-     pk := min(w, h)/2
-     px := Round(cx - pk)
-     py := Round(cy - pk)
-     pw := ph := Round(pk*2)
-     nnBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, newBitmap, px, py, pw, ph, 0, 0, 1, 0)
-     ; ToolTip, % pw "==" nnBMP "===" orbScale , , , 2
-     Gdip_ImageRotateFlip(nnBMP, 4)
-  }
-
-  trGdip_DisposeImage(newBitmap)
-  trGdip_DisposeImage(pBitmap)
-  Return nnBMP
+  Return QPV_PolarTransformBitmap(A_ThisFunc, "rect2polarIMG", pBitmap)
 }
 
 QPV_DissolveBitmap(pBitmap, rx, ry) {
@@ -19793,70 +19743,57 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     ; fnOutputDebug(A_ThisFunc "(" actionu "," extraMod "): " A_TickCount - startZeit)
 }
 
-QPV_polar2rect(oBitmap) {
-  Static modus := 0
+QPV_polar2rect(pBitmap) {
+  Return QPV_PolarTransformBitmap(A_ThisFunc, "polar2rectIMG", pBitmap)
+}
+
+QPV_PolarTransformBitmap(funcu, dllFunc, pBitmap) {
+  ; the DLL sweeps the ellipse inscribed in the bitmap and mirrors the result itself, so there is
+  ; nothing left to square off, crop, stretch or flip here; superSamples replaces the 2x upscale
+  Static orbScale := 1, superSamples := 2
   initQPVmainDLL()
   If !qpvMainDll
   {
-     addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
-     Return 
+     addJournalEntry(funcu "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return
   }
-
-  trGdip_GetImageDimensions(pBitmap, ow, oh)
-  ; kBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, ow*2, oh*2, 0, 5, -1, 1)
-  If !validBMP(kBitmap)
-     pBitmap := trGdip_CloneBitmap(A_ThisFunc, oBitmap)
-  Else
-     pBitmap := kBitmap
 
   If !validBMP(pBitmap)
   {
-     addJournalEntry(A_ThisFunc "(): ERROR. Invalid bitmap")
+     addJournalEntry(funcu "(): ERROR. Invalid bitmap")
      Return
   }
 
-  ; Gdip_ImageRotateFlip(pBitmap, 3)
   trGdip_GetImageDimensions(pBitmap, w, h)
   If (!w || !h)
   {
-     addJournalEntry(A_ThisFunc "(): ERROR. Invalid image dimensions. W=" w " | H=" h)
+     addJournalEntry(funcu "(): ERROR. Invalid image dimensions. W=" w " | H=" h)
      Return
   }
 
-  cx := w/2 , cy := h/2
-  pk := min(w, h)/2
-  px := Round(cx - pk)
-  py := Round(cy - pk)
-  pw := ph := Round(pk*2)
-  GP := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
-  If !GP
-  {
-     addJournalEntry(A_ThisFunc "(): ERROR. Unable to process the image. GDI+ graphics object was not created.")
-     trGdip_DisposeImage(pBitmap, 1)
+  newBitmap := trGdip_CreateBitmap(funcu, w, h)
+  If !validBMP(newBitmap)
      Return
-  }
 
-  tzGdip_DrawImage(GP, oBitmap, px, py, pw, ph)
-  Gdip_DeleteGraphics(GP)
-  startZeit := A_TickCount
-  newBitmap := trGdip_CreateBitmap(A_ThisFunc, w, h)
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
-  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData, 1)
-
-  Static orbScale := 1
+  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
-     r := DllCall("qpvmain.dll\polar2rectIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "Int")
+     r := DllCall("qpvmain.dll\" dllFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", w/2, "double", h/2, "double", orbScale, "Int", superSamples, "Int")
   Else
-     addJournalEntry(A_ThisFunc "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
+     addJournalEntry(funcu "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
   If !E2
      Gdip_UnlockBits(newBitmap, mData)
 
-  Gdip_ImageRotateFlip(newBitmap, 4)
-  trGdip_DisposeImage(pBitmap)
-  ; fnOutputDebug(A_TickCount - startZeit)
+  If (r!=1)
+  {
+     addJournalEntry(funcu "(): ERROR. " dllFunc "() failed to process the image. Result = " r)
+     trGdip_DisposeImage(newBitmap)
+     Return
+  }
+
   Return newBitmap
 }
 
