@@ -19702,9 +19702,9 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     Gdip_SetClipPath(G2, pPath)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
     If (actionu=1)
-       gBitmap := QPV_PolarTransformBitmap(A_ThisFunc, "rect2polarIMG", pBitmap)
+       gBitmap := QPV_PolarTransformBitmap(A_ThisFunc, "rect2polarIMG", zBitmap)
     Else If (actionu=2)
-       gBitmap := QPV_PolarTransformBitmap(A_ThisFunc, "polar2rectIMG", pBitmap)
+       gBitmap := QPV_PolarTransformBitmap(A_ThisFunc, "polar2rectIMG", zBitmap)
     Else If (actionu=3)
     {
         gBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
