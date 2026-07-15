@@ -7701,7 +7701,7 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned c
 // cannot bleed its RGB into its neighbours; resolveSampleAccum() divides that back out.
 // wrapX makes the x axis periodic, which is what keeps the 0/360 seam of a polar strip
 // continuous instead of pinning it against a clamped edge.
-inline void accumBilinearSample(const int *data, int W, int H, double fx, double fy, bool wrapX, double weight, double *acc) {
+inline void accumBilinearSample(const unsigned char *data, int W, int H, double fx, double fy, bool wrapX, double weight, double *acc) {
       double fx0 = floor(fx), fy0 = floor(fy);
       double tx = fx - fx0, ty = fy - fy0;
       int x0 = (int)fx0, y0 = (int)fy0;
@@ -7720,30 +7720,32 @@ inline void accumBilinearSample(const int *data, int W, int H, double fx, double
       y1 = clamp(y1, 0, H - 1);
 
       const double wq[4] = { weight*(1.0 - tx)*(1.0 - ty), weight*tx*(1.0 - ty), weight*(1.0 - tx)*ty, weight*tx*ty };
-      const INT64 idx[4] = { (INT64)y0*W + x0, (INT64)y0*W + x1, (INT64)y1*W + x0, (INT64)y1*W + x1 };
+      const INT64 idx[4] = { ((INT64)y0*W + x0)*4, ((INT64)y0*W + x1)*4, ((INT64)y1*W + x0)*4, ((INT64)y1*W + x1)*4 };
       for (int i = 0; i < 4; i++)
       {
-         const unsigned int p = (unsigned int)data[idx[i]];
-         const double aw = wq[i] * (double)((p >> 24) & 255);
+         const unsigned char *p = data + idx[i];
+         const double aw = wq[i] * (double)p[3];
          acc[0] += aw;
-         acc[1] += aw * (double)((p >> 16) & 255);
-         acc[2] += aw * (double)((p >> 8) & 255);
-         acc[3] += aw * (double)(p & 255);
+         acc[1] += aw * (double)p[2];
+         acc[2] += aw * (double)p[1];
+         acc[3] += aw * (double)p[0];
       }
 }
 
-inline int resolveSampleAccum(const double *acc) {
+inline void resolveSampleAccum(const double *acc, unsigned char *out) {
       if (acc[0]<0.5)
-         return 0;
+      {
+         out[0] = 0;   out[1] = 0;   out[2] = 0;   out[3] = 0;
+         return;
+      }
 
-      const int a = clamp((int)round(acc[0]), 0, 255);
-      const int r = clamp((int)round(acc[1]/acc[0]), 0, 255);
-      const int g = clamp((int)round(acc[2]/acc[0]), 0, 255);
-      const int b = clamp((int)round(acc[3]/acc[0]), 0, 255);
-      return (a << 24) | (r << 16) | (g << 8) | b;
+      out[3] = (unsigned char)clamp((int)round(acc[0]), 0, 255);          // alpha
+      out[2] = (unsigned char)clamp((int)round(acc[1]/acc[0]), 0, 255);   // red
+      out[1] = (unsigned char)clamp((int)round(acc[2]/acc[0]), 0, 255);   // green
+      out[0] = (unsigned char)clamp((int)round(acc[3]/acc[0]), 0, 255);   // blue
 }
 
-DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale, int superSamples) {
+DLL_API int DLL_CALLCONV rect2polarIMG(unsigned char *imageData, unsigned char *newData, int Width, int Height, double cx, double cy, double userScale, int superSamples) {
 // Wraps a polar strip (column = angle 0..360, row = radius) back onto a rectangular bitmap.
 // inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
 //
@@ -7790,13 +7792,13 @@ DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, 
                   accumBilinearSample(imageData, Width, Height, angle*angleToCol, sqrt(u*u + v*v)*radiusToRow, true, ssWeight, acc);
                }
             }
-            newData[x + y*Width] = resolveSampleAccum(acc);
+            resolveSampleAccum(acc, newData + ((INT64)x + (INT64)y*Width)*4);
         }
       }
       return 1;
 }
 
-DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale, int superSamples) {
+DLL_API int DLL_CALLCONV polar2rectIMG(unsigned char *imageData, unsigned char *newData, int Width, int Height, double cx, double cy, double userScale, int superSamples) {
 // Unrolls a rectangular bitmap into a polar strip (column = angle 0..360, row = radius): the
 // analytical inverse of rect2polarIMG, so every destination pixel is computed directly from its
 // source location -- no scatter, no gap-filling.
@@ -7835,7 +7837,7 @@ DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, 
                   accumBilinearSample(imageData, Width, Height, cx + r*rx*cos(angleRad), cy + r*ry*sin(angleRad), false, ssWeight, acc);
                }
             }
-            newData[x + y*Width] = resolveSampleAccum(acc);
+            resolveSampleAccum(acc, newData + ((INT64)x + (INT64)y*Width)*4);
         }
       }
       return 1;
