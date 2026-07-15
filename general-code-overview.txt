@@ -1048,9 +1048,9 @@ n) How to add a new panel/tool
    by the search menu options panel.
 
    The function that actually processes and outputs the pixels, invoked on Apply,
-   must finalize the edit itself by calling wrapRecordUndoLevelNow(newBitmap) with
-   the resulting GDI+ bitmap. This is what commits "newBitmap" as the current
-   "gdiBitmap" / "UserMemBMP" and records the undo level. Forgetting this call means
+   should end by calling wrapRecordUndoLevelNow(newBitmap) with the resulting
+   GDI+ bitmap. This is what commits "newBitmap" as the current "gdiBitmap" /
+   "UserMemBMP" and records the undo level. Forgetting this call means
    the edit is neither applied nor undoable. When editing images above 536
    megapixels, call recordUndoLevelHugeImagesNow() instead, from your HugeImages*
    counterpart function, following the pattern used by the other tools.
@@ -1063,29 +1063,24 @@ n) How to add a new panel/tool
    QPV offer to downscale it first [or refuse outright], instead of letting your
    tool operate on it directly.
 
-   If your live preview function caches a bitmap in a Static variable, to avoid
-   regenerating the same preview repeatedly [a common pattern; see
-   livePreviewSymmetricaImgArea() for reference], it should support a "kill" mode
-   that disposes of the cached bitmap. Add a call to your live preview function
+   If your live preview function caches bitmaps in Static variables, to avoid
+   regenerating the same preview repeatedly (a common pattern; see
+   livePreviewSymmetricaImgArea() for reference), it should support a "kill" mode
+   that disposes of any cached bitmaps. Add a call to your live preview function
    with "kill" as the parameter, inside CloseWindow(), in the section handling
    imgEditPanelOpened=1, next to the existing ones, eg.,
    livePreviewInsertTextinArea("kill") and corePasteInPlaceActNow("kill"). Otherwise,
-   the cached bitmap lingers in memory until the same tool is reopened. That same
-   section of CloseWindow() is also where you should restore, or finalize, any
-   global setting your tool temporarily overrides while it is active, as it is done
-   for AnyWindowOpen=74 and AnyWindowOpen=23/68, in there.
+   the cached bitmaps linger in memory. 
 
-   Most tools do not need anything beyond the standard rectangular/vector selection
-   area, which is handled generically. However, if your tool relies on custom mouse
-   interactions instead, eg., picking a colour or a texture source point, or
-   painting with a brush, add a branch keyed on the "AnyWindowOpen" value inside
-   WinClickAction(). See ActFloodFillNow(), ActPaintBrushNow() and the
-   AnyWindowOpen=64 / AnyWindowOpen=81 branches in there, as examples.
+   If your tool relies on custom mouse interactions instead, eg., picking a colour
+   or a texture source point, or painting with a brush, add a branch keyed on the
+   "AnyWindowOpen" value inside WinClickAction(). See ActFloodFillNow(),
+   ActPaintBrushNow() and the AnyWindowOpen=64 / AnyWindowOpen=81 branches
+   in there, as examples.
 
    Optionally, to give the panel its own toolbar launcher icon, register it inside
-   CoreGUItoolbar(): add an entry to the localStaticBtnID list and to the
-   "btnzList" string, then wire its click behaviour in processToolbarFunctions()
-   and/or tlbrInvokeFunction(). See section g) for more details on the toolbar
-   internals.
+   CoreGUItoolbar(): add another button to the list of static objects named BTN*
+   and to the "btnzList" string. In CoreGUItoolbar() add a call to tlbrAddNewIcon()
+   with the newly defined static button object then wire its click behaviour in
+   processToolbarFunctions(). See section g) for more details on the toolbar internals.
 
-   
