@@ -7698,47 +7698,39 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned c
 
 DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
 // inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
-      double maxuRadius = 0;
+// backward (gather) mapping: for each destination pixel, its angle/radius relative to
+// (cx,cy) locates the source pixel to pull from, so every destination is filled in a
+// single pass with no gaps. This only removes the redundant full-image scan the old
+// code ran purely to find maxuRadius, which cancelled out of the per-pixel formula
+// anyway (rScale = maxuRadius/desiredRadius, then r/maxuRadius*rScale = r/desiredRadius).
+
       double minBoundary = min(Width, Height);
-
-      #pragma omp parallel for schedule(dynamic) default(none) shared(maxuRadius) // num_threads(3)
-      for (int y = 0; y < Height; y++)
-      {
-         for (int x = 0; x < Width; x++)
-         {
-            double px = x - cx;     double py = y - cy;
-            double r = sqrt(px*px + py*py);
-            if (r<0)
-               r = 0;
-
-            maxuRadius = max(r, maxuRadius);
-        }
-      }
-
       double desiredRadius = minBoundary/2;
-      double rScale = maxuRadius/desiredRadius;
 
-      // fnOutputDebug("maxR===" + std::to_string(maxuRadius) + "; rS=" + std::to_string(rScale) + "; imgAR=" + std::to_string(imgAR));
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
+      // distance-from-a-point is convex, so its max over the pixel grid is always at
+      // one of the 4 corners -- no need to scan every pixel to find it
+      double c1x = 0-cx,           c1y = 0-cy;
+      double c2x = (Width-1)-cx,   c2y = 0-cy;
+      double c3x = 0-cx,           c3y = (Height-1)-cy;
+      double c4x = (Width-1)-cx,   c4y = (Height-1)-cy;
+      double maxuRadius = sqrt(max(max(c1x*c1x + c1y*c1y, c2x*c2x + c2y*c2y), max(c3x*c3x + c3y*c3y, c4x*c4x + c4y*c4y)));
+
+      const double angleToCol = Width / 360.0;
+      const double radiusToRow = (Height * userScale) / desiredRadius;
+
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, Width, Height, cx, cy, angleToCol, radiusToRow)
       for (int y = 0; y < Height; y++)
       {
          for (int x = 0; x < Width; x++)
          {
-            double angle = 0;
             double px = x - cx;     double py = y - cy;
             double r = sqrt(px*px + py*py);
-            // if ((y - cy)<=0)
-            //    angle = 2*M_PI + atan2(y - cy, x - cx);
-            // else
-               angle = atan2(py, px);
-
-            angle = rad2deg(angle) + 90;
+            double angle = rad2deg(atan2(py, px)) + 90;
             if (angle<0)
                angle += 360;
-            // double zx = r*cos(angle);
-            // double zy = r*sin(angle);
-            int dx = (angle / 360.0f) * Width;
-            int dy = (r / maxuRadius) * Height * rScale * userScale;
+
+            int dx = (int)(angle * angleToCol);
+            int dy = (int)(r * radiusToRow);
             dx = clamp(dx, 0, Width - 1);
             dy = clamp(dy, 0, Height - 1);
             newData[x + y*Width] = imageData[dx + (dy * Width)];
@@ -7748,300 +7740,41 @@ DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, 
 }
 
 DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, int Height, double cx, double cy, double userScale) {
-// TO-DO: this is an absolutely dumb implementation; I do not know how to optimize it
+// backward (gather) mapping: the analytical inverse of the forward angle/radius
+// formula used by rect2polarIMG, so every destination pixel is computed directly
+// from its source location -- no scatter, no supersampling passes, no gap-filling.
 // inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
 
-      double maxuRadius = 0;
       double minBoundary = min(Width, Height);
-
-      // identify the maximum radius
-      // #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < Height*2; y++)
-      {
-         for (int x = 0; x < Width*2; x++)
-         {
-            double px = x/2.0f - cx;     double py = y/2.0f - cy;
-            double r = sqrt(px*px + py*py);
-            if (r<0)
-               r = 0;
-
-            maxuRadius = max(r, maxuRadius);
-        }
-      }
-
       double desiredRadius = minBoundary/2;
-      double rScale = maxuRadius/desiredRadius;
-      const UINT maxPixels = Width + Height * Width;
-      // int *pixelzMap{ new int[maxPixels]{} };  // dynamically allocated array
-      // memset(pixelzMap, -1, maxPixels * sizeof(int*)); // and fill it with -1
-      // std::fill(pixelzMap, pixelzMap + maxPixels, -1); 
-      std::vector<int> pixelzMap(maxPixels, -1);
-      double imgAR = Width/Height;
-      if (imgAR<1)
-         imgAR = 1;
+      double invScale = (userScale!=0) ? 1.0/userScale : 0.0;
 
-      // fill image with accuracy 2x, 4x, 8x, 16x and 32x
-      // the upper sections of the image need high accuracy
-      double acX = 1.0;
-      double acY = 1.0;
-      int ph = Height;
-      int pw = Width;
+      // maximum distance from (cx,cy) to a corner of the image; only needed for
+      // the return value, so found directly instead of by scanning every pixel
+      double c1 = (0-cx)*(0-cx)         + (0-cy)*(0-cy);
+      double c2 = (Width-cx)*(Width-cx) + (0-cy)*(0-cy);
+      double c3 = (0-cx)*(0-cx)         + (Height-cy)*(Height-cy);
+      double c4 = (Width-cx)*(Width-cx) + (Height-cy)*(Height-cy);
+      double maxuRadius = sqrt(max(max(c1, c2), max(c3, c4)));
 
-
-      acX = 2.0;       acY = 2.0;
-      ph = Height*acY; pw = Width*acX;
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < ph; y++)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, Width, Height, cx, cy, desiredRadius, invScale)
+      for (int y = 0; y < Height; y++)
       {
-         // if (y>=ph*0.425)
-         //   continue;
-         for (int x = 0; x < pw; x++)
+         for (int x = 0; x < Width; x++)
          {
-            if (x>=pw*0.41 && x<=pw*0.59)
-               continue;
+            double angle = (x / (double)Width) * 360.0;
+            double r = (y / (double)Height) * desiredRadius * invScale;
+            double angleRad = deg2rad(angle - 90.0);
 
-            double angle = 0;
-            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
-            double r = sqrt(px*px + py*py);
-            // if ((y - cy)<=0)
-            //    angle = 2*M_PI + atan2(y - cy, x - cx);
-            // else
-               angle = atan2(py, px);
+            int sx = (int)(cx + r*cos(angleRad));
+            int sy = (int)(cy + r*sin(angleRad));
+            sx = clamp(sx, 0, Width - 1);
+            sy = clamp(sy, 0, Height - 1);
 
-            angle = rad2deg(angle) + 90;
-            if (angle<0)
-               angle += 360;
-
-            int dx = (angle / 360.0f) * Width;
-            int dy = (r / maxuRadius) * Height * rScale * userScale;
-            dx = clamp(dx, 0, Width - 1);
-            dy = clamp(dy, 0, Height - 1);
-
-            int zx = x/acX; int zy = y/acY;
-            zx = clamp(zx, 0, Width - 1);
-            zy = clamp(zy, 0, Height - 1);
-
-            pixelzMap[dx + dy*Width] = zx;
-            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
+            newData[x + y*Width] = imageData[sx + sy*Width];
         }
       }
 
-      acX = 4.0;       acY = 4.0;
-      ph = Height*acY; pw = Width*acX;
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < ph; y++)
-      {
-         // if (y>ph*0.455)
-         //   continue;
-         for (int x = 0; x < pw; x++)
-         {
-            if (x<pw*0.4)
-              continue;
-            if (x>pw*0.6)
-              continue;
-
-            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
-            double r = sqrt(px*px + py*py);
-            double angle = atan2(py, px);
-            angle = rad2deg(angle) + 90;
-            if (angle<0)
-               angle += 360;
-
-            int dx = (angle / 360.0f) * Width;
-            int dy = (r / maxuRadius) * Height * rScale * userScale;
-            dx = clamp(dx, 0, Width - 1);
-            dy = clamp(dy, 0, Height - 1);
-
-            int zx = x/acX; int zy = y/acY;
-            zx = clamp(zx, 0, Width - 1);
-            zy = clamp(zy, 0, Height - 1);
-
-            pixelzMap[dx + dy*Width] = zx;
-            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
-        }
-      }
-
-      acX = 8.0;       acY = 8.0;
-      ph = Height*acY; pw = Width*acX;
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < ph; y++)
-      {
-         if (y<ph*0.45)
-           continue;
-         for (int x = 0; x < pw; x++)
-         {
-            if (x<pw*0.45)
-              continue;
-            if (x>pw*0.55)
-              continue;
-
-            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
-            double r = sqrt(px*px + py*py);
-            double angle = atan2(py, px);
-            angle = rad2deg(angle) + 90;
-            if (angle<0)
-               angle += 360;
-
-            int dx = (angle / 360.0f) * Width;
-            int dy = (r / maxuRadius) * Height * rScale * userScale;
-            dx = clamp(dx, 0, Width - 1);
-            dy = clamp(dy, 0, Height - 1);
-
-            int zx = x/acX; int zy = y/acY;
-            zx = clamp(zx, 0, Width - 1);
-            zy = clamp(zy, 0, Height - 1);
-
-            pixelzMap[dx + dy*Width] = zx;
-            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
-        }
-      }
-
-      acX = 16.0;      acY = 16.0;
-      ph = Height*acY; pw = Width*acX;
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < ph; y++)
-      {
-         if (y<ph*0.47)
-           continue;
-         for (int x = 0; x < pw; x++)
-         {
-            if (x<pw*0.47)
-              continue;
-            if (x>pw*0.53)
-              continue;
-
-            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
-            double r = sqrt(px*px + py*py);
-            double angle = atan2(py, px);
-            angle = rad2deg(angle) + 90;
-            if (angle<0)
-               angle += 360;
-
-            int dx = (angle / 360.0f) * Width;
-            int dy = (r / maxuRadius) * Height * rScale * userScale;
-            dx = clamp(dx, 0, Width - 1);
-            dy = clamp(dy, 0, Height - 1);
-
-            int zx = x/acX; int zy = y/acY;
-            zx = clamp(zx, 0, Width - 1);
-            zy = clamp(zy, 0, Height - 1);
-
-            pixelzMap[dx + dy*Width] = zx;
-            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
-        }
-      }
-
-      acX = 32.0;       acY = 32.0;
-      ph = Height*acY;  pw = Width*acX;
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 0; y < ph; y++)
-      {
-         if (y<ph*0.49)
-           continue;
-         for (int x = 0; x < pw; x++)
-         {
-            if (x<pw*0.49)
-              continue;
-            if (x>pw*0.51)
-              continue;
-
-            double px = (double)x/acX - cx;     double py = (double)y/acY - cy;
-            double r = sqrt(px*px + py*py);
-            double angle = atan2(py, px);
-            angle = rad2deg(angle) + 90;
-            if (angle<0)
-               angle += 360;
-
-            int dx = (angle / 360.0f) * Width;
-            int dy = (r / maxuRadius) * Height * rScale * userScale;
-            dx = clamp(dx, 0, Width - 1);
-            dy = clamp(dy, 0, Height - 1);
-
-            int zx = x/acX; int zy = y/acY;
-            zx = clamp(zx, 0, Width - 1);
-            zy = clamp(zy, 0, Height - 1);
-
-            pixelzMap[dx + dy*Width] = zx;
-            newData[dx + dy*Width] = imageData[zx + (zy * Width)];
-        }
-      }
-
-      int failed = 0; int fixt = 0;
-      // fill missing pixels; silly algorithm
-      #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
-      for (int y = 1; y < Height - 1; y++)
-      {
-         for (int x = 1; x < Width - 1; x++)
-         {
-               int px = x + y*Width;
-               if (pixelzMap[px]==-1)
-               {
-                   fixt++;
-                   if (pixelzMap[x-1 + y*Width]==(x-1))
-                   {
-                      pixelzMap[px] = pixelzMap[x-1 + y*Width];
-                      newData[px] = newData[x-1 + (y * Width)];
-                   } else if (pixelzMap[x+1 + y*Width]==(x+1))
-                   {
-                      pixelzMap[px] = pixelzMap[x+1 + y*Width];
-                      newData[px] = newData[x+1 + (y * Width)];
-                   } else if (pixelzMap[x + (y-1)*Width]==x)
-                   {
-                      pixelzMap[px] = pixelzMap[x + (y-1)*Width];
-                      newData[px] = newData[x + ((y-1) * Width)];
-                   } else if (pixelzMap[x + (y+1)*Width]==x)
-                   {
-                      pixelzMap[px] = pixelzMap[x + (y+1)*Width];
-                      newData[px] = newData[x + ((y+1) * Width)];
-                   } else if (pixelzMap[x + (y-1)*Width]>=0)
-                   {
-                      pixelzMap[px] = pixelzMap[x + (y-1)*Width];
-                      newData[px] = newData[x + ((y-1) * Width)];
-                   } else if (pixelzMap[x + (y+1)*Width]>=0)
-                   {
-                      pixelzMap[px] = pixelzMap[x + (y+1)*Width];
-                      newData[px] = newData[x + ((y+1) * Width)];
-                   } else if (pixelzMap[x-1 + y*Width]>=0)
-                   {
-                      pixelzMap[px] = pixelzMap[x-1 + y*Width];
-                      newData[px] = newData[x-1 + (y * Width)];
-                   } else if (pixelzMap[x+1 + y*Width]>=0)
-                   {
-                      pixelzMap[px] = pixelzMap[x+1 + y*Width];
-                      newData[px] = newData[x+1 + (y * Width)];
-                   } else 
-                      failed++;
-               }
-        }
-      }
-
-      fixt -= failed;
-      // fnOutputDebug("failed= " + std::to_string(failed) + " yay= " + std::to_string(fixt));
-      int y = 0;
-      for (int x = 1; x < Width - 1; x++)
-      {
-          int px = x + y*Width;
-          if (pixelzMap[px]==-1)
-          {
-              fixt++;
-              pixelzMap[px] = pixelzMap[x-1 + y*Width];
-              newData[px] = newData[x-1 + (y * Width)];
-          }
-      }
-
-      y = Height - 1;
-      for (int x = 1; x < Width - 1; x++)
-      {
-          int px = x + y*Width;
-          if (pixelzMap[px]==-1)
-          {
-              fixt++;
-              pixelzMap[px] = pixelzMap[x-1 + y*Width];
-              newData[px] = newData[x-1 + (y * Width)];
-          }
-      }
-
-      // delete[] pixelzMap;
       return (int)maxuRadius;
 }
 
