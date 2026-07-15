@@ -7700,9 +7700,7 @@ DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, 
 // inspired by https://imagej.nih.gov/ij/plugins/polar-transformer.html
 // backward (gather) mapping: for each destination pixel, its angle/radius relative to
 // (cx,cy) locates the source pixel to pull from, so every destination is filled in a
-// single pass with no gaps. This only removes the redundant full-image scan the old
-// code ran purely to find maxuRadius, which cancelled out of the per-pixel formula
-// anyway (rScale = maxuRadius/desiredRadius, then r/maxuRadius*rScale = r/desiredRadius).
+// single pass with no gaps.
 
       double minBoundary = min(Width, Height);
       double desiredRadius = minBoundary/2;

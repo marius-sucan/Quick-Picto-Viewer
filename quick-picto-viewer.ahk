@@ -19297,11 +19297,11 @@ QPV_rect2polar(pBitmap) {
   }
 
   trGdip_GetImageDimensions(pBitmap, ow, oh)
-  kBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, ow*2, oh*2, 0, 5, -1, 1)
+  ; kBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, ow*2, oh*2, 0, 5, -1, 1)
   If !validBMP(kBitmap)
      pBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
-  Else
-     pBitmap := kBitmap
+  ; Else
+  ;    pBitmap := kBitmap
 
   If !validBMP(pBitmap)
      Return
@@ -19314,9 +19314,9 @@ QPV_rect2polar(pBitmap) {
   If !validBMP(newBitmap)
      Return
 
+  Static orbScale := 1
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
-  orbScale := 1
   cx := w/2 , cy := h/2
   If (!E1 && !E2)
      r := DllCall("qpvmain.dll\rect2polarIMG", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "double", cx, "double", cy, "double", orbScale, "int")
@@ -19828,7 +19828,6 @@ QPV_polar2rect(oBitmap) {
   px := Round(cx - pk)
   py := Round(cy - pk)
   pw := ph := Round(pk*2)
-
   GP := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
   If !GP
   {
