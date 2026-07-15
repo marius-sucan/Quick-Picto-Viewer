@@ -19288,10 +19288,6 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
     dummyTimerDelayiedImageDisplay(50)
 } ; // EraseOrInvertOrGraySelectedArea()
 
-QPV_rect2polar(pBitmap) {
-  Return QPV_PolarTransformBitmap(A_ThisFunc, "rect2polarIMG", pBitmap)
-}
-
 QPV_DissolveBitmap(pBitmap, rx, ry) {
   initQPVmainDLL()
   If !qpvMainDll
@@ -19706,9 +19702,9 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     Gdip_SetClipPath(G2, pPath)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
     If (actionu=1)
-       gBitmap := QPV_rect2polar(zBitmap)
+       gBitmap := QPV_PolarTransformBitmap(A_ThisFunc, "rect2polarIMG", pBitmap)
     Else If (actionu=2)
-       gBitmap := QPV_polar2rect(zBitmap)
+       gBitmap := QPV_PolarTransformBitmap(A_ThisFunc, "polar2rectIMG", pBitmap)
     Else If (actionu=3)
     {
         gBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
@@ -19741,10 +19737,6 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     }
     SetTimer, ResetImgLoadStatus, -250
     ; fnOutputDebug(A_ThisFunc "(" actionu "," extraMod "): " A_TickCount - startZeit)
-}
-
-QPV_polar2rect(pBitmap) {
-  Return QPV_PolarTransformBitmap(A_ThisFunc, "polar2rectIMG", pBitmap)
 }
 
 QPV_PolarTransformBitmap(funcu, dllFunc, pBitmap) {
