@@ -7751,11 +7751,8 @@ DLL_API int DLL_CALLCONV rect2polarIMG(int *imageData, int *newData, int Width, 
 // strip pixel to pull from, so every destination is filled in one pass with no gaps.
 // The destination is addressed in normalized elliptical coordinates -- radius 1 is the ellipse
 // inscribed in the WxH destination, not a circle of radius min(W,H)/2 -- so the whole bitmap is
-// covered whatever its aspect ratio. That is what the caller used to buy by cropping the disk
-// out of the result and stretching it back up. Beyond radius 1 the strip's last row keeps being
+// covered whatever its aspect ratio. Beyond radius 1 the strip's last row keeps being
 // pulled, which is what fills the corners.
-// The horizontal mirror the caller used to apply afterwards is folded into the coordinate, and
-// superSamples (NxN) replaces the 2x upscale it used to run the transform through.
 
       if (!imageData || !newData || Width<1 || Height<1)
          return 0;
@@ -7807,9 +7804,7 @@ DLL_API int DLL_CALLCONV polar2rectIMG(int *imageData, int *newData, int Width, 
 //
 // The source is swept in normalized elliptical coordinates -- radius 1 is the ellipse inscribed
 // in the WxH source, not a circle of radius min(W,H)/2 -- so the whole bitmap is read whatever
-// its aspect ratio. That is what the caller used to buy by squashing the image into a centred
-// square first; sweeping the ellipse here reads the original pixels once instead of resampling
-// them twice. The angular mirror the caller used to apply afterwards is folded into the angle.
+// its aspect ratio. 
 
       if (!imageData || !newData || Width<1 || Height<1)
          return 0;

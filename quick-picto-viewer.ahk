@@ -19748,8 +19748,7 @@ QPV_polar2rect(pBitmap) {
 }
 
 QPV_PolarTransformBitmap(funcu, dllFunc, pBitmap) {
-  ; the DLL sweeps the ellipse inscribed in the bitmap and mirrors the result itself, so there is
-  ; nothing left to square off, crop, stretch or flip here; superSamples replaces the 2x upscale
+  ; the DLL sweeps the ellipse inscribed in the bitmap and mirrors the result itself
   Static orbScale := 1, superSamples := 2
   initQPVmainDLL()
   If !qpvMainDll
