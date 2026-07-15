@@ -7759,8 +7759,8 @@ DLL_API int DLL_CALLCONV rect2polarIMG(unsigned char *imageData, unsigned char *
       if (!imageData || !newData || Width<1 || Height<1)
          return 0;
 
-      // semi-axes of the covered ellipse; Width/2 and Height/2 for a centred origin, and far
-      // enough to still reach every edge if the origin is moved off centre
+      // semi-axes of the covered ellipse; Width/2 and Height/2 for a centered origin, and far
+      // enough to still reach every edge if the origin is moved off center
       const double rx = max(cx, Width - cx);
       const double ry = max(cy, Height - cy);
       if (rx<=0 || ry<=0)
@@ -7831,7 +7831,7 @@ DLL_API int DLL_CALLCONV polar2rectIMG(unsigned char *imageData, unsigned char *
                const double r = max(0.0, (y + (sy + 0.5)*ssStep - 0.5)) * rowToRadius;
                for (int sx = 0; sx < ss; sx++)
                {
-                  // mirrored angle, as the caller used to flip the finished strip
+                  // mirrored angle
                   const double angle = (Width - 1 - (x + (sx + 0.5)*ssStep - 0.5)) * colToAngle;
                   const double angleRad = deg2rad(angle - 90.0);
                   accumBilinearSample(imageData, Width, Height, cx + r*rx*cos(angleRad), cy + r*ry*sin(angleRad), false, ssWeight, acc);
