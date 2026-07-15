@@ -660,10 +660,31 @@ struct RGBAColor {
 };
 
 
+// ---------------------------------------------------------------------------
+// RGBA16color - the 16-bit-internal pixel used by AdjustImageColorsPrecise().
+//
+// The 65536-entry LUTs stay: benchmarking says recomputing their closed forms
+// per pixel is a LOSS (contraMathsInt16 hides a floor(), which is not a single
+// instruction without SSE4.1, and the tables are cache-coherent in practice).
+// What changed is WHO uses them:
+//   UseLUT=true  -> the per-pixel path, reads the tables.
+//   UseLUT=false -> the 256-entry table builders in AdjustPlan, which evaluate
+//                   the closed form directly and so need no 65536-entry build.
+// gammaMathsInt16(i,z)==LUTgamma[i]/LUTgammaBright[i], brightMathsInt16(i,f)==
+// LUTbright[i] and contraMathsInt16(i,f,32768)==LUTcontra[i] by construction,
+// so the two modes are bit-identical.
+//
+// Alpha is gone from the RGB ops: it never reads r/g/b and r/g/b never read it,
+// so the caller resolves alpha with a 256-entry LUT instead.
+//
+// Everything per-pixel is QPV_FORCEINLINE: the pipeline is one ~2.5 KB body and
+// the inliner otherwise gives up on it, spilling the pixel to memory and costing
+// ~25 cycles/px.
+// ---------------------------------------------------------------------------
 struct RGBA16color {
     int b, g, r, a;
 
-    HSLColor ConvertRGBtoHSL() {
+    QPV_FORCEINLINE HSLColor ConvertRGBtoHSL() const {
        const double rf = int_to_float[r];
        const double gf = int_to_float[g];
        const double bf = int_to_float[b];
@@ -700,54 +721,38 @@ struct RGBA16color {
         return {H * 360.0, S, L};
     }
 
-    void channelOffset(int ao, int ro, int go, int bo, int noClamping) {
-        a = clamp(a + ao, 0, 65535);
+    QPV_FORCEINLINE void channelOffsetRGB(int ro, int go, int bo, int noClamping) {
         r = (noClamping==1) ? r + ro : clamp(r + ro, 0, 65535);
         g = (noClamping==1) ? g + go : clamp(g + go, 0, 65535);
         b = (noClamping==1) ? b + bo : clamp(b + bo, 0, 65535);
     }
 
-    void threshold(int ao, int ro, int go, int bo, int seeThrough) {
+    QPV_FORCEINLINE void thresholdRGB(int ro, int go, int bo, int seeThrough) {
         if (seeThrough==2)
         {
-           if (ao>=0)
-              a = (a>ao) ? a : 0;
-           if (ro>=0)
-              r = (r>ro) ? r : 0;
-           if (go>=0)
-              g = (g>go) ? g : 0;
-           if (bo>=0)
-              b = (b>bo) ? b : 0;
+           if (ro>=0) r = (r>ro) ? r : 0;
+           if (go>=0) g = (g>go) ? g : 0;
+           if (bo>=0) b = (b>bo) ? b : 0;
        } else if (seeThrough==3)
        {
-          if (ao>=0)
-             a = (a>ao) ? 65535 : a;
-          if (ro>=0)
-             r = (r>ro) ? 65535 : r;
-          if (go>=0)
-             g = (g>go) ? 65535 : g;
-          if (bo>=0)
-             b = (b>bo) ? 65535 : b;
+          if (ro>=0) r = (r>ro) ? 65535 : r;
+          if (go>=0) g = (g>go) ? 65535 : g;
+          if (bo>=0) b = (b>bo) ? 65535 : b;
       } else
       {
-         if (ao>=0)
-            a = (a>ao) ? 65535 : 0;
-         if (ro>=0)
-            r = (r>ro) ? 65535 : 0;
-         if (go>=0)
-            g = (g>go) ? 65535 : 0;
-         if (bo>=0)
-            b = (b>bo) ? 65535 : 0;
+         if (ro>=0) r = (r>ro) ? 65535 : 0;
+         if (go>=0) g = (g>go) ? 65535 : 0;
+         if (bo>=0) b = (b>bo) ? 65535 : 0;
       }
     }
 
-    void invert() {
+    QPV_FORCEINLINE void invert() {
         r = 65535 - r;
         g = 65535 - g;
         b = 65535 - b;
     }
 
-    void blackPoint(int level, int noise) {
+    QPV_FORCEINLINE void blackPoint(int level, int noise) {
         int rando = 0;
         if (noise == 1) {
             thread_local unsigned int seed = 123456789U;
@@ -759,7 +764,7 @@ struct RGBA16color {
         b = max(b, level + rando);
     }
 
-    void whitePoint(int level, int noise) {
+    QPV_FORCEINLINE void whitePoint(int level, int noise) {
         int rando = 0;
         if (noise == 1) {
             thread_local unsigned int seed = 123456789U;
@@ -771,14 +776,23 @@ struct RGBA16color {
         b = min(b, level - rando);
     }
 
-    void brightness(int level, int altMode, int noClamping, float fintensity) {
+    template<bool UseLUT>
+    QPV_FORCEINLINE void brightness(int level, int altMode, int noClamping, float fintensity, double zammaBright) {
         if (altMode==0)
         {
            if (level<0 && noClamping==0)
            {
-              r = LUTgammaBright[r];
-              g = LUTgammaBright[g];
-              b = LUTgammaBright[b];
+              if (UseLUT)
+              {
+                 r = LUTgammaBright[r];
+                 g = LUTgammaBright[g];
+                 b = LUTgammaBright[b];
+              } else
+              {
+                 r = gammaMathsInt16(r, zammaBright);
+                 g = gammaMathsInt16(g, zammaBright);
+                 b = gammaMathsInt16(b, zammaBright);
+              }
            }
            r = (noClamping==1) ? r + level : clamp(r + level, 0, 65535);
            g = (noClamping==1) ? g + level : clamp(g + level, 0, 65535);
@@ -787,20 +801,24 @@ struct RGBA16color {
        {
            if (noClamping==1)
            {
-              // float fintensity = (level>0) ? level/32768.0f : -1*int_to_float[-1*level];
               r = r + (float)r*fintensity;
               g = g + (float)g*fintensity;
               b = b + (float)b*fintensity;
-           } else
+           } else if (UseLUT)
            {
               r = LUTbright[r];
               g = LUTbright[g];
               b = LUTbright[b];
+           } else
+           {
+              r = brightMathsInt16(r, fintensity);
+              g = brightMathsInt16(g, fintensity);
+              b = brightMathsInt16(b, fintensity);
            }
        }
     }
 
-    int getGrayscaleAdvanced() {
+    QPV_FORCEINLINE int getGrayscaleAdvanced() const {
        const float minu = min(r, min(g, b));
        float maxu = max(r, max(g, b));
        float nr = r;
@@ -826,12 +844,13 @@ struct RGBA16color {
        return gray;
     }
 
-    void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi) {
+    // shadows/highlights force the per-pixel path (they read the pixel's
+    // grayscale), so they always use the tables.
+    QPV_FORCEINLINE void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi) {
        int nr, ng, nb;
        if (noClamping==1)
        {
            float maxu = max(r, max(g, b));
-           float minu = min(r, min(g, b));
            if (maxu<65535)
               maxu = 65535.0f;
 
@@ -872,7 +891,7 @@ struct RGBA16color {
        }
     }
 
-    void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi) {
+    QPV_FORCEINLINE void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -918,12 +937,15 @@ struct RGBA16color {
        }
     }
 
-    void gamma(int level, int bright, int altMode, int noClamping) {
+    // The clamped branch only ever ran on the 256 values reachable straight out
+    // of char_to_int[]+invert, so it is always folded into the head table and
+    // LUTgamma[] is never needed. zamma == 1.0/(gamma/300.0).
+    QPV_FORCEINLINE void gamma(int level, int bright, int altMode, int noClamping, double zamma) {
       if (noClamping==0)
       {
-          r = LUTgamma[r];
-          g = LUTgamma[g];
-          b = LUTgamma[b];
+          r = gammaMathsInt16(r, zamma);
+          g = gammaMathsInt16(g, zamma);
+          b = gammaMathsInt16(b, zamma);
       } else
       {
           const float minu = min(r, min(g, b));
@@ -961,13 +983,9 @@ struct RGBA16color {
       }
     }
 
-    void contrast(int level, int altContra, int linearGamma, float fintensity, int noClamping, float fip) {
-        if (altContra==1)
-        {
-           a = LUTcontra[a];
-           return;
-        }
-
+    // RGB half only; altContra==1 touched nothing but alpha, which is a LUT now.
+    template<bool UseLUT>
+    QPV_FORCEINLINE void contrast(int level, int linearGamma, float fintensity, int noClamping, float fip) {
         if (noClamping==1)
         {
            const float minu = min(r, min(g, b));
@@ -1005,10 +1023,10 @@ struct RGBA16color {
               nb = b + thisMin;
               offset = thisMin*2 + level;
            }
-    
+
            if (maxu<65535)
               maxu = 65535.0f;
-    
+
            float mid = maxu/2.0f;
            if (level>0)
            {
@@ -1017,7 +1035,6 @@ struct RGBA16color {
               nb = floor( (float)fip * (nb - mid) ) + mid - offset;
               if (level<16000)
               {
-                 // level = clamp(level, 0, 16000);
                  fi = level/16000.0f;
                  r = weighTwoValues(nr, r, fip);
                  g = weighTwoValues(ng, g, fip);
@@ -1036,7 +1053,6 @@ struct RGBA16color {
            }
         } else
         {
-           // clamped mode
            if (level>0)
            {
               int gray = getInt16grayscale(r, g, b);
@@ -1052,14 +1068,22 @@ struct RGBA16color {
                  b = weighTwoValues(gray, b, fintensity);
               }
            }
-   
-           r = LUTcontra[r];
-           g = LUTcontra[g];
-           b = LUTcontra[b];
+
+           if (UseLUT)
+           {
+              r = LUTcontra[r];
+              g = LUTcontra[g];
+              b = LUTcontra[b];
+           } else
+           {
+              r = contraMathsInt16(r, fip, 32768);
+              g = contraMathsInt16(g, fip, 32768);
+              b = contraMathsInt16(b, fip, 32768);
+           }
         }
     }
 
-    void saturation(int level, int altMode, int linearGamma, float saturation) {
+    QPV_FORCEINLINE void saturation(int level, int altMode, int linearGamma, float saturation) {
         if (altMode>1)
         {
            int gray = (altMode==2) ? r : g;
@@ -1119,10 +1143,10 @@ struct RGBA16color {
            r = clamp(factor * ((float)r - luxAvg) + luxAvg + lux, 0.0f, 65535.0f);
            g = clamp(factor * ((float)g - luxAvg) + luxAvg + lux, 0.0f, 65535.0f);
            b = clamp(factor * ((float)b - luxAvg) + luxAvg + lux, 0.0f, 65535.0f);
-        };
+        }
     }
 
-    void hueRotate(int degrees, float saturation, int altMode, int level) {
+    QPV_FORCEINLINE void hueRotate(int degrees) {
         HSLColor HSLu = ConvertRGBtoHSL();
         float hue = HSLu.h + (float)degrees;
         while (hue > 360.0f) hue -= 360.0f;
@@ -1135,7 +1159,7 @@ struct RGBA16color {
            fi = degrees/15.0f;
         else if (inRange(-15, 0, degrees))
            fi = abs(degrees)/15.0f;
-        
+
         if (inRange(-15, 15, degrees))
         {
            r = weighTwoValues(newRGB.r, r, fi);
@@ -1149,9 +1173,9 @@ struct RGBA16color {
         }
     }
 
-    void tinto(int degrees, int level, int linearGamma) {
+    QPV_FORCEINLINE void tinto(int degrees, int level, int linearGamma) {
         HSLColor HSLu = ConvertRGBtoHSL();
-        HSLColor newHSL = {degrees, 0.5, HSLu.l};
+        HSLColor newHSL = {(double)degrees, 0.5, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGBint16();
         const float fintensity = int_to_float[level];
         if (linearGamma==1)
@@ -1167,7 +1191,7 @@ struct RGBA16color {
         }
     }
 
-    void tint(float hue, int level, int altMode, int linearGamma) {
+    QPV_FORCEINLINE void tint(float hue, int level, int altMode, int linearGamma) {
         if (altMode==1)
            return tinto(hue, level, linearGamma);
 
@@ -1182,36 +1206,12 @@ struct RGBA16color {
         const float t = gray * (1.0f - (1.0f - f));
         int nr = 0, ng = 0, nb = 0;
         switch (hi) {
-            case 0:
-                nr = z;
-                ng = t * 65535.0f;
-                nb = 0;
-                break;
-            case 1:
-                nr = q * 65535.0f;
-                ng = z;
-                nb = 0;
-                break;
-            case 2:
-                nr = 0;
-                ng = z;
-                nb = t * 65535.0f;
-                break;
-            case 3:
-                nr = 0;
-                ng = q * 65535.0f;
-                nb = z;
-                break;
-            case 4:
-                nr = t * 65535.0f;
-                ng = 0;
-                nb = z;
-                break;
-            case 5:
-                nr = z;
-                ng = 0;
-                nb = q * 65535.0f;
-                break;
+            case 0: nr = z; ng = t * 65535.0f; nb = 0; break;
+            case 1: nr = q * 65535.0f; ng = z; nb = 0; break;
+            case 2: nr = 0; ng = z; nb = t * 65535.0f; break;
+            case 3: nr = 0; ng = q * 65535.0f; nb = z; break;
+            case 4: nr = t * 65535.0f; ng = 0; nb = z; break;
+            case 5: nr = z; ng = 0; nb = q * 65535.0f; break;
         }
 
         z = z/3; // gray
