@@ -5994,6 +5994,13 @@ livePreviewFillSelectedArea() {
       coreFillSelectedArea(1, -1, liveDrawingBrushTool)
 }
 
+livePreviewDrawShapesArea() {
+   If (viewportQPVimage.imgHandle)
+      livePreviewHugeImageDrawLineShapes()
+   Else
+      coreDrawLinesStuffTool("shapes")
+}
+
 dummyLivePreviewsDelayer() {
    livePreviewsImageEditing(0, A_ThisFunc)
 }
@@ -6056,7 +6063,7 @@ corelivePreviewsImageEditing(modus:=0) {
       Else If (AnyWindowOpen=55 && okayu=1)
          livePreviewDesaturateArea()
       Else If (AnyWindowOpen=65 && okayu=1)
-         coreDrawLinesStuffTool("shapes")
+         livePreviewDrawShapesArea()
       Else If (AnyWindowOpen=68 && okayu=1)
          livePreviewFillBehindArea()
       Else If (AnyWindowOpen=70 && (okayu=1 || liveDrawingBrushTool=1))
@@ -18343,6 +18350,173 @@ livePreviewHugeImageFillSelArea() {
       Gdip_DeletePath(invertPath)
 
    ; fnOutputDebug("step END: " A_TickCount - ozeit)
+}
+
+livePreviewHugeImageDrawLineShapes() {
+; Live preview for the «Draw shapes in selected area» tool [AnyWindowOpen=65]
+; when the opened image relies on the viewportQPVimage object [FreeImage handle].
+; Function inspired by livePreviewHugeImageFillSelArea().
+;
+; It renders the line shapes on the bitmap section captured from the viewport
+; using the same qpvmain.dll functions as HugeImagesDrawLineShapes():
+; prepareDrawLinesMask() and NewDrawLinesOnMask(). This way, the preview
+; closely matches the final results: pen alignment/clipping, round or mitered
+; joins, caps styles, double lines, shape cavity and blend modes.
+   Critical, on
+   Gdip_ResetClip(2NDglPG)
+   If (doImgEditLivePreview!=1 || editingSelectionNow!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) || imgSelOutViewPort=1)
+      Return
+
+   ozeit := A_TickCount
+   vpWinClientSize(mainWidth, mainHeight)
+   trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
+   objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+
+   ; calculate the line thickness [as a radius] in image space,
+   ; identically to HugeImagesDrawLineShapes(), then scale it to the zoom level
+   o_imgSelW := max(nImgSelX1, nImgSelX2) - min(nImgSelX1, nImgSelX2)
+   o_imgSelH := max(nImgSelY1, nImgSelY2) - min(nImgSelY1, nImgSelY2)
+   maxLength := min(o_imgSelW, o_imgSelH)//2
+   thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
+   thisThick := thisThick * (DrawLineAreaThickScale / 100)
+   thisThick := Round(thisThick * 0.495 * zoomLevel)
+   tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
+   tk := Round(tk * 1.5) + 2
+
+   ; the selection area bounding box in window coordinates, expanded by «tk»
+   ; on every side, to make room for the line thickness, miters and caps
+   ebx1 := imgSelPx - tk,        eby1 := imgSelPy - tk
+   ebw := imgSelW + tk*2,        ebh := imgSelH + tk*2
+
+   ; the viewport region to capture = the expanded box intersected with
+   ; the image area displayed on the screen [and the window implicitly]
+   getClampedVPimgBounds(icx1, icy1, icx2, icy2, icw, ich)
+   capX1 := Round(max(ebx1, icx1)),         capY1 := Round(max(eby1, icy1))
+   capX2 := Round(min(ebx1 + ebw, icx2)),   capY2 := Round(min(eby1 + ebh, icy2))
+   If (capX2 - capX1<1 || capY2 - capY1<1)
+      Return
+
+   zBitmap := getImgSelectedAreaEditMode(1, capX1, capY1, capX2 - capX1, capY2 - capY1, capX2 - capX1, capY2 - capY1, 0, capX2 - capX1, capY2 - capY1)
+   If !validBMP(zBitmap)
+   {
+      addJournalEntry(A_ThisFunc "(): Failed to capture viewport bitmap required for the live preview.")
+      Return
+   }
+
+   trGdip_GetImageDimensions(zBitmap, imgW, imgH)
+   EZ := trGdip_LockBits(zBitmap, 0, 0, imgW, imgH, Stride, iScan, iData)
+   If EZ
+   {
+      trGdip_DisposeImage(zBitmap)
+      addJournalEntry(A_ThisFunc "(): Failed to generate live preview. Unable to lock the bitmap bits.")
+      Return
+   }
+
+   ; pass to the DLL the expanded box in coordinates relative to the captured
+   ; bitmap and the mask subsection matching the captured region; the
+   ; coordinates systems are the same as in HugeImagesDrawLineShapes(),
+   ; except everything is in viewport space [zoomed] and not flipped on Y,
+   ; because GDI+ bitmaps are stored top-down, unlike FreeImage objects
+   bx1 := ebx1 - capX1,          by1 := eby1 - capY1
+   ppo := [capX1 - ebx1, capY1 - eby1, capX1 - ebx1 + imgW, capY1 - eby1 + imgH, 0]
+   If (DrawLineAreaContourAlign!=2)
+   {
+      ; rasterize the filled shape - used to clip the lines drawn afterwards,
+      ; when the pen alignment is set to inside or outside
+      opza := FillAreaEllipseSection
+      If (FillAreaShape=3 && FillAreaEllipsePie=1)
+         FillAreaEllipseSection := 1440
+
+      QPV_PrepareHugeImgSelectionArea(bx1, by1, bx1 + ebw, by1 + ebh, ebw, ebh, 3, VPselRotation, 1, 0, "a", "a", ppo, [tk, tk, imgSelW, imgSelH])
+      FillAreaEllipseSection := opza
+   } Else
+   {
+      ; no clipping mask required; only the selection area coordinates and the
+      ; mask subsection must be defined in the DLL; the NULL points list
+      ; ensures no polygon is rasterized by prepareSelectionArea()
+      DllCall("qpvmain.dll\prepareSelectionArea", "int", bx1, "int", by1, "int", bx1 + ebw, "int", by1 + ebh, "int", ebw, "int", ebh, "float", 1, "float", 1, "float", 0, "int", 2, "int", 1, "float", 0, "int", 0, "UPtr", 0, "int", 0, "int", ppo[1], "int", ppo[2], "int", ppo[3], "int", ppo[4], "int", 1, "int", 0, "int", 0)
+   }
+
+   rzb := 0
+   rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", DrawLineAreaContourAlign, "int", 0)
+   If (rzq=1)
+   {
+      roundJoins := DrawLineAreaJoinsStyle
+      roundCaps := DrawLineAreaCapsStyle
+      conturAlign := DrawLineAreaContourAlign
+      otherThick := Round(thisThick*0.34)
+      subdivide := (((bezierSplineCustomShape=1 || FillAreaCurveTension>1) && FillAreaShape=7) || FillAreaShape=2 || FillAreaShape=3) ? 1 : 0
+      closed := (FillAreaShape=7) ? FillAreaClosedPath : 1
+      If (FillAreaShape=3 && FillAreaEllipsePie=1 && FillAreaEllipseSection<1440)
+         closed := 0
+
+      doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7 && DrawLineAreaContourAlign<=2) ? 1 : 0
+      pPath := coreCreateFillAreaShape(tk, tk, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
+      If pPath
+      {
+         If (doClone=1)
+            clonedPath := Gdip_ClonePath(pPath)
+
+         If (subdivide=1)
+            Gdip_FlattenPath(pPath, 0.1)
+
+         PointsCount := Gdip_GetPathPointsCount(pPath)
+         VarSetCapacity(PointsF, 8 * (PointsCount + 5), 0)
+         DllCall("gdiplus\GdipGetPathPoints", "UPtr", pPath, "UPtr", &PointsF, "int*", PointsCount)
+         rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
+         If (rzb=1 && DrawLineAreaDoubles=1)
+            rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0)
+
+         Gdip_DeletePath(pPath)
+         If (doClone=1 && rzb=1)
+         {
+            ; draw the inner shape contour [shape cavity]
+            Gdip_ScalePathAtCenter(clonedPath, innerSelectionCavityX, innerSelectionCavityY)
+            If (subdivide=1)
+               Gdip_FlattenPath(clonedPath, 0.1)
+
+            PointsCount := Gdip_GetPathPointsCount(clonedPath)
+            VarSetCapacity(PointsF, 8 * (PointsCount + 5), 0)
+            DllCall("gdiplus\GdipGetPathPoints", "UPtr", clonedPath, "UPtr", &PointsF, "int*", PointsCount)
+            rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
+            If (rzb=1 && DrawLineAreaDoubles=1)
+               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0)
+
+            Gdip_DeletePath(clonedPath)
+         }
+      }
+      PointsF := ""
+   }
+
+   rzc := 0
+   bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
+   If (rzb=1)
+   {
+      newColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
+      rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", imgW, "int", imgH)
+   }
+
+   ; the lines mask overwrites the polygon mask cache in the DLL;
+   ; it must be discarded to force other tools and the next preview pass
+   ; to rasterize the selection area shape again
+   DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
+   Gdip_UnlockBits(zBitmap, iData)
+   If (rzc=1)
+   {
+      If (currIMGdetails.HasAlpha=1 || bpp=32)
+         Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, capX1, capY1, imgW, imgH)
+
+      trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, capX1, capY1)
+      Gdip_ResetClip(2NDglPG)
+   } Else If (rzq!=1)
+      addJournalEntry(A_ThisFunc "(): Failed to generate live preview. Lines mask preparation failed.")
+   Else If (rzb!=1)
+      addJournalEntry(A_ThisFunc "(): Failed to generate live preview. An error occurred drawing the line segments.")
+   Else
+      addJournalEntry(A_ThisFunc "(): Failed to generate live preview. An error occurred utilizing the lines mask to alter the viewport bitmap.")
+
+   trGdip_DisposeImage(zBitmap, 1)
+   ; fnOutputDebug("step END: " A_ThisFunc ": " A_TickCount - ozeit)
 }
 
 coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0, ByRef hasAlpha:=0) {
@@ -49051,8 +49225,8 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     } Else
     {
        GuiAddSlider("DrawLineAreaThickScale", 100, 650, 100, "Thickness scale: $€ %", "updateUIdrawShapesPanel", 1, "xs y+7 w" slideWid - 2 " hp")
-       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp", "Acute angles can cause miters to exceed the bounding box.`nIncrease miters boundary to avoid the clipping of miters.`nNo live preview.")
-       ToolTip2ctrl(hTemp, "Line segments will be connected with rounded joins.`nNo live preview.")
+       GuiAddSlider("DrawLineAreaMitersBorder", 100, 500, 100, "Miters boundary: $€ %", "updateUIdrawShapesPanel", 1, "x+5 wp-30 hp", "Acute angles can cause miters to exceed the bounding box.`nIncrease miters boundary to avoid the clipping of miters.")
+       ToolTip2ctrl(hTemp, "Line segments will be connected with rounded joins.")
     }
 
     btnWid := (PrefsLargeFonts=1) ? 105 : 65
