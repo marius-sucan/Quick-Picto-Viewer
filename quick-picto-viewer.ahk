@@ -18356,15 +18356,6 @@ livePreviewHugeImageFillSelArea() {
 }
 
 livePreviewHugeImageDrawLineShapes() {
-; Live preview for the «Draw shapes in selected area» tool [AnyWindowOpen=65]
-; when the opened image relies on the viewportQPVimage object [FreeImage handle].
-; Function inspired by livePreviewHugeImageFillSelArea().
-;
-; It renders the line shapes on the bitmap section captured from the viewport
-; using the same qpvmain.dll functions as HugeImagesDrawLineShapes():
-; prepareDrawLinesMask() and NewDrawLinesOnMask(). This way, the preview
-; closely matches the final results: pen alignment/clipping, round or mitered
-; joins, caps styles, double lines, shape cavity and blend modes.
    Critical, on
    Gdip_ResetClip(2NDglPG)
    If (doImgEditLivePreview!=1 || editingSelectionNow!=1 || testSelectOutsideImgEntirely(useGdiBitmap()) || imgSelOutViewPort=1)
