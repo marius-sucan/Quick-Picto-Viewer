@@ -21108,9 +21108,13 @@ HugeImagesDrawParametricLines() {
          FillAreaEllipseSection := 1440
          FillAreaShape := (DrawLineAreaCropShape=2) ? 1 : 3
          orXa := o_imgSelX1 - imgSelX1
-         orYa := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
-         ppka := (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
-         ppkb := 0 ; (o_imgSelY2<imgSelY2) ? (imgSelY2 - o_imgSelY2)*1 : 0
+         ; the mask is y-flipped [FreeImage], so the crop shape is anchored to the bottom edge of the
+         ; working area; orYa must be allowed to go negative when the generated path bounds [plus tk]
+         ; do not reach the selection bottom edge [eg. rotated spirals], otherwise the crop shape
+         ; lands shifted upwards relative to the viewport selection area; the DLL clips negative rows
+         orYa := imgSelY2 - o_imgSelY2
+         ppka := orYa + o_imgSelH - orobju.imgSelH
+         ppkb := 0
          ; ToolTip, % "l=" orYa , , , 2
          QPV_PrepareHugeImgSelectionArea(1, 2, 3, 4, orobju.imgSelW, orobju.imgSelH + ppka, 3, VPselRotation, 0, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH + ppkb])
       }
