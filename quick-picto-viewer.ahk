@@ -368,7 +368,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userImgAdjustAltSat := 1, userImgAdjustAltTint := 0, DesaturateAreaBright := 0, DesaturateAreaContra := 0
    , DesaturateAreaInvert := 0, userImgAdjustThreR := -1, userImgAdjustThreG := -1, userImgAdjustThreB := -1
    , userImgAdjustThreA := -1, userImgAdjustLinkThresholds := 1, userImgAdjustSeeThrough := 1
-   , userImgAdjustHiPrecision := 0, userImgAdjustNoClamp := 0, userImgAdjustConvertDepth := 0
+   , userImgAdjustNoClamp := 0, userImgAdjustConvertDepth := 0, cmrRAWtoneMapOCVparamB := 0
    , UserSymmetricaBlendMode := 1, UserSymmetricaOpacity := 255, userImgAdjustNoisePoints := 0
    , blurAreaApplyFX := 0, FillAreaDoBehind := 0, PasteInPlaceRevealOriginal := 0, PasteInPlaceCropDo := 0
    , PasteInPlaceCropAdaptImg := 1, PasteInPlaceOrientFlipX := 0, PasteInPlaceOrientFlipY := 0
@@ -379,7 +379,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaJoinsStyle := 0, DrawLineAreaMitersBorder := 100, DrawLineAreaPolarSection := 1440
    , DrawLineAreaPolarMode := 1, IDedgesModus := 1, IDedgesPreEmphasis := 0, IDedgesPreContrast := 0
    , UIuserToneMapParamC := 180, cmrRAWtoneMapParamC := 1, UIuserToneMapParamD := 60, cmrRAWtoneMapParamD := 0
-   , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72, cmrRAWtoneMapOCVparamB := 0
+   , UIuserToneMapOCVparamA := 80, cmrRAWtoneMapOCVparamA := 1, UIuserToneMapOCVparamB := 72
    , userPerformColorManagement := 1, UserCombinePDFbgrColor := "ffFFff", UserVPalphaBgrStyle := 1
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
@@ -13993,8 +13993,7 @@ QPV_AdjustImageColors(pBitmap, thisOpacity, InvertColors, AltSat, Sat, AltBright
      Else If (previewMode!=-1)
         QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
 
-     this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
-     r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "int", thisOpacity, "int", InvertColors, "int", AltSat, "int", Sat, "int", AltBright, "int", Bright, "int", AltContra, "int", Contra, "int", AltHiLows, "int", Shadows, "int", Highs, "int", Hue, "int", TintDeg, "int", TintAmount, "int", AltTint, "int", Gamma, "int", OffR, "int", OffG, "int", OffB, "int", OffA, "int", ThreR, "int", ThreG, "int", ThreB, "int", ThreA, "int", SeeThrough, "int", userimgGammaCorrect, "int", NoClamp, "int", WhitePoint, "int", BlackPoint, "int", NoisePoints, "UPtr", 0, "int", 0)
+     r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", iScan, "Int", w, "Int", h, "int", stride, "int", 32, "int", thisOpacity, "int", InvertColors, "int", AltSat, "int", Sat, "int", AltBright, "int", Bright, "int", AltContra, "int", Contra, "int", AltHiLows, "int", Shadows, "int", Highs, "int", Hue, "int", TintDeg, "int", TintAmount, "int", AltTint, "int", Gamma, "int", OffR, "int", OffG, "int", OffB, "int", OffA, "int", ThreR, "int", ThreG, "int", ThreB, "int", ThreA, "int", SeeThrough, "int", userimgGammaCorrect, "int", NoClamp, "int", WhitePoint, "int", BlackPoint, "int", NoisePoints, "UPtr", 0, "int", 0)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -18336,7 +18335,6 @@ livePreviewHugeImageFillSelArea() {
       If ((currIMGdetails.HasAlpha=1 || bpp=32) && !thisBrush)
          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, imgSelPx, imgSelPy, imgW, imgH)
 
-      userImgAdjustHiPrecision := 1
       userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
       thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : 255
       If (FillAreaApplyColorFX=1 && isinRange(thisBlendMode, 1, 22))
@@ -21745,12 +21743,10 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             stride := FreeImage_GetStride(hFIFimgX)
             If (BlurAreaBlendMode>1 && blurAreaApplyFX=1)
             {
-               userImgAdjustHiPrecision := 1
                userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
-               this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
                showTOOLtip("Pixelating image`nPhase 2/3...", 1)
                QPV_PrepareHugeImgSelectionArea(0, 0, thisImgW, thisImgH, thisImgW, thisImgH, 0, 0, 0, 0, "a", "a", 1)
-               r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
+               r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsMini, "Int", thisImgW, "Int", thisImgH, "int", strideMini, "int", bpp, "int", blurAreaOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(BlurAreaSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(BlurAreaLight*257), "int", 0, "int", Round(BlurAreaGamma*655.30), "int", 0, "int", 0, "int", 0, "int", BlurAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", 0, "int", 0)
             }
 
             recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, BlurAreaInverted, 0)
@@ -21817,17 +21813,15 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
       {
-         this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, userImgAdjustInvertArea)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, userImgAdjustInvertArea, "a", "a", 1)
-         r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", mScan, "int", mStride)
          ; r := DllCall("qpvmain.dll\applyGaussianBlurHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", 4, "int", 250, "float", 1.1)
       } Else ; grayscale mode
       {
-         this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, EraseAreaInvert)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", DesaturateAreaAmount, "int", DesaturateAreaInvert, "int", DesaturateAreaChannel - 1, "int", -65535, "int", 1, "int", DesaturateAreaBright, "int", 0, "int", DesaturateAreaContra, "int", 0, "int", 0, "int", 0, "int", DesaturateAreaHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", userimgGammaCorrect, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          ; r := DllCall("qpvmain.dll\ConvertToGrayScale", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", DesaturateAreaChannel, "int", DesaturateAreaAmount, "int", stride, "int", bpp, "UPtr", mScan, "int", mStride)
       }
 
@@ -53292,11 +53286,7 @@ UpdateUIsimpleAdjustColors(actionu:=0, b:=0) {
 
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: Submit, NoHide
-    If (CurrentPanelTab=1)
-    {
-        actu := (userImgAdjustHiPrecision=1) ? "Enable" : "Disable"
-        GuiControl, SettingsGUIA: %actu%, userImgAdjustNoClamp
-    } If (CurrentPanelTab=3)
+    If (CurrentPanelTab=3)
     {
        uiSlidersArray["userImgAdjustThreR", 5] := (userImgAdjustLinkThresholds=1) ? "RGB" : "Red"
        uiSlidersArray["userImgAdjustThreG", 10] := !userImgAdjustLinkThresholds
@@ -53851,7 +53841,7 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
       threB := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreB
       threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
       partu := getVPselIDs("saiz-vpos-xy") VPselRotation EllipseSelectMode imgSelW imgSelH innerSelectionCavityX innerSelectionCavityY rotateSelBoundsKeepRatio zoomLevel prevDestPosX prevDestPosY
-      thisIDu := "a" getIDvpFX() imgColorsFXopacity userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustSat userImgAdjustAltBright userImgAdjustBright userImgAdjustAltContra userImgAdjustContra userImgAdjustAltHiLows userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintDeg userImgAdjustTintAmount userImgAdjustAltTint userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustSeeThrough userImgAdjustNoClamp userImgAdjustHiPrecision userImgAdjustWhitePoint userImgAdjustBlackPoint userImgAdjustNoisePoints userimgGammaCorrect DesaturateAreaLevels DesaturateAreaDither DesaturateAreaAmount DesaturateAreaInvert DesaturateAreaChannel DesaturateAreaBright DesaturateAreaContra DesaturateAreaHue partu thisInvertArea userImgChannelAlphaAdd
+      thisIDu := "a" getIDvpFX() imgColorsFXopacity userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustSat userImgAdjustAltBright userImgAdjustBright userImgAdjustAltContra userImgAdjustContra userImgAdjustAltHiLows userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintDeg userImgAdjustTintAmount userImgAdjustAltTint userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustSeeThrough userImgAdjustNoClamp userImgAdjustWhitePoint userImgAdjustBlackPoint userImgAdjustNoisePoints userimgGammaCorrect DesaturateAreaLevels DesaturateAreaDither DesaturateAreaAmount DesaturateAreaInvert DesaturateAreaChannel DesaturateAreaBright DesaturateAreaContra DesaturateAreaHue partu thisInvertArea userImgChannelAlphaAdd
       trGdip_GetImageDimensions(zBitmap, oImgW, oImgH)
       ; ToolTip, % oImgW "|" oImgH "`n" imgSelW "|" imgSelH , , , 2
       objSel.dw := imgSelW,    objSel.dh := imgSelH
@@ -87337,7 +87327,6 @@ ReadSettingsSimpleColorAdjustsPanel(act:=0) {
    RegAction(act, "userImgAdjustContra",, 2, -65530, 65530)
    RegAction(act, "userImgAdjustGamma",, 2, 0, 900)
    RegAction(act, "userImgAdjustHighs",, 2, -65535, 65535)
-   RegAction(act, "userImgAdjustHiPrecision",, 1)
    RegAction(act, "userImgAdjustNoClamp",, 1)
    RegAction(act, "userImgAdjustInvertColors",, 1)
    RegAction(act, "userImgAdjustLinkThresholds",, 1)
@@ -87446,9 +87435,7 @@ PanelAdjustColorsSimpleWindow() {
     GuiAddCheckbox("x+1 hp+1 w" sml " gUpdateUIsimpleAdjustColors Checked" userImgAdjustNoisePoints " vuserImgAdjustNoisePoints", "Generate noise", "N")
     GuiAddSlider("imgColorsFXopacity", 3,255, 255, "Effects opacity", "UpdateUIsimpleAdjustColors", 1, "xs y+10 w" slide3wid " hp")
     Gui, Add, Checkbox, x+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustInvertArea% vuserImgAdjustInvertArea, &Invert selection area
-    Gui, Add, Checkbox, xs y+5 hp w%slide3Wid% -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustHiPrecision% vuserImgAdjustHiPrecision +hwndhTemp, &Higher precision
-    ToolTip2ctrl(hTemp, "The color filters will be calculated based on values ranging from`n0 to 65535, instead of 0 to 255, for greater precision.")
-    Gui, Add, Checkbox, x+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustNoClamp% vuserImgAdjustNoClamp +hwndhTemp, &Avoid clamping (slower)
+    Gui, Add, Checkbox, xs y+5 hp -wrap gUpdateUIsimpleAdjustColors Checked%userImgAdjustNoClamp% vuserImgAdjustNoClamp +hwndhTemp, &Avoid clamping (slower)
     ToolTip2ctrl(hTemp, "When possible, the pixel values will not be clamped internally when calculating the different`ncolor filters. The final output will still be an RGB image with values between 0 to 255.`nThis mode is much more computationally intense.")
 
     Gui, Tab, 2 ; colors
@@ -95288,9 +95275,8 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
 
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetStride(hFIFimgA)
-    this := (userImgAdjustHiPrecision=1) ? "Precise" : ""
     QPV_PrepareHugeImgSelectionArea(0, 0, imgW, imgH, imgW, imgH, 0, 0, 0, 0)
-    r := DllCall("qpvmain.dll\AdjustImageColors" this, "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", 0, "int", 0)
+    r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", imgColorsFXopacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", userImgAdjustSat, "int", userImgAdjustAltBright, "int", userImgAdjustBright, "int", userImgAdjustAltContra, "int", userImgAdjustContra, "int", userImgAdjustAltHiLows, "int", userImgAdjustShadows, "int", userImgAdjustHighs, "int", userImgAdjustHue, "int", userImgAdjustTintDeg, "int", userImgAdjustTintAmount, "int", userImgAdjustAltTint, "int", userImgAdjustGamma, "int", userImgAdjustOffR, "int", userImgAdjustOffG, "int", userImgAdjustOffB, "int", userImgAdjustOffA, "int", userImgAdjustThreR, "int", userImgAdjustThreG, "int", userImgAdjustThreB, "int", userImgAdjustThreA, "int", userImgAdjustSeeThrough, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", userImgAdjustWhitePoint, "int", userImgAdjustBlackPoint, "int", userImgAdjustNoisePoints, "UPtr", 0, "int", 0)
     If (r!=1)
     {
        FreeImage_UnLoad(hFIFimgA)
