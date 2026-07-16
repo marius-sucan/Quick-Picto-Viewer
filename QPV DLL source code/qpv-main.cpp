@@ -4056,7 +4056,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 //    highlights, and contrast<=0) r/g/b are separable too, so the entire
 //    pipeline collapses to 4 byte tables and the inner loop is 4 lookups.
 //
-// AdjustPlan::pixelRGB() is the single scalar kernel. The table builders and
+// AdjustColorsFXplan::pixelRGB() is the single scalar kernel. The table builders and
 // the per-pixel path both go through it, so the two cannot drift apart.
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
@@ -4064,7 +4064,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 // ---------------------------------------------------------------------------
 struct OutRGB { unsigned char b, g, r; };
 
-struct AdjustPlan {
+struct AdjustColorsFXplan {
     int invertColors, gammaLvl, brightness, altBright, altContra, contrast;
     int altHiLows, shadows, highs, hue, tintDegrees, tintAmount, altTint;
     int altSat, saturation, seeThrough, linearGamma, noClamping;
@@ -4166,7 +4166,7 @@ struct AdjustPlan {
     }
 };
 
-static void buildAdjustPlan(AdjustPlan& p, int opacity, int invertColors, int altSat, int saturation,
+static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int invertColors, int altSat, int saturation,
     int altBright, int brightness, int altContra, int contrast, int altHiLows, int shadows,
     int highs, int hue, int tintDegrees, int tintAmount, int altTint, int gamma,
     int rOffset, int gOffset, int bOffset, int aOffset, int rThreshold, int gThreshold,
@@ -4295,12 +4295,12 @@ static void buildAdjustPlan(AdjustPlan& p, int opacity, int invertColors, int al
     {
         if (shadows!=0)
         {
-           #pragma omp parallel for schedule(static)
+           // #pragma omp parallel for schedule(static)
            for (int i = 0; i < 65536; i++) LUTshadows[i] = brightMathsInt16(i, p.fiShadows);
         }
         if (highs!=0)
         {
-           #pragma omp parallel for schedule(static)
+           // #pragma omp parallel for schedule(static)
            for (int i = 0; i < 65536; i++) LUThighs[i] = brightMathsInt16(i, p.fiHighs);
         }
     }
@@ -4308,17 +4308,17 @@ static void buildAdjustPlan(AdjustPlan& p, int opacity, int invertColors, int al
     {
         if (altBright==1)
         {
-           #pragma omp parallel for schedule(static)
+           // #pragma omp parallel for schedule(static)
            for (int i = 0; i < 65536; i++) LUTbright[i] = brightMathsInt16(i, p.fiBright);
         } else if (brightness<0)
         {
-           #pragma omp parallel for schedule(static)
+           // #pragma omp parallel for schedule(static)
            for (int i = 0; i < 65536; i++) LUTgammaBright[i] = gammaMathsInt16(i, p.zammaBright);
         }
     }
     if (contrast!=0 && altContra==0 && noClamping==0)
     {
-        #pragma omp parallel for schedule(static)
+        // #pragma omp parallel for schedule(static)
         for (int i = 0; i < 65536; i++) LUTcontra[i] = contraMathsInt16(i, p.fiContra, 32768);
     }
 }
@@ -4328,24 +4328,14 @@ DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int
     if (opacity<2)
       return 1;
 
-    AdjustPlan p;
-    buildAdjustPlan(p, opacity, invertColors, altSat, saturation, altBright, brightness, altContra,
+    AdjustColorsFXplan p;
+    buildAdjustColorsFXplan(p, opacity, invertColors, altSat, saturation, altBright, brightness, altContra,
         contrast, altHiLows, shadows, highs, hue, tintDegrees, tintAmount, altTint, gamma,
         rOffset, gOffset, bOffset, aOffset, rThreshold, gThreshold, bThreshold, aThreshold,
         seeThrough, linearGamma, noClamping, whitePoint, blackPoint, noiseMode);
 
     const int bpc = bpp/8;
     const bool has32 = (bpp==32);
-
-    // clipMaskFilter() provably returns 0 for every pixel of this bitmap when no
-    // inverted/shape selection is live and the selection rect covers the image
-    // (or highDepthModeMask makes the outside-the-rect answer 0 as well). Then
-    // the per-pixel call can be skipped entirely - it costs as much as the whole
-    // collapsed inner loop does.
-    const bool maskFree = (invertSelection!=1) && (maskBitmap==NULL) && (EllipseSelectMode!=2)
-        && !(EllipseSelectMode==1 || (EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0)))
-        && (highDepthModeMask==1
-            || (imgSelX1<=0 && imgSelX2>=w-1 && (imgSelY1 - polyOffYa)<=0 && imgSelY2>=h-1));
 
     #pragma omp parallel for schedule(dynamic) if ((INT64)w*h >= 16384)
     for (int y = 0; y < h; y++)
@@ -4358,7 +4348,7 @@ DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int
             const unsigned char* LR = p.chanLUT[2];
             for (int x = 0; x < w; x++)
             {
-                if (!maskFree && clipMaskFilter(x, y, maskBitmap, mStride)==1)
+                if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
                    continue;
 
                 unsigned char* q = row + (INT64)x * bpc;
@@ -4386,7 +4376,7 @@ DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int
         {
             for (int x = 0; x < w; x++)
             {
-                if (!maskFree && clipMaskFilter(x, y, maskBitmap, mStride)==1)
+                if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
                    continue;
 
                 unsigned char* q = row + (INT64)x * bpc;

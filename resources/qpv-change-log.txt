@@ -6,8 +6,10 @@
 
 - v6.2.01 (2026-07-**)
   - much faster lines drawing on images above 536 megapixels
+  - faster polar/rectangular coordinates transformations
   - faster blend mode functions
   - faster flood fill / bucket tool
+  - faster color adjustments
   - bug fixes related to paste in place / transform tool
 
 - v6.2.00 (2026-06-11)
