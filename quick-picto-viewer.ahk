@@ -15809,8 +15809,13 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
              zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap, imgSelPx - obj[2], imgSelPy - obj[3], imgSelW, imgSelH, 0, 0, 1)
           } Else
           {
-             thisX := (obj[2]>0) ? imgSelPx - obj[2] : imgSelPx
-             thisY := (obj[3]>0) ? imgSelPy - obj[3] : imgSelPy
+             ; obj[2] and obj[3] are the window coordinates where the cached
+             ; screen section is drawn [tdpX/tdpY]; these can be negative when
+             ; the image fits the window on an axis, but it is panned to a
+             ; negative position; the offsets must always be subtracted,
+             ; otherwise the captured rectangle is shifted by their amount
+             thisX := imgSelPx - obj[2]
+             thisY := imgSelPy - obj[3]
              zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, pBitmap, thisX, thisY, imgSelW, imgSelH, 0, 0, 1)
           }
              ; zBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, fImgW, fImgH, 0, 5)
