@@ -11285,6 +11285,13 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    o_IMGresizingMode := IMGresizingMode
    IMGresizingMode := 4
    customZoomAdaptMode := 0
+   If InStr(key, "wheel")
+   {
+      GetPhysicalCursorPos(mX, mY)
+      vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
+      trGdip_GetImageDimensions(useGdiBitmap(), ImgW, ImgH)
+   }
+
    ; If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && IMGresizingMode=4)
    ;    PrintPosX := (o_IMGresizingMode=IMGresizingMode) ? "W" : "C"
 
