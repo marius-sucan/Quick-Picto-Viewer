@@ -11287,9 +11287,22 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    customZoomAdaptMode := 0
    If InStr(key, "wheel")
    {
-      GetPhysicalCursorPos(mX, mY)
+      GetMouseCoord2wind(PVhwnd, mX, mY)
       vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
       trGdip_GetImageDimensions(useGdiBitmap(), ImgW, ImgH)
+      If (zoomLevel!=oldZoomLevel && ImgW && ImgH && prevResizedVPimgW>1 && prevResizedVPimgH>1)
+      {
+         ; zoom towards the image point beneath the mouse pointer:
+         ; it must remain at the same viewport coordinates on the new zoom level;
+         ; mirrored mouse coords, because flipping is a world transform on the canvas
+         gmX := (FlipImgH=1) ? GuiW - mX : mX
+         gmY := (FlipImgV=1) ? GuiH - mY : mY
+         prcW := clampInRange((gmX - prevDestPosX)/prevResizedVPimgW, 0, 1)
+         prcH := clampInRange((gmY - prevDestPosY)/prevResizedVPimgH, 0, 1)
+         IMGdecalageX := Round(gmX - prcW * ImgW * zoomLevel)
+         IMGdecalageY := Round(gmY - prcH * ImgH * zoomLevel)
+         calcIMGcoordsInVP("setCenter", zoomLevel, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+      }
    }
 
    ; If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && IMGresizingMode=4)
