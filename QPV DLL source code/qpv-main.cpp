@@ -184,19 +184,16 @@ IWICImagingFactory *m_pIWICFactory;
 ID2D1Factory       *pD2D1Factory;
 
 DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
-    // to-do to do - fix this; make it work on Windows 7 
     debugInfos = modus;
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
-    // hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pIWICFactory));
 
-// Use version-specific initialization
-#if (_WIN32_WINNT >= 0x0602) // Windows 8 or newer
-    hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER, 
+    // WICImagingFactory2 is unavailable on Windows 7 without the Platform Update,
+    // so the choice must be made at runtime, not via _WIN32_WINNT
+    hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER,
                          IID_PPV_ARGS(&m_pIWICFactory));
-#else // Windows 7
-    hr = CoCreateInstance(CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER, 
-                         IID_PPV_ARGS(&m_pIWICFactory));
-#endif
+    if (FAILED(hr))
+        hr = CoCreateInstance(CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER,
+                             IID_PPV_ARGS(&m_pIWICFactory));
 
 
     FPDF_LIBRARY_CONFIG config;
