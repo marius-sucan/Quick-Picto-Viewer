@@ -653,9 +653,9 @@ struct RGBA16color {
               if (level<16000)
               {
                  fi = level/16000.0f;
-                 r = weighTwoValues(nr, r, fip);
-                 g = weighTwoValues(ng, g, fip);
-                 b = weighTwoValues(nb, b, fip);
+                 r = weighTwoValues(nr, r, fi);
+                 g = weighTwoValues(ng, g, fi);
+                 b = weighTwoValues(nb, b, fi);
               } else
               {
                  r = nr;

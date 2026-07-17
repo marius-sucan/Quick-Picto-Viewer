@@ -95,6 +95,15 @@ float inline weighTwoValues(const float &A, const float &B, const float &w, int 
        return (w * (A - B) + B);
 }
 
+static inline unsigned int qpvThreadRand(unsigned int &state) {
+    // xorshift32 PRNG; used instead of rand() inside OpenMP loops, where
+    // srand() only seeds the main thread and workers repeat the same sequence
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return state;
+}
+
 static unsigned short gamma_to_linear[256];
 static unsigned char linear_to_gamma[32769];
 static float char_to_float[256];
@@ -635,7 +644,10 @@ void traceMaskPolyBoundaries(const int &w, const int &h, const float* PointsList
     int xa = PointsList[0];
     int ya = PointsList[1];
     
-    polygonMapMin.assign(h, INT_MAX);
+    // do not shrink below the caller's sizing: FillMaskPolygon() sized this to
+    // max(boundMaxY, h) + 1 because edges (and bresenham_line_algo's y0<=h guard)
+    // can touch row h and beyond
+    polygonMapMin.assign(max((size_t)h + 1, polygonMapMin.size()), INT_MAX);
     for (int pts = 0; pts < PointsCount; pts++)
     {
         int xb, yb;
@@ -661,6 +673,8 @@ void traceMaskPolyBoundaries(const int &w, const int &h, const float* PointsList
         bresenham_line_algo(w, h, xa, ya, xb, yb, polygonMapMin);
         int maxu = (max(ya, yb) >= ppy2) ? ppy2 - 1 : max(ya, yb);
         int minu = (min(ya, yb) <= ppy1) ? ppy1 : min(ya, yb);
+        if (minu < 0)
+           minu = 0;
         for (int yy = minu; yy <= maxu; yy++)
         {
             if (polygonMapMin[yy]!=INT_MAX)
@@ -947,7 +961,8 @@ DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount
     // fnOutputDebug("step 2=" + std::to_string(gmx) + " / " + std::to_string(gmy));
     aIndex = 0;
     int hasFound = -1;
-    for ( int i = 0; i < fPointsCount*2; i+=2)
+    // stop at the second-to-last point: each iteration reads the segment [i .. i+3]
+    for ( int i = 0; i < fPointsCount*2 - 2; i+=2)
     {
         aIndex++;
         int ax = fPointsList[i];
@@ -1007,14 +1022,16 @@ DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount
         }
     }
 
-    int zza = PathsMap[hasFound];
-    int zzb = (last==hasFound) ? zza + 1 : PathsMap[last + 1];
-    if (last==hasFound)
-       last = fPointsCount;
-
     int r = 1;
+    int zza = 0;
+    int zzb = 0;
     if (hasFound>=0)
     {
+        zza = PathsMap[hasFound];
+        zzb = (last==hasFound) ? zza + 1 : PathsMap[last + 1];
+        if (last==hasFound)
+           last = fPointsCount;
+
         r = 2;
         *za = zza;
         *zb = zzb;
@@ -1323,6 +1340,12 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 
     if (polyW < 1 || polyH < 1)
        return 0;
+
+    if (clipMode!=2 && s!=polygonOtherMaskMap.size())
+    {
+       fnOutputDebug("NewDrawLinesOnMask: polygonOtherMaskMap[] incorrect size=" + std::to_string(s) + " != " + std::to_string(polygonOtherMaskMap.size()));
+       return 0;
+    }
 
     // Adjust Y-coordinates by polyOffYa - polyOffYb (same as drawLineAllSegmentsMask)
     for (int i = 0; i < PointsCount * 2; i += 2)
@@ -1748,7 +1771,7 @@ DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px
 
   const INT64 rstart = (INT64)my * polyW + mx;
   const INT64 rend = (INT64)mh * polyW + mw;
-  polygonMaskMap.fill_zero(rstart, rend);
+  polygonMaskMap.fill_zero(rstart, rend + 1); // fill_zero() treats the end as exclusive
   return 1;
 }
 
@@ -1894,7 +1917,7 @@ double inverseGamma(double X) {
 }
 
 double toLABf(double Y) {
-  if (Y >= 0.00885645167903563082e-3)
+  if (Y >= 0.00885645167903563082) // CIE epsilon = 216/24389
      Y = cbrt(Y);  // 1/3
   else
      Y = (841.0/108.0) * Y + (4.0/29.0);
@@ -1903,7 +1926,7 @@ double toLABf(double Y) {
 }
 
 double toLABfx(double Y) {
-  if (Y >= 8.88564517)
+  if (Y >= 0.00885645167903563082) // CIE epsilon = 216/24389
      Y = cbrt(Y);  // 1/3
   else
      Y = 7.7870370 * Y + 0.1379310; // (841.0/108.0) * Y + ( 4.0 / 29.0 );
@@ -2631,9 +2654,10 @@ inline RGBAColor CalculateNewBlendModes(
             int idxG = blend65k + Orgb.g * 256 + Brgb.g;
             int idxB = blend65k + Orgb.b * 256 + Brgb.b;
             
-            int rT = (blendMode == 0 || blendMode == 25) ? Orgb.r : blend_lut_srgb[idxR];
-            int gT = (blendMode == 0 || blendMode == 25) ? Orgb.g : blend_lut_srgb[idxG];
-            int bT = (blendMode == 0 || blendMode == 25) ? Orgb.b : blend_lut_srgb[idxB];
+            // the LUTs only cover modes 1..22; treat anything else as normal/pass-through
+            int rT = (blendMode < 1 || blendMode > 22) ? Orgb.r : blend_lut_srgb[idxR];
+            int gT = (blendMode < 1 || blendMode > 22) ? Orgb.g : blend_lut_srgb[idxG];
+            int bT = (blendMode < 1 || blendMode > 22) ? Orgb.b : blend_lut_srgb[idxB];
 
             if (da < 255 && blendMode > 0 && mix)
             {
@@ -2655,9 +2679,10 @@ inline RGBAColor CalculateNewBlendModes(
             int o_g_lin = gamma_to_linear_16[Orgb.g];
             int o_b_lin = gamma_to_linear_16[Orgb.b];
             
-            int rT = (blendMode == 0 || blendMode == 25) ? o_r_lin : blend_lut_linear[idxR];
-            int gT = (blendMode == 0 || blendMode == 25) ? o_g_lin : blend_lut_linear[idxG];
-            int bT = (blendMode == 0 || blendMode == 25) ? o_b_lin : blend_lut_linear[idxB];
+            // the LUTs only cover modes 1..22; treat anything else as normal/pass-through
+            int rT = (blendMode < 1 || blendMode > 22) ? o_r_lin : blend_lut_linear[idxR];
+            int gT = (blendMode < 1 || blendMode > 22) ? o_g_lin : blend_lut_linear[idxG];
+            int bT = (blendMode < 1 || blendMode > 22) ? o_b_lin : blend_lut_linear[idxB];
 
             if (da < 255 && blendMode > 0 && mix)
             {
@@ -2684,7 +2709,13 @@ inline RGBAColor CalculateNewBlendModes(
 
 void toCMYK(float red, float green, float blue, float* cmyk) {
   float k = min(255-red, min(255-green,255-blue));
-  float c = 255*(255-red-k)/(255-k); 
+  if (k >= 255.0f)
+  {
+     // pure black; the general formula would divide by zero
+     cmyk[0] = 0;  cmyk[1] = 0;  cmyk[2] = 0;  cmyk[3] = 255;
+     return;
+  }
+  float c = 255*(255-red-k)/(255-k);
   float m = 255*(255-green-k)/(255-k); 
   float y = 255*(255-blue-k)/(255-k); 
 
@@ -3158,8 +3189,10 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
        loopsOccured++;
        if (useSelArea==1)
        {
+          // a masked pixel ends the span, like a color mismatch;
+          // "continue" here would retest the same x1 forever
           if (clipMaskFilter(x1, y, NULL, 0)==1)
-             continue;
+             break;
        }
 
        INT64 o = CalcPixOffset(x1, y, Stride, bpp);
@@ -3199,14 +3232,14 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
 }
 
 int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
-    if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
+    if ((x < 0) || (x >= w) || (y < 0) || (y >= h))  // out of bounds
        return 0;
 
     int loopsOccured = 0;
     int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
     fnOutputDebug("ReplaceGivenColor: simpleMode=" + std::to_string(simpleMode) + " ; o=" + std::to_string(opacity) + " ; t=" + std::to_string(tolerance) + " ; b=" + std::to_string(blendMode) + " ; c=" + std::to_string(cartoonMode));
     const int bpc = bpp / 8;
-    #pragma omp parallel for schedule(static) shared(loopsOccured)
+    #pragma omp parallel for schedule(static) reduction(+: loopsOccured)
     for (int zy = 0; zy < h; zy++)
     {
         INT64 ky = (INT64)zy * Stride;
@@ -3262,7 +3295,7 @@ int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBA
 }
 
 DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int invertSel, int keepAlpha) {
-    if ((x < 0) || (x >= (w-1)) || (y < 0) || (y >= (h-1)))  // out of bounds
+    if ((x < 0) || (x >= w) || (y < 0) || (y >= h))  // out of bounds
        return 0;
 
     invertSelection = invertSel;
@@ -3317,7 +3350,7 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
 
    int clrPrimeA = BitmapData[0];
    int clrPrimeB = BitmapData[1];
-   int clrPrimeC = BitmapData[Height];
+   int clrPrimeC = (Height > 1) ? BitmapData[Width] : clrPrimeA; // pixel (0,1)
    int prevR1 = wrapRGBtoGray(clrPrimeA, 1);
    int prevR2 = wrapRGBtoGray(clrPrimeB, 1);
    int prevR3 = wrapRGBtoGray(clrPrimeC, 1);
@@ -3380,7 +3413,7 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
             if (inRange(d - adaptLevel, d + adaptLevel, vTolrc) && aaMode==1)
                prevR4 = R1;
 
-            if (ToleranceHits<maxThresholdHitsW && d>vTolrc)
+            if (ToleranceHits<maxThresholdHitsH && d>vTolrc)
             {
                ToleranceHits++;
             } else if (d<=vTolrc)
@@ -3563,10 +3596,13 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         for (int y = 0; y < mh; y++)
         {
             INT64 ky = (INT64)y * StrideMini;
+            unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1));
+            if (rngState==0)
+               rngState = 0x9E3779B9u;
             // prepare the noise bitmap
             for (int x = 0; x < mw; x++)
             {
-                unsigned char z = rand() % 101;
+                unsigned char z = qpvThreadRand(rngState) % 101;
                 INT64 o = ky + (INT64)x * 3;
                 if (z<intensity)
                 {
@@ -3578,15 +3614,15 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
 
                 if (doGrayScale==1)
                 {
-                   unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
+                   unsigned char zT = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
                    newBitmap[2 + o] = zT;
                    newBitmap[1 + o] = zT;
                    newBitmap[o] = zT;
                 } else
                 {
-                   newBitmap[2 + o] = clamp(rand() % 256 + brightness, 0, 255);
-                   newBitmap[1 + o] = clamp(rand() % 256 + brightness, 0, 255);
-                   newBitmap[o] = clamp(rand() % 256 + brightness, 0, 255);
+                   newBitmap[2 + o] = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
+                   newBitmap[1 + o] = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
+                   newBitmap[o] = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
                 }
             }
         }
@@ -3635,10 +3671,13 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
     for (int y = 0; y < h; y++)
     {
         INT64 ky = (INT64)y * Stride;
+        unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1));
+        if (rngState==0)
+           rngState = 0x9E3779B9u;
         for (int x = 0; x < w; x++)
         {
             unsigned char nR, nG, nB;
-            unsigned char z = rand() % 101;
+            unsigned char z = qpvThreadRand(rngState) % 101;
             if (z<intensity)
                continue;
 
@@ -3648,15 +3687,15 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
             INT64 o = ky + (INT64)x * bpc;
             if (doGrayScale==1)
             {
-               unsigned char zT = clamp(rand() % 256 + brightness, 0, 255);
+               unsigned char zT = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
                nR = zT;
                nG = zT;
                nB = zT;
             } else
             {
-               nR = clamp(rand() % 256 + brightness, 0, 255);
-               nG = clamp(rand() % 256 + brightness, 0, 255);
-               nB = clamp(rand() % 256 + brightness, 0, 255);
+               nR = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
+               nG = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
+               nB = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
             }
  
             int oA = (bpp==32) ? bgrImageData[3 + o] : 255;
@@ -3987,7 +4026,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             if (colorBitmap!=NULL)
             {
                // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
-               if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW)
+               if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW || (y - bmpY)<0 || (x - bmpX)<0)
                   continue;
 
                INT64 oz = kzy + kzx;
@@ -4491,13 +4530,18 @@ DLL_API int DLL_CALLCONV openCVdiffBlendBitmap(unsigned char* bgrImageData, int 
 
     #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
     for (int y = 0; y < bitmap.rows; y++) {
+        // walk the row channel-aware: the Mat is CV_8UC4 for 32-bit images,
+        // where at<Vec3b>() would step 3 bytes over 4-byte pixels
+        const int nch = bitmap.channels();
+        unsigned char* row = bitmap.ptr<unsigned char>(y);
         for (int x = 0; x < bitmap.cols; x++) {
-            cv::Vec3b& pixel = bitmap.at<cv::Vec3b>(y, x);
-            pixel[0] = clamp( ( pixel[0] + pixel[1] + pixel[2] ) / 3, 0, 255 );
+            unsigned char* pixel = row + (INT64)x * nch;
+            int gray = clamp( ( pixel[0] + pixel[1] + pixel[2] ) / 3, 0, 255 );
             if (invert==1)
-               pixel[0] = 255 - pixel[0];
-            pixel[1] = pixel[0];
-            pixel[2] = pixel[0];
+               gray = 255 - gray;
+            pixel[0] = gray;
+            pixel[1] = gray;
+            pixel[2] = gray;
         }
     }
 
@@ -4868,6 +4912,8 @@ DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {
                      + std::to_string(block.size) + ", " );
     }
     fnOutputDebug("ListProcessMemoryBlocks D; index=" + std::to_string(index));
+    if (blocks.empty())
+       return 0;
     return (uintptr_t)blocks[0].address;
 }
 
@@ -4941,7 +4987,7 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
             int nA = 255;
             int oA = 255;
             INT64 o = ky + (INT64)(imgX + x) * bpc;
-            if (o>=data || o<0)
+            if (o>data || o<0) // data is the offset of the last valid pixel, inclusive
                continue;
 
             if (newBitmap!=NULL)
@@ -5132,7 +5178,7 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
    // OutputDebugStringA(ss.str().data());
 
     int noffset = 0;
-    for ( INT secondIndex = offsetu ; secondIndex<n+1 ; secondIndex++)
+    for ( INT secondIndex = offsetu ; secondIndex<n ; secondIndex++)
     {
         UINT64 invert2ndindex = 0;
         // UINT64 reversed2ndindex = 0;
@@ -5208,28 +5254,25 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
 }
 
 double calcArrayAvgMedian(std::array<double, 64> givenArray, int modus) {
-    int size = givenArray.size() - 1;
+    const int n = givenArray.size();
     if (modus==1) // median
     {
         std::sort(givenArray.begin(), givenArray.end());
-        if (size % 2 == 0) {
-            return (givenArray[round(size / 2 - 1)] + givenArray[round(size / 2)]) / 2;
+        if (n % 2 == 0) {
+            return (givenArray[n / 2 - 1] + givenArray[n / 2]) / 2;
         }
 
-        return givenArray[floor(size / 2)];
+        return givenArray[n / 2];
     } else
     {
         // Calculate the average value from top 8x8 pixels, except for the first one.
         double thisSum = 0;
-        for (int i = 0; i < size; i++)
+        for (int i = 1; i < n; i++)
         {
-            if (i > 0)
-            {
-                thisSum += givenArray[i];
-            }
+            thisSum += givenArray[i];
         }
 
-        return (thisSum / size);
+        return (thisSum / (n - 1));
     }
 }
 
@@ -5740,7 +5783,7 @@ Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UIN
 BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize, int sliceHeight, int useICM, int mustClip, int x, int y, int w, int h, int newW, int newH, int givenQuality, Gdiplus::GpBitmap* &myBitmap) {
   // WIC factory initialized in initWICnow() 
   // WIC image object preloaded via WICpreLoadImage()
-  HRESULT hr, phr;
+  HRESULT hr = S_OK, phr = S_OK;
   IWICBitmapSource    *pFinalBitmapSource = NULL;
   IWICFormatConverter *pConverter         = NULL;
   IWICBitmapClipper   *pIClipper          = NULL;
@@ -6091,7 +6134,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       // IWICBitmapFrameDecode *pWICclassFrameDecoded = NULL;
       UINT tFrames = 0;
       hr = pWICclassDecoder->GetFrameCount(&tFrames);
-      if (givenFrame > tFrames - 1)
+      if (tFrames>0 && (UINT)givenFrame >= tFrames) // tFrames - 1 would underflow when tFrames==0
          givenFrame = tFrames - 1;
 
       resultsArray[2] = tFrames;
@@ -6137,11 +6180,12 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
                    resultsArray[7] = bpp;
                    resultsArray[8] = channels;
                 }
+                if (pPixelFormatInfo)
+                   pPixelFormatInfo->Release();
                 pComponentInfo->Release();
-                pPixelFormatInfo->Release();
              }
 
-             int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tif")==1) ? 1 : 0;
+             int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
              if (tif==1 && destinationFormat>32 && isFIMokay==1)
              {
                 fnOutputDebug("WICpreLoadImage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
@@ -6332,16 +6376,20 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     std::vector<unsigned short> out;
     *pageCount = FPDF_GetPageCount(doc);
     if (*pageCount<3)
-       return NULL;
+    {
+        FPDF_CloseDocument(doc);
+        return NULL;
+    }
 
     FPDF_BOOKMARK root = FPDFBookmark_GetFirstChild(doc, nullptr);
     if (root)
     {
         std::vector<unsigned int> emptyChain;  // At root level, no parent numbering.
         TraverseBookmarks(doc, root, out, emptyChain);
-    } else 
+    } else
     {
         *errorType = -2;
+        FPDF_CloseDocument(doc);
         return NULL;
     }
 
@@ -6373,6 +6421,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
     {
        fnOutputDebug("failed to load PDF: no pages found");
        errorType = -2;
+       FPDF_CloseDocument(document);
        return errorType;
     }
 
@@ -6396,7 +6445,11 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
                if (FPDFAnnot_GetSubtype(annot) == FPDF_ANNOT_LINK)
                {
                    FPDF_LINK link = FPDFAnnot_GetLink(annot);
-                   if (!link) continue;
+                   if (!link)
+                   {
+                      FPDFPage_CloseAnnot(annot);
+                      continue;
+                   }
   
                    FPDF_ACTION action = FPDFLink_GetAction(link);
                    if (action)
@@ -6450,7 +6503,12 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
                      }
                  }
               } else {
-                 index += buffSize * link_count;
+                 // probe pass: report the real space needed; URLs can exceed buffSize
+                 for (int i = 0; i < link_count; i++)
+                 {
+                     unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
+                     index += (int)url_buffer_size + 1;
+                 }
               }
               FPDFLink_CloseWebLinks(pageWebLinks);
            }
@@ -6488,6 +6546,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
     {
        fnOutputDebug("failed to load PDF: no pages found");
        errorType = -2;
+       FPDF_CloseDocument(document);
        return errorType;
     }
 
@@ -6503,6 +6562,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
           *givenIndex = 1; // copy not allowed
 
        *pages = pageCount;
+       FPDF_CloseDocument(document);
        return errorType;
     }
 
@@ -6720,7 +6780,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
             if (SUCCEEDED(hr))
             {
                resultsArray[2] = tFrames;
-               if (givenFrame > tFrames - 1)
+               if (tFrames>0 && givenFrame >= tFrames) // tFrames - 1 would underflow when tFrames==0
                   givenFrame = tFrames - 1;
  
                hr = pDecoder->GetFrame(givenFrame, &pFrame);
@@ -6771,11 +6831,12 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                             resultsArray[7] = bpp;
                             resultsArray[8] = channels;
                          }
+                         if (pPixelFormatInfo)
+                            pPixelFormatInfo->Release();
                          pComponentInfo->Release();
-                         pPixelFormatInfo->Release();
                       }
 
-                      int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tif")==1) ? 1 : 0;
+                      int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
                       // fnOutputDebug("LoadWICimage: container format ID=" + std::to_string(ucontainerFmt));
                       if (ucontainerFmt==9 && owidth==256 && oheight==192 || tif==1 && destinationBPP>32 && isFIMokay==1)
                       {
@@ -7070,7 +7131,20 @@ STATUS InsertJPEGFile2PDF(const char *fileName, int fileSize, PJPEG2PDF pdfId) {
   STATUS r = IDOK;
 
   jpegBuf = (unsigned char *)malloc(fileSize);
+  if (jpegBuf==NULL)
+  {
+     fnOutputDebug("InsertJPEGFile2PDF: failed to allocate buffer for file: " + std::string(fileName));
+     return ERROR;
+  }
+
   fp = fopen(fileName, "rb");
+  if (fp==NULL)
+  {
+     fnOutputDebug("InsertJPEGFile2PDF: failed to open file: " + std::string(fileName));
+     free(jpegBuf);
+     return ERROR;
+  }
+
   readInSize = (int)fread(jpegBuf, sizeof(UINT8), fileSize, fp);
   fclose(fp);
 
@@ -7157,7 +7231,7 @@ DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinat
   // Get the PDF into the Data Buffer and do the cleanup
   // Output the PDF Data Buffer to file
   STATUS g = Jpeg2PDF_GetFinalDocumentAndCleanup(pdfId, pdfBuf, &pdfFinalSize, pdfSize);
-  if (g=IDOK)
+  if (g==IDOK)
   {
      fnOutputDebug("writing PDF: final size =" + std::to_string(pdfFinalSize));
      FILE *fp = fopen(destinationPDFfile, "wb");
@@ -7509,24 +7583,30 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int h
 
 DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width, int Height, int rx, int ry) {
       // fnOutputDebug("maxR===" + std::to_string(maxuRadius) + "; rS=" + std::to_string(rScale) + "; imgAR=" + std::to_string(imgAR));
+      if (rx<1) rx = 1; // radius 0 would be a modulo-by-zero below
+      if (ry<1) ry = 1;
       const UINT maxPixels = Width + Height * Width;
-      std::vector<bool> pixelzMap(maxPixels, 0);
+      MaskBitMap pixelzMap; // bit-packed with atomic writes; std::vector<bool> races between OpenMP threads
+      pixelzMap.resize(maxPixels);
       time_t nTime;
-      srand((unsigned) time(&nTime));
+      time(&nTime);
 
       #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
       for (int y = 0; y < Height; y++)
       {
+         unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1));
+         if (rngState==0)
+            rngState = 0x9E3779B9u;
          for (int x = 0; x < Width; x++)
          {
-            int gx = rand() % (rx*2) - rx;
-            int gy = rand() % (ry*2) - ry;
+            int gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
+            int gy = (int)(qpvThreadRand(rngState) % (ry*2)) - ry;
             int dx = clamp(x + gx, 0, Width - 1);
             int dy = clamp(y + gy, 0, Height - 1);
             if (pixelzMap[dx + dy*Width]==1)
             {
-               gx = rand() % (rx*2) - rx;
-               gy = rand() % (ry*2) - ry;
+               gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
+               gy = (int)(qpvThreadRand(rngState) % (ry*2)) - ry;
                dx = clamp(x + gx, 0, Width - 1);
                dy = clamp(y + gy, 0, Height - 1);
             }
@@ -7541,16 +7621,19 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
           #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
           for (int y = 0; y < Height; y++)
           {
+             unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1)) ^ 0x55555555u;
+             if (rngState==0)
+                rngState = 0x9E3779B9u;
              for (int x = 0; x < Width; x++)
              {
-                int gx = rand() % (rx*2) - rx;
-                int gy = rand() % (ry*2) - ry;
+                int gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
+                int gy = (int)(qpvThreadRand(rngState) % (ry*2)) - ry;
                 int dx = clamp(x + gx, 0, Width - 1);
                 int dy = clamp(y + gy, 0, Height - 1);
                 if (pixelzMap[dx + dy*Width]==1)
                 {
-                   gx = rand() % (rx*2) - rx;
-                   gy = rand() % (ry*2) - ry;
+                   gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
+                   gy = (int)(qpvThreadRand(rngState) % (ry*2)) - ry;
                    dx = clamp(x + gx, 0, Width - 1);
                    dy = clamp(y + gy, 0, Height - 1);
                 }
@@ -7566,16 +7649,19 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
           #pragma omp parallel for schedule(dynamic) default(none) // num_threads(3)
           for (int y = 0; y < Height; y++)
           {
+             unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1)) ^ 0xAAAAAAAAu;
+             if (rngState==0)
+                rngState = 0x9E3779B9u;
              for (int x = 0; x < Width; x++)
              {
-                int gx = rand() % (rx*2) - rx;
-                int gy = rand() % (ry*2) - ry;
+                int gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
+                int gy = (int)(qpvThreadRand(rngState) % (ry*2)) - ry;
                 int dx = clamp(x + gx, 0, Width - 1);
                 int dy = clamp(y + gy, 0, Height - 1);
                 if (pixelzMap[dx + dy*Width]==1)
                 {
-                   gx = rand() % (rx*2) - rx;
-                   gy = rand() % (ry*2) - ry;
+                   gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
+                   gy = (int)(qpvThreadRand(rngState) % (ry*2)) - ry;
                    dx = clamp(x + gx, 0, Width - 1);
                    dy = clamp(y + gy, 0, Height - 1);
                 }
@@ -8778,9 +8864,6 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
             if (brushType==4 && bytesPerPixel==4)
             {
-               outA = weighTwoValues(srcA, tgtA, weight);
-               outA = weighTwoValues(srcA, tgtA, weight);
-               outA = weighTwoValues(srcA, tgtA, weight);
                outA = weighTwoValues(srcA, tgtA, weight);
             } else if (blendMode==24)
             {
