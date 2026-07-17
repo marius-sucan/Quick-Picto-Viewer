@@ -11297,8 +11297,14 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
          ; mirrored mouse coords, because flipping is a world transform on the canvas
          gmX := (FlipImgH=1) ? GuiW - mX : mX
          gmY := (FlipImgV=1) ? GuiH - mY : mY
-         prcW := clampInRange((gmX - prevDestPosX)/prevResizedVPimgW, 0, 1)
-         prcH := clampInRange((gmY - prevDestPosY)/prevResizedVPimgH, 0, 1)
+         prcW := (gmX - prevDestPosX)/prevResizedVPimgW
+         If (allowFreeIMGpanning!=1)
+            prcW := clampInRange(prcW, 0, 1)
+
+         prcH := (gmY - prevDestPosY)/prevResizedVPimgH
+         If (allowFreeIMGpanning!=1)
+            prcH := clampInRange(prcH, 0, 1)
+
          IMGdecalageX := Round(gmX - prcW * ImgW * zoomLevel)
          IMGdecalageY := Round(gmY - prcH * ImgH * zoomLevel)
          calcIMGcoordsInVP("setCenter", zoomLevel, 0, 0, 0, 0, 0, 0, 0, 0, 0)
