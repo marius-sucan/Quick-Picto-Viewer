@@ -48479,7 +48479,7 @@ calcIMGuserResizer(oImgW, oImgH, givenW, givenH, isPercent, keepRatio) {
 }
 
 PanelManageVectorShapes() {
-    Static LViewDynas, LViewShapesIcons
+    Global LViewDynas, LViewShapesIcons
     If (imgEditPanelOpened=1 && AnyWindowOpen && thumbsDisplaying=0)
        postVectorWinOpen := AnyWindowOpen
 
