@@ -49799,13 +49799,13 @@ PanelFloodFillTool() {
     ; fill color and appearance
     Gui, Add, Text, x15 y15 Section h%ha% +0x200, Flood fill (bucket) color:
     GuiAddPickerColor("xs y+5 h" ha " w25", "FloodFillColor")
-    GuiAddColor("x+5 hp w" clrWid, "FloodFillColor", "Flood fill color")
+    GuiAddColor("x+1 hp w" clrWid, "FloodFillColor", "Flood fill color")
     GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+5 w" fullWid - clrWid - 35 " hp")
     blends := StrReplace(userBlendModesList, "|Clip to alpha*|Replace*|Behind*")
     GuiAddDropDownList("xs y+8 w" colWid - 27 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" blends, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
-    Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Keep alpha channel intact
-    Gui, Add, Checkbox, xs y+8 gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Reduce flooding opacity based on color similarity
+    Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Alpha channel intact
+    Gui, Add, Checkbox, xs y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Flood opacity based on color similarity
 
     ; color similarity
     Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Color similarity:
@@ -49814,14 +49814,13 @@ PanelFloodFillTool() {
     Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%FloodFillEightWays% vFloodFillEightWays, Follow thin lines
 
     ; fill mode and affected area
-    bonus := (viewportQPVimage.imgHandle) ? "" : "|Apply alpha mask"
+    bonus := (viewportQPVimage.imgHandle) ? "" : "|Use alpha mask"
     If (viewportQPVimage.imgHandle && FloodFillSelectionMode=4)
        FloodFillSelectionMode := 1
 
-    Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Selection area:
-    GuiAddDropDownList("x+6 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillSelectionMode " vFloodFillSelectionMode", "Ignore selection area|Flood inside|Flood outside" bonus, "Selection fill mode")
-    Gui, Add, Checkbox, xs y+8 gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace the similar colors anywhere
-    Gui, Add, Checkbox, xs y+8 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
+    Gui, Add, Checkbox, xs y+8 hp gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace similar colors anywhere
+    Gui, Add, Checkbox, xs y+8 hp w%lblWid% gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
+    GuiAddDropDownList("x+6 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillSelectionMode " vFloodFillSelectionMode", "Ignore selection|Flood inside|Flood outside" bonus, "Selection fill mode")
 
     GuiAddCollapseBtn("xs y+15 h" thisBtnHeight " w35")
     Gui, Add, Button, x+5 hp w%btnWid% gBtnCloseWindow Default, &Close
