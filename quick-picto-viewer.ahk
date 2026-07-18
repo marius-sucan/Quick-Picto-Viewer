@@ -49783,60 +49783,48 @@ PanelFloodFillTool() {
        Return
 
     ReadSettingsFloodFillPanel()
-    btnWid := 100
-    txtWid := 250
-    EditWid := 60
     FloodFillSelectionAdj := 0
     interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
     If (PrefsLargeFonts=1)
-    {
-       EditWid := EditWid + 50
-       btnWid := btnWid + 70
-       txtWid := txtWid + 205
        Gui, Font, s%LargeUIfontValue%
-    }
 
-    txtWid2 := (PrefsLargeFonts=1) ? txtWid//2 + 5 : txtWid//2 + 15
-    xCol := (PrefsLargeFonts=1) ? 300 : 200
-    txtWid3 := (PrefsLargeFonts=1) ? txtWid//2 + 25 : txtWid//2 + 35
-    txtWid := (PrefsLargeFonts=1) ? txtWid + 25 : txtWid + 40
+    ha := (PrefsLargeFonts=1) ? 27 : 18
+    colWid := (PrefsLargeFonts=1) ? 230 : 160
+    lblWid := (PrefsLargeFonts=1) ? 160 : 95
+    clrWid := (PrefsLargeFonts=1) ? 55 : 35
+    btnWid := (PrefsLargeFonts=1) ? 90 : 60
+    fullWid := colWid*2 + 10
     Global PickuFloodFillColor
 
-    Gui, Add, Text, x15 y15 Section, Flood fill (bucket) color:
-    ha := (PrefsLargeFonts=1) ? 27 : 18
-    ml := (PrefsLargeFonts=1) ? 55 : 35
-    GuiAddPickerColor("xs+15 y+10 h" ha " w25", "FloodFillColor")
-    GuiAddColor("x+1 hp w" ml, "FloodFillColor", "Flood fill color")
-    GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+3 w" btnWid - 10 " hp")
-    Gui, Add, Checkbox, x%xCol% yp+0 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
-    ; Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillUseAlpha% vFloodFillUseAlpha, Apply alpha mas&k
-
-    pw := (PrefsLargeFonts=1) ? xCol - 42 : xCol - 42
-    Gui, Add, Checkbox, xs+15 y+15 w%pw% hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Keep alpha channel intact
-    ; GuiAddSlider("FloodFillOpacity", 3,255, 255, "Flooding opacity", "updateUIfloodFillPanel", 1, "xs+15 y+15 w" pw " hp")
+    ; fill color and appearance
+    Gui, Add, Text, x15 y15 Section h%ha% +0x200, Flood fill (bucket) color:
+    GuiAddPickerColor("xs y+5 h" ha " w25", "FloodFillColor")
+    GuiAddColor("x+5 hp w" clrWid, "FloodFillColor", "Flood fill color")
+    GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+5 w" fullWid - clrWid - 35 " hp")
     blends := StrReplace(userBlendModesList, "|Clip to alpha*|Replace*|Behind*")
-    GuiAddDropDownList("x" xCol " yp+0 wp-25 gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" blends, "Blending mode")
+    GuiAddDropDownList("xs y+8 w" colWid - 27 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" blends, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
-    Gui, Add, Checkbox, xs+14 y+8 hp gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Reduce flooding opacity based on color similarity
+    Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Keep alpha channel intact
+    Gui, Add, Checkbox, xs y+8 gupdateUIfloodFillPanel Checked%FloodFillDynamicOpacity% vFloodFillDynamicOpacity, Reduce flooding opacity based on color similarity
 
-    kl := (PrefsLargeFonts=1) ? 335 : 225
-    Gui, Add, Text, xs y+15 hp Section +0x200, Color similarity:
-    GuiAddSlider("FloodFillTolerance", 0,255, 10, "Tolerance", "updateUIfloodFillPanel", 1, "x+6 w" kl " h" ha)
-    GuiAddDropDownList("xs+15 y+10  w" txtWid2 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillAltToler " vFloodFillAltToler +hwndhTemp", "Grayscale [fast]|L*a'b' based grayscale|CIE 2000 Delta E [accurate]", "Color similarity algorithm", "The selected algorithm is used to determine the degree of similarity between the colors")
-    Gui, Add, Checkbox, x%xCol% yp+0 hp gupdateUIfloodFillPanel Checked%FloodFillEightWays% vFloodFillEightWays , Follow thin lines
-    Gui, Add, Checkbox, xs+15 y+10 gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace the similar colors anywhere
+    ; color similarity
+    Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Color similarity:
+    GuiAddSlider("FloodFillTolerance", 0,255, 10, "Tolerance", "updateUIfloodFillPanel", 1, "x+6 w" fullWid - lblWid - 6 " hp")
+    GuiAddDropDownList("xs y+8 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillAltToler " vFloodFillAltToler", "Grayscale [fast]|L*a'b' based grayscale|CIE 2000 Delta E [accurate]", "Color similarity algorithm", "The selected algorithm is used to determine the degree of similarity between the colors")
+    Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%FloodFillEightWays% vFloodFillEightWays, Follow thin lines
 
-    sml := (PrefsLargeFonts=1) ? 40 : 30
-    GuiAddCollapseBtn("xm+0 y+25 h" thisBtnHeight " w" sml)
-    ; Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gapplyIMGeditFunction, &Apply
-    Gui, Add, Button, x+5 hp wp+30 gBtnCloseWindow Default, &Close
-
-    txtWid2 := (PrefsLargeFonts=1) ? 230 : 150
+    ; fill mode and affected area
     bonus := (viewportQPVimage.imgHandle) ? "" : "|Apply alpha mask"
     If (viewportQPVimage.imgHandle && FloodFillSelectionMode=4)
        FloodFillSelectionMode := 1
 
-    GuiAddDropDownList("x+5 w" txtWid2 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillSelectionMode " vFloodFillSelectionMode", "Ignore selection area|Flood inside|Flood outside" bonus, "Selection fill mode")
+    Gui, Add, Text, xs y+15 w%lblWid% h%ha% +0x200, Selection area:
+    GuiAddDropDownList("x+6 w" colWid " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillSelectionMode " vFloodFillSelectionMode", "Ignore selection area|Flood inside|Flood outside" bonus, "Selection fill mode")
+    Gui, Add, Checkbox, xs y+8 gupdateUIfloodFillPanel Checked%FloodFillModus% vFloodFillModus, Replace the similar colors anywhere
+    Gui, Add, Checkbox, xs y+8 gupdateUIfloodFillPanel Checked%FloodFillCartoonMode% vFloodFillCartoonMode, Cartoon mode
+
+    GuiAddCollapseBtn("xs y+15 h" thisBtnHeight " w35")
+    Gui, Add, Button, x+5 hp w%btnWid% gBtnCloseWindow Default, &Close
 
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Color bucket tool: " appTitle, winPos)
