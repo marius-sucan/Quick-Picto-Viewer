@@ -167,7 +167,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 0, hGDIinfosWin := ""
    , zeitSillyPrevent := 1, PrintPosX, PrintPosY, PrintPosW, PrintPosH, tinyPrevAreaCoordX := 1, UsrEditFileDestination := ""
-   , hLVmainu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], userMultiCoresLimit := 100
+   , hLVmainu := 0, hLViconsu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], userMultiCoresLimit := 100
    , drawingShapeNow := 0, customShapePoints := [], prevResizedVPimgW := "", prevResizedVPimgH := "", PenuDrawLive := ""
    , customShapePropPoints := [], drawingVectorLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, userDefinedSelCoords := 0, thisSearchString := ""
@@ -47273,7 +47273,8 @@ stopDrawingShape(dummy:="") {
        TriggerMenuBarUpdate()
 }
 
-predefinedVectorShapes(whichShape) {
+getPredefinedVectorShapeDef(whichShape) {
+; each entry: [points list, curve tension]
 ; 1 = right triangle
 ; 2 = triangle
 ; 3 = rhombus
@@ -47281,21 +47282,17 @@ predefinedVectorShapes(whichShape) {
 ; 5 = star-5
 ; 6 = star-4
 ; 7 = cross
-   Static shape1c := "0.0,0.0|0.0,1.0|1.0,1.0"
-        , shape1t := 1
-        , shape2c := "0.5,0.0|0.0,1.0|1.0,1.0"
-        , shape2t := 1
-        , shape3c := "0.5,0.0|1.0,0.5|0.5,1.0|0.0,0.5"
-        , shape3t := 1
-        , shape4c := "0.0,0.0|1.0,0.0|1.0,0.7|0.7,0.7|0.87,1.0|0.5,0.7|0.0,0.7"
-        , shape4t := 1
-        , shape5c := "0.5,0.0|0.3,0.4|0.0,0.45|0.25,0.65|0.1,1.0|0.5,0.77|0.9,1.0|0.75,0.65|1.0,0.45|0.7,0.4"
-        , shape5t := 1
-        , shape6c := "0.5,0.0|0.35,0.35|0.0,0.5|0.35,0.65|0.5,1.0|0.65,0.65|1.0,0.5|0.65,0.35"
-        , shape6t := 1
-        , shape7c := "0.35,0|0.35,0.20|0,0.20|0,0.35|0.35,0.35|0.35,1|0.65,1|0.65,0.35|1,0.35|1,0.20|0.65,0.20|0.65,0"
-        , shape7t := 1
+   Static shapes := {1: ["0.0,0.0|0.0,1.0|1.0,1.0", 1]
+        , 2: ["0.5,0.0|0.0,1.0|1.0,1.0", 1]
+        , 3: ["0.5,0.0|1.0,0.5|0.5,1.0|0.0,0.5", 1]
+        , 4: ["0.0,0.0|1.0,0.0|1.0,0.7|0.7,0.7|0.87,1.0|0.5,0.7|0.0,0.7", 1]
+        , 5: ["0.5,0.0|0.3,0.4|0.0,0.45|0.25,0.65|0.1,1.0|0.5,0.77|0.9,1.0|0.75,0.65|1.0,0.45|0.7,0.4", 1]
+        , 6: ["0.5,0.0|0.35,0.35|0.0,0.5|0.35,0.65|0.5,1.0|0.65,0.65|1.0,0.5|0.65,0.35", 1]
+        , 7: ["0.35,0|0.35,0.20|0,0.20|0,0.35|0.35,0.35|0.35,1|0.65,1|0.65,0.35|1,0.35|1,0.20|0.65,0.20|0.65,0", 1]}
+   Return shapes[whichShape]
+}
 
+predefinedVectorShapes(whichShape) {
      bezierSplineCustomShape := 0
      If (whichShape=9)
      {
@@ -47303,10 +47300,9 @@ predefinedVectorShapes(whichShape) {
         RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
      } Else
      {
-        thisTension := "shape" whichShape "t"
-        thisShape := "shape" whichShape "c"
-        FillAreaCurveTension := %thisTension%
-        FillAreaCustomShape := %thisShape%
+        defu := getPredefinedVectorShapeDef(whichShape)
+        FillAreaCurveTension := defu[2]
+        FillAreaCustomShape := defu[1]
         RegAction(1, "FillAreaCurveTension")
      }
 
@@ -48483,7 +48479,7 @@ calcIMGuserResizer(oImgW, oImgH, givenW, givenH, isPercent, keepRatio) {
 }
 
 PanelManageVectorShapes() {
-    Static LViewDynas
+    Static LViewDynas, LViewShapesIcons
     If (imgEditPanelOpened=1 && AnyWindowOpen && thumbsDisplaying=0)
        postVectorWinOpen := AnyWindowOpen
 
@@ -48501,11 +48497,23 @@ PanelManageVectorShapes() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    Gui, Add, Text, x15 y15 Section, Freeform vector shapes already saved
+    thumbSize := (PrefsLargeFonts=1) ? 96 : 64
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit gBtnTabsInfoUpdate hwndhCurrTab vCurrentPanelTab Choose1, Shapes gallery|Detailed list
+    Gui, Tab, 2
+    Gui, Add, Text, x+15 y+15 Section +hwndhTmpTxtu, Freeform vector shapes already saved
     hLVmainu := GuiAddListView("xs y+10 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid gBTNlvCustomShapes -multi AltSubmit vLViewDynas", "Name|Date|#", "Saved vector shapes")
+    GuiControlGet, txtp, Pos, %hTmpTxtu%
+    GuiControlGet, lvp, Pos, %hLVmainu%
+    Gui, Tab, 1
+    iconsLVh := lvpY + lvpH - txtpY
+    hLViconsu := GuiAddListView("x+15 y+15 w" lstWid " h" iconsLVh " +Icon +LV0x10000 gBTNlvIconsCustomShapes -multi AltSubmit vLViewShapesIcons", "Name|Date|#", "Vector shapes gallery")
+    spacingX := thumbSize + ((PrefsLargeFonts=1) ? 76 : 52)
+    spacingY := thumbSize + ((PrefsLargeFonts=1) ? 58 : 42)
+    SendMessage, 0x1035, 0, % (spacingY<<16)|spacingX,, ahk_id %hLViconsu%   ; LVM_SETICONSPACING
+    Gui, Tab
 
     btnWid2 := (PrefsLargeFonts=1) ? 95 : 60
-    Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid2% Default gBTNloadCustomShape, &Load
+    Gui, Add, Button, x15 y+15 h%thisBtnHeight% w%btnWid2% Default gBTNloadCustomShape, &Load
     If !postVectorWinOpen
     {
        If (EllipseSelectMode=2)
@@ -48519,7 +48527,7 @@ PanelManageVectorShapes() {
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage vector shapes: " appTitle)
     Sleep, 25
-    uiPopulateCustomVectorShapesList()
+    uiPopulateCustomVectorShapesList(thumbSize)
 }
 
 BTNopenCustomShapesFolder() {
@@ -48531,13 +48539,36 @@ BTNlvCustomShapes(a, b, c) {
       BTNloadCustomShape()
 }
 
-BTNdeleteCustomShape() {
+BTNlvIconsCustomShapes(a, b, c) {
+   If ((b="Normal" || b="DoubleClick") && c>0)
+      BTNloadCustomShape()
+}
+
+getSelectedVectorShapeLVrow(ByRef givenName, ByRef datu, ByRef whichShape) {
+   givenName := datu := whichShape := ""
    Gui, SettingsGUIA: Default
-   Gui, SettingsGUIA: ListView, LViewDynas
-   ; RowNumber := LV_GetNext(0, "F")
-   RowNumber := LV_GetFirstSelected(hLVmainu)
+   GuiControlGet, ptab, SettingsGUIA:, CurrentPanelTab
+   If (ptab=2)
+   {
+      Gui, SettingsGUIA: ListView, LViewDynas
+      RowNumber := LV_GetFirstSelected(hLVmainu)
+   } Else
+   {
+      Gui, SettingsGUIA: ListView, LViewShapesIcons
+      RowNumber := LV_GetFirstSelected(hLViconsu)
+   }
+
+   If !RowNumber
+      Return 0
+
    LV_GetText(givenName, RowNumber, 1)
    LV_GetText(datu, RowNumber, 2)
+   LV_GetText(whichShape, RowNumber, 3)
+   Return RowNumber
+}
+
+BTNdeleteCustomShape() {
+   RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
    If (datu="-" || !RowNumber)
       Return
 
@@ -48556,12 +48587,7 @@ BTNdeleteCustomShape() {
 }
 
 BTNrenameCustomShape() {
-   Gui, SettingsGUIA: Default
-   Gui, SettingsGUIA: ListView, LViewDynas
-   RowNumber := LV_GetFirstSelected(hLVmainu)
-   ; RowNumber := LV_GetNext(0, "F")
-   LV_GetText(givenName, RowNumber, 1)
-   LV_GetText(datu, RowNumber, 2)
+   RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
    ; ToolTip, % givenName "|" datu "|" RowNumber , , , 2
    If (datu="-" || !RowNumber || RowNumber<1)
       Return
@@ -48616,15 +48642,10 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    externMode := (isGiven="yes" && FileExist(whichFile) && whichFile) ? 1 : 0
    If (externMode!=1)
    {
-      Gui, SettingsGUIA: Default
-      Gui, SettingsGUIA: ListView, LViewDynas
-      RowNumber := LV_GetFirstSelected(hLVmainu)
+      RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
       If !RowNumber
          Return
 
-      LV_GetText(givenName, RowNumber, 1)
-      LV_GetText(datu, RowNumber, 2)
-      LV_GetText(whichShape, RowNumber, 3)
       If !givenName
          Return
       mustOpenWin := postVectorWinOpen
@@ -48750,7 +48771,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       BTNopenPrevPanel(mustOpenWin, "yes")
 }
 
-uiPopulateCustomVectorShapesList() {
+uiPopulateCustomVectorShapesList(thumbSize:=64) {
     Static defaultShapes := {1:"right triangle", 2:"triangle", 3:"rhombus", 4:"box callout", 5:"star-5", 6:"star-4", 7:"christian cross", 8:"torus", 9:"Last temporarily saved"}
 
     thisIndex := 0
@@ -48773,6 +48794,148 @@ uiPopulateCustomVectorShapesList() {
 
     Loop, 3
         LV_ModifyCol(A_Index, "AutoHdr Left")
+
+    ; the shapes gallery tab; the thumbnails are rendered on each panel open
+    hIL := DllCall("Comctl32.dll\ImageList_Create", "Int", thumbSize, "Int", thumbSize, "UInt", 0x20, "Int", 24, "Int", 24, "UPtr")   ; ILC_COLOR32
+    If !hIL
+       Return
+
+    Gui, SettingsGUIA: ListView, LViewShapesIcons
+    LV_SetImageList(hIL, 0)
+    o_customShapeCountPoints := customShapeCountPoints
+    Loop, % mainCompiledPath "\resources\vector-shapes\*.vqpv"
+    {
+        Try FormatTime, datu, % A_LoopFileTimeModified, dd/MM/yyyy, HH:mm
+        iconNr := renderVectorShapeThumbFile(hIL, A_LoopFileLongPath, thumbSize)
+        LV_Add("Icon" iconNr, StrReplace(A_LoopFileName, ".vqpv"), datu, A_Index)
+    }
+
+    thisIndex := 0
+    For Key, Value in defaultShapes
+    {
+       thisIndex++
+       StringUpper, value, value, T
+       iconNr := renderVectorShapeThumbDefault(hIL, thisIndex, thumbSize)
+       LV_Add("Icon" iconNr, value, "-", "D" thisIndex)
+    }
+    customShapeCountPoints := o_customShapeCountPoints
+}
+
+renderVectorShapeThumbFile(hIL, thisFile, thumbSize) {
+   FileRead, contentu, % thisFile
+   If StrLen(contentu)<5
+      Return renderVectorShapeThumb(hIL, thumbSize, 0, 1, 1, 0, 0, 0, 0)
+
+   obju := StrSplit(contentu, "`n", "`r `t")
+   newArrayu := convertShapePointsStrToArray(obju[1])
+   rotu := clampInRange(obju[2], 0, 360)
+   tenzu := clampInRange(obju[3], 1, 5)
+   cavX := clampInRange(obju[4], 0, 0.49)
+   cavY := clampInRange(obju[5], 0, 0.49)
+   closedu := (Trim(obju[6])=0) ? 0 : 1
+   Return renderVectorShapeThumb(hIL, thumbSize, newArrayu, tenzu, closedu, rotu, cavX, cavY, 0)
+}
+
+renderVectorShapeThumbDefault(hIL, whichShape, thumbSize) {
+   If (whichShape=8)  ; torus
+      Return renderVectorShapeThumb(hIL, thumbSize, 0, 1, 1, 0, 0.45, 0.45, 1)
+
+   If (whichShape=9)  ; last temporarily saved shape
+   {
+      RegRead, tmpShape, % QPVregEntry "\PanelOptions", FillAreaCustomShape
+      RegRead, tmpTension, % QPVregEntry "\PanelOptions", FillAreaCurveTension
+      RegRead, tmpClosed, % QPVregEntry "\PanelOptions", closedLineCustomShape
+      newArrayu := convertShapePointsStrToArray(tmpShape)
+      tenzu := clampInRange(tmpTension, 1, 5)
+      closedu := (Trim(tmpClosed)=0) ? 0 : 1
+      Return renderVectorShapeThumb(hIL, thumbSize, newArrayu, tenzu, closedu, 0, 0, 0, 0)
+   }
+
+   defu := getPredefinedVectorShapeDef(whichShape)
+   newArrayu := convertShapePointsStrToArray(defu[1])
+   Return renderVectorShapeThumb(hIL, thumbSize, newArrayu, defu[2], 1, 0, 0, 0, 0)
+}
+
+buildVectorShapeThumbPath(pPath, ByRef PointsList, tenzu, closedu) {
+; builds the path the same way createPathVectorCustomShape() does,
+; without relying on the active vector editing globals
+   If (tenzu=5)  ; bézier
+   {
+      simpleFixBrokenBezierPath(PointsList)
+      viewerAutoCloseOpenPath(PointsList, closedu)
+      Gdip_AddPathBeziers(pPath, PointsList)
+   } Else If (tenzu=1 && closedu=1)
+      Gdip_AddPathPolygon(pPath, PointsList)
+   Else If (tenzu=1)
+      Gdip_AddPathLines(pPath, PointsList)
+   Else
+   {
+      tensionLvl := (tenzu=4) ? 0.95 : (tenzu=3) ? 0.5 : 0.2
+      If (closedu=1)
+         Gdip_AddPathClosedCurve(pPath, PointsList, tensionLvl)
+      Else
+         Gdip_AddPathCurve(pPath, PointsList, tensionLvl)
+   }
+}
+
+renderVectorShapeThumb(hIL, thumbSize, pointsArray, tenzu, closedu, rotu, cavX, cavY, isEllipse) {
+; renders the given vector shape as black on white and appends it
+; to the image list of the shapes gallery ListView
+   thumbIndex := -1
+   pBitmap := trGdip_CreateBitmap(A_ThisFunc, thumbSize, thumbSize)
+   If !validBMP(pBitmap)
+      Return 0
+
+   marginu := thumbSize//10 + 2
+   areaSize := thumbSize - marginu*2
+   pPath := Gdip_CreatePath()
+   If (isEllipse=1 && pPath)
+      Gdip_AddPathEllipse(pPath, marginu, marginu, areaSize, areaSize)
+   Else If (pPath && IsObject(pointsArray) && pointsArray.Count()>2)
+   {
+      PointsList := convertCustomShape2givenArea(pointsArray, marginu, marginu, areaSize, areaSize, 1)
+      If IsObject(PointsList)
+         buildVectorShapeThumbPath(pPath, PointsList, tenzu, closedu)
+   }
+
+   If (pPath && Gdip_GetPathPointsCount(pPath)>1)
+   {
+      If (rotu>0 && rotu<360)
+         trGdip_RotatePathAtCenter(pPath, rotu, 1, 1, 0, 1)
+
+      centerPath2bounds(pPath, marginu, marginu, areaSize, areaSize)
+      If (cavX>0 && cavY>0)
+      {
+         clonedPath := Gdip_ClonePath(pPath)
+         Gdip_ScalePathAtCenter(clonedPath, cavX, cavY)
+         Gdip_AddPathToPath(pPath, clonedPath, 0)
+         Gdip_DeletePath(clonedPath)
+      }
+   }
+
+   G := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap, 7, 4)
+   trGdip_GraphicsClear(A_ThisFunc, G, "0xFFffFFff")
+   If (G && pPath && Gdip_GetPathPointsCount(pPath)>1)
+   {
+      pBrush := Gdip_BrushCreateSolid("0xFF000000")
+      Gdip_FillPath(G, pBrush, pPath)
+      Gdip_DeleteBrush(pBrush)
+      pPen := Gdip_CreatePen("0xFF000000", (thumbSize>80) ? 3 : 2)
+      Gdip_DrawPath(G, pPen, pPath)
+      Gdip_DeletePen(pPen)
+   }
+
+   Gdip_DeleteGraphics(G)
+   Gdip_DeletePath(pPath)
+   hBMPu := Gdip_CreateHBITMAPFromBitmap(pBitmap, "0xFFffFFff")
+   If hBMPu
+   {
+      thumbIndex := DllCall("Comctl32.dll\ImageList_Add", "UPtr", hIL, "UPtr", hBMPu, "UPtr", 0)
+      DeleteObject(hBMPu)
+   }
+
+   trGdip_DisposeImage(pBitmap, 1)
+   Return thumbIndex + 1
 }
 
 BtnSaveVectorShape() {
@@ -48782,10 +48945,9 @@ BtnSaveVectorShape() {
 
    If (AnyWindowOpen=72)
    {
-      Gui, SettingsGUIA: Default
-      Gui, SettingsGUIA: ListView, LViewDynas
-      RowNumber := LV_GetNext(0, "F")
-      LV_GetText(prevNameSavedVectorShape, RowNumber, 1)
+      RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
+      If RowNumber
+         prevNameSavedVectorShape := givenName
    }
 
    widthu := (PrefsLargeFonts=1) ? 950 : 460
