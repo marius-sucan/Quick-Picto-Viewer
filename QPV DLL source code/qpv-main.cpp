@@ -7966,6 +7966,239 @@ DLL_API int DLL_CALLCONV polar2rectIMG(unsigned char *imageData, unsigned char *
       return 1;
 }
 
+// Edge-extended integral of one channel along a lane of pixels, in box coordinates where pixel i
+// covers [i, i+1). pre holds chan-interleaved prefix sums: pre[i*chan + c] = sum of pixels [0, i).
+// Outside [0, w] the lane continues with its first/last pixel value (clamp-to-edge), so however
+// far an overshooting streak reaches, the integral stays defined.
+inline double zbLaneIntegral(const double *pre, const unsigned char *lane, const int &pixStep, const int &chan, const int &c, const int &w, const double &t) {
+      if (t<=0.0)
+         return t * (double)lane[c];
+
+      if (t>=(double)w)
+         return pre[(INT64)w*chan + c] + (t - (double)w) * (double)lane[(INT64)(w - 1)*pixStep + c];
+
+      const int i = (int)t;
+      return pre[(INT64)i*chan + c] + (t - (double)i) * (double)lane[(INT64)i*pixStep + c];
+}
+
+DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char *newData, int w, int h, int Stride, int bpp, int cx, int cy, int mode, int intensity, int quality) {
+// Zoom blur anchored on (cx, cy): every pixel is streaked along the segment running from itself
+// toward the anchor, over intensity% of its distance to it -- 100 smears all the way to the
+// anchor, higher values keep going past it (clamp-to-edge supplies the samples once the segment
+// leaves the bitmap), so very high intensities are safe. The anchor may sit outside the bitmap.
+// mode: 2 = x axis only, 3 = y axis only, anything else = both axes [true radial zoom].
+// The axis-only modes are computed exactly in O(1) per pixel from prefix sums, whatever the
+// intensity. The radial mode gathers along the segment with a per-pixel sample count matched to
+// the streak length, so pixels near the anchor stay nearly free; quality caps the samples per
+// pixel (<=0 picks 128; hard ceiling 256 -- the integer accumulators overflow past that).
+// 32-bpp data is averaged straight across all four channels, which is only correct for
+// premultiplied alpha [PArgb]; the callers clone with Gdip_CloneBmpPargbArea.
+// imageData is the untouched source and newData receives the result; a gather filter cannot
+// work in place, so the two must be distinct buffers.
+
+      if (!imageData || !newData || imageData==newData || w<1 || h<1 || Stride<1 || (bpp!=24 && bpp!=32))
+         return 0;
+
+      const int chan = bpp / 8;
+      const double f = clamp(intensity, 0, 20000) / 100.0;
+      fnOutputDebug("zoomBlurBitmap invoked; mode=" + std::to_string(mode) + "; intensity=" + std::to_string(intensity) + "; quality=" + std::to_string(quality));
+      if (f==0.0)
+      {
+         #pragma omp parallel for schedule(static) default(none) shared(imageData, newData, h, Stride, w, chan)
+         for (int y = 0; y < h; y++)
+             memcpy(newData + (INT64)y*Stride, imageData + (INT64)y*Stride, (size_t)w*chan);
+         return 1;
+      }
+
+      if (mode==2 || mode==3)
+      {
+         // exact box average along one axis: a lane is a row [mode 2] or a column [mode 3]
+         const int lanes = (mode==2) ? h : w;
+         const int lanePix = (mode==2) ? w : h;
+         const int pixStep = (mode==2) ? chan : Stride;
+         const INT64 laneStep = (mode==2) ? Stride : chan;
+         const double cLane = (mode==2) ? (double)cx : (double)cy;
+
+         #pragma omp parallel shared(imageData, newData, lanes, lanePix, pixStep, laneStep, cLane, chan, f)
+         {
+            std::vector<double> pre((INT64)(lanePix + 1)*chan, 0.0);
+            #pragma omp for schedule(static)
+            for (int L = 0; L < lanes; L++)
+            {
+               const unsigned char *lane = imageData + L*laneStep;
+               unsigned char *outLane = newData + L*laneStep;
+               double sum[4] = { 0.0, 0.0, 0.0, 0.0 };
+               for (int i = 0; i < lanePix; i++)
+               {
+                  const unsigned char *p = lane + (INT64)i*pixStep;
+                  for (int c = 0; c < chan; c++)
+                  {
+                     sum[c] += (double)p[c];
+                     pre[(INT64)(i + 1)*chan + c] = sum[c];
+                  }
+               }
+
+               for (int i = 0; i < lanePix; i++)
+               {
+                  unsigned char *out = outLane + (INT64)i*pixStep;
+                  const double d = f * ((double)i - cLane);
+                  if (d==0.0)
+                  {
+                     const unsigned char *p = lane + (INT64)i*pixStep;
+                     for (int c = 0; c < chan; c++)
+                         out[c] = p[c];
+                     continue;
+                  }
+
+                  const double a = (double)i + 0.5;   // pixel center in box coordinates
+                  const double u = (d>0) ? a - d : a;
+                  const double v = (d>0) ? a : a - d;
+                  const double inv = 1.0 / (v - u);
+                  for (int c = 0; c < chan; c++)
+                  {
+                     const double avg = (zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, v)
+                                       - zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, u)) * inv;
+                     out[c] = (unsigned char)clamp((int)(avg + 0.5), 0, 255);
+                  }
+               }
+            }
+         }
+         return 1;
+      }
+
+      // radial zoom: gather along the pixel->anchor segment in 16.16 fixed point with integer
+      // bilinear taps; rows near the anchor carry far fewer samples, hence schedule(dynamic)
+      const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
+      const double cxf = (double)cx, cyf = (double)cy;
+
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, w, h, Stride, bpp, chan, f, maxS, cxf, cyf)
+      for (int y = 0; y < h; y++)
+      {
+         unsigned char *out = newData + (INT64)y*Stride;
+         const double ty = -f * ((double)y - cyf);
+         for (int x = 0; x < w; x++, out += chan)
+         {
+            const double tx = -f * ((double)x - cxf);
+            const double len = sqrt(tx*tx + ty*ty);
+            if (len<0.0001)
+            {
+               const unsigned char *p = imageData + CalcPixOffset(x, y, Stride, bpp);
+               for (int c = 0; c < chan; c++)
+                   out[c] = p[c];
+               continue;
+            }
+
+            // one sample per streak pixel, endpoints included; n>=2 so the blur fades in
+            // continuously as the streak shrinks toward the anchor
+            const int n = 2 + (int)min((double)(maxS - 2), len);
+            const double invSeg = 1.0 / (double)(n - 1);
+            const INT64 stepX = (INT64)(tx * invSeg * 65536.0);
+            const INT64 stepY = (INT64)(ty * invSeg * 65536.0);
+            INT64 pxf = (INT64)x << 16;
+            INT64 pyf = (INT64)y << 16;
+
+            // the exact endpoints bound every fixed-point tap, so they decide whether the
+            // unclamped fast path is safe; the +1 bilinear tap costs the -1 on each far edge
+            const double ex = (double)x + tx, ey = (double)y + ty;
+            const bool safe = min((double)x, ex)>=0.0 && max((double)x, ex)<(double)(w - 1) - 0.001
+                           && min((double)y, ey)>=0.0 && max((double)y, ey)<(double)(h - 1) - 0.001;
+
+            if (bpp==32)
+            {
+               // SSE2 bilinear: the x blend runs on 16-bit words (7-bit weights keep the products
+               // signed-safe for pmaddwd) and the y blend folds both tap rows in a single madd;
+               // per-sample weights total 128*256 = 32768, so 256 samples peak at
+               // 255*32768*256 < 2^31 per lane and the averages can never exceed 255
+               const __m128i zero = _mm_setzero_si128();
+               __m128i acc = zero;
+               if (safe)
+               {
+                  // both x-neighbours of a tap row arrive in one 64-bit load
+                  for (int i = 0; i < n; i++)
+                  {
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
+                     const unsigned char *row = imageData + (INT64)yi*Stride + (INT64)xi*4;
+                     const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
+                     const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
+                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero), xw);
+                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(row + Stride)), zero), xw);
+                     t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
+                     b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
+                     acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
+                     pxf += stepX;   pyf += stepY;
+                  }
+               } else
+               {
+                  // same arithmetic, but every tap is clamped to the bitmap and loaded singly
+                  for (int i = 0; i < n; i++)
+                  {
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
+                     const INT64 x0 = (INT64)clamp(xi, 0, w - 1)*4, x1 = (INT64)clamp(xi + 1, 0, w - 1)*4;
+                     const unsigned char *r0 = imageData + (INT64)clamp(yi, 0, h - 1)*Stride;
+                     const unsigned char *r1 = imageData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
+                     const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
+                     const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
+                     const __m128i top = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r0 + x0)), _mm_cvtsi32_si128(*(const int *)(r0 + x1)));
+                     const __m128i bot = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r1 + x0)), _mm_cvtsi32_si128(*(const int *)(r1 + x1)));
+                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(top, zero), xw);
+                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(bot, zero), xw);
+                     t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
+                     b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
+                     acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
+                     pxf += stepX;   pyf += stepY;
+                  }
+               }
+
+               const __m128 f4 = _mm_mul_ps(_mm_cvtepi32_ps(acc), _mm_set1_ps(1.0f / ((float)n * 32768.0f)));
+               *(UINT32 *)out = (UINT32)_mm_cvtsi128_si32(_mm_packus_epi16(_mm_packs_epi32(_mm_cvtps_epi32(f4), zero), zero));
+            } else
+            {
+               UINT32 accB = 0, accG = 0, accR = 0;
+               if (safe)
+               {
+                  for (int i = 0; i < n; i++)
+                  {
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const UINT32 wx1 = (pxf >> 8) & 0xFF, wy1 = (pyf >> 8) & 0xFF;
+                     const UINT32 wx0 = 256 - wx1, wy0 = 256 - wy1;
+                     const UINT32 w00 = wx0*wy0, w01 = wx1*wy0, w10 = wx0*wy1, w11 = wx1*wy1;
+                     const unsigned char *p00 = imageData + (INT64)yi*Stride + (INT64)xi*3;
+                     const unsigned char *p10 = p00 + Stride;
+                     accB += p00[0]*w00 + p00[3]*w01 + p10[0]*w10 + p10[3]*w11;
+                     accG += p00[1]*w00 + p00[4]*w01 + p10[1]*w10 + p10[4]*w11;
+                     accR += p00[2]*w00 + p00[5]*w01 + p10[2]*w10 + p10[5]*w11;
+                     pxf += stepX;   pyf += stepY;
+                  }
+               } else
+               {
+                  for (int i = 0; i < n; i++)
+                  {
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const UINT32 wx1 = (pxf >> 8) & 0xFF, wy1 = (pyf >> 8) & 0xFF;
+                     const UINT32 wx0 = 256 - wx1, wy0 = 256 - wy1;
+                     const UINT32 w00 = wx0*wy0, w01 = wx1*wy0, w10 = wx0*wy1, w11 = wx1*wy1;
+                     const INT64 x0 = (INT64)clamp(xi, 0, w - 1)*3, x1 = (INT64)clamp(xi + 1, 0, w - 1)*3;
+                     const unsigned char *r0 = imageData + (INT64)clamp(yi, 0, h - 1)*Stride;
+                     const unsigned char *r1 = imageData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
+                     accB += r0[x0]*w00 + r0[x1]*w01 + r1[x0]*w10 + r1[x1]*w11;
+                     accG += r0[x0 + 1]*w00 + r0[x1 + 1]*w01 + r1[x0 + 1]*w10 + r1[x1 + 1]*w11;
+                     accR += r0[x0 + 2]*w00 + r0[x1 + 2]*w01 + r1[x0 + 2]*w10 + r1[x1 + 2]*w11;
+                     pxf += stepX;   pyf += stepY;
+                  }
+               }
+
+               const double invW = 1.0 / (double)((UINT64)n << 16);
+               out[0] = (unsigned char)((double)accB * invW + 0.5);
+               out[1] = (unsigned char)((double)accG * invW + 0.5);
+               out[2] = (unsigned char)((double)accR * invW + 0.5);
+            }
+         }
+      }
+      return 1;
+}
+
 DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {
     // https://learn.microsoft.com/en-us/windows/win32/tablet/wm-tablet-querysystemgesturestatus-message
     ATOM atom = ::GlobalAddAtom(MICROSOFT_TABLETPENSERVICE_PROPERTY);    

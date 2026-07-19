@@ -19982,6 +19982,68 @@ QPV_PolarTransformBitmap(funcu, dllFunc, pBitmap) {
   Return newBitmap
 }
 
+QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
+  ; zoom blur anchored on [cx, cy], in the given bitmap's own coordinates;
+  ; modus: 2 = x axis only, 3 = y axis only, others = both axes [true radial zoom];
+  ; intensity = percents of each pixel's distance to the anchor to smear across; beyond 100
+  ; the smear travels past the anchor; quality caps the radial samples per pixel [0 = default]
+  initQPVmainDLL()
+  If !qpvMainDll
+  {
+     addJournalEntry(funcu "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+     Return
+  }
+
+  If !validBMP(pBitmap)
+  {
+     addJournalEntry(funcu "(): ERROR. Invalid bitmap")
+     Return
+  }
+
+  trGdip_GetImageDimensions(pBitmap, w, h)
+  If (!w || !h)
+  {
+     addJournalEntry(funcu "(): ERROR. Invalid image dimensions. W=" w " | H=" h)
+     Return
+  }
+
+  newBitmap := trGdip_CreateBitmap(funcu, w, h)
+  If !validBMP(newBitmap)
+     Return
+
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
+  E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
+  If (!E1 && !E2)
+     r := DllCall("qpvmain.dll\zoomBlurBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", modus, "Int", intensity, "Int", quality, "Int")
+  Else
+     addJournalEntry(funcu "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
+
+  If !E1
+     Gdip_UnlockBits(pBitmap, iData)
+  If !E2
+     Gdip_UnlockBits(newBitmap, mData)
+
+  If (r!=1)
+  {
+     addJournalEntry(funcu "(): ERROR. zoomBlurBitmap() failed to process the image. Result = " r)
+     trGdip_DisposeImage(newBitmap)
+     Return
+  }
+
+  Return newBitmap
+}
+
+calcZoomBlurIntensity() {
+  ; maps the 1..254 intensity slider to the percentual scale of zoomBlurBitmap(); the curve keeps
+  ; low slider values as gentle as the retired iterative blur and lets the top end smear well
+  ; past the anchor point; single-axis streaks read weaker, so they get boosted, as before;
+  ; shared by ZoomBlurSelectedArea() and livePreviewZoomBlurPanel() to keep the preview faithful
+  thisIntensity := Round(uiZoomBlurAreaXamount*0.25 + (uiZoomBlurAreaXamount**2)/400)
+  If (zoomBlurMode>1)
+     thisIntensity *= 4
+  Return thisIntensity
+}
+
 dummyDrawImage(pEffect, clrMatrix, zBitmap, G2, funcu) {
    If !pEffect
       r1 := trGdip_DrawImage(funcu, G2, zBitmap, 0, 0,,,,,,, clrMatrix)
@@ -23687,62 +23749,21 @@ ZoomBlurSelectedArea() {
     ; Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
-    thisO := 0.951 ; opacity step for blur iteration
-    thisOstep := (uiZoomBlurAreaXamount>180) ? 0.06 : 0.10
-    thisFa := (uiZoomBlurAreaXamount>180) ? 40 : 10
-    thisFb := (uiZoomBlurAreaXamount>180) ? 1980 : 1200
-    dimgSelPx := imgSelPx, dimgSelPy := imgSelPy
-    dimgSelW := imgSelW, dimgSelH := imgSelH
-
-    prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelW) - imgSelPx)/imgSelW
-    prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelH) - imgSelPy)/imgSelH
-    zoomBlurAreaXamount := uiZoomBlurAreaXamount/thisFa
-    b := zoomBlurAreaXamount/thisFb
-    b := b * ( (imgSelW + imgSelH) / 3 )
-    If (zoomBlurMode>1)
-       b *= 4
-
-    thisBlurX := thisBlurY := clampInRange(Round(zoomBlurAreaXamount * 0.25), 1, 21)
-    If (zoomBlurMode=2)
-       thisBlurY := thisBlurY/5 + 1
-    Else If (zoomBlurMode=3)
-       thisBlurX := thisBlurX/5 + 1
-
+    prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelPx + imgSelW) - imgSelPx)/imgSelW
+    prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelPy + imgSelH) - imgSelPy)/imgSelH
+    thisIntensity := calcZoomBlurIntensity()
     errorsOccured := 0
     doStartLongOpDance()
-    ; fnOutputDebug(A_ThisFunc ": zb=" b "|" thisBlurX "|" thisBlurY)
     If isInRange(zoomBlurMode, 1, 3)
     {
-       Loop
+       showTOOLtip("Radial blur, please wait...")
+       zoomedBMP := QPV_ZoomBlurBitmap(A_ThisFunc, gBitmap, Round(prcX*imgSelW), Round(prcY*imgSelH), zoomBlurMode, thisIntensity)
+       If validBMP(zoomedBMP)
        {
-          thisO -= thisOstep
-          If (thisO<0)
-             Break
-
-          If (zoomBlurMode=1 || zoomBlurMode=2)
-             dimgSelW += A_Index * b
-          If (zoomBlurMode=1 || zoomBlurMode=3)
-             dimgSelH += A_Index * b
-
-          If (zoomBlurMode=1 || zoomBlurMode=2)
-             dimgSelPx := 0 - (dimgSelW - imgSelW)*prcX
-          If (zoomBlurMode=1 || zoomBlurMode=3)
-             dimgSelPy := 0 - (dimgSelH - imgSelH)*prcY
-
-          showTOOLtip("Radial blur: step " A_Index "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)),, , 1 - thisO)
-          r1 := QPV_ResizeSplitBlendChannels(gBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH, thisO, passesX, passesY)
-          If (determineTerminateOperation()=1)
-          {
-             abandonAll := 1
-             Break
-          }
-
-          If (r1!=1)
-          {
-             errorsOccured := 1
-             Break
-          }
-       }
+          trGdip_DisposeImage(gBitmap, 1)
+          gBitmap := zoomedBMP
+       } Else
+          errorsOccured := 1
     }
 
     If (BlurAreaBlendMode>1 && errorsOccured=0)
@@ -53280,8 +53301,6 @@ livePreviewZoomBlurPanel() {
 
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
     thisOpacity := blurAreaOpacity/255
-    zoomBlurAreaXamount := uiZoomBlurAreaXamount/10
-    thisBlurAmount := (doubleBlurPreviewArea=1) ? zoomBlurAreaXamount*2 : zoomBlurAreaXamount*4
     If (viewportQPVimage.imgHandle)
     {
        thisBMP := viewportQPVimage.ImageGetResizedRect(thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH, imgBoxSizeW, imgBoxSizeH, userimgQuality)
@@ -53301,66 +53320,16 @@ livePreviewZoomBlurPanel() {
     yBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, cornersBMP)
 
     Gdip_DisposeImageAttributes(imageAttribs)
-    thisBlurAmount := clampInRange(5 + Round(zoomBlurAreaXamount/2) - 2, 5, 20) ; A_Index * thisBlur
-    If (doubleBlurPreviewArea=1)
-       thisBlurAmount := thisBlurAmount//2 + 1
+    ; the anchor = the user-picked focal point mapped into the preview box coordinates, with the
+    ; same mapping the crop was drawn with; the intensity is the same percentual scale as in
+    ; ZoomBlurSelectedArea(), so the preview matches the applied effect at any preview zoom,
+    ; because the smear of every pixel is proportional to its own distance to the anchor point
+    anchorX := Round(cX + (tinyPrevAreaCoordX - thisPrevieCoordX)*uiboxSizeW/imgBoxSizeW)
+    anchorY := Round(cY + (tinyPrevAreaCoordY - thisPrevieCoordY)*uiboxSizeH/imgBoxSizeH)
+    gBitmap := QPV_ZoomBlurBitmap(A_ThisFunc, yBitmap, anchorX, anchorY, zoomBlurMode, calcZoomBlurIntensity())
+    If !validBMP(gBitmap)
+       gBitmap := trGdip_CloneBitmap(A_ThisFunc, yBitmap)
 
-    opEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
-    gBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, yBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
-    G3 := trGdip_GraphicsFromImage(A_ThisFunc, gBitmap, 5)
-    thisO := 0.85
-    imgSelPx := imgSelPy := 0
-    dimgSelPx := dimgSelPy := 0
-    imgSelW := imgSelH := uiboxSizeW
-    dimgSelW := dimgSelH := uiboxSizeH
-
-    b := (doubleBlurPreviewArea=1) ? zoomBlurAreaXamount/3 : zoomBlurAreaXamount/2
-    If isInRange(zoomBlurMode, 1, 3)
-    {
-       Loop
-       {
-          thisO -= 0.1 ; thisOpacity - (A_Index - 1) * startOpacity
-          If (thisO<0)
-             Break
-
-          ; showTOOLtip("Radial blur: step " A_Index,, , (1 - thisO)/1)
-          ; fnOutputDebug(thisBlurAmount "=" thisO)
-          ApplySpecialFixedBlur(A_ThisFunc, yBitmap, thisBlurAmount, opEffect)
-          If (zoomBlurMode=1 || zoomBlurMode=2)
-             dimgSelW += A_Index * b*2
-          If (zoomBlurMode=1 || zoomBlurMode=3)
-             dimgSelH += A_Index * b*2
-
-          If (zoomBlurMode=1 || zoomBlurMode=2)
-             dimgSelPx -= A_Index * b
-          If (zoomBlurMode=1 || zoomBlurMode=3)
-             dimgSelPy -= A_Index * b
-
-          r1 := trGdip_DrawImage(A_ThisFunc, G3, yBitmap, dimgSelPx, dimgSelPy, dimgSelW, dimgSelH,,,,, thisO)
-          trGdip_DisposeImage(yBitmap, 1)
-          yBitmap := trGdip_CloneBitmap(A_ThisFunc, gBitmap)
-       }
-    } Else
-    {
-       f := (doubleBlurPreviewArea=1) ? (zoomBlurAreaXamount*8)/2 : zoomBlurAreaXamount*8
-       ff := (doubleBlurPreviewArea=1) ? ((zoomBlurAreaXamount*8)/2)/2 : (zoomBlurAreaXamount*8)/2
-       If (zoomBlurMode=4)
-       {
-          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, imgSelW//ff, imgSelH, 0, 5)
-          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW//f, imgSelH, 0, 7)
-       } Else
-       {
-          wbitmap := trGdip_ResizeBitmap(A_ThisFunc, yBitmap, imgSelW, imgSelH//ff, 0, 5)
-          rbitmap := trGdip_ResizeBitmap(A_ThisFunc, wBitmap, imgSelW, imgSelH//f, 0, 7)
-       }
-       fbitmap := trGdip_ResizeBitmap(A_ThisFunc, rBitmap, imgSelW, imgSelH, 0, 7)
-       r1 := trGdip_DrawImage(A_ThisFunc, G3, fBitmap, 0, 0, imgSelW, imgSelH)
-       trGdip_DisposeImage(wBitmap)
-       trGdip_DisposeImage(rBitmap)
-       trGdip_DisposeImage(fBitmap)
-    }
-
-    Gdip_DeleteGraphics(G3)
     If (BlurAreaBlendMode>1)
     {
        applyBlurColorsFX(gBitmap)
@@ -53384,7 +53353,6 @@ livePreviewZoomBlurPanel() {
     trGdip_DisposeImage(bgrBMPu, 1)
     trGdip_DisposeImage(cornersBMP, 1)
     Gdip_DisposeEffect(pEffect)
-    Gdip_DisposeEffect(opEffect)
 }
 
 updateUIerasePanel(actionu:=0, b:=0, c:=0) {
