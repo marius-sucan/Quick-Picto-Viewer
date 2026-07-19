@@ -20037,10 +20037,6 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
 }
 
 calcZoomBlurIntensity() {
-  ; maps the 1..254 intensity slider to the percentual scale of zoomBlurBitmap(); the curve keeps
-  ; low slider values as gentle as the retired iterative blur and lets the top end smear well
-  ; past the anchor point; single-axis streaks read weaker, so they get boosted, as before;
-  ; shared by ZoomBlurSelectedArea() and livePreviewZoomBlurPanel() to keep the preview faithful
   thisIntensity := Round(uiZoomBlurAreaXamount*0.25 + (uiZoomBlurAreaXamount*2)/400)
   If (zoomBlurMode>1)
      thisIntensity *= 2
