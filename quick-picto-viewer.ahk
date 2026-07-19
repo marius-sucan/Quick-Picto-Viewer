@@ -20012,13 +20012,21 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
      Return
 
   If !quality
-     quality := (modus>1) ? 80 : clampInRange(intensity*2, 16, 70)
+  {
+     quality := (modus>1 && modus!=4) ? 80 : clampInRange(intensity*2, 16, 70)
+     If (modus=4)
+        quality += 5
+  }
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
-     r := DllCall("qpvmain.dll\zoomBlurBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", modus, "Int", intensity, "Int", quality, "Int")
-  Else
+  {
+     If (modus=4)
+        r := DllCall("qpvmain.dll\rotateBlurBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", intensity, "Int", quality, "Int")
+     Else
+        r := DllCall("qpvmain.dll\zoomBlurBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", modus, "Int", intensity, "Int", quality, "Int")
+  } Else
      addJournalEntry(funcu "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
 
   If !E1
@@ -20038,7 +20046,7 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
 
 calcZoomBlurIntensity() {
   thisIntensity := Round(uiZoomBlurAreaXamount*0.25 + (uiZoomBlurAreaXamount*2)/400)
-  If (zoomBlurMode>1)
+  If (zoomBlurMode>1 && zoomBlurMode!=4)
      thisIntensity *= 2
   Return thisIntensity
 }
@@ -23753,7 +23761,7 @@ ZoomBlurSelectedArea() {
     thisIntensity := calcZoomBlurIntensity()
     errorsOccured := 0
     doStartLongOpDance()
-    If isInRange(zoomBlurMode, 1, 3)
+    If isInRange(zoomBlurMode, 1, 4)
     {
        showTOOLtip("Radial blur, please wait...")
        zoomedBMP := QPV_ZoomBlurBitmap(A_ThisFunc, gBitmap, Round(prcX*imgSelW), Round(prcY*imgSelH), zoomBlurMode, thisIntensity)
@@ -50624,7 +50632,7 @@ WriteSettingsZoomBlurPanel() {
 }
 
 ReadSettingsZoomBlurPanel(act:=0) {
-    RegAction(act, "zoomBlurMode",, 2, 1, 3)
+    RegAction(act, "zoomBlurMode",, 2, 1, 4)
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "BlurAreaInverted",, 1)
@@ -50716,7 +50724,7 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 w%thisW% Section +hwndhTemp, Blur mode: 
-    GuiAddDropDownList("x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose" zoomBlurMode " vzoomBlurMode", "Zoom H/V|Horizontal|Vertical", [hTemp])
+    GuiAddDropDownList("x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose" zoomBlurMode " vzoomBlurMode", "Zoom H/V|Horizontal|Vertical|Rotational / spin", [hTemp])
     GuiAddSlider("uiZoomBlurAreaXamount", 1,254, 15, "Intensity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid " hp")
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid - 27 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIzoomBlurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
