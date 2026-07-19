@@ -7991,8 +7991,11 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
 // intensity. The radial mode gathers along the segment with a per-pixel sample count matched to
 // the streak length, so pixels near the anchor stay nearly free; quality caps the samples per
 // pixel (<=0 picks 128; hard ceiling 256 -- the integer accumulators overflow past that).
-// 32-bpp data is averaged straight across all four channels, which is only correct for
-// premultiplied alpha [PArgb]; the callers clone with Gdip_CloneBmpPargbArea.
+// 32-bpp data must be premultiplied alpha [PArgb]; the callers clone with
+// Gdip_CloneBmpPargbArea. Colors resolve alpha-weighted: a streak takes the average color
+// of its visible content and its alpha never drops below the source pixel's own, so
+// transparent areas -- inside the image, or clamp-to-edge extended past its borders --
+// cannot dilute the result into invisibility when it is composited back over the original.
 // imageData is the untouched source and newData receives the result; a gather filter cannot
 // work in place, so the two must be distinct buffers.
 
@@ -8054,11 +8057,37 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                   const double u = (d>0) ? a - d : a;
                   const double v = (d>0) ? a : a - d;
                   const double inv = 1.0 / (v - u);
-                  for (int c = 0; c < chan; c++)
+                  if (chan==4)
                   {
-                     const double avg = (zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, v)
-                                       - zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, u)) * inv;
-                     out[c] = (unsigned char)clamp((int)(avg + 0.5), 0, 255);
+                     // alpha-weighted colors, as in the radial mode: transparent stretches
+                     // cannot dilute the average, and the pixel keeps at least its own alpha
+                     double sums[4];
+                     for (int c = 0; c < 4; c++)
+                         sums[c] = zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, v)
+                                 - zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, u);
+                     const unsigned char *px = lane + (INT64)i*pixStep;
+                     if (sums[3]<0.5)
+                     {
+                        for (int c = 0; c < 4; c++)
+                            out[c] = px[c];   // the streak saw nothing visible; keep the pixel
+                     } else
+                     {
+                        const double avgA = sums[3] * inv;
+                        const double outA = ((double)px[3]>avgA) ? (double)px[3] : avgA;
+                        const double sc = outA / sums[3];
+                        out[0] = (unsigned char)(min(255.0, sums[0] * sc) + 0.5);
+                        out[1] = (unsigned char)(min(255.0, sums[1] * sc) + 0.5);
+                        out[2] = (unsigned char)(min(255.0, sums[2] * sc) + 0.5);
+                        out[3] = (unsigned char)(outA + 0.5);
+                     }
+                  } else
+                  {
+                     for (int c = 0; c < chan; c++)
+                     {
+                        const double avg = (zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, v)
+                                          - zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, u)) * inv;
+                        out[c] = (unsigned char)clamp((int)(avg + 0.5), 0, 255);
+                     }
                   }
                }
             }
@@ -8151,8 +8180,29 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                   }
                }
 
-               const __m128 f4 = _mm_mul_ps(_mm_cvtepi32_ps(acc), _mm_set1_ps(1.0f / ((float)n * 32768.0f)));
-               *(UINT32 *)out = (UINT32)_mm_cvtsi128_si32(_mm_packus_epi16(_mm_packs_epi32(_mm_cvtps_epi32(f4), zero), zero));
+               // resolve with alpha-weighted colors: the streak takes the average color of its
+               // visible content only, and its alpha never drops below the source pixel's own,
+               // so transparent samples cannot dilute the result. Premultiplied data keeps
+               // accB/G/R<=accA and the scaled colors <=outA<=255; the min() only guards
+               // against non-premultiplied garbage input. Fully opaque input resolves to the
+               // same plain average as before
+               int lanes[4];
+               _mm_storeu_si128((__m128i *)lanes, acc);
+               const unsigned char *sp = imageData + (INT64)y*Stride + (INT64)x*4;
+               const double accA = (double)lanes[3];
+               if (accA<0.5)
+               {
+                  *(UINT32 *)out = *(const UINT32 *)sp;   // the streak saw nothing visible; keep the pixel
+               } else
+               {
+                  const double avgA = accA / ((double)n * 32768.0);
+                  const double outA = ((double)sp[3]>avgA) ? (double)sp[3] : avgA;
+                  const double sc = outA / accA;
+                  out[0] = (unsigned char)(min(255.0, (double)lanes[0] * sc) + 0.5);
+                  out[1] = (unsigned char)(min(255.0, (double)lanes[1] * sc) + 0.5);
+                  out[2] = (unsigned char)(min(255.0, (double)lanes[2] * sc) + 0.5);
+                  out[3] = (unsigned char)(outA + 0.5);
+               }
             } else
             {
                UINT32 accB = 0, accG = 0, accR = 0;
@@ -8215,8 +8265,11 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 // per-pixel sample count matched to the arc length, so pixels near the anchor stay nearly
 // free; quality caps the samples per pixel (<=0 picks 128; hard ceiling 256 -- the integer
 // accumulators overflow past that).
-// 32-bpp data is averaged straight across all four channels, which is only correct for
-// premultiplied alpha [PArgb]; the callers clone with Gdip_CloneBmpPargbArea.
+// 32-bpp data must be premultiplied alpha [PArgb]; the callers clone with
+// Gdip_CloneBmpPargbArea. Colors resolve alpha-weighted: a streak takes the average color
+// of its visible content and its alpha never drops below the source pixel's own, so
+// transparent areas -- inside the image, or clamp-to-edge extended past its borders --
+// cannot dilute the result into invisibility when it is composited back over the original.
 // imageData is the untouched source and newData receives the result; a gather filter cannot
 // work in place, so the two must be distinct buffers.
 
@@ -8343,8 +8396,29 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                   }
                }
 
-               const __m128 f4 = _mm_mul_ps(_mm_cvtepi32_ps(acc), _mm_set1_ps(1.0f / ((float)n * 32768.0f)));
-               *(UINT32 *)out = (UINT32)_mm_cvtsi128_si32(_mm_packus_epi16(_mm_packs_epi32(_mm_cvtps_epi32(f4), zero), zero));
+               // resolve with alpha-weighted colors: the streak takes the average color of its
+               // visible content only, and its alpha never drops below the source pixel's own,
+               // so transparent samples cannot dilute the result. Premultiplied data keeps
+               // accB/G/R<=accA and the scaled colors <=outA<=255; the min() only guards
+               // against non-premultiplied garbage input. Fully opaque input resolves to the
+               // same plain average as before
+               int lanes[4];
+               _mm_storeu_si128((__m128i *)lanes, acc);
+               const unsigned char *sp = imageData + (INT64)y*Stride + (INT64)x*4;
+               const double accA = (double)lanes[3];
+               if (accA<0.5)
+               {
+                  *(UINT32 *)out = *(const UINT32 *)sp;   // the streak saw nothing visible; keep the pixel
+               } else
+               {
+                  const double avgA = accA / ((double)n * 32768.0);
+                  const double outA = ((double)sp[3]>avgA) ? (double)sp[3] : avgA;
+                  const double sc = outA / accA;
+                  out[0] = (unsigned char)(min(255.0, (double)lanes[0] * sc) + 0.5);
+                  out[1] = (unsigned char)(min(255.0, (double)lanes[1] * sc) + 0.5);
+                  out[2] = (unsigned char)(min(255.0, (double)lanes[2] * sc) + 0.5);
+                  out[3] = (unsigned char)(outA + 0.5);
+               }
             } else
             {
                UINT32 accB = 0, accG = 0, accR = 0;
