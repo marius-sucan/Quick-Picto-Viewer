@@ -8199,6 +8199,200 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
       return 1;
 }
 
+// True when the angular sweep [a0, a1] passes absolute angle a [radians] or a full-turn alias
+// of it; the sweep never exceeds one turn, so the three nearest aliases are exhaustive. Used to
+// find where an arc peaks against the bitmap borders.
+inline bool rbArcCrosses(const double &a0, const double &a1, const double &a) {
+      return (a>=a0 && a<=a1) || (a - 2.0*M_PI>=a0 && a - 2.0*M_PI<=a1) || (a + 2.0*M_PI>=a0 && a + 2.0*M_PI<=a1);
+}
+
+DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned char *newData, int w, int h, int Stride, int bpp, int cx, int cy, int intensity, int quality) {
+// Rotational [spin] blur anchored on (cx, cy): every pixel is streaked along the arc of the
+// circle centered on the anchor and passing through it, sweeping intensity degrees in total --
+// half to each side of the pixel's own position, so the image blurs in place instead of looking
+// rotated; 360 averages the entire circle. The anchor may sit outside the bitmap, and arcs
+// leaving the bitmap are fed by clamp-to-edge samples. The gather walks the arc with a
+// per-pixel sample count matched to the arc length, so pixels near the anchor stay nearly
+// free; quality caps the samples per pixel (<=0 picks 128; hard ceiling 256 -- the integer
+// accumulators overflow past that).
+// 32-bpp data is averaged straight across all four channels, which is only correct for
+// premultiplied alpha [PArgb]; the callers clone with Gdip_CloneBmpPargbArea.
+// imageData is the untouched source and newData receives the result; a gather filter cannot
+// work in place, so the two must be distinct buffers.
+
+      if (!imageData || !newData || imageData==newData || w<1 || h<1 || Stride<1 || (bpp!=24 && bpp!=32))
+         return 0;
+
+      const int chan = bpp / 8;
+      const double A = deg2rad(clamp(intensity, 0, 360));
+      fnOutputDebug("rotateBlurBitmap invoked; intensity=" + std::to_string(intensity) + "; quality=" + std::to_string(quality));
+      if (A==0.0)
+      {
+         #pragma omp parallel for schedule(static) default(none) shared(imageData, newData, h, Stride, w, chan)
+         for (int y = 0; y < h; y++)
+             memcpy(newData + (INT64)y*Stride, imageData + (INT64)y*Stride, (size_t)w*chan);
+         return 1;
+      }
+
+      const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
+      const double cxf = (double)cx, cyf = (double)cy;
+      const double cH = cos(0.5*A), sH = sin(0.5*A);   // rotation by half the sweep reaches the arc ends
+
+      // the arc is walked with the constant-angle rotation recurrence, so cos/sin of the step
+      // are needed only once per sample count, never per sample; every count gets its pair here
+      double stepC[257], stepS[257];
+      for (int i = 2; i <= 256; i++)
+      {
+         const double a = A / (double)(i - 1);
+         stepC[i] = cos(a);   stepS[i] = sin(a);
+      }
+
+      // rows far from the anchor carry longer arcs, hence schedule(dynamic)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, w, h, Stride, bpp, chan, A, maxS, cxf, cyf, cH, sH, stepC, stepS)
+      for (int y = 0; y < h; y++)
+      {
+         unsigned char *out = newData + (INT64)y*Stride;
+         const double dy = (double)y - cyf;
+         for (int x = 0; x < w; x++, out += chan)
+         {
+            const double dx = (double)x - cxf;
+            const double r2 = dx*dx + dy*dy;
+            if (r2<0.00000001)
+            {
+               const unsigned char *p = imageData + CalcPixOffset(x, y, Stride, bpp);
+               for (int c = 0; c < chan; c++)
+                   out[c] = p[c];
+               continue;
+            }
+
+            // one sample per arc pixel, endpoints included; n>=2 so the blur fades in
+            // continuously as the arc shrinks toward the anchor
+            const double r = sqrt(r2);
+            const int n = 2 + (int)min((double)(maxS - 2), r*A);
+            const double rc = stepC[n], rs = stepS[n];
+            // sweep start and end: the pixel's offset from the anchor, rotated a half sweep
+            // backward [walked from] and forward [only bounds-checked]
+            double vx = dx*cH + dy*sH, vy = dy*cH - dx*sH;
+            const double ex = dx*cH - dy*sH, ey = dy*cH + dx*sH;
+
+            // the arc peaks at +-r on every axis direction it sweeps past and at its endpoints
+            // otherwise; that exact bounding box decides whether the unclamped fast path is
+            // safe; the +1 bilinear tap costs the -1 on each far edge. The circle test first
+            // spares the atan2 wherever the whole circle already fits
+            bool safe = cxf - r>=0.0 && cxf + r<(double)(w - 1) - 0.001
+                     && cyf - r>=0.0 && cyf + r<(double)(h - 1) - 0.001;
+            if (!safe)
+            {
+               const double th = atan2(dy, dx);
+               const double a0 = th - 0.5*A, a1 = th + 0.5*A;
+               const double bxMax = rbArcCrosses(a0, a1, 0.0) ? r : max(vx, ex);
+               const double bxMin = rbArcCrosses(a0, a1, M_PI) ? -r : min(vx, ex);
+               const double byMax = rbArcCrosses(a0, a1, 0.5*M_PI) ? r : max(vy, ey);
+               const double byMin = rbArcCrosses(a0, a1, -0.5*M_PI) ? -r : min(vy, ey);
+               safe = cxf + bxMin>=0.0 && cxf + bxMax<(double)(w - 1) - 0.001
+                   && cyf + byMin>=0.0 && cyf + byMax<(double)(h - 1) - 0.001;
+            }
+
+            if (bpp==32)
+            {
+               // SSE2 bilinear: the x blend runs on 16-bit words (7-bit weights keep the products
+               // signed-safe for pmaddwd) and the y blend folds both tap rows in a single madd;
+               // per-sample weights total 128*256 = 32768, so 256 samples peak at
+               // 255*32768*256 < 2^31 per lane and the averages can never exceed 255
+               const __m128i zero = _mm_setzero_si128();
+               __m128i acc = zero;
+               if (safe)
+               {
+                  // both x-neighbours of a tap row arrive in one 64-bit load
+                  for (int i = 0; i < n; i++)
+                  {
+                     const INT64 pxf = (INT64)((cxf + vx)*65536.0), pyf = (INT64)((cyf + vy)*65536.0);
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
+                     const unsigned char *row = imageData + (INT64)yi*Stride + (INT64)xi*4;
+                     const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
+                     const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
+                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero), xw);
+                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(row + Stride)), zero), xw);
+                     t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
+                     b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
+                     acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
+                     const double t = vx*rc - vy*rs;   vy = vx*rs + vy*rc;   vx = t;
+                  }
+               } else
+               {
+                  // same arithmetic, but every tap is clamped to the bitmap and loaded singly
+                  for (int i = 0; i < n; i++)
+                  {
+                     const INT64 pxf = (INT64)((cxf + vx)*65536.0), pyf = (INT64)((cyf + vy)*65536.0);
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
+                     const INT64 x0 = (INT64)clamp(xi, 0, w - 1)*4, x1 = (INT64)clamp(xi + 1, 0, w - 1)*4;
+                     const unsigned char *r0 = imageData + (INT64)clamp(yi, 0, h - 1)*Stride;
+                     const unsigned char *r1 = imageData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
+                     const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
+                     const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
+                     const __m128i top = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r0 + x0)), _mm_cvtsi32_si128(*(const int *)(r0 + x1)));
+                     const __m128i bot = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r1 + x0)), _mm_cvtsi32_si128(*(const int *)(r1 + x1)));
+                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(top, zero), xw);
+                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(bot, zero), xw);
+                     t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
+                     b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
+                     acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
+                     const double t = vx*rc - vy*rs;   vy = vx*rs + vy*rc;   vx = t;
+                  }
+               }
+
+               const __m128 f4 = _mm_mul_ps(_mm_cvtepi32_ps(acc), _mm_set1_ps(1.0f / ((float)n * 32768.0f)));
+               *(UINT32 *)out = (UINT32)_mm_cvtsi128_si32(_mm_packus_epi16(_mm_packs_epi32(_mm_cvtps_epi32(f4), zero), zero));
+            } else
+            {
+               UINT32 accB = 0, accG = 0, accR = 0;
+               if (safe)
+               {
+                  for (int i = 0; i < n; i++)
+                  {
+                     const INT64 pxf = (INT64)((cxf + vx)*65536.0), pyf = (INT64)((cyf + vy)*65536.0);
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const UINT32 wx1 = (pxf >> 8) & 0xFF, wy1 = (pyf >> 8) & 0xFF;
+                     const UINT32 wx0 = 256 - wx1, wy0 = 256 - wy1;
+                     const UINT32 w00 = wx0*wy0, w01 = wx1*wy0, w10 = wx0*wy1, w11 = wx1*wy1;
+                     const unsigned char *p00 = imageData + (INT64)yi*Stride + (INT64)xi*3;
+                     const unsigned char *p10 = p00 + Stride;
+                     accB += p00[0]*w00 + p00[3]*w01 + p10[0]*w10 + p10[3]*w11;
+                     accG += p00[1]*w00 + p00[4]*w01 + p10[1]*w10 + p10[4]*w11;
+                     accR += p00[2]*w00 + p00[5]*w01 + p10[2]*w10 + p10[5]*w11;
+                     const double t = vx*rc - vy*rs;   vy = vx*rs + vy*rc;   vx = t;
+                  }
+               } else
+               {
+                  for (int i = 0; i < n; i++)
+                  {
+                     const INT64 pxf = (INT64)((cxf + vx)*65536.0), pyf = (INT64)((cyf + vy)*65536.0);
+                     const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
+                     const UINT32 wx1 = (pxf >> 8) & 0xFF, wy1 = (pyf >> 8) & 0xFF;
+                     const UINT32 wx0 = 256 - wx1, wy0 = 256 - wy1;
+                     const UINT32 w00 = wx0*wy0, w01 = wx1*wy0, w10 = wx0*wy1, w11 = wx1*wy1;
+                     const INT64 x0 = (INT64)clamp(xi, 0, w - 1)*3, x1 = (INT64)clamp(xi + 1, 0, w - 1)*3;
+                     const unsigned char *r0 = imageData + (INT64)clamp(yi, 0, h - 1)*Stride;
+                     const unsigned char *r1 = imageData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
+                     accB += r0[x0]*w00 + r0[x1]*w01 + r1[x0]*w10 + r1[x1]*w11;
+                     accG += r0[x0 + 1]*w00 + r0[x1 + 1]*w01 + r1[x0 + 1]*w10 + r1[x1 + 1]*w11;
+                     accR += r0[x0 + 2]*w00 + r0[x1 + 2]*w01 + r1[x0 + 2]*w10 + r1[x1 + 2]*w11;
+                     const double t = vx*rc - vy*rs;   vy = vx*rs + vy*rc;   vx = t;
+                  }
+               }
+
+               const double invW = 1.0 / (double)((UINT64)n << 16);
+               out[0] = (unsigned char)((double)accB * invW + 0.5);
+               out[1] = (unsigned char)((double)accG * invW + 0.5);
+               out[2] = (unsigned char)((double)accR * invW + 0.5);
+            }
+         }
+      }
+      return 1;
+}
+
 DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {
     // https://learn.microsoft.com/en-us/windows/win32/tablet/wm-tablet-querysystemgesturestatus-message
     ATOM atom = ::GlobalAddAtom(MICROSOFT_TABLETPENSERVICE_PROPERTY);    
