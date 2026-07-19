@@ -1,15 +1,10 @@
 /QPV DLL source code/.vs
 /QPV DLL source code/includes
 /QPV DLL source code/x64
-seenImagesList.db
-quick-picto-viewer-custom-kbd.ini
-quick-picto-viewer-favourites.ini
-quick-picto-viewer-folder-faves.ini
-quick-picto-viewer-minifaves.ini
-quick-picto-viewer-recents.ini
-quick-picto-viewer.ini
+seenImagesList*.*
+quick-picto-viewer*.ini
 resources/vector-shapes/__-*
-seenImagesList.db-journal
+resources/vector-shapes/_previous_huge_path*
 _to-do-qpv.txt
 Ahk2Exe-new-v1-1-33.lnk
 /qpv-for-x64
