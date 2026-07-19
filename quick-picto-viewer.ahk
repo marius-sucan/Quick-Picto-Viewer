@@ -20011,6 +20011,9 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
   If !validBMP(newBitmap)
      Return
 
+  If !quality
+     quality := (modus>1) ? 80 : clampInRange(intensity*2, 16, 70)
+
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
@@ -20038,9 +20041,9 @@ calcZoomBlurIntensity() {
   ; low slider values as gentle as the retired iterative blur and lets the top end smear well
   ; past the anchor point; single-axis streaks read weaker, so they get boosted, as before;
   ; shared by ZoomBlurSelectedArea() and livePreviewZoomBlurPanel() to keep the preview faithful
-  thisIntensity := Round(uiZoomBlurAreaXamount*0.25 + (uiZoomBlurAreaXamount**2)/400)
+  thisIntensity := Round(uiZoomBlurAreaXamount*0.25 + (uiZoomBlurAreaXamount*2)/400)
   If (zoomBlurMode>1)
-     thisIntensity *= 4
+     thisIntensity *= 2
   Return thisIntensity
 }
 
