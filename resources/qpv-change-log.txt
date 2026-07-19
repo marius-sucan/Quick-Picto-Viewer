@@ -10,8 +10,8 @@
   - faster blend mode functions
   - faster flood fill / bucket tool
   - faster color adjustments
-  - added 16 new predefined vector shapes
-  - added shapes gallery in Vector shapes manager; vector shapes previewed as thumbnails
+  - added 13 new predefined vector shapes
+  - added shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
   - many bug fixes
 
 - v6.2.00 (2026-06-11)

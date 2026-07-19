@@ -48506,9 +48506,9 @@ PanelManageVectorShapes() {
     GuiControlGet, lvp, Pos, %hLVmainu%
     Gui, Tab, 1
     iconsLVh := lvpY + lvpH - txtpY
-    hLViconsu := GuiAddListView("x+15 y+15 w" lstWid " h" iconsLVh " +Icon +LV0x10000 gBTNlvIconsCustomShapes -multi AltSubmit vLViewShapesIcons", "Name|Date|#", "Vector shapes gallery")
-    spacingX := thumbSize + ((PrefsLargeFonts=1) ? 76 : 52)
-    spacingY := thumbSize + ((PrefsLargeFonts=1) ? 58 : 42)
+    hLViconsu := GuiAddListView("x+15 y+15 w" lstWid " h" iconsLVh " +Icon +LV0x10000 gBTNlvCustomShapes -multi AltSubmit vLViewShapesIcons", "Ico|Name|Date|#", "Vector shapes gallery")
+    spacingX := Ceil(thumbSize*1.22)
+    spacingY := Ceil(thumbSize*1.44)
     SendMessage, 0x1035, 0, % (spacingY<<16)|spacingX,, ahk_id %hLViconsu%   ; LVM_SETICONSPACING
     Gui, Tab
 
@@ -48535,12 +48535,7 @@ BTNopenCustomShapesFolder() {
 }
 
 BTNlvCustomShapes(a, b, c) {
-   If (b="DoubleClick")
-      BTNloadCustomShape()
-}
-
-BTNlvIconsCustomShapes(a, b, c) {
-   If ((b="Normal" || b="DoubleClick") && c>0)
+   If (b="DoubleClick" && c>0)
       BTNloadCustomShape()
 }
 
@@ -48550,10 +48545,12 @@ getSelectedVectorShapeLVrow(ByRef givenName, ByRef datu, ByRef whichShape) {
    GuiControlGet, ptab, SettingsGUIA:, CurrentPanelTab
    If (ptab=2)
    {
+      n := 0
       Gui, SettingsGUIA: ListView, LViewDynas
       RowNumber := LV_GetFirstSelected(hLVmainu)
    } Else
    {
+      n := 1
       Gui, SettingsGUIA: ListView, LViewShapesIcons
       RowNumber := LV_GetFirstSelected(hLViconsu)
    }
@@ -48561,9 +48558,9 @@ getSelectedVectorShapeLVrow(ByRef givenName, ByRef datu, ByRef whichShape) {
    If !RowNumber
       Return 0
 
-   LV_GetText(givenName, RowNumber, 1)
-   LV_GetText(datu, RowNumber, 2)
-   LV_GetText(whichShape, RowNumber, 3)
+   LV_GetText(givenName, RowNumber, 1 + n)
+   LV_GetText(datu, RowNumber, 2 + n)
+   LV_GetText(whichShape, RowNumber, 3 + n)
    Return RowNumber
 }
 
@@ -48599,6 +48596,7 @@ BTNrenameCustomShape() {
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
+
    oldName := givenName
    Static forbiddenChars := "<`~@>:""/\|?*.,;"
    widthu := (PrefsLargeFonts=1) ? 950 : 460
@@ -48805,9 +48803,12 @@ uiPopulateCustomVectorShapesList(thumbSize:=64) {
     o_customShapeCountPoints := customShapeCountPoints
     Loop, % mainCompiledPath "\resources\vector-shapes\*.vqpv"
     {
+        If (SubStr(A_LoopFileName, 1, 3)="__-")
+           Continue
+
         Try FormatTime, datu, % A_LoopFileTimeModified, dd/MM/yyyy, HH:mm
         iconNr := renderVectorShapeThumbFile(hIL, A_LoopFileLongPath, thumbSize)
-        LV_Add("Icon" iconNr, StrReplace(A_LoopFileName, ".vqpv"), datu, A_Index)
+        LV_Add("Icon" iconNr,, StrReplace(A_LoopFileName, ".vqpv"), datu, A_Index)
     }
 
     thisIndex := 0
@@ -48816,8 +48817,9 @@ uiPopulateCustomVectorShapesList(thumbSize:=64) {
        thisIndex++
        StringUpper, value, value, T
        iconNr := renderVectorShapeThumbDefault(hIL, thisIndex, thumbSize)
-       LV_Add("Icon" iconNr, value, "-", "D" thisIndex)
+       LV_Add("Icon" iconNr,, value, "-", "D" thisIndex)
     }
+
     customShapeCountPoints := o_customShapeCountPoints
 }
 
@@ -69208,7 +69210,7 @@ ToggleAlwaysFIMus() {
    INIaction(1, "alwaysOpenWithFIM", "General")
    If (FIMfailed2init=1)
       msgBoxWrapper(appTitle ": ERROR", "The FreeImage library failed to properly initialize. Various image file formats will no longer be supported. Error code: " r "." friendly, 0, 0, "error")
-   Else If (thumbsDisplaying!=1 && CurrentSLD && maxFilesIndex>0 && !validBMP(UserMemBMP))
+   Else If (thumbsDisplaying!=1 && CurrentSLD && maxFilesIndex>0 && !validBMP(UserMemBMP) && !InStr(currIMGdetails.OpenedWith, "fim"))
       RefreshImageFileAction()
 }
 
