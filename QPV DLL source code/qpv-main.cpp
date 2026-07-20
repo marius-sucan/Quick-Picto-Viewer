@@ -8249,6 +8249,18 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
       return 1;
 }
 
+// Weights two straight-ARGB pixels, held as 8 unsigned words [B G R A | B G R A], by their own
+// alpha: the colors become c*(a+1)>>8 [exact for a=255, ~c*a/255 otherwise] while the alpha
+// words pass through untouched. The callers hand the DLL straight [non-premultiplied] ARGB, so
+// a transparent pixel still carries real RGB -- usually white -- and mixing that raw would let
+// invisible pixels paint visible ones. Same convention accumBilinearSample() uses.
+inline __m128i rbWeighTapsByAlpha(const __m128i &px16) {
+      const __m128i aMask = _mm_set_epi16(-1, 0, 0, 0, -1, 0, 0, 0);
+      const __m128i a16 = _mm_add_epi16(_mm_shufflehi_epi16(_mm_shufflelo_epi16(px16, 0xFF), 0xFF), _mm_set1_epi16(1));
+      const __m128i pm = _mm_srli_epi16(_mm_mullo_epi16(px16, a16), 8);
+      return _mm_or_si128(_mm_andnot_si128(aMask, pm), _mm_and_si128(aMask, px16));
+}
+
 // True when the angular sweep [a0, a1] passes absolute angle a [radians] or a full-turn alias
 // of it; the sweep never exceeds one turn, so the three nearest aliases are exhaustive. Used to
 // find where an arc peaks against the bitmap borders.
@@ -8265,11 +8277,12 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 // per-pixel sample count matched to the arc length, so pixels near the anchor stay nearly
 // free; quality caps the samples per pixel (<=0 picks 128; hard ceiling 256 -- the integer
 // accumulators overflow past that).
-// 32-bpp data must be premultiplied alpha [PArgb]; the callers clone with
-// Gdip_CloneBmpPargbArea. Colors resolve alpha-weighted: a streak takes the average color
-// of its visible content and its alpha never drops below the source pixel's own, so
-// transparent areas -- inside the image, or clamp-to-edge extended past its borders --
-// cannot dilute the result into invisibility when it is composited back over the original.
+// 32-bpp data is straight [non-premultiplied] ARGB -- what Gdip_LockBits hands over as
+// PixelFormat32bppARGB, whatever the bitmap's own format is -- so every tap is weighted by its
+// own alpha before being mixed and the arc resolves to sum(c*a)/sum(a), the average of the
+// content that is actually visible. Output alpha is the arc average but never below the source
+// pixel's own. Together that keeps transparency from either diluting the effect into
+// invisibility or bleeding the RGB hidden under it [usually white] over the image.
 // imageData is the untouched source and newData receives the result; a gather filter cannot
 // work in place, so the two must be distinct buffers.
 
@@ -8365,8 +8378,8 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                      const unsigned char *row = imageData + (INT64)yi*Stride + (INT64)xi*4;
                      const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
                      const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
-                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero), xw);
-                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(row + Stride)), zero), xw);
+                     __m128i t16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero)), xw);
+                     __m128i b16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(row + Stride)), zero)), xw);
                      t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
                      b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
                      acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
@@ -8387,8 +8400,8 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                      const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
                      const __m128i top = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r0 + x0)), _mm_cvtsi32_si128(*(const int *)(r0 + x1)));
                      const __m128i bot = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r1 + x0)), _mm_cvtsi32_si128(*(const int *)(r1 + x1)));
-                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(top, zero), xw);
-                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(bot, zero), xw);
+                     __m128i t16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(top, zero)), xw);
+                     __m128i b16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(bot, zero)), xw);
                      t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
                      b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
                      acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
@@ -8396,28 +8409,28 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                   }
                }
 
-               // resolve with alpha-weighted colors: the streak takes the average color of its
-               // visible content only, and its alpha never drops below the source pixel's own,
-               // so transparent samples cannot dilute the result. Premultiplied data keeps
-               // accB/G/R<=accA and the scaled colors <=outA<=255; the min() only guards
-               // against non-premultiplied garbage input. Fully opaque input resolves to the
-               // same plain average as before
+               // resolve back to straight ARGB: the color is the arc's alpha-weighted average
+               // [sum(c*a)/sum(a)], so only pixels that are actually visible tint the streak,
+               // and the alpha is the plain arc average but never below the source pixel's own,
+               // so transparency can neither dilute the effect into invisibility nor paint the
+               // image with the RGB hiding under it. Fully opaque input keeps resolving to the
+               // same plain average as always [c*(255+1)>>8 == c]. The arc always passes
+               // through the pixel itself, so an opaque pixel always has its own alpha in the
+               // sum and a faint fringe can never outvote it
                int lanes[4];
                _mm_storeu_si128((__m128i *)lanes, acc);
                const unsigned char *sp = imageData + (INT64)y*Stride + (INT64)x*4;
-               const double accA = (double)lanes[3];
-               if (accA<0.5)
+               if (lanes[3]<1)
                {
-                  *(UINT32 *)out = *(const UINT32 *)sp;   // the streak saw nothing visible; keep the pixel
+                  *(UINT32 *)out = *(const UINT32 *)sp;   // the arc saw nothing visible; keep the pixel
                } else
                {
-                  const double avgA = accA / ((double)n * 32768.0);
-                  const double outA = ((double)sp[3]>avgA) ? (double)sp[3] : avgA;
-                  const double sc = outA / accA;
+                  const double sc = 255.0 / (double)lanes[3];
+                  const double avgA = (double)lanes[3] / ((double)n * 32768.0);
                   out[0] = (unsigned char)(min(255.0, (double)lanes[0] * sc) + 0.5);
                   out[1] = (unsigned char)(min(255.0, (double)lanes[1] * sc) + 0.5);
                   out[2] = (unsigned char)(min(255.0, (double)lanes[2] * sc) + 0.5);
-                  out[3] = (unsigned char)(outA + 0.5);
+                  out[3] = (unsigned char)(((double)sp[3]>avgA ? (double)sp[3] : avgA) + 0.5);
                }
             } else
             {
