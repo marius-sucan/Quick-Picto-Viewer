@@ -7981,6 +7981,50 @@ inline double zbLaneIntegral(const double *pre, const unsigned char *lane, const
       return pre[(INT64)i*chan + c] + (t - (double)i) * (double)lane[(INT64)i*pixStep + c];
 }
 
+// These filters receive straight [non-premultiplied] ARGB: Gdip_LockBits hands over
+// PixelFormat32bppARGB whatever the bitmap's own format is, so a fully transparent pixel still
+// carries real RGB -- usually white -- and mixing that raw lets invisible pixels paint visible
+// ones. A bitmap that has any transparency is therefore weighted by its own alpha once, up
+// front, and the gather loops then run unchanged over the weighted copy: blending weighted
+// colours is the same arithmetic as weighting every tap, at one pass instead of once per
+// sample. The resolve divides the weighting back out. Returns false when every pixel is
+// already opaque, where weighting would be the identity and the copy is pure waste.
+inline bool blurNeedsAlphaWeighting(const unsigned char *data, const int &w, const int &h, const int &Stride) {
+      int opaque = 1;
+      #pragma omp parallel for schedule(static) reduction(&:opaque) default(none) shared(data, w, h, Stride)
+      for (int y = 0; y < h; y++)
+      {
+         const unsigned char *a = data + (INT64)y*Stride + 3;
+         for (int x = 0; x < w; x++, a += 4)
+         {
+            if (*a!=255)
+            {
+               opaque = 0;
+               break;
+            }
+         }
+      }
+      return opaque==0;
+}
+
+// c*(a+1)>>8 -- exact for a=255, ~c*a/255 otherwise; alpha passes through untouched.
+inline void blurWeighByAlpha(const unsigned char *src, unsigned char *dst, const int &w, const int &h, const int &Stride) {
+      #pragma omp parallel for schedule(static) default(none) shared(src, dst, w, h, Stride)
+      for (int y = 0; y < h; y++)
+      {
+         const unsigned char *p = src + (INT64)y*Stride;
+         unsigned char *q = dst + (INT64)y*Stride;
+         for (int x = 0; x < w; x++, p += 4, q += 4)
+         {
+            const unsigned int a = (unsigned int)p[3] + 1;
+            q[0] = (unsigned char)((p[0]*a) >> 8);
+            q[1] = (unsigned char)((p[1]*a) >> 8);
+            q[2] = (unsigned char)((p[2]*a) >> 8);
+            q[3] = p[3];
+         }
+      }
+}
+
 DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char *newData, int w, int h, int Stride, int bpp, int cx, int cy, int mode, int intensity, int quality) {
 // Zoom blur anchored on (cx, cy): every pixel is streaked along the segment running from itself
 // toward the anchor, over intensity% of its distance to it -- 100 smears all the way to the
@@ -7991,11 +8035,13 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
 // intensity. The radial mode gathers along the segment with a per-pixel sample count matched to
 // the streak length, so pixels near the anchor stay nearly free; quality caps the samples per
 // pixel (<=0 picks 128; hard ceiling 256 -- the integer accumulators overflow past that).
-// 32-bpp data must be premultiplied alpha [PArgb]; the callers clone with
-// Gdip_CloneBmpPargbArea. Colors resolve alpha-weighted: a streak takes the average color
-// of its visible content and its alpha never drops below the source pixel's own, so
-// transparent areas -- inside the image, or clamp-to-edge extended past its borders --
-// cannot dilute the result into invisibility when it is composited back over the original.
+// 32-bpp data is straight [non-premultiplied] ARGB -- what Gdip_LockBits hands over as
+// PixelFormat32bppARGB, whatever the bitmap's own format is -- so a bitmap carrying any
+// transparency is weighted by its own alpha up front and every streak resolves to
+// sum(c*a)/sum(a), the average of the content that is actually visible. Output alpha is the
+// streak average but never below the source pixel's own. Together that keeps transparency from
+// either diluting the effect into invisibility or bleeding the RGB hidden under it [usually
+// white] over the image.
 // imageData is the untouched source and newData receives the result; a gather filter cannot
 // work in place, so the two must be distinct buffers.
 
@@ -8013,6 +8059,23 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
          return 1;
       }
 
+      // straight-ARGB sources get weighted by their own alpha once, up front, so the streaks mix
+      // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out
+      unsigned char *weighted = NULL;
+      const unsigned char *srcData = imageData;
+      if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
+      {
+         weighted = new (std::nothrow) unsigned char[(size_t)Stride*h];
+         if (!weighted)
+         {
+            fnOutputDebug("zoomBlurBitmap: out of memory for the alpha-weighted copy");
+            return 0;
+         }
+
+         blurWeighByAlpha(imageData, weighted, w, h, Stride);
+         srcData = weighted;
+      }
+
       if (mode==2 || mode==3)
       {
          // exact box average along one axis: a lane is a row [mode 2] or a column [mode 3]
@@ -8022,13 +8085,14 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
          const INT64 laneStep = (mode==2) ? Stride : chan;
          const double cLane = (mode==2) ? (double)cx : (double)cy;
 
-         #pragma omp parallel shared(imageData, newData, lanes, lanePix, pixStep, laneStep, cLane, chan, f)
+         #pragma omp parallel shared(imageData, srcData, newData, lanes, lanePix, pixStep, laneStep, cLane, chan, f)
          {
             std::vector<double> pre((INT64)(lanePix + 1)*chan, 0.0);
             #pragma omp for schedule(static)
             for (int L = 0; L < lanes; L++)
             {
-               const unsigned char *lane = imageData + L*laneStep;
+               const unsigned char *lane = srcData + L*laneStep;      // alpha-weighted, for the sums
+               const unsigned char *oLane = imageData + L*laneStep;   // untouched, for pass-through pixels
                unsigned char *outLane = newData + L*laneStep;
                double sum[4] = { 0.0, 0.0, 0.0, 0.0 };
                for (int i = 0; i < lanePix; i++)
@@ -8047,7 +8111,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                   const double d = f * ((double)i - cLane);
                   if (d==0.0)
                   {
-                     const unsigned char *p = lane + (INT64)i*pixStep;
+                     const unsigned char *p = oLane + (INT64)i*pixStep;
                      for (int c = 0; c < chan; c++)
                          out[c] = p[c];
                      continue;
@@ -8059,26 +8123,28 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                   const double inv = 1.0 / (v - u);
                   if (chan==4)
                   {
-                     // alpha-weighted colors, as in the radial mode: transparent stretches
-                     // cannot dilute the average, and the pixel keeps at least its own alpha
+                     // straight ARGB: the colour is the streak's alpha-weighted average
+                     // [sum(c*a)/sum(a)], so transparent stretches can neither dilute it nor
+                     // bleed the RGB hiding under them, and the alpha never drops below the
+                     // pixel's own. Opaque lanes give sum(a) = 255*length and resolve to the
+                     // same plain box average as always
                      double sums[4];
                      for (int c = 0; c < 4; c++)
                          sums[c] = zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, v)
                                  - zbLaneIntegral(pre.data(), lane, pixStep, chan, c, lanePix, u);
-                     const unsigned char *px = lane + (INT64)i*pixStep;
+                     const unsigned char *px = oLane + (INT64)i*pixStep;
                      if (sums[3]<0.5)
                      {
                         for (int c = 0; c < 4; c++)
                             out[c] = px[c];   // the streak saw nothing visible; keep the pixel
                      } else
                      {
+                        const double sc = 255.0 / sums[3];
                         const double avgA = sums[3] * inv;
-                        const double outA = ((double)px[3]>avgA) ? (double)px[3] : avgA;
-                        const double sc = outA / sums[3];
                         out[0] = (unsigned char)(min(255.0, sums[0] * sc) + 0.5);
                         out[1] = (unsigned char)(min(255.0, sums[1] * sc) + 0.5);
                         out[2] = (unsigned char)(min(255.0, sums[2] * sc) + 0.5);
-                        out[3] = (unsigned char)(outA + 0.5);
+                        out[3] = (unsigned char)(((double)px[3]>avgA ? (double)px[3] : avgA) + 0.5);
                      }
                   } else
                   {
@@ -8092,6 +8158,8 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                }
             }
          }
+
+         delete[] weighted;
          return 1;
       }
 
@@ -8100,7 +8168,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
       const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
       const double cxf = (double)cx, cyf = (double)cy;
 
-      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, w, h, Stride, bpp, chan, f, maxS, cxf, cyf)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, srcData, newData, w, h, Stride, bpp, chan, f, maxS, cxf, cyf)
       for (int y = 0; y < h; y++)
       {
          unsigned char *out = newData + (INT64)y*Stride;
@@ -8147,7 +8215,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                   {
                      const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
                      const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
-                     const unsigned char *row = imageData + (INT64)yi*Stride + (INT64)xi*4;
+                     const unsigned char *row = srcData + (INT64)yi*Stride + (INT64)xi*4;
                      const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
                      const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
                      __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero), xw);
@@ -8165,8 +8233,8 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                      const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
                      const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
                      const INT64 x0 = (INT64)clamp(xi, 0, w - 1)*4, x1 = (INT64)clamp(xi + 1, 0, w - 1)*4;
-                     const unsigned char *r0 = imageData + (INT64)clamp(yi, 0, h - 1)*Stride;
-                     const unsigned char *r1 = imageData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
+                     const unsigned char *r0 = srcData + (INT64)clamp(yi, 0, h - 1)*Stride;
+                     const unsigned char *r1 = srcData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
                      const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
                      const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
                      const __m128i top = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r0 + x0)), _mm_cvtsi32_si128(*(const int *)(r0 + x1)));
@@ -8180,28 +8248,25 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                   }
                }
 
-               // resolve with alpha-weighted colors: the streak takes the average color of its
-               // visible content only, and its alpha never drops below the source pixel's own,
-               // so transparent samples cannot dilute the result. Premultiplied data keeps
-               // accB/G/R<=accA and the scaled colors <=outA<=255; the min() only guards
-               // against non-premultiplied garbage input. Fully opaque input resolves to the
-               // same plain average as before
+               // resolve back to straight ARGB: the colour is the streak's alpha-weighted
+               // average [sum(c*a)/sum(a)], so only pixels that are actually visible tint it,
+               // and the alpha is the plain streak average but never below the source pixel's
+               // own. Fully opaque input gives sum(a) = 255*n and resolves to the same plain
+               // average as always
                int lanes[4];
                _mm_storeu_si128((__m128i *)lanes, acc);
                const unsigned char *sp = imageData + (INT64)y*Stride + (INT64)x*4;
-               const double accA = (double)lanes[3];
-               if (accA<0.5)
+               if (lanes[3]<1)
                {
                   *(UINT32 *)out = *(const UINT32 *)sp;   // the streak saw nothing visible; keep the pixel
                } else
                {
-                  const double avgA = accA / ((double)n * 32768.0);
-                  const double outA = ((double)sp[3]>avgA) ? (double)sp[3] : avgA;
-                  const double sc = outA / accA;
+                  const double sc = 255.0 / (double)lanes[3];
+                  const double avgA = (double)lanes[3] / ((double)n * 32768.0);
                   out[0] = (unsigned char)(min(255.0, (double)lanes[0] * sc) + 0.5);
                   out[1] = (unsigned char)(min(255.0, (double)lanes[1] * sc) + 0.5);
                   out[2] = (unsigned char)(min(255.0, (double)lanes[2] * sc) + 0.5);
-                  out[3] = (unsigned char)(outA + 0.5);
+                  out[3] = (unsigned char)(((double)sp[3]>avgA ? (double)sp[3] : avgA) + 0.5);
                }
             } else
             {
@@ -8246,19 +8311,9 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
             }
          }
       }
-      return 1;
-}
 
-// Weights two straight-ARGB pixels, held as 8 unsigned words [B G R A | B G R A], by their own
-// alpha: the colors become c*(a+1)>>8 [exact for a=255, ~c*a/255 otherwise] while the alpha
-// words pass through untouched. The callers hand the DLL straight [non-premultiplied] ARGB, so
-// a transparent pixel still carries real RGB -- usually white -- and mixing that raw would let
-// invisible pixels paint visible ones. Same convention accumBilinearSample() uses.
-inline __m128i rbWeighTapsByAlpha(const __m128i &px16) {
-      const __m128i aMask = _mm_set_epi16(-1, 0, 0, 0, -1, 0, 0, 0);
-      const __m128i a16 = _mm_add_epi16(_mm_shufflehi_epi16(_mm_shufflelo_epi16(px16, 0xFF), 0xFF), _mm_set1_epi16(1));
-      const __m128i pm = _mm_srli_epi16(_mm_mullo_epi16(px16, a16), 8);
-      return _mm_or_si128(_mm_andnot_si128(aMask, pm), _mm_and_si128(aMask, px16));
+      delete[] weighted;
+      return 1;
 }
 
 // True when the angular sweep [a0, a1] passes absolute angle a [radians] or a full-turn alias
@@ -8300,6 +8355,23 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
          return 1;
       }
 
+      // straight-ARGB sources get weighted by their own alpha once, up front, so the arcs mix
+      // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out
+      unsigned char *weighted = NULL;
+      const unsigned char *srcData = imageData;
+      if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
+      {
+         weighted = new (std::nothrow) unsigned char[(size_t)Stride*h];
+         if (!weighted)
+         {
+            fnOutputDebug("rotateBlurBitmap: out of memory for the alpha-weighted copy");
+            return 0;
+         }
+
+         blurWeighByAlpha(imageData, weighted, w, h, Stride);
+         srcData = weighted;
+      }
+
       const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
       const double cxf = (double)cx, cyf = (double)cy;
       const double cH = cos(0.5*A), sH = sin(0.5*A);   // rotation by half the sweep reaches the arc ends
@@ -8314,7 +8386,7 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
       }
 
       // rows far from the anchor carry longer arcs, hence schedule(dynamic)
-      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, newData, w, h, Stride, bpp, chan, A, maxS, cxf, cyf, cH, sH, stepC, stepS)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, srcData, newData, w, h, Stride, bpp, chan, A, maxS, cxf, cyf, cH, sH, stepC, stepS)
       for (int y = 0; y < h; y++)
       {
          unsigned char *out = newData + (INT64)y*Stride;
@@ -8375,11 +8447,11 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                      const INT64 pxf = (INT64)((cxf + vx)*65536.0), pyf = (INT64)((cyf + vy)*65536.0);
                      const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
                      const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
-                     const unsigned char *row = imageData + (INT64)yi*Stride + (INT64)xi*4;
+                     const unsigned char *row = srcData + (INT64)yi*Stride + (INT64)xi*4;
                      const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
                      const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
-                     __m128i t16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero)), xw);
-                     __m128i b16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(row + Stride)), zero)), xw);
+                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)row), zero), xw);
+                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(row + Stride)), zero), xw);
                      t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
                      b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
                      acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
@@ -8394,14 +8466,14 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                      const int xi = (int)(pxf >> 16), yi = (int)(pyf >> 16);
                      const int wx1 = (int)((pxf >> 9) & 0x7F), wy1 = (int)((pyf >> 8) & 0xFF);
                      const INT64 x0 = (INT64)clamp(xi, 0, w - 1)*4, x1 = (INT64)clamp(xi + 1, 0, w - 1)*4;
-                     const unsigned char *r0 = imageData + (INT64)clamp(yi, 0, h - 1)*Stride;
-                     const unsigned char *r1 = imageData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
+                     const unsigned char *r0 = srcData + (INT64)clamp(yi, 0, h - 1)*Stride;
+                     const unsigned char *r1 = srcData + (INT64)clamp(yi + 1, 0, h - 1)*Stride;
                      const __m128i xw = _mm_unpacklo_epi64(_mm_set1_epi16((short)(128 - wx1)), _mm_set1_epi16((short)wx1));
                      const __m128i yw = _mm_set1_epi32((256 - wy1) | (wy1 << 16));
                      const __m128i top = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r0 + x0)), _mm_cvtsi32_si128(*(const int *)(r0 + x1)));
                      const __m128i bot = _mm_unpacklo_epi32(_mm_cvtsi32_si128(*(const int *)(r1 + x0)), _mm_cvtsi32_si128(*(const int *)(r1 + x1)));
-                     __m128i t16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(top, zero)), xw);
-                     __m128i b16 = _mm_mullo_epi16(rbWeighTapsByAlpha(_mm_unpacklo_epi8(bot, zero)), xw);
+                     __m128i t16 = _mm_mullo_epi16(_mm_unpacklo_epi8(top, zero), xw);
+                     __m128i b16 = _mm_mullo_epi16(_mm_unpacklo_epi8(bot, zero), xw);
                      t16 = _mm_add_epi16(t16, _mm_srli_si128(t16, 8));
                      b16 = _mm_add_epi16(b16, _mm_srli_si128(b16, 8));
                      acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_unpacklo_epi16(t16, b16), yw));
@@ -8477,6 +8549,8 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
             }
          }
       }
+
+      delete[] weighted;
       return 1;
 }
 
