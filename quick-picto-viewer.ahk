@@ -5700,6 +5700,7 @@ drawInactiveSelArea() {
    ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    vpWinClientSize(mainWidth, mainHeight)
    setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
+   drawClonerSourcePoint()
    SkeletDrawSelectionBox()
    Gdip_ResetWorldTransform(2NDglPG)
 }
@@ -20018,7 +20019,7 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
         quality += 5
   }
 
-  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
   {
@@ -23753,7 +23754,6 @@ ZoomBlurSelectedArea() {
     setWindowTitle("APPLYING BLUR ON IMAGE, please wait", 1)
     modus := (BlurAreaInverted=1) ? 4 : 0
     Gdip_SetClipPath(G2, pPath, modus)
-    ; Gdip_SetClipRect(G2, imgSelPx, imgSelPy, imgSelW, imgSelH, 0)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
     prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelPx + imgSelW) - imgSelPx)/imgSelW
@@ -23761,17 +23761,15 @@ ZoomBlurSelectedArea() {
     thisIntensity := calcZoomBlurIntensity()
     errorsOccured := 0
     doStartLongOpDance()
-    If isInRange(zoomBlurMode, 1, 4)
+    Static zblr := {1:"radial", 2:"horizontal", 3:"vertical", 4: "rotate"}
+    showTOOLtip("Applying " zblr[zoomBlurMode] " blur, please wait...")
+    zoomedBMP := QPV_ZoomBlurBitmap(A_ThisFunc, gBitmap, Round(prcX*imgSelW), Round(prcY*imgSelH), zoomBlurMode, thisIntensity)
+    If validBMP(zoomedBMP)
     {
-       showTOOLtip("Radial blur, please wait...")
-       zoomedBMP := QPV_ZoomBlurBitmap(A_ThisFunc, gBitmap, Round(prcX*imgSelW), Round(prcY*imgSelH), zoomBlurMode, thisIntensity)
-       If validBMP(zoomedBMP)
-       {
-          trGdip_DisposeImage(gBitmap, 1)
-          gBitmap := zoomedBMP
-       } Else
-          errorsOccured := 1
-    }
+       trGdip_DisposeImage(gBitmap, 1)
+       gBitmap := zoomedBMP
+    } Else
+       errorsOccured := 1
 
     If (BlurAreaBlendMode>1 && errorsOccured=0)
        applyBlurColorsFX(gBitmap)
@@ -50724,7 +50722,7 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 w%thisW% Section +hwndhTemp, Blur mode: 
-    GuiAddDropDownList("x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose" zoomBlurMode " vzoomBlurMode", "Zoom H/V|Horizontal|Vertical|Rotational / spin", [hTemp])
+    GuiAddDropDownList("x+5 wp gupdateUIzoomBlurPanel AltSubmit Choose" zoomBlurMode " vzoomBlurMode", "Zoom H/V|Horizontal|Vertical|Rotate / spin", [hTemp])
     GuiAddSlider("uiZoomBlurAreaXamount", 1,254, 15, "Intensity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid " hp")
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid - 27 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIzoomBlurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
@@ -78573,6 +78571,17 @@ convertShapePointsViewerToEditPoints(PointsList, totalz) {
     Return newShape
 }
 
+drawClonerSourcePoint() {
+    If (AnyWindowOpen=64 && BrushToolType=3) || (AnyWindowOpen=23 && FillAreaColorMode=6) 
+    || isVarEqualTo(AnyWindowOpen, 69, 44, 43, 26, 78, 81)
+    {
+       ; highlight brush cloner source point
+       ImageCoords2Window(tinyPrevAreaCoordX, tinyPrevAreaCoordY, prevDestPosX, prevDestPosY, SelDotsSize, outX, outY)
+       Gdip_FillRectangle(2NDglPG, pBrushE, outX, outY, SelDotsSize, SelDotsSize)
+       Gdip_DrawRectangle(2NDglPG, pPen1d, outX, outY, SelDotsSize, SelDotsSize)
+    }
+}
+
 additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0, DestPosY:=0, directRefresh:=0) {
     Critical, on
     If (imgEditPanelOpened=1 && AnyWindowOpen!=10 && drawingShapeNow!=1)
@@ -78602,15 +78611,7 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
     Else If (editingSelectionNow=1 && mode=3)
        drawImgSelectionOnWindow("return", "-", "-", "-", mainWidth, mainHeight, prevResizedVPimgW, prevResizedVPimgH, prevDestPosX, prevDestPosY)
 
-    If (AnyWindowOpen=64 && BrushToolType=3) || (AnyWindowOpen=23 && FillAreaColorMode=6) 
-    || isVarEqualTo(AnyWindowOpen, 69, 44, 43, 26, 78, 81)
-    {
-       ; highlight brush cloner source point
-       ImageCoords2Window(tinyPrevAreaCoordX, tinyPrevAreaCoordY, prevDestPosX, prevDestPosY, SelDotsSize, outX, outY)
-       Gdip_FillRectangle(2NDglPG, pBrushE, outX, outY, SelDotsSize, SelDotsSize)
-       Gdip_DrawRectangle(2NDglPG, pPen1d, outX, outY, SelDotsSize, SelDotsSize)
-    }
-
+    drawClonerSourcePoint()
     If (showImgAnnotations=1 && (!AnyWindowOpen || AnyWindowOpen=22) && drawingShapeNow!=1 && currentUndoLevel<3)
     {
        drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)

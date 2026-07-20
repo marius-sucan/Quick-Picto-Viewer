@@ -8061,19 +8061,11 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
 
       // straight-ARGB sources get weighted by their own alpha once, up front, so the streaks mix
       // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out
-      unsigned char *weighted = NULL;
       const unsigned char *srcData = imageData;
       if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
       {
-         weighted = new (std::nothrow) unsigned char[(size_t)Stride*h];
-         if (!weighted)
-         {
-            fnOutputDebug("zoomBlurBitmap: out of memory for the alpha-weighted copy");
-            return 0;
-         }
-
-         blurWeighByAlpha(imageData, weighted, w, h, Stride);
-         srcData = weighted;
+         fnOutputDebug("zoomBlurBitmap weighted");
+         blurWeighByAlpha(imageData, imageData, w, h, Stride);
       }
 
       if (mode==2 || mode==3)
@@ -8159,7 +8151,6 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
             }
          }
 
-         delete[] weighted;
          return 1;
       }
 
@@ -8312,7 +8303,6 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
          }
       }
 
-      delete[] weighted;
       return 1;
 }
 
@@ -8357,20 +8347,9 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 
       // straight-ARGB sources get weighted by their own alpha once, up front, so the arcs mix
       // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out
-      unsigned char *weighted = NULL;
       const unsigned char *srcData = imageData;
       if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
-      {
-         weighted = new (std::nothrow) unsigned char[(size_t)Stride*h];
-         if (!weighted)
-         {
-            fnOutputDebug("rotateBlurBitmap: out of memory for the alpha-weighted copy");
-            return 0;
-         }
-
-         blurWeighByAlpha(imageData, weighted, w, h, Stride);
-         srcData = weighted;
-      }
+         blurWeighByAlpha(imageData, imageData, w, h, Stride);
 
       const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
       const double cxf = (double)cx, cyf = (double)cy;
@@ -8550,7 +8529,6 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
          }
       }
 
-      delete[] weighted;
       return 1;
 }
 
