@@ -48531,11 +48531,12 @@ PanelManageVectorShapes() {
     GuiControlGet, txtp, Pos, %hTmpTxtu%
     GuiControlGet, lvp, Pos, %hLVmainu%
     Gui, Tab, 1
-    iconsLVh := lvpY + lvpH - txtpY
+    iconsLVh := lvpY + lvpH - txtpY - txtpH
     hLViconsu := GuiAddListView("x+15 y+15 w" lstWid " h" iconsLVh " +Icon +LV0x10000 gBTNlvCustomShapes -multi AltSubmit vLViewShapesIcons", "Ico|Name|Date|#", "Vector shapes gallery")
     spacingX := Ceil(thumbSize*1.22)
     spacingY := Ceil(thumbSize*1.44)
     SendMessage, 0x1035, 0, % (spacingY<<16)|spacingX,, ahk_id %hLViconsu%   ; LVM_SETICONSPACING
+    Gui, Add, Text, y+5 vtxtLine4 wp -wrap, -
     Gui, Tab
 
     btnWid2 := (PrefsLargeFonts=1) ? 95 : 60
@@ -48551,7 +48552,7 @@ PanelManageVectorShapes() {
        Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     } Else  Gui, Add, Button, x+5 hp wp gBTNopenPrevPanel, &Back
 
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage vector shapes: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Vector shapes manager: " appTitle)
     Sleep, 25
     uiPopulateCustomVectorShapesList(thumbSize)
 }
@@ -48561,8 +48562,17 @@ BTNopenCustomShapesFolder() {
 }
 
 BTNlvCustomShapes(a, b, c) {
+   Gui, SettingsGUIA: Default
+   ToolTip, % b "|" c  , , , 2
+   GuiControlGet, ptab, SettingsGUIA:, CurrentPanelTab
    If (b="DoubleClick" && c>0)
+   {
       BTNloadCustomShape()
+   } Else If (ptab=1 && (b="normal" || b="RightClick" || b="k") && c>0)
+   {
+      n := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
+      GuiControl, SettingsGUIA:, txtLine4, % "Selected shape: " givenName
+   }
 }
 
 getSelectedVectorShapeLVrow(ByRef givenName, ByRef datu, ByRef whichShape) {
@@ -63375,7 +63385,7 @@ createMenuImageEditSubMenus(modus:=0) {
    {
       createMenuConvertColorDepths()
       kMenu("PVimgFilters", "Add", "&Blur filters`tShift+B", "PanelBlurSelectedArea", "effects motion directional dissolve dilate erode box glow gaussian morphological morphology median")
-      kMenu("PVimgFilters", "Add", "&Radial blur", "PanelZoomBlurSelectedArea", "effects motion directional zoom")
+      kMenu("PVimgFilters", "Add", "&Radial blur", "PanelZoomBlurSelectedArea", "effects motion directional zoom rotation spin")
       kMenu("PVimgFilters", "Add", "&Pixelate", "PanelPixelizeSelectedArea", "pixelization pixelize mozaic deform", " image")
       kMenu("PVimgFilters", "Add", "S&harpen", "PanelSharpenImage", "effects", " image")
       Menu, PVimgFilters, Add
