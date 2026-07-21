@@ -386,7 +386,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
-   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0
+   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, BrushToolPressureAltMax := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -4306,7 +4306,7 @@ getBrushPenPressure(ByRef rawPressure) {
 
 shapePenPressure(rawPressure) {
 ; Turns the raw 0-1024 reading Windows reports into the 0-1 factor the brush uses.
-   pressu := clampInRange(rawPressure/1024, 0, 1)
+   pressu := clampInRange(rawPressure/(1024 - BrushToolPressureAltMax), 0, 1)
    If (BrushToolPressureCurve!=0)
    {
       ; negative values demand a firmer press, positive ones reach full output sooner
@@ -43639,15 +43639,16 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Text, xs y+10, Please read the help section for more details.
 
     Gui, Tab, 4 ; pen pressure
-    Gui, Add, Checkbox, xs y+15 w%slideWid% h%hasa% +0x1000 gUItogglePenData Checked%BrushToolPenPressure% vBrushToolPenPressure +hwndhTemp, Enable &pen pressure
-    ToolTip2ctrl(hTemp, "Requires a pressure sensitive pen and Windows 8 or newer.`nWhen no pen is in use, the brush behaves exactly as it does with a mouse.")
-    Gui, Add, Checkbox, x+10 wp gUItogglePenData Checked%BrushToolPenData% vBrushToolPenData, Display pen data
-    GuiAddSlider("BrushToolPressureOpacity", 0,100, 100, "Opacity influence", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa, "How strongly the pen pressure drives the brush opacity.`n0% keeps the opacity fixed at the value set in the General tab.")
-    GuiAddSlider("BrushToolPressureSize", 0,100, 60, "Size influence", "updateUIbrushTool", 1, "x+10 wp hp", "How strongly the pen pressure drives the brush size.`n0% keeps the size fixed at the value set in the General tab.")
+    Gui, Add, Checkbox, xs y+15 w%slideWid% h%hasa% +0x1000 gupdateUIbrushTool Checked%BrushToolPenPressure% vBrushToolPenPressure +hwndhTemp, Enable &pen pressure
+    ToolTip2ctrl(hTemp, "This requires a pressure sensitive pen and Windows 8 or newer.`nWhen no pen is in use, the brush behaves exactly as it does with a mouse.")
+    sml := (PrefsLargeFonts=1) ? 35 : 25
+    GuiAddButton("x+1 w" sml " hp gBtnHelpPenPressureBrushes", " ?", "Help")
+    Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolPenData% vBrushToolPenData, Display pen data
+    GuiAddSlider("BrushToolPressureOpacity", 0,100, 100, "Opacity influence", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa)
+    GuiAddSlider("BrushToolPressureSize", 0,100, 60, "Size influence", "updateUIbrushTool", 1, "x+10 wp hp")
     GuiAddSlider("BrushToolPressureCurve", -100,100, 0, "Sensitivity", "updateUIbrushTool", 2, "xs y+15 wp hp", "Negative values demand a firmer press before the brush reacts.`nPositive values let a light touch already reach the full value.")
     GuiAddSlider("BrushToolPressureMin", 0,100, 10, "Minimum output", "updateUIbrushTool", 1, "x+10 wp hp", "The floor the pen pressure can never fall below.`nRaise it if the lightest strokes vanish entirely.")
-    wPressInfo := slideWid * 2 + 5
-    Gui, Add, Text, xs y+15 w%wPressInfo%, Pressure scales the opacity and the size the other tabs define; it never overrides them. Both influences can be used at once.
+    GuiAddSlider("BrushToolPressureAltMax", -256,256, 0, "Sensitivity max.", "updateUIbrushTool", 2, "xs y+15 wp hp")
 
     Gui, Tab
     btnWid := (PrefsLargeFonts=1) ? 90 : 55
@@ -43659,11 +43660,6 @@ PanelBrushTool(dummy:=0, modus:=0) {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Brushes tool: " appTitle, winPos)
     SetTimer, updateUIbrushTool, -125
     SetTimer, resetOpeningPanel, -300
-}
-
-UItogglePenData() {
-   ToolTip, , , , 2
-   SetTimer, updateUIbrushTool, -25
 }
 
 BtnHelpPenPressureBrushes() {
@@ -44299,6 +44295,7 @@ updateUIbrushTool() {
       uiSlidersArray["BrushToolPressureSize", 10] := actu
       uiSlidersArray["BrushToolPressureCurve", 10] := actu
       uiSlidersArray["BrushToolPressureMin", 10] := actu
+      uiSlidersArray["BrushToolPressureAltMax", 10] := actu
       actu := (BrushToolPenPressure=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, BrushToolPenData
       SetTimer, WriteSettingsBrushPanel, -300
@@ -46867,13 +46864,14 @@ ReadSettingsBrushPanel(act:=0) {
    RegAction(act, "BrushToolAspectRatio",, 2, -100, 100)
    RegAction(act, "BrushToolDryingRate",, 2, 0, 20)
    RegAction(act, "BrushToolOverDraw",, 1)
-   RegAction(act, "BrushToolPenPressure",, 1)
-   RegAction(act, "BrushToolPressureOpacity",, 2, 0, 100)
-   RegAction(act, "BrushToolPressureSize",, 2, 0, 100)
-   RegAction(act, "BrushToolPressureCurve",, 2, -100, 100)
-   RegAction(act, "BrushToolPressureMin",, 2, 0, 100)
    If (AnyWindowOpen=64)
    {
+      RegAction(act, "BrushToolPenPressure",, 1)
+      RegAction(act, "BrushToolPressureOpacity",, 2, 0, 100)
+      RegAction(act, "BrushToolPressureSize",, 2, 0, 100)
+      RegAction(act, "BrushToolPressureCurve",, 2, -100, 100)
+      RegAction(act, "BrushToolPressureMin",, 2, 0, 100)
+      RegAction(act, "BrushToolPressureAltMax",, 2, -256, 256)
       RegAction(act, "BrushToolTexture",, 2, 1, 9)
       RegAction(act, "BrushToolBlurStrength",, 2, 0, 99)
       RegAction(act, "BrushToolDynamicCloner",, 1)
@@ -75968,9 +75966,8 @@ ActPaintBrushNow() {
       penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       If (BrushToolPenData=1)
       {
-         msgu := "Pen Sensitivity: " Round(rawPressure/1024*100) "%  -> Adjusted: " Round(thisPenPressure*100) "%"
-         msgu .= "`nRaw value: " rawPressure " -> Altered: "
-         msgu .= "`nOpacity and Size factors: " penOpacityFactor " | " penSizeFactor
+         msgu := "Pen sensitivity: " Round(rawPressure/1024) "% | Adjusted: " Round(thisPenPressure*100) "%"
+         msgu .= "`nOpacity and size factors: " Round(penOpacityFactor, 3) " | " Round(penSizeFactor, 3)
          showTOOLtip(msgu)
       }
 
