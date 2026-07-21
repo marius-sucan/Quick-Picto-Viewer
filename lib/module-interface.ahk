@@ -20,6 +20,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
      , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
+     , penPressure := 0, penPressureActive := 0, penPressureZeit := 0, hasPenPressureAPI := 0
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
@@ -82,6 +83,20 @@ OnMessage(0x20E, "WM_MOUSEWHEEL")
 ; OnMessage(0x0239, "WM_POINTERevents", 10)
 ; OnMessage(0X023A, "WM_POINTERevents", 10)
 ; OnMessage(0x216, "WM_MOVING") ; window moving
+
+; Pen pressure. The main viewport windows are created by this thread, so WM_POINTER*
+; messages land in this thread's queue. That matters: the painting loops in the main
+; thread run under «Critical, on» and never pump messages, so they cannot read pressure
+; themselves. They poll penPressure/penPressureActive from here instead, the same way
+; determineLClickState() already polls LbtnDwn.
+hasPenPressureAPI := DllCall("GetProcAddress", "UPtr", DllCall("GetModuleHandle", "Str", "user32", "UPtr"), "AStr", "GetPointerPenInfo", "UPtr") ? 1 : 0
+If (hasPenPressureAPI=1) ; requires Windows 8 or newer
+{
+   OnMessage(0x0245, "WM_PENpressure")  ; WM_POINTERUPDATE
+   OnMessage(0x0246, "WM_PENpressure")  ; WM_POINTERDOWN
+   OnMessage(0x0247, "WM_PENpressure")  ; WM_POINTERUP
+   OnMessage(0x024A, "WM_PENpressure")  ; WM_POINTERLEAVE
+}
 
 Loop, 9
     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
@@ -1222,6 +1237,46 @@ theSlideShowCore(paramu:=0) {
   Else If (SlideHowMode=3)
      MainExe.ahkPostFunction("NextPicture")
   hasAdvancedSlide := 1
+}
+
+WM_PENpressure(wp, lp, msg, hwnd) {
+; Records the current pen pressure so the painting loops in the main thread can poll it.
+; Never returns a value: the message must keep flowing to DefWindowProc, otherwise
+; Windows stops promoting pen input to the legacy mouse messages the app relies on.
+   Critical, off
+   Static penInfoBuf, bufReady := 0
+
+   If (msg=0x0247 || msg=0x024A) ; WM_POINTERUP / WM_POINTERLEAVE
+   {
+      penPressureActive := 0
+      Return
+   }
+
+   If (bufReady!=1)
+   {
+      ; sizeof(POINTER_PEN_INFO): POINTER_INFO (96 on x64, 88 on x86) + 6 x 4 bytes
+      VarSetCapacity(penInfoBuf, (A_PtrSize=8) ? 120 : 112, 0)
+      bufReady := 1
+   }
+
+   ; GetPointerPenInfo() fails for touch and mouse pointers, so only a real pen gets through
+   If !DllCall("user32\GetPointerPenInfo", "UInt", wp & 0xFFFF, "UPtr", &penInfoBuf)
+      Return
+
+   pointerFlags := NumGet(penInfoBuf, 12, "UInt")
+   If !(pointerFlags & 0x4) ; POINTER_FLAG_INCONTACT ; hovering, not touching
+   {
+      penPressureActive := 0
+      Return
+   }
+
+   thisPressure := NumGet(penInfoBuf, (A_PtrSize=8) ? 104 : 96, "UInt")
+   If (thisPressure<1) ; the digitizer does not report pressure at all
+      Return
+
+   penPressure := thisPressure ; normalized by Windows to the 0-1024 range
+   penPressureActive := 1
+   penPressureZeit := A_TickCount
 }
 
 WM_POINTERevents(wp, lp, msg, hwnd) {

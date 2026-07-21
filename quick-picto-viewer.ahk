@@ -310,6 +310,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolDynamicCloner := 0, BrushToolEraserRestore := 0, BrushToolRandomSize := 0, BrushToolRandomSoftness := 0
    , BrushToolRandomAspectRatio := 0, BrushToolRandomAngle := 0, BrushToolRandomPosX := 0, BrushToolRandomPosY := 0
    , BrushToolRandomHue := 0, BrushToolRandomSat := 0, BrushToolRandomLight := 0, BrushToolRandomDark := 0 
+   , BrushToolPenPressure := 0, BrushToolPressureOpacity := 100, BrushToolPressureSize := 60
+   , BrushToolPressureCurve := 0, BrushToolPressureMin := 10
+   , uiPenPressure := 0, uiPenPressureActive := 0, uiPenPressureZeit := 0
    , BrushToolTexture := 1, BrushToolAutoAngle := 1, ShowAdvToolbar := 1, ToolbarOpacity := 255, findFlippedDupes := 0
    , BrushToolSymmetryX := 0, BrushToolSymmetryY := 0, BrushToolSymmetryPointX := 0.5, BrushToolSymmetryPointY := 0.5
    , BrushToolApplyColorFX := 0, PasteInPlaceBlendMode := 1, PasteInPlaceGlassy := 1, ToolbarScaleFactor := 1
@@ -444,6 +447,18 @@ OnMessage(0x20E, "adjustWheelNumbersEditFields") ; WM_MOUSEWHEEL
 ;     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 OnMessage(0x100, "WM_KEYDOWN")
 OnMessage(0x104, "WM_KEYDOWN")
+
+; Pen pressure readout for the brushes panel. Painting reads its pressure from the
+; interface thread [see lib\module-interface.ahk], because that thread owns the
+; viewport windows. The panel windows belong to this thread instead, so pressing the
+; pen anywhere on the brushes panel is what feeds the live value shown there.
+If DllCall("GetProcAddress", "UPtr", DllCall("GetModuleHandle", "Str", "user32", "UPtr"), "AStr", "GetPointerPenInfo", "UPtr")
+{
+   OnMessage(0x0245, "WM_PENpressureUI")  ; WM_POINTERUPDATE
+   OnMessage(0x0246, "WM_PENpressureUI")  ; WM_POINTERDOWN
+   OnMessage(0x0247, "WM_PENpressureUI")  ; WM_POINTERUP
+   OnMessage(0x024A, "WM_PENpressureUI")  ; WM_POINTERLEAVE
+}
 
 Global interfaceThread
 If !A_IsCompiled
@@ -4285,6 +4300,81 @@ determineLClickState() {
 
    LbtnDwn := interfaceThread.ahkgetvar.LbtnDwn
    Return (GetKeyState("LButton") || LbtnDwn=1) ? 1 : 0
+}
+
+getBrushPenPressure() {
+; Returns the shaped pen pressure as a 0-1 factor, or -1 when there is no live pen
+; input. The painting loops must keep behaving exactly as before for mouse users,
+; so -1 means «leave everything alone». The pressure itself is collected in the
+; interface thread by WM_PENpressure(), see lib\module-interface.ahk
+   If (BrushToolPenPressure!=1)
+      Return -1
+
+   If (interfaceThread.ahkgetvar.penPressureActive!=1)
+      Return -1
+
+   rawPressure := interfaceThread.ahkgetvar.penPressure
+   If (rawPressure<1)
+      Return -1
+
+   Return shapePenPressure(rawPressure)
+}
+
+shapePenPressure(rawPressure) {
+; Turns the raw 0-1024 reading Windows reports into the 0-1 factor the brush uses.
+   pressu := clampInRange(rawPressure/1024, 0, 1)
+   If (BrushToolPressureCurve!=0)
+   {
+      ; negative values demand a firmer press, positive ones reach full output sooner
+      pressu := pressu ** (2 ** (-BrushToolPressureCurve/50))
+   }
+
+   ; the floor keeps feather-light strokes visible instead of painting nothing
+   flooru := BrushToolPressureMin/100
+   Return clampInRange(flooru + (1 - flooru) * pressu, 0, 1)
+}
+
+WM_PENpressureUI(wp, lp, msg, hwnd) {
+; Feeds the live pressure readout of the brushes panel only; painting never uses this.
+; Returns nothing, so the message still reaches DefWindowProc and pen input keeps
+; being promoted to the legacy mouse messages the panels rely on.
+   Critical, off
+   Static penInfoBuf, bufReady := 0
+
+   If (msg=0x0247 || msg=0x024A) ; WM_POINTERUP / WM_POINTERLEAVE
+   {
+      uiPenPressureActive := 0
+      Return
+   }
+
+   If (AnyWindowOpen!=64) ; only ever needed while the brushes panel is open
+      Return
+
+   If (bufReady!=1)
+   {
+      VarSetCapacity(penInfoBuf, (A_PtrSize=8) ? 120 : 112, 0)
+      bufReady := 1
+   }
+
+   If !DllCall("user32\GetPointerPenInfo", "UInt", wp & 0xFFFF, "UPtr", &penInfoBuf)
+      Return
+
+   thisPressure := NumGet(penInfoBuf, (A_PtrSize=8) ? 104 : 96, "UInt")
+   If (thisPressure<1)
+      Return
+
+   uiPenPressure := thisPressure
+   uiPenPressureActive := 1
+   uiPenPressureZeit := A_TickCount
+}
+
+penPressureFactor(pressu, influence) {
+; Blends the pen pressure towards 1 according to how much the user lets it matter.
+; influence=0 returns 1 [parameter untouched], influence=100 returns the pressure itself.
+   If (pressu<0 || influence<1)
+      Return 1
+
+   Return 1 - (influence/100) * (1 - pressu)
 }
 
 ReloadThisPicture() {
@@ -43489,7 +43579,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     slideWid2 := slideWid//2
     Global PickuBrushToolAcolor, PickuBrushToolBcolor, UIbtnBrushColorA, UIbtnBrushColorB, uiBtnSetCloner
-         , infoSymmetryLabel, BTNuiSetLabelSymmetry
+         , infoSymmetryLabel, BTNuiSetLabelSymmetry, UIlivePenPressure
 
     ReadSettingsBrushPanel()
     FloodFillSelectionAdj := 0
@@ -43524,7 +43614,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     hasa := (PrefsLargeFonts=1) ? 27 : 18
-    Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects options|Randomize
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects options|Randomize|Pen pressure
     Gui, Tab, 1 ; general
     GuiAddDropDownList("x+15 y+15 w" slideWid " Section AltSubmit gupdateUIbrushTool Choose" BrushToolType " vBrushToolType", "Simple solid color|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge", "Brush type")
     wo := (PrefsLargeFonts=1) ? slideWid // 2 + 75 : slideWid // 2 + 30
@@ -43598,7 +43688,18 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("BrushToolRandomDark", 0,90, 0, "Darkness", "updateUIbrushTool", 1, "x+10 wp hp")
     Gui, Add, Text, xs y+10, Please read the help section for more details.
 
-    Gui, Tab 
+    Gui, Tab, 4 ; pen pressure
+    Gui, Add, Checkbox, xs y+15 w%slideWid% h%hasa% +0x1000 gupdateUIbrushTool Checked%BrushToolPenPressure% vBrushToolPenPressure +hwndhTemp, Enable &pen pressure
+    ToolTip2ctrl(hTemp, "Requires a pressure sensitive pen and Windows 8 or newer.`nWhen no pen is in use, the brush behaves exactly as it does with a mouse.")
+    Gui, Add, Text, x+10 w%slideWid% hp +0x200 vUIlivePenPressure, Pen: not detected
+    GuiAddSlider("BrushToolPressureOpacity", 0,100, 100, "Opacity influence", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa, "How strongly the pen pressure drives the brush opacity.`n0% keeps the opacity fixed at the value set in the General tab.")
+    GuiAddSlider("BrushToolPressureSize", 0,100, 60, "Size influence", "updateUIbrushTool", 1, "x+10 wp hp", "How strongly the pen pressure drives the brush size.`n0% keeps the size fixed at the value set in the General tab.")
+    GuiAddSlider("BrushToolPressureCurve", -100,100, 0, "Sensitivity", "updateUIbrushTool", 2, "xs y+15 wp hp", "Negative values demand a firmer press before the brush reacts.`nPositive values let a light touch already reach the full value.")
+    GuiAddSlider("BrushToolPressureMin", 0,100, 10, "Minimum output", "updateUIbrushTool", 1, "x+10 wp hp", "The floor the pen pressure can never fall below.`nRaise it if the lightest strokes vanish entirely.")
+    wPressInfo := slideWid * 2 + 5
+    Gui, Add, Text, xs y+15 w%wPressInfo%, Pressure scales the opacity and the size the other tabs define; it never overrides them. Both influences can be used at once.
+
+    Gui, Tab
     btnWid := (PrefsLargeFonts=1) ? 90 : 55
     GuiAddCollapseBtn("xm+1 y+15 h" thisBtnHeight " w35")
     Gui, Add, Button, x+5 hp w%btnWid% gBtnHelpBrushes, &Help
@@ -43608,10 +43709,36 @@ PanelBrushTool(dummy:=0, modus:=0) {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Brushes tool: " appTitle, winPos)
     SetTimer, updateUIbrushTool, -125
     SetTimer, resetOpeningPanel, -300
+    SetTimer, updatePenPressureReadout, 250
+}
+
+updatePenPressureReadout() {
+; Live feedback while calibrating the pressure sliders. Self-terminating: the panel
+; can be closed in many ways, so the timer stops itself once the panel is gone.
+   If (AnyWindowOpen!=64)
+   {
+      SetTimer, updatePenPressureReadout, Off
+      Return
+   }
+
+   ; prefer a pen resting on the panel itself, that is the calibration gesture;
+   ; otherwise fall back to whatever the last brush stroke saw
+   rawPressure := 0
+   If (uiPenPressureActive=1 && (A_TickCount - uiPenPressureZeit<600))
+      rawPressure := uiPenPressure
+   Else If (interfaceThread.ahkgetvar.penPressureActive=1)
+      rawPressure := interfaceThread.ahkgetvar.penPressure
+
+   If (rawPressure<1)
+      msgu := "Pen: press it here to test"
+   Else
+      msgu := "Pen: " Round(rawPressure/1024*100) "%  ->  " Round(shapePenPressure(rawPressure)*100) "%"
+
+   GuiControl, SettingsGUIA:, UIlivePenPressure, %msgu%
 }
 
 BtnHelpBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nThe deformer brushes (smudge, pinch and bulge) give best results when softness is set to ~45% and opacity above 90%. These brushes may yield undesired results in areas with partially opaque pixels.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nThe deformer brushes (smudge, pinch and bulge) give best results when softness is set to ~45% and opacity above 90%. These brushes may yield undesired results in areas with partially opaque pixels.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.`n`nPen pressure`nWhen a pressure sensitive pen is used, the «Pen pressure» tab lets the pressure drive the brush opacity and the brush size. Windows 8 or newer is required. The «Opacity influence» and «Size influence» sliders decide how much of each parameter the pressure may claim: at 0% the parameter stays exactly where the other tabs set it, at 100% it follows the pressure entirely. «Sensitivity» reshapes the response, so that a firmer or a lighter press is needed to reach the full value, while «Minimum output» sets the floor below which the pressure cannot push, which keeps the lightest strokes from disappearing. Painting with a mouse, or with a pen that reports no pressure, is unaffected by all of these.", -1, 0, 0)
 }
 
 btnHelpToolbar() {
@@ -44232,6 +44359,14 @@ updateUIbrushTool() {
    {
       actu := (BrushToolType>1 && BrushToolTexture=1) ? 1 : 0
       uiSlidersArray["BrushToolRandomSoftness", 10] := actu
+   } Else If (CurrentPanelTab=4)
+   {
+      actu := (BrushToolPenPressure=1) ? 1 : 0
+      uiSlidersArray["BrushToolPressureOpacity", 10] := actu
+      uiSlidersArray["BrushToolPressureSize", 10] := actu
+      uiSlidersArray["BrushToolPressureCurve", 10] := actu
+      uiSlidersArray["BrushToolPressureMin", 10] := actu
+      SetTimer, WriteSettingsBrushPanel, -300
    }
 
    createLivePreviewBrush()
@@ -46797,6 +46932,11 @@ ReadSettingsBrushPanel(act:=0) {
    RegAction(act, "BrushToolAspectRatio",, 2, -100, 100)
    RegAction(act, "BrushToolDryingRate",, 2, 0, 20)
    RegAction(act, "BrushToolOverDraw",, 1)
+   RegAction(act, "BrushToolPenPressure",, 1)
+   RegAction(act, "BrushToolPressureOpacity",, 2, 0, 100)
+   RegAction(act, "BrushToolPressureSize",, 2, 0, 100)
+   RegAction(act, "BrushToolPressureCurve",, 2, -100, 100)
+   RegAction(act, "BrushToolPressureMin",, 2, 0, 100)
    If (AnyWindowOpen=64)
    {
       RegAction(act, "BrushToolTexture",, 2, 1, 9)
@@ -75888,6 +76028,9 @@ ActPaintBrushNow() {
       }
 
       GetMouseCoord2wind(PVhwnd, mX, mY)
+      thisPenPressure := getBrushPenPressure()
+      penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
+      penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       If (BrushToolRandomPosX>0 && BrushToolType<6)
       {
          gR := Ceil(brushSize*(BrushToolRandomPosX/100))
@@ -76055,6 +76198,15 @@ ActPaintBrushNow() {
                cur_opacity := thisOpacity
             }
 
+            ; pen pressure modulates whatever opacity/size the settings arrived at,
+            ; so drying rate, wetness and the randomizers all keep working as before
+            cur_brushSize := brushSize
+            If (thisPenPressure>=0)
+            {
+               cur_opacity := clampInRange(Round(cur_opacity * penOpacityFactor), 1, 255)
+               cur_brushSize := clampInRange(Round(brushSize * penSizeFactor), 1, brushSize)
+            }
+
             Gosub, DrawPaintBrushNowStep
             okaySymmetry := isPaintSymmetryModeAllowed()
             If ((BrushToolSymmetryX=1 || BrushToolSymmetryY=1) && okaySymmetry=1)
@@ -76137,7 +76289,7 @@ ActPaintBrushNow() {
 DrawPaintBrushNowStep:
    cloneBits := clonePitch := cloneBMP := 0
    colorARGB := "0x" Format("{1:x}", 255) startToolColor
-   dllRad := (texW>0) ? texW // 2 + 2 : brushSize // 2 + 2
+   dllRad := (texW>0) ? texW // 2 + 2 : cur_brushSize // 2 + 2
    If (BrushToolType=6)
       dllRad += Abs(thisBulgePinchFactor) * 2 + 10
    Else If (BrushToolType>=7)
@@ -76209,7 +76361,7 @@ DrawPaintBrushNowStep:
             , "int", BrushToolType
             , "double", cur_tkX
             , "double", dll_tkY
-            , "int", brushSize
+            , "int", cur_brushSize
             , "int", thisToolSoftness
             , "double", thisToolAngle
             , "double", thisToolAspectRatio
@@ -76484,6 +76636,9 @@ ActPaintBrushLargeNow() {
       }
 
       GetMouseCoord2wind(PVhwnd, mX, mY)
+      thisPenPressure := getBrushPenPressure()
+      penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
+      penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       If (BrushToolRandomPosX>0 && BrushToolType<6)
       {
          gR := Ceil(brushSize*(BrushToolRandomPosX/100))
@@ -76653,6 +76808,14 @@ ActPaintBrushLargeNow() {
                cur_opacity := thisOpacity
             }
 
+            ; see the matching comment in ActPaintBrushNow()
+            cur_brushSize := brushSize
+            If (thisPenPressure>=0)
+            {
+               cur_opacity := clampInRange(Round(cur_opacity * penOpacityFactor), 1, 255)
+               cur_brushSize := clampInRange(Round(brushSize * penSizeFactor), 1, brushSize)
+            }
+
             Gosub, DrawPaintBrushLargeStep
             okaySymmetry := isPaintSymmetryModeAllowed()
             If ((BrushToolSymmetryX=1 || BrushToolSymmetryY=1) && okaySymmetry=1)
@@ -76739,7 +76902,7 @@ DrawPaintBrushLargeStep:
          cur_offY := cur_tkY - tinyPrevAreaCoordY
       }
 
-      dllRad := (texW>0) ? texW // 2 + 2 : brushSize // 2 + 2
+      dllRad := (texW>0) ? texW // 2 + 2 : cur_brushSize // 2 + 2
       src_tkX := cur_tkX - cur_offX
       src_tkY := cur_tkY - cur_offY
       dstX1 := clampInRange(Round(cur_tkX - dllRad), 0, imgW - 1)
@@ -76781,7 +76944,7 @@ DrawPaintBrushLargeStep:
       , "int", BrushToolType
       , "double", cur_tkX
       , "double", cur_tkY
-      , "int", brushSize
+      , "int", cur_brushSize
       , "int", thisToolSoftness
       , "double", thisToolAngle
       , "double", thisToolAspectRatio
@@ -76955,6 +77118,7 @@ ActDrawAlphaMaskBrushNow() {
    }
 
    dryZeit := A_TickCount
+   lastPressOpacity := -1
    dryRateZeit := 300 - BrushToolDryingRate**2
    thisDryRate := clampInRange(BrushToolDryingRate/4, 1, 20)
    isUserStepu := (brushToolStepping=1 || brushToolStepping=2 || brushToolStepping=251) ? 0 : 1
@@ -76980,6 +77144,9 @@ ActDrawAlphaMaskBrushNow() {
       }
 
       GetMouseCoord2wind(PVhwnd, mX, mY)
+      thisPenPressure := getBrushPenPressure()
+      penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
+      penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       mX := (FlipImgH=1) ? mainWidth - mX : mX
       mY := (FlipImgV=1) ? mainHeight - mY : mY
       MouseCoords2Image(mX, mY, 0, pDPX, pDPY, pVPimgW, pVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
@@ -77044,11 +77211,28 @@ ActDrawAlphaMaskBrushNow() {
             }
 
             offX := oMx - tkX, offY := oMy - tkY
+            curBrushSize := (thisPenPressure>=0) ? clampInRange(Round(brushSize * penSizeFactor), 1, brushSize) : brushSize
+            If (BrushToolType=1 && thisPenPressure>=0)
+            {
+               ; the solid brush bakes its own opacity in, so it has to be rebuilt
+               ; whenever pressure moves it; only when it actually changed, though
+               pressOpacity := clampInRange(Round(thisOpacity * penOpacityFactor), 1, 255)
+               If (pressOpacity!=lastPressOpacity)
+               {
+                  lastPressOpacity := pressOpacity
+                  Gdip_DeleteBrush(gdipbrushu)
+                  ; zero padded on purpose: a light press yields values below 0x10,
+                  ; and a single hex digit would build a malformed ARGB string
+                  gdipbrushu := Gdip_BrushCreateSolid("0x" Format("{1:02x}", pressOpacity) startToolColor)
+               }
+            }
+
             ; draw the brushes into main image [ whichBitmap - Gu ]
             If (BrushToolType=1)
             {
                ; draw simple brush
-               tmpPath := createBrushShapePath(brushSize, tkX, tkY, BrushToolAspectRatio, BrushToolAngle + 180, objuAR)
+               ; the brush shape is rebuilt per step anyway, so pressure can size it directly
+               tmpPath := createBrushShapePath(curBrushSize, tkX, tkY, BrushToolAspectRatio, BrushToolAngle + 180, objuAR)
                Gdip_FillPath(Gu, gdipbrushu, tmpPath)
                If (BrushToolOverDraw=0)
                   Gdip_SetClipPath(Gu, tmpPath, 4)
@@ -77056,9 +77240,11 @@ ActDrawAlphaMaskBrushNow() {
             } Else
             {
                ; draw any «generic» brush
+               ; the brush bitmap is pre-rendered at brushSize, so pressure scales the
+               ; destination rectangle instead of regenerating it on every single step
                thisBrushu := (BrushToolType>=5) ? brushImg : brushu
-               thisFloatOpacity := thisOpacity/255
-               tzGdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+               thisFloatOpacity := thisOpacity/255 * penOpacityFactor
+               tzGdip_DrawImage(Gu, thisBrushu, tkX - curBrushSize//2, tkY - curBrushSize//2, curBrushSize, curBrushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
             }
 
             ; tzGdip_DrawImageFast(Gu, brushu[1], tkX - brushToolSize//2, tkY - brushToolSize//2)
@@ -77071,6 +77257,7 @@ ActDrawAlphaMaskBrushNow() {
                   Gdip_DeleteBrush(gdipbrushu)
                   thisHexOpacity := Format("{1:#x}", thisOpacity)
                   gdipbrushu := Gdip_BrushCreateSolid(thisHexOpacity startToolColor)
+                  lastPressOpacity := -1 ; force the pressure rebuild before the next stroke step
                }
             }
             thisZeit := A_TickCount
