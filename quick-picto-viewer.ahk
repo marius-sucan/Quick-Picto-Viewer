@@ -312,6 +312,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolRandomHue := 0, BrushToolRandomSat := 0, BrushToolRandomLight := 0, BrushToolRandomDark := 0 
    , BrushToolPenPressure := 0, BrushToolPressureOpacity := 100, BrushToolPressureSize := 60
    , BrushToolPressureCurve := 0, BrushToolPressureMin := 10, BrushToolPenData := 0
+   , BrushToolPressureMinAt := 0, BrushToolPressureMaxAt := 100
    , BrushToolTexture := 1, BrushToolAutoAngle := 1, ShowAdvToolbar := 1, ToolbarOpacity := 255, findFlippedDupes := 0
    , BrushToolSymmetryX := 0, BrushToolSymmetryY := 0, BrushToolSymmetryPointX := 0.5, BrushToolSymmetryPointY := 0.5
    , BrushToolApplyColorFX := 0, PasteInPlaceBlendMode := 1, PasteInPlaceGlassy := 1, ToolbarScaleFactor := 1
@@ -386,7 +387,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
-   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, BrushToolPressureAltMax := 0
+   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -4306,7 +4307,17 @@ getBrushPenPressure(ByRef rawPressure) {
 
 shapePenPressure(rawPressure) {
 ; Turns the raw 0-1024 reading Windows reports into the 0-1 factor the brush uses.
-   pressu := clampInRange(rawPressure/(1024 - BrushToolPressureAltMax), 0, 1)
+
+   ; Only the band between the softest and the firmest press the user can comfortably
+   ; produce is used, the rest of the pen range is discarded. Pressing softer than the
+   ; lower bound always yields the minimum, pressing firmer than the upper bound always
+   ; yields the maximum, so nobody has to fight the pen to reach either end.
+   lowu := BrushToolPressureMinAt * 10.24    ; the sliders are percentages of the 0-1024 range
+   highu := BrushToolPressureMaxAt * 10.24
+   If (highu<=lowu)
+      highu := lowu + 1
+
+   pressu := clampInRange((rawPressure - lowu)/(highu - lowu), 0, 1)
    If (BrushToolPressureCurve!=0)
    {
       ; negative values demand a firmer press, positive ones reach full output sooner
@@ -43646,9 +43657,10 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Checkbox, x+5 hp gupdateUIbrushTool Checked%BrushToolPenData% vBrushToolPenData, Display pen data
     GuiAddSlider("BrushToolPressureOpacity", 0,100, 100, "Opacity influence", "updateUIbrushTool", 1, "xs y+15 w" slideWid " h" hasa)
     GuiAddSlider("BrushToolPressureSize", 0,100, 60, "Size influence", "updateUIbrushTool", 1, "x+10 wp hp")
-    GuiAddSlider("BrushToolPressureCurve", -100,100, 0, "Sensitivity", "updateUIbrushTool", 2, "xs y+15 wp hp", "Negative values demand a firmer press before the brush reacts.`nPositive values let a light touch already reach the full value.")
+    GuiAddSlider("BrushToolPressureMinAt", 0,95, 0, "Softest press", "updateUIbrushTool", 1, "xs y+15 wp hp", "How hard you must press before the brush starts to react.`nRaise it when the pen already paints at the slightest touch.`nAnything softer than this yields the «Minimum output» below.")
+    GuiAddSlider("BrushToolPressureMaxAt", 5,100, 100, "Firmest press", "updateUIbrushTool", 1, "x+10 wp hp", "How hard you must press to obtain the full brush strength.`nLower it when you cannot press hard enough to reach the maximum.`nAnything firmer than this yields the full value anyway.")
+    GuiAddSlider("BrushToolPressureCurve", -100,100, 0, "Sensitivity", "updateUIbrushTool", 2, "xs y+15 wp hp", "Shapes the response between the two presses set above.`nNegative values demand a firmer press before the brush reacts.`nPositive values let a light touch already reach the full value.")
     GuiAddSlider("BrushToolPressureMin", 0,100, 10, "Minimum output", "updateUIbrushTool", 1, "x+10 wp hp", "The floor the pen pressure can never fall below.`nRaise it if the lightest strokes vanish entirely.")
-    GuiAddSlider("BrushToolPressureAltMax", -256,256, 0, "Sensitivity max.", "updateUIbrushTool", 2, "xs y+15 wp hp")
 
     Gui, Tab
     btnWid := (PrefsLargeFonts=1) ? 90 : 55
@@ -43663,7 +43675,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 }
 
 BtnHelpPenPressureBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "When a pressure sensitive pen is used, the «Pen pressure» tab lets the pressure drive the brush opacity and the brush size. Windows 8 or newer is required.`n `nThe «Opacity influence» and «Size influence» sliders decide how much of each parameter the pressure may claim: at 0% the parameter stays exactly where the other tabs set it, at 100% it follows the pressure entirely. «Sensitivity» reshapes the response, so that a firmer or a lighter press is needed to reach the full value, while «Minimum output» sets the floor below which the pressure cannot push, which keeps the lightest strokes from disappearing.`n `nPainting with a mouse, or with a pen that reports no pressure, is unaffected by these settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "When a pressure sensitive pen is used, the «Pen pressure» tab lets the pressure drive the brush opacity and the brush size. Windows 8 or newer is required.`n `nThe «Opacity influence» and «Size influence» sliders decide how much of each parameter the pressure may claim: at 0% the parameter stays exactly where the other tabs set it, at 100% it follows the pressure entirely.`n `n«Softest press» and «Firmest press» tell QPV which part of the pen range you actually use, both expressed as a percentage of everything the pen can report. The brush spreads its whole response over the band between them: pressing softer than «Softest press» always gives the weakest stroke, pressing firmer than «Firmest press» always gives the strongest one. Lower «Firmest press» when you cannot press hard enough to reach the maximum, and raise «Softest press» when the brush already paints at the slightest touch.`n `nTo find your own values, tick «Display pen data» and paint a stroke: the tool tip reports the raw pressure your hand produces, so you can read off your comfortable softest and firmest presses and set the two sliders accordingly.`n `n«Sensitivity» reshapes the response inside that band, so that a firmer or a lighter press is needed to reach the full value, while «Minimum output» sets the floor below which the pressure cannot push, which keeps the lightest strokes from disappearing.`n `nPainting with a mouse, or with a pen that reports no pressure, is unaffected by these settings.", -1, 0, 0)
 }
 
 BtnHelpBrushes() {
@@ -44290,12 +44302,30 @@ updateUIbrushTool() {
       uiSlidersArray["BrushToolRandomSoftness", 10] := actu
    } Else If (CurrentPanelTab=4)
    {
+      ; the softest press must stay below the firmest one; the slider the user did not
+      ; just move is the one pushed aside, so the one under the cursor never fights back
+      Static prevMinAt := -1, prevMaxAt := -1
+      If (BrushToolPressureMinAt + 5 > BrushToolPressureMaxAt)
+      {
+         If (BrushToolPressureMinAt!=prevMinAt && BrushToolPressureMaxAt=prevMaxAt)
+         {
+            BrushToolPressureMaxAt := clampInRange(BrushToolPressureMinAt + 5, 5, 100)
+            GuiUpdateSliders("BrushToolPressureMaxAt")
+         } Else
+         {
+            BrushToolPressureMinAt := clampInRange(BrushToolPressureMaxAt - 5, 0, 95)
+            GuiUpdateSliders("BrushToolPressureMinAt")
+         }
+      }
+      prevMinAt := BrushToolPressureMinAt, prevMaxAt := BrushToolPressureMaxAt
+
       actu := (BrushToolPenPressure=1) ? 1 : 0
       uiSlidersArray["BrushToolPressureOpacity", 10] := actu
       uiSlidersArray["BrushToolPressureSize", 10] := actu
+      uiSlidersArray["BrushToolPressureMinAt", 10] := actu
+      uiSlidersArray["BrushToolPressureMaxAt", 10] := actu
       uiSlidersArray["BrushToolPressureCurve", 10] := actu
       uiSlidersArray["BrushToolPressureMin", 10] := actu
-      uiSlidersArray["BrushToolPressureAltMax", 10] := actu
       actu := (BrushToolPenPressure=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, BrushToolPenData
       SetTimer, WriteSettingsBrushPanel, -300
@@ -46871,7 +46901,8 @@ ReadSettingsBrushPanel(act:=0) {
       RegAction(act, "BrushToolPressureSize",, 2, 0, 100)
       RegAction(act, "BrushToolPressureCurve",, 2, -100, 100)
       RegAction(act, "BrushToolPressureMin",, 2, 0, 100)
-      RegAction(act, "BrushToolPressureAltMax",, 2, -256, 256)
+      RegAction(act, "BrushToolPressureMinAt",, 2, 0, 95)
+      RegAction(act, "BrushToolPressureMaxAt",, 2, 5, 100)
       RegAction(act, "BrushToolTexture",, 2, 1, 9)
       RegAction(act, "BrushToolBlurStrength",, 2, 0, 99)
       RegAction(act, "BrushToolDynamicCloner",, 1)
@@ -75966,7 +75997,7 @@ ActPaintBrushNow() {
       penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       If (BrushToolPenData=1)
       {
-         msgu := "Pen sensitivity: " Round(rawPressure/1024) "% | Adjusted: " Round(thisPenPressure*100) "%"
+         msgu := "Pen pressure: " Round(rawPressure/10.24) "% | Adjusted: " Round(thisPenPressure*100) "%"
          msgu .= "`nOpacity and size factors: " Round(penOpacityFactor, 3) " | " Round(penSizeFactor, 3)
          showTOOLtip(msgu)
       }
