@@ -20,7 +20,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
      , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
      , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
-     , penPressure := 0, penPressureActive := 0, penPressureZeit := 0, hasPenPressureAPI := 0
+     , penPressureRaw := 0, penPressureZeit := 0, hasPenPressureAPI := 0
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
      , hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
@@ -87,7 +87,7 @@ OnMessage(0x20E, "WM_MOUSEWHEEL")
 ; Pen pressure. The main viewport windows are created by this thread, so WM_POINTER*
 ; messages land in this thread's queue. That matters: the painting loops in the main
 ; thread run under «Critical, on» and never pump messages, so they cannot read pressure
-; themselves. They poll penPressure/penPressureActive from here instead, the same way
+; themselves. They poll penPressureRaw from here instead, the same way
 ; determineLClickState() already polls LbtnDwn.
 hasPenPressureAPI := DllCall("GetProcAddress", "UPtr", DllCall("GetModuleHandle", "Str", "user32", "UPtr"), "AStr", "GetPointerPenInfo", "UPtr") ? 1 : 0
 If (hasPenPressureAPI=1) ; requires Windows 8 or newer
@@ -1248,7 +1248,7 @@ WM_PENpressure(wp, lp, msg, hwnd) {
 
    If (msg=0x0247 || msg=0x024A) ; WM_POINTERUP / WM_POINTERLEAVE
    {
-      penPressureActive := 0
+      penPressureRaw := 0
       Return
    }
 
@@ -1266,7 +1266,7 @@ WM_PENpressure(wp, lp, msg, hwnd) {
    pointerFlags := NumGet(penInfoBuf, 12, "UInt")
    If !(pointerFlags & 0x4) ; POINTER_FLAG_INCONTACT ; hovering, not touching
    {
-      penPressureActive := 0
+      penPressureRaw := 0
       Return
    }
 
@@ -1274,8 +1274,7 @@ WM_PENpressure(wp, lp, msg, hwnd) {
    If (thisPressure<1) ; the digitizer does not report pressure at all
       Return
 
-   penPressure := thisPressure ; normalized by Windows to the 0-1024 range
-   penPressureActive := 1
+   penPressureRaw := thisPressure ; normalized by Windows to the 0-1024 range
    penPressureZeit := A_TickCount
 }
 
