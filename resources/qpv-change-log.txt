@@ -6,6 +6,7 @@
 
 - v6.2.01 (2026-07-**)
   - [new] rotational/spin blur mode in the «Radial Blur» panel
+  - [new] pen pressure support for brushes
   - added shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
   - much faster lines drawing on images above 536 megapixels
   - faster polar/rectangular coordinates transformations
