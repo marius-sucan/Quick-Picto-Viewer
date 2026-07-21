@@ -384,7 +384,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
-   , autoApplyVPcolors := 1
+   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -20017,6 +20017,8 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
      quality := (modus>1 && modus!=4) ? 80 : clampInRange(intensity*2, 16, 70)
      If (modus=4)
         quality += 5
+     If (zoomBlurHighQuality=1)
+        quality := clampInRange(Ceil(quality*2.5), 32, 148)
   }
 
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
@@ -48563,7 +48565,7 @@ BTNopenCustomShapesFolder() {
 
 BTNlvCustomShapes(a, b, c) {
    Gui, SettingsGUIA: Default
-   ToolTip, % b "|" c  , , , 2
+   ; ToolTip, % b "|" c  , , , 2
    GuiControlGet, ptab, SettingsGUIA:, CurrentPanelTab
    If (b="DoubleClick" && c>0)
    {
@@ -50641,6 +50643,7 @@ WriteSettingsZoomBlurPanel() {
 
 ReadSettingsZoomBlurPanel(act:=0) {
     RegAction(act, "zoomBlurMode",, 2, 1, 4)
+    RegAction(act, "zoomBlurHighQuality",, 1)
     RegAction(act, "BlurAreaAlphaMask",, 1)
     RegAction(act, "blurAreaOpacity",, 2, 3, 255)
     RegAction(act, "BlurAreaInverted",, 1)
@@ -50736,6 +50739,7 @@ PanelZoomBlurSelectedArea() {
     GuiAddSlider("uiZoomBlurAreaXamount", 1,254, 15, "Intensity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid " hp")
     GuiAddSlider("blurAreaOpacity", 3,255, 255, "Opacity", "updateUIzoomBlurPanel", 1, "xs y+10 w" txtWid - 27 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIzoomBlurPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
+    Gui, Add, Checkbox, xs y+10 Checked%zoomBlurHighQuality% vzoomBlurHighQuality gupdateUIzoomBlurPanel, High quality (slower)
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaAlphaMask% vBlurAreaAlphaMask gupdateUIzoomBlurPanel, Apply alpha mas&k
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaInverted% vBlurAreaInverted gupdateUIzoomBlurPanel, &Invert selection area
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
