@@ -5615,6 +5615,27 @@ GetMouseCoord2wind(hwnd, ByRef nX, ByRef nY) {
        JEE_ScreenToClient(hwnd, oX, oY, nX, nY)
 }
 
+GetClickCoord2wind(msgPos, hwnd, w, h, ByRef nX, ByRef nY) {
+; Where the click being handled right now actually landed, rather than wherever the cursor
+; happens to sit by the time we get around to reading it. A pen tap on a graphics tablet is
+; long over when its handler runs - Windows even holds the emulated click back for a while,
+; to rule out a press-and-hold gesture - so the live cursor may by then belong to a hovering
+; pen that has already drifted somewhere else.
+; msgPos must be collected with GetMessagePos() before anything pumps messages, otherwise it
+; describes some later message instead. Returns 0, leaving the coordinates untouched, when
+; the recorded point misses the control: that is the proof it was not our click.
+    oX := msgPos & 0xFFFF
+    oY := (msgPos >> 16) & 0xFFFF
+    oX := (oX>32767) ? oX - 65536 : oX   ; the packed pair is two signed 16 bit values, so
+    oY := (oY>32767) ? oY - 65536 : oY   ; monitors left of or above the primary go negative
+    JEE_ScreenToClient(hwnd, oX, oY, cX, cY)
+    If (cX<0 || cY<0 || cX>w || cY>h)
+       Return 0
+
+    nX := cX, nY := cY
+    Return 1
+}
+
 doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
   If (debugModa=2)
   {
@@ -100960,6 +100981,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
 GuiSlidersResponder(a, m_event, keyu) {
    Static lastInvoked := 1
 
+   clickMsgPos := DllCall("GetMessagePos", "UInt")  ; has to be read before anything below pumps messages, see GetClickCoord2wind()
    hwnd := (m_event="uiLabel") ? a : "0x" Format("{:x}", a)
    GetMouseCoord2wind(hwnd, nX, nY)
    whichSlider := uiSlidersArray[hwnd]
@@ -101082,13 +101104,27 @@ GuiSlidersResponder(a, m_event, keyu) {
    occ := A_IsCritical
    allowExpo := (w<rangeu * 2 || doFloat=1) ? 1 : 0 ; this enables precise adjustments of slider values, when the range is much higher than the available width
 
+   ; A pen tap on a graphics tablet is over in a few milliseconds, and Windows delays the
+   ; emulated mouse click further while it decides the tap is not a press-and-hold. By the
+   ; time this subroutine runs, the button is already up, so the loop below never started a
+   ; single pass and the tap did nothing at all - only tap-and-drag ever moved the knob.
+   ; Grant every genuine click one guaranteed pass: it is the very same pass a mouse click
+   ; gets anyway, and it sets the value from the position that was clicked.
+   tapPass := (m_event!="uiLabel" && isGivenKey!=1) ? 1 : 0
+
    Critical, off
-   GetMouseCoord2wind(hwnd, onX, onY)
+   ; the anchor the expo mode measures its drag against, and the spot a plain tap commits to
+   useClickPos := (tapPass=1 && GetClickCoord2wind(clickMsgPos, hwnd, w, h, clickX, clickY)) ? 1 : 0
+   If (useClickPos=1)
+      onX := clickX, onY := clickY
+   Else
+      GetMouseCoord2wind(hwnd, onX, onY)
+
    onX := clampInRange(onX, 2, w)
    onXz := onX / w
    onXKz := onXz * rangeu
    Sleep, -1   ; the excessive amount of added Sleeps is to prevent potential lock-ups/dead locks
-   While, ((determineLClickState()=1 || m_event="uiLabel" && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1) && isActive=1)
+   While, ((determineLClickState()=1 || (m_event="uiLabel" || tapPass=1) && A_Index=1 || GetKeyState(keyu, "P") && isGivenKey=1) && isActive=1)
    {
       ; fnOutputDebug(A_ThisFunc " == A // start")
       Sleep, -1
@@ -101133,7 +101169,11 @@ GuiSlidersResponder(a, m_event, keyu) {
             %givenVar% := clampInRange(%givenVar% - frkB, minV, maxV, 1)
       } Else 
       {
-         GetMouseCoord2wind(hwnd, nX, nY)
+         If (useClickPos=1 && A_Index=1 && mouseMode!=1)
+            nX := clickX, nY := clickY   ; a tap already released: honour where it landed, not where the pen hovers now
+         Else
+            GetMouseCoord2wind(hwnd, nX, nY)
+
          nX := clampInRange(nX, -w, w*2)
          znx := nX - onX
          pxkzp := clampInRange(nX / w, -2, 2) - onXz
