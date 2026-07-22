@@ -43575,7 +43575,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     slideWid2 := slideWid//2
     Global PickuBrushToolAcolor, PickuBrushToolBcolor, UIbtnBrushColorA, UIbtnBrushColorB, uiBtnSetCloner
-         , infoSymmetryLabel, BTNuiSetLabelSymmetry, UIlivePenPressure
+         , infoSymmetryLabel, BTNuiSetLabelSymmetry
 
     ReadSettingsBrushPanel()
     FloodFillSelectionAdj := 0
@@ -76049,13 +76049,6 @@ ActPaintBrushNow() {
       thisPenPressure := getBrushPenPressure(rawPressure)
       penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
       penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
-      If (BrushToolPenData=1)
-      {
-         msgu := "Pen pressure: " Round(rawPressure/10.24) "% | Adjusted: " Round(thisPenPressure*100) "%"
-         msgu .= "`nOpacity and size factors: " Round(penOpacityFactor, 3) " | " Round(penSizeFactor, 3)
-         showTOOLtip(msgu)
-      }
-
       If (BrushToolRandomPosX>0 && BrushToolType<6)
       {
          gR := Ceil(brushSize*(BrushToolRandomPosX/100))
@@ -76109,6 +76102,13 @@ ActPaintBrushNow() {
          If isDotInRect(kX, kY, prevMX - stepu, prevMX + stepu, prevMY - stepu, prevMY + stepu)
          || !isDotInRect(kX, kY, 0 - brushSize//2, imgW + brushSize//2, 0 - brushSize//2, imgH + brushSize//2)
             Continue
+      }
+
+      If (BrushToolPenData=1 && BrushToolPenPressure=1 && thisPenPressure>0)
+      {
+         msgu := "Pen pressure: " Round(rawPressure/10.24) "% | Adjusted: " Round(thisPenPressure*100) "%"
+         msgu .= "`nOpacity and size factors: " Round(penOpacityFactor, 3) " | " Round(penSizeFactor, 3)
+         showTOOLtip(msgu)
       }
 
       thisState := "a" mX mY kX kY randomFactor
@@ -76664,13 +76664,6 @@ ActPaintBrushLargeNow() {
       thisPenPressure := getBrushPenPressure(rawPressure)
       penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
       penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
-      If (BrushToolPenData=1)
-      {
-         msgu := "Pen pressure: " Round(rawPressure/10.24) "% | Adjusted: " Round(thisPenPressure*100) "%"
-         msgu .= "`nOpacity and size factors: " Round(penOpacityFactor, 3) " | " Round(penSizeFactor, 3)
-         showTOOLtip(msgu)
-      }
-
       If (BrushToolRandomPosX>0 && BrushToolType<6)
       {
          gR := Ceil(brushSize*(BrushToolRandomPosX/100))
@@ -76724,6 +76717,13 @@ ActPaintBrushLargeNow() {
          If isDotInRect(kX, kY, prevMX - stepu, prevMX + stepu, prevMY - stepu, prevMY + stepu)
          || !isDotInRect(kX, kY, 0 - brushSize//2, imgW + brushSize//2, 0 - brushSize//2, imgH + brushSize//2)
             Continue
+      }
+
+      If (BrushToolPenData=1 && BrushToolPenPressure=1 && thisPenPressure>0)
+      {
+         msgu := "Pen pressure: " Round(rawPressure/10.24) "% | Adjusted: " Round(thisPenPressure*100) "%"
+         msgu .= "`nOpacity and size factors: " Round(penOpacityFactor, 3) " | " Round(penSizeFactor, 3)
+         showTOOLtip(msgu)
       }
 
       thisState := "a" mX mY kX kY randomFactor
