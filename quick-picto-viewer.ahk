@@ -6096,10 +6096,10 @@ livePreviewsImageEditing(modus:=0, doTimer:=0, hwnd:=0, eventu:=0) {
    ; function meant to filter out repeated calls
    Static prev := -1
    WinGetClass, WinClass, ahk_id %hwnd%
-   If (StrLen(doTimer)>2 && InStr(WinClass, "_trackbar"))
+   If (StrLen(doTimer)>2 && (InStr(WinClass, "_trackbar") || uiSlidersArray[hwnd]))
    {
+      ; fnOutputDebug("slider:" hwnd " = " eventu "=" okay  " | " doTimer " | " WinClass " | " uiSlidersArray[hwnd])
       okay := (prev=5 && eventu=4) ? 0 : 1
-      ; fnOutputDebug("slider:" hwnd " = " eventu "=" okay)
       If (eventu!="normal" && okay=1)
          SetTimer, dummyLivePreviewsDelayer, -25
       prev := eventu
@@ -6208,8 +6208,8 @@ isVPselLarger(mainWidth:=0, mainHeight:=0) {
 
    vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
    vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
-   vPimgSelX := min(zImgSelX1, zImgSelX2) + dotsSize//2
-   vPimgSelY := min(zImgSelY1, zImgSelY2) + dotsSize//2
+   vPimgSelX := min(zImgSelX1, zImgSelX2)
+   vPimgSelY := min(zImgSelY1, zImgSelY2)
 
    larger := (vPimgSelH>mainHeight*2 || vPimgSelW>mainWidth*2) ? 1 : 0
    If !larger
@@ -7324,7 +7324,6 @@ MenuCopyVectorPoints(modus:=0, givenIndex:=0) {
        {
           thisIndex++
           nVpoints[thisIndex] := c
-          nVcoords[thisIndex] := customShapePropPoints[A_Index]
        }
     }
 
@@ -9641,14 +9640,15 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
          Return
       }
    }
- 
+
+   isCtrlShift := (GetKeyState("Ctrl", "P") && GetKeyState("Shift", "P")) ? 1 : 0
    If (IsFunc(hudBTNfuncu) && hudBTNfuncu && hudBTNheightFuncu && mY<hudBTNheightFuncu && mX<hudBTNwidthFuncu && hudBTNtypeFuncu=1)
    {
       lastTimeToggleThumbs := A_TickCount 
       hudBTNtypeFuncu := 0
       %hudBTNfuncu%()
       Return
-   } Else If (AnyWindowOpen=64 && liveDrawingBrushTool=1`&& mustCaptureCloneBrush=1)
+   } Else If (AnyWindowOpen=64 && liveDrawingBrushTool=1`&& (mustCaptureCloneBrush=1 || isCtrlShift=1))
    {
       If StrLen(BrushToolSymmetryX)>1
       {
@@ -9660,7 +9660,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       }
       lastTimeToggleThumbs := A_TickCount 
       Return
-   } Else If (AnyWindowOpen=23 && FillAreaColorMode=6 && mustCaptureCloneBrush=1 || AnyWindowOpen=81 && GetKeyState("Ctrl", "P") && hUserSymmetricaCenteringMode=0)
+   } Else If (AnyWindowOpen=23 && FillAreaColorMode=6 && mustCaptureCloneBrush=1 || AnyWindowOpen=81 && isCtrlShift=1 && UserSymmetricaCenteringMode=0)
    {
       vpWinClientSize(mainWidth, mainHeight)
       setWhileLoopExec(1)
@@ -10367,7 +10367,7 @@ ToggleImageSizingMode(modus:=0) {
           zoomLevel := 1
     } Else 
     {
-       IMGdecalageX := IMGdecalageX := 1
+       IMGdecalageX := IMGdecalageY := 1
        IMGresizingMode := clampInRange(IMGresizingMode + 1, 1, 5, 1)
        If (IMGresizingMode=3)
        {
@@ -10390,7 +10390,7 @@ ToggleImageSizingMode(modus:=0) {
     Else
        showTOOLtip("Adapt to window mode:`n" friendly moreInfos, A_ThisFunc, 1, (IMGresizingMode - 0.99)/4)
 
-    If (IMGresizingMode=4 && (o_friendly!=friendly2 || InStr(modus, "cus-")))
+    If (IMGresizingMode=4 && (o_friendly!=friendly || InStr(modus, "cus-")))
     {
        IMGdecalageX := IMGdecalageY := 1
        PrintPosX := "X"
@@ -11821,7 +11821,7 @@ DestroyGIFuWin() {
 }
 
 restartGIFplayback() {
-   If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1, totalFramesIndex>1 && thumbsDisplaying!=1)
+   If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && totalFramesIndex>1 && thumbsDisplaying!=1)
    {
       autoChangeDesiredFrame("stop", 0)
       Sleep, 5
@@ -14073,7 +14073,7 @@ QPV_ConvertToGrayscale(pBitmap, modus, intensity, previewMode) {
   If !E1
   {
      If (previewMode=1)
-        QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, invertArea)
+        QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, EllipseSelectMode, VPselRotation, 1, 0)
      Else
         QPV_PrepareHugeImgSelectionArea(0, 0, w, h, w, h, -1, 0, 0, 0)
      r := DllCall("qpvmain.dll\ConvertToGrayScale", "UPtr", iScan, "Int", w, "Int", h, "int", modus, "int", intensity, "int", stride, "int", 32, "UPtr", 0, "int", 0)
@@ -16295,7 +16295,6 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
    }
 
    HasAlpha := (forceAlpha!="x") ? forceAlpha : currIMGdetails.HasAlpha
-   selectionCoords := Round(imgSelX1) "|" Round(imgSelY1) "|" Round(imgSelX2) "|" Round(imgSelY2) "|" prcSelX1 "|" prcSelY1 "|" prcSelX2 "|" prcSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" EllipseSelectMode "|" LimitSelectBoundsImg "|" showSelectionGrid "|" innerSelectionCavityX "|" innerSelectionCavityY "|" FillAreaRectRoundness "|" FillAreaEllipseSection
    If (actionu="init" && minimizeMemUsage=1)
    {
       setImageLoading()
@@ -16354,8 +16353,6 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
          maxUndoLevels := hasReachedMaxUndoLevels := undoLevelsRecorded
    }
 
-   ; currentSelUndoLevel := totalSelUndos := Round(undoSelLevelsArray.Count() + 1)
-   ; undoSelLevelsArray[totalSelUndos] := selectionCoords
    recordSelUndoLevelNow()
    imgIndexEditing := currentFileIndex
    ; ToolTip, % currentSelUndoLevel " = p" , , , 2
@@ -17289,10 +17286,7 @@ AdjustColorsSimpleSelectedArea() {
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
-    {
-       imgFxMode := o_imgFxMode
        Return
-    }
 
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     compositingQuality := (userimgGammaCorrect=1) ? 2 : 1
@@ -17330,7 +17324,7 @@ AdjustColorsSimpleSelectedArea() {
        imgSelW  := imgW,  imgSelH  := imgH
     }
 
-    imgFxMode := prevFXmode
+    imgFxMode := 1
     thisOpacity := imgColorsFXopacity/255
     allowAlphaMasking := decideAlphaMaskingFeaseable(1)
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, newBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
@@ -20074,6 +20068,8 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
   ; modus: 2 = x axis only, 3 = y axis only, others = both axes [true radial zoom];
   ; intensity = percents of each pixel's distance to the anchor to smear across; beyond 100
   ; the smear travels past the anchor; quality caps the radial samples per pixel [0 = default]
+  ; pBitmap gets modified; it should be discarded after call 
+
   initQPVmainDLL()
   If !qpvMainDll
   {
@@ -26061,7 +26057,7 @@ PanelDefineKbdShortcut() {
     {
        Gui, Color, % darkWindowColor, % darkWindowColor
        Gui, Font, c%darkControlColor%
-       setDarkWinAttribs(hKbdGui)
+       setDarkWinAttribs(hKbdGuia)
     }
 
     btnWid := 45
@@ -26251,7 +26247,7 @@ ActToggleLivePreview() {
     doImgEditLivePreview := !doImgEditLivePreview
     GuiControl, SettingsGUIA:, doImgEditLivePreview, % doImgEditLivePreview
     If (A_TickCount - lastInvoked > 55)
-       livePreviewsImageEditing(0, A_ThisFunc, actionu, b)
+       livePreviewsImageEditing(0, A_ThisFunc)
 
     lastInvoked := A_TickCount
 }
@@ -29577,8 +29573,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             Break
          }
      }
-     If (SLDtypeLoaded=3)
-        RecordSet.Free()
 
      If (abandonAll!=1)
         prevState := thisState
@@ -50144,7 +50138,7 @@ PanelSymmetricaImage() {
     updateUIsymmetricaPanel()
 }
 
-updateUIsymmetricaPanel(actionu:=0) {
+updateUIsymmetricaPanel(actionu:=0, b:=0) {
     Static lastInvoked := 1
     If (AnyWindowOpen!=81)
        Return
@@ -50967,7 +50961,7 @@ PanelZoomBlurSelectedArea() {
     GuiAddSlider("BlurAreaGamma", -100,100, 0, "Contrast", "updateUIzoomBlurPanel", 2, "xs y+10 wp hp")
 
     Gui, Tab
-    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% gBtnZoomBlurSelectedArea, &Proceed
+    Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% Default w%btnWid% vmainBtnACT gBtnZoomBlurSelectedArea, &Proceed
     Gui, Add, Button, x+6 hp wp gOpenPanelBlur, &Gaussian
     Gui, Add, Button, x+6 hp wp gBtnCloseWindow, &Cancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
@@ -51720,8 +51714,8 @@ UIresponderPrintPreview(a, m_event) {
       GetMouseCoord2wind(hwnd, nX, nY)
       Sleep, 1
       zX := mX, zY := mY
-      newX := clampInRange( Round( (nX / w, 1) * 100) , 0, 100)
-      newY := clampInRange( Round( (nY / h, 1) * 100) , 0, 100)
+      newX := clampInRange( Round( (nX / w) * 100) , 0, 100)
+      newY := clampInRange( Round( (nY / h) * 100) , 0, 100)
       If (modus!=1)
       {
          PrintPosX := newX
@@ -53063,6 +53057,7 @@ updateUIzoomBlurPanel(a:=0,b:=0) {
        GuiControl, SettingsGUIA: Disable, BlurAreaBlendMode
        GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, 1
     }
+
     actu := (BlurAreaBlendMode>1) ? "Enabled" : "Disabled"
     GuiControl, SettingsGUIA: %actu%, blurAreaApplyFX
     isActive := (BlurAreaBlendMode>1 && blurAreaApplyFX=1) ? 1 : 0
@@ -53071,6 +53066,8 @@ updateUIzoomBlurPanel(a:=0,b:=0) {
     uiSlidersArray["BlurAreaHue", 10] := isActive
     uiSlidersArray["BlurAreaSaturation", 10] := isActive
     GuiRefreshSliders()
+    actu := (uiZoomBlurAreaXamount>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, mainBtnACT
 
     lastInvoked := A_TickCount
     SetTimer, WriteSettingsZoomBlurPanel, -300
@@ -62303,6 +62300,8 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
 
     If (!CurrentSLD && maxFilesIndex>0)
     {
+       If !SelectedDir
+          SelectedDir := "\Unsaved-list"
        SLDtypeLoaded := 2
        CurrentSLD := SelectedDir "\newFile.SLD"
     }
@@ -75691,7 +75690,7 @@ decideAlphaMaskingFeaseable(userBias, doLimits:=0) {
       allowAlphaMasking := 0
 
    If (allowAlphaMasking=1 && doLimits=1)
-      innerSelectionCavityX := innerSelectionCavityX := VPselRotation := EllipseSelectMode := 0
+      innerSelectionCavityX := innerSelectionCavityY := VPselRotation := EllipseSelectMode := 0
    Return allowAlphaMasking
 }
 

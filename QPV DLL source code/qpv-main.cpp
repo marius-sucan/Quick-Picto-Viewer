@@ -8042,8 +8042,10 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
 // streak average but never below the source pixel's own. Together that keeps transparency from
 // either diluting the effect into invisibility or bleeding the RGB hidden under it [usually
 // white] over the image.
-// imageData is the untouched source and newData receives the result; a gather filter cannot
+// imageData is the source and newData receives the result; a gather filter cannot
 // work in place, so the two must be distinct buffers.
+// if the image is 32 bits, imageData gets modified by blurWeighByAlpha() if blurNeedsAlphaWeighting() returns true
+// this happens to avoid increasing the memory usage
 
       if (!imageData || !newData || imageData==newData || w<1 || h<1 || Stride<1 || (bpp!=24 && bpp!=32))
          return 0;

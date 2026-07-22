@@ -1492,7 +1492,7 @@ isInRange(value, inputA, inputB) {
 
 WM_SETCURSOR() {
   r := 0
-  If (slideShowRunning=1 && isSamePos=1)
+  If (slideShowRunning=1)
      r := 1
   Else If (drawingShapeNow=1 || liveDrawingBrushTool=1)
      r := 1
