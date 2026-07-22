@@ -1961,14 +1961,14 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        allowLoop := 1
        If (liveDrawingBrushTool=1)
-          func2Call := ["MenuDecBrushOpacity"]
+          func2Call := ["MenuIncBrushOpacity"]
        Else If HKifs("imgsLoaded")
           func2Call := ["IncreaseSlideSpeed"]
     } Else If (givenKey="comma")
     {
        allowLoop := 1
        If (liveDrawingBrushTool=1)
-          func2Call := ["MenuIncBrushOpacity"]
+          func2Call := ["MenuDecBrushOpacity"]
        Else If HKifs("imgsLoaded")
           func2Call := ["DecreaseSlideSpeed"]
     } Else If (givenKey="!comma")
@@ -28916,10 +28916,10 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
 
        If (abandonAll=1)
        {
-          showTOOLtip("Operation abandoned. " groupDigits(thisIndex) " / " groupDigits(thisMaxCount)) percDone
+          showTOOLtip("Operation abandoned. " groupDigits(thisIndex) " / " groupDigits(thisMaxCount) percDone)
           SoundBeep, 300, 100
-       } Else If (abandonAll=1)
-          showTOOLtip("Finished collecting data for " groupDigits(thisMaxCount)) " files"
+       } Else
+          showTOOLtip("Finished collecting data for " groupDigits(thisMaxCount) " files")
 
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -150
@@ -37217,7 +37217,7 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "SimpleOperationsRotateAngle",, 2, 1, 4)
     RegAction(act, "SimpleOperationsScaleXimgFactor",, 2, 1, 32750)
     RegAction(act, "SimpleOperationsScaleYimgFactor",, 2, 1, 32750)
-    RegAction(act, "userActionConflictingFile",, 2, 1, 3)
+    RegAction(act, "userActionConflictingFile",, 2, 1, 4)
     RegAction(act, "userDesireWriteFMT",, 2, 1, 16)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
     RegAction(act, "userVPsvgScale",, 2, 1, 10)
@@ -46294,7 +46294,7 @@ ReadSettingsPasteInPlace(act:=0) {
     RegAction(act, "PasteInPlaceOrientFlipY",, 1)
     RegAction(act, "PasteInPlaceQuality",, 1)
     RegAction(act, "PasteInPlaceAutoExpandIMG",, 1)
-    RegAction(act, "userimgGammaCorrect",, 1)
+    IniAction(act, "userimgGammaCorrect", "General", 1)
 }
 
 togglePasteInPlaceAdaptModes() {
@@ -46950,7 +46950,7 @@ ReadSettingsCombineIMGs(act:=0) {
 }
 
 ReadSettingsVPgrid(act:=0) {
-    RegAction(act, "vpGridSize",, 2, 10, 350)
+    RegAction(act, "vpGridSize",, 2, 10, 450)
     RegAction(act, "vpGridAlpha",, 2, 1, 255)
     RegAction(act, "vpGridColor",, 3)
     RegAction(act, "vpGridFixedSize",, 1)
@@ -63450,8 +63450,8 @@ addMenuBonusesSelectionArea() {
       kMenu("PVselv", "Add", "Move selection: down`tEnd", "MenuSelAreaMoveDown",,,1)
       kMenu("PVselv", "Add", "Move selection: right`tPage up", "MenuSelAreaMoveLeft",,,1)
       kMenu("PVselv", "Add", "Move selection: left`tPage down", "MenuSelAreaMoveRight",,,1)
-      kMenu("PVselv", "Add", "Enlarge selection area`tShift+-", "MenuIncSelAreaSize", "increase size",,1)
-      kMenu("PVselv", "Add", "Shrink selection area`tShift+=", "MenuDecSelAreaSize", "decrease size",,1)
+      kMenu("PVselv", "Add", "Enlarge selection area`tShift+=", "MenuIncSelAreaSize", "increase size",,1)
+      kMenu("PVselv", "Add", "Shrink selection area`tShift+-", "MenuDecSelAreaSize", "decrease size",,1)
       kMenu("PVselv", "Add", "Increase exclusion (selection area)`tCtrl+.", "MenuIncSelAreaCavity", "hallow",,1)
       kMenu("PVselv", "Add", "Decrease exclusion (selection area)`tCtrl+,", "MenuDecSelAreaCavity", "hallow",,1)
       If (innerSelectionCavityX>0 && innerSelectionCavityY>0 || VPselRotation!=0)
@@ -87735,8 +87735,8 @@ WriteSettingsSimpleColorAdjustsPanel() {
 }
 
 ReadSettingsSimpleColorAdjustsPanel(act:=0) {
+   IniAction(act, "userimgGammaCorrect", "General", 1)
    RegAction(act, "imgColorsFXopacity",, 2, 2, 255)
-   RegAction(act, "userimgGammaCorrect",, 1)
    RegAction(act, "userImgAdjustInvertArea",, 1)
    RegAction(act, "userImgAdjustAltBright",, 1)
    RegAction(act, "userImgAdjustAltContra",, 1)
@@ -90860,8 +90860,8 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          showTOOLtip("ERROR: Undo DELETE action failed. File not found in Recycle Bin.`nUnable to recover:`n" OutFileName "`n" OutDir "\")
       Else If (r=-1)
          showTOOLtip("ERROR: Undo DELETE action failed. File found in Recycle Bin, but unable to restore.`n" OutFileName "`n" OutDir "\")
-      Else If (r=-1)
-         showTOOLtip("ERROR: Undo DELETE action failed. Unable to probe the Recycle Bin contents.")
+      Else If (r=-2)
+         showTOOLtip("ERROR: Undo DELETE action failed. COM object error.")
       Else
          showTOOLtip("ERROR: Undo DELETE action failed. An undefined error occured.")
 
@@ -94461,10 +94461,6 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If (prevMsg!=msg)
        lastInvoked := A_TickCount
 
-    If ((perc || hudBTNfuncu) && InStr(mainCompiledPath, "\sucan twins") && !InStr(msg, "zoom level"))
-    && runningLongOperation!=1 && (A_TickCount - lastOSDtooltipInvoked > 325)
-       interfaceThread.ahkPostFunction("sndBeep", 1654, 100)
-
     lastOSDtooltipInvoked := A_TickCount
     If (forceDarker!=1)
        interfaceThread.ahkassign("toolTipGuiCreated", 1)
@@ -94584,7 +94580,7 @@ ReadSettingsAutoCropPanel(act:=0) {
     RegAction(act, "ResizeUseDestDir",, 1)
     RegAction(act, "PreserveDateTimeOnSave",, 1)
     RegAction(act, "usrAutoCropErrThreshold",, 2, 0, 99)
-    RegAction(act, "userActionConflictingFile",, 2, 1, 3)
+    RegAction(act, "userActionConflictingFile",, 2, 1, 4)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
     RegAction(act, "usrAutoCropColorTolerance",, 2, 0, 255)
     RegAction(act, "usrAutoCropDeviation",, 2, -50, 50)
