@@ -2735,40 +2735,51 @@ coreGenerateRandomList() {
       RandyIMGids := Random_ShuffleArray(RandyIMGids)
    } Else If (slidesRandoMode>1)
    {
-      ; SoundBeep 
+      ; SoundBeep
+      qu := maxFilesIndex//4         ; size of the first quarter
+      ru := maxFilesIndex - qu*3     ; size of the last chunk; always qu + (maxFilesIndex mod 4)
       x := []
-      Loop, % maxFilesIndex//4
+      Loop, % qu
           x[A_Index] := A_Index
-      a := Random_ShuffleArray(x.Clone())
-      ; b := Random_ShuffleArray(x.Clone())
-      ; c := Random_ShuffleArray(x.Clone())
-      Loop, % maxFilesIndex - (maxFilesIndex//4) * 3
+      a := Random_ShuffleArray(x)    ; first quarter: values 1 ... qu
+
+      x := []
+      Loop, % ru
           x[A_Index] := A_Index
-      d := Random_ShuffleArray(x)
+      d := Random_ShuffleArray(x)    ; last chunk: values 1 ... ru, shifted by qu*3
 
       f := []
-      Loop, % (maxFilesIndex//4) * 2
+      Loop, % qu*2
           f[A_Index] := A_Index
+      f := Random_ShuffleArray(f)    ; middle half: values 1 ... qu*2, shifted by qu
 
-      ; Loop, % maxFilesIndex//4
-      ;     f[A_Index + maxFilesIndex//4] := c[A_Index] + maxFilesIndex//4
+      ; the head and the tail of the list must be fed by the array
+      ; that matches them in size, otherwise entries are lost [see 2nd half bias]
+      If (slidesRandoMode=2)         ; 1st half bias
+      {
+         headArr := a, headOffset := 0, headCount := qu
+         tailArr := d, tailOffset := qu*3, tailCount := ru
+      } Else                         ; 2nd half bias
+      {
+         headArr := d, headOffset := qu*3, headCount := ru
+         tailArr := a, tailOffset := 0, tailCount := qu
+      }
 
-      f := Random_ShuffleArray(f)
-      Loop, % maxFilesIndex//4
-          RandyIMGids[A_Index] := (slidesRandoMode=2) ? a[A_Index] : d[A_Index] + (maxFilesIndex//4)*3
-      Loop, % (maxFilesIndex//4) * 2
-          RandyIMGids[A_Index + maxFilesIndex//4] := f[A_Index] + maxFilesIndex//4
-      Loop, % maxFilesIndex - (maxFilesIndex//4) * 3
-          RandyIMGids[A_Index + (maxFilesIndex//4)*3] := (slidesRandoMode=2) ? d[A_Index] + (maxFilesIndex//4)*3 : a[A_Index]
-      
+      Loop, % headCount
+          RandyIMGids[A_Index] := headArr[A_Index] + headOffset
+      Loop, % qu*2
+          RandyIMGids[A_Index + headCount] := f[A_Index] + qu
+      Loop, % tailCount
+          RandyIMGids[A_Index + headCount + qu*2] := tailArr[A_Index] + tailOffset
+
       Loop, % maxFilesIndex//2
       {
-         Random, f, 1, 20
-         If (f=2)
+         Random, rndu, 1, 20
+         If (rndu=2)
          {
             t := RandyIMGids[A_Index]
-            RandyIMGids[A_Index] := RandyIMGids[maxFilesIndex - A_Index]
-            RandyIMGids[maxFilesIndex - A_Index] := t
+            RandyIMGids[A_Index] := RandyIMGids[maxFilesIndex + 1 - A_Index]
+            RandyIMGids[maxFilesIndex + 1 - A_Index] := t
          }
       }
       ; k := printArrayStr(RandyIMGids)
