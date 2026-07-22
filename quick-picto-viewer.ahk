@@ -1507,7 +1507,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           func2Call := ["filesListApplyColors"]
        Else If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
-          func2Call := ["PanelColorsAdjusterWindow"]
+          func2Call := ["PanelColorsAdjusterVPwindow"]
     } Else If (givenKey="+^u")
     {
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
@@ -25198,6 +25198,8 @@ generateNumberRangeString(pA, pB) {
 selectFilesRange(pA, pB, sel) {
     mB := max(pA, pB)
     mA := min(pA, pB)
+    mA := clampInRange(mA, 1, maxFilesIndex)
+    mB := clampInRange(mB, 1, maxFilesIndex)
     rangeC := mB - mA + 1
     Loop, % rangeC
     {
@@ -25239,6 +25241,8 @@ jumpSelectRangeGiven(pA, pB) {
 
    mB := max(pA, pB)
    mA := min(pA, pB)
+   mA := clampInRange(mA, 1, maxFilesIndex)
+   mB := clampInRange(mB, 1, maxFilesIndex)
    rangeC := mB - mA + 1
    changeMcursor()
    getSelectedFiles(0, 1)
@@ -42206,7 +42210,7 @@ PanelSetThumbColumnOptions() {
     If (thumbsDisplaying!=1 || thumbsListViewMode>1 && thumbsDisplaying=1)
     {
        If (thumbsDisplaying!=1)
-          PanelColorsAdjusterWindow()
+          PanelColorsAdjusterVPwindow()
        Return
     }
 
@@ -49540,7 +49544,7 @@ BTNopenPrevPanel(givenZZ:=0, isGiven:=0, morrigan:=0) {
       CloseWindow()
 
    If (zz=10)
-      f := "PanelColorsAdjusterWindow"
+      f := "PanelColorsAdjusterVPwindow"
    Else If (zz=23)
       f := "PanelFillSelectedArea"
    Else If (zz=25)
@@ -55982,7 +55986,7 @@ PanelPreferencesWindow() {
     GuiAddSlider("UserGIFsDelayu", -9500, 9500, 30, ".updateLabelGIFdelay", "dummy", 2, pkl " w" slideWid " hp")
 
     ml := (PrefsLargeFonts=1) ? 265 : 150
-    Gui, Add, Button, xs y+7 w%ml% gPanelColorsAdjusterWindow, &Additional viewport options
+    Gui, Add, Button, xs y+7 w%ml% gPanelColorsAdjusterVPwindow, &Additional viewport options
 
     Gui, Tab, 4
     pp := (FIMfailed2init=1) ? "( ! )"
@@ -57033,7 +57037,10 @@ PanelJump2index() {
             RefreshImageFile()
             Return
          } Else If (msgResult.list=3)
+         {
+            newJumpIndex := clampInRange(newJumpIndex, 1, maxFilesIndex)
             jumpSelectRangeGiven(currentFileIndex, newJumpIndex)
+         }
 
          If (newJumpIndex=currentFileIndex && newJumpIndex>0 && msgResult.list!=4)
             Return
@@ -65379,7 +65386,7 @@ createMenuImgSizeAdapt(dummy:=0) {
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
 
          If !AnyWindowOpen
-            kMenu("PVview", "Add", "Viewport and color adjustments panel`tU", "PanelColorsAdjusterWindow")
+            kMenu("PVview", "Add", "Viewport and color adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
 
          kMenu("PVview", "Add", "Reset vie&wport adjustments`t\", "ResetImageView", "image")
          kMenu("PVview", "Add/Uncheck", "Centered &alignment`tA", "ToggleIMGalign", "viewport image position", " (image)")
@@ -65628,7 +65635,7 @@ createMenuMainView() {
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
 
       If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
-         kMenu("PVview", "Add", "Viewport and color adjustments panel`tShift+U", "PanelColorsAdjusterWindow")
+         kMenu("PVview", "Add", "Viewport and color adjustments panel`tShift+U", "PanelColorsAdjusterVPwindow")
 
       ; createMenuVPhudHisto()
       ; kMenu("PVview", "Add", "Show histogram", ":PVimgHistos")
@@ -66384,7 +66391,7 @@ createMenuLiveTools(dummy:=0) {
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
    kMenu("PVlTools", "Add", "Create image s&ymmetry or patterns", "PanelSymmetricaImage")
    kMenu("PVlTools", "Add", "&Adjust image colors`tU", "PanelAdjustColorsSimpleWindow")
-   kMenu("PVlTools", "Add", "Adjust vie&wport colors and effects`tShift+U", "PanelColorsAdjusterWindow")
+   kMenu("PVlTools", "Add", "Adjust vie&wport colors and effects`tShift+U", "PanelColorsAdjusterVPwindow")
    kMenu("PVlTools", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea")
    If (AnyWindowOpen=10)
       kMenu("PVlTools", "Check/Disable", "Adjust vie&wport colors and effects`tShift+U")
@@ -87551,7 +87558,7 @@ PanelColorsAdjusterImage() {
    coreColorsAdjusterWindow("img")
 }
 
-PanelColorsAdjusterWindow() {
+PanelColorsAdjusterVPwindow() {
    coreColorsAdjusterWindow("vp")
 }
 
@@ -100282,7 +100289,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
          Else If isImgEditingNow()
          {
             If isTlbrViewModus()
-               func2Call := ["PanelColorsAdjusterWindow"]
+               func2Call := ["PanelColorsAdjusterVPwindow"]
             Else
                func2Call := ["PanelAdjustColorsSimpleWindow"]
          }
