@@ -32054,6 +32054,24 @@ JEE_StrRegExLiteral(vText) {
   Return vOutput
 }
 
+isValidRegEx(pattern) {
+; True when the pattern compiles as a regular expression. QPV installs no global
+; error handler and has no try/catch elsewhere in the main script, so a malformed
+; user-supplied regex handed to RegExMatch/RegExReplace would otherwise throw an
+; uncaught exception and abort the operation with a raw AHK error dialog. PCRE
+; compiles the pattern before it matches, so testing it against an empty haystack
+; still raises on a bad pattern, while a valid one simply misses.
+   If (pattern="")
+      Return 0
+
+   try
+      RegExMatch("", pattern)
+   catch e
+      Return 0
+
+   Return 1
+}
+
 FiltersComboAction() {
   If (A_GuiControlEvent="DoubleClick")
      BtnApplyFilesFilter()
@@ -32391,8 +32409,11 @@ updateUIFiltersPanel(dummy:=0) {
    Else If (userFilterProperty=20)
       newFilter := "||Already-Seen-Images||"
 
+   ; live check: in «RegEx» matching mode a malformed pattern is flagged in the query
+   ; box here and blocked on Apply, so it never reaches RegExMatch to throw [isValidRegEx()]
+   regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx("i)" UsrEditFilter)) ? 1 : 0
    If (dummy!="external")
-      GuiControl, SettingsGUIA:, InternalFilterString, % newFilter
+      GuiControl, SettingsGUIA:, InternalFilterString, % (regexBad=1) ? "Invalid regular expression - correct the pattern before applying" : newFilter
 
    Return newFilter
 }
@@ -32417,6 +32438,14 @@ BtnApplyFilesFilter() {
    GuiControlGet, userFilterInvertThis
    newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
+   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx("i)" UsrEditFilter))
+   {
+      SoundBeep , 300, 100
+      showTOOLtip("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    If !newFilter
    {
       SoundBeep , 300, 100
@@ -38555,10 +38584,14 @@ coreSearchIndex(imgPath, givenRegEx, whatu, invertu:=0) {
    }
 
    ; ToolTip, % stringu "`n" thisSearchString "`n" z , , , 2
-   If !invertu
-      Return RegExMatch(stringu, givenRegEx)
-   Else
-      Return RegExMatch(stringu, givenRegEx) ? 0 : 1
+   ; a malformed user regex must never throw here: uncaught, it would abort the whole
+   ; filtering/search pass with a raw error dialog [QPV has no global error handler]
+   try
+      matchu := RegExMatch(stringu, givenRegEx)
+   catch e
+      Return invertu ? 1 : 0   ; an uncompilable pattern simply matches nothing
+
+   Return invertu ? (matchu ? 0 : 1) : matchu
 }
 
 processSearchIndexString(inputu) {
@@ -39649,7 +39682,13 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
       Return fileNamuNoEXT
    
    If (obju.regExRemplaceMode=1)
-      newFileName := RegExReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
+   {
+      ; a malformed user regex must never throw: leave the name unchanged instead
+      try
+         newFileName := RegExReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
+      catch e
+         newFileName := fileNamuNoEXT
+   }
    Else If (obju.rechecherRemplaceMode=1)
       newFileName := StrReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
    Else If (obju.charsRemplaceMode=1)
@@ -39764,9 +39803,18 @@ uiPopulateLVmultiRename() {
 
   OriginalNewFileName := UsrEditNewFileName
   objuTemp := decideMultiRename(OriginalNewFileName)
+  If (objuTemp.regExRemplaceMode=1 && !isValidRegEx(objuTemp.strArrA))
+  {
+     ; a malformed «\>...//...» regex would throw inside the preview: show it instead
+     LV_Delete()
+     LV_Add("", "Invalid regular expression pattern", "-", "-", "-")
+     GuiControl, +Redraw, LViewOthers
+     Return
+  }
+
   If (objuTemp.newName)
      OriginalNewFileName := objuTemp.newName
-  
+
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
   {
      LV_Delete()
@@ -39864,6 +39912,14 @@ coreBatchMultiRenameFiles() {
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
   {
      showTOOLtip("WARNING: Incorrect multi-rename pattern provided")
+     SoundBeep 300, 100
+     SetTimer, RemoveTooltip, % -msgDisplayTime
+     Return
+  }
+
+  If (objuTemp.regExRemplaceMode=1 && !isValidRegEx(objuTemp.strArrA))
+  {
+     showTOOLtip("WARNING: The regular expression in the rename pattern is invalid.`nPlease correct the pattern before renaming.")
      SoundBeep 300, 100
      SetTimer, RemoveTooltip, % -msgDisplayTime
      Return
