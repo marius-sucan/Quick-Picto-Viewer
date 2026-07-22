@@ -2936,7 +2936,7 @@ identifyMenus(){
       If (!AnyWindowOpen && drawingShapeNow!=1)
       {
          SendInput, {F10}
-         MainExe.ahkPostFunction("HelpWindow")
+         MainExe.ahkPostFunction("PanelHelpWindow")
       }
    Return
 
@@ -3045,9 +3045,7 @@ constantMenuReader(modus:=0, externMode:=0) {
       WinID := WinExist("ahk_class #32768 ahk_pid " QPVpid)
       AccFromFocused(WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
    } Else
-   {
       AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
-   }
 
    ; goodText := accFocusValue ? accFocusValue : accFocusName
    ; goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0

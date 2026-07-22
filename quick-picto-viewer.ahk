@@ -14155,7 +14155,7 @@ QPV_PrepareHugeImgSelectionArea(x1, y1, x2, y2, w, h, mode, rotation, doFlip, in
    If (editingSelectionNow!=1)
    {
       lastState :=""
-      r := DllCall("qpvmain.dll\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h,  "float", 1, "float", 1, "float", 0, "int", 0, "int", 0, "float", 0, "int", 0)
+      r := DllCall("qpvmain.dll\prepareSelectionArea", "int", x1, "int", y1, "int", x2, "int", y2, "int", w, "int", h, "float", 1, "float", 1, "float", 0, "int", 0, "int", 0, "float", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0)
       Return
    }
 
@@ -21940,7 +21940,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       {
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall("qpvmain.dll\AdjustImageColors", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+         r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "flood")
       {
          inverter := (FloodFillSelectionMode=3) ? 1 : 0
@@ -42216,6 +42216,7 @@ PanelSetThumbColumnOptions() {
     }
 
     INIaction(0, "fadeOtherDupeGroups", "General", 1)
+    INIaction(0, "markSearchMatches", "General", 1)
     ReadSettingsVPgrid()
     slideWid2 := txtWid//2 + 10
     Global UIthumbsAratio, UIvpImgAlignCenter, UIimgFxMode
@@ -45340,8 +45341,8 @@ PanelSearchIndex(dummy:="") {
     Else If AnyWindowOpen
        Return
 
+    INIaction(0, "markSearchMatches", "General", 1)
     SearchedStringz := Trimmer(SearchedStringz)
-    ; ToolTip, % SearchedStringz , , , 2
     thisBtnHeight := createSettingsGUI(29, A_ThisFunc)
     btnWid := 80
     txtWid := 260
@@ -50205,7 +50206,7 @@ PanelFloodFillTool() {
     GuiAddPickerColor("xs y+5 h" ha " w25", "FloodFillColor")
     GuiAddColor("x+1 hp w" clrWid, "FloodFillColor", "Flood fill color")
     GuiAddSlider("FloodFillOpacity", 3,255, 255, "Opacity", "updateUIfloodFillPanel", 1, "x+5 w" fullWid - clrWid - 35 " hp")
-    blends := StrReplace(userBlendModesList, "|Clip to alpha*|Replace*|Behind*")
+    blends := StrReplace(userBlendModesList, "Clip to alpha*|Replace*|Behind*")
     GuiAddDropDownList("xs y+8 w" colWid - 27 " gupdateUIfloodFillPanel AltSubmit Choose" FloodFillBlendMode " vFloodFillBlendMode", "No blend mode|" blends, "Blending mode")
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIfloodFillPanel")
     Gui, Add, Checkbox, x+10 yp hp gupdateUIfloodFillPanel Checked%BlendModesPreserveAlpha% vBlendModesPreserveAlpha, Alpha channel intact
@@ -50701,9 +50702,9 @@ livePreviewFillBehindArea(modus:=0) {
       If (FillBehindInvert!=1)
       {
          tx := clampInRange(imgSelPx, 0, mainWidth)
-         ty := clampInRange(imgSelPy, 0, mainWidth)
+         ty := clampInRange(imgSelPy, 0, mainHeight)
          twx := clampInRange(imgSelPx + imgSelW, 0, mainWidth) - tx
-         twy := clampInRange(imgSelPy + imgSelH, 0, mainWidth) - ty
+         twy := clampInRange(imgSelPy + imgSelH, 0, mainHeight) - ty
          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, tx, ty, twx, twy)
       } Else
          Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, tx, ty, twx, twy)
@@ -51323,6 +51324,7 @@ PanelDetectEdgesImage() {
     thisW := (PrefsLargeFonts=1) ? 88 : 68
     thisPW := (PrefsLargeFonts=1) ? thisW + 9 : thisW + 16
     Gui, +DPIScale
+    blends := StrReplace(userBlendModesList, "Clip to alpha*|Replace*|Behind*")
     Gui, Add, Text, x+20 ys +0x200 Section w%thisW% hwndhTemp, Algorithm
     GuiAddDropDownList("x+3 w" thisW*2 " gupdateUIddlEdgesModusPanel AltSubmit Choose" IDedgesModus " vIDedgesModus", "Sobel|Sobel (alt)|Scharr|Canny|Diff-blending", [hTemp, 0, "Edge detection mode"])
     GuiAddButton("x+1 hp w26 gBtnHelpEdgeDetection", " ?", "Help")
@@ -51340,7 +51342,7 @@ PanelDetectEdgesImage() {
     GuiAddSlider("IDedgesOpacity", 3, 255, 255, "Opacity", "updateUIedgesPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("IDedgesAfterBlur", 0, 10, 0, "Out blur: $€", "updateUIedgesPanel", 1, "x+5 wp hp")
     Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetEdgesBlendMode +TabStop, Blending mode
-    GuiAddDropDownList("x+5 wp-27 gupdateUIedgesPanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" userBlendModesList)
+    GuiAddDropDownList("x+5 wp-27 gupdateUIedgesPanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" blends)
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIedgesPanel")
     Gui, Add, Checkbox, xs y+10 hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert output image
     Gui, Add, Checkbox, xs y+10 gupdateUIedgesPanel Checked%BlurAreaInverted% vBlurAreaInverted, Invert &selection area
@@ -51470,8 +51472,9 @@ PanelAddNoiserImage() {
     Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIaddNoisePanel Checked%IDedgesInvert% vIDedgesInvert, &Invert noise
     Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseGrays% vUserAddNoiseGrays, &Grayscale
 
+    blends := StrReplace(userBlendModesList, "Replace*|Behind*")
     Gui, Add, Text, xs y+7 hp w%2ndcol% +0x200 gBtnResetEdgesBlendMode +TabStop +hwndhTemp, Blending mode:
-    GuiAddDropDownList("x+7 wp-27 gupdateUIaddNoisePanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" userBlendModesList, [hTemp])
+    GuiAddDropDownList("x+7 wp-27 gupdateUIaddNoisePanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" blends, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIaddNoisePanel")
     GuiAddSlider("IDedgesOpacity", 3,255, 255, "Opacity", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid - 27 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIaddNoisePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
