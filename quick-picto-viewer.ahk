@@ -32413,7 +32413,7 @@ updateUIFiltersPanel(dummy:=0) {
    ; box here and blocked on Apply, so it never reaches RegExMatch to throw [isValidRegEx()]
    regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx("i)" UsrEditFilter)) ? 1 : 0
    If (dummy!="external")
-      GuiControl, SettingsGUIA:, InternalFilterString, % (regexBad=1) ? "Invalid regular expression - correct the pattern before applying" : newFilter
+      GuiControl, SettingsGUIA:, InternalFilterString, % (regexBad=1) ? "Invalid regular expression provided." : newFilter
 
    Return newFilter
 }
@@ -38584,12 +38584,10 @@ coreSearchIndex(imgPath, givenRegEx, whatu, invertu:=0) {
    }
 
    ; ToolTip, % stringu "`n" thisSearchString "`n" z , , , 2
-   ; a malformed user regex must never throw here: uncaught, it would abort the whole
-   ; filtering/search pass with a raw error dialog [QPV has no global error handler]
    try
       matchu := RegExMatch(stringu, givenRegEx)
    catch e
-      Return invertu ? 1 : 0   ; an uncompilable pattern simply matches nothing
+      Return 0
 
    Return invertu ? (matchu ? 0 : 1) : matchu
 }
@@ -39617,6 +39615,7 @@ decideMultiRename(ByRef OriginalNewFileName) {
          obju.regExRemplaceMode := 1
          obju.strArrA := SubStr(strArr[1], 3)
          obju.strArrB := strArr[2]
+         obju.regExValid := isValidRegEx(obju.strArrA)
       } Else
       {
          obju.strArrA := strArr[1]
@@ -39682,13 +39681,7 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
       Return fileNamuNoEXT
    
    If (obju.regExRemplaceMode=1)
-   {
-      ; a malformed user regex must never throw: leave the name unchanged instead
-      try
-         newFileName := RegExReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
-      catch e
-         newFileName := fileNamuNoEXT
-   }
+      newFileName := RegExReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
    Else If (obju.rechecherRemplaceMode=1)
       newFileName := StrReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
    Else If (obju.charsRemplaceMode=1)
@@ -39803,11 +39796,12 @@ uiPopulateLVmultiRename() {
 
   OriginalNewFileName := UsrEditNewFileName
   objuTemp := decideMultiRename(OriginalNewFileName)
-  If (objuTemp.regExRemplaceMode=1 && !isValidRegEx(objuTemp.strArrA))
+  ; ToolTip, % objuTemp.regExRemplaceMode "||" objuTemp.regExValid , , , 2
+  If (objuTemp.regExRemplaceMode=1 && objuTemp.regExValid!=1)
   {
      ; a malformed «\>...//...» regex would throw inside the preview: show it instead
      LV_Delete()
-     LV_Add("", "Invalid regular expression pattern", "-", "-", "-")
+     LV_Add("", "Invalid", "RegEx", "-", "-")
      GuiControl, +Redraw, LViewOthers
      Return
   }
@@ -103070,3 +103064,5 @@ testKeysStuff() {
 
    ToolTip, % ppA "`n" ppB , , , 2
 }
+
+
