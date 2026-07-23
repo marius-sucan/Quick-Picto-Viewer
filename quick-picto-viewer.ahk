@@ -1040,7 +1040,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="+COLON")
     {
         func2Call := ["invokeOmniBoxCurrentFile"]
-    } Else If InStr(givenKey, "^Numpad")
+    } Else If (InStr(givenKey, "^Numpad") && editingSelectionNow=1 && thumbsDisplaying!=1)
     {
         func2Call := ["alignImgSelection", givenKey]
     } Else If (givenKey="^NumpadAdd" || givenKey="^equal")
@@ -41223,7 +41223,7 @@ toggleNoEditingWarnings() {
 
 buildQuickSearchMenus() {
    deleteMenus()
-   mustPreventMenus := 1
+   mustPreventMenus := 1   ; this prevents popping the actual menus when generated; it is also used to generate hidden menu entries that the user can access through searches; such as addMenuBonusesSelectionArea()
    BuildMainMenu("forced")
    If (maxFilesIndex>0)
       kMenu("PVmenu", "Add", "Show file header", "PanelDisplayFileHeaderRaw")
@@ -63430,12 +63430,12 @@ MenuSelAreaMoveDown() {
    arrowKeysAdjustSelectionArea(2, 2)
 }
 
-MenuSelAreaMoveLeft() {
+MenuSelAreaMoveRight() {
    arrowKeysAdjustSelectionArea(-1, 1)
    arrowKeysAdjustSelectionArea(-1, 2)
 }
 
-MenuSelAreaMoveRight() {
+MenuSelAreaMoveLeft() {
    arrowKeysAdjustSelectionArea(1, 1)
    arrowKeysAdjustSelectionArea(1, 2)
 }
@@ -63451,12 +63451,12 @@ focusToolbarNavKeys() {
 }
 
 addMenuBonusesSelectionArea() {
-   If (mustPreventMenus=1 && editingSelectionNow=1)
+   If (mustPreventMenus=1 && editingSelectionNow=1 && AnyWindowOpen>0 && imgEditPanelOpened=1)
    {
       kMenu("PVselv", "Add", "Move selection: up`tHome", "MenuSelAreaMoveUp",,,1)
       kMenu("PVselv", "Add", "Move selection: down`tEnd", "MenuSelAreaMoveDown",,,1)
-      kMenu("PVselv", "Add", "Move selection: right`tPage up", "MenuSelAreaMoveLeft",,,1)
-      kMenu("PVselv", "Add", "Move selection: left`tPage down", "MenuSelAreaMoveRight",,,1)
+      kMenu("PVselv", "Add", "Move selection: left`tPage up", "MenuSelAreaMoveLeft",,,1)
+      kMenu("PVselv", "Add", "Move selection: right`tPage down", "MenuSelAreaMoveRight",,,1)
       kMenu("PVselv", "Add", "Enlarge selection area`tShift+=", "MenuIncSelAreaSize", "increase size",,1)
       kMenu("PVselv", "Add", "Shrink selection area`tShift+-", "MenuDecSelAreaSize", "decrease size",,1)
       kMenu("PVselv", "Add", "Increase exclusion (selection area)`tCtrl+.", "MenuIncSelAreaCavity", "hallow",,1)
@@ -67198,7 +67198,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    }
 
    If (markedSelectFile && thumbsDisplaying!=1)
-      kMenu("PVmenu", "Add", "Dro&p files selection`tShift+Tab", "dropFilesSelection")
+      kMenu("PVmenu", "Add", "Dro&p files selection`tCtrl+D", "dropFilesSelection")
 
    If (thumbsDisplaying=1)
    {
