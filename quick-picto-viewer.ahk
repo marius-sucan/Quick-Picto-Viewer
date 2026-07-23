@@ -348,7 +348,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , FillAreaEllipseSection := 1440, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6, DrawLineAreaGridY := 6
    , DrawLineAreaSpiralLength := 350, DrawLineAreaRaysLimit := 0, DrawLineAreaSpiralCenterMode := 1
    , DrawLineAreaCenterCut := 0, blurAreaCircular := 0, ImageSharpenAmount := 25, ImageSharpenRadius := 10
-   , ImageSharpenMode := 1, ImageSharpenXuAmount := 2, ImageSharpenYuAmount := 2, ImageSharpenCenterAmount := 4
+   , ImageSharpenMode := 1, ImageSharpenXuAmount := 6, ImageSharpenYuAmount := 5, ImageSharpenCenterAmount := 2
    , ImageSharpenAfterBlur := 1, ImageSharpenEmphasis := 0, ImageSharpenContrast := 0, ImageSharpenInvert := 0
    , userAutoColorAdjustMode := 1, userAutoColorAdjustAll := 0, userAutoColorIntensity := 255
    , UserSymmetricaCenteringMode := 0, UserSymmetricaSrcFlipX := 0, UserSymmetricaSrcFlipY := 0
@@ -44194,6 +44194,8 @@ getEdgesFilterParams(fromSharpen:=0) {
 
    ; the sharpen panel offers these as drop down lists, it stores the 1 based
    ; indexes; they are converted here into the values expected by the filter
+   ; in diff-blending mode: X/Y are the offsets of the duplicated image,
+   ; the center amount is the pre-blur applied before the difference
    blurLvls := [0, 4, 6, 8, 10]
    prm.xuAmount := Round(ImageSharpenXuAmount) - 4
    prm.yuAmount := Round(ImageSharpenYuAmount) - 4
@@ -44203,9 +44205,10 @@ getEdgesFilterParams(fromSharpen:=0) {
    prm.emphasis := ImageSharpenEmphasis
    prm.contrast := ImageSharpenContrast
 
-   ; the sharpen panel only masks the sharpening effect with the detected edges,
-   ; it never blends the resulted image, therefore these are constants
-   prm.modus := 1
+   ; the sharpen panel always detects the edges with diff-blending and it only
+   ; masks the sharpening effect with them, it never blends the resulted image;
+   ; the emboss level is unused by diff-blending
+   prm.modus := 5
    prm.embossLvl := 1
    prm.preEmphasis := 0
    prm.preContrast := 0
@@ -58307,10 +58310,10 @@ PanelSharpenImage() {
     Gui, Add, Text, x+10 y+10 Section, Direction of edge detection:
     Gui, Add, Text, xs y+5 w%thisW%, X
     Gui, Add, Text, x+3 wp, Y
-    Gui, Add, Text, x+3 wp, C
+    Gui, Add, Text, x+3 wp, B
     GuiAddDropDownList("xs y+7 w" thisW " gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenXuAmount " vImageSharpenXuAmount", "-3|-2|-1|0|1|2|3", "X offset")
     GuiAddDropDownList("x+3 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenYuAmount " vImageSharpenYuAmount", "-3|-2|-1|0|1|2|3", "Y offset")
-    GuiAddDropDownList("x+3 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenCenterAmount " vImageSharpenCenterAmount", "0|1|2|3|4|5", "C offset")
+    GuiAddDropDownList("x+3 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenCenterAmount " vImageSharpenCenterAmount", "0|1|2|3|4|5", "Pre-blur level")
     GuiAddSlider("ImageSharpenEmphasis", -255,255, 0, "Brightness", "updateUIsharpenPanel", 2, "xs y+10 w" txtWid " hp")
     GuiAddSlider("ImageSharpenContrast", -100,100, 0, "Contrast", "updateUIsharpenPanel", 2, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIsharpenPanel Checked%ImageSharpenInvert% vImageSharpenInvert, &Invert image
