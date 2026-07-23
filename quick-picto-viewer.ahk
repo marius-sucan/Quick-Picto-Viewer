@@ -289,6 +289,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , slidesFXrandomize := 0, IDedgesCenterAmount := 1, IDedgesXuAmount := 2, IDedgesYuAmount := 1, IDedgesInvert := 0
    , IDedgesEmphasis := 0, IDedgesContrast := 0, IDedgesBlendMode := 0, IDedgesOpacity := 255, IDedgesAfterBlur := 1
    , IDedgesEmbossLvl := 1, UserAddNoiseIntensity := 35, UserAddNoiseGrays := 0, reverseOrderOnSort := 0
+   , UserAddNoiseEmphasis := 0, UserAddNoiseContrast := 0, UserAddNoiseBlendMode := 1, UserAddNoiseOpacity := 255
+   , UserAddNoiseInvert := 0
    , userSearchWhat := 1, OnSortdoFilesCheck := 0, QuickFileActFolder1 := "", QuickFileActFolder2 := ""
    , QuickFileActFolder3 := "", QuickFileActFolder4 := "", QuickFileActFolder5 := "", QuickFileActAfter1 := 1
    , QuickFileActAfter2 := 1, QuickFileActAfter3 := 1, QuickFileActAfter4 := 1, QuickFileActAfter5 := 1
@@ -346,7 +348,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , FillAreaEllipseSection := 1440, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6, DrawLineAreaGridY := 6
    , DrawLineAreaSpiralLength := 350, DrawLineAreaRaysLimit := 0, DrawLineAreaSpiralCenterMode := 1
    , DrawLineAreaCenterCut := 0, blurAreaCircular := 0, ImageSharpenAmount := 25, ImageSharpenRadius := 10
-   , ImageSharpenMode := 1, userAutoColorAdjustMode := 1, userAutoColorAdjustAll := 0, userAutoColorIntensity := 255
+   , ImageSharpenMode := 1, ImageSharpenXuAmount := 2, ImageSharpenYuAmount := 2, ImageSharpenCenterAmount := 4
+   , ImageSharpenAfterBlur := 1, ImageSharpenEmphasis := 0, ImageSharpenContrast := 0, ImageSharpenInvert := 0
+   , userAutoColorAdjustMode := 1, userAutoColorAdjustAll := 0, userAutoColorIntensity := 255
    , UserSymmetricaCenteringMode := 0, UserSymmetricaSrcFlipX := 0, UserSymmetricaSrcFlipY := 0
    , UserSymmetricaSrcAlign := 1, UserSymmetricaSrcRotated := 0, UserSymmetricaScaleX := 200
    , UserSymmetricaScaleY := 200, UserSymmetricaSelAligned := 1, UserSymmetricaSelOffX := 0
@@ -19750,7 +19754,7 @@ SharpenSelectedArea() {
     If (ImageSharpenMode=3)
     {
        sharpBMP := trGdip_CloneBitmap(A_ThisFunc, orii)
-       edgesBitmap := coreDetectEdgesSelectedArea(orii, 3)
+       edgesBitmap := coreDetectEdgesSelectedArea(orii, 3, 0, 1)
        QPV_SharpenBitmap(sharpBMP, ImageSharpenAmount, ImageSharpenRadius, ImageSharpenMode)
        rr := QPV_SetBitmapAsAlphaChannel(sharpBMP, edgesBitmap)
        ; ToolTip, % "rr=" rr , , , 2
@@ -21993,8 +21997,8 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
          ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         ; fnOutputDebug(A_ThisFunc ": " UserAddNoiseGrays " | " IDedgesBlendMode - 1)
-         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
+         ; fnOutputDebug(A_ThisFunc ": " UserAddNoiseGrays " | " UserAddNoiseBlendMode - 1)
+         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", UserAddNoiseBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
          If (UserAddNoisePixelizeAmount>0)
             FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
@@ -23977,7 +23981,8 @@ detectEdgesSelectedArea() {
     addJournalEntry(A_ThisFunc "() elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
 }
 
-coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
+coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0, fromSharpen:=0) {
+    prm := getEdgesFilterParams(fromSharpen)
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcImgSelection2bmp(1, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
     If (previewMode=3 || previewMode=1)
@@ -24002,30 +24007,30 @@ coreDetectEdgesSelectedArea(whichBitmap, previewMode, Gu:=0) {
        }
     }
 
-    prebrighten := (IDedgesPreEmphasis<0) ? IDedgesPreEmphasis - IDedgesPreContrast * abs(IDedgesPreEmphasis)/255 : IDedgesPreEmphasis
-    precontrast := (IDedgesPreContrast<0) ? 1 - abs(IDedgesPreContrast)/100 : (IDedgesPreContrast + 25) / 25
-    postbrighten := (IDedgesEmphasis<0) ? IDedgesEmphasis - IDedgesContrast * abs(IDedgesEmphasis)/255 : IDedgesEmphasis
-    postcontrast := (IDedgesContrast<0) ? 1 - abs(IDedgesContrast)/100 : (IDedgesContrast + 25) / 25
+    prebrighten := (prm.preEmphasis<0) ? prm.preEmphasis - prm.preContrast * abs(prm.preEmphasis)/255 : prm.preEmphasis
+    precontrast := (prm.preContrast<0) ? 1 - abs(prm.preContrast)/100 : (prm.preContrast + 25) / 25
+    postbrighten := (prm.emphasis<0) ? prm.emphasis - prm.contrast * abs(prm.emphasis)/255 : prm.emphasis
+    postcontrast := (prm.contrast<0) ? 1 - abs(prm.contrast)/100 : (prm.contrast + 25) / 25
     extendedClone := testSelectionLargerThanGiven(imgW, imgH)
     fBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
-    If (IDedgesBlendMode>0 && previewMode!=3)
+    If (prm.blendMode>0 && previewMode!=3)
        gBitmap := trGdip_CloneBitmap(A_ThisFunc, fBitmap)
 
     Gdip_BitmapSetColorDepth(fBitmap, 24)
-    obj := generateAcceptedValuesEdgesDetection()
-    If (IDedgesModus<5)
-       QPV_DetectEdgesFilters(fBitmap, IDedgesModus, obj[1], obj[2], obj[3], IDedgesEmbossLvl, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
+    obj := generateAcceptedValuesEdgesDetection(prm)
+    If (prm.modus<5)
+       QPV_DetectEdgesFilters(fBitmap, prm.modus, obj[1], obj[2], obj[3], prm.embossLvl, prm.afterBlur, prm.invert, prebrighten, precontrast, postbrighten, postcontrast)
     Else
-       QPV_DiffBlendBitmap(fBitmap, IDedgesXuAmount, IDedgesYuAmount, IDedgesCenterAmount, IDedgesAfterBlur, IDedgesInvert, prebrighten, precontrast, postbrighten, postcontrast)
+       QPV_DiffBlendBitmap(fBitmap, prm.xuAmount, prm.yuAmount, prm.centerAmount, prm.afterBlur, prm.invert, prebrighten, precontrast, postbrighten, postcontrast)
 
-    thisBlendMode := (IDedgesBlendMode>24) ? 24 : IDedgesBlendMode
-    preserveAlpha := (IDedgesBlendMode>1) ? 1 : 0
-    If (IDedgesBlendMode>0 && validBMP(gBitmap))
-       QPV_BlendBitmaps(gBitmap, fBitmap, thisBlendMode - 1, preserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - IDedgesOpacity)
+    thisBlendMode := (prm.blendMode>24) ? 24 : prm.blendMode
+    preserveAlpha := (prm.blendMode>1) ? 1 : 0
+    If (prm.blendMode>0 && validBMP(gBitmap))
+       QPV_BlendBitmaps(gBitmap, fBitmap, thisBlendMode - 1, preserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - prm.opacity)
 
     If (previewMode!=3)
     {
-       thisBMP := (IDedgesBlendMode>0 && validBMP(gBitmap)) ? gBitmap : fBitmap
+       thisBMP := (prm.blendMode>0 && validBMP(gBitmap)) ? gBitmap : fBitmap
        If (previewMode=0)
        {
           modus := (BlurAreaInverted=1) ? 4 : 0
@@ -24160,16 +24165,16 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     If (max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
        QPV_BlurBitmapFilters(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
 
-    If ((IDedgesEmphasis!=0 || IDedgesContrast!=0) && UserAddNoiseMode>1)
+    If ((UserAddNoiseEmphasis!=0 || UserAddNoiseContrast!=0) && UserAddNoiseMode>1)
     {
        ; adjust brightness and contrast
-       wEffect := Gdip_CreateEffect(5, IDedgesEmphasis, IDedgesContrast, 0)
+       wEffect := Gdip_CreateEffect(5, UserAddNoiseEmphasis, UserAddNoiseContrast, 0)
        If wEffect
           Gdip_BitmapApplyEffect(noiseBMP, wEffect)
        Gdip_DisposeEffect(wEffect)
     }
 
-    If (IDedgesInvert=1 && UserAddNoiseMode>1)
+    If (UserAddNoiseInvert=1 && UserAddNoiseMode>1)
        Gdip_BitmapApplyInvert(noiseBMP)
 
     If (previewMode!=1 && EllipseSelectMode>0)
@@ -24191,9 +24196,9 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     thisBMP := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, extendedClone)
     Gdip_GraphicsClear(G2)
     If (UserAddNoiseMode=1)
-       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, 23, 1, 0, userimgGammaCorrect, 1, 255 - IDedgesOpacity)
+       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, 23, 1, 0, userimgGammaCorrect, 1, 255 - UserAddNoiseOpacity)
     Else
-       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, IDedgesBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 255 - IDedgesOpacity)
+       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, UserAddNoiseBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 255 - UserAddNoiseOpacity)
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
@@ -24216,6 +24221,11 @@ livePreviewsPanelNoEffects() {
 
 livePreviewIDedgesPanel() {
     er := livePreviewAddNoiser("edges")
+    Return er
+}
+
+livePreviewSharpenPanel() {
+    er := livePreviewAddNoiser((CurrentPanelTab=2) ? "sharpen-edges" : "sharpen")
     Return er
 }
 
@@ -24258,13 +24268,13 @@ livePreviewAddNoiser(modus:=0) {
 
     Gdip_DeleteGraphics(G)
     cornersBMP := applyVPeffectsOnBMP(cornersBMP)
-    If (modus="sharpen" || CurrentPanelTab=1 && AnyWindowOpen=79 && modus!="none")
+    If (modus="sharpen")
     {
        If (ImageSharpenMode=3)
        {
           gk := trGdip_CloneBitmap(A_ThisFunc, cornersBMP)
           gb := trGdip_CloneBitmap(A_ThisFunc, cornersBMP)
-          r0 := coreDetectEdgesSelectedArea(gk, 3)
+          r0 := coreDetectEdgesSelectedArea(gk, 3, 0, 1)
           QPV_SharpenBitmap(gb, ImageSharpenAmount, ImageSharpenRadius, ImageSharpenMode)
           rr := QPV_SetBitmapAsAlphaChannel(gb, r0)
           ; ToolTip, % "rr=" rr , , , 2
@@ -24276,6 +24286,10 @@ livePreviewAddNoiser(modus:=0) {
           trGdip_DisposeImage(gb)
        } Else
           QPV_SharpenBitmap(cornersBMP, ImageSharpenAmount, ImageSharpenRadius, ImageSharpenMode)
+    } Else If (modus="sharpen-edges")
+    {
+       ; the edges filter of the sharpen panel, previewed on its own
+       r0 := coreDetectEdgesSelectedArea(cornersBMP, 1, 0, 1)
     } Else If (modus="edges")
     {
        thisCount := (isNumber(IDedgesEmbossLvl) && IDedgesBlendMode>1) ? clampInRange(IDedgesEmbossLvl, 1, 10) : 1
@@ -24307,7 +24321,7 @@ livePreviewAddNoiser(modus:=0) {
 
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
           E1 := trGdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", IDedgesOpacity, "int", IDedgesEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", IDedgesBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
+          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", UserAddNoiseBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
           Gdip_UnlockBits(cornersBMP, iData)
           If (UserAddNoisePixelizeAmount>0)
              FreeImage_UnLoad(hFIFimgZ)
@@ -44156,14 +44170,59 @@ updateLabelDrawLineThickness() {
        Return "Line width: " DrawLineAreaContourThickness " pixels"
 }
 
-generateAcceptedValuesEdgesDetection() {
-   ks := Round(IDedgesCenterAmount)
-   xa := IDedgesXuAmount
-   ya := IDedgesYuAmount
-   if (IDedgesModus<=2)
+getEdgesFilterParams(fromSharpen:=0) {
+; gathers the parameters of the edges detection filter from the panel that requested it
+; PanelDetectEdgesImage() owns the IDedges* variables, PanelSharpenImage() the ImageSharpen* ones
+   prm := []
+   If (fromSharpen!=1)
    {
-      xa := Round(IDedgesXuAmount) + 3
-      ya := Round(IDedgesYuAmount) + 3
+      prm.modus := IDedgesModus
+      prm.xuAmount := IDedgesXuAmount
+      prm.yuAmount := IDedgesYuAmount
+      prm.centerAmount := IDedgesCenterAmount
+      prm.embossLvl := IDedgesEmbossLvl
+      prm.afterBlur := IDedgesAfterBlur
+      prm.invert := IDedgesInvert
+      prm.preEmphasis := IDedgesPreEmphasis
+      prm.preContrast := IDedgesPreContrast
+      prm.emphasis := IDedgesEmphasis
+      prm.contrast := IDedgesContrast
+      prm.opacity := IDedgesOpacity
+      prm.blendMode := IDedgesBlendMode
+      Return prm
+   }
+
+   ; the sharpen panel offers these as drop down lists, it stores the 1 based
+   ; indexes; they are converted here into the values expected by the filter
+   blurLvls := [0, 4, 6, 8, 10]
+   prm.xuAmount := Round(ImageSharpenXuAmount) - 4
+   prm.yuAmount := Round(ImageSharpenYuAmount) - 4
+   prm.centerAmount := Round(ImageSharpenCenterAmount) - 1
+   prm.afterBlur := blurLvls[clampInRange(Round(ImageSharpenAfterBlur), 1, 5)]
+   prm.invert := ImageSharpenInvert
+   prm.emphasis := ImageSharpenEmphasis
+   prm.contrast := ImageSharpenContrast
+
+   ; the sharpen panel only masks the sharpening effect with the detected edges,
+   ; it never blends the resulted image, therefore these are constants
+   prm.modus := 1
+   prm.embossLvl := 1
+   prm.preEmphasis := 0
+   prm.preContrast := 0
+   prm.opacity := 255
+   prm.blendMode := 1
+   Return prm
+}
+
+generateAcceptedValuesEdgesDetection(prm:=0) {
+   prm := IsObject(prm) ? prm : getEdgesFilterParams()
+   ks := Round(prm.centerAmount)
+   xa := prm.xuAmount
+   ya := prm.yuAmount
+   if (prm.modus<=2)
+   {
+      xa := Round(prm.xuAmount) + 3
+      ya := Round(prm.yuAmount) + 3
       if (mod(ks, 2)!=1)
          ks++
       if (ks>7)
@@ -44182,13 +44241,13 @@ generateAcceptedValuesEdgesDetection() {
          if (ya >= ks)
             ya := ks - 1
       }
-   } else if (IDedgesModus=3)
+   } else if (prm.modus=3)
    {
       ; Scharr dx and dy parameters
       xa := (xa>0) ? 1 : 0
       ya := (ya>0) ? 1 : 0
       ks := 3
-   } else if (IDedgesModus=4)
+   } else if (prm.modus=4)
    {
       ; Canny hysteresis thresholds
       prx := (xa + 3)/6
@@ -44201,11 +44260,11 @@ generateAcceptedValuesEdgesDetection() {
          ks++
 
       ks := clampInRange(ks, 3, 7)
-   } else if (IDedgesModus=5)
+   } else if (prm.modus=5)
    {
-      xa := Round(IDedgesXuAmount)
-      ya := Round(IDedgesYuAmount)
-      ks := Round(IDedgesCenterAmount)
+      xa := Round(prm.xuAmount)
+      ya := Round(prm.yuAmount)
+      ks := Round(prm.centerAmount)
    }
 
    Return [xa, ya, ks]
@@ -48355,12 +48414,17 @@ BtnResetTextBlendMode() {
 }
 
 BtnResetEdgesBlendMode() {
-   IDedgesBlendMode := 1
-   GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, % IDedgesBlendMode
    If (AnyWindowOpen=44)
+   {
+      UserAddNoiseBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, UserAddNoiseBlendMode, % UserAddNoiseBlendMode
       updateUIaddNoisePanel()
-   Else
+   } Else
+   {
+      IDedgesBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, % IDedgesBlendMode
       updateUIedgesPanel()
+   }
 }
 
 BtnResetGlassFX() {
@@ -51254,6 +51318,8 @@ ReadSettingsSymmetricaPanel(act:=0) {
 }
 
 ReadSettingsEdgesPanel(act:=0) {
+; the min/max values given here must match the ranges of the
+; UI controls found in PanelDetectEdgesImage()
     RegAction(act, "IDedgesModus",, 2, 1, 5)
     RegAction(act, "IDedgesOpacity",, 2, 3, 255)
     RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
@@ -51261,20 +51327,20 @@ ReadSettingsEdgesPanel(act:=0) {
     RegAction(act, "IDedgesPreEmphasis",, 2, -255, 255)
     RegAction(act, "IDedgesPreContrast",, 2, -100, 100)
     RegAction(act, "IDedgesBlendMode",, 2, 1, 24)
-    RegAction(act, "IDedgesCenterAmount",, 2, 1, 6)
-    RegAction(act, "IDedgesXuAmount",, 2, 1, 7)
-    RegAction(act, "IDedgesYuAmount",, 2, 1, 7)
-    RegAction(act, "IDedgesAfterBlur",, 2, 1, 5)
-    RegAction(act, "IDedgesEmbossLvl",, 2, 1, 6)
+    RegAction(act, "IDedgesCenterAmount",, 2, 0, 7)
+    RegAction(act, "IDedgesXuAmount",, 2, -3, 3)
+    RegAction(act, "IDedgesYuAmount",, 2, -3, 3)
+    RegAction(act, "IDedgesAfterBlur",, 2, 0, 10)
+    RegAction(act, "IDedgesEmbossLvl",, 2, 0, 6)
     RegAction(act, "IDedgesInvert",, 1)
 }
 
 ReadSettingsAddNoisePanel(act:=0) {
-    RegAction(act, "IDedgesOpacity",, 2, 3, 255)
-    RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
-    RegAction(act, "IDedgesContrast",, 2, -100, 100)
-    RegAction(act, "IDedgesInvert",, 1)
-    RegAction(act, "IDedgesBlendMode",, 2, 1, 26)
+    RegAction(act, "UserAddNoiseOpacity",, 2, 3, 255)
+    RegAction(act, "UserAddNoiseEmphasis",, 2, -255, 255)
+    RegAction(act, "UserAddNoiseContrast",, 2, -100, 100)
+    RegAction(act, "UserAddNoiseInvert",, 1)
+    RegAction(act, "UserAddNoiseBlendMode",, 2, 1, 26)
     RegAction(act, "UserAddNoiseGrays",, 1)
     RegAction(act, "UserAddNoiseIntensity",, 2, 1, 100)
     RegAction(act, "UserAddNoiseTransparent",, 1)
@@ -51378,9 +51444,9 @@ BtnUIpresetsClouds() {
    uiSlidersArray["UserAddNoiseIntensity", 14] := 1
    uiSlidersArray["blurAreaYamount", 14] := 1
    uiSlidersArray["UserAddNoiseDetails", 14] := 1
-   uiSlidersArray["IDedgesContrast", 14] := 1
-   uiSlidersArray["IDedgesEmphasis", 14] := 1
-   uiSlidersArray["IDedgesOpacity", 14] := 1
+   uiSlidersArray["UserAddNoiseContrast", 14] := 1
+   uiSlidersArray["UserAddNoiseEmphasis", 14] := 1
+   uiSlidersArray["UserAddNoiseOpacity", 14] := 1
    uiSlidersArray["UserAddNoiseBlurAmount", 14] := 1
    uiSlidersArray["UserAddNoisePixelizeAmount", 14] := 1
    If (UserAddNoiseMode!=3)
@@ -51389,13 +51455,13 @@ BtnUIpresetsClouds() {
       GuiControl, SettingsGUIA:, UserAddNoiseGrays, 1
       GuiControl, SettingsGUIA:, UserAddNoiseTransparent, 0
       GuiControl, SettingsGUIA: Choose, UserAddNoiseMode, 3
-      GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, 1
+      GuiControl, SettingsGUIA: Choose, UserAddNoiseBlendMode, 1
       UserAddNoiseIntensity := 30
       UserAddNoiseDetails := 80
-      IDedgesInvert := 0
-      IDedgesEmphasis := 35
-      IDedgesContrast := 25
-      IDedgesOpacity := 255
+      UserAddNoiseInvert := 0
+      UserAddNoiseEmphasis := 35
+      UserAddNoiseContrast := 25
+      UserAddNoiseOpacity := 255
       UserAddNoisePixelizeAmount := 55
       UserAddNoiseBlurAmount := 40
    } Else
@@ -51404,12 +51470,12 @@ BtnUIpresetsClouds() {
       GuiControl, SettingsGUIA:, UserAddNoiseGrays, 0
       GuiControl, SettingsGUIA:, UserAddNoiseTransparent, 1
       GuiControl, SettingsGUIA: Choose, UserAddNoiseMode, 2
-      GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, 10
+      GuiControl, SettingsGUIA: Choose, UserAddNoiseBlendMode, 10
       UserAddNoiseIntensity := 15
-      IDedgesInvert := 0
-      IDedgesEmphasis := 0
-      IDedgesContrast := 0
-      IDedgesOpacity := 200
+      UserAddNoiseInvert := 0
+      UserAddNoiseEmphasis := 0
+      UserAddNoiseContrast := 0
+      UserAddNoiseOpacity := 200
       UserAddNoisePixelizeAmount := 0
       UserAddNoiseBlurAmount := 0
    }
@@ -51476,22 +51542,22 @@ PanelAddNoiserImage() {
        GuiAddButton("x+1 w" sml " hp gBtnUIpresetsClouds", "D", "Reset to default presets: noise or clouds")
     GuiAddSlider("UserAddNoiseIntensity", 1,100, 30, "Noise cut-off", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid//2 - 4 " hp")
     GuiAddSlider("UserAddNoiseDetails", 1,100, 20, "Plasmagon", "updateUIaddNoisePanel", 1, "x+5 wp hp")
-    GuiAddSlider("IDedgesEmphasis", -255,255, 0, "Brightness", "updateUIaddNoisePanel", 2, "xs y+8 w" txtWid - 2 " hp")
-    GuiAddSlider("IDedgesContrast", -100,100, 0, "Contrast", "updateUIaddNoisePanel", 2, "xs y+8 wp hp")
+    GuiAddSlider("UserAddNoiseEmphasis", -255,255, 0, "Brightness", "updateUIaddNoisePanel", 2, "xs y+8 w" txtWid - 2 " hp")
+    GuiAddSlider("UserAddNoiseContrast", -100,100, 0, "Contrast", "updateUIaddNoisePanel", 2, "xs y+8 wp hp")
     GuiAddSlider("UserAddNoisePixelizeAmount", 0,100, 0, "Pixelate: $£", "updateUIaddNoisePanel", 1, "xs y+10 wp hp")
     GuiAddSlider("UserAddNoiseBlurAmount", 0,255, 0, "Blur X: $€", "updateUIaddNoisePanel", 1, "xs y+8 w" txtWid//2 - 4 " hp")
     GuiAddSlider("blurAreaYamount", 0,255, 0, "Blur Y: $€", "updateUIaddNoisePanel", 1, "x+5 wp hp")
 
     Gui, Add, Checkbox, xs y+10 w%2ndcol% hp Checked%blurAreaEqualXY% vblurAreaEqualXY gupdateUIaddNoisePanel, &Equal X/Y blur
     Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseTransparent% vUserAddNoiseTransparent, &Allow transparency
-    Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIaddNoisePanel Checked%IDedgesInvert% vIDedgesInvert, &Invert noise
+    Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIaddNoisePanel Checked%UserAddNoiseInvert% vUserAddNoiseInvert, &Invert noise
     Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseGrays% vUserAddNoiseGrays, &Grayscale
 
     blends := StrReplace(userBlendModesList, "Replace*|Behind*")
     Gui, Add, Text, xs y+7 hp w%2ndcol% +0x200 gBtnResetEdgesBlendMode +TabStop +hwndhTemp, Blending mode:
-    GuiAddDropDownList("x+7 wp-27 gupdateUIaddNoisePanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" blends, [hTemp])
+    GuiAddDropDownList("x+7 wp-27 gupdateUIaddNoisePanel AltSubmit Choose" UserAddNoiseBlendMode " vUserAddNoiseBlendMode", "None|" blends, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIaddNoisePanel")
-    GuiAddSlider("IDedgesOpacity", 3,255, 255, "Opacity", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid - 27 " hp")
+    GuiAddSlider("UserAddNoiseOpacity", 3,255, 255, "Opacity", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid - 27 " hp")
     GuiAddCheckbox("x+1 hp w26 gupdateUIaddNoisePanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
 
     thisW := (PrefsLargeFonts=1) ? 85 : 65
@@ -51529,23 +51595,19 @@ BtnAddNoiseNow() {
 
 updateUIedgesPanel(dummy:=0, b:=0) {
     Static lastInvoked := 1
-    isOkay := (AnyWindowOpen=43 || AnyWindowOpen=79) ? 1 : 0
-    If (isOkay!=1)
+    If (AnyWindowOpen!=43)
        Return
 
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: Submit, NoHide
-    If (AnyWindowOpen=43)
-    {
-       actu := (IDedgesBlendMode>1 || IDedgesModus!=5) ? 1 : 0
-       uiSlidersArray["IDedgesXuAmount", 7] := (IDedgesModus=5) ? 2 : 1
-       uiSlidersArray["IDedgesYuAmount", 7] := (IDedgesModus=5) ? 2 : 1
-       uiSlidersArray["IDedgesCenterAmount", 10] := (IDedgesModus=3) ? 0 : 1
-       uiSlidersArray["IDedgesEmbossLvl", 5] := (IDedgesModus=5) ? "Emboss: $€" : "In Blur: $€"
-       uiSlidersArray["IDedgesEmbossLvl", 10] := actu
-       If (IDedgesBlendMode>24)
-          GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, 24
-    }
+    actu := (IDedgesBlendMode>1 || IDedgesModus!=5) ? 1 : 0
+    uiSlidersArray["IDedgesXuAmount", 7] := (IDedgesModus=5) ? 2 : 1
+    uiSlidersArray["IDedgesYuAmount", 7] := (IDedgesModus=5) ? 2 : 1
+    uiSlidersArray["IDedgesCenterAmount", 10] := (IDedgesModus=3) ? 0 : 1
+    uiSlidersArray["IDedgesEmbossLvl", 5] := (IDedgesModus=5) ? "Emboss: $€" : "In Blur: $€"
+    uiSlidersArray["IDedgesEmbossLvl", 10] := actu
+    If (IDedgesBlendMode>24)
+       GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, 24
 
     If (dummy!="no")
     {
@@ -51576,23 +51638,23 @@ updateUIaddNoisePanel(dummy:=0, b:=0) {
     uiSlidersArray["UserAddNoiseDetails", 10] := (UserAddNoiseMode=3) ? 1 : 0
 
     actu := (UserAddNoiseMode>1) ? 1 : 0
-    uiSlidersArray["IDedgesContrast", 10] := actu
-    uiSlidersArray["IDedgesEmphasis", 10] := actu
+    uiSlidersArray["UserAddNoiseContrast", 10] := actu
+    uiSlidersArray["UserAddNoiseEmphasis", 10] := actu
     uiSlidersArray["UserAddNoiseBlurAmount", 10] := actu
     uiSlidersArray["UserAddNoisePixelizeAmount", 10] := actu
     If (viewportQPVimage.imgHandle)
     {
-       uiSlidersArray["IDedgesEmphasis", 10] := 1
+       uiSlidersArray["UserAddNoiseEmphasis", 10] := 1
        uiSlidersArray["UserAddNoisePixelizeAmount", 10] := 1
        GuiControl, SettingsGUIA: Disable, UserAddNoiseMode
     }
 
     actu := (UserAddNoiseMode>1 || viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-    GuiControl, % actu, IDedgesBlendMode
+    GuiControl, % actu, UserAddNoiseBlendMode
     GuiControl, % actu, UserAddNoiseGrays
 
     actu := (UserAddNoiseMode>1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-    GuiControl, % actu, IDedgesInvert
+    GuiControl, % actu, UserAddNoiseInvert
     GuiControl, % actu, UserAddNoiseTransparent
     GuiControl, % actu, blurAreaEqualXY
     GuiRefreshSliders()
@@ -53335,8 +53397,10 @@ PanelsPanIMGpreviewClick(a:=0) {
       noPreview := 0
       If (AnyWindowOpen=26 || AnyWindowOpen=78)
          updateUIblurPanel()
-      Else If (AnyWindowOpen=43 || AnyWindowOpen=79)
+      Else If (AnyWindowOpen=43)
          updateUIedgesPanel()
+      Else If (AnyWindowOpen=79)
+         updateUIsharpenPanel()
       Else If (AnyWindowOpen=44)
          updateUIaddNoisePanel()
       Else If (AnyWindowOpen=69)
@@ -58157,6 +58221,25 @@ BTNdoAutoImgColors() {
       PolarRectSelectedArea(A_ThisFunc, 3, userAutoColorAdjustMode, userAutoColorAdjustAll)
 }
 
+WriteSettingsSharpenPanel() {
+    ReadSettingsSharpenPanel(1)
+}
+
+ReadSettingsSharpenPanel(act:=0) {
+; the min/max values given here must match the ranges of the
+; UI controls found in PanelSharpenImage()
+    RegAction(act, "ImageSharpenMode",, 2, 1, 3)
+    RegAction(act, "ImageSharpenAmount",, 2, 0, 100)
+    RegAction(act, "ImageSharpenRadius",, 2, 0, 255)
+    RegAction(act, "ImageSharpenEmphasis",, 2, -255, 255)
+    RegAction(act, "ImageSharpenContrast",, 2, -100, 100)
+    RegAction(act, "ImageSharpenXuAmount",, 2, 1, 7)
+    RegAction(act, "ImageSharpenYuAmount",, 2, 1, 7)
+    RegAction(act, "ImageSharpenCenterAmount",, 2, 1, 6)
+    RegAction(act, "ImageSharpenAfterBlur",, 2, 1, 5)
+    RegAction(act, "ImageSharpenInvert",, 1)
+}
+
 PanelSharpenImage() {
     If (thumbsDisplaying=1)
        Return
@@ -58167,7 +58250,7 @@ PanelSharpenImage() {
        ToggleEditImgSelection()
 
     thisBtnHeight := createSettingsGUI(79, A_ThisFunc)
-    ReadSettingsEdgesPanel()
+    ReadSettingsSharpenPanel()
     btnWid := 100
     txtWid := 205
     thisW := 100
@@ -58191,8 +58274,6 @@ PanelSharpenImage() {
     If (viewportQPVimage.imgHandle)
        ImageSharpenMode := 1
 
-    IDedgesOpacity := 255
-    IDedgesBlendMode := IDedgesEmbossLvl := 1
     Gui, -DPIScale
     Gui, Font
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
@@ -58207,6 +58288,7 @@ PanelSharpenImage() {
 
     thisW := (PrefsLargeFonts=1) ? 68 : 48
     Gui, +DPIScale
+    CurrentPanelTab := 1  ; this panel always opens on its first tab, the live preview relies on it
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnUiSharpenTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab, General|Edges filter
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 Section +hwndhTemp, Sharpen mode:
@@ -58226,13 +58308,13 @@ PanelSharpenImage() {
     Gui, Add, Text, xs y+5 w%thisW%, X
     Gui, Add, Text, x+3 wp, Y
     Gui, Add, Text, x+3 wp, C
-    GuiAddDropDownList("xs y+7 w" thisW " gupdateUIedgesPanel AltSubmit Choose" IDedgesXuAmount " vIDedgesXuAmount", "-3|-2|-1|0|1|2|3", "X offset")
-    GuiAddDropDownList("x+3 wp gupdateUIedgesPanel AltSubmit Choose" IDedgesYuAmount " vIDedgesYuAmount", "-3|-2|-1|0|1|2|3", "Y offset")
-    GuiAddDropDownList("x+3 wp gupdateUIedgesPanel AltSubmit Choose" IDedgesCenterAmount " vIDedgesCenterAmount", "0|1|2|3|4|5", "C offset")
-    GuiAddSlider("IDedgesEmphasis", -255,255, 0, "Brightness", "updateUIedgesPanel", 2, "xs y+10 w" txtWid " hp")
-    GuiAddSlider("IDedgesContrast", -100,100, 0, "Contrast", "updateUIedgesPanel", 2, "xs y+10 wp hp")
-    Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert image
-    GuiAddDropDownList("x+5 wp AltSubmit gupdateUIedgesPanel Choose" IDedgesAfterBlur " vIDedgesAfterBlur", "No blur|4|6|8|10", "Blur level")
+    GuiAddDropDownList("xs y+7 w" thisW " gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenXuAmount " vImageSharpenXuAmount", "-3|-2|-1|0|1|2|3", "X offset")
+    GuiAddDropDownList("x+3 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenYuAmount " vImageSharpenYuAmount", "-3|-2|-1|0|1|2|3", "Y offset")
+    GuiAddDropDownList("x+3 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenCenterAmount " vImageSharpenCenterAmount", "0|1|2|3|4|5", "C offset")
+    GuiAddSlider("ImageSharpenEmphasis", -255,255, 0, "Brightness", "updateUIsharpenPanel", 2, "xs y+10 w" txtWid " hp")
+    GuiAddSlider("ImageSharpenContrast", -100,100, 0, "Contrast", "updateUIsharpenPanel", 2, "xs y+10 wp hp")
+    Gui, Add, Checkbox, xs y+10 w%2ndcol% hp gupdateUIsharpenPanel Checked%ImageSharpenInvert% vImageSharpenInvert, &Invert image
+    GuiAddDropDownList("x+5 wp AltSubmit gupdateUIsharpenPanel Choose" ImageSharpenAfterBlur " vImageSharpenAfterBlur", "No blur|4|6|8|10", "Blur level")
 
     Gui, Tab
     thisW := (PrefsLargeFonts=1) ? 90 : 65
@@ -58251,21 +58333,27 @@ testAllowSelInvert(imgW:=0, imgH:=0) {
     Return r
 }
 
-updateUIsharpenPanel() {
+updateUIsharpenPanel(dummy:=0, b:=0) {
     If (AnyWindowOpen!=79)
        Return
 
-    updateUIedgesPanel()
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: Submit, NoHide
     actu := (ImageSharpenMode>1) ? 1 : 0
     uiSlidersArray["ImageSharpenRadius", 10] := actu
     GuiRefreshSliders()
+    If (dummy!="no")
+    {
+       SetTimer, WriteSettingsSharpenPanel, -150
+       updateLiveTinyPreviewsWindow(dummy, b)
+    }
 }
 
 BTNdoSharpenFX() {
    If (downscaleHugeImagesForEditing()<0)
       Return 1
 
-   updateUIsharpenPanel()
+   updateUIsharpenPanel("no")
    BtnCloseWindow()
    SharpenSelectedArea()
 }
@@ -81675,8 +81763,10 @@ MouseCoords2Image(mX, mY, limitBounds, dPosX, dPosY, newW, newH, ByRef x, ByRef 
 coreUpdateLiveTinyPreviewsWindow() {
     If (AnyWindowOpen=26 || AnyWindowOpen=78)
        livePreviewBlurPanel()
-    Else If (AnyWindowOpen=43 || AnyWindowOpen=79)
+    Else If (AnyWindowOpen=43)
        livePreviewIDedgesPanel()
+    Else If (AnyWindowOpen=79)
+       livePreviewSharpenPanel()
     Else If (AnyWindowOpen=44)
        livePreviewAddNoiser()
     Else If (AnyWindowOpen=64)
