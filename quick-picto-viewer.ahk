@@ -48384,11 +48384,21 @@ BtnResetBlendMode() {
       FillAreaBlendMode := 1
       GuiControl, SettingsGUIA: Choose, FillAreaBlendMode, % FillAreaBlendMode
       updateUIfillPanel()
-   } Else If (AnyWindowOpen=81)
+   } Else If (AnyWindowOpen=32)
    {
-      UserSymmetricaBlendMode := 1
-      GuiControl, SettingsGUIA: Choose, UserSymmetricaBlendMode, % UserSymmetricaBlendMode
-      updateUIsymmetricaPanel()
+      TextInAreaBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, TextInAreaBlendMode, % TextInAreaBlendMode
+      updateUIInsertTextPanel()
+   } Else If (AnyWindowOpen=43)
+   {
+      IDedgesBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, % IDedgesBlendMode
+      updateUIedgesPanel()
+   } Else If (AnyWindowOpen=44)
+   {
+      UserAddNoiseBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, UserAddNoiseBlendMode, % UserAddNoiseBlendMode
+      updateUIaddNoisePanel()
    } Else If (AnyWindowOpen=65 || AnyWindowOpen=30)
    {
       DrawLineAreaBlendMode := 1
@@ -48397,36 +48407,19 @@ BtnResetBlendMode() {
          updateUIdrawParamLinesPanel()
       Else
          updateUIdrawShapesPanel()
+   } Else If (AnyWindowOpen=81)
+   {
+      UserSymmetricaBlendMode := 1
+      GuiControl, SettingsGUIA: Choose, UserSymmetricaBlendMode, % UserSymmetricaBlendMode
+      updateUIsymmetricaPanel()
    } Else
    {
       BlurAreaBlendMode := 1
       GuiControl, SettingsGUIA: Choose, BlurAreaBlendMode, % BlurAreaBlendMode
       If (AnyWindowOpen=69)
          updateUIzoomBlurPanel()
-      Else If (AnyWindowOpen=44)
-         updateUIaddNoisePanel()
       Else
          updateUIblurPanel()
-   }
-}
-
-BtnResetTextBlendMode() {
-   TextInAreaBlendMode := 1
-   GuiControl, SettingsGUIA: Choose, TextInAreaBlendMode, % TextInAreaBlendMode
-   updateUIInsertTextPanel()
-}
-
-BtnResetEdgesBlendMode() {
-   If (AnyWindowOpen=44)
-   {
-      UserAddNoiseBlendMode := 1
-      GuiControl, SettingsGUIA: Choose, UserAddNoiseBlendMode, % UserAddNoiseBlendMode
-      updateUIaddNoisePanel()
-   } Else
-   {
-      IDedgesBlendMode := 1
-      GuiControl, SettingsGUIA: Choose, IDedgesBlendMode, % IDedgesBlendMode
-      updateUIedgesPanel()
    }
 }
 
@@ -51321,8 +51314,6 @@ ReadSettingsSymmetricaPanel(act:=0) {
 }
 
 ReadSettingsEdgesPanel(act:=0) {
-; the min/max values given here must match the ranges of the
-; UI controls found in PanelDetectEdgesImage()
     RegAction(act, "IDedgesModus",, 2, 1, 5)
     RegAction(act, "IDedgesOpacity",, 2, 3, 255)
     RegAction(act, "IDedgesEmphasis",, 2, -255, 255)
@@ -51425,7 +51416,7 @@ PanelDetectEdgesImage() {
     GuiAddSlider("IDedgesContrast", -100, 100, 0, "Out Contrast", "updateUIedgesPanel", 2, "x+5 wp hp")
     GuiAddSlider("IDedgesOpacity", 3, 255, 255, "Opacity", "updateUIedgesPanel", 1, "xs y+10 wp hp")
     GuiAddSlider("IDedgesAfterBlur", 0, 10, 0, "Out blur: $€", "updateUIedgesPanel", 1, "x+5 wp hp")
-    Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetEdgesBlendMode +TabStop, Blending mode
+    Gui, Add, Text, xs y+10 wp hp +0x200 -wrap gBtnResetBlendMode +TabStop, Blending mode
     GuiAddDropDownList("x+5 wp-27 gupdateUIedgesPanel AltSubmit Choose" IDedgesBlendMode " vIDedgesBlendMode", "None|" blends)
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIedgesPanel")
     Gui, Add, Checkbox, xs y+10 hp gupdateUIedgesPanel Checked%IDedgesInvert% vIDedgesInvert, &Invert output image
@@ -51557,7 +51548,7 @@ PanelAddNoiserImage() {
     Gui, Add, Checkbox, x+7 hp gupdateUIaddNoisePanel Checked%UserAddNoiseGrays% vUserAddNoiseGrays, &Grayscale
 
     blends := StrReplace(userBlendModesList, "Replace*|Behind*")
-    Gui, Add, Text, xs y+7 hp w%2ndcol% +0x200 gBtnResetEdgesBlendMode +TabStop +hwndhTemp, Blending mode:
+    Gui, Add, Text, xs y+7 hp w%2ndcol% +0x200 gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode:
     GuiAddDropDownList("x+7 wp-27 gupdateUIaddNoisePanel AltSubmit Choose" UserAddNoiseBlendMode " vUserAddNoiseBlendMode", "None|" blends, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIaddNoisePanel")
     GuiAddSlider("UserAddNoiseOpacity", 3,255, 255, "Opacity", "updateUIaddNoisePanel", 1, "xs y+10 w" txtWid - 27 " hp")
@@ -55670,7 +55661,7 @@ PanelInsertTextArea() {
     GuiAddPickerColor("x+1 hp w27", "TextInAreaBgrColor")
     GuiAddColor("x+2 w" clrW " hp", "TextInAreaBgrColor", "Background color")
     GuiAddSlider("TextInAreaBgrOpacity", 2,255, 255, "Opacity", "updateUIInsertTextPanel", 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Text, xs y+10 w%wa% hp +0x200 +TabStop gBtnResetTextBlendMode +hwndhTemp, Blending mode
+    Gui, Add, Text, xs y+10 w%wa% hp +0x200 +TabStop gBtnResetBlendMode +hwndhTemp, Blending mode
     GuiAddDropDownList("x+1 wp gupdateUIInsertTextPanel AltSubmit Choose" TextInAreaBlendMode " vTextInAreaBlendMode", "None|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w26 gupdateUIInsertTextPanel")
     GuiAddCheckbox("x+1 hp w26 gupdateUIInsertTextPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
@@ -58229,8 +58220,6 @@ WriteSettingsSharpenPanel() {
 }
 
 ReadSettingsSharpenPanel(act:=0) {
-; the min/max values given here must match the ranges of the
-; UI controls found in PanelSharpenImage()
     RegAction(act, "ImageSharpenMode",, 2, 1, 3)
     RegAction(act, "ImageSharpenAmount",, 2, 0, 100)
     RegAction(act, "ImageSharpenRadius",, 2, 0, 255)
@@ -65563,8 +65552,6 @@ createMenuMainPreferences() {
       kMenu("PVperfs", "Check", "&Apply gamma correction")
    If (minimizeMemUsage=1)
       kMenu("PVperfs", "Check", "&Limit memory usage")
-   If (allowMultiCoreMode=1)
-      kMenu("PVperfs", "Check", "&Multi-threaded processing")
    If (ColorDepthDithering=1)
       kMenu("PVperfs", "Check", "&Perform dithering on color depth changes")
    If (userimgQuality=1)
@@ -88004,7 +87991,7 @@ PanelAdjustColorsSimpleWindow() {
        Gui, Add, Button, x+5 hp w%ml% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
        ml := (PrefsLargeFonts=1) ? 152 : 93
        Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
-       GuiAddDropDownList("x+5 w" ml " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask", [hTemp])
+       GuiAddDropDownList("x+5 w" ml " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
        thisWid := (PrefsLargeFonts=1) ? 235 : 150
        GuiAddSlider("userJpegQuality", 2,100, 95, "Image quality on save", "iniSaveJPGquality", 1, "xs y+5 w" thisWid " hp", "This only applies to the JPEG and WEBP file formats")
        If !ResizeUseDestDir
@@ -88516,7 +88503,7 @@ livePreviewColorsAdjustVP() {
 }
 
 PanelFileFormatConverter() {
-    Global btnFldr, IDbtnConvert, editF5
+    Global btnFldr, editF5
     filesElected := getSelectedFiles(0, 1)
     initFIMGmodule()
     If !wasInitFIMlib
@@ -88583,7 +88570,7 @@ PanelFileFormatConverter() {
 
     thisV := (PrefsLargeFonts=1) ? 135 : 90
     ml := (filesElected>1) ? 30 : 5
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% gBTNconvertImgFmtNow Default vIDbtnConvert, &Convert
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%thisW% gBTNconvertImgFmtNow Default, &Convert
     If (filesElected>1)
        Gui, Add, Button, x+5 hp w%thisV% gBTNconvertImgFmtSoloNow, &Active file only
 
@@ -88627,6 +88614,14 @@ BTNconvertImgFmtNow(modus:=0) {
    {
       SoundBeep, 300, 100
       msgBoxWrapper(appTitle ": ERROR", "File format conversion is currently unsupported. The FreeImage library failed to properly initialize. Please make sure the FreeImage.dll is in the QPV folder.", 0, 0, "error")
+      Return
+   }
+
+   filesPerCore := calculateCoresRequired(filesElected)
+   mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
+   If (userActionConflictingFile=4 && mustDoMultiCore=1)
+   {
+      msgBoxWrapper(appTitle ": WARNING", "Please choose an action to perform on file name conflicts. The option to ask is not supported with multi-threaded execution.", 0, 0, "WARNING")
       Return
    }
 
@@ -88991,7 +88986,7 @@ PanelResizeImageWindow() {
     Gui, Add, Checkbox, xs y+10 gTglRszCropping Checked%ResizeWithCrop% vResizeWithCrop, Crop image(s) to the viewport selection
     Gui, Add, Checkbox, xp+15 y+10 gTglRszCropping Checked%ResizeCropAfterRotation% vResizeCropAfterRotation, Perform image crop after image rotation (as in the viewport)
     Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply color adjustments and image mirroring`nactivated in the main window
-
+ 
     Gui, Tab, 2
     thisW := (PrefsLargeFonts=1) ? 90 : 50
     Gui, Add, Text, x+15 y+15, If no destination folder is chosen,`nthe original files may be overwritten.
@@ -89029,10 +89024,9 @@ PanelResizeImageWindow() {
     Gui, Tab
     If (multipleFilesMode=1)
     {
-       pkl := (allowMultiCoreMode=1) ? "`nMulti-threaded processing not yet implemented." : ""
        zp := groupDigits(filesElected)
        Gui, Font, Bold
-       Gui, Add, Text, xs-15 y+10, %zp% files are selected for processing.%pkl%
+       Gui, Add, Text, xs-15 y+10, %zp% files are selected for processing.
        Gui, Font, Normal
        Gui, Add, Button, xp y+10 h%thisBtnHeight% w%btnWid% Default gBTNsaveResizedIMG, &Process images
        Gui, Add, Button, x+5 hp w%btnWid% gBtnInvokePanelSimpleResizeRotate, &Simple mode
@@ -89087,8 +89081,7 @@ setForceRefreshThumbsFilesIndex(onlySelected) {
 
 batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
    cleanResizeUserOptionsVars()
-   If (!desiredH || !desiredW
-   || desiredW<1 || desiredH<1)
+   If (!desiredH || !desiredW || desiredW<1 || desiredH<1)
    || ((desiredW<5 || desiredH<5) && (isPercntg!=1))
    {
       showTOOLtip("WARNING: Incorrect dimensions given. Please increase the values.")
@@ -89444,6 +89437,15 @@ coreQuickImageFilesListActions(actu) {
       ResizeQualityHigh := ResizeInPercentage := 1
       ResizeUseDestDir := 0
       cleanResizeUserOptionsVars()
+      filesPerCore := calculateCoresRequired(filesElected)
+      mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
+      If (userActionConflictingFile=4 && mustDoMultiCore=1)
+      {
+         userActionConflictingFile := 1
+         RegAction(1, "userActionConflictingFile",, 2, 1, 4)
+         msgBoxWrapper(appTitle ": WARNING", "On file name conflicts, the files will be skipped. Please choose an action to perform on file name conflicts in the «Resize/rotate/crop» panel. The option to ask is not supported with multi-threaded execution.", 0, 0, "WARNING")
+      }
+
       BtnPerformSimpleProcessing("no-prompt", "extern")
    }
 }
@@ -89479,7 +89481,7 @@ BTNsaveResizedIMG() {
           msgBoxWrapper(appTitle ": ERROR", "The ." rDesireWriteFMT " format is currently unsupported. The FreeImage library failed to properly initialize.", 0, 0, "error")
           Return
        }
-
+ 
        WriteSettingsResizePanel()
        If (ResizeUseDestDir=1)
           RegAction(1, "ResizeDestFolder")
@@ -95915,7 +95917,7 @@ PanelSimpleResizeRotate(modus:="") {
     If (filesElected>1)
     {
        Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, Action on file name conflicts:
-       GuiAddDropDownList("x+5 w" pww " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
+       GuiAddDropDownList("x+5 w" pww " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
     }
 
     thisWid := (PrefsLargeFonts=1) ? 235 : 150
@@ -96014,6 +96016,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
        GuiControlGet, convertFormatUseMultiThreads, SettingsGUIA:, convertFormatUseMultiThreads
 
        RegAction(1, "convertFormatUseMultiThreads")
+       RegAction(1, "userActionConflictingFile")
        RegAction(1, "userJpegQuality")
        RegAction(1, "userVPsvgScale")
        RegAction(1, "userVPpdfDPI")
@@ -96034,6 +96037,14 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
        {
           SoundBeep, 300, 100
           msgBoxWrapper(appTitle ": ERROR", "Incorrect image dimensions given. The values must be increased.", 0, 0, "error")
+          Return
+       }
+
+       filesPerCore := calculateCoresRequired(filesElected)
+       mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
+       If (userActionConflictingFile=4 && mustDoMultiCore=1)
+       {
+          msgBoxWrapper(appTitle ": WARNING", "Please choose an action to perform on file name conflicts. The option to ask is not supported with multi-threaded execution.", 0, 0, "WARNING")
           Return
        }
     }

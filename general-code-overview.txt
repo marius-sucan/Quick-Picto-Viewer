@@ -1,4 +1,4 @@
-﻿Table of contents:
+Table of contents:
    a) How Quick Picto Viewer initializes
    b) How a files list index is created
    c) Files index filtering
@@ -233,16 +233,16 @@ c) Files index filtering
    properties are maintained.
 
    FilterFilesListuIndex() can take Regular Expressions or «queries».
-   Strings that begin with: «SQL:query:» will be parsed and used
+   Strings that begin with: «SQL::query::» will be parsed and used
    to perform a SELECT in the currently loaded SQL database. For
-   example: SQL:query:WHERE fmodified LIKE '20200607%' .
+   example: SQL::query::WHERE fmodified LIKE '20200607%' .
 
    If the user does not work with an SQL database, another type
    of queries can be used to filter the files list: «QPV:query:»
    These are structured as follows:
    QPV:query:what:minRange:maxRange:optionalString
 
-   Example: QPV:query:fsize:100002:250001:string
+   Example: QPV::query::fsize::100002::250001::string
 
    When such queries are performed, Quick Picto Viewer uses cached
    data when available, otherwise it will extract image or file
