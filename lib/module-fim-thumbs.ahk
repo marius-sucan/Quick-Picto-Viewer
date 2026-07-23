@@ -444,7 +444,7 @@ MonoGenerateThumb(imgPath, file2save, params, thisBindex) {
       {
          imgBPP := Trim(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
          thisZeit := A_TickCount - startZeit
-         If (imgBPP!=24 || imgBPP!=32)
+         If (imgBPP!=24 && imgBPP!=32)
          {
             hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
             If hFIFimgB
