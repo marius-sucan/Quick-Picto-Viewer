@@ -17714,7 +17714,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           objSel.zw := zw,        objSel.zh := zh
           ; objSel.forceRect := (VPselRotation>0) ? 1 : 0
           ppk := "a" imgSelX1 imgSelY1
-          thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipV TextInAreaAlign TextInAreaCharSpacing thisBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
+          thisIDu := "a" previewMode VPselRotation zoomLevel imgFxMode ForceNoColorMatrix FlipImgH FlipImgV getIDvpFX() tinyPrevAreaCoordX tinyPrevAreaCoordY getVPselIDs("saiz-vpos") FillAreaApplyColorFX PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceLight PasteInPlaceGamma clrGradientOffX clrGradientOffY TextInAreaFlipV TextInAreaFlipH TextInAreaAlign TextInAreaCharSpacing thisBlendMode TextInAreaValign TextInAreaBlurAmount TextInAreaBlurBorderAmount TextInAreaUsrMarginz TextInAreaBgrColor TextInAreaBgrEntire TextInAreaBgrUnified TextInAreaCutOutMode TextInAreaBgrOpacity TextInAreaBorderSize TextInAreaBorderOut TextInAreaBorderColor TextInAreaBorderOpacity TextInAreaFontBold TextInAreaFontColor TextInAreaFontItalic TextInAreaFontName
           thisIDu .= "b" TextInAreaFontLineSpacing TextInAreaFontOpacity TextInAreaFontSize TextInAreaFontStrike TextInAreaFontUline TextInAreaOnlyBorder TextInAreaPaintBgr TextInAreaRoundBoxBgr TextInAreaAutoWrap TextInAreaCaseTransform userimgGammaCorrect undoLevelsRecorded currentUndoLevel useGdiBitmap() getAlphaMaskIDu() ppk TextInAreaBlendMode BlendModesFlipped BlendModesPreserveAlpha
           realtimePasteInPlaceAlphaMasker(previewMode, newBitmap, thisIDu, maskedBitmap, objSel)
        }
@@ -27716,6 +27716,7 @@ PanelIndexedImagesStats() {
 }
 
 SwitchUIdlHistoStats() {
+   Gui, SettingsGUIA: Default
    If (AnyWindowOpen=48)
    {
       GuiControlGet, StatsUIhistoThingy
@@ -43706,7 +43707,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     kk := (viewportQPVimage.imgHandle) ? 4 : 2
     Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × %kk%
 
-    GuiAddSlider("BrushToolSize", 1,980, 25, ".updateLabelBrushSize", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
+    GuiAddSlider("BrushToolSize", 1,990, 25, ".updateLabelBrushSize", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", "updateUIbrushTool", 1, "x+10 wp hp")
     GuiAddSlider("BrushToolAspectRatio", -100,100, 0, "Aspect ratio", "updateUIbrushTool", 2, "xs y+10 wp hp")
     GuiAddSlider("BrushToolAngle", -180,180, 0, "Angle: $€°", "updateUIbrushTool", 2, "x+10 wp hp")
@@ -55669,8 +55670,8 @@ PanelInsertTextArea() {
 
     Gui, Add, Checkbox, xs y+%ml% gupdateUIInsertTextPanel Checked%TextInAreaDoBlurs% vTextInAreaDoBlurs, Apply blur effect
     sml := (PrefsLargeFonts=1) ? 55 : 35
-    GuiAddSlider("TextInAreaBlurAmount", 0,255, 0, "Text blur", "updateUIInsertTextPanel", 1, "xs+15 y+8 w" opaciSlideW + sml " h" ha)
-    GuiAddSlider("TextInAreaBlurBorderAmount", 0,255, 0, "Border blur", "updateUIInsertTextPanel", 1, "x+5 wp hp")
+    GuiAddSlider("TextInAreaBlurAmount", 1,255, 0, "Text blur", "updateUIInsertTextPanel", 1, "xs+15 y+8 w" opaciSlideW + sml " h" ha)
+    GuiAddSlider("TextInAreaBlurBorderAmount", 1,255, 0, "Border blur", "updateUIInsertTextPanel", 1, "x+5 wp hp")
 
     If !viewportQPVimage.imgHandle
        uiADDalphaMaskTabs(4, 5, "updateUIInsertTextPanel")
@@ -86532,6 +86533,11 @@ PanelFindDupes(dummy:=0) {
 
     If (dummy>0 && isNumber(dummy) && isInRange(dummy, 1, 3))
        CurrentPanelTab := dummy
+    If (userFilterStringPos>=4)
+       userFilterStringPos := 1
+
+    If (userFilterWhat>=4)
+       userFilterWhat := 1
 
     col := (PrefsLargeFonts=1) ? 285 : 190
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Image hashes|Collect data|Filtering
@@ -88539,7 +88545,7 @@ PanelFileFormatConverter() {
     GuiAddSlider("userVPsvgScale", 1, 9.876, "1.00f", "Scale factor: $€ x", "dummy", 1, "x+5 w" pww " hp")
 
     Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, On file name conflicts:
-    GuiAddDropDownList("x+5 w" pww " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite", [hTemp])
+    GuiAddDropDownList("x+5 w" pww " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
     GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp")
     zml := (PrefsLargeFonts=1) ? 40 : 30
