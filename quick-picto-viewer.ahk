@@ -96499,7 +96499,7 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
     ; the OCCUPIED levels only, matching the DLL oracle.
     medianValue := minBrLvlK := -1
     modePointK := peakPointK := minPointK := 0
-    modePointV := sumTotalBr := thisSum := pixRms := 0
+    modePointV := sumTotalBr := thisSum := sumSq := 0
     pixMinu := TotalPixelz
     halfPix := TotalPixelz // 2
     Loop, % numEntries
@@ -96509,8 +96509,8 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
         If (nrPixelz<1)   ; empty level: NumGet yields 0 here (never ""), skip it
            Continue
 
-        pixRms += nrPixelz * nrPixelz              ; sum of count^2 -> "rms" spread (per DLL oracle)
         sumTotalBr += nrPixelz * (thisIndex + 1)   ; +1 so the /256 normalisation maps level 255 -> 1.0
+        sumSq += nrPixelz * thisIndex * thisIndex  ; sum of count*level^2 -> standard deviation below
         If (nrPixelz>modePointV)                   ; mode = most-populated level (ties keep the lowest)
         {
            modePointV := nrPixelz
@@ -96537,8 +96537,8 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
 
     ch0 := ""
     avgu := sumTotalBr/TotalPixelz - 1             ; mean brightness level 0..255 (matches createHistogramBMP)
-    zz := (minBrLvlK=-1) ? peakPointK : peakPointK - minBrLvlK
-    rmsu := (zz>0) ? Sqrt(pixRms / zz) : Sqrt(pixRms)
+    variance := sumSq/TotalPixelz - avgu*avgu      ; population variance E[X^2] - mean^2
+    stdDev := Sqrt((variance>0) ? variance : 0)    ; textbook standard deviation (spread / contrast)
 
     entireImgSmall := entireImgBig := ""
     HentireImgSmall := HentireImgBig := ""
@@ -96577,7 +96577,7 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
        r.median := Round((medianValue + 1)/256, 5)
        r.peak := Round((peakPointK + 1)/256, 5)
        r.low := Round((minBrLvlK + 1)/256, 5)
-       r.rms := Round((rmsu + 1)/7000, 5)
+       r.rms := Round(stdDev/256, 5)              ; standard deviation, as a fraction of the 0..255 scale
        r.range := Round((peakPointK - minBrLvlK + 1)/256, 5)
        r.mode := Round((modePointK + 1)/256, 5)
        r.minu := Round((minPointK + 1)/256, 5)
@@ -96593,7 +96593,7 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
        updateFilesListByID(imgIndex, 19, Round((medianValue + 1)/256, 5), isFilter)
        updateFilesListByID(imgIndex, 20, Round((peakPointK + 1)/256, 5), isFilter)
        updateFilesListByID(imgIndex, 21, Round((minBrLvlK + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 24, Round((rmsu + 1)/7000, 5), isFilter)
+       updateFilesListByID(imgIndex, 24, Round(stdDev/256, 5), isFilter)
        updateFilesListByID(imgIndex, 25, Round((peakPointK - minBrLvlK + 1)/256, 5), isFilter)
        updateFilesListByID(imgIndex, 26, Round((modePointK + 1)/256, 5), isFilter)
        updateFilesListByID(imgIndex, 27, Round((minPointK + 1)/256, 5), isFilter)
