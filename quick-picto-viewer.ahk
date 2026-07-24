@@ -73639,14 +73639,7 @@ createHistogramBMP(whichBitmap) {
       ERR := Gdip_GetHistogram(whichBmp, 2, brLvlR, 0, 0)
       ERR := Gdip_GetHistogram(whichBmp, 2, 0, brLvlG, 0)
       ERR := Gdip_GetHistogram(whichBmp, 2, 0, 0, brLvlB)
-      brLvlFakeArray := []
-      Loop, 257
-      {
-          thisIndex := A_Index - 1
-          thisMax := max(brLvlR[thisIndex], brLvlG[thisIndex], brLvlB[thisIndex])
-          brLvlFakeArray[thisIndex] := Round(thisMax/1.25)
-          ; MsgBox, % thisMax
-      }
+      ; the RGB-envelope chart is assembled further down, from brLvlR/G/B
    }
 
    If ERR
@@ -73656,124 +73649,109 @@ createHistogramBMP(whichBitmap) {
    }
 
    trGdip_GetImageDimensions(whichBMP, imgW, imgH)
-   thisSum := zr2ndMaxV := r2ndMaxV := 0
-   minBrLvlV := TotalPixelz := imgW * imgH
+   TotalPixelz := imgW * imgH
+   If (TotalPixelz<1)
+   {
+      addJournalEntry(A_ThisFunc "(): failed to generate histogram - empty bitmap")
+      Return
+   }
+
+   ; A single pass over the 256 brightness levels gathers every statistic the HUD
+   ; needs, replacing the old build-three-strings-then-Sort approach. brLvlArray is
+   ; 0-indexed (level i -> bin i); the on-screen chart is built 1-indexed
+   ; (chartData[i+1]) so BarChart - which reads keys 1..N - renders every level,
+   ; including bin 0 (previously dropped) and without a phantom trailing bin.
+   chartData := []
+   buildChart := (showHistogram!=6)   ; mode 6 assembles its own RGB-envelope chart below
+   cumu := sumTotalBr := sumSq := 0
+   modePointV := modePointK := max2 := r2ndMaxV := 0
+   minCountGt1 := TotalPixelz
+   blackPt := whitePt := -1
+   firstBinGt1 := lastBinGt1 := -1
+   medianValue := ""
    Loop, 256
    {
-       thisIndex := A_Index - 1
-       nrPixelz := brLvlArray[thisIndex]
-       If (nrPixelz="")
-          Continue
+      i := A_Index - 1
+      nz := brLvlArray[i]
+      If (nz="")
+         nz := 0
+      If buildChart
+         chartData[A_Index] := nz
 
-       stringArray .= nrPixelz "." (thisIndex + 1) "`n"
-       If (nrPixelz>0)
-       {
-          thisSum += nrPixelz
-          If (thisSum>TotalPixelz//2 && medianValue="")
-             medianValue := thisIndex
-       }
+      sumTotalBr += nz * (i + 1)
+      sumSq += nz * i * i                  ; Σ count·level² -> standard deviation below
+      If (nz>modePointV)      ; running peak (mode); ties keep the first (lowest) level
+      {
+         max2 := modePointV   ; the former peak becomes the runner-up count
+         modePointV := nz
+         modePointK := i
+      } Else If (nz>max2)     ; 2nd-highest count, ties allowed (matches the old sorted [2])
+         max2 := nz
 
-       If (nrPixelz>1)
-          stringArray3 .= (thisIndex + 1) "." nrPixelz "`n"
+      If (nz<modePointV && nz>r2ndMaxV)   ; order-dependent "2nd max", kept verbatim for graphFocus
+         r2ndMaxV := nz
+      If (nz>1 && nz<minCountGt1)          ; rarest populated level (>1 px), feeds graphFocus
+         minCountGt1 := nz
 
-       sumTotalBr += nrPixelz * (thisIndex + 1)
-       SimpleSumTotalBr += nrPixelz
-       If (nrPixelz>modePointV)
-       {
-          modePointV := nrPixelz
-          modePointK := thisIndex
-       }
+      If (nz>1)
+      {
+         If (firstBinGt1=-1)
+            firstBinGt1 := i
+         lastBinGt1 := i
+      }
 
-       If (nrPixelz<modePointV && nrPixelz>r2ndMaxV)
-          r2ndMaxV := nrPixelz
-       If (nrPixelz>zr2ndMaxV)
-          zr2ndMaxV := nrPixelz
-
-       If (nrPixelz<minBrLvlV && nrPixelz>1)
-       {
-          minBrLvlV := nrPixelz
-          minBrLvlK := thisIndex
-       }
+      If (nz>0)
+      {
+         If (blackPt=-1)                   ; darkest occupied level (black point)
+            blackPt := i
+         whitePt := i                       ; brightest occupied level (white point)
+         cumu += nz                         ; cumulative count -> median level
+         If (medianValue="" && cumu>TotalPixelz//2)
+            medianValue := i
+      }
    }
-   
-   RstringArray := stringArray
-   stringArray := Trim(stringArray, "`n")
-   Sort, stringArray, ND`n
-   stringArray := StrSplit(stringArray, "`n")
-   
-   stringArray3 := Trim(stringArray3, "`n")
-   stringArray3 := StrSplit(stringArray3, "`n")
 
-   Sort, RstringArray, RND`n
-   RstringArray := Trim(RstringArray, "`n")
-   RstringArray := StrSplit(RstringArray, "`n")
-
+   ; Mean brightness level (0..255) and its standard deviation (spread / contrast).
    vpWinClientSize(mainWidth, mainHeight)
-   avgBrLvlK := Round(sumTotalBr/TotalPixelz - 1, 1)
-   thisVal := minu := maxu := 0
-   Loop, 256
+   meanExact := sumTotalBr/TotalPixelz - 1
+   avgBrLvlK := Round(meanExact, 1)
+   variance := sumSq/TotalPixelz - meanExact*meanExact
+   stdDev := Round(Sqrt((variance>0) ? variance : 0), 1)
+   minu := maxu := 0
+   Loop, 256   ; nearest populated level just below the average
    {
       thisVal := brLvlArray[Round(avgBrLvlK) - A_Index]
-      If (thisVal>0 && !minu)
+      If (thisVal>0)
       {
          minu := thisVal
          Break
       }
    }
 
-   Loop, 256
+   Loop, 256   ; nearest populated level just above the average
    {
       thisVal := brLvlArray[A_Index + Round(avgBrLvlK)]
-      If (thisVal>0 && !maxu)
+      If (thisVal>0)
       {
          maxu := thisVal
          Break
       }
    }
+   avgBrLvlV := (minu + maxu)//2
 
-   avgBrLvlV := (minu + maxu)//2 ;  brLvlArray[Round(avgBrLvlK)]
-   modePointK3 := RstringArray[2]
-   modePointK3 := StrSplit(modePointK3, ".")
-   rangeA := stringArray3[1]
-   rangeA := StrSplit(rangeA, ".")
-   tl := stringArray3.Count()
-   rangeB := stringArray3[tl]
-   rangeB := StrSplit(rangeB, ".")
-   Loop, 256
-   {
-       minBrLvlK2 := stringArray[A_Index]
-       minBrLvlK2 := StrSplit(minBrLvlK2, ".")
-       If (minBrLvlK2[1]=0)
-          Continue
-       If (minBrLvlK2[2]>0)
-          Break
-   }
+   ; Occupied tonal range = levels holding more than one pixel (ignores lone outliers).
+   If (firstBinGt1=-1)               ; nothing above 1 px: collapse the range to the black point
+      firstBinGt1 := lastBinGt1 := blackPt
+   rangeLoIdx := firstBinGt1
+   rangeHiIdx := lastBinGt1
+   rangeC := rangeHiIdx - rangeLoIdx + 1
+   meanValue := cumu/rangeC          ; cumu == total pixels; mean pixels per occupied level (feeds graphFocus)
 
-   rangeC := rangeB[1] - rangeA[1] + 1
-   meanValue := SimpleSumTotalBr/rangeC
-   meanValuePrc := Round(meanValue/TotalPixelz * 100)
-   meanValuePrc := (meanValuePrc>0) ? " (" meanValuePrc "%) " : ""
-   2ndMaxVa := (modePointK3[1] + avgBrLvlV)//2 + minBrLvlV
-   2ndMaxVb := (r2ndMaxV + meanValue)//2 + minBrLvlV
-   Loop, 256
-   {
-       lookMean := stringArray[A_Index]
-       lookMean := StrSplit(lookMean, ".")
-       thisMean := lookMean[1]
-       If (thisMean>meanValue)
-       {
-          meanValueK := Round((prevMean + lookMean[2] - 1)/2, 1)
-          Break
-       } prevMean := lookMean[2]
-   }
-
-   ; ToolTip, % avgBrLvlV "--" minBrLvlK2[1] "--" r2ndMaxV , , , 2
-   meanValueK := !meanValueK ? "" : " | Mean: " meanValueK meanValuePrc
+   ; Per-level percentages for the readout (share of total pixels).
    peakPrc := Round(modePointV/TotalPixelz * 100)
    peakPrc := (peakPrc>0) ? " (" peakPrc "%)" : ""
-   minPrc := Round(minBrLvlK2[1]/TotalPixelz * 100)
-   minPrc := (minPrc>0) ? " (" minPrc "%)" : ""
-   medianPrc := Round(thisSum/TotalPixelz * 100)   ; this is wrong
+   medianBinCount := (medianValue="") ? 0 : brLvlArray[medianValue]
+   medianPrc := Round(medianBinCount/TotalPixelz * 100)   ; share of the median level
    medianPrc := (medianPrc>0) ? " (" medianPrc "%)" : ""
    avgPrc := Round(avgBrLvlV/TotalPixelz * 100)
    avgPrc := (avgPrc>0) ? " (" avgPrc "%)" : ""
@@ -73781,26 +73759,38 @@ createHistogramBMP(whichBitmap) {
    TotalPixelzSpaced := groupDigits(imgW*imgH)
 
    infoPeak := "`nMode: " modePointK peakPrc
-   infoAvg := " | Avg: " avgBrLvlK avgPrc " | Min: " minBrLvlK2[2] - 1 minPrc
-   infoMin := "`nMedian: " medianValue medianPrc meanValueK
+   infoAvg := " | Avg: " avgBrLvlK avgPrc " | StdDev: " stdDev
+   infoMin := "`nMedian: " medianValue medianPrc " | Min/Max: " blackPt " - " whitePt
 
-   avgsMax := (2ndMaxVa + r2ndMaxV + 2ndMaxVb + avgBrLvlV + meanValue)/5
+   ; graphFocus sets the chart's vertical zoom; the peak count is the denominator.
+   modePeak := (modePointV>0) ? modePointV : 1
+   secondMaxA := (max2 + avgBrLvlV)//2 + minCountGt1
+   secondMaxB := (r2ndMaxV + meanValue)//2 + minCountGt1
+   avgsMax := (secondMaxA + r2ndMaxV + secondMaxB + avgBrLvlV + meanValue)/5
    If (histogramMode=2)
-      graphFocus := clampInRange(Round(avgsMax/modePointV, 2), 0.20, 0.60)
+      graphFocus := clampInRange(Round(avgsMax/modePeak, 2), 0.20, 0.60)
    Else If (histogramMode=1)
-      graphFocus := clampInRange(Round((avgsMax*0.3)/modePointV, 2), 0.03, 0.10)
+      graphFocus := clampInRange(Round((avgsMax*0.3)/modePeak, 2), 0.03, 0.10)
    Else
-      graphFocus := clampInRange(Round(modePointK3[1] / modePointV, 2), 0.85, 0.99) ; 0.98
+      graphFocus := clampInRange(Round(max2/modePeak, 2), 0.85, 0.99) ; 0.98
 
-   infoRange := defineHistogramMode() ": " graphFocus " | " defineHistogramType() " | Range: " rangeA[1] - 1 " - " rangeB[1] - 1 " (" rangeC ")"
+   infoRange := defineHistogramMode() ": " graphFocus " | " defineHistogramType() " | Range: " rangeLoIdx " - " rangeHiIdx " (" rangeC ")"
    entireString := infoRange infoPeak infoAvg infoMin "`nTotal pixels: " TotalPixelzSpaced
    If (slideShowRunning=1)
       infoBoxBMP := trGdip_CreateBitmap(A_ThisFunc, 5, 5)
    Else
       infoBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.5, mainWidth//1.3, mainHeight//1.3, OSDtextColor, OSDbgrColor, 1, 0)
-   ; tooltip, % "|" TotalPixelz "|" modePointV ", " 2ndMaxV ", " avgBrLvlV " || "  maxW "," maxH  ;  `n" PointsList
+
    Scale := (slideShowRunning=1) ? imgHUDbaseUnit/100 : imgHUDbaseUnit/80
-   thisData := (showHistogram=6) ? brLvlFakeArray : brLvlArray
+   If (showHistogram=6)   ; chart shows the RGB envelope: max of the three channels
+   {
+      Loop, 256
+      {
+         i := A_Index - 1
+         chartData[A_Index] := Round(max(brLvlR[i], brLvlG[i], brLvlB[i])/1.25)
+      }
+   }
+   thisData := chartData
    thisOpacity := (showHistogram=6) ? "CC" : "FF"
    If (showHistogram=3)
       thisGraphColor := "FEFF3300"
@@ -73813,7 +73803,7 @@ createHistogramBMP(whichBitmap) {
    Else
       thisGraphColor := thisOpacity OSDtextColor
 
-   ; TulTip(0, "|  ", modePointK3[1], modePointV, r2ndMaxV, graphFocus, lookValue[2], avgBrLvlV, meanValue)
+   ; TulTip(0, "|  ", max2, modePointV, r2ndMaxV, graphFocus, avgBrLvlV, meanValue)
    HistogramBMP := drawHistogram(thisData, graphFocus, Scale, thisGraphColor, OSDbgrColor, imgHUDbaseUnit//2.5, infoBoxBMP)
    prevHistoBoxString := entireString
    trGdip_DisposeImage(infoBoxBMP, 1)
