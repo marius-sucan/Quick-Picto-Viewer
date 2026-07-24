@@ -73666,9 +73666,11 @@ createHistogramBMP(whichBitmap) {
    cumu := sumTotalBr := sumSq := 0
    modePointV := modePointK := max2 := r2ndMaxV := 0
    minCountGt1 := TotalPixelz
-   blackPt := whitePt := -1
+   blackPt := whitePt := robLo := robHi := -1
    firstBinGt1 := lastBinGt1 := -1
    medianValue := ""
+   loThresh := TotalPixelz * 0.005   ; robust Range trims the outer 0.5% of pixels each side
+   hiThresh := TotalPixelz * 0.995
    Loop, 256
    {
       i := A_Index - 1
@@ -73702,10 +73704,14 @@ createHistogramBMP(whichBitmap) {
 
       If (nz>0)
       {
-         If (blackPt=-1)                   ; darkest occupied level (black point)
+         If (blackPt=-1)                   ; darkest occupied level (absolute black point)
             blackPt := i
-         whitePt := i                       ; brightest occupied level (white point)
-         cumu += nz                         ; cumulative count -> median level
+         whitePt := i                       ; brightest occupied level (absolute white point)
+         cumu += nz                         ; cumulative count -> median + robust range
+         If (robLo=-1 && cumu>=loThresh)   ; robust black point (past the darkest 0.5%)
+            robLo := i
+         If (robHi=-1 && cumu>=hiThresh)   ; robust white point (past the brightest 0.5%)
+            robHi := i
          If (medianValue="" && cumu>TotalPixelz//2)
             medianValue := i
       }
@@ -73739,13 +73745,18 @@ createHistogramBMP(whichBitmap) {
    }
    avgBrLvlV := (minu + maxu)//2
 
-   ; Occupied tonal range = levels holding more than one pixel (ignores lone outliers).
-   If (firstBinGt1=-1)               ; nothing above 1 px: collapse the range to the black point
+   ; Internal tonal span (levels >1 px) still feeds graphFocus through meanValue.
+   If (firstBinGt1=-1)               ; nothing above 1 px: collapse the span to the black point
       firstBinGt1 := lastBinGt1 := blackPt
-   rangeLoIdx := firstBinGt1
-   rangeHiIdx := lastBinGt1
-   rangeC := rangeHiIdx - rangeLoIdx + 1
+   rangeC := lastBinGt1 - firstBinGt1 + 1
    meanValue := cumu/rangeC          ; cumu == total pixels; mean pixels per occupied level (feeds graphFocus)
+
+   ; Displayed Range = robust tonal spread (0.5%..99.5%), as a share of the 0..255 scale.
+   If (robLo=-1)
+      robLo := blackPt
+   If (robHi=-1)
+      robHi := whitePt
+   robSpanPrc := Round((robHi - robLo + 1)/256 * 100)
 
    ; Per-level percentages for the readout (share of total pixels).
    peakPrc := Round(modePointV/TotalPixelz * 100)
@@ -73755,12 +73766,17 @@ createHistogramBMP(whichBitmap) {
    medianPrc := (medianPrc>0) ? " (" medianPrc "%)" : ""
    avgPrc := Round(avgBrLvlV/TotalPixelz * 100)
    avgPrc := (avgPrc>0) ? " (" avgPrc "%)" : ""
+
+   ; Shadow/highlight clipping: pixels pinned at pure black (0) and pure white (255).
+   clipLoPrc := Round(brLvlArray[0]/TotalPixelz * 100, 1)
+   clipHiPrc := Round(brLvlArray[255]/TotalPixelz * 100, 1)
+   clipTxt := (clipLoPrc>0 || clipHiPrc>0) ? " | Clip: " clipLoPrc "% / " clipHiPrc "%" : ""
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    TotalPixelzSpaced := groupDigits(imgW*imgH)
 
    infoPeak := "`nMode: " modePointK peakPrc
    infoAvg := " | Avg: " avgBrLvlK avgPrc " | StdDev: " stdDev
-   infoMin := "`nMedian: " medianValue medianPrc " | Min/Max: " blackPt " - " whitePt
+   infoMin := "`nMedian: " medianValue medianPrc " | Min/Max: " blackPt " - " whitePt clipTxt
 
    ; graphFocus sets the chart's vertical zoom; the peak count is the denominator.
    modePeak := (modePointV>0) ? modePointV : 1
@@ -73774,7 +73790,7 @@ createHistogramBMP(whichBitmap) {
    Else
       graphFocus := clampInRange(Round(max2/modePeak, 2), 0.85, 0.99) ; 0.98
 
-   infoRange := defineHistogramMode() ": " graphFocus " | " defineHistogramType() " | Range: " rangeLoIdx " - " rangeHiIdx " (" rangeC ")"
+   infoRange := defineHistogramMode() ": " graphFocus " | " defineHistogramType() " | Range: " robLo " - " robHi " (" robSpanPrc "%)"
    entireString := infoRange infoPeak infoAvg infoMin "`nTotal pixels: " TotalPixelzSpaced
    If (slideShowRunning=1)
       infoBoxBMP := trGdip_CreateBitmap(A_ThisFunc, 5, 5)
