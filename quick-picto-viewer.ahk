@@ -96464,13 +96464,26 @@ dumpBMPpixels(miniBMP, w, h) {
 }
 
 calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0) {
-    Static TotalPixelz := 122500, fmt := 3
+    Static fmt := 3
     If !validBMP(xBitmap)
        Return 0
 
     ; Gdip_BitmapSetColorDepth(xBitmap, 24, 1)
     If zEffect
        Gdip_BitmapApplyEffect(xBitmap, zEffect)
+
+    ; TotalPixelz is the histogram's true pixel count (== w*h for the luminance
+    ; histogram, which counts every pixel exactly once). It must be the actual
+    ; denominator for the median and average, NOT a hard-coded thumbnail area -
+    ; a wrong total silently skews both. Matches createHistogramBMP() and the
+    ; getPBitmapistoInfos() DLL oracle, which both derive it from the dimensions.
+    trGdip_GetImageDimensions(xBitmap, thumbW, thumbH)
+    TotalPixelz := thumbW * thumbH
+    If (TotalPixelz<1)
+    {
+       addJournalEntry(A_ThisFunc "() empty bitmap for " imgIndex)
+       Return 0
+    }
 
     z := DllCall("gdiplus\GdipBitmapGetHistogramSize", "UInt", fmt, "UInt*", numEntries)
     VarSetCapacity(ch0, numEntries * 4, 0)
@@ -96481,50 +96494,51 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
        Return 0
     }
 
-    medianValue := minBrLvlV := -1
+    ; A single pass over the 256 luminance levels. Empty levels contribute to no
+    ; statistic, so they are skipped up front; every metric below is gathered over
+    ; the OCCUPIED levels only, matching the DLL oracle.
+    medianValue := minBrLvlK := -1
+    modePointK := peakPointK := minPointK := 0
+    modePointV := sumTotalBr := thisSum := pixRms := 0
     pixMinu := TotalPixelz
-    modePointV := peakPointV := sumTotalBr := nrPixelz := thisSum := 0
+    halfPix := TotalPixelz // 2
     Loop, % numEntries
     {
         thisIndex := A_Index - 1
         nrPixelz := NumGet(&ch0+0, thisIndex * 4, "UInt")
-        ; nrPixelz := brLvlArray[thisIndex]
-        If (nrPixelz="")
+        If (nrPixelz<1)   ; empty level: NumGet yields 0 here (never ""), skip it
            Continue
 
-        If (nrPixelz>modePointV)
+        pixRms += nrPixelz * nrPixelz              ; sum of count^2 -> "rms" spread (per DLL oracle)
+        sumTotalBr += nrPixelz * (thisIndex + 1)   ; +1 so the /256 normalisation maps level 255 -> 1.0
+        If (nrPixelz>modePointV)                   ; mode = most-populated level (ties keep the lowest)
         {
            modePointV := nrPixelz
            modePointK := thisIndex
         }
 
-        If (nrPixelz>0 && medianValue=-1)
-        {
-           thisSum += nrPixelz
-           If (thisSum>TotalPixelz//2)
-              medianValue := thisIndex
-        }
+        peakPointK := thisIndex                    ; brightest occupied level (white point / range max)
+        If (minBrLvlK=-1)
+           minBrLvlK := thisIndex                  ; darkest occupied level (black point / range min)
 
-        sumTotalBr += nrPixelz * A_Index
-        If (nrPixelz>0)
-        {
-           peakPointK := thisIndex ; max range in histogram
-           If (minBrLvlK=-1)
-              minBrLvlK := thisIndex ; min range in histogram
-        }
-
-        If (nrPixelz<pixMinu)
+        If (nrPixelz<pixMinu)                       ; rarest OCCUPIED level
         {
            pixMinu := nrPixelz
            minPointK := thisIndex
         }
-        pixRms += nrPixelz ** 2 ; root-mean square
+
+        If (medianValue=-1)                         ; median = first level past half the pixels
+        {
+           thisSum += nrPixelz
+           If (thisSum>halfPix)
+              medianValue := thisIndex
+        }
     }
 
     ch0 := ""
-    avgu := (sumTotalBr/TotalPixelz - 1)/2
-    zz := (minBrLvlK=-1) ?  peakPointK : peakPointK - minBrLvlK
-    rmsu := (zz=0) ? Sqrt(pixRms) : Sqrt(pixRms / zz)
+    avgu := sumTotalBr/TotalPixelz - 1             ; mean brightness level 0..255 (matches createHistogramBMP)
+    zz := (minBrLvlK=-1) ? peakPointK : peakPointK - minBrLvlK
+    rmsu := (zz>0) ? Sqrt(pixRms / zz) : Sqrt(pixRms)
 
     entireImgSmall := entireImgBig := ""
     HentireImgSmall := HentireImgBig := ""
