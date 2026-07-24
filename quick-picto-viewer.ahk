@@ -5822,7 +5822,7 @@ MouseMoveResponder(actu:=0) {
      Return
   }
 
-  If ((A_TickCount - lastOSDtooltipInvoked<625) || whileLoopExec=1 || LbtnDwn=1 || runningLongOperation=1)
+  If ((A_TickCount - lastOSDtooltipInvoked<625) || whileLoopExec=1 || determineLClickState()=1 || runningLongOperation=1)
   {
      SetTimer, MouseMoveResponder, -350
      Return
@@ -10928,7 +10928,8 @@ ToggleImgFX(dir:=0) {
 
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
-      GuiControl, SettingsGUIA: Choose, imgFxMode, % imgFxMode
+      m := (imgFxMode>3) ? imgFxMode - 1 : imgFxMode
+      GuiControl, SettingsGUIA: Choose, UIimgFxMode, % m
       updatePanelColorsInfo()
       updatePanelColorSliderz()
    }
@@ -42212,7 +42213,7 @@ PanelSetThumbColumnOptions() {
        GuiControl, SettingsGUIA: Disable, markSearchMatches
 
     If (minimizeMemUsage=1)
-       GuiControl, SettingsGUIA: Disable, imgFxMode
+       GuiControl, SettingsGUIA: Disable, UIimgFxMode
 
     Gui, Add, Button, xs y+25 w%thisW% h%thisBtnHeight% Default gBtnCloseWindow, &Close
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
@@ -48381,7 +48382,7 @@ PanelEditorImgResize() {
        Return
 
     r1 := trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
-    If (!oImgH || !oImgH)
+    If (!oImgW || !oImgH)
     {
        showTOOLtip("ERROR: No image seems to be loaded or it is malformed")
        SoundBeep, 300, 100
@@ -54429,10 +54430,15 @@ BtnBlurSelectedArea() {
 BtnPixelizeSelectedArea() {
    ; If (downscaleHugeImagesForEditing()<0)
    ;    Return
-   If (blurAreaPixelizeAmount<2 && viewportQPVimage.imgHandle || blurAreaPixelizeAmount<2 && blurAreaAmount<2)
-      Return
-
    updateUIblurPanel("no-preview")
+   If (blurAreaPixelizeAmount<2)
+   {
+      showTOOLtip("WARNING: Pixelation amount is too low")
+      SoundBeep 300, 100 
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    BtnCloseWindow()
    If (viewportQPVimage.imgHandle)
    {
@@ -55937,16 +55943,15 @@ PanelPreferencesWindow() {
     Gui, Tab, 2
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply color management
     ToolTip2ctrl(hTemp, "Color management is not applied on images loaded through FreeImage.")
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction
-    ToolTip2ctrl(hTemp, "It applies only for the image editing tools.")
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction (image editing)
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on color depth changes
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%preventUndoLevels% vpreventUndoLevels, Record undo levels
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%minimizeMemUsage% vminimizeMemUsage +hwndhTemp, Attempt to minimize memory usage (not recommended)
     ToolTip2ctrl(hTemp, "When this option is activated, the performance of QPV will be drastically reduced.`nSome features or functions might be disabled.")
     Gui, Add, Checkbox, xs y+7 gToggleImgQuality Checked%userimgQuality% vuserimgQuality, High quality image resampling in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userHQraw% vuserHQraw, Load Camera RAW files at high quality
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded processing (experimental)
-    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails`nand for batch processing of image files.`n `nIn undefined circumstances, QPV may infinitely freeze`nwhile generating thumbnails.")
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded thumbnails processing (experimental)
+    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails.`n `nIn undefined circumstances, QPV may infinitely freeze`nwhile generating thumbnails.")
     GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//1.5 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
     EnvGet, sc, NUMBER_OF_PROCESSORS
     sc := sc//2
@@ -55974,7 +55979,8 @@ PanelPreferencesWindow() {
     GuiAddSlider("UserGIFsDelayu", -9500, 9500, 30, ".updateLabelGIFdelay", "dummy", 2, pkl " w" slideWid " hp")
 
     ml := (PrefsLargeFonts=1) ? 265 : 150
-    Gui, Add, Button, xs y+7 w%ml% gPanelColorsAdjusterVPwindow, &Additional viewport options
+    labelu := (thumbsDisplaying=1)`? "PanelSetThumbColumnOptions" : "PanelColorsAdjusterVPwindow"
+    Gui, Add, Button, xs y+7 w%ml% g%labelu%, &Viewport color options
 
     Gui, Tab, 4
     pp := (FIMfailed2init=1) ? "( ! )"
@@ -56002,7 +56008,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, y+7 gupdateUIsettings Checked%noQualityWarnings% vnoQualityWarnings, Reduce the number of warnings
     Gui, Add, Text, xs+18 y+7 w%txtWid%, This applies to image quality or color depth changes, or when memory usage may increase excessively.
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userPrivateMode% vuserPrivateMode, Private mode UI
-    Gui, Add, Text, xs+18 y+7 w%txtWid%, The paths and file names will be hidden and the images will be blurred.
+    Gui, Add, Text, xs+18 y+7 w%txtWid%, Hidden file names and blurred images.
     Gui, Add, Text, xs y+10, Maximum thumbnails to hold in memory:
     GuiAddSlider("maxMemThumbsCache", 10, 2048, 420, "Bitmaps cachable: $€", "dummy", 1, "xs+18 y+7 w" editWid * 2 " hp")
 
@@ -57226,9 +57232,9 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       Else If alertReduceSaveColorDepth()
          Return
 
-      If (noQualityWarnings!=1 && !RegExMatch(file2save, saveAlphaTypesRegEX) && (userSaveBitsDepth=1 || userSaveBitsDepth=1 && alphau=1))
+      If (noQualityWarnings!=1 && (!RegExMatch(file2save, saveAlphaTypesRegEX) || userSaveBitsDepth!=1 && currIMGdetails.HasAlpha=1 || userSaveBitsDepth!=1 && alphau=1))
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image format does not have support for an alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not have support for the alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return
       }
@@ -80597,7 +80603,7 @@ performFadeTransition(imgPath, gifAnim) {
            Break
 
         dummyPos := (A_OSVersion!="WIN_7") ? 0 : ""
-        r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, mainWidth, mainHeight, opacity)
+        r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, , , opacity)
         If !r2
            Break
         Sleep, 1
@@ -88603,7 +88609,7 @@ PanelAdjustImageCanvasSize() {
        Return
 
     r1 := trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
-    If (!oImgH || !oImgH)
+    If (!oImgW || !oImgH)
     {
        showTOOLtip("ERROR: No image seems to be loaded or it is malformed")
        SoundBeep, 300, 100
@@ -102437,16 +102443,9 @@ coreprocessTlbrTooltip(msgu, lf) {
    Return msgu
 }
 
-ResetLbtn() {
-  If GetKeyState("LButton", "P")
-     SetTimer, ResetLbtn, -60
-  Else
-     LbtnDwn := 0
-}
-
 DelayedToolbarTooltips(msgu, idu) {
   zbb := (slideShowRunning=1 || imageLoading=1 || runningLongOperation=1) ? 1 : 0
-  If ((LbtnDwn=1 || zbb=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350))
+  If ((determineLClickState()=1 || zbb=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350))
      Return
 
   MouseGetPos,,,, ctrlHover, 2
@@ -102501,13 +102500,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   If (okay=1 && thisState!=prevState && OutputVarWin=hQPVtoolbar) && (A_TickCount - zeitSillyPrevent>150)
   {
      ctrlHover := OutputVarControl
-     If (wP&0x1)
-     {
-        ; ToolTip, % A_TickCount , , ,
-        LbtnDwn := 1
-        SetTimer, ResetLbtn, -55
+     If (wP&0x1) ;L-Click
         Return
-     }
 
      If (soloSliderWinVisible!=1)
         msgu := tlbrDecideTooltips(ctrlHover)
@@ -102532,7 +102526,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
            }
         }
 
-        brr := ((openingPanelNow=1 || LbtnDwn=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350)) ? 1 : 0
+        brr := ((openingPanelNow=1 || determineLClickState()=1 || soloSliderWinVisible=1) || (A_TickCount - lastZeitOpenWin<350) || (A_TickCount - lastOtherWinClose<350)) ? 1 : 0
         If (slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && prevCtrlHover!=ctrlHover && prevMsg!=msgu && brr!=1)
         {
            prevCtrlHover := ctrlHover

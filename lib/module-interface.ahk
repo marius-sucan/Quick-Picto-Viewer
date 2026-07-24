@@ -2800,7 +2800,7 @@ PreProcessKbdKey() {
 
    If isVarEqualTo(hotkate, "Escape","Enter","Space")
    {
-       pp := (slideShowRunning=1 || slideShowRunning=1) ? 1 : 0
+       pp := (animGIFplaying=1 || slideShowRunning=1) ? 1 : 0
        If (animGIFplaying=1)
           stopGiFsPlayback()
        If (slideShowRunning=1)
