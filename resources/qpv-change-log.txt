@@ -8,6 +8,7 @@
   - [new] rotational/spin blur mode in the «Radial Blur» panel
   - [new] pen pressure support for brushes
   - added shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
+  - improvements and fixes related to the histogram statistics
   - much faster lines drawing on images above 536 megapixels
   - faster polar/rectangular coordinates transformations
   - faster blend mode functions
@@ -1185,7 +1186,6 @@ Files organization:
 - use WIC for batch image simple processing tool ? At least, teleport them from WIC to FreeImage
 
 ; Tools left to implement for images above 536 MPx:
-- Brushes [and upgrade the blend modes function]
 - Blur
 -- Low priority tools:
 ---- Detect edges
@@ -1216,5 +1216,4 @@ Files organization:
 - add folder details column - explorer panel
 - transparentize image tool
 - import vector paths
-- reimplement the smudge, pinch, bulge brushes
 
