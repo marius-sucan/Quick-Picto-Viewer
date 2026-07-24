@@ -73681,7 +73681,7 @@ createHistogramBMP(whichBitmap) {
          chartData[A_Index] := nz
 
       sumTotalBr += nz * (i + 1)
-      sumSq += nz * i * i                  ; Σ count·level² -> standard deviation below
+      sumSq += nz * i * i     ; Σ count·level² -> standard deviation below
       If (nz>modePointV)      ; running peak (mode); ties keep the first (lowest) level
       {
          max2 := modePointV   ; the former peak becomes the runner-up count
@@ -73690,7 +73690,7 @@ createHistogramBMP(whichBitmap) {
       } Else If (nz>max2)     ; 2nd-highest count, ties allowed (matches the old sorted [2])
          max2 := nz
 
-      If (nz<modePointV && nz>r2ndMaxV)   ; order-dependent "2nd max", kept verbatim for graphFocus
+      If (nz<modePointV && nz>r2ndMaxV)    ; order-dependent "2nd max", kept verbatim for graphFocus
          r2ndMaxV := nz
       If (nz>1 && nz<minCountGt1)          ; rarest populated level (>1 px), feeds graphFocus
          minCountGt1 := nz
@@ -73704,13 +73704,13 @@ createHistogramBMP(whichBitmap) {
 
       If (nz>0)
       {
-         If (blackPt=-1)                   ; darkest occupied level (absolute black point)
+         If (blackPt=-1)                    ; darkest occupied level (absolute black point)
             blackPt := i
          whitePt := i                       ; brightest occupied level (absolute white point)
          cumu += nz                         ; cumulative count -> median + robust range
-         If (robLo=-1 && cumu>=loThresh)   ; robust black point (past the darkest 0.5%)
+         If (robLo=-1 && cumu>=loThresh)    ; robust black point (past the darkest 0.5%)
             robLo := i
-         If (robHi=-1 && cumu>=hiThresh)   ; robust white point (past the brightest 0.5%)
+         If (robHi=-1 && cumu>=hiThresh)    ; robust white point (past the brightest 0.5%)
             robHi := i
          If (medianValue="" && cumu>TotalPixelz//2)
             medianValue := i
@@ -73724,9 +73724,10 @@ createHistogramBMP(whichBitmap) {
    variance := sumSq/TotalPixelz - meanExact*meanExact
    stdDev := Round(Sqrt((variance>0) ? variance : 0), 1)
    minu := maxu := 0
+   RRavgBrLvlK := Round(avgBrLvlK)
    Loop, 256   ; nearest populated level just below the average
    {
-      thisVal := brLvlArray[Round(avgBrLvlK) - A_Index]
+      thisVal := brLvlArray[RRavgBrLvlK - A_Index]
       If (thisVal>0)
       {
          minu := thisVal
@@ -73736,15 +73737,15 @@ createHistogramBMP(whichBitmap) {
 
    Loop, 256   ; nearest populated level just above the average
    {
-      thisVal := brLvlArray[A_Index + Round(avgBrLvlK)]
+      thisVal := brLvlArray[A_Index + RRavgBrLvlK]
       If (thisVal>0)
       {
          maxu := thisVal
          Break
       }
    }
-   avgBrLvlV := (minu + maxu)//2
 
+   avgBrLvlV := (minu + maxu)//2
    ; Internal tonal span (levels >1 px) still feeds graphFocus through meanValue.
    If (firstBinGt1=-1)               ; nothing above 1 px: collapse the span to the black point
       firstBinGt1 := lastBinGt1 := blackPt
@@ -96509,7 +96510,7 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
         {
            peakPointK := thisIndex ; max range in histogram
            If (minBrLvlK=-1)
-              minBrLvlK := thisIndex   ; min range in histogram
+              minBrLvlK := thisIndex ; min range in histogram
         }
 
         If (nrPixelz<pixMinu)
@@ -96517,7 +96518,7 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
            pixMinu := nrPixelz
            minPointK := thisIndex
         }
-        pixRms += nrPixelz ** 2    ; root-mean square
+        pixRms += nrPixelz ** 2 ; root-mean square
     }
 
     ch0 := ""
