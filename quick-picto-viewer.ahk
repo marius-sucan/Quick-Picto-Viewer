@@ -5482,12 +5482,12 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       Return 0
    }
 
+   Static lowerLimitRatio := 0.4
    startZeit := A_TickCount
    ; GetPhysicalCursorPos(oX, oY)
    JEE_ClientToScreen(hGDIwin, lastLclickX, lastLclickY, oX, oY)
    SelDotsSize := (PrefsLargeFonts=1) ? imgHUDbaseUnit//3 : imgHUDbaseUnit//3.25
    dotSize := Round(SelDotsSize*2.5)
-   lowerLimitRatio := (IMGresizingMode=4) ? 0.4 : 0.4
    GetPhysicalCursorPos(mX, mY)
    vpWinClientSize(mainWidth, mainHeight)
    setWhileLoopExec(1)
@@ -10455,7 +10455,7 @@ DefineImgSizing(modus:=1) {
 }
 
 VPimgFXrandomizer() {
-    Static lastFX, FXmodes := {1:1, 2:2, 3:3, 4:4, 5:10}
+    Static lastFX, FXmodes := {1:1, 2:2, 3:1, 4:4, 5:10}
     Random, OutputVar, 1, 5
     imgFxMode := FXmodes[OutputVar]
     If (imgFxMode=lastFX && lastFX=10)
@@ -10481,6 +10481,7 @@ VPimgFXrandomizer() {
        OutputVar := 1
 
     usrColorDepth := OutputVar
+    lastFX := imgFxMode
 }
 
 dummyInfoToggleSlideShowu(actu:=0) {
@@ -52827,7 +52828,7 @@ BtnCreateNewImage() {
     }
 
     currIMGdetails.HasAlpha := 1
-    If (NewDocUseColor=1 && OutlierFillOpacity>253 && NewDocUseColor=1)
+    If (NewDocUseColor=1 && OutlierFillOpacity>253)
        currIMGdetails.HasAlpha := 0
 
     imgIndexEditing := currentFileIndex
@@ -66037,7 +66038,7 @@ createMenuFilesSort() {
       kMenu("PVsort", "Add", "Histogram range", "MenuActSortHisto5",, "Sort by " sillySeparator)
       kMenu("PVsort", "Add", "Histogram mode", "MenuActSortHisto6",, "Sort by " sillySeparator)
       kMenu("PVsort", "Add", "Histogram minimum", "MenuActSortHisto7",, "Sort by " sillySeparator)
-      kMenu("PVsort", "Add", "Histogram root-mean square", "MenuActSortHisto8",, "Sort by " sillySeparator)
+      kMenu("PVsort", "Add", "Histogram standard deviation", "MenuActSortHisto8",, "Sort by " sillySeparator)
    }
 
    Menu, PVsort, Add, 
@@ -73722,7 +73723,7 @@ createHistogramBMP(whichBitmap) {
    meanExact := sumTotalBr/TotalPixelz - 1
    avgBrLvlK := Round(meanExact, 1)
    variance := sumSq/TotalPixelz - meanExact*meanExact
-   stdDev := Round(Sqrt((variance>0) ? variance : 0), 1)
+   stdDev := Round( Sqrt( (variance>0) ? variance : 0) * 100 )
    minu := maxu := 0
    RRavgBrLvlK := Round(avgBrLvlK)
    Loop, 256   ; nearest populated level just below the average
@@ -86387,7 +86388,7 @@ PanelHistogramSorting() {
 
    widthu := (PrefsLargeFonts=1) ? 650 : 450
    fakeWinCreator(45, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Choose image histogram sort mode: " appTitle, "Each image file will be read to extract its histogram data.`n`nThis operation can take a lot of time with many files.", "&Sort list|&Resolution|&Cancel", 1, "image-file", "&Reverse order", 0, "Average`f`fMedian`fPeak range`fMinimum range`f`Range`fMode`fMinimum`fRoot-mean square", nullEdit, nullEdit, 2, widthu)
+   msgResult := msgBoxWrapper("panelu|Choose image histogram sort mode: " appTitle, "Each image file will be read to extract its histogram data.`n`nThis operation can take a lot of time with many files.", "&Sort list|&Resolution|&Cancel", 1, "image-file", "&Reverse order", 0, "Average`f`fMedian`fPeak range`fMinimum range`f`Range`fMode`fMinimum`fStandard deviation", nullEdit, nullEdit, 2, widthu)
    If InStr(msgResult.btn, "sort")
    {
       good2go := 0
@@ -86503,7 +86504,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimghrange% vUIcheckimghrange, Histogram total range
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimgavg% vUIcheckimgavg, Histogram average
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimgmedian% vUIcheckimgmedian, Histogram median
-    Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghrms% vUIcheckimghrms, Histogram root-mean square
+    Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghrms% vUIcheckimghrms, Histogram standard deviation
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimghmode% vUIcheckimghmode, Histogram mode
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghminu% vUIcheckimghminu, Histogram minimum
 
