@@ -667,7 +667,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
       objuC - menu-names and their properties objuC[menu] := [menu-name, container-menu, accelerator-key]
 
    The menus are searchable via PanelQuickSearchMenuOptions() -->
-   PopulateQuickMenuSearch() --> buildQuickSearchMenus(). The global
+   uiPopulateQuickMenuSearch() --> buildQuickSearchMenus(). The global
    variable "mustPreventMenus" is set to 1 before generating the
    searchable list of the menus. When this is used, some menu items
    are hidden, while others are added, and the menus themselves are
@@ -1083,4 +1083,23 @@ n) How to add a new panel/tool
    and to the "btnzList" string. In CoreGUItoolbar() add a call to tlbrAddNewIcon()
    with the newly defined static button object then wire its click behaviour in
    processToolbarFunctions(). See section g) for more details on the toolbar internals.
+
+
+m) Search menu options [omnibox] (soon)
+=====================================================================
+
+   PanelQuickSearchMenuOptions()
+   uiPopulateQuickMenuSearch()
+   buildQuickSearchMenus()
+   QuickMenuSearchGUIAGuiContextMenu()
+   createOmniBoxFoldersContextMenu()
+   invokeOmniBoxCurrentFile()
+   UIeditQuickMenuSearchTrigger()
+   LVquickSearchMenusResponder()
+
+   PanelFoldersTree()
+   FolderTreeResponder()
+   folderTreeContextMenu()
+   invokeFoldersListerMenu()
+
 

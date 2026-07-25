@@ -2552,7 +2552,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      IniRead, testStaticFolderz, % fileNamu, Folders, Fi1, @
      IniRead, tstSLDcacheFilesList, % fileNamu, General, SLDcacheFilesList, @
      IniRead, testDynaFolderz, % fileNamu, DynamicFolderz, DF1, @
-     If StrLen(testDynaFolderz)>4
+     If (StrLen(testDynaFolderz)>2)
         DynamicFoldersList := "|hexists|"
        ; DynamicFoldersList := coreLoadDynaFolders(fileNamu)
 
@@ -4398,7 +4398,7 @@ FirstPicture() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   If StrLen(mustOpenStartFolder)>3
+   If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
    If (maxFilesIndex>1 && currentFileIndex!=1 && thumbsDisplaying!=1)
@@ -4416,7 +4416,7 @@ LastPicture() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   If StrLen(mustOpenStartFolder)>3
+   If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
    If (maxFilesIndex>1 && currentFileIndex!=maxFilesIndex && thumbsDisplaying!=1)
@@ -4674,7 +4674,7 @@ ToggleThumbsMode() {
    }
 
    mouseTurnOFFtooltip()
-   If (StrLen(mustOpenStartFolder)>3 && !ar)
+   If (StrLen(mustOpenStartFolder)>1 && !ar)
    {
       currentFileIndex := doOpenStartFolder(didSomething)
       If !didSomething
@@ -10486,7 +10486,7 @@ VPimgFXrandomizer() {
 
 dummyInfoToggleSlideShowu(actu:=0) {
   Static lastInvoked := 1
-  If StrLen(mustOpenStartFolder)>3
+  If (StrLen(mustOpenStartFolder)>1)
      currentFileIndex := doOpenStartFolder()
 
   GIFframesPlayied := 0
@@ -11769,7 +11769,7 @@ dummyChangeVProtation() {
    GdipCleanMain(4)
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
-      GuiControl, SettingsGUIA:, vpIMGrotation, % vpIMGrotation
+      uiSlidersArray["vpIMGrotation", 14] := -1
       updatePanelColorsInfo()
       updatePanelColorSliderz()
    }
@@ -12028,7 +12028,7 @@ VPflipImgH() {
 
 doOpenStartFolder(ByRef didSomething:=0) {
    didSomething := 0
-   If StrLen(mustOpenStartFolder)>3
+   If (StrLen(mustOpenStartFolder)>1)
    {
       ForceRefreshNowThumbsList()
       startIndex := currentFileIndex ? currentFileIndex : 1
@@ -12075,7 +12075,7 @@ coreNextPrevImage(direction, startIndex, randomMode) {
          Return currentFileIndex
    }
 
-   If StrLen(mustOpenStartFolder)>3
+   If (StrLen(mustOpenStartFolder)>1)
    {
       startIndex := doOpenStartFolder()
       currentFileIndex := startIndex
@@ -26398,7 +26398,9 @@ OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
     {
        GuiControlGet, userQuickMenusEdit
        edithu := Trimmer(userQuickMenusEdit)
-       edithu := Trimmer(StrReplace(edithu, "\\", "\"), "\")
+       edithu := StrReplace(edithu, "\\", "\")
+       oqme := edithu
+       edithu := Trimmer(edithu, "\")
        RowNumber := LV_GetFirstSelected(hLVquickSearchMenus)
        If !RowNumber
           RowNumber := LV_GetNext(0, "F")
@@ -26409,7 +26411,7 @@ OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
     If InStr(funcu, "!OmniNavigateFilteredFolders")
        edithu := SubStr(edithu, 1, InStr(edithu, "\", 0, -1))
 
-    If (SubStr(edithu, 2, 2)=":\" && (InStr(funcu, "!OmniNavigateFolder") || InStr(funcu, "!OmniNavigateFilteredFolders")))
+    If (SubStr(oqme, 2, 2)=":\" && (InStr(funcu, "!OmniNavigateFolder") || InStr(funcu, "!OmniNavigateFilteredFolders")))
        Return edithu folderu
 }
 
@@ -27754,7 +27756,7 @@ UIeditHammingInterpolation() {
 }
 
 PanelWrapperFilesStats() {
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3 && !filesFilter)
@@ -30041,6 +30043,15 @@ PanelFoldersTree() {
     If MsgBox2hwnd
        Return
 
+    If (slideShowRunning=1)
+       ToggleSlideShowu()
+
+    If (AnyWindowOpen=61 || AnyWindowOpen=83)
+       CloseWindow()
+
+    If (animGIFplaying)
+       DestroyGIFuWin()
+
     mouseTurnOFFtooltip()
     setLVrowsCount()
     thisSize := 300 + PrefsLargeFonts + uiUseDarkMode
@@ -30094,7 +30105,7 @@ PanelFoldersTree() {
     Gui, Add, Text, x+2 vfdTreeInfoLine +0x200 gfolderTreeCopyPath -wrap +TabStop, Folder tree status bar...
     Gui, Add, Button, x+1 y+1 w1 h1 -wantTab -TabStop Default gfolderTreeDefaultAction, &Default
 
-    winPos := (prevSetWinPosY && prevSetWinPosX) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
+    winPos := (prevSetWinPosX && prevSetWinPosY) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("fdTreeGuia", hfdTreeWinGui, 0, "Folders tree view: " appTitle, winPos)
     folderTreeWinOpen := 1
     interfaceThread.ahkassign("folderTreeWinOpen", folderTreeWinOpen)
@@ -30568,9 +30579,9 @@ folderTreeInfoStatusLineUpdater(modus:=0) {
     }
 
     thisFolder := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1))
-    If (!thisFolder && c)
+    If (thisFolder="" && c)
        TV_GetText(OutputVar, c)
-    Else If !thisFolder
+    Else If (thisFolder="")
        thisFolder := "Folder tree: " TV_GetCount() " elements"
 
     If InStr(OutputVar, ":\")
@@ -30591,7 +30602,7 @@ getDriveInfos(OutputVar) {
 }
 
 folderTreeGetSelectedPath(c) {
-   If StrLen(c)<2
+   If (StrLen(c)<2)
       Return
 
    Gui, fdTreeGuia: Default
@@ -30608,7 +30619,7 @@ folderTreeGetSelectedPath(c) {
    }
 
    folderPath := StrReplace(folderPath, "\\", "\")
-   If StrLen(folderPath)<5
+   If (StrLen(folderPath)<2)
       folderPath := ""
 
    Return folderPath
@@ -30852,6 +30863,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
     showTOOLtip("Scanning folders, please wait")
     parentsObj := FileExploreUpDownLevel(1, 1, currentParent)
     parentsLevels := parentsObj.Count()
+    siblingsParent := ""
     ; ToolTip, % parentsLevels " == " currentParent , , , 2
     Loop, % parentsLevels
     {
@@ -30861,7 +30873,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
        If (A_Index=1 && !InStr(parentsObj[1], ":"))
           Break
 
-       pu := A_Index - 1
+       pu := (A_Index=1) ? 1 : A_Index - 1
        If (A_Index=1)
           P1 := TV_Add(parentsObj[A_Index] "\",, "Expand")
        Else If (A_Index!=currentParent)
@@ -31056,7 +31068,7 @@ folderTreeCreateFolder() {
 
    If !FolderExist(thisFolder)
    {
-      If StrLen(thisFolder)>4
+      If (StrLen(thisFolder)>1)
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected folder seems to no longer exist:`n`n" thisFolder "\`n`nWould you like to recreate it? By choosing yes, you will be able to create a new folder inside it.", 4, 0, "question")
 
       If (msgResult="Yes")
@@ -31172,7 +31184,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    If !FolderExist(thisFolder)
    {
       friendly_name := (quickMode!=1) ? "paste the folder(s) inside it" : "perform the intended folder action"
-      If StrLen(thisFolder)>4
+      If (StrLen(thisFolder)>1)
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "Destination folder: " thisFolder "\`n`nIt seems to no longer exist. Would you like to recreate it? By choosing yes, QPV will " friendly_name, 4, 0, "question")
 
       If (msgResult="Yes")
@@ -31193,7 +31205,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
       SetTimer, RemoveTooltip, -200
    }
 
-   If StrLen(listu)<5
+   If (StrLen(listu)<2)
    {
       showTOOLtip("WARNING: Found no folders in the clipboard")
       SoundBeep 300, 100
@@ -31376,6 +31388,11 @@ fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
    If (modus="thisFile" && InStr(imgPath, ":\"))
    {
       linea := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+      If (StrLen(linea)=2 && SubStr(linea, 2, 1)=":")
+      {
+         linea .= "\"
+         ruth := "\"
+      }
    } Else
    {
       Gui, fdTreeGuia: Default
@@ -31390,10 +31407,10 @@ fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
    If (VisibleQuickMenuSearchWin!=1)
       PanelQuickSearchMenuOptions()
 
-   newLabelu := userQuickMenusEdit := Trim(StrReplace(linea, "\\", "\"), "\")
-   len := StrLen(newLabelu)
+   userQuickMenusEdit := Trim(StrReplace(linea, "\\", "\"), "\") ruth
+   len := StrLen(userQuickMenusEdit)
    ; ToolTip, % newLabelu "=" len "`n" userQuickMenusEdit , , , 2
-   GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % newLabelu
+   GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % userQuickMenusEdit
    GuiControl, QuickMenuSearchGUIA: Focus, userQuickMenusEdit
    EM_SETSEL(hEditMenuSearch, len, len)
    SetTimer, uiPopulateQuickMenuSearch, -150
@@ -31465,13 +31482,13 @@ folderTreeScanSubbies(prevent:="") {
       Return
 
    thisFolder := folderTreeGetSelectedPath(c)
-   If !thisFolder
+   If (thisFolder="")
    {
       TV_GetText(thisFolder, c)
       thisFolder := Trimmer(thisFolder, "\")
    }
 
-   If !thisFolder
+   If (thisFolder="")
       Return
 
     showTOOLtip("Scanning folders, please wait")
@@ -31512,13 +31529,12 @@ folderTreeScanSubbies(prevent:="") {
     }
 
     For Key, Value in mustDelete
-       TV_Delete(Key)
+        TV_Delete(Key)
 
    mustDelete := ""
    hasAddedSubs := 0
    doStartLongOpDance()
-   If FolderExist(thisFolder)
-   || (StrLen(thisFolder)=2 && InStr(thisFolder, ":"))
+   If (FolderExist(thisFolder) || (StrLen(thisFolder)=2 && InStr(thisFolder, ":")))
    {
       Loop, Files, % thisFolder "\*", DF
       {
@@ -31527,7 +31543,7 @@ folderTreeScanSubbies(prevent:="") {
 
          If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
          {
-            If mustSkip.hasKey(A_LoopFileName)
+            If (mustSkip.hasKey(A_LoopFileName))
                Continue
 
             P%A_Index% := TV_Add("\" A_LoopFileName, c)
@@ -31926,7 +31942,7 @@ uiPopulateExifToolInfos() {
       Gui, SettingsGUIA: ListView, LViewMetaM
       LV_Delete()
       cmdLine := """" mainExecPath "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
-      output := Cli_RunCMD(cmdLine, A_WorkingDir, "UTF-8", "", 4500)
+      output := Cli_RunCMD(cmdLine, mainExecPath, "UTF-8", "", 4500)
       ; ToolTip, % output , , , 2
       hasAdded := 0
       Loop, Parse, % output,`n,`r
@@ -32092,7 +32108,7 @@ InitialFilterSettingsPanel(modus) {
 
 PanelEnableFilesFilter() {
     Global FilterTypeu := 0
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     If (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_"))
@@ -33683,7 +33699,7 @@ SQLdbGenerateStaticFolders() {
        Rowu := RecordSet.Rows[A_Index]
        thisFolder := Trimmer(Rowu[1])
        z := Format("{:L}", thisFolder)
-       If (StrLen(thisFolder)>2 && foldersListArray[z]!=1)
+       If (StrLen(thisFolder)>1 && foldersListArray[z]!=1)
        {
           foldersListArray[z] := 1
           addDynamicFolderSQLdb(thisFolder, 0, "staticfolders")
@@ -34113,7 +34129,7 @@ SaveFilesList(enforceFile:=0) {
 LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
     countStaticFolders := newStaticFoldersListCache.MaxIndex()
     ths := newStaticFoldersListCache.Count()
-    If (StrLen(newStaticFoldersListCache[1, 1])>4 && countStaticFolders>0 && ths>0)
+    If (StrLen(newStaticFoldersListCache[1, 1])>1 && countStaticFolders>0 && ths>0)
        Return
 
     countStaticFolders := 0
@@ -34161,7 +34177,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
           oldDateu := lineArru[1]
           oldDateu := SubStr(oldDateu, InStr(oldDateu, "=")+1)
           z := Format("{:L}", folderu)
-          If (StrLen(folderu)>3 && hash[z]!=1)
+          If (StrLen(folderu)>1 && hash[z]!=1)
           {
              hash[z] := 1
              countStaticFolders++
@@ -34222,7 +34238,7 @@ countFilesDiskPerStaticFolders() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(folderu, RowNumber, 1)
     folderu := newStaticFoldersListCache[folderu, 1]
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     counter := indexu := RowNumber := 0
@@ -34241,7 +34257,7 @@ countFilesDiskPerStaticFolders() {
           Continue
 
        folderu := newStaticFoldersListCache[indexu, 1]
-       If folderu
+       If (folderu!="")
        {
           counter++
           indexList[counter] := [indexu, RowNumber]
@@ -34295,7 +34311,7 @@ BTNcountFilesDiskDynaFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isR, RowNumber, 2)
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     If !thisIndex
@@ -34360,7 +34376,7 @@ GenerateStaticFoldersListNow() {
    totalLoops := foldersListArray.Count()
    For folderu, Value in foldersListArray
    {
-       If !folderu
+       If (folderu="")
           Continue
 
        counter++
@@ -36030,7 +36046,7 @@ SortFilesList(SortCriterion) {
       setWindowTitle("Sorting files list, please wait", 1)
       backCurrentSLD := CurrentSLD
       CurrentSLD := filterBehaviour := ""
-      newIndex :=  := 0
+      newIndex := 0
       If (StrLen(filesFilter)>1 && !InStr(filesFilter, "SQL:query:"))
       {
          filterBehaviour := 1
@@ -40939,7 +40955,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          If askAboutFileSave(" and the selected files list will be imported to the list")
             Return
 
-         If StrLen(SelectedDir)>3
+         If StrLen(SelectedDir)>1
          {
             zPlitPath(userQuickMenusEdit, 1, fileu, SelectedDir)
             prevOpenFolderPath := SelectedDir
@@ -41217,7 +41233,9 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    GuiControlGet, userQuickMenusEdit
    userQuickMenusEdit := Trimmer(userQuickMenusEdit)
    userQuickMenusEdit := allowCtrlBkspEdit(hEditMenuSearch, userQuickMenusEdit)
-   userQuickMenusEdit := Trimmer(StrReplace(userQuickMenusEdit, "\\", "\"), "\")
+   userQuickMenusEdit := StrReplace(userQuickMenusEdit, "\\", "\")
+   oqme := userQuickMenusEdit
+   userQuickMenusEdit := Trimmer(userQuickMenusEdit, "\")
    RowNumber := LV_GetNext(0, "F")
    initialCount := LV_GetCount()
    omniBoxMode := 0
@@ -41232,13 +41250,14 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    If (isNumber(ndiaz) && (tj="@" || tj="#") && maxFilesIndex>1 && CurrentSLD && !AnyWindowOpen)
    {
       IndexJump := 1
-   } Else If (SubStr(userQuickMenusEdit, 2, 2)=":\" && !AnyWindowOpen)
+   } Else If (SubStr(oqme, 2, 2)=":\" && !AnyWindowOpen)
    {
       pathModus := 1
       allowMenuSearch := 0
    }
 
-   OutDir := SubStr(userQuickMenusEdit, 1, InStr(userQuickMenusEdit, "\", 0, -1))
+   OutDir := (StrLen(oqme)=3 && pathModus=1) ? userQuickMenusEdit : SubStr(userQuickMenusEdit, 1, InStr(userQuickMenusEdit, "\", 0, -1))
+   ; ToolTip, %  OutDir "|" pathModus "|" FolderExist(OutDir) "`n|" userQuickMenusEdit , , , 2
    If (IndexJump=1)
    {
       allowMenuSearch := 0
@@ -41265,7 +41284,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
             LV_Add(1, labelu3, xu, "-", "-", "", "!OmniImportFolder", 1, 1)
             LV_Add(1, labelu4, xu, "-", "-", "", "!OmniImportRfolder", 1, 5)
          }
-      }
+      } Else 
 
       startOperation := A_TickCount
       setImageLoading()
@@ -41292,7 +41311,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
             hasAddedSubs++
             hasAddedItems++
             LV_Add(A_Index, "\" A_LoopFileName, xu, "-", "Change folder", "", "!OmniNavigateFolder", 0, 0)
-            If (A_LoopFileName=prevOmniBoxFolder && prevOmniBoxFolder)
+            If (A_LoopFileName=prevOmniBoxFolder && prevOmniBoxFolder!="")
                mustReselect := hasAddedItems
          } Else If RegExMatch(A_LoopFileFullPath, RegExFilesPattern)
             filesFound++
@@ -42400,7 +42419,7 @@ BTNsaveSlideshowPanel() {
 }
 
 FolderExist(filePath) {
-   If StrLen(filePath)<4
+   If StrLen(filePath)<2
       Return
    Else
       Return InStr(FileExist(filePath), "D")
@@ -44688,7 +44707,7 @@ PanelSearchAndReplaceIndex() {
     If warnFramesActionPrevented("SEARCH AND REPLACE")
        Return
 
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3 && !filesFilter)
@@ -45334,7 +45353,7 @@ PanelSearchIndex(dummy:="") {
     If warnFramesActionPrevented("SEARCH")
        Return
 
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<2)
@@ -47054,7 +47073,6 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
 
     bgrColor := OSDbgrColor
     txtColor := OSDtextColor
-    isBold := (FontBolded=1) ? " Bold" : ""
     lastTippyWin := WinActive("A")
     Sleep, 25
     Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
@@ -49539,10 +49557,14 @@ BTNopenPrevPanel(givenZZ:=0, isGiven:=0, morrigan:=0) {
       f := "PanelColorsAdjusterVPwindow"
    Else If (zz=23)
       f := "PanelFillSelectedArea"
+   Else If (zz=24)
+      f := "PanelPasteInPlace"
    Else If (zz=25)
       f := "PanelEraseSelectedArea"
    Else If (zz=30)
       f := "PanelDrawParametricLines"
+   Else If (zz=31)
+      f := "PanelTransformSelectedArea"
    Else If (zz=32)
       f := "PanelInsertTextArea"
    Else If (zz=55)
@@ -53140,7 +53162,7 @@ updateUIblurPanel(a:=0,b:=0) {
        actu2 := (blurAreaMode>1 && blurAreaMode!=10) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
        GuiControl, % actu2, blurAreaEqualXY
 
-       isActive := (blurAreaMode>1 && blurAreaEqualXY!=1 &&& blurAreaMode!=10) ? 1 : 0
+       isActive := (blurAreaMode>1 && blurAreaEqualXY!=1 && blurAreaMode!=10) ? 1 : 0
        uiSlidersArray["blurAreaYamount", 10] := isActive
     }
 
@@ -55419,12 +55441,13 @@ BtnRemPrivateFolder() {
 }
 
 BtnBrowsePrivateFolder() {
+   Gui, SettingsGUIA: Default
    GuiControlGet, editF1
    editF1 := Trimmer(editF1)
    editF1 := Trimmer(editF1, "\")
    openu := FolderExist(editF1) ? editF1 : prevOpenFolderPath
    SelectedDir := openFoldersDialogWrapper(openu, "Select the folder to be ignored")
-   If (SelectedDir)
+   If (SelectedDir!="")
    {
       SelectedDir := Trimmer(StrReplace(SelectedDir, "\\", "\"), "\")
       SeenIMGprivateFolder := SelectedDir "\"
@@ -56752,7 +56775,7 @@ InvokeOpenRecentMenu(givenCoords:=0) {
 
 PanelDefineEntireSlideshowLength() {
     Global userHourDur, userMinDur, userSecDur, infoLine, userDefinedSpeedSlideshow
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3)
@@ -56961,7 +56984,7 @@ jumpPreviousImage() {
 }
 
 PanelJump2index() {
-   If StrLen(mustOpenStartFolder)>3
+   If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
    If (maxFilesIndex<2)
@@ -57449,7 +57472,7 @@ zPlitPath(inputu, fastMode, ByRef fileNamu, ByRef folderu, ByRef fileNamuNoEXT:=
        FileGetAttrib, OutputAttribs, %inputu%
     } Else StringRight, OutputVar, inputu, 1
 
-    If InStr(OutputAttribs, "D") || (OutputVar="\")
+    If (InStr(OutputAttribs, "D") || OutputVar="\")
     {
        ; fnOutputDebug("hmm = " OutputVar "||" OutputAttribs)
        ; SoundBeep , 300, 100
@@ -57725,7 +57748,7 @@ IdentifyFileFolderRoots(modus) {
    listu := ""
    For Key, Value in foldersListArray
    {
-      If key
+      If (key!="")
          listu .= key "`n"
    }
 
@@ -58572,7 +58595,7 @@ BtnCopyMoveAction(dummy:=0) {
      If (b := InStr(folderu, "; "))
         folderu := SubStr(folderu, b+2)
 
-     If folderu
+     If (folderu!="")
      {
         relativePath := "\" folderu
         folderu := OutDir "\" folderu
@@ -58585,7 +58608,7 @@ BtnCopyMoveAction(dummy:=0) {
      folderu := Trimmer(folderu, ".")
      If (b := InStr(folderu, "; "))
         folderu := SubStr(folderu, b+2)
-     If folderu
+     If (folderu!="")
      {
         relativePath := ".\" folderu
         folderu := OutDir "\" folderu
@@ -58623,7 +58646,7 @@ BtnCopyMoveAction(dummy:=0) {
      Sleep, 2
      r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath)
      dummyTimerDelayiedImageDisplay(50)
-  } Else If (StrLen(folderu)>4)
+  } Else If (StrLen(folderu)>1)
   {
      If (dummy!="quick-actu")
         msgResult := msgBoxWrapper(appTitle, "Destination folder does not seem to exist:`n" folderu "\`n`nDo you want to create the folder?", 4, 0, "question")
@@ -58655,8 +58678,7 @@ BtnCopyMoveAction(dummy:=0) {
 RecentCopyMoveManager(entry2add) {
   entry2add := Trimmer(entry2add)
   mainListu := readRecentFileDesties(1)
-
-  If StrLen(entry2add)<3
+  If (StrLen(entry2add)<2)
      Return
 
   Loop, Parse, mainListu,`n
@@ -61025,7 +61047,7 @@ combineImgsConvertDepth(k, modus, animus) {
      Return hFIFimgC
 }
 
-OpenFolders(dummy:=0) {
+OpenFolders(dummy:="") {
    If (AnyWindowOpen || imageLoading=1)
       Return
 
@@ -61038,7 +61060,7 @@ OpenFolders(dummy:=0) {
    Else
       SelectedDir := openFoldersDialogWrapper(prevOpenFolderPath, "Select the folder to open recursively")
 
-   If (SelectedDir)
+   If (SelectedDir!="")
    {
       SelectedDir := Trimmer(StrReplace(SelectedDir, "\\", "\"), "\")
       If askAboutFileSave(" and another image will be loaded")
@@ -61066,9 +61088,9 @@ openFoldersDialogWrapper(startPath, msg:="") {
    thisHwnd := (AnyWindowOpen>0) ? hSetWinGui : PVhwnd
    entriesList := defaultu "`n" recentOpenedFolders()
    r := SelectFolderEx(startPath, msg, thisHwnd, nullLabel, entriesList, 1, "History", entriesList)
-   If (!InStr(r.SelectedCombo, defaultu) && StrLen(r.SelectedCombo)>3)
+   If (!InStr(r.SelectedCombo, defaultu) && StrLen(r.SelectedCombo)>1)
       z := r.SelectedCombo
-   Else If StrLen(r.SelectedDir)>4
+   Else If StrLen(r.SelectedDir)>1
       z := r.SelectedDir
 
    SetTimer, setWinCloseZeit, -150, 900
@@ -61140,6 +61162,7 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
             Break
          }
       }
+
       If (abandonAll=1)
       {
          ResetImgLoadStatus()
@@ -61183,6 +61206,7 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
    }
 
    thisParent := SubStr(oldFolder, InStr(oldFolder, "\", 0, -1) + 1)
+   thisParent := Trimmer(thisParent, "|")
    If !thisLevel
    {
       Loop, % maxLevels + 1
@@ -61196,6 +61220,7 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
    }
 
    oldIndex := currentFileIndex
+   ; ToolTip, % thisFolder "`n" oldFolder "`n" thisParent "`n" folderPathArray[1] "`n" thisLevel , , , 2
    prevMaxLevels := prevPathArray.Length()
    If (returnObj=1)
    {
@@ -61240,11 +61265,15 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
    oldFolder := baseFolder
    thisFolder := StrReplace(Trimmer(baseFolder), "|")
    initialSibling := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
-   thisFolder := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1) - 1)
+   If !(SubStr(thisFolder, 2, 1)=":" && StrLen(thisFolder)=2)
+      thisFolder := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1) - 1)
+   Else 
+      initialLevel := thisLevel := 1
+
    If (thisFolder!=prevFolder)
    {
-      subFoldersArray := []
       thisIndex := 0
+      subFoldersArray := []
       prevFolder := thisFolder
       doStartLongOpDance()
       Loop, Files, % thisFolder "\*", DF
@@ -61274,6 +61303,7 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
       Return
    }
 
+   ; ToolTip, % "r==" thisFolder "`n" oldFolder "`n" initialSibling "`n" subFoldersArray[1] "`n" thisLevel "|" initialLevel "|" thisIndex , , , 2
    If (returnObj=1)
    {
       iLevel := thisLevel
@@ -61850,7 +61880,7 @@ addNewFile2list() {
    zPlitPath(firstFile, 0, OutFileName, SelectedDir)
    countFiles := ST_Count(imgsListu, "`n") + 1
    ; msgbox, % firstFile "a`n" countFiles "`n" imgsListu
-   If StrLen(SelectedDir)>3
+   If StrLen(SelectedDir)>1
    {
       prevOpenFolderPath := SelectedDir
       INIaction(1, "prevOpenFolderPath", "General")
@@ -61895,7 +61925,7 @@ importSLDplainText(whichFile) {
       Return
    }
 
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       showTOOLtip("Deactivating the files list filter, please wait")
       remFilesListFilter("simple")
@@ -61915,7 +61945,7 @@ importSLDplainText(whichFile) {
    If !mustRemQuotes
    {
       IniRead, testDynaFolderz, % whichFile, DynamicFolderz, DF1, @
-      If StrLen(testDynaFolderz)>4
+      If (StrLen(testDynaFolderz)>1)
          DynamicFoldersList .= "`n" coreLoadDynaFolders(whichFile)
    } Else
    {
@@ -61944,7 +61974,7 @@ importSLDBintoSLDB(whichFile) {
    If (!RegExMatch(whichFile, "i)(.\.sldb)$") || SLDtypeLoaded!=3)
       Return
 
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       showTOOLtip("Deactivating the files list filter, please wait")
       remFilesListFilter("simple")
@@ -62246,7 +62276,7 @@ importSLDBintoPlainText(whichFile) {
     mustOpenStartFolder := ""
     zPlitPath(whichFile, 0, OutFileName, SelectedDir)
     showTOOLtip("Importing files list from database`n" OutFileName "`n" SelectedDir "\")
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
     OpenSLDBdataBase(whichFile, 1)
@@ -62339,9 +62369,9 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     If (!CurrentSLD && maxFilesIndex>0)
     {
        If !SelectedDir
-          SelectedDir := "\Unsaved-list"
+          SelectedDir := "\UnsavedList"
        SLDtypeLoaded := 2
-       CurrentSLD := SelectedDir "\newFile.SLD"
+       CurrentSLD := SelectedDir "\NewFile.SLD"
     }
 
     mustOpenStartFolder := ""
@@ -62460,7 +62490,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       If !CurrentSLD
       {
          SLDtypeLoaded := 2
-         CurrentSLD := SelectedDir "\newFilesList.SLD"
+         CurrentSLD := SelectedDir "\NewFilesList.SLD"
          RandomPicture()
       }
    }
@@ -62591,7 +62621,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
 
    watchFolderDetails := ""
    updateUIctrl()
-   If StrLen(foldersListu)>3
+   If (StrLen(foldersListu)>2)
    {
       If askAboutFileSave(" and the dropped image files will be added to the files list")
          Return
@@ -62602,7 +62632,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       dropFilesSelection(1)
       setWhileLoopExec(1)
       showTOOLtip("Preparing to import dropped folders, please wait")
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
          remFilesListFilter("simple")
 
       prlist := ""
@@ -63931,14 +63961,14 @@ InvokeMenuBarFile(manuID) {
       kMenu("PVtActFile", "Add", "&Explore containing folder`tCtrl+E", "OpenThisFileFolder")
       If ((!FolderExist(OutDir) || StrReplace(CurrentSLD, "|")=OutDir) && !mustOpenStartFolder)
          kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+      If !FolderExist(OutDir)
+         kMenu("PVtActFile", "Disable", "&Explore containing folder`tCtrl+E")
 
       kMenu("PVtActFile", "Add", "System «Open with» dialog", "MenuInvokeSHopenWith", "external")
       kMenu("pvMenuBarFile", "Add", "Open this&...", ":PVtActFile")
       Menu, pvMenuBarFile, Add
       kMenu("pvMenuBarFile", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "properties image details")
       kMenu("pvMenuBarFile", "Add", "File prope&rties (Explorer)", "OpenFileProperties")
-      If !FolderExist(OutDir)
-         kMenu("pvMenuBarFile", "Disable", "&Explore containing folder`tCtrl+E")
       Menu, pvMenuBarFile, Add
       kMenu("pvMenuBarFile", "Add", "&Delete file`tDelete", "DeleteActivePicture")
       kMenu("pvMenuBarFile", "Add", "&Rename file`tShift+F2", "SingularRenameFile")
@@ -64481,7 +64511,7 @@ InvokeMenuBarFind(manuID) {
      }
   } Else
   {
-     If StrLen(mustOpenStartFolder)>3
+     If (StrLen(mustOpenStartFolder)>1)
      {
         kMenu("pvMenuBarFind", "Add", "Searc&h index`tCtrl+F3", "PanelSearchIndex", "files list")
         Menu, pvMenuBarFind, Add
@@ -64497,7 +64527,7 @@ InvokeMenuBarFind(manuID) {
 InvokeMenuBarList(manuID) {
   deleteMenus()
   Try Menu, pvMenuBarList, Delete
-  showThese := (StrLen(mustOpenStartFolder)>3 || maxFilesIndex>1) ? 1 : 0
+  showThese := (StrLen(mustOpenStartFolder)>1 || maxFilesIndex>1) ? 1 : 0
   If (showThese!=1)
   {
      kMenu("pvMenuBarList", "Add", "Insufficient files indexed", "dummy")
@@ -64511,7 +64541,7 @@ InvokeMenuBarList(manuID) {
   kMenu("pvMenuBarList", "Add", "Mana&ge folder(s) list`tAlt+U", "PanelDynamicFolderzWindow")
   labelu := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? "&Update files list selectively`tCtrl+U" : "Folders containin&g indexed files`tCtrl+U"
   kMenu("pvMenuBarList", "Add", labelu, "PanelStaticFolderzManager", "folders manage")
-  If StrLen(DynamicFoldersList)>6
+  If (StrLen(DynamicFoldersList)>1)
      kMenu("pvMenuBarList", "Add", "&Regenerate the entire list", "RegenerateEntireList")
   Menu, pvMenuBarList, Add
   If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1)
@@ -64706,7 +64736,7 @@ createMenuNavigation() {
    imgPath := getIDimage(currentFileIndex)
    thisFolder := StrReplace(Trimmer(CurrentSLD), "|")
    OutDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1))
-   showThese := (StrLen(mustOpenStartFolder)>3 || maxFilesIndex>1) ? 1 : 0
+   showThese := (StrLen(mustOpenStartFolder)>1 || maxFilesIndex>1) ? 1 : 0
    Menu, PVnav, Add
    If showThese
    {
@@ -65062,7 +65092,7 @@ createMenuSoloFile(modus:=0) {
    kMenu("PVtActFile", "Add", "&Explore containing folder`tCtrl+E", "OpenThisFileFolder")
    If !FolderExist(OutDir)
    {
-      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder`tAlt+E")
+      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
       kMenu("PVtActFile", "Disable", "&Explore containing folder`tCtrl+E")
    }
    If (StrReplace(CurrentSLD, "|")=OutDir)
@@ -65126,6 +65156,9 @@ MenuLDecVProtation() {
 MenuResetVProtation() {
    vpIMGrotation := 0
    INIaction(1, "vpIMGrotation", "General")
+   If (AnyWindowOpen=10 && imgEditPanelOpened=1)
+      uiSlidersArray["vpIMGrotation", 14] := -1
+
    dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -66344,7 +66377,7 @@ createMenuImgColorsFX() {
 }
 
 MenuDoOpenStartFolder() {
-  If StrLen(mustOpenStartFolder)>3
+  If (StrLen(mustOpenStartFolder)>1)
      currentFileIndex := doOpenStartFolder()
 
    dummyTimerDelayiedImageDisplay(50)
@@ -67109,7 +67142,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
 ; main menu
    kMenu("PVmenu", "Add", "&Open...", ":PVopenF")
    kMenu("PVmenu", "Add", "Fa&vourites", ":PVfaves")
-   If StrLen(mustOpenStartFolder)>3
+   If (StrLen(mustOpenStartFolder)>1)
       kMenu("PVmenu", "Add", "&Scan files in folder`tSpace/Wheel", "MenuDoOpenStartFolder", "open index")
    If (thumbsDisplaying=1)
    {
@@ -68140,7 +68173,7 @@ createMenuFilesIndexOptions() {
       ; If RegExMatch(CurrentSLD, sldsPattern)
       labelu := (SLDtypeLoaded=3) ? "Clean inexistent files entries" : "Clean &duplicate and inexistent entries"
       kMenu("PVfList", "Add", labelu, "cleanDeadFilesList", "remove dead files erase delete")
-      If StrLen(DynamicFoldersList)>6
+      If (StrLen(DynamicFoldersList)>1)
          kMenu("PVfList", "Add", "&Regenerate the entire list", "RegenerateEntireList")
 
       labelu := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? "&Update files list selectively`tCtrl+U" : "Folders containin&g indexed files`tCtrl+U"
@@ -68936,7 +68969,7 @@ invokeFoldersListerMenu() {
     If !InStr(baseFolder, ":\")
        Return "err"
 
-    showTOOLtip("Identifing sibling and parent folders for`n" baseFolder)
+    showTOOLtip("Identifying sibling and parent folders for`n" baseFolder)
     sibsObj := FileExploreSiblingsNav(1, 0, 1, currentSib)
     parentsObj := FileExploreUpDownLevel(1, 1, currentParent)
     If (sibsObj.Count()>1)
@@ -69030,8 +69063,10 @@ invokeFoldersListerMenu() {
        Try kMenu("PVmFexplorer", "Add", "Breadcrumb folders &hierarchy", ":PVmFparents")
        If (parentsObj.Count()>1 && SLDtypeLoaded=1)
        {
-          kMenu("PVmFexplorer", "Add", "Breadcrumb deeper level`tCtrl+Page Down", "MenuFolderExplorerBreadDeeper")
-          kMenu("PVmFexplorer", "Add", "Breadcrumb higher level`tCtrl+Page Up", "MenuFolderExplorerBreadHigher")
+          kbdu := (thumbsDisplaying=1) ? "`tCtrl+Page Down" : ""
+          kMenu("PVmFexplorer", "Add", "Breadcrumb deeper level" kbdu, "MenuFolderExplorerBreadDeeper")
+          kbdu := (thumbsDisplaying=1) ? "`tCtrl+Page Up" : ""
+          kMenu("PVmFexplorer", "Add", "Breadcrumb higher level" kbdu, "MenuFolderExplorerBreadHigher")
        }
     }
 
@@ -69041,8 +69076,10 @@ invokeFoldersListerMenu() {
        Try kMenu("PVmFexplorer", "Add", "Sibling folders", ":PVmFsibs")
        If (SLDtypeLoaded=1)
        {
-          kMenu("PVmFexplorer", "Add", "Open next sibling`tAlt+Page Down", "MenuFolderExplorerNextSiblings")
-          kMenu("PVmFexplorer", "Add", "Open previous sibling`tAlt+Page Up", "MenuFolderExplorerPrevSiblings")
+          kbdu := (thumbsDisplaying=1) ? "`tAlt+Page Down" : ""
+          kMenu("PVmFexplorer", "Add", "Open next sibling" kbdu, "MenuFolderExplorerNextSiblings")
+          kbdu := (thumbsDisplaying=1) ? "`tAlt+Page Up" : ""
+          kMenu("PVmFexplorer", "Add", "Open previous sibling" kbdu, "MenuFolderExplorerPrevSiblings")
        }
     } Else
     {
@@ -69074,19 +69111,19 @@ invokeFoldersListerMenu() {
 }
 
 MenuFolderExplorerBreadHigher() {
-      FileExploreUpDownLevel(-1)
+    FileExploreUpDownLevel(-1)
 }
 
 MenuFolderExplorerBreadDeeper() {
-      FileExploreUpDownLevel(1)
+    FileExploreUpDownLevel(1)
 }
 
 MenuFolderExplorerNextSiblings() {
-      FileExploreSiblingsNav(1)
+    FileExploreSiblingsNav(1)
 }
 
 MenuFolderExplorerPrevSiblings() {
-      FileExploreSiblingsNav(-1)
+    FileExploreSiblingsNav(-1)
 }
 
 folderzNavInvokeSubs(menuItem) {
@@ -71292,7 +71329,7 @@ retrieveSeenImageDBentry(imgPath, thisIndex) {
 
 recordSeenIMGdbEntry(imgPath, thisIndex, doCommits:=1) {
    Static invoked := 0
-   If (resultedFilesList[thisIndex, 3]=1 || userPrivateMode=1 || InStr(ImgPath, SeenIMGprivateFolder) && StrLen(SeenIMGprivateFolder)>2)
+   If (resultedFilesList[thisIndex, 3]=1 || userPrivateMode=1 || InStr(ImgPath, SeenIMGprivateFolder) && StrLen(SeenIMGprivateFolder)>1)
       Return
 
    If (doCommits=1)
@@ -72008,13 +72045,13 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     }
 
     fileIndexu := (maxFilesIndex>1) ? " | " groupDigits(currentFileIndex) " / " groupDigits(maxFilesIndex) " (" Round((currentFileIndex/maxFilesIndex)*100, 2) "%)" : ""
-    If (userPrivateMode=1 && StrLen(folderu)>3)
+    If (userPrivateMode=1 && StrLen(folderu)>1)
     {
        fileRelatedInfos := "*****.***`n*:\******\*****\" fileMsg fileIndexu
     } Else
     {
        OutDir := PathCompact(folderu, "a", 1, OSDfontSize//1.1, 0, 45)
-       fileRelatedInfos := (StrLen(folderu)>3) ? fileNamu "`n" OutDir "\" fileMsg fileIndexu : ""
+       fileRelatedInfos := (StrLen(folderu)>1) ? fileNamu "`n" OutDir "\" fileMsg fileIndexu : ""
     }
 
     If (thumbsDisplaying!=1)
@@ -74585,20 +74622,24 @@ discardUserPaintedAlpha() {
    {
       userAlphaMaskBmpPainted := trGdip_DisposeImage(userAlphaMaskBmpPainted, 1)
       userPrevAlphaMaskBmpPainted := trGdip_DisposeImage(userPrevAlphaMaskBmpPainted, 1)
+      alphaMaskGradientScale := 1
       If (alphaMaskingMode=5 && isAlphaMaskWindow()=1)
       {
          GuiControl, SettingsGUIA: Choose, alphaMaskingMode, 1
-         GuiControl, SettingsGUIA:, alphaMaskGradientScale, 100
+         GuiUpdateSliders("alphaMaskGradientScale")
          UItriggerBrushUpdate(1)
          showDelayedTooltip("User painted alpha mask discarded")
-      } Else showTOOLtip("User painted alpha mask discarded")
+      } Else
+         showTOOLtip("User painted alpha mask discarded")
+
+      alphaMaskingMode := 1
    } Else If (alphaMaskingMode>1)
    {
-      alphaMaskingMode := 1
+      alphaMaskingMode := alphaMaskGradientScale := 1
       If (isAlphaMaskWindow()=1)
       {
          GuiControl, SettingsGUIA: Choose, alphaMaskingMode, 1
-         GuiControl, SettingsGUIA:, alphaMaskGradientScale, 100
+         GuiUpdateSliders("alphaMaskGradientScale")
          UItriggerBrushUpdate(1)
          showDelayedTooltip("The alpha mask is now undefined")
       } Else 
@@ -83776,7 +83817,7 @@ ReloadDynamicFolderz(fileNamu) {
     {
        line := Trimmer(A_LoopField)
        fileTest := StrReplace(line, "|")
-       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4 || !FileExist(fileTest))
+       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<2 || !FileExist(fileTest))
           Continue
        Else
           r := GetFilesList(line "\*")
@@ -83831,7 +83872,7 @@ cleanDynamicFoldersList(listu) {
     Loop, % listuArray.Count()
     {
        lineu := Format("{:L}", listuArray[A_Index])
-       If lineu
+       If (lineu!="")
           newArrayu[lineu] := 1
     }
 
@@ -83874,14 +83915,14 @@ compareFoldersList(mainFoldersListu, foldersListu) {
    Loop, Parse, foldersListu,`n
    {
        linea := Trimmer(A_LoopField)
-       If StrLen(linea)<4
+       If (StrLen(linea)<2)
           Continue
 
        skipThis := 0
        Loop, Parse, mainFoldersListu, `n
        {
            line := Trimmer(A_LoopField)
-           If StrLen(line)<4
+           If (StrLen(line)<2)
               Continue
 
            If (line=linea)
@@ -85585,7 +85626,7 @@ trimArray(arr) {
 }
 
 ReverseListNow() {
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3)
@@ -89868,7 +89909,7 @@ invokePanelStaticFoldersContextMenu() {
    kMenu("PVopenF", "Add", "In Explorer`tF6", "BtnPanelManageFoldersExplorer")
    kMenu("PVopenF", "Add", "With a new QPV instance", "BtnPanelManageFoldersNewInstance")
    kMenu("PVopenF", "Add", "Folder properties (Explorer)", "BtnPanelManageFoldersProperties")
-   If (folderPath && totalSelected)
+   If (folderPath!="" && totalSelected)
    {
       kMenu("PanelStaticMenu", "Add", "&Jump to first indexed file in folder`tEnter", "BtnPanelStaticJumpFirst")
       kMenu("PanelStaticMenu", "Add", "&Rescan folder(s)`tF5", "BTNupdateSelectedStaticFolder")
@@ -90370,7 +90411,7 @@ PanelStaticFolderzManager() {
     If askAboutFileSave(" if any action will be performed in the invoked panel")
        Return
 
-    If StrLen(mustOpenStartFolder)>3
+    If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
     isUpdateList := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? 1 : 0
@@ -92231,7 +92272,7 @@ BTNignoreDateStaticFolder(dummy:=0) {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     If (SLDtypeLoaded!=3)
@@ -92309,7 +92350,7 @@ BTNcopyStaticFolderPath() {
     If (AnyWindowOpen=2)
        folderu := newStaticFoldersListCache[folderu, 1]
 
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     If (AnyWindowOpen=2)
@@ -92328,7 +92369,7 @@ BTNcopyStaticFolderPath() {
              Continue
 
           folderu := newStaticFoldersListCache[indexu, 1]
-          If folderu
+          If (folderu!="")
           {
              counter++
              foldersListArray .= folderu "`n"
@@ -92362,7 +92403,7 @@ BTNcutCopyStaticFolders(a) {
     If (AnyWindowOpen=2)
        folderu := newStaticFoldersListCache[folderu, 1]
 
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     counter := indexu := RowNumber := 0
@@ -92457,7 +92498,7 @@ BTNremFilesStaticFolder() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     msgResult := msgBoxWrapper(appTitle ": Remove files by folder", "Please confirm that you want to remove the files from the index pertaining to the selected folder(s).", 4, 0, "question")
@@ -92481,7 +92522,7 @@ BTNremFilesStaticFolder() {
              Continue
 
           folderu := Format("{:L}", newStaticFoldersListCache[indexu, 1])
-          If folderu
+          If (folderu!="")
              foldersListArray[folderu] := indexu
        }
 
@@ -92523,7 +92564,7 @@ BTNselFilesStaticFolder(modus:=0) {
       folderu := newStaticFoldersListCache[folderu, 1]
 
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
-   If (StrLen(folderu)<3 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path")
       Return
 
    ToolTip, Selecting matching files
@@ -92548,7 +92589,7 @@ BTNselFilesStaticFolder(modus:=0) {
              Continue
 
           folderu :=  Format("{:L}", newStaticFoldersListCache[indexu, 1])
-          If folderu
+          If (folderu!="")
           {
              foldersListArray[folderu] := indexu
              foldersSelListArray[indexu] := 0
@@ -92633,7 +92674,7 @@ BTNcountFilesDynaFolders() {
    LV_GetText(folderu, RowNumber, 3)
    LV_GetText(onDisk, RowNumber, 7)
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
-   If (StrLen(folderu)<3 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path")
       Return
 
    ToolTip, Identifying matching files
@@ -92761,7 +92802,7 @@ BTNremDynaSelFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isR, RowNumber, 2)
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     If !InStr(isR, "R")
@@ -92836,7 +92877,7 @@ BtnPanelStaticJumpFirst() {
       folderu := newStaticFoldersListCache[folderu, 1]
 
    ; ToolTip, % RowNumber "==" A_GuiEventInfo "`n" folderu , , , 2
-   If (StrLen(folderu)<3 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path")
       Return
 
    winOpen := AnyWindowOpen
@@ -92908,7 +92949,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       folderu := newStaticFoldersListCache[folderu, 1]
 
    ; ToolTip, % RowNumber "==" A_GuiEventInfo "`n" folderu , , , 2
-   If (StrLen(folderu)<3 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path")
       Return
 
    folderPath := StrReplace(folderu, "|")
@@ -92975,7 +93016,7 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     totalSelected := LV_GetCount("S")
 
     ; TulTip(0,"|  ", indexu, folderu, files)
-    If (StrLen(folderu)<3 || !totalSelected || folderu="folder path")
+    If (StrLen(folderu)<2 || !totalSelected || folderu="folder path")
        Return
 
     If (b="k" && c=112) ; F1
@@ -93151,7 +93192,7 @@ countAllFilesPerStaticFolders(dummy:=0) {
     totalLoops := foldersListArray.Count()
     For folderu, Value in foldersListArray
     {
-        If !folderu
+        If (folderu="")
            Continue
 
         If (A_TickCount - prevMSGdisplay>1000)
@@ -93288,7 +93329,7 @@ BtnToggleRecurseDynaFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isPipe, RowNumber, 2)
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     ; BtnCloseWindow()
@@ -93320,7 +93361,7 @@ BTNrescanDynaFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(recu, RowNumber, 2)
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     BtnCloseWindow()
@@ -93387,7 +93428,7 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
    For folderu, newDateu in foldersListArray
    {
        ; add new folder to main array: newStaticFoldersListCache[]
-       If (hash[folderu]=1 || StrLen(folderu)<5 || newDateu="-")
+       If (hash[folderu]=1 || StrLen(folderu)<2 || newDateu="-")
           Continue
 
        counter++
@@ -93419,7 +93460,7 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     selectedFiles := markedSelectFile := 0
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
     oldMaxy := maxFilesIndex
@@ -93506,7 +93547,7 @@ PanelRenameStaticFolder() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, colNum)
     folderu := (AnyWindowOpen=2) ? newStaticFoldersListCache[indexu, 1] : indexu
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
         Return
 
     If (SLDtypeLoaded=2 && AnyWindowOpen=2)
@@ -93799,7 +93840,7 @@ BTNupdateSelectedStaticFolder() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<3 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path")
        Return
 
     If (SLDtypeLoaded=2 && FileExist(CurrentSLD))
@@ -93828,7 +93869,7 @@ BTNupdateSelectedStaticFolder() {
           Continue
 
        folderu := Format("{:L}", newStaticFoldersListCache[indexu, 1])
-       If folderu
+       If (folderu!="")
           foldersListArray[folderu] := indexu
     }
 
@@ -93939,8 +93980,7 @@ retrieveListFoldersIndexed() {
 }
 
 PopulateStaticSQLfolderzList(modus:=0) {
-
-    If (StrLen(newStaticFoldersListCache[1, 1])>4 && modus!="forced")
+    If (StrLen(newStaticFoldersListCache[1, 1])>1 && modus!="forced")
        Return newStaticFoldersListCache.MaxIndex()
 
     RecordSet := ""
@@ -93989,7 +94029,7 @@ PopulateStaticSQLfolderzList(modus:=0) {
     Loop, % fCountThese
     {
         folderu := Trimmer(arrayList[A_Index, 1])
-        If (StrLen(folderu)<5)
+        If (StrLen(folderu)<2)
            Continue
 
         countThese++
@@ -99251,10 +99291,10 @@ coreTlbrSlider(thisFunc, delayu, invertDir) {
       If (delayu="brushSize")
       {
          delayu := (brushToolSize<100) ? 100 : 50
-         If (brushToolSize<50)
-            delayu := 150
-         Else If (brushToolSize<25)
+         If (brushToolSize<25)
             delayu := 200
+         Else If (brushToolSize<50)
+            delayu := 150
       }
 
       If isDotInRect(mX, mY, 5, 5, cX, cY, 1)
@@ -99865,7 +99905,7 @@ invokeSortListMenu() {
       globalMenuOptions := StrReplace(globalMenuOptions, "tlbrMenu", "PVsort")
       showThisMenu("PVsort")
       Return "m"
-   } Else If StrLen(mustOpenStartFolder)>3
+   } Else If (StrLen(mustOpenStartFolder)>1)
    {
       currentFileIndex := doOpenStartFolder()
       SetTimer, invokeSortListMenu, -200
