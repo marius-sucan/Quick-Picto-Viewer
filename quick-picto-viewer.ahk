@@ -8186,6 +8186,13 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    p := customShapePoints[thisIndex]
    pzx := p[1],    pzy := p[2]
    totalCount := customShapePoints.Count()
+   symPoint := prevVectorShapeSymmetryMode[1, 1]
+   If !symPoint
+      symPoint := totalCount//2 + 1
+
+   ; the alignment must act on the same coordinate as the symmetry axis, otherwise the
+   ; axis cannot be maintained; symmetry mode 1 mirrors X, while mode 2 mirrors Y
+   symMatchesAlign := (modus="align-x") ? (CustomShapeSymmetry=1) : (CustomShapeSymmetry=2)
    ; ToolTip, % thisIndex "|" modus , , , 2
    hasLooped := 0
    setWhileLoopExec(1)
@@ -8211,8 +8218,24 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    }
 
    setWhileLoopExec(0)
-   If canDoSymmetry
-      coreSetVPsymmetryPoint(symPoint)
+   If (canDoSymmetry && hasLooped=1)
+   {
+      If (symMatchesAlign=1)
+      {
+         ; the reference point may have moved along the axis; refresh its cached viewport
+         ; coordinates, while keeping the same reference point and symmetry mode
+         coreSetVPsymmetryPoint(symPoint)
+      } Else
+      {
+         alignedOn := (modus="align-x") ? "X" : "Y"
+         friendly := (CustomShapeSymmetry=1) ? "X" : "Y"
+         CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
+         prevVectorShapeSymmetryMode := []
+         showTOOLtip("WARNING: The points were aligned on " alignedOn ", but the path symmetry mode is " friendly ".`nThe symmetry reference and mode were discarded.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime*2
+      }
+   }
 
    lastZeitFileSelect := A_TickCount
    Return hasLooped
