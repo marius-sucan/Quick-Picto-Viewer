@@ -783,6 +783,9 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
                highlightActiveCtrl()
             Else
                highlightActiveArrowsCtrl()
+         } Else If (InStr(OutputVar, "edit") && givenKey="F1")
+         {
+            btnHelpQuickSearchMenus()
          } Else If (InStr(OutputVar, "edit") && omniBoxMode=1)
          {
             If (givenKey="F2")
@@ -797,9 +800,6 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
                omniBoxFolderDelete()
             Else If (givenKey="F12")
                omniBoxFolderProperties()
-         } Else If (InStr(OutputVar, "edit") && givenKey="F1")
-         {
-            btnHelpQuickSearchMenus()
          } Else If (InStr(OutputVar, "edit") && givenKey="F2")
          {
             PanelDefineKbdShortcut()
@@ -25992,6 +25992,16 @@ PanelDefineKbdShortcut() {
     If (!funcu || !RowNumber)
        Return
 
+    If (SubStr(funcu, 1, 1)="!")
+    {
+       ; omnibox entries (folder actions, files list index jump) are not real functions;
+       ; binding a key to them would only waste the shortcut in the current context
+       showTOOLtip("WARNING: No keyboard shortcut can be associated with the selected entry:`n" menuName)
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
     lastZeitOpenWin := A_TickCount
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
     setLVrowsCount()
@@ -26377,6 +26387,17 @@ QuickMenuSearchGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X,
           createOmniBoxFoldersContextMenu(folderPath)
           Return
        } Else addBonus := 1
+    } Else
+    {
+       ; omnibox entries (folder actions, files list index jump) are not menu options,
+       ; therefore no keyboard shortcut can be associated with them
+       RowNumber := LV_GetFirstSelected(hLVquickSearchMenus)
+       If !RowNumber
+          RowNumber := LV_GetNext(0, "F")
+
+       LV_GetText(funcu, RowNumber, 6)
+       If (SubStr(funcu, 1, 1)="!")
+          addBonus := 2
     }
 
     lastInvoked := A_TickCount
@@ -26392,26 +26413,28 @@ OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
     Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
     If (givenRow>0 && isGiven="yes" && InStr(givenPath, ":\"))
     {
-       edithu := givenPath
+       edithu := StrReplace(givenPath, "\\", "\")
        RowNumber := givenRow
     } Else
     {
        GuiControlGet, userQuickMenusEdit
        edithu := Trimmer(userQuickMenusEdit)
        edithu := StrReplace(edithu, "\\", "\")
-       oqme := edithu
-       edithu := Trimmer(edithu, "\")
        RowNumber := LV_GetFirstSelected(hLVquickSearchMenus)
        If !RowNumber
           RowNumber := LV_GetNext(0, "F")
     }
 
+    ; the omnibox browses folders only when the query looks like a path; callers that
+    ; pass a path directly (drag and drop) already hand over a backslash trimmed one
+    isPathModus := (SubStr(edithu, 2, 2)=":\" || (StrLen(edithu)=2 && SubStr(edithu, 2, 1)=":")) ? 1 : 0
+    edithu := Trimmer(edithu, "\")
     LV_GetText(funcu, RowNumber, 6)
     LV_GetText(folderu, RowNumber, 1)
-    If InStr(funcu, "!OmniNavigateFilteredFolders")
-       edithu := SubStr(edithu, 1, InStr(edithu, "\", 0, -1))
+    If (InStr(funcu, "!OmniNavigateFilteredFolders") && InStr(edithu, "\"))
+       edithu := Trimmer(SubStr(edithu, 1, InStr(edithu, "\", 0, -1)), "\")
 
-    If (SubStr(oqme, 2, 2)=":\" && (InStr(funcu, "!OmniNavigateFolder") || InStr(funcu, "!OmniNavigateFilteredFolders")))
+    If (isPathModus=1 && (InStr(funcu, "!OmniNavigateFolder") || InStr(funcu, "!OmniNavigateFilteredFolders")))
        Return edithu folderu
 }
 
@@ -26428,7 +26451,7 @@ omniBoxFolderImport(dummy:=0, isGiven:=0) {
 
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
    changeMcursor()
-   If ((dummy="not" || dummy="recursively") && isGiven="yes")
+   If ((dummy="not" || dummy="recursive") && isGiven="yes")
       r := addNewFolder2list(folderPath, "yes", dummy)
    Else If GetKeyState("Shift", "P")
       r := addNewFolder2list(folderPath, "yes", "recursive")
@@ -26860,6 +26883,11 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
        {
           kMenu("ContextMenu", "Add", "Selected folder is inexistent", "dummy")
           kMenu("ContextMenu", "Disable", "Selected folder is inexistent")
+          Menu, ContextMenu, Add
+       } Else If (addBonus=2)
+       {
+          kMenu("ContextMenu", "Add", "No customizable menu option selected", "dummy")
+          kMenu("ContextMenu", "Disable", "No customizable menu option selected")
           Menu, ContextMenu, Add
        } Else
        {
@@ -31511,9 +31539,11 @@ invokeOmniBoxCurrentFile() {
 }
 
 fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
-   If (modus="thisFile" && InStr(imgPath, ":\"))
+   If (isVarEqualTo(modus, "thisFile", "thisFolder") && InStr(imgPath, ":\"))
    {
-      linea := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+      ; thisFile receives a file path and must navigate to the folder containing it,
+      ; while thisFolder receives the folder to navigate to
+      linea := (modus="thisFolder") ? Trim(Trimmer(imgPath), "\") : SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
       If (StrLen(linea)=2 && SubStr(linea, 2, 1)=":")
       {
          linea .= "\"
@@ -40595,7 +40625,10 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
 
     mouseTurnOFFtooltip()
     If (given="yes" && StrLen(whatu)>1 && createdQuickMenuSearchWin=1)
+    {
+       userQuickMenusEdit := whatu   ; GuiControl alone leaves the variable behind stale
        GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit, % whatu
+    }
 
     thisState := "a" uiUseDarkMode PrefsLargeFonts
     If (createdQuickMenuSearchWin=1 && thisState=lastState && VisibleQuickMenuSearchWin=1)
@@ -40666,9 +40699,11 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
 
 BtnClearQuickSearchEdit() {
    userQuickMenusEdit := ""
+   prevOmniBoxFolder := ""
    lastLVquickSearchSortCol := [8, "SortDesc"]
    GuiControl, QuickMenuSearchGUIA:, userQuickMenusEdit,
    GuiControl, QuickMenuSearchGUIA:Focus, userQuickMenusEdit
+   SetTimer, uiPopulateQuickMenuSearch, -50   ; GuiControl does not trigger the edit field g-label
 }
 
 LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
@@ -40697,17 +40732,25 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       btnHelpQuickSearchMenus()
    } Else If (b="K" && c=113) ; F2
    {
-      omniBoxFolderRename()
-   } Else If (b="K" && c=114) ; F3
+      ; the folder actions apply only when the omnibox lists folders; otherwise F2
+      ; customizes the shortcut of the selected menu option, as the context menu states
+      If (omniBoxMode=1)
+         omniBoxFolderRename()
+      Else
+         PanelDefineKbdShortcut()
+   } Else If (b="K" && c=114 && omniBoxMode=1) ; F3
    {
       omniBoxFolderImport()
    } Else If (b="K" && c=116) ; F5
    {
       SetTimer, uiPopulateQuickMenuSearch, -150
-   } Else If (b="K" && c=118) ; F7
+   } Else If (b="K" && c=118 && omniBoxMode=1) ; F7
    {
       omniBoxFolderCreateNew()
-   } Else If (b="K" && c=45) ; Insert
+   } Else If (b="K" && c=123 && omniBoxMode=1) ; F12
+   {
+      omniBoxFolderProperties()
+   } Else If (b="K" && c=45 && omniBoxMode=1) ; Insert
    {
       omniBoxFolderOpen()
    } Else If (b="K" && c=119) ; F8
@@ -40928,7 +40971,7 @@ BTNquickSearchHidden(actu) {
       showTOOLtip("Result:" listu)
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } Else If ((userQuickMenusEdit=";o" || userQuickMenusEdit=".\o"))
-      fromFolderTreeToOmniBox("thisFile", prevOpenFolderPath)
+      fromFolderTreeToOmniBox("thisFolder", prevOpenFolderPath)
    Else If ((userQuickMenusEdit=";f" || userQuickMenusEdit=".\f") && folderTreeWinOpen=1)
       fromFolderTreeToOmniBox()
    Else If (userQuickMenusEdit=";" || userQuickMenusEdit=".\")
@@ -41393,7 +41436,8 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    {
       hasAddedItems := 0
       allowMenuSearch := 0
-      If FolderExist(userQuickMenusEdit)
+      folderIsReal := FolderExist(userQuickMenusEdit)
+      If folderIsReal
       {
          hasAddedItems += 2
          labelu1 := "Open folder"
@@ -41441,26 +41485,36 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
             filesFound++
       }
 
-      LV_Modify(1, "Col7", filesFound)
-      LV_Modify(2, "Col7", ">" filesFound)
-      If (CurrentSLD && maxFilesIndex>1)
+      ; the four rows below exist only when the typed path is an actual folder; when the
+      ; user is still typing a folder name, row 1 is the up-one-level entry instead
+      If folderIsReal
       {
-         LV_Modify(3, "Col7", filesFound)
-         LV_Modify(4, "Col7", ">" filesFound)
+         LV_Modify(1, "Col7", filesFound)
+         LV_Modify(2, "Col7", ">" filesFound)
+         If (CurrentSLD && maxFilesIndex>1)
+         {
+            LV_Modify(3, "Col7", filesFound)
+            LV_Modify(4, "Col7", ">" filesFound)
+         }
       }
 
       If (!hasAddedSubs && userPrivateMode!=1 && abandonAll!=1)
       {
          restu := SubStr(userQuickMenusEdit, InStr(userQuickMenusEdit, "\", 0, -1) + 1)
          OutDir := SubStr(userQuickMenusEdit, 1, InStr(userQuickMenusEdit, "\", 0, -1))
-         Loop, Files, % Trimmer(OutDir, "\") "\*", DF
+         ; at the root of a drive there is no parent folder to filter the siblings in;
+         ; without OutDir the loop below would scan the current directory of the process
+         If (OutDir && restu)
          {
-            executingCanceableOperation := A_TickCount
-            If (determineTerminateOperation()=1)
-               Break
+            Loop, Files, % Trimmer(OutDir, "\") "\*", DF
+            {
+               executingCanceableOperation := A_TickCount
+               If (determineTerminateOperation()=1)
+                  Break
 
-            If (InStr(A_LoopFileAttrib, "D") && InStr(A_LoopFileName, restu) && restu!=A_LoopFileName)
-               LV_Add(A_Index, "\" A_LoopFileName, xu, "-", "Change folder", "", "!OmniNavigateFilteredFolders", 0, 0)
+               If (InStr(A_LoopFileAttrib, "D") && InStr(A_LoopFileName, restu) && restu!=A_LoopFileName)
+                  LV_Add(A_Index, "\" A_LoopFileName, xu, "-", "Change folder", "", "!OmniNavigateFilteredFolders", 0, 0)
+            }
          }
       }
       RemoveTooltip()
@@ -41619,8 +41673,11 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    LV_ModifyCol(lastLVquickSearchSortCol[1], lastLVquickSearchSortCol[2])
 
    If (allowMenuSearch=0 && pathModus=1 && mustReselect>0 && prevOmniBoxFolder)
-      LV_Modify(mustReselect, "Focus Select Vis")
-   Else If (a="resel" && LV_GetCount()=initialCount && RowNumber)
+   {
+      ; the rows were just re-sorted, the index recorded while adding them is now stale
+      mustReselect := omniBoxFindFolderRow(prevOmniBoxFolder)
+      LV_Modify(mustReselect ? mustReselect : 1, "Focus Select Vis")
+   } Else If (a="resel" && LV_GetCount()=initialCount && RowNumber)
       LV_Modify(RowNumber, "Focus Select Vis")
    Else
       LV_Modify(1, "Focus Select Vis")
@@ -41636,6 +41693,28 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    zeitSillyPrevent := A_TickCount
    lastInvoked := A_TickCount
    SetTimer, updateUistatusLineQuickSearch, -50
+}
+
+omniBoxFindFolderRow(folderName) {
+; the omnibox list is sorted after it was populated, therefore the row indexes recorded
+; while adding the entries cannot be used to select a given folder; look it up by name
+   folderName := Trim(Trimmer(folderName), "\")
+   If !folderName
+      Return 0
+
+   Gui, QuickMenuSearchGUIA: Default
+   Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
+   Loop, % LV_GetCount()
+   {
+      LV_GetText(funcu, A_Index, 6)
+      If !(InStr(funcu, "!OmniNavigateFolder") || InStr(funcu, "!OmniNavigateFilteredFolders"))
+         Continue
+
+      LV_GetText(folderu, A_Index, 1)
+      If (Trim(Trimmer(folderu), "\")=folderName)
+         Return A_Index
+   }
+   Return 0
 }
 
 fuzzifyString(toFuzz) {
