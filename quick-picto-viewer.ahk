@@ -15394,7 +15394,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        If (viewportQPVimage.imgHandle)
           opacityExtra := (oldSelectionArea[10]=32 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255)*256 : 0 
 
-       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX thisBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu(0) PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
+       thisImgCall := "a" getIDimage(currentFileIndex) currentFileIndex viewportStampBMP viewportIDstampBMP PasteInPlaceOrientation VPselRotation PasteInPlaceBlurAmount PasteInPlaceLight PasteInPlaceHue PasteInPlaceSaturation PasteInPlaceGamma PasteInPlaceApplyColorFX thisBlendMode PasteInPlaceBlurEdgesSoft brushingMode shearImgX shearImgY getAlphaMaskIDu(0) PasteInPlaceRevealOriginal userImgAdjustInvertColors userImgAdjustAltSat userImgAdjustAltBright PasteInPlaceOpacity opacityExtra PasteInPlaceOrientFlipX PasteInPlaceOrientFlipY
        If (prevImgCall=thisImgCall && validBMP(prevClipBMP))
        {
           hasCached := 1
@@ -15437,7 +15437,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
        If (alphaMaskingMode>1 && brushingMode!=1 && !viewportQPVimage.imgHandle && thisBlendMode=1)
        {
           thisStartZeit := A_TickCount
-          thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra
+          thisIDu := "a" previewMode PasteInPlaceBlurAmount PasteInPlaceToolMode PasteInPlaceOrientation VPselRotation getAlphaMaskIDu() opacityExtra PasteInPlaceOpacity
           realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, thisIDu, newBitmap, 0, 0, 0, 0, 1)
           fnOutputDebug("before=" A_TickCount - thisStartZeit)
           If validBMP(newBitmap)
@@ -25994,9 +25994,7 @@ PanelDefineKbdShortcut() {
 
     If (SubStr(funcu, 1, 1)="!")
     {
-       ; omnibox entries (folder actions, files list index jump) are not real functions;
-       ; binding a key to them would only waste the shortcut in the current context
-       showTOOLtip("WARNING: No keyboard shortcut can be associated with the selected entry:`n" menuName)
+       showTOOLtip("WARNING: Keyboard shortcuts cannot be associated with the selected entry:`n" menuName)
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        Return
@@ -26876,7 +26874,6 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
     Menu, ContextMenu, UseErrorLevel
     Try Menu, ContextMenu, Delete
     Sleep, 5
-
     If (modus="omni")
     {
        If (addBonus=1)
@@ -26886,9 +26883,7 @@ invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
           Menu, ContextMenu, Add
        } Else If (addBonus=2)
        {
-          kMenu("ContextMenu", "Add", "No customizable menu option selected", "dummy")
-          kMenu("ContextMenu", "Disable", "No customizable menu option selected")
-          Menu, ContextMenu, Add
+          Sleep, -1
        } Else
        {
           kMenu("ContextMenu", "Add", "Customize keyboard shortcut`tF2", "PanelDefineKbdShortcut")
