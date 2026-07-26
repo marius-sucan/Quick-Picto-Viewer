@@ -30867,6 +30867,11 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
           bListu .= testThis "`n"
        }
  
+       ; with no folder indexed, every drive and its first level of
+       ; folders are listed; the recent folders are nested afterwards
+       If (dummy!="given")
+          folderTreeAddAllDrives()
+
        Loop, Parse, bListu, `n
        {
           If A_LoopField
@@ -30961,6 +30966,50 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
     GuiControl, fdTreeGuia: +Redraw, TVlistFolders
     SetTimer, folderTreeInfoStatusLineUpdater, -100
     SetTimer, RemoveTooltip, -100
+}
+
+folderTreeAddAllDrives() {
+   ; it adds every drive available and its first level of folders
+   Gui, fdTreeGuia: Default
+   Gui, fdTreeGuia: TreeView, TVlistFolders
+   drivesList := ""
+   Try DriveGet, drivesList, List
+   If !drivesList
+      Return 0
+
+   countu := 0
+   doStartLongOpDance()
+   Loop, Parse, drivesList
+   {
+      thisDrive := A_LoopField ":"
+      drvStatus := ""
+      ; DriveGet also prevents the OS from asking for a disk to be inserted
+      Try DriveGet, drvStatus, Status, % thisDrive "\"
+      If (drvStatus!="Ready")
+         Continue
+
+      showTOOLtip("Scanning the folders of the drive " thisDrive "\")
+      z := TV_Add(thisDrive "\", 0, "Expand")
+      countu++
+      Loop, Files, % thisDrive "\*", DF
+      {
+         If determineTerminateOperation()
+         {
+            abandonAll := 1
+            Break
+         }
+
+         If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
+            TV_Add("\" A_LoopFileName, z)
+      }
+
+      TV_Modify(z, "Sort")
+      If (abandonAll=1)
+         Break
+   }
+
+   ResetImgLoadStatus()
+   Return countu
 }
 
 folderTreeGetCurrentFolder() {
