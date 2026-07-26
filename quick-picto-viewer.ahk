@@ -37809,7 +37809,7 @@ readMiniFavesEntries() {
 }
 
 RecordFoldersOpenedManager(entry2add) {
-  If (StrLen(entry2add)<5 || !allowRecordHistory || userPrivateMode=1)
+  If (StrLen(entry2add)<3 || !allowRecordHistory || userPrivateMode=1)
      Return
 
   historyList := readRecentOpenedFolderEntries()
@@ -37820,7 +37820,7 @@ RecordFoldersOpenedManager(entry2add) {
       If (A_Index>maxRecentOpenedFolders)
          Break
 
-      If (StrLen(A_LoopField)<5 || !FileExist(StrReplace(A_LoopField, "|")))
+      If (StrLen(A_LoopField)<3 || !FileExist(StrReplace(A_LoopField, "|")))
          Continue
 
       countItemz++
@@ -41359,7 +41359,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
             LV_Add(1, labelu3, xu, "-", "-", "", "!OmniImportFolder", 1, 1)
             LV_Add(1, labelu4, xu, "-", "-", "", "!OmniImportRfolder", 1, 5)
          }
-      } Else 
+      }
 
       startOperation := A_TickCount
       setImageLoading()
