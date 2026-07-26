@@ -30562,11 +30562,13 @@ folderTreeInfoStatusLineUpdater(modus:=0) {
        If c
           TV_GetText(drivu, c)
        thisVfolder := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1))
-       If !Trimmer(thisFolder)
-          thisVfolder := getDriveInfos(drivu)
+       If (Trimmer(thisFolder)="" || Trimmer(thisVfolder, "\")="")
+          thisVfolder := getDriveInfos(drivu)   ; the element is a drive root
 
        GuiControl, fdTreeGuia:, fdTreeInfoLine, %thisVfolder% | Gathering folder details...
-       getFolderInfos(thisFolder, itemz, dirs, sizu)
+       pathu := folderTreeNormalizePath(thisFolder)
+       If FolderExist(pathu)
+          getFolderInfos(pathu, itemz, dirs, sizu)
        ResetImgLoadStatus()
     }
 
@@ -30643,11 +30645,18 @@ FolderTreeFindActiveFile(givenPath:=0) {
     showTOOLtip("Scanning folders, please wait")
     z := 0 ; TV_GetNext()
     oimgPath := StrReplace(getIDimage(currentFileIndex), "||")
-    imgPath := SubStr(oimgPath, 1, InStr(oimgPath, "\", 0, -1) - 1)
+    imgPath := InStr(oimgPath, "\") ? SubStr(oimgPath, 1, InStr(oimgPath, "\", 0, -1) - 1) : ""
     If FolderExist(givenPath)
     {
        imgPath := givenPath
        wasGiven := 1
+    }
+
+    imgPath := folderTreeNormalizePath(imgPath)
+    If (StrLen(imgPath)<2)
+    {
+       SetTimer, RemoveTooltip, -100
+       Return
     }
 
     sliced := StrSplit(imgPath, "\")
@@ -30662,7 +30671,7 @@ FolderTreeFindActiveFile(givenPath:=0) {
     Loop, % sliced.Count()
     {
           thisIndex := A_Index - 1 + lvl
-          If !sliced[thisIndex]
+          If (sliced[thisIndex]="")
              Continue
 
           hasAdded := 1
@@ -30675,9 +30684,18 @@ FolderTreeFindActiveFile(givenPath:=0) {
     If (hasAdded!=1 && z)
        TV_Modify(z, "Expand Select VisFirst")
 
-    initialSibling := SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1)
+    initialSibling := InStr(imgPath, "\") ? SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1) : ""
     If z
        w := TV_GetParent(z)
+
+    If (z && !w)
+    {
+       ; the folder is the root of a drive: it has no parent element in the
+       ; tree and no sibling folders; only its sub-folders must be scanned
+       subsParent := z
+       initialSibling := ""
+    }
+
     ; ToolTip, % initialSibling , , , 2
     mustSkip := new hashtable()
     mustDelete := new hashtable()
@@ -30722,7 +30740,7 @@ FolderTreeFindActiveFile(givenPath:=0) {
     setImageLoading()
     doStartLongOpDance()
     mustDelete := ""
-    subPath := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+    subPath := InStr(imgPath, "\") ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : ""
     If (FolderExist(subPath) && w && !wasGiven)
     {
        Loop, Files, % subPath "\*", DF
@@ -30753,7 +30771,9 @@ FolderTreeFindActiveFile(givenPath:=0) {
        folderTreeScanSubbies()
     }
 
-    TV_Modify(w, "Sort")
+    If w
+       TV_Modify(w, "Sort")
+
     If !wasGiven
     {
        GuiControl, fdTreeGuia: +Redraw, TVlistFolders
@@ -30763,6 +30783,8 @@ FolderTreeFindActiveFile(givenPath:=0) {
 }
 
 iterateFDtreeView(lvl, z, sliced) {
+    ; it identifies the deepest tree element that matches the given path;
+    ; it returns the first path level absent from the tree and its element
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
 
@@ -30772,25 +30794,27 @@ iterateFDtreeView(lvl, z, sliced) {
        If z
           TV_GetText(labelu, z)
 
-       If (Trimmer(labelu, "\")=sliced[lvl] && labelu)
+       If (labelu!="" && Trimmer(labelu, "\")=sliced[lvl])
        {
-          lvl++
           gu := z
+          lvl++
           r := TV_GetChild(z)
-          If (r!=0)
+          If (r && sliced[lvl]!="")
           {
              g := iterateFDtreeView(lvl, r, sliced)
              lvl := g[1]
              If g[2]
                 gu := g[2]
           }
+
+          ; the elements that follow belong to the same level as the
+          ; one just matched and must never be compared to a deeper one
+          Break
        }
 
-       r := TV_GetNext(z)
-       If (r=0)
+       z := TV_GetNext(z)
+       If !z
           Break
-
-       z := r
     }
     Return [lvl, gu]
 }
@@ -30809,13 +30833,13 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
     Gui, fdTreeGuia: TreeView, TVlistFolders
     GuiControl, fdTreeGuia: -Redraw, TVlistFolders
     GuiControl, fdTreeGuia:, fdTreeInfoLine, Please wait...
+    TV_Delete()   ; the entire tree is always regenerated from scratch
 
     If (!HKifs("imgsLoaded") || (dummy="given" && listuGiven))
     {
        If (dummy="given" && listuGiven)
        {
           aListu := listuGiven
-          TV_Delete()
        } Else
        {
           aListu := readRecentOpenedFolderEntries(0, 0)
@@ -30833,13 +30857,13 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
        Loop, Parse, aListu, `n
        {
           countItemz++
-          testThis := StrReplace(A_LoopField, "|")
-          If (StrLen(A_LoopField)<4 || !FileExist(testThis))
+          testThis := folderTreeNormalizePath(A_LoopField)
+          If (StrLen(testThis)<2 || !FileExist(testThis))
              Continue
- 
+
           If RegExMatch(testThis, sldsPattern)
              testThis := SubStr(testThis, 1, InStr(testThis, "\", 0, -1) - 1)
- 
+
           bListu .= testThis "`n"
        }
  
@@ -30856,71 +30880,80 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
        Return
     }
 
-    z := TV_GetNext()
-    If z
-       TV_Delete(z)
-
     showTOOLtip("Scanning folders, please wait")
-    parentsObj := FileExploreUpDownLevel(1, 1, currentParent)
-    parentsLevels := parentsObj.Count()
-    siblingsParent := ""
-    ; ToolTip, % parentsLevels " == " currentParent , , , 2
-    Loop, % parentsLevels
+    thisFolder := folderTreeGetCurrentFolder()
+    sliced := StrSplit(thisFolder, "\")
+    maxLevels := sliced.Count()
+    ; ToolTip, % maxLevels " == " thisFolder , , , 2
+    If (maxLevels<1 || !InStr(sliced[1], ":"))
     {
-       If (A_Index>currentParent)
-          Continue
-   
-       If (A_Index=1 && !InStr(parentsObj[1], ":"))
-          Break
+       ; unrecognized folder path; let the generic finder deal with it
+       FolderTreeFindActiveFile()
+       GuiControl, fdTreeGuia: +Redraw, TVlistFolders
+       SetTimer, folderTreeInfoStatusLineUpdater, -100
+       SetTimer, RemoveTooltip, -100
+       Return
+    }
 
-       pu := (A_Index=1) ? 1 : A_Index - 1
+    ; add the drive letter, then all the parent folders of the current folder
+    parentu := 0
+    parentPath := ""
+    Loop, % maxLevels - 1
+    {
        If (A_Index=1)
-          P1 := TV_Add(parentsObj[A_Index] "\",, "Expand")
-       Else If (A_Index!=currentParent)
-          P%A_Index% := TV_Add("\" parentsObj[A_Index], P%pu%, "Expand")
-
-       If (A_Index=currentParent)
-          siblingsParent := P%pu%
+       {
+          parentPath := sliced[1]
+          parentu := TV_Add(sliced[1] "\", 0, "Expand")
+       } Else
+       {
+          parentPath .= "\" sliced[A_Index]
+          parentu := TV_Add("\" sliced[A_Index], parentu, "Expand")
+       }
     }
-
-    sibsObj := FileExploreSiblingsNav(1, 0, 1, currentSib)
-    Loop, % sibsObj.Count()
-    {
-       If !siblingsParent
-          Continue
-
-       pu := A_Index - 1
-       If (A_Index=currentSib)
-          subsParent := TV_Add("\" sibsObj[A_Index], siblingsParent, "Expand Bold")
-       Else
-          P%A_Index% := TV_Add("\" sibsObj[A_Index], siblingsParent)
-    }
-
-    If siblingsParent
-       TV_Modify(siblingsParent, "Expand Sort")
 
     doStartLongOpDance()
-    hasAddedSubs := 0
-    thisFolder := StrReplace(Trimmer(CurrentSLD), "|")
-    If FolderExist(thisFolder)
+    subsParent := 0
+    If (maxLevels=1)
     {
-       Loop, Files, % thisFolder "\*", DF
+       ; the current folder is the root of a drive: it has no parent
+       ; folder and, therefore, no sibling folders either
+       subsParent := TV_Add(sliced[1] "\", 0, "Expand Bold")
+    } Else
+    {
+       ; add the sibling folders of the current folder
+       Loop, Files, % parentPath "\*", DF
        {
           If determineTerminateOperation()
              Break
 
-          If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
-          {
-             P%A_Index% := TV_Add("\" A_LoopFileName, subsParent)
-             hasAddedSubs := 1
-          }
+          If (A_LoopFileName="" || !InStr(A_LoopFileAttrib, "D"))
+             Continue
+
+          If (A_LoopFileName=sliced[maxLevels])
+             subsParent := TV_Add("\" A_LoopFileName, parentu, "Expand Bold")
+          Else
+             TV_Add("\" A_LoopFileName, parentu)
        }
+
+       ; the current folder may be hidden from its parent by access rights
+       If !subsParent
+          subsParent := TV_Add("\" sliced[maxLevels], parentu, "Expand Bold")
+
+       TV_Modify(parentu, "Expand Sort")
+    }
+
+    ; add the sub-folders of the current folder
+    Loop, Files, % thisFolder "\*", DF
+    {
+       If determineTerminateOperation()
+          Break
+
+       If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
+          TV_Add("\" A_LoopFileName, subsParent)
     }
 
     ResetImgLoadStatus()
-    If subsParent
-       TV_Modify(subsParent, "Expand Sort")
-
+    TV_Modify(subsParent, "Expand Select Vis Sort")
     countu := TV_GetCount()
     If !countu
        FolderTreeFindActiveFile()
@@ -30928,6 +30961,35 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
     GuiControl, fdTreeGuia: +Redraw, TVlistFolders
     SetTimer, folderTreeInfoStatusLineUpdater, -100
     SetTimer, RemoveTooltip, -100
+}
+
+folderTreeGetCurrentFolder() {
+   ; it returns the folder path currently opened / indexed by QPV
+   baseFolder := (SLDtypeLoaded=1) ? CurrentSLD : resultedFilesList[currentFileIndex, 1]
+   baseFolder := StrReplace(Trimmer(baseFolder), "|")
+   If (SLDtypeLoaded!=1)
+      baseFolder := InStr(baseFolder, "\") ? SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1) : ""
+
+   Return folderTreeNormalizePath(baseFolder)
+}
+
+folderTreeNormalizePath(folderPath) {
+   ; drive roots are always returned as C: and never as C:\
+   folderPath := StrReplace(Trimmer(folderPath), "|")
+   folderPath := StrReplace(folderPath, "\\", "\")
+   Return Trimmer(folderPath, "\")
+}
+
+folderTreeIsDriveRoot(folderPath) {
+   ; entire drives must never be renamed, deleted or moved
+   folderPath := folderTreeNormalizePath(folderPath)
+   If (StrLen(folderPath)>2 || SubStr(folderPath, 2, 1)!=":")
+      Return 0
+
+   showTOOLtip("WARNING: An entire drive cannot be renamed, deleted or moved:`n" folderPath "\")
+   SoundBeep 300, 100
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   Return 1
 }
 
 folderTreeContextMenu() {
@@ -31088,7 +31150,7 @@ folderTreeCreateFolder() {
       Gui, fdTreeGuia: Default
       Gui, fdTreeGuia: TreeView, TVlistFolders
       TV_Add("\" newFileName, c)
-      TV_Add(c, "Expand Sort")
+      TV_Modify(c, "Expand Sort")
       GuiControl, fdTreeGuia: +Redraw, TVlistFolders
    }
 }
@@ -31142,6 +31204,9 @@ folderTreeDeleteFolder() {
    If !thisFolder
       Return
 
+   If folderTreeIsDriveRoot(thisFolder)
+      Return
+
    r := UIcoreFolderDelete(thisFolder)
    If (r="deleted")
    {
@@ -31181,6 +31246,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
       listu := fSrc "`n"
    }
 
+   thisFolder := folderTreeNormalizePath(thisFolder)
    If !FolderExist(thisFolder)
    {
       friendly_name := (quickMode!=1) ? "paste the folder(s) inside it" : "perform the intended folder action"
@@ -31242,6 +31308,9 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    Loop, Parse, listu, `n,`r
    {
         line := Trimmer(Trimmer(A_LoopField), "\")
+        If (StrLen(line)<3 && SubStr(line, 2, 1)=":")
+           Continue   ; entire drives are never copied or moved
+
         If FolderExist(line)
         {
            loopsCount++
@@ -31255,7 +31324,12 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    }
 
    folderTreeScanSubbies()
-   If zr
+   If (!zr && !loopsCount)
+   {
+      friendly2 := InStr(msgResult, "Copy") ? "COPY" : "MOVE"
+      showTOOLtip("WARNING: Found no folder to " friendly2 ":`n" Trimmer(listu))
+      SoundBeep , 300, 100
+   } Else If zr
    {
       friendly2 := InStr(msgResult, "Copy") ? "COPY" : "MOVE"
       If (zr=1)
@@ -31314,6 +31388,9 @@ folderTreeRenameFolder() {
    c := TV_GetSelection()
    thisFolder := folderTreeGetSelectedPath(c)
    If !thisFolder
+      Return
+
+   If folderTreeIsDriveRoot(thisFolder)
       Return
 
    r := UIcoreFolderRename(thisFolder, newFileName)
@@ -31426,7 +31503,7 @@ folderTreeAppendFiles(modus:="") {
    Gui, fdTreeGuia: Default
    Gui, fdTreeGuia: TreeView, TVlistFolders
    c := TV_GetSelection()
-   linea := folderTreeGetSelectedPath(c)
+   linea := folderTreeNormalizePath(folderTreeGetSelectedPath(c))
    If (!linea || !FolderExist(linea) || InStr(DynamicFoldersList, linea "`n"))
       Return
 
@@ -31483,11 +31560,9 @@ folderTreeScanSubbies(prevent:="") {
 
    thisFolder := folderTreeGetSelectedPath(c)
    If (thisFolder="")
-   {
       TV_GetText(thisFolder, c)
-      thisFolder := Trimmer(thisFolder, "\")
-   }
 
+   thisFolder := folderTreeNormalizePath(thisFolder)
    If (thisFolder="")
       Return
 
@@ -42419,10 +42494,15 @@ BTNsaveSlideshowPanel() {
 }
 
 FolderExist(filePath) {
-   If StrLen(filePath)<2
+   If (StrLen(filePath)<2)
       Return
-   Else
-      Return InStr(FileExist(filePath), "D")
+
+   ; C: alone means the folder currently used by the OS on that drive,
+   ; while QPV always means the root of the given drive
+   If (StrLen(filePath)=2 && SubStr(filePath, 2, 1)=":")
+      filePath .= "\"
+
+   Return InStr(FileExist(filePath), "D")
 }
 
 PanelExtractFrames() {
@@ -61139,13 +61219,15 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
    Static thisLevel := 0, prevPathArray := []
    baseFolder := (SLDtypeLoaded=1) ? CurrentSLD : resultedFilesList[currentFileIndex, 1]
    If (SLDtypeLoaded!=1)
-      baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
+      baseFolder := InStr(baseFolder, "\") ? SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1) : ""
 
    oldFolder := baseFolder
-   initialLevel := thisLevel
    thisFolder := StrReplace(Trimmer(baseFolder), "|")
+   thisFolder := Trimmer(StrReplace(thisFolder, "\\", "\"), "\")
+   baseArray := StrSplit(thisFolder, "\")
+   baseLevels := baseArray.Length()   ; the depth of the currently opened folder
    prevMaxLevels := prevPathArray.Length()
-   If (prevMaxLevels=thisLevel)
+   If (prevMaxLevels<=baseLevels)
    {
       doStartLongOpDance()
       Loop, Files, % thisFolder "\*", DF
@@ -61199,28 +61281,18 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
    {
         If (folderPathArray[A_Index]!=prevPathArray[A_Index])
         {
-           thisLevel := 0
            prevPathArray := folderPathArray.Clone()
            Break
         }
    }
 
-   thisParent := SubStr(oldFolder, InStr(oldFolder, "\", 0, -1) + 1)
-   thisParent := Trimmer(thisParent, "|")
-   If !thisLevel
-   {
-      Loop, % maxLevels + 1
-      {
-           If (folderPathArray[A_Index]=thisParent)
-           {
-              thisLevel := A_Index
-              Break
-           }
-      }
-   }
-
+   ; the remembered path may be deeper than the folder currently opened,
+   ; to allow navigation into sub-folders; the level must always match
+   ; the depth of the folder currently opened, no matter how it was opened
+   thisLevel := baseLevels
+   initialLevel := thisLevel
    oldIndex := currentFileIndex
-   ; ToolTip, % thisFolder "`n" oldFolder "`n" thisParent "`n" folderPathArray[1] "`n" thisLevel , , , 2
+   ; ToolTip, % thisFolder "`n" oldFolder "`n" baseLevels "`n" folderPathArray[1] "`n" thisLevel , , , 2
    prevMaxLevels := prevPathArray.Length()
    If (returnObj=1)
    {
@@ -68966,7 +69038,8 @@ invokeFoldersListerMenu() {
     If (SLDtypeLoaded!=1)
        baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
 
-    If !InStr(baseFolder, ":\")
+    testu := folderTreeNormalizePath(baseFolder)   ; drive roots are seen as C:
+    If (SubStr(testu, 2, 1)!=":")
        Return "err"
 
     showTOOLtip("Identifying sibling and parent folders for`n" baseFolder)
