@@ -12869,8 +12869,11 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
              thisColor := (TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1) ? borderColor : txtColor
              If (TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1 && TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1)
                 thisColor := txtColor
-             If (pkzo!=1)
-                QPV_SetColorAlphaChannel(thisBMP, thisColor, 0)
+             ; the raw GDI text bitmaps are entirely opaque; the call below turns
+             ; the black area around the glyphs into transparent pixels. It must
+             ; be applied for every line, otherwise the lines that overlap - due to
+             ; reduced line spacing - erase the previously drawn ones
+             QPV_SetColorAlphaChannel(thisBMP, thisColor, 0)
           }
        }
 
@@ -13009,7 +13012,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
        If (doConturDraw=1 && TextInAreaOnlyBorder=1)
           o_txtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : borderColor
-       If (pkzo=1)
+       If (pkzo=1 && TextInAreaCutOutMode!=1)
           o_txtColor := MixARGB(bgrColor, borderColor, TextInAreaBorderOpacity/255)
 
        If doEffect
@@ -13140,7 +13143,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           If validBMP(pBitmapContours)
           {
              If (thisBorderBlur>0 && TextInAreaDoBlurs=1 && !isWinXP)
-                QPV_BlurBitmapFilters(thisBMP, thisBorderBlur, thisBorderBlur, 0)
+                QPV_BlurBitmapFilters(pBitmapContours, thisBorderBlur, thisBorderBlur, 0)
 
              Gdip_ImageRotateFlip(pBitmapContours, 6)
              Gdip_BitmapSetColorDepth(pBitmapContours, 32)
@@ -13257,21 +13260,27 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        {
           If (TextInAreaPaintBgr=1 && TextInAreaCutOutMode!=1 && TextInAreaBgrUnified!=1)
           {
-             tmw := (TextInAreaBgrEntire=1) ? maxLineW : mw
+             tmw := (TextInAreaBgrEntire=1) ? min(maxLineW, mImgW) : mw
              tmx := (TextInAreaBgrEntire=1) ? 0 : thisX
              r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", tmX, "int", thisY, "int", tmw, "int", mh)
              ; fnOutputDebug(A_Index " rendered Z bitmap")
+          } Else If (TextInAreaPaintBgr=1 && TextInAreaCutOutMode=1 && TextInAreaBgrUnified!=1 && TextInAreaBgrEntire=1)
+          {
+             ; in cut-out mode the line bitmap already carries the background with the
+             ; text/border punched out of it; the rest of the line can only be filled
+             ; around it - painted underneath, it would show through the cut-outs.
+             ; the line is placed at thisX, so both margins must be filled separately
+             tmw := mImgW - thisX - mw
+             If (thisX>0)
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", 0, "int", thisY, "int", thisX, "int", mh)
+             If (tmw>0)
+                r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - TextInAreaBgrOpacity, "int", userimgGammaCorrect, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", "0xFF" TextInAreaBgrColor, "int", 32, "int", thisX + mw, "int", thisY, "int", tmw, "int", mh)
+             ; fnOutputDebug(A_Index " rendered Z side margins")
           }
 
           If validBMP(thisBMP)
           {
              EZ := 1
-             If (maxLineW>mw && TextInAreaBgrUnified=0 && TextInAreaBgrEntire=1 && TextInAreaPaintBgr=1 && TextInAreaCutOutMode=1)
-             {
-                thisBMP := expandBitmapCanvas(thisBMP, maxLineW, mh, 1, bgrColor)
-                Gdip_GetImageDimensions(thisBMP, mw, mh)
-             }
-
              If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1)
                 EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
 
@@ -13288,17 +13297,12 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
 
           thisBMP := pBitmapContours
           pkop := (TextInAreaBgrUnified!=1 || TextInAreaPaintBgr!=1) ? 1 : 0
+          pkcut := (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified=0) ? 1 : 0
           If (validBMP(thisBMP) && pkop=1)
           {
              Gdip_GetImageDimensions(thisBMP, mw, mh)
-             If (maxLineW>mw && TextInAreaBgrUnified=0 && TextInAreaBgrEntire=1 && TextInAreaPaintBgr=1 && TextInAreaCutOutMode=1)
-             {
-                thisBMP := expandBitmapCanvas(thisBMP, maxLineW, mh, 1, bgrColor)
-                Gdip_GetImageDimensions(thisBMP, mw, mh)
-             }
-
-             If (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 && TextInAreaBorderOut>1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified=0)
-                QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, "0xFF" TextInAreaBgrColor, 0)
+             If (pkcut=1)
+                QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
              Else If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
                 QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
 
@@ -13306,7 +13310,10 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              If !EZ
              {
                 thisBlendMode := 0
-                bmpOpacity := TextInAreaBorderOpacity
+                ; when the border is cut out from the background, the border colour
+                ; and its opacity are not used at all [see updateUIInsertTextPanel()];
+                ; the bitmap already carries the background opacity in its alpha channel
+                bmpOpacity := (pkcut=1) ? 255 : TextInAreaBorderOpacity
                 r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                 ; fnOutputDebug(A_Index " rendered B contour bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
