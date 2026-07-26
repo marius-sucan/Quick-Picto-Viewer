@@ -4925,7 +4925,7 @@ ToggleTDupesGroupsFading() {
 
   recalculateThumbsSizes()
   fadeOtherDupeGroups := !fadeOtherDupeGroups
-  friendly := (fadeOtherDupeGroups=2) ? "ACTIVATED" : "DEACTIVATED" 
+  friendly := (fadeOtherDupeGroups=1) ? "ACTIVATED" : "DEACTIVATED" 
   showTOOLtip("Fade images not in the active group of duplicates:`n" friendly, A_ThisFunc, 1)
   SetTimer, RemoveTooltip, % -msgDisplayTime
   INIaction(1, "fadeOtherDupeGroups", "General")
@@ -15861,7 +15861,6 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
     If (previewMode=1)
     {
        vpWinClientSize(mainWidth, mainHeight)
-       thisImgTempQuality := (userimgQuality=1) ? 3 : 5
        If (viewportQPVimage.imgHandle)
        {
           obj := retrieveQPVscreenImgSection("last", 0, 0, 0, 0, 0)
@@ -16065,7 +16064,7 @@ destroyGDIfileCache(remAll:=1, makeBackup:=0) {
           {
              mainCall := SubStr(gdiBitmapIDcall, 3)
              gdiBitmapIDcall := "a0" . mainCall
-             gdiBitmap := cloneGDItoMem(A_ThisFunc, gdiBitmap)
+             xBitmap := cloneGDItoMem(A_ThisFunc, gdiBitmap)
              gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
              gdiBitmap := xBitmap
              gdiBitmapIDentire := gdiBitmapIDcall xBitmap
@@ -33667,13 +33666,13 @@ LoadPrefsFromSLD() {
       {
          Sleep, 10
          readSlideSettingsINI(CurrentSLD)
-         showTOOLtip("Settings loaded freo the files list")
+         showTOOLtip("Settings loaded from the files list")
       }
    } Else If (SLDtypeLoaded=3)
    {
       Sleep, 10
       readSlideSettingsInDB()
-      showTOOLtip("Settings loaded freo the database")
+      showTOOLtip("Settings loaded from the database")
    }
    dummyTimerDelayiedImageDisplay(50)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -43615,7 +43614,7 @@ BTNremWallpaper() {
    GuiControlGet, userMonitorIDu
    GuiControlGet, userMonitorImgPos
    dw := new IDesktopWallpaper
-   dw.GetMonitorDevicePathAt(monitorIndex, MonitorID)
+   dw.GetMonitorDevicePathAt(userMonitorIDu - 1, MonitorID)
    dw.SetWallpaper(MonitorID, "")
    dw.SetBackgroundColor("0x" rgb2bgr(monitorBgrColor))
    dw.GetMonitorDevicePathCount(counter)
@@ -54696,7 +54695,7 @@ BtnZoomBlurSelectedArea() {
 BTNresetFillArea() {
     Gui, SettingsGUIA: Default
     FillAreaApplyColorFX := FillAreaInverted := FillAreaBlurAmount := FillAreaRemBGR := 0
-    FillAreaApplyColorFX := FillAreaBlendMode := FillAreaGlassy := alphaMaskingMode := 1
+    FillAreaBlendMode := FillAreaGlassy := alphaMaskingMode := 1
     GuiControl, SettingsGUIA: Choose, FillAreaBlendMode, 1
     GuiControl, SettingsGUIA: Choose, FillAreaGlassy, 1
     If !(viewportQPVimage.imgHandle)
