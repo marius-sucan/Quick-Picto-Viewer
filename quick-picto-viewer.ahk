@@ -2146,11 +2146,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
        {
           allowLoop := 1
-          func2Call := ["adjustCustomShapePositionLive", -1]
+          func2Call := ["adjustCustomShapePositionLive", 1]
        } Else If (HKifs("liveEdit") && editingSelectionNow=1)
        {
           allowLoop := 1
-          func2Call := ["MenuSelAreaMoveLeft"]
+          func2Call := ["MenuSelAreaMoveRight"]
        } Else If HKifs("imgsLoaded")
        {
           func2Call := ["resetSlideshowTimer"]
@@ -2165,11 +2165,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
        {
           allowLoop := 1
-          func2Call := ["adjustCustomShapePositionLive", 1]
+          func2Call := ["adjustCustomShapePositionLive", -1]
        } Else If (HKifs("liveEdit") && editingSelectionNow=1)
        {
           allowLoop := 1
-          func2Call := ["MenuSelAreaMoveRight"]
+          func2Call := ["MenuSelAreaMoveLeft"]
        } Else If HKifs("imgsLoaded")
        {
           func2Call := ["resetSlideshowTimer"]
@@ -2231,14 +2231,14 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        allowLoop := 1
        If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && editingSelectionNow=1 && thumbsDisplaying!=1)
-          func2Call := ["MenuSelAreaMoveRight"]
+          func2Call := ["MenuSelAreaMoveLeft"]
        Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
           func2Call := ["FileExploreSiblingsNav", -1]
     } Else If (givenKey="!PgDn")
     {
        allowLoop := 1
        If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && editingSelectionNow=1 && thumbsDisplaying!=1)
-          func2Call := ["MenuSelAreaMoveLeft"]
+          func2Call := ["MenuSelAreaMoveRight"]
        Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
           func2Call := ["FileExploreSiblingsNav", 1]
     } Else If (givenKey="^Home")
@@ -2262,7 +2262,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
        {
           allowLoop := 1
-          func2Call := ["adjustCustomShapePositionLive", 2]
+          func2Call := ["adjustCustomShapePositionLive", -2]
        } Else If (HKifs("liveEdit") && editingSelectionNow=1)
        {
           allowLoop := 1
@@ -2280,7 +2280,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
        {
           allowLoop := 1
-          func2Call := ["adjustCustomShapePositionLive", -2]
+          func2Call := ["adjustCustomShapePositionLive", 2]
        } Else If (HKifs("liveEdit") && editingSelectionNow=1)
        {
           allowLoop := 1
@@ -63678,13 +63678,13 @@ MenuSelAreaMoveDown() {
 }
 
 MenuSelAreaMoveRight() {
-   arrowKeysAdjustSelectionArea(-1, 1)
-   arrowKeysAdjustSelectionArea(-1, 2)
+   arrowKeysAdjustSelectionArea(1, 1)
+   arrowKeysAdjustSelectionArea(1, 2)
 }
 
 MenuSelAreaMoveLeft() {
-   arrowKeysAdjustSelectionArea(1, 1)
-   arrowKeysAdjustSelectionArea(1, 2)
+   arrowKeysAdjustSelectionArea(-1, 1)
+   arrowKeysAdjustSelectionArea(-1, 2)
 }
 
 focusToolbarNavKeys() {
