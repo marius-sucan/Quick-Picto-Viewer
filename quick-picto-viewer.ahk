@@ -1201,7 +1201,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["OpenQPVfileFolder"]
     } Else If (givenKey="^s")
     {
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       If (drawingShapeNow=1 && isImgEditingNow())
+          func2Call := ["MenuSaveEditorVectorShape"]
+       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
           func2Call := ["PanelSaveImg"]
     } Else If (givenKey="^l")
     {
@@ -49667,7 +49669,7 @@ BtnSaveVectorShape() {
           givenName := StrReplace(givenName, A_LoopField)
 
       givenName := filterFileName(givenName)
-      If StrLen(givenName)>1
+      If (StrLen(givenName)>1)
       {
          r := saveCurrentVectorShape(givenName)
          If (AnyWindowOpen=72 && !r)
@@ -49685,7 +49687,62 @@ BtnSaveVectorShape() {
    }
 }
 
-saveCurrentVectorShape(givenName, allowMsg:=1) {
+MenuSaveEditorVectorShape() {
+; saves the path being edited into a .vqpv file and hands the vector editor back, untouched;
+; modelled on BtnSaveVectorShape(), with the two differences the editor imposes: its points
+; live in another coordinate space, so they are converted the way leaving the editor converts
+; them, and the quick action buttons overlay is rebuilt, since msgBoxWrapper() tears it down
+; for the duration of any dialog it raises
+   Static forbiddenChars := "<`~@>:""/\|?*.,;"
+   If (drawingShapeNow!=1 || EllipseSelectMode!=2)
+      Return
+
+   ; converted before the name is asked for, so a path that cannot be stored is refused
+   ; straight away, rather than after the user typed a name for it
+   newPoints := getEditorVectorShapePoints2save()
+   If !IsObject(newPoints)
+   {
+      showTOOLtip("WARNING: The vector path needs at least three points to be saved")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   widthu := (PrefsLargeFonts=1) ? 950 : 460
+   msgResult := msgBoxWrapper("Save vector shape: " appTitle, "Please type a name for the vector shape to be saved.", "&Save|&Cancel", 1, "save", 0, 0, 0, "limit350", prevNameSavedVectorShape, 0, widthu)
+   If InStr(msgResult.btn, "save")
+   {
+      givenName := Trimmer(msgResult.edit)
+      Loop, Parse, forbiddenChars
+          givenName := StrReplace(givenName, A_LoopField)
+
+      givenName := filterFileName(givenName)
+      If (StrLen(givenName)>1)
+      {
+         ; saveCurrentVectorShape() writes prevNameSavedVectorShape only once the file landed
+         ; on disk; cleared beforehand, it therefore also reports whether the user confirmed
+         ; the overwrite prompt or backed out of it, which the return value alone cannot tell
+         prevName := prevNameSavedVectorShape
+         prevNameSavedVectorShape := ""
+         r := saveCurrentVectorShape(givenName, 1, newPoints)
+         If (!r && prevNameSavedVectorShape=givenName)
+         {
+            showTOOLtip("Vector shape saved:`n" givenName ".vqpv")
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+         } Else prevNameSavedVectorShape := prevName
+      } Else
+      {
+         showTOOLtip("WARNING: Incorrect name provided for the vector shape")
+         SoundBeep 300, 100
+         SetTimer, MenuSaveEditorVectorShape, -250
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+   }
+
+   SetTimer, dummyForcedRefreshImgSelectionWindow, -100
+}
+
+saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    If (EllipseSelectMode!=2)
       Return
 
@@ -49707,8 +49764,10 @@ saveCurrentVectorShape(givenName, allowMsg:=1) {
    }
 
    ; the points are serialized first: convertShapePointsArrayToStr() drops any entry with a
-   ; blank coordinate, so only the resulting string tells how many points will be read back
-   pointsStr := convertShapePointsArrayToStr(customShapePoints)
+   ; blank coordinate, so only the resulting string tells how many points will be read back;
+   ; givenPoints lets a caller hand over an already converted path, the way the vector editor
+   ; does, whose live customShapePoints are not in the coordinate space this format stores
+   pointsStr := convertShapePointsArrayToStr(IsObject(givenPoints) ? givenPoints : customShapePoints)
    resolveVectorShapeSymmetry(symIndex, symMode, pointsStr)
    contentu := pointsStr "`n"
    contentu .= VPselRotation "`n" FillAreaCurveTension "`n" innerSelectionCavityX "`n" innerSelectionCavityY "`n" closedLineCustomShape "`n" symIndex "`n" symMode "`n"
@@ -64166,6 +64225,11 @@ InvokeMenuBarVectorFile(manuID) {
    Menu, pvMenuBarFile, Add
    createVectorMenuToolModes()
    kMenu("pvMenuBarFile", "Add", "&Tool mode", ":pvVectModes")
+   Menu, pvMenuBarFile, Add
+   kMenu("pvMenuBarFile", "Add", "&Save vector shape`tCtrl+S", "MenuSaveEditorVectorShape", "export store write vqpv preset freeform custom path")
+   If (customShapePoints.Count()<3)
+      kMenu("pvMenuBarFile", "Disable", "&Save vector shapes`tCtrl+S")
+
    Menu, pvMenuBarFile, Add
    kMenu("pvMenuBarFile", "Add", "&Apply / done`tEnter", "stopDrawingShape")
    kMenu("pvMenuBarFile", "Add", "&Exit pen tool mode`tEscape", "MenuCancelDrawingShape")
@@ -79185,6 +79249,40 @@ convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
     newShape := []
     Gdip_DeletePath(pPath)
     Loop, % PointsListArray.Count()
+    {
+       xu := (newArrayu[A_Index*2 - 1] - minXu) / boundsW
+       yu := (newArrayu[A_Index*2]     - minYu) / boundsH
+       newShape[A_Index] := [xu, yu]
+    }
+
+    Return newShape
+}
+
+getEditorVectorShapePoints2save() {
+; produces the 0 to 1 bounding box relative points a .vqpv file stores, out of the path the
+; vector editor currently holds; while the editor is live customShapePoints is relative to
+; the displayed image instead, so writing it as it stands would save the path shrunk to the
+; fraction of the image it covers, with whatever falls outside the image clamped onto its edge
+; the math is the one convertEditorCustomShape2viewerCoords() ends with, but none of the
+; selection globals that function rewrites are touched, so the editing session carries on
+    If (customShapePoints.Count()<3)
+       Return
+
+    obju := getVPcustomShapePath(customShapePoints)
+    pPath := obju[1]
+    newArrayu := obju[2]
+    Rect := getAccuratePathBounds(pPath)
+    Gdip_DeletePath(pPath)
+
+    ; a path whose points are all collinear has a zero-width or zero-height bounding
+    ; box; that axis is widened by one viewport pixel centred on the points, so the
+    ; normalisation below cannot divide by zero and every point lands on 0.5
+    boundsW := (Rect.W>0) ? Rect.W : 1
+    boundsH := (Rect.H>0) ? Rect.H : 1
+    minXu := (Rect.W>0) ? Rect.X : Rect.X - 0.5
+    minYu := (Rect.H>0) ? Rect.Y : Rect.Y - 0.5
+    newShape := []
+    Loop, % customShapePoints.Count()
     {
        xu := (newArrayu[A_Index*2 - 1] - minXu) / boundsW
        yu := (newArrayu[A_Index*2]     - minYu) / boundsH
