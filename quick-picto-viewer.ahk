@@ -8190,8 +8190,6 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    If !symPoint
       symPoint := totalCount//2 + 1
 
-   ; does the alignment act on the very coordinate that the symmetry axis mirrors?
-   ; symmetry mode 1 mirrors X, while mode 2 mirrors Y
    symMatchesAlign := (modus="align-x") ? (CustomShapeSymmetry=1) : (CustomShapeSymmetry=2)
 
    ; when the aligning axis coincides with the symmetry axis, the clicked point and its
@@ -8224,9 +8222,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
            If (customShapePropPoints[A_Index, 1]!=1)
               Continue
 
-           ; the reference point carries the symmetry axis; moving it along that axis would
-           ; drag the axis along and thus change the side every other point in the path sits
-           ; on, so it is left alone, the same way the other point movers treat it
+           ; the reference point carries the symmetry axis; moving it would break things
            If (keepSides=1 && A_Index=symPoint)
               Continue
 
@@ -8253,15 +8249,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
 
    setWhileLoopExec(0)
    If (canDoSymmetry && hasLooped=1)
-   {
-      ; the symmetry mode and its reference point are kept in every case; aligning on the
-      ; axis opposite to the symmetry mode cannot break the symmetry, because counterparts
-      ; must share that coordinate unchanged and the alignment hands both of them the very
-      ; same value, while the mirrored coordinate is never written, so the axis stays put;
-      ; refreshing the cached viewport coordinates also re-registers the reference point
-      ; when it had to be guessed above, since the other point movers overwrite it
-      coreSetVPsymmetryPoint(symPoint)
-   }
+      coreSetVPsymmetryPoint(symPoint)      ; the symmetry mode and its reference point are kept
 
    lastZeitFileSelect := A_TickCount
    Return hasLooped
