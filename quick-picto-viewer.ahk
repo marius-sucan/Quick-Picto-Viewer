@@ -49267,16 +49267,66 @@ saveVectorShapeInRegistry() {
     RegAction(1, "closedLineCustomShape")
 }
 
+resolveVectorShapeSymmetry(ByRef symIndex, ByRef symMode, pointsStr:="") {
+; decides the symmetry mode and the reference point index to be written into a .vqpv file;
+; while the vector editor is live, CustomShapeSymmetry is the authority, because a mode just
+; picked by the user may not have reached prevVectorShapeSymmetryMode[] yet; once the editor
+; is closed that array is the only surviving description of the symmetry;
+; pointsStr, when given, is the already serialized path and decides the point count, so that
+; the index stays valid for the file rather than for the array it was produced from
+   symMode := isNowSymmetricVectorShape() ? CustomShapeSymmetry : Round(prevVectorShapeSymmetryMode[1, 2])
+   symIndex := Round(prevVectorShapeSymmetryMode[1, 1])
+   If (pointsStr!="")
+   {
+      writtenu := StrSplit(pointsStr, "|")
+      totalu := writtenu.Count()
+   } Else totalu := customShapePoints.Count()
+
+   If (symMode!=1 && symMode!=2) || (totalu<3)
+   {
+      symIndex := symMode := 0
+      Return 0
+   }
+
+   ; the mirrored pairs are formed as P[i] <> P[totalu - i + 1], so the reference point can
+   ; only ever be the middle one; a stale or out of range index is recomputed, not trusted
+   If (symIndex<1 || symIndex>totalu)
+      symIndex := totalu//2 + 1
+
+   Return symMode
+}
+
+applyLoadedVectorShapeSymmetry(givenIndex, givenMode) {
+; restores the symmetry mode and its reference point read from a .vqpv file; the state is
+; assigned directly, the way restoreGivenVectorUndoLevel() does it, and not through
+; configVectorShapeSymmetryPoint(), which would run autoDeactivateClosedBezier() over the
+; freshly loaded path and could reshape it; any symmetry left over from the shape that was
+; being edited before the load is dropped first, so it cannot leak onto the new path
+   CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
+   prevVectorShapeSymmetryMode := []
+   totalu := customShapePoints.Count()
+   symMode := Round(givenMode)
+   symIndex := Round(givenIndex)
+   If (symMode!=1 && symMode!=2) || (totalu<3)
+      Return 0   ; shapes saved without symmetry and files predating these two fields land here
+
+   If (symIndex<1 || symIndex>totalu)
+      symIndex := totalu//2 + 1
+
+   ; coreSetVPsymmetryPoint() reads CustomShapeSymmetry to record the mode, set it beforehand
+   CustomShapeSymmetry := CustomShapeLockedSymmetry := symMode
+   coreSetVPsymmetryPoint(symIndex)
+   Return symMode
+}
+
 BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    externMode := (isGiven="yes" && FileExist(whichFile) && whichFile) ? 1 : 0
    If (externMode!=1)
    {
       RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
-      If !RowNumber
+      If (!RowNumber !givenName)
          Return
 
-      If !givenName
-         Return
       mustOpenWin := postVectorWinOpen
    }
 
@@ -49293,6 +49343,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
          VPselRotation := 0
          innerSelectionCavityX := innerSelectionCavityY := 0.45
          prevNameSavedVectorShape := ""
+         applyLoadedVectorShapeSymmetry(0, 0)
          saveVectorShapeInRegistry()
          dummyTimerDelayiedImageDisplay(100)
          BTNopenPrevPanel(mustOpenWin, "yes")
@@ -49304,7 +49355,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       bezierSplineCustomShape := 0
       closedLineCustomShape := 1
       vpFreeformShapeOffset := []
-      prevVectorShapeSymmetryMode := []
+      applyLoadedVectorShapeSymmetry(0, 0)   ; the predefined shapes carry no symmetry
       customShapePoints := []
       VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
       customShapePropPoints := []
@@ -49382,7 +49433,6 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
 
    EllipseSelectMode := 2
    vpFreeformShapeOffset := []
-   prevVectorShapeSymmetryMode := []
    customShapePoints := []
    customShapePoints := newArrayu.Clone()
    VPselRotation := clampInRange(obju[2], 0, 360)
@@ -49391,7 +49441,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    innerSelectionCavityY := clampInRange(obju[5], 0, 0.49)
    closedLineCustomShape := Trim(obju[6])
    RegAction(1, "closedLineCustomShape")
-   prevVectorShapeSymmetryMode[1] := [obju[7], obju[8]]
+   applyLoadedVectorShapeSymmetry(obju[7], obju[8])
    prevNameSavedVectorShape := givenName
    decideCustomShapeStyle()
    saveVectorShapeInRegistry()
@@ -49631,8 +49681,12 @@ saveCurrentVectorShape(givenName, allowMsg:=1) {
          Return
    }
 
-   contentu := convertShapePointsArrayToStr(customShapePoints) "`n"
-   contentu .= VPselRotation "`n" FillAreaCurveTension "`n" innerSelectionCavityX "`n" innerSelectionCavityY "`n" closedLineCustomShape "`n" Round(prevVectorShapeSymmetryMode[1, 1]) "`n" Round(prevVectorShapeSymmetryMode[1, 2]) "`n"
+   ; the points are serialized first: convertShapePointsArrayToStr() drops any entry with a
+   ; blank coordinate, so only the resulting string tells how many points will be read back
+   pointsStr := convertShapePointsArrayToStr(customShapePoints)
+   resolveVectorShapeSymmetry(symIndex, symMode, pointsStr)
+   contentu := pointsStr "`n"
+   contentu .= VPselRotation "`n" FillAreaCurveTension "`n" innerSelectionCavityX "`n" innerSelectionCavityY "`n" closedLineCustomShape "`n" symIndex "`n" symMode "`n"
    FileDelete, % thisFile
    FileAppend, % contentu, % thisFile , UTF-8
    If ErrorLevel
