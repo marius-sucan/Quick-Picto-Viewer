@@ -8193,6 +8193,29 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    ; the alignment must act on the same coordinate as the symmetry axis, otherwise the
    ; axis cannot be maintained; symmetry mode 1 mirrors X, while mode 2 mirrors Y
    symMatchesAlign := (modus="align-x") ? (CustomShapeSymmetry=1) : (CustomShapeSymmetry=2)
+
+   ; when the aligning axis coincides with the symmetry axis, the clicked point and its
+   ; mirror provide two aligned coordinates, one on each side of the axis; every selected
+   ; point must be given the one that lies on the side it already occupies, otherwise the
+   ; points from the far side are teleported across the axis and trade places with their
+   ; counterparts; the sides are decided up front, before any point is moved
+   keepSides := (canDoSymmetry=1 && symMatchesAlign=1) ? 1 : 0
+   farSide := []
+   If (keepSides=1)
+   {
+      symAxis := (modus="align-x") ? (pzx + nX)/2 : (pzy + nY)/2
+      refSide := (modus="align-x") ? (pzx>=symAxis) : (pzy>=symAxis)
+      Loop, % totalCount
+      {
+          If (customShapePropPoints[A_Index, 1]!=1)
+             Continue
+
+          q := customShapePoints[A_Index]
+          thisSide := (modus="align-x") ? (q[1]>=symAxis) : (q[2]>=symAxis)
+          farSide[A_Index] := (thisSide!=refSide) ? 1 : 0
+      }
+   }
+
    ; ToolTip, % thisIndex "|" modus , , , 2
    hasLooped := 0
    setWhileLoopExec(1)
@@ -8201,19 +8224,30 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
            If (customShapePropPoints[A_Index, 1]!=1)
               Continue
 
+           ; the reference point carries the symmetry axis; moving it along that axis would
+           ; drag the axis along and thus change the side every other point in the path sits
+           ; on, so it is left alone, the same way the other point movers treat it
+           If (keepSides=1 && A_Index=symPoint)
+              Continue
+
            hasLooped := 1
-           If (modus="align-x")
-              customShapePoints[A_Index] := [pzx, customShapePoints[A_Index, 2]]
+           If (farSide[A_Index]=1)
+              ownX := nX, ownY := nY, mirX := pzx, mirY := pzy
            Else
-              customShapePoints[A_Index] := [customShapePoints[A_Index, 1], pzy]
+              ownX := pzx, ownY := pzy, mirX := nX, mirY := nY
+
+           If (modus="align-x")
+              customShapePoints[A_Index] := [ownX, customShapePoints[A_Index, 2]]
+           Else
+              customShapePoints[A_Index] := [customShapePoints[A_Index, 1], ownY]
 
            oppoIndex := (canDoSymmetry=1) ? totalCount - A_Index + 1 : 0
            If (oppoIndex && canDoSymmetry && thisIndex!=oppoIndex && oppoIndex!=symPoint)
            {
               If (modus="align-x")
-                 customShapePoints[oppoIndex] := [nX, customShapePoints[oppoIndex, 2]]
+                 customShapePoints[oppoIndex] := [mirX, customShapePoints[oppoIndex, 2]]
               Else
-                 customShapePoints[oppoIndex] := [customShapePoints[oppoIndex, 1], nY]
+                 customShapePoints[oppoIndex] := [customShapePoints[oppoIndex, 1], mirY]
            }
    }
 
@@ -8222,8 +8256,9 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    {
       If (symMatchesAlign=1)
       {
-         ; the reference point may have moved along the axis; refresh its cached viewport
-         ; coordinates, while keeping the same reference point and symmetry mode
+         ; refresh the cached viewport coordinates of the axis, while keeping the same
+         ; reference point and symmetry mode; this also re-registers the reference point
+         ; when it had to be guessed above, since the other movers overwrite it
          coreSetVPsymmetryPoint(symPoint)
       } Else
       {
