@@ -7896,7 +7896,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
    selu := customShapePropPoints[thisIndex, 1]
    k := (bezierSplineCustomShape=1) ? thisObjIndex[4] : 1
    getVPcoordsVectorPoint(thisIndex, xu, yu)
-   If isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1)
+   If (isDotInRect(gmX, gmY, SelDotsSize, SelDotsSize, xu, yu, 1) && thisIndex>0)
    {
       hasFoundDot := 1
       If (k!=1 && bezierSplineCustomShape=1)
@@ -8506,6 +8506,12 @@ getVectorCoordsFromVPpoint(px, py, ByRef X, ByRef Y) {
 }
 
 getVPcoordsVectorPoint(whichIndex, ByRef X, ByRef Y) {
+   If (whichIndex<1)
+   {
+      x := y := 0
+      Return
+   }
+
    x := customShapePoints[whichIndex, 1]*prevResizedVPimgW + prevDestPosX
    y := customShapePoints[whichIndex, 2]*prevResizedVPimgH + prevDestPosY
 }
