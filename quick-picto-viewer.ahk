@@ -16645,7 +16645,8 @@ ImgVectorRedoAct() {
    totalUndos := Round(undoVectorShapesLevelsArray.Count())
    If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel + 1])
    {
-      showTOOLtip("Shape redo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, currentVectorUndoLevel/totalUndos)
+      ; reached with an empty undo stack, so totalUndos must not divide as a zero
+      showTOOLtip("Shape redo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, totalUndos ? currentVectorUndoLevel/totalUndos : 0)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
@@ -16668,7 +16669,8 @@ ImgVectorUndoAct() {
    If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel - 1])
    {
       friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
-      showTOOLtip(friendly "Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, currentVectorUndoLevel/totalUndos)
+      ; reached with an empty undo stack, so totalUndos must not divide as a zero
+      showTOOLtip(friendly "Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, totalUndos ? currentVectorUndoLevel/totalUndos : 0)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
