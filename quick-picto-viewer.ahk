@@ -78189,12 +78189,19 @@ generateVPbezierAnchorPaths(mainWidth, mainHeight, ByRef PointsListArray, ByRef 
 
 defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry, altState, ctrlState, shiftState) {
    dontAddPoint := mousePoint[1]
+   symPoint := prevVectorShapeSymmetryMode[1, 1]
+   If !symPoint
+      symPoint := customShapePoints.Count()//2 + 1
+
+   ; labelu decorates the index for display only; dontAddPoint has to stay a number,
+   ; it indexes customShapePropPoints[] below and is handed back to the caller
+   labelu := dontAddPoint
    If (dontAddPoint=1)
-      dontAddPoint := mousePoint[1] " | Path start point"
+      labelu := dontAddPoint " | Path start point"
    Else If (dontAddPoint=customShapePoints.Count())
-      dontAddPoint := mousePoint[1] " | Path end point"
+      labelu := dontAddPoint " | Path end point"
    Else If (dontAddPoint=symPoint && canDoSymmetry)
-      dontAddPoint := mousePoint[1] " | Symmetry reference point"
+      labelu := dontAddPoint " | Symmetry reference point"
 
    If (vectorToolModus<3 || vectorToolModus=5)
    {
@@ -78208,32 +78215,32 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
          {
             msgu := "Click and drag to rescale selected points."
             If (dontAddPoint!=0 && selu=1)
-               msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" dontAddPoint "]." 
+               msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" labelu "]." 
             Else If (dontAddPoint!=0)
-               msgu :=  "Move " pk "point P[" dontAddPoint "]" 
+               msgu :=  "Move " pk "point P[" labelu "]" 
          } Else
-            msgu := (dontAddPoint!=0) ? "Move " pk "point P[" dontAddPoint "]" : "Click and drag points to adjust the path."
+            msgu := (dontAddPoint!=0) ? "Move " pk "point P[" labelu "]" : "Click and drag points to adjust the path."
       } Else
       {
-         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" dontAddPoint "]. Double click to divide in two." : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
+         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" labelu "]. Double click to divide in two." : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
          If (dontAddPoint!=0 && customShapeHasSelectedPoints=1)
-            msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" dontAddPoint "]."
+            msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" labelu "]."
       }
 
       If (altState && vectorToolModus!=5)
-         msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry " pk "P[" dontAddPoint "]"
+         msgu := (dontAddPoint=0 || !canDoSymmetry) ? "ALT: Add new point on existing edge" : "ALT: Move point ignoring symmetry " pk "P[" labelu "]"
       Else If (ctrlState && vectorToolModus!=5)
-         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" dontAddPoint "]"
+         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" labelu "]"
       Else If shiftState
       {
          If (dontAddPoint!=0 && vectorToolModus!=2)
-            msgu := (selu=1) ? "SHIFT: Deselect " pk "point P[" dontAddPoint "]" : "SHIFT: Select " pk "point P[" dontAddPoint "]"
+            msgu := (selu=1) ? "SHIFT: Deselect " pk "point P[" labelu "]" : "SHIFT: Select " pk "point P[" labelu "]"
          Else If (dontAddPoint=0 && vectorToolModus!=5)
             msgu := "SHIFT: Click to add new point snapped every 45° degrees and extend path"
          Else If (dontAddPoint=0 && vectorToolModus=5 && customShapeHasSelectedPoints=1)
             msgu := "SHIFT: Click and drag to uniformly rescale the selected points."
          Else
-            msgu := (dontAddPoint=0) ? "SHIFT: No action" : "SHIFT: P[" dontAddPoint "]. No action."
+            msgu := (dontAddPoint=0) ? "SHIFT: No action" : "SHIFT: P[" labelu "]. No action."
       }
 
       If (customShapePoints.Count()<1)
@@ -78250,20 +78257,20 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
          msgu := "Tool mode: " Format("{:U}", defineVectToolMode()) ". " msgu
    } Else If (vectorToolModus=3)
    {
-      msgu := (dontAddPoint=0) ? "Tool mode: REMOVE. Click on any point to remove it." : "Tool mode: REMOVE. Remove point P[" dontAddPoint "]"
+      msgu := (dontAddPoint=0) ? "Tool mode: REMOVE. Click on any point to remove it." : "Tool mode: REMOVE. Remove point P[" labelu "]"
       If (bezierSplineCustomShape=1 && dontAddPoint=0)
          msgu .= " Click anchor points to collapse them."
       Else If (mousePoint[4]!=1 && bezierSplineCustomShape=1 && dontAddPoint!=0)
-         msgu := "Tool mode: REMOVE. Collapse anchor point P[" dontAddPoint "]"
+         msgu := "Tool mode: REMOVE. Collapse anchor point P[" labelu "]"
    } Else If (vectorToolModus=4)
    {
       selu := customShapePropPoints[dontAddPoint, 1]
       If (shiftState && dontAddPoint=0)
          msgu := "Tool mode: SELECT. SHIFT: Click and drag to create a rectangular selection of points. Hold Ctrl additionally to deselect points."
       Else If ctrlState
-         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" dontAddPoint "]"
+         msgu := (dontAddPoint=0) ? "CTRL: Remove point(s)" : "CTRL: Remove " pk "point P[" labelu "]"
       Else If (dontAddPoint!=0 && vectorToolModus!=2)
-         msgu := (selu=1) ? "Tool mode: SELECT. Deselect " pk "point P[" dontAddPoint "]" : "Tool mode: SELECT. Select " pk "point P[" dontAddPoint "]"
+         msgu := (selu=1) ? "Tool mode: SELECT. Deselect " pk "point P[" labelu "]" : "Tool mode: SELECT. Select " pk "point P[" labelu "]"
       Else
          msgu := "Tool mode: SELECT. Click on any point to select it. Double click elsewhere to deselect all points. Use Shift to select multiple points."
    }
