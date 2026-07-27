@@ -7063,7 +7063,12 @@ MenuExpandSelectedAnchorPoints() {
            Continue
 
         oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
-        rr := expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, c[1], c[2])
+        ; expandGivenAnchorInPath() locates the collapsed anchors by comparing these
+        ; two arguments against viewport coordinates; c[] holds the point normalised
+        ; to the 0..1 range, so nothing was ever matched and nothing was expanded
+        getVPcoordsVectorPoint(thisIndex, vpX, vpY)
+        If (expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, vpX, vpY)=1)
+           rr := 1
     }
     If (rr=1)
        recordVectorUndoLevels()
@@ -8361,8 +8366,17 @@ expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX,
    endsConnected := areEndsConnectedBezierPath(thisIndex, totalCount)
    nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
    auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
-   If (auxiliaryPoints.Count()<1 && endsConnected=1 || !endsConnected || dummy="no")
-      auxiliaryPoints2 := getPointsSameCoordsVectorPath(totalCount, 1, nextK, customShapePoints[nextK, 1], customShapePoints[nextK, 2])
+   ; getPointsSameCoordsVectorPath() matches its last two arguments against viewport
+   ; coordinates, but customShapePoints[] holds points normalised to the 0..1 range,
+   ; so this lookup never matched anything and auxiliaryPoints2 was always empty.
+   ; getAssociatedBezierPoints() also does not bound nextK to the path, and an
+   ; out-of-range index resolves to the image origin, which would match any click
+   ; near it and then write points past the end of the path
+   If (isInRange(nextK, 1, totalCount) && (auxiliaryPoints.Count()<1 && endsConnected=1 || !endsConnected || dummy="no"))
+   {
+      getVPcoordsVectorPoint(nextK, nkX, nkY)
+      auxiliaryPoints2 := getPointsSameCoordsVectorPath(totalCount, 1, nextK, nkX, nkY)
+   }
 
    initial := auxiliaryPoints.Count()
    Loop, % auxiliaryPoints2.Count()
