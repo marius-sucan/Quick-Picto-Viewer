@@ -15113,8 +15113,7 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        tRimgH := (tempArray[4]>1) ? Round(rH*fAgScal) : Round(rImgH*fAgScal)
        offX := rImgW - tRimgW + Round((rImgW*alphaMaskOffsetX)*(fAgScal+1))
        offY := rImgH - tRimgH + Round((rImgH*alphaMaskOffsetY)*(fAgScal+1))
-       doDeduping := (alphaMaskClrBintensity>250) ? 0 : 1
-       PointsList := convertCustomShape2givenArea(customShapePoints, 1 + offX//2, 1 + offY//2, tRimgW - 2, tRimgH - 2, 1, doDeduping)
+       PointsList := convertCustomShape2givenArea(customShapePoints, 1 + offX//2, 1 + offY//2, tRimgW - 2, tRimgH - 2, 1)
        tensionLvl := Round(alphaMaskClrBintensity/255, 2)
        If (alphaMaskClrBintensity>250 && alphaPath)
           Gdip_AddPathBeziers(alphaPath, PointsList)
@@ -17884,7 +17883,7 @@ dummyInnerCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, shape, pPath
        Gdip_AddPathPolygon(pPath, [cX1, cY1, cX2, cY2, cX3, cY3, cX4, cY4])
     } Else If (shape=7)
     {
-       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH, 1, !bezierSplineCustomShape)
+       PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx + 1, imgSelPy + 1, imgSelW, imgSelH, 1)
        createPathVectorCustomShape(pPath, PointsList, FillAreaCurveTension, closedLineCustomShape, bezierSplineCustomShape, 0)
     }
 }
@@ -48036,7 +48035,7 @@ resumeCustomShapeSelection(thisZL) {
    vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
    offX := offY := 0
 
-   PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
+   PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1)
    tempPath := Gdip_CreatePath()
    Gdip_AddPathPolygon(tempPath, PointsList)
    If (VPselRotation!=0)
@@ -79082,9 +79081,11 @@ adjustCustomShapePositionLive(dir:=0) {
     SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
-convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArray:=1, filterPointDupes:=0, isBezier:=0) {
+convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArray:=1) {
     ; this assumes drawingShapeNow=0
     ; values must be in the range of 0 to 1 for the coord entries in PointsListArray
+    ; NOTE: this used to accept filterPointDupes and isBezier, which nothing in the
+    ; body ever read; no point de-duplication happens here and none ever did
     If (PointsListArray.Count()<3)
        Return
 
@@ -79785,7 +79786,7 @@ createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, ellipse, angleu:=0, keepB
    startZeit := A_TickCount
    If (ellipse=2)
    {
-      PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH, 1, !bezierSplineCustomShape, bezierSplineCustomShape)
+      PointsList := convertCustomShape2givenArea(customShapePoints, imgSelPx, imgSelPy, imgSelW, imgSelH, 1)
       If (!(FillAreaCurveTension=1 || zeroTension=1) || bezierSplineCustomShape=1 || allowErrMargin=2)
       {
          alreadySorted := 1
