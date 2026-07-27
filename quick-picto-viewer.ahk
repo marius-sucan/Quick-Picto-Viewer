@@ -78082,12 +78082,14 @@ snapPointsAtAngles(gmX, gmY, dulaX, dulaY, ByRef guX, ByRef guY) {
 ; gmX, gmY         = coords of the 2nd point [P2], the point to be placed at 90/45/0°
 
     guY  := gmY,          guX := gmX
-    zY   := Abs(gmY),      zX := Abs(gmX)
-    wY   := Abs(dulaY),    wX := Abs(dulaX)
-    maxX := max(zX, wX), maxY := max(zY, wY)
-    minX := min(zX, wX), minY := min(zY, wY)
-    lenX := maxX - minX
-    lenY := maxY - minY
+    ; the spans are the distances between the two points on each axis; taking Abs()
+    ; of every coordinate before subtracting yields ||a| - |b||, which only equals
+    ; |a - b| while both coordinates share a sign - the fixed point is at a negative
+    ; viewport coordinate as soon as the previous path point sits left of or above
+    ; the visible client area, and the diagonal length and the axis choice below
+    ; were then both computed from the wrong span
+    lenX := Abs(gmX - dulaX)
+    lenY := Abs(gmY - dulaY)
     lenAvg := (lenX + lenY)//2
     thisAngle := getAngleBetweenTwoPoints(gmX, gmY, dulaX, dulaY, 2)
     ; ToolTip, % thisAngle , , , 2
