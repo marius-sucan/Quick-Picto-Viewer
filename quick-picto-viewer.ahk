@@ -78622,6 +78622,10 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        If (canDoSymmetry)
           Return
 
+       ; totalz is already the count after reduceCustomShapeLength() popped the points,
+       ; so pp walks the removed indices down from the old end; totalz itself must not
+       ; be decremented as well, or the two refreshes below land whichPoint entries too
+       ; low and the new end of the path keeps its stale cache entry
        pp := totalz + whichPoint
        Loop, % whichPoint
        {
@@ -78629,7 +78633,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
           PointsListArray.Pop()
           PointsListArray.Pop()
           pp--
-          totalz--
        }
 
        updateCachedLiveDrawPathGivenPoint(totalz, vectorVisiblePoints, PointsListArray, kOnes)
