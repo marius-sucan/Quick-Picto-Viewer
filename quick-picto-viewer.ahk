@@ -6770,11 +6770,13 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
          kMenu("PVnav", "Add", "&Divide point" keyu, "MenuSplitVectorPoint")
 
       keyu := (vectorToolModus<3 || vectorToolModus=5) ? "`tAlt+Click" : ""
-      If (bk=1 && bezierSplineCustomShape=1)
+      ; these two act on the hovered point only; with several points selected they would be
+      ; mistaken for the selection aware entries further down, so they are left out entirely
+      If (bk=1 && bezierSplineCustomShape=1 && countSelectedVectorKeyPoints()<2)
       {
          kMenu("PVnav", "Add", "E&xpand anchors" keyu, "MenuExpandVectorPointAnchors")
          kMenu("PVnav", "Add", "&Collapse anchors", "MenuCollapseVectorPoint")
-      } 
+      }
 
       keyu := (vectorToolModus<3) ? "`tCtrl+Click" : ""
       If (bk!=1 && bezierSplineCustomShape=1)
@@ -7059,7 +7061,7 @@ MenuExpandSelectedAnchorPoints() {
         selu := customShapePropPoints[thisIndex, 1]
         c := customShapePoints[thisIndex]
         k := clampInRange(k + 1, 1, 3, 1)
-        If (c[1]="" || c[2]="" || selu!=1 || lol[thisIndex]=1 || k!=1)
+        If (c[1]="" || c[2]="" || selu!=1 || k!=1)
            Continue
 
         oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
@@ -7556,13 +7558,12 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
             oppoIndex++
 
          If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
-            pushed := pushAtGivenVectorPoint(oppoIndex, nX, nY)
+            pushAtGivenVectorPoint(oppoIndex, nX, nY)
          Else If (k=1 && bezierSplineCustomShape=1 && zzz!=1)
-            pushed := pushAtGivenVectorPoint(oppoIndex - 1, nX, nY)
+            pushAtGivenVectorPoint(oppoIndex - 1, nX, nY)
          Else If (k=2 && bezierSplineCustomShape=1)
-            pushed := pushAtGivenVectorPoint(oppoIndex + 1, nX, nY)
-
-         prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + pushed
+            pushAtGivenVectorPoint(oppoIndex + 1, nX, nY)
+         ; pushAtGivenVectorPoint() now keeps the symmetry reference in step by itself
       }
 
       symPoint := totalCount//2 + 1
@@ -7880,7 +7881,12 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
    Critical, on
    Static lastIndex
    If ((mainParam="setStart") || (A_TickCount - lastOtherWinClose<250))
+   {
+      ; the recorded index may point past the end of a path that shrank in the meantime
+      If (IsObject(customShapePoints) && lastIndex>customShapePoints.Count())
+         lastIndex := 0
       Return lastIndex
+   }
 
    ; fnOutputDebug(A_ThisFunc "(): " lastIndex " | " mX "=" mY " || " mainParam)
    If (mainParam="rClick")
@@ -7923,15 +7929,26 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          ; if they do, then consider the associated key point as the point that was clicked...
          ; this prevents users from clicking on anchors when they click on «key» points
          nextK := getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
+         ownK := (k=2) ? thisIndex - 1 : thisIndex + 1   ; the key point the anchor belongs to
          getVPcoordsVectorPoint(thisIndex, refX, refY)
          getVPcoordsVectorPoint(A, refAx, refAy)
          getVPcoordsVectorPoint(B, refBx, refBy)
          getVPcoordsVectorPoint(nextK, refKx, refKy)
-         If ( isDotInRect(refX, refY, sl, sl, refAx, refAy, 1)
-         || isDotInRect(refX, refY, sl, sl, refBx, refBy, 1)
-         || isDotInRect(refX, refY, sl, sl, refKx, refKy, 1) )
+         ; the key point the anchor belongs to and the next key point down the path are two
+         ; distinct points; the one that was actually matched has to name the destination,
+         ; k alone cannot: an anchor resting on the next key point used to send the click
+         ; three points back, to a key point sitting somewhere else entirely
+         If ( (A && isDotInRect(refX, refY, sl, sl, refAx, refAy, 1))
+         || (B && isDotInRect(refX, refY, sl, sl, refBx, refBy, 1)) )
+            zKey := ownK
+         Else If isDotInRect(refX, refY, sl, sl, refKx, refKy, 1)
+            zKey := nextK
+         Else
+            zKey := 0
+
+         If isInRange(zKey, 1, totalCount)
          {
-            thisIndex := (k=3) ? nextK : nextK - 3
+            thisIndex := zKey
             oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
             getVPcoordsVectorPoint(thisIndex, xu, yu)
             k := 1
@@ -8004,7 +8021,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          If (vectorToolModus=4 && ctrlState=1 && mainParam="normal")
             selectPathPointsInRect(gmX, gmY, shiftState, ctrlState)
          Else
-            removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
+            removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
       } Else If (mainParam!="remClick" && mainParam!="rClick" && ctrlState=0 && shiftState=0)
       {
          If (customShapeHasSelectedPoints=1 && selu=1)
@@ -8035,7 +8052,9 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
       thisIndex := 0
    }
 
-   If (dontAddPoint && thisIndex)
+   If (dotRemoved=1)
+      lastIndex := 0    ; whatever was recorded there is gone or has moved
+   Else If (dontAddPoint && thisIndex)
       lastIndex := thisIndex
 
    If (mustRem=1)
@@ -8096,6 +8115,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
 
       thisIndex := pushEndNewVectorPoint(gmX, gmY)
+      lastIndex := customShapePoints.Count()   ; the new key point ends the path
       If (customShapePoints.Count()=3 && CustomShapeSymmetry)
          prevVectorShapeSymmetryMode[1, 1] := 2 
       ; klp := prevVectorShapeSymmetryMode[1, 1]
@@ -8140,26 +8160,35 @@ pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0, zz:=0) {
    zr := 1
    handleOpenCloseBezier("kill")
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
+   ; appending never shifts the existing indices, so the recorded symmetry point stays
+   ; where it is; only the insertions done by pushAtGivenVectorPoint() move it
    customShapePoints.Push([gmX, gmY])
    customShapePropPoints.Push([0, 0])
-   prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
    thisIndex := customShapePoints.MaxIndex()
    If (bezierSplineCustomShape=1)
    {
       zr := 2
       customShapePoints.Push([gmX, gmY])
       customShapePropPoints.Push([0, 0])
-      prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
       If (thisIndex>4)
       {
          zr := 3
          customShapePoints.Push([gmX, gmY])
          customShapePropPoints.Push([0, 0])
-         prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + 1
+         ; the first of the three points pushed here is the outgoing anchor of the PREVIOUS
+         ; key point; leaving it on the new position only looks collapsed - the segment is
+         ; drawn as a straight line either way - but the anchor then belongs to a key point
+         ; it is not drawn with, so dragging that key point later leaves it behind and the
+         ; path sprouts a handle on one side
+         c := customShapePoints[thisIndex - 1]
+         customShapePoints[thisIndex] := [c[1], c[2]]
       }
    }
 
-   If (isNowSymmetricVectorShape() && bezierSplineCustomShape=1)
+   ; a symmetric path has just been given its mirrored point at the front by
+   ; pushAtGivenVectorPoint(), which shifted every cached index; the incremental refresh
+   ; below cannot be used on such a cache, the whole thing has to be rebuilt instead
+   If isNowSymmetricVectorShape()
    {
       lastZeitFileSelect := A_TickCount
    } Else If (zz!=1)
@@ -8178,21 +8207,43 @@ pushAtGivenVectorPoint(givenIndex, ogmX, ogmY) {
       handleOpenCloseBezier("kill")
 
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
+   ; how many points are inserted is decided from the length the path has now, the very
+   ; same way pushEndNewVectorPoint() decides it
+   threePoints := (bezierSplineCustomShape=1 && customShapePoints.Count()>3) ? 1 : 0
    customShapePoints.InsertAt(givenIndex, [gmX, gmY])
    customShapePropPoints.InsertAt(givenIndex, [0, 0])
-   thisIndex := customShapePoints.MaxIndex()
    If (bezierSplineCustomShape=1)
    {
       customShapePoints.InsertAt(givenIndex, [gmX, gmY])
       customShapePropPoints.InsertAt(givenIndex, [0, 0])
       pushed++
-      If (thisIndex>4)
+      If threePoints
       {
          pushed++
          customShapePoints.InsertAt(givenIndex, [gmX, gmY])
          customShapePropPoints.InsertAt(givenIndex, [0, 0])
       }
+
+      ; the three points only form a key point with both of its anchors when they land on
+      ; a k=3 slot; on the other two slots one of them is an anchor of a neighbouring key
+      ; point and has to start collapsed onto that key point [see pushEndNewVectorPoint()]
+      zk := Mod(givenIndex, 3)
+      If (pushed=3 && zk=1 && givenIndex + 3<=customShapePoints.Count())
+      {
+         c := customShapePoints[givenIndex + 3]
+         customShapePoints[givenIndex + 2] := [c[1], c[2]]
+      } Else If (pushed=3 && zk=2 && givenIndex>1)
+      {
+         c := customShapePoints[givenIndex - 1]
+         customShapePoints[givenIndex] := [c[1], c[2]]
+      }
    }
+
+   ; every index from givenIndex onwards was moved up, the symmetry reference included
+   symIndex := prevVectorShapeSymmetryMode[1, 1]
+   If (symIndex>=givenIndex)
+      prevVectorShapeSymmetryMode[1, 1] := symIndex + pushed
+
    Return pushed
 }
 
@@ -8332,11 +8383,11 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
          oppoIndex++
 
       If (k=3 && bezierSplineCustomShape=1 || bezierSplineCustomShape!=1)
-         pushed := pushAtGivenVectorPoint(oppoIndex, nX, nY)
+         pushAtGivenVectorPoint(oppoIndex, nX, nY)
       Else If (k=1 && bezierSplineCustomShape=1 && thisIndex!=1)
-         pushed := pushAtGivenVectorPoint(oppoIndex - 1, nX, nY)
+         pushAtGivenVectorPoint(oppoIndex - 1, nX, nY)
       Else If (k=2 && bezierSplineCustomShape=1)
-         pushed := pushAtGivenVectorPoint(oppoIndex + 1, nX, nY)
+         pushAtGivenVectorPoint(oppoIndex + 1, nX, nY)
 
       If (bezierSplineCustomShape=1)
       {
@@ -8352,7 +8403,7 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
             ; ToolTip, % pp "|" thisIndex + 5 , , , 2
          }
       }
-      prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] + pushed
+      ; pushAtGivenVectorPoint() now keeps the symmetry reference in step by itself
    } Else If (CustomShapeLockedSymmetry && oppoIndex=-1)
    {
       prevVectorShapeSymmetryMode[1, 2] := 0
@@ -8529,7 +8580,7 @@ getVectorCoordsFromVPpoint(px, py, ByRef X, ByRef Y) {
 }
 
 getVPcoordsVectorPoint(whichIndex, ByRef X, ByRef Y) {
-   If (whichIndex<1)
+   If (whichIndex<1 || whichIndex>customShapePoints.Count())
    {
       x := y := 0
       Return
@@ -8761,6 +8812,9 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
               endsConnected := areEndsConnectedBezierPath(thisIndex, totalCount, 1)
 
            getVPcoordsVectorPoint(thisIndex, soX, soY)
+           ; the cursor may sit anywhere inside the dot that was clicked; the point keeps
+           ; that offset while it is dragged, instead of jumping its centre to the cursor
+           grabDX := gmX - soX,    grabDY := gmY - soY
            If (endsConnected=1)
            {
               getVPcoordsVectorPoint(2, poX, poY)
@@ -8771,8 +8825,10 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
               getVPcoordsVectorPoint(thisIndex - 1, doX, doY)
            }
 
+           ; matched against the coordinates of the point itself, not against the click:
+           ; which anchors ride along must not depend on where inside the dot user pressed
            If (bezierSplineCustomShape=1)
-              auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
+              auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, soX, soY)
         }
 
         zeitSillyPrevent := A_TickCount
@@ -8781,6 +8837,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            GetMouseCoord2wind(PVhwnd, mX, mY)
            gmX := (FlipImgH=1) ? mainWidth - mX : mX
            gmY := (FlipImgV=1) ? mainHeight - mY : mY
+           gmX -= grabDX,   gmY -= grabDY
            If GetKeyState("Shift", "P")
            {
               snapPointsAtAngles(gmX, gmY, refX, refY, gmX, gmY)
@@ -8931,7 +8988,7 @@ selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
    Return hasLooped
 }
 
-removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY) {
+removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry) {
    If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
       handleOpenCloseBezier("kill")
 
@@ -8978,28 +9035,48 @@ removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry,
    }
 
 
+   ; the points sharing the position of the point about to be deleted have to be collected
+   ; while they are still there; the removals below shift every index that follows them
+   If (bezierSplineCustomShape=1 && IsObject(nextKcoords))
+   {
+      getVPcoordsVectorPoint(thisIndex, zoX, zoY)
+      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, zoX, zoY)
+   }
+
    lista := Trim(listu, "|")
    Sort, lista, R U N D|
    ; ToolTip, % listu "`n" lista , , , 2
    ; ToolTip, % anchorPa "=" anchorPb "=" anchorPc , , , 2
+   remIndexes := []
    Loop, Parse, lista, |
    {
       If !A_LoopField
          Continue
 
+      remIndexes[A_LoopField] := 1
       customShapePoints.RemoveAt(A_LoopField)
       customShapePropPoints.RemoveAt(A_LoopField)
       If (A_LoopField < prevVectorShapeSymmetryMode[1, 1])
          prevVectorShapeSymmetryMode[1, 1] := prevVectorShapeSymmetryMode[1, 1] - 1
    }
 
-   If (bezierSplineCustomShape=1)
+   ; the survivors are dropped on the next key point, so that they do not dangle where the
+   ; deleted point used to be; nextKcoords is only defined for a key point in mid path
+   If (bezierSplineCustomShape=1 && IsObject(nextKcoords))
    {
-      auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
       Loop, % auxiliaryPoints.Count()
       {
-         If auxiliaryPoints[A_Index, 1]
-            customShapePoints[auxiliaryPoints[A_Index, 1]] := [nextKcoords[1], nextKcoords[2]]
+         zu := auxiliaryPoints[A_Index, 1]
+         If (!zu || remIndexes[zu]=1)
+            Continue
+
+         nu := zu
+         Loop, % zu
+             If (remIndexes[A_Index]=1)
+                nu--
+
+         If (nu>=1 && nu<=customShapePoints.Count())
+            customShapePoints[nu] := [nextKcoords[1], nextKcoords[2]]
       }
    }
 
@@ -9292,6 +9369,20 @@ calculateSymmetricVectorPoint(gmX, gmY, ByRef mX, ByRef mY) {
 
    ; fnOutputDebug(A_ThisFunc "(): " gmX "=" gmY " | " mX "=" mY " | " vpSymX "=" vpSymY)
    Return hasSymmetry
+}
+
+countSelectedVectorKeyPoints() {
+; counts the selected key points alone; the anchors that ride along with them are ignored,
+; a single visible dot usually stands for a key point plus one or two of its anchors
+   k := zTotal := 0
+   Loop, % customShapePropPoints.Count()
+   {
+       k := (bezierSplineCustomShape=1) ? clampInRange(k + 1, 1, 3, 1) : 1
+       If (k=1 && customShapePropPoints[A_Index, 1]=1)
+          zTotal++
+   }
+
+   Return zTotal
 }
 
 isNowSymmetricVectorShape() {
@@ -78757,6 +78848,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        If (bezierSplineCustomShape=1)
        {
           ; generate the list of key points, to be used by generateVPbezierAnchorPaths() to draw the anchors
+          promoteKeys := []
           For KeyPoint, vObj in vectorVisiblePoints
           {
               ; fnOutputDebug(KeyPoint "|" vObj[3] " / " vObj[4] " / " vObj[5])
@@ -78769,34 +78861,35 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
               If IsObject(kOnes[KeyPoint])
                  Continue
 
-              If (vObj[5]=3)
-              {
-                 xu := PointsListArray[(KeyPoint + 1)*2 - 1],    yu := PointsListArray[(KeyPoint + 1)*2]
-              } Else
-              {
-                 xu := PointsListArray[(KeyPoint - 1)*2 - 1],    yu := PointsListArray[(KeyPoint - 1)*2]
-              }
-
+              ; the key point an anchor belongs to follows it when k=3 and precedes it when k=2
+              zKey := (vObj[5]=3) ? KeyPoint + 1 : KeyPoint - 1
+              xu := PointsListArray[zKey*2 - 1],    yu := PointsListArray[zKey*2]
               tx := xu - slz/2,    ty := yu - slz/2
               bz := tx//slz "|" ty//slz
               ; tzz := "a" xu yu
-              If (overDrawFilter[bz]!=1 && overDrawFilter[bz]>1) ; || (overDrawFilter[tzz]!=1 && overDrawFilter[tzz]>1)
+              ; the loop above reduced a stack of collapsed points to this anchor, so it has
+              ; to be drawn and clicked as the key point it hides - true only while it really
+              ; rests on that key point, otherwise the entry would carry foreign coordinates
+              If (xu=vObj[3] && yu=vObj[4] && overDrawFilter[bz]!=1 && overDrawFilter[bz]>1)
               {
                  ; fnOutputDebug(A_ThisFunc "(): " KeyPoint "|" vObj[5])
-                 If IsObject(vectorVisiblePoints[KeyPoint]) && !IsObject(vectorVisiblePoints[KeyPoint + 1])
+                 If (IsObject(vectorVisiblePoints[KeyPoint]) && !IsObject(vectorVisiblePoints[zKey]) && !promoteKeys[zKey])
                  {
                     ; fix drawing of collapsed anchors
                     ; fnOutputDebug(A_ThisFunc "(): doooone " KeyPoint "|" vObj[5])
-                    vectorVisiblePoints[KeyPoint] := 0
-                    vectorVisiblePoints[KeyPoint + 1] := [tx, ty, xu, yu, 1, SelDotsSize, slz]
+                    promoteKeys[zKey] := [KeyPoint, xu - SelDotsSize/2, yu - SelDotsSize/2, xu, yu, slz]
                     overDrawFilter[bz] := 1
                  }
               }
 
-              If (vObj[5]=3)
-                 kOnes[KeyPoint + 1] := [ xu, yu ]
-              Else
-                 kOnes[KeyPoint - 1] := [ xu, yu ]
+              kOnes[zKey] := [ xu, yu ]
+          }
+
+          ; done out here, the enumeration above must not be handed new entries while it runs
+          For zKey, zObj in promoteKeys
+          {
+              vectorVisiblePoints[zObj[1]] := 0
+              vectorVisiblePoints[zKey] := [zObj[2], zObj[3], zObj[4], zObj[5], 1, SelDotsSize, zObj[6]]
           }
 
           bezierLinesPath := generateVPbezierAnchorPaths(mainWidth, mainHeight, PointsListArray, kOnes, bezierLinesPath)
