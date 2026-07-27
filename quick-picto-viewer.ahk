@@ -53644,7 +53644,7 @@ updateUIblurPanel(a:=0,b:=0) {
           GuiControl, SettingsGUIA: Enable, mainBtnACT
           GuiControl, % actu, blurAreaSoftEdges
           GuiControl, % actu, blurAreaSoftLevel
-          If (blurAreaSoftEdges=1)
+          ; If (blurAreaSoftEdges=1)
              GuiControl, SettingsGUIA: Enable, blurAreaTwice
        } Else
        {

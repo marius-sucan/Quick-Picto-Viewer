@@ -430,7 +430,7 @@ LV_EX_IsRowSelected(HLV, Row) {
 }
 
 LV_GetFirstVisible(HLV) {
-   LV_GetFirstSelected(HLV, 1)
+   Return LV_GetFirstSelected(HLV, 1)
 }
 
 LV_GetFirstSelected(HLV, visible:=0) {
@@ -439,9 +439,9 @@ LV_GetFirstSelected(HLV, visible:=0) {
    Loop, % Rows 
    {
       If (visible=1)
-         s := LV_EX_IsRowVisible(HLV, p)
+         s := LV_EX_IsRowVisible(HLV, A_Index)
       Else
-         s := LV_EX_IsRowSelected(HLV, p)
+         s := LV_EX_IsRowSelected(HLV, A_Index)
 
       If s
       {
