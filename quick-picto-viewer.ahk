@@ -48022,9 +48022,12 @@ resumeCustomShapeSelection(thisZL) {
    If !thisZL
       thisZL := zoomLevel
 
-   fX := vpFreeformShapeOffset[1] ? vpFreeformShapeOffset[1] : 0
-   fY := vpFreeformShapeOffset[2] ? vpFreeformShapeOffset[2] : 0
-   fS := vpFreeformShapeOffset[3] ? vpFreeformShapeOffset[3] : 1
+   ; NOTE: vpFreeformShapeOffset[1..3] hold the centring offset and the scale that
+   ; centerPath2bounds() applied when the shape was last fitted to the selection.
+   ; They used to be read into fX/fY/fS here and then never used, so resuming a
+   ; shape has always discarded them; nothing else in the file reads those three
+   ; entries either. Re-applying them would change where a resumed shape lands,
+   ; which is a behaviour decision rather than a fix.
    zImgSelX1 := imgSelX1 * thisZL
    zImgSelY1 := imgSelY1 * thisZL
    zImgSelX2 := imgSelX2 * thisZL
@@ -48033,7 +48036,6 @@ resumeCustomShapeSelection(thisZL) {
    vPimgSelPy := prevDestPosY + min(zImgSelY1, zImgSelY2)
    vPimgSelW := max(zImgSelX1, zImgSelX2) - min(zImgSelX1, zImgSelX2)
    vPimgSelH := max(zImgSelY1, zImgSelY2) - min(zImgSelY1, zImgSelY2)
-   offX := offY := 0
 
    PointsList := convertCustomShape2givenArea(customShapePoints, vPimgSelPx, vPimgSelPy, VPimgSelW, VPimgSelH, 1)
    tempPath := Gdip_CreatePath()
