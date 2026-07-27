@@ -17938,8 +17938,12 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
      ncY := nRect.y + (nRect.h / 2)
      pMatrix := Gdip_CreateMatrix()
      Gdip_TranslateMatrix(pMatrix, -ncX , -ncY)
-     sX := Rect.w / nRect.w
-     sY := Rect.h / nRect.h
+     ; a path with no extent on one axis (all of its points collinear) keeps a
+     ; zero-sized rotated bounding box whenever the angle is a multiple of 90°;
+     ; a zero ratio then skips the rescaling below, as it already did for a zero
+     ; source extent, instead of dividing by zero
+     sX := (nRect.w>0) ? Rect.w / nRect.w : 0
+     sY := (nRect.h>0) ? Rect.h / nRect.h : 0
      If (withinBkeepRatio=1)
      {
         sX := min(sX, sY)
@@ -78942,17 +78946,30 @@ convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
     pPath := obju[1]
     newArrayu := obju[2]
     Rect := getAccuratePathBounds(pPath)
-    minXu := Rect.X,  minYu := Rect.Y
-    maxXu := Rect.X + Rect.W, maxYu := Rect.Y + Rect.H
+    ; a path whose points are all collinear has a zero-width or zero-height bounding
+    ; box; that axis is widened by one viewport pixel centred on the points, so the
+    ; normalisation below cannot divide by zero and every point lands on 0.5
+    boundsW := (Rect.W>0) ? Rect.W : 1
+    boundsH := (Rect.H>0) ? Rect.H : 1
+    minXu := (Rect.W>0) ? Rect.X : Rect.X - 0.5
+    minYu := (Rect.H>0) ? Rect.Y : Rect.Y - 0.5
+    maxXu := minXu + boundsW, maxYu := minYu + boundsH
 
     MouseCoords2Image(minXu, minYu, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, ImgSelX1, imgSelY1)
     MouseCoords2Image(maxXu, maxYu, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, ImgSelX2, imgSelY2)
+
+    ; one viewport pixel rounds down to zero image pixels when zoomed in; the selection
+    ; must keep a non-zero extent, or every consumer of it divides by zero in turn
+    If (imgSelX2<=imgSelX1)
+       imgSelX2 := imgSelX1 + 1
+    If (imgSelY2<=imgSelY1)
+       imgSelY2 := imgSelY1 + 1
 
     trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
     defineRelativeSelCoords(imgW, imgH)
     initialCustomShapeCoords := imgSelX1 "|" imgSelY1 ; i forgot what this is for ^_^ 
     RegAction(1, "initialCustomShapeCoords")
-    mW := Rect.W
+    mW := boundsW
     mH := maxYu - minYu
 
     ; pp := Gdip_GetPathPointsCount(pPath)
@@ -78965,8 +78982,8 @@ convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
     Gdip_DeletePath(pPath)
     Loop, % PointsListArray.Count()
     {
-       xu := (newArrayu[A_Index*2 - 1] - minXu) / Rect.W
-       yu := (newArrayu[A_Index*2]     - minYu) / Rect.H
+       xu := (newArrayu[A_Index*2 - 1] - minXu) / boundsW
+       yu := (newArrayu[A_Index*2]     - minYu) / boundsH
        newShape[A_Index] := [xu, yu]
     }
 
@@ -79820,11 +79837,24 @@ centerPath2bounds(ImgSelPath, imgSelPx, imgSelPy, imgSelW, imgSelH, destinationP
    startZeit := A_TickCount
    Rect := getAccuratePathBounds(ImgSelPath, 0, doPrecise)
    pMatrix := Gdip_CreateMatrix()
+   ; a degenerate path (all of its points collinear) has a zero-width or zero-height
+   ; bounding box, and a zero-sized target area yields a zero scale that would collapse
+   ; the path to a single point; in both cases that axis is left unscaled instead
+   sW := (Rect.w>0 && imgSelW>0) ? imgSelW/Rect.w : 0
+   sH := (Rect.h>0 && imgSelH>0) ? imgSelH/Rect.h : 0
    If (scaleUniform=1)
    {
-      scaleu := min(imgSelW/Rect.w, imgSelH/Rect.h)
+      If (sW>0 && sH>0)
+         scaleu := min(sW, sH)
+      Else If (sW>0)
+         scaleu := sW
+      Else If (sH>0)
+         scaleu := sH
+      Else
+         scaleu := 1
+
       Gdip_ScaleMatrix(pMatrix, scaleu, scaleu)
-   } Else Gdip_ScaleMatrix(pMatrix, imgSelW/Rect.w, imgSelH/Rect.h)
+   } Else Gdip_ScaleMatrix(pMatrix, (sW>0) ? sW : 1, (sH>0) ? sH : 1)
 
    E := Gdip_TransformPath(ImgSelPath, pMatrix)
    If destinationPath
