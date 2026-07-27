@@ -434,17 +434,20 @@ LV_GetFirstVisible(HLV) {
 }
 
 LV_GetFirstSelected(HLV, visible:=0) {
-   LV_EX_GetItemsCount(HLV, rows, cols)
    p := 0
+   LV_EX_GetItemsCount(HLV, rows, cols)
    Loop, % Rows 
    {
-      p := A_Index
       If (visible=1)
          s := LV_EX_IsRowVisible(HLV, p)
       Else
          s := LV_EX_IsRowSelected(HLV, p)
+
       If s
+      {
+         p := A_Index
          Break
+      }
    }
    Return p
 }

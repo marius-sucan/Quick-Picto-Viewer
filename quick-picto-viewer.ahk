@@ -31277,7 +31277,7 @@ folderTreeContextMenu() {
          Menu, PVfdTree, Add
          kMenu("PVfdTree", "Add", "Selected folder is inexistent", "dummy")
          kMenu("PVfdTree", "Disable", "Selected folder is inexistent")
-         Menu, PVfdTree, Delete, &Scan for sub-folders`tSpace
+         Try Menu, PVfdTree, Delete, &Scan for sub-folders`tSpace
          Menu, PVfdTree, Add
          addBonus := 1
       }
@@ -46733,11 +46733,10 @@ togglePasteInPlaceCropNone() {
 }
 
 FlipVtransformedIMGpanel() {
-   Static kl := {4:2, 3:1, 2:4, 1:3}
    If (AnyWindowOpen=31 || AnyWindowOpen=24)
    {
-      PasteInPlaceOrientation := kl[PasteInPlaceOrientation]
-      GuiControl, SettingsGUIA: Choose, PasteInPlaceOrientation, % PasteInPlaceOrientation
+      PasteInPlaceOrientFlipY := !PasteInPlaceOrientFlipY
+      GuiControl, SettingsGUIA:, PasteInPlaceOrientFlipY, % PasteInPlaceOrientFlipY
       updateUIpastePanel()
    }
 }
@@ -46746,8 +46745,8 @@ FlipHtransformedIMGpanel() {
    Static kl := {4:3, 3:4, 2:1, 1:2}
    If (AnyWindowOpen=31 || AnyWindowOpen=24)
    {
-      PasteInPlaceOrientation := kl[PasteInPlaceOrientation]
-      GuiControl, SettingsGUIA: Choose, PasteInPlaceOrientation, % PasteInPlaceOrientation
+      PasteInPlaceOrientFlipX := !PasteInPlaceOrientFlipX
+      GuiControl, SettingsGUIA:, PasteInPlaceOrientFlipX, % PasteInPlaceOrientFlipX
       updateUIpastePanel()
    }
 }
@@ -49351,7 +49350,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    If (externMode!=1)
    {
       RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
-      If (!RowNumber !givenName)
+      If (!RowNumber || !givenName)
          Return
 
       mustOpenWin := postVectorWinOpen
@@ -49418,7 +49417,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    Else
       FileRead, contentu, % mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
 
-   If StrLen(contentu)<5
+   If (StrLen(contentu)<5 || ErrorLevel)
    {
       If (externMode=1)
       {
@@ -64226,7 +64225,7 @@ InvokeMenuBarVectorFile(manuID) {
    createVectorMenuToolModes()
    kMenu("pvMenuBarFile", "Add", "&Tool mode", ":pvVectModes")
    Menu, pvMenuBarFile, Add
-   kMenu("pvMenuBarFile", "Add", "&Save vector shape`tCtrl+S", "MenuSaveEditorVectorShape", "export store write vqpv preset freeform custom path")
+   kMenu("pvMenuBarFile", "Add", "&Save vector shapes`tCtrl+S", "MenuSaveEditorVectorShape", "export store write vqpv preset freeform custom path")
    If (customShapePoints.Count()<3)
       kMenu("pvMenuBarFile", "Disable", "&Save vector shapes`tCtrl+S")
 
@@ -75736,9 +75735,9 @@ changeBrushSize(dir) {
       BrushToolSize -= factoru
 
    endCaptureCloneBrush()
-   BrushToolSize := clampInRange(BrushToolSize, 1, 950)
+   BrushToolSize := clampInRange(BrushToolSize, 1, 990)
    friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
-   RegAction(1, "BrushToolSize",, 2, 2, 980)
+   RegAction(1, "BrushToolSize",, 2, 2, 990)
    showTOOLtip("Brush " friendly " size: " groupDigits(BrushToolSize) " px", A_ThisFunc, 2, BrushToolSize/950)
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
@@ -75835,7 +75834,7 @@ changeBrushSoftness(dir) {
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-   BrushToolSoftness := clampInRange(BrushToolSoftness, 1, 99)
+   BrushToolSoftness := clampInRange(BrushToolSoftness, 1, 100)
    RegAction(1, "BrushToolSoftness",, 2, 1, 100)
    showTOOLtip("Brush softness: " BrushToolSoftness "%", A_ThisFunc, 2, BrushToolSoftness/100)
    If (AnyWindowOpen=64 || AnyWindowOpen=24 || AnyWindowOpen=31)

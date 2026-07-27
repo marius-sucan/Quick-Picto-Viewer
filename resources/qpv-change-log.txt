@@ -9,7 +9,7 @@
   - [new] pen pressure support for brushes
   - added shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
   - improvements and fixes to the vector shapes editor, much improved handling for Bezier splines
-  - improvements and fixes related to the histogram statistics
+  - improvements and fixes for the histogram statistics
   - much faster lines drawing on images above 536 megapixels
   - faster polar/rectangular coordinates transformations
   - faster blend mode functions
