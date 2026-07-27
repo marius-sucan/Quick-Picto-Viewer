@@ -49201,11 +49201,42 @@ BTNdeleteCustomShape() {
    If (msgResult="Yes")
    {
       FileRecycle, % mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
-      BtnCloseWindow()
+      removeVectorShapeFromLVs(givenName)
       showTOOLtip("Vector shape file moved to recycle bin:`n " givenName ".vqpv")
       SetTimer, RemoveTooltip, % -msgDisplayTime
-      SetTimer, PanelManageVectorShapes, -250
    }
+}
+
+removeVectorShapeFromLVs(givenName) {
+; removes the row of the given saved vector shape from the list views
+; of both tabs of the vector shapes manager panel, without reopening it
+   Gui, SettingsGUIA: Default
+   Loop, 2
+   {
+      If (A_Index=1)
+      {
+         Gui, SettingsGUIA: ListView, LViewDynas
+         nameCol := 1
+         dateCol := 2
+      } Else
+      {
+         Gui, SettingsGUIA: ListView, LViewShapesIcons
+         nameCol := 2
+         dateCol := 3
+      }
+
+      Loop, % LV_GetCount()
+      {
+          LV_GetText(thisName, A_Index, nameCol)
+          LV_GetText(thisDate, A_Index, dateCol)
+          If (thisDate!="-" && thisName=givenName)
+          {
+             LV_Delete(A_Index)
+             Break
+          }
+      }
+   }
+   GuiControl, SettingsGUIA:, txtLine4, -
 }
 
 BTNrenameCustomShape() {
