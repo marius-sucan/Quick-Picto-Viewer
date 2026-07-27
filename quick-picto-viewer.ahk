@@ -78327,6 +78327,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
    }
 
    mousePoint := [0, 0]
+   dontAddPoint := 0
    canDoSymmetry := isNowSymmetricVectorShape()
    symPoint := prevVectorShapeSymmetryMode[1, 1]
    If (canDoSymmetry && Gu && totalz>1)
@@ -78374,6 +78375,11 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
        }
    }
 
+   ; hovering an existing point means a click will not add a new one, which is the
+   ; same thing the -1 dead zones above report; this used to be set only as a side
+   ; effect of defineVectorEditorStatusBar(), so the cursor below silently depended
+   ; on the contextual status bar being switched on
+   dontAddPoint := mousePoint[1]
    If (mousePoint[1]!=0 && Gu)
    {
       ; draw the mouse hovered point
