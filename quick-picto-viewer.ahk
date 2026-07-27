@@ -6770,10 +6770,9 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
          kMenu("PVnav", "Add", "&Divide point" keyu, "MenuSplitVectorPoint")
 
       keyu := (vectorToolModus<3 || vectorToolModus=5) ? "`tAlt+Click" : ""
-      ; these two act on the hovered point only; with several points selected they would be
-      ; mistaken for the selection aware entries further down, so they are left out entirely
       If (bk=1 && bezierSplineCustomShape=1 && countSelectedVectorKeyPoints()<2)
       {
+         ; these two act on the hovered point only
          kMenu("PVnav", "Add", "E&xpand anchors" keyu, "MenuExpandVectorPointAnchors")
          kMenu("PVnav", "Add", "&Collapse anchors", "MenuCollapseVectorPoint")
       }
@@ -6813,8 +6812,8 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
 
       If (bezierSplineCustomShape=1 && customShapePoints.Count()>3)
       {
-         kMenu("PVnav", "Add", "&Collapse anchors for selected points", "MenuCollapseSelectedAnchorPoints")
-         kMenu("PVnav", "Add", "&Expand anchors for selected points", "MenuExpandSelectedAnchorPoints")
+         kMenu("PVnav", "Add", "&Collapse anchors (selected points)", "MenuCollapseSelectedAnchorPoints")
+         kMenu("PVnav", "Add", "&Expand anchors (selected points)", "MenuExpandSelectedAnchorPoints")
       }
    }
 
@@ -7936,8 +7935,7 @@ PerformVectorShapeActions(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, s
          getVPcoordsVectorPoint(nextK, refKx, refKy)
          ; the key point the anchor belongs to and the next key point down the path are two
          ; distinct points; the one that was actually matched has to name the destination,
-         ; k alone cannot: an anchor resting on the next key point used to send the click
-         ; three points back, to a key point sitting somewhere else entirely
+         ; k alone cannot
          If ( (A && isDotInRect(refX, refY, sl, sl, refAx, refAy, 1))
          || (B && isDotInRect(refX, refY, sl, sl, refBx, refBy, 1)) )
             zKey := ownK
@@ -8175,11 +8173,7 @@ pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0, zz:=0) {
          zr := 3
          customShapePoints.Push([gmX, gmY])
          customShapePropPoints.Push([0, 0])
-         ; the first of the three points pushed here is the outgoing anchor of the PREVIOUS
-         ; key point; leaving it on the new position only looks collapsed - the segment is
-         ; drawn as a straight line either way - but the anchor then belongs to a key point
-         ; it is not drawn with, so dragging that key point later leaves it behind and the
-         ; path sprouts a handle on one side
+         ; the first of the three points pushed here is the outgoing anchor of the PREVIOUS key point
          c := customShapePoints[thisIndex - 1]
          customShapePoints[thisIndex] := [c[1], c[2]]
       }
@@ -8206,9 +8200,9 @@ pushAtGivenVectorPoint(givenIndex, ogmX, ogmY) {
    If (givenIndex<4 || givenIndex>(customShapePoints.Count() - 3))
       handleOpenCloseBezier("kill")
 
-   getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
    ; how many points are inserted is decided from the length the path has now, the very
    ; same way pushEndNewVectorPoint() decides it
+   getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
    threePoints := (bezierSplineCustomShape=1 && customShapePoints.Count()>3) ? 1 : 0
    customShapePoints.InsertAt(givenIndex, [gmX, gmY])
    customShapePropPoints.InsertAt(givenIndex, [0, 0])
@@ -8811,9 +8805,9 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            If (k=1 && thisReflctAnchr=1 && bezierSplineCustomShape=1)
               endsConnected := areEndsConnectedBezierPath(thisIndex, totalCount, 1)
 
-           getVPcoordsVectorPoint(thisIndex, soX, soY)
            ; the cursor may sit anywhere inside the dot that was clicked; the point keeps
            ; that offset while it is dragged, instead of jumping its centre to the cursor
+           getVPcoordsVectorPoint(thisIndex, soX, soY)
            grabDX := gmX - soX,    grabDY := gmY - soY
            If (endsConnected=1)
            {
