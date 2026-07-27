@@ -8190,8 +8190,8 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    If !symPoint
       symPoint := totalCount//2 + 1
 
-   ; the alignment must act on the same coordinate as the symmetry axis, otherwise the
-   ; axis cannot be maintained; symmetry mode 1 mirrors X, while mode 2 mirrors Y
+   ; does the alignment act on the very coordinate that the symmetry axis mirrors?
+   ; symmetry mode 1 mirrors X, while mode 2 mirrors Y
    symMatchesAlign := (modus="align-x") ? (CustomShapeSymmetry=1) : (CustomShapeSymmetry=2)
 
    ; when the aligning axis coincides with the symmetry axis, the clicked point and its
@@ -8254,22 +8254,13 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    setWhileLoopExec(0)
    If (canDoSymmetry && hasLooped=1)
    {
-      If (symMatchesAlign=1)
-      {
-         ; refresh the cached viewport coordinates of the axis, while keeping the same
-         ; reference point and symmetry mode; this also re-registers the reference point
-         ; when it had to be guessed above, since the other movers overwrite it
-         coreSetVPsymmetryPoint(symPoint)
-      } Else
-      {
-         alignedOn := (modus="align-x") ? "X" : "Y"
-         friendly := (CustomShapeSymmetry=1) ? "X" : "Y"
-         CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
-         prevVectorShapeSymmetryMode := []
-         showTOOLtip("WARNING: The points were aligned on " alignedOn ", but the path symmetry mode is " friendly ".`nThe symmetry reference and mode were discarded.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime*2
-      }
+      ; the symmetry mode and its reference point are kept in every case; aligning on the
+      ; axis opposite to the symmetry mode cannot break the symmetry, because counterparts
+      ; must share that coordinate unchanged and the alignment hands both of them the very
+      ; same value, while the mirrored coordinate is never written, so the axis stays put;
+      ; refreshing the cached viewport coordinates also re-registers the reference point
+      ; when it had to be guessed above, since the other point movers overwrite it
+      coreSetVPsymmetryPoint(symPoint)
    }
 
    lastZeitFileSelect := A_TickCount
