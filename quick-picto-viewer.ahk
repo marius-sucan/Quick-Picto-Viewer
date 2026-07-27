@@ -7063,9 +7063,6 @@ MenuExpandSelectedAnchorPoints() {
            Continue
 
         oppoIndex := (canDoSymmetry=1) ? totalCount - thisIndex + 1 : -1
-        ; expandGivenAnchorInPath() locates the collapsed anchors by comparing these
-        ; two arguments against viewport coordinates; c[] holds the point normalised
-        ; to the 0..1 range, so nothing was ever matched and nothing was expanded
         getVPcoordsVectorPoint(thisIndex, vpX, vpY)
         If (expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, vpX, vpY)=1)
            rr := 1
@@ -8368,10 +8365,6 @@ expandGivenAnchorInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX,
    auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, gmX, gmY)
    ; getPointsSameCoordsVectorPath() matches its last two arguments against viewport
    ; coordinates, but customShapePoints[] holds points normalised to the 0..1 range,
-   ; so this lookup never matched anything and auxiliaryPoints2 was always empty.
-   ; getAssociatedBezierPoints() also does not bound nextK to the path, and an
-   ; out-of-range index resolves to the image origin, which would match any click
-   ; near it and then write points past the end of the path
    If (isInRange(nextK, 1, totalCount) && (auxiliaryPoints.Count()<1 && endsConnected=1 || !endsConnected || dummy="no"))
    {
       getVPcoordsVectorPoint(nextK, nkX, nkY)
@@ -16658,8 +16651,8 @@ ImgVectorRedoAct() {
    totalUndos := Round(undoVectorShapesLevelsArray.Count())
    If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel + 1])
    {
-      ; reached with an empty undo stack, so totalUndos must not divide as a zero
-      showTOOLtip("Shape redo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, totalUndos ? currentVectorUndoLevel/totalUndos : 0)
+      zz := totalUndos ? currentVectorUndoLevel/totalUndos : 0
+      showTOOLtip("Shape redo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
@@ -16681,9 +16674,9 @@ ImgVectorUndoAct() {
    totalUndos := Round(undoVectorShapesLevelsArray.Count())
    If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel - 1])
    {
+      zz := totalUndos ? currentVectorUndoLevel/totalUndos : 0
       friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
-      ; reached with an empty undo stack, so totalUndos must not divide as a zero
-      showTOOLtip(friendly "Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, totalUndos ? currentVectorUndoLevel/totalUndos : 0)
+      showTOOLtip(friendly "Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
@@ -17940,8 +17933,8 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
   E := Gdip_TransformPath(pathu, pMatrix)
   If destinationPath
      E := Gdip_TransformPath(pPath, pMatrix)
-  Gdip_DeleteMatrix(pMatrix)
 
+  Gdip_DeleteMatrix(pMatrix)
   If (withinBounds=1 && !E && Angle!=0)
   {
      If (highAccuracy=1)
@@ -17953,10 +17946,7 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
      ncY := nRect.y + (nRect.h / 2)
      pMatrix := Gdip_CreateMatrix()
      Gdip_TranslateMatrix(pMatrix, -ncX , -ncY)
-     ; a path with no extent on one axis (all of its points collinear) keeps a
-     ; zero-sized rotated bounding box whenever the angle is a multiple of 90°;
-     ; a zero ratio then skips the rescaling below, as it already did for a zero
-     ; source extent, instead of dividing by zero
+     ; avoid dividing by zero
      sX := (nRect.w>0) ? Rect.w / nRect.w : 0
      sY := (nRect.h>0) ? Rect.h / nRect.h : 0
      If (withinBkeepRatio=1)
@@ -17964,6 +17954,7 @@ trGdip_RotatePathAtCenter(pPath, Angle, MatrixOrder:=1, withinBounds:=0, withinB
         sX := min(sX, sY)
         sY := min(sX, sY)
      }
+
      Gdip_ScaleMatrix(pMatrix, sX, sY, MatrixOrder)
      Gdip_TranslateMatrix(pMatrix, ncX, ncY, MatrixOrder)
      If (sX!=0 && sY!=0)
@@ -48022,12 +48013,6 @@ resumeCustomShapeSelection(thisZL) {
    If !thisZL
       thisZL := zoomLevel
 
-   ; NOTE: vpFreeformShapeOffset[1..3] hold the centring offset and the scale that
-   ; centerPath2bounds() applied when the shape was last fitted to the selection.
-   ; They used to be read into fX/fY/fS here and then never used, so resuming a
-   ; shape has always discarded them; nothing else in the file reads those three
-   ; entries either. Re-applying them would change where a resumed shape lands,
-   ; which is a behaviour decision rather than a fix.
    zImgSelX1 := imgSelX1 * thisZL
    zImgSelY1 := imgSelY1 * thisZL
    zImgSelX2 := imgSelX2 * thisZL
@@ -78082,13 +78067,8 @@ snapPointsAtAngles(gmX, gmY, dulaX, dulaY, ByRef guX, ByRef guY) {
 ; dulaX, dulaY     = coords of the fixed point [P1]
 ; gmX, gmY         = coords of the 2nd point [P2], the point to be placed at 90/45/0°
 
-    guY  := gmY,          guX := gmX
-    ; the spans are the distances between the two points on each axis; taking Abs()
-    ; of every coordinate before subtracting yields ||a| - |b||, which only equals
-    ; |a - b| while both coordinates share a sign - the fixed point is at a negative
-    ; viewport coordinate as soon as the previous path point sits left of or above
-    ; the visible client area, and the diagonal length and the axis choice below
-    ; were then both computed from the wrong span
+    guY  := gmY
+    guX := gmX
     lenX := Abs(gmX - dulaX)
     lenY := Abs(gmY - dulaY)
     lenAvg := (lenX + lenY)//2
@@ -78225,7 +78205,8 @@ defineVectorEditorStatusBar(ByRef mousePoint, ByRef dontAddPoint, canDoSymmetry,
             msgu := (dontAddPoint!=0) ? "Move " pk "point P[" labelu "]" : "Click and drag points to adjust the path."
       } Else
       {
-         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" labelu "]. Double click to divide in two." : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
+         divu := !Instr(labelu, " symmetry") ? "Double click to divide in two." : ""
+         msgu := (dontAddPoint!=0) ? "Move existing " pk "point P[" labelu "]. " divu : "Click to add new point and extend path. Hold Alt, Ctrl or Shift for other modes."
          If (dontAddPoint!=0 && customShapeHasSelectedPoints=1)
             msgu := "Click and drag to move selected points. Shift + L-Click to deselect " pk "P[" labelu "]."
       }
@@ -79086,8 +79067,6 @@ adjustCustomShapePositionLive(dir:=0) {
 convertCustomShape2givenArea(PointsListArray, refX, refY, refW, refH, returnArray:=1) {
     ; this assumes drawingShapeNow=0
     ; values must be in the range of 0 to 1 for the coord entries in PointsListArray
-    ; NOTE: this used to accept filterPointDupes and isBezier, which nothing in the
-    ; body ever read; no point de-duplication happens here and none ever did
     If (PointsListArray.Count()<3)
        Return
 
