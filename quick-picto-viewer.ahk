@@ -7249,7 +7249,8 @@ MenuRemSelVectorPoints() {
     }
 
     zpp := 0
-    Loop, % customShapePoints.Count()
+    origCountu := customShapePoints.Count()
+    Loop, % origCountu
     {
        c := customShapePoints[A_Index]
        selu := customShapePropPoints[A_Index, 1]
@@ -7284,6 +7285,21 @@ MenuRemSelVectorPoints() {
     customShapeHasSelectedPoints := 0
     recordVectorUndoLevels()
     lastZeitFileSelect := A_TickCount
+    remainedu := customShapePoints.Count()
+    removedu := origCountu - remainedu
+    If (removedu>0 && remainedu<2)
+    {
+       ; the entire path, or all of it but one point, was selected and is now gone
+       If remainedu
+          friendly := groupDigits(removedu) " out of " groupDigits(origCountu) " path points were selected and removed`nOnly one point is left, the vector path is no longer usable"
+       Else
+          friendly := "All " groupDigits(origCountu) " path points were selected and removed`nThe vector path is now empty"
+
+       showTOOLtip("WARNING: " friendly)
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+    }
+
     SetTimer, dummyRefreshImgSelectionWindow, -10
 }
 
