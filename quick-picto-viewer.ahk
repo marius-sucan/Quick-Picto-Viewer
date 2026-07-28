@@ -36080,7 +36080,7 @@ BtnCollectImageInfos() {
 }
 
 BtnCollectHistoInfos() {
-   scu :=  (dummy="dupes" && findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
+   scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
    BtnCloseWindow()
    If (SLDtypeLoaded=3)
       collectSQLFileInfosNow(scu, 0, 0)
