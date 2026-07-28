@@ -35504,8 +35504,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       filesToBeSorted := RecordSet.RowCount
       thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
       alreadySorted := thisMaxCount - filesToBeSorted
-      ; MsgBox, % strPosu "=" whatu "`n" SQLstr 
-      zEffect := (adaptedSortCriteria=3 && filesToBeSorted>0) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
+      ; MsgBox, % strPosu "=" whatu "`n" SQLstr
       If (asku=1 && noQuestion=0 && filesToBeSorted>10 && filesToBeSorted!=thisMaxCount)
       {
          thisFriendly := (SLDtypeLoaded=3) ? "`n`nThe data will be automatically cached in the database and you can stop and resume this process at anytime." : ""
@@ -35522,6 +35521,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          }
       }
 
+      ; created only after the user agreed to the scan, otherwise it would leak on the early return above
+      zEffect := (adaptedSortCriteria=3 && filesToBeSorted>0) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
       If (filesToBeSorted>0)
          activeSQLdb.Exec("BEGIN TRANSACTION;")
 
