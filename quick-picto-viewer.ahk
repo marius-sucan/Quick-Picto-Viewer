@@ -28980,7 +28980,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
     prevMSGdisplay := A_TickCount
     thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
     isFilter := StrLen(filesFilter)>2 ? 1 : 0
-    failedFiles := abandonAll := 0
+    failedFiles := abandonAll := thisIndex := 0
     zEffect := (modus=11) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
     Loop, % thisMaxCount
     {
@@ -28991,6 +28991,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
           Break
        }
 
+       thisIndex := A_Index   ; how far into the list we got; the files skipped below are counted too
        If (A_TickCount - prevMSGdisplay>1000)
        {
           etaTime := ETAinfos(A_Index, thisMaxCount, startOperation)
@@ -29016,7 +29017,6 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
              Continue
        }
 
-       thisIndex := A_Index
        If (modus=9)
        {
           r := GetCachableImgFileDetails(imgPath, A_Index, 0, 0, isFilter)
@@ -29048,7 +29048,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
     If (simple=1)
     {
        CurrentSLD := backCurrentSLD
-       percDone := " ( " Round((thisIndex / thisMaxCount) * 100, 1) "% )"
+       percDone := thisMaxCount ? " ( " Round((thisIndex / thisMaxCount) * 100, 1) "% )" : ""
        If failedFiles
           percDone .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
 
@@ -29061,7 +29061,6 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
 
        SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -150
-       Return
     }
     Return abandonAll
 }
