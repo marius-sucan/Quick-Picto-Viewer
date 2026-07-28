@@ -29555,9 +29555,10 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             prevMSGdisplay := A_TickCount
          }
 
-         entriesCount++
          If (isFilter=1)
          {
+            imgWidth := bckpResultedFilesList[A_Index, 13]
+            hasHisto := bckpResultedFilesList[A_Index, 11]
             mgpx := bckpResultedFilesList[A_Index, 17]
             frames := bckpResultedFilesList[A_Index, 9]
             ratio := bckpResultedFilesList[A_Index, 16]
@@ -29570,6 +29571,8 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             hrange := bckpResultedFilesList[A_Index, 25]
          } Else
          {
+            imgWidth := resultedFilesList[A_Index, 13]
+            hasHisto := resultedFilesList[A_Index, 11]
             mgpx := resultedFilesList[A_Index, 17]
             frames := resultedFilesList[A_Index, 9]
             ratio := resultedFilesList[A_Index, 16]
@@ -29581,6 +29584,9 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             dpiu := resultedFilesList[A_Index, 22]
             hrange := resultedFilesList[A_Index, 25]
          }
+
+         If imgWidth   ; only files whose image details were actually collected are "indexed"
+            entriesCount++
 
          havg := Round(256*havg)
          hmed := Round(256*hmed)
