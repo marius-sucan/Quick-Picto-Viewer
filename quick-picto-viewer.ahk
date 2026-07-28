@@ -35642,7 +35642,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       Return 1
    }
 
-   If (modus!=1 && filesToBeSorted>1)
+   If (modus!=1 && filesToBeSorted>0)
    {
       showTOOLtip(ErrorMsg "Finished collecting data for " groupDigits(filesToBeSorted) " files`nFor " groupDigits(alreadySorted) " files the data was already collected" someErrors)
       SoundBeep 900, 100
