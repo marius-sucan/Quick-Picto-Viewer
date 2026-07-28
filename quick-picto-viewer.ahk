@@ -29305,7 +29305,6 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
         prevState := thisState
   }
 
-  entriesCount := StrReplace(entriesCount, A_Space)
   ; msgBox, % entriesCount "=" thisMaxCount
   If (entriesCount<Round(thisMaxCount - 1)) && (abandonAll!=1)
   {
@@ -29420,9 +29419,9 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   GuiControl, +Redraw, LViewMetaY
   GuiControl, +Redraw, LViewMetaS
   GuiControl, +Redraw, LViewMetaT
-  entriesCount := groupDigits(entriesCount)
+  friendlyCount := groupDigits(entriesCount)   ; entriesCount is static and reused when cached: keep it numeric
   totalFsize := Round(totalSizeu/1024, 1)
-  GuiControl, SettingsGUIA:, infoLine, Total images: %entriesCount% [%totalFsize% GB]
+  GuiControl, SettingsGUIA:, infoLine, Total images: %friendlyCount% [%totalFsize% GB]
   zeitOperation := A_TickCount - startZeit
   addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
   SetTimer, ResetImgLoadStatus, -200
@@ -29737,7 +29736,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
         entriesCount += entriesD[A_Index, 1]
   }
 
-  entriesCount := StrReplace(entriesCount, A_Space)
   If (abandonAll=1)
   {
      prevState := ""
@@ -29871,9 +29869,9 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   GuiControl, +Redraw, LViewMetaY
   thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
   percDone := " (" Round((entriesCount / thisMaxCount) * 100, 1) "%)"
-  entriesCount := groupDigits(entriesCount)
+  friendlyCount := groupDigits(entriesCount)   ; entriesCount is static and reused when cached: keep it numeric
   thisMaxCount := groupDigits(thisMaxCount)
-  GuiControl, SettingsGUIA:, infoLine, Indexed images: %entriesCount% / %thisMaxCount%%percDone%
+  GuiControl, SettingsGUIA:, infoLine, Indexed images: %friendlyCount% / %thisMaxCount%%percDone%
   zeitOperation := A_TickCount - startZeit
   addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
   SetTimer, ResetImgLoadStatus, -200
@@ -29947,7 +29945,6 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
      RecordSet.Free()
   } Else cachedMode := 1
 
-  entriesCount := StrReplace(entriesCount, A_Space)
   If (abandonAll=1)
   {
      prevState := ""
@@ -30111,14 +30108,14 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   Loop, 5
      LV_ModifyCol(A_Index, "AutoHdr Center")
 
-  entriesCount := groupDigits(entriesCount)
+  friendlyCount := groupDigits(entriesCount)   ; entriesCount is static and reused when cached: keep it numeric
   totalFsize := Round(j/1024, 1)
   GuiControl, +Redraw, LViewMetaD
   GuiControl, +Redraw, LViewMetaM
   GuiControl, +Redraw, LViewMetaY
   GuiControl, +Redraw, LViewMetaS
   GuiControl, +Redraw, LViewMetaT
-  GuiControl, SettingsGUIA:, infoLine, Total images: %entriesCount% [%totalFsize% GB]
+  GuiControl, SettingsGUIA:, infoLine, Total images: %friendlyCount% [%totalFsize% GB]
   zeitOperation := A_TickCount - startZeit
   addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
   SetTimer, ResetImgLoadStatus, -200
