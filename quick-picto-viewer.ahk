@@ -35458,7 +35458,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    } Else If (doFilterExtra=2 && stringu)
    {
       stringu := processSQLsearchIndexString(stringu, strPosu, whatu)
-      extraFilter := (mustNotHave=1) ? " WHERE " whatu " NOT LIKE '" stringu "'" : " WHERE " whatu " LIKE '" stringu "'"
+      extraFilter := (mustNotHave=1) ? " WHERE " whatu " NOT LIKE '" stringu "' ESCAPE '>'" : " WHERE " whatu " LIKE '" stringu "' ESCAPE '>'"
    }
 
    friendly := extraFilter ? "`nCurrent files list filter:`n" extraFilter : ""
@@ -35925,7 +35925,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
 
    stringu := processSQLsearchIndexString(stringu, strPosu, whatu)
    If stringu ; allow query database  filtering?
-      containsT := (mustNotHave=1) ? " AND " whatu " NOT LIKE '" stringu "'" : " AND " whatu " LIKE '" stringu "'"
+      containsT := (mustNotHave=1) ? " AND " whatu " NOT LIKE '" stringu "' ESCAPE '>'" : " AND " whatu " LIKE '" stringu "' ESCAPE '>'"
 
    If (InStr(whichHashu, "dHash") || InStr(whichHashu, "lHash"))
    {
@@ -38920,12 +38920,13 @@ processSQLsearchIndexString(inputu, strPosu, ByRef whatu) {
       whatu := "fullPath"
 
    inputu := StrReplace(inputu, "'")
-   inputu := StrReplace(inputu, "_", "\_")
+   inputu := StrReplace(inputu, "\>")
+   inputu := StrReplace(inputu, ">")   ; ">" is the LIKE escape character the callers declare; illegal in file names anyway
+   inputu := StrReplace(inputu, "_", ">_")
    inputu := StrReplace(inputu, "%", "_")
    inputu := StrReplace(inputu, "*", "_")
    inputu := StrReplace(inputu, "?", "_")
    inputu := StrReplace(inputu, "|", "_")
-   inputu := StrReplace(inputu, "\>")
    inputu := StrReplace(inputu, "/")
 
    If (strPosu=3 && StrLen(inputu)>1)
