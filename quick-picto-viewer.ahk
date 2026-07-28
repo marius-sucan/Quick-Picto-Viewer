@@ -35502,13 +35502,16 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
 
       failedFiles := countTFilez := 0
       filesToBeSorted := RecordSet.RowCount
-      thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
-      alreadySorted := thisMaxCount - filesToBeSorted
+      ; both figures must describe the same population: the database rows in scope for
+      ; this query. The in-memory files list is a different (usually smaller) set.
+      totalWhere := extraFilter ? extraFilter " AND isDeleted=0" : "WHERE isDeleted=0"
+      filesInScope := getTotalIMGsSQLdb(totalWhere)
+      alreadySorted := (filesInScope>filesToBeSorted) ? filesInScope - filesToBeSorted : 0
       ; MsgBox, % strPosu "=" whatu "`n" SQLstr
-      If (asku=1 && noQuestion=0 && filesToBeSorted>10 && filesToBeSorted!=thisMaxCount)
+      If (asku=1 && noQuestion=0 && filesToBeSorted>10)
       {
          thisFriendly := (SLDtypeLoaded=3) ? "`n`nThe data will be automatically cached in the database and you can stop and resume this process at anytime." : ""
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(thisMaxCount) " files. By refusing to the collect data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data", 0, "question", "&Do not collect file data and never ask again in this session", 0)
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(filesInScope) " files. By refusing to the collect data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data", 0, "question", "&Do not collect file data and never ask again in this session", 0)
          If (InStr(msgResult.btn, "incomplete") || InStr(msgResult.btn, "collect"))
             noQuestion := msgResult.Check
 
