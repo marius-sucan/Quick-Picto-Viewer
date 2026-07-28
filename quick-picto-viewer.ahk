@@ -29023,7 +29023,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
        } Else
        {
           fileInfos := GetFileAttributesEx(imgPath)
-          updateFilesListByID(A_Index, 6, fileInfos.size, isFilter)
+          updateFilesListByID(A_Index, 6, fileInfos.size ? fileInfos.size : 1, isFilter)
           updateFilesListByID(A_Index, 7, fileInfos.wTime, isFilter)
           updateFilesListByID(A_Index, 8, fileInfos.cTime, isFilter)
           r := GetCachableHistogramFile(imgPath, A_Index, 0, isFilter, zEffect)
