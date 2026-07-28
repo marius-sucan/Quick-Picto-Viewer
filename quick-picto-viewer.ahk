@@ -27402,6 +27402,18 @@ DestroyTempBtnGui(dummy:=0) {
        SetTimer, DestroyTempBtnGui, -950
 }
 
+getHostPanelFunc() {
+; Returns the function that opened the panel the current action was invoked from,
+; or "" when it was invoked from a menu, the quick search or a hotkey with no panel
+; open. Must be called *before* the action closes that panel: prevOpenedWindow only
+; describes the panel while it is still the opened one.
+   thisFunc := prevOpenedWindow[2]
+   If (AnyWindowOpen && prevOpenedWindow[1]=AnyWindowOpen && prevOpenedWindow[3]=1 && IsFunc(thisFunc))
+      Return thisFunc
+
+   Return ""
+}
+
 openPreviousPanel(mode:="") {
    thisFunc := prevOpenedWindow[2]
    allowReopen := prevOpenedWindow[3]
@@ -36082,6 +36094,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
 }
 
 BtnCollectFileInfos() {
+   hostPanel := getHostPanelFunc()
    BtnCloseWindow()
    If (SLDtypeLoaded=3)
    {
@@ -36093,10 +36106,14 @@ BtnCollectFileInfos() {
       PopulateIndexFilesStatsInfos("kill")
    }
 
-   PanelWrapperFilesStats()
+   If hostPanel
+      %hostPanel%()
+   Else
+      PanelWrapperFilesStats()
 }
 
 BtnCollectImageInfos() {
+   hostPanel := getHostPanelFunc()
    BtnCloseWindow()
    If (SLDtypeLoaded=3)
       collectSQLFileInfosNow("imgmegapix", 0, 0)
@@ -36104,10 +36121,14 @@ BtnCollectImageInfos() {
       collectImageInfosNow(0, 9, 1)
 
    PopulateImagesIndexStatsInfos("kill")
-   PanelWrapperFilesStats()
+   If hostPanel
+      %hostPanel%()
+   Else
+      PanelWrapperFilesStats()
 }
 
 BtnCollectHistoInfos() {
+   hostPanel := getHostPanelFunc()
    scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
    BtnCloseWindow()
    If (SLDtypeLoaded=3)
@@ -36116,7 +36137,10 @@ BtnCollectHistoInfos() {
       collectImageInfosNow(0, 11, 1)
 
    PopulateImagesIndexStatsInfos("kill")
-   PanelWrapperFilesStats()
+   If hostPanel
+      %hostPanel%()
+   Else
+      PanelWrapperFilesStats()
 }
 
 dbSortingCached(SortCriterion) {
