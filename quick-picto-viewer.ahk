@@ -29588,136 +29588,142 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
          If imgWidth   ; only files whose image details were actually collected are "indexed"
             entriesCount++
 
-         havg := Round(256*havg)
-         hmed := Round(256*hmed)
-         hpeak := Round(256*hpeak)
-         hlow := Round(256*hlow)
-         hrange := Round(256*hrange)
-         If isInRange(havg, 0, 50)
+         If hasHisto   ; blank histogram columns would otherwise all bin as pitch black
          {
-            entriezHA1++
-            entriesT[1] := [entriezHA1, "0-50"]
-         } Else If isInRange(havg, 50, 100)
-         {
-            entriezHA2++
-            entriesT[2] := [entriezHA2, "50-100"]
-         } Else If isInRange(havg, 100, 150)
-         {
-            entriezHA3++
-            entriesT[3] := [entriezHA3, "100-150"]
-         } Else If isInRange(havg, 150, 200)
-         {
-            entriezHA4++
-            entriesT[4] := [entriezHA4, "150-200"]
-         } Else If isInRange(havg, 200, 258)
-         {
-            entriezHA5++
-            entriesT[5] := [entriezHA5, "200-255"]
+            havg := Round(256*havg)
+            hmed := Round(256*hmed)
+            hpeak := Round(256*hpeak)
+            hlow := Round(256*hlow)
+            hrange := Round(256*hrange)
+            If isInRange(havg, 0, 50)
+            {
+               entriezHA1++
+               entriesT[1] := [entriezHA1, "0-50"]
+            } Else If isInRange(havg, 50, 100)
+            {
+               entriezHA2++
+               entriesT[2] := [entriezHA2, "50-100"]
+            } Else If isInRange(havg, 100, 150)
+            {
+               entriezHA3++
+               entriesT[3] := [entriezHA3, "100-150"]
+            } Else If isInRange(havg, 150, 200)
+            {
+               entriezHA4++
+               entriesT[4] := [entriezHA4, "150-200"]
+            } Else If isInRange(havg, 200, 258)
+            {
+               entriezHA5++
+               entriesT[5] := [entriezHA5, "200-255"]
+            }
+
+            If isInRange(hmed, 0, 50)
+            {
+               entriezHM1++
+               entriesG[1] := [entriezHM1, "0-50"]
+            } Else If isInRange(hmed, 50, 100)
+            {
+               entriezHM2++
+               entriesG[2] := [entriezHM2, "50-100"]
+            } Else If isInRange(hmed, 100, 150)
+            {
+               entriezHM3++
+               entriesG[3] := [entriezHM3, "100-150"]
+            } Else If isInRange(hmed, 150, 200)
+            {
+               entriezHM4++
+               entriesG[4] := [entriezHM4, "150-200"]
+            } Else If isInRange(hmed, 200, 258)
+            {
+               entriezHM5++
+               entriesG[5] := [entriezHM5, "200-255"]
+            }
+
+            If isInRange(hpeak, 0, 50)
+            {
+               entriezHP1++
+               entriesA[1] := [entriezHP1, "0-50"]
+            } Else If isInRange(hpeak, 50, 100)
+            {
+               entriezHP2++
+               entriesA[2] := [entriezHP2, "50-100"]
+            } Else If isInRange(hpeak, 100, 150)
+            {
+               entriezHP3++
+               entriesA[3] := [entriezHP3, "100-150"]
+            } Else If isInRange(hpeak, 150, 200)
+            {
+               entriezHP4++
+               entriesA[4] := [entriezHP4, "150-200"]
+            } Else If isInRange(hpeak, 200, 258)
+            {
+               entriezHP5++
+               entriesA[5] := [entriezHP5, "200-255"]
+            }
+
+            If isInRange(hlow, 0, 50)
+            {
+               entriezHL1++
+               entriesI[1] := [entriezHL1, "0-50"]
+            } Else If isInRange(hlow, 50, 100)
+            {
+               entriezHL2++
+               entriesI[2] := [entriezHL2, "50-100"]
+            } Else If isInRange(hlow, 100, 150)
+            {
+               entriezHL3++
+               entriesI[3] := [entriezHL3, "100-150"]
+            } Else If isInRange(hlow, 150, 200)
+            {
+               entriezHL4++
+               entriesI[4] := [entriezHL4, "150-200"]
+            } Else If isInRange(hlow, 200, 258)
+            {
+               entriezHL5++
+               entriesI[5] := [entriezHL5, "200-255"]
+            }
+
+            If isInRange(hRange, 0, 50)
+            {
+               entriezHR1++
+               entriesR[1] := [entriezHR1, "0-50"]
+            } Else If isInRange(hRange, 50, 100)
+            {
+               entriezHR2++
+               entriesR[2] := [entriezHR2, "50-100"]
+            } Else If isInRange(hRange, 100, 150)
+            {
+               entriezHR3++
+               entriesR[3] := [entriezHR3, "100-150"]
+            } Else If isInRange(hRange, 150, 200)
+            {
+               entriezHR4++
+               entriesR[4] := [entriezHR4, "150-200"]
+            } Else If isInRange(hRange, 200, 258)
+            {
+               entriezHR5++
+               entriesR[5] := [entriezHR5, "200-255"]
+            }
          }
 
-         If isInRange(hmed, 0, 50)
+         If imgWidth   ; skip files whose image details were never collected
          {
-            entriezHM1++
-            entriesG[1] := [entriezHM1, "0-50"]
-         } Else If isInRange(hmed, 50, 100)
-         {
-            entriezHM2++
-            entriesG[2] := [entriezHM2, "50-100"]
-         } Else If isInRange(hmed, 100, 150)
-         {
-            entriezHM3++
-            entriesG[3] := [entriezHM3, "100-150"]
-         } Else If isInRange(hmed, 150, 200)
-         {
-            entriezHM4++
-            entriesG[4] := [entriezHM4, "150-200"]
-         } Else If isInRange(hmed, 200, 258)
-         {
-            entriezHM5++
-            entriesG[5] := [entriezHM5, "200-255"]
+            mgpx := Round(mgpx, 1)
+            ratio := Round(ratio, 1)
+            pixu := "z" StringToASC(pixfmt)
+            ratiou := StrReplace(ratio, ".", "q")
+            mgpxu := StrReplace(mgpx, ".", "q")
+            entriez%ratiou%++
+            entriez%pixu%++
+            entriezMP%mgpxu%++
+            entriezFram%frames%++
+            entriezU%dpiu%++
+            entriesD[mgpxu] := [entriezMP%mgpxu%, mgpx]
+            entriesS[pixu] := [entriez%pixu%, pixFmt]
+            entriesY[ratiou] := [entriez%ratiou%, ratio]
+            entriesM["z" frames] := [entriezFram%frames%, frames]
+            entriesU["z" dpiu] := [entriezU%dpiu%, dpiu]
          }
-
-         If isInRange(hpeak, 0, 50)
-         {
-            entriezHP1++
-            entriesA[1] := [entriezHP1, "0-50"]
-         } Else If isInRange(hpeak, 50, 100)
-         {
-            entriezHP2++
-            entriesA[2] := [entriezHP2, "50-100"]
-         } Else If isInRange(hpeak, 100, 150)
-         {
-            entriezHP3++
-            entriesA[3] := [entriezHP3, "100-150"]
-         } Else If isInRange(hpeak, 150, 200)
-         {
-            entriezHP4++
-            entriesA[4] := [entriezHP4, "150-200"]
-         } Else If isInRange(hpeak, 200, 258)
-         {
-            entriezHP5++
-            entriesA[5] := [entriezHP5, "200-255"]
-         }
-
-         If isInRange(hlow, 0, 50)
-         {
-            entriezHL1++
-            entriesI[1] := [entriezHL1, "0-50"]
-         } Else If isInRange(hlow, 50, 100)
-         {
-            entriezHL2++
-            entriesI[2] := [entriezHL2, "50-100"]
-         } Else If isInRange(hlow, 100, 150)
-         {
-            entriezHL3++
-            entriesI[3] := [entriezHL3, "100-150"]
-         } Else If isInRange(hlow, 150, 200)
-         {
-            entriezHL4++
-            entriesI[4] := [entriezHL4, "150-200"]
-         } Else If isInRange(hlow, 200, 258)
-         {
-            entriezHL5++
-            entriesI[5] := [entriezHL5, "200-255"]
-         }
-
-         If isInRange(hRange, 0, 50)
-         {
-            entriezHR1++
-            entriesR[1] := [entriezHR1, "0-50"]
-         } Else If isInRange(hRange, 50, 100)
-         {
-            entriezHR2++
-            entriesR[2] := [entriezHR2, "50-100"]
-         } Else If isInRange(hRange, 100, 150)
-         {
-            entriezHR3++
-            entriesR[3] := [entriezHR3, "100-150"]
-         } Else If isInRange(hRange, 150, 200)
-         {
-            entriezHR4++
-            entriesR[4] := [entriezHR4, "150-200"]
-         } Else If isInRange(hRange, 200, 258)
-         {
-            entriezHR5++
-            entriesR[5] := [entriezHR5, "200-255"]
-         }
-
-         mgpx := Round(mgpx, 1)
-         ratio := Round(ratio, 1)
-         pixu := "z" StringToASC(pixfmt)
-         ratiou := StrReplace(ratio, ".", "q")
-         mgpxu := StrReplace(mgpx, ".", "q")
-         entriez%ratiou%++
-         entriez%pixu%++
-         entriezMP%mgpxu%++
-         entriezFram%frames%++
-         entriezU%dpiu%++
-         entriesD[mgpxu] := [entriezMP%mgpxu%, mgpx]
-         entriesS[pixu] := [entriez%pixu%, pixFmt]
-         entriesY[ratiou] := [entriez%ratiou%, ratio]
-         entriesM["z" frames] := [entriezFram%frames%, frames]
-         entriesU["z" dpiu] := [entriezU%dpiu%, dpiu]
 
          executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
