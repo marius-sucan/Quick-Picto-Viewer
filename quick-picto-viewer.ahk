@@ -29340,6 +29340,7 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   GuiControl, -Redraw, LViewMetaT
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesD
   {
       stringu := ST_Insert("-", SubStr(Value[2], 2), 5)
@@ -29356,7 +29357,7 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaM
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesM
   {
       stringu := ST_Insert("-", SubStr(Value[2], 2), 5)
@@ -29370,7 +29371,7 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaY
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesY
       LV_Add(A_Index, A_Index, SubStr(Value[2], 2), Value[1], Round((Value[1]/thisMaxCount)*100, 1))
   Loop, 4
@@ -29381,7 +29382,7 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaT
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   showTOOLtip("Generating statistics, please wait", 0, 0, 3/10)
   For Key, Value in entriesT
@@ -29391,8 +29392,9 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
 
   Gui, SettingsGUIA: ListView, LViewMetaS
   LV_ModifyCol(1, "Integer")
-  LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(3, "Float")
   LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(5, "Float")
   LV_Add(1, 1, "<5 KB", Round(sizeTr1/(1024**2), 1), sizer1, Round((sizer1/thisMaxCount)*100, 1))
   LV_Add(2, 2, "5-10 KB", Round(sizeTr2/(1024**2), 1), sizer2, Round((sizer2/thisMaxCount)*100, 1))
   LV_Add(3, 3, "10-25 KB", Round(sizeTr3/(1024**2), 1), sizer3, Round((sizer3/thisMaxCount)*100, 1))
@@ -29766,7 +29768,9 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   GuiControl, -Redraw, LViewMetaY
 
   LV_ModifyCol(1, "Integer")
+  LV_ModifyCol(2, "Float")
   LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesD
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
 
@@ -29776,8 +29780,9 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   LV_ModifyCol(3, "SortDesc")
 
   Gui, SettingsGUIA: ListView, LViewMetaM
-  Loop, 4
+  Loop, 3
      LV_ModifyCol(A_Index, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesM
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29787,8 +29792,10 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   LV_ModifyCol(3, "SortDesc")
 
   Gui, SettingsGUIA: ListView, LViewMetaU
-  Loop, 4
-     LV_ModifyCol(A_Index, "Integer")
+  LV_ModifyCol(1, "Integer")
+  LV_ModifyCol(2, "Float")
+  LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesU
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29799,8 +29806,9 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
 
   Gui, SettingsGUIA: ListView, LViewMetaY
   LV_ModifyCol(1, "Integer")
+  LV_ModifyCol(2, "Float")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesY
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
   Loop, 4
@@ -29811,7 +29819,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaA
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesA
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29823,7 +29831,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaG
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesG
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29833,7 +29841,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaR
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesR
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29844,7 +29852,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaI
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesI
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29855,7 +29863,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaS
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesS
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
   Loop, 5
@@ -29866,7 +29874,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaT
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   For Key, Value in entriesT
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
@@ -29978,6 +29986,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
 
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesD
   {
       stringu := ST_Insert("-", Value[2], 5)
@@ -30003,7 +30012,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaM
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesM
   {
       stringu := ST_Insert("-", Value[2], 5)
@@ -30027,7 +30036,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaY
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
   For Key, Value in entriesY
       LV_Add(A_Index, A_Index, Value[2], Value[1], Round((Value[1]/thisMaxCount)*100, 1))
   Loop, 4
@@ -30048,7 +30057,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: ListView, LViewMetaT
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
-  LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(4, "Float")
 
   showTOOLtip("Generating statistics, please wait", 0, 0, 3/10)
   Loop, % thisMaxCount
@@ -30092,8 +30101,9 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewMetaS
   LV_ModifyCol(1, "Integer")
-  LV_ModifyCol(3, "Integer")
+  LV_ModifyCol(3, "Float")
   LV_ModifyCol(4, "Integer")
+  LV_ModifyCol(5, "Float")
   zr := (cachedMode=1) ? "c" : 0
   j := 0
   showTOOLtip("Generating statistics, please wait", 0, 0, 4/10)
