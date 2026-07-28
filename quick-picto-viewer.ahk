@@ -35462,7 +35462,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    }
 
    friendly := extraFilter ? "`nCurrent files list filter:`n" extraFilter : ""
-   ; If showInfos
+   If showInfos
       showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait" friendly)
 
    If RegExMatch(scu, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms|lHash|dHash|pHash|pixelzFsmall|pixelzFbig)")
