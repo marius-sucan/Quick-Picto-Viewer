@@ -35565,8 +35565,14 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
                    rs := updateSQLdbEntryImgHisto(Row[2], objul[1], objul[2], fInfos, Row[1])
                 Else
                    failedFiles++
-             } Else
+             } Else If !FileExist(Row[2])
+             {
+                ; only flag the record when the file is really gone. GetFileAttributesEx()
+                ; also yields size 0 when the attributes merely could not be read (offline
+                ; share, denied access, unsupported path), and isDeleted=1 hides the record
+                ; from every later query and exposes it to the purge query.
                 markSQLdbEntryDeleted(Row[1], 1)
+             }
 
              If !rs
                 failedSQLfiles++
