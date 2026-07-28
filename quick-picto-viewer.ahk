@@ -27813,11 +27813,11 @@ PanelIndexedImagesStats() {
     GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaS -multi AltSubmit gIndexStatsLVaction", "#|Formats|Images|%", "Pixel formats")
     Gui, Tab, 6
     GuiAddDropDownList("y+15 w" lstWid " AltSubmit Choose1 gSwitchUIdlHistoStats vStatsUIhistoThingy", "Averages|Medians|Peak (range)|Minimum (range)|Total (range)", "Histogram data points")
-    Gui, Add, ListView, y+10 w%lstWid% r6 Grid vLViewMetaG -multi AltSubmit gIndexStatsLVaction, #|Medians|Images|`%
-    Gui, Add, ListView, yp w%lstWid% r6 Grid vLViewMetaA -multi AltSubmit gIndexStatsLVaction, #|Max|Images|`%
-    Gui, Add, ListView, yp w%lstWid% r6 Grid vLViewMetaI -multi AltSubmit gIndexStatsLVaction, #|Min|Images|`%
-    Gui, Add, ListView, yp w%lstWid% r6 Grid vLViewMetaT -multi AltSubmit gIndexStatsLVaction, #|Avg|Images|`%
-    Gui, Add, ListView, yp w%lstWid% r6 Grid vLViewMetaR -multi AltSubmit gIndexStatsLVaction, #|Range|Images|`%
+    GuiAddListView("y+10 w" lstWid " +LV0x10000 r6 Grid vLViewMetaG -multi AltSubmit gIndexStatsLVaction", "#|Medians|Images|%", "Histogram medians")
+    GuiAddListView("yp w" lstWid " +LV0x10000 r6 Grid vLViewMetaA -multi AltSubmit gIndexStatsLVaction", "#|Max|Images|%", "Histogram peak values")
+    GuiAddListView("yp w" lstWid " +LV0x10000 r6 Grid vLViewMetaI -multi AltSubmit gIndexStatsLVaction", "#|Min|Images|%", "Histogram minimum values")
+    GuiAddListView("yp w" lstWid " +LV0x10000 r6 Grid vLViewMetaT -multi AltSubmit gIndexStatsLVaction", "#|Avg|Images|%", "Histogram averages")
+    GuiAddListView("yp w" lstWid " +LV0x10000 r6 Grid vLViewMetaR -multi AltSubmit gIndexStatsLVaction", "#|Range|Images|%", "Histogram ranges")
 
     Gui, Tab
     Gui, Add, Button, xp Section y+5 h%thisBtnHeight% w2 gBtnCloseWindow, &Close
