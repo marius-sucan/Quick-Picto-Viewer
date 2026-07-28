@@ -36106,7 +36106,7 @@ BtnCollectHistoInfos() {
       collectImageInfosNow(0, 11, 1)
 
    PopulateImagesIndexStatsInfos("kill")
-   openPreviousPanel()
+   PanelWrapperFilesStats()
 }
 
 dbSortingCached(SortCriterion) {
