@@ -29428,7 +29428,7 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
 
 retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth") {
    showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
-   SQL := "SELECT " which ", Count(*) FROM images WHERE " constrain " IS NOT NULL GROUP BY " which ";"
+   SQL := "SELECT " which ", Count(*) FROM images WHERE isDeleted=0 AND " constrain " IS NOT NULL GROUP BY " which ";"
    If activeSQLdb.GetTable(SQL, RecordSet)
    {
       newArrayu := []
@@ -29446,7 +29446,7 @@ retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth") {
 
 retrieveHistoGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgavg") {
    showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
-   SQL := "SELECT Round(" which "*256), Count(*) FROM images WHERE " constrain " IS NOT NULL GROUP BY " which ";"
+   SQL := "SELECT Round(" which "*256), Count(*) FROM images WHERE isDeleted=0 AND " constrain " IS NOT NULL GROUP BY " which ";"
    entriezHM1 := entriezHM2 := entriezHM3 := entriezHM4 := entriezHM5 := 0
    If activeSQLdb.GetTable(SQL, RecordSet)
    {
@@ -29523,7 +29523,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
 
      If (SLDtypeLoaded=3)
      {
-        prevMaxu := getTotalIMGsSQLdb()
+        prevMaxu := getTotalIMGsSQLdb("WHERE isDeleted=0")
         ; prevMaxu := getTotalIMGsSQLdb("WHERE imgwidth IS NOT NULL")
         thisMaxCount := prevMaxu
         If !prevMaxu
@@ -29917,7 +29917,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
 
      RecordSet := ""
      tableu := (uiPreferedFileStats=1) ? "fmodified" : "Fcreated"
-     SQL := "SELECT substr(" tableu ", 1, 8), COUNT(*) FROM images GROUP BY substr(" tableu ", 1, 8);"
+     SQL := "SELECT substr(" tableu ", 1, 8), COUNT(*) FROM images WHERE isDeleted=0 GROUP BY substr(" tableu ", 1, 8);"
      If !activeSQLdb.GetTable(SQL, RecordSet)
      {
         throwSQLqueryDBerror(A_ThisFunc)
@@ -30147,7 +30147,7 @@ uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, 
      Return "c"
   }
 
-  SQL := "SELECT sum(fsize), COUNT(*) FROM images WHERE fsize BETWEEN " minu " AND " maxu ";"
+  SQL := "SELECT sum(fsize), COUNT(*) FROM images WHERE isDeleted=0 AND fsize BETWEEN " minu " AND " maxu ";"
   If activeSQLdb.GetTable(SQL, RecordSet)
   {
      abandonAll := thisSizeFiles := thisTotalSizeRange := 0
