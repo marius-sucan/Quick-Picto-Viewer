@@ -28990,8 +28990,8 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
     showTOOLtip("Collecting image details, please wait`n0 / " groupDigits(maxFilesIndex))
     startOperation := A_TickCount
     prevMSGdisplay := A_TickCount
-    thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
-    isFilter := StrLen(filesFilter)>2 ? 1 : 0
+    thisMaxCount := (StrLen(filesFilter)>2) ? bckpMaxFilesIndex : maxFilesIndex
+    isFilter := (StrLen(filesFilter)>2) ? 1 : 0
     failedFiles := abandonAll := thisIndex := 0
     zEffect := (modus=11) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
     Loop, % thisMaxCount
@@ -29085,8 +29085,8 @@ collectFileInfosNow(queryString:=0) {
     showTOOLtip("Collecting file details, please wait`n0 / " groupDigits(maxFilesIndex))
     startOperation := A_TickCount
     prevMSGdisplay := A_TickCount
-    thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
-    isFilter := StrLen(filesFilter)>2 ? 1 : 0
+    thisMaxCount := (StrLen(filesFilter)>2) ? bckpMaxFilesIndex : maxFilesIndex
+    isFilter := (StrLen(filesFilter)>2) ? 1 : 0
     abandonAll := 0
     Loop, % thisMaxCount
     {
@@ -29440,9 +29440,10 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   SetTimer, ResetImgLoadStatus, -200
 }
 
-retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth") {
+retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth", noDeads:=0) {
    showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
-   SQL := "SELECT " which ", Count(*) FROM images WHERE isDeleted=0 AND " constrain " IS NOT NULL GROUP BY " which ";"
+   delu := (noDeads=1) ? "isDeleted=0 AND " : ""
+   SQL := "SELECT " which ", Count(*) FROM images WHERE " delu constrain " IS NOT NULL GROUP BY " which ";"
    If activeSQLdb.GetTable(SQL, RecordSet)
    {
       newArrayu := []
@@ -29458,9 +29459,10 @@ retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth") {
    }
 }
 
-retrieveHistoGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgavg") {
+retrieveHistoGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgavg", noDeads:=0) {
    showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
-   SQL := "SELECT Round(" which "*256), Count(*) FROM images WHERE isDeleted=0 AND " constrain " IS NOT NULL GROUP BY " which ";"
+   delu := (noDeads=1) ? "isDeleted=0 AND " : ""
+   SQL := "SELECT Round(" which "*256), Count(*) FROM images WHERE " delu constrain " IS NOT NULL GROUP BY " which ";"
    entriezHM1 := entriezHM2 := entriezHM3 := entriezHM4 := entriezHM5 := 0
    If activeSQLdb.GetTable(SQL, RecordSet)
    {
@@ -29537,7 +29539,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
 
      If (SLDtypeLoaded=3)
      {
-        prevMaxu := getTotalIMGsSQLdb("WHERE isDeleted=0")
+        prevMaxu := getTotalIMGsSQLdb()
         ; prevMaxu := getTotalIMGsSQLdb("WHERE imgwidth IS NOT NULL")
         thisMaxCount := prevMaxu
         If !prevMaxu
@@ -29571,6 +29573,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
          If (isFilter=1)
          {
             imgWidth := bckpResultedFilesList[A_Index, 13]
+            imgHeight := bckpResultedFilesList[A_Index, 14]
             hasHisto := bckpResultedFilesList[A_Index, 11]
             mgpx := bckpResultedFilesList[A_Index, 17]
             frames := bckpResultedFilesList[A_Index, 9]
@@ -29585,6 +29588,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
          } Else
          {
             imgWidth := resultedFilesList[A_Index, 13]
+            imgHeight := resultedFilesList[A_Index, 14]
             hasHisto := resultedFilesList[A_Index, 11]
             mgpx := resultedFilesList[A_Index, 17]
             frames := resultedFilesList[A_Index, 9]
@@ -29598,7 +29602,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             hrange := resultedFilesList[A_Index, 25]
          }
 
-         If imgWidth   ; only files whose image details were actually collected are "indexed"
+         If (imgWidth && imgHeight) ; only files whose image details were actually collected are "indexed"
             entriesCount++
 
          If hasHisto   ; blank histogram columns would otherwise all bin as pitch black
@@ -29719,7 +29723,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             }
          }
 
-         If imgWidth   ; skip files whose image details were never collected
+         If (imgWidth && imgHeight)   ; skip files whose image details were never collected
          {
             mgpx := Round(mgpx, 1)
             ratio := Round(ratio, 1)
@@ -29911,7 +29915,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
 PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   Static entriesD, entriesM, entriesY, entriesT, prevState, entriesCount
 
-  thisMaxCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
+  thisMaxCount := (StrLen(filesFilter)>2) ? bckpMaxFilesIndex : maxFilesIndex
   thisState := "z" CurrentSLD DynamicFoldersList SLDtypeLoaded thisMaxCount uiPreferedFileStats
   startZeit := A_TickCount
   If (thisState!=prevState || dummy="kill")
@@ -29937,7 +29941,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
 
      RecordSet := ""
      tableu := (uiPreferedFileStats=1) ? "fmodified" : "Fcreated"
-     SQL := "SELECT substr(" tableu ", 1, 8), COUNT(*) FROM images WHERE isDeleted=0 GROUP BY substr(" tableu ", 1, 8);"
+     SQL := "SELECT substr(" tableu ", 1, 8), COUNT(*) FROM images GROUP BY substr(" tableu ", 1, 8);"
      If !activeSQLdb.GetTable(SQL, RecordSet)
      {
         throwSQLqueryDBerror(A_ThisFunc)
@@ -30154,10 +30158,9 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   SetTimer, ResetImgLoadStatus, -200
 }
 
-uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, maxu) {
+uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, maxu, noDeads:=0) {
   Static cacheInfos := []
-
-  thisCount := StrLen(filesFilter)>2 ? bckpMaxFilesIndex : maxFilesIndex
+  thisCount := (StrLen(filesFilter)>2) ? bckpMaxFilesIndex : maxFilesIndex
   If (zr=1)
   {
      cacheInfos := []
@@ -30169,7 +30172,8 @@ uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, 
      Return "c"
   }
 
-  SQL := "SELECT sum(fsize), COUNT(*) FROM images WHERE isDeleted=0 AND fsize BETWEEN " minu " AND " maxu ";"
+  delu := (noDeads=1) ? "isDeleted=0 AND " : ""
+  SQL := "SELECT sum(fsize), COUNT(*) FROM images WHERE " delu "fsize BETWEEN " minu " AND " maxu ";"
   If activeSQLdb.GetTable(SQL, RecordSet)
   {
      abandonAll := thisSizeFiles := thisTotalSizeRange := 0
@@ -30190,6 +30194,7 @@ uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, 
             }
          }
      }
+
      RecordSet.Free()
      totalSizeu += Round(thisTotalSizeRange/(1024**2), 4)
      cacheInfos[indexu] := [Round(thisTotalSizeRange/(1024**2), 1), thisSizeFiles]
@@ -35484,7 +35489,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    }
 
    friendly := extraFilter ? "`nCurrent files list filter:`n" extraFilter : ""
-   If showInfos
+   ; If showInfos
       showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait" friendly)
 
    If RegExMatch(scu, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms|lHash|dHash|pHash|pixelzFsmall|pixelzFbig)")
@@ -35561,10 +35566,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
              countTFilez++
              fInfos := GetFileAttributesEx(Row[2])
              If (!fInfos.size || fInfos.size<3)
-             {
-                failedFiles++
                 okay := 0
-             }
 
              If (adaptedSortCriteria=1 && okay=1)
              {
@@ -35574,24 +35576,27 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
              {
                 ; image properties and file properties
                 objul := GetCachableImgFileDetails(Row[2], Row[1], 0, 1)
-                If IsObject(objul)
+                If (IsObject(objul) && objul.w && objul.h)
                    rs := updateSQLdbEntryImgRes(Row[2], objul, fInfos, Row[1])
                 Else
-                   failedFiles++
+                   okay := 0
              } Else If (adaptedSortCriteria=3 && okay=1)
              {
                 ; gather histogram main points and pixel data
                 objul := GetCachableHistogramFile(Row[2], Row[1], 1, 0, zEffect)
-                If IsObject(objul[1])
+                If (IsObject(objul[1]) && objul[2].w && objul[2].h)
                    rs := updateSQLdbEntryImgHisto(Row[2], objul[1], objul[2], fInfos, Row[1])
                 Else
-                   failedFiles++
-             } Else If !FileExist(Row[2])
+                   okay := 0
+             }
+
+             If (okay=0)
              {
-                ; only flag the record when the file is really gone. GetFileAttributesEx()
-                ; also yields size 0 when the attributes merely could not be read (offline
-                ; share, denied access, unsupported path), and isDeleted=1 hides the record
-                ; from every later query and exposes it to the purge query.
+                ; mark the file as dead or ignored; no other data collection runs will ever
+                ; try to read it again;
+                ; these file entries in the database can be purged via PanelPurgeCachedSQLdata()
+                ; or can be revalidated through PanelWrapperFilesStats().
+                failedFiles++
                 markSQLdbEntryDeleted(Row[1], 1)
              }
 
@@ -35664,7 +35669,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       Return 1
    }
 
-   If (modus!=1 && filesToBeSorted>0)
+   If (modus!=1 && filesToBeSorted>2) ; do not show infos for few files
    {
       showTOOLtip(ErrorMsg "Finished collecting data for " groupDigits(filesToBeSorted) " files`nFor " groupDigits(alreadySorted) " files the data was already collected" someErrors)
       SoundBeep 900, 100
@@ -36129,10 +36134,9 @@ BtnCollectImageInfos() {
 
 BtnCollectHistoInfos() {
    hostPanel := getHostPanelFunc()
-   scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
    BtnCloseWindow()
    If (SLDtypeLoaded=3)
-      collectSQLFileInfosNow(scu, 0, 0)
+      collectSQLFileInfosNow("pixelzFsmall", 0, 0)
    Else
       collectImageInfosNow(0, 11, 1)
 
@@ -74421,13 +74425,13 @@ createHistogramBMP(whichBitmap) {
 
 groupDigits(nrIn) {
    delim := (isWinXP || A_OSVersion="WIN_7") ? " " : " "
-   If StrLen(nrin)>3
+   If (StrLen(nrin)>3)
       nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 2)
-   If StrLen(nrin)>7
+   If (StrLen(nrin)>7)
       nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 6)
-   If StrLen(nrin)>11
+   If (StrLen(nrin)>11)
       nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 10)
-   If StrLen(nrin)>15
+   If (StrLen(nrin)>15)
       nrIn := ST_Insert(delim, nrIn, StrLen(nrIn) - 14)
    Return nrIn
 }

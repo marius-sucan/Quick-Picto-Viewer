@@ -2847,7 +2847,7 @@ GetFileAttributesEx(inFile, getAttributes:=0) {
 ; THANK YOU VERY MUCH @ TheArkive
 
     If (StrLen(inFile)>32766 || StrLen(inFile)<4)
-       return
+       Return
 
     Static GetFileExInfoStandard := 0, GetFileExMaxInfoLevel := 1 ; https://docs.microsoft.com/en-us/windows/win32/api/minwinbase/ne-minwinbase-get_fileex_info_levels
     Static attr := { Archive:0x20 ; https://docs.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
@@ -2881,7 +2881,6 @@ GetFileAttributesEx(inFile, getAttributes:=0) {
 FileTimeToSystemTime(ptr) {         
     VarSetCapacity(SYSTEMTIME, 16, 0)
     r := DllCall("FileTimeToSystemTime","UPtr",ptr,"UPtr",&SYSTEMTIME)
-
     VarSetCapacity(SYSTIME2, 16, 0)
     r := DllCall("SystemTimeToTzSpecificLocalTime","UPtr",0,"UPtr",&SYSTEMTIME,"Ptr",&SYSTIME2) ; https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-systemtimetotzspecificlocaltime
 
