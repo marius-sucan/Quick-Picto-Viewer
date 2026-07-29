@@ -27988,7 +27988,7 @@ PanelWrapperFilesStats() {
     ; Gui, Add, Button, x+5 h%thisBtnHeight% gPanelFindDupes, Find &duplicates panel
     Gui, Add, Button, xs+15 y+10 hp gBtnCollectImageInfos, Collect image &properties and file details
     If (SLDtypeLoaded=3)
-       Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Advanced options (Find duplicates panel)
+       Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Find duplicates panel
     Else
        Gui, Add, Button, xs y+30 h%thisBtnHeight% gBtnCollectHistoInfos, Collect image properties and &histogram details
     ; Gui, Add, Button, x+5 h%thisBtnHeight% gOpenFileDupesPanel, &Options
