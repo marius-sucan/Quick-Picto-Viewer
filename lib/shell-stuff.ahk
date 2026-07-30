@@ -2580,6 +2580,47 @@ GetWindowBounds(hWnd) {
    Return r
 }
 
+WinVisibleBox(hwnd, ByRef x, ByRef y, ByRef w, ByRef h) {
+   ; The function retrieves the bounding box of the portion of the window
+   ; [hwnd] that is actually visible on the screen(s). The coordinates
+   ; returned by x, y, w and h are in screen coordinates and in real pixels;
+   ; they are not affected by the DPI virtualization of the script.
+
+   ; The window region set with SetWindowRgn(), the edges of the screen(s)
+   ; and any child or sibling window clipping it are taken into account.
+   ; Note that since Windows Vista, when desktop composition is enabled,
+   ; top-level windows are no longer clipped by other top-level windows
+   ; overlapping them; only screen edges and in-window clipping are reported.
+
+   ; Return value: the complexity of the visible region
+   ;    0 = an error occurred
+   ;    1 = NULLREGION - the window is entirely hidden [ minimized, off-screen ]
+   ;    2 = SIMPLEREGION - the visible area is a single rectangle
+   ;    3 = COMPLEXREGION - the visible area is not rectangular
+
+   x := y := w := h := 0
+   hDC := DllCall("user32\GetDCEx", "UPtr", hwnd, "UPtr", 0
+        , "UInt", 0x403, "UPtr")  ; DCX_WINDOW | DCX_CACHE | DCX_LOCKWINDOWUPDATE
+   If !hDC
+      Return 0
+
+   hRgn := DllCall("gdi32\CreateRectRgn", "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UPtr")
+   r := DllCall("gdi32\GetRandomRgn", "UPtr", hDC, "UPtr", hRgn, "Int", 4)  ; 4 = SYSRGN
+   VarSetCapacity(RECT, 16, 0)
+   E := (r=1) ? DllCall("gdi32\GetRgnBox", "UPtr", hRgn, "UPtr", &RECT) : (r=0 ? 1 : 0)
+   If (E>1)
+   {
+      x := NumGet(RECT, 0, "Int"), y := NumGet(RECT, 4, "Int")
+      w := NumGet(RECT, 8, "Int") - x
+      h := NumGet(RECT, 12, "Int") - y
+   }
+
+   DllCall("gdi32\DeleteObject", "UPtr", hRgn)
+   DllCall("user32\ReleaseDC", "UPtr", hwnd, "UPtr", hDC)
+   RECT := ""
+   Return E
+}
+
 GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
 ; modified by Marius Șucan
