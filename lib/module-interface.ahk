@@ -361,7 +361,7 @@ detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
 ; differently. Keep both in sync, including the IsWindowVisible() test - this thread runs
 ; with DetectHiddenWindows off while the main one has it on, so WinExist() would not match.
     Static lastX := "", lastY := "", lW, lH
-    If (ShowAdvToolbar!=1 || slideShowRunning=1 || lockToolbar2Win!=1)
+    If (ShowAdvToolbar!=1 || lockToolbar2Win!=1)
        Return 0
 
     thisX := thisY := ""

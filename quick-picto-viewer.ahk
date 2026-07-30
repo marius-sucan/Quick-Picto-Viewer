@@ -2534,7 +2534,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
         prevOpenFolderPath := OutDir
         INIaction(1, "prevOpenFolderPath", "General")
         RandomPicture()
-        InfoToggleSlideShowu()
+        ; InfoToggleSlideShowu()
      } Else resetMainWin2Welcome()
      SetTimer, createGUItoolbar, -100
      SetTimer, TriggerMenuBarUpdate, -90
@@ -2609,7 +2609,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   If (maxFilesIndex>2)
   {
      RandomPicture()
-     InfoToggleSlideShowu()
+     ; InfoToggleSlideShowu()
   } Else If (maxFilesIndex>0)
   {
      currentFileIndex := 1
@@ -72895,7 +72895,6 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     theFntSize := OSDfontSize//1.1
     borderSize := Floor(theFntSize*1.2)
     borderSize := borderu ? borderu : borderSize//3
-    tlbrBonusX := tlbrBonusY := 0
     thisTxtAlignu := (thumbsDisplaying=1) ? "Left" : 0
     txtOptions := initInPlaceTextOptions(thisGu, OSDfontBolded, OSDfontItalica, 1, thisTxtAlignu, OSDFontName, theFntSize, "0xEE" OSDtextColor, borderSize)
     otherTxtObj := TextuToGraphics(thisGu, "initing", txtOptions, OSDFontName, "begin", 0, 0, 1)
@@ -72974,25 +72973,22 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
     If !entireString
        entireString := "[CC]"
 
-    tlbrBonusX := tlbrBonusY := 0
-    textBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth - tlbrBonusX, mainHeight, OSDtextColor, OSDbgrColor, 0, !thumbsDisplaying, usrTextAlign)
+    textBoxBMP := drawTextInBox(entireString, OSDFontName, OSDfontSize//1.1, mainWidth, mainHeight, OSDtextColor, OSDbgrColor, 0, !thumbsDisplaying, usrTextAlign)
     If validBMP(textBoxBMP)
     {
        trGdip_GetImageDimensions(textBoxBMP, imgW, imgH)
        thisPosY := mainHeight - imgH
        If (thumbsDisplaying=1)
           thisPosY -= ThumbsStatusBarH
-       Else If (FlipImgV=1)
-          thisPosY -= tlbrBonusY
 
        thisPosX := mainWidth - imgW 
        If (FlipImgV=0 && scrollBarHy>1 && thumbsDisplaying=0)
           thisPosY -= scrollBarHy
 
        If (usrTextAlign="Left")
-          thisPosX := 0 + tlbrBonusX
+          thisPosX := 0
        Else If (usrTextAlign="Center")
-          thisPosX := Round(tlbrBonusX/2 + mainWidth/2 - imgW/2)
+          thisPosX := Round(mainWidth/2 - imgW/2)
 
        ERR := trGdip_DrawImage(A_ThisFunc, Gu, textBoxBMP, thisPosX, thisPosY)
        If !ERR
@@ -74541,9 +74537,9 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     Critical, on
 
     createVPnavBox(navBoxu, imgW, imgH, diffX, diffY, zImgW, zImgH, entireString)
-    hasTrans := adjustCanvas2Toolbar()
     scrbH := (thumbsDisplaying=1 && FlipImgV=0) ? 0 : scrollBarHy
     scrbV := (thumbsDisplaying=1 && FlipImgH=1) ? 0 : scrollBarVx
+    hasTrans := adjustCanvas2Toolbar()
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2 && thumbsDisplaying=0) ? ToolbarWinH : 0
     thisPosX := (FlipImgH=1 && scrbV>0) ? scrbV : 0
@@ -78325,10 +78321,9 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
 
     If (showHistogram>1 && validBMP(HistogramBMP) && mode!=2)
     { 
-       tlbrBonusX := tlbrBonusY := 0
        trGdip_GetImageDimensions(HistogramBMP, imgW, imgH)
-       thisPosX := (FlipImgH=0 && scrollBarVx>0) ? mainWidth - scrollBarVx - imgW - tlbrBonusX : mainWidth - imgW - tlbrBonusX
-       thisPosY := (FlipImgV=0 && scrollBarHy>0) ? mainHeight - scrollBarHy - imgH - tlbrBonusY : mainHeight - imgH - tlbrBonusY
+       thisPosX := (FlipImgH=0 && scrollBarVx>0) ? mainWidth - scrollBarVx - imgW : mainWidth - imgW
+       thisPosY := (FlipImgV=0 && scrollBarHy>0) ? mainHeight - scrollBarHy - imgH : mainHeight - imgH
        If (FlipImgH=1 || FlipImgV=1)
        {
           tempBMP := trGdip_CloneBitmap(A_ThisFunc, HistogramBMP)
@@ -81313,14 +81308,14 @@ performFadeTransition(imgPath, gifAnim) {
     ToggleVisibilityWindow("show", hGDIthumbsWin)
     trGdip_DrawImage(A_ThisFunc, glPG, GDIfadeVPcache)
     r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC)
+
     Loop, 255
     {
         opacity := 255 - A_Index*12
         If (opacity<2)
            Break
 
-        dummyPos := (A_OSVersion!="WIN_7") ? 0 : ""
-        r2 := UpdateLayeredWindow(hGDIwin, glHDC, dummyPos, dummyPos, , , opacity)
+        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC, opacity)
         If !r2
            Break
         Sleep, 1
@@ -95042,24 +95037,24 @@ adjustCanvas2Toolbar() {
 ; Keep in sync with detectToolbar() in lib\module-interface.ahk, which answers the same
 ; question on the interface thread for the mouse hit-test controls.
     Static lastX := "", lastY := ""
-    If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || slideShowRunning=1)
-       Return 0
-
-    If (!ToolbarWinW || !ToolbarWinH)
+    If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || !ToolbarWinW || !ToolbarWinH || slideShowRunning=1)
        Return 0
 
     ; IsWindowVisible() rather than WinExist(), because the two threads run with different
     ; DetectHiddenWindows settings and would otherwise disagree about a hidden toolbar
     thisX := thisY := ""
     If (hQPVtoolbar && DllCall("IsWindowVisible", "UPtr", hQPVtoolbar))
-       WinGetPos, thisX, thisY, , , ahk_id %hQPVtoolbar%
+    {
+       WinGetPos, thisX, thisY, ww, hh, ahk_id %hQPVtoolbar%
+       GetWinVisibleBox(hQPVtoolbar, xx, yy, wa, ha)
+    }
 
-    If (thisX="" || thisY="")
+    If (thisX="" || thisY="" || ww<3 || hh<3 || wa<3 || ha<3)
     {
        ; CoreGUItoolbar() destroys and re-creates the toolbar GUI, so for a few milliseconds
        ; there is no window to measure. Bridge that gap with the last position seen instead
        ; of letting the viewport snap out to full width and back.
-       If (lastX="" || lastY="")
+       If (lastX="" || lastY="" || ww<3 || hh<3 || wa<3 || ha<3)
           Return 0
 
        thisX := lastX, thisY := lastY
@@ -102565,7 +102560,7 @@ tlbrPushPrefs() {
 }
 
 redrawToolbarGUI() {
-   If (AnyWindowOpen && imgEditPanelOpened!=1 || mustCaptureCloneBrush=1 || slideShowRunning=1 || colorPickerModeNow=1)
+   If (AnyWindowOpen && imgEditPanelOpened!=1 || mustCaptureCloneBrush=1 || colorPickerModeNow=1)
    {
       Loop, % tlbrIconzList["counter"]
       {

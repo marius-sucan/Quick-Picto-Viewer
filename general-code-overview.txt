@@ -584,6 +584,7 @@ g) Windows, AHK GUIs, Menus, Toolbar
 
    5. createGUItoolbar() - customizable toolbar
       hQPVtoolbar, OSDguiToolbar
+      redrawToolbarGUI() - active or inactive toolbar states
 
    6. CreateSoloSliderWidgetWin() - a sliders widget
       hSliderWidget, SoloSliderWidgetGUIA
@@ -606,6 +607,10 @@ g) Windows, AHK GUIs, Menus, Toolbar
    the main thread by drawHUDelements() or other associated
    functions. This is meant to help make the viewport more
    accessible for users relying on screen readers.
+
+   adjustCanvas2Toolbar() is used to decide if the viewport gets
+   shifted when the toolbar is attached to the main window.
+
 
    \\Contexts:
    Toolbar and menu related functions decide what options to display

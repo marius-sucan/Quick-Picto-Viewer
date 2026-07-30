@@ -2580,7 +2580,7 @@ GetWindowBounds(hWnd) {
    Return r
 }
 
-WinVisibleBox(hwnd, ByRef x, ByRef y, ByRef w, ByRef h) {
+GetWinVisibleBox(hwnd, ByRef x, ByRef y, ByRef w, ByRef h) {
    ; The function retrieves the bounding box of the portion of the window
    ; [hwnd] that is actually visible on the screen(s). The coordinates
    ; returned by x, y, w and h are in screen coordinates and in real pixels;
