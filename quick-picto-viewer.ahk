@@ -32270,10 +32270,24 @@ uiPopulateImgInfos() {
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
 
+   ; the metadata tab is filled by ExifTool, which takes a while to answer; say what is
+   ; going on there, rather than leaving the tab empty until it does - or forever, when
+   ; the program it needs is not around
+   hasExifTool := FileExist(mainExecPath "\exiftool.exe")
+   Gui, SettingsGUIA: ListView, LViewMetaM
+   LV_Delete()
+   If hasExifTool
+      LV_Add("", "Gathering data...", "-")
+   Else
+      LV_Add("", "ERROR: missing file: exiftool.exe", "This feature is not available")
+
+   Loop, 2
+       LV_ModifyCol(A_Index, "AutoHdr Left")
+
    ; this must remain the last thing done here: uiPopulateExifToolInfos() runs on its own thread
    ; and both functions add rows through the same GUI, whose current list view is a per-window
    ; setting - if this thread still had rows of its own to add, they would land in the wrong list
-   If FileExist(mainExecPath "\exiftool.exe")
+   If hasExifTool
       SetTimer, uiPopulateExifToolInfos, -60
 }
 
@@ -32296,14 +32310,24 @@ uiPopulateExifToolInfos() {
       Return
    }
 
-   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
-   If !FileExist(imgPath)
-      Return
-
-   busyZeit := A_TickCount
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewMetaM
+   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+   If !FileExist(imgPath)
+   {
+      LV_Delete()
+      LV_Add("", "ERROR: file not found or access denied", "-")
+      Return
+   }
+
+   busyZeit := A_TickCount
+   ; the rows put here by uiPopulateImgInfos() - or by the previous image - are only replaced
+   ; once ExifTool answers, so that the tab keeps saying what it is doing while it does not
    LV_Delete()
+   LV_Add("", "Gathering data...", "-")
+   Loop, 2
+       LV_ModifyCol(A_Index, "AutoHdr Left")
+
    ; ExifTool is a Perl program and receives its command line in the system code page: file names
    ; holding characters that code page cannot represent arrive as question marks and the file is
    ; never found. Passing the path in an UTF-8 arguments file and declaring it with
@@ -32333,6 +32357,7 @@ uiPopulateExifToolInfos() {
    }
 
    Gui, SettingsGUIA: ListView, LViewMetaM
+   LV_Delete()   ; drops the "Gathering data..." row
    ; ToolTip, % output , , , 2
    hasAdded := 0
    Loop, Parse, % output,`n,`r
