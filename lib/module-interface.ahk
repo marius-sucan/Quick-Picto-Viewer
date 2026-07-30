@@ -59,6 +59,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0, TLBRtwoColumns := 1
      , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
+     , isWelcomeScreenu := 0, ToolBarBtnWidth := 45
      , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
      , navKeysCounter := 0, lastSwipeZeitGesture := 1, hFlyBtn1, hFlyBtn2, hFlyBtn3, AllowDarkModeForWindow
 
@@ -346,45 +347,60 @@ updateUIctrlFromOutside(paramA) {
     updateUIctrl(0)
 }
 
+isTlbrVertical() {
+; must mirror isTlbrVertical() in quick-picto-viewer.ahk
+    If (TLBRtwoColumns=1 && !isWelcomeScreenu)
+       Return 1
+
+    Return (TLBRverticalAlign=1) ? 1 : 0
+}
+
 detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
-    Static lastX := 0, lastY := 0, lW, lH
+; Interface thread twin of adjustCanvas2Toolbar() in quick-picto-viewer.ahk; the two must
+; agree, otherwise the painted viewport and the mouse hit-test controls end up offset
+; differently. Keep both in sync, including the IsWindowVisible() test - this thread runs
+; with DetectHiddenWindows off while the main one has it on, so WinExist() would not match.
+    Static lastX := "", lastY := "", lW, lH
     If (ShowAdvToolbar!=1 || slideShowRunning=1 || lockToolbar2Win!=1)
        Return 0
 
-    hasTrans := 0
-    WinGetPos, thisX, thisY, ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
+    thisX := thisY := ""
+    If (hQPVtoolbar && DllCall("IsWindowVisible", "UPtr", hQPVtoolbar))
+       WinGetPos, thisX, thisY, ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
+
     If (!ToolbarWinW || !ToolbarWinH)
     {
        ToolbarWinW := lW
        ToolbarWinH := lH
+    } Else
+    {
+       lW := ToolbarWinW
+       lH := ToolbarWinH
     }
 
     If (!ToolbarWinW || !ToolbarWinH)
        Return 0
 
-    lW := ToolbarWinW
-    lH := ToolbarWinH
-    If (thisX="" && ToolbarWinW && ToolbarWinH)
-       thisX := lastX
-    If (thisY="" && ToolbarWinW && ToolbarWinH)
-       thisY := lastY
-
-    JEE_ScreenToClient(PVhwnd, thisX, thisY, thisX, thisY)
-    positionOk := (isInRange(thisX, -5, 5) && isInRange(thisY, -5, 5)) ? 1 : 0
-    ; ToolTip, % "p=" positionOk "||" thisX "|" thisY , , , 2
-    If (positionOk=1 && (TLBRverticalAlign=1 || TLBRtwoColumns=1))
-       hasTrans := 1
-    Else If (positionOk=1 && TLBRverticalAlign=0)
-       hasTrans := 2
-
-    If hasTrans
+    If (thisX="" || thisY="")
     {
-       lastX := thisX
+       ; the toolbar GUI is being destroyed and re-created; bridge the gap
+       If (lastX="" || lastY="")
+          Return 0
+
+       thisX := lastX, thisY := lastY
+    } Else
+    {
+       lastX := thisX   ; kept in SCREEN space; converted to client space just below
        lastY := thisY
     }
 
-    ; ToolTip, % hasTrans "|" thisX "|" ToolbarWinW "|" hQPVtoolbar , , , 2
-    Return hasTrans
+    JEE_ScreenToClient(PVhwnd, thisX, thisY, cX, cY)
+    tolerance := ToolBarBtnWidth//3 + 5
+    ; ToolTip, % "t=" tolerance "||" cX "|" cY "|" ToolbarWinW "|" hQPVtoolbar , , , 2
+    If (!isInRange(cX, -tolerance, tolerance) || !isInRange(cY, -tolerance, tolerance))
+       Return 0
+
+    Return isTlbrVertical() ? 1 : 2
 }
 
 updateUIctrl(forceThis:=0) {
@@ -396,9 +412,7 @@ updateUIctrl(forceThis:=0) {
    }
 
    GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
-   If (ShowAdvToolbar=1 && lockToolbar2Win=1)
-      hasTrans := detectToolbar(tW, tH)
-
+   hasTrans := detectToolbar(tW, tH)   ; guards ShowAdvToolbar / lockToolbar2Win itself
    tX := (hasTrans=1) ? tW : 0
    tY := (hasTrans=2) ? tH : 0
    If (hasTrans=1)
@@ -2616,12 +2630,15 @@ WM_NCMOUSEMOVE(wP, lP, msg, hwnd) {
 }
 
 tlbrInitPrefs(paramA) {
+; sent by tlbrPushPrefs() in quick-picto-viewer.ahk; feeds detectToolbar()
   p := StrSplit(paramA, "|")
   hQPVtoolbar := p[1]
   ShowAdvToolbar := p[2]
   lockToolbar2Win := p[3]
   TLBRverticalAlign := p[4]
   TLBRtwoColumns := p[5]
+  isWelcomeScreenu := p[6]
+  ToolBarBtnWidth := p[7]
 }
 
 updateTlbrPosition() {
@@ -4659,13 +4676,13 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
 ; modified by Marius Șucan
     Static prevW, prevH, prevHwnd, lastInvoked := 1
-    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd)
+    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd "-" mode)
     {
        W := prevW, H := prevH
        Return
     }
 
-    prevHwnd := hwnd
+    prevHwnd := hwnd "-" mode
     VarSetCapacity(rc, 16, 0)
     If (mode=1)
     {

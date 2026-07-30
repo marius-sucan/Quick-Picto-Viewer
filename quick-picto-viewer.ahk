@@ -4799,7 +4799,7 @@ TriggerMenuBarUpdate(modus:=0, tt:=0) {
 refreshEntireViewport() {
    Static prevState := ""
    vpWinClientSize(mainWidth, mainHeight)
-   thisState := "a" mainWidth "|" mainHeight "|" showMainMenuBar ToolbarWinW ToolbarWinH TLBRverticalAlign TLBRtwoColumns ToolbarScaleFactor
+   thisState := "a" mainWidth "|" mainHeight "|" showMainMenuBar "|" ToolbarWinW "|" ToolbarWinH "|" TLBRverticalAlign "|" TLBRtwoColumns "|" ToolbarScaleFactor "|" lockToolbar2Win "|" ShowAdvToolbar
    If (thisState!=prevState)
    {
       createGDIPcanvas(mainWidth, mainHeight, 1)
@@ -5687,7 +5687,7 @@ doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
      JEE_ClientToScreen(hPicOnGui1, 0, 0, xPos, yPos)
   } Else If (ShowAdvToolbar=1 && lockToolbar2Win=1)
   {
-     hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+     hasTrans := adjustCanvas2Toolbar()
      If (hasTrans=1)
         xPos += ToolbarWinW
      If (hasTrans=2)
@@ -5707,21 +5707,20 @@ vpWinClientSize(ByRef w, ByRef h, hwnd:=0, mode:=0) {
   If !hwnd
      hwnd := PVhwnd
 
-  If ((A_TickCount - lastInvoked<70) && pW && pH && pa=hwnd)
+  If ((A_TickCount - lastInvoked<70) && pW && pH && pa=hwnd "-" mode)
   {
      w := pW, h := pH
      Return
   }
 
   p := GetWinClientSize(w, h, hwnd, mode)
-  If (ShowAdvToolbar=1)
-     hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+  hasTrans := adjustCanvas2Toolbar()   ; guards ShowAdvToolbar / lockToolbar2Win itself
   If (hasTrans=1)
      w -= ToolbarWinW
   If (hasTrans=2)
      h -= ToolbarWinH
 
-  pW := w, pH := h, pa := hwnd
+  pW := w, pH := h, pa := hwnd "-" mode
   lastInvoked := A_TickCount
   Return p
 }
@@ -27334,7 +27333,7 @@ RepositionTempBtnGui(mm:=0) {
 
     offsetuY := scrollBarHy ? scrollBarHy : 0
     Final_y := winPosY + Heig - thisFntSize * 2 - gHeig - offsetuY//2
-    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+    hasTrans := adjustCanvas2Toolbar()
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
     ; ToolTip, % tlbrBonusX "|" hasTrans , , , 2
     Final_x := winPosX + thisFntSize * 2 + tlbrBonusX
@@ -28338,11 +28337,8 @@ PlotSeenHourStatsNow() {
    textu := "Seen images chart: HOURS.`nRange: 01:00 to 24:00.`nAverage: " avgu ". Peak at " maxKvalu "h: " groupDigits(maxValu)
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
-   ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
-   tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-   tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
-   borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
-   borderSizeY := imgHUDbaseUnit//10 + tlbrBonusY
+   borderSizeX := imgHUDbaseUnit//10
+   borderSizeY := imgHUDbaseUnit//10
    plotBMP := BarChart(dataArray, namesLabel, Round(196*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:2, BarHeight:" Scale*3.5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:" OSDfontSize//2+1 " BarTextColor:ff999999, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
    recordGdipBitmaps(plotBMP, A_ThisFunc "<-BarChart()")
    trGdip_GetImageDimensions(plotBMP, imgW, imgH)
@@ -28356,7 +28352,7 @@ PlotSeenHourStatsNow() {
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
    Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSizeX, imgH + borderSizeY)
    tzGdip_DrawImage(2NDglPG, plotBMP, borderSizeX, borderSizeY)
-   tzGdip_DrawImage(2NDglPG, infoBoxBMP, tlbrBonusX, imgH + borderSizeY)
+   tzGdip_DrawImage(2NDglPG, infoBoxBMP, 0, imgH + borderSizeY)
    trGdip_DisposeImage(infoBoxBMP, 1)
    trGdip_DisposeImage(plotBMP, 1)
    ResetImgLoadStatus()
@@ -28463,11 +28459,8 @@ PlotSeenMonthsStatsNow() {
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
 
-   ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
-   tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-   tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
-   borderSizeX := imgHUDbaseUnit//10 + tlbrBonusX
-   borderSizeY := imgHUDbaseUnit//10 + tlbrBonusY
+   borderSizeX := imgHUDbaseUnit//10
+   borderSizeY := imgHUDbaseUnit//10
    If (counter>20)
       plotBMP := BarChart(dataArray, namesLabel, Round(106*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:0, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
    Else
@@ -28486,7 +28479,7 @@ PlotSeenMonthsStatsNow() {
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
    Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSizeX, imgH + borderSizeY)
    tzGdip_DrawImage(2NDglPG, plotBMP, borderSizeX, borderSizeY)
-   tzGdip_DrawImage(2NDglPG, infoBoxBMP, tlbrBonusX, imgH + borderSizeY)
+   tzGdip_DrawImage(2NDglPG, infoBoxBMP, 0, imgH + borderSizeY)
    trGdip_DisposeImage(infoBoxBMP, 1)
    trGdip_DisposeImage(plotBMP, 1)
    ResetImgLoadStatus()
@@ -28642,12 +28635,9 @@ PlotSeenDaysStatsNow(modus:=0) {
    textu := "Seen images chart: " friendly "`nTotal: " groupDigits(counter) " days. " lacking "`nRange: " startPeriod " - " endPeriod "`nAverage: " avgu ". Peak on: " maxKvalu "=" groupDigits(maxValu)
    infoBoxBMP := drawTextInBox(textu, OSDFontName, OSDfontSize, w, h, OSDtextColor, OSDbgrColor, 1, 0)
    Scale := imgHUDbaseUnit/40
-   ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
-   tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-   tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
    borderSize := (counter>200) ? imgHUDbaseUnit/60 : imgHUDbaseUnit/10
-   borderSizeX := borderSize + tlbrBonusX
-   borderSizeY := borderSize + tlbrBonusY
+   borderSizeX := borderSize
+   borderSizeY := borderSize
 
    If (counter>(avgLevel*2 + 1) && InStr(modus, "avg-"))
       plotBMP := BarChart(dataAvg, namesLabel, Round(106*Scale), 385, "", "DiagonBlackGreen", "DisplayValues:0, BarHeight:" Scale*5 ",BarHeightFactor:1, BarSpacing:" Scale/2 ",BarRoundness:0,AutoCalculateHeight:1, BarColorDirection:2, BgrStyle:3, BarBorderColor:0,TextSize:0, BarColorA:ff" OSDtextColor ", ChartBackColorA:00" OSDbgrColor)
@@ -28669,7 +28659,7 @@ PlotSeenDaysStatsNow(modus:=0) {
    pBrush := Gdip_BrushCreateSolid("0xee" OSDbgrColor)
    Gdip_FillRectangle(2NDglPG, pBrush, 0, 0, max(imgW, boxW) + borderSizeX, imgH + borderSizeY)
    tzGdip_DrawImage(2NDglPG, plotBMP, borderSizeX, borderSizeY)
-   tzGdip_DrawImage(2NDglPG, infoBoxBMP, tlbrBonusX, imgH + borderSizeY)
+   tzGdip_DrawImage(2NDglPG, infoBoxBMP, 0, imgH + borderSizeY)
    trGdip_DisposeImage(infoBoxBMP, 1)
    trGdip_DisposeImage(plotBMP, 1)
    ResetImgLoadStatus()
@@ -58615,6 +58605,9 @@ BtnSaveCustomToolbar() {
    GuiControlGet, TLBRtwoColumns
    GuiControlGet, TLBRverticalAlign
    GuiControlGet, TLBRinvertColors
+   If (TLBRtwoColumns=1)
+      TLBRverticalAlign := 1   ; two columns only exists as a vertical layout; see ToggleToolBarValign()
+
    GuiControlGet, lockToolbar2Win
    GuiControlGet, hwnd, hwnd, UIuserTlbrList
    ControlGet, listBoxOptions, List,,, ahk_id %hwnd%
@@ -69221,7 +69214,8 @@ ToggleFullScreenMode() {
      ; If (o_TouchScreenMode!="a")
      ;    TouchScreenMode := o_TouchScreenMode
      isTitleBarVisible := 1
-     WinGetPos, thisX, thisY, ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
+     ; no WinGetPos on the toolbar here: entering fullscreen hid it, so it would only put
+     ; stale dimensions back; the deferred toggleAppToolbar() below re-measures it
      WinSet, Style, +0xC00000, ahk_id %PVhwnd%
      WinRestore, ahk_id %PVhwnd%
      INIaction(0, "showMainMenuBar", "General", 1)
@@ -70169,13 +70163,11 @@ dummyToggleTitleBarActionBtns() {
 ToggleMenuBaru() {
    Critical, on
    Static lastInvoked := 1
-   hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+   hasTrans := adjustCanvas2Toolbar()
    showMainMenuBar := !showMainMenuBar
    INIaction(1, "showMainMenuBar", "General")
    interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
-   interfaceThread.ahkassign("ShowAdvToolbar", ShowAdvToolbar)
-   interfaceThread.ahkassign("lockToolbar2Win", lockToolbar2Win)
-   interfaceThread.ahkassign("hQPVtoolbar", hQPVtoolbar)
+   tlbrPushPrefs()
    If !showMainMenuBar
       Win_SetMenu(PVhwnd, 0)
 
@@ -70307,7 +70299,7 @@ ToggleToolbarLockPositionWin() {
     If (lockToolbar2Win=1)
        tlbrResetPosition()
 
-    interfaceThread.ahkassign("lockToolbar2Win", lockToolbar2Win)
+    tlbrPushPrefs()
     showDelayedTooltip("Toolbar position: `n" friendly, A_ThisFunc, 1)
     SetTimer, refreshEntireViewport, -350
  }
@@ -71354,7 +71346,7 @@ createGDIPcanvas(W:=0, H:=0, forceIT:=0) {
    ; If (pW!=W || pH!=H || ppW!=W || ppH!=H)
    ;    forceIT := 1
 
-   azp := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 1 "|" TLBRverticalAlign : 0
+   azp := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 1 "|" TLBRverticalAlign "|" TLBRtwoColumns : 0
    newDimensions := "w" W "-h" H "-mbar" showMainMenuBar azp
    doAgain := (prevDimensions!=newDimensions) ? 1 : 0
    If (!qpvCanvasHasInit || doAgain=1 || forceIT=1)
@@ -72718,7 +72710,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     scX := scY := 0
     If (showInfoBoxHUD=1 || showInfoBoxHUD=2 && bonusInfo="scroll")
     {
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       hasTrans := adjustCanvas2Toolbar()
        If (thumbsDisplaying=1)
        {
           tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
@@ -72914,7 +72906,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     txtOptions.h := mainHeight - borderSize
     lastInfoBoxBMP[1] := [dimsFw, dimsFh]
 
-    hasTrans := adjustCanvas2Toolbar(Gu, 0)
+    hasTrans := adjustCanvas2Toolbar()
     tlbrBonusX := (hasTrans=1 && (FlipImgH=0 || thumbsDisplaying=1)) ? ToolbarWinW : 0
     tlbrBonusY := (hasTrans=2 && (FlipImgV=0 || thumbsDisplaying=1)) ? ToolbarWinH : 0
     If (FlipImgH=1 && thumbsDisplaying=0 && scrollBarVx>1)
@@ -73013,7 +73005,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
           If (FlipImgV=1 && thumbsDisplaying=0)
              thisPosY := 0
 
-          hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+          hasTrans := adjustCanvas2Toolbar()
           tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
           tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
           thisPosX += tlbrBonusX
@@ -74549,7 +74541,7 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     Critical, on
 
     createVPnavBox(navBoxu, imgW, imgH, diffX, diffY, zImgW, zImgH, entireString)
-    hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+    hasTrans := adjustCanvas2Toolbar()
     scrbH := (thumbsDisplaying=1 && FlipImgV=0) ? 0 : scrollBarHy
     scrbV := (thumbsDisplaying=1 && FlipImgH=1) ? 0 : scrollBarVx
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
@@ -78345,7 +78337,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
           trGdip_DisposeImage(tempBMP, 1)
        } Else E := trGdip_DrawImage(A_ThisFunc, glPG, HistogramBMP, thisPosX, thisPosY,,,,,,, 0.9)
 
-       hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
+       hasTrans := adjustCanvas2Toolbar()
        tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
        tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
        If (FlipImgH=1)
@@ -83148,16 +83140,10 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
           theMSG2 := labelu2 ": " thisu " | " theMSG2
        }
 
-       ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
-       tlbrBonusX := (hasTrans=1 && (ToolbarWinH - 3 > mainHeight - ThumbsStatusBarH)) ? ToolbarWinW + 5 : 0
-       tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
        infoBoxBMP := drawTextInBox(theMsg, OSDFontName, Round(OSDfontSize*0.9), mainWidth, mainHeight//3, OSDtextColor, bgrTXT, 1)
        trGdip_GetImageDimensions(infoBoxBMP, ThumbsStatusBarW, ThumbsStatusBarH)
-       statusPosX := -1 + tlbrBonusX
+       statusPosX := -1
        ThumbsStatusBarW := clampInRange(ThumbsStatusBarW, 1, mainWidth - imgHUDbaseUnit//3.3)
-       If tlbrBonusX
-          Gdip_FillRectangle(2NDglPG, OSDwinFadedBrushBGR, 0, mainHeight - ThumbsStatusBarH, tlbrBonusX, ThumbsStatusBarH)
-
        trGdip_DrawImage(A_ThisFunc, 2NDglPG, infoBoxBMP, statusPosX, mainHeight - ThumbsStatusBarH)
        If (simpleMode=0)
        {
@@ -86752,13 +86738,10 @@ drawViewportHelpMap() {
        Gdip_Draw%thisu%(2NDglPG, Penuha, thisX, thisY, thisW, thisH)
        thisFntSize := "Bold Center vCenter cFFeeEEee s" Round(OSDfontSize*0.77)
        thisStylu := " x" thisX " y" thisY
-       ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 0)
-       tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-       tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
        thisString := (EllipseSelectMode=2) ? "Image selected area`nFreeform shape" : "Image selected area"
        ERR := Gdip_TextToGraphics(2NDglPG, thisString, thisFntSize thisStylu , "Arial", thisW, thisH)
        thisFntSize := "Bold cFFeeEEee s" Round(OSDfontSize*0.77)
-       thisStylu := " x" OSDfontSize*2 + tlbrBonusX " y" OSDfontSize*2 + tlbrBonusY
+       thisStylu := " x" OSDfontSize*2 " y" OSDfontSize*2
        ERR := Gdip_TextToGraphics(2NDglPG, "Current selection type: " DefineVPselAreaMode() ".`n `nDouble click on it to open a menu.`n `nDouble click outside to drop the selection.`n `nHold Space and click to pan image.`n `nCtrl + Wheel Up/Down to zoom in/out anywhere.", thisFntSize thisStylu , "Arial", mainWidth - OSDfontSize*2, mainHeight - OSDfontSize*2)
        Gdip_DeletePen(Penuha)
        Gdip_DeleteBrush(BrushAa)
@@ -95041,40 +95024,61 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     createGUItoolbar()
 }
 
-adjustCanvas2Toolbar(Gu, applyTransform) {
-    Static lastX := 0, lastY := 0
+isTlbrVertical() {
+; Whether the toolbar is laid out as a column rather than a row. This must mirror the
+; layout decisions taken in CoreGUItoolbar() and tlbrAddNewIcon(): two-column mode wins
+; over TLBRverticalAlign, but it is suppressed on the welcome screen, where the bar falls
+; back to whatever TLBRverticalAlign says. The two settings are kept mutually exclusive by
+; the menu toggles, yet the customize panel can still save both at once.
+    If (TLBRtwoColumns=1 && !isWelcomeScreenu)
+       Return 1
+
+    Return (TLBRverticalAlign=1) ? 1 : 0
+}
+
+adjustCanvas2Toolbar() {
+; Returns 0 when the viewport must ignore the toolbar, 1 when it has to give up ToolbarWinW
+; on the left, and 2 when it has to give up ToolbarWinH at the top.
+; Keep in sync with detectToolbar() in lib\module-interface.ahk, which answers the same
+; question on the interface thread for the mouse hit-test controls.
+    Static lastX := "", lastY := ""
     If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || slideShowRunning=1)
        Return 0
 
-    hasTrans := 0
-    WinGetPos, thisX, thisY, , , ahk_id %hQPVtoolbar%
-    If (thisX="" && ToolbarWinW && ToolbarWinH)
-       thisX := lastX
-    If (thisY="" && ToolbarWinW && ToolbarWinH)
-       thisY := lastY
+    If (!ToolbarWinW || !ToolbarWinH)
+       Return 0
 
-    JEE_ScreenToClient(PVhwnd, thisX, thisY, thisX, thisY)
-    positionOk := (isInRange(thisX, -5, 5) && isInRange(thisY, -5, 5)) ? 1 : 0
-    ; ToolTip, % "p=" positionOk "||" UserToolbarX "|" UserToolbarY "||" thisX "|" thisY , , , 2
-    If (positionOk=1 && (TLBRverticalAlign=1 || TLBRtwoColumns=1))
+    ; IsWindowVisible() rather than WinExist(), because the two threads run with different
+    ; DetectHiddenWindows settings and would otherwise disagree about a hidden toolbar
+    thisX := thisY := ""
+    If (hQPVtoolbar && DllCall("IsWindowVisible", "UPtr", hQPVtoolbar))
+       WinGetPos, thisX, thisY, , , ahk_id %hQPVtoolbar%
+
+    If (thisX="" || thisY="")
     {
-       hasTrans := 1
-       If (applyTransform=1)
-          Gdip_TranslateWorldTransform(Gu, ToolbarWinW, 0)
-    } Else If (positionOk=1 && TLBRverticalAlign=0)
+       ; CoreGUItoolbar() destroys and re-creates the toolbar GUI, so for a few milliseconds
+       ; there is no window to measure. Bridge that gap with the last position seen instead
+       ; of letting the viewport snap out to full width and back.
+       If (lastX="" || lastY="")
+          Return 0
+
+       thisX := lastX, thisY := lastY
+    } Else
     {
-       hasTrans := 2
-       If (applyTransform=1)
-          Gdip_TranslateWorldTransform(Gu, 0, ToolbarWinH)
+       lastX := thisX   ; kept in SCREEN space; the conversion to client space happens below,
+       lastY := thisY   ; feeding a converted value back in here was the original bug
     }
 
-    If hasTrans
-    {
-       lastX := thisX
-       lastY := thisY
-    }
+    ; The toolbar is pinned to the client origin by tlbrResetPosition() and updateTlbrPosition(),
+    ; but both of those run on a timer, so a repaint can catch the toolbar still sitting at its
+    ; pre-drag position. Tolerate that rather than flip-flopping the alignment mid-drag.
+    JEE_ScreenToClient(PVhwnd, thisX, thisY, cX, cY)
+    tolerance := ToolBarBtnWidth//3 + 5
+    ; ToolTip, % "t=" tolerance "||" UserToolbarX "|" UserToolbarY "||" cX "|" cY , , , 2
+    If (!isInRange(cX, -tolerance, tolerance) || !isInRange(cY, -tolerance, tolerance))
+       Return 0
 
-    Return hasTrans
+    Return isTlbrVertical() ? 1 : 2
 }
 
 drawLiveViewportSection(Gu, mainWidth, mainHeight) {
@@ -95170,9 +95174,6 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        Return
     }
 
-    ; hasTrans := adjustCanvas2Toolbar(2NDglPG, 1)
-    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     posYu := perc ? knobSize//2 : 0
     trGdip_GetImageDimensions(BoxBMP, imgW, imgH)
     If (showInfoBoxHUD>0 && FlipImgH=0 && FlipImgV=0 && drawingShapeNow!=1)
@@ -95198,8 +95199,8 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     }
 
     tzGdip_DrawImage(2NDglPG, BoxBMP, posXu, posYu, imgW, imgH)
-    hudBTNheightFuncu := imgH + posYu + tlbrBonusY
-    hudBTNwidthFuncu := imgW + posXu + tlbrBonusX
+    hudBTNheightFuncu := imgH + posYu
+    hudBTNwidthFuncu := imgW + posXu
     If uBrushA
     {
        Gdip_FillRectangle(2NDglPG, uBrushA, 0, posYu, knobSize, imgH)
@@ -95222,9 +95223,6 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     interfaceThread.ahkPostFunction("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
     If (hudBTNfuncu && hudBTNtypeFuncu=1)
        Gdip_FillRectangle(2NDglPG, pBrushD, posXu, posYu, knobSize//2, imgH)
-
-    If hasTrans
-       Gdip_ResetWorldTransform(2NDglPG)
 
     r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
     trGdip_DisposeImage(BoxBMP, 1)
@@ -101838,8 +101836,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
 
     ; tlbrAddNewIcon(BTNrotateTlbr, handleWidth, handleHeight, 0)
     tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
-    todisplay := (ShowAdvToolbar=1) ? "" : "hide"
-    prevState := thisState
+    prevState := thisState   ; only ever reached with ShowAdvToolbar=1; createGUItoolbar() returns early otherwise
     If (simpleRefresh=0)
        Gui, OSDguiToolbar: Show, x%tX% y%tY% AutoSize NoActivate, QPV toolbar
 }
@@ -102469,6 +102466,8 @@ readSettingsToolbar(actu) {
     IniAction(actu, "TLBRtwoColumns", "General", 1)
     IniAction(actu, "TLBRinvertColors", "General", 1)
     IniAction(actu, "lockToolbar2Win", "General", 1)
+    If (TLBRtwoColumns=1)
+       TLBRverticalAlign := 1   ; repairs INI files written before the customize panel enforced this
 }
 
 createGUItoolbar(dummy:=0) {
@@ -102483,7 +102482,8 @@ createGUItoolbar(dummy:=0) {
    If (ShowAdvToolbar=0)
    {
       ; prevState := ""
-      interfaceThread.ahkPostFunction("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns)
+      ToolbarWinW := ToolbarWinH := 0   ; nothing must keep reserving viewport space for a hidden toolbar
+      tlbrPushPrefs()
       If (TouchToolbarGUIcreated=1)
          Gui, OSDguiToolbar: Hide
       Return
@@ -102534,7 +102534,6 @@ createGUItoolbar(dummy:=0) {
    } 
 
    mustDoRefresh := 0
-   interfaceThread.ahkPostFunction("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns)
    If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
    {
       redrawToolbarGUI()
@@ -102545,7 +102544,7 @@ createGUItoolbar(dummy:=0) {
 
       ; fnOutputDebug(UserToolbarX "|" UserToolbarY)
       tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
-      Gui, OSDguiToolbar: Show, NoActivate x%UserToolbarX% y%UserToolbarY%, QPV toolbar
+      Gui, OSDguiToolbar: Show, NoActivate x%tX% y%tY%, QPV toolbar
       whichWin := (AnyWindowOpen && panelWinCollapsed!=1) ? hSetWinGui : PVhwnd
       If (WinActive("A")=hQPVtoolbar)
          WinActivate, ahk_id %whichWin%
@@ -102555,6 +102554,14 @@ createGUItoolbar(dummy:=0) {
    }
 
    WinGetPos, , , ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
+   tlbrPushPrefs()   ; last, so the interface thread sees the rebuilt window and not the one it replaced
+}
+
+tlbrPushPrefs() {
+; Hands the interface thread everything detectToolbar() needs to reach the same verdict as
+; adjustCanvas2Toolbar() does here. CoreGUItoolbar() mints a new hQPVtoolbar on every rebuild,
+; so this must be re-sent whenever the toolbar is touched.
+   interfaceThread.ahkPostFunction("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns "|" isWelcomeScreenu "|" ToolBarBtnWidth)
 }
 
 redrawToolbarGUI() {

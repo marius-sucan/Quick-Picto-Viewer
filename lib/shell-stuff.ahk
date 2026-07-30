@@ -2584,13 +2584,13 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
 ; modified by Marius Șucan
     Static prevW, prevH, prevHwnd, lastInvoked := 1
-    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd)
+    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd "-" mode)
     {
        W := prevW, H := prevH
        Return
     }
 
-    prevHwnd := hwnd
+    prevHwnd := hwnd "-" mode
     If (mode=2)
     {
        r := GetWindowPlacement(hwnd)
