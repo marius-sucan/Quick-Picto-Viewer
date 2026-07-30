@@ -96,11 +96,14 @@ class cli {
    }
 }
 
-Cli_RunCMD(CmdLine, WorkingDir:="", Codepage:="CP850", Fn:="RunCMD_Output", maxDelay:=15250) {
-  ; Local         ; RunCMD v0.94 by SKAN on D34E/D37C @ https://www.autohotkey.com/boards/viewtopic.php?t=74647                                                             
+Cli_RunCMD(CmdLine, WorkingDir:="", Codepage:="CP850", Fn:="RunCMD_Output", maxDelay:=15250, ByRef runStatus:="") {
+  ; Local         ; RunCMD v0.94 by SKAN on D34E/D37C @ https://www.autohotkey.com/boards/viewtopic.php?t=74647
   ; Global A_Args ; Based on StdOutToVar.ahk by Sean @ https://www.autohotkey.com/board/topic/15455-stdouttovar
   ; modified by Marius Șucan; added the maxDelay parameter
+  ; runStatus tells the caller apart the reasons for an empty or truncated result:
+  ; "ok", "timeout", "aborted" [Escape held down], "start-failed|..." or "pipe-failed"
 
+  runStatus := "pipe-failed"
   Fn := IsFunc(Fn) ? Func(Fn) : 0
   r := DllCall("CreatePipe", "UPtr*",hPipeR:=0, "UPtr*",hPipeW:=0, "UPtr",0, "Int",0)
   If (r=0 || r="")
@@ -123,10 +126,10 @@ Cli_RunCMD(CmdLine, WorkingDir:="", Codepage:="CP850", Fn:="RunCMD_Output", maxD
 
   If (r=0 || r="")
   {
-     z := ErrorLevel "|" A_LastError
+     runStatus := "start-failed|" ErrorLevel "|" A_LastError
      DllCall("CloseHandle", "UPtr",hPipeW)
      DllCall("CloseHandle", "UPtr",hPipeR)
-     Return ; z
+     Return
   }
 
   DllCall("CloseHandle", "UPtr",hPipeW)
@@ -142,22 +145,26 @@ Cli_RunCMD(CmdLine, WorkingDir:="", Codepage:="CP850", Fn:="RunCMD_Output", maxD
   {
        If ((A_TickCount - startTime>maxDelay) || GetKeyState("Escape", "P"))
        {
-          timeOut := 1
+          timeOut := (A_TickCount - startTime>maxDelay) ? 1 : 2
           Break
        }
 
+       ; the pipe is set to PIPE_NOWAIT, so without this the wait below is a busy loop
+       ; keeping an entire CPU core at 100% for as long as the invoked program runs.
+       ; This is the Windows Sleep(), it does not let other threads interrupt this one
+       DllCall("Sleep", "Int", 5)
        While (A_Args.RunCMD.PID and (Line := FileObj.ReadLine()))
        {
             sOutput .= Fn ? Fn.Call(Line, LineNum++) : Line
             If ((A_TickCount - startTime>maxDelay) || GetKeyState("Escape", "P"))
             {
-               timeOut := 1
+               timeOut := (A_TickCount - startTime>maxDelay) ? 1 : 2
                Break
             }
        }
   }
 
-  If (timeOut=1)
+  If timeOut
   {
      SoundBeep 300, 100
      Process, Close, % PIDu
@@ -169,6 +176,7 @@ Cli_RunCMD(CmdLine, WorkingDir:="", Codepage:="CP850", Fn:="RunCMD_Output", maxD
   DllCall("CloseHandle", "UPtr",hThread)
   DllCall("CloseHandle", "UPtr",hPipeR)
   FileObj.Close()
+  runStatus := (timeOut=1) ? "timeout" : (timeOut=2) ? "aborted" : "ok"
   ErrorLevel := ExitCode
   Return sOutput
 }

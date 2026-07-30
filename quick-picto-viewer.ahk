@@ -32270,41 +32270,149 @@ uiPopulateImgInfos() {
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
 
+   ; this must remain the last thing done here: uiPopulateExifToolInfos() runs on its own thread
+   ; and both functions add rows through the same GUI, whose current list view is a per-window
+   ; setting - if this thread still had rows of its own to add, they would land in the wrong list
    If FileExist(mainExecPath "\exiftool.exe")
-      uiPopulateExifToolInfos()
+      SetTimer, uiPopulateExifToolInfos, -60
 }
 
 uiPopulateExifToolInfos() {
-   If (AnyWindowOpen=5)
+; Always invoked through a timer by uiPopulateImgInfos(), never directly. ExifTool needs from half
+; a second to several seconds per file, and the thread that opens the panel runs Critical [see
+; createSettingsGUI()], so calling this in-line used to freeze the whole application - the panel
+; was already on screen - until ExifTool returned.
+   Static busyZeit := 0, firstRun := 1
+   If (AnyWindowOpen!=5)
+      Return
+
+   If (busyZeit && A_TickCount - busyZeit<30000)
    {
-      Gui, SettingsGUIA: Default
-      Gui, SettingsGUIA: ListView, LViewMetaM
-      LV_Delete()
-      cmdLine := """" mainExecPath "\exiftool.exe"" -all """ getIDimage(currentFileIndex) """ `r`n `r`n"
-      output := Cli_RunCMD(cmdLine, mainExecPath, "UTF-8", "", 4500)
-      ; ToolTip, % output , , , 2
-      hasAdded := 0
-      Loop, Parse, % output,`n,`r
-      {
-          If (!A_LoopField || SubStr(Trimmer(A_LoopField), 2, 2)=":\" || InStr(A_LoopField, "use -b option")
-          || InStr(A_LoopField, "exiftool version") || InStr(A_LoopField, "wb rb levels"))
-             Continue
-
-          lineArru := StrSplit(A_LoopField, " : ")
-          prop := Trimmer(lineArru[1])
-          val := Trimmer(lineArru[2])
-          If (StrLen(prop)>2 && val!="")
-          {
-             hasAdded++
-             LV_Add(A_Index, prop, val)
-          }
-      }
-      If (hasAdded<2)
-         LV_Add(A_Index, "Failed to retrieve the data", "-")
-
-      Loop, 2
-          LV_ModifyCol(A_Index, "AutoHdr Left")
+      ; a previous call is still waiting for ExifTool; come back when it is done. Two calls
+      ; running at once would fight over A_Args.RunCMD in Cli_RunCMD() - the younger one
+      ; ends the wait of the older one - and mix two images into the same list. This
+      ; happens simply by clicking the << >> buttons faster than ExifTool answers
+      SetTimer, uiPopulateExifToolInfos, -300
+      Return
    }
+
+   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+   If !FileExist(imgPath)
+      Return
+
+   busyZeit := A_TickCount
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewMetaM
+   LV_Delete()
+   ; ExifTool is a Perl program and receives its command line in the system code page: file names
+   ; holding characters that code page cannot represent arrive as question marks and the file is
+   ; never found. Passing the path in an UTF-8 arguments file and declaring it with
+   ; -charset filename=UTF8 [which must precede -@] is the work-around ExifTool documents
+   argsFile := writeExifToolArgsFile(imgPath)
+   If argsFile
+      cmdLine := """" mainExecPath "\exiftool.exe"" -charset filename=UTF8 -all -@ """ argsFile """"
+   Else
+      cmdLine := """" mainExecPath "\exiftool.exe"" -all """ imgPath """"
+
+   ; the first call of a session is the slow one: exiftool.exe unpacks itself into %TEMP%
+   ; before it reads anything, and an antivirus scanning the result makes it slower still
+   maxWait := (firstRun=1) ? 20000 : 8000
+   firstRun := 0
+   exifStatus := ""
+   output := Cli_RunCMD(cmdLine, mainExecPath, "UTF-8", "", maxWait, exifStatus)
+   exitCodu := ErrorLevel
+   If argsFile
+      FileDelete, % argsFile
+
+   ; the panel may have been closed - or replaced by another one, they all share this window -
+   ; while ExifTool was busy; the rows would then be added to whatever list that panel uses
+   If (AnyWindowOpen!=5)
+   {
+      busyZeit := 0
+      Return
+   }
+
+   Gui, SettingsGUIA: ListView, LViewMetaM
+   ; ToolTip, % output , , , 2
+   hasAdded := 0
+   Loop, Parse, % output,`n,`r
+   {
+       If (!A_LoopField || SubStr(Trimmer(A_LoopField), 2, 2)=":\" || InStr(A_LoopField, "use -b option")
+       || InStr(A_LoopField, "exiftool version") || InStr(A_LoopField, "wb rb levels"))
+          Continue
+
+       lineArru := StrSplit(A_LoopField, " : ", , 2)   ; MaxParts=2: values contain " : " as well
+       prop := Trimmer(lineArru[1])
+       val := Trimmer(lineArru[2])
+       If (userPrivateMode=1 && (prop="Directory" || prop="File Name" || prop="File Path" || prop="Source File"))
+          Continue
+
+       If (StrLen(prop)>2 && val!="")
+       {
+          hasAdded++
+          LV_Add(A_Index, prop, val)
+          Continue
+       }
+
+       ; a line without the separator continues the value of the tag above it: ExifTool prints
+       ; multi-line values [comments, XMP descriptions] as they are, on several lines
+       If (hasAdded && lineArru.Length()<2 && StrLen(prop)>0
+       && InStr(prop, "Error:")!=1 && InStr(prop, "Warning:")!=1 && SubStr(prop, 1, 2)!="==")
+       {
+          LV_GetText(prevVal, hasAdded, 2)
+          LV_Modify(hasAdded, "Col2", prevVal " " prop)
+       }
+   }
+
+   If (hasAdded<2)
+   {
+      If (exifStatus="timeout")
+         msgu := "ExifTool did not answer within " Round(maxWait/1000) " seconds"
+      Else If (exifStatus="aborted")
+         msgu := "Reading the metadata was aborted"
+      Else If InStr(exifStatus, "failed")
+         msgu := "ExifTool could not be started"
+      Else
+         msgu := "Failed to retrieve the data"
+
+      LV_Add(A_Index, msgu, "-")
+      ; the raw answer tells apart the cases the status cannot: ExifTool refusing to unpack
+      ; itself into %TEMP%, a mangled file name, an unsupported option...
+      whatSaid := (userPrivateMode=1) ? "" : "`n" SubStr(Trimmer(output), 1, 250)
+      addJournalEntry(A_ThisFunc "(): " msgu ". [status: " exifStatus "; exit code: " exitCodu "]" whatSaid)
+   }
+
+   Loop, 2
+       LV_ModifyCol(A_Index, "AutoHdr Left")
+   busyZeit := 0
+}
+
+writeExifToolArgsFile(imgPath) {
+; Writes the arguments file ExifTool reads with -@ [one argument per line] and returns its path,
+; or nothing when it cannot be created. The file must be UTF-8 without a BOM, otherwise ExifTool
+; takes the BOM as part of the first argument. The path of the file itself still travels on the
+; command line, so it is reduced to its 8.3 form when it holds non-ASCII characters.
+   argsFile := A_Temp "\qpv-exiftool-args-" QPVpid ".txt"
+   fileObj := FileOpen(argsFile, "w", "UTF-8-RAW")
+   If !IsObject(fileObj)
+      Return
+
+   fileObj.Write(imgPath "`n")
+   fileObj.Close()
+   If !FileExist(argsFile)
+      Return
+
+   If RegExMatch(argsFile, "[^\x00-\x7F]")
+      argsFile := GetShortPathNameU(argsFile)
+
+   Return argsFile
+}
+
+GetShortPathNameU(filePath) {
+; Returns the 8.3 path of an existing file; the path given, when the volume has no short names.
+   VarSetCapacity(shortPath, 2080, 0)
+   r := DllCall("GetShortPathName", "Str", filePath, "Str", shortPath, "UInt", 1040, "UInt")
+   Return (r>0 && r<1040) ? shortPath : filePath
 }
 
 Trimmer(string, whatTrim:="") {
