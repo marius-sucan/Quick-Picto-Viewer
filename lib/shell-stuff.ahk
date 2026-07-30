@@ -2915,6 +2915,13 @@ PathToExtendedPath(inFile) {
     Return inFile   ; relative or drive relative path; it cannot be prefixed
 }
 
+GetShortPathNameU(filePath) {
+; Returns the 8.3 path of an existing file; the path given, when the volume has no short names.
+   VarSetCapacity(shortPath, 2080, 0)
+   r := DllCall("GetShortPathName", "Str", filePath, "Str", shortPath, "UInt", 1040, "UInt")
+   Return (r>0 && r<1040) ? shortPath : filePath
+}
+
 GetFileAttributesEx(inFile, getAttributes:=0, getAccessTime:=0) {
 ; https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileattributesexw
 ; coded by TheArkive and modified by Marius Șucan

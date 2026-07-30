@@ -32321,10 +32321,8 @@ uiPopulateExifToolInfos() {
    }
 
    busyZeit := A_TickCount
-   ; the rows put here by uiPopulateImgInfos() - or by the previous image - are only replaced
-   ; once ExifTool answers, so that the tab keeps saying what it is doing while it does not
    LV_Delete()
-   LV_Add("", "Gathering data...", "-")
+   LV_Add("", "Gathering data with ExifTool...", "-")
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
 
@@ -32348,8 +32346,6 @@ uiPopulateExifToolInfos() {
    If argsFile
       FileDelete, % argsFile
 
-   ; the panel may have been closed - or replaced by another one, they all share this window -
-   ; while ExifTool was busy; the rows would then be added to whatever list that panel uses
    If (AnyWindowOpen!=5)
    {
       busyZeit := 0
@@ -32431,13 +32427,6 @@ writeExifToolArgsFile(imgPath) {
       argsFile := GetShortPathNameU(argsFile)
 
    Return argsFile
-}
-
-GetShortPathNameU(filePath) {
-; Returns the 8.3 path of an existing file; the path given, when the volume has no short names.
-   VarSetCapacity(shortPath, 2080, 0)
-   r := DllCall("GetShortPathName", "Str", filePath, "Str", shortPath, "UInt", 1040, "UInt")
-   Return (r>0 && r<1040) ? shortPath : filePath
 }
 
 Trimmer(string, whatTrim:="") {
