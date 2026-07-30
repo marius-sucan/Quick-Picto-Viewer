@@ -27978,24 +27978,21 @@ PanelWrapperFilesStats() {
 
     RegAction(0, "uiPreferedFileStats",, 1)
     ; Gui, Tab, 1
-    Gui, Add, Text, x15 y15 w%txtWid%, The statistics panel allows users to filter the indexed files to various criteria by double-clicking on list view entries. It is meant to facilitate the identification of small files, low resolution images, low key or high key, or washed out images in your collection.
+    Gui, Add, Text, x15 y15 w%txtWid%, Every statistics panel allows users to filter the indexed files to various criteria by double-clicking on ay list view entry. Users can easily identify small files, low resolution images, low key or high key, or washed out images in the image collection.
     Gui, Add, Text, y+15 Section, File details: size, date modified, type and more.
     Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedFilesStats, Open &file statistics panel
     Gui, Add, Button, x+5 hp gBtnCollectFileInfos, &Collect data
-    Gui, Add, Checkbox, xs+15 y+5 Checked%uiPreferedFileStats% vuiPreferedFileStats gToggleFileStatsDating, &Generate date statistics based on modified date.
+    Gui, Add, Checkbox, xs+15 y+5 Checked%uiPreferedFileStats% vuiPreferedFileStats gToggleFileStatsDating, &Generate date statistics based on modified date
     Gui, Add, Text, xs y+35 Section, Image properties: resolution, frames and more.
     Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedImagesStats, Open &images statistics panel
     ; Gui, Add, Button, x+5 h%thisBtnHeight% gPanelFindDupes, Find &duplicates panel
     Gui, Add, Button, xs+15 y+10 hp gBtnCollectImageInfos, Collect image &properties and file details
     If (SLDtypeLoaded=3)
-       Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Find duplicates panel
+       Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Find &duplicates panel
     Else
        Gui, Add, Button, xs y+30 h%thisBtnHeight% gBtnCollectHistoInfos, Collect image properties and &histogram details
-    ; Gui, Add, Button, x+5 h%thisBtnHeight% gOpenFileDupesPanel, &Options
-    ; Gui, Add, Checkbox, xs+15 y+5 hp Checked%hamDistInterpolation% vhamDistInterpolation gUIeditHammingInterpolation, High-quality resampling (not recommended)
 
-    ; Gui, Tab
-    Gui, Add, Button, xs y+35 h%thisBtnHeight% gPanelEnableFilesFilter, C&reate custom filter
+    Gui, Add, Button, xs y+35 h%thisBtnHeight% gPanelEnableFilesFilter, Files lis&t filter
     If (SLDtypeLoaded=3)
     {
        Gui, Add, Button, x+5 hp gBtnPurgeCachedSQLdata, Pur&ge caches
@@ -33767,9 +33764,13 @@ SQLdeleteEntriesMarked() {
 
     SQLstr := "DELETE FROM images WHERE isDeleted=1;"
     If !activeSQLdb.Exec(SQLStr)
+    {
        throwSQLqueryDBerror(A_ThisFunc)
-    Else
+    } Else
+    {
        getMaxRowIDsqlDB()
+       Return 1
+    }
 }
 
 deleteSQLdbEntry(fullPath, dbIndex) {
@@ -35399,7 +35400,16 @@ extractSQLqueryFromFilter() {
     }
 }
 
-PanelStateOFsqlNation(){
+PanelStateOFsqlNation() {
+   oka := (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern)) ? 1 : 0
+   If (oka!=1)
+   {
+      showTOOLtip("WARNING: A .SLDB files list database must be opened first to invoke this panel.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    If AnyWindowOpen
    {
       zz := AnyWindowOpen
@@ -35438,7 +35448,9 @@ PanelStateOFsqlNation(){
    hlHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(hlHash, '')='' ")
 
    showTOOLtip("Gathering database information: finishing", 0, 0, 13/13)
-   ignored := "Ignored or known deleted files: " groupDigits(ignored) " ( " Round(ignored / totalz * 100, 2) "% )"
+   bonusBtn := (ignored>1) ? "|Purge ignored entries|Revalidate ignored entries" : ""
+   ogn := ignored
+   ignored := "Ignored or deleted file entries: " groupDigits(ignored) " ( " Round(ignored / totalz * 100, 2) "% )"
    fsize := "File details: " groupDigits(fsize) " ( " Round(fsize / totalz * 100, 2) "% )"
    imgmegapix := "Image details: " groupDigits(imgmegapix) " ( " Round(imgmegapix / totalz * 100, 2) "% )"
    imgmedian := "Image histogram details: " groupDigits(imgmedian) " ( " Round(imgmedian / totalz * 100, 2) "% )"
@@ -35456,13 +35468,47 @@ PanelStateOFsqlNation(){
    infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
    msgu := "Database version: " dbVersion infou "`nTotal indexed files: " groupDigits(totalz) "`n" ignored "`n" fsize "`n" imgmegapix "`n" imgmedian "`n" pixelzFsmall "`n" HpixelzFsmall "`n" dHash "`n" pHash "`n" lHash "`n" hdHash "`n" hpHash "`n" hlHash 
    widthu := (PrefsLargeFonts=1) ? 1150 : 660
-   msgResult := msgBoxWrapper("Database overview: " appTitle, "This is an overview of how much data was collected pertaining to the indexed files.`n`n" msgu, "&Back|C&lose", 1, 0, 0, 0, "", "", 0, 0, widthu)
-   If InStr(msgResult, "back")
+   back := (zz>0) ? "&Back" : ""
+   msgResult := msgBoxWrapper("Database overview: " appTitle, "This is an overview of how much data was collected pertaining to the indexed files.`n`n" msgu, back bonusBtn "|C&lose", 1, 0, 0, 0, "", "", 0, 0, widthu)
+   If InStr(msgResult, "revalidate")
+   {
+      showTOOLtip("Updating database: revalidate ignored " groupDigits(ogn) " files")
+      SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted=1;"
+      If !activeSQLdb.Exec(SQLStr)
+      {
+         showTOOLtip("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      } Else
+      {
+         SoundBeep 900, 100
+         RemoveTooltip()
+      }
+   } Else If InStr(msgResult, "purge")
+   {
+      showTOOLtip("Purging already ignored " groupDigits(ogn) " file entries")
+      r := SQLdeleteEntriesMarked()
+      If (r=1)
+      {
+         SoundBeep 900, 100
+         RemoveTooltip()
+      }
+   } Else If InStr(msgResult, "back")
    {
       If (zz=58)
          PanelWrapperFilesStats()
       Else If (zz=49)
          PanelFindDupes()
+   }
+
+   If (InStr(msgResult, "revalidate") || InStr(msgResult, "purge"))
+   {
+      If (SLDtypeLoaded=3)
+         PopulateIndexSQLFilesStatsInfos("kill")
+      Else
+         PopulateIndexFilesStatsInfos("kill")
+
+      PopulateImagesIndexStatsInfos("kill")
    }
 }
 
@@ -44067,7 +44113,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddColor("x+5 hp w60", "BrushToolAcolor")
     opaciSlideW := (PrefsLargeFonts=1) ? 130 : 85
     GuiAddSlider("BrushToolAopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, x+5 hp wp +0x1000 Checked%BrushToolAutoAngle% vBrushToolAutoAngle gupdateUIbrushTool, Auto-rotate
+    Gui, Add, Checkbox, x+5 hp wp Checked%BrushToolAutoAngle% vBrushToolAutoAngle gupdateUIbrushTool, Auto-rotate
 
     Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop +hwndhBtnTglClrB, [X]
     ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
@@ -56284,12 +56330,12 @@ uiADDalphaMaskTabs(t1, t2, labelu) {
 
     opaciSlideW := (PrefsLargeFonts=1) ? 130 : 85
     GuiAddSlider("BrushToolAopacity", 2,255, 255, "Opacity", labelu, 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, x+5 hp wp +0x1000 -wrap Checked%BrushToolAutoAngle% vBrushToolAutoAngle g%labelu%, Auto-rotate
+    Gui, Add, Checkbox, x+5 hp wp -wrap Checked%BrushToolAutoAngle% vBrushToolAutoAngle g%labelu%, Auto-rotate
     Gui, Add, Text, xs y+10 hp w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorB +TabStop +hwndhBtnTglClrB, [X]
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolBcolor")
     GuiAddColor("x+5 hp w60", "BrushToolBcolor")
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", labelu, 1, "x+5 w" opaciSlideW " hp")
-    Gui, Add, Checkbox, x+5 hp wp +0x1000 g%labelu% Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × 2
+    Gui, Add, Checkbox, x+5 hp wp g%labelu% Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × 2
 
     ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
     ToolTip2ctrl(hBtnTglClrB, "Toggle active color")
@@ -68674,15 +68720,12 @@ createMenuStatistics() {
    If (mustRecordSeenImgs=1)
       kMenu("PVstats", "Add", "&Seen images stats panel", "PanelSeenStats", "stats")
 
-   If (mustPreventMenus=1)
-      kMenu("PVstats", "Add", "&Remove all from favourites", "eraseAllFavedIMGs")
-
    Menu, PVstats, Add
    kMenu("PVstats", "Add", "&Collect file details", "BtnCollectFileInfos")
    kMenu("PVstats", "Add", "Collect image &properties", "BtnCollectImageInfos")
    kMenu("PVstats", "Add", "Collect image &histogram data", "BtnCollectHistoInfos")
-   If (mustPreventMenus=1)
-      kMenu("PVstats", "Add", "C&reate custom files list filter`tCtrl+F", "PanelEnableFilesFilter")
+   If (SLDtypeLoaded=3)
+      kMenu("PVstats", "Add", "Cached data overview", "PanelStateOFsqlNation")
 }
 
 createMenuFilesIndexOptions() {
@@ -68759,7 +68802,7 @@ createMenuFilesIndexOptions() {
       }
 
       kMenu("PVfList", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
-      kMenu("PVfList", "Add", "&Index filters`tCtrl+F", "PanelEnableFilesFilter", "files list")
+      kMenu("PVfList", "Add", "&Index filters`tCtrl+F", "PanelEnableFilesFilter", "files custom list entries")
       If (StrLen(filesFilter)>1 && !testIsDupesList())
          kMenu("PVfList", "Check", "&Index filters`tCtrl+F")
    }
@@ -87571,14 +87614,16 @@ PanelPurgeCachedSQLdata() {
 
    widthu := (PrefsLargeFonts=1) ? 650 : 450
    fakeWinCreator(46, A_ThisFunc, 1)
-   msgResult := msgBoxWrapper("panelu|Purge cached data: " appTitle, "Please choose what kind of cached data to erase from the files list database.", "&Purge|C&ancel", 1, "trash", 0, 0, "File details`f`fImage properties`fImage histograms and hashes`fImage hashes`fAll`fAll (selected files only)`fAll (modified files only)", nullEdit, nullEdit, 2, widthu)
+   bonusBtn := (SLDtypeLoaded=3) ? "`fFile entries marked as dead or ignored" : ""
+   msgResult := msgBoxWrapper("panelu|Purge cached data: " appTitle, "Please choose what kind of cached data to erase from the files list database.", "&Purge|C&ancel", 1, "trash", 0, 0, "File details`f`fImage properties`fImage histograms and hashes`fImage hashes`fAll`fAll (selected files only)`fAll (modified files only)" bonusBtn, nullEdit, nullEdit, 2, widthu)
    If InStr(msgResult.btn, "purge")
    {
       extraFilter := extractSQLqueryFromFilter()
-      If extraFilter
+      If (extraFilter && msgResult.list!=8)
          msgInfos := "`n`nThe purge will occur only for the files matching the current files list filter. To purge all the cached data, deactivate current filter."
  
-      msgResultu := msgBoxWrapper(appTitle ": Purge cached data", "Please confirm you want to purge selected cached data from the database.`n`nThis data is used for sorting the files list much faster, identify image duplicates or to generate files list statistics." msgInfos, 4, 0, "question")
+      dtl := (msgResult.list!=8) ? "`n`nThis data is used for sorting the files list much faster, identify image duplicates or to generate files list statistics." : ""
+      msgResultu := msgBoxWrapper(appTitle ": Purge cached data", "Please confirm you want to purge selected cached data from the database." dtl msgInfos, 4, 0, "question")
       If !InStr(msgResultu, "yes")
          Return
 
@@ -87596,6 +87641,12 @@ PanelPurgeCachedSQLdata() {
          PurgeCachedDataSelectedFiles()
       Else If (msgResult.list=7)
          PurgeCachedDataModifiedFiles()
+      Else If (msgResult.list=8)
+      {
+         r := SQLdeleteEntriesMarked()
+         If (r=1)
+            SoundBeep 900, 100
+      }
 
       If (SLDtypeLoaded=3)
          PopulateIndexSQLFilesStatsInfos("kill")
@@ -100481,6 +100532,12 @@ InvokeSelShapesMenu(givenCoords:=0) {
 }
 
 tlbrUndoAction() {
+   If isNowAlphaPainting()
+   {
+      performUndoAlphaPainting()
+      Return
+   }
+
    setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index=1)
    {
@@ -100520,6 +100577,12 @@ tlbrPanIMG() {
 }
 
 tlbrRedoAction() {
+   If isNowAlphaPainting()
+   {
+      performUndoAlphaPainting()
+      Return
+   }
+
    setWhileLoopExec(1)
    While, (determineLClickState()=1 || A_Index=1)
    {
