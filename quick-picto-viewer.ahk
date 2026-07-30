@@ -28048,10 +28048,11 @@ IndexStatsLVaction(CtrlHwnd:=0, b:=0, c:=0) {
     ; MouseGetPos, , , OutputVarWin, OutputVarControl, 3
     RowNumber := LV_GetNext()
     LV_GetText(dateu, RowNumber, 2)
+    LV_GetText(rowIndexu, RowNumber, 1)   ; the "#" column holds the insertion ordinal and travels with the row when the user sorts by any header
     If (StrLen(dateu)<1 || dateu="date" || InStr(dateu, "file"))
        Return
 
-    r := BtnIndexStatsToList(RowNumber, dateu, varu, 0)
+    r := BtnIndexStatsToList(rowIndexu ? rowIndexu : RowNumber, dateu, varu, 0)
     If (SLDtypeLoaded!=3 && r)
     {
        coreSetFilesFilteru(r)
@@ -28061,8 +28062,12 @@ IndexStatsLVaction(CtrlHwnd:=0, b:=0, c:=0) {
 }
 
 BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
+   ; the 16 file size buckets are also spelled out in PopulateIndexFilesStatsInfos() [isInRange() chain]
+   ; and in PopulateIndexSQLFilesStatsInfos() [uiFileIndexStatsRetrieveSizeRangeDB() calls]: keep all three in sync
    Static minz := {1:0, 2:4999, 3:10002, 4:25002, 5:50002, 6:100002, 7:250002, 8:500002, 9:1000002, 10:2500002, 11:5000002, 12:10000002, 13:25000002, 14:50000002, 15:100000002, 16:250000002}
         , maxz := {1:4998, 2:10001, 3:25001, 4:50001, 5:100001, 6:250001, 7:500001, 8:1000001, 9:2500001, 10:5000001, 11:10000001, 12:25000001, 13:50000001, 14:100000001, 15:250000001, 16:500000001}
+        , sizeIdx := {"<5 KB":1, "5-10 KB":2, "10-25 KB":3, "25-50 KB":4, "50-100 KB":5, "100-250 KB":6, "250-500 KB":7, "0.5-1.0 MB":8
+                    , "1.0-2.5 MB":9, "2.5-5.0 MB":10, "5-10 MB":11, "10-25 MB":12, "25-50 MB":13, "50-100 MB":14, "100-250 MB":15, "250-500 MB":16}
 
    ; ToolTip, % RowNumber "==" dateu "==" LVvaru , , , 2
    winOpen := AnyWindowOpen
@@ -28104,8 +28109,9 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
    If (winOpen!=48)
       dateu := StrReplace(dateu, "-")
 
-   minRange := (winOpen=48) ? arDateu[1] : minz[RowNumber]
-   maxRange := (winOpen=48) ? arDateu[2] : maxz[RowNumber]
+   rangeIdx := sizeIdx[oDateu] ? sizeIdx[oDateu] : RowNumber   ; the label is authoritative: the row position is meaningless once the list was sorted
+   minRange := (winOpen=48) ? arDateu[1] : minz[rangeIdx]
+   maxRange := (winOpen=48) ? arDateu[2] : maxz[rangeIdx]
    ftableu := (uiPreferedFileStats=1) ? "fmodified" : "Fcreated"
 
    If !dataColumn
@@ -28769,13 +28775,13 @@ BtnCopyImageFileStats() {
    textu .= getListViewData("SettingsGUIA", "LViewMetaS", 4)
 
    textu .= "`nIMAGES: HISTOGRAM - AVERAGES`n"
-   textu .= getListViewData("SettingsGUIA", "LViewMetaG", 4)
-   textu .= "`nIMAGES: HISTOGRAM - MEDIANS`n"
-   textu .= getListViewData("SettingsGUIA", "LViewMetaA", 4)
-   textu .= "`nIMAGES: HISTOGRAM - PEAK (RANGE)`n"
-   textu .= getListViewData("SettingsGUIA", "LViewMetaI", 4)
-   textu .= "`nIMAGES: HISTOGRAM - MINIMUM (RANGE)`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaT", 4)
+   textu .= "`nIMAGES: HISTOGRAM - MEDIANS`n"
+   textu .= getListViewData("SettingsGUIA", "LViewMetaG", 4)
+   textu .= "`nIMAGES: HISTOGRAM - PEAK (RANGE)`n"
+   textu .= getListViewData("SettingsGUIA", "LViewMetaA", 4)
+   textu .= "`nIMAGES: HISTOGRAM - MINIMUM (RANGE)`n"
+   textu .= getListViewData("SettingsGUIA", "LViewMetaI", 4)
    textu .= "`nIMAGES: HISTOGRAM - TOTAL (RANGE)`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaR", 4)
 
