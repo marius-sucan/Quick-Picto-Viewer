@@ -2880,25 +2880,85 @@ SetWindowRegion(hwnd, x:=0, y:=0, w:=0, h:=0, r:=1) {
   Return Result
 }
 
-GetFileAttributesEx(inFile, getAttributes:=0) {
+PathToExtendedPath(inFile) {
+; The function prepares a file path for the wide [W] file APIs, by prefixing
+; it with \\?\ , which lifts the MAX_PATH [260 characters] limitation.
+; The prefix is added only when it is safe to do so, because it also disables
+; the path normalization performed by the system: forward slashes, relative
+; paths and the . or .. components are not accepted in such a path.
+; UNC paths [ \\server\share\ ] require a prefix of their own: \\?\UNC\
+; If the path cannot be used at all, an empty string is returned.
+; function by Marius Șucan
+
+    If (StrLen(inFile)<3 || StrLen(inFile)>32766)
+       Return
+
+    If (SubStr(inFile, 1, 4)="\\?\" || SubStr(inFile, 1, 4)="\\.\")
+       Return inFile
+
+    zPath := StrReplace(inFile, "/", "\")
+    lastChar := SubStr(zPath, 0)
+    If (InStr(zPath, "\.\") || InStr(zPath, "\..\") || lastChar="." || lastChar=" ")
+       Return inFile   ; the relative components and the trailing dots or
+                       ; spaces must be resolved by the system itself
+
+    ; a trailing backslash is rejected by the APIs when the \\?\ prefix
+    ; is used, except for the root folder of a drive
+    If (StrLen(zPath)>3 && lastChar="\")
+       zPath := RTrim(zPath, "\")
+
+    If (SubStr(zPath, 1, 2)="\\")                ; UNC path
+       Return "\\?\UNC\" SubStr(zPath, 3)
+    Else If RegExMatch(zPath, "^[a-zA-Z]:\\")    ; absolute path
+       Return "\\?\" zPath
+
+    Return inFile   ; relative or drive relative path; it cannot be prefixed
+}
+
+GetFileAttributesEx(inFile, getAttributes:=0, getAccessTime:=0) {
 ; https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileattributesexw
 ; coded by TheArkive and modified by Marius Șucan
 ; https://www.autohotkey.com/boards/viewtopic.php?t=83269
 ; https://github.com/TheArkive
 ; THANK YOU VERY MUCH @ TheArkive
 
-    If (StrLen(inFile)>32766 || StrLen(inFile)<4)
+; Return value: an object with the fields listed below or an empty string,
+; if the informations could not be retrieved. In the latter case, ErrorLevel
+; contains the error code returned by the system; it is zero on success.
+; The function never returns a file size of zero for a file it failed to
+; access; a size of zero is reported only for empty files and for folders.
+;   size  = the size of the file, in bytes
+;   cTime = creation time ; wTime = last modification time
+;   aTime = last access time; retrieved only if [getAccessTime] is 1
+;   dir   = 1, if the given path points to a folder
+;   attr  = array with the names of the attributes set for the given path;
+;           the array is created only if [getAttributes] is 1
+
+    zFile := PathToExtendedPath(inFile)
+    If !zFile
+    {
+       ErrorLevel := 87   ; ERROR_INVALID_PARAMETER
        Return
+    }
 
     Static GetFileExInfoStandard := 0, GetFileExMaxInfoLevel := 1 ; https://docs.microsoft.com/en-us/windows/win32/api/minwinbase/ne-minwinbase-get_fileex_info_levels
     Static attr := { Archive:0x20 ; https://docs.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
             , Compressed:0x800, Device:0x40, Directory:0x10, Encrypted:0x4000, Hidden:0x2, integ_stream:0x8000, Normal:0x80, NotContentIndexed:0x2000
             , NoScrubData:0x20000, Offline:0x1000, ReadOnly:0x1, RecallOnDataAccess:0x400000, RecallOnOpen:0x40000, ReparsePoint:0x400, SparseFile:0x200
             , System:0x4, Temporary:0x100, Virtual:0x10000}
-    
+
     VarSetCapacity(bFileAttribs,((A_PtrSize=8)?40:36),0) ; AHK v1
     p2 := &bFileAttribs
-    r := DllCall("GetFileAttributesExW", "Str", "\\?\" inFile,"Int", 0, "Ptr", p2)
+    r := DllCall("GetFileAttributesExW", "Str", zFile,"Int", 0, "Ptr", p2)
+    If !r
+    {
+       ; the structure was left untouched by the API; returning it would
+       ; mean reporting a zero file size and bogus dates for the file
+       ErrorLevel := A_LastError
+       Return
+    }
+
+    ErrorLevel := 0
     iAttribs := NumGet(bFileAttribs,"UInt")
     dir := (0x10 & iAttribs) ? 1 : 0
     If (getAttributes=1)
@@ -2907,23 +2967,32 @@ GetFileAttributesEx(inFile, getAttributes:=0) {
        For attrib, value in attr
        {
            If (value & iAttribs)
-              AttrList[A_Index] := attrib
+              AttrList.Push(attrib)
        }
     }
 
     cTime := FileTimeToSystemTime(p2 + 4)    ; CreationTimePtr
     wTime := FileTimeToSystemTime(p2 + 20)   ; LastWriteTime
-    ; aTime := FileTimeToSystemTime(p2+12)   ; LastAccessTime
-    ; sizeHigh << 32 | sizeLow 
+    If (getAccessTime=1)
+       aTime := FileTimeToSystemTime(p2 + 12)   ; LastAccessTime
+
+    ; sizeHigh << 32 | sizeLow
     fileSize := (NumGet(bFileAttribs, 28, "UInt") << 32) | NumGet(bFileAttribs, 32, "UInt")
     return {attr:AttrList, cTime:cTime, aTime:aTime, wTime:wTime, size:fileSize, dir:dir}
 }
 
-FileTimeToSystemTime(ptr) {         
+FileTimeToSystemTime(ptr) {
     VarSetCapacity(SYSTEMTIME, 16, 0)
+    ; a zero or an invalid file time cannot be converted; this happens
+    ; with the file systems that do not record all the dates
     r := DllCall("FileTimeToSystemTime","UPtr",ptr,"UPtr",&SYSTEMTIME)
+    If !r
+       Return
+
     VarSetCapacity(SYSTIME2, 16, 0)
     r := DllCall("SystemTimeToTzSpecificLocalTime","UPtr",0,"UPtr",&SYSTEMTIME,"Ptr",&SYSTIME2) ; https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-systemtimetotzspecificlocaltime
+    If !r
+       Return
 
     ; dayOfWeek := NumGet(SYSTIME2,4,"UShort")
     ; mil := NumGet(SYSTIME2,14,"UShort")
