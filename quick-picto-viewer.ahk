@@ -94526,6 +94526,13 @@ PanelRenameStaticFolder() {
     }
 }
 
+repairPathSeparators(pathu) {
+; collapses the separators doubled by a search and replace: the callers do not
+; agree on the trailing separator of the strings they hand over. The leading
+; "\\" of an UNC path is left alone
+   Return RegExReplace(pathu, "(.)\\{2,}", "$1\")
+}
+
 SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" what "`n" replacer)
@@ -94540,11 +94547,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     selectedFiles := totalAffected := 0
     If (SLDtypeLoaded=3)
     {
-       ; the callers do not agree on the trailing separator: it must be dropped on
-       ; both sides, otherwise the rewritten paths end up with a doubled or a
-       ; missing separator. The in-memory list below repairs itself; the database
-       ; used to keep whatever came out of the replacement
-       whatu := RegExReplace(what, "\\+$")
+       ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
        replaceru := RegExReplace(replacer, "\\+$")
        activeSQLdb.Exec("BEGIN TRANSACTION;")
        If (folderMode=1)
@@ -94555,9 +94558,9 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
        If (activeSQLdb.Exec(SQLStr) || folderMode!=1)
        {
           If (folderMode=1)
-             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE " SQLfolderMatchClause(what) ";"
+             SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE " SQLfolderMatchClause(what) ";"
           Else
-             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '%" Format("{:L}", SQLescapeStr(what, 1)) "%' ESCAPE '>';"
+             SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE fullPath LIKE '%" Format("{:L}", SQLescapeStr(what, 1)) "%' ESCAPE '>';"
 
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
              errorOccured := activeSQLdb.ErrorMsg
@@ -94577,11 +94580,20 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
 
               If Row[2]
               {
-                 ; the stored paths are lowercased; see SQLfolderMatchClause()
-                 newFolderName := Format("{:L}", StrReplace(Row[2], whatu, replaceru))
-                 SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(newFolderName) "' WHERE imgidu='" Row[1] "';"
-                 If !activeSQLdb.Exec(SQLstr)
-                    failedFiles++
+                 ; rewrite the entire path, the very way the files list does below:
+                 ; the searched string may sit in the file name, or cover both sides
+                 ; of the separator. The stored paths are lowercased and split in
+                 ; two columns, see SQLfolderMatchClause()
+                 thisPath := repairPathSeparators(StrReplace(Row[2] "\" Row[3], what, replacer))
+                 thisPos := InStr(thisPath, "\", 0, -1)
+                 If (thisPos>1)
+                 {
+                    newFolderName := SQLescapeStr(Format("{:L}", SubStr(thisPath, 1, thisPos - 1)))
+                    newFileNamu := SQLescapeStr(Format("{:L}", SubStr(thisPath, thisPos + 1)))
+                    SQLstr := "UPDATE images SET imgfolder='" newFolderName "', imgfile='" newFileNamu "' WHERE imgidu='" Row[1] "';"
+                    If !activeSQLdb.Exec(SQLstr)
+                       failedFiles++
+                 } Else failedFiles++
               }
           }
           RecordSet.Free()
@@ -94603,7 +94615,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
               Continue
 
            value := StrReplace(imgPath, what, replacer, affected)
-           value := StrReplace(value, "\\", "\")
+           value := repairPathSeparators(value)
            resultedFilesList[A_Index, 1] := value
            If StrLen(filesFilter)>1
               updateMainUnfilteredList(A_Index, 1, value)
