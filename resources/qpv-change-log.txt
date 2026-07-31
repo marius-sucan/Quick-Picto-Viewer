@@ -7,8 +7,11 @@
 - v6.2.01 (2026-07-**)
   - [new] rotational/spin blur mode in the «Radial Blur» panel
   - [new] pen pressure support for brushes
-  - added shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
-  - improvements and fixes to the vector shapes editor, much improved handling for Bezier splines
+  - [new] shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
+  - finer control when adding folder to the files list index
+  - added option to revalidate ignored files or previously marked as dead in a database files list [.SLDB]
+  - improvements to the «Search and replace in files index» tool when using it with a database files list [.SLDB]
+  - improvements and fixes for the vector shapes editor, much improved handling for Bezier splines
   - improvements and fixes for the histogram statistics
   - much faster lines drawing on images above 536 megapixels
   - faster polar/rectangular coordinates transformations
