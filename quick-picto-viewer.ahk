@@ -63163,11 +63163,12 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
           good2go := "null"
     } Else good2go := "null"
 
-    If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+    If (SLDtypeLoaded=3)
     {
-       good2go := 0
-       ; purge only what coreAddNewFolder() has marked: the entries of the
-       ; rescanned folder that are gone from the disk
+       ; resolve the marking done by coreAddNewFolder(): purge only the entries
+       ; of the rescanned folder that are gone from the disk. It must happen even
+       ; when CurrentSLD is temporarily unset, as GuiDroppedFiles() does, otherwise
+       ; the dead entries remain in the database, marked and never purged
        markedFolder := (forceRemAll=1) ? StrReplace(folderu, "|") : folderu
        thisClause := SQLfolderMatchClause(markedFolder)
        If (z="abandoned")
@@ -63175,10 +63176,16 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
        Else
           SQLdeleteEntriesMarked(2, thisClause)
 
-       isPipe := InStr(folderu, "|") ? 1 : 0
-       folderuz := StrReplace(folderu, "|")
-       SQLdbRetrieveGivenFolder(folderuz, !isPipe)
-       getMaxRowIDsqlDB()
+       If RegExMatch(CurrentSLD, sldsPattern)
+       {
+          ; GetFilesList() populates only the database in this mode; the files
+          ; list must be read back from it
+          good2go := 0
+          isPipe := InStr(folderu, "|") ? 1 : 0
+          folderuz := StrReplace(folderu, "|")
+          SQLdbRetrieveGivenFolder(folderuz, !isPipe)
+          getMaxRowIDsqlDB()
+       }
     }
 
     If (isInLoop=1)
