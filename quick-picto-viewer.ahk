@@ -33900,11 +33900,28 @@ updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
    Return 1
 }
 
-SQLdeleteEntriesMarked() {
+SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
+; The isDeleted column holds two different states:
+;
+; isDeleted=1 marks a file entry as dead or ignored. It is durable: it is set
+; when the file is deleted from the disk, or when it cannot be read at all by
+; the data collection. The user purges or revalidates these entries through
+; PanelStateOFsqlNation().
+;
+; isDeleted=2 marks the entries of a folder about to be rescanned. It is
+; transient: addSQLdbEntry() resets it to 0 for every file still found on the
+; disk, so whatever is still marked once the scan ends are the files that
+; disappeared from the disk, purged by this function.
+;
+; A rescan must pass markValue=2 and folderClause, so that it purges only the
+; entries of the folder it has just marked; without it, the durable entries of
+; the whole database would be destroyed as well. folderClause is built by
+; SQLfolderMatchClause().
     If (SLDtypeLoaded!=3)
        Return
 
-    SQLstr := "DELETE FROM images WHERE isDeleted=1;"
+    extraWhere := folderClause ? " AND " folderClause : ""
+    SQLstr := "DELETE FROM images WHERE isDeleted=" markValue extraWhere ";"
     If !activeSQLdb.Exec(SQLStr)
     {
        throwSQLqueryDBerror(A_ThisFunc)
@@ -33913,6 +33930,20 @@ SQLdeleteEntriesMarked() {
        getMaxRowIDsqlDB()
        Return 1
     }
+}
+
+SQLrestoreEntriesMarked(markValue:=2, folderClause:="") {
+; reverts the marking described in SQLdeleteEntriesMarked(); the caller must
+; own a valid database handle, SLDtypeLoaded is not yet set to 3 while a
+; database is being opened
+    extraWhere := folderClause ? " AND " folderClause : ""
+    SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted=" markValue extraWhere ";"
+    If !activeSQLdb.Exec(SQLstr)
+    {
+       addJournalEntry(A_ThisFunc "() " activeSQLdb.ErrorMsg)
+       Return
+    }
+    Return 1
 }
 
 deleteSQLdbEntry(fullPath, dbIndex) {
@@ -63135,7 +63166,10 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
     {
        good2go := 0
-       SQLdeleteEntriesMarked()
+       ; purge only what coreAddNewFolder() has marked: the entries of the
+       ; rescanned folder that are gone from the disk
+       markedFolder := (forceRemAll=1) ? StrReplace(folderu, "|") : folderu
+       SQLdeleteEntriesMarked(2, SQLfolderMatchClause(markedFolder))
        isPipe := InStr(folderu, "|") ? 1 : 0
        folderuz := StrReplace(folderu, "|")
        SQLdbRetrieveGivenFolder(folderuz, !isPipe)
@@ -84807,7 +84841,7 @@ RegenerateEntireList() {
        If (SLDtypeLoaded=3)
        {
           getMaxRowIDsqlDB()
-          SQLstr := "UPDATE images SET isDeleted=1 WHERE " SQLfolderMatchClause(line) ";"
+          SQLstr := "UPDATE images SET isDeleted=2 WHERE " SQLfolderMatchClause(line) ";"
           activeSQLdb.Exec(SQLstr)
        }
 
@@ -84829,7 +84863,7 @@ RegenerateEntireList() {
        } Else
        {
           showTOOLtip("Finalising database operations, please wait", 0, 0, 1/5)
-          SQLdeleteEntriesMarked()
+          SQLdeleteEntriesMarked(2)   ; every folder of the list was marked
           showTOOLtip("Finalising database operations, please wait", 0, 0, 2/5)
           If !activeSQLdb.Exec("COMMIT TRANSACTION;")
              throwSQLqueryDBerror(A_ThisFunc)
@@ -84947,6 +84981,11 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
      IniSLDBreadGiven("userpHashMode")
      IniSLDBreadGiven("dbVersion")
   }
+
+  ; a folder rescan interrupted by a crash leaves transient marks behind; the
+  ; files would be hidden from any further data collection. See SQLdeleteEntriesMarked()
+  If (importMode!=1)
+     SQLrestoreEntriesMarked(2)
 
   RecordSet := ""
   sortMode := (reverseOrderOnSort=1) ? " DESC" : ""
@@ -94314,7 +94353,9 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
              throwSQLqueryDBerror(A_ThisFunc)
        } Else
        {
-          SQLstr := "UPDATE images SET isDeleted=1 WHERE " thisClause ";"
+          ; transient marking: the caller rescans the folder right away and
+          ; purges what is still marked afterwards. See SQLdeleteEntriesMarked()
+          SQLstr := "UPDATE images SET isDeleted=2 WHERE " thisClause ";"
           If !activeSQLdb.Exec(SQLstr)
              throwSQLqueryDBerror(A_ThisFunc)
        }
