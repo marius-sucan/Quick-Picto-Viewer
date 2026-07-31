@@ -63169,7 +63169,12 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
        ; purge only what coreAddNewFolder() has marked: the entries of the
        ; rescanned folder that are gone from the disk
        markedFolder := (forceRemAll=1) ? StrReplace(folderu, "|") : folderu
-       SQLdeleteEntriesMarked(2, SQLfolderMatchClause(markedFolder))
+       thisClause := SQLfolderMatchClause(markedFolder)
+       If (z="abandoned")
+          SQLrestoreEntriesMarked(2, thisClause) ; the folder was not entirely scanned
+       Else
+          SQLdeleteEntriesMarked(2, thisClause)
+
        isPipe := InStr(folderu, "|") ? 1 : 0
        folderuz := StrReplace(folderu, "|")
        SQLdbRetrieveGivenFolder(folderuz, !isPipe)
