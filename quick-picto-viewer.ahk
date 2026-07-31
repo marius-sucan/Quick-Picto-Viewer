@@ -32669,6 +32669,29 @@ SQLescapeStr(str, likeu:=0) {
    Return str
 }
 
+SQLfolderMatchClause(folderu) {
+; Returns the WHERE condition matching the images indexed in the given folder.
+; A "|" prefix in the given path means the folder is not scanned recursively.
+;
+; The folder paths are stored lowercased by addSQLdbEntry(), because SQLite case
+; folds only ASCII characters; the pattern must be lowercased the very same way.
+;
+; The "\" separator is mandatory in the recursive pattern. Without it,
+; imgfolder LIKE 'd:\pics%' also matches unrelated folders, such as
+; d:\pics 2024 or d:\pictures.
+   isPipe := InStr(folderu, "|") ? 1 : 0
+   folderu := RegExReplace(StrReplace(folderu, "|"), "\\+$")  ; drop any trailing separator
+   folderu := Format("{:L}", folderu)
+   thisFolder := "imgfolder='" SQLescapeStr(folderu) "'"
+   If RegExMatch(folderu, "\:$") ; a drive root may be stored with its separator: c: or c:\
+      thisFolder := "(" thisFolder " OR imgfolder='" SQLescapeStr(folderu) "\')"
+
+   If (isPipe=1)
+      Return thisFolder
+
+   Return "(" thisFolder " OR imgfolder LIKE '" SQLescapeStr(folderu, 1) "\%' ESCAPE '>')"
+}
+
 updateUIFiltersPanel(dummy:=0) {
    Static columnsList := {2:"fsize", 3:"fmodified", 4:"fcreated", 5:"imgmegapix", 6:"imgwidth", 7:"imgheight", 8:"imgwhratio", 9:"imgframes", 10:"imgdpi", 11:"imgavg", 12:"imgmedian", 13:"imghpeak", 14:"imghlow", 15:"imghrange", 16:"imghmode", 17:"imghminu", 18:"imghrms"}
 
@@ -84777,7 +84800,6 @@ RegenerateEntireList() {
     Loop, Parse, listu,`n
     {
        line := Trimmer(A_LoopField)
-       isPipe := InStr(line, "|") ? 1 : 0
        fileTest := StrReplace(line, "|")
        If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4 || !FileExist(fileTest))
           Continue
@@ -84785,9 +84807,7 @@ RegenerateEntireList() {
        If (SLDtypeLoaded=3)
        {
           getMaxRowIDsqlDB()
-          thisR := Format("{:L}", SQLescapeStr(fileTest, 1)) ; the stored paths are lowercased
-          thisR := (isPipe=1) ? thisR : thisR "%"
-          SQLstr := "UPDATE images SET isDeleted=1 WHERE imgfolder LIKE '" thisR "' ESCAPE '>';"
+          SQLstr := "UPDATE images SET isDeleted=1 WHERE " SQLfolderMatchClause(line) ";"
           activeSQLdb.Exec(SQLstr)
        }
 
@@ -85051,12 +85071,8 @@ disposeSQLgetTableHandle(hTable) {
 }
 
 SQLdbRetrieveGivenFolder(pathu, isRecursive) {
-   rec := (isRecursive=1) ? "%" : ""
-   ; the folder paths are stored lowercased by addSQLdbEntry(), because SQLite
-   ; case folds only ASCII characters; the pattern must be lowercased the same
-   ; way, otherwise folders having non-ASCII upper case letters never match
-   pathu := Format("{:L}", SQLescapeStr(pathu, 1))
-   SQL := "SELECT imgidu, fullPath FROM images WHERE imgfolder LIKE '%" pathu rec "' ESCAPE '>'" ; reorder
+   thisClause := SQLfolderMatchClause((isRecursive=1) ? pathu : "|" pathu)
+   SQL := "SELECT imgidu, fullPath FROM images WHERE " thisClause ; reorder
    If !InitSQLgetTable(SQL, activeSQLdb._Handle, errMsg, Rows, Cols, hTable)
    {
       showTOOLtip("ERROR: Failed to open the SQL database:`n" errMsg)
@@ -94259,6 +94275,7 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
 
     oldMaxy := maxFilesIndex
     isPipe := InStr(SelectedDir, "|") ? 1 : 0
+    thisClause := SQLfolderMatchClause(SelectedDir)  ; must be built before the pipe is dropped
     SelectedDir := StrReplace(SelectedDir, "|")
     newArrayu := []
     Loop, % maxFilesIndex + 1
@@ -94286,25 +94303,18 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
 
     If (SLDtypeLoaded=3)
     {
-       thisR := Format("{:L}", SQLescapeStr(SelectedDir, 1))
-       thisR := (isPipe=1) ? thisR : thisR "%"
        If (forReal=1)
        {
           activeSQLdb.Exec("BEGIN TRANSACTION;")
-          SQLstr := "DELETE FROM images WHERE imgfolder LIKE '" thisR "' ESCAPE '>';"
+          SQLstr := "DELETE FROM images WHERE " thisClause ";"
           If !activeSQLdb.Exec(SQLStr)
-          {
-             stringA:= thisR
-             activeSQLdb.EscapeStr(stringA)
-             SQLstr := "DELETE FROM images WHERE imgfolder LIKE " stringA " ESCAPE '>';"
-             activeSQLdb.Exec(SQLStr)
-          }
+             throwSQLqueryDBerror(A_ThisFunc)
 
           If !activeSQLdb.Exec("COMMIT TRANSACTION;")
              throwSQLqueryDBerror(A_ThisFunc)
        } Else
        {
-          SQLstr := "UPDATE images SET isDeleted=1 WHERE imgfolder LIKE '" thisR "' ESCAPE '>';"
+          SQLstr := "UPDATE images SET isDeleted=1 WHERE " thisClause ";"
           If !activeSQLdb.Exec(SQLstr)
              throwSQLqueryDBerror(A_ThisFunc)
        }
