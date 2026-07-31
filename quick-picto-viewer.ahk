@@ -31768,9 +31768,11 @@ folderTreeAppendFiles(modus:="") {
    Gui, fdTreeGuia: TreeView, TVlistFolders
    c := TV_GetSelection()
    linea := folderTreeNormalizePath(folderTreeGetSelectedPath(c))
-   If (!linea || !FolderExist(linea) || InStr(DynamicFoldersList, linea "`n"))
+   If (!linea || !FolderExist(linea))
       Return
 
+   ; a folder already indexed by the dynamic folders list is not silently
+   ; ignored here: addNewFolder2list() tells the user about it
    changeMcursor()
    If GetKeyState("Shift", "P")
       addNewFolder2list(linea, "yes", "recursive")
@@ -63200,6 +63202,89 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
     Return good2go
 }
 
+askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allowApplyAll:=0) {
+; Decides how a folder given to be imported has to be scanned. When the folder is
+; already covered by the dynamic folders list, the user is informed about it and
+; offered to rescan the entry that indexes it, instead of indexing it a second
+; time. Otherwise, the user is asked whether the scan must be recursive.
+; actu and coveredModus carry the answers already given for the other folders of
+; the same batch, so that the questions are not repeated. It returns an object:
+;   .action    = "rescan" [.entry is a folders list entry to rescan]
+;              , "scan" [.entry is the folder to index] or "cancel"
+;   .entry     = the folder to hand over to wrapperAddNewFolderToList(), prefixed
+;                by "|" when its subfolders must not be scanned
+;   .covered   = the folder is already indexed by the dynamic folders list
+;   .allAction = the user asked to treat the other folders of the batch the same
+;   .allModus  = the user asked to scan the other folders of the batch the same
+   thisFolder := StrReplace(Trimmer(SelectedDir), "|")
+   decisionu := {action: "scan", entry: thisFolder, covered: 0, allAction: "", allModus: ""}
+   coverage := getDynaFolderCoverage(thisFolder, foldersListu)
+   If coverage.entry
+   {
+      decisionu.covered := 1
+      If (coveredModus!="rescan" && coveredModus!="import")
+      {
+         If (coverage.exactly=1)
+         {
+            msgu := "The folder you want to import is already in the list of folders that generates the files index:`n`n" thisFolder "\`n`n"
+            msgu .= (coverage.recursive=1) ? "It is scanned recursively, through all its subfolders." : "Only the image files placed directly in it are indexed."
+         } Else
+         {
+            msgu := "The folder you want to import is already indexed. It is placed inside a folder that is scanned recursively:`n`n" thisFolder "\`n`n"
+            msgu .= "This entry of the folders list covers it:`n`n" coverage.folder "\"
+         }
+
+         ; the last button stops the entire operation, not only this folder
+         zbtn := (allowApplyAll=1) ? "&Rescan|&Import anyway|&Abort" : "&Rescan|&Import anyway|&Cancel"
+         zpk := (allowApplyAll=1) ? "Do the same for the other folders" : ""
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu "`n`nDo you want to rescan that folders list entry, to refresh the files indexed from it?", zbtn, 1, "question", zpk)
+         btnu := zpk ? msgResult.btn : msgResult
+         If InStr(btnu, "rescan")
+            coveredModus := "rescan"
+         Else If InStr(btnu, "import")
+            coveredModus := "import"
+         Else
+            coveredModus := "cancel"
+
+         If (zpk && msgResult.check=1 && coveredModus!="cancel")
+            decisionu.allAction := coveredModus
+      }
+
+      If (coveredModus="rescan")
+      {
+         decisionu.action := "rescan"
+         decisionu.entry := coverage.entry
+         Return decisionu
+      } Else If (coveredModus!="import")
+      {
+         decisionu.action := "cancel"
+         Return decisionu
+      }
+   }
+
+   If (actu="not" || actu="recursive")
+   {
+      decisionu.entry := (actu="not") ? "|" thisFolder : thisFolder
+      Return decisionu
+   }
+
+   zpk := (allowApplyAll=1) ? "Do the same for the other folders" : ""
+   msgResult := msgBoxWrapper(appTitle, "Do you want to scan for image files recursively, through all its subfolders?`n`n" thisFolder "\", 3, 0, "question", zpk)
+   btnu := zpk ? msgResult.btn : msgResult
+   If (btnu="no")
+      decisionu.entry := "|" thisFolder
+   Else If (btnu!="yes")
+   {
+      decisionu.action := "cancel"
+      Return decisionu
+   }
+
+   If (zpk && msgResult.check=1)
+      decisionu.allModus := (btnu="no") ? "not" : "recursive"
+
+   Return decisionu
+}
+
 addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
    If (slideShowRunning=1)
       ToggleSlideShowu()
@@ -63220,32 +63305,33 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       If askAboutFileSave(" and new files will be added from the selected folder")
          Return
 
-      If InStr(DynamicFoldersList, SelectedDir "`n")
-      {
-         hasAskedAboutDupes := 1
-         msgResult := msgBoxWrapper(appTitle, "The folder you want to add, seems to be already indexed. Are you sure you want to add it again? This action will likely lead to duplicate entries in the list.`n`n" SelectedDir "\", 4, 0, "question")
-         If (msgResult!="yes")
-            Return "cancel"
-      }
+      decisionu := askFolderImportMode(SelectedDir, getDynamicFoldersList(), actu)
+      If (decisionu.action="cancel")
+         Return "cancel"
 
-      If (actu="not" || actu="recursive")
-      {
-         If (actu="not")
-            isNotRecursive := "|"
-      } Else
-      {
-         msgResult := msgBoxWrapper(appTitle, "Do you want to scan for image files recursively, through all its subfolders?`n`n" SelectedDir "\", 3, 0, "question")
-         If (msgResult="no")
-            isNotRecursive := "|"
-         Else If (msgResult="cancel" || InStr(msgResult, "win_close"))
-            Return "cancel"
-      }
-
+      ; the user was already told the folder is indexed by the folders list
+      hasAskedAboutDupes := decisionu.covered
       BtnCloseWindow()
       Sleep, 1
       prevOpenFolderPath := SelectedDir
       setImageLoading()
       INIaction(1, "prevOpenFolderPath", "General")
+      If (decisionu.action="rescan")
+      {
+         coreRescanDynaFolder(decisionu.entry)
+         If !CurrentSLD
+         {
+            SLDtypeLoaded := 2
+            CurrentSLD := SelectedDir "\NewFilesList.SLD"
+         }
+
+         ResetImgLoadStatus()
+         SoundBeep 900, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return "rescan"
+      }
+
+      isNotRecursive := InStr(decisionu.entry, "|") ? "|" : ""
       mainListu := retrieveListFoldersIndexed()
       If (mainListu[Format("{:L}", SelectedDir)] && hasAskedAboutDupes!=1)
       {
@@ -63442,6 +63528,17 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       For zKey, zValue in mainListu
           prlist .= zKey "\`n"
 
+      countDropped := 0
+      Loop, Parse, foldersListu,`n,`r
+      {
+          If (StrLen(Trimmer(A_LoopField))>3)
+             countDropped++
+      }
+
+      ; coverListu grows with the folders imported now, so that a folder dropped
+      ; along with one of its parents is seen as covered by it
+      coverListu := mainFoldersListu
+      rescannedu := new hashtable()
       newListu := DynamicFoldersList "`n"
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
@@ -63451,8 +63548,30 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
           If StrLen(linea)<4
              Continue
 
+          decisionu := askFolderImportMode(linea, coverListu, applyAllModus, applyAllAction, countDropped>1)
+          If (decisionu.action="cancel")
+             Break
+
+          If decisionu.allAction
+             applyAllAction := decisionu.allAction
+
+          If decisionu.allModus
+             applyAllModus := decisionu.allModus
+
+          thisEntry := decisionu.entry
           noRemAtAll := 1
-          If (mainListu[Format("{:L}", linea)] && noAsking!=1)
+          If (decisionu.action="rescan")
+          {
+             ; several dropped folders can be covered by the same entry
+             If (rescannedu[Format("{:L}", thisEntry)]=1)
+                Continue
+
+             rescannedu[Format("{:L}", thisEntry)] := 1
+             noRemAtAll := 0
+          } Else If (decisionu.covered=1)
+          {
+             noRemAtAll := 0 ; its files are already in the index
+          } Else If (mainListu[Format("{:L}", linea)] && noAsking!=1)
           {
              msgu := "The following folder seems to be already indexed:`n`n" linea "\"
              msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu "`n`nDo you want to add it to the list? This may lead to duplicate entries.", "&Yes|&No|&Abort", 2, "question", "Do not ask again in this application session")
@@ -63466,18 +63585,31 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
           } Else If InStr(prlist, linea "\")
              noRemAtAll := 0
 
+          ; a folder indexed non recursively only gives up the files placed
+          ; directly in it, while rescanning an entry clears its entire subtree
+          forceRemAll := (decisionu.action="rescan" || !InStr(thisEntry, "|")) ? 1 : 0
           changeMcursor()
-          r := wrapperAddNewFolderToList(linea, 1, 1, noRemAtAll)
+          r := wrapperAddNewFolderToList(thisEntry, forceRemAll, 1, noRemAtAll)
           If (r="abandoned")
              Break
 
           stuffAdded := 1
           lastOne := linea
-          newListu .= "`n" linea "`n"
+          newListu .= "`n" thisEntry "`n"
+          coverListu .= "`n" thisEntry "`n"
       }
 
       mainListu := ""
       CurrentSLD := backCurrentSLD
+      If (stuffAdded!=1) ; the user refused every dropped folder: nothing changed
+      {
+         setWhileLoopExec(0)
+         lastInvoked := A_TickCount
+         SetTimer, ResetImgLoadStatus, -50
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
       If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
          markUndefinedFavedList()
 
@@ -94230,6 +94362,24 @@ BtnToggleRecurseDynaFolder() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+coreRescanDynaFolder(dynaEntry) {
+; Rescans the given entry of the dynamic folders list, exactly as it is defined
+; by the list: the "|" prefix means only the files placed directly in the folder
+; are indexed back
+    folderu := StrReplace(dynaEntry, "|")
+    mustOpenStartFolder := ""
+    ; forceRemAll=1 on purpose, do not pass the recursivity of the scan here:
+    ; the whole subtree of the folder is cleared, while only what the entry
+    ; describes is scanned back. This is how rescanning an entry that was just
+    ; turned non recursive drops the images indexed in its subfolders
+    z := wrapperAddNewFolderToList(dynaEntry, 1)
+    modus := InStr(dynaEntry, "|") ? 1 : 0
+    If (z!="null" && RegExMatch(CurrentSLD, sldsPattern))
+       updateCachedStaticFolders(folderu, modus)
+
+    Return z
+}
+
 BTNrescanDynaFolder() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewDynas
@@ -94242,17 +94392,8 @@ BTNrescanDynaFolder() {
     BtnCloseWindow()
     Sleep, 25
     ; msgbox, % folderu
-    mustOpenStartFolder := ""
     recu := InStr(recu, "R") ? "" : "|"
-    ; forceRemAll=1 on purpose, do not pass the recursivity of the scan here:
-    ; the whole subtree of the folder is cleared, while only what the entry
-    ; describes is scanned back. This is how rescanning an entry that was just
-    ; turned non recursive drops the images indexed in its subfolders
-    z := wrapperAddNewFolderToList(recu folderu, 1)
-    modus := InStr(recu, "|") ? 1 : 0
-    If (z!="null" && RegExMatch(CurrentSLD, sldsPattern))
-       updateCachedStaticFolders(folderu, modus)
-
+    coreRescanDynaFolder(recu folderu)
     Sleep, 15
     PanelDynamicFolderzWindow()
 }
@@ -94330,6 +94471,55 @@ SQLDBdumpStaticFoldersList() {
 
    If !activeSQLdb.Exec("COMMIT TRANSACTION;")
       throwSQLqueryDBerror(A_ThisFunc)
+}
+
+getDynaFolderCoverage(SelectedDir, foldersListu:=0) {
+; Tells whether the given folder is already indexed by the dynamic folders list:
+; either it is one of its entries, or it is placed inside an entry that is
+; scanned recursively. An entry prefixed by "|" indexes only the files placed
+; directly in it, therefore it covers nothing else than itself.
+; It returns an object:
+;   .entry     = the entry that covers the folder, exactly as it is stored in
+;                the list, the "|" prefix included; empty when none covers it
+;   .folder    = the same entry, with the prefix removed
+;   .exactly   = the entry is the given folder itself
+;   .recursive = the entry indexes the files of its subfolders as well
+   coverage := {entry: "", folder: "", exactly: 0, recursive: 0}
+   thisFolder := Format("{:L}", RegExReplace(StrReplace(Trimmer(SelectedDir), "|"), "\\+$"))
+   If (StrLen(thisFolder)<2)
+      Return coverage
+
+   If !foldersListu
+      foldersListu := getDynamicFoldersList()
+
+   Loop, Parse, % StrReplace(foldersListu, "|hexists|"), `n, `r
+   {
+       linea := Trimmer(A_LoopField)
+       entryFolder := Format("{:L}", RegExReplace(StrReplace(linea, "|"), "\\+$"))
+       If (StrLen(entryFolder)<2)
+          Continue
+
+       If (entryFolder=thisFolder)
+       {
+          coverage.entry := linea
+          coverage.folder := entryFolder
+          coverage.exactly := 1
+          coverage.recursive := InStr(linea, "|") ? 0 : 1
+          Return coverage ; the entry of the folder itself describes it best
+       }
+
+       ; the separator keeps out d:\pics 2024 when the entry is d:\pics
+       If (InStr(linea, "|") || InStr(thisFolder "\", entryFolder "\")!=1)
+          Continue
+
+       If (StrLen(entryFolder)>StrLen(coverage.folder)) ; the closest parent wins
+       {
+          coverage.entry := linea
+          coverage.folder := entryFolder
+          coverage.recursive := 1
+       }
+   }
+   Return coverage
 }
 
 getDynaFoldersInside(mainFolderu) {
