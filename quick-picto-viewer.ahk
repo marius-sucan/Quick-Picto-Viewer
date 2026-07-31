@@ -63204,13 +63204,22 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
 
 askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allowApplyAll:=0) {
 ; Decides how a folder given to be imported has to be scanned. When the folder is
-; already covered by the dynamic folders list, the user is informed about it and
-; offered to rescan the entry that indexes it, instead of indexing it a second
-; time. Otherwise, the user is asked whether the scan must be recursive.
+; already indexed by the dynamic folders list, the user is informed about it and
+; offered what makes sense for the way the folder is covered, instead of indexing
+; the same files a second time:
+;  - the folder is an entry scanned recursively: rescan it
+;  - the folder is an entry indexing only the files placed directly in it: rescan
+;    it as it is, or scan it recursively from now on
+;  - the folder is placed inside an entry scanned recursively: rescan the entire
+;    entry, or only the folder itself, that stays out of the folders list
+; Otherwise, the user is asked whether the scan must be recursive.
 ; actu and coveredModus carry the answers already given for the other folders of
-; the same batch, so that the questions are not repeated. It returns an object:
-;   .action    = "rescan" [.entry is a folders list entry to rescan]
-;              , "scan" [.entry is the folder to index] or "cancel"
+; the same batch, so that the questions are not repeated: "entry" rescans what
+; covers the folder, "local" deals with the folder itself. Neither of them ever
+; restructures the folders list, only an explicit click does. It returns:
+;   .action    = "rescan" [.entry is a folder to scan back, the folders list is
+;                left untouched], "scan" [.entry is the folder to index] or
+;                "cancel"
 ;   .entry     = the folder to hand over to wrapperAddNewFolderToList(), prefixed
 ;                by "|" when its subfolders must not be scanned
 ;   .covered   = the folder is already indexed by the dynamic folders list
@@ -63221,45 +63230,67 @@ askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allo
    coverage := getDynaFolderCoverage(thisFolder, foldersListu)
    If coverage.entry
    {
+      ; every branch below returns: for a folder already indexed, the recursivity
+      ; of the scan is decided by the way it is covered, there is nothing to ask
       decisionu.covered := 1
-      If (coveredModus!="rescan" && coveredModus!="import")
+      If (coveredModus!="entry" && coveredModus!="local")
       {
-         If (coverage.exactly=1)
+         zbtn := "&Rescan"
+         zdef := 1
+         If (coverage.exactly!=1)
          {
-            msgu := "The folder you want to import is already in the list of folders that generates the files index:`n`n" thisFolder "\`n`n"
-            msgu .= (coverage.recursive=1) ? "It is scanned recursively, through all its subfolders." : "Only the image files placed directly in it are indexed."
+            msgu := "The folder you want to import is already indexed:`n`n" thisFolder "\`n`n"
+            msgu .= "It is placed inside this entry of the folders list, that is scanned recursively:`n`n" coverage.folder "\`n`n"
+            msgu .= "Do you want to rescan the entire entry, or only the folder you want to import?"
+            zbtn := "&Rescan the entry|Rescan &only this folder"
+            zdef := 2 ; rescanning the entire entry can be a much longer operation
+         } Else If (coverage.recursive=1)
+         {
+            msgu := "The folder you want to import is already in the list of folders that generates the files index and it is scanned recursively, through all its subfolders:`n`n" thisFolder "\`n`n"
+            msgu .= "Do you want to rescan it, to refresh the files indexed from it?"
          } Else
          {
-            msgu := "The folder you want to import is already indexed. It is placed inside a folder that is scanned recursively:`n`n" thisFolder "\`n`n"
-            msgu .= "This entry of the folders list covers it:`n`n" coverage.folder "\"
+            msgu := "The folder you want to import is already in the list of folders that generates the files index, but only the image files placed directly in it are indexed:`n`n" thisFolder "\`n`n"
+            msgu .= "Do you want to rescan it as it is, or to scan it recursively, through all its subfolders, from now on?"
+            zbtn := "&Rescan|Scan recursi&vely"
+            zdef := (actu="recursive") ? 2 : 1 ; the caller already asked for it
          }
 
          ; the last button stops the entire operation, not only this folder
-         zbtn := (allowApplyAll=1) ? "&Rescan|&Import anyway|&Abort" : "&Rescan|&Import anyway|&Cancel"
+         zbtn .= (allowApplyAll=1) ? "|&Abort" : "|&Cancel"
          zpk := (allowApplyAll=1) ? "Do the same for the other folders" : ""
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu "`n`nDo you want to rescan that folders list entry, to refresh the files indexed from it?", zbtn, 1, "question", zpk)
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu, zbtn, zdef, "question", zpk)
          btnu := zpk ? msgResult.btn : msgResult
-         If InStr(btnu, "rescan")
-            coveredModus := "rescan"
-         Else If InStr(btnu, "import")
-            coveredModus := "import"
+         If InStr(btnu, "only this") ; tested first, it also contains "rescan"
+            coveredModus := "local"
+         Else If InStr(btnu, "recursively")
+            coveredModus := "widen"
+         Else If InStr(btnu, "rescan")
+            coveredModus := "entry"
          Else
             coveredModus := "cancel"
 
          If (zpk && msgResult.check=1 && coveredModus!="cancel")
-            decisionu.allAction := coveredModus
+            decisionu.allAction := (coveredModus="entry") ? "entry" : "local"
       }
 
-      If (coveredModus="rescan")
+      If (coveredModus="widen")
+      {
+         decisionu.entry := thisFolder ; the recursive entry replaces the "|" one
+      } Else If (coveredModus="entry")
       {
          decisionu.action := "rescan"
          decisionu.entry := coverage.entry
-         Return decisionu
-      } Else If (coveredModus!="import")
+      } Else If (coveredModus="local")
       {
+         ; the folder is scanned back the way it is already indexed: as its own
+         ; entry defines it, or recursively, as the entry that covers it does
+         decisionu.action := "rescan"
+         decisionu.entry := (coverage.exactly=1) ? coverage.entry : thisFolder
+      } Else
          decisionu.action := "cancel"
-         Return decisionu
-      }
+
+      Return decisionu
    }
 
    If (actu="not" || actu="recursive")
@@ -63595,8 +63626,11 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
 
           stuffAdded := 1
           lastOne := linea
-          newListu .= "`n" thisEntry "`n"
-          coverListu .= "`n" thisEntry "`n"
+          If (decisionu.action="scan") ; a rescan adds no entry to the list
+          {
+             newListu .= "`n" thisEntry "`n"
+             coverListu .= "`n" thisEntry "`n"
+          }
       }
 
       mainListu := ""
@@ -94363,9 +94397,10 @@ BtnToggleRecurseDynaFolder() {
 }
 
 coreRescanDynaFolder(dynaEntry) {
-; Rescans the given entry of the dynamic folders list, exactly as it is defined
-; by the list: the "|" prefix means only the files placed directly in the folder
-; are indexed back
+; Scans back the files of the given folder, without touching the dynamic folders
+; list. The folder is given the way the list defines it: the "|" prefix means
+; only the files placed directly in it are indexed back. A folder that is not an
+; entry itself is passed unprefixed, to be scanned as the entry covering it does
     folderu := StrReplace(dynaEntry, "|")
     mustOpenStartFolder := ""
     ; forceRemAll=1 on purpose, do not pass the recursivity of the scan here:
