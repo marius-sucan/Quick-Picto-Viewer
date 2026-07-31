@@ -94529,22 +94529,24 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     selectedFiles := totalAffected := 0
     If (SLDtypeLoaded=3)
     {
-       whatESC := SQLescapeStr(what)
-       replacerESC := SQLescapeStr(replacer)
-       ; activeSQLdb.EscapeStr(what)
-       ; activeSQLdb.EscapeStr(replacer)
+       ; the callers do not agree on the trailing separator: it must be dropped on
+       ; both sides, otherwise the rewritten paths end up with a doubled or a
+       ; missing separator. The in-memory list below repairs itself; the database
+       ; used to keep whatever came out of the replacement
+       whatu := RegExReplace(what, "\\+$")
+       replaceru := RegExReplace(replacer, "\\+$")
        activeSQLdb.Exec("BEGIN TRANSACTION;")
        If (folderMode=1)
-          SQLstr := "UPDATE images SET imgfolder='" Trimmer(replacerESC, "\") "' WHERE imgfolder='" Trimmer(whatESC, "\") "' COLLATE NOCASE;"
+          SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(Format("{:L}", replaceru)) "' WHERE " SQLfolderMatchClause("|" what) ";"
 
        startOperation := A_TickCount
        prevMSGdisplay := A_TickCount
        If (activeSQLdb.Exec(SQLStr) || folderMode!=1)
        {
           If (folderMode=1)
-             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '" Trimmer(SQLescapeStr(what, 1), "\") "\%' ESCAPE '>';"
+             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE " SQLfolderMatchClause(what) ";"
           Else
-             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '%" SQLescapeStr(what, 1) "%' ESCAPE '>';"
+             SQLstr := "SELECT imgidu, imgfolder FROM images WHERE imgfolder LIKE '%" Format("{:L}", SQLescapeStr(what, 1)) "%' ESCAPE '>';"
 
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
              errorOccured := activeSQLdb.ErrorMsg
@@ -94564,7 +94566,8 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
 
               If Row[2]
               {
-                 newFolderName := StrReplace(Row[2], what, replacer)
+                 ; the stored paths are lowercased; see SQLfolderMatchClause()
+                 newFolderName := Format("{:L}", StrReplace(Row[2], whatu, replaceru))
                  SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(newFolderName) "' WHERE imgidu='" Row[1] "';"
                  If !activeSQLdb.Exec(SQLstr)
                     failedFiles++
