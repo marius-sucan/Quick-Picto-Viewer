@@ -32401,7 +32401,8 @@ uiPopulateExifToolInfos() {
       ; itself into %TEMP%, a mangled file name, an unsupported option...
       whatSaid := (userPrivateMode=1) ? "" : "`n" SubStr(Trimmer(output), 1, 250)
       addJournalEntry(A_ThisFunc "(): " msgu ". [status: " exifStatus "; exit code: " exitCodu "]" whatSaid)
-   }
+   } Else
+      LV_ModifyCol(1, "Sort")
 
    Loop, 2
        LV_ModifyCol(A_Index, "AutoHdr Left")
@@ -63218,7 +63219,7 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, no
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     ; markedSelectFile := 0
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
     thisFolder := (forceRemAll=1) ? StrReplace(SelectedDir, "|") : SelectedDir
