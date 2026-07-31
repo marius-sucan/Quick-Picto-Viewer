@@ -63185,6 +63185,7 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
           folderuz := StrReplace(folderu, "|")
           SQLdbRetrieveGivenFolder(folderuz, !isPipe)
           getMaxRowIDsqlDB()
+          RandomPicture() ; coreAddNewFolder() left the display refresh to us
        }
     }
 
@@ -63306,6 +63307,12 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, no
     }
 
     CurrentSLD := backCurrentSLD
+    ; in database mode the files list is repopulated by the caller; refreshing
+    ; the display here would act on the list stripped by remFilesFromList(),
+    ; before the scanned files are read back from the database
+    If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
+       Return z
+
     If (noRandom=1)
     {
        currentFileIndex := maxFilesIndex - 1
