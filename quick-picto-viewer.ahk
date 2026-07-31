@@ -31707,7 +31707,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       {
          performSRinSeenDB := performSRinDynas := 0
          If (lastChecked=1)
-            SearchAndReplaceThroughIndex(thisFolder, oldPath "\" newFileName "\", 0, 1)
+            SearchAndReplaceThroughIndex(thisFolder "\", oldPath "\" newFileName "\", 0, 1)
          Return 1
       } Else
       {
@@ -94586,15 +94586,13 @@ repairPathSeparators(pathu) {
    Return RegExReplace(pathu, "(.)\\{2,}", "$1\")
 }
 
-SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
+SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" what "`n" replacer)
 
     ; in folders mode, both strings always cover entire folder paths: 
     ; whole folders are matched
     ; d:\pics\old must never match d:\pics\oldies
-    whatu := (folderMode=1) ? (RegExReplace(what, "\\+$") "\") : what
-    replacerz := (folderMode=1) ? (RegExReplace(replacer, "\\+$") "\") : replacer
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
