@@ -84785,7 +84785,7 @@ RegenerateEntireList() {
        If (SLDtypeLoaded=3)
        {
           getMaxRowIDsqlDB()
-          thisR := SQLescapeStr(fileTest, 1)
+          thisR := Format("{:L}", SQLescapeStr(fileTest, 1)) ; the stored paths are lowercased
           thisR := (isPipe=1) ? thisR : thisR "%"
           SQLstr := "UPDATE images SET isDeleted=1 WHERE imgfolder LIKE '" thisR "' ESCAPE '>';"
           activeSQLdb.Exec(SQLstr)
@@ -85052,7 +85052,10 @@ disposeSQLgetTableHandle(hTable) {
 
 SQLdbRetrieveGivenFolder(pathu, isRecursive) {
    rec := (isRecursive=1) ? "%" : ""
-   pathu := SQLescapeStr(pathu, 1)
+   ; the folder paths are stored lowercased by addSQLdbEntry(), because SQLite
+   ; case folds only ASCII characters; the pattern must be lowercased the same
+   ; way, otherwise folders having non-ASCII upper case letters never match
+   pathu := Format("{:L}", SQLescapeStr(pathu, 1))
    SQL := "SELECT imgidu, fullPath FROM images WHERE imgfolder LIKE '%" pathu rec "' ESCAPE '>'" ; reorder
    If !InitSQLgetTable(SQL, activeSQLdb._Handle, errMsg, Rows, Cols, hTable)
    {
