@@ -94245,11 +94245,12 @@ BTNrescanDynaFolder() {
     ; msgbox, % folderu
     mustOpenStartFolder := ""
     recu := InStr(recu, "R") ? "" : "|"
+    ; forceRemAll=1 on purpose, do not pass the recursivity of the scan here:
+    ; the whole subtree of the folder is cleared, while only what the entry
+    ; describes is scanned back. This is how rescanning an entry that was just
+    ; turned non recursive drops the images indexed in its subfolders
+    z := wrapperAddNewFolderToList(recu folderu, 1)
     modus := InStr(recu, "|") ? 1 : 0
-    ; forceRemAll must agree with the scan: with 1, coreAddNewFolder() drops the
-    ; "|" and clears the whole subtree of the folder, while only the folder
-    ; itself is scanned back. Every other caller passes the recursivity of its scan
-    z := wrapperAddNewFolderToList(recu folderu, !modus)
     If (z!="null" && RegExMatch(CurrentSLD, sldsPattern))
        updateCachedStaticFolders(folderu, modus)
 
