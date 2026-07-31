@@ -35604,7 +35604,7 @@ PanelStateOFsqlNation() {
    showTOOLtip("Gathering database information: total number", 0, 0, 0.1/13)
    totalz := getTotalIMGsSQLdb()
    showTOOLtip("Gathering database information: ignored files", 0, 0, 1/13)
-   ignored := getTotalIMGsSQLdb("WHERE isDeleted=1 ")
+   ignored := getTotalIMGsSQLdb("WHERE isDeleted IS NOT 0")
    showTOOLtip("Gathering database information: file details", 0, 0, 2/13)
    fsize := totalz - getTotalIMGsSQLdb("WHERE ifnull(fsize, '')='' ")
    showTOOLtip("Gathering database information: image details", 0, 0, 3/13)
@@ -35654,7 +35654,7 @@ PanelStateOFsqlNation() {
    If InStr(msgResult, "revalidate")
    {
       showTOOLtip("Updating database: revalidate ignored " groupDigits(ogn) " files")
-      SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted=1;"
+      SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted IS NOT 0;"
       If !activeSQLdb.Exec(SQLStr)
       {
          showTOOLtip("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
@@ -35668,7 +35668,7 @@ PanelStateOFsqlNation() {
    } Else If InStr(msgResult, "purge")
    {
       showTOOLtip("Purging already ignored " groupDigits(ogn) " file entries")
-      r := SQLdeleteEntriesMarked()
+      r := SQLdeleteEntriesMarked(1, "isDeleted=2")
       If (r=1)
       {
          SoundBeep 900, 100
