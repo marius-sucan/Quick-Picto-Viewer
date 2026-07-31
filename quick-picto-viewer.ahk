@@ -94237,8 +94237,11 @@ BTNrescanDynaFolder() {
     ; msgbox, % folderu
     mustOpenStartFolder := ""
     recu := InStr(recu, "R") ? "" : "|"
-    z := wrapperAddNewFolderToList(recu folderu, 1)
     modus := InStr(recu, "|") ? 1 : 0
+    ; forceRemAll must agree with the scan: with 1, coreAddNewFolder() drops the
+    ; "|" and clears the whole subtree of the folder, while only the folder
+    ; itself is scanned back. Every other caller passes the recursivity of its scan
+    z := wrapperAddNewFolderToList(recu folderu, !modus)
     If (z!="null" && RegExMatch(CurrentSLD, sldsPattern))
        updateCachedStaticFolders(folderu, modus)
 
