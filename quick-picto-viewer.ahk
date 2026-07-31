@@ -63304,8 +63304,12 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, no
     If (forReal=0 && SLDtypeLoaded=3)
        getMaxRowIDsqlDB()
 
+    ; the removal is widened to the entire subtree, while only the folder itself
+    ; is scanned back: the other entries of the dynamic folders list placed in
+    ; that subtree index their own files and nothing else brings them back
+    protectu := (forceRemAll=1 && InStr(SelectedDir, "|")) ? getDynaFoldersInside(thisFolder) : ""
     If (noRemAtAll=0)
-       remFilesFromList(thisFolder, 1, forReal)
+       remFilesFromList(thisFolder, 1, forReal, protectu)
 
     z := GetFilesList(SelectedDir "\*", 0, 1, fastu)
     If (fastu=1)
@@ -94333,7 +94337,53 @@ SQLDBdumpStaticFoldersList() {
       throwSQLqueryDBerror(A_ThisFunc)
 }
 
-remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
+getDynaFoldersInside(mainFolderu) {
+; Returns the entries of the dynamic folders list placed inside the given folder.
+; Rescanning a folder clears its entire subtree, while these entries are indexed
+; on their own and are not scanned back by it: their files must survive it.
+; The "|" prefix is kept, so that each entry protects exactly what it indexes.
+;
+; DynamicFoldersList is read as it is: getDynamicFoldersList() would reload it
+; through coreLoadDynaFolders(), which reads the file whenever it is not the
+; CurrentSLD in use, and the callers of this function blank CurrentSLD
+   mainFolderu := RegExReplace(StrReplace(mainFolderu, "|"), "\\+$")
+   protectu := ""
+   Loop, Parse, % StrReplace(DynamicFoldersList, "|hexists|"), `n, `r
+   {
+       linea := Trimmer(A_LoopField)
+       thisFolder := RegExReplace(StrReplace(linea, "|"), "\\+$")
+       If (StrLen(thisFolder)<2 || thisFolder=mainFolderu)
+          Continue
+
+       If InStr(thisFolder, mainFolderu "\") ; the separator keeps out d:\pics 2024
+          protectu .= linea "`n"
+   }
+   Return protectu
+}
+
+isPathInGivenFolders(filePath, foldersList) {
+; tells whether the given file belongs to one of the given folders; a "|" prefix
+; means the file must sit directly in it, not in one of its subfolders
+   Loop, Parse, foldersList, `n, `r
+   {
+       linea := Trimmer(A_LoopField)
+       If (StrLen(linea)<2)
+          Continue
+
+       isPipe := InStr(linea, "|") ? 1 : 0
+       thisFolder := RegExReplace(StrReplace(linea, "|"), "\\+$") "\"
+       If !InStr(filePath, thisFolder)
+          Continue
+
+       If (isPipe!=1)
+          Return 1
+       Else If !InStr(StrReplace(filePath, thisFolder), "\")
+          Return 1
+   }
+   Return 0
+}
+
+remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
     If (silentus=0)
        showTOOLtip("Removing files from the list pertaining to`n" SelectedDir "\")
 
@@ -94346,6 +94396,13 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
     oldMaxy := maxFilesIndex
     isPipe := InStr(SelectedDir, "|") ? 1 : 0
     thisClause := SQLfolderMatchClause(SelectedDir)  ; must be built before the pipe is dropped
+    Loop, Parse, protectedFolders, `n, `r
+    {
+        linea := Trimmer(A_LoopField)
+        If (StrLen(linea)>1)
+           thisClause .= " AND NOT (" SQLfolderMatchClause(linea) ")"
+    }
+
     SelectedDir := StrReplace(SelectedDir, "|")
     newArrayu := []
     Loop, % maxFilesIndex + 1
@@ -94355,15 +94412,15 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1) {
            Continue
 
         If !isPipe
-        {
-           If InStr(r, SelectedDir "\")
-              Continue
-        } Else If (isPipe=1)
-        {
-           rT := StrReplace(r, SelectedDir "\")
-           If !InStr(rT, "\")
-              Continue
-        }
+           mustRemove := InStr(r, SelectedDir "\") ? 1 : 0
+        Else
+           mustRemove := InStr(StrReplace(r, SelectedDir "\"), "\") ? 0 : 1
+
+        If (mustRemove=1 && protectedFolders)
+           mustRemove := isPathInGivenFolders(r, protectedFolders) ? 0 : 1
+
+        If (mustRemove=1)
+           Continue
 
         countFiles++
         newArrayu[countFiles] := resultedFilesList[A_Index]
