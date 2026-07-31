@@ -33916,15 +33916,11 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
 ; the data collection. The user purges or revalidates these entries through
 ; PanelStateOFsqlNation().
 ;
-; isDeleted=2 marks the entries of a folder about to be rescanned. It is
-; transient: addSQLdbEntry() resets it to 0 for every file still found on the
-; disk, so whatever is still marked once the scan ends are the files that
-; disappeared from the disk, purged by this function.
-;
-; A rescan must pass markValue=2 and folderClause, so that it purges only the
-; entries of the folder it has just marked; without it, the durable entries of
-; the whole database would be destroyed as well. folderClause is built by
-; SQLfolderMatchClause().
+; isDeleted=2 marks the entries of a folder about to be rescanned through
+; wrapperAddNewFolderToList() and coreAddNewFolder().
+; It is transient. addSQLdbEntry() resets it to 0 for every file still found 
+; on the disk, the files still marked isDeleted=2 once the scan ends are the
+; files that disappeared from the disk. They are purged using this function.
     If (SLDtypeLoaded!=3)
        Return
 
@@ -33941,9 +33937,7 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
 }
 
 SQLrestoreEntriesMarked(markValue:=2, folderClause:="") {
-; reverts the marking described in SQLdeleteEntriesMarked(); the caller must
-; own a valid database handle, SLDtypeLoaded is not yet set to 3 while a
-; database is being opened
+; reverts the marking described in SQLdeleteEntriesMarked();
     extraWhere := folderClause ? " AND " folderClause : ""
     SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted=" markValue extraWhere ";"
     If !activeSQLdb.Exec(SQLstr)
@@ -94596,12 +94590,9 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" what "`n" replacer)
 
-    ; in folders mode, both strings always cover entire folder paths: the callers do
-    ; not agree on the trailing separator, so it is enforced here and the two paths are
-    ; taken to be terminated by it from now on. Whole folders are matched this way:
-    ; d:\pics\old must never be found in d:\pics\oldies, the very way
-    ; SQLfolderMatchClause() matches them in the database. Below, only these two
-    ; strings are searched and replaced with, never the given "what" and "replacer"
+    ; in folders mode, both strings always cover entire folder paths: 
+    ; whole folders are matched
+    ; d:\pics\old must never match d:\pics\oldies
     whatu := (folderMode=1) ? (RegExReplace(what, "\\+$") "\") : what
     replacerz := (folderMode=1) ? (RegExReplace(replacer, "\\+$") "\") : replacer
 
@@ -94650,20 +94641,12 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
               {
                  If (folderMode=1)
                  {
-                    ; folders mode: only the folder path is searched and replaced, the
-                    ; file name must be left alone, the searched string may well be
-                    ; found in it as well. The separator dropped by the storage is given
-                    ; back before the replacement, such that the folder itself matches
-                    ; the trailing separator of whatu, see SQLfolderMatchClause()
+
                     newFolder := RegExReplace(repairPathSeparators(StrReplace(Row[2] "\", whatu, replacerz)), "\\+$")
                     newFileu := Row[3]
                     pathOK := (StrLen(newFolder)>1) ? 1 : 0
                  } Else
                  {
-                    ; rewrite the entire path, the very way the files list does below:
-                    ; the searched string may sit in the file name, or cover both sides
-                    ; of the separator. The stored paths are lowercased and split in
-                    ; two columns, see SQLfolderMatchClause()
                     thisPath := repairPathSeparators(StrReplace(Row[2] "\" Row[3], whatu, replacerz))
                     thisPos := InStr(thisPath, "\", 0, -1)
                     newFolder := SubStr(thisPath, 1, thisPos - 1)
@@ -94701,9 +94684,6 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
 
            If (folderMode=1)
            {
-              ; folders mode: only the folder path is searched and replaced, the file
-              ; name must be left alone. The trailing separator is kept on the folder,
-              ; to be matched by the one enforced on whatu
               affected := 0
               value := imgPath
               thisPos := InStr(imgPath, "\", 0, -1)
@@ -94717,6 +94697,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
               value := StrReplace(imgPath, whatu, replacerz, affected)
               value := repairPathSeparators(value)
            }
+
            resultedFilesList[A_Index, 1] := value
            If (StrLen(filesFilter)>1)
               updateMainUnfilteredList(A_Index, 1, value)
