@@ -31707,7 +31707,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       {
          performSRinSeenDB := performSRinDynas := 0
          If (lastChecked=1)
-            SearchAndReplaceThroughIndex(thisFolder, oldPath "\" newFileName "\", 0, 0)
+            SearchAndReplaceThroughIndex(thisFolder, oldPath "\" newFileName "\", 0, 1)
          Return 1
       } Else
       {
@@ -63193,7 +63193,8 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
           folderuz := StrReplace(folderu, "|")
           SQLdbRetrieveGivenFolder(folderuz, !isPipe)
           getMaxRowIDsqlDB()
-          RandomPicture() ; coreAddNewFolder() left the display refresh to us
+          If (isInLoop!=1)
+             SetTimer, RandomPicture, -100 ; coreAddNewFolder() left the display refresh to us
        }
     }
 
@@ -94675,7 +94676,7 @@ SearchAndReplaceThroughIndex(what, replacer, silentus:=0, folderMode:=0) {
            value := StrReplace(imgPath, what, replacer, affected)
            value := repairPathSeparators(value)
            resultedFilesList[A_Index, 1] := value
-           If StrLen(filesFilter)>1
+           If (StrLen(filesFilter)>1)
               updateMainUnfilteredList(A_Index, 1, value)
 
            totalAffected += affected
