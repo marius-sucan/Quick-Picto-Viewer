@@ -33879,16 +33879,24 @@ updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
    If (updateDates=1)
       obju := GetFileAttributesEx(newEntry)
 
-   If !dbIndex
-      activeSQLdb.EscapeStr(oldEntry)
-
+   ; the paths are stored lowercased by addSQLdbEntry(), and must be written back
+   ; the same way. UNIQUE(fullPath) compares them byte per byte, so a record
+   ; renamed with the capitalisation of the user no longer conflicts with the scan
+   ; of its own folder, which then inserts a second record for the same file
    zPlitPath(newEntry, 1, newFileName, newFilePath)
+   newFileName := Format("{:L}", newFileName)
+   newFilePath := Format("{:L}", newFilePath)
+   oldEntry := Format("{:L}", oldEntry)
+   plainOldEntry := oldEntry
+   If !dbIndex
+      activeSQLdb.EscapeStr(oldEntry) ; quotes it in place
+
    extra := (updateDates=1) ? ", fmodified=" SubStr(obju.wTime, 1, 12) ", fcreated=" SubStr(obju.cTime, 1, 12) ", fsize=" obju.size : ""
    wherePart := dbIndex ? " WHERE imgidu=" dbIndex ";" : " WHERE fullPath=" oldEntry " COLLATE NOCASE;"
    SQLstr := "UPDATE images SET isDeleted=0, imgfile='" SQLescapeStr(newFileName) "', imgfolder='" SQLescapeStr(newFilePath) "'" extra wherePart
    If !activeSQLdb.Exec(SQLstr)
    {
-      zPlitPath(oldEntry, 1, fileNamu, imgPath)
+      zPlitPath(plainOldEntry, 1, fileNamu, imgPath)
       activeSQLdb.EscapeStr(fileNamu)
       activeSQLdb.EscapeStr(imgPath)
       activeSQLdb.EscapeStr(newFileName)
