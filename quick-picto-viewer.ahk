@@ -86638,6 +86638,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 */
    Static extMap := 0, extMapSrc := ""
    Static dirBuf, dirBufAddr := 0, BUFSZ := 262144
+   Static stampBuf, stampAddr := 0
    ; RegExFilesPattern is anchored on "^(.\:\\)", so oldGetFilesList() only ever
    ; returns files that sit on a drive letter path; UNC paths never match it.
    ; That behaviour is reproduced here. Set this to 0 to index UNC paths too.
@@ -86664,6 +86665,15 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
       Return "abandoned"
    }
 
+   ; the file times are converted by the DLL, one call per file; without it
+   ; there is nothing to fall back on but the old, slower function
+   initQPVmainDLL()
+   If !qpvMainDll
+   {
+      addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
+      Return oldGetFilesList(origArg, progressInfo, doCommits, factCheck)
+   }
+
    dirInfoClass := QPV_ProbeDirEnumClass(rootDir, nameOffset)
    If !dirInfoClass    ; this volume cannot do bulk directory reads
       Return oldGetFilesList(origArg, progressInfo, doCommits, factCheck)
@@ -86683,6 +86693,8 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
    {
       VarSetCapacity(dirBuf, BUFSZ + 16, 0)
       dirBufAddr := (&dirBuf + 15) & -16   ; the directory records hold Int64 fields
+      VarSetCapacity(stampBuf, 32, 0)      ; the two time stamps the DLL returns
+      stampAddr := (&stampBuf + 15) & -16
    }
    bufEnd := dirBufAddr + BUFSZ
 
@@ -86775,18 +86787,25 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
                           dirIdx := nDirsList
                        }
                        thisCounter++
+                       ; the DLL reads CreationTime and LastWriteTime out of the
+                       ; record itself and hands back both as local YYYYMMDDHHMISS
+                       ; numbers. Called inline, on purpose: wrapping it in an AHK
+                       ; function would cost more than the conversion itself.
+                       DllCall("qpvmain.dll\DirEntryTimesToLocal", "Ptr", p, "Ptr", stampAddr, "Int")
                        newArrayu[++flatIdx] := fname
                        newArrayu[++flatIdx] := dirIdx
                        newArrayu[++flatIdx] := NumGet(p+0, 40, "Int64")
-                       newArrayu[++flatIdx] := QPV_FileTimeStamp(p + 24)   ; LastWriteTime
-                       newArrayu[++flatIdx] := QPV_FileTimeStamp(p + 8)    ; CreationTime
+                       newArrayu[++flatIdx] := NumGet(stampAddr+0, 0, "Int64")   ; LastWriteTime
+                       newArrayu[++flatIdx] := NumGet(stampAddr+0, 8, "Int64")   ; CreationTime
                     } Else
                     {
                        addedNow++
                        maxFilesIndex++
                        If (storeExtras=1)
-                          resultedFilesList[maxFilesIndex] := [thisDir "\" fname,,,,, NumGet(p+0, 40, "Int64"), QPV_FileTimeStamp(p + 24), QPV_FileTimeStamp(p + 8)]
-                       Else
+                       {
+                          DllCall("qpvmain.dll\DirEntryTimesToLocal", "Ptr", p, "Ptr", stampAddr, "Int")
+                          resultedFilesList[maxFilesIndex] := [thisDir "\" fname,,,,, NumGet(p+0, 40, "Int64"), NumGet(stampAddr+0, 0, "Int64"), NumGet(stampAddr+0, 8, "Int64")]
+                       } Else
                           resultedFilesList[maxFilesIndex] := [thisDir "\" fname]
                     }
                  }
@@ -86940,59 +86959,6 @@ QPV_ProbeDirEnumClass(dirPath, ByRef nameOffset) {
    }
 
    DllCall("CloseHandle", "Ptr", hDir)
-   Return r
-}
-
-QPV_FileTimeStamp(ftPtr) {
-/*
-  Converts the FILETIME found at [ftPtr] into the local "YYYYMMDDHH24MISS"
-  string that A_LoopFileTimeModified and GetFileAttributesEx() both produce,
-  so that the values stored in the database and in resultedFilesList[] stay
-  byte for byte what GetFilesList() used to store.
-
-  The results are memoized on the 64 bit FILETIME value. Two system calls
-  and a Format() get replaced by one lookup, which pays off well, because
-  files that were copied, downloaded or extracted together carry identical
-  time stamps. Note that the cache assumes the time zone of the session does
-  not change while it runs.
-*/
-
-   Static memo := {}, memoCount := 0, st1, st2, initu := 0
-   If !initu
-   {
-      VarSetCapacity(st1, 16, 0)
-      VarSetCapacity(st2, 16, 0)
-      initu := 1
-   }
-
-   ftv := NumGet(ftPtr+0, 0, "Int64")
-   If !ftv       ; file systems that do not record all the dates
-      Return
-
-   r := memo[ftv]
-   If (r!="")
-      Return r
-
-   If !DllCall("FileTimeToSystemTime", "Ptr", ftPtr, "Ptr", &st1)
-      Return
-   ; the same conversion GetFileAttributesEx() performs: it accounts for the
-   ; daylight saving rules in force on that very date, which the cheaper
-   ; FileTimeToLocalFileTime() does not
-   If !DllCall("SystemTimeToTzSpecificLocalTime", "Ptr", 0, "Ptr", &st1, "Ptr", &st2)
-      Return
-
-   r := Format("{:04d}{:02d}{:02d}{:02d}{:02d}{:02d}"
-             , NumGet(st2, 0, "UShort"), NumGet(st2, 2, "UShort"), NumGet(st2, 6, "UShort")
-             , NumGet(st2, 8, "UShort"), NumGet(st2, 10, "UShort"), NumGet(st2, 12, "UShort"))
-
-   If (memoCount>32768)
-   {
-      memo := {}
-      memoCount := 0
-   }
-
-   memo[ftv] := r
-   memoCount++
    Return r
 }
 

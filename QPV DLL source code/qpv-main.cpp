@@ -9462,3 +9462,175 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 }
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+// Local time stamps for file times
+//
+// GetFilesList() in the script converts two FILETIMEs per file into the local
+// "YYYYMMDDHH24MISS" form that A_LoopFileTimeModified produces. At 800 000
+// files that is 1.6 million conversions, and driving them one at a time from
+// the script, through FileTimeToSystemTime() + SystemTimeToTzSpecificLocalTime(),
+// costs many seconds.
+//
+// The offset between UTC and local time only ever changes twice a year, so it
+// is cached per day here and the calendar arithmetic is done inline.
+// SystemTimeToTzSpecificLocalTime(NULL, ..) applies the time zone rule that is
+// currently in force to every date it is handed, historical or not, so one
+// fixed offset per day reproduces its results exactly. The two days a year
+// that do contain a transition are marked as such in the cache and are passed
+// to the system call itself, so nothing is ever approximated.
+//
+// The cache would go stale if the user changed the time zone of the machine
+// while the application is running. Note that a mere daylight saving switch is
+// not enough to do that: what is cached is the offset of the day a file was
+// written on, not the offset of today.
+////////////////////////////////////////////////////////////////////////////////
+
+#define QPV_FT_PER_DAY   864000000000LL   // 100 ns units in 24 hours
+#define QPV_FT_PER_SEC   10000000LL
+#define QPV_FT_PER_MIN   600000000LL
+#define QPV_DAYS_1601_1970  134774LL      // whole days between the two epochs
+
+#define QPV_TZDAY_SLOTS     32768         // enough distinct days for 89 years
+#define QPV_TZ_TRANSITION   0x7FFFFFFF    // this day contains a DST switch
+
+// Every slot packs (day + 1) in the high 32 bits and the offset, in minutes,
+// in the low 32. A 64 bit atomic load can never see one half of an update, so
+// no lock is needed here, and a slot that misses is simply recomputed. Zero,
+// which is what the table starts out as, can never be mistaken for a real day,
+// because the day is stored biased by one.
+static std::atomic<INT64> qpvTZdayCache[QPV_TZDAY_SLOTS];
+
+static bool qpvUTCtoLocalFileTime(INT64 ft, INT64 &outLocal) {
+// Runs one UTC file time through the system, and hands back the local wall
+// clock reading of it, expressed on the very same 100 ns scale. The result is
+// not a valid file time any more, it is only ever used to take a difference.
+    FILETIME f, lf;
+    SYSTEMTIME su, sl;
+
+    f.dwLowDateTime  = (DWORD)(ft & 0xFFFFFFFFLL);
+    f.dwHighDateTime = (DWORD)((ft >> 32) & 0xFFFFFFFFLL);
+    if (!FileTimeToSystemTime(&f, &su))
+        return false;
+    if (!SystemTimeToTzSpecificLocalTime(NULL, &su, &sl))
+        return false;
+    if (!SystemTimeToFileTime(&sl, &lf))
+        return false;
+
+    outLocal = ((INT64)lf.dwHighDateTime << 32) | (INT64)lf.dwLowDateTime;
+    return true;
+}
+
+static int qpvComputeDayOffset(INT64 day) {
+// The UTC to local offset, in minutes, for the given day, or QPV_TZ_TRANSITION
+// when the two ends of that day do not agree. Both probes are placed on a
+// whole second, so that the millisecond resolution of SYSTEMTIME cannot round
+// one of them and forge a difference that is not there.
+    INT64 a = day * QPV_FT_PER_DAY;                    // 00:00:00
+    INT64 b = a + QPV_FT_PER_DAY - QPV_FT_PER_SEC;     // 23:59:59
+    INT64 la, lb;
+
+    if (!qpvUTCtoLocalFileTime(a, la) || !qpvUTCtoLocalFileTime(b, lb))
+        return QPV_TZ_TRANSITION;
+
+    INT64 offA = (la - a) / QPV_FT_PER_MIN;
+    INT64 offB = (lb - b) / QPV_FT_PER_MIN;
+    if (offA != offB)
+        return QPV_TZ_TRANSITION;
+
+    return (int)offA;
+}
+
+static QPV_FORCEINLINE void qpvCivilFromDays(INT64 z, int &y, int &m, int &d) {
+// Days since 1970-01-01 to a proleptic Gregorian date, after Howard Hinnant's
+// chrono-Compatible Low-Level Date Algorithms
+    z += 719468;
+    const INT64 era = (z >= 0 ? z : z - 146096) / 146097;
+    const unsigned doe = (unsigned)(z - era * 146097);              // [0, 146096]
+    const unsigned yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;   // [0, 399]
+    const INT64 yy = (INT64)yoe + era * 400;
+    const unsigned doy = doe - (365*yoe + yoe/4 - yoe/100);         // [0, 365]
+    const unsigned mp = (5*doy + 2)/153;                            // [0, 11]
+    d = (int)(doy - (153*mp+2)/5 + 1);                              // [1, 31]
+    m = (int)(mp < 10 ? mp + 3 : mp - 9);                           // [1, 12]
+    y = (int)(yy + (m <= 2));
+}
+
+static QPV_FORCEINLINE INT64 qpvStampFromLocalFileTime(INT64 lft) {
+// Packs a local wall clock reading into the decimal YYYYMMDDHHMISS number the
+// script stores, for instance 20240131235959
+    INT64 days = lft / QPV_FT_PER_DAY;
+    int secOfDay = (int)((lft - days * QPV_FT_PER_DAY) / QPV_FT_PER_SEC);
+    int y, m, d;
+
+    qpvCivilFromDays(days - QPV_DAYS_1601_1970, y, m, d);
+    if (y < 1601 || y > 9999)
+        return 0;
+
+    return ((((((INT64)y * 100 + m) * 100 + d) * 100
+            + secOfDay / 3600) * 100
+            + (secOfDay / 60) % 60) * 100)
+            + secOfDay % 60;
+}
+
+static INT64 qpvFileTimeToLocalStamp(INT64 ft) {
+    if (ft <= 0)
+        return 0;
+
+    INT64 day = ft / QPV_FT_PER_DAY;
+    unsigned slot = (unsigned)(day & (QPV_TZDAY_SLOTS - 1));
+    INT64 packed = qpvTZdayCache[slot].load(std::memory_order_relaxed);
+    int offMin;
+
+    if ((packed >> 32) == day + 1)
+    {
+       offMin = (int)(unsigned int)(packed & 0xFFFFFFFFLL);
+    } else
+    {
+       offMin = qpvComputeDayOffset(day);
+       qpvTZdayCache[slot].store(((day + 1) << 32) | (INT64)(unsigned int)offMin, std::memory_order_relaxed);
+    }
+
+    if (offMin == QPV_TZ_TRANSITION)
+    {
+       INT64 lft;
+       if (!qpvUTCtoLocalFileTime(ft, lft))
+          return 0;
+
+       return qpvStampFromLocalFileTime(lft);
+    }
+
+    return qpvStampFromLocalFileTime(ft + (INT64)offMin * QPV_FT_PER_MIN);
+}
+
+DLL_API INT64 DLL_CALLCONV FileTimeToLocalStamp(INT64 fileTime) {
+// One UTC file time to one local YYYYMMDDHHMISS number; zero when the value
+// cannot be converted, which is what file systems that do not record all the
+// dates hand out.
+    return qpvFileTimeToLocalStamp(fileTime);
+}
+
+DLL_API int DLL_CALLCONV DirEntryTimesToLocal(const unsigned char *dirEntry, INT64 *out) {
+// Reads the two file times straight out of one directory record as returned by
+// GetFileInformationByHandleEx(), and writes them back as local YYYYMMDDHHMISS
+// numbers: out[0] is the last write time, out[1] the creation time.
+// CreationTime sits at offset 8 and LastWriteTime at offset 24 in both of the
+// record layouts the script asks for, FILE_FULL_DIR_INFO and
+// FILE_ID_BOTH_DIR_INFO, so one entry pointer is all this needs.
+    if (!dirEntry || !out)
+        return 0;
+
+    INT64 ctime, mtime;
+    std::memcpy(&ctime, dirEntry + 8, sizeof(INT64));
+    std::memcpy(&mtime, dirEntry + 24, sizeof(INT64));
+    out[0] = qpvFileTimeToLocalStamp(mtime);
+    out[1] = qpvFileTimeToLocalStamp(ctime);
+    return 1;
+}
+
+DLL_API void DLL_CALLCONV ResetFileTimeCache() {
+// Throws the per day offset cache away. Only needed if the time zone of the
+// machine is changed while the application is running.
+    for (int i = 0; i < QPV_TZDAY_SLOTS; i++)
+        qpvTZdayCache[i].store(0, std::memory_order_relaxed);
+}
