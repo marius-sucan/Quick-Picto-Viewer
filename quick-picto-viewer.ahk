@@ -38,7 +38,6 @@
 ; Current licence: I do not know, I do not care. Licences are for obedient entities.
 ;
 ;@Ahk2Exe-AddResource Lib\module-interface.ahk
-;@Ahk2Exe-AddResource Lib\module-fim-thumbs.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetProductName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
@@ -483,8 +482,7 @@ If !InStr(initGUI, "|")
 createGDIPcanvas()
 InitGDIpStuff()
 
-Global multiCoreThumbsInitGood := "n", thumbThread1,thumbThread2,thumbThread3,thumbThread4
-,thumbThread5,thumbThread6,thumbThread7
+Global multiCoreThumbsInitGood := "n", thumbsPoolState := 0, thumbsPoolWantBMP := 1
 
 If (A_PtrSize=4)
 {
@@ -4475,6 +4473,7 @@ TrueCleanup() {
    If (slideShowRunning=1)
       DestroyGIFuWin()
    Sleep, 1
+   QPV_ThumbsPoolShutdown() ; must happen before FreeImage and GDI+ are let go
    If (wasInitFIMlib=1)
       FreeImage_FoxInit(0) ; Unload Dll
 
@@ -4600,50 +4599,155 @@ MenuDummyToggleThumbsMode() {
    ToggleThumbsMode()
 }
 
-initAHKhThumbThreads() {
+extractFmtsFromRegEx(ptrn) {
+; the two file formats patterns share the shape  i)(.\\*\.(ext|ext|...))$
+; this returns just the pipe delimited list of extensions out of them
+
+   posu := InStr(ptrn, "\.(")
+   If !posu
+      Return ""
+
+   listu := SubStr(ptrn, posu + 3)
+   posu := InStr(listu, ")")
+   Return (posu>1) ? SubStr(listu, 1, posu - 1) : ""
+}
+
+initThumbsPool() {
+; starts the thumbnails generator managed by qpvmain.dll; it replaces the ahk_h threads
+; that used to run Lib\module-fim-thumbs.ahk / MonoGenerateThumb()
+
     Static multiCoreInit := 0
     If (multiCoreInit=1 || allowMultiCoreMode!=1 || minimizeMemUsage=1)
        Return
 
+    multiCoreInit := 1
+    If (A_PtrSize=4)
+    {
+       addJournalEntry("Multi-threaded thumbnails generation is unavailable in the 32 bits edition")
+       multiCoreThumbsInitGood := 0
+       Return
+    }
+
     addJournalEntry("Attempting to initialize " realSystemCores " threads for thumbnails generation")
     initFIMGmodule()
     initQPVmainDLL()
-    If (FIMfailed2init=1)
+    If (!qpvMainDll || WICmoduleHasInit!=1)
     {
-       addJournalEntry("Failed to initialize the auxiliary threads because FreeImage failed to initialize")
+       addJournalEntry("Failed to initialize the thumbnails workers: qpvMain.dll or its WIC module is unavailable")
        multiCoreThumbsInitGood := 0
-    } Else
-    {
-       If A_IsCompiled
-          r := GetRes(dataFile, 0, "MODULE-FIM-THUMBS.AHK", 10)
-
-       Loop, % realSystemCores
-       {
-           If IsObject(thumbThread%A_Index%)
-              Continue
-
-           If !A_IsCompiled
-              thumbThread%A_Index% := ahkThread("#Include *i Lib\module-fim-thumbs.ahk")
-           Else If r
-              thumbThread%A_Index% := ahkThread(StrGet(&dataFile, r, "utf-8"))
-
-           Sleep, 5
-       }
-
-       Loop, % realSystemCores
-       {
-           Sleep, 5
-           goodInit += thumbThread%A_Index%.ahkFunction("initThisThread", GDIPToken "|" mainCompiledPath "|" userimgQuality "|" A_Index "|" WICmoduleHasInit)
-       }
-
-       multiCoreThumbsInitGood := (goodInit=realSystemCores) ? 1 : 0
-       If (multiCoreThumbsInitGood=1)
-          addJournalEntry("Succesfully initialized " goodInit " threads.")
-       Else
-          addJournalEntry("Failed to initialize the auxiliary threads (unknown cause).")
+       Return
     }
 
-    multiCoreInit := 1
+    r := DllCall("qpvmain.dll\thumbsPoolInit", "Int", realSystemCores, "Int")
+    thumbsPoolState := r ? DllCall("qpvmain.dll\thumbsPoolGetState", "UPtr") : 0
+    If (!r || !thumbsPoolState)
+    {
+       addJournalEntry("Failed to initialize the thumbnails workers (unknown cause).")
+       multiCoreThumbsInitGood := 0
+       Return
+    }
+
+    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(RegExWICfmtPtrn), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+    multiCoreThumbsInitGood := 1
+    addJournalEntry("Succesfully initialized " r " threads.")
+}
+
+QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSave) {
+; prepares the workers for one QPV_ShowThumbnails() run; it also discards whatever
+; may have been left behind by a previous, abandoned run
+
+    If (multiCoreThumbsInitGood!=1 || !thumbsPoolState)
+       Return 0
+
+    thumbsPoolWantBMP := wantBitmap
+    paramz := thumbSize "|" timePerImg "|" enableThumbsCaching "|" userHQraw "|" allowToneMappingImg
+    paramz .= "|" allowWICloader "|" allowFIMloader "|" thisImgQuality "|" cmrRAWtoneMapAlgo
+    paramz .= "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
+    paramz .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
+    paramz .= "|" wantBitmap "|" alwaysSave
+    Return DllCall("qpvmain.dll\thumbsPoolBegin", "Str", paramz, "Int")
+}
+
+QPV_ThumbsPoolSubmit(fileIndex, kind, srcPath, savePath, frameIndex:=0) {
+; kind: 0 = generate a thumbnail out of srcPath ; 1 = decode the cached thumbnail srcPath
+   Return DllCall("qpvmain.dll\thumbsPoolSubmit", "Int64", fileIndex, "Int", kind, "Str", srcPath, "Str", savePath, "Int", frameIndex, "Int")
+}
+
+QPV_ThumbsPoolReady() {
+; how many finished thumbnails are waiting to be collected
+   Return thumbsPoolState ? NumGet(thumbsPoolState + 0, 8, "Int") : 0
+}
+
+QPV_ThumbsPoolPending() {
+; queued + in flight + ready; zero means the workers have nothing left to say
+   If !thumbsPoolState
+      Return 0
+
+   Return NumGet(thumbsPoolState + 0, 0, "Int") + NumGet(thumbsPoolState + 0, 4, "Int") + NumGet(thumbsPoolState + 0, 8, "Int")
+}
+
+QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
+; collects the finished thumbnails; the GDI+ bitmaps become ours, there is nothing to clone
+
+    Static maxItems := 32, resultSize := 48, resultsBuffer
+    If !VarSetCapacity(resultsBuffer)
+       VarSetCapacity(resultsBuffer, maxItems*resultSize, 0)
+
+    n := DllCall("qpvmain.dll\thumbsPoolFetch", "UPtr", &resultsBuffer, "Int", maxItems, "Int")
+    Loop, % n
+    {
+        offu := (A_Index - 1)*resultSize
+        thisIndex := NumGet(resultsBuffer, offu, "Int64")
+        thisPBitmap := NumGet(resultsBuffer, offu + 8, "UPtr")
+        thisStatus := NumGet(resultsBuffer, offu + 16, "Int")
+        If !thumbsArray[thisIndex]
+        {
+           If (thisPBitmap>0)
+              Gdip_DisposeImage(thisPBitmap, 1)
+           Continue
+        }
+
+        If (thisPBitmap>0)
+        {
+           recordGdipBitmaps(thisPBitmap, "QPV_ShowThumbnails<-ThumbsPool")
+           thumbsArray[thisIndex, 1] := "fim"
+           thumbsArray[thisIndex, 2] := thisPBitmap
+        } Else If (thisStatus=0 && thumbsPoolWantBMP!=1)
+        {
+           ; generate all thumbnails mode; only the cache file was wanted
+           thumbsArray[thisIndex, 1] := "d"
+           imgsHavePainted++
+        } Else If (thisStatus=20)
+        {
+           ; a password protected PDF; the file must not be considered dead
+           addJournalEntry("ThumbsMode. Unable to render a password protected PDF: " thumbsArray[thisIndex, 3])
+           thumbsArray[thisIndex, 1] := "d"
+           imgsHavePainted++
+        } Else If (thumbsArray[thisIndex, 10]="cache")
+        {
+           ; the cached thumbnail file is unusable; rebuild it from the original image
+           thumbsArray[thisIndex, 10] := "retried"
+           file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" thumbsArray[thisIndex, 7] ".png"
+           thumbsArray[thisIndex, 1] := "w"
+           thumbsArray[thisIndex, 4] := file2save
+           QPV_ThumbsPoolSubmit(thisIndex, 0, thumbsArray[thisIndex, 3], file2save, 0)
+        } Else
+           thumbsArray[thisIndex, 1] := "x"
+    }
+
+    Return n
+}
+
+QPV_ThumbsPoolEnd() {
+   If (multiCoreThumbsInitGood=1 && thumbsPoolState)
+      DllCall("qpvmain.dll\thumbsPoolEnd", "Int")
+}
+
+QPV_ThumbsPoolShutdown() {
+   If (multiCoreThumbsInitGood=1 && thumbsPoolState)
+      DllCall("qpvmain.dll\thumbsPoolShutdown", "Int")
+
+   thumbsPoolState := 0
 }
 
 getFolderDetails(pathu) {
@@ -4754,7 +4858,7 @@ ToggleThumbsMode() {
 
       prevIndexu := resultedFilesList[currentFileIndex, 1] currentFileIndex
       If (thumbsListViewMode=1 && !isWinXP)
-         initAHKhThumbThreads()
+         initThumbsPool()
 
       If hSNDmediaFile
          MCI_Pause(hSNDmedia)
@@ -45475,7 +45579,7 @@ toggleMultiCoresUse() {
    showTOOLtip("Multi-threaded thumbnails generation: " friendly, A_ThisFunc, 1)
    IniAction(1, "allowMultiCoreMode", "General")
    If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
-      initAHKhThumbThreads()
+      initThumbsPool()
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -57323,7 +57427,7 @@ BtnSavePreferencesClose() {
    RegAction(1, "userVPsvgScale",, 2, 1, 10)
    RegAction(1, "userVPpdfDPI",, 2, 72, 3500)
    If (thumbsDisplaying=1 && thumbsListViewMode=1 && multiCoreThumbsInitGood="n")
-      initAHKhThumbThreads()
+      initThumbsPool()
 }
 
 InvokeStandardDialogColorPicker(hC, event, c) {
@@ -69716,7 +69820,7 @@ toggleListViewModeThumbs() {
    INIaction(1, "thumbsListViewMode", "General")
    recalculateThumbsSizes()
    If (thumbsListViewMode=1)
-      initAHKhThumbThreads()
+      initThumbsPool()
 
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(50)
@@ -83820,7 +83924,7 @@ generateAllThumbsNow() {
    currentFileIndex := 1
    thumbsListViewMode := 1
    ; If (thumbnailsListMode!=1)
-   ;    initAHKhThumbThreads()
+   ;    initThumbsPool()
 
    INIaction(1, "thumbsListViewMode", "General")
    recalculateThumbsSizes()
@@ -83913,7 +84017,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     doStartLongOpDance()
     imgsListArrayThumbs := []
     prevGUIupdate := A_TickCount
-    whichCoreBusy := hasDrawn := lastMsg := imgsMustPaint := imgsNotCached := 0
+    whichCoreBusy := hasDrawn := lastMsg := imgsMustPaint := imgsNotCached := imgsFileCached := 0
     framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
     Loop, % maxItemsW*maxItemsH*2
     {
@@ -83972,7 +84076,12 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
            wasThumbCached := (isForceRefresh=1) ? 0 : checkThumbExists(MD5name, imgPath, ".png", file2load)
            ; fnOutputDebug("ThumbsMode. File #" thisFileIndex  " cached=" wasThumbCached " original file: " imgPath " thumb file: " file2load)
            If (wasThumbCached=1)
-              imgsListArrayThumbs[thisFileIndex] := ["f", 0, imgPath, file2load, DestPosX, DestPosY, MD5name, whichCoreBusy, hasDrawn]
+           {
+              ; the 10th slot lets QPV_ThumbsPoolDrain() rebuild the thumbnail from the
+              ; original image, should the cached file turn out to be unreadable
+              imgsFileCached++
+              imgsListArrayThumbs[thisFileIndex] := ["f", 0, imgPath, file2load, DestPosX, DestPosY, MD5name, whichCoreBusy, hasDrawn, "cache"]
+           }
         }
 
         If (currentFileIndex=thisFileIndex)
@@ -84007,12 +84116,16 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       filesPerCore := imgsNotCached//systemCores
    } Else systemCores := limitCores
 
+   ; the workers of qpvmain.dll are persistent, so there is no per run start-up cost to
+   ; amortize any longer; the only thing that still does not pay off is a lone image
    maxLimitReached := (minimizeMemUsage=1) && (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
-   mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && systemCores>1 && filesPerCore>1 && multiCoreThumbsInitGood=1) ? 1 : 0
+   mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && multiCoreThumbsInitGood=1 && thumbsPoolState) ? 1 : 0
+   If (imgsNotCached + imgsFileCached < 2)
+      mustDoMultiCore := 0
    If InStr(filesFilter, "qpv:pages:")
       mustDoMultiCore := 0
-   
-   fnOutputDebug("ThumbsMode. Init. doMultiCore=" mustDoMultiCore " cores=" systemCores " filesPerCore=" filesPerCore " imgsNotCached=" imgsNotCached " imgsMustPaint=" imgsMustPaint)
+
+   fnOutputDebug("ThumbsMode. Init. doMultiCore=" mustDoMultiCore " cores=" systemCores " filesPerCore=" filesPerCore " imgsNotCached=" imgsNotCached " fileCached=" imgsFileCached " imgsMustPaint=" imgsMustPaint)
    If !isWinXP
    {
       memInfos := getMemUsage()
@@ -84037,23 +84150,51 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       timePerImgMultiCore := 350
 
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
+   thisImgQuality := (userimgQuality=1) ? 6 : 5
+   thumbsPoolOK := idleLaps := 0
    If (mustDoMultiCore=1)
    {
-      paramz := enableThumbsCaching "|" userHQraw "|" allowToneMappingImg "|" allowWICloader "|" userimgQuality "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo "|" userPerformColorManagement "|" allowFIMloader
-      fnOutputDebug("ThumbsMode. Clean multi-core GDIs mess. Cores: " limitCores)
-      Loop, % limitCores
-          thumbThread%A_Index%.ahkFunction("cleanMess", "c" A_Index, paramz)
-      ; fnOutputDebug("ThumbsMode. Clean multi-core GDIs mess. DONE")
-   } Else limitCores := 1
+      ; when generating every thumbnail of a list, nothing is ever drawn; asking the
+      ; workers for no GDI+ bitmap at all spares a decode-sized allocation per file
+      wantThumbBMP := (modus="all") ? 0 : 1
+      thumbsPoolOK := QPV_ThumbsPoolBegin(thumbsSizeQuality, timePerImgMultiCore, thisImgQuality, wantThumbBMP, (modus="all") ? 1 : 0)
+      If (thumbsPoolOK!=1)
+      {
+         mustDoMultiCore := 0
+         addJournalEntry("The thumbnails workers refused to start. Falling back to single threaded processing.")
+      }
+   }
 
-   thisImgQuality := (userimgQuality=1) ? 6 : 5
+   If (mustDoMultiCore!=1)
+      limitCores := 1
+
    sizesDesired := []
    sizesDesired[1] := [thumbsSizeQuality, thumbsSizeQuality, 1, 0, thisImgQuality]
    thisFileIndex := MD5name := Bindex := rowIndex := imgsListed := lastMsg := 0
-   imgsHavePainted := thisNonCachedImg := coreIndex := threadIndex := memCached := lapsOccured := totalLoops := 0
+   imgsHavePainted := thisNonCachedImg := memCached := lapsOccured := totalLoops := 0
    lowestGiven := maxIndexu := maxImgSize := maxZeit := columnIndex := -1
-   prevCoreEventZeit := A_TickCount - 2
     ; MsgBox, % filesPerCore "--" imgsMustPaint "--" imgsNotCached "--" imgsListArrayThumbs.Length()
+   If (thumbsPoolOK=1)
+   {
+      ; hand the whole page over to the workers in one go; they decode images and cached
+      ; thumbnail files in parallel while this thread does nothing but draw
+      Loop, % imgsMustPaint
+      {
+          poolIndex := startIndex + A_Index - 1
+          poolType := imgsListArrayThumbs[poolIndex, 1]
+          If (poolType="w")
+             QPV_ThumbsPoolSubmit(poolIndex, 0, imgsListArrayThumbs[poolIndex, 3], imgsListArrayThumbs[poolIndex, 4], 0)
+          Else If (poolType="f" && modus="all")
+          {
+             ; the cache file is already there and nothing gets drawn in this mode
+             imgsListArrayThumbs[poolIndex, 1] := "d"
+             imgsHavePainted++
+          } Else If (poolType="f")
+             QPV_ThumbsPoolSubmit(poolIndex, 1, imgsListArrayThumbs[poolIndex, 4], "", 0)
+      }
+   }
+
+   lastScrollCheck := A_TickCount
    interfaceThread.ahkassign("alterFilesIndex", 0)
    If (userPrivateMode=1)
       blurEffect := Gdip_CreateEffect(1, clampInRange(thumbsSizeQuality//2, 30, thumbsSizeQuality*2), 0, 0)
@@ -84063,7 +84204,13 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       Loop
       {
           ; in this loop, the thumbnails are drawn on screen
-          alterFilesIndex := interfaceThread.ahkgetvar.alterFilesIndex
+          If (A_TickCount - lastScrollCheck>100)
+          {
+             ; a cross interpreter read; the loop spins much faster now, no need to do it every time
+             lastScrollCheck := A_TickCount
+             alterFilesIndex := interfaceThread.ahkgetvar.alterFilesIndex
+          }
+
           If (alterFilesIndex>1 && lapsOccured>3)
           {
              fnOutputDebug("ThumbsMode. User abandoned the operation by scrolling.")
@@ -84122,99 +84269,48 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           }
 
           innerLoops++
-          If (cacheType="w" && mustDoMultiCore=1)
+          If (thumbsPoolOK=1)
           {
-             ; in this IF block workload is distributed to other threads, if mustDoMultiCore=1
-             thisCoreDoneLine := ""
-             thisCoreDoneArr := ""
-             whichCoreBusy := imgsListArrayThumbs[thisFileIndex, 8]
-             mamUsage := GetProcessMemoryUsage(QPVpid)
-             systemMemInfo := GlobalMemoryStatusEx()
-             thisMemoryLoad := Round((max(mamUsage[1], mamUsage[8])/Round(systemMemInfo.TotalPhys*0.9))*100, 1)
-             If (A_TickCount - prevCoreEventZeit>69500 && innerLoops>2 && lapsOccured>2 && totalLoops>2)
+             ; collect whatever the workers of qpvmain.dll have finished; the GDI+ bitmaps
+             ; they hand over become ours, so there is nothing left to clone here
+             If QPV_ThumbsPoolReady()
              {
-                fnOutputDebug("ThumbsMode. Wait time since last new core started ... exceeded.  " thisFileIndex " . Loop. Break. Now. :-) ")
-                Break
+                QPV_ThumbsPoolDrain(imgsListArrayThumbs, imgsHavePainted)
+                cacheType := imgsListArrayThumbs[thisFileIndex, 1]
+                idleLaps := 0
              }
 
-             If (whichCoreBusy>0)
+             If (cacheType="w" || cacheType="f" || cacheType="x" || cacheType="d")
              {
-                hasThumbFailed := thumbThread%whichCoreBusy%.AHKgetvar.operationFailed
-                thisCoreDoneLine := thumbThread%whichCoreBusy%.AHKgetvar.resultsList
-                thisCoreDoneArr := StrSplit(thisCoreDoneLine, "|")
-                waitDataCollect := thumbThread%whichCoreBusy%.AHKgetvar.waitDataCollect
-                If (thisCoreDoneArr[1]=1 && thisCoreDoneArr[4]=whichCoreBusy && thisCoreDoneArr[5]=Bindex && waitDataCollect=1)
+                ; this image is still being processed, or it was just settled by the drain
+                If (cacheType="w" || cacheType="f")
                 {
-                   thumbThread%whichCoreBusy%.ahkassign("waitDataCollect", 0)
-                   thisPBitmap := StrLen(thisCoreDoneArr[2])>2 ? thisCoreDoneArr[2] : 0
-                   If StrLen(thisPBitmap)>2
-                      thisPBitmap := trGdip_CloneBitmap(A_ThisFunc "<-FIM_ExternThread", thisPBitmap, 1)
-                   else 
-                      hasThumbFailed := 1
-
-                   imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "fim"
-                   imgsListArrayThumbs[thisCoreDoneArr[3], 2] := validBMP(thisPBitmap) ? thisPBitmap : 0
-                   If (hasThumbFailed=1)
+                   idleLaps++
+                   If (idleLaps>7)
                    {
-                      prevCoreEventZeit := A_TickCount
-                      thumbThread%whichCoreBusy%.ahkassign("operationFailed", 0)
-                      fnOutputDebug("ThumbsMode. Failed to generate - file index=" thisFileIndex " core=" whichCoreBusy " pBitmap=" thisCoreDoneArr[2])
-                      If (thisCoreDoneArr[2]!=20) ; if the pdf is pass-protected, do not mark it dead
-                         imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "x"
-                   }
-                } Else If (thisCoreDoneArr[1]=1 && thisCoreDoneArr[4]=whichCoreBusy && waitDataCollect=1)
-                {
-                   ; SoundBeep 
-                   thumbThread%whichCoreBusy%.ahkassign("waitDataCollect", 0)
-                   thisFileIndex := thisCoreDoneArr[3]
-                   Bindex := thisCoreDoneArr[5]
-                   thisPBitmap := StrLen(thisCoreDoneArr[2])>2 ? thisCoreDoneArr[2] : 0
-                   If StrLen(thisPBitmap)>2
-                      thisPBitmap := trGdip_CloneBitmap(A_ThisFunc "<-FIM_ExternThread", thisPBitmap, 1)
-                   else 
-                      hasThumbFailed := 1
+                      ; nothing became ready for a while; hand the CPU over to the workers
+                      ; instead of spinning here. If they have nothing left to say either,
+                      ; some image will never arrive and the loop would never end
+                      If !QPV_ThumbsPoolPending()
+                      {
+                         fnOutputDebug("ThumbsMode. The workers went idle while images are still expected. Loop. Break. Now.")
+                         Break
+                      }
 
-                   imgsListArrayThumbs[thisFileIndex, 1] := "fim"
-                   imgsListArrayThumbs[thisFileIndex, 2] := validBMP(thisPBitmap) ? thisPBitmap : 0
-                   If (hasThumbFailed=1)
-                   {
-                      prevCoreEventZeit := A_TickCount
-                      thumbThread%whichCoreBusy%.ahkassign("operationFailed", 0)
-                      If (thisCoreDoneArr[2]!=20) ; if the pdf is pass-protected, do not mark it dead
-                         imgsListArrayThumbs[thisCoreDoneArr[3], 1] := "x"
-                      fnOutputDebug("ThumbsMode. Failed to generate - file index=" thisFileIndex " core=" whichCoreBusy " pBitmap=" thisCoreDoneArr[2] )
+                      Sleep, 1
+                      idleLaps := 0
                    }
-                } Else Continue
-             } Else
-             {
-                coreIndex++
-                If (coreIndex>limitCores)
-                   coreIndex := 1
-
-                thisCoreDone := thumbThread%coreIndex%.AHKgetvar.operationDone
-                waitDataCollect := thumbThread%coreIndex%.AHKgetvar.waitDataCollect
-                hasThumbFailed := thumbThread%coreIndex%.AHKgetvar.operationFailed
-                If (thisMemoryLoad<90 && thisCoreDone=1 && waitDataCollect<1 && hasThumbFailed=0)
-                {
-                   prevCoreEventZeit := A_TickCount
-                   ; thumbThread%coreIndex%.ahkassign("operationDone", 0)
-                   ; thumbThread%coreIndex%.ahkassign("waitDataCollect", 0)
-                   thisPath := imgsListArrayThumbs[thisFileIndex, 3]
-                   thisSavePath := imgsListArrayThumbs[thisFileIndex, 4]
-                   thumbThread%coreIndex%.ahkPostFunction("MonoGenerateThumb", thisPath, thisSavePath, thumbsSizeQuality "|" timePerImgMultiCore "|" coreIndex "|" thisFileIndex, Bindex)
-                   imgsListArrayThumbs[thisFileIndex, 8] := coreIndex
-                   ; fnOutputDebug("ThumbsMode. Work assigned to thread. IMG #" thisFileIndex ". Core " coreindex " ")
-                   Sleep, 1
                 }
                 Continue
              }
-          } ; // mustDoMultiCore IF block end
+             idleLaps := 0
+          }
 
           ; Sleep, 1
           changeMcursor()
           startZeit := A_TickCount
           cacheType := imgsListArrayThumbs[thisFileIndex, 1]
-          ; fnOutputDebug("thumbs inner " thisCoreDoneLine " -- cT" cacheType " --cB" whichCoreBusy  " -- " reallyThreadsDone " -- loops infos " A_Index " -- " innerLoops " -- " lapsOccured " -- " totalLoops " -- " imgsHavePainted " -- " imgsMustPaint)
+          ; fnOutputDebug("thumbs inner cT" cacheType " -- loops infos " A_Index " -- " innerLoops " -- " lapsOccured " -- " totalLoops " -- " imgsHavePainted " -- " imgsMustPaint)
           fimCached := mustDisposeImgNow := 0
           frameLoad := (framePreviewsMode=1) ? thisFileIndex - 1 : 0
           wasCacheFile := thumbCachable := WasMemCached := hasNowMemCached := 0
@@ -84222,10 +84318,8 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           ; fnOutputDebug(A_ThisFunc ": i=" thisFileIndex "|" resultedFilesList[thisFileIndex, 9] " | "  resultedFilesList[thisFileIndex, 13] " x " resultedFilesList[thisFileIndex, 14])
           If (cacheType="w")
           {
-             ; when the original file must be loaded
-             If (mustDoMultiCore=1)
-                Continue
-
+             ; when the original file must be loaded; only reached in single threaded mode,
+             ; the workers of qpvmain.dll take care of these images otherwise
              ; mustDisposeImgNow := 1
              thumbCachable := 1
              imgsListArrayThumbs[thisFileIndex, 1] := "f"
@@ -84248,7 +84342,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           {
              fimCached := 1
              oBitmap := imgsListArrayThumbs[thisFileIndex, 2]
-             fnOutputDebug("thumb cached with a FIM thread " thisFileIndex ". File=" file2load)
+             fnOutputDebug("thumb generated by the workers " thisFileIndex ". File=" file2load)
              If !validBMP(oBitmap)
              {
                 ; mustDisposeImgNow := 1
@@ -84256,7 +84350,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 wasCacheFile := 1
                 fimCached := 0
                 file2load := imgsListArrayThumbs[thisFileIndex, 4]
-                fnOutputDebug("missing thumb cached with a FIM thread " thisFileIndex ". load file=" file2load)
+                fnOutputDebug("missing thumb generated by the workers " thisFileIndex ". load file=" file2load)
                 If !FileExist(file2load)
                 {
                    ; load the original file
@@ -84281,10 +84375,18 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           {
              If (WasMemCached=1)
              {
+                ; the memory cached thumbnail went stale; have it rebuilt
                 wasThumbCached := checkThumbExists(MD5name, imgPath, ".png", file2load)
                 imgsListArrayThumbs[thisFileIndex, 1] := FileExist(file2load) ? "fim" : "w"
                 imgsListArrayThumbs[thisFileIndex, 2] := 0
                 imgsListArrayThumbs[thisFileIndex, 4] := file2load
+                If (thumbsPoolOK=1 && imgsListArrayThumbs[thisFileIndex, 1]="w")
+                {
+                   ; nothing waits on this image otherwise, the workers must be told about it
+                   imgsListArrayThumbs[thisFileIndex, 4] := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
+                   imgsListArrayThumbs[thisFileIndex, 10] := "retried"
+                   QPV_ThumbsPoolSubmit(thisFileIndex, 0, imgPath, imgsListArrayThumbs[thisFileIndex, 4], 0)
+                }
              } Else imgsHavePainted++
 
              DestPosX := imgsListArrayThumbs[thisFileIndex, 5]
@@ -84306,16 +84408,14 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 ; fnOutputDebug("must dispose GDI object thumbCachable=1. DONE")
                 oBitmap := zBitmap
              }
-          } Else If (WasMemCached!=1 && modus!="all")
+          } Else If (WasMemCached!=1 && modus!="all" && fimCached!=1)
           {
+             ; bitmaps handed over by the workers are already standalone memory bitmaps;
+             ; only the ones created out of a file need to be copied away from it
              ; fnOutputDebug("must clone GDI object fimCached=0 - WasMemCached=0. obj=" oBitmap)
              zBitmap := cloneGDItoMem(A_ThisFunc, oBitmap, imgW, imgH)
-             If (fimCached!=1)
-             {
-                oBitmap := trGdip_DisposeImage(oBitmap, 1)
-                ; fnOutputDebug("must dispose GDI object fimCached=0 - WasMemCached=0. obj=" oBitmap)
-                ; fnOutputDebug("must dispose GDI object fimCached=0 - WasMemCached=0. DONE")
-             }
+             oBitmap := trGdip_DisposeImage(oBitmap, 1)
+             ; fnOutputDebug("must dispose GDI object fimCached=0 - WasMemCached=0. DONE")
              If validBMP(zBitmap)
                 oBitmap := zBitmap
           }
@@ -84407,18 +84507,27 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    }
 
     Gdip_DisposeEffect(blurEffect)
+    If (thumbsPoolOK=1)
+    {
+       ; abandons whatever is still queued and disposes the results nobody collected
+       QPV_ThumbsPoolEnd()
+
+       ; thumbnails that were generated but never made it on screen; consuming an entry
+       ; turns it into "d", so anything still marked "fim" was left behind
+       Loop, % imgsMustPaint
+       {
+           poolIndex := startIndex + A_Index - 1
+           If (imgsListArrayThumbs[poolIndex, 1]="fim")
+              imgsListArrayThumbs[poolIndex, 2] := trGdip_DisposeImage(imgsListArrayThumbs[poolIndex, 2], 1)
+       }
+    }
+
     If (alterFilesIndex>1 && mustEndLoop!=1 && lapsOccured>3 && modus!="all")
     {
        mustReloadThumbsList := 1
        ; QPV_ListViewGridHUDoverlay()
        SetTimer, ForceRefreshNowThumbsList, -350
        ; Return
-    } Else If (mustDoMultiCore=1 && mustEndLoop=1 && abandonAll!=1 && modus!="all")
-    {
-       ; fnOutputDebug("ThumbsMode after. Clean GDIs mess. Cores: " limitCores)
-       Loop, % limitCores
-           thumbThread%A_Index%.ahkFunction("cleanMess", "c" A_Index)
-       ; fnOutputDebug("Thumbnails generator after. Clean GDIs mess. DONE.")
     }
 
     executingCanceableOperation := 0

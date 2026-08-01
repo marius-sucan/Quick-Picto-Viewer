@@ -7118,6 +7118,10 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW,
     return myBitmap;
 }
 
+// multi-threaded thumbnails generator; it must sit here because it calls LoadSVGimage(),
+// RenderPdfPageAsBitmap(), adaptImageGivenSize() and the openCV* helpers defined above
+#include "thumbs-pool.h"
+
 int myRound(double x) {
     return (x<0) ? (int)(x-0.5) : (int)(x+0.5);
 }
