@@ -54,6 +54,15 @@
 #define TP_ERR_PDFLOCKED  20  // QPV_ShowThumbnails() must not mark these files as dead
 
 #define TP_MAX_READY      48  // undelivered results allowed before workers park
+#define TP_MAX_READY_BYTES (48ull*1024*1024)  // ... and the memory they may hold on to
+
+// Memory pressure. Above either of these the pool narrows down to a single running job,
+// so that images keep coming - slowly - instead of everything grinding to a halt.
+// The percentage mirrors what QPV_ShowThumbnails() used to test on every iteration of its
+// inner loop; the absolute floor matters on machines where 10% of the RAM is still plenty.
+#define TP_MEM_LOAD_HIGH   90
+#define TP_MEM_FREE_FLOOR  (768ull*1024*1024)
+#define TP_MEM_SAMPLE_MS   250
 
 #pragma pack(push, 8)
 struct ThumbResult {          // 48 bytes; AHK reads the fields with NumGet()
@@ -77,6 +86,9 @@ struct ThumbsPoolState {      // read-only for AHK
     volatile LONG failed;     // 16
     volatile LONG generation; // 20
     volatile LONG alive;      // 24
+    volatile LONG memTight;   // 28   1 while the pool is throttled down to a single job
+    volatile LONG activeJobs; // 32   images being decoded right now
+    volatile LONG readyKB;    // 36   memory held by results nobody collected yet
 };
 #pragma pack(pop)
 
@@ -126,10 +138,12 @@ static std::atomic<LONG>                 tpGeneration{1};
 static std::shared_ptr<const ThumbsConfig> tpConfig = std::make_shared<ThumbsConfig>();
 static std::unordered_set<std::wstring>  tpWicExts;
 static std::unordered_set<std::wstring>  tpFimExts;
-static ThumbsPoolState                   tpState = {0, 0, 0, 0, 0, 1, 0};
+static ThumbsPoolState                   tpState = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0};
 static int                               tpPrevCVthreads = -1;
-static std::atomic<LONG>                 tpMemLoad{0};
+static std::atomic<LONG>                 tpActiveJobs{0};
+static std::atomic<LONG>                 tpMemTight{0};
 static std::atomic<ULONGLONG>            tpMemStamp{0};
+static ULONGLONG                         tpReadyBytes = 0;   // guarded by tpMutex
 
 // ---------------------------------------------------------------------------------------
 //  small helpers
@@ -256,28 +270,66 @@ static int tpSavePngFIM(FIBITMAPptr dib, const std::wstring &path) {
     return 1;
 }
 
-// one shared memory sample refreshed at most twice per second; it replaces the
-// GetProcessMemoryUsage() + GlobalMemoryStatusEx() pair that QPV_ShowThumbnails() used to
-// perform on every single iteration of its inner loop
-static void tpWaitForMemory() {
-    for (int i = 0; i < 40; i++)
+// One shared memory sample for the whole pool, refreshed a few times per second. It
+// replaces the GetProcessMemoryUsage() + GlobalMemoryStatusEx() pair QPV_ShowThumbnails()
+// used to perform on every single iteration of its inner loop, in the calling thread.
+static bool tpMemoryIsTight() {
+    const ULONGLONG now = GetTickCount64();
+    if (now - tpMemStamp.load(std::memory_order_relaxed) > TP_MEM_SAMPLE_MS)
     {
-        ULONGLONG now = GetTickCount64();
-        if (now - tpMemStamp.load(std::memory_order_relaxed) > 500)
-        {
-           MEMORYSTATUSEX ms;
-           ms.dwLength = sizeof(ms);
-           if (GlobalMemoryStatusEx(&ms))
-              tpMemLoad.store((LONG)ms.dwMemoryLoad, std::memory_order_relaxed);
+       MEMORYSTATUSEX ms;
+       ms.dwLength = sizeof(ms);
+       if (GlobalMemoryStatusEx(&ms))
+       {
+          const bool tight = (ms.dwMemoryLoad>=TP_MEM_LOAD_HIGH) || (ms.ullAvailPhys<TP_MEM_FREE_FLOOR);
+          tpMemTight.store(tight ? 1 : 0, std::memory_order_relaxed);
+          tpState.memTight = tight ? 1 : 0;
+       }
+       tpMemStamp.store(now, std::memory_order_relaxed);
+    }
 
-           tpMemStamp.store(now, std::memory_order_relaxed);
+    return tpMemTight.load(std::memory_order_relaxed)!=0;
+}
+
+// Takes a slot to decode one image. While memory is plentiful every worker gets one
+// straight away. When it is not, only the worker that finds no other job running may take
+// one: the pool narrows down to a single decode at a time rather than stalling altogether,
+// so thumbnails keep arriving - slowly - and QPV_ShowThumbnails() never waits forever.
+// Returns false only when the pool is shutting down, in which case the job is dropped.
+// There is no timeout: a worker that finds nothing else running is always let through, so
+// the queue can never wedge, no matter how long memory stays scarce.
+static bool tpAcquireJobSlot() {
+    for (;;)
+    {
+        if (tpStopping.load())
+           return false;
+
+        LONG active = tpActiveJobs.load(std::memory_order_acquire);
+        if (active<1 || !tpMemoryIsTight())
+        {
+           if (tpActiveJobs.compare_exchange_weak(active, active + 1, std::memory_order_acq_rel))
+           {
+              tpState.activeJobs = active + 1;
+              return true;
+           }
+           continue;   // somebody else moved first, look again
         }
 
-        if (tpMemLoad.load(std::memory_order_relaxed)<90 || tpStopping.load())
-           return;
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // wait for the image being decoded right now to release its memory
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
     }
+}
+
+static void tpReleaseJobSlot() {
+    LONG active = tpActiveJobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
+    tpState.activeJobs = (active>0) ? active : 0;
+}
+
+static ULONGLONG tpResultBytes(const ThumbResult &res) {
+    if (res.pBitmap==NULL || res.outW<1 || res.outH<1)
+       return 0;
+
+    return (ULONGLONG)res.outW * (ULONGLONG)res.outH * 4ull;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -395,9 +447,14 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
           {
              Gdiplus::BitmapData bitmapDatu;
              Gdiplus::Rect rectu(0, 0, width, height);
-             Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, Gdiplus::ImageLockModeWrite, PixelFormat32bppPARGB, &bitmapDatu);
-             HRESULT hrc = pConverter->CopyPixels(NULL, bitmapDatu.Stride, bitmapDatu.Stride*height, (BYTE*)bitmapDatu.Scan0);
-             Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+             Gdiplus::Status lockSt = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, Gdiplus::ImageLockModeWrite, PixelFormat32bppPARGB, &bitmapDatu);
+             HRESULT hrc = E_FAIL;
+             if (lockSt==Gdiplus::Ok)
+             {
+                hrc = pConverter->CopyPixels(NULL, bitmapDatu.Stride, bitmapDatu.Stride*height, (BYTE*)bitmapDatu.Scan0);
+                Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+             } else fnOutputDebug("thumbsPool: failed to lock the GDI+ bitmap for " + WideCharToString(szFileName));
+
              if (FAILED(hrc))
              {
                 fnOutputDebug("thumbsPool: WIC failed to copy pixels for " + WideCharToString(szFileName));
@@ -425,10 +482,22 @@ static std::string tpReadTextFile(const std::wstring &path, DWORD maxBytes = 1u<
     if (hFile==INVALID_HANDLE_VALUE)
        return "";
 
+    // only as much as the file actually holds; SVGs are usually a couple of kilobytes
+    LARGE_INTEGER fileSize;
+    DWORD toRead = maxBytes;
+    if (GetFileSizeEx(hFile, &fileSize) && fileSize.QuadPart<(LONGLONG)maxBytes)
+       toRead = (DWORD)fileSize.QuadPart;
+
+    if (toRead<1)
+    {
+       CloseHandle(hFile);
+       return "";
+    }
+
     std::string data;
-    data.resize(maxBytes);
+    data.resize(toRead);
     DWORD readBytes = 0;
-    BOOL gotIt = ReadFile(hFile, &data[0], maxBytes, &readBytes, NULL);
+    BOOL gotIt = ReadFile(hFile, &data[0], toRead, &readBytes, NULL);
     CloseHandle(hFile);
     if (!gotIt)
        return "";
@@ -866,6 +935,11 @@ static void tpRunJob(IWICImagingFactory *fac, const ThumbJob &job, ThumbResult &
     res.elapsedMs   = 0;
     res.loaderUsed  = 0;
 
+    // OpenCV happily throws out of openCVapplyToneMappingAlgos(), and allocations may
+    // throw when memory is scarce; letting that escape would tear the worker thread down
+    // and silently shrink the pool for the rest of the session
+    try
+    {
     if (job.kind==TP_JOB_LOADCACHE)
     {
        bmp = tpWICload(fac, job.src.c_str(), 0, 0, 0, cfg->imgQuality, 0, res.srcW, res.srcH);
@@ -915,6 +989,16 @@ static void tpRunJob(IWICImagingFactory *fac, const ThumbJob &job, ThumbResult &
              res.srcH = fh;
           }
        }
+    }
+    } catch (...)
+    {
+        if (bmp!=NULL)
+        {
+           Gdiplus::DllExports::GdipDisposeImage(bmp);
+           bmp = NULL;
+        }
+        res.status = TP_ERR_LOAD;
+        fnOutputDebug("thumbsPool: an exception escaped while processing " + WideCharToString(job.src.c_str()));
     }
 
     res.elapsedMs = (int)(GetTickCount() - startTick);
@@ -969,7 +1053,15 @@ static void tpWorkerBody() {
         ThumbJob job;
         {
             std::unique_lock<std::mutex> lk(tpMutex);
-            tpJobCV.wait(lk, [] { return tpStopping.load() || (!tpQueue.empty() && tpResults.size()<TP_MAX_READY); });
+            // the byte cap only bites once something is already waiting to be collected,
+            // so a single oversized thumbnail can never block the pool
+            tpJobCV.wait(lk, [] {
+                if (tpStopping.load())
+                   return true;
+                if (tpQueue.empty() || tpResults.size()>=TP_MAX_READY)
+                   return false;
+                return tpResults.empty() || tpReadyBytes<TP_MAX_READY_BYTES;
+            });
             if (tpStopping.load())
                break;
 
@@ -980,32 +1072,30 @@ static void tpWorkerBody() {
         }
 
         ThumbResult res;
-        if (job.generation!=tpGeneration.load())
+        bool ranIt = false;
+        if (job.generation==tpGeneration.load() && tpAcquireJobSlot())
         {
-           // abandoned before it even started
-           std::lock_guard<std::mutex> lk(tpMutex);
-           if (tpState.inFlight>0)
-              tpState.inFlight = tpState.inFlight - 1;
-           continue;
+           tpRunJob(fac, job, res);
+           tpReleaseJobSlot();
+           ranIt = true;
         }
-
-        tpWaitForMemory();
-        tpRunJob(fac, job, res);
 
         {
             std::lock_guard<std::mutex> lk(tpMutex);
             if (tpState.inFlight>0)
                tpState.inFlight = tpState.inFlight - 1;
 
-            if (job.generation!=tpGeneration.load())
+            // abandoned before it started, or the run was cancelled while it was decoding
+            if (!ranIt || job.generation!=tpGeneration.load())
             {
-               // the run was cancelled while this image was being decoded
-               if (res.pBitmap!=NULL)
+               if (ranIt && res.pBitmap!=NULL)
                   Gdiplus::DllExports::GdipDisposeImage((Gdiplus::GpBitmap*)res.pBitmap);
             } else
             {
+               tpReadyBytes += tpResultBytes(res);
                tpResults.push_back(res);
                tpState.ready = (LONG)tpResults.size();
+               tpState.readyKB = (LONG)(tpReadyBytes/1024ull);
                tpState.completed = tpState.completed + 1;
                if (res.status!=TP_OK)
                   tpState.failed = tpState.failed + 1;
@@ -1031,8 +1121,10 @@ static void tpCancelLocked() {
            Gdiplus::DllExports::GdipDisposeImage((Gdiplus::GpBitmap*)tpResults[i].pBitmap);
     }
     tpResults.clear();
+    tpReadyBytes      = 0;
     tpState.queued    = 0;
     tpState.ready     = 0;
+    tpState.readyKB   = 0;
     tpState.completed = 0;
     tpState.failed    = 0;
     tpState.generation = tpGeneration.load();
@@ -1075,6 +1167,13 @@ DLL_API int DLL_CALLCONV thumbsPoolSetFormats(const wchar_t *wicExts, const wcha
 
 DLL_API void* DLL_CALLCONV thumbsPoolGetState() {
     return (void*)&tpState;
+}
+
+// 1 when the machine is short on memory. The sample behind it is shared with the workers
+// and refreshed at most every TP_MEM_SAMPLE_MS, so AHK may call this per thumbnail without
+// paying for a syscall every time. Usable whether or not the pool is running.
+DLL_API int DLL_CALLCONV thumbsPoolMemoryTight() {
+    return tpMemoryIsTight() ? 1 : 0;
 }
 
 DLL_API int DLL_CALLCONV thumbsPoolBegin(const wchar_t *packedOptions) {
@@ -1173,10 +1272,13 @@ DLL_API int DLL_CALLCONV thumbsPoolFetch(void *outArray, int maxItems) {
         std::lock_guard<std::mutex> lk(tpMutex);
         while (n<maxItems && !tpResults.empty())
         {
+            const ULONGLONG bytes = tpResultBytes(tpResults.front());
+            tpReadyBytes = (tpReadyBytes>bytes) ? tpReadyBytes - bytes : 0;
             out[n++] = tpResults.front();
             tpResults.pop_front();
         }
-        tpState.ready = (LONG)tpResults.size();
+        tpState.ready   = (LONG)tpResults.size();
+        tpState.readyKB = (LONG)(tpReadyBytes/1024ull);
     }
 
     if (n>0)

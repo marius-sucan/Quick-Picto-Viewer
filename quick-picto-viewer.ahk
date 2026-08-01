@@ -4678,6 +4678,16 @@ QPV_ThumbsPoolReady() {
    Return thumbsPoolState ? NumGet(thumbsPoolState + 0, 8, "Int") : 0
 }
 
+QPV_MemoryIsTight() {
+; 1 when the machine is short on physical memory; the sample lives in qpvmain.dll and is
+; refreshed a few times per second at most, so this is cheap enough to call per thumbnail
+
+   If !qpvMainDll
+      Return 0
+
+   Return DllCall("qpvmain.dll\thumbsPoolMemoryTight", "Int")
+}
+
 QPV_ThumbsPoolPending() {
 ; queued + in flight + ready; zero means the workers have nothing left to say
    If !thumbsPoolState
@@ -4709,6 +4719,10 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
 
         If (thisPBitmap>0)
         {
+           ; never overwrite a bitmap nobody disposed of; it would leak silently
+           If validBMP(thumbsArray[thisIndex, 2])
+              trGdip_DisposeImage(thumbsArray[thisIndex, 2], 1)
+
            recordGdipBitmaps(thisPBitmap, "QPV_ShowThumbnails<-ThumbsPool")
            thumbsArray[thisIndex, 1] := "fim"
            thumbsArray[thisIndex, 2] := thisPBitmap
@@ -84436,10 +84450,13 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              Continue
           }
 
-          If (WasMemCached!=1 && minimizeMemUsage!=1 && modus!="all")
+          ; the in-memory thumbnails cache holds up to maxMemThumbsCache bitmaps [420 by
+          ; default]; at large thumbnail sizes that is hundreds of megabytes, so stop
+          ; feeding it while the machine is short on memory. The cached files remain
+          If (WasMemCached!=1 && minimizeMemUsage!=1 && modus!="all" && QPV_MemoryIsTight()!=1)
           {
              hasNowMemCached := 1
-             hasMemThumbsCached++ 
+             hasMemThumbsCached++
              ; fnOutputDebug("ThumbsMode. Memory cached GDI thumb to be disposed: " imgThumbsCacheArray[hasMemThumbsCached, 1] )
              ; fnOutputDebug("ThumbsMode. A memory cached GDI thumb to be disposed... DONE")
              trGdip_DisposeImage(imgThumbsCacheArray[hasMemThumbsCached, 1], 1)

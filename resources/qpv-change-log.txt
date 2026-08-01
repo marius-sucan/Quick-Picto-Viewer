@@ -13,6 +13,9 @@
   - already cached thumbnails are also loaded by the worker threads; browsing a folder
     visited before is now substantially faster
   - «Generate all thumbnails» no longer skips images that are quick to process
+  - the thumbnails generator postpones loading images while the system runs low on
+    memory, but always keeps one thread working, so thumbnails never stop arriving;
+    the in-memory thumbnails cache also stops growing while memory is scarce
   - [new] pen pressure support for brushes
   - [new] shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
   - finer control when adding folder to the files list index
