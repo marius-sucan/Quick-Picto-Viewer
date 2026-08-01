@@ -86736,19 +86736,22 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
       hDir := DllCall("CreateFileW", "WStr", zPath
                     , "UInt", 0x1                ; FILE_LIST_DIRECTORY
                     , "UInt", 0x7                ; share read | write | delete
-                    , "Ptr", 0
+                    , "UPtr", 0
                     , "UInt", 3                  ; OPEN_EXISTING
                     , "UInt", 0x02000000         ; FILE_FLAG_BACKUP_SEMANTICS
-                    , "Ptr", 0, "Ptr")
-      If (!hDir || hDir=-1)
+                    , "UPtr", 0, "UPtr")
+      ; INVALID_HANDLE_VALUE arrives as -1 from a 64 bit build, where "UPtr"
+      ; is too wide for AHK to hold unsigned, and as 0xFFFFFFFF from a 32 bit
+      ; one, where it is not
+      If (!hDir || hDir=-1 || hDir=0xFFFFFFFF)
          Continue      ; unreadable folder; the rest of the tree still counts
 
       dirIdx := nSub := 0
       subDirs := ""
       Loop
       {
-          gotBlock := DllCall("GetFileInformationByHandleEx", "Ptr", hDir, "Int", dirInfoClass
-                            , "Ptr", dirBufAddr, "UInt", BUFSZ)
+          gotBlock := DllCall("GetFileInformationByHandleEx", "UPtr", hDir, "Int", dirInfoClass
+                            , "UPtr", dirBufAddr, "UInt", BUFSZ)
           If !gotBlock
              Break     ; ERROR_NO_MORE_FILES, the folder was fully read
 
@@ -86791,7 +86794,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
                        ; record itself and hands back both as local YYYYMMDDHHMISS
                        ; numbers. Called inline, on purpose: wrapping it in an AHK
                        ; function would cost more than the conversion itself.
-                       DllCall("qpvmain.dll\DirEntryTimesToLocal", "Ptr", p, "Ptr", stampAddr, "Int")
+                       DllCall("qpvmain.dll\DirEntryTimesToLocal", "UPtr", p, "UPtr", stampAddr, "Int")
                        newArrayu[++flatIdx] := fname
                        newArrayu[++flatIdx] := dirIdx
                        newArrayu[++flatIdx] := NumGet(p+0, 40, "Int64")
@@ -86803,7 +86806,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
                        maxFilesIndex++
                        If (storeExtras=1)
                        {
-                          DllCall("qpvmain.dll\DirEntryTimesToLocal", "Ptr", p, "Ptr", stampAddr, "Int")
+                          DllCall("qpvmain.dll\DirEntryTimesToLocal", "UPtr", p, "UPtr", stampAddr, "Int")
                           resultedFilesList[maxFilesIndex] := [thisDir "\" fname,,,,, NumGet(p+0, 40, "Int64"), NumGet(stampAddr+0, 0, "Int64"), NumGet(stampAddr+0, 8, "Int64")]
                        } Else
                           resultedFilesList[maxFilesIndex] := [thisDir "\" fname]
@@ -86831,7 +86834,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
           }
       }
 
-      DllCall("CloseHandle", "Ptr", hDir)
+      DllCall("CloseHandle", "UPtr", hDir)
       If (abandonAll=1)
          Break
 
@@ -86935,17 +86938,18 @@ QPV_ProbeDirEnumClass(dirPath, ByRef nameOffset) {
    If !zPath
       zPath := openPath
 
-   hDir := DllCall("CreateFileW", "WStr", zPath, "UInt", 0x1, "UInt", 0x7, "Ptr", 0
-                 , "UInt", 3, "UInt", 0x02000000, "Ptr", 0, "Ptr")
-   If (!hDir || hDir=-1)
+   hDir := DllCall("CreateFileW", "WStr", zPath, "UInt", 0x1, "UInt", 0x7, "UPtr", 0
+                 , "UInt", 3, "UInt", 0x02000000, "UPtr", 0, "UPtr")
+   ; -1 on a 64 bit build, 0xFFFFFFFF on a 32 bit one; see GetFilesList()
+   If (!hDir || hDir=-1 || hDir=0xFFFFFFFF)
       Return 0
 
    r := 0
    Loop, 2
    {
        thisClass := (A_Index=1) ? 14 : 10
-       ok := DllCall("GetFileInformationByHandleEx", "Ptr", hDir, "Int", thisClass
-                   , "Ptr", probeAddr, "UInt", 4096)
+       ok := DllCall("GetFileInformationByHandleEx", "UPtr", hDir, "Int", thisClass
+                   , "UPtr", probeAddr, "UInt", 4096)
        ; ErrorLevel is not zero when the call itself could not be made at all,
        ; which is what happens on Windows XP; A_LastError means nothing then.
        ; 18 = ERROR_NO_MORE_FILES, an empty folder on a file system that has
@@ -86958,7 +86962,7 @@ QPV_ProbeDirEnumClass(dirPath, ByRef nameOffset) {
        }
    }
 
-   DllCall("CloseHandle", "Ptr", hDir)
+   DllCall("CloseHandle", "UPtr", hDir)
    Return r
 }
 
