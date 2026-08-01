@@ -86585,6 +86585,413 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   Return 1
 }
 
+NewGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
+/*
+  A faster replacement for GetFilesList(). Same parameters, same return
+  values ["abandoned" or 1] and the same effects on resultedFilesList[],
+  on maxFilesIndex and on the SQLite database.
+
+  Instead of the "Loop, Files" of GetFilesList(), which asks the system for
+  one directory entry at a time [FindFirstFile / FindNextFile], this reads
+  whole blocks of directory entries at once, with
+  GetFileInformationByHandleEx() into a 256 KB buffer.
+
+  Why this matters when the file cache is cold and the disk has to be read:
+   - the amount of data pulled off the disk is exactly the same. The file
+     names, the sizes and the time stamps all live together, inside the
+     directory index of the volume, and that index has to be walked either
+     way. What changes is the *number of I/O requests* it is broken into:
+     one kernel transition per few thousand entries, instead of one per
+     file, so the index blocks are faulted in as long runs, which is what
+     lets the cache manager coalesce them and read ahead.
+   - the size and the two time stamps arrive in the very same buffer as the
+     names, so no file ever has to be opened or queried a second time. One
+     stray FileGetSize() per file would cost a scattered ~1 KB read of the
+     master file table for each of them, which is far more expensive than
+     the whole directory listing.
+
+  On top of the I/O, the per file work was cut down as well:
+   - the file extension is tested with a lookup table, built once out of
+     RegExAllFilesPattern, instead of a RegExMatch() against the full path.
+   - the drive letter anchor of RegExFilesPattern is checked only once, for
+     the folder given, since every file found below it shares its prefix.
+   - FILETIME to "YYYYMMDDHH24MISS" conversions are memoized. Files that
+     were copied or extracted together share their time stamps, so this
+     turns most of those conversions into a lookup.
+   - the recursion is an explicit stack, and in SQLite mode the scan results
+     are kept in one flat array holding 5 slots per file, rather than in one
+     small array object per file.
+
+  Two deliberate differences from GetFilesList():
+   - directory reparse points [junctions, directory symbolic links] found
+     inside the tree are not followed. This makes the traversal a real tree,
+     so it can never spin in a cycle. The folder the user asked for is
+     always entered, even when it is itself a junction.
+   - paths longer than MAX_PATH [260 characters] are handled, through the
+     \\?\ prefix, which "Loop, Files" does not do.
+
+  When the file system cannot serve the bulk directory information classes
+  [Windows XP has no GetFileInformationByHandleEx at all, and a few network
+  redirectors reject both classes], the job is quietly handed over to
+  GetFilesList(), before anything at all was added.
+*/
+   Static extMap := 0, extMapSrc := ""
+   Static dirBuf, dirBufAddr := 0, BUFSZ := 262144
+   ; RegExFilesPattern is anchored on "^(.\:\\)", so GetFilesList() only ever
+   ; returns files that sit on a drive letter path; UNC paths never match it.
+   ; That behaviour is reproduced here. Set this to 0 to index UNC paths too.
+   Static requireDriveLetter := 1
+
+   origArg := strDir
+   OutDir := PathCompact(Trim(StrReplace(strDir, "*"), "\"), "a", 1, OSDfontSize)
+   friendly := (userPrivateMode=1) ? "*:\********\****" : OutDir
+   showTOOLtip("Loading files from`n" friendly "`n", 0, 0, progressInfo)
+   If InStr(strDir, "|")
+   {
+      doRecursive := 0
+      strDir := StrReplace(strDir, "|")
+   } Else doRecursive := 1
+
+   ; "C:\folder\*" becomes "C:\folder" ; "C:\*" becomes "C:", exactly the
+   ; shape A_LoopFileDir has, so that dir "\" name rebuilds the full path
+   rootDir := RTrim(RTrim(StrReplace(strDir, "/", "\"), "*"), "\")
+   If (StrLen(rootDir)<2)
+   {
+      showTOOLtip("Files list loading aborted")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return "abandoned"
+   }
+
+   dirInfoClass := QPV_ProbeDirEnumClass(rootDir, nameOffset)
+   If !dirInfoClass    ; this volume cannot do bulk directory reads
+      Return GetFilesList(origArg, progressInfo, doCommits, factCheck)
+
+   If (extMapSrc!=RegExAllFilesPattern)   ; the list grows when WIC initializes
+   {
+      extMap := {}
+      Loop, Parse, RegExAllFilesPattern, |
+      {
+          If (A_LoopField!="")
+             extMap[A_LoopField] := 1
+      }
+      extMapSrc := RegExAllFilesPattern
+   }
+
+   If !dirBufAddr
+   {
+      VarSetCapacity(dirBuf, BUFSZ + 16, 0)
+      dirBufAddr := (&dirBuf + 15) & -16   ; the directory records hold Int64 fields
+   }
+   bufEnd := dirBufAddr + BUFSZ
+
+   abandonAll := thisCounter := addedNow := 0
+   startOperation := A_TickCount
+   prevMSGdisplay := A_TickCount
+   prevDisplay := A_TickCount
+   doStartLongOpDance()
+
+   isSQLmode := (SLDtypeLoaded=3) ? 1 : 0
+   storeExtras := (A_PtrSize=8 && minimizeMemUsage!=1) ? 1 : 0
+   If (isSQLmode=1)
+   {
+      newArrayu := []      ; flat, 5 slots per file: name, dirID, size, mDate, cDate
+      dirsList := []       ; the folder paths, held once and referred to by index
+      nDirsList := flatIdx := 0
+      If (doCommits=1)
+         activeSQLdb.Exec("BEGIN TRANSACTION;")
+   }
+
+   ; hoisted out of the per file test: every file found below rootDir shares
+   ; its prefix, so the "^(.\:\\)" anchor only has to be evaluated once
+   probeRoot := (StrLen(rootDir)=2 && SubStr(rootDir, 2, 1)=":") ? rootDir "\" : rootDir
+   isDriveRooted := RegExMatch(probeRoot, "^.\:\\") ? 1 : 0
+
+   dirStack := [rootDir]
+   nStack := (requireDriveLetter=1 && !isDriveRooted) ? 0 : 1
+   While (nStack>0)
+   {
+      thisDir := dirStack[nStack]
+      dirStack[nStack] := ""
+      nStack--
+
+      ; "C:" on its own means "the current folder of drive C", never the root
+      openPath := (StrLen(thisDir)=2 && SubStr(thisDir, 2, 1)=":") ? thisDir "\" : thisDir
+      zPath := PathToExtendedPath(openPath)
+      If !zPath
+         zPath := openPath
+
+      hDir := DllCall("CreateFileW", "WStr", zPath
+                    , "UInt", 0x1                ; FILE_LIST_DIRECTORY
+                    , "UInt", 0x7                ; share read | write | delete
+                    , "Ptr", 0
+                    , "UInt", 3                  ; OPEN_EXISTING
+                    , "UInt", 0x02000000         ; FILE_FLAG_BACKUP_SEMANTICS
+                    , "Ptr", 0, "Ptr")
+      If (!hDir || hDir=-1)
+         Continue      ; unreadable folder; the rest of the tree still counts
+
+      dirIdx := nSub := 0
+      subDirs := ""
+      Loop
+      {
+          gotBlock := DllCall("GetFileInformationByHandleEx", "Ptr", hDir, "Int", dirInfoClass
+                            , "Ptr", dirBufAddr, "UInt", BUFSZ)
+          If !gotBlock
+             Break     ; ERROR_NO_MORE_FILES, the folder was fully read
+
+          p := dirBufAddr
+          Loop
+          {
+              nextOff := NumGet(p+0, 0, "UInt")
+              fattr := NumGet(p+0, 56, "UInt")
+              nlen := NumGet(p+0, 60, "UInt")      ; in bytes, not characters
+              If (fattr & 0x10)                    ; FILE_ATTRIBUTE_DIRECTORY
+              {
+                 ; 0x400 = FILE_ATTRIBUTE_REPARSE_POINT; skip "." and ".." too
+                 If (doRecursive=1 && nlen && !(fattr & 0x400))
+                 {
+                    firstChar := NumGet(p+0, nameOffset, "UShort")
+                    isDotEntry := (firstChar=46 && (nlen=2 || (nlen=4 && NumGet(p+0, nameOffset+2, "UShort")=46)))
+                    If !isDotEntry
+                    {
+                       If !nSub
+                          subDirs := []
+                       subDirs[++nSub] := StrGet(p+nameOffset, nlen//2, "UTF-16")
+                    }
+                 }
+              } Else If (NumGet(p+0, 40, "Int64")>120)   ; EndOfFile; the >120 bytes filter
+              {
+                 fname := StrGet(p+nameOffset, nlen//2, "UTF-16")
+                 dotPos := InStr(fname, ".", 0, -1)      ; the last dot
+                 ; object keys are case insensitive in AHK v1, so "JPG" hits "jpg"
+                 If (dotPos && extMap[SubStr(fname, dotPos+1)])
+                 {
+                    If (isSQLmode=1)
+                    {
+                       If !dirIdx
+                       {
+                          dirsList[++nDirsList] := thisDir
+                          dirIdx := nDirsList
+                       }
+                       thisCounter++
+                       newArrayu[++flatIdx] := fname
+                       newArrayu[++flatIdx] := dirIdx
+                       newArrayu[++flatIdx] := NumGet(p+0, 40, "Int64")
+                       newArrayu[++flatIdx] := QPV_FileTimeStamp(p + 24)   ; LastWriteTime
+                       newArrayu[++flatIdx] := QPV_FileTimeStamp(p + 8)    ; CreationTime
+                    } Else
+                    {
+                       addedNow++
+                       maxFilesIndex++
+                       If (storeExtras=1)
+                          resultedFilesList[maxFilesIndex] := [thisDir "\" fname,,,,, NumGet(p+0, 40, "Int64"), QPV_FileTimeStamp(p + 24), QPV_FileTimeStamp(p + 8)]
+                       Else
+                          resultedFilesList[maxFilesIndex] := [thisDir "\" fname]
+                    }
+                 }
+              }
+
+              If (!nextOff || p+nextOff>=bufEnd)
+                 Break
+              p += nextOff
+          }
+
+          ; once per buffer refill is around once per two thousand files, and
+          ; determineTerminateOperation() throttles itself to 200 ms anyway
+          If (A_TickCount - prevMSGdisplay>2000)
+          {
+             showTOOLtip("Loading files from`n" friendly "`nFound " groupDigits(isSQLmode ? thisCounter : addedNow) " files...`nTotal indexed files: " groupDigits(maxFilesIndex), 0, 0, progressInfo)
+             prevMSGdisplay := A_TickCount
+          }
+
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
+      }
+
+      DllCall("CloseHandle", "Ptr", hDir)
+      If (abandonAll=1)
+         Break
+
+      ; pushed in reverse, so that they pop back in the order the volume
+      ; listed them in, the same order "Loop, Files, ..., R" walks them
+      Loop, % nSub
+          dirStack[++nStack] := thisDir "\" subDirs[nSub - A_Index + 1]
+   }
+
+   If (isSQLmode=1)
+   {
+      resultedFilesList.SetCapacity(maxFilesIndex + thisCounter + 8)
+      Loop, % thisCounter
+      {
+          If (determineTerminateOperation()=1 || abandonAll=1)
+          {
+             abandonAll := 1
+             Break
+          }
+
+          b := (A_Index - 1)*5
+          thisName := newArrayu[b+1]
+          thisDir := dirsList[newArrayu[b+2]]
+          erru := addSQLdbEntry(thisName, thisDir, newArrayu[b+3], newArrayu[b+4], newArrayu[b+5], 0, factCheck)
+          If !erru
+          {
+             addedNow++
+             If (factCheck!=0)
+             {
+                maxFilesIndex++
+                fullPath := thisDir "\" thisName
+                If (storeExtras=1)
+                   resultedFilesList[maxFilesIndex] := [fullPath,,,,, newArrayu[b+3], newArrayu[b+4], newArrayu[b+5]]
+                Else
+                   resultedFilesList[maxFilesIndex] := [fullPath]
+
+                resultedFilesList[maxFilesIndex, 12] := sqlDBrowID
+             }
+          }
+
+          If (A_TickCount - prevMSGdisplay>2000)
+          {
+             etaTime := ETAinfos(A_Index, thisCounter, startOperation)
+             showTOOLtip("Inserting records into the database for`n" friendly etaTime, 0, 0, A_Index / thisCounter)
+             prevMSGdisplay := A_TickCount
+          }
+      }
+
+      If (doCommits=1)
+      {
+         If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+            throwSQLqueryDBerror(A_ThisFunc)
+      }
+   }
+
+   currentFilesListModified := 1
+   executingCanceableOperation := 0
+   SetTimer, ResetImgLoadStatus, -50
+   If (abandonAll=1)
+   {
+      showTOOLtip("Files list loading aborted")
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return "abandoned"
+   }
+
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   Return 1
+}
+
+QPV_ProbeDirEnumClass(dirPath, ByRef nameOffset) {
+/*
+  Finds out which bulk directory information class the file system under
+  [dirPath] is willing to serve, and returns it, together with the offset
+  at which the file name sits inside one of its records:
+
+    14 = FileFullDirectoryInfo    Windows 8 and above; the leanest records,
+                                  so the most entries fit in one buffer
+    10 = FileIdBothDirectoryInfo  Windows Vista and above
+     0 = neither one of them; the caller has to fall back on FindFirstFile
+
+  Every other field NewGetFilesList() reads - EndOfFile at 40, FileAttributes
+  at 56, FileNameLength at 60, CreationTime at 8 and LastWriteTime at 24 -
+  sits at the very same offset in both structures; only the name moves.
+
+  The folder is opened and closed again here, on purpose: the probe is what
+  brings the first index blocks of the folder into the cache, so the real
+  pass that follows immediately does not pay for them twice.
+*/
+   Static probeBuf, probeAddr := 0
+   If !probeAddr
+   {
+      VarSetCapacity(probeBuf, 4096 + 16, 0)
+      probeAddr := (&probeBuf + 15) & -16
+   }
+
+   nameOffset := 0
+   openPath := (StrLen(dirPath)=2 && SubStr(dirPath, 2, 1)=":") ? dirPath "\" : dirPath
+   zPath := PathToExtendedPath(openPath)
+   If !zPath
+      zPath := openPath
+
+   hDir := DllCall("CreateFileW", "WStr", zPath, "UInt", 0x1, "UInt", 0x7, "Ptr", 0
+                 , "UInt", 3, "UInt", 0x02000000, "Ptr", 0, "Ptr")
+   If (!hDir || hDir=-1)
+      Return 0
+
+   r := 0
+   Loop, 2
+   {
+       thisClass := (A_Index=1) ? 14 : 10
+       ok := DllCall("GetFileInformationByHandleEx", "Ptr", hDir, "Int", thisClass
+                   , "Ptr", probeAddr, "UInt", 4096)
+       ; ErrorLevel is not zero when the call itself could not be made at all,
+       ; which is what happens on Windows XP; A_LastError means nothing then.
+       ; 18 = ERROR_NO_MORE_FILES, an empty folder on a file system that has
+       ; no "." and ".." entries; the class is supported all the same.
+       If (ok || (!ErrorLevel && A_LastError=18))
+       {
+          r := thisClass
+          nameOffset := (thisClass=14) ? 68 : 104
+          Break
+       }
+   }
+
+   DllCall("CloseHandle", "Ptr", hDir)
+   Return r
+}
+
+QPV_FileTimeStamp(ftPtr) {
+/*
+  Converts the FILETIME found at [ftPtr] into the local "YYYYMMDDHH24MISS"
+  string that A_LoopFileTimeModified and GetFileAttributesEx() both produce,
+  so that the values stored in the database and in resultedFilesList[] stay
+  byte for byte what GetFilesList() used to store.
+
+  The results are memoized on the 64 bit FILETIME value. Two system calls
+  and a Format() get replaced by one lookup, which pays off well, because
+  files that were copied, downloaded or extracted together carry identical
+  time stamps. Note that the cache assumes the time zone of the session does
+  not change while it runs.
+*/
+   Static memo := {}, memoCount := 0, st1, st2, initu := 0
+   If !initu
+   {
+      VarSetCapacity(st1, 16, 0)
+      VarSetCapacity(st2, 16, 0)
+      initu := 1
+   }
+
+   ftv := NumGet(ftPtr+0, 0, "Int64")
+   If !ftv       ; file systems that do not record all the dates
+      Return
+
+   r := memo[ftv]
+   If (r!="")
+      Return r
+
+   If !DllCall("FileTimeToSystemTime", "Ptr", ftPtr, "Ptr", &st1)
+      Return
+   ; the same conversion GetFileAttributesEx() performs: it accounts for the
+   ; daylight saving rules in force on that very date, which the cheaper
+   ; FileTimeToLocalFileTime() does not
+   If !DllCall("SystemTimeToTzSpecificLocalTime", "Ptr", 0, "Ptr", &st1, "Ptr", &st2)
+      Return
+
+   r := Format("{:04d}{:02d}{:02d}{:02d}{:02d}{:02d}"
+             , NumGet(st2, 0, "UShort"), NumGet(st2, 2, "UShort"), NumGet(st2, 6, "UShort")
+             , NumGet(st2, 8, "UShort"), NumGet(st2, 10, "UShort"), NumGet(st2, 12, "UShort"))
+
+   If (memoCount>32768)
+   {
+      memo := {}
+      memoCount := 0
+   }
+
+   memo[ftv] := r
+   memoCount++
+   Return r
+}
+
 getIDimage(imgID) {
     pp := resultedFilesList[imgID, 1]
     Return pp
