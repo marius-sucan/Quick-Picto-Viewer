@@ -20123,7 +20123,7 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
        SetTimer, RemoveTooltip, % -msgDisplayTime
     }
     SetTimer, ResetImgLoadStatus, -250
-    ; fnOutputDebug(A_ThisFunc "(" actionu "," extraMod "): " A_TickCount - startZeit)
+    addJournalEntry("Polar/rect coordinates transformation. Elapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)))
 }
 
 QPV_PolarTransformBitmap(funcu, dllFunc, pBitmap) {
@@ -86426,7 +86426,7 @@ sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes, doOptionals:=1) 
     }
 }
 
-GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
+oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 /*
   QPV internally relies on resultedFilesList[] array. 
   Each file entry is defined by various properties:
@@ -86571,6 +86571,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
      }
   }
 
+  fnOutputDebug(A_ThisFunc "(" strDir "). Files " thisCounter ". Elapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
   currentFilesListModified := 1
   executingCanceableOperation := 0
   SetTimer, ResetImgLoadStatus, -50
@@ -86585,7 +86586,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   Return 1
 }
 
-NewGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
+GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 /*
   A faster replacement for GetFilesList(). Same parameters, same return
   values ["abandoned" or 1] and the same effects on resultedFilesList[],
@@ -86643,6 +86644,7 @@ NewGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
    Static requireDriveLetter := 1
 
    origArg := strDir
+   startOperation := A_TickCount
    OutDir := PathCompact(Trim(StrReplace(strDir, "*"), "\"), "a", 1, OSDfontSize)
    friendly := (userPrivateMode=1) ? "*:\********\****" : OutDir
    showTOOLtip("Loading files from`n" friendly "`n", 0, 0, progressInfo)
@@ -86657,7 +86659,7 @@ NewGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
    rootDir := RTrim(RTrim(StrReplace(strDir, "/", "\"), "*"), "\")
    If (StrLen(rootDir)<2)
    {
-      showTOOLtip("Files list loading aborted")
+      showTOOLtip("ERROR: Incorrect path. Files list loading aborted")
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return "abandoned"
    }
@@ -86685,7 +86687,6 @@ NewGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
    bufEnd := dirBufAddr + BUFSZ
 
    abandonAll := thisCounter := addedNow := 0
-   startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    prevDisplay := A_TickCount
    doStartLongOpDance()
@@ -86867,6 +86868,8 @@ NewGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
       }
    }
 
+   fnOutputDebug(A_ThisFunc "(" strDir "). Files " thisCounter ". Elapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
+
    currentFilesListModified := 1
    executingCanceableOperation := 0
    SetTimer, ResetImgLoadStatus, -50
@@ -86953,6 +86956,7 @@ QPV_FileTimeStamp(ftPtr) {
   time stamps. Note that the cache assumes the time zone of the session does
   not change while it runs.
 */
+
    Static memo := {}, memoCount := 0, st1, st2, initu := 0
    If !initu
    {
