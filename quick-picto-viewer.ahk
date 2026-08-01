@@ -86588,11 +86588,11 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 
 GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 /*
-  A faster replacement for GetFilesList(). Same parameters, same return
+  A faster replacement for oldGetFilesList(). Same parameters, same return
   values ["abandoned" or 1] and the same effects on resultedFilesList[],
   on maxFilesIndex and on the SQLite database.
 
-  Instead of the "Loop, Files" of GetFilesList(), which asks the system for
+  Instead of the "Loop, Files" of oldGetFilesList(), which asks the system for
   one directory entry at a time [FindFirstFile / FindNextFile], this reads
   whole blocks of directory entries at once, with
   GetFileInformationByHandleEx() into a 256 KB buffer.
@@ -86623,7 +86623,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
      are kept in one flat array holding 5 slots per file, rather than in one
      small array object per file.
 
-  Two deliberate differences from GetFilesList():
+  Two deliberate differences from oldGetFilesList():
    - directory reparse points [junctions, directory symbolic links] found
      inside the tree are not followed. This makes the traversal a real tree,
      so it can never spin in a cycle. The folder the user asked for is
@@ -86634,11 +86634,11 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   When the file system cannot serve the bulk directory information classes
   [Windows XP has no GetFileInformationByHandleEx at all, and a few network
   redirectors reject both classes], the job is quietly handed over to
-  GetFilesList(), before anything at all was added.
+  oldGetFilesList(), before anything at all was added.
 */
    Static extMap := 0, extMapSrc := ""
    Static dirBuf, dirBufAddr := 0, BUFSZ := 262144
-   ; RegExFilesPattern is anchored on "^(.\:\\)", so GetFilesList() only ever
+   ; RegExFilesPattern is anchored on "^(.\:\\)", so oldGetFilesList() only ever
    ; returns files that sit on a drive letter path; UNC paths never match it.
    ; That behaviour is reproduced here. Set this to 0 to index UNC paths too.
    Static requireDriveLetter := 1
@@ -86666,7 +86666,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 
    dirInfoClass := QPV_ProbeDirEnumClass(rootDir, nameOffset)
    If !dirInfoClass    ; this volume cannot do bulk directory reads
-      Return GetFilesList(origArg, progressInfo, doCommits, factCheck)
+      Return oldGetFilesList(origArg, progressInfo, doCommits, factCheck)
 
    If (extMapSrc!=RegExAllFilesPattern)   ; the list grows when WIC initializes
    {
