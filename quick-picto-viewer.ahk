@@ -30921,11 +30921,7 @@ FolderTreeFindActiveFile(givenPath:=0) {
           If (A_Index>1)
              r := TV_GetNext(r)
 
-          If r
-             x := TV_GetChild(r)
-          Else
-             x := ""
-
+          x := r ? TV_GetChild(r) : ""
           If !r
              Break
 
@@ -63248,12 +63244,12 @@ askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allo
             zdef := 2 ; rescanning the entire entry can be a much longer operation
          } Else If (coverage.recursive=1)
          {
-            msgu := "The folder you want to import is already in the list of folders that generates the files index and it is scanned recursively, through all its subfolders:`n`n" thisFolder "\`n`n"
+            msgu := "The folder you want to import is already in the list of folders that generates the files index and it is scanned recursively:`n`n" thisFolder "\`n`n"
             msgu .= "Do you want to rescan it, to refresh the files indexed from it?"
          } Else
          {
             msgu := "The folder you want to import is already in the list of folders that generates the files index, but only the image files placed directly in it are indexed:`n`n" thisFolder "\`n`n"
-            msgu .= "Do you want to rescan it as it is, or to scan it recursively, through all its subfolders, from now on?"
+            msgu .= "Do you want to rescan it as it is, or to scan it recursively, through all its subfolder?"
             zbtn := "&Rescan|Scan recursi&vely"
             zdef := (actu="recursive") ? 2 : 1 ; the caller already asked for it
          }
