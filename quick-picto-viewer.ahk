@@ -391,7 +391,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
-   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0
+   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -45390,7 +45390,7 @@ PanelSearchAndReplaceIndex() {
     imgPath := resultedFilesList[currentFileIndex, 1]
     doPwd := (userPrivateMode=1) ? " password " : ""
     zPlitPath(imgPath, 0, OutFileName, OutDir)
-    Gui, Add, Text, x15 y15 w%txtWid% Section, Please type what to search for and what to replace it with. This panel is meant to help you fix broken files lists. e.g., files moved to a different folder. RegEx, tokens or wildcards are not supported. %infos%
+    Gui, Add, Text, x15 y15 w%txtWid% Section, This panel is meant to help you fix broken files lists. e.g., files moved to a different folder. RegEx, tokens or wildcards are not supported. %infos%
     Gui, Add, Text, y+15 wp, Search for:
     GuiAddEdit("y+5 wp " doPwd " veditF5 r1 gUIeditsGenericAllowCtrlBksp", OutDir)
     Gui, Add, Text, y+15 wp, Replace with:
@@ -45398,6 +45398,7 @@ PanelSearchAndReplaceIndex() {
     Gui, Add, Checkbox, y+15 Checked%performSRinSeenDB% vperformSRinSeenDB gUItogglePerformSearchSeenDB, Perform action in the seen images database as well
     Gui, Add, Checkbox, y+15 Checked%performSRinDynas% vperformSRinDynas , Perform action over the main folders list as well
     Gui, Add, Checkbox, y+15 Checked%limitSearchReplaceSelected% vlimitSearchReplaceSelected gUItogglePerformSearchSeenDB, Apply action only on the selected files
+    Gui, Add, Checkbox, y+15 Checked%userSrcRplcIndexFolder% vuserSrcRplcIndexFolder, Only modify folder paths in the files list index
     If (mustRecordSeenImgs!=1)
        GuiControl, Disable, performSRinSeenDB
 
@@ -45427,6 +45428,7 @@ BTNperformIndexSearchReplace() {
    GuiControlGet, limitSearchReplaceSelected
    GuiControlGet, performSRinSeenDB
    GuiControlGet, performSRinDynas
+   GuiControlGet, userSrcRplcIndexFolder
    If (editF5="")
    {
       showTOOLtip("WARNING: No search criteria given")
@@ -45450,7 +45452,7 @@ BTNperformIndexSearchReplace() {
       Sleep, 500
    }
 
-   SearchAndReplaceThroughIndex(editF5, editF6, 0, 0)
+   SearchAndReplaceThroughIndex(editF5, editF6, 0, userSrcRplcIndexFolder)
    If (performSRinDynas=1)
    {
       listu := getDynamicFoldersList()
