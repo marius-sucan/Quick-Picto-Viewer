@@ -1,9 +1,8 @@
 // thumbs-pool.h
 //
 // Multi-threaded thumbnails generator, entirely managed in C++.
-// It replaces the up-to-7 ahk_h interpreter threads that used to run
-// lib\module-fim-thumbs.ahk / MonoGenerateThumb(); QPV_ShowThumbnails() now only submits
-// jobs, polls a shared status block and fetches finished GDI+ bitmaps that it owns.
+// QPV_ShowThumbnails() submits jobs, polls a shared status block and
+// fetches finished GDI+ bitmaps that it owns.
 //
 // Usage from AHK:
 //    thumbsPoolInit(nThreads)                  once per process
@@ -19,7 +18,7 @@
 // IsFileExtension(), LoadSVGimage(), RenderPdfPageAsBitmap(), openCVresizeBitmapExtended()
 // and openCVapplyToneMappingAlgos() directly.
 //
-// written by Marius Șucan
+// written by Marius Șucan with Claude Opus 5
 
 #ifndef QPV_THUMBS_POOL_H
 #define QPV_THUMBS_POOL_H

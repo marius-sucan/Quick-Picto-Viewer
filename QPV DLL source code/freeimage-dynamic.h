@@ -4,13 +4,12 @@
 // qpvmain.dll does not link FreeImage; the AHK side already LoadLibraryW()s it
 // (FreeImage_FoxInit() in lib\freeimage-wrapper.ahk), so GetModuleHandleW() normally
 // finds the very same module. If it is absent, LoadLibraryW() is tried once and, failing
-// that, FIM.ok stays false and the pool simply behaves as if wasInitFIMlib=0 - exactly
-// what module-fim-thumbs.ahk did.
+// that, FIM.ok stays false and the pool simply behaves as if wasInitFIMlib=0
 //
 // Only the entry points MonoGenerateThumb() used are bound. Signatures match the DllCall
 // argument sizes encoded in getFIMfunc()'s fList tables.
 //
-// written by Marius Șucan
+// written by Marius Șucan with Claude Opus 5
 
 #ifndef QPV_FREEIMAGE_DYNAMIC_H
 #define QPV_FREEIMAGE_DYNAMIC_H
