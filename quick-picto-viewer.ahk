@@ -48548,10 +48548,23 @@ resumeCustomShapeSelection(thisZL) {
    }
 
    customShapePoints := convertShapePointsViewerToEditPoints(PointsList, PointsList.Count()//2)
-   If (prevVectorShapeSymmetryMode[1, 2]=1)
-      configVectorShapeSymmetryPoint("x", 1, ( customShapePoints.Count() ) // 2 + 1, 0, 0)
-   Else If (prevVectorShapeSymmetryMode[1, 2]=2)
-      configVectorShapeSymmetryPoint("y", 1, ( customShapePoints.Count() ) // 2 + 1, 0, 0)
+
+   ; the symmetry has to be re-anchored, because every point was just rewritten into another
+   ; coordinate space and the bézier fix ups above may have appended a few, so the axis can
+   ; only be read off the points as they now stand; the assignment is made directly, and not
+   ; through configVectorShapeSymmetryPoint(), for the reason applyLoadedVectorShapeSymmetry()
+   ; states: on a bézier path that function begins with autoDeactivateClosedBezier(), which
+   ; would open the path and pop the closure points off it, leaving a gaping shape behind
+   ; an even count leaves no self paired index to hold the axis, so the mode is only dropped
+   ; as the active one; prevVectorShapeSymmetryMode keeps it, and the next resume can restore it
+   symMode := Round(prevVectorShapeSymmetryMode[1, 2])
+   totalu := customShapePoints.Count()
+   If (symMode=1 || symMode=2) && (totalu>2) && (totalu//2 != totalu/2)
+   {
+      CustomShapeSymmetry := CustomShapeLockedSymmetry := symMode
+      coreSetVPsymmetryPoint(totalu//2 + 1)
+   } Else
+      CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
 
    ; ToolTip, % customShapePoints.Count() "===" PointsList , , , 2
 }
