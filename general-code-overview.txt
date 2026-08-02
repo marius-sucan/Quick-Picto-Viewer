@@ -981,6 +981,14 @@ l) List view and thumbnails list (soon)
    QPV_ThumbsPoolEnd()      cancels the leftovers of a run
    QPV_ThumbsPoolShutdown() joins the workers; called from TrueCleanup()
 
+   The drawing loop of QPV_ShowThumbnails() waits on the workers instead of doing the
+   decoding itself, so it needs its own ways out: it stops when everything is painted,
+   when the user aborts or scrolls, when the workers report nothing pending while some
+   images are still expected, and when nothing at all was delivered for 69.5 seconds
+   [lastPoolProgress]. That last one covers a decoder that never returns. For the same
+   reason thumbsPoolShutdown() waits at most 5 seconds for the workers to report
+   themselves out and abandons the ones that did not, rather than blocking app exit.
+
 
 m) Image duplicates identification (soon)
 =====================================================================

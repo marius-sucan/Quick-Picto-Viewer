@@ -131,6 +131,7 @@ static std::deque<ThumbJob>              tpQueue;
 static std::deque<ThumbResult>           tpResults;
 static std::mutex                        tpMutex;
 static std::condition_variable           tpJobCV;
+static std::condition_variable           tpExitCV;        // a worker announces it is leaving
 static std::mutex                        tpPdfMutex;      // PDFium is not thread safe
 static std::atomic<bool>                 tpStopping{false};
 static std::atomic<LONG>                 tpGeneration{1};
@@ -143,6 +144,7 @@ static std::atomic<LONG>                 tpActiveJobs{0};
 static std::atomic<LONG>                 tpMemTight{0};
 static std::atomic<ULONGLONG>            tpMemStamp{0};
 static ULONGLONG                         tpReadyBytes = 0;   // guarded by tpMutex
+static size_t                            tpExited = 0;       // guarded by tpMutex
 
 // ---------------------------------------------------------------------------------------
 //  small helpers
@@ -1107,6 +1109,14 @@ static void tpWorkerBody() {
 
     if (SUCCEEDED(hrCo))
        CoUninitialize();
+
+    // the very last thing a worker does; thumbsPoolShutdown() waits on this count rather
+    // than joining blind, so a decoder that never returns cannot keep the process alive
+    {
+        std::lock_guard<std::mutex> lk(tpMutex);
+        tpExited++;
+    }
+    tpExitCV.notify_all();
 }
 
 // drops everything that is queued and every result nobody collected; in flight jobs are
@@ -1314,14 +1324,30 @@ DLL_API int DLL_CALLCONV thumbsPoolShutdown() {
 
         tpCancelLocked();
         tpStopping.store(true);
+        tpExited = 0;
         workers.swap(tpWorkers);
     }
 
     tpJobCV.notify_all();
+
+    // a decoder that never returns [a malformed PDF, a file on a share that went away] must
+    // not keep the whole application from closing; join only if every worker announced it
+    // reached the end of tpWorkerBody(), otherwise let the stragglers go
+    bool allOut = false;
+    {
+        std::unique_lock<std::mutex> lk(tpMutex);
+        allOut = tpExitCV.wait_for(lk, std::chrono::seconds(5), [&workers] { return tpExited>=workers.size(); });
+    }
+
     for (size_t i = 0; i < workers.size(); i++)
     {
-        if (workers[i].joinable())
+        if (!workers[i].joinable())
+           continue;
+
+        if (allOut)
            workers[i].join();
+        else
+           workers[i].detach();
     }
 
     {
@@ -1329,13 +1355,23 @@ DLL_API int DLL_CALLCONV thumbsPoolShutdown() {
         tpCancelLocked();
         tpState.alive    = 0;
         tpState.inFlight = 0;
-        tpStopping.store(false);
+
+        // a detached worker is still alive and will come back through this loop; leaving the
+        // flag raised is what makes it quit on its own instead of parking on tpJobCV again
+        if (allOut)
+           tpStopping.store(false);
     }
 
     if (tpPrevCVthreads>=0)
     {
        cv::setNumThreads(tpPrevCVthreads);
        tpPrevCVthreads = -1;
+    }
+
+    if (!allOut)
+    {
+       fnOutputDebug("thumbsPool: shut down, but a worker was still busy and had to be abandoned");
+       return 0;
     }
 
     fnOutputDebug("thumbsPool: shut down");

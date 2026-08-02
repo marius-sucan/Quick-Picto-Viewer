@@ -84167,6 +84167,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    thisImgQuality := (userimgQuality=1) ? 6 : 5
    thumbsPoolOK := idleLaps := 0
+   lastPoolProgress := A_TickCount
    If (mustDoMultiCore=1)
    {
       ; when generating every thumbnail of a list, nothing is ever drawn; asking the
@@ -84209,7 +84210,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       }
    }
 
-   lastScrollCheck := A_TickCount
+   lastScrollCheck := lastPoolProgress := A_TickCount
    interfaceThread.ahkassign("alterFilesIndex", 0)
    If (userPrivateMode=1)
       blurEffect := Gdip_CreateEffect(1, clampInRange(thumbsSizeQuality//2, 30, thumbsSizeQuality*2), 0, 0)
@@ -84290,7 +84291,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              ; they hand over become ours, so there is nothing left to clone here
              If QPV_ThumbsPoolReady()
              {
-                QPV_ThumbsPoolDrain(imgsListArrayThumbs, imgsHavePainted)
+                If QPV_ThumbsPoolDrain(imgsListArrayThumbs, imgsHavePainted)
+                   lastPoolProgress := A_TickCount
+
                 cacheType := imgsListArrayThumbs[thisFileIndex, 1]
                 idleLaps := 0
              }
@@ -84309,6 +84312,14 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                       If !QPV_ThumbsPoolPending()
                       {
                          fnOutputDebug("ThumbsMode. The workers went idle while images are still expected. Loop. Break. Now.")
+                         Break
+                      }
+
+                      ; a decoder that never returns [a malformed PDF, a file on a share that
+                      ; went away] would otherwise keep this loop spinning for ever
+                      If (A_TickCount - lastPoolProgress>69500)
+                      {
+                         fnOutputDebug("ThumbsMode. The workers delivered nothing for 69.5 seconds. Loop. Break. Now.")
                          Break
                       }
 
