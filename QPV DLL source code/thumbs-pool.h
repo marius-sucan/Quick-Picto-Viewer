@@ -252,6 +252,107 @@ static int tpSavePngGdip(Gdiplus::GpBitmap *bmp, const std::wstring &path) {
     return 1;
 }
 
+// Encodes the thumbnail with WIC instead of GDI+. GDI+ holds process wide locks in its
+// engine, so several workers saving at once end up taking turns; WIC has no such lock and
+// each worker owns its factory. The pixels are unchanged: locking the bitmap as 32bppARGB
+// makes GDI+ perform the very same un-premultiply its own PNG encoder does, so what WIC
+// compresses is byte for byte what GDI+ would have compressed. Only the deflate stream of
+// the resulting file differs, and PNG is lossless
+static int tpSavePngWIC(IWICImagingFactory *fac, Gdiplus::GpBitmap *bmp, const std::wstring &path) {
+    if (!fac || !bmp || path.empty())
+       return 0;
+
+    UINT w = 0, h = 0;
+    Gdiplus::DllExports::GdipGetImageWidth(bmp, &w);
+    Gdiplus::DllExports::GdipGetImageHeight(bmp, &h);
+    if (w<1 || h<1)
+       return 0;
+
+    Gdiplus::PixelFormat srcFmt = 0;
+    Gdiplus::DllExports::GdipGetImagePixelFormat(bmp, &srcFmt);
+    const bool opaque24 = (srcFmt==PixelFormat24bppRGB);
+    const Gdiplus::PixelFormat lockFmt = opaque24 ? PixelFormat24bppRGB : PixelFormat32bppARGB;
+    WICPixelFormatGUID wantFmt = opaque24 ? GUID_WICPixelFormat24bppBGR : GUID_WICPixelFormat32bppBGRA;
+
+    Gdiplus::BitmapData bitmapDatu;
+    Gdiplus::Rect rectu(0, 0, (INT)w, (INT)h);
+    if (Gdiplus::DllExports::GdipBitmapLockBits(bmp, &rectu, Gdiplus::ImageLockModeRead, lockFmt, &bitmapDatu)!=Gdiplus::Ok)
+       return 0;
+
+    // a bottom-up bitmap answers with a negative stride, which WritePixels() cannot take;
+    // every bitmap reaching this point is top-down, but the GDI+ encoder handles either
+    if (bitmapDatu.Stride<1 || bitmapDatu.Scan0==NULL)
+    {
+       Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bitmapDatu);
+       return 0;
+    }
+
+    // written aside then moved over, so that an interrupted save cannot leave behind a
+    // truncated file that checkThumbExists() would happily serve later on
+    const std::wstring temp = path + L".tmp";
+    IWICStream            *pStream = NULL;
+    IWICBitmapEncoder     *pEnc    = NULL;
+    IWICBitmapFrameEncode *pFrame  = NULL;
+    IPropertyBag2         *pProps  = NULL;
+    int done = 0;
+
+    HRESULT hr = fac->CreateStream(&pStream);
+    if (SUCCEEDED(hr))
+       hr = pStream->InitializeFromFilename(temp.c_str(), GENERIC_WRITE);
+    if (SUCCEEDED(hr))
+       hr = fac->CreateEncoder(GUID_ContainerFormatPng, NULL, &pEnc);
+    if (SUCCEEDED(hr))
+       hr = pEnc->Initialize(pStream, WICBitmapEncoderNoCache);
+    if (SUCCEEDED(hr))
+       hr = pEnc->CreateNewFrame(&pFrame, &pProps);
+    if (SUCCEEDED(hr))
+       hr = pFrame->Initialize(pProps);
+    if (SUCCEEDED(hr))
+       hr = pFrame->SetSize(w, h);
+    if (SUCCEEDED(hr))
+    {
+       WICPixelFormatGUID gotFmt = wantFmt;
+       hr = pFrame->SetPixelFormat(&gotFmt);
+
+       // SetPixelFormat() answers with the nearest format the encoder supports; PNG takes
+       // both of ours, so anything else means this build cannot serve us. Rather than
+       // inserting a converter, let the caller fall back to the GDI+ encoder
+       if (SUCCEEDED(hr) && !(gotFmt==wantFmt))
+          hr = E_FAIL;
+    }
+
+    if (SUCCEEDED(hr))
+       hr = pFrame->WritePixels(h, (UINT)bitmapDatu.Stride, (UINT)bitmapDatu.Stride*h, (BYTE*)bitmapDatu.Scan0);
+    if (SUCCEEDED(hr))
+       hr = pFrame->Commit();
+    if (SUCCEEDED(hr))
+       hr = pEnc->Commit();
+
+    done = SUCCEEDED(hr) ? 1 : 0;
+    SafeRelease(pProps, "tpSavePngWIC: pProps", 0);
+    SafeRelease(pFrame, "tpSavePngWIC: pFrame", 0);
+    SafeRelease(pEnc, "tpSavePngWIC: pEnc", 0);
+
+    // the stream keeps the file open; it must go before the file can be moved
+    SafeRelease(pStream, "tpSavePngWIC: pStream", 0);
+    Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bitmapDatu);
+
+    if (done==1 && MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING))
+       return 1;
+
+    DeleteFileW(temp.c_str());
+    return 0;
+}
+
+// WIC first, GDI+ as the safety net; a thumbnail that cannot be written at all would be
+// regenerated from scratch on every visit to its folder
+static int tpSavePng(IWICImagingFactory *fac, Gdiplus::GpBitmap *bmp, const std::wstring &path) {
+    if (tpSavePngWIC(fac, bmp, path)==1)
+       return 1;
+
+    return tpSavePngGdip(bmp, path);
+}
+
 static int tpSavePngFIM(FIBITMAPptr dib, const std::wstring &path) {
     if (!FIM.ok || !FIM.SaveU || !dib || path.empty())
        return 0;
@@ -616,7 +717,8 @@ static void tpCapSVGdimensions(int givenSize, int &resizedW, int &resizedH) {
     resizedH = max(1, resizedH);
 }
 
-static Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int givenW, int givenH, int &srcW, int &srcH) {
+static Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int givenW, int givenH, int &srcW, int &srcH,
+                                      ID2D1Factory *d2dFac, IWICImagingFactory *wicFac) {
     std::string content = tpReadTextFile(path);
     if (content.empty())
        return NULL;
@@ -662,7 +764,7 @@ static Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int givenW, int 
        fScaleY = (pct>100.0) ? (float)(100.0/pct) : 1.0f;
     }
 
-    return LoadSVGimage(0, (UINT)w, (UINT)h, fScaleX, fScaleY, path.c_str());
+    return LoadSVGimageEx((UINT)w, (UINT)h, fScaleX, fScaleY, path.c_str(), d2dFac, wicFac);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -923,7 +1025,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
 //  one job
 // ---------------------------------------------------------------------------------------
 
-static void tpRunJob(IWICImagingFactory *fac, const ThumbJob &job, ThumbResult &res) {
+static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const ThumbJob &job, ThumbResult &res) {
     const ThumbsConfig *cfg = job.cfg.get();
     const DWORD startTick   = GetTickCount();
     Gdiplus::GpBitmap *bmp  = NULL;
@@ -953,7 +1055,17 @@ static void tpRunJob(IWICImagingFactory *fac, const ThumbJob &job, ThumbResult &
 
        if (ext==L"svg" && cfg->allowWIC==1)
        {
-          bmp = tpRenderSVG(job.src, cfg->thumbSize, cfg->thumbSize, res.srcW, res.srcH);
+          // a factory of this worker's own, made on first use so a session that never opens
+          // an SVG pays nothing for it. SINGLE_THREADED carries no internal lock, which is
+          // the whole point; it is safe because the factory, its render target and the SVG
+          // document all live and die inside one WicD2DrenderSVG() call on this thread
+          if (d2dFac==NULL)
+          {
+             if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFac)))
+                d2dFac = NULL;   // LoadSVGimageEx() then shares the process wide one
+          }
+
+          bmp = tpRenderSVG(job.src, cfg->thumbSize, cfg->thumbSize, res.srcW, res.srcH, d2dFac, fac);
           res.loaderUsed = 3;
           res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
        } else if (ext==L"pdf" && cfg->allowWIC==1)
@@ -1016,7 +1128,7 @@ static void tpRunJob(IWICImagingFactory *fac, const ThumbJob &job, ThumbResult &
 
        if (job.kind==TP_JOB_THUMB && res.savedToFile!=1 && cfg->enableCaching==1 && !job.dst.empty()
        && (res.elapsedMs>cfg->timePerImg || cfg->alwaysSave==1))
-          res.savedToFile = tpSavePngGdip(bmp, job.dst);
+          res.savedToFile = tpSavePng(fac, bmp, job.dst);
 
        if (cfg->wantBitmap!=1)
        {
@@ -1052,6 +1164,9 @@ static void tpWorkerBody() {
        fnOutputDebug("thumbsPool: worker could not create its own WIC factory; sharing the global one");
     }
 
+    // made on the first SVG this worker meets; see the tpRunJob() branch that creates it
+    ID2D1Factory *d2dFac = NULL;
+
     for (;;)
     {
         ThumbJob job;
@@ -1079,7 +1194,7 @@ static void tpWorkerBody() {
         bool ranIt = false;
         if (job.generation==tpGeneration.load() && tpAcquireJobSlot())
         {
-           tpRunJob(fac, job, res);
+           tpRunJob(fac, d2dFac, job, res);
            tpReleaseJobSlot();
            ranIt = true;
         }
@@ -1107,6 +1222,7 @@ static void tpWorkerBody() {
         }
     }
 
+    SafeRelease(d2dFac, "tpWorkerBody: d2dFac", 0);
     if (ownFactory)
        SafeRelease(fac, "tpWorkerBody: fac", 0);
 

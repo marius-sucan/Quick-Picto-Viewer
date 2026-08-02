@@ -7028,12 +7028,22 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
     return myBitmap;
 }
 
-IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, float fSx, float fSy) {
+// d2dFac and wicFac let a caller supply its own factories; the thumbnails pool hands over
+// per worker ones, so several SVGs render at the same time. pD2D1Factory is created
+// MULTI_THREADED, which makes it safe to share but also puts a lock around the factory and
+// every resource made from it, so workers sharing it would take turns
+IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, float fSx, float fSy,
+                            ID2D1Factory *d2dFac = NULL, IWICImagingFactory *wicFac = NULL) {
     // Create file stream and SVG document
     IStream*           pStream       = NULL;
     IWICBitmap*        pWICBitmap    = NULL;
     ID2D1RenderTarget* pRenderTarget = NULL;
     ID2D1SvgDocument*  pSvgDocument  = NULL;
+    if (d2dFac==NULL)
+       d2dFac = pD2D1Factory;
+    if (wicFac==NULL)
+       wicFac = m_pIWICFactory;
+
     HRESULT hr = SHCreateStreamOnFile(szFileName, STGM_READ | STGM_SHARE_DENY_WRITE, &pStream);
     if (pStream==NULL) {
         fnOutputDebug("WicD2DrenderSVG: failed SHCreateStreamOnFile()");
@@ -7041,7 +7051,7 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
     }
 
     // Create WIC Bitmap
-    hr = m_pIWICFactory->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnDemand, &pWICBitmap);
+    hr = wicFac->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnDemand, &pWICBitmap);
     if (!(SUCCEEDED(hr))) {
         fnOutputDebug("WicD2DrenderSVG: failed WIC factory - CreateBitmap()");
         pStream->Release();
@@ -7053,7 +7063,7 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
                                           D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f );
 
     // Create WIC Bitmap render target
-    hr = pD2D1Factory->CreateWicBitmapRenderTarget(pWICBitmap, props, &pRenderTarget);
+    hr = d2dFac->CreateWicBitmapRenderTarget(pWICBitmap, props, &pRenderTarget);
     if (!(SUCCEEDED(hr))) {
         fnOutputDebug("WicD2DrenderSVG: failed CreateWicBitmapRenderTarget()");
         pStream->Release();
@@ -7103,19 +7113,26 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
     return pWICBitmap; // Caller is responsible for releasing this
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW, UINT givenH, float fSx, float fSy, const wchar_t *szFileName) {
+// the body of LoadSVGimage(), with the two factories left to the caller; not exported.
+// Passing NULL for either one falls back to the process wide factory, so this behaves
+// exactly like LoadSVGimage() unless the caller has its own
+Gdiplus::GpBitmap* LoadSVGimageEx(UINT givenW, UINT givenH, float fSx, float fSy, const wchar_t *szFileName,
+                                  ID2D1Factory *d2dFac, IWICImagingFactory *wicFac) {
     Gdiplus::GpBitmap* myBitmap = NULL;
     IWICBitmap* thisWICbitmap = NULL;
-    HRESULT hr = E_FAIL;
     if (givenW<2 || givenH<2)
        return myBitmap;
 
-    thisWICbitmap = WicD2DrenderSVG(szFileName, givenW, givenH, fSx, fSy);
+    thisWICbitmap = WicD2DrenderSVG(szFileName, givenW, givenH, fSx, fSy, d2dFac, wicFac);
     if (thisWICbitmap!=NULL)
        myBitmap = WICBitmapToGdipBitmap(thisWICbitmap);
 
     SafeRelease(thisWICbitmap, "LoadSVGimage: thisWICbitmap", 0);
     return myBitmap;
+}
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW, UINT givenH, float fSx, float fSy, const wchar_t *szFileName) {
+    return LoadSVGimageEx(givenW, givenH, fSx, fSy, szFileName, NULL, NULL);
 }
 
 // multi-threaded thumbnails generator; it must sit here because it calls LoadSVGimage(),

@@ -981,6 +981,20 @@ l) List view and thumbnails list (soon)
    QPV_ThumbsPoolEnd()      cancels the leftovers of a run
    QPV_ThumbsPoolShutdown() joins the workers; called from TrueCleanup()
 
+   What actually runs in parallel, and what does not. WIC does not sit on GDI+ or GDI --
+   it is the later, separate stack, and on current Windows it is GDI+ that routes work
+   into windowscodecs.dll, not the reverse. WIC has no global engine lock, so the image
+   decoding and the Fant scaling run concurrently, one decoder chain per worker; a single
+   image is still decoded by one thread. FreeImage is likewise safe for distinct FIBITMAPs.
+   Each worker holds omp_set_num_threads(1) and the run holds cv::setNumThreads(1), so no
+   worker spawns a team of its own. GDI+ does hold process wide locks, so everything it
+   touches is kept off the hot path: the resize never goes through it, and cache PNGs are
+   written by WIC [tpSavePngWIC, GDI+ only as a fallback] or by FreeImage. SVG rendering
+   uses a Direct2D factory per worker, created SINGLE_THREADED on first use, because the
+   shared pD2D1Factory is MULTI_THREADED and that flag means "locked", not "parallel".
+   PDFium has global state and no thread safety at all; it stays serialised behind
+   tpPdfMutex, so PDF thumbnails are built one at a time.
+
    The drawing loop of QPV_ShowThumbnails() waits on the workers instead of doing the
    decoding itself, so it needs its own ways out: it stops when everything is painted,
    when the user aborts or scrolls, when the workers report nothing pending while some
