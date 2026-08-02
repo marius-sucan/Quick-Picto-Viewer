@@ -9028,7 +9028,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
 
            prevState := thisState
            fr := (k!=1 && bezierSplineCustomShape=1) ? "P'" : "P"
-           showTOOLtip(fr "[" thisIndex otheru "] = (" gmX ", " gmY ")")
+           showTOOLtip(fr "[" thisIndex otheru "] = (" Round(gmX) ", " Round(gmY) ")")
            drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-update", thisIndex)
            ; dummyRefreshImgSelectionWindow()
         }
