@@ -960,9 +960,12 @@ static void tpRunJob(IWICImagingFactory *fac, const ThumbJob &job, ThumbResult &
        {
           int maxW = cfg->thumbSize, maxH = cfg->thumbSize, pageCount = 0, errorType = -100;
           {
-             // PDFium keeps global state; the ahk_h threads used to call into it unguarded
+             // PDFium keeps global state; the ahk_h threads used to call into it unguarded.
+             // do24bits stays 0, so the page arrives as 32bppPARGB like every other loader
+             // here; RenderPDFpage() of module-fim-thumbs.ahk slipped an extra argument in
+             // ahead of it, so the trailing 1 of that DllCall was never do24bits
              std::lock_guard<std::mutex> pdfLock(tpPdfMutex);
-             bmp = RenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
+             bmp = RenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 0);
           }
           res.loaderUsed = 4;
           res.srcW = maxW;
