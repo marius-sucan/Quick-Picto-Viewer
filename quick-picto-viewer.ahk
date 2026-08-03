@@ -48338,7 +48338,7 @@ stopDrawingShape(dummy:="") {
        showDelayedTooltip("Drawing abandoned")
     } Else
     {
-       saveVectorShapeInRegistry()
+       saveVectorShapeInTempFile()
        editingSelectionNow := 1
        EllipseSelectMode := 2
        dummyTimerDelayiedImageDisplay(100)
@@ -49763,8 +49763,11 @@ BTNrenameCustomShape() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-saveVectorShapeInRegistry() {
-    FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints, 65305)
+saveVectorShapeInTempFile() {
+    r := saveCurrentVectorShape("Last_Temporarily_Saved_Shape")
+    If !r
+       addJournalEntry(A_ThisFunc "(): Failed to save vector shape to disk...")
+    ; FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints, 65305)
     RegAction(1, "FillAreaCustomShape")
     RegAction(1, "FillAreaCurveTension")
     RegAction(1, "closedLineCustomShape")
@@ -49847,7 +49850,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
          innerSelectionCavityX := innerSelectionCavityY := 0.45
          prevNameSavedVectorShape := ""
          applyLoadedVectorShapeSymmetry(0, 0)
-         saveVectorShapeInRegistry()
+         saveVectorShapeInTempFile()
          dummyTimerDelayiedImageDisplay(100)
          BTNopenPrevPanel(mustOpenWin, "yes")
          Return
@@ -49867,7 +49870,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       Loop, % customShapePoints.Count()
            customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
 
-      saveVectorShapeInRegistry()
+      saveVectorShapeInTempFile()
       dummyTimerDelayiedImageDisplay(100)
       BTNopenPrevPanel(mustOpenWin, "yes")
       undoVectorShapesLevelsArray := []
@@ -49887,7 +49890,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
          Return
       }
       BtnCloseWindow()
-   }
+   } Else zPlitPath(whichFile, 0, givenName, Outdir)
 
    If (externMode=1)
       FileRead, contentu, % whichFile
@@ -49918,7 +49921,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    newArrayu := convertShapePointsStrToArray(obju[1])
    If (newArrayu.Count()<3)
    {
-      showTOOLtip("ERROR: Incorrect file format. Found no points defining the vector shape.")
+      showTOOLtip("ERROR: Incorrect file format. Found no points defining the vector shape")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       If (externMode!=1)
@@ -49945,12 +49948,13 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    closedLineCustomShape := Trim(obju[6])
    RegAction(1, "closedLineCustomShape")
    applyLoadedVectorShapeSymmetry(obju[7], obju[8])
-   prevNameSavedVectorShape := givenName
+   prevNameSavedVectorShape := (givenName="Last_Temporarily_Saved_Shape") ? "" : givenName
    decideCustomShapeStyle()
-   saveVectorShapeInRegistry()
+   ; saveVectorShapeInTempFile()
    dummyTimerDelayiedImageDisplay(100)
    If (externMode!=1)
       BTNopenPrevPanel(mustOpenWin, "yes")
+   Return customShapePoints.Count()
 }
 
 uiPopulateCustomVectorShapesList(thumbSize:=64) {
@@ -70430,12 +70434,8 @@ toggleEllipseSelection(modus:=-1) {
    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    If (customShapePoints.Count()<3 && EllipseSelectMode=2)
    {
-      RegAction(0, "FillAreaCustomShape",, 5)
-      RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
-      RegAction(0, "closedLineCustomShape",, 1)
-      customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-      decideCustomShapeStyle()
-      If (customShapePoints.Count()<3)
+      r := BTNloadCustomShape("yes", "Last_Temporarily_Saved_Shape")
+      If (r<3)
       {
          MenuStartDrawingSelectionArea()
          Return
