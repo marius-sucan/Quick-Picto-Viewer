@@ -9158,16 +9158,24 @@ removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
       Return
    }
 
+   ; a closed bezier path keeps its start point and its end point in the same place, one seam
+   ; vertex written down twice; deleting it has to take both copies, and the path can no longer
+   ; close on itself afterwards -- reduceCustomShapeLength() reads the same thing before it pops
+   wasClosed := (bezierSplineCustomShape=1) ? testIsEditorBezierPathClosed() : 0
    listu := thisIndex "|"
    zpp := (isNowSymmetricVectorShape() && thisIndex=prevVectorShapeSymmetryMode[1, 1]) ? 1 : 0
    If (bezierSplineCustomShape=1 && k=1 && thisIndex=1)
    {
       a := 3, b := 2
       listu .= "2|3|"
+      If (wasClosed=1)
+         listu .= totalCount "|" totalCount - 1 "|" totalCount - 2 "|"
    } Else If (bezierSplineCustomShape=1 && k=1 && thisIndex=totalCount)
    {
       a := totalCount - 1, b := totalCount - 2
       listu .= a "|" b "|"
+      If (wasClosed=1)
+         listu .= "1|2|3|"
    } Else If (bezierSplineCustomShape=1 && k=1)
    {
       ; identify associated points to be deleted - the anchors
@@ -9254,6 +9262,19 @@ removeGivenPointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry)
    {
       CustomShapeLockedSymmetry := CustomShapeSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
       prevVectorShapeSymmetryMode := []
+   }
+
+   ; the seam is gone and the two ends left behind are distinct points; the very same test is
+   ; used on both sides, so that a deletion in the middle of the path, which cannot touch the
+   ; ends, reads the same answer twice and leaves the state of the path alone
+   If (wasClosed=1 && closedLineCustomShape!=0 && testIsEditorBezierPathClosed()!=1)
+   {
+      ; the quick action button is captioned with the action and not with the state,
+      ; it has to be redrawn for the path to start offering to be closed again
+      closedLineCustomShape := 0
+      RegAction(1, "closedLineCustomShape")
+      If (drawingShapeNow=1)
+         showQuickActionButtonsDrawingShape()
    }
 }
 
