@@ -48380,9 +48380,8 @@ predefinedVectorShapes(whichShape) {
      bezierSplineCustomShape := 0
      defu := getPredefinedVectorShapeDef(whichShape)
      FillAreaCurveTension := defu[2]
-     FillAreaCustomShape := defu[1]
      RegAction(1, "FillAreaCurveTension")
-     customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
+     customShapePoints := convertShapePointsStrToArray(defu[1])
      decideCustomShapeStyle()
      dummyTimerDelayiedImageDisplay(50)
 }
@@ -49851,7 +49850,8 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       } Else If (whichShape="D9")
       {
          ; previously used vector shape
-         SetTimer, loadPreviousVectorShape, -50
+         loadPreviousVectorShape()
+         BTNopenPrevPanel(mustOpenWin, "yes")
          Return
       }
 
