@@ -7043,7 +7043,9 @@ MenuSetVectorShapeSymmetryYPoint() {
 }
 
 configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0, allowReinit:=1) {
-   If (bezierSplineCustomShape=1)
+   ; a closed bezier path that can carry the mirror pairing as it stands is left closed; only one
+   ; that cannot be paired is torn open, the way every closed path used to be
+   If (bezierSplineCustomShape=1 && testEditorBezierPathPairsAsClosed()!=1)
       autoDeactivateClosedBezier()
 
    totalLoops := customShapePoints.Count()
@@ -48879,103 +48881,197 @@ toggleOpenClosedLineEditorCustomShape() {
 }
 
 handleOpenCloseBezier(mm:=0) {
-   Static prevEndsOpen, prevEndsClosed, prevEndsAny, prevPoints := []
+; brings the point list of a bezier path in line with the open/closed state the user asked for
+; through closedLineCustomShape; the renderer performs the same reconciliation on the fly, in
+; viewerAutoCloseOpenPath(), this one performs it on the editable list, so that the closing
+; segment gets its own key point and its own anchors and can be edited like any other segment;
+; the memo below holds the path as it was before the last toggle, so that toggling straight back
+; hands the user the very seam they had rather than a freshly generated one. It is dropped by
+; every editing operation through the «kill» entry point, and it is additionally checked against
+; the geometry this function produced, so that an edit which did not call «kill» -- moving a
+; point in the middle of the path does not -- can never be silently reverted
+   Static memoPoints := [], memoProps := [], memoAfter := [], memoSym := [], memoDir := ""
    If (mm="kill" || bezierSplineCustomShape!=1)
    {
-      prevPoints := []
-      prevEndsOpen := prevEndsClosed := prevEndsAny := ""
+      memoPoints := [], memoProps := [], memoAfter := [], memoSym := []
+      memoDir := ""
       Return
    }
 
-   If isNowSymmetricVectorShape()
-      CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
+   totalz := customShapePoints.Count()
+   ; the count of a bezier path is always 3n + 1; a malformed list is left alone, the renderer
+   ; pads it for display and performBezierActivePathAutoFixNow() repairs the array itself
+   If (totalz<4 || Mod(totalz, 3)!=1)
+      Return
 
    isClosed := testIsEditorBezierPathClosed()
-   firstu := testBezierFirstLastPointsCollapsed("first")
-   lastu := testBezierFirstLastPointsCollapsed("last")
-   totalz := customShapePoints.Count()
-   f  := customShapePoints[1],   l := customShapePoints[totalz]
-   fi := customShapePoints[2],  li := customShapePoints[totalz - 1]
+   wantClosed := (closedLineCustomShape=1) ? 1 : 0
+   If (wantClosed=1 && isClosed=1) || (wantClosed!=1 && isClosed!=1)
+      Return    ; the path already is what the flag says; the symmetry must not be touched
 
-   pz := (lastu=1 && firstu=1) ? 1 : 0
-   zthisID := f[1] "|" f[2] "|" fi[1] "|" fi[2] "|" li[1] "|" li[2] "|" l[1] "|" l[2]
-   If isClosed
-      prevEndsClosed := zthisID
-   Else
-      prevEndsOpen := zthisID
+   thisDir := (wantClosed=1) ? "close" : "open"
+   If (memoDir!="" && memoDir!=thisDir && vectorPointsListsMatch(memoAfter, customShapePoints))
+   {
+      ; the previous toggle is being taken back and nothing was edited since: the path is handed
+      ; back verbatim, anchors, point selections and symmetry reference included
+      customShapePoints := cloneVectorPointsList(memoPoints)
+      customShapePropPoints := cloneVectorPointsList(memoProps)
+      CustomShapeSymmetry := memoSym[1]
+      CustomShapeLockedSymmetry := memoSym[2]
+      vpSymmetryPointXdp := memoSym[3]
+      vpSymmetryPointYdp := memoSym[4]
+      prevVectorShapeSymmetryMode := memoSym[5] ? [[memoSym[5], memoSym[6]]] : []
+      memoPoints := [], memoProps := [], memoAfter := [], memoSym := []
+      memoDir := ""
+      If isNowSymmetricVectorShape()      ; the viewport may have been zoomed or panned since
+         coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
 
-   If (prevEndsAny>=1)
-   {
-      ; ToolTip, % "yaaaaaay" , , , 2
-      totalUndos := Round(undoVectorShapesLevelsArray.Count())
-      currentVectorUndoLevel := clampInRange(currentVectorUndoLevel - 1, 1, totalUndos)
-      restoreGivenVectorUndoLevel(currentVectorUndoLevel)
-      closedLineCustomShape := testIsEditorBezierPathClosed()
-      SetTimer, dummyRefreshImgSelectionWindow, -150
-   } Else If (prevEndsOpen=zthisID && closedLineCustomShape=1 && isClosed=0 && prevEndsClosed)
-   {
-      ; ToolTip, % "open" , , , 2
-      p := StrSplit(prevEndsClosed, "|")
-      customShapePoints[1] := [p[1], p[2]],  customShapePoints[totalz - 1] := [p[5], p[6]]
-      customShapePoints[2] := [p[3], p[4]],  customShapePoints[totalz] := [p[7], p[8]]
-   } Else If (prevEndsClosed=zthisID && closedLineCustomShape=0 && isClosed=1 && prevEndsOpen)
-   {
-      ; ToolTip, % "closed" , , , 2
-      p := StrSplit(prevEndsOpen, "|")
-      customShapePoints[1] := [p[1], p[2]],  customShapePoints[totalz - 1] := [p[5], p[6]]
-      customShapePoints[2] := [p[3], p[4]],  customShapePoints[totalz] := [p[7], p[8]]
-   } Else If ((firstu=1 || lastu=1) && (closedLineCustomShape=1 && isClosed=0) && pk!=1)
-   {
-      ; ToolTip, % isClosed "|bt" totalz "|" firstu "|" lastu , , , 2
-      If lastu 
-         customShapePoints[totalz] := [f[1], f[2]]
-      Else
-         customShapePoints[1] := [l[1], l[2]]
-   } Else If ((firstu!=1 || lastu!=1) && (closedLineCustomShape=0 && isClosed=1))
-   {
-      ; ToolTip, %  isClosed "|at" totalz "|" firstu "|" lastu , , , 2
-      If !lastu 
-         customShapePoints[totalz] := [li[1], li[2]]
-      Else
-         customShapePoints[1] := [fi[1], fi[2]]
-   } Else If (closedLineCustomShape=1 && isClosed=0)
-   {
-      ; ToolTip, % thisIndex "=l" , , , 2
-      thisIndex := customShapePoints.Count() - 1
-      getVPcoordsVectorPoint(1, mX, mY)
-      pushEndNewVectorPoint(mX, mY, 1, 1)
-      reflectGivenAnchorInPath(2, customShapePoints.Count(), 2, 0, 0, 0)
-      reflectGivenAnchorInPath(3, customShapePoints.Count(), thisIndex, 0, 0, 0)
       recordVectorUndoLevels()
-      actz := 1
-   } Else If (closedLineCustomShape=0 && isClosed=1)
-   {
-      reduceCustomShapeLength("K")
-      If (testIsEditorBezierPathClosed()=1)
-         reduceCustomShapeLength("K")
-      recordVectorUndoLevels()
-      actz := 2
+      lastZeitFileSelect := A_TickCount
+      Return
    }
 
-   Sleep, 2
-   isClosed := testIsEditorBezierPathClosed()
-   ntotalz := customShapePoints.Count()
-   zf  := customShapePoints[1],   lz := customShapePoints[ntotalz]
-   zfi := customShapePoints[2],  liz := customShapePoints[ntotalz - 1]
-   thisID := zf[1] "|" zf[2] "|" zfi[1] "|" zfi[2] "|" liz[1] "|" liz[2] "|" lz[1] "|" lz[2]
-   If isClosed
-      prevEndsClosed := thisID
-   Else
-      prevEndsOpen := thisID
-
-   If (totalz!=ntotalz && actz>=1)
+   canDoSymmetry := isNowSymmetricVectorShape()
+   If (canDoSymmetry=1)
    {
-      prevEndsAny := actz
-      prevEndsClosed := prevEndsOpen := ""
-   } Else
-      prevEndsAny := 0
+      ; only an odd count can carry the P[i] <> P[totalz - i + 1] pairing, and opening a mirrored
+      ; path takes six points off it, three at each end; when the path cannot keep the pairing
+      ; the mode is discarded whole, prevVectorShapeSymmetryMode included, or a stale reference
+      ; would still be written into the .vqpv file by resolveVectorShapeSymmetry()
+      If (Mod(totalz, 2)!=1)
+         symDropMsg := "WARNING: The vector path has an even number of points: " groupDigits(totalz) "."
+      Else If (wantClosed!=1 && totalz<10)
+         symDropMsg := "WARNING: The vector path is too short to be opened and stay mirrored."
 
+      If symDropMsg
+      {
+         CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
+         prevVectorShapeSymmetryMode := []
+         canDoSymmetry := 0
+         showTOOLtip(symDropMsg "`nThe symmetry mode had to be discarded.")
+         SoundBeep, 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+      }
+   }
+
+   memoPoints := cloneVectorPointsList(customShapePoints)
+   memoProps := cloneVectorPointsList(customShapePropPoints)
+   memoSym := [CustomShapeSymmetry, CustomShapeLockedSymmetry, vpSymmetryPointXdp, vpSymmetryPointYdp
+             , Round(prevVectorShapeSymmetryMode[1, 1]), Round(prevVectorShapeSymmetryMode[1, 2])]
+   If (wantClosed=1)
+      closeEditorBezierPath(canDoSymmetry)
+   Else
+      openEditorBezierPath(canDoSymmetry)
+
+   memoAfter := cloneVectorPointsList(customShapePoints)
+   memoDir := thisDir
+   If vectorPointsListsMatch(memoPoints, memoAfter)
+   {
+      ; the path was too short to gain or lose a closing segment; nothing was taken away, so
+      ; there is nothing to hand back either and the memo must not claim otherwise
+      memoPoints := [], memoProps := [], memoAfter := [], memoSym := []
+      memoDir := ""
+   }
+
+   If (canDoSymmetry=1)
+      coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
+
+   recordVectorUndoLevels()
    lastZeitFileSelect := A_TickCount
+}
+
+closeEditorBezierPath(canDoSymmetry) {
+; appends the segment that takes the path from its last key point back onto its first one; the
+; two anchors of that segment are the reflections of the anchors already sitting next to the two
+; ends, so that the path closes smoothly -- the very curve viewerAutoCloseOpenPath() draws for a
+; path whose flag says closed while its points still say open
+   totalz := customShapePoints.Count()
+   fP := customShapePoints[1],   lP := customShapePoints[totalz]
+   fA := customShapePoints[2],   lA := customShapePoints[totalz - 1]
+   hOut := [lP[1]*2 - lA[1], lP[2]*2 - lA[2]]     ; leaves the last key point
+   hIn  := [fP[1]*2 - fA[1], fP[2]*2 - fA[2]]     ; enters the first key point
+   If (canDoSymmetry!=1)
+   {
+      customShapePoints.Push(hOut, hIn, [fP[1], fP[2]])
+      customShapePropPoints.Push([0, 0], [0, 0], [0, 0])
+      Return
+   }
+
+   ; the two ends of a mirrored path are each other's mirror image, so they cannot be welded into
+   ; a single seam vertex: that would leave the path with an even count and no vertex of its own
+   ; sitting on the axis. The closing segment is cut in two instead, at its middle [de Casteljau
+   ; at t = 0.5], which lands on the symmetry axis, and the seam is put there. The curve drawn is
+   ; the very same one, the count stays odd, and the new middle index is the old reference point
+   ; shifted by the three points inserted in front of it
+   pAB  := [(lP[1] + hOut[1])/2,  (lP[2] + hOut[2])/2]
+   pBC  := [(hOut[1] + hIn[1])/2, (hOut[2] + hIn[2])/2]
+   pCD  := [(hIn[1] + fP[1])/2,   (hIn[2] + fP[2])/2]
+   pABC := [(pAB[1] + pBC[1])/2,  (pAB[2] + pBC[2])/2]
+   pBCD := [(pBC[1] + pCD[1])/2,  (pBC[2] + pCD[2])/2]
+   seamX := (pABC[1] + pBCD[1])/2
+   seamY := (pABC[2] + pBCD[2])/2
+   getVectorCoordsFromVPpoint(vpSymmetryPointXdp, vpSymmetryPointYdp, axisX, axisY)
+   If (CustomShapeSymmetry=1)    ; the seam has to sit on the axis, whatever the rounding says
+      seamX := axisX
+   Else
+      seamY := axisY
+
+   customShapePoints.Push(pAB, pABC, [seamX, seamY])
+   customShapePropPoints.Push([0, 0], [0, 0], [0, 0])
+   customShapePoints.InsertAt(1, [seamX, seamY], pBCD, pCD)
+   customShapePropPoints.InsertAt(1, [0, 0], [0, 0], [0, 0])
+}
+
+openEditorBezierPath(canDoSymmetry) {
+; drops the segment that closes the path; on a mirrored path the seam sits on the axis and its
+; two halves are the first three and the last three points, so both have to go for the
+; P[i] <> P[totalz - i + 1] pairing, and the odd count, to survive. A saved shape may carry more
+; than one seam -- viewerAutoCloseOpenPath() unwinds them in a loop as well
+   Loop, 4
+   {
+      minz := (canDoSymmetry=1) ? 10 : 7
+      If (customShapePoints.Count()<minz || testIsEditorBezierPathClosed()!=1)
+         Break
+
+      Loop, 3
+      {
+         customShapePoints.Pop()
+         customShapePropPoints.Pop()
+      }
+
+      If (canDoSymmetry!=1)
+         Continue
+
+      Loop, 3
+      {
+         customShapePoints.RemoveAt(1)
+         customShapePropPoints.RemoveAt(1)
+      }
+   }
+}
+
+cloneVectorPointsList(ByRef listu) {
+; the entries of customShapePropPoints[] are written to in place [the point selection flags], so
+; a plain Clone() of the outer array would keep handing back the live objects
+   newArrayu := []
+   Loop, % listu.Count()
+       newArrayu.Push(IsObject(listu[A_Index]) ? listu[A_Index].Clone() : listu[A_Index])
+
+   Return newArrayu
+}
+
+vectorPointsListsMatch(ByRef arrayA, ByRef arrayB) {
+   totalz := arrayA.Count()
+   If (totalz<1 || totalz!=arrayB.Count())
+      Return 0
+
+   Loop, % totalz
+   {
+       p := arrayA[A_Index],  q := arrayB[A_Index]
+       If (p[1]!=q[1] || p[2]!=q[2])
+          Return 0
+   }
+   Return 1
 }
 
 testIsEditorBezierPathClosed(m:=0) {
@@ -48993,6 +49089,18 @@ testIsEditorBezierPathClosed(m:=0) {
 
     ; ToolTip, % r "|" m "|" SelDotsSize//2 , , , 2
     Return r
+}
+
+testEditorBezierPathPairsAsClosed() {
+; whether a closed bezier path can carry the P[i] <> P[totalz - i + 1] symmetry pairing exactly
+; as it stands: the seam is written down twice, so 1 <> totalz pairs it with itself, and an odd
+; count leaves exactly one further self paired index, the middle key point, sitting on the axis.
+; A well formed bezier path counts 6m + 1 points, so that middle index is always a key point
+    totalz := customShapePoints.Count()
+    If (bezierSplineCustomShape!=1 || totalz<7 || Mod(totalz, 2)!=1 || Mod(totalz, 3)!=1)
+       Return 0
+
+    Return (testIsEditorBezierPathClosed()=1) ? 1 : 0
 }
 
 testIsBezierViewPathClosed(ByRef PointsList) {
@@ -75629,6 +75737,12 @@ toggleBrushAirMode() {
 }
 
 MenuSetVectAutoSymmetryX() {
+   ; the path may be opened by configVectorShapeSymmetryPoint() below, which changes the count and
+   ; therefore both the even count test and the middle index; it is settled here first, so that
+   ; the two of them read the very list the symmetry is declared on
+   If (bezierSplineCustomShape=1 && testEditorBezierPathPairsAsClosed()!=1)
+      autoDeactivateClosedBezier()
+
    totalz := customShapePoints.Count()
    If (totalz/2=totalz//2)
    {
@@ -75650,6 +75764,10 @@ MenuSetVectAutoSymmetryX() {
 }
 
 MenuSetVectAutoSymmetryY() {
+   ; see MenuSetVectAutoSymmetryX(): the count has to be settled before it is read
+   If (bezierSplineCustomShape=1 && testEditorBezierPathPairsAsClosed()!=1)
+      autoDeactivateClosedBezier()
+
    totalz := customShapePoints.Count()
    If (totalz/2=totalz//2)
    {
