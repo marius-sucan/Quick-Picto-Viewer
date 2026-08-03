@@ -49827,14 +49827,11 @@ applyLoadedVectorShapeSymmetry(givenIndex, givenMode) {
 
 BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    ; a caller may name the shape rather than the file that holds it, the way
-   ; saveCurrentVectorShape() takes a name; it is resolved here against the folder that
-   ; function writes into, or the test below finds no such file and the whole call is taken
-   ; for a click in the shapes gallery -- which has no row selected when the request came
-   ; from anywhere else, so it would return blank and the shape would never be loaded
+   ; saveCurrentVectorShape() takes a name
    If (isGiven="yes" && whichFile && !InStr(whichFile, "\"))
       whichFile := mainCompiledPath "\resources\vector-shapes\" whichFile ".vqpv"
 
-   externMode := (isGiven="yes" && FileExist(whichFile) && whichFile) ? 1 : 0
+   externMode := (isGiven="yes" && whichFile) ? 1 : 0
    If (externMode!=1)
    {
       RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
@@ -49910,7 +49907,8 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       If (externMode=1)
       {
          OutDir := PathCompact(whichFile, "a", 1, OSDfontSize)
-         showTOOLtip("Failed to read file contents:`n" OutDir)
+         If (givenName!="Last_Temporarily_Saved_Shape")
+            showTOOLtip("Failed to read file contents:`n" OutDir)
       } Else
       {
          showTOOLtip("Failed to read file contents: " givenName ".vqpv`n" OutDir)
@@ -49958,8 +49956,12 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    applyLoadedVectorShapeSymmetry(obju[7], obju[8])
    prevNameSavedVectorShape := (givenName="Last_Temporarily_Saved_Shape") ? "" : givenName
    decideCustomShapeStyle()
-   ; saveVectorShapeInTempFile()
-   dummyTimerDelayiedImageDisplay(100)
+   If (givenName!="Last_Temporarily_Saved_Shape")
+   {
+      saveVectorShapeInTempFile()
+      dummyTimerDelayiedImageDisplay(100)
+   }
+
    If (externMode!=1)
       BTNopenPrevPanel(mustOpenWin, "yes")
    Return customShapePoints.Count()
