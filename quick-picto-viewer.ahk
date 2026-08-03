@@ -47103,17 +47103,9 @@ ReadSettingsPasteInPlace(act:=0) {
     If (act=0)
     {
        RegAction(0, "initialCustomShapeCoords",, 5)
-       If !InStr(FillAreaCustomShape, "|")
-          RegAction(0, "FillAreaCustomShape",, 5)
-
-       If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
+       loadSimplifiedPreviousVectorShape()
     } Else If (act=1)
-    {
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
-       If InStr(FillAreaCustomShape, "|")
-          RegAction(1, "FillAreaCustomShape")
-    }
     
     RegAction(act, "FillAreaRectRoundness",, 2, 4, 98)
     RegAction(act, "PasteInPlaceGlassy",, 2, 1, 6)
@@ -47487,7 +47479,6 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     If (toolu="transform")
        prevModeViewPortSelectionManager(prevDestPosX, prevDestPosY, oImgW, oImgH)
 
-    customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
     FillAreaClosedPath := FillAreaEllipsePie := 1
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     thisOpacity := Round((PasteInPlaceOpacity / 255) * 100)
@@ -47673,17 +47664,9 @@ ReadSettingsFillBehindAreaPanel(act:=0) {
     If (act=0)
     {
        RegAction(0, "initialCustomShapeCoords",, 5)
-       If !InStr(FillAreaCustomShape, "|")
-          RegAction(0, "FillAreaCustomShape",, 5)
-
-       If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
+       loadSimplifiedPreviousVectorShape()
     } Else If (act=1)
-    {
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
-       If InStr(FillAreaCustomShape, "|")
-          RegAction(1, "FillAreaCustomShape")
-    }
 
     RegAction(act, "FillBehindOpacity",, 2, 1, 512)
     RegAction(act, "FillBehindClrOpacity",, 2, 2, 255)
@@ -47697,17 +47680,9 @@ ReadSettingsFillAreaPanel(act:=0) {
     If (act=0)
     {
        RegAction(0, "initialCustomShapeCoords",, 5)
-       If !InStr(FillAreaCustomShape, "|")
-          RegAction(0, "FillAreaCustomShape",, 5)
-
-       If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
+       loadSimplifiedPreviousVectorShape()
     } Else If (act=1)
-    {
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
-       If InStr(FillAreaCustomShape, "|")
-          RegAction(1, "FillAreaCustomShape")
-    }
 
     RegAction(act, "FillAreaColor",, 3)
     RegAction(act, "FillAreaOpacity",, 2, 1, 255)
@@ -47750,17 +47725,9 @@ ReadSettingsDrawShapeAreaPanel(act:=0) {
     If (act=0)
     {
        RegAction(0, "initialCustomShapeCoords",, 5)
-       If !InStr(FillAreaCustomShape, "|")
-          RegAction(0, "FillAreaCustomShape",, 5)
-
-       If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
+       loadSimplifiedPreviousVectorShape()
     } Else If (act=1)
-    {
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
-       If InStr(FillAreaCustomShape, "|")
-          RegAction(1, "FillAreaCustomShape")
-    }
 
     RegAction(act, "DrawLineAreaColor",, 3)
     RegAction(act, "DrawLineAreaOpacity",, 2, 1, 255)
@@ -48378,20 +48345,43 @@ getPredefinedVectorShapeDef(whichShape) {
    Return shapes[whichShape]
 }
 
+loadSimplifiedPreviousVectorShape() {
+   FileRead, contentu, % mainCompiledPath "\resources\vector-shapes\_Last_Temporarily_Saved_Shape.vqpv"
+   obju := StrSplit(contentu, "`n", "`r `t")
+   newArrayu := convertShapePointsStrToArray(obju[1])
+   If (newArrayu.Count()<3)
+      Return
+
+   customShapePropPoints := []
+   Loop, % newArrayu.Count()
+        customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
+
+   customShapePoints := []
+   customShapePoints := newArrayu.Clone()
+   VPselRotation := clampInRange(obju[2], 0, 360)
+   FillAreaCurveTension := clampInRange(obju[3], 1, 5)
+   innerSelectionCavityX := clampInRange(obju[4], 0, 0.49)
+   innerSelectionCavityY := clampInRange(obju[5], 0, 0.49)
+   closedLineCustomShape := Trim(obju[6])
+   decideCustomShapeStyle()
+   RegAction(1, "closedLineCustomShape")
+   ; RegAction(1, "FillAreaCurveTension")
+   applyLoadedVectorShapeSymmetry(obju[7], obju[8])
+   Return newArrayu.Count()
+}
+
+loadPreviousVectorShape() {
+     r := BTNloadCustomShape("yes", "_Last_Temporarily_Saved_Shape")
+     dummyTimerDelayiedImageDisplay(100)
+     Return r
+}
+
 predefinedVectorShapes(whichShape) {
      bezierSplineCustomShape := 0
-     If (whichShape=9)
-     {
-        RegAction(0, "FillAreaCustomShape",, 5)
-        RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
-     } Else
-     {
-        defu := getPredefinedVectorShapeDef(whichShape)
-        FillAreaCurveTension := defu[2]
-        FillAreaCustomShape := defu[1]
-        RegAction(1, "FillAreaCurveTension")
-     }
-
+     defu := getPredefinedVectorShapeDef(whichShape)
+     FillAreaCurveTension := defu[2]
+     FillAreaCustomShape := defu[1]
+     RegAction(1, "FillAreaCurveTension")
      customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
      decideCustomShapeStyle()
      dummyTimerDelayiedImageDisplay(50)
@@ -49764,11 +49754,10 @@ BTNrenameCustomShape() {
 }
 
 saveVectorShapeInTempFile() {
-    r := saveCurrentVectorShape("Last_Temporarily_Saved_Shape")
+    r := saveCurrentVectorShape("_Last_Temporarily_Saved_Shape")
     If !r
        addJournalEntry(A_ThisFunc "(): Failed to save vector shape to disk...")
-    ; FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints, 65305)
-    RegAction(1, "FillAreaCustomShape")
+
     RegAction(1, "FillAreaCurveTension")
     RegAction(1, "closedLineCustomShape")
 }
@@ -49859,6 +49848,11 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
          dummyTimerDelayiedImageDisplay(100)
          BTNopenPrevPanel(mustOpenWin, "yes")
          Return
+      } Else If (whichShape="D9")
+      {
+         ; previously used vector shape
+         SetTimer, loadPreviousVectorShape, -50
+         Return
       }
 
       VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
@@ -49907,7 +49901,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       If (externMode=1)
       {
          OutDir := PathCompact(whichFile, "a", 1, OSDfontSize)
-         If (givenName!="Last_Temporarily_Saved_Shape")
+         If (givenName!="_Last_Temporarily_Saved_Shape")
             showTOOLtip("Failed to read file contents:`n" OutDir)
       } Else
       {
@@ -49954,9 +49948,9 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    closedLineCustomShape := Trim(obju[6])
    RegAction(1, "closedLineCustomShape")
    applyLoadedVectorShapeSymmetry(obju[7], obju[8])
-   prevNameSavedVectorShape := (givenName="Last_Temporarily_Saved_Shape") ? "" : givenName
+   prevNameSavedVectorShape := (givenName="_Last_Temporarily_Saved_Shape") ? "" : givenName
    decideCustomShapeStyle()
-   If (givenName!="Last_Temporarily_Saved_Shape")
+   If (givenName!="_Last_Temporarily_Saved_Shape")
    {
       saveVectorShapeInTempFile()
       dummyTimerDelayiedImageDisplay(100)
@@ -50001,12 +49995,13 @@ uiPopulateCustomVectorShapesList(thumbSize:=64) {
     o_customShapeCountPoints := customShapeCountPoints
     Loop, % mainCompiledPath "\resources\vector-shapes\*.vqpv"
     {
-        If (SubStr(A_LoopFileName, 1, 3)="__-")
+        namu := StrReplace(A_LoopFileName, ".vqpv")
+        If (SubStr(A_LoopFileName, 1, 3)="__-" || namu="_Last_Temporarily_Saved_Shape")
            Continue
 
         Try FormatTime, datu, % A_LoopFileTimeModified, dd/MM/yyyy, HH:mm
         iconNr := renderVectorShapeThumbFile(hIL, A_LoopFileLongPath, thumbSize)
-        LV_Add("Icon" iconNr,, StrReplace(A_LoopFileName, ".vqpv"), datu, A_Index)
+        LV_Add("Icon" iconNr,, namu, datu, A_Index)
     }
 
     thisIndex := 0
@@ -50023,7 +50018,7 @@ uiPopulateCustomVectorShapesList(thumbSize:=64) {
 
 renderVectorShapeThumbFile(hIL, thisFile, thumbSize) {
    FileRead, contentu, % thisFile
-   If StrLen(contentu)<5
+   If (StrLen(contentu)<5)
       Return renderVectorShapeThumb(hIL, thumbSize, 0, 1, 1, 0, 0, 0, 0)
 
    obju := StrSplit(contentu, "`n", "`r `t")
@@ -50041,15 +50036,7 @@ renderVectorShapeThumbDefault(hIL, whichShape, thumbSize) {
       Return renderVectorShapeThumb(hIL, thumbSize, 0, 1, 1, 0, 0.45, 0.45, 1)
 
    If (whichShape=9)  ; last temporarily saved shape
-   {
-      RegRead, tmpShape, % QPVregEntry "\PanelOptions", FillAreaCustomShape
-      RegRead, tmpTension, % QPVregEntry "\PanelOptions", FillAreaCurveTension
-      RegRead, tmpClosed, % QPVregEntry "\PanelOptions", closedLineCustomShape
-      newArrayu := convertShapePointsStrToArray(tmpShape)
-      tenzu := clampInRange(tmpTension, 1, 5)
-      closedu := (Trim(tmpClosed)=0) ? 0 : 1
-      Return renderVectorShapeThumb(hIL, thumbSize, newArrayu, tenzu, closedu, 0, 0, 0, 0)
-   }
+      Return renderVectorShapeThumbFile(hIL, mainCompiledPath "\resources\vector-shapes\_Last_Temporarily_Saved_Shape.vqpv", thumbSize)
 
    defu := getPredefinedVectorShapeDef(whichShape)
    newArrayu := convertShapePointsStrToArray(defu[1])
@@ -50246,7 +50233,7 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    }
 
    thisFile := mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"
-   If (FileExist(thisFile) && allowMsg=1)
+   If (FileExist(thisFile) && allowMsg=1 && givenName!="_Last_Temporarily_Saved_Shape")
    {
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "A vector shape was already defined with the provided name: " givenName ". Do you want to overwrite it? This action is irreversible.", "&Overwrite|&Cancel", 2, "exclamation")
       If (msgResult!="overwrite")
@@ -50352,7 +50339,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
        FillAreaInverted := FillBehindInvert
     }
 
-    customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
     btnWid := 100, btnHeight := 25
     txtWid := 285, slideWid := 155
     EditWid := 60, EllipseSelectMode := 0
@@ -50603,7 +50589,6 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
     If (dummy="tlbr" && isInRange(which, 1, 7))
        FillAreaShape := which
 
-    customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
     btnWid := 100, btnHeight := 25
     txtWid := 285, slideWid := 155
     EditWid := 60, EllipseSelectMode := 0
@@ -51329,7 +51314,6 @@ PanelFillBehindBgrImage() {
        FillAreaShape := 7
 
     ReadSettingsFillBehindAreaPanel()
-    customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
     FillAreaClosedPath := FillAreaEllipsePie := 1
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     btnWid := 80,    txtWid := 350,    EditWid := 60
@@ -69695,14 +69679,6 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
    varValue := %var%
    If (act=1)
    {
-      If (var="FillAreaCustomShape")
-      {
-         If (StrLen(FillAreaCustomShape)>65300)
-            saveCurrentVectorShape("_previous_huge_path", 0)
-
-         varValue := SubStr(varValue, 1, 65300)
-      }
-
       If (storeReg=1)
          RegWrite, REG_SZ, % QPVregEntry "\" section, %var%, %varValue%
       Else
@@ -70444,7 +70420,7 @@ toggleEllipseSelection(modus:=-1) {
    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
    If (customShapePoints.Count()<3 && EllipseSelectMode=2)
    {
-      r := BTNloadCustomShape("yes", "Last_Temporarily_Saved_Shape")
+      r := loadSimplifiedPreviousVectorShape()
       If (r<3)
       {
          MenuStartDrawingSelectionArea()
