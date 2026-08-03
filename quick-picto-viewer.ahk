@@ -79531,6 +79531,26 @@ updateCachedLiveDrawPathGivenPoint(whichPoint, ByRef vectorVisiblePoints, ByRef 
       kOnes[whichPoint] := [xu, yu]
 }
 
+drawVPvectorSymmetryAxis(mainWidth, mainHeight, Gu) {
+; the mirror axis of the vector path being edited. Every redraw path that owns the frame by
+; itself has to call it: additionalHUDelements() only gets to run between drags, and the
+; incremental redraws clear the canvas, so the axis would blink out for the whole drag
+   If (!Gu || drawingShapeNow!=1 || AnyWindowOpen || !isNowSymmetricVectorShape())
+      Return
+
+   thisThick := imgHUDbaseUnit/11
+   Gdip_SetPenWidth(pPen4, thisThick)
+   If (CustomShapeSymmetry=1)
+   {
+      ccX := Round(vpSymmetryPointXdp) - thisThick/4
+      Gdip_DrawLine(Gu, pPen4, ccX, 0, ccX, mainHeight)
+   } Else If (CustomShapeSymmetry=2)
+   {
+      ccY := Round(vpSymmetryPointYdp) - thisThick/4
+      Gdip_DrawLine(Gu, pPen4, 0, ccY, mainWidth, ccY)
+   }
+}
+
 drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp:=0) {
     ; Related functions: PerformVectorShapeActions()
     Static pWhite, prevBMP, prevCstate, prevpx, prevpy, prevMousePoint , prevPartialState
@@ -79643,6 +79663,12 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
     } Else If (actu="point-update" && whichPoint>0 && prevCstate)
     {
        owPoint := whichPoint
+       ; the axis is re-derived the same way drawVisibleVectorPoints() does it on every other
+       ; redraw; that function is skipped on this path, so without this the axis would sit
+       ; still while the pivot itself is dragged and only jump into place on mouse release
+       If (canDoSymmetry && totalz>1)
+          coreSetVPsymmetryPoint(totalz//2 + 1)
+
        If (whichPoint<3 || whichPoint>totalz - 2)
        {
           updateCachedLiveDrawPathGivenPoint(1, vectorVisiblePoints, PointsListArray, kOnes)
@@ -79687,6 +79713,13 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
           bezierLinesPath := generateVPbezierAnchorPaths(mainWidth, mainHeight, PointsListArray, kOnes, bezierLinesPath)
           bezierAnchorsLinesUpdated := 1
        }
+
+       ; drawn before the points and not after them: handed a rect, drawVisibleVectorPoints()
+       ; does the layered window update by itself, so anything painted afterwards misses the
+       ; frame. The other callers reach this only through additionalHUDelements(), which
+       ; paints the axis on its own once this returns
+       If (actu="sel-rect")
+          drawVPvectorSymmetryAxis(mainWidth, mainHeight, Gu)
 
        drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHeight, vectorVisiblePoints, bezierLinesPath, whichPoint)
        If (actu="sel-rect")
@@ -79945,6 +79978,8 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
           Gdip_DrawPath(Gu, pPen1d, pzPath)
           Gdip_DeletePath(pzPath)
        }
+
+       drawVPvectorSymmetryAxis(mainWidth, mainHeight, Gu)
        Gdip_ResetWorldTransform(Gu)
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
     }
@@ -80301,17 +80336,23 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        hasDrawnImageMap := 0
     }
 
-    ; highlight image editing each symmetry axis
-    thisThick := imgHUDbaseUnit/11
-    Gdip_SetPenWidth(pPen4, thisThick)
-    isSymmetryAllowed := (drawingShapeNow=1 && !AnyWindowOpen) ? 1 : isPaintSymmetryModeAllowed()
-    ccX := (drawingShapeNow=1) ? Round(vpSymmetryPointXdp) : prevDestPosX + Round(prevResizedVPimgW * BrushToolSymmetryPointX)
-    ccY := (drawingShapeNow=1) ? Round(vpSymmetryPointYdp) : prevDestPosY + Round(prevResizedVPimgH * BrushToolSymmetryPointY)
-    If ((BrushToolSymmetryX=1 || CustomShapeSymmetry=1) && isSymmetryAllowed=1)
-       Gdip_DrawLine(2NDglPG, pPen4, ccX - thisThick/4, 0, ccX - thisThick/4, mainHeight)
-    If ((BrushToolSymmetryY=1 || CustomShapeSymmetry=2) && isSymmetryAllowed=1)
-       Gdip_DrawLine(2NDglPG, pPen4, 0, ccY - thisThick/4, mainWidth, ccY - thisThick/4)
+    ; highlight image editing each symmetry axis; isPaintSymmetryModeAllowed() is already 0
+    ; in vector editor mode, which is what the ternary here used to resolve to as well
+    If (isPaintSymmetryModeAllowed()=1)
+    {
+       thisThick := imgHUDbaseUnit/11
+       Gdip_SetPenWidth(pPen4, thisThick)
+       ccX := prevDestPosX + Round(prevResizedVPimgW * BrushToolSymmetryPointX)
+       ccY := prevDestPosY + Round(prevResizedVPimgH * BrushToolSymmetryPointY)
+       If (BrushToolSymmetryX=1)
+          Gdip_DrawLine(2NDglPG, pPen4, ccX - thisThick/4, 0, ccX - thisThick/4, mainHeight)
+       If (BrushToolSymmetryY=1)
+          Gdip_DrawLine(2NDglPG, pPen4, 0, ccY - thisThick/4, mainWidth, ccY - thisThick/4)
+    }
 
+    ; the vector path axis is drawn by the same helper the incremental redraws call, so it
+    ; stays on screen while the user drags a point
+    drawVPvectorSymmetryAxis(mainWidth, mainHeight, 2NDglPG)
     Gdip_ResetWorldTransform(2NDglPG)
     r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
 }
