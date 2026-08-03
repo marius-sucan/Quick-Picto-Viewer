@@ -190,7 +190,6 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := [], lastZeitUndoRecorded := 0
    , CustomShapeSymmetry := 0, CustomShapeLockedSymmetry := 0, viewportQPVimage := new screenQPVimage
    , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0, userSeenSessionImagesIndex := 0, FloodFillSelectionAdj := 0
-   , vectorShapeSymmetryMode := 0, vectorShapeSymmetryIndex := 0
    , createdQuickMenuSearchWin := 0, lastUserRclickVPx := 0, lastUserRclickVPy := 0, vpFreeformShapeOffset := []
    , customShapeHasSelectedPoints := 0, currentVectorUndoLevel := 1, undoVectorShapesLevelsArray := []
    , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := [], navKeysCounter := 0
@@ -47489,7 +47488,6 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        prevModeViewPortSelectionManager(prevDestPosX, prevDestPosY, oImgW, oImgH)
 
     customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-    loadVectorShapeSymmetryFromRegistry()
     FillAreaClosedPath := FillAreaEllipsePie := 1
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     thisOpacity := Round((PasteInPlaceOpacity / 255) * 100)
@@ -47813,7 +47811,6 @@ ReadSettingsAlphaMaskPanel(act:=0) {
        RegAction(0, "FillAreaCustomShape",, 5)
        RegAction(0, "initialCustomShapeCoords",, 5)
        customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-       loadVectorShapeSymmetryFromRegistry()
        If (drawingShapeNow!=1)
           RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
     }
@@ -48397,14 +48394,6 @@ predefinedVectorShapes(whichShape) {
 
      customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
      decideCustomShapeStyle()
-
-     ; entry 9 is the path kept in the registry and it may well declare a symmetry; the other
-     ; predefined shapes carry none and the caller has already dropped whatever was in place.
-     ; It has to be read back here, or the saveVectorShapeInRegistry() the caller ends with
-     ; would store a shape that has a symmetry along with the statement that it has none
-     If (whichShape=9)
-        loadVectorShapeSymmetryFromRegistry()
-
      dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -49776,17 +49765,9 @@ BTNrenameCustomShape() {
 
 saveVectorShapeInRegistry() {
     FillAreaCustomShape := convertShapePointsArrayToStr(customShapePoints, 65305)
-
-    ; the symmetry is stored along with the path it describes, the way a .vqpv file carries it;
-    ; the serialized string decides the point count and not the array it was produced from,
-    ; because convertShapePointsArrayToStr() drops any entry with a blank coordinate and stops
-    ; at the length limit, so the reference index has to match what is actually written down
-    resolveVectorShapeSymmetry(vectorShapeSymmetryIndex, vectorShapeSymmetryMode, FillAreaCustomShape)
     RegAction(1, "FillAreaCustomShape")
     RegAction(1, "FillAreaCurveTension")
     RegAction(1, "closedLineCustomShape")
-    RegAction(1, "vectorShapeSymmetryMode")
-    RegAction(1, "vectorShapeSymmetryIndex")
 }
 
 resolveVectorShapeSymmetry(ByRef symIndex, ByRef symMode, pointsStr:="") {
@@ -49839,20 +49820,6 @@ applyLoadedVectorShapeSymmetry(givenIndex, givenMode) {
    CustomShapeSymmetry := CustomShapeLockedSymmetry := symMode
    coreSetVPsymmetryPoint(symIndex)
    Return symMode
-}
-
-loadVectorShapeSymmetryFromRegistry() {
-; the symmetry belongs to the stored path and travels with it: every route that pulls the shape
-; out of the registry seeds the state the vector editor picks up later, through
-; prevVectorShapeSymmetryMode, when resumeCustomShapeSelection() re-anchors the axis on the
-; points as they stand in the editor coordinate space; to be called right after the points were
-; read with convertShapePointsStrToArray(FillAreaCustomShape)
-   If (drawingShapeNow=1)
-      Return 0   ; a live editing session owns this state, it must not be overwritten
-
-   RegAction(0, "vectorShapeSymmetryMode",, 2, 0, 2)
-   RegAction(0, "vectorShapeSymmetryIndex",, 4)
-   Return applyLoadedVectorShapeSymmetry(vectorShapeSymmetryIndex, vectorShapeSymmetryMode)
 }
 
 BTNloadCustomShape(isGiven:=0, whichFile:=0) {
@@ -50372,7 +50339,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     }
 
     customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-    loadVectorShapeSymmetryFromRegistry()
     btnWid := 100, btnHeight := 25
     txtWid := 285, slideWid := 155
     EditWid := 60, EllipseSelectMode := 0
@@ -50624,7 +50590,6 @@ PanelDrawShapesInArea(dummy:=0, which:=0) {
        FillAreaShape := which
 
     customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-    loadVectorShapeSymmetryFromRegistry()
     btnWid := 100, btnHeight := 25
     txtWid := 285, slideWid := 155
     EditWid := 60, EllipseSelectMode := 0
@@ -51351,7 +51316,6 @@ PanelFillBehindBgrImage() {
 
     ReadSettingsFillBehindAreaPanel()
     customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-    loadVectorShapeSymmetryFromRegistry()
     FillAreaClosedPath := FillAreaEllipsePie := 1
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     btnWid := 80,    txtWid := 350,    EditWid := 60
@@ -70476,8 +70440,6 @@ toggleEllipseSelection(modus:=-1) {
          MenuStartDrawingSelectionArea()
          Return
       }
-
-      loadVectorShapeSymmetryFromRegistry()
    }
 
    If (imgEditPanelOpened=1)
