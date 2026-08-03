@@ -9578,6 +9578,24 @@ isNowSymmetricVectorShape() {
    Return hasSymmetry
 }
 
+rotateVectorSymmetryMode(symMode, angleu) {
+; the symmetry mode that describes a path after it was rotated by the given angle: a quarter
+; turn takes a vertical axis [mode 1] onto a horizontal one [mode 2] and back, a half turn
+; leaves either where it stood. Any other angle leaves the axis oblique, which neither mode can
+; stand for, and 0 comes back for it. The P[i] <> P[count - i + 1] pairing needs no adjusting
+; either way -- a rotation is affine and it does not reorder the point list -- so the mode and
+; the axis coordinate are the whole of what has to follow the path around
+   If (symMode!=1 && symMode!=2)
+      Return 0
+
+   angleu := Mod(Mod(angleu, 360) + 360, 360)
+   quartersu := Round(angleu/90)
+   If (Abs(angleu - quartersu*90)>0.1)   ; the margin absorbs rounding, it does not snap an
+      Return 0                           ; angle the user deliberately set off the right angle
+
+   Return (Mod(quartersu, 2)=1) ? ((symMode=1) ? 2 : 1) : symMode
+}
+
 thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, shiftState, altState) {
    Static lastInvoked := 1, doNotAskAgain := 0
    If (A_TickCount - lastInvoked<50)
@@ -48398,16 +48416,31 @@ flipWHcustomShape(modus) {
        If (c[1]="" || c[2]="")
           Continue
 
-       thisIndex++
        If (modus="h")
-          customShapePoints[thisIndex] := [1 - c[1], c[2]]
+          customShapePoints[A_Index] := [1 - c[1], c[2]]
        Else
-          customShapePoints[thisIndex] := [c[1], 1 - c[2]]
+          customShapePoints[A_Index] := [c[1], 1 - c[2]]
     }
+
+    ; a flip does not reorder the list, so the P[i] <> P[count - i + 1] pairing and the middle
+    ; point that holds the axis both come through it untouched, and a vertical axis stays
+    ; vertical whichever way the shape was flipped. The axis itself does move -- flipping
+    ; horizontally takes it to the far side of the shape -- and vpSymmetryPointXdp/Ydp cache it
+    ; in viewport pixels, so it has to be read off the points again, or every mirrored edit
+    ; that follows reflects across the line the axis used to be on
+    If (drawingShapeNow=1 && isNowSymmetricVectorShape())
+       coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
 
     modus := (modus="h") ? "HORIZONTALLY" : "VERTICALLY"
     showDelayedTooltip("Custom shape flipped: " modus)
     decideCustomShapeStyle()
+    If (drawingShapeNow=1)
+    {
+       ; the editor keys its point cache on the point count, which a flip leaves alone; the
+       ; redraw has to be forced the way every other editor side mutation forces it
+       lastZeitFileSelect := A_TickCount
+       recordVectorUndoLevels()
+    }
     dummyTimerDelayiedImageDisplay(50)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -48616,6 +48649,25 @@ resumeCustomShapeSelection(thisZL) {
    ; an even count leaves no self paired index to hold the axis, so the mode is only dropped
    ; as the active one; prevVectorShapeSymmetryMode keeps it, and the next resume can restore it
    symMode := Round(prevVectorShapeSymmetryMode[1, 2])
+   ; the rotation baked into the points above turned the mirror axis with them: a right angle
+   ; step swaps a vertical axis for a horizontal one, which is what the mode swap stands for,
+   ; while the reference point stays the middle one and its pairing is untouched. Any other
+   ; angle leaves the axis oblique and no mode can describe it; the mode is then dropped whole,
+   ; prevVectorShapeSymmetryMode included, or resolveVectorShapeSymmetry() would still write it
+   ; into the .vqpv file and the next resume would put it back on a path that is no longer
+   ; mirrored about a straight vertical or horizontal line
+   If (symMode && VPselRotation!=0)
+   {
+      newMode := rotateVectorSymmetryMode(symMode, VPselRotation)
+      If !newMode
+      {
+         addJournalEntry(A_ThisFunc "(): the shape is rotated by " Round(VPselRotation, 2) "°, its symmetry axis is neither vertical nor horizontal any more; the symmetry mode was discarded.")
+         showDelayedTooltip("WARNING: The shape is rotated by " Round(VPselRotation, 2) "°.`nIts symmetry mode had to be discarded.", 0, 800)
+         prevVectorShapeSymmetryMode := []
+      }
+      symMode := newMode
+   }
+
    totalu := customShapePoints.Count()
    If (symMode=1 || symMode=2) && (totalu>2) && (totalu//2 != totalu/2)
    {
