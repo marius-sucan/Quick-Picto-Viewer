@@ -277,7 +277,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , allowRecordHistory := 1, TextInAreaPaintBgr := 1, rotateSelBoundsKeepRatio := 1, TextInAreaFlipH := 0
    , highlightAlreadySeenImages := 1, useCachedSLDdata := 1, PreserveDateTimeOnSave := 0, PrintAdaptToFit := 1
    , PrintDimensionsXYWH := "0|0|50|50", PrintColorMode := 0, PrintImgAngleOrientation := 0, PrintUseViewportColors := 1
-   , FillAreaClosedPath := 1, FillAreaCustomShape := "", alphaMaskingMode := 1, userImgAdjustInvertArea := 0
+   , FillAreaClosedPath := 1, alphaMaskingMode := 1, userImgAdjustInvertArea := 0
    , alphaMaskClrAintensity := 0, alphaMaskClrBintensity := 255, closeEditPanelOnApply := 1, FillAreaCurveTension := 2
    , alphaMaskOffsetX := 0, alphaMaskOffsetY := 0, alphaMaskReplaceMode := 0, alphaMaskBMPchannel := 5
    , blurAreaMode := 2, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
@@ -47775,11 +47775,8 @@ ReadSettingsVPgrid(act:=0) {
 ReadSettingsAlphaMaskPanel(act:=0) {
     If (customShapePoints.Count()<3 && act=0)
     {
-       RegAction(0, "FillAreaCustomShape",, 5)
        RegAction(0, "initialCustomShapeCoords",, 5)
-       customShapePoints := convertShapePointsStrToArray(FillAreaCustomShape)
-       If (drawingShapeNow!=1)
-          RegAction(0, "FillAreaCurveTension",, 2, 1, 5)
+       loadSimplifiedPreviousVectorShape()
     }
 
     RegAction(act, "BrushToolDoubleSize",, 1)
@@ -48346,6 +48343,9 @@ getPredefinedVectorShapeDef(whichShape) {
 }
 
 loadSimplifiedPreviousVectorShape() {
+   If (customShapePoints.Count()>=3)
+      Return
+
    FileRead, contentu, % mainCompiledPath "\resources\vector-shapes\_Last_Temporarily_Saved_Shape.vqpv"
    obju := StrSplit(contentu, "`n", "`r `t")
    newArrayu := convertShapePointsStrToArray(obju[1])
@@ -49754,8 +49754,8 @@ BTNrenameCustomShape() {
 }
 
 saveVectorShapeInTempFile() {
-    r := saveCurrentVectorShape("_Last_Temporarily_Saved_Shape")
-    If !r
+    r := saveCurrentVectorShape("_Last_Temporarily_Saved_Shape", 0)
+    If (r>0)
        addJournalEntry(A_ThisFunc "(): Failed to save vector shape to disk...")
 
     RegAction(1, "FillAreaCurveTension")
@@ -50221,7 +50221,7 @@ MenuSaveEditorVectorShape() {
 
 saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    If (EllipseSelectMode!=2)
-      Return
+      Return 1
 
    If !FolderExist(mainCompiledPath "\resources\vector-shapes")
    {
@@ -50237,7 +50237,7 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    {
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "A vector shape was already defined with the provided name: " givenName ". Do you want to overwrite it? This action is irreversible.", "&Overwrite|&Cancel", 2, "exclamation")
       If (msgResult!="overwrite")
-         Return
+         Return -1
    }
 
    ; the points are serialized first: convertShapePointsArrayToStr() drops any entry with a
