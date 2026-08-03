@@ -79949,7 +79949,7 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
     }
     ; ToolTip, % r "|" pp "|" iCount "|" zGu "|" Gu "|" prevBMP "|" gmx "|" gmy  , , , 2
-    fnOutputDebug(doCompleteRefresh "|" cacheRefresh " | " A_ThisFunc "(): redraw in " A_TickCount - startZeit "ms ")
+    ; fnOutputDebug(doCompleteRefresh "|" cacheRefresh " | " A_ThisFunc "(): redraw in " A_TickCount - startZeit "ms ")
 } ; // drawLiveCreateCustomShape()
 
 getVPcustomShapePath(PointsListArray) {
