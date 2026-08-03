@@ -8942,7 +8942,44 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
            ; matched against the coordinates of the point itself, not against the click:
            ; which anchors ride along must not depend on where inside the dot user pressed
            If (bezierSplineCustomShape=1)
+           {
               auxiliaryPoints := getPointsSameCoordsVectorPath(totalCount, k, thisIndex, soX, soY)
+              hasFirstu := (thisIndex=1) ? 1 : 0
+              hasLastu := (thisIndex=totalCount) ? 1 : 0
+              Loop, % auxiliaryPoints.Count()
+              {
+                  zu := auxiliaryPoints[A_Index, 1]
+                  If (zu=1)
+                     hasFirstu := 1
+                  Else If (zu=totalCount)
+                     hasLastu := 1
+              }
+              bundledEnds := (hasFirstu=1 && hasLastu=1) ? 1 : 0
+           }
+
+           If (bundledEnds=1)
+           {
+              ; the path is closed: the start point and the end point sit on top of each other
+              ; and the bundle collected above drags them as one. They are also each other's
+              ; mirror image [1 <> totalCount], so the symmetry has nothing left to place for
+              ; them; it would only write the mirrored position over the position the bundle
+              ; was just given, which sends the points off in the direction opposite to the
+              ; mouse. The drag is therefore carried out with the symmetry off, whichever the
+              ; mode; the mode itself is left untouched, every other point still mirrors, and
+              ; bringing the ends back onto the axis makes the shape symmetric again
+              canDoSymmetry := 0
+              otheru := ""
+              Loop, % auxiliaryPoints.Count()
+                  otheru .= ", " auxiliaryPoints[A_Index, 1]
+
+              ; the bundle is written to a single position below, so the path ends up exactly
+              ; closed; for as long as the flag says otherwise, viewerAutoCloseOpenPath() pops
+              ; the closure points off every path built from these points and the shape loses
+              ; its last segment. handleOpenCloseBezier() is not the way to declare it here:
+              ; those points are already in place and it would drop the symmetry mode
+              If (closedLineCustomShape!=1)
+                 closedLineCustomShape := mustCloseLine := 1
+           }
         }
 
         zeitSillyPrevent := A_TickCount
@@ -9042,6 +9079,15 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
       splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
    } Else If (zpp=1)
       coreSetVPsymmetryPoint(thisIndex)
+
+   If (mustCloseLine=1)
+   {
+      ; the quick action button is captioned with the action and not with the state,
+      ; it has to be redrawn for the path to stop offering to be closed again
+      RegAction(1, "closedLineCustomShape")
+      If (drawingShapeNow=1)
+         showQuickActionButtonsDrawingShape()
+   }
 
    MouseMove, 2, 0, 2, R
    MouseMove, -2, 0, 2, R
