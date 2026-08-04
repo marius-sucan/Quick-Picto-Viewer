@@ -48940,9 +48940,9 @@ handleOpenCloseBezier(mm:=0) {
 ; through closedLineCustomShape; the renderer performs the same reconciliation on the fly, in
 ; viewerAutoCloseOpenPath(), this one performs it on the editable list, so that the closing
 ; segment gets its own key point and its own anchors and can be edited like any other segment;
-; the memo below holds the inverse of the last toggle, so that toggling straight back hands the
-; user the very seam they had rather than a freshly generated one. 
-
+; the memo [cahed data] below holds the inverse of the last toggle, so that toggling straight
+; back hands the user the very seam they had rather than a freshly generated one. 
+;
 ; Only the ends of the path are cached. closeEditorBezierPath() and openEditorBezierPath()
 ; affect only the ends of the path.
 ;
