@@ -942,66 +942,66 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
     // and silently shrink the pool for the rest of the session
     try
     {
-    if (job.kind==TP_JOB_LOADCACHE)
-    {
-       bmp = tpWICload(fac, job.src.c_str(), 0, 0, 0, cfg->imgQuality, 0, res.srcW, res.srcH);
-       res.loaderUsed = 5;
-       res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
-    } else
-    {
-       const std::wstring ext = tpFileExtension(job.src);
-       const bool fimHandles  = (FIM.ok && cfg->allowFIM==1 && tpFimExts.count(ext)>0);
-
-       if (ext==L"svg" && cfg->allowWIC==1)
-       {
-          // a factory of this worker's own, made on first use so a session that never opens
-          // an SVG pays nothing for it. SINGLE_THREADED carries no internal lock, which is
-          // the whole point; it is safe because the factory, its render target and the SVG
-          // document all live and die inside one WicD2DrenderSVG() call on this thread
-          if (d2dFac==NULL)
-          {
-             if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFac)))
-                d2dFac = NULL;   // LoadSVGimageEx() then shares the process wide one
-          }
-
-          bmp = tpRenderSVG(job.src, cfg->thumbSize, cfg->thumbSize, res.srcW, res.srcH, d2dFac, fac);
-          res.loaderUsed = 3;
-          res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
-       } else if (ext==L"pdf" && cfg->allowWIC==1)
-       {
-          int maxW = cfg->thumbSize, maxH = cfg->thumbSize, pageCount = 0, errorType = -100;
-          {
-             // PDFium keeps global state;
-             std::lock_guard<std::mutex> pdfLock(tpPdfMutex);
-             bmp = RenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
-          }
-          res.loaderUsed = 4;
-          res.srcW = maxW;
-          res.srcH = maxH;
-          res.status = (bmp!=NULL) ? TP_OK : TP_ERR_PDFLOCKED;
-       } else if (!fimHandles && cfg->allowWIC==1 && tpWicExts.count(ext)>0)
-       {
-          bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                          (FIM.ok && cfg->allowFIM==1) ? 1 : 0, res.srcW, res.srcH);
-          res.loaderUsed = 1;
-          res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
-       }
-
-       if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && cfg->allowFIM==1)
-       {
-          int status = TP_ERR_LOAD, saved = 0;
-          int fw = 0, fh = 0;
-          bmp = tpFIMthumb(cfg, job.src, job.dst, startTick, fw, fh, status, saved);
-          res.loaderUsed  = 2;
-          res.status      = status;
-          res.savedToFile = saved;
-          if (fw>0 && fh>0)
-          {
-             res.srcW = fw;
-             res.srcH = fh;
-          }
-       }
-    }
+        if (job.kind==TP_JOB_LOADCACHE)
+        {
+           bmp = tpWICload(fac, job.src.c_str(), 0, 0, 0, cfg->imgQuality, 0, res.srcW, res.srcH);
+           res.loaderUsed = 5;
+           res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+        } else
+        {
+           const std::wstring ext = tpFileExtension(job.src);
+           const bool fimHandles  = (FIM.ok && cfg->allowFIM==1 && tpFimExts.count(ext)>0);
+  
+           if (ext==L"svg")
+           {
+              // a factory of this worker's own, made on first use so a session that never opens
+              // an SVG pays nothing for it. SINGLE_THREADED carries no internal lock, which is
+              // the whole point; it is safe because the factory, its render target and the SVG
+              // document all live and die inside one WicD2DrenderSVG() call on this thread
+              if (d2dFac==NULL)
+              {
+                 if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFac)))
+                    d2dFac = NULL;   // LoadSVGimageEx() then shares the process wide one
+              }
+  
+              bmp = tpRenderSVG(job.src, cfg->thumbSize, cfg->thumbSize, res.srcW, res.srcH, d2dFac, fac);
+              res.loaderUsed = 3;
+              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+           } else if (ext==L"pdf")
+           {
+              int maxW = cfg->thumbSize, maxH = cfg->thumbSize, pageCount = 0, errorType = -100;
+              {
+                 // PDFium keeps global state;
+                 std::lock_guard<std::mutex> pdfLock(tpPdfMutex);
+                 bmp = RenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
+              }
+              res.loaderUsed = 4;
+              res.srcW = maxW;
+              res.srcH = maxH;
+              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_PDFLOCKED;
+           } else if (!fimHandles && cfg->allowWIC==1 && tpWicExts.count(ext)>0)
+           {
+              bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
+                              (FIM.ok && cfg->allowFIM==1) ? 1 : 0, res.srcW, res.srcH);
+              res.loaderUsed = 1;
+              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+           }
+  
+           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && cfg->allowFIM==1)
+           {
+              int status = TP_ERR_LOAD, saved = 0;
+              int fw = 0, fh = 0;
+              bmp = tpFIMthumb(cfg, job.src, job.dst, startTick, fw, fh, status, saved);
+              res.loaderUsed  = 2;
+              res.status      = status;
+              res.savedToFile = saved;
+              if (fw>0 && fh>0)
+              {
+                 res.srcW = fw;
+                 res.srcH = fh;
+              }
+           }
+        }
     } catch (...)
     {
         if (bmp!=NULL)
