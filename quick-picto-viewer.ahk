@@ -48277,6 +48277,7 @@ stopDrawingShape(dummy:="") {
     drawLiveCreateCustomShape("kill", 0, 0)
     If (dummy="cancel")
     {
+       ; restore the path, selection area and symmetry infos
        VPselRotation := vpFreeformShapeOffset[4]
        innerSelectionCavityX := vpFreeformShapeOffset[5]
        innerSelectionCavityY := vpFreeformShapeOffset[6]
@@ -48286,8 +48287,6 @@ stopDrawingShape(dummy:="") {
        closedLineCustomShape := vpFreeformShapeOffset[9]
        bezierSplineCustomShape := vpFreeformShapeOffset[10]
        customShapePoints := oldCustomShapePoints.Clone()
-       ; the points are back as they were, so the symmetry that described them goes back
-       ; too -- and the next resume reads its mode out of prevVectorShapeSymmetryMode[]
        If oldVectorShapeSymmetry.Count()
        {
           CustomShapeSymmetry := oldVectorShapeSymmetry[1]
@@ -48691,12 +48690,7 @@ resumeCustomShapeSelection(thisZL) {
 }
 
 startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
-     ; the symmetry state is taken down before anything below can touch it, so that
-     ; stopDrawingShape("cancel") can hand back exactly what the session started with;
-     ; coreSetVPsymmetryPoint() rewrites prevVectorShapeSymmetryMode[] on nearly every
-     ; redraw and resumeCustomShapeSelection() derives the next session's mode from it,
-     ; so a mode that was picked and then cancelled would otherwise come back as the
-     ; initial mode of the session after it
+     ; record symmetry mode infos to later restore if needed in stopDrawingShape()
      oldVectorShapeSymmetry := [CustomShapeSymmetry, CustomShapeLockedSymmetry, vpSymmetryPointXdp, vpSymmetryPointYdp
                               , Round(prevVectorShapeSymmetryMode[1, 1]), Round(prevVectorShapeSymmetryMode[1, 2])]
      If !CustomShapeSymmetry
