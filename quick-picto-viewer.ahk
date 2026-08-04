@@ -179,7 +179,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := "", hamLowLim := 0, hamUppLim := 0
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
-   , oldCustomShapePoints := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
+   , oldCustomShapePoints := [], oldVectorShapeSymmetry := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, fimMultiBMP := 0, staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
@@ -48286,6 +48286,17 @@ stopDrawingShape(dummy:="") {
        closedLineCustomShape := vpFreeformShapeOffset[9]
        bezierSplineCustomShape := vpFreeformShapeOffset[10]
        customShapePoints := oldCustomShapePoints.Clone()
+       ; the points are back as they were, so the symmetry that described them goes back
+       ; too -- and the next resume reads its mode out of prevVectorShapeSymmetryMode[]
+       If oldVectorShapeSymmetry.Count()
+       {
+          CustomShapeSymmetry := oldVectorShapeSymmetry[1]
+          CustomShapeLockedSymmetry := oldVectorShapeSymmetry[2]
+          vpSymmetryPointXdp := oldVectorShapeSymmetry[3]
+          vpSymmetryPointYdp := oldVectorShapeSymmetry[4]
+          prevVectorShapeSymmetryMode := oldVectorShapeSymmetry[5] ? [[oldVectorShapeSymmetry[5], oldVectorShapeSymmetry[6]]] : []
+       }
+
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
        RegAction(1, "closedLineCustomShape",, 1)
        decideCustomShapeStyle()
@@ -48680,6 +48691,14 @@ resumeCustomShapeSelection(thisZL) {
 }
 
 startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
+     ; the symmetry state is taken down before anything below can touch it, so that
+     ; stopDrawingShape("cancel") can hand back exactly what the session started with;
+     ; coreSetVPsymmetryPoint() rewrites prevVectorShapeSymmetryMode[] on nearly every
+     ; redraw and resumeCustomShapeSelection() derives the next session's mode from it,
+     ; so a mode that was picked and then cancelled would otherwise come back as the
+     ; initial mode of the session after it
+     oldVectorShapeSymmetry := [CustomShapeSymmetry, CustomShapeLockedSymmetry, vpSymmetryPointXdp, vpSymmetryPointYdp
+                              , Round(prevVectorShapeSymmetryMode[1, 1]), Round(prevVectorShapeSymmetryMode[1, 2])]
      If !CustomShapeSymmetry
         CustomShapeLockedSymmetry := 0
 
