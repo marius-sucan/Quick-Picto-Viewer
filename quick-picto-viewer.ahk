@@ -4656,7 +4656,6 @@ QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSav
 ; prepares the workers for one QPV_ShowThumbnails() run; it also discards whatever
 ; may have been left behind by a previous, abandoned run
 ; in the dll, a struct type ThumbsConfig holds these parameters
-
     If (multiCoreThumbsInitGood!=1 || !thumbsPoolState)
        Return 0
 
@@ -4666,27 +4665,30 @@ QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSav
     paramz .= "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
     paramz .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
     paramz .= "|" wantBitmap "|" alwaysSave
-    Return DllCall("qpvmain.dll\thumbsPoolBegin", "Str", paramz, "Int")
+    r := DllCall("qpvmain.dll\thumbsPoolBegin", "Str", paramz, "Int")
+    Return r
 }
 
 QPV_ThumbsPoolSubmit(fileIndex, kind, srcPath, savePath, frameIndex:=0) {
 ; kind: 0 = generate a thumbnail out of srcPath ; 1 = decode the cached thumbnail srcPath
-   Return DllCall("qpvmain.dll\thumbsPoolSubmit", "Int64", fileIndex, "Int", kind, "Str", srcPath, "Str", savePath, "Int", frameIndex, "Int")
+   r := DllCall("qpvmain.dll\thumbsPoolSubmit", "Int64", fileIndex, "Int", kind, "Str", srcPath, "Str", savePath, "Int", frameIndex, "Int")
+   Return r
 }
 
 QPV_ThumbsPoolReady() {
 ; how many finished thumbnails are waiting to be collected
-   Return thumbsPoolState ? NumGet(thumbsPoolState + 0, 8, "Int") : 0
+   r := thumbsPoolState ? NumGet(thumbsPoolState + 0, 8, "Int") : 0
+   Return r
 }
 
 QPV_MemoryIsTight() {
 ; 1 when the machine is short on physical memory; the sample lives in qpvmain.dll and is
 ; refreshed a few times per second at most, so this is cheap enough to call per thumbnail
-
    If !qpvMainDll
       Return 0
 
-   Return DllCall("qpvmain.dll\thumbsPoolMemoryTight", "Int")
+   r := DllCall("qpvmain.dll\thumbsPoolMemoryTight", "Int")
+   Return r
 }
 
 QPV_ThumbsPoolPending() {
@@ -4694,7 +4696,10 @@ QPV_ThumbsPoolPending() {
    If !thumbsPoolState
       Return 0
 
-   Return NumGet(thumbsPoolState + 0, 0, "Int") + NumGet(thumbsPoolState + 0, 4, "Int") + NumGet(thumbsPoolState + 0, 8, "Int")
+   queued := NumGet(thumbsPoolState + 0, 0, "Int") 
+   busy := NumGet(thumbsPoolState + 0, 4, "Int")
+   ready := NumGet(thumbsPoolState + 0, 8, "Int")
+   Return queued + busy + ready
 }
 
 QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
@@ -84454,7 +84459,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         ; identify what needs to be done; are thumbs cached in memory?
         ; load thumbnails or read the original image files
         ; it creates the imgsListArrayThumbs[] array
-
         If (modus="all" && maxFilesIndex>100)
         {
            If (determineTerminateOperation()=1)
