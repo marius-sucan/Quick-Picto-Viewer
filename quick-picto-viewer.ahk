@@ -7924,9 +7924,6 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
   If (newStartPoint=1)
      Return
 
-  ; the whole list is about to be resequenced; the open/close memo describes the two ends of the
-  ; path as they stand now and cannot survive that -- and on a path whose ends sit on collapsed
-  ; anchors its fingerprint could well come through the reordering unchanged
   handleOpenCloseBezier("kill")
   newStartCoords := []
   Loop, % totalLoops - newStartPoint
@@ -7943,12 +7940,6 @@ MenuSetStartVectorPoint(given:=0, isGiven:=0) {
       newArrayu[A_Index + totalLoops - newStartPoint] := customShapePoints[A_Index]
   newArrayu.InsertAt(1 + totalLoops - newStartPoint, customShapePoints[totalLoops])
 
-  ; r := totalLoops - newStartPoint
-  ; d := newStartPoint - 1
-  ; e := 1 + totalLoops - newStartPoint
-  ; f := d + totalLoops - newStartPoint
-  ; newu := newArrayu.Count()
-  ; ToolTip, % totalLoops "==" newu "|" r "|" d "|" e "|" f , , , 2
   customShapePropPoints := newStartCoords.Clone()
   customShapePoints := newArrayu.Clone()
   recordVectorUndoLevels()
@@ -8277,15 +8268,13 @@ autoDeactivateClosedBezier() {
    }
 }
 
-pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0, zz:=0) {
+pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0) {
    If (bezierSplineCustomShape=1 && noCloseTest=0)
       autoDeactivateClosedBezier()
 
    zr := 1
    handleOpenCloseBezier("kill")
    getVectorCoordsFromVPpoint(ogmX, ogmY, gmX, gmY)
-   ; appending never shifts the existing indices, so the recorded symmetry point stays
-   ; where it is; only the insertions done by pushAtGivenVectorPoint() move it
    customShapePoints.Push([gmX, gmY])
    customShapePropPoints.Push([0, 0])
    thisIndex := customShapePoints.MaxIndex()
@@ -8306,12 +8295,11 @@ pushEndNewVectorPoint(ogmX, ogmY, noCloseTest:=0, zz:=0) {
    }
 
    ; a symmetric path has just been given its mirrored point at the front by
-   ; pushAtGivenVectorPoint(), which shifted every cached index; the incremental refresh
-   ; below cannot be used on such a cache, the whole thing has to be rebuilt instead
+   ; pushAtGivenVectorPoint(), which shifted every cached index
    If isNowSymmetricVectorShape()
    {
       lastZeitFileSelect := A_TickCount
-   } Else If (zz!=1)
+   } Else
    {
       vpWinClientSize(mainWidth, mainHeight)
       drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-new-end", zr)
@@ -8346,7 +8334,7 @@ pushAtGivenVectorPoint(givenIndex, ogmX, ogmY) {
 
       ; the three points only form a key point with both of its anchors when they land on
       ; a k=3 slot; on the other two slots one of them is an anchor of a neighbouring key
-      ; point and has to start collapsed onto that key point [see pushEndNewVectorPoint()]
+      ; point and has to start collapsed onto that key point
       zk := Mod(givenIndex, 3)
       If (pushed=3 && zk=1 && givenIndex + 3<=customShapePoints.Count())
       {
@@ -8473,6 +8461,7 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
 
    If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
       handleOpenCloseBezier("kill")
+
    Random, slx, % SelDotsSize//2 + 1, SelDotsSize*4
    Random, sly, % SelDotsSize//2 + 1, SelDotsSize*4
    Random, r1, -1, 1
@@ -17039,7 +17028,6 @@ restoreGivenVectorUndoLevel(levelu) {
    lastZeitFileSelect := A_TickCount
    a := undoVectorShapesLevelsArray[levelu, 1]
    b := undoVectorShapesLevelsArray[levelu, 2]
-   ; the point list is replaced wholesale below; whatever the open/close memo describes is gone
    handleOpenCloseBezier("kill")
    customShapePoints := a.Clone()
    customShapePropPoints := b.Clone()
@@ -48275,10 +48263,10 @@ stopDrawingShape(dummy:="") {
        Return
 
     vectorToolModus := 1
+    zeitSillyPrevent := A_TickCount
+    handleOpenCloseBezier("kill")
     If (customShapePoints.Count()>2000)
        showTOOLtip("Exiting vector tool mode...")
-    handleOpenCloseBezier("kill")
-    zeitSillyPrevent := A_TickCount
     VPcreateSelPath("kill", 0, 0, 0, 0, 0, 0, 0, 0)
     drawLiveCreateCustomShape("kill", 0, 0)
     If (dummy="cancel")
@@ -48388,7 +48376,7 @@ loadSimplifiedPreviousVectorShape() {
    If (newArrayu.Count()<3)
       Return
 
-   handleOpenCloseBezier("kill")   ; both lists are replaced wholesale below
+   handleOpenCloseBezier("kill")
    customShapePropPoints := []
    Loop, % newArrayu.Count()
         customShapePropPoints[A_Index] := [prevDestPosX, prevDestPosY, 0, prevResizedVPimgW, prevResizedVPimgH]
@@ -48427,7 +48415,6 @@ flipWHcustomShape(modus) {
     If (editingSelectionNow!=1 || EllipseSelectMode!=2)
        Return
 
-    ; every point is about to be rewritten, the two ends the open/close memo describes included
     handleOpenCloseBezier("kill")
     Loop, % customShapePoints.Count()
     {
@@ -48441,12 +48428,6 @@ flipWHcustomShape(modus) {
           customShapePoints[A_Index] := [c[1], 1 - c[2]]
     }
 
-    ; a flip does not reorder the list, so the P[i] <> P[count - i + 1] pairing and the middle
-    ; point that holds the axis both come through it untouched, and a vertical axis stays
-    ; vertical whichever way the shape was flipped. The axis itself does move -- flipping
-    ; horizontally takes it to the far side of the shape -- and vpSymmetryPointXdp/Ydp cache it
-    ; in viewport pixels, so it has to be read off the points again, or every mirrored edit
-    ; that follows reflects across the line the axis used to be on
     If (drawingShapeNow=1 && isNowSymmetricVectorShape())
        coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
 
@@ -48455,8 +48436,7 @@ flipWHcustomShape(modus) {
     decideCustomShapeStyle()
     If (drawingShapeNow=1)
     {
-       ; the editor keys its point cache on the point count, which a flip leaves alone; the
-       ; redraw has to be forced the way every other editor side mutation forces it
+       ; trigger a redraw of the viewport
        lastZeitFileSelect := A_TickCount
        recordVectorUndoLevels()
     }
@@ -48752,8 +48732,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
         postVectorWinOpen := StrReplace(postVectorWinOpen, "c")
 
      drawingShapeNow := 1
-     handleOpenCloseBezier("kill")   ; a memo left over from the previous editing session says
-                                     ; nothing about the path this one is about to work on
+     handleOpenCloseBezier("kill")
      If (customShapePoints.Count()>2)
         oldCustomShapePoints := customShapePoints.Clone()
 
@@ -48961,16 +48940,14 @@ handleOpenCloseBezier(mm:=0) {
 ; through closedLineCustomShape; the renderer performs the same reconciliation on the fly, in
 ; viewerAutoCloseOpenPath(), this one performs it on the editable list, so that the closing
 ; segment gets its own key point and its own anchors and can be edited like any other segment;
-; the memo below holds the inverse of the last toggle -- what it put on the two ends, to be taken
-; off again, and what it took off them, to be put back -- so that toggling straight back hands the
-; user the very seam they had rather than a freshly generated one. Only the ends are ever written
-; down: closeEditorBezierPath() only ever adds points at the two ends of the path and
-; openEditorBezierPath() only ever removes them from those same two ends, neither of them so much
-; as reads the middle, and so the memo has no business carrying a copy of the whole path around.
-; It is dropped by every editing operation through the «kill» entry point, and it is additionally
-; checked against the two ends this function produced, so that an edit which did not call «kill»
-; -- moving a point in the middle of the path does not -- can never be silently reverted; see
-; vectorPathEndsFingerprint() for why four points at each end are exactly enough
+; the memo below holds the inverse of the last toggle, so that toggling straight back hands the
+; user the very seam they had rather than a freshly generated one. 
+
+; Only the ends of the path are cached. closeEditorBezierPath() and openEditorBezierPath()
+; affect only the ends of the path.
+;
+; The cache is dropped by every editing operation through the «kill» entry point.
+
    Static memo := ""
    If (mm="kill" || bezierSplineCustomShape!=1)
    {
@@ -48992,15 +48969,10 @@ handleOpenCloseBezier(mm:=0) {
    thisDir := (wantClosed=1) ? "close" : "open"
    If canApplyOpenCloseBezierMemo(memo, thisDir)
    {
-      ; the previous toggle is being taken back and neither end was edited since: the seam it had
-      ; removed goes back where it stood, or the one it had added comes away again, anchors and
-      ; point selections included. The middle of the path is left exactly as it is found
       newRec := undoEditorBezierSplice(memo)
       If IsObject(newRec)
       {
          ; the symmetry only comes back when the user did not declare another one in the meantime;
-         ; when they did, the geometry is still handed back -- running the opener over a seam it
-         ; did not make would leave half of it dangling at the front -- but their choice stands
          If (Round(CustomShapeSymmetry)=memo.symNow[1] && Round(CustomShapeLockedSymmetry)=memo.symNow[2]
             && Round(prevVectorShapeSymmetryMode[1, 1])=memo.symNow[3])
          {
@@ -49028,8 +49000,7 @@ handleOpenCloseBezier(mm:=0) {
    {
       ; only an odd count can carry the P[i] <> P[totalz - i + 1] pairing, and opening a mirrored
       ; path takes six points off it, three at each end; when the path cannot keep the pairing
-      ; the mode is discarded whole, prevVectorShapeSymmetryMode included, or a stale reference
-      ; would still be written into the .vqpv file by resolveVectorShapeSymmetry()
+      ; the mode is discarded whole, prevVectorShapeSymmetryMode included
       If (Mod(totalz, 2)!=1)
          symDropMsg := "WARNING: The vector path has an even number of points: " groupDigits(totalz) "."
       Else If (wantClosed!=1 && totalz<10)
@@ -49052,8 +49023,6 @@ handleOpenCloseBezier(mm:=0) {
    Else
       thisRec := openEditorBezierPath(canDoSymmetry)
 
-   ; the reference point is settled before the memo is sealed, or the state written into it is
-   ; not the one the user will be editing from and the memo rejects itself on the way back
    If (canDoSymmetry=1)
       coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
 
@@ -49217,7 +49186,7 @@ undoEditorBezierSplice(memo) {
 }
 
 canApplyOpenCloseBezierMemo(memo, thisDir) {
-; whether the memo still describes the path in front of us: the toggle has to be going the other
+; whether the memo [cached data] still describes the path in front of us: the toggle has to be going the other
 ; way, the count has to be the one the toggle left behind, and the two ends have to be untouched.
 ; Nothing else is compared -- the splice writes to the ends alone and hands the middle on exactly
 ; as it finds it, so an edit made in the middle has nothing to be protected from
@@ -49325,8 +49294,7 @@ testIsEditorBezierPathClosed(m:=0) {
 
 testEditorBezierPathPairsAsClosed() {
 ; whether a closed bezier path can carry the P[i] <> P[totalz - i + 1] symmetry pairing exactly
-; as it stands: the seam is written down twice, so 1 <> totalz pairs it with itself, and an odd
-; count leaves exactly one further self paired index, the middle key point, sitting on the axis.
+; as it stands.
 ; A well formed bezier path counts 6m + 1 points, so that middle index is always a key point
     totalz := customShapePoints.Count()
     If (bezierSplineCustomShape!=1 || totalz<7 || Mod(totalz, 2)!=1 || Mod(totalz, 3)!=1)
@@ -50160,7 +50128,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
       whichFile := mainCompiledPath "\resources\vector-shapes\" whichFile ".vqpv"
 
    externMode := (isGiven="yes" && whichFile) ? 1 : 0
-   handleOpenCloseBezier("kill")   ; whatever is loaded below replaces the point list wholesale
+   handleOpenCloseBezier("kill")
    If (externMode!=1)
    {
       RowNumber := getSelectedVectorShapeLVrow(givenName, datu, whichShape)
