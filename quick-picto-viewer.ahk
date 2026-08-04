@@ -48955,9 +48955,9 @@ handleOpenCloseBezier(mm:=0) {
       Return
    }
 
-   totalz := customShapePoints.Count()
    ; the count of a bezier path is always 3n + 1; a malformed list is left alone, the renderer
    ; pads it for display and performBezierActivePathAutoFixNow() repairs the array itself
+   totalz := customShapePoints.Count()
    If (totalz<4 || Mod(totalz, 3)!=1)
       Return
 
@@ -48969,7 +48969,7 @@ handleOpenCloseBezier(mm:=0) {
    thisDir := (wantClosed=1) ? "close" : "open"
    If canApplyOpenCloseBezierMemo(memo, thisDir)
    {
-      newRec := undoEditorBezierSplice(memo)
+      newRec := OpenCloseBezierUndoEditorSplice(memo)
       If IsObject(newRec)
       {
          ; the symmetry only comes back when the user did not declare another one in the meantime;
@@ -48987,7 +48987,7 @@ handleOpenCloseBezier(mm:=0) {
          If isNowSymmetricVectorShape()      ; the viewport may have been zoomed or panned since
             coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
 
-         memo := sealOpenCloseBezierMemo(newRec, thisDir, preSym)
+         memo := storeOpenCloseBezierMemo(newRec, thisDir, preSym)
          recordVectorUndoLevels()
          lastZeitFileSelect := A_TickCount
          Return
@@ -49026,7 +49026,7 @@ handleOpenCloseBezier(mm:=0) {
    If (canDoSymmetry=1)
       coreSetVPsymmetryPoint(customShapePoints.Count()//2 + 1)
 
-   memo := sealOpenCloseBezierMemo(thisRec, thisDir, preSym)
+   memo := storeOpenCloseBezierMemo(thisRec, thisDir, preSym)
    recordVectorUndoLevels()
    lastZeitFileSelect := A_TickCount
 }
@@ -49127,12 +49127,9 @@ openEditorBezierPath(canDoSymmetry) {
    Return thisRec
 }
 
-undoEditorBezierSplice(memo) {
-; takes the last toggle back off the path: what it put on the two ends comes away and what it took
-; off them goes back, at the very indices they held. What is done here is written down the same
-; way the toggle itself was, so that the memo can be turned around and the two states keep handing
-; each other back for as long as the ends are left alone. Returns "" when the arithmetic does not
-; add up, and nothing has been touched in that case
+OpenCloseBezierUndoEditorSplice(memo) {
+; takes as parameter the cached data from handleOpenCloseBezier()
+
    totalz := customShapePoints.Count()
    headz := Round(memo.addHead),  tailz := Round(memo.addTail)
    If (headz<0 || tailz<0 || headz + tailz>totalz - 1)
@@ -49186,10 +49183,9 @@ undoEditorBezierSplice(memo) {
 }
 
 canApplyOpenCloseBezierMemo(memo, thisDir) {
-; whether the memo [cached data] still describes the path in front of us: the toggle has to be going the other
-; way, the count has to be the one the toggle left behind, and the two ends have to be untouched.
-; Nothing else is compared -- the splice writes to the ends alone and hands the middle on exactly
-; as it finds it, so an edit made in the middle has nothing to be protected from
+; whether the memo [cached data by handleOpenCloseBezier()] still describes the same path:
+; the toggle has to be going the other way, the count has to be the same,
+; and the ends of the path have to be unmodified.
    If (!IsObject(memo) || memo.dir="" || memo.dir=thisDir)
       Return 0
 
@@ -49200,10 +49196,7 @@ canApplyOpenCloseBezierMemo(memo, thisDir) {
    Return vectorPointsListsMatch(memo.ends, vectorPathEndsFingerprint())
 }
 
-sealOpenCloseBezierMemo(thisRec, thisDir, preSym) {
-; writes down what the toggle just did to the two ends of the path, together with the state it is
-; to be taken back to. The path is measured afterwards, not before: what has to be recognised on
-; the way back is the path the toggle produced
+storeOpenCloseBezierMemo(thisRec, thisDir, preSym) {
    If !IsObject(thisRec)
       Return ""
 
@@ -49224,13 +49217,9 @@ sealOpenCloseBezierMemo(thisRec, thisDir, preSym) {
 }
 
 vectorPathEndsFingerprint() {
-; the first four points of the path and the last four. Every editing operation that can reach an
-; index the seam splice writes to either drops the memo through «kill» -- those guards all read
-; thisIndex<4 || thisIndex>count - 3 -- or moves one of the eight points recorded here: 4 and
-; count - 3 are the two indices the kill guards let through, and expandGivenAnchorInPath() and
-; moveOnePointInVectorPath() reach their neighbours at 3 and count - 2 from there. A memo that
-; comes through this test can only have survived an edit in the middle of the path, and the
-; splice does not touch the middle, it hands it on exactly as it finds it
+; The first four points of the path and the last four.
+; Every editing operation that can affect these points calls handleOpenCloseBezier("kill") to 
+; clear the cached data (memo)
    newArrayu := []
    totalz := customShapePoints.Count()
    If (totalz<4)
@@ -49246,11 +49235,11 @@ vectorPathEndsFingerprint() {
 }
 
 cloneVectorPointsRange(ByRef listu, startu, countu) {
-; a copy of countu entries of listu, from startu on. The entries of customShapePropPoints[] are
-; written to in place [the point selection flags] and recordVectorUndoLevels() only takes a
-; shallow copy of the outer array, so the recorded undo levels already hold the very same objects;
-; handing those to the memo would let a later selection write into the memo, and into the undo
-; level with it -- a plain Clone() of the outer array keeps handing back the live objects too
+; The function performs a deep copy of count entries of the elements from listu into itself,
+; beginning with the index defined by startu.
+; It is necessary because the clones of customShapePointsp[] recorded by recordVectorUndoLevels()
+; are shallow.
+
    newArrayu := []
    Loop, % countu
    {
