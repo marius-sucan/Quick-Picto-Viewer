@@ -21903,14 +21903,19 @@ HugeImagesApplyPasteInPlace() {
       {
          If (hFIFimgD && PasteInPlaceOrientation>1)
          {
-            hFIFimgA := trFreeImage_Rescale(hFIFimgD, dw, dh, thisQuality)
-            FreeImage_UnLoad(hFIFimgD)
+            hFIFimgA := hFIFimgA
+            hFIFimgD := ""
          } Else
-            hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
+         {
+            If (PasteInPlaceApplyColorFX=1 && applyCLRfxAfter=1 || PasteInPlaceOrientFlipY=1 || PasteInPlaceOrientFlipX=1)
+               hFIFimgA := FreeImage_Crop(viewportQPVimage.imgHandle, x1, y1, w, h)
+            Else
+               hFIFimgA := FreeImage_CroppedView(viewportQPVimage.imgHandle, x1, y1, w, h)
+            ; hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
+         }
       } Else If oldSelectionArea[11]
       {
-         hFIFimgA := trFreeImage_Rescale(oldSelectionArea[11], dw, dh, thisQuality)
-         FreeImage_UnLoad(oldSelectionArea[11])
+         hFIFimgA := oldSelectionArea[11]
          oldSelectionArea[11] := ""
       }
 
@@ -21967,6 +21972,7 @@ HugeImagesApplyPasteInPlace() {
       If (VPselRotation=360)
          VPselRotation := 0
 
+      ; hFIFimgA must be resized JIT at dw x dh.
       r := HugeImagesApplyGenericFilters(friendly, 1, hFIFimgA, 0)
       terminatePasteInPlace()
       If (r!=1)
@@ -22059,6 +22065,8 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
             gradientsBMP := drawFillSelGradient(ResizedW, ResizedH, 0, 0, 0, ResizedW, ResizedH, userimgGammaCorrect)
             fnOutputDebug(A_ThisFunc "(): gradient bitmap generated at: " ResizedW " | " ResizedH)
+/*
+commented code that crops the bitmap
             azX := (imgSelX1<0) ? abs(ImgSelX1) : 0
             azY := (imgSelY1<0) ? abs(ImgSelY1) : 0
             sazY := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
@@ -22076,10 +22084,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                pZy := (imgSelY1<0) ? 0 : Floor(sazY*yf)
                If (imgSelY1<0 && imgSelY2>imgH)
                   pZy += abs(Round(imgSelY2 - imgH)*yf)
-               ; ToolTip, % "l=" pZy  , , , 2
-               ; Gux := Gdip_GraphicsFromImage(gradientsBMP)
-               ; Gdip_DrawRectangle(Gux, pPen7, zX, pZy, rw, rh)
-               ; Gdip_DeleteGraphics(Gux)
+
                kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, Round(pZy), rw, rh)
                trGdip_GetImageDimensions(kBitmap, kww, khh)
                fnOutputDebug(A_ThisFunc "(): crop coordinates: " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
@@ -22091,6 +22096,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                   ; fnOutputDebug(A_ThisFunc ": cropped top/left bounds from gradient YAY")
                }
             }
+*/
 
             If validBMP(gradientsBMP)
             {
@@ -22117,12 +22123,13 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                addJournalEntry(A_ThisFunc "(): Failed to generate the gradient bitmap.")
          } Else If (transformTool=1)
          {
+/*
+commented code that crops the bitmap
             FreeImage_GetImageDimensions(hFIFimgExtern, tw, th)
             zxa := (imgSelX1<0) ? abs(ImgSelX1) : 0
             zya := (imgSelY1<0) ? abs(ImgSelY1) : 0
             zxb := (ImgSelX2>imgW) ? tw - (imgSelX2 - imgW) : tw
             zyb := (ImgSelY2>imgH) ? th - (imgSelY2 - imgH) : th
-            ; wz := zxb - zxa,    hz := zyb - zya
             If (zxa || zya || zxb!=tw || zyb!=th)
             {
                ; crop top/left out of bounds
@@ -22130,11 +22137,13 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                FreeImage_UnLoad(hFIFimgExtern)
                hFIFimgExtern := hFIFimgZB
             }
-
+*/
             gScan := FreeImage_GetBits(hFIFimgExtern)
             gStride := FreeImage_GetStride(hFIFimgExtern)
             gBpp := FreeImage_GetBPP(hFIFimgExtern)
             FreeImage_GetImageDimensions(hFIFimgExtern, nBmpW, nBmpH)
+            rescaleJIT := 2
+            rescaleJITfilter := 3
             ; TulTip(A_ThisFunc, "|", zxa, zya, wz, hz, obju.imgZelW, obju.imgZelH)
          }
 

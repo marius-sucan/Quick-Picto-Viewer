@@ -1120,6 +1120,10 @@ FreeImage_Crop(hImage, x, y, w, h) {
    Return FreeImage_Copy(hImage, x, y, x + w, y + h)
 }
 
+FreeImage_CroppedView(hImage, x, y, w, h) {
+   Return FreeImage_CreateView(hImage, x, y, x + w, y + h)
+}
+
 FreeImage_Copy(hImage, nLeft, nTop, nRight, nBottom) {
 ; use this function to crop images
    If (hImage="")
