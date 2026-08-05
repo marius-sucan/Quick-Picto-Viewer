@@ -13422,7 +13422,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     fntWeight := (TextInAreaFontBold=1) ? 800 : 400
     hFont := Gdi_CreateFontByName(TextInAreaFontName, TextInAreaFontSize, fntWeight, TextInAreaFontItalic, TextInAreaFontStrike, TextInAreaFontUline, fntQuality, thisLineAngle)
     If (Gdi_GetObjectType(hFont)!="FONT")
-       Return "fail"
+       Return "Unable to create the font object."
 
     thisBlurAmount := (TextInAreaDoBlurs=1) ? max(TextInAreaBlurAmount, TextInAreaBlurBorderAmount) // 2 : 0
     obs := borderSize := (TextInAreaBorderOut>1) ? TextInAreaBorderSize//2 + thisBlurAmount : thisBlurAmount
@@ -13590,7 +13590,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 1])
           trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 2])
        }
-       Return
+       Return "Unable to allocate FreeImage bitmap."
     }
 
     FreeImage_GetImageDimensions(hFIFimgA, mImgW, mImgH)
@@ -13796,7 +13796,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     If (fattalErr>1)
     {
        FreeImage_UnLoad(hFIFimgA)
-       Return
+       Return "Errors counter: " fattalErr "."
     }
 
     If (TextInAreaValign=3)
@@ -21321,11 +21321,17 @@ HugeImagesApplyInsertText() {
          imgSelX1 := o_imgSelX1,    imgSelY1 := o_imgSelY1
          imgSelX2 := o_imgSelX2,    imgSelY2 := o_imgSelY2
          defineRelativeSelCoords(imgW, imgH)
-      } Else failure := 1
+      } Else failure := 2
 
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       If failure
       {
+         If (failure=2)
+         {
+            showTOOLtip("ERROR: Unable to render texts. " tobju)
+            SoundBeep 300, 100
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+         }
          ResetImgLoadStatus()
          Return
       }
