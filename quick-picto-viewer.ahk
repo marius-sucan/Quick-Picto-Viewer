@@ -13582,17 +13582,26 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
     }
 
     hFIFimgA := FreeImage_Allocate(maxedW, maxedH, 32)
+    If !hFIFimgA
+    {
+       Loop, % rendered
+       {
+          ; discard rendered lines
+          trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 1])
+          trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 2])
+       }
+       Return
+    }
+
     FreeImage_GetImageDimensions(hFIFimgA, mImgW, mImgH)
     bpp := FreeImage_GetBPP(hFIFimgA)
     pBitsAll := FreeImage_GetBits(hFIFimgA)
     Stride := FreeImage_GetStride(hFIFimgA)
+    fattalErr := 0
 
     showTOOLtip("Applying insert text, please wait...`nColouring text lines")
     Loop, % rendered
     {
-       If fattalErr
-          Break
-
        thisBMP := cachedRawTXTbmps[A_Index, 1]
        pBitmapContours := cachedRawTXTbmps[A_Index, 2]
        imgW := mw := cachedRawTXTbmps[A_Index, 5]
@@ -13602,14 +13611,15 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        cachedRawTXTbmps[A_Index, 3] := thisX
        cachedRawTXTbmps[A_Index, 4] := thisY
        ; fnOutputDebug(A_ThisFunc " loop rendered " A_Index "|" mw "|" mh "|" thisX "|" thisY)
+       r := rz := -1
        If validBMP(thisBMP)
        {
           If (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
              Sleep, -1
           Else If (TextInAreaCutOutMode=1 && TextInAreaPaintBgr=1)
-             QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
+             rz := QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
           Else
-             QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaFontColor, "0x00" TextInAreaFontColor, 0)
+             rz := QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaFontColor, "0x00" TextInAreaFontColor, 0)
        }
 
        If (validBMP(thisBMP) || validBMP(pBitmapContours))
@@ -13658,9 +13668,9 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           {
              Gdip_GetImageDimensions(thisBMP, mw, mh)
              If (pkcut=1)
-                QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
+                rz := QPV_ColorizeGrayImage(thisBMP, "0x00" TextInAreaBgrColor, bgrColor, 0)
              Else If !(TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1)
-                QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
+                rz := QPV_ColorizeGrayImage(thisBMP, "0xFF" TextInAreaBorderColor, "0x00" TextInAreaBorderColor, 0)
 
              EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
              If !EZ
@@ -13676,7 +13686,10 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 thisBMP := trGdip_DisposeImage(thisBMP)
              }
           }
+
        }
+       If (r=0 || rz=0)
+          fattalErr++
     }
 
     modusContour := (TextInAreaCutOutMode=1 && TextInAreaOnlyBorder=1 || TextInAreaCutOutMode=0) ? 1 : 0
@@ -13686,7 +13699,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
        modusContour := 1
 
     showTOOLtip("Applying insert text, please wait...`nPost-processing text line bitmaps")
-    If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && fattalErr!=1)
+    If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1)
     {
        r := DllCall("qpvmain.dll\FillImageHoles", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", "0xFF000000")
        If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=0 && TextInAreaBorderOut>1)
@@ -13698,7 +13711,8 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              thisBMP := cachedRawTXTbmps[A_Index, 2]
              If validBMP(thisBMP)
              {
-                thisX := cachedRawTXTbmps[A_Index, 3],    thisY := cachedRawTXTbmps[A_Index, 4]
+                thisX := cachedRawTXTbmps[A_Index, 3]
+                thisY := cachedRawTXTbmps[A_Index, 4]
                 Gdip_GetImageDimensions(thisBMP, mw, mh)
                 EZ := trGdip_LockBits(thisBMP, 0, 0, mw, mh, mStride, mScan, mData, 1)
                 If !EZ
@@ -13706,12 +13720,15 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                    r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 0, "int", userimgGammaCorrect, "int", 5, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                    Gdip_UnlockBits(thisBMP, mData)
                    thisBMP := trGdip_DisposeImage(thisBMP)
+                   If (r!=1)
+                      fattalErr++
                    ; fnOutputDebug(A_Index " rendered C bitmap")
                 }
              }
           }
        }
 
+       r := -1
        If (TextInAreaCutOutMode=1)
        {
           r := DllCall("qpvmain.dll\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", 0, "int", "0x00" TextInAreaBgrColor, "int", bgrColor)
@@ -13738,6 +13755,8 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           ntxtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
           r := DllCall("qpvmain.dll\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", ntxtColor, "int", bgrColor)
        }
+       If (r=0)
+          fattalErr++
     }
 
     If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=1 && TextInAreaBorderOut>1 && fattalErr!=1)
@@ -13759,14 +13778,26 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
                 ; fnOutputDebug(A_Index " rendered D bitmap")
                 Gdip_UnlockBits(thisBMP, mData)
                 thisBMP := trGdip_DisposeImage(thisBMP)
+                If (r!=1)
+                   fattalErr++
              }
           }
        }
     }
 
+    Loop, % rendered
+    {
+       ; make sure everything is discarded
+       trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 1])
+       trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 2])
+    }
+
     Gdi_DeleteObject(hFont)
-    If (fattalErr=1)
+    If (fattalErr>1)
+    {
+       FreeImage_UnLoad(hFIFimgA)
        Return
+    }
 
     If (TextInAreaValign=3)
        minedY += lnSpace
@@ -21243,7 +21274,7 @@ HugeImagesApplyInsertText() {
                FreeImage_UnLoad(hFIFimgA)
                hFIFimgA := hFIFimgZ
                FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
-            } else failure++
+            } Else failure++
          }
 
          If (imgSelX1<0 && failure=0)
@@ -21254,7 +21285,7 @@ HugeImagesApplyInsertText() {
                FreeImage_UnLoad(hFIFimgA)
                hFIFimgA := hFIFimgZ
                FreeImage_GetImageDimensions(hFIFimgA, nImgW, nImgH)
-            } else failure++
+            } Else failure++
          }
 
          If (failure=0)
@@ -21290,7 +21321,7 @@ HugeImagesApplyInsertText() {
          imgSelX1 := o_imgSelX1,    imgSelY1 := o_imgSelY1
          imgSelX2 := o_imgSelX2,    imgSelY2 := o_imgSelY2
          defineRelativeSelCoords(imgW, imgH)
-      }
+      } Else failure := 1
 
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       If failure
@@ -22143,8 +22174,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
          r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH, "int", rescaleJIT, "int", rescaleJITfilter)
-         If hFIFimgRealGradient
-            FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
             FreeImage_UnLoad(hFIFimgExtern)
    
@@ -38159,7 +38188,9 @@ readSlideSettingsINI(readThisFile, act:=0) {
         If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
            imageAlignVPtopLeft := 0
 
+        interfaceThread.ahkassign("WindowBGRcolor", WindowBGRcolor)
         interfaceThread.ahkFunction("updateWindowColor")
+        refreshWinBGRbrush()
         defineColorDepth()
         recalculateThumbsSizes()
     } Else
@@ -70839,7 +70870,7 @@ focusVectorEndPoint() {
    }
 }
 
-focusImgSelArea(zx:=0, zy:=0, isGiven:=0, doCenter:=0) {
+focusImgSelArea(zx:=0, zy:=0, isGiven:=0, doCenter:=0, bothAxesForced:=0) {
    nImgSelX1 := min(imgSelX1, imgSelX2)
    nImgSelY1 := min(imgSelY1, imgSelY2)
    gX := Round(nImgSelX1*zoomLevel)
@@ -70870,7 +70901,7 @@ focusImgSelArea(zx:=0, zy:=0, isGiven:=0, doCenter:=0) {
       IMGdecalageY := -(gY - cY)
    }
 
-   If (forced=1)
+   If (bothAxesForced=1)
    {
       IMGdecalageX := -(gX - cX)
       IMGdecalageY := -(gY - cY)
