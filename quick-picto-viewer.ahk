@@ -21852,9 +21852,12 @@ HugeImagesApplyPasteInPlace() {
       xa := allowOutside[2], ya := allowOutside[3]
       xb := allowOutside[4], yb := allowOutside[5]
       dw := xb - xa,         dh := yb - ya
-      Stride := (bpp * max(dW, w, kw)) / 8
-      bufferSize := (PasteInPlaceOrientation>1) ? Stride * max(dH, h, kh) : 1
-      If memoryUsageWarning(max(dw, w), max(dh, h), bpp, 0, bufferSize)
+      ; the object is never rescaled into a dw x dh buffer any longer: FillSelectArea()
+      ; stretches it over the destination area as it paints. Only the object itself,
+      ; at its own size, is ever allocated here [rotated and/or cropped]
+      Stride := (bpp * max(w, kw)) / 8
+      bufferSize := (PasteInPlaceOrientation>1) ? Stride * max(h, kh) : 1
+      If memoryUsageWarning(max(w, kw), max(h, kh), bpp, 0, bufferSize)
       {
          terminatePasteInPlace()
          Return
@@ -21903,11 +21906,21 @@ HugeImagesApplyPasteInPlace() {
       {
          If (hFIFimgD && PasteInPlaceOrientation>1)
          {
-            hFIFimgA := hFIFimgA
+            hFIFimgA := hFIFimgD
             hFIFimgD := ""
          } Else
          {
-            If (PasteInPlaceApplyColorFX=1 && applyCLRfxAfter=1 || PasteInPlaceOrientFlipY=1 || PasteInPlaceOrientFlipX=1)
+            ; a view shares its bits with the image FillSelectArea() is about to paint,
+            ; so it only holds up while nothing writes over the source area: not when it
+            ; is altered in place, not when the initial area is erased first [that would
+            ; wipe the view before it is read], and not when the source overlaps the
+            ; destination [the paint loop would then read pixels it just wrote]
+            mustCopy := (PasteInPlaceApplyColorFX=1 && applyCLRfxAfter=1 || PasteInPlaceOrientFlipY=1 || PasteInPlaceOrientFlipX=1 || PasteInPlaceEraseInitial=1) ? 1 : 0
+            If (mustCopy!=1 && x1<xb && xa<x2 && y1<yb && ya<y2)
+               mustCopy := 1
+
+            fnOutputDebug(A_ThisFunc "(): transform object taken as a " (mustCopy=1 ? "copy" : "view") " at " x1 "|" y1 " - " w " x " h)
+            If (mustCopy=1)
                hFIFimgA := FreeImage_Crop(viewportQPVimage.imgHandle, x1, y1, w, h)
             Else
                hFIFimgA := FreeImage_CroppedView(viewportQPVimage.imgHandle, x1, y1, w, h)
@@ -22039,12 +22052,11 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             zW := (FillAreaInverted=1) ? imgW : max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
             zH := (FillAreaInverted=1) ? imgH : max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
             nzW := zW, nzH := zH
-            mustUnlock := mustResize := 0
+            mustUnlock := 0
             capIMGdimensionsFormatlimits("gdip", 1, nzW, nzH)
             ; If (max(zW, zH)>14500)
             If (zW!=nzW || zH!=nzH)
             {
-               mustResize := 1
                ResizedW := nzW
                ResizedH := nzH
                ; fnOutputDebug(A_ThisFunc " small gradient bitmap")
@@ -22065,48 +22077,14 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
             gradientsBMP := drawFillSelGradient(ResizedW, ResizedH, 0, 0, 0, ResizedW, ResizedH, userimgGammaCorrect)
             fnOutputDebug(A_ThisFunc "(): gradient bitmap generated at: " ResizedW " | " ResizedH)
-/*
-commented code that crops the bitmap
-            azX := (imgSelX1<0) ? abs(ImgSelX1) : 0
-            azY := (imgSelY1<0) ? abs(ImgSelY1) : 0
-            sazY := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
-            szW := (ImgSelX2>imgW) ? imgSelX2 - imgW : 0
-            szH := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
-            If ((szW || szH || azX || azY) && validBMP(gradientsBMP) && FillAreaInverted=0)
-            {
-               ; crop top/left out of bounds
-               xf := ResizedW/zW,                 yf := ResizedH/zH
-               zX := Floor(azX*xf),               zY := Floor(azY*yf)
-               szX := Ceil(azX*xf) + 1,           szY := Ceil(azY*yf) + 1
-               szW := Ceil(szW*xf) + 1,           szH := Ceil(szH*yf) + 1
-               rw := clampInRange(ResizedW - szX - szW, 2, ResizedW)
-               rh := clampInRange(ResizedH - szY - szH, 2, ResizedH)
-               pZy := (imgSelY1<0) ? 0 : Floor(sazY*yf)
-               If (imgSelY1<0 && imgSelY2>imgH)
-                  pZy += abs(Round(imgSelY2 - imgH)*yf)
-
-               kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, Round(pZy), rw, rh)
-               trGdip_GetImageDimensions(kBitmap, kww, khh)
-               fnOutputDebug(A_ThisFunc "(): crop coordinates: " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
-               fnOutputDebug(A_ThisFunc "(): gradient bitmap cropped at w/h: " kww " | " khh)
-               If validBMP(kBitmap)
-               {
-                  trGdip_DisposeImage(gradientsBMP, 1)
-                  gradientsBMP := kBitmap
-                  ; fnOutputDebug(A_ThisFunc ": cropped top/left bounds from gradient YAY")
-               }
-            }
-*/
-
             If validBMP(gradientsBMP)
             {
-               If (mustResize=1)
-               {
-                  ; The gradient stays at its capped size and FillSelectArea() stretches it
-                  ; just-in-time, as it walks the image.
-                  rescaleJIT := (FillAreaInverted=1) ? 1 : 2    ; mode 1 = stretch over the whole image; mode 2 = over the selection box.
-                  rescaleJITfilter := 4   ; Catmull-Rom
-               }
+               ; The gradient always spans the whole selection area, off-image parts
+               ; included, whether it was capped or not; FillSelectArea() stretches it
+               ; over that area just-in-time, as it walks the image, and drops whatever
+               ; lands outside the image. No cropped copy of the gradient is needed.
+               rescaleJIT := (FillAreaInverted=1) ? 1 : 2    ; mode 1 = stretch over the whole image; mode 2 = over the selection box.
+               rescaleJITfilter := 4   ; Catmull-Rom
                gBpp := 32
                trGdip_GetImageDimensions(gradientsBMP, nBmpW, nBmpH)
                fnOutputDebug(A_ThisFunc "(): locking gradient bits with gdi+. w/h = " ResizedW " | " ResizedH)
@@ -22123,28 +22101,16 @@ commented code that crops the bitmap
                addJournalEntry(A_ThisFunc "(): Failed to generate the gradient bitmap.")
          } Else If (transformTool=1)
          {
-/*
-commented code that crops the bitmap
-            FreeImage_GetImageDimensions(hFIFimgExtern, tw, th)
-            zxa := (imgSelX1<0) ? abs(ImgSelX1) : 0
-            zya := (imgSelY1<0) ? abs(ImgSelY1) : 0
-            zxb := (ImgSelX2>imgW) ? tw - (imgSelX2 - imgW) : tw
-            zyb := (ImgSelY2>imgH) ? th - (imgSelY2 - imgH) : th
-            If (zxa || zya || zxb!=tw || zyb!=th)
-            {
-               ; crop top/left out of bounds
-               hFIFimgZB := FreeImage_Copy(hFIFimgExtern, zxa, zya, zxb, zyb)
-               FreeImage_UnLoad(hFIFimgExtern)
-               hFIFimgExtern := hFIFimgZB
-            }
-*/
+            ; hFIFimgExtern comes in at its own size and FillSelectArea() stretches it
+            ; over the entire selection area, off-image parts included, dropping
+            ; whatever lands outside the image. No cropped copy of it is needed.
             gScan := FreeImage_GetBits(hFIFimgExtern)
             gStride := FreeImage_GetStride(hFIFimgExtern)
             gBpp := FreeImage_GetBPP(hFIFimgExtern)
             FreeImage_GetImageDimensions(hFIFimgExtern, nBmpW, nBmpH)
             rescaleJIT := 2
-            rescaleJITfilter := 3
-            ; TulTip(A_ThisFunc, "|", zxa, zya, wz, hz, obju.imgZelW, obju.imgZelH)
+            rescaleJITfilter := (PasteInPlaceQuality=1) ? 3 : 2   ; B-spline / bilinear; the JIT has no box filter
+            fnOutputDebug(A_ThisFunc "(): transform object at " nBmpW " | " nBmpH " onto the selection area " obju.imgSelW " | " obju.imgSelH)
          }
 
          If (imgSelY1<0 && FillAreaInverted=1 && fillTool=1)

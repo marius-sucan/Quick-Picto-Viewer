@@ -4197,9 +4197,10 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     //    rescaleBitmapJIT=0 / colorBitmap is read 1:1 and placed at bmpX/bmpY
     //    rescaleBitmapJIT=1 / colorBitmap is stretched over the whole of BitmapData,
     //                         w and h; bmpX/bmpY do not apply
-    //    rescaleBitmapJIT=2 / colorBitmap is stretched over the on-image part of the
-    //                         selection box, anchored at bmpX/bmpY; an inverted
-    //                         selection falls back to the full w and h
+    //    rescaleBitmapJIT=2 / colorBitmap is stretched over the WHOLE selection box,
+    //                         the parts of it that hang off the image included, and
+    //                         whatever lands outside the image is dropped; an
+    //                         inverted selection falls back to the full w and h
     // jitFilter picks the interpolation, in FreeImage's numbering: 1 = bicubic
     // (Mitchell), 2 = bilinear, 3 = B-spline, 4 = Catmull-Rom. Anything else,
     // 0 (box) and 5 (Lanczos3) included, degrades to bilinear.
@@ -4216,8 +4217,16 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
     const int bpc = bpp/8;
     const int gbpc = gBpp/8;
-    const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
-    const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    // where a 1:1 overlay starts. The rescaleBitmapJIT=0 call sites hand over an
+    // overlay they cropped themselves to the on-image part of the selection box, so
+    // for them the origin is the clamped one; the JIT modes below re-anchor it
+    int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
+    int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    // ... and the selection box as the caller actually declared it, off-image parts
+    // included. QPV_PrepareHugeImgSelectionArea() pushes y1 up by polyOffYb for mode 2
+    // to accomodate FreeImage's Y-flipped crap, so subtracting it recovers the origin
+    const int selX = imgSelX1;
+    const int selY = imgSelY1 - (int)polyOffYb;
     const int mw = (EllipseSelectMode==2 && invertSelection==0) ? min(w - 1, imgSelX2) : w - 1;
     const int mh = (EllipseSelectMode==2 && invertSelection==0) ? min(h - 1, imgSelY2) : h - 1;
     const int mx = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelX1, 0, w - 1) : 0;
@@ -4232,19 +4241,29 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     int jitX = 0, jitY = 0, jitW = w, jitH = h;
     if (useJIT && rescaleBitmapJIT==2 && invertSelection!=1)
     {
-       // the same extent the loop above walks, so the overlay lands exactly where
-       // a pre-rescaled one would have
-       jitX = bmpX;
-       jitY = bmpY;
-       jitW = min(w - 1, imgSelX2) - bmpX + 1;
-       jitH = min(h - 1, imgSelY2) - bmpY + 1;
+       // the overlay spans the whole selection box, so the box is what it is stretched
+       // onto -- and the loop below simply never visits the part of it that falls off
+       // the image. That is the crop the callers used to make by hand, minus the copy;
+       // and because the overlay is never trimmed, the taps along the image border
+       // still gather their real neighbours instead of a replicated edge
+       jitX = selX;
+       jitY = selY;
+       jitW = imgSelX2 - selX + 1;
+       jitH = imgSelY2 - selY + 1;
        if (jitW<1 || jitH<1)
           useJIT = false;
     }
 
-    // nothing to interpolate and nothing to move: leave the direct path alone
-    if (useJIT && nBmpW==jitW && nBmpH==jitH && jitX==bmpX && jitY==bmpY)
+    // nothing left to interpolate: hand the overlay back to the direct path, anchored
+    // at the box origin rather than the clamped one -- the negative-source guard there
+    // drops whatever hangs off the image. This is not merely an optimisation: B-spline
+    // at t==0 is a blur, so a 1:1 overlay must not go through the resampler
+    if (useJIT && nBmpW==jitW && nBmpH==jitH)
+    {
        useJIT = false;
+       bmpX = jitX;
+       bmpY = jitY;
+    }
 
     std::vector<JITaxisTap> jitMapX, jitMapY;
     bool jitCubic = false;
