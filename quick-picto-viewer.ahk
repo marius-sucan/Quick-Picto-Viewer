@@ -12056,26 +12056,42 @@ VPchangeSelRotation(dir, stepu:=1) {
    dummyTimerDelayiedImageDisplay(delayu)
 }
 
+getIMGformatLimits(typu, ByRef dimLimit, ByRef mpxLimit) {
+; Per-format size limits, shared by isImgSizeTooLarge() and capIMGdimensionsFormatlimits().
+; dimLimit = maximum width or height, in pixels. mpxLimit = maximum area, in megapixels.
+; A limit of zero means the format is not restricted on that axis.
+; The keys are lower case; typu may arrive as a file extension or as the human
+; readable name returned by FreeImage_GetFileType(), eg., JPEG or TARGA.
+; Returns 0 for the formats with no known limits, eg., PNG, TIFF or BMP.
+; The gdip entry is the GDI+ 32 bits limit: sqrt(2GB/4) = 23160 px = 536.7 mgpx.
+; The fim entry is the FreeImage ceiling; it applies to any format, see showHelpImgEditPanels().
+    Static fmtLimits := {"gdip": [199000, 536.7]
+       , "fim"  : [600500, 13579]
+       , "webp" : [16350, 267.2]
+       , "ico"  : [256, 0]
+       , "jp2"  : [32760, 1073], "j2k"  : [32760, 1073]
+       , "jpeg" : [65530, 4294], "jpg"  : [65530, 4294], "jfif": [65530, 4294]
+       , "jpe"  : [65530, 4294], "jng"  : [65530, 4294], "gif" : [65530, 4294]
+       , "tga"  : [65530, 4294], "targa": [65530, 4294]}
+
+    dimLimit := mpxLimit := 0
+    z := fmtLimits[Format("{:L}", typu)]
+    If !z
+       Return 0
+
+    dimLimit := z[1], mpxLimit := z[2]
+    Return 1
+}
+
 isImgSizeTooLarge(imgW, imgH, typu:="gdip", extraLimit:=1) {
-   If (typu="gdip")
-      r := (Round((imgW * imgH)/1000000, 1) > 536.7) || (max(imgW, imgH)>199000) ? 1 : 0
-   Else If (typu="webp")
-      r := (Round((imgW * imgH)/1000000, 1) > 267.2) || (imgW>16350 || imgH>16350) ? 1 : 0 ; max. 267 mgpx
-   ; Else If (typu="png")
-   ;    r := (Round((imgW * imgH)/1000000, 1) > 486) ? 1 : 0
-   Else If (typu="fim")
-      r := (Round((imgW * imgH)/1000000, 1) > 9850) ? 1 : 0
-   Else If (typu="ico")
-      r := (imgW>256 || imgH>256) ? 1 : 0 ; max. 267 mgpx
-   Else If isVarEqualTo(typu, "jng", "jpg", "jpeg", "jfif", "gif", "tga")
-      r := (imgW>65530 || imgH>65530) || (Round((imgW * imgH)/1000000, 1) > 4294) ? 1 : 0
-   Else If isVarEqualTo(typu, "jp2", "j2k")
-      r := (imgW>32760 || imgH>32760) || (Round((imgW * imgH)/1000000, 1) > 1073) ? 1 : 0
+   getIMGformatLimits(typu, dimLimit, mpxLimit)
+   mpx := Round((imgW * imgH)/1000000, 1)
+   r := ((dimLimit>0 && max(imgW, imgH)>dimLimit) || (mpxLimit>0 && mpx>mpxLimit)) ? 1 : 0
 
    ; (23160*23160)/1000000 = 536.7 mgpx 32 bits limit [RGBA]
    ; (26745*26745)/1000000 = 715.3 mgpx 24 bits limit [RGB]
    If (!r && extraLimit=1)
-      r := (Round((imgW * imgH)/1000000, 1) > 715.3) ? 1 : 0
+      r := (mpx>715.3) ? 1 : 0
    Return r
 }
 
@@ -16166,73 +16182,60 @@ capIMGdimensionsGDIPlimits(ByRef ResizedW, ByRef ResizedH) {
 }
 
 capIMGdimensionsFormatlimits(typu, keepRatio, ByRef ResizedW, ByRef ResizedH) {
-    mpxLimit := thisLimit := 0
-    If (typu="gdip")
-    {
-       thisLimit := 199000
-       mpxLimit := 536.7
-    } Else If (typu="qpv-live")
+; Shrinks the given dimensions to fit within the limits of the given format:
+; at most dimLimit pixels on either axis and at most mpxLimit megapixels of area.
+; With keepRatio=0 the two axes are capped independently, but an area overflow
+; can only be resolved by shrinking both of them by the same amount.
+; Returns the linear scale factor that was applied, or 1 if nothing was changed.
+
+    dimLimit := mpxLimit := 0
+    If (typu="qpv-live")   ; never build a bitmap much larger than the viewport window
     {
        vpWinClientSize(mainWidth, mainHeight)
-       thisLimit := Floor(max(mainWidth, mainHeight) * 1.15)
-       mpxLimit := Floor(thisLimit**1.15)
-    } Else If (typu="webp")
-    {
-       thisLimit := 16350
-       mpxLimit := 267.2
-    } Else If (typu="ico")
-    {
-       thisLimit := 256
-       mpxLimit := 1
-    } Else If (typu="fim")
-    {
-       thisLimit := 600500
-       mpxLimit := 13579
-    } Else If isVarEqualTo(typu, "jp2", "j2k")
-    {
-       thisLimit := 32760
-       mpxLimit := 1073
-    } Else If isVarEqualTo(typu, "jng", "jpeg", "gif", "targa", "tga")
-    {
-       thisLimit := 65530
-       mpxLimit := 4294
-    } Else Return
+       dimLimit := Floor(max(mainWidth, mainHeight) * 1.15)
+    } Else getIMGformatLimits(typu, dimLimit, mpxLimit)
 
     ow := ResizedW, oh := ResizedH
-    If (keepRatio=1 && thisLimit>1)
+    If (ow<1 || oh<1 || (dimLimit<=1 && mpxLimit<=0))
+       Return 1
+
+    sw := sh := 1
+    If (dimLimit>1)
     {
-       If (max(ResizedW, ResizedH)>thisLimit)
+       If (keepRatio=1)
        {
-          z := thisLimit/max(ResizedW, ResizedH)
-          ResizedW := Floor(ResizedW * z)
-          ResizedH := Floor(ResizedH * z)
+          If (max(ow, oh)>dimLimit)
+             sw := sh := dimLimit/max(ow, oh)
+       } Else
+       {
+          If (ow>dimLimit)
+             sw := dimLimit/ow
+          If (oh>dimLimit)
+             sh := dimLimit/oh
        }
-    } Else If (thisLimit>1)
-    {
-       ResizedW := (ResizedW>thisLimit) ? thisLimit : ResizedW
-       ResizedH := (ResizedH>thisLimit) ? thisLimit : ResizedH
     }
 
-    mpx := Round((ResizedW * ResizedH)/1000000, 1)
-    If (mpx>mpxLimit)
+    If (mpxLimit>0)
     {
-       g := 1
-       rw := rh := 0
-       Loop
+       maxArea := mpxLimit * 1000000
+       nowArea := (ow * sw) * (oh * sh)
+       If (nowArea>maxArea)
        {
-          g -= 0.001
-          rw := Floor(ResizedW * g)
-          rh := Floor(ResizedH * g)
-          mpx := Round((rw * rh)/1000000, 1)
-          If (mpx<mpxLimit)
-             Break
+          ; flooring only ever decreases, so this single factor always
+          ; suffices: ResizedW * ResizedH <= ow * oh * z**2 = maxArea
+          z := Sqrt(maxArea/nowArea)
+          sw *= z, sh *= z
        }
-       ResizedW := rw
-       ResizedH := rh
     }
 
-    p := ((ResizedW + ResizedH)/2) / ((ow + oh)/2)
-    Return p
+    If (sw=1 && sh=1)
+       Return 1
+
+    ; the epsilon absorbs the rounding error of the divisions above, so that
+    ; a dimension landing exactly on the limit is not floored down by one pixel
+    ResizedW := max(1, Floor(ow * sw + 0.000000001))
+    ResizedH := max(1, Floor(oh * sh + 0.000000001))
+    Return Sqrt(sw * sh)
 }
 
 getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSelW, imgSelH, BlurAmount:=0, fimgW:=0, fimgH:=0, allowFX:=1) {
