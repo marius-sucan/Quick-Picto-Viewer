@@ -14,6 +14,7 @@
   - improvements to the «Search and replace in files index» tool when using it with a database files list [.SLDB]
   - improvements and fixes for the vector shapes editor, much improved handling for Bezier splines
   - improvements and fixes for the histogram statistics
+  - considerably less memory usage and faster execution with «transform» and «fill selection area» tools [for images above 536 megapixels]
   - much faster lines drawing on images above 536 megapixels
   - faster polar/rectangular coordinates transformations
   - faster blend mode functions

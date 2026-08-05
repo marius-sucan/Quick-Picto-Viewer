@@ -15051,7 +15051,7 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      E4 := trGdip_LockBits(xBitmap, 0, 0, w, h, stride, nScan, nData)
      If !E4
      {
-        rb := DllCall("qpvmain.dll\MergeBitmapsWithMask", "UPtr", nScan, "UPtr", iScan, "UPtr", gScan, "int", invertAlphaMask, "Int", w, "Int", h, "int", 0, "int", 0, "int", stride, "int", 32, "int", gamma, "int", 0)
+        rb := DllCall("qpvmain.dll\MergeBitmapsWithMask", "UPtr", nScan, "UPtr", iScan, "UPtr", gScan, "int", invertAlphaMask, "Int", w, "Int", h, "int", 0, "int", 0, "int", stride, "int", 32, "int", linearGamma, "int", 0)
         Gdip_UnlockBits(xBitmap, nData)
         If (rb=1)
            r := xBitmap
@@ -19452,7 +19452,7 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, linea
        ; ToolTip, % "l=" Round(texScaleX, 3) , , , 2
     }
 
-    If StrLen(Brush)<2
+    If (StrLen(Brush)<2)
     {
        trGdip_DisposeImage(pBitmap)
        Return
@@ -21866,13 +21866,10 @@ HugeImagesApplyPasteInPlace() {
             FreeImage_UnLoad(hFIFimgD)
          } Else
             hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
-      } Else
+      } Else If oldSelectionArea[11]
       {
-         If oldSelectionArea[11]
-         {
-            hFIFimgA := trFreeImage_Rescale(oldSelectionArea[11], dw, dh, thisQuality)
-            FreeImage_UnLoad(oldSelectionArea[11])
-         }
+         hFIFimgA := trFreeImage_Rescale(oldSelectionArea[11], dw, dh, thisQuality)
+         FreeImage_UnLoad(oldSelectionArea[11])
          oldSelectionArea[11] := ""
       }
 
@@ -21994,11 +21991,15 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             showTOOLtip("Applying " modus "`nGenerating gradient bitmap, please wait", 1)
             zW := (FillAreaInverted=1) ? imgW : max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
             zH := (FillAreaInverted=1) ? imgH : max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+            nzW := zW, nzH := zH
             mustUnlock := mustResize := 0
-            If (max(zW, zH)>14500)
+            capIMGdimensionsFormatlimits("gdip", 1, nzW, nzH)
+            ; If (max(zW, zH)>14500)
+            If (zW!=nzW || zH!=nzH)
             {
                mustResize := 1
-               calcIMGdimensions(zW, zH, 14500, 14500, ResizedW, ResizedH)
+               ResizedW := nzW
+               ResizedH := nzH
                ; fnOutputDebug(A_ThisFunc " small gradient bitmap")
             } Else
             {
@@ -22007,19 +22008,8 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                fnOutputDebug(A_ThisFunc "(): gradient bitmap size matches selection area dimensions: " ResizedW " | " ResizedH)
             }
 
-            Strode := (32 * obju.ImgZelW) / 8
-            bonusBuffer := (ResizedW=obju.imgZelW && ResizedH=obju.imgZelH) ? 0 : Strode * obju.ImgZelH
-            If (FillAreaInverted=1)
-               bonusBuffer := ((32 * imgW) / 8) * imgH
-
-            If (mustResize=1)
-            {
-               ; the gradient is no longer blown up to full size; FillSelectArea() stretches
-               ; it just-in-time. All that is still duplicated is the capped-size bitmap,
-               ; when ConvertPBITMAPtoFIM() hands it over to FreeImage
-               bonusBuffer := ((32 * ResizedW) / 8) * ResizedH
-            }
-
+            Strode := (32 * ResizedW) / 8
+            bonusBuffer := (ResizedW=obju.imgZelW && ResizedH=obju.imgZelH) ? 0 : Strode * ResizedH
             If memoryUsageWarning(ResizedW, ResizedH, 32, 0, bonusBuffer)
             {
                DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
@@ -22065,42 +22055,23 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             {
                If (mustResize=1)
                {
-                  ; fnOutputDebug(A_ThisFunc ": convert small gradient bitmap to FreeImage")
-                  Gdip_ImageRotateFlip(gradientsBMP, 6)
-                  hFIFimgGradient := ConvertPBITMAPtoFIM(gradientsBMP)
-                  gradientsBMP := trGdip_DisposeImage(gradientsBMP)
-                  If hFIFimgGradient
-                  {
-                     ; The gradient stays at its capped size and FillSelectArea() stretches it
-                     ; just-in-time, with bilinear interpolation, as it walks the image. Blowing
-                     ; it up to obju.imgZelW/H here first cost a full-size 32bpp buffer -- several
-                     ; GB on a huge image -- for something read exactly once.
-                     ; mode 1 = stretch over the whole image; mode 2 = over the selection box.
-                     hFIFimgRealGradient := hFIFimgGradient
-                     rescaleJIT := (FillAreaInverted=1) ? 1 : 2
-                     rescaleJITfilter := 4   ; Catmull-Rom; crisper at colour stops than the B-spline this replaced
-                     gScan := FreeImage_GetBits(hFIFimgRealGradient)
-                     gStride := FreeImage_GetStride(hFIFimgRealGradient)
-                     gBpp := FreeImage_GetBPP(hFIFimgRealGradient)
-                     FreeImage_GetImageDimensions(hFIFimgRealGradient, nBmpW, nBmpH)
-                     fnOutputDebug(A_ThisFunc "(): gradient bitmap kept at " nBmpW " | " nBmpH " and rescaled just-in-time, mode " rescaleJIT)
-                  }
-               } Else
-               {
-                  trGdip_GetImageDimensions(gradientsBMP, nBmpW, nBmpH)
-                  fnOutputDebug(A_ThisFunc "(): locking gradient bits with gdi+. w/h = " ResizedW " | " ResizedH)
-                  EZ := trGdip_LockBits(gradientsBMP, 0, 0, nBmpW, nBmpH, gStride, gScan, gData)
-                  gBpp := 32
-                  mustUnlock := 1
+                  ; The gradient stays at its capped size and FillSelectArea() stretches it
+                  ; just-in-time, as it walks the image.
+                  rescaleJIT := (FillAreaInverted=1) ? 1 : 2    ; mode 1 = stretch over the whole image; mode 2 = over the selection box.
+                  rescaleJITfilter := 4   ; Catmull-Rom
                }
-
-               If (EZ || !hFIFimgGradient && mustResize=1)
+               gBpp := 32
+               trGdip_GetImageDimensions(gradientsBMP, nBmpW, nBmpH)
+               fnOutputDebug(A_ThisFunc "(): locking gradient bits with gdi+. w/h = " ResizedW " | " ResizedH)
+               EZ := trGdip_LockBits(gradientsBMP, 0, 0, nBmpW, nBmpH, gStride, gScan, gData)
+               If EZ
                {
                   If gradientsBMP
                      trGdip_DisposeImage(gradientsBMP)
                   addJournalEntry(A_ThisFunc "(): Failed to lock the bits of the gradient bitmap.")
                   gradientsBMP := ""
-               }
+               } Else
+                  mustUnlock := 1
             } Else
                addJournalEntry(A_ThisFunc "(): Failed to generate the gradient bitmap.")
          } Else If (transformTool=1)
@@ -37040,12 +37011,10 @@ SortFilesList(SortCriterion) {
 
       If (abandonAll=1)
       {
-         If errorOccured
-            msgInfos := "`nErrors occured. Multi-threading error."
          If (failedFiles && SLDtypeLoaded=3 && OnSortdoFilesCheck=1)
             msgInfos .= "`n" failedFiles " inexistent files were removed from the SQL database index"
 
-         If StrLen(backfilesFilter)>1
+         If (StrLen(backfilesFilter)>1)
          {
             ; rebuilding the filtered files list index, as it was
             thisIndex := 0
@@ -38190,9 +38159,7 @@ readSlideSettingsINI(readThisFile, act:=0) {
         If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
            imageAlignVPtopLeft := 0
 
-        If (scriptInit=1)
-           interfaceThread.ahkFunction("updateWindowColor")
-
+        interfaceThread.ahkFunction("updateWindowColor")
         defineColorDepth()
         recalculateThumbsSizes()
     } Else
@@ -73463,9 +73430,6 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    r := QPV_ShowImgonGui(ResizedW, ResizedH, GuiW, GuiH, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged)
    delayu := (A_TickCount - prevFastDisplay < 300) ? 90 : 550
    thisModus := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? 1 : 0
-   If (wasPrevious=1 && animGIFplaying!=1 && vpImgPanningNow=0 && thisModus!=1)
-      dummyTimerReloadThisPicture(delayu)
-
    infoFilesSel := (markedSelectFile>0) ? "[ " markedSelectFile " ] " : ""
    If (totalFramesIndex>0)
       infoFrames := "["  desiredFrameIndex "/" totalFramesIndex "] "
@@ -82419,9 +82383,6 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
    Gdip_ResetWorldTransform(glPG)
    whichWin := (imgEditPanelOpened=1 && AnyWindowOpen!=10) ? hGDIthumbsWin : hGDIwin
    r2 := doLayeredWinUpdate(A_ThisFunc, whichWin, glHDC)
-   If (imageHasFaded=1)
-      r2 := doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, 2NDglHDC)
-
    ; ToolTip, % Round(sfW) "|" Round(sfH) "|" imgW "|" imgH  "=" rimgW "|" rimgH "??" kW "|" kH , , , 2
    ; ToolTip, yay , , , 2
    Return r2 ? r2 : "error"
@@ -90594,6 +90555,7 @@ BTNconvertImgFmtNow(modus:=0) {
       Return
    }
 
+   filesElected := getSelectedFiles(0, 1)
    filesPerCore := calculateCoresRequired(filesElected)
    mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
    If (userActionConflictingFile=4 && mustDoMultiCore=1)
@@ -92003,9 +91965,9 @@ invokePanelReviewSelContextMenu() {
    GuiControlGet, editu, SettingsGUIA:, listViewReviewFilteru
 
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
+   Gui, SettingsGUIA: ListView, % whichLV
    RowNumber := LV_GetNext(0, "F")
    LV_GetText(folderPath, RowNumber, 3)
-   Gui, SettingsGUIA: ListView, % whichLV
    totalSelected := LV_GetCount("S")
    total := LV_GetCount()
 
@@ -93617,7 +93579,7 @@ BTNreviewDropFilesSelection() {
    modus := markedSelectFile ? 0 : 1
    If listViewReviewFilteru
    {
-      LV_GetText(thisFileIndex, RowNumber + 1, 3)
+      LV_GetText(thisFileIndex, RowNumber + 1, 4)
       modus := resultedFilesList[thisFileIndex, 2] ? 0 : 1
       ; ToolTip, % thisFileIndex "===" isSelected "===" modus , , , 2
    }
@@ -94684,7 +94646,7 @@ BTNcountFilesDynaFolders() {
       If !imgPath
          Continue
 
-      If (InStr(imgPath "\", folderu "\"))
+      If InStr(imgPath "\", folderu "\")
       {
          thisIndex++
          If resultedFilesList[A_Index, 2]
@@ -94695,9 +94657,8 @@ BTNcountFilesDynaFolders() {
    ToolTip
    LV_Modify(RowNumber, "Col4", thisIndex)
    LV_Modify(RowNumber, "Col5", thisSelIndex)
-
    diffu := (onDisk!="" && thisIndex!="") ? onDisk - thisIndex : 0
-   perc := countFiles ? Round((Round(thisSelIndex)/thisIndex)*100, 1) : 0
+   perc := thisIndex ? Round((Round(thisSelIndex)/thisIndex)*100, 1) : 0
    LV_Modify(RowNumber, "Col6", perc)
    LV_Modify(RowNumber, "Col8", diffu)
    ResetImgLoadStatus()
@@ -98185,6 +98146,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
           Return
        }
 
+       filesElected := getSelectedFiles(0, 1)
        filesPerCore := calculateCoresRequired(filesElected)
        mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
        If (userActionConflictingFile=4 && mustDoMultiCore=1)
@@ -100422,7 +100384,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
       mainLoadedIMGdetails.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
       mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)
-      mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Widh, Height)
+      mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
       mainLoadedIMGdetails.BPP := NumGet(resultsArray, 4 * 7, "uInt")
       mainLoadedIMGdetails.ConvertedBPP := r
       mainLoadedIMGdetails.Channels := NumGet(resultsArray, 4 * 8, "uInt")
