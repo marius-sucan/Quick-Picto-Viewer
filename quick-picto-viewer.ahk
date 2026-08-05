@@ -13590,6 +13590,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 1])
           trGdip_DisposeImage(cachedRawTXTbmps[A_Index, 2])
        }
+       Gdi_DeleteObject(hFont)
        Return "Unable to allocate FreeImage bitmap."
     }
 
@@ -13688,7 +13689,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           }
 
        }
-       If (r=0 || rz=0)
+       If (!r || !rz)
           fattalErr++
     }
 
@@ -13755,11 +13756,11 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           ntxtColor := (TextInAreaCutOutMode=1) ? "0x00" TextInAreaBgrColor : thisColoru
           r := DllCall("qpvmain.dll\ColorizeGrayImage", "UPtr", pBitsAll, "int", mImgW, "int", mImgH, "int", Stride, "int", 32, "int", userimgGammaCorrect, "int", ntxtColor, "int", bgrColor)
        }
-       If (r=0)
+       If !r
           fattalErr++
     }
 
-    If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=1 && TextInAreaBorderOut>1 && fattalErr!=1)
+    If (TextInAreaBgrUnified=1 && TextInAreaPaintBgr=1 && modusContour=1 && TextInAreaBorderOut>1 && fattalErr<3)
     {
        ; fnOutputDebug("post-unified processing with borders")
        Loop, % rendered
