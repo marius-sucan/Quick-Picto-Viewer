@@ -18747,7 +18747,7 @@ livePreviewHugeImageFillSelArea() {
       }
 
       livePreviewPrepareSelectionArea(objSel, FillAreaInverted, 3)
-      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", 0, "int", thisCutGlass, "int", imgW, "int", imgH, "int", 0)
+      r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", thisOpacity, "int", 0, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", 0, "int", thisCutGlass, "int", imgW, "int", imgH, "int", 0, "int", 2)
       ; ToolTip, % r "|" imgW "|" imgH , , , 2
       Gdip_UnlockBits(zBitmap, iData)
       If validBMP(gradientsBMP)
@@ -18911,7 +18911,7 @@ livePreviewHugeImageDrawLineShapes() {
    If (rzb=1)
    {
       newColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
-      rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", imgW, "int", imgH, "int", 0)
+      rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", imgW, "int", imgH, "int", 0, "int", 2)
    }
 
    ; the lines mask overwrites the polygon mask cache in the DLL;
@@ -21275,7 +21275,7 @@ HugeImagesApplyInsertText() {
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
             blendMode := (TextInAreaBlendMode=25) ? 100 : TextInAreaBlendMode - 1
             showTOOLtip("Applying insert text, please wait...`nFinalizing momentarily")
-            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", blendMode, "int", BlendModesFlipped, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH, "int", 0)
+            r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", blendMode, "int", BlendModesFlipped, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH, "int", 0, "int", 2)
             FillAreaShape := orr
             ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          } Else
@@ -21443,7 +21443,7 @@ HugeImagesDrawLineShapes() {
       fnOutputDebug("Draw lines in mask finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0, "int", 2)
 
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
@@ -21712,7 +21712,7 @@ HugeImagesDrawParametricLines() {
       startFill := A_TickCount
       thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
       If (rzb=1 && abandonAll!=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0, "int", 2)
 
       fnOutputDebug("Fill lines mask finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
@@ -21986,6 +21986,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       If advancedMode
       {
          nBmpW := nBmpH := rescaleJIT := 0
+         rescaleJITfilter := 2   ; FreeImage numbering; 2 = bilinear, the DLL default
          fillTool := InStr(modus, "fill") ? 1 : 0
          transformTool := (InStr(modus, "transform") || InStr(modus, "paste in place")) ? 1 : 0
          If (isInRange(FillAreaColorMode, 2, 4) && fillTool=1 && obju.imgZelW && obju.imgZelH) ; && FillAreaInverted=0 && !isImgSizeTooLarge(zW, zH))
@@ -22077,6 +22078,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                      ; mode 1 = stretch over the whole image; mode 2 = over the selection box.
                      hFIFimgRealGradient := hFIFimgGradient
                      rescaleJIT := (FillAreaInverted=1) ? 1 : 2
+                     rescaleJITfilter := 4   ; Catmull-Rom; crisper at colour stops than the B-spline this replaced
                      gScan := FreeImage_GetBits(hFIFimgRealGradient)
                      gStride := FreeImage_GetStride(hFIFimgRealGradient)
                      gBpp := FreeImage_GetBPP(hFIFimgRealGradient)
@@ -22169,7 +22171,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          showTOOLtip("Applying " modus "`nProcessing main bitmap, please wait", 1)
          recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, thisInvert, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, shapeu, thisRotation, 0, thisInvert, "a", "a", 1)
-         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH, "int", rescaleJIT)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", thisOpacity, "int", eraser, "int", userimgGammaCorrect, "int", thisBlendMode, "int", thisModesFlipped, "UPtr", gScan, "int", gStride, "int", gBpp, "int", opacityExtra, "int", thisKeepAlpha, "int", nBmpW, "int", nBmpH, "int", rescaleJIT, "int", rescaleJITfilter)
          If hFIFimgRealGradient
             FreeImage_UnLoad(hFIFimgRealGradient)
          If (hFIFimgExtern && r=1)
@@ -22210,7 +22212,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          thisOpacity := (EraseAreaFader=1) ? EraseAreaOpacity : 255
          newColor := "0x" Format("{1:x}", thisOpacity) "010101"
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, EraseAreaInvert, "a", "a", 1)
-         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0)
+         r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", newColor, "int", 255, "int", 1, "int", 0, "int", 0, "int", 0, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 2)
          If InStr(modus, "initially")
          {
             If r
