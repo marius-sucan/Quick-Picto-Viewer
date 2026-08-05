@@ -3982,9 +3982,101 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
     return 1;
 }
 
+// ---------------------------------------------------------------------------
+// Just-in-time bilinear rescaling of the overlay bitmap in FillSelectArea().
+//
+// The overlay is stretched inside the loop that already walks the destination,
+// so the caller never has to materialise a full-size copy of it. Same trick as
+// PixelateHugeBitmap() and GenerateRandomNoiseOnBitmap(), which map a small
+// bitmap onto a big one through precalculated per-axis tables -- those two use
+// nearest-neighbour, this one interpolates.
+//
+// One table entry per DESTINATION column/row, so the set-up is O(w + h) instead
+// of the O(w*h) buffer it replaces, and the divide/floor leave the inner loop.
+// ---------------------------------------------------------------------------
+struct JITaxisTap {
+    INT64 o0, o1;   // byte offsets of the two taps (x: pixel stride, y: row stride)
+    float t;        // blend weight towards o1
+};
+
+// destSize entries covering the destination axis; the source is stretched onto
+// [origin, origin + targetSize). Pixel centres are mapped the way OpenCV's
+// INTER_LINEAR does it, so this lines up with openCVresizeBitmap() elsewhere.
+static void buildJITaxis(std::vector<JITaxisTap> &tab, int destSize, int origin, int targetSize, int srcSize, INT64 unitStride) {
+    tab.resize(max(destSize, 1));
+    const double scale = (double)srcSize / (double)targetSize;
+    for (int i = 0; i < destSize; i++)
+    {
+        const double s = ((double)(i - origin) + 0.5) * scale - 0.5;
+        const int i0 = (int)floor(s);
+        // outside the source the edge texel is replicated; o0==o1 there, which
+        // makes t irrelevant, so it does not need clamping too
+        tab[i].o0 = (INT64)clamp(i0,     0, srcSize - 1) * unitStride;
+        tab[i].o1 = (INT64)clamp(i0 + 1, 0, srcSize - 1) * unitStride;
+        tab[i].t  = (float)(s - (double)i0);
+    }
+}
+
+// The overlay buffer is straight (non-premultiplied) ARGB: the code downstream
+// hands alpha to the blend modes as a separate weight and never divides RGB by
+// it. So each tap has to be weighed by its own alpha before mixing, otherwise a
+// fully transparent texel bleeds its stored colour into every neighbour and the
+// overlay grows halos along its edges. The accumulated alpha is divided back out.
+QPV_FORCEINLINE void sampleColorBitmapBilinear(const unsigned char *src, const JITaxisTap &tx, const JITaxisTap &ty, int gBpp, int flatOpacity, int &oR, int &oG, int &oB, int &oA) {
+    const float wx1 = tx.t, wx0 = 1.0f - wx1;
+    const float wy1 = ty.t, wy0 = 1.0f - wy1;
+    const INT64 q[4]  = { ty.o0 + tx.o0, ty.o0 + tx.o1, ty.o1 + tx.o0, ty.o1 + tx.o1 };
+    const float wq[4] = { wx0*wy0, wx1*wy0, wx0*wy1, wx1*wy1 };
+    if (gBpp==32)
+    {
+       float sa = 0.0f, sr = 0.0f, sg = 0.0f, sb = 0.0f;
+       for (int i = 0; i < 4; i++)
+       {
+           const unsigned char *p = src + q[i];
+           const float aw = wq[i] * (float)p[3];
+           sa += aw;
+           sr += aw * (float)p[2];
+           sg += aw * (float)p[1];
+           sb += aw * (float)p[0];
+       }
+
+       if (sa<0.5f)
+       {
+          oR = oG = oB = oA = 0;
+          return;
+       }
+
+       oA = clamp((int)(sa + 0.5f), 0, 255);
+       oR = clamp((int)(sr/sa + 0.5f), 0, 255);
+       oG = clamp((int)(sg/sa + 0.5f), 0, 255);
+       oB = clamp((int)(sb/sa + 0.5f), 0, 255);
+    } else
+    {
+       float sr = 0.0f, sg = 0.0f, sb = 0.0f;
+       for (int i = 0; i < 4; i++)
+       {
+           const unsigned char *p = src + q[i];
+           sr += wq[i] * (float)p[2];
+           sg += wq[i] * (float)p[1];
+           sb += wq[i] * (float)p[0];
+       }
+
+       oA = flatOpacity;
+       oR = clamp((int)(sr + 0.5f), 0, 255);
+       oG = clamp((int)(sg + 0.5f), 0, 255);
+       oB = clamp((int)(sb + 0.5f), 0, 255);
+    }
+}
+
 DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *colorBitmap, int gStride, int gBpp, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH, int rescaleBitmapJIT) {
-    // nBmpW and nBmpH, gBpp, gStride describe colorBitmap data, if rescaleBitmapJIT=1,
-    // colorBitmap is scaled just-in time at the dimensions of BitmapData, w and h.
+    // nBmpW and nBmpH, gBpp, gStride describe colorBitmap data. colorBitmap is scaled
+    // just-in-time, with bilinear interpolation, as the loop below unfolds:
+    //    rescaleBitmapJIT=0 / colorBitmap is read 1:1 and placed at bmpX/bmpY
+    //    rescaleBitmapJIT=1 / colorBitmap is stretched over the whole of BitmapData,
+    //                         w and h; bmpX/bmpY do not apply
+    //    rescaleBitmapJIT=2 / colorBitmap is stretched over the on-image part of the
+    //                         selection box, anchored at bmpX/bmpY; an inverted
+    //                         selection falls back to the full w and h
     // the opacity and opacityMultiplier parameters only apply if colorBitmap is not NULL
 
     // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
@@ -4006,11 +4098,50 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     const int my = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
     // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
     // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
+
+    // colorBitmap!=NULL has to be tested FIRST: the call sites that pass no overlay
+    // stop short of this parameter, so rescaleBitmapJIT is uninitialised stack there
+    // and only the short-circuit keeps it from being read
+    bool useJIT = (colorBitmap!=NULL && (rescaleBitmapJIT==1 || rescaleBitmapJIT==2) && nBmpW>0 && nBmpH>0);
+    int jitX = 0, jitY = 0, jitW = w, jitH = h;
+    if (useJIT && rescaleBitmapJIT==2 && invertSelection!=1)
+    {
+       // the same extent the loop above walks, so the overlay lands exactly where
+       // a pre-rescaled one would have
+       jitX = bmpX;
+       jitY = bmpY;
+       jitW = min(w - 1, imgSelX2) - bmpX + 1;
+       jitH = min(h - 1, imgSelY2) - bmpY + 1;
+       if (jitW<1 || jitH<1)
+          useJIT = false;
+    }
+
+    // nothing to interpolate and nothing to move: leave the direct path alone
+    if (useJIT && nBmpW==jitW && nBmpH==jitH && jitX==bmpX && jitY==bmpY)
+       useJIT = false;
+
+    std::vector<JITaxisTap> jitMapX, jitMapY;
+    if (useJIT)
+    {
+       fnOutputDebug("FillSelectArea(): JIT rescale mode " + std::to_string(rescaleBitmapJIT) + "; " + std::to_string(nBmpW) + "x" + std::to_string(nBmpH) + " onto " + std::to_string(jitW) + "x" + std::to_string(jitH) + " at " + std::to_string(jitX) + "|" + std::to_string(jitY));
+       buildJITaxis(jitMapX, w, jitX, jitW, nBmpW, (INT64)gbpc);
+       buildJITaxis(jitMapY, h, jitY, jitH, nBmpH, (INT64)gStride);
+    }
+
     #pragma omp parallel for schedule(dynamic)
     for (int y = my; y <= mh; y++)
     {
         INT64 ky = (INT64)y * Stride;
         INT64 kzy = (INT64)(y - bmpY) * gStride;
+        JITaxisTap rowTap = {0, 0, 0.0f};
+        if (useJIT)
+        {
+           if (y<jitY || (y - jitY)>=jitH)
+              continue;
+
+           rowTap = jitMapY[y];
+        }
+
         for (int x = mx; x <= mw; x++)
         {
             INT64 kx = (INT64)x * bpc;
@@ -4027,12 +4158,30 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             if (colorBitmap!=NULL)
             {
                // INT64 oz = CalcPixOffset(x - zx1, y - zy1, gStride, 32);
-               if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW || (y - bmpY)<0 || (x - bmpX)<0)
-                  continue;
+               int sR, sG, sB, sA, sRawA;
+               if (useJIT)
+               {
+                  // same no-bleed-outside-the-footprint rule as the direct path below
+                  if (x<jitX || (x - jitX)>=jitW)
+                     continue;
 
-               INT64 oz = kzy + kzx;
-               // fnOutputDebug("y=" + std::to_string(y - bmpY));
-               int thisOpacity = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
+                  sampleColorBitmapBilinear(colorBitmap, jitMapX[x], rowTap, gBpp, opacity, sR, sG, sB, sA);
+                  sRawA = sA;
+               } else
+               {
+                  if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW || (y - bmpY)<0 || (x - bmpX)<0)
+                     continue;
+
+                  INT64 oz = kzy + kzx;
+                  // fnOutputDebug("y=" + std::to_string(y - bmpY));
+                  sA = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
+                  sR = colorBitmap[2 + oz];
+                  sG = colorBitmap[1 + oz];
+                  sB = colorBitmap[oz];
+                  sRawA = colorBitmap[3 + oz];
+               }
+
+               int thisOpacity = sA;
                if (color==-1 && thisOpacity>0)
                   thisOpacity = clamp(thisOpacity - (255 - opacity), 0, 255);
 
@@ -4043,10 +4192,10 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                   thisOpacity = clamp(thisOpacity * opacityDepth, 0.0f, 255.0f);
 
                userColor.a = thisOpacity;
-               userColor.r = colorBitmap[2 + oz];
-               userColor.g = colorBitmap[1 + oz];
-               userColor.b = colorBitmap[oz];
-               if (color==-1 && userColor.r==0 && userColor.g==0 && userColor.b==0 && colorBitmap[3 + oz]==0)
+               userColor.r = sR;
+               userColor.g = sG;
+               userColor.b = sB;
+               if (color==-1 && userColor.r==0 && userColor.g==0 && userColor.b==0 && sRawA==0)
                   userColor.a = 0;
             } else
             {
