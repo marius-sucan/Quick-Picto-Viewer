@@ -22003,7 +22003,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             {
                ResizedW := (FillAreaInverted=1) ? imgW : obju.imgSelW
                ResizedH := (FillAreaInverted=1) ? imgH : obju.imgSelH
-               fnOutputDebug(A_ThisFunc " gradient bitmap size matches selection area dimensions: " ResizedW " | " ResizedH)
+               fnOutputDebug(A_ThisFunc "(): gradient bitmap size matches selection area dimensions: " ResizedW " | " ResizedH)
             }
 
             Strode := (32 * obju.ImgZelW) / 8
@@ -22018,6 +22018,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             }
 
             gradientsBMP := drawFillSelGradient(ResizedW, ResizedH, 0, 0, 0, ResizedW, ResizedH, userimgGammaCorrect)
+            fnOutputDebug(A_ThisFunc "(): gradient bitmap generated at: " ResizedW " | " ResizedH)
             azX := (imgSelX1<0) ? abs(ImgSelX1) : 0
             azY := (imgSelY1<0) ? abs(ImgSelY1) : 0
             sazY := (ImgSelY2>imgH) ? imgSelY2 - imgH : 0
@@ -22040,7 +22041,9 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                ; Gdip_DrawRectangle(Gux, pPen7, zX, pZy, rw, rh)
                ; Gdip_DeleteGraphics(Gux)
                kBitmap := trGdip_CloneBitmapArea(A_ThisFunc, gradientsBMP, zX, Round(pZy), rw, rh)
-               ; fnOutputDebug(A_ThisFunc ": " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
+               trGdip_GetImageDimensions(kBitmap, kww, khh)
+               fnOutputDebug(A_ThisFunc "(): crop coordinates: " zX "|" zY "||" szX "|" szY " | crop top/left bounds from gradient rw, rh=" rw "|" rh)
+               fnOutputDebug(A_ThisFunc "(): gradient bitmap cropped at w/h: " kww " | " khh)
                If validBMP(kBitmap)
                {
                   trGdip_DisposeImage(gradientsBMP, 1)
@@ -22070,13 +22073,13 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
                      gStride := FreeImage_GetStride(hFIFimgRealGradient)
                      gBpp := FreeImage_GetBPP(hFIFimgRealGradient)
                      FreeImage_GetImageDimensions(hFIFimgRealGradient, nBmpW, nBmpH)
-                     ; fnOutputDebug(A_ThisFunc ": freeimage resized gradient " nBmpW "||" nBmpH)
+                     fnOutputDebug(A_ThisFunc "(): freeimage resized gradient bitmap at: " nBmpW " | " nBmpH)
                      FreeImage_UnLoad(hFIFimgGradient)
                   }
                } Else
                {
                   trGdip_GetImageDimensions(gradientsBMP, nBmpW, nBmpH)
-                  ; fnOutputDebug(A_ThisFunc ": locking gradient bits with gdi+ " ResizedW "||" ResizedH)
+                  fnOutputDebug(A_ThisFunc "(): locking gradient bits with gdi+. w/h = " ResizedW " | " ResizedH)
                   EZ := trGdip_LockBits(gradientsBMP, 0, 0, nBmpW, nBmpH, gStride, gScan, gData)
                   gBpp := 32
                   mustUnlock := 1

@@ -3982,7 +3982,9 @@ DLL_API int DLL_CALLCONV ConvertToGrayScale(unsigned char *BitmapData, const int
     return 1;
 }
 
-DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *colorBitmap, int gStride, int gBpp, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH) {
+DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int color, int opacity, int eraser, int linearGamma, int blendMode, int flipLayers, unsigned char *colorBitmap, int gStride, int gBpp, int opacityMultiplier, int keepAlpha, int nBmpW, int nBmpH, int rescaleBitmapJIT) {
+    // nBmpW and nBmpH, gBpp, gStride describe colorBitmap data, if rescaleBitmapJIT=1,
+    // colorBitmap is scaled just-in time at the dimensions of BitmapData, w and h.
     // the opacity and opacityMultiplier parameters only apply if colorBitmap is not NULL
 
     // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
