@@ -1660,10 +1660,14 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
           func2Call := ["VPchangeZoom", 1, "WheelUp"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["ThumbsNavigator", "Upu", givenKey]
     } Else If (givenKey="WheelDown")
     {
        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
           func2Call := ["VPchangeZoom", -1, "WheelDown"]
+       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+          func2Call := ["ThumbsNavigator", "Down", givenKey]
     } Else If (givenKey="!Left")
     {
        allowLoop := 1
