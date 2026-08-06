@@ -4204,7 +4204,10 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     // jitFilter picks the interpolation, in FreeImage's numbering: 1 = bicubic
     // (Mitchell), 2 = bilinear, 3 = B-spline, 4 = Catmull-Rom. Anything else,
     // 0 (box) and 5 (Lanczos3) included, degrades to bilinear.
-    // the opacity and opacityMultiplier parameters only apply if colorBitmap is not NULL
+    // the opacity and opacityMultiplier parameters only apply if colorBitmap is not NULL.
+    // With gBpp!=32 the overlay has no alpha of its own, so opacity simply IS the alpha of
+    // every one of its pixels; opacityMultiplier stays 32bpp-only because an overlay that
+    // is opaque everywhere has no partially visible pixels left to restore
 
     fnOutputDebug("FillSelectArea() Stride=" + std::to_string(Stride) + " opacity=" + std::to_string(opacity));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
@@ -4322,7 +4325,9 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                   else
                      sampleColorBitmapBilinear(colorBitmap, jitMapX[x], rowTap, gBpp, opacity, sR, sG, sB, sA);
 
-                  sRawA = sA;
+                  // an overlay that carries no alpha channel is opaque, whatever
+                  // flat opacity the sampler just handed back as sA
+                  sRawA = (gBpp==32) ? sA : 255;
                } else
                {
                   if ((y - bmpY)>=nBmpH || (x - bmpX)>=nBmpW || (y - bmpY)<0 || (x - bmpX)<0)
@@ -4330,15 +4335,22 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
                   INT64 oz = kzy + kzx;
                   // fnOutputDebug("y=" + std::to_string(y - bmpY));
-                  sA = (gBpp==32) ? colorBitmap[3 + oz] : opacity;
+                  // byte 3 of a 24bpp pixel is the NEXT pixel's blue, not an alpha, and on
+                  // the last pixel of an unpadded row it is not even inside the bitmap
+                  sRawA = (gBpp==32) ? colorBitmap[3 + oz] : 255;
+                  sA = (gBpp==32) ? sRawA : opacity;
                   sR = colorBitmap[2 + oz];
                   sG = colorBitmap[1 + oz];
                   sB = colorBitmap[oz];
-                  sRawA = colorBitmap[3 + oz];
                }
 
                int thisOpacity = sA;
-               if (color==-1 && thisOpacity>0)
+               // opacity is subtractive here, and that only makes sense against an alpha
+               // channel the overlay actually has: for anything but 32bpp sA IS the flat
+               // opacity, so subtracting it again applies it twice and the object dies at
+               // half the slider [2*opacity - 255]. An opaque 32bpp overlay resolves to
+               // 255 - (255 - opacity), and one without an alpha channel has to match it
+               if (color==-1 && gBpp==32 && thisOpacity>0)
                   thisOpacity = clamp(thisOpacity - (255 - opacity), 0, 255);
 
                if (opacityMultiplier>0 && gBpp==32)
