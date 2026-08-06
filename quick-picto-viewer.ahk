@@ -88007,8 +88007,10 @@ calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef im
    If (initialboundLess=-1 && boundLess=0 && !givenRotation)
    {
       capSelectionRelativeCoords()
-      imgSelX1 := X1, imgSelY1 := Y1
-      imgSelX2 := X2, imgSelY2 := Y2
+      ; the coordinates the callers receive as X1..Y2 are these ByRef parameters;
+      ; X1..Y2 are names that only exist on the outside, never in here
+      imgSelX1 := nImgSelX1, imgSelY1 := nImgSelY1
+      imgSelX2 := nImgSelX2, imgSelY2 := nImgSelY2
       SetTimer, dummyRefreshImgSelectionWindow, -100
    }
 }
@@ -99486,7 +99488,10 @@ adjustWheelNumbersEditFields(wParam, lParam, msg) {
    {
       result := (wParam >> 16)     ; return the HIWORD -  high-order word 
       givenKey := (result>0 && result<51234) ? "WheelUp" : "WheelDown"
-      If ((wParam & 0xffff=4) || (wParam & 0xffff=8))
+      ; each MK_ flag has to be masked out on its own; comparing the whole low word
+      ; to 4 or 8 only matched that one modifier held alone, so Ctrl+Shift [=12] or
+      ; a held mouse button [adds its own bit] silently fell back to the plain wheel
+      If ((wParam & 4) || (wParam & 8))
          givenKey := (result>0 && result<51234) ? "PgUp" : "PgDn"
 
       GuiControlGet, hVar, SettingsGUIA: hwnd, % OutputVname
@@ -99508,7 +99513,8 @@ adjustWheelNumbersEditFields(wParam, lParam, msg) {
    result := (wParam >> 16)     ; return the HIWORD -  high-order word 
    stepping := Round(Abs(result) / 120)
    direction := (result>0 && result<51234) ? 1 : -1
-   mult := ((wParam & 0xffff=4) ? 5 : (wParam & 0xffff=8) ? 10 : 1)
+   ; masked one modifier at a time, as above; shift still wins if both are held
+   mult := ((wParam & 4) ? 5 : (wParam & 8) ? 10 : 1)
    amt := (msg=526) ? 5 : 1 ; How much to increase the value
    value += direction*amt*mult
    GuiControl,, %A_GuiControl%, % RegExReplace(value, "(\.[1-9]+)0+$", "$1")
