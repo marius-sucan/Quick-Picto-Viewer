@@ -20662,7 +20662,8 @@ undoRedoHugeImagesAct() {
       mStride := FreeImage_GetStride(hFIFimgA)
       showTOOLtip("Performing the undo action")
       startZeit := A_TickCount
-      r := DllCall("qpvmain.dll\UndoAiderSwapPixelRegions", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", Stride, "UPtr", pBitsMini, "int", mStride, "int", bpp, "int", X1, "int", Y1, "int", X2, "int", Y2)
+      ; the two strides are INT64 on the other side; "int" pushes only 4 bytes on x86
+      r := DllCall("qpvmain.dll\UndoAiderSwapPixelRegions", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "Int64", Stride, "UPtr", pBitsMini, "Int64", mStride, "int", bpp, "int", X1, "int", Y1, "int", X2, "int", Y2)
       ; ToolTip, % A_TickCount - startZeit , , , 2
       If !r
       {
@@ -100515,7 +100516,9 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
    ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
-   buffer := DllCall("qpvmain.dll\WICgetBufferImage", "Int", bitsDepth, "int", Stride, "int", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
+   ; cbStride and cbBufferSize are UINT64 on the other side; "int" pushes only 4 bytes
+   ; on x86, and bufferSize alone reaches ~4e9 for the image sizes sliced for just above
+   buffer := DllCall("qpvmain.dll\WICgetBufferImage", "Int", bitsDepth, "UInt64", Stride, "UInt64", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
       hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, imageType, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
    Else
