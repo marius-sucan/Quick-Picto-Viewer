@@ -1656,15 +1656,13 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["ThumbsNavigator", "Down", givenKey]
        Else If HKifs("imgsLoaded")
           func2Call := ["MenuPrevDesiredFrame"]
-    } Else If (givenKey="^WheelUp")
+    } Else If (givenKey="WheelUp")
     {
-       allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
           func2Call := ["VPchangeZoom", 1, "WheelUp"]
-    } Else If (givenKey="^WheelDown")
+    } Else If (givenKey="WheelDown")
     {
-       allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1)
+       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
           func2Call := ["VPchangeZoom", -1, "WheelDown"]
     } Else If (givenKey="!Left")
     {
@@ -2089,20 +2087,18 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        If HKifs("imgsLoaded")
           func2Call := ["invokeFoldersListerMenu"]
-    } Else If (givenKey="WheelUp")
+    } Else If (givenKey="^WheelUp")
     {
+       allowLoop := 1
        If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Upu", givenKey]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
-          func2Call := ["VPchangeZoom", 1, "WheelUp"]
        Else If (HKifs("imgsLoaded"))
           func2Call := ["PreviousPicture", "key-" givenKey]
-    } Else If (givenKey="WheelDown")
+    } Else If (givenKey="^WheelDown")
     {
+       allowLoop := 1
        If (HKifs("imgsLoaded") && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Down", givenKey]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (IMGresizingMode=4 && thumbsDisplaying!=1)
-          func2Call := ["VPchangeZoom", -1, "WheelDown"]
        Else If (HKifs("imgsLoaded"))
           func2Call := ["NextPicture", "key-" givenKey]
     } Else If (givenKey="Right" || givenKey="+Right")
@@ -21773,14 +21769,14 @@ HugeImagesDrawParametricLines() {
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         If (rza!=1)
+         If (rzq!=1)
             showTOOLtip("ERROR: Failed to draw the lines.`nLines mask preparation failed.")
          Else If (rzb!=1)
             showTOOLtip("ERROR: Failed to draw the lines.`nAn error occurred drawing the line segments.")
          Else If (rzc!=1)
             showTOOLtip("ERROR: Failed to draw the lines.`nAn error occurred utilizing the lines mask to alter the main bitmap.")
          Else
-            showTOOLtip("ERROR: Failed to draw the lines. Unknown cause[s].")
+            showTOOLtip("ERROR: Failed to draw the lines. Unknown cause.")
 
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -27695,7 +27691,6 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
     {
        setDarkWinAttribs(hwndGUI)
        WinGet, strControlList, ControlListHwnd, ahk_id %hwndGUI%
-       Gui, %whichGUI%: Color, %intWindowColor%, %intControlColor%
        Static clrBG := "303030"
        clrTX := SubStr(darkControlColor, 3)
        For strKey, strControlHwnd in StrSplit(strControlList,"`n","`r`n")
@@ -33191,7 +33186,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
 
     msgBoxed := 1
     setWinCloseZeit()
-    If (iconz="error" || iconz="exclamation" || iconz="question") && (runningLongOperation!=1)
+    If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
        interfaceThread.ahkPostFunction("setTaskbarIconState", iconz)
 
     panelMode := 0
@@ -33213,7 +33208,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
           WinSet, Disable,, ahk_id %hfdTreeWinGui%
        }
 
-       If (VisibleQuickMenuSearchWin=1 && az)
+       If (VisibleQuickMenuSearchWin=1)
        {
           hasDisabled[2] := 1
           WinSet, Disable,, ahk_id %hQuickMenuSearchWin%
@@ -33254,7 +33249,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     }
     createGUItoolbar()
     lastLongOperationAbort := A_TickCount
-    If (iconz="error" || iconz="exclamation" || iconz="question") && (runningLongOperation!=1)
+    If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
        interfaceThread.ahkPostFunction("setTaskbarIconState", "normal")
 
     ; SetTimer, setWinCloseZeit, -200, 900
@@ -34179,7 +34174,7 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
    optionz .= " NoChangeDir HideReadOnly"
    If InStr(p_type, "o")
    {
-      entriesList := defaultu "`n" recentOpenedFolders()
+      entriesList := recentOpenedFolders()
       If (p_type="o1")
       {
          thisCombo := "Open selected file only"
@@ -51927,8 +51922,7 @@ livePreviewAlphaMasking(dummy:=0, dummyOpacity:=0) {
       If validBMP(alphaMaskGray)
       {
          vpWinClientSize(mainWidth, mainHeight)
-         thisu := ((objSel.sw != objSel.dh || objSel.sh != objSel.dh) && objSel.invertArea=0) ? 0 : 0
-         If ((!isSelEntirelyWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && objSel.invertArea=0 || objSel.invertArea=1 || thisu=1)
+         If ((!isSelEntirelyWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && objSel.invertArea=0 || objSel.invertArea=1)
          {
             thisAlphaBitmap := getRectFromBitmap(alphaMaskGray, objSel, 1)
             If validBMP(thisAlphaBitmap)
@@ -54482,7 +54476,6 @@ gradientsPreviewResponder(thisHwnd:=0) {
    }
 
    WinGetPos, , , W, H, ahk_id %thisHwnd%
-   px := w, py := ph
    w *=2, h *= 2
    While, (determineLClickState()=1)
    {
@@ -57360,7 +57353,7 @@ PanelAdjustToneMapping() {
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
     Gui, +DPIScale
-    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: %ppp%
+    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: -----
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
     GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)|Simple mode (OpenCV)", "HDR tone mapping algorithm")
     GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Additional exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
@@ -57546,9 +57539,10 @@ updateUIfimToneMappedIMG() {
 
    hFIFimgZ := hFIFimgD ? hFIFimgD : hFIFimgE
    pBitmap := ConvertFIMtoPBITMAP(hFIFimgZ, coreDesiredPixFmt)
-   If StrLen(pBitmap)>2
+   If (StrLen(pBitmap)>2)
       recordGdipBitmaps(pBitmap, A_ThisFunc)
-   Else Return
+   Else
+      Return
 
    tempBMP := trGdip_CreateBitmap(A_ThisFunc, uiBoxW, uiBoxH, coreDesiredPixFmt)
    If !validBMP(tempBMP)
@@ -75846,7 +75840,7 @@ ZoomImageToClickPointInWindow() {
    mY := clampInRange(mY - ay, 0, fh)
    navWidth := fw,   navHeight := fh
    diffIMGdecX := diffIMGdecY := 0
-   calcIMGcoordsInVP("setCenter", zoomLevel, mw//2, mh//2, 0, 0, 0, 0, 0, 0, 0)
+   calcIMGcoordsInVP("setCenter", zoomLevel, imgW//2, imgH/2, 0, 0, 0, 0, 0, 0, 0)
    obju := createImgSelection2Win(1, 1, ResizedW, ResizedH, ImgW, ImgH, mainWidth, mainHeight, 1, 0)
    coords := obju.x1 "|" obju.y1 "|" obju.x2 "|" obju.y2
    ; fnOutputDebug("coords = " coords)
@@ -78833,10 +78827,8 @@ ActDrawAlphaMaskBrushNow() {
                Gdip_DeletePath(tmpPath)
             } Else
             {
-               ; draw any «generic» brush
-               thisBrushu := (BrushToolType>=5) ? brushImg : brushu
-               thisFloatOpacity := thisOpacity/255
-               tzGdip_DrawImage(Gu, thisBrushu, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisFloatOpacity)
+               ; soft brush
+               tzGdip_DrawImage(Gu, brushu, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisOpacity/255)
             }
 
             ; tzGdip_DrawImageFast(Gu, brushu[1], tkX - brushToolSize//2, tkY - brushToolSize//2)
@@ -89165,7 +89157,7 @@ PurgeCachedDataSelectedFiles() {
             If failedFiles
                etaTime .= "`nFailed to remove cached data for " groupDigits(failedFiles) " files"
 
-            showTOOLtip("Purging cached data for selected image files, please wait" etaTime, 0, 0, A_Index/thisMaxCount)
+            showTOOLtip("Purging cached data for selected image files, please wait" etaTime, 0, 0, countTFiles/markedSelectFile)
             prevMSGdisplay := A_TickCount
          }
       }
@@ -89918,7 +89910,7 @@ PanelAdjustColorsSimpleWindow() {
     GuiAddSlider("userImgAdjustTintAmount", 0, 65535, 0, "Tint amount", "UpdateUIsimpleAdjustColors", 1, "xs y+5 w" thisWS " hp")
     GuiAddSlider("userImgAdjustTintDeg", -180,180, 0, "Tint angle: $€°", "UpdateUIsimpleAdjustColors", 2, "x+5 wp hp")
     GuiAddCheckbox("x+1 hp+1 w" sml " gUpdateUIsimpleAdjustColors Checked" userImgAdjustAltTint " vuserImgAdjustAltTint", "Preserve light on tinting", "L")
-    thisW := (PrefsLargeFonts=1) ? txtWid//3 - 3 : txtWid//3 - 3
+    thisW := txtWid//3 - 3
     GuiAddSlider("userImgAdjustOffR", -65535,65535, 0, "R offset", "UpdateUIsimpleAdjustColors", 2, "xs y+5 w" thisWS " hp")
     GuiAddSlider("userImgAdjustOffG", -65535,65535, 0, "G offset", "UpdateUIsimpleAdjustColors", 2, "x+5 wp hp")
     GuiAddSlider("userImgAdjustOffB", -65535,65535, 0, "B offset", "UpdateUIsimpleAdjustColors", 2, "xs y+5 wp hp")
@@ -95748,15 +95740,15 @@ repairPathSeparators(pathu) {
 }
 
 SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
-    If (silentus=0)
-       showTOOLtip("Performing search and replace in the files list index:`n" what "`n" replacer)
-
     ; in folders mode, both strings always cover entire folder paths: 
     ; whole folders are matched
     ; d:\pics\old must never match d:\pics\oldies
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
+    If (silentus=0)
+       showTOOLtip("Performing search and replace in the files list index:`n" whatu "`n" replacerz)
+
     changeMcursor()
     getSelectedFiles(0, 1)
     If (StrLen(filesFilter)>1 && SLDtypeLoaded=3)
@@ -103030,7 +103022,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
 
     TlbrGuiMarginH := ToolBarBtnWidth//5
     TlbrGuiMarginV := TlbrGuiMarginH
-    IconSpacing := (TLBRverticalAlign=1) ? TlbrGuiMarginH//3 : TlbrGuiMarginH//3
+    IconSpacing := TlbrGuiMarginH//3
     handleWidth := (TLBRverticalAlign=1) ? ToolBarBtnWidth + IconSpacing*2 : ToolBarBtnWidth//2
     handleHeight := (TLBRverticalAlign=1) ? ToolBarBtnWidth//3 : ToolBarBtnWidth + IconSpacing*2
     handleClrW := (TLBRverticalAlign=1) ? ToolBarBtnWidth + IconSpacing*2 : ToolBarBtnWidth
@@ -104690,7 +104682,7 @@ DelayedToolbarTooltips(msgu, idu) {
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Critical, off
-  Static lastInvoked := 1, prevCtrlHover, prevState, prevMsg
+  Static lastInvoked := 1, prevCtrlHover, prevState, prevMsg, lkmu
        , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
        , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
        , hCursMove := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32646, "Ptr")
@@ -104749,10 +104741,11 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         If (imageLoading!=1 && runningLongOperation!=1)
         {
            IndexBtn := tlbrIconzList[ctrlHover, 5]
-           If (A_Gui="OSDguiToolbar" && ctrlHover && IndexBtn>0 && k!=msgu)
+           If (A_Gui="OSDguiToolbar" && ctrlHover && IndexBtn>0 && lkmu!=msgu)
            {
               ControlSetText , , % StrReplace(msgu, "`n", ".`n") ".", ahk_id %ctrlHover%
               tlbrIconzList[ctrlHover, 11] := msgu
+              lkmu := msgu
            }
         }
 
