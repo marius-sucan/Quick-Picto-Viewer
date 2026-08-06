@@ -70617,7 +70617,7 @@ folderzNavInvokeSubs(menuItem) {
     If (hasFound!=1)
        Return
 
-    tryOpenGivenFolder(thisFolder, oldFolder, oldIndex)
+    tryOpenGivenFolder(thisFolder, oldFolder, currentFileIndex)
 }
 
 tryOpenGivenFolder(thisFolder, oldFolder, oldIndex) {
@@ -99488,9 +99488,6 @@ adjustWheelNumbersEditFields(wParam, lParam, msg) {
    {
       result := (wParam >> 16)     ; return the HIWORD -  high-order word 
       givenKey := (result>0 && result<51234) ? "WheelUp" : "WheelDown"
-      ; each MK_ flag has to be masked out on its own; comparing the whole low word
-      ; to 4 or 8 only matched that one modifier held alone, so Ctrl+Shift [=12] or
-      ; a held mouse button [adds its own bit] silently fell back to the plain wheel
       If ((wParam & 4) || (wParam & 8))
          givenKey := (result>0 && result<51234) ? "PgUp" : "PgDn"
 

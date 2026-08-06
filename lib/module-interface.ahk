@@ -877,10 +877,6 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    }
 
    prefix := ""
-   ; the low word carries every MK_ flag at once, so each modifier has to be masked
-   ; out on its own; comparing the whole word to 4 or 8 only ever matched that one
-   ; modifier held alone - Ctrl+Shift is 12 and a held mouse button adds its own bit,
-   ; and either way the prefix came out empty and the bare wheel action fired
    prefix .= (wParam & 4) ? "+" : "" ; shift
    prefix .= (wParam & 8) ? "^" : "" ; ctrl
    prefix .= GetKeyState("Alt", "P") ? "!" : ""
