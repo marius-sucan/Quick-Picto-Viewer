@@ -22049,23 +22049,22 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          If (isInRange(FillAreaColorMode, 2, 4) && fillTool=1 && obju.imgZelW && obju.imgZelH) ; && FillAreaInverted=0 && !isImgSizeTooLarge(zW, zH))
          {
             showTOOLtip("Applying " modus "`nGenerating gradient bitmap, please wait", 1)
-            zW := (FillAreaInverted=1) ? imgW : max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
-            zH := (FillAreaInverted=1) ? imgH : max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+            ; the gradient is stretched onto obju's bounding box, so it must be measured
+            ; there and not on imgSelX1..imgSelY2: when the two disagree [a selection area
+            ; that reaches outside the canvas] the gradient would be generated for one
+            ; rectangle and stretched over another
+            zW := (FillAreaInverted=1) ? imgW : obju.imgSelW
+            zH := (FillAreaInverted=1) ? imgH : obju.imgSelH
             nzW := zW, nzH := zH
             mustUnlock := 0
             capIMGdimensionsFormatlimits("gdip", 1, nzW, nzH)
             ; If (max(zW, zH)>14500)
+            ResizedW := nzW
+            ResizedH := nzH
             If (zW!=nzW || zH!=nzH)
-            {
-               ResizedW := nzW
-               ResizedH := nzH
-               ; fnOutputDebug(A_ThisFunc " small gradient bitmap")
-            } Else
-            {
-               ResizedW := (FillAreaInverted=1) ? imgW : obju.imgSelW
-               ResizedH := (FillAreaInverted=1) ? imgH : obju.imgSelH
+               fnOutputDebug(A_ThisFunc "(): gradient bitmap capped to " ResizedW " | " ResizedH " for the selection area " zW " | " zH)
+            Else
                fnOutputDebug(A_ThisFunc "(): gradient bitmap size matches selection area dimensions: " ResizedW " | " ResizedH)
-            }
 
             Strode := (32 * ResizedW) / 8
             bonusBuffer := (ResizedW=obju.imgZelW && ResizedH=obju.imgZelH) ? 0 : Strode * ResizedH
@@ -80990,7 +80989,17 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
 
 InitHugeImgSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
    obju := []
-   If !(editingSelectionNow=1 && testAllowSelInvert())
+   ; a selection area that hangs outside the canvas still covers all of it, so
+   ; testAllowSelInvert() calls it "no selection" and the bounding box below collapses
+   ; onto the image. The tools that only want a clip mask get the very same mask either
+   ; way, but the advanced ones [fill, transform, paste in place] also stretch an overlay
+   ; onto this box: collapsing it squeezes the overlay into the canvas. Keep the box they
+   ; declared whenever it reaches past an edge
+   keepDeclaredBox := (advancedMode=1 && editingSelectionNow=1 && testSelectionLargerThanGiven(imgW, imgH)) ? 1 : 0
+   If (keepDeclaredBox=1)
+      fnOutputDebug(A_ThisFunc "(): the selection area reaches outside the image; keeping the declared bounding box")
+
+   If !(editingSelectionNow=1 && (keepDeclaredBox=1 || testAllowSelInvert()))
    {
       obju.x1 := 0,          obju.y1 := 0
       obju.x2 := imgW,       obju.y2 := imgH
