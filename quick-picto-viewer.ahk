@@ -2468,7 +2468,7 @@ initializeAppWithGivenArguments() {
    } Else If folderOpened
    {
       If InStr(folderOpened, "|")
-         tryOpenGivenFolder(folderOpened, 0)
+         tryOpenGivenFolder(folderOpened, 0, 1)
       Else
          OpenFolders(folderOpened)
    } Else If (thisCounter=1 && !sldOpened && !folderOpened)
@@ -27031,7 +27031,7 @@ omniBoxFolderOpen() {
       Return
 
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
-   tryOpenGivenFolder(folderPath, CurrentSLD)
+   tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex)
    FileExploreSiblingsNav("reset")
    userQuickMenusEdit := folderPath
    If !VisibleQuickMenuSearchWin
@@ -30637,7 +30637,7 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       If askAboutFilesSelect("discard it")
          Return
 
-      tryOpenGivenFolder(folderPath, CurrentSLD)
+      tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex)
       FileExploreSiblingsNav("reset")
       Sleep, 1
       WinActivate, ahk_id %hfdTreeWinGui%
@@ -62527,7 +62527,7 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
 
    newFolder := Trimmer(newFolder, "\")
    If (initialLevel!=thisLevel)
-      tryOpenGivenFolder(newFolder, oldFolder)
+      tryOpenGivenFolder(newFolder, oldFolder, oldIndex)
 }
 
 FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) {
@@ -62617,7 +62617,7 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
 
    If (initialLevel!=thisLevel && FolderExist(newFolder))
    {
-      r := tryOpenGivenFolder(newFolder, oldFolder)
+      r := tryOpenGivenFolder(newFolder, oldFolder, oldIndex)
       If (r=1)
       {
          subFoldersArray[thisLevel] := ""
@@ -62733,7 +62733,7 @@ addStaticFolderSQLdb(whichFolder, fileMdate, renewList) {
 
 RefreshImageFileAction() {
    isThumbMode := (thumbsDisplaying=1 && maxFilesIndex>1) ? 1 : 0
-   ; imgPath := getIDimage(currentFileIndex)
+   imgPath := getIDimage(currentFileIndex)
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
@@ -62765,7 +62765,6 @@ RefreshImageFileAction() {
       INIaction(1, "FlipImgH", "General")
       INIaction(1, "FlipImgV", "General")
       INIaction(1, "vpIMGrotation", "General")
-
       r := IDshowImage(currentFileIndex, 3)
       If !r
          informUserFileMissing(1)
@@ -70618,10 +70617,10 @@ folderzNavInvokeSubs(menuItem) {
     If (hasFound!=1)
        Return
 
-    tryOpenGivenFolder(thisFolder, oldFolder)
+    tryOpenGivenFolder(thisFolder, oldFolder, oldIndex)
 }
 
-tryOpenGivenFolder(thisFolder, oldFolder) {
+tryOpenGivenFolder(thisFolder, oldFolder, oldIndex) {
    oldFolderu := StrReplace(oldFolder, "|")
    thisFolder := StrReplace(thisFolder, "|")
    thisFolder := StrReplace(Trimmer(thisFolder, "\"), "\\", "\")
@@ -74761,10 +74760,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   totalIMGres := imgW + imgH
   defineRelativeSelCoords(imgW, imgH)
   totalScreenRes := ResolutionWidth + ResolutionHeight
-  thisImgQuality := (userimgQuality=1) ? 6 : 5
-  If (minimizeMemUsage=1 && rawFmt!="MEMORYBMP")
-     thisImgQuality := ""
-
   changeMcursor()
   newW := imgW,  newH := imgH
   isGIFgdip := ((animGIFplaying=1 || gifLoaded=1) && currIMGdetails.OpenedWith="[GDI+]") ? 1 : 0
@@ -74817,9 +74812,13 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   If (abortImgLoad<3 && vpIMGrotation>0)
   {
      setWindowTitle("Rotating image at " vpIMGrotation "°")
-     brushu := (currIMGdetails.HasAlpha!=1 || gifLoaded=1) ? pBrushWinBGR : ""
+     thisImgQuality := (userimgQuality=1) ? 6 : 5
+     If (minimizeMemUsage=1 && rawFmt!="MEMORYBMP")
+        thisImgQuality := ""
+
      changeMcursor()
-     nBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, rBitmap, vpIMGrotation, "", imgQuality, pargbPixFmt)
+     brushu := (currIMGdetails.HasAlpha!=1 || gifLoaded=1) ? pBrushWinBGR : ""
+     nBitmap := trGdip_RotateBitmapAtCenter(A_ThisFunc, rBitmap, vpIMGrotation, "", thisImgQuality, pargbPixFmt)
      If validBMP(nBitmap)
      {
         trGdip_GetImageDimensions(nBitmap, imgW, imgH)
@@ -88894,7 +88893,6 @@ BTNfindDupesNow() {
 }
 
 BTNhelpFindDupes() {
-   friendly := 
    msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe precision factor does not apply for file names, size in bytes, file dates and image width, height, frames and pixel format properties.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, precision 2 and dHash threshold 3 in the fingerprints tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 8x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
@@ -94968,7 +94966,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       If askAboutFilesSelect("discard it")
          Return
 
-      tryOpenGivenFolder(folderPath, CurrentSLD)
+      tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex)
       FileExploreSiblingsNav("reset")
    }
 }
@@ -99375,7 +99373,7 @@ generateThumbName(imgPath, forceThis:=0, bonusID:="") {
    ;    Return
 
    obju := GetFileAttributesEx(imgPath)
-   MD5name := CalcStringHash(imgPath obj.size obju.wtime obju.ctime, 0x8003) . bonusID
+   MD5name := CalcStringHash(imgPath obju.size obju.wtime obju.ctime, 0x8003) . bonusID
    lastInvoked := A_TickCount
    prevMD5name := MD5name
    prevBonus := bonusID
@@ -100520,8 +100518,6 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
    remainderHeight := mod(imgH, SliceHeight)
    SliceHeight := (numberSlices>1) ? SliceHeight : 0
    ; fnOutputDebug(A_ThisFunc "(): " Stride " | w/h =" imgW " x " imgH " | buffer = " bufferSize " | sh=" SliceHeight " | ns=" numberSlices " | " remainderHeight)
-   ; cbStride and cbBufferSize are UINT64 on the other side; "int" pushes only 4 bytes
-   ; on x86, and bufferSize alone reaches ~4e9 for the image sizes sliced for just above
    buffer := DllCall("qpvmain.dll\WICgetBufferImage", "Int", bitsDepth, "UInt64", Stride, "UInt64", bufferSize, "int", SliceHeight, "int", useICM, "UPtr")
    If buffer
       hFIFimgA := FreeImage_ConvertFromRawBitsEx(0, buffer, imageType, imgW, imgH, Stride, bitsDepth, "0x00FF0000", "0x0000FF00", "0x000000FF", 1)
