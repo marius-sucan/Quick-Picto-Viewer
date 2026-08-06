@@ -4325,8 +4325,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                   else
                      sampleColorBitmapBilinear(colorBitmap, jitMapX[x], rowTap, gBpp, opacity, sR, sG, sB, sA);
 
-                  // an overlay that carries no alpha channel is opaque, whatever
-                  // flat opacity the sampler just handed back as sA
+                  // an overlay that carries no alpha channel is opaque
                   sRawA = (gBpp==32) ? sA : 255;
                } else
                {
@@ -4335,8 +4334,6 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 
                   INT64 oz = kzy + kzx;
                   // fnOutputDebug("y=" + std::to_string(y - bmpY));
-                  // byte 3 of a 24bpp pixel is the NEXT pixel's blue, not an alpha, and on
-                  // the last pixel of an unpadded row it is not even inside the bitmap
                   sRawA = (gBpp==32) ? colorBitmap[3 + oz] : 255;
                   sA = (gBpp==32) ? sRawA : opacity;
                   sR = colorBitmap[2 + oz];
