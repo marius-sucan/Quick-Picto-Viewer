@@ -1589,12 +1589,22 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     mouseToolTipWinCreated := 1
     delayu := StrLen(msg) * 75 + 950
     lastZeitToolTip := A_TickCount
-    showOSDinfoLineNow(delayu, givenCoords)
+    showOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
 }
 
-showOSDinfoLineNow(delayu, givenCoords:=0) {
+showOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
     If !mouseToolTipWinCreated
        Return
+
+    ; the branch further below re-creates the text control to re-wrap a tooltip wider
+    ; than the monitor, so it needs the caption and the colour of the control it
+    ; replaces. Both belong to mouseCreateOSDinfoLine() and are invisible here, so it
+    ; hands them over now; the callers that merely reposition an existing tooltip have
+    ; neither at hand and read back what is already on screen instead
+    If (msgu="")
+       GuiControlGet, msgu, mouseToolTipGuia:, TippyMsg
+    If (txtClr="")
+       txtClr := OSDtextColor
 
     GetPhysicalCursorPos(mX, mY)
     If IsObject(givenCoords)
@@ -1622,11 +1632,13 @@ showOSDinfoLineNow(delayu, givenCoords:=0) {
        tipY := (forced=1) ?  mY : mY + 20
        ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
        MaxWidth := Floor(ResWidth*0.85)
-       If (MaxWidth<Wid && MaxWidth>10)
+       ; an empty caption means the tooltip was already re-wrapped by an earlier call:
+       ; TippyMsg was emptied then, and wrapping it again would only blank it out
+       If (MaxWidth<Wid && MaxWidth>10 && msgu!="")
        {
           GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
           GuiControl, mouseToolTipGuia:, TippyMsg,
-          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtColor% gmouseClickTurnOFFtooltip w%MaxWidth%, %msg%
+          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtClr% gmouseClickTurnOFFtooltip w%MaxWidth%, % msgu
           Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
           ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
        }
