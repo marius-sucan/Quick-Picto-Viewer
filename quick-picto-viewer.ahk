@@ -21844,6 +21844,7 @@ HugeImagesApplyPasteInPlace() {
       w := x2 - x1
       h := y2 - y1
       kw := kh := 0
+      ; oldSelectionArea[11] holds a FreeImage image object. oldSelectionArea[] object is populated in MainPanelTransformArea()
       If (PasteInPlaceToolMode!=1 && oldSelectionArea[11])
          FreeImage_GetImageDimensions(oldSelectionArea[11],  kw, kh)
 
@@ -21928,6 +21929,7 @@ HugeImagesApplyPasteInPlace() {
          }
       } Else If oldSelectionArea[11]
       {
+         fnOutputDebug(A_ThisFunc "(): oldSelectionArea[11] used")
          hFIFimgA := oldSelectionArea[11]
          oldSelectionArea[11] := ""
       }
@@ -21936,7 +21938,7 @@ HugeImagesApplyPasteInPlace() {
       {
          terminatePasteInPlace()
          ResetImgLoadStatus()
-         showTOOLtip("ERROR: Failed to " friendly ":`nUnable to rescale image object.")
+         showTOOLtip("ERROR: Failed to " friendly ":`nUnable to prepare image object.")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -22058,7 +22060,6 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             nzW := zW, nzH := zH
             mustUnlock := 0
             capIMGdimensionsFormatlimits("gdip", 1, nzW, nzH)
-            ; If (max(zW, zH)>14500)
             ResizedW := nzW
             ResizedH := nzH
             If (zW!=nzW || zH!=nzH)
@@ -22123,7 +22124,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          {
             newColor := (FillAreaColorMode=1) ? "0x" Format("{1:x}", FillAreaOpacity) FillAreaColor : "0xFF" FillAreaColor
             thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : 255
-         } else
+         } Else
          {
             newColor := (transformTool=1) ? -1 : "0xFF" FillAreaColor
             thisOpacity := (transformTool=1) ? clampInRange(PasteInPlaceOpacity, 0, 255) : FillAreaOpacity
@@ -22162,9 +22163,9 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             FreeImage_UnLoad(hFIFimgExtern)
    
          userImgAdjustNoClamp := (PasteInPlaceLight>1 && PasteInPlaceGamma<1) ? 1 : 0 
-         thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : max(FillAreaOpacity, FillArea2ndOpacity)
          If (FillAreaApplyColorFX=1 && isinRange(thisBlendMode, 1, 22) && r && fillTool=1)
          {
+            thisOpacity := (FillAreaColorMode=1) ? FillAreaOpacity : max(FillAreaOpacity, FillArea2ndOpacity)
             showTOOLtip("Applying " modus "`nPerforming color adjustments, please wait", 1)
             rz := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisOpacity, "int", userImgAdjustInvertColors, "int", userImgAdjustAltSat, "int", Round(PasteInPlaceSaturation*655.35), "int", userImgAdjustAltBright, "int", Round(PasteInPlaceLight*257), "int", 0, "int", Round(PasteInPlaceGamma*655.30), "int", 0, "int", 0, "int", 0, "int", PasteInPlaceHue, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 0, "int", userimgGammaCorrect, "int", userImgAdjustNoClamp, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
          }
@@ -47387,6 +47388,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
              oPasteInPlaceCropDo := 0
           }
 
+          ; hFIFimgA will be used by HugeImagesApplyPasteInPlace()
           oldSelectionArea := [imgSelX1, imgSelY1, imgSelX2, imgSelY2, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, innerSelectionCavityX, innerSelectionCavityY, imgBPP, hFIFimgA, ow, oh]
           VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY := 0
           trGdip_GetImageDimensions(userClipBMPpaste, imgW, imgH)

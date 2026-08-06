@@ -4206,7 +4206,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     // 0 (box) and 5 (Lanczos3) included, degrades to bilinear.
     // the opacity and opacityMultiplier parameters only apply if colorBitmap is not NULL
 
-    // fnOutputDebug("FillSelectArea mStride=" + std::to_string(mStride));
+    fnOutputDebug("FillSelectArea() Stride=" + std::to_string(Stride) + " opacity=" + std::to_string(opacity));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
     RGBAColor initialColor;
