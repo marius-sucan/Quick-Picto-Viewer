@@ -66460,9 +66460,7 @@ checkForUpdatesNow() {
 
 fetchUpdateInfosINI(ByRef newVersion, ByRef newDate) {
    ; Downloads the published version manifest into a temporary file and extracts
-   ; the Version / ReleaseDate keys. The second URL is only tried when the first one
-   ; failed quickly: a slow failure means the network itself is down, not that the
-   ; host is wrong, and retrying would just stall the main thread a second time.
+   ; the Version / ReleaseDate keys.
    ; Returns 1 when both fields were retrieved and look sane.
    Static iniURLs := ["https://files.sucan.ro/marius/blog/ahk-scripts/qpv-version.ini"
                     , "https://raw.githubusercontent.com/marius-sucan/Quick-Picto-Viewer/master/qpv-version.ini"]
