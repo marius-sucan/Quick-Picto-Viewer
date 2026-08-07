@@ -5499,9 +5499,37 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
    // ss << " maxResults " << maxResults;
    // OutputDebugStringA(ss.str().data());
 
-    int noffset = 0;
-    for ( INT secondIndex = offsetu ; secondIndex<n ; secondIndex++)
+    // The caller walks the outer index in batches of "stepping" so it can show
+    // progress and stay interruptible; the old code covered offsetu ..
+    // offsetu+stepping inclusive, which is preserved here.
+    const INT firstIndex = offsetu;
+    INT lastIndex = offsetu + stepping;
+    if (lastIndex > (INT)n - 1)
+       lastIndex = (INT)n - 1;
+
+    const int noffset = (firstIndex <= lastIndex) ? (lastIndex - firstIndex + 1) : 0;
+    if (noffset < 1)
     {
+       *hoffset = 0;
+       return 0;
+    }
+
+    // The OUTER loop is the one worth parallelising. Parallelising the inner one
+    // forked and joined a team per outer iteration over a trip count that
+    // shrinks to nothing, so for the 2-5 image groups that dominate a real scan
+    // the OpenMP overhead exceeded the work outright.
+    // Each outer index also collects into its own buffer, which removes the
+    // shared push_back entirely and makes the result order reproducible: the
+    // buffers are concatenated by index below, so the output is exactly what a
+    // serial run would have produced. It used to be whatever order the threads
+    // happened to reach the critical section in, which is why two identical
+    // scans of the same library could come back with different groups.
+    std::vector< std::vector<UINT> > partA(noffset), partB(noffset), partC(noffset);
+
+    #pragma omp parallel for schedule(dynamic) if (noffset > 1 && ((INT)n - firstIndex) > 64)
+    for ( INT slot = 0 ; slot < noffset ; slot++)
+    {
+        const INT secondIndex = firstIndex + slot;
         UINT64 invert2ndindex = 0;
         // UINT64 reversed2ndindex = 0;
         if (checkInverted==1)
@@ -5513,9 +5541,7 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
         //    // fnOutputDebug("reverso " + to_string(givenHashesArray[secondIndex]) + " -- " + to_string(reversed2ndindex));
         // }
 
-        noffset++;
-        #pragma omp parallel for schedule(dynamic) default(none) shared(results)
-        for ( INT mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
+        for ( INT mainIndex = secondIndex + 1 ; mainIndex<(INT)n ; mainIndex++)
         {
             int diff2 = 900;
             int diff3 = 900;
@@ -5529,43 +5555,52 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
             // if (threshold>2 && diff>=threshold)
             //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamMask);
 
-            // Matches are rare, so test before taking the lock: the critical
-            // section used to be entered for every single pair, which
-            // serialised the whole loop on one mutex and made the parallel for
-            // slower than a plain serial scan.
+            // matches are rare: skip the bookkeeping for the overwhelming
+            // majority of pairs
             if (diff>=threshold && diff2>=threshold && diff3>=threshold)
                continue;
 
-            #pragma omp critical
+            if (diff<threshold)
             {
-               if (diff<threshold)
-               {
-                   dupesListIDsA.push_back(givenIDs[mainIndex]);
-                   dupesListIDsB.push_back(givenIDs[secondIndex]);
-                   dupesListIDsC.push_back(diff);
-                   results++;
-               };
+                partA[slot].push_back(givenIDs[mainIndex]);
+                partB[slot].push_back(givenIDs[secondIndex]);
+                partC[slot].push_back(diff);
+            }
 
-               if (diff2<threshold)
-               {
-                   dupesListIDsA.push_back(givenIDs[mainIndex]);
-                   dupesListIDsB.push_back(givenIDs[secondIndex]);
-                   dupesListIDsC.push_back(diff2);
-                   results++;
-               }
+            if (diff2<threshold)
+            {
+                partA[slot].push_back(givenIDs[mainIndex]);
+                partB[slot].push_back(givenIDs[secondIndex]);
+                partC[slot].push_back(diff2);
+            }
 
-               if (diff3<threshold)
-               {
-                   // fnOutputDebug("c++ dupe pair:" + to_string(givenHashesArray[mainIndex]) + "/" + to_string(givenFlippedHashesArray[secondIndex]));
-                   dupesListIDsA.push_back(givenIDs[mainIndex]);
-                   dupesListIDsB.push_back(givenIDs[secondIndex]);
-                   dupesListIDsC.push_back(diff3);
-                   results++;
-               }
+            if (diff3<threshold)
+            {
+                // fnOutputDebug("c++ dupe pair:" + to_string(givenHashesArray[mainIndex]) + "/" + to_string(givenFlippedHashesArray[secondIndex]));
+                partA[slot].push_back(givenIDs[mainIndex]);
+                partB[slot].push_back(givenIDs[secondIndex]);
+                partC[slot].push_back(diff3);
             }
         }
-        if (noffset>stepping)
-           break;
+    }
+
+    for (int slot = 0; slot < noffset; slot++)
+        results += (UINT)partC[slot].size();
+
+    if (results > 0)
+    {
+       dupesListIDsA.reserve(dupesListIDsA.size() + results);
+       dupesListIDsB.reserve(dupesListIDsB.size() + results);
+       dupesListIDsC.reserve(dupesListIDsC.size() + results);
+       for (int slot = 0; slot < noffset; slot++)
+       {
+           if (partC[slot].empty())
+              continue;
+
+           dupesListIDsA.insert(dupesListIDsA.end(), partA[slot].begin(), partA[slot].end());
+           dupesListIDsB.insert(dupesListIDsB.end(), partB[slot].begin(), partB[slot].end());
+           dupesListIDsC.insert(dupesListIDsC.end(), partC[slot].begin(), partC[slot].end());
+       }
     }
 
    *hoffset = noffset;
