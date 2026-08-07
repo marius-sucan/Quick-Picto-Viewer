@@ -86437,9 +86437,6 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
           }
 
           idRc := NumGet(resultsArrayC, 4 * (A_Index - 1), "uInt")
-          If !idRc
-             idRc := 0
-
           resultsDupesArray[thisCounter + thisIndex] := [idRa, idRb, idRc, MSE]
           ; fnOutputDebug("res=" totalResults " tL=" totalLoops " g=" grupu " tC=" thisCounter " (" resultsDupesArray.Count() ") aI=" thisIndex " MSE=" MSE " hD=" idRc " A=" idRa " B=" idRb)
        }
