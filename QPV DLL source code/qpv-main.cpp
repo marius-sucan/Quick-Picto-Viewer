@@ -5406,30 +5406,37 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     return 1;
 }
 
-inline int hammingDistance(const UINT64 n1, const UINT64 n2, const UINT hamDistLBorderCrop, const UINT hamDistRBorderCrop, const bool doRange) { 
-    UINT64 x = n1 ^ n2; 
-    int setBits = 0; 
-    if (doRange==0)
-    {
-        while (x > 0)
-        { 
-           setBits += x & 1; 
-           x >>= 1; 
-        }
-    } else
-    {
-        int loopsOccured = 0;
-        while (x > 0)
-        { 
-           loopsOccured++;
-           if (inRange(hamDistLBorderCrop, 64 - hamDistRBorderCrop, loopsOccured))
-              setBits += x & 1; 
-           x >>= 1; 
-        }
-    }  
+// SWAR population count. POPCNT needs SSE4.2 while this project builds with
+// EnableEnhancedInstructionSet=SSE2 and ships a Win7 x64 DLL, so no intrinsic
+// and no CPU dispatch: this is ~12 branch-free ops instead of up to 64 loop
+// iterations per comparison, and hammingDistance() runs n*n/2 times per group.
+inline int popcount64(UINT64 x) {
+    x -= (x >> 1) & 0x5555555555555555ULL;
+    x  = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
+    x  = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+    return (int)((x * 0x0101010101010101ULL) >> 56);
+}
 
-    return setBits; 
-} 
+// Builds the bit window the two crop settings describe: lCrop drops that many
+// LOW bits, rCrop that many HIGH bits. That is what the 8x8 preview grid in
+// updateUIimageHashPreview() promises; the old loop compared a 1-based counter
+// against hamDistLBorderCrop and so dropped only lCrop-1 low bits while
+// dropping rCrop high bits.
+// A crop wider than the hash is treated as "no crop": the alternative is an
+// empty mask, which makes every distance 0 and every image a duplicate.
+inline UINT64 buildHamMask(UINT lCrop, UINT rCrop) {
+    if (lCrop > 64) lCrop = 64;
+    if (rCrop > 64) rCrop = 64;
+    if (lCrop + rCrop >= 64)
+       return ~0ULL;
+
+    const UINT keep = 64 - lCrop - rCrop;
+    return ((keep == 64) ? ~0ULL : ((1ULL << keep) - 1ULL)) << lCrop;
+}
+
+inline int hammingDistance(const UINT64 n1, const UINT64 n2, const UINT64 mask) {
+    return popcount64((n1 ^ n2) & mask);
+}
 
 DLL_API UINT DLL_CALLCONV retrieveHammingDistanceResults(UINT *resultsArray, UINT whichArray, UINT results) {
    for ( int index = 0 ; index <= results ; index++)
@@ -5484,7 +5491,7 @@ void setMainWindowTitle(std::string str, HWND pvHwnd) {
 DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UINT64 *givenFlippedHashesArray, UINT *givenIDs, UINT arraySize, int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped, int stepping, int offsetu, int* hoffset) {
    UINT results = 0;
    UINT n = arraySize;
-   const bool doRange = (hamDistLBorderCrop==0 && hamDistRBorderCrop==0) ? 0 : 1;
+   const UINT64 hamMask = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
    // int mainIndex = 1;
    // int returnVal = 1;
    // std::stringstream ss;
@@ -5513,14 +5520,14 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
             int diff2 = 900;
             int diff3 = 900;
 
-            int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex], hamDistLBorderCrop, hamDistRBorderCrop, doRange);
+            int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex], hamMask);
             if (checkInverted==1)
-               diff2 = hammingDistance(givenHashesArray[mainIndex], invert2ndindex, hamDistLBorderCrop, hamDistRBorderCrop, doRange);
+               diff2 = hammingDistance(givenHashesArray[mainIndex], invert2ndindex, hamMask);
             if (checkFlipped==1)
-               diff3 = hammingDistance(givenHashesArray[mainIndex], givenFlippedHashesArray[secondIndex], hamDistLBorderCrop, hamDistRBorderCrop, doRange);
+               diff3 = hammingDistance(givenHashesArray[mainIndex], givenFlippedHashesArray[secondIndex], hamMask);
 
             // if (threshold>2 && diff>=threshold)
-            //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamDistLBorderCrop, hamDistRBorderCrop);
+            //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamMask);
 
             #pragma omp critical
             {
