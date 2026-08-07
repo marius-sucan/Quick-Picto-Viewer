@@ -35863,7 +35863,7 @@ PanelStateOFsqlNation() {
    } Else If InStr(msgResult, "purge")
    {
       showTOOLtip("Purging already ignored " groupDigits(ogn) " file entries")
-      r := SQLdeleteEntriesMarked(1, "ANY")
+      r := SQLdeleteEntriesMarked("ANY")
       If (r=1)
       {
          SoundBeep 900, 100
