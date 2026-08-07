@@ -86342,6 +86342,12 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
    stepping := 100
    startuZ := A_TickCount
    lastStep := A_TickCount
+   ; Progress has to be measured in comparisons, not in outer indices. The sweep
+   ; is triangular - the first outer index compares against every other image,
+   ; the last against none - so callOffset/totalLoops reported a bar that
+   ; crawled through the expensive first batches and then jumped to the end,
+   ; and fed ETAinfos() an increment rate that was wrong in the same direction.
+   totalWork := (totalLoops<2) ? 1 : totalLoops*(totalLoops - 1)//2
    doStartLongOpDance()
    Loop
    {
@@ -86359,11 +86365,13 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
 
       If (A_TickCount - prevMSGdisplay>1000)
       {
-         etaTime := SubStr(ETAinfos(callOffset, totalLoops, startuZ), 2)
+         restu := totalLoops - callOffset
+         doneWork := totalWork - ((restu<2) ? 0 : restu*(restu - 1)//2)
+         etaTime := SubStr(ETAinfos(doneWork, totalWork, startuZ), 2)
          etaTime := SubStr(etaTime, InStr(etaTime, "`n"))
          etaTime .= "`nTotal elapsed time: " SecToHHMMSS(Round((A_TickCount - mainZeit)/1000, 3))
-         pxk := Round(callOffset/totalLoops * 100, 1) 
-         showTOOLtip("Calculating Hamming distance between the images" generalDetails " ( " pxk "% )" etatime, 0, 0, callOffset/totalLoops)
+         pxk := Round(doneWork/totalWork * 100, 1)
+         showTOOLtip("Calculating Hamming distance between the images" generalDetails " ( " pxk "% )" etatime, 0, 0, doneWork/totalWork)
          prevMSGdisplay := A_TickCount
       }
 
