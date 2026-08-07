@@ -36117,48 +36117,42 @@ calcDLLpHashAlgo(arrayChars, ByRef givenArray, modus) {
 }
 
 calcLhashAlgo(pixArray) {
-    ; ToolTip, % RecordSet.RowCount "|" countTFilez "=" whichHashu "==" arrayChars.Count()  , , , 2
-    summo := 0
-    ; pixArray := []
+    ; pixArray is the pixels fingerprint stored in pixelzFsmall: 9x8 = 72 gray
+    ; levels, produced by calcHistoAvgFile() through trGdip_ResizeBitmap(9, 8).
+    ; The hash covers its leftmost 8x8 block: every pixel is compared against the
+    ; mean of its row mean and its column mean.
+    ; W must stay in sync with the resize in calcHistoAvgFile().
+    Static W := 9, H := 8
     linezArray := []
     colsArray := []
-    cols := linez := thisIndex := 1
-    Loop, % pixArray.Count()
+    Loop, % H ; row means, over the 8 columns that get hashed
     {
-       If (thisIndex>8)
-       {
-          thisIndex := 1
-          linezArray[linez] := summo/8
-          ; fnOutputDebug(A_Index "summo[" linez "]=" Round(summo/16))
-          summo := 0
-          linez++
-       }
+       rowu := A_Index
+       summo := 0
+       Loop, 8
+          summo += pixArray[(rowu - 1)*W + A_Index]
+       linezArray[rowu] := summo/8
+    }
 
-       ; pixArray[A_Index] := discretizeValue(Ord(arrayChars[A_Index]) - 161, graylevelCompressor)
-       col%thisIndex% += pixArray[A_Index]
-       summo += pixArray[A_Index]
-       thisIndex++
-       If (A_Index=64)
-       {
-          Loop, 8
-             colsArray[A_Index] := col%A_Index%/8
-       }
+    Loop, 8 ; column means
+    {
+       colu := A_Index
+       summo := 0
+       Loop, % H
+          summo += pixArray[(A_Index - 1)*W + colu]
+       colsArray[colu] := summo/H
     }
 
     hashu := ""
-    allIndex := 0
-    Loop, 8
+    Loop, % H
     {
-       thisIndex := 0
-       mainIndexu := A_Index
+       rowu := A_Index
        Loop, 8
        {
-          allIndex++
-          thisIndex := A_Index
-          avg := (colsArray[thisIndex] + linezArray[mainIndexu])//2
-          hashu .= pixArray[allIndex] > avg ? 1 : 0
-          ; hashu .= (avg>linezArray[mainIndexu, 17]) ? 1 : 0
-          ; fnOutputDebug("avg[" mainIndexu ", " thisIndex "]=" avg)
+          ; the exact float mean is used on purpose: rounding it first creates
+          ; ties between the pixel and its threshold
+          avg := (colsArray[A_Index] + linezArray[rowu])/2
+          hashu .= (pixArray[(rowu - 1)*W + A_Index] > avg) ? 1 : 0
        }
     }
 
