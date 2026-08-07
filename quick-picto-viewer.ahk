@@ -86787,10 +86787,16 @@ autoSelectDupesInGroups(mode, givenRegEx:=0) {
 
                If !r
                   countSel%grpID%++
-            } Else If (fsMax=fsMin && countSel%grpID%!=1)
+            } Else If (fsMax=fsMin && countSel%grpID%<countPerGroup%grpID%)
             {
-               countSel%grpID% := 1
-               resultedFilesList[A_Index, 2] := 1
+               ; every member is the same size / resolution, so nothing
+               ; distinguishes them: select all but one, as mode 1 does.
+               ; This used to select exactly the FIRST member and keep the rest,
+               ; which is the inverse of what the panel promises - a group of
+               ; five identical files lost one copy per run instead of four.
+               countSel%grpID%++
+               If (countSel%grpID%<countPerGroup%grpID%)
+                  resultedFilesList[A_Index, 2] := 1
             } Else If (fsMax!=fsMin)
             {
                thisIndex := (mode=2) ? theArray[grpID, 1, 2] : theArray[grpID, 2, 2]
