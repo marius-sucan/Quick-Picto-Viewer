@@ -85901,7 +85901,13 @@ sortDupeGroups(givenArray, oldMap:=0, remSingles:=1) {
           ; lgrpIDv%grpIDu%++
           ; If (InStr(givenArray[A_Index, 28], "_"))
           ;    looseGroupies[grpIDu] := (lgrpIDv%grpIDu%=1) ? A_Index : 0
-          listuGroupies .= grpIDu "z" A_Index "|"
+          ; Sort below is lexicographic, so both numbers are zero-padded: the
+          ; group ID's numeric part keeps the groups in list order rather than
+          ; in string order ("100_2" before "12_2"), and the padded row index
+          ; preserves the SQL's ORDER BY within each group (it used to place
+          ; row 100 ahead of row 7). The real group ID travels along after the
+          ; "y" because groupies[] is keyed by it.
+          listuGroupies .= Format("{:09d}", tgrpIDu) "y" grpIDu "z" Format("{:09d}", A_Index) "|"
        }
    }
 
@@ -85925,10 +85931,12 @@ sortDupeGroups(givenArray, oldMap:=0, remSingles:=1) {
        If A_LoopField
        {
           zu := StrSplit(A_LoopField, "z")
-          If groupies[zu[1]]
+          grpIDu := SubStr(zu[1], InStr(zu[1], "y") + 1) ; drop the sort prefix
+          rowIndexu := zu[2] + 0 ; force numeric: "000000007" is not an array key
+          If groupies[grpIDu]
           {
              newIndex++
-             newArrayu[newIndex] := givenArray[zu[2]]
+             newArrayu[newIndex] := givenArray[rowIndexu]
              newArrayu[newIndex, 28] := ""
              If (PerformMSDonDupes=1)
              {
@@ -85937,7 +85945,7 @@ sortDupeGroups(givenArray, oldMap:=0, remSingles:=1) {
              }
 
              If (hasHamDistCached=1 && IsObject(oldMap))
-                newMappingList[newIndex] := oldMap[zu[2]]
+                newMappingList[newIndex] := oldMap[rowIndexu]
           }
        }
    }
