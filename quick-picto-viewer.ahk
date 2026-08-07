@@ -86269,7 +86269,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    totalLoops := dupeIDsArray.Count()
-   VarSetCapacity(IDsbigArray, 8 * totalLoops + 1, 0)
+   VarSetCapacity(IDsbigArray, 4 * totalLoops + 1, 0) ; UINT entries, 4-byte stride
    VarSetCapacity(HbigArray, 8 * totalLoops + 1, 0)
    If (findFlippedDupes=1)
       VarSetCapacity(flipHbigArray, 8 * totalLoops + 1, 0)
