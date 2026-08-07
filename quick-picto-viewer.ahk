@@ -86425,7 +86425,11 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    Else If (userFindDupesFilterHamDist=4)
       includeHash := ", lHash"
 
-   If (findFlippedDupes=1)
+   ; the flipped columns only exist when a hash type is selected: with
+   ; includeHash empty, StrReplace() would blank thisNOTnullCol and the query
+   ; below would ask for ifnull(, '')!='' - a syntax error whose handler
+   ; silently resets userFindDupesFilterHamDist to "Ignore"
+   If (findFlippedDupes=1 && includeHash)
    {
       hashA := thisNOTnullCol
       hashB := thisNOTnullCol := StrReplace(includeHash, ", ", "h")
@@ -86433,11 +86437,14 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    } Else if includeHash
       hashA := thisNOTnullCol
 
+   If !thisNOTnullCol
+      thisNOTnullCol := "imgfile"
+
    If (PerformMSDonDupes=1 && includeHash)
    {
-      pixelzA := (hashA) ? 7 : 6
+      pixelzA := 7 ; SELECT: imgidu, fullPath, imgmegapix, fsize, groupID, hash
       If (findFlippedDupes=1)
-         pixelzA++
+         pixelzA++ ; ... plus the flipped hash
 
       ; If (findFlippedDupes=1)
       ;    pixelzB := pixelzA + 1
@@ -88652,8 +88659,11 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % actu, BreakDupesGroups
    actu := (userFindDupesFilterHamDist>1 && userFindDupesFilterHamDist!=2 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, findInvertedDupes
-   ; actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-   ; GuiControl, % actu, findFlippedDupes
+   ; flipped detection needs the H-prefixed hash columns, which only exist once
+   ; a hash type is picked: retrieveDupesByProperties() cannot build its query
+   ; without one
+   actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, findFlippedDupes
    actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, editFr
    GuiControl, % actu, userFindDupesMSElvl
