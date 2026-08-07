@@ -5526,7 +5526,17 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
     // scans of the same library could come back with different groups.
     std::vector< std::vector<UINT> > partA(noffset), partB(noffset), partC(noffset);
 
-    #pragma omp parallel for schedule(dynamic) if (noffset > 1 && ((INT)n - firstIndex) > 64)
+    // The shared state is spelled out rather than left to default(none): the old
+    // clause was default(none) shared(results), which named one of the dozen or
+    // so variables the region actually touched. MSVC's OpenMP 2.0 lets that
+    // through, clang-cl and gcc do not. default(none) is deliberately not used
+    // here either, because whether a const variable may appear in a data-sharing
+    // clause changed between OpenMP versions and the compilers disagree; the
+    // read-only locals below (n, threshold, checkInverted, checkFlipped,
+    // firstIndex, hamMask, noffset) are shared by default on every one of them.
+    // Every slot of partA/B/C is written by exactly one iteration, so the three
+    // buffers need no synchronisation.
+    #pragma omp parallel for schedule(dynamic) shared(partA, partB, partC, givenHashesArray, givenFlippedHashesArray, givenIDs) if (noffset > 1 && ((INT)n - firstIndex) > 64)
     for ( INT slot = 0 ; slot < noffset ; slot++)
     {
         const INT secondIndex = firstIndex + slot;
