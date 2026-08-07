@@ -86398,6 +86398,13 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
    MSE := 2500
    startOperation := A_TickCount
    thisindex := 0
+   ; calcMSDvalues() used to StrSplit() both of its 1024-token operands on every
+   ; pair, so an image matching k others had its fingerprint split k times - and
+   ; every one of those also cost a machine-code hashtable lookup. The results
+   ; arrive grouped by the second index, so caching the split arrays covers
+   ; nearly all of it. The cache is dropped wholesale when it grows too large:
+   ; each entry is ~1024 AHK array slots and a group can be big.
+   pixCache := []
    Loop, % totalResults + 1
    {
        If (determineTerminateOperation()=1)
@@ -86431,7 +86438,13 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
           {
              pixIDa := resultedFilesList[idRa, 12]
              pixIDb := resultedFilesList[idRb, 12]
-             MSE := calcMSDvalues(dupesPixelData[pixIDa], dupesPixelData[pixIDb], 1024, 1)
+             If (pixCache.Count()>512)
+                pixCache := []
+             If !pixCache.HasKey(pixIDa)
+                pixCache[pixIDa] := StrSplit(dupesPixelData[pixIDa], "|")
+             If !pixCache.HasKey(pixIDb)
+                pixCache[pixIDb] := StrSplit(dupesPixelData[pixIDb], "|")
+             MSE := calcMSDvalues(pixCache[pixIDa], pixCache[pixIDb], 1024)
           }
 
           idRc := NumGet(resultsArrayC, 4 * (A_Index - 1), "uInt")
@@ -86440,6 +86453,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
        }
    }
 
+   pixCache := ""
    IDsbigArray := ""
    HbigArray := ""
    resultsArrayA := ""
