@@ -85949,6 +85949,22 @@ testWasMSEdupes() {
    Return allowMSE
 }
 
+pullDupeRowFromCache(idu) {
+   ; Object.Clone() is shallow, so bckpResultedFilesList shares its row objects
+   ; with resultedFilesList. Storing a row straight into newArrayu and then
+   ; writing cols 2/23/33/34 would write through into the cache, and the next
+   ; run of changeHdistLevelCached() - which does not re-clone once the cache is
+   ; populated - would start from the previous pass's values. The min() in the
+   ; "one grouped, one not" branch can then never rise again, so narrowing the
+   ; threshold kept showing the older, smaller similarity index.
+   ; The seeds match the ones filterDupeResultsByHdist() writes.
+   rowu := bckpResultedFilesList[idu].Clone()
+   rowu[2] := 0
+   rowu[33] := 100
+   rowu[34] := 2500
+   Return rowu
+}
+
 changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:=0) {
    ; Static cachedListu := []
    If (modus="kill")
@@ -86051,14 +86067,12 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
           thisDupeID := min(idRa, idRb) "_" hamDist
           dupesIDs[idRa] := thisDupeID
           dupesIDs[idRb] := thisDupeID
-          newArrayu[idRa] := bckpResultedFilesList[idRa]
-          newArrayu[idRa, 2] := 0
+          newArrayu[idRa] := pullDupeRowFromCache(idRa)
           newArrayu[idRa, 23] := thisDupeID
           newArrayu[idRa, 33] := hamDist
           newArrayu[idRa, 34] := MSE
 
-          newArrayu[idRb] := bckpResultedFilesList[idRb]
-          newArrayu[idRb, 2] := 0
+          newArrayu[idRb] := pullDupeRowFromCache(idRb)
           newArrayu[idRb, 23] := thisDupeID
           newArrayu[idRb, 33] := hamDist
           newArrayu[idRb, 34] := MSE
@@ -86070,14 +86084,9 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
           dupesIDs[idRa] := thisDupeID
           dupesIDs[idRb] := thisDupeID
           If (newArrayu[idRa, 1]="")
-          {
-             newArrayu[idRa] := bckpResultedFilesList[idRa]
-             newArrayu[idRa, 2] := 0
-          } Else If (newArrayu[idRb, 1]="")
-          {
-             newArrayu[idRb] := bckpResultedFilesList[idRb]
-             newArrayu[idRb, 2] := 0
-          }
+             newArrayu[idRa] := pullDupeRowFromCache(idRa)
+          Else If (newArrayu[idRb, 1]="")
+             newArrayu[idRb] := pullDupeRowFromCache(idRb)
 
           newArrayu[idRa, 23] := thisDupeID
           newArrayu[idRa, 33] := min(hamDist, newArrayu[idRa, 33], newArrayu[idRb, 33])
