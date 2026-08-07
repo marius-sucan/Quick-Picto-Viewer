@@ -5599,6 +5599,11 @@ double calcArrayAvgMedian(std::array<double, 64> givenArray, int modus) {
 }
 
 DLL_API int DLL_CALLCONV calculateDCTcoeffs(int size) {
+    // DCTcoeffs is std::array<double, 1025> and is filled 1-based, so size*size
+    // must stay within 1024; calculateDCT() is hard-coded to 32 anyway
+    if (size < 1 || size > 32)
+       return 0;
+
     int thisIndex = 0;
     for (int i = 0; i < size; i++)
     {
@@ -5643,6 +5648,11 @@ DLL_API INT64 DLL_CALLCONV calcPHashAlgo(unsigned char *givenArray, UINT size, i
 // based on the PHP implementation found on https://github.com/jenssegers/imagehash
 
     // givenArray is the pixels fingerprint
+    // The buffers below, calculateDCT() and the DCTcoeffs table are all fixed at
+    // 32; any other size would run the loops past the end of the stack arrays.
+    if (size != 32)
+       return 0;
+
     // calculate DCT for rows
     double rows[32][32];
     std::array<double, 32>  trow;
