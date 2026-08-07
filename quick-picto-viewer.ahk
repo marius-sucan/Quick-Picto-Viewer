@@ -36106,8 +36106,13 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
 
 calcDLLpHashAlgo(arrayChars, ByRef givenArray, modus) {
     ; givenArray holds the 32x32 image pixels, grayscale
-    static runs := 0
-    Loop, % arrayChars.Count() ; 1024 ; 32*32
+    ; The DLL always reads all 1024 bytes, and the caller allocates givenArray
+    ; once and reuses it for every record, so a short fingerprint would hash the
+    ; tail of the previous image.
+    If (arrayChars.Count()!=1024)
+       Return ""
+
+    Loop, 1024 ; 32*32
         NumPut(arrayChars[A_Index], givenArray, A_Index - 1, "UChar")
 
     r := DllCall("qpvmain.dll\calcPHashAlgo", "UPtr", &givenArray, "uint", 32, "Int", modus, "INT64")
@@ -36243,7 +36248,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    }
 
    If InStr(whichHashu, "pHash")
-      VarSetCapacity(givenArray, 4 * 1024 + 1)
+      VarSetCapacity(givenArray, 4 * 1024 + 1, 0) ; zero-filled: reused per record
 
    failedFiles := countTFilez := 0
    filesToBeSorted := RecordSet.RowCount
@@ -36260,17 +36265,23 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
        Row := RecordSet.Rows[A_Index]
        If Row[1]
        {
-          hashu := ""
+          ; hash must be cleared per record: it is only conditionally assigned
+          ; below, and the UPDATE would otherwise store the previous image's hash
+          hashu := hash := ""
           countTFilez++
           arrayChars := processPixArrayChars(Row[2])
-          If (o_whichHashu=4) ; lHash
+          If (o_whichHashu=4 && arrayChars.Count()=72) ; lHash
           {
              hashu := calcLhashAlgo(arrayChars)
              hash := ConvertBase(2, 16, hashu)
-          } Else If (o_whichHashu=2)
+          } Else If (o_whichHashu=2 && arrayChars.Count()=72)
           {
              ; ToolTip, % RecordSet.RowCount "|" countTFilez "=" whichHashu "==" arrayChars.Count()  , , , 2
-             Loop, % arrayChars.Count() ; 8x9 = 72
+             ; 9x8 = 72: every 9th value is skipped so the 64 comparisons never
+             ; straddle a row. thisIndex has to start from 0 for each record -
+             ; it only happened to land there because 72 is a multiple of 9.
+             thisIndex := 0
+             Loop, 72
              {
                 thisIndex++
                 If (thisIndex=9)
