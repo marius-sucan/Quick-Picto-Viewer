@@ -86237,7 +86237,6 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
 }
 
 calcMSDvalues(arrayA, arrayB, size, asStr:=0) {
-    Static squaredCache := []
     ; [avg/ ] mean square difference [/ error] also known as standard deviation
     ; https://stackoverflow.com/questions/20271479/what-does-it-mean-to-get-the-mse-mean-error-squared-for-2-images
     ; https://stackoverflow.com/questions/25493010/c-difference-between-the-sum-of-the-squares-of-the-first-ten-natural-numbers-a
@@ -86258,13 +86257,12 @@ calcMSDvalues(arrayA, arrayB, size, asStr:=0) {
        ; sumB += Abs(arrayA[A_Index] - arrayB[A_Index]) // f
     }
 
-    If (squaredCache[sumB]!="")
-       Return squaredCache[sumB]
-
-    ; squaredCache[sumB] := Round(sqrt(sumB)/2)
-    squaredCache[sumB] := Round(sqrt(sumB/(size/2)))
-    ; fnOutputDebug("sum=" sumB "|" squaredCache[sumB])
-    Return squaredCache[sumB]
+    ; there used to be a Static cache keyed by sumB here. sumB is essentially a
+    ; unique integer per pair, so it never hit; AHK stores integer keys in a
+    ; sorted array, so every miss cost a binary search plus a memmove of
+    ; everything above it, and the table grew by one entry per pair for the
+    ; whole session - all to avoid a single sqrt().
+    Return Round(sqrt(sumB/(size/2)))
 }
 
 corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCounter, mainZeit) {
