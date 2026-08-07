@@ -85949,6 +85949,21 @@ testWasMSEdupes() {
    Return allowMSE
 }
 
+findDupeGroupRoot(parentu, x) {
+   ; union-find with path compression; parentu is mutated in place
+   r := x
+   While (parentu[r]!="")
+      r := parentu[r]
+
+   While (parentu[x]!="" && parentu[x]!=r)
+   {
+      nx := parentu[x]
+      parentu[x] := r
+      x := nx
+   }
+   Return r
+}
+
 pullDupeRowFromCache(idu) {
    ; Object.Clone() is shallow, so bckpResultedFilesList shares its row objects
    ; with resultedFilesList. Storing a row straight into newArrayu and then
@@ -86011,6 +86026,17 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
    isStrFilter := StrLen(thisString)>1 ? 1 : 0
    newArrayu := []
    dupesIDs := []
+   ; BreakDupesGroups deliberately splits the groups by similarity, so it keeps
+   ; the incremental single-pass labelling below. Otherwise the surviving pairs
+   ; are unioned first. The old code dropped a pair outright when both of its
+   ; images already carried a group ID, so A~B and C~D followed by B~C left two
+   ; groups of two instead of one of four - and which of those happened depended
+   ; on the order resultsDupesArray arrived in, which is the order an OpenMP loop
+   ; in the DLL happened to finish its iterations. The same library could group
+   ; differently on two identical scans.
+   doUnion := (BreakDupesGroups=1) ? 0 : 1
+   parentu := []
+   keptA := [], keptB := [], keptH := [], keptM := []
    Loop, % resultsDupesArray.Count()
    {
         idRa := resultsDupesArray[A_Index, 1]
@@ -86032,6 +86058,17 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
                  Continue
            }
        } Else Continue
+
+       If (doUnion=1)
+       {
+          keptA.Push(idRa), keptB.Push(idRb)
+          keptH.Push(hamDist), keptM.Push(MSE)
+          ra := findDupeGroupRoot(parentu, idRa)
+          rb := findDupeGroupRoot(parentu, idRb)
+          If (ra!=rb) ; the smaller ID always wins, so the group ID does not
+             parentu[max(ra, rb)] := min(ra, rb) ; depend on the arrival order
+          Continue
+       }
 
        If (dupesIDs[idRa]!="" && dupesIDs[idRb]!="")
        {
@@ -86096,6 +86133,40 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
           newArrayu[idRb, 33] := (BreakDupesGroups=1) ? hamDist : min(hamDist, newArrayu[idRa, 33], newArrayu[idRb, 33])
           newArrayu[idRb, 34] := (BreakDupesGroups=1) ? MSE : min(MSE, newArrayu[idRa, 34], newArrayu[idRb, 34])
        }
+   }
+
+   If (doUnion=1)
+   {
+      ; col 33/34 hold how close this image is to its nearest match; the suffix
+      ; of the group ID holds the tightest pair in the whole group
+      imgHam := [], imgMSE := [], grpHam := []
+      Loop, % keptA.Count()
+      {
+          idRa := keptA[A_Index], idRb := keptB[A_Index]
+          hamDist := keptH[A_Index], MSE := keptM[A_Index]
+          If (imgHam[idRa]="" || hamDist<imgHam[idRa])
+             imgHam[idRa] := hamDist
+          If (imgHam[idRb]="" || hamDist<imgHam[idRb])
+             imgHam[idRb] := hamDist
+          If (imgMSE[idRa]="" || MSE<imgMSE[idRa])
+             imgMSE[idRa] := MSE
+          If (imgMSE[idRb]="" || MSE<imgMSE[idRb])
+             imgMSE[idRb] := MSE
+
+          rootu := findDupeGroupRoot(parentu, idRa)
+          If (grpHam[rootu]="" || hamDist<grpHam[rootu])
+             grpHam[rootu] := hamDist
+      }
+
+      For idu, hamDist in imgHam ; integer keys iterate in ascending order
+      {
+          rootu := findDupeGroupRoot(parentu, idu)
+          newArrayu[idu] := pullDupeRowFromCache(idu)
+          newArrayu[idu, 23] := rootu "_" grpHam[rootu]
+          newArrayu[idu, 33] := hamDist
+          newArrayu[idu, 34] := imgMSE[idu]
+      }
+      keptA := keptB := keptH := keptM := ""
    }
 
    newIndex := 0
