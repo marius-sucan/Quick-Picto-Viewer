@@ -86486,7 +86486,12 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
 
    ; ToolTip, % theseCols "==" thisNOTnullCol "==" mustForceHashes , , , 2
    showTOOLtip("Identifying image duplicates, please wait")
-   If (InStr(thisNOTnullCol, "hash") || mustForceHashes=1 || userFindDupesFilterHamDist>1)
+   ; BTNfindDupesNow() passes userFindDupesFilterHamDist as mustForceHashes, so
+   ; "Ignore" arrives here as 1. Testing =1 therefore collected the pixel
+   ; fingerprints for the entire library - decoding and resizing every
+   ; not-yet-scanned image - for a property-only search that then correctly
+   ; declines to generate a single hash from them (the >1 test just below).
+   If (InStr(thisNOTnullCol, "hash") || mustForceHashes>1 || userFindDupesFilterHamDist>1)
    {
       scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
       collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, userFilterStringIsNot)
