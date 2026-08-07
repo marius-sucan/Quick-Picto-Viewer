@@ -86203,13 +86203,19 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
        {
           ash := StrSplit(dupesHashesData[hIDu], "|")
           hashA := "0x" ash[1],   hashB := "0x" ash[2]
+          If !ash[2] ; no flipped hash stored for this record
+             hashB := hashA
           NumPut(hashA, HbigArray, (A_Index - 1) * 8, "uint64")
           NumPut(hashB, flipHbigArray, (A_Index - 1) * 8, "uint64")
        } Else
        {
           hashA := "0x" dupesHashesData[hIDu]
           NumPut(hashA, HbigArray, (A_Index - 1) * 8, "uint64")
-
+          ; leaving the flipped slot at 0 would make this record match every
+          ; image whose hash has fewer set bits than the threshold; mirroring
+          ; its own hash makes diff3 degenerate to diff, which is harmless
+          If (findFlippedDupes=1)
+             NumPut(hashA, flipHbigArray, (A_Index - 1) * 8, "uint64")
        }
 
        NumPut(idu, IDsbigArray, (A_Index - 1) * 4, "uint")
@@ -86454,13 +86460,28 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
 
    doStartLongOpDance()
    startOperation := A_TickCount
+   ; The ifnull() guard has to be repeated on the outer table. The subquery only
+   ; shapes the groups; rows of "a" join on the property columns alone, so
+   ; without it an image with no hash still lands in the results, gets read back
+   ; as "0x" -> 0 in corefilterDupeResultsByHdist(), and every such image sits at
+   ; distance 0 from every other one - one enormous phantom group. That happens
+   ; whenever the pixel-data collection is interrupted or narrowed by a filter.
+   ; isDeleted=0 is likewise needed on both sides: every other query in this path
+   ; filters it, so entries the user marked ignored (isDeleted=1) or rows caught
+   ; mid-rescan (isDeleted=2) were offered up as duplicates.
+   whereA := " WHERE a.isDeleted=0 AND ifnull(a." thisNOTnullCol ", '')!=''"
+   If (findFlippedDupes=1 && hashA)
+      whereA .= " AND ifnull(a." hashA ", '')!=''"
+
    SQLstr := "SELECT imgidu, fullPath, a.imgmegapix, a.fsize, b.groupID" includeHash includePixels " FROM images AS a`n"
    SQLstr .= " JOIN (SELECT " selectuCols ", ROWID AS groupID`n"
    ; SQLstr .= " FROM images WHERE " thisNOTnullCol " IS NOT NULL`n"
-   SQLstr .= " FROM images WHERE ifnull(" thisNOTnullCol ", '')!=''`n"
+   SQLstr .= " FROM images WHERE isDeleted=0 AND ifnull(" thisNOTnullCol ", '')!=''`n"
    SQLstr .= " GROUP BY " theseCols " HAVING count(*)>1) AS b`n"
    SQLstr .= StrReplace(ONlist, "ON ( AND ", "ON (") ") "
-   SQLstr .= StrLen(SortCriterion)>1 ? "ORDER BY a." SortCriterion ";" : "ORDER BY b.groupID," orderCol ";"
+   SQLstr .= whereA
+   ; keep the leading space: filesFilter is sliced on InStr(SQLstr, " ORDER BY")
+   SQLstr .= StrLen(SortCriterion)>1 ? " ORDER BY a." SortCriterion ";" : " ORDER BY b.groupID," orderCol ";"
    If !activeSQLdb.GetTable(SQLstr, RecordSet)
    {
       userFindDupesFilterHamDist := 1
