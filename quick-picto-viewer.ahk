@@ -88432,7 +88432,7 @@ PanelFindDupes(dummy:=0) {
     fingEdt := (PrefsLargeFonts=1) ? 70 : 50
     thumbu := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Below you can choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare. The blue dots in the preview area highlight the areas of the images that will be compared. Higher threshold may yield more false-positives listed.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Below you can choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare. The blue dots in the preview area highlight the sections of the hash that will be compared: image areas for dHash and lHash, DCT frequencies for pHash, from the lowest at the top-left. Higher threshold may yield more false-positives listed.
     GuiAddDropDownList("xs y+10 w" fingWid " AltSubmit Section gupdateUIdupesPanel Choose" userFindDupesFilterHamDist " vuserFindDupesFilterHamDist", "Ignore|dHash 8x8|pHash DCT 32x32|lHash 8x8", "Image hash type")
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF11", hamDistLBorderCrop, "Image hash crop left.")
     Gui, Add, UpDown, vhamDistLBorderCrop gupdateUIdupesPanel Range0-9, % hamDistLBorderCrop
@@ -88556,7 +88556,16 @@ updateUIimageHashPreview() {
        {
           pX := A_Index - 1
           allLoops++
-          If (isInRange(allLoops, hamDistLBorderCrop + 1, 64 - hamDistRBorderCrop) && userFindDupesFilterHamDist>1)
+          ; The dots are drawn row-major from the top-left, but the three hashes
+          ; do not agree on where that lands in the 64-bit value:
+          ;   pHash  - calcPHashAlgo() shifts a mask left from 1, so DCT
+          ;            coefficient 0 sits in bit 0 and dot 1 is bit position 1.
+          ;   dHash / lHash - the bits are assembled into a binary string that
+          ;            ConvertBase(2, 16) reads MSB-first, so the FIRST
+          ;            comparison lands in bit 63 and the map has to be flipped.
+          ; hammingDistance() always crops counting up from the LSB.
+          bitPos := (userFindDupesFilterHamDist=3) ? allLoops : 65 - allLoops
+          If (isInRange(bitPos, hamDistLBorderCrop + 1, 64 - hamDistRBorderCrop) && userFindDupesFilterHamDist>1)
              Gdip_FillRectangle(G, pBrushD, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
        }
     }
