@@ -5632,7 +5632,7 @@ auto calculateDCT(const std::array<double, 32> &matrix, int col, int loopu) {
     return transformed;
 }
 
-DLL_API INT64 DLL_CALLCONV calcPHashAlgo(char *givenArray, UINT size, int compareMethod) {
+DLL_API INT64 DLL_CALLCONV calcPHashAlgo(unsigned char *givenArray, UINT size, int compareMethod) {
 // based on the PHP implementation found on https://github.com/jenssegers/imagehash
 
     // givenArray is the pixels fingerprint
@@ -5644,7 +5644,7 @@ DLL_API INT64 DLL_CALLCONV calcPHashAlgo(char *givenArray, UINT size, int compar
     {
         for (int x = 0; x < size; x++) 
         {
-            trow[x] = abs(givenArray[x + size*y]);
+            trow[x] = givenArray[x + size*y];
         }
 
         auto transformed = calculateDCT(trow, y, 1);

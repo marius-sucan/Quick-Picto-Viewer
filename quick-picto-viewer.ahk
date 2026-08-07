@@ -2647,10 +2647,11 @@ resetMainWin2Welcome() {
      newStaticFoldersListCache := [] ; used by PanelDynamicFolderzWindow()
      bckpResultedFilesList := [] ; used by PanelEnableFilesFilter()
      filteredMap2mainList := [] ; used by PanelEnableFilesFilter() and FilterFilesListuIndex()
-     toBeExcludedIndexes := [] ; used by PanelFindDupes(), toBeExcludedIndexes() and retrieveDupesByProperties()
-     resultsDupesArray := [] ; used by PanelFindDupes() and corefilterDupeResultsByHdist()
-     dupesHashesData := [] ; used by PanelFindDupes(), corefilterDupeResultsByHdist() and retrieveDupesByProperties()
-     dupesPixelData := [] ; used by PanelFindDupes() and retrieveDupesByProperties()
+     ; used by PanelFindDupes()
+           toBeExcludedIndexes := [] ; toBeExcludedIndexes() and retrieveDupesByProperties()
+           resultsDupesArray := [] ; corefilterDupeResultsByHdist()
+           dupesHashesData := [] ; corefilterDupeResultsByHdist() and retrieveDupesByProperties()
+           dupesPixelData := [] ; retrieveDupesByProperties()
      RandyIMGids := [] ; used by random slideshow mode in coreNextPrevImage()
      calcScreenLimits()
      resetImgSelection("forced")
@@ -36103,98 +36104,30 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    Return 0
 }
 
-calcPHashAlgo(givenArray, size:=32, compareMethod:=1) {
-   ; givenArray is the pixels fingerprint
-   ; calculte DCT for rows
-   trow := [] ; current/this row
-   rows := []
-   x := y := 0
-   Loop, % size ; y
-   {
-      trow := []
-      y := A_Index - 1
-      Loop, % size ; x
-         trow[A_Index - 1] := givenArray[A_Index - 1 + size*y]
-
-      rows[y] := calculateDCT(trow.Clone(), size)
-   }
-
-   ; calculte DCT for columns
-   x := y := 0
-   matrix := []
-   col  := []
-   Loop, % size
-   {
-      col := []
-      x := A_Index - 1
-      Loop, % size
-      {
-          y := A_Index - 1
-          col[y] := rows[y, x]
-      }
-      matrix[x] := calculateDCT(col.Clone(), size)
-   }
-
-   ; extract the top 8x8 pixels from the DCT matrix
-   x := y := thisIndex := 0
-   fpexels := []
-   Loop, 8
-   {
-      y := A_Index - 1
-      Loop, 8
-      {
-          If (matrix[y, A_Index - 1]!="")
-          {
-             thisIndex++
-             fpexels[thisIndex] := matrix[y, A_Index - 1]
-          }
-      }
-   }
-
-   ; Calculate hash
-   bits := ""
-   compareTerm := calcArrayAvgMedian(fpexels, compareMethod, thisIndex)
-   ; fnOutputDebug("ahk DCT compareTerm=" compareTerm "|" thisIndex) ; "=fpexels" printArrayStr(fpexels)
-   Loop, % thisIndex
-       bits .= (fpexels[A_Index] > compareTerm) ? 1 : 0
-
-   return bits
-}
-
 calcDLLpHashAlgo(arrayChars, ByRef givenArray, modus) {
     ; givenArray holds the 32x32 image pixels, grayscale
     static runs := 0
-    ; stringu := ""
     Loop, % arrayChars.Count() ; 1024 ; 32*32
-    ; {
-    ;     stringu .= Ord(arrayChars[A_Index]) - 161 ","
-        NumPut(arrayChars[A_Index], givenArray, A_Index - 1, "char")
-    ; }
+        NumPut(arrayChars[A_Index], givenArray, A_Index - 1, "UChar")
 
     r := DllCall("qpvmain.dll\calcPHashAlgo", "UPtr", &givenArray, "uint", 32, "Int", modus, "INT64")
-    if (r!="")
-    {
+    If (r!="")
        hashu := ConvertBase(10, 16, r)
-       ; hashu := ""
-       ; Loop, 64
-          ; hashu .= NumGet(resultsArray, A_Index - 1, "char")
-       ; fnOutputDebug("phash=" hashu)
-    }
-    return hashu
+    Return hashu
 }
 
 calcArrayAvgMedian(o_givenArray, modus, size) {
-    if (modus=1) ; median
+    If (modus=1) ; median
     {
         thisCount := size / 2
         givenArray := numericSortArray(o_givenArray)
-        if (thisCount=Round(thisCount))
+        If (thisCount=Round(thisCount))
         {
             value := givenArray[Round(thisCount) - 1] + givenArray[Round(thisCount / 2)]
-            return (value / 2)
+            Return (value / 2)
         }
-        return givenArray[Round(thisCount)]
-    } else
+        Return givenArray[Round(thisCount)]
+    } Else
     {
         ; Calculate the average value from top 8x8 pixels, except for the first one.
         thisSum := 0
@@ -36203,8 +36136,7 @@ calcArrayAvgMedian(o_givenArray, modus, size) {
            ; If (A_Index>1)
               thisSum += o_givenArray[A_Index]
         }
-
-        return (thisSum / size)
+        Return (thisSum / size)
     }
 }
 
@@ -36302,7 +36234,7 @@ calcLhashAlgo(pixArray) {
        {
           allIndex++
           thisIndex := A_Index
-          avg := Round((colsArray[mainIndexu] + linezArray[thisIndex])/2)
+          avg := (colsArray[thisIndex] + linezArray[mainIndexu])//2
           hashu .= pixArray[allIndex] > avg ? 1 : 0
           ; hashu .= (avg>linezArray[mainIndexu, 17]) ? 1 : 0
           ; fnOutputDebug("avg[" mainIndexu ", " thisIndex "]=" avg)
@@ -36438,10 +36370,6 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
           } Else If (o_whichHashu=3)
           {
              hash := calcDLLpHashAlgo(arrayChars, givenArray, userpHashMode + 1)
-             ; pixelsArray := []
-             ; Loop, % arrayChars.Count() ; 1024 ; 32*32
-             ;    pixelsArray[A_Index - 1] := Ord(arrayChars[A_Index]) - 161
-             ; hashu := calcPHashAlgo(pixelsArray, 32, userpHashMode + 1)
           }
 
           if (hash!="")
@@ -86013,12 +85941,12 @@ filterDupeResultsByHdist(threshold) {
       Return 2
 
    changeHdistLevelCached("kill")
-   hamUppLim := mseLowLim := 0
+   hamLowLim := mseLowLim := 0
    mseUppLim := userFindDupesMSElvl
    hamUppLim := threshold
    UserHamDistStringFilter := ""
    UserHamDistCacheFilterMonoGroups := 0
-   showTOOLtip("Finishing the duplicate images filtered list, please wait")
+   showTOOLtip("Finishing preparing the duplicate images filtered list, please wait")
    r := changeHdistLevelCached(0, 0, threshold, 0, userFindDupesMSElvl)
    ResetImgLoadStatus()
    If (r<1)
@@ -86168,6 +86096,7 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
 
            If (isStrFilter=1)
            {
+              imgPath := bckpResultedFilesList[idRa]
               If !coreSearchIndex(imgPath, givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert)
                  Continue
            }
@@ -86311,8 +86240,7 @@ calcMSDvalues(arrayA, arrayB, size, asStr:=0) {
     sumB := 0
     Loop, % size
     {
-       f := (A_Index<33 || A_Index>991) ? 1 : 1
-       sumB += (arrayA[A_Index] - arrayB[A_Index])**2 // f
+       sumB += (arrayA[A_Index] - arrayB[A_Index])**2
        ; sumB += Abs(arrayA[A_Index] - arrayB[A_Index]) // f
     }
 
@@ -86441,18 +86369,18 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
       prevMSGdisplay := A_TickCount
    }
 
-   VarSetCapacity(resultsArrayA, 4 * totalResults + 1, 0) ; Lpair
+   VarSetCapacity(resultsArrayA, 4 * (totalResults + 1), 0) ; Lpair
    err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayA, "Int", 1, "uInt", totalResults)
-   VarSetCapacity(resultsArrayB, 4 * totalResults + 1, 0) ; Rpair
+   VarSetCapacity(resultsArrayB, 4 * (totalResults + 1), 0) ; Rpair
    err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayB, "Int", 2, "uInt", totalResults)
-   VarSetCapacity(resultsArrayC, 4 * totalResults + 1, 0) ; hamming distance
+   VarSetCapacity(resultsArrayC, 4 * (totalResults + 1), 0) ; hamming distance
    err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayC, "Int", 3, "uInt", totalResults)
    ; msgbox, % "r=" totalResults
 
    MSE := 2500
    startOperation := A_TickCount
    thisindex := 0
-   Loop, % totalResults + 2
+   Loop, % totalResults + 1
    {
        If (determineTerminateOperation()=1)
        {
@@ -86490,7 +86418,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
 
           idRc := NumGet(resultsArrayC, 4 * (A_Index - 1), "uInt")
           If !idRc
-             idRc := 1
+             idRc := 0
 
           resultsDupesArray[thisCounter + thisIndex] := [idRa, idRb, idRc, MSE]
           ; fnOutputDebug("res=" totalResults " tL=" totalLoops " g=" grupu " tC=" thisCounter " (" resultsDupesArray.Count() ") aI=" thisIndex " MSE=" MSE " hD=" idRc " A=" idRa " B=" idRb)
@@ -86509,7 +86437,7 @@ corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCo
 retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|dHash|lHash|pHash|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt)"
    If SortCriterion
-      mode := prevMode
+      theseCols := prevMode
 
    wasDupesList := (testIsDupesList() && dupesHashesData.Count()>2) ? 1 : 0
    If (RegExMatch(theseCols, "i)(dHash)") || userFindDupesFilterHamDist=2)
@@ -86555,10 +86483,6 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    }
 
    prevMode := theseCols
-   innerTrimL := hamDistLBorderCrop + 1
-   innerTrimR := 64 - hamDistLBorderCrop - hamDistRBorderCrop
-   mustDoSubStr := 0
-
    orderCol := "a.imgmegapix,a.fsize"
    ONlist := "ON ("
    Loop, Parse, % theseCols, CSV
@@ -86740,7 +86664,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
 
    RecordSet.Free()
    ; MsgBox, % "g=" groupies.Count() " | i = " resultedFilesList.Count()
-   If (userFindDupesFilterHamDist>1 && maxFilesIndex>2 && includeHash && abandonAll!=1)
+   If (userFindDupesFilterHamDist>1 && maxFilesIndex>1 && includeHash && abandonAll!=1)
       r := filterDupeResultsByHdist(userFindDupesHamDistLvl)
 
    userFilterInvertThis := userFilterDoString := 0
@@ -88725,10 +88649,8 @@ updateUIimageHashPreview() {
     Gdip_DeleteGraphics(G)
     Gdip_SetPbitmapCtrl(hCropCornersPic, cornersBMP)
     trGdip_DisposeImage(cornersBMP, 1)
-    er := r1 ? r1 : r0
     UIfindDupesChecksu()
     ; updateUIdupesPanel()
-    Return er
 }
 
 BTNautoselectDupes() {
@@ -88944,7 +88866,6 @@ BTNfindDupesNow() {
    }
 
    BtnCloseWindow()
-   MSEgroupiesScores := []
    toBeExcludedIndexes := []
    If (excludePreviousDupesFromList=1)
    {
