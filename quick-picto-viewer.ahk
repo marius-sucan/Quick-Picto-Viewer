@@ -66376,7 +66376,7 @@ createMenuHelpQPV() {
       kMenu("PVhelp", "Add", "&Viewport help map", "MenuDrawViewportHelpMap")
 
    Menu, PVhelp, Add,
-   kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow", "version")
+   kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow", "version update upgrade release download")
    kMenu("PVhelp", "Add", "&Official QPV page", "OpenGitHub", "site")
    kMenu("PVhelp", "Add", "&Make a donation", "DonateNow", "paypal")
    kMenu("PVhelp", "Add", "&About", "PanelAboutWindow", "author developer")
@@ -66421,55 +66421,110 @@ checkForUpdatesNow() {
      Return
   }
 
-  Static iniURL := "https://marius.sucan.ro/media/files/blog/ahk-scripts/qpv-version.ini"
-  iniTMP := mainCompiledPath "\resources\update-infos.ini"
   BtnCloseWindow()
   showTOOLtip("Checking for updates, please wait")
-  newVersion := newDate := 0
-  FileDelete, %iniTmp%
-  Sleep, 150
-  UrlDownloadToFile, %iniURL%, %iniTmp%
-  Sleep, 950
-  If FileExist(iniTMP)
+  gotInfos := fetchUpdateInfosINI(newVersion, newDate)
+  RemoveTooltip()
+  If (gotInfos!=1)
   {
-     FileRead, OutputVar, %iniTmp%
-     Loop, Parse, OutputVar, `n,`r
-     {
-        If InStr(A_LoopField, "version=")
-        {
-           klop := StrSplit(A_LoopField, "=")
-           newVersion := Trimmer(klop[2])
-        } Else If InStr(A_LoopField, "ReleaseDate=")
-        {
-           klop := StrSplit(A_LoopField, "=")
-           newDate := Trimmer(klop[2])
-        }
-        If (A_Index>10)
-           Break
-     }
-  }
-
-  failed := (InStr(newVersion, ".") && InStr(newDate, "/")) ? 0 : 1
-  new := (newVersion=appVersion && newDate=vReleaseDate) ? 0 : 1
-  If (failed=1)
-  {
-     msg := "Failed to check for updates... Please click on «Manual check» to open the " appTitle " web site."
+     msg := "Failed to check for updates... Please click on «Manual check» to open the " appTitle " releases page."
      friendly := "Manual check"
   } Else
   {
+     cmp := compareAppVersions(newVersion, appVersion)
      msg := "Running version:`n" appVersion " [ " vReleaseDate " ]"
-     msg .= "`n`nOnline version:`n" newVersion " [ " newDate " ]"
-     msg .= (new=1) ? "`n`nA" : "`n`nNo"
-     msg .= " new version seems to be available."
-     friendly := (new!=1) ? "Open QPV web page" : "Download latest version"
+     msg .= "`n`nLatest release:`n" newVersion " [ " newDate " ]"
+     If (cmp=1)
+     {
+        msg .= "`n`nA new version is available."
+        friendly := "Download latest version"
+     } Else If (cmp=-1)
+     {
+        msg .= "`n`nYou are running a version newer than the latest published release."
+        friendly := "Open QPV web page"
+     } Else
+     {
+        msg .= "`n`nYou are running the latest version."
+        friendly := "Open QPV web page"
+     }
   }
-  RemoveTooltip()
-  msgResult := msgBoxWrapper(appTitle ": Check for updates", msg, "&" friendly "|&Cancel", 0, "settings")
 
-  If (InStr(msgResult, "open") || InStr(msgResult, "manual") || InStr(msgResult, "download"))
+  msgResult := msgBoxWrapper(appTitle ": Check for updates", msg, "&" friendly "|&Cancel", 1, "settings")
+  If (InStr(msgResult, "download") || InStr(msgResult, "manual"))
+     OpenGitHubReleases()
+  Else If InStr(msgResult, "open")
      OpenGitHub()
 
   RemoveTooltip()
+}
+
+fetchUpdateInfosINI(ByRef newVersion, ByRef newDate) {
+   ; Downloads the published version manifest into a temporary file and extracts
+   ; the Version / ReleaseDate keys. The second URL is only tried when the first one
+   ; failed quickly: a slow failure means the network itself is down, not that the
+   ; host is wrong, and retrying would just stall the main thread a second time.
+   ; Returns 1 when both fields were retrieved and look sane.
+   Static iniURLs := ["https://files.sucan.ro/marius/blog/ahk-scripts/qpv-version.ini"
+                    , "https://raw.githubusercontent.com/marius-sucan/Quick-Picto-Viewer/master/qpv-version.ini"]
+
+   newVersion := newDate := ""
+   iniTMP := A_Temp "\qpv-update-check-" QPVpid ".ini"
+   For idx, iniURL in iniURLs
+   {
+      FileDelete, %iniTMP%
+      zeit := A_TickCount
+      UrlDownloadToFile, %iniURL%, %iniTMP%
+      dlFailed := ErrorLevel
+      elapsed := A_TickCount - zeit
+      If (dlFailed || !FileExist(iniTMP))
+      {
+         addJournalEntry("Update check: download failed [" elapsed " ms]: " iniURL)
+         If (elapsed>8000)
+            Break
+
+         Continue
+      }
+
+      FileRead, contentu, %iniTMP%
+      Loop, Parse, contentu, `n, `r
+      {
+         klop := StrSplit(A_LoopField, "=")
+         keyu := Trimmer(klop[1])
+         If (keyu="Version")
+            newVersion := Trimmer(klop[2])
+         Else If (keyu="ReleaseDate")
+            newDate := Trimmer(klop[2])
+
+         If (A_Index>10)
+            Break
+      }
+
+      If (newVersion!="" && newDate!="")
+      {
+         addJournalEntry("Update check: fetched " newVersion " [" newDate "] from " iniURL)
+         Break
+      }
+   }
+
+   FileDelete, %iniTMP%
+   Return (RegExMatch(newVersion, "^\d+(\.\d+)*$") && InStr(newDate, "/")) ? 1 : 0
+}
+
+compareAppVersions(verA, verB) {
+   ; Compares dotted numeric version strings of any length ("6.2.00", "6.1.75.1").
+   ; Returns 1 if verA is newer than verB, -1 if older, 0 if equivalent.
+   a := StrSplit(Trimmer(verA), ".")
+   b := StrSplit(Trimmer(verB), ".")
+   Loop, % max(a.Length(), b.Length())
+   {
+      x := (a[A_Index]="") ? 0 : Round(a[A_Index])
+      y := (b[A_Index]="") ? 0 : Round(b[A_Index])
+      If (x>y)
+         Return 1
+      Else If (y>x)
+         Return -1
+   }
+   Return 0
 }
 
 MenuCmdLineHelp() {
@@ -88029,7 +88084,14 @@ OpenGitHub() {
   Static thisURL := "https://github.com/marius-sucan/Quick-Picto-Viewer"
   Try Run, % thisURL
   Catch wasError
-        msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL:`n" %thisURL%, 0, 0, "error")
+        msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL:`n" thisURL, 0, 0, "error")
+}
+
+OpenGitHubReleases() {
+  Static thisURL := "https://github.com/marius-sucan/Quick-Picto-Viewer/releases/latest"
+  Try Run, % thisURL
+  Catch wasError
+        msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL:`n" thisURL, 0, 0, "error")
 }
 
 MenuDrawViewportHelpMap() {
