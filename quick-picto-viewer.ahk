@@ -88436,8 +88436,8 @@ PanelFindDupes(dummy:=0) {
     GuiAddDropDownList("xs y+10 w" fingWid " AltSubmit Section gupdateUIdupesPanel Choose" userFindDupesFilterHamDist " vuserFindDupesFilterHamDist", "Ignore|dHash 8x8|pHash DCT 32x32|lHash 8x8", "Image hash type")
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF11", hamDistLBorderCrop, "Image hash crop left.")
     Gui, Add, UpDown, vhamDistLBorderCrop gupdateUIdupesPanel Range0-9, % hamDistLBorderCrop
-    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF6", hamDistLBorderCrop, "Image hash crop right.")
-    Gui, Add, UpDown, vhamDistRBorderCrop gupdateUIdupesPanel Range0-9, % hamDistLBorderCrop
+    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF6", hamDistRBorderCrop, "Image hash crop right.")
+    Gui, Add, UpDown, vhamDistRBorderCrop gupdateUIdupesPanel Range0-9, % hamDistRBorderCrop
     Gui, Add, Text, x+20 yp w%thumbu% h%thumbu% -Border +0xE +hwndhCropCornersPic, Image hashing preview
     dp := (PrefsLargeFonts=1) ? 35 : 28
 
