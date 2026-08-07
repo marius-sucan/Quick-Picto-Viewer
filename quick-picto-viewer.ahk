@@ -34124,8 +34124,9 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
     If (SLDtypeLoaded!=3)
        Return
 
+    compare := (markValue="ANY") ? "isDeleted IS NOT 0" : "isDeleted=" markValue
     extraWhere := folderClause ? " AND " folderClause : ""
-    SQLstr := "DELETE FROM images WHERE isDeleted=" markValue extraWhere ";"
+    SQLstr := "DELETE FROM images WHERE " compare extraWhere ";"
     If !activeSQLdb.Exec(SQLStr)
     {
        throwSQLqueryDBerror(A_ThisFunc)
@@ -35862,7 +35863,7 @@ PanelStateOFsqlNation() {
    } Else If InStr(msgResult, "purge")
    {
       showTOOLtip("Purging already ignored " groupDigits(ogn) " file entries")
-      r := SQLdeleteEntriesMarked(1, "isDeleted=2")
+      r := SQLdeleteEntriesMarked(1, "ANY")
       If (r=1)
       {
          SoundBeep 900, 100
@@ -74612,7 +74613,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
       GuiControlGet, whichHwnd, hwnd, %A_GuiControl%
       WinGetClass, ctrlClassNN, ahk_id %whichHwnd%
       ; MouseGetPos, , , WhichWindow, whichHwnd
-      If InStr(ctrlClassNN, "static" && whichHwnd!=hCropCornersPic)
+      If (InStr(ctrlClassNN, "static") && whichHwnd!=hCropCornersPic)
       {
          prevCtrl := 0
          ControlFocus, , ahk_id %whichHwnd%
@@ -86760,7 +86761,7 @@ keepSelectedDupeInGroup() {
 }
 
 autoSelectDupesInGroups(mode, givenRegEx:=0) {
-   ; dropFilesSelection(1)
+   dropFilesSelection(1)
    theArray := []
    megaCheck := new hashtable()
    ; ToolTip, % mode "==" givenRegEx , , , 2
