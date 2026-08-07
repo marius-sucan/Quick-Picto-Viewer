@@ -5529,6 +5529,13 @@ DLL_API UINT DLL_CALLCONV hammingDistanceOverArray(UINT64 *givenHashesArray, UIN
             // if (threshold>2 && diff>=threshold)
             //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamMask);
 
+            // Matches are rare, so test before taking the lock: the critical
+            // section used to be entered for every single pair, which
+            // serialised the whole loop on one mutex and made the parallel for
+            // slower than a plain serial scan.
+            if (diff>=threshold && diff2>=threshold && diff3>=threshold)
+               continue;
+
             #pragma omp critical
             {
                if (diff<threshold)
