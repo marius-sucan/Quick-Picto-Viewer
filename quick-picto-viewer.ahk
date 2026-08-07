@@ -36116,85 +36116,6 @@ calcDLLpHashAlgo(arrayChars, ByRef givenArray, modus) {
     Return hashu
 }
 
-calcArrayAvgMedian(o_givenArray, modus, size) {
-    If (modus=1) ; median
-    {
-        thisCount := size / 2
-        givenArray := numericSortArray(o_givenArray)
-        If (thisCount=Round(thisCount))
-        {
-            value := givenArray[Round(thisCount) - 1] + givenArray[Round(thisCount / 2)]
-            Return (value / 2)
-        }
-        Return givenArray[Round(thisCount)]
-    } Else
-    {
-        ; Calculate the average value from top 8x8 pixels, except for the first one.
-        thisSum := 0
-        Loop, % size
-        {
-           ; If (A_Index>1)
-              thisSum += o_givenArray[A_Index]
-        }
-        Return (thisSum / size)
-    }
-}
-
-numericSortArray(givenArray, forMode:=0) {
-   listu := printArrayStr(givenArray, "|", forMode)
-   Sort, listu, ND|
-   newArray := StrSplit(Trim(listu, "|"), "|")
-   Return newArray
-}
-
-calculateDCT(matrix, size) {
-     Static hasRan := 0, pi := 3.141592653
-          , z := 0.70710678 ; 1 / sqrt(2)
-          , coeffsArray := []
-
-     transformed := []
-     g := (size=32) ? 0.25 : sqrt(2 / size)
-     thisIndex := 0
-
-     If (hasRan!=size)
-     {
-        hasRan := size
-        Loop, % size
-        {
-            i := A_Index - 1
-            Loop, % size
-            {
-                j := A_Index - 1
-                thisIndex++
-                coeffsArray[thisIndex] := cos(i * pi * (j + 0.5) / size)
-            }
-        }
-        thisIndex := 0
-     }
-
-     Loop, % size
-     {
-         i := A_Index - 1
-         sum := 0
-         Loop, % size
-         {
-             j := A_Index - 1
-             thisIndex++
-             ; sum += matrix[j] * cos(i * pi * (j + 0.5) / size)
-             sum += matrix[j] * coeffsArray[thisIndex]
-         }
-
-         sum *= g
-         if (i=0)
-             sum *= z
-         
-         transformed[i] := sum
-         ; fnOutputDebug("ahk matrix[" i "] DCT = " matrix[i])
-     }
-     ; msgbox, % A_ThisFunc "=" printArrayStr(transformed,,1)
-     return transformed
-}
-
 calcLhashAlgo(pixArray) {
     ; ToolTip, % RecordSet.RowCount "|" countTFilez "=" whichHashu "==" arrayChars.Count()  , , , 2
     summo := 0
@@ -86096,7 +86017,7 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
 
            If (isStrFilter=1)
            {
-              imgPath := bckpResultedFilesList[idRa]
+              imgPath := bckpResultedFilesList[idRa, 1]
               If !coreSearchIndex(imgPath, givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert)
                  Continue
            }
