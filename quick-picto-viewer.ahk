@@ -35831,7 +35831,7 @@ PanelStateOFsqlNation() {
    fsize := "File details: " groupDigits(fsize) " ( " Round(fsize / totalz * 100, 2) "% )"
    imgmegapix := "Image details: " groupDigits(imgmegapix) " ( " Round(imgmegapix / totalz * 100, 2) "% )"
    imgmedian := "Image histogram details: " groupDigits(imgmedian) " ( " Round(imgmedian / totalz * 100, 2) "% )"
-   pixelzFsmall := "Pixels data (8x8, 32x32): " groupDigits(pixelzFsmall) " ( " Round(pixelzFsmall / totalz * 100, 2) "% )"
+   pixelzFsmall := "Pixels data (9x8, 32x32): " groupDigits(pixelzFsmall) " ( " Round(pixelzFsmall / totalz * 100, 2) "% )"
    HpixelzFsmall := "Flipped pixels data (8x8, 32x32): " groupDigits(HpixelzFsmall) " ( " Round(HpixelzFsmall / totalz * 100, 2) "% )"
    dHash := " `nImage hashes:`ndHash (8x8): " groupDigits(dHash) " ( " Round(dHash / totalz * 100, 2) "% )"
    pHash := "pHash (32x32): " groupDigits(pHash) " ( " Round(pHash / totalz * 100, 2) "% )"
@@ -88934,7 +88934,7 @@ BTNfindDupesNow() {
 }
 
 BTNhelpFindDupes() {
-   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe precision factor does not apply for file names, size in bytes, file dates and image width, height, frames and pixel format properties.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, precision 2 and dHash threshold 3 in the fingerprints tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 8x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe precision factor does not apply for file names, size in bytes, file dates and image width, height, frames and pixel format properties.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, precision 2 and dHash threshold 3 in the fingerprints tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
