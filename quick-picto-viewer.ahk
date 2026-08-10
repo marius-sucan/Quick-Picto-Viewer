@@ -37961,7 +37961,7 @@ coreReadSettingsImageProcessing(act) {
     If (act=0)
     {
        calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
-       cleanResizeUserOptionsVars()
+       decideUserImgRotationOption()
        rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
     }
 }
@@ -45516,6 +45516,7 @@ BtnChangeHamDistThreshold() {
    GuiControlGet, BreakDupesGroups
 
    BtnCloseWindow()
+   dropFilesSelection(1)
    r := changeHdistLevelCached(0, hamLowLim, hamUppLim, mseLowLim, mseUppLim)
    If (r<1)
    {
@@ -91386,7 +91387,7 @@ setForceRefreshThumbsFilesIndex(onlySelected) {
 }
 
 batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
-   cleanResizeUserOptionsVars()
+   decideUserImgRotationOption()
    If (!desiredH || !desiredW || desiredW<1 || desiredH<1)
    || ((desiredW<5 || desiredH<5) && (isPercntg!=1))
    {
@@ -91612,7 +91613,7 @@ filesListApplyColors() {
    {
       If (filesElected>200)
       {
-         msgResult := msgBoxWrapper(appTitle ": Apply colors", "All the images in supported writing formats will be processed accordingly to the color adjustments of the viewport. The original files will be overwritten. Do you want to continue?", 4, 0, "question")
+         msgResult := msgBoxWrapper(appTitle ": Apply colors", "You have selected " groupDigits(filesElected) " images. The images in supported write formats will be processed accordingly to the color adjustments of the viewport. The original files will be OVERWRITTEN. Do you want to continue?", 4, 0, "question")
          If !InStr(msgResult, "yes")
             Return
       }
@@ -91690,7 +91691,7 @@ coreQuickImageFilesListActions(actu) {
       Return
 
    initFIMGmodule()
-   countNotJpegs := firstu := 0
+   countJpegs := firstu := 0
    filesElected := getSelectedFiles(0, 1)
    RegAction(0, "convertFormatUseMultiThreads",, 1)
    If (filesElected>1)
@@ -91701,32 +91702,23 @@ coreQuickImageFilesListActions(actu) {
             Continue
 
          imgPath := resultedFilesList[A_Index, 1]
-         If (!RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && imgPath)
+         If (RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && imgPath)
          {
-            countNotJpegs++
+            countJpegs++
             If !firstu
                firstu := A_Index
-         }
-         If (countNotJpegs>3)
             Break
+         }
       }
    }
 
    imgPath := resultedFilesList[currentFileIndex, 1]
-   If (RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && countNotJpegs<2)
+   If countJpegs
    {
       hasExec := 1
       jpegDesiredOperation := actu
       BtnPerformJpegOp("extern")
-   }
-
-   If (countNotJpegs=1 && firstu)
-   {
-      hasExec := 0
-      currentFileIndex := firstu
-   }
-
-   If (hasExec!=1)
+   } Else
    {
       ResizeMustPerform := 0 
       SimpleOperationsFlipV := (actu=3) ? 1 : 0
@@ -91742,7 +91734,7 @@ coreQuickImageFilesListActions(actu) {
       SimpleOperationsScaleYimgFactor := 100
       ResizeQualityHigh := ResizeInPercentage := 1
       ResizeUseDestDir := 0
-      cleanResizeUserOptionsVars()
+      decideUserImgRotationOption()
       filesPerCore := calculateCoresRequired(filesElected)
       mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
       If (userActionConflictingFile=4 && mustDoMultiCore=1)
@@ -91774,7 +91766,7 @@ BTNsaveResizedIMG() {
     GuiControlGet, userActionAdvImgProcConflictingFile
 
     EditResizeWidth()
-    cleanResizeUserOptionsVars()
+    decideUserImgRotationOption()
     filesElected := getSelectedFiles(0, 1)
     If (filesElected>1)
     {
@@ -91889,7 +91881,7 @@ BtnCopy2ClipResizedIMG() {
    GuiControlGet, userActionAdvImgProcConflictingFile
 
    EditResizeWidth()
-   cleanResizeUserOptionsVars()
+   decideUserImgRotationOption()
    z := advImgResizerCalcIMGsize(img2resizePath, "clipboard", userEditWidth, userEditHeight, newW, newH, imgW, imgH, givenAngle)
    If z
       Return
@@ -91965,7 +91957,7 @@ EditResizeWidth() {
       Return
 
    If (AnyWindowOpen=4)
-      cleanResizeUserOptionsVars()
+      decideUserImgRotationOption()
 
    filesElected := getSelectedFiles()
    If (filesElected>1 && ResizeKeepAratio=1 && ResizeInPercentage=1)
@@ -92026,7 +92018,7 @@ EditResizeHeight() {
       Return
 
    If (AnyWindowOpen=4)
-      cleanResizeUserOptionsVars()
+      decideUserImgRotationOption()
 
    filesElected := getSelectedFiles()
    If (filesElected>1 && ResizeKeepAratio=1 && ResizeInPercentage=1)
@@ -92135,7 +92127,7 @@ TglRszUnsprtFrmt() {
    RegAction(1, "userDesireWriteFMT")
 }
 
-cleanResizeUserOptionsVars() {
+decideUserImgRotationOption() {
     If (SimpleOperationsRotateAngle=2)
        simpleOpRotationAngle := 90
     Else If (SimpleOperationsRotateAngle=3)
@@ -92149,7 +92141,7 @@ cleanResizeUserOptionsVars() {
 TglRszRotation() {
    Gui, SettingsGUIA: Default
    GuiControlGet, ResizeWithCrop
-   cleanResizeUserOptionsVars()
+   decideUserImgRotationOption()
    If (ResizeRotationUser!=0 && ResizeWithCrop=1 && editingSelectionNow=1)
       GuiControl, SettingsGUIA: Enable, ResizeCropAfterRotation
    Else If (editingSelectionNow=1)
@@ -98493,7 +98485,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
        RegAction(1, "userJpegQuality")
        RegAction(1, "userVPsvgScale")
        RegAction(1, "userVPpdfDPI")
-       cleanResizeUserOptionsVars()
+       decideUserImgRotationOption()
        thisu := (ResizeMustPerform=1 && ResizeInPercentage=1 && SimpleOperationsScaleXimgFactor=100 && SimpleOperationsScaleYimgFactor=100) ? 1 : 0
        If ((thisu=1 || ResizeMustPerform=0) && SimpleOperationsRotateAngle=1 && SimpleOperationsFlipV=0 && SimpleOperationsFlipH=0 && SimpleOperationsDoCrop=0)
        {
@@ -98661,7 +98653,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
       If (ResizeUseDestDir=1)
          msgInfos .= "`n`nThe files will be saved in " ResizeDestFolder "\"
       Else
-         msgInfos .= "`n`nThe files will be will be OVERWRITTEN."
+         msgInfos .= "`n`nThe files will be OVERWRITTEN."
       msgResult := msgBoxWrapper(appTitle ": Confirmation", msgInfos, 4, 0, "question")
       If (msgResult!="Yes")
          Return
