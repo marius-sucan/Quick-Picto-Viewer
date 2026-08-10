@@ -5568,11 +5568,12 @@ DLL_API UINT DLL_CALLCONV dupesFetchPairs(void *outArray, UINT maxItems) {
    return (UINT)n;
 }
 
+void dupesQueryFreeRows();
+
 // Releases everything the duplicate scan holds. AHK calls it on every exit path from
 // filterDupeResultsByHdist(), including the abandoned ones: a partially read pair list
 // would otherwise be handed to the next scan ahead of its own results.
 DLL_API UINT DLL_CALLCONV dupesClearPairs() {
-    extern void dupesQueryFreeRows();
     dupesQueryFreeRows();
     dupesPairsList.clear();
     dupesPairsList.shrink_to_fit();
@@ -6045,9 +6046,8 @@ DLL_API void* DLL_CALLCONV dupesScanGetState() {
 // fingerprints, and it is worth handing back before AHK starts building its result rows.
 DLL_API int DLL_CALLCONV dupesScanEnd() {
     // dupesQueryFreeRows() lives further down with the query engine; forward-declared
-    // here so releasing the sweep also releases the candidate rows and their paths,
+    // at global scope so releasing the sweep also releases the candidate rows and their paths,
     // which AHK has already copied into resultedFilesList by this point.
-    extern void dupesQueryFreeRows();
     dupesQueryFreeRows();
     dupesScanHashes.clear();     dupesScanHashes.shrink_to_fit();
     dupesScanFlipped.clear();    dupesScanFlipped.shrink_to_fit();
