@@ -36427,6 +36427,9 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
        more := DllCall("qpvmain.dll\dupesHashStep", "int", 512, "int")
        countTFilez := DllCall("qpvmain.dll\dupesHashWrittenCount", "Int64")
        failedSQLfiles := DllCall("qpvmain.dll\dupesHashFailedCount", "Int64")
+       ; images whose stored fingerprint is the wrong length: passed over, not failed
+       ; writes. A qpvmain.dll without this export returns blank, which reads as 0 below.
+       skippedFiles := DllCall("qpvmain.dll\dupesHashSkippedCount", "Int64")
        If (more=-1)
        {
           ErrorMsgS := "ERROR: " readDupesEngineError() "`n"
@@ -36449,8 +36452,12 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
           etaTime := ETAinfos(countTFilez, filesToBeSorted, startOperation)
           If (failedSQLfiles>0)
              etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
+          If (skippedFiles>0)
+             etaTime .= "`nSkipped " groupDigits(skippedFiles) " files with an unusable image fingerprint"
 
-          showTOOLtip(ErrorMsgS "Generating image " fwhichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
+          ; the skipped files are done with, so they belong in the progress ratio too, or
+          ; the bar can never reach the end when any of them exist
+          showTOOLtip(ErrorMsgS "Generating image " fwhichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, (filesToBeSorted>0) ? (countTFilez + skippedFiles)/filesToBeSorted : 0)
           prevMSGdisplay := A_TickCount
           If (A_TickCount - prevSaveData>9000)
              ErrorMsgS := ""
@@ -36482,6 +36489,12 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    {
       someErrors .= "`nFailed to commit to database " groupDigits(failedSQLfiles) " hashes"
       addJournalEntry(A_ThisFunc "(): " someErrors)
+   }
+
+   If (skippedFiles>0)
+   {
+      someErrors .= "`nSkipped " groupDigits(skippedFiles) " files with an unusable image fingerprint"
+      addJournalEntry(A_ThisFunc "(): skipped " skippedFiles " files whose stored fingerprint was not the expected " pixCount " bytes. Purge their cached data and collect it again to hash them.")
    }
 
    someErrors .= "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
@@ -63445,6 +63458,7 @@ importSLDBintoSLDB(whichFile) {
    ; loop below applies column by column.
    ; ATTACH before BEGIN: SQLite will not attach or detach while a transaction is open
    pixelsCarried := 1
+   pixelsRenamed := 0
    escapedOther := whichFile
    activeSQLdb.EscapeStr(escapedOther)
    If !activeSQLdb.Exec("ATTACH DATABASE " escapedOther " AS srcdb;")
@@ -63463,12 +63477,36 @@ importSLDBintoSLDB(whichFile) {
       {
          pixelsCarried := 0
          addJournalEntry(A_ThisFunc "(): could not set the fingerprints aside; they will have to be collected again.`n" activeSQLdb.ErrorMsg)
-      } Else If !activeSQLdb.Exec("CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB, smallH BLOB, bigH BLOB);")
-      {
-         pixelsCarried := 0
-         addJournalEntry(A_ThisFunc "(): could not recreate imagesPixels.`n" activeSQLdb.ErrorMsg)
       } Else
-         activeSQLdb.Exec("CREATE TEMP TABLE pixMap (newID INTEGER PRIMARY KEY, mainID INTEGER, otherID INTEGER);")
+      {
+         pixelsRenamed := 1
+         If !activeSQLdb.Exec("CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB, smallH BLOB, bigH BLOB);")
+         {
+            pixelsCarried := 0
+            addJournalEntry(A_ThisFunc "(): could not recreate imagesPixels.`n" activeSQLdb.ErrorMsg)
+         } Else
+            activeSQLdb.Exec("CREATE TEMP TABLE pixMap (newID INTEGER PRIMARY KEY, mainID INTEGER, otherID INTEGER);")
+      }
+   }
+
+   ; The merge below hands out a fresh imgidu to every row, so a fingerprint that the
+   ; INSERT ... SELECT at the end does not re-key belongs to whichever file inherits its
+   ; old identity - every fingerprint in the database silently attached to the wrong
+   ; image, and collectSQLFileInfosNow() would consider all of them already collected.
+   ; So when the carry-over could not be set up, the fingerprints really do go, which is
+   ; what the journal entries above promise: a re-collection costs time, the alternative
+   ; costs correctness. The rename is undone first, because a failed CREATE leaves the
+   ; database with no imagesPixels table at all.
+   If (pixelsCarried!=1)
+   {
+      If (pixelsRenamed=1)
+      {
+         activeSQLdb.Exec("ALTER TABLE imagesPixelsOld RENAME TO imagesPixels;")
+         activeSQLdb.Exec("DROP TABLE IF EXISTS imagesPixelsOld;")
+      }
+
+      activeSQLdb.Exec("CREATE TABLE IF NOT EXISTS imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB, smallH BLOB, bigH BLOB);")
+      activeSQLdb.Exec("DELETE FROM imagesPixels;")
    }
 
    activeSQLdb.Exec("DELETE FROM images;")
@@ -91691,7 +91729,7 @@ coreQuickImageFilesListActions(actu) {
       Return
 
    initFIMGmodule()
-   countJpegs := firstu := 0
+   countJpegs := 0
    filesElected := getSelectedFiles(0, 1)
    RegAction(0, "convertFormatUseMultiThreads",, 1)
    If (filesElected>1)
@@ -91705,14 +91743,20 @@ coreQuickImageFilesListActions(actu) {
          If (RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && imgPath)
          {
             countJpegs++
-            If !firstu
-               firstu := A_Index
             Break
          }
       }
    }
 
+   ; getSelectedFiles(0, 1) never answers 1: a lone selected file is dropped from the
+   ; selection and it returns 0. So the loop above only runs for a real multi-file
+   ; selection, and the single-image case - by far the most common one - has to test the
+   ; current file itself. Without this every lone JPEG rotate/flip/crop fell through to
+   ; the branch below, which decodes and re-encodes the file over its original.
    imgPath := resultedFilesList[currentFileIndex, 1]
+   If (!countJpegs && filesElected<2 && RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$"))
+      countJpegs := 1
+
    If countJpegs
    {
       hasExec := 1
@@ -95921,6 +95965,13 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
        If (forReal=1)
        {
           activeSQLdb.Exec("BEGIN TRANSACTION;")
+          ; the side table first, while the rows it belongs to are still there to name
+          ; them. imagesPixels has no foreign key, and imgidu is handed out as
+          ; max(imgidu)+1 - so a fingerprint left behind here is inherited by whatever
+          ; file reuses the identity, and collectSQLFileInfosNow() then considers that
+          ; file already collected and never repairs it. Same sweep as deleteSQLdbEntry()
+          ; and SQLdeleteEntriesMarked().
+          activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images WHERE " thisClause ");")
           SQLstr := "DELETE FROM images WHERE " thisClause ";"
           If !activeSQLdb.Exec(SQLStr)
              throwSQLqueryDBerror(A_ThisFunc)

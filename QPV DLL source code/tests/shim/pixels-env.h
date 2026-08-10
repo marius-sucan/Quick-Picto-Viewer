@@ -124,6 +124,10 @@ namespace Gdiplus {
         int w = 0, h = 0;
         std::vector<unsigned char> bgra;    // w*h*4
         int flips = 0, blurs = 0, grays = 0;
+        // Set by the synthetic decoders for a path the test wants to fail AFTER the
+        // decode, which is the only way to reach DP_ERR_PROCESS: the histogram stub
+        // below refuses a poisoned bitmap the way GDI+ refuses one when memory is gone.
+        bool poisoned = false;
     };
     struct GpGraphics { GpBitmap *target = NULL; int interp = -1, smooth = -1, offset = -1; };
     struct Rect { int X, Y, Width, Height; Rect(int x, int y, int w, int h) : X(x), Y(y), Width(w), Height(h) {} };
@@ -182,6 +186,9 @@ static inline Status GdipBitmapUnlockBits(GpBitmap*, BitmapData*) { return Ok; }
 static inline Status GdipBitmapGetHistogram(GpBitmap *b, HistogramFormat, unsigned int n,
                                             unsigned int *c0, unsigned int*, unsigned int*, unsigned int*) {
     if (b==NULL || c0==NULL || n!=256)
+       return GenericError;
+
+    if (b->poisoned)      // decoded, then the chain after it failed
        return GenericError;
 
     gShimHistogramCalls++;
@@ -283,6 +290,10 @@ static int gShimWicCalls = 0;
 static int gShimFimCalls = 0;
 static int gShimDecodeW = 40, gShimDecodeH = 30;
 
+static bool shimPathHas(const wchar_t *path, const wchar_t *needle) {
+    return (path!=NULL && needle!=NULL && wcsstr(path, needle)!=NULL);
+}
+
 static Gdiplus::GpBitmap *shimMakeBitmap(int w, int h, unsigned char seed) {
     Gdiplus::GpBitmap *b = NULL;
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(w, h, 0, PixelFormat32bppPARGB, NULL, &b);
@@ -306,7 +317,11 @@ static inline Gdiplus::GpBitmap* tpWICload(IWICImagingFactory*, const wchar_t *p
 
     srcW = gShimDecodeW*4;
     srcH = gShimDecodeH*4;
-    return shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path ? path[3] : 0));
+    Gdiplus::GpBitmap *b = shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path ? path[3] : 0));
+    if (b!=NULL && path!=NULL && shimPathHas(path, L"poison"))
+       b->poisoned = true;
+
+    return b;
 }
 
 static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstring &path, const std::wstring&,
@@ -316,7 +331,11 @@ static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstr
     srcW = gShimDecodeW*2;
     srcH = gShimDecodeH*2;
     status = 0;
-    return shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path.size() & 0xFF));
+    Gdiplus::GpBitmap *b = shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path.size() & 0xFF));
+    if (b!=NULL && shimPathHas(path.c_str(), L"poison"))
+       b->poisoned = true;
+
+    return b;
 }
 
 // ---- the two names dupes-pixels.h borrows from the query engine ------------------------

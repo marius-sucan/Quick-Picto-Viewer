@@ -40,7 +40,16 @@ static INT64 qpvFileTimeToLocalStamp(INT64 ft);
 
 #define DP_OK           0
 #define DP_ERR_LOAD     1   // nothing could decode the file; the row is marked isDeleted=1
-#define DP_ERR_PROCESS  2   // it decoded but the GDI+ chain failed; also marked
+// It decoded, and then something after the decode failed. Counted as a failure but NOT
+// marked, deliberately: a file that is genuinely unreadable fails at the decode and lands
+// on DP_ERR_LOAD, so what reaches here is an allocation that did not come back, an
+// exception out of the FreeImage/OpenCV rescale, or GDI+ refusing a bitmap it had just
+// produced - all of them transient, and all of them far more likely now that the decode
+// runs on up to 32 threads at once than they were in the serial AHK this replaced.
+// isDeleted=1 is durable: it hides the image from every query in this path until the user
+// finds PanelPurgeCachedSQLdata(). Losing a run's work on a tight machine is a retry; a
+// library quietly marking good photos as dead is not.
+#define DP_ERR_PROCESS  2
 
 #define DP_MAX_READY   256  // finished images allowed to pile up before workers park
 
@@ -576,9 +585,13 @@ static void dpBindBlobOrNull(sqlite3_stmt *st, int idx, const std::vector<unsign
 static bool dpWriteResult(const DupePixResult &res) {
     if (res.status!=DP_OK)
     {
-       // dead or unreadable: marked exactly the way markSQLdbEntryDeleted() marked it, so
-       // no later collection run tries to open the file again
-       if (dpMarkDead!=NULL)
+       // Only DP_ERR_LOAD is marked: nothing could decode the file, so it is dead or
+       // unreadable and is marked exactly the way markSQLdbEntryDeleted() marked it, so
+       // no later collection run tries to open it again. DP_ERR_PROCESS is a failure of
+       // this attempt rather than of the file - see the comment on the constant - and is
+       // left alone, so the next run picks it up. The keyset cursor in dpTopUpQueue()
+       // already stops it being re-offered inside THIS run, so nothing spins.
+       if (res.status==DP_ERR_LOAD && dpMarkDead!=NULL)
        {
           SQ.reset(dpMarkDead);
           SQ.bind_int64(dpMarkDead, 1, res.imgidu);

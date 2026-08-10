@@ -510,6 +510,107 @@ static void collectionAgainstRealSQLite() {
 }
 
 // ---------------------------------------------------------------------------------------
+//
+// isDeleted=1 is durable: it hides an image from every query in the duplicates path until
+// the user goes and finds PanelPurgeCachedSQLdata(). So it may only be set for a file that
+// really cannot be read - which is a failure of the DECODE. A failure after the decode is
+// a failure of the attempt: an allocation that did not come back, an exception out of the
+// rescale, GDI+ refusing a bitmap it had just produced. Those got much more likely when
+// this phase went from one serial decode to a pool of them, and marking on one would mean
+// a tight machine quietly retiring good photos from the library.
+static void processFailureIsNotMarkedDead() {
+    printf("  a failure after the decode\n");
+    bindSQLiteOnce();
+    if (!SQ.ok || SQ.exec==NULL || SQ.bind_double==NULL || SQ.bind_blob==NULL)
+    {
+       printf("    SKIPPED: libsqlite3.so.0 is not available\n");
+       return;
+    }
+
+    const char *path = "pixels_poison.sldb";
+    remove(path);
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(path, &db, SQLITE_OPEN_READWRITE | QPV_SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK || db==NULL)
+    {
+       printf("    could not create the scratch database\n");
+       failures++;
+       return;
+    }
+
+    execOrDie(db,
+        "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
+        " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgmedian FLOAT, imgavg FLOAT,"
+        " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
+        " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
+        " smallH BLOB, bigH BLOB);", "create the v3 schema");
+
+    // three populations: readable, missing from the disk, and decoding but failing after
+    std::string ins = "BEGIN;";
+    const int total = 300;
+    int wantOK = 0, wantGone = 0, wantPoison = 0;
+    for ( int i = 1 ; i <= total ; i++)
+    {
+        const char *stem = "img";
+        if ((i % 7)==0)      { stem = "gone";   wantGone++; }
+        else if ((i % 5)==0) { stem = "poison"; wantPoison++; }
+        else                   wantOK++;
+
+        char row[256];
+        snprintf(row, sizeof(row), "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (%d,'%s%d.jpg','C:\\p');",
+                 i, stem, i);
+        ins += row;
+    }
+    ins += "COMMIT;";
+    execOrDie(db, ins.c_str(), "insert the rows");
+    check(wantPoison > 10, "enough files fail after the decode to be meaningful");
+
+    for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 4;
+    tpWicExts.clear();
+    tpFimExts.clear();
+    tpWicExts.insert(L"jpg");
+    FIM.ok = true;
+    m_pIWICFactory = (IWICImagingFactory*)1;
+    check(dupesPixInit(3) >= 1, "the pool starts");
+
+    const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"
+                         L" WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
+                         L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "dupesPixBegin prepares the run");
+
+    execOrDie(db, "BEGIN;", "open the transaction");
+    int steps = 0;
+    while (dupesPixStep(5)==1)
+        if (++steps > 200000) { printf("    the collection loop did not terminate\n"); failures++; break; }
+
+    execOrDie(db, "COMMIT;", "commit the collected data");
+    dupesPixEnd();
+
+    check(dpState.written==wantOK, "the readable images were collected");
+    check(dpState.failed==wantGone + wantPoison, "both kinds of failure are counted as failures");
+    check(scalar(db, "SELECT count(*) FROM images WHERE isDeleted=1")==wantGone,
+          "but only the ones that could not be decoded at all are marked dead");
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgfile LIKE 'poison%' AND isDeleted=1")==0,
+          "a failure after the decode never retires the image from the library");
+    check(scalar(db, "SELECT count(*) FROM imagesPixels p JOIN images i ON i.imgidu=p.imgidu"
+                     " WHERE i.imgfile LIKE 'poison%'")==0, "and writes no fingerprint for it");
+
+    // the point of not marking them: the next run gets to try again
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "the run can be started again");
+    int steps2 = 0;
+    while (dupesPixStep(5)==1)
+        if (++steps2 > 200000) break;
+
+    dupesPixEnd();
+    check(dpState.submitted==wantPoison, "a second pass offers exactly those images again");
+
+    check(dupesPixShutdown()==1, "the pool shuts down cleanly");
+    SQ.close_v2(db);
+    remove(path);
+}
+
+// ---------------------------------------------------------------------------------------
 
 int main() {
     printf("dupes-pixels.h\n");
@@ -519,6 +620,7 @@ int main() {
     jobPipeline();
     poolPlumbing();
     collectionAgainstRealSQLite();
+    processFailureIsNotMarkedDead();
 
     printf("\n  %s\n", failures ? "PIXEL COLLECTOR TEST FAILED" : "pixel collector test passed");
     return failures ? 1 : 0;

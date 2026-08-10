@@ -51,8 +51,12 @@ typedef long long           sqlite3_int64;   // "long long", not __int64: same w
 #define SQLITE_OPEN_NOMUTEX    0x00008000
 #define SQLITE_OPEN_FULLMUTEX  0x00010000
 
-// The destructor sentinel that tells SQLite to copy a bound value; SQLITE_STATIC (0)
-// promises the buffer outlives the statement, which is only true for literals.
+// The destructor sentinel that tells SQLite to copy a bound value. SQLITE_STATIC (0)
+// promises instead that the buffer stays put and unchanged until the statement is
+// finished with it - which holds for a literal, and equally for a caller-owned buffer
+// that is still alive at the sqlite3_step()/sqlite3_reset() pair, the way dpWriteResult()
+// binds the fingerprints straight out of the DupePixResult it is writing. What it must
+// never be is a temporary that dies before the step, or a buffer some other thread edits.
 #define QPV_SQLITE_TRANSIENT ((void(__cdecl*)(void*))-1)
 #define QPV_SQLITE_STATIC    ((void(__cdecl*)(void*))0)
 
@@ -140,9 +144,14 @@ static void bindSQLiteOnce() {
         // close_v2 arrived in 3.7.14 and prepare16_v2 in 3.3.9; the AHK class already
         // refuses anything below 3.6, and the engine needs both, so a shipped DLL that
         // predates them simply leaves the engine off rather than crashing later.
+        // bind_text16 and bind_int64 belong in this list as much as the column readers do:
+        // the hash loop only wraps them in a NULL test, so without them its UPDATE would
+        // run on unbound (NULL) parameters, match no row, still report SQLITE_DONE, and
+        // hand the same rows back on every batch forever.
         SQ.ok = (SQ.open_v2 && SQ.close_v2 && SQ.prepare16_v2 && SQ.step && SQ.reset && SQ.finalize
               && SQ.column_type && SQ.column_int64 && SQ.column_double && SQ.column_text16
-              && SQ.column_bytes16 && SQ.column_blob && SQ.column_bytes && SQ.column_count && SQ.interrupt);
+              && SQ.column_bytes16 && SQ.column_blob && SQ.column_bytes && SQ.column_count && SQ.interrupt
+              && SQ.bind_int64 && SQ.bind_text16);
 
         if (SQ.ok)
            fnOutputDebug("dupesEngine: sqlite3.dll bound successfully");

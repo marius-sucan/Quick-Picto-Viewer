@@ -545,6 +545,105 @@ static void hashGenerationWritesBack(const char *dbPath) {
     if (system(cmd)) {}
 }
 
+// ---- hash generation over fingerprints that cannot be hashed -------------------------
+//
+// A fingerprint of the wrong length has no hash, so the row has to be taken out of the
+// "hash IS NULL" result set some other way or the loop re-reads it forever. Three things
+// about how that is done are load-bearing and none of them is obvious:
+//
+//   - the marker is the EMPTY string, never "0". "0" is a real hash value - a uniform
+//     image hashes to zero - and the candidate query keeps every row for which
+//     ifnull(hash,'')!='', so "0" would collect all of these into one phantom duplicate
+//     group together with every flat image in the library.
+//   - a batch that is entirely unhashable must NOT report the run as finished. The SELECT
+//     is capped at the batch size, so such a batch says nothing about the rows behind it.
+//   - they are not write failures, and are counted apart from them.
+static long long qeScalar(sqlite3 *db, const char *sql) {
+    const std::wstring w = widen(sql);
+    sqlite3_stmt *st = NULL;
+    long long v = -1;
+    if (SQ.prepare16_v2(db, w.c_str(), -1, &st, NULL)!=SQLITE_OK || st==NULL)
+       return -1;
+
+    if (SQ.step(st)==SQLITE_ROW)
+       v = SQ.column_int64(st, 0);
+
+    SQ.finalize(st);
+    return v;
+}
+
+static void qeExec(sqlite3 *db, const char *sql) {
+    const std::wstring w = widen(sql);
+    sqlite3_stmt *st = NULL;
+    if (SQ.prepare16_v2(db, w.c_str(), -1, &st, NULL)!=SQLITE_OK || st==NULL)
+       return;
+
+    SQ.step(st);
+    SQ.finalize(st);
+}
+
+static void hashGenerationSkipsShortFingerprints(const char *dbPath) {
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "cp -f '%s' '%s.short' 2>/dev/null", dbPath, dbPath);
+    if (system(cmd)!=0) { printf("    could not copy the test database\n"); failures++; return; }
+
+    std::string scratch = std::string(dbPath) + ".short";
+    sqlite3 *db = NULL;
+    std::vector<char> u8(scratch.begin(), scratch.end());
+    u8.push_back(0);
+    if (SQ.open_v2(u8.data(), &db, SQLITE_OPEN_READWRITE, NULL)!=SQLITE_OK) {
+        printf("    could not open the scratch database read-write\n"); failures++; return;
+    }
+
+    // Truncate the fingerprints of the 80 lowest identities by one byte. The batch below
+    // is 64, and the SELECT has no ORDER BY - it scans - so the first batch lands wholly
+    // inside the damaged run, which is exactly the case that used to end the whole loop.
+    qeExec(db, "UPDATE images SET lHash=NULL");
+    qeExec(db, "UPDATE imagesPixels SET small=substr(small, 1, 71) WHERE imgidu IN"
+               " (SELECT imgidu FROM images WHERE isDeleted=0 ORDER BY imgidu LIMIT 80)");
+
+    const char *scopeSQL = " FROM images LEFT JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
+                           " WHERE images.isDeleted=0 AND p.small IS NOT NULL";
+    const long long shortRows = qeScalar(db, (std::string("SELECT count(*)") + scopeSQL + " AND length(p.small)!=72").c_str());
+    const long long goodRows  = qeScalar(db, (std::string("SELECT count(*)") + scopeSQL + " AND length(p.small)=72").c_str());
+    check(shortRows >= 64, "the scratch database has more short fingerprints than one batch holds");
+    check(goodRows > 100,  "and good ones behind them");
+
+    const std::wstring sel = widen("SELECT images.imgidu, p.small FROM images"
+                                   " LEFT JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
+                                   " WHERE images.isDeleted=0 AND p.small IS NOT NULL"
+                                   " AND lHash IS NULL LIMIT ?1");
+    const std::wstring upd = widen("UPDATE images SET lHash=?1 WHERE imgidu=?2");
+    check(dupesHashBegin(db, sel.c_str(), upd.c_str(), 4, 72, 1, 1)==1,
+          "dupesHashBegin prepares both statements");
+
+    int steps = 0;
+    while (dupesHashStep(64) > 0) {
+        steps++;
+        if (steps > 10000) { printf("    the hash loop did not terminate\n"); failures++; break; }
+    }
+
+    check(dupesHashWrittenCount()==goodRows, "every hashable row was hashed, not just the ones before the damage");
+    check(dupesHashSkippedCount()==shortRows, "and every unhashable one was counted as skipped");
+    check(dupesHashFailedCount()==0, "a skipped fingerprint is not a failed write");
+    dupesHashEnd();
+
+    check(qeScalar(db, (std::string("SELECT count(*)") + scopeSQL + " AND lHash IS NULL").c_str())==0,
+          "the SELECT is empty afterwards, which is what ends the loop");
+    check(qeScalar(db, "SELECT count(*) FROM images WHERE lHash=''")==shortRows,
+          "the short rows carry an empty hash");
+    check(qeScalar(db, "SELECT count(*) FROM images WHERE lHash='0' AND imgidu IN"
+                       " (SELECT imgidu FROM imagesPixels WHERE length(small)!=72)")==0,
+          "... and never the string \"0\", which is a legitimate hash value");
+    check(qeScalar(db, "SELECT count(*) FROM images WHERE ifnull(lHash,'')!='' AND imgidu IN"
+                       " (SELECT imgidu FROM imagesPixels WHERE length(small)!=72)")==0,
+          "so the candidate query's ifnull() guard drops them");
+
+    SQ.close_v2(db);
+    snprintf(cmd, sizeof(cmd), "rm -f '%s'", scratch.c_str());
+    if (system(cmd)) {}
+}
+
 int main(int argc, char **argv) {
     const char *dbPath = (argc > 1) ? argv[1] : "testdb.sldb";
 
@@ -576,6 +675,8 @@ int main(int argc, char **argv) {
     rejectsBadInput();
     printf("  hash generation\n");
     hashGenerationWritesBack(dbPath);
+    printf("  hash generation, unhashable fingerprints\n");
+    hashGenerationSkipsShortFingerprints(dbPath);
 
     dupesEngineRelease();
     SQ.close_v2(refDB);

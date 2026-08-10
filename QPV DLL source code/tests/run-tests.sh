@@ -172,6 +172,39 @@ else
     else
         echo "  ERROR: query_engine.cpp did not compile"; fail=1
     fi
+
+    echo
+    echo "== mutation check: the unhashable-fingerprint cases must reject both old bugs =="
+    # Two regressions that a passing suite would otherwise say nothing about, because both
+    # only show up on a database that holds a fingerprint of the wrong length:
+    #   A - answering "nothing left to do" for a batch that was entirely unhashable, which
+    #       ended the whole run and reported it as finished;
+    #   B - marking those rows with the string "0" instead of an empty hash. "0" is a real
+    #       hash value, so it lands them all in one phantom duplicate group.
+    cp query_extract.cpp query_extract.orig
+    for mutant in A B; do
+        cp query_extract.orig query_extract.cpp
+        case $mutant in
+          A) sed -i 's|return sawRow ? 1 : 0;|return 0;|' query_extract.cpp
+             label="a batch of only unhashable rows ends the run" ;;
+          B) sed -i 's|SQ.bind_text16(dupesHashUpd, 1, L"", 0, QPV_SQLITE_STATIC);|SQ.bind_text16(dupesHashUpd, 1, L"0", 2, QPV_SQLITE_STATIC);|' query_extract.cpp
+             label="the marker is the string \"0\"" ;;
+        esac
+
+        if cmp -s query_extract.cpp query_extract.orig; then
+            echo "  ERROR: mutant $mutant did not apply - the anchor no longer matches"; fail=1
+            continue
+        fi
+
+        g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -o query_mutant query_engine.cpp -ldl 2>/dev/null
+        if ./query_mutant testdb.sldb > /dev/null 2>&1; then
+            echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
+        else
+            echo "   ok - mutant $mutant is caught ($label)"
+        fi
+    done
+    mv -f query_extract.orig query_extract.cpp
+    rm -f query_mutant
 fi
 
 if [ "${1:-}" = "--bench" ]; then

@@ -5411,18 +5411,38 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     return 1;
 }
 
-// SWAR population count with hardware POPCNT optimization when available.
+// POPCNT is an SSE4.2 instruction. This project builds with
+// EnableEnhancedInstructionSet=SSE2 and ships a Win7 x64 DLL, and MSVC emits the
+// instruction wherever __popcnt64() appears - /arch does not gate it - so using the
+// intrinsic unconditionally faults with an illegal instruction on the x64 machines
+// that predate it (Intel before Nehalem, AMD before K10). Hence the run-time check:
+// the CPUID bit is read once at load and the branch below is perfectly predicted,
+// which is noise next to the memory traffic of the sweep. DO NOT remove the SWAR
+// fallback - hammingDistance() runs n*n/2 times per group and this is the one place
+// where the baseline the project declares actually has teeth.
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+static bool qpvDetectPopcnt() {
+    int regs[4] = {0, 0, 0, 0};
+    __cpuid(regs, 1);
+    return (regs[2] & (1 << 23))!=0;    // CPUID.01H:ECX.POPCNT[bit 23]
+}
+static const bool qpvHasPopcnt = qpvDetectPopcnt();
+#endif
+
+// SWAR population count, with the hardware instruction when this CPU has it.
 inline int popcount64(UINT64 x) {
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
-    return (int)__popcnt64(x);
+    if (qpvHasPopcnt)
+       return (int)__popcnt64(x);
 #elif defined(__GNUC__) || defined(__clang__)
+    // without -mpopcnt this expands to a table or the same SWAR, never a bare POPCNT
     return __builtin_popcountll((unsigned long long)x);
-#else
+#endif
+
     x -= (x >> 1) & 0x5555555555555555ULL;
     x  = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
     x  = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
     return (int)((x * 0x0101010101010101ULL) >> 56);
-#endif
 }
 
 // Builds the bit window the two crop settings describe: lCrop drops that many
@@ -7068,6 +7088,10 @@ static sqlite3_stmt *dupesHashSel = NULL;
 static sqlite3_stmt *dupesHashUpd = NULL;
 static int   dupesHashKind = 0, dupesHashPix = 0, dupesHashGray = 1, dupesHashMode = 1;
 static INT64 dupesHashWritten = 0, dupesHashFailed = 0, dupesHashSeen = 0;
+// images whose stored fingerprint is not the length this hash needs. They are not write
+// failures - the write succeeds, it just has nothing to write - so they are counted apart
+// from dupesHashFailed, which AHK reports as "failed to commit to database".
+static INT64 dupesHashSkipped = 0;
 
 // discretizeValue(v, level) -> Round(v/level)*level, and AHK's Round() is half away from
 // zero. Note this is the PRODUCT, not the quotient the MSD path stores: dHash and lHash
@@ -7175,7 +7199,7 @@ DLL_API int DLL_CALLCONV dupesHashBegin(void *ahkDb, const wchar_t *selectSQL, c
     dupesHashPix = pixCount;
     dupesHashGray = (grayCompressor > 1) ? grayCompressor : 1;
     dupesHashMode = pHashMode;
-    dupesHashWritten = dupesHashFailed = dupesHashSeen = 0;
+    dupesHashWritten = dupesHashFailed = dupesHashSeen = dupesHashSkipped = 0;
 
     if (SQ.prepare16_v2(dupesHashDB, selectSQL, -1, &dupesHashSel, NULL)!=SQLITE_OK || dupesHashSel==NULL)
     {
@@ -7208,9 +7232,11 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
        batch = 256;
 
     std::vector<INT64> ids;
+    std::vector<INT64> badIds;    // written back after the SELECT is reset, never during
     std::vector<int> pix;
     ids.reserve(batch);
     pix.reserve((size_t)batch * dupesHashPix);
+    bool sawRow = false;
 
     SQ.reset(dupesHashSel);
     if (SQ.bind_int64!=NULL)
@@ -7224,23 +7250,15 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
            const unsigned char *s = (const unsigned char*)SQ.column_blob(dupesHashSel, 1);
            const int n = (s!=NULL) ? SQ.column_bytes(dupesHashSel, 1) : 0;
            dupesHashSeen++;
+           sawRow = true;
            // a fingerprint of the wrong length was skipped by the AHK too: it tested
-           // arrayChars.Count()=72 before hashing
+           // arrayChars.Count()=72 before hashing. The row is only remembered here and
+           // written below: stepping an UPDATE against "images" while this SELECT is
+           // still scanning it leaves what the cursor sees next undefined, which is the
+           // very reason the good rows are held back to the end of the batch as well.
            if (n!=dupesHashPix)
            {
-              const INT64 badId = (INT64)SQ.column_int64(dupesHashSel, 0);
-              if (SQ.bind_text16!=NULL && SQ.bind_int64!=NULL)
-              {
-                 SQ.reset(dupesHashUpd);
-                 SQ.bind_text16(dupesHashUpd, 1, L"0", 1, QPV_SQLITE_STATIC);
-                 SQ.bind_int64(dupesHashUpd, 2, badId);
-                 if (SQ.step(dupesHashUpd)==SQLITE_DONE)
-                    dupesHashFailed++;
-                 SQ.reset(dupesHashUpd);
-              }
-              if ((int)ids.size() >= batch)
-                 break;
-
+              badIds.push_back((INT64)SQ.column_int64(dupesHashSel, 0));
               continue;
            }
 
@@ -7262,8 +7280,37 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     }
 
     SQ.reset(dupesHashSel);
+
+    // A row whose fingerprint cannot be hashed is given an EMPTY hash, not "0". Either
+    // one takes it out of the "hash IS NULL" result set, which is what stops it being
+    // offered again - but "0" is a legitimate hash value (dupesHexHash(0) writes it, and
+    // a uniform image really does hash to zero), and the candidate query keeps every row
+    // for which ifnull(hash,'')!='', so "0" would drop all of these into the duplicates
+    // set at distance 0 from one another and from every flat image in the library. The
+    // empty string is exactly what that filter exists to exclude.
+    // nByte counts BYTES for bind_text16, not characters: 0 is the empty string.
+    if (!badIds.empty() && SQ.bind_text16!=NULL && SQ.bind_int64!=NULL)
+    {
+       for ( size_t i = 0 ; i < badIds.size() ; i++)
+       {
+           SQ.reset(dupesHashUpd);
+           SQ.bind_text16(dupesHashUpd, 1, L"", 0, QPV_SQLITE_STATIC);
+           SQ.bind_int64(dupesHashUpd, 2, badIds[i]);
+           if (SQ.step(dupesHashUpd)==SQLITE_DONE)
+              dupesHashSkipped++;
+           else
+              dupesHashFailed++;
+       }
+
+       SQ.reset(dupesHashUpd);
+    }
+
+    // Not "there is nothing left to do": the SELECT is capped at `batch` rows, so a batch
+    // that was entirely unhashable says nothing about the rows behind it. Answering 0
+    // here ended the whole run and reported it as finished, leaving every image after
+    // those rows unhashed. They have just been marked, so the next call moves past them.
     if (ids.empty())
-       return 0;
+       return sawRow ? 1 : 0;
 
     const int count = (int)ids.size();
     std::vector<UINT64> out((size_t)count, 0);
@@ -7304,6 +7351,9 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
 
 DLL_API INT64 DLL_CALLCONV dupesHashWrittenCount() { return dupesHashWritten; }
 DLL_API INT64 DLL_CALLCONV dupesHashFailedCount()  { return dupesHashFailed; }
+// images passed over because their stored fingerprint is not the length this hash needs;
+// separate from dupesHashFailedCount(), which really does mean the write failed
+DLL_API INT64 DLL_CALLCONV dupesHashSkippedCount() { return dupesHashSkipped; }
 
 DLL_API int DLL_CALLCONV dupesHashEnd() {
     if (SQ.ok)
