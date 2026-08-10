@@ -35865,7 +35865,11 @@ PanelStateOFsqlNation() {
    showTOOLtip("Gathering database information: file details", 0, 0, 2/13)
    fsize := totalz - getTotalIMGsSQLdb("WHERE ifnull(fsize, '')='' ")
    showTOOLtip("Gathering database information: image details", 0, 0, 3/13)
-   imgmegapix := totalz - getTotalIMGsSQLdb("WHERE ifnull(imgmegapix, '')='' ")
+   ; imgpixfmt, not imgmegapix, for the reason collectSQLFileInfosNow() gives: imgmegapix is
+   ; generated from imgwidth, so it can carry a value for an image whose properties are only
+   ; half collected. This figure has to describe the same population that "collect image
+   ; details" would go and scan, or the panel reports 100% for work that is still pending.
+   imgmegapix := totalz - getTotalIMGsSQLdb("WHERE ifnull(imgmegapix, '')='' OR ifnull(imgpixfmt, '')='' ")
    showTOOLtip("Gathering database information: image histograms", 0, 0, 4/13)
    imgmedian := totalz - getTotalIMGsSQLdb("WHERE ifnull(imgmedian, '')='' ")
    showTOOLtip("Gathering database information: pixel data", 0, 0, 5/13)
@@ -36004,8 +36008,20 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       ; A subquery keeps the outer statement single-table, which is what lets extraFilter -
       ; built by extractSQLqueryFromFilter() over "images" columns - stay exactly as it is.
       ; imgidu is INTEGER PRIMARY KEY NOT NULL there, so the NOT IN cannot meet a NULL.
+      ;
+      ; Mode 2 asks a wider question than its sort key does. The five image properties used
+      ; to be written together, so any one of them answered for the group; the collection
+      ; pool of dupes-pixels.h now writes them together as well, but for a while it wrote
+      ; only imgwidth and imgheight - and imgmegapix and imgwhratio are GENERATED from
+      ; those, so in a database collected in that window every one of the usual sort keys
+      ; already has a value and "collect image details" would answer that there is nothing
+      ; to do, forever, while imgpixfmt, imgframes and imgdpi stayed empty.
+      ; imgpixfmt is the honest test for the group: it is the one column no image can
+      ; legitimately leave blank once it has been decoded.
       If (isPixelsTarget=1)
          missingClause := "imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE " SQLpixelsColumn(scu) " IS NOT NULL) AND isDeleted=0"
+      Else If (adaptedSortCriteria=2)
+         missingClause := "(ifnull(" scu ", '')='' OR ifnull(imgpixfmt, '')='') AND isDeleted=0"
       Else
          missingClause := "ifnull(" scu ", '')='' AND isDeleted=0"
 
@@ -36310,11 +36326,19 @@ initDupesPixelsPool() {
 
    ; the pool is created on first use and lives until TrueCleanup(); a session that never
    ; collects image data never pays for the threads
-   If !DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBegin", "UPtr")
+   hasPool := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBegin", "UPtr")
+   hasNames := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixSetFormatNames", "UPtr")
+   If (!hasPool || !hasNames)
    {
       addJournalEntry(A_ThisFunc "(): qpvmain.dll is older than this script and has no collection pool.")
       Return 0
    }
+
+   ; The pool writes imgpixfmt itself, and the names of the pixel formats are this script's:
+   ; WicPixelFormats() for the images WIC decodes, FIMcolorTypeNames() for the ones
+   ; FreeImage does. Sending them keeps a single copy of both lists in the product; without
+   ; this call qpvmain.dll leaves the column NULL rather than inventing a second spelling.
+   DllCall("qpvmain.dll\dupesPixSetFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "Int")
 
    ; The loaders and the extension sets are the thumbnails pool's. Setting the formats does
    ; not start that pool and does not depend on it having been started - initThumbsPool()
@@ -100948,6 +100972,26 @@ WicPixelFormats(pixFmt) {
    If !r
       r := "UNKNOWN"
    Return r
+}
+
+; The same names, "|" separated and indexed from zero, for dupesPixSetFormatNames().
+; The collection pool decodes through WIC itself and writes imgpixfmt without ever coming
+; back here, so it has to spell a format exactly as this function does - one pixel format
+; under two spellings splits every grouping and filter over that column in half.
+; Built from WicPixelFormats() rather than beside it, so there is nothing to keep in sync.
+packWICpixelFormatNames() {
+   Static packedu := ""
+   If packedu
+      Return packedu
+
+   ; indexedWICpixelFormats() in qpv-main.cpp numbers the formats 1 to 90 and answers 0 for
+   ; one it does not know, so the list runs from index 0 and both of the leading entries are
+   ; the "UNKNOWN" this function already returns for them
+   packedu := WicPixelFormats(0)
+   Loop, 90
+       packedu .= "|" WicPixelFormats(A_Index)
+
+   Return packedu
 }
 
 WICcontainerFmts(containerID, imgPath) {

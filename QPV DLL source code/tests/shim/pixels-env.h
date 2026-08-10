@@ -258,6 +258,18 @@ static QpvFIMstub FIM;
 static inline void bindFreeImageOnce() { }
 
 #define TP_ERR_LOAD 1
+// mirrors TpSrcMeta of thumbs-pool.h; the stubbed loaders below fill it the way the real
+// ones do, so the collector's imgframes/imgdpi/imgpixfmt path is exercised here too
+#define FIC_RGBALPHA 4
+struct TpSrcMeta {
+    int frames = 1;
+    int dpi = 0;
+    int wicFmt = -1;
+    int fimBPP = 0;
+    int fimColor = -1;
+    int fimToneMap = 0;
+};
+
 struct ThumbsConfig {
     int thumbSize = 250, timePerImg = 25, enableCaching = 1, userHQraw = 1, allowToneMapping = 1;
     int allowWIC = 1, allowFIM = 1, imgQuality = 5, toneMapAlgo = 0;
@@ -310,13 +322,30 @@ static Gdiplus::GpBitmap *shimMakeBitmap(int w, int h, unsigned char seed) {
 }
 
 static inline Gdiplus::GpBitmap* tpWICload(IWICImagingFactory*, const wchar_t *path, int, int, int, int, int,
-                                           int &srcW, int &srcH) {
+                                           int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
     gShimWicCalls++;
     if (gShimWicFails)
+    {
+       // a failed WIC attempt still touches the record, which is what dpDecodeFile() has
+       // to clear before it hands the file to FreeImage
+       if (meta!=NULL)
+       {
+          meta->frames = 99;
+          meta->dpi    = 999;
+          meta->wicFmt = 15;
+       }
        return NULL;
+    }
 
     srcW = gShimDecodeW*4;
     srcH = gShimDecodeH*4;
+    if (meta!=NULL)
+    {
+       meta->frames = 3;
+       meta->dpi    = 72;
+       meta->wicFmt = 15;         // "24-bpp - BGR"
+    }
+
     Gdiplus::GpBitmap *b = shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path ? path[3] : 0));
     if (b!=NULL && path!=NULL && shimPathHas(path, L"poison"))
        b->poisoned = true;
@@ -325,12 +354,22 @@ static inline Gdiplus::GpBitmap* tpWICload(IWICImagingFactory*, const wchar_t *p
 }
 
 static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstring &path, const std::wstring&,
-                                            DWORD, int &srcW, int &srcH, int &status, int &saved) {
+                                            DWORD, int &srcW, int &srcH, int &status, int &saved,
+                                            TpSrcMeta *meta = NULL) {
     gShimFimCalls++;
     saved = 0;
     srcW = gShimDecodeW*2;
     srcH = gShimDecodeH*2;
     status = 0;
+    if (meta!=NULL)
+    {
+       meta->frames     = 1;
+       meta->dpi        = 300;
+       meta->fimBPP     = 48;
+       meta->fimColor   = 2;      // FIC_RGB -> "48-RGB"
+       meta->fimToneMap = 2;      // " (TONE-MAPPABLE)"
+    }
+
     Gdiplus::GpBitmap *b = shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path.size() & 0xFF));
     if (b!=NULL && shimPathHas(path.c_str(), L"poison"))
        b->poisoned = true;

@@ -1,7 +1,14 @@
 // dupes-pixels.h
 //
 // Parallel collection of the per-image data the duplicate finder needs: the histogram
-// statistics, the image dimensions, the file stamps, and the four pixel fingerprints.
+// statistics, the image properties, the file stamps, and the four pixel fingerprints.
+//
+// "The image properties" means every column the database keeps about the picture itself -
+// imgwidth, imgheight, imgframes, imgdpi and imgpixfmt - and all five are read off the
+// image as it came out of the decoder, before the loader scales it into the 350 pixel box
+// or converts it to 32bppPARGB. Read afterwards they would describe the intermediate this
+// file builds rather than the file on disk: one frame, 96 DPI and 32bppPARGB, for every
+// image in the library.
 //
 // This is the phase collectSQLFileInfosNow() used to run strictly serially in AHK, one
 // GDI+ decode at a time, with dumpBMPpixels() appending Chr(gray+161) one character at a
@@ -16,6 +23,7 @@
 //
 // Usage from AHK:
 //    dupesPixInit(nThreads)                          once, lazily
+//    dupesPixSetFormatNames(wicNames, fimNames)      once, before the first run
 //    dupesPixBegin(ahkDb, selectSQL, packedOptions)  per collection run
 //    dupesPixStep(msBudget)                          1 while more remains, 0 done, -1 error
 //    dupesPixGetState()                              pointer polled with NumGet()
@@ -95,6 +103,9 @@ struct DupePixResult {
     int    status = DP_ERR_LOAD;
     int    loaderUsed = 0;          // 1 WIC, 2 FreeImage
     int    width = 0, height = 0;
+    // imgframes, imgdpi and imgpixfmt: the properties of the file itself, read by the
+    // loader before it scaled or converted anything - see TpSrcMeta in thumbs-pool.h
+    TpSrcMeta meta;
     INT64  fsize = 0, fmodified = 0, fcreated = 0;
     // the eight values getImgHistoValuesSet() writes, already normalised the way
     // calcHistoAvgFile() normalises them
@@ -113,6 +124,16 @@ static std::atomic<LONG>                   dpGeneration(1);
 static std::shared_ptr<const DupePixCfg>   dpConfig = std::make_shared<DupePixCfg>();
 static DupePixState                        dpState = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static size_t                              dpExited = 0;        // guarded by dpMutex
+
+// The names the database stores in imgpixfmt, exactly as the interpreter spells them:
+// dpWicNames is indexed by indexedWICpixelFormats() and holds what WicPixelFormats()
+// returns, dpFimNames by FREE_IMAGE_COLOR_TYPE and holds what FreeImage_GetColorType()
+// returns. dupesPixSetFormatNames() fills both once per session, so there is one copy of
+// those strings in the product and a label can never be renamed on one side only.
+// Written before any run begins and only read afterwards - and read on the dupesPixStep()
+// thread alone, since dpWriteResult() is what composes the string.
+static std::vector<std::wstring> dpWicNames;
+static std::vector<std::wstring> dpFimNames;
 
 static sqlite3      *dpDB      = NULL;      // AHK's handle; never closed here
 static sqlite3_stmt *dpSelect  = NULL;
@@ -323,7 +344,8 @@ static bool dpHistogram(Gdiplus::GpBitmap *bmp, int w, int h, DupePixResult &res
 // formats FreeImage claims exclusively go straight to it, and anything WIC fails to open
 // falls back to it as well - the same order LoadBitmapFromFileu() uses in AHK.
 static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, const DupePixCfg &cfg, const std::wstring &path,
-                                       const ThumbsConfig &tcfg, int &srcW, int &srcH, int &loaderUsed) {
+                                       const ThumbsConfig &tcfg, int &srcW, int &srcH, int &loaderUsed,
+                                       TpSrcMeta &meta) {
     Gdiplus::GpBitmap *bmp = NULL;
     const std::wstring ext = tpFileExtension(path);
     const bool fimHandles  = (FIM.ok && cfg.allowFIM==1 && tpFimExts.count(ext) > 0);
@@ -331,15 +353,18 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, const DupePixCfg
     if (!fimHandles && cfg.allowWIC==1 && tpWicExts.count(ext) > 0)
     {
        bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality,
-                       (FIM.ok && cfg.allowFIM==1) ? 1 : 0, srcW, srcH);
+                       (FIM.ok && cfg.allowFIM==1) ? 1 : 0, srcW, srcH, &meta);
        if (bmp!=NULL)
           loaderUsed = 1;
     }
 
     if (bmp==NULL && FIM.ok && cfg.allowFIM==1)
     {
+       // whatever a failed WIC attempt left behind describes an image that was not the one
+       // finally decoded; the FreeImage loader has to start from a clean record
+       meta = TpSrcMeta();
        int status = TP_ERR_LOAD, saved = 0, fw = 0, fh = 0;
-       bmp = tpFIMthumb(&tcfg, path, L"", GetTickCount(), fw, fh, status, saved);
+       bmp = tpFIMthumb(&tcfg, path, L"", GetTickCount(), fw, fh, status, saved, &meta);
        if (bmp!=NULL)
        {
           loaderUsed = 2;
@@ -379,7 +404,7 @@ static void dpRunJob(IWICImagingFactory *fac, DpEffects &fx, const DupePixCfg &c
     try
     {
         int srcW = 0, srcH = 0;
-        bmp = dpDecodeFile(fac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed);
+        bmp = dpDecodeFile(fac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta);
         if (bmp==NULL)
            return;
 
@@ -582,6 +607,44 @@ static void dpBindBlobOrNull(sqlite3_stmt *st, int idx, const std::vector<unsign
        SQ.bind_blob(st, idx, v.data(), (int)v.size(), QPV_SQLITE_STATIC);
 }
 
+// imgpixfmt, spelled the way the loader that actually decoded the image spells it in
+// mainLoadedIMGdetails.PixelFormat:
+//    WIC        WicPixelFormats(index)                     "24-bpp - BGR"
+//    FreeImage  bpp "-" colourType + tone mapping marker   "48-RGB (TONE-MAPPED)"
+// An empty result is written as NULL rather than as an empty string: "collected, and the
+// format is blank" and "never collected" have to stay distinguishable, or the collection
+// pass that fills the gaps decodes those images again on every single run.
+static std::wstring dpPixelFormatName(const DupePixResult &res) {
+    if (res.loaderUsed==1)
+    {
+       if (dpWicNames.empty())
+          return std::wstring();
+
+       // index 0 is what indexedWICpixelFormats() answers for a format it does not know
+       // and what WicPixelFormats() spells "UNKNOWN" - which is also the honest answer for
+       // a frame whose pixel format WIC would not report at all
+       const size_t idx = (res.meta.wicFmt > 0 && (size_t)res.meta.wicFmt < dpWicNames.size())
+                        ? (size_t)res.meta.wicFmt : 0;
+       return dpWicNames[idx];
+    }
+
+    if (res.loaderUsed==2 && res.meta.fimBPP > 0
+     && res.meta.fimColor >= 0 && (size_t)res.meta.fimColor < dpFimNames.size())
+    {
+       std::wstring out = std::to_wstring(res.meta.fimBPP);
+       out += L"-";
+       out += dpFimNames[res.meta.fimColor];
+       if (res.meta.fimToneMap==1)
+          out += L" (TONE-MAPPED)";
+       else if (res.meta.fimToneMap==2)
+          out += L" (TONE-MAPPABLE)";
+
+       return out;
+    }
+
+    return std::wstring();
+}
+
 static bool dpWriteResult(const DupePixResult &res) {
     if (res.status!=DP_OK)
     {
@@ -604,6 +667,10 @@ static bool dpWriteResult(const DupePixResult &res) {
     bool okay = true;
     if (dpUpdHist!=NULL)
     {
+       // alive until the step/reset pair below, which is what lets it be bound STATIC;
+       // nByte counts BYTES for bind_text16, so -1 and let SQLite measure the string
+       const std::wstring pixFmt = dpPixelFormatName(res);
+
        SQ.reset(dpUpdHist);
        SQ.bind_double(dpUpdHist,  1, res.median);
        SQ.bind_double(dpUpdHist,  2, res.avg);
@@ -615,10 +682,17 @@ static bool dpWriteResult(const DupePixResult &res) {
        SQ.bind_double(dpUpdHist,  8, res.minu);
        SQ.bind_int64(dpUpdHist,   9, res.width);
        SQ.bind_int64(dpUpdHist,  10, res.height);
-       SQ.bind_int64(dpUpdHist,  11, res.fsize);
-       SQ.bind_int64(dpUpdHist,  12, res.fmodified);
-       SQ.bind_int64(dpUpdHist,  13, res.fcreated);
-       SQ.bind_int64(dpUpdHist,  14, res.imgidu);
+       SQ.bind_int64(dpUpdHist,  11, (res.meta.frames > 0) ? res.meta.frames : 1);
+       SQ.bind_int64(dpUpdHist,  12, res.meta.dpi);
+       if (pixFmt.empty())
+          SQ.bind_null(dpUpdHist, 13);
+       else
+          SQ.bind_text16(dpUpdHist, 13, pixFmt.c_str(), -1, QPV_SQLITE_STATIC);
+
+       SQ.bind_int64(dpUpdHist,  14, res.fsize);
+       SQ.bind_int64(dpUpdHist,  15, res.fmodified);
+       SQ.bind_int64(dpUpdHist,  16, res.fcreated);
+       SQ.bind_int64(dpUpdHist,  17, res.imgidu);
        if (SQ.step(dpUpdHist)!=SQLITE_DONE)
           okay = false;
 
@@ -759,6 +833,38 @@ DLL_API void* DLL_CALLCONV dupesPixGetState() {
     return (void*)&dpState;
 }
 
+// "|" separated, one entry per index, both tables built by the interpreter out of the very
+// functions that name a pixel format everywhere else in the product - WicPixelFormats() and
+// the colour type table of FreeImage_GetColorType(). Sent once, the way
+// thumbsPoolSetFormats() sends the extension lists.
+//
+// Without it imgpixfmt is simply left NULL, which the next collection pass fills in; what
+// must never happen is this file inventing its own spelling for a format, because then one
+// format sits in the column under two names and every grouping and filter over it splits.
+static void dpSplitNames(const wchar_t *packed, std::vector<std::wstring> &out) {
+    out.clear();
+    if (packed==NULL)
+       return;
+
+    std::wstring cur;
+    for ( const wchar_t *p = packed ; ; p++)
+    {
+        if (*p==L'|' || *p==0)
+        {
+           out.push_back(cur);
+           cur.clear();
+           if (*p==0)
+              break;
+        } else cur.push_back(*p);
+    }
+}
+
+DLL_API int DLL_CALLCONV dupesPixSetFormatNames(const wchar_t *wicNames, const wchar_t *fimColorNames) {
+    dpSplitNames(wicNames, dpWicNames);
+    dpSplitNames(fimColorNames, dpFimNames);
+    return (int)(dpWicNames.size() + dpFimNames.size());
+}
+
 // packedOptions is "|" delimited, the same shape thumbsPoolBegin() takes:
 //   0 boxSize | 1 interpolation | 2 applyBlur | 3 wantFlipped | 4 allowWIC | 5 allowFIM
 //   6 userHQraw | 7 allowToneMapping
@@ -820,10 +926,15 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
        return 0;
     }
 
+    // Every column the serial collection this replaced wrote out of one decode:
+    // getImgHistoValuesSet(), then getImgPropsValuesSet() - imgwidth, imgheight, imgframes,
+    // imgdpi and imgpixfmt - then getImgFileValuesSet(). imgwhratio and imgmegapix are
+    // generated from imgwidth and imgheight and follow on their own.
     static const wchar_t *updHistSQL =
         L"UPDATE images SET imgmedian=?1, imgavg=?2, imghpeak=?3, imghlow=?4, imghrms=?5,"
         L" imghrange=?6, imghmode=?7, imghminu=?8, imgwidth=?9, imgheight=?10,"
-        L" fsize=?11, fmodified=?12, fcreated=?13 WHERE imgidu=?14;";
+        L" imgframes=?11, imgdpi=?12, imgpixfmt=?13,"
+        L" fsize=?14, fmodified=?15, fcreated=?16 WHERE imgidu=?17;";
     static const wchar_t *updPixSQL =
         L"INSERT OR REPLACE INTO imagesPixels (imgidu, small, big, smallH, bigH) VALUES (?1,?2,?3,?4,?5);";
     static const wchar_t *markDeadSQL =

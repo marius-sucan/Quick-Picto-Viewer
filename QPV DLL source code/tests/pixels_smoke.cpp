@@ -286,6 +286,14 @@ static void jobPipeline() {
     check(res.smallH.empty() && res.bigH.empty(), "no flipped fingerprints were asked for");
     check(gShimGrayCalls==1, "the grey effect ran exactly once");
     check(res.fsize==4096 && res.fmodified==202601011200ll, "the file stamps are collected, seconds dropped");
+    // the properties of the FILE, not of the 350 pixel intermediate the fingerprints are
+    // taken from: the stub decodes 40x30 out of a 160x120 source
+    check(res.width==160 && res.height==120, "the ORIGINAL dimensions are recorded");
+    check(res.meta.frames==3 && res.meta.dpi==72 && res.meta.wicFmt==15,
+          "and so are the frame count, the resolution and the pixel format");
+
+    dupesPixSetFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR", L"MINISWHITE|MINISBLACK|RGB");
+    check(dpPixelFormatName(res)==L"24-bpp - BGR", "a WIC format is named the way WicPixelFormats() names it");
 
     // a format WIC does not declare goes straight to FreeImage
     gShimWicCalls = gShimFimCalls = 0;
@@ -293,6 +301,8 @@ static void jobPipeline() {
     runOne(L"img2.exr", cfg, res2);
     check(res2.status==DP_OK && gShimWicCalls==0 && gShimFimCalls==1, "a FreeImage-only format skips WIC");
     check(res2.loaderUsed==2, "and reports the FreeImage loader");
+    check(dpPixelFormatName(res2)==L"48-RGB (TONE-MAPPABLE)",
+          "a FreeImage format is named bit depth, colour type and tone mapping marker");
 
     // ... and so does one WIC declares but cannot open
     gShimWicFails = 1;
@@ -300,6 +310,11 @@ static void jobPipeline() {
     DupePixResult res3;
     runOne(L"img3.jpg", cfg, res3);
     check(res3.status==DP_OK && gShimWicCalls==1 && gShimFimCalls==1, "a WIC failure falls back to FreeImage");
+    // the WIC attempt filled the record before it gave up; what is written must describe
+    // the decode that actually happened
+    check(res3.meta.wicFmt==-1 && res3.meta.frames==1 && res3.meta.dpi==300,
+          "the abandoned WIC attempt leaves nothing of itself behind");
+    check(dpPixelFormatName(res3)==L"48-RGB (TONE-MAPPABLE)", "and the name comes from FreeImage");
     gShimWicFails = 0;
 
     // a file that is not there is never handed to a decoder
@@ -427,7 +442,8 @@ static void collectionAgainstRealSQLite() {
     execOrDie(db,
         "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
         " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
-        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgmedian FLOAT, imgavg FLOAT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
         " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
         " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
         "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
@@ -460,6 +476,14 @@ static void collectionAgainstRealSQLite() {
     m_pIWICFactory = (IWICImagingFactory*)1;      // "initWICnow() has run"
 
     check(dupesPixInit(3) >= 1, "the pool starts");
+    // the interpreter's two tables, abbreviated: index 15 of the first is the one the
+    // stubbed WIC loader reports, index 2 of the second the one the FreeImage stub reports
+    check(dupesPixSetFormatNames(L"UNKNOWN|UNKNOWN|1-bpp - Indexed|2-bpp - Indexed|4-bpp - Indexed|"
+                                 L"8-bpp - Indexed|BlackWhite|2-bpp - Gray|4-bpp - Gray|8-bpp - Gray|"
+                                 L"8-bpp - Alpha|16-bpp - BGR555|16-bpp - BGR565|16-bpp - BGRA5551|"
+                                 L"16-bpp - Gray|24-bpp - BGR|24-bpp - RGB",
+                                 L"MINISWHITE|MINISBLACK|RGB|PALETTIZED|RGBA|CMYK")==23,
+          "the pixel format names arrive from the interpreter");
 
     const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"
                          L" WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
@@ -489,6 +513,14 @@ static void collectionAgainstRealSQLite() {
     check(scalar(db, "SELECT count(*) FROM images WHERE imgavg IS NOT NULL AND imghrms IS NOT NULL")==wantOK,
           "the histogram statistics landed on the same rows");
     check(scalar(db, "SELECT count(*) FROM images WHERE fsize=4096")==wantOK, "so did the file size");
+    // the three columns the collection stopped writing when it moved in here. They describe
+    // the file, not the 350 pixel intermediate: the stub decodes 40x30 and reports a 3 frame,
+    // 72 DPI, 24-bpp source, and that is what has to be in the database.
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgframes=3 AND imgdpi=72"
+                     " AND imgpixfmt='24-bpp - BGR'")==wantOK,
+          "the frame count, the resolution and the pixel format of the ORIGINAL landed too");
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgwidth=160 AND imgheight=120")==wantOK,
+          "and so did its dimensions, rather than the intermediate's");
     check(scalar(db, "SELECT count(*) FROM images WHERE isDeleted=1")==wantDead,
           "the images that could not be read are marked, not retried forever");
     check(scalar(db, "SELECT count(*) FROM imagesPixels p JOIN images i ON i.imgidu=p.imgidu"
@@ -540,7 +572,8 @@ static void processFailureIsNotMarkedDead() {
     execOrDie(db,
         "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
         " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
-        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgmedian FLOAT, imgavg FLOAT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
         " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
         " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
         "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"

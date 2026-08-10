@@ -96,6 +96,13 @@ around the compile cover everything that is not an image decoder:
 - **one job**: WIC first, FreeImage for the formats WIC does not declare *and* whenever WIC
   fails, a missing file marked rather than handed to a decoder, and the blur applied as the
   two passes `Gdip_GaussianBlur()` applied.
+- **the properties of the original file** — `imgwidth`, `imgheight`, `imgframes`, `imgdpi`
+  and `imgpixfmt` — taken before anything is scaled or converted, and named with the tables
+  the interpreter sends through `dupesPixSetFormatNames()`. The stubbed loaders report a
+  source larger than the bitmap they return, so a value read off the 350 pixel intermediate
+  instead of the file cannot pass. A WIC attempt that fails and falls through to FreeImage
+  must leave nothing of itself in the record either, or the database is told a `.psd` is
+  whatever WIC thought before it gave up.
 - **a whole collection run against a real SQLite database**: 3000 rows, three worker
   threads, a 1 ms budget. It asserts that the step loop yields and is re-entered, that every
   readable image is written exactly once, that unreadable ones are marked `isDeleted=1`

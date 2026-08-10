@@ -33,6 +33,7 @@ typedef void* FIBITMAPptr;   // opaque FIBITMAP*
 #define FIF_EXR       29
 #define FIF_PFM       32
 #define FIF_RAW       34
+#define FIF_JXR       36
 
 // FREE_IMAGE_TYPE
 #define FIT_UNKNOWN    0
@@ -92,6 +93,8 @@ struct FreeImageAPI {
     BITMAPINFO* (__stdcall *GetInfo)(FIBITMAPptr) = NULL;
     int         (__stdcall *GetImageType)(FIBITMAPptr) = NULL;
     int         (__stdcall *GetColorType)(FIBITMAPptr) = NULL;
+    unsigned    (__stdcall *GetDotsPerMeterX)(FIBITMAPptr) = NULL;
+    unsigned    (__stdcall *GetDotsPerMeterY)(FIBITMAPptr) = NULL;
 
     FIBITMAPptr (__stdcall *AllocateT)(int, int, int, int, unsigned, unsigned, unsigned) = NULL;
     FIBITMAPptr (__stdcall *Rescale)(FIBITMAPptr, int, int, int) = NULL;
@@ -149,6 +152,8 @@ static void bindFreeImageOnce() {
         BINDFIM(GetInfo, 4);
         BINDFIM(GetImageType, 4);
         BINDFIM(GetColorType, 4);
+        BINDFIM(GetDotsPerMeterX, 4);
+        BINDFIM(GetDotsPerMeterY, 4);
         BINDFIM(AllocateT, 28);
         BINDFIM(Rescale, 16);
         BINDFIM(ConvertToGreyscale, 4);
@@ -159,6 +164,9 @@ static void bindFreeImageOnce() {
         BINDFIM(FlipVertical, 4);
         #undef BINDFIM
 
+        // GetDotsPerMeterX/Y are deliberately not in this list: they only fill in the
+        // imgdpi the collection pool records, and an image whose resolution could not be
+        // read is worth far less than the whole FreeImage loader. Their callers test them.
         FIM.ok = (FIM.GetFileTypeU && FIM.LoadU && FIM.Unload && FIM.GetWidth && FIM.GetHeight
                && FIM.GetBPP && FIM.GetPitch && FIM.GetBits && FIM.GetInfo && FIM.GetImageType
                && FIM.GetColorType && FIM.Rescale && FIM.ConvertTo24Bits && FIM.FlipVertical);

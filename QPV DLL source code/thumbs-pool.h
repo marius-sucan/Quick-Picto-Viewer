@@ -334,6 +334,32 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 }
 
 // ---------------------------------------------------------------------------------------
+//  the properties of the image as it came off the disk
+// ---------------------------------------------------------------------------------------
+
+// Everything here describes the ORIGINAL file, and every field is read before the loader
+// scales the image or converts it to anything: a 350 pixel box of 32bppPARGB says nothing
+// about the frame count, the resolution or the pixel format of the RAW it came from, and
+// those three are exactly what the database keeps in imgframes, imgdpi and imgpixfmt.
+//
+// The pixel format is left as raw numbers on purpose. The strings the database stores are
+// the interpreter's - WicPixelFormats() and FreeImage_GetColorType() in the AHK - and they
+// reach the collection pool through dupesPixSetFormatNames(); composing them here would be
+// a second copy of two lists that must agree, forever, or one format lands in the column
+// under two spellings and every "group by pixel format" splits in half.
+//
+// Only the collection pool of dupes-pixels.h asks for this; the thumbnails pool passes
+// NULL and pays nothing.
+struct TpSrcMeta {
+    int frames    = 1;    // total, 1 for a single-frame image, the way imgframes counts
+    int dpi       = 0;    // real DPI - NOT FreeImage's dots per metre; see tpFIMthumb()
+    int wicFmt    = -1;   // indexedWICpixelFormats(); -1 when this was not a WIC decode
+    int fimBPP    = 0;    // FreeImage: bits per pixel of the freshly loaded bitmap
+    int fimColor  = -1;   // FreeImage: FREE_IMAGE_COLOR_TYPE; -1 when not a FreeImage decode
+    int fimToneMap = 0;   // 0 none, 1 " (TONE-MAPPED)", 2 " (TONE-MAPPABLE)"
+};
+
+// ---------------------------------------------------------------------------------------
 //  WIC loader
 // ---------------------------------------------------------------------------------------
 
@@ -343,7 +369,8 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 // JPEG-XR decoders perform a scaled decode through IWICBitmapSourceTransform instead of
 // unpacking the full resolution image only to shrink it afterwards.
 static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFileName, int targetW, int targetH,
-                                    int frameIndex, int givenQuality, int isFIMokay, int &srcW, int &srcH) {
+                                    int frameIndex, int givenQuality, int isFIMokay, int &srcW, int &srcH,
+                                    TpSrcMeta *meta = NULL) {
     Gdiplus::GpBitmap     *myBitmap    = NULL;
     IWICBitmapDecoder     *pDecoder    = NULL;
     IWICBitmapFrameDecode *pFrame      = NULL;
@@ -377,6 +404,9 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
        if (tFrames>0 && useFrame>=tFrames)
           useFrame = tFrames - 1;
 
+       if (meta!=NULL && tFrames>0)
+          meta->frames = (int)tFrames;
+
        hr = pDecoder->GetFrame(useFrame, &pFrame);
     }
 
@@ -396,7 +426,21 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
        // 256x192 icon, and a high bit depth TIFF that FreeImage handles better
        GUID containerFmt;
        WICPixelFormatGUID opixelFormat = GUID_WICPixelFormatDontCare;
-       if (SUCCEEDED(pDecoder->GetContainerFormat(&containerFmt)) && SUCCEEDED(pFrame->GetPixelFormat(&opixelFormat)))
+       const bool gotPixFmt = SUCCEEDED(pFrame->GetPixelFormat(&opixelFormat));
+       if (meta!=NULL)
+       {
+          // WICpreLoadImage() records exactly these two, off the same frame and before
+          // anything is scaled or converted; the numbers reach the database through
+          // WicPixelFormats() and mainLoadedIMGdetails.DPI
+          if (gotPixFmt)
+             meta->wicFmt = (int)indexedWICpixelFormats(opixelFormat);
+
+          double dpix = 0, dpiy = 0;
+          if (SUCCEEDED(pFrame->GetResolution(&dpix, &dpiy)))
+             meta->dpi = (int)round((dpix + dpiy)/2);
+       }
+
+       if (gotPixFmt && SUCCEEDED(pDecoder->GetContainerFormat(&containerFmt)))
        {
           UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
           int destinationBPP = decideWICtoFIMpixelFormat(opixelFormat);
@@ -764,7 +808,8 @@ static Gdiplus::GpBitmap* tpFIMtoGdip(FIBITMAPptr dib, int w, int h) {
 }
 
 static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring &path, const std::wstring &dst,
-                                     DWORD startTick, int &srcW, int &srcH, int &status, int &savedToFile) {
+                                     DWORD startTick, int &srcW, int &srcH, int &status, int &savedToFile,
+                                     TpSrcMeta *meta = NULL) {
     if (!FIM.ok)
     {
        status = TP_ERR_UNSUPPORTED;
@@ -799,6 +844,34 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        FIM.Unload(dib);
        status = TP_ERR_LOAD;
        return NULL;
+    }
+
+    // Read off the bitmap as it came out of the decoder. Everything below rescales it,
+    // greyscales UINT16, tone maps and forces 24 or 32 bits, and LoadFimFile() reads the
+    // same three at the same point - before any of that - which is what makes the values
+    // the pool writes comparable with the ones the interpreter writes for the same file.
+    //
+    // FreeImage stores the resolution in dots per METRE. The interpreter's wrapper,
+    // FreeImage_GetDPIresolution(), converts it back to DPI, and so does this: imgdpi is a
+    // DPI column, and the WIC branch above fills it with a real DPI.
+    int fimSrcBPP = 0, fimSrcColor = -1;
+    if (meta!=NULL)
+    {
+       fimSrcBPP   = (int)FIM.GetBPP(dib);
+       fimSrcColor = FIM.GetColorType(dib);
+       meta->fimBPP   = fimSrcBPP;
+       meta->fimColor = fimSrcColor;
+       // A page count needs the file reopened as a multi-bitmap, which this loader never
+       // does - and neither does FreeImage_SimpleGetPageCount(), whose DllCall names an
+       // entry point that does not exist and which therefore always answers 1. The formats
+       // that really carry pages, GIF and TIFF, are WIC's here.
+       meta->frames = 1;
+       if (FIM.GetDotsPerMeterX!=NULL && FIM.GetDotsPerMeterY!=NULL)
+       {
+          const double dpmX = (double)FIM.GetDotsPerMeterX(dib);
+          const double dpmY = (double)FIM.GetDotsPerMeterY(dib);
+          meta->dpi = (int)round(((dpmX + dpmY)/2) * 0.0254);
+       }
     }
 
     int resizedW = 0, resizedH = 0;
@@ -875,6 +948,24 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
           return NULL;
        }
        dib = mapped;
+       if (meta!=NULL)
+          meta->fimToneMap = 1;    // " (TONE-MAPPED)"
+    }
+
+    // The rest of the suffix FIMapplyToneMapper() appends to mainLoadedIMGdetails.PixelFormat,
+    // decided the way the interpreter decides it - off the bit depth and colour type of the
+    // ORIGINAL bitmap, which is why they were kept above. The pool's own tone-mapping test a
+    // few lines up runs on the rescaled one and is left exactly as it was: changing which
+    // images get tone mapped would change the thumbnails, and the histogram the collection
+    // pool measures on this very bitmap.
+    if (meta!=NULL && meta->fimToneMap==0)
+    {
+       const int ahkMust = ((fimSrcBPP>32 && fimSrcColor!=FIC_RGBALPHA && GFT!=FIF_PNG) || fimSrcBPP>=48) ? 1 : 0;
+       const bool hdrish = (GFT==FIF_PFM || GFT==FIF_RAW || GFT==FIF_JXR || GFT==FIF_HDR || GFT==FIF_EXR);
+       if ((ahkMust==1 || hdrish) && fimSrcBPP>32)
+          meta->fimToneMap = 2;    // " (TONE-MAPPABLE)"
+       else if (GFT==FIF_RAW && cfg->userHQraw!=1)
+          meta->fimToneMap = 2;    // LoadFimFile() marks a low quality RAW the same way
     }
 
     if ((int)FIM.GetWidth(dib)!=resizedW || (int)FIM.GetHeight(dib)!=resizedH)

@@ -348,8 +348,15 @@ FreeImage_GetPalette(hImage) {
 }
 
 FreeImage_GetDPIresolution(hImage, ByRef dpiX, ByRef dpiY) {
-   dpiX := FreeImage_GetDotsPerMeterX(hImage)
-   dpiY := FreeImage_GetDotsPerMeterY(hImage)
+; FreeImage stores the resolution in dots per METRE - GetDotsPerMeterX/Y is the whole of
+; its resolution API - so it has to be converted, or a 72 DPI image reports 2835.
+; Every caller of this wants DPI: mainLoadedIMGdetails.DPI and the imgdpi column of the
+; database, where the WIC and GDI+ loaders both put a real DPI, and Gdip_BitmapSetResolution()
+; in ConvertFIMtoPBITMAP() / ConvertAdvancedFIMtoPBITMAP(), which is a DPI setter.
+; Left unrounded on purpose: the callers average the two axes and round once, which keeps
+; the result identical to converting the average.
+   dpiX := FreeImage_GetDotsPerMeterX(hImage) * 0.0254
+   dpiY := FreeImage_GetDotsPerMeterY(hImage) * 0.0254
 }
 
 FreeImage_GetDotsPerMeterX(hImage) {
@@ -361,8 +368,10 @@ FreeImage_GetDotsPerMeterY(hImage) {
 }
 
 FreeImage_SetDPIresolution(hImage, dpiX, dpiY) {
-  FreeImage_SetDotsPerMeterX(hImage, dpiX)
-  r := FreeImage_SetDotsPerMeterY(hImage, dpiY)
+; the inverse of FreeImage_GetDPIresolution(): the callers hand over a DPI - ConvertPBITMAPtoFIM()
+; reads one out of Gdip_BitmapGetDPIresolution() - and FreeImage wants dots per metre
+  FreeImage_SetDotsPerMeterX(hImage, Round(dpiX / 0.0254))
+  r := FreeImage_SetDotsPerMeterY(hImage, Round(dpiY / 0.0254))
   Return r
 }
 
@@ -391,12 +400,33 @@ FreeImage_GetColorType(hImage, humanReadable:=1) {
 ; 4 = RGBALPHA    - High-color bitmap with an alpha channel (32 bit bitmap, RGBA16 or RGBAF)
 ; 5 = CMYK        - CMYK bitmap (32 bit only)
 
-   Static ColorsTypes := {1:"MINISBLACK", 0:"MINISWHITE", 3:"PALETTIZED", 2:"RGB", 4:"RGBA", 5:"CMYK"}
    r := DllCall(getFIMfunc("GetColorType"), "uptr", hImage)
-   If (ColorsTypes.HasKey(r) && humanReadable=1)
-      r := ColorsTypes[r]
+   If (humanReadable=1)
+   {
+      k := FIMcolorTypeNames("name", r)
+      If (k!="")
+         r := k
+   }
 
    Return r
+}
+
+; The names above, in one place, because the collection pool inside qpvmain.dll spells the
+; imgpixfmt column with them too - it decodes RAWs and PSDs through FreeImage and has to
+; produce the very string this function would have produced. initDupesPixelsPool() sends
+; the packed list down; a second copy of these six words living in C++ is exactly how one
+; pixel format ends up in the database under two names.
+FIMcolorTypeNames(modus, indexu:=0) {
+   Static ColorsTypes := {1:"MINISBLACK", 0:"MINISWHITE", 3:"PALETTIZED", 2:"RGB", 4:"RGBA", 5:"CMYK"}
+   If (modus="name")
+      Return ColorsTypes[indexu]
+
+   ; "packed": "|" separated, index 0 first, the order dupesPixSetFormatNames() expects
+   packedu := ColorsTypes[0]
+   Loop, % ColorsTypes.Count() - 1
+       packedu .= "|" ColorsTypes[A_Index]
+
+   Return packedu
 }
 
 FreeImage_GetRedMask(hImage) {
