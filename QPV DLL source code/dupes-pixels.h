@@ -22,8 +22,8 @@
 // worker too, so the calling thread only binds the finished values.
 //
 // Usage from AHK:
+//    qpvSetPixelFormatNames(wic, fim, loaders)       once, from initQPVmainDLL()
 //    dupesPixInit(nThreads)                          once, lazily
-//    dupesPixSetFormatNames(wicNames, fimNames)      once, before the first run
 //    dupesPixBegin(ahkDb, selectSQL, packedOptions)  per collection run
 //    dupesPixStep(msBudget)                          1 while more remains, 0 done, -1 error
 //    dupesPixGetState()                              pointer polled with NumGet()
@@ -128,12 +128,18 @@ static size_t                              dpExited = 0;        // guarded by dp
 // The names the database stores in imgpixfmt, exactly as the interpreter spells them:
 // dpWicNames is indexed by indexedWICpixelFormats() and holds what WicPixelFormats()
 // returns, dpFimNames by FREE_IMAGE_COLOR_TYPE and holds what FreeImage_GetColorType()
-// returns. dupesPixSetFormatNames() fills both once per session, so there is one copy of
-// those strings in the product and a label can never be renamed on one side only.
-// Written before any run begins and only read afterwards - and read on the dupesPixStep()
-// thread alone, since dpWriteResult() is what composes the string.
+// returns, and dpLoaderNames by TpSrcMeta's loader number for the two loaders whose
+// format is a constant - the SVG renderer and PDFium - the way RenderSVGfile() and
+// RenderPDFpage() report theirs. qpvSetPixelFormatNames() fills all three once per
+// session, so there is one copy of those strings in the product and a label can never be
+// renamed on one side only.
+//
+// Both users of the names are single-threaded readers and both run after the tables are
+// filled: dpWriteResult(), on the dupesPixStep() thread, and qpvGetPixelFormatName(),
+// which QPV_ThumbsPoolDrain() calls for the images the thumbnails workers read off disk.
 static std::vector<std::wstring> dpWicNames;
 static std::vector<std::wstring> dpFimNames;
+static std::vector<std::wstring> dpLoaderNames;
 
 static sqlite3      *dpDB      = NULL;      // AHK's handle; never closed here
 static sqlite3_stmt *dpSelect  = NULL;
@@ -609,13 +615,20 @@ static void dpBindBlobOrNull(sqlite3_stmt *st, int idx, const std::vector<unsign
 
 // imgpixfmt, spelled the way the loader that actually decoded the image spells it in
 // mainLoadedIMGdetails.PixelFormat:
-//    WIC        WicPixelFormats(index)                     "24-bpp - BGR"
-//    FreeImage  bpp "-" colourType + tone mapping marker   "48-RGB (TONE-MAPPED)"
+//    1 WIC        WicPixelFormats(index)                     "24-bpp - BGR"
+//    2 FreeImage  bpp "-" colourType + tone mapping marker   "48-RGB (TONE-MAPPED)"
+//    3 SVG, 4 PDF a constant, out of dpLoaderNames
+//    5            the CACHED thumbnail file, which describes nothing about the original
 // An empty result is written as NULL rather than as an empty string: "collected, and the
 // format is blank" and "never collected" have to stay distinguishable, or the collection
 // pass that fills the gaps decodes those images again on every single run.
-static std::wstring dpPixelFormatName(const DupePixResult &res) {
-    if (res.loaderUsed==1)
+//
+// Shared: the collection pool writes the answer into the database, and the thumbnails pool
+// hands it to QPV_ThumbsPoolDrain() through qpvGetPixelFormatName(). One format must have
+// one spelling however it was produced, or every grouping and filter over the column
+// splits in half.
+static std::wstring qpvPixelFormatName(int loaderUsed, const TpSrcMeta &meta) {
+    if (loaderUsed==1)
     {
        if (dpWicNames.empty())
           return std::wstring();
@@ -623,24 +636,27 @@ static std::wstring dpPixelFormatName(const DupePixResult &res) {
        // index 0 is what indexedWICpixelFormats() answers for a format it does not know
        // and what WicPixelFormats() spells "UNKNOWN" - which is also the honest answer for
        // a frame whose pixel format WIC would not report at all
-       const size_t idx = (res.meta.wicFmt > 0 && (size_t)res.meta.wicFmt < dpWicNames.size())
-                        ? (size_t)res.meta.wicFmt : 0;
+       const size_t idx = (meta.wicFmt > 0 && (size_t)meta.wicFmt < dpWicNames.size())
+                        ? (size_t)meta.wicFmt : 0;
        return dpWicNames[idx];
     }
 
-    if (res.loaderUsed==2 && res.meta.fimBPP > 0
-     && res.meta.fimColor >= 0 && (size_t)res.meta.fimColor < dpFimNames.size())
+    if (loaderUsed==2 && meta.fimBPP > 0
+     && meta.fimColor >= 0 && (size_t)meta.fimColor < dpFimNames.size())
     {
-       std::wstring out = std::to_wstring(res.meta.fimBPP);
+       std::wstring out = std::to_wstring(meta.fimBPP);
        out += L"-";
-       out += dpFimNames[res.meta.fimColor];
-       if (res.meta.fimToneMap==1)
+       out += dpFimNames[meta.fimColor];
+       if (meta.fimToneMap==1)
           out += L" (TONE-MAPPED)";
-       else if (res.meta.fimToneMap==2)
+       else if (meta.fimToneMap==2)
           out += L" (TONE-MAPPABLE)";
 
        return out;
     }
+
+    if (loaderUsed > 0 && (size_t)loaderUsed < dpLoaderNames.size())
+       return dpLoaderNames[loaderUsed];
 
     return std::wstring();
 }
@@ -669,7 +685,7 @@ static bool dpWriteResult(const DupePixResult &res) {
     {
        // alive until the step/reset pair below, which is what lets it be bound STATIC;
        // nByte counts BYTES for bind_text16, so -1 and let SQLite measure the string
-       const std::wstring pixFmt = dpPixelFormatName(res);
+       const std::wstring pixFmt = qpvPixelFormatName(res.loaderUsed, res.meta);
 
        SQ.reset(dpUpdHist);
        SQ.bind_double(dpUpdHist,  1, res.median);
@@ -833,9 +849,10 @@ DLL_API void* DLL_CALLCONV dupesPixGetState() {
     return (void*)&dpState;
 }
 
-// "|" separated, one entry per index, both tables built by the interpreter out of the very
-// functions that name a pixel format everywhere else in the product - WicPixelFormats() and
-// the colour type table of FreeImage_GetColorType(). Sent once, the way
+// "|" separated, one entry per index, all three tables built by the interpreter out of the
+// very functions that name a pixel format everywhere else in the product -
+// WicPixelFormats(), the colour type table of FreeImage_GetColorType(), and the constants
+// RenderSVGfile() and RenderPDFpage() report. Sent once by initQPVmainDLL(), the way
 // thumbsPoolSetFormats() sends the extension lists.
 //
 // Without it imgpixfmt is simply left NULL, which the next collection pass fills in; what
@@ -859,10 +876,39 @@ static void dpSplitNames(const wchar_t *packed, std::vector<std::wstring> &out) 
     }
 }
 
-DLL_API int DLL_CALLCONV dupesPixSetFormatNames(const wchar_t *wicNames, const wchar_t *fimColorNames) {
+DLL_API int DLL_CALLCONV qpvSetPixelFormatNames(const wchar_t *wicNames, const wchar_t *fimColorNames,
+                                                const wchar_t *loaderNames) {
     dpSplitNames(wicNames, dpWicNames);
     dpSplitNames(fimColorNames, dpFimNames);
-    return (int)(dpWicNames.size() + dpFimNames.size());
+    dpSplitNames(loaderNames, dpLoaderNames);
+    return (int)(dpWicNames.size() + dpFimNames.size() + dpLoaderNames.size());
+}
+
+// The same name, for the caller that is not writing a database row: QPV_ThumbsPoolDrain()
+// asks for it once per image the thumbnails workers read off disk, so that a thumbnail and
+// a collection run put the same string in front of the user for the same file.
+// Returns the number of characters written, 0 when there is no name for that loader.
+DLL_API int DLL_CALLCONV qpvGetPixelFormatName(int loaderUsed, int wicFmt, int fimBPP, int fimColor,
+                                               int fimToneMap, wchar_t *out, int cch) {
+    if (out==NULL || cch < 1)
+       return 0;
+
+    out[0] = 0;
+    TpSrcMeta meta;
+    meta.wicFmt     = wicFmt;
+    meta.fimBPP     = fimBPP;
+    meta.fimColor   = fimColor;
+    meta.fimToneMap = fimToneMap;
+
+    const std::wstring name = qpvPixelFormatName(loaderUsed, meta);
+    if (name.empty())
+       return 0;
+
+    const size_t room = (size_t)cch - 1;
+    const size_t n = (name.size() < room) ? name.size() : room;
+    memcpy(out, name.c_str(), n*sizeof(wchar_t));
+    out[n] = 0;
+    return (int)n;
 }
 
 // packedOptions is "|" delimited, the same shape thumbsPoolBegin() takes:

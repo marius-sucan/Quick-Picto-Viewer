@@ -52,6 +52,7 @@ slice header_extract.h   "$HDR" '^\/\/ One record per surviving image pair' '^\/
 slice block_extract.cpp  "$SRC" '^\/\/ SWAR population count'          '^\/\/ qpv-dupes-block-end' 450 || exit 1
 slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qpv-dupes-query-end' 350 || exit 1
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1
+slice thumbs_structs.part ../thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
 echo "   ok"
 
 echo
@@ -118,6 +119,17 @@ if g++ $CXXFLAGS -Wno-sign-compare -Ishim -o pixels_smoke pixels_smoke.cpp -ldl 
     ./pixels_smoke || fail=1
 else
     echo "  ERROR: pixels_smoke.cpp did not compile"; fail=1
+fi
+
+echo
+echo "== the records the thumbnails pool shares with AutoHotkey =="
+# Nothing else pins these: the AHK walks thumbsPoolFetch()'s array with a stride and byte
+# offsets it writes out by hand, so a field inserted in ThumbResult compiles and then hands
+# AHK a bitmap pointer read out of the middle of another record.
+if g++ $CXXFLAGS -o thumbs_record thumbs_record.cpp 2>&1; then
+    ./thumbs_record || fail=1
+else
+    echo "  ERROR: thumbs_record.cpp did not compile"; fail=1
 fi
 
 echo

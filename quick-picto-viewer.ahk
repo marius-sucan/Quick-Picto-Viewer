@@ -195,7 +195,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := [], navKeysCounter := 0
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
    , thisBMPdummy := 0, dummyGu := 9, whileLoopExec := 0, WICmoduleHasInit := 0, dupesDCTcoeffsInit := 0
-   , dupesEngineInitGood := 0, dupesPixInitGood := 0, dupesPixState := 0
+   , dupesEngineInitGood := 0, dupesPixInitGood := 0, dupesPixState := 0, pixFmtNamesGood := 0
    , hTVlistFolders := "", SearchedStringz := ""
    , dupesHashesData := [], dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
@@ -2376,6 +2376,19 @@ initQPVmainDLL(modus:=0) {
    dupesEngineInitGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesScanStep", "UPtr") ? 1 : 0
    If !dupesEngineInitGood
       addJournalEntry("ERROR: qpvmain.dll is older than this script and does not export the duplicates scan engine (dupesScanStep). Identifying image duplicates by Hamming distance will not work; please update qpvmain.dll.")
+
+   ; Both worker pools name a pixel format for this script - the collection pool writes the
+   ; name into imgpixfmt, the thumbnails pool hands it back for resultedFilesList - and the
+   ; names are this script's own. Sending the three tables once is what keeps a single
+   ; spelling per format in the product: WicPixelFormats() for the images WIC decodes,
+   ; FIMcolorTypeNames() for the ones FreeImage does, and one constant each for the two
+   ; loaders whose bitmap has no format of its own, indexed by the loader number the DLL
+   ; reports. Without this, both pools leave the pixel format blank rather than invent one.
+   pixFmtNamesGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvSetPixelFormatNames", "UPtr") ? 1 : 0
+   If pixFmtNamesGood
+      DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", packLoaderPixelFormatNames(), "Int")
+   Else
+      addJournalEntry("ERROR: qpvmain.dll is older than this script and does not export qpvSetPixelFormatNames. The workers will not report the pixel format of the images they read.")
 
    WICmoduleHasInit := DllCall("qpvmain.dll\initWICnow", "int", debugModa, "int", 0)
    If WICmoduleHasInit
@@ -4662,6 +4675,21 @@ initThumbsPool() {
        Return
     }
 
+    ; A version gate, and not an optional one. thumbsPoolFetch() fills an array of
+    ; ThumbResult records and QPV_ThumbsPoolDrain() walks it by a stride this script
+    ; hardcodes; the record grew when the workers started reporting the properties of the
+    ; image they read, so an older qpvmain.dll would write 48 byte records into a buffer
+    ; read at 72 - every field past the first record misaligned, GDI+ bitmap pointers among
+    ; them. qpvGetPixelFormatName() arrived with the wider record and stands in for it.
+    ; The single threaded branch of QPV_ShowThumbnails() is a complete fallback: slower, and
+    ; it fills the very same columns through GetCachableImgFileDetails().
+    If !DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvGetPixelFormatName", "UPtr")
+    {
+       addJournalEntry("ERROR: qpvmain.dll is older than this script and its thumbnails workers report a different record. Multi-threaded thumbnails generation is disabled; please update qpvmain.dll.")
+       multiCoreThumbsInitGood := 0
+       Return
+    }
+
     r := DllCall("qpvmain.dll\thumbsPoolInit", "Int", realSystemCores, "Int")
     thumbsPoolState := r ? DllCall("qpvmain.dll\thumbsPoolGetState", "UPtr") : 0
     If (!r || !thumbsPoolState)
@@ -4729,7 +4757,7 @@ QPV_ThumbsPoolPending() {
 QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
 ; collects the finished thumbnails; the GDI+ bitmaps become ours, there is nothing to clone
 
-    Static maxItems := 32, resultSize := 48, resultsBuffer
+    Static maxItems := 32, resultSize := 72, resultsBuffer
     If !VarSetCapacity(resultsBuffer)
        VarSetCapacity(resultsBuffer, maxItems*resultSize, 0)
 
@@ -4746,6 +4774,9 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
               Gdip_DisposeImage(thisPBitmap, 1)
            Continue
         }
+
+        If (thisStatus=0)
+           poolRecordImgProps(thisIndex, resultsBuffer, offu, thumbsArray)
 
         If (thisPBitmap>0)
         {
@@ -4780,6 +4811,67 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
     }
 
     Return n
+}
+
+; The properties of the ORIGINAL image, out of one ThumbResult, into the files list.
+;
+; The workers already read the file; before qpvmain.dll took this phase over, the single
+; threaded branch of QPV_ShowThumbnails() called GetCachableImgFileDetails() right after
+; LoadBitmapFromFileu() and the same columns were filled from mainLoadedIMGdetails. That
+; branch is still there and still does it - it is the fallback for machines where the pool
+; is off - so without this the two paths disagree about the very same folder.
+;
+; Only for an image the workers opened themselves. Loader 5 decoded the CACHED thumbnail
+; PNG: its dimensions, frame count and pixel format are the cache file's, and writing them
+; would tell the files list that every photograph in the library is a 250 pixel PNG.
+; Loader 0 means nothing ran. Loader 4, PDFium, is left out on purpose: none of these
+; columns describes a PDF, and the two render paths do not even agree on the numbers - the
+; PDF branch of tpRunJob() in thumbs-pool.h says why. PDFs keep being collected by the
+; single threaded branch, exactly as before.
+poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
+   Static nameBuf
+   loaderUsed := NumGet(resultsBuffer, offu + 44, "Int")
+   If (loaderUsed<1 || loaderUsed>3)
+      Return 0
+
+   srcW := NumGet(resultsBuffer, offu + 24, "Int")
+   srcH := NumGet(resultsBuffer, offu + 28, "Int")
+   If (srcW<1 || srcH<1)
+      Return 0
+
+   ; the index is a row of resultedFilesList, and a result can arrive after the list moved
+   ; underneath it - an entry removed, a file renamed. A thumbnail drawn against the wrong
+   ; row is fixed by the next repaint; seven cached properties written there are not, and
+   ; the database collection would later believe them.
+   If (StrReplace(getIDimage(indexu), "||")!=thumbsArray[indexu, 3])
+      Return 0
+
+   ; the name is composed in the DLL, out of the tables initQPVmainDLL() sent it, so that
+   ; the string a thumbnail produces for a file and the string the collection pool writes
+   ; into imgpixfmt for the same file are one string
+   pixFmt := ""
+   If (pixFmtNamesGood=1)
+   {
+      If !VarSetCapacity(nameBuf)
+         VarSetCapacity(nameBuf, 128*2, 0)
+
+      r := DllCall("qpvmain.dll\qpvGetPixelFormatName", "Int", loaderUsed
+          , "Int", NumGet(resultsBuffer, offu + 56, "Int")   ; wicFmt
+          , "Int", NumGet(resultsBuffer, offu + 60, "Int")   ; fimBPP
+          , "Int", NumGet(resultsBuffer, offu + 64, "Int")   ; fimColor
+          , "Int", NumGet(resultsBuffer, offu + 68, "Int")   ; fimToneMap
+          , "UPtr", &nameBuf, "Int", 128, "Int")
+      If (r>0)
+         pixFmt := StrGet(&nameBuf, r, "UTF-16")
+   }
+
+   ; a loader that could not name the format must not erase a name something else knew
+   If !pixFmt
+      pixFmt := resultedFilesList[indexu, 15]
+
+   framesu := NumGet(resultsBuffer, offu + 48, "Int")
+   recordFilesListImgProps(indexu, srcW, srcH, (framesu>0) ? framesu : 1, pixFmt, NumGet(resultsBuffer, offu + 52, "Int"))
+   Return 1
 }
 
 QPV_ThumbsPoolEnd() {
@@ -36325,20 +36417,14 @@ initDupesPixelsPool() {
       Return 0
 
    ; the pool is created on first use and lives until TrueCleanup(); a session that never
-   ; collects image data never pays for the threads
+   ; collects image data never pays for the threads. The pixel format names it writes into
+   ; imgpixfmt were sent by initQPVmainDLL(), which every path into here goes through.
    hasPool := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBegin", "UPtr")
-   hasNames := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixSetFormatNames", "UPtr")
-   If (!hasPool || !hasNames)
+   If (!hasPool || pixFmtNamesGood!=1)
    {
       addJournalEntry(A_ThisFunc "(): qpvmain.dll is older than this script and has no collection pool.")
       Return 0
    }
-
-   ; The pool writes imgpixfmt itself, and the names of the pixel formats are this script's:
-   ; WicPixelFormats() for the images WIC decodes, FIMcolorTypeNames() for the ones
-   ; FreeImage does. Sending them keeps a single copy of both lists in the product; without
-   ; this call qpvmain.dll leaves the column NULL rather than inventing a second spelling.
-   DllCall("qpvmain.dll\dupesPixSetFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "Int")
 
    ; The loaders and the extension sets are the thumbnails pool's. Setting the formats does
    ; not start that pool and does not depend on it having been started - initThumbsPool()
@@ -83800,13 +83886,31 @@ GetCachableImgFileDetails(imgPath, imgIndex, thumbBMP:=0, returnObj:=0, isFilter
 
 UpdateFilesListImgIDinfos(imgIndex, isFilter:=0) {
    ; fnOutputDebug(A_ThisFunc ": i=" imgIndex " | " mainLoadedIMGdetails.Frames  " | " mainLoadedIMGdetails.Width " x " mainLoadedIMGdetails.Height)
-   updateFilesListByID(imgIndex, 9, (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames + 1 : 1, isFilter)
-   updateFilesListByID(imgIndex, 13, mainLoadedIMGdetails.Width, isFilter)
-   updateFilesListByID(imgIndex, 14, mainLoadedIMGdetails.Height, isFilter)
-   updateFilesListByID(imgIndex, 15, mainLoadedIMGdetails.PixelFormat, isFilter)
-   updateFilesListByID(imgIndex, 16, Round(mainLoadedIMGdetails.Width / mainLoadedIMGdetails.Height, 2), isFilter)
-   updateFilesListByID(imgIndex, 17, Round((mainLoadedIMGdetails.Width * mainLoadedIMGdetails.Height)/1000000, 2), isFilter)
-   updateFilesListByID(imgIndex, 22, mainLoadedIMGdetails.dpi, isFilter)
+   recordFilesListImgProps(imgIndex, mainLoadedIMGdetails.Width, mainLoadedIMGdetails.Height
+       , (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames + 1 : 1
+       , mainLoadedIMGdetails.PixelFormat, mainLoadedIMGdetails.dpi, isFilter)
+}
+
+; Which column of the files list holds what about an image, in one place. Two producers
+; reach it: UpdateFilesListImgIDinfos(), with whatever loader last filled
+; mainLoadedIMGdetails, and QPV_ThumbsPoolDrain(), with what the thumbnails workers of
+; qpvmain.dll reported for an original image file they opened themselves - see
+; TpSrcMeta in thumbs-pool.h. Both must land in the same columns in the same shapes, or a
+; page of thumbnails and a page browsed one image at a time disagree about the same file.
+;
+; Columns 16 and 17 are derived here rather than stored by the caller because the database
+; derives imgwhratio and imgmegapix from imgwidth and imgheight in exactly the same way.
+; No guard on the dimensions, deliberately: this is what UpdateFilesListImgIDinfos() always
+; did, blank height and all, and its callers are the ones that know whether the image
+; loaded. QPV_ThumbsPoolDrain() checks before it calls.
+recordFilesListImgProps(imgIndex, widthu, heightu, framesu, pixFmt, dpiu, isFilter:=0) {
+   updateFilesListByID(imgIndex, 9, framesu, isFilter)
+   updateFilesListByID(imgIndex, 13, widthu, isFilter)
+   updateFilesListByID(imgIndex, 14, heightu, isFilter)
+   updateFilesListByID(imgIndex, 15, pixFmt, isFilter)
+   updateFilesListByID(imgIndex, 16, Round(widthu / heightu, 2), isFilter)
+   updateFilesListByID(imgIndex, 17, Round((widthu * heightu)/1000000, 2), isFilter)
+   updateFilesListByID(imgIndex, 22, dpiu, isFilter)
    ; fnOutputDebug(A_ThisFunc ": i=" imgIndex "|" resultedFilesList[imgIndex, 9] " | "  resultedFilesList[imgIndex, 13] " x " resultedFilesList[imgIndex, 14])
    fileInfos := GetFileAttributesEx(getIDimage(imgIndex))
    updateFilesListByID(imgIndex, 6, fileInfos.size, isFilter)
@@ -100992,6 +101096,20 @@ packWICpixelFormatNames() {
        packedu .= "|" WicPixelFormats(A_Index)
 
    Return packedu
+}
+
+; Indexed by the loader number qpvmain.dll reports - 1 WIC, 2 FreeImage, 3 SVG, 4 PDF,
+; 5 a cached thumbnail file - and only for a loader whose answer is a constant.
+;
+; An SVG document has no pixel format of its own, so what this script records for one is
+; the format of the bitmap it renders, and "32-PARGB" is the literal RenderSVGfile() puts
+; in mainLoadedIMGdetails.PixelFormat every time.
+; 1 and 2 are blank because those two are composed from the tables above. 5 is blank
+; because a cached thumbnail says nothing about the image it was made from, and 4 because
+; a PDF page has no format either and the two renders do not agree on one - see the
+; comment on the PDF branch of tpRunJob() in thumbs-pool.h.
+packLoaderPixelFormatNames() {
+   Return "|||32-PARGB||"
 }
 
 WICcontainerFmts(containerID, imgPath) {

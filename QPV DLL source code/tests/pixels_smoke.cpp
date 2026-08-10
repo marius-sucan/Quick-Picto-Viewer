@@ -292,8 +292,8 @@ static void jobPipeline() {
     check(res.meta.frames==3 && res.meta.dpi==72 && res.meta.wicFmt==15,
           "and so are the frame count, the resolution and the pixel format");
 
-    dupesPixSetFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR", L"MINISWHITE|MINISBLACK|RGB");
-    check(dpPixelFormatName(res)==L"24-bpp - BGR", "a WIC format is named the way WicPixelFormats() names it");
+    qpvSetPixelFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR", L"MINISWHITE|MINISBLACK|RGB", L"|||32-PARGB||");
+    check(qpvPixelFormatName(res.loaderUsed, res.meta)==L"24-bpp - BGR", "a WIC format is named the way WicPixelFormats() names it");
 
     // a format WIC does not declare goes straight to FreeImage
     gShimWicCalls = gShimFimCalls = 0;
@@ -301,7 +301,7 @@ static void jobPipeline() {
     runOne(L"img2.exr", cfg, res2);
     check(res2.status==DP_OK && gShimWicCalls==0 && gShimFimCalls==1, "a FreeImage-only format skips WIC");
     check(res2.loaderUsed==2, "and reports the FreeImage loader");
-    check(dpPixelFormatName(res2)==L"48-RGB (TONE-MAPPABLE)",
+    check(qpvPixelFormatName(res2.loaderUsed, res2.meta)==L"48-RGB (TONE-MAPPABLE)",
           "a FreeImage format is named bit depth, colour type and tone mapping marker");
 
     // ... and so does one WIC declares but cannot open
@@ -314,8 +314,29 @@ static void jobPipeline() {
     // the decode that actually happened
     check(res3.meta.wicFmt==-1 && res3.meta.frames==1 && res3.meta.dpi==300,
           "the abandoned WIC attempt leaves nothing of itself behind");
-    check(dpPixelFormatName(res3)==L"48-RGB (TONE-MAPPABLE)", "and the name comes from FreeImage");
+    check(qpvPixelFormatName(res3.loaderUsed, res3.meta)==L"48-RGB (TONE-MAPPABLE)", "and the name comes from FreeImage");
     gShimWicFails = 0;
+
+    // the thumbnails pool asks for the same name through this export, so that a thumbnail
+    // and a collection run put one spelling in front of the user for one file. Loader 3
+    // has no format of its own and answers with the constant RenderSVGfile() reports;
+    // loader 5 opened a cached thumbnail, and loader 4 is PDFium, whose render this pool
+    // and the interpreter do not agree on - both must answer nothing at all.
+    {
+        wchar_t buf[64];
+        const TpSrcMeta &m = res.meta;
+        check(qpvGetPixelFormatName(1, m.wicFmt, 0, -1, 0, buf, 64)==12 && std::wstring(buf)==L"24-bpp - BGR",
+              "qpvGetPixelFormatName hands the WIC name to the thumbnails pool");
+        check(qpvGetPixelFormatName(3, -1, 0, -1, 0, buf, 64) > 0 && std::wstring(buf)==L"32-PARGB",
+              "an SVG is named the way RenderSVGfile() names it");
+        check(qpvGetPixelFormatName(4, -1, 0, -1, 0, buf, 64)==0 && buf[0]==0,
+              "a PDF is left unnamed, the way the drain leaves it uncollected");
+        check(qpvGetPixelFormatName(5, -1, 0, -1, 0, buf, 64)==0 && buf[0]==0,
+              "and a cached thumbnail file has no name to give");
+        // a caller with a short buffer gets a truncated, terminated string, never a spill
+        check(qpvGetPixelFormatName(1, m.wicFmt, 0, -1, 0, buf, 5)==4 && std::wstring(buf)==L"24-b",
+              "a short buffer truncates and still terminates");
+    }
 
     // a file that is not there is never handed to a decoder
     gShimWicCalls = gShimFimCalls = 0;
@@ -476,13 +497,14 @@ static void collectionAgainstRealSQLite() {
     m_pIWICFactory = (IWICImagingFactory*)1;      // "initWICnow() has run"
 
     check(dupesPixInit(3) >= 1, "the pool starts");
-    // the interpreter's two tables, abbreviated: index 15 of the first is the one the
-    // stubbed WIC loader reports, index 2 of the second the one the FreeImage stub reports
-    check(dupesPixSetFormatNames(L"UNKNOWN|UNKNOWN|1-bpp - Indexed|2-bpp - Indexed|4-bpp - Indexed|"
+    // the interpreter's tables, abbreviated: index 15 of the first is the one the stubbed
+    // WIC loader reports, index 2 of the second the one the FreeImage stub reports
+    check(qpvSetPixelFormatNames(L"UNKNOWN|UNKNOWN|1-bpp - Indexed|2-bpp - Indexed|4-bpp - Indexed|"
                                  L"8-bpp - Indexed|BlackWhite|2-bpp - Gray|4-bpp - Gray|8-bpp - Gray|"
                                  L"8-bpp - Alpha|16-bpp - BGR555|16-bpp - BGR565|16-bpp - BGRA5551|"
                                  L"16-bpp - Gray|24-bpp - BGR|24-bpp - RGB",
-                                 L"MINISWHITE|MINISBLACK|RGB|PALETTIZED|RGBA|CMYK")==23,
+                                 L"MINISWHITE|MINISBLACK|RGB|PALETTIZED|RGBA|CMYK",
+                                 L"|||32-PARGB||")==29,
           "the pixel format names arrive from the interpreter");
 
     const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"

@@ -31,6 +31,7 @@
 #include <memory>
 #include <regex>
 #include <cmath>
+#include <cstddef>
 #include <cctype>
 #include <cwctype>
 #include <cstdlib>
@@ -63,8 +64,35 @@
 #define TP_MEM_FREE_FLOOR  (768ull*1024*1024)
 #define TP_MEM_SAMPLE_MS   250
 
+// ---------------------------------------------------------------------------------------
+//  the properties of the image as it came off the disk
+// ---------------------------------------------------------------------------------------
+
+// Everything here describes the ORIGINAL file, and every field is read before the loader
+// scales the image or converts it to anything: a 350 pixel box of 32bppPARGB says nothing
+// about the frame count, the resolution or the pixel format of the RAW it came from, and
+// those three are exactly what the database keeps in imgframes, imgdpi and imgpixfmt, and
+// what resultedFilesList[] holds in its columns 9, 22 and 15.
+//
+// The pixel format is left as raw numbers on purpose. The strings are the interpreter's -
+// WicPixelFormats() and FreeImage_GetColorType() in the AHK - and they reach the DLL
+// through qpvSetPixelFormatNames(); composing them here would be a second copy of two
+// lists that must agree, forever, or one format lands in the column under two spellings
+// and every "group by pixel format" splits in half. qpvPixelFormatName() in
+// dupes-pixels.h turns these numbers into that string, for both pools.
+//
+// A loader that is handed no TpSrcMeta pays nothing for it.
 #pragma pack(push, 8)
-struct ThumbResult {          // 48 bytes; AHK reads the fields with NumGet()
+struct TpSrcMeta {
+    int frames    = 1;    // total, 1 for a single-frame image, the way imgframes counts
+    int dpi       = 0;    // real DPI - NOT FreeImage's dots per metre; see tpFIMthumb()
+    int wicFmt    = -1;   // indexedWICpixelFormats(); -1 when this was not a WIC decode
+    int fimBPP    = 0;    // FreeImage: bits per pixel of the freshly loaded bitmap
+    int fimColor  = -1;   // FreeImage: FREE_IMAGE_COLOR_TYPE; -1 when not a FreeImage decode
+    int fimToneMap = 0;   // 0 none, 1 " (TONE-MAPPED)", 2 " (TONE-MAPPABLE)"
+};
+
+struct ThumbResult {          // 72 bytes; AHK reads the fields with NumGet()
     INT64 jobId;              //  0
     void* pBitmap;            //  8   GpBitmap*; ownership is transfered to AHK
     int   status;             // 16
@@ -75,7 +103,19 @@ struct ThumbResult {          // 48 bytes; AHK reads the fields with NumGet()
     int   outH;               // 36
     int   elapsedMs;          // 40
     int   loaderUsed;         // 44   1=WIC 2=FreeImage 3=SVG 4=PDF 5=cached file
-};
+    // The properties of the ORIGINAL image, for the files list QPV_ThumbsPoolDrain() keeps
+    // - see TpSrcMeta. Filled only for a TP_JOB_THUMB job: loader 5 opened a cached
+    // thumbnail, whose frame count, resolution and pixel format are the cache file's and
+    // say nothing about the picture it was made from. loaderUsed is the test.
+    TpSrcMeta meta;           // 48   frames 48, dpi 52, wicFmt 56, fimBPP 60, fimColor 64,
+};                            //      fimToneMap 68
+
+// QPV_ThumbsPoolDrain() walks the array thumbsPoolFetch() fills at a stride it hardcodes,
+// and poolRecordImgProps() reads the metadata at a byte offset it hardcodes. Both are in
+// quick-picto-viewer.ahk, where no compiler will notice a field added here; these two lines
+// will. initThumbsPool() refuses a qpvmain.dll that predates the wider record.
+static_assert(sizeof(ThumbResult)==72, "ThumbResult changed size: update resultSize in QPV_ThumbsPoolDrain()");
+static_assert(offsetof(ThumbResult, meta)==48, "TpSrcMeta moved: update the offsets in poolRecordImgProps()");
 
 struct ThumbsPoolState {      // read-only for AHK
     volatile LONG queued;     //  0
@@ -332,32 +372,6 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 
     return (ULONGLONG)res.outW * (ULONGLONG)res.outH * 4ull;
 }
-
-// ---------------------------------------------------------------------------------------
-//  the properties of the image as it came off the disk
-// ---------------------------------------------------------------------------------------
-
-// Everything here describes the ORIGINAL file, and every field is read before the loader
-// scales the image or converts it to anything: a 350 pixel box of 32bppPARGB says nothing
-// about the frame count, the resolution or the pixel format of the RAW it came from, and
-// those three are exactly what the database keeps in imgframes, imgdpi and imgpixfmt.
-//
-// The pixel format is left as raw numbers on purpose. The strings the database stores are
-// the interpreter's - WicPixelFormats() and FreeImage_GetColorType() in the AHK - and they
-// reach the collection pool through dupesPixSetFormatNames(); composing them here would be
-// a second copy of two lists that must agree, forever, or one format lands in the column
-// under two spellings and every "group by pixel format" splits in half.
-//
-// Only the collection pool of dupes-pixels.h asks for this; the thumbnails pool passes
-// NULL and pays nothing.
-struct TpSrcMeta {
-    int frames    = 1;    // total, 1 for a single-frame image, the way imgframes counts
-    int dpi       = 0;    // real DPI - NOT FreeImage's dots per metre; see tpFIMthumb()
-    int wicFmt    = -1;   // indexedWICpixelFormats(); -1 when this was not a WIC decode
-    int fimBPP    = 0;    // FreeImage: bits per pixel of the freshly loaded bitmap
-    int fimColor  = -1;   // FreeImage: FREE_IMAGE_COLOR_TYPE; -1 when not a FreeImage decode
-    int fimToneMap = 0;   // 0 none, 1 " (TONE-MAPPED)", 2 " (TONE-MAPPABLE)"
-};
 
 // ---------------------------------------------------------------------------------------
 //  WIC loader
@@ -1027,6 +1041,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
     res.srcW = res.srcH = res.outW = res.outH = 0;
     res.elapsedMs   = 0;
     res.loaderUsed  = 0;
+    res.meta        = TpSrcMeta();
 
     // OpenCV happily throws out of openCVapplyToneMappingAlgos(), and allocations may
     // throw when memory is scarce; letting that escape would tear the worker thread down
@@ -1035,6 +1050,10 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
     {
         if (job.kind==TP_JOB_LOADCACHE)
         {
+           // no TpSrcMeta, deliberately: this opens the cached thumbnail PNG, so its frame
+           // count, resolution and pixel format are the cache file's own and describe
+           // nothing about the image it was made from. loaderUsed 5 is what tells
+           // QPV_ThumbsPoolDrain() to leave the files list alone.
            bmp = tpWICload(fac, job.src.c_str(), 0, 0, 0, cfg->imgQuality, 0, res.srcW, res.srcH);
            res.loaderUsed = 5;
            res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
@@ -1058,6 +1077,10 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               bmp = tpRenderSVG(job.src, cfg->thumbSize, cfg->thumbSize, res.srcW, res.srcH, d2dFac, fac);
               res.loaderUsed = 3;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+              // what RenderSVGfile() reports: one frame, 96 DPI, and a pixel format that is
+              // the renderer's rather than the file's, since an SVG has none of its own
+              res.meta.frames = 1;
+              res.meta.dpi    = 96;
            } else if (ext==L"pdf")
            {
               int maxW = cfg->thumbSize, maxH = cfg->thumbSize, pageCount = 0, errorType = -100;
@@ -1070,19 +1093,32 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               res.srcW = maxW;
               res.srcH = maxH;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_PDFLOCKED;
+              // No TpSrcMeta for a PDF, deliberately, and QPV_ThumbsPoolDrain() ignores
+              // loader 4 for the same reason. Not one of the five columns would say
+              // anything about the document: srcW and srcH above are the size of THIS
+              // render, which is fitted into the thumbnail box at the 250 DPI this pool
+              // picked, while RenderPDFpage() fits it at userVPpdfDPI and reports 32-PARGB
+              // where this asks PDFium for 24 bits. The same PDF would land in the files
+              // list with different numbers depending on whether the workers or the single
+              // threaded branch happened to draw it, which is the whole thing this is
+              // meant to stop. The page count is real - and the single threaded branch
+              // still collects it, through GetCachableImgFileDetails().
            } else if (!fimHandles && cfg->allowWIC==1 && tpWicExts.count(ext)>0)
            {
               bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                              (FIM.ok && cfg->allowFIM==1) ? 1 : 0, res.srcW, res.srcH);
+                              (FIM.ok && cfg->allowFIM==1) ? 1 : 0, res.srcW, res.srcH, &res.meta);
               res.loaderUsed = 1;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
            }
-  
+
            if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && cfg->allowFIM==1)
            {
               int status = TP_ERR_LOAD, saved = 0;
               int fw = 0, fh = 0;
-              bmp = tpFIMthumb(cfg, job.src, job.dst, startTick, fw, fh, status, saved);
+              // whatever the attempt above left behind describes an image that was not the
+              // one finally decoded; FreeImage starts from a clean record
+              res.meta = TpSrcMeta();
+              bmp = tpFIMthumb(cfg, job.src, job.dst, startTick, fw, fh, status, saved, &res.meta);
               res.loaderUsed  = 2;
               res.status      = status;
               res.savedToFile = saved;

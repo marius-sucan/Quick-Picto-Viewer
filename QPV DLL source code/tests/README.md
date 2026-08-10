@@ -98,11 +98,14 @@ around the compile cover everything that is not an image decoder:
   two passes `Gdip_GaussianBlur()` applied.
 - **the properties of the original file** — `imgwidth`, `imgheight`, `imgframes`, `imgdpi`
   and `imgpixfmt` — taken before anything is scaled or converted, and named with the tables
-  the interpreter sends through `dupesPixSetFormatNames()`. The stubbed loaders report a
+  the interpreter sends through `qpvSetPixelFormatNames()`. The stubbed loaders report a
   source larger than the bitmap they return, so a value read off the 350 pixel intermediate
   instead of the file cannot pass. A WIC attempt that fails and falls through to FreeImage
   must leave nothing of itself in the record either, or the database is told a `.psd` is
   whatever WIC thought before it gave up.
+- **`qpvGetPixelFormatName()`**, which is the same naming handed to the *thumbnails* pool
+  so that one file gets one spelling however it was decoded. A cached thumbnail file must
+  answer nothing at all, and a short buffer must truncate rather than spill.
 - **a whole collection run against a real SQLite database**: 3000 rows, three worker
   threads, a 1 ms budget. It asserts that the step loop yields and is re-entered, that every
   readable image is written exactly once, that unreadable ones are marked `isDeleted=1`
@@ -115,6 +118,16 @@ around the compile cover everything that is not an image decoder:
 The mutation check for it drops the `- 1` from the mean, which is the one term that looks
 like an off-by-one and is not. It is applied to a **copy** of the header, so an interrupted
 run cannot leave the shipped source broken.
+
+**`thumbs_record.cpp`** — the layout of `ThumbResult` and `ThumbsPoolState`, sliced out of
+the shipped `thumbs-pool.h`. Nothing else pins them: `thumbsPoolFetch()` fills an array of
+records and `QPV_ThumbsPoolDrain()` / `poolRecordImgProps()` / `QPV_ThumbsPoolPending()`
+walk it with a stride and byte offsets written out by hand in the AHK. A field inserted in
+the middle of `ThumbResult` compiles perfectly and then hands AutoHotkey a GDI+ bitmap
+pointer read out of the middle of the next record. Every offset asserted here appears as a
+literal in `quick-picto-viewer.ahk`; when this test fails, the AHK is what has to change —
+and `initThumbsPool()` refuses a `qpvmain.dll` that predates the current record, because a
+version mismatch is the same corruption from the other side.
 
 **`import_merge.py`** — the database import, executed by SQLite rather than simulated.
 `importSLDBintoSLDB()` renumbers every `imgidu`, so fingerprints keyed by it have to be
