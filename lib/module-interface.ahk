@@ -2003,9 +2003,10 @@ byeByeRoutine() {
          turnOffSlideshow()
       } Else If (thumbsDisplaying=1)
       {
-         thumbsDisplaying := 0
-         lastOtherWinClose := A_TickCount
-         MainExe.ahkPostFunction("MenuReturnIMGedit")
+         lastCloseInvoked := 5 ; exit application 
+         ; thumbsDisplaying := 0
+         ; lastOtherWinClose := A_TickCount
+         ; MainExe.ahkPostFunction("MenuReturnIMGedit")
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
