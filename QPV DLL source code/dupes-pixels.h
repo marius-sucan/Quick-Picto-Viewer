@@ -127,6 +127,11 @@ struct DpBlurParams { float radius; BOOL expandEdge; };
 
 // One set of effects per worker, made once and kept: GdipCreateEffect() is not free and
 // every image in a run uses the same three.
+//
+// Note the namespace: GdipCreateEffect/GdipSetEffectParameters/GdipDeleteEffect are declared
+// in gdipluseffects.h, which gdiplus.h includes at plain Gdiplus scope, so they are NOT
+// members of Gdiplus::DllExports like the rest of the flat API. GdipBitmapApplyEffect() below
+// comes from gdiplusflat.h and does stay in DllExports.
 struct DpEffects {
     Gdiplus::CGpEffect *gray  = NULL;
     Gdiplus::CGpEffect *blurA = NULL;
@@ -134,10 +139,10 @@ struct DpEffects {
 };
 
 static void dpMakeEffects(DpEffects &fx, int blurRadius) {
-    if (fx.gray==NULL && Gdiplus::DllExports::GdipCreateEffect(dpHSLeffectGUID, &fx.gray)==Gdiplus::Ok && fx.gray!=NULL)
+    if (fx.gray==NULL && Gdiplus::GdipCreateEffect(dpHSLeffectGUID, &fx.gray)==Gdiplus::Ok && fx.gray!=NULL)
     {
        DpHSLparams p = {0, -100, 0};
-       Gdiplus::DllExports::GdipSetEffectParameters(fx.gray, &p, (UINT)sizeof(p));
+       Gdiplus::GdipSetEffectParameters(fx.gray, &p, (UINT)sizeof(p));
     }
 
     // Gdip_GaussianBlur(bmp, 4, 0) bumps a radius of 4 to 6 through its offsets table and
@@ -148,17 +153,17 @@ static void dpMakeEffects(DpEffects &fx, int blurRadius) {
        DpBlurParams p;
        p.radius = (float)blurRadius;
        p.expandEdge = FALSE;
-       if (Gdiplus::DllExports::GdipCreateEffect(dpBlurEffectGUID, &fx.blurA)==Gdiplus::Ok && fx.blurA!=NULL)
-          Gdiplus::DllExports::GdipSetEffectParameters(fx.blurA, &p, (UINT)sizeof(p));
-       if (Gdiplus::DllExports::GdipCreateEffect(dpBlurEffectGUID, &fx.blurB)==Gdiplus::Ok && fx.blurB!=NULL)
-          Gdiplus::DllExports::GdipSetEffectParameters(fx.blurB, &p, (UINT)sizeof(p));
+       if (Gdiplus::GdipCreateEffect(dpBlurEffectGUID, &fx.blurA)==Gdiplus::Ok && fx.blurA!=NULL)
+          Gdiplus::GdipSetEffectParameters(fx.blurA, &p, (UINT)sizeof(p));
+       if (Gdiplus::GdipCreateEffect(dpBlurEffectGUID, &fx.blurB)==Gdiplus::Ok && fx.blurB!=NULL)
+          Gdiplus::GdipSetEffectParameters(fx.blurB, &p, (UINT)sizeof(p));
     }
 }
 
 static void dpFreeEffects(DpEffects &fx) {
-    if (fx.gray!=NULL)  { Gdiplus::DllExports::GdipDeleteEffect(fx.gray);  fx.gray = NULL; }
-    if (fx.blurA!=NULL) { Gdiplus::DllExports::GdipDeleteEffect(fx.blurA); fx.blurA = NULL; }
-    if (fx.blurB!=NULL) { Gdiplus::DllExports::GdipDeleteEffect(fx.blurB); fx.blurB = NULL; }
+    if (fx.gray!=NULL)  { Gdiplus::GdipDeleteEffect(fx.gray);  fx.gray = NULL; }
+    if (fx.blurA!=NULL) { Gdiplus::GdipDeleteEffect(fx.blurA); fx.blurA = NULL; }
+    if (fx.blurB!=NULL) { Gdiplus::GdipDeleteEffect(fx.blurB); fx.blurB = NULL; }
 }
 
 static void dpApplyGaussian(Gdiplus::GpBitmap *bmp, const DpEffects &fx) {

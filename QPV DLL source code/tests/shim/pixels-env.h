@@ -128,6 +128,19 @@ namespace Gdiplus {
     struct GpGraphics { GpBitmap *target = NULL; int interp = -1, smooth = -1, offset = -1; };
     struct Rect { int X, Y, Width, Height; Rect(int x, int y, int w, int h) : X(x), Y(y), Width(w), Height(h) {} };
     struct BitmapData { unsigned int Width = 0, Height = 0; int Stride = 0; void *Scan0 = NULL; };
+
+    // These three sit at Gdiplus scope rather than in DllExports below, because that is
+    // where the real SDK puts them: gdiplus.h includes gdipluseffects.h outside the
+    // namespace DllExports { #include "gdiplusflat.h" } block. GdipBitmapApplyEffect(),
+    // which does come from gdiplusflat.h, stays in DllExports.
+    static inline Status GdipCreateEffect(const GUID, CGpEffect **fx) { *fx = new CGpEffect(); return Ok; }
+    static inline Status GdipSetEffectParameters(CGpEffect *fx, const void *p, unsigned int size) {
+        // 12 bytes is the hue/saturation/lightness struct, 8 the blur one
+        if (fx!=NULL) fx->kind = (size==12) ? 1 : 2;
+        (void)p;
+        return Ok;
+    }
+    static inline Status GdipDeleteEffect(CGpEffect *fx) { delete fx; return Ok; }
 }
 typedef int PixelFormat;
 #define PixelFormat32bppARGB  0x0026200A
@@ -176,14 +189,6 @@ static inline Status GdipBitmapGetHistogram(GpBitmap *b, HistogramFormat, unsign
     return Ok;
 }
 
-static inline Status GdipCreateEffect(const GUID, CGpEffect **fx) { *fx = new CGpEffect(); return Ok; }
-static inline Status GdipSetEffectParameters(CGpEffect *fx, const void *p, unsigned int size) {
-    // 12 bytes is the hue/saturation/lightness struct, 8 the blur one
-    if (fx!=NULL) fx->kind = (size==12) ? 1 : 2;
-    (void)p;
-    return Ok;
-}
-static inline Status GdipDeleteEffect(CGpEffect *fx) { delete fx; return Ok; }
 static inline Status GdipBitmapApplyEffect(GpBitmap *b, CGpEffect *fx, void*, BOOL, void**, int*) {
     if (b==NULL || fx==NULL)
        return GenericError;
