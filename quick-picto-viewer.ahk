@@ -4842,8 +4842,9 @@ poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
    ; the index is a row of resultedFilesList, and a result can arrive after the list moved
    ; underneath it - an entry removed, a file renamed. A thumbnail drawn against the wrong
    ; row is fixed by the next repaint; seven cached properties written there are not, and
-   ; the database collection would later believe them.
-   If (StrReplace(getIDimage(indexu), "||")!=thumbsArray[indexu, 3])
+   ; neither is a database row written from them.
+   imgPath := StrReplace(getIDimage(indexu), "||")
+   If (imgPath!=thumbsArray[indexu, 3])
       Return 0
 
    ; the name is composed in the DLL, out of the tables initQPVmainDLL() sent it, so that
@@ -4871,6 +4872,10 @@ poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
 
    framesu := NumGet(resultsBuffer, offu + 48, "Int")
    recordFilesListImgProps(indexu, srcW, srcH, (framesu>0) ? framesu : 1, pixFmt, NumGet(resultsBuffer, offu + 52, "Int"))
+
+   ; and into the database the list came out of, so that the work is not repeated the next
+   ; time something asks for these columns
+   recordSQLimgPropsNow(indexu, imgPath)
    Return 1
 }
 
@@ -83918,6 +83923,29 @@ recordFilesListImgProps(imgIndex, widthu, heightu, framesu, pixFmt, dpiu, isFilt
    updateFilesListByID(imgIndex, 8, fileInfos.cTime, isFilter)
 }
 
+; The database half of that record, for every caller that has just read an ORIGINAL image
+; file and filled those columns: poolRecordImgProps(), with what the workers of qpvmain.dll
+; reported, and the single threaded branch of QPV_ShowThumbnails(), with what
+; GetCachableImgFileDetails() left behind. Both go through here so that a page of
+; thumbnails leaves the same rows behind whichever of them drew it.
+;
+; updateSQLdbEntryImgRes() reads the very columns recordFilesListImgProps() writes - an
+; imgResu and a fileInfos of 1 mean "out of resultedFilesList" - so this runs after it and
+; never before, and never at all for an image whose dimensions are not there. Column 12 is
+; the row's imgidu.
+;
+; Never for a frames list either: there every row is a page of the SAME file and each would
+; write its own dimensions over one database row.
+;
+; QPV_ShowThumbnails() holds one transaction open around the whole page, so this is one
+; statement rather than a commit of its own per image.
+recordSQLimgPropsNow(imgIndex, imgPath) {
+   If (SLDtypeLoaded!=3 || !resultedFilesList[imgIndex, 13] || InStr(filesFilter, "QPV:PAGES:"))
+      Return 0
+
+   Return updateSQLdbEntryImgRes(imgPath, 1, 1, resultedFilesList[imgIndex, 12], imgIndex)
+}
+
 updateFilesListByID(indexu, indexProperty, value, isFilter) {
    If isFilter
       bckpResultedFilesList[indexu, indexProperty] := value
@@ -85014,6 +85042,31 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    If (userPrivateMode=1)
       blurEffect := Gdip_CreateEffect(1, clampInRange(thumbsSizeQuality//2, 30, thumbsSizeQuality*2), 0, 0)
 
+   ; Every image whose ORIGINAL file is read below - by the workers, and by the single
+   ; threaded branch when they are off - has its properties written into the files list and
+   ; into the database, through recordSQLimgPropsNow(). One transaction for the whole page
+   ; rather than a commit per image: that is what QPV_listThumbnailsGridMode() does around
+   ; its own loop, and what "generate all thumbnails" over a large library depends on.
+   ; SQLite defers a BEGIN until the first write, so a page whose thumbnails are all cached
+   ; pays nothing for this.
+   ; Every way out of the loop below falls through to the COMMIT further down; there is no
+   ; Return inside it, and the loop runs Critical.
+   ;
+   ; Unless a transaction is already open. This function is reached from a timer, and a
+   ; long operation that holds one - a data collection run, a sort - is interruptible while
+   ; it waits; nesting is not allowed, so the BEGIN would fail and the COMMIT would then
+   ; end somebody else's transaction early. sqlite3_get_autocommit() answers zero while a
+   ; transaction is open; a call that fails returns blank, which lands on the safe side -
+   ; the writes still happen, each in a commit of its own.
+   pageWritesSQL := (SLDtypeLoaded=3 && activeSQLdb._Handle) ? 1 : 0
+   If (pageWritesSQL=1)
+   {
+      If DllCall("SQlite3.dll\sqlite3_get_autocommit", "UPtr", activeSQLdb._Handle, "Cdecl Int")
+         activeSQLdb.Exec("BEGIN TRANSACTION;")
+      Else
+         pageWritesSQL := 0
+   }
+
    If (abandonAll!=1)
    {
       Loop
@@ -85152,7 +85205,14 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              file2load := imgsListArrayThumbs[thisFileIndex, 3]
              oBitmap := LoadBitmapFromFileu(file2load, 0, 0, frameLoad, sizesDesired)
              If validBMP(oBitmap)
-                GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
+             {
+                ; the original file was read here, so the same columns the workers fill
+                ; through poolRecordImgProps() are filled here, and land in the database
+                ; the same way; a page must leave the same rows behind whichever branch
+                ; happened to draw it
+                If GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
+                   recordSQLimgPropsNow(thisFileIndex, file2load)
+             }
           } Else If (cacheType="m")
           {
              WasMemCached := 1
@@ -85184,7 +85244,11 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                    file2load := imgsListArrayThumbs[thisFileIndex, 3]
                    oBitmap := LoadBitmapFromFileu(file2load, 0, 0, frameLoad, sizesDesired)
                    If validBMP(oBitmap)
-                      GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
+                   {
+                      ; the original file again, so the same columns and the same row
+                      If GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
+                         recordSQLimgPropsNow(thisFileIndex, file2load)
+                   }
                 } Else
                    oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, file2load)
              }
@@ -85348,6 +85412,14 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
            If (imgsListArrayThumbs[poolIndex, 1]="fim")
               imgsListArrayThumbs[poolIndex, 2] := trGdip_DisposeImage(imgsListArrayThumbs[poolIndex, 2], 1)
        }
+    }
+
+    ; the last database action of the run, whether the page finished or the user scrolled
+    ; away from it: an abandoned page keeps the properties of every image that did arrive
+    If (pageWritesSQL=1)
+    {
+       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+          addJournalEntry(A_ThisFunc "(): failed to commit the image properties collected while listing thumbnails - " activeSQLdb.ErrorMsg)
     }
 
     If (alterFilesIndex>1 && mustEndLoop!=1 && lapsOccured>3 && modus!="all")
