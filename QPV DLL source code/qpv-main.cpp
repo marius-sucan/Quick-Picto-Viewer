@@ -24,6 +24,9 @@
 #include <numeric>
 #include <algorithm>
 #include <emmintrin.h> // SSE2 intrinsics for CalculateNewBlendModes
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
 #include <d2d1.h>
 #include <d2d1_3.h>
 #include <wincodec.h>
@@ -5408,15 +5411,18 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     return 1;
 }
 
-// SWAR population count. POPCNT needs SSE4.2 while this project builds with
-// EnableEnhancedInstructionSet=SSE2 and ships a Win7 x64 DLL, so no intrinsic
-// and no CPU dispatch: this is ~12 branch-free ops instead of up to 64 loop
-// iterations per comparison, and hammingDistance() runs n*n/2 times per group.
+// SWAR population count with hardware POPCNT optimization when available.
 inline int popcount64(UINT64 x) {
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+    return (int)__popcnt64(x);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __builtin_popcountll((unsigned long long)x);
+#else
     x -= (x >> 1) & 0x5555555555555555ULL;
     x  = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
     x  = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
     return (int)((x * 0x0101010101010101ULL) >> 56);
+#endif
 }
 
 // Builds the bit window the two crop settings describe: lCrop drops that many
@@ -7221,7 +7227,22 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
            // a fingerprint of the wrong length was skipped by the AHK too: it tested
            // arrayChars.Count()=72 before hashing
            if (n!=dupesHashPix)
+           {
+              const INT64 badId = (INT64)SQ.column_int64(dupesHashSel, 0);
+              if (SQ.bind_text16!=NULL && SQ.bind_int64!=NULL)
+              {
+                 SQ.reset(dupesHashUpd);
+                 SQ.bind_text16(dupesHashUpd, 1, L"0", 1, QPV_SQLITE_STATIC);
+                 SQ.bind_int64(dupesHashUpd, 2, badId);
+                 if (SQ.step(dupesHashUpd)==SQLITE_DONE)
+                    dupesHashFailed++;
+                 SQ.reset(dupesHashUpd);
+              }
+              if ((int)ids.size() >= batch)
+                 break;
+
               continue;
+           }
 
            ids.push_back((INT64)SQ.column_int64(dupesHashSel, 0));
            for ( int i = 0 ; i < n ; i++)

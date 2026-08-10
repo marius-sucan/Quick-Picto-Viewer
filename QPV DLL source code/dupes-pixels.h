@@ -570,7 +570,7 @@ static void dpBindBlobOrNull(sqlite3_stmt *st, int idx, const std::vector<unsign
     }
 
     if (SQ.bind_blob!=NULL)
-       SQ.bind_blob(st, idx, v.data(), (int)v.size(), QPV_SQLITE_TRANSIENT);
+       SQ.bind_blob(st, idx, v.data(), (int)v.size(), QPV_SQLITE_STATIC);
 }
 
 static bool dpWriteResult(const DupePixResult &res) {

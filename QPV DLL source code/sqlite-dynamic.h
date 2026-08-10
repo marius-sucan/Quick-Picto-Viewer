@@ -140,9 +140,9 @@ static void bindSQLiteOnce() {
         // close_v2 arrived in 3.7.14 and prepare16_v2 in 3.3.9; the AHK class already
         // refuses anything below 3.6, and the engine needs both, so a shipped DLL that
         // predates them simply leaves the engine off rather than crashing later.
-        SQ.ok = (SQ.open_v2 && SQ.close_v2 && SQ.prepare16_v2 && SQ.step && SQ.finalize
+        SQ.ok = (SQ.open_v2 && SQ.close_v2 && SQ.prepare16_v2 && SQ.step && SQ.reset && SQ.finalize
               && SQ.column_type && SQ.column_int64 && SQ.column_double && SQ.column_text16
-              && SQ.column_bytes16 && SQ.column_count && SQ.interrupt);
+              && SQ.column_bytes16 && SQ.column_blob && SQ.column_bytes && SQ.column_count && SQ.interrupt);
 
         if (SQ.ok)
            fnOutputDebug("dupesEngine: sqlite3.dll bound successfully");
