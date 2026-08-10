@@ -182,10 +182,92 @@ MaskBitMap  polygonOtherMaskMap;
 vector<pair<float, float>> DrawLineCapsGrid;
 // vector<pair<int, int>> DrawLineGrid;
 
-std::vector<UINT>  dupesListIDsA(1);
-std::vector<UINT>  dupesListIDsB(1);
-std::vector<UINT>  dupesListIDsC(1);
+// One record per surviving image pair, as dupesFetchPairs() hands them to AHK.
+// The three parallel std::vector<UINT> this replaced needed three exports, three
+// AHK buffers and three copies of what is one row.
+struct DupePairRec {      // 16 bytes; AHK NumGet()s the fields at 0/4/8/12
+    UINT idA;
+    UINT idB;
+    UINT hamDist;
+    UINT mse;             // QPV_MSD_NONE when MSD is off or a fingerprint is missing
+};
+
+std::vector<DupePairRec>    dupesPairsList;
+std::vector<unsigned char>  dupesPixData;   // decoded fingerprints, arraySize * dupesPixStride
+std::vector<unsigned char>  dupesPixOK;     // 1 when that index carries a usable fingerprint
+UINT                        dupesPixStride = 0;
+int                         dupesPixScale = 1;   // graylevelCompressor, folded back in by msdScore()
+size_t                      dupesPairsRead = 0;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
+
+// Progress and phase for the whole-scan duplicate sweep. AHK polls it with NumGet()
+// through dupesScanGetState(), the way it polls thumbsPoolGetState(), so a tooltip and
+// an ETA cost no DllCall of their own. Fixed layout - do not reorder.
+#pragma pack(push, 8)
+struct DupesScanState {
+    volatile LONG  phase;      //  0   0 idle, 1 loading, 2 querying, 3 sweeping, 5 done, -1 cancelled
+    volatile LONG  lastError;  //  4
+    volatile INT64 done;       //  8   comparisons performed
+    volatile INT64 total;      // 16   comparisons planned
+    volatile INT64 pairs;      // 24   surviving pairs collected so far
+    volatile LONG  groups;     // 32
+    volatile LONG  rows;       // 36   candidate images
+    volatile INT64 scanned;    // 40   rows the candidate query has stepped through
+    volatile LONG  queryDone;  // 48   1 once the query has been walked to the end
+    volatile LONG  spare;      // 52
+};
+#pragma pack(pop)
+
+// The whole candidate set for one duplicate scan, laid out flat and grouped.
+// dupesScanGroupStart holds groups+1 offsets into the arrays, so group g occupies
+// [dupesScanGroupStart[g], dupesScanGroupStart[g+1]) and the last entry is the row
+// count - the same shape a CSR sparse matrix uses for its rows.
+std::vector<UINT64>         dupesScanHashes;
+std::vector<UINT64>         dupesScanFlipped;   // empty unless findFlippedDupes=1
+std::vector<UINT>           dupesScanIDs;       // resultedFilesList row indexes
+std::vector<UINT>           dupesScanGroupStart;
+DupesScanState              dupesScanState = {};
+UINT                        dupesScanRows = 0;
+int                         dupesScanWantMSD = 0;
+// Cursor: the next (group, outer index) the sweep has to visit, plus the adaptive
+// number of comparisons one block aims for - see dupesScanStep().
+UINT                        dupesScanGroup = 0;
+UINT                        dupesScanOuter = 0;
+INT64                       dupesScanBlock = 0;
+// qpv-dupes-state-end - sliced by tests/run-tests.sh; leave the marker in place.
+
+// One candidate row, as dupesFetchRows() hands it to AHK. The path is not in the record:
+// every path of the scan lives end to end in one UTF-16 buffer (dupesGetPathBuffer()) and
+// the row points at it, so AHK pays one StrGet per row and no DllCall at all.
+#pragma pack(push, 8)
+struct DupeCandRow {          // 32 bytes; AHK NumGet()s the fields at 0/8/16/24/28
+    INT64  imgidu;            //  0
+    INT64  fsize;             //  8
+    double megapix;           // 16
+    UINT   groupID;           // 24   1-based ordinal, ascending in scan order
+    UINT   pathOffset;        // 28   UTF-16 code units into the path buffer
+};
+#pragma pack(pop)
+
+std::vector<DupeCandRow>    dupesCandRows;
+std::wstring                dupesPathBuf;     // every candidate path, NUL separated
+UINT                        dupesCandGroups = 0;
+
+// One image of the filtered duplicates list, in display order, as dupesFetchFiltered()
+// hands it to AHK. AHK turns groupRoot and grpTag into the "root_tag" group ID column 23
+// has always held, and copies hamDist / mse into columns 33 and 34.
+#pragma pack(push, 8)
+struct DupeResultRow {        // 20 bytes; AHK NumGet()s the fields at 0/4/8/12/16
+    UINT imgIndex;            //  0   row index into bckpResultedFilesList
+    UINT groupRoot;           //  4   union-find root: the smallest row index in the group
+    UINT grpTag;              //  8   the group ID's suffix
+    UINT hamDist;             // 12   this image's own closest match
+    UINT mse;                 // 16
+};
+#pragma pack(pop)
+
+std::vector<DupeResultRow>  dupesFilterRows;
+// qpv-dupes-query-state-end - sliced by tests/run-tests.sh; leave the marker in place.
 
 std::array<double, 1025>  DCTcoeffs;
 

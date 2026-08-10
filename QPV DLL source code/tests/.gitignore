@@ -1,0 +1,24 @@
+# regenerated from the shipped sources on every run
+msd_extract.cpp
+decode_extract.cpp
+header_extract.h
+block_extract.cpp
+query_extract.cpp
+dct_extract.cpp
+pixels_mutant.h
+*.part
+# built by make_test_db.py
+testdb.sldb
+testdb.sldb.hash
+pixels_scratch.sldb
+# test binaries
+msd_oracle
+msd_bench
+msd_mutant
+sweep_smoke
+sweep_asan
+filter_oracle
+hash_oracle
+query_engine
+pixels_smoke
+pixels_mutant

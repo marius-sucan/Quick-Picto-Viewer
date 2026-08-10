@@ -195,8 +195,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := [], navKeysCounter := 0
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
    , thisBMPdummy := 0, dummyGu := 9, whileLoopExec := 0, WICmoduleHasInit := 0, dupesDCTcoeffsInit := 0
-   , resultsDupesArray := [], hTVlistFolders := "", SearchedStringz := "", dupesPixelData := []
-   , dupesHashesData := [], dbVersion := 0, dbExpectedVersion := 2, userPrevAlphaMaskBmpPainted := ""
+   , dupesEngineInitGood := 0, dupesPixInitGood := 0, dupesPixState := 0
+   , hTVlistFolders := "", SearchedStringz := ""
+   , dupesHashesData := [], dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
@@ -2368,6 +2369,14 @@ initQPVmainDLL(modus:=0) {
    If !dupesDCTcoeffsInit
       addJournalEntry("ERROR: Failed to initialize DCT coefficients required for identifying image duplicates. This feature will not work.")
 
+   ; The duplicates scan engine lives in the DLL now. A stale qpvmain.dll simply would
+   ; not export it, and every DllCall would return blank - which reads downstream as "no
+   ; duplicates found" rather than as a failure, so it is probed once here instead.
+   ; dupesScanStep() is the newest of the set and stands in for all of them.
+   dupesEngineInitGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesScanStep", "UPtr") ? 1 : 0
+   If !dupesEngineInitGood
+      addJournalEntry("ERROR: qpvmain.dll is older than this script and does not export the duplicates scan engine (dupesScanStep). Identifying image duplicates by Hamming distance will not work; please update qpvmain.dll.")
+
    WICmoduleHasInit := DllCall("qpvmain.dll\initWICnow", "int", debugModa, "int", 0)
    If WICmoduleHasInit
    {
@@ -2649,9 +2658,8 @@ resetMainWin2Welcome() {
      filteredMap2mainList := [] ; used by PanelEnableFilesFilter() and FilterFilesListuIndex()
      ; used by PanelFindDupes()
            toBeExcludedIndexes := [] ; toBeExcludedIndexes() and retrieveDupesByProperties()
-           resultsDupesArray := [] ; corefilterDupeResultsByHdist()
-           dupesHashesData := [] ; corefilterDupeResultsByHdist() and retrieveDupesByProperties()
-           dupesPixelData := [] ; retrieveDupesByProperties()
+           DllCall("qpvmain.dll\dupesClearPairs") ; the pair list lives in qpvmain.dll
+           dupesHashesData := [] ; filterDupeResultsByHdist() and retrieveDupesByProperties()
      RandyIMGids := [] ; used by random slideshow mode in coreNextPrevImage()
      calcScreenLimits()
      resetImgSelection("forced")
@@ -4277,7 +4285,7 @@ remFilesListFilter(modus:=0) {
       addJournalEntry("Removing files list filter:`n" filesFilter)
       prevFilter := filesFilter
       filesFilter := ""
-      resultsDupesArray := []
+      DllCall("qpvmain.dll\dupesClearPairs")
       FilterFilesListuIndex(0, prevFilter)
       currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
    } Else coreSetFilesFilteru("")
@@ -4460,6 +4468,21 @@ TrueCleanup() {
    userSeenSlideImages := userSeenSessionImagesArray.Count()
    If (maxFilesIndex>1 && userSeenSlideImages>1 && mustRecordSeenImgs=1)
       seenImagesDB.Exec("COMMIT TRANSACTION;")
+
+   ; before CloseDB(): the duplicates engine holds its own read-only handle on the same
+   ; file, and it has to be closed while sqlite3.dll is still around. The collection pool
+   ; holds prepared statements on AHK's handle, so it has to let go first of all - and its
+   ; workers are decoding images, so this is also where they are stopped.
+   If (dupesPixInitGood=1)
+   {
+      DllCall("qpvmain.dll\dupesEngineCancel", "int")
+      DllCall("qpvmain.dll\dupesPixShutdown", "int")
+      dupesPixInitGood := 0
+      dupesPixState := 0
+   }
+
+   If (dupesEngineInitGood=1)
+      DllCall("qpvmain.dll\dupesEngineRelease")
 
    activeSQLdb.CloseDB()
    seenImagesDB.CloseDB()
@@ -29234,7 +29257,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
           updateFilesListByID(A_Index, 6, fileInfos.size ? fileInfos.size : 1, isFilter)
           updateFilesListByID(A_Index, 7, fileInfos.wTime, isFilter)
           updateFilesListByID(A_Index, 8, fileInfos.cTime, isFilter)
-          r := GetCachableHistogramFile(imgPath, A_Index, 0, isFilter, zEffect)
+          r := GetCachableHistogramFile(imgPath, A_Index, isFilter, zEffect)
        }
 
        If !r
@@ -33391,9 +33414,8 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
      bckpResultedFilesList := []
      filteredMap2mainList := []
      toBeExcludedIndexes := []
-     resultsDupesArray := []
+     DllCall("qpvmain.dll\dupesClearPairs")
      dupesHashesData := []
-     dupesPixelData := []
      ; ToolTip, haha , , , 2
      currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
   }
@@ -33952,20 +33974,24 @@ getImgPropsValuesSet(indexu, m) {
    Return "imgpixfmt='" getValueFilesList(indexu, 15, m) "', imgframes='" getValueFilesList(indexu, 9, m) "', imgdpi='" getValueFilesList(indexu, 22, m) "', imgwidth='" getValueFilesList(indexu, 13, m) "', imgheight='" getValueFilesList(indexu, 14, m) "'"
 }
 
+; The four pixel fingerprints used to be appended here, out of resultedFilesList columns
+; 29-32. They are BLOBs in imagesPixels now and there is exactly one thing that produces
+; them - the collection pool of dupes-pixels.h - so that a fingerprint is always comparable
+; with every other fingerprint in the same database. Interpolating them into an UPDATE
+; string was also, on its own, several kilobytes of SQL to parse per image.
 getImgHistoValuesSet(indexu, m) {
-   Return "imgmedian='" getValueFilesList(indexu, 19, m) "', imgavg='" getValueFilesList(indexu, 18, m) "', imghpeak='" getValueFilesList(indexu, 20, m) "', imghlow='" getValueFilesList(indexu, 21, m) "', imghrms='" getValueFilesList(indexu, 24, m) "', imghrange='" getValueFilesList(indexu, 25, m) "',  imghmode='" getValueFilesList(indexu, 26, m) "', imghminu='" getValueFilesList(indexu, 27, m) "', pixelzFsmall='" getValueFilesList(indexu, 29, m) "', pixelzFbig='" getValueFilesList(indexu, 30, m) "', HpixelzFsmall='" getValueFilesList(indexu, 31, m) "', HpixelzFbig='" getValueFilesList(indexu, 32, m) "'"
+   Return "imgmedian='" getValueFilesList(indexu, 19, m) "', imgavg='" getValueFilesList(indexu, 18, m) "', imghpeak='" getValueFilesList(indexu, 20, m) "', imghlow='" getValueFilesList(indexu, 21, m) "', imghrms='" getValueFilesList(indexu, 24, m) "', imghrange='" getValueFilesList(indexu, 25, m) "',  imghmode='" getValueFilesList(indexu, 26, m) "', imghminu='" getValueFilesList(indexu, 27, m) "'"
 }
 
+; obju and imgResu name which files list the values are read out of - 1 is
+; resultedFilesList, 2 is bckpResultedFilesList - and 0 leaves that group of columns alone.
+; Both used to accept an object instead, built by calcHistoAvgFile(returnObj=1) for the
+; database collection to write; that collection is the worker pool's now and nothing
+; produces those objects any more. fileInfos still does: GetFileAttributesEx() returns one.
 updateSQLdbEntryImgHisto(fullPath, obju, imgResu, fileInfos, dbIndex, indexu:=0) {
-   If (obju=1 || obju=2)
-      thisPart := A_Space getImgHistoValuesSet(indexu, obju)
-   Else
-      thisPart := " imgmedian='" obju.median "', imgavg='" obju.avg "', imghpeak='" obju.peak "', imghlow='" obju.low "', imghrms='" obju.rms "', imghrange='" obju.range "',  imghmode='" obju.mode "', imghminu='" obju.minu "', pixelzFsmall='" obju.entireSmall  "', pixelzFbig='" obju.entireBig  "', HpixelzFsmall='" obju.HentireSmall "', HpixelzFbig='" obju.HentireBig "'"
-
+   thisPart := A_Space getImgHistoValuesSet(indexu, obju)
    If (imgResu=1 || imgResu=2)
       thisPart .= ", " getImgPropsValuesSet(indexu, imgResu)
-   Else If IsObject(imgResu)
-      thisPart .= ", imgdpi='" imgResu.dpi "', imgpixfmt='" imgResu.pixFmt "', imgframes='" imgResu.frames "', imgwidth='" imgResu.W "', imgheight='" imgResu.H "'"
 
    If (fileInfos=1 || fileInfos=2)
       thisPart .= ", " getImgFileValuesSet(indexu, fileInfos)
@@ -34127,6 +34153,8 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
 
     compare := (markValue="ANY") ? "isDeleted IS NOT 0" : "isDeleted=" markValue
     extraWhere := folderClause ? " AND " folderClause : ""
+    ; the side table first, while the rows it belongs to are still there to name them
+    activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images WHERE " compare extraWhere ");")
     SQLstr := "DELETE FROM images WHERE " compare extraWhere ";"
     If !activeSQLdb.Exec(SQLStr)
     {
@@ -34154,13 +34182,17 @@ deleteSQLdbEntry(fullPath, dbIndex) {
   If !dbIndex
      activeSQLdb.EscapeStr(fullPath)
 
+  ; imagesPixels has no foreign key, so its rows have to be swept along by hand or the
+  ; fingerprints of a deleted image would be inherited by whatever reuses its imgidu
   wherePart := dbIndex ? " WHERE imgidu=" dbIndex ";" : " WHERE fullPath=" fullPath " COLLATE NOCASE;"
+  activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images" StrReplace(wherePart, ";") ");")
   SQLstr := "DELETE FROM images" wherePart
   If !activeSQLdb.Exec(SQLStr)
   {
      zPlitPath(fullPath, 1, fileNamu, imgPath)
      activeSQLdb.EscapeStr(fileNamu)
      activeSQLdb.EscapeStr(imgPath)
+     activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images WHERE (imgfile=" fileNamu " AND imgfolder=" imgPath "));")
      SQLstr := "DELETE FROM images WHERE (imgfile=" fileNamu " AND imgfolder=" imgPath ");"
      activeSQLdb.Exec(SQLStr)
   }
@@ -34371,6 +34403,35 @@ IniSLDBwrite(what, value, whichTable:="settings") {
        z := activeSQLdb.Exec(SQLStr)
        fnOutputDebug(A_ThisFunc "(): " SQLStr " | " z)
     }
+}
+
+; Reads one settings row out of a .SLDB other than the one currently open, through a
+; connection of its own so activeSQLdb is not disturbed. Returns "" when the file cannot be
+; opened, has no settings table, or simply does not carry that parameter.
+readSLDBsettingFrom(fileNamu, paramu) {
+   probeDB := new SQLiteDB
+   If !probeDB.OpenDB(fileNamu, "R", False)
+   {
+      addJournalEntry(A_ThisFunc "(): unable to open " fileNamu " - " probeDB.ErrorMsg)
+      Return ""
+   }
+
+   valu := ""
+   escaped := paramu
+   probeDB.EscapeStr(escaped)
+   If probeDB.GetTable("SELECT valuez FROM settings WHERE paramz=" escaped " COLLATE NOCASE;", RecordSet)
+   {
+      Loop, % RecordSet.RowCount
+      {
+          Rowu := RecordSet.Rows[A_Index]
+          If (StrLen(Rowu[1])>0)
+             valu := Rowu[1]
+      }
+      RecordSet.Free()
+   }
+
+   probeDB.CloseDB()
+   Return valu
 }
 
 IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
@@ -35808,9 +35869,9 @@ PanelStateOFsqlNation() {
    showTOOLtip("Gathering database information: image histograms", 0, 0, 4/13)
    imgmedian := totalz - getTotalIMGsSQLdb("WHERE ifnull(imgmedian, '')='' ")
    showTOOLtip("Gathering database information: pixel data", 0, 0, 5/13)
-   pixelzFsmall := totalz - getTotalIMGsSQLdb("WHERE ifnull(pixelzFsmall, '')='' ")
+   pixelzFsmall := getTotalIMGsSQLdb(SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"))
    showTOOLtip("Gathering database information: pixel data (flipped)", 0, 0, 6/13)
-   HpixelzFsmall := totalz - getTotalIMGsSQLdb("WHERE ifnull(HpixelzFsmall, '')='' ")
+   HpixelzFsmall := getTotalIMGsSQLdb(SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"))
    showTOOLtip("Gathering database information: image hashes", 0, 0, 7/13)
    dHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(dHash, '')='' ")
    showTOOLtip("Gathering database information: image hashes", 0, 0, 8/13)
@@ -35915,7 +35976,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    ; If showInfos
       showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait" friendly)
 
-   If RegExMatch(scu, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms|lHash|dHash|pHash|pixelzFsmall|pixelzFbig)")
+   isPixelsTarget := isSQLpixelsColumn(scu)
+   If (isPixelsTarget=1 || RegExMatch(scu, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms|lHash|dHash|pHash)"))
       adaptedSortCriteria := 3
    Else If RegExMatch(scu, "i)(imgmegapix|imgdpi|imgwidth|imgframes|imgpixfmt|imgheight|imgwhratio)")
       adaptedSortCriteria := 2
@@ -35937,7 +35999,17 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          Return -1
       }
 
-      thisWhere := extraFilter ? extraFilter " AND ifnull(" scu ", '')='' AND isDeleted=0" : "WHERE ifnull(" scu ", '')='' AND isDeleted=0"
+      ; "not collected yet". A fingerprint is a row of imagesPixels since schema v3, so the
+      ; test is a NOT IN over its primary key rather than ifnull() on a column of "images".
+      ; A subquery keeps the outer statement single-table, which is what lets extraFilter -
+      ; built by extractSQLqueryFromFilter() over "images" columns - stay exactly as it is.
+      ; imgidu is INTEGER PRIMARY KEY NOT NULL there, so the NOT IN cannot meet a NULL.
+      If (isPixelsTarget=1)
+         missingClause := "imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE " SQLpixelsColumn(scu) " IS NOT NULL) AND isDeleted=0"
+      Else
+         missingClause := "ifnull(" scu ", '')='' AND isDeleted=0"
+
+      thisWhere := extraFilter ? extraFilter " AND " missingClause : "WHERE " missingClause
       SQLstr := "SELECT imgidu, fullPath FROM images " thisWhere " ORDER BY fullPath;"
       ; addJournalEntry(SQLstr)
       If !activeSQLdb.GetTable(SQLstr, RecordSet)
@@ -35973,8 +36045,34 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          }
       }
 
-      ; created only after the user agreed to the scan, otherwise it would leak on the early return above
-      zEffect := (adaptedSortCriteria=3 && filesToBeSorted>0) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
+      ; The expensive mode. Everything it collects - the histogram statistics, the image
+      ; dimensions, the file stamps and the four pixel fingerprints - comes out of one
+      ; decode of the image, and the decode is essentially the whole cost. It runs on the
+      ; worker pool inside qpvmain.dll, and ONLY there. There is deliberately no serial
+      ; fallback: a second producer would write fingerprints made by a different decode
+      ; pipeline into the same database as the pool's, and two fingerprints made by
+      ; different pipelines cannot be compared with one another - which is the entire
+      ; point of collecting them. A qpvmain.dll too old to have the pool has to be
+      ; updated; nothing here can stand in for it.
+      If (adaptedSortCriteria=3 && filesToBeSorted>0)
+      {
+         RecordSet.Free()
+         If (collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, abandonAll, countTFilez, failedFiles, failedSQLfiles)!=1)
+         {
+            addJournalEntry(A_ThisFunc "(): the in-DLL collection pool could not be started; no image data was collected.")
+            CurrentSLD := backCurrentSLD
+            showTOOLtip("ERROR: unable to collect the image data. Please update qpvmain.dll.")
+            SoundBeep 300, 100
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            SetTimer, ResetImgLoadStatus, -200
+            Return -1
+         }
+
+         PopulateIndexFilesStatsInfos("kill")
+         CurrentSLD := backCurrentSLD
+         Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, "")
+      }
+
       If (filesToBeSorted>0)
          activeSQLdb.Exec("BEGIN TRANSACTION;")
 
@@ -36001,14 +36099,6 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
                 objul := GetCachableImgFileDetails(Row[2], Row[1], 0, 1)
                 If (IsObject(objul) && objul.w && objul.h)
                    rs := updateSQLdbEntryImgRes(Row[2], objul, fInfos, Row[1])
-                Else
-                   okay := 0
-             } Else If (adaptedSortCriteria=3 && okay=1)
-             {
-                ; gather histogram main points and pixel data
-                objul := GetCachableHistogramFile(Row[2], Row[1], 1, 0, zEffect)
-                If (IsObject(objul[1]) && objul[2].w && objul[2].h)
-                   rs := updateSQLdbEntryImgHisto(Row[2], objul[1], objul[2], fInfos, Row[1])
                 Else
                    okay := 0
              }
@@ -36061,7 +36151,6 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
           }
       }
 
-      Gdip_DisposeEffect(zEffect)
       RecordSet.Free()
       If (filesToBeSorted>0)
       {
@@ -36072,6 +36161,12 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
 
    PopulateIndexFilesStatsInfos("kill")
    CurrentSLD := backCurrentSLD
+   Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, ErrorMsg)
+}
+
+; The tail of collectSQLFileInfosNow(), shared with the pool-driven path so that both
+; report the same tallies in the same words.
+reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, ErrorMsg) {
    someErrors := ""
    If (failedFiles>0)
       someErrors .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
@@ -36104,98 +36199,150 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    Return 0
 }
 
-calcDLLpHashAlgo(arrayChars, ByRef givenArray, modus) {
-    ; givenArray holds the 32x32 image pixels, grayscale
-    ; The DLL always reads all 1024 bytes, and the caller allocates givenArray
-    ; once and reuses it for every record, so a short fingerprint would hash the
-    ; tail of the previous image.
-    If (arrayChars.Count()!=1024)
-       Return ""
+; ---- the pool-driven half of mode 3 ------------------------------------------------------
+; Returns 1 when the pool ran the collection, 0 when it could not be started at all and the
+; caller has to fall back to its serial loop. The tallies come back through the ByRef
+; parameters, exactly as the serial loop maintains them.
+;
+; The DLL writes on activeSQLdb's own handle, inside the transaction opened here, so the
+; periodic COMMIT keeps its meaning: an interrupted run keeps every image it finished.
+; That is the promise the collect-data dialog makes and the reason the whole phase is
+; resumable at all.
+collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonAll, ByRef countTFilez, ByRef failedFiles, ByRef failedSQLfiles) {
+   Static msBudget := 120
+   If (dupesEngineInitGood!=1 || SLDtypeLoaded!=3 || !activeSQLdb._Handle)
+      Return 0
 
-    Loop, 1024 ; 32*32
-        NumPut(arrayChars[A_Index], givenArray, A_Index - 1, "UChar")
+   If (dupesPixInitGood!=1)
+      initDupesPixelsPool()
 
-    r := DllCall("qpvmain.dll\calcPHashAlgo", "UPtr", &givenArray, "uint", 32, "Int", modus, "INT64")
-    If (r!="")
-       hashu := ConvertBase(10, 16, r)
-    Return hashu
-}
+   If (dupesPixInitGood!=1 || !dupesPixState)
+      Return 0
 
-calcLhashAlgo(pixArray) {
-    ; pixArray is the pixels fingerprint stored in pixelzFsmall: 9x8 = 72 gray
-    ; levels, produced by calcHistoAvgFile() through trGdip_ResizeBitmap(9, 8).
-    ; The hash covers its leftmost 8x8 block: every pixel is compared against the
-    ; mean of its row mean and its column mean.
-    ; W must stay in sync with the resize in calcHistoAvgFile().
-    Static W := 9, H := 8
-    linezArray := []
-    colsArray := []
-    Loop, % H ; row means, over the 8 columns that get hashed
-    {
-       rowu := A_Index
-       summo := 0
-       Loop, 8
-          summo += pixArray[(rowu - 1)*W + A_Index]
-       linezArray[rowu] := summo/8
-    }
-
-    Loop, 8 ; column means
-    {
-       colu := A_Index
-       summo := 0
-       Loop, % H
-          summo += pixArray[(A_Index - 1)*W + colu]
-       colsArray[colu] := summo/H
-    }
-
-    hashu := ""
-    Loop, % H
-    {
-       rowu := A_Index
-       Loop, 8
-       {
-          ; the exact float mean is used on purpose: rounding it first creates
-          ; ties between the pixel and its threshold
-          avg := (colsArray[A_Index] + linezArray[rowu])/2
-          hashu .= (pixArray[(rowu - 1)*W + A_Index] > avg) ? 1 : 0
-       }
-    }
-
-    Return hashu
-}
-
-discretizeValue(valu, levelu) {
-   Return (levelu!=1) ? Round(valu/levelu) * levelu : valu
-}
-
-processPixArrayCharsAsSTR(ByRef arrayChars) {
-   newStr := ""
-   newArray := StrSplit(arrayChars)
-   If (graylevelCompressor!=1)
+   ; ?2 is a keyset cursor over imgidu and ?1 the refill size. It cannot be a bare LIMIT
+   ; the way the hash loop's is: an image here is handed to a worker and only written some
+   ; milliseconds later, so it still matches this WHERE while it is being decoded and a
+   ; second refill would hand it out all over again. A partial run still resumes exactly
+   ; where it stopped - the cursor restarts at zero and the rows already written no longer
+   ; match at all.
+   selectSQL := "SELECT imgidu, fullPath FROM images " thisWhere " AND imgidu>?2 ORDER BY imgidu LIMIT ?1;"
+   thisPolation := (hamDistInterpolation=1) ? 6 : 5
+   packedOptions := 350 "|" thisPolation "|" dupesApplyBlur "|" findFlippedDupes "|" allowWICloader "|" allowFIMloader "|" userHQraw "|" allowToneMappingImg
+   If !DllCall("qpvmain.dll\dupesPixBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", packedOptions, "int")
    {
-      Loop, % newArray.Count()
-          newStr .= discretizeValue(Ord(newArray[A_index]) - 161, graylevelCompressor) "|"
-   } Else
-   {
-      Loop, % newArray.Count()
-          newStr .= Ord(newArray[A_index]) - 161 "|"
+      addJournalEntry(A_ThisFunc "(): qpvmain.dll refused the collection query - " readDupesEngineError() "`n" selectSQL)
+      Return 0
    }
-   Return newStr
+
+   addJournalEntry("Collecting image data through the in-DLL worker pool:`n" selectSQL)
+   activeSQLdb.Exec("BEGIN TRANSACTION;")
+   prevMSGdisplay := A_TickCount
+   prevSaveData := A_TickCount
+   ErrorMsgS := ""
+   ; A backstop, not the mechanism: the keyset cursor above already means a row is offered
+   ; at most once, so this can only trip if that ever stops being true.
+   maxHandouts := filesToBeSorted*2 + 128
+   Loop
+   {
+      more := DllCall("qpvmain.dll\dupesPixStep", "int", msBudget, "int")
+      countTFilez := NumGet(dupesPixState + 0, 16, "Int") + NumGet(dupesPixState + 0, 20, "Int")
+      failedFiles := NumGet(dupesPixState + 0, 20, "Int")
+      failedSQLfiles := NumGet(dupesPixState + 0, 24, "Int")
+      If (A_TickCount - prevSaveData>300100)
+      {
+         prevSaveData := A_TickCount
+         If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+         {
+            SoundBeep 300, 100
+            ErrorMsgS := "ERROR: Failed to commit collected data to the SQL database`n" activeSQLdb.ErrorMsg "`n"
+         } Else
+            activeSQLdb.Exec("BEGIN TRANSACTION;")
+      }
+
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         etaTime := ETAinfos(countTFilez, filesToBeSorted, startOperation)
+         If (failedFiles>0)
+            etaTime .= "`nFailed to collect data for " groupDigits(failedFiles) " files"
+         If (failedSQLfiles>0)
+            etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
+
+         showTOOLtip(ErrorMsgS "Gathering files information, please wait`nDecoding " groupDigits(NumGet(dupesPixState + 0, 8, "Int")) " images at once" etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
+         prevMSGdisplay := A_TickCount
+      }
+
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         DllCall("qpvmain.dll\dupesEngineCancel", "int")
+         Break
+      }
+
+      If (more!=1)
+         Break
+
+      If (NumGet(dupesPixState + 0, 28, "Int")>maxHandouts)
+      {
+         addJournalEntry(A_ThisFunc "(): stopping - the collection query keeps returning rows that cannot be written. Handed out " NumGet(dupesPixState + 0, 28, "Int") " rows for " filesToBeSorted " files.")
+         abandonAll := 1
+         Break
+      }
+   }
+
+   DllCall("qpvmain.dll\dupesPixEnd", "int")
+   If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+      addJournalEntry(A_ThisFunc "(): failed to commit the collected data - " activeSQLdb.ErrorMsg)
+
+   countTFilez := NumGet(dupesPixState + 0, 16, "Int") + NumGet(dupesPixState + 0, 20, "Int")
+   failedFiles := NumGet(dupesPixState + 0, 20, "Int")
+   failedSQLfiles := NumGet(dupesPixState + 0, 24, "Int")
+   Return 1
 }
 
-processPixArrayChars(ByRef arrayChars) {
-   newArray := StrSplit(arrayChars)
-   If (graylevelCompressor!=1)
+initDupesPixelsPool() {
+   If (dupesPixInitGood=1 && dupesPixState)
+      Return 1
+
+   initQPVmainDLL()
+   If (!qpvMainDll || WICmoduleHasInit!=1 || dupesEngineInitGood!=1)
+      Return 0
+
+   ; the pool is created on first use and lives until TrueCleanup(); a session that never
+   ; collects image data never pays for the threads
+   If !DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBegin", "UPtr")
    {
-      Loop, % newArray.Count()
-          newArray[A_Index] := discretizeValue(Ord(newArray[A_Index]) - 161, graylevelCompressor)
-   } Else
-   {
-      Loop, % newArray.Count()
-          newArray[A_Index] := Ord(newArray[A_Index]) - 161
+      addJournalEntry(A_ThisFunc "(): qpvmain.dll is older than this script and has no collection pool.")
+      Return 0
    }
-   Return newArray
+
+   ; The loaders and the extension sets are the thumbnails pool's. Setting the formats does
+   ; not start that pool and does not depend on it having been started - initThumbsPool()
+   ; declines outright when allowMultiCoreMode is off or memory is being minimised, and
+   ; without these two lists every file would look like a format WIC cannot handle and go
+   ; straight to FreeImage.
+   initFIMGmodule()
+   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(RegExWICfmtPtrn), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+
+   nThreads := (minimizeMemUsage=1) ? 2 : realSystemCores
+   r := DllCall("qpvmain.dll\dupesPixInit", "Int", nThreads, "Int")
+   dupesPixState := r ? DllCall("qpvmain.dll\dupesPixGetState", "UPtr") : 0
+   dupesPixInitGood := (r && dupesPixState) ? 1 : 0
+   addJournalEntry(dupesPixInitGood ? "Started " r " workers for the image data collection." : "Failed to start the image data collection workers.")
+   Return dupesPixInitGood
 }
+
+; calcDLLpHashAlgo(), calcLhashAlgo(), discretizeValue() and processPixArrayChars() lived
+; here, along with processPixArrayCharsAsSTR() before them. All of it is now in
+; qpv-main.cpp: dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
+; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
+;
+; Two details that were easy to lose in the move and that tests/hash_oracle.cpp pins:
+; discretizeValue() returns Round(v/L)*L - the PRODUCT, which reaches 256 at L=2 - and
+; calcDLLpHashAlgo() wrote those values with NumPut(..., "UChar"), so a 256 became 0 and
+; every pHash in every existing database was computed that way. lHash compares each pixel
+; against the exact float mean, never a rounded one, because rounding it first creates
+; ties between the pixel and its threshold.
 
 generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave, strPosu, whatu) {
    Static userFriendly := {1:"NONE", 2:"dHash", 3:"pHash", 4:"lHash"}
@@ -36228,82 +36375,62 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    If stringu ; allow query database  filtering?
       containsT := (mustNotHave=1) ? " AND " whatu " NOT LIKE '" stringu "' ESCAPE '>'" : " AND " whatu " LIKE '" stringu "' ESCAPE '>'"
 
-   If (InStr(whichHashu, "dHash") || InStr(whichHashu, "lHash"))
+   ; The hashes are computed in qpvmain.dll now. What used to happen per image, in the
+   ; interpreter: StrSplit() the fingerprint into an AHK array, a per-element loop calling
+   ; Ord() and discretizeValue(), a 64-iteration loop building a binary STRING, then
+   ; ConvertBase() through two msvcrt DllCalls - and for pHash, a 1024-iteration NumPut
+   ; loop purely to marshal the array the previous loop had just built. Then one
+   ; string-built UPDATE, parsed from scratch by SQLite. Three to five thousand
+   ; interpreted operations to produce eight bytes.
+   ; dupesHashStep() decodes once, hashes a whole batch across cores, and writes through
+   ; one prepared statement. The values are unchanged - see tests/hash_oracle.cpp.
+   ;
+   ; Both statements run on AHK's own handle, deliberately: a second connection would not
+   ; see the rows already updated inside the transaction below, so they would come back as
+   ; "hash IS NULL" on the next batch, forever.
+   ; the fingerprints are BLOBs in imagesPixels since schema v3; "p" is the join alias
+   pixCol := SQLpixelsColumn((o_whichHashu=3) ? sH "pixelzFbig" : sH "pixelzFsmall")
+   pixCount := (o_whichHashu=3) ? 1024 : 72
+   pixWhere := " WHERE images.isDeleted=0 AND p." pixCol " IS NOT NULL AND " whichHashu " IS NULL" containsT
+   selectSQL := "SELECT images.imgidu, p." pixCol " FROM images" SQLpixelsJoinClause() pixWhere " LIMIT ?1;"
+   updateSQL := "UPDATE images SET " whichHashu "=?1 WHERE imgidu=?2;"
+   ; getTotalIMGsSQLdb() supplies "SELECT COUNT(*) FROM images " and the trailing ";"
+   filesToBeSorted := getTotalIMGsSQLdb(SQLpixelsJoinClause() pixWhere)
+   If (filesToBeSorted<1)
    {
-      b := 1
-      SQLstr := "SELECT imgidu, " sH "pixelzFsmall, " whichHashu " FROM images WHERE isDeleted=0 AND ifnull(" sH "pixelzFsmall, '')!='' AND " whichHashu " IS NULL" containsT ";"
-   } Else If InStr(whichHashu, "pHash")
-   {
-      b := 0
-      SQLstr := "SELECT imgidu, " sH "pixelzFbig, " whichHashu " FROM images WHERE isDeleted=0 AND ifnull(" sH "pixelzFbig, '')!='' AND " whichHashu " IS NULL" containsT ";"
+      CurrentSLD := backCurrentSLD
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      SetTimer, ResetImgLoadStatus, -200
+      Return 0
    }
 
-   If !activeSQLdb.GetTable(SQLstr, RecordSet)
+   If (dupesEngineInitGood!=1 || !DllCall("qpvmain.dll\dupesHashBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", updateSQL, "int", o_whichHashu, "int", pixCount, "int", graylevelCompressor, "int", userpHashMode + 1, "int"))
    {
-      throwSQLqueryDBerror(A_ThisFunc)
+      addJournalEntry(A_ThisFunc "(): qpvmain.dll could not prepare the hash generation - " ((dupesEngineInitGood=1) ? readDupesEngineError() : "the DLL is older than this script") ".`n" selectSQL)
       CurrentSLD := backCurrentSLD
+      showTOOLtip("ERROR: could not generate the image hashes. Please update qpvmain.dll.")
+      SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SetTimer, ResetImgLoadStatus, -200
       Return -1
    }
 
-   If InStr(whichHashu, "pHash")
-      VarSetCapacity(givenArray, 4 * 1024 + 1, 0) ; zero-filled: reused per record
-
    failedFiles := countTFilez := 0
-   filesToBeSorted := RecordSet.RowCount
-   If (filesToBeSorted>0)
-      activeSQLdb.Exec("BEGIN TRANSACTION;")
-
-   ; ToolTip, % RecordSet.RowCount "==" whichHashu "==" SQLstr , , , 2
-   ; MsgBox, % RecordSet.RowCount "===" findFlippedDupes "=" SQLstr
+   activeSQLdb.Exec("BEGIN TRANSACTION;")
    prevMSGdisplay := A_TickCount
    prevSaveData := A_TickCount
    ErrorMsgS := ""
-   Loop, % RecordSet.RowCount
+   Loop
    {
-       Row := RecordSet.Rows[A_Index]
-       If Row[1]
+       ; one batch: the rows leave the result set as they are updated, so re-running the
+       ; SELECT is what advances the cursor
+       more := DllCall("qpvmain.dll\dupesHashStep", "int", 512, "int")
+       countTFilez := DllCall("qpvmain.dll\dupesHashWrittenCount", "Int64")
+       failedSQLfiles := DllCall("qpvmain.dll\dupesHashFailedCount", "Int64")
+       If (more=-1)
        {
-          ; hash must be cleared per record: it is only conditionally assigned
-          ; below, and the UPDATE would otherwise store the previous image's hash
-          hashu := hash := ""
-          countTFilez++
-          arrayChars := processPixArrayChars(Row[2])
-          If (o_whichHashu=4 && arrayChars.Count()=72) ; lHash
-          {
-             hashu := calcLhashAlgo(arrayChars)
-             hash := ConvertBase(2, 16, hashu)
-          } Else If (o_whichHashu=2 && arrayChars.Count()=72)
-          {
-             ; ToolTip, % RecordSet.RowCount "|" countTFilez "=" whichHashu "==" arrayChars.Count()  , , , 2
-             ; 9x8 = 72: every 9th value is skipped so the 64 comparisons never
-             ; straddle a row. thisIndex has to start from 0 for each record -
-             ; it only happened to land there because 72 is a multiple of 9.
-             thisIndex := 0
-             Loop, 72
-             {
-                thisIndex++
-                If (thisIndex=9)
-                {
-                   thisIndex := 0
-                   Continue
-                }
-                hashu .= (arrayChars[A_Index] < arrayChars[A_Index + 1]) ? 1 : 0
-             }
-
-             hash := ConvertBase(2, 16, hashu)
-          } Else If (o_whichHashu=3)
-          {
-             hash := calcDLLpHashAlgo(arrayChars, givenArray, userpHashMode + 1)
-          }
-
-          if (hash!="")
-          {
-             SQLstr := "UPDATE images SET " whichHashu "='" hash "' WHERE imgidu=" Row[1] ";"
-             If !activeSQLdb.Exec(SQLstr)
-                failedSQLfiles++
-          }
+          ErrorMsgS := "ERROR: " readDupesEngineError() "`n"
+          Break
        }
 
        If (A_TickCount - prevSaveData>300100)
@@ -36323,7 +36450,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
           If (failedSQLfiles>0)
              etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
 
-          showTOOLtip(ErrorMsgS "Generating image " fwhichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, countTFilez / filesToBeSorted)
+          showTOOLtip(ErrorMsgS "Generating image " fwhichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
           prevMSGdisplay := A_TickCount
           If (A_TickCount - prevSaveData>9000)
              ErrorMsgS := ""
@@ -36335,10 +36462,12 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
           abandonAll := 1
           Break
        }
+
+       If (more!=1)
+          Break
    }
 
-   givenArray := resultsArray := ""
-   RecordSet.Free()
+   DllCall("qpvmain.dll\dupesHashEnd")
    If (filesToBeSorted>0)
    {
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -36819,7 +36948,7 @@ SortFilesList(SortCriterion) {
           } Else If InStr(SortCriterion, "histogram")
           {
              If !resultedFilesList[A_Index, 11]
-                GetCachableHistogramFile(r, A_Index, 0, 0, zEffect)
+                GetCachableHistogramFile(r, A_Index, 0, zEffect)
 
              If (resultedFilesList[A_Index, 11])
              {
@@ -45299,7 +45428,10 @@ PanelChangeHamDistThreshold() {
     If (!InStr(resultedFilesList[currentFileIndex, 23], "_") && !msgu)
        msgu := "WARNING: The files list does not seem to contain pairs of images filtered by Hamming distance"
 
-    If (dupesHashesData.Count()<2 && !msgu)
+    ; The pair list is what changeHdistLevelCached() re-filters, and it lives in
+    ; qpvmain.dll now: dupesHashesData was only ever a proxy for it, and the DLL-side scan
+    ; does not build one at all - the hashes never leave the DLL.
+    If (DllCall("qpvmain.dll\dupesPairCount", "uint")<2 && !msgu)
        msgu := "WARNING: The files list does not seem to have cached data to allow changing the similarity threshold"
 
     If msgu
@@ -45353,7 +45485,7 @@ PanelChangeHamDistThreshold() {
     GuiAddDropDownList("x+2 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userHamDistStringFilterWhat " vuserHamDistStringFilterWhat", "Full path|Folder path|File name", "Apply filter based on")
     Gui, Add, Checkbox, xs y+25 Checked%UserHamDistCacheFilterMonoGroups%  vUserHamDistCacheFilterMonoGroups, &Filter out matches without pairs
     Gui, Add, Checkbox, xs y+7 Checked%BreakDupesGroups%  vBreakDupesGroups, &Break the groups based on the similarity index
-    If (testWasMSEdupes()!=1)
+    If (DllCall("qpvmain.dll\dupesHaveMSD", "int")!=1)
     {
        GuiControl, SettingsGUIA: Disable, mseUppLim 
        GuiControl, SettingsGUIA: Disable, mseLowLim 
@@ -63134,12 +63266,27 @@ importSLDBintoSLDB(whichFile) {
       Return
    }
 
+   ; The imported database must be schema v3 too: the fingerprints are carried across
+   ; below through its imagesPixels table, which a database of any other vintage does not
+   ; have. Nothing here upgrades it - there is no migration path by design.
+   otherVersion := readSLDBsettingFrom(whichFile, "dbVersion")
+   If (otherVersion!=dbExpectedVersion)
+   {
+      showTOOLtip("WARNING: Illegal operation. The database you selected was saved with a different version of " appTitle " (v" (otherVersion ? otherVersion : "unknown") ", this one is v" dbExpectedVersion "). Please rebuild it before importing.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    startZeit := A_TickCount
    mustOpenStartFolder := ""
    zPlitPath(CurrentSLD, 0, OutFileName, SelectedDir)
    showTOOLtip("Preparing main database content, please wait`n" OutFileName "`n" SelectedDir "\")
    setImageLoading()
-   Static  SQLa := "SELECT imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, dHash, pHash, pixelzFsmall, pixelzFbig, lHash, imgmedian FROM images"
+   ; 21 data columns plus imgidu, which is not inserted: the merge renumbers every row, so
+   ; the old identity is only kept long enough to re-key the fingerprints in imagesPixels.
+   Static  SQLa := "SELECT imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, dHash, pHash, lHash, imgmedian, imgidu FROM images"
+        , SQLaCols := 21
    If !activeSQLdb.GetTable(SQLa, mainRecordSet)
    {
       ResetImgLoadStatus()
@@ -63176,7 +63323,10 @@ importSLDBintoSLDB(whichFile) {
            allIndex++
            mainArrayu[allIndex] := A_Index
            totalArrayu[allIndex] := "m"
-           uniqueArrayu[Rowu[2] "\" Rowu[1]] := 1
+           ; the PLAN SLOT, not a flag: the second pass needs it to find the entry this
+           ; file already has, so that a file present in both databases occupies one slot
+           ; rather than two
+           uniqueArrayu[Rowu[2] "\" Rowu[1]] := allIndex
         }
    }
 
@@ -63223,6 +63373,17 @@ importSLDBintoSLDB(whichFile) {
    prevMSGdisplay := A_TickCount
    countFiles := otherRecordSet.RowCount
    otherArrayu := []
+   ; A file present in BOTH databases used to get a second plan slot of its own here, and
+   ; the "b" branch of the merge then looked its main row up as mainArrayu[thatNewSlot] -
+   ; a slot the first pass never filled. So the merge never merged: it wrote the imported
+   ; record alone, UNIQUE (fullPath) rejected it because the main record had already been
+   ; inserted under its own slot, and every shared file was counted as an error.
+   ; Now such a file keeps the one slot the first pass gave it, and the imported row that
+   ; pairs with it is recorded alongside. pairedArrayu is a hashtable rather than a write
+   ; back into otherArrayu because those writes land on slots below the ones already
+   ; there, and an out-of-order integer-key insert into an AHK object shifts everything
+   ; above it - quadratic over a large shared set.
+   pairedArrayu := new hashtable()
    Loop, % otherRecordSet.RowCount
    {
         If (determineTerminateOperation()=1)
@@ -63241,9 +63402,18 @@ importSLDBintoSLDB(whichFile) {
         Rowu := otherRecordSet.Rows[A_Index]
         If Rowu[2]
         {
-           allIndex++
-           otherArrayu[allIndex] := A_Index
-           totalArrayu[allIndex] := uniqueArrayu.hasKey(Rowu[2] "\" Rowu[1]) ? "b" : "o"
+           thisKey := Rowu[2] "\" Rowu[1]
+           If uniqueArrayu.hasKey(thisKey)
+           {
+              mSlot := uniqueArrayu[thisKey]
+              totalArrayu[mSlot] := "b"    ; an update of an existing key, so no shifting
+              pairedArrayu[mSlot] := A_Index
+           } Else
+           {
+              allIndex++
+              otherArrayu[allIndex] := A_Index
+              totalArrayu[allIndex] := "o"
+           }
         }
    }
 
@@ -63255,6 +63425,7 @@ importSLDBintoSLDB(whichFile) {
       mainArrayu := ""
       uniqueArrayu := ""
       otherArrayu := ""
+      pairedArrayu := ""
       otherRecordSet.Free()
       mainRecordSet.Free()
       otherSQLdb.CloseDB()
@@ -63264,14 +63435,50 @@ importSLDBintoSLDB(whichFile) {
    }
 
    showTOOLtip("Merging databases contents, please wait")
+   ; The fingerprints are BLOBs in a table of their own since schema v3, and this merge
+   ; renumbers every imgidu - so they have to be re-keyed rather than copied. The old side
+   ; table is set aside under another name, the other database is ATTACHed so both sources
+   ; are reachable from one statement, and a small map of new -> (old main, old other) is
+   ; filled as the rows are written. One INSERT ... SELECT at the end does the rest; the
+   ; COALESCE in it is the same "the imported value wins when it has one" rule the k%i%
+   ; loop below applies column by column.
+   ; ATTACH before BEGIN: SQLite will not attach or detach while a transaction is open
+   pixelsCarried := 1
+   escapedOther := whichFile
+   activeSQLdb.EscapeStr(escapedOther)
+   If !activeSQLdb.Exec("ATTACH DATABASE " escapedOther " AS srcdb;")
+   {
+      pixelsCarried := 0
+      addJournalEntry(A_ThisFunc "(): could not attach the imported database; its fingerprints will have to be collected again.`n" activeSQLdb.ErrorMsg)
+   }
+
    activeSQLdb.Exec("BEGIN TRANSACTION;")
+   If (pixelsCarried=1)
+   {
+      ; an import that was interrupted between the rename and the commit could have left
+      ; the old table behind under its temporary name
+      activeSQLdb.Exec("DROP TABLE IF EXISTS imagesPixelsOld;")
+      If !activeSQLdb.Exec("ALTER TABLE imagesPixels RENAME TO imagesPixelsOld;")
+      {
+         pixelsCarried := 0
+         addJournalEntry(A_ThisFunc "(): could not set the fingerprints aside; they will have to be collected again.`n" activeSQLdb.ErrorMsg)
+      } Else If !activeSQLdb.Exec("CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB, smallH BLOB, bigH BLOB);")
+      {
+         pixelsCarried := 0
+         addJournalEntry(A_ThisFunc "(): could not recreate imagesPixels.`n" activeSQLdb.ErrorMsg)
+      } Else
+         activeSQLdb.Exec("CREATE TEMP TABLE pixMap (newID INTEGER PRIMARY KEY, mainID INTEGER, otherID INTEGER);")
+   }
+
    activeSQLdb.Exec("DELETE FROM images;")
 
    sqlDBrowID := 1
-   baseSQLstr := "INSERT INTO images (imgidu, imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, dHash, pHash, pixelzFsmall, pixelzFbig, lHash, imgmedian) VALUES ("
-   k1 := k2 := k3 := k4 := k5 := k6 := k7 := k8 := k9 := k10 := k11 := k12 := k13 := k14 := k15 := k16 := k17 := k18 := k19 := k20 := k21 := k22 := k23 := k24 := ""
+   baseSQLstr := "INSERT INTO images (imgidu, imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, dHash, pHash, lHash, imgmedian) VALUES ("
+   k1 := k2 := k3 := k4 := k5 := k6 := k7 := k8 := k9 := k10 := k11 := k12 := k13 := k14 := k15 := k16 := k17 := k18 := k19 := k20 := k21 := k22 := ""
 
    newIndex := 0
+   pixMapRows := ""
+   pixMapCount := 0
    newArrayu := []
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
@@ -63297,53 +63504,85 @@ importSLDBintoSLDB(whichFile) {
          prevMSGdisplay := A_TickCount
       }
 
+      srcMainID := srcOtherID := ""
       If (value="m")
       {
          thisIndex := mainArrayu[key]
          Rowu := mainRecordSet.Rows[thisIndex]
+         srcMainID := Rowu[SQLaCols + 1]
       } Else If (value="o")
       {
          thisIndex := otherArrayu[key]
          Rowu := otherRecordSet.Rows[thisIndex]
+         srcOtherID := Rowu[SQLaCols + 1]
       } Else If (value="b")
       {
-         thisIndex := otherArrayu[key]
-         oRowu := otherRecordSet.Rows[thisIndex]
-         thisIndex := mainArrayu[key]
-         mRowu := mainRecordSet.Rows[thisIndex]
-         Loop, 23
+         ; the file is in both databases: one row, merged column by column, with the
+         ; imported value winning wherever it has one. pairedArrayu - and not otherArrayu -
+         ; is what holds the imported row's index for this slot; see the second pass above
+         oRowu := otherRecordSet.Rows[pairedArrayu[key]]
+         mRowu := mainRecordSet.Rows[mainArrayu[key]]
+         srcOtherID := oRowu[SQLaCols + 1]
+         srcMainID := mRowu[SQLaCols + 1]
+         Loop, % SQLaCols
             k%A_Index% := oRowu[A_Index] ? oRowu[A_Index] : mRowu[A_Index]
       }
 
       If (value="m" || value="o")
       {
-         Loop, 23
+         Loop, % SQLaCols
             k%A_Index% := Rowu[A_Index]
       }
 
       activeSQLdb.EscapeStr(k1)
       activeSQLdb.EscapeStr(k2)
-      moreSQL := baseSQLstr "'" sqlDBrowID "', " k1 ", " k2 ", '" k3 "', '" k4 "', '" k5 "', '" k6 "', '" k7 "', '" k8 "', '" k9 "', '" k10 "', '" k11 "', '" k12 "', '" k13 "', '" k14 "', '" k15 "', '" k16 "', '" k17 "', '" k18 "', '" k19 "', '" k20 "', '" k21 "', '" k22 "', '" k23 "');"
+      moreSQL := baseSQLstr "'" sqlDBrowID "', " k1 ", " k2 ", '" k3 "', '" k4 "', '" k5 "', '" k6 "', '" k7 "', '" k8 "', '" k9 "', '" k10 "', '" k11 "', '" k12 "', '" k13 "', '" k14 "', '" k15 "', '" k16 "', '" k17 "', '" k18 "', '" k19 "', '" k20 "', '" k21 "');"
       If !activeSQLdb.Exec(moreSQL)
       {
          errorsOccured++
       } Else
       {
+         If (pixelsCarried=1 && (srcMainID || srcOtherID))
+         {
+            ; batched: one statement per row would double the work of this loop for a
+            ; table that is only read once, at the end
+            pixMapRows .= (pixMapCount ? ",(" : "(") sqlDBrowID "," (srcMainID ? srcMainID : "NULL") "," (srcOtherID ? srcOtherID : "NULL") ")"
+            pixMapCount++
+            If (pixMapCount>=500)
+            {
+               If !activeSQLdb.Exec("INSERT INTO pixMap (newID, mainID, otherID) VALUES " pixMapRows ";")
+                  errorsOccured++
+               pixMapRows := ""
+               pixMapCount := 0
+            }
+         }
+
          newIndex++
          sqlDBrowID++
       }
+   }
+
+   If (pixelsCarried=1 && pixMapCount>0)
+   {
+      If !activeSQLdb.Exec("INSERT INTO pixMap (newID, mainID, otherID) VALUES " pixMapRows ";")
+         errorsOccured++
+      pixMapRows := ""
    }
 
    If (abandonAll=1)
    {
       showTOOLtip("Database import operation aborted by user")
       SoundBeep 300, 100
+      ; the rename and the CREATE are inside this transaction too, so the rollback puts
+      ; imagesPixels back exactly as it was
       activeSQLdb.Exec("ROLLBACK TRANSACTION;")
+      activeSQLdb.Exec("DETACH DATABASE srcdb;")
       totalArrayu := ""
       mainArrayu := ""
       otherArrayu := ""
       newArrayu := ""
       uniqueArrayu := ""
+      pairedArrayu := ""
       otherRecordSet.Free()
       mainRecordSet.Free()
       otherSQLdb.CloseDB()
@@ -63353,7 +63592,26 @@ importSLDBintoSLDB(whichFile) {
    }
 
    showTOOLtip("Finalising database import operations, please wait")
-   Static cols := "fsize,fmodified,fcreated,imgwidth,imgheight,imgframes,imgdpi,imgpixfmt,imgavg,imghpeak,imghlow,imghmode,imghrms,imghminu,imghrange,dHash,pHash,pixelzFsmall,pixelzFbig,lHash,imgmedian"
+   If (pixelsCarried=1)
+   {
+      ; COALESCE per column, not per row: the imported fingerprint wins when there is one,
+      ; and the one already here fills the gaps - the same rule the merge applied above to
+      ; every other column of a file present in both databases.
+      pixSQL := "INSERT INTO imagesPixels (imgidu, small, big, smallH, bigH)"
+      pixSQL .= " SELECT m.newID, COALESCE(o.small, x.small), COALESCE(o.big, x.big), COALESCE(o.smallH, x.smallH), COALESCE(o.bigH, x.bigH)"
+      pixSQL .= " FROM pixMap AS m LEFT JOIN srcdb.imagesPixels AS o ON o.imgidu=m.otherID LEFT JOIN imagesPixelsOld AS x ON x.imgidu=m.mainID"
+      pixSQL .= " WHERE o.imgidu IS NOT NULL OR x.imgidu IS NOT NULL;"
+      If !activeSQLdb.Exec(pixSQL)
+      {
+         errorsOccured++
+         addJournalEntry(A_ThisFunc "(): failed to carry the fingerprints across the merge; they will have to be collected again.`n" activeSQLdb.ErrorMsg "`n" pixSQL)
+      }
+
+      activeSQLdb.Exec("DROP TABLE pixMap;")
+      activeSQLdb.Exec("DROP TABLE imagesPixelsOld;")
+   }
+
+   Static cols := "fsize,fmodified,fcreated,imgwidth,imgheight,imgframes,imgdpi,imgpixfmt,imgavg,imghpeak,imghlow,imghmode,imghrms,imghminu,imghrange,dHash,pHash,lHash,imgmedian"
    Loop, Parse, cols, CSV
    {
       If !activeSQLdb.Exec("UPDATE images SET " A_LoopField " = NULL WHERE " A_LoopField "='';")
@@ -63362,6 +63620,8 @@ importSLDBintoSLDB(whichFile) {
 
    If !activeSQLdb.Exec("COMMIT TRANSACTION;")
       throwSQLqueryDBerror(A_ThisFunc)
+
+   activeSQLdb.Exec("DETACH DATABASE srcdb;")
 
    SQL := "SELECT imgfolder FROM dynamicfolders;"
    otherSQLdb.GetTable(SQL, gRecordSet)
@@ -63380,6 +63640,7 @@ importSLDBintoSLDB(whichFile) {
    mainArrayu := []
    otherArrayu := []
    uniqueArrayu := []
+   pairedArrayu := []
    gRecordSet.Free()
    otherRecordSet.Free()
    mainRecordSet.Free()
@@ -72803,14 +73064,50 @@ SLDBinitSQLdb(fileNamu) {
    activeSQLdb.OpenDB(fileNamu)
       ; Return -1
 
-   SQL := "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL, imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\'||imgfile), fsize INT, kbfsize FLOAT AS (round(cast(fsize AS float)/1024,1)), fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT, imgpixfmt TEXT COLLATE NOCASE, imgwhratio FLOAT AS (round(cast(imgwidth AS float)/imgheight, 5)), imgmegapix FLOAT AS (round((cast(imgwidth AS float)*imgheight)/1000000, 5)), imgmedian FLOAT, imgavg FLOAT, imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT, pixelzFsmall TEXT, HpixelzFsmall TEXT, pixelzFbig TEXT, HpixelzFbig TEXT, dHash TEXT, pHash TEXT, lHash TEXT, HdHash TEXT, HpHash TEXT, HlHash TEXT, isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+   ; Schema v3. The four pixel fingerprints used to be TEXT columns of "images" itself,
+   ; 4-8 KB per row of Chr(value + 161) sitting in the same B-tree as every other column -
+   ; so even "SELECT imgidu, fullPath" paid to page over them. They live in a side table
+   ; now, as raw BLOBs: half the bytes, no decode, and the main table scans several times
+   ; cheaper. See SQLpixelsJoinClause() for how the two are read together.
+   SQL := "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL, imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\'||imgfile), fsize INT, kbfsize FLOAT AS (round(cast(fsize AS float)/1024,1)), fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT, imgpixfmt TEXT COLLATE NOCASE, imgwhratio FLOAT AS (round(cast(imgwidth AS float)/imgheight, 5)), imgmegapix FLOAT AS (round((cast(imgwidth AS float)*imgheight)/1000000, 5)), imgmedian FLOAT, imgavg FLOAT, imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT, dHash TEXT, pHash TEXT, lHash TEXT, HdHash TEXT, HpHash TEXT, HlHash TEXT, isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+   SQL .= "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB, smallH BLOB, bigH BLOB);"
    SQL .= "CREATE TABLE imagesData (imgfile TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, imgCaption TEXT, imgAudio TEXT COLLATE NOCASE, PRIMARY KEY(imgfile ASC));"
    SQL .= "CREATE TABLE dynamicfolders (imgfolder TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, fmodified INT, PRIMARY KEY(imgfolder ASC));"
    SQL .= "CREATE TABLE staticfolders (imgfolder TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, fmodified INT, PRIMARY KEY(imgfolder ASC));"
    SQL .= "CREATE TABLE settings (paramz TEXT COLLATE NOCASE NOT NULL ON CONFLICT REPLACE, valuez TEXT COLLATE NOCASE, PRIMARY KEY(paramz ASC));"
    SQL .= "CREATE INDEX imgsIndex ON images(imgidu, imgfolder, imgfile);"
+   ; every query in the duplicates path and every data-collection query filters isDeleted
+   SQL .= "CREATE INDEX imgsAliveIndex ON images(isDeleted);"
    If !activeSQLdb.Exec(SQL)
       Return activeSQLdb.ErrorMsg
+}
+
+; ---- schema v3: the fingerprints live in imagesPixels ------------------------------------
+; One place that knows how the two tables are stitched together, so the half dozen queries
+; that need a fingerprint cannot drift apart. "p" is always the alias.
+;   colu: "small" | "big" | "smallH" | "bigH", or the legacy pixelzF* spelling
+SQLpixelsColumn(colu) {
+   Static mapu := {"pixelzFsmall":"small", "pixelzFbig":"big", "HpixelzFsmall":"smallH", "HpixelzFbig":"bigH"}
+   r := mapu[colu]
+   Return r ? r : colu
+}
+
+SQLpixelsJoinClause(tableAlias:="images") {
+   Return " LEFT JOIN imagesPixels AS p ON p.imgidu=" tableAlias ".imgidu"
+}
+
+; Whether a fingerprint has been collected. A missing imagesPixels row and a NULL blob both
+; mean "not collected"; the old test was ifnull(pixelzFsmall,'')='' on the images row.
+; The "not collected" side of it is spelled as a NOT IN subquery where it is needed, in
+; collectSQLFileInfosNow(), so that the statement around it stays single-table.
+SQLpixelsPresentClause(colu) {
+   Return "p." SQLpixelsColumn(colu) " IS NOT NULL"
+}
+
+; True when the given data-collection target names one of the fingerprints rather than a
+; column of "images".
+isSQLpixelsColumn(colu) {
+   Return RegExMatch(colu, "i)^\s*(H?pixelzF(small|big)|small|big|smallH|bigH)\s*$") ? 1 : 0
 }
 
 dummy() {
@@ -85628,6 +85925,12 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
      Return -1
   }
 
+  ; The database was opened with no pragmas at all. Neither of these changes the file or
+  ; its schema - they only affect this connection - and both matter for the duplicate
+  ; scan: the candidate query's ORDER BY sorts in RAM instead of spilling to a temp file,
+  ; and 64 MB of page cache spares a re-read of the whole images table on a second scan.
+  activeSQLdb.Exec("PRAGMA temp_store=MEMORY;")
+  activeSQLdb.Exec("PRAGMA cache_size=-65536;")
   startOperation := A_TickCount
   If (MustLoadSLDprefs=1 && importMode!=1)
   {
@@ -85787,7 +86090,38 @@ SQLdbRetrieveGivenFolder(pathu, isRecursive) {
    disposeSQLgetTableHandle(hTable)
 }
 
-filterDupeResultsByHdist(threshold) {
+readDupesEngineError() {
+   ; the DLL keeps the last SQLite message; this is only ever for the journal
+   VarSetCapacity(errBuf, 1024, 0)
+   n := DllCall("qpvmain.dll\dupesEngineLastError", "UPtr", &errBuf, "int", 511, "int")
+   Return (n>0) ? StrGet(&errBuf, "UTF-16") : "(no details)"
+}
+
+filterDupeResultsByHdist(threshold, fromEngine:=0) {
+   ; pixStride: the 32x32 fingerprint the MSD filter compares; must match the "big"
+   ;   fingerprint the collection pool writes into imagesPixels (dupes-pixels.h).
+   ; feedMax: images per dupesScanFeed() call, so the candidate set reaches the DLL in
+   ;   chunks rather than as one library-sized buffer.
+   ; msBudget: how long one dupesScanStep() may run. determineTerminateOperation() is
+   ;   throttled to 200 ms, so a step shorter than that keeps the cancel latency intact.
+   Static pixStride := 1024, feedMax := 1024, msBudget := 150
+   ; a stale qpvmain.dll makes every DllCall below return blank, which would read as
+   ; "no pairs" and quietly hand back an empty duplicates list; BTNfindDupesNow() says
+   ; so out loud, this covers the sort/refresh paths that re-enter here
+   If (dupesEngineInitGood!=1)
+   {
+      addJournalEntry(A_ThisFunc "(): aborted - qpvmain.dll does not export the duplicates scan engine.")
+      Return 2
+   }
+
+   startOperation := A_TickCount
+   prevMSGdisplay := A_TickCount
+   ; fromEngine=1: retrieveDupesByProperties() ran the candidate query inside the DLL, so
+   ; the candidate set - hashes, fingerprints, group boundaries and the row IDs to report
+   ; pairs by - is already there, and everything in this block would be rebuilding what
+   ; the DLL just built. The sweep below is shared by both paths.
+   If (fromEngine!=1)
+   {
    doStartLongOpDance()
    showTOOLtip("Preparing list for Hamming distance calculations, please wait")
    groupies := []
@@ -85824,18 +86158,49 @@ filterDupeResultsByHdist(threshold) {
       Return 2
    }
 
-   ; prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
-   totalLoops := groupies.Count()
-   rtotalLoops := 0
-   For Key, Value in groupies
-       rtotalLoops += Value.Count()
-
-   ; MsgBox, % "groups=" totalLoops "= l=" rtotalLoops
    prevMSGdisplay := A_TickCount
-   ; startOperation := A_TickCount
-   resultsDupesArray := []
-   thisLoop := 0
+   totalGroups := groupies.Count()
+   totalRows := 0
+   For Key, Value in groupies
+       totalRows += Value.Count()
+
+   If (totalRows<2 || totalGroups<1)
+   {
+      groupies := ""
+      Return 2
+   }
+
+   ; This is the fallback path, entered only when qpvmain.dll could not open the database
+   ; itself: the candidate query then runs through Class_SQLiteDB.GetTable(), which is
+   ; sqlite3_get_table() and can only hand back text. Since schema v3 the fingerprints are
+   ; BLOBs in imagesPixels, so no query AHK can run brings one back and the MSD filter is
+   ; simply unavailable here. retrieveDupesByProperties() journals that where it decides it.
+   ; Feeding the DLL a blob of "no fingerprint here" padding instead would be worse than
+   ; not asking: every pair would score QPV_MSD_NONE and the search would find nothing.
+   doMSD := 0
+   showTOOLtip("Handing " groupDigits(totalRows) " images in " groupDigits(totalGroups) " groups to the comparison engine, please wait")
+   If !DllCall("qpvmain.dll\dupesScanBegin", "uint", totalRows, "uint", totalGroups, "int", pixStride, "int", graylevelCompressor, "int", doMSD, "int")
+   {
+      addJournalEntry(A_ThisFunc "(): qpvmain.dll could not allocate the candidate set (" totalRows " images, MSD=" doMSD ").")
+      DllCall("qpvmain.dll\dupesClearPairs")
+      groupies := ""
+      Return 2
+   }
+
+   ; One flat candidate set, fed in chunks, instead of one DllCall per group: on a library
+   ; with 20 000 groups of two to four images that was 60 000+ entries into the DLL, each
+   ; one preceded by three VarSetCapacity()s and an interpreted marshalling loop, wrapped
+   ; around a few hundred nanoseconds of real work.
+   ; The order matters and is not incidental - groups ascending by ID, images ascending by
+   ; row index inside a group, exactly what the per-group calls used to visit. The DLL
+   ; emits its pairs in that order, so the union-find below sees them in a reproducible
+   ; sequence no matter how many threads the sweep ran on.
+   VarSetCapacity(HbigArray, 8 * feedMax, 0)
+   VarSetCapacity(flipHbigArray, 8 * feedMax, 0)
+   VarSetCapacity(IDsbigArray, 4 * feedMax, 0)
+   VarSetCapacity(groupStartBuf, 4 * (totalGroups + 1), 0)
+   flatIndex := 0, chunkCount := 0, grpIndex := 0
    For Key, arrayGroup in groupies
    {
        If (determineTerminateOperation()=1)
@@ -85844,28 +86209,128 @@ filterDupeResultsByHdist(threshold) {
           Break
        }
 
-       ; If (A_TickCount - prevMSGdisplay>1000)
-       ; {
-       ;    etaTime := ETAinfos(thisLoop, rtotalLoops, startOperation)
-       ;    showTOOLtip("Calculating Hamming distance between image pairs`nImage groups: " groupDigits(A_Index) " / " groupDigits(totalLoops) etaTime, 0, 0, thisLoop/rtotalLoops)
-       ;    prevMSGdisplay := A_TickCount
-       ; }
-
-       thisLoop += arrayGroup.Count()
-       thisCounter := resultsDupesArray.Count()
-       ; fnOutputDebug("tL=" arrayGroup.Count() )
-       If corefilterDupeResultsByHdist(arrayGroup, threshold, thisLoop, rtotalLoops, thisCounter, startOperation)
+       If (A_TickCount - prevMSGdisplay>1000)
        {
-          abandonAll := 1
-          Break
+          etaTime := ETAinfos(flatIndex, totalRows, startOperation)
+          showTOOLtip("Preparing the images for comparison, please wait" etaTime, 0, 0, flatIndex/totalRows)
+          prevMSGdisplay := A_TickCount
+       }
+
+       NumPut(flatIndex, groupStartBuf, grpIndex * 4, "uint")
+       grpIndex++
+       Loop, % arrayGroup.Count()
+       {
+           idu := arrayGroup[A_Index]
+           hIDu := resultedFilesList[idu, 12]
+           If (InStr(dupesHashesData[hIDu], "|") && findFlippedDupes=1)
+           {
+              ash := StrSplit(dupesHashesData[hIDu], "|")
+              hashA := "0x" ash[1],   hashB := "0x" ash[2]
+              If !ash[2] ; no flipped hash stored for this record
+                 hashB := hashA
+           } Else
+           {
+              hashA := "0x" dupesHashesData[hIDu]
+              ; leaving the flipped slot at 0 would make this record match every
+              ; image whose hash has fewer set bits than the threshold; mirroring
+              ; its own hash makes diff3 degenerate to diff, which is harmless
+              hashB := hashA
+           }
+
+           NumPut(hashA, HbigArray, chunkCount * 8, "uint64")
+           NumPut(hashB, flipHbigArray, chunkCount * 8, "uint64")
+           NumPut(idu, IDsbigArray, chunkCount * 4, "uint")
+           chunkCount++
+           flatIndex++
+           If (chunkCount=feedMax)
+           {
+              DllCall("qpvmain.dll\dupesScanFeed", "uint", flatIndex - chunkCount, "uint", chunkCount, "UPtr", &HbigArray, "UPtr", (findFlippedDupes=1) ? &flipHbigArray : 0, "UPtr", &IDsbigArray, "UPtr", 0, "int")
+              chunkCount := 0
+           }
        }
    }
 
-   err := DllCall("qpvmain.dll\clearHammingDistanceResults")
+   If (abandonAll!=1 && chunkCount>0)
+      DllCall("qpvmain.dll\dupesScanFeed", "uint", flatIndex - chunkCount, "uint", chunkCount, "UPtr", &HbigArray, "UPtr", (findFlippedDupes=1) ? &flipHbigArray : 0, "UPtr", &IDsbigArray, "UPtr", 0, "int")
+
+   HbigArray := ""
+   flipHbigArray := ""
+   IDsbigArray := ""
    groupies := ""
    If (abandonAll=1)
+   {
+      DllCall("qpvmain.dll\dupesClearPairs")
       Return 2
+   }
 
+   ; the closing boundary: group g covers [groupStart[g], groupStart[g+1])
+   NumPut(flatIndex, groupStartBuf, grpIndex * 4, "uint")
+   If !DllCall("qpvmain.dll\dupesScanSetGroups", "UPtr", &groupStartBuf, "uint", grpIndex, "int")
+   {
+      addJournalEntry(A_ThisFunc "(): qpvmain.dll rejected the group boundaries (" grpIndex " groups, " flatIndex " images).")
+      DllCall("qpvmain.dll\dupesClearPairs")
+      Return 2
+   }
+   }
+
+   ; DupesScanState offsets, from qpv-main.h: 32 groups, 36 rows, 8 done, 16 total, 24 pairs
+   statePtr := DllCall("qpvmain.dll\dupesScanGetState", "UPtr")
+   If (fromEngine=1)
+   {
+      totalRows := statePtr ? NumGet(statePtr + 0, 36, "Int") : 0
+      totalGroups := statePtr ? NumGet(statePtr + 0, 32, "Int") : 0
+      If (totalRows<2 || totalGroups<1)
+      {
+         DllCall("qpvmain.dll\dupesClearPairs")
+         Return 2
+      }
+   }
+
+   ; The sweep runs in bounded steps rather than in one uninterruptible call. Progress is
+   ; read straight out of the DLL's state block with NumGet() - see DupesScanState in
+   ; qpv-main.h for the offsets - so a tooltip refresh costs no DllCall of its own.
+   startuZ := A_TickCount
+   doStartLongOpDance()
+   Loop
+   {
+      more := DllCall("qpvmain.dll\dupesScanStep", "int", threshold + 1, "uint", hamDistLBorderCrop, "uint", hamDistRBorderCrop, "int", findInvertedDupes, "int", findFlippedDupes, "int", msBudget, "int")
+      If (statePtr && A_TickCount - prevMSGdisplay>1000)
+      {
+         doneWork := NumGet(statePtr + 0, 8, "Int64")
+         totalWork := NumGet(statePtr + 0, 16, "Int64")
+         foundPairs := NumGet(statePtr + 0, 24, "Int64")
+         If (totalWork>0)
+         {
+            etaTime := ETAinfos(doneWork, totalWork, startuZ)
+            pxk := Round(doneWork/totalWork * 100, 1)
+            showTOOLtip("Calculating Hamming distance between the images`nImage groups: " groupDigits(totalGroups) ". Images: " groupDigits(totalRows) "`nSimilar pairs found: " groupDigits(foundPairs) " ( " pxk "% )" etaTime, 0, 0, doneWork/totalWork)
+         }
+         prevMSGdisplay := A_TickCount
+      }
+
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (more!=1) ; 0 = the scan is complete, "" = the DllCall failed
+         Break
+   }
+
+   ; hands back the fingerprints and hashes - on a large library with MSD on that is
+   ; several hundred megabytes, and the result rows are about to be built
+   DllCall("qpvmain.dll\dupesScanEnd")
+   If (abandonAll=1)
+   {
+      DllCall("qpvmain.dll\dupesClearPairs")
+      Return 2
+   }
+
+   ; The pairs stay in the DLL. They used to be copied out into resultsDupesArray - one
+   ; four-element AHK array per pair, millions of them on a large library - purely so that
+   ; changeHdistLevelCached() could walk them again on every threshold change. It asks
+   ; dupesApplyFilter() now, so there is nothing to copy and nothing to hold.
    changeHdistLevelCached("kill")
    hamLowLim := mseLowLim := 0
    mseUppLim := userFindDupesMSElvl
@@ -85878,139 +86343,44 @@ filterDupeResultsByHdist(threshold) {
    If (r<1)
       Return 1
 
-   ; finalArray := sortDupeGroups(resultedFilesList.Clone())
-   ; maxFilesIndex := finalArray.Count()
-   ; resultedFilesList := []
-   ; resultedFilesList := finalArray.Clone()
 }
 
-sortDupeGroups(givenArray, oldMap:=0, remSingles:=1) {
-   groupies := []
-   looseGroupies := []
-   listuGroupies := "|"
-   Loop, % givenArray.Count()
-   {
-       grpIDu := givenArray[A_Index, 23]
-       If (grpIDu && InStr(grpIDu, "_"))
-       {
-          tgrpIDu := SubStr(grpIDu, 1, InStr(grpIDu,"_") - 1)
-          grpIDv%tgrpIDu%++
-          If (grpIDv%tgrpIDu%>remSingles)
-             groupies[grpIDu] := 1
- 
-          ; lgrpIDv%grpIDu%++
-          ; If (InStr(givenArray[A_Index, 28], "_"))
-          ;    looseGroupies[grpIDu] := (lgrpIDv%grpIDu%=1) ? A_Index : 0
-          ; Sort below is lexicographic, so both numbers are zero-padded: the
-          ; group ID's numeric part keeps the groups in list order rather than
-          ; in string order ("100_2" before "12_2"), and the padded row index
-          ; preserves the SQL's ORDER BY within each group (it used to place
-          ; row 100 ahead of row 7). The real group ID travels along after the
-          ; "y" because groupies[] is keyed by it.
-          listuGroupies .= Format("{:09d}", tgrpIDu) "y" grpIDu "z" Format("{:09d}", A_Index) "|"
-       }
-   }
-
-   ; For key, value in looseGroupies
-   ; {
-   ;    If value
-   ;    {
-   ;       givenArray[value, 23] := givenArray[value, 28]
-   ;       listuGroupies .= value "z" A_Index "|"
-   ;    }
-   ; }
-
-   listuGroupies := Trimmer(listuGroupies, "|")
-   Sort, listuGroupies, D|
-   newIndex := 0
-   newArrayu := []
-   newMappingList := []
-   ; ToolTip, % listuGroupies , , , 2
-   Loop, Parse, listuGroupies, |
-   {
-       If A_LoopField
-       {
-          zu := StrSplit(A_LoopField, "z")
-          grpIDu := SubStr(zu[1], InStr(zu[1], "y") + 1) ; drop the sort prefix
-          rowIndexu := zu[2] + 0 ; force numeric: "000000007" is not an array key
-          If groupies[grpIDu]
-          {
-             newIndex++
-             newArrayu[newIndex] := givenArray[rowIndexu]
-             newArrayu[newIndex, 28] := ""
-             If (PerformMSDonDupes=1)
-             {
-                newArrayu[newIndex, 29] := ""
-                newArrayu[newIndex, 31] := ""
-             }
-
-             If (hasHamDistCached=1 && IsObject(oldMap))
-                newMappingList[newIndex] := oldMap[rowIndexu]
-          }
-       }
-   }
-
-   If (hasHamDistCached=1 && IsObject(oldMap) && newIndex>1)
-   {
-      filteredMap2mainList := []
-      filteredMap2mainList := newMappingList.Clone()
-   }
- 
-   Return newArrayu
-}
-
-testWasMSEdupes() {
-   MSEna := resultsDupesArray[1, 4]
-   MSEnb := resultsDupesArray[2, 4]
-   MSEa := isNumber(Trim(MSEna))
-   MSEb := isNumber(Trim(MSEnb))
-   allowMSE := (MSEa=1 && MSEb=1 && MSEna<2500 && MSEnb<2500) ? 1 : 0
-   Return allowMSE
-}
-
-findDupeGroupRoot(parentu, x) {
-   ; union-find with path compression; parentu is mutated in place
-   r := x
-   While (parentu[r]!="")
-      r := parentu[r]
-
-   While (parentu[x]!="" && parentu[x]!=r)
-   {
-      nx := parentu[x]
-      parentu[x] := r
-      x := nx
-   }
-   Return r
-}
-
-pullDupeRowFromCache(idu) {
-   ; Object.Clone() is shallow, so bckpResultedFilesList shares its row objects
-   ; with resultedFilesList. Storing a row straight into newArrayu and then
-   ; writing cols 2/23/33/34 would write through into the cache, and the next
-   ; run of changeHdistLevelCached() - which does not re-clone once the cache is
-   ; populated - would start from the previous pass's values. The min() in the
-   ; "one grouped, one not" branch can then never rise again, so narrowing the
-   ; threshold kept showing the older, smaller similarity index.
-   ; The seeds match the ones filterDupeResultsByHdist() writes.
-   rowu := bckpResultedFilesList[idu].Clone()
-   rowu[2] := 0
-   rowu[33] := 100
-   rowu[34] := 2500
-   Return rowu
-}
+; sortDupeGroups(), testWasMSEdupes(), findDupeGroupRoot() and pullDupeRowFromCache()
+; lived here. All four were changeHdistLevelCached()'s workings and moved into
+; dupesApplyFilter() in qpv-main.cpp with it: the union-find, the per-image and per-group
+; minima, the mono-group drop, and the ordering - which sortDupeGroups() did by building
+; one "|"-delimited string of every row, handing it to the AHK Sort command and parsing it
+; back. tests/filter_oracle.cpp fuzzes the C++ against a transcription of all of it,
+; because a difference here would show up as nothing worse than duplicates grouped or
+; ordered slightly differently, which is invisible without two builds side by side.
 
 changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:=0) {
-   ; Static cachedListu := []
+   ; The pair list stays in qpvmain.dll after the sweep, so re-filtering it is one DllCall
+   ; instead of a full interpreted pass over millions of pairs, an AHK union-find, and
+   ; sortDupeGroups() building a multi-megabyte string for the Sort command and parsing it
+   ; back - all of which used to run again from scratch on every nudge of a slider.
+   ;
+   ; imgKeep is the one part of the filter that cannot move: the search string is a PCRE.
+   ; One byte per image row index, rebuilt only when the filter itself changes, where the
+   ; old loop re-tested the regex once per surviving PAIR.
+   Static maskFor := "", imgKeep, keepCount := 0, fltSize := 20, fltMax := 4096, fltBuf
    If (modus="kill")
    {
       hasHamDistCached := 0
       bckpResultedFilesList := []
       filteredMap2mainList := []
+      maskFor := ""
+      keepCount := 0
       Return -1
    }
 
-   ; mustRenew := (newLvl=userFindDupesHamDistLvl && resultedFilesList.Count() != cachedListu.Count()) ? 1 : 0
-   If (bckpResultedFilesList.Count()<3) ; || mustRenew=1)
+   If (dupesEngineInitGood!=1)
+   {
+      addJournalEntry(A_ThisFunc "(): aborted - qpvmain.dll does not export the duplicates scan engine.")
+      Return 0
+   }
+
+   If (bckpResultedFilesList.Count()<3)
    {
       hasHamDistCached := 1
       If markedSelectFile
@@ -86020,7 +86390,7 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
       bckpResultedFilesList := resultedFilesList.Clone()
       bckpMaxFilesIndex := maxFilesIndex
    }
-   ; ToolTip, % MSEa "=" MSEb "=" allowMSE , , , 2
+
    thisString := StrReplace(Trimmer(UserHamDistStringFilter), "||", "|")
    thisString := Trimmer(thisString, "|")
    If thisString
@@ -86041,438 +86411,101 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
          userHamDistStringStringPos := n
    }
 
-   allowMSE := testWasMSEdupes()
    isStrFilter := StrLen(thisString)>1 ? 1 : 0
-   newArrayu := []
-   dupesIDs := []
-   ; BreakDupesGroups deliberately splits the groups by similarity, so it keeps
-   ; the incremental single-pass labelling below. Otherwise the surviving pairs
-   ; are unioned first. The old code dropped a pair outright when both of its
-   ; images already carried a group ID, so A~B and C~D followed by B~C left two
-   ; groups of two instead of one of four - and which of those happened depended
-   ; on the order resultsDupesArray arrived in, which is the order an OpenMP loop
-   ; in the DLL happened to finish its iterations. The same library could group
-   ; differently on two identical scans.
-   doUnion := (BreakDupesGroups=1) ? 0 : 1
-   parentu := []
-   keptA := [], keptB := [], keptH := [], keptM := []
-   Loop, % resultsDupesArray.Count()
+   maskKey := isStrFilter "|" thisString "|" userHamDistStringFilterWhat "|" UserHamDistStringInvert "|" bckpMaxFilesIndex
+   If (maskFor!=maskKey)
    {
-        idRa := resultsDupesArray[A_Index, 1]
-        idRb := resultsDupesArray[A_Index, 2]
-        hamDist := resultsDupesArray[A_Index, 3]
-        MSE := resultsDupesArray[A_Index, 4]
-        If isInRange(hamDist, newLvlA, newLvlB)
-        {
-           If (allowMSE=1)
-           {
-              If !isInRange(MSE, newLvlMSEa, newLvlMSEb)
-                 Continue
-           }
+      ; index 0 is unused: image row indexes are 1-based, and the DLL rejects any pair
+      ; whose first image falls outside the mask
+      keepCount := bckpMaxFilesIndex + 1
+      VarSetCapacity(imgKeep, keepCount + 1, 0)
+      Loop, % bckpMaxFilesIndex
+      {
+          imgPath := bckpResultedFilesList[A_Index, 1]
+          okay := (imgPath && !InStr(imgPath, "||")) ? 1 : 0
+          If (okay=1 && isStrFilter=1)
+             okay := coreSearchIndex(imgPath, givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert) ? 1 : 0
 
-           If (isStrFilter=1)
-           {
-              imgPath := bckpResultedFilesList[idRa, 1]
-              If !coreSearchIndex(imgPath, givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert)
-                 Continue
-           }
-       } Else Continue
-
-       If (doUnion=1)
-       {
-          keptA.Push(idRa), keptB.Push(idRb)
-          keptH.Push(hamDist), keptM.Push(MSE)
-          ra := findDupeGroupRoot(parentu, idRa)
-          rb := findDupeGroupRoot(parentu, idRb)
-          If (ra!=rb) ; the smaller ID always wins, so the group ID does not
-             parentu[max(ra, rb)] := min(ra, rb) ; depend on the arrival order
-          Continue
-       }
-
-       If (dupesIDs[idRa]!="" && dupesIDs[idRb]!="")
-       {
-          If (BreakDupesGroups=1)
-          {
-             thisDupeID := newArrayu[idRa, 23]
-             thisDupeID := SubStr(thisDupeID, 1, InStr(thisDupeID, "_") - 1)  "_" hamDist
-             newArrayu[idRa, 23] := thisDupeID
-             newArrayu[idRa, 33] := hamDist
-             newArrayu[idRa, 34] := MSE
-
-             thisDupeID := newArrayu[idRb, 23]
-             thisDupeID := SubStr(thisDupeID, 1, InStr(thisDupeID, "_") - 1)  "_" hamDist
-             newArrayu[idRb, 23] := thisDupeID
-             newArrayu[idRb, 33] := hamDist
-             newArrayu[idRb, 34] := MSE
-          }
-
-          ; y := i := ""
-          ; i .= newArrayu[idRa, 23]
-          ; i .= "h" newArrayu[idRa, 33]
-          ; i .= "m" newArrayu[idRa, 34]
-          ; y .= newArrayu[idRb, 23]
-          ; y .= "h" newArrayu[idRb, 33]
-          ; y .= "m" newArrayu[idRb, 34]
-          ; fnOutputDebug(hamDist "|" idRa "=" i "|" idRb "=" y "wow")
-          ; Sleep, -1
-          ; SoundBeep 950, 900
-          Continue
-       } Else If (dupesIDs[idRa]="" && dupesIDs[idRb]="")
-       {
-          ; thisDupeID := idRc "_" min(idRa, idRb)
-          thisDupeID := min(idRa, idRb) "_" hamDist
-          dupesIDs[idRa] := thisDupeID
-          dupesIDs[idRb] := thisDupeID
-          newArrayu[idRa] := pullDupeRowFromCache(idRa)
-          newArrayu[idRa, 23] := thisDupeID
-          newArrayu[idRa, 33] := hamDist
-          newArrayu[idRa, 34] := MSE
-
-          newArrayu[idRb] := pullDupeRowFromCache(idRb)
-          newArrayu[idRb, 23] := thisDupeID
-          newArrayu[idRb, 33] := hamDist
-          newArrayu[idRb, 34] := MSE
-       } Else
-       {
-          thisDupeID := (dupesIDs[idRa]="") ? dupesIDs[idRb] : dupesIDs[idRa]
-          If (BreakDupesGroups=1)
-             thisDupeID := SubStr(thisDupeID, 1, InStr(thisDupeID, "_") - 1)  "_" hamDist
-          dupesIDs[idRa] := thisDupeID
-          dupesIDs[idRb] := thisDupeID
-          If (newArrayu[idRa, 1]="")
-             newArrayu[idRa] := pullDupeRowFromCache(idRa)
-          Else If (newArrayu[idRb, 1]="")
-             newArrayu[idRb] := pullDupeRowFromCache(idRb)
-
-          newArrayu[idRa, 23] := thisDupeID
-          newArrayu[idRa, 33] := min(hamDist, newArrayu[idRa, 33], newArrayu[idRb, 33])
-          newArrayu[idRa, 34] := min(MSE, newArrayu[idRa, 34], newArrayu[idRb, 34])
-
-          newArrayu[idRb, 23] := thisDupeID
-          newArrayu[idRb, 33] := (BreakDupesGroups=1) ? hamDist : min(hamDist, newArrayu[idRa, 33], newArrayu[idRb, 33])
-          newArrayu[idRb, 34] := (BreakDupesGroups=1) ? MSE : min(MSE, newArrayu[idRa, 34], newArrayu[idRb, 34])
-       }
+          NumPut(okay, imgKeep, A_Index, "UChar")
+      }
+      maskFor := maskKey
    }
 
-   If (doUnion=1)
-   {
-      ; col 33/34 hold how close this image is to its nearest match; the suffix
-      ; of the group ID holds the tightest pair in the whole group
-      imgHam := [], imgMSE := [], grpHam := []
-      Loop, % keptA.Count()
-      {
-          idRa := keptA[A_Index], idRb := keptB[A_Index]
-          hamDist := keptH[A_Index], MSE := keptM[A_Index]
-          If (imgHam[idRa]="" || hamDist<imgHam[idRa])
-             imgHam[idRa] := hamDist
-          If (imgHam[idRb]="" || hamDist<imgHam[idRb])
-             imgHam[idRb] := hamDist
-          If (imgMSE[idRa]="" || MSE<imgMSE[idRa])
-             imgMSE[idRa] := MSE
-          If (imgMSE[idRb]="" || MSE<imgMSE[idRb])
-             imgMSE[idRb] := MSE
+   ; BreakDupesGroups deliberately splits the groups by similarity, so the DLL keeps the
+   ; old incremental single-pass labelling for it; otherwise the surviving pairs are
+   ; unioned, with the smallest image index always winning as the root so that two
+   ; identical scans of the same library cannot come back with different groups.
+   newIndex := DllCall("qpvmain.dll\dupesApplyFilter", "int", newLvlA, "int", newLvlB, "int", newLvlMSEa, "int", newLvlMSEb, "int", (BreakDupesGroups=1) ? 1 : 0, "int", UserHamDistCacheFilterMonoGroups, "UPtr", &imgKeep, "uint", keepCount, "uint")
+   If (newIndex<2 || newIndex="")
+      Return 0
 
-          rootu := findDupeGroupRoot(parentu, idRa)
-          If (grpHam[rootu]="" || hamDist<grpHam[rootu])
-             grpHam[rootu] := hamDist
-      }
+   If !VarSetCapacity(fltBuf)
+      VarSetCapacity(fltBuf, fltSize * fltMax, 0)
 
-      For idu, hamDist in imgHam ; integer keys iterate in ascending order
-      {
-          rootu := findDupeGroupRoot(parentu, idu)
-          newArrayu[idu] := pullDupeRowFromCache(idu)
-          newArrayu[idu, 23] := rootu "_" grpHam[rootu]
-          newArrayu[idu, 33] := hamDist
-          newArrayu[idu, 34] := imgMSE[idu]
-      }
-      keptA := keptB := keptH := keptM := ""
-   }
-
-   newIndex := 0
-   fnewArrayu := []
+   ; the rows arrive in display order already - group by group, ascending inside a group
+   finalArray := []
    newMappingList := []
-   For Key, Value in newArrayu
-   {
-       grpIDu := Value[23]
-       imgPath := Value[1]
-       If (grpIDu && imgPath && !InStr(imgPath, "||"))
-       {
-          newIndex++
-          fnewArrayu[newIndex] := Value
-          newMappingList[newIndex] := Key
-       }
-   }
-
-   If (newIndex>1)
-   {
-      hasThis := 1
-      finalArray := sortDupeGroups(fnewArrayu, newMappingList, UserHamDistCacheFilterMonoGroups)
-      newIndex := finalArray.Count()
-   }
-
-   ; ToolTip, % lvl "=" newLvlA "=" newLvlB "=" newIndex , , , 2
-   If (newIndex>1)
-   {
-      If !hasThis
-      {
-         maxFilesIndex := newIndex
-         filteredMap2mainList := []
-         filteredMap2mainList := newMappingList.Clone()
-         resultedFilesList := []
-         resultedFilesList := fnewArrayu.Clone()
-      } Else
-      {
-         maxFilesIndex := finalArray.Count()
-         resultedFilesList := []
-         resultedFilesList := finalArray.Clone()
-      }
-
-      hasHamDistCached := 1
-      ForceRefreshNowThumbsList()
-      lastZeitFileSelect := A_TickCount
-      ; dropFilesSelection(1)
-      ; SetTimer, RandomPicture, -350
-      Return 1
-   } Else Return 0
-}
-
-calcMSDvalues(arrayA, arrayB, size, asStr:=0) {
-    ; [avg/ ] mean square difference [/ error] also known as standard deviation
-    ; https://stackoverflow.com/questions/20271479/what-does-it-mean-to-get-the-mse-mean-error-squared-for-2-images
-    ; https://stackoverflow.com/questions/25493010/c-difference-between-the-sum-of-the-squares-of-the-first-ten-natural-numbers-a
-    ; https://www.introspective-mode.org/means-squared-variance-standard-deviation-error/
-    ; https://stats.stackexchange.com/questions/239379/what-is-the-difference-between-mean-squared-deviation-and-variance
-    ; https://www.mygreatlearning.com/blog/mean-square-error-explained/
-
-    If (asStr=1)
-    {
-       arrayA := StrSplit(arrayA, "|")
-       arrayB := StrSplit(arrayB, "|")
-    }
-
-    sumB := 0
-    Loop, % size
-    {
-       sumB += (arrayA[A_Index] - arrayB[A_Index])**2
-       ; sumB += Abs(arrayA[A_Index] - arrayB[A_Index]) // f
-    }
-
-    ; there used to be a Static cache keyed by sumB here. sumB is essentially a
-    ; unique integer per pair, so it never hit; AHK stores integer keys in a
-    ; sorted array, so every miss cost a binary search plus a memmove of
-    ; everything above it, and the table grew by one entry per pair for the
-    ; whole session - all to avoid a single sqrt().
-    Return Round(sqrt(sumB/(size/2)))
-}
-
-corefilterDupeResultsByHdist(dupeIDsArray, threshold, grupu, totalgroups, thisCounter, mainZeit) {
-   startOperation := A_TickCount
-   prevMSGdisplay := A_TickCount
-   totalLoops := dupeIDsArray.Count()
-   VarSetCapacity(IDsbigArray, 4 * totalLoops + 1, 0) ; UINT entries, 4-byte stride
-   VarSetCapacity(HbigArray, 8 * totalLoops + 1, 0)
-   If (findFlippedDupes=1)
-      VarSetCapacity(flipHbigArray, 8 * totalLoops + 1, 0)
-   Else
-      VarSetCapacity(flipHbigArray, 8, 0)
-
-   pxk := Round(grupu / totalgroups * 100, 1)
-   generalDetails := "`nImage group: " groupDigits(grupu) " / " groupDigits(totalgroups) " ( " pxk "% )`nImages in current group: " groupDigits(totalLoops)
-   etaTime := ""
-   Loop, % totalLoops
-   {
-       If (determineTerminateOperation()=1)
-       {
-          abandonAll := 1
-          Break
-       }
-
-       If (A_TickCount - prevMSGdisplay>1500)
-       {
-          etaTime := ETAinfos(A_Index, totalLoops, startOperation)
-          showTOOLtip("Hamming distance image duplicates preparations" etaTime generalDetails, 0, 0, A_Index/totalLoops)
-          prevMSGdisplay := A_TickCount
-       }
-
-       idu := dupeIDsArray[A_Index]
-       hIDu :=  resultedFilesList[idu, 12]
-       If (InStr(dupesHashesData[hIDu], "|") && findFlippedDupes=1)
-       {
-          ash := StrSplit(dupesHashesData[hIDu], "|")
-          hashA := "0x" ash[1],   hashB := "0x" ash[2]
-          If !ash[2] ; no flipped hash stored for this record
-             hashB := hashA
-          NumPut(hashA, HbigArray, (A_Index - 1) * 8, "uint64")
-          NumPut(hashB, flipHbigArray, (A_Index - 1) * 8, "uint64")
-       } Else
-       {
-          hashA := "0x" dupesHashesData[hIDu]
-          NumPut(hashA, HbigArray, (A_Index - 1) * 8, "uint64")
-          ; leaving the flipped slot at 0 would make this record match every
-          ; image whose hash has fewer set bits than the threshold; mirroring
-          ; its own hash makes diff3 degenerate to diff, which is harmless
-          If (findFlippedDupes=1)
-             NumPut(hashA, flipHbigArray, (A_Index - 1) * 8, "uint64")
-       }
-
-       NumPut(idu, IDsbigArray, (A_Index - 1) * 4, "uint")
-       ; fnOutputDebug("tL=" totalLoops " g=" grupu " imgID[" A_Index "]=" idu)
-       ; stringu .= A_Index "|" idu "=" hash "`n"
-       ; msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have. " stringu, 4, 0, "question")
-       ; If (msgResult="Yes")
-       ;    Break
-   }
-
-   If (abandonAll=1)
-   {
-      flipHbigArray := ""
-      IDsbigArray := ""
-      HbigArray := ""
-      Return "abandon"
-   }
-
-   ; If (A_TickCount - prevMSGdisplay>1000)
-   ; {
-      showTOOLtip("Calculating Hamming distance between the images in the current group: " generalDetails "`nPlease wait", 0, 0, grupu/totalgroups)
-      prevMSGdisplay := A_TickCount
-   ; }
-
-   ; initQPVmainDLL()
-   callOffset := totalResults := 0
-   stepping := 100
-   startuZ := A_TickCount
-   lastStep := A_TickCount
-   ; Progress has to be measured in comparisons, not in outer indices. The sweep
-   ; is triangular - the first outer index compares against every other image,
-   ; the last against none - so callOffset/totalLoops reported a bar that
-   ; crawled through the expensive first batches and then jumped to the end,
-   ; and fed ETAinfos() an increment rate that was wrong in the same direction.
-   totalWork := (totalLoops<2) ? 1 : totalLoops*(totalLoops - 1)//2
-   doStartLongOpDance()
+   thisIndex := 0
+   firstu := 0
    Loop
    {
-      hoffset := 0
-      rzs := DllCall("qpvmain.dll\hammingDistanceOverArray", "UPtr", &HbigArray, "UPtr", &flipHbigArray, "UPtr", &IDsbigArray, "uint", totalLoops, "Int", threshold + 1, "uint", hamDistLBorderCrop, "uint", hamDistRBorderCrop, "int", findInvertedDupes, "int", findFlippedDupes, "int", stepping, "int", callOffset, "int*", hoffset)
-      callOffset += hoffset
-      If (rzs>0)
-         totalResults += rzs
-
-      If (rzs="" || hOffset=0)
+      gotu := DllCall("qpvmain.dll\dupesFetchFiltered", "UPtr", &fltBuf, "uint", firstu, "uint", fltMax, "uint")
+      If (gotu<1 || gotu="")
          Break
 
-      If (A_TickCount - lastStep<1520)
-         stepping += stepping//2
-
-      If (A_TickCount - prevMSGdisplay>1000)
+      Loop, % gotu
       {
-         restu := totalLoops - callOffset
-         doneWork := totalWork - ((restu<2) ? 0 : restu*(restu - 1)//2)
-         etaTime := SubStr(ETAinfos(doneWork, totalWork, startuZ), 2)
-         etaTime := SubStr(etaTime, InStr(etaTime, "`n"))
-         etaTime .= "`nTotal elapsed time: " SecToHHMMSS(Round((A_TickCount - mainZeit)/1000, 3))
-         pxk := Round(doneWork/totalWork * 100, 1)
-         showTOOLtip("Calculating Hamming distance between the images" generalDetails " ( " pxk "% )" etatime, 0, 0, doneWork/totalWork)
-         prevMSGdisplay := A_TickCount
-      }
+          offu := (A_Index - 1) * fltSize
+          idu := NumGet(fltBuf, offu, "UInt")
+          ; Object.Clone() is shallow, so bckpResultedFilesList shares its row objects with
+          ; resultedFilesList; the row has to be cloned before columns 2/23/33/34 are
+          ; written or the next pass would start from this one's values.
+          rowu := bckpResultedFilesList[idu].Clone()
+          If !IsObject(rowu)
+             Continue
 
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
-      lastStep := A_TickCount
-   }
-   ; fnOutputDebug(A_ThisFunc ": hamDist g=" grupu " results=" totalResults)   
-   IDsbigArray := ""
-   flipHbigArray := ""
-   HbigArray := ""
-   If (abandonAll=1)
-      Return "abandon"
-
-   If (A_TickCount - prevMSGdisplay>1500)
-   {
-      showTOOLtip("Preparing to retrieve the similarity results for the images compared" generalDetails "`nPlease wait", 0, 0, grupu/totalgroups)
-      prevMSGdisplay := A_TickCount
-   }
-
-   VarSetCapacity(resultsArrayA, 4 * (totalResults + 1), 0) ; Lpair
-   err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayA, "Int", 1, "uInt", totalResults)
-   VarSetCapacity(resultsArrayB, 4 * (totalResults + 1), 0) ; Rpair
-   err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayB, "Int", 2, "uInt", totalResults)
-   VarSetCapacity(resultsArrayC, 4 * (totalResults + 1), 0) ; hamming distance
-   err := DllCall("qpvmain.dll\retrieveHammingDistanceResults", "UPtr", &resultsArrayC, "Int", 3, "uInt", totalResults)
-   ; msgbox, % "r=" totalResults
-
-   MSE := 2500
-   startOperation := A_TickCount
-   thisindex := 0
-   ; calcMSDvalues() used to StrSplit() both of its 1024-token operands on every
-   ; pair, so an image matching k others had its fingerprint split k times - and
-   ; every one of those also cost a machine-code hashtable lookup. The results
-   ; arrive grouped by the second index, so caching the split arrays covers
-   ; nearly all of it. The cache is dropped wholesale when it grows too large:
-   ; each entry is ~1024 AHK array slots and a group can be big.
-   pixCache := []
-   Loop, % totalResults + 1
-   {
-       If (determineTerminateOperation()=1)
-       {
-          abandonAll := 1
-          Break
-       }
-
-       If (A_TickCount - prevMSGdisplay>1500)
-       {
-          etaTime := ETAinfos(A_Index, totalResults, startOperation)
-          If (PerformMSDonDupes=1)
-             showTOOLtip("Calculating Mean-Squared Difference for image duplicates pairs" etaTime generalDetails, 0, 0, A_Index/totalResults)
-          Else
-             showTOOLtip("Integrating Hamming distance results" etaTime generalDetails, 0, 0, A_Index/totalResults)
-          prevMSGdisplay := A_TickCount
-       }
-
-       idRa := NumGet(resultsArrayA, 4 * (A_Index - 1), "uInt")
-       If (idRa<0)
-          idRa := Abs(idRa)
-
-       idRb := NumGet(resultsArrayB, 4 * (A_Index - 1), "uInt")
-       If (idRb<0)
-          idRb := Abs(idRb)
-
-       If (idRa && idRb)
-       {
-          thisIndex++
+          rowu[2] := 0
+          rowu[23] := NumGet(fltBuf, offu + 4, "UInt") "_" NumGet(fltBuf, offu + 8, "UInt")
+          rowu[33] := NumGet(fltBuf, offu + 12, "UInt")
+          rowu[34] := NumGet(fltBuf, offu + 16, "UInt")
+          rowu[28] := ""
           If (PerformMSDonDupes=1)
           {
-             pixIDa := resultedFilesList[idRa, 12]
-             pixIDb := resultedFilesList[idRb, 12]
-             If (pixCache.Count()>512)
-                pixCache := []
-             If !pixCache.HasKey(pixIDa)
-                pixCache[pixIDa] := StrSplit(dupesPixelData[pixIDa], "|")
-             If !pixCache.HasKey(pixIDb)
-                pixCache[pixIDb] := StrSplit(dupesPixelData[pixIDb], "|")
-             MSE := calcMSDvalues(pixCache[pixIDa], pixCache[pixIDb], 1024)
+             rowu[29] := ""
+             rowu[31] := ""
           }
 
-          idRc := NumGet(resultsArrayC, 4 * (A_Index - 1), "uInt")
-          resultsDupesArray[thisCounter + thisIndex] := [idRa, idRb, idRc, MSE]
-          ; fnOutputDebug("res=" totalResults " tL=" totalLoops " g=" grupu " tC=" thisCounter " (" resultsDupesArray.Count() ") aI=" thisIndex " MSE=" MSE " hD=" idRc " A=" idRa " B=" idRb)
-       }
+          thisIndex++
+          finalArray[thisIndex] := rowu
+          newMappingList[thisIndex] := idu
+      }
+      firstu += gotu
    }
 
-   pixCache := ""
-   IDsbigArray := ""
-   HbigArray := ""
-   resultsArrayA := ""
-   resultsArrayB := ""
-   resultsArrayC := ""
-   If (abandonAll=1)
-      Return "abandon"
+   If (thisIndex<2)
+      Return 0
+
+   maxFilesIndex := thisIndex
+   resultedFilesList := []
+   resultedFilesList := finalArray
+   filteredMap2mainList := []
+   filteredMap2mainList := newMappingList
+   hasHamDistCached := 1
+   ForceRefreshNowThumbsList()
+   lastZeitFileSelect := A_TickCount
+   Return 1
 }
 
+; corefilterDupeResultsByHdist() lived here. It marshalled one group at a time into three
+; fresh buffers and entered the DLL once per group - 60 000+ DllCalls on a real library,
+; each wrapped around a few hundred nanoseconds of work. filterDupeResultsByHdist() now
+; hands the whole candidate set over once through dupesScanBegin()/dupesScanFeed() and
+; drives dupesScanStep() under a time budget, so the sweep walks every group itself.
+
 retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
+   ; rowSize: sizeof(DupeCandRow) in qpv-main.h - imgidu, fsize, megapix, groupID, pathOffset
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|dHash|lHash|pHash|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt)"
+        , rowSize := 32, fetchRows := 2048, rowsBuf
    If SortCriterion
       theseCols := prevMode
 
@@ -86569,14 +86602,15 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
 
    If (PerformMSDonDupes=1 && includeHash)
    {
-      pixelzA := 7 ; SELECT: imgidu, fullPath, imgmegapix, fsize, groupID, hash
-      If (findFlippedDupes=1)
-         pixelzA++ ; ... plus the flipped hash
-
       ; If (findFlippedDupes=1)
       ;    pixelzB := pixelzA + 1
-      ; includePixels := (findFlippedDupes=1) ? ", pixelzFbig, HpixelzFbig" : ", pixelzFbig"
-      includePixels := ", pixelzFbig"
+      ; includePixels := (findFlippedDupes=1) ? ", p.big, p.bigH" : ", p.big"
+      ; The 32x32 fingerprint the MSD filter compares. Only the engine path selects it:
+      ; it is a BLOB since schema v3 and Class_SQLiteDB.GetTable() - the legacy
+      ; sqlite3_get_table() the fallback below uses - can only hand back text, so the
+      ; fallback silently does the Hamming pass without MSD. That is journalled where it
+      ; happens rather than being pretended away.
+      includePixels := ", p.big"
    }
 
    doStartLongOpDance()
@@ -86584,7 +86618,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    ; The ifnull() guard has to be repeated on the outer table. The subquery only
    ; shapes the groups; rows of "a" join on the property columns alone, so
    ; without it an image with no hash still lands in the results, gets read back
-   ; as "0x" -> 0 in corefilterDupeResultsByHdist(), and every such image sits at
+   ; as "0x" -> 0 by filterDupeResultsByHdist(), and every such image sits at
    ; distance 0 from every other one - one enormous phantom group. That happens
    ; whenever the pixel-data collection is interrupted or narrowed by a filter.
    ; isDeleted=0 is likewise needed on both sides: every other query in this path
@@ -86594,7 +86628,55 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    If (findFlippedDupes=1 && hashA)
       whereA .= " AND ifnull(a." hashA ", '')!=''"
 
-   SQLstr := "SELECT imgidu, fullPath, a.imgmegapix, a.fsize, b.groupID" includeHash includePixels " FROM images AS a`n"
+   ; ---- the engine's query -------------------------------------------------------
+   ; qpvmain.dll runs the candidate query itself when it can: GetTable() below is the
+   ; legacy sqlite3_get_table(), which materialises the whole result set as a char**
+   ; table and then again as AHK row objects - with MSD on, a 2 KB fingerprint per
+   ; candidate row travels through both - and it cannot be cancelled at all.
+   ; The engine also replaces the self-join with one sorted scan: the rows arrive
+   ; ordered by the grouping columns, so a group is a run of consecutive rows.
+   ; The column order below is a contract with dupesQueryBegin() - see the comment
+   ; above it in qpv-main.cpp - and the ORDER BY has to lead with the same key
+   ; expressions or the runs are not runs.
+   useEngine := 0
+   If (dupesEngineInitGood=1 && activeSQLdb._Path)
+   {
+      useEngine := DllCall("qpvmain.dll\dupesEngineReady", "int")
+      If (useEngine!=1)
+         useEngine := DllCall("qpvmain.dll\dupesEngineInit", "WStr", activeSQLdb._Path, "int")
+
+      If (useEngine!=1)
+         addJournalEntry(A_ThisFunc "(): qpvmain.dll could not open the database read-only; falling back to the slower query path.")
+   }
+
+   engKeyCount := 0
+   engNocaseMask := 0
+   engSelKeys := ""
+   engOrderKeys := ""
+   If (useEngine=1)
+   {
+      Loop, Parse, % prevMode, CSV
+      {
+         If !A_LoopField
+            Continue
+
+         engExpr := !RegExMatch(A_LoopField, notFloatsRegEX) ? "Round(" A_LoopField "," findDupesPrecision ")" : A_LoopField
+         engSelKeys .= ", " engExpr " AS k" engKeyCount
+         engOrderKeys .= (engKeyCount ? ", " : "") "k" engKeyCount
+         ; imgfile and imgpixfmt are declared COLLATE NOCASE, so SQLite groups and
+         ; orders them case-insensitively and the DLL's key builder must fold too
+         If RegExMatch(A_LoopField, "i)^\s*(imgfile|imgpixfmt|imgfolder)\s*$")
+            engNocaseMask |= (1 << engKeyCount)
+
+         engKeyCount++
+      }
+
+      If (engKeyCount<1)
+         useEngine := 0
+   }
+
+   ; the fallback path cannot carry a BLOB through GetTable(), so it never asks for one
+   SQLstr := "SELECT a.imgidu, fullPath, a.imgmegapix, a.fsize, b.groupID" includeHash " FROM images AS a`n"
    SQLstr .= " JOIN (SELECT " selectuCols ", ROWID AS groupID`n"
    ; SQLstr .= " FROM images WHERE " thisNOTnullCol " IS NOT NULL`n"
    SQLstr .= " FROM images WHERE isDeleted=0 AND ifnull(" thisNOTnullCol ", '')!=''`n"
@@ -86603,20 +86685,93 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    SQLstr .= whereA
    ; keep the leading space: filesFilter is sliced on InStr(SQLstr, " ORDER BY")
    SQLstr .= StrLen(SortCriterion)>1 ? " ORDER BY a." SortCriterion ";" : " ORDER BY b.groupID," orderCol ";"
-   If !activeSQLdb.GetTable(SQLstr, RecordSet)
+   totalCandidates := 0
+   If (useEngine=1)
    {
-      userFindDupesFilterHamDist := 1
-      throwSQLqueryDBerror(A_ThisFunc)
-      Return -1
+      ; the same WHERE, on one table instead of two
+      engWhere := " WHERE images.isDeleted=0 AND ifnull(" thisNOTnullCol ", '')!=''"
+      If (findFlippedDupes=1 && hashA)
+         engWhere .= " AND ifnull(" hashA ", '')!=''"
+
+      ; The requested sort only ever shaped the order INSIDE a group: sortDupeGroups()
+      ; re-sorts the list by group afterwards regardless. Trailing it after the key
+      ; columns keeps that meaning and keeps each group contiguous.
+      engOrder := StrLen(SortCriterion)>1 ? engOrderKeys ", " SortCriterion : engOrderKeys ", imgmegapix, fsize"
+      ; imgidu is the one name both tables carry, so it has to be qualified
+      engineSQL := "SELECT images.imgidu, fullPath, imgmegapix, fsize" includeHash includePixels engSelKeys
+      engineSQL .= " FROM images" (includePixels ? SQLpixelsJoinClause() : "") engWhere " ORDER BY " engOrder ";"
+      engHasHash := includeHash ? 1 : 0
+      engHasFlip := (findFlippedDupes=1 && hashB) ? 1 : 0
+      engHasPix := includePixels ? 1 : 0
+      If !DllCall("qpvmain.dll\dupesQueryBegin", "WStr", engineSQL, "int", engKeyCount, "uint", engNocaseMask, "int", engHasHash, "int", engHasFlip, "int", engHasPix, "int", 1024, "int", graylevelCompressor, "int")
+      {
+         addJournalEntry(A_ThisFunc "(): qpvmain.dll rejected the candidate query:`n" engineSQL "`n" readDupesEngineError())
+         DllCall("qpvmain.dll\dupesEngineRelease")
+         useEngine := 0
+      }
    }
 
-   addJournalEntry("SQL query used to identify the dupes:`n" SQLstr)
-   If (determineTerminateOperation()=1)
-      abandonAll := 1
-
-   If (RecordSet.RowCount<2 || abandonAll=1)
+   If (useEngine=1)
    {
-      RecordSet.Free()
+      addJournalEntry("SQL query used to identify the dupes (in-DLL ordered scan):`n" engineSQL)
+      statePtr := DllCall("qpvmain.dll\dupesScanGetState", "UPtr")
+      prevMSGdisplay := A_TickCount
+      Loop
+      {
+         more := DllCall("qpvmain.dll\dupesQueryStep", "int", 150, "int")
+         If (more!=1)
+            Break
+
+         If (statePtr && A_TickCount - prevMSGdisplay>1000)
+         {
+            showTOOLtip("Identifying image duplicates`nImages examined: " groupDigits(NumGet(statePtr + 0, 40, "Int64")) "`nCandidates so far: " groupDigits(DllCall("qpvmain.dll\dupesQueryRowCount", "uint")))
+            prevMSGdisplay := A_TickCount
+         }
+
+         ; A cancel has to reach SQLite from the interface thread - this one is sitting
+         ; inside sqlite3_step() and cannot ask anything while a sort is running. The
+         ; poll here catches the ordinary case where the step returned in time.
+         If (determineTerminateOperation()=1)
+         {
+            DllCall("qpvmain.dll\dupesEngineCancel")
+            abandonAll := 1
+            Break
+         }
+      }
+
+      If (more=-1 && abandonAll!=1)
+      {
+         addJournalEntry(A_ThisFunc "(): the candidate query failed - " readDupesEngineError())
+         DllCall("qpvmain.dll\dupesEngineRelease")
+         userFindDupesFilterHamDist := 1
+         SetTimer, ResetImgLoadStatus, -150
+         Return -1
+      }
+
+      totalCandidates := DllCall("qpvmain.dll\dupesQueryRowCount", "uint")
+   } Else
+   {
+      If !activeSQLdb.GetTable(SQLstr, RecordSet)
+      {
+         userFindDupesFilterHamDist := 1
+         throwSQLqueryDBerror(A_ThisFunc)
+         Return -1
+      }
+
+      addJournalEntry("SQL query used to identify the dupes:`n" SQLstr)
+      If (determineTerminateOperation()=1)
+         abandonAll := 1
+
+      totalCandidates := RecordSet.RowCount
+   }
+
+   If (totalCandidates<2 || abandonAll=1)
+   {
+      If (useEngine=1)
+         DllCall("qpvmain.dll\dupesEngineRelease")
+      Else
+         RecordSet.Free()
+
       If (abandonAll=1)
          showTOOLtip("Operation aborted by user")
       Else
@@ -86629,7 +86784,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       Return
    }
 
-   showTOOLtip("Found " groupDigits(RecordSet.RowCount) " duplicate images`nGenerating the files list, please wait")
+   showTOOLtip("Found " groupDigits(totalCandidates) " duplicate images`nGenerating the files list, please wait")
    If !filesFilter
       bckpMaxFilesIndex := maxFilesIndex   
 
@@ -86656,15 +86811,101 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    groupies := []
-   totalFiles := RecordSet.RowCount
+   totalFiles := totalCandidates
+   fromEngine := 0
+   If (useEngine=1)
+   {
+      ; The DLL already holds the hashes and the fingerprints, decoded; nothing about
+      ; them has to exist in AHK. What comes back here is only what the files list
+      ; needs - path, imgidu, megapix, fsize and the group ordinal.
+      ; keepMask says which candidates survived the two filters AHK still owns: the
+      ; path regex, and "exclude the duplicates already in the list". Dropping a row
+      ; can leave its group with a single member, so the DLL recuts the boundaries
+      ; around the survivors rather than reusing the ones the scan produced.
+      If !VarSetCapacity(rowsBuf)
+         VarSetCapacity(rowsBuf, rowSize * fetchRows, 0)
+
+      VarSetCapacity(keepMask, totalCandidates + 1, 1)
+      pathBuf := DllCall("qpvmain.dll\dupesGetPathBuffer", "UPtr")
+      idBase := maxFilesIndex
+      firstu := 0
+      Loop
+      {
+         gotu := DllCall("qpvmain.dll\dupesFetchRows", "UPtr", &rowsBuf, "uint", firstu, "uint", fetchRows, "uint")
+         If (gotu<1 || gotu="")
+            Break
+
+         executingCanceableOperation := A_TickCount
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+
+         If (A_TickCount - prevMSGdisplay>2000)
+         {
+            etaTime := ETAinfos(firstu, totalFiles, startOperation)
+            showTOOLtip("Retrieving image duplicates files list, please wait" etaTime, 0, 0, firstu/totalFiles)
+            prevMSGdisplay := A_TickCount
+         }
+
+         Loop, % gotu
+         {
+             offu := (A_Index - 1) * rowSize
+             imgIDu := NumGet(rowsBuf, offu, "Int64")
+             thisPath := StrGet(pathBuf + NumGet(rowsBuf, offu + 28, "UInt") * 2, "UTF-16")
+             If (toBeExcludedIndexes[imgIDu]=1)
+                okay := 0
+             Else If givenRegEx
+                okay := coreSearchIndex(thisPath, givenRegEx, userFilterWhat, userFilterStringIsNot) ? 1 : 0
+             Else
+                okay := 1
+
+             If (okay!=1)
+             {
+                NumPut(0, keepMask, firstu + A_Index - 1, "UChar")
+                Continue
+             }
+
+             grpIDu := NumGet(rowsBuf, offu + 24, "UInt")
+             groupies[grpIDu] := 1
+             maxFilesIndex++
+             resultedFilesList[maxFilesIndex, 1]  := thisPath
+             resultedFilesList[maxFilesIndex, 12] := imgIDu   ; sqlDBrowID
+             resultedFilesList[maxFilesIndex, 17] := NumGet(rowsBuf, offu + 16, "Double")
+             resultedFilesList[maxFilesIndex, 6]  := NumGet(rowsBuf, offu + 8, "Int64")
+             resultedFilesList[maxFilesIndex, 23] := grpIDu   ; initial dupe group ID
+             ; seeded here rather than in filterDupeResultsByHdist(): its preparation
+             ; pass no longer exists on this path
+             resultedFilesList[maxFilesIndex, 33] := 100
+             resultedFilesList[maxFilesIndex, 34] := 2500
+         }
+         firstu += gotu
+      }
+
+      If (abandonAll!=1 && maxFilesIndex>1)
+         fromEngine := DllCall("qpvmain.dll\dupesScanBuildFromQuery", "UPtr", &keepMask, "uint", totalCandidates, "uint", idBase, "int")
+
+      keepMask := ""
+      ; the paths and the candidate metadata are AHK's now; the hashes and fingerprints
+      ; stay in the DLL for the sweep, and dupesClearPairs() releases them at the end
+      dupesHashesData := []
+   } Else
+   {
    arrHashesData := new hashtable(totalFiles)
-   arrPixelData := new hashtable(totalFiles)
+   If (PerformMSDonDupes=1 && includeHash)
+      addJournalEntry(A_ThisFunc "(): running without the MSD filter - the in-DLL query engine is unavailable and the fallback query cannot read the fingerprint BLOBs.")
+
    Loop, % RecordSet.RowCount
    {
       Rowu := RecordSet.Rows[A_Index]
       If Rowu[2]
       {
-         If (toBeExcludedIndexes[Rowu["imgidu"]]=1)
+         ; Rowu[1], not Rowu["imgidu"]: GetTable() is never called with getColumnNames=1
+         ; anywhere in this script, so TB.ColumnNames is empty and the rows carry integer
+         ; keys only. The string key always read blank, so "exclude the duplicates already
+         ; in the list" silently excluded nothing.
+         If (toBeExcludedIndexes[Rowu[1]]=1)
             Continue
 
          executingCanceableOperation := A_TickCount
@@ -86706,30 +86947,39 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
             prevMSGdisplay := A_TickCount
          }
 
-         If includePixels
-         {
-            arrPixelData[ Rowu[1] ] := processPixArrayCharsAsSTR(Rowu[pixelzA])
-            ; resultedFilesList[maxFilesIndex, 29] := processPixArrayChars(Rowu[pixelzA])
-            ; If pixelzB
-            ;    resultedFilesList[maxFilesIndex, 31] := processPixArrayChars(Rowu[pixelzB])
-         }
       }
    }
 
    If (maxFilesIndex<2 || abandonAll=1)
-   {
       arrHashesData := ""
-      arrPixelData := ""
-   } Else
-   {
+   Else
       dupesHashesData := arrHashesData
-      dupesPixelData := arrPixelData
-   }
 
    RecordSet.Free()
+   }
+
    ; MsgBox, % "g=" groupies.Count() " | i = " resultedFilesList.Count()
+   keptPairs := 0
    If (userFindDupesFilterHamDist>1 && maxFilesIndex>1 && includeHash && abandonAll!=1)
-      r := filterDupeResultsByHdist(userFindDupesHamDistLvl)
+   {
+      ; useEngine=1 with fromEngine=0 means the DLL ran the query but built no candidate
+      ; set - the keep mask left fewer than two comparable images. There is nothing to
+      ; sweep, and the AHK-fed path must NOT be entered as a substitute: it looks its
+      ; hashes up in dupesHashesData, which this path deliberately leaves empty, and would
+      ; read every one of them as "0x" -> 0, i.e. one enormous phantom group.
+      If (useEngine=1 && fromEngine!=1)
+         r := 1
+      Else
+      {
+         r := filterDupeResultsByHdist(userFindDupesHamDistLvl, fromEngine)
+         ; "" means the filtered list is live: the pair list has to stay in the DLL so the
+         ; similarity sliders can re-filter it without rescanning
+         keptPairs := (r="") ? 1 : 0
+      }
+   }
+
+   If (keptPairs!=1)
+      DllCall("qpvmain.dll\dupesClearPairs")
 
    userFilterInvertThis := userFilterDoString := 0
    currentFileIndex := userFilterProperty := 1
@@ -86744,9 +86994,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       If (r>0)
       {
          arrHashesData := ""
-         arrPixelData := ""
          dupesHashesData := arrHashesData
-         dupesPixelData := arrPixelData
       }
 
       maxFilesIndex := backupArray.Count()
@@ -87049,9 +87297,14 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
   , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
-  , 27_imghMin, 28_imgHASH, 29_pixelzFsmall, 30_pixelzFbig
-  , 31_HpixelzFsmall, 32_HpixelzFbig, 33_HammingDist, 34_MSEscore
+  , 27_imghMin, 28_imgHASH, 29_unused, 30_unused
+  , 31_unused, 32_unused, 33_HammingDist, 34_MSEscore
   , 35_dateSeenDB, 36_sortModeDB]
+
+  29 to 32 used to hold the four pixel fingerprints. They are BLOBs in the
+  imagesPixels table since schema v3 and are produced, read and compared
+  entirely inside qpvmain.dll; nothing in AHK ever holds one. The slots are
+  left numbered rather than reused so that every other index keeps its meaning.
 
   All these properties are optional and are filled based on the
   application context. 1_filePath is the only property that is not
@@ -88947,6 +89200,12 @@ BTNfindDupesNow() {
       Return
    }
 
+   If (userFindDupesFilterHamDist>1 && dupesEngineInitGood!=1)
+   {
+      msgBoxWrapper(appTitle ": ERROR", "The bundled qpvmain.dll is older than this version of " appTitle " and does not provide the image similarity engine.`n`nSearching for duplicates by fingerprint (Hamming distance) is unavailable until qpvmain.dll is updated. Searching by file and image properties alone still works: set the fingerprint type to ""Ignore"".", 0, 0, "error")
+      Return
+   }
+
    BtnCloseWindow()
    toBeExcludedIndexes := []
    If (excludePreviousDupesFromList=1)
@@ -89030,7 +89289,7 @@ corePurgeCachedSQLdata(mode) {
    Static fAtribs := {1:"fsize", 2:"fmodified", 3:"fcreated"}
         , imgResu := {1:"imgdpi", 2:"imgwidth", 3:"imgheight", 4:"imgframes", 5:"imgpixfmt"}
         , hashTypes := {1:"pHash", 2:"dHash", 3:"lHash", 4:"HpHash", 5:"HdHash", 6:"HlHash"}
-        , histoStuff := {1:"imgavg", 2:"imgmedian", 3:"imghpeak", 4:"imghlow", 5:"imghminu", 6:"imghmode", 7:"imghrms", 8:"imghrange", 9:"pixelzFsmall", 10:"pixelzFbig", 11:"HpixelzFsmall", 12:"HpixelzFbig"}
+        , histoStuff := {1:"imgavg", 2:"imgmedian", 3:"imghpeak", 4:"imghlow", 5:"imghminu", 6:"imghmode", 7:"imghrms", 8:"imghrange"}
         , mantra := "UPDATE images SET "
 
    setImageLoading()
@@ -89065,9 +89324,16 @@ corePurgeCachedSQLdata(mode) {
    thisu := ""
    If (mode="histogram" || mode="all")
    {
-      Loop, 12
+      Loop, 8
             thisu .= histoStuff[A_Index] "=NULL,"
       SQLstr .= mantra Trim(thisu, ",") wherePart " imgavg IS NOT NULL; "
+      ; the fingerprints are rows of their own now; dropping the row is the purge.
+      ; extractSQLqueryFromFilter() builds a WHERE over "images" columns, so the filter
+      ; has to be applied there and the imgidu list carried across.
+      If extraFilter
+         SQLstr .= "DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images " extraFilter "); "
+      Else
+         SQLstr .= "DELETE FROM imagesPixels; "
    }
 
    addJournalEntry("Query used to purge data:`n" SQLstr)
@@ -89274,7 +89540,8 @@ markSQLdbEntryDeleted(dbIndex, batchMode:=0) {
 }
 
 selectivePurgeCachedSQLdata(dbIndex, batchMode:=0) {
-   SQLstr := "UPDATE images SET dHash=NULL, lHash=NULL, pHash=NULL, HdHash=NULL, HlHash=NULL, HpHash=NULL, pixelzFbig=NULL, pixelzFsmall=NULL, HpixelzFbig=NULL, HpixelzFsmall=NULL, imgavg=NULL, imgmedian=NULL, imghmode=NULL, imghrms=NULL, imghminu=NULL, imghrange=NULL, imghpeak=NULL, imghlow=NULL, imgwidth=NULL, imgheight=NULL, imgframes=NULL, imgpixfmt=NULL, imgdpi=NULL, fsize=NULL, fmodified=NULL, fcreated=NULL, isDeleted=0 WHERE imgidu=" dbIndex ";"
+   SQLstr := "DELETE FROM imagesPixels WHERE imgidu=" dbIndex "; "
+   SQLstr .= "UPDATE images SET dHash=NULL, lHash=NULL, pHash=NULL, HdHash=NULL, HlHash=NULL, HpHash=NULL, imgavg=NULL, imgmedian=NULL, imghmode=NULL, imghrms=NULL, imghminu=NULL, imghrange=NULL, imghpeak=NULL, imghlow=NULL, imgwidth=NULL, imgheight=NULL, imgframes=NULL, imgpixfmt=NULL, imgdpi=NULL, fsize=NULL, fmodified=NULL, fcreated=NULL, isDeleted=0 WHERE imgidu=" dbIndex ";"
    If !activeSQLdb.Exec(SQLStr)
    {
       If (batchMode=1)
@@ -98707,24 +98974,13 @@ printLargeStrArray(whichArray, maxList, delim) {
   Return result
 }
 
-dumpBMPpixels(miniBMP, w, h) {
-    entireImgSmall := ""
-    E1 := trGdip_LockBits(miniBMP, 0, 0, w, h, Stride1, Scan01, BitmapData1, 1, "0x21808")
-    If !E1
-    {
-       Loop, % h
-       {
-          pY := A_Index - 1 ; y++
-          Loop, % w ; x++
-             entireImgSmall .= Chr(Gdip_BFromARGB(NumGet(Scan01+0, (A_Index - 1)*4+(pY*Stride1), "UInt")) + 161)
-       }
+; dumpBMPpixels() lived here: a per-pixel interpreted loop that appended
+; Chr(Gdip_BFromARGB(...) + 161) one character at a time, 72 + 1024 iterations per image
+; and twice that with flipped detection on. The fingerprints are produced by the worker
+; pool in qpvmain.dll now (dupes-pixels.h), stored as raw BLOBs in imagesPixels, and
+; nothing in AHK ever holds one again.
 
-       Gdip_UnlockBits(miniBMP, BitmapData1)
-    } 
-    Return entireImgSmall
-}
-
-calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0) {
+calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
     Static fmt := 3
     If !validBMP(xBitmap)
        Return 0
@@ -98801,73 +99057,35 @@ calcHistoAvgFile(xBitmap, returnObj, isFilter, imgIndex, zEffect:=0, otherBMP:=0
     variance := sumSq/TotalPixelz - avgu*avgu      ; population variance E[X^2] - mean^2
     stdDev := Sqrt((variance>0) ? variance : 0)    ; textbook standard deviation (spread / contrast)
 
-    entireImgSmall := entireImgBig := ""
-    HentireImgSmall := HentireImgBig := ""
-    If (SLDtypeLoaded=3) ; database 
-    {
-       ; to-do, redo this via opencv and investigate which one gives more accurate results: 
-       ; - grayscale and blur before resize or after?
-       If (dupesApplyBlur=1)
-          Gdip_GaussianBlur(xBitmap, 4, 0)
-
-       thisPolation := (hamDistInterpolation=1) ? 6 : 5
-       x1 := trGdip_ResizeBitmap(A_ThisFunc, xBitmap, 9, 8, 0, thisPolation, -1)
-       x2 := trGdip_ResizeBitmap(A_ThisFunc, xBitmap, 32, 32, 0, thisPolation, -1)
-       entireImgSmall := dumpBMPpixels(x1, 9, 8)
-       entireImgBig := dumpBMPpixels(x2, 32, 32)
-       trGdip_DisposeImage(x1, 1)
-       trGdip_DisposeImage(x2, 1)
-       If (findFlippedDupes=1 && validBMP(otherBMP))
-       {
-          Gdip_BitmapApplyEffect(otherBMP, zEffect)
-          If (dupesApplyBlur=1)
-             Gdip_GaussianBlur(xBitmap, otherBMP, 0)
-          x1 := trGdip_ResizeBitmap(A_ThisFunc, otherBMP, 9, 8, 0, thisPolation, -1)
-          x2 := trGdip_ResizeBitmap(A_ThisFunc, otherBMP, 32, 32, 0, thisPolation, -1)
-          HentireImgSmall := dumpBMPpixels(x1, 9, 8)
-          HentireImgBig := dumpBMPpixels(x2, 32, 32)
-          trGdip_DisposeImage(x1, 1)
-          trGdip_DisposeImage(x2, 1)
-       }
-    }
-    ; fnOutputDebug("p = " entireImgSmall)
-    If (returnObj=1)
-    {
-       r := []
-       r.avg := Round((avgu + 1)/256, 5)
-       r.median := Round((medianValue + 1)/256, 5)
-       r.peak := Round((peakPointK + 1)/256, 5)
-       r.low := Round((minBrLvlK + 1)/256, 5)
-       r.rms := Round(stdDev/256, 5)              ; standard deviation, as a fraction of the 0..255 scale
-       r.range := Round((peakPointK - minBrLvlK + 1)/256, 5)
-       r.mode := Round((modePointK + 1)/256, 5)
-       r.minu := Round((minPointK + 1)/256, 5)
-       r.entireSmall := entireImgSmall
-       r.entireBig := entireImgBig
-       r.HentireSmall := HentireImgSmall
-       r.HentireBig := HentireImgBig
-       Return r
-    } Else
-    {
-       updateFilesListByID(imgIndex, 11, 1, isFilter)
-       updateFilesListByID(imgIndex, 18, Round((avgu + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 19, Round((medianValue + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 20, Round((peakPointK + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 21, Round((minBrLvlK + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 24, Round(stdDev/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 25, Round((peakPointK - minBrLvlK + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 26, Round((modePointK + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 27, Round((minPointK + 1)/256, 5), isFilter)
-       updateFilesListByID(imgIndex, 29, entireImgSmall, isFilter)
-       updateFilesListByID(imgIndex, 30, entireImgBig, isFilter)
-       updateFilesListByID(imgIndex, 31, hentireImgSmall, isFilter)
-       updateFilesListByID(imgIndex, 32, hentireImgBig, isFilter)
-    }
-    ; ToolTip, % medianValue "=" r.avg "=" peakPointK "=" minBrLvlK , , , 2
+    ; The pixel fingerprints were extracted here, from this very bitmap: grey, optionally
+    ; blurred, resized to 9x8 and 32x32, blue channel dumped. That whole chain now runs in
+    ; qpvmain.dll on a pool of worker threads (dupes-pixels.h) - which is the only reason
+    ; a first scan of a large library is no longer one image at a time - and it is the
+    ; ONLY producer of fingerprints, so every one of them in a database is comparable with
+    ; every other one. Keeping a second producer here would have quietly made images
+    ; collected while sorting incomparable with images collected by the duplicate finder.
+    ;
+    ; This used to have a second mode that returned the eight values as an object instead
+    ; of writing them into the files list, for the database collection to hand to
+    ; updateSQLdbEntryImgHisto(). That collection is the pool's now, so the values only
+    ; ever go one way: into the in-memory list, for sorting and filtering.
+    updateFilesListByID(imgIndex, 11, 1, isFilter)
+    updateFilesListByID(imgIndex, 18, Round((avgu + 1)/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 19, Round((medianValue + 1)/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 20, Round((peakPointK + 1)/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 21, Round((minBrLvlK + 1)/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 24, Round(stdDev/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 25, Round((peakPointK - minBrLvlK + 1)/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 26, Round((modePointK + 1)/256, 5), isFilter)
+    updateFilesListByID(imgIndex, 27, Round((minPointK + 1)/256, 5), isFilter)
     Return 1
 }
 
-GetCachableHistogramFile(imgPath, imgIndex, returnObj:=0, isFilter:=0, zEffect:=0) {
+; Decodes one image and fills the in-memory files list with its histogram statistics and
+; its dimensions. It used to have a second mode that returned both as objects instead, for
+; the database collection to write; that collection runs on the worker pool inside
+; qpvmain.dll now, so this is only ever the sorting and filtering path.
+GetCachableHistogramFile(imgPath, imgIndex, isFilter:=0, zEffect:=0) {
      If (!imgPath || !imgIndex)
      {
         addJournalEntry(A_ThisFunc "() - incorrect params error: " imgPath " | " imgIndex)
@@ -98878,51 +99096,25 @@ GetCachableHistogramFile(imgPath, imgIndex, returnObj:=0, isFilter:=0, zEffect:=
      sizesDesired := []
      sizesDesired[1] := [350, 350, 0, 1, thisPolation, 0, 0]
      thumbBMP := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired)
-     If (SLDtypeLoaded=3)
-     {
-        If (findFlippedDupes=1)
-        {
-           sizesDesired[1] := [350, 350, 0, 1, thisPolation, 4, 0]
-           otherBMP := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired)
-        }
-     }
+     ; a second, horizontally flipped decode used to happen here purely to build the
+     ; flipped fingerprints; the pool mirrors the bitmap it already has instead
 
      r := (mainLoadedIMGdetails.Width>1 && mainLoadedIMGdetails.Height>1) ? 1 : 0
      If (validBMP(thumbBMP) && r)
      {
-        If (returnObj=1)
-        {
-           imgInfosObju := []
-           imgInfosObju.dpi := mainLoadedIMGdetails.dpi
-           imgInfosObju.w := mainLoadedIMGdetails.Width
-           imgInfosObju.h := mainLoadedIMGdetails.Height
-           imgInfosObju.pixFmt := mainLoadedIMGdetails.PixelFormat
-           imgInfosObju.frames := (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames + 1 : 1
-        } Else
-        {
-           updateFilesListByID(imgIndex, 9, (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames + 1 : 1, isFilter)
-           updateFilesListByID(imgIndex, 13, mainLoadedIMGdetails.Width, isFilter)
-           updateFilesListByID(imgIndex, 14, mainLoadedIMGdetails.Height, isFilter)
-           updateFilesListByID(imgIndex, 15, mainLoadedIMGdetails.PixelFormat, isFilter)
-           updateFilesListByID(imgIndex, 16, Round(mainLoadedIMGdetails.Width / mainLoadedIMGdetails.Height, 2), isFilter)
-           updateFilesListByID(imgIndex, 17, Round((mainLoadedIMGdetails.Width * mainLoadedIMGdetails.Height)/1000000, 2), isFilter)
-           updateFilesListByID(imgIndex, 22, mainLoadedIMGdetails.dpi, isFilter)
-        }
-     } Else imgInfosObju := 0
+        updateFilesListByID(imgIndex, 9, (mainLoadedIMGdetails.Frames) ? mainLoadedIMGdetails.Frames + 1 : 1, isFilter)
+        updateFilesListByID(imgIndex, 13, mainLoadedIMGdetails.Width, isFilter)
+        updateFilesListByID(imgIndex, 14, mainLoadedIMGdetails.Height, isFilter)
+        updateFilesListByID(imgIndex, 15, mainLoadedIMGdetails.PixelFormat, isFilter)
+        updateFilesListByID(imgIndex, 16, Round(mainLoadedIMGdetails.Width / mainLoadedIMGdetails.Height, 2), isFilter)
+        updateFilesListByID(imgIndex, 17, Round((mainLoadedIMGdetails.Width * mainLoadedIMGdetails.Height)/1000000, 2), isFilter)
+        updateFilesListByID(imgIndex, 22, mainLoadedIMGdetails.dpi, isFilter)
+     }
 
-     If r
-        histoObj := calcHistoAvgFile(thumbBMP, returnObj, isFilter, imgIndex, zEffect, otherBMP)
-     Else
-        histoObj := 0
-
-     trGdip_DisposeImage(otherBMP, 1)
+     histoObj := r ? calcHistoAvgFile(thumbBMP, isFilter, imgIndex, zEffect) : 0
      trGdip_DisposeImage(thumbBMP, 1)
-     If (IsObject(histoObj) && returnObj=1)
-        Return [histoObj, imgInfosObju]
-     Else
-        Return histoObj
-        ; fnOutputDebug(A_ThisFunc "() - no cache: " imgPath)
-     ; } Else fnOutputDebug(A_ThisFunc "() - failed to generate histogram: " imgIndex " = " imgPath)
+     Return histoObj
+     ; fnOutputDebug(A_ThisFunc "() - failed to generate histogram: " imgIndex " = " imgPath)
 }
 
 SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, fileEXT:=0, gdipDepth:=32) {
