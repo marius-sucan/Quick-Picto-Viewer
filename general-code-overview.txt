@@ -1036,17 +1036,14 @@ n) How to add a new panel/tool
 
    Assign a unique window ID for the new panel (e.g., IDwin := 99). This value
    represents the active panel ID and is assigned to "AnyWindowOpen" variable.
-   The IDs are allocated by hand and there is no central table of them: grep for
-   createSettingsGUI( and fakeWinCreator( to find one that is still free.
+   The IDs are allocated by hand and there is no central table of them. You can
+   do a grep for createSettingsGUI( and fakeWinCreator( to find one that is
+   still free.
 
-   Only live image editing tools belong in BTNopenPrevPanel(). That Else If chain
-   is the return path out of the vector shape editor, keyed on "postVectorWinOpen",
-   and it lists editor IDs only. None of the list, stats or manager panels appear
-   in it, so a branch added there for one of them can never be reached.
-   If an ordinary panel needs a "Back" button to the panel that invoked it, call
-   getHostPanelFunc() BEFORE createSettingsGUI() - that one overwrites
-   prevOpenedWindow with its own entry - and then call the function it returned.
-   See BtnCollectFileInfos() and PanelStateOFsqlNation() for the pattern.
+   Live image editing tools belong in BTNopenPrevPanel(). Add the panel ID there 
+   to have your panel tracked. If an ordinary panel needs a "Back" button to the
+   panel that invoked it, call getHostPanelFunc() before createSettingsGUI().
+   See BtnCollectFileInfos() and PanelCachesOverview() for the pattern.
 
    Create the panel function, such as PanelMyNewTool(). Inside this function you must
    call createSettingsGUI(IDwin, A_ThisFunc) to initialize UI font configurations.

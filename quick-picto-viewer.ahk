@@ -182,7 +182,6 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , oldCustomShapePoints := [], oldVectorShapeSymmetry := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, fimMultiBMP := 0, staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
-   , sqlCachesHostPanel := ""
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
    , gdiAmbientalTexBrush := "", GDIbrushWinBGR := "", GDIbrushHatch := "", vpImgPanningNow := 0, viewportDynamicOBJcoords := []
    , mustCaptureCloneBrush := 0, hCropCornersPic2, globalWinStates := [], userAlphaMaskBmpPainted := "", lastPaintEventID := 1
@@ -28303,7 +28302,7 @@ PanelWrapperFilesStats() {
     If (SLDtypeLoaded=3)
     {
        Gui, Add, Button, x+5 hp gBtnPurgeCachedSQLdata, Pur&ge caches
-       Gui, Add, Button, x+5 hp gPanelStateOFsqlNation, Caches &overview
+       Gui, Add, Button, x+5 hp gPanelCachesOverview, Caches &overview
     }
 
     wu := (PrefsLargeFonts=1) ? 90 : 60
@@ -34346,7 +34345,7 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
 ; isDeleted=1 marks a file entry as dead or ignored. It is durable: it is set
 ; when the file is deleted from the disk, or when it cannot be read at all by
 ; the data collection. The user purges or revalidates these entries through
-; PanelStateOFsqlNation().
+; PanelCachesOverview().
 ;
 ; isDeleted=2 marks the entries of a folder about to be rescanned through
 ; wrapperAddNewFolderToList() and coreAddNewFolder().
@@ -36093,7 +36092,7 @@ extractSQLqueryFromFilter() {
     }
 }
 
-PanelStateOFsqlNation() {
+PanelCachesOverview() {
    Global LViewCaches, infoLine
 
    oka := (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern)) ? 1 : 0
@@ -36109,34 +36108,35 @@ PanelStateOFsqlNation() {
    ; own entry, and afterwards the panel this action was invoked from is unrecoverable. This
    ; is also why the «Back» button works from any caller - including the quick search - and
    ; not only from the two panels that carry a button for this one.
-   sqlCachesHostPanel := getHostPanelFunc()
+   hostPanel := getHostPanelFunc()
    If !(thisBtnHeight := createSettingsGUI(91, A_ThisFunc))
       Return
 
    ; the button row must stay inside the list view width, or the auto-sized window grows wider
    ; than its table: 190 + 190 + 65 + 65 + 3 gaps = 525 <= 580, large 305 + 305 + 95 + 95 = 815 <= 840
-   btnWid := 190
+   btnWid := 180
    btnWid2 := 65
-   lstWid := 580
+   lstWid := 380
    If (PrefsLargeFonts=1)
    {
-      lstWid := lstWid + 260
+      lstWid := lstWid + 160
       btnWid := btnWid + 115
-      btnWid2 := btnWid2 + 30
+      btnWid2 := btnWid2 + 10
       Gui, Font, s%LargeUIfontValue%
    }
 
-   Gui, Add, Text, x15 y15 w%lstWid%, This is an overview of how much data was collected pertaining to the indexed files.
+   Gui, Add, Text, x15 y15 w%lstWid%, An overview of the data collected on the indexed files.
    ; NoSortHdr: the row order carries meaning and groupDigits() writes a thin space into the
    ; numeric cells, so a header click would sort them as text and get it wrong.
    hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Missing|%", "Database caches overview")
+   Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Gathering database information`, please wait . . .
    Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNpurgeIgnoredSQLentries, &Purge ignored entries
    Gui, Add, Button, x+5 hp wp gBTNrevalidateIgnoredSQLentries, Re&validate ignored entries
-   If sqlCachesHostPanel
+   If hostPanel
       Gui, Add, Button, x+5 hp w%btnWid2% gBTNcachesOverviewBack, &Back
 
    Gui, Add, Button, x+5 hp w%btnWid2% Default gBtnCloseWindow, C&lose
-   Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Gathering database information`, please wait . . .
+   Gui, Add, Edit, x+1 h1 w1 vEditF5 -wantTab +ReadOnly, % hostPanel
    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Database caches overview: " appTitle)
    Sleep, 5
    ; on a timer, so the window is painted before the counting queries block the thread
@@ -36189,11 +36189,11 @@ uiPopulateCachesOverview() {
         If (thisRow[3]=1)
            countu := totalz - countu
 
-        percu := (totalz>0) ? Round(countu/totalz*100, 2) : 0
+        percu := (totalz>0) ? Round(countu/totalz*100, 1) : 0
         ; for the ignored entries "total minus ignored" would read as "not ignored", which is
         ; not pending work; the cell is left empty rather than filled with a misleading figure
-        missu := (thisRow[5]=1) ? groupDigits(totalz - countu) : ""
-        LV_Add("", A_Index, thisRow[1], groupDigits(countu), missu, percu)
+        missu := (thisRow[5]=1) ? totalz - countu : ""
+        LV_Add("", A_Index, thisRow[1], countu, missu, percu)
         If (AnyWindowOpen!=91)   ; the user closed the panel while the queries were running
            Break
     }
@@ -36207,11 +36207,14 @@ uiPopulateCachesOverview() {
     }
 
     Loop, 5
-        LV_ModifyCol(A_Index, "AutoHdr Left")
+    {
+        pp :=  (A_Index=2) ? "" : "Integer"
+        LV_ModifyCol(A_Index, "AutoHdr Left " pp)
+    }
 
     GuiControl, +Redraw, LViewCaches
     infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
-    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou "     Total indexed files: " groupDigits(totalz)
+    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou ". Total indexed files: " groupDigits(totalz)
     SetTimer, RemoveTooltip, -150
     SetTimer, ResetImgLoadStatus, -50
 }
@@ -36226,7 +36229,9 @@ BTNrevalidateIgnoredSQLentries() {
 
 BTNcachesOverviewBack() {
    ; read before the close: the panel reopened below overwrites the global with its own host
-   thisFunc := sqlCachesHostPanel
+   Gui, SettingsGUIA: Default
+   GuiControlGet, editF5
+   thisFunc := editF5
    BtnCloseWindow()
    If (thisFunc && IsFunc(thisFunc))
       %thisFunc%()
@@ -36390,7 +36395,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          {
             CurrentSLD := backCurrentSLD
             SetTimer, RemoveTooltip, % -msgDisplayTime
-            SetTimer, ResetImgLoadStatus, -200
+            ResetImgLoadStatus()
+            SetTimer, ResetImgLoadStatus, -300
             Return 0
          }
       }
@@ -36420,6 +36426,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
 
          PopulateIndexFilesStatsInfos("kill")
          CurrentSLD := backCurrentSLD
+         SetTimer, ResetImgLoadStatus, -300
          Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, "")
       }
 
@@ -70140,7 +70147,7 @@ createMenuStatistics() {
    kMenu("PVstats", "Add", "Collect image &properties", "BtnCollectImageInfos")
    kMenu("PVstats", "Add", "Collect image &histogram data", "BtnCollectHistoInfos")
    If (SLDtypeLoaded=3)
-      kMenu("PVstats", "Add", "Cached data overview", "PanelStateOFsqlNation")
+      kMenu("PVstats", "Add", "Cached data overview", "PanelCachesOverview")
 }
 
 createMenuFilesIndexOptions() {
@@ -89345,7 +89352,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, UpDown, vgraylevelCompressor gupdateUIdupesPanel Range1-9, % graylevelCompressor
     Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnPurgeCachedSQLdata, Pur&ge cached data
     Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xels data
-    Gui, Add, Button, x+5 hp gPanelStateOFsqlNation, &Overview
+    Gui, Add, Button, x+5 hp gPanelCachesOverview, &Overview
 
     Gui, Tab, 4
     Gui, Add, Text, x+15 y+15 Section, Filter the results and data collection with a given string:
