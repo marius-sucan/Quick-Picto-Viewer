@@ -36594,7 +36594,7 @@ initDupesPixelsPool() {
    Return dupesPixInitGood
 }
 
-; All hash generation functions are now in qpv-main.cpp: 
+; All hash generation functions are now in dupes-search.h: 
 ; dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
 ; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
 ;
@@ -86665,7 +86665,7 @@ filterDupeResultsByHdist(threshold, fromEngine:=0) {
    }
    }
 
-   ; DupesScanState offsets, from qpv-main.h: 32 groups, 36 rows, 8 done, 16 total, 24 pairs
+   ; DupesScanState offsets, from dupes-search.h: 32 groups, 36 rows, 8 done, 16 total, 24 pairs
    statePtr := DllCall("qpvmain.dll\dupesScanGetState", "UPtr")
    If (fromEngine=1)
    {
@@ -86680,7 +86680,7 @@ filterDupeResultsByHdist(threshold, fromEngine:=0) {
 
    ; The sweep runs in bounded steps rather than in one uninterruptible call. Progress is
    ; read straight out of the DLL's state block with NumGet() - see DupesScanState in
-   ; qpv-main.h for the offsets - so a tooltip refresh costs no DllCall of its own.
+   ; dupes-search.h for the offsets - so a tooltip refresh costs no DllCall of its own.
    startuZ := A_TickCount
    doStartLongOpDance()
    Loop
@@ -86739,7 +86739,7 @@ filterDupeResultsByHdist(threshold, fromEngine:=0) {
 
 ; sortDupeGroups(), testWasMSEdupes(), findDupeGroupRoot() and pullDupeRowFromCache()
 ; lived here. All four were changeHdistLevelCached()'s workings and moved into
-; dupesApplyFilter() in qpv-main.cpp with it: the union-find, the per-image and per-group
+; dupesApplyFilter() in dupes-search.h with it: the union-find, the per-image and per-group
 ; minima, the mono-group drop, and the ordering - which sortDupeGroups() did by building
 ; one "|"-delimited string of every row, handing it to the AHK Sort command and parsing it
 ; back. tests/filter_oracle.cpp fuzzes the C++ against a transcription of all of it,
@@ -86895,7 +86895,7 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
 ; drives dupesScanStep() under a time budget, so the sweep walks every group itself.
 
 retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
-   ; rowSize: sizeof(DupeCandRow) in qpv-main.h - imgidu, fsize, megapix, groupID, pathOffset
+   ; rowSize: sizeof(DupeCandRow) in dupes-search.h - imgidu, fsize, megapix, groupID, pathOffset
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|dHash|lHash|pHash|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt)"
         , rowSize := 32, fetchRows := 2048, rowsBuf
    If SortCriterion
@@ -87028,7 +87028,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    ; The engine also replaces the self-join with one sorted scan: the rows arrive
    ; ordered by the grouping columns, so a group is a run of consecutive rows.
    ; The column order below is a contract with dupesQueryBegin() - see the comment
-   ; above it in qpv-main.cpp - and the ORDER BY has to lead with the same key
+   ; above it in dupes-search.h - and the ORDER BY has to lead with the same key
    ; expressions or the runs are not runs.
    useEngine := 0
    If (dupesEngineInitGood=1 && activeSQLdb._Path)

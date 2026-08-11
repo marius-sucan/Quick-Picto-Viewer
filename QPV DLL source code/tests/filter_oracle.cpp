@@ -1,5 +1,5 @@
 // Oracle for the threshold filter and the grouping: the SHIPPED dupesApplyFilter(), text
-// -sliced out of qpv-main.cpp, against a line-by-line transcription of the AHK it
+// -sliced out of dupes-search.h, against a line-by-line transcription of the AHK it
 // replaced - changeHdistLevelCached()'s pair loop, its union-find, and sortDupeGroups().
 //
 // This is the part of the pipeline where a subtle difference is invisible: nothing

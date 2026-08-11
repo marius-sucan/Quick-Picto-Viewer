@@ -7,10 +7,15 @@ tests slice the functions under test straight out of the shipped sources and com
 against minimal Windows shims.
 
 The slicing is the point. A scratch copy of an algorithm drifts from the shipped one and
-then proves nothing; `run-tests.sh` re-extracts from `../qpv-main.cpp` and `../qpv-main.h`
-on every run and fails loudly if an anchor stops matching. The markers it anchors on
+then proves nothing; `run-tests.sh` re-extracts from `../dupes-search.h` on every run and
+fails loudly if an anchor stops matching. The markers it anchors on
 (`qpv-dupes-block-end`, `qpv-dupes-query-begin`, `qpv-dupes-state-end`, `qpv-dct-block-end`
 and friends) are comments in the sources; leave them there.
+
+`dupes-search.h` is the whole duplicate-identification pipeline in one file — the sweep,
+the grouping, the candidate query engine, hash generation, the DCT, and the records
+AutoHotkey reads by byte offset. It used to be the middle third of `qpv-main.cpp`, with
+the records in `qpv-main.h`, which is why the anchors are worded the way they are.
 
 ## Running
 

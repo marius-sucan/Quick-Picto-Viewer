@@ -43,16 +43,16 @@ __attribute__((unused)) static void fnOutputDebug(std::string s) {
 static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "../sqlite-dynamic.h"   // verbatim, the shipped run-time binder
-#include "header_extract.h"      // verbatim from qpv-main.h
+#include "header_extract.h"      // verbatim from dupes-search.h
 
-// three literal declarations from qpv-main.h, outside the sliced region
+// three literal declarations from dupes-search.h, outside the sliced region
 const double div2sz = sqrt(2.0 / 32.0);
 const double div2sq = 1 / sqrt(2.0);
 std::array<double, 1025> DCTcoeffs;
 
 #include "dct_extract.cpp"       // verbatim: calculateDCT + calcPHashAlgo, for pHash
-#include "block_extract.cpp"     // verbatim from qpv-main.cpp: the sweep
-#include "query_extract.cpp"     // verbatim from qpv-main.cpp: the query engine
+#include "block_extract.cpp"     // verbatim from dupes-search.h: the sweep
+#include "query_extract.cpp"     // verbatim from dupes-search.h: the query engine
 
 // ---- helpers -------------------------------------------------------------------------
 

@@ -187,6 +187,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dupes-pixels.h" />
+    <ClInclude Include="dupes-search.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="freeimage-dynamic.h" />
     <ClInclude Include="pch.h" />

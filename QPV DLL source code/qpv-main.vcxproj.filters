@@ -36,6 +36,9 @@
     <ClInclude Include="dupes-pixels.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
+    <ClInclude Include="dupes-search.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
     <ClInclude Include="sqlite-dynamic.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>

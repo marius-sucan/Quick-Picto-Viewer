@@ -1,4 +1,4 @@
-// Compiles the shipped duplicate-search block out of qpv-main.cpp against minimal
+// Compiles the shipped duplicate-search block out of dupes-search.h against minimal
 // Windows shims and exercises it end to end, so a syntax error, a type error or a
 // broken result contract is caught here rather than on the MSVC box.
 // Built with -fopenmp, so the "#pragma omp parallel for" clause is parsed too.
@@ -40,14 +40,14 @@ typedef const wchar_t*     LPCWSTR;
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
 static void SetWindowText(HWND, LPCWSTR) {}
 
-#include "header_extract.h"    // verbatim from qpv-main.h
+#include "header_extract.h"    // verbatim from dupes-search.h
 
 // dupesScanEnd() and dupesClearPairs() forward-declare this so a scan can hand back its
 // candidate rows without the sweep knowing where they came from. The query engine that
 // defines it is not part of this test; query_engine.cpp covers that half.
 void dupesQueryFreeRows() {}
 
-#include "block_extract.cpp"   // verbatim from qpv-main.cpp
+#include "block_extract.cpp"   // verbatim from dupes-search.h
 
 // ------------------------------------------------------------------------------------
 

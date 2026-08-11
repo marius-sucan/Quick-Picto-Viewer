@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies the duplicate-search maths in qpv-main.cpp on a machine that cannot build
+# Verifies the duplicate-search maths in dupes-search.h on a machine that cannot build
 # the DLL (no MSVC, no WIC, no Direct2D). The functions under test are TEXT-SLICED out
 # of the shipped sources on every run, so what is tested is what actually ships rather
 # than a scratch copy that can drift.
@@ -17,11 +17,13 @@ set -u
 cd "$(dirname "$0")" || exit 1
 
 CXXFLAGS="-O2 -std=c++17 -msse2 -mfpmath=sse -Wall"
-SRC="../qpv-main.cpp"
-HDR="../qpv-main.h"
+# One file now: the pipeline, the records AHK reads by byte offset and the DCT all moved
+# out of qpv-main.cpp/.h into dupes-search.h, so every slice below comes from the same
+# place. thumbs-pool.h is named inline by the one slice that needs it.
+SRC="../dupes-search.h"
 fail=0
 
-for f in "$SRC" "$HDR"; do
+for f in "$SRC"; do
     [ -r "$f" ] || { echo "cannot read $f - run this from inside the tests directory"; exit 1; }
 done
 
@@ -48,7 +50,7 @@ cat msd_score.part >> msd_extract.cpp && rm -f msd_score.part
 slice decode_extract.cpp "$SRC" '^static void decodeFingerprintChunk'  '^}' 20 || exit 1
 slice decode_blob.part   "$SRC" '^static void decodeFingerprintBlob'   '^}' 5  || exit 1
 cat decode_blob.part >> decode_extract.cpp && rm -f decode_blob.part
-slice header_extract.h   "$HDR" '^\/\/ One record per surviving image pair' '^\/\/ qpv-dupes-query-state-end' 55 || exit 1
+slice header_extract.h   "$SRC" '^\/\/ One record per surviving image pair' '^\/\/ qpv-dupes-query-state-end' 55 || exit 1
 slice block_extract.cpp  "$SRC" '^\/\/ SWAR population count'          '^\/\/ qpv-dupes-block-end' 450 || exit 1
 slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qpv-dupes-query-end' 350 || exit 1
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1

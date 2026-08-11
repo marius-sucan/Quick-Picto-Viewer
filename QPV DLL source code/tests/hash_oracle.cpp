@@ -1,5 +1,5 @@
 // Oracle for the perceptual hashes: the SHIPPED dupesDHash/dupesLHash/dupesPHash and the
-// fingerprint decode that feeds them, text-sliced out of qpv-main.cpp, against a
+// fingerprint decode that feeds them, text-sliced out of dupes-search.h, against a
 // transcription of the AHK they replaced.
 //
 // The stakes here are the highest in the pipeline: a hash that differs by one bit is not
@@ -45,7 +45,7 @@ static void SetWindowText(HWND, LPCWSTR) {}
 #include "../sqlite-dynamic.h"
 #include "header_extract.h"
 
-// The DCT table and its two scale factors live in qpv-main.h outside the sliced region;
+// The DCT table and its two scale factors live in dupes-search.h outside the sliced region;
 // copied here rather than sliced because they are three literal declarations, and the
 // oracle's whole point is that everything with logic in it comes from the real source.
 const double div2sz = sqrt(2.0 / 32.0);

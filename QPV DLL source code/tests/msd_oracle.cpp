@@ -1,5 +1,5 @@
 // Oracle harness for the MSD port: the SHIPPED msdScore()/decodeFingerprintBlob() are
-// text-sliced out of qpv-main.cpp by run-tests.sh, so this tests what
+// text-sliced out of dupes-search.h by run-tests.sh, so this tests what
 // actually ships, not a scratch copy.
 //
 // Reference side reimplements the retired AHK pair exactly:
