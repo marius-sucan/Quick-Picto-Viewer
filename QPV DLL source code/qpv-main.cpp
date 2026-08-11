@@ -74,6 +74,9 @@ void fnOutputDebug(std::string input) {
   #define QPV_FORCEINLINE inline __attribute__((always_inline))
 #endif
 
+IWICImagingFactory *m_pIWICFactory;
+ID2D1Factory       *pD2D1Factory;
+
 inline bool inRange(const float &low, const float &high, const float &x) {
     return (low <= x && x <= high);
 }
@@ -184,9 +187,6 @@ static inline float compute_blend_float(int mode, float rOf, float rBf) {
     }
     return max(0.0f, min(1.0f, rT));
 }
-
-IWICImagingFactory *m_pIWICFactory;
-ID2D1Factory       *pD2D1Factory;
 
 DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     debugInfos = modus;
@@ -315,6 +315,48 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     return (SUCCEEDED(hr)) ? 1 : 0;
 }
 
+int inline getGrayscale(int r, int g, int b) {
+    return clamp((int)round(char_to_grayRfloat[clamp(r, 0, 255)] + char_to_grayGfloat[clamp(g, 0, 255)] + char_to_grayBfloat[clamp(b, 0, 255)]), 0, 255);
+}
+
+int inline brightMaths(int i, float fintensity) {
+    return clamp((int)(i + round((float)i * fintensity)), 0, 255);
+}
+
+int inline contraMaths(int i, float fintensity, float deviation) {
+    return clamp((int)(floor(fintensity * (i - 128.0f)) + deviation), 0, 255);
+}
+
+int inline gammaMaths(int i, double gamma) {
+    return round(255.0f * pow(char_to_float[clamp(i, 0, 255)], gamma));
+}
+
+int inline getInt16grayscale(int r, int g, int b) {
+    return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
+}
+
+int inline brightMathsInt16(int i, float fintensity) {
+    return clamp((int)(i + (float)i * fintensity), 0, 65535);
+}
+
+int inline contraMathsInt16(int i, float fintensity, float deviation) {
+    return clamp((int)(floor(fintensity * (i - 32768.0f)) + deviation), 0, 65535);
+}
+
+int inline gammaMathsInt16(int i, double gamma) {
+    return round(65535.0f * pow(int_to_float[clamp(i, 0, 65535)], gamma));
+}
+
+#include "qpv-main.h"
+// The duplicate-identification pipeline used to sit right here, between ColorizeGrayImage()
+// and SafeRelease(): the Hamming/MSD sweep, the whole-scan cursor, the threshold filter and
+// grouping, the candidate query engine, hash generation and the DCT that pHash is built on.
+// It is a file of its own now. Still #included rather than compiled separately - it shares
+// fnOutputDebug(), the DLL_API / QPV_FORCEINLINE macros and M_PI with this translation unit,
+// and it brings in sqlite-dynamic.h, whose binding is static and has to be the same one
+// dupes-pixels.h uses further down.
+#include "dupes-search.h"
+
 std::string ucs2_to_utf8(const unsigned short* ucs2_data, std::size_t length) {
 // Converts a UCS2 buffer (array of unsigned short) to a UTF-8 encoded std::string.
     std::string utf8_result;
@@ -355,41 +397,6 @@ std::string WideCharToString(const wchar_t* inwstr) {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     return converter.to_bytes(wstr);
 }
-
-int inline getGrayscale(int r, int g, int b) {
-    return clamp((int)round(char_to_grayRfloat[clamp(r, 0, 255)] + char_to_grayGfloat[clamp(g, 0, 255)] + char_to_grayBfloat[clamp(b, 0, 255)]), 0, 255);
-}
-
-int inline brightMaths(int i, float fintensity) {
-    return clamp((int)(i + round((float)i * fintensity)), 0, 255);
-}
-
-int inline contraMaths(int i, float fintensity, float deviation) {
-    return clamp((int)(floor(fintensity * (i - 128.0f)) + deviation), 0, 255);
-}
-
-int inline gammaMaths(int i, double gamma) {
-    return round(255.0f * pow(char_to_float[clamp(i, 0, 255)], gamma));
-}
-
-int inline getInt16grayscale(int r, int g, int b) {
-    return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
-}
-
-int inline brightMathsInt16(int i, float fintensity) {
-    return clamp((int)(i + (float)i * fintensity), 0, 65535);
-}
-
-int inline contraMathsInt16(int i, float fintensity, float deviation) {
-    return clamp((int)(floor(fintensity * (i - 32768.0f)) + deviation), 0, 65535);
-}
-
-int inline gammaMathsInt16(int i, double gamma) {
-    return round(65535.0f * pow(int_to_float[clamp(i, 0, 65535)], gamma));
-}
-
-
-#include "qpv-main.h"
 
 inline INT64 CalcPixOffset(const int &x, const int &y, const int &Stride, const int &bitsPerPixel) {
     return (INT64)y * Stride + (INT64)x * (bitsPerPixel / 8);
@@ -442,6 +449,7 @@ bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
 }
 
 
+DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel) {
 /*
 pBitmap and pBitmapMask must be the same width and height
 and in 32-ARGB format: PXF32ARGB - 0x26200A.
@@ -450,8 +458,6 @@ The alpha channel will be applied directly on the pBitmap provided.
 
 For best results, pBitmapMask should be grayscale.
 */
-
-DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel) {
     const int bpc = bpp / 8;
     #pragma omp parallel for schedule(dynamic)
     for (int y = 0; y < h; y++)
@@ -5410,15 +5416,6 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     }
     return 1;
 }
-
-// The duplicate-identification pipeline used to sit right here, between ColorizeGrayImage()
-// and SafeRelease(): the Hamming/MSD sweep, the whole-scan cursor, the threshold filter and
-// grouping, the candidate query engine, hash generation and the DCT that pHash is built on.
-// It is a file of its own now. Still #included rather than compiled separately - it shares
-// fnOutputDebug(), the DLL_API / QPV_FORCEINLINE macros and M_PI with this translation unit,
-// and it brings in sqlite-dynamic.h, whose binding is static and has to be the same one
-// dupes-pixels.h uses further down.
-#include "dupes-search.h"
 
 template <typename T> inline void SafeRelease(T *&p, std::string infos, int d) {
     if (p!=NULL) {
