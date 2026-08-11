@@ -66673,8 +66673,8 @@ createMenuNavigation() {
    kMenu("PVnav", "Add", "&Last`tEnd", "LastPicture",, " image in index")
    If (thumbsDisplaying=1)
    {
-      kMenu("PVnav", "Add", "&Previous page`tPage down", "MenuPrevThumbsPage",, " image index")
-      kMenu("PVnav", "Add", "&Next page`tPage up", "MenuNextThumbsPage",, " image index")
+      kMenu("PVnav", "Add", "&Previous page`tPage up", "MenuPrevThumbsPage",, " image index")
+      kMenu("PVnav", "Add", "&Next page`tPage down", "MenuNextThumbsPage",, " image index")
    }
 
    kMenu("PVnav", "Add", "&Previously displayed image`tCtrl+Backspace", "jumpPreviousImage")
@@ -75966,8 +75966,8 @@ calcRelativeSelCoords(whichBitmap, imgW:=0, imgH:=0) {
    imgSelY1 := Round(prcSelY1*imgH)
    imgSelX2 := Round(prcSelX2*imgW)
    imgSelY2 := Round(prcSelY2*imgH)
-   nImgSelX1 := imgSelX1 := min(imgSelX1, imgSelX2)
-   nImgSelY1 := imgSelY1 := min(imgSelY1, imgSelY2)
+   nImgSelX1 := min(imgSelX1, imgSelX2)
+   nImgSelY1 := min(imgSelY1, imgSelY2)
    nimgSelX2 := max(imgSelX1, imgSelX2)
    nimgSelY2 := max(imgSelY1, imgSelY2)
  
