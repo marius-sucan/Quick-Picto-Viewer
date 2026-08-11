@@ -1,4 +1,6 @@
 # regenerated from the shipped sources on every run
+jpeg2pdf_mutant.h
+jpeg2pdf_mutant.cpp
 msd_extract.cpp
 decode_extract.cpp
 header_extract.h
@@ -23,3 +25,5 @@ query_engine
 pixels_smoke
 pixels_mutant
 thumbs_record
+pdf_document
+pdf_mutant
