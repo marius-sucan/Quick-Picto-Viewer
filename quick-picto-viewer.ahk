@@ -182,6 +182,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , oldCustomShapePoints := [], oldVectorShapeSymmetry := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, fimMultiBMP := 0, staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
+   , sqlCachesHostPanel := ""
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
    , gdiAmbientalTexBrush := "", GDIbrushWinBGR := "", GDIbrushHatch := "", vpImgPanningNow := 0, viewportDynamicOBJcoords := []
    , mustCaptureCloneBrush := 0, hCropCornersPic2, globalWinStates := [], userAlphaMaskBmpPainted := "", lastPaintEventID := 1
@@ -36093,6 +36094,8 @@ extractSQLqueryFromFilter() {
 }
 
 PanelStateOFsqlNation() {
+   Global LViewCaches, infoLine
+
    oka := (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern)) ? 1 : 0
    If (oka!=1)
    {
@@ -36102,110 +36105,187 @@ PanelStateOFsqlNation() {
       Return
    }
 
-   If AnyWindowOpen
+   ; Must be read before createSettingsGUI(): that one overwrites prevOpenedWindow with its
+   ; own entry, and afterwards the panel this action was invoked from is unrecoverable. This
+   ; is also why the «Back» button works from any caller - including the quick search - and
+   ; not only from the two panels that carry a button for this one.
+   sqlCachesHostPanel := getHostPanelFunc()
+   If !(thisBtnHeight := createSettingsGUI(91, A_ThisFunc))
+      Return
+
+   ; the button row must stay inside the list view width, or the auto-sized window grows wider
+   ; than its table: 190 + 190 + 65 + 65 + 3 gaps = 525 <= 580, large 305 + 305 + 95 + 95 = 815 <= 840
+   btnWid := 190
+   btnWid2 := 65
+   lstWid := 580
+   If (PrefsLargeFonts=1)
    {
-      zz := AnyWindowOpen
-      BtnCloseWindow()
+      lstWid := lstWid + 260
+      btnWid := btnWid + 115
+      btnWid2 := btnWid2 + 30
+      Gui, Font, s%LargeUIfontValue%
    }
 
-   backCurrentSLD := CurrentSLD
-   CurrentSLD := ""
+   Gui, Add, Text, x15 y15 w%lstWid%, This is an overview of how much data was collected pertaining to the indexed files.
+   ; NoSortHdr: the row order carries meaning and groupDigits() writes a thin space into the
+   ; numeric cells, so a header click would sort them as text and get it wrong.
+   hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Missing|%", "Database caches overview")
+   Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNpurgeIgnoredSQLentries, &Purge ignored entries
+   Gui, Add, Button, x+5 hp wp gBTNrevalidateIgnoredSQLentries, Re&validate ignored entries
+   If sqlCachesHostPanel
+      Gui, Add, Button, x+5 hp w%btnWid2% gBTNcachesOverviewBack, &Back
 
-   setImageLoading()
-   showTOOLtip("Gathering database information: total number", 0, 0, 0.1/13)
-   totalz := getTotalIMGsSQLdb()
-   showTOOLtip("Gathering database information: ignored files", 0, 0, 1/13)
-   ignored := getTotalIMGsSQLdb("WHERE isDeleted IS NOT 0")
-   showTOOLtip("Gathering database information: file details", 0, 0, 2/13)
-   fsize := totalz - getTotalIMGsSQLdb("WHERE ifnull(fsize, '')='' ")
-   showTOOLtip("Gathering database information: image details", 0, 0, 3/13)
-   ; imgpixfmt, not imgmegapix, for the reason collectSQLFileInfosNow() gives: imgmegapix is
-   ; generated from imgwidth, so it can carry a value for an image whose properties are only
-   ; half collected. This figure has to describe the same population that "collect image
-   ; details" would go and scan, or the panel reports 100% for work that is still pending.
-   imgmegapix := totalz - getTotalIMGsSQLdb("WHERE ifnull(imgmegapix, '')='' OR ifnull(imgpixfmt, '')='' ")
-   showTOOLtip("Gathering database information: image histograms", 0, 0, 4/13)
-   imgmedian := totalz - getTotalIMGsSQLdb("WHERE ifnull(imgmedian, '')='' ")
-   showTOOLtip("Gathering database information: pixel data", 0, 0, 5/13)
-   pixelzFsmall := getTotalIMGsSQLdb(SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"))
-   showTOOLtip("Gathering database information: pixel data (flipped)", 0, 0, 6/13)
-   HpixelzFsmall := getTotalIMGsSQLdb(SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"))
-   showTOOLtip("Gathering database information: image hashes", 0, 0, 7/13)
-   dHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(dHash, '')='' ")
-   showTOOLtip("Gathering database information: image hashes", 0, 0, 8/13)
-   pHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(pHash, '')='' ")
-   showTOOLtip("Gathering database information: image hashes", 0, 0, 9/13)
-   lHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(lHash, '')='' ")
-   showTOOLtip("Gathering database information: image hashes (flipped)", 0, 0, 10/13)
-   hdHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(hdHash, '')='' ")
-   showTOOLtip("Gathering database information: image hashes (flipped)", 0, 0, 11/13)
-   hpHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(hpHash, '')='' ")
-   showTOOLtip("Gathering database information: image hashes (flipped)", 0, 0, 12/13)
-   hlHash := totalz - getTotalIMGsSQLdb("WHERE ifnull(hlHash, '')='' ")
+   Gui, Add, Button, x+5 hp w%btnWid2% Default gBtnCloseWindow, C&lose
+   Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Gathering database information`, please wait . . .
+   repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Database caches overview: " appTitle)
+   Sleep, 5
+   ; on a timer, so the window is painted before the counting queries block the thread
+   SetTimer, uiPopulateCachesOverview, -50
+}
 
-   showTOOLtip("Gathering database information: finishing", 0, 0, 13/13)
-   bonusBtn := (ignored>1) ? "|Purge ignored entries|Revalidate ignored entries" : ""
-   ogn := ignored
-   ignored := "Ignored or deleted file entries: " groupDigits(ignored) " ( " Round(ignored / totalz * 100, 2) "% )"
-   fsize := "File details: " groupDigits(fsize) " ( " Round(fsize / totalz * 100, 2) "% )"
-   imgmegapix := "Image details: " groupDigits(imgmegapix) " ( " Round(imgmegapix / totalz * 100, 2) "% )"
-   imgmedian := "Image histogram details: " groupDigits(imgmedian) " ( " Round(imgmedian / totalz * 100, 2) "% )"
-   pixelzFsmall := "Pixels data (9x8, 32x32): " groupDigits(pixelzFsmall) " ( " Round(pixelzFsmall / totalz * 100, 2) "% )"
-   HpixelzFsmall := "Flipped pixels data (8x8, 32x32): " groupDigits(HpixelzFsmall) " ( " Round(HpixelzFsmall / totalz * 100, 2) "% )"
-   dHash := " `nImage hashes:`ndHash (8x8): " groupDigits(dHash) " ( " Round(dHash / totalz * 100, 2) "% )"
-   pHash := "pHash (32x32): " groupDigits(pHash) " ( " Round(pHash / totalz * 100, 2) "% )"
-   lHash := "lHash (8x8): " groupDigits(lHash) " ( " Round(lHash / totalz * 100, 2) "% )"
-   hdHash := " `ndHash (8x8, flipped): " groupDigits(hdHash) " ( " Round(hdHash / totalz * 100, 2) "% )"
-   hpHash := "pHash (32x32, flipped): " groupDigits(hpHash) " ( " Round(hpHash / totalz * 100, 2) "% )"
-   hlHash := "lHash (8x8, flipped): " groupDigits(hlHash) " ( " Round(hlHash / totalz * 100, 2) "% )"
-   SetTimer, RemoveTooltip, -150
-   SetTimer, ResetImgLoadStatus, -50
-   CurrentSLD := backCurrentSLD
-   infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
-   msgu := "Database version: " dbVersion infou "`nTotal indexed files: " groupDigits(totalz) "`n" ignored "`n" fsize "`n" imgmegapix "`n" imgmedian "`n" pixelzFsmall "`n" HpixelzFsmall "`n" dHash "`n" pHash "`n" lHash "`n" hdHash "`n" hpHash "`n" hlHash 
-   widthu := (PrefsLargeFonts=1) ? 1150 : 660
-   back := (zz>0) ? "&Back" : ""
-   msgResult := msgBoxWrapper("Database overview: " appTitle, "This is an overview of how much data was collected pertaining to the indexed files.`n`n" msgu, back bonusBtn "|C&lose", 1, 0, 0, 0, "", "", 0, 0, widthu)
-   If InStr(msgResult, "revalidate")
+uiPopulateCachesOverview() {
+    If (AnyWindowOpen!=91)
+       Return
+
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: ListView, LViewCaches
+
+    ; One table for the whole overview: label | SQL tail | 1 = the query counts the rows that
+    ; are still MISSING the data, so it has to be subtracted from the total | progress message
+    ; | 1 = the "Missing" cell means something for this row.
+    rowsDef := []
+    rowsDef[1] := ["Ignored or deleted file entries", "WHERE isDeleted IS NOT 0", 0, "ignored files", 0]
+    rowsDef[2] := ["File details", "WHERE ifnull(fsize, '')='' ", 1, "file details", 1]
+    ; imgpixfmt, not imgmegapix, for the reason collectSQLFileInfosNow() gives: imgmegapix is
+    ; generated from imgwidth, so it can carry a value for an image whose properties are only
+    ; half collected. This figure has to describe the same population that "collect image
+    ; details" would go and scan, or the panel reports 100% for work that is still pending.
+    rowsDef[3] := ["Image details", "WHERE ifnull(imgmegapix, '')='' OR ifnull(imgpixfmt, '')='' ", 1, "image details", 1]
+    rowsDef[4] := ["Image histogram details", "WHERE ifnull(imgmedian, '')='' ", 1, "image histograms", 1]
+    rowsDef[5] := ["Pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
+    rowsDef[6] := ["Flipped pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"), 0, "pixel data (flipped)", 1]
+    rowsDef[7] := ["dHash (8x8)", "WHERE ifnull(dHash, '')='' ", 1, "image hashes", 1]
+    rowsDef[8] := ["pHash (32x32)", "WHERE ifnull(pHash, '')='' ", 1, "image hashes", 1]
+    rowsDef[9] := ["lHash (8x8)", "WHERE ifnull(lHash, '')='' ", 1, "image hashes", 1]
+    rowsDef[10] := ["dHash (8x8, flipped)", "WHERE ifnull(hdHash, '')='' ", 1, "image hashes (flipped)", 1]
+    rowsDef[11] := ["pHash (32x32, flipped)", "WHERE ifnull(hpHash, '')='' ", 1, "image hashes (flipped)", 1]
+    rowsDef[12] := ["lHash (8x8, flipped)", "WHERE ifnull(hlHash, '')='' ", 1, "image hashes (flipped)", 1]
+
+    setImageLoading()
+    GuiControl, SettingsGUIA:, infoLine, Gathering database information`, please wait . . .
+    GuiControl, -Redraw, LViewCaches
+    LV_Delete()
+    backCurrentSLD := CurrentSLD
+    CurrentSLD := ""
+    totalu := rowsDef.Count()
+    showTOOLtip("Gathering database information: total number", 0, 0, 0.1/(totalu + 1))
+    totalz := getTotalIMGsSQLdb()
+    Loop, % totalu
+    {
+        thisRow := rowsDef[A_Index]
+        showTOOLtip("Gathering database information: " thisRow[4], 0, 0, A_Index/(totalu + 1))
+        countu := getTotalIMGsSQLdb(thisRow[2])
+        countu := countu ? countu : 0    ; getTotalIMGsSQLdb() returns blank, not zero, on a failed query
+        If (thisRow[3]=1)
+           countu := totalz - countu
+
+        percu := (totalz>0) ? Round(countu/totalz*100, 2) : 0
+        ; for the ignored entries "total minus ignored" would read as "not ignored", which is
+        ; not pending work; the cell is left empty rather than filled with a misleading figure
+        missu := (thisRow[5]=1) ? groupDigits(totalz - countu) : ""
+        LV_Add("", A_Index, thisRow[1], groupDigits(countu), missu, percu)
+        If (AnyWindowOpen!=91)   ; the user closed the panel while the queries were running
+           Break
+    }
+
+    CurrentSLD := backCurrentSLD
+    If (AnyWindowOpen!=91)
+    {
+       RemoveTooltip()
+       SetTimer, ResetImgLoadStatus, -50
+       Return
+    }
+
+    Loop, 5
+        LV_ModifyCol(A_Index, "AutoHdr Left")
+
+    GuiControl, +Redraw, LViewCaches
+    infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
+    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou "     Total indexed files: " groupDigits(totalz)
+    SetTimer, RemoveTooltip, -150
+    SetTimer, ResetImgLoadStatus, -50
+}
+
+BTNpurgeIgnoredSQLentries() {
+   coreCachesOverviewIgnoredAct("purge")
+}
+
+BTNrevalidateIgnoredSQLentries() {
+   coreCachesOverviewIgnoredAct("revalidate")
+}
+
+BTNcachesOverviewBack() {
+   ; read before the close: the panel reopened below overwrites the global with its own host
+   thisFunc := sqlCachesHostPanel
+   BtnCloseWindow()
+   If (thisFunc && IsFunc(thisFunc))
+      %thisFunc%()
+}
+
+coreCachesOverviewIgnoredAct(modus) {
+; The two actions the caches overview offers on the file entries marked isDeleted, see
+; SQLdeleteEntriesMarked() for what the two states of that column mean.
+   ; counted again here rather than read back from the list view: one COUNT is cheap, and this
+   ; way the figure the user is asked to confirm can never be a stale one
+   ogn := getTotalIMGsSQLdb("WHERE isDeleted IS NOT 0")
+   If (ogn<1)
    {
-      showTOOLtip("Updating database: revalidate ignored " groupDigits(ogn) " files")
-      SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted IS NOT 0;"
-      If !activeSQLdb.Exec(SQLStr)
-      {
-         showTOOLtip("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      } Else
-      {
-         SoundBeep 900, 100
-         RemoveTooltip()
-      }
-   } Else If InStr(msgResult, "purge")
+      showTOOLtip("There are no ignored or dead file entries in the database.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If (modus="purge")
    {
+      msgResult := msgBoxWrapper(appTitle ": Purge ignored entries", "Please confirm you want to permanently delete " groupDigits(ogn) " ignored or dead file entries from the database.`n`nThe image data cached for them is deleted as well. This cannot be undone.", 4, 0, "question")
+      If !InStr(msgResult, "yes")
+         Return
+
       showTOOLtip("Purging already ignored " groupDigits(ogn) " file entries")
+      ; no early return on failure: the side table is swept before the images rows, so a
+      ; half-done purge still changed the database and the list view has to be refreshed
       r := SQLdeleteEntriesMarked("ANY")
       If (r=1)
       {
          SoundBeep 900, 100
          RemoveTooltip()
       }
-   } Else If InStr(msgResult, "back")
+   } Else
    {
-      If (zz=58)
-         PanelWrapperFilesStats()
-      Else If (zz=49)
-         PanelFindDupes()
+      showTOOLtip("Updating database: revalidate ignored " groupDigits(ogn) " files")
+      SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted IS NOT 0;"
+      If !activeSQLdb.Exec(SQLStr)
+      {
+         ; a failed UPDATE changed nothing, so the list view is still accurate; returning here
+         ; leaves the error message on screen instead of having the repopulate overwrite it
+         showTOOLtip("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
+      SoundBeep 900, 100
+      RemoveTooltip()
    }
 
-   If (InStr(msgResult, "revalidate") || InStr(msgResult, "purge"))
-   {
-      If (SLDtypeLoaded=3)
-         PopulateIndexSQLFilesStatsInfos("kill")
-      Else
-         PopulateIndexFilesStatsInfos("kill")
+   If (SLDtypeLoaded=3)
+      PopulateIndexSQLFilesStatsInfos("kill")
+   Else
+      PopulateIndexFilesStatsInfos("kill")
 
-      PopulateImagesIndexStatsInfos("kill")
-   }
+   PopulateImagesIndexStatsInfos("kill")
+   uiPopulateCachesOverview()
 }
 
 collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu:=0, mustNotHave:=0, strPosu:=0, whatu:=0) {
