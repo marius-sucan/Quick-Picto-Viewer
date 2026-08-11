@@ -33998,6 +33998,56 @@ addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0, fact
    } Else sqlDBrowID++
 }
 
+; ---- prepared statements ------------------------------------------------------------------
+; One DllCall each, in the style InitSQLgetTable() already uses for sqlite3_get_table.
+; Class_SQLiteDB does have Prepare()/Bind()/Step(), but nothing in the application uses them
+; and they are the wrong shape for a loop that runs once per indexed file: Bind() writes two
+; object properties, range checks, looks the type up in a map and then walks a chain of
+; string comparisons - per parameter. Its "Static Types := {Blob:1, Double:1, Int:1, Text:1}"
+; guard also rejects "Int64" and "Null" outright, so those two branches of it can never run,
+; and "Int" binds through the 32-bit sqlite3_bind_int, which cannot hold a 12 digit fmodified.
+;
+; These are the very entry points the DLL resolves out of the very same sqlite3.dll; see
+; sqlite-dynamic.h for the list, and dupes-pixels.h for the writer they serve there.
+SQLstmtPrepare(SQL, dbHandle) {
+   ; prepare16_v2 takes the statement as UTF-16, which is what an AHK string already is
+   hStmt := 0
+   RC := DllCall("SQlite3.dll\sqlite3_prepare16_v2", "Ptr", dbHandle, "WStr", SQL, "Int", -1
+               , "PtrP", hStmt, "Ptr", 0, "Cdecl Int")
+   Return (RC || ErrorLevel) ? 0 : hStmt
+}
+
+SQLstmtFinalize(hStmt) {
+   Return hStmt ? DllCall("SQlite3.dll\sqlite3_finalize", "Ptr", hStmt, "Cdecl Int") : 0
+}
+
+SQLstmtStep(hStmt) {
+   Return DllCall("SQlite3.dll\sqlite3_step", "Ptr", hStmt, "Cdecl Int")
+}
+
+; clear_bindings is what lets a writer bind only the values it actually has: every parameter
+; it skips is NULL again, instead of still holding the value the previous row left there.
+SQLstmtReset(hStmt) {
+   DllCall("SQlite3.dll\sqlite3_reset", "Ptr", hStmt, "Cdecl Int")
+   DllCall("SQlite3.dll\sqlite3_clear_bindings", "Ptr", hStmt, "Cdecl Int")
+}
+
+SQLstmtBindInt(hStmt, idx, valu) {
+   Return DllCall("SQlite3.dll\sqlite3_bind_int64", "Ptr", hStmt, "Int", idx, "Int64", valu, "Cdecl Int")
+}
+
+SQLstmtBindDouble(hStmt, idx, valu) {
+   Return DllCall("SQlite3.dll\sqlite3_bind_double", "Ptr", hStmt, "Int", idx, "Double", valu, "Cdecl Int")
+}
+
+; nByte counts BYTES for bind_text16, so -1 and let SQLite measure the string, the way
+; dupes-pixels.h does. SQLITE_TRANSIENT (-1) makes SQLite copy the text before the call
+; returns, so binding straight out of an AHK variable is safe.
+SQLstmtBindText(hStmt, idx, txtu) {
+   Return DllCall("SQlite3.dll\sqlite3_bind_text16", "Ptr", hStmt, "Int", idx, "WStr", txtu
+               , "Int", -1, "Ptr", -1, "Cdecl Int")
+}
+
 updateSQLdbEntryImgRes(fullPath, imgResu, fileInfos, dbIndex, indexu:=0) {
    If (imgResu=1 || imgResu=2)
       thisPart := A_Space getImgPropsValuesSet(indexu, imgResu)
@@ -34078,6 +34128,79 @@ getImgPropsValuesSet(indexu, m) {
 ; string was also, on its own, several kilobytes of SQL to parse per image.
 getImgHistoValuesSet(indexu, m) {
    Return "imgmedian='" getValueFilesList(indexu, 19, m) "', imgavg='" getValueFilesList(indexu, 18, m) "', imghpeak='" getValueFilesList(indexu, 20, m) "', imghlow='" getValueFilesList(indexu, 21, m) "', imghrms='" getValueFilesList(indexu, 24, m) "', imghrange='" getValueFilesList(indexu, 25, m) "',  imghmode='" getValueFilesList(indexu, 26, m) "', imghminu='" getValueFilesList(indexu, 27, m) "'"
+}
+
+; The same three groups as the builders above, but bound into the statement SaveDBfilesList()
+; prepares once for the whole files list, instead of interpolated into an UPDATE per image.
+; rowu is one entry of resultedFilesList - see the column map at the top of oldGetFilesList()
+; for what the numbered slots hold. Returns 1 when the row was written.
+;
+; A value that was never collected is simply not bound, so it lands as NULL rather than as
+; the empty string the interpolated statements write into an INT column: the collection pool
+; binds NULL for the same reason (dupes-pixels.h), importSLDBintoSLDB() converts '' back to
+; NULL on the way in, and "never collected" has to stay apart from "collected and blank".
+; Values that are present are stored exactly as before - '202401151230' interpolated into an
+; INT column already became the integer 202401151230 through column affinity.
+SQLdbStoreFilesListEntry(hStmt, ByRef rowu, imgPath) {
+   ; No reset to open with: the reset at the bottom leaves the statement clean for the next
+   ; entry, and a freshly prepared statement has nothing bound to begin with.
+   ;
+   ; The file name and the folder are stored lowercased - updateSQLdbEntry() explains why -
+   ; and lowercasing the whole path before it is split gives exactly the two halves that
+   ; lowercasing each of them afterwards would.
+   zPlitPath(Format("{:L}", imgPath), 1, OutFileName, OutDir)
+   SQLstmtBindInt(hStmt, 1, sqlDBrowID)
+   SQLstmtBindText(hStmt, 2, OutFileName)
+   SQLstmtBindText(hStmt, 3, OutDir)
+
+   ; file properties, each on its own. addSQLdbEntry() has only a "with" and a "without"
+   ; variant of its INSERT, so it drops a known fsize whenever fmodified happens to be
+   ; missing, and it drops the size of a zero byte file along with it.
+   If (rowu[6]!="")
+      SQLstmtBindInt(hStmt, 4, rowu[6])
+   If rowu[7]
+      SQLstmtBindInt(hStmt, 5, SubStr(rowu[7], 1, 12))
+   If rowu[8]
+      SQLstmtBindInt(hStmt, 6, SubStr(rowu[8], 1, 12))
+
+   ; image properties, gated on the width the way updateSQLdbEntryImgRes() is called
+   If rowu[13]
+   {
+      SQLstmtBindInt(hStmt, 7, rowu[13])
+      If rowu[14]
+         SQLstmtBindInt(hStmt, 8, rowu[14])
+      If (rowu[9]!="")
+         SQLstmtBindInt(hStmt, 9, rowu[9])
+      If (rowu[22]!="")
+         SQLstmtBindInt(hStmt, 10, rowu[22])
+      If (rowu[15]!="")
+         SQLstmtBindText(hStmt, 11, rowu[15])
+   }
+
+   ; the eight histogram statistics, all of them or none of them. Column 11 is set only by
+   ; calcHistoAvgFile(), which sets all eight along with it, so the gate is exact - and it
+   ; must stay all or nothing: collectSQLFileInfosNow() keys "still to be collected" on
+   ; imgmedian alone, so a row carrying imgmedian and nothing else would never be offered
+   ; again and the other seven would stay empty for good.
+   If rowu[11]
+   {
+      SQLstmtBindDouble(hStmt, 12, rowu[19])
+      SQLstmtBindDouble(hStmt, 13, rowu[18])
+      SQLstmtBindDouble(hStmt, 14, rowu[20])
+      SQLstmtBindDouble(hStmt, 15, rowu[21])
+      SQLstmtBindDouble(hStmt, 16, rowu[24])
+      SQLstmtBindDouble(hStmt, 17, rowu[25])
+      SQLstmtBindDouble(hStmt, 18, rowu[26])
+      SQLstmtBindDouble(hStmt, 19, rowu[27])
+   }
+
+   ; 101 is SQLITE_DONE. The only other answer this statement can give is SQLITE_CONSTRAINT
+   ; on UNIQUE(fullPath) - the same path twice in the files list. The reset has to happen
+   ; here, before the caller yields to another thread, which its tooltip and its cancel
+   ; check both can.
+   rz := (SQLstmtStep(hStmt)=101) ? 1 : 0
+   SQLstmtReset(hStmt)
+   Return rz
 }
 
 ; obju and imgResu name which files list the values are read out of - 1 is
@@ -34702,7 +34825,9 @@ SaveDBfilesList(enforceFile:=0) {
          }
       }
 
-      err := SLDbInitSQLdb(file2save)
+      ; the two indexes are deliberately left out of the new database and built once over
+      ; the finished table further down - see SLDBindexesSQL()
+      err := SLDbInitSQLdb(file2save, 1)
       If err
       {
          msgBoxWrapper(appTitle ": ERROR", "Unable to create SQL database file. Fatal error. Please choose the plain-text format to save the files list (slideshow).`n`nError details: " err, 0, 0, "error")
@@ -34729,39 +34854,74 @@ SaveDBfilesList(enforceFile:=0) {
 
       doStartLongOpDance()
       showTOOLtip("Saving " groupDigits(maxFilesIndex) " entries in the SQL database`n" file2save "`nPlease wait", 0, 0, 3/100)
+
+      ; One statement, prepared once and re-used for every entry, carrying everything the
+      ; files list holds about a file. This used to be an INSERT of the file properties and
+      ; then an UPDATE of the image properties and the histogram statistics on top of the row
+      ; just written: two SQL strings built in AHK and parsed by SQLite from scratch per
+      ; file, and a second seek and a full row rewrite for every image with any cached data.
+      ;
+      ; No ON CONFLICT clause, unlike addSQLdbEntry(): this branch always writes into a
+      ; database file that was created moments ago, so the table is empty and the only
+      ; conflict possible is the same path appearing twice in the files list. sqlite3_step()
+      ; reports that as SQLITE_CONSTRAINT, which is the duplicate check for free -
+      ; addSQLdbEntry() needs a sqlite3_last_insert_rowid() call per file to see the same.
+      insertSQL := "INSERT INTO images (imgidu, isDeleted, imgfile, imgfolder, fsize, fmodified, fcreated"
+                 . ", imgwidth, imgheight, imgframes, imgdpi, imgpixfmt"
+                 . ", imgmedian, imgavg, imghpeak, imghlow, imghrms, imghrange, imghmode, imghminu)"
+                 . " VALUES (?1,0,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19);"
+      hInsertStmt := SQLstmtPrepare(insertSQL, activeSQLdb._Handle)
+      If !hInsertStmt
+      {
+         ; errmsg16 straight off the connection, not the class's _ErrMsg(): that one does
+         ; StrGet(&RC) on the pointer variable rather than on the pointer, so it reads the
+         ; variable itself and returns rubbish
+         errPtr := DllCall("SQlite3.dll\sqlite3_errmsg16", "Ptr", activeSQLdb._Handle, "Cdecl Ptr")
+         addJournalEntry(A_ThisFunc "() - failed to prepare the entries statement: " (errPtr ? StrGet(errPtr, "UTF-16") : "") "`n" insertSQL)
+         activeSQLdb.CloseDB()
+         ; doStartLongOpDance() has already run, so the busy state has to be undone here the
+         ; way the end of this branch undoes it
+         RemoveTooltip()
+         SetTimer, ResetImgLoadStatus, -50
+         dummyTimerDelayiedImageDisplay(50)
+         SoundBeep, 300, 100
+         msgBoxWrapper(appTitle ": ERROR", "Unable to write the entries into the SQL database file. Fatal error. Please choose the plain-text format to save the files list (slideshow).", 0, 0, "error")
+         SetTimer, PanelSaveSlideShowu, -200
+         Return
+      }
+
       activeSQLdb.Exec("BEGIN TRANSACTION;")
       prevMSGdisplay := A_TickCount
       sqlDBrowID := 1
       failedFiles := 0
       Loop, % maxFilesIndex
       {
-         imgPath := resultedFilesList[A_Index, 1]
+         ; the row of the list, once: rowu is the same inner object, so writing rowu[12]
+         ; still lands in resultedFilesList, at half the hash look-ups
+         rowu := resultedFilesList[A_Index]
+         imgPath := rowu[1]
          If InStr(imgPath, "\\")
          {
             imgPath := StrReplace(imgPath, "\\", "\")
-            resultedFilesList[A_Index, 1] := imgPath
+            rowu[1] := imgPath
          }
 
-         zPlitPath(imgPath, 1, OutFileName, OutDir)
+         ; nothing is collected here - see the files list, which already holds whatever was
+         ; collected about this file, and GetFileAttributesEx() below, removed on purpose
          ; fileInfos := GetFileAttributesEx(imgPath)
-         If (resultedFilesList[A_Index, 6] && resultedFilesList[A_Index, 7])
-            z := addSQLdbEntry(OutFileName, OutDir, resultedFilesList[A_Index, 6], resultedFilesList[A_Index, 7], resultedFilesList[A_Index, 8], 0)
-         Else
-            z := addSQLdbEntry(OutFileName, OutDir, 0, 0, 0, 1, 0)
-
-         If z
-            failedFiles++
-
-         resultedFilesList[A_Index, 12] := sqlDBrowID
-         If (resultedFilesList[A_Index, 11] && resultedFilesList[A_Index, 13])
+         z := imgPath ? SQLdbStoreFilesListEntry(hInsertStmt, rowu, imgPath) : 0
+         If (z=1)
          {
-            updateSQLdbEntryImgHisto(imgPath, 1, 1, 0, sqlDBrowID, A_Index)
+            rowu[12] := sqlDBrowID
+            sqlDBrowID++
          } Else
          {
-            If resultedFilesList[A_Index, 11]
-               updateSQLdbEntryImgHisto(imgPath, 1, 0, 0, sqlDBrowID, A_Index)
-            If resultedFilesList[A_Index, 13]
-               updateSQLdbEntryImgRes(imgPath, 1, 0, sqlDBrowID, A_Index)
+            ; the same path twice in the list, or an entry with no path at all. It gets no
+            ; row of its own and must not be left pointing at the row of another file, which
+            ; is what happened while the id was written before the insert was known to have
+            ; worked: the histogram of this file then landed on that other file's row.
+            failedFiles++
+            rowu[12] := 0
          }
 
          If (A_TickCount - prevMSGdisplay>1500)
@@ -34783,6 +34943,19 @@ SaveDBfilesList(enforceFile:=0) {
       }
 
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+         throwSQLqueryDBerror(A_ThisFunc)
+
+      ; before anything can close the connection: CloseDB() only finalizes the handles that
+      ; Query() registered in _Queries, so a statement still alive here would make
+      ; sqlite3_close() answer SQLITE_BUSY and leave the database file locked
+      SQLstmtFinalize(hInsertStmt)
+
+      ; and now the two indexes the entries were written without, in one sorted pass over the
+      ; finished table rather than two random B-tree inserts per file. Ahead of the abandonAll
+      ; test on purpose: a cancelled save still leaves a complete database structure behind on
+      ; the disk rather than an unindexed one.
+      showTOOLtip("Building the indexes of the SQL database`n" file2save "`nPlease wait", 0, 0, 1)
+      If !activeSQLdb.Exec(SLDBindexesSQL())
          throwSQLqueryDBerror(A_ThisFunc)
 
       ; MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000)
@@ -73211,12 +73384,28 @@ initSeenImagesListDB() {
    }
 }
 
-SLDBinitSQLdb(fileNamu) {
+; The two indexes of the images table, apart from the ones SQLite maintains on its own for
+; imgidu and for UNIQUE(fullPath). They live here rather than inside SLDBinitSQLdb()'s SQL so
+; that a bulk load can leave them out and build them once, sorted, over the finished table:
+; with them in place every INSERT maintains five B-trees instead of three, and neither of
+; them is read while the load runs. SaveDBfilesList() is the one caller that does this.
+SLDBindexesSQL() {
+   ; every query in the duplicates path and every data-collection query filters isDeleted
+   Return "CREATE INDEX IF NOT EXISTS imgsIndex ON images(imgidu, imgfolder, imgfile); CREATE INDEX IF NOT EXISTS imgsAliveIndex ON images(isDeleted);"
+}
+
+SLDBinitSQLdb(fileNamu, deferIndexes:=0) {
    activeSQLdb.CloseDB()
    Sleep, 5
    activeSQLdb := new SQLiteDB
    activeSQLdb.OpenDB(fileNamu)
       ; Return -1
+
+   ; the connection was left on SQLite's own defaults, and this one carries the largest write
+   ; the application ever performs. Same two pragmas, same values and the same reasons as
+   ; OpenSLDBdataBase(): neither touches the file or the schema, only this connection.
+   activeSQLdb.Exec("PRAGMA temp_store=MEMORY;")
+   activeSQLdb.Exec("PRAGMA cache_size=-65536;")
 
    ; Schema v3. The four pixel fingerprints used to be TEXT columns of "images" itself,
    ; 4-8 KB per row of Chr(value + 161) sitting in the same B-tree as every other column -
@@ -73229,9 +73418,9 @@ SLDBinitSQLdb(fileNamu) {
    SQL .= "CREATE TABLE dynamicfolders (imgfolder TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, fmodified INT, PRIMARY KEY(imgfolder ASC));"
    SQL .= "CREATE TABLE staticfolders (imgfolder TEXT COLLATE NOCASE NOT NULL ON CONFLICT IGNORE, fmodified INT, PRIMARY KEY(imgfolder ASC));"
    SQL .= "CREATE TABLE settings (paramz TEXT COLLATE NOCASE NOT NULL ON CONFLICT REPLACE, valuez TEXT COLLATE NOCASE, PRIMARY KEY(paramz ASC));"
-   SQL .= "CREATE INDEX imgsIndex ON images(imgidu, imgfolder, imgfile);"
-   ; every query in the duplicates path and every data-collection query filters isDeleted
-   SQL .= "CREATE INDEX imgsAliveIndex ON images(isDeleted);"
+   If (deferIndexes!=1)
+      SQL .= SLDBindexesSQL()
+
    If !activeSQLdb.Exec(SQL)
       Return activeSQLdb.ErrorMsg
 }
