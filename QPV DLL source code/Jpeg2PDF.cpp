@@ -11,7 +11,7 @@ static void Jpeg2PDF_SetXREF(PJPEG2PDF pPDF, int index, int offset, char c) {
   //    printf("pPDF->pdfXREF[%d] = %s", index, (int)pPDF->pdfXREF[index], 3,4,5,6);
 }
 
-PJPEG2PDF Jpeg2PDF_BeginDocument(double pdfW, double pdfH, int pdf_dpi) {
+PJPEG2PDF Jpeg2PDF_BeginDocument(double pdfW, double pdfH) {
 // based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
 
   PJPEG2PDF pPDF;
@@ -21,9 +21,14 @@ PJPEG2PDF Jpeg2PDF_BeginDocument(double pdfW, double pdfH, int pdf_dpi) {
     memset(pPDF, 0, sizeof(JPEG2PDF));
     // if (JPEG2PDF_DEBUG)
     //    printf("PDF List Inited (pPDF = %p)\n", (int)pPDF, 2,3,4,5,6);
-    pPDF->pageW = (UINT32)(pdfW * pdf_dpi);
-    pPDF->pageH = (UINT32)(pdfH * pdf_dpi);
-    // fnOutputDebug("PDF Page Size: " + std::to_string(pPDF->pageW) + " x " + std::to_string(pPDF->pageH) + " @ " + std::to_string(pdf_dpi) + " dpi");
+    // pageW/pageH are PDF user space units, which are 1/72 inch - the page box and the
+    // image placement matrix below are both written in them. They must NOT be scaled by
+    // the render DPI: the embedded JPEG carries its own pixel count, so a page box in
+    // points already yields (pixels / inches) dots per inch on paper. Scaling by the DPI
+    // instead made every page (dpi/72) times too large - a 2.67x oversized Letter at 192.
+    pPDF->pageW = (UINT32)(pdfW * PDF_UNITS_PER_INCH + 0.5);
+    pPDF->pageH = (UINT32)(pdfH * PDF_UNITS_PER_INCH + 0.5);
+    // fnOutputDebug("PDF Page Size: " + std::to_string(pPDF->pageW) + " x " + std::to_string(pPDF->pageH) + " pt");
 
     pPDF->currentOffSet = 0;
     Jpeg2PDF_SetXREF(pPDF, 0, pPDF->currentOffSet, 'f');

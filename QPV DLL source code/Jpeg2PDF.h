@@ -4,6 +4,9 @@
 
 /* Defined for Compiling on Windows. Might need to be changed for other compiler */
 typedef unsigned char UINT8;
+/* UINT32 is left to windows.h on purpose: the original "unsigned long" below conflicts
+   with the SDK's "unsigned int" and will not compile. Including this header outside the
+   DLL - a test harness, say - has to typedef UINT32 first. */
 //typedef unsigned long UINT32;
 typedef int STATUS;
 
@@ -12,6 +15,8 @@ typedef int STATUS;
 
 #define JPEG2PDF_DEBUG        0
 #define MAX_PDF_PAGES         2050
+/* PDF user space unit: fixed at 1/72 inch by the PDF spec, unrelated to the render DPI */
+#define PDF_UNITS_PER_INCH    72.0
 #define INDEX_USE_PPDF        (-1)
 #define PDF_TOP_MARGIN        0.0
 #define PDF_LEFT_MARGIN       0.0
@@ -50,9 +55,14 @@ typedef struct {
    UINT32 pageW, pageH, pdfObj, currentOffSet, imgObj;
 } JPEG2PDF, *PJPEG2PDF;
 
-PJPEG2PDF   Jpeg2PDF_BeginDocument(double pdfW, double pdfH);  /* pdfW, pdfH: Page Size in Inch ( 1 inch=25.4 mm ) */
+/* pdfW, pdfH: Page Size in Inch ( 1 inch=25.4 mm ). Stored as PDF user space units,
+   ie. multiplied by PDF_UNITS_PER_INCH - never by the DPI the pages were rendered at. */
+PJPEG2PDF   Jpeg2PDF_BeginDocument(double pdfW, double pdfH);
 STATUS      Jpeg2PDF_AddJpeg(PJPEG2PDF pPDF, UINT32 imgW, UINT32 imgH, UINT32 fileSize, UINT8 *pJpeg, UINT8 isColor);
+/* Returns the byte count Jpeg2PDF_GetFinalDocumentAndCleanup() needs outPDF to hold. */
 UINT32      Jpeg2PDF_EndDocument(PJPEG2PDF pPDF);
-STATUS      Jpeg2PDF_GetFinalDocumentAndCleanup(PJPEG2PDF pPDF, UINT8 *outPDF, UINT32 *outPDFSize);
+/* tehPDFSize is the capacity of outPDF: nothing is written when it is short of the size
+   Jpeg2PDF_EndDocument() returned. Frees pPDF and the page list either way. */
+STATUS      Jpeg2PDF_GetFinalDocumentAndCleanup(PJPEG2PDF pPDF, UINT8 *outPDF, UINT32 *outPDFSize, UINT32 tehPDFSize);
 
 #endif /* _JPEG2PDF_H_ */

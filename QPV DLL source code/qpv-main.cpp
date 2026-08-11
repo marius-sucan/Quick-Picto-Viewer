@@ -7222,9 +7222,12 @@ DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinat
 
   // Initialize the PDF Object with Page Size Information
   fnOutputDebug("function CreatePDFfile called" + std::to_string(pageW) + " x " + std::to_string(pageH) );
+  // dpi is no longer part of the page geometry - see Jpeg2PDF_BeginDocument(). It stays in
+  // the exported signature because AutoHotkey's DllCall passes it, and it still describes
+  // the pixel size AHK rendered each page at, which is what sets the PDF's effective DPI.
   PJPEG2PDF pdfId;
-  pdfId = Jpeg2PDF_BeginDocument(pageW, pageH, dpi);
-  if (pdfId < 0) 
+  pdfId = Jpeg2PDF_BeginDocument(pageW, pageH);
+  if (pdfId == NULL)
      return -1;
  
   UINT32 pdfSize, pdfFinalSize;
