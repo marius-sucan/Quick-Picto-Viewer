@@ -1,10 +1,12 @@
-# Duplicate-identification tests
+# qpvmain.dll tests
 
 `qpvmain.dll` builds only under MSVC on Windows — WIC, Direct2D, OpenMP, `windows.h` — so a
-change to the duplicate-identification pipeline cannot be checked by building the project on
-a Linux box or in CI. The parts that carry the meaning are self-contained, though, so these
-tests slice the functions under test straight out of the shipped sources and compile *those*
-against minimal Windows shims.
+change to it cannot be checked by building the project on a Linux box or in CI. The parts
+that carry the meaning are self-contained, though, so these tests slice the functions under
+test straight out of the shipped sources and compile *those* against minimal Windows shims.
+
+Most of the suite covers the duplicate-identification pipeline, which is what it was written
+for; `pdf_document.cpp` covers the PDF exporter.
 
 The slicing is the point. A scratch copy of an algorithm drifts from the shipped one and
 then proves nothing; `run-tests.sh` re-extracts from `../dupes-search.h` on every run and
@@ -133,6 +135,34 @@ pointer read out of the middle of the next record. Every offset asserted here ap
 literal in `quick-picto-viewer.ahk`; when this test fails, the AHK is what has to change —
 and `initThumbsPool()` refuses a `qpvmain.dll` that predates the current record, because a
 version mismatch is the same corruption from the other side.
+
+**`pdf_document.cpp`** — the PDF exporter's page geometry and document structure. This one
+does not slice: `Jpeg2PDF.cpp` is `#include`d into `qpv-main.cpp` rather than compiled on its
+own and needs nothing from `windows.h` beyond `UINT32`, `IDOK` and `ERROR`, so the whole
+shipped file is compiled **verbatim** — no anchors, nothing to drift.
+
+What it pins is a unit that is invisible in the output. `MediaBox` is written in PDF user
+space units, which the spec fixes at 1/72 inch, but the file emits bare integers — so when
+`Jpeg2PDF_BeginDocument()` scaled the page by the DPI the pages were *rasterised* at, every
+exported page came out `(dpi/72)` times too large and nothing looked wrong: a Letter page
+measured 22.7 × 29.3 in at the high quality setting, while the layout stayed correct because
+the image placement matrix is driven by the same two fields. Only a reader's page properties
+showed it. Hence the checks that Letter, A4 and landscape land on their canonical point
+sizes, that the placement matrix agrees with `MediaBox`, and that the render DPI still comes
+out as the printed resolution via the embedded JPEG's own pixel count.
+
+Two more things it guards:
+
+- A4 is 8.27 × 11.69 in, so its height is 841.68 pt. The cast to `UINT32` truncates, which
+  gives a page one point short of the canonical 842 — the rounding is deliberate.
+- the xref offsets are accumulated by hand from `sprintf` return values, and the fix changed
+  the page size's digit count. The test walks the table the way a reader does and requires
+  every offset to land on its own object.
+
+**The mutation check** — `run-tests.sh` restores both bugs in *copies* of the shipped sources
+(the DPI-scaled page box, and the truncating cast) and requires the test to fail. The
+`QPV_JPEG2PDF_HEADER` / `QPV_JPEG2PDF_SOURCE` defines exist for that; they default to the
+shipped files.
 
 **`import_merge.py`** — the database import, executed by SQLite rather than simulated.
 `importSLDBintoSLDB()` renumbers every `imgidu`, so fingerprints keyed by it have to be

@@ -221,6 +221,54 @@ else
     rm -f query_mutant
 fi
 
+echo
+echo "== the PDF exporter's page geometry and document structure =="
+# Jpeg2PDF.cpp is #included into qpv-main.cpp rather than compiled on its own, and it needs
+# nothing from windows.h beyond three typedefs, so pdf_document.cpp compiles it VERBATIM.
+# No slicing and no anchors to drift: what is tested is the whole shipped file.
+if g++ $CXXFLAGS -o pdf_document pdf_document.cpp 2>&1; then
+    ./pdf_document || fail=1
+else
+    echo "  ERROR: pdf_document.cpp did not compile"; fail=1
+fi
+
+echo
+echo "== mutation check: the page box must be rejected at any unit but the point =="
+# Both mutants restore a bug the exporter actually shipped with. They go into COPIES - the
+# shipped sources are never edited, so an interrupted run cannot leave them broken.
+#   A - the page box scaled by the render DPI instead of 72, which is what made every
+#       exported page (dpi/72) times too large while the layout still looked correct;
+#   B - the truncating cast that rounds A4's 841.68 pt down to a 841 pt page.
+sed 's|#define PDF_UNITS_PER_INCH    72.0|#define PDF_UNITS_PER_INCH    192.0|' \
+    ../Jpeg2PDF.h > jpeg2pdf_mutant.h
+sed 's|\* PDF_UNITS_PER_INCH + 0.5|* PDF_UNITS_PER_INCH|g' ../Jpeg2PDF.cpp > jpeg2pdf_mutant.cpp
+for mutant in A B; do
+    case $mutant in
+      A) defs="-DQPV_JPEG2PDF_HEADER='\"jpeg2pdf_mutant.h\"'"
+         orig=../Jpeg2PDF.h;   copy=jpeg2pdf_mutant.h
+         label="the page box is scaled by the render DPI" ;;
+      B) defs="-DQPV_JPEG2PDF_SOURCE='\"jpeg2pdf_mutant.cpp\"'"
+         orig=../Jpeg2PDF.cpp; copy=jpeg2pdf_mutant.cpp
+         label="the page size is truncated rather than rounded" ;;
+    esac
+
+    if cmp -s "$copy" "$orig"; then
+        echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
+        continue
+    fi
+
+    if ! eval g++ \$CXXFLAGS $defs -o pdf_mutant pdf_document.cpp 2>/dev/null; then
+        echo "  ERROR: mutant $mutant did not compile"; fail=1
+        continue
+    fi
+    if ./pdf_mutant > /dev/null 2>&1; then
+        echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
+    else
+        echo "   ok - mutant $mutant is caught ($label)"
+    fi
+done
+rm -f pdf_mutant jpeg2pdf_mutant.h jpeg2pdf_mutant.cpp
+
 if [ "${1:-}" = "--bench" ]; then
     echo
     echo "== MSD benchmark =="
