@@ -2067,11 +2067,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="^Left")
     {
        If HKifs("imgsLoaded")
-          func2Call := ["navSelectedFiles", -1]
+          func2Call := ["navSelectedFilesPrev"]
     } Else If (givenKey="^Right")
     {
        If HKifs("imgsLoaded")
-          func2Call := ["navSelectedFiles", 1]
+          func2Call := ["navSelectedFilesNext"]
     } Else If (givenKey="F3")
     {
        If HKifs("imgsLoaded")
@@ -17523,7 +17523,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        Return 
     }
 
-    If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected() && modus="ouside")
+    If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected() && modus="outside")
     {
        prevFXmode := imgFxMode
        Return 
@@ -25169,8 +25169,8 @@ CropImageInViewPortToSelection(modus:=0) {
        imgSelY1 := Round(prcSelY1*imgH)
        imgSelX2 := Round(prcSelX2*imgW)
        imgSelY2 := Round(prcSelY2*imgH)
-       nImgSelX1 := imgSelX1 := min(imgSelX1, imgSelX2)
-       nImgSelY1 := imgSelY1 := min(imgSelY1, imgSelY2)
+       nImgSelX1 := min(imgSelX1, imgSelX2)
+       nImgSelY1 := min(imgSelY1, imgSelY2)
        nimgSelX2 := max(imgSelX1, imgSelX2)
        nimgSelY2 := max(imgSelY1, imgSelY2)
        ImgSelX1 := nImgSelX1,       ImgSelY1 := nImgSelY1
@@ -39604,7 +39604,7 @@ navSelectedFilesNext() {
 }
 
 navSelectedFilesPrev() {
-   navSelectedFiles(1)
+   navSelectedFiles(-1)
 }
 
 navSelectedFiles(direction) {
@@ -66662,8 +66662,8 @@ createMenuNavigation() {
    kMenu("PVnav", "Add", "&First`tHome", "FirstPicture",, " image in index")
    If (thumbsDisplaying!=1)
    {
-      kMenu("PVnav", "Add", "&Previous`tPage down", "PreviousPicture",, " image in index")
-      kMenu("PVnav", "Add", "&Next`tPage up", "NextPicture",, " image in index")
+      kMenu("PVnav", "Add", "&Previous`tPage up", "PreviousPicture",, " image in index")
+      kMenu("PVnav", "Add", "&Next`tPage down", "NextPicture",, " image in index")
    } Else If (mustPreventMenus=1 && thumbsDisplaying=1)
    {
       kMenu("PVnav", "Add", "Select to first in index`tShift+Home", "MenuSelectHomeFiles")
@@ -66740,8 +66740,8 @@ createMenuNavigation() {
       kMenu("PVnav", "Add", "&First`tHome", "FirstPicture",, " image in index")
       If (thumbsDisplaying!=1)
       {
-         kMenu("PVnav", "Add", "&Previous`tPage down", "PreviousPicture",, " image index")
-         kMenu("PVnav", "Add", "&Next`tPage up", "NextPicture",, " image in index")
+         kMenu("PVnav", "Add", "&Previous`tPage up", "PreviousPicture",, " image index")
+         kMenu("PVnav", "Add", "&Next`tPage down", "NextPicture",, " image in index")
       }
       kMenu("PVnav", "Add", "&Last`tEnd", "LastPicture",, " image in index")
       kMenu("PVnav", "Add", "&Skip to index`tJ", "PanelJump2index", "frames")

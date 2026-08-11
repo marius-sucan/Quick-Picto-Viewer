@@ -173,7 +173,7 @@ Home / End|Jump to the first or last image in the index|Anywhere|-
 Ctrl + Up / Down|Next / Previous frame or page (in GIFs, PDFs, TIFFs or WEBP)|Image view|-
 Shift + Ctrl + Up / Down|Next / Previous PDF chapter|Image view|-
 Ctrl + Wheel Up / Down|Navigate through the listed files|Files list|-
-Page Up / Down|Next / Previous image|Image view|-
+Page Up / Down|Previous / Next image|Image view|-
 Page Up / Down|Jump forwards or backwards one page of images|Files list|-
 Backspace|Previous random image|Anywhere|-
 Backspace|Remove last added point in the path|Vector drawing|-
