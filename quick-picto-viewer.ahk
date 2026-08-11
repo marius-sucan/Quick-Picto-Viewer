@@ -2386,7 +2386,7 @@ initQPVmainDLL(modus:=0) {
    ; reports. Without this, both pools leave the pixel format blank rather than invent one.
    pixFmtNamesGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvSetPixelFormatNames", "UPtr") ? 1 : 0
    If pixFmtNamesGood
-      DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", packLoaderPixelFormatNames(), "Int")
+      DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
    Else
       addJournalEntry("ERROR: qpvmain.dll is older than this script and does not export qpvSetPixelFormatNames. The workers will not report the pixel format of the images they read.")
 
@@ -4675,22 +4675,8 @@ initThumbsPool() {
        Return
     }
 
-    ; A version gate, and not an optional one. thumbsPoolFetch() fills an array of
-    ; ThumbResult records and QPV_ThumbsPoolDrain() walks it by a stride this script
-    ; hardcodes; the record grew when the workers started reporting the properties of the
-    ; image they read, so an older qpvmain.dll would write 48 byte records into a buffer
-    ; read at 72 - every field past the first record misaligned, GDI+ bitmap pointers among
-    ; them. qpvGetPixelFormatName() arrived with the wider record and stands in for it.
-    ; The single threaded branch of QPV_ShowThumbnails() is a complete fallback: slower, and
-    ; it fills the very same columns through GetCachableImgFileDetails().
-    If !DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvGetPixelFormatName", "UPtr")
-    {
-       addJournalEntry("ERROR: qpvmain.dll is older than this script and its thumbnails workers report a different record. Multi-threaded thumbnails generation is disabled; please update qpvmain.dll.")
-       multiCoreThumbsInitGood := 0
-       Return
-    }
-
-    r := DllCall("qpvmain.dll\thumbsPoolInit", "Int", realSystemCores, "Int")
+    nThreads := (minimizeMemUsage=1) ? 2 : realSystemCores
+    r := DllCall("qpvmain.dll\thumbsPoolInit", "Int", nThreads, "Int")
     thumbsPoolState := r ? DllCall("qpvmain.dll\thumbsPoolGetState", "UPtr") : 0
     If (!r || !thumbsPoolState)
     {
@@ -13277,7 +13263,6 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
     rescaleWidthCharSpacing := (TextInAreaCharSpacing<0) ? (100 - Abs(TextInAreaCharSpacing))/90 : 1
     allowOpti := (previewMode!=1 || VPselRotation!=0 || TextInAreaValign=2) ? 0 : 1
     thisHFont := (previewMode=1) ? hFontPreview : hFont
-    threads := (previewMode=1) ? realSystemCores : 0
     prevImgH := imgH := (previewMode=1) ? testHb : testHa
     prevImgW := imgW := (previewMode=1) ? testWb : testWa
     pkzo := (TextInAreaBorderOut>1 && TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaOnlyBorder=1) ? 1 : 0
@@ -15525,7 +15510,6 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        userAlpha := trGdip_CloneBitmap(A_ThisFunc, thisAlphaFile)
        trGdip_GetImageDimensions(userAlpha, testImgW, testImgH)
        msize := (testImgW + testImgH)//2
-       threads := (previewMode=1) ? realSystemCores : 0
        If (validBMP(userAlpha) && testImgW>1 && testImgH>1)
        {
           If (!rImgW || !rImgH)
@@ -34728,7 +34712,7 @@ getDynamicFoldersList(fileu:=0) {
 }
 
 rebuildDBfilesList() {
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
       MenuRemFilesListFilter()
 
    If !activeSQLdb.CloseDB()
@@ -34748,7 +34732,7 @@ SaveDBfilesList(enforceFile:=0) {
 
    If (maxFilesIndex>1)
    {
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
       {
          msgResult := msgBoxWrapper(appTitle ": Save files list - database", "The files list is filtered down to " groupDigits(maxFilesIndex) " files from " groupDigits(bckpMaxFilesIndex) ".`n`nTo save the entire list of indexed files, you have to deactivate the filter [Ctrl + Space].`n`nPlease choose how to proceed...", "&Deactivate filter|&Save list as is|&Cancel", 0, "info")
          If InStr(msgResult, "deactivate")
@@ -34885,7 +34869,7 @@ SaveDBfilesList(enforceFile:=0) {
          SetTimer, ResetImgLoadStatus, -50
          dummyTimerDelayiedImageDisplay(50)
          SoundBeep, 300, 100
-         msgBoxWrapper(appTitle ": ERROR", "Unable to write the entries into the SQL database file. Fatal error. Please choose the plain-text format to save the files list (slideshow).", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "Unable to write the entries into the SQL database file. Fatal error.`n `nPlease choose the plain-text format to save the files list (slideshow).", 0, 0, "error")
          SetTimer, PanelSaveSlideShowu, -200
          Return
       }
@@ -35024,7 +35008,7 @@ SaveFilesList(enforceFile:=0) {
 
    If (maxFilesIndex>0)
    {
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
       {
          msgResult := msgBoxWrapper(appTitle ": Save files list - plain text", "The files list is filtered down to " groupDigits(maxFilesIndex) " files from " groupDigits(bckpMaxFilesIndex) ".`n`nTo save the entire list of indexed files, you have to deactivate the filter [Ctrl + Space].`n`nPlease choose how to proceed...", "&Deactivate filter|&Save list as is|&Cancel", 0, "info")
          If InStr(msgResult, "deactivate")
@@ -36594,16 +36578,6 @@ initDupesPixelsPool() {
    If (!qpvMainDll || WICmoduleHasInit!=1 || dupesEngineInitGood!=1)
       Return 0
 
-   ; the pool is created on first use and lives until TrueCleanup(); a session that never
-   ; collects image data never pays for the threads. The pixel format names it writes into
-   ; imgpixfmt were sent by initQPVmainDLL(), which every path into here goes through.
-   hasPool := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBegin", "UPtr")
-   If (!hasPool || pixFmtNamesGood!=1)
-   {
-      addJournalEntry(A_ThisFunc "(): qpvmain.dll is older than this script and has no collection pool.")
-      Return 0
-   }
-
    ; The loaders and the extension sets are the thumbnails pool's. Setting the formats does
    ; not start that pool and does not depend on it having been started - initThumbsPool()
    ; declines outright when allowMultiCoreMode is off or memory is being minimised, and
@@ -36620,9 +36594,8 @@ initDupesPixelsPool() {
    Return dupesPixInitGood
 }
 
-; calcDLLpHashAlgo(), calcLhashAlgo(), discretizeValue() and processPixArrayChars() lived
-; here, along with processPixArrayCharsAsSTR() before them. All of it is now in
-; qpv-main.cpp: dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
+; All hash generation functions are now in qpv-main.cpp: 
+; dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
 ; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
 ;
 ; Two details that were easy to lose in the move and that tests/hash_oracle.cpp pins:
@@ -36663,16 +36636,6 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    If stringu ; allow query database  filtering?
       containsT := (mustNotHave=1) ? " AND " whatu " NOT LIKE '" stringu "' ESCAPE '>'" : " AND " whatu " LIKE '" stringu "' ESCAPE '>'"
 
-   ; The hashes are computed in qpvmain.dll now. What used to happen per image, in the
-   ; interpreter: StrSplit() the fingerprint into an AHK array, a per-element loop calling
-   ; Ord() and discretizeValue(), a 64-iteration loop building a binary STRING, then
-   ; ConvertBase() through two msvcrt DllCalls - and for pHash, a 1024-iteration NumPut
-   ; loop purely to marshal the array the previous loop had just built. Then one
-   ; string-built UPDATE, parsed from scratch by SQLite. Three to five thousand
-   ; interpreted operations to produce eight bytes.
-   ; dupesHashStep() decodes once, hashes a whole batch across cores, and writes through
-   ; one prepared statement. The values are unchanged - see tests/hash_oracle.cpp.
-   ;
    ; Both statements run on AHK's own handle, deliberately: a second connection would not
    ; see the rows already updated inside the transaction below, so they would come back as
    ; "hash IS NULL" on the next batch, forever.
@@ -37583,6 +37546,7 @@ WorkLoadMultiCoresJpegLL(maxList) {
                If (filesStatusArr[3]>0)
                   skippedFiles += filesStatusArr[3]
             }
+
             etaTime := ETAinfos(processedFiles, countTFilez, startOperation)
             etaTime .= "`nUsing " jobsRunning " / " systemCores " execution threads"
             If (threadsCrashed>0)
@@ -101359,20 +101323,6 @@ packWICpixelFormatNames() {
    Return packedu
 }
 
-; Indexed by the loader number qpvmain.dll reports - 1 WIC, 2 FreeImage, 3 SVG, 4 PDF,
-; 5 a cached thumbnail file - and only for a loader whose answer is a constant.
-;
-; An SVG document has no pixel format of its own, so what this script records for one is
-; the format of the bitmap it renders, and "32-PARGB" is the literal RenderSVGfile() puts
-; in mainLoadedIMGdetails.PixelFormat every time.
-; 1 and 2 are blank because those two are composed from the tables above. 5 is blank
-; because a cached thumbnail says nothing about the image it was made from, and 4 because
-; a PDF page has no format either and the two renders do not agree on one - see the
-; comment on the PDF branch of tpRunJob() in thumbs-pool.h.
-packLoaderPixelFormatNames() {
-   Return "|||32-PARGB||"
-}
-
 WICcontainerFmts(containerID, imgPath) {
    Static containerFmts := {1:"BMP",2:"PNG",3:"ICO",4:"JPEG",5:"TIFF",6:"GIF",7:"WMP",8:"DDS",9:"ADNG",10:"HEIF",11:"WEBP",12:"RAW"}
    r := containerFmts[containerID]
@@ -106073,5 +106023,3 @@ testKeysStuff() {
 
    ToolTip, % ppA "`n" ppB , , , 2
 }
-
-
