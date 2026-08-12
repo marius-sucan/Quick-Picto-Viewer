@@ -382,6 +382,11 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 // WIC scaler is initialized straight to the thumbnail size, which lets the JPEG / HEIF /
 // JPEG-XR decoders perform a scaled decode through IWICBitmapSourceTransform instead of
 // unpacking the full resolution image only to shrink it afterwards.
+//
+// Every call that reaches a codec goes through the SEH guards declared in qpv-main.cpp: a
+// worker thread that faults on a corrupt file kills the whole application just as surely
+// as the viewport thread would, and the pool is the part of QPV that walks over every
+// file in a folder without anyone asking it to.
 static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFileName, int targetW, int targetH,
                                     int frameIndex, int givenQuality, int isFIMokay, int &srcW, int &srcH,
                                     TpSrcMeta *meta = NULL) {
@@ -391,73 +396,56 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
     IWICBitmapScaler      *pScaler     = NULL;
     IWICFormatConverter   *pConverter  = NULL;
     IWICBitmapSource      *pSource     = NULL;
-    if (!fac || !szFileName)
+    if (!fac || !szFileName || !szFileName[0])
        return myBitmap;
 
-    HRESULT hr = S_OK;
-    try
+    WICframeFacts facts = {};
+    DWORD   sehCode = 0;
+    HRESULT hr = WICguardedOpenFrame(fac, szFileName, frameIndex, &pDecoder, &pFrame, &facts, &sehCode);
+    if (sehCode!=0)
     {
-        hr = fac->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
-    } catch (const char* message)
-    {
-        fnOutputDebug("thumbsPool: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
-        return myBitmap;
-    }
-
-    if (FAILED(hr))
-    {
-       SafeRelease(pDecoder, "tpWICload: pDecoder", 0);
+       fnOutputDebug("thumbsPool: the WIC codec faulted while opening " + WideCharToString(szFileName));
+       WICsafeRelease(pFrame);
+       WICsafeRelease(pDecoder);
        return myBitmap;
     }
 
-    UINT tFrames = 0;
-    hr = pDecoder->GetFrameCount(&tFrames);
-    if (SUCCEEDED(hr))
-    {
-       UINT useFrame = (frameIndex>0) ? (UINT)frameIndex : 0;
-       if (tFrames>0 && useFrame>=tFrames)
-          useFrame = tFrames - 1;
-
-       if (meta!=NULL && tFrames>0)
-          meta->frames = (int)tFrames;
-
-       hr = pDecoder->GetFrame(useFrame, &pFrame);
-    }
-
-    UINT owidth = 0, oheight = 0;
-    if (SUCCEEDED(hr))
-       hr = pFrame->GetSize(&owidth, &oheight);
-
+    const UINT owidth = facts.width, oheight = facts.height;
     if (SUCCEEDED(hr) && ((!owidth || !oheight) || (owidth==1 && oheight==1)))
        hr = E_FAIL;
+
+    if (SUCCEEDED(hr) && (owidth>0x7FFFFFFFu || oheight>0x7FFFFFFFu))
+       hr = E_FAIL;   // srcW/srcH are ints, and so is everything downstream of them
 
     if (SUCCEEDED(hr))
     {
        srcW = (int)owidth;
        srcH = (int)oheight;
 
-       // same two escape hatches as LoadWICimage(): a DNG that decoded into its embedded
-       // 256x192 icon, and a high bit depth TIFF that FreeImage handles better
-       GUID containerFmt;
-       WICPixelFormatGUID opixelFormat = GUID_WICPixelFormatDontCare;
-       const bool gotPixFmt = SUCCEEDED(pFrame->GetPixelFormat(&opixelFormat));
        if (meta!=NULL)
        {
           // WICpreLoadImage() records exactly these two, off the same frame and before
           // anything is scaled or converted; the numbers reach the database through
           // WicPixelFormats() and mainLoadedIMGdetails.DPI
-          if (gotPixFmt)
-             meta->wicFmt = (int)indexedWICpixelFormats(opixelFormat);
+          if (facts.frames>0)
+             meta->frames = (int)facts.frames;
 
-          double dpix = 0, dpiy = 0;
-          if (SUCCEEDED(pFrame->GetResolution(&dpix, &dpiy)))
-             meta->dpi = (int)round((dpix + dpiy)/2);
+          if (facts.gotPixelFmt)
+             meta->wicFmt = (int)indexedWICpixelFormats(facts.pixelFmt);
+
+          // a NaN or absurd resolution out of broken metadata used to convert into
+          // garbage; both comparisons are false for NaN, which lands on nothing recorded
+          const double dpiAvg = (facts.dpix + facts.dpiy) * 0.5;
+          if (facts.gotResolution && dpiAvg>0.0 && dpiAvg<1000000.0)
+             meta->dpi = (int)(dpiAvg + 0.5);
        }
 
-       if (gotPixFmt && SUCCEEDED(pDecoder->GetContainerFormat(&containerFmt)))
+       // same two escape hatches as LoadWICimage(): a DNG that decoded into its embedded
+       // 256x192 icon, and a high bit depth TIFF that FreeImage handles better
+       if (facts.gotPixelFmt && facts.gotContainerFmt)
        {
-          UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
-          int destinationBPP = decideWICtoFIMpixelFormat(opixelFormat);
+          UINT ucontainerFmt = indexedWICcontainerFormats(facts.containerFmt);
+          int destinationBPP = decideWICtoFIMpixelFormat(facts.pixelFmt);
           int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
           if ((ucontainerFmt==9 && owidth==256 && oheight==192) || (tif==1 && destinationBPP>32 && isFIMokay==1))
              hr = E_FAIL;
@@ -472,30 +460,32 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
           auto nSize = adaptImageGivenSize(1, 0, owidth, oheight, (UINT)targetW, (UINT)targetH);
           if (nSize[0]!=owidth || nSize[1]!=oheight)
           {
-             if (SUCCEEDED(fac->CreateBitmapScaler(&pScaler)))
+             if (SUCCEEDED(fac->CreateBitmapScaler(&pScaler)) && pScaler!=NULL)
              {
                 WICBitmapInterpolationMode mode = (givenQuality==7) ? WICBitmapInterpolationModeHighQualityCubic : WICBitmapInterpolationModeFant;
-                HRESULT hrs = pScaler->Initialize(pFrame, nSize[0], nSize[1], mode);
-                if (FAILED(hrs) && mode!=WICBitmapInterpolationModeFant)   // not available before WIC2
-                   hrs = pScaler->Initialize(pFrame, nSize[0], nSize[1], WICBitmapInterpolationModeFant);
+                HRESULT hrs = WICguardedScalerInit(pScaler, pFrame, nSize[0], nSize[1], mode, &sehCode);
+                // the retry is for HighQualityCubic being unavailable before WIC2, which
+                // reports an error; a codec that faulted is not asked a second time
+                if (FAILED(hrs) && sehCode==0 && mode!=WICBitmapInterpolationModeFant)
+                   hrs = WICguardedScalerInit(pScaler, pFrame, nSize[0], nSize[1], WICBitmapInterpolationModeFant, &sehCode);
 
                 if (SUCCEEDED(hrs))
                    pSource = pScaler;
                 else
-                   SafeRelease(pScaler, "tpWICload: pScaler", 0);
+                   WICsafeRelease(pScaler);
              }
           }
        }
 
        hr = fac->CreateFormatConverter(&pConverter);
        if (SUCCEEDED(hr))
-          hr = pConverter->Initialize(pSource, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0f, WICBitmapPaletteTypeCustom);
+          hr = WICguardedConverterInit(pConverter, pSource, &GUID_WICPixelFormat32bppPBGRA, &sehCode);
     }
 
     if (SUCCEEDED(hr))
     {
        UINT width = 0, height = 0, cbStride = 0;
-       hr = pConverter->GetSize(&width, &height);
+       hr = WICguardedSourceInfo(pConverter, &width, &height, NULL, &sehCode);
        if (SUCCEEDED(hr))
           hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
 
@@ -510,8 +500,14 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
              HRESULT hrc = E_FAIL;
              if (lockSt==Gdiplus::Ok)
              {
-                hrc = pConverter->CopyPixels(NULL, bitmapDatu.Stride, bitmapDatu.Stride*height, (BYTE*)bitmapDatu.Scan0);
+                // in 64-bit: Stride is an INT and height a UINT, so the old product wrapped
+                // silently once an image passed roughly one gigapixel of output
+                const UINT64 bufSize = (UINT64)(bitmapDatu.Stride<0 ? -bitmapDatu.Stride : bitmapDatu.Stride) * (UINT64)height;
+                hrc = (bufSize>0xFFFFFFFFull) ? E_INVALIDARG
+                    : WICguardedCopyPixels(pConverter, NULL, bitmapDatu.Stride, (UINT)bufSize, (BYTE*)bitmapDatu.Scan0, &sehCode);
                 Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+                if (sehCode!=0)
+                   fnOutputDebug("thumbsPool: the codec faulted while decoding " + WideCharToString(szFileName));
              } else fnOutputDebug("thumbsPool: failed to lock the GDI+ bitmap for " + WideCharToString(szFileName));
 
              if (FAILED(hrc))
@@ -524,10 +520,10 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
        }
     }
 
-    SafeRelease(pConverter, "tpWICload: pConverter", 0);
-    SafeRelease(pScaler, "tpWICload: pScaler", 0);
-    SafeRelease(pFrame, "tpWICload: pFrame", 0);
-    SafeRelease(pDecoder, "tpWICload: pDecoder", 0);
+    WICsafeRelease(pConverter);
+    WICsafeRelease(pScaler);
+    WICsafeRelease(pFrame);
+    WICsafeRelease(pDecoder);
     return myBitmap;
 }
 

@@ -5786,20 +5786,340 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
       return okay;
 }
 
+// ---------------------------------------------------------------------------------------
+// Guarded WIC decoding
+//
+// A malformed, truncated or hostile image file does not always come back as a failure
+// HRESULT. WIC codecs - above all the third party ones users install for RAW, HEIF or
+// JPEG-XL - do walk off their own buffers and raise an access violation instead; and
+// because CreateDecoderFromFilename() reads the file through a memory mapping, a file on
+// a network share or on a card that is pulled mid-read raises EXCEPTION_IN_PAGE_ERROR.
+// Neither of those is a C++ exception, so no catch() handler in this file can ever see
+// them under the synchronous exception model this project builds with - only __except().
+//
+// The helpers below exist because MSVC refuses __try inside any function that holds an
+// object needing unwinding (C2712), which every function here does the moment it builds
+// an std::string for fnOutputDebug(). They therefore keep to plain data and raw COM
+// pointers, and they never read a local variable inside the __except block: a local
+// modified inside a __try is not reliable in the handler.
+//
+// Every call that hands control to a codec goes through one of these: opening the file,
+// reading the frame header, initializing a scaler or a converter (a codec may do a scaled
+// decode of its own through IWICBitmapSourceTransform), reading the embedded colour
+// profile, and above all CopyPixels(), which is where the pixels are actually decoded and
+// therefore where a corrupt file is most likely to take the process down.
+//
+// This is damage control, not a guarantee. A codec that corrupts the heap before it
+// faults, or that faults on a thread of its own, is still fatal.
+// ---------------------------------------------------------------------------------------
+
+static int WICcodecCrashFilter(DWORD code) {
+    switch (code)
+    {
+       case EXCEPTION_ACCESS_VIOLATION:
+       case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+       case EXCEPTION_DATATYPE_MISALIGNMENT:
+       case EXCEPTION_ILLEGAL_INSTRUCTION:
+       case EXCEPTION_IN_PAGE_ERROR:
+       case EXCEPTION_INT_DIVIDE_BY_ZERO:
+       case EXCEPTION_INT_OVERFLOW:
+       case EXCEPTION_PRIV_INSTRUCTION:
+            return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // everything else keeps unwinding: a stack overflow leaves no guard page to recover
+    // into, and C++ exceptions (0xE06D7363) must still reach their own handlers
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void WICguardedRelease(IUnknown *p) {
+    if (p==NULL)
+       return;
+
+    __try
+    {
+        p->Release();
+    } __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        // a codec that faulted once can fault again on the way out; the object is then
+        // abandoned - a few leaked bytes beat taking the whole viewer down
+    }
+}
+
+// SafeRelease() for anything a codec has touched: same job, but it survives a faulting
+// Release(). Worth using on every WIC object once a decode has begun, because the object
+// most likely to fault on the way out is the one that just faulted on the way in.
+template <typename T> inline void WICsafeRelease(T *&p) {
+    if (p!=NULL)
+    {
+       WICguardedRelease(p);
+       p = NULL;
+    }
+}
+
+// Everything a caller reads out of a frame header, in one plain struct so the guarded
+// reader below stays free of anything that would need unwinding. The three got* flags
+// mark the fields that are metadata rather than structure: whether a missing one is fatal
+// is the caller's policy, not this function's.
+struct WICframeFacts {
+    UINT   width;
+    UINT   height;
+    UINT   frames;
+    UINT   activeFrame;
+    double dpix;
+    double dpiy;
+    GUID   containerFmt;
+    WICPixelFormatGUID pixelFmt;
+    int    gotContainerFmt;
+    int    gotPixelFmt;
+    int    gotResolution;
+};
+
+// Opens szFileName, picks a frame and reads its header. The decoder and the frame are
+// written straight into the caller's pointers, so the caller can release whatever was
+// produced no matter where this failed. sehCode comes back non-zero when the codec
+// faulted rather than returned an error.
+static HRESULT WICguardedOpenFrame(IWICImagingFactory *fac, const wchar_t *szFileName, int givenFrame,
+                                   IWICBitmapDecoder **ppDecoder, IWICBitmapFrameDecode **ppFrame,
+                                   WICframeFacts *facts, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    __try
+    {
+        hr = fac->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, ppDecoder);
+        if (SUCCEEDED(hr) && *ppDecoder==NULL)
+           hr = E_POINTER;   // a success code with no object is still nothing to work with
+
+        UINT tFrames = 0;
+        if (SUCCEEDED(hr))
+           hr = (*ppDecoder)->GetFrameCount(&tFrames);
+
+        if (SUCCEEDED(hr) && tFrames<1)
+           hr = E_FAIL;      // a container that declares no frame has nothing to decode
+
+        if (SUCCEEDED(hr))
+        {
+           UINT useFrame = (givenFrame>0) ? (UINT)givenFrame : 0;
+           if (useFrame>=tFrames)
+              useFrame = tFrames - 1;
+
+           facts->frames = tFrames;
+           facts->activeFrame = useFrame;
+           hr = (*ppDecoder)->GetFrame(useFrame, ppFrame);
+           if (SUCCEEDED(hr) && *ppFrame==NULL)
+              hr = E_POINTER;
+        }
+
+        if (SUCCEEDED(hr))
+           hr = (*ppFrame)->GetSize(&facts->width, &facts->height);
+
+        // from here on nothing is fatal by itself; the caller decides what it can do
+        // without a container format, a pixel format or a resolution
+        if (SUCCEEDED(hr))
+        {
+           if (SUCCEEDED((*ppDecoder)->GetContainerFormat(&facts->containerFmt)))
+              facts->gotContainerFmt = 1;
+
+           if (SUCCEEDED((*ppFrame)->GetPixelFormat(&facts->pixelFmt)))
+              facts->gotPixelFmt = 1;
+
+           if (SUCCEEDED((*ppFrame)->GetResolution(&facts->dpix, &facts->dpiy)))
+              facts->gotResolution = 1;
+           else
+           {
+              facts->dpix = 0;
+              facts->dpiy = 0;
+           }
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+// bits per pixel and channel count for a pixel format GUID; reads no file data, but it
+// still runs inside the codec that registered the format
+static HRESULT WICguardedPixelFormatInfo(IWICImagingFactory *fac, const WICPixelFormatGUID *fmt,
+                                         UINT *bpp, UINT *channels, DWORD *sehCode) {
+    IWICComponentInfo   *pComponentInfo   = NULL;
+    IWICPixelFormatInfo *pPixelFormatInfo = NULL;
+    HRESULT hr = E_FAIL;
+    *bpp = 0;
+    *channels = 0;
+    *sehCode = 0;
+    __try
+    {
+        hr = fac->CreateComponentInfo(*fmt, &pComponentInfo);
+        if (SUCCEEDED(hr) && pComponentInfo!=NULL)
+        {
+           hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
+           if (SUCCEEDED(hr) && pPixelFormatInfo!=NULL)
+           {
+              pPixelFormatInfo->GetBitsPerPixel(bpp);
+              hr = pPixelFormatInfo->GetChannelCount(channels);
+           }
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;   // both component objects are abandoned on purpose
+    }
+
+    WICguardedRelease(pPixelFormatInfo);
+    WICguardedRelease(pComponentInfo);
+    return hr;
+}
+
+// size and pixel format of whatever is at the end of a scaler/converter chain; the call
+// walks back down that chain into the codec
+static HRESULT WICguardedSourceInfo(IWICBitmapSource *src, UINT *width, UINT *height,
+                                    WICPixelFormatGUID *fmt, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *width = 0;
+    *height = 0;
+    *sehCode = 0;
+    if (src==NULL)
+       return E_POINTER;
+
+    __try
+    {
+        hr = src->GetSize(width, height);
+        if (SUCCEEDED(hr) && fmt!=NULL)
+           hr = src->GetPixelFormat(fmt);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+static HRESULT WICguardedScalerInit(IWICBitmapScaler *pScaler, IWICBitmapSource *src, UINT width, UINT height,
+                                    WICBitmapInterpolationMode mode, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    if (pScaler==NULL || src==NULL)
+       return E_POINTER;
+
+    __try
+    {
+        hr = pScaler->Initialize(src, width, height, mode);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+static HRESULT WICguardedConverterInit(IWICFormatConverter *pConverter, IWICBitmapSource *src,
+                                       const WICPixelFormatGUID *destFmt, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    if (pConverter==NULL || src==NULL)
+       return E_POINTER;
+
+    __try
+    {
+        hr = pConverter->Initialize(src, *destFmt, WICBitmapDitherTypeNone, NULL, 0.0f, WICBitmapPaletteTypeCustom);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+// the decode itself
+static HRESULT WICguardedCopyPixels(IWICBitmapSource *src, const WICRect *rc, UINT cbStride,
+                                    UINT cbBufferSize, BYTE *buffer, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    if (src==NULL || buffer==NULL || cbStride<1 || cbBufferSize<1)
+       return E_INVALIDARG;
+
+    __try
+    {
+        hr = src->CopyPixels(rc, cbStride, cbBufferSize, buffer);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+// applyColorManagement() parses the ICC profile embedded in the file, which is codec
+// territory like any other; it builds std::strings of its own, so the __try has to sit
+// out here rather than inside it
+static int WICguardedColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode* &pFrame,
+                                     GUID destPixFormat, int useICM, DWORD *sehCode) {
+    int okay = 0;
+    *sehCode = 0;
+    __try
+    {
+        okay = applyColorManagement(thisWICbitmap, pFrame, destPixFormat, useICM);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return 0;
+    }
+
+    return okay;
+}
+
 Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UINT &width, UINT &height, UINT cbStride, UINT cbBufferSize, Gdiplus::PixelFormat destinationFormat) {
      Gdiplus::GpBitmap *myBitmap = NULL;
+     if (thisWICbitmap==NULL || width<1 || height<1)
+        return myBitmap;
+
      Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, cbStride, destinationFormat, NULL, &myBitmap);
      if (myBitmap!=NULL)
      {
          Gdiplus::BitmapData bitmapDatu;
          Gdiplus::Rect rect(0, 0, width, height);
-         Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationFormat, &bitmapDatu);
- 
-         // HRESULT hr = thisWICbitmap->CopyPixels(NULL, cbStride, cbBufferSize, (BYTE*)bitmapDatu.Scan0);
-         HRESULT hr = thisWICbitmap->CopyPixels(NULL, bitmapDatu.Stride, bitmapDatu.Stride * height, (BYTE*)bitmapDatu.Scan0);
+         // the lock status used to go unchecked, and bitmapDatu is uninitialized until it
+         // succeeds - CopyPixels() then wrote the decoded image over a junk Scan0
+         Gdiplus::Status lockSt = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationFormat, &bitmapDatu);
+         if (lockSt!=Gdiplus::Ok)
+         {
+            fnOutputDebug("WICbmpSourceConvertGdip: failed to lock the GDI+ bitmap");
+            Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+            return (Gdiplus::GpBitmap*)NULL;
+         }
+
+         // the buffer size is computed in 64-bit: stride is an INT and height a UINT, so
+         // the old product wrapped silently on very large images
+         DWORD   sehCode = 0;
+         UINT64  bufSize = (UINT64)(bitmapDatu.Stride<0 ? -bitmapDatu.Stride : bitmapDatu.Stride) * (UINT64)height;
+         HRESULT hr = (bufSize>0xFFFFFFFFull) ? E_INVALIDARG
+                    : WICguardedCopyPixels(thisWICbitmap, NULL, bitmapDatu.Stride, (UINT)bufSize, (BYTE*)bitmapDatu.Scan0, &sehCode);
          Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+         if (sehCode!=0)
+            fnOutputDebug("WICbmpSourceConvertGdip: the codec faulted while decoding the pixels");
+
          if (!(SUCCEEDED(hr)))
+         {
             fnOutputDebug("WICbmpSourceConvertGdip: copy pixels FAILED: " + std::to_string(cbStride) + "|" + std::to_string(cbBufferSize));
+            // a half written bitmap is not worth handing back; it used to be returned as
+            // though the decode had worked
+            Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+            myBitmap = NULL;
+         }
     }
     return myBitmap;
 }
@@ -6149,166 +6469,6 @@ bool IsFileExtension(const wchar_t* szFileName, const wchar_t* extension) {
     return _wcsicmp(fileExt, dotExtension) == 0;
 }
 
-// ---------------------------------------------------------------------------------------
-// Guarded WIC decoding
-//
-// A malformed, truncated or hostile image file does not always come back as a failure
-// HRESULT. WIC codecs - above all the third party ones users install for RAW, HEIF or
-// JPEG-XL - do walk off their own buffers and raise an access violation instead; and
-// because CreateDecoderFromFilename() reads the file through a memory mapping, a file on
-// a network share or on a card that is pulled mid-read raises EXCEPTION_IN_PAGE_ERROR.
-// Neither of those is a C++ exception, so no catch() handler in this file can ever see
-// them under the synchronous exception model this project builds with - only __except().
-//
-// The helpers below exist because MSVC refuses __try inside any function that holds an
-// object needing unwinding (C2712), which every function here does the moment it builds
-// an std::string for fnOutputDebug(). They therefore keep to plain data and raw COM
-// pointers, and they never read a local variable inside the __except block: a local
-// modified inside a __try is not reliable in the handler.
-//
-// This is damage control, not a guarantee. A codec that corrupts the heap before it
-// faults, or that faults on a thread of its own, is still fatal.
-// ---------------------------------------------------------------------------------------
-
-static int WICcodecCrashFilter(DWORD code) {
-    switch (code)
-    {
-       case EXCEPTION_ACCESS_VIOLATION:
-       case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-       case EXCEPTION_DATATYPE_MISALIGNMENT:
-       case EXCEPTION_ILLEGAL_INSTRUCTION:
-       case EXCEPTION_IN_PAGE_ERROR:
-       case EXCEPTION_INT_DIVIDE_BY_ZERO:
-       case EXCEPTION_INT_OVERFLOW:
-       case EXCEPTION_PRIV_INSTRUCTION:
-            return EXCEPTION_EXECUTE_HANDLER;
-    }
-
-    // everything else keeps unwinding: a stack overflow leaves no guard page to recover
-    // into, and C++ exceptions (0xE06D7363) must still reach their own handlers
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-
-static void WICguardedRelease(IUnknown *p) {
-    if (p==NULL)
-       return;
-
-    __try
-    {
-        p->Release();
-    } __except (WICcodecCrashFilter(GetExceptionCode()))
-    {
-        // a codec that faulted once can fault again on the way out; the object is then
-        // abandoned - a few leaked bytes beat taking the whole viewer down
-    }
-}
-
-// everything WICpreLoadImage() reads out of the file, in one plain struct, so that the
-// guarded reader below stays free of anything that would need unwinding
-struct WICframeFacts {
-    UINT   width;
-    UINT   height;
-    UINT   frames;
-    UINT   activeFrame;
-    double dpix;
-    double dpiy;
-    GUID   containerFmt;
-    WICPixelFormatGUID pixelFmt;
-};
-
-// Opens szFileName, picks a frame and reads its header fields. The decoder and the frame
-// are written straight into the caller's pointers - the two globals - so that the caller
-// can release whatever was produced no matter where this failed. sehCode comes back
-// non-zero when the codec faulted rather than returned an error.
-static HRESULT WICguardedOpenFrame(IWICImagingFactory *fac, const wchar_t *szFileName, int givenFrame,
-                                   IWICBitmapDecoder **ppDecoder, IWICBitmapFrameDecode **ppFrame,
-                                   WICframeFacts *facts, DWORD *sehCode) {
-    HRESULT hr = E_FAIL;
-    *sehCode = 0;
-    __try
-    {
-        hr = fac->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, ppDecoder);
-        if (SUCCEEDED(hr) && *ppDecoder==NULL)
-           hr = E_POINTER;   // a success code with no object is still nothing to work with
-
-        if (SUCCEEDED(hr))
-           hr = (*ppDecoder)->GetContainerFormat(&facts->containerFmt);
-
-        UINT tFrames = 0;
-        if (SUCCEEDED(hr))
-           hr = (*ppDecoder)->GetFrameCount(&tFrames);
-
-        if (SUCCEEDED(hr) && tFrames<1)
-           hr = E_FAIL;      // a container that declares no frame has nothing to preload
-
-        if (SUCCEEDED(hr))
-        {
-           UINT useFrame = (givenFrame>0) ? (UINT)givenFrame : 0;
-           if (useFrame>=tFrames)
-              useFrame = tFrames - 1;
-
-           facts->frames = tFrames;
-           facts->activeFrame = useFrame;
-           hr = (*ppDecoder)->GetFrame(useFrame, ppFrame);
-           if (SUCCEEDED(hr) && *ppFrame==NULL)
-              hr = E_POINTER;
-        }
-
-        if (SUCCEEDED(hr))
-           hr = (*ppFrame)->GetSize(&facts->width, &facts->height);
-
-        if (SUCCEEDED(hr))
-           hr = (*ppFrame)->GetPixelFormat(&facts->pixelFmt);
-
-        if (SUCCEEDED(hr) && FAILED((*ppFrame)->GetResolution(&facts->dpix, &facts->dpiy)))
-        {
-           facts->dpix = 0;  // a frame that reports no resolution is still a good frame
-           facts->dpiy = 0;
-        }
-    }
-    __except (WICcodecCrashFilter(GetExceptionCode()))
-    {
-        *sehCode = GetExceptionCode();
-        return E_UNEXPECTED;
-    }
-
-    return hr;
-}
-
-// bits per pixel and channel count for a pixel format GUID; reads no file data, but it
-// still runs inside the codec that registered the format
-static HRESULT WICguardedPixelFormatInfo(IWICImagingFactory *fac, const WICPixelFormatGUID *fmt,
-                                         UINT *bpp, UINT *channels, DWORD *sehCode) {
-    IWICComponentInfo   *pComponentInfo   = NULL;
-    IWICPixelFormatInfo *pPixelFormatInfo = NULL;
-    HRESULT hr = E_FAIL;
-    *bpp = 0;
-    *channels = 0;
-    *sehCode = 0;
-    __try
-    {
-        hr = fac->CreateComponentInfo(*fmt, &pComponentInfo);
-        if (SUCCEEDED(hr) && pComponentInfo!=NULL)
-        {
-           hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
-           if (SUCCEEDED(hr) && pPixelFormatInfo!=NULL)
-           {
-              pPixelFormatInfo->GetBitsPerPixel(bpp);
-              hr = pPixelFormatInfo->GetChannelCount(channels);
-           }
-        }
-    }
-    __except (WICcodecCrashFilter(GetExceptionCode()))
-    {
-        *sehCode = GetExceptionCode();
-        return E_UNEXPECTED;   // both component objects are abandoned on purpose
-    }
-
-    WICguardedRelease(pPixelFormatInfo);
-    WICguardedRelease(pComponentInfo);
-    return hr;
-}
-
 DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFrame, UINT *resultsArray, int isFIMokay) {
   // WIC factory initialized in initWICnow()
   if (resultsArray==NULL || szFileName==NULL || szFileName[0]==L'\0')
@@ -6342,6 +6502,14 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
          pWICclassFrameDecoded = NULL;
          pWICclassDecoder = NULL;
          return 0;
+      }
+
+      // this loader hands the caller a container format and a pixel format that AHK
+      // records and acts on, so unlike the thumbnailer it cannot proceed without either
+      if (SUCCEEDED(hr) && (!facts.gotContainerFmt || !facts.gotPixelFmt))
+      {
+         fnOutputDebug("WICpreLoadImage: error: the frame reports no container or pixel format");
+         hr = E_FAIL;
       }
 
       if (SUCCEEDED(hr) && !IsWicDecoderAvailable(facts.containerFmt))
@@ -6946,7 +7114,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlipHV, int useICM, const wchar_t *szFileName, UINT *&resultsArray, int isFIMokay) {
 // this function is meant to be self-contained and can be executed by different threads, via AHK
-    // WIC factory initialized in initWICnow() 
+    // WIC factory initialized in initWICnow()
     Gdiplus::GpBitmap     *myBitmap             = NULL;
     IWICBitmapSource      *pFinalBitmapSource   = NULL;
     IWICFormatConverter   *pConverter           = NULL;
@@ -6956,6 +7124,15 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
     WICPixelFormatGUID    opixelFormat          = GUID_WICPixelFormatDontCare;
     WICPixelFormatGUID    destinationFormat     = GUID_WICPixelFormat32bppPBGRA;
     Gdiplus::PixelFormat  destinationGdipFormat = PixelFormat32bppPARGB;
+    if (szFileName==NULL || szFileName[0]==L'\0' || resultsArray==NULL)
+       return myBitmap;
+
+    if (m_pIWICFactory==NULL)
+    {
+       fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC was never initialized; initWICnow() must succeed first");
+       return myBitmap;
+    }
+
     if (noBPPconv==32)
        destinationFormat = GUID_WICPixelFormat32bppBGRA;
     else if (noBPPconv==24)
@@ -6970,166 +7147,179 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
     else if (noBPPconv==16)
        destinationGdipFormat = PixelFormat16bppRGB555;
 
-    HRESULT hr  = S_OK, hr2 = S_OK;
+    HRESULT hr = S_OK;
     UINT owidth = 0, oheight = 0, mustResize = 0;
-    if (szFileName)
+    DWORD sehCode = 0;
+    char  sehTxt[32];
+    try
     {
-        try
+        // the decoder, the frame and the whole header read happen behind the SEH guard;
+        // see the block above WICbmpSourceConvertGdip() for why a catch() cannot do this
+        WICframeFacts facts = {};
+        int wantFrame = (givenFrame>0x7FFFFFFFu) ? 0x7FFFFFFF : (int)givenFrame;
+        hr = WICguardedOpenFrame(m_pIWICFactory, szFileName, wantFrame, &pDecoder, &pFrame, &facts, &sehCode);
+        if (sehCode!=0)
         {
-            // Create a decoder; Decode the source image to IWICBitmapSource
-            hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
-        } catch (const char* message)
-        {
-            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
-            return myBitmap;
+           sprintf_s(sehTxt, "0x%08X", (unsigned int)sehCode);
+           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: the WIC codec faulted (" + std::string(sehTxt) + ") on file: " + WideCharToString(szFileName));
+           WICsafeRelease(pFrame);
+           WICsafeRelease(pDecoder);
+           return myBitmap;
         }
 
+        if (FAILED(hr))
+           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to open a frame of " + WideCharToString(szFileName));
+
+        owidth  = facts.width;
+        oheight = facts.height;
+        if (SUCCEEDED(hr) && ((!owidth || !oheight) || (owidth==1 && oheight==1)))
+        {
+           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: error: no width and height for the decoded frame");
+           hr = E_FAIL;
+        }
+
+        if (SUCCEEDED(hr) && (owidth>0x7FFFFFFFu || oheight>0x7FFFFFFFu))
+        {
+           // everything downstream carries these as signed ints
+           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: error: the frame declares an impossible size");
+           hr = E_FAIL;
+        }
+
+        if (SUCCEEDED(hr) && !facts.gotPixelFmt)
+        {
+           // the pixel format decides destinationBPP and reaches AHK as image properties;
+           // it used to be read into opixelFormat and the failure then silently overwritten
+           // by the CreateComponentInfo() call that followed
+           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to retrieve image pixel format");
+           hr = E_FAIL;
+        }
+
+        int destinationBPP = 24;
         if (SUCCEEDED(hr))
         {
-            UINT tFrames = 0;
-            hr = pDecoder->GetFrameCount(&tFrames);
-            if (SUCCEEDED(hr))
-            {
-               resultsArray[2] = tFrames;
-               if (tFrames>0 && givenFrame >= tFrames) // tFrames - 1 would underflow when tFrames==0
-                  givenFrame = tFrames - 1;
- 
-               hr = pDecoder->GetFrame(givenFrame, &pFrame);
-               if (SUCCEEDED(hr))
-               {
-                   hr = pFrame->GetSize(&owidth, &oheight); 
-                   if ((!owidth || !oheight) || (owidth==1 && oheight==1))
-                   {
-                      fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: error: no width and height for the decoded frame");
-                      hr = E_FAIL;
-                   } else
-                   {
-                      GUID containerFmt;
-                      resultsArray[0] = owidth;
-                      resultsArray[1] = oheight;
-                      hr2 = pDecoder->GetContainerFormat(&containerFmt);
-                      UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
-                      resultsArray[5] = ucontainerFmt;
-                      auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, owidth, oheight, givenW, givenH);
-                      mustResize = (nSize[0]!=owidth || nSize[1]!=oheight) ? 1 : 0;
-                      if (mustResize==1)
-                      {
-                         destinationFormat = GUID_WICPixelFormat32bppPBGRA;
-                         destinationGdipFormat = PixelFormat32bppPARGB;
-                      }
+           opixelFormat = facts.pixelFmt;
+           UINT ucontainerFmt = facts.gotContainerFmt ? indexedWICcontainerFormats(facts.containerFmt) : 0;
+           auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, owidth, oheight, givenW, givenH);
+           mustResize = (nSize[0]!=owidth || nSize[1]!=oheight) ? 1 : 0;
+           if (mustResize==1)
+           {
+              destinationFormat = GUID_WICPixelFormat32bppPBGRA;
+              destinationGdipFormat = PixelFormat32bppPARGB;
+           }
 
-                      double dpix = 0, dpiy = 0;
-                      hr2 = pFrame->GetResolution(&dpix, &dpiy); 
-                      resultsArray[4] = round((dpix + dpiy)/2);
+           destinationBPP = decideWICtoFIMpixelFormat(opixelFormat);
+           UINT bpp = 0, channels = 0;
+           DWORD infoSehCode = 0;
+           hr = WICguardedPixelFormatInfo(m_pIWICFactory, &opixelFormat, &bpp, &channels, &infoSehCode);
+           if (infoSehCode!=0)
+              fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: the pixel format component faulted");
 
-                      hr = pFrame->GetPixelFormat(&opixelFormat);
-                      UINT uPixFmt = indexedWICpixelFormats(opixelFormat);
-                      resultsArray[3] = uPixFmt;
-                      int destinationBPP = decideWICtoFIMpixelFormat(opixelFormat);
-                      resultsArray[6] = destinationBPP;
-                      UINT bpp = NULL;
-                      UINT channels = NULL;
-                      IWICComponentInfo* pComponentInfo = NULL;
-                      hr = m_pIWICFactory->CreateComponentInfo(opixelFormat, &pComponentInfo);
-                      if (SUCCEEDED(hr))
-                      {
-                         IWICPixelFormatInfo* pPixelFormatInfo = NULL;
-                         hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
-                         if (SUCCEEDED(hr))
-                         {
-                            hr = pPixelFormatInfo->GetBitsPerPixel(&bpp);
-                            hr = pPixelFormatInfo->GetChannelCount(&channels);
-                            resultsArray[7] = bpp;
-                            resultsArray[8] = channels;
-                         }
-                         if (pPixelFormatInfo)
-                            pPixelFormatInfo->Release();
-                         pComponentInfo->Release();
-                      }
+           if (SUCCEEDED(hr))
+           {
+              // published in one go, so a failed load can no longer leave the caller with
+              // half of an image description
+              double dpiAvg = (facts.dpix + facts.dpiy) * 0.5;
+              resultsArray[0] = owidth;
+              resultsArray[1] = oheight;
+              resultsArray[2] = facts.frames;
+              resultsArray[3] = indexedWICpixelFormats(opixelFormat);
+              // NaN and absurd resolutions out of broken metadata used to convert into
+              // garbage; both comparisons are false for NaN, which lands on zero
+              resultsArray[4] = (dpiAvg>0.0 && dpiAvg<1000000.0) ? (UINT)(dpiAvg + 0.5) : 0;
+              resultsArray[5] = ucontainerFmt;
+              resultsArray[6] = destinationBPP;
+              resultsArray[7] = bpp;
+              resultsArray[8] = channels;
+           }
 
-                      int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
-                      // fnOutputDebug("LoadWICimage: container format ID=" + std::to_string(ucontainerFmt));
-                      if (ucontainerFmt==9 && owidth==256 && oheight==192 || tif==1 && destinationBPP>32 && isFIMokay==1)
-                      {
-                         if (ucontainerFmt==9 && owidth==256 && oheight==192)
-                            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
-                         else
-                            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
-                         hr = E_FAIL;
-                      }
-                   }
-               } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to decode the frame");
-            } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to retrieve frame count");
+           int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
+           // fnOutputDebug("LoadWICimage: container format ID=" + std::to_string(ucontainerFmt));
+           if (SUCCEEDED(hr) && (ucontainerFmt==9 && owidth==256 && oheight==192 || tif==1 && destinationBPP>32 && isFIMokay==1))
+           {
+              if (ucontainerFmt==9 && owidth==256 && oheight==192)
+                 fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
+              else
+                 fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
+              hr = E_FAIL;
+           }
         }
 
         if (FAILED(hr))
         {
-            SafeRelease(pFrame, "LoadWICimage: pFrame", 0);
-            SafeRelease(pDecoder, "LoadWICimage: pDecoder", 0);
+            WICsafeRelease(pFrame);
+            WICsafeRelease(pDecoder);
             fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC decoder error on file " + WideCharToString(szFileName));
             return myBitmap;
         };
 
         if (SUCCEEDED(hr))
         {
-            const double mpx = (owidth * oheight)/1000000;
+            // computed in 64-bit: the old UINT product wrapped, and a header claiming
+            // 65536 x 65536 then reported 0 megapixels and walked straight past this gate
+            const double mpx = ((UINT64)owidth * (UINT64)oheight)/1000000.0;
             if (noBPPconv==1 || noBPPconv==2 && mpx>536.4)
             {
-               SafeRelease(pFrame, "LoadWICimage: pFrame", 0);
-               SafeRelease(pDecoder, "LoadWICimage: pDecoder", 0);
+               WICsafeRelease(pFrame);
+               WICsafeRelease(pDecoder);
                return myBitmap;
             }
 
+            hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
             if (SUCCEEDED(hr))
             {
-                hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
-                if (SUCCEEDED(hr))
-                {
-                    // this will scale the image to the GDI+ limits; 536 mgpx; it ignores the givenW/H; 
-                    // the image is going to be rescaled to the givenW/H, if needed, with OpenCV
-                    // I use opencv because it is much faster and because pScaler breaks the color 
-                    // management function applyColorManagement();
+                // this will scale the image to the GDI+ limits; 536 mgpx; it ignores the givenW/H;
+                // the image is going to be rescaled to the givenW/H, if needed, with OpenCV
+                // I use opencv because it is much faster and because pScaler breaks the color
+                // management function applyColorManagement();
 
-                    WICBitmapInterpolationMode wicScaleQuality = indexedWICinterpolations(givenQuality);
-                    auto nSize = adaptImageGivenSize(2, ScaleAnySize, owidth, oheight, givenW, givenH);
-                    // auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, owidth, oheight, givenW, givenH);
-                    if (nSize[2]==1)
-                       wicScaleQuality = WICBitmapInterpolationModeNearestNeighbor;
-                    //fnOutputDebug("LoadWICimage: " + std::to_string(nSize[0]) + " x " + std::to_string(nSize[1]));
-                    hr = pScaler->Initialize(pFrame, nSize[0], nSize[1], WICBitmapInterpolationModeNearestNeighbor);
+                WICBitmapInterpolationMode wicScaleQuality = indexedWICinterpolations(givenQuality);
+                auto nSize = adaptImageGivenSize(2, ScaleAnySize, owidth, oheight, givenW, givenH);
+                // auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, owidth, oheight, givenW, givenH);
+                if (nSize[2]==1)
+                   wicScaleQuality = WICBitmapInterpolationModeNearestNeighbor;
+                //fnOutputDebug("LoadWICimage: " + std::to_string(nSize[0]) + " x " + std::to_string(nSize[1]));
+                hr = WICguardedScalerInit(pScaler, pFrame, nSize[0], nSize[1], WICBitmapInterpolationModeNearestNeighbor, &sehCode);
+                if (SUCCEEDED(hr))
+                   hr = pScaler->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+                else
+                   fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to initialize image scaler");
+            } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to create image scaler");
+
+            if (SUCCEEDED(hr))
+            {
+                // convert the bitmap into 32bppBGR, a convenient pixel format for GDI+ rendering
+                // the profile parsing sits behind the guard too: a corrupt embedded ICC is
+                // read by the codec like any other part of the file
+                int hasICM = (useICM!=1) ? 0 : WICguardedColorManagement(pFinalBitmapSource, pFrame, destinationFormat, useICM, &sehCode);
+                if (sehCode!=0)
+                   fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: the codec faulted on the embedded colour profile");
+
+                if (hasICM!=1)
+                {
+                    hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
                     if (SUCCEEDED(hr))
-                       hr = pScaler->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
-                    else 
-                       fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to initialize image scaler");
-                } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to create image scaler");
-
-                if (SUCCEEDED(hr))
-                {
-                    // convert the bitmap into 32bppBGR, a convenient pixel format for GDI+ rendering 
-                    int hasICM = (useICM!=1) ? 0 : applyColorManagement(pFinalBitmapSource, pFrame, destinationFormat, useICM);
-                    if (hasICM!=1)
                     {
-                        hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
+                        hr = WICguardedConverterInit(pConverter, pFinalBitmapSource, &destinationFormat, &sehCode);
                         if (SUCCEEDED(hr))
                         {
-                            hr = pConverter->Initialize(pFinalBitmapSource, destinationFormat, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
-                            if (SUCCEEDED(hr))
-                            {
-                               SafeRelease(pFinalBitmapSource, "LoadWICimage: pFinalBitmapSource for pConverter", 0);
-                               hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
-                            } else 
-                               fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to initialize image pixel format converter");
-                        } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to create the image pixel format converter");
-                    }
-                } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to rescale image");
-            } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to retrieve image pixel format");
-        } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to retrieve given frame: " + std::to_string(givenFrame));
+                           WICsafeRelease(pFinalBitmapSource);
+                           hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+                        } else
+                           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to initialize image pixel format converter");
+                    } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to create the image pixel format converter");
+                }
+            } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to rescale image");
+        }
 
+        UINT width = 0, height = 0, cbStride = 0, cbBufferSize = 0;
         if (SUCCEEDED(hr))
         {
-            // double check bitmap source format
-            WICPixelFormatGUID pixelFormat;
-            hr = (pFinalBitmapSource==NULL) ? E_FAIL : pFinalBitmapSource->GetPixelFormat(&pixelFormat);
+            // double check bitmap source format, and take the size off the same guarded call
+            WICPixelFormatGUID pixelFormat = GUID_WICPixelFormatDontCare;
+            hr = WICguardedSourceInfo(pFinalBitmapSource, &width, &height, &pixelFormat, &sehCode);
+            if (sehCode!=0)
+               fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: the codec faulted while reporting the converted source");
+
             if (SUCCEEDED(hr))
                hr = (pixelFormat == destinationFormat) ? S_OK : E_FAIL;
         }
@@ -7137,12 +7327,11 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
         if (SUCCEEDED(hr))
         {
             // create a DIB from the converted IWICBitmapSource
-            UINT width = 0, height = 0, cbStride = 0, cbBufferSize = 0;
-            hr = pFinalBitmapSource->GetSize(&width, &height); 
-
             // Size of a scan line represented in bytes: 4 bytes each pixel
             hr = UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
-            hr = UIntMult(cbStride, height, &cbBufferSize);
+            if (SUCCEEDED(hr))
+               hr = UIntMult(cbStride, height, &cbBufferSize);
+
             if (SUCCEEDED(hr) && width>0 && height>0 && cbStride>0 && cbBufferSize>=cbStride)
             {
                 BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
@@ -7155,7 +7344,10 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                     if (mustResize==1)
                     {
                         auto nSize = adaptImageGivenSize(keepAratio, ScaleAnySize, width, height, givenW, givenH);
-                        hr = pFinalBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
+                        hr = WICguardedCopyPixels(pFinalBitmapSource, NULL, cbStride, cbBufferSize, m_pbBuffer, &sehCode);
+                        if (sehCode!=0)
+                           fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: the codec faulted while decoding the pixels");
+
                         if (SUCCEEDED(hr))
                         {
                            // resize image with OpenCV;
@@ -7163,8 +7355,10 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                            UIntMult(nSize[0], sizeof(Gdiplus::ARGB), &NcbStride);
                            UIntMult(NcbStride, nSize[1], &NcbBufferSize);
 
-                           BYTE *otherData = NULL;  // the GDI+ bitmap buffer ... resized ^_^ 
-                           otherData = new (std::nothrow) BYTE[NcbBufferSize];
+                           BYTE *otherData = NULL;  // the GDI+ bitmap buffer ... resized ^_^
+                           if (NcbStride>0 && NcbBufferSize>=NcbStride)
+                              otherData = new (std::nothrow) BYTE[NcbBufferSize];
+
                            hr = (otherData!=NULL) ? S_OK : E_FAIL;
                            if (SUCCEEDED(hr))
                            {
@@ -7172,11 +7366,11 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                                k = openCVresizeBitmap(m_pbBuffer, otherData, width, height, cbStride, nSize[0], nSize[1], NcbStride, 32, k, doFlipHV);
                                if (k==1)
                                   myBitmap = BYTEconvertGdip(otherData, nSize[0], nSize[1], NcbStride);
-                               else 
+                               else
                                   fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to rescale bitmap using OpenCV");
 
                                delete[] otherData;
-                               otherData = NULL; 
+                               otherData = NULL;
                            } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to allocate buffer for the resized bitmap");
                         } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to copy pixels to the allocated buffer");
                     } else {
@@ -7185,17 +7379,32 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
                 } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to allocate the buffer for copy pixels");
 
                 delete[] m_pbBuffer;
-                m_pbBuffer = NULL; 
+                m_pbBuffer = NULL;
             } else fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: failed to prepare buffer for copy pixels");
+        }
+    } catch (...)
+    {
+        // nothing here may escape into AHK, which has no handler for a C++ exception
+        try
+        {
+            fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: an undefined error occured");
+        } catch (...) { }
+
+        if (myBitmap!=NULL)
+        {
+           Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+           myBitmap = NULL;
         }
     }
 
-    SafeRelease(pFinalBitmapSource, "LoadWICimage: pFinalBitmapSource END", 0);
-    SafeRelease(pConverter, "LoadWICimage: pConverter", 0);
+    WICsafeRelease(pFinalBitmapSource);
+    WICsafeRelease(pConverter);
+    // useICM==100 is the cleanup mode: it releases the static colour contexts the
+    // function keeps between calls, and returns before it looks at the two pointers
     applyColorManagement(pFinalBitmapSource, pFrame, destinationFormat, 100);
-    SafeRelease(pScaler, "LoadWICimage: pScaler", 0);
-    SafeRelease(pFrame, "LoadWICimage: pFrame", 0);
-    SafeRelease(pDecoder, "LoadWICimage: pDecoder", 0);
+    WICsafeRelease(pScaler);
+    WICsafeRelease(pFrame);
+    WICsafeRelease(pDecoder);
     return myBitmap;
 }
 
