@@ -23,7 +23,7 @@
   - faster color adjustments
   - faster zoom/radial blur
   - added 13 new predefined vector shapes
-  - many bug fixes
+  - really MANY bug fixes
 
 - v6.2.00 (2026-06-11)
   - new brush system with substantial performance improvements; it now also works with images of 8000 megapixels or larger
