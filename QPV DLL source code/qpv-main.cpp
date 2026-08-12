@@ -6041,6 +6041,50 @@ static HRESULT WICguardedConverterInit(IWICFormatConverter *pConverter, IWICBitm
     return hr;
 }
 
+// a clipper validates the rectangle against the source, which means asking the codec how
+// big the frame really is
+static HRESULT WICguardedClipperInit(IWICBitmapClipper *pClipper, IWICBitmapSource *src,
+                                     const WICRect *rc, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    if (pClipper==NULL || src==NULL || rc==NULL)
+       return E_POINTER;
+
+    __try
+    {
+        hr = pClipper->Initialize(src, rc);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+static HRESULT WICguardedCanConvert(IWICFormatConverter *pConverter, const GUID *srcFmt,
+                                    const GUID *destFmt, BOOL *possible, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    *possible = 0;
+    if (pConverter==NULL)
+       return E_POINTER;
+
+    __try
+    {
+        hr = pConverter->CanConvert(*srcFmt, *destFmt, possible);
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        *possible = 0;
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
 // the decode itself
 static HRESULT WICguardedCopyPixels(IWICBitmapSource *src, const WICRect *rc, UINT cbStride,
                                     UINT cbBufferSize, BYTE *buffer, DWORD *sehCode) {
@@ -6136,6 +6180,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   }
 
   HRESULT hr = S_OK, phr = S_OK;
+  DWORD   sehCode = 0;
   IWICBitmapSource    *pFinalBitmapSource = NULL;
   IWICFormatConverter *pConverter         = NULL;
   IWICBitmapClipper   *pIClipper          = NULL;
@@ -6150,7 +6195,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
       hr = m_pIWICFactory->CreateBitmapClipper(&pIClipper);
       if (SUCCEEDED(hr))
       {
-         hr = pIClipper->Initialize(pWICclassFrameDecoded, &rcClip);
+         hr = WICguardedClipperInit(pIClipper, pWICclassFrameDecoded, &rcClip, &sehCode);
          if (SUCCEEDED(hr))
             hr = pIClipper->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
       }
@@ -6161,37 +6206,38 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   {
      if (newW<1 || newH<1)
      {
-        if (pFinalBitmapSource)
-           hr = pFinalBitmapSource->GetSize(&width, &height); 
-        else
-           hr = pWICclassFrameDecoded->GetSize(&width, &height); 
-        newW = (pIClipper!=NULL) ? w : width;
-        newH = (pIClipper!=NULL) ? h : height;
+        UINT srcW = 0, srcH = 0;
+        hr = WICguardedSourceInfo(pFinalBitmapSource ? pFinalBitmapSource : (IWICBitmapSource*)pWICclassFrameDecoded,
+                                  &srcW, &srcH, NULL, &sehCode);
+        width  = srcW;
+        height = srcH;
+        newW = (pIClipper!=NULL) ? w : (int)width;
+        newH = (pIClipper!=NULL) ? h : (int)height;
      }
 
-     hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
      if (SUCCEEDED(hr))
      {
-        WICBitmapInterpolationMode wicScaleQuality = indexedWICinterpolations(givenQuality);
-        if (pFinalBitmapSource)
-           hr = pScaler->Initialize(pFinalBitmapSource, newW, newH, wicScaleQuality);
-        else
-           hr = pScaler->Initialize(pWICclassFrameDecoded, newW, newH, wicScaleQuality);
-
+        hr = m_pIWICFactory->CreateBitmapScaler(&pScaler);
         if (SUCCEEDED(hr))
         {
-           SafeRelease(pFinalBitmapSource, "coreWICgetBufferImage: pFinalBitmapSource", 0);
-           hr = pScaler->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+           WICBitmapInterpolationMode wicScaleQuality = indexedWICinterpolations(givenQuality);
+           hr = WICguardedScalerInit(pScaler, pFinalBitmapSource ? pFinalBitmapSource : (IWICBitmapSource*)pWICclassFrameDecoded,
+                                     newW, newH, wicScaleQuality, &sehCode);
+           if (SUCCEEDED(hr))
+           {
+              WICsafeRelease(pFinalBitmapSource);
+              hr = pScaler->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
+           }
         }
      }
   }
 
-  if (FAILED(hr))
+  if (FAILED(hr) || pFinalBitmapSource==NULL)
   {
      fnOutputDebug("coreWICgetBufferImage: init failed");
-     SafeRelease(pFinalBitmapSource, "coreWICgetBufferImage: pFinalBitmapSource", 0);
-     SafeRelease(pScaler, "coreWICgetBufferImage: pScaler", 0);
-     SafeRelease(pIClipper, "coreWICgetBufferImage: pIClipper", 0);
+     WICsafeRelease(pFinalBitmapSource);
+     WICsafeRelease(pScaler);
+     WICsafeRelease(pIClipper);
      WICdestroyPreloadedImage(1);
      return NULL;
   }
@@ -6210,21 +6256,25 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   else if (bitsDepth==128)
      destFmt = GUID_WICPixelFormat128bppRGBAFloat;
 
-  int hasICM = (useICM!=1) ? 0 : applyColorManagement(pFinalBitmapSource, pWICclassFrameDecoded, destFmt, useICM);
+  int hasICM = (useICM!=1) ? 0 : WICguardedColorManagement(pFinalBitmapSource, pWICclassFrameDecoded, destFmt, useICM, &sehCode);
+  if (sehCode!=0)
+     fnOutputDebug("coreWICgetBufferImage: the codec faulted on the embedded colour profile");
+
   if (hasICM!=1)
   {
      hr = m_pIWICFactory->CreateFormatConverter(&pConverter);
      if (SUCCEEDED(hr))
      {
-        GUID srcFmt;
-        hr = pFinalBitmapSource->GetPixelFormat(&srcFmt);
+        GUID srcFmt = GUID_WICPixelFormatDontCare;
+        UINT tmpW = 0, tmpH = 0;
+        hr = WICguardedSourceInfo(pFinalBitmapSource, &tmpW, &tmpH, &srcFmt, &sehCode);
         BOOL possible = 0;
         if (SUCCEEDED(hr))
-           hr = pConverter->CanConvert(srcFmt, destFmt, &possible);
+           hr = WICguardedCanConvert(pConverter, &srcFmt, &destFmt, &possible, &sehCode);
 
-        if (possible==1)
+        if (SUCCEEDED(hr) && possible==1)
         {
-           hr = pConverter->Initialize(pFinalBitmapSource, destFmt, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
+           hr = WICguardedConverterInit(pConverter, pFinalBitmapSource, &destFmt, &sehCode);
         } else
         {
            fnOutputDebug("coreWICgetBufferImage failed: cannot convert source to destination format (pixel formats)");
@@ -6234,29 +6284,34 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
 
      if (SUCCEEDED(hr))
      {
-        SafeRelease(pFinalBitmapSource, "coreWICgetBufferImage: pFinalBitmapSource", 0);
+        WICsafeRelease(pFinalBitmapSource);
         hr = pConverter->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&pFinalBitmapSource));
      }
   } else hr = S_OK;
 
   if (pFinalBitmapSource!=NULL)
-     phr = pFinalBitmapSource->GetSize(&width, &height); 
+  {
+     UINT finalW = 0, finalH = 0;
+     phr = WICguardedSourceInfo(pFinalBitmapSource, &finalW, &finalH, NULL, &sehCode);
+     width  = finalW;
+     height = finalH;
+  }
 
   if (FAILED(hr) || FAILED(phr) || pFinalBitmapSource==NULL || !width || !height)
   {
      fnOutputDebug("coreWICgetBufferImage: early failure");
-     SafeRelease(pFinalBitmapSource, "coreWICgetBufferImage: pFinalBitmapSource", 0);
-     SafeRelease(pConverter, "coreWICgetBufferImage: pConverter", 0);
+     WICsafeRelease(pFinalBitmapSource);
+     WICsafeRelease(pConverter);
      applyColorManagement(pFinalBitmapSource, pWICclassFrameDecoded, destFmt, 100);
-     SafeRelease(pScaler, "coreWICgetBufferImage: pScaler", 0);
-     SafeRelease(pIClipper, "coreWICgetBufferImage: pIClipper", 0);
+     WICsafeRelease(pScaler);
+     WICsafeRelease(pIClipper);
      WICdestroyPreloadedImage(1);
      return NULL;
   }
 
   if (cbBufferSize==0 && cbStride==0)
   {
-     cbStride = width * sizeof(Gdiplus::ARGB);
+     cbStride = (UINT64)width * sizeof(Gdiplus::ARGB);
      cbBufferSize = cbStride * height;
   }
 
@@ -6264,59 +6319,80 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   if (myBitmap!=NULL)
   {
       Gdiplus::DllExports::GdipDisposeImage(myBitmap);
-      myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, cbStride, cbBufferSize, PixelFormat32bppPARGB);
-  } else
+      myBitmap = WICbmpSourceConvertGdip(pFinalBitmapSource, width, height, (UINT)cbStride, (UINT)cbBufferSize, PixelFormat32bppPARGB);
+  } else if (cbStride>0 && cbStride<=0xFFFFFFFFull && cbBufferSize>=cbStride)
   {
+      // CopyPixels() takes the stride and the buffer size as UINTs, so anything past that
+      // has to be refused here rather than truncated on the way in
       m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
-      hr = (m_pbBuffer!=NULL) ? S_OK : E_FAIL;
       y = 0;
       int indexu = 0;
       UINT64 buffOffset = 0;
-      if (SUCCEEDED(hr) && width>0 && height>0 && cbStride>0 && cbBufferSize>=cbStride)
+      if (m_pbBuffer==NULL)
+         fnOutputDebug("coreWICgetBufferImage: failed to allocate the pixel buffer");
+      else
       {
           // fnOutputDebug("WIC buffer created: " + std::to_string(cbBufferSize));
           if (sliceHeight>0)
           {
              fnOutputDebug("WIC copy pixels in slices of h=" + std::to_string(sliceHeight));
-             while (y<height)
+             while (y<(int)height)
              {
                  if (indexu>0)
                     y += sliceHeight;
-                 if (y>=height)
+                 if (y>=(int)height)
                     break;
-     
-                 int h = (y + sliceHeight>height) ? height - y : sliceHeight;
-                 WICRect rc = { 0, y, width, h };
-                 UINT tmpBufferSize = cbStride * h;
-                 // fnOutputDebug(std::to_string(indexu) + "# y=" + std::to_string(y) + "; h=" + std::to_string(h));
-                 // fnOutputDebug("tmp buffer prepped:" + std::to_string(tmpBufferSize));
-                 HRESULT hr = pFinalBitmapSource->CopyPixels(&rc, cbStride, tmpBufferSize, m_pbBuffer + buffOffset);
-                 if (SUCCEEDED(hr))
-                    buffOffset += tmpBufferSize;
 
+                 int h = (y + sliceHeight>(int)height) ? (int)height - y : sliceHeight;
+                 WICRect rc = { 0, y, (int)width, h };
+                 // in 64-bit, and checked against what is left of the buffer: this used to
+                 // be a UINT product that could wrap, and CopyPixels() writes as many bytes
+                 // as it is told to at m_pbBuffer + buffOffset
+                 UINT64 tmpBufferSize = cbStride * (UINT64)h;
+                 if (tmpBufferSize<1 || tmpBufferSize>0xFFFFFFFFull || buffOffset+tmpBufferSize>cbBufferSize)
+                 {
+                    fnOutputDebug("coreWICgetBufferImage: the slice does not fit the buffer");
+                    hr = E_FAIL;
+                    break;
+                 }
+
+                 // fnOutputDebug(std::to_string(indexu) + "# y=" + std::to_string(y) + "; h=" + std::to_string(h));
+                 // the result used to land in an inner HRESULT that shadowed this one, so a
+                 // sliced copy could fail from end to end and still be reported as a success
+                 hr = WICguardedCopyPixels(pFinalBitmapSource, &rc, (UINT)cbStride, (UINT)tmpBufferSize, m_pbBuffer + buffOffset, &sehCode);
+                 if (FAILED(hr))
+                    break;
+
+                 buffOffset += tmpBufferSize;
                  indexu++;
              }
           } else {
              // fnOutputDebug("coreWICgetBufferImage: WIC copy pixels to buffer: JOKE");
-             hr = pFinalBitmapSource->CopyPixels(NULL, cbStride, cbBufferSize, m_pbBuffer);
+             hr = (cbBufferSize>0xFFFFFFFFull) ? E_INVALIDARG
+                : WICguardedCopyPixels(pFinalBitmapSource, NULL, (UINT)cbStride, (UINT)cbBufferSize, m_pbBuffer, &sehCode);
           }
+
+          if (sehCode!=0)
+             fnOutputDebug("coreWICgetBufferImage: the codec faulted while decoding the pixels");
 
           if (SUCCEEDED(hr)) {
              fnOutputDebug("coreWICgetBufferImage: WIC copy pixels to buffer: yay");
           } else
           {
+             // the buffer is handed to FreeImage_ConvertFromRawBitsEx() as a finished image;
+             // returning it half written means displaying uninitialized heap
              fnOutputDebug("coreWICgetBufferImage: copy pixels to buffer: FAILED");
              delete[] m_pbBuffer;
              m_pbBuffer = NULL;
           }
       }
-  }
+  } else fnOutputDebug("coreWICgetBufferImage: the stride and buffer size given do not describe an image");
 
-  SafeRelease(pFinalBitmapSource, "coreWICgetBufferImage: pFinalBitmapSource", 0);
-  SafeRelease(pConverter, "coreWICgetBufferImage: pConverter", 0);
+  WICsafeRelease(pFinalBitmapSource);
+  WICsafeRelease(pConverter);
   applyColorManagement(pFinalBitmapSource, pWICclassFrameDecoded, destFmt, 100);
-  SafeRelease(pScaler, "coreWICgetBufferImage: pScaler", 0);
-  SafeRelease(pIClipper, "coreWICgetBufferImage: pIClipper", 0);
+  WICsafeRelease(pScaler);
+  WICsafeRelease(pIClipper);
   return m_pbBuffer;
 }
 
