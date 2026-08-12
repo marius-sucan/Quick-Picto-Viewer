@@ -76,16 +76,21 @@ static void fillRecord(std::vector<wchar_t> &blob, int rec, int stride, int recS
         blob[(size_t)rec * stride + i] = (wchar_t)(161 + ((i * 7 + recSeed * 29) % 256));
 }
 
+// The pairs used to be drained in 512-record chunks through dupesFetchPairs(). That entry
+// point is gone: the sweep now leaves its results in dupesPairsList until dupesClearPairs()
+// releases them, and AHK reads them through dupesApplyFilter()/dupesFetchFiltered() instead.
+// Every caller below clears before it sweeps, so the whole list is exactly what the sweep
+// just produced. dupesPairCount() is the exported view of that same list, so check the two
+// agree while we are here - once, because this runs inside the per-case oracle loop.
 static std::vector<DupePairRec> drainPairs() {
-    std::vector<DupePairRec> out;
-    DupePairRec buf[512];
-    for (;;)
+    static int reported = 0;
+    if (!reported && dupesPairCount() != (UINT)dupesPairsList.size())
     {
-        const UINT got = dupesFetchPairs(buf, 512);
-        if (got==0) break;
-        out.insert(out.end(), buf, buf + got);
+       reported = 1;
+       failures++;
+       printf("    %-58s %s\n", "dupesPairCount() matches the pair list", "FAILED");
     }
-    return out;
+    return dupesPairsList;
 }
 
 // ------------------------------------------------------------------------------------
@@ -118,7 +123,7 @@ static void resultContract() {
     check(got > 0, "the sweep found pairs");
 
     const std::vector<DupePairRec> ref = drainPairs();
-    check(ref.size() == got, "dupesFetchPairs returns exactly what the sweep counted");
+    check(ref.size() == got, "the pair list holds exactly what the sweep counted");
 
     int sentinelPairs = 0, scoredPairs = 0, badId = 0, badHam = 0;
     for (size_t i = 0; i < ref.size(); i++) {
@@ -377,9 +382,13 @@ static void scanProgressAndCursor() {
     }
     check(S->total == expect, "state.total is the triangular comparison count");
 
-    // stepping a finished scan again must be a no-op, not a second pass
+    // Stepping a finished scan again must be a no-op, not a second pass. This used to read
+    // as "the pair list is empty", which only held because the old dupesFetchPairs() had
+    // consumed it; the list now survives until dupesClearPairs(), so what a second pass
+    // would show is the count growing.
+    const size_t pairsBefore = dupesPairsList.size();
     const int more = dupesScanStep(K.threshold, K.lCrop, K.rCrop, K.checkInverted, K.checkFlipped, 50);
-    check(more == 0 && dupesPairsList.empty(), "stepping past the end finds nothing new");
+    check(more == 0 && dupesPairsList.size() == pairsBefore, "stepping past the end finds nothing new");
 
     dupesScanEnd();
     check(dupesScanHashes.empty() && dupesPixData.empty() && dupesScanRows == 0,

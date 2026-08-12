@@ -140,7 +140,7 @@ b) How a files list index is created
   QPV internally relies on the resultedFilesList[] array object. 
   Each file entry is defined by various properties:
 
-  The resultedFilesList[] array object is populated by, GetFilesList(),
+  The resultedFilesList[] array object is populated by GetFilesList(),
   OpenSLD(), sldGenerateFilesList(), OpenSLDBdataBase(),
   performSQLgetTable(), dbSortingCached(), SortFilesList() and others.
 
@@ -151,9 +151,15 @@ b) How a files list index is created
   , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
   , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
-  , 27_imghMin, 28_imgHASH, 29_pixelzFsmall, 30_pixelzFbig
-  , 31_HpixelzFsmall, 32_HpixelzFbig, 33_HammingDist, 34_MSEscore
-  , 35_dateSeenDB, 36_sortModeDB]
+  , 27_imghMin, 28_unused, 29_unused, 30_unused, 31_unused
+  , 32_unused, 33_HammingDist, 34_MSEscore, 35_dateSeenDB
+  , 36_sortModeDB]
+
+  29 to 32 used to hold the four pixel fingerprints. They are BLOBs in the
+  imagesPixels table since SLDB schema v3 and are produced, read and compared
+  entirely inside qpvmain.dll; nothing in AHK ever holds one. The slots are
+  left numbered rather than reused so that every other index keeps its meaning.
+  28 used to hold the image hash in use for Hamming distance.
 
   All these properties are optional and are filled based on the
   application context. 1_filePath is the only property that is not

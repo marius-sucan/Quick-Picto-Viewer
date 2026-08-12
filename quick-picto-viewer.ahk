@@ -2670,9 +2670,9 @@ resetMainWin2Welcome() {
      bckpResultedFilesList := [] ; used by PanelEnableFilesFilter()
      filteredMap2mainList := [] ; used by PanelEnableFilesFilter() and FilterFilesListuIndex()
      ; used by PanelFindDupes()
-           toBeExcludedIndexes := [] ; toBeExcludedIndexes() and retrieveDupesByProperties()
-           DllCall("qpvmain.dll\dupesClearPairs") ; the pair list lives in qpvmain.dll
-           dupesHashesData := [] ; filterDupeResultsByHdist() and retrieveDupesByProperties()
+     toBeExcludedIndexes := [] ; BTNfindDupesNow() and retrieveDupesByProperties()
+     DllCall("qpvmain.dll\dupesClearPairs") ; the pair list lives in qpvmain.dll
+     dupesHashesData := [] ; filterDupeResultsByHdist() and retrieveDupesByProperties()
      RandyIMGids := [] ; used by random slideshow mode in coreNextPrevImage()
      calcScreenLimits()
      resetImgSelection("forced")
@@ -28284,15 +28284,16 @@ PanelWrapperFilesStats() {
 
     RegAction(0, "uiPreferedFileStats",, 1)
     ; Gui, Tab, 1
-    Gui, Add, Text, x15 y15 w%txtWid%, Every statistics panel allows users to filter the indexed files to various criteria by double-clicking on ay list view entry. Users can easily identify small files, low resolution images, low key or high key, or washed out images in the image collection.
+    Gui, Add, Text, x15 y15 w%txtWid%, Every statistics panel allows users to filter the indexed files to various criteria by double-clicking on list view entries. Users can easily identify files by size, date, type, resolution, pixel format, or based on histogram data: low or high key, or washed out images in the image collection.
     Gui, Add, Text, y+15 Section, File details: size, date modified, type and more.
-    Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedFilesStats, Open &file statistics panel
+    Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedFilesStats, &File statistics panel
     Gui, Add, Button, x+5 hp gBtnCollectFileInfos, &Collect data
     Gui, Add, Checkbox, xs+15 y+5 Checked%uiPreferedFileStats% vuiPreferedFileStats gToggleFileStatsDating, &Generate date statistics based on modified date
-    Gui, Add, Text, xs y+35 Section, Image properties: resolution, frames and more.
-    Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedImagesStats, Open &images statistics panel
+    Gui, Add, Text, xs y+35 Section, Image properties: resolution, frames, pixel format and more.
+    Gui, Add, Button, xp+15 y+5 h%thisBtnHeight% gPanelIndexedImagesStats, &Images statistics panel
     ; Gui, Add, Button, x+5 h%thisBtnHeight% gPanelFindDupes, Find &duplicates panel
-    Gui, Add, Button, xs+15 y+10 hp gBtnCollectImageInfos, Collect image &properties and file details
+    Gui, Add, Button, x+5 hp gBtnCollectImageInfos +hwndhTemp, Collect data
+    ToolTip2ctrl(hTemp, "Collect image properties and file details")
     If (SLDtypeLoaded=3)
        Gui, Add, Button, xs y+30 h%thisBtnHeight% gOpenFileDupesPanel, Find &duplicates panel
     Else
@@ -45825,10 +45826,10 @@ PanelChangeHamDistThreshold() {
     Gui, Add, Text, y+15 w%btnWid% vtxtLine2, Lower limit:
     Gui, Add, Text, x+15 wp vtxtLine3, Upper limit:
     GuiAddEdit("xs y+5 wp number -multi limit3 vEditFa", mseLowLim, "Lower limit")
-    Gui, Add, UpDown, vmseLowLim Range0-950, % mseLowLim
+    Gui, Add, UpDown, vmseLowLim Range0-400, % mseLowLim
 
     GuiAddEdit("x+15 wp number -multi limit3 vEditFb", mseUppLim, "Upper limit")
-    Gui, Add, UpDown, vmseUppLim Range0-950, % mseUppLim
+    Gui, Add, UpDown, vmseUppLim Range0-400, % mseUppLim
     Gui, Add, Text, xs y+15 wp, String filter:
     Gui, Add, Checkbox, x+15 Checked%UserHamDistStringInvert% vUserHamDistStringInvert, &Must not contain it
     GuiAddEdit("xs y+5 w" EditWid " -multi gUIeditsGenericAllowCtrlBksp vUserHamDistStringFilter", UserHamDistStringFilter, "String filter")
@@ -86577,6 +86578,10 @@ readDupesEngineError() {
 }
 
 filterDupeResultsByHdist(threshold, fromEngine:=0) {
+; filterDupeResultsByHdist() hands the whole candidate set over once through dupesScanBegin(),
+; dupesScanFeed() and drives dupesScanStep() under a time budget, so the sweep walks every group itself.
+; function invoked by retrieveDupesByProperties()
+
    ; pixStride: the 32x32 fingerprint the MSD filter compares; must match the "big"
    ;   fingerprint the collection pool writes into imagesPixels (dupes-pixels.h).
    ; feedMax: images per dupesScanFeed() call, so the candidate set reaches the DLL in
@@ -86601,155 +86606,155 @@ filterDupeResultsByHdist(threshold, fromEngine:=0) {
    ; the DLL just built. The sweep below is shared by both paths.
    If (fromEngine!=1)
    {
-   doStartLongOpDance()
-   showTOOLtip("Preparing list for Hamming distance calculations, please wait")
-   groupies := []
-   prevMSGdisplay := A_TickCount
-   startOperation := A_TickCount
-   Loop, % maxFilesIndex
-   {
-       If (determineTerminateOperation()=1)
-       {
-          abandonAll := 1
-          Break
-       }
+      doStartLongOpDance()
+      showTOOLtip("Preparing list for Hamming distance calculations, please wait")
+      groupies := []
+      prevMSGdisplay := A_TickCount
+      startOperation := A_TickCount
+      Loop, % maxFilesIndex
+      {
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
 
-       If (A_TickCount - prevMSGdisplay>1000)
-       {
-          etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
-          showTOOLtip("Preparing list for Hamming distance calculations, please wait" etaTime, 0, 0, A_index/maxFilesIndex)
-          prevMSGdisplay := A_TickCount
-       }
+          If (A_TickCount - prevMSGdisplay>1000)
+          {
+             etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
+             showTOOLtip("Preparing list for Hamming distance calculations, please wait" etaTime, 0, 0, A_index/maxFilesIndex)
+             prevMSGdisplay := A_TickCount
+          }
 
-       grpIDu := resultedFilesList[A_Index, 23]
-       If grpIDu
-       {
-          grpIDv%grpIDu%++
-          resultedFilesList[A_Index, 33] := 100
-          resultedFilesList[A_Index, 34] := 2500
-          groupies[grpIDu, grpIDv%grpIDu%] := A_Index
-       }
-   }
+          grpIDu := resultedFilesList[A_Index, 23]
+          If grpIDu
+          {
+             grpIDv%grpIDu%++
+             resultedFilesList[A_Index, 33] := 100
+             resultedFilesList[A_Index, 34] := 2500
+             groupies[grpIDu, grpIDv%grpIDu%] := A_Index
+          }
+      }
 
-   If (abandonAll=1)
-   {
-      groupies := ""
-      Return 2
-   }
+      If (abandonAll=1)
+      {
+         groupies := ""
+         Return 2
+      }
 
-   startOperation := A_TickCount
-   prevMSGdisplay := A_TickCount
-   totalGroups := groupies.Count()
-   totalRows := 0
-   For Key, Value in groupies
-       totalRows += Value.Count()
+      startOperation := A_TickCount
+      prevMSGdisplay := A_TickCount
+      totalGroups := groupies.Count()
+      totalRows := 0
+      For Key, Value in groupies
+          totalRows += Value.Count()
 
-   If (totalRows<2 || totalGroups<1)
-   {
-      groupies := ""
-      Return 2
-   }
+      If (totalRows<2 || totalGroups<1)
+      {
+         groupies := ""
+         Return 2
+      }
 
-   ; This is the fallback path, entered only when qpvmain.dll could not open the database
-   ; itself: the candidate query then runs through Class_SQLiteDB.GetTable(), which is
-   ; sqlite3_get_table() and can only hand back text. Since schema v3 the fingerprints are
-   ; BLOBs in imagesPixels, so no query AHK can run brings one back and the MSD filter is
-   ; simply unavailable here. retrieveDupesByProperties() journals that where it decides it.
-   ; Feeding the DLL a blob of "no fingerprint here" padding instead would be worse than
-   ; not asking: every pair would score QPV_MSD_NONE and the search would find nothing.
-   doMSD := 0
-   showTOOLtip("Handing " groupDigits(totalRows) " images in " groupDigits(totalGroups) " groups to the comparison engine, please wait")
-   If !DllCall("qpvmain.dll\dupesScanBegin", "uint", totalRows, "uint", totalGroups, "int", pixStride, "int", graylevelCompressor, "int", doMSD, "int")
-   {
-      addJournalEntry(A_ThisFunc "(): qpvmain.dll could not allocate the candidate set (" totalRows " images, MSD=" doMSD ").")
-      DllCall("qpvmain.dll\dupesClearPairs")
-      groupies := ""
-      Return 2
-   }
+      ; This is the fallback path, entered only when qpvmain.dll could not open the database
+      ; itself: the candidate query then runs through Class_SQLiteDB.GetTable(), which is
+      ; sqlite3_get_table() and can only hand back text. Since schema v3 the fingerprints are
+      ; BLOBs in imagesPixels, so no query AHK can run brings one back and the MSD filter is
+      ; simply unavailable here. retrieveDupesByProperties() journals that where it decides it.
+      ; Feeding the DLL a blob of "no fingerprint here" padding instead would be worse than
+      ; not asking: every pair would score QPV_MSD_NONE and the search would find nothing.
+      doMSD := 0
+      showTOOLtip("Handing " groupDigits(totalRows) " images in " groupDigits(totalGroups) " groups to the comparison engine, please wait")
+      If !DllCall("qpvmain.dll\dupesScanBegin", "uint", totalRows, "uint", totalGroups, "int", pixStride, "int", graylevelCompressor, "int", doMSD, "int")
+      {
+         addJournalEntry(A_ThisFunc "(): qpvmain.dll could not allocate the candidate set (" totalRows " images, MSD=" doMSD ").")
+         DllCall("qpvmain.dll\dupesClearPairs")
+         groupies := ""
+         Return 2
+      }
 
-   ; One flat candidate set, fed in chunks, instead of one DllCall per group: on a library
-   ; with 20 000 groups of two to four images that was 60 000+ entries into the DLL, each
-   ; one preceded by three VarSetCapacity()s and an interpreted marshalling loop, wrapped
-   ; around a few hundred nanoseconds of real work.
-   ; The order matters and is not incidental - groups ascending by ID, images ascending by
-   ; row index inside a group, exactly what the per-group calls used to visit. The DLL
-   ; emits its pairs in that order, so the union-find below sees them in a reproducible
-   ; sequence no matter how many threads the sweep ran on.
-   VarSetCapacity(HbigArray, 8 * feedMax, 0)
-   VarSetCapacity(flipHbigArray, 8 * feedMax, 0)
-   VarSetCapacity(IDsbigArray, 4 * feedMax, 0)
-   VarSetCapacity(groupStartBuf, 4 * (totalGroups + 1), 0)
-   flatIndex := 0, chunkCount := 0, grpIndex := 0
-   For Key, arrayGroup in groupies
-   {
-       If (determineTerminateOperation()=1)
-       {
-          abandonAll := 1
-          Break
-       }
+      ; One flat candidate set, fed in chunks, instead of one DllCall per group: on a library
+      ; with 20 000 groups of two to four images that was 60 000+ entries into the DLL, each
+      ; one preceded by three VarSetCapacity()s and an interpreted marshalling loop, wrapped
+      ; around a few hundred nanoseconds of real work.
+      ; The order matters and is not incidental - groups ascending by ID, images ascending by
+      ; row index inside a group, exactly what the per-group calls used to visit. The DLL
+      ; emits its pairs in that order, so the union-find below sees them in a reproducible
+      ; sequence no matter how many threads the sweep ran on.
+      VarSetCapacity(HbigArray, 8 * feedMax, 0)
+      VarSetCapacity(flipHbigArray, 8 * feedMax, 0)
+      VarSetCapacity(IDsbigArray, 4 * feedMax, 0)
+      VarSetCapacity(groupStartBuf, 4 * (totalGroups + 1), 0)
+      flatIndex := 0, chunkCount := 0, grpIndex := 0
+      For Key, arrayGroup in groupies
+      {
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
 
-       If (A_TickCount - prevMSGdisplay>1000)
-       {
-          etaTime := ETAinfos(flatIndex, totalRows, startOperation)
-          showTOOLtip("Preparing the images for comparison, please wait" etaTime, 0, 0, flatIndex/totalRows)
-          prevMSGdisplay := A_TickCount
-       }
+          If (A_TickCount - prevMSGdisplay>1000)
+          {
+             etaTime := ETAinfos(flatIndex, totalRows, startOperation)
+             showTOOLtip("Preparing the images for comparison, please wait" etaTime, 0, 0, flatIndex/totalRows)
+             prevMSGdisplay := A_TickCount
+          }
 
-       NumPut(flatIndex, groupStartBuf, grpIndex * 4, "uint")
-       grpIndex++
-       Loop, % arrayGroup.Count()
-       {
-           idu := arrayGroup[A_Index]
-           hIDu := resultedFilesList[idu, 12]
-           If (InStr(dupesHashesData[hIDu], "|") && findFlippedDupes=1)
-           {
-              ash := StrSplit(dupesHashesData[hIDu], "|")
-              hashA := "0x" ash[1],   hashB := "0x" ash[2]
-              If !ash[2] ; no flipped hash stored for this record
+          NumPut(flatIndex, groupStartBuf, grpIndex * 4, "uint")
+          grpIndex++
+          Loop, % arrayGroup.Count()
+          {
+              idu := arrayGroup[A_Index]
+              hIDu := resultedFilesList[idu, 12]
+              If (InStr(dupesHashesData[hIDu], "|") && findFlippedDupes=1)
+              {
+                 ash := StrSplit(dupesHashesData[hIDu], "|")
+                 hashA := "0x" ash[1],   hashB := "0x" ash[2]
+                 If !ash[2] ; no flipped hash stored for this record
+                    hashB := hashA
+              } Else
+              {
+                 hashA := "0x" dupesHashesData[hIDu]
+                 ; leaving the flipped slot at 0 would make this record match every
+                 ; image whose hash has fewer set bits than the threshold; mirroring
+                 ; its own hash makes diff3 degenerate to diff, which is harmless
                  hashB := hashA
-           } Else
-           {
-              hashA := "0x" dupesHashesData[hIDu]
-              ; leaving the flipped slot at 0 would make this record match every
-              ; image whose hash has fewer set bits than the threshold; mirroring
-              ; its own hash makes diff3 degenerate to diff, which is harmless
-              hashB := hashA
-           }
+              }
 
-           NumPut(hashA, HbigArray, chunkCount * 8, "uint64")
-           NumPut(hashB, flipHbigArray, chunkCount * 8, "uint64")
-           NumPut(idu, IDsbigArray, chunkCount * 4, "uint")
-           chunkCount++
-           flatIndex++
-           If (chunkCount=feedMax)
-           {
-              DllCall("qpvmain.dll\dupesScanFeed", "uint", flatIndex - chunkCount, "uint", chunkCount, "UPtr", &HbigArray, "UPtr", (findFlippedDupes=1) ? &flipHbigArray : 0, "UPtr", &IDsbigArray, "UPtr", 0, "int")
-              chunkCount := 0
-           }
-       }
-   }
+              NumPut(hashA, HbigArray, chunkCount * 8, "uint64")
+              NumPut(hashB, flipHbigArray, chunkCount * 8, "uint64")
+              NumPut(idu, IDsbigArray, chunkCount * 4, "uint")
+              chunkCount++
+              flatIndex++
+              If (chunkCount=feedMax)
+              {
+                 DllCall("qpvmain.dll\dupesScanFeed", "uint", flatIndex - chunkCount, "uint", chunkCount, "UPtr", &HbigArray, "UPtr", (findFlippedDupes=1) ? &flipHbigArray : 0, "UPtr", &IDsbigArray, "UPtr", 0, "int")
+                 chunkCount := 0
+              }
+          }
+      }
 
-   If (abandonAll!=1 && chunkCount>0)
-      DllCall("qpvmain.dll\dupesScanFeed", "uint", flatIndex - chunkCount, "uint", chunkCount, "UPtr", &HbigArray, "UPtr", (findFlippedDupes=1) ? &flipHbigArray : 0, "UPtr", &IDsbigArray, "UPtr", 0, "int")
+      If (abandonAll!=1 && chunkCount>0)
+         DllCall("qpvmain.dll\dupesScanFeed", "uint", flatIndex - chunkCount, "uint", chunkCount, "UPtr", &HbigArray, "UPtr", (findFlippedDupes=1) ? &flipHbigArray : 0, "UPtr", &IDsbigArray, "UPtr", 0, "int")
 
-   HbigArray := ""
-   flipHbigArray := ""
-   IDsbigArray := ""
-   groupies := ""
-   If (abandonAll=1)
-   {
-      DllCall("qpvmain.dll\dupesClearPairs")
-      Return 2
-   }
+      HbigArray := ""
+      flipHbigArray := ""
+      IDsbigArray := ""
+      groupies := ""
+      If (abandonAll=1)
+      {
+         DllCall("qpvmain.dll\dupesClearPairs")
+         Return 2
+      }
 
-   ; the closing boundary: group g covers [groupStart[g], groupStart[g+1])
-   NumPut(flatIndex, groupStartBuf, grpIndex * 4, "uint")
-   If !DllCall("qpvmain.dll\dupesScanSetGroups", "UPtr", &groupStartBuf, "uint", grpIndex, "int")
-   {
-      addJournalEntry(A_ThisFunc "(): qpvmain.dll rejected the group boundaries (" grpIndex " groups, " flatIndex " images).")
-      DllCall("qpvmain.dll\dupesClearPairs")
-      Return 2
-   }
+      ; the closing boundary: group g covers [groupStart[g], groupStart[g+1])
+      NumPut(flatIndex, groupStartBuf, grpIndex * 4, "uint")
+      If !DllCall("qpvmain.dll\dupesScanSetGroups", "UPtr", &groupStartBuf, "uint", grpIndex, "int")
+      {
+         addJournalEntry(A_ThisFunc "(): qpvmain.dll rejected the group boundaries (" grpIndex " groups, " flatIndex " images).")
+         DllCall("qpvmain.dll\dupesClearPairs")
+         Return 2
+      }
    }
 
    ; DupesScanState offsets, from dupes-search.h: 32 groups, 36 rows, 8 done, 16 total, 24 pairs
@@ -86824,20 +86829,9 @@ filterDupeResultsByHdist(threshold, fromEngine:=0) {
 
 }
 
-; sortDupeGroups(), testWasMSEdupes(), findDupeGroupRoot() and pullDupeRowFromCache()
-; lived here. All four were changeHdistLevelCached()'s workings and moved into
-; dupesApplyFilter() in dupes-search.h with it: the union-find, the per-image and per-group
-; minima, the mono-group drop, and the ordering - which sortDupeGroups() did by building
-; one "|"-delimited string of every row, handing it to the AHK Sort command and parsing it
-; back. tests/filter_oracle.cpp fuzzes the C++ against a transcription of all of it,
-; because a difference here would show up as nothing worse than duplicates grouped or
-; ordered slightly differently, which is invisible without two builds side by side.
-
 changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:=0) {
    ; The pair list stays in qpvmain.dll after the sweep, so re-filtering it is one DllCall
-   ; instead of a full interpreted pass over millions of pairs, an AHK union-find, and
-   ; sortDupeGroups() building a multi-megabyte string for the Sort command and parsing it
-   ; back - all of which used to run again from scratch on every nudge of a slider.
+   ; instead of a full interpreted pass.
    ;
    ; imgKeep is the one part of the filter that cannot move: the search string is a PCRE.
    ; One byte per image row index, rebuilt only when the filter itself changes, where the
@@ -86947,7 +86941,6 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
           rowu[23] := NumGet(fltBuf, offu + 4, "UInt") "_" NumGet(fltBuf, offu + 8, "UInt")
           rowu[33] := NumGet(fltBuf, offu + 12, "UInt")
           rowu[34] := NumGet(fltBuf, offu + 16, "UInt")
-          rowu[28] := ""
           If (PerformMSDonDupes=1)
           {
              rowu[29] := ""
@@ -86974,12 +86967,6 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
    lastZeitFileSelect := A_TickCount
    Return 1
 }
-
-; corefilterDupeResultsByHdist() lived here. It marshalled one group at a time into three
-; fresh buffers and entered the DLL once per group - 60 000+ DllCalls on a real library,
-; each wrapped around a few hundred nanoseconds of work. filterDupeResultsByHdist() now
-; hands the whole candidate set over once through dupesScanBegin()/dupesScanFeed() and
-; drives dupesScanStep() under a time budget, so the sweep walks every group itself.
 
 retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    ; rowSize: sizeof(DupeCandRow) in dupes-search.h - imgidu, fsize, megapix, groupID, pathOffset
@@ -87081,14 +87068,11 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
 
    If (PerformMSDonDupes=1 && includeHash)
    {
-      ; If (findFlippedDupes=1)
-      ;    pixelzB := pixelzA + 1
-      ; includePixels := (findFlippedDupes=1) ? ", p.big, p.bigH" : ", p.big"
       ; The 32x32 fingerprint the MSD filter compares. Only the engine path selects it:
-      ; it is a BLOB since schema v3 and Class_SQLiteDB.GetTable() - the legacy
+      ; it is a BLOB since SLDB schema v3 and Class_SQLiteDB.GetTable() - the legacy
       ; sqlite3_get_table() the fallback below uses - can only hand back text, so the
       ; fallback silently does the Hamming pass without MSD. That is journalled where it
-      ; happens rather than being pretended away.
+      ; happens.
       includePixels := ", p.big"
    }
 
@@ -87101,8 +87085,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    ; distance 0 from every other one - one enormous phantom group. That happens
    ; whenever the pixel-data collection is interrupted or narrowed by a filter.
    ; isDeleted=0 is likewise needed on both sides: every other query in this path
-   ; filters it, so entries the user marked ignored (isDeleted=1) or rows caught
-   ; mid-rescan (isDeleted=2) were offered up as duplicates.
+   ; filters it, so entries marked ignored (isDeleted=1) or rows caught
+   ; mid-rescan (isDeleted=2) are not offered as duplicates.
    whereA := " WHERE a.isDeleted=0 AND ifnull(a." thisNOTnullCol ", '')!=''"
    If (findFlippedDupes=1 && hashA)
       whereA .= " AND ifnull(a." hashA ", '')!=''"
@@ -87371,70 +87355,70 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       dupesHashesData := []
    } Else
    {
-   arrHashesData := new hashtable(totalFiles)
-   If (PerformMSDonDupes=1 && includeHash)
-      addJournalEntry(A_ThisFunc "(): running without the MSD filter - the in-DLL query engine is unavailable and the fallback query cannot read the fingerprint BLOBs.")
+      arrHashesData := new hashtable(totalFiles)
+      If (PerformMSDonDupes=1 && includeHash)
+         addJournalEntry(A_ThisFunc "(): running without the MSD filter - the in-DLL query engine is unavailable and the fallback query cannot read the fingerprint BLOBs.")
 
-   Loop, % RecordSet.RowCount
-   {
-      Rowu := RecordSet.Rows[A_Index]
-      If Rowu[2]
+      Loop, % RecordSet.RowCount
       {
-         ; Rowu[1], not Rowu["imgidu"]: GetTable() is never called with getColumnNames=1
-         ; anywhere in this script, so TB.ColumnNames is empty and the rows carry integer
-         ; keys only. The string key always read blank, so "exclude the duplicates already
-         ; in the list" silently excluded nothing.
-         If (toBeExcludedIndexes[Rowu[1]]=1)
-            Continue
-
-         executingCanceableOperation := A_TickCount
-         If (determineTerminateOperation()=1)
+         Rowu := RecordSet.Rows[A_Index]
+         If Rowu[2]
          {
-            abandonAll := 1
-            Break
+            ; Rowu[1], not Rowu["imgidu"]: GetTable() is never called with getColumnNames=1
+            ; anywhere in this script, so TB.ColumnNames is empty and the rows carry integer
+            ; keys only. The string key always read blank, so "exclude the duplicates already
+            ; in the list" silently excluded nothing.
+            If (toBeExcludedIndexes[Rowu[1]]=1)
+               Continue
+
+            executingCanceableOperation := A_TickCount
+            If (determineTerminateOperation()=1)
+            {
+               abandonAll := 1
+               Break
+            }
+
+            If givenRegEx
+            {
+               okay := 0
+               If coreSearchIndex(Rowu[2], givenRegEx, userFilterWhat, userFilterStringIsNot)
+                  okay := 1
+            } Else okay := 1
+
+            If (okay!=1)
+               Continue
+
+            groupies[Rowu[5]] := 1
+            maxFilesIndex++
+            resultedFilesList[maxFilesIndex, 1]  := Rowu[2]
+            resultedFilesList[maxFilesIndex, 12] := Rowu[1]  ; sqlDBrowID
+            resultedFilesList[maxFilesIndex, 17] := Rowu[3]
+            resultedFilesList[maxFilesIndex, 6]  := Rowu[4]
+            resultedFilesList[maxFilesIndex, 23] := Rowu[5]  ; initial dupe group ID
+            If includeHash
+            {
+               If (hashA && hashB)
+                  arrHashesData[ Rowu[1] ] := Rowu[6] "|" Rowu[7]
+               Else
+                  arrHashesData[ Rowu[1] ] := Rowu[6]
+            }
+
+            If (A_TickCount - prevMSGdisplay>2000)
+            {
+               etaTime := ETAinfos(maxFilesIndex, totalFiles, startOperation)
+               showTOOLtip("Retrieving image duplicates files list, please wait" etaTime, 0, 0, A_Index/totalFiles)
+               prevMSGdisplay := A_TickCount
+            }
+
          }
-
-         If givenRegEx
-         {
-            okay := 0
-            If coreSearchIndex(Rowu[2], givenRegEx, userFilterWhat, userFilterStringIsNot)
-               okay := 1
-         } Else okay := 1
-
-         If (okay!=1)
-            Continue
-
-         groupies[Rowu[5]] := 1
-         maxFilesIndex++
-         resultedFilesList[maxFilesIndex, 1]  := Rowu[2]
-         resultedFilesList[maxFilesIndex, 12] := Rowu[1]  ; sqlDBrowID
-         resultedFilesList[maxFilesIndex, 17] := Rowu[3]
-         resultedFilesList[maxFilesIndex, 6]  := Rowu[4]
-         resultedFilesList[maxFilesIndex, 23] := Rowu[5]  ; initial dupe group ID
-         If includeHash
-         {
-            If (hashA && hashB)
-               arrHashesData[ Rowu[1] ] := Rowu[6] "|" Rowu[7]
-            Else
-               arrHashesData[ Rowu[1] ] := Rowu[6]
-         }
-
-         If (A_TickCount - prevMSGdisplay>2000)
-         {
-            etaTime := ETAinfos(maxFilesIndex, totalFiles, startOperation)
-            showTOOLtip("Retrieving image duplicates files list, please wait" etaTime, 0, 0, A_Index/totalFiles)
-            prevMSGdisplay := A_TickCount
-         }
-
       }
-   }
 
-   If (maxFilesIndex<2 || abandonAll=1)
-      arrHashesData := ""
-   Else
-      dupesHashesData := arrHashesData
+      If (maxFilesIndex<2 || abandonAll=1)
+         arrHashesData := ""
+      Else
+         dupesHashesData := arrHashesData
 
-   RecordSet.Free()
+      RecordSet.Free()
    }
 
    ; MsgBox, % "g=" groupies.Count() " | i = " resultedFilesList.Count()
@@ -87447,8 +87431,9 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       ; hashes up in dupesHashesData, which this path deliberately leaves empty, and would
       ; read every one of them as "0x" -> 0, i.e. one enormous phantom group.
       If (useEngine=1 && fromEngine!=1)
+      {
          r := 1
-      Else
+      } Else
       {
          r := filterDupeResultsByHdist(userFindDupesHamDistLvl, fromEngine)
          ; "" means the filtered list is live: the pair list has to stay in the DLL so the
@@ -87776,7 +87761,7 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
   , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
-  , 27_imghMin, 28_imgHASH, 29_unused, 30_unused
+  , 27_imghMin, 28_unused, 29_unused, 30_unused
   , 31_unused, 32_unused, 33_HammingDist, 34_MSEscore
   , 35_dateSeenDB, 36_sortModeDB]
 
@@ -89336,7 +89321,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on hamming distance [similarity]
     Gui, Add, Checkbox, xp y+15 Checked%PerformMSDonDupes% gupdateUIdupesPanel vPerformMSDonDupes, Filter results using Mean-Squared Difference [32x32]
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit3 veditFr", userFindDupesMSElvl, "MSD hash threshold")
-    Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range1-950, % userFindDupesMSElvl
+    Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range1-400, % userFindDupesMSElvl
 
     Gui, Tab, 3
     Gui, Add, Text, x+15 y+15 w%txtWid% Section, These options allow altering how image data is collected. For best results, these settings should be altered only once, before any data is collected. All processes can be interrupted and resumed at any time.

@@ -54,7 +54,7 @@
 // Declared here rather than in qpv-main.h so the whole subsystem is one file. Everything
 // below is read from AHK by byte offset, which is what the fixed layouts are about.
 
-// One record per surviving image pair, as dupesFetchPairs() hands them to AHK.
+// One record per surviving image pair.
 // The three parallel std::vector<UINT> this replaced needed three exports, three
 // AHK buffers and three copies of what is one row.
 struct DupePairRec {      // 16 bytes; AHK NumGet()s the fields at 0/4/8/12
@@ -294,37 +294,6 @@ static void decodeFingerprintBlob(const wchar_t *blob, const UINT count, const U
     decodeFingerprintChunk(blob, 0, count);
 }
 
-
-// Hands the collected pairs back in chunks, advancing an internal cursor and dropping
-// the list once it has been read out - the same drain-after-read contract the three
-// retrieveHammingDistanceResults() calls had, in one export and one buffer.
-DLL_API UINT DLL_CALLCONV dupesFetchPairs(void *outArray, UINT maxItems) {
-   if (outArray==NULL || maxItems==0)
-      return 0;
-
-   const size_t total = dupesPairsList.size();
-   if (dupesPairsRead >= total)
-   {
-      dupesPairsList.clear();
-      dupesPairsRead = 0;
-      return 0;
-   }
-
-   size_t n = total - dupesPairsRead;
-   if (n > (size_t)maxItems)
-      n = (size_t)maxItems;
-
-   memcpy(outArray, dupesPairsList.data() + dupesPairsRead, n * sizeof(DupePairRec));
-   dupesPairsRead += n;
-   if (dupesPairsRead >= total)
-   {
-      dupesPairsList.clear();
-      dupesPairsRead = 0;
-   }
-
-   return (UINT)n;
-}
-
 void dupesQueryFreeRows();
 
 // Releases everything the duplicate scan holds. AHK calls it on every exit path from
@@ -332,6 +301,8 @@ void dupesQueryFreeRows();
 // would otherwise be handed to the next scan ahead of its own results.
 DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     dupesQueryFreeRows();
+    dupesFilterRows.clear();
+    dupesFilterRows.shrink_to_fit();
     dupesPairsList.clear();
     dupesPairsList.shrink_to_fit();
     dupesPixData.clear();
@@ -1096,11 +1067,33 @@ DLL_API UINT DLL_CALLCONV dupesPairCount() {
 }
 
 // What testWasMSEdupes() answered: whether the scan actually computed similarity scores,
-// which is what decides if the MSD sliders mean anything. Same test - the first two pairs
-// standing in for the whole list.
+// which is what decides if the MSD sliders mean anything. Sampling only the first two pairs
+// was too thin - a sweep can legitimately leave the leading pairs without a score. Sample
+// the first half of the list instead, but keep the old bar of two scored pairs so a single
+// stray score cannot switch the sliders on, and stop the moment the second one turns up:
+// only a genuinely score-less list pays for the whole walk. The sample never drops below
+// two entries, otherwise short lists could not clear the bar no matter what they hold.
 DLL_API int DLL_CALLCONV dupesHaveMSD() {
-    return (dupesPairsList.size() >= 2 && dupesPairsList[0].mse < QPV_MSD_NONE
-                                       && dupesPairsList[1].mse < QPV_MSD_NONE) ? 1 : 0;
+    size_t total = dupesPairsList.size();
+    if (total < 2)
+       return 0;
+
+    size_t n = total / 2;
+    if (n < 2)
+       n = 2;
+
+    int k = 0;
+    for (size_t i=0; i<n; i++)
+    {
+        if (dupesPairsList[i].mse < QPV_MSD_NONE)
+        {
+           k++;
+           if (k>1)
+              return 1;
+        }
+    }
+
+    return 0;
 }
 
 // qpv-dupes-block-end - tests/run-tests.sh slices from the SWAR comment above down to
