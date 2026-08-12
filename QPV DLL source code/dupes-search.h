@@ -540,10 +540,15 @@ DLL_API UINT DLL_CALLCONV dupesSweepPairs(UINT64 *givenHashesArray, UINT64 *give
 // preceded by three VarSetCapacity()s and an interpreted marshalling loop, around a few
 // hundred nanoseconds of actual work.
 //
-// The candidate set is loaded once - by AHK through dupesScanFeed(), or straight from
-// SQLite - and the sweep is then driven by dupesScanStep(msBudget), which does a bounded
-// chunk of work and returns so AHK can repaint and poll determineTerminateOperation().
-// Interruption therefore keeps exactly the shape it had; only the call count changed.
+// The candidate set is loaded once and the sweep is then driven by dupesScanStep(msBudget),
+// which does a bounded chunk of work and returns so AHK can repaint and poll
+// determineTerminateOperation(). Interruption therefore keeps exactly the shape it had;
+// only the call count changed.
+//
+// In the application the set only ever arrives from SQLite, through dupesQueryBegin() and
+// dupesScanBuildFromQuery(): AHK no longer has a query path of its own, so it has nothing
+// to feed. dupesScanBegin/Feed/SetGroups stay exported because they are the seam
+// tests/sweep_smoke.cpp drives the sweep through, without a database and without SQLite.
 
 // Sizes the candidate arrays. rows is the total across every group; groups only reserves
 // the boundary array, dupesScanSetGroups() is what actually fills it.
