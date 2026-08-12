@@ -5805,8 +5805,16 @@ Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UIN
 }
 
 BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize, int sliceHeight, int useICM, int mustClip, int x, int y, int w, int h, int newW, int newH, int givenQuality, Gdiplus::GpBitmap* &myBitmap) {
-  // WIC factory initialized in initWICnow() 
+  // WIC factory initialized in initWICnow()
   // WIC image object preloaded via WICpreLoadImage()
+  if (m_pIWICFactory==NULL || pWICclassFrameDecoded==NULL)
+  {
+     // reached whenever a preload failed or was discarded and the caller asked for pixels
+     // anyway; without this the frame is dereferenced below at GetSize()
+     fnOutputDebug("coreWICgetBufferImage: there is no preloaded WIC image to read from");
+     return NULL;
+  }
+
   HRESULT hr = S_OK, phr = S_OK;
   IWICBitmapSource    *pFinalBitmapSource = NULL;
   IWICFormatConverter *pConverter         = NULL;
@@ -6032,6 +6040,8 @@ bool IsWicDecoderAvailable(const GUID& formatGuid) {
     IWICBitmapDecoderInfo *pDecInfo   = NULL;
     IEnumUnknown          *pEnum      = NULL;
     bool                  isAvailable = false;
+    if (m_pIWICFactory==NULL)
+       return false;
 
     // Create component enumerator for decoders
     HRESULT hr = m_pIWICFactory->CreateComponentEnumerator(WICDecoder, WICComponentEnumerateDefault, &pEnum);
@@ -6047,16 +6057,18 @@ bool IsWicDecoderAvailable(const GUID& formatGuid) {
                 if (SUCCEEDED(hr)) {
                     GUID decoderGuid;
                     hr = pDecInfo->GetContainerFormat(&decoderGuid);
-                    if (SUCCEEDED(hr) && decoderGuid == formatGuid) {
+                    if (SUCCEEDED(hr) && decoderGuid == formatGuid)
                         isAvailable = true;
-                        pDecInfo->Release();
-                        break;
-                    }
+
                     pDecInfo->Release();
                 }
                 pCompInfo->Release();
             }
             pElement->Release();
+            // the match used to break out from inside, before pCompInfo and pElement were
+            // released, so every image loaded leaked two component references
+            if (isAvailable)
+                break;
         }
         pEnum->Release();
     }
@@ -6137,111 +6149,286 @@ bool IsFileExtension(const wchar_t* szFileName, const wchar_t* extension) {
     return _wcsicmp(fileExt, dotExtension) == 0;
 }
 
+// ---------------------------------------------------------------------------------------
+// Guarded WIC decoding
+//
+// A malformed, truncated or hostile image file does not always come back as a failure
+// HRESULT. WIC codecs - above all the third party ones users install for RAW, HEIF or
+// JPEG-XL - do walk off their own buffers and raise an access violation instead; and
+// because CreateDecoderFromFilename() reads the file through a memory mapping, a file on
+// a network share or on a card that is pulled mid-read raises EXCEPTION_IN_PAGE_ERROR.
+// Neither of those is a C++ exception, so no catch() handler in this file can ever see
+// them under the synchronous exception model this project builds with - only __except().
+//
+// The helpers below exist because MSVC refuses __try inside any function that holds an
+// object needing unwinding (C2712), which every function here does the moment it builds
+// an std::string for fnOutputDebug(). They therefore keep to plain data and raw COM
+// pointers, and they never read a local variable inside the __except block: a local
+// modified inside a __try is not reliable in the handler.
+//
+// This is damage control, not a guarantee. A codec that corrupts the heap before it
+// faults, or that faults on a thread of its own, is still fatal.
+// ---------------------------------------------------------------------------------------
+
+static int WICcodecCrashFilter(DWORD code) {
+    switch (code)
+    {
+       case EXCEPTION_ACCESS_VIOLATION:
+       case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+       case EXCEPTION_DATATYPE_MISALIGNMENT:
+       case EXCEPTION_ILLEGAL_INSTRUCTION:
+       case EXCEPTION_IN_PAGE_ERROR:
+       case EXCEPTION_INT_DIVIDE_BY_ZERO:
+       case EXCEPTION_INT_OVERFLOW:
+       case EXCEPTION_PRIV_INSTRUCTION:
+            return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // everything else keeps unwinding: a stack overflow leaves no guard page to recover
+    // into, and C++ exceptions (0xE06D7363) must still reach their own handlers
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void WICguardedRelease(IUnknown *p) {
+    if (p==NULL)
+       return;
+
+    __try
+    {
+        p->Release();
+    } __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        // a codec that faulted once can fault again on the way out; the object is then
+        // abandoned - a few leaked bytes beat taking the whole viewer down
+    }
+}
+
+// everything WICpreLoadImage() reads out of the file, in one plain struct, so that the
+// guarded reader below stays free of anything that would need unwinding
+struct WICframeFacts {
+    UINT   width;
+    UINT   height;
+    UINT   frames;
+    UINT   activeFrame;
+    double dpix;
+    double dpiy;
+    GUID   containerFmt;
+    WICPixelFormatGUID pixelFmt;
+};
+
+// Opens szFileName, picks a frame and reads its header fields. The decoder and the frame
+// are written straight into the caller's pointers - the two globals - so that the caller
+// can release whatever was produced no matter where this failed. sehCode comes back
+// non-zero when the codec faulted rather than returned an error.
+static HRESULT WICguardedOpenFrame(IWICImagingFactory *fac, const wchar_t *szFileName, int givenFrame,
+                                   IWICBitmapDecoder **ppDecoder, IWICBitmapFrameDecode **ppFrame,
+                                   WICframeFacts *facts, DWORD *sehCode) {
+    HRESULT hr = E_FAIL;
+    *sehCode = 0;
+    __try
+    {
+        hr = fac->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, ppDecoder);
+        if (SUCCEEDED(hr) && *ppDecoder==NULL)
+           hr = E_POINTER;   // a success code with no object is still nothing to work with
+
+        if (SUCCEEDED(hr))
+           hr = (*ppDecoder)->GetContainerFormat(&facts->containerFmt);
+
+        UINT tFrames = 0;
+        if (SUCCEEDED(hr))
+           hr = (*ppDecoder)->GetFrameCount(&tFrames);
+
+        if (SUCCEEDED(hr) && tFrames<1)
+           hr = E_FAIL;      // a container that declares no frame has nothing to preload
+
+        if (SUCCEEDED(hr))
+        {
+           UINT useFrame = (givenFrame>0) ? (UINT)givenFrame : 0;
+           if (useFrame>=tFrames)
+              useFrame = tFrames - 1;
+
+           facts->frames = tFrames;
+           facts->activeFrame = useFrame;
+           hr = (*ppDecoder)->GetFrame(useFrame, ppFrame);
+           if (SUCCEEDED(hr) && *ppFrame==NULL)
+              hr = E_POINTER;
+        }
+
+        if (SUCCEEDED(hr))
+           hr = (*ppFrame)->GetSize(&facts->width, &facts->height);
+
+        if (SUCCEEDED(hr))
+           hr = (*ppFrame)->GetPixelFormat(&facts->pixelFmt);
+
+        if (SUCCEEDED(hr) && FAILED((*ppFrame)->GetResolution(&facts->dpix, &facts->dpiy)))
+        {
+           facts->dpix = 0;  // a frame that reports no resolution is still a good frame
+           facts->dpiy = 0;
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+// bits per pixel and channel count for a pixel format GUID; reads no file data, but it
+// still runs inside the codec that registered the format
+static HRESULT WICguardedPixelFormatInfo(IWICImagingFactory *fac, const WICPixelFormatGUID *fmt,
+                                         UINT *bpp, UINT *channels, DWORD *sehCode) {
+    IWICComponentInfo   *pComponentInfo   = NULL;
+    IWICPixelFormatInfo *pPixelFormatInfo = NULL;
+    HRESULT hr = E_FAIL;
+    *bpp = 0;
+    *channels = 0;
+    *sehCode = 0;
+    __try
+    {
+        hr = fac->CreateComponentInfo(*fmt, &pComponentInfo);
+        if (SUCCEEDED(hr) && pComponentInfo!=NULL)
+        {
+           hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
+           if (SUCCEEDED(hr) && pPixelFormatInfo!=NULL)
+           {
+              pPixelFormatInfo->GetBitsPerPixel(bpp);
+              hr = pPixelFormatInfo->GetChannelCount(channels);
+           }
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return E_UNEXPECTED;   // both component objects are abandoned on purpose
+    }
+
+    WICguardedRelease(pPixelFormatInfo);
+    WICguardedRelease(pComponentInfo);
+    return hr;
+}
+
 DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFrame, UINT *resultsArray, int isFIMokay) {
-  // WIC factory initialized in initWICnow() 
-  HRESULT hr = S_OK;
+  // WIC factory initialized in initWICnow()
+  if (resultsArray==NULL || szFileName==NULL || szFileName[0]==L'\0')
+     return 0;
+
+  if (m_pIWICFactory==NULL)
+  {
+     fnOutputDebug("WICpreLoadImage: WIC was never initialized; initWICnow() must succeed first");
+     return 0;
+  }
+
+  // whatever a previous preload left behind is released here instead of being overwritten:
+  // the two globals are the only handle anybody holds on those objects, and the decoder
+  // keeps the previous file mapped until it goes
+  WICdestroyPreloadedImage(1);
+
+  int destinationFormat = 0;
   try
   {
-      hr = m_pIWICFactory->CreateDecoderFromFilename(szFileName, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pWICclassDecoder);
-  } catch (const char* message)
-  {
-      WICdestroyPreloadedImage(1);
-      fnOutputDebug("WICpreLoadImage: WIC decoder error > " + std::string(message) + ". File: " + WideCharToString(szFileName));
-      return 0;
-  }
+      WICframeFacts facts = {};
+      DWORD   sehCode = 0;
+      char    sehTxt[32];
+      HRESULT hr = WICguardedOpenFrame(m_pIWICFactory, szFileName, givenFrame,
+                                       &pWICclassDecoder, &pWICclassFrameDecoded, &facts, &sehCode);
+      if (sehCode!=0)
+      {
+         sprintf_s(sehTxt, "0x%08X", (unsigned int)sehCode);
+         fnOutputDebug("WICpreLoadImage: the WIC codec faulted (" + std::string(sehTxt) + ") on file: " + WideCharToString(szFileName));
+         WICguardedRelease(pWICclassFrameDecoded);
+         WICguardedRelease(pWICclassDecoder);
+         pWICclassFrameDecoded = NULL;
+         pWICclassDecoder = NULL;
+         return 0;
+      }
 
-  GUID containerFmt;
-  int destinationFormat;
-  hr = pWICclassDecoder->GetContainerFormat(&containerFmt);
-  if (SUCCEEDED(hr) && IsWicDecoderAvailable(containerFmt))
-  {
-      // IWICBitmapFrameDecode *pWICclassFrameDecoded = NULL;
-      UINT tFrames = 0;
-      hr = pWICclassDecoder->GetFrameCount(&tFrames);
-      if (tFrames>0 && (UINT)givenFrame >= tFrames) // tFrames - 1 would underflow when tFrames==0
-         givenFrame = tFrames - 1;
+      if (SUCCEEDED(hr) && !IsWicDecoderAvailable(facts.containerFmt))
+         hr = E_FAIL;
 
-      resultsArray[2] = tFrames;
-      resultsArray[6] = givenFrame;
-      hr = pWICclassDecoder->GetFrame(givenFrame, &pWICclassFrameDecoded);
+      if (SUCCEEDED(hr) && ((!facts.width || !facts.height) || (facts.width==1 && facts.height==1)))
+      {
+         fnOutputDebug("WICpreLoadImage: error: no width and height for the decoded frame");
+         hr = E_FAIL;
+      }
+
+      if (SUCCEEDED(hr) && (facts.width>0x7FFFFFFFu || facts.height>0x7FFFFFFFu))
+      {
+         // GDI+, FreeImage and the AHK side all carry these as signed ints further down;
+         // a header claiming more than that is malformed by definition
+         fnOutputDebug("WICpreLoadImage: error: the frame declares an impossible size");
+         hr = E_FAIL;
+      }
+
       if (SUCCEEDED(hr))
       {
-          UINT width = 0, height = 0;
-          hr = pWICclassFrameDecoded->GetSize(&width, &height); 
-          if ((!width || !height) || (width==1 && height==1))
-          {
-             fnOutputDebug("WICpreLoadImage: error: no width and height for the decoded frame");
-             hr = E_FAIL;
-          } else
-          {
-             resultsArray[0] = width;
-             resultsArray[1] = height;
-             UINT ucontainerFmt = indexedWICcontainerFormats(containerFmt);
-             resultsArray[5] = ucontainerFmt;
+         UINT ucontainerFmt = indexedWICcontainerFormats(facts.containerFmt);
+         UINT bpp = 0, channels = 0;
+         DWORD infoSehCode = 0;
+         hr = WICguardedPixelFormatInfo(m_pIWICFactory, &facts.pixelFmt, &bpp, &channels, &infoSehCode);
+         if (infoSehCode!=0)
+         {
+            sprintf_s(sehTxt, "0x%08X", (unsigned int)infoSehCode);
+            fnOutputDebug("WICpreLoadImage: the pixel format component faulted (" + std::string(sehTxt) + ")");
+         }
 
-             double dpix = 0, dpiy = 0;
-             hr = pWICclassFrameDecoded->GetResolution(&dpix, &dpiy); 
-             resultsArray[4] = round((dpix + dpiy)/2);
- 
-             WICPixelFormatGUID opixelFormat;
-             hr = pWICclassFrameDecoded->GetPixelFormat(&opixelFormat);
-             UINT uPixFmt = indexedWICpixelFormats(opixelFormat);
-             resultsArray[3] = uPixFmt;
-             destinationFormat = decideWICtoFIMpixelFormat(opixelFormat);
+         destinationFormat = decideWICtoFIMpixelFormat(facts.pixelFmt);
+         int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
+         if (tif==1 && destinationFormat>32 && isFIMokay==1)
+         {
+            fnOutputDebug("WICpreLoadImage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
+            destinationFormat = 0;
+            hr = E_FAIL;
+         } else if (ucontainerFmt==9 && facts.width==256 && facts.height==192)
+         {
+            fnOutputDebug("WICpreLoadImage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
+            hr = E_FAIL;
+         }
+         // fnOutputDebug("WICpreLoadImage: container format = " + std::to_string(ucontainerFmt));
 
-             UINT bpp = NULL;
-             UINT channels = NULL;
-             IWICComponentInfo* pComponentInfo = NULL;
-             hr = m_pIWICFactory->CreateComponentInfo(opixelFormat, &pComponentInfo);
-             if (SUCCEEDED(hr))
-             {
-                IWICPixelFormatInfo* pPixelFormatInfo = NULL;
-                hr = pComponentInfo->QueryInterface(IID_PPV_ARGS(&pPixelFormatInfo));
-                if (SUCCEEDED(hr))
-                {
-                   hr = pPixelFormatInfo->GetBitsPerPixel(&bpp);
-                   hr = pPixelFormatInfo->GetChannelCount(&channels);
-                   resultsArray[7] = bpp;
-                   resultsArray[8] = channels;
-                }
-                if (pPixelFormatInfo)
-                   pPixelFormatInfo->Release();
-                pComponentInfo->Release();
-             }
-
-             int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
-             if (tif==1 && destinationFormat>32 && isFIMokay==1)
-             {
-                fnOutputDebug("WICpreLoadImage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
-                destinationFormat = 0;
-                hr = E_FAIL;
-             } else if (ucontainerFmt==9 && width==256 && height==192)
-             {
-                fnOutputDebug("WICpreLoadImage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
-                hr = E_FAIL;
-             }
-             // fnOutputDebug("WICpreLoadImage: container format = " + std::to_string(ucontainerFmt));
-          }
+         if (SUCCEEDED(hr))
+         {
+            // the results are published only once the frame is known to be usable, so a
+            // half filled array can never be read back as if it described a real image
+            double dpiAvg = (facts.dpix + facts.dpiy) * 0.5;
+            resultsArray[0] = facts.width;
+            resultsArray[1] = facts.height;
+            resultsArray[2] = facts.frames;
+            resultsArray[3] = indexedWICpixelFormats(facts.pixelFmt);
+            // a NaN or an absurd resolution out of broken metadata would convert into
+            // garbage; both comparisons are false for NaN, which lands on zero
+            resultsArray[4] = (dpiAvg>0.0 && dpiAvg<1000000.0) ? (UINT)(dpiAvg + 0.5) : 0;
+            resultsArray[5] = ucontainerFmt;
+            resultsArray[6] = facts.activeFrame;
+            resultsArray[7] = bpp;
+            resultsArray[8] = channels;
+         }
       }
-  } else hr = E_FAIL;
 
-  if (FAILED(hr))
-  {
-      WICdestroyPreloadedImage(1);
-      fnOutputDebug("WICpreLoadImage: WIC decoder error on file: " + WideCharToString(szFileName));
-      return 0;
-  };
+      if (FAILED(hr))
+      {
+         WICdestroyPreloadedImage(1);
+         fnOutputDebug("WICpreLoadImage: WIC decoder error on file: " + WideCharToString(szFileName));
+         return 0;
+      }
 
-  if (SUCCEEDED(hr))
-  {
       // fnOutputDebug("WIC pixel format index: " + std::to_string(uPixFmt) + " | bpp = " + std::to_string(bpp) + " * " + std::to_string(channels) + " channels");
       return destinationFormat;
-  } else
+  } catch (...)
   {
-      fnOutputDebug("WICpreLoadImage: an undefined error occured");
-      WICdestroyPreloadedImage(1);
+      // an std::string that fails to allocate, or WideCharToString() choking on a path
+      // with unpaired surrogates, would otherwise unwind straight out of this exported
+      // function and into AHK, which has nothing to catch it with
+      try
+      {
+          fnOutputDebug("WICpreLoadImage: an undefined error occured");
+          WICdestroyPreloadedImage(1);
+      } catch (...) { }
       return 0;
   }
+
+  return 0;
 }
 
 void ListWICdecoders() {
