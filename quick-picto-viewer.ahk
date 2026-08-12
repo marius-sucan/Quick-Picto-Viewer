@@ -36335,7 +36335,9 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       addJournalEntry("Must collect files data in mode: " adaptedSortCriteria " | " scu)
       If !getMaxRowIDsqlDB()
       {
+         showTOOLtip("ERROR: No row ID retrieved from the database.")
          CurrentSLD := backCurrentSLD
+         SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          SetTimer, ResetImgLoadStatus, -200
          Return -1
@@ -36386,9 +36388,9 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       If (asku=1 && noQuestion=0 && filesToBeSorted>10)
       {
          thisFriendly := (SLDtypeLoaded=3) ? "`n`nThe data will be automatically cached in the database and you can stop and resume this process at anytime." : ""
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(filesInScope) " files. By refusing to the collect data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data", 0, "question", "&Do not collect file data and never ask again in this session", 0)
-         If (InStr(msgResult.btn, "incomplete") || InStr(msgResult.btn, "collect"))
-            noQuestion := msgResult.Check
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have selected to perform an operation that relies on collected file and image details. " appTitle " needs to scan " groupDigits(filesToBeSorted) " out of " groupDigits(filesInScope) " files. By refusing to the collect data, the operation you chose (sort, filter, generate statistics or find duplicates) will likely give incomplete or erroneous results." thisFriendly, "Collect &data now|&Continue with incomplete data|&Abort", 0, "question", "&Do not collect file data and never ask again in this session", 0)
+         If (InStr(msgResult.btn, "incomplete") || InStr(msgResult.btn, "collect")) 
+           noQuestion := msgResult.Check
 
          If !InStr(msgResult.btn, "collect")
          {
@@ -36396,23 +36398,24 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
             SetTimer, RemoveTooltip, % -msgDisplayTime
             ResetImgLoadStatus()
             SetTimer, ResetImgLoadStatus, -300
-            Return 0
+            SetTimer, createGUItoolbar, -100
+            Return -3
          }
       }
 
-      ; The expensive mode. Everything it collects - the histogram statistics, the image
-      ; dimensions, the file stamps and the four pixel fingerprints - comes out of one
-      ; decode of the image, and the decode is essentially the whole cost. It runs on the
-      ; worker pool inside qpvmain.dll, and ONLY there. There is deliberately no serial
-      ; fallback.
       If (adaptedSortCriteria=3 && filesToBeSorted>0)
       {
+         ; Everything collected, the histogram statistics, the image
+         ; dimensions, the file stamps and the four pixel fingerprints, 
+         ; comes out of one decode of the image. It runs on the
+         ; worker pool inside qpvmain.dll (dupes-pixels.h).
+         ; There is deliberately no serial fallback.
          RecordSet.Free()
          If (collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, abandonAll, countTFilez, failedFiles, failedSQLfiles)!=1)
          {
             addJournalEntry(A_ThisFunc "(): the in-DLL collection pool could not be started; no image data was collected.")
             CurrentSLD := backCurrentSLD
-            showTOOLtip("ERROR: unable to collect the image data. Please update qpvmain.dll.")
+            showTOOLtip("ERROR: Unable to collect the image data. Please update qpvmain.dll.")
             SoundBeep 300, 100
             SetTimer, RemoveTooltip, % -msgDisplayTime
             SetTimer, ResetImgLoadStatus, -200
@@ -36559,9 +36562,9 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
 ;
 ; The DLL writes on activeSQLdb's own handle, inside the transaction opened here, so the
 ; periodic COMMIT keeps its meaning: an interrupted run keeps every image it finished.
-; That is the promise the collect-data dialog makes and the reason the whole phase is
+; That is what the collect-data dialog says and the reason the whole phase is
 ; resumable at all.
-   Static msBudget := 120
+   Static msBudget := 320
    If (dupesEngineInitGood!=1 || SLDtypeLoaded!=3 || !activeSQLdb._Handle)
       Return 0
 
@@ -36918,8 +36921,17 @@ dbSortingCached(SortCriterion) {
       If askAboutFileSave(" and the files list will be sorted")
          Return
 
+      If !getMaxRowIDsqlDB()
+      {
+         showTOOLtip("ERROR: No row ID retrieved from the database.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         SetTimer, ResetImgLoadStatus, -200
+         Return
+      }
+
       abandonAll := collectSQLFileInfosNow(SortCriterion, 1, 1)
-      If (!getMaxRowIDsqlDB() || abandonAll=1)
+      If (abandonAll=1 || abandonAll=-3)
       {
          SetTimer, ResetImgLoadStatus, -200
          Return
@@ -74150,10 +74162,12 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
        If (notFound!=1 && bonusInfo!="scroll")
        {
           asr := " px (" Round(resultedFilesList[thisFileIndex, 13] / resultedFilesList[thisFileIndex, 14], 2) ") | "
-          infoRes := "`nResolution: " groupDigits(resultedFilesList[thisFileIndex, 13]) " x " groupDigits(resultedFilesList[thisFileIndex, 14]) asr resultedFilesList[thisFileIndex, 17] " MPx"
+          If resultedFilesList[thisFileIndex, 13]
+             infoRes := "`nResolution: " groupDigits(resultedFilesList[thisFileIndex, 13]) " x " groupDigits(resultedFilesList[thisFileIndex, 14]) asr resultedFilesList[thisFileIndex, 17] " MPx"
           ; infoRes .= " | " resultedFilesList[thisFileIndex, 22] " DPI"
           infoRes .= (resultedFilesList[thisFileIndex, 9]>1) ? "`nImage frames / pages: " resultedFilesList[thisFileIndex, 9] : ""
-          infoRes .= "`nPixel format: " resultedFilesList[thisFileIndex, 15]
+          If resultedFilesList[thisFileIndex, 15]
+             infoRes .= "`nPixel format: " resultedFilesList[thisFileIndex, 15]
        }
     }
 
@@ -86601,7 +86615,7 @@ filterDupeResultsByHdist(threshold) {
    ; "no pairs" and quietly hand back an empty duplicates list; BTNfindDupesNow() says
    ; so out loud, this covers the sort/refresh paths that re-enter here
 
-   Static msBudget := 150
+   Static msBudget := 350
    If (dupesEngineInitGood!=1)
    {
       addJournalEntry(A_ThisFunc "(): aborted - qpvmain.dll does not export the duplicates scan engine.")
@@ -86851,7 +86865,12 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    If (InStr(thisNOTnullCol, "hash") || mustForceHashes>1 || userFindDupesFilterHamDist>1)
    {
       scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
-      collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, userFilterStringIsNot)
+      rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, userFilterStringIsNot)
+      If (rr=-3)
+      {
+         RemoveTooltip()
+         Return
+      }
    }
 
    If (InStr(thisNOTnullCol, "hash") || userFindDupesFilterHamDist>1 || mustForceHashes>1)
@@ -87006,7 +87025,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       }
    }
 
-   Static msBudget := 150  ; see filterDupeResultsByHdist() for its meaning
+   Static msBudget := 350  ; see filterDupeResultsByHdist() for its meaning
    addJournalEntry("SQL query used to identify the dupes (in-DLL ordered scan):`n" engineSQL)
    statePtr := DllCall("qpvmain.dll\dupesScanGetState", "UPtr")
    prevMSGdisplay := A_TickCount
@@ -87489,7 +87508,7 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   , 8_fileDateCreated, 9_imgFrames, 10_mustDoSort, 11_IsImgHisto
   , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
-  , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
+  , 22_imgDPI, 23_dupeID, 24_imghStdDev, 25_imghRange, 26_imghMode
   , 27_imghMin, 28_unused, 29_unused, 30_unused
   , 31_unused, 32_unused, 33_HammingDist, 34_MSEscore
   , 35_dateSeenDB, 36_sortModeDB]
@@ -99170,12 +99189,6 @@ printLargeStrArray(whichArray, maxList, delim) {
   ; MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000) 
   Return result
 }
-
-; dumpBMPpixels() lived here: a per-pixel interpreted loop that appended
-; Chr(Gdip_BFromARGB(...) + 161) one character at a time, 72 + 1024 iterations per image
-; and twice that with flipped detection on. The fingerprints are produced by the worker
-; pool in qpvmain.dll now (dupes-pixels.h), stored as raw BLOBs in imagesPixels, and
-; nothing in AHK ever holds one again.
 
 calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
     Static fmt := 3

@@ -16,7 +16,7 @@ Table of contents:
    o) Search menu options [omnibox] and the folders tree (soon)
 
 
-Deniere mise à jour: dimanche 2 août 2026.
+Deniere mise à jour: mercredi 12 août 2026.
 =====================================================================
 
 -) Introduction
@@ -150,7 +150,7 @@ b) How a files list index is created
   , 8_fileDateCreated, 9_imgFrames, 10_mustDoSort, 11_IsImgHisto
   , 12_dbRowIndex, 13_imgW, 14_imgH, 15_imgPixFmt, 16_imgWHratio
   , 17_imgMGPX, 18_imgHAvg, 19_imgHmedian, 20_imgHpeak, 21_imgHlow
-  , 22_imgDPI, 23_dupeID, 24_imghRMS, 25_imghRange, 26_imghMode
+  , 22_imgDPI, 23_dupeID, 24_imghStdDev, 25_imghRange, 26_imghMode
   , 27_imghMin, 28_unused, 29_unused, 30_unused, 31_unused
   , 32_unused, 33_HammingDist, 34_MSEscore, 35_dateSeenDB
   , 36_sortModeDB]
