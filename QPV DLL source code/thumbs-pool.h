@@ -54,15 +54,15 @@
 #define TP_ERR_PDFLOCKED  20  // QPV_ShowThumbnails() must not mark these files as dead
 
 #define TP_MAX_READY      48  // undelivered results allowed before workers park
-#define TP_MAX_READY_BYTES (48ull*1024*1024)  // ... and the memory they may hold on to
+#define TP_MAX_READY_BYTES (78ull*1024*1024)  // ... and the memory they may hold on to
 
 // Memory pressure. Above either of these the pool narrows down to a single running job,
 // so that images keep coming - slowly - instead of everything grinding to a halt.
 // The percentage mirrors what QPV_ShowThumbnails() used to test on every iteration of its
 // inner loop; the absolute floor matters on machines where 10% of the RAM is still plenty.
 #define TP_MEM_LOAD_HIGH   90
-#define TP_MEM_FREE_FLOOR  (768ull*1024*1024)
-#define TP_MEM_SAMPLE_MS   250
+#define TP_MEM_FREE_FLOOR  (768ull*1024*1024)  // 768 mb
+#define TP_MEM_SAMPLE_MS   950
 
 // ---------------------------------------------------------------------------------------
 //  the properties of the image as it came off the disk
@@ -1130,12 +1130,6 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               // threaded branch happened to draw it, which is the whole thing this is
               // meant to stop. The page count is real - and the single threaded branch
               // still collects it, through GetCachableImgFileDetails().
-           } else if (!fimHandles && cfg->allowWIC==1 && tpWicExts.count(ext)>0)
-           {
-              bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                              (FIM.ok && cfg->allowFIM==1) ? 1 : 0, res.srcW, res.srcH, &res.meta);
-              res.loaderUsed = 1;
-              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
            }
 
            if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && cfg->allowFIM==1)
@@ -1154,6 +1148,16 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
                  res.srcW = fw;
                  res.srcH = fh;
               }
+           }
+
+           if (bmp==NULL && tpWicExts.count(ext)>0 && res.status!=TP_ERR_PDFLOCKED)
+           {
+              // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
+              // WIC always serializes image processing operations
+              bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
+                              0, res.srcW, res.srcH, &res.meta);
+              res.loaderUsed = 1;
+              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
            }
         }
     } catch (...)

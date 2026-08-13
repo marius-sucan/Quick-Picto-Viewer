@@ -36340,24 +36340,11 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          SetTimer, ResetImgLoadStatus, -200
+         SetTimer, createGUItoolbar, -100
          Return -1
       }
 
-      ; "not collected yet". A fingerprint is a row of imagesPixels since schema v3, so the
-      ; test is a NOT IN over its primary key rather than ifnull() on a column of "images".
-      ; A subquery keeps the outer statement single-table, which is what lets extraFilter -
-      ; built by extractSQLqueryFromFilter() over "images" columns - stay exactly as it is.
-      ; imgidu is INTEGER PRIMARY KEY NOT NULL there, so the NOT IN cannot meet a NULL.
-      ;
-      ; Mode 2 asks a wider question than its sort key does. The five image properties used
-      ; to be written together, so any one of them answered for the group; the collection
-      ; pool of dupes-pixels.h now writes them together as well, but for a while it wrote
-      ; only imgwidth and imgheight - and imgmegapix and imgwhratio are GENERATED from
-      ; those, so in a database collected in that window every one of the usual sort keys
-      ; already has a value and "collect image details" would answer that there is nothing
-      ; to do, forever, while imgpixfmt, imgframes and imgdpi stayed empty.
-      ; imgpixfmt is the honest test for the group: it is the one column no image can
-      ; legitimately leave blank once it has been decoded.
+      ; A fingerprint is a row of imagesPixels since SLDB schema v3.
       If (isPixelsTarget=1)
          missingClause := "imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE " SQLpixelsColumn(scu) " IS NOT NULL) AND isDeleted=0"
       Else If (adaptedSortCriteria=2)
@@ -36368,15 +36355,13 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       thisWhere := extraFilter ? extraFilter " AND " missingClause : "WHERE " missingClause
       SQLstr := "SELECT imgidu, fullPath FROM images " thisWhere " ORDER BY fullPath;"
       ; addJournalEntry(SQLstr)
-      ; Mode 3 never walks this result set: the collection pool reads its own rows through
-      ; the keyset cursor of collectImgDataViaPool(), and all that is wanted here is how
-      ; many of them there are. Materialising every (imgidu, fullPath) pair in the library
-      ; only to read RowCount off it - and to free it again a few lines further down - is a
-      ; large allocation taken in the moment right before the pool starts decoding on every
-      ; core, which is when memory is least likely to be there.
       failedFiles := countTFilez := 0
       If (adaptedSortCriteria=3)
       {
+         ; In mode 3, AHK never walks țhe results set of the query.
+         ; The data collection pool reads on its own the SQL rows through
+         ; the keyset cursor of collectImgDataViaPool(), and all that is wanted here is how
+         ; many of them there are.
          ; getTotalIMGsSQLdb() answers blank when the query fails; zero is a real answer
          filesToBeSorted := getTotalIMGsSQLdb(thisWhere)
          If !StrLen(filesToBeSorted)
@@ -36385,6 +36370,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
             CurrentSLD := backCurrentSLD
             SetTimer, RemoveTooltip, % -msgDisplayTime
             SetTimer, ResetImgLoadStatus, -200
+            SetTimer, createGUItoolbar, -100
             Return -1
          }
       } Else If !activeSQLdb.GetTable(SQLstr, RecordSet)
@@ -36393,6 +36379,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          CurrentSLD := backCurrentSLD
          SetTimer, RemoveTooltip, % -msgDisplayTime
          SetTimer, ResetImgLoadStatus, -200
+         SetTimer, createGUItoolbar, -100
          Return -1
       } Else filesToBeSorted := RecordSet.RowCount
 
@@ -36435,10 +36422,11 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          {
             addJournalEntry(A_ThisFunc "(): the in-DLL collection pool could not be started; no image data was collected.")
             CurrentSLD := backCurrentSLD
-            showTOOLtip("ERROR: Unable to collect the image data. The journal says why; if it names an outdated qpvmain.dll, please update it.")
+            showTOOLtip("ERROR: Unable to collect the image data.`nMore details in the session journal.")
             SoundBeep 300, 100
             SetTimer, RemoveTooltip, % -msgDisplayTime
             SetTimer, ResetImgLoadStatus, -200
+            SetTimer, createGUItoolbar, -150
             Return -1
          }
 
@@ -36588,17 +36576,10 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    ; The longest the whole pool may go without finishing a single image before this stops
    ; waiting for it. QPV_ShowThumbnails() keeps the same kind of watch over the thumbnails
    ; pool [69.5 seconds]; this one is more patient because these workers decode whole images
-   ; rather than thumbnails - one at a time whenever the machine is short of memory - and a
-   ; RAW or a large PSD off a network share is allowed to take a while. What it must not do
-   ; is wait for ever: a codec that never returns, or a pool that cannot start a decode at
-   ; all, would otherwise leave this loop spinning on "0 / N ( 0% )" with nothing to show
-   ; for it until the user notices and cancels.
-   Static stallLimit := 120000
+   ; rather than thumbnails.
+   Static stallLimit := 180000   ; miliseconds
    If (dupesEngineInitGood!=1 || SLDtypeLoaded!=3 || !activeSQLdb._Handle)
    {
-      ; every way out of here used to be silent, and the caller says "please update
-      ; qpvmain.dll" over all of them; three of these four causes have nothing to do with
-      ; the DLL and the journal is the only place that can tell them apart
       addJournalEntry(A_ThisFunc "(): no image data was collected. dupesEngineInitGood=" dupesEngineInitGood " [qpvmain.dll must export dupesScanStep], SLDtypeLoaded=" SLDtypeLoaded " [3 = a database is loaded], the database handle is " (activeSQLdb._Handle ? "open" : "GONE") ".")
       Return 0
    }
@@ -36684,8 +36665,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
 
          ; every worker holds an image, but while the machine is short of memory only one of
          ; them is allowed to decode at a time - tpTryTakeJobSlot() in thumbs-pool.h, one
-         ; count shared with the thumbnails pool - and "Decoding 16 images at once" sitting
-         ; there unchanged would be a lie about what the machine is doing
+         ; count shared with the thumbnails pool.
          busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " groupDigits(NumGet(dupesPixState + 0, 8, "Int")) " images at once"
          showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
          prevMSGdisplay := A_TickCount
