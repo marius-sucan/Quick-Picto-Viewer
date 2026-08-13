@@ -4684,7 +4684,7 @@ initThumbsPool() {
        Return
     }
 
-    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(RegExWICfmtPtrn), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
     multiCoreThumbsInitGood := 1
     addJournalEntry("Succesfully initialized " r " threads.")
 }

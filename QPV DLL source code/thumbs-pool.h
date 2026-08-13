@@ -866,8 +866,6 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_DISPLAY;
     else if (GFT==FIF_RAW)
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_PREVIEW;
-    else if (GFT==FIF_JPEG)
-       loadArgs = JPEG_EXIFROTATE;
 
     FIBITMAPptr dib = FIM.LoadU(GFT, path.c_str(), loadArgs);
     if (dib==NULL)
@@ -1132,13 +1130,11 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               // still collects it, through GetCachableImgFileDetails().
            }
 
-           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && cfg->allowFIM==1)
+           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && fimHandles && cfg->allowFIM==1)
            {
               int status = TP_ERR_LOAD, saved = 0;
               int fw = 0, fh = 0;
-              // whatever the attempt above left behind describes an image that was not the
-              // one finally decoded; FreeImage starts from a clean record
-              res.meta = TpSrcMeta();
+              res.meta = TpSrcMeta();  // reset the record
               bmp = tpFIMthumb(cfg, job.src, job.dst, startTick, fw, fh, status, saved, &res.meta);
               res.loaderUsed  = 2;
               res.status      = status;
@@ -1154,6 +1150,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            {
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
               // WIC always serializes image processing operations
+              res.meta = TpSrcMeta();  // reset the record
               bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
                               0, res.srcW, res.srcH, &res.meta);
               res.loaderUsed = 1;
