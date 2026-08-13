@@ -36757,7 +36757,7 @@ initDupesPixelsPool() {
    initFIMGmodule()
    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
 
-   nThreads := (minimizeMemUsage=1) ? 2 : realSystemCores
+   nThreads := (minimizeMemUsage=1 || allowMultiCoreMode!=1) ? 2 : realSystemCores
    r := DllCall("qpvmain.dll\dupesPixInit", "Int", nThreads, "Int")
    dupesPixState := r ? DllCall("qpvmain.dll\dupesPixGetState", "UPtr") : 0
    dupesPixInitGood := (r && dupesPixState) ? 1 : 0
@@ -36765,7 +36765,7 @@ initDupesPixelsPool() {
    Return dupesPixInitGood
 }
 
-; All hash generation functions are now in dupes-search.h: 
+; All of the functions to generate hashes are now in dupes-search.h: 
 ; dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
 ; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
 ;
@@ -82396,9 +82396,9 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
           r1 := trGdip_DrawImage(A_ThisFunc, Gu, kBitmap, brickVPx, brickVPy, brickVPw, brickVPh, 0, 0, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
           trGdip_DisposeImage(kBitmap)
        }
-       if r1
+       If r1
           fnOutputDebug("an error occured drawing bitmap in " A_ThisFunc)
-    } else 
+    } Else 
        fnOutputDebug("invalid bitmap after resize, an error occured in " A_ThisFunc)
 
     ; ToolTip, % brickVPx "=" brickVPy "`n" brickVPw "==" brickVPh , , , 2
@@ -85131,7 +85131,7 @@ ScreenCaptureListView() {
    ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectwin)
    ; clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    r := Gdip_BitmapFromHWND(PVhwnd, 1)
-   If StrLen(r)>2
+   If (StrLen(r)>2)
       recordGdipBitmaps(r, A_ThisFunc)
 
    pBitmap := r
@@ -85889,7 +85889,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              abortedPageRetries := 0
           }
 
-          If (abortedPageRetries<3)
+          If (abortedPageRetries<1)
           {
              abortedPageRetries++
              fnOutputDebug("ThumbsMode. The page was left unfinished; asking for it again [" abortedPageRetries "].")
