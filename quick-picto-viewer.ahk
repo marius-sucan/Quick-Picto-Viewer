@@ -85163,6 +85163,9 @@ saveImageThumbnail(oBitmap, file2save) {
 
 QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     Critical, on
+    ; which page was left unfinished and how many times it has been asked for again; see
+    ; the retry at the end of this function
+    Static prevAbortedPage := 0, abortedPageRetries := 0
     prevFullThumbsUpdate := A_TickCount
     mainStartZeit := A_TickCount
     thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
@@ -85175,8 +85178,10 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
     If (thumbsListViewMode>1)
     {
+       ; the page was listed, by the other function; saying so lets the caller record this
+       ; page index as the one on screen, the way it does for every other successful run
        QPV_listThumbnailsGridMode(0, glPG, glHDC, hGDIthumbsWin)
-       Return
+       Return 1
     }
 
     G2 := glPG
@@ -85196,6 +85201,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     imgsListArrayThumbs := []
     prevGUIupdate := A_TickCount
     whichCoreBusy := hasDrawn := lastMsg := imgsMustPaint := imgsNotCached := imgsFileCached := 0
+    paintedOnScreen := pageIncomplete := drawErrors := 0
     framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
     Loop, % maxItemsW*maxItemsH*2
     {
@@ -85244,8 +85250,12 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         If (thisFileDead=1)
         {
            imgsListArrayThumbs[thisFileIndex] := ["x", 0, imgPath, MD5name, DestPosX, DestPosY, MD5name, whichCoreBusy, hasDrawn]
-        } Else If validBMP(imgThumbsCacheArray[imgThumbsCacheIDsArray[MD5name], 1])
+        } Else If (modus!="all" && validBMP(imgThumbsCacheArray[imgThumbsCacheIDsArray[MD5name], 1]))
         {
+           ; generating every thumbnail of a list is about the files in the cache folder, and
+           ; an image held in the memory cache says nothing about whether one was ever written
+           ; for it: nothing is drawn in that mode, so claiming it here used to mean that up
+           ; to maxMemThumbsCache images of the library silently got no thumbnail file
            memCached := 1
            imgsListArrayThumbs[thisFileIndex] := ["m", 0, imgPath, MD5name, DestPosX, DestPosY, MD5name, whichCoreBusy, hasDrawn]
         } Else
@@ -85285,13 +85295,12 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         ; fnoutputdebug("thumbs prepare " imgPath "|" thisFileIndex "|" MD5name)
     }
 
+   ; only limitCores still matters here, to shape the time budget handed to the workers; the
+   ; files per core arithmetic went away with the ahk_h threads - qpvmain.dll divides the
+   ; work itself now. It wrote systemCores, the global the multi core file operations share,
+   ; and an entirely cached page [imgsNotCached=0, the common case when browsing back over a
+   ; folder] left that global on zero, through a division by zero
    limitCores := realSystemCores + 1
-   filesPerCore := imgsNotCached//limitCores
-   If (filesPerCore<2 && limitCores>1)
-   {
-      systemCores := imgsNotCached//2
-      filesPerCore := imgsNotCached//systemCores
-   } Else systemCores := limitCores
 
    ; the workers of qpvmain.dll are persistent, so there is no per run start-up cost to
    ; amortize any longer; the only thing that still does not pay off is a lone image
@@ -85302,7 +85311,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    If InStr(filesFilter, "qpv:pages:")
       mustDoMultiCore := 0
 
-   fnOutputDebug("ThumbsMode. Init. doMultiCore=" mustDoMultiCore " cores=" systemCores " filesPerCore=" filesPerCore " imgsNotCached=" imgsNotCached " fileCached=" imgsFileCached " imgsMustPaint=" imgsMustPaint)
+   fnOutputDebug("ThumbsMode. Init. doMultiCore=" mustDoMultiCore " cores=" limitCores " imgsNotCached=" imgsNotCached " fileCached=" imgsFileCached " imgsMustPaint=" imgsMustPaint)
    If !isWinXP
    {
       memInfos := getMemUsage()
@@ -85316,7 +85325,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    }
 
    ; how much time in milliseconds can an image take to load and not be cached
-   timePerImg := 1550//imgsNotCached
+   timePerImg := (imgsNotCached>0) ? 1550//imgsNotCached : 25
    If (timePerImg<25 || modus="all")
       timePerImg := 25
    Else If (timePerImg>300)
@@ -85328,9 +85337,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    thisImgQuality := (userimgQuality=1) ? 6 : 5
-   thumbsPoolOK := idleLaps := 0
+   thumbsPoolOK := poolDrainOn := idleLaps := 0
    lastPoolProgress := A_TickCount
-   If (mustDoMultiCore=1)
+   If (mustDoMultiCore=1 && abandonAll!=1)
    {
       ; when generating every thumbnail of a list, nothing is ever drawn; asking the
       ; workers for no GDI+ bitmap at all spares a decode-sized allocation per file
@@ -85341,6 +85350,10 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
          mustDoMultiCore := 0
          addJournalEntry("The thumbnails workers refused to start. Falling back to single threaded processing.")
       }
+
+      ; thumbsPoolOK says a run was started and has to be ended; poolDrainOn says the loop
+      ; below still expects images from it. The loop may give up on the workers halfway
+      poolDrainOn := (thumbsPoolOK=1) ? 1 : 0
    }
 
    If (mustDoMultiCore!=1)
@@ -85351,8 +85364,8 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    thisFileIndex := MD5name := Bindex := rowIndex := imgsListed := lastMsg := 0
    imgsHavePainted := thisNonCachedImg := memCached := lapsOccured := totalLoops := 0
    lowestGiven := maxIndexu := maxImgSize := maxZeit := columnIndex := -1
-    ; MsgBox, % filesPerCore "--" imgsMustPaint "--" imgsNotCached "--" imgsListArrayThumbs.Length()
-   If (thumbsPoolOK=1)
+    ; MsgBox, % imgsMustPaint "--" imgsNotCached "--" imgsListArrayThumbs.Length()
+   If (thumbsPoolOK=1 || modus="all")
    {
       ; hand the whole page over to the workers in one go; they decode images and cached
       ; thumbnail files in parallel while this thread does nothing but draw
@@ -85360,14 +85373,21 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       {
           poolIndex := startIndex + A_Index - 1
           poolType := imgsListArrayThumbs[poolIndex, 1]
-          If (poolType="w")
-             QPV_ThumbsPoolSubmit(poolIndex, 0, imgsListArrayThumbs[poolIndex, 3], imgsListArrayThumbs[poolIndex, 4], 0)
-          Else If (poolType="f" && modus="all")
+          If (poolType="f" && modus="all")
           {
-             ; the cache file is already there and nothing gets drawn in this mode
+             ; the cache file is already there and nothing gets drawn in this mode; true
+             ; whether the workers are running or not, so it is settled before the test
              imgsListArrayThumbs[poolIndex, 1] := "d"
              imgsHavePainted++
-          } Else If (poolType="f")
+             Continue
+          }
+
+          If (thumbsPoolOK!=1)
+             Continue
+
+          If (poolType="w")
+             QPV_ThumbsPoolSubmit(poolIndex, 0, imgsListArrayThumbs[poolIndex, 3], imgsListArrayThumbs[poolIndex, 4], 0)
+          Else If (poolType="f")
              QPV_ThumbsPoolSubmit(poolIndex, 1, imgsListArrayThumbs[poolIndex, 4], "", 0)
       }
    }
@@ -85424,8 +85444,12 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           totalLoops++
           If (determineTerminateOperation()=1)
           {
+             ; asked before anything is drawn, and the flag is raised by whichever operation
+             ; the user last stopped - not necessarily this one - so this can and does fire
+             ; on the very first lap of a page nobody asked to stop
              fnOutputDebug("ThumbsMode. User abandoned the operation.")
              abandonAll := 1
+             pageIncomplete := 1
              Break
           }
 
@@ -85457,6 +85481,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              imgsListArrayThumbs[thisFileIndex, 1] := "d"
              thumbsFailures++
              imgsHavePainted++
+             ; the cleared background is this cell's final appearance; it counts as settled,
+             ; so that a page of nothing but unreadable files is not taken for an empty one
+             paintedOnScreen++
              Continue
           }
 
@@ -85472,7 +85499,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           }
 
           innerLoops++
-          If (thumbsPoolOK=1)
+          If (poolDrainOn=1)
           {
              ; collect whatever the workers of qpvmain.dll have finished; the GDI+ bitmaps
              ; they hand over become ours, so there is nothing left to clone here
@@ -85495,18 +85522,26 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                    {
                       ; nothing became ready for a while; hand the CPU over to the workers
                       ; instead of spinning here. If they have nothing left to say either,
-                      ; some image will never arrive and the loop would never end
+                      ; some image will never arrive - a submit the dll declined, a result
+                      ; that went missing - and every image still expected used to be
+                      ; abandoned with it, which on the first lap means an empty page.
+                      ; Finish the page in this thread instead; both branches below know
+                      ; how to read the original file and the cached thumbnail themselves
                       If !QPV_ThumbsPoolPending()
                       {
-                         fnOutputDebug("ThumbsMode. The workers went idle while images are still expected. Loop. Break. Now.")
-                         Break
+                         fnOutputDebug("ThumbsMode. The workers went idle while images are still expected. Single threaded from here on.")
+                         poolDrainOn := 0
+                         idleLaps := 0
+                         Continue
                       }
 
                       ; a decoder that never returns [a malformed PDF, a file on a share that
-                      ; went away] would otherwise keep this loop spinning for ever
+                      ; went away] would otherwise keep this loop spinning for ever. Here the
+                      ; workers are alive and busy, so the file is not handed to this thread
                       If (A_TickCount - lastPoolProgress>69500)
                       {
                          fnOutputDebug("ThumbsMode. The workers delivered nothing for 69.5 seconds. Loop. Break. Now.")
+                         pageIncomplete := 1
                          Break
                       }
 
@@ -85599,20 +85634,38 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           {
              If (WasMemCached=1)
              {
-                ; the memory cached thumbnail went stale; have it rebuilt
+                ; the memory cached thumbnail went stale - the ring reached its slot while
+                ; this page was being drawn; have it rebuilt. checkThumbExists() hands back
+                ; the ORIGINAL image in file2load when it finds no thumbnail to load, and
+                ; says so through its return value only: testing the file for existence
+                ; instead had this branch treat the photograph itself as a thumbnail, read
+                ; at full resolution, never resized and then kept in the thumbnails memory
+                ; cache. It can also return without touching file2load at all
+                file2load := ""
+                file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
                 wasThumbCached := checkThumbExists(MD5name, imgPath, ".png", file2load)
-                imgsListArrayThumbs[thisFileIndex, 1] := FileExist(file2load) ? "fim" : "w"
+                imgsListArrayThumbs[thisFileIndex, 1] := (wasThumbCached=1) ? "fim" : "w"
                 imgsListArrayThumbs[thisFileIndex, 2] := 0
-                imgsListArrayThumbs[thisFileIndex, 4] := file2load
-                If (thumbsPoolOK=1 && imgsListArrayThumbs[thisFileIndex, 1]="w")
+                imgsListArrayThumbs[thisFileIndex, 4] := (wasThumbCached=1) ? file2load : file2save
+                If (poolDrainOn=1 && wasThumbCached!=1)
                 {
                    ; nothing waits on this image otherwise, the workers must be told about it
-                   imgsListArrayThumbs[thisFileIndex, 4] := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
                    imgsListArrayThumbs[thisFileIndex, 10] := "retried"
-                   QPV_ThumbsPoolSubmit(thisFileIndex, 0, imgPath, imgsListArrayThumbs[thisFileIndex, 4], 0)
+                   QPV_ThumbsPoolSubmit(thisFileIndex, 0, imgPath, file2save, 0)
                 }
-             } Else imgsHavePainted++
+             } Else
+             {
+                ; the bitmap belongs to this loop whenever it did not come out of the memory
+                ; cache. The test above is an OR: a perfectly good thumbnail whose original
+                ; file went away between the two loops lands here too, and used to be
+                ; dropped without a dispose - the entry is marked "d" just above, so the
+                ; sweep after the loop does not see it either
+                imgsListArrayThumbs[thisFileIndex, 2] := 0
+                oBitmap := trGdip_DisposeImage(oBitmap, 1)
+                imgsHavePainted++
+             }
 
+             paintedOnScreen++
              DestPosX := imgsListArrayThumbs[thisFileIndex, 5]
              DestPosY := imgsListArrayThumbs[thisFileIndex, 6]
              r1 := Gdip_FillRectangle(G2, pBrushWinBGR, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
@@ -85656,6 +85709,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              r1 := Gdip_FillRectangle(G2, pBrushWinBGR, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
              r1 := Gdip_DrawRectangle(G2, pPen4, DestPosX - thumbsW//2, DestPosY - thumbsH//2, thumbsW, thumbsH)
              imgsListArrayThumbs[thisFileIndex, 9] := 1
+             paintedOnScreen++
              ; fnOutputDebug("ThumbsMode. Faulty GDI thumbnail object disposed.")
              Continue
           }
@@ -85666,15 +85720,26 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           If (WasMemCached!=1 && minimizeMemUsage!=1 && modus!="all" && QPV_MemoryIsTight()!=1)
           {
              hasNowMemCached := 1
+             prevMemSlot := imgThumbsCacheIDsArray[MD5name]
              hasMemThumbsCached++
              ; fnOutputDebug("ThumbsMode. Memory cached GDI thumb to be disposed: " imgThumbsCacheArray[hasMemThumbsCached, 1] )
              ; fnOutputDebug("ThumbsMode. A memory cached GDI thumb to be disposed... DONE")
              trGdip_DisposeImage(imgThumbsCacheArray[hasMemThumbsCached, 1], 1)
              imgThumbsCacheIDsArray[imgThumbsCacheArray[hasMemThumbsCached, 2]] := ""
 
+             ; a thumbnail regenerated for a name that is already in the ring [a forced
+             ; refresh of an unchanged file] must not leave the older copy behind it: the
+             ; slot that one sits in blanks the name when the ring reaches it, and the name
+             ; by then points at this new copy, which would be lost to every later lookup
+             If (prevMemSlot && prevMemSlot!=hasMemThumbsCached)
+             {
+                trGdip_DisposeImage(imgThumbsCacheArray[prevMemSlot, 1], 1)
+                imgThumbsCacheArray[prevMemSlot] := ""
+             }
+
              imgThumbsCacheArray[hasMemThumbsCached] := [oBitmap, MD5name]
              imgThumbsCacheIDsArray[MD5name] := hasMemThumbsCached
-             If (hasMemThumbsCached>maxMemThumbsCache)
+             If (hasMemThumbsCached>=maxMemThumbsCache)
                 hasMemThumbsCached := 0
           }
 
@@ -85684,7 +85749,10 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           DestPosY := imgsListArrayThumbs[thisFileIndex, 6]
           DestPosY -= (imageAlignVPtopLeft!=0) ? thumbsH//2 : fH//2
           file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
-          If (fimCached!=1 && thumbCachable=1 && thisZeit>timePerImg && file2save!=file2load && enableThumbsCaching=1 && WasMemCached!=1)
+          ; a fast loading image is not worth a cache file when browsing, but "generate all
+          ; thumbnails" is a promise about the cache folder: there, every image read here
+          ; gets its file, however quick it was. The workers are told the same [alwaysSave]
+          If (fimCached!=1 && thumbCachable=1 && (thisZeit>timePerImg || modus="all") && file2save!=file2load && enableThumbsCaching=1 && WasMemCached!=1)
           {
              ; fnOutputDebug("Saving thumb for: " file2load " -- " file2save) 
              saveImageThumbnail(oBitmap, file2save)
@@ -85702,6 +85770,11 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              oBitmap := applyVPeffectsOnBMP(oBitmap, 1)
              r1 := Gdip_FillRectangle(G2, GDIPbrushHatch, DestPosX, DestPosY, fW - 1, fH - 1)
              r1 := trGdip_DrawImage(A_ThisFunc, G2, oBitmap, DestPosX, DestPosY, fW - 1, fH - 1)
+             If (r1="fail")
+                drawErrors++
+             Else
+                paintedOnScreen++
+
              imgsListArrayThumbs[thisFileIndex, 9] := 1
           }
 
@@ -85724,8 +85797,10 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 Gdip_FillRectangle(G2, pBrushD, DestPosX - thumbsW//2, DestPosY - thumbsH//2, Ceil(thumbsW*0.05), thumbsH - 8)
           }
 
-          If ((A_TickCount - prevGUIupdate>350) && modus!="all")
+          If ((A_TickCount - prevGUIupdate>350) && modus!="all" && paintedOnScreen>0)
           {
+             ; nothing is put on screen before the first thumbnail is on the canvas: while
+             ; the workers are still decoding there is nothing to show but the clear
              ; fnOutputDebug("ThumbsMode. Redraw the whole window.")
              r2 := doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, glHDC)
              prevGUIupdate := A_TickCount
@@ -85768,12 +85843,24 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     executingCanceableOperation := 0
     mainEndZeit := A_TickCount
     setPriorityThread(0)
-    If (modus!="all")
+
+    ; Nothing at all came of this run - not one cell drawn, not one settled: it gave up
+    ; before the first image, which is what an abort flag left up by some earlier operation
+    ; does to a page nobody asked to stop. The canvas was cleared at the top, so putting it
+    ; on screen now paints an empty grid, and the caller records this page as the one being
+    ; displayed whatever this function answers: nothing would ever come back to fill it.
+    ; Keep the frame that is already up there instead, and ask for the page again below
+    nothingHappened := (modus!="all" && imgsMustPaint>0 && paintedOnScreen<1 && imgsHavePainted<1) ? 1 : 0
+    If (nothingHappened=1)
+       pageIncomplete := 1
+
+    If (modus!="all" && nothingHappened!=1)
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, glHDC)
 
     ; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     prevFullThumbsUpdate := A_TickCount
-    If (!userScrolled && !abandonAll && alterFilesIndex!=1)
+    pageIsWhole := (!userScrolled && !abandonAll && alterFilesIndex!=1) ? 1 : 0
+    If (pageIsWhole=1)
     {
        mustReloadThumbsList := 0
        prevFullIndexThumbsUpdate := startPageIndex
@@ -85786,10 +85873,41 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     If (modus!="all")
        SetTimer, ResetImgLoadStatus, -25
 
+    ; An unfinished page has to be asked for again by name. The caller clears
+    ; mustReloadThumbsList as soon as this returns and has already recorded this page index
+    ; as the one on screen, so on its own it never comes back here: the grid stays as it is
+    ; until the user scrolls elsewhere. The ResetImgLoadStatus timer just armed is what
+    ; lowers the abort flag, and it runs long before this does, so the next pass normally
+    ; goes through - bounded all the same, in case whatever raised that flag never lowers it
+    If (modus!="all")
+    {
+       If (pageIncomplete=1)
+       {
+          If (prevAbortedPage!=startPageIndex)
+          {
+             prevAbortedPage := startPageIndex
+             abortedPageRetries := 0
+          }
+
+          If (abortedPageRetries<3)
+          {
+             abortedPageRetries++
+             fnOutputDebug("ThumbsMode. The page was left unfinished; asking for it again [" abortedPageRetries "].")
+             mustReloadThumbsList := 1
+             SetTimer, RefreshThumbsList, -450
+          }
+       } Else ; a page that came out whole clears the count, wherever it was in the list
+          prevAbortedPage := abortedPageRetries := 0
+    }
+
     prevFullThumbsUpdate := A_TickCount
     addJournalEntry(maxItemsPage " thumbnails listed in " SecToHHMMSS((A_TickCount - mainStartZeit)/1000) ".")
     ; ToolTip, % lapsOccured "|"  totalLoops " | " innerLoops " | " extendedLoops " | " imgsNotCached "`nZeit: " A_TickCount - mainStartZeit , , , 2
-    r := (r1!=0 || !r2 || abandonAll=1) ? 0 : 1
+    ; the page is done only if it was drawn whole and reached the window - the same test
+    ; this function applies to its own bookkeeping just above. r1 cannot be part of it:
+    ; trGdip_DrawImage() answers with a blank string when it succeeds, and a blank is not
+    ; equal to zero in a comparison, so a finished page used to report failure every time
+    r := (pageIsWhole!=1 || pageIncomplete=1 || drawErrors>0 || !r2) ? 0 : 1
     If (modus="all")
        Return abandonAll
     Return r
