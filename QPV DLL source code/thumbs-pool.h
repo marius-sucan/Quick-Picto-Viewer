@@ -125,8 +125,9 @@ struct ThumbsPoolState {      // read-only for AHK
     volatile LONG failed;     // 16
     volatile LONG generation; // 20
     volatile LONG alive;      // 24
-    volatile LONG memTight;   // 28   1 while the pool is throttled down to a single job
-    volatile LONG activeJobs; // 32   images being decoded right now
+    volatile LONG memTight;   // 28   1 while decoding is throttled down to a single job
+    volatile LONG activeJobs; // 32   images being decoded right now, by EITHER pool of the
+                              //      DLL - see tpTryTakeJobSlot(); diagnostic only
     volatile LONG readyKB;    // 36   memory held by results nobody collected yet
 };
 #pragma pack(pop)
@@ -332,32 +333,37 @@ static bool tpMemoryIsTight() {
     return tpMemTight.load(std::memory_order_relaxed)!=0;
 }
 
-// Takes a slot to decode one image. While memory is plentiful every worker gets one
-// straight away. When it is not, only the worker that finds no other job running may take
-// one: the pool narrows down to a single decode at a time rather than stalling altogether,
-// so thumbnails keep arriving - slowly - and QPV_ShowThumbnails() never waits forever.
-// Returns false only when the pool is shutting down, in which case the job is dropped.
-// There is no timeout: a worker that finds nothing else running is always let through, so
-// the queue can never wedge, no matter how long memory stays scarce.
-static bool tpAcquireJobSlot() {
+// One attempt at taking a slot to decode one image. While memory is plentiful every worker
+// gets one straight away. When it is not, only the worker that finds no other decode
+// running may take one: decoding narrows down to a single image at a time rather than
+// stalling altogether, so images keep arriving - slowly - and nobody waits forever.
+// Returns false when the caller has to wait and ask again.
+//
+// The count is one count for the whole DLL, deliberately. Both pools decode images on
+// their own worker threads and both can be doing it at the same moment: QPV_ShowThumbnails()
+// is reached from a timer and lists a page while a data collection run is in progress -
+// that is what the sqlite3_get_autocommit() test around its transaction is there for - so
+// the collection workers of dupes-pixels.h keep decoding while it draws. A counter per pool
+// would let each of them believe it is the only one and the machine would be asked for two
+// decoder-sized allocations at once, which is the single thing this exists to prevent.
+//
+// Whoever takes a slot must give it back, however the scope is left; TpJobSlot below is the
+// way to do that. There is no timeout anywhere in here: the count only ever falls back to
+// zero, so a waiting worker is always let through eventually and the queues can never
+// wedge, no matter how long memory stays scarce.
+static bool tpTryTakeJobSlot() {
     for (;;)
     {
-        if (tpStopping.load())
+        LONG active = tpActiveJobs.load(std::memory_order_acquire);
+        if (active>=1 && tpMemoryIsTight())
            return false;
 
-        LONG active = tpActiveJobs.load(std::memory_order_acquire);
-        if (active<1 || !tpMemoryIsTight())
+        if (tpActiveJobs.compare_exchange_weak(active, active + 1, std::memory_order_acq_rel))
         {
-           if (tpActiveJobs.compare_exchange_weak(active, active + 1, std::memory_order_acq_rel))
-           {
-              tpState.activeJobs = active + 1;
-              return true;
-           }
-           continue;   // somebody else moved first, look again
+           tpState.activeJobs = active + 1;
+           return true;
         }
-
-        // wait for the image being decoded right now to release its memory
-        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        // somebody else moved first, look again
     }
 }
 
@@ -365,6 +371,31 @@ static void tpReleaseJobSlot() {
     LONG active = tpActiveJobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
     tpState.activeJobs = (active>0) ? active : 0;
 }
+
+// Gives the slot back however the scope is left. Neither decode is supposed to throw -
+// both wrap themselves - but the count is shared by both pools now, so one slot leaked by
+// either of them would stop the other from ever decoding again for as long as memory stays
+// scarce. That is far too much to hang on a catch block somebody may narrow later.
+struct TpJobSlot {
+    ~TpJobSlot() { tpReleaseJobSlot(); }
+};
+
+// The thumbnails workers wait here until they are let through, and give up only when the
+// pool is being shut down - in which case the job is dropped.
+static bool tpAcquireJobSlot() {
+    for (;;)
+    {
+        if (tpStopping.load())
+           return false;
+
+        if (tpTryTakeJobSlot())
+           return true;
+
+        // wait for the image being decoded right now to release its memory
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+}
+// qpv-job-slot-end
 
 static ULONGLONG tpResultBytes(const ThumbResult &res) {
     if (res.pBitmap==NULL || res.outW<1 || res.outH<1)
@@ -1213,8 +1244,8 @@ static void tpWorkerBody() {
         bool ranIt = false;
         if (job.generation==tpGeneration.load() && tpAcquireJobSlot())
         {
+           TpJobSlot slot;      // released at the end of this block, whatever happens in it
            tpRunJob(fac, d2dFac, job, res);
-           tpReleaseJobSlot();
            ranIt = true;
         }
 

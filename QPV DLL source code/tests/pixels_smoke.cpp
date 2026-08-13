@@ -666,6 +666,122 @@ static void processFailureIsNotMarkedDead() {
 }
 
 // ---------------------------------------------------------------------------------------
+//
+// A collection run on a machine that is short of memory. Decoding then narrows to one image
+// at a time - tpTryTakeJobSlot() in thumbs-pool.h, one count for both pools of the DLL -
+// and the whole point of narrowing rather than stopping is that the run still finishes:
+// dupesPixStep() keeps returning, the pool goes idle at the end, and every readable image
+// is still collected.
+//
+// The loop below runs against a wall clock for that reason. The defect this pins down had
+// every worker wait for a count that included itself - dpState.inFlight, raised when the job
+// leaves the queue - so with more than one worker no decode ever started, dupesPixStep()
+// never returned 0, and collectImgDataViaPool() sat on "0 / N ( 0% )" for as long as the
+// user let it. A test without a deadline would hang here instead of failing.
+static void collectionSurvivesMemoryPressure() {
+    printf("  a run while the machine is short of memory\n");
+    bindSQLiteOnce();
+    if (!SQ.ok || SQ.exec==NULL || SQ.bind_double==NULL || SQ.bind_blob==NULL)
+    {
+       printf("    SKIPPED: libsqlite3.so.0 is not available\n");
+       return;
+    }
+
+    const char *path = "pixels_tight.sldb";
+    remove(path);
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(path, &db, SQLITE_OPEN_READWRITE | QPV_SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK || db==NULL)
+    {
+       printf("    could not create the scratch database\n");
+       failures++;
+       return;
+    }
+
+    execOrDie(db,
+        "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
+        " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
+        " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
+        " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
+        " smallH BLOB, bigH BLOB);", "create the v3 schema");
+
+    std::string ins = "BEGIN;";
+    const int total = 600, missingEvery = 7;
+    int wantOK = 0, wantDead = 0;
+    for ( int i = 1 ; i <= total ; i++)
+    {
+        const bool gone = (i % missingEvery)==0;
+        char row[256];
+        snprintf(row, sizeof(row), "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (%d,'%s%d.jpg','C:\\p');",
+                 i, gone ? "gone" : "img", i);
+        ins += row;
+        if (gone) wantDead++; else wantOK++;
+    }
+    ins += "COMMIT;";
+    execOrDie(db, ins.c_str(), "insert the rows");
+
+    for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 4;
+    tpWicExts.clear();
+    tpFimExts.clear();
+    tpWicExts.insert(L"jpg");
+    FIM.ok = true;
+    m_pIWICFactory = (IWICImagingFactory*)1;
+
+    // more workers than the throttle will ever let decode at once, which is the shape the
+    // defect needed: every one of them holding a job and waiting for the others
+    const int nWorkers = 6;
+    check(dupesPixInit(nWorkers)==nWorkers, "the pool starts with every worker asked for");
+
+    gShimMaxActiveJobs.store(0);
+    gShimMemoryTight = true;
+
+    const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"
+                         L" WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
+                         L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "dupesPixBegin prepares the run");
+
+    execOrDie(db, "BEGIN;", "open the transaction");
+    const std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    bool finished = false, wedged = false;
+    int steps = 0;
+    while (!wedged)
+    {
+        if (dupesPixStep(5)!=1)
+        {
+           finished = true;
+           break;
+        }
+
+        steps++;
+        // eight seconds. The fixed pool needs a small fraction of a second for these; a pool
+        // that cannot start a decode never gets anywhere at all, so nothing in between is
+        // worth waiting for
+        if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > 8.0)
+           wedged = true;
+    }
+    execOrDie(db, "COMMIT;", "commit the collected data");
+
+    check(finished && !wedged, "the run ends by itself while memory is tight - it does not wedge");
+    check(steps > 1, "and it still yields to the caller between steps");
+    check(gShimMaxActiveJobs.load()==1, "no two images were ever decoded at once while it was tight");
+
+    dupesPixEnd();
+    check(dpState.written==wantOK, "every readable image was collected anyway");
+    check(dpState.failed==wantDead, "and every missing one was counted as a failure");
+    check(dpState.dbErrors==0, "no write failed");
+    check(scalar(db, "SELECT count(*) FROM imagesPixels")==wantOK, "the fingerprints are in the database");
+
+    check(dupesPixShutdown()==1, "the pool shuts down cleanly, even under the throttle");
+    check(tpActiveJobs.load()==0, "and every job slot it took was given back");
+
+    gShimMemoryTight = false;
+    SQ.close_v2(db);
+    remove(path);
+}
+
+// ---------------------------------------------------------------------------------------
 
 int main() {
     printf("dupes-pixels.h\n");
@@ -676,6 +792,7 @@ int main() {
     poolPlumbing();
     collectionAgainstRealSQLite();
     processFailureIsNotMarkedDead();
+    collectionSurvivesMemoryPressure();
 
     printf("\n  %s\n", failures ? "PIXEL COLLECTOR TEST FAILED" : "pixel collector test passed");
     return failures ? 1 : 0;

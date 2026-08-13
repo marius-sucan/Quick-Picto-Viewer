@@ -55,6 +55,7 @@ slice block_extract.cpp  "$SRC" '^\/\/ SWAR population count'          '^\/\/ qp
 slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qpv-dupes-query-end' 350 || exit 1
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1
 slice thumbs_structs.part ../thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
+slice slots_extract.part  ../thumbs-pool.h '^\/\/ One attempt at taking a slot' '^\/\/ qpv-job-slot-end' 40 || exit 1
 echo "   ok"
 
 echo
@@ -124,6 +125,35 @@ else
 fi
 
 echo
+echo "== the decode throttle both worker pools share =="
+# One slot while the machine is short of memory, and a waiter that is always let through
+# afterwards. Both pools stop dead without the second property, and the collection pool did.
+if g++ $CXXFLAGS -pthread -o throttle_slots throttle_slots.cpp 2>&1; then
+    ./throttle_slots || fail=1
+else
+    echo "  ERROR: throttle_slots.cpp did not compile"; fail=1
+fi
+
+echo
+echo "== mutation check: the throttle must reject a second decode while memory is tight =="
+# Lets two decodes run at once under memory pressure, which is the state this exists to
+# prevent. The mutation goes into the SLICE, never into the shipped header.
+cp slots_extract.part slots_extract.orig
+sed -i 's|if (active>=1 \&\& tpMemoryIsTight())|if (active>=2 \&\& tpMemoryIsTight())|' slots_extract.part
+if ! cmp -s slots_extract.part slots_extract.orig; then
+    g++ $CXXFLAGS -pthread -o throttle_mutant throttle_slots.cpp 2>/dev/null
+    if ./throttle_mutant > /dev/null 2>&1; then
+        echo "  ERROR: the mutant passed - the throttle test proves nothing"; fail=1
+    else
+        echo "   ok - the mutant is caught"
+    fi
+    rm -f throttle_mutant
+else
+    echo "  ERROR: the mutation did not apply - update the sed pattern"; fail=1
+fi
+mv -f slots_extract.orig slots_extract.part
+
+echo
 echo "== the records the thumbnails pool shares with AutoHotkey =="
 # Nothing else pins these: the AHK walks thumbsPoolFetch()'s array with a stride and byte
 # offsets it writes out by hand, so a field inserted in ThumbResult compiles and then hands
@@ -135,24 +165,42 @@ else
 fi
 
 echo
-echo "== mutation check: the histogram oracle must reject wrong maths =="
-# Drops the "- 1" from the mean, which is the one term that looks like an off-by-one and
-# is not: sumTotalBr accumulates (level + 1) so the /256 maps level 255 to exactly 1.0.
-# The mutation goes into a COPY - the shipped header is never edited, so an interrupted
-# run cannot leave it broken.
-sed 's|const double avgu     = (double)sumTotalBr/totalPixelz - 1.0;|const double avgu     = (double)sumTotalBr/totalPixelz;|' \
-    ../dupes-pixels.h > pixels_mutant.h
-if ! cmp -s pixels_mutant.h ../dupes-pixels.h; then
+echo "== mutation check: the collector must reject wrong maths and a wedged pool =="
+# Both mutants go into a COPY - the shipped header is never edited, so an interrupted run
+# cannot leave it broken.
+#   A - drops the "- 1" from the mean, which is the one term that looks like an off-by-one
+#       and is not: sumTotalBr accumulates (level + 1) so the /256 maps level 255 to
+#       exactly 1.0;
+#   B - restores the memory throttle the pool shipped with, which waited on a count that
+#       included the waiting worker itself. It bites only while memory is tight, which is
+#       why it survived every other test in the file: with every worker holding a job,
+#       dpState.inFlight never falls back to 1, no decode ever starts, dupesPixStep() never
+#       reports the pool idle, and collectImgDataViaPool() sits on "0 / N ( 0% )" for ever.
+for mutant in A B; do
+    case $mutant in
+      A) sed 's|const double avgu     = (double)sumTotalBr/totalPixelz - 1.0;|const double avgu     = (double)sumTotalBr/totalPixelz;|' \
+             ../dupes-pixels.h > pixels_mutant.h
+         label="the mean is computed without its offset" ;;
+      B) sed 's|        if (tpTryTakeJobSlot())|        if (!(tpMemoryIsTight() \&\& dpState.inFlight > 1) \&\& tpTryTakeJobSlot())|' \
+             ../dupes-pixels.h > pixels_mutant.h
+         label="a worker waits for a count that includes itself" ;;
+    esac
+
+    if cmp -s pixels_mutant.h ../dupes-pixels.h; then
+        echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
+        continue
+    fi
+
     g++ $CXXFLAGS -Wno-sign-compare -Ishim -DQPV_PIXELS_HEADER='"pixels_mutant.h"' -o pixels_mutant pixels_smoke.cpp -ldl -lpthread 2>/dev/null
+    # mutant B is a deadlock: it is caught by the wall clock in the test, not by a wrong
+    # number, so this one takes the deadline to answer
     if ./pixels_mutant > /dev/null 2>&1; then
-        echo "  ERROR: the mutant passed - the histogram oracle proves nothing"; fail=1
+        echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
     else
-        echo "   ok - the mutant is caught"
+        echo "   ok - mutant $mutant is caught ($label)"
     fi
     rm -f pixels_mutant
-else
-    echo "  ERROR: the mutation did not apply - update the sed pattern"; fail=1
-fi
+done
 rm -f pixels_mutant.h
 
 echo

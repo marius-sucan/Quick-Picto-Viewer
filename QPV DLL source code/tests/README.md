@@ -11,8 +11,8 @@ for; `pdf_document.cpp` covers the PDF exporter.
 The slicing is the point. A scratch copy of an algorithm drifts from the shipped one and
 then proves nothing; `run-tests.sh` re-extracts from `../dupes-search.h` on every run and
 fails loudly if an anchor stops matching. The markers it anchors on
-(`qpv-dupes-block-end`, `qpv-dupes-query-begin`, `qpv-dupes-state-end`, `qpv-dct-block-end`
-and friends) are comments in the sources; leave them there.
+(`qpv-dupes-block-end`, `qpv-dupes-query-begin`, `qpv-dupes-state-end`, `qpv-dct-block-end`,
+`qpv-job-slot-end` and friends) are comments in the sources; leave them there.
 
 `dupes-search.h` is the whole duplicate-identification pipeline in one file — the sweep,
 the grouping, the candidate query engine, hash generation, the DCT, and the records
@@ -122,9 +122,31 @@ around the compile cover everything that is not an image decoder:
   matches the query while it is being decoded; `dpTopUpQueue()` therefore walks a keyset
   cursor on `imgidu` rather than re-running a plain `LIMIT`.
 
-The mutation check for it drops the `- 1` from the mean, which is the one term that looks
-like an off-by-one and is not. It is applied to a **copy** of the header, so an interrupted
-run cannot leave the shipped source broken.
+- **a run on a machine that is short of memory**, six workers, driven against a wall clock.
+  Decoding then narrows to one image at a time (see `throttle_slots.cpp` below) and the
+  point of narrowing rather than stopping is that the run still ends by itself, with every
+  readable image collected. `shim/pixels-env.h` drives `tpMemoryIsTight()` for it, since
+  nothing else here can make the machine short of memory on demand. The deadline is what
+  turns the failure this pins down into a failed check instead of a hung test.
+
+Two mutation checks for it, both applied to a **copy** of the header so an interrupted run
+cannot leave the shipped source broken. **A** drops the `- 1` from the mean, which is the one
+term that looks like an off-by-one and is not. **B** restores the memory throttle the pool
+shipped with: a worker waiting on `dpState.inFlight`, a count raised when the job leaves the
+queue and therefore including the waiter itself. With every worker holding an image it never
+fell back to 1, no decode ever started, `dupesPixStep()` never reported the pool idle, and
+`collectImgDataViaPool()` sat on `0 / N ( 0% )` in front of the user for as long as they let
+it. It only bites while memory is tight, which is how it got past every other test here.
+
+**`throttle_slots.cpp`** — the decode throttle both pools share, sliced out of the shipped
+`thumbs-pool.h` (`tpTryTakeJobSlot()`, `tpReleaseJobSlot()`, `TpJobSlot`, `tpAcquireJobSlot()`;
+`dpAcquireJobSlot()` in `dupes-pixels.h` is the collection pool's waiter over the same
+count). One count for the whole DLL is deliberate: `QPV_ShowThumbnails()` is reached from a
+timer and lists a page *while* a collection run is in progress, so both pools decode at the
+same time, and a counter per pool would let each believe it is alone. The tests are the two
+properties the pools cannot work without — at most one decode at a time while memory is
+tight, and a waiter always let through afterwards, including twelve threads taking forty
+images each through a single slot. The mutation check lets two decodes run at once.
 
 **`thumbs_record.cpp`** — the layout of `ThumbResult` and `ThumbsPoolState`, sliced out of
 the shipped `thumbs-pool.h`. Nothing else pins them: `thumbsPoolFetch()` fills an array of

@@ -36368,17 +36368,34 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       thisWhere := extraFilter ? extraFilter " AND " missingClause : "WHERE " missingClause
       SQLstr := "SELECT imgidu, fullPath FROM images " thisWhere " ORDER BY fullPath;"
       ; addJournalEntry(SQLstr)
-      If !activeSQLdb.GetTable(SQLstr, RecordSet)
+      ; Mode 3 never walks this result set: the collection pool reads its own rows through
+      ; the keyset cursor of collectImgDataViaPool(), and all that is wanted here is how
+      ; many of them there are. Materialising every (imgidu, fullPath) pair in the library
+      ; only to read RowCount off it - and to free it again a few lines further down - is a
+      ; large allocation taken in the moment right before the pool starts decoding on every
+      ; core, which is when memory is least likely to be there.
+      failedFiles := countTFilez := 0
+      If (adaptedSortCriteria=3)
+      {
+         ; getTotalIMGsSQLdb() answers blank when the query fails; zero is a real answer
+         filesToBeSorted := getTotalIMGsSQLdb(thisWhere)
+         If !StrLen(filesToBeSorted)
+         {
+            throwSQLqueryDBerror(A_ThisFunc)
+            CurrentSLD := backCurrentSLD
+            SetTimer, RemoveTooltip, % -msgDisplayTime
+            SetTimer, ResetImgLoadStatus, -200
+            Return -1
+         }
+      } Else If !activeSQLdb.GetTable(SQLstr, RecordSet)
       {
          throwSQLqueryDBerror(A_ThisFunc)
          CurrentSLD := backCurrentSLD
          SetTimer, RemoveTooltip, % -msgDisplayTime
          SetTimer, ResetImgLoadStatus, -200
          Return -1
-      }
+      } Else filesToBeSorted := RecordSet.RowCount
 
-      failedFiles := countTFilez := 0
-      filesToBeSorted := RecordSet.RowCount
       ; both figures must describe the same population: the database rows in scope for
       ; this query. The in-memory files list is a different (usually smaller) set.
       totalWhere := extraFilter ? extraFilter " AND isDeleted=0" : "WHERE isDeleted=0"
@@ -36403,19 +36420,22 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          }
       }
 
-      If (adaptedSortCriteria=3 && filesToBeSorted>0)
+      If (adaptedSortCriteria=3)
       {
          ; Everything collected, the histogram statistics, the image
-         ; dimensions, the file stamps and the four pixel fingerprints, 
+         ; dimensions, the file stamps and the four pixel fingerprints,
          ; comes out of one decode of the image. It runs on the
          ; worker pool inside qpvmain.dll (dupes-pixels.h).
          ; There is deliberately no serial fallback.
-         RecordSet.Free()
-         If (collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, abandonAll, countTFilez, failedFiles, failedSQLfiles)!=1)
+         ;
+         ; Nothing to collect is not a failure - the pool is simply never started - and this
+         ; branch must not fall through to the serial loop below in that case either: there
+         ; is no result set here to walk, only a count.
+         If (filesToBeSorted>0 && collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, abandonAll, countTFilez, failedFiles, failedSQLfiles, ErrorMsg)!=1)
          {
             addJournalEntry(A_ThisFunc "(): the in-DLL collection pool could not be started; no image data was collected.")
             CurrentSLD := backCurrentSLD
-            showTOOLtip("ERROR: Unable to collect the image data. Please update qpvmain.dll.")
+            showTOOLtip("ERROR: Unable to collect the image data. The journal says why; if it names an outdated qpvmain.dll, please update it.")
             SoundBeep 300, 100
             SetTimer, RemoveTooltip, % -msgDisplayTime
             SetTimer, ResetImgLoadStatus, -200
@@ -36425,7 +36445,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          PopulateIndexFilesStatsInfos("kill")
          CurrentSLD := backCurrentSLD
          SetTimer, ResetImgLoadStatus, -300
-         Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, "")
+         Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, ErrorMsg)
       }
 
       If (filesToBeSorted>0)
@@ -36554,25 +36574,46 @@ reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, already
    Return 0
 }
 
-collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonAll, ByRef countTFilez, ByRef failedFiles, ByRef failedSQLfiles) {
+collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonAll, ByRef countTFilez, ByRef failedFiles, ByRef failedSQLfiles, ByRef ErrorMsg) {
 ; ---- the pool-driven half of mode 3 ------------------------------------------------------
-; Returns 1 when the pool ran the collection, 0 when it could not be started at all and the
-; caller has to fall back to its serial loop. The tallies come back through the ByRef
-; parameters, exactly as the serial loop maintains them.
+; Returns 1 when the pool ran the collection, 0 when it could not be started at all. The
+; tallies come back through the ByRef parameters, exactly as the serial loop maintains them,
+; and ErrorMsg carries whatever went wrong while it was running.
 ;
 ; The DLL writes on activeSQLdb's own handle, inside the transaction opened here, so the
 ; periodic COMMIT keeps its meaning: an interrupted run keeps every image it finished.
 ; That is what the collect-data dialog says and the reason the whole phase is
 ; resumable at all.
    Static msBudget := 320
+   ; The longest the whole pool may go without finishing a single image before this stops
+   ; waiting for it. QPV_ShowThumbnails() keeps the same kind of watch over the thumbnails
+   ; pool [69.5 seconds]; this one is more patient because these workers decode whole images
+   ; rather than thumbnails - one at a time whenever the machine is short of memory - and a
+   ; RAW or a large PSD off a network share is allowed to take a while. What it must not do
+   ; is wait for ever: a codec that never returns, or a pool that cannot start a decode at
+   ; all, would otherwise leave this loop spinning on "0 / N ( 0% )" with nothing to show
+   ; for it until the user notices and cancels.
+   Static stallLimit := 120000
    If (dupesEngineInitGood!=1 || SLDtypeLoaded!=3 || !activeSQLdb._Handle)
+   {
+      ; every way out of here used to be silent, and the caller says "please update
+      ; qpvmain.dll" over all of them; three of these four causes have nothing to do with
+      ; the DLL and the journal is the only place that can tell them apart
+      addJournalEntry(A_ThisFunc "(): no image data was collected. dupesEngineInitGood=" dupesEngineInitGood " [qpvmain.dll must export dupesScanStep], SLDtypeLoaded=" SLDtypeLoaded " [3 = a database is loaded], the database handle is " (activeSQLdb._Handle ? "open" : "GONE") ".")
       Return 0
+   }
 
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
 
    If (dupesPixInitGood!=1 || !dupesPixState)
+   {
+      ; WIC is a hard requirement of the pool and not an oversight: its workers decode
+      ; through WIC first and fall back to FreeImage per file, and dupesPixInit() refuses to
+      ; start without the factory initWICnow() creates
+      addJournalEntry(A_ThisFunc "(): the collection workers are unavailable. WICmoduleHasInit=" WICmoduleHasInit ", qpvmain.dll is " (qpvMainDll ? "loaded" : "NOT loaded") ", allowMultiCoreMode=" allowMultiCoreMode ".")
       Return 0
+   }
 
    ; ?2 is a keyset cursor over imgidu and ?1 the refill size. It cannot be a bare LIMIT
    ; the way the hash loop's is: an image here is handed to a worker and only written some
@@ -36593,6 +36634,8 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    activeSQLdb.Exec("BEGIN TRANSACTION;")
    prevMSGdisplay := A_TickCount
    prevSaveData := A_TickCount
+   lastProgress := A_TickCount
+   prevDone := -1
    ErrorMsgS := ""
    ; A backstop, not the mechanism: the keyset cursor above already means a row is offered
    ; at most once, so this can only trip if that ever stops being true.
@@ -36600,9 +36643,25 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    Loop
    {
       more := DllCall("qpvmain.dll\dupesPixStep", "int", msBudget, "int")
-      countTFilez := NumGet(dupesPixState + 0, 16, "Int") + NumGet(dupesPixState + 0, 20, "Int")
       failedFiles := NumGet(dupesPixState + 0, 20, "Int")
       failedSQLfiles := NumGet(dupesPixState + 0, 24, "Int")
+      ; every row the pool is done with, whatever became of it. That is the population the
+      ; serial loop counts as well - there a file that cannot be read and a row that cannot
+      ; be written both still advance the tally - and leaving the database failures out of
+      ; it meant a database that refuses writes reported 0% throughout and never arrived.
+      countTFilez := NumGet(dupesPixState + 0, 16, "Int") + failedFiles + failedSQLfiles
+      If (more=-1)
+      {
+         ; a database failure inside the DLL. The hash loop next door has always handled
+         ; this; here it used to be indistinguishable from a run that finished
+         thisDLLerror := readDupesEngineError()
+         addJournalEntry(A_ThisFunc "(): the collection was stopped by a database failure - " thisDLLerror)
+         ErrorMsgS := "ERROR: " thisDLLerror "`n"
+         DllCall("qpvmain.dll\dupesEngineCancel", "int")
+         abandonAll := 1
+         Break
+      }
+
       If (A_TickCount - prevSaveData>300100)
       {
          prevSaveData := A_TickCount
@@ -36610,6 +36669,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          {
             SoundBeep 300, 100
             ErrorMsgS := "ERROR: Failed to commit collected data to the SQL database`n" activeSQLdb.ErrorMsg "`n"
+            addJournalEntry(A_ThisFunc "(): " ErrorMsgS)
          } Else
             activeSQLdb.Exec("BEGIN TRANSACTION;")
       }
@@ -36622,7 +36682,12 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          If (failedSQLfiles>0)
             etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
 
-         showTOOLtip(ErrorMsgS "Gathering files information, please wait`nDecoding " groupDigits(NumGet(dupesPixState + 0, 8, "Int")) " images at once" etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
+         ; every worker holds an image, but while the machine is short of memory only one of
+         ; them is allowed to decode at a time - tpTryTakeJobSlot() in thumbs-pool.h, one
+         ; count shared with the thumbnails pool - and "Decoding 16 images at once" sitting
+         ; there unchanged would be a lie about what the machine is doing
+         busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " groupDigits(NumGet(dupesPixState + 0, 8, "Int")) " images at once"
+         showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
          prevMSGdisplay := A_TickCount
       }
 
@@ -36643,15 +36708,48 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          abandonAll := 1
          Break
       }
+
+      If (NumGet(dupesPixState + 0, 32, "Int")<1)
+      {
+         ; no worker threads are left to decode anything, so the images still expected are
+         ; never going to arrive, no matter how long this waits for them
+         addJournalEntry(A_ThisFunc "(): stopping - the collection workers are gone. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done.")
+         abandonAll := 1
+         Break
+      }
+
+      If (countTFilez!=prevDone)
+      {
+         prevDone := countTFilez
+         lastProgress := A_TickCount
+      } Else If (A_TickCount - lastProgress>stallLimit)
+      {
+         addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round(stallLimit/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " NumGet(dupesPixState + 0, 8, "Int") " were in flight, " NumGet(dupesPixState + 0, 4, "Int") " queued, " NumGet(dupesPixState + 0, 12, "Int") " waiting to be written.")
+         ErrorMsgS := "ERROR: the image decoding workers stopped responding.`n"
+         DllCall("qpvmain.dll\dupesEngineCancel", "int")
+         abandonAll := 1
+         Break
+      }
    }
+
+   ; dupesPixStep() answers 0 both when the run is complete and when it was cancelled from
+   ; another thread - stopDupesEngineNow(), which the interface thread calls. Only the phase
+   ; tells those apart, and reporting "finished collecting data for N files" over a run that
+   ; stopped halfway is exactly how an interrupted collection goes unnoticed.
+   If (NumGet(dupesPixState + 0, 0, "Int")=-1)
+      abandonAll := 1
 
    DllCall("qpvmain.dll\dupesPixEnd", "int")
    If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+   {
+      ErrorMsgS .= "ERROR: failed to commit collected data to the SQL database`n" activeSQLdb.ErrorMsg "`n"
       addJournalEntry(A_ThisFunc "(): failed to commit the collected data - " activeSQLdb.ErrorMsg)
+   }
 
-   countTFilez := NumGet(dupesPixState + 0, 16, "Int") + NumGet(dupesPixState + 0, 20, "Int")
    failedFiles := NumGet(dupesPixState + 0, 20, "Int")
    failedSQLfiles := NumGet(dupesPixState + 0, 24, "Int")
+   countTFilez := NumGet(dupesPixState + 0, 16, "Int") + failedFiles + failedSQLfiles
+   ErrorMsg := ErrorMsgS
    Return 1
 }
 

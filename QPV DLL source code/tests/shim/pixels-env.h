@@ -279,7 +279,44 @@ struct ThumbsConfig {
 
 static std::unordered_set<std::wstring> tpWicExts;
 static std::unordered_set<std::wstring> tpFimExts;
-static inline bool tpMemoryIsTight() { return false; }
+
+// The real one samples GlobalMemoryStatusEx() a few times a second. Here the tests say when
+// the machine is short of memory, because that is the state in which the collector's job
+// slot handling is the only thing keeping the pool moving.
+static bool gShimMemoryTight = false;
+static inline bool tpMemoryIsTight() { return gShimMemoryTight; }
+
+// The shared job-slot count of thumbs-pool.h. Mirrored here the way ThumbsConfig and
+// TpSrcMeta are: while memory is tight only the worker that finds no decode running is let
+// through, so both pools of the DLL together decode one image at a time. gShimMaxActiveJobs
+// is the high-water mark, which is what a test can assert on.
+static std::atomic<LONG> tpActiveJobs(0);
+static std::atomic<int>  gShimMaxActiveJobs(0);
+
+static inline bool tpTryTakeJobSlot() {
+    for (;;)
+    {
+        LONG active = tpActiveJobs.load(std::memory_order_acquire);
+        if (active>=1 && tpMemoryIsTight())
+           return false;
+
+        if (tpActiveJobs.compare_exchange_weak(active, active + 1, std::memory_order_acq_rel))
+        {
+           int taken = (int)active + 1, seen = gShimMaxActiveJobs.load();
+           while (taken > seen && !gShimMaxActiveJobs.compare_exchange_weak(seen, taken))
+               ;
+           return true;
+        }
+    }
+}
+
+static inline void tpReleaseJobSlot() {
+    tpActiveJobs.fetch_sub(1, std::memory_order_acq_rel);
+}
+
+struct TpJobSlot {
+    ~TpJobSlot() { tpReleaseJobSlot(); }
+};
 
 static inline std::wstring tpLowerCase(const std::wstring &s) {
     std::wstring r = s;

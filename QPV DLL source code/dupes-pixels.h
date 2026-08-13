@@ -480,6 +480,34 @@ static void dpRunJob(IWICImagingFactory *fac, DpEffects &fx, const DupePixCfg &c
 //  worker threads
 // ---------------------------------------------------------------------------------------
 
+// The collection pool's half of the shared throttle in thumbs-pool.h: while memory is
+// scarce, only the worker that finds no decode running anywhere in the DLL starts one, so
+// the machine is never asked for two decoder-sized allocations at once and the pool still
+// moves - one image at a time - instead of stopping. Returns false only when the run is
+// being abandoned, in which case the job is dropped without being decoded.
+//
+// What this must never do is wait on a count that includes the waiter. dpState.inFlight is
+// raised the moment a job leaves the queue, before any of this, so every worker holding a
+// job counts towards it: waiting for it to fall to 1 asks the other workers to finish jobs
+// that are themselves waiting for this one. With N workers each holding a job the count
+// never falls below N, no decode ever starts, dupesPixStep() never sees the pool go idle
+// and the loop in collectImgDataViaPool() spins on nothing written for as long as the user
+// lets it. tpActiveJobs counts decodes actually running, and a worker waiting here is not
+// one of them.
+static bool dpAcquireJobSlot() {
+    for (;;)
+    {
+        if (dpStopping.load() || dupesPixCancel.load()!=0)
+           return false;
+
+        if (tpTryTakeJobSlot())
+           return true;
+
+        // wait for the image being decoded right now to release its memory
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+}
+
 static void dpWorkerBody() {
     HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
     omp_set_num_threads(1);
@@ -539,13 +567,12 @@ static void dpWorkerBody() {
 
         DupePixResult res;
         bool ranIt = false;
-        if (job.generation==dpGeneration.load() && dupesPixCancel.load()==0)
+        // the memory sample and the count of running decodes are the thumbnails pool's, and
+        // are shared with it; when the machine is tight, decoding narrows to one image at a
+        // time across the whole DLL
+        if (job.generation==dpGeneration.load() && dupesPixCancel.load()==0 && dpAcquireJobSlot())
         {
-           // the thumbnails pool's memory sample is shared and refreshed a few times a
-           // second; when the machine is tight, decoding narrows to one image at a time
-           while (tpMemoryIsTight() && dpState.inFlight > 1 && !dpStopping.load() && dupesPixCancel.load()==0)
-               std::this_thread::sleep_for(std::chrono::milliseconds(25));
-
+           TpJobSlot slot;      // released at the end of this block, whatever happens in it
            dpRunJob(fac, fx, *cfg, tcfg, job, res);
            ranIt = true;
         }
