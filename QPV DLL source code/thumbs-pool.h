@@ -1304,6 +1304,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               // still collects it, through GetCachableImgFileDetails().
            }
 
+           int hasFIMtried = 0;
            if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && fimHandles && cfg->allowFIM==1)
            {
               int status = TP_ERR_LOAD, saved = 0;
@@ -1313,6 +1314,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               res.loaderUsed  = 2;
               res.status      = status;
               res.savedToFile = saved;
+              hasFIMtried = 1;
               if (fw>0 && fh>0)
               {
                  res.srcW = fw;
@@ -1329,6 +1331,21 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
                               0, res.srcW, res.srcH, &res.meta);
               res.loaderUsed = 1;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+              if (bmp==NULL && FIM.ok && cfg->allowFIM==1 && hasFIMtried!=1)
+              {
+                 int status = TP_ERR_LOAD, saved = 0;
+                 int fw = 0, fh = 0;
+                 res.meta = TpSrcMeta();  // reset the record
+                 bmp = tpFIMthumb(cfg, job.src, job.dst, startTick, fw, fh, status, saved, &res.meta);
+                 res.loaderUsed  = 2;
+                 res.status      = status;
+                 res.savedToFile = saved;
+                 if (fw>0 && fh>0)
+                 {
+                    res.srcW = fw;
+                    res.srcH = fh;
+                 }
+              }
            }
 
            // The last resort, and for some files the only one: EMF and WMF have neither a
