@@ -332,9 +332,10 @@ static inline std::wstring tpFileExtension(const std::wstring &path) {
     return tpLowerCase(path.substr(dot + 1));
 }
 
-// The synthetic decoders. gShimWicFails makes WIC refuse, which is how the FreeImage
-// fallback gets exercised; both record what they were asked for.
+// The synthetic decoders. The gShim*Fails switches make one refuse, which is how the
+// fallbacks down the chain get exercised; every one of them records what it was asked for.
 static int gShimWicFails = 0;
+static int gShimFimFails = 0;
 static int gShimWicCalls = 0;
 static int gShimFimCalls = 0;
 static int gShimDecodeW = 40, gShimDecodeH = 30;
@@ -395,6 +396,23 @@ static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstr
                                             TpSrcMeta *meta = NULL) {
     gShimFimCalls++;
     saved = 0;
+    status = TP_ERR_LOAD;
+    // "nofim" in the name is a file FreeImage alone refuses, the way an EMF or one of the
+    // GIFs its plugin chokes on does; gShimFimFails is the same thing for every file
+    if (gShimFimFails || shimPathHas(path.c_str(), L"nofim"))
+    {
+       // a failed attempt still touches the record, which is what dpDecodeFile() has to
+       // clear before it hands the file to the loader after it
+       if (meta!=NULL)
+       {
+          meta->frames   = 77;
+          meta->dpi      = 777;
+          meta->fimBPP   = 8;
+          meta->fimColor = 3;
+       }
+       return NULL;
+    }
+
     srcW = gShimDecodeW*2;
     srcH = gShimDecodeH*2;
     status = 0;
@@ -412,6 +430,72 @@ static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstr
        b->poisoned = true;
 
     return b;
+}
+
+// ---- the three loaders dupes-pixels.h shares with the thumbnails pool -------------------
+//
+// The SVG renderer, PDFium and GDI+, stubbed the way the two above are. What the tests drive
+// with them is the DISPATCH: which loader a given extension reaches, in which order, and
+// what each one leaves in TpSrcMeta - not the decoding, which nothing off Windows can do.
+struct ID2D1Factory { int dummy; };
+#define D2D1_FACTORY_TYPE_SINGLE_THREADED 0
+static int gShimD2DfactoryCalls = 0;
+static inline HRESULT D2D1CreateFactory(int, ID2D1Factory **f) {
+    gShimD2DfactoryCalls++;
+    *f = new ID2D1Factory();
+    return S_OK;
+}
+
+// the real one lives in thumbs-pool.h and is shared BETWEEN the two pools, because PDFium
+// keeps global state
+static std::mutex tpPdfMutex;
+
+static int gShimSvgCalls = 0, gShimPdfCalls = 0, gShimGdipCalls = 0;
+static int gShimSvgFails = 0, gShimPdfFails = 0, gShimGdipFails = 0;
+
+static inline Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int, int, int &srcW, int &srcH,
+                                             ID2D1Factory*, IWICImagingFactory*) {
+    gShimSvgCalls++;
+    if (gShimSvgFails)
+       return NULL;
+
+    // the size the document declares, which is what RenderSVGfile() reports as well
+    srcW = 200;
+    srcH = 100;
+    return shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path.size() & 0xFF));
+}
+
+static inline Gdiplus::GpBitmap* RenderPdfPageAsBitmap(const wchar_t *path, int, float, int *givenW, int *givenH,
+                                                       int, int, int *varOut, int *errorType, const wchar_t*, int) {
+    gShimPdfCalls++;
+    *errorType = 0;
+    if (gShimPdfFails)
+    {
+       *errorType = 4;            // FPDF: the document wants a password
+       return NULL;
+    }
+
+    *varOut = 5;                  // pages
+    *givenW = 612;                // the PAGE, in points - what the real one hands back
+    *givenH = 792;
+    return shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path ? path[0] : 0));
+}
+
+static inline Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int, int, int, int,
+                                            int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
+    gShimGdipCalls++;
+    if (gShimGdipFails)
+       return NULL;
+
+    srcW = gShimDecodeW*3;
+    srcH = gShimDecodeH*3;
+    if (meta!=NULL)
+    {
+       meta->frames = 7;          // an animated GIF; GDI+ counts the time dimension
+       meta->dpi    = 96;
+    }
+
+    return shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path.size() & 0xFF));
 }
 
 // ---- the two names dupes-pixels.h borrows from the query engine ------------------------

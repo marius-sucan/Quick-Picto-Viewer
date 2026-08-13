@@ -996,6 +996,16 @@ l) List view and thumbnails list (soon)
    safety at all; it stays serialised behind tpPdfMutex, so PDF thumbnails are built
    one at a time.
 
+   Both pools try the loaders in one order: SVG and PDF to the renderer of their own,
+   then FreeImage for the extensions it claims [RegExFIMformPtrn], then WIC for the ones
+   it declares [RegExWICfmtPtrn, minus svg and pdf], then GDI+ [tpGDIPload()] for what is
+   left over - EMF, WMF and the GIFs FreeImage refuses and WIC cannot decode, which is
+   what LoadFileWithGDIp() ends up drawing in the viewport - and for anything the loader
+   that did claim the file failed to open. That last one inherits the process wide GDI+
+   locks, so a folder full of them decodes with far less overlap than a folder of JPEGs;
+   it is also the loader that hands back a copy and disposes the file-backed bitmap,
+   because GDI+ keeps the file mapped until it goes.
+
    The drawing loop of QPV_ShowThumbnails() waits on the workers instead of doing the
    decoding itself, so it needs its own ways out: it stops when everything is painted,
    when the user aborts or scrolls, when the workers report nothing pending while some

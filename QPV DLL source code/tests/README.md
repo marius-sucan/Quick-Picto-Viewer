@@ -100,9 +100,13 @@ around the compile cover everything that is not an image decoder:
   The flipped fingerprint is taken from a flipped *bitmap* rather than by reversing the
   unflipped fingerprint, because no resampler that samples at fixed offsets is
   mirror-equivariant — the test says so where it is exact and only where it is exact.
-- **one job**: WIC first, FreeImage for the formats WIC does not declare *and* whenever WIC
-  fails, a missing file marked rather than handed to a decoder, and the blur applied as the
-  two passes `Gdip_GaussianBlur()` applied.
+- **one job**: the loader chain, in the order `tpRunJob()` runs it — SVG and PDF to the two
+  renderers of their own and to nothing else, then FreeImage for the extensions it claims,
+  then WIC for the ones it declares, then GDI+ for everything left over, including whatever
+  the loader that did claim the file could not open. A missing file is marked rather than
+  handed to a decoder, a file every loader refuses is a decode failure, and the blur is
+  applied as the two passes `Gdip_GaussianBlur()` applied. Which loader a file reaches
+  decides what its fingerprints are measured on, so this is where a reordering shows up.
 - **the properties of the original file** — `imgwidth`, `imgheight`, `imgframes`, `imgdpi`
   and `imgpixfmt` — taken before anything is scaled or converted, and named with the tables
   the interpreter sends through `qpvSetPixelFormatNames()`. The stubbed loaders report a
@@ -121,6 +125,15 @@ around the compile cover everything that is not an image decoder:
   would have broken. An image is handed to a worker and written *later*, so it still
   matches the query while it is being decoded; `dpTopUpQueue()` therefore walks a keyset
   cursor on `imgidu` rather than re-running a plain `LIMIT`.
+
+- **the files only GDI+ reads** — EMF, WMF and the GIFs FreeImage refuses. They reach the
+  third loader and are collected; before it existed they reached no decoder at all and the
+  collection marked them `isDeleted=1`, which hides an image from the whole library until
+  the caches overview revalidates it. The same test covers the `COALESCE` in the UPDATE: a
+  loader that cannot name a pixel format — PDFium, GDI+ — must leave `imgpixfmt` as it
+  found it, because "collected, and the format is blank" and "never collected" are the same
+  thing to `ifnull(imgpixfmt,'')=''` and the single threaded pass would then re-decode those
+  files on every run, for ever.
 
 - **a run on a machine that is short of memory**, six workers, driven against a wall clock.
   Decoding then narrows to one image at a time (see `throttle_slots.cpp` below) and the
@@ -147,6 +160,22 @@ same time, and a counter per pool would let each believe it is alone. The tests 
 properties the pools cannot work without — at most one decode at a time while memory is
 tight, and a waiter always let through afterwards, including twelve threads taking forty
 images each through a single slot. The mutation check lets two decodes run at once.
+
+**`gdip_loader.cpp`** — `tpGDIPload()`, the third loader of the product, sliced out of the
+shipped `thumbs-pool.h` together with `tpCalcIMGdimensions()` and compiled against
+`shim/gdip-env.h`. It exists because EMF and WMF have neither a FreeImage plugin nor a WIC
+codec, and a GIF that FreeImage refuses and WIC cannot decode is still drawn in the viewport
+by `LoadFileWithGDIp()`; until it was written, both pools ran out of loaders on those files.
+
+The shim maps `__try`/`__except` onto a dead branch rather than dropping them, so both blocks
+and the filter expression are type-checked — nothing else here ever puts that code in front
+of a compiler. Beyond the compile it pins the two rules a reader cannot see by looking at the
+function: the bitmap handed back is a **copy** and the file-backed original is disposed
+(`GdipCreateBitmapFromFile()` keeps the file mapped for as long as its bitmap lives — what
+`GDIbmpFileConnected` tracks in the AHK — and the copy is also what turns the 8bpp indexed
+bitmap a GIF decodes into into the 32bpp one the effects and the histogram need), and the
+frame is selected *before* the size is read, because the frames of an animated GIF need not
+all be the size of the first. The mutation check hands the file-backed bitmap straight back.
 
 **`thumbs_record.cpp`** — the layout of `ThumbResult` and `ThumbsPoolState`, sliced out of
 the shipped `thumbs-pool.h`. Nothing else pins them: `thumbsPoolFetch()` fills an array of

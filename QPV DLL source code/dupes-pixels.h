@@ -35,8 +35,10 @@
 // rows written inside AHK's open transaction and would hand them out again forever.
 //
 // This file is #included by qpv-main.cpp after thumbs-pool.h, so it can reuse that pool's
-// loaders (tpWICload, tpFIMthumb), its extension sets and its memory throttle rather than
-// growing a third copy of them.
+// loaders (tpRenderSVG, tpWICload, tpFIMthumb, tpGDIPload), its extension sets, its PDFium
+// lock and its memory throttle rather than growing a second copy of them. dpDecodeFile()
+// runs the same chain, in the same order, as tpRunJob(): what a thumbnail was drawn from
+// and what a fingerprint was measured on should never be two different decodes of one file.
 //
 // written by Marius Șucan with Claude Opus 5
 
@@ -346,28 +348,81 @@ static bool dpHistogram(Gdiplus::GpBitmap *bmp, int w, int h, DupePixResult &res
 //  one job
 // ---------------------------------------------------------------------------------------
 
-// The decode, and only the decode. WIC is asked first for the formats it declares; the
-// formats FreeImage claims exclusively go straight to it, and anything WIC fails to open
-// falls back to it as well - the same order LoadBitmapFromFileu() uses in AHK.
-static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, const DupePixCfg &cfg, const std::wstring &path,
-                                       const ThumbsConfig &tcfg, int &srcW, int &srcH, int &loaderUsed,
-                                       TpSrcMeta &meta) {
+// The decode, and only the decode. The chain is tpRunJob()'s, loader for loader: the two
+// formats that carry a renderer of their own go to it, then FreeImage for the extensions it
+// claims, then WIC for the ones it declares, then GDI+ for whatever is left over - EMF, WMF
+// and the GIFs the two before it refuse. The two pools reading a file the same way is the
+// point - a thumbnail and a stored fingerprint made from different decoders for the same
+// image is exactly the kind of disagreement nobody ever notices.
+//
+// Every attempt after the first starts from a clean TpSrcMeta: whatever the one before it
+// left there describes an image that was not the one finally decoded.
+static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const DupePixCfg &cfg,
+                                       const std::wstring &path, const ThumbsConfig &tcfg,
+                                       int &srcW, int &srcH, int &loaderUsed, TpSrcMeta &meta) {
     Gdiplus::GpBitmap *bmp = NULL;
     const std::wstring ext = tpFileExtension(path);
     const bool fimHandles  = (FIM.ok && cfg.allowFIM==1 && tpFimExts.count(ext) > 0);
 
-    if (!fimHandles && cfg.allowWIC==1 && tpWicExts.count(ext) > 0)
+    if (ext==L"svg")
     {
-       bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality,
-                       (FIM.ok && cfg.allowFIM==1) ? 1 : 0, srcW, srcH, &meta);
+       // a factory of this worker's own, made on first use; SINGLE_THREADED carries no
+       // internal lock, which is the whole point, and is safe because the factory, its
+       // render target and the document all live and die inside one call on this thread
+       if (d2dFac==NULL)
+       {
+          if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFac)))
+             d2dFac = NULL;      // LoadSVGimageEx() then shares the process wide one
+       }
+
+       bmp = tpRenderSVG(path, cfg.boxSize, cfg.boxSize, srcW, srcH, d2dFac, fac);
        if (bmp!=NULL)
-          loaderUsed = 1;
+       {
+          loaderUsed = 3;
+          // what RenderSVGfile() reports: one frame, 96 DPI, and a pixel format that is the
+          // renderer's rather than the file's, since an SVG has none of its own. srcW/srcH
+          // come back as the size the document declares, which is what
+          // mainLoadedIMGdetails.Width/Height holds for an SVG as well.
+          meta.frames = 1;
+          meta.dpi    = 96;
+       }
+    } else if (ext==L"pdf")
+    {
+       int maxW = cfg.boxSize, maxH = cfg.boxSize, pageCount = 0, errorType = -100;
+       {
+          // PDFium keeps global state; this is the thumbnails pool's own mutex, so the two
+          // pools serialise against each other rather than each against itself
+          std::lock_guard<std::mutex> pdfLock(tpPdfMutex);
+          // 32bpp rather than the 24 the thumbnails pool asks for: the chain after the
+          // decode applies a GDI+ effect and reads a histogram, and both want 32bpp.
+          // The white fill behind the page is RenderPDFpage()'s own default.
+          bmp = RenderPdfPageAsBitmap(path.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff,
+                                      &pageCount, &errorType, L"", 0);
+       }
+
+       if (bmp!=NULL)
+       {
+          loaderUsed = 4;
+          // maxW/maxH come back as the size of the PAGE in points - RenderPdfPageAsBitmap()
+          // overwrites them with it - which is what RenderPDFpage() leaves in
+          // mainLoadedIMGdetails.Width/Height too, and is independent of the DPI this
+          // render happened to use. The page count is real; the pixel format is not named
+          // at all, for the reason tpRunJob() gives.
+          srcW = maxW;
+          srcH = maxH;
+          meta.frames = (pageCount > 0) ? pageCount : 1;
+       } else if (errorType!=0)
+          fnOutputDebug("dupesPixels: PDFium could not render " + WideCharToString(path.c_str())
+                      + ", error " + std::to_string(errorType));
+       // A PDF that will not render is DP_ERR_LOAD like anything else here, so the row is
+       // marked the way markSQLdbEntryDeleted() marks it. That is deliberately unlike
+       // TP_ERR_PDFLOCKED next door, where a password protected document must not cost the
+       // user a thumbnail; here nothing can ever be collected from it until the password is
+       // known, and the caches overview revalidates the entry when it is.
     }
 
-    if (bmp==NULL && FIM.ok && cfg.allowFIM==1)
+    if (bmp==NULL && fimHandles)
     {
-       // whatever a failed WIC attempt left behind describes an image that was not the one
-       // finally decoded; the FreeImage loader has to start from a clean record
        meta = TpSrcMeta();
        int status = TP_ERR_LOAD, saved = 0, fw = 0, fh = 0;
        bmp = tpFIMthumb(&tcfg, path, L"", GetTickCount(), fw, fh, status, saved, &meta);
@@ -382,10 +437,32 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, const DupePixCfg
        }
     }
 
+    if (bmp==NULL && cfg.allowWIC==1 && tpWicExts.count(ext) > 0)
+    {
+       // isFIMokay is 0 here, as it is in tpRunJob(): it exists to hand a high bit depth
+       // TIFF over to FreeImage, and by this line FreeImage has either had the file and
+       // failed or does not claim the format at all - either way there is nothing to hand
+       // it to
+       meta = TpSrcMeta();
+       bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality,
+                       0, srcW, srcH, &meta);
+       if (bmp!=NULL)
+          loaderUsed = 1;
+    }
+
+    if (bmp==NULL)
+    {
+       // EMF, WMF and the GIFs neither of the two above will open; see tpGDIPload()
+       meta = TpSrcMeta();
+       bmp = tpGDIPload(path, cfg.boxSize, cfg.boxSize, 0, cfg.interpolation, srcW, srcH, &meta);
+       if (bmp!=NULL)
+          loaderUsed = 6;
+    }
+
     return bmp;
 }
 
-static void dpRunJob(IWICImagingFactory *fac, DpEffects &fx, const DupePixCfg &cfg,
+static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &fx, const DupePixCfg &cfg,
                      const ThumbsConfig &tcfg, const DupePixJob &job, DupePixResult &res) {
     res.imgidu = job.imgidu;
     res.status = DP_ERR_LOAD;
@@ -410,7 +487,7 @@ static void dpRunJob(IWICImagingFactory *fac, DpEffects &fx, const DupePixCfg &c
     try
     {
         int srcW = 0, srcH = 0;
-        bmp = dpDecodeFile(fac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta);
+        bmp = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta);
         if (bmp==NULL)
            return;
 
@@ -523,6 +600,8 @@ static void dpWorkerBody() {
 
     DpEffects fx;
     std::shared_ptr<const DupePixCfg> madeFor;
+    // made on the first SVG this worker meets; see the dpDecodeFile() branch that creates it
+    ID2D1Factory *d2dFac = NULL;
 
     for (;;)
     {
@@ -573,7 +652,7 @@ static void dpWorkerBody() {
         if (job.generation==dpGeneration.load() && dupesPixCancel.load()==0 && dpAcquireJobSlot())
         {
            TpJobSlot slot;      // released at the end of this block, whatever happens in it
-           dpRunJob(fac, fx, *cfg, tcfg, job, res);
+           dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res);
            ranIt = true;
         }
 
@@ -591,6 +670,7 @@ static void dpWorkerBody() {
     }
 
     dpFreeEffects(fx);
+    SafeRelease(d2dFac, "dpWorkerBody: d2dFac", 0);
     if (ownFactory)
        SafeRelease(fac, "dpWorkerBody: fac", 0);
 
@@ -646,6 +726,10 @@ static void dpBindBlobOrNull(sqlite3_stmt *st, int idx, const std::vector<unsign
 //    2 FreeImage  bpp "-" colourType + tone mapping marker   "48-RGB (TONE-MAPPED)"
 //    3 SVG, 4 PDF a constant, out of dpLoaderNames
 //    5            the CACHED thumbnail file, which describes nothing about the original
+//    6 GDI+       nothing: the interpreter sends no table for it, and the names
+//                 Gdip_GetImagePixelFormat() spells are its own to give. The column is left
+//                 as it was and the single threaded pass fills it - which is why the
+//                 statement in dupesPixBegin() COALESCEs it.
 // An empty result is written as NULL rather than as an empty string: "collected, and the
 // format is blank" and "never collected" have to stay distinguishable, or the collection
 // pass that fills the gaps decodes those images again on every single run.
@@ -723,10 +807,24 @@ static bool dpWriteResult(const DupePixResult &res) {
        SQ.bind_double(dpUpdHist,  6, res.range);
        SQ.bind_double(dpUpdHist,  7, res.mode);
        SQ.bind_double(dpUpdHist,  8, res.minu);
-       SQ.bind_int64(dpUpdHist,   9, res.width);
-       SQ.bind_int64(dpUpdHist,  10, res.height);
+       // NULL means "this loader could not say", which the COALESCE above turns into
+       // "leave the column as it is"; every one of these is a real value or nothing
+       if (res.width > 0)
+          SQ.bind_int64(dpUpdHist, 9, res.width);
+       else
+          SQ.bind_null(dpUpdHist, 9);
+
+       if (res.height > 0)
+          SQ.bind_int64(dpUpdHist, 10, res.height);
+       else
+          SQ.bind_null(dpUpdHist, 10);
+
        SQ.bind_int64(dpUpdHist,  11, (res.meta.frames > 0) ? res.meta.frames : 1);
-       SQ.bind_int64(dpUpdHist,  12, res.meta.dpi);
+       if (res.meta.dpi > 0)
+          SQ.bind_int64(dpUpdHist, 12, res.meta.dpi);
+       else
+          SQ.bind_null(dpUpdHist, 12);
+
        if (pixFmt.empty())
           SQ.bind_null(dpUpdHist, 13);
        else
@@ -1003,10 +1101,21 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
     // getImgHistoValuesSet(), then getImgPropsValuesSet() - imgwidth, imgheight, imgframes,
     // imgdpi and imgpixfmt - then getImgFileValuesSet(). imgwhratio and imgmegapix are
     // generated from imgwidth and imgheight and follow on their own.
+    //
+    // The five image properties are COALESCEd, the eight statistics and the three file
+    // stamps are not. Not every loader can describe the original: PDFium's render says
+    // nothing about the document's pixel format, and GDI+ has no name table here at all, so
+    // those come back empty - and binding them straight would erase what another producer
+    // had already written and leave the next collection pass re-decoding those files for
+    // ever, because "collected, and the format is blank" and "never collected" are the same
+    // thing to ifnull(imgpixfmt,'')=''. This is poolRecordImgProps()'s rule in the AHK: a
+    // loader that could not name the format must not erase a name something else knew.
     static const wchar_t *updHistSQL =
         L"UPDATE images SET imgmedian=?1, imgavg=?2, imghpeak=?3, imghlow=?4, imghrms=?5,"
-        L" imghrange=?6, imghmode=?7, imghminu=?8, imgwidth=?9, imgheight=?10,"
-        L" imgframes=?11, imgdpi=?12, imgpixfmt=?13,"
+        L" imghrange=?6, imghmode=?7, imghminu=?8,"
+        L" imgwidth=COALESCE(?9, imgwidth), imgheight=COALESCE(?10, imgheight),"
+        L" imgframes=COALESCE(?11, imgframes), imgdpi=COALESCE(?12, imgdpi),"
+        L" imgpixfmt=COALESCE(?13, imgpixfmt),"
         L" fsize=?14, fmodified=?15, fcreated=?16 WHERE imgidu=?17;";
     static const wchar_t *updPixSQL =
         L"INSERT OR REPLACE INTO imagesPixels (imgidu, small, big, smallH, bigH) VALUES (?1,?2,?3,?4,?5);";

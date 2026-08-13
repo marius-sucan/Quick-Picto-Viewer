@@ -15,6 +15,7 @@ testdb.sldb.hash
 pixels_scratch.sldb
 pixels_poison.sldb
 pixels_tight.sldb
+pixels_gdip.sldb
 # test binaries
 msd_oracle
 msd_bench
@@ -29,5 +30,7 @@ pixels_mutant
 thumbs_record
 throttle_slots
 throttle_mutant
+gdip_loader
+gdip_mutant
 pdf_document
 pdf_mutant

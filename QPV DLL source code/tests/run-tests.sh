@@ -56,6 +56,8 @@ slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qp
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1
 slice thumbs_structs.part ../thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
 slice slots_extract.part  ../thumbs-pool.h '^\/\/ One attempt at taking a slot' '^\/\/ qpv-job-slot-end' 40 || exit 1
+slice calc_dims.part      ../thumbs-pool.h '^\/\/ qpv-calc-dims-begin'   '^\/\/ qpv-calc-dims-end' 30 || exit 1
+slice gdip_loader.part    ../thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\/\/ qpv-gdip-loader-end' 120 || exit 1
 echo "   ok"
 
 echo
@@ -152,6 +154,39 @@ else
     echo "  ERROR: the mutation did not apply - update the sed pattern"; fail=1
 fi
 mv -f slots_extract.orig slots_extract.part
+
+echo
+echo "== the GDI+ loader of the two worker pools =="
+# The third loader of the product: EMF, WMF and the GIFs FreeImage refuses and WIC cannot
+# decode. thumbs-pool.h never reaches a compiler on this box, so this is the only thing that
+# type-checks it before MSVC does - and it pins the two rules a reader cannot see: the file
+# backed bitmap is disposed [it holds a lock on the file] and the frame is selected before
+# the size is read.
+if g++ $CXXFLAGS -o gdip_loader gdip_loader.cpp 2>&1; then
+    ./gdip_loader || fail=1
+else
+    echo "  ERROR: gdip_loader.cpp did not compile"; fail=1
+fi
+
+echo
+echo "== mutation check: the GDI+ loader must hand back a copy, not the file =="
+# Returns the file-backed bitmap itself. It looks like an optimisation - one allocation
+# fewer - and it leaves every file the loader ever touched locked for as long as the
+# thumbnail lives, which is what GDIbmpFileConnected exists to avoid in the AHK.
+cp gdip_loader.part gdip_loader.orig
+sed -i 's|    Gdiplus::GpBitmap \*out = tpGdipResizeCopy(loaded, outW, outH, interpolation);|    Gdiplus::GpBitmap *out = loaded;|' gdip_loader.part
+if ! cmp -s gdip_loader.part gdip_loader.orig; then
+    g++ $CXXFLAGS -o gdip_mutant gdip_loader.cpp 2>/dev/null
+    if ./gdip_mutant > /dev/null 2>&1; then
+        echo "  ERROR: the mutant passed - the test proves nothing"; fail=1
+    else
+        echo "   ok - the mutant is caught (the file-backed bitmap is handed straight back)"
+    fi
+    rm -f gdip_mutant
+else
+    echo "  ERROR: the mutation did not apply - update the sed pattern"; fail=1
+fi
+mv -f gdip_loader.orig gdip_loader.part
 
 echo
 echo "== the records the thumbnails pool shares with AutoHotkey =="

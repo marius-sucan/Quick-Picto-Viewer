@@ -15,8 +15,9 @@
 //
 // This file is #included by qpv-main.cpp after LoadSVGimage(), so it can use
 // adaptImageGivenSize(), indexedWICcontainerFormats(), decideWICtoFIMpixelFormat(),
-// IsFileExtension(), LoadSVGimage(), RenderPdfPageAsBitmap(), openCVresizeBitmapExtended()
-// and openCVapplyToneMappingAlgos() directly.
+// IsFileExtension(), LoadSVGimage(), RenderPdfPageAsBitmap(), openCVresizeBitmapExtended(),
+// openCVapplyToneMappingAlgos() and the SEH filter of the WIC guards, WICcodecCrashFilter(),
+// directly.
 //
 // written by Marius Șucan with Claude Opus 5
 
@@ -102,7 +103,7 @@ struct ThumbResult {          // 72 bytes; AHK reads the fields with NumGet()
     int   outW;               // 32
     int   outH;               // 36
     int   elapsedMs;          // 40
-    int   loaderUsed;         // 44   1=WIC 2=FreeImage 3=SVG 4=PDF 5=cached file
+    int   loaderUsed;         // 44   1=WIC 2=FreeImage 3=SVG 4=PDF 5=cached file 6=GDI+
     // The properties of the ORIGINAL image, for the files list QPV_ThumbsPoolDrain() keeps
     // - see TpSrcMeta. Filled only for a TP_JOB_THUMB job: loader 5 opened a cached
     // thumbnail, whose frame count, resolution and pixel format are the cache file's and
@@ -231,6 +232,7 @@ static void tpSplitExtensions(const wchar_t *list, std::unordered_set<std::wstri
     }
 }
 
+// qpv-calc-dims-begin
 // mirrors calcIMGdimensions() of module-fim-thumbs.ahk; it also enlarges images
 // smaller than the thumbnail box, exactly like the AHK original did
 static void tpCalcIMGdimensions(int imgW, int imgH, int givenW, int givenH, int &resizedW, int &resizedH) {
@@ -265,6 +267,7 @@ static void tpCalcIMGdimensions(int imgW, int imgH, int givenW, int givenH, int 
     resizedW = max(1, resizedW);
     resizedH = max(1, resizedH);
 }
+// qpv-calc-dims-end
 
 // PNG encoder CLSID; resolved statically instead of enumerating every GDI+ encoder per save,
 // the way Gdip_SaveBitmapToFile() used to do in each ahk_h thread
@@ -557,6 +560,177 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
     WICsafeRelease(pDecoder);
     return myBitmap;
 }
+
+// qpv-gdip-loader-begin
+// ---------------------------------------------------------------------------------------
+//  GDI+ loader; port of LoadFileWithGDIp()
+// ---------------------------------------------------------------------------------------
+
+// The third loader of the product, and the last one either pool tries. It is here because
+// GDI+ reads files the other two do not: EMF and WMF have no FreeImage plugin and no WIC
+// codec at all, and a GIF that FreeImage refuses - and that WIC either has no codec for or
+// cannot decode - is still drawn in the viewport, by LoadFileWithGDIp(). Without this, a
+// file the viewer displays perfectly reaches QPV_ShowThumbnails() as a failure, and the
+// collection pool of dupes-pixels.h marks it isDeleted=1.
+//
+// What comes back is always a COPY, even when no resize was needed. GdipCreateBitmapFromFile()
+// keeps the file mapped for as long as its bitmap lives - GDIbmpFileConnected tracks exactly
+// that in the AHK - and a worker must not leave a lock behind on a file the user may be
+// about to move or delete. The copy is also what turns the 8bpp indexed bitmap a GIF decodes
+// into into the 32bpp one GdipBitmapApplyEffect() and GdipBitmapGetHistogram() need in
+// dpRunJob().
+struct TpGdipFacts {
+    UINT   width = 0, height = 0;
+    UINT   frames = 1;
+    double dpix = 0.0, dpiy = 0.0;
+};
+
+// The load, the header reads and the frame selection all run inside a codec, so they sit
+// behind the same guard the WIC helpers use: a worker that faults on a malformed file takes
+// the whole application down with it. Nothing in here owns anything that would need
+// unwinding, which is what lets __try wrap it at all.
+static Gdiplus::Status tpGuardedGdipOpen(const wchar_t *path, int frameIndex, Gdiplus::GpBitmap **ppBmp,
+                                         TpGdipFacts *facts, DWORD *sehCode) {
+    Gdiplus::Status st = Gdiplus::GenericError;
+    *sehCode = 0;
+    __try
+    {
+        st = Gdiplus::DllExports::GdipCreateBitmapFromFile(path, ppBmp);
+        if (st==Gdiplus::Ok && *ppBmp==NULL)
+           st = Gdiplus::GenericError;
+
+        if (st==Gdiplus::Ok)
+        {
+           // Gdip_GetBitmapFramesCount(): the count belongs to a frame DIMENSION, and the
+           // first one is the only one GDI+ reports for the two formats it pages at all -
+           // time for a GIF, page for a TIFF
+           UINT dimensions = 0;
+           GUID dimensionID;
+           if (Gdiplus::DllExports::GdipImageGetFrameDimensionsCount(*ppBmp, &dimensions)==Gdiplus::Ok && dimensions>0
+            && Gdiplus::DllExports::GdipImageGetFrameDimensionsList(*ppBmp, &dimensionID, 1)==Gdiplus::Ok)
+           {
+              UINT count = 0;
+              if (Gdiplus::DllExports::GdipImageGetFrameCount(*ppBmp, &dimensionID, &count)==Gdiplus::Ok && count>0)
+              {
+                 facts->frames = count;
+                 // selected before the size is read, the way LoadFileWithGDIp() does it:
+                 // the frames of an animated GIF need not all be the size of the first
+                 if (frameIndex>0 && count>1)
+                    Gdiplus::DllExports::GdipImageSelectActiveFrame(*ppBmp, &dimensionID,
+                                                                    (UINT)min(frameIndex, (int)count - 1));
+              }
+           }
+
+           Gdiplus::DllExports::GdipGetImageWidth(*ppBmp, &facts->width);
+           Gdiplus::DllExports::GdipGetImageHeight(*ppBmp, &facts->height);
+           Gdiplus::REAL dpix = 0.0f, dpiy = 0.0f;
+           if (Gdiplus::DllExports::GdipGetImageHorizontalResolution(*ppBmp, &dpix)==Gdiplus::Ok
+            && Gdiplus::DllExports::GdipGetImageVerticalResolution(*ppBmp, &dpiy)==Gdiplus::Ok)
+           {
+              facts->dpix = (double)dpix;
+              facts->dpiy = (double)dpiy;
+           }
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return Gdiplus::GenericError;
+    }
+
+    return st;
+}
+
+// Gdip_ResizeBitmap()'s non-indexed branch, which is also the chain dpResizeBitmap() runs in
+// dupes-pixels.h: a fresh 32bppARGB bitmap, the interpolation the caller asked for,
+// antialiased smoothing, high quality pixel offsets, one DrawImage.
+static Gdiplus::GpBitmap* tpGdipResizeCopy(Gdiplus::GpBitmap *src, int w, int h, int interpolation) {
+    if (src==NULL || w<1 || h<1)
+       return NULL;
+
+    Gdiplus::GpBitmap *dst = NULL;
+    if (Gdiplus::DllExports::GdipCreateBitmapFromScan0(w, h, 0, PixelFormat32bppARGB, NULL, &dst)!=Gdiplus::Ok || dst==NULL)
+       return NULL;
+
+    Gdiplus::GpGraphics *g = NULL;
+    if (Gdiplus::DllExports::GdipGetImageGraphicsContext(dst, &g)!=Gdiplus::Ok || g==NULL)
+    {
+       Gdiplus::DllExports::GdipDisposeImage(dst);
+       return NULL;
+    }
+
+    Gdiplus::DllExports::GdipSetInterpolationMode(g, (Gdiplus::InterpolationMode)clamp(interpolation, 0, 7));
+    Gdiplus::DllExports::GdipSetSmoothingMode(g, Gdiplus::SmoothingModeAntiAlias);
+    Gdiplus::DllExports::GdipSetPixelOffsetMode(g, Gdiplus::PixelOffsetModeHighQuality);
+    const Gdiplus::Status st = Gdiplus::DllExports::GdipDrawImageRectI(g, src, 0, 0, w, h);
+    Gdiplus::DllExports::GdipDeleteGraphics(g);
+    if (st!=Gdiplus::Ok)
+    {
+       Gdiplus::DllExports::GdipDisposeImage(dst);
+       return NULL;
+    }
+
+    return dst;
+}
+
+static Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int targetW, int targetH, int frameIndex,
+                                     int interpolation, int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
+    if (path.empty())
+       return NULL;
+
+    Gdiplus::GpBitmap *loaded = NULL;
+    TpGdipFacts facts;
+    DWORD sehCode = 0;
+    const Gdiplus::Status st = tpGuardedGdipOpen(path.c_str(), frameIndex, &loaded, &facts, &sehCode);
+    if (sehCode!=0)
+    {
+       // whatever the codec left behind is abandoned on purpose: the object most likely to
+       // fault on the way out is the one that just faulted on the way in
+       fnOutputDebug("thumbsPool: GDI+ faulted while opening " + WideCharToString(path.c_str()));
+       return NULL;
+    }
+
+    if (st!=Gdiplus::Ok || loaded==NULL)
+    {
+       if (loaded!=NULL)
+          Gdiplus::DllExports::GdipDisposeImage(loaded);
+
+       return NULL;
+    }
+
+    // the same floor tpWICload() applies: a 1x1 is what a decoder hands back when it gave up
+    if (facts.width<1 || facts.height<1 || (facts.width==1 && facts.height==1)
+     || facts.width>0x7FFFFFFFu || facts.height>0x7FFFFFFFu)
+    {
+       Gdiplus::DllExports::GdipDisposeImage(loaded);
+       return NULL;
+    }
+
+    srcW = (int)facts.width;
+    srcH = (int)facts.height;
+    if (meta!=NULL)
+    {
+       meta->frames = (facts.frames>0) ? (int)facts.frames : 1;
+       // an absurd resolution out of broken metadata is recorded as nothing at all; both
+       // comparisons are false for a NaN, which lands on the same place
+       const double dpiAvg = (facts.dpix + facts.dpiy)*0.5;
+       if (dpiAvg>0.0 && dpiAvg<1000000.0)
+          meta->dpi = (int)(dpiAvg + 0.5);
+    }
+
+    int outW = 0, outH = 0;
+    tpCalcIMGdimensions((int)facts.width, (int)facts.height,
+                        (targetW>1) ? targetW : (int)facts.width,
+                        (targetH>1) ? targetH : (int)facts.height, outW, outH);
+
+    Gdiplus::GpBitmap *out = tpGdipResizeCopy(loaded, outW, outH, interpolation);
+    Gdiplus::DllExports::GdipDisposeImage(loaded);
+    if (out==NULL)
+       fnOutputDebug("thumbsPool: failed to copy the GDI+ bitmap of " + WideCharToString(path.c_str()));
+
+    return out;
+}
+// qpv-gdip-loader-end
 
 // ---------------------------------------------------------------------------------------
 //  SVG loader; port of RenderSVGfile() / convertSVGunitsToPixels() of module-fim-thumbs.ahk
@@ -1086,7 +1260,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
         {
            const std::wstring ext = tpFileExtension(job.src);
            const bool fimHandles  = (FIM.ok && cfg->allowFIM==1 && tpFimExts.count(ext)>0);
-  
+
            if (ext==L"svg")
            {
               // a factory of this worker's own, made on first use so a session that never opens
@@ -1154,6 +1328,19 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
                               0, res.srcW, res.srcH, &res.meta);
               res.loaderUsed = 1;
+              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+           }
+
+           // The last resort, and for some files the only one: EMF and WMF have neither a
+           // FreeImage plugin nor a WIC codec, and the GIFs those two refuse are read here
+           // as well - LoadFileWithGDIp() is what draws them in the viewport. A file this
+           // cannot open either is unreadable in every sense the product has.
+           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED)
+           {
+              res.meta = TpSrcMeta();
+              bmp = tpGDIPload(job.src, cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
+                               res.srcW, res.srcH, &res.meta);
+              res.loaderUsed = 6;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
            }
         }

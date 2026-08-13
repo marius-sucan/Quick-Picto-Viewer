@@ -256,7 +256,11 @@ static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &re
     DupePixJob job;
     job.imgidu = 42;
     job.path = path;
-    dpRunJob(NULL, fx, cfg, tcfg, job, res);
+    ID2D1Factory *d2dFac = NULL;      // the per-worker factory dpWorkerBody() keeps
+    dpRunJob(NULL, d2dFac, fx, cfg, tcfg, job, res);
+    if (d2dFac!=NULL)
+       delete d2dFac;
+
     dpFreeEffects(fx);
 }
 
@@ -275,12 +279,16 @@ static void jobPipeline() {
     cfg.wantFlipped = 0;
     cfg.applyBlur = 0;
 
-    gShimWicFails = 0;
+    gShimWicFails = gShimFimFails = gShimSvgFails = gShimPdfFails = gShimGdipFails = 0;
     gShimWicCalls = gShimFimCalls = gShimGrayCalls = 0;
+    gShimSvgCalls = gShimPdfCalls = gShimGdipCalls = 0;
+
+    // each loader is offered the extensions it claims, in the order tpRunJob() runs them,
+    // and what none of them claims still has GDI+ behind it
     DupePixResult res;
     runOne(L"img1.jpg", cfg, res);
     check(res.status==DP_OK, "a WIC format is collected");
-    check(gShimWicCalls==1 && gShimFimCalls==0, "WIC was asked, FreeImage was not");
+    check(gShimWicCalls==1 && gShimFimCalls==0, "WIC was asked, FreeImage was not - it does not claim .jpg");
     check(res.loaderUsed==1, "and the result says so");
     check(res.small.size()==72 && res.big.size()==1024, "both fingerprints have their full length");
     check(res.smallH.empty() && res.bigH.empty(), "no flipped fingerprints were asked for");
@@ -293,29 +301,84 @@ static void jobPipeline() {
           "and so are the frame count, the resolution and the pixel format");
 
     qpvSetPixelFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR", L"MINISWHITE|MINISBLACK|RGB", L"|||32-PARGB||");
-    check(qpvPixelFormatName(res.loaderUsed, res.meta)==L"24-bpp - BGR", "a WIC format is named the way WicPixelFormats() names it");
+    check(qpvPixelFormatName(res.loaderUsed, res.meta)==L"24-bpp - BGR",
+          "a WIC format is named the way WicPixelFormats() names it");
 
-    // a format WIC does not declare goes straight to FreeImage
+    // a format FreeImage claims goes to it, and never to WIC
     gShimWicCalls = gShimFimCalls = 0;
     DupePixResult res2;
     runOne(L"img2.exr", cfg, res2);
-    check(res2.status==DP_OK && gShimWicCalls==0 && gShimFimCalls==1, "a FreeImage-only format skips WIC");
+    check(res2.status==DP_OK && gShimFimCalls==1 && gShimWicCalls==0, "a FreeImage format skips WIC");
     check(res2.loaderUsed==2, "and reports the FreeImage loader");
+    check(res2.width==80 && res2.height==60, "with the dimensions FreeImage reported");
     check(qpvPixelFormatName(res2.loaderUsed, res2.meta)==L"48-RGB (TONE-MAPPABLE)",
           "a FreeImage format is named bit depth, colour type and tone mapping marker");
 
-    // ... and so does one WIC declares but cannot open
+    // whatever the loader that claimed the file cannot open falls through to the next one,
+    // and the last one is GDI+ - the loader that reads EMF, WMF and the GIFs the other two
+    // refuse, and the reason a file the viewport displays is no longer marked dead here
     gShimWicFails = 1;
-    gShimWicCalls = gShimFimCalls = 0;
-    DupePixResult res3;
-    runOne(L"img3.jpg", cfg, res3);
-    check(res3.status==DP_OK && gShimWicCalls==1 && gShimFimCalls==1, "a WIC failure falls back to FreeImage");
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;
+    DupePixResult res2b;
+    runOne(L"img3.jpg", cfg, res2b);
+    check(res2b.status==DP_OK && gShimWicCalls==1 && gShimGdipCalls==1, "a WIC failure falls through to GDI+");
+    check(res2b.loaderUsed==6, "and reports the GDI+ loader");
     // the WIC attempt filled the record before it gave up; what is written must describe
     // the decode that actually happened
-    check(res3.meta.wicFmt==-1 && res3.meta.frames==1 && res3.meta.dpi==300,
+    check(res2b.meta.wicFmt==-1 && res2b.meta.frames==7 && res2b.meta.dpi==96,
           "the abandoned WIC attempt leaves nothing of itself behind");
-    check(qpvPixelFormatName(res3.loaderUsed, res3.meta)==L"48-RGB (TONE-MAPPABLE)", "and the name comes from FreeImage");
+    check(res2b.width==120 && res2b.height==90, "and the dimensions are the ones GDI+ reported");
+    check(qpvPixelFormatName(res2b.loaderUsed, res2b.meta).empty(),
+          "GDI+ names no pixel format - the interpreter sends no table for it");
     gShimWicFails = 0;
+
+    // a format NEITHER of them claims reaches GDI+ without either being started
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;
+    DupePixResult res2c;
+    runOne(L"drawing.emf", cfg, res2c);
+    check(res2c.status==DP_OK && gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==1,
+          "a format neither loader claims goes straight to GDI+");
+    check(res2c.loaderUsed==6 && res2c.meta.frames==7, "the properties of the original come off GDI+ as well");
+
+    // and a file NOTHING can open is a decode failure, which is what marks a row dead
+    gShimGdipFails = 1;
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;
+    DupePixResult res2d;
+    runOne(L"broken.gif", cfg, res2d);
+    check(res2d.status==DP_ERR_LOAD, "a file every loader refuses fails the decode");
+    check(gShimGdipCalls==1, "after the last one was given a turn at it");
+    gShimGdipFails = 0;
+
+    // the two formats with a renderer of their own; both are reached BEFORE FreeImage and
+    // neither is handed to another loader afterwards
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = gShimSvgCalls = 0;
+    DupePixResult res3;
+    runOne(L"vector.svg", cfg, res3);
+    check(res3.status==DP_OK && gShimSvgCalls==1, "an SVG is rendered by the SVG loader");
+    check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "and by nothing else");
+    check(res3.loaderUsed==3 && res3.meta.frames==1 && res3.meta.dpi==96,
+          "one frame at 96 DPI, the way RenderSVGfile() reports it");
+    check(res3.width==200 && res3.height==100, "the size the document declares is the recorded one");
+    check(qpvPixelFormatName(res3.loaderUsed, res3.meta)==L"32-PARGB", "and the format is the renderer's constant");
+
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = gShimPdfCalls = 0;
+    DupePixResult res3b;
+    runOne(L"doc.pdf", cfg, res3b);
+    check(res3b.status==DP_OK && gShimPdfCalls==1, "a PDF is rendered by PDFium");
+    check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "and by nothing else");
+    check(res3b.loaderUsed==4 && res3b.meta.frames==5, "the page count is what imgframes gets");
+    check(res3b.width==612 && res3b.height==792, "and the page size in points is the recorded one");
+    check(qpvPixelFormatName(res3b.loaderUsed, res3b.meta).empty(), "a PDF is left unnamed");
+
+    // a document that will not render is a plain decode failure here - which is what marks
+    // the row - deliberately unlike the thumbnails pool, where TP_ERR_PDFLOCKED spares a
+    // password protected PDF. GDI+ cannot read a PDF either, hence the second switch.
+    gShimPdfFails = gShimGdipFails = 1;
+    gShimFimCalls = gShimGdipCalls = gShimPdfCalls = 0;
+    DupePixResult res3c;
+    runOne(L"locked.pdf", cfg, res3c);
+    check(res3c.status==DP_ERR_LOAD && gShimPdfCalls==1, "a PDF that will not render fails the decode");
+    gShimPdfFails = gShimGdipFails = 0;
 
     // the thumbnails pool asks for the same name through this export, so that a thumbnail
     // and a collection run put one spelling in front of the user for one file. Loader 3
@@ -324,7 +387,7 @@ static void jobPipeline() {
     // and the interpreter do not agree on - both must answer nothing at all.
     {
         wchar_t buf[64];
-        const TpSrcMeta &m = res.meta;
+        const TpSrcMeta &m = res.meta;       // the one WIC decoded
         check(qpvGetPixelFormatName(1, m.wicFmt, 0, -1, 0, buf, 64)==12 && std::wstring(buf)==L"24-bpp - BGR",
               "qpvGetPixelFormatName hands the WIC name to the thumbnails pool");
         check(qpvGetPixelFormatName(3, -1, 0, -1, 0, buf, 64) > 0 && std::wstring(buf)==L"32-PARGB",
@@ -333,17 +396,22 @@ static void jobPipeline() {
               "a PDF is left unnamed, the way the drain leaves it uncollected");
         check(qpvGetPixelFormatName(5, -1, 0, -1, 0, buf, 64)==0 && buf[0]==0,
               "and a cached thumbnail file has no name to give");
+        check(qpvGetPixelFormatName(6, -1, 0, -1, 0, buf, 64)==0 && buf[0]==0,
+              "and neither has GDI+, which the interpreter sends no table for");
         // a caller with a short buffer gets a truncated, terminated string, never a spill
         check(qpvGetPixelFormatName(1, m.wicFmt, 0, -1, 0, buf, 5)==4 && std::wstring(buf)==L"24-b",
               "a short buffer truncates and still terminates");
     }
 
     // a file that is not there is never handed to a decoder
-    gShimWicCalls = gShimFimCalls = 0;
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = gShimSvgCalls = gShimPdfCalls = 0;
     DupePixResult res4;
     runOne(L"gone.jpg", cfg, res4);
     check(res4.status==DP_ERR_LOAD, "a missing file fails");
-    check(gShimWicCalls==0 && gShimFimCalls==0, "... without either decoder being started");
+    check(gShimWicCalls==0 && gShimFimCalls==0 && gShimGdipCalls==0, "... without any decoder being started");
+    runOne(L"gone.svg", cfg, res4);
+    runOne(L"gone.pdf", cfg, res4);
+    check(gShimSvgCalls==0 && gShimPdfCalls==0, "and neither do the two renderers ahead of them");
 
     // the blur is two passes, the way Gdip_GaussianBlur() applied it
     cfg.applyBlur = 1;
@@ -536,8 +604,8 @@ static void collectionAgainstRealSQLite() {
           "the histogram statistics landed on the same rows");
     check(scalar(db, "SELECT count(*) FROM images WHERE fsize=4096")==wantOK, "so did the file size");
     // the three columns the collection stopped writing when it moved in here. They describe
-    // the file, not the 350 pixel intermediate: the stub decodes 40x30 and reports a 3 frame,
-    // 72 DPI, 24-bpp source, and that is what has to be in the database.
+    // the file, not the 350 pixel intermediate: these are .jpg, which only WIC claims here,
+    // and its stub decodes 40x30 and reports a 3 frame, 72 DPI, 24-bpp source.
     check(scalar(db, "SELECT count(*) FROM images WHERE imgframes=3 AND imgdpi=72"
                      " AND imgpixfmt='24-bpp - BGR'")==wantOK,
           "the frame count, the resolution and the pixel format of the ORIGINAL landed too");
@@ -782,6 +850,112 @@ static void collectionSurvivesMemoryPressure() {
 }
 
 // ---------------------------------------------------------------------------------------
+//
+// The files only GDI+ can read - EMF, WMF, and the GIFs FreeImage refuses and WIC has no
+// codec for - reach the third loader, and what they leave behind respects a column another
+// producer already filled.
+//
+// Both halves matter. Before the GDI+ loader existed those files reached neither pool's
+// decoder at all: the collection marked them isDeleted=1, which hides them from the whole
+// library until the caches overview revalidates them, and the thumbnails pool drew nothing.
+// And a loader that cannot name a pixel format must leave imgpixfmt alone rather than write
+// NULL over it, or "collected, and the format is blank" and "never collected" become the
+// same thing to ifnull(imgpixfmt,'')='' and the single threaded pass re-decodes those files
+// on every run, for ever.
+static void gdipLoaderAndTheColumnsItCannotFill() {
+    printf("  the files only GDI+ reads\n");
+    bindSQLiteOnce();
+    if (!SQ.ok || SQ.exec==NULL || SQ.bind_double==NULL || SQ.bind_blob==NULL)
+    {
+       printf("    SKIPPED: libsqlite3.so.0 is not available\n");
+       return;
+    }
+
+    const char *path = "pixels_gdip.sldb";
+    remove(path);
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(path, &db, SQLITE_OPEN_READWRITE | QPV_SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK || db==NULL)
+    {
+       printf("    could not create the scratch database\n");
+       failures++;
+       return;
+    }
+
+    execOrDie(db,
+        "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
+        " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
+        " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
+        " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
+        " smallH BLOB, bigH BLOB);", "create the v3 schema");
+
+    // 1: a format neither FreeImage nor WIC claims, and something has already written a
+    //    pixel format for it - the single threaded pass, or a thumbnails page
+    // 2: the same file with nothing known about it yet
+    // 3: an ordinary image, which WIC reads and names
+    execOrDie(db,
+        "BEGIN;"
+        "INSERT INTO images (imgidu, imgfile, imgfolder, imgpixfmt, imgdpi) VALUES (1,'logo1.emf','C:\\p','32-ARGB',600);"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (2,'logo2.emf','C:\\p');"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (3,'img3.jpg','C:\\p');"
+        "COMMIT;", "insert the rows");
+
+    for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 4;
+    tpWicExts.clear();
+    tpFimExts.clear();
+    tpWicExts.insert(L"jpg");
+    FIM.ok = true;
+    m_pIWICFactory = (IWICImagingFactory*)1;
+    qpvSetPixelFormatNames(L"a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|24-bpp - BGR",
+                           L"MINISWHITE|MINISBLACK|RGB", L"|||32-PARGB||");
+    check(dupesPixInit(2) >= 1, "the pool starts");
+
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;
+    const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"
+                         L" WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
+                         L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "dupesPixBegin prepares the run");
+
+    execOrDie(db, "BEGIN;", "open the transaction");
+    int steps = 0;
+    while (dupesPixStep(5)==1)
+        if (++steps > 200000) { printf("    the collection loop did not terminate\n"); failures++; break; }
+
+    execOrDie(db, "COMMIT;", "commit the collected data");
+    dupesPixEnd();
+
+    check(dpState.written==3, "all three images were collected");
+    check(dpState.failed==0, "none of them failed");
+    check(gShimGdipCalls==2, "the two EMFs reached GDI+");
+    check(scalar(db, "SELECT count(*) FROM images WHERE isDeleted=1")==0,
+          "and nothing was marked dead - which is what used to happen to every one of them");
+    check(scalar(db, "SELECT count(*) FROM imagesPixels")==3, "every one of them has a fingerprint");
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgavg IS NOT NULL")==3,
+          "and its histogram statistics");
+
+    // the properties GDI+ does report land; imgdpi is a real value, so it replaces the one
+    // that was there
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgfile LIKE 'logo%'"
+                     " AND imgwidth=120 AND imgheight=90 AND imgframes=7 AND imgdpi=96")==2,
+          "the size, the frame count and the resolution come off GDI+");
+
+    // ... and the one it cannot report does not erase what was known
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgidu=1 AND imgpixfmt='32-ARGB'")==1,
+          "a loader that names no pixel format leaves the one already there alone");
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgidu=2 AND imgpixfmt IS NULL")==1,
+          "and writes nothing where there was nothing");
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgidu=3"
+                     " AND imgpixfmt='24-bpp - BGR'")==1,
+          "while a loader that can name one still writes it");
+
+    check(dupesPixShutdown()==1, "the pool shuts down cleanly");
+    SQ.close_v2(db);
+    remove(path);
+}
+
+// ---------------------------------------------------------------------------------------
 
 int main() {
     printf("dupes-pixels.h\n");
@@ -792,6 +966,7 @@ int main() {
     poolPlumbing();
     collectionAgainstRealSQLite();
     processFailureIsNotMarkedDead();
+    gdipLoaderAndTheColumnsItCannotFill();
     collectionSurvivesMemoryPressure();
 
     printf("\n  %s\n", failures ? "PIXEL COLLECTOR TEST FAILED" : "pixel collector test passed");

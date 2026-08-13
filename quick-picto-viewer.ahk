@@ -4806,9 +4806,11 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
 ; branch is still there and still does it - it is the fallback for machines where the pool
 ; is off - so without this the two paths disagree about the very same folder.
 ;
-; Only for an image the workers opened themselves. Loader 5 decoded the CACHED thumbnail
-; PNG: its dimensions, frame count and pixel format are the cache file's, and writing them
-; would tell the files list that every photograph in the library is a 250 pixel PNG.
+; Only for an image the workers opened themselves: loaders 1 [WIC], 2 [FreeImage], 3 [SVG]
+; and 6 [GDI+], which is the one that reads EMF, WMF and the GIFs the other two refuse.
+; Loader 5 decoded the CACHED thumbnail PNG: its dimensions, frame count and pixel format
+; are the cache file's, and writing them would tell the files list that every photograph in
+; the library is a 250 pixel PNG.
 ; Loader 0 means nothing ran. Loader 4, PDFium, is left out on purpose: none of these
 ; columns describes a PDF, and the two render paths do not even agree on the numbers - the
 ; PDF branch of tpRunJob() in thumbs-pool.h says why. PDFs keep being collected by the
@@ -4816,7 +4818,7 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
 poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
    Static nameBuf
    loaderUsed := NumGet(resultsBuffer, offu + 44, "Int")
-   If (loaderUsed<1 || loaderUsed>3)
+   If (loaderUsed<1 || loaderUsed=4 || loaderUsed=5 || loaderUsed>6)
       Return 0
 
    srcW := NumGet(resultsBuffer, offu + 24, "Int")
@@ -36743,11 +36745,17 @@ initDupesPixelsPool() {
 
    ; The loaders and the extension sets are the thumbnails pool's. Setting the formats does
    ; not start that pool and does not depend on it having been started - initThumbsPool()
-   ; declines outright when allowMultiCoreMode is off or memory is being minimised, and
-   ; without these two lists every file would look like a format WIC cannot handle and go
-   ; straight to FreeImage.
+   ; declines outright when allowMultiCoreMode is off or memory is being minimised - and
+   ; both lists decide which loader is offered a file at all: without them every file falls
+   ; past FreeImage and WIC alike, straight to the GDI+ loader.
+   ;
+   ; The same two lists initThumbsPool() sends, svg and pdf taken out of the WIC one for the
+   ; same reason: both pools render those two themselves and WIC has a codec for neither, so
+   ; leaving them in only buys a doomed WIC attempt after the renderer has already failed.
+   ; The DLL keeps ONE pair of sets for both pools, so these two calls must agree - whichever
+   ; of them runs last is the one that counts.
    initFIMGmodule()
-   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(RegExWICfmtPtrn), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
 
    nThreads := (minimizeMemUsage=1) ? 2 : realSystemCores
    r := DllCall("qpvmain.dll\dupesPixInit", "Int", nThreads, "Int")
