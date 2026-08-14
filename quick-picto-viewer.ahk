@@ -147,7 +147,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", hGuiBtn
    , CCLVO := " gInvokeStandardDialogColorPicker -E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit ", FontList := []
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", prevSetWinPosX := "", prevSetWinPosY := ""
-   , coreIMGzeitLoad := 0, desiredFrameIndex := 0, prevDrawingMode := 0, sqlFailedInit := 0, currentImgModified := 0
+   , coreIMGzeitLoad := 0, desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0
    , currIMGdetails := [], AbackupIMGdetails := [], BbackupIMGdetails := [], mainLoadedIMGdetails := [], lastSelPrinterName := ""
    , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
@@ -36161,7 +36161,7 @@ uiPopulateCachesOverview() {
     ; generated from imgwidth, so it can carry a value for an image whose properties are only
     ; half collected. This figure has to describe the same population that "collect image
     ; details" would go and scan, or the panel reports 100% for work that is still pending.
-    rowsDef[3] := ["Image details", "WHERE ifnull(imgmegapix, '')='' OR ifnull(imgpixfmt, '')='' ", 1, "image details", 1]
+    rowsDef[3] := ["Image details", "WHERE ifnull(imgwidth, '')='' AND ifnull(imgheight, '')='' ", 1, "image details", 1]
     rowsDef[4] := ["Image histogram details", "WHERE ifnull(imgmedian, '')='' ", 1, "image histograms", 1]
     rowsDef[5] := ["Pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
     rowsDef[6] := ["Flipped pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"), 0, "pixel data (flipped)", 1]
@@ -39768,12 +39768,10 @@ coreSearchIndex(imgPath, givenRegEx, whatu, invertu:=0) {
    }
 
    ; ToolTip, % stringu "`n" thisSearchString "`n" z , , , 2
-   try
-      matchu := RegExMatch(stringu, givenRegEx)
-   catch e
-      Return 0
-
-   Return invertu ? (matchu ? 0 : 1) : matchu
+   If !invertu
+      Return RegExMatch(stringu, givenRegEx)
+   Else
+      Return RegExMatch(stringu, givenRegEx) ? 0 : 1
 }
 
 processSearchIndexString(inputu) {
@@ -73651,7 +73649,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
   }
 
   thisImgPath := imgPath
-  doIT := ((A_TickCount - lastInvoked<125) && (drawModeAzeit>180 && LastWasFastDisplay!=1 && prevDrawingMode=1)) || ((A_TickCount - lastInvoked<65) && (prevImgPath!=thisImgPath && drawModeAzeit>50)) || ((A_TickCount - lastInvoked<10) && prevDrawingMode=1) ? 1 : 0
+  doIT := ((A_TickCount - lastInvoked<125) && (drawModeAzeit>180 && LastWasFastDisplay!=1)) || ((A_TickCount - lastInvoked<65) && (prevImgPath!=thisImgPath && drawModeAzeit>50)) ? 1 : 0
   skippedKeys := navKeysCounter - prevNavKeysu
   delayu := (skippedKeys>1) ? 450 : 350
   If ((skippedKeys>5 || (A_TickCount - lastSkippy<delayu)) && thumbsDisplaying!=1)
@@ -73949,7 +73947,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        If (thisImgPath!=prevImgPath && currentFileIndex!=0)
        {
           terminateIMGediting()
-          If InStr(filesFilter, "QPV:PAGES:") ? 
+          If InStr(filesFilter, "QPV:PAGES:")
              desiredFrameIndex := currentFileIndex - 1
           ; Else If (SubStr(prevImgPath, InStr(prevImgPath, "|"))!=SubStr(thisImgPath, InStr(thisImgPath, "|")))
           Else If (prevImgPath!=thisImgPath)
@@ -74006,6 +74004,9 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
    If (IMGresizingMode=3) ; original [100%]
    {
+      ; mode no longer accessible
+      ResizedW := oImgW
+      ResizedH := oImgH
       lGuiW := (GuiW>oImgW) ? oImgW : GuiW
       lGuiH := (GuiH>oImgH) ? oImgH : GuiH
       ws := Round(ResizedW / oImgW * 100, 1)
@@ -74014,13 +74015,10 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
          ws := Round(((lGuiW*lGuiH) / (oImgW * oImgH)) * 100, 1)
          ws .= "% visible"
       } Else If (ws>100)
-      {
          ws := "100%"
-      } Else ws .= "%"
+      Else ws .= "%"
 
       zoomLevel := 1
-      ResizedW := oImgW
-      ResizedH := oImgH
    } Else If (IMGresizingMode=4) ; custom zoom level
    {
       prevVPsize := max(prevResizedVPimgW, prevResizedVPimgH)
@@ -74147,8 +74145,6 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    ResizedW := Round(ResizedW)
    ResizedH := Round(ResizedH)
    r := QPV_ShowImgonGui(ResizedW, ResizedH, GuiW, GuiH, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged)
-   delayu := (A_TickCount - prevFastDisplay < 300) ? 90 : 550
-   thisModus := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? 1 : 0
    infoFilesSel := (markedSelectFile>0) ? "[ " markedSelectFile " ] " : ""
    If (totalFramesIndex>0)
       infoFrames := "["  desiredFrameIndex "/" totalFramesIndex "] "
@@ -82447,6 +82443,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        mustGenerate := 0
 
     mustGoIntoLowQuality := 0
+    sizeChanged := (prevNewW!=newW || prevNewH!=newH) ? 1 : 0
     thisDelayu := (vpImgPanningNow=2 || sizeChanged=1) ? 950 : 400
     If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>10 && userimgQuality=1))
        mustGoIntoLowQuality := 1
@@ -82473,13 +82470,11 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If !validBMP(whichBitmap)
        Return "invalid screen bitmap"
 
-    sizeChanged := (prevNewW!=newW || prevNewH!=newH) ? 1 : 0
     prevNewW := newW, prevNewH := newH
     ; ToolTip, % "resized cache = " mustGenerate " | " oldZoomLevel "==" zoomLevel  , , , 2
     interfaceThread.ahkassign("canCancelImageLoad", 0)
     startZeit := A_TickCount
-    oldZoomLevel := matrix := ""
-    prevDrawingMode := 1
+    oldZoomLevel := ""
     thisVPpanningNow := (vpImgPanningNow=2) ? 1 : 0
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     calcIMGcoordsInVP(mainWidth, mainHeight, newW, newH, zoomLevel, IMGdecalageX, IMGdecalageY, DestPosX, DestPosY, IMGdecalageX, IMGdecalageY)
@@ -82503,6 +82498,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     diffIMGdecX := diffIMGdecY := 0
     If (r := retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, newH))
     {
+       If (mustRecordSeenImgs=1 && gdiBMPchanged=1 && !InStr(r, "error"))
+          recordSeenIMGdbEntry(imgPath, currentFileIndex)
        prevVPcacheIMGid := ""
        prevVPcacheHadpartialFX := prevVPcacheIDfx := prevNewW := prevNewH := ""
        prevVPcachePos := "", prevVPcacheZoom := []
@@ -82540,14 +82537,14 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     allowForceIMGload := (thisVPpanningNow=1) ? ForceIMGload : 0
     thisVPcacheIMGid := "a" gdiBitmap currentFileIndex imgPath allowForceIMGload whichBitmap desiredFrameIndex currentUndoLevel UserMemBMP undoLevelsRecorded UserVPalphaBgrStyle
     thisVPcachePos := "a" newW newH zoomLevel allowForceIMGload DestPosX DestPosY thisVPcacheIMGid
-    prevVPcacheIDfx := (AnyWindowOpen=74) ? "-" : decideGDIPimageFX(matrix, imageAttribs, pEffect)
+    thisVPcacheIDfx := (AnyWindowOpen=74) ? "-" : decideGDIPimageFX(matrix, imageAttribs, pEffect)
     forceNoFXcaching := (thisVPcachePos=prevVPcachePos && prevVPcacheHadpartialFX=2 && thisVPpanningNow=0) ? 1 : 0
     thisThingMatrix := (IntensityAlphaChannel>1 && imgFxMode>=2 && imgFxMode!=8 && currIMGdetails.HasAlpha=1) ? 1 : 0
     isAlphaMaskMode := (currIMGdetails.HasAlpha=1 && imgFxMode=8 && ForceNoColorMatrix=0) ? 1 :0 
     thisImgAlphaChn := "a" IntensityAlphaChannel thisThingMatrix isAlphaMaskMode
     trGdip_GetImageDimensions(whichBitmap, rImgW, rImgH)
     ; ToolTip, % forceNoFXcaching "==" vpImgPanningNow "|" allowVPcacheOptimizations "`n" thisVPcachePos "`n" prevVPcachePos , , , 2
-    If (thisVPcachePos!=prevVPcachePos || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn || liveBrushModeUpdates=1)
+    If (thisVPcachePos!=prevVPcachePos || thisVPcacheIDfx!=prevVPcacheIDfx || forceNoFXcaching=1 || !validBMP(ViewPortBMPcache) || thisImgAlphaChn!=prevImgAlphaChn || liveBrushModeUpdates=1)
     {
        If (mustGoIntoLowQuality>0)
        {
@@ -82661,7 +82658,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           {
              Gdip_DisposeEffect(thisPeffect)
              Gdip_DisposeImageAttributes(thisImageAttribs)
-             thisImageAttribs := thisPeffect := pEffect := imageAttribs := ""
+             thisImageAttribs := thisPeffect := ""
+             ; pEffect := imageAttribs := ""
           }
           ; ToolTip, % r2 "==" diffuDestPosX "==" diffuDestPosY "`n"  brickIMGx "=" brickIMGy "`n" brickIMGw "==" brickIMGh , , , 2
        }
@@ -82831,9 +82829,10 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
           thisBMP := trGdip_CloneBitmap(A_ThisFunc, ViewPortBMPcache)
           If validBMP(thisBMP)
              Gdip_BitmapApplyEffect(thisBMP, pEffect, dpX, dpY, kW, kH)
-
-          Gdip_DisposeEffect(pEffect)
        }
+
+       If pEffect
+          Gdip_DisposeEffect(pEffect)
 
        aBmp := validBMP(thisBMP) ? thisBMP : ViewPortBMPcache
        r2 := trGdip_DrawImage(A_ThisFunc, glPG, aBmp, dpX, dpY, kW, kH, dpX, dpY, kW, kH,,, imageAttribs)
@@ -82855,7 +82854,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     }
 
     ; ToolTip, % confirmTexBGR "=" z "=" hRgnA "==" gdiAmbientalTexBrush , , , 2
-    thisModus := (mustPlayAnim=0 && thisUSRimgQuality=0 && userimgQuality=1 && mustGoIntoLowQuality!=2) ? 2 : 1
+    thisModus := (mustPlayAnim!=1 && thisUSRimgQuality=0 && userimgQuality=1 && mustGoIntoLowQuality!=2) ? 2 : 1
     drawHUDelements(thisModus, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, imgPath)
     Gdip_ResetWorldTransform(glPG)
     If (minimizeMemUsage!=1 && slideShowRunning=1 && doSlidesTransitions=1 && slideShowDelay>950 && validBMP(GDIfadeVPcache))
@@ -83058,7 +83057,7 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       wasEntireX := (apx1=1 && apx2=1) ? 1 : 0
       wasEntireY := (apy1=1 && apy2=1) ? 1 : 0
       vpCacheBmp := trGdip_DisposeImage(vpCacheBmp, 1)
-      otherIDu := imgIDu "|" mainWidth "|" mainHeight
+      otherIDu := imgIDu "|" mainWidth "|" mainHeight "|" kW "|" kH
       If (otherIDu=entireVpCacheIDu && wasEntireX=1 && wasEntireY=1 && (kW>mainWidth*0.85 || kH>mainHeight*0.85))
       {
          ; SoundBeep , 900, 100
@@ -83070,7 +83069,7 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
          {
             entireVpCacheBmp := trGdip_DisposeImage(entireVpCacheBmp, 1)
             entireVpCacheBmp := trGdip_CloneBitmap(A_ThisFunc, vpCacheBmp)
-            entireVpCacheIDu := imgIDu "|" mainWidth "|" mainHeight
+            entireVpCacheIDu := otherIDu
          }
       }
       ; ToolTip, % sfPosX1 "|" sfPosY1 "`n" sfW "|" sfH "`n" kW "|" kH , , , 2
@@ -83085,7 +83084,7 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
    If !validBMP(lolBMP)
       Return "error"
 
-   Gdip_GraphicsClear(glPG)
+   Gdip_GraphicsClear(glPG, "0xFF" WindowBGRcolor)
    trGdip_GetImageDimensions(lolBMP, imgW, imgH)
    ; ToolTip, % sfPosX1 "/" sfPosY1 "`n" sfPosX2 "/" sfPosY2 "`n" imgW "/" imgH "`n" kW "/" kH "`n" sfW "/" sfH , , , 2
 
@@ -83107,7 +83106,6 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
    tzGdip_DrawImage(glPG, lolBMP, tdpX, tdpY, timgW, timgH)
    trGdip_DisposeImage(lolBMP)
 
-   ; thisModus := (mustPlayAnim=0 && thisUSRimgQuality=0 && userimgQuality=1 && mustGoIntoLowQuality!=2) ? 2 : 1
    drawHUDelements(1, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, viewportQPVimage.ImgFile)
    Gdip_ResetWorldTransform(glPG)
    whichWin := (imgEditPanelOpened=1 && AnyWindowOpen!=10) ? hGDIthumbsWin : hGDIwin
@@ -85306,9 +85304,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    ; amortize any longer; the only thing that still does not pay off is a lone image
    maxLimitReached := (minimizeMemUsage=1) && (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
    mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && multiCoreThumbsInitGood=1 && thumbsPoolState) ? 1 : 0
-   If (imgsNotCached + imgsFileCached < 2)
-      mustDoMultiCore := 0
-   If InStr(filesFilter, "qpv:pages:")
+   If ((imgsNotCached + imgsFileCached < 2) || InStr(filesFilter, "qpv:pages:"))
       mustDoMultiCore := 0
 
    fnOutputDebug("ThumbsMode. Init. doMultiCore=" mustDoMultiCore " cores=" limitCores " imgsNotCached=" imgsNotCached " fileCached=" imgsFileCached " imgsMustPaint=" imgsMustPaint)
@@ -86703,7 +86699,7 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
      SoundBeep , 900, 100
 
   If (dbVersion!=dbExpectedVersion && importMode!=1)
-     msgResult := msgBoxWrapper(appTitle ": WARNING", "This database was saved by an older version of " appTitle ". Some features in the application will likely malfunction, because this version of the application expects a database with a different structure.`n`nPlease use the «Rebuild» option in the save panel to recreate this database with the new structure. Resaving this database will not restructure the database.", "&OK", 1, "exclamation")
+     msgResult := msgBoxWrapper(appTitle ": WARNING", "This file was saved by a version of " appTitle " that used a different database structure. Some features in the application will likely malfunction. SLDB database schema v3 is expected.`n`nPlease use the «Rebuild» option in the save panel to recreate this database with the new structure. Resaving this database will not restructure the database.", "&OK", 1, "exclamation")
 
   If (importMode=1)
      activeSQLdb.CloseDB()
@@ -89308,8 +89304,6 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Button, xm+15 y+20 h%thisBtnHeight% w%btnWid% Default gBTNfindDupesNow, &Find duplicates
     If testIsDupesList()
        Gui, Add, Button, x+5 hp wp gBTNautoselectDupes, &Auto-select dupes
-    ; Else
-    ;    Gui, Add, Button, x+5 hp wp gBtnCollectDupesData, Collect files &data
     btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNhelpFindDupes, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
@@ -89336,8 +89330,8 @@ BtnCollectDupesData() {
    GuiControlGet, findDupesPrecision
 
    BtnCloseWindow()
-   scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
-   collectSQLFileInfosNow(scu, 0, 0, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
+   ; scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
+   collectSQLFileInfosNow("HpixelzFsmall", 0, 0, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
    PopulateImagesIndexStatsInfos("kill")
    openPreviousPanel()
 }
