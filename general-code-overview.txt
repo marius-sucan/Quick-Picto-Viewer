@@ -43,11 +43,15 @@ Deniere mise à jour: mercredi 12 août 2026.
    I circumvented this by creating my own DLL in C++ which I rely 
    on to process data.
 
-   QPV v6.0 is the last major development push that I plan. This 
-   version brings full support for images above 536 megapixels
-   (the limit of GDI+), through FreeImage. Most of the image
-   editing tools will work with such images - through my own DLL:
-   "qpvmain.dll". 
+   In 2024, QPV v6.0 was a major development push.
+   This version brings full support for images above 536 megapixels
+   (the limit of GDI+), through FreeImage. Most of the image editing
+   tools will work with such images - through my own DLL: qpvmain.dll.
+   In 2026, another major development drive was possible with AI. Using
+   Gemini and Claude I optimized and overhauled various parts of QPV.
+   Multi-threaded thumbnails generation and image duplicates detection
+   were reimplemented with C++. Many image editing tools are now much
+   more efficient.
 
    I use a custom build of the FreeImage.DLL. Because the developer 
    behind Freeimage rarely updates the library, I decided to make my 

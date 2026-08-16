@@ -4693,6 +4693,7 @@ QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSav
 ; prepares the workers for one QPV_ShowThumbnails() run; it also discards whatever
 ; may have been left behind by a previous, abandoned run
 ; in the dll, a struct type ThumbsConfig holds these parameters
+; see also initDupesPixelsPool()
     If (multiCoreThumbsInitGood!=1 || !thumbsPoolState)
        Return 0
 
@@ -11632,6 +11633,8 @@ VPchangeLumos(dir, dummy:=0) {
          addMsg .= "`nImage color depth: ALTERED [ " defineColorDepth() " ]"
       If (vpIMGrotation>0)
          addMsg .= "`nImage rotated: " vpIMGrotation "° degrees."
+      If InStr(currIMGdetails.PixelFormat, "TONE-MAPPED")
+         addMsg .= "`nImage TONE-MAPPED based on user defined settings."
 
       addMsg .= defineIMGmirroring()
       If (dummy!="k" && showHardReset=1)
@@ -36420,6 +36423,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          ; Nothing to collect is not a failure - the pool is simply never started - and this
          ; branch must not fall through to the serial loop below in that case either: there
          ; is no result set here to walk, only a count.
+         ReadSettingsAdjustToneMapPanel()
+         calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
          If (filesToBeSorted>0 && collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, abandonAll, countTFilez, failedFiles, failedSQLfiles, ErrorMsg)!=1)
          {
             addJournalEntry(A_ThisFunc "(): the in-DLL collection pool could not be started; no image data was collected.")
@@ -36565,15 +36570,12 @@ reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, already
 }
 
 collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonAll, ByRef countTFilez, ByRef failedFiles, ByRef failedSQLfiles, ByRef ErrorMsg) {
-; ---- the pool-driven half of mode 3 ------------------------------------------------------
 ; Returns 1 when the pool ran the collection, 0 when it could not be started at all. The
 ; tallies come back through the ByRef parameters, exactly as the serial loop maintains them,
 ; and ErrorMsg carries whatever went wrong while it was running.
 ;
 ; The DLL writes on activeSQLdb's own handle, inside the transaction opened here, so the
 ; periodic COMMIT keeps its meaning: an interrupted run keeps every image it finished.
-; That is what the collect-data dialog says and the reason the whole phase is
-; resumable at all.
    Static msBudget := 320
    ; The longest the whole pool may go without finishing a single image before this stops
    ; waiting for it. QPV_ShowThumbnails() keeps the same kind of watch over the thumbnails
@@ -36604,9 +36606,15 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    ; second refill would hand it out all over again. A partial run still resumes exactly
    ; where it stopped - the cursor restarts at zero and the rows already written no longer
    ; match at all.
+   ; images are decoded by dpDecodeFile() found in dupes-pixels.h and it relies on thumbs-pool.h
+
+   Static thumbSize := 350
    selectSQL := "SELECT imgidu, fullPath FROM images " thisWhere " AND imgidu>?2 ORDER BY imgidu LIMIT ?1;"
    thisPolation := (hamDistInterpolation=1) ? 6 : 5
-   packedOptions := 350 "|" thisPolation "|" dupesApplyBlur "|" findFlippedDupes "|" allowWICloader "|" allowFIMloader "|" userHQraw "|" allowToneMappingImg
+   packedOptions := thumbSize "|" thisPolation "|" dupesApplyBlur "|" findFlippedDupes "|" allowWICloader "|" allowFIMloader "|" userHQraw "|" allowToneMappingImg
+   packedOptions .= "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
+   packedOptions .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
+
    If !DllCall("qpvmain.dll\dupesPixBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", packedOptions, "int")
    {
       addJournalEntry(A_ThisFunc "(): qpvmain.dll refused the collection query - " readDupesEngineError() "`n" selectSQL)
@@ -36668,7 +36676,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          ; every worker holds an image, but while the machine is short of memory only one of
          ; them is allowed to decode at a time - tpTryTakeJobSlot() in thumbs-pool.h, one
          ; count shared with the thumbnails pool.
-         busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " groupDigits(NumGet(dupesPixState + 0, 8, "Int")) " images at once"
+         busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " NumGet(dupesPixState + 0, 8, "Int") " images at once"
          showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
          prevMSGdisplay := A_TickCount
       }
@@ -36736,6 +36744,8 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
 }
 
 initDupesPixelsPool() {
+   ; see also the init DLL call to dupesPixBegin from collectImgDataViaPool()
+   ; and related initThumbsPool()
    If (dupesPixInitGood=1 && dupesPixState)
       Return 1
 
@@ -36743,17 +36753,6 @@ initDupesPixelsPool() {
    If (!qpvMainDll || WICmoduleHasInit!=1 || dupesEngineInitGood!=1)
       Return 0
 
-   ; The loaders and the extension sets are the thumbnails pool's. Setting the formats does
-   ; not start that pool and does not depend on it having been started - initThumbsPool()
-   ; declines outright when allowMultiCoreMode is off or memory is being minimised - and
-   ; both lists decide which loader is offered a file at all: without them every file falls
-   ; past FreeImage and WIC alike, straight to the GDI+ loader.
-   ;
-   ; The same two lists initThumbsPool() sends, svg and pdf taken out of the WIC one for the
-   ; same reason: both pools render those two themselves and WIC has a codec for neither, so
-   ; leaving them in only buys a doomed WIC attempt after the renderer has already failed.
-   ; The DLL keeps ONE pair of sets for both pools, so these two calls must agree - whichever
-   ; of them runs last is the one that counts.
    initFIMGmodule()
    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
 
@@ -36765,18 +36764,10 @@ initDupesPixelsPool() {
    Return dupesPixInitGood
 }
 
+generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave, strPosu, whatu) {
 ; All of the functions to generate hashes are now in dupes-search.h: 
 ; dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
 ; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
-;
-; Two details that were easy to lose in the move and that tests/hash_oracle.cpp pins:
-; discretizeValue() returns Round(v/L)*L - the PRODUCT, which reaches 256 at L=2 - and
-; calcDLLpHashAlgo() wrote those values with NumPut(..., "UChar"), so a 256 became 0 and
-; every pHash in every existing database was computed that way. lHash compares each pixel
-; against the exact float mean, never a rounded one, because rounding it first creates
-; ties between the pixel and its threshold.
-
-generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave, strPosu, whatu) {
    Static userFriendly := {1:"NONE", 2:"dHash", 3:"pHash", 4:"lHash"}
    setImageLoading()
    doStartLongOpDance()
@@ -89330,8 +89321,8 @@ BtnCollectDupesData() {
    GuiControlGet, findDupesPrecision
 
    BtnCloseWindow()
-   ; scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
-   collectSQLFileInfosNow("HpixelzFsmall", 0, 0, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
+   scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
+   collectSQLFileInfosNow(scu, 0, 0, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
    PopulateImagesIndexStatsInfos("kill")
    openPreviousPanel()
 }

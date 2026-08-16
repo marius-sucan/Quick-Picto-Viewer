@@ -90,6 +90,14 @@ struct DupePixCfg {
     int allowFIM      = 1;
     int userHQraw     = 1;
     int allowToneMap  = 1;
+    int   toneMapAlgo      = 0;
+    float tmParamA         = 0.0f;
+    float tmParamB         = 0.0f;
+    float tmParamC         = 0.0f;
+    float tmParamD         = 0.0f;
+    float tmOCVparamA      = 0.0f;
+    float tmOCVparamB      = 0.0f;
+    int   tmAltExpo        = 0;
     int smallW = 9, smallH = 8;
     int bigW  = 32, bigH  = 32;
 };
@@ -421,8 +429,10 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
        // known, and the caches overview revalidates the entry when it is.
     }
 
+    int hasTriedFim = 0;
     if (bmp==NULL && fimHandles)
     {
+       hasTriedFim = 1;
        meta = TpSrcMeta();
        int status = TP_ERR_LOAD, saved = 0, fw = 0, fh = 0;
        bmp = tpFIMthumb(&tcfg, path, L"", GetTickCount(), fw, fh, status, saved, &meta);
@@ -437,17 +447,32 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
        }
     }
 
-    if (bmp==NULL && cfg.allowWIC==1 && tpWicExts.count(ext) > 0)
+    if (bmp==NULL && tpWicExts.count(ext) > 0)
     {
        // isFIMokay is 0 here, as it is in tpRunJob(): it exists to hand a high bit depth
        // TIFF over to FreeImage, and by this line FreeImage has either had the file and
        // failed or does not claim the format at all - either way there is nothing to hand
        // it to
        meta = TpSrcMeta();
-       bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality,
-                       0, srcW, srcH, &meta);
+       bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
        if (bmp!=NULL)
+       {
           loaderUsed = 1;
+       } else if (FIM.ok && cfg.allowFIM==1 && hasTriedFim!=1)
+       {
+          meta = TpSrcMeta();
+          int status = TP_ERR_LOAD, saved = 0, fw = 0, fh = 0;
+          bmp = tpFIMthumb(&tcfg, path, L"", GetTickCount(), fw, fh, status, saved, &meta);
+          if (bmp!=NULL)
+          {
+             loaderUsed = 2;
+             if (fw > 0 && fh > 0)
+             {
+                srcW = fw;
+                srcH = fh;
+             }
+          }
+       }
     }
 
     if (bmp==NULL)
@@ -643,6 +668,14 @@ static void dpWorkerBody() {
         tcfg.allowWIC         = cfg->allowWIC;
         tcfg.allowFIM         = cfg->allowFIM;
         tcfg.imgQuality       = cfg->wicQuality;
+        tcfg.toneMapAlgo     = cfg->toneMapAlgo;
+        tcfg.tmParamA        = cfg->tmParamA;
+        tcfg.tmParamB        = cfg->tmParamB;
+        tcfg.tmParamC        = cfg->tmParamC;
+        tcfg.tmParamD        = cfg->tmParamD;
+        tcfg.tmOCVparamA     = cfg->tmOCVparamA;
+        tcfg.tmOCVparamB     = cfg->tmOCVparamB;
+        tcfg.tmAltExpo       = cfg->tmAltExpo;
 
         DupePixResult res;
         bool ranIt = false;
@@ -1076,6 +1109,14 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
        cfg->allowFIM      = (int)DPOPT(5, 1);
        cfg->userHQraw     = (int)DPOPT(6, 1);
        cfg->allowToneMap  = (int)DPOPT(7, 1);
+       cfg->toneMapAlgo    = (int)DPOPT(8, 0);
+       cfg->tmParamA       = (float)DPOPT(9, 0);
+       cfg->tmParamB       = (float)DPOPT(10, 0);
+       cfg->tmParamC       = (float)DPOPT(11, 0);
+       cfg->tmParamD       = (float)DPOPT(12, 0);
+       cfg->tmOCVparamA    = (float)DPOPT(13, 0);
+       cfg->tmOCVparamB    = (float)DPOPT(14, 0);
+       cfg->tmAltExpo      = (int)DPOPT(15, 0);
        #undef DPOPT
     }
 
