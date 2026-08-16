@@ -36614,7 +36614,6 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    packedOptions := thumbSize "|" thisPolation "|" dupesApplyBlur "|" findFlippedDupes "|" allowWICloader "|" allowFIMloader "|" userHQraw "|" allowToneMappingImg
    packedOptions .= "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
    packedOptions .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
-
    If !DllCall("qpvmain.dll\dupesPixBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", packedOptions, "int")
    {
       addJournalEntry(A_ThisFunc "(): qpvmain.dll refused the collection query - " readDupesEngineError() "`n" selectSQL)
@@ -36676,8 +36675,18 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          ; every worker holds an image, but while the machine is short of memory only one of
          ; them is allowed to decode at a time - tpTryTakeJobSlot() in thumbs-pool.h, one
          ; count shared with the thumbnails pool.
-         busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " NumGet(dupesPixState + 0, 8, "Int") " images at once"
+         inFlight := NumGet(dupesPixState + 0, 8, "Int")
+         busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " inFlight " images at once"
          showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
+         fnOutputDebug("phase = " NumGet(dupesPixState + 0, 0, "Int") )
+         fnOutputDebug("queued = " NumGet(dupesPixState + 0, 4, "Int") )
+         fnOutputDebug("inFlight = " NumGet(dupesPixState + 0, 8, "Int") )
+         fnOutputDebug("ready = " NumGet(dupesPixState + 0, 12, "Int") )
+         fnOutputDebug("written = " NumGet(dupesPixState + 0, 16, "Int") )
+         fnOutputDebug("failed = " NumGet(dupesPixState + 0, 20, "Int") )
+         fnOutputDebug("dbErrors = " NumGet(dupesPixState + 0, 24, "Int") )
+         fnOutputDebug("submitted = " NumGet(dupesPixState + 0, 28, "Int") )
+         fnOutputDebug("alive = " NumGet(dupesPixState + 0, 32, "Int") )
          prevMSGdisplay := A_TickCount
       }
 
@@ -82647,10 +82656,9 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
           If (!diffuDestPosX && !diffuDestPosY)
           {
-             Gdip_DisposeEffect(thisPeffect)
-             Gdip_DisposeImageAttributes(thisImageAttribs)
-             thisImageAttribs := thisPeffect := ""
-             ; pEffect := imageAttribs := ""
+             Gdip_DisposeEffect(pEffect)
+             Gdip_DisposeImageAttributes(imageAttribs)
+             thisImageAttribs := thisPeffect := pEffect := imageAttribs := ""
           }
           ; ToolTip, % r2 "==" diffuDestPosX "==" diffuDestPosY "`n"  brickIMGx "=" brickIMGy "`n" brickIMGw "==" brickIMGh , , , 2
        }
