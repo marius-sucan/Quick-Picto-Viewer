@@ -152,14 +152,35 @@ fell back to 1, no decode ever started, `dupesPixStep()` never reported the pool
 it. It only bites while memory is tight, which is how it got past every other test here.
 
 **`throttle_slots.cpp`** — the decode throttle both pools share, sliced out of the shipped
-`thumbs-pool.h` (`tpTryTakeJobSlot()`, `tpReleaseJobSlot()`, `TpJobSlot`, `tpAcquireJobSlot()`;
-`dpAcquireJobSlot()` in `dupes-pixels.h` is the collection pool's waiter over the same
-count). One count for the whole DLL is deliberate: `QPV_ShowThumbnails()` is reached from a
-timer and lists a page *while* a collection run is in progress, so both pools decode at the
-same time, and a counter per pool would let each believe it is alone. The tests are the two
-properties the pools cannot work without — at most one decode at a time while memory is
-tight, and a waiter always let through afterwards, including twelve threads taking forty
-images each through a single slot. The mutation check lets two decodes run at once.
+`thumbs-pool.h`: the thresholds, `tpMemoryIsTight()`, `tpTryTakeJobSlot()`,
+`tpTryTakeJobSlotNow()`, `tpReleaseJobSlot()`, `TpJobSlot` and `tpWaitForJobSlot()`, which
+both pools wait in (`dpAcquireJobSlot()` in `dupes-pixels.h` is the collection pool's, with a
+wider predicate). One count for the whole DLL is deliberate: `QPV_ShowThumbnails()` is
+reached from a timer and lists a page *while* a collection run is in progress, so both pools
+decode at the same time, and a counter per pool would let each believe it is alone.
+
+The memory readings and the clock are the test's own, which is what makes any of this
+testable at all: `GlobalMemoryStatusEx()` and `GetTickCount64()` are shimmed, so a test can
+say what the machine reports and move time forward itself, and a frozen clock keeps the
+memory state from changing under the threaded tests. Five properties:
+
+- at most one decode at a time while memory is short, twelve threads taking forty images
+  each through the single slot, and a waiter always let through afterwards;
+- the throttle is entered and left at **different** readings. Most of the pressure is its
+  own doing — the decodes it throttles are what put the machine over the line — so one set
+  of thresholds lifts it the moment it has worked, and puts the machine straight back over;
+- and it is lifted one decode per reading rather than all at once, for the same reason;
+- what turns it on: the percentage, the free physical memory, the commit headroom, and the
+  address space left to *this process*, which is the wall the 32 bits build hits while
+  `GlobalMemoryStatusEx()` still reports gigabytes free;
+- neither pool can lock the other out. A worker that has just released a slot asks for
+  another one microseconds later while everybody else is asleep, so it wins any race decided
+  by who asks first — the count or the mutex, it makes no difference. Slots are handed out
+  in the order the workers queued for them instead.
+
+Four mutation checks, one per property that has a single line to get wrong: a second decode
+allowed while the machine is short, the throttle lifted at the reading that turned it on, the
+full worker count restored in one step, and arrivals allowed to barge past the queue.
 
 **`gdip_loader.cpp`** — `tpGDIPload()`, the third loader of the product, sliced out of the
 shipped `thumbs-pool.h` together with `tpCalcIMGdimensions()` and compiled against

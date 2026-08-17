@@ -287,22 +287,34 @@ static std::unordered_set<std::wstring> tpFimExts;
 
 // The real one samples GlobalMemoryStatusEx() a few times a second. Here the tests say when
 // the machine is short of memory, because that is the state in which the collector's job
-// slot handling is the only thing keeping the pool moving.
+// slot handling is the only thing keeping the pool moving. tpMemTight is the sample the
+// real sampler leaves behind for dupesPixWorkStates() to report.
 static bool gShimMemoryTight = false;
-static inline bool tpMemoryIsTight() { return gShimMemoryTight; }
+static std::atomic<LONG> tpMemTight(0);
+static inline bool tpMemoryIsTight() {
+    tpMemTight.store(gShimMemoryTight ? 1 : 0, std::memory_order_relaxed);
+    return gShimMemoryTight;
+}
 
 // The shared job-slot count of thumbs-pool.h. Mirrored here the way ThumbsConfig and
 // TpSrcMeta are: while memory is tight only the worker that finds no decode running is let
 // through, so both pools of the DLL together decode one image at a time. gShimMaxActiveJobs
 // is the high-water mark, which is what a test can assert on.
+//
+// The fairness half of the real thing - the queue that stops one pool locking the other out
+// - is not mirrored here: it needs two pools to mean anything, and throttle_slots.cpp tests
+// the shipped code itself. What this has to get right is the semantics the collector relies
+// on: one decode at a time while memory is tight, and a waiter that is let through after.
 static std::atomic<LONG> tpActiveJobs(0);
+static std::atomic<LONG> tpSlotCap(64);
 static std::atomic<int>  gShimMaxActiveJobs(0);
 
 static inline bool tpTryTakeJobSlot() {
     for (;;)
     {
+        const LONG cap = tpMemoryIsTight() ? 1 : tpSlotCap.load(std::memory_order_acquire);
         LONG active = tpActiveJobs.load(std::memory_order_acquire);
-        if (active>=1 && tpMemoryIsTight())
+        if (active>=cap)
            return false;
 
         if (tpActiveJobs.compare_exchange_weak(active, active + 1, std::memory_order_acq_rel))
@@ -322,6 +334,24 @@ static inline void tpReleaseJobSlot() {
 struct TpJobSlot {
     ~TpJobSlot() { tpReleaseJobSlot(); }
 };
+
+template <class QuitFn>
+static inline bool tpWaitForJobSlot(QuitFn shouldQuit) {
+    for (;;)
+    {
+        if (shouldQuit())
+           return false;
+
+        if (tpTryTakeJobSlot())
+           return true;
+
+        // TP_SLOT_POLL_MS, and it has to be that rather than something quicker: how long a
+        // worker waits for the slot is what a throttled run spends its time doing, and the
+        // test that dupesPixStep() keeps handing control back to its caller has nothing to
+        // measure if the whole run fits inside one step
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+}
 
 static inline std::wstring tpLowerCase(const std::wstring &s) {
     std::wstring r = s;

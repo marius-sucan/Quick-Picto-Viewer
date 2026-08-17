@@ -636,6 +636,10 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
 // moves - one image at a time - instead of stopping. Returns false only when the run is
 // being abandoned, in which case the job is dropped without being decoded.
 //
+// The generation is part of that: without it a worker that waited out a whole run - which
+// on a tight machine is minutes - would come through the slot and spend it decoding an
+// image for a run that no longer exists, while the run that replaced it waits behind it.
+//
 // What this must never do is wait on a count that includes the waiter. dpState.inFlight is
 // raised the moment a job leaves the queue, before any of this, so every worker holding a
 // job counts towards it: waiting for it to fall to 1 asks the other workers to finish jobs
@@ -643,19 +647,11 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
 // never falls below N, no decode ever starts, dupesPixStep() never sees the pool go idle
 // and the loop in collectImgDataViaPool() spins on nothing written for as long as the user
 // lets it. tpActiveJobs counts decodes actually running, and a worker waiting here is not
-// one of them.
-static bool dpAcquireJobSlot() {
-    for (;;)
-    {
-        if (dpStopping.load() || dupesPixCancel.load()!=0)
-           return false;
-
-        if (tpTryTakeJobSlot())
-           return true;
-
-        // wait for the image being decoded right now to release its memory
-        std::this_thread::sleep_for(std::chrono::milliseconds(25));
-    }
+// one of them - which is also why dupesPixWorkStates() exists.
+static bool dpAcquireJobSlot(LONG jobGeneration) {
+    return tpWaitForJobSlot([jobGeneration] {
+        return dpStopping.load() || dupesPixCancel.load()!=0 || jobGeneration!=dpGeneration.load();
+    });
 }
 
 static void dpWorkerBody(size_t mySlot) {
@@ -735,7 +731,7 @@ static void dpWorkerBody(size_t mySlot) {
            // recorded from before the slot is asked for, not after: a worker that never gets
            // one is holding a job and doing nothing, and that is the state worth naming
            dpMarkBusy(mySlot, &job.path, 1);
-           if (dpAcquireJobSlot())
+           if (dpAcquireJobSlot(job.generation))
            {
               dpMarkBusy(mySlot, NULL, 2);
               TpJobSlot slot;      // released at the end of this block, whatever happens in it
@@ -1120,6 +1116,51 @@ DLL_API INT64 DLL_CALLCONV dupesPixBusyJob(wchar_t *out, int cch, int *state) {
     }
 
     return oldest;
+}
+
+// How the workers are spending the jobs they are holding, and what the decode throttle is
+// allowing while they do it. None of the counters in the state block can answer this:
+// inFlight is raised the moment a job leaves the queue - it has to be, see
+// dpAcquireJobSlot() - so a pool holding eight images with one decoder running looks
+// exactly like a pool with eight decoders running, and on a machine short of memory the
+// first is the normal state and the second one cannot happen at all.
+//
+// Which matters well beyond a tooltip. collectImgDataViaPool() gives up on a pool that has
+// delivered nothing for three minutes, and there are two ways to deliver nothing: a decode
+// that has wedged, which is what that limit is for, and every worker queued behind a slot
+// the thumbnails pool is using, which is the throttle working as intended and no reason at
+// all to throw away the user's run.
+//
+//   waiting   jobs a worker holds but has not been let through the shared slot for
+//   decoding  jobs a decoder was actually started for
+//   active    decodes running right now anywhere in the DLL, this pool and the other one
+//   cap       how many the throttle is allowing; 1 means the machine is short of memory
+//
+// Every argument is optional. Always returns 1.
+DLL_API int DLL_CALLCONV dupesPixWorkStates(int *waiting, int *decoding, int *active, int *cap) {
+    int nWait = 0, nDecode = 0;
+    for ( size_t i = 0 ; i < (size_t)DP_MAX_WORKERS ; i++)
+    {
+        // read without dpMutex, on purpose: these are the states the workers store on their
+        // way past without taking it either, and holding a lock here would not make the
+        // thirty-two of them one single instant
+        const int st = dpBusy[i].state.load(std::memory_order_relaxed);
+        if (st==1)
+           nWait++;
+        else if (st==2)
+           nDecode++;
+    }
+
+    if (waiting!=NULL)
+       *waiting = nWait;
+    if (decoding!=NULL)
+       *decoding = nDecode;
+    if (active!=NULL)
+       *active = (int)tpActiveJobs.load(std::memory_order_relaxed);
+    if (cap!=NULL)
+       *cap = (tpMemTight.load(std::memory_order_relaxed)!=0) ? 1 : (int)tpSlotCap.load(std::memory_order_relaxed);
+
+    return 1;
 }
 
 // "|" separated, one entry per index, all three tables built by the interpreter out of the

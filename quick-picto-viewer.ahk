@@ -36556,6 +36556,13 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    ; pool [69.5 seconds]; this one is more patient because these workers decode whole images
    ; rather than thumbnails.
    Static stallLimit := 180000   ; miliseconds
+   ; ... and the same watch over a pool that is not stuck but throttled: on a machine short
+   ; of memory the DLL hands out one decode at a time to BOTH pools, so a collection whose
+   ; workers are all queued behind the thumbnails pool can go a long while without finishing
+   ; anything, with nothing whatsoever wrong with it. That case is told apart by
+   ; dupesPixWorkStates() and gets this much longer rope; see the stall test at the end of
+   ; the loop.
+   Static starvedLimit := 900000   ; 15 minutes
    If (SLDtypeLoaded!=3 || !activeSQLdb._Handle)
    {
       addJournalEntry(A_ThisFunc "(): ERROR. A SLDB files list must be opened.")
@@ -36597,6 +36604,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    prevSaveData := A_TickCount
    lastProgress := A_TickCount
    prevDone := -1
+   saidThrottled := 0
    ErrorMsgS := ""
    ; A backstop, not the mechanism: the keyset cursor above already means a row is offered
    ; at most once, so this can only trip if that ever stops being true.
@@ -36643,8 +36651,24 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          If (failedSQLfiles>0)
             etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
 
+         ; inFlight counts the jobs the workers are HOLDING, not the decodes running: a worker
+         ; that the throttle shared with the thumbnails pool has not let through yet is in
+         ; flight and reading nothing at all. Announcing "decoding 8 images" over eight
+         ; workers queued behind a single decoder is how a throttled run reads as a healthy
+         ; one - and the memory flag alone cannot fix that, because it is the whole DLL's:
+         ; when the thumbnails pool holds the slot this pool is decoding nothing.
          inFlight := NumGet(dupesPixState + 0, 8, "Int")
-         busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " inFlight " images at once"
+         If (readDupesPixWorkStates(waitingJobs, decodingJobs)!=1)
+            busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " inFlight " images at once"
+         Else If (waitingJobs>0 && decodingJobs<1)
+            busyNow := "Low on memory: " waitingJobs " images are waiting for the decoder"
+         Else If (waitingJobs>0)
+            busyNow := "Low on memory: decoding " decodingJobs " of " (decodingJobs + waitingJobs) " images at once"
+         Else If (decodingJobs>0)
+            busyNow := "Decoding " decodingJobs " images at once"
+         Else
+            busyNow := "Collecting the data of the images already read"
+
          showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
          fnOutputDebug("phase = " NumGet(dupesPixState + 0, 0, "Int") )
          fnOutputDebug("queued = " NumGet(dupesPixState + 0, 4, "Int") )
@@ -36656,6 +36680,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          fnOutputDebug("submitted = " NumGet(dupesPixState + 0, 28, "Int") )
          fnOutputDebug("alive = " NumGet(dupesPixState + 0, 32, "Int") )
          fnOutputDebug("drained = " dupesPixDrainedFlag() " [1 = the refill query has no rows left; nothing more will be handed out]")
+         fnOutputDebug("decoding = " decodingJobs " | waiting for the shared decode slot = " waitingJobs " [the two halves of inFlight; -1 = this qpvmain.dll cannot say]")
          ; fnOutputDebug("oldest job = " readDupesPixBusyJob())
          prevMSGdisplay := A_TickCount
       }
@@ -36671,9 +36696,15 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
       If (more!=1)
          Break
 
+      ; Both of these stop the run, so both have to cancel it as well, the way every other
+      ; exit from this loop does. dupesPixEnd() alone only throws the results away: the
+      ; workers holding an image carry on decoding it, one at a time on a machine short of
+      ; memory, and every one of those decodes holds the slot the thumbnails pool is waiting
+      ; for - work nobody will ever look at, in front of work somebody is waiting on.
       If (NumGet(dupesPixState + 0, 28, "Int")>maxHandouts)
       {
          addJournalEntry(A_ThisFunc "(): stopping - the collection query keeps returning rows that cannot be written. Handed out " NumGet(dupesPixState + 0, 28, "Int") " rows for " filesToBeSorted " files.")
+         DllCall("qpvmain.dll\dupesEngineCancel", "int")
          abandonAll := 1
          Break
       }
@@ -36683,6 +36714,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          ; no worker threads are left to decode anything, so the images still expected are
          ; never going to arrive, no matter how long this waits for them
          addJournalEntry(A_ThisFunc "(): stopping - the collection workers are gone. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done.")
+         DllCall("qpvmain.dll\dupesEngineCancel", "int")
          abandonAll := 1
          Break
       }
@@ -36691,15 +36723,35 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
       {
          prevDone := countTFilez
          lastProgress := A_TickCount
+         saidThrottled := 0
       } Else If (A_TickCount - lastProgress>stallLimit)
       {
-         ; the file that wedged it, and whether a decoder was ever started for it: a worker
-         ; still waiting for the slot the two pools share has nothing to do with the image
-         addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round(stallLimit/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " NumGet(dupesPixState + 0, 8, "Int") " were in flight, " NumGet(dupesPixState + 0, 4, "Int") " queued, " NumGet(dupesPixState + 0, 12, "Int") " waiting to be written." (dupesPixDrainedFlag()=1 ? " The refill query had already run out of rows." : "") "`nThe job held longest: " readDupesPixBusyJob())
-         ErrorMsgS := "ERROR: the image decoding workers stopped responding.`n"
-         DllCall("qpvmain.dll\dupesEngineCancel", "int")
-         abandonAll := 1
-         Break
+         ; Nothing has arrived for a long time, and there are two entirely different reasons
+         ; for that. When no worker has been let through the decode slot shared with the
+         ; thumbnails pool, nothing CAN arrive: the machine is short of memory, the throttle
+         ; in thumbs-pool.h is doing precisely what it exists for, and there is nothing wrong
+         ; with this pool at all - throwing the run away over it loses the user's work over a
+         ; queue. A decode that IS running and never returns is the case this limit was
+         ; written for, and that one still ends here. So does a starvation that never lets up,
+         ; at starvedLimit, because by then something is wrong with the other pool instead.
+         throttled := (readDupesPixWorkStates(waitingJobs, decodingJobs)=1 && decodingJobs<1 && waitingJobs>0)
+         If (throttled && A_TickCount - lastProgress<starvedLimit)
+         {
+            If (saidThrottled!=1)
+            {
+               saidThrottled := 1
+               addJournalEntry(A_ThisFunc "(): the collection is throttled, not stuck - the machine is short of memory and all " waitingJobs " of the images held are queued for the decode slot shared with the thumbnails pool. Still waiting; " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files are done.")
+            }
+         } Else
+         {
+            ; the file that wedged it, and whether a decoder was ever started for it: a worker
+            ; still waiting for the slot the two pools share has nothing to do with the image
+            addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round((A_TickCount - lastProgress)/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " NumGet(dupesPixState + 0, 8, "Int") " were in flight, " NumGet(dupesPixState + 0, 4, "Int") " queued, " NumGet(dupesPixState + 0, 12, "Int") " waiting to be written." (dupesPixDrainedFlag()=1 ? " The refill query had already run out of rows." : "") "`nThe job held longest: " readDupesPixBusyJob())
+            ErrorMsgS := "ERROR: the image decoding workers stopped responding.`n"
+            DllCall("qpvmain.dll\dupesEngineCancel", "int")
+            abandonAll := 1
+            Break
+         }
       }
    }
 
@@ -36741,7 +36793,13 @@ initDupesPixelsPool() {
    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
    DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
 
-   nThreads := (minimizeMemUsage=1 || allowMultiCoreMode!=1) ? 2 : realSystemCores
+   ; The 32 bits build has about two gigabytes of address space for the entire application,
+   ; and a single worker decoding a large photograph can want a few hundred megabytes of it -
+   ; so the number of workers, not the amount of RAM in the machine, is what decides whether
+   ; this runs out of room. initThumbsPool() refuses to start there at all; this pool cannot
+   ; do that, it IS the collection, so it runs narrow instead. The throttle watches the same
+   ; wall from the other side: see ullAvailVirtual in tpMemoryIsTight().
+   nThreads := (minimizeMemUsage=1 || allowMultiCoreMode!=1 || A_PtrSize=4) ? 2 : realSystemCores
    r := DllCall("qpvmain.dll\dupesPixInit", "Int", nThreads, "Int")
    dupesPixState := r ? DllCall("qpvmain.dll\dupesPixGetState", "UPtr") : 0
    dupesPixInitGood := (r && dupesPixState) ? 1 : 0
@@ -85531,9 +85589,17 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                       ; a decoder that never returns [a malformed PDF, a file on a share that
                       ; went away] would otherwise keep this loop spinning for ever. Here the
                       ; workers are alive and busy, so the file is not handed to this thread
-                      If (A_TickCount - lastPoolProgress>69500)
+                      ;
+                      ; ... and when the machine is short of memory they may be neither slow
+                      ; nor stuck, but queued: the DLL then hands out one decode at a time
+                      ; across BOTH pools, and a single large photograph on the collection
+                      ; side of that queue can hold this page up for longer than the limit.
+                      ; Breaking there paints an incomplete page over a pool that is working
+                      ; perfectly, so the throttle is given three times the rope
+                      thisPoolStallLimit := (QPV_MemoryIsTight()=1) ? 208500 : 69500
+                      If (A_TickCount - lastPoolProgress>thisPoolStallLimit)
                       {
-                         fnOutputDebug("ThumbsMode. The workers delivered nothing for 69.5 seconds. Loop. Break. Now.")
+                         fnOutputDebug("ThumbsMode. The workers delivered nothing for " Round(thisPoolStallLimit/1000, 1) " seconds. Loop. Break. Now.")
                          pageIncomplete := 1
                          Break
                       }
@@ -86804,10 +86870,42 @@ readDupesPixBusyJob() {
    If (elapsed<0)
       Return "none - no worker is holding an image"
 
+   ; elapsed is how long the worker has been HOLDING that image, which under the throttle is
+   ; the queueing and the decoding together - the decode itself started somewhere inside it.
+   ; Reporting it as "12s decoding" over a worker that queued for eleven of those seconds is
+   ; the same confusion the state is here to clear up
    thisWhat := friendly[thisState] ? friendly[thisState] : "state " thisState
-   gg := Round(elapsed/1000, 1) "s " thisWhat ": " StrGet(&pathBuf, "UTF-16")
+   gg := Round(elapsed/1000, 1) "s held, " thisWhat ": " StrGet(&pathBuf, "UTF-16")
    pathBuf := ""
    Return gg
+}
+
+readDupesPixWorkStates(ByRef waitingJobs, ByRef decodingJobs, ByRef decodesNow:="", ByRef decodesAllowed:="") {
+; How the collection workers are spending the images they hold: how many are queued for the
+; decode slot shared with the thumbnails pool, and how many a decoder was actually started
+; for. Optionally also how many decodes are running anywhere in the DLL and how many the
+; throttle is allowing at all - 1 while the machine is short of memory.
+;
+; dupesPixState cannot answer any of this. Its inFlight counts every image a worker is
+; holding, queued ones included - it has to, see dpAcquireJobSlot() in dupes-pixels.h - so
+; eight workers behind one decoder and eight decoders running look exactly alike there, and
+; telling those apart is the difference between a pool that is throttled and a pool that has
+; stopped.
+;
+; Returns 0 when the DLL cannot say [an older qpvmain.dll], with everything set to -1.
+   waitingJobs := decodingJobs := decodesNow := decodesAllowed := -1
+   If !qpvMainDll
+      Return 0
+
+   r := DllCall("qpvmain.dll\dupesPixWorkStates", "IntP", nWaiting, "IntP", nDecoding, "IntP", nActive, "IntP", nCap, "Int")
+   If (ErrorLevel || r!=1)
+      Return 0
+
+   waitingJobs := nWaiting
+   decodingJobs := nDecoding
+   decodesNow := nActive
+   decodesAllowed := nCap
+   Return 1
 }
 
 throwDupesEngineError(funcu, whatu) {

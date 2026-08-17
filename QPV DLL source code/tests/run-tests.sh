@@ -55,6 +55,8 @@ slice block_extract.cpp  "$SRC" '^\/\/ SWAR population count'          '^\/\/ qp
 slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qpv-dupes-query-end' 350 || exit 1
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1
 slice thumbs_structs.part ../thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
+slice mem_limits.part     ../thumbs-pool.h '^\/\/ Memory pressure'   '^#define TP_SLOT_POLL_MS' 20 || exit 1
+slice mem_sample.part     ../thumbs-pool.h '^\/\/ qpv-mem-sample-begin' '^\/\/ qpv-mem-sample-end' 30 || exit 1
 slice slots_extract.part  ../thumbs-pool.h '^\/\/ One attempt at taking a slot' '^\/\/ qpv-job-slot-end' 40 || exit 1
 slice calc_dims.part      ../thumbs-pool.h '^\/\/ qpv-calc-dims-begin'   '^\/\/ qpv-calc-dims-end' 30 || exit 1
 slice gdip_loader.part    ../thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\/\/ qpv-gdip-loader-end' 120 || exit 1
@@ -137,23 +139,46 @@ else
 fi
 
 echo
-echo "== mutation check: the throttle must reject a second decode while memory is tight =="
-# Lets two decodes run at once under memory pressure, which is the state this exists to
-# prevent. The mutation goes into the SLICE, never into the shipped header.
-cp slots_extract.part slots_extract.orig
-sed -i 's|if (active>=1 \&\& tpMemoryIsTight())|if (active>=2 \&\& tpMemoryIsTight())|' slots_extract.part
-if ! cmp -s slots_extract.part slots_extract.orig; then
-    g++ $CXXFLAGS -pthread -o throttle_mutant throttle_slots.cpp 2>/dev/null
-    if ./throttle_mutant > /dev/null 2>&1; then
-        echo "  ERROR: the mutant passed - the throttle test proves nothing"; fail=1
-    else
-        echo "   ok - the mutant is caught"
+echo "== mutation checks: the throttle test must reject each way of getting this wrong =="
+# Every mutation goes into the SLICE, never into the shipped header, and each one is a
+# plausible version of the code that the test has to notice. One that still passes means
+# the property it stands for is not actually being tested.
+#
+# throttleMutant <part-file> <sed-expression> <what it breaks>
+throttleMutant() {
+    local part=$1 expr=$2 what=$3
+    cp "$part" "$part.orig"
+    sed -i "$expr" "$part"
+    if cmp -s "$part" "$part.orig"; then
+        echo "  ERROR: the mutation did not apply [$what] - update the sed pattern"; fail=1
+        mv -f "$part.orig" "$part"
+        return 1
     fi
+
+    if ! g++ $CXXFLAGS -pthread -o throttle_mutant throttle_slots.cpp 2>/dev/null; then
+        echo "  ERROR: the mutant did not compile [$what] - the mutation is malformed"; fail=1
+    elif ./throttle_mutant > /dev/null 2>&1; then
+        echo "  ERROR: the mutant passed [$what] - that property is not being tested"; fail=1
+    else
+        echo "   ok - caught: $what"
+    fi
+
     rm -f throttle_mutant
-else
-    echo "  ERROR: the mutation did not apply - update the sed pattern"; fail=1
-fi
-mv -f slots_extract.orig slots_extract.part
+    mv -f "$part.orig" "$part"
+}
+
+# two decodes at once under memory pressure, which is the state this exists to prevent
+throttleMutant slots_extract.part 's|if (active>=cap)|if (active>=cap + 1)|' \
+    "a second decode allowed while the machine is short of memory"
+# the throttle lifted at the same reading that turned it on - the flapping this used to do
+throttleMutant mem_sample.part 's|ms.dwMemoryLoad    <= TP_MEM_LOAD_LOW|ms.dwMemoryLoad    < TP_MEM_LOAD_HIGH|' \
+    "no hysteresis: the throttle lifted at the reading that turned it on"
+# every waiting worker let through on the first good reading, all starting a decoder at once
+throttleMutant mem_sample.part 's|tpSlotCap.store(cap + 1, std::memory_order_release);|tpSlotCap.store(TP_SLOT_CAP_MAX, std::memory_order_release);|' \
+    "the full worker count restored in one step instead of one decode per reading"
+# and the fairness: a worker that just released a slot walking straight back into it
+throttleMutant slots_extract.part 's|return tpSlotWaiters.load(std::memory_order_acquire)==0 \&\& tpTryTakeJobSlot();|return tpTryTakeJobSlot();|' \
+    "arrivals allowed to barge past the workers already queued"
 
 echo
 echo "== the GDI+ loader of the two worker pools =="
@@ -216,7 +241,7 @@ for mutant in A B; do
       A) sed 's|const double avgu     = (double)sumTotalBr/totalPixelz - 1.0;|const double avgu     = (double)sumTotalBr/totalPixelz;|' \
              ../dupes-pixels.h > pixels_mutant.h
          label="the mean is computed without its offset" ;;
-      B) sed 's|        if (tpTryTakeJobSlot())|        if (!(tpMemoryIsTight() \&\& dpState.inFlight > 1) \&\& tpTryTakeJobSlot())|' \
+      B) sed 's|    return tpWaitForJobSlot(\[jobGeneration\] {|    while (tpMemoryIsTight() \&\& dpState.inFlight > 1)\n       std::this_thread::sleep_for(std::chrono::milliseconds(2));\n    return tpWaitForJobSlot([jobGeneration] {|' \
              ../dupes-pixels.h > pixels_mutant.h
          label="a worker waits for a count that includes itself" ;;
     esac

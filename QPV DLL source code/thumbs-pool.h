@@ -57,13 +57,39 @@
 #define TP_MAX_READY      48  // undelivered results allowed before workers park
 #define TP_MAX_READY_BYTES (78ull*1024*1024)  // ... and the memory they may hold on to
 
-// Memory pressure. Above either of these the pool narrows down to a single running job,
+// Memory pressure. Above any of these the pool narrows down to a single running job,
 // so that images keep coming - slowly - instead of everything grinding to a halt.
 // The percentage mirrors what QPV_ShowThumbnails() used to test on every iteration of its
 // inner loop; the absolute floor matters on machines where 10% of the RAM is still plenty.
-#define TP_MEM_LOAD_HIGH   90
-#define TP_MEM_FREE_FLOOR  (768ull*1024*1024)  // 768 mb
+//
+// TWO sets of thresholds, because most of the pressure is self-inflicted: the decodes this
+// throttles are what pushed the machine over the line, so the moment it narrows down to one
+// image the memory comes back and a single set would read "plenty" again one sample later -
+// with every waiting worker let through at once, and the machine straight back over the
+// line. The throttle is entered at the HIGH/FLOOR values and left only at the LOW/CLEAR
+// ones, and even then one worker at a time; see tpMemoryIsTight() and tpSlotCap.
+#define TP_MEM_LOAD_HIGH   90                   // % of the physical memory in use: throttle at or above
+#define TP_MEM_LOAD_LOW    80                   // ... and stop throttling only at or below
+#define TP_MEM_FREE_FLOOR  (768ull*1024*1024)   // 768 mb of free physical memory, or of commit headroom
+#define TP_MEM_FREE_CLEAR  (1536ull*1024*1024)  // ... and twice that before the throttle is lifted
+// The address space of THIS process, which is the wall the 32 bits build hits long before
+// the machine runs out of anything: a GlobalMemoryStatusEx() reporting nine free gigabytes
+// says nothing about a two gigabyte process with 300 mb of address space left, and one
+// worker decoding a large photograph can want a few hundred megabytes of it. The process
+// half of the GetProcessMemoryUsage() + GlobalMemoryStatusEx() pair this replaced was the
+// only thing that ever saw that, and ullAvailVirtual is that half at no extra cost - it
+// comes back in the same struct. On x64 both values are astronomical and never trip.
+#define TP_MEM_VIRT_FLOOR  (512ull*1024*1024)
+#define TP_MEM_VIRT_CLEAR  (768ull*1024*1024)
 #define TP_MEM_SAMPLE_MS   950
+
+// The most decodes the throttle ever allows at once. Both pools clamp themselves to 32
+// workers, so this is "no limit at all" rather than a policy.
+#define TP_SLOT_CAP_MAX    64
+// How long a worker queued for a slot sleeps before looking again when nothing wakes it.
+// Releasing a slot does wake it; this is the backstop, and what picks up a cap that grew
+// while it slept.
+#define TP_SLOT_POLL_MS    25
 
 // ---------------------------------------------------------------------------------------
 //  the properties of the image as it came off the disk
@@ -185,6 +211,24 @@ static int                               tpPrevCVthreads = -1;
 static std::atomic<LONG>                 tpActiveJobs{0};
 static std::atomic<LONG>                 tpMemTight{0};
 static std::atomic<ULONGLONG>            tpMemStamp{0};
+// How many decodes the throttle allows at this moment, and the workers - of BOTH pools -
+// queued for one, oldest first. tpSlotMutex is a leaf lock: it is never taken while tpMutex
+// or the collection pool's dpMutex is held, and nothing under it does more than move a few
+// numbers about. tpSlotWaiters mirrors tpSlotQueued so that the two places which only need
+// to know WHETHER anybody is queued can ask without taking the lock.
+//
+// A fixed array rather than a container, because this is the code that runs when the
+// machine is short of memory and it has no business asking for any: a std::deque takes a
+// block from the heap as workers come and go, and a bad_alloc thrown out of here would
+// leave a worker thread with nothing to catch it. Both pools clamp themselves to 32
+// workers, so TP_SLOT_CAP_MAX places is every thread that can ever be in here at once.
+static std::atomic<LONG>                 tpSlotCap{TP_SLOT_CAP_MAX};
+static std::atomic<LONG>                 tpSlotWaiters{0};
+static std::mutex                        tpSlotMutex;
+static std::condition_variable           tpSlotCV;
+static ULONGLONG                         tpSlotQueue[TP_SLOT_CAP_MAX] = {0};  // guarded by tpSlotMutex
+static int                               tpSlotQueued = 0;                    // guarded by tpSlotMutex
+static ULONGLONG                         tpSlotTicket = 0;                    // guarded by tpSlotMutex
 static ULONGLONG                         tpReadyBytes = 0;   // guarded by tpMutex
 static size_t                            tpExited = 0;       // guarded by tpMutex
 
@@ -315,32 +359,66 @@ static int tpSavePngFIM(FIBITMAPptr dib, const std::wstring &path) {
     return 1;
 }
 
-// One shared memory sample for the whole pool, refreshed a few times per second. It
+// qpv-mem-sample-begin
+// One shared memory sample for the whole DLL, refreshed a few times per second. It
 // replaces the GetProcessMemoryUsage() + GlobalMemoryStatusEx() pair QPV_ShowThumbnails()
-// used to perform on every single iteration of its inner loop, in the calling thread.
+// used to perform on every single iteration of its inner loop, in the calling thread -
+// including the process half of it, which ullAvailVirtual is; see TP_MEM_VIRT_FLOOR.
+//
+// It also carries the cap the throttle enforces, because the two belong together. Snapping
+// the cap back to the full worker count the instant a sample reads "plenty" is what made
+// this flap: memory recovers precisely BECAUSE the pool narrowed down to one image, so the
+// first good sample would let all thirty-two of them start a decoder-sized allocation at
+// once - the one thing the throttle exists to prevent - and the sample after that would
+// find the machine over the line again. So the cap is raised by ONE per sample instead:
+// additive increase, and back to a single decode the moment the machine is short again.
+// Nothing here throttles a machine with memory to spare - the cap climbs to
+// TP_SLOT_CAP_MAX, which is more workers than either pool can start.
 static bool tpMemoryIsTight() {
     const ULONGLONG now = GetTickCount64();
-    if (now - tpMemStamp.load(std::memory_order_relaxed) > TP_MEM_SAMPLE_MS)
+    ULONGLONG stamp = tpMemStamp.load(std::memory_order_relaxed);
+    // whoever moves the stamp owns this sample. Without the exchange every worker that
+    // arrives in the same millisecond takes one, and the cap below would climb by as many
+    // steps as there are workers rather than by one
+    if (now - stamp > TP_MEM_SAMPLE_MS && tpMemStamp.compare_exchange_strong(stamp, now))
     {
        MEMORYSTATUSEX ms;
        ms.dwLength = sizeof(ms);
        if (GlobalMemoryStatusEx(&ms))
        {
-          const bool tight = (ms.dwMemoryLoad>=TP_MEM_LOAD_HIGH) || (ms.ullAvailPhys<TP_MEM_FREE_FLOOR);
+          const bool wasTight = tpMemTight.load(std::memory_order_relaxed)!=0;
+          const bool tight = wasTight
+                           ? !(ms.dwMemoryLoad    <= TP_MEM_LOAD_LOW
+                            && ms.ullAvailPhys     >= TP_MEM_FREE_CLEAR
+                            && ms.ullAvailPageFile >= TP_MEM_FREE_CLEAR
+                            && ms.ullAvailVirtual  >= TP_MEM_VIRT_CLEAR)
+                           :  (ms.dwMemoryLoad    >= TP_MEM_LOAD_HIGH
+                            || ms.ullAvailPhys     <  TP_MEM_FREE_FLOOR
+                            || ms.ullAvailPageFile <  TP_MEM_FREE_FLOOR
+                            || ms.ullAvailVirtual  <  TP_MEM_VIRT_FLOOR);
+
           tpMemTight.store(tight ? 1 : 0, std::memory_order_relaxed);
           tpState.memTight = tight ? 1 : 0;
+          if (tight)
+             tpSlotCap.store(1, std::memory_order_release);
+          else
+          {
+             const LONG cap = tpSlotCap.load(std::memory_order_relaxed);
+             if (cap < TP_SLOT_CAP_MAX)
+                tpSlotCap.store(cap + 1, std::memory_order_release);
+          }
        }
-       tpMemStamp.store(now, std::memory_order_relaxed);
     }
 
     return tpMemTight.load(std::memory_order_relaxed)!=0;
 }
+// qpv-mem-sample-end
 
 // One attempt at taking a slot to decode one image. While memory is plentiful every worker
-// gets one straight away. When it is not, only the worker that finds no other decode
-// running may take one: decoding narrows down to a single image at a time rather than
-// stalling altogether, so images keep arriving - slowly - and nobody waits forever.
-// Returns false when the caller has to wait and ask again.
+// gets one straight away. When it is not, the cap is one and only the worker that finds no
+// other decode running may take it: decoding narrows down to a single image at a time
+// rather than stalling altogether, so images keep arriving - slowly - and nobody waits
+// forever. Returns false when the caller has to wait and ask again.
 //
 // The count is one count for the whole DLL, deliberately. Both pools decode images on
 // their own worker threads and both can be doing it at the same moment: QPV_ShowThumbnails()
@@ -357,8 +435,14 @@ static bool tpMemoryIsTight() {
 static bool tpTryTakeJobSlot() {
     for (;;)
     {
+        // Asking for the sample here is also what keeps it fresh: every worker that wants to
+        // decode passes through, so while anything at all is waiting on the memory reading it
+        // is never older than one sample period. Tight is answered immediately rather than
+        // through the cap, which the same sample sets, so that a machine that has just gone
+        // short narrows down on this attempt and not on the next one.
+        const LONG cap = tpMemoryIsTight() ? 1 : tpSlotCap.load(std::memory_order_acquire);
         LONG active = tpActiveJobs.load(std::memory_order_acquire);
-        if (active>=1 && tpMemoryIsTight())
+        if (active>=cap)
            return false;
 
         if (tpActiveJobs.compare_exchange_weak(active, active + 1, std::memory_order_acq_rel))
@@ -370,9 +454,28 @@ static bool tpTryTakeJobSlot() {
     }
 }
 
+// A slot for a worker that has only just arrived, refused while anybody is already queued
+// for one - otherwise the queue in tpWaitForJobSlot() would order the workers waiting in it
+// and be walked straight past by everyone else. The pair is the fairness between the pools.
+static bool tpTryTakeJobSlotNow() {
+    return tpSlotWaiters.load(std::memory_order_acquire)==0 && tpTryTakeJobSlot();
+}
+
 static void tpReleaseJobSlot() {
     LONG active = tpActiveJobs.fetch_sub(1, std::memory_order_acq_rel) - 1;
     tpState.activeJobs = (active>0) ? active : 0;
+    if (tpSlotWaiters.load(std::memory_order_acquire)>0)
+    {
+       // Taken and dropped again with nothing done under it. The waiters test the count
+       // while they hold it, so passing through here is what makes sure this release cannot
+       // land between one of those tests and the wait that follows it - the wake that never
+       // comes, and a free slot nobody takes for as long as the machine stays short.
+       tpSlotMutex.lock();
+       tpSlotMutex.unlock();
+       // all of them, not one: only the worker at the head of the queue may take this, and
+       // waking any of the others instead would leave the slot standing empty
+       tpSlotCV.notify_all();
+    }
 }
 
 // Gives the slot back however the scope is left. Neither decode is supposed to throw -
@@ -383,21 +486,90 @@ struct TpJobSlot {
     ~TpJobSlot() { tpReleaseJobSlot(); }
 };
 
-// The thumbnails workers wait here until they are let through, and give up only when the
-// pool is being shut down - in which case the job is dropped.
-static bool tpAcquireJobSlot() {
+// Waits for a slot and returns true holding one. Returns false only when shouldQuit() says
+// this worker must give up - its pool is shutting down, the run was cancelled, the job it
+// is holding belongs to a run that no longer exists - and then nothing was taken.
+//
+// The queue is what keeps one pool from locking the other out, and it has to be a QUEUE.
+// A worker that has just released a slot is back around its loop asking for another one
+// microseconds later, while everybody else is asleep: it wins any race that is decided by
+// who asks first, every single time, whether that race is over the count or over the mutex
+// the waiters share. So the count is not raced for at all - only the worker at the head of
+// tpSlotQueue may take a slot, everybody else waits their turn, and a worker that has just
+// been served goes to the back. Whichever pool is churning through short jobs then hands
+// over to the other one every time instead of never.
+//
+// Which is not an abstract fairness argument: collectImgDataViaPool() reads a pool that has
+// delivered nothing for three minutes as a pool that has stopped, and used to abandon the
+// user's run over one that was merely queued.
+//
+// shouldQuit() is the only reason a wait ends early, and it is asked before every sleep - a
+// worker holding a job for a cancelled run must not spend the one decode a machine short of
+// memory allows on an image whose result is going to be thrown away.
+template <class QuitFn>
+static bool tpWaitForJobSlot(QuitFn shouldQuit) {
+    // asked before anything else, and before every sleep below: a pool being shut down must
+    // not start one more decode, and neither must a worker holding a job nobody wants
+    if (shouldQuit())
+       return false;
+
+    if (tpTryTakeJobSlotNow())
+       return true;
+
+    bool got = false;
+    std::unique_lock<std::mutex> lk(tpSlotMutex);
+    const ULONGLONG mine = tpSlotTicket++;
+    // a caller with no room left in the queue waits without a place in it: it is served
+    // less orderly than the others, never wrongly, and with both pools clamped to 32
+    // workers there is no such caller
+    const bool queued = (tpSlotQueued < TP_SLOT_CAP_MAX);
+    if (queued)
+    {
+       tpSlotQueue[tpSlotQueued] = mine;
+       tpSlotQueued++;
+       tpSlotWaiters.store((LONG)tpSlotQueued, std::memory_order_release);
+    }
+
     for (;;)
     {
-        if (tpStopping.load())
-           return false;
+        if (shouldQuit())
+           break;
 
-        if (tpTryTakeJobSlot())
-           return true;
+        if ((!queued || tpSlotQueue[0]==mine) && tpTryTakeJobSlot())
+        {
+           got = true;
+           break;
+        }
 
-        // wait for the image being decoded right now to release its memory
-        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        // A released slot notifies, so this is not really a poll; the timeout is what picks
+        // up a cap that grew while this slept, and what keeps a missed notification costing
+        // one short sleep rather than the run.
+        tpSlotCV.wait_for(lk, std::chrono::milliseconds(TP_SLOT_POLL_MS));
     }
+
+    if (queued)
+    {
+       for ( int i = 0 ; i < tpSlotQueued ; i++)
+           if (tpSlotQueue[i]==mine)
+           {
+              for ( int j = i + 1 ; j < tpSlotQueued ; j++)
+                  tpSlotQueue[j - 1] = tpSlotQueue[j];
+
+              tpSlotQueued--;
+              break;
+           }
+
+       tpSlotWaiters.store((LONG)tpSlotQueued, std::memory_order_release);
+    }
+
+    const bool anyoneLeft = (tpSlotQueued > 0);
+    lk.unlock();
+    if (anyoneLeft)
+       tpSlotCV.notify_all();   // there is a new worker at the head of the queue now
+
+    return got;
 }
+
 // qpv-job-slot-end
 
 static ULONGLONG tpResultBytes(const ThumbResult &res) {
@@ -1447,7 +1619,12 @@ static void tpWorkerBody() {
 
         ThumbResult res;
         bool ranIt = false;
-        if (job.generation==tpGeneration.load() && tpAcquireJobSlot())
+        // The generation is tested on the way THROUGH the throttle as well, not only here.
+        // On a machine short of memory the wait for a slot can outlast the page this job was
+        // listed for, and spending the single decode such a machine allows on a thumbnail
+        // nobody is going to look at holds up whichever pool still has work worth doing.
+        if (job.generation==tpGeneration.load()
+         && tpWaitForJobSlot([&job] { return tpStopping.load() || job.generation!=tpGeneration.load(); }))
         {
            TpJobSlot slot;      // released at the end of this block, whatever happens in it
            tpRunJob(fac, d2dFac, job, res);
