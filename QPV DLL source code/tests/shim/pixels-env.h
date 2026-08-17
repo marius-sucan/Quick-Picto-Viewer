@@ -344,6 +344,37 @@ static bool shimPathHas(const wchar_t *path, const wchar_t *needle) {
     return (path!=NULL && needle!=NULL && wcsstr(path, needle)!=NULL);
 }
 
+// The time a decoder pretends to spend waiting for the disk. Zero - the default - leaves
+// every other test exactly as fast as it was; pool_latency.cpp raises it, because the one
+// thing that differs between a run over an SSD and a run over a mechanical drive is how
+// long a decode takes, and the pool's queue behaviour is supposed to be the same either
+// way. A path carrying "slow" is the straggler: the single huge file at the tail of a run.
+static std::atomic<int> gShimDecodeSleepMs(0);
+static std::atomic<int> gShimDecodeJitterMs(0);
+static std::atomic<int> gShimStragglerFactor(25);
+
+static void shimFakeDiskDelay(const wchar_t *path) {
+    int ms = gShimDecodeSleepMs.load();
+    if (ms < 1)
+       return;
+
+    const int jitter = gShimDecodeJitterMs.load();
+    if (jitter > 0)
+    {
+       // deterministic per path, so a run is repeatable
+       unsigned int h = 2166136261u;
+       for ( const wchar_t *p = path ; p!=NULL && *p ; p++)
+           h = (h ^ (unsigned int)*p) * 16777619u;
+
+       ms += (int)(h % (unsigned int)jitter);
+    }
+
+    if (shimPathHas(path, L"slow"))
+       ms *= gShimStragglerFactor.load();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+
 static Gdiplus::GpBitmap *shimMakeBitmap(int w, int h, unsigned char seed) {
     Gdiplus::GpBitmap *b = NULL;
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(w, h, 0, PixelFormat32bppPARGB, NULL, &b);
@@ -362,6 +393,7 @@ static Gdiplus::GpBitmap *shimMakeBitmap(int w, int h, unsigned char seed) {
 static inline Gdiplus::GpBitmap* tpWICload(IWICImagingFactory*, const wchar_t *path, int, int, int, int, int,
                                            int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
     gShimWicCalls++;
+    shimFakeDiskDelay(path);
     if (gShimWicFails)
     {
        // a failed WIC attempt still touches the record, which is what dpDecodeFile() has
@@ -395,6 +427,7 @@ static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstr
                                             DWORD, int &srcW, int &srcH, int &status, int &saved,
                                             TpSrcMeta *meta = NULL) {
     gShimFimCalls++;
+    shimFakeDiskDelay(path.c_str());
     saved = 0;
     status = TP_ERR_LOAD;
     // "nofim" in the name is a file FreeImage alone refuses, the way an EMF or one of the
