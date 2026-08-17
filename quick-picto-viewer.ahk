@@ -4633,24 +4633,16 @@ initThumbsPool() {
        Return
 
     multiCoreInit := 1
-    If (A_PtrSize=4)
-    {
-       addJournalEntry("Multi-threaded thumbnails generation is unavailable in the 32 bits edition")
-       multiCoreThumbsInitGood := 0
-       Return
-    }
-
-    addJournalEntry("Attempting to initialize " realSystemCores " threads for thumbnails generation")
     initFIMGmodule()
     initQPVmainDLL()
-    If (!qpvMainDll || WICmoduleHasInit!=1)
+    If (!qpvMainDll || WICmoduleHasInit!=1 || wasInitFIMlib!=1)
     {
-       addJournalEntry("Failed to initialize the thumbnails workers: qpvMain.dll or its WIC module is unavailable")
+       addJournalEntry("Failed to initialize the thumbnails workers: qpvMain.dll or FreeImmage and WIC modules are unavailable. FIM=" wasInitFIMlib ". WIC=" WICmoduleHasInit ". Main DLL=" qpvMainDll)
        multiCoreThumbsInitGood := 0
        Return
     }
 
-    nThreads := (minimizeMemUsage=1) ? 2 : realSystemCores
+    nThreads := (minimizeMemUsage=1 || A_PtrSize=4) ? 2 : realSystemCores
     r := DllCall("qpvmain.dll\thumbsPoolInit", "Int", nThreads, "Int")
     thumbsPoolState := r ? DllCall("qpvmain.dll\thumbsPoolGetState", "UPtr") : 0
     If (!r || !thumbsPoolState)
@@ -27319,7 +27311,7 @@ BtnHelpEdgeDetection() {
 
 invokePrefsPanelsContextMenu(modus:=0, addBonus:=0) {
     Menu, ContextMenu, UseErrorLevel
-    Try Menu, ContextMenu, Delete
+    Try Menu, ContextMenu, DeleteAll
     Sleep, 5
     If (modus="omni")
     {
@@ -28399,7 +28391,6 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
    minRange := (winOpen=48) ? arDateu[1] : minz[rangeIdx]
    maxRange := (winOpen=48) ? arDateu[2] : maxz[rangeIdx]
    ftableu := (uiPreferedFileStats=1) ? "fmodified" : "Fcreated"
-
    If !dataColumn
       dataColumn := InStr(LVvaru, "metaS") ? "fsize" : ftableu
 
@@ -28490,6 +28481,16 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          userFilterInvertThis := userFilterDoString := 0
          FilteruDateMaxRange := FilteruDateMinRange := Format("{1}{2:" k "}", dateu, 0)
          theQuery := "WHERE " dataColumn " LIKE '" dateu "%'"
+         theQueryNonDB := "QPV::query::" dataColumn "::" FilteruDateMinRange "::" FilteruDateMaxRange
+         theQueryNonDB := StrReplace(theQueryNonDB, A_Space, 0)
+      } Else If InStr(LVvaru, "isDeleted")
+      {
+         userFilterProperty := 3
+         userFilterInvertThis := userFilterDoString := 0
+         FilteruDateMaxRange := 1
+         FilteruDateMinRange := 2
+         dataColumn := "isDeleted"
+         theQuery := "WHERE " dataColumn " IS NOT 0"
          theQueryNonDB := "QPV::query::" dataColumn "::" FilteruDateMinRange "::" FilteruDateMaxRange
          theQueryNonDB := StrReplace(theQueryNonDB, A_Space, 0)
       } Else If (InStr(LVvaru, "metaS") || InStr(LVvaru, "BETWEEN"))
@@ -33495,7 +33496,7 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
    If (InStr(prevFilter, "SQL:query:") && !InStr(filesFilter, "SQL:query:"))
    {
       BtnIndexStatsToList(0, 0, "none", 0) 
-      If StrLen(filesFilter)<2
+      If (StrLen(filesFilter)<2)
          Return
    }
 
@@ -33690,7 +33691,7 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
 
    filteredMap2mainList := []
    renewCurrentFilesList()
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
       filteredMap2mainList := newMappingList.Clone()
    resultedFilesList := newFilesList.Clone()
    markedSelectFile := selectedFiles
@@ -33718,7 +33719,7 @@ updateMainUnfilteredList(indexu, indexProperty, value) {
          Return
    }
 
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       currentFilesListModified := 1
       oldIndex := filteredMap2mainList[indexu]
@@ -36072,7 +36073,6 @@ extractSQLqueryFromFilter() {
 
 PanelCachesOverview() {
    Global LViewCaches, infoLine
-
    oka := (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern)) ? 1 : 0
    If (oka!=1)
    {
@@ -36092,13 +36092,13 @@ PanelCachesOverview() {
 
    ; the button row must stay inside the list view width, or the auto-sized window grows wider
    ; than its table: 190 + 190 + 65 + 65 + 3 gaps = 525 <= 580, large 305 + 305 + 95 + 95 = 815 <= 840
-   btnWid := 180
+   btnWid := 105
    btnWid2 := 65
    lstWid := 380
    If (PrefsLargeFonts=1)
    {
       lstWid := lstWid + 160
-      btnWid := btnWid + 115
+      btnWid := btnWid + 100
       btnWid2 := btnWid2 + 10
       Gui, Font, s%LargeUIfontValue%
    }
@@ -36108,8 +36108,7 @@ PanelCachesOverview() {
    ; numeric cells, so a header click would sort them as text and get it wrong.
    hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Missing|%", "Database caches overview")
    Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Gathering database information`, please wait . . .
-   Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNpurgeIgnoredSQLentries, &Purge ignored entries
-   Gui, Add, Button, x+5 hp wp gBTNrevalidateIgnoredSQLentries, Re&validate ignored entries
+   Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNignoredEntriesActs vbtn1, &Ignored entries
    If hostPanel
       Gui, Add, Button, x+5 hp w%btnWid2% gBTNcachesOverviewBack, &Back
 
@@ -36119,6 +36118,21 @@ PanelCachesOverview() {
    Sleep, 5
    ; on a timer, so the window is painted before the counting queries block the thread
    SetTimer, uiPopulateCachesOverview, -50
+}
+
+BTNignoredEntriesActs() {
+   Menu, ContextMenu, UseErrorLevel
+   Try Menu, ContextMenu, DeleteAll
+   Menu, ContextMenu, Add, 
+   Menu, ContextMenu, Add, &Purge ignored entries, BTNpurgeIgnoredSQLentries
+   Menu, ContextMenu, Add, Re&validate ignored entries, BTNrevalidateIgnoredSQLentries
+   Menu, ContextMenu, Add, List i&gnored entries in the viewport, BTNlistDeadEntries
+   Menu, ContextMenu, Show
+}
+
+BTNlistDeadEntries() {
+   BtnCloseWindow()
+   BtnIndexStatsToList(0, 0, "isDeleted", 0) 
 }
 
 uiPopulateCachesOverview() {
@@ -36163,6 +36177,9 @@ uiPopulateCachesOverview() {
         thisRow := rowsDef[A_Index]
         showTOOLtip("Gathering database information: " thisRow[4], 0, 0, A_Index/(totalu + 1))
         countu := getTotalIMGsSQLdb(thisRow[2])
+        actu := (!countu && A_Index=1) ? "Disable" : "Enable"
+        If (A_Index=1)
+           GuiControl, SettingsGUIA: %actu%, btn1
         countu := countu ? countu : 0    ; getTotalIMGsSQLdb() returns blank, not zero, on a failed query
         If (thisRow[3]=1)
            countu := totalz - countu
@@ -36170,7 +36187,7 @@ uiPopulateCachesOverview() {
         percu := (totalz>0) ? Round(countu/totalz*100, 1) : 0
         ; for the ignored entries "total minus ignored" would read as "not ignored", which is
         ; not pending work; the cell is left empty rather than filled with a misleading figure
-        missu := (thisRow[5]=1) ? totalz - countu : ""
+        missu := (thisRow[5]=1) ? totalz - countu : 0
         LV_Add("", A_Index, thisRow[1], countu, missu, percu)
         If (AnyWindowOpen!=91)   ; the user closed the panel while the queries were running
            Break
@@ -36192,7 +36209,7 @@ uiPopulateCachesOverview() {
 
     GuiControl, +Redraw, LViewCaches
     infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
-    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou ". Total indexed files: " groupDigits(totalz)
+    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou ". Total indexed files: " groupDigits(totalz) "."
     SetTimer, RemoveTooltip, -150
     SetTimer, ResetImgLoadStatus, -50
 }
@@ -36294,9 +36311,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    }
 
    friendly := extraFilter ? "`nCurrent files list filter:`n" extraFilter : ""
-   ; If showInfos
-      showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait" friendly)
-
+   showTOOLtip("Preparing to collect image files data, please wait" friendly)
    isPixelsTarget := isSQLpixelsColumn(scu)
    If (isPixelsTarget=1 || RegExMatch(scu, "i)(imgmedian|imgavg|imghpeak|imghlow|imghmode|imghminu|imghrange|imghrms|lHash|dHash|pHash)"))
       adaptedSortCriteria := 3
@@ -36550,18 +36565,17 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
 ;
 ; The DLL writes on activeSQLdb's own handle, inside the transaction opened here, so the
 ; periodic COMMIT keeps its meaning: an interrupted run keeps every image it finished.
+
    Static msBudget := 320
    ; The longest the whole pool may go without finishing a single image before this stops
-   ; waiting for it. QPV_ShowThumbnails() keeps the same kind of watch over the thumbnails
-   ; pool [69.5 seconds]; this one is more patient because these workers decode whole images
-   ; rather than thumbnails.
-   Static stallLimit := 180000   ; miliseconds
-   ; ... and the same watch over a pool that is not stuck but throttled: on a machine short
-   ; of memory the DLL hands out one decode at a time to BOTH pools, so a collection whose
-   ; workers are all queued behind the thumbnails pool can go a long while without finishing
-   ; anything, with nothing whatsoever wrong with it. That case is told apart by
-   ; dupesPixWorkStates() and gets this much longer rope; see the stall test at the end of
-   ; the loop.
+   ; waiting for it. 
+
+   Static stallLimit := 180000   ; in miliseconds
+   ; on a machine short of memory the DLL hands out one decode at a time to BOTH pools,
+   ; so a collection of workers are all queued, it can go a long while without finishing
+   ; anything, with nothing whatsoever wrong with it if decoding is slow. This case is 
+   ; differentiated by dupesPixWorkStates() and gets this much longer rope;
+   ; see the stall test at the end of the loop.
    Static starvedLimit := 900000   ; 15 minutes
    If (SLDtypeLoaded!=3 || !activeSQLdb._Handle)
    {
@@ -36653,48 +36667,37 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
 
          ; inFlight counts the jobs the workers are HOLDING, not the decodes running: a worker
          ; that the throttle shared with the thumbnails pool has not let through yet is in
-         ; flight and reading nothing at all. Announcing "decoding 8 images" over eight
-         ; workers queued behind a single decoder is how a throttled run reads as a healthy
-         ; one - and the memory flag alone cannot fix that, because it is the whole DLL's:
-         ; when the thumbnails pool holds the slot this pool is decoding nothing.
+         ; flight and reading nothing at all.
          inFlight := NumGet(dupesPixState + 0, 8, "Int")
          If (readDupesPixWorkStates(waitingJobs, decodingJobs)!=1)
             busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " inFlight " images at once"
          Else If (waitingJobs>0 && decodingJobs<1)
             busyNow := "Low on memory: " waitingJobs " images are waiting for the decoder"
          Else If (waitingJobs>0)
-            busyNow := "Low on memory: decoding " decodingJobs " of " (decodingJobs + waitingJobs) " images at once"
+            busyNow := "Low on memory: decoding " decodingJobs " image(s) and " waitingJobs " are in queue"
          Else If (decodingJobs>0)
             busyNow := "Decoding " decodingJobs " images at once"
          Else
             busyNow := "Collecting the data of the images already read"
 
          showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
-         fnOutputDebug("phase = " NumGet(dupesPixState + 0, 0, "Int") )
-         fnOutputDebug("queued = " NumGet(dupesPixState + 0, 4, "Int") )
-         fnOutputDebug("inFlight = " NumGet(dupesPixState + 0, 8, "Int") )
-         fnOutputDebug("ready = " NumGet(dupesPixState + 0, 12, "Int") )
-         fnOutputDebug("written = " NumGet(dupesPixState + 0, 16, "Int") )
-         fnOutputDebug("failed = " NumGet(dupesPixState + 0, 20, "Int") )
-         fnOutputDebug("dbErrors = " NumGet(dupesPixState + 0, 24, "Int") )
-         fnOutputDebug("submitted = " NumGet(dupesPixState + 0, 28, "Int") )
-         fnOutputDebug("alive = " NumGet(dupesPixState + 0, 32, "Int") )
-         fnOutputDebug("drained = " dupesPixDrainedFlag() " [1 = the refill query has no rows left; nothing more will be handed out]")
-         fnOutputDebug("decoding = " decodingJobs " | waiting for the shared decode slot = " waitingJobs " [the two halves of inFlight; -1 = this qpvmain.dll cannot say]")
-         ; fnOutputDebug("oldest job = " readDupesPixBusyJob())
+         If (debugModa=1)
+         {
+            fnOutputDebug("phase = " NumGet(dupesPixState + 0, 0, "Int") )
+            fnOutputDebug("queued = " NumGet(dupesPixState + 0, 4, "Int") )
+            fnOutputDebug("inFlight = " NumGet(dupesPixState + 0, 8, "Int") )
+            fnOutputDebug("ready = " NumGet(dupesPixState + 0, 12, "Int") )
+            fnOutputDebug("written = " NumGet(dupesPixState + 0, 16, "Int") )
+            fnOutputDebug("failed = " NumGet(dupesPixState + 0, 20, "Int") )
+            fnOutputDebug("dbErrors = " NumGet(dupesPixState + 0, 24, "Int") )
+            fnOutputDebug("submitted = " NumGet(dupesPixState + 0, 28, "Int") )
+            fnOutputDebug("alive = " NumGet(dupesPixState + 0, 32, "Int") )
+            fnOutputDebug("all data drained to AHK = " dupesPixDrainedFlag())
+            fnOutputDebug("decoding = " decodingJobs " | waiting = " waitingJobs)
+            ; fnOutputDebug("oldest job = " readDupesPixBusyJob())
+         }
          prevMSGdisplay := A_TickCount
       }
-
-      executingCanceableOperation := A_TickCount
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         DllCall("qpvmain.dll\dupesEngineCancel", "int")
-         Break
-      }
-
-      If (more!=1)
-         Break
 
       ; Both of these stop the run, so both have to cancel it as well, the way every other
       ; exit from this loop does. dupesPixEnd() alone only throws the results away: the
@@ -36718,6 +36721,18 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          abandonAll := 1
          Break
       }
+
+
+      executingCanceableOperation := A_TickCount
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         DllCall("qpvmain.dll\dupesEngineCancel", "int")
+         Break
+      }
+
+      If (more!=1)
+         Break
 
       If (countTFilez!=prevDone)
       {
@@ -36746,7 +36761,12 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          {
             ; the file that wedged it, and whether a decoder was ever started for it: a worker
             ; still waiting for the slot the two pools share has nothing to do with the image
-            addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round((A_TickCount - lastProgress)/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " NumGet(dupesPixState + 0, 8, "Int") " were in flight, " NumGet(dupesPixState + 0, 4, "Int") " queued, " NumGet(dupesPixState + 0, 12, "Int") " waiting to be written." (dupesPixDrainedFlag()=1 ? " The refill query had already run out of rows." : "") "`nThe job held longest: " readDupesPixBusyJob())
+            inFlight := NumGet(dupesPixState + 0, 8, "Int")
+            queued := NumGet(dupesPixState + 0, 4, "Int")
+            toDrain := NumGet(dupesPixState + 0, 12, "Int")
+            brf := dupesPixDrainedFlag()=1 ? " The refill query had already run out of rows." : ""
+            brf .= "`nThe job held longest: " readDupesPixBusyJob()
+            addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round((A_TickCount - lastProgress)/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " inFlight " in flight, " queued " queued, " toDrain " waiting to be written." brf)
             ErrorMsgS := "ERROR: the image decoding workers stopped responding.`n"
             DllCall("qpvmain.dll\dupesEngineCancel", "int")
             abandonAll := 1
@@ -36785,7 +36805,7 @@ initDupesPixelsPool() {
    initQPVmainDLL()
    If (!qpvMainDll || WICmoduleHasInit!=1 || wasInitFIMlib!=1)
    {
-      addJournalEntry(A_ThisFunc "(): ERROR. Failed to initialize dupes detection system. Prerequisites did not initialize: WIC=" WICmoduleHasInit " | FIM=" wasInitFIMlib " | Main DLL=" qpvMainDll)
+      addJournalEntry(A_ThisFunc "(): ERROR. Failed to initialize dupes detection system. Prerequisites did not initialize. WIC=" WICmoduleHasInit ". FIM=" wasInitFIMlib ". Main DLL=" qpvMainDll)
       Return 0
    }
 
@@ -36793,12 +36813,6 @@ initDupesPixelsPool() {
    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
    DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
 
-   ; The 32 bits build has about two gigabytes of address space for the entire application,
-   ; and a single worker decoding a large photograph can want a few hundred megabytes of it -
-   ; so the number of workers, not the amount of RAM in the machine, is what decides whether
-   ; this runs out of room. initThumbsPool() refuses to start there at all; this pool cannot
-   ; do that, it IS the collection, so it runs narrow instead. The throttle watches the same
-   ; wall from the other side: see ullAvailVirtual in tpMemoryIsTight().
    nThreads := (minimizeMemUsage=1 || allowMultiCoreMode!=1 || A_PtrSize=4) ? 2 : realSystemCores
    r := DllCall("qpvmain.dll\dupesPixInit", "Int", nThreads, "Int")
    dupesPixState := r ? DllCall("qpvmain.dll\dupesPixGetState", "UPtr") : 0
@@ -57726,7 +57740,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gToggleImgQuality Checked%userimgQuality% vuserimgQuality, High quality image resampling in the viewport
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userHQraw% vuserHQraw, Load Camera RAW files at high quality
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowMultiCoreMode% vallowMultiCoreMode +hwndhTemp, Multi-threaded thumbnails processing (experimental)
-    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails.`n `nIn undefined circumstances, QPV may infinitely freeze`nwhile generating thumbnails.")
+    ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails and perform image duplicates detection.")
     GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//1.5 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
     EnvGet, sc, NUMBER_OF_PROCESSORS
     sc := sc//2
@@ -85576,8 +85590,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                       ; some image will never arrive - a submit the dll declined, a result
                       ; that went missing - and every image still expected used to be
                       ; abandoned with it, which on the first lap means an empty page.
-                      ; Finish the page in this thread instead; both branches below know
-                      ; how to read the original file and the cached thumbnail themselves
+                      ; Finish the page in this thread instead;
                       If !QPV_ThumbsPoolPending()
                       {
                          fnOutputDebug("ThumbsMode. The workers went idle while images are still expected. Single threaded from here on.")
@@ -85586,11 +85599,11 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                          Continue
                       }
 
-                      ; a decoder that never returns [a malformed PDF, a file on a share that
+                      ; A decoder that never returns [a malformed PDF, a file on a share that
                       ; went away] would otherwise keep this loop spinning for ever. Here the
                       ; workers are alive and busy, so the file is not handed to this thread
                       ;
-                      ; ... and when the machine is short of memory they may be neither slow
+                      ; When the machine is short of memory they may be neither slow
                       ; nor stuck, but queued: the DLL then hands out one decode at a time
                       ; across BOTH pools, and a single large photograph on the collection
                       ; side of that queue can hold this page up for longer than the limit.
@@ -85693,13 +85706,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           {
              If (WasMemCached=1)
              {
-                ; the memory cached thumbnail went stale - the ring reached its slot while
-                ; this page was being drawn; have it rebuilt. checkThumbExists() hands back
-                ; the ORIGINAL image in file2load when it finds no thumbnail to load, and
-                ; says so through its return value only: testing the file for existence
-                ; instead had this branch treat the photograph itself as a thumbnail, read
-                ; at full resolution, never resized and then kept in the thumbnails memory
-                ; cache. It can also return without touching file2load at all
                 file2load := ""
                 file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
                 wasThumbCached := checkThumbExists(MD5name, imgPath, ".png", file2load)
@@ -86871,9 +86877,7 @@ readDupesPixBusyJob() {
       Return "none - no worker is holding an image"
 
    ; elapsed is how long the worker has been HOLDING that image, which under the throttle is
-   ; the queueing and the decoding together - the decode itself started somewhere inside it.
-   ; Reporting it as "12s decoding" over a worker that queued for eleven of those seconds is
-   ; the same confusion the state is here to clear up
+   ; the queueing and the decoding together
    thisWhat := friendly[thisState] ? friendly[thisState] : "state " thisState
    gg := Round(elapsed/1000, 1) "s held, " thisWhat ": " StrGet(&pathBuf, "UTF-16")
    pathBuf := ""
@@ -86891,14 +86895,9 @@ readDupesPixWorkStates(ByRef waitingJobs, ByRef decodingJobs, ByRef decodesNow:=
 ; eight workers behind one decoder and eight decoders running look exactly alike there, and
 ; telling those apart is the difference between a pool that is throttled and a pool that has
 ; stopped.
-;
-; Returns 0 when the DLL cannot say [an older qpvmain.dll], with everything set to -1.
    waitingJobs := decodingJobs := decodesNow := decodesAllowed := -1
-   If !qpvMainDll
-      Return 0
-
    r := DllCall("qpvmain.dll\dupesPixWorkStates", "IntP", nWaiting, "IntP", nDecoding, "IntP", nActive, "IntP", nCap, "Int")
-   If (ErrorLevel || r!=1)
+   If (r!=1)
       Return 0
 
    waitingJobs := nWaiting
@@ -86927,11 +86926,7 @@ filterDupeResultsByHdist(threshold) {
    ; that path went with the query fallback it existed to serve. See retrieveDupesByProperties().
    ;
    ; msBudget: how long one dupesScanStep() may run. determineTerminateOperation() is
-   ; throttled to 200 ms, so a step shorter than that keeps the cancel latency intact.
-   ; a stale qpvmain.dll makes every DllCall below return blank, which would read as
-   ; "no pairs" and quietly hand back an empty duplicates list; BTNfindDupesNow() says
-   ; so out loud, this covers the sort/refresh paths that re-enter here
-
+   ; throttled to 200 ms, 
    Static msBudget := 350
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
