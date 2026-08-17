@@ -1320,7 +1320,7 @@ DLL_API int DLL_CALLCONV dupesPixStep(int msBudget) {
     }
 
     const int workers = (int)dpWorkers.size();
-    const int highWater = clamp(workers*4, 8, 128);
+    const int highWater = clamp(workers*5 + 2, 8, 128);
     const std::chrono::steady_clock::time_point tStart = std::chrono::steady_clock::now();
 
     for (;;)

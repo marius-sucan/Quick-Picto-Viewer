@@ -195,15 +195,13 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := [], navKeysCounter := 0
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
    , thisBMPdummy := 0, dummyGu := 9, whileLoopExec := 0, WICmoduleHasInit := 0, dupesDCTcoeffsInit := 0
-   , dupesEngineInitGood := 0, dupesPixInitGood := 0, dupesPixState := 0, pixFmtNamesGood := 0
-   , dupesPixBusyGood := 0
-   , hTVlistFolders := "", SearchedStringz := ""
-   , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
+   , dupesPixInitGood := 0, dupesPixState := 0, hTVlistFolders := "", SearchedStringz := ""
+   , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := "", lastTippyWin := 0
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
    , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
-   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, lastTippyWin := 0
+   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
@@ -2370,33 +2368,6 @@ initQPVmainDLL(modus:=0) {
    If !dupesDCTcoeffsInit
       addJournalEntry("ERROR: Failed to initialize DCT coefficients required for identifying image duplicates. This feature will not work.")
 
-   ; The duplicates scan engine lives in the DLL now. A stale qpvmain.dll simply would
-   ; not export it, and every DllCall would return blank - which reads downstream as "no
-   ; duplicates found" rather than as a failure, so it is probed once here instead.
-   ; dupesScanStep() is the newest of the set and stands in for all of them.
-   dupesEngineInitGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesScanStep", "UPtr") ? 1 : 0
-   If !dupesEngineInitGood
-      addJournalEntry("ERROR: qpvmain.dll is older than this script and does not export the duplicates scan engine (dupesScanStep). Identifying image duplicates by Hamming distance will not work; please update qpvmain.dll.")
-
-   ; Both worker pools name a pixel format for this script - the collection pool writes the
-   ; name into imgpixfmt, the thumbnails pool hands it back for resultedFilesList - and the
-   ; names are this script's own. Sending the three tables once is what keeps a single
-   ; spelling per format in the product: WicPixelFormats() for the images WIC decodes,
-   ; FIMcolorTypeNames() for the ones FreeImage does, and one constant each for the two
-   ; loaders whose bitmap has no format of its own, indexed by the loader number the DLL
-   ; reports. Without this, both pools leave the pixel format blank rather than invent one.
-   ; The collection pool's state block grew a tenth field - "drained", at offset 40 - and
-   ; dupesPixBusyJob() arrived with it. On a DLL that has neither, offset 40 is whatever
-   ; static happens to sit after the block, so it must not be read at all rather than read
-   ; and disbelieved. Both are diagnostics only: a collection run works without them.
-   dupesPixBusyGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBusyJob", "UPtr") ? 1 : 0
-
-   pixFmtNamesGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvSetPixelFormatNames", "UPtr") ? 1 : 0
-   If pixFmtNamesGood
-      DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
-   Else
-      addJournalEntry("ERROR: qpvmain.dll is older than this script and does not export qpvSetPixelFormatNames. The workers will not report the pixel format of the images they read.")
-
    WICmoduleHasInit := DllCall("qpvmain.dll\initWICnow", "int", debugModa, "int", 0)
    If WICmoduleHasInit
    {
@@ -4496,12 +4467,10 @@ TrueCleanup() {
    {
       DllCall("qpvmain.dll\dupesEngineCancel", "int")
       DllCall("qpvmain.dll\dupesPixShutdown", "int")
+      DllCall("qpvmain.dll\dupesEngineRelease")
       dupesPixInitGood := 0
       dupesPixState := 0
    }
-
-   If (dupesEngineInitGood=1)
-      DllCall("qpvmain.dll\dupesEngineRelease")
 
    activeSQLdb.CloseDB()
    seenImagesDB.CloseDB()
@@ -4691,6 +4660,7 @@ initThumbsPool() {
        Return
     }
 
+    rz := DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
     DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
     multiCoreThumbsInitGood := 1
     addJournalEntry("Succesfully initialized " r " threads.")
@@ -4846,20 +4816,17 @@ poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
    ; the string a thumbnail produces for a file and the string the collection pool writes
    ; into imgpixfmt for the same file are one string
    pixFmt := ""
-   If (pixFmtNamesGood=1)
-   {
-      If !VarSetCapacity(nameBuf)
-         VarSetCapacity(nameBuf, 128*2, 0)
+   If !VarSetCapacity(nameBuf)
+      VarSetCapacity(nameBuf, 128*2, 0)
 
-      r := DllCall("qpvmain.dll\qpvGetPixelFormatName", "Int", loaderUsed
-          , "Int", NumGet(resultsBuffer, offu + 56, "Int")   ; wicFmt
-          , "Int", NumGet(resultsBuffer, offu + 60, "Int")   ; fimBPP
-          , "Int", NumGet(resultsBuffer, offu + 64, "Int")   ; fimColor
-          , "Int", NumGet(resultsBuffer, offu + 68, "Int")   ; fimToneMap
-          , "UPtr", &nameBuf, "Int", 128, "Int")
-      If (r>0)
-         pixFmt := StrGet(&nameBuf, r, "UTF-16")
-   }
+   r := DllCall("qpvmain.dll\qpvGetPixelFormatName", "Int", loaderUsed
+       , "Int", NumGet(resultsBuffer, offu + 56, "Int")   ; wicFmt
+       , "Int", NumGet(resultsBuffer, offu + 60, "Int")   ; fimBPP
+       , "Int", NumGet(resultsBuffer, offu + 64, "Int")   ; fimColor
+       , "Int", NumGet(resultsBuffer, offu + 68, "Int")   ; fimToneMap
+       , "UPtr", &nameBuf, "Int", 128, "Int")
+   If (r>0)
+      pixFmt := StrGet(&nameBuf, r, "UTF-16")
 
    ; a loader that could not name the format must not erase a name something else knew
    If !pixFmt
@@ -36589,9 +36556,9 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    ; pool [69.5 seconds]; this one is more patient because these workers decode whole images
    ; rather than thumbnails.
    Static stallLimit := 180000   ; miliseconds
-   If (dupesEngineInitGood!=1 || SLDtypeLoaded!=3 || !activeSQLdb._Handle)
+   If (SLDtypeLoaded!=3 || !activeSQLdb._Handle)
    {
-      addJournalEntry(A_ThisFunc "(): no image data was collected. dupesEngineInitGood=" dupesEngineInitGood " [qpvmain.dll must export dupesScanStep], SLDtypeLoaded=" SLDtypeLoaded " [3 = a database is loaded], the database handle is " (activeSQLdb._Handle ? "open" : "GONE") ".")
+      addJournalEntry(A_ThisFunc "(): ERROR. A SLDB files list must be opened.")
       Return 0
    }
 
@@ -36600,10 +36567,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
 
    If (dupesPixInitGood!=1 || !dupesPixState)
    {
-      ; WIC is a hard requirement of the pool and not an oversight: its workers decode
-      ; through WIC first and fall back to FreeImage per file, and dupesPixInit() refuses to
-      ; start without the factory initWICnow() creates
-      addJournalEntry(A_ThisFunc "(): the collection workers are unavailable. WICmoduleHasInit=" WICmoduleHasInit ", qpvmain.dll is " (qpvMainDll ? "loaded" : "NOT loaded") ", allowMultiCoreMode=" allowMultiCoreMode ".")
+      addJournalEntry(A_ThisFunc "(): ERROR: the collection workers are unavailable. Failed to initialize dupes detection system.")
       Return 0
    }
 
@@ -36679,9 +36643,6 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          If (failedSQLfiles>0)
             etaTime .= "`nFailed to commit data to database for " groupDigits(failedSQLfiles) " files"
 
-         ; every worker holds an image, but while the machine is short of memory only one of
-         ; them is allowed to decode at a time - tpTryTakeJobSlot() in thumbs-pool.h, one
-         ; count shared with the thumbnails pool.
          inFlight := NumGet(dupesPixState + 0, 8, "Int")
          busyNow := (QPV_MemoryIsTight()=1) ? "Low on memory: decoding one image at a time" : "Decoding " inFlight " images at once"
          showTOOLtip(ErrorMsgS "Gathering files information, please wait`n" busyNow etaTime, 0, 0, (filesToBeSorted>0) ? countTFilez/filesToBeSorted : 0)
@@ -36694,12 +36655,8 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          fnOutputDebug("dbErrors = " NumGet(dupesPixState + 0, 24, "Int") )
          fnOutputDebug("submitted = " NumGet(dupesPixState + 0, 28, "Int") )
          fnOutputDebug("alive = " NumGet(dupesPixState + 0, 32, "Int") )
-         ; the three that say how to read the nine above. Without them an empty queue with
-         ; idle workers - the tail of a run, everything handed out already - is indis-
-         ; tinguishable from a pool that cannot keep up, and "432 of 433" from "432 of 50000".
          fnOutputDebug("drained = " dupesPixDrainedFlag() " [1 = the refill query has no rows left; nothing more will be handed out]")
-         fnOutputDebug("toCollect = " filesToBeSorted " | done = " countTFilez)
-         fnOutputDebug("oldest job = " readDupesPixBusyJob())
+         ; fnOutputDebug("oldest job = " readDupesPixBusyJob())
          prevMSGdisplay := A_TickCount
       }
 
@@ -36774,11 +36731,15 @@ initDupesPixelsPool() {
       Return 1
 
    initQPVmainDLL()
-   If (!qpvMainDll || WICmoduleHasInit!=1 || dupesEngineInitGood!=1)
+   If (!qpvMainDll || WICmoduleHasInit!=1 || wasInitFIMlib!=1)
+   {
+      addJournalEntry(A_ThisFunc "(): ERROR. Failed to initialize dupes detection system. Prerequisites did not initialize: WIC=" WICmoduleHasInit " | FIM=" wasInitFIMlib " | Main DLL=" qpvMainDll)
       Return 0
+   }
 
    initFIMGmodule()
    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+   DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
 
    nThreads := (minimizeMemUsage=1 || allowMultiCoreMode!=1) ? 2 : realSystemCores
    r := DllCall("qpvmain.dll\dupesPixInit", "Int", nThreads, "Int")
@@ -36841,11 +36802,12 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
       Return 0
    }
 
-   If (dupesEngineInitGood!=1 || !DllCall("qpvmain.dll\dupesHashBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", updateSQL, "int", o_whichHashu, "int", pixCount, "int", graylevelCompressor, "int", userpHashMode + 1, "int"))
+   zr := DllCall("qpvmain.dll\dupesHashBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", updateSQL, "int", o_whichHashu, "int", pixCount, "int", graylevelCompressor, "int", userpHashMode + 1, "int")
+   If !zr
    {
-      addJournalEntry(A_ThisFunc "(): qpvmain.dll could not prepare the hash generation - " ((dupesEngineInitGood=1) ? readDupesEngineError() : "the DLL is older than this script") ".`n" selectSQL)
       CurrentSLD := backCurrentSLD
-      showTOOLtip("ERROR: could not generate the image hashes. Please update qpvmain.dll.")
+      addJournalEntry(A_ThisFunc "(): qpvmain.dll could not prepare the hash generation. SQL query: `n" selectSQL)
+      showTOOLtip("ERROR: Could not generate the image hashes. " readDupesEngineError())
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SetTimer, ResetImgLoadStatus, -200
@@ -45879,7 +45841,6 @@ createLivePreviewBrush() {
 
 PanelChangeHamDistThreshold() {
     Global editFa, editFb, txtline3
-
     If !testIsDupesList()
        msgu := "WARNING: The files list does not seem to contain pairs of images identified as duplicates"
 
@@ -86822,11 +86783,7 @@ readDupesEngineError() {
 }
 
 dupesPixDrainedFlag() {
-; 1 once the collection pool's refill query has run out of rows: everything the run will ever
-; hand out has been handed out, and what is left is the workers finishing what they hold. That
-; is the difference between the tail of a run and a pool that cannot keep up, and the nine
-; counters beside it read the same either way. -1 means this qpvmain.dll cannot say.
-   Return (dupesPixBusyGood=1 && dupesPixState) ? NumGet(dupesPixState + 0, 40, "Int") : -1
+   Return (dupesPixState) ? NumGet(dupesPixState + 0, 40, "Int") : -1
 }
 
 readDupesPixBusyJob() {
@@ -86837,8 +86794,6 @@ readDupesPixBusyJob() {
 ; reads the same for a huge raw that needs another minute and for a worker the decode slot
 ; shared with the thumbnails pool has not let through at all.
    Static friendly := {1:"WAITING for the shared decode slot (nothing has been read yet)", 2:"decoding"}
-   If (dupesPixBusyGood!=1)
-      Return "(this qpvmain.dll is older than this script and cannot say)"
 
    VarSetCapacity(pathBuf, 2080, 0)
    thisState := 0
@@ -86850,15 +86805,11 @@ readDupesPixBusyJob() {
       Return "none - no worker is holding an image"
 
    thisWhat := friendly[thisState] ? friendly[thisState] : "state " thisState
-   Return Round(elapsed/1000, 1) "s " thisWhat ": " StrGet(&pathBuf, "UTF-16")
+   gg := Round(elapsed/1000, 1) "s " thisWhat ": " StrGet(&pathBuf, "UTF-16")
+   pathBuf := ""
+   Return gg
 }
 
-; Every way the duplicates search can fail to obtain the in-DLL query engine ends here.
-; There is no second query path: the AHK self-join this used to fall back on could not be
-; cancelled, materialised the whole result set twice, and could not read the fingerprint
-; BLOBs - so it silently answered without the MSD filter. A clear stop is worth more than a
-; slower, quieter, differently-wrong answer. The hash filter is reset so the panel reopens
-; on a setting that does not need the engine.
 throwDupesEngineError(funcu, whatu) {
    addJournalEntry(funcu "(): " whatu " - " readDupesEngineError())
    userFindDupesFilterHamDist := 1
@@ -86884,9 +86835,12 @@ filterDupeResultsByHdist(threshold) {
    ; so out loud, this covers the sort/refresh paths that re-enter here
 
    Static msBudget := 350
-   If (dupesEngineInitGood!=1)
+   If (dupesPixInitGood!=1)
+      initDupesPixelsPool()
+
+   If (dupesPixInitGood!=1)
    {
-      addJournalEntry(A_ThisFunc "(): aborted - qpvmain.dll does not export the duplicates scan engine.")
+      addJournalEntry(A_ThisFunc "(): ERROR. Duplicates detection system failed to initialize.")
       Return 2
    }
 
@@ -86970,12 +86924,6 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
       maskFor := ""
       keepCount := 0
       Return -1
-   }
-
-   If (dupesEngineInitGood!=1)
-   {
-      addJournalEntry(A_ThisFunc "(): aborted - qpvmain.dll does not export the duplicates scan engine.")
-      Return 0
    }
 
    If (bckpResultedFilesList.Count()<3)
@@ -87186,19 +87134,12 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    If (PerformMSDonDupes=1 && includeHash)
       includePixels := ", p.big"
 
-   doStartLongOpDance()
-   startOperation := A_TickCount
+   If (dupesPixInitGood!=1)
+      initDupesPixelsPool()
 
-   ; ---- the candidate query ------------------------------------------------------
-   ; qpvmain.dll runs it on its own read-only connection, and there is no second query path
-   ; behind it any more. The engine performs a sorted scan: the rows arrive ordered by the
-   ; grouping columns, so a group is a run of consecutive rows. The column order that
-   ; dupesCandidateSQL() lays out is a contract with dupesQueryBegin() - see the comment
-   ; above it in dupes-search.h - and the ORDER BY has to lead with the same key expressions
-   ; or the runs are not runs.
-   If (dupesEngineInitGood!=1 || !activeSQLdb._Path)
+   If (dupesPixInitGood!=1 || !activeSQLdb._Path)
    {
-      throwDupesEngineError(A_ThisFunc, "the duplicates engine in qpvmain.dll is unavailable")
+      throwDupesEngineError(A_ThisFunc, "the image duplicates detection engine in qpvmain.dll is unavailable")
       Return -1
    }
 
@@ -87219,6 +87160,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       enginePath := activeSQLdb._Path
    }
 
+   doStartLongOpDance()
+   startOperation := A_TickCount
    engKeyCount := 0
    engNocaseMask := 0
    engSelKeys := ""
@@ -89391,13 +89334,13 @@ BtnCollectDupesData() {
    GuiControlGet, userFilterWhat
    GuiControlGet, graylevelCompressor
    GuiControlGet, findInvertedDupes
-   GuiControlGet, findFlippedDupes
    GuiControlGet, userpHashMode
    GuiControlGet, hamDistInterpolation
    GuiControlGet, dupesApplyBlur
    GuiControlGet, findDupesPrecision
 
    BtnCloseWindow()
+   Global findFlippedDupes := 1
    scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
    collectSQLFileInfosNow(scu, 0, 0, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
    PopulateImagesIndexStatsInfos("kill")
@@ -89539,8 +89482,7 @@ UIfindDupesCheckboxes(hactu, v:="") {
    actu := (userFindDupesFilterHamDist>1 && userFindDupesFilterHamDist!=2 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, findInvertedDupes
    ; flipped detection needs the H-prefixed hash columns, which only exist once
-   ; a hash type is picked: retrieveDupesByProperties() cannot build its query
-   ; without one
+   ; a hash type is picked: retrieveDupesByProperties() cannot build its query without one
    actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, findFlippedDupes
    actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
@@ -89666,21 +89608,23 @@ BTNfindDupesNow() {
       theseCols := StrReplace(theseCols, "lHash")
       theseCols := StrReplace(theseCols, ",,", ",")
       theseCols := StrReplace(theseCols, ", ,", ",")
-      If StrLen(theseCols)<3
+      If (StrLen(theseCols)<3)
          columnus := theseCols := "imgwhratio,imgframes"
    } Else theseCols := columnus
 
-   If StrLen(theseCols)<3
+   If (StrLen(theseCols)<3)
    {
       showTOOLtip("WARNING: Insufficient properties selected by which to identify duplicates.")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
+   If (dupesPixInitGood!=1)
+      initDupesPixelsPool()
 
-   If (userFindDupesFilterHamDist>1 && dupesEngineInitGood!=1)
+   If (userFindDupesFilterHamDist>1 && dupesPixInitGood!=1)
    {
-      msgBoxWrapper(appTitle ": ERROR", "The bundled qpvmain.dll is older than this version of " appTitle " and does not provide the image similarity engine.`n`nSearching for duplicates by fingerprint (Hamming distance) is unavailable until qpvmain.dll is updated. Searching by file and image properties alone still works: set the fingerprint type to ""Ignore"".", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.`n`nSearching for duplicates by fingerprint (Hamming distance). Searching by file and image properties alone still works: set the fingerprint type to «Ignore».", 0, 0, "error")
       Return
    }
 
