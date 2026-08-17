@@ -92,7 +92,12 @@ static inline int GetFileAttributesExW(const wchar_t *path, int, WIN32_FILE_ATTR
     return 1;
 }
 static inline DWORD GetTickCount() { return 0; }
-static inline ULONGLONG GetTickCount64() { return 0; }
+// A real clock: dupesPixBusyJob() times a job with it, and a test that wants to see how long
+// a worker has been holding one cannot do that against a constant.
+static inline ULONGLONG GetTickCount64() {
+    return (ULONGLONG)std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 // ---- COM / WIC ------------------------------------------------------------------------
 struct IWICImagingFactory { int dummy; };

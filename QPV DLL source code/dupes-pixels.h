@@ -62,6 +62,7 @@ static INT64 qpvFileTimeToLocalStamp(INT64 ft);
 #define DP_ERR_PROCESS  2
 
 #define DP_MAX_READY   256  // finished images allowed to pile up before workers park
+#define DP_MAX_WORKERS  32  // what dupesPixInit() clamps to, and the size of dpBusy below
 
 #pragma pack(push, 8)
 struct DupePixState {         // AHK NumGet()s these by byte offset
@@ -75,6 +76,11 @@ struct DupePixState {         // AHK NumGet()s these by byte offset
     volatile LONG submitted;  // 28
     volatile LONG alive;      // 32   worker threads
     volatile LONG lastError;  // 36
+    // 1 once the refill query has run out of rows. From that moment dupesPixStep() stops
+    // asking it for more and the run is only finishing what the workers already hold, which
+    // is the one thing the counters above cannot be read for: an empty queue with idle
+    // workers is the TAIL of a run, and looks nothing like a pool that cannot keep up.
+    volatile LONG drained;    // 40
 };
 #pragma pack(pop)
 
@@ -123,16 +129,33 @@ struct DupePixResult {
     std::vector<unsigned char> small, big, smallH, bigH;
 };
 
+// What one worker is holding right now, so that a run which has stopped moving can be
+// asked WHICH file it is waiting for. The nine counters can say that one job is in flight
+// and nothing is arriving; they cannot say whether that job is a 200 MB raw being decoded
+// or a worker the shared throttle of thumbs-pool.h has not let through yet, and those two
+// call for opposite answers from whoever is looking at them.
+//
+// One entry per worker, indexed by the slot dupesPixInit() gave the thread. Never resized -
+// a worker that outlived a shutdown is detached, not stopped, and would still be writing
+// here. path and startedMs are guarded by dpMutex; state is written without it, on the way
+// past, and is only ever read for a message.
+struct DpBusy {
+    volatile INT64   startedMs = 0;   // GetTickCount64() when the job was taken; 0 = holding nothing
+    std::atomic<int> state{0};        // 1 waiting for a decode slot, 2 decoding
+    std::wstring     path;
+};
+
 static std::vector<std::thread>            dpWorkers;
 static std::deque<DupePixJob>              dpQueue;
 static std::deque<DupePixResult>           dpResults;
+static DpBusy                              dpBusy[DP_MAX_WORKERS];
 static std::mutex                          dpMutex;
 static std::condition_variable             dpJobCV;
 static std::condition_variable             dpExitCV;
 static std::atomic<bool>                   dpStopping(false);
 static std::atomic<LONG>                   dpGeneration(1);
 static std::shared_ptr<const DupePixCfg>   dpConfig = std::make_shared<DupePixCfg>();
-static DupePixState                        dpState = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static DupePixState                        dpState = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static size_t                              dpExited = 0;        // guarded by dpMutex
 
 // The names the database stores in imgpixfmt, exactly as the interpreter spells them:
@@ -158,6 +181,31 @@ static sqlite3_stmt *dpUpdPix  = NULL;
 static sqlite3_stmt *dpMarkDead = NULL;
 static bool          dpSelectDrained = false;
 static INT64         dpLastID = 0;        // keyset cursor; see dpTopUpQueue()
+
+// The flag the step loop tests and the number AHK reads are set together, in one place, so
+// they can never disagree about whether anything more is coming.
+static void dpSetDrained(bool drained) {
+    dpSelectDrained = drained;
+    dpState.drained = drained ? 1 : 0;
+}
+
+// One worker's turn, for dupesPixBusyJob() to report. Called with the path only when the job
+// is taken; the state alone changes as the worker moves from waiting to decoding.
+static void dpMarkBusy(size_t slot, const std::wstring *path, int state) {
+    if (slot >= (size_t)DP_MAX_WORKERS)
+       return;
+
+    if (path==NULL)
+    {
+       dpBusy[slot].state.store(state, std::memory_order_relaxed);
+       return;
+    }
+
+    std::lock_guard<std::mutex> lk(dpMutex);
+    dpBusy[slot].startedMs = (state!=0) ? (INT64)GetTickCount64() : 0;
+    dpBusy[slot].state.store(state, std::memory_order_relaxed);
+    dpBusy[slot].path = *path;
+}
 
 // ---------------------------------------------------------------------------------------
 //  the GDI+ chain, reproduced from calcHistoAvgFile()
@@ -610,7 +658,7 @@ static bool dpAcquireJobSlot() {
     }
 }
 
-static void dpWorkerBody() {
+static void dpWorkerBody(size_t mySlot) {
     HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
     omp_set_num_threads(1);
 
@@ -682,15 +730,27 @@ static void dpWorkerBody() {
         // the memory sample and the count of running decodes are the thumbnails pool's, and
         // are shared with it; when the machine is tight, decoding narrows to one image at a
         // time across the whole DLL
-        if (job.generation==dpGeneration.load() && dupesPixCancel.load()==0 && dpAcquireJobSlot())
+        if (job.generation==dpGeneration.load() && dupesPixCancel.load()==0)
         {
-           TpJobSlot slot;      // released at the end of this block, whatever happens in it
-           dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res);
-           ranIt = true;
+           // recorded from before the slot is asked for, not after: a worker that never gets
+           // one is holding a job and doing nothing, and that is the state worth naming
+           dpMarkBusy(mySlot, &job.path, 1);
+           if (dpAcquireJobSlot())
+           {
+              dpMarkBusy(mySlot, NULL, 2);
+              TpJobSlot slot;      // released at the end of this block, whatever happens in it
+              dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res);
+              ranIt = true;
+           }
         }
 
         {
             std::lock_guard<std::mutex> lk(dpMutex);
+            // this worker is holding nothing again. Cleared here rather than through
+            // dpMarkBusy() because the lock is already held
+            dpBusy[mySlot].startedMs = 0;
+            dpBusy[mySlot].state.store(0, std::memory_order_relaxed);
+            dpBusy[mySlot].path.clear();
             if (dpState.inFlight > 0)
                dpState.inFlight = dpState.inFlight - 1;
 
@@ -968,7 +1028,7 @@ static int dpTopUpQueue(int want) {
     // fewer rows than the LIMIT allowed means the statement really did run out, rather
     // than simply reaching its limit for this refill
     if (seen < want)
-       dpSelectDrained = true;
+       dpSetDrained(true);
 
     if (added > 0)
        dpJobCV.notify_all();
@@ -992,11 +1052,12 @@ DLL_API int DLL_CALLCONV dupesPixInit(int nThreads) {
        return 0;
     }
 
-    nThreads = clamp(nThreads, 1, 32);
+    nThreads = clamp(nThreads, 1, DP_MAX_WORKERS);
     dpStopping.store(false);
     dpWorkers.reserve(nThreads);
+    // the slot is the thread's index into dpBusy, and stays its own for as long as it runs
     for ( int i = 0 ; i < nThreads ; i++)
-        dpWorkers.push_back(std::thread(dpWorkerBody));
+        dpWorkers.push_back(std::thread(dpWorkerBody, (size_t)i));
 
     dpState.alive = (LONG)dpWorkers.size();
     fnOutputDebug("dupesPixels: started with " + std::to_string(dpWorkers.size()) + " workers");
@@ -1005,6 +1066,60 @@ DLL_API int DLL_CALLCONV dupesPixInit(int nThreads) {
 
 DLL_API void* DLL_CALLCONV dupesPixGetState() {
     return (void*)&dpState;
+}
+
+// The job that has been in a worker's hands the longest, and for how long.
+//
+// Returns those milliseconds, or -1 when no worker is holding anything. The path goes into
+// out, truncated to cch characters and always terminated, and *state - when asked for - says
+// what the worker is doing with it: 1 waiting for the decode slot the two pools share, 2
+// decoding. It is the question the counters cannot answer. A run whose queue is empty and
+// whose workers are idle is finishing its last few images, and "the last few images" can mean
+// one 200 MB raw that will take another minute, or a worker that tpTryTakeJobSlot() has not
+// let through since the thumbnails pool started drawing a page - the same three numbers
+// either way, and nothing to do about the second one until it is named.
+DLL_API INT64 DLL_CALLCONV dupesPixBusyJob(wchar_t *out, int cch, int *state) {
+    if (out!=NULL && cch > 0)
+       out[0] = 0;
+    if (state!=NULL)
+       *state = 0;
+
+    const INT64 now = (INT64)GetTickCount64();
+    INT64 oldest = -1;
+    size_t which = 0;
+    std::lock_guard<std::mutex> lk(dpMutex);
+    for ( size_t i = 0 ; i < (size_t)DP_MAX_WORKERS ; i++)
+    {
+        const INT64 started = dpBusy[i].startedMs;
+        if (started==0)
+           continue;
+
+        const INT64 held = (now > started) ? now - started : 0;
+        if (held > oldest)
+        {
+           oldest = held;
+           which = i;
+        }
+    }
+
+    if (oldest < 0)
+       return -1;
+
+    if (state!=NULL)
+       *state = dpBusy[which].state.load(std::memory_order_relaxed);
+
+    if (out!=NULL && cch > 1)
+    {
+       const std::wstring &p = dpBusy[which].path;
+       const size_t room = (size_t)cch - 1;
+       const size_t n = (p.size() < room) ? p.size() : room;
+       if (n > 0)
+          memcpy(out, p.c_str(), n*sizeof(wchar_t));
+
+       out[n] = 0;
+    }
+
+    return oldest;
 }
 
 // "|" separated, one entry per index, all three tables built by the interpreter out of the
@@ -1128,7 +1243,7 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
 
     dpFinalizeStatements();
     dpDB = (sqlite3*)ahkDb;
-    dpSelectDrained = false;
+    dpSetDrained(false);
     dpLastID = 0;
 
     if (SQ.prepare16_v2(dpDB, selectSQL, -1, &dpSelect, NULL)!=SQLITE_OK || dpSelect==NULL)
@@ -1293,7 +1408,7 @@ DLL_API int DLL_CALLCONV dupesPixEnd() {
 
     dpFinalizeStatements();
     dpDB = NULL;
-    dpSelectDrained = false;
+    dpSetDrained(false);
     dpLastID = 0;
     if (dpState.phase!=-1)
        dpState.phase = 0;

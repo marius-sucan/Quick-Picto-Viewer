@@ -196,6 +196,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
    , thisBMPdummy := 0, dummyGu := 9, whileLoopExec := 0, WICmoduleHasInit := 0, dupesDCTcoeffsInit := 0
    , dupesEngineInitGood := 0, dupesPixInitGood := 0, dupesPixState := 0, pixFmtNamesGood := 0
+   , dupesPixBusyGood := 0
    , hTVlistFolders := "", SearchedStringz := ""
    , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
@@ -2384,6 +2385,12 @@ initQPVmainDLL(modus:=0) {
    ; FIMcolorTypeNames() for the ones FreeImage does, and one constant each for the two
    ; loaders whose bitmap has no format of its own, indexed by the loader number the DLL
    ; reports. Without this, both pools leave the pixel format blank rather than invent one.
+   ; The collection pool's state block grew a tenth field - "drained", at offset 40 - and
+   ; dupesPixBusyJob() arrived with it. On a DLL that has neither, offset 40 is whatever
+   ; static happens to sit after the block, so it must not be read at all rather than read
+   ; and disbelieved. Both are diagnostics only: a collection run works without them.
+   dupesPixBusyGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "dupesPixBusyJob", "UPtr") ? 1 : 0
+
    pixFmtNamesGood := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvSetPixelFormatNames", "UPtr") ? 1 : 0
    If pixFmtNamesGood
       DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
@@ -36351,7 +36358,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
 
       ; A fingerprint is a row of imagesPixels since SLDB schema v3.
       If (isPixelsTarget=1)
-         missingClause := "imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE " SQLpixelsColumn(scu) " IS NOT NULL) AND isDeleted=0"
+         missingClause := SQLpixelsMissingClause(scu) " AND isDeleted=0"
       Else If (adaptedSortCriteria=2)
          missingClause := "(ifnull(" scu ", '')='' OR ifnull(imgpixfmt, '')='') AND isDeleted=0"
       Else
@@ -36687,6 +36694,12 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          fnOutputDebug("dbErrors = " NumGet(dupesPixState + 0, 24, "Int") )
          fnOutputDebug("submitted = " NumGet(dupesPixState + 0, 28, "Int") )
          fnOutputDebug("alive = " NumGet(dupesPixState + 0, 32, "Int") )
+         ; the three that say how to read the nine above. Without them an empty queue with
+         ; idle workers - the tail of a run, everything handed out already - is indis-
+         ; tinguishable from a pool that cannot keep up, and "432 of 433" from "432 of 50000".
+         fnOutputDebug("drained = " dupesPixDrainedFlag() " [1 = the refill query has no rows left; nothing more will be handed out]")
+         fnOutputDebug("toCollect = " filesToBeSorted " | done = " countTFilez)
+         fnOutputDebug("oldest job = " readDupesPixBusyJob())
          prevMSGdisplay := A_TickCount
       }
 
@@ -36723,7 +36736,9 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          lastProgress := A_TickCount
       } Else If (A_TickCount - lastProgress>stallLimit)
       {
-         addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round(stallLimit/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " NumGet(dupesPixState + 0, 8, "Int") " were in flight, " NumGet(dupesPixState + 0, 4, "Int") " queued, " NumGet(dupesPixState + 0, 12, "Int") " waiting to be written.")
+         ; the file that wedged it, and whether a decoder was ever started for it: a worker
+         ; still waiting for the slot the two pools share has nothing to do with the image
+         addJournalEntry(A_ThisFunc "(): stopping - the collection workers delivered nothing for " Round(stallLimit/1000) " seconds. " groupDigits(countTFilez) " of " groupDigits(filesToBeSorted) " files were done; " NumGet(dupesPixState + 0, 8, "Int") " were in flight, " NumGet(dupesPixState + 0, 4, "Int") " queued, " NumGet(dupesPixState + 0, 12, "Int") " waiting to be written." (dupesPixDrainedFlag()=1 ? " The refill query had already run out of rows." : "") "`nThe job held longest: " readDupesPixBusyJob())
          ErrorMsgS := "ERROR: the image decoding workers stopped responding.`n"
          DllCall("qpvmain.dll\dupesEngineCancel", "int")
          abandonAll := 1
@@ -73583,10 +73598,32 @@ SQLpixelsJoinClause(tableAlias:="images") {
 
 ; Whether a fingerprint has been collected. A missing imagesPixels row and a NULL blob both
 ; mean "not collected"; the old test was ifnull(pixelzFsmall,'')='' on the images row.
-; The "not collected" side of it is spelled as a NOT IN subquery where it is needed, in
-; collectSQLFileInfosNow(), so that the statement around it stays single-table.
+; The "not collected" side of it is SQLpixelsMissingClause() below, which keeps the statement
+; around it single-table.
 SQLpixelsPresentClause(colu) {
    Return "p." SQLpixelsColumn(colu) " IS NOT NULL"
+}
+
+; "this image has no fingerprint yet", for the data-collection queries of
+; collectSQLFileInfosNow(): the row count it reports, the serial result set it walks, and the
+; refill query the in-DLL collection pool re-runs to keep its workers fed.
+;
+; NOT EXISTS rather than "imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE ... )", which
+; is what this used to be. The subquery carries a WHERE, so SQLite cannot answer the NOT IN
+; from imagesPixels' primary key and copies the whole table into an ephemeral index instead -
+; and it does that again on every single execution. The collection pool's refill runs
+; hundreds of times per run against the table that same run is filling, 2.2 KB per row, so
+; the cost of handing out the next image grows with the number of images already done: one
+; 31-row refill measured 6.5 ms at the start of a run and 63 ms once 32k rows were collected
+; [tests/pool_latency.cpp]. Correlated, it is one primary-key probe per candidate row, and
+; it gets CHEAPER as the run proceeds because fewer rows remain to probe for - 1.47x over a
+; 20k image run, with the decoders untouched.
+;
+; The alias cannot be "p": SQLpixelsJoinClause() already spells imagesPixels "p", and these
+; two are not meant to be able to collide.
+;   tableAlias: how the outer statement names the images table
+SQLpixelsMissingClause(colu, tableAlias:="images") {
+   Return "NOT EXISTS (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=" tableAlias ".imgidu AND px." SQLpixelsColumn(colu) " IS NOT NULL)"
 }
 
 ; True when the given data-collection target names one of the fingerprints rather than a
@@ -86782,6 +86819,38 @@ readDupesEngineError() {
    VarSetCapacity(errBuf, 1024, 0)
    n := DllCall("qpvmain.dll\dupesEngineLastError", "UPtr", &errBuf, "int", 511, "int")
    Return (n>0) ? StrGet(&errBuf, "UTF-16") : "(no details)"
+}
+
+dupesPixDrainedFlag() {
+; 1 once the collection pool's refill query has run out of rows: everything the run will ever
+; hand out has been handed out, and what is left is the workers finishing what they hold. That
+; is the difference between the tail of a run and a pool that cannot keep up, and the nine
+; counters beside it read the same either way. -1 means this qpvmain.dll cannot say.
+   Return (dupesPixBusyGood=1 && dupesPixState) ? NumGet(dupesPixState + 0, 40, "Int") : -1
+}
+
+readDupesPixBusyJob() {
+; The image the collection pool has held on to the longest, how long for, and whether a
+; decoder was ever started for it. For the journal and the debug output of
+; collectImgDataViaPool(), which is where a run that stopped moving has to be explained:
+; the state counters can say that one job is in flight and nothing is arriving, and that
+; reads the same for a huge raw that needs another minute and for a worker the decode slot
+; shared with the thumbnails pool has not let through at all.
+   Static friendly := {1:"WAITING for the shared decode slot (nothing has been read yet)", 2:"decoding"}
+   If (dupesPixBusyGood!=1)
+      Return "(this qpvmain.dll is older than this script and cannot say)"
+
+   VarSetCapacity(pathBuf, 2080, 0)
+   thisState := 0
+   elapsed := DllCall("qpvmain.dll\dupesPixBusyJob", "UPtr", &pathBuf, "int", 1024, "IntP", thisState, "Int64")
+   If (ErrorLevel || elapsed="")
+      Return "(this qpvmain.dll is older than this script and cannot say)"
+
+   If (elapsed<0)
+      Return "none - no worker is holding an image"
+
+   thisWhat := friendly[thisState] ? friendly[thisState] : "state " thisState
+   Return Round(elapsed/1000, 1) "s " thisWhat ": " StrGet(&pathBuf, "UTF-16")
 }
 
 ; Every way the duplicates search can fail to obtain the in-DLL query engine ends here.

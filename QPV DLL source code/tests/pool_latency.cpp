@@ -58,7 +58,7 @@ static bool exec(sqlite3 *db, const char *sql) {
     return true;
 }
 
-__attribute__((unused)) static long long scalar(sqlite3 *db, const char *sql) {
+static long long scalar(sqlite3 *db, const char *sql) {
     sqlite3_stmt *st = NULL;
     const std::wstring w = widenA(sql);
     if (SQ.prepare16_v2(db, w.c_str(), -1, &st, NULL)!=SQLITE_OK || st==NULL)
@@ -138,10 +138,63 @@ static sqlite3* buildDB(const char *path, int nRows, int nCollected, int slowEve
     return db;
 }
 
+// What collectSQLFileInfosNow() builds now, through SQLpixelsMissingClause()
 static const wchar_t *kSelect =
+    L"SELECT imgidu, fullPath FROM images"
+    L" WHERE NOT EXISTS (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=images.imgidu"
+    L" AND px.small IS NOT NULL) AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+
+// and what it built before, kept for the comparison below
+static const wchar_t *kSelectNotIn =
     L"SELECT imgidu, fullPath FROM images"
     L" WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
     L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+
+// The two must select the same images, or the change is not a speed-up but a different run.
+// A missing imagesPixels row, a row whose blob is NULL and a row with a real blob all have to
+// keep meaning what they meant, and so do both spellings of isDeleted - 1 is durable, 2 is a
+// rescan marker, and neither is 0.
+static void clausesAgree() {
+    printf("\n  NOT EXISTS selects exactly what NOT IN selected\n");
+    sqlite3 *db = buildDB("pool_equiv.sldb", 900, 0, 0);
+    if (db==NULL)
+       return;
+
+    exec(db, "INSERT INTO imagesPixels (imgidu, small, big) SELECT imgidu, zeroblob(72), zeroblob(1024)"
+             " FROM images WHERE imgidu%3=0;");                       // collected
+    exec(db, "INSERT INTO imagesPixels (imgidu, small, big) SELECT imgidu, NULL, zeroblob(1024)"
+             " FROM images WHERE imgidu%3=1;");                       // a row, but no fingerprint
+    exec(db, "UPDATE images SET isDeleted=1 WHERE imgidu%7=0;");
+    exec(db, "UPDATE images SET isDeleted=2 WHERE imgidu%11=0;");
+
+    // both directions, so neither can be a subset of the other
+    const char *diffA = "SELECT count(*) FROM (SELECT imgidu FROM images WHERE NOT EXISTS"
+                        " (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=images.imgidu AND px.small IS NOT NULL)"
+                        " AND isDeleted=0 EXCEPT SELECT imgidu FROM images WHERE imgidu NOT IN"
+                        " (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL) AND isDeleted=0);";
+    const char *diffB = "SELECT count(*) FROM (SELECT imgidu FROM images WHERE imgidu NOT IN"
+                        " (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL) AND isDeleted=0"
+                        " EXCEPT SELECT imgidu FROM images WHERE NOT EXISTS"
+                        " (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=images.imgidu AND px.small IS NOT NULL)"
+                        " AND isDeleted=0);";
+    const char *countNew = "SELECT count(*) FROM images WHERE NOT EXISTS (SELECT 1 FROM imagesPixels AS px"
+                           " WHERE px.imgidu=images.imgidu AND px.small IS NOT NULL) AND isDeleted=0;";
+    const char *countOld = "SELECT count(*) FROM images WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels"
+                           " WHERE small IS NOT NULL) AND isDeleted=0;";
+    const long long dA = scalar(db, diffA), dB = scalar(db, diffB);
+    const long long cNew = scalar(db, countNew), cOld = scalar(db, countOld);
+    printf("    %-62s %s\n", "the two row sets are identical, both ways round",
+           (dA==0 && dB==0) ? "ok" : "FAILED");
+    printf("    %-62s %s\n", "and getTotalIMGsSQLdb() counts the same population",
+           (cNew==cOld && cNew > 0) ? "ok" : "FAILED");
+    if (dA!=0 || dB!=0 || cNew!=cOld || cNew <= 0)
+       problems++;
+
+    printf("    (%lld of 900 images are still to collect: 300 have a fingerprint,"
+           " 300 have a row with a NULL blob, 300 have no row at all, minus the deleted ones)\n", cNew);
+    SQ.close_v2(db);
+    remove("pool_equiv.sldb");
+}
 
 // ---------------------------------------------------------------------------------------
 //  the AHK loop, and a 2 ms watcher over the same struct
@@ -185,6 +238,8 @@ struct ScenarioResult {
     int  written = 0, failed = 0, dbErrors = 0, submitted = 0;
     double wallMs = 0;
     bool drainedWhileWorkersIdle = false;
+    bool namedADecodingJob = false;      // dupesPixBusyJob() had something to say
+    bool mirrorHeld = true;              // dpState.drained never disagreed with dpSelectDrained
 };
 
 // A transcription of collectImgDataViaPool()'s loop: the same 320 ms budget, the same nine
@@ -229,10 +284,18 @@ static ScenarioResult runScenario(const char *title, sqlite3 *db, int nRows, int
         const int submitted = (int)dpState.submitted;
         const int alive = (int)dpState.alive;
         const int countTFilez = written + failed + dbErrors;
+        if (((int)dpState.drained!=0)!=dpSelectDrained)
+           out.mirrorHeld = false;
 
         if (nowMs() - prevMSGdisplay > sampleEveryMs)
         {
            const double sinceMs = nowMs() - prevMSGdisplay;
+           // the two lines collectImgDataViaPool() prints beside the nine counters
+           wchar_t busyPath[512];
+           int busyState = 0;
+           const INT64 busyMs = dupesPixBusyJob(busyPath, 512, &busyState);
+           if (busyMs >= 0 && busyState==2 && busyPath[0]!=0)
+              out.namedADecodingJob = true;
            printf("    t=%6.1fs  phase=%d queued=%3d inFlight=%2d ready=%3d written=%6d failed=%d"
                   " dbErrors=%d submitted=%6d alive=%d | drained=%d cursor=%-6lld step=%4.0fms"
                   " %6.0f img/s  [2ms watcher: queued %d..%d, inFlight %d..%d, ready max %d]\n",
@@ -241,6 +304,10 @@ static ScenarioResult runScenario(const char *title, sqlite3 *db, int nRows, int
                   1000.0*(written - prevSampleWritten)/(sinceMs > 0 ? sinceMs : 1),
                   watch.qMin.load(), watch.qMax.load(), watch.fMin.load(), watch.fMax.load(),
                   watch.rMax.load());
+           if (busyMs >= 0)
+              printf("               oldest job: %.1fs %s %s\n", busyMs/1000.0,
+                     (busyState==1) ? "WAITING for the shared decode slot" : "decoding",
+                     WideCharToString(busyPath).c_str());
            out.samplesTaken++;
            prevSampleWritten = written;
            prevMSGdisplay = nowMs();
@@ -293,7 +360,7 @@ static void refillCost() {
     printf("\n  what one refill of 31 rows costs as the run progresses\n");
     printf("    (this machine, warm page cache - a cold mechanical drive pays seek time on top\n"
            "     of every page these walks touch, and the images being decoded are on the same head)\n");
-    printf("    %10s %14s %14s %14s\n", "collected", "shipped NOT IN", "NOT EXISTS", "LEFT JOIN");
+    printf("    %10s %14s %14s %14s\n", "collected", "old NOT IN", "shipped NOT EXISTS", "LEFT JOIN");
     const int totals = 40000;
     for ( int collected = 0 ; collected <= 32000 ; collected = collected ? collected*2 : 1000)
     {
@@ -303,10 +370,8 @@ static void refillCost() {
 
         struct Variant { const wchar_t *sql; double ms; };
         Variant vs[3] = {
+            { kSelectNotIn, 0 },
             { kSelect, 0 },
-            { L"SELECT imgidu, fullPath FROM images WHERE NOT EXISTS (SELECT 1 FROM imagesPixels p"
-              L" WHERE p.imgidu=images.imgidu AND p.small IS NOT NULL)"
-              L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;", 0 },
             { L"SELECT i.imgidu, i.fullPath FROM images i LEFT JOIN imagesPixels p ON p.imgidu=i.imgidu"
               L" WHERE p.small IS NULL AND i.isDeleted=0 AND i.imgidu>?2 ORDER BY i.imgidu LIMIT ?1;", 0 }
         };
@@ -367,6 +432,8 @@ int main(int argc, char **argv) {
     FIM.ok = true;
     m_pIWICFactory = (IWICImagingFactory*)1;
 
+    clausesAgree();
+
     const bool costOnly = (argc > 1 && strcmp(argv[1], "cost")==0);
     if (costOnly)
     {
@@ -415,6 +482,13 @@ int main(int argc, char **argv) {
         {
            const ScenarioResult r = runScenario("the same drive with a few huge files - watch the tail",
                                                 db, 400, 60, 40, 1500, watch);
+           printf("    %-62s %s\n", "the straggler that holds the run open is named",
+                  r.namedADecodingJob ? "ok" : "FAILED");
+           printf("    %-62s %s\n", "and dpState.drained never disagreed with the flag itself",
+                  r.mirrorHeld ? "ok" : "FAILED");
+           if (!r.namedADecodingJob || !r.mirrorHeld)
+              problems++;
+
            printf("    => %s\n", r.drainedWhileWorkersIdle
                   ? "reproduced: at the tail the cursor is drained, the queue is empty and the"
                     " workers that are left are idle - queued=0 with a low inFlight"
@@ -435,8 +509,6 @@ int main(int argc, char **argv) {
         {
            shipped = runScenario("a fast drive, and a library the run keeps making bigger", db, 20000,
                                  2, 2, 4000, watch).wallMs;
-           printf("    => the rate falls as the run goes on with the decoders unchanged: every refill"
-                  " re-materialises the NOT IN subquery over every row collected so far\n");
            SQ.close_v2(db);
            remove("pool_prod.sldb");
         }
@@ -444,22 +516,29 @@ int main(int argc, char **argv) {
         // the same run, the same pool, the same decoders - only the way the refill asks for
         // "no fingerprint yet" differs. NOT EXISTS is answered from imagesPixels' own primary
         // key, one probe per candidate row, instead of a fresh copy of the whole table.
-        static const wchar_t *selExists =
-            L"SELECT imgidu, fullPath FROM images"
-            L" WHERE NOT EXISTS (SELECT 1 FROM imagesPixels p WHERE p.imgidu=images.imgidu"
-            L" AND p.small IS NOT NULL) AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
         db = buildDB("pool_prod2.sldb", 20000, 0, 0);
         if (db!=NULL)
         {
-           exists = runScenario("the same run, with NOT EXISTS in place of NOT IN", db, 20000,
-                                2, 2, 4000, watch, selExists).wallMs;
+           exists = runScenario("the same run, with the NOT IN this replaced", db, 20000,
+                                2, 2, 4000, watch, kSelectNotIn).wallMs;
            SQ.close_v2(db);
            remove("pool_prod2.sldb");
         }
 
         if (shipped > 0 && exists > 0)
-           printf("    => %.1fs shipped vs %.1fs with NOT EXISTS: %.2fx on the same decoders\n",
-                  shipped/1000.0, exists/1000.0, shipped/exists);
+           printf("    => %.1fs with NOT EXISTS vs %.1fs with the old NOT IN: %.2fx"
+                  " on the same decoders\n", shipped/1000.0, exists/1000.0, exists/shipped);
+    }
+
+    // with nothing running there is nothing to name, and nothing left marked busy either
+    {
+        wchar_t idlePath[64] = {L'x', 0};
+        int idleState = 7;
+        const INT64 idleMs = dupesPixBusyJob(idlePath, 64, &idleState);
+        printf("\n    %-62s %s\n", "an idle pool reports no job at all",
+               (idleMs==-1 && idlePath[0]==0 && idleState==0) ? "ok" : "FAILED");
+        if (idleMs!=-1 || idlePath[0]!=0 || idleState!=0)
+           problems++;
     }
 
     dupesPixShutdown();
