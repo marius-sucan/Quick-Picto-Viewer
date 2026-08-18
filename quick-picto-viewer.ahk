@@ -9732,15 +9732,17 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
    rowIndex := 0, columnIndex := -1
    Loop, % maxItemsPage*2
    {
+      ; identify which thumbnail was clicked by user
       columnIndex++
       If (columnIndex>=maxItemsW)
       {
          rowIndex++
          columnIndex := 0
       }
-      DestPosX := thumbsW*columnIndex + thumbsW
-      DestPosY := thumbsH*rowIndex + thumbsH
-      If (DestPosX>mX && DestPosY>mY)
+
+      dpX := thumbsW*columnIndex
+      dpY := thumbsH*rowIndex
+      If (isInRange(mX, dpX, dpX + thumbsW) && isInRange(mY, dpY, dpY + thumbsH))
       {
          newIndex := startIndex + A_Index - 1
          Break
