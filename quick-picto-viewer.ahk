@@ -9740,8 +9740,6 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
          columnIndex := 0
       }
 
-      ; same bounds as the thumbs renderers: cells beyond the last row or past
-      ; the end of the files list are never drawn, so they must not be clickable
       thisFileIndex := startIndex + A_Index - 1
       If (rowIndex>=maxItemsH || thisFileIndex>maxFilesIndex)
          Break
@@ -85253,8 +85251,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
     If (thumbsListViewMode>1)
     {
-       ; the page was listed, by the other function; saying so lets the caller record this
-       ; page index as the one on screen, the way it does for every other successful run
        QPV_listThumbnailsGridMode(0, glPG, glHDC, hGDIthumbsWin)
        Return 1
     }
