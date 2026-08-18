@@ -36398,7 +36398,13 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          If (InStr(msgResult.btn, "incomplete") || InStr(msgResult.btn, "collect")) 
            noQuestion := msgResult.Check
 
-         If !InStr(msgResult.btn, "collect")
+         If InStr(msgResult.btn, "incomplete")
+         {
+            CurrentSLD := backCurrentSLD
+            ResetImgLoadStatus()
+            addJournalEntry(A_ThisFunc "(): User refused to collect image data.")
+            Return 0
+         } Else If !InStr(msgResult.btn, "data")
          {
             CurrentSLD := backCurrentSLD
             SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -87180,10 +87186,9 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
    Else
       thisNOTnullCol := "imgfile"
 
-   ; ToolTip, % theseCols "==" thisNOTnullCol "==" mustForceHashes , , , 2
    showTOOLtip("Identifying image duplicates, please wait")
-   ; BTNfindDupesNow() passes userFindDupesFilterHamDist as mustForceHashes, so
-   ; "Ignore" arrives here as 1.
+   ; ToolTip, % theseCols "==" thisNOTnullCol "==" mustForceHashes , , , 2
+   ; BTNfindDupesNow() passes userFindDupesFilterHamDist as mustForceHashes, so "Ignore" arrives here as 1.
    If (InStr(thisNOTnullCol, "hash") || mustForceHashes>1 || userFindDupesFilterHamDist>1)
    {
       scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
