@@ -5175,11 +5175,11 @@ thumbsInfoYielder(ByRef maxItemsW, ByRef maxItemsH, ByRef maxItemsPage, ByRef ma
             startIndex := prevRealThumbsIndex
          Else
             startIndex := (startIndex<prevRealThumbsIndex) ? startIndex : startIndex - maxItemsPage + maxItemsW
-      } Else startIndex := Floor(currentFileIndex/maxItemsPage) * maxItemsPage
+      } Else startIndex := ((currentFileIndex - 1)//maxItemsPage)*maxItemsPage + 1
 
       maxTotalLines := Ceil(maxFilesIndex/maxItemsW)
       maxuStartIndex := (maxTotalLines - maxItemsH + 1)*maxItemsW - maxItemsW + 1
-      maxuStartIndex := clampInRange(maxuStartIndex, maxItemsPage, maxFilesIndex - 1)
+      maxuStartIndex := clampInRange(maxuStartIndex, 1, maxFilesIndex)
       startIndex := clampInRange(startIndex, 1, maxuStartIndex)
       prevRealThumbsIndex := startIndex
    } Else
@@ -5217,15 +5217,15 @@ thumbsInfoYielder(ByRef maxItemsW, ByRef maxItemsH, ByRef maxItemsPage, ByRef ma
           }
       } Else ; this is for a jump
       {
-         thisIndexu := currentFileIndex/maxFilesIndex
-         startIndex := Floor(maxTotalLines*thisIndexu)*maxItemsW
-         ; startIndex := ((currentFileIndex//maxItemsLine) * maxItemsLine) + 1
+         ; a page starts at 1 + k*maxItemsLine, like the ones the branches above yield;
+         ; a proportion of the list lands between two lines and shifts every column by one
+         startIndex := ((currentFileIndex - 1)//maxItemsLine)*maxItemsLine + 1 - (maxItemsH//2)*maxItemsLine
          prevRealThumbsIndex := startIndex
          ; fnOutputDebug("4: startIndex: " startIndex)
       }
 
       maxuStartIndex := (maxTotalLines - maxItemsH + 1)*maxItemsW - maxItemsW + 1
-      maxuStartIndex := clampInRange(maxuStartIndex, maxItemsPage, maxFilesIndex - 1)
+      maxuStartIndex := clampInRange(maxuStartIndex, 1, maxFilesIndex)
       ; maxuStartIndex := (maxFilesIndex>maxItemsPage) ? maxFilesIndex - maxItemsPage + 1 : maxFilesIndex - 1
       ; fnOutputDebug(startIndex  "s -- " prevRealThumbsIndex "p -- " maxuStartIndex " || " maxItemsW "w -- h" maxItemsH)
       startIndex := clampInRange(startIndex, 1, maxuStartIndex)
@@ -5516,7 +5516,9 @@ ThumbsScrollbar() {
       mY := clampInRange(mY + 0 - offsetu, 0, ScrollRegionH - offsetu)
       prcY := Round(mY/(ScrollRegionH - offsetu), 3)
       ; ToolTip, % mY "|" prcY , , , 2
-      newIndex := clampInRange(Round(((maxFilesIndex/maxItemsH)*prcY)*maxItemsH), 1, maxFilesIndex)
+      ; snapped to a whole row - a row is maxItemsW files - so the drag walks over page
+      ; starts; the Round() used to sit inside the parentheses, where it snapped nothing
+      newIndex := clampInRange(Round((maxFilesIndex/maxItemsW)*prcY)*maxItemsW + 1, 1, maxFilesIndex)
       ; newIndex := clampInRange(Ceil((maxFilesIndex/100)*mYperc), 1, maxFilesIndex)
       ; mapOffset := - clampInRange(mY * 2, 0, mainHeight*2 - 1)
       If (lastu!=newIndex)
@@ -25686,8 +25688,14 @@ ThumbsNavigator(keyu, aKey) {
      PreviousPicture(0, 1)
   } Else If (keyu="PgUp")
   {
-     currentFileIndex := currentFileIndex - maxItemsPage + 1
-     PreviousPicture()
+     ; a row at a time, like PgDn below: moving a whole page in one step puts the index
+     ; past what thumbsInfoYielder() reads as scrolling, so it took its jump branch
+     Loop, % maxItemsH
+     {
+        currentFileIndex := currentFileIndex - maxItemsW + 1
+        PreviousPicture(0, 1)
+        thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
+     }
   } Else If (keyu="PgDn")
   {
      Loop, % maxItemsH
@@ -84432,7 +84440,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
 
     startZeit := A_TickCount
     trGdip_GraphicsClear(A_ThisFunc, thisGu, "0xFF" WindowBgrColor)
-    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
+    thisPageSig := thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
     rowIndex := 0
     columnIndex := -1
     prevMSGdisplay := A_TickCount
@@ -84568,7 +84576,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
     ; ToolTip, % mainEndZeit - startZeit , , , 2
     If (forceMode!=1)
     {
-       prevFullIndexThumbsUpdate := startIndex
+       prevFullIndexThumbsUpdate := thisPageSig
        SetTimer, ResetImgLoadStatus, -15
        prevFullThumbsUpdate := A_TickCount
     } Else prevTryThumbsUpdate := A_TickCount
@@ -85241,7 +85249,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     Static prevAbortedPage := 0, abortedPageRetries := 0
     prevFullThumbsUpdate := A_TickCount
     mainStartZeit := A_TickCount
-    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
+    thisPageSig := thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
     If (modus="all")
     {
        maxItemsW := maxItemsH := allStarter//2 + 1
@@ -85932,7 +85940,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     If (pageIsWhole=1)
     {
        mustReloadThumbsList := 0
-       prevFullIndexThumbsUpdate := startPageIndex
+       prevFullIndexThumbsUpdate := thisPageSig
     }
 
     If (abandonAll=1)
@@ -85952,9 +85960,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     {
        If (pageIncomplete=1)
        {
-          If (prevAbortedPage!=startPageIndex)
+          If (prevAbortedPage!=thisPageSig)
           {
-             prevAbortedPage := startPageIndex
+             prevAbortedPage := thisPageSig
              abortedPageRetries := 0
           }
 
