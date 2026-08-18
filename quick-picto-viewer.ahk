@@ -5516,11 +5516,7 @@ ThumbsScrollbar() {
       mY := clampInRange(mY + 0 - offsetu, 0, ScrollRegionH - offsetu)
       prcY := Round(mY/(ScrollRegionH - offsetu), 3)
       ; ToolTip, % mY "|" prcY , , , 2
-      ; snapped to a whole row - a row is maxItemsW files - so the drag walks over page
-      ; starts; the Round() used to sit inside the parentheses, where it snapped nothing
       newIndex := clampInRange(Round((maxFilesIndex/maxItemsW)*prcY)*maxItemsW + 1, 1, maxFilesIndex)
-      ; newIndex := clampInRange(Ceil((maxFilesIndex/100)*mYperc), 1, maxFilesIndex)
-      ; mapOffset := - clampInRange(mY * 2, 0, mainHeight*2 - 1)
       If (lastu!=newIndex)
       {
          lastu := newIndex
@@ -5859,7 +5855,6 @@ doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
   {
      ; If (hwnd=hGDIselectWin)
      ;    opacity := 120
-
      If (hwnd=hGDIwin)
         nameHwnd := "hGDIwin"
      Else If (hwnd=hGDIthumbsWin)
@@ -5904,7 +5899,6 @@ doLayeredWinUpdate(funcu, hwnd, HDCu, opacity:=255) {
 
 vpWinClientSize(ByRef w, ByRef h, hwnd:=0, mode:=0) {
   Static lastInvoked := 1, pW, pH, pa
-
   If !hwnd
      hwnd := PVhwnd
 
@@ -11714,6 +11708,7 @@ ChangeThumbsZoom(dir) {
       Return
    }
 
+   apo := thumbsZoomLevel "|" thumbsColumns
    If (dynamicThumbsColumns=1)
    {
       If (dir=1)
@@ -11730,6 +11725,9 @@ ChangeThumbsZoom(dir) {
 
    thumbsZoomLevel := clampInRange(thumbsZoomLevel, 0.35, 3)
    thumbsColumns := clampInRange(thumbsColumns, 2, 100)
+   zapo := thumbsZoomLevel "|" thumbsColumns
+   If (zapo!=apo)
+      clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
    ForceRefreshNowThumbsList()
    recalculateThumbsSizes()
    If (thumbsListViewMode=1)
@@ -25688,8 +25686,6 @@ ThumbsNavigator(keyu, aKey) {
      PreviousPicture(0, 1)
   } Else If (keyu="PgUp")
   {
-     ; a row at a time, like PgDn below: moving a whole page in one step puts the index
-     ; past what thumbsInfoYielder() reads as scrolling, so it took its jump branch
      Loop, % maxItemsH
      {
         currentFileIndex := currentFileIndex - maxItemsW + 1
@@ -25704,8 +25700,6 @@ ThumbsNavigator(keyu, aKey) {
         NextPicture(0, 1)
         thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
      }
-     ; currentFileIndex := currentFileIndex + maxItemsPage - 1
-     ; NextPicture()
   } Else If (keyu="Left")
      PreviousPicture()
   Else If (keyu="Right")
@@ -70907,6 +70901,7 @@ toggleListViewModeThumbs() {
    If (thumbsDisplaying!=1)
       Return
 
+   opi := thumbsListViewMode
    thumbsListViewMode++
    If (thumbsListViewMode>4)
       thumbsListViewMode := 1
@@ -70915,11 +70910,13 @@ toggleListViewModeThumbs() {
    recalculateThumbsSizes()
    If (thumbsListViewMode=1)
       initThumbsPool()
-
+   
+   If (opi=1 && thumbsListViewMode!=1 || opi!=1 && thumbsListViewMode=1)
+      clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(50)
    friendly := defineListViewModes()
-   If StrLen(userSearchString)>1
+   If (StrLen(userSearchString)>1)
       friendly .= "`nFiles matching search criteria are highlighted:`n" userSearchString
 
    If (ShowAdvToolbar=1)
@@ -74675,6 +74672,7 @@ clampInRange(value, min, max, reverse:=0) {
 
 changeOSDfontSize(direction) {
   stepu := (OSDfontSize>30) ? 5 : 2
+  zapo := OSDfontSize
   If (direction=1)
      OSDfontSize += stepu
   Else
@@ -74690,6 +74688,9 @@ changeOSDfontSize(direction) {
   updateUIctrl()
   If (thumbsListViewMode>1 && thumbsDisplaying=1)
   {
+     If (zapo!=OSDfontSize)
+        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
+
      ForceRefreshNowThumbsList()
      dummyTimerDelayiedImageDisplay(25)
   } Else If (thumbsDisplaying=1)
@@ -84833,7 +84834,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
        pVwinTitle .= " | " CurrentSLD
 
     setWindowTitle(pVwinTitle)
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        theMsg := "[F] " theMsg
 
     prevIndexu := startIndex
