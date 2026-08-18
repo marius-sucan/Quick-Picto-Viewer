@@ -9730,7 +9730,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
    oIndex := currentFileIndex
    thumbsInfoYielder(maxItemsW, maxItemsH, maxItemsPage, maxPages, startIndex, mainWidth, mainHeight)
    rowIndex := 0, columnIndex := -1
-   Loop, % maxItemsPage*2
+   Loop, % maxItemsPage
    {
       ; identify which thumbnail was clicked by user
       columnIndex++
@@ -9740,11 +9740,17 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
          columnIndex := 0
       }
 
+      ; same bounds as the thumbs renderers: cells beyond the last row or past
+      ; the end of the files list are never drawn, so they must not be clickable
+      thisFileIndex := startIndex + A_Index - 1
+      If (rowIndex>=maxItemsH || thisFileIndex>maxFilesIndex)
+         Break
+
       dpX := thumbsW*columnIndex
       dpY := thumbsH*rowIndex
       If (isInRange(mX, dpX, dpX + thumbsW) && isInRange(mY, dpY, dpY + thumbsH))
       {
-         newIndex := startIndex + A_Index - 1
+         newIndex := thisFileIndex
          Break
       }
    }
