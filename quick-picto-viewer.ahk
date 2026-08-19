@@ -35450,6 +35450,8 @@ doStartLongOpDance() {
      startLongOperation := A_TickCount
      imageLoading := runningLongOperation := 1
      interfaceThread.ahkPostFunction("initAppBusyMode")
+     If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1)
+        redrawToolbarGUI()
 }
 
 cleanDeadFilesList(dummy:=0) {
@@ -36090,23 +36092,17 @@ PanelCachesOverview() {
       Return
    }
 
-   ; Must be read before createSettingsGUI(): that one overwrites prevOpenedWindow with its
-   ; own entry, and afterwards the panel this action was invoked from is unrecoverable. This
-   ; is also why the «Back» button works from any caller - including the quick search - and
-   ; not only from the two panels that carry a button for this one.
    hostPanel := getHostPanelFunc()
    If !(thisBtnHeight := createSettingsGUI(91, A_ThisFunc))
       Return
 
-   ; the button row must stay inside the list view width, or the auto-sized window grows wider
-   ; than its table: 190 + 190 + 65 + 65 + 3 gaps = 525 <= 580, large 305 + 305 + 95 + 95 = 815 <= 840
-   btnWid := 105
+   btnWid := 100
    btnWid2 := 65
    lstWid := 380
    If (PrefsLargeFonts=1)
    {
       lstWid := lstWid + 160
-      btnWid := btnWid + 100
+      btnWid := btnWid + 90
       btnWid2 := btnWid2 + 10
       Gui, Font, s%LargeUIfontValue%
    }
@@ -36214,10 +36210,11 @@ uiPopulateCachesOverview() {
         pp :=  (A_Index=2) ? "" : "Integer"
         LV_ModifyCol(A_Index, "AutoHdr Left " pp)
     }
-
+    LV_ModifyCol(1, 1)
     GuiControl, +Redraw, LViewCaches
     infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
-    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou ". Total indexed files: " groupDigits(totalz) "."
+    FileGetSize, szu, % CurrentSLD
+    GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou ". Files: " groupDigits(totalz) ". Cache size: " fileSizeFriendly(szu) "."
     SetTimer, RemoveTooltip, -150
     SetTimer, ResetImgLoadStatus, -50
 }
@@ -36944,7 +36941,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
           ; the bar can never reach the end when any of them exist
           showTOOLtip(ErrorMsgS "Generating image " fwhichHashu moreInfo " fingerprints, please wait" etaTime, 0, 0, (filesToBeSorted>0) ? (countTFilez + skippedFiles)/filesToBeSorted : 0)
           prevMSGdisplay := A_TickCount
-          If (A_TickCount - prevSaveData>9000)
+          If (A_TickCount - prevSaveData>9500)
              ErrorMsgS := ""
        }
 
@@ -46353,7 +46350,7 @@ triggerQuickFileAction(keyu, forceIT:=0) {
       }
    }
 
-   If StrLen(UsrEditFileDestination)<5
+   If (StrLen(UsrEditFileDestination)<5)
    {
       PanelQuickMoveConfigure()
       Return
@@ -60124,7 +60121,7 @@ PanelStructuredCopyMoveWindow() {
     ml := (PrefsLargeFonts=1) ? 110 : 70
     Gui, +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
-    Gui, Add, Text, x15 y15 Section, %infoSelection%This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the defined source folder (or in a sub-folder of it)`, will be skipped.
+    Gui, Add, Text, x15 y15 Section, %infoSelection%This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
     Gui, Add, Text, xs y+10 w%ml%, Source: 
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", OutDir)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
@@ -60147,10 +60144,15 @@ PanelStructuredCopyMoveWindow() {
     SetTimer, ResetImgLoadStatus, -50
 
     Gui, Add, Button, xs y+25 h%thisBtnHeight% w%btnWid2% Default gBTNuiProceedStructuredOperation vBtnCpyMv, &Proceed
-    Gui, Add, Button, x+5 hp w%sml% gBtnCloseWindow, C&ancel
+    Gui, Add, Button, x+5 hp w%sml% gBtnHelpStructuredCopyMove, &Help
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
     Gui, Add, Text, x+5 hp +0x200, % infoSelection
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Structured copy/move file(s): " appTitle)
     SetTimer, resetOpeningPanel, -300
+}
+
+BtnHelpStructuredCopyMove() {
+   msgBoxWrapper(appTitle ": HELP", "The tool allows users to copy or move files from the source folder to destination folder. The subfolders from the user defined source folder will be recreated in the destination folder. The selected files from the list that are not found in the defined source (sub-)folders will be skipped. Therefore, if the user selects as source an unrelated folder to the selected files, no file action will be performed.`n `nEXAMPLE:`nSource: c:\temp\imgs\`nDestination: d:\ordered\images\`n `nFiles selected:`nc:\temp\imgs\imgA.png`nc:\temp\imgs\imgB.png`nc:\temp\imgs\new\img01.jpg`nc:\temp\imgs\new\img02.jpg`nc:\temp\imgs\old\img02.jpg`nc:\other-files\DSC0202.bmp [skipped]`nc:\temp\CRW0292303.tga [skipped]`n `nFiles in Destination:`nd:\ordered\images\imgA.png`nd:\ordered\images\imgB.png`nd:\ordered\images\new\img01.jpg`nd:\ordered\images\new\img02.jpg`nd:\ordered\images\old\img02.jpg", -1, 0, 0)
 }
 
 BTNuiProceedStructuredOperation() {
@@ -73707,6 +73709,8 @@ ResetImgLoadStatus() {
      changeMcursor("normal-extra")
      runningLongOperation := 0
      mustAbandonCurrentOperations := imageLoading := 0
+     If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1)
+        SetTimer, createGUItoolbar, -100
   } Else If (imageLoading=1)
      SetTimer, ResetImgLoadStatus, -70
 }
@@ -99078,16 +99082,15 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
              Return
        }
 
-       If (contextu!="extern")
-          WriteSettingsResizeSimplePanel()
+       WriteSettingsResizeSimplePanel()
        batchSimpleProcessing(simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor)
        Return
     }
 
-    imgPath := getIDimage(currentFileIndex)
-    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
-    thisDialogSavePtrns := StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)")
-    thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+   imgPath := getIDimage(currentFileIndex)
+   zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
+   thisDialogSavePtrns := StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)")
+   thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
 
    getSaveDialogIndexForFile(imgPath, defFMTindex, 1)
    startPath := (ResizeUseDestDir=1) ? ResizeDestFolder "\" OutFileName : imgPath
@@ -104847,7 +104850,7 @@ tlbrPushPrefs() {
 }
 
 redrawToolbarGUI() {
-   If (AnyWindowOpen && imgEditPanelOpened!=1 || mustCaptureCloneBrush=1 || colorPickerModeNow=1)
+   If (AnyWindowOpen && imgEditPanelOpened!=1 || mustCaptureCloneBrush=1 || colorPickerModeNow=1 || runningLongOperation=1)
    {
       Loop, % tlbrIconzList["counter"]
       {
