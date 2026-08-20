@@ -23,7 +23,7 @@ the records in `qpv-main.h`, which is why the anchors are worded the way they ar
 
 ```sh
 ./run-tests.sh            # correctness
-./run-tests.sh --bench    # correctness, then the MSD benchmark
+./run-tests.sh --bench    # correctness, then the MSD and duplicate-sweep benchmarks
 ```
 
 Needs `g++`. `python3` and `libsqlite3.so.0` unlock four more suites; without them those are
@@ -60,11 +60,38 @@ counted, every pair is under the threshold, a record with no fingerprint scores
 `QPV_MSD_NONE` rather than 0 (0 would read as a *perfect* match), MSD-off leaves every score
 at the sentinel, and the crop mask never empties out.
 
-The load-bearing test is `scanMatchesPerGroupSweep()`. `dupesScanStep()` walks every group
-from one entry point under a time budget, with an adaptive block size and a cursor over
-(group, outer index); the only thing keeping that arithmetic honest is that it must produce,
-**byte for byte**, what the simple one-group-per-call `dupesSweepPairs()` produces. That is
-why `dupesSweepPairs()` is still exported even though AHK no longer calls it.
+The load-bearing test is `scanMatchesPerGroupSweep()`. `dupesScanStep()` walks the whole
+candidate set from one entry point under a time budget, with an adaptive block size and a
+cursor that is a plain candidate-row index; the only thing keeping that arithmetic honest is
+that it must produce, **byte for byte**, what the simple one-group-per-call
+`dupesSweepPairs()` produces. That is why `dupesSweepPairs()` is still exported even though
+AHK no longer calls it.
+
+Two more stages belong to the parallel sweep, which fans a block of candidate rows out
+across every core:
+
+- `scanIsThreadCountIndependent()` sweeps one candidate set with teams of 1, 2, 3, 5 and 8
+  and requires all five to be byte-identical to the per-group reference — and checks that
+  more than one thread really did collect pairs, so the comparison is not vacuous. Each item
+  of a block collects into a buffer of its own and the buffers are concatenated in
+  **planning** order, never in the order the threads finished; the grouping downstream is
+  order-dependent by design, so an output that depended on the team size would label the
+  same images into different groups on different machines.
+- `sweepReallocatesRarely()` counts how often `dupesPairsList` changes capacity across 1 500
+  appends. `reserve()` honours its request *exactly*, so the `reserve(size() + found)` this
+  replaced re-allocated and copied the whole accumulated list on every batch — quadratic in
+  the number of pairs, and by a wide margin the most expensive thing the sweep did: 160
+  seconds of copying against 1.2 seconds of comparing hashes, on a candidate set that yields
+  seven million pairs. Nothing about the *result* changes when that comes back, which is why
+  the capacity is what gets watched.
+
+`run-tests.sh` also builds `sweep_smoke.cpp` **without** `-fopenmp` and runs the same suite:
+everything degrades to a one-thread sweep when the macro is absent, which is also what a
+single-core machine gets, and the answer has to be the same one.
+
+**The sweep mutation checks** — two plausible versions of the code that break exactly those
+two properties and nothing else: concatenating the items in whatever order suits the loop
+rather than in planning order, and going back to an exact `reserve()` per batch.
 
 **`filter_oracle.cpp`** — `dupesApplyFilter()` against a transcription of
 `changeHdistLevelCached()` and `sortDupeGroups()`. This is where a difference is invisible:
@@ -277,6 +304,16 @@ returns adapters for the five `*16` functions so the difference stays in the loa
 **`msd_bench.cpp`** — times the SSE2 MSD against a scalar loop. Order of magnitude only:
 GCC's inliner is not MSVC's, and this says nothing about the AHK interpreter the port
 replaced.
+
+**`sweep_bench.cpp`** — drives `dupesScanStep()` over library-sized candidate sets exactly
+the way AHK does, and reports comparisons per second along with how many cores the sweep
+actually used (wall time against process CPU time). The three shapes are the ones a real
+library produces: hundreds of thousands of groups of two or three (grouping by file size and
+megapixels), one group holding most of the library (grouping by aspect ratio and frame
+count, which is the fallback the Find Duplicates panel drops to), and a long tail of sizes.
+Built with `-mpopcnt` on purpose — the shipped DLL uses the POPCNT instruction whenever
+CPUID reports it, and without the flag gcc expands `__builtin_popcountll()` into a libgcc
+call no shipped build ever executes. The correctness tests stay on the plain SSE2 baseline.
 
 ## Conventions
 

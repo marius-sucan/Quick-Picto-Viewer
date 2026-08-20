@@ -10,7 +10,10 @@
 //   - the records and the state AutoHotkey reads by byte offset - DupePairRec,
 //     DupesScanState, DupeCandRow, DupeResultRow - which came out of qpv-main.h with it;
 //   - the Hamming and mean-squared-difference sweep, per group (dupesSweepPairs) or over
-//     a whole library from one entry point (dupesScanBegin/Feed/SetGroups/Step/End);
+//     a whole library from one entry point (dupesScanBegin/Feed/SetGroups/Step/End). It
+//     runs across every core: the unit of parallel work is a run of candidate ROWS, which
+//     is the only unit that fills the machine for both shapes a real library comes in -
+//     see "the parallel pair sweep" below;
 //   - the threshold filter and the union-find grouping behind the similarity sliders
 //     (dupesApplyFilter), plus the fetches AHK drains the results through;
 //   - the candidate query engine, which steps the grouping SELECT itself and keeps only
@@ -21,7 +24,9 @@
 //
 // A run goes the other way round: the hashes are generated once for the library, the query
 // engine then picks the candidates and groups them, the sweep compares them, and the filter
-// is what the similarity sliders re-run over the pairs the sweep left behind.
+// is what the similarity sliders re-run over the pairs the sweep left behind. On a library
+// of a million images the sweep is where all the time goes, and it is the only part of the
+// pipeline that is threaded.
 //
 // The fingerprints the hashes are computed FROM are collected by dupes-pixels.h, which is
 // included further down qpv-main.cpp and reads dupesPixCancel out of here, so that the one
@@ -100,9 +105,14 @@ std::vector<UINT>           dupesScanGroupStart;
 DupesScanState              dupesScanState = {};
 UINT                        dupesScanRows = 0;
 int                         dupesScanWantMSD = 0;
-// Cursor: the next (group, outer index) the sweep has to visit, plus the adaptive
-// number of comparisons one block aims for - see dupesScanStep().
-UINT                        dupesScanGroup = 0;
+// Where every candidate row's group ends: row r is swept against [r+1, dupesScanRowEnd[r]).
+// It is dupesScanGroupStart flattened to one entry per row, which is what lets a unit of
+// work be any run of consecutive rows rather than a slice of one group - see the sweep
+// below. A row no group covers gets r+1, i.e. nothing to compare, which is exactly what
+// the group-walking cursor this replaced did with it. Built by dupesScanBuildRowEnd().
+std::vector<UINT>           dupesScanRowEnd;
+// Cursor: the next candidate row the sweep has to visit, plus the adaptive amount of work
+// one parallel block aims for - see dupesScanStep().
 UINT                        dupesScanOuter = 0;
 INT64                       dupesScanBlock = 0;
 // qpv-dupes-state-end - sliced by tests/run-tests.sh; leave the marker in place.
@@ -295,12 +305,16 @@ static void decodeFingerprintBlob(const wchar_t *blob, const UINT count, const U
 }
 
 void dupesQueryFreeRows();
+// The sweep's collecting buffers and its block plan, both defined with the sweep further
+// down. Forward-declared so the two release paths above the sweep can hand them back.
+static void dupesSweepReleaseScratch();
 
 // Releases everything the duplicate scan holds. AHK calls it on every exit path from
 // filterDupeResultsByHdist(), including the abandoned ones: a partially read pair list
 // would otherwise be handed to the next scan ahead of its own results.
 DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     dupesQueryFreeRows();
+    dupesSweepReleaseScratch();
     dupesFilterRows.clear();
     dupesFilterRows.shrink_to_fit();
     dupesPairsList.clear();
@@ -313,12 +327,12 @@ DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     dupesScanFlipped.clear();    dupesScanFlipped.shrink_to_fit();
     dupesScanIDs.clear();        dupesScanIDs.shrink_to_fit();
     dupesScanGroupStart.clear(); dupesScanGroupStart.shrink_to_fit();
+    dupesScanRowEnd.clear();     dupesScanRowEnd.shrink_to_fit();
     dupesPixStride = 0;
     dupesPixScale = 1;
     dupesPairsRead = 0;
     dupesScanRows = 0;
     dupesScanWantMSD = 0;
-    dupesScanGroup = 0;
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     memset((void*)&dupesScanState, 0, sizeof(dupesScanState));
@@ -334,6 +348,36 @@ void setMainWindowTitle(std::string str, HWND pvHwnd) {
   SetWindowText(pvHwnd, wideString);
 }
 
+// ---- the parallel pair sweep -----------------------------------------------------------
+//
+// A scan of a large library spends nearly all of its time here, so the sweep runs across
+// every core the machine has. What gets fanned out is a BLOCK OF CANDIDATE ROWS, not one
+// group and not one outer index of one group, because a real candidate set is both shapes
+// at once: grouping by file size and megapixels gives hundreds of thousands of groups of
+// two or three, and grouping by aspect ratio and frame count gives a handful of groups one
+// of which holds most of the library. Cutting the work up by group, or by the outer indexes
+// inside one group, is what this used to do, and neither fills the machine for the first
+// shape - a group of three has two outer indexes and two comparisons, which is not enough
+// to be worth a team however it is sliced, so the sweep ran on one core no matter how many
+// the machine had. Rows are the unit that serves both, and dupesScanRowEnd[] is what makes
+// a row self-describing: it says where that row's own group ends, so a block of rows never
+// has to care how many groups it spans.
+//
+// The result order is the one a serial run would have produced - row ascending, and inner
+// index ascending within a row - because every item of the block collects into a buffer of
+// its own and the buffers are concatenated in PLANNING order afterwards. Nothing about the
+// output depends on how many threads ran, on which item they took or on the order they
+// finished in. Both callers rely on that: it is what makes the whole-scan sweep
+// byte-identical to the per-group one, and it is why two identical scans of the same
+// library cannot come back with different groups. See [[qpv-2026-08-dupes-sweep]].
+
+// qpv-main.cpp includes this unconditionally; the test slices do not, and they are built
+// both with and without -fopenmp. Everything below degrades to a serial sweep when the
+// macro is absent - the pragma is ignored and the team is one thread wide.
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 // Everything the pair sweep needs that does not change while it runs. Gathered into a
 // struct because the sweep is now entered from two places - the per-group export below
 // and the whole-scan cursor in dupesScanStep() - and a fourteen-argument inner function
@@ -342,6 +386,8 @@ struct DupesSweepCtx {
     const UINT64 *hashes;
     const UINT64 *flipped;    // may alias hashes when flipped detection is off
     const UINT   *ids;
+    const UINT   *rowEnd;     // NULL: every row's group ends at flatEnd (the one-group entry point)
+    UINT   flatEnd;
     UINT64 hamMask;
     int    threshold;
     int    checkInverted;
@@ -349,62 +395,103 @@ struct DupesSweepCtx {
     bool   wantMSD;
 };
 
-// Compares outer indexes [firstOuter, lastOuter] against everything after them inside the
-// half-open candidate range [groupFirst, groupEnd), and appends the surviving pairs to
-// dupesPairsList. Returns how many it appended.
-//
-// The pairs land in exactly the order a serial run would have produced them: outer index
-// ascending, inner index ascending. Both callers rely on that - it is what makes the
-// whole-scan sweep byte-identical to the per-group one, and it is why two identical scans
-// of the same library cannot come back with different groups.
-static UINT sweepOuterRange(const DupesSweepCtx &C, const UINT groupFirst, const UINT groupEnd, const UINT firstOuter, const UINT lastOuter) {
-    (void)groupFirst;
-    if (firstOuter > lastOuter || lastOuter >= groupEnd)
-       return 0;
+// One unit of parallel work: the candidate rows [firstRow, lastRow]. slot, begin and count
+// are written by whichever thread ran the item and say where its pairs ended up, so the
+// concatenation can put the items back in planning order without the threads having to
+// agree on anything while they run.
+struct DupesSweepItem {
+    UINT   firstRow, lastRow;
+    int    slot;
+    int    failed;            // this item ran out of memory; see dupesRunPlan()
+    size_t begin, count;
+};
 
-    const INT   noffset   = (INT)(lastOuter - firstOuter) + 1;
-    const INT   n         = (INT)groupEnd;
-    const INT   firstIndex = (INT)firstOuter;
-    const UINT64 hamMask  = C.hamMask;
-    const int   threshold = C.threshold;
-    const int   checkInverted = C.checkInverted;
-    const int   checkFlipped  = C.checkFlipped;
-    const bool  wantMSD   = C.wantMSD;
+// One collecting buffer per thread, padded so that no two of them share a cache line: a
+// push_back writes the vector's own size field, and two threads finding pairs at the same
+// moment would otherwise ping-pong that line between their caches for the whole sweep.
+// Both arrays survive from block to block and from call to call. Their predecessor was a
+// "std::vector<std::vector<DupePairRec>> part(noffset)" allocated and thrown away on every
+// block of every group, which on a library of 300 000 groups is 300 000 allocations of a
+// vector of vectors before a single comparison is made.
+struct DupesSweepBuf {
+    std::vector<DupePairRec> v;
+    char pad[128 - (sizeof(std::vector<DupePairRec>) % 128)];
+};
+
+static std::vector<DupesSweepItem> dupesSweepPlan;
+static std::vector<DupesSweepBuf>  dupesSweepBufs;
+// Set when a block could not be collected because the machine ran out of memory. Cleared
+// and read by dupesScanStep(), which turns it into the error phase AHK stops on: a scan
+// that silently dropped a block of pairs would report duplicate groups it had not finished
+// building, and nothing downstream could tell that apart from a library that really has
+// none. dupesSweepPairs() neither clears nor reports it - it sweeps one group of a size AHK
+// chose, and nothing in the application drives it any more.
+static bool dupesSweepAllocFailed = false;
+
+static void dupesSweepReleaseScratch() {
+    dupesSweepPlan.clear();  dupesSweepPlan.shrink_to_fit();
+    dupesSweepBufs.clear();  dupesSweepBufs.shrink_to_fit();
+}
+
+// How wide the team may be. Read once per block rather than baked in: omp_set_num_threads()
+// can change it from outside, and the buffers above are indexed by the thread number, so
+// the count and the buffer array have to be decided together. The num_threads clause on the
+// region below is what makes that airtight - a team is never larger than it asks for, so
+// omp_get_thread_num() cannot come back with an index past the end of the array.
+static int dupesSweepThreads() {
+#ifdef _OPENMP
+    int t = omp_get_max_threads();
+    if (t < 1)
+       t = 1;
+
+    if (t > 256)      // one buffer per thread; a machine this wide is not the problem here
+       t = 256;
+
+    return t;
+#else
+    return 1;
+#endif
+}
+
+// What one candidate row costs on top of its comparisons: the group-end lookup and the
+// inner loop's setup, and for a singleton nothing else at all. Blocks are planned in these
+// units rather than in comparisons, because a candidate set of 300 000 groups of three is
+// almost no comparisons and a very great deal of loop - planned by comparisons alone, one
+// block would swallow the entire scan and the cancel latency with it.
+#define QPV_SWEEP_ROW_COST   4
+// Never cut an item smaller than this: below it the OpenMP scheduler costs more than the
+// work does.
+#define QPV_SWEEP_MIN_ITEM   4096
+// And never plan more items than this in one block, whatever the arithmetic says.
+#define QPV_SWEEP_MAX_ITEMS  4096
+
+// Sweeps candidate rows [firstRow, lastRow] against everything after each of them inside
+// that row's own group, appending the survivors to out - outer ascending, inner ascending,
+// exactly what a serial run over the same rows produces.
+static void sweepRowsInto(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, std::vector<DupePairRec> &out) {
     const UINT64 *givenHashesArray = C.hashes;
     const UINT64 *givenFlippedHashesArray = C.flipped;
     const UINT   *givenIDs = C.ids;
-    UINT results = 0;
+    const UINT   *rowEnd   = C.rowEnd;
+    const UINT64  hamMask  = C.hamMask;
+    const int  threshold     = C.threshold;
+    const int  checkInverted = C.checkInverted;
+    const int  checkFlipped  = C.checkFlipped;
+    const bool wantMSD       = C.wantMSD;
 
-    // The OUTER loop is the one worth parallelising. Parallelising the inner one
-    // forked and joined a team per outer iteration over a trip count that
-    // shrinks to nothing, so for the 2-5 image groups that dominate a real scan
-    // the OpenMP overhead exceeded the work outright.
-    // Each outer index also collects into its own buffer, which removes the
-    // shared push_back entirely and makes the result order reproducible: the
-    // buffers are concatenated by index below, so the output is exactly what a
-    // serial run would have produced. It used to be whatever order the threads
-    // happened to reach the critical section in, which is why two identical
-    // scans of the same library could come back with different groups.
-    std::vector< std::vector<DupePairRec> > part(noffset);
-
-    // The shared state is spelled out rather than left to default(none): the old
-    // clause was default(none) shared(results), which named one of the dozen or
-    // so variables the region actually touched. MSVC's OpenMP 2.0 lets that
-    // through, clang-cl and gcc do not. default(none) is deliberately not used
-    // here either, because whether a const variable may appear in a data-sharing
-    // clause changed between OpenMP versions and the compilers disagree; the
-    // read-only locals above (n, threshold, checkInverted, checkFlipped,
-    // firstIndex, hamMask, noffset) are shared by default on every one of them.
-    // Every slot of part[] is written by exactly one iteration, so it needs no
-    // synchronisation. dupesPixData/dupesPixOK are read-only for the whole region.
-    #pragma omp parallel for schedule(dynamic) shared(part, givenHashesArray, givenFlippedHashesArray, givenIDs) if (noffset > 1 && (n - firstIndex) > 64)
-    for ( INT slot = 0 ; slot < noffset ; slot++)
+    for ( UINT secondIndex = firstRow ; secondIndex <= lastRow ; secondIndex++)
     {
-        const INT secondIndex = firstIndex + slot;
+        const UINT n = (rowEnd!=NULL) ? rowEnd[secondIndex] : C.flatEnd;
+        if (secondIndex + 1 >= n)
+           continue;      // a singleton, or the last member of its group: nothing after it
+
+        const UINT64 hashSecond = givenHashesArray[secondIndex];
         UINT64 invert2ndindex = 0;
         // UINT64 reversed2ndindex = 0;
         if (checkInverted==1)
-           invert2ndindex = ~(givenHashesArray[secondIndex]);
+           invert2ndindex = ~hashSecond;
+
+        const UINT64 flipped2ndindex = (checkFlipped==1) ? givenFlippedHashesArray[secondIndex] : 0;
 
         // if (checkFlipped==1)
         // {
@@ -412,16 +499,16 @@ static UINT sweepOuterRange(const DupesSweepCtx &C, const UINT groupFirst, const
         //    // fnOutputDebug("reverso " + to_string(givenHashesArray[secondIndex]) + " -- " + to_string(reversed2ndindex));
         // }
 
-        for ( INT mainIndex = secondIndex + 1 ; mainIndex<n ; mainIndex++)
+        for ( UINT mainIndex = secondIndex + 1 ; mainIndex < n ; mainIndex++)
         {
             int diff2 = 900;
             int diff3 = 900;
 
-            int diff = hammingDistance(givenHashesArray[mainIndex], givenHashesArray[secondIndex], hamMask);
+            int diff = hammingDistance(givenHashesArray[mainIndex], hashSecond, hamMask);
             if (checkInverted==1)
                diff2 = hammingDistance(givenHashesArray[mainIndex], invert2ndindex, hamMask);
             if (checkFlipped==1)
-               diff3 = hammingDistance(givenHashesArray[mainIndex], givenFlippedHashesArray[secondIndex], hamMask);
+               diff3 = hammingDistance(givenHashesArray[mainIndex], flipped2ndindex, hamMask);
 
             // if (threshold>2 && diff>=threshold)
             //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamMask);
@@ -445,35 +532,238 @@ static UINT sweepOuterRange(const DupesSweepCtx &C, const UINT groupFirst, const
 
             const UINT idA = givenIDs[mainIndex], idB = givenIDs[secondIndex];
             if (diff<threshold)
-               part[slot].push_back({ idA, idB, (UINT)diff, mse });
+               out.push_back({ idA, idB, (UINT)diff, mse });
 
             if (diff2<threshold)
-               part[slot].push_back({ idA, idB, (UINT)diff2, mse });
+               out.push_back({ idA, idB, (UINT)diff2, mse });
 
             if (diff3<threshold)
             {
                 // fnOutputDebug("c++ dupe pair:" + to_string(givenHashesArray[mainIndex]) + "/" + to_string(givenFlippedHashesArray[secondIndex]));
-                part[slot].push_back({ idA, idB, (UINT)diff3, mse });
+                out.push_back({ idA, idB, (UINT)diff3, mse });
             }
         }
     }
+}
 
-    for (int slot = 0; slot < noffset; slot++)
-        results += (UINT)part[slot].size();
+// Grows the pair list the way push_back would have. std::vector::reserve() honours the
+// request EXACTLY - it never rounds up - so the old "reserve(size() + found)" on every
+// block made each block re-allocate the whole accumulated list and copy it across. Over
+// the thousands of blocks a library-sized scan runs that is quadratic in the number of
+// pairs, and it was by a wide margin the most expensive thing the sweep did: a candidate
+// set that produced seven million pairs spent 160 seconds in here and 1.2 seconds
+// comparing hashes. Growing by half again amortises it back to linear.
+static void dupesReservePairs(size_t need) {
+    size_t cap = dupesPairsList.capacity();
+    if (need <= cap)
+       return;
+
+    if (cap < 4096)
+       cap = 4096;
+
+    while (cap < need)
+    {
+        const size_t grown = cap + cap / 2;
+        if (grown <= cap)      // size_t is about to wrap: ask for exactly what is needed
+        {
+           cap = need;
+           break;
+        }
+
+        cap = grown;
+    }
+
+    dupesPairsList.reserve(cap);
+}
+
+// Fills dupesSweepPlan with items covering the rows from firstRow, stopping at lastRow,
+// when costBudget units of work have been planned, or when the plan is full. A new item is
+// cut every itemTarget units so the team gets several items per thread to balance against
+// and one heavy item cannot leave the rest of the machine idle.
+// Returns the comparisons planned - which is what the progress counter counts - and reports
+// the first row NOT planned through stoppedAt, which is where the caller resumes.
+static INT64 dupesPlanRows(const DupesSweepCtx &C, const UINT firstRow, const UINT lastRow, const INT64 costBudget, const INT64 itemTarget, UINT &stoppedAt) {
+    dupesSweepPlan.clear();
+    stoppedAt = firstRow;
+    if (firstRow > lastRow)
+       return 0;
+
+    const UINT  *rowEnd = C.rowEnd;
+    const INT64  last = (INT64)lastRow;
+    INT64 comparisons = 0, cost = 0;
+    INT64 r = (INT64)firstRow;
+    while (r <= last)
+    {
+        const INT64 itemFirst = r;
+        INT64 itemCost = 0;
+        while (r <= last)
+        {
+            const UINT row = (UINT)r;
+            const UINT end = (rowEnd!=NULL) ? rowEnd[row] : C.flatEnd;
+            const INT64 c = (end > row + 1) ? (INT64)(end - row - 1) : 0;
+            comparisons += c;
+            cost        += c + QPV_SWEEP_ROW_COST;
+            itemCost    += c + QPV_SWEEP_ROW_COST;
+            r++;
+            if (itemCost >= itemTarget)
+               break;
+        }
+
+        DupesSweepItem it;
+        it.firstRow = (UINT)itemFirst;
+        it.lastRow  = (UINT)(r - 1);
+        it.slot   = 0;
+        it.failed = 0;
+        it.begin  = 0;
+        it.count  = 0;
+        dupesSweepPlan.push_back(it);
+        if (costBudget > 0 && cost >= costBudget)
+           break;
+
+        if ((INT64)dupesSweepPlan.size() >= QPV_SWEEP_MAX_ITEMS)
+           break;
+    }
+
+    stoppedAt = (UINT)r;
+    return comparisons;
+}
+
+// Runs the planned block across the team and appends everything it found to
+// dupesPairsList in planning order. Returns how many pairs that was.
+static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads) {
+    const int nItems = (int)dupesSweepPlan.size();
+    if (nItems < 1)
+       return 0;
+
+    if ((int)dupesSweepBufs.size() < nThreads)
+       dupesSweepBufs.resize((size_t)nThreads);
+
+    for ( int t = 0 ; t < nThreads ; t++)
+        dupesSweepBufs[t].v.clear();    // keeps the capacity: after the first few blocks
+                                        // the sweep stops allocating altogether
+
+    DupesSweepItem *items = dupesSweepPlan.data();
+    DupesSweepBuf  *bufs  = dupesSweepBufs.data();
+    const DupesSweepCtx *ctx = &C;
+
+    // Every iteration writes only its own slot of items[] and only its own thread's
+    // buffer, so the region needs no synchronisation whatsoever; the candidate arrays,
+    // dupesPixData and dupesPixOK are read-only for its whole duration.
+    // The shared state is spelled out rather than left to default(none): the old clause
+    // named one of the dozen or so variables the region actually touched, which MSVC's
+    // OpenMP 2.0 lets through and clang-cl and gcc do not. default(none) is deliberately
+    // not used here either, because whether a const variable may appear in a data-sharing
+    // clause changed between OpenMP versions and the compilers disagree; the read-only
+    // locals above are shared by default on every one of them.
+    #pragma omp parallel for schedule(dynamic) num_threads(nThreads) shared(items, bufs, ctx) if (nItems > 1 && nThreads > 1)
+    for ( int i = 0 ; i < nItems ; i++)
+    {
+        int slot = 0;
+#ifdef _OPENMP
+        slot = omp_get_thread_num();
+#endif
+        std::vector<DupePairRec> &out = bufs[slot].v;
+        const size_t begin = out.size();
+        // An exception that leaves an OpenMP structured block is undefined behaviour, and
+        // push_back() can throw: one block of a pathological candidate set - a hundred
+        // thousand images that are all the same picture - really can ask for more than the
+        // machine has. Caught here so it becomes a reported failure instead of a crash.
+        // The flag is per ITEM rather than a shared one so the region still needs no
+        // synchronisation; what the item collected before it threw is a PREFIX of what it
+        // owed, so the ordering of everything else survives.
+        int failed = 0;
+        try
+        {
+            sweepRowsInto(*ctx, items[i].firstRow, items[i].lastRow, out);
+        }
+        catch (const std::bad_alloc&)
+        {
+            failed = 1;
+        }
+
+        items[i].slot   = slot;
+        items[i].failed = failed;
+        items[i].begin  = begin;
+        items[i].count  = out.size() - begin;
+    }
+
+    size_t results = 0;
+    for ( int i = 0 ; i < nItems ; i++)
+    {
+        results += dupesSweepPlan[i].count;
+        if (dupesSweepPlan[i].failed!=0)
+           dupesSweepAllocFailed = true;
+    }
 
     if (results > 0)
     {
-       dupesPairsList.reserve(dupesPairsList.size() + results);
-       for (int slot = 0; slot < noffset; slot++)
+       // and the same for the concatenation: this throw would otherwise cross the __stdcall
+       // boundary into AutoHotkey, which has nothing to catch it with
+       try
        {
-           if (part[slot].empty())
-              continue;
+           dupesReservePairs(dupesPairsList.size() + results);
+           for ( int i = 0 ; i < nItems ; i++)
+           {
+               const DupesSweepItem &it = dupesSweepPlan[i];
+               if (it.count==0)
+                  continue;
 
-           dupesPairsList.insert(dupesPairsList.end(), part[slot].begin(), part[slot].end());
+               const std::vector<DupePairRec> &src = dupesSweepBufs[it.slot].v;
+               dupesPairsList.insert(dupesPairsList.end(), src.begin() + it.begin, src.begin() + it.begin + it.count);
+           }
+       }
+       catch (const std::bad_alloc&)
+       {
+           dupesSweepAllocFailed = true;
        }
     }
 
     return results;
+}
+
+// Compares outer indexes [firstOuter, lastOuter] against everything after them inside the
+// half-open candidate range [groupFirst, groupEnd), and appends the surviving pairs to
+// dupesPairsList. Returns how many it appended.
+//
+// This is the one-group entry point dupesSweepPairs() drives, where every row of the range
+// shares one group end and C.rowEnd is therefore NULL. dupesScanStep() does not come
+// through here - it plans its own blocks, which is the whole point of the rewrite - but
+// both go through the same planner, the same worker and the same concatenation, so the two
+// cannot drift apart. tests/sweep_smoke.cpp asserts they agree record for record.
+static UINT sweepOuterRange(const DupesSweepCtx &C, const UINT groupFirst, const UINT groupEnd, const UINT firstOuter, const UINT lastOuter) {
+    (void)groupFirst;
+    if (firstOuter > lastOuter || lastOuter >= groupEnd)
+       return 0;
+
+    // The group is flat here, so the cost of the range is closed-form: outer index m
+    // compares against groupEnd-m-1 others, which is an arithmetic series.
+    const INT64 rows = (INT64)lastOuter - (INT64)firstOuter + 1;
+    const INT64 hi = (INT64)groupEnd - (INT64)firstOuter - 1;
+    const INT64 lo = (INT64)groupEnd - (INT64)lastOuter - 1;
+    const INT64 cost = (hi + lo) * rows / 2 + rows * QPV_SWEEP_ROW_COST;
+
+    const int nThreads = dupesSweepThreads();
+    INT64 itemTarget = cost / ((INT64)nThreads * 8);
+    if (itemTarget < QPV_SWEEP_MIN_ITEM)
+       itemTarget = QPV_SWEEP_MIN_ITEM;
+
+    // One plan is capped at QPV_SWEEP_MAX_ITEMS items, so a range wide enough to overflow
+    // it takes more than one pass. It cannot happen with the item size above; the loop is
+    // what makes "sweeps the whole range" true rather than nearly true.
+    size_t results = 0;
+    UINT next = firstOuter;
+    while (next <= lastOuter)
+    {
+        UINT stoppedAt = next;
+        dupesPlanRows(C, next, lastOuter, -1, itemTarget, stoppedAt);
+        if (stoppedAt <= next)
+           break;
+
+        results += dupesRunPlan(C, nThreads);
+        next = stoppedAt;
+    }
+
+    return (UINT)results;
 }
 
 // Renamed from hammingDistanceOverArray() when the mean-squared difference moved in
@@ -508,6 +798,8 @@ DLL_API UINT DLL_CALLCONV dupesSweepPairs(UINT64 *givenHashesArray, UINT64 *give
     C.hashes   = givenHashesArray;
     C.flipped  = (givenFlippedHashesArray!=NULL) ? givenFlippedHashesArray : givenHashesArray;
     C.ids      = givenIDs;
+    C.rowEnd   = NULL;    // one group, and it ends where the caller's arrays do
+    C.flatEnd  = n;
     C.hamMask  = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
     C.threshold = threshold;
     C.checkInverted = checkInverted;
@@ -560,12 +852,12 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
     dupesScanFlipped.clear();
     dupesScanIDs.clear();
     dupesScanGroupStart.clear();
+    dupesScanRowEnd.clear();
     dupesPixData.clear();
     dupesPixOK.clear();
     dupesPairsList.clear();
     dupesPairsRead = 0;
     dupesScanRows = 0;
-    dupesScanGroup = 0;
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     dupesScanWantMSD = 0;
@@ -638,6 +930,46 @@ DLL_API int DLL_CALLCONV dupesScanFeed(UINT firstIndex, UINT count, const UINT64
     return 1;
 }
 
+// Flattens the group boundaries into one entry per candidate row, so a block of work can
+// be any run of rows: row r is compared against [r+1, dupesScanRowEnd[r]). A row that no
+// group covers - neither dupesScanSetGroups() nor dupesScanBuildFromQuery() insists the
+// boundaries start at 0 - gets r+1 and is stepped over, which is exactly what the cursor
+// that walked groupStart did with it.
+// Returns false only when the array cannot be allocated. That is four bytes a row against
+// the eight of hash and the up-to-a-kilobyte of fingerprint the same scan already holds,
+// so it is not a realistic failure; it is reported rather than ignored because a short
+// dupesScanRowEnd would sweep the wrong ranges rather than none.
+static bool dupesScanBuildRowEnd() {
+    dupesScanRowEnd.clear();
+    if (dupesScanRows < 1)
+       return true;
+
+    try
+    {
+        dupesScanRowEnd.resize(dupesScanRows);
+    }
+    catch (const std::bad_alloc&)
+    {
+        dupesScanRowEnd.clear();
+        return false;
+    }
+
+    for ( UINT r = 0 ; r < dupesScanRows ; r++)
+        dupesScanRowEnd[r] = r + 1;
+
+    for ( size_t g = 0 ; g + 1 < dupesScanGroupStart.size() ; g++)
+    {
+        const UINT a = dupesScanGroupStart[g], b = dupesScanGroupStart[g + 1];
+        if (b <= a || b > dupesScanRows)   // already rejected by the two callers; a
+           continue;                       // malformed boundary must not index past the end
+
+        for ( UINT r = a ; r < b ; r++)
+            dupesScanRowEnd[r] = b;
+    }
+
+    return true;
+}
+
 // groupStart holds groups+1 ascending offsets into the candidate arrays; entry g is where
 // group g starts and the last entry is the row count, so group g is
 // [groupStart[g], groupStart[g+1]). Also computes the comparison total the progress bar
@@ -667,10 +999,19 @@ DLL_API int DLL_CALLCONV dupesScanSetGroups(const UINT *groupStart, UINT groups)
         total += m * (m - 1) / 2;
     }
 
+    if (!dupesScanBuildRowEnd())
+    {
+       dupesScanGroupStart.clear();
+       dupesScanState.lastError = 1;
+       dupesScanState.phase = -1;
+       return 0;
+    }
+
     dupesScanState.groups = (LONG)groups;
     dupesScanState.total = total;
-    dupesScanGroup = 0;
-    dupesScanOuter = dupesScanGroupStart[0];
+    dupesScanOuter = 0;         // rows before the first group carry no comparisons at all,
+                                // so starting at 0 costs one loop iteration each and keeps
+                                // the cursor a plain row index
     dupesScanBlock = 1 << 16;   // first block is deliberately small; the clock below sizes
     dupesScanState.phase = 3;   // the rest from what this machine actually managed
     return 1;
@@ -680,13 +1021,19 @@ DLL_API int DLL_CALLCONV dupesScanSetGroups(const UINT *groupStart, UINT groups)
 // the scan is complete. Progress is in dupesScanState - AHK NumGet()s it rather than
 // paying for a DllCall per tooltip refresh.
 //
-// The budget is checked between blocks of comparisons, never per comparison, and the
-// block size adapts to what this machine measured: the old AHK-side heuristic grew
-// "stepping" by half whenever the previous batch came back inside 1.5 s, which is the
-// same idea driven by a number nobody could calibrate. Blocks never span a group, so the
-// pair order stays group by group.
+// The work is done in BLOCKS of candidate rows, each one fanned out across every core - see
+// the sweep above for why rows rather than groups are the unit. The budget is checked
+// between blocks, never per comparison and never inside a block, and the block size adapts
+// to what this machine measured: the old AHK-side heuristic grew "stepping" by half
+// whenever the previous batch came back inside 1.5 s, which is the same idea driven by a
+// number nobody could calibrate.
+//
+// A block is free to span as many groups as fit it, which is the difference that matters on
+// a real library: a candidate set of 300 000 groups of three used to be 300 000 blocks of
+// two comparisons each, every one of them below the size at which the old code would even
+// start a team, so the whole sweep ran on one core no matter how many the machine had.
 DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped, int msBudget) {
-    if (dupesScanGroupStart.size() < 2 || dupesScanRows < 2)
+    if (dupesScanGroupStart.size() < 2 || dupesScanRows < 2 || dupesScanRowEnd.size() < (size_t)dupesScanRows)
     {
        if (dupesScanState.phase!=-1)   // a rejected boundary array stays an error; it
           dupesScanState.phase = 5;    // must not read back as a scan that found nothing
@@ -698,6 +1045,8 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
     C.hashes   = dupesScanHashes.data();
     C.flipped  = (dupesScanFlipped.size() >= dupesScanRows) ? dupesScanFlipped.data() : dupesScanHashes.data();
     C.ids      = dupesScanIDs.data();
+    C.rowEnd   = dupesScanRowEnd.data();
+    C.flatEnd  = dupesScanRows;
     C.hamMask  = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
     C.threshold = threshold;
     C.checkInverted = checkInverted;
@@ -714,46 +1063,37 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
     // block cannot blow the cancel latency, rare enough that the clock read is noise
     const double blockTargetMs = (double)msBudget / 8.0;
     const std::chrono::steady_clock::time_point tStart = std::chrono::steady_clock::now();
-    const UINT nGroups = (UINT)dupesScanGroupStart.size() - 1;
+    const int nThreads = dupesSweepThreads();
+    dupesSweepAllocFailed = false;
     dupesScanState.phase = 3;
 
-    while (dupesScanGroup < nGroups)
+    while (dupesScanOuter < dupesScanRows)
     {
-        const UINT gFirst = dupesScanGroupStart[dupesScanGroup];
-        const UINT gEnd   = dupesScanGroupStart[dupesScanGroup + 1];
-        if (dupesScanOuter < gFirst)
-           dupesScanOuter = gFirst;
+        // several items per thread, so a heavy one cannot leave the rest of the team idle
+        INT64 itemTarget = dupesScanBlock / ((INT64)nThreads * 8);
+        if (itemTarget < QPV_SWEEP_MIN_ITEM)
+           itemTarget = QPV_SWEEP_MIN_ITEM;
 
-        // a group of one, or one whose last outer index is done: nothing left to compare
-        if (dupesScanOuter + 1 >= gEnd)
-        {
-           dupesScanGroup++;
-           dupesScanOuter = (dupesScanGroup < nGroups) ? dupesScanGroupStart[dupesScanGroup] : 0;
-           continue;
-        }
-
-        // take as many outer indexes as fit one block, but always at least one: the outer
-        // index nearest the start of a group carries the most comparisons, so a block
-        // that refused to start would deadlock the cursor on a big group
-        UINT lastOuter = dupesScanOuter;
-        INT64 planned = (INT64)(gEnd - dupesScanOuter - 1);
-        while (lastOuter + 2 < gEnd)
-        {
-            const INT64 c = (INT64)(gEnd - lastOuter - 2);
-            if (planned + c > dupesScanBlock)
-               break;
-
-            planned += c;
-            lastOuter++;
-        }
+        UINT stoppedAt = dupesScanOuter;
+        const INT64 planned = dupesPlanRows(C, dupesScanOuter, dupesScanRows - 1, dupesScanBlock, itemTarget, stoppedAt);
+        if (stoppedAt <= dupesScanOuter)   // an empty plan would spin this loop for ever
+           break;
 
         const std::chrono::steady_clock::time_point tBlock = std::chrono::steady_clock::now();
-        const UINT got = sweepOuterRange(C, gFirst, gEnd, dupesScanOuter, lastOuter);
+        const size_t got = dupesRunPlan(C, nThreads);
         const double blockMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tBlock).count();
 
-        dupesScanState.pairs += got;
+        dupesScanState.pairs += (INT64)got;
         dupesScanState.done += planned;
-        dupesScanOuter = lastOuter + 1;
+        dupesScanOuter = stoppedAt;
+        if (dupesSweepAllocFailed)
+        {
+           // the pair list is missing part of this block and cannot be completed; stopping
+           // on the error phase is what keeps AHK from presenting it as a finished scan
+           dupesScanState.lastError = 1;
+           dupesScanState.phase = -1;
+           return 0;
+        }
 
         if (blockMs < blockTargetMs * 0.5 && dupesScanBlock < (INT64)1 << 30)
            dupesScanBlock *= 2;
@@ -782,17 +1122,18 @@ DLL_API int DLL_CALLCONV dupesScanEnd() {
     // at global scope so releasing the sweep also releases the candidate rows and their paths,
     // which AHK has already copied into resultedFilesList by this point.
     dupesQueryFreeRows();
+    dupesSweepReleaseScratch();
     dupesScanHashes.clear();     dupesScanHashes.shrink_to_fit();
     dupesScanFlipped.clear();    dupesScanFlipped.shrink_to_fit();
     dupesScanIDs.clear();        dupesScanIDs.shrink_to_fit();
     dupesScanGroupStart.clear(); dupesScanGroupStart.shrink_to_fit();
+    dupesScanRowEnd.clear();     dupesScanRowEnd.shrink_to_fit();
     dupesPixData.clear();        dupesPixData.shrink_to_fit();
     dupesPixOK.clear();          dupesPixOK.shrink_to_fit();
     dupesPixStride = 0;
     dupesPixScale = 1;
     dupesScanRows = 0;
     dupesScanWantMSD = 0;
-    dupesScanGroup = 0;
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     if (dupesScanState.phase!=-1)
@@ -1400,6 +1741,7 @@ static void dupesQueryReset() {
     dupesScanFlipped.clear();
     dupesScanIDs.clear();
     dupesScanGroupStart.clear();
+    dupesScanRowEnd.clear();
     dupesPixData.clear();
     dupesPixOK.clear();
     dupesPairsList.clear();
@@ -1410,7 +1752,6 @@ static void dupesQueryReset() {
     dupesRunStart = 0;
     dupesRunOpen = false;
     dupesScanRows = 0;
-    dupesScanGroup = 0;
     dupesScanOuter = 0;
     dupesScanBlock = 0;
     memset((void*)&dupesScanState, 0, sizeof(dupesScanState));
@@ -1775,6 +2116,14 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
     }
 
     dupesScanGroupStart.push_back(kept);
+    if (!dupesScanBuildRowEnd())
+    {
+       dupesScanGroupStart.clear();
+       dupesScanState.lastError = 1;
+       dupesScanState.phase = -1;
+       return 0;
+    }
+
     INT64 comparisons = 0;
     for ( size_t g = 0 ; g + 1 < dupesScanGroupStart.size() ; g++)
     {
@@ -1786,7 +2135,6 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
     dupesScanState.total = comparisons;
     dupesScanState.done = 0;
     dupesScanState.pairs = 0;
-    dupesScanGroup = 0;
     dupesScanOuter = 0;
     dupesScanBlock = 1 << 16;
     dupesScanState.phase = 3;

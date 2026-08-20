@@ -87003,6 +87003,14 @@ filterDupeResultsByHdist(threshold) {
          Break
    }
 
+   ; Phase -1 means the sweep stopped on an error rather than at the end of the candidate
+   ; set. Running out of memory collecting a block of pairs is the only error it can raise,
+   ; and a library large enough to need this function at all really can do it. The pair
+   ; list is then missing part of that block, so it cannot be presented as a finished scan:
+   ; the groups built out of it would be short members nobody could tell were missing.
+   ; Read before dupesScanEnd(), which leaves the phase alone either way.
+   sweepFailed := (statePtr && NumGet(statePtr + 0, 0, "Int")=-1) ? 1 : 0
+
    ; hands back the fingerprints and hashes - on a large library with MSD on that is
    ; several hundred megabytes, and the result rows are about to be built
    DllCall("qpvmain.dll\dupesScanEnd")
@@ -87010,6 +87018,14 @@ filterDupeResultsByHdist(threshold) {
    {
       DllCall("qpvmain.dll\dupesClearPairs")
       Return 2
+   }
+
+   If (sweepFailed=1)
+   {
+      DllCall("qpvmain.dll\dupesClearPairs")
+      addJournalEntry(A_ThisFunc "(): the duplicates sweep ran out of memory and was abandoned. Nothing was kept.")
+      SoundBeep, 300, 100
+      Return 3
    }
 
    changeHdistLevelCached("kill")
@@ -87543,6 +87559,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       backupArray := ""
       If (abandonAll=1 || r=2)
          showTOOLtip("User abandoned image duplicates identification")
+      Else If (r=3)
+         showTOOLtip("ERROR: not enough memory to compare this many images at once.`nNarrow the search down with more image properties, or turn the MSD filter off.")
       Else
          showTOOLtip("Found no image duplicates after filtering the duplicates list")
 

@@ -101,6 +101,56 @@ else
 fi
 
 echo
+echo "== and without OpenMP at all: the sweep must still build and agree =="
+# The whole thing degrades to a one-thread sweep when the macro is absent, and the result
+# has to be the same one. A team of one is also what a machine with a single core gets.
+if g++ $CXXFLAGS -Wno-unknown-pragmas -o sweep_serial sweep_smoke.cpp 2>&1; then
+    ./sweep_serial > /dev/null && echo "   ok - the serial build passes the same suite" || { ./sweep_serial | tail -20; fail=1; }
+else
+    echo "  ERROR: sweep_smoke.cpp did not compile without -fopenmp"; fail=1
+fi
+rm -f sweep_serial
+
+echo
+echo "== mutation checks: the parallel sweep must reject each way of getting it wrong =="
+# Both mutations go into the SLICE, never into the shipped header. Each is a plausible
+# version of the code, and each breaks one of the two properties the sweep rests on that
+# no ordinary result check would notice.
+#
+# sweepMutant <sed-expression> <what it breaks>
+sweepMutant() {
+    local expr=$1 what=$2
+    cp block_extract.cpp block_extract.orig
+    sed -i "$expr" block_extract.cpp
+    if cmp -s block_extract.cpp block_extract.orig; then
+        echo "  ERROR: the mutation did not apply [$what] - update the sed pattern"; fail=1
+        mv -f block_extract.orig block_extract.cpp
+        return 1
+    fi
+
+    if ! g++ $CXXFLAGS -fopenmp -o sweep_mutant sweep_smoke.cpp 2>/dev/null; then
+        echo "  ERROR: the mutant did not compile [$what] - the mutation is malformed"; fail=1
+    elif ./sweep_mutant > /dev/null 2>&1; then
+        echo "  ERROR: the mutant passed [$what] - that property is not being tested"; fail=1
+    else
+        echo "   ok - caught: $what"
+    fi
+
+    rm -f sweep_mutant
+    mv -f block_extract.orig block_extract.cpp
+}
+
+# The items are concatenated in whatever order suits the loop rather than in planning
+# order. It still finds every pair; it just hands them back in an order that depends on
+# how the work was cut up, and the grouping downstream is order-dependent by design.
+sweepMutant 's|^           for ( int i = 0 ; i < nItems ; i++)$|           for ( int i = nItems - 1 ; i >= 0 ; i--)|' \
+    "the pairs are concatenated in item order no longer"
+# reserve() asked for exactly what is needed, which is what the sweep used to do: correct,
+# and quadratic in the number of pairs.
+sweepMutant 's|    dupesPairsList.reserve(cap);|    dupesPairsList.reserve(need);|' \
+    "the pair list re-allocated once per batch instead of geometrically"
+
+echo
 echo "== threshold filter and grouping vs the AHK they replaced =="
 if g++ $CXXFLAGS -fopenmp -o filter_oracle filter_oracle.cpp 2>&1; then
     ./filter_oracle || fail=1
@@ -381,6 +431,14 @@ if [ "${1:-}" = "--bench" ]; then
     echo
     echo "== MSD benchmark =="
     g++ $CXXFLAGS -o msd_bench msd_bench.cpp 2>&1 && ./msd_bench
+
+    echo
+    echo "== duplicate sweep benchmark, at library scale =="
+    # -mpopcnt on purpose: the shipped DLL uses the POPCNT instruction whenever the CPU
+    # reports it, and without the flag gcc expands __builtin_popcountll into a libgcc call
+    # no shipped build ever executes. The correctness tests above stay on the plain SSE2
+    # baseline, which is what the DLL is compiled against.
+    g++ $CXXFLAGS -mpopcnt -fopenmp -o sweep_bench sweep_bench.cpp 2>&1 && ./sweep_bench
 fi
 
 echo

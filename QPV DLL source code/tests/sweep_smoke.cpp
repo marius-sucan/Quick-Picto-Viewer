@@ -13,6 +13,18 @@
 // keeping its cursor arithmetic honest is that it must produce, byte for byte, what the
 // simple one-group-per-call dupesSweepPairs() produces.
 //
+// Two more invariants belong to the parallel sweep and are checked here as well:
+//   - scanIsThreadCountIndependent(): the same candidate set must come back identical
+//     whatever the team size is, down to a one-thread run. The pairs are collected into
+//     one buffer per thread and concatenated in PLANNING order, so nothing about the
+//     output may depend on who took which item or who finished first;
+//   - sweepReallocatesRarely(): the pair list must grow geometrically, not once per
+//     batch. reserve() honours its request exactly, so the "reserve(size() + found)" this
+//     replaced re-allocated and copied the whole accumulated list on every batch, which
+//     is quadratic - 160 seconds of copying against 1.2 seconds of comparing on a scan
+//     that yields seven million pairs. Nothing about the RESULT changes when that comes
+//     back, so the capacity is what has to be watched.
+//
 // written by Marius Șucan with Claude Opus 5
 
 #include <cstdio>
@@ -494,12 +506,148 @@ static void scanEdgeCases() {
     dupesClearPairs();
 }
 
+// The result must not depend on how many threads swept it. This is the whole reason the
+// items collect into buffers of their own and are concatenated in planning order rather
+// than pushed into one shared list under a lock - and it is not a theoretical worry: the
+// sweep that preceded this one appended under a critical section, so two identical scans
+// of the same library could label the same images into different groups. See
+// [[qpv-2026-08-dupes-sweep]].
+static void scanIsThreadCountIndependent() {
+    printf("  the team size changes nothing about the result\n");
+#ifdef _OPENMP
+    const int wasMax = omp_get_max_threads();
+#endif
+    // big groups on purpose: a candidate set of nothing but pairs would be swept by one
+    // thread whatever the team size, and prove nothing
+    ScanCase K = makeCase(90210, 12, 1024);
+    K.hashes.clear(); K.flipped.clear(); K.ids.clear(); K.groupStart.clear();
+    rngSeed(5150);
+    K.groupStart.push_back(0);
+    for (int g = 0; g < 6; g++)
+    {
+        const UINT64 base = rnd64();
+        const UINT m = 400 + rndBelow(400);
+        for (UINT i = 0; i < m; i++)
+        {
+            UINT64 h = base;
+            const int flips = (int)rndBelow(5);
+            for (int f = 0; f < flips; f++)
+                h ^= 1ULL << rndBelow(64);
+
+            K.hashes.push_back(h);
+            K.flipped.push_back(h);
+            K.ids.push_back((UINT)K.ids.size() + 1);
+        }
+        K.groupStart.push_back((UINT)K.hashes.size());
+    }
+    K.pix.assign(K.hashes.size() * K.stride, (wchar_t)200);
+    K.doMSD = 0; K.checkInverted = 0; K.checkFlipped = 0;
+    K.threshold = 6; K.lCrop = K.rCrop = 0; K.grayCompressor = 1;
+
+    const std::vector<DupePairRec> ref = perGroupSweep(K);
+    check(ref.size() > 10000, "the candidate set yields enough pairs to be worth threading");
+
+    int mismatches = 0, slotsSeen = 0;
+    const int teams[5] = {1, 2, 3, 5, 8};
+    for (int t = 0; t < 5; t++)
+    {
+#ifdef _OPENMP
+        omp_set_num_threads(teams[t]);
+#endif
+        // step it by hand rather than through wholeScanSweep(), so the plan can be read
+        // back after every step: it still holds the last block's items, and the slot each
+        // one recorded is the thread that ran it
+        const UINT rows = (UINT)K.hashes.size();
+        const UINT groups = (UINT)K.groupStart.size() - 1;
+        dupesClearPairs();
+        dupesScanBegin(rows, groups, K.stride, K.grayCompressor, K.doMSD);
+        dupesScanFeed(0, rows, K.hashes.data(), NULL, K.ids.data(), NULL);
+        dupesScanSetGroups(K.groupStart.data(), groups);
+        int guard = 0;
+        while (dupesScanStep(K.threshold, K.lCrop, K.rCrop, K.checkInverted, K.checkFlipped, 1))
+        {
+            int lo = 1 << 30, hi = -1;
+            for (size_t i = 0; i < dupesSweepPlan.size(); i++)
+            {
+                if (dupesSweepPlan[i].slot < lo) lo = dupesSweepPlan[i].slot;
+                if (dupesSweepPlan[i].slot > hi) hi = dupesSweepPlan[i].slot;
+            }
+            if (hi > lo && teams[t] > 1)
+               slotsSeen = 1;
+
+            if (++guard > 200000) { printf("    runaway step loop\n"); failures++; break; }
+        }
+
+        if (!samePairs(ref, dupesPairsList))
+           mismatches++;
+
+        dupesScanEnd();
+    }
+#ifdef _OPENMP
+    omp_set_num_threads(wasMax);
+#endif
+    dupesClearPairs();
+
+    char msg[128];
+    snprintf(msg, sizeof(msg), "%d pairs, teams of 1/2/3/5/8: identical record for record", (int)ref.size());
+    check(mismatches == 0, msg);
+#ifdef _OPENMP
+    check(slotsSeen == 1, "and more than one thread really did collect pairs");
+#else
+    (void)slotsSeen;
+    printf("    %-58s %s\n", "team size (this build has no OpenMP)", "skipped");
+#endif
+}
+
+// The pair list has to grow the way push_back grows, not once per batch. dupesSweepPairs()
+// is the sharp instrument for this: one call per outer index means one append per call, so
+// counting how often the capacity changes counts re-allocations exactly. Geometric growth
+// gets from nothing to a million records in about twenty steps; an exact reserve() per
+// batch re-allocates on every single one of the 1 500 calls and copies everything it has
+// so far each time.
+static void sweepReallocatesRarely() {
+    printf("  the pair list grows geometrically, not once per batch\n");
+    const UINT n = 1500;
+    std::vector<UINT64> h(n, 0x0123456789abcdefULL);   // identical: every pair survives
+    std::vector<UINT>   ids(n);
+    for (UINT i = 0; i < n; i++)
+        ids[i] = i + 1;
+
+    dupesClearPairs();
+    size_t lastCap = dupesPairsList.capacity();
+    int changes = 0, calls = 0, offset = 0;
+    for (;;)
+    {
+        int hoff = 0;
+        dupesSweepPairs(h.data(), h.data(), ids.data(), NULL, n, /*threshold*/ 1, 0, 0,
+                        0, 0, /*doMSD*/ 0, 1, 0, /*stepping*/ 0, offset, &hoff);
+        offset += hoff;
+        calls++;
+        if (dupesPairsList.capacity() != lastCap)
+        {
+           lastCap = dupesPairsList.capacity();
+           changes++;
+        }
+        if (hoff == 0 || calls > 100000)
+           break;
+    }
+
+    char msg[160];
+    snprintf(msg, sizeof(msg), "%d appends of %d pairs re-allocated %d times",
+             calls, (int)dupesPairsList.size(), changes);
+    check(dupesPairsList.size() == (size_t)n * (n - 1) / 2, "every pair of an all-equal group is found");
+    check(changes > 0 && changes < 64, msg);
+    dupesClearPairs();
+}
+
 int main() {
     resultContract();
     scanMatchesPerGroupSweep();
     scanProgressAndCursor();
     scanTimeBudget();
     scanEdgeCases();
+    scanIsThreadCountIndependent();
+    sweepReallocatesRarely();
 
     printf("\n  %s\n", failures ? "SWEEP SMOKE TEST FAILED" : "sweep smoke test passed");
     return failures ? 1 : 0;

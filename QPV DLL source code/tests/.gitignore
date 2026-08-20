@@ -21,6 +21,9 @@ msd_oracle
 msd_bench
 msd_mutant
 sweep_smoke
+sweep_serial
+sweep_mutant
+sweep_bench
 sweep_asan
 filter_oracle
 hash_oracle
