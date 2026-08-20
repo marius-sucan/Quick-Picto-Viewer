@@ -1574,9 +1574,27 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
 static void tpWorkerBody() {
     HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
-    // one OpenMP team member per worker; the ICV is per thread, so the main thread keeps
-    // its own full width for the viewport operations
-    omp_set_num_threads(1);
+    // No omp_set_num_threads(1) here. It used to be, so that a worker reaching an OpenMP
+    // region would not fork a team of its own on top of the pool - eight workers each
+    // forking eight threads is sixty-four of them fighting over four cores. Nothing a
+    // worker calls does that: of the thirty qpv-main.cpp functions reachable from this
+    // file and dupes-pixels.h, not one holds an OpenMP region, and neither pool touches
+    // CImg. OpenCV is the one library in the loaders' path that threads on its own, and it
+    // is handled properly a few hundred lines below - cv::setNumThreads(1) with the
+    // viewport's value saved and put back by thumbsPoolEnd().
+    //
+    // What it cost was worse than what it bought. omp_set_num_threads() is process-visible
+    // mutable state, and vcomp140.dll is an OpenMP 2.0 runtime from before the per-thread
+    // ICV model was written down: if that setting is NOT per thread there, then the first
+    // time this pool starts, every one of the fifty-odd OpenMP regions in qpv-main.cpp
+    // runs on one thread for the rest of the session - the whole image-processing path -
+    // with no symptom beyond "the application feels slow". The duplicates sweep was the
+    // one place that showed it, and it now threads on std::thread precisely so it does not
+    // have to care.
+    //
+    // If a worker is ever given work that DOES contain an OpenMP region, the fix belongs at
+    // that call site - a num_threads(1) clause on the region, or a serial variant of the
+    // function - and not as a setting the whole process shares.
 
     // a private WIC factory avoids any apartment question about the one initWICnow() made
     IWICImagingFactory *fac = NULL;

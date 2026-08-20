@@ -656,7 +656,8 @@ static bool dpAcquireJobSlot(LONG jobGeneration) {
 
 static void dpWorkerBody(size_t mySlot) {
     HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    omp_set_num_threads(1);
+    // no omp_set_num_threads(1) - see the note in tpWorkerBody() in thumbs-pool.h for what
+    // it was guarding and why it was costing more than it guarded
 
     IWICImagingFactory *fac = NULL;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fac));

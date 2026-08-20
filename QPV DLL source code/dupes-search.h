@@ -376,14 +376,17 @@ void setMainWindowTitle(std::string str, HWND pvHwnd) {
 // with /openmp and the rest of qpv-main.cpp uses it. Three reasons, and the first one is
 // not hypothetical:
 //
-//   - tpWorkerBody() and dpWorkerBody() both call omp_set_num_threads(1) when they start,
-//     so that a decoding worker does not fork a team of its own. The OpenMP spec says that
-//     setting is per thread, and gcc implements it that way, but vcomp140.dll is an
-//     OpenMP 2.0 runtime from before the ICV model was written down and there is no
-//     guarantee the main thread keeps its own width once a pool has run. Both pools are
-//     started BEFORE a duplicate scan - filterDupeResultsByHdist() starts the collection
-//     pool itself - so if it does leak, the sweep is pinned to one thread on the very path
-//     that needs it most, and nothing anywhere says so.
+//   - the OpenMP width is process-visible mutable state that anything in the process can
+//     move. tpWorkerBody() and dpWorkerBody() both called omp_set_num_threads(1) when they
+//     started, and both pools run BEFORE a duplicate scan - filterDupeResultsByHdist()
+//     starts the collection pool itself. The spec says that setting is per thread and gcc
+//     implements it that way, but vcomp140.dll is an OpenMP 2.0 runtime from before the ICV
+//     model was written down, so there was no guarantee the main thread kept its own width
+//     once a pool had run: the sweep would have been pinned to one thread on the very path
+//     that needs it most, with nothing anywhere saying so. Those two calls are gone now -
+//     nothing either pool reaches holds an OpenMP region - but the next library linked into
+//     this process can do the same thing, and opencv_world and CImg are both compiled
+//     against the runtime already.
 //   - whether a team is created at all then depends on /openmp surviving into the build,
 //     on OMP_NUM_THREADS, and on whatever else in the process has touched the runtime
 //     (opencv_world and CImg are both compiled against it). A sweep that silently runs on
