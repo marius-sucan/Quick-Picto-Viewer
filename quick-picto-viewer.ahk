@@ -86961,7 +86961,8 @@ filterDupeResultsByHdist(threshold) {
    }
 
    prevMSGdisplay := A_TickCount
-   ; DupesScanState offsets, from dupes-search.h: 32 groups, 36 rows, 8 done, 16 total, 24 pairs
+   ; DupesScanState offsets, from dupes-search.h: 32 groups, 36 rows, 8 done, 16 total,
+   ; 24 pairs, 52 threads
    statePtr := DllCall("qpvmain.dll\dupesScanGetState", "UPtr")
    totalRows := statePtr ? NumGet(statePtr + 0, 36, "Int") : 0
    totalGroups := statePtr ? NumGet(statePtr + 0, 32, "Int") : 0
@@ -86988,7 +86989,12 @@ filterDupeResultsByHdist(threshold) {
          {
             etaTime := ETAinfos(doneWork, totalWork, startuZ)
             pxk := Round(doneWork/totalWork * 100, 1)
-            showTOOLtip("Calculating Hamming distance between the images`nImage groups: " groupDigits(totalGroups) ". Images: " groupDigits(totalRows) "`nSimilar pairs found: " groupDigits(foundPairs) " ( " pxk "% )" etaTime, 0, 0, doneWork/totalWork)
+            ; offset 52 is the widest crew the sweep has actually run a block with. It is
+            ; shown rather than kept for the journal because "why is this using one core"
+            ; is otherwise unanswerable from outside the DLL.
+            nThreads := NumGet(statePtr + 0, 52, "Int")
+            threadsTxt := (nThreads>0) ? " on " nThreads ((nThreads=1) ? " thread" : " threads") : ""
+            showTOOLtip("Calculating Hamming distance between the images" threadsTxt "`nImage groups: " groupDigits(totalGroups) ". Images: " groupDigits(totalRows) "`nSimilar pairs found: " groupDigits(foundPairs) " ( " pxk "% )" etaTime, 0, 0, doneWork/totalWork)
          }
          prevMSGdisplay := A_TickCount
       }
@@ -87002,6 +87008,17 @@ filterDupeResultsByHdist(threshold) {
       If (more!=1) ; 0 = the scan is complete, "" = the DllCall failed
          Break
    }
+
+   ; Offset 52 carries the widest crew the sweep ran a block with. A qpvmain.dll older than
+   ; the threaded sweep never writes it, so 0 does NOT mean "one core" - it means the DLL
+   ; beside this script predates the threading, which looks exactly the same from outside.
+   ; Worth a journal line either way: it is the one number that separates "this machine is
+   ; busy" from "this build is not doing what it says".
+   sweepThreads := statePtr ? NumGet(statePtr + 0, 52, "Int") : 0
+   If (sweepThreads<1)
+      addJournalEntry(A_ThisFunc "(): the sweep reported no thread count. The qpvmain.dll in use predates the threaded duplicates sweep - replace or rebuild it, or the Hamming distance pass keeps running on a single core.")
+   Else
+      addJournalEntry(A_ThisFunc "(): compared " groupDigits(totalRows) " images in " groupDigits(totalGroups) " groups across " sweepThreads " threads in " SecToHHMMSS(Round((A_TickCount - startuZ)/1000, 3)) ".")
 
    ; Phase -1 means the sweep stopped on an error rather than at the end of the candidate
    ; set. Running out of memory collecting a block of pairs is the only error it can raise,

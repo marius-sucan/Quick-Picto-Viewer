@@ -11,9 +11,10 @@
 //     DupesScanState, DupeCandRow, DupeResultRow - which came out of qpv-main.h with it;
 //   - the Hamming and mean-squared-difference sweep, per group (dupesSweepPairs) or over
 //     a whole library from one entry point (dupesScanBegin/Feed/SetGroups/Step/End). It
-//     runs across every core: the unit of parallel work is a run of candidate ROWS, which
-//     is the only unit that fills the machine for both shapes a real library comes in -
-//     see "the parallel pair sweep" below;
+//     runs across every core on std::thread - NOT OpenMP, for reasons the note above
+//     DupesSweepCtx spells out - and the unit of parallel work is a run of candidate ROWS,
+//     which is the only unit that fills the machine for both shapes a real library comes
+//     in. dupesScanState.threads reports how wide it actually ran;
 //   - the threshold filter and the union-find grouping behind the similarity sliders
 //     (dupesApplyFilter), plus the fetches AHK drains the results through;
 //   - the candidate query engine, which steps the grouping SELECT itself and keeps only
@@ -25,8 +26,8 @@
 // A run goes the other way round: the hashes are generated once for the library, the query
 // engine then picks the candidates and groups them, the sweep compares them, and the filter
 // is what the similarity sliders re-run over the pairs the sweep left behind. On a library
-// of a million images the sweep is where all the time goes, and it is the only part of the
-// pipeline that is threaded.
+// of a million images the sweep is where most of the time goes; it and the hash generation
+// are the two halves of the pipeline that thread, and both do it the same way.
 //
 // The fingerprints the hashes are computed FROM are collected by dupes-pixels.h, which is
 // included further down qpv-main.cpp and reads dupesPixCancel out of here, so that the one
@@ -90,8 +91,8 @@ struct DupesScanState {
     volatile LONG  rows;       // 36   candidate images
     volatile INT64 scanned;    // 40   rows the candidate query has stepped through
     volatile LONG  queryDone;  // 48   1 once the query has been walked to the end
-    volatile LONG  spare;      // 52
-};
+    volatile LONG  threads;    // 52   widest crew the sweep actually ran a block with;
+};                             //      0 from any qpvmain.dll older than the threaded sweep
 #pragma pack(pop)
 
 // The whole candidate set for one duplicate scan, laid out flat and grouped.
@@ -371,12 +372,30 @@ void setMainWindowTitle(std::string str, HWND pvHwnd) {
 // byte-identical to the per-group one, and it is why two identical scans of the same
 // library cannot come back with different groups. See [[qpv-2026-08-dupes-sweep]].
 
-// qpv-main.cpp includes this unconditionally; the test slices do not, and they are built
-// both with and without -fopenmp. Everything below degrades to a serial sweep when the
-// macro is absent - the pragma is ignored and the team is one thread wide.
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+// The threads are std::thread and NOT OpenMP, deliberately, even though the DLL is built
+// with /openmp and the rest of qpv-main.cpp uses it. Three reasons, and the first one is
+// not hypothetical:
+//
+//   - tpWorkerBody() and dpWorkerBody() both call omp_set_num_threads(1) when they start,
+//     so that a decoding worker does not fork a team of its own. The OpenMP spec says that
+//     setting is per thread, and gcc implements it that way, but vcomp140.dll is an
+//     OpenMP 2.0 runtime from before the ICV model was written down and there is no
+//     guarantee the main thread keeps its own width once a pool has run. Both pools are
+//     started BEFORE a duplicate scan - filterDupeResultsByHdist() starts the collection
+//     pool itself - so if it does leak, the sweep is pinned to one thread on the very path
+//     that needs it most, and nothing anywhere says so.
+//   - whether a team is created at all then depends on /openmp surviving into the build,
+//     on OMP_NUM_THREADS, and on whatever else in the process has touched the runtime
+//     (opencv_world and CImg are both compiled against it). A sweep that silently runs on
+//     one core is indistinguishable from a slow machine.
+//   - the two worker pools of this DLL are std::thread already, so this is the mechanism
+//     the project has actually proven on the machines it ships to.
+//
+// dupesSweepSetThreads() below makes the width settable and dupesScanState.threads reports
+// what was really used, so "is it threading?" is a question the application can answer
+// instead of a question about the compiler.
+#include <thread>
+#include <atomic>
 
 // Everything the pair sweep needs that does not change while it runs. Gathered into a
 // struct because the sweep is now entered from two places - the per-group export below
@@ -433,24 +452,109 @@ static void dupesSweepReleaseScratch() {
     dupesSweepBufs.clear();  dupesSweepBufs.shrink_to_fit();
 }
 
-// How wide the team may be. Read once per block rather than baked in: omp_set_num_threads()
-// can change it from outside, and the buffers above are indexed by the thread number, so
-// the count and the buffer array have to be decided together. The num_threads clause on the
-// region below is what makes that airtight - a team is never larger than it asks for, so
-// omp_get_thread_num() cannot come back with an index past the end of the array.
+// The shared cursor a block's workers pull items off. One relaxed increment per item is
+// the whole of the coordination between them: an item is millions of comparisons, so the
+// contention is nothing, and taking them one at a time is what balances a block whose items
+// are not all equally heavy - the same thing schedule(dynamic) was there for.
+static std::atomic<int> dupesSweepCursor(0);
+
+// How wide a team may be. hardware_concurrency() is the logical processor count of this
+// process's processor group, which is what the machine can actually run at once.
+static int dupesSweepHW = 0;
+static int dupesSweepWidthSet = 0;      // 0 = one worker per hardware thread
+
 static int dupesSweepThreads() {
-#ifdef _OPENMP
-    int t = omp_get_max_threads();
-    if (t < 1)
-       t = 1;
+    if (dupesSweepWidthSet > 0)
+       return dupesSweepWidthSet;
 
-    if (t > 256)      // one buffer per thread; a machine this wide is not the problem here
-       t = 256;
+    if (dupesSweepHW==0)
+    {
+       const unsigned int hw = std::thread::hardware_concurrency();
+       int t = (hw > 0) ? (int)hw : 1;
+       if (t < 1)
+          t = 1;
 
-    return t;
-#else
-    return 1;
-#endif
+       if (t > 256)   // one collecting buffer per worker; a machine this wide is not the
+          t = 256;    // problem this code has
+
+       dupesSweepHW = t;
+    }
+
+    return dupesSweepHW;
+}
+
+// Pins the sweep to a fixed number of workers; 0 puts it back to one per hardware thread.
+// Returns the width now in force.
+//
+// It exists for two reasons. tests/sweep_smoke.cpp sweeps one candidate set with teams of
+// 1, 2, 3, 5 and 8 and requires all five to come back byte-identical, which is the only way
+// to prove the result does not depend on how the work was cut up. And it is the switch to
+// reach for when a machine behaves oddly: pinning the sweep to 1 turns a threading question
+// into a plain measurement, without a rebuild.
+DLL_API int DLL_CALLCONV dupesSweepSetThreads(int n) {
+    if (n < 0)
+       n = 0;
+
+    if (n > 256)
+       n = 256;
+
+    dupesSweepWidthSet = n;
+    return dupesSweepThreads();
+}
+
+// Runs body(i) for every i in [0, count) across the same crew width the sweep uses, and
+// returns when the last one is done. The items come off a shared cursor rather than being
+// split up front, so a machine that will not give us a thread is slower and not wrong -
+// whatever the crew does not take, the calling thread does.
+//
+// body() must not throw: it runs on threads whose entry point is this lambda, and an
+// exception out of one calls std::terminate. The only caller is the hash loop, whose three
+// hash functions are arithmetic over a stack buffer.
+template <class F>
+static void dupesParallelFor(const int count, F body) {
+    if (count < 1)
+       return;
+
+    int team = dupesSweepThreads();
+    if (team > count)
+       team = count;
+
+    if (team < 2)
+    {
+       for ( int i = 0 ; i < count ; i++)
+           body(i);
+
+       return;
+    }
+
+    std::atomic<int> cursor(0);
+    std::atomic<int> *pCursor = &cursor;
+    std::vector<std::thread> crew;
+    const auto run = [pCursor, count, &body]() {
+        for (;;)
+        {
+            const int i = pCursor->fetch_add(1, std::memory_order_relaxed);
+            if (i >= count)
+               break;
+
+            body(i);
+        }
+    };
+
+    try
+    {
+        crew.reserve((size_t)(team - 1));
+        for ( int t = 1 ; t < team ; t++)
+            crew.push_back(std::thread(run));
+    }
+    catch (...)
+    {
+        // out of threads or out of memory; the cursor covers whatever did not start
+    }
+
+    run();
+    for ( size_t t = 0 ; t < crew.size() ; t++)
+        crew[t].join();
 }
 
 // What one candidate row costs on top of its comparisons: the group-end lookup and the
@@ -459,8 +563,8 @@ static int dupesSweepThreads() {
 // almost no comparisons and a very great deal of loop - planned by comparisons alone, one
 // block would swallow the entire scan and the cancel latency with it.
 #define QPV_SWEEP_ROW_COST   4
-// Never cut an item smaller than this: below it the OpenMP scheduler costs more than the
-// work does.
+// Never cut an item smaller than this: below it handing the item out costs more than
+// running it does.
 #define QPV_SWEEP_MIN_ITEM   4096
 // And never plan more items than this in one block, whatever the arithmetic says.
 #define QPV_SWEEP_MAX_ITEMS  4096
@@ -628,55 +732,37 @@ static INT64 dupesPlanRows(const DupesSweepCtx &C, const UINT firstRow, const UI
     return comparisons;
 }
 
-// Runs the planned block across the team and appends everything it found to
-// dupesPairsList in planning order. Returns how many pairs that was.
-static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads) {
-    const int nItems = (int)dupesSweepPlan.size();
-    if (nItems < 1)
-       return 0;
-
-    if ((int)dupesSweepBufs.size() < nThreads)
-       dupesSweepBufs.resize((size_t)nThreads);
-
-    for ( int t = 0 ; t < nThreads ; t++)
-        dupesSweepBufs[t].v.clear();    // keeps the capacity: after the first few blocks
-                                        // the sweep stops allocating altogether
-
-    DupesSweepItem *items = dupesSweepPlan.data();
-    DupesSweepBuf  *bufs  = dupesSweepBufs.data();
-    const DupesSweepCtx *ctx = &C;
-
-    // Every iteration writes only its own slot of items[] and only its own thread's
-    // buffer, so the region needs no synchronisation whatsoever; the candidate arrays,
-    // dupesPixData and dupesPixOK are read-only for its whole duration.
-    // The shared state is spelled out rather than left to default(none): the old clause
-    // named one of the dozen or so variables the region actually touched, which MSVC's
-    // OpenMP 2.0 lets through and clang-cl and gcc do not. default(none) is deliberately
-    // not used here either, because whether a const variable may appear in a data-sharing
-    // clause changed between OpenMP versions and the compilers disagree; the read-only
-    // locals above are shared by default on every one of them.
-    #pragma omp parallel for schedule(dynamic) num_threads(nThreads) shared(items, bufs, ctx) if (nItems > 1 && nThreads > 1)
-    for ( int i = 0 ; i < nItems ; i++)
+// One worker's whole job for one block: take items off the shared cursor until there are
+// none left, sweeping each into this worker's own buffer and recording where it landed.
+//
+// Nothing here is shared with another worker: the cursor hands out each item exactly once,
+// item i is the only writer of items[i], and slot is this worker's alone. The main thread
+// reads all of it after join(), which is what makes those writes visible to it.
+static void dupesSweepWorker(const DupesSweepCtx *ctx, DupesSweepItem *items, const int nItems, DupesSweepBuf *bufs, const int slot) {
+    std::vector<DupePairRec> &out = bufs[slot].v;
+    for (;;)
     {
-        int slot = 0;
-#ifdef _OPENMP
-        slot = omp_get_thread_num();
-#endif
-        std::vector<DupePairRec> &out = bufs[slot].v;
+        const int i = dupesSweepCursor.fetch_add(1, std::memory_order_relaxed);
+        if (i >= nItems)
+           break;
+
         const size_t begin = out.size();
-        // An exception that leaves an OpenMP structured block is undefined behaviour, and
+        int failed = 0;
+        // An exception out of a std::thread's entry point calls std::terminate, and
         // push_back() can throw: one block of a pathological candidate set - a hundred
         // thousand images that are all the same picture - really can ask for more than the
-        // machine has. Caught here so it becomes a reported failure instead of a crash.
-        // The flag is per ITEM rather than a shared one so the region still needs no
-        // synchronisation; what the item collected before it threw is a PREFIX of what it
-        // owed, so the ordering of everything else survives.
-        int failed = 0;
+        // machine has. Caught per item so it becomes a reported failure instead of a
+        // crash. What the item collected before it threw is a PREFIX of what it owed, so
+        // the ordering of everything else survives.
         try
         {
             sweepRowsInto(*ctx, items[i].firstRow, items[i].lastRow, out);
         }
         catch (const std::bad_alloc&)
+        {
+            failed = 1;
+        }
+        catch (...)
         {
             failed = 1;
         }
@@ -686,6 +772,81 @@ static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads) {
         items[i].begin  = begin;
         items[i].count  = out.size() - begin;
     }
+}
+
+// Runs the planned block across a crew of worker threads and appends everything it found to
+// dupesPairsList in planning order. Returns how many pairs that was, and reports the width
+// it actually ran at through teamOut - which is what dupesScanState.threads carries up to
+// the tooltip.
+//
+// The crew is created for the block and joined before this returns. A parked pool woken per
+// block would save the thread starts - a scan runs thousands of blocks - but there is
+// NOWHERE SAFE for a DLL to shut one down. DllMain cannot join a thread [the loader lock],
+// and by the time the CRT runs this file's static destructors ExitProcess has already
+// killed every other thread in the process, so a std::thread still holding one is joinable,
+// its destructor calls std::terminate, and the application crashes on the way out. That is
+// not a hypothetical: the first version of this WAS a parked pool, and it hung
+// tests/query_engine on exit the first time it ran. Threads that cannot outlive the call
+// that made them have no shutdown question at all.
+//
+// The rule is therefore as simple as it can be: every block is fanned out over one worker
+// per hardware thread, unless it holds fewer items than that. There is deliberately no
+// "too small to bother" threshold - the obvious one to write is against the block's planned
+// cost, and dupesScanBlock is sized from the CALLER's millisecond budget, so a caller that
+// passed a small budget would silently get a one-core sweep. A block that is not worth a
+// crew is by definition a block that costs almost nothing to sweep twice over.
+static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads, int *teamOut) {
+    const int nItems = (int)dupesSweepPlan.size();
+    if (teamOut!=NULL)
+       *teamOut = 0;
+
+    if (nItems < 1)
+       return 0;
+
+    int team = nThreads;
+    if (team > nItems)      // a worker with no item to take is a thread started for nothing
+       team = nItems;
+
+    if (team < 1)
+       team = 1;
+
+    if ((int)dupesSweepBufs.size() < team)
+       dupesSweepBufs.resize((size_t)team);
+
+    for ( int t = 0 ; t < team ; t++)
+        dupesSweepBufs[t].v.clear();    // keeps the capacity: after the first few blocks
+                                        // the sweep stops allocating altogether
+
+    DupesSweepItem *items = dupesSweepPlan.data();
+    DupesSweepBuf  *bufs  = dupesSweepBufs.data();
+    const DupesSweepCtx *ctx = &C;
+    dupesSweepCursor.store(0, std::memory_order_relaxed);
+
+    // Slot 0 is this thread. The caller works alongside the crew instead of waiting on it,
+    // so a width of one costs nothing at all, and a machine that will not give us a thread
+    // is slower rather than broken: the shared cursor decides who runs which item, not how
+    // many workers turned up, so whatever the crew does not take this thread does.
+    std::vector<std::thread> crew;
+    if (team > 1)
+    {
+       try
+       {
+           crew.reserve((size_t)(team - 1));      // reserved first: a push_back that
+           for ( int t = 1 ; t < team ; t++)      // re-allocated could drop a live thread
+               crew.push_back(std::thread(dupesSweepWorker, ctx, items, nItems, bufs, t));
+       }
+       catch (...)
+       {
+           // out of threads or out of memory; carry on with the ones that did start
+       }
+    }
+
+    dupesSweepWorker(ctx, items, nItems, bufs, 0);
+    for ( size_t t = 0 ; t < crew.size() ; t++)
+        crew[t].join();
+
+    if (teamOut!=NULL)
+       *teamOut = (int)crew.size() + 1;
 
     size_t results = 0;
     for ( int i = 0 ; i < nItems ; i++)
@@ -697,8 +858,8 @@ static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads) {
 
     if (results > 0)
     {
-       // and the same for the concatenation: this throw would otherwise cross the __stdcall
-       // boundary into AutoHotkey, which has nothing to catch it with
+       // and the same guard for the concatenation: this throw would otherwise cross the
+       // __stdcall boundary into AutoHotkey, which has nothing to catch it with
        try
        {
            dupesReservePairs(dupesPairsList.size() + results);
@@ -759,7 +920,7 @@ static UINT sweepOuterRange(const DupesSweepCtx &C, const UINT groupFirst, const
         if (stoppedAt <= next)
            break;
 
-        results += dupesRunPlan(C, nThreads);
+        results += dupesRunPlan(C, nThreads, NULL);
         next = stoppedAt;
     }
 
@@ -1079,9 +1240,15 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
         if (stoppedAt <= dupesScanOuter)   // an empty plan would spin this loop for ever
            break;
 
+        int team = 0;
         const std::chrono::steady_clock::time_point tBlock = std::chrono::steady_clock::now();
-        const size_t got = dupesRunPlan(C, nThreads);
+        const size_t got = dupesRunPlan(C, nThreads, &team);
         const double blockMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tBlock).count();
+        // the widest crew any block of this scan actually ran with, for the tooltip. A
+        // qpvmain.dll that predates the threaded sweep never writes it, so a 0 here does
+        // not mean "one core" - it means the DLL beside the script is the old one.
+        if ((LONG)team > dupesScanState.threads)
+           dupesScanState.threads = (LONG)team;
 
         dupesScanState.pairs += (INT64)got;
         dupesScanState.done += planned;
@@ -2396,14 +2563,18 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     const int *pixData = pix.data();
     UINT64 *outData = out.data();
 
-    #pragma omp parallel for schedule(static) shared(pixData, outData) if (count > 8)
-    for ( int i = 0 ; i < count ; i++)
-    {
+    // Threaded the same way the sweep is, and for the same reason: this used to be an
+    // "#pragma omp parallel for", and whether that produced a team at all depended on
+    // /openmp surviving the build and on nothing else in the process having set the OpenMP
+    // width to 1 - which both worker pools of this DLL do when they start. pHash is two
+    // 32x32 DCTs per image, so on a library-sized run this is minutes of arithmetic, not
+    // a rounding error.
+    dupesParallelFor(count, [pixData, outData, kind, stride, mode](int i) {
         const int *p = pixData + (size_t)i * stride;
         if (kind==2)      outData[i] = dupesDHash(p);
         else if (kind==4) outData[i] = dupesLHash(p);
         else              outData[i] = dupesPHash(p, mode);
-    }
+    });
 
     for ( int i = 0 ; i < count ; i++)
     {

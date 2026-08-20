@@ -94,18 +94,22 @@ mv msd_extract.orig msd_extract.cpp
 
 echo
 echo "== sweep: compiles under -Wall -fopenmp, and the result contract holds =="
-if g++ $CXXFLAGS -fopenmp -o sweep_smoke sweep_smoke.cpp 2>&1; then
+if g++ $CXXFLAGS -fopenmp -pthread -o sweep_smoke sweep_smoke.cpp 2>&1; then
     ./sweep_smoke || fail=1
 else
     echo "  ERROR: sweep_smoke.cpp did not compile"; fail=1
 fi
 
 echo
-echo "== and without OpenMP at all: the sweep must still build and agree =="
-# The whole thing degrades to a one-thread sweep when the macro is absent, and the result
-# has to be the same one. A team of one is also what a machine with a single core gets.
-if g++ $CXXFLAGS -Wno-unknown-pragmas -o sweep_serial sweep_smoke.cpp 2>&1; then
-    ./sweep_serial > /dev/null && echo "   ok - the serial build passes the same suite" || { ./sweep_serial | tail -20; fail=1; }
+echo "== and with no OpenMP in the build at all: same suite, same answers =="
+# The sweep threads itself with std::thread and must not depend on OpenMP for anything -
+# see the note above DupesSweepCtx for why. The build above has /openmp's equivalent on,
+# because qpv-main.cpp is compiled that way and the header has to be clean in that
+# translation unit; this one has it off, and if the two ever disagree something has crept
+# back in. -Wno-unknown-pragmas because dupes-pixels.h and thumbs-pool.h are not in this
+# slice but their pragmas would be flagged if they were.
+if g++ $CXXFLAGS -Wno-unknown-pragmas -pthread -o sweep_serial sweep_smoke.cpp 2>&1; then
+    ./sweep_serial > /dev/null && echo "   ok - the no-OpenMP build passes the same suite" || { ./sweep_serial | tail -20; fail=1; }
 else
     echo "  ERROR: sweep_smoke.cpp did not compile without -fopenmp"; fail=1
 fi
@@ -128,7 +132,7 @@ sweepMutant() {
         return 1
     fi
 
-    if ! g++ $CXXFLAGS -fopenmp -o sweep_mutant sweep_smoke.cpp 2>/dev/null; then
+    if ! g++ $CXXFLAGS -fopenmp -pthread -o sweep_mutant sweep_smoke.cpp 2>/dev/null; then
         echo "  ERROR: the mutant did not compile [$what] - the mutation is malformed"; fail=1
     elif ./sweep_mutant > /dev/null 2>&1; then
         echo "  ERROR: the mutant passed [$what] - that property is not being tested"; fail=1
@@ -152,7 +156,7 @@ sweepMutant 's|    dupesPairsList.reserve(cap);|    dupesPairsList.reserve(need)
 
 echo
 echo "== threshold filter and grouping vs the AHK they replaced =="
-if g++ $CXXFLAGS -fopenmp -o filter_oracle filter_oracle.cpp 2>&1; then
+if g++ $CXXFLAGS -fopenmp -pthread -o filter_oracle filter_oracle.cpp 2>&1; then
     ./filter_oracle || fail=1
 else
     echo "  ERROR: filter_oracle.cpp did not compile"; fail=1
@@ -160,7 +164,7 @@ fi
 
 echo
 echo "== perceptual hashes vs the AHK that computed them =="
-if g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -o hash_oracle hash_oracle.cpp -ldl 2>&1; then
+if g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -pthread -o hash_oracle hash_oracle.cpp -ldl 2>&1; then
     ./hash_oracle || fail=1
 else
     echo "  ERROR: hash_oracle.cpp did not compile"; fail=1
@@ -339,7 +343,7 @@ elif ! ls /usr/lib/*/libsqlite3.so.0 >/dev/null 2>&1 && ! ls /usr/lib/libsqlite3
     echo "  SKIPPED: libsqlite3.so.0 not available"
 else
     python3 make_test_db.py testdb.sldb || fail=1
-    if g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -o query_engine query_engine.cpp -ldl 2>&1; then
+    if g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -pthread -o query_engine query_engine.cpp -ldl 2>&1; then
         ./query_engine testdb.sldb || fail=1
     else
         echo "  ERROR: query_engine.cpp did not compile"; fail=1
@@ -368,7 +372,7 @@ else
             continue
         fi
 
-        g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -o query_mutant query_engine.cpp -ldl 2>/dev/null
+        g++ $CXXFLAGS -Wno-sign-compare -Ishim -fopenmp -pthread -o query_mutant query_engine.cpp -ldl 2>/dev/null
         if ./query_mutant testdb.sldb > /dev/null 2>&1; then
             echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
         else
@@ -438,7 +442,7 @@ if [ "${1:-}" = "--bench" ]; then
     # reports it, and without the flag gcc expands __builtin_popcountll into a libgcc call
     # no shipped build ever executes. The correctness tests above stay on the plain SSE2
     # baseline, which is what the DLL is compiled against.
-    g++ $CXXFLAGS -mpopcnt -fopenmp -o sweep_bench sweep_bench.cpp 2>&1 && ./sweep_bench
+    g++ $CXXFLAGS -mpopcnt -pthread -o sweep_bench sweep_bench.cpp 2>&1 && ./sweep_bench
 fi
 
 echo

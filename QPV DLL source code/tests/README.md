@@ -68,15 +68,19 @@ that it must produce, **byte for byte**, what the simple one-group-per-call
 AHK no longer calls it.
 
 Two more stages belong to the parallel sweep, which fans a block of candidate rows out
-across every core:
+across every core on `std::thread` — not OpenMP; the note above `DupesSweepCtx` says why,
+and the short version is that both worker pools of the DLL call `omp_set_num_threads(1)`
+when they start and there is no guarantee vcomp keeps that per thread:
 
-- `scanIsThreadCountIndependent()` sweeps one candidate set with teams of 1, 2, 3, 5 and 8
-  and requires all five to be byte-identical to the per-group reference — and checks that
-  more than one thread really did collect pairs, so the comparison is not vacuous. Each item
-  of a block collects into a buffer of its own and the buffers are concatenated in
-  **planning** order, never in the order the threads finished; the grouping downstream is
-  order-dependent by design, so an output that depended on the team size would label the
-  same images into different groups on different machines.
+- `scanIsThreadCountIndependent()` sweeps one candidate set with teams of 1, 2, 3, 5, 8 and
+  the unpinned default (`dupesSweepSetThreads()` is what pins it) and requires all six to be
+  byte-identical to the per-group reference. Each item of a block collects into a buffer of
+  its own and the buffers are concatenated in **planning** order, never in the order the
+  threads finished; the grouping downstream is order-dependent by design, so an output that
+  depended on the team size would label the same images into different groups on different
+  machines. It also requires the unpinned run to report `dupesScanState.threads > 1` on a
+  multi-processor machine — the same number the application's tooltip shows — so a build
+  that quietly swept on one core fails here instead of in front of a user.
 - `sweepReallocatesRarely()` counts how often `dupesPairsList` changes capacity across 1 500
   appends. `reserve()` honours its request *exactly*, so the `reserve(size() + found)` this
   replaced re-allocated and copied the whole accumulated list on every batch — quadratic in
@@ -85,9 +89,17 @@ across every core:
   seven million pairs. Nothing about the *result* changes when that comes back, which is why
   the capacity is what gets watched.
 
-`run-tests.sh` also builds `sweep_smoke.cpp` **without** `-fopenmp` and runs the same suite:
-everything degrades to a one-thread sweep when the macro is absent, which is also what a
-single-core machine gets, and the answer has to be the same one.
+`run-tests.sh` also builds `sweep_smoke.cpp` **without** `-fopenmp` and runs the same suite.
+Nothing in the sweep depends on OpenMP any more, and this is what keeps it that way — the
+other build has it on, because `qpv-main.cpp` is compiled that way and the header has to be
+clean in that translation unit.
+
+One shape of fix is ruled out and worth recording: the crew is created per block and joined
+before the block returns, **never parked between blocks**. A pooled version was written
+first, and it hung `query_engine` on exit the first time it ran — a DLL has nowhere safe to
+join a worker thread at process shutdown, because `ExitProcess` kills every other thread
+before the CRT runs this file's static destructors, and `~thread` on a joinable thread calls
+`std::terminate`.
 
 **The sweep mutation checks** — two plausible versions of the code that break exactly those
 two properties and nothing else: concatenating the items in whatever order suits the loop

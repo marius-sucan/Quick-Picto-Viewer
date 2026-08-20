@@ -17,7 +17,10 @@
 //   - scanIsThreadCountIndependent(): the same candidate set must come back identical
 //     whatever the team size is, down to a one-thread run. The pairs are collected into
 //     one buffer per thread and concatenated in PLANNING order, so nothing about the
-//     output may depend on who took which item or who finished first;
+//     output may depend on who took which item or who finished first. It also requires the
+//     sweep to really run wide when it is not pinned - dupesScanState.threads is the same
+//     number the application's tooltip shows, so a build that quietly swept on one core
+//     fails here rather than in front of a user;
 //   - sweepReallocatesRarely(): the pair list must grow geometrically, not once per
 //     batch. reserve() honours its request exactly, so the "reserve(size() + found)" this
 //     replaced re-allocated and copied the whole accumulated list on every batch, which
@@ -514,9 +517,6 @@ static void scanEdgeCases() {
 // [[qpv-2026-08-dupes-sweep]].
 static void scanIsThreadCountIndependent() {
     printf("  the team size changes nothing about the result\n");
-#ifdef _OPENMP
-    const int wasMax = omp_get_max_threads();
-#endif
     // big groups on purpose: a candidate set of nothing but pairs would be swept by one
     // thread whatever the team size, and prove nothing
     ScanCase K = makeCase(90210, 12, 1024);
@@ -547,13 +547,13 @@ static void scanIsThreadCountIndependent() {
     const std::vector<DupePairRec> ref = perGroupSweep(K);
     check(ref.size() > 10000, "the candidate set yields enough pairs to be worth threading");
 
-    int mismatches = 0, slotsSeen = 0;
-    const int teams[5] = {1, 2, 3, 5, 8};
-    for (int t = 0; t < 5; t++)
+    // 0 is "one worker per hardware thread", which is what the application gets and the
+    // only entry that proves the default is not secretly one
+    int mismatches = 0, slotsSeen = 0, widestDefault = 0;
+    const int teams[6] = {1, 2, 3, 5, 8, 0};
+    for (int t = 0; t < 6; t++)
     {
-#ifdef _OPENMP
-        omp_set_num_threads(teams[t]);
-#endif
+        dupesSweepSetThreads(teams[t]);
         // step it by hand rather than through wholeScanSweep(), so the plan can be read
         // back after every step: it still holds the last block's items, and the slot each
         // one recorded is the thread that ran it
@@ -572,7 +572,7 @@ static void scanIsThreadCountIndependent() {
                 if (dupesSweepPlan[i].slot < lo) lo = dupesSweepPlan[i].slot;
                 if (dupesSweepPlan[i].slot > hi) hi = dupesSweepPlan[i].slot;
             }
-            if (hi > lo && teams[t] > 1)
+            if (hi > lo && teams[t] != 1)
                slotsSeen = 1;
 
             if (++guard > 200000) { printf("    runaway step loop\n"); failures++; break; }
@@ -581,22 +581,30 @@ static void scanIsThreadCountIndependent() {
         if (!samePairs(ref, dupesPairsList))
            mismatches++;
 
+        if (teams[t] == 0)
+           widestDefault = (int)((const DupesScanState*)dupesScanGetState())->threads;
+
         dupesScanEnd();
     }
-#ifdef _OPENMP
-    omp_set_num_threads(wasMax);
-#endif
+    dupesSweepSetThreads(0);
     dupesClearPairs();
 
-    char msg[128];
-    snprintf(msg, sizeof(msg), "%d pairs, teams of 1/2/3/5/8: identical record for record", (int)ref.size());
+    char msg[160];
+    snprintf(msg, sizeof(msg), "%d pairs, teams of 1/2/3/5/8 and the default: identical", (int)ref.size());
     check(mismatches == 0, msg);
-#ifdef _OPENMP
     check(slotsSeen == 1, "and more than one thread really did collect pairs");
-#else
-    (void)slotsSeen;
-    printf("    %-58s %s\n", "team size (this build has no OpenMP)", "skipped");
-#endif
+
+    const int hw = (int)std::thread::hardware_concurrency();
+    snprintf(msg, sizeof(msg), "unpinned, the sweep ran %d wide on a %d-thread machine", widestDefault, hw);
+    if (hw > 1)
+       check(widestDefault > 1, msg);
+    else
+       printf("    %-58s %s\n", "single-processor machine: nothing to widen", "skipped");
+
+    // pinning has to be honoured too, or the case above proves nothing about the others
+    dupesSweepSetThreads(3);
+    check(dupesSweepSetThreads(3) == 3, "dupesSweepSetThreads pins the width");
+    check(dupesSweepSetThreads(0) == hw || hw < 1, "... and 0 puts it back to the hardware count");
 }
 
 // The pair list has to grow the way push_back grows, not once per batch. dupesSweepPairs()

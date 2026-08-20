@@ -17,13 +17,14 @@
 //   - "mixed": a spread of group sizes with a long tail, which is what an ordinary
 //     library looks like.
 //
-// Built with -fopenmp and -mpopcnt: the shipped DLL uses the POPCNT instruction whenever
-// the CPU reports it, and without -mpopcnt gcc expands __builtin_popcountll to a libgcc
-// call that no shipped build ever executes. Treat the absolute numbers as an order of
-// magnitude - GCC's inliner is not MSVC's - and the ratios as the real result.
+// Built with -mpopcnt: the shipped DLL uses the POPCNT instruction whenever the CPU reports
+// it, and without the flag gcc expands __builtin_popcountll to a libgcc call that no shipped
+// build ever executes. Treat the absolute numbers as an order of magnitude - GCC's inliner
+// is not MSVC's - and the ratios as the real result.
 //
-// Usage:  ./sweep_bench [shape] [rows]
-//         shapes: small | huge | mixed | msd | all   (default all)
+// Usage:  ./sweep_bench [shape] [rows] [threads]
+//         shapes:  small | huge | mixed | msd | all   (default all)
+//         threads: 0 or omitted for one worker per hardware thread
 //
 // written by Marius Șucan with Claude Opus 5
 
@@ -37,9 +38,6 @@
 #include <vector>
 #include <algorithm>
 #include <emmintrin.h>
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 #ifndef _WIN32
 #include <time.h>
 #endif
@@ -226,7 +224,7 @@ static void feedCase(const BenchCase &K) {
 
 struct Result {
     double wallSec, cpuSec, worstStepMs;
-    int    steps;
+    int    steps, team;
     INT64  comparisons, pairs;
 };
 
@@ -255,6 +253,7 @@ static Result runCase(const BenchCase &K, int msBudget) {
     R.cpuSec = cpuSeconds() - cpu0;
     R.comparisons = dupesScanState.total;
     R.pairs = dupesScanState.pairs;
+    R.team = (int)dupesScanState.threads;
     dupesScanEnd();
     dupesClearPairs();
     return R;
@@ -266,20 +265,19 @@ static void report(const BenchCase &K, const Result &R) {
     printf("      comparisons %14lld   pairs %10lld\n", (long long)R.comparisons, (long long)R.pairs);
     printf("      wall %8.3f s   cpu %8.3f s   cores used %5.2f\n",
            R.wallSec, R.cpuSec, (R.wallSec > 0.0) ? R.cpuSec / R.wallSec : 0.0);
-    printf("      %10.1f M comparisons/s      steps %6d   worst step %7.1f ms\n\n",
-           mcps, R.steps, R.worstStepMs);
+    printf("      %10.1f M comparisons/s      steps %6d   worst step %7.1f ms   widest team %3d\n\n",
+           mcps, R.steps, R.worstStepMs, R.team);
 }
 
 int main(int argc, char **argv) {
     const std::string shape = (argc > 1) ? argv[1] : "all";
     const UINT rows = (argc > 2) ? (UINT)strtoul(argv[2], NULL, 10) : 1000000;
+    const int pinned = (argc > 3) ? (int)strtol(argv[3], NULL, 10) : 0;
     const int msBudget = 350;      // filterDupeResultsByHdist()'s own budget
 
-#ifdef _OPENMP
-    printf("OpenMP: %d threads available\n", omp_get_max_threads());
-#else
-    printf("OpenMP: NOT enabled in this build\n");
-#endif
+    const int width = dupesSweepSetThreads(pinned);
+    printf("sweep width %d (%u hardware threads)%s\n", width,
+           std::thread::hardware_concurrency(), pinned ? "  [pinned]" : "");
     printf("budget %d ms per step, %u rows\n\n", msBudget, rows);
 
     if (shape=="small" || shape=="all")
