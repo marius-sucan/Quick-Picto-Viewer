@@ -949,12 +949,14 @@ static bool dpWriteResult(const DupePixResult &res) {
 
 // Refills the queue from the SELECT.
 //
-// The cursor is a keyset one - "... AND imgidu > ?2 ORDER BY imgidu LIMIT ?1" - and not
-// the bare LIMIT the hash loop gets away with. The difference is that a row is not written
-// the moment it is handed out: it goes to a worker, comes back some milliseconds later and
-// is written then. Re-running a bare LIMIT in the meantime would hand out the very same
-// rows again, because they still match. Remembering the highest imgidu handed out is what
-// makes each row leave exactly once.
+// The cursor is a keyset one - "... AND imgidu > ?2 ORDER BY imgidu LIMIT ?1" - which the
+// hash loop of dupes-search.h now walks too, though for the other of the two reasons. Here
+// it is a correctness one: a row is not written the moment it is handed out, it goes to a
+// worker, comes back some milliseconds later and is written then, so re-running a bare
+// LIMIT in the meantime would hand out the very same rows again because they still match.
+// There a row is written before the next batch reads, and the cursor is what keeps the
+// batch from re-walking every row already done. Remembering the highest imgidu handed out
+// is what makes each row leave exactly once.
 //
 // It also bounds the run: a row that is decoded and then fails to be written is behind the
 // cursor and is not offered again, so a persistent write failure cannot spin forever.

@@ -492,12 +492,18 @@ DLL_API int DLL_CALLCONV dupesSweepSetThreads(int n) {
 // body() must not throw: it runs on threads whose entry point is this lambda, and an
 // exception out of one calls std::terminate. The only caller is the hash loop, whose three
 // hash functions are arithmetic over a stack buffer.
+//
+// worthATeam is the caller saying whether one item is expensive enough to be worth handing
+// to another thread, because count alone cannot tell: 512 items are 512 items whether each
+// one is a DCT or a handful of comparisons. Starting and joining the crew costs about the
+// same either way, and for the cheap hashes that is several times the work itself - see the
+// measurements at the call site in dupesHashStep().
 template <class F>
-static void dupesParallelFor(const int count, F body) {
+static void dupesParallelFor(const int count, F body, const bool worthATeam = true) {
     if (count < 1)
        return;
 
-    int team = dupesSweepThreads();
+    int team = worthATeam ? dupesSweepThreads() : 1;
     if (team > count)
        team = count;
 
@@ -2314,11 +2320,33 @@ static sqlite3      *dupesHashDB = NULL;     // AHK's handle - never the engine'
 static sqlite3_stmt *dupesHashSel = NULL;
 static sqlite3_stmt *dupesHashUpd = NULL;
 static int   dupesHashKind = 0, dupesHashPix = 0, dupesHashGray = 1, dupesHashMode = 1;
-static INT64 dupesHashWritten = 0, dupesHashFailed = 0, dupesHashSeen = 0;
+static INT64 dupesHashWritten = 0, dupesHashFailed = 0;
 // images whose stored fingerprint is not the length this hash needs. They are not write
 // failures - the write succeeds, it just has nothing to write - so they are counted apart
 // from dupesHashFailed, which AHK reports as "failed to commit to database".
 static INT64 dupesHashSkipped = 0;
+
+// The keyset cursor: the highest imgidu this run has read, bound as ?2 of the SELECT.
+// See the contract above dupesHashBegin() for what it is for and what happens without it.
+static INT64 dupesHashCursor = 0;
+// Consecutive batches that moved nothing at all; the backstop in dupesHashStillMoving().
+static int   dupesHashStall = 0;
+#define QPV_HASH_STALL_BATCHES 3
+
+// discretizeValue() over every byte a fingerprint can hold, built once per run. The
+// fingerprint is bytes and the function is a pure map, so 256 entries cover it exactly -
+// and at 1024 bytes per pHash image that is 524 288 divisions, floors and multiplications
+// per batch replaced by 524 288 loads. Decoding one batch of 512 went from 1.76 ms to
+// 0.40 ms at compressor 2 and from 0.73 ms to 0.39 ms at compressor 1, where the table is
+// the identity and the win is simply that the level is no longer a runtime branch inside
+// the loop. What it looks like from outside is that the compressor no longer changes what
+// a run costs at all - which is what tests/hash_bench.cpp measures, at 1 and at 9.
+static int   dupesHashLUT[256];
+
+// The decoded fingerprints of one batch, kept between calls. It is 2 MB for pHash, and a
+// fresh vector per batch means that much mapped, faulted in and handed back on every one of
+// the hundreds of batches a library takes. dupesHashEnd() gives it back.
+static std::vector<int> dupesHashPixBuf;
 
 // discretizeValue(v, level) -> Round(v/level)*level, and AHK's Round() is half away from
 // zero. Note this is the PRODUCT, not the quotient the MSD path stores: dHash and lHash
@@ -2405,17 +2433,41 @@ static void dupesHexHash(UINT64 v, wchar_t *out, int cap) {
     out[i] = 0;
 }
 
-// selectSQL must end in "LIMIT ?1" - the batch size is bound, and rows leave the result
-// set as they are updated, so re-running it is what advances the cursor.
-// updateSQL takes the hash as ?1 and the imgidu as ?2.
+// selectSQL should end in "AND <table>.imgidu>?2 ORDER BY <table>.imgidu LIMIT ?1", the
+// same keyset cursor dpTopUpQueue() walks: ?1 is the batch size and ?2 the highest imgidu
+// already read. updateSQL takes the hash as ?1 and the imgidu as ?2.
 // hashKind: 2 dHash, 3 pHash, 4 lHash. pixCount: 72 for dHash/lHash, 1024 for pHash.
+//
+// The bare "LIMIT ?1" this used to require still works - binding ?2 of a statement that
+// has no ?2 is a no-op - and generateSQLimageFingerPrintHash() falls back to it when the
+// qpvmain.dll beside it predates dupesHashHasKeyset(). It is correct, because a row here
+// really is written before the next batch reads and so leaves the result set on its own.
+// What it is not is cheap. Nothing indexes "dHash IS NULL", so every batch restarts the
+// scan at the first row of the library and walks past everything already hashed, and the
+// cost of finding the next 512 rows grows with the number already done. Over 200 000
+// images its batches go from 2.2 ms to 21 ms and the run takes 4.9 s; the keyset form
+// starts where the last batch stopped, never leaves the 0.1 to 4 ms band, and takes 0.8 s
+// [tests/hash_bench.cpp, which also says what happens when the query loses its planner
+// hint and the ORDER BY has to be satisfied by sorting instead: 36 s].
+//
+// It also bounds the run. A row that fails to be written is behind the cursor and is not
+// offered again, where a bare LIMIT hands it back on every batch, for ever, because its
+// hash is still NULL. dupesHashStillMoving() is the backstop for the fallback form.
 DLL_API int DLL_CALLCONV dupesHashBegin(void *ahkDb, const wchar_t *selectSQL, const wchar_t *updateSQL, int hashKind, int pixCount, int grayCompressor, int pHashMode) {
     bindSQLiteOnce();
     dupesEngineError.clear();
     if (!SQ.ok || ahkDb==NULL || selectSQL==NULL || updateSQL==NULL)
        return 0;
 
-    if ((hashKind==3 && pixCount!=1024) || ((hashKind==2 || hashKind==4) && pixCount!=72))
+    // 2, 3 and 4 are the three hashes and there is no fourth. userFriendly[1] is "NONE",
+    // which reaches here when the caller asks to hash by a column rather than by a hash;
+    // the query it builds cannot prepare, so it never got as far as the step loop - but
+    // the loop's dispatch reads anything that is not dHash or lHash as pHash, and a pHash
+    // over a buffer sized for a dHash walks 952 ints off the end of it.
+    if (hashKind!=2 && hashKind!=3 && hashKind!=4)
+       return 0;
+
+    if (pixCount!=((hashKind==3) ? 1024 : 72))
        return 0;
 
     if (dupesHashSel!=NULL) { SQ.finalize(dupesHashSel); dupesHashSel = NULL; }
@@ -2426,7 +2478,11 @@ DLL_API int DLL_CALLCONV dupesHashBegin(void *ahkDb, const wchar_t *selectSQL, c
     dupesHashPix = pixCount;
     dupesHashGray = (grayCompressor > 1) ? grayCompressor : 1;
     dupesHashMode = pHashMode;
-    dupesHashWritten = dupesHashFailed = dupesHashSeen = dupesHashSkipped = 0;
+    dupesHashWritten = dupesHashFailed = dupesHashSkipped = 0;
+    dupesHashCursor = 0;
+    dupesHashStall = 0;
+    for ( int v = 0 ; v < 256 ; v++)
+        dupesHashLUT[v] = dupesDiscretize(v, dupesHashGray);
 
     if (SQ.prepare16_v2(dupesHashDB, selectSQL, -1, &dupesHashSel, NULL)!=SQLITE_OK || dupesHashSel==NULL)
     {
@@ -2447,6 +2503,29 @@ DLL_API int DLL_CALLCONV dupesHashBegin(void *ahkDb, const wchar_t *selectSQL, c
     return 1;
 }
 
+// Whether the batch that just ran moved the run forward at all: the keyset cursor, a row
+// written, or a row marked unhashable. Any one of those takes rows out of the result set
+// the next batch reads, and the run ends because it eventually empties.
+//
+// With the keyset cursor this can only answer no on a batch that read nothing, and the
+// caller has already dealt with that. It is here for the bare-LIMIT fallback, where the
+// same rows come back until something writes them: a database that refuses every write -
+// out of space, read-only, locked by another connection - would otherwise leave the loop
+// re-reading, re-hashing and re-failing the same 512 rows until the user pressed cancel.
+static int dupesHashStillMoving(INT64 cursorWas, INT64 wroteWas, INT64 skippedWas) {
+    if (dupesHashCursor > cursorWas || dupesHashWritten > wroteWas || dupesHashSkipped > skippedWas)
+    {
+       dupesHashStall = 0;
+       return 1;
+    }
+
+    if (++dupesHashStall < QPV_HASH_STALL_BATCHES)
+       return 1;
+
+    dupesSetError(L"the hash generation stopped making progress - the database is refusing every write");
+    return -1;
+}
+
 // Reads up to `batch` rows, hashes them across cores, writes them back, and returns 1
 // while there is more to do. AHK keeps the surrounding transaction and its periodic
 // COMMIT, so an interrupted run keeps the work it finished - which is what the "you can
@@ -2458,16 +2537,24 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     if (batch < 1)
        batch = 256;
 
+    const INT64 cursorWas = dupesHashCursor, wroteWas = dupesHashWritten, skippedWas = dupesHashSkipped;
     std::vector<INT64> ids;
     std::vector<INT64> badIds;    // written back after the SELECT is reset, never during
-    std::vector<int> pix;
     ids.reserve(batch);
-    pix.reserve((size_t)batch * dupesHashPix);
+    // sized once and kept: resizing a vector that is already this big does nothing at all,
+    // so only the first batch of a run pays for the 2 MB pHash needs
+    dupesHashPixBuf.resize((size_t)batch * dupesHashPix);
+    int *pix = dupesHashPixBuf.data();
     bool sawRow = false;
 
     SQ.reset(dupesHashSel);
     if (SQ.bind_int64!=NULL)
+    {
        SQ.bind_int64(dupesHashSel, 1, batch);
+       // ?2 is the keyset cursor. A selectSQL that has no ?2 - the older bare-LIMIT form -
+       // makes this a no-op that answers SQLITE_RANGE, which is why one build serves both.
+       SQ.bind_int64(dupesHashSel, 2, dupesHashCursor);
+    }
 
     for (;;)
     {
@@ -2476,8 +2563,14 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
         {
            const unsigned char *s = (const unsigned char*)SQ.column_blob(dupesHashSel, 1);
            const int n = (s!=NULL) ? SQ.column_bytes(dupesHashSel, 1) : 0;
-           dupesHashSeen++;
+           const INT64 id = (INT64)SQ.column_int64(dupesHashSel, 0);
            sawRow = true;
+           // every row read moves the cursor, hashable or not - a fingerprint that cannot
+           // be hashed is still done with, and leaving it in front of the cursor would
+           // hand it back on the next batch
+           if (id > dupesHashCursor)
+              dupesHashCursor = id;
+
            // a fingerprint of the wrong length was skipped by the AHK too: it tested
            // arrayChars.Count()=72 before hashing. The row is only remembered here and
            // written below: stepping an UPDATE against "images" while this SELECT is
@@ -2485,13 +2578,15 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
            // very reason the good rows are held back to the end of the batch as well.
            if (n!=dupesHashPix)
            {
-              badIds.push_back((INT64)SQ.column_int64(dupesHashSel, 0));
+              badIds.push_back(id);
               continue;
            }
 
-           ids.push_back((INT64)SQ.column_int64(dupesHashSel, 0));
+           int *d = pix + ids.size() * (size_t)dupesHashPix;
            for ( int i = 0 ; i < n ; i++)
-               pix.push_back(dupesDiscretize((int)s[i], dupesHashGray));
+               d[i] = dupesHashLUT[s[i]];
+
+           ids.push_back(id);
            if ((int)ids.size() >= batch)
               break;
 
@@ -2537,20 +2632,27 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     // here ended the whole run and reported it as finished, leaving every image after
     // those rows unhashed. They have just been marked, so the next call moves past them.
     if (ids.empty())
-       return sawRow ? 1 : 0;
+       return sawRow ? dupesHashStillMoving(cursorWas, wroteWas, skippedWas) : 0;
 
     const int count = (int)ids.size();
     std::vector<UINT64> out((size_t)count, 0);
     const int kind = dupesHashKind, stride = dupesHashPix, mode = dupesHashMode;
-    const int *pixData = pix.data();
+    const int *pixData = pix;
     UINT64 *outData = out.data();
 
+    // Only pHash is worth a crew. It is 65 536 multiply-adds per image through
+    // calculateDCT(), 19.5 ms for a batch of 512 on one core, and a whole 200 000 image
+    // run goes from 8.0 s to 2.7 s when the crew is let loose on it. dHash and lHash are a
+    // few dozen comparisons over 72 numbers - the same batch is 0.03 ms and 0.06 ms -
+    // while starting and joining the crew costs 0.15 ms whatever it is asked to do, so
+    // threading those made them three to six times SLOWER [tests/hash_bench.cpp].
+    const bool worthATeam = (kind==3);
     dupesParallelFor(count, [pixData, outData, kind, stride, mode](int i) {
         const int *p = pixData + (size_t)i * stride;
         if (kind==2)      outData[i] = dupesDHash(p);
         else if (kind==4) outData[i] = dupesLHash(p);
         else              outData[i] = dupesPHash(p, mode);
-    });
+    }, worthATeam);
 
     for ( int i = 0 ; i < count ; i++)
     {
@@ -2571,7 +2673,7 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     }
 
     SQ.reset(dupesHashUpd);
-    return 1;
+    return dupesHashStillMoving(cursorWas, wroteWas, skippedWas);
 }
 
 DLL_API INT64 DLL_CALLCONV dupesHashWrittenCount() { return dupesHashWritten; }
@@ -2579,6 +2681,16 @@ DLL_API INT64 DLL_CALLCONV dupesHashFailedCount()  { return dupesHashFailed; }
 // images passed over because their stored fingerprint is not the length this hash needs;
 // separate from dupesHashFailedCount(), which really does mean the write failed
 DLL_API INT64 DLL_CALLCONV dupesHashSkippedCount() { return dupesHashSkipped; }
+
+// Whether this build binds ?2 of the hash SELECT as a keyset cursor over imgidu.
+//
+// generateSQLimageFingerPrintHash() asks before it builds the query, because the two forms
+// are not interchangeable in the dangerous direction: a qpvmain.dll that never binds ?2
+// leaves it NULL, "imgidu>NULL" is true of no row at all, and such a run would hash nothing
+// while reporting that it had finished. An older DLL has no such export, DllCall() answers
+// blank, and the AHK sends the plain "LIMIT ?1" form it always sent - slower on a large
+// library, and correct.
+DLL_API int DLL_CALLCONV dupesHashHasKeyset() { return 1; }
 
 DLL_API int DLL_CALLCONV dupesHashEnd() {
     if (SQ.ok)
@@ -2588,6 +2700,9 @@ DLL_API int DLL_CALLCONV dupesHashEnd() {
     }
 
     dupesHashDB = NULL;
+    // swap(), not clear(): clear() keeps the capacity, and holding 2 MB of decoded
+    // fingerprints for the rest of the session is what this buffer exists to avoid
+    std::vector<int>().swap(dupesHashPixBuf);
     return 1;
 }
 // qpv-dupes-query-end - sliced by tests/run-tests.sh; leave the marker in place.

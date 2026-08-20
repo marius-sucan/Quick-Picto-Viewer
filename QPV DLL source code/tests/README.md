@@ -23,7 +23,7 @@ the records in `qpv-main.h`, which is why the anchors are worded the way they ar
 
 ```sh
 ./run-tests.sh            # correctness
-./run-tests.sh --bench    # correctness, then the MSD and duplicate-sweep benchmarks
+./run-tests.sh --bench    # correctness, then the MSD, sweep and hash benchmarks
 ```
 
 Needs `g++`. `python3` and `libsqlite3.so.0` unlock four more suites; without them those are
@@ -305,8 +305,28 @@ and the shipped engine runs against the genuine article — nothing about it is 
 the loader underneath. Covers the grouping equivalence again (this time through the actual
 C++), the row/path/fingerprint/hash round trip through the `imagesPixels` join, the
 keep-mask recut, cancellation, and the hash-generation loop end to end: the values land on
-the right rows and the batch loop terminates, which it only does because updated rows drop
-out of its own `SELECT`.
+the right rows and the batch loop terminates.
+
+Every hash case runs **twice**, once per query shape, because one `qpvmain.dll` has to serve
+both. `generateSQLimageFingerPrintHash()` sends a keyset cursor — `AND images.imgidu>?2
+ORDER BY images.imgidu LIMIT ?1` — when the DLL beside it exports `dupesHashHasKeyset()`,
+and the plain `LIMIT ?1` when it does not; binding `?2` of a statement that has no `?2` is a
+no-op, which is what makes one build work with both. The pairing that would break silently
+is the other one: a DLL that never binds `?2` leaves it NULL, `imgidu>NULL` is true of no
+row, and the run would hash nothing while reporting success.
+
+The load-bearing case is **a database that refuses every write** (a `BEFORE UPDATE` trigger
+that `RAISE(ABORT)`s). The loop ends because rows stop matching the `SELECT`, and only a
+successful write makes that happen, so this is the one shape where something else has to
+bound the run — and it is the only place the cursor is *observable*: on a healthy run a
+cursor that advances and one that stands still produce identical output at very different
+cost. With the cursor, every row is offered exactly once and the run reports every one of
+them as a failed write; with the plain `LIMIT` the same rows come back until the stall
+backstop in `dupesHashStillMoving()` answers -1, which is what stops the loop re-reading,
+re-hashing and re-failing the same 512 rows in front of a user who can only press cancel.
+Four mutants guard all of it: answering "nothing left to do" for an entirely unhashable
+batch, marking those rows `"0"` instead of empty, a cursor that never advances, and a
+backstop that never fires.
 
 `wchar_t` is 4 bytes here and 2 on Windows, while sqlite3's `*16` entry points always speak
 2-byte UTF-16 — on Windows those coincide, which is exactly why the engine can read
@@ -326,6 +346,27 @@ count, which is the fallback the Find Duplicates panel drops to), and a long tai
 Built with `-mpopcnt` on purpose — the shipped DLL uses the POPCNT instruction whenever
 CPUID reports it, and without the flag gcc expands `__builtin_popcountll()` into a libgcc
 call no shipped build ever executes. The correctness tests stay on the plain SSE2 baseline.
+
+**`hash_bench.cpp`** — the shipped `dupesHashBegin`/`Step`/`End`, driven the way
+`generateSQLimageFingerPrintHash()` drives it, over a synthetic 200 000 image database with
+the real schema and the real indexes. It exists because three comments now quote numbers,
+and a number in a comment that nobody can reproduce is a number that drifts:
+
+- **the cursor.** Nothing indexes `dHash IS NULL`, so the plain `LIMIT` restarts the scan at
+  the first image of the library on every batch and walks past everything already hashed.
+  Its batches grow with the run — 2.2 ms to 21 ms — where the cursor's stay in a 0.1 to 4 ms
+  band; 4.9 s against 0.8 s for the whole run. The third row is the same keyset query with
+  the unary plus removed from `isDeleted`: 36 s, because the planner then drives it off
+  `imgsAliveIndex` and sorts the result to satisfy the `ORDER BY`. That is what the plus is
+  for, and why it must survive anyone tidying the SQL.
+- **the crew.** `dupesSweepSetThreads()` pins the width from outside, so the same pHash run
+  is measured on one worker and on all of them: 8.0 s against 2.7 s. Beside it, what one
+  image costs each hash — 0.06 µs for dHash, 0.12 µs for lHash, 38 µs for pHash — against
+  0.15 ms to start and join a crew at all, which is the whole of the argument behind
+  `dupesParallelFor()`'s `worthATeam`.
+- **the fingerprint decode**, at `graylevelCompressor` 1 and 9. They cost the same now, which
+  is the visible half of `discretizeValue()` having become a 256 entry table built once per
+  run rather than a divide, a floor and a multiply per byte.
 
 ## Conventions
 

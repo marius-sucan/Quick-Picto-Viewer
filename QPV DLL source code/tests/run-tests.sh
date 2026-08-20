@@ -9,7 +9,7 @@
 # an order of magnitude, not as a prediction of the shipped DLL.
 #
 # Usage:  ./run-tests.sh            correctness only
-#         ./run-tests.sh --bench    also run the MSD benchmark
+#         ./run-tests.sh --bench    also run the MSD, sweep and hash benchmarks
 #
 # written by Marius Șucan with Claude Opus 5
 
@@ -350,21 +350,32 @@ else
     fi
 
     echo
-    echo "== mutation check: the unhashable-fingerprint cases must reject both old bugs =="
-    # Two regressions that a passing suite would otherwise say nothing about, because both
-    # only show up on a database that holds a fingerprint of the wrong length:
+    echo "== mutation check: the hash loop must reject four regressions =="
+    # Four things a passing suite would otherwise say nothing about. The first two only
+    # show up on a database holding a fingerprint of the wrong length, and the last two
+    # only on one that refuses the writes:
     #   A - answering "nothing left to do" for a batch that was entirely unhashable, which
     #       ended the whole run and reported it as finished;
     #   B - marking those rows with the string "0" instead of an empty hash. "0" is a real
     #       hash value, so it lands them all in one phantom duplicate group.
+    #   C - a keyset cursor that never advances. Invisible on a healthy run - the rows
+    #       leave the result set as they are written either way - and the whole point of
+    #       the cursor, which is that each row is offered exactly once whatever happens
+    #       to it.
+    #   D - the stall backstop never firing, which is the plain-LIMIT fallback re-reading
+    #       the same batch for ever in front of a user who can only press cancel.
     cp query_extract.cpp query_extract.orig
-    for mutant in A B; do
+    for mutant in A B C D; do
         cp query_extract.orig query_extract.cpp
         case $mutant in
-          A) sed -i 's|return sawRow ? 1 : 0;|return 0;|' query_extract.cpp
+          A) sed -i 's|return sawRow ? dupesHashStillMoving(cursorWas, wroteWas, skippedWas) : 0;|return 0;|' query_extract.cpp
              label="a batch of only unhashable rows ends the run" ;;
           B) sed -i 's|SQ.bind_text16(dupesHashUpd, 1, L"", 0, QPV_SQLITE_STATIC);|SQ.bind_text16(dupesHashUpd, 1, L"0", 2, QPV_SQLITE_STATIC);|' query_extract.cpp
              label="the marker is the string \"0\"" ;;
+          C) sed -i 's|if (id > dupesHashCursor)|if (0)|' query_extract.cpp
+             label="the keyset cursor never advances" ;;
+          D) sed -i 's|if (++dupesHashStall < QPV_HASH_STALL_BATCHES)|if (1)|' query_extract.cpp
+             label="a loop that moves nothing is never stopped" ;;
         esac
 
         if cmp -s query_extract.cpp query_extract.orig; then
@@ -443,6 +454,19 @@ if [ "${1:-}" = "--bench" ]; then
     # no shipped build ever executes. The correctness tests above stay on the plain SSE2
     # baseline, which is what the DLL is compiled against.
     g++ $CXXFLAGS -mpopcnt -pthread -o sweep_bench sweep_bench.cpp 2>&1 && ./sweep_bench
+
+    echo
+    echo "== hash generation benchmark, at library scale =="
+    # The measurements the comments around dupesHashStep() and
+    # generateSQLimageFingerPrintHash() quote: the keyset cursor against the plain LIMIT
+    # and against a keyset with no planner hint, whether each hash is worth a crew, and
+    # what the fingerprint decode costs at either end of the compressor range. It builds a
+    # 200 000 row database first, so give it a minute.
+    if ! ls /usr/lib/*/libsqlite3.so.0 >/dev/null 2>&1 && ! ls /usr/lib/libsqlite3.so.0 >/dev/null 2>&1; then
+        echo "  SKIPPED: libsqlite3.so.0 not available"
+    else
+        g++ $CXXFLAGS -Wno-sign-compare -Ishim -mpopcnt -pthread -o hash_bench hash_bench.cpp -ldl 2>&1 && ./hash_bench
+    fi
 fi
 
 echo

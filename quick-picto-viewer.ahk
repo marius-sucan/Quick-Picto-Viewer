@@ -36603,12 +36603,13 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
       Return 0
    }
 
-   ; ?2 is a keyset cursor over imgidu and ?1 the refill size. It cannot be a bare LIMIT
-   ; the way the hash loop's is: an image here is handed to a worker and only written some
+   ; ?2 is a keyset cursor over imgidu and ?1 the refill size - the same shape
+   ; generateSQLimageFingerPrintHash() sends the hash loop, though here it is a matter of
+   ; correctness rather than of cost: an image is handed to a worker and only written some
    ; milliseconds later, so it still matches this WHERE while it is being decoded and a
-   ; second refill would hand it out all over again. A partial run still resumes exactly
-   ; where it stopped - the cursor restarts at zero and the rows already written no longer
-   ; match at all.
+   ; bare LIMIT would hand it out all over again on the next refill. A partial run still
+   ; resumes exactly where it stopped - the cursor restarts at zero and the rows already
+   ; written no longer match at all.
    ; images are decoded by dpDecodeFile() found in dupes-pixels.h and it relies on thumbs-pool.h
 
    Static thumbSize := 350
@@ -36872,9 +36873,36 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    ; the fingerprints are BLOBs in imagesPixels since schema v3; "p" is the join alias
    pixCol := SQLpixelsColumn((o_whichHashu=3) ? sH "pixelzFbig" : sH "pixelzFsmall")
    pixCount := (o_whichHashu=3) ? 1024 : 72
-   pixWhere := " WHERE images.isDeleted=0 AND p." pixCol " IS NOT NULL AND " whichHashu " IS NULL" containsT
-   selectSQL := "SELECT images.imgidu, p." pixCol " FROM images" SQLpixelsJoinClause() pixWhere " LIMIT ?1;"
+
+   ; The unary plus in front of isDeleted is deliberate and has to stay. It tells SQLite
+   ; that this one term may not be answered from an index, and without it the planner
+   ; drives the whole query off imgsAliveIndex(isDeleted) - a term true of very nearly
+   ; every row - and then sorts what comes out of it to satisfy the ORDER BY below.
+   ; Disqualified, the only index left to drive it is the one over imgidu that the primary
+   ; key always creates, which is the one the cursor wants and costs no sort at all. Over
+   ; 200 000 images: 0.8 s with the plus, 36 s without it. It is also what the row count
+   ; just below is measured with, and that is faster for it too.
+   pixWhere := " WHERE +images.isDeleted=0 AND p." pixCol " IS NOT NULL AND " whichHashu " IS NULL" containsT
+
+   ; ?2 is a keyset cursor over imgidu and ?1 the batch size - the same shape
+   ; collectImgDataViaPool() hands the collection pool. The plain "LIMIT ?1" this used to
+   ; send is correct: a row IS written before the next batch reads and so leaves the result
+   ; set on its own. What it is not is cheap. Nothing indexes "dHash IS NULL", so every
+   ; batch restarted the scan at the first image of the library and walked past everything
+   ; already hashed, and the cost of finding the next 512 rows grew with the number already
+   ; done - over 200 000 images the batches went from 2.2 ms to 21 ms and the run took
+   ; 4.9 s, against 0.8 s and a flat 0.1 to 4 ms for the cursor.
+   ; A qpvmain.dll older than this never binds ?2, and an unbound ?2 is NULL, which
+   ; "imgidu>NULL" matches for no row whatsoever - such a run would hash nothing at all and
+   ; report that it had finished. So ask first; DllCall() answers blank when the export is
+   ; missing, and blank is not 1.
+   hasKeysetCursor := (DllCall("qpvmain.dll\dupesHashHasKeyset", "int")=1) ? 1 : 0
+   keysetSQL := (hasKeysetCursor=1) ? " AND images.imgidu>?2 ORDER BY images.imgidu" : ""
+   selectSQL := "SELECT images.imgidu, p." pixCol " FROM images" SQLpixelsJoinClause() pixWhere keysetSQL " LIMIT ?1;"
    updateSQL := "UPDATE images SET " whichHashu "=?1 WHERE imgidu=?2;"
+   If (qpvMainDll && hasKeysetCursor!=1)
+      addJournalEntry(A_ThisFunc "(): the qpvmain.dll in use predates the keyset cursor of the hash loop - replace or rebuild it. Every batch re-walks the images already hashed, which costs a large library minutes it does not need to spend.")
+
    ; getTotalIMGsSQLdb() supplies "SELECT COUNT(*) FROM images " and the trailing ";"
    filesToBeSorted := getTotalIMGsSQLdb(SQLpixelsJoinClause() pixWhere)
    If (filesToBeSorted<1)

@@ -11,7 +11,7 @@ pixels_mutant.h
 *.part
 # built by make_test_db.py
 testdb.sldb
-testdb.sldb.hash
+testdb.sldb.*
 pixels_scratch.sldb
 pixels_poison.sldb
 pixels_tight.sldb
@@ -37,3 +37,6 @@ gdip_loader
 gdip_mutant
 pdf_document
 pdf_mutant
+hash_bench
+# built by hash_bench.cpp, which makes its own library-sized database
+hash_bench.sldb

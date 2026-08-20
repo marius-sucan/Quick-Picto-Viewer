@@ -456,6 +456,17 @@ static void rejectsBadInput() {
     const std::wstring nonsense = L"SELECT nope FROM nothing";
     check(dupesQueryBegin(nonsense.c_str(), 1, 0, 0, 0, 0, 0, 1)==0, "an unpreparable statement is rejected");
     check(dupesQueryStep(10)==-1, "... and stepping it reports an error");
+
+    // 2, 3 and 4 are the hashes. The step loop reads anything that is not dHash or lHash
+    // as pHash, so a kind of 1 - userFriendly[1], "NONE", which the panel really can ask
+    // for - would run a 1024 value DCT over a buffer sized for 72, and a fingerprint
+    // length that does not belong to the kind is the same mistake from the other side.
+    const std::wstring anySel = L"SELECT imgidu, 1 FROM images LIMIT ?1";
+    const std::wstring anyUpd = L"UPDATE images SET lHash=?1 WHERE imgidu=?2";
+    check(dupesHashBegin(refDB, anySel.c_str(), anyUpd.c_str(), 1, 72, 1, 1)==0,
+          "a hash kind that is not one of the three is refused");
+    check(dupesHashBegin(refDB, anySel.c_str(), anyUpd.c_str(), 4, 1024, 1, 1)==0,
+          "and so is a fingerprint length that does not belong to the kind");
 }
 
 // ---- hash generation, end to end -----------------------------------------------------
@@ -463,9 +474,25 @@ static void rejectsBadInput() {
 // dupesHashStep() reads fingerprints, hashes them and writes the hex back through a
 // prepared statement, all on one connection. Two things have to hold that no amount of
 // arithmetic testing can show: the values land on the right rows, and the loop terminates
-// - it re-runs the same SELECT every batch and relies on the rows dropping out of it as
-// they are updated, so a write that did not take would spin forever.
-static void hashGenerationWritesBack(const char *dbPath) {
+// - a batch that moved nothing would otherwise re-read the same rows for ever.
+//
+// Every case below runs twice, because one qpvmain.dll has to serve two query shapes.
+// generateSQLimageFingerPrintHash() sends the keyset cursor when the DLL beside it exports
+// dupesHashHasKeyset(), and the plain "LIMIT ?1" when it does not; a build that only
+// worked with the form it ships with would break the other pairing silently, and hashing
+// nothing at all while reporting success is not a failure anybody would notice.
+static std::wstring hashSelectSQL(const char *pixCol, const char *hashCol, bool keyset) {
+    std::string s = std::string("SELECT images.imgidu, p.") + pixCol
+                  + " FROM images LEFT JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
+                  + " WHERE +images.isDeleted=0 AND p." + pixCol + " IS NOT NULL"
+                  + " AND " + hashCol + " IS NULL";
+    if (keyset)
+       s += " AND images.imgidu>?2 ORDER BY images.imgidu";
+
+    return widen(s + " LIMIT ?1");
+}
+
+static void hashGenerationWritesBack(const char *dbPath, bool keyset) {
     // a scratch copy, so the shared test database keeps its NULL hashes for other runs
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "cp -f '%s' '%s.hash' 2>/dev/null", dbPath, dbPath);
@@ -494,10 +521,7 @@ static void hashGenerationWritesBack(const char *dbPath) {
     SQ.finalize(st);
     check(want > 100, "the scratch database has fingerprints waiting to be hashed");
 
-    const std::wstring sel = widen("SELECT images.imgidu, p.small FROM images"
-                                   " LEFT JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
-                                   " WHERE images.isDeleted=0 AND p.small IS NOT NULL"
-                                   " AND lHash IS NULL LIMIT ?1");
+    const std::wstring sel = hashSelectSQL("small", "lHash", keyset);
     const std::wstring upd = widen("UPDATE images SET lHash=?1 WHERE imgidu=?2");
     check(dupesHashBegin(db, sel.c_str(), upd.c_str(), /*lHash*/ 4, 72, /*gray*/ 1, 1)==1,
           "dupesHashBegin prepares both statements");
@@ -582,7 +606,7 @@ static void qeExec(sqlite3 *db, const char *sql) {
     SQ.finalize(st);
 }
 
-static void hashGenerationSkipsShortFingerprints(const char *dbPath) {
+static void hashGenerationSkipsShortFingerprints(const char *dbPath, bool keyset) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "cp -f '%s' '%s.short' 2>/dev/null", dbPath, dbPath);
     if (system(cmd)!=0) { printf("    could not copy the test database\n"); failures++; return; }
@@ -596,8 +620,10 @@ static void hashGenerationSkipsShortFingerprints(const char *dbPath) {
     }
 
     // Truncate the fingerprints of the 80 lowest identities by one byte. The batch below
-    // is 64, and the SELECT has no ORDER BY - it scans - so the first batch lands wholly
-    // inside the damaged run, which is exactly the case that used to end the whole loop.
+    // is 64, so the first batch lands wholly inside the damaged run - which is exactly the
+    // case that used to end the whole loop. The keyset form reads in imgidu order and hits
+    // it by construction; the plain LIMIT scans, and lands there because those rows are
+    // physically first as well.
     qeExec(db, "UPDATE images SET lHash=NULL");
     qeExec(db, "UPDATE imagesPixels SET small=substr(small, 1, 71) WHERE imgidu IN"
                " (SELECT imgidu FROM images WHERE isDeleted=0 ORDER BY imgidu LIMIT 80)");
@@ -609,10 +635,7 @@ static void hashGenerationSkipsShortFingerprints(const char *dbPath) {
     check(shortRows >= 64, "the scratch database has more short fingerprints than one batch holds");
     check(goodRows > 100,  "and good ones behind them");
 
-    const std::wstring sel = widen("SELECT images.imgidu, p.small FROM images"
-                                   " LEFT JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
-                                   " WHERE images.isDeleted=0 AND p.small IS NOT NULL"
-                                   " AND lHash IS NULL LIMIT ?1");
+    const std::wstring sel = hashSelectSQL("small", "lHash", keyset);
     const std::wstring upd = widen("UPDATE images SET lHash=?1 WHERE imgidu=?2");
     check(dupesHashBegin(db, sel.c_str(), upd.c_str(), 4, 72, 1, 1)==1,
           "dupesHashBegin prepares both statements");
@@ -639,6 +662,82 @@ static void hashGenerationSkipsShortFingerprints(const char *dbPath) {
                        " (SELECT imgidu FROM imagesPixels WHERE length(small)!=72)")==0,
           "so the candidate query's ifnull() guard drops them");
 
+    SQ.close_v2(db);
+    snprintf(cmd, sizeof(cmd), "rm -f '%s'", scratch.c_str());
+    if (system(cmd)) {}
+}
+
+// ---- a database that refuses every write ----------------------------------------------
+//
+// The loop ends because rows stop matching the SELECT, and only a successful write makes
+// that happen. A database that refuses the UPDATEs - out of space, opened read-only, a
+// lock held by another connection - is therefore the one shape where the run has to be
+// bounded by something else, and it is not a shape anybody reaches by hand.
+//
+// The keyset cursor is what bounds it: a row that could not be written is behind the
+// cursor and is never offered again, so the run walks to the end of the library, reports
+// every row as a failed write and stops. That is also the ONLY observable difference
+// between a cursor that advances and one that stands still - on a healthy run the two
+// produce identical output at very different cost - so this is the case that pins it.
+// The plain LIMIT has no cursor to bound it and is stopped by the backstop in
+// dupesHashStillMoving() instead, which answers -1 rather than re-reading for ever.
+//
+// A trigger stands in for the failure: RAISE(ABORT) makes every UPDATE against images
+// come back SQLITE_CONSTRAINT, and nothing else about the database changes.
+static void hashGenerationEndsWhenWritesFail(const char *dbPath, bool keyset) {
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "cp -f '%s' '%s.nowrite' 2>/dev/null", dbPath, dbPath);
+    if (system(cmd)!=0) { printf("    could not copy the test database\n"); failures++; return; }
+
+    std::string scratch = std::string(dbPath) + ".nowrite";
+    sqlite3 *db = NULL;
+    std::vector<char> u8(scratch.begin(), scratch.end());
+    u8.push_back(0);
+    if (SQ.open_v2(u8.data(), &db, SQLITE_OPEN_READWRITE, NULL)!=SQLITE_OK) {
+        printf("    could not open the scratch database read-write\n"); failures++; return;
+    }
+
+    qeExec(db, "UPDATE images SET lHash=NULL");
+    const long long want = qeScalar(db, "SELECT count(*) FROM images LEFT JOIN imagesPixels AS p"
+                                        " ON p.imgidu=images.imgidu WHERE images.isDeleted=0"
+                                        " AND p.small IS NOT NULL AND lHash IS NULL");
+    // more rows than the backstop can reach in the batches it allows, or "it stopped early"
+    // and "it walked the library" would be the same number
+    check(want > 4*64, "there is more waiting to be hashed than a stalled loop could reach");
+    qeExec(db, "CREATE TRIGGER qpvNoWrites BEFORE UPDATE ON images"
+               " BEGIN SELECT RAISE(ABORT, 'the database is refusing writes'); END");
+
+    const std::wstring sel = hashSelectSQL("small", "lHash", keyset);
+    const std::wstring upd = widen("UPDATE images SET lHash=?1 WHERE imgidu=?2");
+    check(dupesHashBegin(db, sel.c_str(), upd.c_str(), 4, 72, 1, 1)==1,
+          "dupesHashBegin prepares both statements");
+
+    // generous and still nothing like unbounded: offering every row once is 1200/64 = 19
+    // batches, and the backstop gives up after 3 that moved nothing
+    const int cap = 200;
+    int steps = 0, answer = 1;
+    while ((answer = dupesHashStep(64)) > 0)
+    {
+        steps++;
+        if (steps > cap)
+           break;
+    }
+
+    check(steps <= cap, "the run ends by itself rather than re-reading rows it cannot write");
+    check(dupesHashWrittenCount()==0, "and nothing was written, because nothing could be");
+    if (keyset)
+    {
+       check(answer==0, "the keyset run reaches the end of the library and says so");
+       check(dupesHashFailedCount()==want, "having offered every row exactly once, though none of them took");
+    } else
+    {
+       wchar_t err[512];
+       check(answer==-1, "the plain LIMIT is stopped by the backstop instead, as an error");
+       check(dupesEngineLastError(err, 511) > 0, "... with something for the journal to say");
+       check(dupesHashFailedCount() < want, "long before the library has been walked");
+    }
+
+    dupesHashEnd();
     SQ.close_v2(db);
     snprintf(cmd, sizeof(cmd), "rm -f '%s'", scratch.c_str());
     if (system(cmd)) {}
@@ -673,10 +772,19 @@ int main(int argc, char **argv) {
     printf("  cancellation and bad input\n");
     cancelStopsTheQuery();
     rejectsBadInput();
-    printf("  hash generation\n");
-    hashGenerationWritesBack(dbPath);
-    printf("  hash generation, unhashable fingerprints\n");
-    hashGenerationSkipsShortFingerprints(dbPath);
+    // both query shapes, every time: the keyset cursor the interpreter sends this build,
+    // and the plain LIMIT it falls back to for a qpvmain.dll without dupesHashHasKeyset()
+    for ( int pass = 0 ; pass < 2 ; pass++)
+    {
+        const bool keyset = (pass==0);
+        const char *shape = keyset ? "keyset cursor" : "plain LIMIT, as an older interpreter sends it";
+        printf("  hash generation - %s\n", shape);
+        hashGenerationWritesBack(dbPath, keyset);
+        printf("  hash generation, unhashable fingerprints - %s\n", shape);
+        hashGenerationSkipsShortFingerprints(dbPath, keyset);
+        printf("  hash generation, a database refusing every write - %s\n", shape);
+        hashGenerationEndsWhenWritesFail(dbPath, keyset);
+    }
 
     dupesEngineRelease();
     SQ.close_v2(refDB);
