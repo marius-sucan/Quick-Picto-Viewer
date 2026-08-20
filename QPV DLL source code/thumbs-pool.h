@@ -1597,6 +1597,7 @@ static void tpWorkerBody() {
     // function - and not as a setting the whole process shares.
 
     // a private WIC factory avoids any apartment question about the one initWICnow() made
+    // inside qpv-main.cpp
     IWICImagingFactory *fac = NULL;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fac));
     if (FAILED(hr))

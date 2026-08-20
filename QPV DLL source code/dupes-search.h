@@ -11,8 +11,7 @@
 //     DupesScanState, DupeCandRow, DupeResultRow - which came out of qpv-main.h with it;
 //   - the Hamming and mean-squared-difference sweep, per group (dupesSweepPairs) or over
 //     a whole library from one entry point (dupesScanBegin/Feed/SetGroups/Step/End). It
-//     runs across every core on std::thread - NOT OpenMP, for reasons the note above
-//     DupesSweepCtx spells out - and the unit of parallel work is a run of candidate ROWS,
+//     runs across every core on std::thread and the unit of parallel work is a run of candidate ROWS,
 //     which is the only unit that fills the machine for both shapes a real library comes
 //     in. dupesScanState.threads reports how wide it actually ran;
 //   - the threshold filter and the union-find grouping behind the similarity sliders
@@ -372,27 +371,7 @@ void setMainWindowTitle(std::string str, HWND pvHwnd) {
 // byte-identical to the per-group one, and it is why two identical scans of the same
 // library cannot come back with different groups. See [[qpv-2026-08-dupes-sweep]].
 
-// The threads are std::thread and NOT OpenMP, deliberately, even though the DLL is built
-// with /openmp and the rest of qpv-main.cpp uses it. Three reasons, and the first one is
-// not hypothetical:
-//
-//   - the OpenMP width is process-visible mutable state that anything in the process can
-//     move. tpWorkerBody() and dpWorkerBody() both called omp_set_num_threads(1) when they
-//     started, and both pools run BEFORE a duplicate scan - filterDupeResultsByHdist()
-//     starts the collection pool itself. The spec says that setting is per thread and gcc
-//     implements it that way, but vcomp140.dll is an OpenMP 2.0 runtime from before the ICV
-//     model was written down, so there was no guarantee the main thread kept its own width
-//     once a pool had run: the sweep would have been pinned to one thread on the very path
-//     that needs it most, with nothing anywhere saying so. Those two calls are gone now -
-//     nothing either pool reaches holds an OpenMP region - but the next library linked into
-//     this process can do the same thing, and opencv_world and CImg are both compiled
-//     against the runtime already.
-//   - whether a team is created at all then depends on /openmp surviving into the build,
-//     on OMP_NUM_THREADS, and on whatever else in the process has touched the runtime
-//     (opencv_world and CImg are both compiled against it). A sweep that silently runs on
-//     one core is indistinguishable from a slow machine.
-//   - the two worker pools of this DLL are std::thread already, so this is the mechanism
-//     the project has actually proven on the machines it ships to.
+// The threads are std::thread and NOT OpenMP, deliberately.
 //
 // dupesSweepSetThreads() below makes the width settable and dupesScanState.threads reports
 // what was really used, so "is it threading?" is a question the application can answer
@@ -2566,12 +2545,6 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     const int *pixData = pix.data();
     UINT64 *outData = out.data();
 
-    // Threaded the same way the sweep is, and for the same reason: this used to be an
-    // "#pragma omp parallel for", and whether that produced a team at all depended on
-    // /openmp surviving the build and on nothing else in the process having set the OpenMP
-    // width to 1 - which both worker pools of this DLL do when they start. pHash is two
-    // 32x32 DCTs per image, so on a library-sized run this is minutes of arithmetic, not
-    // a rounding error.
     dupesParallelFor(count, [pixData, outData, kind, stride, mode](int i) {
         const int *p = pixData + (size_t)i * stride;
         if (kind==2)      outData[i] = dupesDHash(p);

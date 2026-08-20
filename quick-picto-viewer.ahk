@@ -36110,7 +36110,7 @@ PanelCachesOverview() {
    Gui, Add, Text, x15 y15 w%lstWid%, An overview of the data collected on the indexed files.
    ; NoSortHdr: the row order carries meaning and groupDigits() writes a thin space into the
    ; numeric cells, so a header click would sort them as text and get it wrong.
-   hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Missing|%", "Database caches overview")
+   hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Remaining|%", "Database caches overview")
    Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Gathering database information`, please wait . . .
    Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNignoredEntriesActs vbtn1, &Ignored entries
    If hostPanel
@@ -86982,8 +86982,8 @@ filterDupeResultsByHdist(threshold) {
       more := DllCall("qpvmain.dll\dupesScanStep", "int", threshold + 1, "uint", hamDistLBorderCrop, "uint", hamDistRBorderCrop, "int", findInvertedDupes, "int", findFlippedDupes, "int", msBudget, "int")
       If (statePtr && A_TickCount - prevMSGdisplay>1000)
       {
-         doneWork := NumGet(statePtr + 0, 8, "Int64")
-         totalWork := NumGet(statePtr + 0, 16, "Int64")
+         doneWork := NumGet(statePtr + 0, 8, "Int64") // 100
+         totalWork := NumGet(statePtr + 0, 16, "Int64") // 100
          foundPairs := NumGet(statePtr + 0, 24, "Int64")
          If (totalWork>0)
          {
@@ -86993,8 +86993,8 @@ filterDupeResultsByHdist(threshold) {
             ; shown rather than kept for the journal because "why is this using one core"
             ; is otherwise unanswerable from outside the DLL.
             nThreads := NumGet(statePtr + 0, 52, "Int")
-            threadsTxt := (nThreads>0) ? " on " nThreads ((nThreads=1) ? " thread" : " threads") : ""
-            showTOOLtip("Calculating Hamming distance between the images" threadsTxt "`nImage groups: " groupDigits(totalGroups) ". Images: " groupDigits(totalRows) "`nSimilar pairs found: " groupDigits(foundPairs) " ( " pxk "% )" etaTime, 0, 0, doneWork/totalWork)
+            threadsTxt := (nThreads>1) ? "`nUsing " nThreads " execution threads" : ""
+            showTOOLtip("Calculating Hamming distance between the images" threadsTxt "`nImage groups: " groupDigits(totalGroups) ". Images: " groupDigits(totalRows) "`nSimilar pairs found: " groupDigits(foundPairs) etaTime, 0, 0, doneWork/totalWork)
          }
          prevMSGdisplay := A_TickCount
       }
@@ -89487,8 +89487,6 @@ BtnCollectDupesData() {
    GuiControlGet, userpHashMode
    GuiControlGet, hamDistInterpolation
    GuiControlGet, dupesApplyBlur
-   GuiControlGet, findDupesPrecision
-
    BtnCloseWindow()
    Global findFlippedDupes := 1
    scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
