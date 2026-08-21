@@ -29339,6 +29339,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
 
     Gdip_DisposeEffect(zEffect)
     PopulateIndexFilesStatsInfos("kill")
+    uiPopulateCachesOverview("kill")
     SetTimer, ResetImgLoadStatus, -150
     zeitOperation := A_TickCount - startOperation
     addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
@@ -29418,6 +29419,7 @@ collectFileInfosNow(queryString:=0) {
     ; k := resultedFilesList[3, 7]
     ; ToolTip, % k , , , 2
     PopulateIndexFilesStatsInfos("kill")
+    uiPopulateCachesOverview("kill")
     SetTimer, ResetImgLoadStatus, -150
     zeitOperation := A_TickCount - startOperation
     addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
@@ -36139,7 +36141,15 @@ BTNlistDeadEntries() {
    BtnIndexStatsToList(0, 0, "isDeleted", 0) 
 }
 
-uiPopulateCachesOverview() {
+uiPopulateCachesOverview(modus:=0) {
+    Static rowsDef := [], totalz := 0
+    If (modus="kill")
+    {
+       totalz := 0
+       rowsDef := []
+       Return
+    }
+
     If (AnyWindowOpen!=91)
        Return
 
@@ -36149,25 +36159,35 @@ uiPopulateCachesOverview() {
     ; One table for the whole overview: label | SQL tail | 1 = the query counts the rows that
     ; are still MISSING the data, so it has to be subtracted from the total | progress message
     ; | 1 = the "Missing" cell means something for this row.
-    rowsDef := []
-    rowsDef[1] := ["Ignored or deleted file entries", "WHERE isDeleted IS NOT 0", 0, "ignored files", 0]
-    rowsDef[2] := ["File details", "WHERE ifnull(fsize, '')='' ", 1, "file details", 1]
-    ; imgpixfmt, not imgmegapix, for the reason collectSQLFileInfosNow() gives: imgmegapix is
-    ; generated from imgwidth, so it can carry a value for an image whose properties are only
-    ; half collected. This figure has to describe the same population that "collect image
-    ; details" would go and scan, or the panel reports 100% for work that is still pending.
-    rowsDef[3] := ["Image details", "WHERE ifnull(imgwidth, '')='' AND ifnull(imgheight, '')='' ", 1, "image details", 1]
-    rowsDef[4] := ["Image histogram details", "WHERE ifnull(imgmedian, '')='' ", 1, "image histograms", 1]
-    rowsDef[5] := ["Pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
-    rowsDef[6] := ["Flipped pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"), 0, "pixel data (flipped)", 1]
-    rowsDef[7] := ["dHash (8x8)", "WHERE ifnull(dHash, '')='' ", 1, "image hashes", 1]
-    rowsDef[8] := ["pHash (32x32)", "WHERE ifnull(pHash, '')='' ", 1, "image hashes", 1]
-    rowsDef[9] := ["lHash (8x8)", "WHERE ifnull(lHash, '')='' ", 1, "image hashes", 1]
-    rowsDef[10] := ["dHash (8x8, flipped)", "WHERE ifnull(hdHash, '')='' ", 1, "image hashes (flipped)", 1]
-    rowsDef[11] := ["pHash (32x32, flipped)", "WHERE ifnull(hpHash, '')='' ", 1, "image hashes (flipped)", 1]
-    rowsDef[12] := ["lHash (8x8, flipped)", "WHERE ifnull(hlHash, '')='' ", 1, "image hashes (flipped)", 1]
-
-    setImageLoading()
+    If !totalz
+    {
+       setImageLoading()
+       rowsDef := []
+       rowsDef[1] := ["Ignored or deleted file entries", "WHERE isDeleted IS NOT 0", 0, "ignored files", 0]
+       rowsDef[2] := ["File details", "WHERE ifnull(fsize, '')='' ", 1, "file details", 1]
+       ; imgpixfmt, not imgmegapix, for the reason collectSQLFileInfosNow() gives: imgmegapix is
+       ; generated from imgwidth, so it can carry a value for an image whose properties are only
+       ; half collected. This figure has to describe the same population that "collect image
+       ; details" would go and scan, or the panel reports 100% for work that is still pending.
+       rowsDef[3] := ["Image details", "WHERE ifnull(imgwidth, '')='' AND ifnull(imgheight, '')='' ", 1, "image details", 1]
+       rowsDef[4] := ["Image histogram details", "WHERE ifnull(imgmedian, '')='' ", 1, "image histograms", 1]
+       rowsDef[5] := ["Pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
+       rowsDef[6] := ["Flipped pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("smallH"), 0, "pixel data (flipped)", 1]
+       rowsDef[7] := ["dHash (8x8)", "WHERE ifnull(dHash, '')='' ", 1, "image hashes", 1]
+       rowsDef[8] := ["pHash (32x32)", "WHERE ifnull(pHash, '')='' ", 1, "image hashes", 1]
+       rowsDef[9] := ["lHash (8x8)", "WHERE ifnull(lHash, '')='' ", 1, "image hashes", 1]
+       rowsDef[10] := ["dHash (8x8, flipped)", "WHERE ifnull(hdHash, '')='' ", 1, "image hashes (flipped)", 1]
+       rowsDef[11] := ["pHash (32x32, flipped)", "WHERE ifnull(hpHash, '')='' ", 1, "image hashes (flipped)", 1]
+       rowsDef[12] := ["lHash (8x8, flipped)", "WHERE ifnull(hlHash, '')='' ", 1, "image hashes (flipped)", 1]
+       totalz := getTotalIMGsSQLdb()
+       totalu := rowsDef.Count()
+       Loop, % totalu
+       {
+           showTOOLtip("Gathering database information: " rowsDef[A_Index, 4], 0, 0, A_Index/13)
+           rowsDef[A_Index, 5] := getTotalIMGsSQLdb(rowsDef[A_Index, 2])
+       }
+    }
+   
     GuiControl, SettingsGUIA:, infoLine, Gathering database information`, please wait . . .
     GuiControl, -Redraw, LViewCaches
     LV_Delete()
@@ -36175,12 +36195,10 @@ uiPopulateCachesOverview() {
     CurrentSLD := ""
     totalu := rowsDef.Count()
     showTOOLtip("Gathering database information: total number", 0, 0, 0.1/(totalu + 1))
-    totalz := getTotalIMGsSQLdb()
     Loop, % totalu
     {
         thisRow := rowsDef[A_Index]
-        showTOOLtip("Gathering database information: " thisRow[4], 0, 0, A_Index/(totalu + 1))
-        countu := getTotalIMGsSQLdb(thisRow[2])
+        countu := thisRow[5]
         actu := (!countu && A_Index=1) ? "Disable" : "Enable"
         If (A_Index=1)
            GuiControl, SettingsGUIA: %actu%, btn1
@@ -36189,9 +36207,7 @@ uiPopulateCachesOverview() {
            countu := totalz - countu
 
         percu := (totalz>0) ? Round(countu/totalz*100, 1) : 0
-        ; for the ignored entries "total minus ignored" would read as "not ignored", which is
-        ; not pending work; the cell is left empty rather than filled with a misleading figure
-        missu := (thisRow[5]=1) ? totalz - countu : 0
+        missu := (A_Index=1) ? 0 : totalz - countu
         LV_Add("", A_Index, thisRow[1], countu, missu, percu)
         If (AnyWindowOpen!=91)   ; the user closed the panel while the queries were running
            Break
@@ -36210,6 +36226,7 @@ uiPopulateCachesOverview() {
         pp :=  (A_Index=2) ? "" : "Integer"
         LV_ModifyCol(A_Index, "AutoHdr Left " pp)
     }
+
     LV_ModifyCol(1, 1)
     GuiControl, +Redraw, LViewCaches
     infou := (dbVersion!=dbExpectedVersion) ? " (outdated)" : ""
@@ -36290,6 +36307,8 @@ coreCachesOverviewIgnoredAct(modus) {
       PopulateIndexFilesStatsInfos("kill")
 
    PopulateImagesIndexStatsInfos("kill")
+   uiPopulateCachesOverview("kill")
+   Sleep, 1
    uiPopulateCachesOverview()
 }
 
@@ -36412,6 +36431,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          }
       }
 
+      uiPopulateCachesOverview("kill")
       If (adaptedSortCriteria=3)
       {
          ; Everything collected, the histogram statistics, the image
@@ -36438,6 +36458,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          }
 
          PopulateIndexFilesStatsInfos("kill")
+         uiPopulateCachesOverview("kill")
          CurrentSLD := backCurrentSLD
          SetTimer, ResetImgLoadStatus, -300
          Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, ErrorMsg)
@@ -36530,6 +36551,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
    }
 
    PopulateIndexFilesStatsInfos("kill")
+   uiPopulateCachesOverview("kill")
    CurrentSLD := backCurrentSLD
    Return reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, alreadySorted, failedFiles, failedSQLfiles, startOperation, ErrorMsg)
 }
@@ -36887,22 +36909,12 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    ; ?2 is a keyset cursor over imgidu and ?1 the batch size - the same shape
    ; collectImgDataViaPool() hands the collection pool. The plain "LIMIT ?1" this used to
    ; send is correct: a row IS written before the next batch reads and so leaves the result
-   ; set on its own. What it is not is cheap. Nothing indexes "dHash IS NULL", so every
-   ; batch restarted the scan at the first image of the library and walked past everything
-   ; already hashed, and the cost of finding the next 512 rows grew with the number already
-   ; done - over 200 000 images the batches went from 2.2 ms to 21 ms and the run took
-   ; 4.9 s, against 0.8 s and a flat 0.1 to 4 ms for the cursor.
-   ; A qpvmain.dll older than this never binds ?2, and an unbound ?2 is NULL, which
-   ; "imgidu>NULL" matches for no row whatsoever - such a run would hash nothing at all and
-   ; report that it had finished. So ask first; DllCall() answers blank when the export is
-   ; missing, and blank is not 1.
-   hasKeysetCursor := (DllCall("qpvmain.dll\dupesHashHasKeyset", "int")=1) ? 1 : 0
-   keysetSQL := (hasKeysetCursor=1) ? " AND images.imgidu>?2 ORDER BY images.imgidu" : ""
+   ; set on its own. With no keyset cursor every batch restarted the scan at the first image of 
+   ; the library and walked past everything; already hashed, and the cost of finding the next
+   ; 512 rows grew with the number already done.
+   keysetSQL := " AND images.imgidu>?2 ORDER BY images.imgidu"
    selectSQL := "SELECT images.imgidu, p." pixCol " FROM images" SQLpixelsJoinClause() pixWhere keysetSQL " LIMIT ?1;"
    updateSQL := "UPDATE images SET " whichHashu "=?1 WHERE imgidu=?2;"
-   If (qpvMainDll && hasKeysetCursor!=1)
-      addJournalEntry(A_ThisFunc "(): the qpvmain.dll in use predates the keyset cursor of the hash loop - replace or rebuild it. Every batch re-walks the images already hashed, which costs a large library minutes it does not need to spend.")
-
    ; getTotalIMGsSQLdb() supplies "SELECT COUNT(*) FROM images " and the trailing ";"
    filesToBeSorted := getTotalIMGsSQLdb(SQLpixelsJoinClause() pixWhere)
    If (filesToBeSorted<1)
@@ -39428,6 +39440,7 @@ retrieveFavesAsList(dummy:=0) {
       activeSQLdb.CloseDB()
    }
 
+   uiPopulateCachesOverview("kill")
    PopulateIndexFilesStatsInfos("kill")
    AnyWindowOpen := 100
    resetMainWin2Welcome()
@@ -86726,6 +86739,8 @@ getTotalIMGsSQLdb(morus:="") {
 
 OpenSLDBdataBase(fileNamu, importMode:=0) {
   activeSQLdb.CloseDB()
+  uiPopulateCachesOverview("kill")
+  PopulateIndexFilesStatsInfos("kill")
   activeSQLdb := new SQLiteDB
   If !activeSQLdb.OpenDB(fileNamu)
   {
@@ -89947,6 +89962,9 @@ corePurgeCachedSQLdata(mode) {
       SoundBeep 900, 100
    }
 
+   uiPopulateCachesOverview("kill")
+   PopulateIndexFilesStatsInfos("kill")
+   PopulateImagesIndexStatsInfos("kill")
    SetTimer, RemoveTooltip, -350
    SetTimer, ResetImgLoadStatus, -250
 }
@@ -90123,6 +90141,9 @@ PurgeCachedDataSelectedFiles() {
       SoundBeep, 900, 100
    }
   
+   uiPopulateCachesOverview("kill")
+   PopulateIndexFilesStatsInfos("kill")
+   PopulateImagesIndexStatsInfos("kill")
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, ResetImgLoadStatus, -150
 }
