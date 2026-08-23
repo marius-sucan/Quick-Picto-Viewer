@@ -1288,18 +1288,18 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["MenuChangeIncSaturat"]
     } Else If (givenKey="!LBRACKET")
     {
-       allowLoop := 1 
+       allowLoop := 1
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuDecBrushAspectRatio"]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-          func2Call := ["MenuChangeIncGamma"]
+          func2Call := ["MenuChangeDecGamma"]
     } Else If (givenKey="!RBRACKET")
     {
-       allowLoop := 1 
+       allowLoop := 1
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuIncBrushAspectRatio"]
        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
-          func2Call := ["MenuChangeDecGamma"]
+          func2Call := ["MenuChangeIncGamma"]
     } Else If (givenKey="BSLASH")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
@@ -4165,7 +4165,7 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
   If validBMP(whichBitmap)
   {
      obju := []
-     obju[1] := [VPselRotation, EllipseSelectMode, innerSelectionCavityX, innerSelectionCavityY]
+     obju[1] := [EllipseSelectMode, VPselRotation, innerSelectionCavityX, innerSelectionCavityY]
      VPselRotation := EllipseSelectMode := innerSelectionCavityX := innerSelectionCavityY :=  0
      showTOOLtip("Processing image" friendly ", please wait")
      If (editingSelectionNow=1 && wasGiven!=1)
@@ -12208,7 +12208,9 @@ changeImgRotationInVP(dir, stepu:=5, doReset:=0) {
 
    resetSlideshowTimer()
    stepu := (dir=1) ? stepu : -stepu
-   vpIMGrotation := clampInRange(vpIMGrotation + stepu, 0, 360 - stepu, 1)
+   ; the wrap ceiling must rely on the step magnitude; with the raw negative step,
+   ; decreasing from 0° used to wrap to 365° [or 361°] instead of 355° [or 359°]
+   vpIMGrotation := clampInRange(vpIMGrotation + stepu, 0, 360 - Abs(stepu), 1)
    If (doReset=1)
       vpIMGrotation := 0
 
@@ -32913,7 +32915,13 @@ PanelEnableFilesFilter() {
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIFiltersPanel Checked%userFilterDoString% vuserFilterDoString, Filter files list with given string
     Gui, Add, Text, y+7 w1 h1, String filter
     Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditFilter, % listu
-    GuiAddDropDownList("y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterStringPos " vuserFilterStringPos", "Anywhere`nBegins with`nEnds with`nRegEx", "String filter matching mode")
+    ; Regular Expressions cannot be translated into the LIKE queries used for SQLite
+    ; lists, so the matching mode is not offered there; it used to be passed verbatim
+    ; into LIKE, where any real pattern matched nothing
+    If (SLDtypeLoaded=3 && userFilterStringPos>3)
+       userFilterStringPos := 1
+    strModesList := (SLDtypeLoaded=3) ? "Anywhere`nBegins with`nEnds with" : "Anywhere`nBegins with`nEnds with`nRegEx"
+    GuiAddDropDownList("y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterStringPos " vuserFilterStringPos", strModesList, "String filter matching mode")
     GuiAddDropDownList("x+2 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterWhat " vuserFilterWhat", "Full paths`nFolder paths`nFile names`nParent folders", "Apply filter based on")
     Gui, Add, Checkbox, xs y+7 gupdateUIFiltersPanel Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain the given string
     Gui, Add, Button, xs y+7 vbtnFldr h%thisBtnHeight% w%btnWid% gEraseFilterzHisto, Erase &history
@@ -33065,9 +33073,7 @@ updateUIFiltersPanel(dummy:=0) {
    If (userFilterDoString=1 && SLDtypeLoaded=3)
    {
       thisStringFilter := SQLescapeStr(UsrEditFilter, 1)
-      If (userFilterStringPos=4 && thisStringFilter)
-         thisStringFilter := thisStringFilter
-      Else If (userFilterStringPos=3 && thisStringFilter) 
+      If (userFilterStringPos=3 && thisStringFilter)
          thisStringFilter := "%" thisStringFilter
       Else If (userFilterStringPos=2 && thisStringFilter)
          thisStringFilter := thisStringFilter "%"
@@ -33105,8 +33111,18 @@ updateUIFiltersPanel(dummy:=0) {
          maxRange := (userFilterSizeProperty=2) ? maxRange*(1024**2) : maxRange*1024
       } Else If (userFilterProperty=3 || userFilterProperty=4)
       {
-         minRange := SubStr(minDrange, 1, 8) "010101"
-         maxRange := SubStr(maxDrange, 1, 8) "010101"
+         ; the database stores fmodified/fcreated as 12 digits [yyyyMMddHHmm, see
+         ; addSQLdbEntry()], while the files list slots hold full 14 digit stamps;
+         ; both bounds must include the whole day chosen in the date pickers
+         If (SLDtypeLoaded=3)
+         {
+            minRange := SubStr(minDrange, 1, 8) "0000"
+            maxRange := SubStr(maxDrange, 1, 8) "2359"
+         } Else
+         {
+            minRange := SubStr(minDrange, 1, 8) "000000"
+            maxRange := SubStr(maxDrange, 1, 8) "235959"
+         }
       } Else If (userFilterProperty=8)
       {
          minRange := Round(minRange/10, 1)
@@ -33643,8 +33659,12 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
                {
                   Case "fmodified":
                      valu := bckpResultedFilesList[A_Index, 7]
+                     If (StrLen(valu)=12)   ; stamps cached from SQLite lack the seconds
+                        valu .= "00"
                   Case "fcreated":
                      valu := bckpResultedFilesList[A_Index, 8]
+                     If (StrLen(valu)=12)
+                        valu .= "00"
                   Case "fsize":
                      valu := bckpResultedFilesList[A_Index, 6]
                   Case "imgmegapix":
@@ -33843,6 +33863,10 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
    {
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
          throwSQLqueryDBerror(A_ThisFunc)
+
+      uiPopulateCachesOverview("kill")
+      PopulateIndexFilesStatsInfos("kill")
+      PopulateImagesIndexStatsInfos("kill")
    } Else currentFilesListModified := 1
 
    GenerateRandyList()
@@ -33897,7 +33921,12 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
    }
 
    If (SLDtypeLoaded=3 && preventDBentryRemoval!=1)
+   {
       deleteSQLdbEntry(StrReplace(imgPath, "||"), dbIndex)
+      uiPopulateCachesOverview("kill")
+      PopulateIndexFilesStatsInfos("kill")
+      PopulateImagesIndexStatsInfos("kill")
+   }
 
    maxFilesIndex--
    currentFilesListModified := 1
@@ -34357,6 +34386,9 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
     } Else
     {
        getMaxRowIDsqlDB()
+       uiPopulateCachesOverview("kill")
+       PopulateIndexFilesStatsInfos("kill")
+       PopulateImagesIndexStatsInfos("kill")
        Return 1
     }
 }
@@ -34370,6 +34402,9 @@ SQLrestoreEntriesMarked(markValue:=2, folderClause:="") {
        addJournalEntry(A_ThisFunc "() " activeSQLdb.ErrorMsg)
        Return
     }
+    uiPopulateCachesOverview("kill")
+    PopulateIndexFilesStatsInfos("kill")
+    PopulateImagesIndexStatsInfos("kill")
     Return 1
 }
 
@@ -35081,6 +35116,7 @@ SaveFilesList(enforceFile:=0) {
          Return
       }
 
+      wasErrorC := 0    ; set when any write below fails [disk full, access denied]
       startOperation := A_TickCount
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
@@ -35097,7 +35133,8 @@ SaveFilesList(enforceFile:=0) {
       ; ToolTip, % thisTmpFile "=" , , , 2
 
       saveDynaFolders := getDynamicFoldersList(thisTmpFile)
-      mainFile.Write("`n[DynamicFolderz]`n")
+      If !mainFile.Write("`n[DynamicFolderz]`n")
+         wasErrorC := 1
       Loop, Parse, saveDynaFolders, `n
       {
           fileTest := StrReplace(A_LoopField, "|")
@@ -35105,21 +35142,27 @@ SaveFilesList(enforceFile:=0) {
              Continue
 
           countDynas++
-          mainFile.Write("DF" countDynas "=" A_LoopField "`n")
+          If !mainFile.Write("DF" countDynas "=" A_LoopField "`n")
+             wasErrorC := 1
           changeMcursor()
       }
 
       changeMcursor()
-      mainFile.Write("`n[Folders]`n")
+      If !mainFile.Write("`n[Folders]`n")
+         wasErrorC := 1
       If (SLDcacheFilesList=1)
       {
          thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
          LoadStaticFoldersCached(thisTmpFile, countStaticFolders, "f")
          Loop, % countStaticFolders
-               mainFile.Write("Fi" A_Index "=" newStaticFoldersListCache[A_Index, 2] "*&*" newStaticFoldersListCache[A_Index, 1] "`n")
+         {
+             If !mainFile.Write("Fi" A_Index "=" newStaticFoldersListCache[A_Index, 2] "*&*" newStaticFoldersListCache[A_Index, 1] "`n")
+                wasErrorC := 1
+         }
       }
 
-      mainFile.Write("`n[FilesList]`n")
+      If !mainFile.Write("`n[FilesList]`n")
+         wasErrorC := 1
       If (SLDcacheFilesList=1)
       {
          Loop, % maxFilesIndex
@@ -35134,7 +35177,8 @@ SaveFilesList(enforceFile:=0) {
                resultedFilesList[A_Index, 1] := r
             }
 
-            mainFile.Write(r "`n")
+            If !mainFile.Write(r "`n")
+               wasErrorC := 1
          }
       }
 
@@ -35575,6 +35619,13 @@ cleanDeadFilesList(dummy:=0) {
             throwSQLqueryDBerror(A_ThisFunc)
       }
 
+      If (SLDtypeLoaded=3)
+      {
+         uiPopulateCachesOverview("kill")
+         PopulateIndexFilesStatsInfos("kill")
+         PopulateImagesIndexStatsInfos("kill")
+      }
+
       etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
       If (abandonAll=1)
          showTOOLtip("Operation aborted. " groupDigits(deadFiles) " index entries were removed until now" etaTime)
@@ -35754,6 +35805,13 @@ removeFilesListSeenImages(modus:=0) {
       seenEntries := ""
       If (!activeSQLdb.Exec("COMMIT TRANSACTION;") && SLDtypeLoaded=3)
          throwSQLqueryDBerror(A_ThisFunc)
+
+      If (SLDtypeLoaded=3 && remFromDb=1)
+      {
+         uiPopulateCachesOverview("kill")
+         PopulateIndexFilesStatsInfos("kill")
+         PopulateImagesIndexStatsInfos("kill")
+      }
 
       If (abandonAll=1)
       {
@@ -36303,11 +36361,9 @@ coreCachesOverviewIgnoredAct(modus) {
       RemoveTooltip()
    }
 
-   If (SLDtypeLoaded=3)
-      PopulateIndexSQLFilesStatsInfos("kill")
-   Else
-      PopulateIndexFilesStatsInfos("kill")
-
+   ; PopulateIndexFilesStatsInfos("kill") also resets, in cascade, the caches of
+   ; PopulateIndexSQLFilesStatsInfos() and PopulateImagesIndexStatsInfos()
+   PopulateIndexFilesStatsInfos("kill")
    PopulateImagesIndexStatsInfos("kill")
    uiPopulateCachesOverview("kill")
    Sleep, 1
@@ -36434,6 +36490,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       }
 
       uiPopulateCachesOverview("kill")
+      PopulateIndexFilesStatsInfos("kill")
+      PopulateImagesIndexStatsInfos("kill")
       If (adaptedSortCriteria=3)
       {
          ; Everything collected, the histogram statistics, the image
@@ -36862,6 +36920,9 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
 ; dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
 ; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
    Static userFriendly := {1:"NONE", 2:"dHash", 3:"pHash", 4:"lHash"}
+   uiPopulateCachesOverview("kill")   ; the counters these panels display are about to change
+   PopulateIndexFilesStatsInfos("kill")
+   PopulateImagesIndexStatsInfos("kill")
    setImageLoading()
    doStartLongOpDance()
    backCurrentSLD := CurrentSLD
@@ -37671,6 +37732,13 @@ SortFilesList(SortCriterion) {
       ForceRefreshNowThumbsList()
       If StrLen(backfilesFilter)>1
          filesFilter := backfilesFilter
+
+      If (SLDtypeLoaded=3)
+      {
+         uiPopulateCachesOverview("kill")
+         PopulateIndexFilesStatsInfos("kill")
+         PopulateImagesIndexStatsInfos("kill")
+      }
 
       GenerateRandyList()
       entireString := entireNotSortedString := ""
@@ -40497,6 +40565,10 @@ batchFileDelete(dontAlterIndex:=0) {
          someErrors .= "Failed to update the database"
          throwSQLqueryDBerror(A_ThisFunc)
       }
+
+      uiPopulateCachesOverview("kill")
+      PopulateIndexFilesStatsInfos("kill")
+      PopulateImagesIndexStatsInfos("kill")
    }
 
    watchFolderDetails := ""
@@ -40658,7 +40730,12 @@ DeletePicture(dummy:=0) {
   } Else
   {
      If (SLDtypeLoaded=3)
+     {
         markSQLdbEntryDeleted(resultedFilesList[currentFileIndex, 12])
+        uiPopulateCachesOverview("kill")
+        PopulateIndexFilesStatsInfos("kill")
+        PopulateImagesIndexStatsInfos("kill")
+     }
 
      If (resultedFilesList[currentFileIndex, 5]=1 && !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
      {
@@ -41605,20 +41682,41 @@ reorderIndexEntryManually(oldIndex, newFileIndex)  {
 switchIndexEntries(newFileIndex, oldIndex) {
    If (SLDtypeLoaded=3)
    {
-      SQLstr := "UPDATE images SET imgidu=999999999 WHERE imgidu=" newFileIndex ";"
-      If activeSQLdb.Exec(SQLStr)
+      ; the rows are identified by their imgidu [resultedFilesList slot 12], never by the
+      ; list positions: the list may be sorted [or the database has id gaps after purges],
+      ; so positions and ids rarely match and the wrong rows used to get their ids swapped.
+      ; The imagesPixels fingerprints are keyed by imgidu as well and must travel along,
+      ; otherwise the swap crosses the fingerprints between the two images.
+      dbIdA := resultedFilesList[oldIndex, 12]
+      dbIdB := resultedFilesList[newFileIndex, 12]
+      If (!isNumber(dbIdA) || !isNumber(dbIdB) || dbIdA=dbIdB)
       {
-         SQLstr := "UPDATE images SET imgidu=" newFileIndex " WHERE imgidu=" oldIndex ";"
-         If activeSQLdb.Exec(SQLStr)
-         {
-            SQLstr := "UPDATE images SET imgidu=" oldIndex " WHERE imgidu=999999999;"
-            If !activeSQLdb.Exec(SQLStr)
-            {
-               addJournalEntry("Failed to change index entry position in the SQL database.")
-               Return
-            } ; Else ToggleDBdefaultSQLsort()
-         }
+         addJournalEntry("Failed to change index entry position in the SQL database; unknown row IDs.")
+         Return
       }
+
+      allGood := 1
+      activeSQLdb.Exec("BEGIN TRANSACTION;")
+      Loop, Parse, % "images|imagesPixels", |
+      {
+          If !activeSQLdb.Exec("UPDATE " A_LoopField " SET imgidu=999999999 WHERE imgidu=" dbIdA ";")
+             allGood := 0
+          If !activeSQLdb.Exec("UPDATE " A_LoopField " SET imgidu=" dbIdA " WHERE imgidu=" dbIdB ";")
+             allGood := 0
+          If !activeSQLdb.Exec("UPDATE " A_LoopField " SET imgidu=" dbIdB " WHERE imgidu=999999999;")
+             allGood := 0
+      }
+
+      If (allGood!=1)
+      {
+         activeSQLdb.Exec("ROLLBACK;")
+         addJournalEntry("Failed to change index entry position in the SQL database.")
+         Return
+      }
+      activeSQLdb.Exec("COMMIT TRANSACTION;")
+      uiPopulateCachesOverview("kill")
+      PopulateIndexFilesStatsInfos("kill")
+      PopulateImagesIndexStatsInfos("kill")
    }
 
    tempA := resultedFilesList[oldIndex]
@@ -41626,6 +41724,13 @@ switchIndexEntries(newFileIndex, oldIndex) {
    ; ToolTip, % tempA "`n" tempB "`n" oldIndex "===" newFileIndex , , , 2
    resultedFilesList[oldIndex] := tempB
    resultedFilesList[newFileIndex] := tempA
+   If (SLDtypeLoaded=3)
+   {
+      ; each position keeps its database id: the two rows exchanged ids above, so the
+      ; entry that moved here owns from now on the id already present at this position
+      resultedFilesList[oldIndex, 12] := dbIdA
+      resultedFilesList[newFileIndex, 12] := dbIdB
+   }
    ; If (StrLen(filesFilter)>1 && !InStr(filesFilter, "SQL:query:"))
    ; {
    ;    tempA := bckpResultedFilesList[filteredMap2mainList[oldIndex], 1]
@@ -46695,8 +46800,10 @@ QuickSelectFilesSameFolder(modus:=0, external:=0) {
     og := thisSearchString
 
     markSearchMatches := 0
-    userSearchWhat := 1
-    userSearchString := OutDir "\"
+    userSearchWhat := 2
+    ; exact match on the containing folder [as regex], otherwise the files
+    ; found in its sub-folders used to be selected as well
+    userSearchString := "\>i)^" JEE_StrRegExLiteral(OutDir) "$"
     SearchIndexSelectAll("quick")
     userSearchWhat := od
     userSearchString := oz
@@ -59223,7 +59330,12 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
             resultedFilesList[currentFileIndex, 1] := file2save
 
          If (SLDtypeLoaded=3)
+         {
             selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
+            uiPopulateCachesOverview("kill")
+            PopulateIndexFilesStatsInfos("kill")
+            PopulateImagesIndexStatsInfos("kill")
+         }
 
          imgIndexEditing := currentFileIndex
          currentImgModified := 2
@@ -64335,6 +64447,9 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
        If !activeSQLdb.Exec("COMMIT TRANSACTION;")
           throwSQLqueryDBerror(A_ThisFunc)
        getMaxRowIDsqlDB()
+       uiPopulateCachesOverview("kill")
+       PopulateIndexFilesStatsInfos("kill")
+       PopulateImagesIndexStatsInfos("kill")
     }
 
     If added
@@ -88066,6 +88181,13 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   }
 
   fnOutputDebug(A_ThisFunc "(" strDir "). Files " thisCounter ". Elapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
+  If (SLDtypeLoaded=3)
+  {
+     uiPopulateCachesOverview("kill")
+     PopulateIndexFilesStatsInfos("kill")
+     PopulateImagesIndexStatsInfos("kill")
+  }
+
   currentFilesListModified := 1
   executingCanceableOperation := 0
   SetTimer, ResetImgLoadStatus, -50
@@ -88385,6 +88507,13 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
    }
 
    fnOutputDebug(A_ThisFunc "(" strDir "). Files " thisCounter ". Elapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
+
+   If (SLDtypeLoaded=3)
+   {
+      uiPopulateCachesOverview("kill")
+      PopulateIndexFilesStatsInfos("kill")
+      PopulateImagesIndexStatsInfos("kill")
+   }
 
    currentFilesListModified := 1
    executingCanceableOperation := 0
@@ -89644,6 +89773,9 @@ updateUIdupesPanel() {
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
    GuiControl, % actu, userFindDupesSelectAllDummy
    GuiControl, % actu, btnFldr6
+   ; the hash type is honoured only in Custom mode; preset 1 pins dHash and
+   ; the other presets group by properties alone [see BTNfindDupesNow()]
+   GuiControl, % actu, userFindDupesFilterHamDist
    GuiControl, % actu2, UIfindDupePrecision
    GuiControl, % actu2, btnFldr
    UIfindDupesCheckboxes(actu)
@@ -89810,6 +89942,12 @@ BTNfindDupesNow() {
       columnus := "imgfile,imgframes"
    Else If (userFindDupePresets=6)
       columnus := "fsize,imgfile,imgframes"
+
+   ; the Image hashes tab applies only to preset 1 [which pins dHash] and to Custom
+   ; mode; the other presets group by file/image properties alone, no matter what
+   ; hash type was previously chosen and stored for the Custom mode
+   If isInRange(userFindDupePresets, 2, 6)
+      userFindDupesFilterHamDist := 1
 
    ; Gui, SettingsGUIA: Submit, NoHide
    ; ToolTip, % userFindDupePresets "==" columnus , , , 2
@@ -90405,7 +90543,12 @@ BtnPerformJpegOp(modus:=0) {
        resultedFilesList[currentFileIndex, 4] := 1
        FlipImgV := FlipImgH := vpIMGrotation := 0
        If (SLDtypeLoaded=3)
+       {
           selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
+          uiPopulateCachesOverview("kill")
+          PopulateIndexFilesStatsInfos("kill")
+          PopulateImagesIndexStatsInfos("kill")
+       }
 
        showTOOLtip("JPEG operation completed succesfully")
        RefreshImageFile()
@@ -92316,7 +92459,12 @@ filesListApplyColors() {
          {
             resultedFilesList[currentFileIndex, 4] := 1
             If (SLDtypeLoaded=3)
+            {
                selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
+               uiPopulateCachesOverview("kill")
+               PopulateIndexFilesStatsInfos("kill")
+               PopulateImagesIndexStatsInfos("kill")
+            }
 
             showTOOLtip("Viewport colour effects applied on the image:`n" OutFileName "`n" OutDir "\")
          }
@@ -92527,7 +92675,12 @@ BTNsaveResizedIMG() {
       GuiControl, SettingsGUIA: Enable, btn2
       resultedFilesList[currentFileIndex, 4] := 1
       If (SLDtypeLoaded=3)
+      {
          selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
+         uiPopulateCachesOverview("kill")
+         PopulateIndexFilesStatsInfos("kill")
+         PopulateImagesIndexStatsInfos("kill")
+      }
 
       SoundBeep, 900, 100
       showTOOLtip("Processed image saved`n" OutFileName "`n`n" OutDir "\")
@@ -99305,7 +99458,12 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
       ForceRefreshNowThumbsList()
       resultedFilesList[currentFileIndex, 4] := 1
       If (SLDtypeLoaded=3)
+      {
          selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
+         uiPopulateCachesOverview("kill")
+         PopulateIndexFilesStatsInfos("kill")
+         PopulateImagesIndexStatsInfos("kill")
+      }
 
       If (contextu!="extern")
       {

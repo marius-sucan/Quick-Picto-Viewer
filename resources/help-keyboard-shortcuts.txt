@@ -8,8 +8,8 @@ NumPad *|100% image zoom [original size]|Image view|-
 NumPad /|Adjust image to window|Image view|-
 Ctrl + /|100% image zoom [original size]|Image view|-
 /|Adjust image to window|Image view|-
-Ctrl + -|Increase OSD font sizes|Anywhere|-
-Ctrl + =|Decrease OSD font sizes|Anywhere|-
+Ctrl + -|Decrease OSD font sizes|Anywhere|-
+Ctrl + =|Increase OSD font sizes|Anywhere|-
 0|Rotate image by +15°|Image view|-
 9|Rotate image by -15°|Image view|-
 Alt + 0|Rotate image by +1°|Image view|-
@@ -281,14 +281,14 @@ Shift + L-Click on edges or dots|Resize selection area maintaing initial aspect 
 Shift + L-Click inside area|Move selection area constrained on X or Y axis|Image selected area|-
 Alt + L-Click inside area|Resize selection area relative to its center and transform to 1:1 ratio [square]|Image selected area|-
 Double L-Click outside area|Drop image selection area|Image selected area|-
-[|Increase brush size|Painting mode|-
-]|Decrease brush size|Painting mode|-
-Shift + [|Increase brush softness|Painting mode|-
-Shift + ]|Decrease brush softness|Painting mode|-
-Ctrl + [|Increase brush angle|Painting mode|-
-Ctrl + ]|Decrease brush angle|Painting mode|-
-Alt + [|Increase brush aspect ratio|Painting mode|-
-Alt + ]|Decrease brush aspect ratio|Painting mode|-
+[|Decrease brush size|Painting mode|-
+]|Increase brush size|Painting mode|-
+Shift + [|Decrease brush softness|Painting mode|-
+Shift + ]|Increase brush softness|Painting mode|-
+Ctrl + [|Decrease brush angle|Painting mode|-
+Ctrl + ]|Increase brush angle|Painting mode|-
+Alt + [|Decrease brush aspect ratio|Painting mode|-
+Alt + ]|Increase brush aspect ratio|Painting mode|-
 .|Increase brush opacity|Painting mode|-
 ,|Decrease brush opacity|Painting mode|-
 Shift + .|Increase brush wetness or deform intensity|Painting mode|-
