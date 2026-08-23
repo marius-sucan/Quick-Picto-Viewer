@@ -295,7 +295,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , QuickFileActAfter2 := 1, QuickFileActAfter3 := 1, QuickFileActAfter4 := 1, QuickFileActAfter5 := 1
    , QuickFileActAfter6 := 1, QuickFileActFolder6 := "", userFilterWhat := 1, userFilterStringPos := 1
    , userFilterStringIsNot := 0, userFilterDoString := 1, UsrEditFilter, QuickFileActConflict := 4
-   , preventDBentryRemoval := 0, findDupesPrecision := 5, DesaturateAreaAmount := 255, PrintPaperOrient := 1
+   , preventDBentryRemoval := 0, findDupesPrecision := 5, UIfindDupesPrecision := 1, DesaturateAreaAmount := 255, PrintPaperOrient := 1
    , DesaturateAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
@@ -87243,13 +87243,20 @@ dupesCandidateSQL(includeHash, includePixels, engSelKeys, engWhere, engOrder) {
    Return SQLstr " FROM images" (includePixels ? SQLpixelsJoinClause() : "") engWhere " ORDER BY " engOrder ";"
 }
 
-retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
+retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, precision:="") {
    ; rowSize: sizeof(DupeCandRow) in dupes-search.h - imgidu, fsize, megapix, groupID, pathOffset
    ; enginePath: the database the DLL's read-only handle was last opened on, see below
+   ; prevPrecision: the decimals Round() kept on the numeric keys of the last search, so
+   ; that a re-sort (SortCriterion set) rebuilds the very same groups even if the panel's
+   ; setting was changed in between. BTNfindDupesNow() passes it; it also forces 5 for the
+   ; presets that group by the exact file size, where a tolerance could only add groups of
+   ; different images sharing a size, so the global is not always the value in effect.
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|dHash|lHash|pHash|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt)"
-        , rowSize := 32, fetchRows := 2048, rowsBuf, enginePath := ""
+        , rowSize := 32, fetchRows := 2048, rowsBuf, enginePath := "", prevPrecision := 5
    If SortCriterion
       theseCols := prevMode
+   Else
+      prevPrecision := (precision!="") ? precision : findDupesPrecision
 
    If (RegExMatch(theseCols, "i)(dHash)") || userFindDupesFilterHamDist=2)
       thisNOTnullCol := "dHash"
@@ -87362,7 +87369,11 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0) {
       If !A_LoopField
          Continue
 
-      engExpr := !RegExMatch(A_LoopField, notFloatsRegEX) ? "Round(" A_LoopField "," findDupesPrecision ")" : A_LoopField
+      ; Every column this rounds is stored at five decimals or fewer (imgwhratio and
+      ; imgmegapix by the schema, the histogram statistics by the collection pool, kbfsize
+      ; at one), so 5 leaves every value as it is and only 2 and 1 widen the buckets - the
+      ; panel offers exactly those three as Exact / Close / Loose.
+      engExpr := !RegExMatch(A_LoopField, notFloatsRegEX) ? "Round(" A_LoopField "," prevPrecision ")" : A_LoopField
       engSelKeys .= ", " engExpr " AS k" engKeyCount
       engOrderKeys .= (engKeyCount ? ", " : "") "k" engKeyCount
       ; imgfile and imgpixfmt are declared COLLATE NOCASE, so SQLite groups and
@@ -89430,9 +89441,14 @@ PanelFindDupes(dummy:=0) {
     GuiAddDropDownList("x+15 y+15 Section w" txtWid " gupdateUIdupesPanel AltSubmit Choose" userFindDupePresets " vuserFindDupePresets", "Image content fingerprint (dHash 8x8)|Image histogram data|Image resolution and file size|Image histogram, resolution and file size|Identical file names|Identical file names and file sizes|Custom mode", "Duplicates detection presets")
     Gui, Add, Checkbox, xs y+7 w%col% -wrap gUIfindDupesChecksu Checked%UIcheckimgfile% vUIcheckimgfile, File name and its extension
     Gui, Add, Checkbox, x+7 gBTNselectAllFindDupesProperties Checked%userFindDupesSelectAllDummy% vuserFindDupesSelectAllDummy, &Select all
-    Gui, Add, Text, x+3 vbtnFldr, Precision:
-    GuiAddEdit("x+2 w50 number -multi limit1 veditF5", findDupesPrecision)
-    Gui, Add, UpDown, vfindDupesPrecision Range1-5, % findDupesPrecision
+    ; findDupesPrecision is the number of decimals retrieveDupesByProperties() keeps on the
+    ; numeric grouping keys. The stored values have five at most, and the six level-based
+    ; histogram statistics cannot tell 3, 4 and 5 apart, so the 1-5 spinner this used to be
+    ; offered three real settings under five labels: 5 = Exact, 2 = Close, 1 = Loose.
+    UIfindDupesPrecision := (findDupesPrecision<=1) ? 3 : (findDupesPrecision=2) ? 2 : 1
+    ddlWid := (PrefsLargeFonts=1) ? 100 : 72
+    Gui, Add, Text, x+3 vbtnFldr, Matching:
+    GuiAddDropDownList("x+2 w" ddlWid " AltSubmit Choose" UIfindDupesPrecision " vUIfindDupesPrecision", "Exact|Close|Loose", "Numeric properties matching tolerance", "How closely the aspect ratio, megapixels and histogram values of two images must agree to be grouped: Exact - as stored; Close - to two decimals; Loose - to one decimal. File names, dates, sizes, width, height, frames and pixel format always have to be identical.")
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckfcreated% vUIcheckfcreated, Date created
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckfmodified% vUIcheckfmodified, Date modified
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckfsize% vUIcheckfsize, Size (bytes)
@@ -89520,7 +89536,8 @@ BtnCollectDupesData() {
        Return
 
    Gui, SettingsGUIA: Default
-   GuiControlGet, findDupesPrecision
+   GuiControlGet, UIfindDupesPrecision
+   findDupesPrecision := dupesPrecisionFromUI(UIfindDupesPrecision)
    GuiControlGet, dupesStringFilter
    GuiControlGet, userFilterStringIsNot
    GuiControlGet, userFilterStringPos
@@ -89613,12 +89630,14 @@ updateUIdupesPanel() {
    Gui, SettingsGUIA: Default
    GuiControlGet, userFindDupePresets
    actu := (userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-   actu2 := (userFindDupePresets=5 || userFindDupePresets=6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   ; the Matching tolerance applies to aspect ratio, megapixels and the histogram values;
+   ; presets 5 and 6 have none of those, and presets 3 and 4 group by the exact file size,
+   ; for which BTNfindDupesNow() forces an exact match - so only 1, 2 and Custom get it
+   actu2 := isInRange(userFindDupePresets, 3, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
    GuiControl, % actu, userFindDupesSelectAllDummy
    GuiControl, % actu, btnFldr6
-   GuiControl, % actu2, findDupesPrecision
-   GuiControl, % actu2, editF5
+   GuiControl, % actu2, UIfindDupesPrecision
    GuiControl, % actu2, btnFldr
    UIfindDupesCheckboxes(actu)
 }
@@ -89687,7 +89706,8 @@ BTNfindDupesNow() {
 
    columnus := ""
    Gui, SettingsGUIA: Default
-   GuiControlGet, findDupesPrecision
+   GuiControlGet, UIfindDupesPrecision
+   findDupesPrecision := dupesPrecisionFromUI(UIfindDupesPrecision)
    GuiControlGet, dupesStringFilter
    GuiControlGet, userFilterStringIsNot
    GuiControlGet, userFilterStringPos
@@ -89827,11 +89847,23 @@ BTNfindDupesNow() {
          toBeExcludedIndexes[resultedFilesList[A_Index, 12]] := 1
    }
 
-   retrieveDupesByProperties(columnus, 0, userFindDupesFilterHamDist)
+   ; Presets 3 and 4 group by the exact file size (bytes, or tenths of a kilobyte). A
+   ; tolerance on their remaining keys could only ever add groups of DIFFERENT images that
+   ; happen to share a size, so they always match exactly; updateUIdupesPanel() greys the
+   ; control out for them. Passed rather than written into findDupesPrecision so the
+   ; user's choice survives for the presets that do use it.
+   precisionUsed := (userFindDupePresets=3 || userFindDupePresets=4) ? 5 : findDupesPrecision
+   retrieveDupesByProperties(columnus, 0, userFindDupesFilterHamDist, precisionUsed)
+}
+
+; The Matching dropdown of PanelFindDupes(): Exact | Close | Loose, 1-based, to the number
+; of decimals retrieveDupesByProperties() keeps on the numeric grouping keys.
+dupesPrecisionFromUI(indexu) {
+   Return (indexu=3) ? 1 : (indexu=2) ? 2 : 5
 }
 
 BTNhelpFindDupes() {
-   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe precision factor does not apply for file names, size in bytes, file dates and image width, height, frames and pixel format properties.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, precision 2 and dHash threshold 3 in the fingerprints tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe «Matching» option sets how closely the numeric image properties must agree for two images to be grouped: aspect ratio, megapixels and the histogram values. «Exact» compares them as stored; «Close» rounds them to two decimals first, so small differences are ignored - an aspect ratio of 1.778 matches 1.783, a histogram value matches within two or three gray levels; «Loose» rounds to one decimal and is far more forgiving - only broad families of aspect ratios such as 4:3, 3:2 and 16:9 stay apart, and the histogram values match within about 25 levels. It does not apply to file names, dates, sizes, width, height, frames and pixel format, which always have to be identical. With an image hash selected, the aspect ratio is also what limits which images are compared with each other, so «Exact» will miss resized copies whose dimensions were rounded, and «Close» or «Loose» is advised there.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, set «Matching» to «Close» and the dHash threshold to 3 in the image hashes tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
