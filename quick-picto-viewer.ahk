@@ -12127,7 +12127,7 @@ VPchangeSelRotation(dir, stepu:=1) {
       Return
 
    stepu := (dir=1) ? stepu : -stepu
-   VPselRotation := clampInRange(VPselRotation, 0, 360 - 1, 1)
+   VPselRotation := clampInRange(VPselRotation + stepu, 0, 359, 1)
    vpImgPanningNow := (allowFreeIMGpanning=1) ? 1 : 2
    ; SetTimer, dummyRefreshImgSelectionWindow, -50
    dummyRefreshImgSelectionWindow()
@@ -32920,7 +32920,7 @@ PanelEnableFilesFilter() {
     Gui, Add, Text, xs y+15 vbtnFldr2, You can use | for OR and the *, ? wildcards in the filter`nto match more files.
     Gui, Tab, 2
     Gui, Add, Text, x+15 y+15 Section, Please choose the type of criteria and`nset minimum and maximum range.
-    GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterProperty " vuserFilterProperty", "No criteria defined`nFile size`nModified date`nCreated date`nMegapixels`nWidth`nHeight`nAspect ratio`nFrames`nDPI`nAverage`nMedian`nPeak range`nMinimum range`nTotal range`nMode`nMinimum`nRoot-mean suqare`nSelected files`nAlready seen", "Filter criteria")
+    GuiAddDropDownList("xs y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterProperty " vuserFilterProperty", "No criteria defined`nFile size`nModified date`nCreated date`nMegapixels`nWidth`nHeight`nAspect ratio`nFrames`nDPI`nAverage`nMedian`nPeak range`nMinimum range`nTotal range`nMode`nMinimum`nStandard deviation`nSelected files`nAlready seen", "Filter criteria")
     Gui, Add, Text, x+5 wp hp +0x200 vFilterTypeu, -
     hEditA := GuiAddEdit("xs y+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMinRange", FilteruMinRange, "Minimum")
     hEditB := GuiAddEdit("x+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMaxRange", FilteruMaxRange, "Maximum")
@@ -33035,7 +33035,7 @@ updateUIFiltersPanel(dummy:=0) {
       actu := (userFilterProperty=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, userFilterSizeProperty
 
-      actu := (userFilterProperty=3 || userFilterProperty=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+      actu := (userFilterProperty=3 || userFilterProperty=4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
       GuiControl, % actu, FilteruDateMaxRange
       GuiControl, % actu, FilteruDateMinRange
 
@@ -33094,6 +33094,9 @@ updateUIFiltersPanel(dummy:=0) {
    maxRange := max(FilteruMinRange, FilteruMaxRange)
    minDrange := min(FilteruDateMinRange, FilteruDateMaxRange)
    maxDrange := max(FilteruDateMinRange, FilteruDateMaxRange)
+   If (userFilterProperty=3 || userFilterProperty=4)
+      minRange := minDrange
+
    If (userFilterProperty>1 && minRange!="")
    {
       If (userFilterProperty=2)
@@ -40011,10 +40014,10 @@ searchNextIndex(direction, inLoop:=0) {
 
    If (!newIndex && inLoop=1)
    {
-      userSearchString := ""
       showTOOLtip("WARNING: No indexed file matched the search criteria:`n" userSearchString)
       SetTimer, RemoveTooltip, % -msgDisplayTime
       SoundBeep , 900, 100
+      userSearchString := ""
       Return
    }
 
@@ -43516,7 +43519,6 @@ PanelRenameThisFile(dummy:=0) {
          PanelRenameThisFile(dummy)
       } Else
       {
-         file2rem := getIDimage(currentFileIndex)
          If (resultedFilesList[currentFileIndex, 5]=1)
             ToggleImgFavourites(file2rem, "rem")
 
@@ -44840,11 +44842,9 @@ PanelSaveImg() {
     entriesList := StrReplace(recentOpenedFolders(), "`n", "|")
     delim := InStr(entriesList, prevFileSavePath "|") ? "|" : ""
     entriesList := StrReplace(entriesList, prevFileSavePath delim, prevFileSavePath "||")
-    If StrLen(entriesList)<4
-    {
+    If (StrLen(entriesList)<4)
        usePrevSaveFolder := 0
-       GuiControl, Disable, usePrevSaveFolder
-    } Else If !InStr(entriesList, "||")
+    Else If !InStr(entriesList, "||")
        entriesList .= "|"
 
     imgPath := getIDimage(currentFileIndex)
@@ -44895,6 +44895,9 @@ PanelSaveImg() {
 
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFoderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open file dialog in a previous location
+    If !entriesList
+       GuiControl, SettingsGUIA: Disable, usePrevSaveFolder
+
     GuiAddDropDownList("xp+15 y+7 wp+135 vuserDestinationFolder", entriesList, "Recent folders")
     Gui, Add, Text, xs y+10 hp +0x200, Save options:
     Gui, Add, Checkbox, xp+15 y+10 hp Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
@@ -59096,18 +59099,19 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       If (testWasImageEditedInVP()=1 && imgPath!=file2save && FileRexists(imgPath) && noQualityWarnings!=1)
       {
          msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match would be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
-         If (oExt!=nExt && desiredFrameIndex>0)
+         If (oExt!=nExt || desiredFrameIndex>0)
             dilemma := ""
 
          If dilemma
+         {
             msgResult := msgBoxWrapper(appTitle ": Confirmation", "You are about to resave an unmodified image. The original file will be used, not the viewport data if you answer affirmatively.`n`n" dilemma "`n`n" OutFileName "`n`n" OutDir "\", 3, 0, "question")
-   
-         If (msgResult="Yes")
-            quickieSave := 1
-         Else If (msgResult="No")
-            quickieSave := 0
-         Else
-            Return
+            If (msgResult="Yes")
+               quickieSave := 1
+            Else If (msgResult="No")
+               quickieSave := 0
+            Else
+               Return
+         }
       }
 
       prevFileSavePath := OutDir
@@ -89420,14 +89424,14 @@ PanelFindDupes(dummy:=0) {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    If StrLen(filesFilter)<3
+    If (StrLen(filesFilter)<3)
        excludePreviousDupesFromList := 0
 
     If (A_PtrSize!=8)
        userFindDupesFilterHamDist := 1
 
     If (dummy>0 && isNumber(dummy) && isInRange(dummy, 1, 3))
-       CurrentPanelTab := dummy
+       thisPanelTab := dummy
     If (userFilterStringPos>=4)
        userFilterStringPos := 1
 
@@ -89674,7 +89678,6 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % hactu, UIcheckimghrms, %v%
    GuiControl, % hactu, UIcheckimghmode, %v%
    GuiControl, % hactu, UIcheckimghminu, %v%
-   GuiControl, % hactu, userFindDupesFilterHamDist, %v%
 
    GuiControlGet, userFindDupePresets
    GuiControlGet, PerformMSDonDupes
