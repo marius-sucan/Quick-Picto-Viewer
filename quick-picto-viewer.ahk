@@ -277,7 +277,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , allowRecordHistory := 1, TextInAreaPaintBgr := 1, rotateSelBoundsKeepRatio := 1, TextInAreaFlipH := 0
    , highlightAlreadySeenImages := 1, useCachedSLDdata := 1, PreserveDateTimeOnSave := 0, PrintAdaptToFit := 1
    , PrintDimensionsXYWH := "0|0|50|50", PrintColorMode := 0, PrintImgAngleOrientation := 0, PrintUseViewportColors := 1
-   , FillAreaClosedPath := 1, alphaMaskingMode := 1, userImgAdjustInvertArea := 0
+   , FillAreaClosedPath := 1, alphaMaskingMode := 1, userImgAdjustInvertArea := 0, UserAddNoiseInvert := 0
    , alphaMaskClrAintensity := 0, alphaMaskClrBintensity := 255, closeEditPanelOnApply := 1, FillAreaCurveTension := 2
    , alphaMaskOffsetX := 0, alphaMaskOffsetY := 0, alphaMaskReplaceMode := 0, alphaMaskBMPchannel := 5
    , blurAreaMode := 2, FillAreaBlendMode := 1, PasteInPlaceApplyColorFX := 0, blurAreaPixelizeAmount := 0
@@ -289,13 +289,12 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , IDedgesEmphasis := 0, IDedgesContrast := 0, IDedgesBlendMode := 0, IDedgesOpacity := 255, IDedgesAfterBlur := 1
    , IDedgesEmbossLvl := 1, UserAddNoiseIntensity := 35, UserAddNoiseGrays := 0, reverseOrderOnSort := 0
    , UserAddNoiseEmphasis := 0, UserAddNoiseContrast := 0, UserAddNoiseBlendMode := 1, UserAddNoiseOpacity := 255
-   , UserAddNoiseInvert := 0
    , userSearchWhat := 1, OnSortdoFilesCheck := 0, QuickFileActFolder1 := "", QuickFileActFolder2 := ""
    , QuickFileActFolder3 := "", QuickFileActFolder4 := "", QuickFileActFolder5 := "", QuickFileActAfter1 := 1
    , QuickFileActAfter2 := 1, QuickFileActAfter3 := 1, QuickFileActAfter4 := 1, QuickFileActAfter5 := 1
    , QuickFileActAfter6 := 1, QuickFileActFolder6 := "", userFilterWhat := 1, userFilterStringPos := 1
    , userFilterStringIsNot := 0, userFilterDoString := 1, UsrEditFilter, QuickFileActConflict := 4
-   , preventDBentryRemoval := 0, findDupesPrecision := 5, UIfindDupesPrecision := 1, DesaturateAreaAmount := 255, PrintPaperOrient := 1
+   , preventDBentryRemoval := 0, findDupesPrecision := 1, UIfindDupePrecision := 3, DesaturateAreaAmount := 255, PrintPaperOrient := 1
    , DesaturateAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
@@ -89441,14 +89440,6 @@ PanelFindDupes(dummy:=0) {
     GuiAddDropDownList("x+15 y+15 Section w" txtWid " gupdateUIdupesPanel AltSubmit Choose" userFindDupePresets " vuserFindDupePresets", "Image content fingerprint (dHash 8x8)|Image histogram data|Image resolution and file size|Image histogram, resolution and file size|Identical file names|Identical file names and file sizes|Custom mode", "Duplicates detection presets")
     Gui, Add, Checkbox, xs y+7 w%col% -wrap gUIfindDupesChecksu Checked%UIcheckimgfile% vUIcheckimgfile, File name and its extension
     Gui, Add, Checkbox, x+7 gBTNselectAllFindDupesProperties Checked%userFindDupesSelectAllDummy% vuserFindDupesSelectAllDummy, &Select all
-    ; findDupesPrecision is the number of decimals retrieveDupesByProperties() keeps on the
-    ; numeric grouping keys. The stored values have five at most, and the six level-based
-    ; histogram statistics cannot tell 3, 4 and 5 apart, so the 1-5 spinner this used to be
-    ; offered three real settings under five labels: 5 = Exact, 2 = Close, 1 = Loose.
-    UIfindDupesPrecision := (findDupesPrecision<=1) ? 3 : (findDupesPrecision=2) ? 2 : 1
-    ddlWid := (PrefsLargeFonts=1) ? 100 : 72
-    Gui, Add, Text, x+3 vbtnFldr, Matching:
-    GuiAddDropDownList("x+2 w" ddlWid " AltSubmit Choose" UIfindDupesPrecision " vUIfindDupesPrecision", "Exact|Close|Loose", "Numeric properties matching tolerance", "How closely the aspect ratio, megapixels and histogram values of two images must agree to be grouped: Exact - as stored; Close - to two decimals; Loose - to one decimal. File names, dates, sizes, width, height, frames and pixel format always have to be identical.")
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckfcreated% vUIcheckfcreated, Date created
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckfmodified% vUIcheckfmodified, Date modified
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckfsize% vUIcheckfsize, Size (bytes)
@@ -89467,12 +89458,23 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghrms% vUIcheckimghrms, Histogram standard deviation
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimghmode% vUIcheckimghmode, Histogram mode
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghminu% vUIcheckimghminu, Histogram minimum
+    ; findDupesPrecision is the number of decimals retrieveDupesByProperties() keeps on the
+    ; numeric grouping keys. The stored values have five at most, and the six level-based
+    ; histogram statistics cannot tell 3, 4 and 5 apart, so the 1-5 spinner this used to be
+    ; offered three real settings under five labels: 5 = Exact, 2 = Close, 1 = Loose.
+    UIfindDupePrecision := (findDupesPrecision<=1) ? 3 : (findDupesPrecision=2) ? 2 : 1
+    ddlWid := (PrefsLargeFonts=1) ? 105 : 75
+    Gui, Add, Text, xs y+9 hp +0x200 vbtnFldr, Matching precision:
+    GuiAddDropDownList("x+5 w" ddlWid " AltSubmit Choose" UIfindDupePrecision " vUIfindDupePrecision", "Exact|Close|Loose", "Numeric properties matching tolerance")
+
+    sml := (PrefsLargeFonts=1) ? 40 : 30
+    GuiAddButton("x+5 w" sml " hp gBtnHelpDupesPrecision", " ?", "Help")
 
     fingWid := (PrefsLargeFonts=1) ? 170 : 100
     fingEdt := (PrefsLargeFonts=1) ? 70 : 50
     thumbu := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Tab, 2
-    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Below you can choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare. The blue dots in the preview area highlight the sections of the hash that will be compared: image areas for dHash and lHash, DCT frequencies for pHash, from the lowest at the top-left. Higher threshold may yield more false-positives listed.
+    Gui, Add, Text, x+15 y+15 w%txtWid% Section vbtnFldr6, Choose what image hashing algorithm to use to compare images and configure what sections of the hashes to compare.
     GuiAddDropDownList("xs y+10 w" fingWid " AltSubmit Section gupdateUIdupesPanel Choose" userFindDupesFilterHamDist " vuserFindDupesFilterHamDist", "Ignore|dHash 8x8|pHash DCT 32x32|lHash 8x8", "Image hash type")
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditF11", hamDistLBorderCrop, "Image hash crop left.")
     Gui, Add, UpDown, vhamDistLBorderCrop gupdateUIdupesPanel Range0-9, % hamDistLBorderCrop
@@ -89484,6 +89486,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Text, xs ys+%dp% w%fingWid% vtxtLine1, Threshold:
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit2 veditF7", userFindDupesHamDistLvl, "Image hash difference threshold")
     Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range1-15, % userFindDupesHamDistLvl
+    GuiAddButton("x+5 w" sml " hp gBtnHelpDupesHashes", " ?", "Help")
     Gui, Add, Checkbox, xs y+15 Checked%findFlippedDupes% vfindFlippedDupes, Identify images horizontally flipped
     Gui, Add, Checkbox, xp y+15 Checked%findInvertedDupes% vfindInvertedDupes, Attempt to identify color inverted images
     Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on hamming distance [similarity]
@@ -89536,8 +89539,7 @@ BtnCollectDupesData() {
        Return
 
    Gui, SettingsGUIA: Default
-   GuiControlGet, UIfindDupesPrecision
-   findDupesPrecision := dupesPrecisionFromUI(UIfindDupesPrecision)
+   GuiControlGet, UIfindDupePrecision
    GuiControlGet, dupesStringFilter
    GuiControlGet, userFilterStringIsNot
    GuiControlGet, userFilterStringPos
@@ -89547,6 +89549,7 @@ BtnCollectDupesData() {
    GuiControlGet, userpHashMode
    GuiControlGet, hamDistInterpolation
    GuiControlGet, dupesApplyBlur
+   findDupesPrecision := dupesPrecisionFromUI(UIfindDupePrecision)
    BtnCloseWindow()
    Global findFlippedDupes := 1
    scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
@@ -89637,7 +89640,7 @@ updateUIdupesPanel() {
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
    GuiControl, % actu, userFindDupesSelectAllDummy
    GuiControl, % actu, btnFldr6
-   GuiControl, % actu2, UIfindDupesPrecision
+   GuiControl, % actu2, UIfindDupePrecision
    GuiControl, % actu2, btnFldr
    UIfindDupesCheckboxes(actu)
 }
@@ -89706,8 +89709,7 @@ BTNfindDupesNow() {
 
    columnus := ""
    Gui, SettingsGUIA: Default
-   GuiControlGet, UIfindDupesPrecision
-   findDupesPrecision := dupesPrecisionFromUI(UIfindDupesPrecision)
+   GuiControlGet, UIfindDupePrecision
    GuiControlGet, dupesStringFilter
    GuiControlGet, userFilterStringIsNot
    GuiControlGet, userFilterStringPos
@@ -89725,6 +89727,7 @@ BTNfindDupesNow() {
    GuiControlGet, userFindDupesMSElvl
    GuiControlGet, dupesApplyBlur
    GuiControlGet, BreakDupesGroups
+   findDupesPrecision := dupesPrecisionFromUI(UIfindDupePrecision)
    If (PerformMSDonDupes=1)
       findFlippedDupes := findInvertedDupes := 0
 
@@ -89810,7 +89813,7 @@ BTNfindDupesNow() {
    columnus := Trimmer(columnus, ",")
    If (StrLen(columnus)<3 && userFindDupesFilterHamDist>1)
    {
-      findDupesPrecision := 1
+      UIcheckimgwhratio := UIcheckimgframes := 1
       columnus := theseCols := "imgwhratio,imgframes"
    } Else If (userFindDupesFilterHamDist>1)
    {
@@ -89820,7 +89823,10 @@ BTNfindDupesNow() {
       theseCols := StrReplace(theseCols, ",,", ",")
       theseCols := StrReplace(theseCols, ", ,", ",")
       If (StrLen(theseCols)<3)
+      {
+         UIcheckimgwhratio := UIcheckimgframes := 1
          columnus := theseCols := "imgwhratio,imgframes"
+      }
    } Else theseCols := columnus
 
    If (StrLen(theseCols)<3)
@@ -89862,8 +89868,16 @@ dupesPrecisionFromUI(indexu) {
    Return (indexu=3) ? 1 : (indexu=2) ? 2 : 5
 }
 
+BtnHelpDupesPrecision() {
+   msgBoxWrapper(appTitle ": HELP", "The «Matching precision» option sets how closely the floating point numeric image properties must agree for two images to be grouped: aspect ratio, megapixels and the histogram values.`n`n«Exact» compares them as stored; «Close» rounds them to two decimals first, so small differences are ignored - an aspect ratio of 1.778 matches 1.783, a histogram value matches within two or three gray levels; «Loose» rounds to one decimal and is far more forgiving - only broad families of aspect ratios such as 4:3, 3:2 and 16:9 stay apart, and the histogram values match within about 25 levels.`n`nThis setting does not apply to file names, dates, sizes, width, height, frames and pixel format.`n`nWith an image hash selected, the aspect ratio is also what limits which images are compared with each other, so «Exact» will miss resized copies whose dimensions were rounded. «Close» or «Loose» is advised there.", -1, 0, 0)
+}
+
+BtnHelpDupesHashes() {
+   msgBoxWrapper(appTitle ": HELP", "The blue dots in the preview area highlight the sections of the hash that will be compared: image areas for dHash and lHash, DCT frequencies for pHash, from the lowest at the top-left.`n`nPlease note, higher threshold values may yield more false-positives.", -1, 0, 0)
+}
+
 BTNhelpFindDupes() {
-   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe «Matching» option sets how closely the numeric image properties must agree for two images to be grouped: aspect ratio, megapixels and the histogram values. «Exact» compares them as stored; «Close» rounds them to two decimals first, so small differences are ignored - an aspect ratio of 1.778 matches 1.783, a histogram value matches within two or three gray levels; «Loose» rounds to one decimal and is far more forgiving - only broad families of aspect ratios such as 4:3, 3:2 and 16:9 stay apart, and the histogram values match within about 25 levels. It does not apply to file names, dates, sizes, width, height, frames and pixel format, which always have to be identical. With an image hash selected, the aspect ratio is also what limits which images are compared with each other, so «Exact» will miss resized copies whose dimensions were rounded, and «Close» or «Loose» is advised there.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, set «Matching» to «Close» and the dHash threshold to 3 in the image hashes tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, set «Matching» to «Close» and the dHash threshold to 3 in the image hashes tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
@@ -90307,6 +90321,7 @@ PanelJpegPerformOperation() {
        Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gBtnPerformJpegOp, &Perform operation
        Gui, Add, Button, x+5 hp wp-20 gBtnPerformSoloJpegOp, &Active file only
     }
+
     sml := (PrefsLargeFonts=1) ? 80 : 60
     Gui, Add, Button, x+5 hp w%sml% gBtnCloseWindow, C&lose
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "JPEG lossless operations: " appTitle)
