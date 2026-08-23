@@ -36119,7 +36119,7 @@ PanelCachesOverview() {
 
    Gui, Add, Button, x+5 hp w%btnWid2% Default gBtnCloseWindow, C&lose
    Gui, Add, Edit, x+1 h1 w1 vEditF5 -wantTab +ReadOnly, % hostPanel
-   repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Database caches overview: " appTitle)
+   repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Database cache overview: " appTitle)
    Sleep, 5
    ; on a timer, so the window is painted before the counting queries block the thread
    SetTimer, uiPopulateCachesOverview, -50
@@ -89813,7 +89813,6 @@ BTNfindDupesNow() {
    columnus := Trimmer(columnus, ",")
    If (StrLen(columnus)<3 && userFindDupesFilterHamDist>1)
    {
-      UIcheckimgwhratio := UIcheckimgframes := 1
       columnus := theseCols := "imgwhratio,imgframes"
    } Else If (userFindDupesFilterHamDist>1)
    {
@@ -89823,10 +89822,7 @@ BTNfindDupesNow() {
       theseCols := StrReplace(theseCols, ",,", ",")
       theseCols := StrReplace(theseCols, ", ,", ",")
       If (StrLen(theseCols)<3)
-      {
-         UIcheckimgwhratio := UIcheckimgframes := 1
          columnus := theseCols := "imgwhratio,imgframes"
-      }
    } Else theseCols := columnus
 
    If (StrLen(theseCols)<3)
