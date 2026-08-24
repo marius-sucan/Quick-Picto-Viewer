@@ -2681,8 +2681,8 @@ resetMainWin2Welcome() {
      gdipObjectsTerminator()
      ForceRefreshNowThumbsList()
      prevOpenedWindow := ""
-     SetTimer, createGUItoolbar, -100
      drawWelcomeImg()
+     SetTimer, createGUItoolbar, -100
      interfaceThread.ahkPostFunction("uiAccessWelcomeView")
      SetTimer, TriggerMenuBarUpdate, -90
      SetTimer, ResetImgLoadStatus, -50
@@ -12208,8 +12208,6 @@ changeImgRotationInVP(dir, stepu:=5, doReset:=0) {
 
    resetSlideshowTimer()
    stepu := (dir=1) ? stepu : -stepu
-   ; the wrap ceiling must rely on the step magnitude; with the raw negative step,
-   ; decreasing from 0° used to wrap to 365° [or 361°] instead of 355° [or 359°]
    vpIMGrotation := clampInRange(vpIMGrotation + stepu, 0, 360 - Abs(stepu), 1)
    If (doReset=1)
       vpIMGrotation := 0
@@ -32915,11 +32913,9 @@ PanelEnableFilesFilter() {
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIFiltersPanel Checked%userFilterDoString% vuserFilterDoString, Filter files list with given string
     Gui, Add, Text, y+7 w1 h1, String filter
     Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditFilter, % listu
-    ; Regular Expressions cannot be translated into the LIKE queries used for SQLite
-    ; lists, so the matching mode is not offered there; it used to be passed verbatim
-    ; into LIKE, where any real pattern matched nothing
     If (SLDtypeLoaded=3 && userFilterStringPos>3)
        userFilterStringPos := 1
+
     strModesList := (SLDtypeLoaded=3) ? "Anywhere`nBegins with`nEnds with" : "Anywhere`nBegins with`nEnds with`nRegEx"
     GuiAddDropDownList("y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterStringPos " vuserFilterStringPos", strModesList, "String filter matching mode")
     GuiAddDropDownList("x+2 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterWhat " vuserFilterWhat", "Full paths`nFolder paths`nFile names`nParent folders", "Apply filter based on")
@@ -33113,7 +33109,6 @@ updateUIFiltersPanel(dummy:=0) {
       {
          ; the database stores fmodified/fcreated as 12 digits [yyyyMMddHHmm, see
          ; addSQLdbEntry()], while the files list slots hold full 14 digit stamps;
-         ; both bounds must include the whole day chosen in the date pickers
          If (SLDtypeLoaded=3)
          {
             minRange := SubStr(minDrange, 1, 8) "0000"
@@ -35135,6 +35130,7 @@ SaveFilesList(enforceFile:=0) {
       saveDynaFolders := getDynamicFoldersList(thisTmpFile)
       If !mainFile.Write("`n[DynamicFolderz]`n")
          wasErrorC := 1
+
       Loop, Parse, saveDynaFolders, `n
       {
           fileTest := StrReplace(A_LoopField, "|")
@@ -35150,6 +35146,7 @@ SaveFilesList(enforceFile:=0) {
       changeMcursor()
       If !mainFile.Write("`n[Folders]`n")
          wasErrorC := 1
+
       If (SLDcacheFilesList=1)
       {
          thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
@@ -35163,6 +35160,7 @@ SaveFilesList(enforceFile:=0) {
 
       If !mainFile.Write("`n[FilesList]`n")
          wasErrorC := 1
+
       If (SLDcacheFilesList=1)
       {
          Loop, % maxFilesIndex
@@ -35196,6 +35194,7 @@ SaveFilesList(enforceFile:=0) {
       SoundBeep, % wasErrorC ? 300 : 900, 100
       If wasErrorC
          msgBoxWrapper(appTitle ": ERROR", "Errors occured when writing the files list to disk. Permission denied or not enough disk space.", 0, 0, "error")
+
       dummyTimerDelayiedImageDisplay(50)
    }
 }
@@ -36361,8 +36360,6 @@ coreCachesOverviewIgnoredAct(modus) {
       RemoveTooltip()
    }
 
-   ; PopulateIndexFilesStatsInfos("kill") also resets, in cascade, the caches of
-   ; PopulateIndexSQLFilesStatsInfos() and PopulateImagesIndexStatsInfos()
    PopulateIndexFilesStatsInfos("kill")
    PopulateImagesIndexStatsInfos("kill")
    uiPopulateCachesOverview("kill")
@@ -36920,9 +36917,6 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
 ; dupesDHash(), dupesLHash() and dupesPHash() over a fingerprint decoded
 ; once by dupesHashStep(), and decodeFingerprintChunk() for the MSD path.
    Static userFriendly := {1:"NONE", 2:"dHash", 3:"pHash", 4:"lHash"}
-   uiPopulateCachesOverview("kill")   ; the counters these panels display are about to change
-   PopulateIndexFilesStatsInfos("kill")
-   PopulateImagesIndexStatsInfos("kill")
    setImageLoading()
    doStartLongOpDance()
    backCurrentSLD := CurrentSLD
@@ -37000,6 +36994,9 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
       Return -1
    }
 
+   uiPopulateCachesOverview("kill")
+   PopulateIndexFilesStatsInfos("kill")
+   PopulateImagesIndexStatsInfos("kill")
    failedFiles := countTFilez := 0
    activeSQLdb.Exec("BEGIN TRANSACTION;")
    prevMSGdisplay := A_TickCount
@@ -37730,15 +37727,8 @@ SortFilesList(SortCriterion) {
       2ndnewFilesList := []
       finalNewList := []
       ForceRefreshNowThumbsList()
-      If StrLen(backfilesFilter)>1
+      If (StrLen(backfilesFilter)>1)
          filesFilter := backfilesFilter
-
-      If (SLDtypeLoaded=3)
-      {
-         uiPopulateCachesOverview("kill")
-         PopulateIndexFilesStatsInfos("kill")
-         PopulateImagesIndexStatsInfos("kill")
-      }
 
       GenerateRandyList()
       entireString := entireNotSortedString := ""
@@ -46786,29 +46776,39 @@ SelectFilesDead() {
 }
 
 QuickSelectFilesSameFolder(modus:=0, external:=0) {
+    Static lastInvoked := 1
     imgPath := (isNumber(modus) && modus>0 && external="aye") ? modus : getIDimage(currentFileIndex)
     zPlitPath(imgPath, 0, OutFileName, OutDir)
     If (!OutDir || !currentFileIndex || maxFilesIndex<3)
        Return
 
     If warnFramesActionPrevented("SELECT")
-      Return
+       Return
 
     o := markSearchMatches
     oz := userSearchString
     od := userSearchWhat
     og := thisSearchString
+    If (resultedFilesList[currentFileIndex, 2]=1 && (A_TickCount - lastInvoked<950))
+    {
+       ; select from subfolders as well 
+       SoundBeep 900,100
+       userSearchWhat := 1
+       userSearchString := OutDir "\"
+    } Else
+    {
+       ; exact match on the containing folder [as regex]
+       userSearchWhat := 2
+       userSearchString := "\>i)^" JEE_StrRegExLiteral(OutDir) "$"
+    }
 
     markSearchMatches := 0
-    userSearchWhat := 2
-    ; exact match on the containing folder [as regex], otherwise the files
-    ; found in its sub-folders used to be selected as well
-    userSearchString := "\>i)^" JEE_StrRegExLiteral(OutDir) "$"
     SearchIndexSelectAll("quick")
     userSearchWhat := od
     userSearchString := oz
     markSearchMatches := o
     thisSearchString := og
+    lastInvoked := A_TickCount
     dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -59328,14 +59328,6 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
             SLDtypeLoaded := 1
          } Else If (imgPath=file2save)
             resultedFilesList[currentFileIndex, 1] := file2save
-
-         If (SLDtypeLoaded=3)
-         {
-            selectivePurgeCachedSQLdata(resultedFilesList[currentFileIndex, 12])
-            uiPopulateCachesOverview("kill")
-            PopulateIndexFilesStatsInfos("kill")
-            PopulateImagesIndexStatsInfos("kill")
-         }
 
          imgIndexEditing := currentFileIndex
          currentImgModified := 2
@@ -72605,6 +72597,7 @@ drawWelcomeImg() {
     Gdip_DisposeImageAttributes(imageAttribs)
     If (TouchScreenMode=1 && screenSaverMode!=1)
     {
+       ; draw touch screen friendly viewport section separators
        calculateTouchMargins(thisX, thisY, thisW, thisH)
        thisThick := imgHUDbaseUnit//11
        Penuha := Gdip_CreatePen("0x34334433", thisThick)
@@ -72643,7 +72636,6 @@ drawWelcomeImg() {
 
 coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, minX, minY, startMode, previewMode:=0, usePrevious:=0) {
     Static prevObj := [], prevBMPu, prevState
-
     If (modelu="kill")
     {
        prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
@@ -86889,16 +86881,11 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
      IniSLDBreadGiven("dbVersion")
   }
 
-  ; a folder rescan interrupted by a crash leaves transient marks behind; the
-  ; files would be hidden from any further data collection. See SQLdeleteEntriesMarked()
-  If (importMode!=1)
-     SQLrestoreEntriesMarked(2)
-
   RecordSet := ""
   sortMode := (reverseOrderOnSort=1) ? " DESC" : ""
-  reorder := StrLen(prevFilesSortMode)>3 ? " ORDER BY " prevFilesSortMode sortMode ";" : " ORDER BY imgidu;"
+  reorder := (StrLen(prevFilesSortMode)>3) ? " ORDER BY " prevFilesSortMode sortMode ";" : " ORDER BY imgidu;"
   If !RegExMatch(prevFilesSortMode, "i)(fsize|fmodified|fcreated|imgfile|imgfolder)")
-     moreCol := StrLen(prevFilesSortMode)>3 ? ", " prevFilesSortMode : ""
+     moreCol := (StrLen(prevFilesSortMode)>3) ? ", " prevFilesSortMode : ""
   ; ToolTip, % prevFilesSortMode "=" reverseOrderOnSort , , , 2
   startOperation := A_TickCount
   SQL := "SELECT imgidu, imgfolder||'\'||imgfile " moreCol " FROM images" reorder
@@ -89766,16 +89753,17 @@ updateUIdupesPanel() {
    Gui, SettingsGUIA: Default
    GuiControlGet, userFindDupePresets
    actu := (userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-   ; the Matching tolerance applies to aspect ratio, megapixels and the histogram values;
-   ; presets 5 and 6 have none of those, and presets 3 and 4 group by the exact file size,
-   ; for which BTNfindDupesNow() forces an exact match - so only 1, 2 and Custom get it
-   actu2 := isInRange(userFindDupePresets, 3, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
    GuiControl, % actu, userFindDupesSelectAllDummy
    GuiControl, % actu, btnFldr6
    ; the hash type is honoured only in Custom mode; preset 1 pins dHash and
    ; the other presets group by properties alone [see BTNfindDupesNow()]
    GuiControl, % actu, userFindDupesFilterHamDist
+
+   ; the Matching tolerance applies to aspect ratio, megapixels and the histogram values;
+   ; presets 5 and 6 have none of those, and presets 3 and 4 group by the exact file size,
+   ; for which BTNfindDupesNow() forces an exact match - so only 1, 2 and Custom use UIfindDupePrecision
+   actu2 := isInRange(userFindDupePresets, 3, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % actu2, UIfindDupePrecision
    GuiControl, % actu2, btnFldr
    UIfindDupesCheckboxes(actu)
@@ -99471,7 +99459,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
          SoundBeep, 900, 100
       }
 
-      showTOOLtip("Processed image saved`n" OutFileName)
+      showTOOLtip("Processed image saved:`n" OutFileName)
       If (dummy="no-prompt")
          SetTimer, RefreshImageFile, -150
 
