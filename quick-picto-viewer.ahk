@@ -4881,7 +4881,7 @@ ToggleThumbsMode() {
          Return
    } Else If (thumbsDisplaying=1 && currentFileIndex!=imgIndexEditing)
    {
-      ar := askAboutFileSave(" and another image will be loaded", 1, "yes")
+      ar := askAboutFileSave(" and another image will be loaded", "yes")
       If ar
       {
          If (ar=1)
@@ -9446,8 +9446,8 @@ moveSelectedPointsInVectorPath(gmX, gmY, altState) {
    pp := ""
    vpImgPanningNow := 1
    startOperation := A_TickCount
-   zx := (FlipImgV=1) ? -1 : 1
-   zy := (FlipImgH=1) ? -1 : 1
+   zx := (FlipImgH=1) ? -1 : 1
+   zy := (FlipImgV=1) ? -1 : 1
    While, (determineLClickState()=1)
    {
       If (A_TickCount - startOperation<150)
@@ -11238,12 +11238,6 @@ ToggleImgColorDepth(dir:=0) {
 
    lastInvoked := A_TickCount
    resetSlideshowTimer()
-   If (imgFxMode=4 && bwDithering=1)
-   {
-      imgFxMode := 1
-      Return
-   }
-
    good2go := (imgFxMode=1 || imgFxMode=2 || imgFxMode=3 || imgFxMode=8) ? 1 : 0
    If (good2go!=1)
       imgFxMode := 1
@@ -17112,9 +17106,6 @@ ImgVectorUndoAct() {
 }
 
 recordVectorUndoLevels() {
-   If (preventUndoLevels=1)
-      Return
-
    bonus := 0
    mainArray := customShapePoints.Clone()
    VPstuffArray := customShapePropPoints.Clone()
@@ -25229,10 +25220,10 @@ PasteHDropFiles(allowFilesPaste) {
       Loop, Parse, imgsListu, `n,`r
       {
            If FileExist(Trimmer(A_LoopField))
-              filesFound := 1
-      } Until (A_Index>5)
+              filesFound++
+      } Until (A_Index>10)
 
-      If (filesFound!=1)
+      If !filesFound
       {
          ResetImgLoadStatus()
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -25240,33 +25231,37 @@ PasteHDropFiles(allowFilesPaste) {
       }
    }
 
-   If (testClipType=1 || filesFound=1) && (allowFilesPaste=0)
+   If ((testClipType=1 || filesFound>0) && (allowFilesPaste=0))
    {
       ResetImgLoadStatus()
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return 1
    }
 
-   countFiles := ST_Count(Trimmer(imgsListu), "`n")
+   countFiles := ST_Count(imgsListu, ":\")
    If (countFiles>0 && StrLen(imgsListu)>4)
    {
       showTOOLtip("Files identified in the clipboard")
       zpk := (maxFilesIndex>1) ? "Select newly inserted index entries" : ""
-      msgResult := msgBoxWrapper(appTitle ": Paste files", "You have " countFiles " file entries stored in the clipboard by your file explorer or manager.`n`nWould you like to import the image files (if any) into the files list of " appTitle "?", 4, 0, "question", zpk)
+      If maxFilesIndex
+         msgResult := msgBoxWrapper(appTitle ": Paste files", "You have " groupDigits(countFiles) " file entries stored in the clipboard by your file explorer or manager.`n`nWould you like to import the image files (if any) into the files list of " appTitle "?", 4, 0, "question", zpk)
+      Else
+         msgResult := "yes"
    }
 
    If (InStr(msgResult.btn, "yes") || msgResult="yes")
    {
-      initialIndex := maxFilesIndex
+      pp := maxFilesIndex
+      initialIndex := maxFilesIndex ? maxFilesIndex : 1
       mustOpenStartFolder := ""
       coreAddNewFiles(imgsListu, countFiles, SelectedDir, msgResult.check)
       If (initialIndex!=maxFilesIndex)
       {
-         currentFileIndex := maxFilesIndex - 1
+         currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
          GenerateRandyList()
          dummyTimerDelayiedImageDisplay(50)
          ForceRefreshNowThumbsList()
-         newFiles := max(initialIndex, maxFilesIndex) - min(initialIndex, maxFilesIndex)
+         newFiles := !pp ? maxFilesIndex : max(initialIndex, maxFilesIndex) - min(initialIndex, maxFilesIndex)
          showTOOLtip("Finished adding " groupDigits(newFiles) " files to the current list from the clipboard")
       } Else showTOOLtip("No image files identified in the clipboard`nFiles list unchanged.")
    } Else RemoveTooltip()
@@ -26409,7 +26404,7 @@ CreateCollapsedPanelWidget(modus:=0) {
 }
 
 PanelDefineKbdShortcut() {
-    Static keyzList := "0|1|2|3|4|5|6|7|8|9|0|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|F1|F2|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12|Tab|Space|Enter|Backspace|Delete|Insert|Home|End|Page up|Page down|Left|Right|Up |Down|-|=|[|]|\|/|;|,|.|""|Numpad +|Numpad -|Numpad *|Numpad /|Numpad .|Numpad 0|Numpad 1|Numpad 2|Numpad 3|Numpad 4|Numpad 5|Numpad 6|Numpad 7|Numpad 8|Numpad 9|Escape"
+    Static keyzList := "0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|F1|F2|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12|Tab|Space|Enter|Backspace|Delete|Insert|Home|End|Page up|Page down|Left|Right|Up |Down|-|=|[|]|\|/|;|,|.|""|Numpad +|Numpad -|Numpad *|Numpad /|Numpad .|Numpad 0|Numpad 1|Numpad 2|Numpad 3|Numpad 4|Numpad 5|Numpad 6|Numpad 7|Numpad 8|Numpad 9|Escape"
     Global BtnModsCtrl, BtnModsAlt, BtnModsShift, tehCustomKeysThing
     If (allowCustomKeys!=1)
     {
@@ -26906,7 +26901,7 @@ omniBoxFolderImport(dummy:=0, isGiven:=0) {
    If (r="cancel")
       Return
 
-   currentFileIndex := maxFilesIndex - 1
+   currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
    dummyTimerDelayiedImageDisplay(50)
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
@@ -32072,7 +32067,7 @@ folderTreeAppendFiles(modus:="") {
       addNewFolder2list(linea, "yes", modus)
    ; SoundBeep 900, 100
    ResetImgLoadStatus()
-   currentFileIndex := maxFilesIndex - 1
+   currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
    dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -35718,7 +35713,8 @@ removeFilesListSeenImages(modus:=0) {
          msgResult := msgBoxWrapper(appTitle ": Remove " friendlyLabel " images from index", "The files list is filtered down to " maxFilesIndex " files from " bckpMaxFilesIndex ".`n`nOnly the files matched by current filter will be scanned.`n`nTo scan all the image files from the index, deactivcate the filter by pressing Ctrl + F.", 1, 0, "info")
          If (msgResult="cancel" || InStr(msgResult, "win_close"))
             Return
-         Else hasAskedFilter := 1
+         Else 
+            hasAskedFilter := 1
       }
 
       remFromDb := 1
@@ -35757,10 +35753,12 @@ removeFilesListSeenImages(modus:=0) {
       showTOOLtip("Removing " friendlyLabel " images, please wait" etaTime)
       doStartLongOpDance()
       newArrayu := []
+      newMappingList := []
       newFilesIndex := 0
       If (SLDtypeLoaded=3)
          activeSQLdb.Exec("BEGIN TRANSACTION;")
 
+      updateMainu := (StrLen(filesFilter)>1 && (!InStr(filesFilter, "SQL:query:") || hasHamDistCached=1)) ? 1 : 0
       Loop, % maxFilesIndex + 1
       {
           r := resultedFilesList[A_Index, 1]
@@ -35780,7 +35778,7 @@ removeFilesListSeenImages(modus:=0) {
              If (SLDtypeLoaded=3 && remFromDb=1)
                 deleteSQLdbEntry(r, resultedFilesList[A_Index, 12])
 
-             If StrLen(filesFilter)>1
+             If (updateMainu=1)
                 updateMainUnfilteredList(A_Index, 1, "")
 
              countSeen++
@@ -35789,11 +35787,14 @@ removeFilesListSeenImages(modus:=0) {
 
           newFilesIndex++
           newArrayu[newFilesIndex] := resultedFilesList[A_Index]
+          If (updateMainu=1)
+             newMappingList[newFilesIndex] := filteredMap2mainList[A_Index]
+
           If resultedFilesList[A_Index, 2]
              selectedFiles++
 
-          executingCanceableOperation := A_TickCount
           changeMcursor()
+          executingCanceableOperation := A_TickCount
           If (determineTerminateOperation()=1)
           {
              abandonAll := 1
@@ -35844,10 +35845,15 @@ removeFilesListSeenImages(modus:=0) {
       ; renewCurrentFilesList()
       currentFilesListModified := 1
       maxFilesIndex := newFilesIndex
+      resultedFilesList := []
       resultedFilesList := newArrayu.Clone()
+      filteredMap2mainList := []
+      If (updateMainu=1)
+         filteredMap2mainList := newMappingList.Clone()
       markedSelectFile := selectedFiles
       ForceRefreshNowThumbsList()
       newArrayu := ""
+      newMappingList := ""
       GenerateRandyList()
       getSelectedFiles(0, 1)
 
@@ -36925,7 +36931,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    If (flippedModus=1)
       moreInfo := " (flipped)"
 
-   showTOOLtip("Generating images " userFriendly[o_whichHashu] moreInfo " hashes for " groupDigits(maxFilesIndex) " files, please wait" friendly)
+   showTOOLtip("Preparing to generate image " userFriendly[o_whichHashu] moreInfo " hashes, please wait" friendly)
    failedFiles := failedSQLfiles := 0
    If !getMaxRowIDsqlDB()
    {
@@ -40680,8 +40686,8 @@ DeletePicture(dummy:=0) {
   If (fSize>0)
   {
      fileMsg := "`nFile size: " fileSizeFriendly(fSize)
-     oFileDateM := QPV_FileGetSizeTime(file2rem, "M", thisFileIndex)
-     oFileDateC := QPV_FileGetSizeTime(file2rem, "C", thisFileIndex)
+     oFileDateM := QPV_FileGetSizeTime(file2rem, "M", currentFileIndex)
+     oFileDateC := QPV_FileGetSizeTime(file2rem, "C", currentFileIndex)
      Try FormatTime, FileDateM, % oFileDateM, dd/MM/yyyy, HH:mm
      Try FormatTime, FileDateC, % oFileDateC, dd/MM/yyyy, HH:mm
      fileMsg .= "`nDate created: " FileDateC "`nDate modified: " FileDateM
@@ -41349,7 +41355,7 @@ coreBatchMultiRenameFiles() {
 
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
          file2save := OutDir "\" newFileName "." fileEXTu
-         If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
+         If (file2save=file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
          {
             skippedFiles++
             Continue
@@ -41358,8 +41364,8 @@ coreBatchMultiRenameFiles() {
          If (PreserveDateTimeOnSave=1)
          {
             originalMtime := ""
-            FileGetTime, originalMtime, %file2save%, M
-            FileGetTime, originalCtime, %file2save%, C
+            FileGetTime, originalMtime, %file2rem%, M
+            FileGetTime, originalCtime, %file2rem%, C
          }
 
          If (FileExist(file2save) && !FolderExist(file2save))
@@ -42353,16 +42359,16 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
       } Else If (funcu="!OmniImportFolder")
       {
          addNewFolder2list(userQuickMenusEdit, "yes", "not")
+         currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
          ResetImgLoadStatus()
-         currentFileIndex := maxFilesIndex - 1
          dummyTimerDelayiedImageDisplay(50)
          SetTimer, TriggerMenuBarUpdate, -90
          SetTimer, createGUItoolbar, -100
       } Else If (funcu="!OmniImportRfolder")
       {
          addNewFolder2list(userQuickMenusEdit, "yes", "recursive")
+         currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
          ResetImgLoadStatus()
-         currentFileIndex := maxFilesIndex - 1
          dummyTimerDelayiedImageDisplay(50)
          SetTimer, TriggerMenuBarUpdate, -90
          SetTimer, createGUItoolbar, -100
@@ -50050,7 +50056,8 @@ togglePathCurveTension() {
       Return
    }
 
-   FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, 5, 1)
+   maxu := (customShapePropPoints.Count()>3 && drawingShapeNow=1) ? 4 : 5
+   FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, 4, 1)
    decideCustomShapeStyle()
    If (FillAreaCurveTension=1)
      ll := "Polygonal"
@@ -58869,6 +58876,7 @@ DefineSlidesTotalTimeBTNaction() {
 
     etaTime := EstimateSlideShowLength(0, 1)
     infoSliSpeed := DefineSlidesRate()
+    approxMarker := (slideShowDelay<drawModeCzeit + 50) ? "~" : ""
     IniAction(1, "SlideHowMode", "General")
     GuiControl, SettingsGUIA:, InfoLine, One image every: %approxMarker%%infoSliSpeed%`nEstimated slideshow duration: %approxMarker%%etaTime%
 }
@@ -58876,7 +58884,7 @@ DefineSlidesTotalTimeBTNaction() {
 EstimateSlideShowLength(noPrecision:=0, totalu:=0) {
     slidesDuration := (slideShowDelay<drawModeCzeit) ? (drawModeCzeit + slideShowDelay)/2 : drawModeCzeit*0.9 + slideShowDelay
     ; slidesDuration := (slideShowDelay<drawModeCzeit) ? drawModeCzeit : slideShowDelay
-    approxMarker := (slideShowDelay<drawModeCzeit) ? "~" : ""
+    approxMarker := (slideShowDelay<drawModeCzeit + 50) ? "~" : ""
     If (totalu=1)
        infoFilesSel := maxFilesIndex
     Else If (SlideHowMode=1)
@@ -59206,7 +59214,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       If (testWasImageEditedInVP()=1 && imgPath!=file2save && FileRexists(imgPath) && noQualityWarnings!=1)
       {
          msgResult := dilemma := (oExt!=nExt) ? "Do you want QPV to preserve the original color depth? If the destination file format does not allow it, the next best match would be chosen." : "The destination image file format is the same as the original one. Do you want QPV to preserve the original color depth and pixel data, to avoid any potential quality loss? The image will not be re-encoded."
-         If (oExt!=nExt || desiredFrameIndex>0)
+         If (desiredFrameIndex>0)
             dilemma := ""
 
          If dilemma
@@ -61037,7 +61045,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    If (failedFiles>0)
       someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
    If (failedFolders>0)
-      etaTime .= "`nFailed to create " groupDigits(failedFolders) " folders"
+      someErrors .= "`nFailed to create " groupDigits(failedFolders) " folders"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -63611,7 +63619,7 @@ askAboutSlidesListSave() {
    Return r
 }
 
-askAboutFileSave(msg:="", lvls:=1, dontOpen:=0) {
+askAboutFileSave(msg:="", dontOpen:=0) {
    Static lastInvoked := 1, prevAnswer
    lvls := (minimizeMemUsage=1 || A_PtrSize=4) ? 1 : 2
    If (preventUndoLevels=1)
@@ -64743,7 +64751,7 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, no
 
     If (noRandom=1)
     {
-       currentFileIndex := maxFilesIndex - 1
+       currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
        dummyTimerDelayiedImageDisplay(150)
     } Else RandomPicture()
     Return z
@@ -64988,9 +64996,9 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       SetTimer, RemoveTooltip, % -msgDisplayTime
       If (hasReopened!=1)
       {
+         currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
          SetTimer, createGUItoolbar, -100
          TriggerMenuBarUpdate()
-         currentFileIndex := maxFilesIndex - 1
       }
       dummyTimerDelayiedImageDisplay(10)
    } Else If (imgsListu && countFiles=1 && !CurrentSLD)

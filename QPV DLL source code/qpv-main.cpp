@@ -8,7 +8,6 @@
 #include "math.h"
 #include "windows.h"
 #include <string>
-#include <sstream>
 #include <vector>
 #include <atomic>
 #include <stack>
@@ -63,9 +62,8 @@ void fnOutputDebug(std::string input) {
     if (debugInfos!=1)
        return;
 
-    std::stringstream ss;
-    ss << "qpv: " << input;
-    OutputDebugStringA(ss.str().data());
+    std::string line = "qpv: " + input;
+    OutputDebugStringA(line.c_str());
 }
 
 #if defined(_MSC_VER)

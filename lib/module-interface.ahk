@@ -1744,7 +1744,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         Else If (hwnd=hFlyBtn3)
            Tooltip, Menu bar [ F10 ], % xu, % yu
         lastTip := A_TickCount
-     } Else (uiUseDarkMode=1)
+     } Else If (uiUseDarkMode=1)
      {
         HTT := GetWindowFromPos(xu + 5, yu + hh + 5)
         WinGetClass, classu, ahk_id %HTT%
