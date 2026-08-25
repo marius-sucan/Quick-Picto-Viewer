@@ -33181,17 +33181,10 @@ updateUIFiltersPanel(dummy:=0) {
    thisStringFilter := ""
    If (userFilterDoString=1 && SLDtypeLoaded=3)
    {
-      thisStringFilter := SQLescapeStr(UsrEditFilter, 1)
-      If (userFilterStringPos=3 && thisStringFilter)
-         thisStringFilter := "%" thisStringFilter
-      Else If (userFilterStringPos=2 && thisStringFilter)
-         thisStringFilter := thisStringFilter "%"
-      Else If (UsrEditFilter!="")
-         thisStringFilter := "%" thisStringFilter "%"
-
-      thisStringFilter := StrReplace(thisStringFilter, "?", "_")
-      thisStringFilter := StrReplace(thisStringFilter, "*", "_")
-      thisStringFilter := StrReplace(thisStringFilter, "|")
+      ; the whole condition, parenthesised, "NOT (...)" for "must not contain". The "|"
+      ; alternatives and the "*" and "?" wildcards the panel promises used to be lost right here:
+      ; "|" was dropped and both wildcards became "_", a single character
+      thisStringFilter := SQLlikeClauseFromFilter(UsrEditFilter, userFilterWhat, userFilterStringPos, userFilterStringIsNot)
    } Else If (userFilterDoString=1)
    {
       If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
@@ -33243,22 +33236,17 @@ updateUIFiltersPanel(dummy:=0) {
 
       If (SLDtypeLoaded=3)
       {
-         isOrNot := (userFilterStringIsNot=1) ? " NOT " : ""
-         2ndColumn := (userFilterWhat=1) ? "fullPath" : "imgfolder"
          If (userFilterProperty=8)
             columnu := "Round(imgwhratio, 1)"
          If (userFilterProperty=5)
             columnu := "Round(imgmegapix)"
-
-         If (userFilterWhat=3)
-            2ndColumn := "imgfile"
 
          If (userFilterInvertThis=1)
             invertor := " NOT "
 
          finalFilteru := "SQL:query:WHERE " columnu invertor " BETWEEN " minRange " AND " maxRange
          If thisStringFilter
-            finalFilteru .= " AND " 2ndColumn isOrNot " LIKE '" thisStringFilter "' ESCAPE '>'"
+            finalFilteru .= " AND " thisStringFilter
       } Else
       {
          finalFilteru := "QPV::query::" columnu "::" minRange "::" maxRange
@@ -33268,13 +33256,8 @@ updateUIFiltersPanel(dummy:=0) {
    } Else
    {
       If (SLDtypeLoaded=3 && thisStringFilter)
-      {
-         isOrNot := (userFilterStringIsNot=1) ? " NOT " : ""
-         2ndColumn := (userFilterWhat=1) ? "fullPath" : "imgfolder"
-         If (userFilterWhat=3)
-            2ndColumn := "imgfile"
-         finalFilteru := "SQL:query:WHERE " 2ndColumn isOrNot " LIKE '" thisStringFilter "' ESCAPE '>'"
-      } Else If thisStringFilter
+         finalFilteru := "SQL:query:WHERE " thisStringFilter
+      Else If thisStringFilter
          finalFilteru := "\>" thisStringFilter
    }
 
@@ -36509,8 +36492,8 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       extraFilter := extractSQLqueryFromFilter()
    } Else If (doFilterExtra=2 && stringu)
    {
-      stringu := processSQLsearchIndexString(stringu, strPosu, whatu)
-      extraFilter := (mustNotHave=1) ? " WHERE " whatu " NOT LIKE '" stringu "' ESCAPE '>'" : " WHERE " whatu " LIKE '" stringu "' ESCAPE '>'"
+      stringu := SQLlikeClauseFromFilter(stringu, whatu, strPosu, mustNotHave)
+      extraFilter := stringu ? " WHERE " stringu : ""
    }
 
    friendly := extraFilter ? "`nCurrent files list filter:`n" extraFilter : ""
@@ -37066,9 +37049,9 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
       whichHashu := "H" whichHashu
    }
 
-   stringu := processSQLsearchIndexString(stringu, strPosu, whatu)
+   stringu := SQLlikeClauseFromFilter(stringu, whatu, strPosu, mustNotHave)
    If stringu ; allow query database  filtering?
-      containsT := (mustNotHave=1) ? " AND " whatu " NOT LIKE '" stringu "' ESCAPE '>'" : " AND " whatu " LIKE '" stringu "' ESCAPE '>'"
+      containsT := " AND " stringu
 
    ; Both statements run on AHK's own handle, deliberately: a second connection would not
    ; see the rows already updated inside the transaction below, so they would come back as
@@ -40080,34 +40063,56 @@ processSearchIndexString(inputu) {
    Return thisFilter
 }
 
-processSQLsearchIndexString(inputu, strPosu, ByRef whatu) {
+SQLlikeClauseFromFilter(userString, whatu, strPosu, mustNot) {
+; The WHERE condition of the string filter on the SQLite lists, built from the text the user
+; typed: the terms separated by "|" are alternatives, "*" stands for any run of characters and
+; "?" for a single one, the way the plain-text lists read the very same text through
+; JEE_StrRegExLiteral(). The path columns are stored lowercased [addSQLdbEntry()] and SQLite
+; folds the case of the ASCII letters alone, so every term is lowercased the same way.
+; ">" is the LIKE escape character the callers declare: SQLescapeStr() puts it in front of a
+; literal "_", "%" and "[" BEFORE the wildcards of the user become "%" and "_", and a ">" typed
+; by the user is dropped, it is illegal in file names anyway.
+; whatu: 1 = full path, 2 = folder path, 3 = file name, 4 = the name of the parent folder alone,
+; as coreSearchIndex() reads them for the plain-text lists; strPosu: 2 = begins with, 3 = ends
+; with, anything else = anywhere [RegEx is not offered on the SQL lists].
+; The condition comes back in parentheses, "NOT (...)" when mustNot is set: every caller glues
+; it to further conditions with AND, and the OR chain must not spill into them. It comes back
+; empty when no term is left, and the callers then apply no string condition at all.
    If (whatu=2)
-      whatu := "imgfolder"
+      columnu := "imgfolder"
    Else If (whatu=3)
-      whatu := "imgfile"
-   Else ; If (whatu=1)
-      whatu := "fullPath"
+      columnu := "imgfile"
+   Else If (whatu=4)
+      columnu := "replace(imgfolder, rtrim(imgfolder, replace(imgfolder, '\', '')), '')"
+   Else
+      columnu := "fullPath"
 
-   inputu := StrReplace(inputu, "'")
-   inputu := StrReplace(inputu, "\>")
-   inputu := StrReplace(inputu, ">")   ; ">" is the LIKE escape character the callers declare; illegal in file names anyway
-   inputu := StrReplace(inputu, "_", ">_")
-   inputu := StrReplace(inputu, "%", "_")
-   inputu := StrReplace(inputu, "*", "_")
-   inputu := StrReplace(inputu, "?", "_")
-   inputu := StrReplace(inputu, "|", "_")
-   inputu := StrReplace(inputu, "/")
-
-   If (strPosu=3 && StrLen(inputu)>1)
+   listu := ""
+   Loop, Parse, userString, |
    {
-      thisFilter := "%" inputu
-   } Else If (strPosu=2 && StrLen(inputu)>1)
-   {
-      thisFilter := inputu "%"
-   } Else If inputu
-      thisFilter := "%" inputu "%"
+      termu := StrReplace(A_LoopField, ">")
+      If (termu="")
+         Continue
 
-   Return thisFilter
+      termu := SQLescapeStr(Format("{:L}", termu), 1)
+      termu := StrReplace(termu, "*", "%")
+      termu := StrReplace(termu, "?", "_")
+      If (strPosu=2)
+         termu .= "%"
+      Else If (strPosu=3)
+         termu := "%" termu
+      Else
+         termu := "%" termu "%"
+
+      If listu
+         listu .= " OR "
+      listu .= columnu " LIKE '" termu "' ESCAPE '>'"
+   }
+
+   If (listu="")
+      Return ""
+
+   Return (mustNot=1) ? "NOT (" listu ")" : "(" listu ")"
 }
 
 searchNextIndex(direction, inLoop:=0) {
@@ -87532,7 +87537,9 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    If (InStr(thisNOTnullCol, "hash") || mustForceHashes>1 || userFindDupesFilterHamDist>1)
    {
       scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
-      rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, userFilterStringIsNot)
+      ; the same matching mode and column the hashes below and the results list are filtered
+      ; with; the collection used to read "anywhere in the full path" whatever the panel said
+      rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
       If (rr=-3)
       {
          RemoveTooltip()
