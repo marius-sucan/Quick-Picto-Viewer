@@ -153,7 +153,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
    , drawModeBzeit := 1, drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, AutoCropBordersSize := 15
    , GDIfadeVPcache := "", executingCanceableOperation := 1, hCropCornersPic, UserMemBMP := "", userSearchString := ""
-   , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1, losslessJpegTransforms := 0
+   , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
    , prevTryThumbsUpdate := 1, thumbsSizeQuality := 245, prevFullIndexThumbsUpdate := -1, userClipBMPpaste
    , UserNewWidth := 0, UserNewHeight := 0, UserNewDPI := 0, viewportStampBMP := "", tinyPrevAreaCoordY := 1
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
@@ -38234,11 +38234,11 @@ applyMultiCoresConvertResults(theFinalList) {
   }
 }
 
-WorkLoadMultiCoresSimpleImgProcessing(maxList) {
+WorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
   job := {}
   job.maxList := maxList
   job.mode := "batch-simpleimgproc"
-  job.args := imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" editingSelectionNow "=" simpleOpRotationAngle "=" losslessJpegTransforms
+  job.args := imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" editingSelectionNow "=" simpleOpRotationAngle "=" losslessJpegs
   job.eligibleRegEx := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
   job.flagThumbs := (ResizeUseDestDir=1) ? 0 : 1  ; rewritten in place: a lossless JPEG transform keeps the file times the thumbnails cache keys on
   job.failVerb := "process"
@@ -38451,7 +38451,7 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
   prcSelY2 := argumentsArray[8]
   editingSelectionNow := argumentsArray[9]
   simpleOpRotationAngle := argumentsArray[10]
-  losslessJpegTransforms := argumentsArray[11]
+  losslessJpegs := argumentsArray[11]
   skippedFiles := failedFiles := countFilez := operationDone := 0
   thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
   Loop, Parse, filesList,`n,`r
@@ -38497,7 +38497,7 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
           Break
        }
 
-       r := coreSimpleFileProcessing(imgPath, file2save, simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor)
+       r := coreSimpleFileProcessing(imgPath, file2save, simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor, 0, losslessJpegs)
        If r
           failedFiles++
        Else
@@ -92563,9 +92563,7 @@ coreQuickImageFilesListActions(actu) {
    ResizeQualityHigh := ResizeInPercentage := 1
    ResizeUseDestDir := 0
    decideUserImgRotationOption()
-   losslessJpegTransforms := 1
-   r := BtnPerformSimpleProcessing("no-prompt", "extern")
-   losslessJpegTransforms := 0
+   r := BtnPerformSimpleProcessing("no-prompt", "extern", 1)
    If (r=1)
    {
       ; the displayed image was transformed on disk: a flip or rotation of the viewport
@@ -98875,17 +98873,17 @@ coreWIAsimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Ys
    Return !r
 }
 
-coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion:=0) {
+coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion:=0, losslessJpegs:=0) {
   If RegExMatch(imgPath, "i)(.\.(ico))$")
      Return "err"
 
-  ; losslessJpegTransforms=1 - the flip/rotate/crop actions of the files list: a JPEG gets
+  ; losslessJpegs=1 - the flip/rotate/crop actions of the files list: a JPEG gets
   ; the operation applied to its DCT coefficients, in place, by coreJpegLossLessAction(): no
   ; re-encoding, and its metadata and colour profile survive, which the pixel path below
   ; strips when it decodes through WIC. Only a real JPEG (by signature, whatever its name)
   ; and only when the transformations amount to one lossless operation; a failure is
   ; reported as such instead of silently re-encoding the file.
-  If (losslessJpegTransforms=1 && doConversion=0 && (file2save=imgPath || ResizeUseDestDir!=1) && RegExMatch(imgPath, "i)(.\.(jpeg|jpg|jpe))$"))
+  If (losslessJpegs=1 && doConversion=0 && (file2save=imgPath || ResizeUseDestDir!=1) && RegExMatch(imgPath, "i)(.\.(jpeg|jpg|jpe))$"))
   {
      jpegOp := losslessJpegOpFromSimpleFlags()
      If (jpegOp && FreeImage_GetFileType(imgPath)=2)  ; 2 = FIF_JPEG
@@ -99348,9 +99346,10 @@ TglRszMustPerformResize() {
     GuiControl, % actu, ResizeKeepAratio
 }
 
-BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
+BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
     If (contextu!="extern")
     {
+       losslessJpegs := 0  ; only the files list actions ask for it; as a g-label this function also receives GUI event arguments here
        Gui, SettingsGUIA: Default
        GuiControlGet, ResizeMustPerform, SettingsGUIA:, ResizeMustPerform
        GuiControlGet, SimpleOperationsFlipV, SettingsGUIA:, SimpleOperationsFlipV
@@ -99420,7 +99419,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
        }
 
        WriteSettingsResizeSimplePanel()
-       batchSimpleProcessing(simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor)
+       batchSimpleProcessing(simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor, losslessJpegs)
        Return
     }
 
@@ -99498,7 +99497,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
       }
 
       showTOOLtip("Processing image, please wait")
-      r := coreSimpleFileProcessing(imgPath, file2save, simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor, doConversion)
+      r := coreSimpleFileProcessing(imgPath, file2save, simpleOpRotationAngle, SimpleOperationsScaleXimgFactor, SimpleOperationsScaleYimgFactor, doConversion, losslessJpegs)
       SetTimer, ResetImgLoadStatus, -250
       If r
       {
@@ -99536,7 +99535,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
    }
 }
 
-batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
+batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpegs:=0) {
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>50)
    {
@@ -99564,7 +99563,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
    {
       setPriorityThread(-2)
       addJournalEntry("Preparing " systemCores " threads to start. " filesPerCore " files per thread.")
-      infoResult := WorkLoadMultiCoresSimpleImgProcessing(filesElected)
+      infoResult := WorkLoadMultiCoresSimpleImgProcessing(filesElected, losslessJpegs)
       setPriorityThread(0)
       If (infoResult!="single-core")
          Return
@@ -99635,7 +99634,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
          Continue
       }
 
-      r := coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor)
+      r := coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, 0, losslessJpegs)
       If r
       {
          failedFiles++
