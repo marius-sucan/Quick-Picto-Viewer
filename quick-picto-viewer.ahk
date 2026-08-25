@@ -17090,8 +17090,7 @@ ImgVectorUndoAct() {
    If !IsObject(undoVectorShapesLevelsArray[currentVectorUndoLevel - 1])
    {
       zz := totalUndos ? currentVectorUndoLevel/totalUndos : 0
-      friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
-      showTOOLtip(friendly "Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
+      showTOOLtip("Shape undo [ " currentVectorUndoLevel " / " totalUndos " ]", 0, 0, zz)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       Return
    }
@@ -50057,7 +50056,7 @@ togglePathCurveTension() {
    }
 
    maxu := (customShapePropPoints.Count()>3 && drawingShapeNow=1) ? 4 : 5
-   FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, 4, 1)
+   FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, maxu, 1)
    decideCustomShapeStyle()
    If (FillAreaCurveTension=1)
      ll := "Polygonal"
