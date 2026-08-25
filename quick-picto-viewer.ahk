@@ -7416,17 +7416,13 @@ MenuRemSelVectorPoints() {
               listu .= a "|" b "|"
               If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
               {
-                 ; the mirrored key point goes as well, with its own anchors; P[i] pairs with
-                 ; P[totalCount - i + 1]. This used to select the mirrored anchors alone, and
-                 ; with .= instead of := from the second key point on, which left the mirrored
-                 ; key point behind, a stray anchor with it, and put stray entries into
-                 ; customShapePropPoints
+                 ; the mirrored key point goes as well, with its own anchors; P[i] pairs with P[totalCount - i + 1].
                  za := (a) ? totalCount - a + 1 : 0
                  zb := (b) ? totalCount - b + 1 : 0
                  listu .= oppoIndex "|" za "|" zb "|"
               }
 
-              ; selected, so that the second pass drops them; handled, so that this pass does not
+              ; select them so that the second pass drops them; handled, so that this pass does not
               ; collapse and deselect the anchors among them when it reaches them
               Loop, Parse, listu, |
               {
@@ -7947,8 +7943,7 @@ coreAddUnorderedVectorPointPolyMode(gmx, gmy, sl) {
    ; as well; that one is held as the extra slot n + 1, so that the caller reads it as the pair
    ; [n, n + 1] and appends the new point at the end of the list. closedLineCustomShape is the
    ; flag of the editor; FillAreaClosedPath belongs to the panel and does not follow the
-   ; open/close toggle of the editor. The slot n + 1 used to be left empty, the wrap-around wrote
-   ; P[1] into its own slot instead, so the closing edge never accepted a point
+   ; open/close toggle of the editor.
    foundDots := []
    PointsListArray := []
    Loop, % totalCount
@@ -7989,11 +7984,7 @@ coreAddUnorderedVectorPointPolyMode(gmx, gmy, sl) {
           outline := Gdip_IsOutlineVisiblePathPoint(0, pPath, pPen8, gmX, gmY)
           If (outline=1)
           {
-             ; the points and the mouse are in the unflipped space of the viewport, the caller
-             ; unflipped the mouse; the screen shows the viewport flipped, so the highlight is
-             ; painted through the very transform the editor paints the path with, as the curve
-             ; mode does; without it the highlight lands mirrored, away from the edge under the mouse
-             ; Gdip_GraphicsClear(2NDglPG)
+             ; flip drawing according to viewport conditions/settings
              setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
              Gdip_DrawPath(2NDglPG, pPen8, pPath)
              Gdip_ResetWorldTransform(2NDglPG)
@@ -33181,9 +33172,6 @@ updateUIFiltersPanel(dummy:=0) {
    thisStringFilter := ""
    If (userFilterDoString=1 && SLDtypeLoaded=3)
    {
-      ; the whole condition, parenthesised, "NOT (...)" for "must not contain". The "|"
-      ; alternatives and the "*" and "?" wildcards the panel promises used to be lost right here:
-      ; "|" was dropped and both wildcards became "_", a single character
       thisStringFilter := SQLlikeClauseFromFilter(UsrEditFilter, userFilterWhat, userFilterStringPos, userFilterStringIsNot)
    } Else If (userFilterDoString=1)
    {
@@ -40072,12 +40060,17 @@ SQLlikeClauseFromFilter(userString, whatu, strPosu, mustNot) {
 ; ">" is the LIKE escape character the callers declare: SQLescapeStr() puts it in front of a
 ; literal "_", "%" and "[" BEFORE the wildcards of the user become "%" and "_", and a ">" typed
 ; by the user is dropped, it is illegal in file names anyway.
-; whatu: 1 = full path, 2 = folder path, 3 = file name, 4 = the name of the parent folder alone,
-; as coreSearchIndex() reads them for the plain-text lists; strPosu: 2 = begins with, 3 = ends
-; with, anything else = anywhere [RegEx is not offered on the SQL lists].
+;
+; PARAM whatu: 1 = full path, 2 = folder path, 3 = file name, 4 = the name of the parent folder alone,
+; as coreSearchIndex() reads them for the plain-text lists; 
+;
+; PARAM strPosu: 2 = begins with, 3 = ends with, 4 >= anything else means anywhere
+; [RegEx is not offered on the SQL lists].
+;
 ; The condition comes back in parentheses, "NOT (...)" when mustNot is set: every caller glues
 ; it to further conditions with AND, and the OR chain must not spill into them. It comes back
 ; empty when no term is left, and the callers then apply no string condition at all.
+
    If (whatu=2)
       columnu := "imgfolder"
    Else If (whatu=3)
@@ -41484,13 +41477,7 @@ coreBatchMultiRenameFiles() {
             Continue
          }
 
-         ; a name that differs from the old one only in the case of its letters [case{U}, case{L},
-         ; case{T}, a new extension typed in another case, a replacement that changes the case]
-         ; names the same file on Windows: no other file is in the way, nothing is there to
-         ; overwrite or recycle, and the test above must not read it as "unchanged", which is why
-         ; it compares the case as well. The case sensitive directory, where the two spellings can
-         ; be two files, is told apart by isSameFileOtherCase() and takes the regular route
-         caseOnly := isSameFileOtherCase(file2rem, file2save)
+         caseOnly := isSameFileOtherCase(file2rem, file2save) ; string case change test
          If (PreserveDateTimeOnSave=1)
          {
             originalMtime := ""
@@ -41534,8 +41521,9 @@ coreBatchMultiRenameFiles() {
          FileSetAttrib, -R, %file2rem%
          Sleep, 1
          If (caseOnly=1)
+         {
             moveFailed := renameFileCaseOnly(file2rem, file2save)
-         Else
+         } Else
          {
             FileMove, %file2rem%, %file2save%, 1
             moveFailed := ErrorLevel
@@ -41608,7 +41596,7 @@ coreBatchMultiRenameFiles() {
 RecordUsedMultiRenamesQueriesManager(entry2add) {
   entry2add := Trimmer(entry2add)
   mainListu := readRecentMultiRenameEntries()
-  If StrLen(entry2add)<3
+  If (StrLen(entry2add)<3)
      Return
 
   Loop, Parse, mainListu, `n
@@ -41625,8 +41613,9 @@ RecordUsedMultiRenamesQueriesManager(entry2add) {
       If (A_Index>35)
          Break
 
-      If StrLen(A_LoopField)<3
+      If (StrLen(A_LoopField)<3)
          Continue
+
       countItemz++
       IniWrite, % A_LoopField, % mainRecentsFile, RecentMultiRename, E%countItemz%
   }
@@ -47325,7 +47314,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      destroyGDIfileCache()
      oMD5name := generateThumbName(file2rem, 1)
      file2save := OutDir "\" newFileName
-     ; the same file spelled in another case: nothing is in the way, see coreBatchMultiRenameFiles()
+     ; the same file spelled in another case: nothing is in the way
      caseOnly := isSameFileOtherCase(file2rem, file2save)
      If (caseOnly!=1 && FileRexists(file2save, 0))
         file2save := askAboutFileCollision(file2rem, file2save, 0, doLastOption + 1, 0, performOverwrite)
@@ -47358,8 +47347,9 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      FileSetAttrib, -R, %file2rem%
      Sleep, 2
      If (caseOnly=1)
+     {
         moveFailed := renameFileCaseOnly(file2rem, file2save)
-     Else
+     } Else
      {
         FileMove, %file2rem%, %file2save%, 1
         moveFailed := ErrorLevel
@@ -62059,7 +62049,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          } Else If !file2save
             Continue
 
-         frameu := A_Index - 1   ; pages are counted from 0, the files from 1; the clamp used to skip page 0 and write the last page twice
+         frameu := A_Index - 1
          If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1)
          {
             ; use WIC loader to extract the TIF pages to not miss on color management
@@ -62135,9 +62125,7 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    sizesDesired[1] := [32750, 32750, 1, 0, thisImgQuality]
    ; the first frame is decoded here only to learn how many frames there are; .Frames holds
    ; the index of the last frame, not the count. Every frame is loaded again by the loop below,
-   ; the first one included, so that all of them go through the same collision, size cap and
-   ; format handling; it used to be saved apart, as _0 and through the wrong extension table,
-   ; while the loop, run on the last index, never reached the last frame
+   ; the first one included
    oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement, sizesDesired)
    tFrames := mainLoadedIMGdetails.Frames + 1
    If !validBMP(oBitmap)
@@ -62449,7 +62437,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          } Else If !file2save
             Continue
 
-         Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)   ; frames are counted from 0, the files from 1; the loop used to run on count - 1 and skip frame 0
+         Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)
          trGdip_GetImageDimensions(oBitmap, imgW, imgH)
          nBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH)
          If !validBMP(nBitmap)
@@ -94349,8 +94337,9 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
 
          Sleep, 5
          If (caseOnly=1)
+         {
             moveFailed := renameFileCaseOnly(imgPath, otherFile)
-         Else
+         } Else
          {
             FileMove, % imgPath, % otherFile, 1
             moveFailed := ErrorLevel
@@ -94358,7 +94347,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
 
          If !moveFailed
          {
-            If (originalMtime)
+            If originalMtime
             {
                FileSetTime, % originalMtime, % otherFile, M
                FileSetTime, % originalCtime, % otherFile, C
