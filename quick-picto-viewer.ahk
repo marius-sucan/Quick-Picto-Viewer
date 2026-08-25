@@ -7318,7 +7318,7 @@ MenuCollapseSelectedAnchorPoints() {
            If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
            {
               za := totalCount - a + 1
-              zb .= totalCount - b + 1
+              zb := totalCount - b + 1   ; := not .=, with .= the second selected key point produced a stray index
               If (a!=za && za!=zb && a)
               {
                  customShapePropPoints[za, 1] := 1
@@ -7357,6 +7357,8 @@ MenuReflectAnchorVectorPoint() {
 }
 
 MenuRemSelVectorPoints() {
+    ; a closed bezier path holds its seam vertex twice, in P[1] and P[n]; read before anything moves
+    wasClosed := (bezierSplineCustomShape=1) ? testIsEditorBezierPathClosed() : 0
     If (bezierSplineCustomShape=1)
     {
        lol := []
@@ -7390,37 +7392,49 @@ MenuRemSelVectorPoints() {
               }
            } Else
            {
-              ; select anchors of selected main/key points and below, they all get removed
+              ; a selected main/key point takes its anchors along, they all get removed; the set
+              ; is the one removeGivenPointInVectorPath() removes: a key point at either end of
+              ; the path owns a single anchor and drops the inner anchor of its neighbour as well,
+              ; since the segment that anchor shaped goes with the key point; the seam vertex of
+              ; a closed path is held twice and both copies go
               A := B := 0
               hasFoundDot := 1
-              getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
-              If A
+              listu := thisIndex "|"
+              If (thisIndex=1)
               {
-                 lol[a] := 1
-                 customShapePropPoints[A, 1] := 1
-              }
-
-              If B
+                 a := 2, b := 3
+                 If (wasClosed=1)
+                    listu .= totalCount "|" totalCount - 1 "|" totalCount - 2 "|"
+              } Else If (thisIndex=totalCount)
               {
-                 lol[b] := 1
-                 customShapePropPoints[B, 1] := 1
-              }
+                 a := totalCount - 1, b := totalCount - 2
+                 If (wasClosed=1)
+                    listu .= "1|2|3|"
+              } Else
+                 getAssociatedBezierPoints(k, totalCount, thisIndex, A, B)
 
+              listu .= a "|" b "|"
               If (oppoIndex!=thisIndex && canDoSymmetry=1 && a!=thisIndex && b!=thisIndex && a!=oppoIndex && b!=oppoIndex)
               {
-                 za := totalCount - a + 1
-                 zb .= totalCount - b + 1
-                 If (a!=za && za!=zb && a)
-                 {
-                    customShapePropPoints[za, 1] := 1
-                    lol[za] := 1
-                 }
- 
-                 If (b!=zb && za!=zb && b)
-                 {
-                    customShapePropPoints[zb, 1] := 1
-                    lol[zb] := 1
-                 }
+                 ; the mirrored key point goes as well, with its own anchors; P[i] pairs with
+                 ; P[totalCount - i + 1]. This used to select the mirrored anchors alone, and
+                 ; with .= instead of := from the second key point on, which left the mirrored
+                 ; key point behind, a stray anchor with it, and put stray entries into
+                 ; customShapePropPoints
+                 za := (a) ? totalCount - a + 1 : 0
+                 zb := (b) ? totalCount - b + 1 : 0
+                 listu .= oppoIndex "|" za "|" zb "|"
+              }
+
+              ; selected, so that the second pass drops them; handled, so that this pass does not
+              ; collapse and deselect the anchors among them when it reaches them
+              Loop, Parse, listu, |
+              {
+                 If (!A_LoopField || A_LoopField<1 || A_LoopField>totalCount)
+                    Continue
+
+                 lol[A_LoopField] := 1
+                 customShapePropPoints[A_LoopField, 1] := 1
               }
            }
        }
@@ -7434,6 +7448,16 @@ MenuRemSelVectorPoints() {
           SetTimer, dummyRefreshImgSelectionWindow, -10
           Return
        }
+    } Else If isNowSymmetricVectorShape()
+    {
+       ; in symmetry mode a point and its mirror go together, as they do in
+       ; removeGivenPointInVectorPath(); P[i] pairs with P[totalCount - i + 1]
+       totalCount := customShapePoints.Count()
+       Loop, % totalCount
+       {
+           If (customShapePropPoints[A_Index, 1]=1)
+              customShapePropPoints[totalCount - A_Index + 1, 1] := 1
+       }
     }
 
     newArrayu := []
@@ -7446,7 +7470,7 @@ MenuRemSelVectorPoints() {
        symPoint := thePoint
     }
 
-    zpp := 0
+    zpp := minRem := maxRem := 0
     origCountu := customShapePoints.Count()
     Loop, % origCountu
     {
@@ -7460,6 +7484,8 @@ MenuRemSelVectorPoints() {
           If (A_Index<symPoint && symPoint && hasSymmetry=1)
              thePoint--
 
+          minRem := minRem ? min(minRem, A_Index) : A_Index
+          maxRem := max(maxRem, A_Index)
           Continue
        }
 
@@ -7481,10 +7507,28 @@ MenuRemSelVectorPoints() {
     customShapePoints := newArrayu.Clone()
     customShapePropPoints := newuArrayu.Clone()
     customShapeHasSelectedPoints := 0
-    recordVectorUndoLevels()
-    lastZeitFileSelect := A_TickCount
     remainedu := customShapePoints.Count()
     removedu := origCountu - remainedu
+    If (removedu>0)
+    {
+       ; the memo of the last open/close toggle describes the ends of the path; it is dropped
+       ; once either end is touched, as every other editing operation does
+       If (minRem<4 || maxRem>origCountu - 3)
+          handleOpenCloseBezier("kill")
+
+       ; the seam of a closed bezier path went with the removed points and the two ends left
+       ; behind are distinct points now, as in removeGivenPointInVectorPath()
+       If (wasClosed=1 && closedLineCustomShape!=0 && testIsEditorBezierPathClosed()!=1)
+       {
+          closedLineCustomShape := 0
+          RegAction(1, "closedLineCustomShape")
+          If (drawingShapeNow=1)
+             showQuickActionButtonsDrawingShape()
+       }
+    }
+
+    recordVectorUndoLevels()
+    lastZeitFileSelect := A_TickCount
     If (removedu>0 && remainedu<2)
     {
        ; the entire path, or all of it but one point, was selected and is now gone
@@ -7742,7 +7786,10 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
       ; pushAtGivenVectorPoint(zzz, gmX, gmY)
       symPoint := totalCount//2 + 1
       oppoIndex := (canDoSymmetry=1) ? totalCount - zzz + 1 : 0
-      If (oppoIndex!=zzz && canDoSymmetry=1 && oppoIndex>0)
+      ; a point added on the closing edge is appended at the end of the list, oppoIndex reads 0
+      ; for it and its mirror belongs at the very start of the list, where the increments below
+      ; take it; the bezier branch pushes three points at a time and does not take that route
+      If (oppoIndex!=zzz && canDoSymmetry=1 && (oppoIndex>0 || oppoIndex=0 && bezierSplineCustomShape!=1))
       {
          calculateSymmetricVectorPoint(gmX, gmY, nX, nY)
          If (zzz < oppoIndex)
@@ -7762,7 +7809,13 @@ MenuAddUnorderedVectorPoint(zzx:=0, zzy:=0, mo:=0) {
          ; pushAtGivenVectorPoint() now keeps the symmetry reference in step by itself
       }
 
-      symPoint := totalCount//2 + 1
+      ; the reference point sits in the middle of the list and pushAtGivenVectorPoint() moved it
+      ; along with the insertions above; totalCount is the length the list had before them, so
+      ; the old middle would now name the point next to the reference and move the axis onto it
+      symPoint := prevVectorShapeSymmetryMode[1, 1]
+      If !symPoint
+         symPoint := customShapePoints.Count()//2 + 1
+
       If canDoSymmetry
          coreSetVPsymmetryPoint(symPoint)
       recordVectorUndoLevels()
@@ -7890,19 +7943,28 @@ coreAddUnorderedVectorPointPolyMode(gmx, gmy, sl) {
    If (totalCount<3)
       Return
 
+   ; the edges are P[1]-P[2] ... P[n - 1]-P[n], and a closed path has the closing edge P[n]-P[1]
+   ; as well; that one is held as the extra slot n + 1, so that the caller reads it as the pair
+   ; [n, n + 1] and appends the new point at the end of the list. closedLineCustomShape is the
+   ; flag of the editor; FillAreaClosedPath belongs to the panel and does not follow the
+   ; open/close toggle of the editor. The slot n + 1 used to be left empty, the wrap-around wrote
+   ; P[1] into its own slot instead, so the closing edge never accepted a point
    foundDots := []
-   aIndex := bIndex := 0
-   z := (FillAreaClosedPath=1) ? totalCount + 1 : totalCount
    PointsListArray := []
-   Loop, % totalCount + 1
+   Loop, % totalCount
    {
-       aIndex++
-       If (aIndex>totalCount)
-          aIndex := 1
-       getVPcoordsVectorPoint(aIndex, ax, ay)
-       PointsListArray[aIndex] := [ax, ay]
+       getVPcoordsVectorPoint(A_Index, ax, ay)
+       PointsListArray[A_Index] := [ax, ay]
    }
 
+   z := totalCount - 1
+   If (closedLineCustomShape=1)
+   {
+      z := totalCount
+      PointsListArray[totalCount + 1] := [PointsListArray[1, 1], PointsListArray[1, 2]]
+   }
+
+   vpWinClientSize(mainWidth, mainHeight)
    aIndex := 0
    bIndex := 1
    Loop, % z
@@ -7927,8 +7989,14 @@ coreAddUnorderedVectorPointPolyMode(gmx, gmy, sl) {
           outline := Gdip_IsOutlineVisiblePathPoint(0, pPath, pPen8, gmX, gmY)
           If (outline=1)
           {
+             ; the points and the mouse are in the unflipped space of the viewport, the caller
+             ; unflipped the mouse; the screen shows the viewport flipped, so the highlight is
+             ; painted through the very transform the editor paints the path with, as the curve
+             ; mode does; without it the highlight lands mirrored, away from the edge under the mouse
              ; Gdip_GraphicsClear(2NDglPG)
+             setMainCanvasTransform(mainWidth, mainHeight, 2NDglPG)
              Gdip_DrawPath(2NDglPG, pPen8, pPath)
+             Gdip_ResetWorldTransform(2NDglPG)
              doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
              Gdip_DeletePath(pPath)
              foundDots := [aIndex, bIndex]
@@ -25251,7 +25319,7 @@ PasteHDropFiles(allowFilesPaste) {
    If (InStr(msgResult.btn, "yes") || msgResult="yes")
    {
       pp := maxFilesIndex
-      initialIndex := maxFilesIndex ? maxFilesIndex : 1
+      initialIndex := maxFilesIndex   ; 0 for an empty list, so that a single added file counts as a change below
       mustOpenStartFolder := ""
       coreAddNewFiles(imgsListu, countFiles, SelectedDir, msgResult.check)
       If (initialIndex!=maxFilesIndex)
@@ -61873,8 +61941,9 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    {
       hasOpenedMulti := 1
       tFrames := FreeImage_GetPageCount(hMultiBMP)
-      If (tFrames<0 || !tFrames)
+      If (tFrames<2)
       {
+         ; a single page is nothing to extract, the answer the GIF and WEBP paths give as well
          tFrames := 0
          FreeImage_CloseMultiBitmap(hMultiBMP, 0)
          Return -2
@@ -61911,7 +61980,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          } Else If !file2save
             Continue
 
-         frameu := clampInRange(A_Index, 0, tFrames - 1)
+         frameu := A_Index - 1   ; pages are counted from 0, the files from 1; the clamp used to skip page 0 and write the last page twice
          If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1)
          {
             ; use WIC loader to extract the TIF pages to not miss on color management
@@ -61941,6 +62010,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          If (!imgW || !imgH || imgW=1 && imgH=1)
          {
             FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := ""   ; otherwise the next page reuses the freed handle instead of locking its own
             FimBuffer := DestroyMemoryBuffer(FimBuffer)
             failedFrames++
             Continue
@@ -61984,21 +62054,21 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    thisImgQuality := (userimgQuality=1) ? 6 : 5
    sizesDesired := []
    sizesDesired[1] := [32750, 32750, 1, 0, thisImgQuality]
+   ; the first frame is decoded here only to learn how many frames there are; .Frames holds
+   ; the index of the last frame, not the count. Every frame is loaded again by the loop below,
+   ; the first one included, so that all of them go through the same collision, size cap and
+   ; format handling; it used to be saved apart, as _0 and through the wrong extension table,
+   ; while the loop, run on the last index, never reached the last frame
    oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement, sizesDesired)
-   tFrames := mainLoadedIMGdetails.Frames
+   tFrames := mainLoadedIMGdetails.Frames + 1
    If !validBMP(oBitmap)
       Return -4
 
-   If (tFrames<0 || !tFrames)
-   {
-      trGdip_DisposeImage(oBitmap)
+   trGdip_DisposeImage(oBitmap)
+   If (tFrames<2)
       Return -2
-   }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-   file2save := ResizeDestFolder "\" OutNameNoExt "_0." dialogSaveIndexes[userExtractFramesFmt]
-   QPV_SaveImageFile(A_ThisFunc, oBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-   trGdip_DisposeImage(oBitmap)
    If (inLoop!=1)
    {
       showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
@@ -62007,9 +62077,6 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
    Loop, % tFrames
    {
-      If (A_Index=1)
-         Continue
-
       executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
@@ -62032,7 +62099,7 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       } Else If !file2save
          Continue
 
-      nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, userPerformColorManagement, sizesDesired)
+      nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, userPerformColorManagement, sizesDesired)   ; frames are counted from 0, the files from 1
       If !validBMP(nBitmap)
       {
          failedFrames++
@@ -62265,8 +62332,8 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If RegExMatch(rawFmt, "i)(gif|tiff)$")
    {
-      tFrames := Gdip_GetBitmapFramesCount(oBitmap) - 1
-      If (tFrames<0 || !tFrames)
+      tFrames := Gdip_GetBitmapFramesCount(oBitmap)
+      If (tFrames<2)
       {
          trGdip_DisposeImage(oBitmap)
          Return -2
@@ -62303,7 +62370,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          } Else If !file2save
             Continue
 
-         Gdip_BitmapSelectActiveFrame(oBitmap, A_Index)
+         Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)   ; frames are counted from 0, the files from 1; the loop used to run on count - 1 and skip frame 0
          trGdip_GetImageDimensions(oBitmap, imgW, imgH)
          nBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH)
          If !validBMP(nBitmap)
@@ -62924,9 +62991,9 @@ coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
      If (tFrames>1)
      {
         preventer := 1
-        Loop, % tFrames + 1
+        Loop, % tFrames
         {
-           frameu := clampInRange(A_Index - 1, 0, tFrames - 1)
+           frameu := A_Index - 1   ; pages are counted from 0; one loop too many used to add the last page twice
            ; fnOutputDebug("fT=" tFrames " | f=" frameu " | " imgPath)
            hPage := FreeImage_LockPage(hMultiBMP, frameu)
            If hPage
