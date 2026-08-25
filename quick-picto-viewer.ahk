@@ -28421,8 +28421,9 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
       showTOOLtip("Retrieving entire files list SQL index, please wait")
    } Else
    {
-      showTOOLtip("Gathering entries matching " dateu ", please wait")
-      setWindowTitle("Gathering entries matching " dateu ", please wait...", 1)
+      fsu := (StrLen(dateu)>40) ? SubStr(dateu, 1, 38) " [...]" : dateu
+      showTOOLtip("Gathering entries matching " fsu ", please wait")
+      setWindowTitle("Gathering entries matching " fsu ", please wait...", 1)
       If (InStr(LVvaru, "metaT") && winOpen!=48)
       {
          If (SLDtypeLoaded=3)
@@ -28571,9 +28572,9 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          Return -1
 
       If !RegExMatch(prevFilesSortMode, "i)(fsize|fmodified|fcreated|imgfile|imgfolder)")
-         moreCol := StrLen(prevFilesSortMode)>3 ? ", " prevFilesSortMode : ""
+         moreCol := (StrLen(prevFilesSortMode)>3) ? ", " prevFilesSortMode : ""
+
       SQLstr := "SELECT imgidu, fullPath" moreCol " FROM images " theQuery reorder
-      ; ToolTip, % SQLstr , , , 2
       If !InitSQLgetTable(SQLstr, activeSQLdb._Handle, errMsg, Rows, Cols, hTable)
       {
          showTOOLtip("ERROR: Failed to open the SQL database:`n" errMsg)
@@ -28609,7 +28610,10 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
    }
 
    If (LVvaru!="none")
-      showTOOLtip("Generating files list index for " oDateu)
+   {
+      fsu := (StrLen(oDateu)>50) ? SubStr(oDateu, 1, 58) " [...]" : oDateu
+      showTOOLtip("Generating files list index for:`n" fsu)
+   }
 
    renewCurrentFilesList()
    performSQLgetTable(Rows, Cols, hTable)
@@ -33535,11 +33539,11 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
 
   backCurrentSLD := CurrentSLD
   userSearchString := CurrentSLD := ""
-  friendly := (StrLen(stringu)>1) ? "Applying filter on the list of files, please wait`n" stringu : "Deactivating the files list filter, please wait..."
+  fsu := (StrLen(stringu)>50) ? SubStr(stringu, 1, 48) " [...]" : stringu
+  friendly := (StrLen(stringu)>1) ? "Applying filter on the list of files, please wait`n" fsu : "Deactivating the files list filter, please wait..."
   showTOOLtip(friendly)
   setImageLoading()
-
-  If StrLen(filesFilter)<2
+  If (StrLen(filesFilter)<2)
   {
      thereWasFilter := 0
      bckpResultedFilesList := []
@@ -33570,7 +33574,8 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   If (maxFilesIndex<1)
   {
      SoundBeep, 300, 100
-     msgBoxWrapper(appTitle ": WARNING", "No files matched your filtering criteria:`n" stringu "`n`nQPV will now restore the complete list of files.", 0, 1, "exclamation")
+     fsu := (StrLen(stringu)>40) ? SubStr(stringu, 1, 38) " [...]" : stringu
+     msgBoxWrapper(appTitle ": WARNING", "No files matched your filtering criteria:`n" fsu "`n`nQPV will now restore the complete list of files.", 0, 1, "exclamation")
      filesFilter := ""
      FilterFilesListuIndex(0, 0)
   } Else If (A_TickCount - startOperation>1500)
@@ -33586,12 +33591,6 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
      ; ToolTip, haha , , , 2
      currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
   }
-
-  ; If (maxFilesIndex>0)
-  ; {
-  ;    currentFileIndex := 1
-  ;    dummyTimerDelayiedImageDisplay(50)
-  ; }
 
   SetTimer, ResetImgLoadStatus, -50
   SetTimer, TriggerMenuBarUpdate, -50
@@ -36316,6 +36315,7 @@ uiPopulateCachesOverview(modus:=0) {
     If !totalz
     {
        setImageLoading()
+       doStartLongOpDance()
        rowsDef := []
        rowsDef[1] := ["Ignored or deleted file entries", "WHERE isDeleted IS NOT 0", 0, "ignored files", 0]
        rowsDef[2] := ["File details", "WHERE ifnull(fsize, '')='' ", 1, "file details", 1]
@@ -36337,11 +36337,26 @@ uiPopulateCachesOverview(modus:=0) {
        totalu := rowsDef.Count()
        Loop, % totalu
        {
+           Sleep, 5
+           executingCanceableOperation := A_TickCount
+           If (determineTerminateOperation()=1)
+           {
+              abandonAll := 1
+              Break
+           }
+
            showTOOLtip("Gathering database information: " rowsDef[A_Index, 4], 0, 0, A_Index/13)
            rowsDef[A_Index, 5] := getTotalIMGsSQLdb(rowsDef[A_Index, 2])
+           Sleep, 5
+           executingCanceableOperation := A_TickCount
+           If (determineTerminateOperation()=1)
+           {
+              abandonAll := 1
+              Break
+           }
        }
     }
-   
+
     GuiControl, SettingsGUIA:, infoLine, Gathering database information`, please wait . . .
     GuiControl, -Redraw, LViewCaches
     LV_Delete()
@@ -36368,6 +36383,9 @@ uiPopulateCachesOverview(modus:=0) {
     }
 
     CurrentSLD := backCurrentSLD
+    If abandonAll
+       totalz := 0
+
     If (AnyWindowOpen!=91)
     {
        RemoveTooltip()
