@@ -153,7 +153,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
    , drawModeBzeit := 1, drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, AutoCropBordersSize := 15
    , GDIfadeVPcache := "", executingCanceableOperation := 1, hCropCornersPic, UserMemBMP := "", userSearchString := ""
-   , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
+   , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1, losslessJpegTransforms := 0
    , prevTryThumbsUpdate := 1, thumbsSizeQuality := 245, prevFullIndexThumbsUpdate := -1, userClipBMPpaste
    , UserNewWidth := 0, UserNewHeight := 0, UserNewDPI := 0, viewportStampBMP := "", tinyPrevAreaCoordY := 1
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
@@ -38238,8 +38238,9 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
   job := {}
   job.maxList := maxList
   job.mode := "batch-simpleimgproc"
-  job.args := imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" editingSelectionNow "=" simpleOpRotationAngle
+  job.args := imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" editingSelectionNow "=" simpleOpRotationAngle "=" losslessJpegTransforms
   job.eligibleRegEx := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+  job.flagThumbs := (ResizeUseDestDir=1) ? 0 : 1  ; rewritten in place: a lossless JPEG transform keeps the file times the thumbnails cache keys on
   job.failVerb := "process"
   job.progressMsg := "Processing image files, please wait"
   job.abandonMsg := "Abandoning image files processing, please wait"
@@ -38450,6 +38451,7 @@ multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
   prcSelY2 := argumentsArray[8]
   editingSelectionNow := argumentsArray[9]
   simpleOpRotationAngle := argumentsArray[10]
+  losslessJpegTransforms := argumentsArray[11]
   skippedFiles := failedFiles := countFilez := operationDone := 0
   thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
   Loop, Parse, filesList,`n,`r
@@ -92526,69 +92528,49 @@ filesListCropImgVPsel() {
 }
 
 coreQuickImageFilesListActions(actu) {
+   ; The flip/rotate/crop actions of the files list. Every selected file - or the current
+   ; image when nothing is selected - goes through the Resize/rotate/crop pipeline, whose
+   ; per-file entry point applies the operation losslessly to JPEGs and through FreeImage to
+   ; everything else (see coreSimpleFileProcessing). One pass, so the selection is never
+   ; touched and there is one confirmation, one set of worker threads and one abort. This
+   ; used to route the whole selection either to the JPEG batch, which skipped every other
+   ; format, or to the pixel path, depending on whether any JPEG was selected.
    If warnFramesActionPrevented("IMAGE ACTION " actu)
       Return
 
    initFIMGmodule()
-   countJpegs := 0
    filesElected := getSelectedFiles(0, 1)
    RegAction(0, "convertFormatUseMultiThreads",, 1)
-   If (filesElected>1)
+   If (actu=9 && filesElected>1)
    {
-      Loop, % maxFilesIndex
-      {
-         If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
-            Continue
-
-         imgPath := resultedFilesList[A_Index, 1]
-         If (RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && imgPath)
-         {
-            countJpegs++
-            Break
-         }
-      }
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Are you sure you want to crop the selected files? There are currently " groupDigits(filesElected) " selected files.`n`nThe crop operation IS irreversible!", 4, 0, "question")
+      If (msgResult!="Yes")
+         Return
    }
 
-   ; getSelectedFiles(0, 1) never answers 1: a lone selected file is dropped from the
-   ; selection and it returns 0. So the loop above only runs for a real multi-file
-   ; selection, and the single-image case - by far the most common one - has to test the
-   ; current file itself. Without this every lone JPEG rotate/flip/crop fell through to
-   ; the branch below, which decodes and re-encodes the file over its original.
-   imgPath := resultedFilesList[currentFileIndex, 1]
-   If (!countJpegs && filesElected<2 && RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$"))
-      countJpegs := 1
+   ResizeMustPerform := 0
+   SimpleOperationsFlipV := (actu=3) ? 1 : 0
+   SimpleOperationsFlipH := (actu=2) ? 1 : 0
+   SimpleOperationsDoCrop := (actu=9) ? 1 : 0
+   SimpleOperationsRotateAngle := 1
+   If (actu=6)  ; 90 degrees rotation
+      SimpleOperationsRotateAngle := 2
+   Else If (actu=8) ; -90 degrees rotation
+      SimpleOperationsRotateAngle := 4
 
-   If countJpegs
+   SimpleOperationsScaleXimgFactor := 100
+   SimpleOperationsScaleYimgFactor := 100
+   ResizeQualityHigh := ResizeInPercentage := 1
+   ResizeUseDestDir := 0
+   decideUserImgRotationOption()
+   losslessJpegTransforms := 1
+   r := BtnPerformSimpleProcessing("no-prompt", "extern")
+   losslessJpegTransforms := 0
+   If (r=1)
    {
-      jpegDesiredOperation := actu
-      BtnPerformJpegOp("extern")
-   } Else
-   {
-      ResizeMustPerform := 0 
-      SimpleOperationsFlipV := (actu=3) ? 1 : 0
-      SimpleOperationsFlipH := (actu=2) ? 1 : 0
-      SimpleOperationsDoCrop := (actu=9) ? 1 : 0
-      SimpleOperationsRotateAngle := 1
-      If (actu=6)  ; 90 degrees rotation
-         SimpleOperationsRotateAngle := 2
-      Else If (actu=8) ; -90 degrees rotation 
-         SimpleOperationsRotateAngle := 4
-
-      SimpleOperationsScaleXimgFactor := 100
-      SimpleOperationsScaleYimgFactor := 100
-      ResizeQualityHigh := ResizeInPercentage := 1
-      ResizeUseDestDir := 0
-      decideUserImgRotationOption()
-      filesPerCore := calculateCoresRequired(filesElected)
-      mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
-      If (userActionConflictingFile=4 && mustDoMultiCore=1)
-      {
-         userActionConflictingFile := 1
-         RegAction(1, "userActionConflictingFile",, 2, 1, 4)
-         msgBoxWrapper(appTitle ": WARNING", "On file name conflicts, the files will be skipped. Please choose an action to perform on file name conflicts in the «Resize/rotate/crop» panel. The option to ask is not supported with multi-threaded execution.", 0, 0, "WARNING")
-      }
-
-      BtnPerformSimpleProcessing("no-prompt", "extern")
+      ; the displayed image was transformed on disk: a flip or rotation of the viewport
+      ; itself would now be applied on top of it, as the JPEG path always undid
+      FlipImgV := FlipImgH := vpIMGrotation := 0
    }
 }
 
@@ -98895,10 +98877,47 @@ coreWIAsimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Ys
 
 coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion:=0) {
   If RegExMatch(imgPath, "i)(.\.(ico))$")
-     r := "err"
-  Else
-     r := coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion)
-  Return r
+     Return "err"
+
+  ; losslessJpegTransforms=1 - the flip/rotate/crop actions of the files list: a JPEG gets
+  ; the operation applied to its DCT coefficients, in place, by coreJpegLossLessAction(): no
+  ; re-encoding, and its metadata and colour profile survive, which the pixel path below
+  ; strips when it decodes through WIC. Only a real JPEG (by signature, whatever its name)
+  ; and only when the transformations amount to one lossless operation; a failure is
+  ; reported as such instead of silently re-encoding the file.
+  If (losslessJpegTransforms=1 && doConversion=0 && (file2save=imgPath || ResizeUseDestDir!=1) && RegExMatch(imgPath, "i)(.\.(jpeg|jpg|jpe))$"))
+  {
+     jpegOp := losslessJpegOpFromSimpleFlags()
+     If (jpegOp && FreeImage_GetFileType(imgPath)=2)  ; 2 = FIF_JPEG
+        Return coreJpegLossLessAction(imgPath, jpegOp) ? 0 : "err"
+  }
+
+  Return coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion)
+}
+
+; The operation code of coreJpegLossLessAction() for the transformations set in the
+; Resize/rotate/crop variables, or 0 when they are not exactly one lossless operation.
+losslessJpegOpFromSimpleFlags() {
+  If (ResizeMustPerform=1)
+     Return 0
+
+  opsCount := (SimpleOperationsFlipH=1) + (SimpleOperationsFlipV=1) + (SimpleOperationsDoCrop=1) + (SimpleOperationsRotateAngle>1)
+  If (opsCount!=1)
+     Return 0
+
+  If (SimpleOperationsFlipH=1)
+     Return 2
+  If (SimpleOperationsFlipV=1)
+     Return 3
+  If (SimpleOperationsDoCrop=1)
+     Return 9
+  If (SimpleOperationsRotateAngle=2)
+     Return 6
+  If (SimpleOperationsRotateAngle=3)
+     Return 7
+  If (SimpleOperationsRotateAngle=4)
+     Return 8
+  Return 0
 }
 
 DestroyMemoryBuffer(buffer) {
@@ -99513,6 +99532,7 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="") {
          SetTimer, RefreshImageFile, -150
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return 1
    }
 }
 
@@ -99617,9 +99637,14 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
 
       r := coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor)
       If r
+      {
          failedFiles++
-      Else
+      } Else
+      {
          filesConverted++
+         If (ResizeUseDestDir!=1)
+            resultedFilesList[A_Index, 4] := 1
+      }
    }
 
    If failedFiles
