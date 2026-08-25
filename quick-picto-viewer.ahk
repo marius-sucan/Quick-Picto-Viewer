@@ -422,9 +422,11 @@ If (!GDIPToken || thisGDIPversion<1.97)
 }
 
 ; RegRead, initArgu, %QPVregEntry%, initArgu
-If (InitCheckReg=2)
+; a worker of the multi-threaded batches announces itself on its command line, see
+; OpenNewExternalCoreThread()
+If RegExMatch(A_Args[1], "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg)
 {
-   initExternalCoreMode()
+   initExternalCoreMode(coreThreadArg1)
    Return
 }
 
@@ -37866,9 +37868,14 @@ SortFilesList(SortCriterion) {
    }
 }
 
-getSelectedFilesListString(maxList, ByRef countTFilez, ByRef filesListu) {
-  trenchSize := maxList//systemCores
-  countTFilez := 0
+getSelectedFilesListString(maxList, ByRef countTFilez, ByRef filesListu, ByRef excludedFiles, eligibleRegEx:="") {
+  ; eligibleRegEx: the files a worker would only skip are not dispatched at all, so the
+  ; progress denominators count real work and no thread is spawned for files it cannot
+  ; touch; they are reported back through excludedFiles. systemCores was planned by
+  ; calculateCoresRequired() for the whole selection: it is trimmed when the eligible files
+  ; are too few for it, and below two threads filesListu[1] stays blank, which the callers
+  ; take as the cue to fall back to single-threaded processing.
+  countTFilez := excludedFiles := 0
   filesListu := []
   selectedFilesArray := []
   showTOOLtip("Preparing workload for multi-threaded processing")
@@ -37881,12 +37888,23 @@ getSelectedFilesListString(maxList, ByRef countTFilez, ByRef filesListu) {
       If (InStr(r, "||") || !r)
          Continue
 
+      If (eligibleRegEx && !RegExMatch(r, eligibleRegEx))
+      {
+         excludedFiles++
+         Continue
+      }
+
       countTFilez++
       selectedFilesArray[countTFilez] := A_Index "?" r "`n"
   }
 
   selectedFilesArray := Random_ShuffleArray(selectedFilesArray)
   maxList := selectedFilesArray.Count()
+  If (maxList//2<systemCores)
+     systemCores := maxList//2
+  If (systemCores<2)
+     Return
+
   trenchSize := maxList//systemCores
   r := 0
   Loop, % systemCores - 1
@@ -37914,68 +37932,177 @@ getSelectedFilesListString(maxList, ByRef countTFilez, ByRef filesListu) {
   }
 }
 
+; Launches one worker per planned execution thread, in order, each one confirmed started
+; before the next. When a launch fails, the workers already running are told to stop and
+; waited for before 0 is returned: the callers then fall back to single-threaded processing
+; over the whole selection, which used to run at the same time as the surviving workers and
+; process their files a second time.
+spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
+  pidsArray := []
+  RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 0
+  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainWindowID, % hGDIwin
+  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
+  Loop, % systemCores
+  {
+      pidsArray[A_Index] := OpenNewExternalCoreThread(A_Index, argsToGive, filesListu[A_Index])
+      If StrLen(pidsArray[A_Index])<2
+      {
+         addJournalEntry("Execution thread " A_Index " of " systemCores " failed to start; stopping the started ones.")
+         stopExternalCoreThreads(pidsArray, 120000, "Multi-threaded processing failed to start")
+         Loop, % systemCores
+         {
+             Try FileDelete, %thumbsCacheFolder%\tempFilesList%A_Index%.txt
+         }
+         Return 0
+      }
+      Sleep, 1
+  }
+
+  Sleep, 500
+  Return 1
+}
+
+; Raises the abort flag for every worker and waits up to graceMs for them to end on their
+; own - a worker looks at the flag between files, so one busy with a large image needs a
+; while - then closes the ones still running. Returns how many had to be closed.
+stopExternalCoreThreads(pidsArray, graceMs, reason:="") {
+  RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
+  startZeit := A_TickCount
+  Loop
+  {
+      stillRunning := 0
+      For slotu, pidu in pidsArray
+      {
+          If (StrLen(pidu)<2)
+             Continue
+
+          RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%slotu%
+          If (thisThreadStatus=1 && testProcessExists(pidu)=1)
+             stillRunning++
+      }
+
+      If (!stillRunning || A_TickCount - startZeit>graceMs)
+         Break
+
+      If reason
+         showTOOLtip(reason ".`nWaiting for " stillRunning " started threads to stop, please wait")
+      Sleep, 250
+  }
+
+  closedThreads := 0
+  For slotu, pidu in pidsArray
+  {
+      If (StrLen(pidu)>1 && testProcessExists(pidu)=1)
+      {
+         Process, Close, % pidu
+         closedThreads++
+      }
+  }
+
+  If (closedThreads>0)
+     addJournalEntry("Closed " closedThreads " unresponsive execution threads.")
+  Return closedThreads
+}
+
+; After an abort request, a worker that cannot see the flag - stuck in a modal dialog or
+; inside a library call - would keep the dispatcher waiting forever. Once the grace period
+; has passed, the workers still running are closed and, from then on, counted as crashed.
+closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning) {
+  Static graceMs := 30000, handledZeit := 0
+  If (!abortRequestedZeit || jobsRunning<1 || A_TickCount - abortRequestedZeit<graceMs || handledZeit=abortRequestedZeit)
+     Return 0
+
+  handledZeit := abortRequestedZeit
+  Return stopExternalCoreThreads(pidsArray, 0)
+}
+
+; One look at the worker slots: how many are running, done, or gone. Returns the number of
+; slots that have ended, one way or the other.
+scanExternalCoreThreads(pidsArray, spawnZeit, ByRef jobsRunning, ByRef jobDone, ByRef threadsCrashed) {
+  jobsRunning := jobDone := threadsCrashed := 0
+  Loop, % systemCores
+  {
+     thisThreadStatus := 1
+     RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
+     isPIDalive := (A_TickCount - spawnZeit > 2500) ? testProcessExists(pidsArray[A_Index]) : 1
+     If (thisThreadStatus=1 && isPIDalive=1)
+        jobsRunning++
+     Else If (thisThreadStatus=2)
+        jobDone++
+     Else
+        threadsCrashed++
+  }
+  Return jobDone + threadsCrashed
+}
+
+; Files a worker never reached: what its slot was given minus what its ThreadJob counters
+; account for. Non-zero only after a thread crashed, was closed or was told to stop early.
+; The format conversion counters carry an extra field - originals that could not be removed
+; after converting - which is not a count of files and is left out.
+countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
+  leftoverFiles := 0
+  Loop, % systemCores
+  {
+     slotu := A_Index
+     givenFiles := 0
+     thisList := filesListu[slotu]
+     Loop, Parse, thisList, `n, `r
+     {
+        If A_LoopField
+           givenFiles++
+     }
+
+     accountedFiles := 0
+     RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%slotu%
+     For fieldIndex, fieldu in StrSplit(filesStatus, "/")
+     {
+        If (hasRemovalField=1 && fieldIndex=3)
+           Continue
+        If (fieldu>0)
+           accountedFiles += fieldu
+     }
+
+     If (givenFiles>accountedFiles)
+        leftoverFiles += givenFiles - accountedFiles
+  }
+  Return leftoverFiles
+}
+
 WorkLoadMultiCoresJpegLL(maxList) {
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
   backCurrentSLD := CurrentSLD
   CurrentSLD := ""
-  skippedFiles := theseFailures := failedFiles := 0
-  getSelectedFilesListString(maxList, countTFilez, filesListu)
+  skippedFiles := theseFailures := failedFiles := closedThreads := abortRequestedZeit := 0
+  getSelectedFilesListString(maxList, countTFilez, filesListu, excludedFiles, "i)(.\.(jpeg|jpg|jpe))$")
   If StrLen(filesListu[1])<3
   {
      CurrentSLD := backCurrentSLD
      Return "single-core"
   }
 
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 0
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainWindowID, % hGDIwin
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 2
-  Loop, % systemCores
-  {
-      thisList := filesListu[A_Index]
-      argsToGive := "batch-jpegll||" jpegDesiredOperation "=0=" relativeImgSelCoords "=" imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2
-      pidThread%A_Index% := OpenNewExternalCoreThread(A_Index, argsToGive, thisList)
-      If StrLen(pidThread%A_Index%)<2
-      {
-         fatalError := 1
-         Break
-      }
-      Sleep, 1
-  }
-
-  If (fatalError=1)
+  argsToGive := "batch-jpegll||" jpegDesiredOperation "=" relativeImgSelCoords "=" imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2
+  If !spawnExternalCoreThreads(argsToGive, filesListu, pidsArray)
   {
      CurrentSLD := backCurrentSLD
-     RegWrite, REG_SZ, %QPVregEntry%, Running, 1
      Return "single-core"
   }
 
-  Sleep, 500
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
+  setWhileLoopExec(1)
   setForceRefreshThumbsFilesIndex(1)
   Loop
   {
-      Loop, % systemCores
+      totalEnded := scanExternalCoreThreads(pidsArray, thisZeit, jobsRunning, jobDone, threadsCrashed)
+      If (threadsCrashed - closedThreads>systemCores//2 && fatalError!=1)
       {
-         thisThreadStatus := 1
-         RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
-         thisPIDcheck := pidThread%A_Index%
-         isPIDalive := (A_TickCount - thisZeit > 2500) ? testProcessExists(thisPIDcheck) : 1
-         If (thisThreadStatus=1 && isPIDalive=1)
-            jobsRunning++
-         Else If (thisThreadStatus=2)
-            jobDone++
-         Else ; If (thisPIDdead=1)
-            threadsCrashed++
-
-         totalEnded := jobDone + threadsCrashed
-      }
-
-      If (threadsCrashed>systemCores//2)
+         ; most threads died: the survivors are stopped now, instead of running to completion
+         ; behind an "abandoning" message
          fatalError := abandonAll := 1
+         abortRequestedZeit := A_TickCount
+         RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
+      }
 
       If (jobDone>=systemCores) || (totalEnded>=systemCores)
       {
@@ -37984,7 +38111,8 @@ WorkLoadMultiCoresJpegLL(maxList) {
       } Else
       {
          Sleep, 200
-         processedFiles := skippedFiles := failedFiles := 0
+         processedFiles := failedFiles := 0
+         skippedFiles := excludedFiles
          executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>1500)
          {
@@ -38025,41 +38153,47 @@ WorkLoadMultiCoresJpegLL(maxList) {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          abandonAll := 1
          lastLongOperationAbort := A_TickCount
-         ; fatalError := 0
-         ; Break
+         If !abortRequestedZeit
+            abortRequestedZeit := A_TickCount
       }
-      jobDone := threadsCrashed := jobsRunning := 0
+      closedThreads += closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning)
   }
 
-   Loop, % systemCores
-       FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+  Loop, % systemCores
+  {
+      Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+  }
 
-   processedFiles := skippedFiles := failedFiles := 0
-   Loop, % systemCores
-   {
-      RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
-      filesStatusArr := StrSplit(filesStatus, "/")
-      If (filesStatusArr[1]>0)
-         processedFiles += filesStatusArr[1]
-      If (filesStatusArr[2]>0)
-         failedFiles += filesStatusArr[2]
-      If (filesStatusArr[3]>0)
-         skippedFiles += filesStatusArr[3]
-   }
+  processedFiles := failedFiles := 0
+  skippedFiles := excludedFiles
+  Loop, % systemCores
+  {
+     RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
+     filesStatusArr := StrSplit(filesStatus, "/")
+     If (filesStatusArr[1]>0)
+        processedFiles += filesStatusArr[1]
+     If (filesStatusArr[2]>0)
+        failedFiles += filesStatusArr[2]
+     If (filesStatusArr[3]>0)
+        skippedFiles += filesStatusArr[3]
+  }
 
-   zeitOperation := A_TickCount - startOperation
-   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
-   If (failedFiles>0)
-      someErrors .= "`nFailed to process " groupDigits(failedFiles) " files"
-   If (skippedFiles>0)
-      someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
-    
+  setWhileLoopExec(0)
+  leftoverFiles := countExternalCoreThreadsLeftovers(filesListu)
+  zeitOperation := A_TickCount - startOperation
+  percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
+  someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
+  If (failedFiles>0)
+     someErrors .= "`nFailed to process " groupDigits(failedFiles) " files"
+  If (skippedFiles>0)
+     someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+  If (leftoverFiles>0 && threadsCrashed>0)
+     someErrors .= "`n" groupDigits(leftoverFiles) " files were left unprocessed by threads that crashed or were stopped"
+
   If (fatalError=1)
   {
-     ; RemoveTooltip()
      SoundBeep, 300, 100
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
-     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. JPEG lossless processing aborted. `n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countFilez) " selected files were processed until now." someErrors, 0, 0, "error")
+     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. JPEG lossless processing aborted. `n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed until now." someErrors, 0, 0, "error")
      r := "error"
   }
 
@@ -38067,7 +38201,7 @@ WorkLoadMultiCoresJpegLL(maxList) {
   CurrentSLD := backCurrentSLD
   dummyTimerDelayiedImageDisplay(100)
   If (abandonAll=1 && fatalError!=1)
-     showTOOLtip("Operation aborted. " groupDigits(processedFiles) " out of " groupDigits(markedSelectFile) " selected files were processed until now" someErrors)
+     showTOOLtip("Operation aborted. " groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed until now" someErrors)
   Else If (fatalError!=1)
      showTOOLtip(groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected JPEG files were processed" someErrors)
 
@@ -38077,10 +38211,7 @@ WorkLoadMultiCoresJpegLL(maxList) {
   SetTimer, ResetImgLoadStatus, -50
   SetTimer, RemoveTooltip, % -msgDisplayTime*1.5
   If (abandonAll=1 && fatalError!=1)
-  {
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
      r := "abandoned"
-  }
 
   Return r
 }
@@ -38114,63 +38245,32 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   prevMSGdisplay := A_TickCount
   backCurrentSLD := CurrentSLD
   CurrentSLD := ""
-  skippedFiles := theseFailures := failedFiles := 0
-  getSelectedFilesListString(maxList, countTFilez, filesListu)
+  skippedFiles := theseFailures := failedFiles := closedThreads := abortRequestedZeit := 0
+  getSelectedFilesListString(maxList, countTFilez, filesListu, excludedFiles)
   If StrLen(filesListu[1])<3
   {
      CurrentSLD := backCurrentSLD
      Return "single-core"
   }
 
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 0
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainWindowID, % hGDIwin
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 2
-  Loop, % systemCores
-  {
-      thisList := filesListu[A_Index]
-      argsToGive := "batch-fmtconv"
-      pidThread%A_Index% := OpenNewExternalCoreThread(A_Index, argsToGive, thisList)
-      If StrLen(pidThread%A_Index%)<2
-      {
-         fatalError := 1
-         Break
-      }
-      Sleep, 1
-  }
-
-  If (fatalError=1)
+  If !spawnExternalCoreThreads("batch-fmtconv", filesListu, pidsArray)
   {
      CurrentSLD := backCurrentSLD
-     RegWrite, REG_SZ, %QPVregEntry%, Running, 1
      Return "single-core"
   }
 
-  Sleep, 500
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
   setWhileLoopExec(1)
   Loop
   {
-      Loop, % systemCores
+      totalEnded := scanExternalCoreThreads(pidsArray, thisZeit, jobsRunning, jobDone, threadsCrashed)
+      If (threadsCrashed - closedThreads>systemCores//2 && fatalError!=1)
       {
-         thisThreadStatus := 1
-         RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
-         thisPIDcheck := pidThread%A_Index%
-         isPIDalive := (A_TickCount - thisZeit > 2500) ? testProcessExists(thisPIDcheck) : 1
-         If (thisThreadStatus=1 && isPIDalive=1)
-            jobsRunning++
-         Else If (thisThreadStatus=2)
-            jobDone++
-         Else ; If (thisPIDdead=1)
-            threadsCrashed++
-
-         totalEnded := jobDone + threadsCrashed
-      }
-
-      If (threadsCrashed>systemCores//2)
          fatalError := abandonAll := 1
+         abortRequestedZeit := A_TickCount
+         RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
+      }
 
       If (jobDone>=systemCores) || (totalEnded>=systemCores)
       {
@@ -38179,7 +38279,8 @@ WorkLoadMultiCoresConvertFormat(maxList) {
       } Else
       {
          Sleep, 200
-         processedFiles := skippedFiles := failedFiles := theseFailures := 0
+         processedFiles := failedFiles := theseFailures := 0
+         skippedFiles := excludedFiles
          executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>1500)
          {
@@ -38224,13 +38325,14 @@ WorkLoadMultiCoresConvertFormat(maxList) {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          lastLongOperationAbort := A_TickCount
          abandonAll := 1
-         ; fatalError := 0
-         ; Break
+         If !abortRequestedZeit
+            abortRequestedZeit := A_TickCount
       }
-      jobDone := threadsCrashed := jobsRunning := 0
+      closedThreads += closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning)
   }
 
   processedFiles := failedFiles := theseFailures := 0
+  skippedFiles := excludedFiles
   Loop, % systemCores
   {
      RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
@@ -38241,16 +38343,20 @@ WorkLoadMultiCoresConvertFormat(maxList) {
         failedFiles += filesStatusArr[2]
      If (filesStatusArr[3]>0)
         theseFailures += filesStatusArr[3]
+     If (filesStatusArr[4]>0)
+        skippedFiles += filesStatusArr[4]
   }
 
+  ; the results of every thread that got to write them are applied, crash or no crash:
+  ; a file converted by a surviving thread has had its original removed already, and the
+  ; files list has to follow it
   Loop, % systemCores
   {
-        ; RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
-        If (fatalError!=1)
-           Try FileRead, results, %thumbsCacheFolder%\tempList%A_Index%.txt
-        theFinalList .= results
-        Sleep, 0
-        Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+     results := ""
+     Try FileRead, results, %thumbsCacheFolder%\tempList%A_Index%.txt
+     theFinalList .= results
+     Sleep, 0
+     Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
   }
 
   If (SLDtypeLoaded=3)
@@ -38282,6 +38388,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   }
 
   setWhileLoopExec(0)
+  leftoverFiles := countExternalCoreThreadsLeftovers(filesListu, 1)
   zeitOperation := A_TickCount - startOperation
   percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
@@ -38291,13 +38398,13 @@ WorkLoadMultiCoresConvertFormat(maxList) {
      someErrors .= "`nUnable to remove " groupDigits(theseFailures) " original files after conversion"
   If (skippedFiles>0)
      someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+  If (leftoverFiles>0 && threadsCrashed>0)
+     someErrors .= "`n" groupDigits(leftoverFiles) " files were left unprocessed by threads that crashed or were stopped"
 
   If (fatalError=1)
   {
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
-     ; RemoveTooltip()
      SoundBeep, 300, 100
-     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. Image file formats conversion aborted.`n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countFilez) " selected files were processed until now." someErrors, 0, 0, "error")
+     msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. Image file formats conversion aborted.`n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed until now." someErrors, 0, 0, "error")
      r := "error"
   }
 
@@ -38305,7 +38412,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   ForceRefreshNowThumbsList()
   dummyTimerDelayiedImageDisplay(100)
   If (abandonAll=1 && fatalError!=1)
-     showTOOLtip("Operation aborted. " groupDigits(processedFiles) " out of " markedSelectFile " selected files were converted to ." rDesireWriteFMT " until now" someErrors)
+     showTOOLtip("Operation aborted. " groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were converted to ." rDesireWriteFMT " until now" someErrors)
   Else If (fatalError!=1)
      showTOOLtip(groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were converted to ." rDesireWriteFMT someErrors)
 
@@ -38315,10 +38422,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   SetTimer, ResetImgLoadStatus, -50
   SetTimer, RemoveTooltip, % -msgDisplayTime*1.5
   If (abandonAll=1 && fatalError!=1)
-  {
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
      r := "abandoned"
-  }
 
   Return r
 }
@@ -38328,65 +38432,34 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
   prevMSGdisplay := A_TickCount
   backCurrentSLD := CurrentSLD
   CurrentSLD := ""
-  skippedFiles := theseFailures := failedFiles := 0
-  getSelectedFilesListString(maxList, countTFilez, filesListu)
+  skippedFiles := theseFailures := failedFiles := closedThreads := abortRequestedZeit := 0
+  thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
+  getSelectedFilesListString(maxList, countTFilez, filesListu, excludedFiles, thisRegEXsaveFmts)
   If StrLen(filesListu[1])<3
   {
      CurrentSLD := backCurrentSLD
      Return "single-core"
   }
 
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 0
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainWindowID, % hGDIwin
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 2
-  Loop, % systemCores
-  {
-      thisList := filesListu[A_Index]
-      argsToGive := "batch-simpleimgproc||" imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" editingSelectionNow "=" simpleOpRotationAngle
-      pidThread%A_Index% := OpenNewExternalCoreThread(A_Index, argsToGive, thisList)
-      If StrLen(pidThread%A_Index%)<2
-      {
-         fatalError := 1
-         Break
-      }
-      Sleep, 1
-  }
-
-  If (fatalError=1)
+  argsToGive := "batch-simpleimgproc||" imgSelX1 "=" imgSelX2 "=" imgSelY1 "=" imgSelY2 "=" prcSelX1 "=" prcSelX2 "=" prcSelY1 "=" prcSelY2 "=" editingSelectionNow "=" simpleOpRotationAngle
+  If !spawnExternalCoreThreads(argsToGive, filesListu, pidsArray)
   {
      CurrentSLD := backCurrentSLD
-     RegWrite, REG_SZ, %QPVregEntry%, Running, 1
      Return "single-core"
   }
 
-  Sleep, 500
-  RegWrite, REG_SZ, %QPVregEntry%, Running, 1
   thisZeit := A_TickCount
   doStartLongOpDance()
+  setWhileLoopExec(1)
   Loop
   {
-      Loop, % systemCores
+      totalEnded := scanExternalCoreThreads(pidsArray, thisZeit, jobsRunning, jobDone, threadsCrashed)
+      If (threadsCrashed - closedThreads>systemCores//2 && fatalError!=1)
       {
-         thisThreadStatus := 1
-         RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
-         thisPIDcheck := pidThread%A_Index%
-         isPIDalive := (A_TickCount - thisZeit > 2500) ? testProcessExists(thisPIDcheck) : 1
-         If (thisThreadStatus=1 && isPIDalive=1)
-            jobsRunning++
-         Else If (thisThreadStatus=2)
-            jobDone++
-         Else ; If (thisPIDdead=1)
-            threadsCrashed++
-
-         totalEnded := jobDone + threadsCrashed
-         ; sleep, 450
-         ; ToolTip, % jobsRunning "//" jobDone "//" threadsCrashed "//" totalEnded , , , 2
-         ; ToolTip, % thisThreadStatus " // " isPIDalive , , , 2
-      }
-
-      If (threadsCrashed>systemCores//2)
          fatalError := abandonAll := 1
+         abortRequestedZeit := A_TickCount
+         RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
+      }
 
       If (jobDone>=systemCores) || (totalEnded>=systemCores)
       {
@@ -38395,7 +38468,8 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
       } Else
       {
          Sleep, 200
-         processedFiles := skippedFiles := failedFiles := 0
+         processedFiles := failedFiles := 0
+         skippedFiles := excludedFiles
          executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>1500)
          {
@@ -38436,13 +38510,14 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          abandonAll := 1
          lastLongOperationAbort := A_TickCount
-         ; fatalError := 0
-         ; Break
+         If !abortRequestedZeit
+            abortRequestedZeit := A_TickCount
       }
-      jobDone := threadsCrashed := jobsRunning := 0
+      closedThreads += closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning)
   }
 
-  processedFiles := failedFiles := skippedFiles := 0
+  processedFiles := failedFiles := 0
+  skippedFiles := excludedFiles
   Loop, % systemCores
   {
      RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
@@ -38457,14 +38532,11 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
 
   Loop, % systemCores
   {
-        ; RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%A_Index%, 0
-        If (fatalError!=1)
-           Try FileRead, results, %thumbsCacheFolder%\tempList%A_Index%.txt
-        theFinalList .= results
-        Sleep, 0
-        Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+      Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
   }
 
+  setWhileLoopExec(0)
+  leftoverFiles := countExternalCoreThreadsLeftovers(filesListu)
   percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
   zeitOperation := A_TickCount - startOperation
   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
@@ -38472,12 +38544,12 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
      someErrors .= "`nFailed to process " groupDigits(failedFiles) " files"
   If (skippedFiles>0)
      someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+  If (leftoverFiles>0 && threadsCrashed>0)
+     someErrors .= "`n" groupDigits(leftoverFiles) " files were left unprocessed by threads that crashed or were stopped"
 
   If (fatalError=1)
   {
-     ; RemoveTooltip()
      SoundBeep, 300, 100
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
      msgBoxWrapper(appTitle ": ERROR", "Most execution threads have crashed. Image processing aborted. `n`nPlease try again with multi-threading disabled.`n`n" groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed until now..." someErrors, 0, 0, "error")
      r := "error"
   }
@@ -38485,7 +38557,7 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
   ForceRefreshNowThumbsList()
   dummyTimerDelayiedImageDisplay(100)
   If (abandonAll=1 && fatalError!=1)
-     showTOOLtip("Operation aborted. " groupDigits(processedFiles) " out of " groupDigits(markedSelectFile) " selected files were processed until now." someErrors)
+     showTOOLtip("Operation aborted. " groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed until now." someErrors)
   Else If (fatalError!=1)
      showTOOLtip(groupDigits(processedFiles) " out of " groupDigits(countTFilez) " selected files were processed" someErrors)
 
@@ -38495,10 +38567,7 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList) {
   SetTimer, ResetImgLoadStatus, -50
   SetTimer, RemoveTooltip, % -msgDisplayTime*1.5
   If (abandonAll=1 && fatalError!=1)
-  {
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
      r := "abandoned"
-  }
 
   CurrentSLD := backCurrentSLD
   Return r
@@ -38508,16 +38577,15 @@ multiCoresJpegLL(coreThread, arguments, filesList) {
   resultsList := ""
   argumentsArray := StrSplit(arguments, "=")
   jpegOperation := argumentsArray[1]
-  mustCrop := argumentsArray[2]
-  relativeImgSelCoords := argumentsArray[3]
-  imgSelX1 := argumentsArray[4]
-  imgSelX2 := argumentsArray[5]
-  imgSelY1 := argumentsArray[6]
-  imgSelY2 := argumentsArray[7]
-  prcSelX1 := argumentsArray[8]
-  prcSelX2 := argumentsArray[9]
-  prcSelY1 := argumentsArray[10]
-  prcSelY2 := argumentsArray[11]
+  relativeImgSelCoords := argumentsArray[2]
+  imgSelX1 := argumentsArray[3]
+  imgSelX2 := argumentsArray[4]
+  imgSelY1 := argumentsArray[5]
+  imgSelY2 := argumentsArray[6]
+  prcSelX1 := argumentsArray[7]
+  prcSelX2 := argumentsArray[8]
+  prcSelY1 := argumentsArray[9]
+  prcSelY2 := argumentsArray[10]
   failedFiles := skippedFiles := countFilez := operationDone := 0
   Loop, Parse, filesList,`n,`r
   {
@@ -61277,7 +61345,7 @@ batchConvert2format(modus:=0) {
    }
 
    If (infoResult="single-core")
-      addJournalEntry("JPEG lossless processing: failed to initialize multi-threaded processing")
+      addJournalEntry("Image format conversion: falling back to single-threaded processing")
 
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
@@ -61286,7 +61354,7 @@ batchConvert2format(modus:=0) {
 
    doStartLongOpDance()
    initFIMGmodule()
-   skipDeadFiles := theseFailures := failedFiles := countTFilez := filesConverted := 0
+   skippedFiles := theseFailures := failedFiles := countTFilez := filesConverted := 0
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
@@ -90754,7 +90822,7 @@ batchJpegLLoperations() {
    }
 
    If (infoResult="single-core")
-      addJournalEntry("JPEG operations error: failed to initialize multi-threaded processing")
+      addJournalEntry("JPEG lossless operations: falling back to single-threaded processing")
 
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
@@ -92403,13 +92471,13 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
       executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
-         etaTime := ETAinfos(countTFilez, markedSelectFile, startOperation)
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If (failedFiles>0)
             etaTime .= "`nFailed to process " groupDigits(failedFiles) " files"
          If (skippedFiles>0)
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
-         showTOOLtip("Processing images, please wait" etaTime, 0, 0, countTFilez / markedSelectFile)
+         showTOOLtip("Processing images, please wait" etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
       }
 
@@ -92682,7 +92750,6 @@ coreQuickImageFilesListActions(actu) {
 
    If countJpegs
    {
-      hasExec := 1
       jpegDesiredOperation := actu
       BtnPerformJpegOp("extern")
    } Else
@@ -99674,7 +99741,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
    }
 
    If (infoResult="single-core")
-      addJournalEntry("Image processing in batch: failed to initialize multi-threaded processing")
+      addJournalEntry("Image processing in batch: falling back to single-threaded processing")
 
    If (ResizeUseDestDir=1 && userPrivateMode!=1)
       destInfo := "`nDestination folder:`n" PathCompact(ResizeDestFolder, 50)
@@ -99685,6 +99752,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
    countTFilez := failedFiles := filesConverted := skippedFiles := 0
    doStartLongOpDance()
    startOperation := A_TickCount
+   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -99701,13 +99769,13 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor) {
       executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
-         etaTime := ETAinfos(countTFilez, markedSelectFile, startOperation)
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If failedFiles
             etaTime := "`nFailed to process " groupDigits(failedFiles) " files"
          If skippedFiles
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
-         showTOOLtip("Processing image files, please wait" destInfo etaTime, 0, 0, countTFilez / markedSelectFile)
+         showTOOLtip("Processing image files, please wait" destInfo etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
       }
 
@@ -99794,6 +99862,7 @@ batchSimpleColorsAdjusts() {
    countTFilez := failedFiles := filesConverted := skippedFiles := 0
    doStartLongOpDance()
    startOperation := A_TickCount
+   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -99810,13 +99879,13 @@ batchSimpleColorsAdjusts() {
       executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
-         etaTime := ETAinfos(countTFilez, markedSelectFile, startOperation)
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If failedFiles
             etaTime := "`nFailed to process " groupDigits(failedFiles) " files"
          If skippedFiles
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
-         showTOOLtip("Processing image files, please wait" destInfo etaTime, 0, 0, countTFilez / markedSelectFile)
+         showTOOLtip("Processing image files, please wait" destInfo etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
       }
 
@@ -100785,33 +100854,37 @@ adjustNumbersEditFields(OutputVal, OutputVname) {
 OpenNewExternalCoreThread(thisIndex, args, thisList) {
    pidThread := 0
    Try FileDelete, %thumbsCacheFolder%\tempList%thisIndex%.txt
-   Try FileDelete, %thumbsCacheFolder%\tempFilesList.txt
+   Try FileDelete, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt
    Sleep, 0
-   Try FileAppend, % thisList, %thumbsCacheFolder%\tempFilesList.txt, utf-16
+   Try FileAppend, % thisList, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt, utf-16
    Catch wasErrorA
          Sleep, 1
 
    If wasErrorA
       Return 0
 
+   ; the parameters and the files list are per thread, and the worker learns which thread
+   ; it is from its command line. A shared registry flag (Running=2) used to announce "the
+   ; next QPV to start is a worker" for the whole spawn phase, so a copy started meanwhile
+   ; by the user - a file association double-click - became one too, took over the last
+   ; slot and processed its files a second time.
    Sleep, 0
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%thisIndex%, 0
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%thisIndex%, 0
-   RegWrite, REG_SZ, %QPVregEntry%\multicore, threadParams, %thisIndex%||%args%
+   RegWrite, REG_SZ, %QPVregEntry%\multicore, threadParams%thisIndex%, %thisIndex%||%args%
 
    thisPath := A_IsCompiled ? Chr(34) fullPath2exe Chr(34) : unCompiledExePath
-   Try Run, %thisPath%,,, pidThread
+   Try Run, %thisPath% qpv-core-thread=%thisIndex%,,, pidThread
    Catch wasErrorB
        Sleep, 0
 
    If (wasErrorB || !pidThread)
    {
-      Try FileDelete, %thumbsCacheFolder%\tempFilesList.txt
+      Try FileDelete, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt
       Return 0
    } Else
    {
       WinWait, ahk_pid %pidThread%,,2
-      WinGet, hwndThread, ID, ahk_pid %pidThread%
       Sleep, 10
       Loop, 500
       {
@@ -100827,14 +100900,14 @@ OpenNewExternalCoreThread(thisIndex, args, thisList) {
       {
          Process, Close, % pidThread
          RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%thisIndex%, 0
-         Try FileDelete, %thumbsCacheFolder%\tempFilesList.txt
+         Try FileDelete, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt
          Return 0
       }
       Return pidThread
    }
 }
 
-initExternalCoreMode() {
+initExternalCoreMode(coreThread) {
   Critical, on
   hasInitSpecialMode := 1
   RegRead, mainThreadHwnd, %QPVregEntry%\multicore, mainThreadHwnd
@@ -100844,14 +100917,16 @@ initExternalCoreMode() {
      fatalError := 1
   }
 
-  RegRead, threadParams, %QPVregEntry%\multicore, threadParams
+  RegRead, threadParams, %QPVregEntry%\multicore, threadParams%coreThread%
   If !threadParams
      fatalError := 1
 
   args := StrSplit(threadParams, "||")
-  coreThread := args[1]
+  If (args[1]!=coreThread)
+     fatalError := 1
 
-  Try FileRead, filesList, %thumbsCacheFolder%\tempFilesList.txt
+  Try FileRead, filesList, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
+  Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
   If !filesList
      fatalError := 1
 
@@ -100863,9 +100938,13 @@ initExternalCoreMode() {
   }
 
   RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
+  ; this thread is critical, so the watchdog only gets to run while a modal dialog - an
+  ; AHK runtime error, a library fault - is up: the one situation in which the per-file
+  ; abort check of the loops below cannot run, and the main thread would otherwise have
+  ; to close the process from outside
+  SetTimer, watchExternalCoreAbort, 750
   initFIMGmodule()
   RegRead, hGDIwin, %QPVregEntry%\multicore, mainWindowID
-     ; MsgBox, % args[1] "--" args[3]
   If (args[2]="batch-jpegll")
      multiCoresJpegLL(args[1], args[3], filesList)
   Else If (args[2]="batch-simpleimgproc")
@@ -100873,9 +100952,14 @@ initExternalCoreMode() {
   Else If (args[2]="batch-fmtconv")
      multiCoresFormatConvert(args[1], filesList)
 
-  ; msgbox, killaaaa
   ForceExitNow()
   Return
+}
+
+watchExternalCoreAbort() {
+  RegRead, mustAbort, %QPVregEntry%\multicore, mustAbortAllOperations
+  If (mustAbort=1 || !WinExist("ahk_id" mainThreadHwnd))
+     ForceExitNow()
 }
 
 printImageNow(mainBMP, PrintOptions, previewMode, inLoop:=0, OutFileName:=0) {
