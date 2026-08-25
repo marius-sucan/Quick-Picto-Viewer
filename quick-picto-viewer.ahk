@@ -32803,6 +32803,57 @@ FileRexists(filePath, loose:=1) {
       Return 1
 }
 
+isSameFileOtherCase(fileA, fileB) {
+; tells whether two spellings of one path, equal but for the case of their letters, name the
+; same file. That is the rule on Windows, its volumes ignore the case, and there a rename from
+; one spelling to the other only changes the case of the name. A directory can be made case
+; sensitive [fsutil, Windows 10 and later], and there the two spellings can be two files, or the
+; second one can be free; FindFirstFile answers with the name as it is stored on the disk, and
+; only the same file answers with the same stored name for both spellings
+   If (fileA==fileB || !(fileA=fileB))
+      Return 0
+
+   nameA := nameB := ""
+   Loop, Files, %fileA%
+      nameA := A_LoopFileName
+   Loop, Files, %fileB%
+      nameB := A_LoopFileName
+
+   Return (nameA!="" && nameA==nameB) ? 1 : 0
+}
+
+renameFileCaseOnly(oldPath, newPath) {
+; oldPath and newPath spell the same file with a different case, see isSameFileOtherCase(). The
+; name is changed through a temporary name, so that neither step has a destination that already
+; exists: the file system and the runtime are never asked to tell the file apart from itself, and
+; nothing gets deleted or recycled to make room. Returns 0 on success and 1 on failure, the way
+; ErrorLevel reads after FileMove; when the second step fails the file gets its old name back
+   tmpPath := oldPath "-tmp"
+   Loop
+   {
+      If !FileExist(tmpPath)
+         Break
+
+      tmpPath := oldPath "-tmp" A_Index
+   } Until (A_Index>500)
+
+   If FileExist(tmpPath)
+      Return 1
+
+   FileMove, %oldPath%, %tmpPath%
+   If ErrorLevel
+      Return 1
+
+   FileMove, %tmpPath%, %newPath%
+   If ErrorLevel
+   {
+      FileMove, %tmpPath%, %oldPath%
+      Return 1
+   }
+
+   Return 0
+}
+
 informUserFileMissing(clearScreen:=0) {
    Critical, on
    If (clearScreen=1)
@@ -41422,12 +41473,19 @@ coreBatchMultiRenameFiles() {
 
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
          file2save := OutDir "\" newFileName "." fileEXTu
-         If (file2save=file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
+         If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
          {
             skippedFiles++
             Continue
          }
 
+         ; a name that differs from the old one only in the case of its letters [case{U}, case{L},
+         ; case{T}, a new extension typed in another case, a replacement that changes the case]
+         ; names the same file on Windows: no other file is in the way, nothing is there to
+         ; overwrite or recycle, and the test above must not read it as "unchanged", which is why
+         ; it compares the case as well. The case sensitive directory, where the two spellings can
+         ; be two files, is told apart by isSameFileOtherCase() and takes the regular route
+         caseOnly := isSameFileOtherCase(file2rem, file2save)
          If (PreserveDateTimeOnSave=1)
          {
             originalMtime := ""
@@ -41435,7 +41493,7 @@ coreBatchMultiRenameFiles() {
             FileGetTime, originalCtime, %file2rem%, C
          }
 
-         If (FileExist(file2save) && !FolderExist(file2save))
+         If (caseOnly!=1 && FileExist(file2save) && !FolderExist(file2save))
          {
             file2save := askAboutFileCollision(file2rem, file2save, 1, 0, onConflictMultiRenameAct, performOverwrite)
             If !file2save
@@ -41450,7 +41508,7 @@ coreBatchMultiRenameFiles() {
          }
 
          originalFileInfos := ""
-         thisFileExists := FileRexists(file2save, 0)
+         thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
          If (performOverwrite=1 && objuTemp.renamingCount!=1 && thisFileExists=1)
          {
             overwrittenFiles++
@@ -41470,8 +41528,15 @@ coreBatchMultiRenameFiles() {
 
          FileSetAttrib, -R, %file2rem%
          Sleep, 1
-         FileMove, %file2rem%, %file2save%, 1
-         If ErrorLevel
+         If (caseOnly=1)
+            moveFailed := renameFileCaseOnly(file2rem, file2save)
+         Else
+         {
+            FileMove, %file2rem%, %file2save%, 1
+            moveFailed := ErrorLevel
+         }
+
+         If moveFailed
          {
             failedFiles++
             wasError++
@@ -43674,7 +43739,7 @@ PanelRenameThisFile(dummy:=0) {
       newFileName := Trimmer(msgResult.edit)
       file2rem := getIDimage(currentFileIndex)
       zPlitPath(file2rem, 0, OutFileName, OutDir)
-      If ((Trimmer(OutFileName)=newFileName) || !newFileName)
+      If ((Trimmer(OutFileName)==newFileName) || !newFileName)   ; == so that a change of case alone goes through
          Return
 
       If askAboutFileSave(" and the current file will be renamed and reloaded")
@@ -47246,7 +47311,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      If !InStr(newFileName, ".")
         newFileName .= "." oldEXT
 
-     If (OutFileName=newFileName)
+     If (OutFileName==newFileName)   ; the very same spelling; a name that differs in its case alone is a rename
         Return 1
 
      If !FileExist(file2rem)
@@ -47255,7 +47320,9 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      destroyGDIfileCache()
      oMD5name := generateThumbName(file2rem, 1)
      file2save := OutDir "\" newFileName
-     If FileRexists(file2save, 0)
+     ; the same file spelled in another case: nothing is in the way, see coreBatchMultiRenameFiles()
+     caseOnly := isSameFileOtherCase(file2rem, file2save)
+     If (caseOnly!=1 && FileRexists(file2save, 0))
         file2save := askAboutFileCollision(file2rem, file2save, 0, doLastOption + 1, 0, performOverwrite)
 
      If (file2save="abort" || !file2save)
@@ -47266,7 +47333,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 
      FileGetTime, originalMtime, % file2rem, M
      FileGetTime, originalCtime, % file2rem, C
-     thisFileExists := FileRexists(file2save, 0)
+     thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
      If (performOverwrite=1 && thisFileExists=1)
      {
         jso := GetFileAttributesEx(file2save)
@@ -47285,8 +47352,15 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 
      FileSetAttrib, -R, %file2rem%
      Sleep, 2
-     FileMove, %file2rem%, %file2save%, 1
-     If ErrorLevel
+     If (caseOnly=1)
+        moveFailed := renameFileCaseOnly(file2rem, file2save)
+     Else
+     {
+        FileMove, %file2rem%, %file2save%, 1
+        moveFailed := ErrorLevel
+     }
+
+     If moveFailed
      {
         OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
         showTOOLtip("ERROR: Access denied. The file could not be renamed.`n" OutFileName "`n" OutDir "\")
@@ -94241,12 +94315,15 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
       }
    } Else If (obj.typu="move" || obj.typu="rename")
    {
-      If (imgPath!=otherFile)
+      If !(imgPath==otherFile)
       {
          oMD5name := generateThumbName(imgPath, 1)
          FileGetTime, originalMtime, % imgPath, M
          FileGetTime, originalCtime, % imgPath, C
-         If FileRexists(otherFile, 0)
+         ; undoing a rename that changed the case of the name alone: the two spellings are the
+         ; same file, nothing is in the way and nothing is there to delete
+         caseOnly := isSameFileOtherCase(imgPath, otherFile)
+         If (caseOnly!=1 && FileRexists(otherFile, 0))
          {
             otherFile := askAboutFileCollision(imgPath, otherFile, 0, 1, 0, performOverwrite, 1, "Undo " obj.typu " operation. ")
             If (otherFile="abort" || !otherFile)
@@ -94264,8 +94341,15 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          }
 
          Sleep, 5
-         FileMove, % imgPath, % otherFile, 1
-         If !ErrorLevel
+         If (caseOnly=1)
+            moveFailed := renameFileCaseOnly(imgPath, otherFile)
+         Else
+         {
+            FileMove, % imgPath, % otherFile, 1
+            moveFailed := ErrorLevel
+         }
+
+         If !moveFailed
          {
             If (originalMtime)
             {
