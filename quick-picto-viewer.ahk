@@ -1927,7 +1927,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        {
           If (slideShowRunning=1)
              func2Call := ["dummyInfoToggleSlideShowu", "stop"]
-          Else If StrLen(filesFilter)>1
+          Else If (StrLen(filesFilter)>1)
              func2Call := ["MenuRemFilesListFilter"]
        }
     } Else If (givenKey="BackSpace")
@@ -2985,7 +2985,7 @@ OpenWithNewQPVinstance(modus:=0, givenList:=0, givenCount:=0) {
       Loop, Parse, givenList, `n
       {
          imgPath := Trimmer(A_LoopField)
-         If StrLen(imgPath)>4
+         If (StrLen(imgPath)>4)
          {
             Sleep, (A_Index>1) ? 700 : 300
             OpenNewQPVinstance(imgPath)
@@ -3001,7 +3001,7 @@ OpenWithNewQPVinstance(modus:=0, givenList:=0, givenCount:=0) {
 
          thisIndex++
          imgPath := resultedFilesList[A_Index, 1]
-         If StrLen(imgPath)>4
+         If (StrLen(imgPath)>4)
          {
             Sleep, (thisIndex>1) ? 700 : 300
             OpenNewQPVinstance(imgPath)
@@ -3067,12 +3067,12 @@ InvokeOpenWithMenu(imgPath) {
     {
        IniAction(0, "UserExternalApp", "General", 6)
        pathu := "&X. " PathCompact(UserExternalApp, 28)
-       If StrLen(Trimmer(UserExternalApp))<6
+       If (StrLen(Trimmer(UserExternalApp))<6)
           pathu := "NONE CHOSEN"
 
        IniAction(0, "UserExternalEditApp", "General", 6)
        pathu2 := "&Y. " PathCompact(UserExternalEditApp, 28)
-       If StrLen(Trimmer(UserExternalEditApp))<6
+       If (StrLen(Trimmer(UserExternalEditApp))<6)
           pathu2 := "NONE CHOSEN"
 
        If !markedSelectFile
@@ -3679,7 +3679,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
            Continue
 
         imgPath := StrReplace(resultedFilesList[A_Index, 1], "||")
-        If StrLen(imgPath)<4
+        If (StrLen(imgPath)<4)
            Continue
 
         If (onWhat="folderu")
@@ -10158,7 +10158,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       Return
    } Else If (AnyWindowOpen=64 && liveDrawingBrushTool=1`&& (mustCaptureCloneBrush=1 || isCtrlShift=1))
    {
-      If StrLen(BrushToolSymmetryX)>1
+      If (StrLen(BrushToolSymmetryX)>1)
       {
          setNewBrushSymmetryPoints()
       } Else
@@ -13180,7 +13180,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
     startZeit := A_TickCount
     theString := applyTextTransform(theString, TextInAreaCaseTransform)
-    If StrLen(theString)<1
+    If (StrLen(theString)<1)
        Return "fail"
 
     txtColor := makeRGBAcolor(TextInAreaFontColor, TextInAreaFontOpacity)
@@ -15388,7 +15388,7 @@ cImg_GdipResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
      Return 0
 
   r := DllCall("qpvmain.dll\cImgResizeBitmap", "UPtr", pBitmap, "Int", w, "Int", h, "int", newW, "int", newH, "Int", interpolation, "int", bond, "UPtr")
-  If StrLen(r)>2
+  If (StrLen(r)>2)
   {
      recordGdipBitmaps(r, A_ThisFunc)
      Return r
@@ -15438,7 +15438,7 @@ cImg_CreatePlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, bl
      Return 0
 
   pBitmap := DllCall("qpvmain.dll\GenerateCIMGnoiseBitmap", "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
-  If StrLen(pBitmap)>2
+  If (StrLen(pBitmap)>2)
      recordGdipBitmaps(pBitmap, A_ThisFunc)
 
   If (validBMP(pBitmap) && fillBgr=1)
@@ -25379,7 +25379,7 @@ rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
        If (rescaled=1)
           FreeImage_UnLoad(hFIFimgB)
 
-       If StrLen(pBitmap)>2
+       If (StrLen(pBitmap)>2)
        {
           recordGdipBitmaps(pBitmap, A_ThisFunc)
           addJournalEntry(A_ThisFunc "(): YAY - rescaled FIM bitmap to screen. BPP = " bpp "|" rescaled)
@@ -25400,7 +25400,7 @@ rescaleFIMbmpGDIp(ByRef hFIFimgA, nw, nh) {
 
 corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
     clipBMP := Gdip_CreateBitmapFromClipboard()
-    If StrLen(clipBMP)>2
+    If (StrLen(clipBMP)>2)
        recordGdipBitmaps(clipBMP, A_ThisFunc "|recordUndoLevelNow")
 
     If (isInRange(Abs(clipBMP), 1, 5) || !validBMP(clipBMP))
@@ -25409,7 +25409,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
           Return
 
        Try toPaste := Trimmer(Clipboard)
-       If StrLen(toPaste)>2
+       If (StrLen(toPaste)>2)
        {
           textMode := 1
           toPaste := SubStr(toPaste, 1, 9500)
@@ -26049,7 +26049,7 @@ MenuDisableKbdShortcut() {
        humanKbd := sillySeparator processKkbdNameToHuman(oldShortcut)
        newLine := (oldShortcut!="") ? oldShortcut txtLine humanKbd : ""
        defaultu := processDefaultKbdCombos(shortcut, PVhwnd, 0, PVhwnd, 1)
-       If StrLen(defaultu[1])>2
+       If (StrLen(defaultu[1])>2)
           bonusLine := (oldShortcut!=shortcut) ? shortcut sillySeparator "?_generic" sillySeparator "ALL" sillySeparator "\ANYWHERE" sillySeparator c sillySeparator shortcut sillySeparator oshortcut : ""
    
        r := updateCustomUserKbds(newLine, userCustomKeysDefined[cshortcut, 7], 0, bonusLine)
@@ -26380,7 +26380,7 @@ defineKBDcontexts(humanMode) {
 
 testCustomKBDcontexts(givenKey) {
    r := defineKBDcontexts(0)
-   If StrLen(userCustomKeysDefined[r . givenKey, 1])>0
+   If (StrLen(userCustomKeysDefined[r . givenKey, 1])>0)
       Return r . givenKey
 }
 
@@ -26773,7 +26773,7 @@ trackImageListButtons(actu, r:=0, hwnd:=0, discardedImageList:=0, guiu:=0) {
     {
        ; SoundBeep , 300, 100
        HILs["r" r] := [r, hwnd, guiu]
-       If StrLen(discardedImageList)>1
+       If (StrLen(discardedImageList)>1)
        {
           HILs["r" discardedImageList, 1] := 0
           HILs["r" discardedImageList, 2] := hwnd
@@ -27041,7 +27041,7 @@ readFoldersFavedList() {
    newArrayu := []
    Loop, Parse, OutputVar, `n,`r
    {
-      If StrLen(A_LoopField)<4
+      If (StrLen(A_LoopField)<4)
          Continue
       thisIndex++
       newArrayu[thisIndex] := Trimmer(A_LoopField)
@@ -27490,7 +27490,7 @@ SettingsToolTips() {
    ControlGet, ctrlActiveState, Enabled,,, ahk_id %hwnd%
    If (info=value)
       info := ""
-   If StrLen(info)>0
+   If (StrLen(info)>0)
       info .= "`n"
 
    If (posuk := InStr(value, "&"))
@@ -27567,7 +27567,7 @@ SettingsToolTips() {
    ; ToolTip, % A_DefaultGUI "===" msg2show , , , 2
    ; If (ctrlActiveState!=1 && StrLen(msg2show)>2 && btnType)
    ;    msg2show .= "`n[CONTROL DISABLED]"
-   If StrLen(listBoxOptions)>3
+   If (StrLen(listBoxOptions)>3)
    {
       countListBoxOptions := ST_Count(listBoxOptions, "`n") + 1
       If (countListBoxOptions>10)
@@ -29035,7 +29035,7 @@ BtnCopySeenStats() {
    textu .= "`nHOURLY SEEN IMAGES:`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaH", 4)
 
-   If StrLen(textu)>10
+   If (StrLen(textu)>10)
    {
       Try Clipboard := Trimmer(textu)
       Catch wasError
@@ -29094,7 +29094,7 @@ BtnCopyFileStats() {
    GuiControlGet, infoLine
    textu .= "`n" infoLine "`n"
 
-   If StrLen(textu)>10
+   If (StrLen(textu)>10)
    {
       Try Clipboard := Trimmer(textu)
       Catch wasError
@@ -29138,7 +29138,7 @@ BtnCopyImageFileStats() {
    textu .= "`nIMAGES: HISTOGRAM - TOTAL (RANGE)`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaR", 4)
 
-   If StrLen(textu)>10
+   If (StrLen(textu)>10)
    {
       Try Clipboard := Trimmer(textu)
       Catch wasError
@@ -29323,7 +29323,7 @@ ETAinfos(countTFilez, filesElected, startOperation) {
 }
 
 collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
-    ; If StrLen(filesFilter)>1
+    ; If (StrLen(filesFilter)>1)
     ;    remFilesListFilter("simple")
 
     doStartLongOpDance()
@@ -29425,7 +29425,7 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
 }
 
 collectFileInfosNow(queryString:=0) {
-    ; If StrLen(filesFilter)>1
+    ; If (StrLen(filesFilter)>1)
     ;    remFilesListFilter("simple")
 
     doStartLongOpDance()
@@ -32273,7 +32273,7 @@ folderTreePasteClippy() {
 PasteFilesIntoGivenFolder(folderPath) {
    showTOOLtip("Importing clipboard content...")
    Try listu := Clipboard
-   If StrLen(listu)<5
+   If (StrLen(listu)<5)
    {
       showTOOLtip("WARNING: Found no files in the clipboard")
       SoundBeep 300, 100
@@ -32473,7 +32473,7 @@ copyIMGinfos2clip() {
    textu .= "`n `nMETADATA:`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaM", 2, ": ")
 
-   If StrLen(textu)>10
+   If (StrLen(textu)>10)
    {
       Try Clipboard := Trimmer(textu)
       Catch wasError
@@ -32924,7 +32924,7 @@ readRecentFiltersEntries() {
        If (InStr(entriesList, newEntry "`n") || !newEntry)
           Continue
 
-       If StrLen(newEntry)>1
+       If (StrLen(newEntry)>1)
           entriesList .= newEntry "`n"
    }
 
@@ -33048,7 +33048,7 @@ PanelEnableFilesFilter() {
 
     btnWid := (PrefsLargeFonts=1) ? btnWid - 15 : btnWid - 5
     Gui, Add, Button, xs+0 y+10 h%thisBtnHeight% w%btnWid% Default gBtnApplyFilesFilter, &Apply filter
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        Gui, Add, Button, x+5 hp wp+20 gBTNuiremFilesListFilter, &Remove filters
     btnWid := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, x+5 hp w%btnWid% gPanelWrapperFilesStats, S&tats
@@ -33364,7 +33364,7 @@ RecordUsedFiltersManager(entry2add) {
       If (A_Index>20)
          Break
 
-      If StrLen(A_LoopField)<3
+      If (StrLen(A_LoopField)<3)
          Continue
       countItemz++
       IniWrite, % A_LoopField, % mainRecentsFile, RecentFilters, E%countItemz%
@@ -33961,7 +33961,7 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
    If (maxFilesIndex<1)
    {
       FadeMainWindow()
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
       {
          changeMcursor()
          ; showTOOLtip("Removing files list index filter, please wait")
@@ -33992,7 +33992,7 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
    dbIndex := resultedFilesList[thisFileIndex, 12]
    file2remZ := resultedFilesList.RemoveAt(thisFileIndex)
    ; file2remA := file2remZ[1]
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       oldIndex := updateMainUnfilteredList(thisFileIndex, 1, 0)
       file2remC := filteredMap2mainList.RemoveAt(thisFileIndex)
@@ -34026,7 +34026,7 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
    If (maxFilesIndex<1)
    {
       FadeMainWindow()
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
       {
          ; showTOOLtip("Removing files list index filter, please wait")
          remFilesListFilter("simple")
@@ -34548,7 +34548,7 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
    }
 
    r := Trimmer(r)
-   If StrLen(r)<4
+   If (StrLen(r)<4)
       r := ""
 
    SetWorkingDir, % mainCompiledPath
@@ -34625,7 +34625,7 @@ recreateDynaFoldersSQLdbList(saveDynaFolders) {
    activeSQLdb.Exec("DELETE FROM dynamicfolders;")
    Loop, Parse, saveDynaFolders, `n
    {
-       If StrLen(A_LoopField)>2
+       If (StrLen(A_LoopField)>2)
           addDynamicFolderSQLdb(Trimmer(A_LoopField), 0, "dynamicfolders")
    }
 
@@ -34757,7 +34757,7 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
   Loop, % RecordSet.RowCount
   {
       Rowu := RecordSet.Rows[A_Index]
-      If StrLen(Rowu[1])>2
+      If (StrLen(Rowu[1])>2)
       {
          paramu := Rowu[1]
          valu := Rowu[2]
@@ -35381,7 +35381,7 @@ regenerateStaticFoldersList() {
       Return
    }
 
-   If StrLen(filesFilter)>2
+   If (StrLen(filesFilter)>2)
       MenuRemFilesListFilter()
 
    lastFilterEditSearch := StaticListViewFilteru := ""
@@ -36013,7 +36013,7 @@ findFavesInList(modus:=0, doSel:=0) {
 
           If (seenEntries[Format("{:L}", r)]=1)
           {
-             If StrLen(filesFilter)>1
+             If (StrLen(filesFilter)>1)
                 updateMainUnfilteredList(A_Index, idIndex, 1)
 
              resultedFilesList[A_Index, idIndex] := 1
@@ -36022,7 +36022,7 @@ findFavesInList(modus:=0, doSel:=0) {
              countSeen++
           } Else
           {
-             If StrLen(filesFilter)>1
+             If (StrLen(filesFilter)>1)
                 updateMainUnfilteredList(A_Index, idIndex, 0)
              resultedFilesList[A_Index, idIndex] := 0
           }
@@ -37344,7 +37344,7 @@ dbSortingCached(SortCriterion) {
 
       newStaticFoldersListCache := []
       previmgPath := getIDimage(currentFileIndex)
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
          backFilesFilter := filesFilter
 
       showTOOLtip("Generating sorted files list index")
@@ -37963,7 +37963,7 @@ spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
   Loop, % systemCores
   {
       pidsArray[A_Index] := launchExternalCoreThread(A_Index)
-      If StrLen(pidsArray[A_Index])<2
+      If (StrLen(pidsArray[A_Index])<2)
       {
          failedSlot := A_Index
          Break
@@ -38146,7 +38146,7 @@ multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles) {
   Return infos
 }
 
-WorkLoadMultiCoresJpegLL(maxList) {
+initWorkLoadMultiCoresJpegLL(maxList) {
   job := {}
   job.maxList := maxList
   job.mode := "batch-jpegll"
@@ -38159,11 +38159,11 @@ WorkLoadMultiCoresJpegLL(maxList) {
   job.fatalMsg := "JPEG lossless processing aborted."
   job.abortTail := "selected files were processed until now"
   job.doneTail := "selected JPEG files were processed"
-  Return WorkLoadMultiCores(job)
+  Return WorkLoadMultiCoreHandler(job)
 }
 
 testProcessExists(pid) {
-   If StrLen(pid)<2
+   If (StrLen(pid)<2)
       Return 0
 
    Process, Exist, % pid
@@ -38186,7 +38186,7 @@ calculateCoresRequired(filesElected) {
    Return filesPerCore
 }
 
-WorkLoadMultiCoresConvertFormat(maxList) {
+initWorkLoadMultiCoresConvertFormat(maxList) {
   job := {}
   job.maxList := maxList
   job.mode := "batch-fmtconv"
@@ -38197,7 +38197,7 @@ WorkLoadMultiCoresConvertFormat(maxList) {
   job.fatalMsg := "Image file formats conversion aborted."
   job.abortTail := "selected files were converted to ." rDesireWriteFMT " until now"
   job.doneTail := "selected files were converted to ." rDesireWriteFMT
-  Return WorkLoadMultiCores(job)
+  Return WorkLoadMultiCoreHandler(job)
 }
 
 ; The converted files reported by the workers (index?newPath lines) replace their originals
@@ -38210,7 +38210,7 @@ applyMultiCoresConvertResults(theFinalList) {
 
   Loop, Parse, theFinalList,`n,`r
   {
-       If StrLen(A_LoopField)>2
+       If (StrLen(A_LoopField)>2)
        {
           lineArr := StrSplit(A_LoopField, "?")
           thisIndex := lineArr[1]
@@ -38234,7 +38234,7 @@ applyMultiCoresConvertResults(theFinalList) {
   }
 }
 
-WorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
+initWorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
   job := {}
   job.maxList := maxList
   job.mode := "batch-simpleimgproc"
@@ -38247,7 +38247,7 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
   job.fatalMsg := "Image processing aborted."
   job.abortTail := "selected files were processed until now"
   job.doneTail := "selected files were processed"
-  Return WorkLoadMultiCores(job)
+  Return WorkLoadMultiCoreHandler(job)
 }
 
 ; Runs one of the multi-threaded batches: the selected files are split among worker
@@ -38256,14 +38256,14 @@ WorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
 ; which files are eligible, and the wording of the messages. Returns "single-core" when the
 ; workers could not be used - the caller then processes the selection itself - "error" when
 ; most of them crashed, "abandoned" when the user aborted, blank otherwise.
-WorkLoadMultiCores(job) {
+WorkLoadMultiCoreHandler(job) {
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
   backCurrentSLD := CurrentSLD
   CurrentSLD := ""
   closedThreads := abortRequestedZeit := 0
   getSelectedFilesListString(job.maxList, countTFilez, filesListu, excludedFiles, job.eligibleRegEx)
-  If StrLen(filesListu[1])<3
+  If (StrLen(filesListu[1])<3)
   {
      CurrentSLD := backCurrentSLD
      Return "single-core"
@@ -38385,7 +38385,7 @@ WorkLoadMultiCores(job) {
   Return r
 }
 
-multiCoresJpegLL(coreThread, arguments, filesList) {
+multiCoreThreadJpegLL(coreThread, arguments, filesList) {
   resultsList := ""
   argumentsArray := StrSplit(arguments, "=")
   jpegOperation := argumentsArray[1]
@@ -38437,7 +38437,7 @@ multiCoresJpegLL(coreThread, arguments, filesList) {
    ; cleanupThread()
 }
 
-multiCoresSimpleImgProcessing(coreThread, arguments, filesList) {
+multiCoreThreadSimpleImgProcessing(coreThread, arguments, filesList) {
   resultsList := ""
   argumentsArray := StrSplit(arguments, "=")
   ReadSettingsImageProcessing()
@@ -38565,7 +38565,7 @@ coreReadSettingsImageProcessing(act) {
     }
 }
 
-multiCoresFormatConvert(coreThread, filesList) {
+multiCoreThreadFormatConvert(coreThread, filesList) {
   resultsList := ""
   failedFiles := theseFailures := countFilez := operationDone := 0
   ; FileRead, filesList, %thumbsCacheFolder%\tempList%coreThread%.txt
@@ -39527,10 +39527,10 @@ retrieveFavesAsList(dummy:=0) {
 }
 
 saveFavesListBasedOnIndexList() {
-   ; If StrLen(filesFilter)>1
+   ; If (StrLen(filesFilter)>1)
    ;    Return
    newListu := ""
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       lastInvoked := A_TickCount
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The current files list has " groupDigits(maxFilesIndex) " images indexed. It is the result of a filter applied on the favourite images list.`n`nPlease confirm you want to save the favourites list as is, filtered. The total of " groupdigits(bckpMaxFilesIndex) " favourited images will no longer be retrievable.", "&Deactivate filter|&Save list|&Cancel", 0, "question")
@@ -39593,7 +39593,7 @@ saveFavesListBasedOnIndexList() {
        If (realCount>maxFavesEntries)
           Break
 
-       ; If StrLen(filesFilter)>1
+       ; If (StrLen(filesFilter)>1)
        ;    thisImg := bckpResultedFilesList[filteredMap2mainList[A_Index], 1]
        ; Else
           thisImg := resultedFilesList[A_Index, 1]
@@ -41604,7 +41604,7 @@ MenuMoveMarkedEntries() {
 }
 
 moveMarkedEntryNow(indexu, modus:=0) {
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       showTOOLtip("WARNING: Index entries cannot be reordered when the files list is filtered.")
       SoundBeep 300, 100
@@ -41884,7 +41884,7 @@ PanelBrowseAudioAnnotation() {
       startPath := AudioFileu ? AudioFileu : imgPath
       AudioFileu := openFileDialogWrapper("O", "FileMustExist", startPath, "Browse sound file", patternObj, chosenOption, 2)
       AudioFileu := Trimmer(AudioFileu)
-      If StrLen(AudioFileu)>3
+      If (StrLen(AudioFileu)>3)
       {
          If AnyWindowOpen
             BtnCloseWindow()
@@ -42411,7 +42411,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          If askAboutFileSave(" and the selected files list will be imported to the list")
             Return
 
-         If StrLen(SelectedDir)>1
+         If (StrLen(SelectedDir)>1)
          {
             zPlitPath(userQuickMenusEdit, 1, fileu, SelectedDir)
             prevOpenFolderPath := SelectedDir
@@ -42900,7 +42900,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
                   Continue
 
                matches := 0
-               If StrLen(thisUserWord)<2
+               If (StrLen(thisUserWord)<2)
                {
                   If (thisUserWord=haystacku[A_Index])
                      score += 10
@@ -43116,7 +43116,7 @@ PanelSetSlidesMusic() {
       showTOOLtip("Slideshow music is now set to`n" OutFileName "`n" OutDir "\")
    } Else If (InStr(msgResult.btn, "disassociate") || (InStr(msgResult.btn, "update") && !audioFileu))
    {
-      If StrLen(SlidesMusicSong)>3
+      If (StrLen(SlidesMusicSong)>3)
          currentFilesListModified := 1
       SlidesMusicSong := ""
       autoPlaySlidesAudio := 0
@@ -43149,7 +43149,7 @@ PanelSetSlidesMusic() {
       startPath := StrLen(SlidesMusicSong)>3 ? SlidesMusicSong : CurrentSLD
       AudioFileu := openFileDialogWrapper("O", "FileMustExist", startPath, "Browse music file", patternObj, chosenOption, 2)
       AudioFileu := Trimmer(AudioFileu)
-      If StrLen(AudioFileu)>3
+      If (StrLen(AudioFileu)>3)
       {
          If (SlidesMusicSong!=AudioFileu)
             currentFilesListModified := 1
@@ -43220,7 +43220,7 @@ BrowseReplaceIndexEntry() {
    If AnyWindowOpen
       BtnCloseWindow()
    Sleep, 25
-   If StrLen(imgPath)>3
+   If (StrLen(imgPath)>3)
    {
       zPlitPath(imgPath, 0, OutFileName, SelectedDir)
       prevOpenFolderPath := SelectedDir
@@ -43366,7 +43366,7 @@ coreDialogConflictsMsgBox(title, sMsg, dMsg, filez, btnList, checkBoxCaption, ch
   }
 
   Gui, Add, Text, xp yp w1 h1 BackgroundTrans,% A_Space
-  If StrLen(ownerHwnd)>1
+  If (StrLen(ownerHwnd)>1)
      Try Gui, +Owner%ownerHwnd%
 
   If modalHwnd
@@ -43720,7 +43720,7 @@ PanelSetThumbColumnOptions() {
     If (mustRecordSeenImgs!=1)
        GuiControl, SettingsGUIA: Disable, highlightAlreadySeenImages
 
-    If StrLen(userSearchString)<2
+    If (StrLen(userSearchString)<2)
        GuiControl, SettingsGUIA: Disable, markSearchMatches
 
     If (minimizeMemUsage=1)
@@ -46854,7 +46854,7 @@ EraseSearchEdit() {
       BtnCloseWindow()
    }
 
-   If StrLen(UsrEditFilter)<2
+   If (StrLen(UsrEditFilter)<2)
       SearchedStringz := ""
    userSearchString := ""
    ForceRefreshNowThumbsList()
@@ -50724,7 +50724,7 @@ BTNrenameCustomShape() {
           givenName := StrReplace(givenName, A_LoopField)
 
       givenName := filterFileName(givenName)
-      If StrLen(givenName)>1
+      If (StrLen(givenName)>1)
       {
          If FileExist(mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv")
          {
@@ -56961,7 +56961,7 @@ BTNcopyPDFtexts(CtrlHwnd:=0, b:=0, c:=0) {
       textu .= getListViewData("SettingsGUIA", l, k)
     }
 
-    If StrLen(textu)>5
+    If (StrLen(textu)>5)
     {
        Try Clipboard := Trimmer(textu)
        Catch wasError
@@ -59566,7 +59566,7 @@ CopyMovePanelWindow() {
        If (A_Index>10)
           Break 
 
-       If StrLen(A_LoopField<4)
+       If (StrLen(A_LoopField<4))
           Continue 
 
        changeMcursor()
@@ -59586,7 +59586,7 @@ CopyMovePanelWindow() {
         If (A_Index>15)
            Break
 
-        If StrLen(A_LoopField)<4
+        If (StrLen(A_LoopField)<4)
            Continue
 
         changeMcursor()
@@ -59630,7 +59630,7 @@ CopyMovePanelWindow() {
 
     Loop, Parse, finalListu, `n
     {
-       If StrLen(A_LoopField)>2
+       If (StrLen(A_LoopField)>2)
           LV_Add(A_Index, A_LoopField, A_Index)
     }
 
@@ -60378,7 +60378,7 @@ BTNuiProceedStructuredOperation() {
 
    If !FolderExist(dS)
    {
-      If StrLen(dS)>4
+      If (StrLen(dS)>4)
       {
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination folder seems to not exist.`n`n" dS "\`n`nWould you like to create it now?", 4, 0, "question")
          If (msgResult="Yes")
@@ -61151,7 +61151,7 @@ batchConvert2format(modus:=0) {
    {
       setPriorityThread(-2)
       addJournalEntry("Preparing " systemCores " threads to start. " filesPerCore " files per thread.")
-      infoResult := WorkLoadMultiCoresConvertFormat(filesElected)
+      infoResult := initWorkLoadMultiCoresConvertFormat(filesElected)
       setPriorityThread(0)
       If (infoResult!="single-core")
          Return
@@ -61905,7 +61905,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    extractedFrames := failedFrames := FimBuffer := abandonAll := yay := 0
    GFT := FreeImage_GetFileType(imgPath)
    hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, 0)
-   If StrLen(hMultiBMP)>1
+   If (StrLen(hMultiBMP)>1)
    {
       hasOpenedMulti := 1
       tFrames := FreeImage_GetPageCount(hMultiBMP)
@@ -62948,7 +62948,7 @@ coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
 
   thisIndex := 0
   otherFrames := []
-  If StrLen(hMultiBMP)>1
+  If (StrLen(hMultiBMP)>1)
   {
      tFrames := FreeImage_GetPageCount(hMultiBMP)
      If (tFrames<0 || !tFrames)
@@ -63016,7 +63016,7 @@ combineImgsConvertDepth(k, modus, animus) {
   Else If (imgBPPc!=8 && modus=4)
      hFIFimgC := FreeImage_ColorQuantize(k)
 
-  If StrLen(hFIFimgC)>1
+  If (StrLen(hFIFimgC)>1)
      Return hFIFimgC
 }
 
@@ -63063,7 +63063,7 @@ openFoldersDialogWrapper(startPath, msg:="") {
    r := SelectFolderEx(startPath, msg, thisHwnd, nullLabel, entriesList, 1, "History", entriesList)
    If (!InStr(r.SelectedCombo, defaultu) && StrLen(r.SelectedCombo)>1)
       z := r.SelectedCombo
-   Else If StrLen(r.SelectedDir)>1
+   Else If (StrLen(r.SelectedDir)>1)
       z := r.SelectedDir
 
    SetTimer, setWinCloseZeit, -150, 900
@@ -63507,7 +63507,7 @@ RefreshFilesList() {
      OpenSLD(CurrentSLD, 1)
      currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
      dummyTimerDelayiedImageDisplay(50)
-  } Else If StrLen(CurrentSLD)>3
+  } Else If (StrLen(CurrentSLD)>3)
      RegenerateEntireList()
      ; coreOpenFolder(CurrentSLD)
 }
@@ -63760,7 +63760,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
 
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
          CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
-   } Else If StrLen(LastOpenedImg)>3
+   } Else If (StrLen(LastOpenedImg)>3)
    {
       zPlitPath(LastOpenedImg, 0, OutFileName, OutDir, OutNameNoExt)
       If !RegExMatch(LastOpenedImg, RegExFilesPattern)
@@ -63844,7 +63844,7 @@ addNewFile2list() {
    zPlitPath(firstFile, 0, OutFileName, SelectedDir)
    countFiles := ST_Count(imgsListu, "`n") + 1
    ; msgbox, % firstFile "a`n" countFiles "`n" imgsListu
-   If StrLen(SelectedDir)>1
+   If (StrLen(SelectedDir)>1)
    {
       prevOpenFolderPath := SelectedDir
       INIaction(1, "prevOpenFolderPath", "General")
@@ -63859,7 +63859,7 @@ addNewFile2list() {
    } Else If RegExMatch(firstFile, "i)(.\.sld)$")
    {
       importSLDplainText(firstFile)
-   } Else If StrLen(imgsListu)>3
+   } Else If (StrLen(imgsListu)>3)
    {
       showTOOLtip("Processing files list, please wait")
       setImageLoading()
@@ -64415,7 +64415,7 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
        dropFilesSelection(1)
 
     showTOOLtip("Adding " groupDigits(countFiles) " files into the current files list")
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
     doStartLongOpDance()
@@ -64431,7 +64431,7 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     Loop, Parse, imgsListu, `n`r
     {
        line := Trimmer(A_LoopField)
-       If StrLen(line)<3
+       If (StrLen(line)<3)
           Continue
 
        If (A_TickCount - prevMSGdisplay>1500)
@@ -64920,7 +64920,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       Loop, Parse, foldersListu,`n,`r
       {
           linea := Trimmer(A_LoopField)
-          If StrLen(linea)<4
+          If (StrLen(linea)<4)
              Continue
 
           decisionu := askFolderImportMode(linea, coverListu, applyAllModus, applyAllAction, countDropped>1)
@@ -65067,7 +65067,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
          SetTimer, ResetImgLoadStatus, -150
          Return
       } Else resetMainWin2Welcome()
-   } Else If StrLen(imgsListu)>3
+   } Else If (StrLen(imgsListu)>3)
    {
       If (thumbsDisplaying!=1 && countFiles=1 && isImgEditingNow()=1 && !AnyWindowOpen)
       {
@@ -66583,7 +66583,7 @@ InvokeMenuBarSelection(manuID) {
    If (thumbsDisplaying=1)
    {
       createMenuFilesSelections("pvMenuBarSelection")
-      If StrLen(filesFilter)>1
+      If (StrLen(filesFilter)>1)
       {
          If testIsDupesList()
          {
@@ -69623,7 +69623,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
       kMenu("PVmenu", "Add", "F&iles selection", ":PVfileSel")
    }
 
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
    {
       Menu, PVmenu, Add
       kMenu("PVmenu", "Add", "Remove files list filter`tCtrl+Space", "MenuRemFilesListFilter")
@@ -70438,7 +70438,7 @@ createMenuFavourites() {
          Continue
 
       entryu := (userPrivateMode=1) ? "*:\*******\******.***" : PathCompact(A_LoopField, 30)
-      If StrLen(entryu)>3
+      If (StrLen(entryu)>3)
       {
          countFaved++
          kMenu("PVfaves", "Add", "&" countItemz ". " entryu, "OpenFavesEntry")
@@ -70780,7 +70780,7 @@ OpenRecentEntry(menuItem, modus:=0) {
 
   ; MsgBox, %openthisu% -- %newentry%
   newEntry := Trimmer(newEntry)
-  If StrLen(newEntry)>4
+  If (StrLen(newEntry)>4)
   {
      If (SLDtypeLoaded=3)
      {
@@ -72534,7 +72534,7 @@ defineWinTitlePrefix() {
    If (validBMP(UserMemBMP) && thumbsDisplaying!=1)
       winPrefix .= "IMAGE EDITING | "
 
-   If StrLen(filesFilter)>1
+   If (StrLen(filesFilter)>1)
       winPrefix .= "F "
 
    If hSNDmedia
@@ -73266,7 +73266,7 @@ convertGDIPbrushGDI(pBrush, size) {
 
 createGDIbrushPbitmap(pBitmap) {
     hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, pBitmap)
-    If StrLen(hBitmap)>1
+    If (StrLen(hBitmap)>1)
     {
        gdiBrushu := Gdi_CreatePatternBrush(hBitmap)
        Gdi_DeleteObject(hBitmap)
@@ -74804,7 +74804,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
     If !textFileContent
     {
        Try FileRead, textFileContent, % " *t " textFile
-       If StrLen(textFileContent)<1
+       If (StrLen(textFileContent)<1)
           textFileContent := ""
     }
 
@@ -75571,7 +75571,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
       }
 
       msg2show := Trimmer(info "`n[" OutputVar "] " hotkeyu)
-      If StrLen(listBoxOptions)>3
+      If (StrLen(listBoxOptions)>3)
       {
          countListBoxOptions := ST_Count(listBoxOptions, "`n") + 1
          If (countListBoxOptions>10)
@@ -75964,7 +75964,7 @@ IdentifyAudioFileAssociated() {
     If (SLDtypeLoaded=3)
     {
        AudioFileu := retrieveSQLdbEntryCaption(imgPath, "imgAudio")
-       If StrLen(AudioFileu)>3 && FileExist(AudioFileu)
+       If (StrLen(AudioFileu)>3 && FileExist(AudioFileu))
           Return AudioFileu
     }
 
@@ -76046,7 +76046,7 @@ AutoPlayAudioFileAssociated() {
 
 startSlidesMusicNow() {
     StopMediaPlaying(1)
-    If StrLen(SlidesMusicSong)>3
+    If (StrLen(SlidesMusicSong)>3)
     {
        hSNDsong := MCI_Open(SlidesMusicSong,,,0)
        E := MCI_Play(hSNDsong)
@@ -82283,7 +82283,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 
         ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight, 1)
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-        If StrLen(ImgSelPath)>1
+        If (StrLen(ImgSelPath)>1)
         {
            Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
            Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
@@ -82416,7 +82416,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         }
 
         Gdip_SetClipRect(2NDglPG, 0, 0, mainWidth, mainHeight)
-        If StrLen(ImgSelPath)>1
+        If (StrLen(ImgSelPath)>1)
         {
            Gdip_DrawPath(2NDglPG, dPen, ImgSelPath)
            Gdip_DrawPath(2NDglPG, wPen, ImgSelPath)
@@ -84738,7 +84738,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
            }
         }
 
-        If StrLen(entireString)>2
+        If (StrLen(entireString)>2)
         {
            txtOptions.x := (FlipImgH=1) ? DestPosX : DestPosX + borderSize
            txtOptions.y := DestPosY + borderSize
@@ -84914,7 +84914,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
            {
               frameLoad := (framePreviewsMode=1) ? thisFileIndex - 1 : 0
               MD5name := generateThumbName(imgPath, 1, frameLoad)
-              If StrLen(imgThumbsCacheIDsArray[MD5name])>0
+              If (StrLen(imgThumbsCacheIDsArray[MD5name])>0)
                  thisThumb := imgThumbsCacheArray[imgThumbsCacheIDsArray[MD5name], 1]
 
               If validBMP(thisThumb)
@@ -85110,7 +85110,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
           If (bgrTXT!=OSDbgrColor)
              theMSG2 .= " | File selected"
 
-          If StrLen(filesFilter)>1
+          If (StrLen(filesFilter)>1)
              theMSG2 .= " | Files list filtered"
 
           listInfos := "Files list container: " maxItemsPage " elements in view. Listing mode: " defineListViewModes() ". Tap and hold, or Control+Left-Click, on any listed item to select it. Items listed:`n" listedItems
@@ -86739,7 +86739,7 @@ RegenerateEntireList() {
     startOperation := A_TickCount
     showTOOLtip("Preparing to refresh the files list, please wait")
     listu := getDynamicFoldersList()
-    If StrLen(listu)<4
+    If (StrLen(listu)<4)
     {
        showTOOLtip("WARNING: No list of dynamic folders found")
        SoundBeep , 300, 100
@@ -86747,7 +86747,7 @@ RegenerateEntireList() {
        Return
     }
 
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
     mustOpenStartFolder := ""
@@ -86849,6 +86849,7 @@ throwSQLqueryDBerror(funcu) {
 }
 
 getMaxRowIDsqlDB() {
+  ; only one row retrieved
   SQL := "SELECT max(imgidu) FROM images;"
   If !activeSQLdb.GetTable(SQL, RecordSet)
   {
@@ -86868,6 +86869,7 @@ getMaxRowIDsqlDB() {
 }
 
 getTotalIMGsSQLdb(morus:="") {
+  ; only one row retrieved
   SQL := "SELECT COUNT(*) FROM images " morus ";"
   If !activeSQLdb.GetTable(SQL, RecordSet)
   {
@@ -88626,7 +88628,7 @@ getIDimage(imgID) {
 IDshowImage(imgID, opentehFile:=0) {
     Static prevIMGid, prevImgPath, lastInvoked := 1
     imgPath := resultedFilesList[imgID, 1]
-    If StrLen(imgPath)<4
+    If (StrLen(imgPath)<4)
     {
        addJournalEntry("Index entry error: incorrect file path:`n" imgPath " [ " imgID " ]")
        If (A_TickCount - lastInvoked>1050)
@@ -88711,7 +88713,7 @@ ReverseListNow() {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     resultedFilesList := reverseArray(resultedFilesList)
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
        filteredMap2mainList := reverseArray(filteredMap2mainList)
 
     currentFilesListModified := 1
@@ -88723,7 +88725,7 @@ ReverseListNow() {
 }
 
 RandomizeListNow() {
-    If StrLen(filesFilter)>1
+    If (StrLen(filesFilter)>1)
     {
        msgResult := msgBoxWrapper(appTitle ": Randomize files list", "You currently have a files list filter applied. To randomize the list, it will be deactivated.", 4, 0, "question")
        If InStr(msgResult, "yes")
@@ -90628,7 +90630,7 @@ batchJpegLLoperations() {
    {
       setPriorityThread(-2)
       addJournalEntry("Preparing " systemCores " threads to start. " filesPerCore " files per thread.")
-      infoResult := WorkLoadMultiCoresJpegLL(filesElected)
+      infoResult := initWorkLoadMultiCoresJpegLL(filesElected)
       setPriorityThread(0)
       If (infoResult!="single-core")
          Return
@@ -92507,27 +92509,27 @@ filesListApplyColors() {
 }
 
 filesListFlipHimage() {
-   coreQuickImageFilesListActions(2)
+   coreQuickImageFilesListActions(2, 1)
 }
 
 filesListFlipVimage() {
-   coreQuickImageFilesListActions(3)
+   coreQuickImageFilesListActions(3, 1)
 }
 
 filesListFlipRotatePlus() {
-   coreQuickImageFilesListActions(6)
+   coreQuickImageFilesListActions(6, 1)
 }
 
 filesListFlipRotateMinus() {
-   coreQuickImageFilesListActions(8)
+   coreQuickImageFilesListActions(8, 1)
 }
 
 filesListCropImgVPsel() {
    If (editingSelectionNow=1)
-      coreQuickImageFilesListActions(9)
+      coreQuickImageFilesListActions(9, 1)
 }
 
-coreQuickImageFilesListActions(actu) {
+coreQuickImageFilesListActions(actu, losslessJpegs:=0) {
    ; The flip/rotate/crop actions of the files list. Every selected file - or the current
    ; image when nothing is selected - goes through the Resize/rotate/crop pipeline, whose
    ; per-file entry point applies the operation losslessly to JPEGs and through FreeImage to
@@ -92563,13 +92565,7 @@ coreQuickImageFilesListActions(actu) {
    ResizeQualityHigh := ResizeInPercentage := 1
    ResizeUseDestDir := 0
    decideUserImgRotationOption()
-   r := BtnPerformSimpleProcessing("no-prompt", "extern", 1)
-   If (r=1)
-   {
-      ; the displayed image was transformed on disk: a flip or rotation of the viewport
-      ; itself would now be applied on top of it, as the JPEG path always undid
-      FlipImgV := FlipImgH := vpIMGrotation := 0
-   }
+   BtnPerformSimpleProcessing("no-prompt", "extern", losslessJpegs)
 }
 
 BTNsaveResizedIMG() {
@@ -93294,7 +93290,7 @@ filterListByKeywords() {
 
    LV_GetText(keyword, RowNumber, 1)
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
-   If StrLen(keyword)<3
+   If (StrLen(keyword)<3)
       Return
 
    setImageLoading()
@@ -95182,7 +95178,7 @@ UIeditApplyFilterReviewPanel() {
    Gui, SettingsGUIA: Default
    GuiControlGet, listViewReviewFilteru
    Tooltip
-   If StrLen(Trimmer(listViewReviewFilteru))<2
+   If (StrLen(Trimmer(listViewReviewFilteru))<2)
    {
       UIstringEditFilterErase()
    } Else
@@ -97226,7 +97222,7 @@ UIeditApplyStaticFolderFilter() {
 
    Gui, SettingsGUIA: Default
    GuiControlGet, StaticListViewFilteru
-   If StrLen(Trimmer(StaticListViewFilteru))<2
+   If (StrLen(Trimmer(StaticListViewFilteru))<2)
    {
       UIlvFilterEraseStaticPanel()
       Return
@@ -97384,7 +97380,7 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
     prevMSGdisplay := A_TickCount
     k := SubStr(listFilter, 1, 2)
     givenLimit := SubStr(listFilter, 3)
-    If StrLen(listFilter)<2
+    If (StrLen(listFilter)<2)
        listFilter := ""
 
     If (k=":>" || k=":<" || k="?>" || k="?<" || k="*>" || k="*<")
@@ -99427,7 +99423,6 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    thisDialogSavePtrns := StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)")
    thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
-
    getSaveDialogIndexForFile(imgPath, defFMTindex, 1)
    startPath := (ResizeUseDestDir=1) ? ResizeDestFolder "\" OutFileName : imgPath
    If (dummy="no-prompt")
@@ -99563,7 +99558,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
    {
       setPriorityThread(-2)
       addJournalEntry("Preparing " systemCores " threads to start. " filesPerCore " files per thread.")
-      infoResult := WorkLoadMultiCoresSimpleImgProcessing(filesElected, losslessJpegs)
+      infoResult := initWorkLoadMultiCoresSimpleImgProcessing(filesElected, losslessJpegs)
       setPriorityThread(0)
       If (infoResult!="single-core")
          Return
@@ -100210,7 +100205,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   tFrames := 0
   fimMultiPage := ""
   mainLoadedIMGdetails.Frames := 0
-  If StrLen(hMultiBMP)>1
+  If (StrLen(hMultiBMP)>1)
   {
      hasOpenedMulti := 1
      tFrames := FreeImage_GetPageCount(hMultiBMP)
@@ -100348,7 +100343,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         hFIFimgKO := trFreeImage_Rescale(hFIFimgC, nimgW, nimgH, 0)
      }
 
-     If StrLen(hFIFimgKO)>2
+     If (StrLen(hFIFimgKO)>2)
      {
         hFIFimgC := hFIFimgKO
         mainLoadedIMGdetails.TooLargeGDI := 1
@@ -100368,7 +100363,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         mainLoadedIMGdetails.HasAlpha := FIMalphaChannelFix(alphaBitmap, hFIFimgE)
 
      pBitmap := ConvertFIMtoPBITMAP(hFIFimgE, coreDesiredPixFmt)
-     If StrLen(pBitmap)>2
+     If (StrLen(pBitmap)>2)
         recordGdipBitmaps(pBitmap, A_ThisFunc)
   } Else pBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH, coreDesiredPixFmt)
 
@@ -100588,7 +100583,7 @@ WM_LBUTTONdown(wP, lP, msg, hwnd) {
     If (btnMode=1)
     {
        phwnd := Format("0x{1:x}", hwnd)
-       If StrLen(OutputVarControl)>3
+       If (StrLen(OutputVarControl)>3)
           phwnd := OutputVarControl
 
        btnName := tlbrIconzList[phwnd, 3]
@@ -100793,15 +100788,15 @@ initExternalCoreMode(coreThread) {
   ; AHK runtime error, a library fault - is up: the one situation in which the per-file
   ; abort check of the loops below cannot run, and the main thread would otherwise have
   ; to close the process from outside
-  SetTimer, watchExternalCoreAbort, 750
   initFIMGmodule()
+  SetTimer, watchExternalCoreAbort, 750
   RegRead, hGDIwin, %QPVregEntry%\multicore, mainWindowID
   If (args[2]="batch-jpegll")
-     multiCoresJpegLL(args[1], args[3], filesList)
+     multiCoreThreadJpegLL(args[1], args[3], filesList)
   Else If (args[2]="batch-simpleimgproc")
-     multiCoresSimpleImgProcessing(args[1], args[3], filesList)
+     multiCoreThreadSimpleImgProcessing(args[1], args[3], filesList)
   Else If (args[2]="batch-fmtconv")
-     multiCoresFormatConvert(args[1], filesList)
+     multiCoreThreadFormatConvert(args[1], filesList)
 
   ForceExitNow()
   Return
@@ -101226,7 +101221,7 @@ RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=
     If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
        pBitmap := DllCall("qpvmain.dll\RenderPdfPageAsBitmap", "Str", imgPath, "Int", frameu, "float", dpi, "int*", maxW, "int*", maxH, "int", fillBgr, "int", "0xff" bgrColor, "int*", pageCount, "int*", errorType, "Str", pwd, "int", do24bits, "UPtr")
 
-    If StrLen(pBitmap)>2
+    If (StrLen(pBitmap)>2)
     {
        If (asked=1)
           PDFpwdsCache[imgPath] := pwd
@@ -101395,7 +101390,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
       Return 1
 
    pBitmap := DllCall("qpvmain.dll\LoadSVGimage", "Int", 0 ,"Int", w, "Int", h, "float", fscaleX, "float", fscaleY, "Str", imgPath, "UPtr")
-   If StrLen(pBitmap)>2
+   If (StrLen(pBitmap)>2)
    {
       recordGdipBitmaps(pBitmap, A_ThisFunc)
       Gdip_BitmapSetResolution(pBitmap, 96, 96)
@@ -101628,7 +101623,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
       newH := h := Height
       mainLoadedIMGdetails.TooLargeGDI := isImgSizeTooLarge(Width, Height)
       pBitmap := DllCall("qpvmain.dll\WICgetRectImage", "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", quality, "UPtr")
-      If StrLen(pBitmap)>2
+      If (StrLen(pBitmap)>2)
          recordGdipBitmaps(pBitmap, A_ThisFunc)
 
       ; ToolTip, % pBitmap "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
@@ -101763,7 +101758,7 @@ LoadWICimage(imgPath, noBPPconv, frameu, useICM, sizesDesired:=0, ByRef newBitma
    ; fnOutputDebug(A_ThisFunc ": " r " | " z)
    If (r || z>0)
    {
-      If StrLen(r)>2
+      If (StrLen(r)>2)
       {
          recordGdipBitmaps(r, A_ThisFunc)
          If (doGray=1)
@@ -101892,7 +101887,7 @@ trGdip_CreateBitmap(funcu, Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
     If (gdipLastError && r)
        addJournalEntry(A_ThisFunc "() called by " funcu "() has created possibly a faulty object: " Gdip_ErrorHandler(gdipLastError, 0))
 
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
     Else
        addJournalEntry(A_ThisFunc "() called by " funcu "() using w" Width " - h" Height " - pixFmt" PixelFormat " failed: " Gdip_ErrorHandler(gdipLastError, 0))
@@ -101901,7 +101896,7 @@ trGdip_CreateBitmap(funcu, Width, Height, PixelFormat:=0, Stride:=0, Scan0:=0) {
 }
 
 setGdipBMPinfos(r, info) {
-   If StrLen(r)>2
+   If (StrLen(r)>2)
       createdGDIobjsArray["x" r, 4] := info
 }
 
@@ -101909,7 +101904,7 @@ recordGdipBitmaps(r, infoz, pointer:=0, pointerType:=0, objType:="bmp") {
    If validBMP(r)
       addJournalEntry("ERROR: recorded a new bitmap ID that was not discarded. WTF? OLD=" createdGDIobjsArray["x" r, 4] ".`n`nNEW=" infoz)
 
-   If StrLen(r)>2
+   If (StrLen(r)>2)
       createdGDIobjsArray["x" r] := [r, objType, 1, infoz, AnyWindowOpen, A_Now, pointer, pointerType]
 
    ; ppp := 0 ; useful to identify memory leaks related to bitmap objects
@@ -101926,7 +101921,7 @@ trGdip_CreateBitmapFromFile(funcu, sFile, useICM:=0) {
     If (gdipLastError=1 && A_LastError=8)
        gdipLastError := 3
 
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
     Else
        addJournalEntry(A_ThisFunc "() error: " Gdip_ErrorHandler(gdipLastError, 0) ". Invoked by " funcu "(). File to load:" sFile)
@@ -101942,7 +101937,7 @@ trGdip_CreateBitmapFromHBITMAP(funcu, hBitmap, hPalette:=0) {
     If (gdipLastError && r)
        addJournalEntry(A_ThisFunc "() has created possibly a faulty object: " Gdip_ErrorHandler(gdipLastError, 0) ". Function invoked by " funcu "().")
 
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
     Else
        addJournalEntry(A_ThisFunc "() failed, hBitmap = " hBitmap ": " Gdip_ErrorHandler(gdipLastError, 0))
@@ -101963,7 +101958,7 @@ trGdip_CreateHBITMAPFromBitmap(funcu, pBitmap, bgr:=0) {
 
 trGdip_CreateARGBBitmapFromHBITMAP(hBitmap) {
     r := Gdip_CreateARGBBitmapFromHBITMAP(hBitmap)
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc)
     Else
        addJournalEntry(A_ThisFunc "() failed to create pBitmap from hBitmap = " hBitmap)
@@ -101979,7 +101974,7 @@ trGdip_BitmapConvertGray(funcu, pBitmap, hue:=0, vibrance:=-40, brightness:=1, c
     }
 
     r := Gdip_BitmapConvertGray(pBitmap, hue, vibrance, brightness, contrast, KeepPixelFormat)
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu)
     Else
        addJournalEntry(A_ThisFunc "(): failed to process pBitmap=" pBitmap)
@@ -102009,7 +102004,7 @@ trGdip_CloneBitmapArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:="0
        Return
     }
 
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu " {" k "}")
     Else
        addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed, pBitmap = " pBitmap ": " Gdip_ErrorHandler(gdipLastError, 0))
@@ -102037,7 +102032,7 @@ trGdip_CloneBitmap(funcu, pBitmap, forceIT:=0) {
        Return
     }
 
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu " {" k "}")
     Else
        addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed, pBitmap = " pBitmap ": " Gdip_ErrorHandler(gdipLastError, 0))
@@ -102053,7 +102048,7 @@ trGdip_BlurBitmap(pBitmap, BlurAmount, usePARGB:=0, quality:=7) {
     }
 
     r := Gdip_BlurBitmap(pBitmap, BlurAmount, usePARGB, quality)
-    If StrLen(r)>2
+    If (StrLen(r)>2)
        recordGdipBitmaps(r, A_ThisFunc)
     Else
        addJournalEntry(A_ThisFunc "() failed, pBitmap = " pBitmap)
@@ -102081,14 +102076,14 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
        If hFIFimgA
        {
           r := ConvertAdvancedFIMtoPBITMAP(hFIFimgA, 0)
-          If StrLen(z[1])>2
+          If (StrLen(z[1])>2)
             recordGdipBitmaps(z[1], A_ThisFunc, z[2], "fim")
        }
     } Else
        r := Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode, thisPixFmt, checkTooLarge)
 
     ; fnOutputDebug(A_ThisFunc ": " A_TickCount - t)
-    If StrLen(r)<3
+    If (StrLen(r)<3)
     {
        If (checkTooLarge!=1)
        {
@@ -102144,7 +102139,7 @@ trGdip_RotateBitmapAtCenter(funcu, pBitmap, Angle, pBrush:=0, InterpolationMode:
     thisPixFmt := (PixelFormat=-1) ? coreDesiredPixFmt : PixelFormat
     k := createdGDIobjsArray["x" pBitmap, 4]
     r := Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush, InterpolationMode, thisPixFmt)
-    If StrLen(r)<3
+    If (StrLen(r)<3)
     {
        baseMsg := "Unable to rotate internal bitmap to given angle: " angle "° for obj=" pBitmap ".`n`nError occured in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k
        generalInternalErrorMsgBox(gdipLastError, baseMsg)
@@ -102168,7 +102163,7 @@ trGdip_GetImageDimensions(pBitmap, ByRef W, ByRef H) {
 }
 
 trGdip_DisposeImage(pBitmap, noErr:=1) {
-    If StrLen(pBitmap)<2
+    If (StrLen(pBitmap)<2)
        Return
 
     If !validBMP(pBitmap)
@@ -105744,7 +105739,7 @@ tlbrDecideTooltips(hwnd) {
    {
       friendly := StrLen(filesFilter)>2 ? "L:" : ""
       msgu := friendly "Filter files list «Ctrl + F»"
-      If StrLen(filesFilter)>2
+      If (StrLen(filesFilter)>2)
          msgu .= "`nR: Deactivate active files list filter «Ctrl + Space»"
    } Else If InStr(icoFile, "statistics") 
    {
@@ -106197,7 +106192,7 @@ ListGlobalVars() {
     final := ""
     Loop, Parse, text, `n,`r
     {
-       If StrLen(A_LoopField)>1
+       If (StrLen(A_LoopField)>1)
        {
           If (z := InStr(A_LoopField, "["))
              line := Trimmer(SubStr(A_LoopField, 1, z - 1))
