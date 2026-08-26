@@ -64,13 +64,6 @@ OnMessage(0x207, "WM_MBUTTONDOWN")
 OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
 OnMessage(0x20A, "WM_MOUSEWHEEL")
 OnMessage(0x20E, "WM_MOUSEWHEEL")
-; OnMessage(0x024B, "WM_POINTERevents", 10)
-; OnMessage(0x0246, "WM_POINTERevents", 10)
-; OnMessage(0x0247, "WM_POINTERevents", 10)
-; OnMessage(0x0249, "WM_POINTERevents", 10)
-; OnMessage(0x024A, "WM_POINTERevents", 10)
-; OnMessage(0x0239, "WM_POINTERevents", 10)
-; OnMessage(0X023A, "WM_POINTERevents", 10)
 ; OnMessage(0x216, "WM_MOVING") ; window moving
 
 ; Pen pressure. The main viewport windows are created by this thread, so WM_POINTER*
@@ -1283,42 +1276,6 @@ WM_PENpressure(wp, lp, msg, hwnd) {
       Return
 
    penPressureRaw := thisPressure ; normalized by Windows to the 0-1024 range
-}
-
-WM_POINTERevents(wp, lp, msg, hwnd) {
-  If (msg=0x024B)
-     m := "WM_POINTERACTIVATE"
-  Else If (msg=0x0246)
-  {
-     m := "WM_POINTERDOWN"
-     counter := (wP & 0xffff)
-     la := (wP & 0x00ff)
-     lb := ((wP >> 8) & 0xffffff)
-     ; ToolTip, % flags , , , 2
-  } Else If (msg=0x0247)
-  {
-     m := "WM_POINTERUP"
-     counter := (wP & 0xffff)
-     la := (wP & 0x000f)
-     lb := (wP & 0x0004)
-  } Else If (msg=0x0249)
-  {
-     m := "WM_POINTERENTER"
-     counter := (wP & 0xffff)
-     la := (wP & 0x000f)
-     lb := (wP & 0x0004)
-  } Else If (msg=0x024A)
-  {
-     m := "WM_POINTERLEAVE"
-     counter := (wP & 0xffff)
-     la := (wP & 0x000f)
-     lb := (wP & 0x0004)
-  } Else If (msg=0x0239)
-     m := "WM_POINTERDEVICEINRANGE"
-  Else If (msg=0x023A)
-     m := "WM_POINTERDEVICEOUTOFRANGE"
-
-   ; fnOutDebug(A_ThisFunc "|" msg "|" m "|" counter "|" la "|" lb)
 }
 
 updateGDIwinPos() {
