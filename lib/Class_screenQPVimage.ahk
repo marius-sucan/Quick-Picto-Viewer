@@ -46,7 +46,7 @@ Class screenQPVimage {
          {
             FreeImage_UnLoad(This.imgHandle)
          } Else If (This.LoadedWith="WIC")
-            r := DllCall(whichMainDLL "\WICdestroyPreloadedImage", "Int", 12, "Int")
+            r := DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
 
          If (This.FimBuffer!="" && disposeBuffer=1)
          {
@@ -251,7 +251,7 @@ Class screenQPVimage {
       ; I could use OpenCV, but as of now, QPV [almost] never loads huge images
       ; in this mode with WIC, therefore,  I do not care for now ;-).
 
-      pBitmap := DllCall(whichMainDLL "\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", resizeQuality, "UPtr")
+      pBitmap := DllCall("qpvmain.dll\" func2exec, "Int", x, "Int", y, "Int", w, "Int", h, "Int", newW, "Int", newH, "Int", mustClip, "int", useICM, "int", resizeQuality, "UPtr")
       ; ToolTip, % pBitmap "|"  hFIFimgE "|" hFIFimgZ "|" x "|" y "|" w "|" h "|" newW "|" newH , , , 2
       If StrLen(pBitmap)>1
          recordGdipBitmaps(pBitmap, A_ThisFunc)
@@ -264,7 +264,7 @@ Class screenQPVimage {
       {
          VarSetCapacity(resultsArray, 8 * 9, 0)
          func2exec := (A_PtrSize=8) ? "WICpreLoadImage" : "_LoadWICimage@48"
-         r := DllCall(whichMainDLL "\" func2exec, "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
+         r := DllCall("qpvmain.dll\" func2exec, "Str", imgPath, "Int", frameu, "UPtr", &resultsArray, "UPtr")
       }
 
       If r
