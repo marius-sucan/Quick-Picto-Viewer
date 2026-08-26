@@ -19,14 +19,9 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
      , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
+     , penPressureRaw := 0, hasPenPressureAPI := 0, isWelcomeScreenu := 0, ToolBarBtnWidth := 45
      , slideShowRunning := 0, toolTipGuiCreated, LbtnDwn := 0
-     , penPressureRaw := 0, hasPenPressureAPI := 0
      , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1
-     , hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
-     , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
-     , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
-     , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
-     , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "Ptr")
      , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
      , isTitleBarVisible := 0, imageLoading := 0, hPicOnGui1
      , slideShowDelay := 9000, scriptStartTime := A_TickCount, prevFullIMGload := 1
@@ -50,16 +45,9 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , lastWinStatus, lastZeitToolTip := 1, OSDfontSize := 14, ImgNavBox, OSDmsgsLine, ImgInfoBox
      , imgHUDbaseUnit := 0, picVscroll, picHscroll, QPVpid := 0, menuArray := [], menuCurrentIndex := 0
      , menuTotalIndex := 0, hMenuBar, lastMenuZeit := 1, menusList, hFlyOut, menuHotkeys, lastMenuHoverZeit := 1
-     , menusListView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
-     , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
-     , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
-     , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
-     , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
-     , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
      , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, TLBRtwoColumns := 1
      , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
-     , isWelcomeScreenu := 0, ToolBarBtnWidth := 45
      , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
      , navKeysCounter := 0, lastSwipeZeitGesture := 1, hFlyBtn1, hFlyBtn2, hFlyBtn3, AllowDarkModeForWindow
 
@@ -1450,8 +1438,11 @@ saveMainWinPos() {
 }
 
 changeMcursor(whichCursor) {
-  ; If (whichCursor="normal")
-  ;    SetTimer, ResetLoadStatus, -20
+   Static hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
+        , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
+        , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
+        , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
+        , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "Ptr")
 
   If (slideShowRunning=1 || animGIFplaying=1)
      Return
@@ -1494,11 +1485,6 @@ changeMcursor(whichCursor) {
   } Else Return
 
   Try DllCall("user32\SetCursor", "UPtr", thisCursor)
-}
-
-ResetLoadStatus() {
-   imageLoading := 0
-   Try DllCall("user32\SetCursor", "Ptr", hCursN)
 }
 
 isInRange(value, inputA, inputB) {
@@ -2417,6 +2403,13 @@ isNowAlphaPainting() {
 }
 
 BuildMenuBar(modus:=0, applyFilter:=0) {
+   Static menusListView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+        , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
+        , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
+        , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
+        , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+        , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
+
    If (modus="welcome")
       menusList := menusListWelcome
    Else If (modus="freeform" || drawingShapeNow=1)
@@ -2433,7 +2426,6 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
    menuArray := []
    menuTotalIndex := 0
    menuHotkeys := "|"
-
    If (applyFilter=1)
    {
       Menu, PVmenu, Add, >>, dummy
