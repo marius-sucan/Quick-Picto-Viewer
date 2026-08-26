@@ -716,7 +716,6 @@ WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
 
 deactivateTlbrKbdMode(m:=0) {
    isToolbarKBDnav := 0
-   interfaceThread.ahkassign("isToolbarKBDnav", isToolbarKBDnav)
    If (m=1)
       WinActivate, ahk_id %PVhwnd%
 }
@@ -65781,7 +65780,6 @@ focusToolbarNavKeys() {
       WinActivate, ahk_id %hQPVtoolbar%
       isToolbarKBDnav := 1
       displayNowToolbarHelp(2)
-      interfaceThread.ahkassign("isToolbarKBDnav", isToolbarKBDnav)
    }
 }
 

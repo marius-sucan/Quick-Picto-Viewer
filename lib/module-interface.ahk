@@ -19,29 +19,29 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
      , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
      , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
-     , slideShowRunning := 0, toolTipGuiCreated, editDummy, LbtnDwn := 0
-     , penPressureRaw := 0, penPressureZeit := 0, hasPenPressureAPI := 0
-     , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1, allowGIFsPlayEntirely := 0
+     , slideShowRunning := 0, toolTipGuiCreated, LbtnDwn := 0
+     , penPressureRaw := 0, hasPenPressureAPI := 0
+     , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1
      , hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
      , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
      , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
      , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
      , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "Ptr")
      , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
-     , isTitleBarVisible := 0, imageLoading := 0, hPicOnGui1, hotkeysSuspended := 0
+     , isTitleBarVisible := 0, imageLoading := 0, hPicOnGui1
      , slideShowDelay := 9000, scriptStartTime := A_TickCount, prevFullIMGload := 1
      , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
-     , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0, prevOpenedFile := 0
-     , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin, hasAdvancedSlide := 1
+     , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0
+     , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin
      , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
      , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles := [], tempBtnVisible := "null"
-     , drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1, lastZeitStylus := 1
+     , drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
      , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0, FontBolded := 1
      , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
-     , currentFilesListModified := 0, folderTreeWinOpen := 0, hStatusBaru, OSDFontName := "Arial"
+     , currentFilesListModified := 0, folderTreeWinOpen := 0, OSDFontName := "Arial"
      , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
-     , lastMenuInvoked := [], hQPVtoolbar := 0, ShowAdvToolbar := 0, whileLoopExec := 0
-     , isToolbarActivated := 0, lockToolbar2Win := 1, lastZeitPanCursor := 1, VisibleQuickMenuSearchWin :=0
+     , hQPVtoolbar := 0, ShowAdvToolbar := 0, whileLoopExec := 0
+     , lockToolbar2Win := 1, lastZeitPanCursor := 1, VisibleQuickMenuSearchWin :=0
      , hquickMenuSearchWin, hGuiTip, lastTippyWin, lastMouseLeave := 1, colorPickerModeNow := 0
      , mustCaptureCloneBrush := 0, doNormalCursor := 1, hotkate, uiUseDarkMode := 0
      , menusflyOutVisible := 0, otherAscriptHwnd := "", lastLclickX := 0, lastLclickY := 0
@@ -57,7 +57,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Qu
      , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
      , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
      , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
-     , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, isToolbarKBDnav := 0, TLBRtwoColumns := 1
+     , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, TLBRtwoColumns := 1
      , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
      , isWelcomeScreenu := 0, ToolBarBtnWidth := 45
      , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
@@ -123,7 +123,6 @@ OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
 
 
 setPriorityThread(2)
-lastMenuInvoked[1] := A_TickCount
 QPVpid := DllCall("Kernel32.dll\GetCurrentProcessId")
 ; OnExit, doCleanup
 Return
@@ -1120,7 +1119,6 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If !identifyThisWin()
      Return 0
 
-  ; GuiControl, 1:, editDummy, -
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
   {
      askAboutStoppingOperations()
@@ -1233,13 +1231,10 @@ slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
 }
 
 dummySlideshow() {
-   ; hasAdvancedSlide := (modus="gif") ? hasAdvancedSlide : 1
    ; thisAllowNextSlide := (animGIFplaying=1) ? 0 : allowNextSlide
-   ; preventChange := (allowGIFsPlayEntirely=1 && animGIFplaying=1) ? 1 : 0
    If (slideShowRunning=1 && allowNextSlide=1)
    {
       setTaskbarIconState("Normal")
-      hasAdvancedSlide := 0
       SetTimer, theSlideShowCore, % -slideShowDelay
    }
 }
@@ -1247,7 +1242,7 @@ dummySlideshow() {
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
   ; MsgBox, % thisZeit "--" slideShowDelay
-  If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1 && paramu!="force") ; || (allowGIFsPlayEntirely=1 && animGIFplaying=1)
+  If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
 
   mouseTurnOFFtooltip()
@@ -1262,7 +1257,6 @@ theSlideShowCore(paramu:=0) {
      MainExe.ahkPostFunction("PreviousPicture")
   Else If (SlideHowMode=3)
      MainExe.ahkPostFunction("NextPicture")
-  hasAdvancedSlide := 1
 }
 
 WM_PENpressure(wp, lp, msg, hwnd) {
@@ -1301,11 +1295,9 @@ WM_PENpressure(wp, lp, msg, hwnd) {
       Return
 
    penPressureRaw := thisPressure ; normalized by Windows to the 0-1024 range
-   penPressureZeit := A_TickCount
 }
 
 WM_POINTERevents(wp, lp, msg, hwnd) {
-  lastZeitStylus := A_TickCount
   If (msg=0x024B)
      m := "WM_POINTERACTIVATE"
   Else If (msg=0x0246)
