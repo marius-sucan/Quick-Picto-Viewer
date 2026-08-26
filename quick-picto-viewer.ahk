@@ -93,7 +93,7 @@ SetBatchLines, -1
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := "", pBrushZ := ""
    , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", pPen8 := ""
-   , pBrushHatch := "", pBrushWinBGR := "", pBrushA := "", pBrushB := "", pBrushC := "", pBrushD := "", currentPixFmt := ""
+   , pBrushWinBGR := "", pBrushA := "", pBrushB := "", pBrushC := "", pBrushD := ""
    , pBrushE := "", pBrushHatchLow, hGuiTip := 1, hSetWinGui := 1, undoSelLevelsArray := [], QPVerrJournal := []
    , prevFullThumbsUpdate := 1, currentFilesListModified := 0
    , hPicOnGui1 := "", scriptStartTime := A_TickCount, lastEditRHChange :=1, doubleBlurPreviewArea := 0
@@ -102,7 +102,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache", hSNDsong, lastZeitOpenWin := 1
    , resultedFilesList := [], currentFileIndex := "", maxFilesIndex := 0, gdiBitmapIDentire := 0
    , appTitle := "Quick Picto Viewer", FirstRun := 1, hSNDmediaFile := "", mouseToolTipWinCreated := 0
-   , bckpResultedFilesList := [], bckpMaxFilesIndex := 0, DynamicFoldersList := "", lastPointerUseZeit := 1
+   , bckpResultedFilesList := [], bckpMaxFilesIndex := 0, DynamicFoldersList := ""
    , animGIFplaying := 0, startPageIndex := 0, RandyIMGids := [], IMGdecalageY := 1, IMGdecalageX := 1
    , RandyIMGnow := 0, GDIPToken := "", gdiBitmapSmall := "", hSNDmedia := "", imgIndexEditing := 0
    , AprevGdiBitmap := "", BprevGdiBitmap := "", msgDisplayTime := 3000, gdiBitmapIDcall := ""
@@ -129,11 +129,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", initialCustomShapeCoords := ""
    , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := "", brushBclrAlpha := "010101"
    , mustGenerateStaticFolders := 1, lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0
-   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", prevFilesSortMode, bruAchClrAlpha := ""
+   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", prevFilesSortMode
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , othumbsW := 300, othumbsH := 300, VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := ""
    , CountFilesFolderzList := 0, imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, colorPickerMustEnd := 0
-   , UsrMustInvertFilter := 0, userActionConflictingFile := 1, LastWasFastDisplay := 0
+   , userActionConflictingFile := 1, LastWasFastDisplay := 0
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
@@ -145,13 +145,13 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", hGuiBtn
-   , CCLVO := " gInvokeStandardDialogColorPicker -E0x200 +Border -Hdr -Multi +ReadOnly Report AltSubmit ", FontList := []
+   , FontList := []
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", prevSetWinPosX := "", prevSetWinPosY := ""
-   , coreIMGzeitLoad := 0, desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0
+   , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0
    , currIMGdetails := [], AbackupIMGdetails := [], BbackupIMGdetails := [], mainLoadedIMGdetails := [], lastSelPrinterName := ""
    , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
-   , drawModeBzeit := 1, drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, AutoCropBordersSize := 15
+   , drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1
    , GDIfadeVPcache := "", executingCanceableOperation := 1, hCropCornersPic, UserMemBMP := "", userSearchString := ""
    , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
    , prevTryThumbsUpdate := 1, thumbsSizeQuality := 245, prevFullIndexThumbsUpdate := -1, userClipBMPpaste
@@ -159,9 +159,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
    , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], viewportIDstampBMP := 0, qpvMainDll, sqlDBrowID := 1
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1, liveDrawingBrushTool := 0
-   , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := "", maxGDIbmpSize := 536847521
+   , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := ""
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
-   , startLongOperation := 1, simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := ""
+   , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := ""
    , runningLongOperation := 0, hasReachedMaxUndoLevels := 0, GIFframesPlayied := 0, allImagesWereSeen := 0
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 0, hGDIinfosWin := ""
@@ -178,16 +178,16 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0, highDesiredPixFmt := "0xE200B"
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := "", hamLowLim := 0, hamUppLim := 0
    , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
-   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], countGDIobjects := 0
+   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := []
    , oldCustomShapePoints := [], oldVectorShapeSymmetry := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
-   , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, fimMultiBMP := 0, staticListViewFilteru
+   , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
    , gdiAmbientalTexBrush := "", GDIbrushWinBGR := "", GDIbrushHatch := "", vpImgPanningNow := 0, viewportDynamicOBJcoords := []
-   , mustCaptureCloneBrush := 0, hCropCornersPic2, globalWinStates := [], userAlphaMaskBmpPainted := "", lastPaintEventID := 1
+   , mustCaptureCloneBrush := 0, hCropCornersPic2, userAlphaMaskBmpPainted := "", lastPaintEventID := 1
    , prevImgEditZeit := 1, hudBTNfuncu, hudBTNtypeFuncu, hudBTNheightFuncu, hudBTNwidthFuncu, TouchToolbarGUIcreated := 0
    , tlbrIconzList := [], ToolBarBtnWidth := 45, UserToolbarY := 60, UserToolbarX := 200, prevFolderSortMode := 0
-   , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := [], lastZeitUndoRecorded := 0
+   , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := []
    , CustomShapeSymmetry := 0, CustomShapeLockedSymmetry := 0, viewportQPVimage := new screenQPVimage
    , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0, userSeenSessionImagesIndex := 0, FloodFillSelectionAdj := 0
    , createdQuickMenuSearchWin := 0, lastUserRclickVPx := 0, lastUserRclickVPy := 0, vpFreeformShapeOffset := []
@@ -245,7 +245,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
    , borderAroundImage := 0, usrAutoCropColorTolerance := 5, userActionAdvImgProcConflictingFile := 4
    , SimpleOperationsDoCrop := 0, SimpleOperationsRotateAngle := 1, SimpleOperationsScaleYImgFactor := "100 %"
-   , SimpleOperationsNoPromptOnSave := 0, SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0
+   , SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0
    , usrAutoCropDeviationPixels := 0, multilineStatusBar := 0, AutoCropAdaptiveMode := 1, allowGIFsPlayEntirely := 0
    , allowMultiCoreMode := 0, minimizeMemUsage := 0, GIFspeedDelay := 35, userImgAdjustAltBright := 1
    , maxMemThumbsCache := 420, resetImageViewOnChange := 0, FillAreaRemBGR := 0, blurAreaPixelizeMethod := 1
@@ -295,7 +295,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , QuickFileActAfter6 := 1, QuickFileActFolder6 := "", userFilterWhat := 1, userFilterStringPos := 1
    , userFilterStringIsNot := 0, userFilterDoString := 1, UsrEditFilter, QuickFileActConflict := 4
    , preventDBentryRemoval := 0, findDupesPrecision := 1, UIfindDupePrecision := 3, DesaturateAreaAmount := 255, PrintPaperOrient := 1
-   , DesaturateAreaHue := 0, DesatureAreaAlternate := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1
+   , DesaturateAreaHue := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
    , excludePreviousDupesFromList := 0, userFindDupesHamDistLvl := 1, userFindDupesFilterHamDist := 1
@@ -313,7 +313,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , BrushToolPenPressure := 0, BrushToolPressureOpacity := 100, BrushToolPressureSize := 60
    , BrushToolPressureCurve := 0, BrushToolPressureFloor := 10, BrushToolPenData := 0
    , BrushToolPressureMinAt := 0, BrushToolPressureMaxAt := 100, BrushToolPressureCeiling := 100
-   , BrushToolTexture := 1, BrushToolAutoAngle := 1, ShowAdvToolbar := 1, ToolbarOpacity := 255, findFlippedDupes := 0
+   , BrushToolTexture := 1, BrushToolAutoAngle := 1, ShowAdvToolbar := 1, findFlippedDupes := 0
    , BrushToolSymmetryX := 0, BrushToolSymmetryY := 0, BrushToolSymmetryPointX := 0.5, BrushToolSymmetryPointY := 0.5
    , BrushToolApplyColorFX := 0, PasteInPlaceBlendMode := 1, PasteInPlaceGlassy := 1, ToolbarScaleFactor := 1
    , ToolbarBgrColor := "212121", TLBRverticalAlign := 1, TLBRtwoColumns := 1, FillAreaApplyColorFX := 0
@@ -329,11 +329,11 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , alphaMaskGradientPosA := 0, alphaMaskGradientPosB := 100, alphaMaskGradientWrapped := 5
    , FillBehindClrOpacity  := 200, FillBehindOpacity := 255, FillBehindColor := "ff4400", allowCustomKeys := 0
    , alphaMaskGradientAngle := 0, DesaturateAreaChannel := 1, FloodFillOpacity := 205, FloodFillBlendMode := 1
-   , TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0, FloodFillUseAlpha := 0, EraseAreaUseAlpha := 0
+   , TextInAreaBlendMode := 1, BlurAreaAlphaMask := 0, EraseAreaUseAlpha := 0
    , UserAddNoiseBlurAmount := 0, UserAddNoisePixelizeAmount := 2, FillBehindInvert := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
-   , minKeywordLength := 2, LangKeywordsFilter := 0, mergeKeywordRows := 1, limitSearchReplaceSelected := 0
+   , minKeywordLength := 2, LangKeywordsFilter := 0, limitSearchReplaceSelected := 0
    , autoReflectVectorAnchors := 0, shearImgX := 0, shearImgY := 0, UserSymmetricaMode := 1
    , uiZoomBlurAreaXamount := 15, zoomBlurMode := 1, DesaturateAreaLevels := 1, DesaturateAreaDither := 0
    , BlurAreaHue := 0, BlurAreaSaturation := 0, BlurAreaLight := 0, BlurAreaGamma := 0
@@ -358,7 +358,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , OutlierFillOpacity := 200, alphaMaskBMPbright := 0, alphaMaskBMPcontrast := 0, FillAreaWelcomePattern := 1
    , toolbarViewerMode := 1, userCustomizedToolbar := 0, userThumbsToolbarList, userImgViewToolbarList
    , thumbsModeItemHighlight := 1, convertFormatUseMultiThreads := 0, convertFormatAutoSkip := 1
-   , SimpleOperationsMultiThreaded := 0, FillAreaBlurAmount := 0, BrushToolBlendMode := 1
+   , FillAreaBlurAmount := 0, BrushToolBlendMode := 1
    , BlendModesFlipped := 0, allowToneMappingImg := 1, userThumbsSheetWidth := 300, userThumbsSheetHeight := 300
    , userThumbsSheetColumns := 10, userThumbsSheetSpacing := 50, userThumbsSheetFrame := 100
    , userThumbsSheetBgrColor := "FFffFF", userThumbsSheetShowLabel := 0, userThumbsSheetHideExt := 1
@@ -4501,7 +4501,6 @@ TrueCleanup() {
    userAlphaMaskBmpPainted := trGdip_DisposeImage(userAlphaMaskBmpPainted)
    userPrevAlphaMaskBmpPainted := trGdip_DisposeImage(userPrevAlphaMaskBmpPainted)
    Gdip_DeleteBrush(pBrushWinBGR)
-   Gdip_DeleteBrush(pBrushHatch)
    Gdip_DeleteBrush(pBrushHatchLow)
    Gdip_DeleteBrush(pBrushA)
    Gdip_DeleteBrush(pBrushB)
@@ -12324,7 +12323,7 @@ changeDesiredFrame(dir:=1) {
    newValues := "a" desiredFrameIndex currentFileIndex totalFramesIndex getIDimage(currentFileIndex)
    If (prevValues!=newValues)
    {
-      ; ToolTip, % drawModeCzeit "==" drawModeAzeit "==" drawModeBzeit , , , 2
+      ; ToolTip, % drawModeCzeit "==" drawModeAzeit , , , 2
       If (drawModeAzeit>450)
          SetTimer, RefreshImageFile, -450
       Else
@@ -35569,7 +35568,6 @@ determineTerminateOperation() {
 }
 
 doStartLongOpDance() {
-     startLongOperation := A_TickCount
      imageLoading := runningLongOperation := 1
      interfaceThread.ahkPostFunction("initAppBusyMode")
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1)
@@ -45574,7 +45572,6 @@ ReadSettingsFloodFillPanel(act:=0) {
    RegAction(act, "FloodFillAltToler",, 2, 1, 3)
    RegAction(act, "FloodFillDynamicOpacity",, 1)
    RegAction(act, "FloodFillModus",, 1)
-   RegAction(act, "FloodFillUseAlpha",, 1)
    RegAction(act, "FloodFillTolerance",, 2, 0, 256)
 }
 
@@ -65461,8 +65458,6 @@ InitGuiContextForcedMenu() {
 InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
    Static lastInvoked := 1
    Critical, off
-   If (A_TickCount - lastPointerUseZeit<600)
-      Return
 
    If !isNumber(mX)
       GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -75109,7 +75104,6 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   If (alwaysOpenWithFIM=1)
      initFIMGmodule()
 
-  coreIMGzeitLoad := A_TickCount
   If validBMP(UserMemBMP)
   {
      setViewPortGDIPimageEditingProperties()
@@ -75265,7 +75259,6 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   }
   If (slideShowRunning!=1 && animGIFplaying!=1)
      UpdateFilesListImgIDinfos(currentFileIndex)
-  ; fnOutputDebug(A_ThisFunc ": " currIMGdetails.LoadedWith " image load time: " A_TickCount - coreIMGzeitLoad)
   Return oBitmap
 }
 
@@ -84316,7 +84309,6 @@ ToggleVisibilityWindow(actu, winIDu) {
    If (thisState=prevState)
       Return
 
-   globalWinStates["a" winIDu] := (actu="show") ? 1 : 0
    If (actu="show")
       WinSet, Region,, ahk_id %winIDu%
    Else
@@ -93425,7 +93417,7 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
         counter++
         thisKey := (userPrivateMode=1) ? "*****" : Key
         perc := Value ? Round((Round(Value)/maxu)*100, 1) : 0
-        If (!newArrayu[Value, 1] || newArrayu[Value, 3]>5 || mergeKeywordRows!=1)
+        If (!newArrayu[Value, 1] || newArrayu[Value, 3]>5)
         {
            rowsCounter++
            newArrayu[Value] := [rowsCounter, thisKey, 1]
@@ -98142,7 +98134,7 @@ coreCaptureImgCorners(whichBmp, thisSize:=0, thisBoxSize:=0) {
        Return
 
     boxSize := (thisBoxSize=0) ? 220 : thisBoxSize
-    realSize := (thisSize=0) ? AutoCropBordersSize : thisSize
+    realSize := (thisSize=0) ? 15 : thisSize
     cornersBMP := trGdip_CreateBitmap(A_ThisFunc, boxSize, boxSize, coreDesiredPixFmt)
     If !validBMP(cornersBMP)
        Return
@@ -105152,7 +105144,7 @@ createGUItoolbar(dummy:=0) {
    {
       redrawToolbarGUI()
       ; WinMove, ahk_id %hQPVtoolbar%,, 100, 100
-      WinSet, Transparent, % ToolbarOpacity, ahk_id %hQPVtoolbar%
+      WinSet, Transparent, 255, ahk_id %hQPVtoolbar%
       If (lockToolbar2Win=1)
          JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)
 
