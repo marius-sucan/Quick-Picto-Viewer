@@ -18136,8 +18136,6 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
     {
        If (TextInAreaBlendMode>0 || alphaMaskingMode>1)
        {
-          otx := tX, oty := tY
-          otw := tW, oth := tH
           getClampedVPselToWindow(0, mainWidth, mainHeight, thisW, thisH, tX, tY, tW, tH)
           objSel.dw := tW,   objSel.dh := tH
           objSel.dx := tX,   objSel.dy := tY
