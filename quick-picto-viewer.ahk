@@ -294,7 +294,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , QuickFileActAfter6 := 1, QuickFileActFolder6 := "", userFilterWhat := 1, userFilterStringPos := 1
    , userFilterStringIsNot := 0, userFilterDoString := 1, UsrEditFilter, QuickFileActConflict := 4
    , preventDBentryRemoval := 0, findDupesPrecision := 1, UIfindDupePrecision := 3, DesaturateAreaAmount := 255, PrintPaperOrient := 1
-   , DesaturateAreaHue := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1
+   , DesaturateAreaHue := 0, skipSeenImageSlides := 0, blurAreaSoftLevel := 1, performSRindexMode := 1
    , BlurAreaBlendMode := 1, PasteInPlaceBlurEdgesSoft := 0, preventDeleteMatchingSearch := 0
    , protectedFolderPath := "", preventDeleteFromProtectedPath := 0, preventDeleteFromProtectedSubPaths := 0
    , excludePreviousDupesFromList := 0, userFindDupesHamDistLvl := 1, userFindDupesFilterHamDist := 1
@@ -32042,7 +32042,6 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       FileMoveDir, % thisFolder, % oldPath "\" newFileName, R
       If !ErrorLevel
       {
-         performSRinSeenDB := performSRinDynas := 0
          If (lastChecked=1)
             SearchAndReplaceThroughIndex(thisFolder "\", oldPath "\" newFileName "\", 0, 1)
          Return 1
@@ -46206,7 +46205,7 @@ BtnChangeHamDistThreshold() {
 }
 
 PanelSearchAndReplaceIndex() {
-    Global editF5, editF6, performSRindexMode
+    Global editF5, editF6
     If warnFramesActionPrevented("SEARCH AND REPLACE")
        Return
 
@@ -46234,13 +46233,10 @@ PanelSearchAndReplaceIndex() {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    If (performSRindexMode="")
-       performSRindexMode := 1
-
     imgPath := resultedFilesList[currentFileIndex, 1]
     doPwd := (userPrivateMode=1) ? " password " : ""
     zPlitPath(imgPath, 0, OutFileName, OutDir)
-    Gui, Add, Text, x15 y15 w%txtWid% Section, This panel is meant to help you fix broken files lists. e.g., files moved to a different folder. RegEx, tokens or wildcards are not supported. %infos%
+    Gui, Add, Text, x15 y15 w%txtWid% Section, This panel is meant to help you fix broken files lists. e.g., files moved to a different folder. RegEx, tokens or wildcards are not supported.
     Gui, Add, Text, y+15 wp, Search for:
     GuiAddEdit("y+5 wp " doPwd " veditF5 r1 gUIeditsGenericAllowCtrlBksp", OutDir)
     Gui, Add, Text, y+15 wp, Replace with:
@@ -46258,9 +46254,6 @@ BTNperformIndexSearchReplace() {
    GuiControlGet, editF5
    GuiControlGet, editF6
    GuiControlGet, performSRindexMode
-   ; GuiControlGet, limitSearchReplaceSelected
-   ; GuiControlGet, performSRinSeenDB
-   ; GuiControlGet, performSRinDynas
    GuiControlGet, userSrcRplcIndexFolder
    If (editF5="")
    {
@@ -46295,7 +46288,7 @@ BTNperformIndexSearchReplace() {
    {
       If (mustRecordSeenImgs!=1)
       {
-         showTOOLtip("WARNING: The option to record seen images is currently deactivate.")
+         showTOOLtip("WARNING: The option to record seen images is currently deactivated.")
          SoundBeep , 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -96904,7 +96897,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     getSelectedFiles(0, 1)
     If (onlySelected=1 && markedSelectFile<1)
     {
-       CurrentSLD := backCurrentSLD
        changeMcursor("normal")
        showTOOLtip("WARNING: No files are currently selected")
        SoundBeep , 300, 100
