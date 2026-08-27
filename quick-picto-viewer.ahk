@@ -15747,7 +15747,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     {
        ; ToolTip, % "cropping" , , , 2
        vpWinClientSize(mainWidth, mainHeight)
-       thisu := ((offX.sw != offX.dh || offX.sh != offX.dh) && offX.invertArea=0) ? 1 : 0
+       thisu := ((offX.sw != offX.dw || offX.sh != offX.dh) && offX.invertArea=0) ? 1 : 0
        If ((!isSelEntirelyWithinIMGbounds() || !isSelEntireVisible(mainWidth, mainHeight)) && offX.invertArea=0 || offX.invertArea=1 || offX.forceRect=1 || thisu=1)
        {
           thisAlphaBitmap := getRectFromBitmap(alphaMaskGray, offX, 1)
@@ -38926,7 +38926,7 @@ readMainSettingsApp(act) {
     IniAction(act, "useCachedSLDdata", "General", 1)
     IniAction(act, "userimgGammaCorrect", "General", 1)
     IniAction(act, "userimgQuality", "General", 1)
-    IniAction(act, "userMultiCoresLimit", "General", 2, 2, thisSystemCores//2)
+    IniAction(act, "userMultiCoresLimit", "General", 2, 2, thisSystemCores//2 + 1)
     IniAction(act, "usrTextAlign", "General", 5)
     IniAction(act, "preventDeleteFromProtectedPath", "General", 1)
     IniAction(act, "protectedFolderPath", "General", 6)
@@ -57868,7 +57868,6 @@ PanelPreferencesWindow() {
        Return
 
     thisBtnHeight := createSettingsGUI(14, A_ThisFunc)
-
     btnWid := 100
     txtWid := 350
     EditWid := 60
@@ -57939,7 +57938,7 @@ PanelPreferencesWindow() {
     ToolTip2ctrl(hTemp, "Multiple execution threads can be used to generate thumbnails and perform image duplicates detection.")
     GuiAddEdit("xs+18 y+7 gupdateUIsettings w" editWid//1.5 " r1 limit2 -multi number -wantCtrlA -wantReturn -wantTab -wrap vEditFb", userMultiCoresLimit)
     EnvGet, sc, NUMBER_OF_PROCESSORS
-    sc := sc//2
+    sc := sc//2 + 1
     Gui, Add, UpDown, vuserMultiCoresLimit Range2-%sc%, % userMultiCoresLimit
     Gui, Add, Text, xs y+7 hp +0x200, Resolution to render PDF pages:
     GuiAddSlider("userVPpdfDPI", 72, 3500, 420, "DPI: $€", "dummy", 1, "x+5 w" editWid * 2 " hp")
@@ -58440,6 +58439,7 @@ updateUIsettings() {
      ; SetTimer, WriteSettingsUI, -90
      If (CurrentPanelTab=4)
      {
+        SetVolume(mediaSNDvolume)
         loadCustomUserKbds()
      } Else If (CurrentPanelTab=1)
      {
@@ -58904,9 +58904,8 @@ DefineSlidesTotalTimeBTNaction() {
 
     etaTime := EstimateSlideShowLength(0, 1)
     infoSliSpeed := DefineSlidesRate()
-    approxMarker := (slideShowDelay<drawModeCzeit + 50) ? "~" : ""
     IniAction(1, "SlideHowMode", "General")
-    GuiControl, SettingsGUIA:, InfoLine, One image every: %approxMarker%%infoSliSpeed%`nEstimated slideshow duration: %approxMarker%%etaTime%
+    GuiControl, SettingsGUIA:, InfoLine, One image every: %infoSliSpeed%`nEstimated slideshow duration: %approxMarker%%etaTime%
 }
 
 EstimateSlideShowLength(noPrecision:=0, totalu:=0) {
