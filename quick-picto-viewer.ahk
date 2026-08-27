@@ -12151,6 +12151,13 @@ ChangeSoundVolume(dir) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
+applyAudioVolumeNow() {
+; the "QPV audio volume" slider of PanelPreferencesWindow() calls this on every step and once
+; more when the knob is released, so the level is heard while it is being dragged. Writing
+; mediaSNDvolume alone changes nothing: SetVolume() is what reaches waveOutSetVolume()
+   SetVolume(mediaSNDvolume)
+}
+
 VPchangeGIFsDelayu(dir) {
    Static lastInvoked := 1
    If (A_TickCount - lastInvoked < 50)
@@ -28898,6 +28905,7 @@ PlotSeenDaysStatsNow(modus:=0) {
    Loop
    {
       nDay++
+      realDay := 1
       thisM := (nMon<10) ? "0" . nMon : nMon
       thisD := (nDay<10) ? "0" . nDay : nDay
       If !JEE_DateIsValid(nYear . thisM . thisD)
@@ -28910,16 +28918,25 @@ PlotSeenDaysStatsNow(modus:=0) {
 
       If (nMon>12)
       {
+         ; the walk rolls into the new year on day 0 and only reaches the 1st on the next
+         ; pass, so this one date names no day at all and must not be counted as missing
          nMon := 1
          nDay := 0
          thisM := (nMon<10) ? "0" . nMon : nMon
          thisD := (nDay<10) ? "0" . nDay : nDay
          nYear++
+         realDay := 0
       }
 
       dateu := nYear "-" thisM "-" thisD
       If (dateu=endPeriod || (A_TickCount - startZeit > 2500))
          Break
+
+      ; every day between the first and the last recorded one starts out marked as missing;
+      ; the pass over the list view below clears the ones that do carry images, the way
+      ; PlotSeenMonthsStatsNow() does it for months
+      If (realDay=1)
+         dataSkipped[dateu] := 1
    }
 
    counter := 0
@@ -57978,7 +57995,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoRemDeadEntry% vautoRemDeadEntry, Automatically remove index entries pointing to inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipDeadFiles% vskipDeadFiles, Automatically skip inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoPlaySNDs% vautoPlaySNDs, Automatically play sound files associated to images
-    GuiAddSlider("mediaSNDvolume", 1,100, 50, "QPV audio volume", "dummy", 1, "xs+16 y+7 w" slideWid " hp")
+    GuiAddSlider("mediaSNDvolume", 1,100, 50, "QPV audio volume", "applyAudioVolumeNow", 1, "xs+16 y+7 w" slideWid " hp")
     Gui, Add, Checkbox, xs y+7 gToggleToolBarViewModa Checked%toolbarViewerMode% vtoolbarViewerMode, Image viewer toolbar (simplified mode)
     Gui, Add, Checkbox, xs y+7 gtoggleCustomaToolbara Checked%userCustomizedToolbar% vuserCustomizedToolbar, Use customized list of toolbar icons
     ml := (PrefsLargeFonts=1) ? 210 : 110
@@ -58437,9 +58454,12 @@ updateUIsettings() {
      setLVrowsCount()
      msgDisplayTime := DisplayTimeUser*1000
      ; SetTimer, WriteSettingsUI, -90
+
+     ; outside the tab test on purpose: the audio volume can be set on its own tab and the
+     ; panel saved from any other one, and this runs on the way out of BtnSavePreferencesClose()
+     SetVolume(mediaSNDvolume)
      If (CurrentPanelTab=4)
      {
-        SetVolume(mediaSNDvolume)
         loadCustomUserKbds()
      } Else If (CurrentPanelTab=1)
      {
