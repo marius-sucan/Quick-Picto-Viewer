@@ -35,7 +35,7 @@ Alt + Delete|Remove active file index entry|Anywhere|-
 Ctrl + Delete|Delete active file|Anywhere|-
 Alt + E|Selection properties|Image view|Panel
 Alt + E|Open in QPV containing folder|Files list|-
-Alt + U|Manage dynamic folder(s) list|Anywhere|Panel
+Alt + U|Manage seed folder(s) list|Anywhere|Panel
 Alt + Y|Automatic image crop|Image view|Panel
 Alt + Arrow keys|Adjust image selection: top-left corner position|Image selection area|-
 Alt + Shift + Arrow keys|Adjust image selection: bottom-right corner position|Image selection area|-
@@ -227,7 +227,7 @@ Shift + Home|Select files to the first in index|Files list|-
 Shift + End|Select files to the last one in index|Files list|-
 Shift + Page Up / Down|Select files in pages of visible items|Files list|-
 Shift + Arrow keys|Select files|Files list|-
-Shift + Insert|Add new folder(s) to files index list|Anywhere|Folder selector
+Shift + Insert|Add new seed folder(s) to files index list|Anywhere|Folder selector
 Shift + O|Open folder recursively|Anywhere|Folder selector
 Shift + Space|Stop or start slideshow|Image view|-
 Shift + Space|Drop files selection [if any]|Files list|-

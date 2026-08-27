@@ -94,9 +94,9 @@ SetBatchLines, -1
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := "", pBrushZ := ""
    , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", pPen8 := ""
    , pBrushWinBGR := "", pBrushA := "", pBrushB := "", pBrushC := "", pBrushD := ""
-   , pBrushE := "", pBrushHatchLow, hGuiTip := 1, hSetWinGui := 1, undoSelLevelsArray := [], QPVerrJournal := []
-   , prevFullThumbsUpdate := 1, currentFilesListModified := 0
-   , hPicOnGui1 := "", scriptStartTime := A_TickCount, lastEditRHChange :=1, doubleBlurPreviewArea := 0
+   , pBrushE := "", pBrushHatchLow, hGuiTip := 1, hSetWinGui := 1, undoSelLevelsArray := []
+   , prevFullThumbsUpdate := 1, currentFilesListModified := 0, QPVerrJournal := []
+   , hPicOnGui1 := "", scriptStartTime := A_TickCount, lastEditRHChange := 1, doubleBlurPreviewArea := 0
    , newStaticFoldersListCache := [], lastEditRWChange := 1, QPVjournal := [], pPen7 := "", hQPVtoolbar
    , mainCompiledPath := "", wasInitFIMlib := 0, hGDIselectWin, allowNextSlide := 1, LVitemsPerPage := 5100
    , filteredMap2mainList := [], thumbsCacheFolder := A_ScriptDir "\thumbs-cache", hSNDsong, lastZeitOpenWin := 1
@@ -133,7 +133,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , othumbsW := 300, othumbsH := 300, VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := ""
    , CountFilesFolderzList := 0, imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, colorPickerMustEnd := 0
-   , userActionConflictingFile := 1, LastWasFastDisplay := 0
+   , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := []
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
@@ -145,20 +145,19 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", hGuiBtn
-   , FontList := []
-   , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", prevSetWinPosX := "", prevSetWinPosY := ""
-   , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0
+   , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := ""
+   , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
    , currIMGdetails := [], AbackupIMGdetails := [], BbackupIMGdetails := [], mainLoadedIMGdetails := [], lastSelPrinterName := ""
    , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
-   , drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1
+   , drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, liveDrawingBrushTool := 0
    , GDIfadeVPcache := "", executingCanceableOperation := 1, hCropCornersPic, UserMemBMP := "", userSearchString := ""
    , systemCores := 1, realSystemCores := 1, hasInitSpecialMode := 0, CountGIFframes := 0, prevSlideShowStop := 1
    , prevTryThumbsUpdate := 1, thumbsSizeQuality := 245, prevFullIndexThumbsUpdate := -1, userClipBMPpaste
    , UserNewWidth := 0, UserNewHeight := 0, UserNewDPI := 0, viewportStampBMP := "", tinyPrevAreaCoordY := 1
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
    , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], viewportIDstampBMP := 0, qpvMainDll, sqlDBrowID := 1
-   , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1, liveDrawingBrushTool := 0
+   , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1
    , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := ""
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
    , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := ""
@@ -245,7 +244,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
    , borderAroundImage := 0, usrAutoCropColorTolerance := 5, userActionAdvImgProcConflictingFile := 4
    , SimpleOperationsDoCrop := 0, SimpleOperationsRotateAngle := 1, SimpleOperationsScaleYImgFactor := "100 %"
-   , SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0
+   , SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0, PasteInPlaceCropAngular := 0, globalMenuOptions := 0
    , usrAutoCropDeviationPixels := 0, multilineStatusBar := 0, AutoCropAdaptiveMode := 1, allowGIFsPlayEntirely := 0
    , allowMultiCoreMode := 0, minimizeMemUsage := 0, GIFspeedDelay := 35, userImgAdjustAltBright := 1
    , maxMemThumbsCache := 420, resetImageViewOnChange := 0, FillAreaRemBGR := 0, blurAreaPixelizeMethod := 1
@@ -253,7 +252,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , FillAreaOpacity := 250, FillAreaColor := OSDbgrColor, FillAreaShape := 1, FillAreaInverted := 0
    , PasteInPlaceAlignment := 3, PasteInPlaceOpacity := 255, PasteInPlaceAdaptMode := 1, PasteInPlaceQuality := 1
    , PasteInPlaceOrientation := 4, showImgAnnotations := 0, blurAreaSoftEdges := 1, BlurAreaInverted := 0
-   , PasteInPlaceBlurAmount := 0, PasteInPlaceCropSel := 1, PasteInPlaceCropAngular := 0, globalMenuOptions := 0
+   , PasteInPlaceBlurAmount := 0, PasteInPlaceCropSel := 1
 
 Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0, PasteInPlaceLight := 0
    , EllipseSelectMode := 0, thumbsListViewMode := 1, userimgGammaCorrect := 0, FillAreaGradientAngle := 0
@@ -333,7 +332,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , UserAddNoiseBlurAmount := 0, UserAddNoisePixelizeAmount := 2, FillBehindInvert := 0
    , innerSelectionCavityX := 0, innerSelectionCavityY := 0, ResizeEnforceCanvas := 0
    , ResizeFillCanvasMode := 1, ShowToolTipsToolbar := 1, userPrivateMode := 0, thresholdKeywords := 1
-   , minKeywordLength := 2, LangKeywordsFilter := 0, limitSearchReplaceSelected := 0
+   , FillAreaBlurAmount := 0, BrushToolBlendMode := 1, minKeywordLength := 2, LangKeywordsFilter := 0
    , autoReflectVectorAnchors := 0, shearImgX := 0, shearImgY := 0, UserSymmetricaMode := 1
    , uiZoomBlurAreaXamount := 15, zoomBlurMode := 1, DesaturateAreaLevels := 1, DesaturateAreaDither := 0
    , BlurAreaHue := 0, BlurAreaSaturation := 0, BlurAreaLight := 0, BlurAreaGamma := 0
@@ -358,7 +357,6 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , OutlierFillOpacity := 200, alphaMaskBMPbright := 0, alphaMaskBMPcontrast := 0, FillAreaWelcomePattern := 1
    , toolbarViewerMode := 1, userCustomizedToolbar := 0, userThumbsToolbarList, userImgViewToolbarList
    , thumbsModeItemHighlight := 1, convertFormatUseMultiThreads := 0, convertFormatAutoSkip := 1
-   , FillAreaBlurAmount := 0, BrushToolBlendMode := 1
    , BlendModesFlipped := 0, allowToneMappingImg := 1, userThumbsSheetWidth := 300, userThumbsSheetHeight := 300
    , userThumbsSheetColumns := 10, userThumbsSheetSpacing := 50, userThumbsSheetFrame := 100
    , userThumbsSheetBgrColor := "FFffFF", userThumbsSheetShowLabel := 0, userThumbsSheetHideExt := 1
@@ -46208,7 +46206,7 @@ BtnChangeHamDistThreshold() {
 }
 
 PanelSearchAndReplaceIndex() {
-    Global editF5, editF6, performSRinSeenDB, performSRinDynas
+    Global editF5, editF6, performSRindexMode
     If warnFramesActionPrevented("SEARCH AND REPLACE")
        Return
 
@@ -46235,17 +46233,9 @@ PanelSearchAndReplaceIndex() {
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
-    If (SLDtypeLoaded=3)
-       infos := "`n`nThis action will affect only folder paths."
 
-    If (mustRecordSeenImgs!=1 || performSRinSeenDB="")
-       performSRinSeenDB := 0
-
-    If (performSRinDynas="")
-       performSRinDynas := 0
-
-    If (markedSelectFile<2)
-       limitSearchReplaceSelected := 0
+    If (performSRindexMode="")
+       performSRindexMode := 1
 
     imgPath := resultedFilesList[currentFileIndex, 1]
     doPwd := (userPrivateMode=1) ? " password " : ""
@@ -46255,39 +46245,22 @@ PanelSearchAndReplaceIndex() {
     GuiAddEdit("y+5 wp " doPwd " veditF5 r1 gUIeditsGenericAllowCtrlBksp", OutDir)
     Gui, Add, Text, y+15 wp, Replace with:
     GuiAddEdit("y+5 wp " doPwd " veditF6 r1 gUIeditsGenericAllowCtrlBksp", "")
-    Gui, Add, Checkbox, y+15 Checked%performSRinSeenDB% vperformSRinSeenDB gUItogglePerformSearchSeenDB, Perform action in the seen images database as well
-    Gui, Add, Checkbox, y+15 Checked%performSRinDynas% vperformSRinDynas , Perform action over the main folders list as well
-    Gui, Add, Checkbox, y+15 Checked%limitSearchReplaceSelected% vlimitSearchReplaceSelected gUItogglePerformSearchSeenDB, Apply action only on the selected files
-    Gui, Add, Checkbox, y+15 Checked%userSrcRplcIndexFolder% vuserSrcRplcIndexFolder, Only modify folder paths in the files list index
-    If (mustRecordSeenImgs!=1)
-       GuiControl, Disable, performSRinSeenDB
-
-    If (markedSelectFile<2)
-       GuiControl, Disable, limitSearchReplaceSelected
-
+    Gui, Add, Text, y+15 hp wp, Apply action on:
+    GuiAddDropDownList("y+1 wp AltSubmit Choose" performSRindexMode " vperformSRindexMode", "Current files list|Selected files only|Entire seen images database|Main seed folders list")
+    Gui, Add, Checkbox, y+15 Checked%userSrcRplcIndexFolder% vuserSrcRplcIndexFolder, Modify folder paths only (do not modify file names)
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNperformIndexSearchReplace, &Perform
     Gui, Add, Button, x+5 hp w90 gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Search and replace through the files index: " appTitle)
-}
-
-UItogglePerformSearchSeenDB() {
-   Gui, SettingsGUIA: Default
-   GuiControlGet, performSRinSeenDB
-   GuiControlGet, limitSearchReplaceSelected
-   ; actu := (performSRinSeenDB=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
-   ; GuiControl, % actu, performSRinDynas
-
-   ; actu := (performSRinSeenDB=1 || SLDtypeLoaded=3 || markedSelectFile<2) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
-   ; GuiControl, % actu, limitSearchReplaceSelected
 }
 
 BTNperformIndexSearchReplace() {
    Gui, SettingsGUIA: Default
    GuiControlGet, editF5
    GuiControlGet, editF6
-   GuiControlGet, limitSearchReplaceSelected
-   GuiControlGet, performSRinSeenDB
-   GuiControlGet, performSRinDynas
+   GuiControlGet, performSRindexMode
+   ; GuiControlGet, limitSearchReplaceSelected
+   ; GuiControlGet, performSRinSeenDB
+   ; GuiControlGet, performSRinDynas
    GuiControlGet, userSrcRplcIndexFolder
    If (editF5="")
    {
@@ -46299,23 +46272,49 @@ BTNperformIndexSearchReplace() {
 
    If (editF5==editF6)
    {
-      showTOOLtip("WARNING: Both fields are equal: what to search for and replace with.")
+      showTOOLtip("WARNING: Both fields are equal: what to search for and replace with")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
-   BtnCloseWindow()
-   If (mustRecordSeenImgs=1 && performSRinSeenDB=1)
+   If (performSRindexMode=1 || performSRindexMode=2)
    {
-      SearchAndReplaceSeenDB(editF5, editF6)
-      Sleep, 500
-   }
+      If (!markedSelectFile && performSRindexMode=2)
+      {
+         showTOOLtip("WARNING: There are no files selected in the QPV list")
+         SoundBeep , 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
 
-   SearchAndReplaceThroughIndex(editF5, editF6, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
-   If (performSRinDynas=1)
+      BtnCloseWindow()
+      limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
+      SearchAndReplaceThroughIndex(editF5, editF6, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
+   } Else If (performSRindexMode=3)
+   {
+      If (mustRecordSeenImgs!=1)
+      {
+         showTOOLtip("WARNING: The option to record seen images is currently deactivate.")
+         SoundBeep , 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
+      BtnCloseWindow()
+      SearchAndReplaceSeenDB(editF5, editF6)
+   } Else If (performSRindexMode=4)
    {
       listu := getDynamicFoldersList()
+      If !InStr(listu, ":\")
+      {
+         showTOOLtip("WARNING: The seed folders list is empty")
+         SoundBeep , 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
+      BtnCloseWindow()
       listu := StrReplace(listu, "`n", "\`n")
       listu := StrReplace(listu, editF5, editF6)
       listu := StrReplace(listu, "\\", "\")
@@ -66227,7 +66226,7 @@ InvokeMenuBarFile(manuID) {
    If (maxFilesIndex<1 || !CurrentSLD)
    {
       kMenu("pvMenuBarFile", "Add", "Insert &file(s)`tInsert", "addNewFile2list", "images list")
-      kMenu("pvMenuBarFile", "Add", "&Manage folders list`tAlt+U", "PanelDynamicFolderzWindow")
+      kMenu("pvMenuBarFile", "Add", "&Manage seed folders list`tAlt+U", "PanelDynamicFolderzWindow")
    }
 
    Menu, pvMenuBarFile, Add
@@ -66851,8 +66850,8 @@ InvokeMenuBarList(manuID) {
   }
 
   kMenu("pvMenuBarList", "Add", "I&mport list / insert file(s)`tInsert", "addNewFile2list")
-  kMenu("pvMenuBarList", "Add", "&Add folder(s)`tShift+Insert", "addNewFolder2list")
-  kMenu("pvMenuBarList", "Add", "Mana&ge folder(s) list`tAlt+U", "PanelDynamicFolderzWindow")
+  kMenu("pvMenuBarList", "Add", "&Add seed folder(s)`tShift+Insert", "addNewFolder2list")
+  kMenu("pvMenuBarList", "Add", "Mana&ge seed folder(s) list`tAlt+U", "PanelDynamicFolderzWindow")
   labelu := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? "&Update files list selectively`tCtrl+U" : "Folders containin&g indexed files`tCtrl+U"
   kMenu("pvMenuBarList", "Add", labelu, "PanelStaticFolderzManager", "folders manage")
   If (StrLen(DynamicFoldersList)>1)
@@ -70300,7 +70299,7 @@ createMenuOpenRecents(modus:=0) {
       If (maxFilesIndex<1 || !CurrentSLD)
       {
          kMenu("PVopenF", "Add", "Insert file(s)`tInsert", "addNewFile2list", "images list")
-         kMenu("PVopenF", "Add", "&Manage folders list`tAlt+U", "PanelDynamicFolderzWindow")
+         kMenu("PVopenF", "Add", "&Manage seed folders list`tAlt+U", "PanelDynamicFolderzWindow")
       }
    }
 
@@ -70505,8 +70504,8 @@ createMenuFilesIndexOptions() {
 
    Menu, PVfList, Add,
    kMenu("PVfList", "Add", "Import list / insert file(s)`tInsert", "addNewFile2list")
-   kMenu("PVfList", "Add", "&Add folder(s)`tShift+Insert", "addNewFolder2list")
-   kMenu("PVfList", "Add", "Mana&ge folder(s) list`tAlt+U", "PanelDynamicFolderzWindow")
+   kMenu("PVfList", "Add", "&Add seed folder(s)`tShift+Insert", "addNewFolder2list")
+   kMenu("PVfList", "Add", "Mana&ge seed folder(s) list`tAlt+U", "PanelDynamicFolderzWindow")
    If (maxFilesIndex>1)
    {
       kMenu("PVfList", "Add", "Save files list as &.SLD`tCtrl+Shift+S", "PanelSaveSlideShowu")
@@ -95342,7 +95341,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    Gui, Add, Text, x15 y15, This folders list is used to generate the files list index.
+    Gui, Add, Text, x15 y15, The seed folders are what generate the files list index.
     hLVmainu := GuiAddListView("y+10 w" lstWid " +LV0x10000 r" uLVr " Grid +LV0x400 guiLVfolderzFilterListBTN +ReadOnly -multi AltSubmit vLViewDynas", "#|(?)|Folder path|Files|Selected|`%|Files on disk|Difference|Size (MB)", "Folders to scan")
     btnWid2 := (PrefsLargeFonts=1) ? 95 : 60
     btnWid3 := (PrefsLargeFonts=1) ? 120 : 90
@@ -95358,7 +95357,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNcopyDynaFoldersList, &Copy list
     Gui, Add, Button, x+5 hp wp+5 gBTNpasteDynaFoldersList, &Paste list
     Gui, Add, Button, x+5 hp wp+5 ginvokePanelDynaFoldersContextMenu, &More
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage folders list: " appTitle)
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage seed folders list: " appTitle)
     uiPopulateDynamicFolderzList()
 }
 
@@ -96899,12 +96898,9 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     ; the list itself. Only PanelSearchAndReplaceIndex() offers the option; renaming a
     ; folder has to update every file it moved, selected or not.
 
-    backCurrentSLD := CurrentSLD
-    CurrentSLD := ""
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" whatu "`n" replacerz)
 
-    changeMcursor()
     getSelectedFiles(0, 1)
     If (onlySelected=1 && markedSelectFile<1)
     {
@@ -96916,6 +96912,9 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        Return
     }
 
+    backCurrentSLD := CurrentSLD
+    CurrentSLD := ""
+    changeMcursor()
     ; the filter has to stay in place here: removing a "SQL:query:" filter regenerates the
     ; files list straight from the database, which drops the very selection to be read below
     If (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && onlySelected!=1)
@@ -98901,11 +98900,9 @@ coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Yscal
      Return "err"
 
   ; losslessJpegs=1 - the flip/rotate/crop actions of the files list: a JPEG gets
-  ; the operation applied to its DCT coefficients, in place, by coreJpegLossLessAction(): no
-  ; re-encoding, and its metadata and colour profile survive, which the pixel path below
-  ; strips when it decodes through WIC. Only a real JPEG (by signature, whatever its name)
-  ; and only when the transformations amount to one lossless operation; a failure is
-  ; reported as such instead of silently re-encoding the file.
+  ; the operation applied to its DCT coefficients, in place, by coreJpegLossLessAction():
+  ; via FreeImmage, no re-encoding, and its metadata and colour profile survive,
+  ; which the pixel path below strips
   If (losslessJpegs=1 && doConversion=0 && (file2save=imgPath || ResizeUseDestDir!=1) && RegExMatch(imgPath, "i)(.\.(jpeg|jpg|jpe))$"))
   {
      jpegOp := losslessJpegOpFromSimpleFlags()
