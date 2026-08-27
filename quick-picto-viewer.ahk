@@ -35566,10 +35566,10 @@ determineTerminateOperation() {
   Return theEnd
 }
 
-doStartLongOpDance() {
+doStartLongOpDance(affectTlbr:=0) {
      imageLoading := runningLongOperation := 1
      interfaceThread.ahkPostFunction("initAppBusyMode")
-     If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1)
+     If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1 && affectTlbr!="no")
         redrawToolbarGUI()
 }
 
@@ -85431,7 +85431,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
        Gdip_SetPenWidth(pPen5, imgHUDbaseUnit//11.5)
 
     ; Gdip_FillRectangle(G2, pBrushWinBGR, -2, -2, mainWidth + 5, mainHeight + 5)
-    doStartLongOpDance()
+    doStartLongOpDance("no")
     imgsListArrayThumbs := []
     prevGUIupdate := A_TickCount
     whichCoreBusy := hasDrawn := lastMsg := imgsMustPaint := imgsNotCached := imgsFileCached := 0
