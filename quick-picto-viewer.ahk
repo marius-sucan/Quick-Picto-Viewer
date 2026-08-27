@@ -46295,7 +46295,7 @@ BTNperformIndexSearchReplace() {
       }
 
       BtnCloseWindow()
-      SearchAndReplaceSeenDB(editF5, editF6)
+      SearchAndReplaceSeenDB(editF5, editF6, userSrcRplcIndexFolder)
    } Else If (performSRindexMode=4)
    {
       listu := getDynamicFoldersList()
@@ -97088,7 +97088,13 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     SetTimer, ResetImgLoadStatus, -100
 }
 
-SearchAndReplaceSeenDB(what, replacer) {
+SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
+    ; folderMode=1 confines the replacement to the folder part of every path: the file names
+    ; are left exactly as they are. Unlike the SQL branch of SearchAndReplaceThroughIndex(),
+    ; whole folders are not matched here. This database keeps each path whole, in a single
+    ; imgfile column, so there is no folder column to match a folder against: the search
+    ; stays the plain substring replace it is in the other mode, only confined to the part
+    ; of the string that precedes the last separator.
     initSeenImagesListDB()
     If (sqlFailedInit=1)
     {
@@ -97101,12 +97107,9 @@ SearchAndReplaceSeenDB(what, replacer) {
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     startOperation := A_TickCount
-    showTOOLtip("Performing search and replace in the seen database list:`n" what "`n" replacer)
+    modeInfo := (folderMode=1) ? "`nFolder paths only" : ""
+    showTOOLtip("Performing search and replace in the seen database list:`n" what "`n" replacer modeInfo)
     changeMcursor()
-    whatESC := what
-    replacerESC := replacer
-    seenImagesDB.EscapeStr(whatESC)
-    seenImagesDB.EscapeStr(replacerESC)
     seenImagesDB.Exec("BEGIN TRANSACTION;")
     SQLstr := "SELECT ROWID, imgfile FROM images WHERE imgfile LIKE '%" Trimmer(SQLescapeStr(what, 1)) "%' ESCAPE '>';"
     If !seenImagesDB.GetTable(SQLstr, RecordSet)
@@ -97129,12 +97132,36 @@ SearchAndReplaceSeenDB(what, replacer) {
 
            If Row[2]
            {
-              newFolderName := StrReplace(Row[2], what, replacer)
-              SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newFolderName) "' WHERE ROWID='" Row[1] "';"
-              If !seenImagesDB.Exec(SQLstr)
-                 failedFiles++
-              Else
-                 totalAffected++
+              If (folderMode=1)
+              {
+                 ; the folder is cut off with its trailing separator still attached, so that a
+                 ; search string ending in "\" matches it too; the separator that doubles when
+                 ; the file name is joined back on is collapsed by repairPathSeparators()
+                 affected := 0
+                 newFolderName := Row[2]
+                 thisPos := InStr(Row[2], "\", 0, -1)
+                 If (thisPos>1)
+                 {
+                    newFolder := StrReplace(SubStr(Row[2], 1, thisPos), what, replacer, affected)
+                    newFolderName := repairPathSeparators(newFolder "\" SubStr(Row[2], thisPos + 1))
+                 }
+              } Else
+              {
+                 newFolderName := StrReplace(Row[2], what, replacer, affected)
+                 newFolderName := repairPathSeparators(newFolderName)
+              }
+
+              ; the query above reads every path the search string occurs in, wherever it sits.
+              ; In folders mode the records holding it in their file name alone come back from
+              ; the replacement unchanged, and there is nothing to write for them
+              If affected
+              {
+                 SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newFolderName) "' WHERE ROWID='" Row[1] "';"
+                 If !seenImagesDB.Exec(SQLstr)
+                    failedFiles++
+                 Else
+                    totalAffected++
+              }
            }
        }
        RecordSet.Free()
