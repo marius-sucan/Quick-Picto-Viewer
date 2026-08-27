@@ -4304,9 +4304,8 @@ determineLClickState() {
 
 getBrushPenPressure(ByRef rawPressure) {
 ; Returns the shaped pen pressure as a 0-1 factor, or -1 when there is no live pen
-; input. The painting loops must keep behaving exactly as before for mouse users,
-; so -1 means «leave everything alone». The pressure itself is collected in the
-; interface thread by WM_PENpressure(), see lib\module-interface.ahk
+; input. The pressure itself is collected in the interface thread by 
+; WM_PENpressure(), see lib\module-interface.ahk
    If (BrushToolPenPressure!=1)
       Return -1
 
@@ -4457,10 +4456,6 @@ TrueCleanup() {
    If (maxFilesIndex>1 && userSeenSlideImages>1 && mustRecordSeenImgs=1)
       seenImagesDB.Exec("COMMIT TRANSACTION;")
 
-   ; before CloseDB(): the duplicates engine holds its own read-only handle on the same
-   ; file, and it has to be closed while sqlite3.dll is still around. The collection pool
-   ; holds prepared statements on AHK's handle, so it has to let go first of all - and its
-   ; workers are decoding images, so this is also where they are stopped.
    If (dupesPixInitGood=1)
    {
       DllCall("qpvmain.dll\dupesEngineCancel", "int")
@@ -4478,7 +4473,6 @@ TrueCleanup() {
    Sleep, 10
    WinSet, Region, 0-0 w1 h1, ahk_id %PVhwnd%
    RegWrite, REG_SZ, %QPVregEntry%, Running, 0
-
    lastInvoked := A_TickCount
    If (slideShowRunning=1)
       DestroyGIFuWin()
@@ -4658,7 +4652,7 @@ initThumbsPool() {
 QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSave) {
 ; prepares the workers for one QPV_ShowThumbnails() run; it also discards whatever
 ; may have been left behind by a previous, abandoned run
-; in the dll, a struct type ThumbsConfig holds these parameters
+; in the DLL, a struct type ThumbsConfig holds these parameters
 ; see also initDupesPixelsPool()
     If (multiCoreThumbsInitGood!=1 || !thumbsPoolState)
        Return 0
@@ -4686,7 +4680,7 @@ QPV_ThumbsPoolReady() {
 }
 
 QPV_MemoryIsTight() {
-; 1 when the machine is short on physical memory; the sample lives in qpvmain.dll and is
+; Returns 1 when the machine is short on physical memory; the sample lives in qpvmain.dll and is
 ; refreshed a few times per second at most, so this is cheap enough to call per thumbnail
    If !qpvMainDll
       Return 0
@@ -4708,7 +4702,6 @@ QPV_ThumbsPoolPending() {
 
 QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
 ; collects the finished thumbnails; the GDI+ bitmaps become ours, there is nothing to clone
-
     Static maxItems := 32, resultSize := 72, resultsBuffer
     If !VarSetCapacity(resultsBuffer)
        VarSetCapacity(resultsBuffer, maxItems*resultSize, 0)
@@ -4765,24 +4758,14 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
     Return n
 }
 
-; The properties of the ORIGINAL image, out of one ThumbResult, into the files list.
-;
-; The workers already read the file; before qpvmain.dll took this phase over, the single
-; threaded branch of QPV_ShowThumbnails() called GetCachableImgFileDetails() right after
-; LoadBitmapFromFileu() and the same columns were filled from mainLoadedIMGdetails. That
-; branch is still there and still does it - it is the fallback for machines where the pool
-; is off - so without this the two paths disagree about the very same folder.
-;
-; Only for an image the workers opened themselves: loaders 1 [WIC], 2 [FreeImage], 3 [SVG]
-; and 6 [GDI+], which is the one that reads EMF, WMF and the GIFs the other two refuse.
-; Loader 5 decoded the CACHED thumbnail PNG: its dimensions, frame count and pixel format
-; are the cache file's, and writing them would tell the files list that every photograph in
-; the library is a 250 pixel PNG.
-; Loader 0 means nothing ran. Loader 4, PDFium, is left out on purpose: none of these
-; columns describes a PDF, and the two render paths do not even agree on the numbers - the
-; PDF branch of tpRunJob() in thumbs-pool.h says why. PDFs keep being collected by the
-; single threaded branch, exactly as before.
 poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
+; Retrieve the properties of the ORIGINAL image, out of one ThumbResult, into the files list.
+; loaders: 1 [WIC], 2 [FreeImage], 3 [SVG] and 6 [GDI+], which is the one that reads EMF, 
+; WMF and the GIFs the other two refuse.
+; Loader 5 decoded the CACHED thumbnail.
+; Loader 0 means nothing ran. 
+; Loader 4, PDFium, is left out on purpose: none of these columns describes a PDF.
+; PDFs keep being collected by the single threaded branch, exactly as before.
    Static nameBuf
    loaderUsed := NumGet(resultsBuffer, offu + 44, "Int")
    If (loaderUsed<1 || loaderUsed=4 || loaderUsed=5 || loaderUsed>6)
@@ -4793,10 +4776,6 @@ poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
    If (srcW<1 || srcH<1)
       Return 0
 
-   ; the index is a row of resultedFilesList, and a result can arrive after the list moved
-   ; underneath it - an entry removed, a file renamed. A thumbnail drawn against the wrong
-   ; row is fixed by the next repaint; seven cached properties written there are not, and
-   ; neither is a database row written from them.
    imgPath := StrReplace(getIDimage(indexu), "||")
    If (imgPath!=thumbsArray[indexu, 3])
       Return 0
@@ -4817,15 +4796,11 @@ poolRecordImgProps(indexu, ByRef resultsBuffer, offu, ByRef thumbsArray) {
    If (r>0)
       pixFmt := StrGet(&nameBuf, r, "UTF-16")
 
-   ; a loader that could not name the format must not erase a name something else knew
    If !pixFmt
       pixFmt := resultedFilesList[indexu, 15]
 
    framesu := NumGet(resultsBuffer, offu + 48, "Int")
    recordFilesListImgProps(indexu, srcW, srcH, (framesu>0) ? framesu : 1, pixFmt, NumGet(resultsBuffer, offu + 52, "Int"))
-
-   ; and into the database the list came out of, so that the work is not repeated the next
-   ; time something asks for these columns
    recordSQLimgPropsNow(indexu, imgPath)
    Return 1
 }
@@ -12151,13 +12126,6 @@ ChangeSoundVolume(dir) {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-applyAudioVolumeNow() {
-; the "QPV audio volume" slider of PanelPreferencesWindow() calls this on every step and once
-; more when the knob is released, so the level is heard while it is being dragged. Writing
-; mediaSNDvolume alone changes nothing: SetVolume() is what reaches waveOutSetVolume()
-   SetVolume(mediaSNDvolume)
-}
-
 VPchangeGIFsDelayu(dir) {
    Static lastInvoked := 1
    If (A_TickCount - lastInvoked < 50)
@@ -12203,8 +12171,8 @@ getIMGformatLimits(typu, ByRef dimLimit, ByRef mpxLimit) {
 ; The keys are lower case; typu may arrive as a file extension or as the human
 ; readable name returned by FreeImage_GetFileType(), eg., JPEG or TARGA.
 ; Returns 0 for the formats with no known limits, eg., PNG, TIFF or BMP.
-; The gdip entry is the GDI+ 32 bits limit: sqrt(2GB/4) = 23160 px = 536.7 mgpx.
-; The fim entry is the FreeImage ceiling; it applies to any format, see showHelpImgEditPanels().
+; The GDIP entry is the GDI+ 32-bits RGBA limit: sqrt(2GB/4) = 23160 px = 536.7 mgpx.
+; The FIM entry is the FreeImage ceiling; it applies to any format, see showHelpImgEditPanels().
     Static fmtLimits := {"gdip": [199000, 536.7]
        , "fim"  : [600500, 13579]
        , "webp" : [16350, 267.2]
@@ -12228,8 +12196,8 @@ isImgSizeTooLarge(imgW, imgH, typu:="gdip", extraLimit:=1) {
    mpx := Round((imgW * imgH)/1000000, 1)
    r := ((dimLimit>0 && max(imgW, imgH)>dimLimit) || (mpxLimit>0 && mpx>mpxLimit)) ? 1 : 0
 
-   ; (23160*23160)/1000000 = 536.7 mgpx 32 bits limit [RGBA]
-   ; (26745*26745)/1000000 = 715.3 mgpx 24 bits limit [RGB]
+   ; (23160*23160)/1000000 = 536.7 mgpx 32-bits limit [RGBA]
+   ; (26745*26745)/1000000 = 715.3 mgpx 24-bits limit [RGB]
    If (!r && extraLimit=1)
       r := (mpx>715.3) ? 1 : 0
    Return r
@@ -13832,9 +13800,6 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
              If !EZ
              {
                 thisBlendMode := 0
-                ; when the border is cut out from the background, the border colour
-                ; and its opacity are not used at all [see updateUIInsertTextPanel()];
-                ; the bitmap already carries the background opacity in its alpha channel
                 bmpOpacity := (pkcut=1) ? 255 : TextInAreaBorderOpacity
                 r := DllCall("qpvmain.dll\DrawTextBitmapInPlace", "UPtr", pBitsAll, "Int", mImgW, "Int", mImgH, "int", Stride, "int", bpp, "int", 255 - bmpOpacity, "int", userimgGammaCorrect, "int", thisBlendMode, "int", 0, "int", 0, "UPtr", mScan, "int", mStride, "int", 32, "int", thisX, "int", thisY, "int", mw, "int", mh)
                 ; fnOutputDebug(A_Index " rendered B contour bitmap")
@@ -21983,9 +21948,6 @@ HugeImagesApplyPasteInPlace() {
       xa := allowOutside[2], ya := allowOutside[3]
       xb := allowOutside[4], yb := allowOutside[5]
       dw := xb - xa,         dh := yb - ya
-      ; the object is never rescaled into a dw x dh buffer any longer: FillSelectArea()
-      ; stretches it over the destination area as it paints. Only the object itself,
-      ; at its own size, is ever allocated here [rotated and/or cropped]
       Stride := (bpp * max(w, kw)) / 8
       bufferSize := (PasteInPlaceOrientation>1) ? Stride * max(h, kh) : 1
       If memoryUsageWarning(max(w, kw), max(h, kh), bpp, 0, bufferSize)
@@ -28760,9 +28722,6 @@ PlotSeenMonthsStatsNow() {
       dateu := nYear "-" thisM
       If (dateu=endPeriod || (A_TickCount - startZeit > 2500))
          Break
-
-      If (nYear thisM>=202004)
-         dataSkipped[dateu] := 1
    }
 
    counter := 1
@@ -28918,8 +28877,6 @@ PlotSeenDaysStatsNow(modus:=0) {
 
       If (nMon>12)
       {
-         ; the walk rolls into the new year on day 0 and only reaches the 1st on the next
-         ; pass, so this one date names no day at all and must not be counted as missing
          nMon := 1
          nDay := 0
          thisM := (nMon<10) ? "0" . nMon : nMon
@@ -28932,9 +28889,6 @@ PlotSeenDaysStatsNow(modus:=0) {
       If (dateu=endPeriod || (A_TickCount - startZeit > 2500))
          Break
 
-      ; every day between the first and the last recorded one starts out marked as missing;
-      ; the pass over the list view below clears the ones that do carry images, the way
-      ; PlotSeenMonthsStatsNow() does it for months
       If (realDay=1)
          dataSkipped[dateu] := 1
    }
@@ -34085,18 +34039,8 @@ addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0, fact
 }
 
 ; ---- prepared statements ------------------------------------------------------------------
-; One DllCall each, in the style InitSQLgetTable() already uses for sqlite3_get_table.
-; Class_SQLiteDB does have Prepare()/Bind()/Step(), but nothing in the application uses them
-; and they are the wrong shape for a loop that runs once per indexed file: Bind() writes two
-; object properties, range checks, looks the type up in a map and then walks a chain of
-; string comparisons - per parameter. Its "Static Types := {Blob:1, Double:1, Int:1, Text:1}"
-; guard also rejects "Int64" and "Null" outright, so those two branches of it can never run,
-; and "Int" binds through the 32-bit sqlite3_bind_int, which cannot hold a 12 digit fmodified.
-;
-; These are the very entry points the DLL resolves out of the very same sqlite3.dll; see
-; sqlite-dynamic.h for the list, and dupes-pixels.h for the writer they serve there.
 SQLstmtPrepare(SQL, dbHandle) {
-   ; prepare16_v2 takes the statement as UTF-16, which is what an AHK string already is
+; prepare16_v2 takes the statement as UTF-16, which is what an AHK string already is
    hStmt := 0
    RC := DllCall("SQlite3.dll\sqlite3_prepare16_v2", "Ptr", dbHandle, "WStr", SQL, "Int", -1
                , "PtrP", hStmt, "Ptr", 0, "Cdecl Int")
@@ -34104,34 +34048,38 @@ SQLstmtPrepare(SQL, dbHandle) {
 }
 
 SQLstmtFinalize(hStmt) {
-   Return hStmt ? DllCall("SQlite3.dll\sqlite3_finalize", "Ptr", hStmt, "Cdecl Int") : 0
+   rr := hStmt ? DllCall("SQlite3.dll\sqlite3_finalize", "Ptr", hStmt, "Cdecl Int") : 0
+   Return rr
 }
 
 SQLstmtStep(hStmt) {
-   Return DllCall("SQlite3.dll\sqlite3_step", "Ptr", hStmt, "Cdecl Int")
+   rr := DllCall("SQlite3.dll\sqlite3_step", "Ptr", hStmt, "Cdecl Int")
+   Return rr
 }
 
+SQLstmtReset(hStmt) {
 ; clear_bindings is what lets a writer bind only the values it actually has: every parameter
 ; it skips is NULL again, instead of still holding the value the previous row left there.
-SQLstmtReset(hStmt) {
    DllCall("SQlite3.dll\sqlite3_reset", "Ptr", hStmt, "Cdecl Int")
    DllCall("SQlite3.dll\sqlite3_clear_bindings", "Ptr", hStmt, "Cdecl Int")
 }
 
 SQLstmtBindInt(hStmt, idx, valu) {
-   Return DllCall("SQlite3.dll\sqlite3_bind_int64", "Ptr", hStmt, "Int", idx, "Int64", valu, "Cdecl Int")
+   rr := DllCall("SQlite3.dll\sqlite3_bind_int64", "Ptr", hStmt, "Int", idx, "Int64", valu, "Cdecl Int")
+   Return rr
 }
 
 SQLstmtBindDouble(hStmt, idx, valu) {
-   Return DllCall("SQlite3.dll\sqlite3_bind_double", "Ptr", hStmt, "Int", idx, "Double", valu, "Cdecl Int")
+   rr := DllCall("SQlite3.dll\sqlite3_bind_double", "Ptr", hStmt, "Int", idx, "Double", valu, "Cdecl Int")
+   Return rr
 }
 
+SQLstmtBindText(hStmt, idx, txtu) {
 ; nByte counts BYTES for bind_text16, so -1 and let SQLite measure the string, the way
 ; dupes-pixels.h does. SQLITE_TRANSIENT (-1) makes SQLite copy the text before the call
 ; returns, so binding straight out of an AHK variable is safe.
-SQLstmtBindText(hStmt, idx, txtu) {
-   Return DllCall("SQlite3.dll\sqlite3_bind_text16", "Ptr", hStmt, "Int", idx, "WStr", txtu
-               , "Int", -1, "Ptr", -1, "Cdecl Int")
+   rr := DllCall("SQlite3.dll\sqlite3_bind_text16", "Ptr", hStmt, "Int", idx, "WStr", txtu, "Int", -1, "Ptr", -1, "Cdecl Int")
+   Return rr
 }
 
 updateSQLdbEntryImgRes(fullPath, imgResu, fileInfos, dbIndex, indexu:=0) {
@@ -34207,11 +34155,6 @@ getImgPropsValuesSet(indexu, m) {
    Return "imgpixfmt='" getValueFilesList(indexu, 15, m) "', imgframes='" getValueFilesList(indexu, 9, m) "', imgdpi='" getValueFilesList(indexu, 22, m) "', imgwidth='" getValueFilesList(indexu, 13, m) "', imgheight='" getValueFilesList(indexu, 14, m) "'"
 }
 
-; The four pixel fingerprints used to be appended here, out of resultedFilesList columns
-; 29-32. They are BLOBs in imagesPixels now and there is exactly one thing that produces
-; them - the collection pool of dupes-pixels.h - so that a fingerprint is always comparable
-; with every other fingerprint in the same database. Interpolating them into an UPDATE
-; string was also, on its own, several kilobytes of SQL to parse per image.
 getImgHistoValuesSet(indexu, m) {
    Return "imgmedian='" getValueFilesList(indexu, 19, m) "', imgavg='" getValueFilesList(indexu, 18, m) "', imghpeak='" getValueFilesList(indexu, 20, m) "', imghlow='" getValueFilesList(indexu, 21, m) "', imghrms='" getValueFilesList(indexu, 24, m) "', imghrange='" getValueFilesList(indexu, 25, m) "',  imghmode='" getValueFilesList(indexu, 26, m) "', imghminu='" getValueFilesList(indexu, 27, m) "'"
 }
@@ -34225,15 +34168,7 @@ getImgHistoValuesSet(indexu, m) {
 ; the empty string the interpolated statements write into an INT column: the collection pool
 ; binds NULL for the same reason (dupes-pixels.h), importSLDBintoSLDB() converts '' back to
 ; NULL on the way in, and "never collected" has to stay apart from "collected and blank".
-; Values that are present are stored exactly as before - '202401151230' interpolated into an
-; INT column already became the integer 202401151230 through column affinity.
 SQLdbStoreFilesListEntry(hStmt, ByRef rowu, imgPath) {
-   ; No reset to open with: the reset at the bottom leaves the statement clean for the next
-   ; entry, and a freshly prepared statement has nothing bound to begin with.
-   ;
-   ; The file name and the folder are stored lowercased - updateSQLdbEntry() explains why -
-   ; and lowercasing the whole path before it is split gives exactly the two halves that
-   ; lowercasing each of them afterwards would.
    zPlitPath(Format("{:L}", imgPath), 1, OutFileName, OutDir)
    SQLstmtBindInt(hStmt, 1, sqlDBrowID)
    SQLstmtBindText(hStmt, 2, OutFileName)
@@ -34264,10 +34199,7 @@ SQLdbStoreFilesListEntry(hStmt, ByRef rowu, imgPath) {
    }
 
    ; the eight histogram statistics, all of them or none of them. Column 11 is set only by
-   ; calcHistoAvgFile(), which sets all eight along with it, so the gate is exact - and it
-   ; must stay all or nothing: collectSQLFileInfosNow() keys "still to be collected" on
-   ; imgmedian alone, so a row carrying imgmedian and nothing else would never be offered
-   ; again and the other seven would stay empty for good.
+   ; calcHistoAvgFile(), which sets all eight along with it
    If rowu[11]
    {
       SQLstmtBindDouble(hStmt, 12, rowu[19])
@@ -34289,12 +34221,9 @@ SQLdbStoreFilesListEntry(hStmt, ByRef rowu, imgPath) {
    Return rz
 }
 
+updateSQLdbEntryImgHisto(fullPath, obju, imgResu, fileInfos, dbIndex, indexu:=0) {
 ; obju and imgResu name which files list the values are read out of - 1 is
 ; resultedFilesList, 2 is bckpResultedFilesList - and 0 leaves that group of columns alone.
-; Both used to accept an object instead, built by calcHistoAvgFile(returnObj=1) for the
-; database collection to write; that collection is the worker pool's now and nothing
-; produces those objects any more. fileInfos still does: GetFileAttributesEx() returns one.
-updateSQLdbEntryImgHisto(fullPath, obju, imgResu, fileInfos, dbIndex, indexu:=0) {
    thisPart := A_Space getImgHistoValuesSet(indexu, obju)
    If (imgResu=1 || imgResu=2)
       thisPart .= ", " getImgPropsValuesSet(indexu, imgResu)
@@ -34367,7 +34296,6 @@ retrieveSQLdbEntryImgInfos(fullPath, imgIndex, dbIndex) {
    wherePart := dbIndex ? " WHERE imgidu=" dbIndex ";" : " WHERE fullPath=" fullPath " COLLATE NOCASE;"
    SQL := "SELECT imgwidth, imgheight, imgframes, imgpixfmt, imgmedian, imgavg, imghpeak, imghlow, imgdpi FROM images" wherePart
    yay := RecordSet := ""
-
    If !activeSQLdb.GetTable(SQL, RecordSet)
    {
       addJournalEntry(A_ThisFunc "() - failed to query the database: " fullPath "`n" SQL)
@@ -34412,10 +34340,6 @@ updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
    If (updateDates=1)
       obju := GetFileAttributesEx(newEntry)
 
-   ; the paths are stored lowercased by addSQLdbEntry(), and must be written back
-   ; the same way. UNIQUE(fullPath) compares them byte per byte, so a record
-   ; renamed with the capitalisation of the user no longer conflicts with the scan
-   ; of its own folder, which then inserts a second record for the same file
    zPlitPath(newEntry, 1, newFileName, newFilePath)
    newFileName := Format("{:L}", newFileName)
    newFilePath := Format("{:L}", newFilePath)
@@ -34444,14 +34368,8 @@ updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
 updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldEntry:="") {
 ; Writes the path of a single record back, split over the two columns it is stored in. The
 ; record is named by its imgidu; the path it holds right now is the fallback for the rare
-; entry that carries no database index. Both parts must be written lowercased, the way
-; addSQLdbEntry() stores them: UNIQUE(fullPath) is declared on a plain TEXT generated
-; column and therefore compares byte per byte, so a record written with the capitalisation
-; of the user no longer conflicts with the lowercased upsert of a scan, which then indexes
-; the very same file a second time.
-;
-; Returns how many records were written, so that a path naming no record at all - a blank
-; or stale database index, an entry no longer in the database - is not taken for a success.
+; entry that carries no database index.
+; Returns how many records were written
    If dbIndex
       wherePart := "imgidu='" dbIndex "'"
    Else If oldEntry
@@ -34468,7 +34386,7 @@ SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
 ;
 ; isDeleted=1 marks a file entry as dead or ignored. It is durable: it is set
 ; when the file is deleted from the disk, or when it cannot be read at all by
-; the data collection. The user purges or revalidates these entries through
+; the data collection. The user ca purge or revalidate these entries through
 ; PanelCachesOverview().
 ;
 ; isDeleted=2 marks the entries of a folder about to be rescanned through
@@ -34739,10 +34657,10 @@ IniSLDBwrite(what, value, whichTable:="settings") {
     }
 }
 
+readSLDBsettingFrom(fileNamu, paramu) {
 ; Reads one settings row out of a .SLDB other than the one currently open, through a
 ; connection of its own so activeSQLdb is not disturbed. Returns "" when the file cannot be
 ; opened, has no settings table, or simply does not carry that parameter.
-readSLDBsettingFrom(fileNamu, paramu) {
    probeDB := new SQLiteDB
    If !probeDB.OpenDB(fileNamu, "R", False)
    {
@@ -34970,10 +34888,7 @@ SaveDBfilesList(enforceFile:=0) {
       showTOOLtip("Saving " groupDigits(maxFilesIndex) " entries in the SQL database`n" file2save "`nPlease wait", 0, 0, 3/100)
 
       ; One statement, prepared once and re-used for every entry, carrying everything the
-      ; files list holds about a file. This used to be an INSERT of the file properties and
-      ; then an UPDATE of the image properties and the histogram statistics on top of the row
-      ; just written: two SQL strings built in AHK and parsed by SQLite from scratch per
-      ; file, and a second seek and a full row rewrite for every image with any cached data.
+      ; files list holds about a file. 
       ;
       ; No ON CONFLICT clause, unlike addSQLdbEntry(): this branch always writes into a
       ; database file that was created moments ago, so the table is empty and the only
@@ -35030,10 +34945,6 @@ SaveDBfilesList(enforceFile:=0) {
             sqlDBrowID++
          } Else
          {
-            ; the same path twice in the list, or an entry with no path at all. It gets no
-            ; row of its own and must not be left pointing at the row of another file, which
-            ; is what happened while the id was written before the insert was known to have
-            ; worked: the histogram of this file then landed on that other file's row.
             failedFiles++
             rowu[12] := 0
          }
@@ -37926,8 +37837,8 @@ getSelectedFilesListString(maxList, ByRef countTFilez, ByRef filesListu, ByRef e
   If (systemCores<2)
      Return
 
-  trenchSize := maxList//systemCores
   r := 0
+  trenchSize := maxList//systemCores
   Loop, % systemCores - 1
   {
       thisIndex := A_Index
@@ -37953,18 +37864,14 @@ getSelectedFilesListString(maxList, ByRef countTFilez, ByRef filesListu, ByRef e
   }
 }
 
+spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
 ; Launches one worker per planned execution thread, in order, each one confirmed started
 ; before the next. When a launch fails, the workers already running are told to stop and
 ; waited for before 0 is returned: the callers then fall back to single-threaded processing
-; over the whole selection, which used to run at the same time as the surviving workers and
-; process their files a second time.
-spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
-  ; Every worker is a full QPV instance that has to parse the whole script before it can
-  ; report in, so they are launched together and waited for together: the previous scheme
-  ; confirmed each one before starting the next and cost as many start-up times as there
-  ; were threads. When one of them fails to start, the others are told to stop and waited
-  ; for before 0 is returned: the callers then fall back to single-threaded processing over
-  ; the whole selection.
+; over the whole selection.
+;
+; Every worker is a full QPV instance that has to parse the whole script before it can
+; report in, so they are launched together and waited for together:
   pidsArray := []
   failedSlot := 0
   startZeit := A_TickCount
@@ -38006,10 +37913,10 @@ spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
   Return 1
 }
 
+stopExternalCoreThreads(pidsArray, graceMs, reason:="") {
 ; Raises the abort flag for every worker and waits up to graceMs for them to end on their
 ; own - a worker looks at the flag between files, so one busy with a large image needs a
 ; while - then closes the ones still running. Returns how many had to be closed.
-stopExternalCoreThreads(pidsArray, graceMs, reason:="") {
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
   startZeit := A_TickCount
   Loop
@@ -38048,10 +37955,10 @@ stopExternalCoreThreads(pidsArray, graceMs, reason:="") {
   Return closedThreads
 }
 
+closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning) {
 ; After an abort request, a worker that cannot see the flag - stuck in a modal dialog or
 ; inside a library call - would keep the dispatcher waiting forever. Once the grace period
 ; has passed, the workers still running are closed and, from then on, counted as crashed.
-closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning) {
   Static graceMs := 30000, handledZeit := 0
   If (!abortRequestedZeit || jobsRunning<1 || A_TickCount - abortRequestedZeit<graceMs || handledZeit=abortRequestedZeit)
      Return 0
@@ -38060,8 +37967,6 @@ closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning) {
   Return stopExternalCoreThreads(pidsArray, 0)
 }
 
-; One look at the worker slots: how many are running, done, or gone. Returns the number of
-; slots that have ended, one way or the other.
 scanExternalCoreThreads(pidsArray, spawnZeit, ByRef jobsRunning, ByRef jobDone, ByRef threadsCrashed) {
   jobsRunning := jobDone := threadsCrashed := 0
   Loop, % systemCores
@@ -38079,11 +37984,11 @@ scanExternalCoreThreads(pidsArray, spawnZeit, ByRef jobsRunning, ByRef jobDone, 
   Return jobDone + threadsCrashed
 }
 
+countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
 ; Files a worker never reached: what its slot was given minus what its ThreadJob counters
 ; account for. Non-zero only after a thread crashed, was closed or was told to stop early.
 ; The format conversion counters carry an extra field - originals that could not be removed
 ; after converting - which is not a count of files and is left out.
-countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
   leftoverFiles := 0
   Loop, % systemCores
   {
@@ -38112,9 +38017,9 @@ countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
   Return leftoverFiles
 }
 
+sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef failedFiles, ByRef theseFailures, ByRef skippedFiles) {
 ; The ThreadJob counters of every slot added up: processed/failed/skipped, with the format
 ; conversion's extra third field - originals that could not be removed - in between.
-sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef failedFiles, ByRef theseFailures, ByRef skippedFiles) {
   processedFiles := failedFiles := theseFailures := skippedFiles := 0
   Loop, % systemCores
   {
@@ -38135,11 +38040,9 @@ sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef fail
   }
 }
 
-; Marks the dispatched files as modified for the thumbnails cache. A lossless JPEG transform
-; keeps the file times, so the cache key would not change by itself; marking the whole
-; selection instead, as it used to be done, regenerated the thumbnails of files that were
-; never dispatched - the non-JPEGs of a mixed selection.
 flagDispatchedFilesForThumbsRefresh(filesListu) {
+; Marks the dispatched files as modified for the thumbnails cache in the QPV files list.
+; This triggers a regeneration of the thumbnails of the files
   Loop, % systemCores
   {
      thisList := filesListu[A_Index]
@@ -38221,11 +38124,10 @@ initWorkLoadMultiCoresConvertFormat(maxList) {
   Return WorkLoadMultiCoreHandler(job)
 }
 
-; The converted files reported by the workers (index?newPath lines) replace their originals
-; in the files list. The results of every thread that got to write them are applied, crash
-; or no crash: a file converted by a surviving thread has had its original removed already,
-; and the files list has to follow it.
 applyMultiCoresConvertResults(theFinalList) {
+; The converted files reported by the workers (index?newPath lines) replace their originals
+; in the QPV files list of the main thread. The results of every thread that got to write
+; them are applied.
   If (SLDtypeLoaded=3)
      activeSQLdb.Exec("BEGIN TRANSACTION;")
 
@@ -38271,13 +38173,13 @@ initWorkLoadMultiCoresSimpleImgProcessing(maxList, losslessJpegs:=0) {
   Return WorkLoadMultiCoreHandler(job)
 }
 
-; Runs one of the multi-threaded batches: the selected files are split among worker
+WorkLoadMultiCoreHandler(job) {
+; Runs one of the multi-threaded batch functions: the selected files are split among worker
 ; processes (see spawnExternalCoreThreads), their counters are polled while they run, and
 ; the outcome is reported. The job object says which worker mode to run, its parameters,
 ; which files are eligible, and the wording of the messages. Returns "single-core" when the
 ; workers could not be used - the caller then processes the selection itself - "error" when
 ; most of them crashed, "abandoned" when the user aborted, blank otherwise.
-WorkLoadMultiCoreHandler(job) {
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
   backCurrentSLD := CurrentSLD
@@ -41650,7 +41552,6 @@ moveMarkedEntryNow(indexu, modus:=0) {
          reorderIndexEntryManually(EntryMarkedMoveIndex, indexu)
       Else
          switchIndexEntries(EntryMarkedMoveIndex, indexu)
-
       ; currentFileIndex := EntryMarkedMoveIndex
       EntryMarkedMoveIndex := 0
    }
@@ -41723,9 +41624,7 @@ reorderIndexEntryManually(oldIndex, newFileIndex)  {
 switchIndexEntries(newFileIndex, oldIndex) {
    If (SLDtypeLoaded=3)
    {
-      ; the rows are identified by their imgidu [resultedFilesList slot 12], never by the
-      ; list positions: the list may be sorted [or the database has id gaps after purges],
-      ; so positions and ids rarely match and the wrong rows used to get their ids swapped.
+      ; the rows are identified by their imgidu [resultedFilesList, 12], 
       ; The imagesPixels fingerprints are keyed by imgidu as well and must travel along,
       ; otherwise the swap crosses the fingerprints between the two images.
       dbIdA := resultedFilesList[oldIndex, 12]
@@ -41772,13 +41671,6 @@ switchIndexEntries(newFileIndex, oldIndex) {
       resultedFilesList[oldIndex, 12] := dbIdA
       resultedFilesList[newFileIndex, 12] := dbIdB
    }
-   ; If (StrLen(filesFilter)>1 && !InStr(filesFilter, "SQL:query:"))
-   ; {
-   ;    tempA := bckpResultedFilesList[filteredMap2mainList[oldIndex], 1]
-   ;    tempB := bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1]
-   ;    bckpResultedFilesList[filteredMap2mainList[oldIndex], 1] := tempB
-   ;    bckpResultedFilesList[filteredMap2mainList[newFileIndex], 1] := tempA
-   ; }
 
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
@@ -49345,24 +49237,14 @@ resumeCustomShapeSelection(thisZL) {
       ; ToolTip, % PointsList.Count() "==zz" , , , 2
    }
 
-   customShapePoints := convertShapePointsViewerToEditPoints(PointsList, PointsList.Count()//2)
-
    ; the symmetry has to be re-anchored, because every point was just rewritten into another
    ; coordinate space and the bézier fix ups above may have appended a few, so the axis can
    ; only be read off the points as they now stand; the assignment is made directly, and not
-   ; through configVectorShapeSymmetryPoint(), for the reason applyLoadedVectorShapeSymmetry()
-   ; states: on a bézier path that function begins with autoDeactivateClosedBezier(), which
-   ; would open the path and pop the closure points off it, leaving a gaping shape behind
-   ; an even count leaves no self paired index to hold the axis, so the mode is only dropped
-   ; as the active one; prevVectorShapeSymmetryMode keeps it, and the next resume can restore it
-   symMode := Round(prevVectorShapeSymmetryMode[1, 2])
+   ; through configVectorShapeSymmetryPoint()
    ; the rotation baked into the points above turned the mirror axis with them: a right angle
-   ; step swaps a vertical axis for a horizontal one, which is what the mode swap stands for,
-   ; while the reference point stays the middle one and its pairing is untouched. Any other
-   ; angle leaves the axis oblique and no mode can describe it; the mode is then dropped whole,
-   ; prevVectorShapeSymmetryMode included, or resolveVectorShapeSymmetry() would still write it
-   ; into the .vqpv file and the next resume would put it back on a path that is no longer
-   ; mirrored about a straight vertical or horizontal line
+   ; step swaps a vertical axis for a horizontal one
+   customShapePoints := convertShapePointsViewerToEditPoints(PointsList, PointsList.Count()//2)
+   symMode := Round(prevVectorShapeSymmetryMode[1, 2])
    If (symMode && VPselRotation!=0)
    {
       newMode := rotateVectorSymmetryMode(symMode, VPselRotation)
@@ -49644,7 +49526,7 @@ toggleOpenClosedLineEditorCustomShape() {
 }
 
 handleOpenCloseBezier(mm:=0) {
-; brings the point list of a bezier path in line with the open/closed state the user asked for
+; Brings the point list of a bezier path in line with the open/closed state the user asked for
 ; through closedLineCustomShape; the renderer performs the same reconciliation on the fly, in
 ; viewerAutoCloseOpenPath(), this one performs it on the editable list, so that the closing
 ; segment gets its own key point and its own anchors and can be edited like any other segment;
@@ -49748,9 +49630,7 @@ readVectorShapeSymmetryState() {
 closeEditorBezierPath(canDoSymmetry) {
 ; appends the segment that takes the path from its last key point back onto its first one; the
 ; two anchors of that segment are the reflections of the anchors already sitting next to the two
-; ends, so that the path closes smoothly -- the very curve viewerAutoCloseOpenPath() draws for a
-; path whose flag says closed while its points still say open. What it put on each end is handed
-; back, so that handleOpenCloseBezier() can take it off again without having to guess
+; ends, so that the path closes smoothly.
    totalz := customShapePoints.Count()
    fP := customShapePoints[1],   lP := customShapePoints[totalz]
    fA := customShapePoints[2],   lA := customShapePoints[totalz - 1]
@@ -49793,9 +49673,7 @@ openEditorBezierPath(canDoSymmetry) {
 ; drops the segment that closes the path; on a mirrored path the seam sits on the axis and its
 ; two halves are the first three and the last three points, so both have to go for the
 ; P[i] <> P[totalz - i + 1] pairing, and the odd count, to survive. A saved shape may carry more
-; than one seam -- viewerAutoCloseOpenPath() unwinds them in a loop as well. Everything taken off
-; is handed back, in the order the path held it, so that handleOpenCloseBezier() can put the very
-; same points back where they were rather than generate a fresh seam over them
+; than one seam, viewerAutoCloseOpenPath() unwinds them in a loop as well.
    thisRec := {addHead: 0, addTail: 0, remHead: [], remHeadP: [], remTail: [], remTailP: []}
    Loop, 4
    {
@@ -49804,10 +49682,6 @@ openEditorBezierPath(canDoSymmetry) {
       If (totalz<minz || testIsEditorBezierPathClosed()!=1)
          Break
 
-      ; each pass reaches a seam that sits further in than the one the pass before it took, so
-      ; what this one lifts off the tail belongs BEFORE what is already recorded, while what it
-      ; lifts off the head belongs AFTER it; a shape carrying more than one seam comes back
-      ; scrambled if the two are accumulated the same way
       passu := cloneVectorPointsRange(customShapePoints, totalz - 2, 3)
       passuP := cloneVectorPointsRange(customShapePropPoints, totalz - 2, 3)
       Loop, 3
@@ -49973,7 +49847,7 @@ vectorPointsListsMatch(ByRef arrayA, ByRef arrayB) {
 }
 
 testIsEditorBezierPathClosed(m:=0) {
-    ; this assumes drawingShapeNow = 1 ;
+; this assumes drawingShapeNow = 1
     totalz := customShapePoints.Count()
     If (totalz<4)
        Return -1
@@ -49990,8 +49864,7 @@ testIsEditorBezierPathClosed(m:=0) {
 }
 
 testEditorBezierPathPairsAsClosed() {
-; whether a closed bezier path can carry the P[i] <> P[totalz - i + 1] symmetry pairing exactly
-; as it stands.
+; whether a closed bezier path can carry the P[i] <> P[totalz - i + 1] symmetry pairing exactly as it stands.
 ; A well formed bezier path counts 6m + 1 points, so that middle index is always a key point
     totalz := customShapePoints.Count()
     If (bezierSplineCustomShape!=1 || totalz<7 || Mod(totalz, 2)!=1 || Mod(totalz, 3)!=1)
@@ -50798,10 +50671,7 @@ resolveVectorShapeSymmetry(ByRef symIndex, ByRef symMode, pointsStr:="") {
 
 applyLoadedVectorShapeSymmetry(givenIndex, givenMode) {
 ; restores the symmetry mode and its reference point read from a .vqpv file; the state is
-; assigned directly, the way restoreGivenVectorUndoLevel() does it, and not through
-; configVectorShapeSymmetryPoint(), which would run autoDeactivateClosedBezier() over the
-; freshly loaded path and could reshape it; any symmetry left over from the shape that was
-; being edited before the load is dropped first, so it cannot leak onto the new path
+; assigned directly, the way restoreGivenVectorUndoLevel() does it
    CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
    prevVectorShapeSymmetryMode := []
    totalu := customShapePoints.Count()
@@ -50820,8 +50690,8 @@ applyLoadedVectorShapeSymmetry(givenIndex, givenMode) {
 }
 
 BTNloadCustomShape(isGiven:=0, whichFile:=0) {
-   ; a caller may name the shape rather than the file that holds it, the way
-   ; saveCurrentVectorShape() takes a name
+; a caller may name the shape rather than the file that holds it, the way
+; saveCurrentVectorShape() takes a name
    If (isGiven="yes" && whichFile && !InStr(whichFile, "\"))
       whichFile := mainCompiledPath "\resources\vector-shapes\" whichFile ".vqpv"
 
@@ -51175,14 +51045,11 @@ MenuSaveEditorVectorShape() {
 ; saves the path being edited into a .vqpv file and hands the vector editor back, untouched;
 ; modelled on BtnSaveVectorShape(), with the two differences the editor imposes: its points
 ; live in another coordinate space, so they are converted the way leaving the editor converts
-; them, and the quick action buttons overlay is rebuilt, since msgBoxWrapper() tears it down
-; for the duration of any dialog it raises
+; them via stopDrawingShape()
    Static forbiddenChars := "<`~@>:""/\|?*.,;"
    If (drawingShapeNow!=1 || EllipseSelectMode!=2)
       Return
 
-   ; converted before the name is asked for, so a path that cannot be stored is refused
-   ; straight away, rather than after the user typed a name for it
    newPoints := getEditorVectorShapePoints2save()
    If !IsObject(newPoints)
    {
@@ -51203,9 +51070,6 @@ MenuSaveEditorVectorShape() {
       givenName := filterFileName(givenName)
       If (StrLen(givenName)>1)
       {
-         ; saveCurrentVectorShape() writes prevNameSavedVectorShape only once the file landed
-         ; on disk; cleared beforehand, it therefore also reports whether the user confirmed
-         ; the overwrite prompt or backed out of it, which the return value alone cannot tell
          prevName := prevNameSavedVectorShape
          prevNameSavedVectorShape := ""
          r := saveCurrentVectorShape(givenName, 1, newPoints)
@@ -55553,10 +55417,6 @@ livePreviewZoomBlurPanel() {
     yBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, cornersBMP)
 
     Gdip_DisposeImageAttributes(imageAttribs)
-    ; the anchor = the user-picked focal point mapped into the preview box coordinates, with the
-    ; same mapping the crop was drawn with; the intensity is the same percentual scale as in
-    ; ZoomBlurSelectedArea(), so the preview matches the applied effect at any preview zoom,
-    ; because the smear of every pixel is proportional to its own distance to the anchor point
     anchorX := Round(cX + (tinyPrevAreaCoordX - thisPrevieCoordX)*uiboxSizeW/imgBoxSizeW)
     anchorY := Round(cY + (tinyPrevAreaCoordY - thisPrevieCoordY)*uiboxSizeH/imgBoxSizeH)
     gBitmap := QPV_ZoomBlurBitmap(A_ThisFunc, yBitmap, anchorX, anchorY, zoomBlurMode, calcZoomBlurIntensity())
@@ -57995,7 +57855,7 @@ PanelPreferencesWindow() {
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoRemDeadEntry% vautoRemDeadEntry, Automatically remove index entries pointing to inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipDeadFiles% vskipDeadFiles, Automatically skip inexistent files
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%autoPlaySNDs% vautoPlaySNDs, Automatically play sound files associated to images
-    GuiAddSlider("mediaSNDvolume", 1,100, 50, "QPV audio volume", "applyAudioVolumeNow", 1, "xs+16 y+7 w" slideWid " hp")
+    GuiAddSlider("mediaSNDvolume", 1,100, 50, "QPV audio volume", "dummy", 1, "xs+16 y+7 w" slideWid " hp")
     Gui, Add, Checkbox, xs y+7 gToggleToolBarViewModa Checked%toolbarViewerMode% vtoolbarViewerMode, Image viewer toolbar (simplified mode)
     Gui, Add, Checkbox, xs y+7 gtoggleCustomaToolbara Checked%userCustomizedToolbar% vuserCustomizedToolbar, Use customized list of toolbar icons
     ml := (PrefsLargeFonts=1) ? 210 : 110
@@ -58454,9 +58314,6 @@ updateUIsettings() {
      setLVrowsCount()
      msgDisplayTime := DisplayTimeUser*1000
      ; SetTimer, WriteSettingsUI, -90
-
-     ; outside the tab test on purpose: the audio volume can be set on its own tab and the
-     ; panel saved from any other one, and this runs on the way out of BtnSavePreferencesClose()
      SetVolume(mediaSNDvolume)
      If (CurrentPanelTab=4)
      {
@@ -63973,13 +63830,10 @@ importSLDBintoSLDB(whichFile) {
       Return
    }
 
-   ; The imported database must be schema v3 too: the fingerprints are carried across
-   ; below through its imagesPixels table, which a database of any other vintage does not
-   ; have. Nothing here upgrades it - there is no migration path by design.
    otherVersion := readSLDBsettingFrom(whichFile, "dbVersion")
    If (otherVersion!=dbExpectedVersion)
    {
-      showTOOLtip("WARNING: Illegal operation. The database you selected was saved with a different version of " appTitle " (v" (otherVersion ? otherVersion : "unknown") ", this one is v" dbExpectedVersion "). Please rebuild it before importing.")
+      showTOOLtip("WARNING: Illegal operation. The database was saved with a different version of QPV (v" (otherVersion ? otherVersion : "unknown") ".`nThis QPV instance is v" dbExpectedVersion ").`nPlease rebuild it before importing.")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -63992,7 +63846,7 @@ importSLDBintoSLDB(whichFile) {
    setImageLoading()
    ; 21 data columns plus imgidu, which is not inserted: the merge renumbers every row, so
    ; the old identity is only kept long enough to re-key the fingerprints in imagesPixels.
-   Static  SQLa := "SELECT imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, dHash, pHash, lHash, imgmedian, imgidu FROM images"
+   Static SQLa := "SELECT imgfile, imgfolder, fsize, fmodified, fcreated, imgwidth, imgheight, imgframes, imgdpi, imgpixfmt, imgavg, imghpeak, imghlow, imghmode, imghrms, imghminu, imghrange, dHash, pHash, lHash, imgmedian, imgidu FROM images"
         , SQLaCols := 21
    If !activeSQLdb.GetTable(SQLa, mainRecordSet)
    {
@@ -64080,16 +63934,6 @@ importSLDBintoSLDB(whichFile) {
    prevMSGdisplay := A_TickCount
    countFiles := otherRecordSet.RowCount
    otherArrayu := []
-   ; A file present in BOTH databases used to get a second plan slot of its own here, and
-   ; the "b" branch of the merge then looked its main row up as mainArrayu[thatNewSlot] -
-   ; a slot the first pass never filled. So the merge never merged: it wrote the imported
-   ; record alone, UNIQUE (fullPath) rejected it because the main record had already been
-   ; inserted under its own slot, and every shared file was counted as an error.
-   ; Now such a file keeps the one slot the first pass gave it, and the imported row that
-   ; pairs with it is recorded alongside. pairedArrayu is a hashtable rather than a write
-   ; back into otherArrayu because those writes land on slots below the ones already
-   ; there, and an out-of-order integer-key insert into an AHK object shifts everything
-   ; above it - quadratic over a large shared set.
    pairedArrayu := new hashtable()
    Loop, % otherRecordSet.RowCount
    {
@@ -64141,8 +63985,7 @@ importSLDBintoSLDB(whichFile) {
       Return
    }
 
-   showTOOLtip("Merging databases contents, please wait")
-   ; The fingerprints are BLOBs in a table of their own since schema v3, and this merge
+   ; The fingerprints are BLOBs in a table of their own since SLDB schema v3, and this merge
    ; renumbers every imgidu - so they have to be re-keyed rather than copied. The old side
    ; table is set aside under another name, the other database is ATTACHed so both sources
    ; are reachable from one statement, and a small map of new -> (old main, old other) is
@@ -64150,6 +63993,7 @@ importSLDBintoSLDB(whichFile) {
    ; COALESCE in it is the same "the imported value wins when it has one" rule the k%i%
    ; loop below applies column by column.
    ; ATTACH before BEGIN: SQLite will not attach or detach while a transaction is open
+   showTOOLtip("Merging databases contents, please wait")
    pixelsCarried := 1
    pixelsRenamed := 0
    escapedOther := whichFile
@@ -64186,10 +64030,7 @@ importSLDBintoSLDB(whichFile) {
    ; INSERT ... SELECT at the end does not re-key belongs to whichever file inherits its
    ; old identity - every fingerprint in the database silently attached to the wrong
    ; image, and collectSQLFileInfosNow() would consider all of them already collected.
-   ; So when the carry-over could not be set up, the fingerprints really do go, which is
-   ; what the journal entries above promise: a re-collection costs time, the alternative
-   ; costs correctness. The rename is undone first, because a failed CREATE leaves the
-   ; database with no imagesPixels table at all.
+   ; So when the carry-over could not be set up, the fingerprints really do go.
    If (pixelsCarried!=1)
    {
       If (pixelsRenamed=1)
@@ -64215,7 +64056,6 @@ importSLDBintoSLDB(whichFile) {
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    countFiles := allIndex ; totalArrayu.Count()
-   ; For Key, Value in totalArrayu
    Loop, % allIndex
    {
       key := A_Index
@@ -64250,7 +64090,7 @@ importSLDBintoSLDB(whichFile) {
       } Else If (value="b")
       {
          ; the file is in both databases: one row, merged column by column, with the
-         ; imported value winning wherever it has one. pairedArrayu - and not otherArrayu -
+         ; imported value winning wherever it has one. pairedArrayu
          ; is what holds the imported row's index for this slot; see the second pass above
          oRowu := otherRecordSet.Rows[pairedArrayu[key]]
          mRowu := mainRecordSet.Rows[mainArrayu[key]]
@@ -64537,8 +64377,7 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
 
        If RegExMatch(CurrentSLD, sldsPattern)
        {
-          ; GetFilesList() populates only the database in this mode; the files
-          ; list must be read back from it
+          ; GetFilesList() populates only the database in this mode; the files list must be read back from it
           good2go := 0
           isPipe := InStr(folderu, "|") ? 1 : 0
           folderuz := StrReplace(folderu, "|")
@@ -64786,9 +64625,6 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, no
     }
 
     CurrentSLD := backCurrentSLD
-    ; in database mode the files list is repopulated by the caller; refreshing
-    ; the display here would act on the list stripped by remFilesFromList(),
-    ; before the scanned files are read back from the database
     If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
        Return z
 
@@ -73777,11 +73613,6 @@ initSeenImagesListDB() {
    }
 }
 
-; The two indexes of the images table, apart from the ones SQLite maintains on its own for
-; imgidu and for UNIQUE(fullPath). They live here rather than inside SLDBinitSQLdb()'s SQL so
-; that a bulk load can leave them out and build them once, sorted, over the finished table:
-; with them in place every INSERT maintains five B-trees instead of three, and neither of
-; them is read while the load runs. SaveDBfilesList() is the one caller that does this.
 SLDBindexesSQL() {
    ; every query in the duplicates path and every data-collection query filters isDeleted
    Return "CREATE INDEX IF NOT EXISTS imgsIndex ON images(imgidu, imgfolder, imgfile); CREATE INDEX IF NOT EXISTS imgsAliveIndex ON images(isDeleted);"
@@ -73800,10 +73631,8 @@ SLDBinitSQLdb(fileNamu, deferIndexes:=0) {
    activeSQLdb.Exec("PRAGMA temp_store=MEMORY;")
    activeSQLdb.Exec("PRAGMA cache_size=-65536;")
 
-   ; Schema v3. The four pixel fingerprints used to be TEXT columns of "images" itself,
-   ; 4-8 KB per row of Chr(value + 161) sitting in the same B-tree as every other column -
-   ; so even "SELECT imgidu, fullPath" paid to page over them. They live in a side table
-   ; now, as raw BLOBs: half the bytes, no decode, and the main table scans several times
+   ; SLDB schema v3. The four pixel fingerprints  live in a side table as raw BLOBs:
+   ; half the bytes compared to v2, no decode, and the main table scans several times
    ; cheaper. See SQLpixelsJoinClause() for how the two are read together.
    SQL := "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL, imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\'||imgfile), fsize INT, kbfsize FLOAT AS (round(cast(fsize AS float)/1024,1)), fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT, imgpixfmt TEXT COLLATE NOCASE, imgwhratio FLOAT AS (round(cast(imgwidth AS float)/imgheight, 5)), imgmegapix FLOAT AS (round((cast(imgwidth AS float)*imgheight)/1000000, 5)), imgmedian FLOAT, imgavg FLOAT, imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT, dHash TEXT, pHash TEXT, lHash TEXT, HdHash TEXT, HpHash TEXT, HlHash TEXT, isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
    SQL .= "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB, smallH BLOB, bigH BLOB);"
@@ -73818,11 +73647,8 @@ SLDBinitSQLdb(fileNamu, deferIndexes:=0) {
       Return activeSQLdb.ErrorMsg
 }
 
-; ---- schema v3: the fingerprints live in imagesPixels ------------------------------------
-; One place that knows how the two tables are stitched together, so the half dozen queries
-; that need a fingerprint cannot drift apart. "p" is always the alias.
-;   colu: "small" | "big" | "smallH" | "bigH", or the legacy pixelzF* spelling
 SQLpixelsColumn(colu) {
+; colu: "small" | "big" | "smallH" | "bigH", or the legacy pixelzF* spelling
    Static mapu := {"pixelzFsmall":"small", "pixelzFbig":"big", "HpixelzFsmall":"smallH", "HpixelzFbig":"bigH"}
    r := mapu[colu]
    Return r ? r : colu
@@ -73832,39 +73658,21 @@ SQLpixelsJoinClause(tableAlias:="images") {
    Return " LEFT JOIN imagesPixels AS p ON p.imgidu=" tableAlias ".imgidu"
 }
 
-; Whether a fingerprint has been collected. A missing imagesPixels row and a NULL blob both
-; mean "not collected"; the old test was ifnull(pixelzFsmall,'')='' on the images row.
-; The "not collected" side of it is SQLpixelsMissingClause() below, which keeps the statement
-; around it single-table.
 SQLpixelsPresentClause(colu) {
+; Whether a fingerprint has been collected. A missing imagesPixels row and a NULL blob both
+; mean "not collected".
    Return "p." SQLpixelsColumn(colu) " IS NOT NULL"
 }
 
-; "this image has no fingerprint yet", for the data-collection queries of
-; collectSQLFileInfosNow(): the row count it reports, the serial result set it walks, and the
-; refill query the in-DLL collection pool re-runs to keep its workers fed.
-;
-; NOT EXISTS rather than "imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE ... )", which
-; is what this used to be. The subquery carries a WHERE, so SQLite cannot answer the NOT IN
-; from imagesPixels' primary key and copies the whole table into an ephemeral index instead -
-; and it does that again on every single execution. The collection pool's refill runs
-; hundreds of times per run against the table that same run is filling, 2.2 KB per row, so
-; the cost of handing out the next image grows with the number of images already done: one
-; 31-row refill measured 6.5 ms at the start of a run and 63 ms once 32k rows were collected
-; [tests/pool_latency.cpp]. Correlated, it is one primary-key probe per candidate row, and
-; it gets CHEAPER as the run proceeds because fewer rows remain to probe for - 1.47x over a
-; 20k image run, with the decoders untouched.
-;
+SQLpixelsMissingClause(colu, tableAlias:="images") {
 ; The alias cannot be "p": SQLpixelsJoinClause() already spells imagesPixels "p", and these
 ; two are not meant to be able to collide.
 ;   tableAlias: how the outer statement names the images table
-SQLpixelsMissingClause(colu, tableAlias:="images") {
    Return "NOT EXISTS (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=" tableAlias ".imgidu AND px." SQLpixelsColumn(colu) " IS NOT NULL)"
 }
 
-; True when the given data-collection target names one of the fingerprints rather than a
-; column of "images".
 isSQLpixelsColumn(colu) {
+; True when the given data-collection target names one of the fingerprints rather than a column of "images".
    Return RegExMatch(colu, "i)^\s*(H?pixelzF(small|big)|small|big|smallH|bigH)\s*$") ? 1 : 0
 }
 
@@ -76111,11 +75919,6 @@ createHistogramBMP(whichBitmap) {
       Return
    }
 
-   ; A single pass over the 256 brightness levels gathers every statistic the HUD
-   ; needs, replacing the old build-three-strings-then-Sort approach. brLvlArray is
-   ; 0-indexed (level i -> bin i); the on-screen chart is built 1-indexed
-   ; (chartData[i+1]) so BarChart - which reads keys 1..N - renders every level,
-   ; including bin 0 (previously dropped) and without a phantom trailing bin.
    chartData := []
    buildChart := (showHistogram!=6)   ; mode 6 assembles its own RGB-envelope chart below
    cumu := sumTotalBr := sumSq := 0
@@ -80799,10 +80602,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
        If (canDoSymmetry)
           Return
 
-       ; totalz is already the count after reduceCustomShapeLength() popped the points,
-       ; so pp walks the removed indices down from the old end; totalz itself must not
-       ; be decremented as well, or the two refreshes below land whichPoint entries too
-       ; low and the new end of the path keeps its stale cache entry
        pp := totalz + whichPoint
        Loop, % whichPoint
        {
@@ -80821,9 +80620,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
     } Else If (actu="point-update" && whichPoint>0 && prevCstate)
     {
        owPoint := whichPoint
-       ; the axis is re-derived the same way drawVisibleVectorPoints() does it on every other
-       ; redraw; that function is skipped on this path, so without this the axis would sit
-       ; still while the pivot itself is dragged and only jump into place on mouse release
        If (canDoSymmetry && totalz>1)
           coreSetVPsymmetryPoint(totalz//2 + 1)
 
@@ -80872,10 +80668,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
           bezierAnchorsLinesUpdated := 1
        }
 
-       ; drawn before the points and not after them: handed a rect, drawVisibleVectorPoints()
-       ; does the layered window update by itself, so anything painted afterwards misses the
-       ; frame. The other callers reach this only through additionalHUDelements(), which
-       ; paints the axis on its own once this returns
        If (actu="sel-rect")
           drawVPvectorSymmetryAxis(mainWidth, mainHeight, Gu)
 
@@ -80919,8 +80711,6 @@ drawLiveCreateCustomShape(mainWidth, mainHeight, Gu, actu:=0, whichPoint:=0, kpp
               sl := (k=1) ? SelDotsSize : slz   ; keys or anchors
            }
  
-           ; NumPut(xu, &PointsList, 4 * ((A_Index - 1) * 2), "Float")
-           ; NumPut(yu, &PointsList, 4 * ((A_Index - 1) * 2 + 1), "Float")
            If (customShapePropPoints[A_Index, 1])
               customShapeHasSelectedPoints := 1
  
@@ -81494,10 +81284,9 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        hasDrawnImageMap := 0
     }
 
-    ; highlight image editing each symmetry axis; isPaintSymmetryModeAllowed() is already 0
-    ; in vector editor mode, which is what the ternary here used to resolve to as well
     If (isPaintSymmetryModeAllowed()=1)
     {
+       ; highlight image editing symmetry axis
        thisThick := imgHUDbaseUnit/11
        Gdip_SetPenWidth(pPen4, thisThick)
        ccX := prevDestPosX + Round(prevResizedVPimgW * BrushToolSymmetryPointX)
@@ -81508,8 +81297,6 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
           Gdip_DrawLine(2NDglPG, pPen4, 0, ccY - thisThick/4, mainWidth, ccY - thisThick/4)
     }
 
-    ; the vector path axis is drawn by the same helper the incremental redraws call, so it
-    ; stays on screen while the user drags a point
     drawVPvectorSymmetryAxis(mainWidth, mainHeight, 2NDglPG)
     Gdip_ResetWorldTransform(2NDglPG)
     r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
@@ -81961,12 +81748,6 @@ createPathVectorCustomShape(ImgSelPath, ByRef PointsList, tension, isClosed, isB
 
 InitHugeImgSelPath(advancedMode, imgW, imgH, shapeu:=0, angle:=0, keepBounds:=0) {
    obju := []
-   ; a selection area that hangs outside the canvas still covers all of it, so
-   ; testAllowSelInvert() calls it "no selection" and the bounding box below collapses
-   ; onto the image. The tools that only want a clip mask get the very same mask either
-   ; way, but the advanced ones [fill, transform, paste in place] also stretch an overlay
-   ; onto this box: collapsing it squeezes the overlay into the canvas. Keep the box they
-   ; declared whenever it reaches past an edge
    keepDeclaredBox := (advancedMode=1 && editingSelectionNow=1 && testSelectionLargerThanGiven(imgW, imgH)) ? 1 : 0
    If (keepDeclaredBox=1)
       fnOutputDebug(A_ThisFunc "(): the selection area reaches outside the image; keeping the declared bounding box")
@@ -84500,18 +84281,6 @@ UpdateFilesListImgIDinfos(imgIndex, isFilter:=0) {
        , mainLoadedIMGdetails.PixelFormat, mainLoadedIMGdetails.dpi, isFilter)
 }
 
-; Which column of the files list holds what about an image, in one place. Two producers
-; reach it: UpdateFilesListImgIDinfos(), with whatever loader last filled
-; mainLoadedIMGdetails, and QPV_ThumbsPoolDrain(), with what the thumbnails workers of
-; qpvmain.dll reported for an original image file they opened themselves - see
-; TpSrcMeta in thumbs-pool.h. Both must land in the same columns in the same shapes, or a
-; page of thumbnails and a page browsed one image at a time disagree about the same file.
-;
-; Columns 16 and 17 are derived here rather than stored by the caller because the database
-; derives imgwhratio and imgmegapix from imgwidth and imgheight in exactly the same way.
-; No guard on the dimensions, deliberately: this is what UpdateFilesListImgIDinfos() always
-; did, blank height and all, and its callers are the ones that know whether the image
-; loaded. QPV_ThumbsPoolDrain() checks before it calls.
 recordFilesListImgProps(imgIndex, widthu, heightu, framesu, pixFmt, dpiu, isFilter:=0) {
    updateFilesListByID(imgIndex, 9, framesu, isFilter)
    updateFilesListByID(imgIndex, 13, widthu, isFilter)
@@ -84527,22 +84296,6 @@ recordFilesListImgProps(imgIndex, widthu, heightu, framesu, pixFmt, dpiu, isFilt
    updateFilesListByID(imgIndex, 8, fileInfos.cTime, isFilter)
 }
 
-; The database half of that record, for every caller that has just read an ORIGINAL image
-; file and filled those columns: poolRecordImgProps(), with what the workers of qpvmain.dll
-; reported, and the single threaded branch of QPV_ShowThumbnails(), with what
-; GetCachableImgFileDetails() left behind. Both go through here so that a page of
-; thumbnails leaves the same rows behind whichever of them drew it.
-;
-; updateSQLdbEntryImgRes() reads the very columns recordFilesListImgProps() writes - an
-; imgResu and a fileInfos of 1 mean "out of resultedFilesList" - so this runs after it and
-; never before, and never at all for an image whose dimensions are not there. Column 12 is
-; the row's imgidu.
-;
-; Never for a frames list either: there every row is a page of the SAME file and each would
-; write its own dimensions over one database row.
-;
-; QPV_ShowThumbnails() holds one transaction open around the whole page, so this is one
-; statement rather than a commit of its own per image.
 recordSQLimgPropsNow(imgIndex, imgPath) {
    If (SLDtypeLoaded!=3 || !resultedFilesList[imgIndex, 13] || InStr(filesFilter, "QPV:PAGES:"))
       Return 0
@@ -85562,15 +85315,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         ; fnoutputdebug("thumbs prepare " imgPath "|" thisFileIndex "|" MD5name)
     }
 
-   ; only limitCores still matters here, to shape the time budget handed to the workers; the
-   ; files per core arithmetic went away with the ahk_h threads - qpvmain.dll divides the
-   ; work itself now. It wrote systemCores, the global the multi core file operations share,
-   ; and an entirely cached page [imgsNotCached=0, the common case when browsing back over a
-   ; folder] left that global on zero, through a division by zero
    limitCores := realSystemCores + 1
-
-   ; the workers of qpvmain.dll are persistent, so there is no per run start-up cost to
-   ; amortize any longer; the only thing that still does not pay off is a lone image
    maxLimitReached := (minimizeMemUsage=1) && (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
    mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && multiCoreThumbsInitGood=1 && thumbsPoolState) ? 1 : 0
    If ((imgsNotCached + imgsFileCached < 2) || InStr(filesFilter, "qpv:pages:"))
@@ -85664,20 +85409,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
    ; Every image whose ORIGINAL file is read below - by the workers, and by the single
    ; threaded branch when they are off - has its properties written into the files list and
-   ; into the database, through recordSQLimgPropsNow(). One transaction for the whole page
-   ; rather than a commit per image: that is what QPV_listThumbnailsGridMode() does around
-   ; its own loop, and what "generate all thumbnails" over a large library depends on.
-   ; SQLite defers a BEGIN until the first write, so a page whose thumbnails are all cached
-   ; pays nothing for this.
-   ; Every way out of the loop below falls through to the COMMIT further down; there is no
-   ; Return inside it, and the loop runs Critical.
-   ;
-   ; Unless a transaction is already open. This function is reached from a timer, and a
-   ; long operation that holds one - a data collection run, a sort - is interruptible while
-   ; it waits; nesting is not allowed, so the BEGIN would fail and the COMMIT would then
-   ; end somebody else's transaction early. sqlite3_get_autocommit() answers zero while a
-   ; transaction is open; a call that fails returns blank, which lands on the safe side -
-   ; the writes still happen, each in a commit of its own.
+   ; into the database, through recordSQLimgPropsNow(). 
    pageWritesSQL := (SLDtypeLoaded=3 && activeSQLdb._Handle) ? 1 : 0
    If (pageWritesSQL=1)
    {
@@ -85694,7 +85426,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           ; in this loop, the thumbnails are drawn on screen
           If (A_TickCount - lastScrollCheck>100)
           {
-             ; a cross interpreter read; the loop spins much faster now, no need to do it every time
              lastScrollCheck := A_TickCount
              alterFilesIndex := interfaceThread.ahkgetvar.alterFilesIndex
           }
@@ -85709,9 +85440,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           totalLoops++
           If (determineTerminateOperation()=1)
           {
-             ; asked before anything is drawn, and the flag is raised by whichever operation
-             ; the user last stopped - not necessarily this one - so this can and does fire
-             ; on the very first lap of a page nobody asked to stop
              fnOutputDebug("ThumbsMode. User abandoned the operation.")
              abandonAll := 1
              pageIncomplete := 1
@@ -85746,8 +85474,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              imgsListArrayThumbs[thisFileIndex, 1] := "d"
              thumbsFailures++
              imgsHavePainted++
-             ; the cleared background is this cell's final appearance; it counts as settled,
-             ; so that a page of nothing but unreadable files is not taken for an empty one
              paintedOnScreen++
              Continue
           }
@@ -85785,12 +85511,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                    idleLaps++
                    If (idleLaps>10)
                    {
-                      ; nothing became ready for a while; hand the CPU over to the workers
-                      ; instead of spinning here. If they have nothing left to say either,
-                      ; some image will never arrive - a submit the dll declined, a result
-                      ; that went missing - and every image still expected used to be
-                      ; abandoned with it, which on the first lap means an empty page.
-                      ; Finish the page in this thread instead;
+                      ; nothing became ready for a while
                       If !QPV_ThumbsPoolPending()
                       {
                          fnOutputDebug("ThumbsMode. The workers went idle while images are still expected. Single threaded from here on.")
@@ -85802,13 +85523,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                       ; A decoder that never returns [a malformed PDF, a file on a share that
                       ; went away] would otherwise keep this loop spinning for ever. Here the
                       ; workers are alive and busy, so the file is not handed to this thread
-                      ;
-                      ; When the machine is short of memory they may be neither slow
-                      ; nor stuck, but queued: the DLL then hands out one decode at a time
-                      ; across BOTH pools, and a single large photograph on the collection
-                      ; side of that queue can hold this page up for longer than the limit.
-                      ; Breaking there paints an incomplete page over a pool that is working
-                      ; perfectly, so the throttle is given three times the rope
+                      ; If nothing happens for too long, break
                       thisPoolStallLimit := (QPV_MemoryIsTight()=1) ? 208500 : 69500
                       If (A_TickCount - lastPoolProgress>thisPoolStallLimit)
                       {
@@ -85848,10 +85563,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              oBitmap := LoadBitmapFromFileu(file2load, 0, 0, frameLoad, sizesDesired)
              If validBMP(oBitmap)
              {
-                ; the original file was read here, so the same columns the workers fill
-                ; through poolRecordImgProps() are filled here, and land in the database
-                ; the same way; a page must leave the same rows behind whichever branch
-                ; happened to draw it
                 If GetCachableImgFileDetails(file2load, thisFileIndex, oBitmap, 0, 0)
                    recordSQLimgPropsNow(thisFileIndex, file2load)
              }
@@ -85918,11 +85629,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 }
              } Else
              {
-                ; the bitmap belongs to this loop whenever it did not come out of the memory
-                ; cache. The test above is an OR: a perfectly good thumbnail whose original
-                ; file went away between the two loops lands here too, and used to be
-                ; dropped without a dispose - the entry is marked "d" just above, so the
-                ; sweep after the loop does not see it either
+                ; the bitmap belongs to this loop whenever it did not come out of the memory cache.
                 imgsListArrayThumbs[thisFileIndex, 2] := 0
                 oBitmap := trGdip_DisposeImage(oBitmap, 1)
                 imgsHavePainted++
@@ -85989,11 +85696,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              ; fnOutputDebug("ThumbsMode. A memory cached GDI thumb to be disposed... DONE")
              trGdip_DisposeImage(imgThumbsCacheArray[hasMemThumbsCached, 1], 1)
              imgThumbsCacheIDsArray[imgThumbsCacheArray[hasMemThumbsCached, 2]] := ""
-
-             ; a thumbnail regenerated for a name that is already in the ring [a forced
-             ; refresh of an unchanged file] must not leave the older copy behind it: the
-             ; slot that one sits in blanks the name when the ring reaches it, and the name
-             ; by then points at this new copy, which would be lost to every later lookup
              If (prevMemSlot && prevMemSlot!=hasMemThumbsCached)
              {
                 trGdip_DisposeImage(imgThumbsCacheArray[prevMemSlot, 1], 1)
@@ -86013,8 +85715,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           DestPosY -= (imageAlignVPtopLeft!=0) ? thumbsH//2 : fH//2
           file2save := thumbsCacheFolder "\" thumbsSizeQuality "-" MD5name ".png"
           ; a fast loading image is not worth a cache file when browsing, but "generate all
-          ; thumbnails" is a promise about the cache folder: there, every image read here
-          ; gets its file, however quick it was. The workers are told the same [alwaysSave]
+          ; thumbnails" every image read gets a thumbnail, however quick it was.
           If (fimCached!=1 && thumbCachable=1 && (thisZeit>timePerImg || modus="all") && file2save!=file2load && enableThumbsCaching=1 && WasMemCached!=1)
           {
              ; fnOutputDebug("Saving thumb for: " file2load " -- " file2save) 
@@ -86074,9 +85775,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     Gdip_DisposeEffect(blurEffect)
     If (thumbsPoolOK=1)
     {
-       ; abandons whatever is still queued and disposes the results nobody collected
        QPV_ThumbsPoolEnd()
-
        ; thumbnails that were generated but never made it on screen; consuming an entry
        ; turns it into "d", so anything still marked "fim" was left behind
        Loop, % imgsMustPaint
@@ -86087,8 +85786,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
        }
     }
 
-    ; the last database action of the run, whether the page finished or the user scrolled
-    ; away from it: an abandoned page keeps the properties of every image that did arrive
     If (pageWritesSQL=1)
     {
        If !activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -86106,13 +85803,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     executingCanceableOperation := 0
     mainEndZeit := A_TickCount
     setPriorityThread(0)
-
-    ; Nothing at all came of this run - not one cell drawn, not one settled: it gave up
-    ; before the first image, which is what an abort flag left up by some earlier operation
-    ; does to a page nobody asked to stop. The canvas was cleared at the top, so putting it
-    ; on screen now paints an empty grid, and the caller records this page as the one being
-    ; displayed whatever this function answers: nothing would ever come back to fill it.
-    ; Keep the frame that is already up there instead, and ask for the page again below
     nothingHappened := (modus!="all" && imgsMustPaint>0 && paintedOnScreen<1 && imgsHavePainted<1) ? 1 : 0
     If (nothingHappened=1)
        pageIncomplete := 1
@@ -86136,12 +85826,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     If (modus!="all")
        SetTimer, ResetImgLoadStatus, -25
 
-    ; An unfinished page has to be asked for again by name. The caller clears
-    ; mustReloadThumbsList as soon as this returns and has already recorded this page index
-    ; as the one on screen, so on its own it never comes back here: the grid stays as it is
-    ; until the user scrolls elsewhere. The ResetImgLoadStatus timer just armed is what
-    ; lowers the abort flag, and it runs long before this does, so the next pass normally
-    ; goes through - bounded all the same, in case whatever raised that flag never lowers it
     If (modus!="all")
     {
        If (pageIncomplete=1)
@@ -86166,10 +85850,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     prevFullThumbsUpdate := A_TickCount
     addJournalEntry(maxItemsPage " thumbnails listed in " SecToHHMMSS((A_TickCount - mainStartZeit)/1000) ".")
     ; ToolTip, % lapsOccured "|"  totalLoops " | " innerLoops " | " extendedLoops " | " imgsNotCached "`nZeit: " A_TickCount - mainStartZeit , , , 2
+
     ; the page is done only if it was drawn whole and reached the window - the same test
-    ; this function applies to its own bookkeeping just above. r1 cannot be part of it:
-    ; trGdip_DrawImage() answers with a blank string when it succeeds, and a blank is not
-    ; equal to zero in a comparison, so a finished page used to report failure every time
+    ; this function applies to its own bookkeeping just above
     r := (pageIsWhole!=1 || pageIncomplete=1 || drawErrors>0 || !r2) ? 0 : 1
     If (modus="all")
        Return abandonAll
@@ -87054,9 +86737,8 @@ dupesPixDrainedFlag() {
 }
 
 readDupesPixBusyJob() {
-; The image the collection pool has held on to the longest, how long for, and whether a
-; decoder was ever started for it. For the journal and the debug output of
-; collectImgDataViaPool(), which is where a run that stopped moving has to be explained:
+; Idenify the image file the collection pool has held on to the longest, how long for, and whether a
+; decoder was ever started for it. 
 ; the state counters can say that one job is in flight and nothing is arriving, and that
 ; reads the same for a huge raw that needs another minute and for a worker the decode slot
 ; shared with the thumbnails pool has not let through at all.
@@ -87199,9 +86881,6 @@ filterDupeResultsByHdist(threshold) {
    ; the groups built out of it would be short members nobody could tell were missing.
    ; Read before dupesScanEnd(), which leaves the phase alone either way.
    sweepFailed := (statePtr && NumGet(statePtr + 0, 0, "Int")=-1) ? 1 : 0
-
-   ; hands back the fingerprints and hashes - on a large library with MSD on that is
-   ; several hundred megabytes, and the result rows are about to be built
    DllCall("qpvmain.dll\dupesScanEnd")
    If (abandonAll=1)
    {
@@ -87918,9 +87597,6 @@ autoSelectDupesInGroups(mode, givenRegEx:=0) {
             {
                ; every member is the same size / resolution, so nothing
                ; distinguishes them: select all but one, as mode 1 does.
-               ; This used to select exactly the FIRST member and keep the rest,
-               ; which is the inverse of what the panel promises - a group of
-               ; five identical files lost one copy per run instead of four.
                countSel%grpID%++
                If (countSel%grpID%<countPerGroup%grpID%)
                   resultedFilesList[A_Index, 2] := 1
@@ -89601,10 +89277,10 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghrms% vUIcheckimghrms, Histogram standard deviation
     Gui, Add, Checkbox, xs y+7 w%col% gUIfindDupesChecksu Checked%UIcheckimghmode% vUIcheckimghmode, Histogram mode
     Gui, Add, Checkbox, x+7 gUIfindDupesChecksu Checked%UIcheckimghminu% vUIcheckimghminu, Histogram minimum
+
     ; findDupesPrecision is the number of decimals retrieveDupesByProperties() keeps on the
     ; numeric grouping keys. The stored values have five at most, and the six level-based
-    ; histogram statistics cannot tell 3, 4 and 5 apart, so the 1-5 spinner this used to be
-    ; offered three real settings under five labels: 5 = Exact, 2 = Close, 1 = Loose.
+    ; histogram statistics cannot tell 3, 4 and 5 apart.
     UIfindDupePrecision := (findDupesPrecision<=1) ? 3 : (findDupesPrecision=2) ? 2 : 1
     ddlWid := (PrefsLargeFonts=1) ? 105 : 75
     Gui, Add, Text, xs y+9 hp +0x200 vbtnFldr, Matching precision:
@@ -92508,13 +92184,7 @@ filesListCropImgVPsel() {
 }
 
 coreQuickImageFilesListActions(actu, losslessJpegs:=0) {
-   ; The flip/rotate/crop actions of the files list. Every selected file - or the current
-   ; image when nothing is selected - goes through the Resize/rotate/crop pipeline, whose
-   ; per-file entry point applies the operation losslessly to JPEGs and through FreeImage to
-   ; everything else (see coreSimpleFileProcessing). One pass, so the selection is never
-   ; touched and there is one confirmation, one set of worker threads and one abort. This
-   ; used to route the whole selection either to the JPEG batch, which skipped every other
-   ; format, or to the pixel path, depending on whether any JPEG was selected.
+   ; The flip/rotate/crop operations are applied losslessly to JPEGs via FreeImage, seecoreSimpleFileProcessing()
    If warnFramesActionPrevented("IMAGE ACTION " actu)
       Return
 
@@ -96734,12 +96404,6 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
        If (forReal=1)
        {
           activeSQLdb.Exec("BEGIN TRANSACTION;")
-          ; the side table first, while the rows it belongs to are still there to name
-          ; them. imagesPixels has no foreign key, and imgidu is handed out as
-          ; max(imgidu)+1 - so a fingerprint left behind here is inherited by whatever
-          ; file reuses the identity, and collectSQLFileInfosNow() then considers that
-          ; file already collected and never repairs it. Same sweep as deleteSQLdbEntry()
-          ; and SQLdeleteEntriesMarked().
           activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images WHERE " thisClause ");")
           SQLstr := "DELETE FROM images WHERE " thisClause ";"
           If !activeSQLdb.Exec(SQLStr)
@@ -96900,15 +96564,10 @@ repairPathSeparators(pathu) {
 }
 
 SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0) {
-    ; in folders mode, both strings always cover entire folder paths: 
+    ; onlySelected=1 limits the operation to the files the user selected.
+    ; in folderMode=1, both strings always cover entire folder paths: 
     ; whole folders are matched
     ; d:\pics\old must never match d:\pics\oldies
-    ;
-    ; onlySelected=1 limits the operation to the files the user selected. The database is
-    ; then never searched: the selection lives in the files list index alone, so the entries
-    ; it names are the ones rewritten, one by one, by their imgidu, down in the loop over
-    ; the list itself. Only PanelSearchAndReplaceIndex() offers the option; renaming a
-    ; folder has to update every file it moved, selected or not.
 
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" whatu "`n" replacerz)
@@ -96926,8 +96585,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     changeMcursor()
-    ; the filter has to stay in place here: removing a "SQL:query:" filter regenerates the
-    ; files list straight from the database, which drops the very selection to be read below
     If (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && onlySelected!=1)
        remFilesListFilter("simple")
 
@@ -96998,10 +96655,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
     If !errorOccured
     {
-       ; with the operation limited to the selection, the database was not searched at all
-       ; above: each selected entry is written back here instead, out of the very string
-       ; the files list holds, so the list and the records it was generated from cannot
-       ; describe different files once the operation ends
        writeSQLrows := (SLDtypeLoaded=3 && onlySelected=1) ? 1 : 0
        startOperation := A_TickCount
        prevMSGdisplay := A_TickCount
@@ -97048,17 +96701,12 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
            entryOK := 1
            If (writeSQLrows=1 && affected && !InStr(imgPath, "||"))
            {
-              ; the path is split on its last separator, the way the query above splits the
-              ; records it reads: zPlitPath() rebuilds the folder out of the parts it split
-              ; and drops the leading "\\" of an UNC path
               splitPos := InStr(value, "\", 0, -1)
               entryOK := (splitPos>1) ? updateSQLdbEntryPath(resultedFilesList[A_Index, 12], SubStr(value, 1, splitPos - 1), SubStr(value, splitPos + 1), imgPath) : 0
               If !entryOK
                  failedFiles++
            }
 
-           ; an entry whose record could not be written keeps the path it had, so that the
-           ; files list still describes the records it was generated from
            If entryOK
            {
               resultedFilesList[A_Index, 1] := value
@@ -97109,11 +96757,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
 SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     ; folderMode=1 confines the replacement to the folder part of every path: the file names
-    ; are left exactly as they are. Unlike the SQL branch of SearchAndReplaceThroughIndex(),
-    ; whole folders are not matched here. This database keeps each path whole, in a single
-    ; imgfile column, so there is no folder column to match a folder against: the search
-    ; stays the plain substring replace it is in the other mode, only confined to the part
-    ; of the string that precedes the last separator.
+    ; are left exactly as they are.
     initSeenImagesListDB()
     If (sqlFailedInit=1)
     {
@@ -97153,9 +96797,6 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
            {
               If (folderMode=1)
               {
-                 ; the folder is cut off with its trailing separator still attached, so that a
-                 ; search string ending in "\" matches it too; the separator that doubles when
-                 ; the file name is joined back on is collapsed by repairPathSeparators()
                  affected := 0
                  newFolderName := Row[2]
                  thisPos := InStr(Row[2], "\", 0, -1)
@@ -97170,9 +96811,6 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
                  newFolderName := repairPathSeparators(newFolderName)
               }
 
-              ; the query above reads every path the search string occurs in, wherever it sits.
-              ; In folders mode the records holding it in their file name alone come back from
-              ; the replacement unchanged, and there is nothing to write for them
               If affected
               {
                  SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newFolderName) "' WHERE ROWID='" Row[1] "';"
@@ -97729,11 +97367,6 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 }
 
 isTlbrVertical() {
-; Whether the toolbar is laid out as a column rather than a row. This must mirror the
-; layout decisions taken in CoreGUItoolbar() and tlbrAddNewIcon(): two-column mode wins
-; over TLBRverticalAlign, but it is suppressed on the welcome screen, where the bar falls
-; back to whatever TLBRverticalAlign says. The two settings are kept mutually exclusive by
-; the menu toggles, yet the customize panel can still save both at once.
     If (TLBRtwoColumns=1 && !isWelcomeScreenu)
        Return 1
 
@@ -98937,10 +98570,7 @@ coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Yscal
   If RegExMatch(imgPath, "i)(.\.(ico))$")
      Return "err"
 
-  ; losslessJpegs=1 - the flip/rotate/crop actions of the files list: a JPEG gets
-  ; the operation applied to its DCT coefficients, in place, by coreJpegLossLessAction():
-  ; via FreeImmage, no re-encoding, and its metadata and colour profile survive,
-  ; which the pixel path below strips
+  ; losslessJpegs=1 - the flip/rotate/crop actions. See coreQuickImageFilesListActions()()
   If (losslessJpegs=1 && doConversion=0 && (file2save=imgPath || ResizeUseDestDir!=1) && RegExMatch(imgPath, "i)(.\.(jpeg|jpg|jpe))$"))
   {
      jpegOp := losslessJpegOpFromSimpleFlags()
@@ -98951,9 +98581,9 @@ coreSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, Yscal
   Return coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion)
 }
 
+losslessJpegOpFromSimpleFlags() {
 ; The operation code of coreJpegLossLessAction() for the transformations set in the
 ; Resize/rotate/crop variables, or 0 when they are not exactly one lossless operation.
-losslessJpegOpFromSimpleFlags() {
   If (ResizeMustPerform=1)
      Return 0
 
@@ -99929,11 +99559,6 @@ calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
     If zEffect
        Gdip_BitmapApplyEffect(xBitmap, zEffect)
 
-    ; TotalPixelz is the histogram's true pixel count (== w*h for the luminance
-    ; histogram, which counts every pixel exactly once). It must be the actual
-    ; denominator for the median and average, NOT a hard-coded thumbnail area -
-    ; a wrong total silently skews both. Matches createHistogramBMP() and the
-    ; getPBitmapistoInfos() DLL oracle, which both derive it from the dimensions.
     trGdip_GetImageDimensions(xBitmap, thumbW, thumbH)
     TotalPixelz := thumbW * thumbH
     If (TotalPixelz<1)
@@ -99951,9 +99576,6 @@ calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
        Return 0
     }
 
-    ; A single pass over the 256 luminance levels. Empty levels contribute to no
-    ; statistic, so they are skipped up front; every metric below is gathered over
-    ; the OCCUPIED levels only, matching the DLL oracle.
     medianValue := minBrLvlK := -1
     modePointK := peakPointK := minPointK := 0
     modePointV := sumTotalBr := thisSum := sumSq := 0
@@ -99997,18 +99619,6 @@ calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
     variance := sumSq/TotalPixelz - avgu*avgu      ; population variance E[X^2] - mean^2
     stdDev := Sqrt((variance>0) ? variance : 0)    ; textbook standard deviation (spread / contrast)
 
-    ; The pixel fingerprints were extracted here, from this very bitmap: grey, optionally
-    ; blurred, resized to 9x8 and 32x32, blue channel dumped. That whole chain now runs in
-    ; qpvmain.dll on a pool of worker threads (dupes-pixels.h) - which is the only reason
-    ; a first scan of a large library is no longer one image at a time - and it is the
-    ; ONLY producer of fingerprints, so every one of them in a database is comparable with
-    ; every other one. Keeping a second producer here would have quietly made images
-    ; collected while sorting incomparable with images collected by the duplicate finder.
-    ;
-    ; This used to have a second mode that returned the eight values as an object instead
-    ; of writing them into the files list, for the database collection to hand to
-    ; updateSQLdbEntryImgHisto(). That collection is the pool's now, so the values only
-    ; ever go one way: into the in-memory list, for sorting and filtering.
     updateFilesListByID(imgIndex, 11, 1, isFilter)
     updateFilesListByID(imgIndex, 18, Round((avgu + 1)/256, 5), isFilter)
     updateFilesListByID(imgIndex, 19, Round((medianValue + 1)/256, 5), isFilter)
@@ -100021,11 +99631,8 @@ calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
     Return 1
 }
 
-; Decodes one image and fills the in-memory files list with its histogram statistics and
-; its dimensions. It used to have a second mode that returned both as objects instead, for
-; the database collection to write; that collection runs on the worker pool inside
-; qpvmain.dll now, so this is only ever the sorting and filtering path.
 GetCachableHistogramFile(imgPath, imgIndex, isFilter:=0, zEffect:=0) {
+; Decodes one image and fills the in-memory files list with its histogram statistics and its dimensions.
      If (!imgPath || !imgIndex)
      {
         addJournalEntry(A_ThisFunc "() - incorrect params error: " imgPath " | " imgIndex)
@@ -100036,9 +99643,6 @@ GetCachableHistogramFile(imgPath, imgIndex, isFilter:=0, zEffect:=0) {
      sizesDesired := []
      sizesDesired[1] := [350, 350, 0, 1, thisPolation, 0, 0]
      thumbBMP := LoadBitmapFromFileu(imgPath, 0, 0, 0, sizesDesired)
-     ; a second, horizontally flipped decode used to happen here purely to build the
-     ; flipped fingerprints; the pool mirrors the bitmap it already has instead
-
      r := (mainLoadedIMGdetails.Width>1 && mainLoadedIMGdetails.Height>1) ? 1 : 0
      If (validBMP(thumbBMP) && r)
      {
@@ -100053,8 +99657,8 @@ GetCachableHistogramFile(imgPath, imgIndex, isFilter:=0, zEffect:=0) {
 
      histoObj := r ? calcHistoAvgFile(thumbBMP, isFilter, imgIndex, zEffect) : 0
      trGdip_DisposeImage(thumbBMP, 1)
-     Return histoObj
      ; fnOutputDebug(A_ThisFunc "() - failed to generate histogram: " imgIndex " = " imgPath)
+     Return histoObj
 }
 
 SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, fileEXT:=0, gdipDepth:=32) {
@@ -100743,11 +100347,7 @@ adjustNumbersEditFields(OutputVal, OutputVname) {
 }
 
 prepareExternalCoreThread(thisIndex, args, thisList) {
-   ; The parameters and the files list are per thread, and the worker learns which thread
-   ; it is from its command line. A shared registry flag (Running=2) used to announce "the
-   ; next QPV to start is a worker" for the whole spawn phase, so a copy started meanwhile
-   ; by the user - a file association double-click - became one too, took over the last
-   ; slot and processed its files a second time.
+; The parameters and the files list are per thread, and the worker learns which thread it is from its command line.
    Try FileDelete, %thumbsCacheFolder%\tempList%thisIndex%.txt
    Try FileDelete, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt
    Sleep, 0
@@ -100776,10 +100376,10 @@ launchExternalCoreThread(thisIndex) {
    Return pidThread
 }
 
+waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
 ; Waits until every worker has reported in (ThreadRunning 1 or 2). Returns 0 when all did,
 ; otherwise the slot that reported a fatal start (-1), died, or was still silent when the
 ; deadline passed - a worker stuck in a load-error dialog, for instance.
-waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
    startZeit := A_TickCount
    Loop
    {
@@ -101879,12 +101479,8 @@ WicPixelFormats(pixFmt) {
    Return r
 }
 
-; The same names, "|" separated and indexed from zero, for dupesPixSetFormatNames().
-; The collection pool decodes through WIC itself and writes imgpixfmt without ever coming
-; back here, so it has to spell a format exactly as this function does - one pixel format
-; under two spellings splits every grouping and filter over that column in half.
-; Built from WicPixelFormats() rather than beside it, so there is nothing to keep in sync.
 packWICpixelFormatNames() {
+   ; Names separated by "|" and indexed from zero, for dupesPixSetFormatNames().
    Static packedu := ""
    If packedu
       Return packedu
