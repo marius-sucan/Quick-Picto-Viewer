@@ -28685,7 +28685,6 @@ PlotSeenMonthsStatsNow() {
    widthu := maxValu := maxKvalu := aR := aC := totalu := 0
    dataArray := []
    namesLabel:= []
-   dataSkipped := new hashtable()
    totalz := LV_GetCount()
    If (totalz<2)
    {
@@ -28705,26 +28704,16 @@ PlotSeenMonthsStatsNow() {
       Return
    }
 
-   startZeit := A_TickCount
-   Loop
-   {
-      If (nMon>12)
-      {
-         nMon := 0
-         nYear++
-      }
+   ; how many months the records span, both ends included. The list view is built from
+   ; entriesM, which only gets a key for a month that has images, so its row count is the
+   ; number of months that do carry data and the remainder of the span is what lacks it.
+   ; Months are uniform, so the span is arithmetic - PlotSeenDaysStatsNow() has to walk a
+   ; calendar for the same figure only because days are not.
+   eYear := SubStr(endPeriod, 1, 4)
+   eMon := LTrim(SubStr(endPeriod, 6, 2), "0")
+   monthsRange := (eYear - nYear)*12 + (eMon - nMon) + 1
 
-      nMon++
-      If (nMon=13)
-         Continue
-
-      thisM := (nMon<10) ? "0" . nMon : nMon
-      dateu := nYear "-" thisM
-      If (dateu=endPeriod || (A_TickCount - startZeit > 2500))
-         Break
-   }
-
-   counter := 1
+   counter := 0
    Loop
    {
        aC++
@@ -28746,24 +28735,20 @@ PlotSeenMonthsStatsNow() {
              maxKvalu := oindexu
           }
           ; fnOutputDebug(A_ThisFunc "==="  oindexu "|" counter "|" valu)
+          counter++
           totalu += valu
           dataArray[counter] := valu ? valu : 1
           namesLabel[counter] := oindexu
-          dataSkipped[oindexu] := valu ? 0 : 1
-          counter++
        }
        ; ToolTip, %valu% -- %aC% -- %aR%
        If (valu="" && A_Index>950 || (aR>totalz + 1))
           Break
    }
 
-   countSkipped := 0
-   For Key, Value in dataSkipped
-   {
-      If (Value=1)
-         countSkipped++
-   }
-
+   ; counter is the number of months that have a row, so the rest of the span is what has
+   ; none. Taken off counter rather than off LV_GetCount() so the two figures below - the
+   ; total and the lacking months - can never disagree about the same list view.
+   countSkipped := (monthsRange>counter) ? monthsRange - counter : 0
    lacking := (countSkipped>0) ? groupDigits(countSkipped) " months lack data." : ""
    itemz := LV_GetCount()
    avgu := groupDigits(Floor(totalu/counter))
