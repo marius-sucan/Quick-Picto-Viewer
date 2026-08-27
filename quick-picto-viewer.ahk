@@ -34427,6 +34427,28 @@ updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
    Return 1
 }
 
+updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldEntry:="") {
+; Writes the path of a single record back, split over the two columns it is stored in. The
+; record is named by its imgidu; the path it holds right now is the fallback for the rare
+; entry that carries no database index. Both parts must be written lowercased, the way
+; addSQLdbEntry() stores them: UNIQUE(fullPath) is declared on a plain TEXT generated
+; column and therefore compares byte per byte, so a record written with the capitalisation
+; of the user no longer conflicts with the lowercased upsert of a scan, which then indexes
+; the very same file a second time.
+;
+; Returns how many records were written, so that a path naming no record at all - a blank
+; or stale database index, an entry no longer in the database - is not taken for a success.
+   If dbIndex
+      wherePart := "imgidu='" dbIndex "'"
+   Else If oldEntry
+      wherePart := "fullPath='" SQLescapeStr(Format("{:L}", oldEntry)) "' COLLATE NOCASE"
+   Else
+      Return 0
+
+   SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(Format("{:L}", newFolder)) "', imgfile='" SQLescapeStr(Format("{:L}", newFileu)) "' WHERE " wherePart ";"
+   Return activeSQLdb.Exec(SQLstr) ? activeSQLdb.Changes : 0
+}
+
 SQLdeleteEntriesMarked(markValue:=1, folderClause:="") {
 ; The isDeleted column holds two different states:
 ;
@@ -46222,7 +46244,7 @@ PanelSearchAndReplaceIndex() {
     If (performSRinDynas="")
        performSRinDynas := 0
 
-    If (markedSelectFile<2 || SLDtypeLoaded=3)
+    If (markedSelectFile<2)
        limitSearchReplaceSelected := 0
 
     imgPath := resultedFilesList[currentFileIndex, 1]
@@ -46240,7 +46262,7 @@ PanelSearchAndReplaceIndex() {
     If (mustRecordSeenImgs!=1)
        GuiControl, Disable, performSRinSeenDB
 
-    If (markedSelectFile<2 || SLDtypeLoaded=3)
+    If (markedSelectFile<2)
        GuiControl, Disable, limitSearchReplaceSelected
 
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNperformIndexSearchReplace, &Perform
@@ -46290,7 +46312,7 @@ BTNperformIndexSearchReplace() {
       Sleep, 500
    }
 
-   SearchAndReplaceThroughIndex(editF5, editF6, 0, userSrcRplcIndexFolder)
+   SearchAndReplaceThroughIndex(editF5, editF6, 0, userSrcRplcIndexFolder, limitSearchReplaceSelected)
    If (performSRinDynas=1)
    {
       listu := getDynamicFoldersList()
@@ -96866,10 +96888,16 @@ repairPathSeparators(pathu) {
    Return RegExReplace(pathu, "(.)\\{2,}", "$1\")
 }
 
-SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
+SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0) {
     ; in folders mode, both strings always cover entire folder paths: 
     ; whole folders are matched
     ; d:\pics\old must never match d:\pics\oldies
+    ;
+    ; onlySelected=1 limits the operation to the files the user selected. The database is
+    ; then never searched: the selection lives in the files list index alone, so the entries
+    ; it names are the ones rewritten, one by one, by their imgidu, down in the loop over
+    ; the list itself. Only PanelSearchAndReplaceIndex() offers the option; renaming a
+    ; folder has to update every file it moved, selected or not.
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
@@ -96878,11 +96906,23 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
 
     changeMcursor()
     getSelectedFiles(0, 1)
-    If (StrLen(filesFilter)>1 && SLDtypeLoaded=3)
+    If (onlySelected=1 && markedSelectFile<1)
+    {
+       CurrentSLD := backCurrentSLD
+       changeMcursor("normal")
+       showTOOLtip("WARNING: No files are currently selected")
+       SoundBeep , 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    ; the filter has to stay in place here: removing a "SQL:query:" filter regenerates the
+    ; files list straight from the database, which drops the very selection to be read below
+    If (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && onlySelected!=1)
        remFilesListFilter("simple")
 
-    selectedFiles := totalAffected := 0
-    If (SLDtypeLoaded=3)
+    selectedFiles := totalAffected := doneFiles := 0
+    If (SLDtypeLoaded=3 && onlySelected!=1)
     {
        ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
        replaceru := RegExReplace(replacerz, "\\+$")
@@ -96934,10 +96974,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
 
                  If (pathOK=1)
                  {
-                    newFolderName := SQLescapeStr(Format("{:L}", newFolder))
-                    newFileNamu := SQLescapeStr(Format("{:L}", newFileu))
-                    SQLstr := "UPDATE images SET imgfolder='" newFolderName "', imgfile='" newFileNamu "' WHERE imgidu='" Row[1] "';"
-                    If !activeSQLdb.Exec(SQLstr)
+                    If !updateSQLdbEntryPath(Row[1], newFolder, newFileu)
                        failedFiles++
                  } Else failedFiles++
               }
@@ -96951,14 +96988,36 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
 
     If !errorOccured
     {
+       ; with the operation limited to the selection, the database was not searched at all
+       ; above: each selected entry is written back here instead, out of the very string
+       ; the files list holds, so the list and the records it was generated from cannot
+       ; describe different files once the operation ends
+       writeSQLrows := (SLDtypeLoaded=3 && onlySelected=1) ? 1 : 0
+       startOperation := A_TickCount
+       prevMSGdisplay := A_TickCount
+       If (writeSQLrows=1)
+          activeSQLdb.Exec("BEGIN TRANSACTION;")
+
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
            If !imgPath
               Continue
 
-           If (!resultedFilesList[A_Index, 2] && limitSearchReplaceSelected=1 && SLDtypeLoaded!=3)
+           If (onlySelected=1 && resultedFilesList[A_Index, 2]!=1)
               Continue
+
+           If (writeSQLrows=1)
+           {
+              doneFiles++
+              changeMcursor()
+              If (A_TickCount - prevMSGdisplay>1500)
+              {
+                 etaTime := ETAinfos(doneFiles, markedSelectFile, startOperation)
+                 showTOOLtip("Performing search and replace in the files list index" etaTime, 0, 0, doneFiles/markedSelectFile)
+                 prevMSGdisplay := A_TickCount
+              }
+           }
 
            If (folderMode=1)
            {
@@ -96976,13 +97035,38 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0) {
               value := repairPathSeparators(value)
            }
 
-           resultedFilesList[A_Index, 1] := value
-           If (StrLen(filesFilter)>1)
-              updateMainUnfilteredList(A_Index, 1, value)
+           entryOK := 1
+           If (writeSQLrows=1 && affected && !InStr(imgPath, "||"))
+           {
+              ; the path is split on its last separator, the way the query above splits the
+              ; records it reads: zPlitPath() rebuilds the folder out of the parts it split
+              ; and drops the leading "\\" of an UNC path
+              splitPos := InStr(value, "\", 0, -1)
+              entryOK := (splitPos>1) ? updateSQLdbEntryPath(resultedFilesList[A_Index, 12], SubStr(value, 1, splitPos - 1), SubStr(value, splitPos + 1), imgPath) : 0
+              If !entryOK
+                 failedFiles++
+           }
 
-           totalAffected += affected
+           ; an entry whose record could not be written keeps the path it had, so that the
+           ; files list still describes the records it was generated from
+           If entryOK
+           {
+              resultedFilesList[A_Index, 1] := value
+              If (StrLen(filesFilter)>1)
+                 updateMainUnfilteredList(A_Index, 1, value)
+
+              totalAffected += affected
+           }
+
            If (resultedFilesList[A_Index, 2]=1)
               selectedFiles++
+       }
+
+       If (writeSQLrows=1)
+       {
+          showTOOLtip("Finishing search and replace in the files list, please wait")
+          If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+             errorOccured := activeSQLdb.ErrorMsg
        }
     }
 
