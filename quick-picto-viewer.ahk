@@ -388,6 +388,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
    , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0
+   , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -15216,11 +15217,11 @@ QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:
      Gdip_UnlockBits(pBitmap2Blend, mData)
   If !E3
      Gdip_UnlockBits(alphaMaskGray, gData)
-  return r
+  Return r
 }
 
 trFreeImage_Rescale(hImage, w, h, filter:=3) {
-   ; z := A_TickCount
+   z := A_TickCount
    a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, clampInRange(filter - 1, 0, 3))
    If !a
       a := FreeImage_Rescale(hImage, w, h, filter)
@@ -28704,15 +28705,9 @@ PlotSeenMonthsStatsNow() {
       Return
    }
 
-   ; how many months the records span, both ends included. The list view is built from
-   ; entriesM, which only gets a key for a month that has images, so its row count is the
-   ; number of months that do carry data and the remainder of the span is what lacks it.
-   ; Months are uniform, so the span is arithmetic - PlotSeenDaysStatsNow() has to walk a
-   ; calendar for the same figure only because days are not.
    eYear := SubStr(endPeriod, 1, 4)
    eMon := LTrim(SubStr(endPeriod, 6, 2), "0")
    monthsRange := (eYear - nYear)*12 + (eMon - nMon) + 1
-
    counter := 0
    Loop
    {
@@ -28745,9 +28740,6 @@ PlotSeenMonthsStatsNow() {
           Break
    }
 
-   ; counter is the number of months that have a row, so the rest of the span is what has
-   ; none. Taken off counter rather than off LV_GetCount() so the two figures below - the
-   ; total and the lacking months - can never disagree about the same list view.
    countSkipped := (monthsRange>counter) ? monthsRange - counter : 0
    lacking := (countSkipped>0) ? groupDigits(countSkipped) " months lack data." : ""
    itemz := LV_GetCount()
@@ -43895,6 +43887,11 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, txtLine2
    GuiControl, % actu, userCombineGIFframeDelay
    GuiControl, % actu, editF5
+   GuiControl, % actu, editF7
+   GuiControl, % actu, editF8
+   GuiControl, % actu, userJoinIMGsW
+   GuiControl, % actu, userJoinIMGsH
+   GuiControl, % actu, userJoinIMGres
 
    actu := (userCombineFramesFmt=2 && userSaveBitsDepth>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userCombineDepthDithering
@@ -43905,12 +43902,13 @@ BtnChangeMultiPageFmt() {
 
    actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, UserCombinePDFbgrColor
-   GuiControl, % actu, combinePDFpageLandscape
 
    actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, combinePDFpageLandscape
    GuiControl, % actu, txtLine3
    GuiControl, % actu, txtLine4
    GuiControl, % actu, txtLine5
+   GuiControl, % actu, txtLine6
    GuiControl, % actu, UserCombinePDFpageSize
    GuiControl, % actu, ResizeApplyEffects
    GuiControl, % actu, combinePDFpageHighQuality
@@ -43954,11 +43952,13 @@ PanelCombineImagesMultipage() {
     ; depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 275 : 175
-    Gui, Add, Text, x15 y15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
-    ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
+
+    Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, General|PDF options
+    Gui, Tab, 1
+    Gui, Add, Text, x+15 y+15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
     Gui, Add, Text, xs+15 y+10 w%ml% +0x200 +hwndhTemp, File format on save:
     GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".gif|.tiff|.pdf", [hTemp])
-    Gui, Add, Checkbox, xs+30 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
+    Gui, Add, Checkbox, xs+15 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, TIFF maximum color depth:
     GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
@@ -43967,25 +43967,35 @@ PanelCombineImagesMultipage() {
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF5", userCombineGIFframeDelay)
     Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
+    Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% vuserJoinIMGres, Set GIF dimensions (W x H):
+    thisWid += 20
+    GuiAddEdit("x+1 w" thisWid " number -multi limit5 veditF7", userJoinIMGsW)
+    Gui, Add, UpDown, vuserJoinIMGsW Range2-32000, % userJoinIMGsW
+    GuiAddEdit("x+1 wp number -multi limit5 veditF8", userJoinIMGsH)
+    Gui, Add, UpDown, vuserJoinIMGsH Range2-32000, % userJoinIMGsH
+
+    Gui, Tab, 2
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine3 +hwndhTemp, PDF page size:
-    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" UserCombinePDFpageSize " vUserCombinePDFpageSize", "A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)", [hTemp])
+    Gui, Add, Text, x+15 y+15 w%ml% Section vtxtLine3 +hwndhTemp, PDF page size:
+    GuiAddDropDownList("xs+15 y+10 w" thisWid + 35 " AltSubmit Choose" UserCombinePDFpageSize " vUserCombinePDFpageSize", "A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%combinePDFpageLandscape% vcombinePDFpageLandscape, Landscape
     thisWid := (PrefsLargeFonts=1) ? 90 : 65
     ml -= 15
-    Gui, Add, Text, xs+30 y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
     GuiAddDropDownList("x+1 w" thisWid " Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
     GuiAddDropDownList("x+5 wp Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
-    zml := (PrefsLargeFonts=1) ? 55 : 40
-    GuiAddColor("x+5 hp w" zml, "UserCombinePDFbgrColor", "PDF background color")
-    Gui, Add, Checkbox, xs+30 y+10 Checked%combinePDFpageHighQuality% vcombinePDFpageHighQuality, High resolution pages (192 dpi)
-    Gui, Add, Checkbox, xs+30 y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
+    zml := (PrefsLargeFonts=1) ? 65 : 50
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine6, Background color:
+    GuiAddColor("x+1 hp w" zml, "UserCombinePDFbgrColor", "PDF background color")
+    Gui, Add, Checkbox, xs y+10 Checked%combinePDFpageHighQuality% vcombinePDFpageHighQuality, High resolution pages (192 dpi)
+    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
-    Gui, Add, Text, xs+30 y+7 w%ml% hp+5 +0x200 vtxtLine5, Image quality `%:
+    Gui, Add, Text, xs y+7 w%ml% hp+5 +0x200 vtxtLine5, Image quality `%:
     GuiAddEdit("x+1 w" thisWid " number -multi limit3 veditF6", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range3-97, % userJpegQuality
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
 
+    Gui, Tab
     Gui, Font, Bold
     ml := (PrefsLargeFonts=1) ? 20 : 10
     If (filesElected>1)
@@ -43997,7 +44007,7 @@ PanelCombineImagesMultipage() {
     Gui, Font, Normal
     ; GuiControl, SettingsGUIA: Disable, ResizeDestFolder
     ; btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% Default gBTNperformCombineIMGs, &Join images
+    Gui, Add, Button, xm+15 y+15 h%thisBtnHeight% w%btnWid% Default gBTNperformCombineIMGs, &Join images
     btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+5 hp w%btnWid2% gBtnHelpCombineImgs, &Help
     Gui, Add, Button, x+5 hp w%btnWid2% gBtnCloseWindow, C&ancel
@@ -44040,7 +44050,7 @@ BTNperformCombineIMGs() {
    Else If (userCombineFramesFmt=3)
       CombineImgsIntoPDF(file2save)
    Else ; used only for GIFs
-      combineImagesMultiPage(userSaveBitsDepth, animus, file2save)
+      combineImagesFimMultiPage(userSaveBitsDepth, animus, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
 }
 
 CombineImgsIntoPDF(file2save) {
@@ -62478,7 +62488,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
    CurrentSLD := backCurrentSLD
 }
 
-combineImagesMultiPage(modus, animus, destFilePath) {
+combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    zPlitPath(destFilePath, 0, OutFileName, OutDir)
    If !FolderExist(OutDir)
    {
@@ -62490,13 +62500,6 @@ combineImagesMultiPage(modus, animus, destFilePath) {
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
       }
-   }
-
-   If (animus=1)
-   {
-      showTOOLtip("WARNING: Create animated GIF. Experimental feature.`nQPV will likely crash.")
-      SoundBeep , 300, 100
-      sleep, 3000
    }
 
    filesElected := getSelectedFiles(0, 1)
@@ -62631,7 +62634,6 @@ combineImagesMultiPage(modus, animus, destFilePath) {
    prevMSGdisplay := 1
    startOperation := A_TickCount
    doStartLongOpDance()
-
    Loop, % tFrames
    {
       i := A_Index
@@ -62647,6 +62649,16 @@ combineImagesMultiPage(modus, animus, destFilePath) {
          etaTime := ETAinfos(A_Index, tFrames, startOperation)
          showTOOLtip("Phase 2: Adding pages to the multipaged " extFile " image:" etaTime, 0, 0, A_Index / tFrames)
          prevMSGdisplay := A_TickCount
+      }
+
+      If (setW>1 && setH>1 && setRes=1)
+      {
+         hFIFimgX := trFreeImage_Rescale(imgList[i], setW, setH)
+         If hFIFimgX
+         {
+            FreeImage_UnLoad(imgList[i])
+            imgList[i] := hFIFimgX
+         }
       }
 
       ; clear any animation metadata used by this dib as we’ll adding our own ones
@@ -62793,7 +62805,6 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
 coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
   Critical, on
   sTime := A_TickCount
-
   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
   multiFlags := (GFT=25) ? 2 : 0
   changeMcursor()
@@ -99769,6 +99780,7 @@ initFIMGmodule() {
      bonusPath := mainExecPath
      Static DllName := "FreeImage.dll"
      Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\freeimage-r1909-custom\x64\Release\FreeImage.dll"
+     ; Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\cPlusPlus\freeimage-r1909-custom\x64\FreeImage.dll"
      ; Static srcDll := "E:\Sucan twins\_small-apps\AutoHotkey\my scripts\fast-image-viewer\FreeImage-vold.dll"
      If (A_PtrSize=8 && InStr(A_ScriptDir, "sucan twins") && !A_IsCompiled && FileExist(srcDll))
         bonusPath := srcDll

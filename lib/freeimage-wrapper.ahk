@@ -1122,8 +1122,7 @@ FreeImage_RescaleRawBits(srcBits, dstBits, FimType, imgW, imgH, srcStride, dstSt
 }
 
 FreeImage_RescaleRectRawBits(srcBits, dstBits, FimType, imgW, imgH, srcStride, dstStride, BPP, dstW, dstH, srcX1, srcY1, srcX2, srcY2, filter) {
-   r := DllCall(getFIMfunc("RescaleRawBits"), "uptr", srcBits, "uptr", dstBits, "Int", FimType, "Int", imgW, "Int", imgH, "uInt", srcStride, "uInt", dstStride, "Int", BPP, "Int", dstW, "Int", dstH, "Int", srcX1, "int", srcY1, "Int", srcX2, "int", srcY2, "int", filter)
-   Return r
+   Return DllCall(getFIMfunc("RescaleRawBits"), "uptr", srcBits, "uptr", dstBits, "Int", FimType, "Int", imgW, "Int", imgH, "uInt", srcStride, "uInt", dstStride, "Int", BPP, "Int", dstW, "Int", dstH, "Int", srcX1, "int", srcY1, "Int", srcX2, "int", srcY2, "int", filter)
 }
 
 FreeImage_MakeThumbnail(hImage, squareSize, convert:=1) {
