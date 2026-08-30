@@ -3344,6 +3344,22 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     return r;
 }
 
+// Auto-crop pixel metric. A pixel is (luma, alpha): two fully transparent pixels must
+// read as identical whatever their RGB is, and a transparent pixel must never be mistaken
+// for an opaque black one. For opaque pixels the weight is 255 and the result is exactly
+// the plain luma difference, so images without an alpha channel are unaffected.
+static inline void acReadPixel(int color, int &gray, int &alpha) {
+   alpha = (color >> 24) & 0xFF;
+   gray = wrapRGBtoGray(color, 1);
+}
+
+static inline int acDelta(int prevGray, int prevAlpha, int gray, int alpha) {
+   int dA = abs(prevAlpha - alpha);
+   int weight = (prevAlpha < alpha) ? prevAlpha : alpha;
+   int dG = (abs(prevGray - gray) * weight) / 255;
+   return (dA > dG) ? dA : dG;
+}
+
 DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
    int maxThresholdHitsW = round(Width*threshold) + 1;
    if (maxThresholdHitsW>floor(Width/2))
@@ -3353,17 +3369,21 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
    if (maxThresholdHitsH>floor(Height/2))
       maxThresholdHitsH = floor(Height/2);
 
-   if (threshold==0)
-      maxThresholdHitsW = maxThresholdHitsH = 1;
-
    int clrPrimeA = BitmapData[0];
-   int clrPrimeB = BitmapData[1];
+   int clrPrimeB = (Width > 1) ? BitmapData[1] : clrPrimeA;      // pixel (1,0)
    int clrPrimeC = (Height > 1) ? BitmapData[Width] : clrPrimeA; // pixel (0,1)
-   int prevR1 = wrapRGBtoGray(clrPrimeA, 1);
-   int prevR2 = wrapRGBtoGray(clrPrimeB, 1);
-   int prevR3 = wrapRGBtoGray(clrPrimeC, 1);
+   int prevR1, prevR2, prevR3, prevA1, prevA2, prevA3;
+   acReadPixel(clrPrimeA, prevR1, prevA1);
+   acReadPixel(clrPrimeB, prevR2, prevA2);
+   acReadPixel(clrPrimeC, prevR3, prevA3);
    int prevR4 = (prevR1 + prevR2 + prevR3)/3;
-   int oprevR4 = prevR4;
+   int prevA4 = (prevA1 + prevA2 + prevA3)/3;
+
+   // In adaptive mode the reference is re-seeded from the leading pixels of every scan line.
+   // Letting it carry across the line break pins it to the far end of the previous line on any
+   // graded background, and every later line then spends its whole tolerance budget at once.
+   int seedStepW = (Width > 2) ? 2 : Width - 1;
+   int seedStepH = (Height > 2) ? 2 : Height - 1;
 
    int ToleranceHits = 0;
    int loopDone = 0;
@@ -3372,18 +3392,28 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
    {
       for (y = 0; y < Height; y++)
       {
+         if (aaMode==1)
+         {
+            int lineR1, lineA1, lineR2, lineA2;
+            acReadPixel(BitmapData[y * Width], lineR1, lineA1);
+            acReadPixel(BitmapData[seedStepW + (y * Width)], lineR2, lineA2);
+            prevR4 = (lineR1 + lineR2 + 1)/2;
+            prevA4 = (lineA1 + lineA2 + 1)/2;
+         }
+
          for (x = 0; x < Width; x++)
          {
-            int clrR1 = BitmapData[x + (y * Width)];
-            int R1 = wrapRGBtoGray(clrR1, 1);
-            int d = abs(prevR4 - R1);
+            int R1, A1;
+            acReadPixel(BitmapData[x + (y * Width)], R1, A1);
+            int d = acDelta(prevR4, prevA4, R1, A1);
 
             if (aaMode==1)
             {
                if (inRange(d - adaptLevel, d + adaptLevel, vTolrc))
+               {
                   prevR4 = R1;
-
-               // d = min(d, abs(oprevR4 - R1));
+                  prevA4 = A1;
+               }
             }
 
             if (ToleranceHits<maxThresholdHitsW && d>vTolrc)
@@ -3397,7 +3427,6 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
                loopDone = 1;
                break;
             }
-            // fnOutputDebug(std::to_string(whichLoop) + " d" + std::to_string(d) + " R" + std::to_string(R1) + " H" + std::to_string(ToleranceHits) + " maxH" + std::to_string(maxThresholdHitsW) );
          }
 
          ToleranceHits = 0;
@@ -3411,15 +3440,26 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
    {
       for (x = 0; x < Width; x++)
       {
+         if (aaMode==1)
+         {
+            int lineR1, lineA1, lineR2, lineA2;
+            acReadPixel(BitmapData[x], lineR1, lineA1);
+            acReadPixel(BitmapData[x + (seedStepH * Width)], lineR2, lineA2);
+            prevR4 = (lineR1 + lineR2 + 1)/2;
+            prevA4 = (lineA1 + lineA2 + 1)/2;
+         }
+
          for (y = 0; y < Height; y++)
          {
-            int clrR1 = BitmapData[x + (y * Width)];
-            // int clrR1 = BitmapData[x * Height + y];
-            int R1 = wrapRGBtoGray(clrR1, 1);
-            int d = abs(prevR4 - R1);
+            int R1, A1;
+            acReadPixel(BitmapData[x + (y * Width)], R1, A1);
+            int d = acDelta(prevR4, prevA4, R1, A1);
 
-            if (inRange(d - adaptLevel, d + adaptLevel, vTolrc) && aaMode==1)
+            if (aaMode==1 && inRange(d - adaptLevel, d + adaptLevel, vTolrc))
+            {
                prevR4 = R1;
+               prevA4 = A1;
+            }
 
             if (ToleranceHits<maxThresholdHitsH && d>vTolrc)
             {
@@ -3432,7 +3472,6 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
                loopDone = 1;
                break;
             }
-            // fnOutputDebug(std::to_string(whichLoop) + " d" + std::to_string(d) + " R" + std::to_string(R1) + " H" + std::to_string(ToleranceHits) + " maxH" + std::to_string(maxThresholdHitsW) );
          }
 
          ToleranceHits = 0;
@@ -3443,7 +3482,6 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
          }
       }
    }
-   // fnOutputDebug(std::to_string(whichLoop) + " fc" + std::to_string(*fcoord)  + " x" + std::to_string(x) + " y" + std::to_string(y) + " prev=" + std::to_string(prevR4) );
    return 1;
 }
 
