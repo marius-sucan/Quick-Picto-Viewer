@@ -2350,7 +2350,7 @@ Gdip_SaveImagesInTIFF(filesListArray, destFilePath) {
 
       countTFilez++
       thisBitmap := Gdip_CreateBitmapFromFile(imgPath)
-      If StrLen(thisBitmap)<2
+      If (StrLen(thisBitmap)<2)
       {
          failedFiles++
          Continue
@@ -2384,9 +2384,7 @@ Gdip_SaveImagesInTIFF(filesListArray, destFilePath) {
 
          If !_p
          {
-            ; the encoder exposes no single-value Long parameter, so there is nothing to
-            ; drive the multi-frame state machine with; every GdipSaveAddImage() below
-            ; would be rejected and the tail flush would write through a null pointer
+            ; the encoder exposes no single-value Long parameter, so there is nothing to drive the multi-frame state machine with
             fatalError := -2
             Break
          }
@@ -2681,7 +2679,7 @@ Gdip_GetImageHeight(pBitmap) {
 
 Gdip_GetImageDimensions(pBitmap, ByRef Width, ByRef Height) {
    Width := 0, Height := 0
-   If StrLen(pBitmap)<3
+   If (StrLen(pBitmap)<3)
       Return 2
 
    E := Gdip_GetImageDimension(pBitmap, Width, Height)
@@ -2860,7 +2858,7 @@ Gdip_BitmapSetResolution(pBitmap, dpix, dpiy) {
 
 Gdip_BitmapGetDPIResolution(pBitmap, ByRef dpix, ByRef dpiy) {
    dpix := dpiy := 0
-   If StrLen(pBitmap)<3
+   If (StrLen(pBitmap)<3)
       Return 2
 
    dpix := Gdip_GetImageHorizontalResolution(pBitmap)
@@ -3435,7 +3433,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
           PixelFormat := "0xE200B"
 
        newBitmap := Gdip_CreateBitmap(RWidth, RHeight, PixelFormat)
-       If StrLen(newBitmap)>1
+       If (StrLen(newBitmap)>1)
           G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode, 4)
     }
 
@@ -3455,7 +3453,7 @@ Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush:=0, InterpolationMode:=7, Pixel
        defaultBrush := 1
     }
 
-    If StrLen(pBrush)>1
+    If (StrLen(pBrush)>1)
        Gdip_FillRectangle(G, pBrush, 0, 0, RWidth, RHeight)
 
     Gdip_TranslateWorldTransform(G, xTranslation, yTranslation)
@@ -3510,7 +3508,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
     Else If (KeepPixelFormat=-1)
        PixelFormat := "0xE200B"
-    Else If Strlen(KeepPixelFormat)>3
+    Else If (Strlen(KeepPixelFormat)>3)
        PixelFormat := KeepPixelFormat
 
     If ((mpx>536.4 && (!PixelFormat || PixelFormat=0x22009 || PixelFormat=0xE200B)) || (mpx>715.3 && PixelFormat=0x21808) || max(ResizedW, ResizedH)>32750 && checkTooLarge=1)
@@ -3556,7 +3554,7 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
     } Else
     {
        newBitmap := Gdip_CreateBitmap(ResizedW, ResizedH, PixelFormat)
-       If StrLen(newBitmap)>2
+       If (StrLen(newBitmap)>2)
        {
           G := Gdip_GraphicsFromImage(newBitmap, InterpolationMode, 4)
           Gdip_SetPixelOffsetMode(G, 2)
@@ -9322,7 +9320,7 @@ Gdip_BitmapConvertGray(pBitmap, hue:=0, vibrance:=-40, brightness:=1, contrast:=
     Gdip_GetImageDimensions(pBitmap, Width, Height)
     If (KeepPixelFormat=1)
        PixelFormat := Gdip_GetImagePixelFormat(pBitmap, 1)
-    If StrLen(KeepPixelFormat)>3
+    If (StrLen(KeepPixelFormat)>3)
        PixelFormat := KeepPixelFormat
     Else If (KeepPixelFormat=-1)
        PixelFormat := "0xE200B"

@@ -1051,7 +1051,7 @@ Metadata models [metaModel] supported by FreeImage
 ; leaves the model untouched.
 
    If (key="")
-      Return DllCall(getFIMfunc("SetMetadata"), "int", metaModel, "uptr", hImage, "uptr", 0, "uptr", fiTag)
+      Return DllCall(getFIMfunc("SetMetadata"), "int", metaModel, "uptr", hImage, "uptr", 0, "uptr", 0)
 
    Return DllCall(getFIMfunc("SetMetadata"), "int", metaModel, "uptr", hImage, "astr", key, "uptr", fiTag)
 }

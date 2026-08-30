@@ -43922,10 +43922,6 @@ PanelCombineImagesMultipage() {
     Static hasOpened := 0
     If !hasOpened
     {
-       ; first-run defaults for the settings this panel persists of its own; they are
-       ; seeded before ReadSettingsCombineIMGs() so that a missing registry entry falls
-       ; back to these rather than to the shared globals. userSaveBitsDepth is clamped to
-       ; 1-4 on the way back in, so the 5 lands on «8 bits RGB».
        hasOpened := 1
        TextInAreaAlign := TextInAreaValign := 2
        userSaveBitsDepth := 5
@@ -44352,8 +44348,8 @@ BTNperformExtractFrames(a) {
          showTOOLtip("WARNING: The image format does not have support for multiple frames.`nNo frames or pages were extracted.")
       Else If (r=-2)
          showTOOLtip("The image has no frames or pages to extract")
-      Else If (r>1)
-         showTOOLtip("Succesfully extracted " groupDigits(r - failedFrames) " frames out of " r)
+      Else If (r>=1)
+         showTOOLtip("Succesfully extracted " groupDigits(extractedFrames) " frames out of " r)
       Else 
          showTOOLtip("ERROR: An undefined error has occured.`nNo frames or pages were extracted.")
 
@@ -61699,7 +61695,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
-         percF := Round((1 - tFramFailed / tFrames) * 100, 1)
+         percF := (tFrames>0) ? Round(((tFrames - tFramFailed) / tFrames) * 100, 1) : 0
          thisFramesInfo := "`n" labelu "s extracted: " groupDigits(tFrames - tFramFailed) " / " groupDigits(tFrames) " ( " percF "% )"
          If (failedFiles>0)
             etaTime .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
@@ -61724,25 +61720,25 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       Else
          r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz)
 
-      If (r=-5 && pdfTextMode=1)
+      If (r=-5) ; abort signal
       {
+         tFrames += totalz + failedFrames
+         tFramFailed += failedFrames
          abandonAll := 1
          Break
       }
 
-      If (r>1)
+      If (r>=1)
       {
-         tFrames += totalz
+         tFrames += totalz + failedFrames
          tFramFailed += failedFrames
       }
 
       If (r=-4)
          failedFiles++
-      Else If (r=-3)
+      Else If (r=-3 || r-2)
          skippedFiles++
-      Else If (r=-2)
-         skippedFiles++
-      Else If (r>1)
+      Else If (r>=1)
          countFilez++
       Else 
          failedFiles++
@@ -61750,7 +61746,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
 
    CurrentSLD := backCurrentSLD
    zeitOperation := A_TickCount - startOperation
-   percF := Round((1 - tFramFailed / tFrames) * 100, 1)
+   percF := (tFrames>0) ? Round(((tFrames - tFramFailed) / tFrames) * 100, 1) : 0
    someErrors := "`n" labelu "s extracted: " groupDigits(tFrames - tFramFailed) " / " groupDigits(tFrames) " ( " percF "% )`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
    If (failedFiles>0)
       someErrors .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
@@ -61771,17 +61767,17 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
 }
 
 coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
-   extractedFrames := failedFrames := FimBuffer := abandonAll := yay := 0
+   extractedFrames := failedFrames := FimBuffer := abandonAll := 0
    GFT := FreeImage_GetFileType(imgPath)
-   hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, 0)
+   multiFlags := (GFT=25) ? 2 : 0
+   hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
    If (StrLen(hMultiBMP)>1)
    {
       hasOpenedMulti := 1
       tFrames := FreeImage_GetPageCount(hMultiBMP)
       If (tFrames<2)
       {
-         ; a single page is nothing to extract, the answer the GIF and WEBP paths give as well
-         tFrames := 0
+         tFrames := 0 ; a single page is nothing to extract, the answer the GIF and WEBP paths give as well
          FreeImage_CloseMultiBitmap(hMultiBMP, 0)
          Return -2
       }
@@ -61792,6 +61788,8 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
          doStartLongOpDance()
       }
+      If !bonusMsg
+         bonusMsg := ""
 
       Loop, % tFrames
       {
@@ -61803,10 +61801,12 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Break
          }
 
-         If ((A_TickCount - prevMSGdisplay>3000) && inLoop=1 && yay=1)
+         If (A_TickCount - prevMSGdisplay>3000)
+         {
             showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
+            prevMSGdisplay := A_TickCount
+         }
 
-         yay := !yay
          If (FileExist(file2save) && !FolderExist(file2save))
             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
 
@@ -61859,6 +61859,7 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             hFIFimgB := trFreeImage_Rescale(hFIFimgA, imgW, imgH)
             If hFIFimgB
             {
+               FreeImage_UnLoad(hFIFimgA)
                FimBuffer := DestroyMemoryBuffer(FimBuffer)
                rz := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
             } Else
@@ -61886,28 +61887,199 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    } Else Return -1
 }
 
+readWEBPuint24(pData, offsetu) {
+; The WEBP container stores its geometry as 24 bits little endian integers.
+   Return NumGet(pData + 0, offsetu, "UChar") | (NumGet(pData + 0, offsetu + 1, "UChar") << 8) | (NumGet(pData + 0, offsetu + 2, "UChar") << 16)
+}
+
+parseWEBPanimation(imgPath, ByRef canvasW, ByRef canvasH) {
+; Walks the RIFF container of a .webp file and returns one object per ANMF chunk: .x and .y
+; place the frame on the canvas, .w and .h are the area it covers, .blend says whether it is
+; alpha blended over what is already there (1) or replaces that rectangle outright (0), and
+; .dispose says whether the rectangle goes back to transparent once the frame has been shown.
+; Returns "" for anything that is not an animation; a still WEBP carries no ANMF chunk at all.
+;
+; The geometry has to come from the container because no decoder hands it over: WIC returns
+; every ANMF payload as a bitmap of its own, with no hint of where it belongs on the canvas.
+; Only the chunk headers are read here, the encoded frames themselves are seeked over.
+
+   canvasW := canvasH := nFrames := 0
+   f := FileOpen(imgPath, "r")
+   If !IsObject(f)
+      Return ""
+
+   fLen := f.Length
+   VarSetCapacity(chunku, 32, 0)
+   If (f.RawRead(chunku, 12)!=12 || NumGet(chunku, 0, "UInt")!=0x46464952 || NumGet(chunku, 8, "UInt")!=0x50424557)
+   {
+      f.Close()   ; the file does not even open with RIFF .... WEBP
+      Return ""
+   }
+
+   frames := []
+   While (f.Pos + 8 <= fLen)
+   {
+      If (f.RawRead(chunku, 8)!=8)
+         Break
+
+      fourCC := NumGet(chunku, 0, "UInt")
+      chunkSize := NumGet(chunku, 4, "UInt")
+      payloadPos := f.Pos
+      If (chunkSize>fLen)
+         Break   ; a corrupt length would walk the reader past the end of the file
+
+      If (fourCC=0x58385056 && chunkSize>=10)          ; VP8X, carries the canvas size
+      {
+         If (f.RawRead(chunku, 10)=10)
+         {
+            canvasW := readWEBPuint24(&chunku, 4) + 1
+            canvasH := readWEBPuint24(&chunku, 7) + 1
+         }
+      } Else If (fourCC=0x464D4E41 && chunkSize>=16)   ; ANMF, one animation frame
+      {
+         If (f.RawRead(chunku, 16)=16)
+         {
+            ; the offsets are stored halved and the sizes decremented; the last byte holds
+            ; the blending method in bit 1 and the disposal method in bit 0
+            flagsu := NumGet(chunku, 15, "UChar")
+            thisFrame := []
+            thisFrame.x := readWEBPuint24(&chunku, 0) * 2
+            thisFrame.y := readWEBPuint24(&chunku, 3) * 2
+            thisFrame.w := readWEBPuint24(&chunku, 6) + 1
+            thisFrame.h := readWEBPuint24(&chunku, 9) + 1
+            thisFrame.blend := (flagsu & 2) ? 0 : 1
+            thisFrame.dispose := (flagsu & 1) ? 1 : 0
+            nFrames++
+            frames[nFrames] := thisFrame
+         }
+      }
+
+      If (nFrames>65500)
+         Break   ; no animation has this many frames
+
+      f.Seek(payloadPos + chunkSize + (chunkSize & 1), 0)   ; chunks are padded to an even length
+   }
+
+   f.Close()
+   If (!canvasW || !canvasH || !nFrames)
+      Return ""
+
+   Return frames
+}
+
+compositeWEBPframeOnCanvas(canvasBMP, frameBMP, frameInfo) {
+; Draws one decoded animation frame onto the canvas, where the container says it belongs.
+; Blending method 1 alpha blends it over whatever the previous frames left there; 0 replaces
+; the rectangle outright, alpha included, which is what GDI+ calls SourceCopy.
+
+   Gu := trGdip_GraphicsFromImage(A_ThisFunc, canvasBMP, 5)   ; nearest neighbour: the blit is 1:1
+   If !Gu
+      Return
+
+   Gdip_SetCompositingMode(Gu, (frameInfo.blend=1) ? 0 : 1)
+   trGdip_DrawImage(A_ThisFunc, Gu, frameBMP, frameInfo.x, frameInfo.y)
+   Gdip_DeleteGraphics(Gu)
+}
+
+disposeWEBPframeArea(canvasBMP, frameInfo) {
+; Applies the frame's disposal method once the frame has been written out: method 1 returns
+; the rectangle it occupied to transparent, ready for the frame that follows. The container
+; may name a background colour, but browsers and libwebp's own decoder both clear animated
+; WEBPs to transparent instead, so the frames extracted here match what a viewer shows.
+
+   If (frameInfo.dispose!=1)
+      Return
+
+   Gu := trGdip_GraphicsFromImage(A_ThisFunc, canvasBMP)
+   If !Gu
+      Return
+
+   pBrushu := Gdip_BrushCreateSolid(0x00000000)
+   Gdip_SetCompositingMode(Gu, 1)
+   Gdip_FillRectangle(Gu, pBrushu, frameInfo.x, frameInfo.y, frameInfo.w, frameInfo.h)
+   Gdip_DeleteBrush(pBrushu)
+   Gdip_DeleteGraphics(Gu)
+}
+
 coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
-   failedFrames := extractedFrames := abandonAll := yay := 0
+   failedFrames := extractedFrames := abandonAll := doComposite := 0
    thisImgQuality := (userimgQuality=1) ? 6 : 5
    sizesDesired := []
    sizesDesired[1] := [32750, 32750, 1, 0, thisImgQuality]
-   ; the first frame is decoded here only to learn how many frames there are; .Frames holds
-   ; the index of the last frame, not the count. Every frame is loaded again by the loop below,
-   ; the first one included
-   oBitmap := LoadWICimage(imgPath, 0, 0, userPerformColorManagement, sizesDesired)
-   tFrames := mainLoadedIMGdetails.Frames + 1
-   If !validBMP(oBitmap)
-      Return -4
+   If !bonusMsg
+      bonusMsg := ""
 
+   ; every LoadWICimage() below overwrites mainLoadedIMGdetails, which describes the image the
+   ; viewport has open; the caller's copy goes back in place through each of the exits below
+   backupIMGdetails := mainLoadedIMGdetails.Clone()
+
+   ; WIC hands over each animation frame on its own, so an animated WEBP has to be composed
+   ; here; the container is the only thing that says where a frame belongs on the canvas
+   animFrames := parseWEBPanimation(imgPath, canvasW, canvasH)
+   probeFrame := 1
+   If IsObject(animFrames)
+   {
+      doComposite := 1
+      tFrames := animFrames.MaxIndex()
+      ; the first frame the container declares smaller than the canvas is the one that tells
+      ; a raw payload apart from one a decoder has already placed on the canvas itself
+      Loop, % tFrames
+      {
+         If (animFrames[A_Index].w!=canvasW || animFrames[A_Index].h!=canvasH)
+         {
+            probeFrame := A_Index
+            Break
+         }
+      }
+   }
+
+   ; the probe doubles as the check that the file decodes at all
+   oBitmap := LoadWICimage(imgPath, 0, probeFrame - 1, userPerformColorManagement, sizesDesired)
+   If !validBMP(oBitmap)
+   {
+      mainLoadedIMGdetails := backupIMGdetails
+      Return -4
+   }
+
+   trGdip_GetImageDimensions(oBitmap, imgW, imgH)
    trGdip_DisposeImage(oBitmap)
+   wicFrames := mainLoadedIMGdetails.Frames + 1   ; .Frames is the index of the last frame, not the count
+   If (doComposite=1 && wicFrames!=tFrames)
+   {
+      ; the parser and the decoder disagree about this file, so the decoder wins - but the frames then go out uncomposed
+      addJournalEntry(A_ThisFunc "(): the WEBP container declares " tFrames " animation frames while the decoder reports " wicFrames ". Extracting the decoder's frames uncomposed:`n" imgPath)
+      doComposite := 0
+   }
+
+   If (doComposite=1 && imgW=canvasW && imgH=canvasH && (animFrames[probeFrame].w!=canvasW || animFrames[probeFrame].h!=canvasH))
+   {
+      ; the decoder placed the frame on the canvas itself, so there is nothing left to compose
+      addJournalEntry(A_ThisFunc "(): the WEBP decoder composes the animation frames itself; extracting them as they arrive:`n" imgPath)
+      doComposite := 0
+   }
+
+   If (doComposite!=1)
+      tFrames := wicFrames
+
    If (tFrames<2)
+   {
+      mainLoadedIMGdetails := backupIMGdetails
       Return -2
+   }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
    If (inLoop!=1)
    {
       showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
       doStartLongOpDance()
+   }
+
+   If (doComposite=1)
+   {
+      ; a fresh 32 bits canvas comes up fully transparent, which is where an animation starts
+      canvasBMP := trGdip_CreateBitmap(A_ThisFunc, canvasW, canvasH, highDesiredPixFmt)
+      If !validBMP(canvasBMP)
+         doComposite := 0
    }
 
    Loop, % tFrames
@@ -61919,10 +62091,12 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          Break
       }
 
-      If ((A_TickCount - prevMSGdisplay>3000) && inLoop=1 && yay=1)
+      If (A_TickCount - prevMSGdisplay>3000)
+      {
          showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
+         prevMSGdisplay := A_TickCount
+      }
 
-      yay := !yay
       file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
@@ -61931,35 +62105,61 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       {
          abandonAll := 1
          Break
-      } Else If !file2save
-         Continue
+      }
 
       nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, userPerformColorManagement, sizesDesired)   ; frames are counted from 0, the files from 1
       If !validBMP(nBitmap)
       {
          failedFrames++
-         Continue
+      } Else
+      {
+         If (doComposite=1)
+            compositeWEBPframeOnCanvas(canvasBMP, nBitmap, animFrames[A_Index])
+
+         If file2save
+         {
+            sBitmap := (doComposite=1) ? trGdip_CloneBitmapArea(A_ThisFunc, canvasBMP, 0, 0, canvasW, canvasH) : nBitmap
+            If !validBMP(sBitmap)
+            {
+               failedFrames++
+            } Else
+            {
+               trGdip_GetImageDimensions(sBitmap, imgW, imgH)
+               If FileExist(file2save)
+                  FileSetAttrib, -R, % file2save
+
+               If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
+               {
+                  capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
+                  kBitmap := trGdip_ResizeBitmap(A_ThisFunc, sBitmap, imgW, imgH, 1)
+                  If validBMP(kBitmap)
+                  {
+                     r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+                     kBitmap := trGdip_DisposeImage(kBitmap)
+                  } Else r := 1
+               } Else r := QPV_SaveImageFile(A_ThisFunc, sBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+
+               If r
+                  failedFrames++
+               Else
+                  extractedFrames++
+
+               If (sBitmap!=nBitmap)
+                  sBitmap := trGdip_DisposeImage(sBitmap)
+            }
+         }
+
+         nBitmap := trGdip_DisposeImage(nBitmap)
       }
 
-      trGdip_GetImageDimensions(nBitmap, imgW, imgH)
-      If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
-      {
-         capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
-         kBitmap := trGdip_ResizeBitmap(A_ThisFunc, nBitmap, imgW, imgH, 1)
-         If validBMP(kBitmap)
-         {
-            r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-            kBitmap := trGdip_DisposeImage(kBitmap)
-         } Else r := 1
-      } Else r := QPV_SaveImageFile(A_ThisFunc, nBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-
-      If r
-         failedFrames++
-      Else 
-         extractedFrames++
-
-      nBitmap := trGdip_DisposeImage(nBitmap)
+      If (doComposite=1)
+         disposeWEBPframeArea(canvasBMP, animFrames[A_Index])
    }
+
+   If canvasBMP
+      canvasBMP := trGdip_DisposeImage(canvasBMP)
+
+   mainLoadedIMGdetails := backupIMGdetails
    If (inLoop!=1)
       ResetImgLoadStatus()
 
@@ -62052,8 +62252,8 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
 }
 
 coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
-   yay := failedFrames := extractedFrames := 0
-   imgPath := isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu
+   failedFrames := extractedFrames := 0
+   imgPath := StrReplace(isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu, "||")
    If RegExMatch(imgPath, "i)(.\.webp)$")
    {
       r := coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, thisu, extracted)
@@ -62076,7 +62276,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
       If (errorType)
       {
-         ; msgBoxWrapper(appTitle ": ERROR", friendlyPDFerrorCodes(errorType, pwd) ". ", 0, 0, "error")
+         addJournalEntry(A_ThisFunc "(): ERROR." friendlyPDFerrorCodes(errorType, pwd))
          Return -4
       }
 
@@ -62113,7 +62313,6 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             prevMSGdisplay := A_TickCount
          }
 
-         yay := !yay
          If (FileExist(file2save) && !FolderExist(file2save))
             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
 
@@ -62123,6 +62322,9 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Break
          } Else If !file2save
             Continue
+
+         If FileExist(file2save)
+            FileSetAttrib, -R, % file2save
 
          if (saveImgFormatsList[userExtractFramesFmt]="webp")
             oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 16350, 16350, userPDFdpi)
@@ -62175,6 +62377,8 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       }
 
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      If !bonusMsg
+         bonusMsg := ""
       If (inLoop!=1)
       {
          showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
@@ -62191,10 +62395,12 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Break
          }
 
-         If ((A_TickCount - prevMSGdisplay>3000) && inLoop=1 && yay=1)
+         If (A_TickCount - prevMSGdisplay>3000)
+         {
             showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
+            prevMSGdisplay := A_TickCount
+         }
 
-         yay := !yay
          If (FileExist(file2save) && !FolderExist(file2save))
             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
 
@@ -62204,6 +62410,9 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Break
          } Else If !file2save
             Continue
+
+         If FileExist(file2save)
+            FileSetAttrib, -R, % file2save
 
          Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)
          trGdip_GetImageDimensions(oBitmap, imgW, imgH)
@@ -62285,15 +62494,14 @@ askOverwriteDestFile(destFilePath) {
 }
 
 combineImagesMultiTiffGDIp(destFilePath) {
+   ; inspiration: https://senapi.blogspot.com/2010/04/creating-multi-page-tiff-vc-gdi.html
+   ; https://docs.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-creating-and-saving-a-multiple-frame-image-use
    Static EncoderParameterValueTypeLong := 4
         , EncoderValueFrameDimensionPage := 23
         , EncoderValueMultiFrame := 18
         , EncoderValueFlush := 20
-   ; inspiration: https://senapi.blogspot.com/2010/04/creating-multi-page-tiff-vc-gdi.html
-   ; https://docs.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-creating-and-saving-a-multiple-frame-image-use
 
    zPlitPath(destFilePath, 0, OutFileName, OutDir)
-   ; fnOutputDebug("file=" OutFileName "|" OutDir)
    If !FolderExist(OutDir)
    {
       FileCreateDir, % OutDir
@@ -62306,8 +62514,6 @@ combineImagesMultiTiffGDIp(destFilePath) {
       }
    }
 
-   ; the selection is checked before the destination is touched, so a stale one cannot
-   ; destroy an existing file and then bail out
    filesElected := getSelectedFiles(0, 1)
    If !filesElected
    {
@@ -62398,8 +62604,6 @@ combineImagesMultiTiffGDIp(destFilePath) {
       {
          If (A_Index>1)
          {
-            ; the abort is tested before the frame is loaded, so a cancelled run does not
-            ; leak the bitmap it was about to hand over
             If (determineTerminateOperation()=1)
             {
                abandonAll := 1
@@ -62432,8 +62636,6 @@ combineImagesMultiTiffGDIp(destFilePath) {
                Gdip_BitmapSetColorDepth(thisBitmap, thisBitsDepth, userCombineDepthDithering)
          }
 
-         ; selectedFiles counts the pages actually written, not the attempts, so the closing
-         ; summary cannot claim more embedded images than the file holds
          If !selectedFiles
          {
             multiBitmap := thisBitmap   ; the tail disposes it, including on the errors below
@@ -62467,18 +62669,15 @@ combineImagesMultiTiffGDIp(destFilePath) {
 
             If !_p
             {
-               ; without a single-value Long parameter there is nothing to drive the
-               ; multi-frame state machine with: every page after the first would be
-               ; rejected and the file would end up single-paged
                showTOOLtip("ERROR: The .TIFF encoder exposes no usable multi-frame parameter.")
                SoundBeep 300, 100
-               fnOutputDebug("no long param; nCount=" nCount "|pCodec=" pCodec)
+               fnOutputDebug(A_ThisFunc "(): no long param; nCount=" nCount "|pCodec=" pCodec)
                fattalErr := 1
                Break
             }
 
             _E := DllCall("gdiplus\GdipSaveImageToFile", "UPtr", multiBitmap, "WStr", destFilePath, "UPtr", pCodec, "uint", _p)
-            fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; pCodec=" pCodec)
+            ; fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; pCodec=" pCodec)
             If _E
             {
                showTOOLtip("ERROR: Failed to create the multipaged .TIFF file. Error code: " _E)
@@ -62513,28 +62712,22 @@ combineImagesMultiTiffGDIp(destFilePath) {
       ; then hand GDI+ an image that never got saved
       NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
       _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
-      ; this call fails, I do not know why; err-code = 2 ; invalid parameter;
-      ; however the file is created successfully
-      ; fnOutputDebug("TIFF end: " _E)
    }
+
    trGdip_DisposeImage(multiBitmap)
    encoderParameters := ""
-   
+   If fattalErr
+      FileDelete, % destFilePath
+
    If (abandonAll=1)
    {
       showTOOLtip("Operation aborted by user. Multipaged .TIFF file not created.")
       SoundBeep , 300, 100
       FileDelete, % destFilePath
-   } Else If fattalErr
-   {
-      ; whichever branch raised it already named the cause on screen; nothing usable was
-      ; written, so do not leave a half-made file behind
-      FileDelete, % destFilePath
    } Else If !selectedFiles
    {
       showTOOLtip("ERROR: Failed to create the multipaged .TIFF file. No image could be embedded.`n" OutFileName "`n" OutDir "\")
       SoundBeep , 300, 100
-      addJournalEntry("No image could be embedded into the multipaged .TIFF file: " destFilePath)
    } Else
    {
       If (failedFiles>0)
@@ -62573,8 +62766,6 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       Return
    }
 
-   ; ask before any work is done, and before the destination is touched; phase 1 can run
-   ; for minutes and the user cannot back out of it
    If askOverwriteDestFile(destFilePath)
       Return
 
@@ -62650,7 +62841,7 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       showTOOLtip("Operation aborted. No multipaged image file created.")
       Loop, % tFrames
          FreeImage_UnLoad(imgList[A_Index])
-   
+
       mustEnd := 1
    } Else If (tFrames<2)
    {
@@ -62674,9 +62865,6 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    }
 
    file2save := destFilePath
-   ; askOverwriteDestFile() already removed it and got the user's consent; this only covers
-   ; a file that reappeared meanwhile, since FreeImage may crash when asked to create one
-   ; that already exists
    If FileExist(file2save)
    {
       FileSetAttrib, -R, %file2save%
@@ -62724,16 +62912,13 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
          prevMSGdisplay := A_TickCount
       }
 
-      ; clear any animation metadata used by this dib as we’ll adding our own ones;
-      ; a blank key deletes the whole model, so the FrameLeft / FrameTop / DisposalMethod
-      ; a cloned source frame carries do not follow it into the new file
       g := FreeImage_SetMetadata(imgList[i], 0, 9, "")   ; FIMD_ANIMATION = 9
-      ; add animation tags to dib[i]
       If (animus=1)
       {
          tag := FreeImage_CreateTag()
          if tag
          {
+            ; add animation tags to dib[i]
             p := FreeImage_SetTagKey(tag, "FrameTime")
             FreeImage_SetTagType(tag, 4)        ; FIDT_LONG = 4
             FreeImage_SetTagCount(tag, 1)
@@ -62749,9 +62934,6 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       ; fnOutputDebug(A_ThisFunc ": " i " | " g "." p "." k "." j "." t "." h " | " imgW " x " imgH)
    }
 
-   ; the only honest page count: FreeImage_AppendPage() returns nothing and drops in silence
-   ; any page the encoder refuses, so ask the multibitmap how many actually went in. It must
-   ; be read before the file is closed.
    addedPages := FreeImage_GetPageCount(multiFim)
    showTOOLtip("Phase 3: Saving multipaged image file: " groupDigits(addedPages) " pages`n" OutFileName)
    ; fnOutputDebug(multiFim "|" addedPages "==" file2save)
@@ -62881,21 +63063,18 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
    Return hFIFimgA
 }
 
-coreImgCombinerLoadFimFile(imgPath, subFrames, ByRef otherFrames) {
+coreImgCombinerLoadFimFile(imgPath, loadSubFrames, ByRef otherFrames) {
 ; Returns the loaded and tone-mapped bitmap, or "f" when the file was a multi-page one and
 ; its pages were handed over in otherFrames instead, or "" when nothing could be loaded.
 ; The caller owns everything returned. Depth conversion and rescaling happen in
 ; combineImgsAddPage(), so that single-page and multi-page sources go through one path.
-
-; subFrames mirrors the «Join contained frames from selected files» checkbox: with it off,
-; a multi-page source contributes its first page only, as the .tiff exporter already did.
 
   Critical, on
   sTime := A_TickCount
   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
   multiFlags := (GFT=25) ? 2 : 0
   changeMcursor()
-  If ((GFT=18 || GFT=25) && subFrames=1)
+  If ((GFT=18 || GFT=25) && loadSubFrames=1)
      hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
 
   thisIndex := 0
@@ -62948,18 +63127,10 @@ coreImgCombinerLoadFimFile(imgPath, subFrames, ByRef otherFrames) {
      ; eTime := A_TickCount - sTime
      Return hFIFimgA
   }
-  ; ToolTip, % imgW ", " imgW2,,,2
 }
 
-combineImgsAddPage(k, modus, animus, setW, setH, setRes, imgList, ByRef tFrames, ByRef BMPmemSize) {
-; Prepares one page and appends it to imgList. It takes ownership of k: whatever it does not
-; store is unloaded here.
-
-; The rescale must come BEFORE the depth conversion. FreeImage_Rescale() expands a palettised
-; bitmap back to 24 bits, which the GIF encoder refuses; and OpenCV - the fast path inside
-; trFreeImage_Rescale() - rejects anything under 24 bits outright, so resizing a quantised
-; page was both slow and silently fatal to the whole file.
-
+combineImgsAddPage(k, modus, animus, setW, setH, setRes, ByRef imgList, ByRef tFrames, ByRef BMPmemSize) {
+; Prepares one page and appends it to imgList. It takes ownership of k: whatever it does not store is unloaded here.
    If !k
       Return
 
@@ -62999,8 +63170,9 @@ combineImgsConvertDepth(k, modus, animus) {
         Return   ; already palettised; keep the source palette
 
      If (imgBPPc=24 || imgBPPc=32)
+     {
         hFIFimgC := FreeImage_ColorQuantize(k)
-     Else
+     } Else
      {
         ; ColorQuantize() only takes 24 or 32 bits input, so 1/4/16/48/64 bits pages
         ; need a step through 24 bits or they reach the encoder unquantised
@@ -63011,8 +63183,7 @@ combineImgsConvertDepth(k, modus, animus) {
            FreeImage_UnLoad(hFIFimgD)
         }
      }
-  }
-  Else If (imgBPPc!=32 && modus=1)
+  } Else If (imgBPPc!=32 && modus=1)
      hFIFimgC := FreeImage_ConvertTo(k, "32Bits")
   Else If (imgBPPc!=24 && modus=2)
      hFIFimgC := FreeImage_ConvertTo(k, "24Bits")
@@ -101522,6 +101693,10 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
       viewportQPVimage.OpenedWith := OpenedWith
       Return 1
    }
+
+   ; the wrap around the buffer failed, but WICgetBufferImage() did allocate it; the
+   ; caller only ever sees a bare 0 back, so this is the last place able to free it
+   DestroyMemoryBuffer(buffer)
    Return 0
 }
 
