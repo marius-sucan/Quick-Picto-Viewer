@@ -43922,6 +43922,11 @@ PanelCombineImagesMultipage() {
     Static hasOpened := 0
     If !hasOpened
     {
+       ; first-run defaults for the settings this panel persists of its own; they are
+       ; seeded before ReadSettingsCombineIMGs() so that a missing registry entry falls
+       ; back to these rather than to the shared globals. userSaveBitsDepth is clamped to
+       ; 1-4 on the way back in, so the 5 lands on «8 bits RGB».
+       hasOpened := 1
        TextInAreaAlign := TextInAreaValign := 2
        userSaveBitsDepth := 5
     }
@@ -62250,6 +62255,35 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    }
 }
 
+askOverwriteDestFile(destFilePath) {
+; Asks before an existing destination file is replaced, and removes it. Returns 1 when the
+; caller must abandon: the file is there and the user declined, or it could not be removed.
+; Shared by the multipage exporters so that every one of them asks BEFORE it starts working,
+; rather than deleting the destination once the work is already done.
+
+   If !FileExist(destFilePath)
+      Return 0
+
+   zPlitPath(destFilePath, 0, OutFileName, OutDir)
+   msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
+   If (msgResult!="Yes")
+      Return 1
+
+   FileSetAttrib, -R, %destFilePath%
+   Sleep, 1
+   Try FileDelete, %destFilePath%
+   Catch wasErrorB
+         Sleep, 1
+
+   If (wasErrorB || FileExist(destFilePath))
+   {
+      msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
+      Return 1
+   }
+
+   Return 0
+}
+
 combineImagesMultiTiffGDIp(destFilePath) {
    Static EncoderParameterValueTypeLong := 4
         , EncoderValueFrameDimensionPage := 23
@@ -62272,27 +62306,20 @@ combineImagesMultiTiffGDIp(destFilePath) {
       }
    }
 
-   If FileExist(destFilePath)
+   ; the selection is checked before the destination is touched, so a stale one cannot
+   ; destroy an existing file and then bail out
+   filesElected := getSelectedFiles(0, 1)
+   If !filesElected
    {
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-      If (msgResult="Yes")
-      {
-         FileSetAttrib, -R, %destFilePath%
-         Sleep, 1
-         Try FileDelete, %destFilePath%
-         Catch wasErrorB
-               Sleep, 1
-
-         If wasErrorB
-         {
-            abandoned := 1
-            msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
-            Return
-         }
-      } Else Return
+      showTOOLtip("WARNING: Insufficient files selected to join.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
    }
 
-   filesElected := getSelectedFiles(0, 1)
+   If askOverwriteDestFile(destFilePath)
+      Return
+
    rg := Gdip_GetImageEncoder(".tif", pCodec, ci)
    If !pCodec
       rg := Gdip_GetImageEncoder(".tif", pCodec, ci)
@@ -62307,7 +62334,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
       Return
    }
 
-   tFrames := failedFiles := countTFilez := 0
+   failedFiles := countTFilez := 0
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    prevMSGdisplay := 1
@@ -62364,15 +62391,26 @@ combineImagesMultiTiffGDIp(destFilePath) {
       }
 
       totalFlames := (userCombineSubFrames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
+      If (totalFlames<1)   ; a loader that reported no frame at all leaves .Frames at -1
+         totalFlames := 1
+
       Loop, % totalFlames
       {
          If (A_Index>1)
          {
-            thisBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
+            ; the abort is tested before the frame is loaded, so a cancelled run does not
+            ; leak the bitmap it was about to hand over
             If (determineTerminateOperation()=1)
             {
                abandonAll := 1
                Break
+            }
+
+            thisBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
+            If !validBMP(thisBitmap)
+            {
+               failedFiles++
+               Continue
             }
          }
 
@@ -62387,7 +62425,6 @@ combineImagesMultiTiffGDIp(destFilePath) {
          }
 
          yay := !yay
-         selectedFiles++
          If thisBitsDepth
          {
             pix := Gdip_GetImagePixelFormat(thisBitmap, 2)
@@ -62395,9 +62432,11 @@ combineImagesMultiTiffGDIp(destFilePath) {
                Gdip_BitmapSetColorDepth(thisBitmap, thisBitsDepth, userCombineDepthDithering)
          }
 
-         If (selectedFiles=1)
+         ; selectedFiles counts the pages actually written, not the attempts, so the closing
+         ; summary cannot claim more embedded images than the file holds
+         If !selectedFiles
          {
-            multiBitmap := thisBitmap
+            multiBitmap := thisBitmap   ; the tail disposes it, including on the errors below
             nCount := Gdip_GetEncoderParameterList(multiBitmap, pCodec, EncoderParameters)
             If !nCount
             {
@@ -62410,7 +62449,6 @@ combineImagesMultiTiffGDIp(destFilePath) {
                showTOOLtip("ERROR: Failed to get TIFF encoder properties. Please try again.")
                SoundBeep 300, 100
                fnOutputDebug("paramsCount=" nCount "|pCodec=" pCodec)
-               trGdip_DisposeImage(thisBitmap)
                fattalErr := 1
                Break
             }
@@ -62427,53 +62465,77 @@ combineImagesMultiTiffGDIp(destFilePath) {
                }
             }
 
+            If !_p
+            {
+               ; without a single-value Long parameter there is nothing to drive the
+               ; multi-frame state machine with: every page after the first would be
+               ; rejected and the file would end up single-paged
+               showTOOLtip("ERROR: The .TIFF encoder exposes no usable multi-frame parameter.")
+               SoundBeep 300, 100
+               fnOutputDebug("no long param; nCount=" nCount "|pCodec=" pCodec)
+               fattalErr := 1
+               Break
+            }
+
             _E := DllCall("gdiplus\GdipSaveImageToFile", "UPtr", multiBitmap, "WStr", destFilePath, "UPtr", pCodec, "uint", _p)
-            fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; nSize=" nSize "; pCodec=" pCodec)
+            fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; pCodec=" pCodec)
             If _E
             {
                showTOOLtip("ERROR: Failed to create the multipaged .TIFF file. Error code: " _E)
                SoundBeep 300, 100
-               trGdip_DisposeImage(thisBitmap)
                fattalErr := 1
                Break
             }
+            selectedFiles++
          } Else
          {
-            If (selectedFiles=2)
+            If (selectedFiles=1)
                NumPut(EncoderValueFrameDimensionPage, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
-   
-            If thisBitsDepth
-            {
-               pix := Gdip_GetImagePixelFormat(thisBitmap, 2)
-               If (SubStr(pix, 1, InStr(pix, "-") - 1)>thisBitsDepth)
-                  Gdip_BitmapSetColorDepth(thisBitmap, thisBitsDepth, userCombineDepthDithering)
-            }
 
             _E := Gdip_SaveAddImage(multiBitmap, thisBitmap, _p)
             If _E
                failedFiles++
+            Else
+               selectedFiles++
             trGdip_DisposeImage(thisBitmap)
             ; fnOutputDebug("tiff-gdi+:" multiBitmap  " | new=" thisBitmap " | e=" _E " | p=" _p)
          }
       }
-      If fattalErr
+      If (fattalErr || abandonAll=1)
          Break
    }
  
-   NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
-   _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
-   ; this call fails, I do not know why; err-code = 2 ; invalid parameter; 
-   ; however the file is created successfully
-   ; fnOutputDebug("TIFF end: " _E)
+   If (_p && !fattalErr)
+   {
+      ; only when a file was actually started. On the fatal paths _p can still be zero and
+      ; multiBitmap already carries no file, and NumPut()/NumGet() quietly do nothing below
+      ; address 65536, so the flush would write through a null EncoderParameters pointer and
+      ; then hand GDI+ an image that never got saved
+      NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
+      _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
+      ; this call fails, I do not know why; err-code = 2 ; invalid parameter;
+      ; however the file is created successfully
+      ; fnOutputDebug("TIFF end: " _E)
+   }
    trGdip_DisposeImage(multiBitmap)
    encoderParameters := ""
    
    If (abandonAll=1)
    {
       showTOOLtip("Operation aborted by user. Multipaged .TIFF file not created.")
-      SoundBeep , 900, 100
+      SoundBeep , 300, 100
       FileDelete, % destFilePath
-   } Else If (!fattalErr && !abandonAll)
+   } Else If fattalErr
+   {
+      ; whichever branch raised it already named the cause on screen; nothing usable was
+      ; written, so do not leave a half-made file behind
+      FileDelete, % destFilePath
+   } Else If !selectedFiles
+   {
+      showTOOLtip("ERROR: Failed to create the multipaged .TIFF file. No image could be embedded.`n" OutFileName "`n" OutDir "\")
+      SoundBeep , 300, 100
+      addJournalEntry("No image could be embedded into the multipaged .TIFF file: " destFilePath)
+   } Else
    {
       If (failedFiles>0)
          rr .= "`nFailed to embed " groupDigits(failedFiles) " images.`nFiles selected to embed: " groupDigits(filesElected)
@@ -62503,8 +62565,21 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    }
 
    filesElected := getSelectedFiles(0, 1)
+   If !filesElected
+   {
+      showTOOLtip("WARNING: Insufficient files selected to join.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   ; ask before any work is done, and before the destination is touched; phase 1 can run
+   ; for minutes and the user cannot back out of it
+   If askOverwriteDestFile(destFilePath)
+      Return
+
    showTOOLtip("Phase 1: Preparing " groupDigits(filesElected) " image files, please wait")
-   tFrames := failedFiles := countFilez := countTFilez := 0
+   tFrames := failedFiles := countTFilez := 0
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    prevMSGdisplay := 1
@@ -62544,35 +62619,14 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
 
       countTFilez++
       ; fnOutputDebug(A_ThisFunc ": " imgPath)
-      r := coreImgCombinerLoadFimFile(imgPath, modus, animus, otherFrames)
-      If (r!="")
+      r := coreImgCombinerLoadFimFile(imgPath, userCombineSubFrames, otherFrames)
+      If (otherFrames.Count()>0)
       {
-         If (otherFrames.Count()>0)
-         {
-            Loop, % otherFrames.Count()
-            {
-               tFrames++
-               If (modus!=5 && animus=0 || animus=1)
-                  z := combineImgsConvertDepth(otherFrames[A_Index], modus, animus)
-   
-               If z
-               {
-                  BMPmemSize += FreeImage_GetMemorySize(z)
-                  FreeImage_UnLoad(otherFrames[A_Index])
-                  imgList[tFrames] := z
-               } Else
-               {
-                  BMPmemSize += FreeImage_GetMemorySize(otherFrames[A_Index])
-                  imgList[tFrames] := otherFrames[A_Index]
-               }
-            }
-         } Else If (r!="f")
-         {
-            tFrames++
-            BMPmemSize += FreeImage_GetMemorySize(r)
-            imgList[tFrames] := r
-         }
-      } Else
+         Loop, % otherFrames.Count()
+            combineImgsAddPage(otherFrames[A_Index], modus, animus, setW, setH, setRes, imgList, tFrames, BMPmemSize)
+      } Else If (r && r!="f")
+         combineImgsAddPage(r, modus, animus, setW, setH, setRes, imgList, tFrames, BMPmemSize)
+      Else ; nothing loaded, or a multi-page file whose every page failed to lock
          failedFiles++
 
       If (tFrames>=maxMultiPagesAllowed || BMPmemSize>maxMemLimitMultiPage)
@@ -62580,7 +62634,7 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
          SoundBeep , 300, 100
          msgu := (BMPmemSize>maxMemLimitMultiPage) ? "The maximum allowed file size limit was reached: " fileSizeFriendly(maxMemLimitMultiPage) : "The limit of maximum allowed pages was reached: " maxMultiPagesAllowed
          msgResult := msgBoxWrapper(appTitle ": ERROR", msgu ". If you choose to continue, the remaining selected files will be skipped and the multipaged file will be created. It will have " groupDigits(tFrames) " pages.", "&Continue|&Abort", 0, "error")
-         If (msgResult="abort")
+         If (msgResult!="continue")   ; closing the dialog is not a licence to carry on
             abandonAll := 1
          Break
       }
@@ -62600,7 +62654,8 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       mustEnd := 1
    } Else If (tFrames<2)
    {
-      showTOOLtip("ERROR: Failed to load selected images. No multipaged image file created.")
+      msgu := (tFrames=1) ? "ERROR: At least two images or frames are required to create a multipaged file." : "ERROR: Failed to load selected images. No multipaged image file created."
+      showTOOLtip(msgu someErrors)
       Loop, % tFrames
          FreeImage_UnLoad(imgList[A_Index])
 
@@ -62613,24 +62668,42 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       ForceRefreshNowThumbsList()
       dummyTimerDelayiedImageDisplay(100)
       SetTimer, ResetImgLoadStatus, -50
-      SoundBeep, % (mustEnd=1) ? 300 : 900, 100
+      SoundBeep, 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
    file2save := destFilePath
+   ; askOverwriteDestFile() already removed it and got the user's consent; this only covers
+   ; a file that reappeared meanwhile, since FreeImage may crash when asked to create one
+   ; that already exists
    If FileExist(file2save)
    {
-      FileDelete, % file2save
+      FileSetAttrib, -R, %file2save%
+      Sleep, 1
+      Try FileDelete, %file2save%
+      Catch wasErrorB
+            Sleep, 1
       Sleep, 100
    }
 
    zPlitPath(file2save, 0, OutFileName, OutDir)
    multiFim := FreeImage_OpenMultiBitmap(file2save, formatu, 1, 0)
+   If !multiFim
+   {
+      showTOOLtip("ERROR: Unable to create the multipaged image file:`n" OutFileName "`n" OutDir "\")
+      SoundBeep, 300, 100
+      addJournalEntry("Failed to create the multipaged image file: " file2save)
+      Loop, % tFrames
+         FreeImage_UnLoad(imgList[A_Index])
+
+      SetTimer, ResetImgLoadStatus, -50
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
    dwFrameTime := userCombineGIFframeDelay
    showTOOLtip("Phase 2: Creating the multipaged image: " groupDigits(tFrames) " pages`n" OutFileName)
-   bonusList := []
-   bonux := 0
    prevMSGdisplay := 1
    startOperation := A_TickCount
    doStartLongOpDance()
@@ -62651,18 +62724,10 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
          prevMSGdisplay := A_TickCount
       }
 
-      If (setW>1 && setH>1 && setRes=1)
-      {
-         hFIFimgX := trFreeImage_Rescale(imgList[i], setW, setH)
-         If hFIFimgX
-         {
-            FreeImage_UnLoad(imgList[i])
-            imgList[i] := hFIFimgX
-         }
-      }
-
-      ; clear any animation metadata used by this dib as we’ll adding our own ones
-      g := FreeImage_SetMetadata(imgList[i], NULL, 9, NULL)   ; FIMD_ANIMATION = 9
+      ; clear any animation metadata used by this dib as we’ll adding our own ones;
+      ; a blank key deletes the whole model, so the FrameLeft / FrameTop / DisposalMethod
+      ; a cloned source frame carries do not follow it into the new file
+      g := FreeImage_SetMetadata(imgList[i], 0, 9, "")   ; FIMD_ANIMATION = 9
       ; add animation tags to dib[i]
       If (animus=1)
       {
@@ -62684,22 +62749,36 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       ; fnOutputDebug(A_ThisFunc ": " i " | " g "." p "." k "." j "." t "." h " | " imgW " x " imgH)
    }
 
-   z := FreeImage_GetPageCount(multiFim)
-   showTOOLtip("Phase 3: Saving multipaged image file: " groupDigits(tFrames) " pages`n" OutFileName)
-   ; fnOutputDebug(multiFim "|" z "==" file2save)
+   ; the only honest page count: FreeImage_AppendPage() returns nothing and drops in silence
+   ; any page the encoder refuses, so ask the multibitmap how many actually went in. It must
+   ; be read before the file is closed.
+   addedPages := FreeImage_GetPageCount(multiFim)
+   showTOOLtip("Phase 3: Saving multipaged image file: " groupDigits(addedPages) " pages`n" OutFileName)
+   ; fnOutputDebug(multiFim "|" addedPages "==" file2save)
    r := FreeImage_CloseMultiBitmap(multiFim, 0)
    ; fnOutputDebug("closed and saved = " r)
    Loop, % tFrames
       FreeImage_UnLoad(imgList[A_Index])
 
-   If (animus=1 && bonux>0)
+   If (abandonAll=1)
    {
-      Loop, % bonux
-         FreeImage_UnLoad(bonusList[A_Index])
+      showTOOLtip("Operation aborted by user. Multipaged image file not created.")
+      SoundBeep, 300, 100
+      FileDelete, % file2save
+   } Else If (!r || !addedPages || !FileExist(file2save))
+   {
+      showTOOLtip("ERROR: Failed to create the multipaged image file. No page could be embedded.`n" OutFileName "`n" OutDir "\")
+      SoundBeep, 300, 100
+      addJournalEntry("No page could be embedded into the multipaged image file: " file2save ". Pages offered: " tFrames ". Pages accepted: " addedPages ". Saved: " r)
+   } Else
+   {
+      lostPages := (tFrames>addedPages) ? "`nFailed to embed " groupDigits(tFrames - addedPages) " pages" : ""
+      FileGetSize, OutputVar, % file2save
+      showTOOLtip("Finished creating the multipaged image file: " groupDigits(addedPages) " pages`n" OutFileName "`nFile size: " fileSizeFriendly(OutputVar) lostPages "`n" OutDir "\")
+      SoundBeep, 900, 100
    }
-   showTOOLtip("Finished creating the multipaged image file: " groupDigits(tFrames) " pages`n" OutFileName "`n" OutDir "\")
+
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (mustEnd=1) ? 300 : 900, 100
    SetTimer, RemoveTooltip, % -msgDisplayTime
    ; fnOutputDebug("the end")
 }
@@ -62802,13 +62881,21 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
    Return hFIFimgA
 }
 
-coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
+coreImgCombinerLoadFimFile(imgPath, subFrames, ByRef otherFrames) {
+; Returns the loaded and tone-mapped bitmap, or "f" when the file was a multi-page one and
+; its pages were handed over in otherFrames instead, or "" when nothing could be loaded.
+; The caller owns everything returned. Depth conversion and rescaling happen in
+; combineImgsAddPage(), so that single-page and multi-page sources go through one path.
+
+; subFrames mirrors the «Join contained frames from selected files» checkbox: with it off,
+; a multi-page source contributes its first page only, as the .tiff exporter already did.
+
   Critical, on
   sTime := A_TickCount
   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
   multiFlags := (GFT=25) ? 2 : 0
   changeMcursor()
-  If (GFT=18 || GFT=25)
+  If ((GFT=18 || GFT=25) && subFrames=1)
      hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
 
   thisIndex := 0
@@ -62829,9 +62916,13 @@ coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
            hPage := FreeImage_LockPage(hMultiBMP, frameu)
            If hPage
            {
-              thisIndex++
-              otherFrames[thisIndex] := FreeImage_Clone(hPage)
+              hClone := FreeImage_Clone(hPage)
               FreeImage_UnlockPage(hMultiBMP, hPage, 0)
+              If hClone   ; a failed clone must not enter the list as a null page
+              {
+                 thisIndex++
+                 otherFrames[thisIndex] := hClone
+              }
            }
         }
      }
@@ -62854,24 +62945,73 @@ coreImgCombinerLoadFimFile(imgPath, modus, animus, ByRef otherFrames) {
      ColorsType := FreeImage_GetColorType(hFIFimgA)
      imgType := FreeImage_GetImageType(hFIFimgA, 1)
      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
-     If (modus!=5 && animus=0 || animus=1)
-        hFIFimgC := combineImgsConvertDepth(hFIFimgA, modus, animus)
-
      ; eTime := A_TickCount - sTime
-     If hFIFimgC
-     {
-        FreeImage_UnLoad(hFIFimgA)
-        Return hFIFimgC
-     } Else Return hFIFimgA
+     Return hFIFimgA
   }
   ; ToolTip, % imgW ", " imgW2,,,2
 }
 
+combineImgsAddPage(k, modus, animus, setW, setH, setRes, imgList, ByRef tFrames, ByRef BMPmemSize) {
+; Prepares one page and appends it to imgList. It takes ownership of k: whatever it does not
+; store is unloaded here.
+
+; The rescale must come BEFORE the depth conversion. FreeImage_Rescale() expands a palettised
+; bitmap back to 24 bits, which the GIF encoder refuses; and OpenCV - the fast path inside
+; trFreeImage_Rescale() - rejects anything under 24 bits outright, so resizing a quantised
+; page was both slow and silently fatal to the whole file.
+
+   If !k
+      Return
+
+   If (setW>1 && setH>1 && setRes=1)
+   {
+      hFIFimgX := trFreeImage_Rescale(k, setW, setH)
+      If hFIFimgX
+      {
+         FreeImage_UnLoad(k)
+         k := hFIFimgX
+      }
+   }
+
+   hFIFimgC := combineImgsConvertDepth(k, modus, animus)
+   If hFIFimgC
+   {
+      FreeImage_UnLoad(k)
+      k := hFIFimgC
+   }
+
+   tFrames++
+   BMPmemSize += FreeImage_GetMemorySize(k)
+   imgList[tFrames] := k
+}
+
 combineImgsConvertDepth(k, modus, animus) {
+; animus=1 means the page is bound for a GIF, and the GIF encoder accepts 1, 4 or 8 bits
+; only. The modus branches below are the TIFF colour depth choice and must never be reached
+; in that case: a page that is already 8 bits used to fall through to them and come back
+; 32 bits, which FreeImage_AppendPage() then dropped without a word.
+
   imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(k), "-"))
   ; fnOutputDebug("depth=" imgBPPc "| m=" modus "| a=" animus)
-  If (imgBPPc!=8 && animus=1)
-     hFIFimgC := FreeImage_ColorQuantize(k)
+  If (animus=1)
+  {
+     If (imgBPPc=8)
+        Return   ; already palettised; keep the source palette
+
+     If (imgBPPc=24 || imgBPPc=32)
+        hFIFimgC := FreeImage_ColorQuantize(k)
+     Else
+     {
+        ; ColorQuantize() only takes 24 or 32 bits input, so 1/4/16/48/64 bits pages
+        ; need a step through 24 bits or they reach the encoder unquantised
+        hFIFimgD := FreeImage_ConvertTo(k, "24Bits")
+        If hFIFimgD
+        {
+           hFIFimgC := FreeImage_ColorQuantize(hFIFimgD)
+           FreeImage_UnLoad(hFIFimgD)
+        }
+     }
+  }
   Else If (imgBPPc!=32 && modus=1)
      hFIFimgC := FreeImage_ConvertTo(k, "32Bits")
   Else If (imgBPPc!=24 && modus=2)
@@ -74830,7 +74970,7 @@ LoadFileWithWIA(imgPath, fastMode, noBMP:=0, sizesDesired:=0, ByRef newBitmap:=0
       mainLoadedIMGdetails.dpi := Round((wiaImg.HorizontalResolution + wiaImg.VerticalResolution)/2)
       mainLoadedIMGdetails.Width := wiaImg.Width
       mainLoadedIMGdetails.Height := wiaImg.Height
-      mainLoadedIMGdetails.Frames := wiaImg.FrameCount
+      mainLoadedIMGdetails.Frames := (wiaImg.FrameCount>1) ? wiaImg.FrameCount - 1 : 0   ; a last-frame index, not a count
       mainLoadedIMGdetails.HasAlpha := wiaImg.IsAlphaPixelFormat
       If (wiaImg.IsAlphaPixelFormat=1)
          extraPixelFormat := "A"
@@ -75111,6 +75251,8 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
      mainLoadedIMGdetails.Width := imgW
      mainLoadedIMGdetails.Height := imgH
      mainLoadedIMGdetails.Frames := Gdip_GetBitmapFramesCount(oBitmap) - 1
+     If (mainLoadedIMGdetails.Frames<0)   ; a failed frame count must not read as -1 frames
+        mainLoadedIMGdetails.Frames := 0
      mainLoadedIMGdetails.HasAlpha := InStr(pixFmt, "argb") ? 1 : 0
      mainLoadedIMGdetails.PixelFormat := pixFmt
      mainLoadedIMGdetails.RawFormat := Gdip_GetImageRawFormat(oBitmap)
@@ -101243,6 +101385,8 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
       mainLoadedIMGdetails.Height := Height
       mainLoadedIMGdetails.ImgFile := imgPath
       mainLoadedIMGdetails.Frames := NumGet(resultsArray, 4 * 2, "uInt") - 1
+      If (mainLoadedIMGdetails.Frames<0)   ; a failed frame count must not read as -1 frames
+         mainLoadedIMGdetails.Frames := 0
       mainLoadedIMGdetails.ActiveFrame := NumGet(resultsArray, 4 * 6, "uInt")
       mainLoadedIMGdetails.DPI := NumGet(resultsArray, 4 * 4, "uInt")
       mainLoadedIMGdetails.RawFormat := WICcontainerFmts(NumGet(resultsArray, 4 * 5, "uInt"), imgPath)

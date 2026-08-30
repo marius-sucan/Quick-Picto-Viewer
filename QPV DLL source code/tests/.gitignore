@@ -38,5 +38,6 @@ gdip_mutant
 pdf_document
 pdf_mutant
 hash_bench
+freeimage_gif_oracle
 # built by hash_bench.cpp, which makes its own library-sized database
 hash_bench.sldb

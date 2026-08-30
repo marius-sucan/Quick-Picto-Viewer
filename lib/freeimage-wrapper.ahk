@@ -1045,6 +1045,14 @@ Metadata models [metaModel] supported by FreeImage
    FIMD_EXIF_RAW       = 11   // Exif metadata as a raw buffer
 */
 
+; To delete an entire metadata model, pass a blank key AND a blank fiTag. The blank key
+; must reach FreeImage as a real NULL pointer; DllCall marshals a blank "astr" as a pointer
+; to an empty string, which FreeImage reads as a request to delete the tag named "" and so
+; leaves the model untouched.
+
+   If (key="")
+      Return DllCall(getFIMfunc("SetMetadata"), "int", metaModel, "uptr", hImage, "uptr", 0, "uptr", fiTag)
+
    Return DllCall(getFIMfunc("SetMetadata"), "int", metaModel, "uptr", hImage, "astr", key, "uptr", fiTag)
 }
 

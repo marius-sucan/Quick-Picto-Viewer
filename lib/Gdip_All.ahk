@@ -2321,7 +2321,7 @@ Gdip_SaveImagesInTIFF(filesListArray, destFilePath) {
    ;  >0 = the number of files that failed to make it into the created .tiff
    ;  0 = complete succes 
    ; -1 = failed to initialize the .TIFF encoder 
-   ; -2 = failed to get the encoder parameters
+   ; -2 = failed to get the encoder parameters, or the encoder exposes no usable one
    ; -3 = failed to create the tiff file ; after the dot, isgdi+  the error code, returned by GdipSaveImageToFile
 
    Static EncoderParameterValueTypeLong := 4
@@ -2382,6 +2382,15 @@ Gdip_SaveImagesInTIFF(filesListArray, destFilePath) {
             }
          }
 
+         If !_p
+         {
+            ; the encoder exposes no single-value Long parameter, so there is nothing to
+            ; drive the multi-frame state machine with; every GdipSaveAddImage() below
+            ; would be rejected and the tail flush would write through a null pointer
+            fatalError := -2
+            Break
+         }
+
          _E := DllCall("gdiplus\GdipSaveImageToFile", "UPtr", multiBitmap, "WStr", destFilePath, "UPtr", pCodec, "uint", _p)
          If _E
          {
@@ -2401,10 +2410,16 @@ Gdip_SaveImagesInTIFF(filesListArray, destFilePath) {
       }
    }
  
-   NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
-   _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
-   ; this call fails, I do not know why; err-code = 2 ; invalid parameter; 
-   ; however the file is created succesfully
+   If (_p && !fatalError)
+   {
+      ; only when a file was actually started: on a fatal error _p can still be zero, and
+      ; NumPut()/NumGet() silently do nothing below address 65536, so the flush would be a
+      ; no-op writing through a null EncoderParameters pointer
+      NumPut(EncoderValueFlush, NumGet(NumPut(4, NumPut(1, _p+0)+20, "UInt")), "UInt")
+      _E := DllCall("gdiplus\GdipSaveAddImage", "UPtr", multiBitmap, "uint", _p)
+      ; this call fails, I do not know why; err-code = 2 ; invalid parameter;
+      ; however the file is created succesfully
+   }
    Gdip_DisposeImage(multiBitmap)
    encoderParameters := ""
    r := fatalError ? fatalError : failedFiles
