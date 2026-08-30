@@ -83314,9 +83314,9 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       Else
          entireVpCacheIDu := entireVpCacheBmp := ""
       Return
-   } Else If (DestPosX="15mpx-entire")
+   } Else If (DestPosX="25mpx-entire")
    {
-      ; the entire image at ~15 megapixels, for AutoCropAction() on huge images;
+      ; the entire image at ~25 megapixels, for AutoCropAction() on huge images;
       ; the caller owns the returned bitmap [it gets mutated and disposed],
       ; so the cache always hands out a clone
       If !(viewportQPVimage.imgHandle)
@@ -83333,7 +83333,7 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       If (rImgW<1 || rImgH<1)
          Return
 
-      ratio := Sqrt(15000000/(rImgW*rImgH))
+      ratio := Sqrt(25000000/(rImgW*rImgH))
       kW := (ratio<1) ? Round(rImgW*ratio) : rImgW
       kH := (ratio<1) ? Round(rImgH*ratio) : rImgH
       kW := clampInRange(kW, 1, rImgW)
@@ -98259,19 +98259,14 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    startu := A_TickCount
    If (zBitmap="large-img")
    {
-      ; huge image loaded through FreeImage/WIC [viewportQPVimage]; the analysis runs on
-      ; a proxy of ~15 megapixels and CoreAutoCropAlgo() maps the resulting coordinates
-      ; back onto the full-scale image [doubleSize=2], so every clamp and the selection
-      ; defined below must use the full-scale dimensions
       If (silentMode=0)
          showTOOLtip("Calculating auto-cropped region`nRetrieving the image, please wait", 0, 0, 0.01)
 
+      doubleSize := 2
       Width := viewportQPVimage.Width
       Height := viewportQPVimage.Height
-      doubleSize := 2
-      pBitmap := retrieveQPVscreenImgSection("15mpx-entire", 0, 0, 0, 0, 0)
-      If validBMP(pBitmap)
-         pBitmap := applyVPeffectsOnBMP(pBitmap)
+      pBitmap := retrieveQPVscreenImgSection("25mpx-entire", 0, 0, 0, 0, 0)
+      HardResetImageView()
    } Else
    {
       trGdip_GetImageDimensions(zBitmap, Width, Height)
@@ -98298,8 +98293,11 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       Return
    }
 
-   selCoords := (doubleSize=2) ? CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize, Width, Height)
-              : CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize)
+   If (doubleSize=2)
+      selCoords := CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize, Width, Height)
+   Else
+      selCoords := CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize)
+
    trGdip_DisposeImage(pBitmap, 1)
    If (selCoords="error")
    { 
@@ -98356,8 +98354,6 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    {
       If (zBitmap="large-img")
       {
-         ; there is no bitmap to crop and return in this mode; huge images
-         ; only support defining the crop area as a selection [selMode=1]
          addJournalEntry(A_ThisFunc "(): ERROR. selMode=0 is not supported for huge images")
          Return
       }
@@ -98544,8 +98540,6 @@ BTNsaveAutoCroppedFile() {
     }
 
     BtnCloseWindow()
-    ; define the auto-crop area as a selection [huge images get it at full scale],
-    ; crop the image in the viewport to it and let the user save the result
     r := BTNautoCropRealtime()
     If (r!="ok")
        Return
