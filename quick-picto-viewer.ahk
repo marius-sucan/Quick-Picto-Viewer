@@ -22564,6 +22564,7 @@ ResizeIMGviewportSelection() {
     imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
     If !(viewportQPVimage.imgHandle)
        capIMGdimensionsGDIPlimits(imgSelW, imgSelH)
+
     If (imgSelW=imgW && imgSelH=imgH)
        Return
 
@@ -22620,8 +22621,6 @@ PerformAutoCropViewportMode() {
     newBitmap := AutoCropAction(whichBitmap, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 0)
     If (newBitmap="change")
     {
-       ; the user altered the parameters mid-run; AutoCropAction() has already said so.
-       ; This is not a failure and must not be journalled as one.
        SetTimer, ResetImgLoadStatus, -150
        Return "abort"
     }
@@ -98262,9 +98261,6 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    If (Width>900 && Height>900)
    {
       doubleSize := 1
-      ; KeepRatio must stay 0: both arguments are already exact halves, and letting
-      ; calcIMGdimensions() re-derive them leaves the copy 1-2 px short of half, which the
-      ; unconditional *2 in CoreAutoCropAlgo() then turns into leftover border
       pBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, Width//2, Height//2, 0, 2)
    } Else
    {
@@ -98356,13 +98352,11 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
 CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0) {
    If !validBMP(pBitmap)
    {
-      addJournalEntry(A_ThisFunc "(): no bitmap given for auto-cropping")
+      addJournalEntry(A_ThisFunc "(): ERROR. No bitmap given for auto-cropping")
       Return "error"
    }
 
    trGdip_GetImageDimensions(pBitmap, Width, Height)
-   ; the DLL only reads the buffer; a read-only lock avoids a full-image write-back
-   ; conversion on every Gdip_UnlockBits() below
    E1 := trGdip_LockBits(pBitmap, 0, 0, Width, Height, Stride, iScan, BitmapData1, 1)
    If E1
       Return "error"
@@ -98371,7 +98365,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    ; so a padded - or negative, for a bottom-up bitmap - stride would walk off the buffer
    If (Stride != Width*4)
    {
-      addJournalEntry(A_ThisFunc "(): unusable stride " Stride " for width " Width ", expected " Width*4 ". Auto-crop needs a packed 32bpp buffer.")
+      addJournalEntry(A_ThisFunc "(): ERROR. Unusable stride " Stride " for width " Width ", expected " Width*4 ". Auto-crop needs a packed 32bpp buffer.")
       Gdip_UnlockBits(pBitmap, BitmapData1)
       Return "error"
    }
@@ -98435,7 +98429,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
 
    If (Stride != Width*4)
    {
-      addJournalEntry(A_ThisFunc "(): unusable stride " Stride " for width " Width ", expected " Width*4 ". Auto-crop needs a packed 32bpp buffer.")
+      addJournalEntry(A_ThisFunc "(): ERROR. Unusable stride " Stride " for width " Width ", expected " Width*4 ". Auto-crop needs a packed 32bpp buffer.")
       Gdip_UnlockBits(pBitmap, BitmapData1)
       Return "error"
    }
@@ -98475,12 +98469,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
       showTOOLtip("Calculating auto-cropped region`nDONE", 0, 0, 0.99)
 
    if (X1=-1 && Y1=-1 && X2=-1 && Y2=-1)
-   {
-      ; every scan ran to completion without ever exceeding the tolerance budget: the whole
-      ; image matches its own corner, so there is no border to find. Saying so lets the
-      ; caller return the entire frame instead of the two pixel box this used to produce.
       Return "nocrop"
-   }
 
    X2 := Width - X2
    Y2 := Height - Y2
@@ -98499,9 +98488,6 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
       X1 := X1*2, Y1 := Y1*2
    }
 
-   ; "Cropped area alteration": this belongs on the shared path, and has to be applied in
-   ; full-image pixels - i.e. after the doubleSize scaling above - or the "px" mode is
-   ; silently doubled and the "%" mode measures against the halved copy
    fullW := (doubleSize=1) ? Width*2 : Width
    fullH := (doubleSize=1) ? Height*2 : Height
    deviationW := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullW/100)*usrAutoCropDeviation)
@@ -98539,20 +98525,19 @@ BTNsaveAutoCroppedFile() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    ; nothing cropped means the panel must stay open: closing it and going straight to
-    ; PanelSaveImg() would offer the untouched image as though it had been cropped.
-    ; "fail" and "abort" have already put their own message on screen; "noop" has not.
     r := PerformAutoCropViewportMode()
     If (r="noop")
     {
-       showTOOLtip("Auto-crop could not run on this image")
+       showTOOLtip("WARNING: Auto-crop could not run on this image")
        SoundBeep, 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
     }
+
     If (r="noop" || r="fail" || r="abort")
        Return
 
     BtnCloseWindow()
+    Sleep, 5
     PanelSaveImg()
 }
 
