@@ -98361,14 +98361,9 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    If E1
       Return "error"
 
-   ; autoCropAider() indexes the buffer as [x + y*Width] and takes no stride of its own,
-   ; so a padded - or negative, for a bottom-up bitmap - stride would walk off the buffer
-   If (Stride != Width*4)
-   {
-      addJournalEntry(A_ThisFunc "(): ERROR. Unusable stride " Stride " for width " Width ", expected " Width*4 ". Auto-crop needs a packed 32bpp buffer.")
-      Gdip_UnlockBits(pBitmap, BitmapData1)
-      Return "error"
-   }
+   ; trGdip_LockBits() locks as 0x26200A, so the buffer handed to the DLL below is always
+   ; 32 bpp; autoCropAider() addresses it in bytes and walks the stride it is given, which
+   ; is why a padded - or negative, for a bottom-up bitmap - stride needs no guard here
 
    partialUpdateUIautoCropParams()
    adaptLevel := (AutoCropStrongAdaptiveMode=1) ? 6 : 3
@@ -98377,7 +98372,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 1 - Y1", 0, 0, 0.1)
 
-   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y1)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y1)
    If !r
    {
       Gdip_UnlockBits(pBitmap, BitmapData1)
@@ -98391,7 +98386,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    }
 
    If (AutoCropAdaptiveMode=1 && Y1=-1)
-      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y1)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y1)
 
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 2 - X1", 0, 0, 0.3)
@@ -98402,7 +98397,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
       Return "change"
    }
 
-   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X1)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X1)
    If !partialUpdateUIautoCropParams()
    {
       Gdip_UnlockBits(pBitmap, BitmapData1)
@@ -98410,7 +98405,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    }
 
    If (AutoCropAdaptiveMode=1 && X1=-1)
-      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 0, "int*", X1)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 0, "int*", X1)
 
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 3 - Y2", 0, 0, 0.5)
@@ -98427,14 +98422,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    If E2
       Return "error"
 
-   If (Stride != Width*4)
-   {
-      addJournalEntry(A_ThisFunc "(): ERROR. Unusable stride " Stride " for width " Width ", expected " Width*4 ". Auto-crop needs a packed 32bpp buffer.")
-      Gdip_UnlockBits(pBitmap, BitmapData1)
-      Return "error"
-   }
-
-   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y2)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", AutoCropAdaptiveMode, "int*", Y2)
    If (silentMode=0)
       showTOOLtip("Calculating auto-cropped region`nStep 4 - X2", 0, 0, 0.8)
 
@@ -98445,7 +98433,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    }
 
    If (AutoCropAdaptiveMode=1 && Y2=-1)
-      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y2)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 1, "Int", 0, "int*", Y2)
 
    If !partialUpdateUIautoCropParams()
    {
@@ -98453,7 +98441,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
       Return "change"
    }
 
-   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X2)
+   r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", AutoCropAdaptiveMode, "int*", X2)
    If !partialUpdateUIautoCropParams()
    {
       Gdip_UnlockBits(pBitmap, BitmapData1)
@@ -98461,7 +98449,7 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    }
 
    If (AutoCropAdaptiveMode=1 && X2=-1)
-      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 0, "int*", X2)
+      r := DllCall("qpvmain.dll\autoCropAider", "UPtr", iScan, "Int", Width, "Int", Height, "Int", Stride, "Int", 32, "Int", adaptLevel, "double", threshold, "double", varTolerance, "Int", 2, "Int", 0, "int*", X2)
 
    ; fnOutputDebug(X1 "=" Y1 "|" X2 "=" Y2)
    Gdip_UnlockBits(pBitmap, BitmapData1)

@@ -3348,9 +3348,12 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
 // read as identical whatever their RGB is, and a transparent pixel must never be mistaken
 // for an opaque black one. For opaque pixels the weight is 255 and the result is exactly
 // the plain luma difference, so images without an alpha channel are unaffected.
-static inline void acReadPixel(int color, int &gray, int &alpha) {
-   alpha = (color >> 24) & 0xFF;
-   gray = wrapRGBtoGray(color, 1);
+static inline void acReadPixel(const unsigned char *px, int bpp, int &gray, int &alpha) {
+   // px points at one pixel of a BGRA / BGR buffer; a bitmap without an alpha
+   // channel is opaque everywhere
+   alpha = (bpp==32) ? px[3] : 255;
+   int sR = px[2], sG = px[1], sB = px[0], mode = 1;
+   gray = RGBtoGray(sR, sG, sB, mode);
 }
 
 static inline int acDelta(int prevGray, int prevAlpha, int gray, int alpha) {
@@ -3360,7 +3363,14 @@ static inline int acDelta(int prevGray, int prevAlpha, int gray, int alpha) {
    return (dA > dG) ? dA : dG;
 }
 
-DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
+DLL_API int DLL_CALLCONV autoCropAider(unsigned char* BitmapData, int Width, int Height, int Stride, int bpp, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
+   // BitmapData is addressed in bytes, the way FillSelectArea() does it: a row starts at
+   // y*Stride and a pixel at x*bpc within it. Honouring the stride means a padded row -- or
+   // a bottom-up buffer, where Stride is negative and BitmapData points at the top row --
+   // is walked correctly instead of being refused by the caller. y*Stride has to be INT64:
+   // at QPV's 32750 px per side cap the stride is 131000 bytes and the byte offset leaves
+   // the range of an int at row 16394, less than halfway down the image
+   const int bpc = bpp/8;
    int maxThresholdHitsW = round(Width*threshold) + 1;
    if (maxThresholdHitsW>floor(Width/2))
       maxThresholdHitsW = floor(Width/2);
@@ -3369,13 +3379,13 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
    if (maxThresholdHitsH>floor(Height/2))
       maxThresholdHitsH = floor(Height/2);
 
-   int clrPrimeA = BitmapData[0];
-   int clrPrimeB = (Width > 1) ? BitmapData[1] : clrPrimeA;      // pixel (1,0)
-   int clrPrimeC = (Height > 1) ? BitmapData[Width] : clrPrimeA; // pixel (0,1)
+   const unsigned char *clrPrimeA = BitmapData;
+   const unsigned char *clrPrimeB = (Width > 1) ? BitmapData + bpc : clrPrimeA;     // pixel (1,0)
+   const unsigned char *clrPrimeC = (Height > 1) ? BitmapData + Stride : clrPrimeA; // pixel (0,1)
    int prevR1, prevR2, prevR3, prevA1, prevA2, prevA3;
-   acReadPixel(clrPrimeA, prevR1, prevA1);
-   acReadPixel(clrPrimeB, prevR2, prevA2);
-   acReadPixel(clrPrimeC, prevR3, prevA3);
+   acReadPixel(clrPrimeA, bpp, prevR1, prevA1);
+   acReadPixel(clrPrimeB, bpp, prevR2, prevA2);
+   acReadPixel(clrPrimeC, bpp, prevR3, prevA3);
    int prevR4 = (prevR1 + prevR2 + prevR3)/3;
    int prevA4 = (prevA1 + prevA2 + prevA3)/3;
 
@@ -3392,11 +3402,12 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
    {
       for (y = 0; y < Height; y++)
       {
+         const unsigned char *row = BitmapData + (INT64)y * Stride;
          if (aaMode==1)
          {
             int lineR1, lineA1, lineR2, lineA2;
-            acReadPixel(BitmapData[y * Width], lineR1, lineA1);
-            acReadPixel(BitmapData[seedStepW + (y * Width)], lineR2, lineA2);
+            acReadPixel(row, bpp, lineR1, lineA1);
+            acReadPixel(row + (INT64)seedStepW * bpc, bpp, lineR2, lineA2);
             prevR4 = (lineR1 + lineR2 + 1)/2;
             prevA4 = (lineA1 + lineA2 + 1)/2;
          }
@@ -3404,7 +3415,7 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
          for (x = 0; x < Width; x++)
          {
             int R1, A1;
-            acReadPixel(BitmapData[x + (y * Width)], R1, A1);
+            acReadPixel(row + (INT64)x * bpc, bpp, R1, A1);
             int d = acDelta(prevR4, prevA4, R1, A1);
 
             if (aaMode==1)
@@ -3440,11 +3451,12 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
    {
       for (x = 0; x < Width; x++)
       {
+         const unsigned char *col = BitmapData + (INT64)x * bpc;
          if (aaMode==1)
          {
             int lineR1, lineA1, lineR2, lineA2;
-            acReadPixel(BitmapData[x], lineR1, lineA1);
-            acReadPixel(BitmapData[x + (seedStepH * Width)], lineR2, lineA2);
+            acReadPixel(col, bpp, lineR1, lineA1);
+            acReadPixel(col + (INT64)seedStepH * Stride, bpp, lineR2, lineA2);
             prevR4 = (lineR1 + lineR2 + 1)/2;
             prevA4 = (lineA1 + lineA2 + 1)/2;
          }
@@ -3452,7 +3464,7 @@ DLL_API int DLL_CALLCONV autoCropAider(int* BitmapData, int Width, int Height, i
          for (y = 0; y < Height; y++)
          {
             int R1, A1;
-            acReadPixel(BitmapData[x + (y * Width)], R1, A1);
+            acReadPixel(col + (INT64)y * Stride, bpp, R1, A1);
             int d = acDelta(prevR4, prevA4, R1, A1);
 
             if (aaMode==1 && inRange(d - adaptLevel, d + adaptLevel, vTolrc))
