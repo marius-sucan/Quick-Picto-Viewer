@@ -22608,41 +22608,6 @@ ResizeIMGviewportSelection() {
     SetTimer, dummyInfoImgResizeVP, -125
 }
 
-PerformAutoCropViewportMode() {
-    stopNow := (editingSelectionNow=1 && validBMP(useGdiBitmap())) ? 0 : 1
-    If (stopNow=1)
-       Return "noop"
-
-    stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc)
-    whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
-    If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1)
-       Return "noop"
-
-    newBitmap := AutoCropAction(whichBitmap, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 0)
-    If (newBitmap="change")
-    {
-       SetTimer, ResetImgLoadStatus, -150
-       Return "abort"
-    }
-
-    If !validBMP(newBitmap)
-    {
-       addJournalEntry(A_ThisFunc "(): ERROR. Failed to perform auto-crop for image.")
-       SoundBeep 300, 100
-       SetTimer, ResetImgLoadStatus, -150
-       Return "fail"
-    }
-
-    wrapRecordUndoLevelNow(newBitmap)
-    ResetImgLoadStatus()
-    editingSelectionNow := vpIMGrotation := 0
-    updateUIctrl()
-    MouseMoveResponder()
-    dummyTimerDelayiedImageDisplay(50)
-    SetTimer, ResetImgLoadStatus, -150
-    SetTimer, dummyInfoImgResizeVP, -125
-}
-
 dummyInfoImgResizeVP() {
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    mpx := Round((imgW * imgH)/1000000, 2)
@@ -98407,6 +98372,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       ImgSelX1 := xa, ImgSelY1 := ya
       ImgSelX2 := xb, ImgSelY2 := yb
       defineRelativeSelCoords(Width, Height)
+      Return "ok"
    }
 }
 
@@ -98571,30 +98537,20 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0,
 BTNsaveAutoCroppedFile() {
     UpdateUIautoCropParams()
     filesElected := getSelectedFiles(0, 1)
-    If (filesElected>1)
+    If (filesElected>1 && !viewportQPVimage.imgHandle)
     {
        batchAutoCropFiles()
        Return
     }
 
-    If (AnyWindowOpen=17)
-       UpdateUIautoCropParams()
-
-    If (editingSelectionNow!=1)
-       ToggleEditImgSelection()
-
-    r := PerformAutoCropViewportMode()
-    If (r="noop")
-    {
-       showTOOLtip("WARNING: Auto-crop could not run on this image")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-    }
-
-    If (r="noop" || r="fail" || r="abort")
+    BtnCloseWindow()
+    ; define the auto-crop area as a selection [huge images get it at full scale],
+    ; crop the image in the viewport to it and let the user save the result
+    r := BTNautoCropRealtime()
+    If (r!="ok")
        Return
 
-    BtnCloseWindow()
+    CropImageInViewPortToSelection()
     Sleep, 5
     PanelSaveImg()
 }
@@ -98906,10 +98862,11 @@ BTNautoCropVP() {
   GuiControl, SettingsGUIA: Disable, mainBtnACT
   UpdateUIautoCropParams()
   BtnCloseWindow()
-  If (editingSelectionNow!=1)
-     ToggleEditImgSelection()
-
-  PerformAutoCropViewportMode()
+  ; define the auto-crop area as a selection [huge images get it at full scale]
+  ; and crop the image in the viewport to it; on abort or failure, no crop occurs
+  r := BTNautoCropRealtime()
+  If (r="ok")
+     CropImageInViewPortToSelection()
 }
 
 BTNautoCropRealtime() {
@@ -98928,13 +98885,13 @@ BTNautoCropRealtime() {
 
   If (viewportQPVimage.imgHandle)
   {
-     AutoCropAction("large-img", usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
+     r := AutoCropAction("large-img", usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
   } Else
   {
      thumbBMP := applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap()))
      If validBMP(thumbBMP)
      {
-        AutoCropAction(thumbBMP, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
+        r := AutoCropAction(thumbBMP, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
         trGdip_DisposeImage(thumbBMP, 1)
      }
   }
@@ -98949,6 +98906,7 @@ BTNautoCropRealtime() {
      Loop, 5
          GuiControl, SettingsGUIA: Enable, btn%A_Index%
   }
+  Return r
 }
 
 coreWIAsimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor) {
