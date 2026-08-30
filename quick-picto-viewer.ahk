@@ -98021,7 +98021,7 @@ PanelImgAutoCrop() {
     {
        Tooltip, Please wait...
        getSelectedFiles(0, 1)
-       If !markedSelectFile
+       If (!markedSelectFile || viewportQPVimage.imgHandle)
        {
           lastOtherWinClose := 1
           ToggleThumbsMode()
@@ -98030,9 +98030,6 @@ PanelImgAutoCrop() {
           Return
        }
     }
-
-    If (downscaleHugeImagesForEditing()<0)
-       Return
 
     If (vpIMGrotation>0)
     {
@@ -98074,19 +98071,20 @@ PanelImgAutoCrop() {
     GuiAddSlider("usrAutoCropDeviation", -50,50, 0, "Cropped area alteration", "UpdateUIautoCropParams", 2, "xs y+10 w" slide2Wid " h" ha)
     Gui, Add, Checkbox, x+10 hp gUpdateUIautoCropParams Checked%usrAutoCropDeviationPixels% vusrAutoCropDeviationPixels, Alteration in pixels
 
+    allowMulti := (filesElected>1 && !viewportQPVimage.imgHandle) ? 1 : 0
     thisBW := (PrefsLargeFonts=1) ? 145 : 90
     thisAW := (PrefsLargeFonts=1) ? 85 : 75
-    thisAW := (filesElected>1) ? "w" thisAW : "w1"
-    thisW := (filesElected>1) ? "" : "w1"
-    thisH := (filesElected>1) ? "" : "h1"
-    thisH2 := (filesElected>1) ? "hp" : "h1"
-    ty:= (filesElected>1) ? 10 : 0
+    thisAW := (allowMulti=1) ? "w" thisAW : "w1"
+    thisW := (allowMulti=1) ? "" : "w1"
+    thisH := (allowMulti=1) ? "" : "h1"
+    thisH2 := (allowMulti=1) ? "hp" : "h1"
+    ty:= (allowMulti=1) ? 10 : 0
 
     Gui, Add, Checkbox, xs y+%ty% gTglRszDestFoldr %thisW% %thisH% Checked%ResizeUseDestDir% vResizeUseDestDir, Save file[s] in the specified destination folder: 
     GuiAddEdit("xp+15 y+5 wp " thisH " r1 +0x0800 -wrap vResizeDestFolder", ResizeDestFolder, "Destination folder")
     ml := (PrefsLargeFonts=1) ? 90 : 70
     Gui, Add, Button, x+5 hp w%ml% %thisW% %thisH% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
-    If (filesElected>1)
+    If (allowMulti=1)
     {
        Gui, Add, Text, xs y+%ty% hp +0x200 +hwndhTemp, Action on file name conflicts:
        GuiAddDropDownList("x+5 w" thisBW A_Space thisW A_Space thisH " AltSubmit Choose" userActionAutoCropConflictingFile " vuserActionAutoCropConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
@@ -98096,7 +98094,7 @@ PanelImgAutoCrop() {
     }
 
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    If (filesElected>1)
+    If (allowMulti=1)
     {
        GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "x+5 w" thisWid + 20 " hp", "This only applies to the JPEG and WEBP file formats")
        Gui, Font, Bold
@@ -98130,10 +98128,12 @@ PanelImgAutoCrop() {
     }
 
     sml := (PrefsLargeFonts=1) ? 90 : 55
-    If (filesElected>1)
+    If (allowMulti=1)
     {
-       Gui, Add, Button, x+5 hp w%btnWid% Default gBTNautoCropRealtime vmainBtnACT, &Viewport preview
-       Gui, Add, Button, x+5 hp wp gBTNsaveAutoCroppedFile vbtn3, &Process files
+       defu := (thumbsDisplaying=1) ? "Default" : ""
+       If (thumbsDisplaying!=1)
+          Gui, Add, Button, x+5 hp w%btnWid% Default gBTNautoCropRealtime vmainBtnACT, &Viewport preview
+       Gui, Add, Button, x+5 hp wp %defu% gBTNsaveAutoCroppedFile vbtn3, &Process files
     } Else
     {
        btnWid -= 10
@@ -98141,8 +98141,8 @@ PanelImgAutoCrop() {
        Gui, Add, Button, x+5 hp wp Default gBTNautoCropRealtime vbtn3, &Preview
        Gui, Add, Button, x+5 hp w%btnWid% gBTNsaveAutoCroppedFile vbtn4, &Save image
     }
-    Gui, Add, Button, x+5 hp w%sml% gBtnCloseWindow vbtn5, &Cancel
 
+    Gui, Add, Button, x+5 hp w%sml% gBtnCloseWindow vbtn5, &Cancel
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Automatic image crop: " appTitle, winPos)
     Sleep, 1
@@ -98257,15 +98257,23 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       showTOOLtip("Calculating auto-cropped region`nStep 0", 0, 0, 0.001)
 
    startu := A_TickCount
-   trGdip_GetImageDimensions(zBitmap, Width, Height)
-   If (Width>900 && Height>900)
+   If (zBitmap="large-img")
    {
+      pBitmap := retrieveQPVscreenImgSection("last-entire", 0, 0, 0, 0, 0)
       doubleSize := 1
-      pBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, Width//2, Height//2, 0, 2)
+      trGdip_GetImageDimensions(pBitmap, Width, Height)
    } Else
    {
-      pBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
-      doubleSize := 0
+      trGdip_GetImageDimensions(zBitmap, Width, Height)
+      If (Width>1800 && Height>1800)
+      {
+         doubleSize := 1
+         pBitmap := trGdip_ResizeBitmap(A_ThisFunc, zBitmap, Width//2, Height//2, 0, 2)
+      } Else
+      {
+         pBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
+         doubleSize := 0
+      }
    }
 
    ; trGdip_DisposeImage(zBitmap, 1)   ; the function caller must dispose it
@@ -98286,7 +98294,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    { 
       If (silentMode!=1)
       {
-         showTOOLtip("Auto-crop failed to process the image")
+         showTOOLtip("ERROR: Auto-crop failed to process the image")
          SoundBeep, 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
@@ -98296,7 +98304,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       ; the user altered the auto-crop parameters mid-run; this is not a failure
       If (silentMode!=1)
       {
-         showTOOLtip("Auto-crop processing aborted by user")
+         showTOOLtip("WARNING: Auto-crop processing aborted by user")
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
       Return "change"
@@ -98321,17 +98329,16 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       yb := clampInRange(Y2, ya + 1, Height)
    }
 
-   If (silentMode=0)
+   If (nothing2crop=1 && silentMode=0)
+   {
+      showTOOLtip("WARNING: The image is uniform within the given tolerance.`nThere is nothing to trim.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   } Else If (silentMode=0)
    {
       If (A_TickCount - startu > 3000)
          SoundBeep, 900, 100
       SetTimer, RemoveTooltip, -500
-   }
-
-   If (nothing2crop=1 && silentMode=0)
-   {
-      showTOOLtip("Auto-crop: the image is uniform within the given tolerance,`nthere is nothing to trim")
-      SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 
    If (selMode=0)
@@ -98339,7 +98346,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       newW := xb - xa
       newH := yb - ya
       kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, zBitmap, xa, ya, newW, newH)
-      return kBitmap
+      Return kBitmap
    } Else
    {
       VPselRotation := innerSelectionCavityX := innerSelectionCavityY := EllipseSelectMode := 0
@@ -98360,10 +98367,6 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    E1 := trGdip_LockBits(pBitmap, 0, 0, Width, Height, Stride, iScan, BitmapData1, 1)
    If E1
       Return "error"
-
-   ; trGdip_LockBits() locks as 0x26200A, so the buffer handed to the DLL below is always
-   ; 32 bpp; autoCropAider() addresses it in bytes and walks the stride it is given, which
-   ; is why a padded - or negative, for a bottom-up bitmap - stride needs no guard here
 
    partialUpdateUIautoCropParams()
    adaptLevel := (AutoCropStrongAdaptiveMode=1) ? 6 : 3
@@ -98835,9 +98838,6 @@ batchAutoColorsFiles() {
 BTNautoCropVP() {
   GuiControl, SettingsGUIA: Disable, mainBtnACT
   UpdateUIautoCropParams()
-  If (downscaleHugeImagesForEditing()<0)
-     Return
-
   BtnCloseWindow()
   If (editingSelectionNow!=1)
      ToggleEditImgSelection()
@@ -98849,7 +98849,6 @@ BTNautoCropRealtime() {
   lockSelectionAspectRatio := 1
   defineSelectionAspectRatios()
   GuiControl, SettingsGUIA: Disable, mainBtnACT
-
   If (AnyWindowOpen=17)
   {
      UpdateUIautoCropParams()
@@ -98860,14 +98859,17 @@ BTNautoCropRealtime() {
   If (editingSelectionNow!=1)
      ToggleEditImgSelection()
 
-  If (downscaleHugeImagesForEditing()<0)
-     Return
-
-  thumbBMP := applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap()))
-  If validBMP(thumbBMP)
+  If (viewportQPVimage.imgHandle)
   {
-     AutoCropAction(thumbBMP, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
-     trGdip_DisposeImage(thumbBMP, 1)
+     AutoCropAction("large-img", usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
+  } Else
+  {
+     thumbBMP := applyVPeffectsOnBMP(trGdip_CloneBitmap(A_ThisFunc, useGdiBitmap()))
+     If validBMP(thumbBMP)
+     {
+        AutoCropAction(thumbBMP, usrAutoCropColorTolerance, usrAutoCropErrThreshold/100, 0, 1)
+        trGdip_DisposeImage(thumbBMP, 1)
+     }
   }
 
   dummyRefreshImgSelectionWindow()

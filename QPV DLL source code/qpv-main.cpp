@@ -2900,14 +2900,6 @@ bool decideColorsEqual(RGBAColor newColor, RGBAColor oldColor, float tolerance, 
     return result;
 }
 
-int wrapRGBtoGray(int color, int mode) {
-    int rB = (color >> 16) & 0xFF;
-    int gB = (color >> 8) & 0xFF;
-    int bB = color & 0xFF;
-    int index = RGBtoGray(rB, gB, bB, mode);
-    return index;
-}
-
 void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RGBAColor newColor, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, int flipLayers, int bpp, int keepAlpha, int simpleMode) {
   RGBAColor thisColor = {0, 0, 0, 0};
   if (simpleMode==1)
