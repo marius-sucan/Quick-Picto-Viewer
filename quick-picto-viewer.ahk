@@ -83322,12 +83322,14 @@ killQPVscreenImgSection() {
 
 retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, newH) {
    Static vpCacheBmp, prevState, wasEntireX := 0, wasEntireY := 0, prevZoom := 0, prevImgIDu := "", entireVpCacheBmp, entireVpCacheIDu
-        , tdpX, tdpY, timgW, timgH
+        , tdpX, tdpY, timgW, timgH, mpxVpCacheBmp, mpxVpCacheIDu
 
    If (DestPosX="kill")
    {
       vpCacheBmp := trGdip_DisposeImage(vpCacheBmp, 1)
       entireVpCacheBmp := trGdip_DisposeImage(entireVpCacheBmp, 1)
+      mpxVpCacheBmp := trGdip_DisposeImage(mpxVpCacheBmp, 1)
+      mpxVpCacheIDu := ""
       entireVpCacheIDu := ""
       prevState := ""
       Return
@@ -83347,6 +83349,39 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       Else
          entireVpCacheIDu := entireVpCacheBmp := ""
       Return
+   } Else If (DestPosX="15mpx-entire")
+   {
+      ; the entire image at ~15 megapixels, for AutoCropAction() on huge images;
+      ; the caller owns the returned bitmap [it gets mutated and disposed],
+      ; so the cache always hands out a clone
+      If !(viewportQPVimage.imgHandle)
+         Return
+
+      imgIDu := viewportQPVimage.ImgFile "|" viewportQPVimage.imgHandle
+      If (validBMP(mpxVpCacheBmp) && mpxVpCacheIDu=imgIDu)
+         Return trGdip_CloneBitmap(A_ThisFunc, mpxVpCacheBmp)
+
+      mpxVpCacheBmp := trGdip_DisposeImage(mpxVpCacheBmp, 1)
+      mpxVpCacheIDu := ""
+      rImgW := viewportQPVimage.Width
+      rImgH := viewportQPVimage.Height
+      If (rImgW<1 || rImgH<1)
+         Return
+
+      ratio := Sqrt(15000000/(rImgW*rImgH))
+      kW := (ratio<1) ? Round(rImgW*ratio) : rImgW
+      kH := (ratio<1) ? Round(rImgH*ratio) : rImgH
+      kW := clampInRange(kW, 1, rImgW)
+      kH := clampInRange(kH, 1, rImgH)
+      mpxVpCacheBmp := viewportQPVimage.ImageGetResizedRect(0, 0, rImgW, rImgH, kW, kH, userimgQuality)
+      If !validBMP(mpxVpCacheBmp)
+      {
+         mpxVpCacheBmp := ""
+         Return
+      }
+
+      mpxVpCacheIDu := imgIDu
+      Return trGdip_CloneBitmap(A_ThisFunc, mpxVpCacheBmp)
    }
 
    If !(viewportQPVimage.imgHandle)
@@ -98259,9 +98294,19 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    startu := A_TickCount
    If (zBitmap="large-img")
    {
-      pBitmap := retrieveQPVscreenImgSection("last-entire", 0, 0, 0, 0, 0)
-      doubleSize := 1
-      trGdip_GetImageDimensions(pBitmap, Width, Height)
+      ; huge image loaded through FreeImage/WIC [viewportQPVimage]; the analysis runs on
+      ; a proxy of ~15 megapixels and CoreAutoCropAlgo() maps the resulting coordinates
+      ; back onto the full-scale image [doubleSize=2], so every clamp and the selection
+      ; defined below must use the full-scale dimensions
+      If (silentMode=0)
+         showTOOLtip("Calculating auto-cropped region`nRetrieving the image, please wait", 0, 0, 0.01)
+
+      Width := viewportQPVimage.Width
+      Height := viewportQPVimage.Height
+      doubleSize := 2
+      pBitmap := retrieveQPVscreenImgSection("15mpx-entire", 0, 0, 0, 0, 0)
+      If validBMP(pBitmap)
+         pBitmap := applyVPeffectsOnBMP(pBitmap)
    } Else
    {
       trGdip_GetImageDimensions(zBitmap, Width, Height)
@@ -98288,7 +98333,8 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       Return
    }
 
-   selCoords := CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize)
+   selCoords := (doubleSize=2) ? CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize, Width, Height)
+              : CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode, doubleSize)
    trGdip_DisposeImage(pBitmap, 1)
    If (selCoords="error")
    { 
@@ -98343,6 +98389,14 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
 
    If (selMode=0)
    {
+      If (zBitmap="large-img")
+      {
+         ; there is no bitmap to crop and return in this mode; huge images
+         ; only support defining the crop area as a selection [selMode=1]
+         addJournalEntry(A_ThisFunc "(): ERROR. selMode=0 is not supported for huge images")
+         Return
+      }
+
       newW := xb - xa
       newH := yb - ya
       kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, zBitmap, xa, ya, newW, newH)
@@ -98356,7 +98410,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    }
 }
 
-CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0) {
+CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0, givenFullW:=0, givenFullH:=0) {
    If !validBMP(pBitmap)
    {
       addJournalEntry(A_ThisFunc "(): ERROR. No bitmap given for auto-cropping")
@@ -98477,10 +98531,23 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0)
    {
       X2 := X2*2, Y2 := Y2*2
       X1 := X1*2, Y1 := Y1*2
+      fullW := Width*2
+      fullH := Height*2
+   } Else If (doubleSize=2)
+   {
+      ; the analysis ran on a proxy downscaled to ~15 megapixels [huge images];
+      ; adapt the coordinates to match the real full-scale image; the two axes
+      ; are mapped separately because the proxy dimensions round independently
+      fullW := (givenFullW>0) ? givenFullW : Width
+      fullH := (givenFullH>0) ? givenFullH : Height
+      X1 := Round(X1*fullW/Width),   Y1 := Round(Y1*fullH/Height)
+      X2 := Round(X2*fullW/Width),   Y2 := Round(Y2*fullH/Height)
+   } Else
+   {
+      fullW := Width
+      fullH := Height
    }
 
-   fullW := (doubleSize=1) ? Width*2 : Width
-   fullH := (doubleSize=1) ? Height*2 : Height
    deviationW := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullW/100)*usrAutoCropDeviation)
    deviationH := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullH/100)*usrAutoCropDeviation)
    If (usrAutoCropDeviationSnap=1 && X1>2) || (usrAutoCropDeviationSnap=0)
