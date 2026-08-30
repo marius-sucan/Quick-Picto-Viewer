@@ -340,7 +340,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , combinePDFpageLandscape := 0, combinePDFpageHighQuality := 0, usePrevSaveFolder := 0
    , userCombineSubFrames := 0, blurAreaYamount := 10, blurAreaEqualXY := 1, UserAddNoiseMode := 1
    , UserAddNoiseDetails := 10, slidesRandoMode := 1, convertOnAutoCrop := 0, AutoCropStrongAdaptiveMode := 0
-   , usrAutoCropErrThreshold := 5, onConflictMultiRenameAct := 4, userActionAutoCropConflictingFile := 4
+   , usrAutoCropErrThreshold := 5, onConflictMultiRenameAct := 4
    , userCopyMoveStructuredConflictMode := 4, SeenIMGprivateFolder := "", FillAreaRectRoundness := 45
    , FillAreaEllipseSection := 1440, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6, DrawLineAreaGridY := 6
    , DrawLineAreaSpiralLength := 350, DrawLineAreaRaysLimit := 0, DrawLineAreaSpiralCenterMode := 1
@@ -25145,7 +25145,10 @@ CropImageInViewPortToSelection(modus:=0) {
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     mgpx := Round((imgW * imgH)/1000000, 1)
     calcImgSelection2bmp(1, imgW, imgH, imgW - 1, imgH - 1, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    If (modus!="simplex" && EllipseSelectMode=0 && isInRange(imgSelW, imgW - 2, imgW + 2) && isInRange(imgSelH, imgH - 2, imgH + 2) && !imgSelPx && !imgSelPy)
+    ; nothing to trim: a selection at origin covering the entire image; up to 2px of
+    ; overhang is treated as drag slop, but an undersized selection is a real crop,
+    ; even by a single pixel
+    If (modus!="simplex" && EllipseSelectMode=0 && isInRange(imgSelW, imgW, imgW + 2) && isInRange(imgSelH, imgH, imgH + 2) && !imgSelPx && !imgSelPy)
     {
        MouseMoveResponder()
        dummyTimerDelayiedImageDisplay(50)
@@ -98087,7 +98090,7 @@ PanelImgAutoCrop() {
     If (allowMulti=1)
     {
        Gui, Add, Text, xs y+%ty% hp +0x200 +hwndhTemp, Action on file name conflicts:
-       GuiAddDropDownList("x+5 w" thisBW A_Space thisW A_Space thisH " AltSubmit Choose" userActionAutoCropConflictingFile " vuserActionAutoCropConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
+       GuiAddDropDownList("x+5 w" thisBW A_Space thisW A_Space thisH " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
        Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve files date/time
        Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%convertOnAutoCrop% vconvertOnAutoCrop, &Convert on save to:
        GuiAddDropDownList("x+5 " thisAW A_Space thisH " gTglDesiredSaveFormat AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs, "Image file format")
@@ -98104,7 +98107,7 @@ PanelImgAutoCrop() {
     {
        GuiControl, Disable, PreserveDateTimeOnSave
        GuiControl, Disable, convertOnAutoCrop
-       GuiControl, Disable, userActionAutoCropConflictingFile
+       GuiControl, Disable, userActionConflictingFile
        GuiControl, Disable, editF5
        GuiControl, Disable, userDesireWriteFMT
        GuiControl, Disable, ResizeUseDestDir
@@ -98179,7 +98182,7 @@ UpdateUIautoCropParams() {
 
     If markedSelectFile
     {
-       GuiControlGet, userActionAutoCropConflictingFile
+       GuiControlGet, userActionConflictingFile
        GuiControlGet, ResizeUseDestDir
        GuiControlGet, ResizeDestFolder
        GuiControlGet, PreserveDateTimeOnSave
@@ -98510,8 +98513,24 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0,
       fullH := Height
    }
 
+   ; normalize the corners before applying the user alteration; the four scans can
+   ; yield a crossed pair on two-tone backgrounds and that must not flip the
+   ; alteration direction
+   If (X1 > X2)
+      tmpv := X1, X1 := X2, X2 := tmpv
+   If (Y1 > Y2)
+      tmpv := Y1, Y1 := Y2, Y2 := tmpv
+
    deviationW := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullW/100)*usrAutoCropDeviation)
    deviationH := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullH/100)*usrAutoCropDeviation)
+   ; a negative alteration [shrink] may cut at most a quarter of the detected box
+   ; per side; unclamped, a large negative value collapses the box to a sliver and
+   ; batch mode would then overwrite the original files with it
+   If (deviationW<0)
+      deviationW := -min(-deviationW, (X2 - X1)//4)
+   If (deviationH<0)
+      deviationH := -min(-deviationH, (Y2 - Y1)//4)
+
    If (usrAutoCropDeviationSnap=1 && X1>2) || (usrAutoCropDeviationSnap=0)
       X1 -= deviationW
    If (usrAutoCropDeviationSnap=1 && Y1>2) || (usrAutoCropDeviationSnap=0)
@@ -98520,11 +98539,6 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0,
       X2 += deviationW
    If (usrAutoCropDeviationSnap=1 && Y2<fullH-3) || (usrAutoCropDeviationSnap=0)
       Y2 += deviationH
-
-   If (X2 < X1 - 2)
-      X2 := X1 + 2
-   If (Y2 < Y1 - 2)
-      Y2 := Y1 + 2
 
    selCoords := [x1, y1, x2, y2]
    Return selCoords
@@ -98663,8 +98677,12 @@ batchAutoCropFiles() {
       msgInfos := "Are you sure you want to crop " groupDigits(filesElected) " files? This may take some time to finish. If needed, press Escape to abandon it."
       If (ResizeUseDestDir=1)
          msgInfos .= "`n`nThe files will be saved in " ResizeDestFolder "\"
+      Else If (convertOnAutoCrop=1)
+         msgInfos .= "`n`nThe converted files will be saved next to the original files; files already in the chosen format are overwritten in place."
+      Else
+         msgInfos .= "`n`nThe cropped files will OVERWRITE the original files, in place."
 
-      If (userActionAutoCropConflictingFile=3)
+      If (userActionConflictingFile=3)
          msgInfos .= "`n`nOn file name collision(s), destination file(s) will be OVERWRITTEN."
 
       msgResult := msgBoxWrapper(appTitle ": Confirmation", msgInfos, 4, 0, "question")
@@ -98732,10 +98750,12 @@ batchAutoCropFiles() {
          destImgPath := OutDir "\" fileNamuNoEXT "." thisWriteFMT
       } Else destImgPath := imgPath
 
-      If (ResizeUseDestDir=1)
+      ; the conflicts action must also cover convert-to-format outputs saved next to
+      ; the originals; only a plain in-place re-save is exempt from collision handling
+      If (ResizeUseDestDir=1 || destImgPath!=imgPath)
       {
          If (FileExist(destImgPath) && !FolderExist(destImgPath))
-            destImgPath := askAboutFileCollision(imgPath, destImgPath, 1, 0, userActionAutoCropConflictingFile, performOverwrite)
+            destImgPath := askAboutFileCollision(imgPath, destImgPath, 1, 0, userActionConflictingFile, performOverwrite)
       }
 
       If !destImgPath
