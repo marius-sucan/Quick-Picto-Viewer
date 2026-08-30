@@ -83314,9 +83314,9 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       Else
          entireVpCacheIDu := entireVpCacheBmp := ""
       Return
-   } Else If (DestPosX="25mpx-entire")
+   } Else If (DestPosX="35mpx-entire")
    {
-      ; the entire image at ~25 megapixels, for AutoCropAction() on huge images;
+      ; the entire image at ~35 megapixels, for AutoCropAction() on huge images;
       ; the caller owns the returned bitmap [it gets mutated and disposed],
       ; so the cache always hands out a clone
       If !(viewportQPVimage.imgHandle)
@@ -83333,7 +83333,7 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       If (rImgW<1 || rImgH<1)
          Return
 
-      ratio := Sqrt(25000000/(rImgW*rImgH))
+      ratio := Sqrt(35000000/(rImgW*rImgH))
       kW := (ratio<1) ? Round(rImgW*ratio) : rImgW
       kH := (ratio<1) ? Round(rImgH*ratio) : rImgH
       kW := clampInRange(kW, 1, rImgW)
@@ -98265,7 +98265,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       doubleSize := 2
       Width := viewportQPVimage.Width
       Height := viewportQPVimage.Height
-      pBitmap := retrieveQPVscreenImgSection("25mpx-entire", 0, 0, 0, 0, 0)
+      pBitmap := retrieveQPVscreenImgSection("35mpx-entire", 0, 0, 0, 0, 0)
       HardResetImageView()
    } Else
    {
