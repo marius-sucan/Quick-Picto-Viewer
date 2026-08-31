@@ -115,7 +115,27 @@ Return
 ; one-shot BoundFunc timer, MT_get/MT_set direct global access.
 
 MT_post(funcName, args*) {
-   MainExe.ahkPostFunction(funcName, args*)
+; AHK v1.1 accepts args* in function definitions and plain function calls, but NOT
+; expanded into an object METHOD call [load-time "Invalid value" error] - so the
+; facade dispatches on the argument count and forwards with the exact arity of the
+; call site; sites in this file use at most 5 extra arguments.
+   n := args.Length()
+   If (n=0)
+      MainExe.ahkPostFunction(funcName)
+   Else If (n=1)
+      MainExe.ahkPostFunction(funcName, args[1])
+   Else If (n=2)
+      MainExe.ahkPostFunction(funcName, args[1], args[2])
+   Else If (n=3)
+      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3])
+   Else If (n=4)
+      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4])
+   Else If (n=5)
+      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5])
+   Else If (n=6)
+      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6])
+   Else
+      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7])
 }
 
 MT_get(varName) {
