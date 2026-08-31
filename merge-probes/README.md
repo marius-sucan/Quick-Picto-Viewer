@@ -46,8 +46,24 @@ MSGF_MENU; wheel does not, hence round 3).
 |---|---|---|
 | p12-getmessage-wheel | WH_GETMESSAGE rewrite of wheel → WM_KEYDOWN | **FAIL** (2026-08-31) |
 
-## Round 4 — the final wheel probe
+## Round 4
 
-| Probe | Question | Decides |
+| Probe | Question | Verdict |
 |---|---|---|
-| p13-wheel-forensics | Taps ALL remaining layers at once — queue (PM_REMOVE + peeks), messages SENT to this thread's windows, and a low-level WH_MOUSE_LL hook that eats the wheel while our menu is visible and posts WM_KEYDOWN Up/Down | The definitive answer in one run: the counters show where wheel input goes (or that nothing above the hardware layer ever sees it), and the LL tap tests the last viable mechanism (a menu-scoped low-level hook). If the LL tap sees wheel but the highlight still does not move, menus ignore queue-posted key-downs and the in-menu wheel feature is dropped for good (accepted degradation - native Win10 menus wheel-scroll on overflow regardless). |
+| p13-wheel-forensics | Wheel via a menu-scoped WH_MOUSE_LL hook (eat + post WM_KEYDOWN) | **PASS** (2026-08-31) — the highlight moves per notch. Bonus finding: menus DO accept queue-posted WM_KEYDOWN, validated for the first time (p10 never got to exercise it). |
+
+## PROBE PROGRAM COMPLETE — final phase-D mechanism table
+
+| Need | Mechanism | Proven by |
+|---|---|---|
+| Bar hover-switching, Alt-accelerators, F10 | Native submenus attached to the PVbar menu bar (pure Win32) | design + p2 (native bar used) |
+| JIT dropdown rebuild | WH_CALLWNDPROC hook on WM_INITMENUPOPUP → `InvokeMenuBar*` builders | **p8 FULL PASS** |
+| Reader: highlight tracking + live OSD tip | WH_CALLWNDPROC hook on WM_MENUSELECT → tooltip GUI from the raw callback | **p7 FULL PASS** (alternative: out-of-context SetWinEventHook, **p11 FULL PASS**) |
+| In-menu wheel scrolling | Menu-scoped WH_MOUSE_LL hook: eat wheel while a visible own-process #32768 exists, post WM_KEYDOWN Up/Down to the owner | **p13 PASS** |
+| In-menu RButton announce, PgUp/PgDn | MSGF_MENU hook sees them (p5 census: keydown 8, rbutton 2); posted key-downs also proven (p13) | p5 + p13 |
+| What must NOT be relied on | OnMessage monitors, SetTimer, hotkey subroutines during any same-interpreter menu loop (p1/p2/p3/p4/p6); SendInput from hook callbacks (p5); MSGF_MENU for wheel (p5: wheel 0); WH_GETMESSAGE for wheel (p12) | rounds 1-3 |
+
+Hook lifecycle for the D2 implementation: install CALLWNDPROC + MOUSE_LL on menu open
+(WM_ENTERMENULOOP 0x211 arrives via CALLWNDPROC; or install CALLWNDPROC permanently — it
+is cheap — and LL only while a menu is up), remove LL at WM_EXITMENULOOP 0x212. Keep the
+LL callback minimal (system-wide hook with a latency budget): compare, post, return.
