@@ -56,9 +56,9 @@ If !A_IsCompiled
 
 ; OnMessage(0x388, "WM_PENEVENT")
 OnMessage(0x2a3, "WM_MOUSELEAVE")
-OnMessage(0x201, "WM_LBUTTONDOWN")
+OnMessage(0x201, "uiWM_LBUTTONDOWN")
 OnMessage(0x203, "WM_LBUTTON_DBL")
-OnMessage(0x202, "WM_LBUTTONUP")
+OnMessage(0x202, "uiWM_LBUTTONUP")
 OnMessage(0x205, "WM_RBUTTONUP")
 OnMessage(0x207, "WM_MBUTTONDOWN")
 OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
@@ -83,8 +83,8 @@ If (hasPenPressureAPI=1) ; requires Windows 8 or newer
 Loop, 9
     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
-OnMessage(0x100, "WM_KEYDOWN")
-OnMessage(0x104, "WM_KEYDOWN")
+OnMessage(0x100, "uiWM_KEYDOWN")
+OnMessage(0x104, "uiWM_KEYDOWN")
 ; OnMessage(0x0247, "WM_POINTERUP") 
 ; OnMessage(0x20, "WM_SETCURSOR")
 ; OnMessage(0x211, "WM_ENTERMENULOOP")
@@ -93,7 +93,7 @@ OnMessage(0x104, "WM_KEYDOWN")
 ; OnMessage(0x120, "WM_MENUCHAR")
 ; OnMessage(0x11Fb, "WM_MENUSELECT")
 
-OnMessage(0x200, "WM_MOUSEMOVE")
+OnMessage(0x200, "uiWM_MOUSEMOVE")
 OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
 OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
 ; OnMessage(0x0A0, "WM_NCMOUSEMOVE")  ; mouse move into window area
@@ -105,9 +105,10 @@ OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
 
 setPriorityThread(2)
 QPVpid := DllCall("Kernel32.dll\GetCurrentProcessId")
-; OnExit, doCleanup
+; OnExit handling: window close routes through PVwinGuiClose / byeByeRoutine()
 Return
 
+; MERGEDEL twin: byte-identical copy of setPriorityThread() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 setPriorityThread(level, handle:="A") {
   If (handle="A" || !handle)
      handle := DllCall("GetCurrentThread")
@@ -117,15 +118,15 @@ setPriorityThread(level, handle:="A") {
 updateWindowColor() {
   Sleep, 1
   ; WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
-  Gui, 1: Color, %WindowBgrColor%
+  Gui, PVwin: Color, %WindowBgrColor%
 }
 
 destroyAllGUIs() {
-  Gui, 1: Destroy
-  Gui, 2: Destroy
-  Gui, 3: Destroy
-  Gui, 4: Destroy
-  Gui, 5: Destroy
+  Gui, PVwin: Destroy
+  Gui, PVgdiPic: Destroy
+  Gui, PVgdiThumbs: Destroy
+  Gui, PVgdiInfos: Destroy
+  Gui, PVgdiSelect: Destroy
   taskBarUI.clearAll()
   Sleep, 50
 }
@@ -136,13 +137,14 @@ infosUIAbtns(msgu) {
       Return
 
    lastu := !lastu
-   GuiControl, 1:, UIAbtn%lastu%, % msgu
+   GuiControl, PVwin:, UIAbtn%lastu%, % msgu
    Sleep, 1
    If (WinActive("A")=PVhwnd)
-      GuiControl, 1: Focus, UIAbtn%lastu%
+      GuiControl, PVwin: Focus, UIAbtn%lastu%
    prevMsg := msgu
 }
 
+; MERGEDEL twin: byte-identical copy of UnregisterTouchWindow() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 UnregisterTouchWindow(hwnd) {
       Return DllCall("User32.dll\UnregisterTouchWindow", "UPtr", hwnd)
 }
@@ -190,32 +192,32 @@ BuildGUI(params:=0) {
    ; If !A_IsCompiled
      Try Menu, Tray, Icon, %mainCompiledPath%\qpv-icon.ico
    Global UIAbtn0, UIAbtn1
-   Gui, 1: Color, %WindowBgrColor%
-   Gui, 1: Margin, 0, 0
-   Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
-   Gui, 1: Font, s1
-   Gui, 1: Add, Button, x1 y1 w1 h1 vUIAbtn0, Btn-A
-   Gui, 1: Add, Button, x1 y1 w1 h1 vUIAbtn1, Btn-B
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vOSDmsgsLine hwndhPic11, OSD messages.
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicVscroll hwndhPic5, Vertical scrollbar
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicHscroll hwndhPic6, Horizontal scrollbar
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgInfoBox hwndhPic9, Image information box.
-   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vImgNavBox hwndhPic7, Image navigation area.
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgHistoBox hwndhPic8, Image histogram area.
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgAnnoBox hwndhPic10, Image annotations box.
-   Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans vPicOnGui1 hwndhPic0, Previous image
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2a hwndhPic1, Zoom in
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b hwndhPic2, Image view. Center.
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2c hwndhPic3, Zoom out
-   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vPicOnGui3 hwndhPic4, Next image
-   Gui, 1: Add, Button, xp-100 yp-100 w1 h1 Default,a
+   Gui, PVwin: Color, %WindowBgrColor%
+   Gui, PVwin: Margin, 0, 0
+   Gui, PVwin: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
+   Gui, PVwin: Font, s1
+   Gui, PVwin: Add, Button, x1 y1 w1 h1 vUIAbtn0, Btn-A
+   Gui, PVwin: Add, Button, x1 y1 w1 h1 vUIAbtn1, Btn-B
+   Gui, PVwin: Add, Text, x3 y3 w2 h2 BackgroundTrans vOSDmsgsLine hwndhPic11, OSD messages.
+   Gui, PVwin: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicVscroll hwndhPic5, Vertical scrollbar
+   Gui, PVwin: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicHscroll hwndhPic6, Horizontal scrollbar
+   Gui, PVwin: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgInfoBox hwndhPic9, Image information box.
+   Gui, PVwin: Add, Text, x3 y3 w3 h3 BackgroundTrans vImgNavBox hwndhPic7, Image navigation area.
+   Gui, PVwin: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgHistoBox hwndhPic8, Image histogram area.
+   Gui, PVwin: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgAnnoBox hwndhPic10, Image annotations box.
+   Gui, PVwin: Add, Text, x0 y0 w1 h1 BackgroundTrans vPicOnGui1 hwndhPic0, Previous image
+   Gui, PVwin: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2a hwndhPic1, Zoom in
+   Gui, PVwin: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b hwndhPic2, Image view. Center.
+   Gui, PVwin: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2c hwndhPic3, Zoom out
+   Gui, PVwin: Add, Text, x3 y3 w3 h3 BackgroundTrans vPicOnGui3 hwndhPic4, Next image
+   Gui, PVwin: Add, Button, xp-100 yp-100 w1 h1 Default,a
    hPicOnGui1 := hPic0
    If (isTitleBarVisible=1)
-      Gui, 1: +Caption
+      Gui, PVwin: +Caption
    Else
-      Gui, 1: -Caption
+      Gui, PVwin: -Caption
 
-   Gui, 1: Show, Maximize Hide Center %initialwh%, %appTitle%
+   Gui, PVwin: Show, Maximize Hide Center %initialwh%, %appTitle%
 
    Try taskBarUI := new taskbarInterface(PVhwnd)
    UnregisterTouchWindow(PVhwnd)
@@ -230,7 +232,7 @@ BuildGUI(params:=0) {
    Sleep, 1
    createGDIinfosWin()
    Sleep, 2
-   updateUIctrl(1)
+   uiUpdateUIctrl(1)
    If (mustAssignVarz=1)
    {
       MainExe.ahkassign("PVhwnd", PVhwnd)
@@ -253,12 +255,12 @@ BuildGUI(params:=0) {
    ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
    If (mainWinMaximized=2 || pX="" || pY="" || sW="" || sH="")
    {
-      repositionWindowCenter(1, PVhwnd, "mouse", appTitle)
+      uiRepositionWindowCenter(1, PVhwnd, "mouse", appTitle)
       Sleep, 50
-      Gui, 1: Show, Maximize
+      Gui, PVwin: Show, Maximize
    } Else
    {
-      Gui, 1: Show ; , x%pX% y%pY% w%sW% h%sH%
+      Gui, PVwin: Show ; , x%pX% y%pY% w%sW% h%sH%
       WinMoveZ(PVhwnd, 0, pX, pY, sW, sH)
       Sleep, 2
    }
@@ -267,7 +269,7 @@ BuildGUI(params:=0) {
    Return r
 }
 
-setMenuBarState(modus, mena:="PVmenu") {
+setMenuBarState(modus, mena:="PVbar") {
   Critical, on 
   If (showMainMenuBar!=1)
      Return
@@ -319,11 +321,11 @@ updateUIctrlFromOutside(paramA) {
     isAlwaysOnTop := p[2]
     drawingShapeNow := p[3]
     IMGresizingMode := p[4]
-    updateUIctrl(0)
+    uiUpdateUIctrl(0)
 }
 
+; MERGEDEL twin: byte-identical copy of isTlbrVertical() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 isTlbrVertical() {
-; must mirror isTlbrVertical() in quick-picto-viewer.ahk
     If (TLBRtwoColumns=1 && !isWelcomeScreenu)
        Return 1
 
@@ -378,7 +380,7 @@ detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
     Return isTlbrVertical() ? 1 : 2
 }
 
-updateUIctrl(forceThis:=0) {
+uiUpdateUIctrl(forceThis:=0) {
    Static prevState
    If (forceThis="kill" || thumbsDisplaying=1 && maxFilesIndex>0)
    {
@@ -414,19 +416,19 @@ updateUIctrl(forceThis:=0) {
    {
       k := imgHUDbaseUnit//3 ; the thickness of scrollbars
       WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
-      GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x" tX " y" tY
-      GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" tY
-      GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
-      GuiControl, 1: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
-      GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y" tY
+      GuiControl, PVwin: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x" tX " y" tY
+      GuiControl, PVwin: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" tY
+      GuiControl, PVwin: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
+      GuiControl, PVwin: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
+      GuiControl, PVwin: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y" tY
       If (IMGresizingMode=4)
       {
-         GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k + tX " y" tY
-         GuiControl, 1: Move, picHscroll, % "w" GuiW " h" k " x " tX " y" GuiH - k + tY
+         GuiControl, PVwin: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k + tX " y" tY
+         GuiControl, PVwin: Move, picHscroll, % "w" GuiW " h" k " x " tX " y" GuiH - k + tY
       } Else
       {
-         GuiControl, 1: Move, picVscroll, w1 h1 x1 y1
-         GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
+         GuiControl, PVwin: Move, picVscroll, w1 h1 x1 y1
+         GuiControl, PVwin: Move, picHscroll, w1 h1 x1 y1
       }
       uiAccessImgViewSetUIlabels()
       prevState := thisState
@@ -434,6 +436,7 @@ updateUIctrl(forceThis:=0) {
    }
 }
 
+; MERGEDEL twin: byte-identical copy of calcHUDsize() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 calcHUDsize() {
    imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfontSize*2.5) : Round(OSDfontSize*2)
 }
@@ -441,51 +444,47 @@ calcHUDsize() {
 uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
    If (msgu="hide" || !tW || !tH)
    {
-      GuiControl, 1: Move, ImgHistoBox, x1 y1 w1 h1
+      GuiControl, PVwin: Move, ImgHistoBox, x1 y1 w1 h1
       Return
    }
 
    msgu := StrReplace(msgu, "`n", ".`n")
    msgu := StrReplace(msgu, " | ", ".`n")
-   Gui, 1: Default
-   GuiControl, 1:, ImgHistoBox, % "Image histogram box:`nGraph focus: " msgu "`nClick to cycle modes. Right-click for histogram options."
-   GuiControl, 1: Move, ImgHistoBox, % " x" tX " y" tY " w" tW " h" tH 
+   GuiControl, PVwin:, ImgHistoBox, % "Image histogram box:`nGraph focus: " msgu "`nClick to cycle modes. Right-click for histogram options."
+   GuiControl, PVwin: Move, ImgHistoBox, % " x" tX " y" tY " w" tW " h" tH 
 }
 
 uiAccessUpdateAnnoBox(msgu, tW, tH, tX, tY) {
    If (msgu="hide" || !tW || !tH || msgu="")
    {
-      GuiControl, 1: Move, ImgAnnoBox, x1 y1 w1 h1
+      GuiControl, PVwin: Move, ImgAnnoBox, x1 y1 w1 h1
       Return
    }
 
-   Gui, 1: Default
-   GuiControl, 1:, ImgAnnoBox, % "Image caption:`n" msgu "`nThis viewport area is click-through. The action performed on click will be that as if this box is not visible."
-   GuiControl, 1: Move, ImgAnnoBox, % " x" tX " y" tY " w" tW " h" tH 
+   GuiControl, PVwin:, ImgAnnoBox, % "Image caption:`n" msgu "`nThis viewport area is click-through. The action performed on click will be that as if this box is not visible."
+   GuiControl, PVwin: Move, ImgAnnoBox, % " x" tX " y" tY " w" tW " h" tH 
 }
 
 uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
    If (msgu="hide" || !tW || !tH)
    {
-      GuiControl, 1: Move, ImgNavBox, x1 y1 w1 h1
+      GuiControl, PVwin: Move, ImgNavBox, x1 y1 w1 h1
       Return
    }
 
-   Gui, 1: Default
-   GuiControl, 1:, ImgNavBox, % msgu
-   GuiControl, 1: Move, ImgNavBox, % " x" tX " y" tY " w" tW " h" tH 
+   GuiControl, PVwin:, ImgNavBox, % msgu
+   GuiControl, PVwin: Move, ImgNavBox, % " x" tX " y" tY " w" tW " h" tH 
 }
 
 uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:=0, scrollY:=0) {
    If (msgu="hide" || !tW || !tH)
    {
-      GuiControl, 1: Move, ImgInfoBox, x1 y1 w1 h1
+      GuiControl, PVwin: Move, ImgInfoBox, x1 y1 w1 h1
       Return
    }
 
    msgu := "Info-box. Image in view:`n" StrReplace(msgu, "`n", ".`n") ".`nThis viewport area is click-through."
-   Gui, 1: Default
-   GuiControl, 1:, ImgInfoBox, % msgu
+   GuiControl, PVwin:, ImgInfoBox, % msgu
    GetClientSize(GuiW, GuiH, PVhwnd)
    tX := (flipH=1 && thumbsDisplaying!=1) ? GuiW - tW : 0
    tY := (flipV=1 && thumbsDisplaying!=1) ? GuiH - tH : 0
@@ -496,7 +495,7 @@ uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:
 
    tX -= Round(scrollX)
    tY -= Round(scrollY)
-   GuiControl, 1: Move, ImgInfoBox, % " x" tX " y" tY " w" tW " h" tH 
+   GuiControl, PVwin: Move, ImgInfoBox, % " x" tX " y" tY " w" tW " h" tH 
 }
 
 uiAccessWelcomeView() {
@@ -513,25 +512,23 @@ uiAccessWelcomeView() {
 
    runz++
    ; ToolTip, % runz "=p" , , , 2
-   updateUIctrl()
+   uiUpdateUIctrl()
    uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
    uiAccessUpdateInfoBox("hide", 1, 1, 0, 0)
    uiAccessUpdateNavBox("hide", 1, 1, 0, 0)
    uiAccessUpdateAnnoBox("hide", 1, 1, 0, 0)
-   Gui, 1: Default
-   GuiControl, 1:, PicOnGUI1, % msgu
-   GuiControl, 1:, PicOnGUI2a, % msgu
-   GuiControl, 1:, PicOnGUI2b, % msgu
-   GuiControl, 1:, PicOnGUI2c, % msgu
-   GuiControl, 1:, PicOnGUI3, % msgu
-   GuiControl, 1: Move, picVscroll, w1 h1 x1 y1
-   GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
-   updateUIctrl("kill")
+   GuiControl, PVwin:, PicOnGUI1, % msgu
+   GuiControl, PVwin:, PicOnGUI2a, % msgu
+   GuiControl, PVwin:, PicOnGUI2b, % msgu
+   GuiControl, PVwin:, PicOnGUI2c, % msgu
+   GuiControl, PVwin:, PicOnGUI3, % msgu
+   GuiControl, PVwin: Move, picVscroll, w1 h1 x1 y1
+   GuiControl, PVwin: Move, picHscroll, w1 h1 x1 y1
+   uiUpdateUIctrl("kill")
    lastInvoked := A_TickCount
 }
 
 uiAccessImgViewSetUIlabels() {
-   Gui, 1: Default
    zr := (IMGresizingMode=4) ? " Hold the Space key plus left-click and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
    If (drawingShapeNow=1 || AnyWindowOpen)
    {
@@ -539,11 +536,11 @@ uiAccessImgViewSetUIlabels() {
       If (imgEditPanelOpened=1)
          msgu := "Image view. An image editing live tool is currently in use. " zr " Swipe gestures are not allowed."
 
-      GuiControl, 1:, PicOnGUI1, % msgu
-      GuiControl, 1:, PicOnGUI2a, % msgu
-      GuiControl, 1:, PicOnGUI2b, % msgu
-      GuiControl, 1:, PicOnGUI2c, % msgu
-      GuiControl, 1:, PicOnGUI3, % msgu
+      GuiControl, PVwin:, PicOnGUI1, % msgu
+      GuiControl, PVwin:, PicOnGUI2a, % msgu
+      GuiControl, PVwin:, PicOnGUI2b, % msgu
+      GuiControl, PVwin:, PicOnGUI2c, % msgu
+      GuiControl, PVwin:, PicOnGUI3, % msgu
       Return
    }
 
@@ -560,24 +557,24 @@ uiAccessImgViewSetUIlabels() {
             msgu .= fr
       }
 
-      GuiControl, 1:, PicOnGUI1, % msgu
+      GuiControl, PVwin:, PicOnGUI1, % msgu
       msgu := "Image view. Top. Click to zoom in. Swipe gestures allowed." zr 
       If (editingSelectionNow!=1)
          msgu .= dr
 
-      GuiControl, 1:, PicOnGUI2a, % msgu
+      GuiControl, PVwin:, PicOnGUI2a, % msgu
       msgu := "Image view. Center. Double-click to toggle view mode in this area. " zr dr
       If (editingSelectionNow=1)
          msgu := "Image view. " dr zr
       If (IMGresizingMode=4)
          msgu .= fr
 
-      GuiControl, 1:, PicOnGUI2b, % msgu
+      GuiControl, PVwin:, PicOnGUI2b, % msgu
       msgu := "Image view. Bottom. Click to zoom out. Swipe gestures allowed." zr
       If (editingSelectionNow!=1)
          msgu .= dr
 
-      GuiControl, 1:, PicOnGUI2c, % msgu
+      GuiControl, PVwin:, PicOnGUI2c, % msgu
       msgu := "Image view. Right. Click for next image. Swipe gestures allowed." zr dr
       If (editingSelectionNow=1)
       {
@@ -586,31 +583,30 @@ uiAccessImgViewSetUIlabels() {
             msgu .= fr
       }
 
-      GuiControl, 1:, PicOnGUI3, % msgu
+      GuiControl, PVwin:, PicOnGUI3, % msgu
    } Else
    {
       zr := (IMGresizingMode=4) ? " Left-click outside selection area and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
       dr := (editingSelectionNow=1) ? "Double click outside selection area to deactivate it." : "Double-click anywhere to toggle view mode. Press Shift + Left-Click anywhere to create a new selection area. "
       msgu := "Image view. " dr zr
-      GuiControl, 1:, PicOnGUI1, % msgu
-      GuiControl, 1:, PicOnGUI2a, % msgu
-      GuiControl, 1:, PicOnGUI2b, % msgu
-      GuiControl, 1:, PicOnGUI2c, % msgu
-      GuiControl, 1:, PicOnGUI3, % msgu
+      GuiControl, PVwin:, PicOnGUI1, % msgu
+      GuiControl, PVwin:, PicOnGUI2a, % msgu
+      GuiControl, PVwin:, PicOnGUI2b, % msgu
+      GuiControl, PVwin:, PicOnGUI2c, % msgu
+      GuiControl, PVwin:, PicOnGUI3, % msgu
    }
 }
 
 uiAccessUpdateOSDmsg(stringu, tW, tH) {
     If (stringu="-" || !tW || !tH)
     {
-       GuiControl, 1: Move, OSDmsgsLine, x1 y1 w1 h1
+       GuiControl, PVwin: Move, OSDmsgsLine, x1 y1 w1 h1
        Return
     }
 
-    Gui, 1: Default
     GetClientSize(GuiW, GuiH, PVhwnd)
-    GuiControl, 1:, OSDmsgsLine, % "OSD: " stringu
-    GuiControl, 1: Move, OSDmsgsLine, % " x1 y1 w" GuiW " h" tH 
+    GuiControl, PVwin:, OSDmsgsLine, % "OSD: " stringu
+    GuiControl, PVwin: Move, OSDmsgsLine, % " x1 y1 w" GuiW " h" tH 
 }
 
 uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSize:="n", itemz:="n") {
@@ -637,45 +633,45 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
       If (thisState!=prevState)
       {
          k := imgHUDbaseUnit//3 ; the thickness of scrollbars
-         GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
-         GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-         GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
-         GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
-         GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
-         GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
-         GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
+         GuiControl, PVwin: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
+         GuiControl, PVwin: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
+         GuiControl, PVwin: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
+         GuiControl, PVwin: Move, PicOnGUI2b, w1 h1 x1 y1
+         GuiControl, PVwin: Move, PicOnGUI2c, w1 h1 x1 y1
+         GuiControl, PVwin: Move, PicOnGUI3, w1 h1 x1 y1
+         GuiControl, PVwin: Move, picHscroll, w1 h1 x1 y1
          prevState := thisState
       }
 
-      GuiControl, 1:, PicOnGUI1, Files list container
-      GuiControl, 1:, PicOnGUI2a, Status bar
+      GuiControl, PVwin:, PicOnGUI1, Files list container
+      GuiControl, PVwin:, PicOnGUI2a, Status bar
       uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
       uiAccessUpdateAnnoBox("hide", 1, 1, 0, 0)
-      updateUIctrl("kill")
+      uiUpdateUIctrl("kill")
    } Else If (mustResize="image")
    {
       thumbsDisplaying := 0
       prevState := mustResize
-      updateUIctrl()
+      uiUpdateUIctrl()
    } Else If (stringu && heightu)
    {
-      updateUIctrl("kill")
+      uiUpdateUIctrl("kill")
       prevState := mustResize
       GetClientSize(GuiW, GuiH, PVhwnd)
-      GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
+      GuiControl, PVwin: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
+      GuiControl, PVwin: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
       stringu := StrReplace(stringu, " | ", "`n")
-      GuiControl, 1:, PicOnGUI2a, % "Status bar:`n" stringu
+      GuiControl, PVwin:, PicOnGUI2a, % "Status bar:`n" stringu
       lastWinStatus := stringu
-      GuiControl, 1:, PicOnGUI1, % infos
+      GuiControl, PVwin:, PicOnGUI1, % infos
    }
 }
 
 createGDIwin() {
    Critical, on
    ; WinGetPos, , , mainW, mainH, ahk_id %PVhwnd%
-   Gui, 2: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIwin +Owner1
-   Gui, 2: Show, NoActivate, %appTitle%: Picture container
+   Gui, PVgdiPic: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIwin +OwnerPVwin
+   Gui, PVgdiPic: Show, NoActivate, %appTitle%: Picture container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIwin)
 
@@ -686,8 +682,8 @@ createGDIwin() {
 createGDIwinThumbs() {
    Critical, on
 
-   Gui, 3: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIthumbsWin +Owner1
-   Gui, 3: Show, NoActivate, %appTitle%: Thumbnails container
+   Gui, PVgdiThumbs: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIthumbsWin +OwnerPVwin
+   Gui, PVgdiThumbs: Show, NoActivate, %appTitle%: Thumbnails container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIthumbsWin)
 
@@ -698,8 +694,8 @@ createGDIwinThumbs() {
 createGDIinfosWin() {
    Critical, on
 
-   Gui, 4: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIinfosWin +Owner1
-   Gui, 4: Show, NoActivate, %appTitle%: Infos container
+   Gui, PVgdiInfos: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIinfosWin +OwnerPVwin
+   Gui, PVgdiInfos: Show, NoActivate, %appTitle%: Infos container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIinfosWin)
    UnregisterTouchWindow(hGDIinfosWin)
@@ -708,8 +704,8 @@ createGDIinfosWin() {
 createGDIselectorWin() {
    Critical, on
 
-   Gui, 5: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIselectWin +Owner1
-   Gui, 5: Show, NoActivate, %appTitle%: Selector container
+   Gui, PVgdiSelect: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIselectWin +OwnerPVwin
+   Gui, PVgdiSelect: Show, NoActivate, %appTitle%: Selector container
    If (A_OSVersion!="WIN_7")
       SetParentID(PVhwnd, hGDIselectWin)
    UnregisterTouchWindow(hGDIselectWin)
@@ -730,19 +726,22 @@ PanelOpenCloseEvent(a) {
     lastOtherWinClose := b[11]
     IMGresizingMode := b[12]
     thumbsDisplaying := b[13]
-    updateUIctrl()
+    uiUpdateUIctrl()
     uiAccessImgViewSetUIlabels()
 }
 
+; MERGEDEL twin: byte-identical copy of SetParentID() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 SetParentID(Window_ID, theOther) {
-   Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+  Return r
 }
 
 miniGDIupdater() {
-   updateUIctrl(0)
+   uiUpdateUIctrl(0)
    MainExe.ahkPostFunction("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
+; MERGEABSORB: NOT a twin - independent native-MsgBox implementation. At phase C: simpleMsgBoxWrapper() in quick-picto-viewer.ahk absorbs it [its Else branch at ~33433 becomes this native MsgBox with Gui PVwin:+OwnDialogs], THEN delete this copy; callers byeByeRoutine + askAboutStoppingOperations retarget simpleMsgBoxWrapper
 msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, optionz:=0) {
    ; Buttonz options:
    ; 0 = OK (that is, only an OK button is displayed)
@@ -786,7 +785,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, o
    If optionz
       theseOptionz := optionz
 
-   Gui, 1: +OwnDialogs
+   Gui, PVwin: +OwnDialogs
    MsgBox, % theseOptionz, % winTitle, % msg
    IfMsgBox, Yes
         r := "Yes"
@@ -810,13 +809,13 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, o
    If (!AnyWindowOpen && !InStr(msg, "quit") && !InStr(msg, "exit"))
       lastOtherWinClose := A_TickCount
 
-   ; addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
+   ; uiAddJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
    Return r
 }
 
-addJournalEntry(msg) {
+uiAddJournalEntry(msg) {
    If (!runningLongOperation && !imageLoading)
-      MainExe.ahkPostFunction(A_ThisFunc, msg)
+      MainExe.ahkPostFunction("addJournalEntry", msg)
 }
 
 WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
@@ -853,11 +852,11 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
 }
 
 preventSillyGui(thisGui) {
-  r := (thisGui="mouseToolTipGuia" || thisGui="menuFlier") ? 1 : 0
+  r := (thisGui="uiMouseTipGuia" || thisGui="menuFlier") ? 1 : 0
   Return r
 }
 
-WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
+uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     Static lastInvoked := 1
     If TestDraggableWindow()
        Return
@@ -891,7 +890,7 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     }
 
     If (mouseToolTipWinCreated=1)
-       mouseTurnOFFtooltip()
+       uiMouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
     ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
@@ -901,13 +900,13 @@ WM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     Else If (slideShowRunning=1 || animGIFplaying=1)
        turnOffSlideshow()
     Else If isOkay
-       WinClickAction()
+       uiWinClickAction()
     Return 0
 }
 
-WM_LBUTTONUP(wP, lP, msg, hwnd) {
+uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
     If (statusBarTooltipVisible=1)
-       mouseTurnOFFtooltip()
+       uiMouseTurnOFFtooltip()
 
     LbtnDwn := 0
     colorPickerMustEnd := 1
@@ -919,11 +918,11 @@ WM_LBUTTONUP(wP, lP, msg, hwnd) {
 
        If (hwnd=hFlyBtn1)
           ; testPDFloader()
-          PanelQuickSearchMenuOptions()
+          uiPanelQuickSearchMenuOptions()
        Else If (hwnd=hFlyBtn2)
-          toggleAppToolbar()
+          uiToggleAppToolbar()
        Else If (hwnd=hFlyBtn3)
-          ToggleMenuBaru()
+          uiToggleMenuBaru()
     }
     Return 0
 }
@@ -933,14 +932,14 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return 0
 
     If (statusBarTooltipVisible=1)
-       mouseTurnOFFtooltip()
+       uiMouseTurnOFFtooltip()
 
     colorPickerMustEnd := -1
     If preventSillyGui(A_Gui)
        Return
 
     If (mouseToolTipWinCreated=1)
-       mouseTurnOFFtooltip()
+       uiMouseTurnOFFtooltip()
 
     LbtnDwn := 0
     canCancelImageLoad := 4
@@ -995,7 +994,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
 
        Sleep, 1
        lastDoubleClickZeit := A_TickCount
-       InitGuiContextMenu(mX, mY, oX, oY)
+       uiInitGuiContextMenu(mX, mY, oX, oY)
        Return 0
     }
 
@@ -1015,9 +1014,9 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     }
     ; ToolTip, % "z=" zz , , , 2
     If (zz=1)
-       WinClickAction()
+       uiWinClickAction()
     Else If (A_TickCount - lastMouseLeave>350)
-       WinClickAction("DoubleClick")
+       uiWinClickAction("DoubleClick")
 
     Return 0
 }
@@ -1055,7 +1054,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      Return 0
 
   If (statusBarTooltipVisible=1)
-     mouseTurnOFFtooltip()
+     uiMouseTurnOFFtooltip()
 
   colorPickerMustEnd := -1
   If preventSillyGui(A_Gui)
@@ -1068,12 +1067,12 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   }
 
   If (mouseToolTipWinCreated=1)
-     mouseTurnOFFtooltip()
+     uiMouseTurnOFFtooltip()
 
   ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
   ; AnyWindowOpen := MainExe.ahkgetvar.AnyWindowOpen
   ; maxFilesIndex := MainExe.ahkgetvar.maxFilesIndex
-  If !identifyThisWin()
+  If !uiIdentifyThisWin()
      Return 0
 
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
@@ -1102,12 +1101,12 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      Else If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
         MainExe.ahkPostFunction("BuildSecondMenu")
      Else
-        InitGuiContextMenu(mX, mY, oX, oY)
+        uiInitGuiContextMenu(mX, mY, oX, oY)
   }
   Return 0
 }
 
-PanelQuickSearchMenuOptions() {
+uiPanelQuickSearchMenuOptions() {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked<300)
        Return
@@ -1115,31 +1114,31 @@ PanelQuickSearchMenuOptions() {
     If (VisibleQuickMenuSearchWin=1)
        MainExe.ahkPostFunction("closeQuickSearch")
     Else
-       MainExe.ahkPostFunction(A_ThisFunc)
+       MainExe.ahkPostFunction("PanelQuickSearchMenuOptions")
     lastInvoked := A_TickCount
 }
 
-toggleAppToolbar() {
+uiToggleAppToolbar() {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked<300)
        Return
 
-    MainExe.ahkPostFunction(A_ThisFunc)
+    MainExe.ahkPostFunction("toggleAppToolbar")
     lastInvoked := A_TickCount
 }
 
-ToggleMenuBaru() {
+uiToggleMenuBaru() {
     Static lastInvoked := 1
     If (A_TickCount - lastInvoked<300)
        Return
 
-    MainExe.ahkPostFunction(A_ThisFunc)
+    MainExe.ahkPostFunction("ToggleMenuBaru")
     lastInvoked := A_TickCount
 }
 
-InitGuiContextMenu(mX, mY, oX, oY) {
+uiInitGuiContextMenu(mX, mY, oX, oY) {
     ctrl := IdentifyCtrlUnderMouse(oX, oY)
-    MainExe.ahkPostFunction(A_ThisFunc, "extern", mX, mY, 0, ctrl)
+    MainExe.ahkPostFunction("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)
 }
 
 infosSlideShow(a, b, c, d, e) {
@@ -1164,21 +1163,20 @@ slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
       setTaskbarIconState("normal")
       slideShowRunning := 1
       SetTimer, theSlideShowCore, % -slideShowDelay
-      Gui, 1: Default
       If msgu
       {
-         GuiControl, 1:, PicOnGUI1, % msgu
-         GuiControl, 1:, PicOnGUI2a, % msgu
-         GuiControl, 1:, PicOnGUI2b, % msgu
-         GuiControl, 1:, PicOnGUI2c, % msgu
-         GuiControl, 1:, PicOnGUI3, % msgu
+         GuiControl, PVwin:, PicOnGUI1, % msgu
+         GuiControl, PVwin:, PicOnGUI2a, % msgu
+         GuiControl, PVwin:, PicOnGUI2b, % msgu
+         GuiControl, PVwin:, PicOnGUI2c, % msgu
+         GuiControl, PVwin:, PicOnGUI3, % msgu
       }
    } Else If (act="stop")
    {
       allowNextSlide := 1
       slideShowRunning := 0
       SetTimer, theSlideShowCore, Off
-      updateUIctrl()
+      uiUpdateUIctrl()
       uiAccessImgViewSetUIlabels()
    }
 }
@@ -1198,7 +1196,7 @@ theSlideShowCore(paramu:=0) {
   If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
 
-  mouseTurnOFFtooltip()
+  uiMouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
   Try DllCall("user32\SetCursor", "Ptr", 0)
   If (slideShowRunning=1 && slidesFXrandomize=1)
@@ -1286,7 +1284,7 @@ IdentifyCtrlUnderMouse(mX, mY) {
   Return ctrlName "|"
 }
 
-WinClickAction(thisEvent:="normal") {
+uiWinClickAction(thisEvent:="normal") {
     Static lastInvoked := 1
     MouseGetPos, ,, OutputVarWin
     If ((A_TickCount - lastInvoked<25) || (OutputVarWin=hGuiTip))
@@ -1297,7 +1295,7 @@ WinClickAction(thisEvent:="normal") {
     ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
     canCancelImageLoad := 4
     If (mouseToolTipWinCreated=1)
-       mouseTurnOFFtooltip()
+       uiMouseTurnOFFtooltip()
 
     ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
     lastInvoked := A_TickCount
@@ -1335,9 +1333,9 @@ WM_WINDOWPOSCHANGED() {
       ; Random, z, -900, 900
       ; ToolTip, % z , , , 2
       If (tempBtnVisible!="null")
-         SetTimer, RepositionTempBtnGui, -95
+         SetTimer, uiRepositionTempBtnGui, -95
 
-      SetTimer, saveMainWinPos, -35
+      SetTimer, uiSaveMainWinPos, -35
       Global lastWinDrag := A_TickCount
       If (A_OSVersion="WIN_7" || isWinXP=1)
          SetTimer, updateGDIwinPos, -5
@@ -1347,15 +1345,15 @@ WM_WINDOWPOSCHANGED() {
   }
 }
 
-RepositionTempBtnGui() {
-     MainExe.ahkPostFunction(A_ThisFunc)
+uiRepositionTempBtnGui() {
+     MainExe.ahkPostFunction("RepositionTempBtnGui")
 }
 
-saveMainWinPos() {
-     MainExe.ahkPostFunction(A_ThisFunc)
+uiSaveMainWinPos() {
+     MainExe.ahkPostFunction("saveMainWinPos")
 }
 
-changeMcursor(whichCursor) {
+uiChangeMcursor(whichCursor) {
    Static hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
         , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
         , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
@@ -1405,6 +1403,7 @@ changeMcursor(whichCursor) {
   Try DllCall("user32\SetCursor", "UPtr", thisCursor)
 }
 
+; MERGEDEL twin: byte-identical copy of isInRange() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 isInRange(value, inputA, inputB) {
     If (value=inputA || value=inputB)
        Return 1
@@ -1412,12 +1411,12 @@ isInRange(value, inputA, inputB) {
     Return (value>=min(inputA, inputB) && value<=max(inputA, inputB)) ? 1 : 0
 }
 
+; MERGEDEL twin: byte-identical copy of isDotInRect() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
    If (modus=1)
-      r := (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
+      Return (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
    Else
-      r := (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
-   Return r
+      Return (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
 }
 
 isQPVactive() {
@@ -1439,11 +1438,11 @@ showMouseTooltipStatusbar() {
 
     thisSize := OSDfontSize//3.5 + 2
     statusBarTooltipVisible := 1
-    mouseCreateOSDinfoLine(lastWinStatus, thisSize)
-    SetTimer, mouseTurnOFFtooltip, -4500
+    uiMouseCreateOSDinfoLine(lastWinStatus, thisSize)
+    SetTimer, uiMouseTurnOFFtooltip, -4500
 }
 
-mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
+uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     Critical, On
     Static prevMsg, lastInvoked := 1
     Global TippyMsg
@@ -1454,7 +1453,7 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
        Return
 
     lastInvoked := A_TickCount
-    Gui, mouseToolTipGuia: Destroy
+    Gui, uiMouseTipGuia: Destroy
     thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
     If (thisFntSize<5)
        thisFntSize := 5
@@ -1466,13 +1465,13 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     isBold := (FontBolded=1) ? " Bold" : ""
     lastTippyWin := WinActive("A")
     Sleep, 25
-    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    ; Gui, mouseToolTipGuia: Margin, 0, 0
-    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
-    Gui, mouseToolTipGuia: Color, c%bgrColor%
-    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
-    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+    Gui, uiMouseTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    ; Gui, uiMouseTipGuia: Margin, 0, 0
+    Gui, uiMouseTipGuia: Margin, % thisFntSize, % thisFntSize
+    Gui, uiMouseTipGuia: Color, c%bgrColor%
+    Gui, uiMouseTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
+    Gui, uiMouseTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
+    Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
     MainExe.ahkassign("hGuiTip", hGuiTip)
     If (unClickable=1)
@@ -1481,20 +1480,20 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     mouseToolTipWinCreated := 1
     delayu := StrLen(msg) * 75 + 950
     lastZeitToolTip := A_TickCount
-    showOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
+    uiShowOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
 }
 
-showOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
+uiShowOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
     If !mouseToolTipWinCreated
        Return
 
     ; the branch further below re-creates the text control to re-wrap a tooltip wider
     ; than the monitor, so it needs the caption and the colour of the control it
-    ; replaces. Both belong to mouseCreateOSDinfoLine() and are invisible here, so it
+    ; replaces. Both belong to uiMouseCreateOSDinfoLine() and are invisible here, so it
     ; hands them over now; the callers that merely reposition an existing tooltip have
     ; neither at hand and read back what is already on screen instead
     If (msgu="")
-       GuiControlGet, msgu, mouseToolTipGuia:, TippyMsg
+       GuiControlGet, msgu, uiMouseTipGuia:, TippyMsg
     If (txtClr="")
        txtClr := OSDtextColor
 
@@ -1528,24 +1527,25 @@ showOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
        ; TippyMsg was emptied then, and wrapping it again would only blank it out
        If (MaxWidth<Wid && MaxWidth>10 && msgu!="")
        {
-          GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
-          GuiControl, mouseToolTipGuia:, TippyMsg,
-          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtClr% gmouseClickTurnOFFtooltip w%MaxWidth%, % msgu
-          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+          GuiControl, uiMouseTipGuia: Move, TippyMsg, w1 h1
+          GuiControl, uiMouseTipGuia:, TippyMsg,
+          Gui, uiMouseTipGuia: Add, Text, xp yp c%txtClr% gmouseClickTurnOFFtooltip w%MaxWidth%, % msgu
+          Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
           ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
        }
     }
 
     If (Final_x!="" && Final_y!="")
-       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
+       Gui, uiMouseTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
     WinSet, Transparent, 225, ahk_id %hGuiTip%
     If (delayu<msgDisplayTime/2)
        delayu := msgDisplayTime//2 + 1
     WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
     ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-    SetTimer, mouseTurnOFFtooltip, % -delayu
+    SetTimer, uiMouseTurnOFFtooltip, % -delayu
 }
 
+; MERGEDEL twin: byte-identical copy of adjustWin2MonLimits() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
    GetWinClientSize(Wid, Heig, winHwnd, 1)
    ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
@@ -1565,13 +1565,13 @@ adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef He
    Return ResWidth
 }
 
-mouseToolTipGuiaGuiClose:
-mouseToolTipGuiaGuiEscape:
-   mouseTurnOFFtooltip()
+uiMouseTipGuiaGuiClose:
+uiMouseTipGuiaGuiEscape:
+   uiMouseTurnOFFtooltip()
 Return
 
 
-WM_MOUSEMOVE(wP, lP, msg, hwnd) {
+uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := [], darked := 0
   If ((A_TickCount - lastZeitPanCursor < 300) || !isQPVactive())
      Return
@@ -1592,15 +1592,15 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
   If (slideShowRunning=1 && isSamePos=1)
      Try DllCall("user32\SetCursor", "Ptr", 0)
   Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1)
-     changeMcursor("cross")
+     uiChangeMcursor("cross")
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
-     changeMcursor("busy")
+     uiChangeMcursor("busy")
   Else If (thumbsDisplaying=1 && !AnyWindowOpen && runningLongOperation!=2 && imageLoading!=1 && lastWinStatus)
   {
      ctrlu := IdentifyCtrlUnderMouse(mX, mY) 
      If VarContainsThis(ctrlu, "|PicOnGUI2a|", "|picVscroll|", "|ImgNavBox|")
      {
-        changeMcursor("finger")
+        uiChangeMcursor("finger")
         If (isSamePos=0 && (A_TickCount - lastZeitToolTip>1000) && InStr(ctrlu, "|PicOnGUI2a|"))
            SetTimer, showMouseTooltipStatusbar, -500
      } Else If (isSamePos=0)
@@ -1687,7 +1687,7 @@ activateMainWin() {
    LbtnDwn := 0
    Sleep, -1
    MouseGetPos, ,, winu
-   ; z := identifyThisWin()
+   ; z := uiIdentifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
    && (A_TickCount - lastMenuHoverZeit>300) && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
       MainExe.ahkPostFunction("MouseMoveResponder", "krill")
@@ -1697,10 +1697,10 @@ activateMainWin() {
 
    ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
    If (mouseToolTipWinCreated=1)
-      SetTimer, mouseTurnOFFtooltip, -150
+      SetTimer, uiMouseTurnOFFtooltip, -150
 }
 
-GuiSize(GuiHwnd, EventInfo, Width, Height) {
+PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
     If (A_TickCount - lastMenuBarUpdate < 150)
        Return
 
@@ -1712,7 +1712,7 @@ GuiSize(GuiHwnd, EventInfo, Width, Height) {
     SetTimer, miniGDIupdater, % delayu
 }
 
-GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
+PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
    If (AnyWindowOpen>0 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
       Return
@@ -1728,12 +1728,12 @@ GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Return
 }
 
+; MERGEDEL twin: byte-identical copy of Trimmer() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 Trimmer(string, whatTrim:="") {
    If (whatTrim!="")
       string := Trim(string, whatTrim)
    Else
       string := Trim(string, "`r`n `t`f`v`b")
-      ; string := RegExReplace(string, "i)^([\R\p{Z}\p{C}]{0,})|([\R\p{Z}\p{C}]{0,})$")
    Return string
 }
 
@@ -1755,7 +1755,7 @@ dummyTimerProcessDroppedFiles() {
    ToolTip, Please wait - processing dropped files list , , , 2
    Loop, % totalGroppy
    {
-      changeMcursor("busy")
+      uiChangeMcursor("busy")
       line := groppedFiles[A_Index]
       If !line
          Continue
@@ -1799,9 +1799,7 @@ dummyTimerProcessDroppedFiles() {
    lastInvoked := A_TickCount
 }
 
-1GuiClose:
-GuiClose:
-doCleanup:
+PVwinGuiClose:
    byeByeRoutine()
 Return
 
@@ -1915,11 +1913,12 @@ TimerExit() {
    ExitApp
 }
 
+; MERGEKEEP twin [survivor]: byte-identical to the unregistered dead copy in quick-picto-viewer.ahk [tagged MERGEDEL there]; THIS copy is live [registered 0x100-0x108 above] and survives phase C
 PreventKeyPressBeep() {
-   IfEqual,A_Gui,1,Return 0 ; prevent keystrokes for GUI 1 only
+   IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
 }
 
-identifyThisWin() {
+uiIdentifyThisWin() {
   Static prevR, lastInvoked := 1
   If (A_TickCount - lastInvoked < 50)
      Return prevR
@@ -1964,6 +1963,7 @@ guiCreateMenuFlyout() {
    wasMenuFlierCreated := 1
 }
 
+; MERGEDEL twin: byte-identical copy of IsNumber() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
 IsNumber(Var) {
    Static number := "number"
    If Var Is number
@@ -1974,7 +1974,7 @@ IsNumber(Var) {
 highLightMenuBar() {
     hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
     If !hMenuBar
-       addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
+       uiAddJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
 
     hMenuBar := "0x" Format("{:x}", hMenuBar)
     rect := GetMenuItemRect(PVhwnd, hMenuBar, menuCurrentIndex - 1)
@@ -2101,7 +2101,7 @@ GetMenuWinHwnd(mX, mY, n) {
     Return h
 }
 
-Win_ShowSysMenu(Hwnd) {
+uiShowSysMenu(Hwnd) {
 ; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
 ; modified by Marius Șucan
 
@@ -2133,7 +2133,7 @@ stopGiFsPlayback() {
       lastOtherWinClose := A_TickCount
       animGIFplaying := 0
       MainExe.ahkPostFunction("autoChangeDesiredFrame", "stop")
-      changeMcursor("normal-extra")
+      uiChangeMcursor("normal-extra")
    }
 }
 
@@ -2150,18 +2150,20 @@ turnOffSlideshow() {
    lastOtherWinClose := A_TickCount
 }
 
+; MERGEDEL twin: byte-identical copy of GetMenuItemRect() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetMenuItemRect(hwnd, hMenu, nPos) {
     VarSetCapacity(RECT, 16, 0)
-    if DllCall("User32.dll\GetMenuItemRect", "Ptr", hwnd, "Ptr", hMenu, "UInt", nPos, "Ptr", &RECT)
+    if DllCall("User32.dll\GetMenuItemRect", "UPtr", hwnd, "UPtr", hMenu, "UInt", nPos, "UPtr", &RECT)
     {
        objRect := { left   : numget( RECT,  0, "UInt" )
                   , top    : numget( RECT,  4, "UInt" )
                   , right  : numget( RECT,  8, "UInt" )
                   , bottom : numget( RECT, 12, "UInt" ) }
-       rect := ""
+       rect:= ""
        return objRect
     }
-    rect := ""
+
+    rect:= ""
     return 0
 }
 
@@ -2229,12 +2231,12 @@ uiAlphaMaskTrigger(a, b, c, d, e) {
   UpdateMenuBar()
 }
 
-isAlphaMaskWindow() {
+uiIsAlphaMaskWindow() {
    Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70)
 }
 
-isNowAlphaPainting() {
-   Return (imgEditPanelOpened=1 && isAlphaMaskWindow()=1 && liveDrawingBrushTool=1 && editingSelectionNow=1) ? 1 : 0
+uiIsNowAlphaPainting() {
+   Return (imgEditPanelOpened=1 && uiIsAlphaMaskWindow()=1 && liveDrawingBrushTool=1 && editingSelectionNow=1) ? 1 : 0
 }
 
 BuildMenuBar(modus:=0, applyFilter:=0) {
@@ -2249,7 +2251,7 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
       menusList := menusListWelcome
    Else If (modus="freeform" || drawingShapeNow=1)
       menusList := menusListVector
-   Else If isNowAlphaPainting()
+   Else If uiIsNowAlphaPainting()
       menusList := menusListAlphaMasking
    Else If (imgEditPanelOpened=1 && AnyWindowOpen)
       menusList := menusListEditor
@@ -2263,8 +2265,8 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
    menuHotkeys := "|"
    If (applyFilter=1)
    {
-      Menu, PVmenu, Add, >>, dummy
-      Gui, 1: Menu, PVmenu
+      Menu, PVbar, Add, >>, dummy
+      Gui, PVwin: Menu, PVbar
       ; GetClientSize(mainWidth, mainHeight, PVhwnd)
    }
 
@@ -2278,7 +2280,7 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
       n := SubStr(k[1], 1, 1)
       n2 := SubStr(k[1], 2, 1)
       lbl := (forbiddenAltKeys(n) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
-      rr := kMenu(lbl, "invokeMenuBarItem", hMenuBar, applyFilter)
+      rr := uiKmenu(lbl, "invokeMenuBarItem", hMenuBar, applyFilter)
       If (rr=-1)
          Break
 
@@ -2291,10 +2293,10 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
    }
 
    If (applyFilter=1)
-      Menu, PVmenu, Delete, >>
+      Menu, PVbar, Delete, >>
 
    If (rr=-1)
-      Menu, PVmenu, Add, >>, MenuBonusOptions
+      Menu, PVbar, Add, >>, MenuBonusOptions
 }
 
 MenuBonusOptions() {
@@ -2362,7 +2364,7 @@ simpleGetMenuItemRect(hwnd, hMenuBar, indexu, ByRef mX, ByRef mY, ByRef mW, ByRe
     mW := max(rect.left, rect.right) - min(rect.left, rect.right)
 }
 
-kMenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVmenu", actu:="Add") {
+uiKmenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVbar", actu:="Add") {
    If (actu="add")
    {
       If (funcu="-")
@@ -2390,10 +2392,12 @@ kMenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVmenu", actu:="Add") {
    }
 }
 
+; MERGEDEL twin: byte-identical copy of dummy() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 dummy() {
-   Sleep, -1
+  Sleep, 0
 }
 
+; MERGEDEL twin: byte-identical copy of clampInRange() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 clampInRange(value, min, max, reverse:=0) {
    If (reverse=1)
    {
@@ -2480,7 +2484,7 @@ updateTlbrPosition() {
   ; fnOutDebug(UserToolbarX "|" UserToolbarY)
   tX := Round(UserToolbarX),    tY := Round(UserToolbarY)
   WinMove, ahk_id %hQPVtoolbar%, , % tX, % tY
-  SetTimer, updateUIctrl, -100
+  SetTimer, uiUpdateUIctrl, -100
   ; Gui, OSDguiToolbar: Show, NoActivate x%tX% y%tY%, QPV toolbar
 }
 
@@ -2492,8 +2496,8 @@ UpdateMenuBar(modus:=0, tt:=0) {
       hasRan := 1
    }
 
-   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting()
-   ; ToolTip, % "lol"  isNowAlphaPainting() isAlphaMaskWindow()  , , , 2
+   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar uiIsNowAlphaPainting()
+   ; ToolTip, % "lol"  uiIsNowAlphaPainting() uiIsAlphaMaskWindow()  , , , 2
    If !showMainMenuBar
       prevState := thisState
 
@@ -2509,25 +2513,25 @@ UpdateMenuBar(modus:=0, tt:=0) {
    ; If (thumbsDisplaying=1)
    ;    uiAccessUpdateUiStatusBar(0, 0, "list", 0)
    ; Else 
-   ;    updateUIctrl()
+   ;    uiUpdateUIctrl()
 
    lastMenuBarUpdate := A_TickCount
-   Gui, 1: Menu, PVmanu
-   Try Menu, PVmenu, Delete
+   Gui, PVwin: Menu, PVmanu
+   Try Menu, PVbar, Delete
    If (showMainMenuBar!=1)
    {
       Sleep, -1
-      Gui, 1: Menu
+      Gui, PVwin: Menu
       Return
    }
 
    ; Sleep, -1
    BuildMenuBar(modus, 0)
    MainExe.ahkassign("menuHotkeys", menuHotkeys)
-   ; SetMenuInfo(MenuGetHandle("PVmenu"), 2, 1, 0, 1)
+   ; SetMenuInfo(MenuGetHandle("PVbar"), 2, 1, 0, 1)
    ; Sleep, -1
-   ; Gui, 1: Menu, PVmanu
-   Gui, 1: Menu, PVmenu
+   ; Gui, PVwin: Menu, PVmanu
+   Gui, PVwin: Menu, PVbar
    lastMenuBarUpdate := A_TickCount
 
    prevState := thisState
@@ -2543,6 +2547,7 @@ determineMenuBTNsOKAY() {
       Return 1
 }
 
+; MERGEDEL twin: byte-identical copy of isVarEqualTo() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
 isVarEqualTo(value, vals*) {
    yay := 0
    for index, param in vals
@@ -2576,7 +2581,7 @@ preByeRoutine() {
     byeByeRoutine()
 }
 
-KeyboardResponder(givenKey, abusive) {
+uiKeyboardResponder(givenKey, abusive) {
     ; ToolTip, % givenKey "=" abusive "=" runningLongOperation "|" mustAbandonCurrentOperations , , , 2
     If isVarEqualTo(givenKey, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
     {
@@ -2599,7 +2604,7 @@ KeyboardResponder(givenKey, abusive) {
        preByeRoutine()
     } Else If (givenKey="!Space")
     {
-       Win_ShowSysMenu(PVhwnd)
+       uiShowSysMenu(PVhwnd)
     } Else If (givenKey="Space")
     {
        isOkay := AnyWindowOpen ? 0 : 1
@@ -2610,7 +2615,7 @@ KeyboardResponder(givenKey, abusive) {
        If (slideShowRunning=1)
           turnOffSlideshow()
        Else If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
-          changeMcursor("move")
+          uiChangeMcursor("move")
        Else callMain := 1
     } Else callMain := 1
 
@@ -2618,14 +2623,14 @@ KeyboardResponder(givenKey, abusive) {
     ; ToolTip, % callMain "=" isOkay "(" imageLoading "|" animGIFplaying ")=" runningLongOperation "=" whileLoopExec "=" givenKey , , , 2
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
     {
-       ; addJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
+       ; uiAddJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
        MainExe.ahkPostFunction("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
     }
 }
 
-PreProcessKbdKey() {
+uiPreProcessKbdKey() {
    Static lastInvoked := 1, counter := 0, prevKey
-   If (!identifyThisWin() || (A_TickCount - lastOtherWinClose<300))
+   If (!uiIdentifyThisWin() || (A_TickCount - lastOtherWinClose<300))
       Return
 
    ; ToolTip, % hotkate , , , 2
@@ -2643,12 +2648,12 @@ PreProcessKbdKey() {
           Return
    }
 
-   ; addJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
+   ; uiAddJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
    If ((A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0 || isVarEqualTo(givenKey, "Escape", "Enter","!F4")))
    {
       lastInvoked := A_TickCount
       abusive := (counter>25) ? 1 : 0
-      KeyboardResponder(hotkate, abusive)
+      uiKeyboardResponder(hotkate, abusive)
       ; MainExe.ahkPostFunction("KeyboardResponder", hotkate, PVhwnd, abusive)
       If (hotkate=prevKey)
          counter++
@@ -2662,7 +2667,7 @@ PreProcessKbdKey() {
       counter := 0
 }
 
-constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
+uiConstructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
    Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7"
                   , 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE"
                   , FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT"
@@ -2687,13 +2692,13 @@ constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
    Return newkate
 }
 
-WM_KEYDOWN(wParam, lParam, msg, hwnd) {
+uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_code := Format("{1:x}", wParam)
     If (isInRange(vk_code, 21, 28) || isVarEqualTo(vk_code, "6B", "6D", "BB", "BD", "D"))
        navKeysCounter++
 
     If (statusBarTooltipVisible=1)
-       mouseTurnOFFtooltip()
+       uiMouseTurnOFFtooltip()
 
     If (A_TickCount - lastOtherWinClose<300)
        Return 0
@@ -2712,11 +2717,11 @@ WM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
     vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
     vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
-    hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
+    hotkate := uiConstructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
     ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying "|" hotkate , , , 2
     If (vk_code!=10 && vk_code!=11 && vk_code!=12)
     {
-       SetTimer, PreProcessKbdKey, -3
+       SetTimer, uiPreProcessKbdKey, -3
        Return 0
     }
 
@@ -2778,7 +2783,7 @@ identifyMenus(){
       If (menusflyOutVisible=1 || drawingShapeNow=1)
       {
          SendInput, {F10}
-         toggleAppToolbar()
+         uiToggleAppToolbar()
       }
    Return
 
@@ -2786,7 +2791,7 @@ identifyMenus(){
       If (menusflyOutVisible=1)
       {
          SendInput, {F10}
-         PanelQuickSearchMenuOptions()
+         uiPanelQuickSearchMenuOptions()
       }
    Return
 
@@ -2795,6 +2800,7 @@ identifyMenus(){
    Return
 #If
 
+; MERGEDEL twin: byte-identical copy of calcScreenLimits() in lib/msgbox2.ahk - the merge [phase C] deletes this copy
 calcScreenLimits(whichHwnd:="main") {
     Static lastInvoked := 1, prevHwnd, prevActiveMon := []
 
@@ -2861,7 +2867,7 @@ constantMenuReader(modus:=0, externMode:=0) {
    Static prevLabel := "z"
    If (mouseToolTipWinCreated=1)
    {
-      mouseTurnOFFtooltip()
+      uiMouseTurnOFFtooltip()
       Return
    }
 
@@ -2905,7 +2911,7 @@ constantMenuReader(modus:=0, externMode:=0) {
          ShowClickHalo(coords.x, coords.y, coords.w, coords.h, 1, accFocusName)
 
       If !externMode
-         mouseCreateOSDinfoLine(msgu, PrefsLargeFonts, 0, coords)
+         uiMouseCreateOSDinfoLine(msgu, PrefsLargeFonts, 0, coords)
       Else
          Return msgu
       ; ToolTip, % accFocusName , , , 2
@@ -2927,10 +2933,10 @@ repeatMenuInfosPopup() {
 }
 
 mouseClickTurnOFFtooltip() {
-    SetTimer, mouseTurnOFFtooltip, -50
+    SetTimer, uiMouseTurnOFFtooltip, -50
 }
 
-mouseTurnOFFtooltip() {
+uiMouseTurnOFFtooltip() {
    Global statusBarTooltipVisible := 0
    If (mouseToolTipWinCreated!=1)
       Return
@@ -2939,15 +2945,15 @@ mouseTurnOFFtooltip() {
    If (OutputVarWin=hGuiTip)
       Global lastWinDrag := A_TickCount - 125
    Sleep, 10
-   Gui, mouseToolTipGuia: Destroy
+   Gui, uiMouseTipGuia: Destroy
    Global mouseToolTipWinCreated := 0
    Global statusBarTooltipVisible := 0
    Global lastZeitToolTip := A_TickCount
-   SetTimer, mouseTurnOFFtooltip, Off
+   SetTimer, uiMouseTurnOFFtooltip, Off
 }
 
 destroyTooltipu() {
-   mouseTurnOFFtooltip()
+   uiMouseTurnOFFtooltip()
    Sleep, 1
    MouseGetPos, ,, OutputVarWin
    If (OutputVarWin=hQPVtoolbar && ShowAdvToolbar=1)
@@ -4392,7 +4398,7 @@ class taskbarInterface {
    }
 }
 
-repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
+uiRepositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
     If !winPos
     {
        SysGet, MonitorCount, 80
@@ -4435,6 +4441,7 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
 
 }
 
+; MERGEDEL twin: byte-identical copy of MWAGetMonitorMouseIsIn() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
 ; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
 ; by Maestr0
@@ -4460,11 +4467,11 @@ MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
   Return ActiveMon
 }
 
+; MERGEDEL twin: byte-identical copy of GetWindowBounds() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetWindowBounds(hWnd) {
    ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
    ; W10 compatible function to find a window's visible boundaries
    ; modified by Marius Șucan to return an array
-
    size := VarSetCapacity(rect, 16, 0)
    er := DllCall("dwmapi\DwmGetWindowAttribute"
       , "UPtr", hWnd  ; HWND  hwnd
@@ -4481,10 +4488,12 @@ GetWindowBounds(hWnd) {
    r.x2 := NumGet(rect, 8, "Int"), r.y2 := NumGet(rect, 12, "Int")
    r.w := Abs(max(r.x1, r.x2) - min(r.x1, r.x2))
    r.h := Abs(max(r.y1, r.y2) - min(r.y1, r.y2))
+   rect := ""
    ; ToolTip, % r.w " --- " r.h , , , 2
    Return r
 }
 
+; MERGEDEL twin: byte-identical copy of GetWinClientSize() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
 ; modified by Marius Șucan
@@ -4496,29 +4505,38 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
     }
 
     prevHwnd := hwnd "-" mode
-    VarSetCapacity(rc, 16, 0)
-    If (mode=1)
+    If (mode=2)
+    {
+       r := GetWindowPlacement(hwnd)
+       prevW := W := r.w
+       prevH := H := r.h
+    } Else If (mode=1)
     {
        r := GetWindowBounds(hwnd)
        prevW := W := r.w
        prevH := H := r.h
-       lastInvoked := A_TickCount
-       Return
-    } Else DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
+    } Else 
+    {
+       VarSetCapacity(rc, 16, 0)
+       DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
+       prevW := W := NumGet(rc, 8, "int")
+       prevH := H := NumGet(rc, 12, "int")
+       rc := ""
+    }
 
-    prevW := W := NumGet(rc, 8, "int")
-    prevH := H := NumGet(rc, 12, "int")
     lastInvoked := A_TickCount
 } 
 
+; MERGEDEL twin: byte-identical copy of MDMF_FromHWND() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
 MDMF_FromHWND(HWND, Flag := 0) {
-   Return DllCall("User32.dll\MonitorFromWindow", "Ptr", HWND, "UInt", Flag, "Ptr")
+   Return DllCall("User32.dll\MonitorFromWindow", "UPtr", HWND, "UInt", Flag, "Ptr")
 }
 
+; MERGEDEL twin: byte-identical copy of MDMF_FromPoint() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
 MDMF_FromPoint(ByRef X := "", ByRef Y := "", Flag := 0) {
    If (X = "") || (Y = "") {
       VarSetCapacity(PT, 8, 0)
-      DllCall("User32.dll\GetCursorPos", "Ptr", &PT, "Int")
+      DllCall("User32.dll\GetCursorPos", "UPtr", &PT, "Int")
       If (X = "")
          X := NumGet(PT, 0, "Int")
       If (Y = "")
@@ -4527,9 +4545,10 @@ MDMF_FromPoint(ByRef X := "", ByRef Y := "", Flag := 0) {
    Return DllCall("User32.dll\MonitorFromPoint", "Int64", (X & 0xFFFFFFFF) | (Y << 32), "UInt", Flag, "Ptr")
 }
 
+; MERGEDEL twin: byte-identical copy of MDMF_GetInfo() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
 MDMF_GetInfo(HMON) {
    NumPut(VarSetCapacity(MIEX, 40 + (32 << !!A_IsUnicode)), MIEX, 0, "UInt")
-   If DllCall("User32.dll\GetMonitorInfo", "Ptr", HMON, "Ptr", &MIEX, "Int")
+   If DllCall("User32.dll\GetMonitorInfo", "UPtr", HMON, "Ptr", &MIEX, "Int")
       Return {Name:      (Name := StrGet(&MIEX + 40, 32))  ; CCHDEVICENAME = 32
             , Num:       RegExReplace(Name, ".*(\d+)$", "$1")
             , Left:      NumGet(MIEX, 4, "Int")    ; display rectangle
@@ -4645,6 +4664,7 @@ AccGetStateText(nState) {
   Return sState
 }
 
+; MERGEDEL twin: identical to setMenusTheme() in lib/shell-stuff.ahk except its forwarding line [live there at ~1699, commented here] - phase C deletes this copy AND that forward line
 setMenusTheme(modus) {
    If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
       Return
@@ -4659,6 +4679,7 @@ setMenusTheme(modus) {
 }
 
 
+; MERGEDEL twin: byte-identical copy of WinMoveZ() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
   ; modified by Marius Șucan
@@ -4679,9 +4700,10 @@ WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   If (Redraw=2)
      Return [X, Y]
   Else 
-     Return DllCall("MoveWindow", "Ptr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
+     Return DllCall("MoveWindow", "UPtr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
 }
 
+; MERGEDEL twin: byte-identical copy of JEE_ClientToScreen() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
 ; https://autohotkey.com/boards/viewtopic.php?t=38472
@@ -4694,10 +4716,11 @@ JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   vPosY2 := NumGet(&POINT, 4, "Int")
 }
 
+; MERGEDEL twin: byte-identical copy of JEE_ScreenToClient() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
 ; function by jeeswg found on:
 ; https://autohotkey.com/boards/viewtopic.php?t=38472
-  VarSetCapacity(POINT, 8)
+  VarSetCapacity(POINT, 8, 0)
   NumPut(vPosX, &POINT, 0, "Int")
   NumPut(vPosY, &POINT, 4, "Int")
   DllCall("user32\ScreenToClient", "UPtr", hWnd, "UPtr", &POINT)
@@ -4706,6 +4729,7 @@ JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
   POINT := ""
 }
 
+; MERGEDEL twin: byte-identical copy of GetWindowPlacement() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetWindowPlacement(hWnd) {
     Local WINDOWPLACEMENT, Result := {}
     NumPut(VarSetCapacity(WINDOWPLACEMENT, 44, 0), WINDOWPLACEMENT, 0, "UInt")
@@ -4725,6 +4749,7 @@ GetWindowPlacement(hWnd) {
     Return Result
 }
 
+; MERGEDEL twin: byte-identical copy of GetWinHwndAtPoint() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetWinHwndAtPoint(nX, nY) {
     a := DllCall("WindowFromPhysicalPoint", "Uint64", nX|(nY << 32), "Ptr")
     a := Format("{1:#x}", a)
@@ -4749,6 +4774,7 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
     lastInvoked := A_TickCount
 } 
 
+; MERGEDEL twin: byte-identical copy of GetPhysicalCursorPos() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetPhysicalCursorPos(ByRef mX, ByRef mY) {
 ; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
 ; by jNizM, modified by Marius Șucan
@@ -4763,10 +4789,8 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     lastInvoked := A_TickCount
     Static POINT
          , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
-    If !isWinXP
-       GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
-
-    If (!GPC || isWinXP=1)
+    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+    If (!GPC || A_OSVersion="WIN_XP")
     {
        MouseGetPos, mX, mY
        lastMx := mX
@@ -4780,9 +4804,10 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     Return
 }
 
+; MERGEDEL twin: byte-identical copy of SetMenuInfo() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
    cbSize := (A_PtrSize=8) ? 40 : 28
-   VarSetCapacity(MENUINFO, cbSize)
+   VarSetCapacity(MENUINFO, cbSize, 0)
    fMaskFlags := 0x80000000         ; MIM_APPLYTOSUBMENUS
    cyMax := maxHeight ? maxHeight : 0
    If maxHeight
@@ -4812,6 +4837,7 @@ SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
    Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
 }
 
+; MERGEDEL twin: byte-identical copy of GetWindowFromPos() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 GetWindowFromPos(X, Y, hwnd:=0, DetectHidden:=0) {
    ; by just me https://www.autohotkey.com/boards/viewtopic.php?p=80118
    ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001

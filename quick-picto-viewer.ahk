@@ -2619,7 +2619,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 endCaptureCloneBrush() {
    mustCaptureCloneBrush := 0
    interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
-   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVbar")
    createGUItoolbar()
 }
 
@@ -5910,7 +5910,7 @@ BtnSetBrushSymmetryCoords() {
    showTOOLtip("Please click inside the image area to set the symmetry axis")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
    interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
    createGUItoolbar()
    If (panelWinCollapsed=0)
@@ -27700,7 +27700,7 @@ openPreviousPanel(mode:="") {
 mouseTurnOFFtooltip() {
    Gui, mouseToolTipGuia: Destroy
    mouseToolTipWinCreated := 0
-   ; interfaceThread.ahkPostFunction("mouseTurnOFFtooltip", 1)
+   ; interfaceThread.ahkPostFunction("uiMouseTurnOFFtooltip", 1)
 }
 
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="", guiu:="") {
@@ -32922,7 +32922,7 @@ PanelEnableFilesFilter() {
     If (!InStr(listu, "`n`n") && StrLen(UsrEditFilter)>0 && userFilterDoString=1 && StrLen(filesFilter)>1)
        listu := UsrEditFilter "`n`n" listu
 
-    Gui, +Delimiter`n
+    Gui, SettingsGUIA: +Delimiter`n
     Gui, Add, Tab3, %tabzDarkModus%, Text`nFile and image
     Gui, Tab, 1
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIFiltersPanel Checked%userFilterDoString% vuserFilterDoString, Filter files list with given string
@@ -40676,7 +40676,7 @@ PanelMultiRenameFiles() {
     thisu := groupDigits(markedSelectFile)
     listu := readRecentMultiRenameEntries()
     uiLVoffset := 0
-    Gui, +Delimiter`n
+    Gui, SettingsGUIA: +Delimiter`n
     Gui, Add, Text, x15 y15 w%txtWid% Section, Selected files: %thisu%. Type a pattern to rename the files.
     Gui, Add, Text, y+10 w1 h1, Files rename pattern.
     Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditNewFileName, % listu
@@ -45313,7 +45313,7 @@ BtnSetClonerBrushSource() {
    showTOOLtip("Please click inside the image area to set the cloner brush source")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
    interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
    createGUItoolbar()
    If (panelWinCollapsed=0)
@@ -45362,7 +45362,7 @@ BtnSetTextureSource() {
    showTOOLtip("Please click inside the image area to set the texture source coordinates")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
    interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
    createGUItoolbar()
    If (panelWinCollapsed=0)
@@ -46724,7 +46724,7 @@ PanelSearchIndex(dummy:="") {
     sml := (PrefsLargeFonts=1) ? 30 : 20
     iconFile := "imageres.dll", iconNum := 169
     this := userSearchString ? userSearchString : A_Space
-    Gui, +Delimiter`n
+    Gui, SettingsGUIA: +Delimiter`n
     Gui, Add, Picture, x20 y20 h%thisBtnHeight% Icon%iconNum% w-1, %iconFile%
     Gui, Add, Text, x+20 w%txtWid% Section, %infou%. Use | as the OR operator. Wildcards ? and * are supported as well.
     Gui, Add, Text, y+7 wp h1 Hide, Search string
@@ -48536,7 +48536,7 @@ StopColorPicker() {
    interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
    interfaceThread.ahkassign("colorPickerModeNow", colorPickerModeNow)
    interfaceThread.ahkassign("colorPickerMustEnd", 0)
-   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVbar")
 }
 
 StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
@@ -48558,7 +48558,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
 
    Sleep, 1
    diffH := diffW := 0
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
    CoordMode, Pixel, Screen
    LEDu := imgHUDbaseUnit
    hColorPrev := createLEDgui(LEDu)
@@ -52706,7 +52706,7 @@ PanelZoomBlurSelectedArea() {
        gH := gH//1.2
 
     ; gH := (PrefsLargeFonts=1) ? 640 : 540
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Font
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
@@ -52715,7 +52715,7 @@ PanelZoomBlurSelectedArea() {
     Gui, Add, Text, xp y+10 wp Center vPrinterPageInfos, Click in the viewport to set the origin for the zoom.
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
 
     infoBlend := (coreDesiredPixFmt="0x21808") ? "Disabled in 24-RGB mode" : "None"
     If (coreDesiredPixFmt="0x21808")
@@ -52798,7 +52798,7 @@ PanelPixelizeSelectedArea() {
        gH := gH//1.75
 
     Gui, Font
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
@@ -52829,7 +52829,7 @@ PanelPixelizeSelectedArea() {
     Else If (mpxu > 1250)
        maxu := 3000
 
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 Section w%thisW%, Pixelation mode:
@@ -52923,7 +52923,7 @@ PanelBlurSelectedArea() {
        gH := gH//1.75
 
     Gui, Font
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
        Gui, Font, c%darkControlColor%
@@ -52944,7 +52944,7 @@ PanelBlurSelectedArea() {
        BlurAreaInverted := 0
 
     Global mainBtnACT
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
     Gui, Add, Checkbox, x+10 y+10 w%thisW% Section Checked%blurAreaSoftEdges% vblurAreaSoftEdges gupdateUIblurPanel +hwndhTemp, &Soft edges%friendly%
@@ -53101,7 +53101,7 @@ PanelDetectEdgesImage() {
     If (isWinXP=1 || A_OSVersion="WIN_7")
        gH := gH//1.7
 
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Font
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
@@ -53113,7 +53113,7 @@ PanelDetectEdgesImage() {
 
     thisW := (PrefsLargeFonts=1) ? 88 : 68
     thisPW := (PrefsLargeFonts=1) ? thisW + 9 : thisW + 16
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     blends := StrReplace(userBlendModesList, "Clip to alpha*|Replace*|Behind*")
     Gui, Add, Text, x+20 ys +0x200 Section w%thisW% hwndhTemp, Algorithm
     GuiAddDropDownList("x+3 w" thisW*2 " gupdateUIddlEdgesModusPanel AltSubmit Choose" IDedgesModus " vIDedgesModus", "Sobel|Sobel (alt)|Scharr|Canny|Diff-blending", [hTemp, 0, "Edge detection mode"])
@@ -53223,7 +53223,7 @@ PanelAddNoiserImage() {
     If (isWinXP=1 || A_OSVersion="WIN_7")
        gH := gH//1.75
 
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Font, 
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
@@ -53233,7 +53233,7 @@ PanelAddNoiserImage() {
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     infoMask := defineCurrentAlphaMask()
     If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
        BlurAreaAlphaMask := 0
@@ -57395,6 +57395,7 @@ BTNuiToggleLiveInsertTextPreview() {
 }
 
 uiADDalphaMaskTabs(t1, t2, labelu) {
+    Gui, SettingsGUIA: Default ; sub-builder invoked mid-panel-build; make the target explicit
     Global uiPasteInPlaceAlphaDrawMode, UIviewAlpha, infoAlphaMaskGradientView, UIresetAlphaCenter
     btnWid := 90,  txtWid := 310
     EditWid := 60, slideWid := 150
@@ -57818,10 +57819,10 @@ PanelAdjustToneMapping() {
     sml := (PrefsLargeFonts=1) ? 30 : 20
     showTOOLtip("Initializing tone-mapping panel, please wait")
     Global SliderA, SliderB, infoSliderA, infoSliderB
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: -----
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
     GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)|Simple mode (OpenCV)", "HDR tone mapping algorithm")
@@ -59386,7 +59387,7 @@ CopyMovePanelWindow() {
        infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
     }
 
-    Gui, +Delimiter`n
+    Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 90 : 72
     Gui, Add, Text, x15 y15 Section, Destination folder:
     GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination r1 -wrap -multi -WantReturn", prevFileMovePath)
@@ -59966,7 +59967,7 @@ PanelSharpenImage() {
     If (viewportQPVimage.imgHandle)
        ImageSharpenMode := 1
 
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Font
     Gui, Add, Text, x20 y20 w%gW% h%gH% Section -Border +0xE gUIresponderPanelsLivePreview +hwndhCropCornersPic +TabStop, Preview area
     If (uiUseDarkMode=1)
@@ -59979,7 +59980,7 @@ PanelSharpenImage() {
        BlurAreaInverted := 0
 
     thisW := (PrefsLargeFonts=1) ? 68 : 48
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     CurrentPanelTab := 1  ; this panel always opens on its first tab, the live preview relies on it
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnUiSharpenTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab, General|Edges filter
     Gui, Tab, 1
@@ -60079,7 +60080,7 @@ PanelStructuredCopyMoveWindow() {
     pp := mainExecPath "\resources\toolbar\"
     getSelectedFiles(0, 1)
     ml := (PrefsLargeFonts=1) ? 110 : 70
-    Gui, +Delimiter`n
+    Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
     Gui, Add, Text, x15 y15 Section, %infoSelection%This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
     Gui, Add, Text, xs y+10 w%ml%, Source: 
@@ -69474,7 +69475,7 @@ StopCaptureClickStuff(dummy:=0) {
    If (dummy!="escape" && panelWinCollapsed=1 && imgEditPanelOpened=1 && AnyWindowOpen)
       toggleImgEditPanelWindow()
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVmenu")
+   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVbar")
 }
 
 BuildMainMenu(dummy:=0, givenCoords:=0) {
@@ -88588,8 +88589,9 @@ IDshowImage(imgID, opentehFile:=0) {
     Return 1
 }
 
+; MERGEDEL twin [inverse]: byte-identical to the copy in lib/module-interface.ahk, which is the LIVE one [registered for 0x100-0x108 there]; this main-side copy is unregistered dead code - phase C keeps exactly one
 PreventKeyPressBeep() {
-   IfEqual,A_Gui,1,Return 0 ; prevent keystrokes for GUI 1 only
+   IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
 }
 
 trimArray(arr) {
@@ -89196,7 +89198,7 @@ PanelAboutWindow() {
     thisBtnHeight := createSettingsGUI(1, A_ThisFunc)
     Gui, Add, Button, x15 y15 h1 w1 Default Section gBtnCloseWindow, Close
     ml := (isWinXP=1 || A_OSVersion="WIN_7") ? 85 : 145
-    Gui, -DPIScale
+    Gui, SettingsGUIA: -DPIScale
     Gui, Font, s19 Bold, Arial, -wrap
     Gui, Add, Picture, x+2 y+2 w%ml%  h-1 +0x3 gOpenGitHub, qpv-icon.ico
     Gui, Add, Text, x+20 yp, %appTitle% v%appVersion% %verType%
@@ -89223,7 +89225,7 @@ PanelAboutWindow() {
 
     compiled := (A_IsCompiled=1) ? "Compiled. " : "Uncompiled. "
     compiled .= (A_PtrSize=8) ? "x64. " : "x32. "
-    Gui, +DPIScale
+    Gui, SettingsGUIA: +DPIScale
     Gui, Font, Bold
 
     Gui, Add, Text, xs y+25 w%txtWid% BackgroundTrans, Internal AHK-H version: %A_AhkVersion%. %compiled%OS: %A_OSVersion%.
@@ -100406,10 +100408,10 @@ changeMcursor(whichCursor:=0) {
   If (whichCursor)
   {
      prevCursor := whichCursor
-     interfaceThread.ahkPostFunction("changeMcursor", whichCursor)
+     interfaceThread.ahkPostFunction("uiChangeMcursor", whichCursor)
   } Else If (A_TickCount - lastInvoked > 400) ; && (imageLoading!=1)
   {
-     interfaceThread.ahkPostFunction("changeMcursor", "busy")
+     interfaceThread.ahkPostFunction("uiChangeMcursor", "busy")
      ; interfaceThread.ahkassign("imageLoading", 1)
      ; Try DllCall("user32\SetCursor", "Ptr", hCursBusy)
      lastInvoked := A_TickCount
@@ -102521,7 +102523,7 @@ OnLButtonDblClk(wParam, lParam, msg, hwnd) {
        If !A_Gui
           Return 0  ; Just prevent Clipboard change.
        ; Send a WM_COMMAND message to the Gui to trigger the control's g-label.
-       Gui, +LastFound
+       Gui, %A_Gui%: +LastFound
        gID := DllCall("GetDlgCtrlID", "ptr", hwnd) ; Requires AutoHotkey v1.1.
        Static STN_DBLCLK := 1
        PostMessage, 0x111, gID | (STN_DBLCLK << 16), hwnd
