@@ -108,6 +108,24 @@ QPVpid := DllCall("Kernel32.dll\GetCurrentProcessId")
 ; OnExit handling: window close routes through PVwinGuiClose / byeByeRoutine()
 Return
 
+; ______ main-thread facade [merge phase B] ______
+; Every call back into the main thread goes through these three wrappers; nothing
+; else in this file may touch MainExe.ahk* directly. At the merge proper [phase C
+; in interface-thread-merge-plan.md] only these bodies change: MT_post becomes a
+; one-shot BoundFunc timer, MT_get/MT_set direct global access.
+
+MT_post(funcName, args*) {
+   MainExe.ahkPostFunction(funcName, args*)
+}
+
+MT_get(varName) {
+   Return MainExe.ahkgetvar(varName)
+}
+
+MT_set(varName, value) {
+   MainExe.ahkassign(varName, value)
+}
+
 ; MERGEDEL twin: byte-identical copy of setPriorityThread() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
 setPriorityThread(level, handle:="A") {
   If (handle="A" || !handle)
@@ -117,7 +135,7 @@ setPriorityThread(level, handle:="A") {
 
 updateWindowColor() {
   Sleep, 1
-  ; WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
+  ; WindowBgrColor := MT_get("WindowBgrColor")
   Gui, PVwin: Color, %WindowBgrColor%
 }
 
@@ -154,15 +172,15 @@ BuildGUI(params:=0) {
    If !InStr(params, "$")
    {
       mustAssignVarz := 1
-      WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
-      isAlwaysOnTop := MainExe.ahkgetvar.isAlwaysOnTop
-      mainCompiledPath := MainExe.ahkgetvar.mainCompiledPath
-      isTitleBarVisible := MainExe.ahkgetvar.isTitleBarVisible
-      TouchScreenMode := MainExe.ahkgetvar.TouchScreenMode
-      ; userAllowWindowDrag := MainExe.ahkgetvar.userAllowWindowDrag
-      mainWinPos := MainExe.ahkgetvar.mainWinPos
-      mainWinSize := MainExe.ahkgetvar.mainWinSize
-      mainWinMaximized := MainExe.ahkgetvar.mainWinMaximized
+      WindowBgrColor := MT_get("WindowBgrColor")
+      isAlwaysOnTop := MT_get("isAlwaysOnTop")
+      mainCompiledPath := MT_get("mainCompiledPath")
+      isTitleBarVisible := MT_get("isTitleBarVisible")
+      TouchScreenMode := MT_get("TouchScreenMode")
+      ; userAllowWindowDrag := MT_get("userAllowWindowDrag")
+      mainWinPos := MT_get("mainWinPos")
+      mainWinSize := MT_get("mainWinSize")
+      mainWinMaximized := MT_get("mainWinMaximized")
    } Else
    {
       externObj := StrSplit(params, "$")
@@ -235,14 +253,14 @@ BuildGUI(params:=0) {
    uiUpdateUIctrl(1)
    If (mustAssignVarz=1)
    {
-      MainExe.ahkassign("PVhwnd", PVhwnd)
-      MainExe.ahkassign("hGDIinfosWin", hGDIinfosWin)
-      MainExe.ahkassign("hGDIwin", hGDIwin)
-      MainExe.ahkassign("hGDIthumbsWin", hGDIthumbsWin)
-      MainExe.ahkassign("hGDIselectWin", hGDIselectWin)
-      MainExe.ahkassign("hPicOnGui1", hPicOnGui1)
-      MainExe.ahkassign("winGDIcreated", winGDIcreated)
-      MainExe.ahkassign("ThumbsWinGDIcreated", ThumbsWinGDIcreated)
+      MT_set("PVhwnd", PVhwnd)
+      MT_set("hGDIinfosWin", hGDIinfosWin)
+      MT_set("hGDIwin", hGDIwin)
+      MT_set("hGDIthumbsWin", hGDIthumbsWin)
+      MT_set("hGDIselectWin", hGDIselectWin)
+      MT_set("hPicOnGui1", hPicOnGui1)
+      MT_set("winGDIcreated", winGDIcreated)
+      MT_set("ThumbsWinGDIcreated", ThumbsWinGDIcreated)
    }
 
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
@@ -398,7 +416,7 @@ uiUpdateUIctrl(forceThis:=0) {
       GuiH -= tH
 
    If (forceThis=1)
-      editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
+      editingSelectionNow := MT_get("editingSelectionNow")
 
    lastWinStatus := ""
    ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
@@ -738,7 +756,7 @@ SetParentID(Window_ID, theOther) {
 
 miniGDIupdater() {
    uiUpdateUIctrl(0)
-   MainExe.ahkPostFunction("GuiGDIupdaterResize", PrevGuiSizeEvent)
+   MT_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
 ; MERGEABSORB: NOT a twin - independent native-MsgBox implementation. At phase C: simpleMsgBoxWrapper() in quick-picto-viewer.ahk absorbs it [its Else branch at ~33433 becomes this native MsgBox with Gui PVwin:+OwnDialogs], THEN delete this copy; callers byeByeRoutine + askAboutStoppingOperations retarget simpleMsgBoxWrapper
@@ -815,7 +833,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, o
 
 uiAddJournalEntry(msg) {
    If (!runningLongOperation && !imageLoading)
-      MainExe.ahkPostFunction("addJournalEntry", msg)
+      MT_post("addJournalEntry", msg)
 }
 
 WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
@@ -847,7 +865,7 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    Else
       direction := (mouseData>0 && mouseData<51234) ? "WheelUp" : "WheelDown"
 
-   MainExe.ahkPostFunction("KeyboardResponder", prefix direction, PVhwnd, 0)
+   MT_post("KeyboardResponder", prefix direction, PVhwnd, 0)
    Return 0
 }
 
@@ -962,11 +980,11 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If (drawingShapeNow=1)
        sendWinClickAct("remClick", "n", mX, mY)
     Else If (imgEditPanelOpened=1 && AnyWindowOpen)
-       MainExe.ahkPostFunction("toggleImgEditPanelWindow")
+       MT_post("toggleImgEditPanelWindow")
     Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
        askAboutStoppingOperations()
     Else If (!AnyWindowOpen && isOkay)
-       MainExe.ahkPostFunction("ToggleThumbsMode")
+       MT_post("ToggleThumbsMode")
     Return 0
 }
 
@@ -1069,9 +1087,9 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If (mouseToolTipWinCreated=1)
      uiMouseTurnOFFtooltip()
 
-  ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
-  ; AnyWindowOpen := MainExe.ahkgetvar.AnyWindowOpen
-  ; maxFilesIndex := MainExe.ahkgetvar.maxFilesIndex
+  ; thumbsDisplaying := MT_get("thumbsDisplaying")
+  ; AnyWindowOpen := MT_get("AnyWindowOpen")
+  ; maxFilesIndex := MT_get("maxFilesIndex")
   If !uiIdentifyThisWin()
      Return 0
 
@@ -1097,9 +1115,9 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      }
 
      If (prefix="^" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1 && thumbsDisplaying!=1)
-        MainExe.ahkPostFunction("restartGIFplayback")
+        MT_post("restartGIFplayback")
      Else If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
-        MainExe.ahkPostFunction("BuildSecondMenu")
+        MT_post("BuildSecondMenu")
      Else
         uiInitGuiContextMenu(mX, mY, oX, oY)
   }
@@ -1112,9 +1130,9 @@ uiPanelQuickSearchMenuOptions() {
        Return
  
     If (VisibleQuickMenuSearchWin=1)
-       MainExe.ahkPostFunction("closeQuickSearch")
+       MT_post("closeQuickSearch")
     Else
-       MainExe.ahkPostFunction("PanelQuickSearchMenuOptions")
+       MT_post("PanelQuickSearchMenuOptions")
     lastInvoked := A_TickCount
 }
 
@@ -1123,7 +1141,7 @@ uiToggleAppToolbar() {
     If (A_TickCount - lastInvoked<300)
        Return
 
-    MainExe.ahkPostFunction("toggleAppToolbar")
+    MT_post("toggleAppToolbar")
     lastInvoked := A_TickCount
 }
 
@@ -1132,13 +1150,13 @@ uiToggleMenuBaru() {
     If (A_TickCount - lastInvoked<300)
        Return
 
-    MainExe.ahkPostFunction("ToggleMenuBaru")
+    MT_post("ToggleMenuBaru")
     lastInvoked := A_TickCount
 }
 
 uiInitGuiContextMenu(mX, mY, oX, oY) {
     ctrl := IdentifyCtrlUnderMouse(oX, oY)
-    MainExe.ahkPostFunction("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)
+    MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)
 }
 
 infosSlideShow(a, b, c, d, e) {
@@ -1200,14 +1218,14 @@ theSlideShowCore(paramu:=0) {
   prevFullIMGload := A_TickCount
   Try DllCall("user32\SetCursor", "Ptr", 0)
   If (slideShowRunning=1 && slidesFXrandomize=1)
-     MainExe.ahkPostFunction("VPimgFXrandomizer")
+     MT_post("VPimgFXrandomizer")
 
   If (SlideHowMode=1)
-     MainExe.ahkPostFunction("RandomPicture")
+     MT_post("RandomPicture")
   Else If (SlideHowMode=2)
-     MainExe.ahkPostFunction("PreviousPicture")
+     MT_post("PreviousPicture")
   Else If (SlideHowMode=3)
-     MainExe.ahkPostFunction("NextPicture")
+     MT_post("NextPicture")
 }
 
 WM_PENpressure(wp, lp, msg, hwnd) {
@@ -1249,7 +1267,7 @@ WM_PENpressure(wp, lp, msg, hwnd) {
 }
 
 updateGDIwinPos() {
-  ; thumbsDisplaying := MainExe.ahkgetvar.thumbsDisplaying
+  ; thumbsDisplaying := MT_get("thumbsDisplaying")
   ; If (A_OSVersion="WIN_7")
   JEE_ClientToScreen(hPicOnGui1, 0, 0, GuiX, GuiY)
   ; Else GuiX := GuiY := 1
@@ -1302,7 +1320,7 @@ uiWinClickAction(thisEvent:="normal") {
     If (slideShowRunning=1)
        turnOffSlideshow()
     ; Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
-    ;    MainExe.ahkPostFunction("simplePanIMGonClick", 0, 1, 1)
+    ;    MT_post("simplePanIMGonClick", 0, 1, 1)
     Else
        sendWinClickAct(thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
 }
@@ -1310,7 +1328,7 @@ uiWinClickAction(thisEvent:="normal") {
 sendWinClickAct(ctrlEvent, guiCtrl, mX, mY) {
    ; ToolTip, % guiCtrl "|" mX "|" mY , , , 2
    ; fnOutDebug("UI event: " ctrlEvent "==" guiCtrl "|" mX "|" mY)
-   MainExe.ahkPostFunction("WinClickAction", ctrlEvent, guiCtrl, mX, mY)
+   MT_post("WinClickAction", ctrlEvent, guiCtrl, mX, mY)
 }
 
 ResetLbtn() {
@@ -1346,11 +1364,11 @@ WM_WINDOWPOSCHANGED() {
 }
 
 uiRepositionTempBtnGui() {
-     MainExe.ahkPostFunction("RepositionTempBtnGui")
+     MT_post("RepositionTempBtnGui")
 }
 
 uiSaveMainWinPos() {
-     MainExe.ahkPostFunction("saveMainWinPos")
+     MT_post("saveMainWinPos")
 }
 
 uiChangeMcursor(whichCursor) {
@@ -1473,7 +1491,7 @@ uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     Gui, uiMouseTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
     Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
-    MainExe.ahkassign("hGuiTip", hGuiTip)
+    MT_set("hGuiTip", hGuiTip)
     If (unClickable=1)
       WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
 
@@ -1645,7 +1663,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
      If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1 && whileLoopExec!=1)
-        MainExe.ahkPostFunction("MouseMoveResponder")
+        MT_post("MouseMoveResponder")
  
      prevPos := mX "-" mY
   }
@@ -1657,7 +1675,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
   {
      PostMessage, 0xA1, 2,,, ahk_id %PVhwnd%
      Global lastWinDrag := A_TickCount
-     ; MainExe.ahkassign("lastWinDrag", lastWinDrag)
+     ; MT_set("lastWinDrag", lastWinDrag)
      SetTimer, trackMouseDragging, -55
   } 
 }
@@ -1690,7 +1708,7 @@ activateMainWin() {
    ; z := uiIdentifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
    && (A_TickCount - lastMenuHoverZeit>300) && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
-      MainExe.ahkPostFunction("MouseMoveResponder", "krill")
+      MT_post("MouseMoveResponder", "krill")
 
    If (menusflyOutVisible=1 && !identifyMenus())
       SetTimer, hideMenuFlyOut, -50
@@ -1795,7 +1813,7 @@ dummyTimerProcessDroppedFiles() {
       sldFile := vectorShape
 
    groppedFiles := []
-   MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
+   MT_post("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
    lastInvoked := A_TickCount
 }
 
@@ -1829,7 +1847,7 @@ byeByeRoutine() {
        drawingShapeNow := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("stopDrawingShape", "cancel")
+       MT_post("stopDrawingShape", "cancel")
    } Else If (colorPickerModeNow=1)
    {
        colorPickerModeNow := 0
@@ -1841,19 +1859,19 @@ byeByeRoutine() {
        VisibleQuickMenuSearchWin := omniBoxMode := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("closeQuickSearch")
+       MT_post("closeQuickSearch")
    } Else If (mustCaptureCloneBrush=1)
    {
        mustCaptureCloneBrush := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("StopCaptureClickStuff", "Escape")
+       MT_post("StopCaptureClickStuff", "Escape")
    } Else If (folderTreeWinOpen=1)
    {
        folderTreeWinOpen := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("fdTreeClose")
+       MT_post("fdTreeClose")
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
@@ -1861,7 +1879,7 @@ byeByeRoutine() {
       {
          lastOtherWinClose := A_TickCount
          AnyWindowOpen := 0
-         MainExe.ahkPostFunction("CloseWindow")
+         MT_post("CloseWindow")
       } Else If (animGIFplaying=1)
       {
          lastOtherWinClose := A_TickCount
@@ -1878,15 +1896,15 @@ byeByeRoutine() {
          lastCloseInvoked := 5 ; exit application 
          ; thumbsDisplaying := 0
          ; lastOtherWinClose := A_TickCount
-         ; MainExe.ahkPostFunction("MenuReturnIMGedit")
+         ; MT_post("MenuReturnIMGedit")
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
-      MainExe.ahkPostFunction("exitAppu", "external")
+      MT_post("exitAppu", "external")
       ;  lastCloseInvoked++
    } Else If (markedSelectFile>50 && maxFilesIndex>100)
    {
-      MainExe.ahkPostFunction("exitAppu", "select-external")
+      MT_post("exitAppu", "select-external")
       ;  lastCloseInvoked++
    } Else lastCloseInvoked := 5
 
@@ -1897,7 +1915,7 @@ byeByeRoutine() {
    {
       ; SoundBeep , 500, 2000
       SetTimer, TimerExit, % (lastCloseInvoked>5) ? -550 : -10
-      MainExe.ahkPostFunction("TrueCleanup", 1)
+      MT_post("TrueCleanup", 1)
    }
 }
 
@@ -2107,7 +2125,7 @@ uiShowSysMenu(Hwnd) {
 
   turnOffSlideshow()
   JEE_ClientToScreen(PVhwnd, 1, 1, x, y)
-  ; MainExe.ahkPostFunction("Win_ShowSysMenu", hwnd, x, y)
+  ; MT_post("Win_ShowSysMenu", hwnd, x, y)
   coreShowSysMenu(Hwnd, x, y)
   Return 1
 }
@@ -2132,7 +2150,7 @@ stopGiFsPlayback() {
    {
       lastOtherWinClose := A_TickCount
       animGIFplaying := 0
-      MainExe.ahkPostFunction("autoChangeDesiredFrame", "stop")
+      MT_post("autoChangeDesiredFrame", "stop")
       uiChangeMcursor("normal-extra")
    }
 }
@@ -2144,7 +2162,7 @@ turnOffSlideshow() {
 
    slideShowRunning := 0
    SetTimer, theSlideShowCore, Off
-   MainExe.ahkPostFunction("dummyInfoToggleSlideShowu", "stop")
+   MT_post("dummyInfoToggleSlideShowu", "stop")
    If (slideShowDelay<950)
       SoundBeep , 900, 100
    lastOtherWinClose := A_TickCount
@@ -2351,7 +2369,7 @@ invokeMenuBarItem(a,b) {
    lastItem := b
    Global menuCurrentIndex := b
    lastInvoked := A_TickCount
-   MainExe.ahkPostFunction(funcu, b)
+   MT_post(funcu, b)
    SetTimer, findMenuBarItemUnderMouse, 60
 }
 
@@ -2527,7 +2545,7 @@ UpdateMenuBar(modus:=0, tt:=0) {
 
    ; Sleep, -1
    BuildMenuBar(modus, 0)
-   MainExe.ahkassign("menuHotkeys", menuHotkeys)
+   MT_set("menuHotkeys", menuHotkeys)
    ; SetMenuInfo(MenuGetHandle("PVbar"), 2, 1, 0, 1)
    ; Sleep, -1
    ; Gui, PVwin: Menu, PVmanu
@@ -2624,7 +2642,7 @@ uiKeyboardResponder(givenKey, abusive) {
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
     {
        ; uiAddJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
-       MainExe.ahkPostFunction("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
+       MT_post("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
     }
 }
 
@@ -2654,7 +2672,7 @@ uiPreProcessKbdKey() {
       lastInvoked := A_TickCount
       abusive := (counter>25) ? 1 : 0
       uiKeyboardResponder(hotkate, abusive)
-      ; MainExe.ahkPostFunction("KeyboardResponder", hotkate, PVhwnd, abusive)
+      ; MT_post("KeyboardResponder", hotkate, PVhwnd, abusive)
       If (hotkate=prevKey)
          counter++
       Else 
@@ -2775,7 +2793,7 @@ identifyMenus(){
       If (!AnyWindowOpen && drawingShapeNow!=1)
       {
          SendInput, {F10}
-         MainExe.ahkPostFunction("PanelHelpWindow")
+         MT_post("PanelHelpWindow")
       }
    Return
 
@@ -2915,7 +2933,7 @@ constantMenuReader(modus:=0, externMode:=0) {
       Else
          Return msgu
       ; ToolTip, % accFocusName , , , 2
-      ; MainExe.ahkPostFunction("showtooltip", accFocusName)
+      ; MT_post("showtooltip", accFocusName)
    } Else If (modus="RButton")
    {
       Try MouseGetPos, ,, WinID
@@ -4675,7 +4693,7 @@ setMenusTheme(modus) {
    FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
-   ; interfaceThread.ahkPostFunction("setMenusTheme", modus)
+   ; IF_post("setMenusTheme", modus)
 }
 
 

@@ -457,15 +457,36 @@ If !A_IsCompiled
 Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
    interfaceThread := ahkThread(StrGet(&data, sz, "utf-8"))
 
-; the interface is a separate thread to allow users 
+; ______ interface-thread facade [merge phase B] ______
+; Every call into the interfaceThread goes through these four wrappers; nothing else
+; in the main script may touch interfaceThread.ahk* directly. At the merge proper
+; [phase C in interface-thread-merge-plan.md] only these four bodies change:
+; IF_call becomes a direct %funcName%() call, IF_post a one-shot BoundFunc timer
+; [preserving today's queued-execution semantics], IF_set/IF_get direct global
+; access - which is what keeps the flip small and reversible.
+
+IF_call(funcName, args*) {
+   Return interfaceThread.ahkFunction(funcName, args*)
+}
+
+IF_post(funcName, args*) {
+   interfaceThread.ahkPostFunction(funcName, args*)
+}
+
+IF_set(varName, value) {
+   interfaceThread.ahkassign(varName, value)
+}
+
+IF_get(varName) {
+   Return interfaceThread.ahkgetvar(varName)
+}
+
+; the interface is a separate thread to allow users
 ; enjoy a more responsive user interface when the main thread
 ; is busy processing
 externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$.$" mainWinPos "$" mainWinSize "$" mainWinMaximized "$" IMGresizingMode
 externObj .= "$" OSDbgrColor "$" OSDtextColor "$" OSDfontSize "$" PrefsLargeFonts "$" OSDFontName "$" OSDfontBolded
-initGUI := interfaceThread.ahkFunction("BuildGUI", externObj)
-; interfaceThread.ahkPostFunction("dummy")
-; interfaceThread.ahkassign("dummy")
-; interfaceThread.ahkgetvar("dummy")
+initGUI := IF_call("BuildGUI", externObj)
 fnOutputDebug("extern UI HWNDs: " initGUI)
 If !InStr(initGUI, "|")
 {
@@ -502,7 +523,7 @@ If (qpvCanvasHasInit=1)
 If (doWelcomeNow=1 && qpvCanvasHasInit=1)
 {
    drawWelcomeImg()
-   interfaceThread.ahkPostFunction("uiAccessWelcomeView")
+   IF_post("uiAccessWelcomeView")
 }
 
 If (A_Is64bitOS=1 && A_PtrSize!=8)
@@ -878,7 +899,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
           If (givenKey="escape")
           {
              lastOtherWinClose := A_TickCount
-             interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+             IF_set("lastOtherWinClose", lastOtherWinClose)
           }
 
           deactivateTlbrKbdMode(1)
@@ -945,7 +966,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
              }
           }
           If n
-             interfaceThread.ahkPostFunction("invokeGivenMenuBarPopup", n)
+             IF_post("invokeGivenMenuBarPopup", n)
        }
    }
 
@@ -954,12 +975,12 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
       KeyboardResponder(givenKey, thisWin, 0, "n")
    } Else If (totalFramesIndex>2 && CountGIFframes>2)
    {
-      animGIFplaying := interfaceThread.ahkgetvar.animGIFplaying
+      animGIFplaying := IF_get("animGIFplaying")
       If (animGIFplaying=-1)
       {
          imgPath := resultedFilesList[currentFileIndex, 1]
          animGIFplaying := 1
-         interfaceThread.ahkassign("animGIFplaying", animGIFplaying)
+         IF_set("animGIFplaying", animGIFplaying)
          ; setGIFframesDelay()
          autoChangeDesiredFrame("start", imgPath)
          SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
@@ -2405,7 +2426,7 @@ initQPVmainDLL(modus:=0) {
       RegExFilesPattern := "i)^(.\:\\).*(\.(" 
       RegExFilesPattern .= extensionsList
       RegExFilesPattern .= "))$"
-      ; interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
+      ; IF_set("RegExFilesPattern", RegExFilesPattern)
       allFormats := openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
       Loop, Parse, extensionsList, |
       {
@@ -2416,7 +2437,7 @@ initQPVmainDLL(modus:=0) {
       fnOutputDebug("WIC init formats: " openFptrnWIC)
    } Else addJournalEntry("ERROR: Failed to initialize WIC module. Some image formats may not be supported.")
 
-   ; interfaceThread.ahkassign("RegExFilesPattern", RegExFilesPattern)
+   ; IF_set("RegExFilesPattern", RegExFilesPattern)
    RegWrite, REG_SZ, %QPVregEntry%, RegExFilesPattern, % RegExFilesPattern
    ; MsgBox, % WICmoduleHasInit "==" CLSIDlist "`n" extensionsList
    ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
@@ -2567,7 +2588,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      res := sldGenerateFilesList(fileNamu, 0, mustRemQuotes)
 
   currentFilesListModified := 0
-  interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+  IF_set("currentFilesListModified", currentFilesListModified)
   prevOpenFolderPath := OutDir
   INIaction(1, "prevOpenFolderPath", "General")
   If (res="abandoned")
@@ -2618,8 +2639,8 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
 endCaptureCloneBrush() {
    mustCaptureCloneBrush := 0
-   interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
-   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVbar")
+   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   IF_post("setMenuBarState", "Enable", "PVbar")
    createGUItoolbar()
 }
 
@@ -2657,8 +2678,8 @@ resetMainWin2Welcome() {
      filesFilter := EntryMarkedMoveIndex := mustOpenStartFolder := ""
      createGDIPcanvas()
      ToggleVisibilityWindow("show", hGDIwin)
-     interfaceThread.ahkassign("thumbsDisplaying", 0)
-     interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+     IF_set("thumbsDisplaying", 0)
+     IF_set("maxFilesIndex", maxFilesIndex)
      Gdip_GraphicsClear(glPG, "0x00" WindowBgrColor)
      doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, glHDC, 1)
      doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC, 1)
@@ -2683,7 +2704,7 @@ resetMainWin2Welcome() {
      prevOpenedWindow := ""
      drawWelcomeImg()
      SetTimer, createGUItoolbar, -100
-     interfaceThread.ahkPostFunction("uiAccessWelcomeView")
+     IF_post("uiAccessWelcomeView")
      SetTimer, TriggerMenuBarUpdate, -90
      SetTimer, ResetImgLoadStatus, -50
      If (lockToolbar2Win=1 && ShowAdvToolbar=1)
@@ -2721,14 +2742,14 @@ mainWinTabResponse() {
 }
 
 GenerateRandyList() {
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+   IF_set("maxFilesIndex", maxFilesIndex)
    RandyIMGids := []
    RandyIMGnow := -1
    ; MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000)
 }
 
 coreGenerateRandomList() {
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+   IF_set("maxFilesIndex", maxFilesIndex)
    RandyIMGids := []
    If (slidesRandoMode=1 || maxFilesIndex<100 || !slidesRandoMode)
    {
@@ -4296,11 +4317,14 @@ extraDummyReloadThisPicture() {
 }
 
 determineLClickState() {
+; Reads the logical button state directly since merge phase B; previously this also
+; polled the interface thread's LbtnDwn mirror, which is derived from the same
+; promoted input stream, so the direct read covers mouse, pen and touch alike.
+; The LbtnDwn mirror itself stays - the interface-side click handlers rely on it.
    If (slideShowRunning=1)
       Return 0
 
-   LbtnDwn := interfaceThread.ahkgetvar.LbtnDwn
-   Return (GetKeyState("LButton") || LbtnDwn=1) ? 1 : 0
+   Return GetKeyState("LButton") ? 1 : 0
 }
 
 getBrushPenPressure(ByRef rawPressure) {
@@ -4310,7 +4334,7 @@ getBrushPenPressure(ByRef rawPressure) {
    If (BrushToolPenPressure!=1)
       Return -1
 
-   rawPressure := interfaceThread.ahkgetvar.penPressureRaw
+   rawPressure := IF_get("penPressureRaw")
    If (rawPressure<1)
       Return -1
 
@@ -4888,8 +4912,8 @@ ToggleThumbsMode() {
    }
 
    currentFileIndex := clampInRange(currentFileIndex, 1, maxFilesIndex)
-   interfaceThread.ahkassign("lastCloseInvoked", 0)
-   interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+   IF_set("lastCloseInvoked", 0)
+   IF_set("currentFilesListModified", currentFilesListModified)
    thisIndexu := resultedFilesList[currentFileIndex, 1] currentFileIndex
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
    If (thumbsDisplaying=1)
@@ -4909,7 +4933,7 @@ ToggleThumbsMode() {
       ToggleVisibilityWindow("hide", hGDIthumbsWin)
       fnOutputDebug("Image view initialized")
       dummyTimerDelayiedImageDisplay(50)
-      interfaceThread.ahkPostFunction("uiAccessUpdateUiStatusBar", 0, 0, "image")
+      IF_post("uiAccessUpdateUiStatusBar", 0, 0, "image")
       If hSNDmediaFile
          MCI_Resume(hSNDmedia)
       lastTimeToggleThumbs := A_TickCount
@@ -4939,7 +4963,7 @@ ToggleThumbsMode() {
       uiPanelOpenCloseEvent()
       ; fnOutputDebug("Recalculating thumbnail sizes")
       recalculateThumbsSizes()
-      interfaceThread.ahkFunction("uiAccessUpdateUiStatusBar", 0, 0, "list", 0, OSDfontSize, maxFilesIndex)
+      IF_call("uiAccessUpdateUiStatusBar", 0, 0, "list", 0, OSDfontSize, maxFilesIndex)
       UpdateThumbsScreen()
       ; fnOutputDebug("hGDIinfosWin cleaned... " hGDIinfosWin "  -- G= " 2NDglPG "  -- hDC= " 2NDglHDC " ")
       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
@@ -4963,8 +4987,8 @@ TriggerMenuBarUpdate(modus:=0, tt:=0) {
       modus := "freeform"
 
    lastMenuBarUpdated := A_TickCount
-   ; interfaceThread.ahkassign("thumbsDisplaying", thumbsDisplaying)
-   interfaceThread.ahkPostFunction("UpdateMenuBar", modus, tt)
+   ; IF_set("thumbsDisplaying", thumbsDisplaying)
+   IF_post("UpdateMenuBar", modus, tt)
    SetTimer, refreshEntireViewport, -450
 }
 
@@ -5522,7 +5546,7 @@ ThumbsScrollbar() {
 
 setWhileLoopExec(val) {
    whileLoopExec := val
-   interfaceThread.ahkassign("whileLoopExec", val)
+   IF_set("whileLoopExec", val)
 }
 
 simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
@@ -5755,7 +5779,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       } Else 
       {
          toolTipGuiCreated := 0
-         interfaceThread.ahkassign("toolTipGuiCreated", 0)
+         IF_set("toolTipGuiCreated", 0)
          clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
       }
    }
@@ -5763,14 +5787,14 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    IF clear
    {
       toolTipGuiCreated := 0
-      interfaceThread.ahkassign("toolTipGuiCreated", 0)
+      IF_set("toolTipGuiCreated", 0)
       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    }
 
    setWhileLoopExec(0)
    lastSwipeZeitGesture := A_TickCount
    If (doFrameChange || doNextSlide || doPrevSlide || doZoomChange)
-      interfaceThread.ahkassign("lastSwipeZeitGesture", lastSwipeZeitGesture)
+      IF_set("lastSwipeZeitGesture", lastSwipeZeitGesture)
 
    didSomething := 1
    If doFrameChange
@@ -5786,7 +5810,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
 
    lastSwipeZeitGesture := A_TickCount
    If didSomething
-      interfaceThread.ahkassign("lastSwipeZeitGesture", lastSwipeZeitGesture)
+      IF_set("lastSwipeZeitGesture", lastSwipeZeitGesture)
    Else
       zeitSillyPrevent := 1
 
@@ -5910,8 +5934,8 @@ BtnSetBrushSymmetryCoords() {
    showTOOLtip("Please click inside the image area to set the symmetry axis")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
-   interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   IF_post("setMenuBarState", "Disable", "PVbar")
+   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -9820,7 +9844,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             {
                func2exec := r := info := ""
                Global lastOtherWinClose := A_TickCount
-               interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+               IF_set("lastOtherWinClose", lastOtherWinClose)
                Break
             }
 
@@ -11036,7 +11060,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
   If (RandyIMGnow=-1 || !RandyIMGids.Count()) && (SlideHowMode=1)
      coreGenerateRandomList()
 
-  interfaceThread.ahkFunction("initSlidesModes", animGIFplaying, allowNextSlide, maxFilesIndex, slidesFXrandomize)
+  IF_call("initSlidesModes", animGIFplaying, allowNextSlide, maxFilesIndex, slidesFXrandomize)
   If (slideShowRunning=1 || actu="stop") && (actu!="start")
   {
      If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
@@ -11056,7 +11080,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      ; ResetImgLoadStatus()
      ; SetTimer, theSlideShowCore, Off
      prevSlideShowStop := A_TickCount
-     interfaceThread.ahkFunction("slideshowsHandler", 0, "stop", SlideHowMode)
+     IF_call("slideshowsHandler", 0, "stop", SlideHowMode)
      SetTimer, ResetImgLoadStatus, -150
   } Else If (thumbsDisplaying!=1 || actu="start")
   {
@@ -11081,14 +11105,14 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      }
 
      imageLoading := 0
-     interfaceThread.ahkassign("imageLoading", imageLoading)
+     IF_set("imageLoading", imageLoading)
      changeMcursor("normal-extra")
      SetTimer, ResetImgLoadStatus, Off
      If (StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && resetMode!=1)
         startSlidesMusicNow()
 
      slideShowRunning := 1
-     interfaceThread.ahkassign("allowNextSlide", 1)
+     IF_set("allowNextSlide", 1)
      If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
         milisec := MCI_Length(hSNDmedia) 
 
@@ -11101,7 +11125,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         msgu .= "`nAlready seen images will be skipped."
 
      msgu .= "`nPress Escape or click to stop the slideshow."
-     interfaceThread.ahkFunction("slideshowsHandler", thisSlideSpeed, "start", SlideHowMode, msgu)
+     IF_call("slideshowsHandler", thisSlideSpeed, "start", SlideHowMode, msgu)
      ; SetTimer, theSlideShowCore, % thisSlideSpeed
   }
   Return
@@ -11572,7 +11596,7 @@ coreResetIMGview(dummy:=0) {
      ForceRefreshNowThumbsList()
   }
 
-  interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+  IF_set("IMGresizingMode", IMGresizingMode)
   If (dummy="k")
      usrColorDepth := internalColorDepth := 1
 
@@ -12313,7 +12337,7 @@ DestroyGIFuWin() {
     If (slideShowRunning=1 || animGIFplaying=1)
        SetTimer, ResetImgLoadStatus, -15
 
-    interfaceThread.ahkassign("animGIFplaying", 0)
+    IF_set("animGIFplaying", 0)
     SetTimer, autoChangeDesiredFrame, Off
     autoChangeDesiredFrame("stop")
 }
@@ -12344,7 +12368,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          lastFrameChange := A_TickCount
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
-         interfaceThread.ahkassign("animGIFplaying", 0)
+         IF_set("animGIFplaying", 0)
          ResetImgLoadStatus()
          ; dummyTimerDelayiedImageDisplay(50)
       }
@@ -12361,25 +12385,25 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       prevImgPath := imgPath
       allowNextSlide := 0
       animGIFplaying := 1
-      interfaceThread.ahkassign("animGIFplaying", 1)
-      interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
+      IF_set("animGIFplaying", 1)
+      IF_set("allowNextSlide", allowNextSlide)
       Return
    } Else
    {
       Sleep, -1
-      animGIFplaying := interfaceThread.ahkgetvar.animGIFplaying
-      ; mustHalt := interfaceThread.ahkgetvar.mustProcessKeys
+      animGIFplaying := IF_get("animGIFplaying")
+      ; mustHalt := IF_get("mustProcessKeys")
       If (animGIFplaying<=0)
       {
          SetTimer, ResetImgLoadStatus, -10
          SetTimer, autoChangeDesiredFrame, Off
          animGIFplaying := 0
          allowNextSlide := 1
-         interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
+         IF_set("allowNextSlide", allowNextSlide)
          prevImgPath := ""
          If (animGIFplaying=0)
          {
-            interfaceThread.ahkassign("animGIFplaying", 0)
+            IF_set("animGIFplaying", 0)
             prevAnimGIFwas := prevImgPath
             lastFrameChange := A_TickCount
             Global lastGIFdestroy := A_TickCount
@@ -12414,7 +12438,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       ; allowNextSlide := 0
       lastInvoked := A_TickCount
       prevImgPath := ""
-      interfaceThread.ahkPostFunction("theSlideShowCore", "force")
+      IF_post("theSlideShowCore", "force")
       ; theSlideShowCore()
       invokeExternalSlideshowHandler()
    } Else If (A_TickCount - lastFrameChange > thisFrameDelay)
@@ -12422,8 +12446,8 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       lastFrameChange := A_TickCount
       SetTimer, RefreshImageFile, -1
    }
-   interfaceThread.ahkPostFunction("infosSlideShow", slideShowRunning, SlideHowMode, animGIFplaying, allowNextSlide, runningLongOperation)
-   ; interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
+   IF_post("infosSlideShow", slideShowRunning, SlideHowMode, animGIFplaying, allowNextSlide, runningLongOperation)
+   ; IF_set("allowNextSlide", allowNextSlide)
 }
 
 infoShowCurrentFrameIndex() {
@@ -16839,8 +16863,8 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
    }
 
    currentImgModified := 1
-   interfaceThread.ahkassign("UserMemBMP", UserMemBMP)
-   interfaceThread.ahkassign("undoLevelsRecorded", undoLevelsRecorded)
+   IF_set("UserMemBMP", UserMemBMP)
+   IF_set("undoLevelsRecorded", undoLevelsRecorded)
    SetTimer, ResetImgLoadStatus, -50
    SetTimer, TriggerMenuBarUpdate, -50
    If (A_TickCount - lastInvoked>950) && (liveDrawingBrushTool=0 && AnyWindowOpen!=66)
@@ -16911,8 +16935,8 @@ terminateIMGediting(modus:=0) {
          currentVectorUndoLevel := 1
          customShapeHasSelectedPoints := 0
          currentUndoLevel := hasReachedMaxUndoLevels := undoLevelsRecorded := 0
-         interfaceThread.ahkassign("UserMemBMP", UserMemBMP)
-         interfaceThread.ahkassign("undoLevelsRecorded", undoLevelsRecorded)
+         IF_set("UserMemBMP", UserMemBMP)
+         IF_set("undoLevelsRecorded", undoLevelsRecorded)
          SetTimer, TriggerMenuBarUpdate, -50
          Return
       }
@@ -16938,8 +16962,8 @@ terminateIMGediting(modus:=0) {
    currentSelUndoLevel := 1
    undoSelLevelsArray := []
    currentUndoLevel := hasReachedMaxUndoLevels := undoLevelsRecorded := 0
-   interfaceThread.ahkassign("UserMemBMP", UserMemBMP)
-   interfaceThread.ahkassign("undoLevelsRecorded", undoLevelsRecorded)
+   IF_set("UserMemBMP", UserMemBMP)
+   IF_set("undoLevelsRecorded", undoLevelsRecorded)
    SetTimer, TriggerMenuBarUpdate, -50
 }
 
@@ -21171,8 +21195,8 @@ HugeImagesConvertClrDepth(modus) {
 setHugeImageActionsCount(actions) {
     bmp := viewportQPVimage.imgHandle
     viewportQPVimage.actions := Round(actions)
-    interfaceThread.ahkassign("UserMemBMP", bmp)
-    interfaceThread.ahkassign("undoLevelsRecorded", actions)
+    IF_set("UserMemBMP", bmp)
+    IF_set("undoLevelsRecorded", actions)
     imgIndexEditing := currentFileIndex
     currentImgModified := 1
 }
@@ -26996,7 +27020,7 @@ OpenDirsFavedEntry(a, b, c) {
       resultedFilesList[currentFileIndex, 5] := 1
       currentImgModified := 0
       SlidesMusicSong := ""
-      interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+      IF_set("currentFilesListModified", currentFilesListModified)
    } Else If (folderu="\QPV\favourite-images-list.SLD")
       retrieveFavesAsList()
    Else If (folderu="\QPV\viewed-images-history|current-session.SLD")
@@ -27538,7 +27562,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
        prevBtnList := ""
        Gui, TempBtnGui: Destroy
        tempBtnVisible := "null"
-       interfaceThread.ahkassign("tempBtnVisible", tempBtnVisible)
+       IF_set("tempBtnVisible", tempBtnVisible)
        Return
     }
 
@@ -27576,7 +27600,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
     RepositionTempBtnGui()
     If InStr(btnList, ",,")
        prevBtnList := btnList
-    interfaceThread.ahkassign("tempBtnVisible", tempBtnVisible)
+    IF_set("tempBtnVisible", tempBtnVisible)
     SetTimer, DestroyTempBtnGui, % - delayu
     lastCreated := A_TickCount
 }
@@ -27700,7 +27724,7 @@ openPreviousPanel(mode:="") {
 mouseTurnOFFtooltip() {
    Gui, mouseToolTipGuia: Destroy
    mouseToolTipWinCreated := 0
-   ; interfaceThread.ahkPostFunction("uiMouseTurnOFFtooltip", 1)
+   ; IF_post("uiMouseTurnOFFtooltip", 1)
 }
 
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="", guiu:="") {
@@ -27968,7 +27992,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        If (closeEditPanelOnApply=-1)
           INIaction(0, "closeEditPanelOnApply", "General", 1)
 
-       ; interfaceThread.ahkassign("AnyWindowOpen", IDwin)
+       ; IF_set("AnyWindowOpen", IDwin)
        ; TriggerMenuBarUpdate()
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
@@ -30362,7 +30386,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
      showTOOLtip("Operation abandoned by user")
      SetTimer, RemoveTooltip, % -msgDisplayTime
      lastOtherWinClose := A_TickCount
-     interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+     IF_set("lastOtherWinClose", lastOtherWinClose)
      SetTimer, ResetImgLoadStatus, -200
      GuiControl, SettingsGUIA:, infoLine, Operation abandoned by user
      Return
@@ -30542,7 +30566,7 @@ PanelFoldersTree() {
     {
        Gui, fdTreeGuia: Show
        folderTreeWinOpen := 1
-       interfaceThread.ahkassign("folderTreeWinOpen", folderTreeWinOpen)
+       IF_set("folderTreeWinOpen", folderTreeWinOpen)
        Return
     }
 
@@ -30582,8 +30606,8 @@ PanelFoldersTree() {
     winPos := (prevSetWinPosX && prevSetWinPosY) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("fdTreeGuia", hfdTreeWinGui, 0, "Folders tree view: " appTitle, winPos)
     folderTreeWinOpen := 1
-    interfaceThread.ahkassign("folderTreeWinOpen", folderTreeWinOpen)
-    interfaceThread.ahkassign("hfdTreeWinGui", hfdTreeWinGui)
+    IF_set("folderTreeWinOpen", folderTreeWinOpen)
+    IF_set("hfdTreeWinGui", hfdTreeWinGui)
     hasRan := 1
     SetTimer, FolderTreeRepopulate, -100
     fdTreeGuiaGuiSize()
@@ -30726,10 +30750,10 @@ fdTreeGuiaGuiSize() {
 fdTreeClose() {
    lastTimeToggleThumbs := A_TickCount 
    lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
    Gui, fdTreeGuia: Hide
    folderTreeWinOpen := 0
-   interfaceThread.ahkassign("folderTreeWinOpen", folderTreeWinOpen)
+   IF_set("folderTreeWinOpen", folderTreeWinOpen)
 }
 
 fdTreeGuiaGuiClose:
@@ -30824,7 +30848,7 @@ FolderTreeResponder(a, b, c) {
             func2exec := r := info := ""
             thisFolder := dc := nc := r := info := ""
             Global lastOtherWinClose := A_TickCount
-            interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+            IF_set("lastOtherWinClose", lastOtherWinClose)
             Break
          }
 
@@ -33295,7 +33319,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     msgBoxed := 1
     setWinCloseZeit()
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
-       interfaceThread.ahkPostFunction("setTaskbarIconState", iconz)
+       IF_post("setTaskbarIconState", iconz)
 
     panelMode := 0
     fontSize := (PrefsLargeFonts=1) ? LargeUIfontValue : 0
@@ -33344,7 +33368,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     If hasDisabled[1]
        WinSet, Enable,, ahk_id %hfdTreeWinGui%
 
-    interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+    IF_set("lastOtherWinClose", lastOtherWinClose)
     If (buttonz!=-1)
        addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
     Else
@@ -33353,12 +33377,12 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     If (panelMode=1) ; fake window panel
     {
        AnyWindowOpen := isNowFakeWinOpen := 0
-       interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
+       IF_set("AnyWindowOpen", AnyWindowOpen)
     }
     createGUItoolbar()
     lastLongOperationAbort := A_TickCount
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
-       interfaceThread.ahkPostFunction("setTaskbarIconState", "normal")
+       IF_post("setTaskbarIconState", "normal")
 
     ; SetTimer, setWinCloseZeit, -200, 900
     msgBoxed := 0
@@ -33430,7 +33454,7 @@ simpleMsgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality
            r := "Continue"
       IfMsgBox, TryAgain
            r := "TryAgain"
-   } Else r := interfaceThread.ahkFunction("msgBoxWrapper", winTitle, msg, buttonz, defaultBTN, iconz, modality, optionz)
+   } Else r := IF_call("msgBoxWrapper", winTitle, msg, buttonz, defaultBTN, iconz, modality, optionz)
 
    ; addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
    ; lastLongOperationAbort := A_TickCount
@@ -35430,14 +35454,14 @@ determineTerminateOperation() {
   lastInvoked := A_TickCount
   Loop 
   {
-      p := interfaceThread.ahkgetvar.userPendingAbortOperations
+      p := IF_get("userPendingAbortOperations")
       If (p!=1)
          Break
       Else
          Sleep, 1
   }
 
-  theEnd := interfaceThread.ahkgetvar.mustAbandonCurrentOperations
+  theEnd := IF_get("mustAbandonCurrentOperations")
   If theEnd
      lastLongOperationAbort := A_TickCount
   Return theEnd
@@ -35445,7 +35469,7 @@ determineTerminateOperation() {
 
 doStartLongOpDance(affectTlbr:=0) {
      imageLoading := runningLongOperation := 1
-     interfaceThread.ahkPostFunction("initAppBusyMode")
+     IF_post("initAppBusyMode")
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1 && affectTlbr!="no")
         redrawToolbarGUI()
 }
@@ -38608,8 +38632,8 @@ readSlideSettingsINI(readThisFile, act:=0) {
         If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
            imageAlignVPtopLeft := 0
 
-        interfaceThread.ahkassign("WindowBGRcolor", WindowBGRcolor)
-        interfaceThread.ahkFunction("updateWindowColor")
+        IF_set("WindowBGRcolor", WindowBGRcolor)
+        IF_call("updateWindowColor")
         refreshWinBGRbrush()
         defineColorDepth()
         recalculateThumbsSizes()
@@ -39367,7 +39391,7 @@ retrieveFavesAsList(dummy:=0) {
    If (thumbsDisplaying!=1 && !isNumber(dummy))
       MenuDummyToggleThumbsMode()
 
-   interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+   IF_set("currentFilesListModified", currentFilesListModified)
    GenerateRandyList()
    createGUItoolbar()
    p := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 100 : 50
@@ -39603,8 +39627,8 @@ invertFilesSelection() {
    Else
       dummyTimerDelayiedImageDisplay(50)
 
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-   interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
+   IF_set("maxFilesIndex", maxFilesIndex)
+   IF_set("markedSelectFile", markedSelectFile)
    showTOOLtip("Files selection inverted`n" groupDigits(markedSelectFile) " files are now selected")
    If (thumbsDisplaying=1)
       QPV_ListViewGridHUDoverlay()
@@ -39666,8 +39690,8 @@ markThisFileNow(thisFileIndex:=0) {
   Else
      dummyTimerDelayiedImageDisplay(25)
 
-  interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-  interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
+  IF_set("maxFilesIndex", maxFilesIndex)
+  IF_set("markedSelectFile", markedSelectFile)
 }
 
 jumpToFilesSelBorderFirst() {
@@ -39694,8 +39718,8 @@ jumpToFilesSelBorder(destination) {
   FriendlyName := (destination=-1) ? "First" : "Last"
   dummyTimerDelayiedImageDisplay(50)
   showTOOLtip(FriendlyName " selected element index: " groupDigits(currentFileIndex) "`n" groupDigits(markedSelectFile) " total images selected")
-  interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-  interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
+  IF_set("maxFilesIndex", maxFilesIndex)
+  IF_set("markedSelectFile", markedSelectFile)
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -41765,7 +41789,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     If (createdQuickMenuSearchWin=1 && thisState=lastState && VisibleQuickMenuSearchWin=1)
     {
        WinActivate, ahk_id %hQuickMenuSearchWin%
-       interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+       IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
        uiPopulateQuickMenuSearch("resel")
        Return
     } Else If (createdQuickMenuSearchWin=1 && thisState=lastState)
@@ -41773,7 +41797,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
        Gui, QuickMenuSearchGUIA: Show
        EM_SETSEL(hEditMenuSearch, 0, StrLen(userQuickMenusEdit))
        VisibleQuickMenuSearchWin := 1
-       interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+       IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
        uiPopulateQuickMenuSearch("resel")
        SetTimer, updateUistatusLineQuickSearch, -50
        Return
@@ -41820,8 +41844,8 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     VisibleQuickMenuSearchWin := 1
     createdQuickMenuSearchWin := 1
     lastLVquickSearchSortCol := [8, "SortDesc"]
-    interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
-    interfaceThread.ahkassign("hQuickMenuSearchWin", hQuickMenuSearchWin)
+    IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+    IF_set("hQuickMenuSearchWin", hQuickMenuSearchWin)
     lastState := thisState
     repositionWindowCenter("QuickMenuSearchGUIA", hQuickMenuSearchWin, PVhwnd, "Quick menu options search")
     QuickMenuSearchGUIAGuiSize()
@@ -41917,7 +41941,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             func2exec := r := info := ""
             thisFolder := dc := nc := r := info := ""
             Global lastOtherWinClose := A_TickCount
-            interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+            IF_set("lastOtherWinClose", lastOtherWinClose)
             Break
          }
 
@@ -42328,10 +42352,10 @@ closeQuickSearch() {
    lastTimeToggleThumbs := A_TickCount 
    Gui, QuickMenuSearchGUIA: Hide
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
    ; hQuickMenuSearchWin := ""
    VisibleQuickMenuSearchWin := 0
-   interfaceThread.ahkassign("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+   IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
 }
 
 QuickMenuSearchGUIAGuiEscape:
@@ -42537,7 +42561,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    RowNumber := LV_GetNext(0, "F")
    initialCount := LV_GetCount()
    omniBoxMode := 0
-   interfaceThread.ahkassign("omniBoxMode", omniBoxMode)
+   IF_set("omniBoxMode", omniBoxMode)
    GuiControl, -Redraw, LVsearchMenus
    prevEditu := userQuickMenusEdit
    mustReselect := 0
@@ -42592,7 +42616,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       showTOOLtip("Scanning for files and folders in`n" userQuickMenusEdit "\")
       GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, Scanning folder content...
       omniBoxMode := 1
-      interfaceThread.ahkassign("omniBoxMode", omniBoxMode)
+      IF_set("omniBoxMode", omniBoxMode)
       hasAddedItems++
       filesFound := 0
       LV_Add(A_Index, "...\", xu, "-", "Folder: up-one level", "", "!OmniNavigateUpFolder", 0, 0)
@@ -42678,7 +42702,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    If (allowMenuSearch=1)
    {
       omniBoxMode := 0
-      interfaceThread.ahkassign("omniBoxMode", omniBoxMode)
+      IF_set("omniBoxMode", omniBoxMode)
       buildQuickSearchMenus()
       mustPreventMenus := 0
       objs := kMenu(0, "give", 0)
@@ -44929,8 +44953,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     ReadSettingsBrushPanel()
     FloodFillSelectionAdj := 0
     liveDrawingBrushTool := 1
-    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+    IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+    IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
     If (modus="e" && isNumber(dummy))
     {
        BrushToolType := dummy
@@ -45313,8 +45337,8 @@ BtnSetClonerBrushSource() {
    showTOOLtip("Please click inside the image area to set the cloner brush source")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
-   interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   IF_post("setMenuBarState", "Disable", "PVbar")
+   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -45362,8 +45386,8 @@ BtnSetTextureSource() {
    showTOOLtip("Please click inside the image area to set the texture source coordinates")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
-   interfaceThread.ahkassign("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   IF_post("setMenuBarState", "Disable", "PVbar")
+   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -46443,7 +46467,7 @@ fakeWinCreator(idWin, thisCaller, allowReopen) {
     DestroyGIFuWin()
     mouseTurnOFFtooltip()
     AnyWindowOpen := idWin
-    interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
+    IF_set("AnyWindowOpen", AnyWindowOpen)
     prevOpenedWindow := []
     prevOpenedWindow := [AnyWindowOpen, thisCaller, allowReopen, editingSelectionNow, 1]
     isNowFakeWinOpen := 1
@@ -47760,7 +47784,7 @@ BTNtoggleAlphaPainting() {
       Return
 
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
    UItriggerBrushUpdate()
    toggleAlphaPaintingMode()
    RemoveTooltip()
@@ -48533,10 +48557,10 @@ StopColorPicker() {
    colorPickerModeNow := 0
    Gui, LEDgui: Destroy
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
-   interfaceThread.ahkassign("colorPickerModeNow", colorPickerModeNow)
-   interfaceThread.ahkassign("colorPickerMustEnd", 0)
-   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVbar")
+   IF_set("lastOtherWinClose", lastOtherWinClose)
+   IF_set("colorPickerModeNow", colorPickerModeNow)
+   IF_set("colorPickerMustEnd", 0)
+   IF_post("setMenuBarState", "Enable", "PVbar")
 }
 
 StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
@@ -48551,14 +48575,14 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    ctrl := StrReplace(ctrl, "picku")
    initialColor := %ctrl%
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
    endCaptureCloneBrush()
    If (editingSelectionNow=1)
       toggleLiveEditObject("hide")
 
    Sleep, 1
    diffH := diffW := 0
-   interfaceThread.ahkPostFunction("setMenuBarState", "Disable", "PVbar")
+   IF_post("setMenuBarState", "Disable", "PVbar")
    CoordMode, Pixel, Screen
    LEDu := imgHUDbaseUnit
    hColorPrev := createLEDgui(LEDu)
@@ -48571,9 +48595,9 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    ll := pll := pX := pY := errorOccured := 0
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
-   interfaceThread.ahkassign("colorPickerModeNow", colorPickerModeNow)
-   interfaceThread.ahkassign("colorPickerMustEnd", colorPickerMustEnd)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
+   IF_set("colorPickerModeNow", colorPickerModeNow)
+   IF_set("colorPickerMustEnd", colorPickerMustEnd)
    WinActivate, ahk_id %PVhwnd%
    createGUItoolbar()
    setWhileLoopExec(1)
@@ -48588,7 +48612,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
          Break
       }
 
-      cc := interfaceThread.ahkgetvar.colorPickerMustEnd
+      cc := IF_get("colorPickerMustEnd")
       If (cc=1 || colorPickerMustEnd=1 || (determineLClickState() && hwnd=hColorPrev) || GetKeyState("Enter") || GetKeyState("Numpad5"))
          Break
 
@@ -48855,8 +48879,8 @@ stopDrawingShape(dummy:="") {
     undoVectorShapesLevelsArray := []
     Global zeitSillyPrevent := A_TickCount
     Global lastOtherWinClose := A_TickCount
-    interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
-    interfaceThread.ahkassign("drawingShapeNow", 0)
+    IF_set("lastOtherWinClose", lastOtherWinClose)
+    IF_set("drawingShapeNow", 0)
     createGUItoolbar()
     updateUIctrl()
     MouseMoveResponder()
@@ -49243,7 +49267,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      If (customShapePoints.Count()>2)
         oldCustomShapePoints := customShapePoints.Clone()
 
-     interfaceThread.ahkassign("drawingShapeNow", 1)
+     IF_set("drawingShapeNow", 1)
      CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
      If (dummy="resume")
      {
@@ -51983,7 +52007,7 @@ PanelFloodFillTool() {
 
     ReadSettingsFloodFillPanel()
     FloodFillSelectionAdj := 0
-    interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+    IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
@@ -58250,7 +58274,7 @@ BtnSavePreferencesClose() {
    updateUIsettings()
    WriteSettingsUI()
    loadCustomUserKbds()
-   interfaceThread.ahkFunction("updateWindowColor")
+   IF_call("updateWindowColor")
    realSystemCores := userMultiCoresLimit
    INIaction(1, "userPerformColorManagement", "General")
    INIaction(1, "userimgGammaCorrect", "General")
@@ -58364,8 +58388,8 @@ InvokeStandardDialogColorPicker(hC, event, c) {
      updateUIgridPanel()
   } Else If (AnyWindowOpen=14)
   {
-     interfaceThread.ahkassign("WindowBGRcolor", WindowBGRcolor)
-     interfaceThread.ahkFunction("updateWindowColor")
+     IF_set("WindowBGRcolor", WindowBGRcolor)
+     IF_call("updateWindowColor")
      updateUIsettings()
      refreshWinBGRbrush()
      dummyTimerDelayiedImageDisplay(50)
@@ -58574,7 +58598,7 @@ SetTimeLapseMode() {
     {
        IMGresizingMode := 4
        customZoomAdaptMode := 0
-       interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+       IF_set("IMGresizingMode", IMGresizingMode)
        mustRecordSeenImgs := 0
        imgFxMode := usrColorDepth := zoomLevel := 1
        vpIMGrotation := FlipImgH := FlipImgV := 0
@@ -63176,8 +63200,8 @@ renewCurrentFilesList() {
    currentFileIndex := 1
    prevLoadedImageIndex := ""
    currentImgModified := allImagesWereSeen := 0
-   interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
+   IF_set("currentFilesListModified", currentFilesListModified)
+   IF_set("maxFilesIndex", maxFilesIndex)
    If (forceProtectLoadedImg!=1)
    {
       discardSRCfileCaches()
@@ -63818,8 +63842,8 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       SLDtypeLoaded := 1
       filesFilter := SlidesMusicSong := ""
       currentFilesListModified := 0
-      interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-      interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+      IF_set("maxFilesIndex", maxFilesIndex)
+      IF_set("IMGresizingMode", IMGresizingMode)
       updateUIctrl()
       INIaction(1, "prevOpenFolderPath", "General")
       zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
@@ -63860,8 +63884,8 @@ OpenArgFile(inputu) {
     setImageLoading()
     Global scriptStartTime := A_TickCount
     currentFileIndex := maxFilesIndex := 1
-    interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-    interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+    IF_set("maxFilesIndex", maxFilesIndex)
+    IF_set("IMGresizingMode", IMGresizingMode)
 
     ; usrColorDepth := imgFxMode := 1
     ; vpIMGrotation := FlipImgH := FlipImgV := 0
@@ -65463,7 +65487,7 @@ closeDocuments() {
    trackImageListButtons("kill")
    createGUItoolbar("refresh-later")
    terminateIMGediting()
-   interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+   IF_set("currentFilesListModified", currentFilesListModified)
    PopulateIndexFilesStatsInfos("kill")
    SLDtypeLoaded := 1
    resetMainWin2Welcome()
@@ -65499,7 +65523,7 @@ restartAppu() {
 exitAppu(dummy:=0) {
    If (MsgBox2hwnd && InStr(dummy, "external"))
    {
-      interfaceThread.ahkPostFunction("dummyTimerExit")
+      IF_post("dummyTimerExit")
       terminateIMGediting()
       TrueCleanup()
       Return
@@ -69468,14 +69492,14 @@ BuildSecondMenu(givenCoords:=0) {
 
 StopCaptureClickStuff(dummy:=0) {
    Global lastOtherWinClose := A_TickCount
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
    endCaptureCloneBrush()
    showTOOLtip("Operation abandoned: define source point")
    SoundBeep , 300, 100
    If (dummy!="escape" && panelWinCollapsed=1 && imgEditPanelOpened=1 && AnyWindowOpen)
       toggleImgEditPanelWindow()
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   interfaceThread.ahkPostFunction("setMenuBarState", "Enable", "PVbar")
+   IF_post("setMenuBarState", "Enable", "PVbar")
 }
 
 BuildMainMenu(dummy:=0, givenCoords:=0) {
@@ -69977,7 +70001,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       mYz := Trim(rect.top)
       mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
       mW := max(rect.left, rect.right) - min(rect.left, rect.right)
-      interfaceThread.ahkFunction("ShowClickHalo", mX, mYz, mW, mH, 1, menarg, 1)
+      IF_call("ShowClickHalo", mX, mYz, mW, mH, 1, menarg, 1)
    }
 
    mouseTurnOFFtooltip()
@@ -69989,7 +70013,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
    idu := (manubarMode=1) ? klop[2] : "reset"
    darkMode := (uiUseDarkMode=1) ? "yes" : "no"
-   interfaceThread.ahkFunction("menuFlyoutDisplay", "yes", mX, mY, okay, darkMode, A_ScriptHwnd, idu)
+   IF_call("menuFlyoutDisplay", "yes", mX, mY, okay, darkMode, A_ScriptHwnd, idu)
    Sleep, 0
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
    Global lastMenuZeit := A_TickCount
@@ -70005,12 +70029,12 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
    Global lastWinDrag := A_TickCount
    Global lastOtherWinClose := A_TickCount + 100
-   interfaceThread.ahkassign("lastOtherWinClose", lastOtherWinClose)
+   IF_set("lastOtherWinClose", lastOtherWinClose)
 }
 
 setWinCloseZeit() {
    darkMode := (uiUseDarkMode=1) ? "yes" : "no"
-   interfaceThread.ahkPostFunction("menuFlyoutDisplay", "no", 1, 1, 0, darkMode, A_ScriptHwnd, "reset")
+   IF_post("menuFlyoutDisplay", "no", 1, 1, 0, darkMode, A_ScriptHwnd, "reset")
    ; doSuspendu(0)
 }
 
@@ -70280,7 +70304,7 @@ MenuSetImgZoom(a, b) {
    zoomLevel := SubStr(a, 1, InStr(a, "%") - 1)/100
    IMGresizingMode := 4
    customZoomAdaptMode := 0
-   interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+   IF_set("IMGresizingMode", IMGresizingMode)
    zoomLevel := clampInRange(zoomLevel, 0.01, 20)
    INIaction(1, "IMGresizingMode", "General")
    INIaction(1, "zoomLevel", "General")
@@ -70290,7 +70314,7 @@ MenuSetImgZoom(a, b) {
 
 MenuSetVProt(a, b) {
    vpIMGrotation := StrReplace(a, "°")
-   interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+   IF_set("IMGresizingMode", IMGresizingMode)
    INIaction(1, "vpIMGrotation", "General")
    updateUIctrl()
    dummyTimerDelayiedImageDisplay(150)
@@ -70867,7 +70891,7 @@ OpenRecentEntry(menuItem, modus:=0) {
         coreOpenFolder(newEntry, 1, 0, 1)
         currentFilesListModified := 0
         SlidesMusicSong := ""
-        interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+        IF_set("currentFilesListModified", currentFilesListModified)
         If (maxFilesIndex>0)
            SLDtypeLoaded := 1
 
@@ -70927,7 +70951,7 @@ OpenFavesEntry(menuItem) {
      resultedFilesList[currentFileIndex, 5] := 1
      currentImgModified := 0
      SlidesMusicSong := ""
-     interfaceThread.ahkassign("currentFilesListModified", currentFilesListModified)
+     IF_set("currentFilesListModified", currentFilesListModified)
   }
 
   ; ToolTip, % (A_TickCount - startZeit) - (A_TickCount - startZeitIMGload) , , , 2
@@ -71021,7 +71045,7 @@ ToggleFullScreenMode() {
      If (showMainMenuBar=1)
      {
         showMainMenuBar := 0
-        interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
+        IF_set("showMainMenuBar", showMainMenuBar)
         Win_SetMenu(PVhwnd, 0)
         TriggerMenuBarUpdate()
      }
@@ -71051,7 +71075,7 @@ ToggleFullScreenMode() {
      INIaction(0, "TouchScreenMode", "General", 1)
      If (showMainMenuBar=1)
      {
-        interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
+        IF_set("showMainMenuBar", showMainMenuBar)
         TriggerMenuBarUpdate("forced", A_TickCount)
         SetTimer, TriggerMenuBarUpdate, -100
      }
@@ -71060,8 +71084,8 @@ ToggleFullScreenMode() {
         SetTimer, toggleAppToolbar, -300
   }
 
-  interfaceThread.ahkassign("isTitleBarVisible", isTitleBarVisible)
-  interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
+  IF_set("isTitleBarVisible", isTitleBarVisible)
+  IF_set("TouchScreenMode", TouchScreenMode)
   ; ToolTip, % "l=" isTitleBarVisible " kl=" kl , , , 2
   SetTimer, dummyFullScreenButtons, -250
 }
@@ -71088,7 +71112,7 @@ ToggleAllonTop() {
    isAlwaysOnTop := !isAlwaysOnTop
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    INIaction(1, "isAlwaysOnTop", "General")
-   interfaceThread.ahkassign("isAlwaysOnTop", isAlwaysOnTop)
+   IF_set("isAlwaysOnTop", isAlwaysOnTop)
    friendly := (isAlwaysOnTop=1) ? "ACTIVATED" : "DEACTIVATED"
    showTOOLtip("Window always on top: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -71097,7 +71121,7 @@ ToggleAllonTop() {
 ToggleSlidesFXmode() {
    slidesFXrandomize := !slidesFXrandomize
    INIaction(1, "slidesFXrandomize", "General")
-   interfaceThread.ahkassign("slidesFXrandomize", slidesFXrandomize)
+   IF_set("slidesFXrandomize", slidesFXrandomize)
    friendly := (slidesFXrandomize=1) ? "ACTIVATED" : "DEACTIVATED"
    showTOOLtip("Randomize colour FX during slideshows:`n" friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -71683,8 +71707,8 @@ toggleEllipseSelection(modus:=-1) {
    If isInRange(modus, 0, 2)
       EllipseSelectMode := modus
 
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
    If (customShapePoints.Count()<3 && EllipseSelectMode=2)
    {
       r := loadSimplifiedPreviousVectorShape()
@@ -71972,8 +71996,8 @@ ToggleTitleBaruNow() {
       WinSet, Style, +0xC00000, ahk_id %PVhwnd%
    }
 
-   interfaceThread.ahkassign("isTitleBarVisible", isTitleBarVisible)
-   interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
+   IF_set("isTitleBarVisible", isTitleBarVisible)
+   IF_set("TouchScreenMode", TouchScreenMode)
    If (drawingShapeNow!=1)
       SetTimer, dummyToggleTitleBarActionBtns, -350
 }
@@ -71994,7 +72018,7 @@ ToggleMenuBaru() {
    hasTrans := adjustCanvas2Toolbar()
    showMainMenuBar := !showMainMenuBar
    INIaction(1, "showMainMenuBar", "General")
-   interfaceThread.ahkassign("showMainMenuBar", showMainMenuBar)
+   IF_set("showMainMenuBar", showMainMenuBar)
    tlbrPushPrefs()
    If !showMainMenuBar
       Win_SetMenu(PVhwnd, 0)
@@ -72033,7 +72057,7 @@ ToggleLargeUIfonts() {
     PrefsLargeFonts := !PrefsLargeFonts
     calcHUDsize()
     INIaction(1, "PrefsLargeFonts", "General")
-    interfaceThread.ahkassign("PrefsLargeFonts", PrefsLargeFonts)
+    IF_set("PrefsLargeFonts", PrefsLargeFonts)
     thisFunc := prevOpenedWindow[2]
     AddTooltip2Ctrl("reset")
     If (VisibleQuickMenuSearchWin=1)
@@ -72102,7 +72126,7 @@ ToggleDarkModus() {
     friendly := (uiUseDarkMode=1) ? "ACTIVATED" : "DEACTIVATED"
     AddTooltip2Ctrl("reset")
     setMenusTheme(uiUseDarkMode)
-    interfaceThread.ahkPostFunction("destroyMenuFlyout")
+    IF_post("destroyMenuFlyout")
     showDelayedTooltip("Dark mode: " friendly)
     thisFunc := prevOpenedWindow[2]
     If (VisibleQuickMenuSearchWin=1)
@@ -72523,7 +72547,7 @@ ToggleImgColorDepthDithering() {
 toggleAppToolbar() {
     ShowAdvToolbar := !ShowAdvToolbar
     INIaction(1, "ShowAdvToolbar", "General")
-    interfaceThread.ahkassign("ShowAdvToolbar", ShowAdvToolbar)
+    IF_set("ShowAdvToolbar", ShowAdvToolbar)
     createGUItoolbar()
     If (ShowAdvToolbar=1)
     {
@@ -72574,8 +72598,8 @@ ToggleTouchMode() {
        TouchScreenMode := !TouchScreenMode
 
     updateUIctrl()
-    interfaceThread.ahkassign("isTitleBarVisible", isTitleBarVisible)
-    interfaceThread.ahkassign("TouchScreenMode", TouchScreenMode)
+    IF_set("isTitleBarVisible", isTitleBarVisible)
+    IF_set("TouchScreenMode", TouchScreenMode)
 
     If (AnyWindowOpen=14)
        Return
@@ -73224,10 +73248,10 @@ handleFatalWinInitErrors() {
 
 restartEntireGui() {
    destroyGDIPcanvas()
-   interfaceThread.ahkFunction("destroyAllGUIs")
+   IF_call("destroyAllGUIs")
    Sleep, 25
    externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$.$" mainWinPos "$" mainWinSize "$" mainWinMaximized
-   initGUI := interfaceThread.ahkFunction("BuildGUI", externObj)
+   initGUI := IF_call("BuildGUI", externObj)
    fnOutputDebug("RESTARTED extern UI HWNDs: " initGUI)
    If InStr(initGui, "|")
       handleUIhwnd(InitGui)
@@ -73944,7 +73968,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
   imgPath := StrReplace(imgPath, "||")
   If (slideShowRunning=1)
   {
-     slideShowRunning := interfaceThread.ahkgetvar.slideShowRunning
+     slideShowRunning := IF_get("slideShowRunning")
      If (slideShowRunning!=1)
      {
         StopMediaPlaying(1)
@@ -74224,7 +74248,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     If (editingSelectionNow=1 && IMGresizingMode=5)
     {
        IMGresizingMode := 1
-       interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+       IF_set("IMGresizingMode", IMGresizingMode)
     }
 
     imgPath := StrReplace(imgPath, "||")
@@ -74271,7 +74295,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        changeMcursor()
        r1 := CloneScreenMainBMP(imgPath, mustReloadIMG, hasFullReloaded)
        ; fnOutputDebug(A_ThisFunc ": " mustReloadIMG "|" hasFullReloaded)
-       abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
+       abortImgLoad := IF_get("canCancelImageLoad")
        If (abortImgLoad>2)
        {
           o_ImgQuality := userimgQuality
@@ -74296,7 +74320,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
           ToggleImgQuality("highu")
 
        prevImgPath := ""
-       interfaceThread.ahkassign("canCancelImageLoad", 0)
+       IF_set("canCancelImageLoad", 0)
        FadeMainWindow()
        SetTimer, ResetImgLoadStatus, -15
        ; r := (r1="error") ? r1 : 0
@@ -74438,7 +74462,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
          resetImgSelection("forced")
 
       itemInfos := "Image view. Zoom: " ws ". " fzoomu ". " OutFileName ". " OutDir ". Index " currentFileIndex " of " maxFilesIndex "."
-      interfaceThread.ahkFunction("infosUIAbtns", itemInfos)
+      IF_call("infosUIAbtns", itemInfos)
    }
 
    GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
@@ -74609,7 +74633,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
           trGdip_DrawImage(A_ThisFunc, Gu, infoBoxGdiCached, scX, scY)
           lastInfoBoxBMP[1] := [imgW, imgH]
        }
-       interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", entireString, imgW, imgH, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
+       IF_post("uiAccessUpdateInfoBox", entireString, imgW, imgH, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
        Return
     }
 
@@ -74784,7 +74808,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     txtOptions.x := (FlipImgH=1 && thumbsDisplaying!=1) ? - scX : borderSize*1.1
     txtOptions.y := (FlipImgV=1 && thumbsDisplaying!=1) ? mainHeight - dimsFh + borderSize - scY : borderSize*1.1
     Gdip_FillRectangle(Gu, OSDwinFadedBrushBGR, scX, scY, dimsFw, dimsFh)
-    interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
+    IF_post("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
     If (thumbsDisplaying!=1)
        Gdip_ResetWorldTransform(Gu)
 
@@ -74868,7 +74892,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
           thisPosX += tlbrBonusX
           thisPosY += tlbrBonusY
           hasDrawnAnnoBox := 1
-          interfaceThread.ahkPostFunction("uiAccessUpdateAnnoBox", entireString, imgW, imgH, thisPosX, thisPosY)
+          IF_post("uiAccessUpdateAnnoBox", entireString, imgW, imgH, thisPosX, thisPosY)
        }
        textBoxBMP := trGdip_DisposeImage(textBoxBMP, 1)
     } Else
@@ -74907,7 +74931,7 @@ changeOSDfontSize(direction) {
   SetTimer, RemoveTooltip, % -msgDisplayTime
   calcHUDsize()
   recalculateThumbsSizes()
-  interfaceThread.ahkassign("OSDfontSize", OSDfontSize)
+  IF_set("OSDfontSize", OSDfontSize)
   updateUIctrl()
   If (thumbsListViewMode>1 && thumbsDisplaying=1)
   {
@@ -75637,7 +75661,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
    x2 -= kX,   y2 -= kY
    x2 += 3,    y2 += 3
 
-   interfaceThread.ahkPostFunction("ShowClickHalo", x2, y2, w, h, 1)
+   IF_post("ShowClickHalo", x2, y2, w, h, 1)
    If (InStr(modus, "space") && (ctrlClassNN ~= "i)(static|combobox|syslistview32)"))
    {
       If (thisHwnd=hSetWinGui)
@@ -75709,7 +75733,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250) && animGIFplaying!=1)
      GdipCleanMain(6)
 
-  interfaceThread.ahkassign("canCancelImageLoad", 1)
+  IF_set("canCancelImageLoad", 1)
   changeMcursor()
   thisImgPath := imgPath
   allowCaching := !minimizeMemUsage
@@ -75717,7 +75741,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      allowCaching := 0
 
   If (slideShowRunning!=1 && (A_TickCount - lastInvoked>2000))
-     interfaceThread.ahkPostFunction("uiAccessImgViewSetUIlabels")
+     IF_post("uiAccessImgViewSetUIlabels")
 
   oBitmap := LoadBitmapForScreen(thisImgPath, allowCaching, desiredFrameIndex)
   ; fnOutputDebug(A_ThisFunc ": " allowCaching "|" desiredFrameIndex "|" currIMGdetails.OpenedWith)
@@ -75729,7 +75753,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   hasFullReloaded := 1
   rawFmt := Gdip_GetImageRawFormat(oBitmap)
   rawFmt := (rawFmt="MEMORYBMP" && fimMultiPage) ? fimMultiPage : rawFmt
-  abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
+  abortImgLoad := IF_get("canCancelImageLoad")
 
   ; If (RegExMatch(rawFmt, "i)(gif|tiff)$") && totalFramesIndex>0)
   If (currIMGdetails.frames>0)
@@ -75801,7 +75825,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      }
   }
 
-  abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
+  abortImgLoad := IF_get("canCancelImageLoad")
   If (abortImgLoad<3 && vpIMGrotation>0)
   {
      setWindowTitle("Rotating image at " vpIMGrotation "°")
@@ -75826,7 +75850,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      }
   }
 
-  abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
+  abortImgLoad := IF_get("canCancelImageLoad")
   If (abortImgLoad<3 && bwDithering=1 && imgFxMode=4)
   {
      GDIbmpFileConnected := 0
@@ -75883,7 +75907,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
-  abortImgLoad := interfaceThread.ahkgetvar.canCancelImageLoad
+  abortImgLoad := IF_get("canCancelImageLoad")
   extractAmbientalTexture(abortImgLoad)
   prevFrame := desiredFrameIndex
   BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
@@ -75959,9 +75983,9 @@ OnImgFileChangeActions(forceThis) {
 
 invokeExternalSlideshowHandler() {
    allowNextSlide := 1
-   interfaceThread.ahkassign("animGIFplaying", animGIFplaying)
-   interfaceThread.ahkassign("allowNextSlide", allowNextSlide)
-   interfaceThread.ahkPostFunction("dummySlideshow")
+   IF_set("animGIFplaying", animGIFplaying)
+   IF_set("allowNextSlide", allowNextSlide)
+   IF_post("dummySlideshow")
 }
 
 identifyAudioMediaLength() {
@@ -76421,7 +76445,7 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
        HUDobjNavBoxu := [zImgW, zImgH, thisPosX + diffX - tlbrBonusX, thisPosY + diffY - tlbrBonusY, imgW, imgH, thisPosX - tlbrBonusX, thisPosY - tlbrBonusY]
 
     thisString := hasDrawnImageMap ? entireString : "hide"
-    interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX, thisPosY)
+    IF_post("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX, thisPosY)
     trGdip_DisposeImage(navBoxu, 1)
 }
 
@@ -77145,8 +77169,8 @@ toggleAlphaPaintingMode() {
          liveDrawingBrushTool := !FloodFillSelectionAdj
       }
 
-      interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-      interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+      IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+      IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
       If (FloodFillSelectionAdj=1)
          showTOOLtip(labelu " tool: DEACTIVATED`nSelection area can be adjusted.", A_ThisFunc, 1)
       Else
@@ -77168,7 +77192,7 @@ toggleAlphaPaintingMode() {
 
    FloodFillSelectionAdj := 0
    liveDrawingBrushTool := !liveDrawingBrushTool
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
    Random, OutputVar, 1, 950
    Random, OutputaVar, 1, 950
    randomu := OutputVar / OutputaVar
@@ -77323,8 +77347,8 @@ toggleAlphaPaintingMode() {
    }
 
    createGUItoolbar()
-   interfaceThread.ahkPostFunction("uiAlphaMaskTrigger", AnyWindowOpen, liveDrawingBrushTool, editingSelectionNow, UserMemBMP, showMainMenuBar)
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   IF_post("uiAlphaMaskTrigger", AnyWindowOpen, liveDrawingBrushTool, editingSelectionNow, UserMemBMP, showMainMenuBar)
+   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
    BrushToolTexture := 1
    dummyRefreshImgSelectionWindow()
    BtnTabsInfoUpdate("ignore-panel")
@@ -77339,7 +77363,7 @@ toggleBrushTypes(modus:=0) {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    friendly := (BrushToolType=1) ? "Simple color brush" : "Soft edges color brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
@@ -77374,7 +77398,7 @@ toggleBrushDeformers() {
       BrushToolType := (BrushToolType=7) ? 8 : 7
 
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    friendly := (BrushToolType=7) ? "Pinch brush" : "Bulge brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
@@ -77420,7 +77444,7 @@ toggleBrushTypeFX(modus:=0) {
    BrushToolUseSecondaryColor := 0
    BrushToolApplyColorFX := 1
    BrushToolBlurStrength := 0
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
    moreInfos .= "`nSoftness: " BrushToolSoftness "%"
@@ -77447,7 +77471,7 @@ togglePresetsBrushes(modus, dir:=1) {
    liveDrawingBrushTool := 1
    endCaptureCloneBrush()
    BrushToolUseSecondaryColor := 0
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    level := 0, maxu := 0
    If (modus=1)
    {
@@ -77504,8 +77528,8 @@ toggleBrushDrawInOutModes() {
    If (AnyWindowOpen!=66)
       liveDrawingBrushTool := 1
 
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    If (AnyWindowOpen=66) ; flood fill 
    {
       FloodFillSelectionMode := clampInRange(FloodFillSelectionMode + 1, 1, 4, 1)
@@ -77559,7 +77583,7 @@ toggleBrushTypeCloner() {
 
    BrushToolType := 3
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    friendly := "Cloner brush"
    If (BrushToolDynamicCloner=1)
       friendly .= " (dynamic coords mode)"
@@ -77632,7 +77656,7 @@ changeBrushOpacity(keyu, isKeyu:=0) {
     }
 
     liveDrawingBrushTool := 1
-    interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+    IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
     SetTimer, RemoveTooltip, % -msgDisplayTime
     SetTimer, MouseMoveResponder, -25
 }
@@ -77677,7 +77701,7 @@ changeBrushColorPicker() {
 
 changeBrushSize(dir) {
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    factoru := (BrushToolSize>50) ? 10 : 5
    If (BrushToolSize<15)
       factoru := 1
@@ -77713,7 +77737,7 @@ changeBrushAnglu(dir) {
 
 changeBrushRatioAngle(dir, what) {
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    endCaptureCloneBrush()
    If (what=1)
    {
@@ -77740,7 +77764,7 @@ changeBrushRatioAngle(dir, what) {
 
 MenuResetBrushAsRatio() {
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    endCaptureCloneBrush()
    BrushToolAspectRatio := BrushToolAngle := 0
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
@@ -77760,7 +77784,7 @@ toggleBrushMouseAngle() {
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
    BrushToolAutoAngle  := !BrushToolAutoAngle
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
       GuiControl, SettingsGUIA:, BrushToolAutoAngle, % BrushToolAutoAngle
@@ -77786,7 +77810,7 @@ changeBrushSoftness(dir) {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    BrushToolSoftness := clampInRange(BrushToolSoftness, 1, 100)
    RegAction(1, "BrushToolSoftness",, 2, 1, 100)
    showTOOLtip("Brush softness: " BrushToolSoftness "%", A_ThisFunc, 2, BrushToolSoftness/100)
@@ -77807,7 +77831,7 @@ changeBrushWetness(dir) {
       BrushToolWetness--
 
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    BrushToolWetness := clampInRange(BrushToolWetness, 0, 22)
    friendly := (BrushToolType>6) ? "deform intensity" : "wetness"
    showTOOLtip("Brush " friendly ": " BrushToolWetness, A_ThisFunc, 2, BrushToolWetness/22)
@@ -78462,8 +78486,8 @@ ActPaintBrushNow() {
    }
 
    liveDrawingBrushTool := 1
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    kpi := (BrushToolType < 3) ? 1 : 0
    thisUseSecondaryColor := (kpi=1) ? BrushToolUseSecondaryColor : 0
    If (GetKeyState("Ctrl", "P") && kpi=1)
@@ -79062,8 +79086,8 @@ ActPaintBrushLargeNow() {
       Return
    }
 
-   interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    vpWinClientSize(mainWidth, mainHeight)
    GetMouseCoord2wind(PVhwnd, mX, mY)
    mX := (FlipImgH=1) ? mainWidth - mX : mX
@@ -80027,7 +80051,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     } Else 
     {
        prevImgCall := 0
-       interfaceThread.ahkPostFunction("uiAccessUpdateHistoBox", "hide", 1, 1, 0, 0)
+       IF_post("uiAccessUpdateHistoBox", "hide", 1, 1, 0, 0)
     }
 
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
@@ -80213,11 +80237,11 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
        HUDobjHistoBoxu[4] := thisPosY - tlbrBonusY
        hasDrawnHistoMap := (E="fail") ? 0 : 1
        thisString := (prevHistoBoxString && hasDrawnHistoMap=1) ? prevHistoBoxString : "hide"
-       interfaceThread.ahkPostFunction("uiAccessUpdateHistoBox", thisString, imgW, imgH, thisPosX, thisPosY)
+       IF_post("uiAccessUpdateHistoBox", thisString, imgW, imgH, thisPosX, thisPosY)
     } Else 
     {
        hasDrawnHistoMap := 0
-       interfaceThread.ahkPostFunction("uiAccessUpdateHistoBox", "hide", 0, 0, 0, 0)
+       IF_post("uiAccessUpdateHistoBox", "hide", 0, 0, 0, 0)
     }
 
     additionalHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, 1)
@@ -80492,7 +80516,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
       If (dontAddPoint=-1)
       {
          doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
-         interfaceThread.ahkassign("doNormalCursor", doNormalCursor)
+         IF_set("doNormalCursor", doNormalCursor)
          Return
       }
    }
@@ -80669,7 +80693,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
 
     doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
-    interfaceThread.ahkassign("doNormalCursor", doNormalCursor)
+    IF_set("doNormalCursor", doNormalCursor)
     ; fnOutputDebug(A_ThisFunc "(): x/y=" gmx "|" gmy "|" mousePoint[1])
     Return mousePoint
 }
@@ -81489,21 +81513,21 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)
     } Else
     {
-       interfaceThread.ahkPostFunction("uiAccessUpdateAnnoBox", "hide", 1, 1, 0, 0)
+       IF_post("uiAccessUpdateAnnoBox", "hide", 1, 1, 0, 0)
        hasDrawnAnnoBox := 0
     }
 
     If (showInfoBoxHUD>=1 && drawingShapeNow!=1)
        drawinfoBox(mainWidth, mainHeight, directRefresh, 2NDglPG)
     Else
-       interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
+       IF_post("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
     If (showHUDnavIMG=1 && IMGlargerViewPort=1 && slideShowRunning!=1)
     {
        VPnavBoxWrapper(mainWidth, mainHeight, 2NDglPG)
     } Else
     {
-       interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
+       IF_post("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
        hasDrawnImageMap := 0
     }
 
@@ -82586,7 +82610,7 @@ dummyRefreshImgSelectionWindow(mm:=0) {
      {
         thisu := 1
         IMGresizingMode := 1
-        interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+        IF_set("IMGresizingMode", IMGresizingMode)
      }
 
      ; ToolTip, % "l=" drawingShapeNow "==" editingSelectionNow "==" drawingVectorLiveMode , , , 2
@@ -82748,7 +82772,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     prevNewW := newW, prevNewH := newH
     ; ToolTip, % "resized cache = " mustGenerate " | " oldZoomLevel "==" zoomLevel  , , , 2
-    interfaceThread.ahkassign("canCancelImageLoad", 0)
+    IF_set("canCancelImageLoad", 0)
     startZeit := A_TickCount
     oldZoomLevel := ""
     thisVPpanningNow := (vpImgPanningNow=2) ? 1 : 0
@@ -83446,9 +83470,9 @@ getTopMopStyle(hwnd) {
 updateUIctrl() {
    modus := (validBMP(UserMemBMP) || isImgEditingNow() || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
    If (modus="welcome")
-      interfaceThread.ahkPostFunction("uiAccessWelcomeView")
+      IF_post("uiAccessWelcomeView")
    Else
-      interfaceThread.ahkPostFunction("updateUIctrlFromOutside", editingSelectionNow "|" isAlwaysOnTop "|" drawingShapeNow "|" IMGresizingMode)
+      IF_post("updateUIctrlFromOutside", editingSelectionNow "|" isAlwaysOnTop "|" drawingShapeNow "|" IMGresizingMode)
 }
 
 coreSelectRandomFiles(howMany, a, b) {
@@ -83497,8 +83521,8 @@ updateFilesSelectionInfos(this:=-1) {
    Else
       markedSelectFile := this
 
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-   interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
+   IF_set("maxFilesIndex", maxFilesIndex)
+   IF_set("markedSelectFile", markedSelectFile)
 }
 
 PanelSelectRandomFiles() {
@@ -83600,8 +83624,8 @@ ToggleEditImgSelection(modus:=0) {
 
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
-  interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-  interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+  IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+  IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
   If (ShowAdvToolbar=1 && lockToolbar2Win=1 && editingSelectionNow=1)
      DelayiedImageDisplay()
 
@@ -83687,7 +83711,7 @@ selectEntireImage(act:=0) {
    innerSelectionCavityX := vpx
    innerSelectionCavityY := vpy
    editingSelectionNow := 1
-   interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
+   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
    updateUIctrl()
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    If (ShowAdvToolbar=1)
@@ -84049,8 +84073,8 @@ resetImgSelection(modus:=0) {
 
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
-  interfaceThread.ahkassign("liveDrawingBrushTool", liveDrawingBrushTool)
-  interfaceThread.ahkassign("FloodFillSelectionAdj", FloodFillSelectionAdj)
+  IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+  IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
   updateUIctrl()
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
@@ -84849,7 +84873,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
        If (A_TickCount - lastInfoBoxZeitToggle<800 || thumbsListViewMode>1 || actu="scroll")
           Gdip_SetClipRect(2NDglPG, 0, 0, lastInfoBoxBMP[1, 1], lastInfoBoxBMP[1, 2], 4)
     } Else
-       interfaceThread.ahkPostFunction("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
+       IF_post("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
     listedItems := ""
     theMsg := theMsg2 := itemInfos := ""
@@ -85047,7 +85071,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
     {
        ; draw the status bar
        If (simpleMode=0 && actu!="scroll")
-          interfaceThread.ahkFunction("infosUIAbtns", itemInfos)
+          IF_call("infosUIAbtns", itemInfos)
 
        bgrTXT := (resultedFilesList[currentFileIndex, 2]=1) ? SubStr(MixARGB("0xFF0188FF", "0xFF" OSDbgrColor, 0.65), 5) : OSDbgrColor
        If isDupesList
@@ -85112,7 +85136,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
 
           listInfos := "Files list container: " maxItemsPage " elements in view. Listing mode: " defineListViewModes() ". Tap and hold, or Control+Left-Click, on any listed item to select it. Items listed:`n" listedItems
           If (actu!="scroll")
-             interfaceThread.ahkPostFunction("uiAccessUpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, listInfos, OSDfontSize, maxFilesIndex)
+             IF_post("uiAccessUpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, listInfos, OSDfontSize, maxFilesIndex)
 
           trGdip_DisposeImage(infoBoxBMP, 1)
           If (showHUDnavIMG=1 && actu!="scroll") ;  && (thumbsListViewMode>1 || isDupesList=1))
@@ -85120,7 +85144,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
              VPnavBoxWrapper(mainWidth, mainHeight - ThumbsStatusBarH, 2NDglPG)
           } Else If (actu!="scroll")
           {
-             interfaceThread.ahkPostFunction("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
+             IF_post("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
              hasDrawnImageMap := 0
           }
        }
@@ -85661,7 +85685,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    }
 
    lastScrollCheck := lastPoolProgress := A_TickCount
-   interfaceThread.ahkassign("alterFilesIndex", 0)
+   IF_set("alterFilesIndex", 0)
    If (userPrivateMode=1)
       blurEffect := Gdip_CreateEffect(1, clampInRange(thumbsSizeQuality//2, 30, thumbsSizeQuality*2), 0, 0)
 
@@ -85685,7 +85709,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           If (A_TickCount - lastScrollCheck>100)
           {
              lastScrollCheck := A_TickCount
-             alterFilesIndex := interfaceThread.ahkgetvar.alterFilesIndex
+             alterFilesIndex := IF_get("alterFilesIndex")
           }
 
           If (alterFilesIndex>1 && lapsOccured>3)
@@ -90684,7 +90708,7 @@ toggleImgEditPanelWindow(modus:="") {
    }
 
    lastInvoked := A_TickCount
-   interfaceThread.ahkassign("panelWinCollapsed", panelWinCollapsed)
+   IF_set("panelWinCollapsed", panelWinCollapsed)
 }
 
 selectGivenPanelTab(ot) {
@@ -91395,7 +91419,7 @@ btnResetImageView() {
      uiSlidersArray["imgColorsFXopacity", 14] := -1
   }
 
-  interfaceThread.ahkassign("IMGresizingMode", IMGresizingMode)
+  IF_set("IMGresizingMode", IMGresizingMode)
   updatePanelColorSliderz()
   defineColorDepth()
   UpdateUIadjustVPcolors()
@@ -95690,8 +95714,8 @@ BTNselFilesStaticFolder(modus:=0) {
 
    ToolTip
    lastZeitFileSelect := A_TickCount
-   interfaceThread.ahkassign("maxFilesIndex", maxFilesIndex)
-   interfaceThread.ahkassign("markedSelectFile", markedSelectFile)
+   IF_set("maxFilesIndex", maxFilesIndex)
+   IF_set("markedSelectFile", markedSelectFile)
    If (AnyWindowOpen=2)
    {
       iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
@@ -97486,7 +97510,7 @@ uiPopulateDynamicFolderzList() {
 uiPanelOpenCloseEvent(modus:=0) {
     b := (modus=1) ? "|" 0 "|" 0 "|" 0 "|" : "|" imgEditPanelOpened "|" AnyWindowOpen "|" hSetWinGui "|"
     a := panelWinCollapsed "|" liveDrawingBrushTool b editingSelectionNow "|" maxFilesIndex "|" UserMemBMP "|" undoLevelsRecorded "|" currentFilesListModified "|" lastOtherWinClose "|" IMGresizingMode "|" thumbsDisplaying
-    interfaceThread.ahkPostFunction("PanelOpenCloseEvent", a)
+    IF_post("PanelOpenCloseEvent", a)
 }
 
 CloseWindow(forceIT:=0, cleanCaches:=1) {
@@ -97723,8 +97747,8 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        }
 
        toolTipGuiCreated := 0
-       interfaceThread.ahkPostFunction("uiAccessUpdateOSDmsg", "-", 0, 0)
-       interfaceThread.ahkassign("toolTipGuiCreated", 0)
+       IF_post("uiAccessUpdateOSDmsg", "-", 0, 0)
+       IF_set("toolTipGuiCreated", 0)
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
        hudBTNtypeFuncu := hudBTNfuncu := 0
        preventKill := 0
@@ -97743,7 +97767,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If perc
        mp .= ". Range: " Round(perc*100) "%."
 
-    interfaceThread.ahkFunction("infosUIAbtns", msg mp)
+    IF_call("infosUIAbtns", msg mp)
     addJournalEntry("OSD: " msg)
     If (!CurrentSLD && currentFileIndex!=0) || (forceDarker=1)
        trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x66" WindowBgrColor, 1)
@@ -97814,7 +97838,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If hudBTNfuncu
        omsg .= "`nTemporarily clickable area."
 
-    interfaceThread.ahkPostFunction("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
+    IF_post("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
     If (hudBTNfuncu && hudBTNtypeFuncu=1)
        Gdip_FillRectangle(2NDglPG, pBrushD, posXu, posYu, knobSize//2, imgH)
 
@@ -97828,7 +97852,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
 
     lastOSDtooltipInvoked := A_TickCount
     If (forceDarker!=1)
-       interfaceThread.ahkassign("toolTipGuiCreated", 1)
+       IF_set("toolTipGuiCreated", 1)
 }
 
 Fnt_GetListOfFontsSimplified() {
@@ -100408,11 +100432,11 @@ changeMcursor(whichCursor:=0) {
   If (whichCursor)
   {
      prevCursor := whichCursor
-     interfaceThread.ahkPostFunction("uiChangeMcursor", whichCursor)
+     IF_post("uiChangeMcursor", whichCursor)
   } Else If (A_TickCount - lastInvoked > 400) ; && (imageLoading!=1)
   {
-     interfaceThread.ahkPostFunction("uiChangeMcursor", "busy")
-     ; interfaceThread.ahkassign("imageLoading", 1)
+     IF_post("uiChangeMcursor", "busy")
+     ; IF_set("imageLoading", 1)
      ; Try DllCall("user32\SetCursor", "Ptr", hCursBusy)
      lastInvoked := A_TickCount
   }
@@ -101051,15 +101075,15 @@ AcquireWIAimage() {
     prevOpenedWindow := [-1, A_ThisFunc, 1, editingSelectionNow, 0, userimgQuality]
     addJournalEntry("Window opened: " A_ThisFunc "() [ WIA standard dialogs ]")
     AnyWindowOpen := whileLoopExec := 1
-    interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
-    interfaceThread.ahkassign("whileLoopExec", whileLoopExec)
+    IF_set("AnyWindowOpen", AnyWindowOpen)
+    IF_set("whileLoopExec", whileLoopExec)
     Try obju := WIA_AcquireImage(deviceu)
     Catch errMsg
        Sleep, 1
 
     AnyWindowOpen := whileLoopExec := 0
-    interfaceThread.ahkassign("AnyWindowOpen", AnyWindowOpen)
-    interfaceThread.ahkassign("whileLoopExec", whileLoopExec)
+    IF_set("AnyWindowOpen", AnyWindowOpen)
+    IF_set("whileLoopExec", whileLoopExec)
     WinSet, Enable,, ahk_id %PVhwnd%
 
     ; obju := [kp, 0]
@@ -102476,7 +102500,7 @@ tlbrInvokeFunction(a, b, c) {
    func2Call := processToolbarFunctions(btnID, b)
    ; ToolTip, % z "=" a "=" b "=" c "=" func2Call , , , 2
    WinGetPos, aX, aY,,, ahk_id %hwnd%
-   ; interfaceThread.ahkFunction("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
+   ; IF_call("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    globalMenuOptions := !tlbrIconzList[hwnd, 12] ? "tlbrMenu|" aX "|" aY + ToolBarBtnWidth : 0
    ; ToolTip, % globalMenuOptions , , , 2
    lastTlbrClicked := hwnd
@@ -105240,7 +105264,7 @@ tlbrPushPrefs() {
 ; Hands the interface thread everything detectToolbar() needs to reach the same verdict as
 ; adjustCanvas2Toolbar() does here. CoreGUItoolbar() mints a new hQPVtoolbar on every rebuild,
 ; so this must be re-sent whenever the toolbar is touched.
-   interfaceThread.ahkPostFunction("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns "|" isWelcomeScreenu "|" ToolBarBtnWidth)
+   IF_post("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns "|" isWelcomeScreenu "|" ToolBarBtnWidth)
 }
 
 redrawToolbarGUI() {
@@ -106138,7 +106162,7 @@ KeyboardMoveMouseToolbar(thisu:=0, l:=0) {
 
    msgu := tlbrDecideTooltips(hwndu)
    thisSize := OSDfontSize//3 + 2
-   ; interfaceThread.ahkFunction("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
+   ; IF_call("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    If msgu
       mouseCreateOSDinfoLine(msgu, thisSize, 0, posu)
 }

@@ -1696,7 +1696,7 @@ setMenusTheme(modus) {
    FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
-   interfaceThread.ahkPostFunction("setMenusTheme", modus)
+   IF_post("setMenusTheme", modus)
 }
 
 setDarkWinAttribs(hwndGUI, modus:=2) {
