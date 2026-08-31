@@ -105,5 +105,9 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
 - Verdicts: p4 FAIL (hotkeys fully blocked in-menu), p5 census wheel 0/keydown 8/rbutton 2, **p7 FULL PASS**, **p8 FULL PASS**, p9/p10 FAIL (no wheel in MSGF_MENU), **p11 FULL PASS**. D1 = native submenus + CALLWNDPROC JIT rebuild (proven); D2 = CALLWNDPROC WM_MENUSELECT tracking + tooltip (proven; p11 alternative also proven); wheel = p12 (WH_GETMESSAGE) added, the sole open probe.
 - **Next**: run p12; Phase B can start any time (independent of probe outcomes).
 
+**2026-08-31 (round 3/4) — p12 FAIL; final wheel probe p13 shipped.**
+- p12 (WH_GETMESSAGE rewrite) failed. p13-wheel-forensics.ahk taps all remaining layers in one run: queue (PM_REMOVE + peeks), SENT messages (CALLWNDPROC), and a menu-scoped WH_MOUSE_LL hook that eats the wheel and posts WM_KEYDOWN — the counters localize where wheel input goes, the LL tap tests the last viable mechanism. Its menu-open gate uses the visibility-aware `WinExist("ahk_class #32768 ahk_pid ...")` (the hidden-#32768 trap from the P0 finding applies to probes too). Outcome either selects "menu-scoped LL hook" as the D2 wheel mechanism or retires the in-menu wheel feature as an accepted degradation (native menus wheel-scroll on overflow regardless). All other D1/D2 mechanisms remain settled; nothing else depends on this.
+- **Next**: run p13; Phase B on user's word.
+
 ## Critical files
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).

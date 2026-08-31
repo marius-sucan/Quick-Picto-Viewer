@@ -40,8 +40,14 @@ ride raw callbacks. Round 2 below determines which callback can do what.
 queue-side hook for in-menu input shaping (RButton and keydowns provably traverse
 MSGF_MENU; wheel does not, hence round 3).
 
-## Round 3 — one probe left
+## Round 3
+
+| Probe | Question | Verdict |
+|---|---|---|
+| p12-getmessage-wheel | WH_GETMESSAGE rewrite of wheel → WM_KEYDOWN | **FAIL** (2026-08-31) |
+
+## Round 4 — the final wheel probe
 
 | Probe | Question | Decides |
 |---|---|---|
-| p12-getmessage-wheel | WH_GETMESSAGE (sees every message the modal loop retrieves; PM_REMOVE'd messages are legally modifiable) rewrites wheel → WM_KEYDOWN Up/Down | The D2 in-menu wheel mechanism. PASS → one WH_GETMESSAGE hook handles wheel+RButton+PgUp/PgDn shaping. FAIL with empty log → wheel is consumed below the queue and the in-menu wheel feature is dropped (accepted degradation; native Win10 menus still wheel-scroll when overflowing). |
+| p13-wheel-forensics | Taps ALL remaining layers at once — queue (PM_REMOVE + peeks), messages SENT to this thread's windows, and a low-level WH_MOUSE_LL hook that eats the wheel while our menu is visible and posts WM_KEYDOWN Up/Down | The definitive answer in one run: the counters show where wheel input goes (or that nothing above the hardware layer ever sees it), and the LL tap tests the last viable mechanism (a menu-scoped low-level hook). If the LL tap sees wheel but the highlight still does not move, menus ignore queue-posted key-downs and the in-menu wheel feature is dropped for good (accepted degradation - native Win10 menus wheel-scroll on overflow regardless). |
