@@ -466,57 +466,65 @@ Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
 ; access - which is what keeps the flip small and reversible.
 
 IF_call(funcName, args*) {
-; AHK v1.1 accepts args* in function definitions and plain function calls, but NOT
-; expanded into an object METHOD call [load-time "Invalid value" error] - so the
-; facade dispatches on the argument count and forwards with the exact arity of the
-; call site. The ahk_h api caps at funcName + 9 parameters; sites use at most 7 here.
+; This ahk build rejects two constructs the merge facades first used: args*
+; expanded into an object METHOD call, and args[N] indexing directly inside
+; the method-call arguments [load-time "Invalid value" errors]. So: hoist the
+; arguments into plain locals, then dispatch on the count and forward with the
+; exact arity of the call site [sites here use at most 9 extra arguments].
    n := args.Length()
+   a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
+   a6 := args[6], a7 := args[7], a8 := args[8], a9 := args[9]
    If (n=0)
       Return interfaceThread.ahkFunction(funcName)
    Else If (n=1)
-      Return interfaceThread.ahkFunction(funcName, args[1])
+      Return interfaceThread.ahkFunction(funcName, a1)
    Else If (n=2)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2])
+      Return interfaceThread.ahkFunction(funcName, a1, a2)
    Else If (n=3)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3)
    Else If (n=4)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3], args[4])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4)
    Else If (n=5)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3], args[4], args[5])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5)
    Else If (n=6)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6)
    Else If (n=7)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6, a7)
    Else If (n=8)
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8)
    Else
-      Return interfaceThread.ahkFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9])
+      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8, a9)
 }
 
 IF_post(funcName, args*) {
-; same arity-dispatch rationale as IF_call; sites use at most 9 extra arguments,
-; which is also the ahk_h api limit
+; This ahk build rejects two constructs the merge facades first used: args*
+; expanded into an object METHOD call, and args[N] indexing directly inside
+; the method-call arguments [load-time "Invalid value" errors]. So: hoist the
+; arguments into plain locals, then dispatch on the count and forward with the
+; exact arity of the call site [sites here use at most 9 extra arguments].
    n := args.Length()
+   a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
+   a6 := args[6], a7 := args[7], a8 := args[8], a9 := args[9]
    If (n=0)
       interfaceThread.ahkPostFunction(funcName)
    Else If (n=1)
-      interfaceThread.ahkPostFunction(funcName, args[1])
+      interfaceThread.ahkPostFunction(funcName, a1)
    Else If (n=2)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2])
+      interfaceThread.ahkPostFunction(funcName, a1, a2)
    Else If (n=3)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3)
    Else If (n=4)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3], args[4])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4)
    Else If (n=5)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5)
    Else If (n=6)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6)
    Else If (n=7)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7)
    Else If (n=8)
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8)
    Else
-      interfaceThread.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9])
+      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8, a9)
 }
 
 IF_set(varName, value) {

@@ -115,27 +115,30 @@ Return
 ; one-shot BoundFunc timer, MT_get/MT_set direct global access.
 
 MT_post(funcName, args*) {
-; AHK v1.1 accepts args* in function definitions and plain function calls, but NOT
-; expanded into an object METHOD call [load-time "Invalid value" error] - so the
-; facade dispatches on the argument count and forwards with the exact arity of the
-; call site; sites in this file use at most 5 extra arguments.
+; This ahk build rejects two constructs the merge facades first used: args*
+; expanded into an object METHOD call, and args[N] indexing directly inside
+; the method-call arguments [load-time "Invalid value" errors]. So: hoist the
+; arguments into plain locals, then dispatch on the count and forward with the
+; exact arity of the call site [sites here use at most 7 extra arguments].
    n := args.Length()
+   a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
+   a6 := args[6], a7 := args[7]
    If (n=0)
       MainExe.ahkPostFunction(funcName)
    Else If (n=1)
-      MainExe.ahkPostFunction(funcName, args[1])
+      MainExe.ahkPostFunction(funcName, a1)
    Else If (n=2)
-      MainExe.ahkPostFunction(funcName, args[1], args[2])
+      MainExe.ahkPostFunction(funcName, a1, a2)
    Else If (n=3)
-      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3])
+      MainExe.ahkPostFunction(funcName, a1, a2, a3)
    Else If (n=4)
-      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4])
+      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4)
    Else If (n=5)
-      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5])
+      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4, a5)
    Else If (n=6)
-      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6])
+      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6)
    Else
-      MainExe.ahkPostFunction(funcName, args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7)
 }
 
 MT_get(varName) {

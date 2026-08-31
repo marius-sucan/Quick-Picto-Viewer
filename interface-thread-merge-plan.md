@@ -127,5 +127,10 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
 - Same limitation invalidated the PLANNED C4 bodies (`.Call(args*)`/`.Bind(args*)`) — C4 redesigned onto the legal forms: dynamic `%funcName%(args*)` for IF_call, and a relay BoundFunc (`Func("IF_postRelay").Bind(funcName, args)` — array as one plain arg) for the posts.
 - **Next**: re-run the Windows B-checkpoint smoke on the fixed build.
 
+**2026-08-31 — B-checkpoint round 2: second load failure, fixed per the user's diagnosis.**
+- The arity-dispatch fix loaded in the MAIN interpreter but the thread's parse of module-interface.ahk still failed: this build ALSO rejects `args[N]` indexing directly inside method-call arguments (`MainExe.ahkPostFunction(funcName, args[1])` → "Invalid value"; plain `obj.method(funcName)` on the line above parsed as unflagged context). Notably the exe accepted what the thread's AutoHotkey.dll rejected — the two parsers differ (the bundled dll may be older than the exe). Fix (user-prescribed): hoist `args[N]` into plain locals (`a1 := args[1], …`) before the call; applied uniformly to IF_call/IF_post/MT_post. Gate: zero `args[` inside method-call argument lists repo-wide.
+- Rule collected for phase C and all future facade work on this runtime: **inside object METHOD calls use only plain variables/literals — no `args*` expansion, no `x[n]` indexing; hoist first.** (Assignments and Return-expressions parse the full grammar; statement-level method calls are the restricted context, and the dll parser is the strictest.)
+- **Next**: re-run the Windows B-checkpoint smoke.
+
 ## Critical files
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).
