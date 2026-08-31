@@ -34781,29 +34781,10 @@ SaveDBfilesList(enforceFile:=0) {
    If (SLDtypeLoaded!=3 && file2save)
    {
       activeSQLdb.CloseDB()
-      If FileExist(file2save)
+      If askOverwriteDestFile(file2save)
       {
-         zPlitPath(file2save, 0, OutFileName, OutDir)
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult="Yes")
-         {
-            FileSetAttrib, -R, %file2save%
-            Sleep, 1
-            Try FileDelete, %file2save%
-            Catch wasErrorB
-                  Sleep, 1
-         } Else
-         {
-            SetTimer, PanelSaveSlideShowu, -200
-            Return
-         }
-
-         If wasErrorB
-         {
-            msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
-            SetTimer, PanelSaveSlideShowu, -200
-            Return
-         }
+         SetTimer, PanelSaveSlideShowu, -200
+         Return
       }
 
       ; the two indexes are deliberately left out of the new database and built once over
@@ -44062,24 +44043,8 @@ CombineImgsIntoPDF(file2save) {
       If validBMP(newBitmap)
          G := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
 
-      If (FileExist(file2save) && G)
-      {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult="Yes")
-         {
-            FileSetAttrib, -R, %file2save%
-            Sleep, 1
-            Try FileDelete, %file2save%
-            Catch wasErrorB
-                  Sleep, 1
-
-            If wasErrorB
-            {
-               abandoned := 1
-               msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
-            }
-         } Else abandoned := 1
-      }
+      If G
+         abandoned := askOverwriteDestFile(file2save)
 
       If (!G || abandoned=1)
       {
@@ -44368,7 +44333,6 @@ generateThumbsSheet() {
    imgPath := StrReplace(imgPath, "||")
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    defaultu := !FolderExist(prevFileSavePath) ? OutDir "\thumbs-sheet" : prevFileSavePath "\thumbs-sheet"
-   mustdoDeleteFile := 0
    getSaveDialogIndexForFile(imgPath, defFMTindex)
    file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save thumbnails sheet as...", dialogSaveFptrn, dialogFmtIndex, defFMTindex)
    If file2save
@@ -44390,37 +44354,11 @@ generateThumbsSheet() {
             msgResult := msgBoxWrapper(appTitle ": WARNING", "The thumbnails sheet image will have a dimension of " groupDigits(width) " x " groupDigits(height) " pixels. The image file format you chose cannot handle such large dimensions through QPV.`n`nPlease choose a different image file format, eg., TIFF.", "&OK", 1, "exclamation")
          Return
       }
-
-      If FileExist(file2save)
-      {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult="Yes")
-         {
-            mustdoDeleteFile := 1
-         } Else Return
-      }
    } Else Return
 
    pBitmap := trGdip_CreateBitmap(A_ThisFunc, width, height, "0x21808")
    If validBMP(pBitmap)
       Gu := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
-
-   If (mustdoDeleteFile=1 && FileExist(file2save) && Gu)
-   {
-      FileSetAttrib, -R, %file2save%
-      Sleep, 1
-      Try FileDelete, %file2save%
-      Catch wasErrorB
-            Sleep, 1
-
-      If wasErrorB
-      {
-         Gdip_DeleteGraphics(Gu)
-         trGdip_DisposeImage(pBitmap)
-         msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
-         Return
-      }
-   }
 
    If !Gu
    {
@@ -44428,6 +44366,15 @@ generateThumbsSheet() {
       showTOOLtip("ERROR: Failed to generate the thumbnails sheet.`nInit malfunction. No GDI+ Graphics object.")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   ; asked only once the sheet bitmap is known to be workable, so neither a declined prompt
+   ; nor a failed allocation ends with the destination file deleted for nothing
+   If askOverwriteDestFile(file2save)
+   {
+      Gdip_DeleteGraphics(Gu)
+      trGdip_DisposeImage(pBitmap)
       Return
    }
 
@@ -57108,26 +57055,10 @@ BTNextractALLtextsCurrentPDF() {
    If file2save
    {
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
-      If FileExist(file2save)
-      {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult="Yes")
-         {
-            mustdoDeleteFile := 1
-         } Else Return
-      }
-
-      If (mustdoDeleteFile=1 && FileExist(file2save))
-      {
-         FileSetAttrib, -R, % file2save
-         Sleep, 1
-         FileDelete, % file2save
-         If ErrorLevel
-         {
-            msgBoxWrapper(appTitle ": ERROR", "Unable to access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
-            Return
-         }
-      }
+      ; the file removal matters here: the texts get FileAppend-ed below, so an undeleted
+      ; destination would keep its old content in front of the new one
+      If askOverwriteDestFile(file2save)
+         Return
 
       b := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
       If (errorType=0)
@@ -59017,7 +58948,8 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       If !nExt
       {
          nExt := dialogSaveIndexes[dialogFmtIndex]
-         file2save .= "." dialogSaveIndexes[dialogFmtIndex]
+         file2save .= "." nExt
+         OutFileName := OutNameNoExt "." nExt
       }
 
       If !RegExMatch(file2save, thisRegEXsaveFmts)
@@ -59070,13 +59002,8 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
             Return
       }
 
-      If (FileExist(file2save) && noDialog!=1 && imgPath!=file2save)
-      {
-         zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite it?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult!="Yes")
-            Return
-      }
+      If (noDialog!=1 && imgPath!=file2save && askOverwriteDestFile(file2save, 0))
+         Return
 
       ForceRefreshNowThumbsList()
       If (AnyWindowOpen=35)
@@ -61572,17 +61499,11 @@ convert2format(givenIndex) {
   zPlitPath(file2rem, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
   destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
   file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-  If (FileExist(file2save) && convertFormatAutoSkip=1)
+  ToolTip
+  If (convertFormatAutoSkip=1 && askOverwriteDestFile(file2save, 0))
   {
-     ToolTip
-     zPlitPath(file2save, 0, OutFileName, OutDir)
-     msgResult := msgBoxWrapper(appTitle ": Confirmation", "A file with the same name already exists in the destination folder... Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-     forceOverwrite := (msgResult="Yes") ? 1 : 0
-     If !forceOverwrite
-     {
-        SetTimer, ResetImgLoadStatus, -150
-        Return
-     }
+     SetTimer, ResetImgLoadStatus, -150
+     Return
   }
 
   BtnCloseWindow()
@@ -62436,11 +62357,14 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    }
 }
 
-askOverwriteDestFile(destFilePath) {
-; Asks before an existing destination file is replaced, and removes it. Returns 1 when the
-; caller must abandon: the file is there and the user declined, or it could not be removed.
+askOverwriteDestFile(destFilePath, removeIt:=1) {
+; Asks before an existing destination file is replaced and, by default, removes it. Returns 1
+; when the caller must abandon: the file is there and the user declined, or it could not be removed.
 ; Shared by the multipage exporters so that every one of them asks BEFORE it starts working,
 ; rather than deleting the destination once the work is already done.
+; Callers whose save routine overwrites the destination itself pass removeIt=0: the function
+; then only asks and must not touch the file system at all - deleting upfront would lose the
+; existing file when the save that follows fails.
 
    If !FileExist(destFilePath)
       Return 0
@@ -62449,6 +62373,9 @@ askOverwriteDestFile(destFilePath) {
    msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
    If (msgResult!="Yes")
       Return 1
+
+   If (removeIt=0)
+      Return 0
 
    FileSetAttrib, -R, %destFilePath%
    Sleep, 1
@@ -92615,12 +92542,8 @@ BTNsaveResizedIMG() {
       If z
          Return
 
-      If FileExist(file2save)
-      {
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult!="Yes")
-            Return
-      }
+      If askOverwriteDestFile(file2save, 0)
+         Return
 
       showTOOLtip("Processing and saving image file...`n" newW " x " newH " pixels`n" OutFileName)
       destroyGDIfileCache()
@@ -99542,7 +99465,8 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
       If !nExt
       {
          nExt := dialogSaveIndexes[dialogFmtIndex]
-         file2save .= "." dialogSaveIndexes[dialogFmtIndex]
+         file2save .= "." nExt
+         OutFileName := OutNameNoExt "." nExt
       }
 
       If !RegExMatch(file2save, thisRegEXsaveFmts)
@@ -99581,13 +99505,8 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
          Return
       }
 
-      If (FileExist(file2save) && dummy!="no-prompt" && contextu!="extern")
-      {
-         zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-         If (msgResult!="Yes")
-            Return
-      }
+      If (dummy!="no-prompt" && contextu!="extern" && askOverwriteDestFile(file2save, 0))
+         Return
 
       destroyGDIfileCache()
       If (contextu!="extern")
