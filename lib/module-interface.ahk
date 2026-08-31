@@ -149,7 +149,7 @@ dispatchLButtonDbl(wP, lP, msg, hwnd) {
 dispatchMouseWheel(wP, lP, msg, hwnd) {
    If isUIrootWin(hwnd)
       Return WM_MOUSEWHEEL(wP, lP, msg, hwnd)
-   Return adjustWheelNumbersEditFields(wP, lP, msg, hwnd)
+   Return adjustWheelNumbersEditFields(wP, lP, msg)  ; it declares 3 params [the loader enforces arity on direct calls; monitors never did]
 }
 
 ; ______ liveness shims [merge phase C] ______
