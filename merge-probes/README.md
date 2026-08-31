@@ -23,14 +23,25 @@ DO run during the loop — p5 proved the vehicle. This is exactly why the curren
 the second ahk-h interpreter for its menu reader; post-merge, all in-menu behavior must
 ride raw callbacks. Round 2 below determines which callback can do what.
 
-## Round 2 — run these next
+## Round 2 verdicts (recorded 2026-08-31, second run)
+
+| Probe | Question | Verdict |
+|---|---|---|
+| p4 (re-run) | Hook-hotkey subroutines during the loop? | **FAIL** — no response on wheel/F9/right-click. The reader `#If` block is definitively non-viable post-merge. |
+| p5 (re-run) | MSGF_MENU traffic census | Reception works; **wheel: 0, keydown: 8, rbutton: 2** — wheel does NOT traverse MSGF_MENU (explains p9/p10). |
+| p7-callwndproc-menuselect | WH_CALLWNDPROC sees WM_MENUSELECT + tooltip GUI from the raw callback | **FULL PASS** — tip followed mouse hover AND arrow-key highlight changes. **D2 tracking + display mechanism.** |
+| p8-initmenupopup-hook | AHK `Menu, DeleteAll/Add` from the callback at WM_INITMENUPOPUP time | **FULL PASS** — never showed the placeholder. **D1 JIT rebuild mechanism.** |
+| p9-wheel-rewrite | Wheel via MSGF_MENU rewrite | FAIL (no wheel messages to rewrite — see p5) |
+| p10-wheel-eat-post | Wheel via MSGF_MENU eat+post | FAIL (same cause) |
+| p11-wineventhook-menu | Out-of-context SetWinEventHook(EVENT_OBJECT_FOCUS) + tooltip | **FULL PASS** — available as alternative/fallback to p7. |
+
+**Design consequence:** D1/D2 are settled on two same-thread hooks — `WH_CALLWNDPROC`
+(WM_MENUSELECT tracking/announcements + WM_INITMENUPOPUP JIT rebuild, both proven) and a
+queue-side hook for in-menu input shaping (RButton and keydowns provably traverse
+MSGF_MENU; wheel does not, hence round 3).
+
+## Round 3 — one probe left
 
 | Probe | Question | Decides |
 |---|---|---|
-| p7-callwndproc-menuselect | Same-thread WH_CALLWNDPROC hook sees WM_MENUSELECT (a SENT message the MSGFILTER hook cannot see), and can update a tooltip GUI from the raw callback | D2 reader tracking + display. Distinguishes reception-works from GUI-from-callback-works. |
-| p8-initmenupopup-hook | AHK `Menu, DeleteAll/Add` executed from the CALLWNDPROC callback at WM_INITMENUPOPUP time | D1 JIT dropdown rebuild. FAIL → eager rebuilds on state change (UpdateMenuBar's hash machinery survives phase C). |
-| p9-wheel-rewrite | MSGF_MENU hook rewrites the wheel message in place into WM_KEYDOWN Up/Down | In-menu wheel scrolling, strategy A. Also reports whether wheel traverses MSGF_MENU at all. |
-| p10-wheel-eat-post | MSGF_MENU hook eats the wheel and posts WM_KEYDOWN to the owner | Strategy B, if A fails. Both seeing zero wheel messages → WH_GETMESSAGE needed. |
-| p11-wineventhook-menu | OUT-OF-CONTEXT SetWinEventHook(EVENT_OBJECT_FOCUS) fires per highlighted menu item, tooltip from that callback | The canonical screen-reader mechanism; fallback for p7's display half. (taskbarInterface already uses SetWinEventHook, so there is in-codebase precedent.) |
-
-Record all verdicts before Phase C — they finalize the D1/D2 design.
+| p12-getmessage-wheel | WH_GETMESSAGE (sees every message the modal loop retrieves; PM_REMOVE'd messages are legally modifiable) rewrites wheel → WM_KEYDOWN Up/Down | The D2 in-menu wheel mechanism. PASS → one WH_GETMESSAGE hook handles wheel+RButton+PgUp/PgDn shaping. FAIL with empty log → wheel is consumed below the queue and the in-menu wheel feature is dropped (accepted degradation; native Win10 menus still wheel-scroll when overflowing). |
