@@ -186,6 +186,7 @@ drainUIinput() {
    If busy  ; re-entrancy guard: a drained Escape can show a modal dialog that pumps,
       Return ; and the interrupted operation then reaches its next checkpoint mid-drain
    busy := 1
+   gotKeyDown := 0
    VarSetCapacity(msgu, 48, 0)  ; MSG is 48 bytes on x64, 28 on x86
    prevCrit := A_IsCritical
    Loop, 40  ; hard cap per checkpoint, so an input flood cannot stall the operation
@@ -200,7 +201,10 @@ drainUIinput() {
       mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
       mlp := NumGet(msgu, 3*A_PtrSize, "Ptr")
       If (mnum=0x100 || mnum=0x104)
+      {
+         gotKeyDown := 1
          uiWM_KEYDOWN(mwp, mlp, mnum, mhwnd)
+      }
       Else If (mnum=0x200)
          uiWM_MOUSEMOVE(mwp, mlp, mnum, mhwnd)
       Else If (mnum=0x201)
@@ -219,9 +223,16 @@ drainUIinput() {
       ; consumers read async state via GetKeyState, which removal cannot alter
    }
    ; the keyboard handler defers its work to a 3ms timer that cannot fire while
-   ; the caller holds Critical - run it now, then disarm the pending timer
-   uiPreProcessKbdKey()
-   SetTimer, uiPreProcessKbdKey, Off
+   ; the caller holds Critical - run it now, then disarm the pending timer.
+   ; ONLY when a key-down was actually drained: uiPreProcessKbdKey() processes the
+   ; global hotkate, which otherwise still holds the LAST key ever pressed - an
+   ; unconditional call here re-fired that stale key on every checkpoint [killing
+   ; slideshows after one advance and making GIF playback flicker uninterruptibly].
+   If (gotKeyDown)
+   {
+      uiPreProcessKbdKey()
+      SetTimer, uiPreProcessKbdKey, Off
+   }
    If (prevCrit)
       Critical, %prevCrit%
    Else
