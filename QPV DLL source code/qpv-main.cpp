@@ -3356,12 +3356,6 @@ static inline int acDelta(int prevGray, int prevAlpha, int gray, int alpha) {
 }
 
 DLL_API int DLL_CALLCONV autoCropAider(unsigned char* BitmapData, int Width, int Height, int Stride, int bpp, int adaptLevel, double threshold, double vTolrc, int whichLoop, int aaMode, int* fcoord) {
-   // BitmapData is addressed in bytes, the way FillSelectArea() does it: a row starts at
-   // y*Stride and a pixel at x*bpc within it. Honouring the stride means a padded row -- or
-   // a bottom-up buffer, where Stride is negative and BitmapData points at the top row --
-   // is walked correctly instead of being refused by the caller. y*Stride has to be INT64:
-   // at QPV's 32750 px per side cap the stride is 131000 bytes and the byte offset leaves
-   // the range of an int at row 16394, less than halfway down the image
    const int bpc = bpp/8;
    int maxThresholdHitsW = round(Width*threshold) + 1;
    if (maxThresholdHitsW>floor(Width/2))
@@ -3381,7 +3375,7 @@ DLL_API int DLL_CALLCONV autoCropAider(unsigned char* BitmapData, int Width, int
    int prevR4 = (prevR1 + prevR2 + prevR3)/3;
    int prevA4 = (prevA1 + prevA2 + prevA3)/3;
 
-   // In adaptive mode the reference is re-seeded from the leading pixels of every scan line.
+   // In adaptive mode (aaMode=1) the reference is re-seeded from the leading pixels of every scan line.
    // Letting it carry across the line break pins it to the far end of the previous line on any
    // graded background, and every later line then spends its whole tolerance budget at once.
    int seedStepW = (Width > 2) ? 2 : Width - 1;
