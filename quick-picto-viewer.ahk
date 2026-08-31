@@ -37,7 +37,6 @@
 ; Original Licence: GPL. Please refer to this page for more information. http://www.gnu.org/licenses/gpl.html
 ; Current licence: I do not know, I do not care. Licences are for obedient entities.
 ;
-;@Ahk2Exe-AddResource Lib\module-interface.ahk
 ;@Ahk2Exe-SetName Quick Picto Viewer
 ;@Ahk2Exe-SetProductName Quick Picto Viewer
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
@@ -51,6 +50,7 @@
 ;___________ Auto Execute Section ____
 
 #Requires AutoHotkey v1.1.33.01+
+#Persistent  ; explicit since the interface-thread merge; the app must never auto-exit
 #NoEnv
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
@@ -440,107 +440,97 @@ If (FirstRun!=0)
    IniWrite, % FirstRun, % mainSettingsFile, General, FirstRun
 } Else readMainSettingsApp(0)
 
-OnMessage(0x201, "WM_LBUTTONdown")
-OnMessage(0x202, "WM_LBUTTONup")
-OnMessage(0x200, "WM_MOUSEMOVE")
-OnMessage(0x203, "OnLButtonDblClk")
-OnMessage(0x20A, "adjustWheelNumbersEditFields") ; WM_MOUSEWHEEL
-OnMessage(0x20E, "adjustWheelNumbersEditFields") ; WM_MOUSEWHEEL
-; Loop, 9
-;     OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
-OnMessage(0x100, "WM_KEYDOWN")
-OnMessage(0x104, "WM_KEYDOWN")
+; [merge phase C] Input-handler registration for BOTH the former interface-thread
+; windows and this script's own windows lives in initInterfaceModule() - see
+; Lib\module-interface.ahk, #Include'd at the bottom of this file. The message
+; numbers both sides used to monitor route through per-window-root dispatchers
+; there; the old separate ahkthread interpreter is gone.
+initInterfaceModule()
 
-Global interfaceThread
-If !A_IsCompiled
-   interfaceThread := ahkthread("#Include *i Lib\module-interface.ahk")
-Else If (sz := GetRes(data, 0, "MODULE-INTERFACE.AHK", 10))
-   interfaceThread := ahkThread(StrGet(&data, sz, "utf-8"))
-
-; ______ interface-thread facade [merge phase B] ______
-; Every call into the interfaceThread goes through these four wrappers; nothing else
-; in the main script may touch interfaceThread.ahk* directly. At the merge proper
-; [phase C in interface-thread-merge-plan.md] only these four bodies change:
-; IF_call becomes a direct %funcName%() call, IF_post a one-shot BoundFunc timer
-; [preserving today's queued-execution semantics], IF_set/IF_get direct global
-; access - which is what keeps the flip small and reversible.
+; ______ interface facade [merged - phase C] ______
+; The seven IF_*/MT_* facades survive the merge so the ~315 former cross-thread
+; call sites stay untouched; only the bodies changed. IF_call runs the target
+; directly; IF_post/MT_post preserve the old queued semantics [a post executed
+; when the receiving interpreter pumped] via one-shot BoundFunc timers; IF_set
+; and IF_get are plain global access [many callers pair IF_set with a local
+; write - harmless echoes now, cleaned up in phase E].
+; PARSER RULE for this runtime [see interface-thread-merge-plan.md]: no args*
+; expansion into METHOD calls and no args[N] inside call arguments - hoist into
+; plain locals and dispatch on the count, as below.
 
 IF_call(funcName, args*) {
-; This ahk build rejects two constructs the merge facades first used: args*
-; expanded into an object METHOD call, and args[N] indexing directly inside
-; the method-call arguments [load-time "Invalid value" errors]. So: hoist the
-; arguments into plain locals, then dispatch on the count and forward with the
-; exact arity of the call site [sites here use at most 9 extra arguments].
    n := args.Length()
    a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
    a6 := args[6], a7 := args[7], a8 := args[8], a9 := args[9]
    If (n=0)
-      Return interfaceThread.ahkFunction(funcName)
+      Return %funcName%()
    Else If (n=1)
-      Return interfaceThread.ahkFunction(funcName, a1)
+      Return %funcName%(a1)
    Else If (n=2)
-      Return interfaceThread.ahkFunction(funcName, a1, a2)
+      Return %funcName%(a1, a2)
    Else If (n=3)
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3)
+      Return %funcName%(a1, a2, a3)
    Else If (n=4)
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4)
+      Return %funcName%(a1, a2, a3, a4)
    Else If (n=5)
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5)
+      Return %funcName%(a1, a2, a3, a4, a5)
    Else If (n=6)
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6)
+      Return %funcName%(a1, a2, a3, a4, a5, a6)
    Else If (n=7)
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6, a7)
+      Return %funcName%(a1, a2, a3, a4, a5, a6, a7)
    Else If (n=8)
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8)
+      Return %funcName%(a1, a2, a3, a4, a5, a6, a7, a8)
    Else
-      Return interfaceThread.ahkFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8, a9)
+      Return %funcName%(a1, a2, a3, a4, a5, a6, a7, a8, a9)
 }
 
 IF_post(funcName, args*) {
-; This ahk build rejects two constructs the merge facades first used: args*
-; expanded into an object METHOD call, and args[N] indexing directly inside
-; the method-call arguments [load-time "Invalid value" errors]. So: hoist the
-; arguments into plain locals, then dispatch on the count and forward with the
-; exact arity of the call site [sites here use at most 9 extra arguments].
+; queued execution, like the old cross-interpreter post: the target runs from a
+; one-shot timer when this thread next pumps messages, never inline
+   fn := Func("IF_postRelay").Bind(funcName, args)
+   SetTimer, % fn, -1
+}
+
+IF_postRelay(funcName, args) {
    n := args.Length()
    a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
    a6 := args[6], a7 := args[7], a8 := args[8], a9 := args[9]
    If (n=0)
-      interfaceThread.ahkPostFunction(funcName)
+      %funcName%()
    Else If (n=1)
-      interfaceThread.ahkPostFunction(funcName, a1)
+      %funcName%(a1)
    Else If (n=2)
-      interfaceThread.ahkPostFunction(funcName, a1, a2)
+      %funcName%(a1, a2)
    Else If (n=3)
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3)
+      %funcName%(a1, a2, a3)
    Else If (n=4)
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4)
+      %funcName%(a1, a2, a3, a4)
    Else If (n=5)
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5)
+      %funcName%(a1, a2, a3, a4, a5)
    Else If (n=6)
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6)
+      %funcName%(a1, a2, a3, a4, a5, a6)
    Else If (n=7)
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7)
+      %funcName%(a1, a2, a3, a4, a5, a6, a7)
    Else If (n=8)
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8)
+      %funcName%(a1, a2, a3, a4, a5, a6, a7, a8)
    Else
-      interfaceThread.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7, a8, a9)
+      %funcName%(a1, a2, a3, a4, a5, a6, a7, a8, a9)
 }
 
 IF_set(varName, value) {
-   interfaceThread.ahkassign(varName, value)
+   Global
+   %varName% := value
 }
 
 IF_get(varName) {
-   Return interfaceThread.ahkgetvar(varName)
+   Global
+   Return %varName%
 }
 
-; the interface is a separate thread to allow users
-; enjoy a more responsive user interface when the main thread
-; is busy processing
-externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$.$" mainWinPos "$" mainWinSize "$" mainWinMaximized "$" IMGresizingMode
-externObj .= "$" OSDbgrColor "$" OSDtextColor "$" OSDfontSize "$" PrefsLargeFonts "$" OSDFontName "$" OSDfontBolded
-initGUI := IF_call("BuildGUI", externObj)
+; the interface windows, menus and input handling live in Lib\module-interface.ahk
+; [merged into this interpreter in 2026-08; the settings handshake string is gone -
+; BuildGUI() reads the shared globals directly]
+initGUI := BuildGUI()
 fnOutputDebug("extern UI HWNDs: " initGUI)
 If !InStr(initGUI, "|")
 {
@@ -596,7 +586,7 @@ Return
 
 ;_____________________________________ Hotkeys _________________
 ; the hotkeys are registered since v5.4.5 in the
-; interfaceThread / module-interface.ahk
+; Lib\module-interface.ahk [merged into this interpreter at phase C]
 
 identifyThisWin() {
   Static prevR, lastInvoked := 1
@@ -4388,7 +4378,8 @@ getBrushPenPressure(ByRef rawPressure) {
    If (BrushToolPenPressure!=1)
       Return -1
 
-   rawPressure := IF_get("penPressureRaw")
+   pumpPenMessages()  ; [merge] the queued WM_POINTER* cannot reach the monitor while the brush loop holds Critical
+   rawPressure := penPressureRaw
    If (rawPressure<1)
       Return -1
 
@@ -11114,7 +11105,6 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
   If (RandyIMGnow=-1 || !RandyIMGids.Count()) && (SlideHowMode=1)
      coreGenerateRandomList()
 
-  IF_call("initSlidesModes", animGIFplaying, allowNextSlide, maxFilesIndex, slidesFXrandomize)
   If (slideShowRunning=1 || actu="stop") && (actu!="start")
   {
      If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
@@ -12500,8 +12490,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       lastFrameChange := A_TickCount
       SetTimer, RefreshImageFile, -1
    }
-   IF_post("infosSlideShow", slideShowRunning, SlideHowMode, animGIFplaying, allowNextSlide, runningLongOperation)
-   ; IF_set("allowNextSlide", allowNextSlide)
+   ; [merge] the infosSlideShow mirror-post is gone; the flags are shared globals now
 }
 
 infoShowCurrentFrameIndex() {
@@ -33464,7 +33453,7 @@ simpleMsgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality
    ; 8192 = Task Modal
    ; 262144 = Always-on-top (style WS_EX_TOPMOST - like System Modal but omits title bar icon)
 
-   If AnyWindowOpen
+   If (1)  ; [merge] always the native branch now; the Else used to delegate to the interface thread's copy so the dialog stayed on the live thread
    {
       If (defaultBTN=2)
          defaultBTN := 255
@@ -33508,7 +33497,7 @@ simpleMsgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality
            r := "Continue"
       IfMsgBox, TryAgain
            r := "TryAgain"
-   } Else r := IF_call("msgBoxWrapper", winTitle, msg, buttonz, defaultBTN, iconz, modality, optionz)
+   }
 
    ; addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
    ; lastLongOperationAbort := A_TickCount
@@ -35501,21 +35490,18 @@ GenerateStaticFoldersListNow() {
 }
 
 determineTerminateOperation() {
+; [merge] The old body pinged the interface thread and spun in a Sleep loop while
+; THAT thread showed the abort-confirm dialog. One interpreter now: pump instead -
+; the Escape/click handlers, and askAboutStoppingOperations' modal dialog, run
+; right here during the pump; the old spin slept [which pumped the main side too],
+; so the re-entrancy surface is unchanged. When the pump returns, the flags are final.
   Static lastInvoked := 1
   If (A_TickCount - lastInvoked < 200)
      Return 0
 
   lastInvoked := A_TickCount
-  Loop 
-  {
-      p := IF_get("userPendingAbortOperations")
-      If (p!=1)
-         Break
-      Else
-         Sleep, 1
-  }
-
-  theEnd := IF_get("mustAbandonCurrentOperations")
+  pumpUIevents()
+  theEnd := mustAbandonCurrentOperations
   If theEnd
      lastLongOperationAbort := A_TickCount
   Return theEnd
@@ -48666,7 +48652,8 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
          Break
       }
 
-      cc := IF_get("colorPickerMustEnd")
+      drainUIinput()  ; [merge] processes the viewport clicks that set colorPickerMustEnd while this loop holds Critical
+      cc := colorPickerMustEnd
       If (cc=1 || colorPickerMustEnd=1 || (determineLClickState() && hwnd=hColorPrev) || GetKeyState("Enter") || GetKeyState("Numpad5"))
          Break
 
@@ -65577,7 +65564,7 @@ restartAppu() {
 exitAppu(dummy:=0) {
    If (MsgBox2hwnd && InStr(dummy, "external"))
    {
-      IF_post("dummyTimerExit")
+      SetTimer, TimerExit, -8000  ; [merge] watchdog while the synchronous cleanup below runs
       terminateIMGediting()
       TrueCleanup()
       Return
@@ -72073,7 +72060,6 @@ ToggleMenuBaru() {
    showMainMenuBar := !showMainMenuBar
    INIaction(1, "showMainMenuBar", "General")
    IF_set("showMainMenuBar", showMainMenuBar)
-   tlbrPushPrefs()
    If !showMainMenuBar
       Win_SetMenu(PVhwnd, 0)
 
@@ -72205,7 +72191,6 @@ ToggleToolbarLockPositionWin() {
     If (lockToolbar2Win=1)
        tlbrResetPosition()
 
-    tlbrPushPrefs()
     showDelayedTooltip("Toolbar position: `n" friendly, A_ThisFunc, 1)
     SetTimer, refreshEntireViewport, -350
  }
@@ -73304,8 +73289,7 @@ restartEntireGui() {
    destroyGDIPcanvas()
    IF_call("destroyAllGUIs")
    Sleep, 25
-   externObj := WindowBgrColor "$" isAlwaysOnTop "$" mainCompiledPath "$" isTitleBarVisible "$" TouchScreenMode "$.$" mainWinPos "$" mainWinSize "$" mainWinMaximized
-   initGUI := IF_call("BuildGUI", externObj)
+   initGUI := BuildGUI()  ; [merge] reads the live globals; the old 9-of-16-field handshake bug is gone
    fnOutputDebug("RESTARTED extern UI HWNDs: " initGUI)
    If InStr(initGui, "|")
       handleUIhwnd(InitGui)
@@ -74349,7 +74333,8 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        changeMcursor()
        r1 := CloneScreenMainBMP(imgPath, mustReloadIMG, hasFullReloaded)
        ; fnOutputDebug(A_ThisFunc ": " mustReloadIMG "|" hasFullReloaded)
-       abortImgLoad := IF_get("canCancelImageLoad")
+       drainUIinput()
+       abortImgLoad := canCancelImageLoad
        If (abortImgLoad>2)
        {
           o_ImgQuality := userimgQuality
@@ -75807,7 +75792,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   hasFullReloaded := 1
   rawFmt := Gdip_GetImageRawFormat(oBitmap)
   rawFmt := (rawFmt="MEMORYBMP" && fimMultiPage) ? fimMultiPage : rawFmt
-  abortImgLoad := IF_get("canCancelImageLoad")
+  drainUIinput()
+  abortImgLoad := canCancelImageLoad
 
   ; If (RegExMatch(rawFmt, "i)(gif|tiff)$") && totalFramesIndex>0)
   If (currIMGdetails.frames>0)
@@ -75879,7 +75865,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      }
   }
 
-  abortImgLoad := IF_get("canCancelImageLoad")
+  drainUIinput()
+  abortImgLoad := canCancelImageLoad
   If (abortImgLoad<3 && vpIMGrotation>0)
   {
      setWindowTitle("Rotating image at " vpIMGrotation "°")
@@ -75904,7 +75891,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      }
   }
 
-  abortImgLoad := IF_get("canCancelImageLoad")
+  drainUIinput()
+  abortImgLoad := canCancelImageLoad
   If (abortImgLoad<3 && bwDithering=1 && imgFxMode=4)
   {
      GDIbmpFileConnected := 0
@@ -75961,7 +75949,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
-  abortImgLoad := IF_get("canCancelImageLoad")
+  drainUIinput()
+  abortImgLoad := canCancelImageLoad
   extractAmbientalTexture(abortImgLoad)
   prevFrame := desiredFrameIndex
   BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
@@ -85763,7 +85752,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           If (A_TickCount - lastScrollCheck>100)
           {
              lastScrollCheck := A_TickCount
-             alterFilesIndex := IF_get("alterFilesIndex")
+             drainUIinput()  ; [merge] lets nav-keys advance alterFilesIndex while this loop holds Critical
           }
 
           If (alterFilesIndex>1 && lapsOccured>3)
@@ -88665,11 +88654,6 @@ IDshowImage(imgID, opentehFile:=0) {
     Else
        ShowTheImage(imgPath)
     Return 1
-}
-
-; MERGEDEL twin [inverse]: byte-identical to the copy in lib/module-interface.ahk, which is the LIVE one [registered for 0x100-0x108 there]; this main-side copy is unregistered dead code - phase C keeps exactly one
-PreventKeyPressBeep() {
-   IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
 }
 
 trimArray(arr) {
@@ -105240,7 +105224,6 @@ createGUItoolbar(dummy:=0) {
    {
       ; prevState := ""
       ToolbarWinW := ToolbarWinH := 0   ; nothing must keep reserving viewport space for a hidden toolbar
-      tlbrPushPrefs()
       If (TouchToolbarGUIcreated=1)
          Gui, OSDguiToolbar: Hide
       Return
@@ -105311,15 +105294,9 @@ createGUItoolbar(dummy:=0) {
    }
 
    WinGetPos, , , ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
-   tlbrPushPrefs()   ; last, so the interface thread sees the rebuilt window and not the one it replaced
 }
 
-tlbrPushPrefs() {
-; Hands the interface thread everything detectToolbar() needs to reach the same verdict as
-; adjustCanvas2Toolbar() does here. CoreGUItoolbar() mints a new hQPVtoolbar on every rebuild,
-; so this must be re-sent whenever the toolbar is touched.
-   IF_post("tlbrInitPrefs", hQPVtoolbar "|" ShowAdvToolbar "|" lockToolbar2Win "|" TLBRverticalAlign "|" TLBRtwoColumns "|" isWelcomeScreenu "|" ToolBarBtnWidth)
-}
+; [merge] tlbrPushPrefs() is gone: the 7 toolbar prefs are shared globals now
 
 redrawToolbarGUI() {
    If (AnyWindowOpen && imgEditPanelOpened!=1 || mustCaptureCloneBrush=1 || colorPickerModeNow=1 || runningLongOperation=1)
@@ -106633,3 +106610,11 @@ testKeysStuff() {
 
    ToolTip, % ppA "`n" ppB , , , 2
 }
+
+; ______________________________________________________________________________
+; The user-interface module: main window, viewport windows, menu bar, input
+; handlers, taskbar integration. Merged from the former ahk-h interface thread
+; [2026-08, see interface-thread-merge-plan.md]. It sits at the BOTTOM of the
+; script because it contains labels and context-gated hotkeys; control never
+; flows into it - everything is invoked by name.
+#Include %A_ScriptDir%\Lib\module-interface.ahk

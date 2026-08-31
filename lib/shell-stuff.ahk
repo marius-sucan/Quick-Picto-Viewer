@@ -1696,7 +1696,8 @@ setMenusTheme(modus) {
    FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
-   IF_post("setMenusTheme", modus)
+   ; [merge] the forward to the interface thread's copy is gone - one interpreter,
+   ; one process-wide dark-mode flush [a self-post here would loop forever]
 }
 
 setDarkWinAttribs(hwndGUI, modus:=2) {

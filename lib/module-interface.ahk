@@ -1,159 +1,260 @@
-﻿#Persistent
-#NoTrayIcon
-#MaxHotkeysPerInterval, 950
-#HotkeyInterval, 50
-#MaxThreads, 255
-#MaxThreadsPerHotkey, 1
-#MaxThreadsBuffer, Off
-#IfTimeout, 2000
-#UseHook, Off
-#Hotstring NoMouse
-SetWinDelay, 1
-CoordMode, Mouse, Screen
-SetBatchLines, -1
-SetWorkingDir, %A_ScriptDir%
-CoordMode, Tooltip, Screen
+﻿; module-interface.ahk - the QPV user-interface module.
+; Until 2026-08 this file ran as a separate AutoHotkey_H interpreter thread
+; [ahkthread] so the UI stayed responsive while the main thread worked; it is now
+; #Include'd at the BOTTOM of quick-picto-viewer.ahk and everything runs on one
+; interpreter. initInterfaceModule() replaces the old thread auto-exec section and
+; is called once from the main script startup, before BuildGUI().
+; Merge plan and phase log: interface-thread-merge-plan.md
 
-Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, appTitle := "Quick Picto Viewer"
-     , RegExFilesPattern := "i)^(.\:\\).*(\.(ico))$", QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer"
-     , PVhwnd, hGDIwin, hGDIthumbsWin, WindowBgrColor, mainCompiledPath, hfdTreeWinGui
-     , winGDIcreated := 0, ThumbsWinGDIcreated := 0, MainExe := AhkExported(), omniBoxMode := 0
-     , AnyWindowOpen := 0, lastOtherWinClose := 1, wasMenuFlierCreated := 0, ImgAnnoBox
-     , penPressureRaw := 0, hasPenPressureAPI := 0, isWelcomeScreenu := 0, ToolBarBtnWidth := 45
-     , slideShowRunning := 0, toolTipGuiCreated, LbtnDwn := 0
-     , mustAbandonCurrentOperations := 0, lastCloseInvoked := -1
-     , SlideHowMode := 1, lastWinDrag := 1, TouchScreenMode := 0, allowNextSlide := 1
-     , isTitleBarVisible := 0, imageLoading := 0, hPicOnGui1
-     , slideShowDelay := 9000, scriptStartTime := A_TickCount, prevFullIMGload := 1
-     , maxFilesIndex := 0, thumbsDisplaying := 0, executingCanceableOperation := 1
-     , runningLongOperation := 0, alterFilesIndex := 0, animGIFplaying := 0
-     , canCancelImageLoad := 0, hGDIinfosWin, hGDIselectWin
-     , imgEditPanelOpened := 0, showMainMenuBar := 1, undoLevelsRecorded := 0, UserMemBMP := 0
-     , taskBarUI, hSetWinGui, panelWinCollapsed, groppedFiles := [], tempBtnVisible := "null"
-     , drawingShapeNow := 0, isAlwaysOnTop, lastMenuBarUpdate := 1
-     , mainWinPos := 0, mainWinMaximized := 1, mainWinSize := 0, PrevGuiSizeEvent := 0, FontBolded := 1
-     , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
-     , currentFilesListModified := 0, folderTreeWinOpen := 0, OSDFontName := "Arial"
-     , OSDbgrColor := "001100", OSDtextColor := "FFeeFF", LargeUIfontValue := 14, allowMenuReader := 0
-     , hQPVtoolbar := 0, ShowAdvToolbar := 0, whileLoopExec := 0
-     , lockToolbar2Win := 1, lastZeitPanCursor := 1, VisibleQuickMenuSearchWin :=0
-     , hquickMenuSearchWin, hGuiTip, lastTippyWin, lastMouseLeave := 1, colorPickerModeNow := 0
-     , mustCaptureCloneBrush := 0, doNormalCursor := 1, hotkate, uiUseDarkMode := 0
-     , menusflyOutVisible := 0, otherAscriptHwnd := "", lastLclickX := 0, lastLclickY := 0
-     , mouseToolTipWinCreated := 0, editingSelectionNow, IMGresizingMode, markedSelectFile
-     , PrefsLargeFonts := 0, slidesFXrandomize := 0, liveDrawingBrushTool := 0, ImgHistoBox
-     , lastWinStatus, lastZeitToolTip := 1, OSDfontSize := 14, ImgNavBox, OSDmsgsLine, ImgInfoBox
-     , imgHUDbaseUnit := 0, picVscroll, picHscroll, QPVpid := 0, menuArray := [], menuCurrentIndex := 0
-     , menuTotalIndex := 0, hMenuBar, lastMenuZeit := 1, menusList, hFlyOut, menuHotkeys, lastMenuHoverZeit := 1
-     , prevMenuBarItem := 1, lastContextMenuZeit := 1, colorPickerMustEnd := 0, userPendingAbortOperations := 0
-     , statusBarTooltipVisible := 0, FloodFillSelectionAdj := 0, TLBRtwoColumns := 1
-     , lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, TLBRverticalAlign := 1
-     , hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , navKeysCounter := 0, lastSwipeZeitGesture := 1, hFlyBtn1, hFlyBtn2, hFlyBtn3, AllowDarkModeForWindow
+; State OWNED by this module - these names existed only in this file's interpreter
+; before the merge [the 84 names both sides mirrored were deleted from here; the
+; main script's Global blocks are authoritative for those]. This declaration stays
+; at the TOP of the file, before any function, so the loader registers the names
+; as super-globals regardless of include position. Initial values are seeded in
+; initInterfaceModule() because control never flows through an #Include'd file.
+Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
+     , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
+     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, hMenuBar, menuArray, menuCurrentIndex, menuTotalIndex, menusList
+     , menusflyOutVisible, wasMenuFlierCreated, prevMenuBarItem, lastMenuBarUpdate, lastMenuHoverZeit, lastContextMenuZeit
+     , allowMenuReader, taskBarUI, groppedFiles, LbtnDwn, penPressureRaw, hasPenPressureAPI
+     , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
+     , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
+     , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
+     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
 
-If !A_IsCompiled
-   Try Menu, Tray, Icon, %A_ScriptDir%\qpv-icon.ico
+initInterfaceModule() {
+; Replaces this module's old thread auto-exec: seeds the module state, detects the
+; pen api and registers the input handlers. Message numbers that BOTH sides used
+; to monitor go through the dispatch* composers defined below; the module-only
+; numbers register their handlers directly. setPriorityThread(2) from the thread
+; era is deliberately gone - there is only one thread now - and the tray icon is
+; the main script's job [quick-picto-viewer.ahk sets it during its startup].
 
-; OnMessage(0x388, "WM_PENEVENT")
-OnMessage(0x2a3, "WM_MOUSELEAVE")
-OnMessage(0x201, "uiWM_LBUTTONDOWN")
-OnMessage(0x203, "WM_LBUTTON_DBL")
-OnMessage(0x202, "uiWM_LBUTTONUP")
-OnMessage(0x205, "WM_RBUTTONUP")
-OnMessage(0x207, "WM_MBUTTONDOWN")
-OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
-OnMessage(0x20A, "WM_MOUSEWHEEL")
-OnMessage(0x20E, "WM_MOUSEWHEEL")
-; OnMessage(0x216, "WM_MOVING") ; window moving
+   ; module state seeds [the former Global-block initializers]
+   LbtnDwn := 0, penPressureRaw := 0, canCancelImageLoad := 0, alterFilesIndex := 0
+   mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0, allowMenuReader := 0
+   lastCloseInvoked := -1, lastALclickX := 0, lastALclickY := 0, statusBarTooltipVisible := 0
+   lastContextMenuZeit := 1, lastDoubleClickZeit := 1, lastMenuBarUpdate := 1, lastMenuHoverZeit := 1
+   lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1
+   doNormalCursor := 1, prevFullIMGload := 1, prevMenuBarItem := 1
+   menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuCurrentIndex := 0, menuTotalIndex := 0
+   winGDIcreated := 0, ThumbsWinGDIcreated := 0, uiMouseTipWinCreated := 0, uiLastTippyWin := ""
+   lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
+   otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
-; Pen pressure. The main viewport windows are created by this thread, so WM_POINTER*
-; messages land in this thread's queue. That matters: the painting loops in the main
-; thread run under «Critical, on» and never pump messages, so they cannot read pressure
-; themselves. They poll penPressureRaw from here instead, the same way
-; determineLClickState() already polls LbtnDwn.
-hasPenPressureAPI := DllCall("GetProcAddress", "UPtr", DllCall("GetModuleHandle", "Str", "user32", "UPtr"), "AStr", "GetPointerPenInfo", "UPtr") ? 1 : 0
-If (hasPenPressureAPI=1) ; requires Windows 8 or newer
-{
-   OnMessage(0x0245, "WM_PENpressure")  ; WM_POINTERUPDATE
-   OnMessage(0x0246, "WM_PENpressure")  ; WM_POINTERDOWN
-   OnMessage(0x0247, "WM_PENpressure")  ; WM_POINTERUP
-   OnMessage(0x024A, "WM_PENpressure")  ; WM_POINTERLEAVE
+   ; input handlers. Module-only message numbers first:
+   OnMessage(0x2a3, "WM_MOUSELEAVE")
+   OnMessage(0x205, "WM_RBUTTONUP")
+   OnMessage(0x207, "WM_MBUTTONDOWN")
+   OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
+   OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE
+   OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
+
+   ; pen pressure [requires Windows 8 or newer]. The handler stays message-driven;
+   ; the brush loops additionally drain the queue themselves while they hold
+   ; Critical - see pumpPenMessages() / getBrushPenPressure().
+   hasPenPressureAPI := DllCall("GetProcAddress", "UPtr", DllCall("GetModuleHandle", "Str", "user32", "UPtr"), "AStr", "GetPointerPenInfo", "UPtr") ? 1 : 0
+   If (hasPenPressureAPI=1)
+   {
+      OnMessage(0x0245, "WM_PENpressure")  ; WM_POINTERUPDATE
+      OnMessage(0x0246, "WM_PENpressure")  ; WM_POINTERDOWN
+      OnMessage(0x0247, "WM_PENpressure")  ; WM_POINTERUP
+      OnMessage(0x024A, "WM_PENpressure")  ; WM_POINTERLEAVE
+   }
+
+   ; keystroke-beep suppression for 0x101-0x103 and 0x105-0x108 - matching the
+   ; pre-merge effective state, where the thread re-registered 0x100/0x104 onto
+   ; its keyboard handler [string-mode OnMessage REPLACES, never chains]
+   Loop, 9
+   {
+      If (A_Index=1 || A_Index=5)  ; 0x100 WM_KEYDOWN / 0x104 WM_SYSKEYDOWN
+         Continue
+      OnMessage(255+A_Index, "PreventKeyPressBeep")
+   }
+
+   ; numbers both sides monitored - composed dispatchers [see below]
+   OnMessage(0x100, "dispatchKeyDown")
+   OnMessage(0x104, "dispatchKeyDown")
+   OnMessage(0x200, "dispatchMouseMove")
+   OnMessage(0x201, "dispatchLButtonDown")
+   OnMessage(0x202, "dispatchLButtonUp")
+   OnMessage(0x203, "dispatchLButtonDbl")
+   OnMessage(0x20A, "dispatchMouseWheel")
+   OnMessage(0x20E, "dispatchMouseWheel")
 }
 
-Loop, 9
-    OnMessage(255+A_Index, "PreventKeyPressBeep")   ; 0x100 to 0x108
 
-OnMessage(0x100, "uiWM_KEYDOWN")
-OnMessage(0x104, "uiWM_KEYDOWN")
-; OnMessage(0x0247, "WM_POINTERUP") 
-; OnMessage(0x20, "WM_SETCURSOR")
-; OnMessage(0x211, "WM_ENTERMENULOOP")
-; OnMessage(0x212, "WM_EXITMENULOOP")
-; OnMessage(0x126, "WM_MENUCOMMAND")
-; OnMessage(0x120, "WM_MENUCHAR")
-; OnMessage(0x11Fb, "WM_MENUSELECT")
-
-OnMessage(0x200, "uiWM_MOUSEMOVE")
-OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE 
-OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS 
-; OnMessage(0x0A0, "WM_NCMOUSEMOVE")  ; mouse move into window area
-
-    ; Hotkey, ~#F20, EraserBlah, UseErrorLevel
-    ; Hotkey, ~#F19, EraserBlah, UseErrorLevel
-    ; Hotkey, ~#F18, EraserBlah, UseErrorLevel
-
-
-setPriorityThread(2)
-QPVpid := DllCall("Kernel32.dll\GetCurrentProcessId")
-; OnExit handling: window close routes through PVwinGuiClose / byeByeRoutine()
-Return
-
-; ______ main-thread facade [merge phase B] ______
-; Every call back into the main thread goes through these three wrappers; nothing
-; else in this file may touch MainExe.ahk* directly. At the merge proper [phase C
-; in interface-thread-merge-plan.md] only these bodies change: MT_post becomes a
-; one-shot BoundFunc timer, MT_get/MT_set direct global access.
+; ______ main-thread facade [merged - phase C] ______
+; The MT_* wrappers survive the merge so this module's call sites stay untouched;
+; they now delegate to the IF_* facades in quick-picto-viewer.ahk - one interpreter,
+; one implementation. Queued posts share IF_postRelay.
 
 MT_post(funcName, args*) {
-; This ahk build rejects two constructs the merge facades first used: args*
-; expanded into an object METHOD call, and args[N] indexing directly inside
-; the method-call arguments [load-time "Invalid value" errors]. So: hoist the
-; arguments into plain locals, then dispatch on the count and forward with the
-; exact arity of the call site [sites here use at most 7 extra arguments].
-   n := args.Length()
-   a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
-   a6 := args[6], a7 := args[7]
-   If (n=0)
-      MainExe.ahkPostFunction(funcName)
-   Else If (n=1)
-      MainExe.ahkPostFunction(funcName, a1)
-   Else If (n=2)
-      MainExe.ahkPostFunction(funcName, a1, a2)
-   Else If (n=3)
-      MainExe.ahkPostFunction(funcName, a1, a2, a3)
-   Else If (n=4)
-      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4)
-   Else If (n=5)
-      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4, a5)
-   Else If (n=6)
-      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6)
-   Else
-      MainExe.ahkPostFunction(funcName, a1, a2, a3, a4, a5, a6, a7)
+   fn := Func("IF_postRelay").Bind(funcName, args)
+   SetTimer, % fn, -1
 }
 
 MT_get(varName) {
-   Return MainExe.ahkgetvar(varName)
+   Return IF_get(varName)
 }
 
 MT_set(varName, value) {
-   MainExe.ahkassign(varName, value)
+   IF_set(varName, value)
 }
 
-; MERGEDEL twin: byte-identical copy of setPriorityThread() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-setPriorityThread(level, handle:="A") {
-  If (handle="A" || !handle)
-     handle := DllCall("GetCurrentThread")
-  Return DllCall("SetThreadPriority", "UPtr", handle, "Int", level)
+; ______ merged-thread input routing [merge phase C] ______
+; Before the merge, each interpreter's OnMessage monitors received messages ONLY
+; for its own windows, and every handler's guards assume exactly that universe.
+; The dispatchers below preserve those universes by routing on the receiving
+; window's top-level root: interface-owned roots go to the ui-side handler, all
+; other windows [panels, toolbar, tooltips of the main script] go to the
+; main-side handler. Never convert these to sequential chaining - the guards on
+; either side were not written to see the other side's windows.
+
+isUIrootWin(hwnd) {
+   root := DllCall("user32\GetAncestor", "UPtr", hwnd, "UInt", 2, "UPtr")  ; GA_ROOT
+   Return isVarEqualTo(root, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin, hGuiTip, hFlyOut)
+}
+
+dispatchKeyDown(wP, lP, msg, hwnd) {
+   If isUIrootWin(hwnd)
+      Return uiWM_KEYDOWN(wP, lP, msg, hwnd)
+   Return WM_KEYDOWN(wP, lP, msg, hwnd)
+}
+
+dispatchMouseMove(wP, lP, msg, hwnd) {
+   If isUIrootWin(hwnd)
+      Return uiWM_MOUSEMOVE(wP, lP, msg, hwnd)
+   Return WM_MOUSEMOVE(wP, lP, msg, hwnd)
+}
+
+dispatchLButtonDown(wP, lP, msg, hwnd) {
+   If isUIrootWin(hwnd)
+      Return uiWM_LBUTTONDOWN(wP, lP, msg, hwnd)
+   Return WM_LBUTTONdown(wP, lP, msg, hwnd)
+}
+
+dispatchLButtonUp(wP, lP, msg, hwnd) {
+   If isUIrootWin(hwnd)
+      Return uiWM_LBUTTONUP(wP, lP, msg, hwnd)
+   Return WM_LBUTTONup(wP, lP, msg, hwnd)
+}
+
+dispatchLButtonDbl(wP, lP, msg, hwnd) {
+   If isUIrootWin(hwnd)
+      Return WM_LBUTTON_DBL(wP, lP, msg, hwnd)
+   Return OnLButtonDblClk(wP, lP, msg, hwnd)
+}
+
+dispatchMouseWheel(wP, lP, msg, hwnd) {
+   If isUIrootWin(hwnd)
+      Return WM_MOUSEWHEEL(wP, lP, msg, hwnd)
+   Return adjustWheelNumbersEditFields(wP, lP, msg, hwnd)
+}
+
+; ______ liveness shims [merge phase C] ______
+; Pre-merge, a busy main thread never stopped the interface interpreter from
+; processing input - abort flags, pen pressure and click state stayed live. On one
+; interpreter, a long operation holding Critical blocks all of that; these shims
+; restore it at the operations' existing checkpoints.
+
+pumpUIevents() {
+; FULL message pump - queued posts, timers and dialogs all run. Use it ONLY where
+; the old code already tolerated arbitrary re-entrancy [determineTerminateOperation:
+; its old cross-thread spin slept, which pumped everything on the main side too].
+; NEVER pass 0 to Critical when restoring: «Critical, 0» turns Critical ON.
+   prevCrit := A_IsCritical
+   Critical, Off
+   Sleep, -1
+   If (prevCrit)
+      Critical, %prevCrit%
+   Else
+      Critical, Off
+}
+
+drainUIinput() {
+; SELECTIVE drain for long operations that hold Critical: reads the queued input
+; of the interface windows and hands it straight to the ui handlers, so the
+; abort/cancel flags [canCancelImageLoad, alterFilesIndex, colorPickerMustEnd,
+; mustAbandonCurrentOperations] keep working exactly as when a separate
+; interpreter processed this input live. Input for OTHER windows [panels,
+; toolbar] stays queued - their handlers run when the operation unwinds, which
+; matches the old queued-post semantics. No timers or posts fire in here.
+; PeekMessage with the PVwin handle also drains its children [the hit-test
+; controls and the reparented GDI viewport windows].
+   Static busy := 0
+   If busy  ; re-entrancy guard: a drained Escape can show a modal dialog that pumps,
+      Return ; and the interrupted operation then reaches its next checkpoint mid-drain
+   busy := 1
+   VarSetCapacity(msgu, 48, 0)  ; MSG is 48 bytes on x64, 28 on x86
+   prevCrit := A_IsCritical
+   Loop, 40  ; hard cap per checkpoint, so an input flood cannot stall the operation
+   {
+      If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x100, "UInt", 0x108, "UInt", 1) ; PM_REMOVE
+      {
+         If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x200, "UInt", 0x20E, "UInt", 1)
+            Break
+      }
+      mhwnd := NumGet(msgu, 0, "UPtr")
+      mnum := NumGet(msgu, A_PtrSize, "UInt")
+      mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
+      mlp := NumGet(msgu, 3*A_PtrSize, "Ptr")
+      If (mnum=0x100 || mnum=0x104)
+         uiWM_KEYDOWN(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x200)
+         uiWM_MOUSEMOVE(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x201)
+         uiWM_LBUTTONDOWN(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x202)
+         uiWM_LBUTTONUP(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x203)
+         WM_LBUTTON_DBL(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x205)
+         WM_RBUTTONUP(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x207)
+         WM_MBUTTONDOWN(mwp, mlp, mnum, mhwnd)
+      Else If (mnum=0x20A || mnum=0x20E)
+         WM_MOUSEWHEEL(mwp, mlp, mnum, mhwnd)
+      ; remaining numbers in the ranges [key-ups, dead moves] are swallowed: their
+      ; consumers read async state via GetKeyState, which removal cannot alter
+   }
+   ; the keyboard handler defers its work to a 3ms timer that cannot fire while
+   ; the caller holds Critical - run it now, then disarm the pending timer
+   uiPreProcessKbdKey()
+   SetTimer, uiPreProcessKbdKey, Off
+   If (prevCrit)
+      Critical, %prevCrit%
+   Else
+      Critical, Off
+   busy := 0
+}
+
+pumpPenMessages() {
+; The brush loops hold Critical, so WM_POINTER* messages queue up instead of
+; reaching the WM_PENpressure monitor - read them here directly. The handler is
+; called for its side effect on penPressureRaw, then the message is dispatched
+; anyway so DefWindowProc keeps promoting pen input to the legacy mouse messages
+; [see the note in WM_PENpressure]. The handler's own «Critical, off» is undone
+; by restoring the caller's state afterwards.
+   If (hasPenPressureAPI!=1)
+      Return
+   VarSetCapacity(msgu, 48, 0)
+   prevCrit := A_IsCritical
+   Loop, 20
+   {
+      If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", 0, "UInt", 0x0245, "UInt", 0x024A, "UInt", 1)
+         Break
+      mhwnd := NumGet(msgu, 0, "UPtr")
+      mnum := NumGet(msgu, A_PtrSize, "UInt")
+      mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
+      mlp := NumGet(msgu, 3*A_PtrSize, "Ptr")
+      WM_PENpressure(mwp, mlp, mnum, mhwnd)
+      DllCall("user32\DispatchMessageW", "Ptr", &msgu)
+   }
+   If (prevCrit)
+      Critical, %prevCrit%
+   Else
+      Critical, Off
 }
 
 updateWindowColor() {
@@ -185,53 +286,16 @@ infosUIAbtns(msgu) {
    prevMsg := msgu
 }
 
-; MERGEDEL twin: byte-identical copy of UnregisterTouchWindow() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-UnregisterTouchWindow(hwnd) {
-      Return DllCall("User32.dll\UnregisterTouchWindow", "UPtr", hwnd)
-}
-
-BuildGUI(params:=0) {
+BuildGUI() {
+; De-parameterized at the merge [phase C]: the 16-field "$"-string handshake and
+; its MT_get fallback existed only to marshal the main thread's settings into the
+; interface interpreter - everything below now reads the shared globals directly.
+; [This also retires the old restartEntireGui() bug that re-sent only 9 of the 16
+; fields and blanked the OSD font preferences on every GUI rebuild.]
    Critical, on
-   If !InStr(params, "$")
-   {
-      mustAssignVarz := 1
-      WindowBgrColor := MT_get("WindowBgrColor")
-      isAlwaysOnTop := MT_get("isAlwaysOnTop")
-      mainCompiledPath := MT_get("mainCompiledPath")
-      isTitleBarVisible := MT_get("isTitleBarVisible")
-      TouchScreenMode := MT_get("TouchScreenMode")
-      ; userAllowWindowDrag := MT_get("userAllowWindowDrag")
-      mainWinPos := MT_get("mainWinPos")
-      mainWinSize := MT_get("mainWinSize")
-      mainWinMaximized := MT_get("mainWinMaximized")
-   } Else
-   {
-      externObj := StrSplit(params, "$")
-      WindowBgrColor := externObj[1]
-      isAlwaysOnTop := externObj[2]
-      mainCompiledPath := externObj[3]
-      isTitleBarVisible := externObj[4]
-      TouchScreenMode := externObj[5]
-      ; userAllowWindowDrag := externObj[6]
-      mainWinPos := externObj[7]
-      mainWinSize := externObj[8]
-      mainWinMaximized := externObj[9]
-      IMGresizingMode := externObj[10]
-      OSDbgrColor := externObj[11]
-      OSDtextColor := externObj[12]
-      OSDfontSize := externObj[13]
-      PrefsLargeFonts := externObj[14]
-      OSDFontName := externObj[15]
-      FontBolded := externObj[16]
-   }
-
-   RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
-   ; setMenusTheme(1)
    calcHUDsize()
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
    initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
-   ; If !A_IsCompiled
-     Try Menu, Tray, Icon, %mainCompiledPath%\qpv-icon.ico
    Global UIAbtn0, UIAbtn1
    Gui, PVwin: Color, %WindowBgrColor%
    Gui, PVwin: Margin, 0, 0
@@ -274,18 +338,6 @@ BuildGUI(params:=0) {
    createGDIinfosWin()
    Sleep, 2
    uiUpdateUIctrl(1)
-   If (mustAssignVarz=1)
-   {
-      MT_set("PVhwnd", PVhwnd)
-      MT_set("hGDIinfosWin", hGDIinfosWin)
-      MT_set("hGDIwin", hGDIwin)
-      MT_set("hGDIthumbsWin", hGDIthumbsWin)
-      MT_set("hGDIselectWin", hGDIselectWin)
-      MT_set("hPicOnGui1", hPicOnGui1)
-      MT_set("winGDIcreated", winGDIcreated)
-      MT_set("ThumbsWinGDIcreated", ThumbsWinGDIcreated)
-   }
-
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    Sleep, 1
    WinActivate, ahk_id %PVhwnd%
@@ -363,14 +415,6 @@ updateUIctrlFromOutside(paramA) {
     drawingShapeNow := p[3]
     IMGresizingMode := p[4]
     uiUpdateUIctrl(0)
-}
-
-; MERGEDEL twin: byte-identical copy of isTlbrVertical() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-isTlbrVertical() {
-    If (TLBRtwoColumns=1 && !isWelcomeScreenu)
-       Return 1
-
-    Return (TLBRverticalAlign=1) ? 1 : 0
 }
 
 detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
@@ -475,11 +519,6 @@ uiUpdateUIctrl(forceThis:=0) {
       prevState := thisState
       uiAccessUpdateUiStatusBar(0, 0, "kill", 0)
    }
-}
-
-; MERGEDEL twin: byte-identical copy of calcHUDsize() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-calcHUDsize() {
-   imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfontSize*2.5) : Round(OSDfontSize*2)
 }
 
 uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
@@ -771,87 +810,9 @@ PanelOpenCloseEvent(a) {
     uiAccessImgViewSetUIlabels()
 }
 
-; MERGEDEL twin: byte-identical copy of SetParentID() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-SetParentID(Window_ID, theOther) {
-  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
-  Return r
-}
-
 miniGDIupdater() {
    uiUpdateUIctrl(0)
    MT_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
-}
-
-; MERGEABSORB: NOT a twin - independent native-MsgBox implementation. At phase C: simpleMsgBoxWrapper() in quick-picto-viewer.ahk absorbs it [its Else branch at ~33433 becomes this native MsgBox with Gui PVwin:+OwnDialogs], THEN delete this copy; callers byeByeRoutine + askAboutStoppingOperations retarget simpleMsgBoxWrapper
-msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, optionz:=0) {
-   ; Buttonz options:
-   ; 0 = OK (that is, only an OK button is displayed)
-   ; 1 = OK/Cancel
-   ; 2 = Abort/Retry/Ignore
-   ; 3 - Yes/No/Cancel
-   ; 4 = Yes/No
-   ; 5 = Retry/Cancel
-   ; 6 = Cancel/Try Again/Continue
-
-   ; Iconz options:
-   ; 16 = Icon Hand (stop/error)
-   ; 32 = Icon Question
-   ; 48 = Icon Exclamation
-   ; 64 = Icon Asterisk (info)
-
-   ; Modality options:
-   ; 4096 = System Modal (always on top)
-   ; 8192 = Task Modal
-   ; 262144 = Always-on-top (style WS_EX_TOPMOST - like System Modal but omits title bar icon)
-
-   If (defaultBTN=2)
-      defaultBTN := 255
-   Else If (defaultBTN=3)
-      defaultBTN := 512
-   Else
-      defaultBTN := 0
-
-   If (iconz=1 || iconz="hand" || iconz="error" || iconz="stop")
-      iconz := 16
-   Else If (iconz=2 || iconz="question")
-      iconz := 32
-   Else If (iconz=3 || iconz="exclamation")
-      iconz := 48
-   Else If (iconz=4 || iconz="info")
-      iconz := 64
-   Else
-      iconz := 0
-
-   theseOptionz := buttonz + iconz + defaultBTN + modality
-   If optionz
-      theseOptionz := optionz
-
-   Gui, PVwin: +OwnDialogs
-   MsgBox, % theseOptionz, % winTitle, % msg
-   IfMsgBox, Yes
-        r := "Yes"
-   IfMsgBox, No
-        r := "No"
-   IfMsgBox, OK
-        r := "OK"
-   IfMsgBox, Cancel
-        r := "Cancel"
-   IfMsgBox, Abort
-        r := "Abort"
-   IfMsgBox, Ignore
-        r := "Ignore"
-   IfMsgBox, Retry
-        r := "Retry"
-   IfMsgBox, Continue
-        r := "Continue"
-   IfMsgBox, TryAgain
-        r := "TryAgain"
-
-   If (!AnyWindowOpen && !InStr(msg, "quit") && !InStr(msg, "exit"))
-      lastOtherWinClose := A_TickCount
-
-   ; uiAddJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
-   Return r
 }
 
 uiAddJournalEntry(msg) {
@@ -888,7 +849,7 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    Else
       direction := (mouseData>0 && mouseData<51234) ? "WheelUp" : "WheelDown"
 
-   MT_post("KeyboardResponder", prefix direction, PVhwnd, 0)
+   MT_post("KeyboardResponder", prefix direction, PVhwnd, 0, navKeysCounter)
    Return 0
 }
 
@@ -930,7 +891,7 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        JEE_ScreenToClient(whichWin, mXo, mYo, lastALclickX, lastALclickY)
     }
 
-    If (mouseToolTipWinCreated=1)
+    If (uiMouseTipWinCreated=1)
        uiMouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
@@ -969,6 +930,8 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
 }
 
 WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
+    If !isUIrootWin(hwnd)  ; pre-merge this handler saw only the interface windows
+       Return
     If (A_TickCount - scriptStartTime<500)
        Return 0
 
@@ -979,7 +942,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If preventSillyGui(A_Gui)
        Return
 
-    If (mouseToolTipWinCreated=1)
+    If (uiMouseTipWinCreated=1)
        uiMouseTurnOFFtooltip()
 
     LbtnDwn := 0
@@ -1077,7 +1040,7 @@ askAboutStoppingOperations() {
         userPendingAbortOperations := 1
         lastCloseInvoked := 0
         WinSet, Enable,, ahk_id %PVhwnd%
-        msgResult := msgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
+        msgResult := simpleMsgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
         If (msgResult="yes")
         {
            mustAbandonCurrentOperations := 1
@@ -1090,6 +1053,8 @@ askAboutStoppingOperations() {
 }
 
 WM_RBUTTONUP(wParam, lP, msg, hwnd) {
+  If !isUIrootWin(hwnd)  ; pre-merge this handler saw only the interface windows
+     Return
   LbtnDwn := 0
   If (A_TickCount - scriptStartTime<500)
      Return 0
@@ -1107,7 +1072,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      Return 0
   }
 
-  If (mouseToolTipWinCreated=1)
+  If (uiMouseTipWinCreated=1)
      uiMouseTurnOFFtooltip()
 
   ; thumbsDisplaying := MT_get("thumbsDisplaying")
@@ -1182,18 +1147,8 @@ uiInitGuiContextMenu(mX, mY, oX, oY) {
     MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)
 }
 
-infosSlideShow(a, b, c, d, e) {
-   slideShowRunning := a,  SlideHowMode := b
-   animGIFplaying := c,    allowNextSlide := d
-   runningLongOperation := e
-}
-
-initSlidesModes(paramA, paramB, paramC, paramD) {
-    animGIFplaying := paramA
-    allowNextSlide := paramB
-    maxFilesIndex := paramC
-    slidesFXrandomize := paramD
-}
+; [merge] infosSlideShow() and initSlidesModes() are gone: they only mirrored the
+; slideshow flags into this interpreter, and the globals are shared now.
 
 slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
    SlideHowMode := how
@@ -1335,7 +1290,7 @@ uiWinClickAction(thisEvent:="normal") {
     mX := lastALclickX,    mY := lastALclickY
     ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
     canCancelImageLoad := 4
-    If (mouseToolTipWinCreated=1)
+    If (uiMouseTipWinCreated=1)
        uiMouseTurnOFFtooltip()
 
     ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
@@ -1361,7 +1316,9 @@ ResetLbtn() {
      LbtnDwn := 0
 }
 
-WM_WINDOWPOSCHANGED() {
+WM_WINDOWPOSCHANGED(wP:=0, lP:=0, msg:=0, hwnd:=0) {
+   If (hwnd && hwnd!=PVhwnd)  ; post-merge every window's pos-changes arrive; act only for the main window
+      Return
    Static b
    WinGet, winStateu, MinMax, ahk_id %PVhwnd%
    If (winStateu=-1)
@@ -1444,22 +1401,6 @@ uiChangeMcursor(whichCursor) {
   Try DllCall("user32\SetCursor", "UPtr", thisCursor)
 }
 
-; MERGEDEL twin: byte-identical copy of isInRange() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-isInRange(value, inputA, inputB) {
-    If (value=inputA || value=inputB)
-       Return 1
-
-    Return (value>=min(inputA, inputB) && value<=max(inputA, inputB)) ? 1 : 0
-}
-
-; MERGEDEL twin: byte-identical copy of isDotInRect() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-isDotInRect(mX, mY, x1, x2, y1, y2, modus:=0) {
-   If (modus=1)
-      Return (isInRange(mX, y1 - x1, y1 + x2) && isInRange(mY, y2 - x1, y2 + x2)) ? 1 : 0
-   Else
-      Return (isInRange(mX, x1, x2) && isInRange(mY, y1, y2)) ? 1 : 0
-}
-
 isQPVactive() {
     Static lastInvoked := 1, last := 1
     If ((A_TickCount - lastInvoked<450) && (last=0))
@@ -1467,8 +1408,8 @@ isQPVactive() {
 
     A := WinActive("A")
     lastInvoked := A_TickCount
-    ; last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
-    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1 || A=hFlyOut && menusflyOutVisible=1) ? 1 : 0
+    ; last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && uiMouseTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
+    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && uiMouseTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1 || A=hFlyOut && menusflyOutVisible=1) ? 1 : 0
     Return last
 }
 
@@ -1490,7 +1431,7 @@ uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
 
     ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
     thisHwnd := PVhwnd
-    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && uiMouseTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
        Return
 
     lastInvoked := A_TickCount
@@ -1503,8 +1444,8 @@ uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
 
     bgrColor := OSDbgrColor
     txtColor := OSDtextColor
-    isBold := (FontBolded=1) ? " Bold" : ""
-    lastTippyWin := WinActive("A")
+    isBold := (OSDfontBolded=1) ? " Bold" : ""
+    uiLastTippyWin := WinActive("A")
     Sleep, 25
     Gui, uiMouseTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
     ; Gui, uiMouseTipGuia: Margin, 0, 0
@@ -1518,14 +1459,14 @@ uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     If (unClickable=1)
       WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
 
-    mouseToolTipWinCreated := 1
+    uiMouseTipWinCreated := 1
     delayu := StrLen(msg) * 75 + 950
     lastZeitToolTip := A_TickCount
     uiShowOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
 }
 
 uiShowOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
-    If !mouseToolTipWinCreated
+    If !uiMouseTipWinCreated
        Return
 
     ; the branch further below re-creates the text control to re-wrap a tooltip wider
@@ -1584,26 +1525,6 @@ uiShowOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
     WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
     ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
     SetTimer, uiMouseTurnOFFtooltip, % -delayu
-}
-
-; MERGEDEL twin: byte-identical copy of adjustWin2MonLimits() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
-   GetWinClientSize(Wid, Heig, winHwnd, 1)
-   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
-   If ActiveMon
-   {
-      SysGet, bCoord, Monitor, %ActiveMon%
-      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
-      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
-      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
-      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
-   } Else
-   {
-      rX := winX
-      rY := winY
-   }
-
-   Return ResWidth
 }
 
 uiMouseTipGuiaGuiClose:
@@ -1714,10 +1635,14 @@ trackMouseDragging() {
 }
 
 WM_MOUSELEAVE(wP, lP, msg, hwnd) {
+   If !isUIrootWin(hwnd)  ; pre-merge this handler saw only the interface windows
+      Return
     lastMouseLeave := A_TickCount
 }
 
-activateMainWin() {
+activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
+   If (hwnd && !isUIrootWin(hwnd))  ; pre-merge this handler saw only the interface windows
+      Return
    If (A_TickCount - scriptStartTime<2000)
       Return
 
@@ -1736,8 +1661,8 @@ activateMainWin() {
    If (menusflyOutVisible=1 && !identifyMenus())
       SetTimer, hideMenuFlyOut, -50
 
-   ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
-   If (mouseToolTipWinCreated=1)
+   ; If (uiMouseTipWinCreated=1 && !z && !identifyParentWind())
+   If (uiMouseTipWinCreated=1)
       SetTimer, uiMouseTurnOFFtooltip, -150
 }
 
@@ -1769,24 +1694,14 @@ PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Return
 }
 
-; MERGEDEL twin: byte-identical copy of Trimmer() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-Trimmer(string, whatTrim:="") {
-   If (whatTrim!="")
-      string := Trim(string, whatTrim)
-   Else
-      string := Trim(string, "`r`n `t`f`v`b")
-   Return string
-}
-
 dummyTimerProcessDroppedFiles() {
    Static lastInvoked := 1
    totalGroppy := groppedFiles.Count()
    If (!totalGroppy || (A_TickCount - lastInvoked<400))
       Return
 
-   RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
-   If StrLen(RegExFilesPattern)<12
-      RegExFilesPattern := ""
+   ; [merge] RegExFilesPattern is the live main-script global now - the registry
+   ; round-trip existed only for the separate interpreter
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    vectorShape := imgFiles := foldersList := sldFile := ""
@@ -1854,10 +1769,20 @@ byeByeRoutine() {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
       canCancelImageLoad := 4
       WinSet, Enable,, ahk_id %PVhwnd%
-      msgResult := msgBoxWrapper(appTitle, "The main window seems to be busy at the moment. Do you want to force exit this application ?", 4, 0, "question")
+      msgResult := simpleMsgBoxWrapper(appTitle, "The main window seems to be busy at the moment. Do you want to force exit this application ?", 4, 0, "question")
       If (msgResult="yes")
-         SetTimer, TimerExit, -10
-      Else lastCloseInvoked := -1
+      {
+         ; [merge] the old force-exit killed the process within 10ms - issued from
+         ; the RESPONSIVE interface interpreter. On one thread, a truly stuck
+         ; operation [blocked inside a long DllCall] pumps nothing, so neither a
+         ; queued TrueCleanup nor the TimerExit watchdog can fire. The detached
+         ; taskkill below is therefore the only guaranteed force-exit: ~8s grace,
+         ; then it kills the PID - a no-op if the clean path exited first.
+         mustAbandonCurrentOperations := 1
+         SetTimer, TimerExit, -8000
+         MT_post("TrueCleanup")
+         Try Run, %ComSpec% /c ping -n 9 127.0.0.1 >nul 2>&1 && taskkill /PID %QPVpid% /T /F,, Hide
+      } Else lastCloseInvoked := -1
       lastCloseInvoked++
    } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
    {
@@ -1936,15 +1861,16 @@ byeByeRoutine() {
 
    If (lastCloseInvoked>3)
    {
-      ; SoundBeep , 500, 2000
-      SetTimer, TimerExit, % (lastCloseInvoked>5) ? -550 : -10
-      MT_post("TrueCleanup", 1)
+      ; [merge] the old exit posted TrueCleanup to the main thread and hard-killed
+      ; the shared process ~10ms later - RACING the seen-images DB COMMIT inside
+      ; TrueCleanup. One interpreter now: run the cleanup synchronously [it ends in
+      ; ForceExitNow -> ExitApp]; TimerExit stays armed as a watchdog in case the
+      ; cleanup hangs at one of its pump points.
+      SetTimer, TimerExit, -8000
+      TrueCleanup()
    }
 }
 
-dummyTimerExit() {
-   SetTimer, TimerExit, -550
-}
 
 TimerExit() {
    ; SoundBeep , 900, 2000
@@ -1954,7 +1880,8 @@ TimerExit() {
    ExitApp
 }
 
-; MERGEKEEP twin [survivor]: byte-identical to the unregistered dead copy in quick-picto-viewer.ahk [tagged MERGEDEL there]; THIS copy is live [registered 0x100-0x108 above] and survives phase C
+; the sole PreventKeyPressBeep [the main script's dead unregistered copy was deleted
+; at merge phase C]; registered for 0x101-0x103 and 0x105-0x108 in initInterfaceModule()
 PreventKeyPressBeep() {
    IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
 }
@@ -2004,14 +1931,6 @@ guiCreateMenuFlyout() {
    wasMenuFlierCreated := 1
 }
 
-; MERGEDEL twin: byte-identical copy of IsNumber() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
-IsNumber(Var) {
-   Static number := "number"
-   If Var Is number
-      Return 1
-   Return 0
-}
-
 highLightMenuBar() {
     hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
     If !hMenuBar
@@ -2058,7 +1977,7 @@ dummyMenuFlyoutDisplay(actu, mX, mY) {
    If (actu="yes" && allowMenuReader="yes")
    {
       ; GetPhysicalCursorPos(mX, mY)
-      a := WinExist("ahk_class #32768 ahk_pid " QPVpid)
+      a := uiVisibleMenuWin()
       If !a
       {
          h := GetMenuWinHwnd(mX, mY, "32768")
@@ -2191,23 +2110,6 @@ turnOffSlideshow() {
    lastOtherWinClose := A_TickCount
 }
 
-; MERGEDEL twin: byte-identical copy of GetMenuItemRect() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetMenuItemRect(hwnd, hMenu, nPos) {
-    VarSetCapacity(RECT, 16, 0)
-    if DllCall("User32.dll\GetMenuItemRect", "UPtr", hwnd, "UPtr", hMenu, "UInt", nPos, "UPtr", &RECT)
-    {
-       objRect := { left   : numget( RECT,  0, "UInt" )
-                  , top    : numget( RECT,  4, "UInt" )
-                  , right  : numget( RECT,  8, "UInt" )
-                  , bottom : numget( RECT, 12, "UInt" ) }
-       rect:= ""
-       return objRect
-    }
-
-    rect:= ""
-    return 0
-}
-
 changeMenusBarKbd(keyu) {
    ; Static lastItem := 1
    If ((A_TickCount - lastMenuHoverZeit<300) || (menuCurrentIndex))
@@ -2215,7 +2117,10 @@ changeMenusBarKbd(keyu) {
       Sleep, 25
       msgu := constantMenuReader("focused", 1)
       WinGet, menus, List , % "ahk_class #32768 ahk_pid " QPVpid
-      If (keyu="left" && menus>1)
+      visibleMenus := 0  ; [merge] under DHW-On the list includes the process' hidden menu window
+      Loop, % menus
+          visibleMenus += DllCall("user32\IsWindowVisible", "UPtr", menus%A_Index%) ? 1 : 0
+      If (keyu="left" && visibleMenus>1)
       {
          SendInput, {%keyu%}
       } Else If (InStr(msgu, "submenu container") && keyu="right")
@@ -2433,30 +2338,6 @@ uiKmenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVbar", actu:="Add") {
    }
 }
 
-; MERGEDEL twin: byte-identical copy of dummy() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-dummy() {
-  Sleep, 0
-}
-
-; MERGEDEL twin: byte-identical copy of clampInRange() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-clampInRange(value, min, max, reverse:=0) {
-   If (reverse=1)
-   {
-      If (value>max)
-         value := min
-      Else If (value<min)
-         value := max
-   } Else
-   {
-      If (value>max)
-         value := max
-      Else If (value<min)
-         value := min
-   }
-
-   Return value
-}
-
 findMenuBarItemUnderMouse() {
    Static prevLabel, lastH := 1, lastY := 1
    If (!identifyMenus() && (A_TickCount - lastMenuZeit>700))
@@ -2505,17 +2386,8 @@ findMenuBarItemUnderMouse() {
    }
 }
 
-tlbrInitPrefs(paramA) {
-; sent by tlbrPushPrefs() in quick-picto-viewer.ahk; feeds detectToolbar()
-  p := StrSplit(paramA, "|")
-  hQPVtoolbar := p[1]
-  ShowAdvToolbar := p[2]
-  lockToolbar2Win := p[3]
-  TLBRverticalAlign := p[4]
-  TLBRtwoColumns := p[5]
-  isWelcomeScreenu := p[6]
-  ToolBarBtnWidth := p[7]
-}
+; [merge] tlbrInitPrefs() is gone: it re-parsed the 7 toolbar prefs the main script
+; pushed across the thread boundary; detectToolbar() reads the shared globals now.
 
 updateTlbrPosition() {
   If (lockToolbar2Win!=1 || ShowAdvToolbar!=1)
@@ -2586,20 +2458,6 @@ determineMenuBTNsOKAY() {
       Return 0
    Else
       Return 1
-}
-
-; MERGEDEL twin: byte-identical copy of isVarEqualTo() in quick-picto-viewer.ahk - the merge [phase C] deletes this copy
-isVarEqualTo(value, vals*) {
-   yay := 0
-   for index, param in vals
-   {
-       If (value=param)
-       {
-          yay := 1
-          Break
-       }
-   }
-   Return yay
 }
 
 VarContainsThis(value, vals*) {
@@ -2776,11 +2634,22 @@ SendMenuTabKey() {
    SendInput, % keyu
 }
 
+uiVisibleMenuWin() {
+; [merge] The main script runs DetectHiddenWindows ON, and a HIDDEN #32768 window
+; persists in the process once any menu has ever shown - probing without a
+; visibility check matches it forever. Every menu-window probe in this module
+; goes through here, so it sees what the old interface interpreter [DHW off] saw.
+   h := WinExist("ahk_class #32768 ahk_pid " QPVpid)
+   If (h && DllCall("user32\IsWindowVisible", "UPtr", h))
+      Return h
+   Return 0
+}
+
 identifyMenus(){
-   ; WinGet, OutputVar, List , % "ahk_class #32768 ahk_pid " QPVpid
-   ; ToolTip, % OutputVar "=l" , , , 2
-   r := WinExist("ahk_class #32768 ahk_pid " QPVpid) ? 1 : 0
-   Return r
+; Without the visibility filter [see uiVisibleMenuWin] this would return 1 forever
+; and the menu-reader #If hotkeys below [RButton, Left, Right, Space...] would
+; swallow those keys SYSTEM-WIDE.
+   Return uiVisibleMenuWin() ? 1 : 0
 }
 
 #If, (identifyMenus() && allowMenuReader="yes")
@@ -2841,72 +2710,9 @@ identifyMenus(){
    Return
 #If
 
-; MERGEDEL twin: byte-identical copy of calcScreenLimits() in lib/msgbox2.ahk - the merge [phase C] deletes this copy
-calcScreenLimits(whichHwnd:="main") {
-    Static lastInvoked := 1, prevHwnd, prevActiveMon := []
-
-    ; the function calculates screen boundaries for the user given X/Y position for the OSD
-    If (A_TickCount - lastInvoked<350) && (prevHwnd=whichHwnd)
-       Return prevActiveMon
-
-    whichHwnd := (whichHwnd="main") ? PVhwnd : whichHwnd
-    If (whichHwnd="mouse")
-    {
-       MouseGetPos, OutputVarX, OutputVarY
-       GetPhysicalCursorPos(mainX, mainY)
-       If !mainX
-          mainX := OutputVarX
-       If !mainY
-          mainY := OutputVarY
-       hMon := MDMF_FromPoint(mainX, mainY, 2)
-    } Else 
-    {
-       hMon := MDMF_FromHWND(whichHwnd, 2)
-       WinGetPos, mainX, mainY,, , ahk_id %whichHwnd%
-    }
-
-    If hMon
-       MonitorInfos := MDMF_GetInfo(hMon)
-
-    If !IsObject(MonitorInfos)
-    {
-       ActiveMon := MWAGetMonitorMouseIsIn(mainX, mainY)
-       If !ActiveMon
-       {
-          ActiveMon := MWAGetMonitorMouseIsIn()
-          If !ActiveMon
-             Return prevActiveMon
-       }
-       SysGet, mCoord, MonitorWorkArea, %ActiveMon%
-       prevActiveMon.mCRight := mCoordRight, prevActiveMon.mCLeft := mCoordLeft
-       prevActiveMon.mCTop := mCoordTop, prevActiveMon.mCBottom := mCoordBottom
-    } Else
-    {
-       ActiveMon := MonitorInfos.Num
-       mCoordRight := MonitorInfos.WARight, mCoordLeft := MonitorInfos.WALeft
-       mCoordTop := MonitorInfos.WATop, mCoordBottom := MonitorInfos.WABottom
-       prevActiveMon.mCRight := MonitorInfos.WARight, prevActiveMon.mCLeft := MonitorInfos.WALeft
-       prevActiveMon.mCTop := MonitorInfos.WATop, prevActiveMon.mCBottom := MonitorInfos.WABottom
-    }
-
-    prevActiveMon.w := ResolutionWidth := Abs(max(mCoordRight, mCoordLeft) - min(mCoordRight, mCoordLeft))
-    prevActiveMon.h := ResolutionHeight := Abs(max(mCoordTop, mCoordBottom) - min(mCoordTop, mCoordBottom)) 
-    If !ResolutionWidth
-       prevActiveMon.w := ResolutionWidth := 800
-    If !ResolutionHeight
-       prevActiveMon.h := ResolutionHeight := 600
-
-    prevActiveMon.m := ActiveMon
-    prevActiveMon.hMon := hMon
-    lastInvoked := A_TickCount
-    prevHwnd := whichHwnd
-    ; ToolTip, % ActiveMon "`n" pActiveMon "`n" hMon , , , 2
-    Return prevActiveMon
-}
-
 constantMenuReader(modus:=0, externMode:=0) {
    Static prevLabel := "z"
-   If (mouseToolTipWinCreated=1)
+   If (uiMouseTipWinCreated=1)
    {
       uiMouseTurnOFFtooltip()
       Return
@@ -2923,7 +2729,7 @@ constantMenuReader(modus:=0, externMode:=0) {
       ; WinID := "0x" Format("{:x}", WinID)
       ; winChild := WinEnumChild(WinID)
 
-      WinID := WinExist("ahk_class #32768 ahk_pid " QPVpid)
+      WinID := uiVisibleMenuWin()
       AccFromFocused(WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
    } Else
       AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
@@ -2931,7 +2737,7 @@ constantMenuReader(modus:=0, externMode:=0) {
    ; goodText := accFocusValue ? accFocusValue : accFocusName
    ; goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
    ; ToolTip, % goodText "=" goodRoles "==" WinID "==" winChild.count() , , , 2
-   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || mouseToolTipWinCreated!=1 || externMode=1))
+   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || uiMouseTipWinCreated!=1 || externMode=1))
    {
       prevLabel := accFocusName
       msgu := StrReplace(accFocusName, "`t", "`n[ ")
@@ -2979,7 +2785,7 @@ mouseClickTurnOFFtooltip() {
 
 uiMouseTurnOFFtooltip() {
    Global statusBarTooltipVisible := 0
-   If (mouseToolTipWinCreated!=1)
+   If (uiMouseTipWinCreated!=1)
       Return
 
    MouseGetPos, ,, OutputVarWin
@@ -2987,7 +2793,7 @@ uiMouseTurnOFFtooltip() {
       Global lastWinDrag := A_TickCount - 125
    Sleep, 10
    Gui, uiMouseTipGuia: Destroy
-   Global mouseToolTipWinCreated := 0
+   Global uiMouseTipWinCreated := 0
    Global statusBarTooltipVisible := 0
    Global lastZeitToolTip := A_TickCount
    SetTimer, uiMouseTurnOFFtooltip, Off
@@ -4482,128 +4288,6 @@ uiRepositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos
 
 }
 
-; MERGEDEL twin: byte-identical copy of MWAGetMonitorMouseIsIn() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-MWAGetMonitorMouseIsIn(coordX:=0,coordY:=0) {
-; function from: https://autohotkey.com/boards/viewtopic.php?f=6&t=54557
-; by Maestr0
-
-  ; get the mouse coordinates first
-  If (coordX && coordY)
-  {
-     Mx := coordX
-     My := coordY
-  } Else GetPhysicalCursorPos(mX, mY)
-
-  SysGet, MonitorCount, 80  ; monitorcount, so we know how many monitors there are, and the number of loops we need to do
-  Loop, %MonitorCount%
-  {
-    SysGet, mon%A_Index%, Monitor, %A_Index%  ; "Monitor" will get the total desktop space of the monitor, including taskbars
-    If (Mx>=mon%A_Index%left) && (Mx<mon%A_Index%right)
-    && (My>=mon%A_Index%top) && (My<mon%A_Index%bottom)
-    {
-       ActiveMon := A_Index
-       Break
-    }
-  }
-  Return ActiveMon
-}
-
-; MERGEDEL twin: byte-identical copy of GetWindowBounds() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetWindowBounds(hWnd) {
-   ; function by GeekDude: https://gist.github.com/G33kDude/5b7ba418e685e52c3e6507e5c6972959
-   ; W10 compatible function to find a window's visible boundaries
-   ; modified by Marius Șucan to return an array
-   size := VarSetCapacity(rect, 16, 0)
-   er := DllCall("dwmapi\DwmGetWindowAttribute"
-      , "UPtr", hWnd  ; HWND  hwnd
-      , "UInt", 9     ; DWORD dwAttribute (DWMWA_EXTENDED_FRAME_BOUNDS)
-      , "UPtr", &rect ; PVOID pvAttribute
-      , "UInt", size  ; DWORD cbAttribute
-      , "UInt")       ; HRESULT
-
-   If er
-      DllCall("GetWindowRect", "UPtr", hwnd, "UPtr", &rect, "UInt")
-
-   r := []
-   r.x1 := NumGet(rect, 0, "Int"), r.y1 := NumGet(rect, 4, "Int")
-   r.x2 := NumGet(rect, 8, "Int"), r.y2 := NumGet(rect, 12, "Int")
-   r.w := Abs(max(r.x1, r.x2) - min(r.x1, r.x2))
-   r.h := Abs(max(r.y1, r.y2) - min(r.y1, r.y2))
-   rect := ""
-   ; ToolTip, % r.w " --- " r.h , , , 2
-   Return r
-}
-
-; MERGEDEL twin: byte-identical copy of GetWinClientSize() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
-; by Lexikos http://www.autohotkey.com/forum/post-170475.html
-; modified by Marius Șucan
-    Static prevW, prevH, prevHwnd, lastInvoked := 1
-    If (A_TickCount - lastInvoked<95) && (prevHwnd=hwnd "-" mode)
-    {
-       W := prevW, H := prevH
-       Return
-    }
-
-    prevHwnd := hwnd "-" mode
-    If (mode=2)
-    {
-       r := GetWindowPlacement(hwnd)
-       prevW := W := r.w
-       prevH := H := r.h
-    } Else If (mode=1)
-    {
-       r := GetWindowBounds(hwnd)
-       prevW := W := r.w
-       prevH := H := r.h
-    } Else 
-    {
-       VarSetCapacity(rc, 16, 0)
-       DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
-       prevW := W := NumGet(rc, 8, "int")
-       prevH := H := NumGet(rc, 12, "int")
-       rc := ""
-    }
-
-    lastInvoked := A_TickCount
-} 
-
-; MERGEDEL twin: byte-identical copy of MDMF_FromHWND() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
-MDMF_FromHWND(HWND, Flag := 0) {
-   Return DllCall("User32.dll\MonitorFromWindow", "UPtr", HWND, "UInt", Flag, "Ptr")
-}
-
-; MERGEDEL twin: byte-identical copy of MDMF_FromPoint() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
-MDMF_FromPoint(ByRef X := "", ByRef Y := "", Flag := 0) {
-   If (X = "") || (Y = "") {
-      VarSetCapacity(PT, 8, 0)
-      DllCall("User32.dll\GetCursorPos", "UPtr", &PT, "Int")
-      If (X = "")
-         X := NumGet(PT, 0, "Int")
-      If (Y = "")
-         Y := NumGet(PT, 4, "Int")
-   }
-   Return DllCall("User32.dll\MonitorFromPoint", "Int64", (X & 0xFFFFFFFF) | (Y << 32), "UInt", Flag, "Ptr")
-}
-
-; MERGEDEL twin: byte-identical copy of MDMF_GetInfo() in lib/Gdip_All.ahk - the merge [phase C] deletes this copy
-MDMF_GetInfo(HMON) {
-   NumPut(VarSetCapacity(MIEX, 40 + (32 << !!A_IsUnicode)), MIEX, 0, "UInt")
-   If DllCall("User32.dll\GetMonitorInfo", "UPtr", HMON, "Ptr", &MIEX, "Int")
-      Return {Name:      (Name := StrGet(&MIEX + 40, 32))  ; CCHDEVICENAME = 32
-            , Num:       RegExReplace(Name, ".*(\d+)$", "$1")
-            , Left:      NumGet(MIEX, 4, "Int")    ; display rectangle
-            , Top:       NumGet(MIEX, 8, "Int")    ; "
-            , Right:     NumGet(MIEX, 12, "Int")   ; "
-            , Bottom:    NumGet(MIEX, 16, "Int")   ; "
-            , WALeft:    NumGet(MIEX, 20, "Int")   ; work area
-            , WATop:     NumGet(MIEX, 24, "Int")   ; "
-            , WARight:   NumGet(MIEX, 28, "Int")   ; "
-            , WABottom:  NumGet(MIEX, 32, "Int")   ; "
-            , Primary:   NumGet(MIEX, 36, "UInt")} ; contains a non-zero value for the primary monitor.
-   Return False
-}
-
 Acc_ObjectFromWindow(hWnd, idObject = 0) {
   SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " hwnd
   If DllCall("oleacc\AccessibleObjectFromWindow", "Ptr", hWnd, "UInt", idObject&=0xFFFFFFFF
@@ -4705,98 +4389,6 @@ AccGetStateText(nState) {
   Return sState
 }
 
-; MERGEDEL twin: identical to setMenusTheme() in lib/shell-stuff.ahk except its forwarding line [live there at ~1699, commented here] - phase C deletes this copy AND that forward line
-setMenusTheme(modus) {
-   If (A_OSVersion="WIN_7" || A_OSVersion="WIN_XP")
-      Return
-
-   uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
-   SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 135, "uptr")
-   global AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 133, "uptr")
-   FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
-   DllCall(SetPreferredAppMode, "int", modus) ; Dark
-   DllCall(FlushMenuThemes)
-   ; IF_post("setMenusTheme", modus)
-}
-
-
-; MERGEDEL twin: byte-identical copy of WinMoveZ() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
-  ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
-  ; modified by Marius Șucan
-
-  ; If Redraw=2, the new coordinates will be returned
-  ; Moves a window to given coordinates, but confines the window within the work area of the target monitor.
-  ; Which target monitor? : Whichever monitor POINT (X, Y) belongs to
-  ; What if POINT doesn't belong to any monitor? : The monitor nearest to the POINT will house the window.
-
-  Local V := VarSetCapacity(R, 48, 0), TPM_WORKAREA := 0x10000
-      , A := &R + 16, S := &R + 24, E := &R, NR := &R + 32
-
-  C := ( C:=Abs(C) ) ? DllCall("SetRect", "Ptr",&R, "Int",X-C, "Int",Y-C, "Int",X+C, "Int",Y+C) : 0
-  DllCall("SetRect", "Ptr",&R+16, "Int",X, "Int",Y, "Int",W, "Int",H)
-  DllCall("CalculatePopupWindowPosition", "Ptr",A, "Ptr",S, "UInt",TPM_WORKAREA, "Ptr",E, "Ptr",NR)
-  X := NumGet(NR+0,"Int")
-  Y := NumGet(NR+4,"Int")
-  If (Redraw=2)
-     Return [X, Y]
-  Else 
-     Return DllCall("MoveWindow", "UPtr",hWnd, "Int",X, "Int",Y, "Int",W, "Int",H, "Int",Redraw)
-}
-
-; MERGEDEL twin: byte-identical copy of JEE_ClientToScreen() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
-; function by jeeswg found on:
-; https://autohotkey.com/boards/viewtopic.php?t=38472
-
-  VarSetCapacity(POINT, 8)
-  NumPut(vPosX, &POINT, 0, "Int")
-  NumPut(vPosY, &POINT, 4, "Int")
-  DllCall("user32\ClientToScreen", "UPtr", hWnd, "UPtr", &POINT)
-  vPosX2 := NumGet(&POINT, 0, "Int")
-  vPosY2 := NumGet(&POINT, 4, "Int")
-}
-
-; MERGEDEL twin: byte-identical copy of JEE_ScreenToClient() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-JEE_ScreenToClient(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {
-; function by jeeswg found on:
-; https://autohotkey.com/boards/viewtopic.php?t=38472
-  VarSetCapacity(POINT, 8, 0)
-  NumPut(vPosX, &POINT, 0, "Int")
-  NumPut(vPosY, &POINT, 4, "Int")
-  DllCall("user32\ScreenToClient", "UPtr", hWnd, "UPtr", &POINT)
-  vPosX2 := NumGet(&POINT, 0, "Int")
-  vPosY2 := NumGet(&POINT, 4, "Int")
-  POINT := ""
-}
-
-; MERGEDEL twin: byte-identical copy of GetWindowPlacement() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetWindowPlacement(hWnd) {
-    Local WINDOWPLACEMENT, Result := {}
-    NumPut(VarSetCapacity(WINDOWPLACEMENT, 44, 0), WINDOWPLACEMENT, 0, "UInt")
-    r := DllCall("GetWindowPlacement", "UPtr", hWnd, "UPtr", &WINDOWPLACEMENT)
-    If (r=0)
-    {
-       WINDOWPLACEMENT := ""
-       Return 0
-    }
-    Result.x := NumGet(WINDOWPLACEMENT, 28, "Int")
-    Result.y := NumGet(WINDOWPLACEMENT, 32, "Int")
-    Result.w := NumGet(WINDOWPLACEMENT, 36, "Int") - Result.x
-    Result.h := NumGet(WINDOWPLACEMENT, 40, "Int") - Result.y
-    Result.flags := NumGet(WINDOWPLACEMENT, 4, "UInt") ; 2 = WPF_RESTORETOMAXIMIZED
-    Result.showCmd := NumGet(WINDOWPLACEMENT, 8, "UInt") ; 1 = normal, 2 = minimized, 3 = maximized
-    WINDOWPLACEMENT := ""
-    Return Result
-}
-
-; MERGEDEL twin: byte-identical copy of GetWinHwndAtPoint() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetWinHwndAtPoint(nX, nY) {
-    a := DllCall("WindowFromPhysicalPoint", "Uint64", nX|(nY << 32), "Ptr")
-    a := Format("{1:#x}", a)
-    WinGetClass, h, ahk_id %a%
-    Return [a, h]
-}
 
 GetClientSize(ByRef w, ByRef h, hwnd) {
 ; by Lexikos http://www.autohotkey.com/forum/post-170475.html
@@ -4814,77 +4406,4 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
     prevH := H := NumGet(rc, 12, "int")
     lastInvoked := A_TickCount
 } 
-
-; MERGEDEL twin: byte-identical copy of GetPhysicalCursorPos() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetPhysicalCursorPos(ByRef mX, ByRef mY) {
-; function from: https://github.com/jNizM/AHK_DllCall_WinAPI/blob/master/src/Cursor%20Functions/GetPhysicalCursorPos.ahk
-; by jNizM, modified by Marius Șucan
-    Static lastMx, lastMy, lastInvoked := 1
-    If (A_TickCount - lastInvoked<70)
-    {
-       mX := lastMx
-       mY := lastMy
-       Return
-    }
-
-    lastInvoked := A_TickCount
-    Static POINT
-         , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
-    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
-    If (!GPC || A_OSVersion="WIN_XP")
-    {
-       MouseGetPos, mX, mY
-       lastMx := mX
-       lastMy := mY
-       Return
-     ; Return DllCall("kernel32.dll\GetLastError")
-    }
-
-    lastMx := mX := NumGet(POINT, 0, "Int")
-    lastMy := mY := NumGet(POINT, 4, "Int")
-    Return
-}
-
-; MERGEDEL twin: byte-identical copy of SetMenuInfo() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
-   cbSize := (A_PtrSize=8) ? 40 : 28
-   VarSetCapacity(MENUINFO, cbSize, 0)
-   fMaskFlags := 0x80000000         ; MIM_APPLYTOSUBMENUS
-   cyMax := maxHeight ? maxHeight : 0
-   If maxHeight
-      fMaskFlags |= 0x00000001      ; MIM_MAXHEIGHT
-
-   If (autoDismiss=1 || modeLess=1 || noCheck=1)
-      fMaskFlags |= 0x00000010      ; MIM_STYLE
-
-   dwStyle := 0
-   If (autoDismiss=1)
-      dwStyle |= 0x10000000         ; MNS_AUTODISMISS
-
-   If (modeLess=1)
-      dwStyle |= 0x40000000         ; MNS_MODELESS
-
-   If (noCheck=1)
-      dwStyle |= 0x80000000         ; MNS_NOCHECK
-
-   NumPut(cbSize, MENUINFO, 0, "UInt") ; DWORD
-   NumPut(fMaskFlags, MENUINFO, 4, "UInt") ; DWORD
-   NumPut(dwStyle, MENUINFO, 8, "UInt") ; DWORD
-   NumPut(cyMax, MENUINFO, 12, "UInt") ; UINT
-   ; NumPut(hbrBack, MENUINFO, 16, "Ptr") ; HBRUSH
-   ; NumPut(dwContextHelpID, MENUINFO, 20, "UInt") ; DWORD
-   ; NumPut(dwMenuData, MENUINFO, 24, "UPtr") ; ULONG_PTR
-
-   Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
-}
-
-; MERGEDEL twin: byte-identical copy of GetWindowFromPos() in lib/shell-stuff.ahk - the merge [phase C] deletes this copy
-GetWindowFromPos(X, Y, hwnd:=0, DetectHidden:=0) {
-   ; by just me https://www.autohotkey.com/boards/viewtopic.php?p=80118
-   ; CWP_ALL = 0x0000, CWP_SKIPINVISIBLE = 0x0001
-   hwnd := (hwnd=0) ? DllCall("GetDesktopWindow", "UPtr") : hwnd
-   Return DllCall("ChildWindowFromPointEx", "UPtr", hwnd
-                                          , "Int64", (X & 0xFFFFFFFF) | ((Y & 0xFFFFFFFF) << 32)
-                                          , "UInt", !DetectHidden, "UPtr")
-}
 
