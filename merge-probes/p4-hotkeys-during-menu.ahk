@@ -13,7 +13,21 @@ Menu, TestPop, Add, third item, dummyItem
 MsgBox, 64, P4, While the menu is open:`n1) press F9`n2) RIGHT-click`n3) scroll the wheel DOWN (watch whether the highlight moves)`nThen press Escape.
 Menu, TestPop, Show
 closedAt := A_TickCount
-MsgBox, 64, P4 result, % (hits ? "Hotkey subroutines ran at:`n" hits : "No hotkey subroutine ran at all.`n") . "`nMenu closed at tick " closedAt ".`nEntries with SMALLER ticks ran DURING the loop = PASS (deferred ones show ticks >= close).`nIf the highlight moved on wheel, SendInput works from inside too."
+during := 0, after := 0
+Loop, Parse, hits, `n
+{
+   If !A_LoopField
+      Continue
+   RegExMatch(A_LoopField, "at (\d+)", m)
+   If (m1 && m1 < closedAt)
+      during++
+   Else
+      after++
+}
+verdict := !hits ? "FAIL - no hotkey subroutine ran at all."
+   : (during ? "PASS - " during " subroutine(s) ran DURING the menu loop [" after " deferred]."
+   : "FAIL/DEFERRED - all " after " subroutine(s) ran only after the menu closed.")
+MsgBox, 64, P4 result, % verdict "`n`nRaw log [menu closed at tick " closedAt "]:`n" hits "`nIf the highlight also moved on wheel while the menu was open, SendInput from a hotkey works during the loop."
 ExitApp
 
 #If WinExist("ahk_class #32768 ahk_pid " DllCall("GetCurrentProcessId"))

@@ -1,18 +1,36 @@
 # Merge probes (Phase P)
 
-Six standalone probes for the interfaceThread merge (see the plan). Run each on Windows
+Probes for the interfaceThread merge (see interface-thread-merge-plan.md). Run on Windows
 with **stock AutoHotkey v1.1 (U64)** — NOT AHK_H — because they establish what the merged,
 de-H app can rely on. Each shows its verdict in a MsgBox; no files are written.
 
+## Round 1 verdicts (recorded 2026-08-31)
+
+| Probe | Question | Verdict |
+|---|---|---|
+| p1-menuselect | OnMessage(WM_MENUSELECT) during same-thread `Menu, Show`? | **FAIL** — never fired |
+| p2-initmenupopup | OnMessage(WM_INITMENUPOPUP) + JIT rebuild, native Gui menu bar? | **FAIL** — never fired |
+| p3-timer-during-menu | SetTimer ticks during the menu loop? | **NO** (as expected) |
+| p4-hotkeys-during-menu | Hook-hotkey subroutines run during the loop? SendInput from them? | ambiguous log; no highlight move on wheel, nothing visible on F9 — re-run with the auto-classifying version if needed |
+| p5-msgfilter-hook | WH_MSGFILTER callback runs during the loop? | **Reception PASS** — hook saw MSGF_MENU traffic; but SendInput from it moved nothing (wheel-presence in the log unconfirmed — re-run shows counts) |
+| p6-tooltip-from-monitor | Tooltip GUI from an OnMessage monitor during menus? | **FAIL** — consistent with p1 |
+
+**The empirical rule these establish:** in a single stock-v1 interpreter, NO AHK
+pseudo-thread launches happen while a menu of that same interpreter is being tracked —
+OnMessage monitors, timers, and (apparently) hotkey subroutines are all blocked, for
+`Menu, Show` popups AND native Gui menu-bar tracking alike. Raw Win32 callbacks (hooks)
+DO run during the loop — p5 proved the vehicle. This is exactly why the current app needs
+the second ahk-h interpreter for its menu reader; post-merge, all in-menu behavior must
+ride raw callbacks. Round 2 below determines which callback can do what.
+
+## Round 2 — run these next
+
 | Probe | Question | Decides |
 |---|---|---|
-| p1-menuselect.ahk | Does an `OnMessage(0x11F WM_MENUSELECT)` monitor fire while this same script sits inside `Menu, Show`? | D2 reader architecture. PASS → highlight tracking + announcements come from the monitor. FAIL → reader falls back to the WH_MSGFILTER hook (P5). |
-| p2-initmenupopup.ahk | Does `OnMessage(0x117 WM_INITMENUPOPUP)` fire before the popup opens, and do `Menu, Add/Delete` inside the monitor take effect in that very popup? | D1 dropdown strategy. PASS → JIT rebuild (InvokeMenuBar* builders run from the monitor). FAIL → eager rebuild driven by UpdateMenuBar's state hash. |
-| p3-timer-during-menu.ahk | Do AHK `SetTimer` timers tick while the same thread is inside `Menu, Show`? | Expected NO — confirms `findMenuBarItemUnderMouse` (60ms MSAA poll) cannot survive the merge and must be deleted in favor of native submenus, and predicts the C-era hover-switch degradation. A surprise YES would shrink D1. |
-| p4-hotkeys-during-menu.ahk | Do hook hotkeys under `#If WinExist("ahk_class #32768 ...")` actually RUN (and can they SendInput) while the same thread is inside the menu loop? | Whether the accessibility menu-reader hotkey block (module-interface.ahk:2740) survives the merge nearly unchanged (PASS) or must be rebuilt on the WH_MSGFILTER hook (FAIL). |
-| p5-msgfilter-hook.ahk | Does a thread-scoped `WH_MSGFILTER` hook installed via `RegisterCallback` receive MSGF_MENU messages during `Menu, Show`, and does `SendInput` work from inside the callback? | The fallback transport for in-menu wheel/RButton/PgUp-PgDn behaviors (D2). Also the fallback for P1/P4 failures. |
-| p6-tooltip-from-monitor.ahk | Can a NoActivate, click-through tooltip GUI be created/updated from inside a menu-message monitor without dismissing the menu? | Whether the OSD reader announcements can render live during menus (D2), or must be deferred to menu-close. |
+| p7-callwndproc-menuselect | Same-thread WH_CALLWNDPROC hook sees WM_MENUSELECT (a SENT message the MSGFILTER hook cannot see), and can update a tooltip GUI from the raw callback | D2 reader tracking + display. Distinguishes reception-works from GUI-from-callback-works. |
+| p8-initmenupopup-hook | AHK `Menu, DeleteAll/Add` executed from the CALLWNDPROC callback at WM_INITMENUPOPUP time | D1 JIT dropdown rebuild. FAIL → eager rebuilds on state change (UpdateMenuBar's hash machinery survives phase C). |
+| p9-wheel-rewrite | MSGF_MENU hook rewrites the wheel message in place into WM_KEYDOWN Up/Down | In-menu wheel scrolling, strategy A. Also reports whether wheel traverses MSGF_MENU at all. |
+| p10-wheel-eat-post | MSGF_MENU hook eats the wheel and posts WM_KEYDOWN to the owner | Strategy B, if A fails. Both seeing zero wheel messages → WH_GETMESSAGE needed. |
+| p11-wineventhook-menu | OUT-OF-CONTEXT SetWinEventHook(EVENT_OBJECT_FOCUS) fires per highlighted menu item, tooltip from that callback | The canonical screen-reader mechanism; fallback for p7's display half. (taskbarInterface already uses SetWinEventHook, so there is in-codebase precedent.) |
 
-Record the six verdicts before starting Phase C — they are inputs to the C keep-vs-delete
-list and to the D1/D2 designs. While testing p4, also note whether the wheel highlight
-moves (SendInput from a hotkey during the loop) — that is the load-bearing part.
+Record all verdicts before Phase C — they finalize the D1/D2 design.
