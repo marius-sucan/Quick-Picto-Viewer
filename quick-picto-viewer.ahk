@@ -25145,9 +25145,6 @@ CropImageInViewPortToSelection(modus:=0) {
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
     mgpx := Round((imgW * imgH)/1000000, 1)
     calcImgSelection2bmp(1, imgW, imgH, imgW - 1, imgH - 1, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
-    ; nothing to trim: a selection at origin covering the entire image; up to 2px of
-    ; overhang is treated as drag slop, but an undersized selection is a real crop,
-    ; even by a single pixel
     If (modus!="simplex" && EllipseSelectMode=0 && isInRange(imgSelW, imgW, imgW + 2) && isInRange(imgSelH, imgH, imgH + 2) && !imgSelPx && !imgSelPy)
     {
        MouseMoveResponder()
@@ -83317,9 +83314,9 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       Else
          entireVpCacheIDu := entireVpCacheBmp := ""
       Return
-   } Else If (DestPosX="35mpx-entire")
+   } Else If (DestPosX="65mpx-entire")
    {
-      ; the entire image at ~35 megapixels, for AutoCropAction() on huge images;
+      ; the entire image at ~65 megapixels, for AutoCropAction() on huge images;
       ; the caller owns the returned bitmap [it gets mutated and disposed],
       ; so the cache always hands out a clone
       If !(viewportQPVimage.imgHandle)
@@ -83336,7 +83333,7 @@ retrieveQPVscreenImgSection(DestPosX, DestPosY, mainWidth, mainHeight, newW, new
       If (rImgW<1 || rImgH<1)
          Return
 
-      ratio := Sqrt(35000000/(rImgW*rImgH))
+      ratio := Sqrt(65000000/(rImgW*rImgH))
       kW := (ratio<1) ? Round(rImgW*ratio) : rImgW
       kH := (ratio<1) ? Round(rImgH*ratio) : rImgH
       kW := clampInRange(kW, 1, rImgW)
@@ -98268,7 +98265,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
       doubleSize := 2
       Width := viewportQPVimage.Width
       Height := viewportQPVimage.Height
-      pBitmap := retrieveQPVscreenImgSection("35mpx-entire", 0, 0, 0, 0, 0)
+      pBitmap := retrieveQPVscreenImgSection("65mpx-entire", 0, 0, 0, 0, 0)
       HardResetImageView()
    } Else
    {
@@ -98523,9 +98520,8 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0,
 
    deviationW := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullW/100)*usrAutoCropDeviation)
    deviationH := (usrAutoCropDeviationPixels=1) ? usrAutoCropDeviation : Round((fullH/100)*usrAutoCropDeviation)
-   ; a negative alteration [shrink] may cut at most a quarter of the detected box
-   ; per side; unclamped, a large negative value collapses the box to a sliver and
-   ; batch mode would then overwrite the original files with it
+   ; a negative alteration [shrink] may cut at most a quarter of the detected box per side; unclamped,
+   ; a large negative value collapses the box to a sliver of a few pixels wide or tall
    If (deviationW<0)
       deviationW := -min(-deviationW, (X2 - X1)//4)
    If (deviationH<0)
