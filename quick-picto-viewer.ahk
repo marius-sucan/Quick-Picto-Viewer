@@ -43,8 +43,8 @@
 ;@Ahk2Exe-SetDescription Quick Picto Viewer
 ;@Ahk2Exe-UpdateManifest 0, Quick Picto Viewer
 ;@Ahk2Exe-SetOrigFilename Quick-Picto-Viewer.exe
-;@Ahk2Exe-SetVersion 6.2.00
-;@Ahk2Exe-SetProductVersion 6.2.00
+;@Ahk2Exe-SetVersion 6.3.00
+;@Ahk2Exe-SetProductVersion 6.3.00
 ;@Ahk2Exe-SetCopyright Marius Şucan (2019-2026)
 ;@Ahk2Exe-SetCompanyName https://marius.sucan.ro
 ;@Ahk2Exe-SetMainIcon qpv-icon.ico
@@ -220,7 +220,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := (A_IsCompiled) ? "" : "(dev) "
-   , appVersion := "6.2.01", vReleaseDate := "2026/06/11" ; yyyy-mm-dd
+   , appVersion := "6.3.00", vReleaseDate := "2026/08/31" ; yyyy-mm-dd
 
  ; User settings
    , askDeleteFiles := 1, enableThumbsCaching := 1, OnConvertKeepOriginals := 1
@@ -44356,12 +44356,14 @@ generateThumbsSheet() {
       }
    } Else Return
 
+   Tooltip, Preparing thumbnails sheet...
    pBitmap := trGdip_CreateBitmap(A_ThisFunc, width, height, "0x21808")
    If validBMP(pBitmap)
       Gu := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
 
    If !Gu
    {
+      Tooltip
       trGdip_DisposeImage(pBitmap)
       showTOOLtip("ERROR: Failed to generate the thumbnails sheet.`nInit malfunction. No GDI+ Graphics object.")
       SoundBeep , 300, 100
@@ -44369,15 +44371,15 @@ generateThumbsSheet() {
       Return
    }
 
-   ; asked only once the sheet bitmap is known to be workable, so neither a declined prompt
-   ; nor a failed allocation ends with the destination file deleted for nothing
    If askOverwriteDestFile(file2save)
    {
+      Tooltip
       Gdip_DeleteGraphics(Gu)
       trGdip_DisposeImage(pBitmap)
       Return
    }
 
+   Tooltip
    BtnCloseWindow()
    If (userThumbsSheetShowLabel=1)
    {
@@ -59002,8 +59004,11 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
             Return
       }
 
-      If (noDialog!=1 && imgPath!=file2save && askOverwriteDestFile(file2save, 0))
-         Return
+      If (noDialog!=1 && imgPath!=file2save)
+      {
+         If askOverwriteDestFile(file2save, 0)
+            Return
+      }
 
       ForceRefreshNowThumbsList()
       If (AnyWindowOpen=35)
@@ -61500,10 +61505,13 @@ convert2format(givenIndex) {
   destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
   file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
   ToolTip
-  If (convertFormatAutoSkip=1 && askOverwriteDestFile(file2save, 0))
+  If (convertFormatAutoSkip=1)
   {
-     SetTimer, ResetImgLoadStatus, -150
-     Return
+     If askOverwriteDestFile(file2save, 0)
+     {
+        SetTimer, ResetImgLoadStatus, -150
+        Return
+     }
   }
 
   BtnCloseWindow()
@@ -67265,10 +67273,16 @@ createMenuHelpQPV() {
       kMenu("PVhelp", "Add", "&Viewport help map", "MenuDrawViewportHelpMap")
 
    Menu, PVhelp, Add,
-   kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow", "version update upgrade release download")
+   If !isWinStore()
+      kMenu("PVhelp", "Add", "C&heck for updates", "checkForUpdatesNow", "version update upgrade release download")
    kMenu("PVhelp", "Add", "&Official QPV page", "OpenGitHub", "site")
    kMenu("PVhelp", "Add", "&Make a donation", "DonateNow", "paypal")
+   kMenu("PVhelp", "Add", "&Change log", "invokeChangeLogTab")
    kMenu("PVhelp", "Add", "&About", "PanelAboutWindow", "author developer")
+}
+
+invokeChangeLogTab() {
+   PanelHelpWindow("change-log")
 }
 
 MenuOpenVideoDemos() {
@@ -89260,6 +89274,8 @@ PanelHelpWindow(dummy:=0) {
 
     drawViewportHelpMap()
     tabu := (dummy="cmdu") ? 3 : 2
+    If (dummy="change-log")
+       tabu := 4
     rz := (PrefsLargeFonts=1) ? 15 : 17
     rx := rz - 5
     Gui, Add, Tab3, %tabzDarkModus% x15 y15 Choose%tabu%, Philosophy|Shortcuts|Command line|Change log|Features
@@ -98446,9 +98462,9 @@ CoreAutoCropAlgo(pBitmap, varTolerance, threshold, silentMode:=0, doubleSize:=0,
    ; a negative alteration [shrink] may cut at most a quarter of the detected box per side; unclamped,
    ; a large negative value collapses the box to a sliver of a few pixels wide or tall
    If (deviationW<0)
-      deviationW := -min(-deviationW, (X2 - X1)//4)
+      deviationW := -min(-deviationW, (X2 - X1)//5)
    If (deviationH<0)
-      deviationH := -min(-deviationH, (Y2 - Y1)//4)
+      deviationH := -min(-deviationH, (Y2 - Y1)//5)
 
    If (usrAutoCropDeviationSnap=1 && X1>2) || (usrAutoCropDeviationSnap=0)
       X1 -= deviationW
@@ -99505,8 +99521,11 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
          Return
       }
 
-      If (dummy!="no-prompt" && contextu!="extern" && askOverwriteDestFile(file2save, 0))
-         Return
+      If (dummy!="no-prompt" && contextu!="extern")
+      {
+         If askOverwriteDestFile(file2save, 0)
+            Return
+      }
 
       destroyGDIfileCache()
       If (contextu!="extern")

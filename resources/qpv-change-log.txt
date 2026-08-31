@@ -4,7 +4,7 @@
 // Project began in early May 2019.
 // Related: general-code-overview.txt
 
-- v6.3.00 (2026-08-**)
+- v6.3.00 (2026-08-31)
   - [new] rotational/spin blur mode in the «Radial Blur» panel
   - [new] pen pressure support for brushes
   - [new] shapes gallery in the vector shapes panel manager; vector shapes previewed as thumbnails
