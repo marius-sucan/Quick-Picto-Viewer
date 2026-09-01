@@ -22,6 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
+     , flyoutNeedsPos, popupRootSeen
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -43,6 +44,7 @@ initInterfaceModule() {
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
+   flyoutNeedsPos := 0, popupRootSeen := 0
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -140,7 +142,10 @@ dispatchLButtonDown(wP, lP, msg, hwnd) {
 }
 
 dispatchLButtonUp(wP, lP, msg, hwnd) {
-   If isUIrootWin(hwnd)
+   root := DllCall("user32\GetAncestor", "UPtr", hwnd, "UInt", 2, "UPtr")  ; GA_ROOT
+   If (root = hFlyOut)
+      OutputDebug, % "QPVMERGE: btn-up on flyout window, flyVisible=" menusflyOutVisible
+   If isVarEqualTo(root, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin, hGuiTip, hFlyOut)
       Return uiWM_LBUTTONUP(wP, lP, msg, hwnd)
    Return WM_LBUTTONup(wP, lP, msg, hwnd)
 }
@@ -189,7 +194,22 @@ uiCallWndProc(nCode, wP, lP) {
       If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
          uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "Ptr"))
       Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
-         uiMenuJITrebuild(NumGet(lP+0, A_PtrSize, "UPtr"))
+      {
+         hMinit := NumGet(lP+0, A_PtrSize, "UPtr")
+         ; the flyout anchors to ROOT popups only: bar dropdowns [mapped menus] and
+         ; the FIRST popup of a right-click/AppsKey session - never to submenus,
+         ; which used to drag it around the screen
+         If (barMenuSession=1)
+         {
+            If (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit))
+               flyoutNeedsPos := 1
+         } Else If (popupRootSeen!=1)
+         {
+            popupRootSeen := 1
+            flyoutNeedsPos := 1
+         }
+         uiMenuJITrebuild(hMinit)
+      }
       Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
          uiMenuLoopEnter(NumGet(lP+0, A_PtrSize, "UPtr"))
       Else If (msg=0x212) ; WM_EXITMENULOOP
@@ -275,7 +295,8 @@ uiMenuLoopEnter(fromPopup:=0) {
    Static cbTick := 0
    If !cbTick
       cbTick := RegisterCallback("uiMenuNativeTick", "F")
-   uiMenuNativeTick("reset")
+   popupRootSeen := 0
+   flyoutNeedsPos := 0
    If !menuNativeTimerID
       menuNativeTimerID := DllCall("user32\SetTimer", "Ptr", 0, "UPtr", 0, "UInt", 90, "Ptr", cbTick, "UPtr")
    ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
@@ -359,16 +380,13 @@ uiRefreshBarAttachments() {
 
 uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
 ; TIMERPROC [raw callback, p7-proven class] fired BY the modal menu loop every
-; ~90ms: shows/repositions the menuFlier flyout under the visible menu window.
-; Pass "reset" as the first argument to clear the position memo between sessions.
+; ~90ms. Positions the menuFlier flyout under the menu window ONCE PER ROOT POPUP
+; [flyoutNeedsPos is raised by the WM_INITMENUPOPUP hook for bar dropdowns and
+; for the first popup of a context-menu session]; submenus never move it. The
+; flag clears only after a successful placement, so a tick that fires before the
+; menu window is visible simply retries.
    Critical
-   Static prevKey := ""
-   If (hwnd="reset")
-   {
-      prevKey := ""
-      Return
-   }
-   If (menuLoopActive!=1 || allowMenuReader!="yes")
+   If (menuLoopActive!=1 || flyoutNeedsPos!=1 || allowMenuReader!="yes")
       Return
    a := uiVisibleMenuWin()
    If !a
@@ -376,14 +394,12 @@ uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
    WinGetPos, mX, mY, , Height, ahk_id %a%
-   keyu := a "-" mX "-" mY "-" Height
-   If (keyu = prevKey)
+   If (mX="" || Height="")
       Return
-   prevKey := keyu
+   flyoutNeedsPos := 0
    menusflyOutVisible := 1
    y := mY + Round(Height) + 2
-   If (mX!="" && y!="")
-      Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
+   Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
 }
 
 uiMenuMouseLL(nCode, wP, lP) {
@@ -1197,6 +1213,7 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
     If (menusflyOutVisible=1)
     {
        MouseGetPos, , , OutputVarWin, hwnd, 2
+       OutputDebug, % "QPVMERGE: flyout btn-up ctrl=" hwnd " [S=" hFlyBtn1 " T=" hFlyBtn2 " M=" hFlyBtn3 "] win=" OutputVarWin
        If isVarEqualTo(hwnd, hFlyBtn1, hFlyBtn2, hFlyBtn3)
           Gui, MclickH: Destroy
 
