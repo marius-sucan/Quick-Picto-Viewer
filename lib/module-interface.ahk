@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen
+     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -44,7 +44,7 @@ initInterfaceModule() {
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
-   flyoutNeedsPos := 0, popupRootSeen := 0
+   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -323,7 +323,12 @@ uiMenuLoopExit() {
       menuNativeTimerID := 0
    }
    If (menusflyOutVisible=1)
-      SetTimer, hideMenuFlyOut, -35
+   {
+      ; hold the flyout 350ms after the menu closes [per Marius] so the click that
+      ; dismissed the menu can land on the S/T/M buttons; then the hide pass runs
+      flyoutGraceZeit := A_TickCount
+      SetTimer, hideMenuFlyOut, -350
+   }
    If hLLmouseHook
    {
       DllCall("user32\UnhookWindowsHookEx", "Ptr", hLLmouseHook)
@@ -2258,44 +2263,22 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
 
-   ; GetPhysicalCursorPos(mX, mY)
-   fn := Func("dummyMenuFlyoutDisplay").Bind(actu, mX, mY)
-   SetTimer, % fn, -25
-}
-
-dummyMenuFlyoutDisplay(actu, mX, mY) {
-   If (actu="yes" && allowMenuReader="yes")
-   {
-      ; GetPhysicalCursorPos(mX, mY)
-      a := uiVisibleMenuWin()
-      If !a
-      {
-         h := GetMenuWinHwnd(mX, mY, "32768")
-         a := h[1]
-      }
-      If (!InStr(h[2], "32768") && !a)
-      {
-          ToolTip
-          menusflyOutVisible := 0
-          Gui, menuFlier: Hide
-          Gui, MclickH: Hide
-          Return
-      }
-
-      menusflyOutVisible := 1
-      WinGetPos, mX, mY, , Height, ahk_id %a%
-      ; ToolTip, % z "=" a "=" mY " = " height "=" h , , , 2
-      x := mX
-      y := mY + Round(Height) + 2
-      If (x!="" && y!="")
-         Gui, menuFlier: Show, AutoSize x%x% y%y% NoActivate
-   } Else
-   {
+   ; [merge fix] the old display leg armed dummyMenuFlyoutDisplay on a -25 AHK
+   ; timer. Post-merge that timer sat PENT UP through the modal loop and fired the
+   ; moment the menu closed - found no visible menu and HID the flyout right under
+   ; the user's finger, so the S/T/M buttons never received their click. Display
+   ; belongs to the native ticker now [uiMenuNativeTick]; a non-"yes" call still
+   ; requests the hide pass.
+   If (actu!="yes")
       SetTimer, hideMenuFlyOut, -35
-   }
 }
 
 hideMenuFlyOut() {
+    If (A_TickCount - flyoutGraceZeit < 350)  ; post-menu-close grace: keep the buttons clickable
+    {
+       SetTimer, hideMenuFlyOut, -120
+       Return
+    }
     MouseGetPos,,, OutputVarWin
     ; WinGetClass, glassu, ahk_id %OutputVarWin%
     ; WinGetTitle, titlu, ahk_id %OutputVarWin%
@@ -2309,46 +2292,6 @@ hideMenuFlyOut() {
        SetTimer, hideMenuFlyOut, Off
     } Else If (menusflyOutVisible=1)
        SetTimer, hideMenuFlyOut, -35
-}
-
-GetMenuWinHwnd(mX, mY, n) {
-    ; side note; I know it is dumb but I do not know a better solution
-    h := GetWinHwndAtPoint(mX, mY)
-    If !InStr(h[2], n) ; menu window class
-    {
-       h := GetWinHwndAtPoint(mX + 2, mY)
-       If !InStr(h[2], n)
-       {          
-          h := GetWinHwndAtPoint(mX + 2, mY + 2)
-          If !InStr(h[2], n)
-          {
-             h := GetWinHwndAtPoint(mX, mY + 2)
-             If !InStr(h[2], n)
-             {
-                 h := GetWinHwndAtPoint(mX - 2, mY)
-                 If !InStr(h[2], n)
-                 {
-                     h := GetWinHwndAtPoint(mX - 2, mY - 2)
-                     If !InStr(h[2], n)
-                     {
-                        h := GetWinHwndAtPoint(mX, mY - 2)
-                        If !InStr(h[2], n)
-                        {
-                           h := GetWinHwndAtPoint(mX - 2, mY + 2)
-                           If !InStr(h[2], n)
-                           {
-                              h := GetWinHwndAtPoint(mX + 2, mY - 2)
-                              If !InStr(h[2], n)
-                                 Return
-                           }
-                        }
-                     }
-                 }
-             }
-          }
-       }
-    }
-    Return h
 }
 
 uiShowSysMenu(Hwnd) {
