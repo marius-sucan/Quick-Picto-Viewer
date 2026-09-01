@@ -21,7 +21,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
-     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession
+     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -42,7 +42,7 @@ initInterfaceModule() {
    winGDIcreated := 0, ThumbsWinGDIcreated := 0, uiMouseTipWinCreated := 0, uiLastTippyWin := ""
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0
+   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -268,6 +268,16 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
 
 uiMenuLoopEnter(fromPopup:=0) {
    menuLoopActive := 1
+   ; native WM_TIMER ticker for the menu session: the modal loop dispatches
+   ; TIMERPROC-based timers [AHK's own timers never tick in there - probe p3], so
+   ; this is what positions the flyout beside the open menu, the job the old 25ms
+   ; AHK timer did from the second interpreter
+   Static cbTick := 0
+   If !cbTick
+      cbTick := RegisterCallback("uiMenuNativeTick", "F")
+   uiMenuNativeTick("reset")
+   If !menuNativeTimerID
+      menuNativeTimerID := DllCall("user32\SetTimer", "Ptr", 0, "UPtr", 0, "UInt", 90, "Ptr", cbTick, "UPtr")
    ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
    ; [Menu, Show popups] attach the same shared submenus [PVview, PVnav, PVslide...]
    ; but pre-build everything before showing; letting the hook rebuild them
@@ -286,6 +296,13 @@ uiMenuLoopEnter(fromPopup:=0) {
 uiMenuLoopExit() {
    menuLoopActive := 0
    barMenuSession := 0
+   If menuNativeTimerID
+   {
+      DllCall("user32\KillTimer", "Ptr", 0, "UPtr", menuNativeTimerID)
+      menuNativeTimerID := 0
+   }
+   If (menusflyOutVisible=1)
+      SetTimer, hideMenuFlyOut, -35
    If hLLmouseHook
    {
       DllCall("user32\UnhookWindowsHookEx", "Ptr", hLLmouseHook)
@@ -338,6 +355,35 @@ uiRefreshBarAttachments() {
    menuJITmap := newMap
    If (repaired)
       OutputDebug, % "QPVMERGE: bar attachments repaired: " repaired
+}
+
+uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
+; TIMERPROC [raw callback, p7-proven class] fired BY the modal menu loop every
+; ~90ms: shows/repositions the menuFlier flyout under the visible menu window.
+; Pass "reset" as the first argument to clear the position memo between sessions.
+   Critical
+   Static prevKey := ""
+   If (hwnd="reset")
+   {
+      prevKey := ""
+      Return
+   }
+   If (menuLoopActive!=1 || allowMenuReader!="yes")
+      Return
+   a := uiVisibleMenuWin()
+   If !a
+      Return
+   If (wasMenuFlierCreated!=1)
+      guiCreateMenuFlyout()
+   WinGetPos, mX, mY, , Height, ahk_id %a%
+   keyu := a "-" mX "-" mY "-" Height
+   If (keyu = prevKey)
+      Return
+   prevKey := keyu
+   menusflyOutVisible := 1
+   y := mY + Round(Height) + 2
+   If (mX!="" && y!="")
+      Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
 }
 
 uiMenuMouseLL(nCode, wP, lP) {
