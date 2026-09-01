@@ -21,6 +21,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
+     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -40,6 +41,8 @@ initInterfaceModule() {
    menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuCurrentIndex := 0, menuTotalIndex := 0
    winGDIcreated := 0, ThumbsWinGDIcreated := 0, uiMouseTipWinCreated := 0, uiLastTippyWin := ""
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
+   menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
+   menuLoopActive := 0, uiMenuReaderLastMsg := ""
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -71,6 +74,16 @@ initInterfaceModule() {
          Continue
       OnMessage(255+A_Index, "PreventKeyPressBeep")
    }
+
+   ; [phase D] permanent same-thread WH_CALLWNDPROC hook [probes p7/p8]: receives
+   ; the SENT menu messages during modal menu loops - where OnMessage monitors,
+   ; timers and hotkey subroutines never run - and powers the JIT dropdown
+   ; rebuilds, the menu reader and the menu-scoped wheel hook install
+   Static cbCWP := 0
+   If !cbCWP
+      cbCWP := RegisterCallback("uiCallWndProc", "F")
+   If !hCWPhook
+      hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "Ptr", cbCWP, "Ptr", 0, "UInt", DllCall("GetCurrentThreadId"), "Ptr")
 
    ; numbers both sides monitored - composed dispatchers [see below]
    OnMessage(0x100, "dispatchKeyDown")
@@ -150,6 +163,158 @@ dispatchMouseWheel(wP, lP, msg, hwnd) {
    If isUIrootWin(hwnd)
       Return WM_MOUSEWHEEL(wP, lP, msg, hwnd)
    Return adjustWheelNumbersEditFields(wP, lP, msg)  ; it declares 3 params [the loader enforces arity on direct calls; monitors never did]
+}
+
+; ______ native menu machinery [merge phase D] ______
+; The menu bar carries REAL attached submenus [BuildMenuBar], so hover-switching,
+; F10 and Alt-accelerators are native. Dropdown content is rebuilt just-in-time
+; when Windows sends WM_INITMENUPOPUP, and the reader announcements ride
+; WM_MENUSELECT - both received by the permanent same-thread WH_CALLWNDPROC hook
+; below, because during any same-interpreter menu modal loop OnMessage monitors,
+; timers and hotkey subroutines NEVER run [probe rounds 1-2], while raw Win32
+; callbacks do [probes p7/p8/p11/p13]. The in-menu wheel rides a menu-scoped
+; WH_MOUSE_LL hook [p13]. CWPSTRUCT is REVERSED: lParam@0, wParam@PtrSize,
+; message@2*PtrSize, hwnd@3*PtrSize.
+
+uiMenuNameForBuilder(suffix) {
+; every InvokeMenuBar<suffix> builder rebuilds exactly one named menu - extracted
+; from the builders' own showThisMenu tails at phase D
+   Static mapu := {"File":"pvMenuBarFile", "Edit":"pvMenuBarEdit", "Selection":"pvMenuBarSelection"
+      , "Image":"pvMenuBarImage", "Captions":"PVsounds", "Slides":"PVslide", "Find":"pvMenuBarFind"
+      , "List":"pvMenuBarList", "Sort":"PVsort", "Navigate":"PVnav", "View":"PVview"
+      , "Interface":"PvUIprefs", "Settings":"PVprefs", "Help":"PVhelp"
+      , "EditorFile":"pvMenuBarFile", "EditorSelection":"PVselv", "EditorTools":"PVlTools"
+      , "AlphaMask":"PValpha", "VectorFile":"pvMenuBarFile", "VectorEdit":"pvMenuBarEdit"
+      , "VectorSelection":"pvMenuBarSelection", "VectorView":"pvMenuBarView", "VectorInterface":"PvUIprefs"}
+   Return mapu.HasKey(suffix) ? mapu[suffix] : ""
+}
+
+uiCallWndProc(nCode, wP, lP) {
+   Critical
+   If (nCode >= 0)
+   {
+      msg := NumGet(lP+0, 2*A_PtrSize, "UInt")
+      If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
+         uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "Ptr"))
+      Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
+         uiMenuJITrebuild(NumGet(lP+0, A_PtrSize, "UPtr"))
+      Else If (msg=0x211) ; WM_ENTERMENULOOP
+         uiMenuLoopEnter()
+      Else If (msg=0x212) ; WM_EXITMENULOOP
+         uiMenuLoopExit()
+   }
+   Return DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+}
+
+uiMenuJITrebuild(hMenu) {
+   Static busy := 0
+   If (busy=1 || !IsObject(menuJITmap) || !menuJITmap.HasKey(hMenu))
+      Return
+   busy := 1
+   funcu := menuJITmap[hMenu]
+   OutputDebug, % "QPVMERGE: menu JIT rebuild " funcu
+   If (VisibleQuickMenuSearchWin=1)
+      Try closeQuickSearch()
+   uiMouseTurnOFFtooltip()
+   lastOtherWinClose := A_TickCount
+   ; justBuild=1: refresh the dropdown content in place, no Menu-Show - the popup
+   ; Windows is about to display IS this menu [the builders use DeleteAll, which
+   ; keeps the HMENU alive - a whole-menu Delete would orphan the bar attachment]
+   Try
+   {
+      If (funcu="InvokeMenuBarVectorView")
+         InvokeMenuBarVectorView(0, 0, 1)   ; its 2nd parameter is modus, not justBuild
+      Else
+         %funcu%(0, 1)
+   }
+   Catch weh
+      OutputDebug, % "QPVMERGE: menu JIT rebuild FAILED for " funcu ": " weh.message
+   busy := 0
+}
+
+uiMenuSelectTrack(mwParam, hMenuSel) {
+   item := mwParam & 0xFFFF
+   flags := (mwParam >> 16) & 0xFFFF
+   If (flags=0xFFFF && !hMenuSel)  ; the menu was dismissed
+      Return
+   lastMenuHoverZeit := A_TickCount
+   If (allowMenuReader!="yes" || !hMenuSel)
+      Return
+   VarSetCapacity(bufu, 520, 0)
+   If (flags & 0x10)  ; MF_POPUP: the loword is the item POSITION
+      DllCall("user32\GetMenuStringW", "Ptr", hMenuSel, "UInt", item, "Ptr", &bufu, "Int", 255, "UInt", 0x400)
+   Else               ; otherwise the loword is the command id
+      DllCall("user32\GetMenuStringW", "Ptr", hMenuSel, "UInt", item, "Ptr", &bufu, "Int", 255, "UInt", 0x000)
+   txt := StrGet(&bufu, "UTF-16")
+   If !StrLen(txt)
+      Return
+   accel := ""
+   If InStr(txt, "`t")
+   {
+      p := StrSplit(txt, "`t")
+      txt := p[1], accel := p[2]
+   }
+   msgu := StrReplace(txt, "&")
+   If (flags & 0x10)
+      msgu .= " [submenu]"
+   If (flags & 0x3)   ; MF_GRAYED / MF_DISABLED
+      msgu .= " [unavailable]"
+   If (flags & 0x8)   ; MF_CHECKED
+      msgu .= " [checked]"
+   If accel
+      msgu .= "`nShortcut: " accel
+   uiMenuReaderLastMsg := msgu
+   uiMouseCreateOSDinfoLine(msgu, 1)
+   uiShowOSDinfoLineNow(1500)
+}
+
+uiMenuLoopEnter() {
+   menuLoopActive := 1
+   If !hLLmouseHook
+   {
+      Static cbLL := 0
+      If !cbLL
+         cbLL := RegisterCallback("uiMenuMouseLL", "F")
+      hLLmouseHook := DllCall("SetWindowsHookEx", "Int", 14, "Ptr", cbLL, "Ptr", DllCall("GetModuleHandle", "Ptr", 0, "Ptr"), "UInt", 0, "Ptr")
+   }
+}
+
+uiMenuLoopExit() {
+   menuLoopActive := 0
+   If hLLmouseHook
+   {
+      DllCall("user32\UnhookWindowsHookEx", "Ptr", hLLmouseHook)
+      hLLmouseHook := 0
+   }
+   If (allowMenuReader="yes")
+      uiMouseTurnOFFtooltip()
+}
+
+uiMenuMouseLL(nCode, wP, lP) {
+; menu-scoped low-level mouse hook [probe p13]: while a menu of this process is
+; visible, the wheel moves the highlight [eat the hardware event, post key-downs
+; the modal loop consumes - p13 proved menus accept queue-posted key-downs] and
+; RButton re-announces for the reader. Installed only between WM_ENTERMENULOOP
+; and WM_EXITMENULOOP; the callback must stay minimal [system-wide hook budget].
+   Critical
+   If (nCode=0 && menuLoopActive=1)
+   {
+      If (wP=0x20A && uiVisibleMenuWin())
+      {
+         delta := NumGet(lP+0, 8, "Int") >> 16
+         vk := (delta > 0) ? 0x26 : 0x28
+         DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
+         DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
+         DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
+         Return 1
+      } Else If (wP=0x205 && allowMenuReader="yes" && uiVisibleMenuWin() && StrLen(uiMenuReaderLastMsg)>1)
+      {
+         uiMouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
+         uiShowOSDinfoLineNow(1500)
+         Return 1
+      }
+   }
+   Return DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
 }
 
 ; ______ liveness shims [merge phase C] ______
@@ -1947,21 +2112,6 @@ guiCreateMenuFlyout() {
    wasMenuFlierCreated := 1
 }
 
-highLightMenuBar() {
-    hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
-    If !hMenuBar
-       uiAddJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
-
-    hMenuBar := "0x" Format("{:x}", hMenuBar)
-    rect := GetMenuItemRect(PVhwnd, hMenuBar, menuCurrentIndex - 1)
-    mX := Trim(rect.left)
-    mY := Trim(rect.bottom)
-    mYz := Trim(rect.top)
-    mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
-    mW := max(rect.left, rect.right) - min(rect.left, rect.right)
-    ShowClickHalo(mX, mYz, mW, mH, 1, menarg, 1)
-}
-
 menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    Critical, on
    lastOtherWinClose := A_TickCount
@@ -1976,7 +2126,6 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    If (idu="reset")
       menuCurrentIndex := 0
    Else
-     SetTimer, highLightMenuBar, -50
 
    If (!isOkay && actu="yes")
       Return
@@ -2129,60 +2278,16 @@ turnOffSlideshow() {
    lastOtherWinClose := A_TickCount
 }
 
-changeMenusBarKbd(keyu) {
-   ; Static lastItem := 1
-   If ((A_TickCount - lastMenuHoverZeit<300) || (menuCurrentIndex))
-   {
-      Sleep, 25
-      msgu := constantMenuReader("focused", 1)
-      WinGet, menus, List , % "ahk_class #32768 ahk_pid " QPVpid
-      visibleMenus := 0  ; [merge] under DHW-On the list includes the process' hidden menu window
-      Loop, % menus
-          visibleMenus += DllCall("user32\IsWindowVisible", "UPtr", menus%A_Index%) ? 1 : 0
-      If (keyu="left" && visibleMenus>1)
-      {
-         SendInput, {%keyu%}
-      } Else If (InStr(msgu, "submenu container") && keyu="right")
-      {
-         SendInput, {%keyu%}
-      } ELse
-      {
-         If menuCurrentIndex
-            thisu := (keyu="Right") ? menuCurrentIndex + 1 : menuCurrentIndex - 1
-         Else
-            thisu := (keyu="Right") ? prevMenuBarItem + 1 : prevMenuBarItem - 1
-
-         n := clampInRange(thisu, 1, menuTotalIndex, 1)
-         ; ToolTip, % keyu "==" funcu "=" n "|" menuCurrentIndex "|" lastItem , , , 2
-         prevMenuBarItem := n
-         funcu := menuArray[n, 2]
-         If IsFunc(funcu)
-         {
-            lastMenuZeit := A_TickCount
-            SendInput, {F10}
-            Sleep, 15
-            %funcu%(0, n)
-         } Else
-            SendInput, {%keyu%}
-      }
-   } Else
-   {
-      SendInput, {%keyu%}
-      ; SoundBeep , 300, 100
-      ; ToolTip, % keyu "==" menuCurrentIndex , , , 2
-   }
-}
-
 invokeGivenMenuBarPopup(n) {
+; [phase D] menuArray[n,2] now holds the ":menuName" submenu attachment, so the
+; builder comes from menuJITlist instead; the builder shows at the bar-item rect
+; itself [showThisMenu manubarMode], no F10 focus dance needed
    n := clampInRange(n, 1, menuTotalIndex, 1)
-   funcu := menuArray[n, 2]
+   funcu := menuJITlist[n]
    If IsFunc(funcu)
    {
-      ; ToolTip, % keyu "==" funcu , , , 2
       lastMenuZeit := A_TickCount
-      SendInput, {F10}
-      Sleep, 15
-      %funcu%(0, n)
+      %funcu%(n)
    }
 }
 
@@ -2228,6 +2333,7 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
    menuArray := []
    menuTotalIndex := 0
    menuHotkeys := "|"
+   menuJITmap := {}, menuJITlist := []  ; [phase D] HMENU -> builder map for the WM_INITMENUPOPUP hook
    If (applyFilter=1)
    {
       Menu, PVbar, Add, >>, dummy
@@ -2245,9 +2351,30 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
       n := SubStr(k[1], 1, 1)
       n2 := SubStr(k[1], 2, 1)
       lbl := (forbiddenAltKeys(n) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
-      rr := uiKmenu(lbl, "invokeMenuBarItem", hMenuBar, applyFilter)
+      ; [phase D] every bar item carries its REAL dropdown as an attached submenu, so
+      ; Windows provides hover-switching, F10 and Alt-accelerators natively; the
+      ; dropdown content is rebuilt just-in-time by the WM_INITMENUPOPUP hook via
+      ; menuJITmap [see uiCallWndProc / uiMenuJITrebuild]. The old flow [bar click ->
+      ; invokeMenuBarItem -> post -> builder -> Menu Show] and its MSAA hover
+      ; machinery are gone.
+      suffix := k[2]
+      menaName := uiMenuNameForBuilder(suffix)
+      hSub := 0
+      Try hSub := MenuGetHandle(menaName)
+      If !hSub
+      {
+         Menu, % menaName, Add, building the menu..., dummy
+         Try hSub := MenuGetHandle(menaName)
+      }
+      rr := uiKmenu(lbl, ":" menaName, hMenuBar, applyFilter)
       If (rr=-1)
          Break
+
+      If hSub
+      {
+         menuJITmap[hSub] := "InvokeMenuBar" suffix
+         menuJITlist.Push("InvokeMenuBar" suffix)
+      }
 
       If !InStr(lbl, "&")
       {
@@ -2273,51 +2400,6 @@ forbiddenAltKeys(n) {
       Return isVarEqualTo(n, "e","u")
    Else
       Return isVarEqualTo(n, "a","e","u","p","r","y","g")
-}
-
-invokeMenuBarItem(a,b) {
-   Static lastInvoked, lastItem
-   If (runningLongOperation!=1 && imageLoading=1 && animGIFplaying!=1)
-   || (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
-   {
-      Sleep, -1
-      Return
-   } Else If (animGIFplaying=1)
-   {
-      lastOtherWinClose := A_TickCount
-      If (slideShowRunning=1)
-         turnOffSlideshow()
-
-      stopGiFsPlayback()
-   } Else If (slideShowRunning=1)
-   {
-      lastOtherWinClose := A_TickCount
-      turnOffSlideshow()
-   }
-
-   ; ToolTip, % a "\" b "\" menuCurrentIndex , , , 2
-   If (!determineMenuBTNsOKAY() || menuCurrentIndex=b)
-      Return
-
-   lastMenuZeit := A_TickCount
-   funcu := "InvokeMenuBar"
-   Loop, Parse, menusList, |
-   {
-      If (A_Index!=b)
-         Continue
-
-      k := StrSplit(A_LoopField, ":")
-      funcu .= k[2]
-   }
-
-   If (lastItem=b && (A_TickCount - lastInvoked<125))
-      Return
- 
-   lastItem := b
-   Global menuCurrentIndex := b
-   lastInvoked := A_TickCount
-   MT_post(funcu, b)
-   SetTimer, findMenuBarItemUnderMouse, 60
 }
 
 simpleGetMenuItemRect(hwnd, hMenuBar, indexu, ByRef mX, ByRef mY, ByRef mW, ByRef mH) {
@@ -2354,54 +2436,6 @@ uiKmenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVbar", actu:="Add") {
       menuArray[menuTotalIndex] := [t, funcu, labelu, "Enable"]
       menuArray[t] := [funcu, menuTotalIndex, labelu]
       ; fnOutDebug(A_ThisFunc "(" menuTotalIndex "): " mX + mW "|" mY "||" mW "|" mH "||" mainWidth)
-   }
-}
-
-findMenuBarItemUnderMouse() {
-   Static prevLabel, lastH := 1, lastY := 1
-   If (!identifyMenus() && (A_TickCount - lastMenuZeit>700))
-   {
-      ; ToolTip, % "killed" , , , 3
-      menuCurrentIndex := 0
-      prevMenuBarItem := 1
-      SetTimer, findMenuBarItemUnderMouse, Off
-      Return
-   }
-
-   lastMenuHoverZeit := A_TickCount
-   Try MouseGetPos, ,, WinID
-   If (WinID!=PVhwnd)
-      Return
-
-   GetPhysicalCursorPos(x, y)
-   AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
-   If !(accIRole=12 && accFocusName)
-   {
-      If isInRange(y, lastY - lastH, lastY + lastH)
-      {
-         y := lastY
-         AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
-      }
-   }
-
-   If (accIRole=12 && accFocusName && prevLabel!=accFocusName)
-   {
-      lastY := coords.y + coords.h//2
-      lastH := coords.h
-      prevLabel := accFocusName
-      t := StrReplace(accFocusName, "&")
-      funcu := menuArray[t, 1]
-      idu := menuArray[t, 2]
-      ; ToolTip, % accFocusName "==" funcu "==" t , , , 2
-      If (IsFunc(funcu) && idu!=menuCurrentIndex)
-      {
-         prevMenuBarItem := idu
-         lastMenuZeit := A_TickCount
-         SendInput, {F10}
-         Sleep, 15
-         ; ToolTip, % idu "=l" , , , 2
-         %funcu%(0, idu)
-      }
    }
 }
 
@@ -2469,14 +2503,6 @@ UpdateMenuBar(modus:=0, tt:=0) {
    prevState := thisState
    ; updateTlbrPosition()
    SetTimer, updateTlbrPosition, -300
-}
-
-determineMenuBTNsOKAY() {
-   ; ToolTip, % imageLoading "==" runningLongOperation "==" AnyWindowOpen "==" menuCurrentIndex , , , 2
-   If (imageLoading=1 || runningLongOperation=1) || (AnyWindowOpen && imgEditPanelOpened!=1)
-      Return 0
-   Else
-      Return 1
 }
 
 VarContainsThis(value, vals*) {
@@ -2647,13 +2673,6 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     ; TulTip("|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
 }
 
-SendMenuTabKey() {
-   Static prevState := 0
-   prevState := !prevState
-   keyu := prevState ? "{Right}" : "{Left}"
-   SendInput, % keyu
-}
-
 uiVisibleMenuWin() {
 ; [merge] The main script runs DetectHiddenWindows ON, and a HIDDEN #32768 window
 ; persists in the process once any menu has ever shown - probing without a
@@ -2672,132 +2691,10 @@ identifyMenus(){
    Return uiVisibleMenuWin() ? 1 : 0
 }
 
-#If, (identifyMenus() && allowMenuReader="yes")
-   RButton::
-      constantMenuReader("rbutton")
-   Return
-
-   ~WheelDown::
-   ~PgDn::
-      SendInput, {Down 3}
-   Return
-
-   ~WheelUp::
-   ~PgUp::
-      SendInput, {Up 3}
-   Return
-
-   Left::
-   Right::
-      changeMenusBarKbd(A_ThisHotkey)
-   Return
-
-   Space::
-      constantMenuReader("focused")
-      ; SendInput, {Enter}
-   Return
-
-   ~BackSpace::
-      SendInput, {Left}
-   Return
-
-   F1::
-      If (!AnyWindowOpen && drawingShapeNow!=1)
-      {
-         SendInput, {F10}
-         MT_post("PanelHelpWindow")
-      }
-   Return
-
-   +F10::
-      If (menusflyOutVisible=1 || drawingShapeNow=1)
-      {
-         SendInput, {F10}
-         uiToggleAppToolbar()
-      }
-   Return
-
-   vkBA::    ;  [ ; ]
-      If (menusflyOutVisible=1)
-      {
-         SendInput, {F10}
-         uiPanelQuickSearchMenuOptions()
-      }
-   Return
-
-   ~Tab::
-      SendMenuTabKey()
-   Return
-#If
-
-constantMenuReader(modus:=0, externMode:=0) {
-   Static prevLabel := "z"
-   If (uiMouseTipWinCreated=1)
-   {
-      uiMouseTurnOFFtooltip()
-      Return
-   }
-
-   GetPhysicalCursorPos(x, y)
-   ; ToolTip, % winID "`n" OutputVarWin , , , 2
-   If (modus="focused")
-   {
-      ; WinID := WinActive("A")
-      ; WinID := DllCall("GetFocus", "ptr")
-      ; If !WinID
-      ;    WinID := DllCall("GetForegroundWindow", "ptr")
-      ; WinID := "0x" Format("{:x}", WinID)
-      ; winChild := WinEnumChild(WinID)
-
-      WinID := uiVisibleMenuWin()
-      AccFromFocused(WinID, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
-   } Else
-      AccInfoUnderMouse(x, y, accFocusValue, accFocusName, accIRole, accRole, styleu, strstyles, shortcut, coords)
-
-   ; goodText := accFocusValue ? accFocusValue : accFocusName
-   ; goodRoles := (accIRole=41 || accIRole=42 || accIRole=46) ? 1 : 0
-   ; ToolTip, % goodText "=" goodRoles "==" WinID "==" winChild.count() , , , 2
-   If (accIRole=12 && accFocusName && (prevLabel!=accFocusName || uiMouseTipWinCreated!=1 || externMode=1))
-   {
-      prevLabel := accFocusName
-      msgu := StrReplace(accFocusName, "`t", "`n[ ")
-      If InStr(accFocusName, "`t")
-         msgu .= " ]"
-
-      If InStr(strstyles, "0x00000001")
-         msgu .= "`nITEM DISABLED"
-      Else If shortcut
-         msgu := "&" Format("{:U}", shortcut) ": " msgu
-
-      If InStr(strstyles, "0x00000010")
-         msgu .= InStr(msgu, "item disabled") ? " AND CHECKED" : "`nITEM CHECKED"
-      If InStr(strstyles, "0x40000000")
-         msgu .= "`nSUBMENU CONTAINER"
-
-      If !externMode
-         ShowClickHalo(coords.x, coords.y, coords.w, coords.h, 1, accFocusName)
-
-      If !externMode
-         uiMouseCreateOSDinfoLine(msgu, PrefsLargeFonts, 0, coords)
-      Else
-         Return msgu
-      ; ToolTip, % accFocusName , , , 2
-      ; MT_post("showtooltip", accFocusName)
-   } Else If (modus="RButton")
-   {
-      Try MouseGetPos, ,, WinID
-      WinGetClass, OutputVar, ahk_id %WinID%
-      If !InStr(OutputVar, "#32768")
-         SendInput, {F10}
-   }
-
-   SetTimer, repeatMenuInfosPopup, -150
-}
-
-repeatMenuInfosPopup() {
-   If GetKeyState("RButton", "P")
-      constantMenuReader()
-}
+; [phase D] the menu-reader #If hotkey block is gone: hotkey subroutines never
+; run during same-interpreter menu loops [probe p4], so it could not function
+; after the merge. Its features ride the hooks now: wheel + RButton-announce via
+; uiMenuMouseLL, announcements via uiMenuSelectTrack, native Left/Right/F10.
 
 mouseClickTurnOFFtooltip() {
     SetTimer, uiMouseTurnOFFtooltip, -50
@@ -4308,75 +4205,6 @@ uiRepositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos
 
 }
 
-Acc_ObjectFromWindow(hWnd, idObject = 0) {
-  SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " hwnd
-  If DllCall("oleacc\AccessibleObjectFromWindow", "Ptr", hWnd, "UInt", idObject&=0xFFFFFFFF
-    , "Ptr", -VarSetCapacity(IID,16)+NumPut(idObject==0xFFFFFFF0?0x46000000000000C0:0x719B3800AA000C81
-    ,NumPut(idObject==0xFFFFFFF0?0x0000000000020400:0x11CF3C3D618736E0,IID,"Int64"),"Int64"), "Ptr*", pacc)=0
-    Return ComObjEnwrap(9,pacc,1)
-}
-
-AccFromFocused(hwnd, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut, byref coords) {
-  Static WM_GETOBJECT := 0x003D, hLibrary := 0
-  If !hLibrary
-     hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
-
-  SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " hwnd
-  AccObj := Acc_ObjectFromWindow(hwnd)
-  Try While IsObject(AccObj.accFocus)
-  {
-    AccObj := AccObj.accFocus
-  }
-
-  Try
-  {
-     child := AccObj.accFocus
-     ; ChildCount := AccObj.accChildCount
-     Name := AccObj.accName(child)
-     Val := AccObj.accValue(child)
-     RoleChild := AccObj.accRole(child)
-     shortcut := AccObj.accKeyboardShortCut(child)
-     AccState(AccObj, child, styleu, strstyles)
-     coords := AccGetLocation(AccObj, child)
-     ; ToolTip, % coords.x "==" coords.y , , , 2
-  }
-}
-
-Acc_ObjectFromPoint(ByRef idChild:="", mx:="", my:="") {
-    Try z := DllCall("oleacc\AccessibleObjectFromPoint", "Int64", mx & 0xFFFFFFFF | my << 32, "Ptr*", pacc, "Ptr", VarSetCapacity(varChild,8+2*A_PtrSize,0)*0+&varChild)
-    If (z=0)
-    {
-       Try g := ComObjEnwrap(9,pacc,1)
-       idChild := NumGet(varChild,8,"UInt")
-    }
-    Return g
-}
-
-AccInfoUnderMouse(mx, my, byref val, byref name, byref RoleChild, byref RoleParent, byref styleu, byref strstyles, byref shortcut, byref coords) {
-  Static hLibrary, WM_GETOBJECT := 0x003D  
-  If !hLibrary
-     hLibrary := DllCall("LoadLibrary", "Str", "oleacc", "Ptr")
-
-  AccObj := Acc_ObjectFromPoint(child, mx, my)
-  If !IsObject(AccObj)
-     Return
-
-  ; SendMessage, WM_GETOBJECT, 0, 1, Chrome_RenderWidgetHostHWND1, % "ahk_id " WinID
-  Try
-  {
-     ; ChildCount := AccObj.accChildCount
-     Name := AccObj.accName(child)
-     Val := AccObj.accValue(child)
-     RoleChild := AccObj.accRole(child)
-     shortcut := AccObj.accKeyboardShortCut(child)
-     AccState(AccObj, child, styleu, strstyles)
-     coords := AccGetLocation(AccObj, child)
-     ; ToolTip, % coords.x "==" coords.y , , , 2
-  }
-  ; RoleParent := AccObj.accRole()
-  Return ; ChildCount name val RoleChild RoleParent
-}
-
 AccGetLocation(Acc, ChildId=0) {
   Static x := 0, y := 0, w := 0, h := 0
   coord := []
@@ -4385,28 +4213,6 @@ AccGetLocation(Acc, ChildId=0) {
   coord.w := NumGet(w,0,"int"),  coord.h := NumGet(h,0,"int")
   ; AccCoord[1]:=NumGet(x,0,"int"), AccCoord[2]:=NumGet(y,0,"int"), AccCoord[3]:=NumGet(w,0,"int"), AccCoord[4]:=NumGet(h,0,"int")
   Return coord
-}
-
-AccState(Acc, child, byref style, byref str, i := 1) {
-  ;;  https://docs.microsoft.com/ru-ru/windows/desktop/WinAuto/object-state-constants
-  ;;  http://forum.script-coding.com/viewtopic.php?pid=130762#p130762
-  style := Format("0x{1:08X}", Acc.accState(child))
-  If (style=0)
-     Return AccGetStateText(0)
-
-  While (i <= style)
-  {
-    if (i & style)
-      str .= AccGetStateText(i) "=" Format("0x{1:08X}", i) "`n"
-    i <<= 1
-  }
-}
-
-AccGetStateText(nState) {
-  nSize := DllCall("oleacc\GetStateText", "UInt", nState, "Ptr", 0, "UInt", 0)
-  VarSetCapacity(sState, (A_IsUnicode?2:1)*nSize)
-  DllCall("oleacc\GetStateText", "UInt", nState, "str", sState, "UInt", nSize+1)
-  Return sState
 }
 
 

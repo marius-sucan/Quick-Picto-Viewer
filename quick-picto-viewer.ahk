@@ -66158,9 +66158,9 @@ createMenuImageEditSubMenus(modus:=0) {
    }
 }
 
-InvokeMenuBarVectorFile(manuID) {
+InvokeMenuBarVectorFile(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarFile, Delete
+   Try Menu, pvMenuBarFile, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    kMenu("pvMenuBarFile", "Add", "Vector drawing mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Vector drawing mode")
@@ -66175,19 +66175,21 @@ InvokeMenuBarVectorFile(manuID) {
    Menu, pvMenuBarFile, Add
    kMenu("pvMenuBarFile", "Add", "&Apply / done`tEnter", "stopDrawingShape")
    kMenu("pvMenuBarFile", "Add", "&Exit pen tool mode`tEscape", "MenuCancelDrawingShape")
-   showThisMenu("pvMenuBarFile", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarFile", 0, 1, manuID)
 }
 
-InvokeMenuBarVectorInterface(manuID) {
+InvokeMenuBarVectorInterface(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuInterfaceOptions()
-   showThisMenu("PvUIprefs", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PvUIprefs", 0, 1, manuID)
 }
 
-InvokeMenuBarVectorView(manuID, modus:=0) {
+InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
    If (modus!="extern")
       deleteMenus()
-   Try Menu, pvMenuBarView, Delete
+   Try Menu, pvMenuBarView, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    createMenuImgSizeAdapt()
    kMenu("pvMenuBarView", "Add", "Zoom adapt modes", ":PvImgAdapt")
@@ -66216,12 +66218,13 @@ InvokeMenuBarVectorView(manuID, modus:=0) {
       kMenu("pvMenuBarView", "Check", "Allo&w outside viewport image panning")
 
    If (modus!="extern")
-      showThisMenu("pvMenuBarView", 0, 1, manuID)
+      If (justBuild!=1)
+         showThisMenu("pvMenuBarView", 0, 1, manuID)
 }
 
-InvokeMenuBarVectorSelection(manuID) {
+InvokeMenuBarVectorSelection(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarSelection, Delete
+   Try Menu, pvMenuBarSelection, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    kMenu("pvMenuBarSelection", "Add", "Select all points`tCtrl+A", "MenuSelAllVectorPoints")
    kMenu("pvMenuBarSelection", "Add", "Total points: " groupDigits(customShapePoints.count()), "dummy")
@@ -66242,12 +66245,13 @@ InvokeMenuBarVectorSelection(manuID) {
       }
    }
 
-   showThisMenu("pvMenuBarSelection", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarSelection", 0, 1, manuID)
 }
 
-InvokeMenuBarVectorEdit(manuID) {
+InvokeMenuBarVectorEdit(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarEdit, Delete
+   Try Menu, pvMenuBarEdit, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    undos := undoVectorShapesLevelsArray.Count()
    If (currentVectorUndoLevel>1 || undos>1)
@@ -66281,12 +66285,13 @@ InvokeMenuBarVectorEdit(manuID) {
    If (closedLineCustomShape=0)
       kMenu("pvMenuBarEdit", "Check", "&Open ended path`tO")
 
-   showThisMenu("pvMenuBarEdit", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarEdit", 0, 1, manuID)
 }
 
-InvokeMenuBarEditorFile(manuID) {
+InvokeMenuBarEditorFile(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarFile, Delete
+   Try Menu, pvMenuBarFile, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    kMenu("pvMenuBarFile", "Add", "Live tool mode", "dummy")
    kMenu("pvMenuBarFile", "Disable", "Live tool mode")
@@ -66319,12 +66324,13 @@ InvokeMenuBarEditorFile(manuID) {
          kMenu("pvMenuBarFile", "Disable", "&Explore containing folder")
    }
 
-   showThisMenu("pvMenuBarFile", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarFile", 0, 1, manuID)
 }
 
-InvokeMenuBarFile(manuID) {
+InvokeMenuBarFile(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarFile, Delete
+   Try Menu, pvMenuBarFile, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
    createMenuOpenRecents("simple")
    createMenuFavourites()
    If (thumbsDisplaying!=1)
@@ -66424,12 +66430,13 @@ InvokeMenuBarFile(manuID) {
       kMenu("pvMenuBarFile", "Add", "Close ima&ge and files list`tCtrl+F4", "closeDocuments", "reset")
    kMenu("pvMenuBarFile", "Add", "Restart`tShift+Esc", "restartAppu", "close renew")
    kMenu("pvMenuBarFile", "Add", "Exit`tEscape", "exitAppu", "close")
-   showThisMenu("pvMenuBarFile", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarFile", 0, 1, manuID)
 }
 
-InvokeMenuBarEdit(manuID) {
+InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarEdit, Delete
+   Try Menu, pvMenuBarEdit, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    infoImgEditingNow := isImgEditingNow()
    If (thumbsDisplaying!=1)
@@ -66601,10 +66608,11 @@ InvokeMenuBarEdit(manuID) {
       }
    }
 
-   showThisMenu("pvMenuBarEdit", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarEdit", 0, 1, manuID)
 }
 
-InvokeMenuBarEditorSelection(manuID) {
+InvokeMenuBarEditorSelection(manuID:=0, justBuild:=0) {
    deleteMenus()
    infoImgEditingNow := isImgEditingNow()
    kMenu("PVselv", "Add", "&Undo`tCtrl+Shift+Z", "ImgSelUndoAct")
@@ -66698,12 +66706,13 @@ InvokeMenuBarEditorSelection(manuID) {
       kMenu("PVselv", "Add", "&Activate selection mode`tCtrl+K", "toggleAlphaPaintingMode")
    }
 
-   showThisMenu("PVselv", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVselv", 0, 1, manuID)
 }
 
-InvokeMenuBarSelection(manuID) {
+InvokeMenuBarSelection(manuID:=0, justBuild:=0) {
    deleteMenus()
-   Try Menu, pvMenuBarSelection, Delete
+   Try Menu, pvMenuBarSelection, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
 
    If (thumbsDisplaying=1)
    {
@@ -66795,12 +66804,13 @@ InvokeMenuBarSelection(manuID) {
          kMenu("pvMenuBarSelection", "Disable", friendly " file`tTab")
    }
 
-   showThisMenu("pvMenuBarSelection", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("pvMenuBarSelection", 0, 1, manuID)
 }
 
-InvokeMenuBarImage(manuID) {
+InvokeMenuBarImage(manuID:=0, justBuild:=0) {
   deleteMenus()
-  Try Menu, pvMenuBarImage, Delete
+  Try Menu, pvMenuBarImage, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
   infoImgEditingNow := isImgEditingNow()
   If (infoImgEditingNow=1)
   {
@@ -66911,12 +66921,13 @@ InvokeMenuBarImage(manuID) {
      kMenu("pvMenuBarImage", "Add", "No image loaded", "dummy")
      kMenu("pvMenuBarImage", "Disable", "No image loaded")
   }
-  showThisMenu("pvMenuBarImage", 0, 1, manuID)
+  If (justBuild!=1)
+     showThisMenu("pvMenuBarImage", 0, 1, manuID)
 }
 
-InvokeMenuBarFind(manuID) {
+InvokeMenuBarFind(manuID:=0, justBuild:=0) {
   deleteMenus()
-  Try Menu, pvMenuBarFind, Delete
+  Try Menu, pvMenuBarFind, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
   If (maxFilesIndex>1)
   {
      kMenu("pvMenuBarFind", "Add", "Searc&h index`tCtrl+F3", "PanelSearchIndex", "files list")
@@ -66963,18 +66974,20 @@ InvokeMenuBarFind(manuID) {
      kMenu("pvMenuBarFind", "Disable", "Insufficient files indexed")
   }
 
-  showThisMenu("pvMenuBarFind", 0, 1, manuID)
+  If (justBuild!=1)
+     showThisMenu("pvMenuBarFind", 0, 1, manuID)
 }
 
-InvokeMenuBarList(manuID) {
+InvokeMenuBarList(manuID:=0, justBuild:=0) {
   deleteMenus()
-  Try Menu, pvMenuBarList, Delete
+  Try Menu, pvMenuBarList, DeleteAll ; [phase D] keep the HMENU alive - the bar attachment and the JIT map point at it
   showThese := (StrLen(mustOpenStartFolder)>1 || maxFilesIndex>1) ? 1 : 0
   If (showThese!=1)
   {
      kMenu("pvMenuBarList", "Add", "Insufficient files indexed", "dummy")
      kMenu("pvMenuBarList", "Disable", "Insufficient files indexed")
-     showThisMenu("pvMenuBarList", 0, 1, manuID)
+     If (justBuild!=1)
+        showThisMenu("pvMenuBarList", 0, 1, manuID)
      Return
   }
 
@@ -67028,10 +67041,11 @@ InvokeMenuBarList(manuID) {
      If !InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
         kMenu("pvMenuBarList", "Add", "&Identify favourited images", "findFavesInList", "faved faves stared")
   }
-  showThisMenu("pvMenuBarList", 0, 1, manuID)
+  If (justBuild!=1)
+     showThisMenu("pvMenuBarList", 0, 1, manuID)
 }
 
-InvokeMenuBarView(manuID) {
+InvokeMenuBarView(manuID:=0, justBuild:=0) {
   deleteMenus()
   If (isImgEditingNow() || thumbsDisplaying=1 && maxFilesIndex>0)
   {
@@ -67041,73 +67055,84 @@ InvokeMenuBarView(manuID) {
      kMenu("PVview", "Add", "No image loaded", "dummy")
      kMenu("PVview", "Disable", "No image loaded")
   }
-  showThisMenu("PVview", 0, 1, manuID)
+  If (justBuild!=1)
+     showThisMenu("PVview", 0, 1, manuID)
 }
 
-InvokeMenuBarEditorTools(manuID) {
+InvokeMenuBarEditorTools(manuID:=0, justBuild:=0) {
   deleteMenus()
   If isVarEqualTo(AnyWindowOpen, 31, 24)
   {
      kMenu("PVlTools", "Add", "`Options disabled", "dummy")
      kMenu("PVlTools", "Disable", "Options disabled")
-     showThisMenu("PVlTools", 0, 1, manuID)
+     If (justBuild!=1)
+        showThisMenu("PVlTools", 0, 1, manuID)
   } Else If isImgEditingNow()
   {
      createMenuLiveTools("mbr")
-     showThisMenu("PVlTools", 0, 1, manuID)
+     If (justBuild!=1)
+        showThisMenu("PVlTools", 0, 1, manuID)
   }
 }
 
-InvokeMenuBarAlphaMask(manuID) {
+InvokeMenuBarAlphaMask(manuID:=0, justBuild:=0) {
    deleteMenus()
    kMenu("PValpha", "Add", "Painting mode", "dummy")
    kMenu("PValpha", "Disable", "Painting mode")
    kMenu("PValpha", "Add", "E&xit tool`tEnter", "applyIMGeditFunction")
    Menu, PValpha, Add
    createMenuAlphaMask("PValpha")
-   showThisMenu("PValpha", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PValpha", 0, 1, manuID)
 }
 
-InvokeMenuBarInterface(manuID) {
+InvokeMenuBarInterface(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuInterfaceOptions()
-   showThisMenu("PvUIprefs", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PvUIprefs", 0, 1, manuID)
 }
 
-InvokeMenuBarNavigate(manuID) {
+InvokeMenuBarNavigate(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuNavigation()
-   showThisMenu("PVnav", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVnav", 0, 1, manuID)
 }
 
-InvokeMenuBarCaptions(manuID) {
+InvokeMenuBarCaptions(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuAnnotations()
-   showThisMenu("PVsounds", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVsounds", 0, 1, manuID)
 }
 
-InvokeMenuBarSlides(manuID) {
+InvokeMenuBarSlides(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuSlideshows()
-   showThisMenu("PVslide", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVslide", 0, 1, manuID)
 }
 
-InvokeMenuBarSort(manuID) {
+InvokeMenuBarSort(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuFilesSort()
-   showThisMenu("PVsort", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVsort", 0, 1, manuID)
 }
 
-InvokeMenuBarSettings(manuID) {
+InvokeMenuBarSettings(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuMainPreferences()
-   showThisMenu("PVprefs", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVprefs", 0, 1, manuID)
 }
 
-InvokeMenuBarHelp(manuID) {
+InvokeMenuBarHelp(manuID:=0, justBuild:=0) {
    deleteMenus()
    createMenuHelpQPV()
-   showThisMenu("PVhelp", 0, 1, manuID)
+   If (justBuild!=1)
+      showThisMenu("PVhelp", 0, 1, manuID)
 }
 
 createMenuNavigation() {
@@ -70085,9 +70110,15 @@ deleteMenus() {
        Return
 
     ; fnOutputDebug("menus deleted")
-    Static menusList := "PVmenu|PValpha|PVtFileOpen|PVtFileImgAct|PVselSize|PVselRatio|PVimgTransform|PVimgCreate|PVimgFilters|PVimgDraw|PVperfs|PVfileSel|PVslide|PVnav|PVview|PVfList|PVtActFile|PVfilesActs|PVprefs|PvUIprefs|PVfaves|PVopenF|PVsort|PVedit|PVselv|PVsounds|PvImgAdapt|PVimgColorsFX|PVimgSdepth|PVimgVProt|PVimgHistos|PVlTools|PVstats|PVhelp|PvUItoolbarMenu|PVshapeTension|PVselAlign"
+    ; [phase D] menus attached to the menu bar as submenus must KEEP their HMENU
+    ; [DeleteAll empties them in place] - a whole-menu Delete would orphan the bar
+    ; attachment and the WM_INITMENUPOPUP JIT map; the rest still fully delete
+    Static menusKeepHandle := "PValpha|PVslide|PVnav|PVview|PVprefs|PvUIprefs|PVsort|PVselv|PVsounds|PVlTools|PVhelp"
+         , menusList := "PVmenu|PVtFileOpen|PVtFileImgAct|PVselSize|PVselRatio|PVimgTransform|PVimgCreate|PVimgFilters|PVimgDraw|PVperfs|PVfileSel|PVfList|PVtActFile|PVfilesActs|PVfaves|PVopenF|PVedit|PvImgAdapt|PVimgColorsFX|PVimgSdepth|PVimgVProt|PVimgHistos|PVstats|PvUItoolbarMenu|PVshapeTension|PVselAlign"
     menuCustomNames := []
     kMenu(0, "Reset", 0)
+    Loop, Parse, menusKeepHandle, |
+        Try Menu, % A_LoopField, DeleteAll
     Loop, Parse, menusList, |
         Try Menu, % A_LoopField, Delete
 }
