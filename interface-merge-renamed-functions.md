@@ -124,6 +124,7 @@ GUIs could not coexist). AutoHotkey derives the implicit event handlers from the
 - The Alt+Space emulation chain is dead since Alt+Space rides `SC_KEYMENU`: `Win_ShowSysMenu`
   (shell-stuff, zero references), `uiShowSysMenu` (only reachable from the `!Space` branch of
   `uiKeyboardResponder`, which `uiWM_KEYDOWN` now intercepts first) and `coreShowSysMenu`.
+  *Resolved 2026-09-02, see section 6 — `Win_ShowSysMenu` kept by request.*
 - `uiIsAlphaMaskWindow` still carries the thread-era window-ID set without panels 74 and 89.
 - The group-B rows are the natural next consolidation pass; group A stays as it is by design
   (each pair is two contracts that happened to share a name).
@@ -137,14 +138,16 @@ GUIs could not coexist). AutoHotkey derives the implicit event handlers from the
   main's predicates winning as asked: panels 74 and 89 now count as alpha-mask windows on the
   UI side too, and `isImgEditingNow()` replaces the mirrored `imgEditPanelOpened`/`editingSelectionNow` pair.
 - The tooltip pair → **one window**, `mouseToolTipGuia` (main's names for the GUI, the
-  `mouseToolTipWinCreated` flag and `lastTippyWin`): `mouseCreateOSDinfoLine` adopted the module's
-  OSD font-name/bold preference and margin but keeps main's deliberate no-`Critical` choice and its
-  click handler; `showOSDinfoLineNow` was already identical; `mouseTurnOFFtooltip` took the module's
+  `mouseToolTipWinCreated` flag and `lastTippyWin`): `mouseCreateOSDinfoLine` keeps main's styling
+  (Arial Bold, 1.25× margin — per Marius, tooltips never use the OSD font), main's deliberate
+  no-`Critical` choice and its click handler; `showOSDinfoLineNow` was already identical; `mouseTurnOFFtooltip` took the module's
   richer body (statusbar flag, `lastWinDrag` guard, timer disarm) and replaces `uiMouseTurnOFFtooltip`
   at its 14 module sites — one window needs one owner of the destroy, which is why that function
   joined the pass; `mouseClickTurnOFFtooltip`, `destroyTooltipu` and the `uiMouseTipGuia` close/escape
   labels are gone. `hGuiTip` finally has a single owner (both windows used to write it).
-- Still open from section 4: the dead Alt+Space emulation trio.
+- The dead Alt+Space emulation: `uiShowSysMenu` and `coreShowSysMenu` deleted together with the
+  unreachable `!Space` branch of `uiKeyboardResponder`; `Win_ShowSysMenu` in shell-stuff.ahk is kept
+  on purpose as the library helper for a programmatic system menu.
 
 ## 5. Reproducing the numbers
 

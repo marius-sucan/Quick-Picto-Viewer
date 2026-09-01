@@ -2223,32 +2223,6 @@ hideMenuFlyOut() {
        SetTimer, hideMenuFlyOut, -35
 }
 
-uiShowSysMenu(Hwnd) {
-; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
-; modified by Marius Șucan
-
-  turnOffSlideshow()
-  JEE_ClientToScreen(PVhwnd, 1, 1, x, y)
-  ; MT_post("Win_ShowSysMenu", hwnd, x, y)
-  coreShowSysMenu(Hwnd, x, y)
-  Return 1
-}
-
-coreShowSysMenu(Hwnd, x, y) {
-; Source: https://github.com/majkinetor/mm-autohotkey/blob/master/Appbar/Taskbar/Win.ahk
-; modified by Marius Șucan
-
-  Static WM_SYSCOMMAND := 0x112, TPM_RETURNCMD := 0x100
-  h := WinExist("ahk_id " hwnd)
-  hSysMenu := DllCall("GetSystemMenu", "Uint", Hwnd, "int", False) 
-  r := DllCall("TrackPopupMenu", "uint", hSysMenu, "uint", TPM_RETURNCMD, "int", X, "int", Y, "int", 0, "uint", h, "uint", 0)
-  If (r=0)
-     Return
-
-  SendMessage, WM_SYSCOMMAND, r,,,ahk_id %Hwnd%
-  Return 1
-}
-
 stopGiFsPlayback() {
    If (animGIFplaying!=0)
    {
@@ -2534,9 +2508,6 @@ uiKeyboardResponder(givenKey, abusive) {
     } Else If (givenKey="Escape" || givenKey="!F4")
     {
        preByeRoutine()
-    } Else If (givenKey="!Space")
-    {
-       uiShowSysMenu(PVhwnd)
     } Else If (givenKey="Space")
     {
        isOkay := AnyWindowOpen ? 0 : 1
@@ -2619,8 +2590,9 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
        ; Alt+Space: the very same mechanism - SC_KEYMENU with the SPACE character
        ; is what DefWindowProc generates for the real Alt+Space, and Windows opens
        ; the SYSTEM menu natively [position, Alt-held semantics, keyboard nav all
-       ; native]. This supersedes the TrackPopupMenu emulation in uiShowSysMenu,
-       ; which stopped opening anything after the merge.
+       ; native]. It replaced the thread-era TrackPopupMenu emulation, which stopped
+       ; opening anything after the merge and was deleted; Win_ShowSysMenu in
+       ; shell-stuff.ahk stays as the library helper for a programmatic sys menu.
        OutputDebug, % "QPVMERGE: Alt+Space -> native SC_KEYMENU sysmenu post"
        DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x0112, "Ptr", 0xF100, "Ptr", 0x20)
        Return 0

@@ -48412,13 +48412,12 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
 
     bgrColor := OSDbgrColor
     txtColor := OSDtextColor
-    isBold := (OSDfontBolded=1) ? " Bold" : ""
     lastTippyWin := WinActive("A")
     Sleep, 25
     Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
+    Gui, mouseToolTipGuia: Margin, % thisFntSize * 1.25, % thisFntSize * 1.25
     Gui, mouseToolTipGuia: Color, c%bgrColor%
-    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% Bold Q5, Arial   ; always Arial Bold, never the OSD font [per Marius]
     Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyMouseGuiTooltipu vTippyMsg, % msg
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
