@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu
+     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -44,7 +44,7 @@ initInterfaceModule() {
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
-   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0
+   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0, menuNativeTimerID2 := 0
    ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
    ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
    ; flag was on from the first menu of a session; native bar opens never call it,
@@ -218,12 +218,14 @@ uiCallWndProc(nCode, wP, lP) {
             {
                flyoutNeedsPos := 1
                flyoutAnchorMenu := hMinit
+               OutputDebug, % "QPVMERGE: flyout flag raised [bar] anchor=" hMinit
             }
          } Else If (popupRootSeen!=1)
          {
             popupRootSeen := 1
             flyoutNeedsPos := 1
             flyoutAnchorMenu := hMinit
+            OutputDebug, % "QPVMERGE: flyout flag raised [popup] anchor=" hMinit
          }
          uiMenuJITrebuild(hMinit)
       }
@@ -319,6 +321,12 @@ uiMenuLoopEnter(fromPopup:=0) {
    ; the flag and the bar flyout never showed; the ticker consumes the flag itself
    If !menuNativeTimerID
       menuNativeTimerID := DllCall("user32\SetTimer", "Ptr", 0, "UPtr", 0, "UInt", 90, "Ptr", cbTick, "UPtr")
+   ; belt: a second, WINDOW-bound native timer. A NULL-hwnd timer is a thread
+   ; message; if the menu-BAR tracking loop retrieves only window messages it
+   ; never dispatches the first one - the PVwin-bound WM_TIMER is dispatched by
+   ; any GetMessage the loop runs, and DispatchMessage calls the TIMERPROC
+   If !menuNativeTimerID2
+      menuNativeTimerID2 := DllCall("user32\SetTimer", "Ptr", PVhwnd, "UPtr", 0xF17E, "UInt", 90, "Ptr", cbTick, "UPtr")
    ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
    ; [Menu, Show popups] attach the same shared submenus [PVview, PVnav, PVslide...]
    ; but pre-build everything before showing; letting the hook rebuild them
@@ -341,6 +349,11 @@ uiMenuLoopExit() {
    {
       DllCall("user32\KillTimer", "Ptr", 0, "UPtr", menuNativeTimerID)
       menuNativeTimerID := 0
+   }
+   If menuNativeTimerID2
+   {
+      DllCall("user32\KillTimer", "Ptr", PVhwnd, "UPtr", 0xF17E)
+      menuNativeTimerID2 := 0
    }
    If (menusflyOutVisible=1)
    {
@@ -469,6 +482,11 @@ uiMenuMouseLL(nCode, wP, lP) {
    Critical
    If (nCode=0 && menuLoopActive=1)
    {
+      ; third placement consumer [p13-proven vehicle]: the LL hook runs on every
+      ; physical mouse event during menu sessions, hover jitter included - it
+      ; covers a session where the user clicks and then never changes the
+      ; highlight [no WM_MENUSELECT] on a loop that may not dispatch timers
+      uiTryPlaceFlyout()
       If (wP=0x20A && uiVisibleMenuWin())
       {
          delta := NumGet(lP+0, 8, "Int") >> 16
