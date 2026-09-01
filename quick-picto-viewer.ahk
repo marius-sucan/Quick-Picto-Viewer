@@ -35485,17 +35485,23 @@ GenerateStaticFoldersListNow() {
 }
 
 determineTerminateOperation() {
-; [merge] The old body pinged the interface thread and spun in a Sleep loop while
-; THAT thread showed the abort-confirm dialog. One interpreter now: pump instead -
-; the Escape/click handlers, and askAboutStoppingOperations' modal dialog, run
-; right here during the pump; the old spin slept [which pumped the main side too],
-; so the re-entrancy surface is unchanged. When the pump returns, the flags are final.
+; [merge] The old body pinged the interface thread and spun while THAT thread
+; showed the abort dialog - and the spinning main thread stayed Critical, so NO
+; queued main-side work ran mid-operation. The first merged version full-pumped
+; here [Sleep -1 with Critical off], which let queued posts and timers run INSIDE
+; Critical worker loops - a queued GuiGDIupdaterResize would recreate the GDI+
+; canvas under QPV_ShowThumbnails' feet [trGdip_DrawImage Invalid_Parameter, the
+; error Marius hit]. drainUIinput restores the faithful semantics: only the abort
+; GESTURES [Escape, viewport clicks, the title-bar X] reach their handlers, inline
+; and still under Critical; the abort-confirm dialog works fine from here [MsgBox
+; pumps its own window without launching AHK timers while Critical holds]; all
+; other queued work stays queued until the operation unwinds, as before the merge.
   Static lastInvoked := 1
   If (A_TickCount - lastInvoked < 200)
      Return 0
 
   lastInvoked := A_TickCount
-  pumpUIevents()
+  drainUIinput()
   theEnd := mustAbandonCurrentOperations
   If theEnd
      lastLongOperationAbort := A_TickCount

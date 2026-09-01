@@ -511,19 +511,9 @@ uiMenuMouseLL(nCode, wP, lP) {
 ; interpreter, a long operation holding Critical blocks all of that; these shims
 ; restore it at the operations' existing checkpoints.
 
-pumpUIevents() {
-; FULL message pump - queued posts, timers and dialogs all run. Use it ONLY where
-; the old code already tolerated arbitrary re-entrancy [determineTerminateOperation:
-; its old cross-thread spin slept, which pumped everything on the main side too].
-; NEVER pass 0 to Critical when restoring: «Critical, 0» turns Critical ON.
-   prevCrit := A_IsCritical
-   Critical, Off
-   Sleep, -1
-   If (prevCrit)
-      Critical, %prevCrit%
-   Else
-      Critical, Off
-}
+; [merge] pumpUIevents() [the full Critical-off pump] was retired: its one caller
+; [determineTerminateOperation] moved to drainUIinput after the full pump let queued
+; canvas-rebuilds run inside Critical worker loops [the thumbnails GDI+ error].
 
 drainUIinput() {
 ; SELECTIVE drain for long operations that hold Critical: reads the queued input
@@ -576,6 +566,17 @@ drainUIinput() {
          WM_MOUSEWHEEL(mwp, mlp, mnum, mhwnd)
       ; remaining numbers in the ranges [key-ups, dead moves] are swallowed: their
       ; consumers read async state via GetKeyState, which removal cannot alter
+   }
+   ; the title-bar close button, which the old interface thread answered live: a
+   ; queued non-client click on the X becomes the same escalating close routine;
+   ; other non-client input stays queued untouched
+   If DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 0)  ; WM_NCLBUTTONDOWN, peek only
+   {
+      If (NumGet(msgu, 2*A_PtrSize, "UPtr") = 20)  ; HTCLOSE
+      {
+         DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 1)
+         preByeRoutine()
+      }
    }
    ; the keyboard handler defers its work to a 3ms timer that cannot fire while
    ; the caller holds Critical - run it now, then disarm the pending timer.
