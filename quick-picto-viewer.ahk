@@ -35000,7 +35000,9 @@ SaveDBfilesList(enforceFile:=0) {
    {
       showTOOLtip("Saving SQL files list database, please wait")
       saveSlideSettingsInDB()
+      allowSQLiteAbort := 1
       activeSQLdb.Exec("VACUUM main;")
+      allowSQLiteAbort := 0
       getMaxRowIDsqlDB()
       showTOOLtip("Slideshow database saved")
       SoundBeep, 900, 100
@@ -35021,7 +35023,9 @@ SaveDBfilesList(enforceFile:=0) {
       }
 
       saveSlideSettingsInDB()
+      allowSQLiteAbort := 1
       activeSQLdb.Exec("VACUUM main;")
+      allowSQLiteAbort := 0
       CurrentSLD := file2save
       getMaxRowIDsqlDB()
       showTOOLtip("Slideshow database saved")
@@ -35506,6 +35510,41 @@ determineTerminateOperation() {
   If theEnd
      lastLongOperationAbort := A_TickCount
   Return theEnd
+}
+
+; [phase D3] state and helpers for the sqlite interrupt hatch; declared top-level
+; so the name registers as a super-global [the initializer line never executes
+; here - the callback treats blank as 0]
+Global allowSQLiteAbort
+
+armSQLiteAbortHandler(dbObj) {
+; Registers a progress callback on the given connection: while a long operation is
+; flagged, Escape [or the abort dialog's verdict] cancels the currently executing
+; statement - sqlite3_step returns SQLITE_INTERRUPT and the caller's error path
+; runs. This restores the mid-statement interrupt the interface thread's
+; dupesEngineCancel call provided before the merge. The dupes engine opens its own
+; connection INSIDE qpvmain.dll where this cannot reach - its stepping loops keep
+; their between-steps cancel checks [documented limitation].
+   Static cbSQL := 0
+   If !cbSQL
+      cbSQL := RegisterCallback("sqliteProgressCB", "F")
+   If (IsObject(dbObj) && dbObj._Handle)
+      DllCall("SQlite3.dll\sqlite3_progress_handler", "UPtr", dbObj._Handle, "Int", 9000, "Ptr", cbSQL, "Ptr", 0, "Cdecl")
+}
+
+sqliteProgressCB(unusedArg) {
+; runs on this same thread every ~9000 sqlite opcodes DURING sqlite3_step; keep it
+; to flag reads and one async key probe - no Gui, no messages, no pumping
+   Critical
+   If (runningLongOperation=1 || allowSQLiteAbort=1)
+   {
+      If (mustAbandonCurrentOperations=1 || GetKeyState("Escape", "P"))
+      {
+         OutputDebug, % "QPVMERGE: sqlite statement aborted [progress handler]"
+         Return 1
+      }
+   }
+   Return 0
 }
 
 doStartLongOpDance(affectTlbr:=0) {
@@ -73718,7 +73757,9 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
         throwSQLqueryDBerror(A_ThisFunc)
 
      If (doPartial!="yesu")
+        allowSQLiteAbort := 1
         seenImagesDB.Exec("VACUUM main;")
+        allowSQLiteAbort := 0
   }
 
 

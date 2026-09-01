@@ -775,6 +775,7 @@ Class SQLiteDB {
          Return False
       }
       This._Handle := HDB
+      armSQLiteAbortHandler(This)  ; [phase D3] Escape can abort long statements on every connection; the callback self-gates
       Return True
    }
    ; ===================================================================================================================
