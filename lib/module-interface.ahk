@@ -2798,6 +2798,17 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
           Return 0
        }
     }
+    If (msg=0x104 && wParam=0x20)
+    {
+       ; Alt+Space: the very same mechanism - SC_KEYMENU with the SPACE character
+       ; is what DefWindowProc generates for the real Alt+Space, and Windows opens
+       ; the SYSTEM menu natively [position, Alt-held semantics, keyboard nav all
+       ; native]. This supersedes the TrackPopupMenu emulation in uiShowSysMenu,
+       ; which stopped opening anything after the merge.
+       OutputDebug, % "QPVMERGE: Alt+Space -> native SC_KEYMENU sysmenu post"
+       DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x0112, "Ptr", 0xF100, "Ptr", 0x20)
+       Return 0
+    }
     vk_code := Format("{1:x}", wParam)
     If (isInRange(vk_code, 21, 28) || isVarEqualTo(vk_code, "6B", "6D", "BB", "BD", "D"))
        navKeysCounter++
