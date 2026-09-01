@@ -293,6 +293,51 @@ uiMenuLoopExit() {
    }
    If (allowMenuReader="yes")
       uiMouseTurnOFFtooltip()
+   ; self-healing pass, deferred until the loop is fully gone [timers work again]:
+   ; re-resolve every bar attachment by NAME and repair any whose handle changed
+   SetTimer, uiRefreshBarAttachments, -50
+}
+
+uiRefreshBarAttachments() {
+; [phase D] safety net for the shared attached menus: if anything recreated one
+; of them under a NEW HMENU [historically: a popup parent's whole-delete
+; recursively destroying attached submenus - fixed at the source in deleteMenus],
+; the bar item would silently point at a dead handle and the JIT map would miss.
+; This re-resolves each attachment by name, re-attaches changed ones [Menu-Add on
+; an existing item label updates its submenu link] and rebuilds the JIT map.
+; Normally a complete no-op; repairs are logged.
+   If (!IsObject(menuJITlist) || !menuJITlist.Count() || menuLoopActive=1)
+      Return
+   newMap := {}
+   repaired := 0
+   Loop, % menuJITlist.Count()
+   {
+      builderFn := menuJITlist[A_Index]
+      suffix := StrReplace(builderFn, "InvokeMenuBar")
+      menaName := uiMenuNameForBuilder(suffix)
+      hSub := 0
+      Try hSub := MenuGetHandle(menaName)
+      If !hSub
+      {
+         Menu, % menaName, Add, building the menu..., dummy
+         Try hSub := MenuGetHandle(menaName)
+      }
+      If !hSub
+         Continue
+      If !menuJITmap.HasKey(hSub)
+      {
+         labelu := menuArray[A_Index, 3]
+         If StrLen(labelu)
+         {
+            Try Menu, PVbar, Add, % labelu, % ":" menaName
+            repaired++
+         }
+      }
+      newMap[hSub] := builderFn
+   }
+   menuJITmap := newMap
+   If (repaired)
+      OutputDebug, % "QPVMERGE: bar attachments repaired: " repaired
 }
 
 uiMenuMouseLL(nCode, wP, lP) {

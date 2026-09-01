@@ -70148,7 +70148,14 @@ deleteMenus() {
     Loop, Parse, menusKeepHandle, |
         Try Menu, % A_LoopField, DeleteAll
     Loop, Parse, menusList, |
+    {
+        ; empty the parent BEFORE whole-deleting it: Win32 DestroyMenu recursively
+        ; destroys every ATTACHED submenu, so whole-deleting PVmenu while it still
+        ; linked PVview/PVnav/PVslide/... killed the shared HMENUs the menu-bar
+        ; attachments point at - the bar menus silently stopped opening
+        Try Menu, % A_LoopField, DeleteAll
         Try Menu, % A_LoopField, Delete
+    }
 }
 
 MenuSetImageAdaptAll() {
