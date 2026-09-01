@@ -45,6 +45,12 @@ initInterfaceModule() {
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
    flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1
+   ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
+   ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
+   ; flag was on from the first menu of a session; native bar opens never call it,
+   ; and a 0 seed left bar sessions without the flyout or announcements until the
+   ; first right-click menu. The "no" reset path still turns it off when main asks.
+   allowMenuReader := "yes"
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -262,6 +268,7 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
    If (flags=0xFFFF && !hMenuSel)  ; the menu was dismissed
       Return
    lastMenuHoverZeit := A_TickCount
+   uiTryPlaceFlyout()
    If (allowMenuReader!="yes" || !hMenuSel)
       Return
    VarSetCapacity(bufu, 520, 0)
@@ -393,14 +400,23 @@ uiRefreshBarAttachments() {
 }
 
 uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
-; TIMERPROC [raw callback, p7-proven class] fired BY the modal menu loop every
-; ~90ms. Positions the menuFlier flyout under the menu window ONCE PER ROOT POPUP
+; TIMERPROC [raw callback] fired BY the modal menu loop every ~90ms.
+   Critical
+   If (menuLoopActive!=1)
+      Return
+   uiTryPlaceFlyout()
+}
+
+uiTryPlaceFlyout() {
+; Places the menuFlier flyout under the menu window ONCE PER ROOT POPUP
 ; [flyoutNeedsPos is raised by the WM_INITMENUPOPUP hook for bar dropdowns and
 ; for the first popup of a context-menu session]; submenus never move it. The
-; flag clears only after a successful placement, so a tick that fires before the
-; menu window is visible simply retries.
-   Critical
-   If (menuLoopActive!=1 || flyoutNeedsPos!=1 || allowMenuReader!="yes")
+; flag clears only after a successful placement, so an attempt made before the
+; menu window is visible simply retries. Called from the native ticker AND from
+; every WM_MENUSELECT - the menu-BAR tracking loop may not dispatch NULL-hwnd
+; thread timers at all, while MENUSELECT is SENT on every highlight change in
+; both loop kinds, keyboard navigation included.
+   If (flyoutNeedsPos!=1 || allowMenuReader!="yes")
       Return
    a := uiVisibleMenuWin()
    If !a
