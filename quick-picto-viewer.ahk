@@ -12350,12 +12350,16 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    Static prevImgPath, lastInvoked := 1, lastFrameChange := 1
    If (thumbsDisplaying=1 || act="stop" || AnyWindowOpen || animGIFsSupport!=1 || !maxFilesIndex || !CurrentSLD)
    {
-      If (animGIFplaying=1)
+      ; a non-empty prevImgPath means a playback exists that was not torn down yet,
+      ; whoever zeroed the flag [the ui-side stops zero it before posting "stop";
+      ; with the shared flag the old flag-only gate skipped this branch for them]
+      If (animGIFplaying=1 || StrLen(prevImgPath))
       {
-         OutputDebug, % "QPVMERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen
+         OutputDebug, % "QPVMERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen " flag=" animGIFplaying
          SetTimer, autoChangeDesiredFrame, Off
          SetTimer, ResetImgLoadStatus, -50
-         prevAnimGIFwas := prevImgPath
+         If StrLen(prevImgPath)
+            prevAnimGIFwas := prevImgPath
          prevImgPath := ""
          Global lastGIFdestroy := A_TickCount
          lastFrameChange := A_TickCount
@@ -12394,8 +12398,11 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          ; must capture the path BEFORE it is cleared [the stop branch's order];
          ; the old order latched an empty string, so every ui-initiated stop
          ; [nav keys, Space, Escape - they zero the flag and land here at the next
-         ; tick] was undone by the next re-render: the "toggle" Marius reported
-         prevAnimGIFwas := prevImgPath
+         ; tick] was undone by the next re-render: the "toggle" Marius reported.
+         ; Guarded: this branch can run twice [ShowTheImage re-arms the timer after
+         ; a "start" that landed here], and a second pass must not wipe the latch
+         If StrLen(prevImgPath)
+            prevAnimGIFwas := prevImgPath
          prevImgPath := ""
          lastFrameChange := A_TickCount
          Global lastGIFdestroy := A_TickCount
