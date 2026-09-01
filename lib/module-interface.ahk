@@ -196,12 +196,19 @@ uiCallWndProc(nCode, wP, lP) {
       Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
       {
          hMinit := NumGet(lP+0, A_PtrSize, "UPtr")
+         isMapped := (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit)) ? 1 : 0
+         ; ORDER-PROOFING: menu-BAR tracking can deliver the first INITMENUPOPUP
+         ; BEFORE ENTERMENULOOP [TrackPopupMenu sends ENTER first], so when no loop
+         ; is active yet the session type is inferred here: a mapped HMENU is a bar
+         ; dropdown, anything else is a programmatic popup's root
+         If (menuLoopActive!=1)
+            barMenuSession := isMapped
          ; the flyout anchors to ROOT popups only: bar dropdowns [mapped menus] and
          ; the FIRST popup of a right-click/AppsKey session - never to submenus,
          ; which used to drag it around the screen
          If (barMenuSession=1)
          {
-            If (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit))
+            If isMapped
                flyoutNeedsPos := 1
          } Else If (popupRootSeen!=1)
          {
@@ -296,7 +303,9 @@ uiMenuLoopEnter(fromPopup:=0) {
    If !cbTick
       cbTick := RegisterCallback("uiMenuNativeTick", "F")
    popupRootSeen := 0
-   flyoutNeedsPos := 0
+   ; flyoutNeedsPos is deliberately NOT reset here: on menu-BAR sessions the first
+   ; INITMENUPOPUP [which raises it] can precede ENTERMENULOOP - a reset here wiped
+   ; the flag and the bar flyout never showed; the ticker consumes the flag itself
    If !menuNativeTimerID
       menuNativeTimerID := DllCall("user32\SetTimer", "Ptr", 0, "UPtr", 0, "UInt", 90, "Ptr", cbTick, "UPtr")
    ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
@@ -404,6 +413,7 @@ uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
    flyoutNeedsPos := 0
    menusflyOutVisible := 1
    y := mY + Round(Height) + 2
+   OutputDebug, % "QPVMERGE: flyout placed x" mX " y" y " bar=" barMenuSession
    Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
 }
 
