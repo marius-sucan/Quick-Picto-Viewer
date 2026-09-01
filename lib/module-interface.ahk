@@ -21,7 +21,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
-     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence
+     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -42,7 +42,7 @@ initInterfaceModule() {
    winGDIcreated := 0, ThumbsWinGDIcreated := 0, uiMouseTipWinCreated := 0, uiLastTippyWin := ""
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
+   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -190,8 +190,8 @@ uiCallWndProc(nCode, wP, lP) {
          uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "Ptr"))
       Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
          uiMenuJITrebuild(NumGet(lP+0, A_PtrSize, "UPtr"))
-      Else If (msg=0x211) ; WM_ENTERMENULOOP
-         uiMenuLoopEnter()
+      Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
+         uiMenuLoopEnter(NumGet(lP+0, A_PtrSize, "UPtr"))
       Else If (msg=0x212) ; WM_EXITMENULOOP
          uiMenuLoopExit()
    }
@@ -202,6 +202,11 @@ uiMenuJITrebuild(hMenu) {
    Static busy := 0
    If (busy=1 || !IsObject(menuJITmap) || !menuJITmap.HasKey(hMenu))
       Return
+   If (barMenuSession!=1)
+   {
+      OutputDebug, % "QPVMERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]
+      Return
+   }
    busy := 1
    funcu := menuJITmap[hMenu]
    OutputDebug, % "QPVMERGE: menu JIT rebuild " funcu
@@ -255,13 +260,20 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
       msgu .= " [checked]"
    If accel
       msgu .= "`nShortcut: " accel
+   ; TRACK only - the announcement shows ON DEMAND, on right-click over the item
+   ; [the LL hook's RButton branch], exactly like the old RButton reader hotkey;
+   ; announcing on every highlight change flooded the OSD
    uiMenuReaderLastMsg := msgu
-   uiMouseCreateOSDinfoLine(msgu, 1)
-   uiShowOSDinfoLineNow(1500)
 }
 
-uiMenuLoopEnter() {
+uiMenuLoopEnter(fromPopup:=0) {
    menuLoopActive := 1
+   ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
+   ; [Menu, Show popups] attach the same shared submenus [PVview, PVnav, PVslide...]
+   ; but pre-build everything before showing; letting the hook rebuild them
+   ; mid-popup swapped in the BAR variants and the builders' deleteMenus() calls
+   ; wrecked the open context menu [broken/missing items on reopen].
+   barMenuSession := fromPopup ? 0 : 1
    If !hLLmouseHook
    {
       Static cbLL := 0
@@ -273,6 +285,7 @@ uiMenuLoopEnter() {
 
 uiMenuLoopExit() {
    menuLoopActive := 0
+   barMenuSession := 0
    If hLLmouseHook
    {
       DllCall("user32\UnhookWindowsHookEx", "Ptr", hLLmouseHook)
