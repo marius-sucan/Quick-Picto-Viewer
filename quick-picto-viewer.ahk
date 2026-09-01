@@ -27708,9 +27708,22 @@ openPreviousPanel(mode:="") {
 }
 
 mouseTurnOFFtooltip() {
+; [2026-09-02] the one tooltip window since the module's uiMouseTipGuia pair was
+; folded into this one; the body is the module's richer variant [statusbar flag,
+; the lastWinDrag guard when the pointer sits on the tip, its own timer disarm]
+   Global statusBarTooltipVisible := 0
+   If (mouseToolTipWinCreated!=1)
+      Return
+
+   MouseGetPos, ,, OutputVarWin
+   If (OutputVarWin=hGuiTip)
+      Global lastWinDrag := A_TickCount - 125
+   Sleep, 10
    Gui, mouseToolTipGuia: Destroy
-   mouseToolTipWinCreated := 0
-   ; IF_post("uiMouseTurnOFFtooltip", 1)
+   Global mouseToolTipWinCreated := 0
+   Global statusBarTooltipVisible := 0
+   Global lastZeitToolTip := A_TickCount
+   SetTimer, mouseTurnOFFtooltip, Off
 }
 
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="", guiu:="") {
@@ -48399,12 +48412,13 @@ mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
 
     bgrColor := OSDbgrColor
     txtColor := OSDtextColor
+    isBold := (OSDfontBolded=1) ? " Bold" : ""
     lastTippyWin := WinActive("A")
     Sleep, 25
     Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    Gui, mouseToolTipGuia: Margin, % thisFntSize * 1.25, % thisFntSize * 1.25
+    Gui, mouseToolTipGuia: Margin, % thisFntSize, % thisFntSize
     Gui, mouseToolTipGuia: Color, c%bgrColor%
-    Gui, mouseToolTipGuia: Font, s%thisFntSize% Bold Q5, Arial
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
     Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyMouseGuiTooltipu vTippyMsg, % msg
     Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg

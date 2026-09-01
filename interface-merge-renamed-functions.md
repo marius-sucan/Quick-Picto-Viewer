@@ -47,6 +47,8 @@ behaviour-neutral, and with a single interpreter they are now consolidation cand
 
 ### Group B — same job, drifted bodies (8): consolidation candidates now that there is one interpreter
 
+> **Status 2026-09-02:** the first six rows were consolidated (section 6); the two keyboard rows stay split by window.
+
 | thread-era name | module name now | bodies at master | bodies now | refs ui / main | what differs today | verdict |
 |---|---|---|---|---|---|---|
 | `constructKbdKey` | `uiConstructKbdKey` | identical | identical | 1 / 2 | nothing (only the line-wrapping of the `vkList` literal) | delete `uiConstructKbdKey`, point `uiWM_KEYDOWN` at `constructKbdKey`; zero risk |
@@ -125,6 +127,24 @@ GUIs could not coexist). AutoHotkey derives the implicit event handlers from the
 - `uiIsAlphaMaskWindow` still carries the thread-era window-ID set without panels 74 and 89.
 - The group-B rows are the natural next consolidation pass; group A stays as it is by design
   (each pair is two contracts that happened to share a name).
+
+## 6. Consolidation pass — 2026-09-02 (per Marius)
+
+- `uiConstructKbdKey` and `uiAddJournalEntry` deleted; `uiWM_KEYDOWN` calls `constructKbdKey`.
+- `uiIdentifyThisWin` → `identifyThisWin` (the extra `otherAscriptHwnd` test dropped; that
+  write-only global is gone with it).
+- `uiIsAlphaMaskWindow` and `uiIsNowAlphaPainting` → `isAlphaMaskWindow` / `isNowAlphaPainting`,
+  main's predicates winning as asked: panels 74 and 89 now count as alpha-mask windows on the
+  UI side too, and `isImgEditingNow()` replaces the mirrored `imgEditPanelOpened`/`editingSelectionNow` pair.
+- The tooltip pair → **one window**, `mouseToolTipGuia` (main's names for the GUI, the
+  `mouseToolTipWinCreated` flag and `lastTippyWin`): `mouseCreateOSDinfoLine` adopted the module's
+  OSD font-name/bold preference and margin but keeps main's deliberate no-`Critical` choice and its
+  click handler; `showOSDinfoLineNow` was already identical; `mouseTurnOFFtooltip` took the module's
+  richer body (statusbar flag, `lastWinDrag` guard, timer disarm) and replaces `uiMouseTurnOFFtooltip`
+  at its 14 module sites — one window needs one owner of the destroy, which is why that function
+  joined the pass; `mouseClickTurnOFFtooltip`, `destroyTooltipu` and the `uiMouseTipGuia` close/escape
+  labels are gone. `hGuiTip` finally has a single owner (both windows used to write it).
+- Still open from section 4: the dead Alt+Space emulation trio.
 
 ## 5. Reproducing the numbers
 

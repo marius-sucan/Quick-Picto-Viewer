@@ -20,7 +20,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
-     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
+     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
      , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2
 
@@ -40,7 +40,7 @@ initInterfaceModule() {
    lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1
    doNormalCursor := 1, prevFullIMGload := 1, prevMenuBarItem := 1
    menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuCurrentIndex := 0, menuTotalIndex := 0
-   winGDIcreated := 0, ThumbsWinGDIcreated := 0, uiMouseTipWinCreated := 0, uiLastTippyWin := ""
+   winGDIcreated := 0, ThumbsWinGDIcreated := 0
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
@@ -51,7 +51,6 @@ initInterfaceModule() {
    ; and a 0 seed left bar sessions without the flyout or announcements until the
    ; first right-click menu. The "no" reset path still turns it off when main asks.
    allowMenuReader := "yes"
-   otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
    OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -251,7 +250,7 @@ uiMenuJITrebuild(hMenu) {
    OutputDebug, % "QPVMERGE: menu JIT rebuild " funcu
    If (VisibleQuickMenuSearchWin=1)
       Try closeQuickSearch()
-   uiMouseTurnOFFtooltip()
+   mouseTurnOFFtooltip()
    lastOtherWinClose := A_TickCount
    ; justBuild=1: refresh the dropdown content in place, no Menu-Show - the popup
    ; Windows is about to display IS this menu [the builders use DeleteAll, which
@@ -368,7 +367,7 @@ uiMenuLoopExit() {
       hLLmouseHook := 0
    }
    If (allowMenuReader="yes")
-      uiMouseTurnOFFtooltip()
+      mouseTurnOFFtooltip()
    ; self-healing pass, deferred until the loop is fully gone [timers work again]:
    ; re-resolve every bar attachment by NAME and repair any whose handle changed
    SetTimer, uiRefreshBarAttachments, -50
@@ -497,8 +496,8 @@ uiMenuMouseLL(nCode, wP, lP) {
          Return 1
       } Else If (wP=0x205 && allowMenuReader="yes" && uiVisibleMenuWin() && StrLen(uiMenuReaderLastMsg)>1)
       {
-         uiMouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
-         uiShowOSDinfoLineNow(1500)
+         mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
+         showOSDinfoLineNow(1500)
          Return 1
       }
    }
@@ -1168,11 +1167,6 @@ miniGDIupdater() {
    MT_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
-uiAddJournalEntry(msg) {
-   If (!runningLongOperation && !imageLoading)
-      MT_post("addJournalEntry", msg)
-}
-
 WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
    If !isOkay
@@ -1207,7 +1201,7 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
 }
 
 preventSillyGui(thisGui) {
-  r := (thisGui="uiMouseTipGuia" || thisGui="menuFlier") ? 1 : 0
+  r := (thisGui="mouseToolTipGuia" || thisGui="menuFlier") ? 1 : 0
   Return r
 }
 
@@ -1244,8 +1238,8 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        JEE_ScreenToClient(whichWin, mXo, mYo, lastALclickX, lastALclickY)
     }
 
-    If (uiMouseTipWinCreated=1)
-       uiMouseTurnOFFtooltip()
+    If (mouseToolTipWinCreated=1)
+       mouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
     ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
@@ -1261,7 +1255,7 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
 
 uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
     If (statusBarTooltipVisible=1)
-       uiMouseTurnOFFtooltip()
+       mouseTurnOFFtooltip()
 
     LbtnDwn := 0
     colorPickerMustEnd := 1
@@ -1290,14 +1284,14 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return 0
 
     If (statusBarTooltipVisible=1)
-       uiMouseTurnOFFtooltip()
+       mouseTurnOFFtooltip()
 
     colorPickerMustEnd := -1
     If preventSillyGui(A_Gui)
        Return
 
-    If (uiMouseTipWinCreated=1)
-       uiMouseTurnOFFtooltip()
+    If (mouseToolTipWinCreated=1)
+       mouseTurnOFFtooltip()
 
     LbtnDwn := 0
     canCancelImageLoad := 4
@@ -1414,7 +1408,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      Return 0
 
   If (statusBarTooltipVisible=1)
-     uiMouseTurnOFFtooltip()
+     mouseTurnOFFtooltip()
 
   colorPickerMustEnd := -1
   If preventSillyGui(A_Gui)
@@ -1426,13 +1420,13 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      Return 0
   }
 
-  If (uiMouseTipWinCreated=1)
-     uiMouseTurnOFFtooltip()
+  If (mouseToolTipWinCreated=1)
+     mouseTurnOFFtooltip()
 
   ; thumbsDisplaying := thumbsDisplaying
   ; AnyWindowOpen := AnyWindowOpen
   ; maxFilesIndex := maxFilesIndex
-  If !uiIdentifyThisWin()
+  If !identifyThisWin()
      Return 0
 
   If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
@@ -1553,7 +1547,7 @@ theSlideShowCore(paramu:=0) {
   If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
 
-  uiMouseTurnOFFtooltip()
+  mouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
   Try DllCall("user32\SetCursor", "Ptr", 0)
   If (slideShowRunning=1 && slidesFXrandomize=1)
@@ -1651,8 +1645,8 @@ uiWinClickAction(thisEvent:="normal") {
     mX := lastALclickX,    mY := lastALclickY
     ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
     canCancelImageLoad := 4
-    If (uiMouseTipWinCreated=1)
-       uiMouseTurnOFFtooltip()
+    If (mouseToolTipWinCreated=1)
+       mouseTurnOFFtooltip()
 
     ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
     lastInvoked := A_TickCount
@@ -1769,8 +1763,8 @@ isQPVactive() {
 
     A := WinActive("A")
     lastInvoked := A_TickCount
-    ; last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && uiMouseTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
-    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && uiMouseTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1 || A=hFlyOut && menusflyOutVisible=1) ? 1 : 0
+    ; last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1) ? 1 : 0
+    last := (A=hSetWinGui && AnyWindowOpen || A=PVhwnd || A=hGDIwin || A=hGDIthumbsWin || A=hGDIinfosWin || A=hGuiTip && mouseToolTipWinCreated=1 || A=hquickMenuSearchWin && VisibleQuickMenuSearchWin=1 || A=hQPVtoolbar && ShowAdvToolbar=1 || A=hfdTreeWinGui && folderTreeWinOpen=1 || A=hFlyOut && menusflyOutVisible=1) ? 1 : 0
     Return last
 }
 
@@ -1781,116 +1775,9 @@ showMouseTooltipStatusbar() {
 
     thisSize := OSDfontSize//3.5 + 2
     statusBarTooltipVisible := 1
-    uiMouseCreateOSDinfoLine(lastWinStatus, thisSize)
-    SetTimer, uiMouseTurnOFFtooltip, -4500
+    mouseCreateOSDinfoLine(lastWinStatus, thisSize)
+    SetTimer, mouseTurnOFFtooltip, -4500
 }
-
-uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
-    Critical, On
-    Static prevMsg, lastInvoked := 1
-    Global TippyMsg
-
-    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
-    thisHwnd := PVhwnd
-    If (StrLen(msg)<3) || (prevMsg=msg && uiMouseTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
-       Return
-
-    lastInvoked := A_TickCount
-    Gui, uiMouseTipGuia: Destroy
-    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-    If (thisFntSize<5)
-       thisFntSize := 5
-    If (largus>5)
-       thisFntSize := largus
-
-    bgrColor := OSDbgrColor
-    txtColor := OSDtextColor
-    isBold := (OSDfontBolded=1) ? " Bold" : ""
-    uiLastTippyWin := WinActive("A")
-    Sleep, 25
-    Gui, uiMouseTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    ; Gui, uiMouseTipGuia: Margin, 0, 0
-    Gui, uiMouseTipGuia: Margin, % thisFntSize, % thisFntSize
-    Gui, uiMouseTipGuia: Color, c%bgrColor%
-    Gui, uiMouseTipGuia: Font, s%thisFntSize% %isBold% Q5, %OSDFontName%
-    Gui, uiMouseTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
-    Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
-    prevMsg := msg
-    If (unClickable=1)
-      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-
-    uiMouseTipWinCreated := 1
-    delayu := StrLen(msg) * 75 + 950
-    lastZeitToolTip := A_TickCount
-    uiShowOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
-}
-
-uiShowOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
-    If !uiMouseTipWinCreated
-       Return
-
-    ; the branch further below re-creates the text control to re-wrap a tooltip wider
-    ; than the monitor, so it needs the caption and the colour of the control it
-    ; replaces. Both belong to uiMouseCreateOSDinfoLine() and are invisible here, so it
-    ; hands them over now; the callers that merely reposition an existing tooltip have
-    ; neither at hand and read back what is already on screen instead
-    If (msgu="")
-       GuiControlGet, msgu, uiMouseTipGuia:, TippyMsg
-    If (txtClr="")
-       txtClr := OSDtextColor
-
-    GetPhysicalCursorPos(mX, mY)
-    If IsObject(givenCoords)
-    {
-       If (givenCoords.x && givenCoords.y)
-       {
-          forced := 1
-          mX := givenCoords.x 
-          mY := givenCoords.y + givenCoords.h
-       }
-    } Else If InStr(givenCoords, "|")
-    {
-       pk := StrSplit(givenCoords, "|")
-       mX := pk[1], mY := pk[2]
-    }
-
-    If (!isWinXP && forced!=1)
-    {
-       GetWinClientSize(Wid, Heig, hGuiTip, 1)
-       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
-       Final_x := k[1], Final_y := k[2]
-    } Else
-    {
-       tipX := (forced=1) ?  mX : mX + 20
-       tipY := (forced=1) ?  mY : mY + 20
-       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-       MaxWidth := Floor(ResWidth*0.85)
-       ; an empty caption means the tooltip was already re-wrapped by an earlier call:
-       ; TippyMsg was emptied then, and wrapping it again would only blank it out
-       If (MaxWidth<Wid && MaxWidth>10 && msgu!="")
-       {
-          GuiControl, uiMouseTipGuia: Move, TippyMsg, w1 h1
-          GuiControl, uiMouseTipGuia:, TippyMsg,
-          Gui, uiMouseTipGuia: Add, Text, xp yp c%txtClr% gmouseClickTurnOFFtooltip w%MaxWidth%, % msgu
-          Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
-          ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-       }
-    }
-
-    If (Final_x!="" && Final_y!="")
-       Gui, uiMouseTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
-    WinSet, Transparent, 225, ahk_id %hGuiTip%
-    If (delayu<msgDisplayTime/2)
-       delayu := msgDisplayTime//2 + 1
-    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
-    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-    SetTimer, uiMouseTurnOFFtooltip, % -delayu
-}
-
-uiMouseTipGuiaGuiClose:
-uiMouseTipGuiaGuiEscape:
-   uiMouseTurnOFFtooltip()
-Return
 
 
 uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
@@ -2013,7 +1900,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    LbtnDwn := 0
    Sleep, -1
    MouseGetPos, ,, winu
-   ; z := uiIdentifyThisWin()
+   ; z := identifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
    && (A_TickCount - lastMenuHoverZeit>300) && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
       MT_post("MouseMoveResponder", "krill")
@@ -2021,9 +1908,9 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    If (menusflyOutVisible=1 && !identifyMenus())
       SetTimer, hideMenuFlyOut, -50
 
-   ; If (uiMouseTipWinCreated=1 && !z && !identifyParentWind())
-   If (uiMouseTipWinCreated=1)
-      SetTimer, uiMouseTurnOFFtooltip, -150
+   ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
+   If (mouseToolTipWinCreated=1)
+      SetTimer, mouseTurnOFFtooltip, -150
 }
 
 PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
@@ -2246,17 +2133,6 @@ PreventKeyPressBeep() {
    IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
 }
 
-uiIdentifyThisWin() {
-  Static prevR, lastInvoked := 1
-  If (A_TickCount - lastInvoked < 50)
-     Return prevR
-
-  hwnd := WinActive("A")
-  prevR := isVarEqualTo(hwnd, otherAscriptHwnd, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin)
-  lastInvoked := A_TickCount
-  Return prevR
-}
-
 destroyMenuFlyout() {
    wasMenuFlierCreated := 0
    Gui, menuFlier: Destroy
@@ -2296,7 +2172,6 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    lastOtherWinClose := A_TickCount
    lastContextMenuZeit := A_TickCount
    uiUseDarkMode := (darkMode="yes") ? 1 : 0
-   otherAscriptHwnd := thisHwnd
    ; [phase D fix] «allowMenuReader := actu» is GONE: setWinCloseZeit posts a "no"
    ; after every menu-item selection, and pre-merge the next programmatic menu
    ; open re-armed the flag - native bar opens never do, so choosing any item
@@ -2423,14 +2298,6 @@ uiAlphaMaskTrigger(a, b, c, d, e) {
   UpdateMenuBar()
 }
 
-uiIsAlphaMaskWindow() {
-   Return isVarEqualTo(AnyWindowOpen, 23, 24, 31, 32, 70)
-}
-
-uiIsNowAlphaPainting() {
-   Return (imgEditPanelOpened=1 && uiIsAlphaMaskWindow()=1 && liveDrawingBrushTool=1 && editingSelectionNow=1) ? 1 : 0
-}
-
 BuildMenuBar(modus:=0, applyFilter:=0) {
    Static menusListView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
         , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
@@ -2443,7 +2310,7 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
       menusList := menusListWelcome
    Else If (modus="freeform" || drawingShapeNow=1)
       menusList := menusListVector
-   Else If uiIsNowAlphaPainting()
+   Else If isNowAlphaPainting()
       menusList := menusListAlphaMasking
    Else If (imgEditPanelOpened=1 && AnyWindowOpen)
       menusList := menusListEditor
@@ -2584,8 +2451,8 @@ UpdateMenuBar(modus:=0, tt:=0) {
       hasRan := 1
    }
 
-   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar uiIsNowAlphaPainting()
-   ; ToolTip, % "lol"  uiIsNowAlphaPainting() uiIsAlphaMaskWindow()  , , , 2
+   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting()
+   ; ToolTip, % "lol"  isNowAlphaPainting() isAlphaMaskWindow()  , , , 2
    If !showMainMenuBar
       prevState := thisState
 
@@ -2688,14 +2555,13 @@ uiKeyboardResponder(givenKey, abusive) {
     ; ToolTip, % callMain "=" isOkay "(" imageLoading "|" animGIFplaying ")=" runningLongOperation "=" whileLoopExec "=" givenKey , , , 2
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
     {
-       ; uiAddJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
        MT_post("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
     }
 }
 
 uiPreProcessKbdKey() {
    Static lastInvoked := 1, counter := 0, prevKey
-   If (!uiIdentifyThisWin() || (A_TickCount - lastOtherWinClose<300))
+   If (!identifyThisWin() || (A_TickCount - lastOtherWinClose<300))
       Return
 
    ; ToolTip, % hotkate , , , 2
@@ -2713,7 +2579,6 @@ uiPreProcessKbdKey() {
           Return
    }
 
-   ; uiAddJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
    If ((A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0 || isVarEqualTo(givenKey, "Escape", "Enter","!F4")))
    {
       lastInvoked := A_TickCount
@@ -2731,31 +2596,6 @@ uiPreProcessKbdKey() {
       counter++
    Else 
       counter := 0
-}
-
-uiConstructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
-   Static vkList := {8:"BACKSPACE", 9:"TAB", C:"NUMPADCLEAR", D:"ENTER", 14:"CAPSLOCK", 1B:"ESCAPE", 20:"SPACE", 21:"PGUP", 22:"PGDN", 23:"END", 24:"HOME", 25:"LEFT", 26:"UP", 27:"RIGHT", 28:"DOWN", 2D:"INSERT", 2E:"DELETE", 5B:"SCROLLLOCK", 5D:"APPSKEY", 60:"NUMPAD0", 61:"NUMPAD1", 62:"NUMPAD2", 63:"NUMPAD3", 64:"NUMPAD4", 65:"NUMPAD5", 66:"NUMPAD6", 67:"NUMPAD7"
-                  , 68:"NUMPAD8", 69:"NUMPAD9", 6A:"NUMPADMULT", 6B:"NUMPADADD", 6D:"NUMPADSUB", 6E:"NUMPADDOT", 6F:"NUMPADDIV", 70:"F1", 71:"F2", 72:"F3", 73:"F4", 74:"F5", 75:"F6", 76:"F7", 77:"F8", 78:"F9", 79:"F10", 7A:"F11", 7B:"F12", 90:"NUMLOCK", AD:"VOLUME_MUTE", AE:"VOLUME_DOWN", AF:"VOLUME_UP", B0:"MEDIA_NEXT", B1:"MEDIA_PREV", B2:"MEDIA_STOP", B3:"MEDIA_PLAY_PAUSE"
-                  , FF:"PAUSE", 1:"LBUTTON", 2:"RBUTTON", 3:"BREAK", 4:"MBUTTON", 5:"XBUTTON1", 6:"XBUTTON2", 10:"SHIFT", 11:"CONTROL", 12:"ALT", 13:"PAUSE", 15:"KANA/HANGUL", 17:"JUNJA", 18:"IME_FINAL", 19:"HANJA/KANJI", 16:"IME_ON", 1A:"IME_OFF", 1C:"IME_CONVERT", 1D:"IME_NON_CONVERT", E5:"IME_PROCESSKEY", 1E:"IME_ACCEPT", 1F:"IME_MODECHANGE", 2F:"HELP", 29:"SELECT", 2A:"PRINT"
-                  , 2B:"EXECUTE", 2C:"PRINT_SCREEN", 5F:"SLEEP", 7C:"F13", 7D:"F14", 7E:"F15", 7F:"F16", 80:"F17", 81:"F18", 82:"F19", 83:"F20", 84:"F21", 85:"F22", 86:"F23", 87:"F24", A6:"BROWSER_BACK", A7:"BROWSER_FORWARD", A8:"BROWSER_REFRESH", A9:"BROWSER_STOP", AA:"BROWSER_SEARCH", AB:"BROWSER_FAVORITES", AC:"BROWSER_HOME", B4:"LAUNCH_MAIL", B5:"LAUNCH_MEDIA_SELECT"
-                  , B6:"LAUNCH_APP1", B7:"LAUNCH_APP2", F6:"ATTN", F7:"CrSEL", F8:"ExSEL", F9:"ERASE_EOF", FA:"PLAY", FB:"ZOOM", FD:"PA1", A0:"LSHIFT", A1:"RSHIFT", A2:"LCTRL", A3:"RCTRL", A4:"LALT", A5:"RALT", 5B:"LWIN", 5C:"RWIN", BF:"SLASH", DC:"BSLASH", C0:"TILDA", DE:"QUOTES"}
-        , vkExtraList := {30:"00.1", 31:"1", 32:"2", 33:"3", 34:"4", 35:"5", 36:"6", 37:"7", 38:"8", 39:"9", 41:"A", 42:"B", 43:"C", 44:"D", 45:"E", 46:"F", 47:"G", 48:"H", 49:"I", 4A:"J", 4B:"K", 4C:"L", 4D:"M", 4E:"N", 4F:"O", 50:"P", 51:"Q", 52:"R", 53:"S", 54:"T", 55:"U", 56:"V", 57:"W", 58:"X", 59:"Y", 5A:"Z", BB:"EQUAL", BC:"COMMA", BD:"MINUS", BE:"PERIOD", BA:"COLON", DB:"LBRACKET", DD:"RBRACKET"}
-        ; DF:"OEM_8", E2:"OEM_102", E1:"OEM_9", E3:"OEM_11", E4:"OEM_12", E6:"OEM_13", FE:"OEM_CLEAR", 92:"OEM_14", 93:"OEM_15", 94:"OEM_16", 95:"OEM_17", 96:"OEM_18"}
-   ; vk list based on https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
-
-   newkate := ""
-   If vk_shift
-      newkate .= "+"
-   If vk_ctrl
-      newkate .= "^"
-   If vk_alt
-      newkate .= "!"
-   If (vkExtraList[vk_code]!="")
-      newkate .= vkExtraList[vk_code]
-   Else
-      newkate .= vkList[vk_code] ? vkList[vk_code] : "vk" vk_code
-
-   Return newkate
 }
 
 uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
@@ -2790,7 +2630,7 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
        navKeysCounter++
 
     If (statusBarTooltipVisible=1)
-       uiMouseTurnOFFtooltip()
+       mouseTurnOFFtooltip()
 
     If (A_TickCount - lastOtherWinClose<300)
        Return 0
@@ -2809,7 +2649,7 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
     vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
     vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
-    hotkate := uiConstructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
+    hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
     ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying "|" hotkate , , , 2
     If (vk_code!=10 && vk_code!=11 && vk_code!=12)
     {
@@ -2842,34 +2682,6 @@ identifyMenus(){
 ; run during same-interpreter menu loops [probe p4], so it could not function
 ; after the merge. Its features ride the hooks now: wheel + RButton-announce via
 ; uiMenuMouseLL, announcements via uiMenuSelectTrack, native Left/Right/F10.
-
-mouseClickTurnOFFtooltip() {
-    SetTimer, uiMouseTurnOFFtooltip, -50
-}
-
-uiMouseTurnOFFtooltip() {
-   Global statusBarTooltipVisible := 0
-   If (uiMouseTipWinCreated!=1)
-      Return
-
-   MouseGetPos, ,, OutputVarWin
-   If (OutputVarWin=hGuiTip)
-      Global lastWinDrag := A_TickCount - 125
-   Sleep, 10
-   Gui, uiMouseTipGuia: Destroy
-   Global uiMouseTipWinCreated := 0
-   Global statusBarTooltipVisible := 0
-   Global lastZeitToolTip := A_TickCount
-   SetTimer, uiMouseTurnOFFtooltip, Off
-}
-
-destroyTooltipu() {
-   uiMouseTurnOFFtooltip()
-   Sleep, 1
-   MouseGetPos, ,, OutputVarWin
-   If (OutputVarWin=hQPVtoolbar && ShowAdvToolbar=1)
-      MouseClick, Left
-}
 
 ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="", stay:=0) {
     Static lastInvoked := 1, wasCreated := 0, hClickHalo
