@@ -22,7 +22,7 @@ jobs under one name (group A). 8 pairs are the same job that had drifted apart i
 interpreters (group B) — those were renamed rather than converged to keep phase A
 behaviour-neutral, and with a single interpreter they are now consolidation candidates.
 
-### Group A — same name, different job (18): both copies are needed
+### Group A — same name, different job (18): the rename was the right call; two of them are dead today (see §4)
 
 | thread-era name | module name now | main twin lives in | what the two do | bodies at master | bodies now | refs ui / main |
 |---|---|---|---|---|---|---|
@@ -50,7 +50,7 @@ behaviour-neutral, and with a single interpreter they are now consolidation cand
 | thread-era name | module name now | bodies at master | bodies now | refs ui / main | what differs today | verdict |
 |---|---|---|---|---|---|---|
 | `constructKbdKey` | `uiConstructKbdKey` | identical | identical | 1 / 2 | nothing (only the line-wrapping of the `vkList` literal) | delete `uiConstructKbdKey`, point `uiWM_KEYDOWN` at `constructKbdKey`; zero risk |
-| `identifyThisWin` | `uiIdentifyThisWin` | 0.88 | 0.88 | 2 / 7 | the module copy also accepts `otherAscriptHwnd`, which since the merge is `A_ScriptHwnd` — the script's own hidden window, never the active one in practice | consolidate onto `identifyThisWin` |
+| `identifyThisWin` | `uiIdentifyThisWin` | 0.88 | 0.88 | 2 / 7 | the module copy also accepts `otherAscriptHwnd`, which since the merge is always the script's own hidden window (`initInterfaceModule` seeds it with `A_ScriptHwnd`, and both callers of `menuFlyoutDisplay`, its only runtime setter, pass `A_ScriptHwnd`) — never the active window in practice | consolidate onto `identifyThisWin` |
 | `isAlphaMaskWindow` | `uiIsAlphaMaskWindow` | 0.54 | 0.54 | 1 / 29 | main's ID set is `23,24,31,32,70,74,89` (+ a `m` param); the module's stopped at `70` — the thread copy was never updated when panels 74 and 89 appeared | consolidate onto `isAlphaMaskWindow()`; fixes a latent drift on the UI side |
 | `isNowAlphaPainting` | `uiIsNowAlphaPainting` | 0.78 | 0.77 | 2 / 69 | main tests `isImgEditingNow()`; the module approximated it with mirrored flags (`imgEditPanelOpened=1 && editingSelectionNow=1`) because it could not call main | consolidate onto `isNowAlphaPainting()` after checking the two UI call sites accept `isImgEditingNow()` semantics |
 | `mouseCreateOSDinfoLine` | `uiMouseCreateOSDinfoLine` | 0.90 | 0.83 | 2 / 9 | two tooltip GUIs: the module pair drives `uiMouseTipGuia` (newer: OSD font name/bold prefs, `Critical`), main's drives `mouseToolTipGuia` for the panels | possible, but it means unifying the two tooltip windows — a medium job, not a free win |
@@ -86,20 +86,20 @@ was backported into msgbox2.ahk, `GetWinClientSize` adopted shell-stuff's supers
 | `isTlbrVertical` | quick-picto-viewer.ahk | identical | module copy deleted |
 | `isVarEqualTo` | quick-picto-viewer.ahk | identical | module copy deleted |
 | `JEE_ClientToScreen` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `JEE_ScreenToClient` | lib/shell-stuff.ahk | 1.00 | module copy deleted |
+| `JEE_ScreenToClient` | lib/shell-stuff.ahk | 1.00 | converged, module copy deleted |
 | `MDMF_FromHWND` | lib/Gdip_All.ahk | 0.99 | converged, module copy deleted |
-| `MDMF_FromPoint` | lib/Gdip_All.ahk | 1.00 | module copy deleted |
-| `MDMF_GetInfo` | lib/Gdip_All.ahk | 1.00 | module copy deleted |
+| `MDMF_FromPoint` | lib/Gdip_All.ahk | 1.00 | converged, module copy deleted |
+| `MDMF_GetInfo` | lib/Gdip_All.ahk | 1.00 | converged, module copy deleted |
 | `msgBoxWrapper` | quick-picto-viewer.ahk (14-param, msgbox2-based) | 0.04 | **absorbed**: the module's 7-param native-MsgBox version was dropped and its two callers retargeted to `simpleMsgBoxWrapper` |
 | `MWAGetMonitorMouseIsIn` | lib/shell-stuff.ahk | identical | module copy deleted |
 | `PreventKeyPressBeep` | **lib/module-interface.ahk** | identical | inverse case: main's copy was the dead one and was deleted |
-| `SetMenuInfo` | lib/shell-stuff.ahk | 1.00 | module copy deleted |
+| `SetMenuInfo` | lib/shell-stuff.ahk | 1.00 | converged, module copy deleted |
 | `setMenusTheme` | lib/shell-stuff.ahk | 0.94 | converged, module copy deleted (with shell-stuff's forwarder line) |
 | `SetParentID` | quick-picto-viewer.ahk | 0.93 | converged, module copy deleted |
 | `setPriorityThread` | lib/shell-stuff.ahk | identical | module copy deleted |
 | `Trimmer` | quick-picto-viewer.ahk | identical | module copy deleted |
 | `UnregisterTouchWindow` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `WinMoveZ` | lib/shell-stuff.ahk | 1.00 | module copy deleted |
+| `WinMoveZ` | lib/shell-stuff.ahk | 1.00 | converged, module copy deleted |
 
 ## 3. Renamed for another reason: the numbered GUIs got names
 
