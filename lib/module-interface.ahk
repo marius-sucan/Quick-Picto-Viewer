@@ -2783,15 +2783,20 @@ uiConstructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
 }
 
 uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
-    ; [phase D, per Marius] Alt+letter mnemonics for the menu BAR are no longer
-    ; intercepted: returning EMPTY hands the WM_SYSKEYDOWN to DefWindowProc and
-    ; Windows opens the bar natively - full native keyboard navigation, Left and
-    ; Right switching included. The old path opened a detached positioned popup
-    ; in which Left/Right could not switch menus.
+    ; [phase D, per Marius] Alt+letter must open the bar menu as NATIVE bar
+    ; tracking [so Left/Right switch menus, like a mouse open] instead of the old
+    ; detached positioned popup. Merely returning empty and hoping DefWindowProc
+    ; activates the mnemonic does NOT work here [focus sits on PVwin's hidden
+    ; controls and the SYSCHAR chain never completes - Alt+I went dead]; the
+    ; mechanism Windows itself uses is posted instead: WM_SYSCOMMAND SC_KEYMENU
+    ; with the character enters keyboard menu mode for that mnemonic natively.
     If (msg=0x104 && showMainMenuBar=1 && wParam>=0x41 && wParam<=0x5A)
     {
        If InStr(menuHotkeys, "!" Chr(wParam + 32) "|")
-          Return
+       {
+          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x0112, "Ptr", 0xF100, "Ptr", wParam + 32)
+          Return 0
+       }
     }
     vk_code := Format("{1:x}", wParam)
     If (isInRange(vk_code, 21, 28) || isVarEqualTo(vk_code, "6B", "6D", "BB", "BD", "D"))
