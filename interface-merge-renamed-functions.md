@@ -149,7 +149,58 @@ GUIs could not coexist). AutoHotkey derives the implicit event handlers from the
   unreachable `!Space` branch of `uiKeyboardResponder`; `Win_ShowSysMenu` in shell-stuff.ahk is kept
   on purpose as the library helper for a programmatic system menu.
 
-## 5. Reproducing the numbers
+## 7. Useless wrappers — inventory of 2026-09-02
+
+Criterion: a wrapper is useless when its body only forwards to another function — directly, or
+through the `MT_post`/`IF_post` queue — and every caller could name the target itself with no
+change in behaviour. Two facts decide most rows: a `SetTimer` target already runs as a queued
+thread, so a *timer → wrapper → `MT_post`* chain defers twice for nothing; and `? 1 : 0` adds
+nothing to a value that is only ever tested as a boolean. Method: every module function with
+three or fewer code lines (23 of 111) was classified by body shape and by how it is referenced
+(direct call, `SetTimer` target, quoted name, `g`-label); the 4–12-line relays were read by hand;
+the main script was checked for the functions the merge added there.
+
+### A. Pure forwards in module-interface.ahk — delete and retarget
+
+| wrapper | body | referenced by | replacement |
+|---|---|---|---|
+| `identifyMenus()` | `Return uiVisibleMenuWin() ? 1 : 0` | 2 direct calls, both `!identifyMenus()` | `uiVisibleMenuWin()` — it returns the menu hwnd or 0, which is all a boolean test needs |
+| `sendWinClickAct(ctrlEvent, guiCtrl, mX, mY)` | `MT_post("WinClickAction", ctrlEvent, guiCtrl, mX, mY)` | 2 direct calls (the LButton-up handler, `uiWinClickAction`) | `MT_post("WinClickAction", …)` written at the two sites |
+| `uiRepositionTempBtnGui()` | `MT_post("RepositionTempBtnGui")` | 1 `SetTimer … -95` | `SetTimer, RepositionTempBtnGui, -95` — `RepositionTempBtnGui(mm:=0)` is timer-callable |
+| `uiSaveMainWinPos()` | `MT_post("saveMainWinPos")` | 1 `SetTimer … -35` | `SetTimer, saveMainWinPos, -35` |
+
+### B. Merge facades in quick-picto-viewer.ahk
+
+| facade | what it is today | sites | replacement |
+|---|---|---|---|
+| `IF_call(funcName, args*)` | a 23-line arity-dispatched dynamic call, `%funcName%(a1 … a9)` | 11, every one with a literal function name | the plain direct call `funcName(args)`. The facade exists because the target used to live in the other interpreter; now it is only a slower, arity-capped way to write a normal call |
+| `IF_post` and `MT_post` | byte-identical bodies: `Func("IF_postRelay").Bind(funcName, args)` + `SetTimer, % fn, -1` | 41 + 32 | one name is enough — they were the two directions of a bridge that no longer has two sides. The queued semantics are real and stay; pick one name and rename the other's sites (a whole-word rename). `IF_postRelay` stays, it is the relay both use |
+
+### C. Thin relays — not useless, but only a 300 ms debounce away from it
+
+| relay | body | callers |
+|---|---|---|
+| `uiToggleAppToolbar()` | 300 ms debounce, then `MT_post("toggleAppToolbar")` | 1 |
+| `uiToggleMenuBaru()` | 300 ms debounce, then `MT_post("ToggleMenuBaru")` | 1 |
+| `uiPanelQuickSearchMenuOptions()` | 300 ms debounce, then `MT_post` of `closeQuickSearch` or `PanelQuickSearchMenuOptions` depending on `VisibleQuickMenuSearchWin` | 1 |
+| `uiInitGuiContextMenu(mX, mY, oX, oY)` | `IdentifyCtrlUnderMouse(oX, oY)`, then `MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)` | 2 |
+
+If the three targets took over their own debounce, the first three relays would fall into group A.
+The fourth is an argument adapter shared by two callers — cheap to inline, harmless to keep.
+
+### D. Looked like wrappers, are not — keep
+
+- Timer adapters that exist because `SetTimer` cannot pass arguments or run a bare command:
+  `DestroyClickHalo` (`Gui, MclickH: Hide`; `ShowClickHalo` is still posted from the main script),
+  `trackMouseDragging` (stamps `lastWinDrag`), `miniGDIupdater` (two actions).
+- Real logic with a small body: the six `dispatch*` window-root dispatchers, `isUIrootWin`,
+  `preventSillyGui`, `TestDraggableWindow`, `WM_MOUSELEAVE`, `PreventKeyPressBeep`,
+  `updateWindowColor`, `destroyMenuFlyout`, `stopDupesEngineNow` (a named DllCall with one
+  caller — inline it if you like), and `MenuBonusOptions` (a `SoundBeep` placeholder menu handler).
+- The main script gained only five functions in the merge: the three facades above, plus
+  `armSQLiteAbortHandler` and `sqliteProgressCB` (the SQLite abort hook, real code).
+
+## Appendix — reproducing the numbers
 
 Parse column-0 `name(...)` definitions (body to the next column-0 `}`) from
 `git show master:lib/module-interface.ahk`, `git show a850285:lib/module-interface.ahk`,
