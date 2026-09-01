@@ -86,6 +86,7 @@ SetWorkingDir, %A_ScriptDir%
 #Include %A_ScriptDir%\Lib\cli-interface.ahk      ; command line interface
 #Include %A_ScriptDir%\Lib\file-get-prop-lib.ahk  ; used to get file properties on Alt+Enter [ File Information panel ]
 #Include %A_ScriptDir%\Lib\Class_screenQPVimage.ahk
+#Include %A_ScriptDir%\Lib\Class_taskbarInterface.ahk ; by Helgef
 ; #Include %A_ScriptDir%\Lib\json.ahk
 
 SetWinDelay, 1
