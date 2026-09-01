@@ -107,14 +107,6 @@ MT_post(funcName, args*) {
    SetTimer, % fn, -1
 }
 
-MT_get(varName) {
-   Return IF_get(varName)
-}
-
-MT_set(varName, value) {
-   IF_set(varName, value)
-}
-
 ; ______ merged-thread input routing [merge phase C] ______
 ; Before the merge, each interpreter's OnMessage monitors received messages ONLY
 ; for its own windows, and every handler's guards assume exactly that universe.
@@ -439,7 +431,7 @@ pumpPenMessages() {
 
 updateWindowColor() {
   Sleep, 1
-  ; WindowBgrColor := MT_get("WindowBgrColor")
+  ; WindowBgrColor := WindowBgrColor
   Gui, PVwin: Color, %WindowBgrColor%
 }
 
@@ -663,7 +655,7 @@ uiUpdateUIctrl(forceThis:=0) {
       GuiH -= tH
 
    If (forceThis=1)
-      editingSelectionNow := MT_get("editingSelectionNow")
+      editingSelectionNow := editingSelectionNow
 
    lastWinStatus := ""
    ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
@@ -1255,9 +1247,9 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If (uiMouseTipWinCreated=1)
      uiMouseTurnOFFtooltip()
 
-  ; thumbsDisplaying := MT_get("thumbsDisplaying")
-  ; AnyWindowOpen := MT_get("AnyWindowOpen")
-  ; maxFilesIndex := MT_get("maxFilesIndex")
+  ; thumbsDisplaying := thumbsDisplaying
+  ; AnyWindowOpen := AnyWindowOpen
+  ; maxFilesIndex := maxFilesIndex
   If !uiIdentifyThisWin()
      Return 0
 
@@ -1426,7 +1418,7 @@ WM_PENpressure(wp, lp, msg, hwnd) {
 }
 
 updateGDIwinPos() {
-  ; thumbsDisplaying := MT_get("thumbsDisplaying")
+  ; thumbsDisplaying := thumbsDisplaying
   ; If (A_OSVersion="WIN_7")
   JEE_ClientToScreen(hPicOnGui1, 0, 0, GuiX, GuiY)
   ; Else GuiX := GuiY := 1
@@ -1636,7 +1628,7 @@ uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     Gui, uiMouseTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
     Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
-    MT_set("hGuiTip", hGuiTip)
+    hGuiTip := hGuiTip ; [was MT_set - plain global since phase E]
     If (unClickable=1)
       WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
 
@@ -1800,7 +1792,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
   {
      PostMessage, 0xA1, 2,,, ahk_id %PVhwnd%
      Global lastWinDrag := A_TickCount
-     ; MT_set("lastWinDrag", lastWinDrag)
+     ; lastWinDrag := lastWinDrag ; [was MT_set - plain global since phase E]
      SetTimer, trackMouseDragging, -55
   } 
 }
@@ -2493,7 +2485,7 @@ UpdateMenuBar(modus:=0, tt:=0) {
 
    ; Sleep, -1
    BuildMenuBar(modus, 0)
-   MT_set("menuHotkeys", menuHotkeys)
+   menuHotkeys := menuHotkeys ; [was MT_set - plain global since phase E]
    ; SetMenuInfo(MenuGetHandle("PVbar"), 2, 1, 0, 1)
    ; Sleep, -1
    ; Gui, PVwin: Menu, PVmanu

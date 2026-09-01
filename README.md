@@ -234,7 +234,7 @@
 <h1>Other details</h1>
 <p>Developed by <a href="http://marius.sucan.ro/">Marius Șucan</a> with special attention for people with disabilities.</p>
 
-<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey_H v1.1.33. To execute or compile the source code one needs <a href="https://hotkeyit.github.io/v2/">AHK_H</a>.</p>
+<p>I coded the application as an <a href="https://autohotkey.com/">AHK script</a> for AutoHotkey v1.1. Since the 2026-08 interface-thread merge it no longer relies on AutoHotkey_H: plain <a href="https://autohotkey.com/">AutoHotkey v1.1</a> (v1.1.33 or newer) executes it, and the official Ahk2Exe compiles it. The AHK_H archive kept in the repository is historical.</p>
 
 <p>Quick Picto Viewer can run on Windows 7 and even on XP, but various features might not work. To this end, you may have to copy all the DLL files found in the .\optional-DLL-files-x64\ folder to the same folder where the QPV binary is. If you are running it uncompiled, you must place them in the folder where the AutoHotkey binary resides. The required DLLs for x64 are bundled since version 5.7.5 in the ZIP package and can also be found in the Github repository.</p>
 

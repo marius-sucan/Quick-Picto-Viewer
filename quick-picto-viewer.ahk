@@ -447,13 +447,12 @@ If (FirstRun!=0)
 ; there; the old separate ahkthread interpreter is gone.
 initInterfaceModule()
 
-; ______ interface facade [merged - phase C] ______
-; The seven IF_*/MT_* facades survive the merge so the ~315 former cross-thread
-; call sites stay untouched; only the bodies changed. IF_call runs the target
-; directly; IF_post/MT_post preserve the old queued semantics [a post executed
-; when the receiving interpreter pumped] via one-shot BoundFunc timers; IF_set
-; and IF_get are plain global access [many callers pair IF_set with a local
-; write - harmless echoes now, cleaned up in phase E].
+; ______ interface facade [merged - phases C+E] ______
+; IF_call runs its target directly [arity-dispatched dynamic call]; IF_post and
+; MT_post preserve the old cross-interpreter queued semantics [a post executed
+; when the receiving thread pumped] via one-shot BoundFunc timers through
+; IF_postRelay. The former IF_set/IF_get/MT_set/MT_get variable facades were
+; retired at phase E - every site is a plain global assignment or read now.
 ; PARSER RULE for this runtime [see interface-thread-merge-plan.md]: no args*
 ; expansion into METHOD calls and no args[N] inside call arguments - hoist into
 ; plain locals and dispatch on the count, as below.
@@ -515,16 +514,6 @@ IF_postRelay(funcName, args) {
       %funcName%(a1, a2, a3, a4, a5, a6, a7, a8)
    Else
       %funcName%(a1, a2, a3, a4, a5, a6, a7, a8, a9)
-}
-
-IF_set(varName, value) {
-   Global
-   %varName% := value
-}
-
-IF_get(varName) {
-   Global
-   Return %varName%
 }
 
 ; the interface windows, menus and input handling live in Lib\module-interface.ahk
@@ -943,7 +932,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
           If (givenKey="escape")
           {
              lastOtherWinClose := A_TickCount
-             IF_set("lastOtherWinClose", lastOtherWinClose)
+             lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
           }
 
           deactivateTlbrKbdMode(1)
@@ -1019,12 +1008,12 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
       KeyboardResponder(givenKey, thisWin, 0, "n")
    } Else If (totalFramesIndex>2 && CountGIFframes>2)
    {
-      animGIFplaying := IF_get("animGIFplaying")
+      animGIFplaying := animGIFplaying
       If (animGIFplaying=-1)
       {
          imgPath := resultedFilesList[currentFileIndex, 1]
          animGIFplaying := 1
-         IF_set("animGIFplaying", animGIFplaying)
+         animGIFplaying := animGIFplaying ; [was IF_set - plain global since phase E]
          ; setGIFframesDelay()
          autoChangeDesiredFrame("start", imgPath)
          SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
@@ -2470,7 +2459,7 @@ initQPVmainDLL(modus:=0) {
       RegExFilesPattern := "i)^(.\:\\).*(\.(" 
       RegExFilesPattern .= extensionsList
       RegExFilesPattern .= "))$"
-      ; IF_set("RegExFilesPattern", RegExFilesPattern)
+      ; RegExFilesPattern := RegExFilesPattern ; [was IF_set - plain global since phase E]
       allFormats := openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
       Loop, Parse, extensionsList, |
       {
@@ -2481,7 +2470,7 @@ initQPVmainDLL(modus:=0) {
       fnOutputDebug("WIC init formats: " openFptrnWIC)
    } Else addJournalEntry("ERROR: Failed to initialize WIC module. Some image formats may not be supported.")
 
-   ; IF_set("RegExFilesPattern", RegExFilesPattern)
+   ; RegExFilesPattern := RegExFilesPattern ; [was IF_set - plain global since phase E]
    RegWrite, REG_SZ, %QPVregEntry%, RegExFilesPattern, % RegExFilesPattern
    ; MsgBox, % WICmoduleHasInit "==" CLSIDlist "`n" extensionsList
    ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
@@ -2632,7 +2621,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      res := sldGenerateFilesList(fileNamu, 0, mustRemQuotes)
 
   currentFilesListModified := 0
-  IF_set("currentFilesListModified", currentFilesListModified)
+  currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
   prevOpenFolderPath := OutDir
   INIaction(1, "prevOpenFolderPath", "General")
   If (res="abandoned")
@@ -2683,7 +2672,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
 endCaptureCloneBrush() {
    mustCaptureCloneBrush := 0
-   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   mustCaptureCloneBrush := mustCaptureCloneBrush ; [was IF_set - plain global since phase E]
    IF_post("setMenuBarState", "Enable", "PVbar")
    createGUItoolbar()
 }
@@ -2722,8 +2711,8 @@ resetMainWin2Welcome() {
      filesFilter := EntryMarkedMoveIndex := mustOpenStartFolder := ""
      createGDIPcanvas()
      ToggleVisibilityWindow("show", hGDIwin)
-     IF_set("thumbsDisplaying", 0)
-     IF_set("maxFilesIndex", maxFilesIndex)
+     thumbsDisplaying := 0 ; [was IF_set - plain global since phase E]
+     maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
      Gdip_GraphicsClear(glPG, "0x00" WindowBgrColor)
      doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, glHDC, 1)
      doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC, 1)
@@ -2786,14 +2775,14 @@ mainWinTabResponse() {
 }
 
 GenerateRandyList() {
-   IF_set("maxFilesIndex", maxFilesIndex)
+   maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
    RandyIMGids := []
    RandyIMGnow := -1
    ; MsgBox, % SecToHHMMSS((A_TickCount - startZeit)/1000)
 }
 
 coreGenerateRandomList() {
-   IF_set("maxFilesIndex", maxFilesIndex)
+   maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
    RandyIMGids := []
    If (slidesRandoMode=1 || maxFilesIndex<100 || !slidesRandoMode)
    {
@@ -4957,8 +4946,8 @@ ToggleThumbsMode() {
    }
 
    currentFileIndex := clampInRange(currentFileIndex, 1, maxFilesIndex)
-   IF_set("lastCloseInvoked", 0)
-   IF_set("currentFilesListModified", currentFilesListModified)
+   lastCloseInvoked := 0 ; [was IF_set - plain global since phase E]
+   currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
    thisIndexu := resultedFilesList[currentFileIndex, 1] currentFileIndex
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
    If (thumbsDisplaying=1)
@@ -5032,7 +5021,7 @@ TriggerMenuBarUpdate(modus:=0, tt:=0) {
       modus := "freeform"
 
    lastMenuBarUpdated := A_TickCount
-   ; IF_set("thumbsDisplaying", thumbsDisplaying)
+   ; thumbsDisplaying := thumbsDisplaying ; [was IF_set - plain global since phase E]
    IF_post("UpdateMenuBar", modus, tt)
    SetTimer, refreshEntireViewport, -450
 }
@@ -5591,7 +5580,7 @@ ThumbsScrollbar() {
 
 setWhileLoopExec(val) {
    whileLoopExec := val
-   IF_set("whileLoopExec", val)
+   whileLoopExec := val ; [was IF_set - plain global since phase E]
 }
 
 simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
@@ -5824,7 +5813,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       } Else 
       {
          toolTipGuiCreated := 0
-         IF_set("toolTipGuiCreated", 0)
+         toolTipGuiCreated := 0 ; [was IF_set - plain global since phase E]
          clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
       }
    }
@@ -5832,14 +5821,14 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    IF clear
    {
       toolTipGuiCreated := 0
-      IF_set("toolTipGuiCreated", 0)
+      toolTipGuiCreated := 0 ; [was IF_set - plain global since phase E]
       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    }
 
    setWhileLoopExec(0)
    lastSwipeZeitGesture := A_TickCount
    If (doFrameChange || doNextSlide || doPrevSlide || doZoomChange)
-      IF_set("lastSwipeZeitGesture", lastSwipeZeitGesture)
+      lastSwipeZeitGesture := lastSwipeZeitGesture ; [was IF_set - plain global since phase E]
 
    didSomething := 1
    If doFrameChange
@@ -5855,7 +5844,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
 
    lastSwipeZeitGesture := A_TickCount
    If didSomething
-      IF_set("lastSwipeZeitGesture", lastSwipeZeitGesture)
+      lastSwipeZeitGesture := lastSwipeZeitGesture ; [was IF_set - plain global since phase E]
    Else
       zeitSillyPrevent := 1
 
@@ -5980,7 +5969,7 @@ BtnSetBrushSymmetryCoords() {
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
    IF_post("setMenuBarState", "Disable", "PVbar")
-   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   mustCaptureCloneBrush := mustCaptureCloneBrush ; [was IF_set - plain global since phase E]
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -9889,7 +9878,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             {
                func2exec := r := info := ""
                Global lastOtherWinClose := A_TickCount
-               IF_set("lastOtherWinClose", lastOtherWinClose)
+               lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
                Break
             }
 
@@ -11146,14 +11135,14 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      }
 
      imageLoading := 0
-     IF_set("imageLoading", imageLoading)
+     imageLoading := imageLoading ; [was IF_set - plain global since phase E]
      changeMcursor("normal-extra")
      SetTimer, ResetImgLoadStatus, Off
      If (StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && resetMode!=1)
         startSlidesMusicNow()
 
      slideShowRunning := 1
-     IF_set("allowNextSlide", 1)
+     allowNextSlide := 1 ; [was IF_set - plain global since phase E]
      If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
         milisec := MCI_Length(hSNDmedia) 
 
@@ -11637,7 +11626,7 @@ coreResetIMGview(dummy:=0) {
      ForceRefreshNowThumbsList()
   }
 
-  IF_set("IMGresizingMode", IMGresizingMode)
+  IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
   If (dummy="k")
      usrColorDepth := internalColorDepth := 1
 
@@ -12378,7 +12367,7 @@ DestroyGIFuWin() {
     If (slideShowRunning=1 || animGIFplaying=1)
        SetTimer, ResetImgLoadStatus, -15
 
-    IF_set("animGIFplaying", 0)
+    animGIFplaying := 0 ; [was IF_set - plain global since phase E]
     SetTimer, autoChangeDesiredFrame, Off
     autoChangeDesiredFrame("stop")
 }
@@ -12410,7 +12399,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          lastFrameChange := A_TickCount
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
-         IF_set("animGIFplaying", 0)
+         animGIFplaying := 0 ; [was IF_set - plain global since phase E]
          ResetImgLoadStatus()
          ; dummyTimerDelayiedImageDisplay(50)
       }
@@ -12428,14 +12417,14 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       prevImgPath := imgPath
       allowNextSlide := 0
       animGIFplaying := 1
-      IF_set("animGIFplaying", 1)
-      IF_set("allowNextSlide", allowNextSlide)
+      animGIFplaying := 1 ; [was IF_set - plain global since phase E]
+      allowNextSlide := allowNextSlide ; [was IF_set - plain global since phase E]
       Return
    } Else
    {
       Sleep, -1
-      animGIFplaying := IF_get("animGIFplaying")
-      ; mustHalt := IF_get("mustProcessKeys")
+      animGIFplaying := animGIFplaying
+      ; mustHalt := mustProcessKeys
       If (animGIFplaying<=0)
       {
          OutputDebug, % "QPVMERGE: gifKill [flag read <=0]"
@@ -12443,11 +12432,11 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          SetTimer, autoChangeDesiredFrame, Off
          animGIFplaying := 0
          allowNextSlide := 1
-         IF_set("allowNextSlide", allowNextSlide)
+         allowNextSlide := allowNextSlide ; [was IF_set - plain global since phase E]
          prevImgPath := ""
          If (animGIFplaying=0)
          {
-            IF_set("animGIFplaying", 0)
+            animGIFplaying := 0 ; [was IF_set - plain global since phase E]
             prevAnimGIFwas := prevImgPath
             lastFrameChange := A_TickCount
             Global lastGIFdestroy := A_TickCount
@@ -16907,8 +16896,8 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
    }
 
    currentImgModified := 1
-   IF_set("UserMemBMP", UserMemBMP)
-   IF_set("undoLevelsRecorded", undoLevelsRecorded)
+   UserMemBMP := UserMemBMP ; [was IF_set - plain global since phase E]
+   undoLevelsRecorded := undoLevelsRecorded ; [was IF_set - plain global since phase E]
    SetTimer, ResetImgLoadStatus, -50
    SetTimer, TriggerMenuBarUpdate, -50
    If (A_TickCount - lastInvoked>950) && (liveDrawingBrushTool=0 && AnyWindowOpen!=66)
@@ -16979,8 +16968,8 @@ terminateIMGediting(modus:=0) {
          currentVectorUndoLevel := 1
          customShapeHasSelectedPoints := 0
          currentUndoLevel := hasReachedMaxUndoLevels := undoLevelsRecorded := 0
-         IF_set("UserMemBMP", UserMemBMP)
-         IF_set("undoLevelsRecorded", undoLevelsRecorded)
+         UserMemBMP := UserMemBMP ; [was IF_set - plain global since phase E]
+         undoLevelsRecorded := undoLevelsRecorded ; [was IF_set - plain global since phase E]
          SetTimer, TriggerMenuBarUpdate, -50
          Return
       }
@@ -17006,8 +16995,8 @@ terminateIMGediting(modus:=0) {
    currentSelUndoLevel := 1
    undoSelLevelsArray := []
    currentUndoLevel := hasReachedMaxUndoLevels := undoLevelsRecorded := 0
-   IF_set("UserMemBMP", UserMemBMP)
-   IF_set("undoLevelsRecorded", undoLevelsRecorded)
+   UserMemBMP := UserMemBMP ; [was IF_set - plain global since phase E]
+   undoLevelsRecorded := undoLevelsRecorded ; [was IF_set - plain global since phase E]
    SetTimer, TriggerMenuBarUpdate, -50
 }
 
@@ -21239,8 +21228,8 @@ HugeImagesConvertClrDepth(modus) {
 setHugeImageActionsCount(actions) {
     bmp := viewportQPVimage.imgHandle
     viewportQPVimage.actions := Round(actions)
-    IF_set("UserMemBMP", bmp)
-    IF_set("undoLevelsRecorded", actions)
+    UserMemBMP := bmp ; [was IF_set - plain global since phase E]
+    undoLevelsRecorded := actions ; [was IF_set - plain global since phase E]
     imgIndexEditing := currentFileIndex
     currentImgModified := 1
 }
@@ -27064,7 +27053,7 @@ OpenDirsFavedEntry(a, b, c) {
       resultedFilesList[currentFileIndex, 5] := 1
       currentImgModified := 0
       SlidesMusicSong := ""
-      IF_set("currentFilesListModified", currentFilesListModified)
+      currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
    } Else If (folderu="\QPV\favourite-images-list.SLD")
       retrieveFavesAsList()
    Else If (folderu="\QPV\viewed-images-history|current-session.SLD")
@@ -27606,7 +27595,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
        prevBtnList := ""
        Gui, TempBtnGui: Destroy
        tempBtnVisible := "null"
-       IF_set("tempBtnVisible", tempBtnVisible)
+       tempBtnVisible := tempBtnVisible ; [was IF_set - plain global since phase E]
        Return
     }
 
@@ -27644,7 +27633,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
     RepositionTempBtnGui()
     If InStr(btnList, ",,")
        prevBtnList := btnList
-    IF_set("tempBtnVisible", tempBtnVisible)
+    tempBtnVisible := tempBtnVisible ; [was IF_set - plain global since phase E]
     SetTimer, DestroyTempBtnGui, % - delayu
     lastCreated := A_TickCount
 }
@@ -28036,7 +28025,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        If (closeEditPanelOnApply=-1)
           INIaction(0, "closeEditPanelOnApply", "General", 1)
 
-       ; IF_set("AnyWindowOpen", IDwin)
+       ; AnyWindowOpen := IDwin ; [was IF_set - plain global since phase E]
        ; TriggerMenuBarUpdate()
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
@@ -30430,7 +30419,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
      showTOOLtip("Operation abandoned by user")
      SetTimer, RemoveTooltip, % -msgDisplayTime
      lastOtherWinClose := A_TickCount
-     IF_set("lastOtherWinClose", lastOtherWinClose)
+     lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
      SetTimer, ResetImgLoadStatus, -200
      GuiControl, SettingsGUIA:, infoLine, Operation abandoned by user
      Return
@@ -30610,7 +30599,7 @@ PanelFoldersTree() {
     {
        Gui, fdTreeGuia: Show
        folderTreeWinOpen := 1
-       IF_set("folderTreeWinOpen", folderTreeWinOpen)
+       folderTreeWinOpen := folderTreeWinOpen ; [was IF_set - plain global since phase E]
        Return
     }
 
@@ -30650,8 +30639,8 @@ PanelFoldersTree() {
     winPos := (prevSetWinPosX && prevSetWinPosY) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("fdTreeGuia", hfdTreeWinGui, 0, "Folders tree view: " appTitle, winPos)
     folderTreeWinOpen := 1
-    IF_set("folderTreeWinOpen", folderTreeWinOpen)
-    IF_set("hfdTreeWinGui", hfdTreeWinGui)
+    folderTreeWinOpen := folderTreeWinOpen ; [was IF_set - plain global since phase E]
+    hfdTreeWinGui := hfdTreeWinGui ; [was IF_set - plain global since phase E]
     hasRan := 1
     SetTimer, FolderTreeRepopulate, -100
     fdTreeGuiaGuiSize()
@@ -30794,10 +30783,10 @@ fdTreeGuiaGuiSize() {
 fdTreeClose() {
    lastTimeToggleThumbs := A_TickCount 
    lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
    Gui, fdTreeGuia: Hide
    folderTreeWinOpen := 0
-   IF_set("folderTreeWinOpen", folderTreeWinOpen)
+   folderTreeWinOpen := folderTreeWinOpen ; [was IF_set - plain global since phase E]
 }
 
 fdTreeGuiaGuiClose:
@@ -30892,7 +30881,7 @@ FolderTreeResponder(a, b, c) {
             func2exec := r := info := ""
             thisFolder := dc := nc := r := info := ""
             Global lastOtherWinClose := A_TickCount
-            IF_set("lastOtherWinClose", lastOtherWinClose)
+            lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
             Break
          }
 
@@ -33412,7 +33401,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     If hasDisabled[1]
        WinSet, Enable,, ahk_id %hfdTreeWinGui%
 
-    IF_set("lastOtherWinClose", lastOtherWinClose)
+    lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
     If (buttonz!=-1)
        addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
     Else
@@ -33421,7 +33410,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     If (panelMode=1) ; fake window panel
     {
        AnyWindowOpen := isNowFakeWinOpen := 0
-       IF_set("AnyWindowOpen", AnyWindowOpen)
+       AnyWindowOpen := AnyWindowOpen ; [was IF_set - plain global since phase E]
     }
     createGUItoolbar()
     lastLongOperationAbort := A_TickCount
@@ -38712,7 +38701,7 @@ readSlideSettingsINI(readThisFile, act:=0) {
         If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
            imageAlignVPtopLeft := 0
 
-        IF_set("WindowBGRcolor", WindowBGRcolor)
+        WindowBGRcolor := WindowBGRcolor ; [was IF_set - plain global since phase E]
         IF_call("updateWindowColor")
         refreshWinBGRbrush()
         defineColorDepth()
@@ -39471,7 +39460,7 @@ retrieveFavesAsList(dummy:=0) {
    If (thumbsDisplaying!=1 && !isNumber(dummy))
       MenuDummyToggleThumbsMode()
 
-   IF_set("currentFilesListModified", currentFilesListModified)
+   currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
    GenerateRandyList()
    createGUItoolbar()
    p := (ShowAdvToolbar=1 && lockToolbar2Win=1) ? 100 : 50
@@ -39707,8 +39696,8 @@ invertFilesSelection() {
    Else
       dummyTimerDelayiedImageDisplay(50)
 
-   IF_set("maxFilesIndex", maxFilesIndex)
-   IF_set("markedSelectFile", markedSelectFile)
+   maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+   markedSelectFile := markedSelectFile ; [was IF_set - plain global since phase E]
    showTOOLtip("Files selection inverted`n" groupDigits(markedSelectFile) " files are now selected")
    If (thumbsDisplaying=1)
       QPV_ListViewGridHUDoverlay()
@@ -39770,8 +39759,8 @@ markThisFileNow(thisFileIndex:=0) {
   Else
      dummyTimerDelayiedImageDisplay(25)
 
-  IF_set("maxFilesIndex", maxFilesIndex)
-  IF_set("markedSelectFile", markedSelectFile)
+  maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+  markedSelectFile := markedSelectFile ; [was IF_set - plain global since phase E]
 }
 
 jumpToFilesSelBorderFirst() {
@@ -39798,8 +39787,8 @@ jumpToFilesSelBorder(destination) {
   FriendlyName := (destination=-1) ? "First" : "Last"
   dummyTimerDelayiedImageDisplay(50)
   showTOOLtip(FriendlyName " selected element index: " groupDigits(currentFileIndex) "`n" groupDigits(markedSelectFile) " total images selected")
-  IF_set("maxFilesIndex", maxFilesIndex)
-  IF_set("markedSelectFile", markedSelectFile)
+  maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+  markedSelectFile := markedSelectFile ; [was IF_set - plain global since phase E]
   SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -41869,7 +41858,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     If (createdQuickMenuSearchWin=1 && thisState=lastState && VisibleQuickMenuSearchWin=1)
     {
        WinActivate, ahk_id %hQuickMenuSearchWin%
-       IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+       VisibleQuickMenuSearchWin := VisibleQuickMenuSearchWin ; [was IF_set - plain global since phase E]
        uiPopulateQuickMenuSearch("resel")
        Return
     } Else If (createdQuickMenuSearchWin=1 && thisState=lastState)
@@ -41877,7 +41866,7 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
        Gui, QuickMenuSearchGUIA: Show
        EM_SETSEL(hEditMenuSearch, 0, StrLen(userQuickMenusEdit))
        VisibleQuickMenuSearchWin := 1
-       IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+       VisibleQuickMenuSearchWin := VisibleQuickMenuSearchWin ; [was IF_set - plain global since phase E]
        uiPopulateQuickMenuSearch("resel")
        SetTimer, updateUistatusLineQuickSearch, -50
        Return
@@ -41924,8 +41913,8 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     VisibleQuickMenuSearchWin := 1
     createdQuickMenuSearchWin := 1
     lastLVquickSearchSortCol := [8, "SortDesc"]
-    IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
-    IF_set("hQuickMenuSearchWin", hQuickMenuSearchWin)
+    VisibleQuickMenuSearchWin := VisibleQuickMenuSearchWin ; [was IF_set - plain global since phase E]
+    hQuickMenuSearchWin := hQuickMenuSearchWin ; [was IF_set - plain global since phase E]
     lastState := thisState
     repositionWindowCenter("QuickMenuSearchGUIA", hQuickMenuSearchWin, PVhwnd, "Quick menu options search")
     QuickMenuSearchGUIAGuiSize()
@@ -42021,7 +42010,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             func2exec := r := info := ""
             thisFolder := dc := nc := r := info := ""
             Global lastOtherWinClose := A_TickCount
-            IF_set("lastOtherWinClose", lastOtherWinClose)
+            lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
             Break
          }
 
@@ -42432,10 +42421,10 @@ closeQuickSearch() {
    lastTimeToggleThumbs := A_TickCount 
    Gui, QuickMenuSearchGUIA: Hide
    Global lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
    ; hQuickMenuSearchWin := ""
    VisibleQuickMenuSearchWin := 0
-   IF_set("VisibleQuickMenuSearchWin", VisibleQuickMenuSearchWin)
+   VisibleQuickMenuSearchWin := VisibleQuickMenuSearchWin ; [was IF_set - plain global since phase E]
 }
 
 QuickMenuSearchGUIAGuiEscape:
@@ -42641,7 +42630,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    RowNumber := LV_GetNext(0, "F")
    initialCount := LV_GetCount()
    omniBoxMode := 0
-   IF_set("omniBoxMode", omniBoxMode)
+   omniBoxMode := omniBoxMode ; [was IF_set - plain global since phase E]
    GuiControl, -Redraw, LVsearchMenus
    prevEditu := userQuickMenusEdit
    mustReselect := 0
@@ -42696,7 +42685,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       showTOOLtip("Scanning for files and folders in`n" userQuickMenusEdit "\")
       GuiControl, QuickMenuSearchGUIA:, StatusLineQuickSearch, Scanning folder content...
       omniBoxMode := 1
-      IF_set("omniBoxMode", omniBoxMode)
+      omniBoxMode := omniBoxMode ; [was IF_set - plain global since phase E]
       hasAddedItems++
       filesFound := 0
       LV_Add(A_Index, "...\", xu, "-", "Folder: up-one level", "", "!OmniNavigateUpFolder", 0, 0)
@@ -42782,7 +42771,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    If (allowMenuSearch=1)
    {
       omniBoxMode := 0
-      IF_set("omniBoxMode", omniBoxMode)
+      omniBoxMode := omniBoxMode ; [was IF_set - plain global since phase E]
       buildQuickSearchMenus()
       mustPreventMenus := 0
       objs := kMenu(0, "give", 0)
@@ -45033,8 +45022,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     ReadSettingsBrushPanel()
     FloodFillSelectionAdj := 0
     liveDrawingBrushTool := 1
-    IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
-    IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+    liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
+    FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
     If (modus="e" && isNumber(dummy))
     {
        BrushToolType := dummy
@@ -45418,7 +45407,7 @@ BtnSetClonerBrushSource() {
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
    IF_post("setMenuBarState", "Disable", "PVbar")
-   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   mustCaptureCloneBrush := mustCaptureCloneBrush ; [was IF_set - plain global since phase E]
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -45467,7 +45456,7 @@ BtnSetTextureSource() {
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
    IF_post("setMenuBarState", "Disable", "PVbar")
-   IF_set("mustCaptureCloneBrush", mustCaptureCloneBrush)
+   mustCaptureCloneBrush := mustCaptureCloneBrush ; [was IF_set - plain global since phase E]
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -46547,7 +46536,7 @@ fakeWinCreator(idWin, thisCaller, allowReopen) {
     DestroyGIFuWin()
     mouseTurnOFFtooltip()
     AnyWindowOpen := idWin
-    IF_set("AnyWindowOpen", AnyWindowOpen)
+    AnyWindowOpen := AnyWindowOpen ; [was IF_set - plain global since phase E]
     prevOpenedWindow := []
     prevOpenedWindow := [AnyWindowOpen, thisCaller, allowReopen, editingSelectionNow, 1]
     isNowFakeWinOpen := 1
@@ -47864,7 +47853,7 @@ BTNtoggleAlphaPainting() {
       Return
 
    Global lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
    UItriggerBrushUpdate()
    toggleAlphaPaintingMode()
    RemoveTooltip()
@@ -48637,9 +48626,9 @@ StopColorPicker() {
    colorPickerModeNow := 0
    Gui, LEDgui: Destroy
    Global lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
-   IF_set("colorPickerModeNow", colorPickerModeNow)
-   IF_set("colorPickerMustEnd", 0)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
+   colorPickerModeNow := colorPickerModeNow ; [was IF_set - plain global since phase E]
+   colorPickerMustEnd := 0 ; [was IF_set - plain global since phase E]
    IF_post("setMenuBarState", "Enable", "PVbar")
 }
 
@@ -48655,7 +48644,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    ctrl := StrReplace(ctrl, "picku")
    initialColor := %ctrl%
    Global lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
    endCaptureCloneBrush()
    If (editingSelectionNow=1)
       toggleLiveEditObject("hide")
@@ -48675,9 +48664,9 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    ll := pll := pX := pY := errorOccured := 0
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    Global lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
-   IF_set("colorPickerModeNow", colorPickerModeNow)
-   IF_set("colorPickerMustEnd", colorPickerMustEnd)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
+   colorPickerModeNow := colorPickerModeNow ; [was IF_set - plain global since phase E]
+   colorPickerMustEnd := colorPickerMustEnd ; [was IF_set - plain global since phase E]
    WinActivate, ahk_id %PVhwnd%
    createGUItoolbar()
    setWhileLoopExec(1)
@@ -48960,8 +48949,8 @@ stopDrawingShape(dummy:="") {
     undoVectorShapesLevelsArray := []
     Global zeitSillyPrevent := A_TickCount
     Global lastOtherWinClose := A_TickCount
-    IF_set("lastOtherWinClose", lastOtherWinClose)
-    IF_set("drawingShapeNow", 0)
+    lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
+    drawingShapeNow := 0 ; [was IF_set - plain global since phase E]
     createGUItoolbar()
     updateUIctrl()
     MouseMoveResponder()
@@ -49348,7 +49337,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      If (customShapePoints.Count()>2)
         oldCustomShapePoints := customShapePoints.Clone()
 
-     IF_set("drawingShapeNow", 1)
+     drawingShapeNow := 1 ; [was IF_set - plain global since phase E]
      CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
      If (dummy="resume")
      {
@@ -52088,7 +52077,7 @@ PanelFloodFillTool() {
 
     ReadSettingsFloodFillPanel()
     FloodFillSelectionAdj := 0
-    IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+    FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
@@ -58469,7 +58458,7 @@ InvokeStandardDialogColorPicker(hC, event, c) {
      updateUIgridPanel()
   } Else If (AnyWindowOpen=14)
   {
-     IF_set("WindowBGRcolor", WindowBGRcolor)
+     WindowBGRcolor := WindowBGRcolor ; [was IF_set - plain global since phase E]
      IF_call("updateWindowColor")
      updateUIsettings()
      refreshWinBGRbrush()
@@ -58679,7 +58668,7 @@ SetTimeLapseMode() {
     {
        IMGresizingMode := 4
        customZoomAdaptMode := 0
-       IF_set("IMGresizingMode", IMGresizingMode)
+       IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
        mustRecordSeenImgs := 0
        imgFxMode := usrColorDepth := zoomLevel := 1
        vpIMGrotation := FlipImgH := FlipImgV := 0
@@ -63281,8 +63270,8 @@ renewCurrentFilesList() {
    currentFileIndex := 1
    prevLoadedImageIndex := ""
    currentImgModified := allImagesWereSeen := 0
-   IF_set("currentFilesListModified", currentFilesListModified)
-   IF_set("maxFilesIndex", maxFilesIndex)
+   currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
+   maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
    If (forceProtectLoadedImg!=1)
    {
       discardSRCfileCaches()
@@ -63923,8 +63912,8 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       SLDtypeLoaded := 1
       filesFilter := SlidesMusicSong := ""
       currentFilesListModified := 0
-      IF_set("maxFilesIndex", maxFilesIndex)
-      IF_set("IMGresizingMode", IMGresizingMode)
+      maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+      IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
       updateUIctrl()
       INIaction(1, "prevOpenFolderPath", "General")
       zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
@@ -63965,8 +63954,8 @@ OpenArgFile(inputu) {
     setImageLoading()
     Global scriptStartTime := A_TickCount
     currentFileIndex := maxFilesIndex := 1
-    IF_set("maxFilesIndex", maxFilesIndex)
-    IF_set("IMGresizingMode", IMGresizingMode)
+    maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+    IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
 
     ; usrColorDepth := imgFxMode := 1
     ; vpIMGrotation := FlipImgH := FlipImgV := 0
@@ -65568,7 +65557,7 @@ closeDocuments() {
    trackImageListButtons("kill")
    createGUItoolbar("refresh-later")
    terminateIMGediting()
-   IF_set("currentFilesListModified", currentFilesListModified)
+   currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
    PopulateIndexFilesStatsInfos("kill")
    SLDtypeLoaded := 1
    resetMainWin2Welcome()
@@ -69598,7 +69587,7 @@ BuildSecondMenu(givenCoords:=0) {
 
 StopCaptureClickStuff(dummy:=0) {
    Global lastOtherWinClose := A_TickCount
-   IF_set("lastOtherWinClose", lastOtherWinClose)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
    endCaptureCloneBrush()
    showTOOLtip("Operation abandoned: define source point")
    SoundBeep , 300, 100
@@ -70135,7 +70124,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
    Global lastWinDrag := A_TickCount
    Global lastOtherWinClose := A_TickCount + 100
-   IF_set("lastOtherWinClose", lastOtherWinClose)
+   lastOtherWinClose := lastOtherWinClose ; [was IF_set - plain global since phase E]
 }
 
 setWinCloseZeit() {
@@ -70416,7 +70405,7 @@ MenuSetImgZoom(a, b) {
    zoomLevel := SubStr(a, 1, InStr(a, "%") - 1)/100
    IMGresizingMode := 4
    customZoomAdaptMode := 0
-   IF_set("IMGresizingMode", IMGresizingMode)
+   IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
    zoomLevel := clampInRange(zoomLevel, 0.01, 20)
    INIaction(1, "IMGresizingMode", "General")
    INIaction(1, "zoomLevel", "General")
@@ -70426,7 +70415,7 @@ MenuSetImgZoom(a, b) {
 
 MenuSetVProt(a, b) {
    vpIMGrotation := StrReplace(a, "°")
-   IF_set("IMGresizingMode", IMGresizingMode)
+   IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
    INIaction(1, "vpIMGrotation", "General")
    updateUIctrl()
    dummyTimerDelayiedImageDisplay(150)
@@ -71003,7 +70992,7 @@ OpenRecentEntry(menuItem, modus:=0) {
         coreOpenFolder(newEntry, 1, 0, 1)
         currentFilesListModified := 0
         SlidesMusicSong := ""
-        IF_set("currentFilesListModified", currentFilesListModified)
+        currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
         If (maxFilesIndex>0)
            SLDtypeLoaded := 1
 
@@ -71063,7 +71052,7 @@ OpenFavesEntry(menuItem) {
      resultedFilesList[currentFileIndex, 5] := 1
      currentImgModified := 0
      SlidesMusicSong := ""
-     IF_set("currentFilesListModified", currentFilesListModified)
+     currentFilesListModified := currentFilesListModified ; [was IF_set - plain global since phase E]
   }
 
   ; ToolTip, % (A_TickCount - startZeit) - (A_TickCount - startZeitIMGload) , , , 2
@@ -71157,7 +71146,7 @@ ToggleFullScreenMode() {
      If (showMainMenuBar=1)
      {
         showMainMenuBar := 0
-        IF_set("showMainMenuBar", showMainMenuBar)
+        showMainMenuBar := showMainMenuBar ; [was IF_set - plain global since phase E]
         Win_SetMenu(PVhwnd, 0)
         TriggerMenuBarUpdate()
      }
@@ -71187,7 +71176,7 @@ ToggleFullScreenMode() {
      INIaction(0, "TouchScreenMode", "General", 1)
      If (showMainMenuBar=1)
      {
-        IF_set("showMainMenuBar", showMainMenuBar)
+        showMainMenuBar := showMainMenuBar ; [was IF_set - plain global since phase E]
         TriggerMenuBarUpdate("forced", A_TickCount)
         SetTimer, TriggerMenuBarUpdate, -100
      }
@@ -71196,8 +71185,8 @@ ToggleFullScreenMode() {
         SetTimer, toggleAppToolbar, -300
   }
 
-  IF_set("isTitleBarVisible", isTitleBarVisible)
-  IF_set("TouchScreenMode", TouchScreenMode)
+  isTitleBarVisible := isTitleBarVisible ; [was IF_set - plain global since phase E]
+  TouchScreenMode := TouchScreenMode ; [was IF_set - plain global since phase E]
   ; ToolTip, % "l=" isTitleBarVisible " kl=" kl , , , 2
   SetTimer, dummyFullScreenButtons, -250
 }
@@ -71224,7 +71213,7 @@ ToggleAllonTop() {
    isAlwaysOnTop := !isAlwaysOnTop
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    INIaction(1, "isAlwaysOnTop", "General")
-   IF_set("isAlwaysOnTop", isAlwaysOnTop)
+   isAlwaysOnTop := isAlwaysOnTop ; [was IF_set - plain global since phase E]
    friendly := (isAlwaysOnTop=1) ? "ACTIVATED" : "DEACTIVATED"
    showTOOLtip("Window always on top: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -71233,7 +71222,7 @@ ToggleAllonTop() {
 ToggleSlidesFXmode() {
    slidesFXrandomize := !slidesFXrandomize
    INIaction(1, "slidesFXrandomize", "General")
-   IF_set("slidesFXrandomize", slidesFXrandomize)
+   slidesFXrandomize := slidesFXrandomize ; [was IF_set - plain global since phase E]
    friendly := (slidesFXrandomize=1) ? "ACTIVATED" : "DEACTIVATED"
    showTOOLtip("Randomize colour FX during slideshows:`n" friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -71819,8 +71808,8 @@ toggleEllipseSelection(modus:=-1) {
    If isInRange(modus, 0, 2)
       EllipseSelectMode := modus
 
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
-   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
+   FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
    If (customShapePoints.Count()<3 && EllipseSelectMode=2)
    {
       r := loadSimplifiedPreviousVectorShape()
@@ -72108,8 +72097,8 @@ ToggleTitleBaruNow() {
       WinSet, Style, +0xC00000, ahk_id %PVhwnd%
    }
 
-   IF_set("isTitleBarVisible", isTitleBarVisible)
-   IF_set("TouchScreenMode", TouchScreenMode)
+   isTitleBarVisible := isTitleBarVisible ; [was IF_set - plain global since phase E]
+   TouchScreenMode := TouchScreenMode ; [was IF_set - plain global since phase E]
    If (drawingShapeNow!=1)
       SetTimer, dummyToggleTitleBarActionBtns, -350
 }
@@ -72130,7 +72119,7 @@ ToggleMenuBaru() {
    hasTrans := adjustCanvas2Toolbar()
    showMainMenuBar := !showMainMenuBar
    INIaction(1, "showMainMenuBar", "General")
-   IF_set("showMainMenuBar", showMainMenuBar)
+   showMainMenuBar := showMainMenuBar ; [was IF_set - plain global since phase E]
    If !showMainMenuBar
       Win_SetMenu(PVhwnd, 0)
 
@@ -72168,7 +72157,7 @@ ToggleLargeUIfonts() {
     PrefsLargeFonts := !PrefsLargeFonts
     calcHUDsize()
     INIaction(1, "PrefsLargeFonts", "General")
-    IF_set("PrefsLargeFonts", PrefsLargeFonts)
+    PrefsLargeFonts := PrefsLargeFonts ; [was IF_set - plain global since phase E]
     thisFunc := prevOpenedWindow[2]
     AddTooltip2Ctrl("reset")
     If (VisibleQuickMenuSearchWin=1)
@@ -72657,7 +72646,7 @@ ToggleImgColorDepthDithering() {
 toggleAppToolbar() {
     ShowAdvToolbar := !ShowAdvToolbar
     INIaction(1, "ShowAdvToolbar", "General")
-    IF_set("ShowAdvToolbar", ShowAdvToolbar)
+    ShowAdvToolbar := ShowAdvToolbar ; [was IF_set - plain global since phase E]
     createGUItoolbar()
     If (ShowAdvToolbar=1)
     {
@@ -72708,8 +72697,8 @@ ToggleTouchMode() {
        TouchScreenMode := !TouchScreenMode
 
     updateUIctrl()
-    IF_set("isTitleBarVisible", isTitleBarVisible)
-    IF_set("TouchScreenMode", TouchScreenMode)
+    isTitleBarVisible := isTitleBarVisible ; [was IF_set - plain global since phase E]
+    TouchScreenMode := TouchScreenMode ; [was IF_set - plain global since phase E]
 
     If (AnyWindowOpen=14)
        Return
@@ -74079,7 +74068,7 @@ ShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
   imgPath := StrReplace(imgPath, "||")
   If (slideShowRunning=1)
   {
-     slideShowRunning := IF_get("slideShowRunning")
+     slideShowRunning := slideShowRunning
      If (slideShowRunning!=1)
      {
         StopMediaPlaying(1)
@@ -74359,7 +74348,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     If (editingSelectionNow=1 && IMGresizingMode=5)
     {
        IMGresizingMode := 1
-       IF_set("IMGresizingMode", IMGresizingMode)
+       IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
     }
 
     imgPath := StrReplace(imgPath, "||")
@@ -74432,7 +74421,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
           ToggleImgQuality("highu")
 
        prevImgPath := ""
-       IF_set("canCancelImageLoad", 0)
+       canCancelImageLoad := 0 ; [was IF_set - plain global since phase E]
        FadeMainWindow()
        SetTimer, ResetImgLoadStatus, -15
        ; r := (r1="error") ? r1 : 0
@@ -75043,7 +75032,7 @@ changeOSDfontSize(direction) {
   SetTimer, RemoveTooltip, % -msgDisplayTime
   calcHUDsize()
   recalculateThumbsSizes()
-  IF_set("OSDfontSize", OSDfontSize)
+  OSDfontSize := OSDfontSize ; [was IF_set - plain global since phase E]
   updateUIctrl()
   If (thumbsListViewMode>1 && thumbsDisplaying=1)
   {
@@ -75845,7 +75834,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250) && animGIFplaying!=1)
      GdipCleanMain(6)
 
-  IF_set("canCancelImageLoad", 1)
+  canCancelImageLoad := 1 ; [was IF_set - plain global since phase E]
   changeMcursor()
   thisImgPath := imgPath
   allowCaching := !minimizeMemUsage
@@ -76100,8 +76089,8 @@ OnImgFileChangeActions(forceThis) {
 invokeExternalSlideshowHandler() {
    OutputDebug, % "QPVMERGE: invokeExtSlides via " Exception("", -2).What " animGIF=" animGIFplaying
    allowNextSlide := 1
-   IF_set("animGIFplaying", animGIFplaying)
-   IF_set("allowNextSlide", allowNextSlide)
+   animGIFplaying := animGIFplaying ; [was IF_set - plain global since phase E]
+   allowNextSlide := allowNextSlide ; [was IF_set - plain global since phase E]
    IF_post("dummySlideshow")
 }
 
@@ -77286,8 +77275,8 @@ toggleAlphaPaintingMode() {
          liveDrawingBrushTool := !FloodFillSelectionAdj
       }
 
-      IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
-      IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+      liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
+      FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
       If (FloodFillSelectionAdj=1)
          showTOOLtip(labelu " tool: DEACTIVATED`nSelection area can be adjusted.", A_ThisFunc, 1)
       Else
@@ -77309,7 +77298,7 @@ toggleAlphaPaintingMode() {
 
    FloodFillSelectionAdj := 0
    liveDrawingBrushTool := !liveDrawingBrushTool
-   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
    Random, OutputVar, 1, 950
    Random, OutputaVar, 1, 950
    randomu := OutputVar / OutputaVar
@@ -77465,7 +77454,7 @@ toggleAlphaPaintingMode() {
 
    createGUItoolbar()
    IF_post("uiAlphaMaskTrigger", AnyWindowOpen, liveDrawingBrushTool, editingSelectionNow, UserMemBMP, showMainMenuBar)
-   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+   FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
    BrushToolTexture := 1
    dummyRefreshImgSelectionWindow()
    BtnTabsInfoUpdate("ignore-panel")
@@ -77480,7 +77469,7 @@ toggleBrushTypes(modus:=0) {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    friendly := (BrushToolType=1) ? "Simple color brush" : "Soft edges color brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
@@ -77515,7 +77504,7 @@ toggleBrushDeformers() {
       BrushToolType := (BrushToolType=7) ? 8 : 7
 
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    friendly := (BrushToolType=7) ? "Pinch brush" : "Bulge brush"
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
@@ -77561,7 +77550,7 @@ toggleBrushTypeFX(modus:=0) {
    BrushToolUseSecondaryColor := 0
    BrushToolApplyColorFX := 1
    BrushToolBlurStrength := 0
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    moreInfos := "`nOpacity: " Round(thisOpacity/255*100) "%"
    moreInfos .= "`nSoftness: " BrushToolSoftness "%"
@@ -77588,7 +77577,7 @@ togglePresetsBrushes(modus, dir:=1) {
    liveDrawingBrushTool := 1
    endCaptureCloneBrush()
    BrushToolUseSecondaryColor := 0
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    level := 0, maxu := 0
    If (modus=1)
    {
@@ -77645,8 +77634,8 @@ toggleBrushDrawInOutModes() {
    If (AnyWindowOpen!=66)
       liveDrawingBrushTool := 1
 
-   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    If (AnyWindowOpen=66) ; flood fill 
    {
       FloodFillSelectionMode := clampInRange(FloodFillSelectionMode + 1, 1, 4, 1)
@@ -77700,7 +77689,7 @@ toggleBrushTypeCloner() {
 
    BrushToolType := 3
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    friendly := "Cloner brush"
    If (BrushToolDynamicCloner=1)
       friendly .= " (dynamic coords mode)"
@@ -77773,7 +77762,7 @@ changeBrushOpacity(keyu, isKeyu:=0) {
     }
 
     liveDrawingBrushTool := 1
-    IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+    liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
     SetTimer, RemoveTooltip, % -msgDisplayTime
     SetTimer, MouseMoveResponder, -25
 }
@@ -77818,7 +77807,7 @@ changeBrushColorPicker() {
 
 changeBrushSize(dir) {
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    factoru := (BrushToolSize>50) ? 10 : 5
    If (BrushToolSize<15)
       factoru := 1
@@ -77854,7 +77843,7 @@ changeBrushAnglu(dir) {
 
 changeBrushRatioAngle(dir, what) {
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    endCaptureCloneBrush()
    If (what=1)
    {
@@ -77881,7 +77870,7 @@ changeBrushRatioAngle(dir, what) {
 
 MenuResetBrushAsRatio() {
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    endCaptureCloneBrush()
    BrushToolAspectRatio := BrushToolAngle := 0
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
@@ -77901,7 +77890,7 @@ toggleBrushMouseAngle() {
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
    BrushToolAutoAngle  := !BrushToolAutoAngle
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    If (AnyWindowOpen=64 || isAlphaMaskWindow()=1)
    {
       GuiControl, SettingsGUIA:, BrushToolAutoAngle, % BrushToolAutoAngle
@@ -77927,7 +77916,7 @@ changeBrushSoftness(dir) {
 
    endCaptureCloneBrush()
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    BrushToolSoftness := clampInRange(BrushToolSoftness, 1, 100)
    RegAction(1, "BrushToolSoftness",, 2, 1, 100)
    showTOOLtip("Brush softness: " BrushToolSoftness "%", A_ThisFunc, 2, BrushToolSoftness/100)
@@ -77948,7 +77937,7 @@ changeBrushWetness(dir) {
       BrushToolWetness--
 
    liveDrawingBrushTool := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    BrushToolWetness := clampInRange(BrushToolWetness, 0, 22)
    friendly := (BrushToolType>6) ? "deform intensity" : "wetness"
    showTOOLtip("Brush " friendly ": " BrushToolWetness, A_ThisFunc, 2, BrushToolWetness/22)
@@ -78624,8 +78613,8 @@ ActPaintBrushNow() {
    }
 
    liveDrawingBrushTool := 1
-   IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    kpi := (BrushToolType < 3) ? 1 : 0
    thisUseSecondaryColor := (kpi=1) ? BrushToolUseSecondaryColor : 0
    If (GetKeyState("Ctrl", "P") && kpi=1)
@@ -80157,7 +80146,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
       If (dontAddPoint=-1)
       {
          doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
-         IF_set("doNormalCursor", doNormalCursor)
+         doNormalCursor := doNormalCursor ; [was IF_set - plain global since phase E]
          Return
       }
    }
@@ -80334,7 +80323,7 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
        r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
 
     doNormalCursor := (dontAddPoint!=0 || vpImgPanningNow=1) ? 1 : 0
-    IF_set("doNormalCursor", doNormalCursor)
+    doNormalCursor := doNormalCursor ; [was IF_set - plain global since phase E]
     ; fnOutputDebug(A_ThisFunc "(): x/y=" gmx "|" gmy "|" mousePoint[1])
     Return mousePoint
 }
@@ -82251,7 +82240,7 @@ dummyRefreshImgSelectionWindow(mm:=0) {
      {
         thisu := 1
         IMGresizingMode := 1
-        IF_set("IMGresizingMode", IMGresizingMode)
+        IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
      }
 
      ; ToolTip, % "l=" drawingShapeNow "==" editingSelectionNow "==" drawingVectorLiveMode , , , 2
@@ -82413,7 +82402,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     prevNewW := newW, prevNewH := newH
     ; ToolTip, % "resized cache = " mustGenerate " | " oldZoomLevel "==" zoomLevel  , , , 2
-    IF_set("canCancelImageLoad", 0)
+    canCancelImageLoad := 0 ; [was IF_set - plain global since phase E]
     startZeit := A_TickCount
     oldZoomLevel := ""
     thisVPpanningNow := (vpImgPanningNow=2) ? 1 : 0
@@ -83162,8 +83151,8 @@ updateFilesSelectionInfos(this:=-1) {
    Else
       markedSelectFile := this
 
-   IF_set("maxFilesIndex", maxFilesIndex)
-   IF_set("markedSelectFile", markedSelectFile)
+   maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+   markedSelectFile := markedSelectFile ; [was IF_set - plain global since phase E]
 }
 
 PanelSelectRandomFiles() {
@@ -83265,8 +83254,8 @@ ToggleEditImgSelection(modus:=0) {
 
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
-  IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
-  IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+  liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
+  FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
   If (ShowAdvToolbar=1 && lockToolbar2Win=1 && editingSelectionNow=1)
      DelayiedImageDisplay()
 
@@ -83352,7 +83341,7 @@ selectEntireImage(act:=0) {
    innerSelectionCavityX := vpx
    innerSelectionCavityY := vpy
    editingSelectionNow := 1
-   IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
+   liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
    updateUIctrl()
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    If (ShowAdvToolbar=1)
@@ -83714,8 +83703,8 @@ resetImgSelection(modus:=0) {
 
   liveDrawingBrushTool := (AnyWindowOpen=64 && editingSelectionNow=0) ? 1 : 0
   FloodFillSelectionAdj := (AnyWindowOpen=66 && editingSelectionNow=0) ? 0 : 1
-  IF_set("liveDrawingBrushTool", liveDrawingBrushTool)
-  IF_set("FloodFillSelectionAdj", FloodFillSelectionAdj)
+  liveDrawingBrushTool := liveDrawingBrushTool ; [was IF_set - plain global since phase E]
+  FloodFillSelectionAdj := FloodFillSelectionAdj ; [was IF_set - plain global since phase E]
   updateUIctrl()
   SetTimer, MouseMoveResponder, -90
   SetTimer, dummyRefreshImgSelectionWindow, -25
@@ -85326,7 +85315,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    }
 
    lastScrollCheck := lastPoolProgress := A_TickCount
-   IF_set("alterFilesIndex", 0)
+   alterFilesIndex := 0 ; [was IF_set - plain global since phase E]
    If (userPrivateMode=1)
       blurEffect := Gdip_CreateEffect(1, clampInRange(thumbsSizeQuality//2, 30, thumbsSizeQuality*2), 0, 0)
 
@@ -88888,7 +88877,7 @@ PanelAboutWindow() {
     Gui, SettingsGUIA: +DPIScale
     Gui, Font, Bold
 
-    Gui, Add, Text, xs y+25 w%txtWid% BackgroundTrans, Internal AHK-H version: %A_AhkVersion%. %compiled%OS: %A_OSVersion%.
+    Gui, Add, Text, xs y+25 w%txtWid% BackgroundTrans, Internal AHK version: %A_AhkVersion%. %compiled%OS: %A_OSVersion%.
     If isWinStore()
        Gui, Add, Link, y+10 wp, This open source application was downloaded through <a href="ms-windows-store://pdp/?productid=9N07RF144FV1">Windows Store</a>, published by <a href="https://tabletpro.com">Tablet Pro</a>. Source code available on <a href="https://github.com/marius-sucan/Quick-Picto-Viewer">GitHub</a>.
     Else
@@ -90344,7 +90333,7 @@ toggleImgEditPanelWindow(modus:="") {
    }
 
    lastInvoked := A_TickCount
-   IF_set("panelWinCollapsed", panelWinCollapsed)
+   panelWinCollapsed := panelWinCollapsed ; [was IF_set - plain global since phase E]
 }
 
 selectGivenPanelTab(ot) {
@@ -91055,7 +91044,7 @@ btnResetImageView() {
      uiSlidersArray["imgColorsFXopacity", 14] := -1
   }
 
-  IF_set("IMGresizingMode", IMGresizingMode)
+  IMGresizingMode := IMGresizingMode ; [was IF_set - plain global since phase E]
   updatePanelColorSliderz()
   defineColorDepth()
   UpdateUIadjustVPcolors()
@@ -95350,8 +95339,8 @@ BTNselFilesStaticFolder(modus:=0) {
 
    ToolTip
    lastZeitFileSelect := A_TickCount
-   IF_set("maxFilesIndex", maxFilesIndex)
-   IF_set("markedSelectFile", markedSelectFile)
+   maxFilesIndex := maxFilesIndex ; [was IF_set - plain global since phase E]
+   markedSelectFile := markedSelectFile ; [was IF_set - plain global since phase E]
    If (AnyWindowOpen=2)
    {
       iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
@@ -97293,8 +97282,10 @@ isTlbrVertical() {
 adjustCanvas2Toolbar() {
 ; Returns 0 when the viewport must ignore the toolbar, 1 when it has to give up ToolbarWinW
 ; on the left, and 2 when it has to give up ToolbarWinH at the top.
-; Keep in sync with detectToolbar() in lib\module-interface.ahk, which answers the same
-; question on the interface thread for the mouse hit-test controls.
+; detectToolbar() in lib\module-interface.ahk answers the same question for the
+; hit-test controls with a different contract [ByRef dims + self-measuring]; both
+; read the same shared globals since the merge, so there is no sync hazard - the
+; two were deliberately NOT unified [phase E: contract mismatch, risk over value].
     Static lastX := "", lastY := ""
     If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || !ToolbarWinW || !ToolbarWinH || slideShowRunning=1)
        Return 0
@@ -97384,7 +97375,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
 
        toolTipGuiCreated := 0
        IF_post("uiAccessUpdateOSDmsg", "-", 0, 0)
-       IF_set("toolTipGuiCreated", 0)
+       toolTipGuiCreated := 0 ; [was IF_set - plain global since phase E]
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
        hudBTNtypeFuncu := hudBTNfuncu := 0
        preventKill := 0
@@ -97488,7 +97479,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
 
     lastOSDtooltipInvoked := A_TickCount
     If (forceDarker!=1)
-       IF_set("toolTipGuiCreated", 1)
+       toolTipGuiCreated := 1 ; [was IF_set - plain global since phase E]
 }
 
 Fnt_GetListOfFontsSimplified() {
@@ -100072,7 +100063,7 @@ changeMcursor(whichCursor:=0) {
   } Else If (A_TickCount - lastInvoked > 400) ; && (imageLoading!=1)
   {
      IF_post("uiChangeMcursor", "busy")
-     ; IF_set("imageLoading", 1)
+     ; imageLoading := 1 ; [was IF_set - plain global since phase E]
      ; Try DllCall("user32\SetCursor", "Ptr", hCursBusy)
      lastInvoked := A_TickCount
   }
@@ -100711,15 +100702,15 @@ AcquireWIAimage() {
     prevOpenedWindow := [-1, A_ThisFunc, 1, editingSelectionNow, 0, userimgQuality]
     addJournalEntry("Window opened: " A_ThisFunc "() [ WIA standard dialogs ]")
     AnyWindowOpen := whileLoopExec := 1
-    IF_set("AnyWindowOpen", AnyWindowOpen)
-    IF_set("whileLoopExec", whileLoopExec)
+    AnyWindowOpen := AnyWindowOpen ; [was IF_set - plain global since phase E]
+    whileLoopExec := whileLoopExec ; [was IF_set - plain global since phase E]
     Try obju := WIA_AcquireImage(deviceu)
     Catch errMsg
        Sleep, 1
 
     AnyWindowOpen := whileLoopExec := 0
-    IF_set("AnyWindowOpen", AnyWindowOpen)
-    IF_set("whileLoopExec", whileLoopExec)
+    AnyWindowOpen := AnyWindowOpen ; [was IF_set - plain global since phase E]
+    whileLoopExec := whileLoopExec ; [was IF_set - plain global since phase E]
     WinSet, Enable,, ahk_id %PVhwnd%
 
     ; obju := [kp, 0]

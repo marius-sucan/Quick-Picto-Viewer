@@ -1313,66 +1313,8 @@ ShellFileAssociate(Label,Ext,Cmd,batchMode,storePath, bonusArg:=0) {
   Return 1
 }
 
-GetRes(ByRef bin, lib, res, type) {
-  If !A_IsCompiled
-     Return 0
-
-  hL := 0
-  If lib
-     hM := DllCall("kernel32\GetModuleHandleW", "Str", lib, "Ptr")
-
-  If !lib
-  {
-     hM := 0  ; current module
-  } Else If !hM
-  {
-     If (!hL := hM := DllCall("kernel32\LoadLibraryW", "Str", lib, "Ptr"))
-        Return
-  }
-
-  dt := (type+0 != "") ? "UInt" : "Str"
-  hR := DllCall("kernel32\FindResourceW"
-      , "Ptr" , hM
-      , "Str" , res
-      , dt , type
-      , "Ptr")
-
-  If !hR
-  {
-     fnOutputDebug("GetRes() ERR " FormatMessage(A_ThisFunc "(" lib ", " res ", " type ", " l ")", A_LastError))
-     Return
-  }
-
-  hD := DllCall("kernel32\LoadResource"
-      , "Ptr" , hM
-      , "Ptr" , hR
-      , "Ptr")
-  hB := DllCall("kernel32\LockResource"
-      , "Ptr" , hD
-      , "Ptr")
-  sz := DllCall("kernel32\SizeofResource"
-      , "Ptr" , hM
-      , "Ptr" , hR
-      , "UInt")
-  If !sz
-  {
-     fnOutputDebug("Error: resource size 0 in  " A_ThisFunc " ( " lib " ,  " res " ,  " type " )")
-     DllCall("kernel32\FreeResource", "Ptr" , hD)
-     If hL
-        DllCall("kernel32\FreeLibrary", "Ptr", hL)
-     Return
-  }
-
-  VarSetCapacity(bin, 0),     VarSetCapacity(bin, sz, 0)
-  DllCall("ntdll\RtlMoveMemory", "Ptr", &bin, "Ptr", hB, "UInt", sz)
-  DllCall("kernel32\FreeResource", "Ptr" , hD)
-
-  If hL
-     DllCall("kernel32\FreeLibrary", "Ptr", hL)
-
-  Return sz
-}
-
+; [phase E] GetRes() deleted: it existed to read the module-interface.ahk source
+; from the compiled exe resources for ahkThread; the merge made it a plain #Include.
 FormatMessage(ctx, msg, arg="") {
   Global
   Local txt, buf
