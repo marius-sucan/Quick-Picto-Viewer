@@ -857,9 +857,6 @@ uiUpdateUIctrl(forceThis:=0) {
    If (hasTrans=2)
       GuiH -= tH
 
-   If (forceThis=1)
-      editingSelectionNow := editingSelectionNow
-
    lastWinStatus := ""
    ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
    ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
@@ -1838,7 +1835,6 @@ uiMouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     Gui, uiMouseTipGuia: Add, Text, c%txtColor% gdestroyTooltipu vTippyMsg, %msg%
     Gui, uiMouseTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
     prevMsg := msg
-    hGuiTip := hGuiTip ; [was MT_set - plain global since phase E]
     If (unClickable=1)
       WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
 
@@ -2638,7 +2634,6 @@ UpdateMenuBar(modus:=0, tt:=0) {
 
    ; Sleep, -1
    BuildMenuBar(modus, 0)
-   menuHotkeys := menuHotkeys ; [was MT_set - plain global since phase E]
    ; SetMenuInfo(MenuGetHandle("PVbar"), 2, 1, 0, 1)
    ; Sleep, -1
    ; Gui, PVwin: Menu, PVmanu
