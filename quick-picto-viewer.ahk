@@ -70097,7 +70097,9 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       mYz := Trim(rect.top)
       mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
       mW := max(rect.left, rect.right) - min(rect.left, rect.right)
-      IF_call("ShowClickHalo", mX, mYz, mW, mH, 1, menarg, 1)
+      ; [phase D, per Marius] the blue bar-item halo is gone - native menu-bar
+      ; opens render their own highlight and the programmatic path no longer
+      ; needs to imitate one
    }
 
    mouseTurnOFFtooltip()

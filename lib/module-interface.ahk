@@ -2319,7 +2319,12 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
    lastContextMenuZeit := A_TickCount
    uiUseDarkMode := (darkMode="yes") ? 1 : 0
    otherAscriptHwnd := thisHwnd
-   allowMenuReader := actu
+   ; [phase D fix] «allowMenuReader := actu» is GONE: setWinCloseZeit posts a "no"
+   ; after every menu-item selection, and pre-merge the next programmatic menu
+   ; open re-armed the flag - native bar opens never do, so choosing any item
+   ; [e.g. opening a favourites image] killed the bar flyout until the next
+   ; right-click menu. The flag stays a stable "yes" [seeded]; a non-"yes" call
+   ; still performs its hide/reset duties below.
    ; ToolTip, % "d=" darkMode , , , 2
    If (IsNumber(idu) && idu>0)
       menuCurrentIndex := idu
@@ -2777,6 +2782,16 @@ uiConstructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code) {
 }
 
 uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
+    ; [phase D, per Marius] Alt+letter mnemonics for the menu BAR are no longer
+    ; intercepted: returning EMPTY hands the WM_SYSKEYDOWN to DefWindowProc and
+    ; Windows opens the bar natively - full native keyboard navigation, Left and
+    ; Right switching included. The old path opened a detached positioned popup
+    ; in which Left/Right could not switch menus.
+    If (msg=0x104 && showMainMenuBar=1 && wParam>=0x41 && wParam<=0x5A)
+    {
+       If InStr(menuHotkeys, "!" Chr(wParam + 32) "|")
+          Return
+    }
     vk_code := Format("{1:x}", wParam)
     If (isInRange(vk_code, 21, 28) || isVarEqualTo(vk_code, "6B", "6D", "BB", "BD", "D"))
        navKeysCounter++
