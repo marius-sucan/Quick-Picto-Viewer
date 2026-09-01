@@ -931,9 +931,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
        If isVarEqualTo(givenKey, "+Tab", "Tab", "Escape", "AppsKey", "BackSpace")
        {
           If (givenKey="escape")
-          {
              lastOtherWinClose := A_TickCount
-          }
 
           deactivateTlbrKbdMode(1)
           displayNowToolbarHelp(3)
@@ -2457,7 +2455,6 @@ initQPVmainDLL(modus:=0) {
       RegExFilesPattern := "i)^(.\:\\).*(\.(" 
       RegExFilesPattern .= extensionsList
       RegExFilesPattern .= "))$"
-      ; RegExFilesPattern := RegExFilesPattern ; [was IF_set - plain global since phase E]
       allFormats := openFptrn3 openFptrn1 openFptrn2 openFptrn4 ";"
       Loop, Parse, extensionsList, |
       {
@@ -2468,7 +2465,6 @@ initQPVmainDLL(modus:=0) {
       fnOutputDebug("WIC init formats: " openFptrnWIC)
    } Else addJournalEntry("ERROR: Failed to initialize WIC module. Some image formats may not be supported.")
 
-   ; RegExFilesPattern := RegExFilesPattern ; [was IF_set - plain global since phase E]
    RegWrite, REG_SZ, %QPVregEntry%, RegExFilesPattern, % RegExFilesPattern
    ; MsgBox, % WICmoduleHasInit "==" CLSIDlist "`n" extensionsList
    ; ToolTip, % WICmoduleHasInit " | " A_LastError "==" qpvMainDll "`n" DllPath , , , 2
@@ -2707,7 +2703,6 @@ resetMainWin2Welcome() {
      filesFilter := EntryMarkedMoveIndex := mustOpenStartFolder := ""
      createGDIPcanvas()
      ToggleVisibilityWindow("show", hGDIwin)
-     thumbsDisplaying := 0 ; [was IF_set - plain global since phase E]
      Gdip_GraphicsClear(glPG, "0x00" WindowBgrColor)
      doLayeredWinUpdate(A_ThisFunc, hGDIthumbsWin, glHDC, 1)
      doLayeredWinUpdate(A_ThisFunc, hGDIwin, glHDC, 1)
@@ -3318,7 +3313,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
    startZeit := A_Now
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -3445,7 +3440,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (SLDtypeLoaded=3)
@@ -5013,7 +5008,6 @@ TriggerMenuBarUpdate(modus:=0, tt:=0) {
       modus := "freeform"
 
    lastMenuBarUpdated := A_TickCount
-   ; thumbsDisplaying := thumbsDisplaying ; [was IF_set - plain global since phase E]
    IF_post("UpdateMenuBar", modus, tt)
    SetTimer, refreshEntireViewport, -450
 }
@@ -5425,7 +5419,7 @@ panIMGonScrollBar(doX, doY) {
    scH := Round(mainHeight * (mainHeight / prevResizedVPimgH) / 2)
    scW := Round(mainWidth * (mainWidth / prevResizedVPimgW) / 2)
    oX := doX , oY := doY
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       zeitSillyPrevent := A_TickCount
@@ -5471,7 +5465,7 @@ panIMGonScrollBar(doX, doY) {
          Sleep, 70
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    vpImgPanningNow := 0
    diffIMGdecX := diffIMGdecY := 0
    ; If (thisIndex>10) || (lastWasLowQuality=1)
@@ -5515,7 +5509,7 @@ ThumbsScrollbar() {
       doMapNow := 1
 
    GetMouseCoord2wind(PVhwnd, mX, mY)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    startZeit := A_TickCount
    knobSize := getScrollWidth()
    ScrollRegionH := mainHeight - knobSize*1.5 - 4
@@ -5559,7 +5553,7 @@ ThumbsScrollbar() {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    trGdip_DisposeImage(listMap[1])
    If (GetKeyState("Shift", "P"))
    {
@@ -5568,11 +5562,6 @@ ThumbsScrollbar() {
    }
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(250)
-}
-
-setWhileLoopExec(val) {
-   whileLoopExec := val
-   whileLoopExec := val ; [was IF_set - plain global since phase E]
 }
 
 simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
@@ -5593,7 +5582,7 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
    prevState := thisIndex := 0
    thisZL := (zoomLevel>8) ? 8 : 0.8 + zoomLevel
    ; ToolTip, % "l=" thisZL , , , 2
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    If (modus="scroll")
       wrapResizeImageGDIwin()
 
@@ -5668,7 +5657,7 @@ simplePanIMGonClick(modus:=0, doX:=1, doY:=1, bX:=0, bY:=0) {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    If (bX && bY)
       doSetCursorPos(bX, bY)
 
@@ -5712,7 +5701,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    dotSize := Round(SelDotsSize*2.5)
    GetPhysicalCursorPos(mX, mY)
    vpWinClientSize(mainWidth, mainHeight)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index<2)
    {
       GetPhysicalCursorPos(mX, mY)
@@ -5805,7 +5794,6 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       } Else 
       {
          toolTipGuiCreated := 0
-         toolTipGuiCreated := 0 ; [was IF_set - plain global since phase E]
          clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
       }
    }
@@ -5813,11 +5801,10 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    IF clear
    {
       toolTipGuiCreated := 0
-      toolTipGuiCreated := 0 ; [was IF_set - plain global since phase E]
       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    lastSwipeZeitGesture := A_TickCount
 
    didSomething := 1
@@ -5969,7 +5956,7 @@ setNewBrushSymmetryPoints() {
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    thisZeit := kX := kY := 0
    BrushToolSymmetryX := SubStr(BrushToolSymmetryX, 1, 1)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -5993,7 +5980,7 @@ setNewBrushSymmetryPoints() {
       GuiControl, SettingsGUIA:, BrushToolSymmetryX, 1
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    endCaptureCloneBrush()
    If (panelWinCollapsed=1)
       toggleImgEditPanelWindow()
@@ -8546,7 +8533,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
 
    ; ToolTip, % thisIndex "|" modus , , , 2
    hasLooped := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    Loop, % totalCount
    {
            If (customShapePropPoints[A_Index, 1]!=1)
@@ -8577,7 +8564,7 @@ alignPointsWithPointInPath(modus, thisIndex, oppoIndex, canDoSymmetry, gmX, gmY)
            }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    If (canDoSymmetry && hasLooped=1)
       coreSetVPsymmetryPoint(symPoint)      ; the symmetry mode and its reference point are kept
 
@@ -8918,7 +8905,7 @@ rescaleSelectedVectorPoints(shiftState) {
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    minX := minY := 8823893348934389
    maxX := maxY := -8823893348934389
    lockedAR := 1
@@ -9036,7 +9023,7 @@ rescaleSelectedVectorPoints(shiftState) {
    If canDoSymmetry
       coreSetVPsymmetryPoint(symPoint)
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    RemoveTooltip()
    newArrayu := []
    Return hasLooped
@@ -9055,7 +9042,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
    If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
       handleOpenCloseBezier("kill")
 
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    startOperation := A_TickCount
    symPoint := ( customShapePoints.Count() ) // 2 + 1
    getAssociatedBezierPoints(k, totalCount, thisIndex, Az, Bz)
@@ -9239,7 +9226,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
 
    MouseMove, 2, 0, 2, R
    MouseMove, -2, 0, 2, R
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    SetTimer, dummyForcedRefreshImgSelectionWindow, -50
    Return mustRem
 }
@@ -9247,7 +9234,7 @@ moveOnePointInVectorPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX
 selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
    nmX := nmY := tx := ty := mw := mh := hasLooped := 0
    vpWinClientSize(mainWidth, mainHeight)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    startOperation := A_TickCount
    hasLooped := 0
    ; ToolTip, % thisReflctAnchr "|" prevVectorShapeSymmetryMode[1,1] "|" symPoint , , , 2
@@ -9290,7 +9277,7 @@ selectPathPointsInRect(gmX, gmY, shiftState, ctrlState) {
       MouseMove, -2, 0, 2, R
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    drawLiveCreateCustomShape(mainWidth, mainHeight, 2NDglPG, "point-update", 1)
    SetTimer, dummyForcedRefreshImgSelectionWindow, -50
    Return hasLooped
@@ -9497,7 +9484,7 @@ moveSelectedPointsInVectorPath(gmX, gmY, altState) {
    thisState := prevState := 0
    GetMouseCoord2wind(PVhwnd, omX, omY)
    newArrayu := customShapePoints.Clone()
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    startOperation := A_TickCount
    listPoints := []
    showTOOLtip("Move selected points:`n---, ---")
@@ -9570,7 +9557,7 @@ moveSelectedPointsInVectorPath(gmX, gmY, altState) {
    If isNowSymmetricVectorShape()
       coreSetVPsymmetryPoint(symPoint)
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    RemoveTooltip()
    newArrayu := []
 }
@@ -10187,7 +10174,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    } Else If (AnyWindowOpen=23 && FillAreaColorMode=6 && mustCaptureCloneBrush=1 || AnyWindowOpen=81 && isCtrlShift=1 && UserSymmetricaCenteringMode=0)
    {
       vpWinClientSize(mainWidth, mainHeight)
-      setWhileLoopExec(1)
+      whileLoopExec := 1
       While, (determineLClickState()=1)
       {
          GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -10203,7 +10190,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
          }
       }
 
-      setWhileLoopExec(0)
+      whileLoopExec := 0
       endCaptureCloneBrush()
 
       SoundBeep , 900, 100
@@ -10222,7 +10209,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       If (dotActiveObj.n=0 || dotActiveObj.n=9)
       {
          RemoveTooltip()
-         setWhileLoopExec(1)
+         whileLoopExec := 1
          While, (determineLClickState()=1)
          {
             GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -10237,7 +10224,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
             }
          }
          showTOOLtip("Symmetry point set to`n" kX " / " kY)
-         setWhileLoopExec(0)
+         whileLoopExec := 0
          dummyRefreshImgSelectionWindow()
          SetTimer, RemoveTooltip, % -msgDisplayTime//2
          Return
@@ -10245,13 +10232,13 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    } Else If isVarEqualTo(AnyWindowOpen, 69, 43, 44, 26, 78, 79)
    {
       ; respond to clicks in viewport for panels with region based previews
-      setWhileLoopExec(1)
+      whileLoopExec := 1
       While, (determineLClickState()=1)
       {
          updateTinyPreviewArea(prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, 1)
          dummyRefreshImgSelectionWindow()
       }
-      setWhileLoopExec(0)
+      whileLoopExec := 0
       lastTimeToggleThumbs := A_TickCount 
       Return
    }
@@ -10468,7 +10455,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       }
 
       ; JEE_ClientToScreen(hPicOnGui1, mX, mY, mXo, mYo)
-      setWhileLoopExec(1)
+      whileLoopExec := 1
       MouseGetPos, mXo, mYo
       Critical, off
       While, (determineLClickState()=1 && o_imageLoading!=1 && dotActive)
@@ -10772,7 +10759,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       }
 
       Critical, on
-      setWhileLoopExec(0)
+      whileLoopExec := 0
       adjustingSelDotNow := adjustNowSel := 0
       If dotActive
       {
@@ -12351,7 +12338,6 @@ DestroyGIFuWin() {
     If (slideShowRunning=1 || animGIFplaying=1)
        SetTimer, ResetImgLoadStatus, -15
 
-    animGIFplaying := 0 ; [was IF_set - plain global since phase E]
     SetTimer, autoChangeDesiredFrame, Off
     autoChangeDesiredFrame("stop")
 }
@@ -12383,7 +12369,6 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          lastFrameChange := A_TickCount
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
-         animGIFplaying := 0 ; [was IF_set - plain global since phase E]
          ResetImgLoadStatus()
          ; dummyTimerDelayiedImageDisplay(50)
       }
@@ -12401,7 +12386,6 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       prevImgPath := imgPath
       allowNextSlide := 0
       animGIFplaying := 1
-      animGIFplaying := 1 ; [was IF_set - plain global since phase E]
       Return
    } Else
    {
@@ -12415,13 +12399,9 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          animGIFplaying := 0
          allowNextSlide := 1
          prevImgPath := ""
-         If (animGIFplaying=0)
-         {
-            animGIFplaying := 0 ; [was IF_set - plain global since phase E]
-            prevAnimGIFwas := prevImgPath
-            lastFrameChange := A_TickCount
-            Global lastGIFdestroy := A_TickCount
-         }
+         prevAnimGIFwas := prevImgPath
+         lastFrameChange := A_TickCount
+         Global lastGIFdestroy := A_TickCount
          Return
       }
    }
@@ -21201,10 +21181,7 @@ HugeImagesConvertClrDepth(modus) {
 }
 
 setHugeImageActionsCount(actions) {
-    bmp := viewportQPVimage.imgHandle
     viewportQPVimage.actions := Round(actions)
-    UserMemBMP := bmp ; [was IF_set - plain global since phase E]
-    undoLevelsRecorded := actions ; [was IF_set - plain global since phase E]
     imgIndexEditing := currentFileIndex
     currentImgModified := 1
 }
@@ -21817,7 +21794,7 @@ HugeImagesDrawParametricLines() {
             conturAlign := DrawLineAreaContourAlign
             subdivide := !straightLines
             doStartLongOpDance()
-            setWhileLoopExec(1)
+            whileLoopExec := 1
             bmp := useGdiBitmap()
             While, ((subPath := iterator.NextSubpath()).count > 0)
             {
@@ -21865,7 +21842,7 @@ HugeImagesDrawParametricLines() {
                }
             }
 
-            setWhileLoopExec(0)
+            whileLoopExec := 0
             iterator.Discard()
             Gdip_DeletePath(kPath)
             Gdip_DeleteMatrix(pMatrix)
@@ -26353,7 +26330,7 @@ DragCollapsedWidget() {
    Dx := Dy := 0
    lastInvoked := A_TickCount
    ; ToolTip, % "l=" thisZL , , , 2
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       GetPhysicalCursorPos(mX, mY)
@@ -26363,7 +26340,7 @@ DragCollapsedWidget() {
       WinMove, ahk_id %hCollapseWidget%, , % winX + Dx, % winY + Dy
       Sleep, -1
    }
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    Sleep, 2
    WinActivate, ahk_id %PVhwnd%
 }
@@ -32245,7 +32222,7 @@ PasteFilesIntoGivenFolder(folderPath) {
    filezMoved := countTFilez := 0
    doStartLongOpDance()
    nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    Loop, Parse, listu, `n,`r
@@ -32347,7 +32324,7 @@ PasteFilesIntoGivenFolder(folderPath) {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (skippedFiles>0)
@@ -33406,52 +33383,48 @@ simpleMsgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality
    ; 8192 = Task Modal
    ; 262144 = Always-on-top (style WS_EX_TOPMOST - like System Modal but omits title bar icon)
 
-   If (1)  ; [merge] always the native branch now; the Else used to delegate to the interface thread's copy so the dialog stayed on the live thread
-   {
-      If (defaultBTN=2)
-         defaultBTN := 255
-      Else If (defaultBTN=3)
-         defaultBTN := 512
-      Else
-         defaultBTN := 0
- 
-      If (iconz=1 || iconz="hand" || iconz="error" || iconz="stop")
-         iconz := 16
-      Else If (iconz=2 || iconz="question")
-         iconz := 32
-      Else If (iconz=3 || iconz="exclamation")
-         iconz := 48
-      Else If (iconz=4 || iconz="info")
-         iconz := 64
-      Else
-         iconz := 0
- 
-      theseOptionz := buttonz + iconz + defaultBTN + modality
-      If optionz
-         theseOptionz := optionz
- 
-      Gui, SettingsGUIA: +OwnDialogs
-      MsgBox, % theseOptionz, % winTitle, % msg
-      IfMsgBox, Yes
-           r := "Yes"
-      IfMsgBox, No
-           r := "No"
-      IfMsgBox, OK
-           r := "OK"
-      IfMsgBox, Cancel
-           r := "Cancel"
-      IfMsgBox, Abort
-           r := "Abort"
-      IfMsgBox, Ignore
-           r := "Ignore"
-      IfMsgBox, Retry
-           r := "Retry"
-      IfMsgBox, Continue
-           r := "Continue"
-      IfMsgBox, TryAgain
-           r := "TryAgain"
-   }
+   If (defaultBTN=2)
+      defaultBTN := 255
+   Else If (defaultBTN=3)
+      defaultBTN := 512
+   Else
+      defaultBTN := 0
 
+   If (iconz=1 || iconz="hand" || iconz="error" || iconz="stop")
+      iconz := 16
+   Else If (iconz=2 || iconz="question")
+      iconz := 32
+   Else If (iconz=3 || iconz="exclamation")
+      iconz := 48
+   Else If (iconz=4 || iconz="info")
+      iconz := 64
+   Else
+      iconz := 0
+
+   theseOptionz := buttonz + iconz + defaultBTN + modality
+   If optionz
+      theseOptionz := optionz
+
+   Gui, SettingsGUIA: +OwnDialogs
+   MsgBox, % theseOptionz, % winTitle, % msg
+   IfMsgBox, Yes
+        r := "Yes"
+   IfMsgBox, No
+        r := "No"
+   IfMsgBox, OK
+        r := "OK"
+   IfMsgBox, Cancel
+        r := "Cancel"
+   IfMsgBox, Abort
+        r := "Abort"
+   IfMsgBox, Ignore
+        r := "Ignore"
+   IfMsgBox, Retry
+        r := "Retry"
+   IfMsgBox, Continue
+        r := "Continue"
+   IfMsgBox, TryAgain
+        r := "TryAgain"
    ; addJournalEntry("DIALOG BOX: " msg "`n`nUser answered: " r)
    ; lastLongOperationAbort := A_TickCount
    Return r
@@ -38193,7 +38166,7 @@ WorkLoadMultiCoreHandler(job) {
 
   thisZeit := A_TickCount
   doStartLongOpDance()
-  setWhileLoopExec(1)
+  whileLoopExec := 1
   If (job.flagThumbs=1)
      flagDispatchedFilesForThumbsRefresh(filesListu)
 
@@ -38265,7 +38238,7 @@ WorkLoadMultiCoreHandler(job) {
   If (job.mode="batch-fmtconv")
      applyMultiCoresConvertResults(theFinalList)
 
-  setWhileLoopExec(0)
+  whileLoopExec := 0
   leftoverFiles := countExternalCoreThreadsLeftovers(filesListu, job.hasRemovalField)
   zeitOperation := A_TickCount - startOperation
   percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
@@ -40377,7 +40350,7 @@ batchFileDelete(dontAlterIndex:=0) {
    filesRemoved := abandonAll := failedFiles := skippedFiles := 0
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -40467,7 +40440,7 @@ batchFileDelete(dontAlterIndex:=0) {
          }
       } Else failedFiles++
    }
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    currentFilesListModified := 1
    If failedFiles
@@ -41229,7 +41202,7 @@ coreBatchMultiRenameFiles() {
 
      counterFilez := new hashtable()
      CurrentSLD := ""
-     setWhileLoopExec(1)
+     whileLoopExec := 1
      Loop, % maxFilesIndex
      {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -41367,7 +41340,7 @@ coreBatchMultiRenameFiles() {
          }
      }
 
-     setWhileLoopExec(0)
+     whileLoopExec := 0
      counterFilez := someErrors := ""
      CurrentSLD := backCurrentSLD
      If (SLDtypeLoaded=3)
@@ -44460,7 +44433,7 @@ generateThumbsSheet() {
    frame := Round((userThumbsSheetFrame/100) * userThumbsSheetSpacing)
    px := py := frame
    cols := 1
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    getSelectedFiles(0, 1)
    framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
    imgPath := StrReplace(resultedFilesList[currentFileIndex, 1], "|")
@@ -44543,7 +44516,7 @@ generateThumbsSheet() {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    If pBrush
       Gdip_DeleteBrush(pBrush)
    If shadeBrush
@@ -48568,10 +48541,9 @@ showLEDgui(clr, pX, pY) {
 
 StopColorPicker() {
    Critical, on
-   colorPickerModeNow := 0
    Gui, LEDgui: Destroy
+   colorPickerModeNow := 0
    Global lastOtherWinClose := A_TickCount
-   colorPickerMustEnd := 0 ; [was IF_set - plain global since phase E]
    IF_post("setMenuBarState", "Enable", "PVbar")
 }
 
@@ -48608,7 +48580,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    Global lastOtherWinClose := A_TickCount
    WinActivate, ahk_id %PVhwnd%
    createGUItoolbar()
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (colorPickerModeNow=1)
    {
       If (errorOccured>700)
@@ -48656,7 +48628,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    }
 
    h := (errorOccured>685) ? initialColor : showLEDgui("prev", pX, pY)
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    StopColorPicker()
    createGUItoolbar()
    If (panelWinCollapsed=1 && AnyWindowOpen && d!="leave-it")
@@ -48888,7 +48860,6 @@ stopDrawingShape(dummy:="") {
     undoVectorShapesLevelsArray := []
     Global zeitSillyPrevent := A_TickCount
     Global lastOtherWinClose := A_TickCount
-    drawingShapeNow := 0 ; [was IF_set - plain global since phase E]
     createGUItoolbar()
     updateUIctrl()
     MouseMoveResponder()
@@ -49007,7 +48978,7 @@ addFluidPointsCustomShape() {
       dotsSize := SelDotsSize*3 + 2
 
    prevMX := prevMY := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       If (A_TickCount - lastInvoked<50)
@@ -49035,7 +49006,7 @@ addFluidPointsCustomShape() {
       dummyRefreshImgSelectionWindow()
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    newArrayu := []
    SetTimer, addFluidPointsCustomShape, Off
 }
@@ -49048,7 +49019,7 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
     lastInvoked := A_TickCount
     vpWinClientSize(mainWidth, mainHeight)
     prevState := thisState := prevMX := prevMY := 0
-    setWhileLoopExec(1)
+    whileLoopExec := 1
     canDoSymmetry := isNowSymmetricVectorShape()
     totalCount := customShapePoints.Count()
     GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -49142,7 +49113,7 @@ adjustAnchorPointsCustomShape(thisIndex:=0) {
     RemoveTooltip()
     MouseMove, 2, 0, 2, R
     MouseMove, -2, 0, 2, R
-    setWhileLoopExec(0)
+    whileLoopExec := 0
     SetTimer, dummyForcedRefreshImgSelectionWindow, -150
     SetTimer, adjustAnchorPointsCustomShape, Off
 }
@@ -49275,7 +49246,6 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      If (customShapePoints.Count()>2)
         oldCustomShapePoints := customShapePoints.Clone()
 
-     drawingShapeNow := 1 ; [was IF_set - plain global since phase E]
      CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
      If (dummy="resume")
      {
@@ -51515,10 +51485,10 @@ toggleViewPortGridu(modus="") {
          RegAction(1, "vpGridSize")
       }
 
-      setWhileLoopExec(1)
+      whileLoopExec := 1
       While, (determineLClickState()=1 || A_Index=1)
           Sleep, 5
-      setWhileLoopExec(0)
+      whileLoopExec := 0
    }
 }
 
@@ -54227,7 +54197,7 @@ OffsetSelProperPanel(dummy:=0) {
 
    cX := 0, cY := 0
    GetPhysicalCursorPos(oX, oY)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    ToolTip, Move up/down relative to this point on screen to adjust %varu%
    While, (determineLClickState()=1 || A_Index=1)
    {
@@ -54267,7 +54237,7 @@ OffsetSelProperPanel(dummy:=0) {
          Break
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    Tooltip
    lastInvoked := A_TickCount
    prevVaru := varu
@@ -54986,7 +54956,7 @@ gradientsPreviewResponder(thisHwnd:=0) {
       Return
 
    GetPhysicalCursorPos(zX, zY)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    If (otherKeyState=1)
    {
       varXvalue := (winOpen!=23) ? alphaMaskCoffsetX : clrGradientCoffX
@@ -55050,7 +55020,7 @@ gradientsPreviewResponder(thisHwnd:=0) {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    ; ToolTip, % vPosX "==" vPosY "`n" alphaMaskOffsetX "==" alphaMaskOffsetY , , , 2
    If (keysState=1 && winOpen=23)
       clrGradientOffX := clrGradientOffY := clrGradientCoffX := clrGradientCoffY := 0
@@ -55085,7 +55055,7 @@ PanelsPanIMGpreviewClick(a:=0) {
    thisZeit := A_TickCount
    startZeit := A_TickCount
    hasRun := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       Sleep, 1
@@ -55120,7 +55090,7 @@ PanelsPanIMGpreviewClick(a:=0) {
          thisZeit := A_TickCount
       }
    }
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    If !keysState
       keysState := (GetKeyState("Shift", "P") || GetKeyState("Ctrl", "P")) ? 1 : 0
 
@@ -58493,7 +58463,7 @@ invokeTlbrContextMenu(givenCoords:=0) {
    If (lockToolbar2Win=1)
       kMenu("PvUItoolbarMenu", "Check", "Attach to main &window",,, " (toolbar)")
    If (lockToolbar2Win=1)
-      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "MenuTlbrResetPosition",, " for toolbar")
+      kMenu("PvUItoolbarMenu", "Add", "&Reset position", "tlbrResetPosition",, " (toolbar)")
 
    If (ShowAdvToolbar=1)
    {
@@ -60712,7 +60682,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    ; fnOutputDebug(groupingMode "|" relativeModePath "|" relativeStringPath "|" finalDest)
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -60867,7 +60837,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
    If (SLDtypeLoaded=3)
@@ -64978,7 +64948,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       mainFoldersListu := getDynamicFoldersList()
       doStartLongOpDance()
       dropFilesSelection(1)
-      setWhileLoopExec(1)
+      whileLoopExec := 1
       showTOOLtip("Preparing to import dropped folders, please wait")
       If (StrLen(filesFilter)>1)
          remFilesListFilter("simple")
@@ -65066,7 +65036,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
       CurrentSLD := backCurrentSLD
       If (stuffAdded!=1) ; the user refused every dropped folder: nothing changed
       {
-         setWhileLoopExec(0)
+         whileLoopExec := 0
          lastInvoked := A_TickCount
          SetTimer, ResetImgLoadStatus, -50
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -65094,7 +65064,7 @@ GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
          GenerateRandyList()
       }
 
-      setWhileLoopExec(0)
+      whileLoopExec := 0
       If !CurrentSLD
       {
          If FolderExist(StrReplace(Trimmer(DynamicFoldersList), "|"))
@@ -65584,7 +65554,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
       If (okay!=1)
          Return 1
 
-      setWhileLoopExec(0)
+      whileLoopExec := 0
       If (slideShowRunning=1)
          ToggleSlideShowu()
 
@@ -66174,8 +66144,10 @@ InvokeMenuBarVectorView(manuID:=0, modus:=0, justBuild:=0) {
       kMenu("pvMenuBarView", "Check", "Allo&w outside viewport image panning")
 
    If (modus!="extern")
+   {
       If (justBuild!=1)
          showThisMenu("pvMenuBarView", 0, 1, manuID)
+   }
 }
 
 InvokeMenuBarVectorSelection(manuID:=0, justBuild:=0) {
@@ -73662,9 +73634,11 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
         throwSQLqueryDBerror(A_ThisFunc)
 
      If (doPartial!="yesu")
+     {
         allowSQLiteAbort := 1
         seenImagesDB.Exec("VACUUM main;")
         allowSQLiteAbort := 0
+     }
   }
 
 
@@ -74261,9 +74235,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
 
     setImageLoading()
     If (editingSelectionNow=1 && IMGresizingMode=5)
-    {
        IMGresizingMode := 1
-    }
 
     imgPath := StrReplace(imgPath, "||")
     fldr := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
@@ -76816,7 +76788,7 @@ ImageNavBoxClickResponder() {
    minX := (allowFreeIMGpanning=1) ? - HUDobjNavBoxu[1] : 0
    minY := (allowFreeIMGpanning=1) ? - HUDobjNavBoxu[2] : 0
    thisIndex := f := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index<2)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
@@ -76860,7 +76832,7 @@ ImageNavBoxClickResponder() {
       Sleep, 15
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    vpImgPanningNow := diffIMGdecX := diffIMGdecY := 0
    If (thisIndex>10 || lastWasLowQuality=1)
       SetTimer, wrapResizeImageGDIwin, -60
@@ -78484,8 +78456,9 @@ ActPaintBrushNow() {
    prevState := "a"
    imgBits := imgPitch := 0
    If (isLarge=1)
+   {
       whichBitmap := 0
-   Else
+   } Else
    {
       createGDIPcanvas(mainWidth, mainHeight)
       whichBitmap := useGdiBitmap()
@@ -78667,7 +78640,7 @@ ActPaintBrushNow() {
    If (isLarge=1)
       CreateOSDinfoLine(0, 1)
    lastBrushDecreaseZeit := A_TickCount
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<1)
@@ -78838,6 +78811,7 @@ ActPaintBrushNow() {
                   maxSmudgeDist := 99999999
                Else
                   maxSmudgeDist := brushSize * (0.5 + 10.0 * (thisWetness/21)**((isLarge=1) ? 4 : 3))
+
                fadeFactor := 1.0 - (smudgeAccDist / maxSmudgeDist)
                If (fadeFactor < 0.01)
                   fadeFactor := 0.01
@@ -78874,7 +78848,6 @@ ActPaintBrushNow() {
                cur_offX := oMx - skX
                cur_offY := oMy - skY
                Gosub, DrawPaintBrushNowStep
-
                If (BrushToolSymmetryX=1 && BrushToolSymmetryY=1)
                {
                   cur_tkX := tkX
@@ -78928,7 +78901,7 @@ ActPaintBrushNow() {
    } Else If (isLarge=1)
       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
    DllCall("qpvmain.dll\ResetBrushOpacityMap")
    If hFIFtex
@@ -79290,7 +79263,7 @@ ActDrawAlphaMaskBrushNow() {
       prevMX := prevMY := 0
 
    offX := offY := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index<2)
    {
       If (thisOpacity<0.005 || brushSize<2)
@@ -79408,7 +79381,7 @@ ActDrawAlphaMaskBrushNow() {
       }
    } ; while-loop end
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    Gdip_DeleteGraphics(Gu)
    trGdip_DisposeImage(brushu, 1)
    If gdipbrushu
@@ -93769,7 +93742,7 @@ batchUndoFileActs(modus) {
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    Loop, % totalu
    {
       executingCanceableOperation := A_TickCount
@@ -94021,7 +93994,7 @@ batchUndoFileActs(modus) {
       undoFileActUpdateIMGindex(imgPath)
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
@@ -96685,14 +96658,14 @@ BTNupdateSelectedStaticFolder() {
     If (SLDtypeLoaded=3 || SLDtypeLoaded=2 && allGood=1)
     {
        showTOOLtip("Updating static folders list")
-       setWhileLoopExec(1)
+       whileLoopExec := 1
        For foldar, indexu in foldersListArray
        {
            FileGetTime, dirDate, % foldar, M
            foldersListArray[foldar] := dirDate
        }
        updateCachedStaticFolders(foldersListArray, 1)
-       setWhileLoopExec(0)
+       whileLoopExec := 0
     }
 
     ResetImgLoadStatus()
@@ -97010,9 +96983,8 @@ uiPopulateDynamicFolderzList() {
 }
 
 uiPanelOpenCloseEvent(modus:=0) {
-    b := (modus=1) ? "|" 0 "|" 0 "|" 0 "|" : "|" imgEditPanelOpened "|" AnyWindowOpen "|" hSetWinGui "|"
-    a := panelWinCollapsed "|" liveDrawingBrushTool b editingSelectionNow "|" maxFilesIndex "|" UserMemBMP "|" undoLevelsRecorded "|" currentFilesListModified "|" lastOtherWinClose "|" IMGresizingMode "|" thumbsDisplaying
-    IF_post("PanelOpenCloseEvent", a)
+    uiUpdateUIctrl()
+    uiAccessImgViewSetUIlabels()
 }
 
 CloseWindow(forceIT:=0, cleanCaches:=1) {
@@ -97252,7 +97224,6 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
 
        toolTipGuiCreated := 0
        IF_post("uiAccessUpdateOSDmsg", "-", 0, 0)
-       toolTipGuiCreated := 0 ; [was IF_set - plain global since phase E]
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
        hudBTNtypeFuncu := hudBTNfuncu := 0
        preventKill := 0
@@ -97355,8 +97326,6 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        lastInvoked := A_TickCount
 
     lastOSDtooltipInvoked := A_TickCount
-    If (forceDarker!=1)
-       toolTipGuiCreated := 1 ; [was IF_set - plain global since phase E]
 }
 
 Fnt_GetListOfFontsSimplified() {
@@ -102166,7 +102135,7 @@ tlbrChangeBrushWet(dir) {
 coreTlbrSlider(thisFunc, delayu, invertDir) {
    GetPhysicalCursorPos(oX, oY)
    cX := cY := lastIndex := thisIndex := lastInvoked := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    lastInvoked := A_TickCount
    lastZeit := A_TickCount
    While, (determineLClickState()=1 || A_Index=1)
@@ -102205,7 +102174,7 @@ coreTlbrSlider(thisFunc, delayu, invertDir) {
          %thisFunc%(dir)
       thisIndex++
    }
-   setWhileLoopExec(0)
+   whileLoopExec := 0
 }
 
 tlbrChangeStuffRotation(modus) {
@@ -102238,7 +102207,7 @@ tlbrChangeStuffRotation(modus) {
 
    GetPhysicalCursorPos(mXo, mYo)
    cX := cY := lastIndex := thisIndex := lastInvoked := 0
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    lastInvoked := A_TickCount
    lastZeit := A_TickCount
    mouseMode := determineLClickState()
@@ -102280,7 +102249,7 @@ tlbrChangeStuffRotation(modus) {
       }
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    RemoveTooltip()
    dummyTimerDelayiedImageDisplay(50)
 }
@@ -102562,7 +102531,7 @@ tlbrZoomINout(dummy:=0) {
 
       GetPhysicalCursorPos(oX, oY)
       cX := cY := lastIndex := thisIndex := lastInvoked := 0
-      setWhileLoopExec(1)
+      whileLoopExec := 1
       vpImgPanningNow := (allowFreeIMGpanning=1) ? 1 : 2
       While, (determineLClickState()=1 || A_Index=1)
       {
@@ -102594,7 +102563,7 @@ tlbrZoomINout(dummy:=0) {
       }
       vpImgPanningNow := 0
       dummyTimerDelayiedImageDisplay(150)
-      setWhileLoopExec(0)
+      whileLoopExec := 0
    }
    Return "m"
 }
@@ -102739,13 +102708,13 @@ tlbrUndoAction() {
       Return
    }
 
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index=1)
    {
       ImgUndoAction()
       Sleep, % (A_Index<10) ? 200 : 90
    }
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    Return "m"
 }
 
@@ -102784,13 +102753,13 @@ tlbrRedoAction() {
       Return
    }
 
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index=1)
    {
       ImgRedoAction()
       Sleep, % (A_Index<10) ? 200 : 90
    }
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    Return "m"
 }
 
@@ -104146,7 +104115,7 @@ GuiSlidersResponder(a, m_event, keyu) {
    } Else keyu := 0
 
    obju := []
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    fsizeu := (PrefsLargeFonts=1) ? LargeUIfontValue - 3 : LargeUIfontValue - 7
    txtColor := (uiUseDarkMode=1) ? "FFffFF" : "000000"
    thisOpacity := (isActive=1) ? "0xEF" : "0x99"
@@ -104326,7 +104295,7 @@ GuiSlidersResponder(a, m_event, keyu) {
    Gdip_DeleteFontFamily(hFontFamily)
    Gdip_DeleteBrush(obju.pBrush)
    trGdip_DisposeImage(obju.pBitmap)
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    If (isGivenKey && !InStr(uiSlidersArray[hwnd], "@"))
    {
       ; force refocus
@@ -104751,14 +104720,10 @@ createGUItoolbar(dummy:=0) {
       If (WinActive("A")=hQPVtoolbar)
          WinActivate, ahk_id %whichWin%
    } Else If (ShowAdvToolbar=0)
-   {
       Gui, OSDguiToolbar: Hide
-   }
 
    WinGetPos, , , ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
 }
-
-; [merge] tlbrPushPrefs() is gone: the 7 toolbar prefs are shared globals now
 
 redrawToolbarGUI() {
    If (AnyWindowOpen && imgEditPanelOpened!=1 || mustCaptureCloneBrush=1 || colorPickerModeNow=1 || runningLongOperation=1)
@@ -104781,10 +104746,6 @@ redrawToolbarGUI() {
       WinSet, ExStyle, -0x20, ahk_id %hQPVtoolbar%
    }
    Sleep, 1
-}
-
-MenuTlbrResetPosition() {
-   tlbrResetPosition()
 }
 
 tlbrResetPosition() {
@@ -105558,7 +105519,7 @@ tlbrDraggyNow() {
    Dx := Dy := 0
    lastInvoked := A_TickCount
    ; ToolTip, % "l=" thisZL , , , 2
-   setWhileLoopExec(1)
+   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       Global zeitSillyPrevent := A_TickCount
@@ -105569,7 +105530,7 @@ tlbrDraggyNow() {
       Sleep, -1
    }
 
-   setWhileLoopExec(0)
+   whileLoopExec := 0
    WinGetPos, winX, winY,,, ahk_id %hQPVtoolbar%
    UserToolbarY := winY
    UserToolbarX := winX

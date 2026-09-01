@@ -1163,25 +1163,6 @@ createGDIselectorWin() {
    UnregisterTouchWindow(hGDIselectWin)
 }
 
-PanelOpenCloseEvent(a) {
-    b := StrSplit(a, "|")
-    panelWinCollapsed := b[1]
-    liveDrawingBrushTool := b[2]
-    imgEditPanelOpened := b[3]
-    AnyWindowOpen := b[4]
-    hSetWinGui := b[5]
-    editingSelectionNow := b[6]
-    maxFilesIndex := b[7]
-    UserMemBMP := b[8]
-    undoLevelsRecorded := b[9]
-    currentFilesListModified := b[10]
-    lastOtherWinClose := b[11]
-    IMGresizingMode := b[12]
-    thumbsDisplaying := b[13]
-    uiUpdateUIctrl()
-    uiAccessImgViewSetUIlabels()
-}
-
 miniGDIupdater() {
    uiUpdateUIctrl(0)
    MT_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
