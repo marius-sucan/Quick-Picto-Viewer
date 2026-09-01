@@ -187,6 +187,7 @@ drainUIinput() {
       Return ; and the interrupted operation then reaches its next checkpoint mid-drain
    busy := 1
    gotKeyDown := 0
+   dcount := 0
    VarSetCapacity(msgu, 48, 0)  ; MSG is 48 bytes on x64, 28 on x86
    prevCrit := A_IsCritical
    Loop, 40  ; hard cap per checkpoint, so an input flood cannot stall the operation
@@ -196,6 +197,7 @@ drainUIinput() {
          If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x200, "UInt", 0x20E, "UInt", 1)
             Break
       }
+      dcount++
       mhwnd := NumGet(msgu, 0, "UPtr")
       mnum := NumGet(msgu, A_PtrSize, "UInt")
       mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
@@ -233,6 +235,8 @@ drainUIinput() {
       uiPreProcessKbdKey()
       SetTimer, uiPreProcessKbdKey, Off
    }
+   If (dcount)
+      OutputDebug, % "QPVMERGE: drained " dcount " msgs, keydown=" gotKeyDown ", hotkate=" hotkate
    If (prevCrit)
       Critical, %prevCrit%
    Else
@@ -1162,6 +1166,7 @@ uiInitGuiContextMenu(mX, mY, oX, oY) {
 ; slideshow flags into this interpreter, and the globals are shared now.
 
 slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
+   OutputDebug, % "QPVMERGE: slideshowsHandler act=" act " speed=" thisSlideSpeed " mode=" how
    SlideHowMode := how
    slideShowDelay := thisSlideSpeed
    prevFullIMGload := 1
@@ -1189,7 +1194,7 @@ slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
 }
 
 dummySlideshow() {
-   ; thisAllowNextSlide := (animGIFplaying=1) ? 0 : allowNextSlide
+   OutputDebug, % "QPVMERGE: dummySlideshow running=" slideShowRunning " allowNext=" allowNextSlide
    If (slideShowRunning=1 && allowNextSlide=1)
    {
       setTaskbarIconState("Normal")
@@ -1199,7 +1204,7 @@ dummySlideshow() {
 
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
-  ; MsgBox, % thisZeit "--" slideShowDelay
+  OutputDebug, % "QPVMERGE: slideCore param=" paramu " zeit=" thisZeit " delay=" slideShowDelay " allowNext=" allowNextSlide " running=" slideShowRunning
   If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
 
@@ -2101,6 +2106,8 @@ coreShowSysMenu(Hwnd, x, y) {
 stopGiFsPlayback() {
    If (animGIFplaying!=0)
    {
+      OutputDebug, % "QPVMERGE: stopGiFsPlayback via " Exception("", -2).What
+
       lastOtherWinClose := A_TickCount
       animGIFplaying := 0
       MT_post("autoChangeDesiredFrame", "stop")
@@ -2109,6 +2116,7 @@ stopGiFsPlayback() {
 }
 
 turnOffSlideshow() {
+   OutputDebug, % "QPVMERGE: turnOffSlideshow via " Exception("", -2).What " running=" slideShowRunning
    stopGiFsPlayback()
    If (slideShowRunning!=1)
       Return
@@ -2563,6 +2571,7 @@ uiPreProcessKbdKey() {
    {
       lastInvoked := A_TickCount
       abusive := (counter>25) ? 1 : 0
+      OutputDebug, % "QPVMERGE: kbd dispatch hotkate=" hotkate " via " Exception("", -2).What
       uiKeyboardResponder(hotkate, abusive)
       ; MT_post("KeyboardResponder", hotkate, PVhwnd, abusive)
       If (hotkate=prevKey)

@@ -12401,6 +12401,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    {
       If (animGIFplaying=1)
       {
+         OutputDebug, % "QPVMERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen
          SetTimer, autoChangeDesiredFrame, Off
          SetTimer, ResetImgLoadStatus, -50
          prevAnimGIFwas := prevImgPath
@@ -12421,6 +12422,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 
    If (act="start" && imgPath && prevImgPath!=imgPath)
    {
+      OutputDebug, % "QPVMERGE: gifStart " imgPath
       SetTimer, ResetImgLoadStatus, -15
       lastFrameChange := A_TickCount
       prevImgPath := imgPath
@@ -12436,6 +12438,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       ; mustHalt := IF_get("mustProcessKeys")
       If (animGIFplaying<=0)
       {
+         OutputDebug, % "QPVMERGE: gifKill [flag read <=0]"
          SetTimer, ResetImgLoadStatus, -10
          SetTimer, autoChangeDesiredFrame, Off
          animGIFplaying := 0
@@ -12479,6 +12482,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       ; allowNextSlide := 0
       lastInvoked := A_TickCount
       prevImgPath := ""
+      OutputDebug, % "QPVMERGE: gifForceNextSlide"
       IF_post("theSlideShowCore", "force")
       ; theSlideShowCore()
       invokeExternalSlideshowHandler()
@@ -76022,6 +76026,7 @@ OnImgFileChangeActions(forceThis) {
 }
 
 invokeExternalSlideshowHandler() {
+   OutputDebug, % "QPVMERGE: invokeExtSlides via " Exception("", -2).What " animGIF=" animGIFplaying
    allowNextSlide := 1
    IF_set("animGIFplaying", animGIFplaying)
    IF_set("allowNextSlide", allowNextSlide)
