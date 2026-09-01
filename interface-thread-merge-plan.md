@@ -185,5 +185,7 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
 
 **2026-09-02 (later) — follow-up per Marius:** tooltips always Arial Bold with main's 1.25× margin (the OSD-font adoption reverted); the dead Alt+Space emulation cleared — `uiShowSysMenu` + `coreShowSysMenu` + the unreachable `!Space` branch of `uiKeyboardResponder` deleted, `Win_ShowSysMenu` in shell-stuff.ahk kept by request as the library helper. Alt+Space itself stays on the SC_KEYMENU post in `uiWM_KEYDOWN`.
 
+**2026-09-02 (later) — wrapper clean-up, per Marius (group A + `IF_call` only):** `identifyMenus` → `uiVisibleMenuWin()` at both sites; `sendWinClickAct` → `MT_post("WinClickAction", …)` at both sites; `uiRepositionTempBtnGui`/`uiSaveMainWinPos` timer relays → the timers target `RepositionTempBtnGui`/`saveMainWinPos` directly (one queued hop instead of two); `IF_call` retired — its 11 literal-name sites are plain calls, every arity verified against the target first. `IF_post`/`MT_post` untouched by request. Module at 107 functions.
+
 ## Critical files
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).

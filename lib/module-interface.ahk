@@ -1312,7 +1312,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
-       sendWinClickAct("remClick", "n", mX, mY)
+       MT_post("WinClickAction", "remClick", "n", mX, mY)
     Else If (imgEditPanelOpened=1 && AnyWindowOpen)
        MT_post("toggleImgEditPanelWindow")
     Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
@@ -1655,13 +1655,7 @@ uiWinClickAction(thisEvent:="normal") {
     ; Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
     ;    MT_post("simplePanIMGonClick", 0, 1, 1)
     Else
-       sendWinClickAct(thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
-}
-
-sendWinClickAct(ctrlEvent, guiCtrl, mX, mY) {
-   ; ToolTip, % guiCtrl "|" mX "|" mY , , , 2
-   ; fnOutDebug("UI event: " ctrlEvent "==" guiCtrl "|" mX "|" mY)
-   MT_post("WinClickAction", ctrlEvent, guiCtrl, mX, mY)
+       MT_post("WinClickAction", thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
 }
 
 ResetLbtn() {
@@ -1686,9 +1680,9 @@ WM_WINDOWPOSCHANGED(wP:=0, lP:=0, msg:=0, hwnd:=0) {
       ; Random, z, -900, 900
       ; ToolTip, % z , , , 2
       If (tempBtnVisible!="null")
-         SetTimer, uiRepositionTempBtnGui, -95
+         SetTimer, RepositionTempBtnGui, -95
 
-      SetTimer, uiSaveMainWinPos, -35
+      SetTimer, saveMainWinPos, -35
       Global lastWinDrag := A_TickCount
       If (A_OSVersion="WIN_7" || isWinXP=1)
          SetTimer, updateGDIwinPos, -5
@@ -1696,14 +1690,6 @@ WM_WINDOWPOSCHANGED(wP:=0, lP:=0, msg:=0, hwnd:=0) {
          SetTimer, updateTlbrPosition, -10
       b := a
   }
-}
-
-uiRepositionTempBtnGui() {
-     MT_post("RepositionTempBtnGui")
-}
-
-uiSaveMainWinPos() {
-     MT_post("saveMainWinPos")
 }
 
 uiChangeMcursor(whichCursor) {
@@ -1905,7 +1891,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    && (A_TickCount - lastMenuHoverZeit>300) && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
       MT_post("MouseMoveResponder", "krill")
 
-   If (menusflyOutVisible=1 && !identifyMenus())
+   If (menusflyOutVisible=1 && !uiVisibleMenuWin())
       SetTimer, hideMenuFlyOut, -50
 
    ; If (mouseToolTipWinCreated=1 && !z && !identifyParentWind())
@@ -2212,7 +2198,7 @@ hideMenuFlyOut() {
     ; WinGetClass, glassu, ahk_id %OutputVarWin%
     ; WinGetTitle, titlu, ahk_id %OutputVarWin%
     ; ToolTip, % OutputVarWin "==" hFlyOut "`n" glassu "==" titlu , , , 2
-    If (OutputVarWin!=hFlyOut && !identifyMenus())
+    If (OutputVarWin!=hFlyOut && !uiVisibleMenuWin())
     {
        Tooltip
        menusflyOutVisible := 0
@@ -2641,13 +2627,6 @@ uiVisibleMenuWin() {
    If (h && DllCall("user32\IsWindowVisible", "UPtr", h))
       Return h
    Return 0
-}
-
-identifyMenus(){
-; Without the visibility filter [see uiVisibleMenuWin] this would return 1 forever
-; and the menu-reader #If hotkeys below [RButton, Left, Right, Space...] would
-; swallow those keys SYSTEM-WIDE.
-   Return uiVisibleMenuWin() ? 1 : 0
 }
 
 ; [phase D] the menu-reader #If hotkey block is gone: hotkey subroutines never

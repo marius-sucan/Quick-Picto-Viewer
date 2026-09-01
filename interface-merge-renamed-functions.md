@@ -33,9 +33,9 @@ behaviour-neutral, and with a single interpreter they are now consolidation cand
 | `kMenu` | `uiKmenu` | quick-picto-viewer.ahk | main: the menu-item helper used 1707 times; module: bar-menu variant with a different signature | 0.02 | – | 1 / 1707 |
 | `mouseTurnOFFtooltip` | `uiMouseTurnOFFtooltip` | quick-picto-viewer.ahk | module: hides the viewport tooltip GUI (15 lines); main: 5-line panel variant | 0.29 | 0.26 | 18 / 17 |
 | `PanelQuickSearchMenuOptions` | `uiPanelQuickSearchMenuOptions` | quick-picto-viewer.ahk | main: the 81-line panel; module: 11-line opener | 0.02 | 0.02 | 1 / 25 |
-| `RepositionTempBtnGui` | `uiRepositionTempBtnGui` | quick-picto-viewer.ahk | main: 35-line positioner; module: 3-line post | 0.03 | 0.03 | 1 / 2 |
+| `RepositionTempBtnGui` | `uiRepositionTempBtnGui` | quick-picto-viewer.ahk | main: 35-line positioner; module: 3-line post | 0.03 | 0.03 | 1 / 2 | *(module copy deleted 2026-09-02, §7-A)*
 | `repositionWindowCenter` | `uiRepositionWindowCenter` | quick-picto-viewer.ahk | main: 136-line general window centering; module: 42-line PVwin-family variant | 0.41 | 0.41 | 1 / 77 |
-| `saveMainWinPos` | `uiSaveMainWinPos` | quick-picto-viewer.ahk | main: writes the INI; module: 3-line trigger | 0.18 | 0.18 | 1 / 1 |
+| `saveMainWinPos` | `uiSaveMainWinPos` | quick-picto-viewer.ahk | main: writes the INI; module: 3-line trigger | 0.18 | 0.18 | 1 / 1 | *(module copy deleted 2026-09-02, §7-A)*
 | `toggleAppToolbar` | `uiToggleAppToolbar` | quick-picto-viewer.ahk | main: the 20-line toggle; module: 8-line trigger | 0.05 | 0.07 | 1 / 11 |
 | `ToggleMenuBaru` | `uiToggleMenuBaru` | quick-picto-viewer.ahk | main: the 18-line toggle; module: 8-line trigger | 0.18 | 0.13 | 1 / 4 |
 | `updateUIctrl` | `uiUpdateUIctrl` | quick-picto-viewer.ahk | module: 52-line viewport-controls layout; main: 7-line panel helper | 0.02 | 0.03 | 11 / 21 |
@@ -162,6 +162,8 @@ the main script was checked for the functions the merge added there.
 
 ### A. Pure forwards in module-interface.ahk — delete and retarget
 
+> **Applied 2026-09-02:** all four deleted and their callers retargeted as listed.
+
 | wrapper | body | referenced by | replacement |
 |---|---|---|---|
 | `identifyMenus()` | `Return uiVisibleMenuWin() ? 1 : 0` | 2 direct calls, both `!identifyMenus()` | `uiVisibleMenuWin()` — it returns the menu hwnd or 0, which is all a boolean test needs |
@@ -170,6 +172,10 @@ the main script was checked for the functions the merge added there.
 | `uiSaveMainWinPos()` | `MT_post("saveMainWinPos")` | 1 `SetTimer … -35` | `SetTimer, saveMainWinPos, -35` |
 
 ### B. Merge facades in quick-picto-viewer.ahk
+
+> **Applied 2026-09-02, `IF_call` only:** the facade is deleted and its 11 sites are direct calls (every arity
+> re-checked against the target's signature first — direct calls are load-time checked, the dynamic ones were not).
+> `IF_post` and `MT_post` stay as they are, by request.
 
 | facade | what it is today | sites | replacement |
 |---|---|---|---|

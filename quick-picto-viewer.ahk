@@ -449,40 +449,14 @@ If (FirstRun!=0)
 initInterfaceModule()
 
 ; ______ interface facade [merged - phases C+E] ______
-; IF_call runs its target directly [arity-dispatched dynamic call]; IF_post and
-; MT_post preserve the old cross-interpreter queued semantics [a post executed
-; when the receiving thread pumped] via one-shot BoundFunc timers through
-; IF_postRelay. The former IF_set/IF_get/MT_set/MT_get variable facades were
+; IF_post and MT_post preserve the old cross-interpreter queued semantics [a
+; post executed when the receiving thread pumped] via one-shot BoundFunc timers
+; through IF_postRelay. IF_call, the direct-call facade, was retired 2026-09-02:
+; its sites are plain calls now. The former IF_set/IF_get/MT_set/MT_get variable facades were
 ; retired at phase E - every site is a plain global assignment or read now.
 ; PARSER RULE for this runtime [see interface-thread-merge-plan.md]: no args*
 ; expansion into METHOD calls and no args[N] inside call arguments - hoist into
 ; plain locals and dispatch on the count, as below.
-
-IF_call(funcName, args*) {
-   n := args.Length()
-   a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
-   a6 := args[6], a7 := args[7], a8 := args[8], a9 := args[9]
-   If (n=0)
-      Return %funcName%()
-   Else If (n=1)
-      Return %funcName%(a1)
-   Else If (n=2)
-      Return %funcName%(a1, a2)
-   Else If (n=3)
-      Return %funcName%(a1, a2, a3)
-   Else If (n=4)
-      Return %funcName%(a1, a2, a3, a4)
-   Else If (n=5)
-      Return %funcName%(a1, a2, a3, a4, a5)
-   Else If (n=6)
-      Return %funcName%(a1, a2, a3, a4, a5, a6)
-   Else If (n=7)
-      Return %funcName%(a1, a2, a3, a4, a5, a6, a7)
-   Else If (n=8)
-      Return %funcName%(a1, a2, a3, a4, a5, a6, a7, a8)
-   Else
-      Return %funcName%(a1, a2, a3, a4, a5, a6, a7, a8, a9)
-}
 
 IF_post(funcName, args*) {
 ; queued execution, like the old cross-interpreter post: the target runs from a
@@ -4975,7 +4949,7 @@ ToggleThumbsMode() {
       uiPanelOpenCloseEvent()
       ; fnOutputDebug("Recalculating thumbnail sizes")
       recalculateThumbsSizes()
-      IF_call("uiAccessUpdateUiStatusBar", 0, 0, "list", 0, OSDfontSize, maxFilesIndex)
+      uiAccessUpdateUiStatusBar(0, 0, "list", 0, OSDfontSize, maxFilesIndex)
       UpdateThumbsScreen()
       ; fnOutputDebug("hGDIinfosWin cleaned... " hGDIinfosWin "  -- G= " 2NDglPG "  -- hDC= " 2NDglHDC " ")
       clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
@@ -11074,7 +11048,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      ; ResetImgLoadStatus()
      ; SetTimer, theSlideShowCore, Off
      prevSlideShowStop := A_TickCount
-     IF_call("slideshowsHandler", 0, "stop", SlideHowMode)
+     slideshowsHandler(0, "stop", SlideHowMode)
      SetTimer, ResetImgLoadStatus, -150
   } Else If (thumbsDisplaying!=1 || actu="start")
   {
@@ -11118,7 +11092,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         msgu .= "`nAlready seen images will be skipped."
 
      msgu .= "`nPress Escape or click to stop the slideshow."
-     IF_call("slideshowsHandler", thisSlideSpeed, "start", SlideHowMode, msgu)
+     slideshowsHandler(thisSlideSpeed, "start", SlideHowMode, msgu)
      ; SetTimer, theSlideShowCore, % thisSlideSpeed
   }
   Return
@@ -38660,7 +38634,7 @@ readSlideSettingsINI(readThisFile, act:=0) {
         If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
            imageAlignVPtopLeft := 0
 
-        IF_call("updateWindowColor")
+        updateWindowColor()
         refreshWinBGRbrush()
         defineColorDepth()
         recalculateThumbsSizes()
@@ -58268,7 +58242,7 @@ BtnSavePreferencesClose() {
    updateUIsettings()
    WriteSettingsUI()
    loadCustomUserKbds()
-   IF_call("updateWindowColor")
+   updateWindowColor()
    realSystemCores := userMultiCoresLimit
    INIaction(1, "userPerformColorManagement", "General")
    INIaction(1, "userimgGammaCorrect", "General")
@@ -58382,7 +58356,7 @@ InvokeStandardDialogColorPicker(hC, event, c) {
      updateUIgridPanel()
   } Else If (AnyWindowOpen=14)
   {
-     IF_call("updateWindowColor")
+     updateWindowColor()
      updateUIsettings()
      refreshWinBGRbrush()
      dummyTimerDelayiedImageDisplay(50)
@@ -70026,7 +70000,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
    idu := (manubarMode=1) ? klop[2] : "reset"
    darkMode := (uiUseDarkMode=1) ? "yes" : "no"
-   IF_call("menuFlyoutDisplay", "yes", mX, mY, okay, darkMode, A_ScriptHwnd, idu)
+   menuFlyoutDisplay("yes", mX, mY, okay, darkMode, A_ScriptHwnd, idu)
    Sleep, 0
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
    Global lastMenuZeit := A_TickCount
@@ -73252,7 +73226,7 @@ handleFatalWinInitErrors() {
 
 restartEntireGui() {
    destroyGDIPcanvas()
-   IF_call("destroyAllGUIs")
+   destroyAllGUIs()
    Sleep, 25
    initGUI := BuildGUI()  ; [merge] reads the live globals; the old 9-of-16-field handshake bug is gone
    fnOutputDebug("RESTARTED extern UI HWNDs: " initGUI)
@@ -74466,7 +74440,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
          resetImgSelection("forced")
 
       itemInfos := "Image view. Zoom: " ws ". " fzoomu ". " OutFileName ". " OutDir ". Index " currentFileIndex " of " maxFilesIndex "."
-      IF_call("infosUIAbtns", itemInfos)
+      infosUIAbtns(itemInfos)
    }
 
    GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
@@ -84572,7 +84546,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
     {
        ; draw the status bar
        If (simpleMode=0 && actu!="scroll")
-          IF_call("infosUIAbtns", itemInfos)
+          infosUIAbtns(itemInfos)
 
        bgrTXT := (resultedFilesList[currentFileIndex, 2]=1) ? SubStr(MixARGB("0xFF0188FF", "0xFF" OSDbgrColor, 0.65), 5) : OSDbgrColor
        If isDupesList
@@ -97259,7 +97233,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If perc
        mp .= ". Range: " Round(perc*100) "%."
 
-    IF_call("infosUIAbtns", msg mp)
+    infosUIAbtns(msg mp)
     addJournalEntry("OSD: " msg)
     If (!CurrentSLD && currentFileIndex!=0) || (forceDarker=1)
        trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0x66" WindowBgrColor, 1)
@@ -101986,7 +101960,7 @@ tlbrInvokeFunction(a, b, c) {
    func2Call := processToolbarFunctions(btnID, b)
    ; ToolTip, % z "=" a "=" b "=" c "=" func2Call , , , 2
    WinGetPos, aX, aY,,, ahk_id %hwnd%
-   ; IF_call("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
+   ; ShowClickHalo(aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    globalMenuOptions := !tlbrIconzList[hwnd, 12] ? "tlbrMenu|" aX "|" aY + ToolBarBtnWidth : 0
    ; ToolTip, % globalMenuOptions , , , 2
    lastTlbrClicked := hwnd
@@ -105633,7 +105607,7 @@ KeyboardMoveMouseToolbar(thisu:=0, l:=0) {
 
    msgu := tlbrDecideTooltips(hwndu)
    thisSize := OSDfontSize//3 + 2
-   ; IF_call("ShowClickHalo", aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
+   ; ShowClickHalo(aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    If msgu
       mouseCreateOSDinfoLine(msgu, thisSize, 0, posu)
 }
