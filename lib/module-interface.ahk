@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit
+     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -44,7 +44,7 @@ initInterfaceModule() {
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
-   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1
+   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0
    ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
    ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
    ; flag was on from the first menu of a session; native bar opens never call it,
@@ -215,11 +215,15 @@ uiCallWndProc(nCode, wP, lP) {
          If (barMenuSession=1)
          {
             If isMapped
+            {
                flyoutNeedsPos := 1
+               flyoutAnchorMenu := hMinit
+            }
          } Else If (popupRootSeen!=1)
          {
             popupRootSeen := 1
             flyoutNeedsPos := 1
+            flyoutAnchorMenu := hMinit
          }
          uiMenuJITrebuild(hMinit)
       }
@@ -418,7 +422,30 @@ uiTryPlaceFlyout() {
 ; both loop kinds, keyboard navigation included.
    If (flyoutNeedsPos!=1 || allowMenuReader!="yes")
       Return
-   a := uiVisibleMenuWin()
+   ; anchor by IDENTITY, not mere visibility: dismissed menus FADE OUT, so during
+   ; fast context<->bar alternation the previous session's #32768 is still visible
+   ; when this runs, and placing against it consumed the flag on a dying window's
+   ; rectangle [the intermittent missing-flyout Marius reported]. Every #32768
+   ; answers MN_GETHMENU with the menu it hosts - demand the one hosting the menu
+   ; the flag was raised for; ghosts host the OLD menu and are skipped, retried past.
+   a := 0
+   If flyoutAnchorMenu
+   {
+      WinGet, menuWins, List, % "ahk_class #32768 ahk_pid " QPVpid
+      Loop, % menuWins
+      {
+         w := menuWins%A_Index%
+         If !DllCall("user32\IsWindowVisible", "UPtr", w)
+            Continue
+         hm := DllCall("user32\SendMessageW", "Ptr", w, "UInt", 0x01E1, "Ptr", 0, "Ptr", 0, "UPtr") ; MN_GETHMENU
+         If (hm = flyoutAnchorMenu)
+         {
+            a := w
+            Break
+         }
+      }
+   } Else
+      a := uiVisibleMenuWin()
    If !a
       Return
    If (wasMenuFlierCreated!=1)
