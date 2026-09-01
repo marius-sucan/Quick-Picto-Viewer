@@ -114,35 +114,6 @@ setPriorityThread(level, handle:="A") {
   Return DllCall("SetThreadPriority", "UPtr", handle, "Int", level)
 }
 
-updateWindowColor() {
-  Sleep, 1
-  ; WindowBgrColor := MainExe.ahkgetvar.WindowBgrColor
-  Gui, 1: Color, %WindowBgrColor%
-}
-
-destroyAllGUIs() {
-  Gui, 1: Destroy
-  Gui, 2: Destroy
-  Gui, 3: Destroy
-  Gui, 4: Destroy
-  Gui, 5: Destroy
-  taskBarUI.clearAll()
-  Sleep, 50
-}
-
-infosUIAbtns(msgu) {
-   Static lastu := 0, prevMsg
-   If (prevMsg=msgu)
-      Return
-
-   lastu := !lastu
-   GuiControl, 1:, UIAbtn%lastu%, % msgu
-   Sleep, 1
-   If (WinActive("A")=PVhwnd)
-      GuiControl, 1: Focus, UIAbtn%lastu%
-   prevMsg := msgu
-}
-
 UnregisterTouchWindow(hwnd) {
       Return DllCall("User32.dll\UnregisterTouchWindow", "UPtr", hwnd)
 }
@@ -183,86 +154,6 @@ BuildGUI(params:=0) {
    }
 
    RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
-   ; setMenusTheme(1)
-   calcHUDsize()
-   MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
-   initialWh := "w" A_ScreenWidth//1.7 " h" A_ScreenHeight//1.5
-   ; If !A_IsCompiled
-     Try Menu, Tray, Icon, %mainCompiledPath%\qpv-icon.ico
-   Global UIAbtn0, UIAbtn1
-   Gui, 1: Color, %WindowBgrColor%
-   Gui, 1: Margin, 0, 0
-   Gui, 1: -DPIScale +Resize %MinGUISize% +hwndPVhwnd +LastFound +OwnDialogs
-   Gui, 1: Font, s1
-   Gui, 1: Add, Button, x1 y1 w1 h1 vUIAbtn0, Btn-A
-   Gui, 1: Add, Button, x1 y1 w1 h1 vUIAbtn1, Btn-B
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vOSDmsgsLine hwndhPic11, OSD messages.
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicVscroll hwndhPic5, Vertical scrollbar
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vPicHscroll hwndhPic6, Horizontal scrollbar
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgInfoBox hwndhPic9, Image information box.
-   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vImgNavBox hwndhPic7, Image navigation area.
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgHistoBox hwndhPic8, Image histogram area.
-   Gui, 1: Add, Text, x3 y3 w2 h2 BackgroundTrans vImgAnnoBox hwndhPic10, Image annotations box.
-   Gui, 1: Add, Text, x0 y0 w1 h1 BackgroundTrans vPicOnGui1 hwndhPic0, Previous image
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2a hwndhPic1, Zoom in
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2b hwndhPic2, Image view. Center.
-   Gui, 1: Add, Text, x2 y2 w2 h2 BackgroundTrans vPicOnGui2c hwndhPic3, Zoom out
-   Gui, 1: Add, Text, x3 y3 w3 h3 BackgroundTrans vPicOnGui3 hwndhPic4, Next image
-   Gui, 1: Add, Button, xp-100 yp-100 w1 h1 Default,a
-   hPicOnGui1 := hPic0
-   If (isTitleBarVisible=1)
-      Gui, 1: +Caption
-   Else
-      Gui, 1: -Caption
-
-   Gui, 1: Show, Maximize Hide Center %initialwh%, %appTitle%
-
-   Try taskBarUI := new taskbarInterface(PVhwnd)
-   UnregisterTouchWindow(PVhwnd)
-   Loop, 4
-       UnregisterTouchWindow(hPic%A_Index%)
-   Sleep, 1
-   createGDIwinThumbs()
-   Sleep, 1
-   createGDIwin()
-   Sleep, 1
-   createGDIselectorWin()
-   Sleep, 1
-   createGDIinfosWin()
-   Sleep, 2
-   updateUIctrl(1)
-   If (mustAssignVarz=1)
-   {
-      MainExe.ahkassign("PVhwnd", PVhwnd)
-      MainExe.ahkassign("hGDIinfosWin", hGDIinfosWin)
-      MainExe.ahkassign("hGDIwin", hGDIwin)
-      MainExe.ahkassign("hGDIthumbsWin", hGDIthumbsWin)
-      MainExe.ahkassign("hGDIselectWin", hGDIselectWin)
-      MainExe.ahkassign("hPicOnGui1", hPicOnGui1)
-      MainExe.ahkassign("winGDIcreated", winGDIcreated)
-      MainExe.ahkassign("ThumbsWinGDIcreated", ThumbsWinGDIcreated)
-   }
-
-   WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
-   Sleep, 1
-   WinActivate, ahk_id %PVhwnd%
-   posu := StrSplit(mainWinPos, "|")
-   sizeu := StrSplit(mainWinSize, "|")
-   pX := posu[1], pY := posu[2]
-   sW := sizeu[1], sH := sizeu[2]
-   ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
-   If (mainWinMaximized=2 || pX="" || pY="" || sW="" || sH="")
-   {
-      repositionWindowCenter(1, PVhwnd, "mouse", appTitle)
-      Sleep, 50
-      Gui, 1: Show, Maximize
-   } Else
-   {
-      Gui, 1: Show ; , x%pX% y%pY% w%sW% h%sH%
-      WinMoveZ(PVhwnd, 0, pX, pY, sW, sH)
-      Sleep, 2
-   }
-
    r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
    Return r
 }
@@ -311,15 +202,6 @@ setTaskbarIconState(mode) {
    Else If (mode="question" && runningLongOperation!=1)
       taskBarUI.flashTaskbarIcon("green", 3, 150, 150)
       ; taskBarUI.setTaskbarIconColor("green")
-}
-
-updateUIctrlFromOutside(paramA) {
-    p := StrSplit(paramA, "|")
-    editingSelectionNow := p[1]
-    isAlwaysOnTop := p[2]
-    drawingShapeNow := p[3]
-    IMGresizingMode := p[4]
-    updateUIctrl(0)
 }
 
 isTlbrVertical() {
@@ -378,342 +260,6 @@ detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
     Return isTlbrVertical() ? 1 : 2
 }
 
-updateUIctrl(forceThis:=0) {
-   Static prevState
-   If (forceThis="kill" || thumbsDisplaying=1 && maxFilesIndex>0)
-   {
-      prevState := ""
-      Return
-   }
-
-   GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
-   hasTrans := detectToolbar(tW, tH)   ; guards ShowAdvToolbar / lockToolbar2Win itself
-   tX := (hasTrans=1) ? tW : 0
-   tY := (hasTrans=2) ? tH : 0
-   If (hasTrans=1)
-      GuiW -= tW
-   If (hasTrans=2)
-      GuiH -= tH
-
-   If (forceThis=1)
-      editingSelectionNow := MainExe.ahkgetvar.editingSelectionNow
-
-   lastWinStatus := ""
-   ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
-   ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
-   ctrlH3 := GuiH - ctrlH2*2
-   ctrlW2 := GuiW - ctrlW*2
-   ctrlY1 := tY + ctrlH2
-   ctrlY2 := tY + ctrlH2*2
-   ctrlY3 := tY + ctrlH2 + ctrlH3
-   ctrlX1 := tX + ctrlW
-   ctrlX2 := tX + ctrlW + ctrlW2
-   calcHUDsize()
-   thisState := "a" GuiW GuiH ctrlW2 ctrlH2 ctrlY3 editingSelectionNow isAlwaysOnTop TouchScreenMode drawingShapeNow IMGresizingMode OSDfontSize imgHUDbaseUnit
-   If (thisState!=prevState)
-   {
-      k := imgHUDbaseUnit//3 ; the thickness of scrollbars
-      WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%   
-      GuiControl, 1: Move, PicOnGUI1, % "w" ctrlW " h" GuiH " x" tX " y" tY
-      GuiControl, 1: Move, PicOnGUI2a, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" tY
-      GuiControl, 1: Move, PicOnGUI2b, % "w" ctrlW2 " h" ctrlH3 " x" ctrlX1 " y" ctrlY1
-      GuiControl, 1: Move, PicOnGUI2c, % "w" ctrlW2 " h" ctrlH2 " x" ctrlX1 " y" ctrlY3
-      GuiControl, 1: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y" tY
-      If (IMGresizingMode=4)
-      {
-         GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k + tX " y" tY
-         GuiControl, 1: Move, picHscroll, % "w" GuiW " h" k " x " tX " y" GuiH - k + tY
-      } Else
-      {
-         GuiControl, 1: Move, picVscroll, w1 h1 x1 y1
-         GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
-      }
-      uiAccessImgViewSetUIlabels()
-      prevState := thisState
-      uiAccessUpdateUiStatusBar(0, 0, "kill", 0)
-   }
-}
-
-calcHUDsize() {
-   imgHUDbaseUnit := (PrefsLargeFonts=1) ? Round(OSDfontSize*2.5) : Round(OSDfontSize*2)
-}
-
-uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
-   If (msgu="hide" || !tW || !tH)
-   {
-      GuiControl, 1: Move, ImgHistoBox, x1 y1 w1 h1
-      Return
-   }
-
-   msgu := StrReplace(msgu, "`n", ".`n")
-   msgu := StrReplace(msgu, " | ", ".`n")
-   Gui, 1: Default
-   GuiControl, 1:, ImgHistoBox, % "Image histogram box:`nGraph focus: " msgu "`nClick to cycle modes. Right-click for histogram options."
-   GuiControl, 1: Move, ImgHistoBox, % " x" tX " y" tY " w" tW " h" tH 
-}
-
-uiAccessUpdateAnnoBox(msgu, tW, tH, tX, tY) {
-   If (msgu="hide" || !tW || !tH || msgu="")
-   {
-      GuiControl, 1: Move, ImgAnnoBox, x1 y1 w1 h1
-      Return
-   }
-
-   Gui, 1: Default
-   GuiControl, 1:, ImgAnnoBox, % "Image caption:`n" msgu "`nThis viewport area is click-through. The action performed on click will be that as if this box is not visible."
-   GuiControl, 1: Move, ImgAnnoBox, % " x" tX " y" tY " w" tW " h" tH 
-}
-
-uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
-   If (msgu="hide" || !tW || !tH)
-   {
-      GuiControl, 1: Move, ImgNavBox, x1 y1 w1 h1
-      Return
-   }
-
-   Gui, 1: Default
-   GuiControl, 1:, ImgNavBox, % msgu
-   GuiControl, 1: Move, ImgNavBox, % " x" tX " y" tY " w" tW " h" tH 
-}
-
-uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:=0, scrollY:=0) {
-   If (msgu="hide" || !tW || !tH)
-   {
-      GuiControl, 1: Move, ImgInfoBox, x1 y1 w1 h1
-      Return
-   }
-
-   msgu := "Info-box. Image in view:`n" StrReplace(msgu, "`n", ".`n") ".`nThis viewport area is click-through."
-   Gui, 1: Default
-   GuiControl, 1:, ImgInfoBox, % msgu
-   GetClientSize(GuiW, GuiH, PVhwnd)
-   tX := (flipH=1 && thumbsDisplaying!=1) ? GuiW - tW : 0
-   tY := (flipV=1 && thumbsDisplaying!=1) ? GuiH - tH : 0
-   If (flipH!=1 || thumbsDisplaying=1)
-      tX += Round(bonusX)
-   If (flipV!=1 || thumbsDisplaying=1)
-      tY += Round(bonusY)
-
-   tX -= Round(scrollX)
-   tY -= Round(scrollY)
-   GuiControl, 1: Move, ImgInfoBox, % " x" tX " y" tY " w" tW " h" tH 
-}
-
-uiAccessWelcomeView() {
-   Static msgu := "Random predefined pattern-based image generated in the viewport. No image loaded. No indexed image files. Press O key or Left-Click to open a file or folder. Right-click for the context menu and more options."
-        , lastInvoked := 1, runz := 0
-   If (thumbsDisplaying=1 && maxFilesIndex>0)
-      Return
-
-   If (A_TickCount - lastInvoked<150)
-   {
-      SetTimer, uiAccessWelcomeView, -300
-      Return
-   }
-
-   runz++
-   ; ToolTip, % runz "=p" , , , 2
-   updateUIctrl()
-   uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
-   uiAccessUpdateInfoBox("hide", 1, 1, 0, 0)
-   uiAccessUpdateNavBox("hide", 1, 1, 0, 0)
-   uiAccessUpdateAnnoBox("hide", 1, 1, 0, 0)
-   Gui, 1: Default
-   GuiControl, 1:, PicOnGUI1, % msgu
-   GuiControl, 1:, PicOnGUI2a, % msgu
-   GuiControl, 1:, PicOnGUI2b, % msgu
-   GuiControl, 1:, PicOnGUI2c, % msgu
-   GuiControl, 1:, PicOnGUI3, % msgu
-   GuiControl, 1: Move, picVscroll, w1 h1 x1 y1
-   GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
-   updateUIctrl("kill")
-   lastInvoked := A_TickCount
-}
-
-uiAccessImgViewSetUIlabels() {
-   Gui, 1: Default
-   zr := (IMGresizingMode=4) ? " Hold the Space key plus left-click and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
-   If (drawingShapeNow=1 || AnyWindowOpen)
-   {
-      msgu := AnyWindowOpen ? "Image view. A panel window is opened. " : "Image view. Drawing vector shape mode is activated. " zr " Press Escape to cancel. Press Enter to accept defined path or modifications. Swipe gestures are not allowed."
-      If (imgEditPanelOpened=1)
-         msgu := "Image view. An image editing live tool is currently in use. " zr " Swipe gestures are not allowed."
-
-      GuiControl, 1:, PicOnGUI1, % msgu
-      GuiControl, 1:, PicOnGUI2a, % msgu
-      GuiControl, 1:, PicOnGUI2b, % msgu
-      GuiControl, 1:, PicOnGUI2c, % msgu
-      GuiControl, 1:, PicOnGUI3, % msgu
-      Return
-   }
-
-   If (TouchScreenMode=1)
-   {
-      dr := (editingSelectionNow=1) ? " Double click outside selection area to deactivate it. " : " Press Shift + Left-Click anywhere to create a new selection area. "
-      ; gr := " Otherwise, the movement is considered as a zoom in/out swipe gesture."
-      fr := " `nIf the image is not larger than the viewport, swipe gestures are allowed."
-      msgu := "Image view. Left. Click for previous image. Swipe gestures allowed." zr dr
-      If (editingSelectionNow=1)
-      {
-         msgu := "Image view. " dr zr
-         If (IMGresizingMode=4)
-            msgu .= fr
-      }
-
-      GuiControl, 1:, PicOnGUI1, % msgu
-      msgu := "Image view. Top. Click to zoom in. Swipe gestures allowed." zr 
-      If (editingSelectionNow!=1)
-         msgu .= dr
-
-      GuiControl, 1:, PicOnGUI2a, % msgu
-      msgu := "Image view. Center. Double-click to toggle view mode in this area. " zr dr
-      If (editingSelectionNow=1)
-         msgu := "Image view. " dr zr
-      If (IMGresizingMode=4)
-         msgu .= fr
-
-      GuiControl, 1:, PicOnGUI2b, % msgu
-      msgu := "Image view. Bottom. Click to zoom out. Swipe gestures allowed." zr
-      If (editingSelectionNow!=1)
-         msgu .= dr
-
-      GuiControl, 1:, PicOnGUI2c, % msgu
-      msgu := "Image view. Right. Click for next image. Swipe gestures allowed." zr dr
-      If (editingSelectionNow=1)
-      {
-         msgu := "Image view. " dr zr 
-         If (IMGresizingMode=4)
-            msgu .= fr
-      }
-
-      GuiControl, 1:, PicOnGUI3, % msgu
-   } Else
-   {
-      zr := (IMGresizingMode=4) ? " Left-click outside selection area and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
-      dr := (editingSelectionNow=1) ? "Double click outside selection area to deactivate it." : "Double-click anywhere to toggle view mode. Press Shift + Left-Click anywhere to create a new selection area. "
-      msgu := "Image view. " dr zr
-      GuiControl, 1:, PicOnGUI1, % msgu
-      GuiControl, 1:, PicOnGUI2a, % msgu
-      GuiControl, 1:, PicOnGUI2b, % msgu
-      GuiControl, 1:, PicOnGUI2c, % msgu
-      GuiControl, 1:, PicOnGUI3, % msgu
-   }
-}
-
-uiAccessUpdateOSDmsg(stringu, tW, tH) {
-    If (stringu="-" || !tW || !tH)
-    {
-       GuiControl, 1: Move, OSDmsgsLine, x1 y1 w1 h1
-       Return
-    }
-
-    Gui, 1: Default
-    GetClientSize(GuiW, GuiH, PVhwnd)
-    GuiControl, 1:, OSDmsgsLine, % "OSD: " stringu
-    GuiControl, 1: Move, OSDmsgsLine, % " x1 y1 w" GuiW " h" tH 
-}
-
-uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSize:="n", itemz:="n") {
-   Critical, on
-   Static prevState
-   If itemz is Number
-      maxFilesIndex := itemz
-
-   If fntSize is Number
-   {
-      OSDfontSize := fntSize
-      calcHUDsize()
-   }
-
-   lastWinStatus := ""
-   If (mustResize="kill")
-   {
-      prevState := mustResize
-   } Else If (mustResize="list")
-   {
-      thumbsDisplaying := 1
-      GetClientSize(GuiW, GuiH, PVhwnd)
-      thisState := "a" mustResize GuiW GuiH heightu imgHUDbaseUnit
-      If (thisState!=prevState)
-      {
-         k := imgHUDbaseUnit//3 ; the thickness of scrollbars
-         GuiControl, 1: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
-         GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-         GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
-         GuiControl, 1: Move, PicOnGUI2b, w1 h1 x1 y1
-         GuiControl, 1: Move, PicOnGUI2c, w1 h1 x1 y1
-         GuiControl, 1: Move, PicOnGUI3, w1 h1 x1 y1
-         GuiControl, 1: Move, picHscroll, w1 h1 x1 y1
-         prevState := thisState
-      }
-
-      GuiControl, 1:, PicOnGUI1, Files list container
-      GuiControl, 1:, PicOnGUI2a, Status bar
-      uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
-      uiAccessUpdateAnnoBox("hide", 1, 1, 0, 0)
-      updateUIctrl("kill")
-   } Else If (mustResize="image")
-   {
-      thumbsDisplaying := 0
-      prevState := mustResize
-      updateUIctrl()
-   } Else If (stringu && heightu)
-   {
-      updateUIctrl("kill")
-      prevState := mustResize
-      GetClientSize(GuiW, GuiH, PVhwnd)
-      GuiControl, 1: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-      GuiControl, 1: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
-      stringu := StrReplace(stringu, " | ", "`n")
-      GuiControl, 1:, PicOnGUI2a, % "Status bar:`n" stringu
-      lastWinStatus := stringu
-      GuiControl, 1:, PicOnGUI1, % infos
-   }
-}
-
-createGDIwin() {
-   Critical, on
-   ; WinGetPos, , , mainW, mainH, ahk_id %PVhwnd%
-   Gui, 2: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIwin +Owner1
-   Gui, 2: Show, NoActivate, %appTitle%: Picture container
-   If (A_OSVersion!="WIN_7")
-      SetParentID(PVhwnd, hGDIwin)
-
-   UnregisterTouchWindow(hGDIwin)
-   winGDIcreated := 1
-}
-
-createGDIwinThumbs() {
-   Critical, on
-
-   Gui, 3: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIthumbsWin +Owner1
-   Gui, 3: Show, NoActivate, %appTitle%: Thumbnails container
-   If (A_OSVersion!="WIN_7")
-      SetParentID(PVhwnd, hGDIthumbsWin)
-
-   UnregisterTouchWindow(hGDIthumbsWin)
-   ThumbsWinGDIcreated := 1
-}
-
-createGDIinfosWin() {
-   Critical, on
-
-   Gui, 4: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIinfosWin +Owner1
-   Gui, 4: Show, NoActivate, %appTitle%: Infos container
-   If (A_OSVersion!="WIN_7")
-      SetParentID(PVhwnd, hGDIinfosWin)
-   UnregisterTouchWindow(hGDIinfosWin)
-}
-
-createGDIselectorWin() {
-   Critical, on
-
-   Gui, 5: -DPIScale +E0x20 +Disabled -Caption +E0x80000 +hwndhGDIselectWin +Owner1
-   Gui, 5: Show, NoActivate, %appTitle%: Selector container
-   If (A_OSVersion!="WIN_7")
-      SetParentID(PVhwnd, hGDIselectWin)
-   UnregisterTouchWindow(hGDIselectWin)
-}
 
 PanelOpenCloseEvent(a) {
     b := StrSplit(a, "|")
@@ -730,17 +276,10 @@ PanelOpenCloseEvent(a) {
     lastOtherWinClose := b[11]
     IMGresizingMode := b[12]
     thumbsDisplaying := b[13]
-    updateUIctrl()
-    uiAccessImgViewSetUIlabels()
 }
 
 SetParentID(Window_ID, theOther) {
    Return DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
-}
-
-miniGDIupdater() {
-   updateUIctrl(0)
-   MainExe.ahkPostFunction("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
 msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, modality:=0, optionz:=0) {
@@ -1700,33 +1239,6 @@ activateMainWin() {
       SetTimer, mouseTurnOFFtooltip, -150
 }
 
-GuiSize(GuiHwnd, EventInfo, Width, Height) {
-    If (A_TickCount - lastMenuBarUpdate < 150)
-       Return
-
-    PrevGuiSizeEvent := EventInfo
-    ; ToolTip, % "l=" EventInfo , , , 2
-    turnOffSlideshow()
-    canCancelImageLoad := 4
-    delayu := (isWinXP=1 || thumbsDisplaying=1) ? -15 : -5
-    SetTimer, miniGDIupdater, % delayu
-}
-
-GuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
-   Static lastInvoked := 1
-   If (AnyWindowOpen>0 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
-      Return
-
-   lastInvoked := A_TickCount
-   GuiHwnd := Format("{1:#x}", GuiHwnd)
-   ; ToolTip, % GuiHwnd "`n" PVhwnd "`n" hGDIwin "`n" hGDIthumbsWin "`n" hGDIselectWin "`n" hGDIinfosWin, , , 2
-   For i, file in FileArray
-       groppedFiles[A_Index] := Trimmer(file)
-
-   SetTimer, dummyTimerProcessDroppedFiles, -200
-   lastInvoked := A_TickCount
-   Return
-}
 
 Trimmer(string, whatTrim:="") {
    If (whatTrim!="")
@@ -1737,183 +1249,14 @@ Trimmer(string, whatTrim:="") {
    Return string
 }
 
-dummyTimerProcessDroppedFiles() {
-   Static lastInvoked := 1
-   totalGroppy := groppedFiles.Count()
-   If (!totalGroppy || (A_TickCount - lastInvoked<400))
-      Return
-
-   RegRead, RegExFilesPattern, %QPVregEntry%, RegExFilesPattern
-   If StrLen(RegExFilesPattern)<12
-      RegExFilesPattern := ""
-   isCtrlDown := GetKeyState("Ctrl", "P")
-   lastInvoked := A_TickCount
-   vectorShape := imgFiles := foldersList := sldFile := ""
-   turnOffSlideshow()
-   canCancelImageLoad := 4
-   countD := countV := countF := countFiles := 0
-   ToolTip, Please wait - processing dropped files list , , , 2
-   Loop, % totalGroppy
-   {
-      changeMcursor("busy")
-      line := groppedFiles[A_Index]
-      If !line
-         Continue
-
-      ; MsgBox, % A_LoopField
-      If (A_Index>98700)
-      {
-         Break
-      } Else If RegExMatch(line, "i)(.\.sld|.\.sldb)$")
-      {
-         countD++
-         If !sldFile
-            sldFile := line
-      } Else If RegExMatch(line, "i)(.\.vqpv)$")
-      {
-         countV++
-         vectorShape := line
-      } Else If InStr(FileExist(line), "D")
-      {
-         countF++
-         foldersList .= line "`n"
-      } Else If RegExMatch(line, RegExFilesPattern)
-      {
-         countFiles++
-         imgFiles .= line "`n"
-      }
-   }
-
-   ; fnOutDebug("regex: " RegExFilesPattern)
-   If (countFiles>1 || countF>1)
-      sldFile := ""
-
-   ToolTip, , , , 2
-   If !isCtrlDown
-      isCtrlDown := GetKeyState("Ctrl", "P")
-   If (!imgFiles && !sldFile && vectorShape)
-      sldFile := vectorShape
-
-   groppedFiles := []
-   MainExe.ahkPostFunction("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
-   lastInvoked := A_TickCount
+updateUIctrl(dm:=0) {
+  Return 1
 }
 
-1GuiClose:
-GuiClose:
-doCleanup:
-   byeByeRoutine()
-Return
-
-byeByeRoutine() {
-   Static lastInvokedThis := 1
-   If (A_TickCount - lastInvokedThis < 250)
-      Return
-
-   If (runningLongOperation!=1 && imageLoading=1 && animGIFplaying!=1)
-   {
-      ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
-      canCancelImageLoad := 4
-      WinSet, Enable,, ahk_id %PVhwnd%
-      msgResult := msgBoxWrapper(appTitle, "The main window seems to be busy at the moment. Do you want to force exit this application ?", 4, 0, "question")
-      If (msgResult="yes")
-         SetTimer, TimerExit, -10
-      Else lastCloseInvoked := -1
-      lastCloseInvoked++
-   } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
-   {
-      If (mustAbandonCurrentOperations!=1)
-         askAboutStoppingOperations()
-      Else
-         lastCloseInvoked++
-   } Else If (drawingShapeNow=1)
-   {
-       drawingShapeNow := 0
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("stopDrawingShape", "cancel")
-   } Else If (colorPickerModeNow=1)
-   {
-       colorPickerModeNow := 0
-       colorPickerMustEnd := -1
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-   } Else If (VisibleQuickMenuSearchWin=1)
-   {
-       VisibleQuickMenuSearchWin := omniBoxMode := 0
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("closeQuickSearch")
-   } Else If (mustCaptureCloneBrush=1)
-   {
-       mustCaptureCloneBrush := 0
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("StopCaptureClickStuff", "Escape")
-   } Else If (folderTreeWinOpen=1)
-   {
-       folderTreeWinOpen := 0
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-       MainExe.ahkPostFunction("fdTreeClose")
-   } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
-   {
-      lastInvokedThis := A_TickCount
-      If AnyWindowOpen
-      {
-         lastOtherWinClose := A_TickCount
-         AnyWindowOpen := 0
-         MainExe.ahkPostFunction("CloseWindow")
-      } Else If (animGIFplaying=1)
-      {
-         lastOtherWinClose := A_TickCount
-         If (slideShowRunning=1)
-            turnOffSlideshow()
-
-         stopGiFsPlayback()
-      } Else If (slideShowRunning=1)
-      {
-         lastOtherWinClose := A_TickCount
-         turnOffSlideshow()
-      } Else If (thumbsDisplaying=1)
-      {
-         lastCloseInvoked := 5 ; exit application 
-         ; thumbsDisplaying := 0
-         ; lastOtherWinClose := A_TickCount
-         ; MainExe.ahkPostFunction("MenuReturnIMGedit")
-      } Else lastCloseInvoked++
-   } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
-   {
-      MainExe.ahkPostFunction("exitAppu", "external")
-      ;  lastCloseInvoked++
-   } Else If (markedSelectFile>50 && maxFilesIndex>100)
-   {
-      MainExe.ahkPostFunction("exitAppu", "select-external")
-      ;  lastCloseInvoked++
-   } Else lastCloseInvoked := 5
-
-   If (A_TickCount - lastOtherWinClose < 650)
-      Return
-
-   If (lastCloseInvoked>3)
-   {
-      ; SoundBeep , 500, 2000
-      SetTimer, TimerExit, % (lastCloseInvoked>5) ? -550 : -10
-      MainExe.ahkPostFunction("TrueCleanup", 1)
-   }
+uiAccessImgViewSetUIlabels(dm:=0) {
+  Return 1
 }
 
-dummyTimerExit() {
-   SetTimer, TimerExit, -550
-}
-
-TimerExit() {
-   ; SoundBeep , 900, 2000
-   thisPID := GetCurrentProcessId()
-   OutputDebug, QPV: forced exit. Secondary thread. PID=%thisPID%
-   Process, Close, % thisPID
-   ExitApp
-}
 
 PreventKeyPressBeep() {
    IfEqual,A_Gui,1,Return 0 ; prevent keystrokes for GUI 1 only
@@ -2505,12 +1848,6 @@ UpdateMenuBar(modus:=0, tt:=0) {
       Return
    }
 
-   ; ToolTip, % "l = " modus , , , 2
-   ; If (thumbsDisplaying=1)
-   ;    uiAccessUpdateUiStatusBar(0, 0, "list", 0)
-   ; Else 
-   ;    updateUIctrl()
-
    lastMenuBarUpdate := A_TickCount
    Gui, 1: Menu, PVmanu
    Try Menu, PVmenu, Delete
@@ -2621,6 +1958,10 @@ KeyboardResponder(givenKey, abusive) {
        ; addJournalEntry(A_ThisFunc "(): " WinActive("A") "==" givenKey)
        MainExe.ahkPostFunction("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
     }
+}
+
+byeByeRoutine() {
+  SoundBeep 
 }
 
 PreProcessKbdKey() {

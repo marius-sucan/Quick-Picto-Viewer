@@ -2654,6 +2654,11 @@ GetWinClientSize(ByRef w, ByRef h, hwnd, mode) {
     lastInvoked := A_TickCount
 } 
 
+SetParentID(Window_ID, theOther) {
+  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+  Return r
+}
+
 WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   ; WinMoveZ v0.5 by SKAN on D35V/D361 - https://www.autohotkey.com/boards/viewtopic.php?f=6&t=76745
   ; modified by Marius Șucan
