@@ -578,7 +578,13 @@ BuildGUI() {
    ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
    If (mainWinMaximized=2 || pX="" || pY="" || sW="" || sH="")
    {
-      uiRepositionWindowCenter(1, PVhwnd, "mouse", appTitle)
+      ; [merge fix] this passed the literal gui number 1 - correct when this file's
+      ; interpreter owned Gui "1" [the main window], but on the merged interpreter
+      ; the dynamic «Gui, %whichGUI%:» inside created a NEW anonymous Gui 1: an
+      ; empty, visible-styled window titled with the app name - the phantom
+      ; taskbar button Marius reported. The A1 rename sweep could not see a
+      ; number that only exists as a call argument.
+      uiRepositionWindowCenter("PVwin", PVhwnd, "mouse", appTitle)
       Sleep, 50
       Gui, PVwin: Show, Maximize
    } Else
