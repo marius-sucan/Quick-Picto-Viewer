@@ -1002,19 +1002,10 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
    }
 
    If (abusive=1 && allowLoop=1)
-   {
       KeyboardResponder(givenKey, thisWin, 0, "n")
-   } Else If (totalFramesIndex>2 && CountGIFframes>2)
-   {
-      If (animGIFplaying=-1)
-      {
-         imgPath := resultedFilesList[currentFileIndex, 1]
-         animGIFplaying := 1
-         ; setGIFframesDelay()
-         autoChangeDesiredFrame("start", imgPath)
-         SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
-      }
-   }
+   ; [removed] an auto-resume block for animGIFplaying=-1 stood here; nothing has
+   ; ever produced that value [master included], and a stopped animation must
+   ; only resume on an explicit play [X key, Ctrl+click]
 } ; // KeyboardResponder()
 
 processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
@@ -12347,6 +12338,7 @@ restartGIFplayback() {
    {
       autoChangeDesiredFrame("stop", 0)
       Sleep, 5
+      prevAnimGIFwas := ""   ; explicit play intent [X key, Ctrl+click]: lift the user-stopped latch
       ; setGIFframesDelay()
       autoChangeDesiredFrame("start", getIDimage(currentFileIndex))
       SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
@@ -12380,7 +12372,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 
    If (act="start" && imgPath && prevImgPath!=imgPath)
    {
-      OutputDebug, % "QPVMERGE: gifStart " imgPath
+      OutputDebug, % "QPVMERGE: gifStart " imgPath " via " Exception("", -2).What
       SetTimer, ResetImgLoadStatus, -15
       lastFrameChange := A_TickCount
       prevImgPath := imgPath
@@ -12398,8 +12390,13 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          SetTimer, autoChangeDesiredFrame, Off
          animGIFplaying := 0
          allowNextSlide := 1
-         prevImgPath := ""
+         ; the latch that keeps ShowTheImage from auto-playing this image again
+         ; must capture the path BEFORE it is cleared [the stop branch's order];
+         ; the old order latched an empty string, so every ui-initiated stop
+         ; [nav keys, Space, Escape - they zero the flag and land here at the next
+         ; tick] was undone by the next re-render: the "toggle" Marius reported
          prevAnimGIFwas := prevImgPath
+         prevImgPath := ""
          lastFrameChange := A_TickCount
          Global lastGIFdestroy := A_TickCount
          Return
