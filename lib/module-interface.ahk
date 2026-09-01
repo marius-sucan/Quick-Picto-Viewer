@@ -21,7 +21,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, otherAscriptHwnd, uiMouseTipWinCreated, uiLastTippyWin
-     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg
+     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -42,7 +42,7 @@ initInterfaceModule() {
    winGDIcreated := 0, ThumbsWinGDIcreated := 0, uiMouseTipWinCreated := 0, uiLastTippyWin := ""
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := ""
+   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
    otherAscriptHwnd := A_ScriptHwnd  ; pre-merge this held the OTHER interpreter hwnd; one script now
 
    ; input handlers. Module-only message numbers first:
@@ -1325,13 +1325,19 @@ uiInitGuiContextMenu(mX, mY, oX, oY) {
 slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
    OutputDebug, % "QPVMERGE: slideshowsHandler act=" act " speed=" thisSlideSpeed " mode=" how
    SlideHowMode := how
-   slideShowDelay := thisSlideSpeed
+   ; [merge fix] this line was «slideShowDelay := thisSlideSpeed». Pre-merge it set
+   ; only the interface interpreter's own copy - the effective cadence, possibly
+   ; stretched to the music length. On one interpreter it clobbered the USER
+   ; PREFERENCE: the "stop" call passes 0, so every stop zeroed the speed and the
+   ; next start ran wrong until the user set the speed again. The cadence is its
+   ; own module variable now and only a "start" updates it.
    prevFullIMGload := 1
    If (act="start")
    {
+      slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
       setTaskbarIconState("normal")
       slideShowRunning := 1
-      SetTimer, theSlideShowCore, % -slideShowDelay
+      SetTimer, theSlideShowCore, % -slideShowCadence
       If msgu
       {
          GuiControl, PVwin:, PicOnGUI1, % msgu
@@ -1355,14 +1361,14 @@ dummySlideshow() {
    If (slideShowRunning=1 && allowNextSlide=1)
    {
       setTaskbarIconState("Normal")
-      SetTimer, theSlideShowCore, % -slideShowDelay
+      SetTimer, theSlideShowCore, % -slideShowCadence
    }
 }
 
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
-  OutputDebug, % "QPVMERGE: slideCore param=" paramu " zeit=" thisZeit " delay=" slideShowDelay " allowNext=" allowNextSlide " running=" slideShowRunning
-  If (thisZeit < slideShowDelay//1.25) || (allowNextSlide!=1 && paramu!="force")
+  OutputDebug, % "QPVMERGE: slideCore param=" paramu " zeit=" thisZeit " cadence=" slideShowCadence " allowNext=" allowNextSlide " running=" slideShowRunning
+  If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
 
   uiMouseTurnOFFtooltip()
@@ -2265,7 +2271,7 @@ turnOffSlideshow() {
    slideShowRunning := 0
    SetTimer, theSlideShowCore, Off
    MT_post("dummyInfoToggleSlideShowu", "stop")
-   If (slideShowDelay<950)
+   If (slideShowCadence<950)
       SoundBeep , 900, 100
    lastOtherWinClose := A_TickCount
 }
