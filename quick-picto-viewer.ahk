@@ -35422,7 +35422,7 @@ sqliteAbortProgressCB(unusedArg) {
 
 doStartLongOpDance(affectTlbr:=0) {
      imageLoading := runningLongOperation := 1
-     IF_post("initAppBusyMode")
+     initAppBusyMode()
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1 && affectTlbr!="no")
         redrawToolbarGUI()
 }
