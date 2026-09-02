@@ -2625,6 +2625,26 @@ GetWinParent(hwnd) {
    Return DllCall("GetParent", "UPtr", hwnd)
 }
 
+SetParentID(Window_ID, theOther) {
+  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
+  Return r
+}
+
+disableWindowPenServices(hwnd) {
+; Sets MicrosoftTabletPenServiceProperty on the window, so the tablet input service leaves
+; its system gestures off there: press-and-hold [the long-tap right-click emulation of pen
+; and touch, which also holds the emulated mouse-down back while it decides], the pen tap
+; and barrel feedback animations, flicks and the rest of the set qpv-main.h lists. The
+; property is per HWND and Windows consults the window under the pen, so a window built
+; from child controls needs it on every control as well [see tlbrAddNewIcon].
+   If !hwnd
+      Return
+
+   ; TABLET_DISABLE_PRESSANDHOLD 0x1 | PENTAPFEEDBACK 0x8 | PENBARRELFEEDBACK 0x10 | TOUCHUIFORCEON 0x100
+   ; | FLICKS 0x10000 | SMOOTHSCROLLING 0x80000 | FLICKFALLBACKKEYS 0x100000 [tpcshrd.h]
+   Return DllCall("user32\SetPropW", "UPtr", hwnd, "WStr", "MicrosoftTabletPenServiceProperty", "UPtr", 0x190119)
+}
+
 ModifyMenuItem(hMenu, Pos, hSubMenu) {
     ; If the function succeeds, the return value is nonzero.
     res := DllCall("ModifyMenu"
@@ -2639,7 +2659,7 @@ ModifyMenuItem(hMenu, Pos, hSubMenu) {
 
 GetMenuItemRect(hwnd, hMenu, nPos) {
     VarSetCapacity(RECT, 16, 0)
-    if DllCall("User32.dll\GetMenuItemRect", "UPtr", hwnd, "UPtr", hMenu, "UInt", nPos, "UPtr", &RECT)
+    If DllCall("User32.dll\GetMenuItemRect", "UPtr", hwnd, "UPtr", hMenu, "UInt", nPos, "UPtr", &RECT)
     {
        objRect := { left   : numget( RECT,  0, "UInt" )
                   , top    : numget( RECT,  4, "UInt" )
@@ -2650,11 +2670,11 @@ GetMenuItemRect(hwnd, hMenu, nPos) {
     }
 
     rect:= ""
-    return 0
+    Return 0
 }
 
 doSetCursorPos(pX, pY) {
-  DllCall("user32\SetCursorPos", "Int", pX, "Int", pY)
+  Return DllCall("user32\SetCursorPos", "Int", pX, "Int", pY)
 }
 
 JEE_ClientToScreen(hWnd, vPosX, vPosY, ByRef vPosX2, ByRef vPosY2) {

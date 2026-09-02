@@ -26381,15 +26381,19 @@ CreateCollapsedPanelWidget(modus:=0) {
     ; w := (PrefsLargeFonts=1) ? 64 : 58
     Gui, Add, Picture, x1 y1 w%ww% h%h% +Border Center +0x200 gDragCollapsedWidget +hwndhTemp, % mainExecPath "\resources\toolbar\dragger.png"
     ToolTip2ctrl(hTemp, "Click and drag to reposition this widget")
-    GuiAddButton("x+2 yp w" w " hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA")
+    ll := hCollapseWidget "|" hTemp "|"
+    ll .= GuiAddButton("x+2 yp w" w " hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA") "|"
     If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1)
     {
-       GuiAddButton("x+2 yp wp hp gPanelQuickSearchMenuOptions", pp "loupe" pk ".png", "Quick search panel options. Semi-colon", "Quick search menu options [ `; ]", "collapseWidgetGUIA")
-       GuiAddButton("x+2 yp wp hp gtoggleAppToolbar", pp "toolbar" pk ".png", "Toggle toolbar. Shift+F10", "Toggle toolbar [Shift+F10]", "collapseWidgetGUIA")
-       GuiAddButton("x+2 yp wp hp gToggleMenuBaru", pp "menu" pk ".png", "Toggle menu bar. F10", "Toggle menu bar [F10]", "collapseWidgetGUIA")
-       GuiAddButton("x+2 yp wp hp gBtnCloseWindow", pp "cancel-tool.png", "Cancel tool and close panel. Escape", "Close / cancel current tool [Esc]", "collapseWidgetGUIA")
+       ll .= GuiAddButton("x+2 yp wp hp gPanelQuickSearchMenuOptions", pp "loupe" pk ".png", "Quick search panel options. Semi-colon", "Quick search menu options [ `; ]", "collapseWidgetGUIA") "|"
+       ll .= GuiAddButton("x+2 yp wp hp gtoggleAppToolbar", pp "toolbar" pk ".png", "Toggle toolbar. Shift+F10", "Toggle toolbar [Shift+F10]", "collapseWidgetGUIA") "|"
+       ll .= GuiAddButton("x+2 yp wp hp gToggleMenuBaru", pp "menu" pk ".png", "Toggle menu bar. F10", "Toggle menu bar [F10]", "collapseWidgetGUIA") "|"
+       ll .= GuiAddButton("x+2 yp wp hp gBtnCloseWindow", pp "cancel-tool.png", "Cancel tool and close panel. Escape", "Close / cancel current tool [Esc]", "collapseWidgetGUIA") "|"
     }
+
     lastState := thisState
+    Loop, Parse, % ll, "|"
+          disableWindowPenServices(A_LoopField)
 }
 
 PanelDefineKbdShortcut() {
@@ -27553,6 +27557,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
     Gui, TempBtnGui: -DPIScale -Caption +ToolWindow +E0x8000000 +hwndhGuiBtn +Owner%PVhwnd%
     Gui, TempBtnGui: Margin, % thisFntSize + 10, % thisFntSize
     Gui, TempBtnGui: Color, c%bgrColor%
+    disableWindowPenServices(hGuiBtn)
     Gui, TempBtnGui: Font, s%thisFntSize% Bold Q5, Arial
     btnArray := StrSplit(btnList, "||")
     tempBtnGuiBtnArray := []
@@ -27561,10 +27566,11 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
         thisBtnArr := StrSplit(btnArray[A_Index], ",,")
         ; ToolTip, % thisBtnArr[1] "==" thisBtnArr[2] , , , 2
         If (A_Index=1)
-           Gui, TempBtnGui: Add, Text, c%txtColor% gtempGuiBtnCall%A_Index%, % thisBtnArr[1]
+           Gui, TempBtnGui: Add, Text, c%txtColor% gtempGuiBtnCall%A_Index% +hwndhTemp, % thisBtnArr[1]
         Else If thisBtnArr[1]
-           Gui, TempBtnGui: Add, Text, x+%OSDfontSize% c%txtColor% gtempGuiBtnCall%A_Index%, % thisBtnArr[1]
+           Gui, TempBtnGui: Add, Text, x+%OSDfontSize% c%txtColor% gtempGuiBtnCall%A_Index% +hwndhTemp, % thisBtnArr[1]
  
+        disableWindowPenServices(hTemp)
         tempBtnGuiBtnArray[A_Index] := thisBtnArr[2]
     }
 
@@ -73186,25 +73192,6 @@ restartEntireGui() {
    createGDIPcanvas()
 }
 
-disableWindowPenServices(hwnd) {
-; Sets MicrosoftTabletPenServiceProperty on the window, so the tablet input service leaves
-; its system gestures off there: press-and-hold [the long-tap right-click emulation of pen
-; and touch, which also holds the emulated mouse-down back while it decides], the pen tap
-; and barrel feedback animations, flicks and the rest of the set qpv-main.h lists. The
-; property is per HWND and Windows consults the window under the pen, so a window built
-; from child controls needs it on every control as well [see tlbrAddNewIcon].
-; Written in-process since 2026-09-02: the qpvmain.dll export SetTabletPenServiceProperties
-; did the same, but behind a 500 ms start-up guard [there to keep this helper from loading
-; the DLL early] that silently skipped the windows created at start-up - the toolbar, and
-; PVwin itself on a fast machine. The export stays in the DLL, unused by the scripts.
-   If (isWinXP || !hwnd)
-      Return
-
-   ; TABLET_DISABLE_PRESSANDHOLD 0x1 | PENTAPFEEDBACK 0x8 | PENBARRELFEEDBACK 0x10 | TOUCHUIFORCEON 0x100
-   ; | FLICKS 0x10000 | SMOOTHSCROLLING 0x80000 | FLICKFALLBACKKEYS 0x100000 [tpcshrd.h]
-   Return DllCall("user32\SetPropW", "Ptr", hwnd, "WStr", "MicrosoftTabletPenServiceProperty", "Ptr", 0x190119)
-}
-
 handleUIhwnd(initGui) {
    externObj := StrSplit(initGUI, "|")
    PVhwnd := externObj[1]
@@ -102354,6 +102341,7 @@ CreateSoloSliderWidgetWin(btnHwnd, givenVar, minu, maxu, varDefault, uiLabel, fu
     Gui, SoloSliderWidgetGUIA: Default
     Gui, SoloSliderWidgetGUIA: +Border -MaximizeBox -MinimizeBox -SysMenu +hwndhSliderWidget +Owner%PVhwnd% -Caption
     Gui, SoloSliderWidgetGUIA: Margin, 1, 1
+    disableWindowPenServices(hSliderWidget)
     If (uiUseDarkMode=1)
     {
        Gui, Color, 303030,303030
@@ -102376,7 +102364,7 @@ CreateSoloSliderWidgetWin(btnHwnd, givenVar, minu, maxu, varDefault, uiLabel, fu
 
     Gui, SoloSliderWidgetGUIA: Show, Autosize %coords%, QPV slider
     GuiUpdateSliders(givenVar)
-    UnregisterTouchWindow(hSliderWidget)
+    disableWindowPenServices(r)
     disableWindowPenServices(hSliderWidget)
     SetTimer, mouseTurnOFFtooltip, -150
 }
