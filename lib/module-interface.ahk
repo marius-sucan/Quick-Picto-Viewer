@@ -1397,15 +1397,6 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     Return 0
 }
 
-stopDupesEngineNow() {
-   ; The main thread polls mustAbandonCurrentOperations, but it cannot poll anything while
-   ; it is inside sqlite3_step() waiting for SQLite to sort the duplicate-candidate query -
-   ; which on a large library is where most of the wait is. This thread is the only one
-   ; left able to say stop, and sqlite3_interrupt() is documented as safe to call from
-   ; another thread. A qpvmain.dll too old to export it just sets ErrorLevel.
-   DllCall("qpvmain.dll\dupesEngineCancel", "int")
-}
-
 askAboutStoppingOperations() {
      If (mustAbandonCurrentOperations!=1)
      {
@@ -1417,7 +1408,6 @@ askAboutStoppingOperations() {
         {
            mustAbandonCurrentOperations := 1
            userPendingAbortOperations := 0
-           stopDupesEngineNow()
         } Else
            userPendingAbortOperations := 0
      } Else userPendingAbortOperations := 0
