@@ -263,8 +263,16 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 
 | function | lines | what it does |
 |---|---|---|
-| `armSQLiteAbortHandler(dbObj)` | 14 | installs `sqlite3_progress_handler` on every connection `Class_SQLiteDB.OpenDB` opens |
+| `armSQLiteAbortHandler(dbObj)` | 14 | installed `sqlite3_progress_handler` on every connection `Class_SQLiteDB.OpenDB` opens. *Moved into the class on 2026-09-02 as `SQLiteDB.ArmAbortHandler(CallbackFunc, Opcodes)`; `OpenDB` arms the class-wide `SQLiteDB.AbortCallback`, which the main script sets to `sqliteProgressCB` at startup* |
 | `sqliteProgressCB()` | 14 | the progress callback: during long operations, Escape or the abort flag makes SQLite interrupt the running statement — the hatch the interface thread used to provide |
+
+Also on 2026-09-02, per Marius: the seven `SQLstmt*` raw-handle helpers that lived in the main
+script next to `addSQLdbEntry()` (prepare / finalize / step / reset / bind int, double, text — not
+merge additions, they predate it) were folded into the class's statement object: `Prepare()` +
+`_Statement.BindInt64/BindDouble/BindText/Step/Reset/Free`. `SaveDBfilesList` and
+`SQLdbStoreFilesListEntry` now go through that object; `CloseDB()` finalizes `Prepare()`'d
+statements as well, `Free()` will not finalize a handle twice, `Bind()` can reach its Int64/Null
+branches and binds Int64 as 64-bit, and `_ErrMsg()` reads the message at the pointer.
 
 Footnotes. (1) Added on the branch and gone again: the variable facades `IF_set`, `IF_get`,
 `MT_set`, `MT_get` (phase B, retired at phase E for plain globals), the direct-call facade

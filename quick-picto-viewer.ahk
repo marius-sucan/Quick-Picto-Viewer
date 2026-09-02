@@ -91,6 +91,9 @@ SetWorkingDir, %A_ScriptDir%
 
 SetWinDelay, 1
 SetBatchLines, -1
+; every SQLite connection the class opens arms this progress callback [defined next to
+; SaveDBfilesList]: while a long operation runs, Escape interrupts the executing statement
+SQLiteDB.AbortCallback := "sqliteProgressCB"
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := "", pBrushZ := ""
    , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", pPen8 := ""
@@ -33971,50 +33974,6 @@ addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0, fact
    } Else sqlDBrowID++
 }
 
-; ---- prepared statements ------------------------------------------------------------------
-SQLstmtPrepare(SQL, dbHandle) {
-; prepare16_v2 takes the statement as UTF-16, which is what an AHK string already is
-   hStmt := 0
-   RC := DllCall("SQlite3.dll\sqlite3_prepare16_v2", "Ptr", dbHandle, "WStr", SQL, "Int", -1
-               , "PtrP", hStmt, "Ptr", 0, "Cdecl Int")
-   Return (RC || ErrorLevel) ? 0 : hStmt
-}
-
-SQLstmtFinalize(hStmt) {
-   rr := hStmt ? DllCall("SQlite3.dll\sqlite3_finalize", "Ptr", hStmt, "Cdecl Int") : 0
-   Return rr
-}
-
-SQLstmtStep(hStmt) {
-   rr := DllCall("SQlite3.dll\sqlite3_step", "Ptr", hStmt, "Cdecl Int")
-   Return rr
-}
-
-SQLstmtReset(hStmt) {
-; clear_bindings is what lets a writer bind only the values it actually has: every parameter
-; it skips is NULL again, instead of still holding the value the previous row left there.
-   DllCall("SQlite3.dll\sqlite3_reset", "Ptr", hStmt, "Cdecl Int")
-   DllCall("SQlite3.dll\sqlite3_clear_bindings", "Ptr", hStmt, "Cdecl Int")
-}
-
-SQLstmtBindInt(hStmt, idx, valu) {
-   rr := DllCall("SQlite3.dll\sqlite3_bind_int64", "Ptr", hStmt, "Int", idx, "Int64", valu, "Cdecl Int")
-   Return rr
-}
-
-SQLstmtBindDouble(hStmt, idx, valu) {
-   rr := DllCall("SQlite3.dll\sqlite3_bind_double", "Ptr", hStmt, "Int", idx, "Double", valu, "Cdecl Int")
-   Return rr
-}
-
-SQLstmtBindText(hStmt, idx, txtu) {
-; nByte counts BYTES for bind_text16, so -1 and let SQLite measure the string, the way
-; dupes-pixels.h does. SQLITE_TRANSIENT (-1) makes SQLite copy the text before the call
-; returns, so binding straight out of an AHK variable is safe.
-   rr := DllCall("SQlite3.dll\sqlite3_bind_text16", "Ptr", hStmt, "Int", idx, "WStr", txtu, "Int", -1, "Ptr", -1, "Cdecl Int")
-   Return rr
-}
-
 updateSQLdbEntryImgRes(fullPath, imgResu, fileInfos, dbIndex, indexu:=0) {
    If (imgResu=1 || imgResu=2)
       thisPart := A_Space getImgPropsValuesSet(indexu, imgResu)
@@ -34101,56 +34060,56 @@ getImgHistoValuesSet(indexu, m) {
 ; the empty string the interpolated statements write into an INT column: the collection pool
 ; binds NULL for the same reason (dupes-pixels.h), importSLDBintoSLDB() converts '' back to
 ; NULL on the way in, and "never collected" has to stay apart from "collected and blank".
-SQLdbStoreFilesListEntry(hStmt, ByRef rowu, imgPath) {
+SQLdbStoreFilesListEntry(stmt, ByRef rowu, imgPath) {
    zPlitPath(Format("{:L}", imgPath), 1, OutFileName, OutDir)
-   SQLstmtBindInt(hStmt, 1, sqlDBrowID)
-   SQLstmtBindText(hStmt, 2, OutFileName)
-   SQLstmtBindText(hStmt, 3, OutDir)
+   stmt.BindInt64(1, sqlDBrowID)
+   stmt.BindText(2, OutFileName)
+   stmt.BindText(3, OutDir)
 
    ; file properties, each on its own. addSQLdbEntry() has only a "with" and a "without"
    ; variant of its INSERT, so it drops a known fsize whenever fmodified happens to be
    ; missing, and it drops the size of a zero byte file along with it.
    If (rowu[6]!="")
-      SQLstmtBindInt(hStmt, 4, rowu[6])
+      stmt.BindInt64(4, rowu[6])
    If rowu[7]
-      SQLstmtBindInt(hStmt, 5, SubStr(rowu[7], 1, 12))
+      stmt.BindInt64(5, SubStr(rowu[7], 1, 12))
    If rowu[8]
-      SQLstmtBindInt(hStmt, 6, SubStr(rowu[8], 1, 12))
+      stmt.BindInt64(6, SubStr(rowu[8], 1, 12))
 
    ; image properties, gated on the width the way updateSQLdbEntryImgRes() is called
    If rowu[13]
    {
-      SQLstmtBindInt(hStmt, 7, rowu[13])
+      stmt.BindInt64(7, rowu[13])
       If rowu[14]
-         SQLstmtBindInt(hStmt, 8, rowu[14])
+         stmt.BindInt64(8, rowu[14])
       If (rowu[9]!="")
-         SQLstmtBindInt(hStmt, 9, rowu[9])
+         stmt.BindInt64(9, rowu[9])
       If (rowu[22]!="")
-         SQLstmtBindInt(hStmt, 10, rowu[22])
+         stmt.BindInt64(10, rowu[22])
       If (rowu[15]!="")
-         SQLstmtBindText(hStmt, 11, rowu[15])
+         stmt.BindText(11, rowu[15])
    }
 
    ; the eight histogram statistics, all of them or none of them. Column 11 is set only by
    ; calcHistoAvgFile(), which sets all eight along with it
    If rowu[11]
    {
-      SQLstmtBindDouble(hStmt, 12, rowu[19])
-      SQLstmtBindDouble(hStmt, 13, rowu[18])
-      SQLstmtBindDouble(hStmt, 14, rowu[20])
-      SQLstmtBindDouble(hStmt, 15, rowu[21])
-      SQLstmtBindDouble(hStmt, 16, rowu[24])
-      SQLstmtBindDouble(hStmt, 17, rowu[25])
-      SQLstmtBindDouble(hStmt, 18, rowu[26])
-      SQLstmtBindDouble(hStmt, 19, rowu[27])
+      stmt.BindDouble(12, rowu[19])
+      stmt.BindDouble(13, rowu[18])
+      stmt.BindDouble(14, rowu[20])
+      stmt.BindDouble(15, rowu[21])
+      stmt.BindDouble(16, rowu[24])
+      stmt.BindDouble(17, rowu[25])
+      stmt.BindDouble(18, rowu[26])
+      stmt.BindDouble(19, rowu[27])
    }
 
-   ; 101 is SQLITE_DONE. The only other answer this statement can give is SQLITE_CONSTRAINT
+   ; Step() answers true on SQLITE_DONE. The only other answer this statement can give is SQLITE_CONSTRAINT
    ; on UNIQUE(fullPath) - the same path twice in the files list. The reset has to happen
    ; here, before the caller yields to another thread, which its tooltip and its cancel
    ; check both can.
-   rz := (SQLstmtStep(hStmt)=101) ? 1 : 0
-   SQLstmtReset(hStmt)
+   rz := stmt.Step() ? 1 : 0
+   stmt.Reset()
    Return rz
 }
 
@@ -34813,12 +34772,9 @@ SaveDBfilesList(enforceFile:=0) {
                  . ", imgwidth, imgheight, imgframes, imgdpi, imgpixfmt"
                  . ", imgmedian, imgavg, imghpeak, imghlow, imghrms, imghrange, imghmode, imghminu)"
                  . " VALUES (?1,0,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19);"
-      hInsertStmt := SQLstmtPrepare(insertSQL, activeSQLdb._Handle)
-      If !hInsertStmt
+      If !activeSQLdb.Prepare(insertSQL, insertStmt)
       {
-         ; errmsg16 straight off the connection, not the class's _ErrMsg(): that one does
-         ; StrGet(&RC) on the pointer variable rather than on the pointer, so it reads the
-         ; variable itself and returns rubbish
+         ; the error text straight off the connection, in its UTF-16 form
          errPtr := DllCall("SQlite3.dll\sqlite3_errmsg16", "Ptr", activeSQLdb._Handle, "Cdecl Ptr")
          addJournalEntry(A_ThisFunc "() - failed to prepare the entries statement: " (errPtr ? StrGet(errPtr, "UTF-16") : "") "`n" insertSQL)
          activeSQLdb.CloseDB()
@@ -34852,7 +34808,7 @@ SaveDBfilesList(enforceFile:=0) {
          ; nothing is collected here - see the files list, which already holds whatever was
          ; collected about this file, and GetFileAttributesEx() below, removed on purpose
          ; fileInfos := GetFileAttributesEx(imgPath)
-         z := imgPath ? SQLdbStoreFilesListEntry(hInsertStmt, rowu, imgPath) : 0
+         z := imgPath ? SQLdbStoreFilesListEntry(insertStmt, rowu, imgPath) : 0
          If (z=1)
          {
             rowu[12] := sqlDBrowID
@@ -34884,10 +34840,9 @@ SaveDBfilesList(enforceFile:=0) {
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
          throwSQLqueryDBerror(A_ThisFunc)
 
-      ; before anything can close the connection: CloseDB() only finalizes the handles that
-      ; Query() registered in _Queries, so a statement still alive here would make
-      ; sqlite3_close() answer SQLITE_BUSY and leave the database file locked
-      SQLstmtFinalize(hInsertStmt)
+      ; free the statement before anything can close the connection [CloseDB() finalizes the
+      ; statements Prepare() registered too, but the explicit free keeps the handle count exact]
+      insertStmt.Free()
 
       ; and now the two indexes the entries were written without, in one sorted pass over the
       ; finished table rather than two random B-tree inserts per file. Ahead of the abandonAll
@@ -35438,21 +35393,6 @@ determineTerminateOperation() {
 ; so the name registers as a super-global [the initializer line never executes
 ; here - the callback treats blank as 0]
 Global allowSQLiteAbort
-
-armSQLiteAbortHandler(dbObj) {
-; Registers a progress callback on the given connection: while a long operation is
-; flagged, Escape [or the abort dialog's verdict] cancels the currently executing
-; statement - sqlite3_step returns SQLITE_INTERRUPT and the caller's error path
-; runs. This restores the mid-statement interrupt the interface thread's
-; dupesEngineCancel call provided before the merge. The dupes engine opens its own
-; connection INSIDE qpvmain.dll where this cannot reach - its stepping loops keep
-; their between-steps cancel checks [documented limitation].
-   Static cbSQL := 0
-   If !cbSQL
-      cbSQL := RegisterCallback("sqliteProgressCB", "F")
-   If (IsObject(dbObj) && dbObj._Handle)
-      DllCall("SQlite3.dll\sqlite3_progress_handler", "UPtr", dbObj._Handle, "Int", 9000, "Ptr", cbSQL, "Ptr", 0, "Cdecl")
-}
 
 sqliteProgressCB(unusedArg) {
 ; runs on this same thread every ~9000 sqlite opcodes DURING sqlite3_step; keep it

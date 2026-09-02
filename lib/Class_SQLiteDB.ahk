@@ -44,6 +44,10 @@ Class SQLiteDB {
    Static _RefCount := 0
    Static hasFailedInit := 0
    Static _MinVersion := "3.6"
+   ; Name of the progress-handler callback that OpenDB() arms on every new connection through
+   ; ArmAbortHandler(); empty = arm nothing. Set once, class-wide, before the first OpenDB():
+   ;    SQLiteDB.AbortCallback := "myProgressCB"
+   Static AbortCallback := ""
    ; ===================================================================================================================
    ; CLASS _Table
    ; Object returned from method GetTable()
@@ -345,7 +349,7 @@ Class SQLiteDB {
       Bind(Index, Type, Param3 := "", Param4 := 0, Param5 := 0) {
          Static SQLITE_STATIC := 0
          Static SQLITE_TRANSIENT := -1
-         Static Types := {Blob: 1, Double: 1, Int: 1, Text: 1}
+         Static Types := {Blob: 1, Double: 1, Int: 1, Int64: 1, Null: 1, Text: 1}
          This.ErrorMsg := ""
          This.ErrorCode := 0
          If !(This._Handle) {
@@ -372,7 +376,7 @@ Class SQLiteDB {
             RC := DllCall("SQlite3.dll\sqlite3_bind_int64"
                , "UPtr", This._Handle
                , "Int", Index
-               , "Int", Param3
+               , "Int64", Param3
                , "Cdecl Int")
 
             If (ErrorLeveL) {
@@ -380,7 +384,7 @@ Class SQLiteDB {
                This.ErrorCode := ErrorLevel
                Return False
             } else if (RC) {
-               This.ErrorMsg := This._ErrMsg()
+               This.ErrorMsg := This._DB._ErrMsg()
                This.ErrorCode := RC
                Return False
             }
@@ -396,7 +400,7 @@ Class SQLiteDB {
                This.ErrorCode := ErrorLevel
                Return False
             } else if (RC) {
-               This.ErrorMsg := This._ErrMsg()
+               This.ErrorMsg := This._DB._ErrMsg()
                This.ErrorCode := RC
                Return False
             }
@@ -422,7 +426,7 @@ Class SQLiteDB {
                Return False
             }
             If (RC) {
-               This.ErrorMsg := This._ErrMsg()
+               This.ErrorMsg := This._DB._ErrMsg()
                This.ErrorCode := RC
                Return False
             }
@@ -442,7 +446,7 @@ Class SQLiteDB {
                Return False
             }
             If (RC) {
-               This.ErrorMsg := This._ErrMsg()
+               This.ErrorMsg := This._DB._ErrMsg()
                This.ErrorCode := RC
                Return False
             }
@@ -462,7 +466,7 @@ Class SQLiteDB {
                Return False
             }
             If (RC) {
-               This.ErrorMsg := This._ErrMsg()
+               This.ErrorMsg := This._DB._ErrMsg()
                This.ErrorCode := RC
                Return False
             }
@@ -479,7 +483,7 @@ Class SQLiteDB {
                Return False
             }
             If (RC) {
-               This.ErrorMsg := This._ErrMsg()
+               This.ErrorMsg := This._DB._ErrMsg()
                This.ErrorCode := RC
                Return False
             }
@@ -487,6 +491,25 @@ Class SQLiteDB {
          Return True
       }
 
+      ; ----------------------------------------------------------------------------------------------------------------
+      ; METHODS BindInt64 / BindDouble / BindText   The typed fast path for write loops.
+      ; One DllCall each, no validation, no UTF-8 conversion: a full 64-bit integer, a double that may hold an
+      ; integer value [Bind("Double") rejects those], and UTF-16 text bound straight from the AHK string
+      ; [SQLITE_TRANSIENT: SQLite copies it before the call returns].
+      ; Parameters:        Index       -  1-based index of the SQL parameter
+      ;                    Value/Text  -  the value to bind
+      ; Return values:     the SQLite result code - 0 [SQLITE_OK] on success
+      ; ----------------------------------------------------------------------------------------------------------------
+      BindInt64(Index, Value) {
+         Return DllCall("SQlite3.dll\sqlite3_bind_int64", "UPtr", This._Handle, "Int", Index, "Int64", Value, "Cdecl Int")
+      }
+      BindDouble(Index, Value) {
+         Return DllCall("SQlite3.dll\sqlite3_bind_double", "UPtr", This._Handle, "Int", Index, "Double", Value, "Cdecl Int")
+      }
+      BindText(Index, Text) {
+         ; nByte counts BYTES for bind_text16: -1 lets SQLite measure the string itself
+         Return DllCall("SQlite3.dll\sqlite3_bind_text16", "UPtr", This._Handle, "Int", Index, "WStr", Text, "Int", -1, "UPtr", -1, "Cdecl Int")
+      }
       ; ----------------------------------------------------------------------------------------------------------------
       ; METHOD Step        Evaluate the prepared statement.
       ; Parameters:        None
@@ -509,7 +532,7 @@ Class SQLiteDB {
          }
          If (RC <> This._DB._ReturnCode("SQLITE_DONE"))
          && (RC <> This._DB._ReturnCode("SQLITE_ROW")) {
-            This.ErrorMsg := This._DB.ErrMsg()
+            This.ErrorMsg := This._DB._ErrMsg()
             This.ErrorCode := RC
             Return False
          }
@@ -567,6 +590,13 @@ Class SQLiteDB {
          This.ErrorCode := 0
          If !(This._Handle)
             Return True
+         ; CloseDB() finalizes every statement still registered in _Stmts; a statement object that
+         ; outlives its connection must not finalize the same handle a second time
+         If (IsObject(This._DB) && IsObject(This._DB._Stmts) && !This._DB._Stmts.HasKey(This._Handle)) {
+            This._Handle := 0
+            This._DB := 0
+            Return True
+         }
          RC := DllCall("SQlite3.dll\sqlite3_finalize", "UPtr", This._Handle, "Cdecl Int")
          If (ErrorLevel) {
             This.ErrorMsg := "DllCall sqlite3_finalize failed!"
@@ -656,7 +686,7 @@ Class SQLiteDB {
    ; ===================================================================================================================
    _ErrMsg() {
       If (RC := DllCall("SQLite3.dll\sqlite3_errmsg", "UPtr", This._Handle, "Cdecl UPtr"))
-         Return StrGet(&RC, "UTF-8")
+         Return StrGet(RC, "UTF-8")
       Return ""
    }
    ; ===================================================================================================================
@@ -775,7 +805,8 @@ Class SQLiteDB {
          Return False
       }
       This._Handle := HDB
-      armSQLiteAbortHandler(This)  ; [phase D3] Escape can abort long statements on every connection; the callback self-gates
+      If (This.AbortCallback != "")
+         This.ArmAbortHandler(This.AbortCallback)   ; the class-wide default, see the AbortCallback static
       Return True
    }
    ; ===================================================================================================================
@@ -796,6 +827,12 @@ Class SQLiteDB {
          Return True
       For Each, Query in This._Queries
          DllCall("SQlite3.dll\sqlite3_finalize", "UPtr", Query, "Cdecl Int")
+      ; statements from Prepare() as well: one left alive makes sqlite3_close() answer SQLITE_BUSY
+      ; and leaves the database file locked
+      For Each, Stmt in This._Stmts
+         DllCall("SQlite3.dll\sqlite3_finalize", "UPtr", Stmt, "Cdecl Int")
+      This._Queries := {}
+      This._Stmts := {}
       RC := DllCall("SQlite3.dll\sqlite3_close", "UPtr", This._Handle, "Cdecl Int")
       If (ErrorLevel) {
          This.ErrorMsg := "DLLCall sqlite3_close failed!"
@@ -809,7 +846,40 @@ Class SQLiteDB {
       }
       This._Path := ""
       This._Handle := ""
-      This._Queries := []
+      Return True
+   }
+   ; ===================================================================================================================
+   ; METHOD ArmAbortHandler  Register a progress handler on this connection
+   ;                       http://www.sqlite.org/c3ref/progress_handler.html
+   ; Parameters:           CallbackFunc - name of a script function [or a Func object] taking one parameter.
+   ;                                      SQLite calls it every Opcodes VM steps DURING sqlite3_step(), on this
+   ;                                      same thread; return 1 from it to interrupt the running statement
+   ;                                      [sqlite3_step() then fails with SQLITE_INTERRUPT], 0 to let it run.
+   ;                                      Keep it to flag reads - no GUI, no messages, no pumping.
+   ;                       Opcodes      - approximate number of VM steps between two calls [default 9000]
+   ; Return values:        On success  - True
+   ;                       On failure  - False, ErrorMsg contains additional information
+   ; Remarks:              OpenDB() calls this with the class-wide static AbortCallback when that is set, so
+   ;                       every connection gets the handler; the callback stub of a function is created
+   ;                       once and reused.
+   ; ===================================================================================================================
+   ArmAbortHandler(CallbackFunc, Opcodes := 9000) {
+      Static Stubs := {}
+      This.ErrorMsg := ""
+      This.ErrorCode := 0
+      If !(This._Handle) {
+         This.ErrorMsg := "Invalid database handle!"
+         Return False
+      }
+      Fn := IsObject(CallbackFunc) ? CallbackFunc : Func(CallbackFunc)
+      If !IsObject(Fn) {
+         This.ErrorMsg := "Unknown callback function: " . CallbackFunc
+         Return False
+      }
+      Name := Fn.Name
+      If !Stubs.HasKey(Name)
+         Stubs[Name] := RegisterCallback(Name, "F")
+      DllCall("SQlite3.dll\sqlite3_progress_handler", "UPtr", This._Handle, "Int", Opcodes, "UPtr", Stubs[Name], "UPtr", 0, "Cdecl")
       Return True
    }
    ; ===================================================================================================================
