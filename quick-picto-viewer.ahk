@@ -93,7 +93,7 @@ SetWinDelay, 1
 SetBatchLines, -1
 ; every SQLite connection the class opens arms this progress callback [defined next to
 ; SaveDBfilesList]: while a long operation runs, Escape interrupts the executing statement
-SQLiteDB.AbortCallback := "sqliteProgressCB"
+SQLiteDB.AbortCallback := "sqliteAbortProgressCB"
 
 Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := "", pBrushZ := ""
    , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", pPen8 := ""
@@ -137,7 +137,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , othumbsW := 300, othumbsH := 300, VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := ""
    , CountFilesFolderzList := 0, imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, colorPickerMustEnd := 0
-   , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := []
+   , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := [], allowSQLiteAbort := 0
    , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
@@ -35389,12 +35389,7 @@ determineTerminateOperation() {
   Return theEnd
 }
 
-; [phase D3] state and helpers for the sqlite interrupt hatch; declared top-level
-; so the name registers as a super-global [the initializer line never executes
-; here - the callback treats blank as 0]
-Global allowSQLiteAbort
-
-sqliteProgressCB(unusedArg) {
+sqliteAbortProgressCB(unusedArg) {
 ; runs on this same thread every ~9000 sqlite opcodes DURING sqlite3_step; keep it
 ; to flag reads and one async key probe - no Gui, no messages, no pumping
    Critical
