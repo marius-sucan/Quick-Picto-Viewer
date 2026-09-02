@@ -14,7 +14,7 @@
 ; initInterfaceModule() because control never flows through an #Include'd file.
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, hMenuBar, menuArray, menuCurrentIndex, menuTotalIndex, menusList
+     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray, menuCurrentIndex, menuTotalIndex, menusList
      , menusflyOutVisible, wasMenuFlierCreated, prevMenuBarItem, lastMenuBarUpdate, lastMenuHoverZeit, lastContextMenuZeit
      , allowMenuReader, taskBarUI, groppedFiles, LbtnDwn, penPressureRaw, hasPenPressureAPI
      , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
@@ -2258,7 +2258,7 @@ uiAlphaMaskTrigger(a, b, c, d, e) {
   UpdateMenuBar()
 }
 
-BuildMenuBar(modus:=0, applyFilter:=0) {
+BuildMenuBar(modus:=0) {
    Static menusListView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
         , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
         , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
@@ -2283,16 +2283,6 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
    menuTotalIndex := 0
    menuHotkeys := "|"
    menuJITmap := {}, menuJITlist := []  ; [phase D] HMENU -> builder map for the WM_INITMENUPOPUP hook
-   If (applyFilter=1)
-   {
-      Menu, PVbar, Add, >>, dummy
-      Gui, PVwin: Menu, PVbar
-      ; GetClientSize(mainWidth, mainHeight, PVhwnd)
-   }
-
-   rr := 0
-   hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
-   hMenuBar := "0x" Format("{:x}", hMenuBar)
    Loop, Parse, menusList, |
    {
       ; generate the list of hotkeys for the menu bar items: eg. alt + f
@@ -2315,9 +2305,7 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
          Menu, % menaName, Add, building the menu..., dummy
          Try hSub := MenuGetHandle(menaName)
       }
-      rr := uiKmenu(lbl, ":" menaName, hMenuBar, applyFilter)
-      If (rr=-1)
-         Break
+      uiKmenu(lbl, ":" menaName)
 
       If hSub
       {
@@ -2332,16 +2320,6 @@ BuildMenuBar(modus:=0, applyFilter:=0) {
       } Else
          menuHotkeys .= (!InStr(menuHotkeys, "!" n "|") && InStr(lbl, "&")) ? "!" n "|" : ".|"
    }
-
-   If (applyFilter=1)
-      Menu, PVbar, Delete, >>
-
-   If (rr=-1)
-      Menu, PVbar, Add, >>, MenuBonusOptions
-}
-
-MenuBonusOptions() {
-  SoundBeep 
 }
 
 forbiddenAltKeys(n) {
@@ -2351,16 +2329,7 @@ forbiddenAltKeys(n) {
       Return isVarEqualTo(n, "a","e","u","p","r","y","g")
 }
 
-simpleGetMenuItemRect(hwnd, hMenuBar, indexu, ByRef mX, ByRef mY, ByRef mW, ByRef mH) {
-    rect := GetMenuItemRect(hwnd, hMenuBar, indexu - 1)
-    mX := Trim(rect.left)
-    mY := Trim(rect.bottom)
-    mYz := Trim(rect.top)
-    mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
-    mW := max(rect.left, rect.right) - min(rect.left, rect.right)
-}
-
-uiKmenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVbar", actu:="Add") {
+uiKmenu(labelu, funcu, mena:="PVbar", actu:="Add") {
    If (actu="add")
    {
       If (funcu="-")
@@ -2369,22 +2338,9 @@ uiKmenu(labelu, funcu, hMenuBar, applyFilter, mena:="PVbar", actu:="Add") {
          Menu, % mena, % actu, % labelu, % funcu
 
       menuTotalIndex++
-      If (applyFilter=1)
-      {
-          simpleGetMenuItemRect(PVhwnd, hMenuBar, menuTotalIndex, mX, mY, mW, mH)
-          JEE_ScreenToClient(PVhwnd, mX, mY, mX, mY)
-          If (abs(mY)>3)
-          {
-             menuTotalIndex--
-             Menu, % mena, Delete, % labelu
-             Return -1
-          }
-      }
-
       t := StrReplace(labelu, "&")
       menuArray[menuTotalIndex] := [t, funcu, labelu, "Enable"]
       menuArray[t] := [funcu, menuTotalIndex, labelu]
-      ; fnOutDebug(A_ThisFunc "(" menuTotalIndex "): " mX + mW "|" mY "||" mW "|" mH "||" mainWidth)
    }
 }
 
@@ -2441,7 +2397,7 @@ UpdateMenuBar(modus:=0, tt:=0) {
    }
 
    ; Sleep, -1
-   BuildMenuBar(modus, 0)
+   BuildMenuBar(modus)
    ; SetMenuInfo(MenuGetHandle("PVbar"), 2, 1, 0, 1)
    ; Sleep, -1
    ; Gui, PVwin: Menu, PVmanu

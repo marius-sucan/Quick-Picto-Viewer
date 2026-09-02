@@ -202,7 +202,9 @@ The fourth is an argument adapter shared by two callers — cheap to inline, har
 - Real logic with a small body: the six `dispatch*` window-root dispatchers, `isUIrootWin`,
   `preventSillyGui`, `TestDraggableWindow`, `WM_MOUSELEAVE`, `PreventKeyPressBeep`,
   `updateWindowColor`, `destroyMenuFlyout`, `stopDupesEngineNow` (a named DllCall with one
-  caller — inline it if you like), and `MenuBonusOptions` (a `SoundBeep` placeholder menu handler).
+  caller — inline it if you like). `MenuBonusOptions` (a `SoundBeep` placeholder menu handler) was
+  listed here until 2026-09-02, when it went with the dormant `applyFilter` branch of `BuildMenuBar`
+  (see footnote 3).
 - The main script gained only five functions in the merge: the three facades above, plus
   `armSQLiteAbortHandler` and `sqliteAbortProgressCB` (the SQLite abort hook, real code).
 
@@ -279,7 +281,11 @@ Footnotes. (1) Added on the branch and gone again: the variable facades `IF_set`
 `IF_call` (retired in section 7), and `pumpUIevents` (the full Critical-off pump, deleted after it
 let queued canvas rebuilds run inside the thumbnails loop). (2) `merge-probes/` holds thirteen
 standalone probe scripts (p1–p13) with a README of verdicts; they established what runs during a
-same-interpreter menu loop and are not part of the application.
+same-interpreter menu loop and are not part of the application. (3) Retired 2026-09-02,
+pre-merge code rather than branch additions: the dormant `applyFilter` width-fit branch of
+`BuildMenuBar` (it arrived in 6.0 alpha 2 and no caller ever enabled it) together with its
+single-use helpers `simpleGetMenuItemRect` and `MenuBonusOptions`, the `hMenuBar` super-global
+only that branch read, and the two pass-through parameters of `uiKmenu`.
 
 ## Appendix — reproducing the numbers
 
