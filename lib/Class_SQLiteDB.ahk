@@ -865,6 +865,9 @@ Class SQLiteDB {
    ;                                      same thread; return 1 from it to interrupt the running statement
    ;                                      [sqlite3_step() then fails with SQLITE_INTERRUPT], 0 to let it run.
    ;                                      Keep it to flag reads - no GUI, no messages, no pumping.
+   ;                                      The stub is fast-mode ["F"]: the callback executes INSIDE the querying
+   ;                                      thread and nothing restores that thread afterwards - if it touches
+   ;                                      Critical it must save prevCrit := A_IsCritical and restore it on exit.
    ;                       Opcodes      - approximate number of VM steps between two calls [default 9000]
    ; Return values:        On success  - True
    ;                       On failure  - False, ErrorMsg contains additional information

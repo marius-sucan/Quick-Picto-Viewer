@@ -35391,17 +35391,24 @@ determineTerminateOperation() {
 
 sqliteAbortProgressCB(unusedArg) {
 ; runs on this same thread every ~9000 sqlite opcodes DURING sqlite3_step; keep it
-; to flag reads and one async key probe - no Gui, no messages, no pumping
+; to flag reads and one async key probe - no Gui, no messages, no pumping. It is a
+; fast-mode ["F"] RegisterCallback: it executes INSIDE the querying thread and the
+; interpreter restores nothing afterwards, so Critical is saved and restored here -
+; a bare Critical left every thread that ran a query uninterruptible [same trap as
+; the module's hook callbacks, the 2026-09-02 MsgBox2 stall]
+   prevCrit := A_IsCritical
    Critical
+   r := 0
    If (runningLongOperation=1 || allowSQLiteAbort=1)
    {
       If (mustAbandonCurrentOperations=1 || GetKeyState("Escape", "P"))
       {
          OutputDebug, % "QPVMERGE: sqlite statement aborted [progress handler]"
-         Return 1
+         r := 1
       }
    }
-   Return 0
+   Critical, %prevCrit%
+   Return r
 }
 
 doStartLongOpDance(affectTlbr:=0) {

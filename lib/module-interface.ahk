@@ -177,6 +177,13 @@ dispatchMouseWheel(wP, lP, msg, hwnd) {
 ; callbacks do [probes p7/p8/p11/p13]. The in-menu wheel rides a menu-scoped
 ; WH_MOUSE_LL hook [p13]. CWPSTRUCT is REVERSED: lParam@0, wParam@PtrSize,
 ; message@2*PtrSize, hwnd@3*PtrSize.
+; RULE for every raw callback in this file [all are RegisterCallback "F", fast mode]:
+; a fast callback has NO thread of its own - it executes inside whichever script
+; thread is current, and the interpreter restores only the idle thread afterwards.
+; So each one saves prevCrit := A_IsCritical, turns Critical on for its body, and
+; restores Critical, %prevCrit% on EVERY return path. A bare Critical left the
+; interrupted thread uninterruptible for good [2026-09-02: MsgBox2 boxes pumping in
+; InputHook.Wait lost their buttons, Escape, X and watchdog timers].
 
 uiMenuNameForBuilder(suffix) {
 ; every InvokeMenuBar<suffix> builder rebuilds exactly one named menu - extracted
@@ -192,6 +199,9 @@ uiMenuNameForBuilder(suffix) {
 }
 
 uiCallWndProc(nCode, wP, lP) {
+; permanent same-thread hook: EVERY sent message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND,
+; WM_ACTIVATE...] of every window on this thread passes here - see the RULE above
+   prevCrit := A_IsCritical
    Critical
    If (nCode >= 0)
    {
@@ -233,7 +243,9 @@ uiCallWndProc(nCode, wP, lP) {
       Else If (msg=0x212) ; WM_EXITMENULOOP
          uiMenuLoopExit()
    }
-   Return DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+   r := DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+   Critical, %prevCrit%
+   Return r
 }
 
 uiMenuJITrebuild(hMenu) {
@@ -416,11 +428,12 @@ uiRefreshBarAttachments() {
 }
 
 uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
-; TIMERPROC [raw callback] fired BY the modal menu loop every ~90ms.
+; TIMERPROC [raw callback] fired BY the modal menu loop every ~90ms - see the RULE above
+   prevCrit := A_IsCritical
    Critical
-   If (menuLoopActive!=1)
-      Return
-   uiTryPlaceFlyout()
+   If (menuLoopActive=1)
+      uiTryPlaceFlyout()
+   Critical, %prevCrit%
 }
 
 uiTryPlaceFlyout() {
@@ -478,7 +491,10 @@ uiMenuMouseLL(nCode, wP, lP) {
 ; the modal loop consumes - p13 proved menus accept queue-posted key-downs] and
 ; RButton re-announces for the reader. Installed only between WM_ENTERMENULOOP
 ; and WM_EXITMENULOOP; the callback must stay minimal [system-wide hook budget].
+; See the RULE above: one exit, Critical restored.
+   prevCrit := A_IsCritical
    Critical
+   r := ""
    If (nCode=0 && menuLoopActive=1)
    {
       ; third placement consumer [p13-proven vehicle]: the LL hook runs on every
@@ -493,15 +509,18 @@ uiMenuMouseLL(nCode, wP, lP) {
          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
-         Return 1
+         r := 1
       } Else If (wP=0x205 && allowMenuReader="yes" && uiVisibleMenuWin() && StrLen(uiMenuReaderLastMsg)>1)
       {
          mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
          showOSDinfoLineNow(1500)
-         Return 1
+         r := 1
       }
    }
-   Return DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+   If (r="")
+      r := DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+   Critical, %prevCrit%
+   Return r
 }
 
 ; ______ liveness shims [merge phase C] ______
