@@ -27523,11 +27523,6 @@ ST_Count(Haystack, searchFor) {
     Return OutputVarCount
 }
 
-SetParentID(Window_ID, theOther) {
-  r := DllCall("SetParent", "uint", theOther, "uint", Window_ID) ; success = handle to previous parent, failure =null 
-  Return r
-}
-
 CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
     Critical, On
     Static lastCreated := 1, bgrColor := 112288, txtColor := "ddeeFF", thisOpacity := 200
