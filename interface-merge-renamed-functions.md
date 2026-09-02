@@ -204,7 +204,7 @@ The fourth is an argument adapter shared by two callers — cheap to inline, har
   `updateWindowColor`, `destroyMenuFlyout`, `stopDupesEngineNow` (a named DllCall with one
   caller — inline it if you like), and `MenuBonusOptions` (a `SoundBeep` placeholder menu handler).
 - The main script gained only five functions in the merge: the three facades above, plus
-  `armSQLiteAbortHandler` and `sqliteProgressCB` (the SQLite abort hook, real code).
+  `armSQLiteAbortHandler` and `sqliteAbortProgressCB` (the SQLite abort hook, real code).
 
 ## 8. Functions the merge added (no renames in this list)
 
@@ -263,8 +263,8 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 
 | function | lines | what it does |
 |---|---|---|
-| `armSQLiteAbortHandler(dbObj)` | 14 | installed `sqlite3_progress_handler` on every connection `Class_SQLiteDB.OpenDB` opens. *Moved into the class on 2026-09-02 as `SQLiteDB.ArmAbortHandler(CallbackFunc, Opcodes)`; `OpenDB` arms the class-wide `SQLiteDB.AbortCallback`, which the main script sets to `sqliteProgressCB` at startup* |
-| `sqliteProgressCB()` | 14 | the progress callback: during long operations, Escape or the abort flag makes SQLite interrupt the running statement — the hatch the interface thread used to provide |
+| `armSQLiteAbortHandler(dbObj)` | 14 | installed `sqlite3_progress_handler` on every connection `Class_SQLiteDB.OpenDB` opens. *Moved into the class on 2026-09-02 as `SQLiteDB.ArmAbortHandler(CallbackFunc, Opcodes)`; `OpenDB` arms the class-wide `SQLiteDB.AbortCallback`, which the main script sets to `sqliteAbortProgressCB` at startup* |
+| `sqliteAbortProgressCB()` | 14 | the progress callback: during long operations, Escape or the abort flag makes SQLite interrupt the running statement — the hatch the interface thread used to provide |
 
 Also on 2026-09-02, per Marius: the seven `SQLstmt*` raw-handle helpers that lived in the main
 script next to `addSQLdbEntry()` (prepare / finalize / step / reset / bind int, double, text — not
