@@ -206,6 +206,73 @@ The fourth is an argument adapter shared by two callers — cheap to inline, har
 - The main script gained only five functions in the merge: the three facades above, plus
   `armSQLiteAbortHandler` and `sqliteProgressCB` (the SQLite abort hook, real code).
 
+## 8. Functions the merge added (no renames in this list)
+
+Derived from git on 2026-09-02: the column-0 function sets of `quick-picto-viewer.ahk` and
+`lib/*.ahk` on `master` versus HEAD give 43 names that did not exist before the branch; 17 of
+them are the `ui`-prefixed collision renames and the two GUI-name renames (sections 1 and 3),
+which are excluded here. The remaining **26** are genuinely new. Each was traced to the first
+commit in which it appears; every one of those commits carries the merge's co-author trailer,
+i.e. none came from Marius' own commits on this branch. Phase letters refer to the plan.
+
+### Module bootstrap and message dispatch — lib/module-interface.ahk (phase C, `c629bc2`)
+
+| function | lines | what it does |
+|---|---|---|
+| `initInterfaceModule()` | 78 | the module's auto-exec replacement: seeds the module-owned globals, registers the OnMessage dispatchers and the module-only messages, installs the WH_CALLWNDPROC hook |
+| `isUIrootWin(hwnd)` | 4 | true when a window's root is PVwin, one of the four GDI windows, the tooltip or the flyout — the test every dispatcher branches on |
+| `dispatchKeyDown()` | 5 | WM_KEYDOWN/WM_SYSKEYDOWN → `uiWM_KEYDOWN` for the PVwin family, main's `WM_KEYDOWN` for everything else |
+| `dispatchMouseMove()` | 5 | same split for WM_MOUSEMOVE |
+| `dispatchLButtonDown()` | 5 | same split for WM_LBUTTONDOWN |
+| `dispatchLButtonUp()` | 8 | same split for WM_LBUTTONUP (plus the tooltip window) |
+| `dispatchLButtonDbl()` | 5 | same split for WM_LBUTTONDBLCLK |
+| `dispatchMouseWheel()` | 5 | WM_MOUSEWHEEL → `WM_MOUSEWHEEL` for the PVwin family, `adjustWheelNumbersEditFields` for panels |
+| `uiVisibleMenuWin()` | 10 | the visibility-aware `#32768` probe: a hidden menu-class window persists per process, and the main script runs DetectHiddenWindows On, so a bare WinExist matches forever. Successor of the deleted thread-era probe, not a rename: it returns the hwnd and filters on visibility |
+
+### Liveness shims for Critical worker loops — lib/module-interface.ahk (phase C, `c629bc2`)
+
+| function | lines | what it does |
+|---|---|---|
+| `drainUIinput()` | 82 | selective PeekMessage drain of the PVwin family's input while a loop holds Critical: abort gestures (Escape, viewport clicks, the title-bar ✗) reach their handlers inline, the keyboard tail runs only when a keydown was drained, everything else stays queued. The one checkpoint pump — the full pump was deleted (see the footnote) |
+| `pumpPenMessages()` | 27 | pen/touch message pump for the paint loops: pre-dispatch read plus DispatchMessage, so pressure and coordinates keep flowing while painting |
+
+### Native menus and the hook-based menu reader — lib/module-interface.ahk (phase D, `138b6b0` and its fixes)
+
+| function | lines | what it does |
+|---|---|---|
+| `uiCallWndProc()` | 44 | the WH_CALLWNDPROC callback: sees the SENT menu messages (WM_MENUSELECT, WM_INITMENUPOPUP, WM_ENTER/EXITMENULOOP) that no AHK pseudo-thread can see during a modal menu loop, and routes them to the four functions below |
+| `uiMenuSelectTrack()` | 37 | tracks the highlighted item for the reader (announcements are track-only; RButton re-announces) and triggers flyout placement |
+| `uiMenuJITrebuild()` | 30 | rebuilds a bar dropdown's content just-in-time at WM_INITMENUPOPUP via the `menuJITmap` (HMENU → builder); menu-bar sessions only, busy-guarded |
+| `uiMenuLoopEnter()` | 35 | menu-session start: session type from the ENTERMENULOOP wParam, the two native TIMERPROC tickers, the WH_MOUSE_LL hook |
+| `uiMenuLoopExit()` | 31 | menu-session end: kills the tickers and the hook, arms the 350 ms flyout grace, schedules the self-healing pass |
+| `uiMenuMouseLL()` | 31 | the WH_MOUSE_LL callback active only during menus: eats wheel notches and posts the equivalent arrow keys, RButton re-announce, flyout placement |
+| `uiMenuNativeTick()` | 7 | the TIMERPROC fired by the modal loop itself (AHK timers never tick there): calls the flyout placement (`642f8ca`) |
+| `uiTryPlaceFlyout()` | 48 | positions the S/T/M flyout beside the root popup, found by HMENU identity through MN_GETHMENU so a fading ghost window cannot capture it (`826986b`) |
+| `uiRefreshBarAttachments()` | 41 | self-healing pass after every menu loop: re-resolves each bar attachment by name, repairs changed handles, rebuilds the JIT map (`f6a3b99`) |
+| `uiMenuNameForBuilder()` | 12 | maps a menu-builder function name to the menu name it builds, for the attachment repair above |
+
+### Queued-call facades — phase B/C
+
+| function | file | lines | what it does |
+|---|---|---|---|
+| `MT_post(funcName, args*)` | lib/module-interface.ahk | 4 | module-side queued call: binds the target and its arguments to `IF_postRelay` on a one-shot timer, preserving the old cross-interpreter "runs when the receiver pumps" semantics (`5d32ff5`) |
+| `IF_post(funcName, args*)` | quick-picto-viewer.ahk | 6 | the main-side twin of `MT_post` (kept by request, see section 7-B) (`5d32ff5`) |
+| `IF_postRelay(funcName, args)` | quick-picto-viewer.ahk | 25 | the relay both posts run through: hoists the bound arguments into plain locals and dispatches on their count — the runtime rejects `args*` and `args[N]` inside call arguments (`c629bc2`) |
+
+### SQLite abort hatch — quick-picto-viewer.ahk (phase D3, `2bc4cb1`)
+
+| function | lines | what it does |
+|---|---|---|
+| `armSQLiteAbortHandler(dbObj)` | 14 | installs `sqlite3_progress_handler` on every connection `Class_SQLiteDB.OpenDB` opens |
+| `sqliteProgressCB()` | 14 | the progress callback: during long operations, Escape or the abort flag makes SQLite interrupt the running statement — the hatch the interface thread used to provide |
+
+Footnotes. (1) Added on the branch and gone again: the variable facades `IF_set`, `IF_get`,
+`MT_set`, `MT_get` (phase B, retired at phase E for plain globals), the direct-call facade
+`IF_call` (retired in section 7), and `pumpUIevents` (the full Critical-off pump, deleted after it
+let queued canvas rebuilds run inside the thumbnails loop). (2) `merge-probes/` holds thirteen
+standalone probe scripts (p1–p13) with a README of verdicts; they established what runs during a
+same-interpreter menu loop and are not part of the application.
+
 ## Appendix — reproducing the numbers
 
 Parse column-0 `name(...)` definitions (body to the next column-0 `}`) from
