@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2
+     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -37,7 +37,7 @@ initInterfaceModule() {
    mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0, allowMenuReader := 0
    lastCloseInvoked := -1, lastALclickX := 0, lastALclickY := 0, statusBarTooltipVisible := 0
    lastContextMenuZeit := 1, lastDoubleClickZeit := 1, lastMenuBarUpdate := 1, lastMenuHoverZeit := 1
-   lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1
+   lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1, lastLongOperationStart := 1
    doNormalCursor := 1, prevFullIMGload := 1, prevMenuBarItem := 1
    menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuCurrentIndex := 0, menuTotalIndex := 0
    winGDIcreated := 0, ThumbsWinGDIcreated := 0
@@ -787,6 +787,17 @@ initAppBusyMode() {
      imageLoading := 1
      runningLongOperation := 1
      executingCanceableOperation := A_TickCount
+     ; lastLongOperationStart is what the abort prompt's 900 ms debounce reads [the four
+     ; gates in front of askAboutStoppingOperations()]. Before the merge those gates read
+     ; THIS module's copy of executingCanceableOperation, which only this function set, so
+     ; there it meant "the operation started at". The main script's copy of the same name
+     ; is stamped at EVERY checkpoint of its loops [WinClickAction() ignores clicks within
+     ; 550 ms of one] and the merge fused the two into one variable: a loop that stamps on
+     ; the line before determineTerminateOperation() handed the drained handlers a stamp
+     ; microseconds old, the gate never opened and the prompt never appeared [fingerprint
+     ; collection, hash generation - any loop iterating faster than 900 ms]. Two meanings,
+     ; two names again; the main script never touches this one.
+     lastLongOperationStart := A_TickCount
      setTaskbarIconState("anim")
      ; setMenuBarState("Disable")
 }
@@ -1268,7 +1279,7 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     SetTimer, ResetLbtn, -55
     ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
-    If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900) && slideShowRunning!=1 && animGIFplaying!=1)
+    If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
     Else If (slideShowRunning=1 || animGIFplaying=1)
        turnOffSlideshow()
@@ -1339,7 +1350,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        MT_post("WinClickAction", "remClick", "n", mX, mY)
     Else If (imgEditPanelOpened=1 && AnyWindowOpen)
        MT_post("toggleImgEditPanelWindow")
-    Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
+    Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
        askAboutStoppingOperations()
     Else If (!AnyWindowOpen && isOkay)
        MT_post("ToggleThumbsMode")
@@ -1443,7 +1454,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If !identifyThisWin()
      Return 0
 
-  If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
+  If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
   {
      askAboutStoppingOperations()
      Return 0
@@ -2041,7 +2052,7 @@ byeByeRoutine() {
          Try Run, %ComSpec% /c ping -n 9 127.0.0.1 >nul 2>&1 && taskkill /PID %QPVpid% /T /F,, Hide
       } Else lastCloseInvoked := -1
       lastCloseInvoked++
-   } Else If (runningLongOperation=1 && (A_TickCount - executingCanceableOperation > 900))
+   } Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
    {
       If (mustAbandonCurrentOperations!=1)
          askAboutStoppingOperations()

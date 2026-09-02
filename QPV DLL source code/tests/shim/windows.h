@@ -25,10 +25,18 @@ typedef long long          INT64;
 typedef unsigned long long UINT64;
 typedef int                INT;
 typedef int                LONG;      // Windows LONG is 32-bit; "long" here is 64-bit
+typedef short              SHORT;
 typedef const wchar_t*     LPCWSTR;
 
 #define __cdecl
 #define CP_UTF8 65001
+#define VK_ESCAPE 0x1B
+
+// The engine's progress handler [dupesProgressCB] polls the Escape key through this, the
+// one way left to stop the candidate query while SQLite sorts. A test raises the flag to
+// stand in for the user holding the key down; nothing else in the slice reads a key.
+static int qpvT_escapeDown = 0;
+static inline SHORT GetAsyncKeyState(int vk) { return (vk==VK_ESCAPE && qpvT_escapeDown) ? (SHORT)0x8000 : (SHORT)0; }
 
 // The engine tries GetModuleHandleW first ("AHK already loaded it") and LoadLibraryW as
 // the fallback, so returning NULL here routes it down the dlopen path.

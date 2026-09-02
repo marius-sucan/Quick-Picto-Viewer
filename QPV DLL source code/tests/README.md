@@ -305,7 +305,10 @@ and the shipped engine runs against the genuine article — nothing about it is 
 the loader underneath. Covers the grouping equivalence again (this time through the actual
 C++), the row/path/fingerprint/hash round trip through the `imagesPixels` join, the
 keep-mask recut, cancellation, and the hash-generation loop end to end: the values land on
-the right rows and the batch loop terminates.
+the right rows and the batch loop terminates. Cancellation is covered both ways: through
+`dupesEngineCancel()`, and through the Escape key that `dupesProgressCB()` polls while
+SQLite sorts (the shim's `GetAsyncKeyState` answers its `qpvT_escapeDown` flag), checking
+the phase -1 / lastError 0 pair the interpreter uses to tell that stop from a failure.
 
 Every hash case runs **twice**, once per query shape, because one `qpvmain.dll` has to serve
 both. `generateSQLimageFingerPrintHash()` sends a keyset cursor — `AND images.imgidu>?2

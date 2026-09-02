@@ -1640,7 +1640,7 @@ static std::wstring  dupesEngineError;
 
 // Read by the fingerprint collection pool of dupes-pixels.h, which is included much
 // further down but has to answer the same cancel the query engine answers: the user only
-// ever presses one "stop", and stopDupesEngineNow() only knows about dupesEngineCancel().
+// ever presses one "stop", and the AHK loops only know about dupesEngineCancel().
 static std::atomic<int> dupesPixCancel(0);
 
 struct DupesQueryCfg {
@@ -1674,11 +1674,36 @@ static void dupesSetError(const wchar_t *what) {
 
 // SQLite calls this every few thousand VM instructions, INCLUDING while it is sorting,
 // which is the one place a step budget cannot reach. Returning non-zero aborts the
-// statement with SQLITE_INTERRUPT. The flag is set by dupesEngineCancel(), which the
-// interface thread calls when the user answers "yes" to "stop the current operation" -
-// the main AHK thread is inside sqlite3_step() at that moment and cannot ask anything.
+// statement with SQLITE_INTERRUPT.
+// Two things end the statement from here. The cancel flag, which dupesEngineCancel()
+// raises: the AHK loops call it between step budgets once the user has confirmed the
+// abort prompt, and TrueCleanup() calls it at exit. And the Escape key, polled here
+// because nothing else can reach the sort any more: since the interface thread was
+// merged into the main interpreter [2026-08] the one AHK thread sits inside
+// sqlite3_step() for the whole ORDER BY sort of the first dupesQueryStep(), and no
+// handler, dialog, checkpoint or other thread exists to raise the flag - before the
+// merge the interface thread did exactly that, live, from its own message loop. The
+// poll mirrors sqliteAbortProgressCB() on the AHK side, which ends the statements on
+// AHK's own connections the same way: an unconfirmed stop, since no dialog can be shown
+// from inside a step, and one that also ends the row-stepping phase where a checkpoint
+// would have asked first. The key is read system-wide [GetAsyncKeyState] rather than
+// through the foreground window on purpose: a window that has not pumped for a few
+// seconds is ghosted by Windows and the ghost belongs to another process, so a
+// foreground check would fail exactly when the sort is long enough to need stopping.
+// The interpreter tells this stop from a failure by the state it leaves behind: phase
+// -1 with lastError 0, where a failed statement leaves an error code.
+static bool dupesEscapeSeen = false;
 static int __cdecl dupesProgressCB(void*) {
-    return dupesCancelFlag.load(std::memory_order_relaxed) ? 1 : 0;
+    if (dupesCancelFlag.load(std::memory_order_relaxed))
+       return 1;
+
+    if ((GetAsyncKeyState(VK_ESCAPE) & 0x8000)!=0)
+    {
+       dupesEscapeSeen = true;
+       return 1;
+    }
+
+    return 0;
 }
 
 // Opens the engine's own read-only connection on the database AHK already has open.
@@ -1699,9 +1724,11 @@ DLL_API int DLL_CALLCONV dupesEngineInit(const wchar_t *dbPath) {
     std::vector<char> utf8((size_t)need);
     WideCharToMultiByte(CP_UTF8, 0, dbPath, -1, utf8.data(), need, NULL, NULL);
 
-    // FULLMUTEX because dupesEngineCancel() reaches this handle from the interface
-    // thread; sqlite3_interrupt() is documented as safe either way, but a serialized
-    // connection removes the question. A single-threaded build of sqlite3.dll ignores it.
+    // FULLMUTEX dates from the interface-thread era, when dupesEngineCancel() reached
+    // this handle from that thread; since the 2026-08 merge every caller is the main AHK
+    // thread, so it no longer buys anything, and it costs nothing on a connection that
+    // is only ever stepped from one thread. A single-threaded build of sqlite3.dll
+    // ignores it.
     const int rc = SQ.open_v2(utf8.data(), &dupesDB, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, NULL);
     if (rc!=SQLITE_OK || dupesDB==NULL)
     {
@@ -1747,8 +1774,10 @@ DLL_API int DLL_CALLCONV dupesEngineRelease() {
     return 1;
 }
 
-// Safe to call from any thread - and meant to be: the AHK thread that started the scan is
-// blocked inside sqlite3_step() while SQLite sorts, so only another thread can stop it.
+// Safe to call from any thread. It was written for the interface thread, which stopped a
+// sort the main AHK thread was blocked inside; since the 2026-08 merge only the main AHK
+// thread calls it, between step budgets [after the abort prompt] and from TrueCleanup()
+// at exit, and the sort itself is covered by the Escape poll in dupesProgressCB().
 DLL_API int DLL_CALLCONV dupesEngineCancel() {
     dupesCancelFlag.store(1, std::memory_order_relaxed);
     dupesPixCancel.store(1, std::memory_order_relaxed);
@@ -1989,6 +2018,7 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
 
     dupesQueryReset();
     dupesCancelFlag.store(0, std::memory_order_relaxed);
+    dupesEscapeSeen = false;
     dupesQCfg.keyCount = keyCount;
     dupesQCfg.nocaseMask = nocaseMask;
     dupesQCfg.hasHash = (hasHash==1) ? 1 : 0;
@@ -2155,7 +2185,7 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
         }
 
         // SQLITE_INTERRUPT is the cancel path; anything else is a real failure
-        dupesSetError((rc==SQLITE_INTERRUPT) ? L"the duplicates query was cancelled" : L"the duplicates query failed");
+        dupesSetError((rc==SQLITE_INTERRUPT) ? (dupesEscapeSeen ? L"the duplicates query was stopped: Escape was held down" : L"the duplicates query was cancelled") : L"the duplicates query failed");
         SQ.finalize(dupesStmt);
         dupesStmt = NULL;
         dupesScanState.lastError = (rc==SQLITE_INTERRUPT) ? 0 : 5;

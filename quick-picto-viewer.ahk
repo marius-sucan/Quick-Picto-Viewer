@@ -36820,10 +36820,13 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
       }
    }
 
-   ; dupesPixStep() answers 0 both when the run is complete and when it was cancelled from
-   ; another thread - stopDupesEngineNow(), which the interface thread calls. Only the phase
-   ; tells those apart, and reporting "finished collecting data for N files" over a run that
-   ; stopped halfway is exactly how an interrupted collection goes unnoticed.
+   ; dupesPixStep() answers 0 both when the run is complete and when it was cancelled. Every
+   ; cancel this loop issues sets abandonAll itself before breaking, and since the interface
+   ; thread was merged into this interpreter [2026-08] no other thread can call
+   ; dupesEngineCancel() mid-run [the stopDupesEngineNow() it called is gone], so this is
+   ; belt and braces: the phase is the DLL's own word on whether the run reached the end,
+   ; and reporting "finished collecting data for N files" over a run that stopped halfway is
+   ; exactly how an interrupted collection goes unnoticed.
    If (NumGet(dupesPixState + 0, 0, "Int")=-1)
       abandonAll := 1
 
@@ -86984,9 +86987,22 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
 
    If (more=-1 && abandonAll!=1)
    {
-      DllCall("qpvmain.dll\dupesEngineRelease")
-      throwDupesEngineError(A_ThisFunc, "the query that identifies the duplicate candidates failed")
-      Return -1
+      ; Phase -1 with no error code is the DLL's own stop: dupesProgressCB() ended the
+      ; statement because Escape was held down while it ran - the one stretch this loop
+      ; cannot reach determineTerminateOperation(), since the first dupesQueryStep() sits
+      ; inside sqlite3_step() for the whole ORDER BY sort and nothing else runs on this
+      ; interpreter meanwhile [the interface thread used to stop it from outside]. A failed
+      ; statement leaves an error code behind; a qpvmain.dll without the poll never gets here.
+      If (statePtr && NumGet(statePtr + 0, 0, "Int")=-1 && NumGet(statePtr + 0, 4, "Int")=0)
+      {
+         addJournalEntry(A_ThisFunc "(): the candidates query was stopped by the user - " readDupesEngineError())
+         abandonAll := 1
+      } Else
+      {
+         DllCall("qpvmain.dll\dupesEngineRelease")
+         throwDupesEngineError(A_ThisFunc, "the query that identifies the duplicate candidates failed")
+         Return -1
+      }
    }
 
    totalCandidates := DllCall("qpvmain.dll\dupesQueryRowCount", "uint")

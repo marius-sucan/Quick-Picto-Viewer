@@ -450,6 +450,33 @@ static void cancelStopsTheQuery() {
     check(dupesQueryRowCount() > 0, "the engine recovers for the next scan");
 }
 
+// The other stop: Escape held down while the query runs. Since the interface thread was
+// merged into the main interpreter nothing can call dupesEngineCancel() while the first
+// dupesQueryStep() sits inside the ORDER BY sort, so dupesProgressCB() polls the key itself.
+// The shim's GetAsyncKeyState answers qpvT_escapeDown; the interpreter tells this stop from
+// a failure by phase -1 with lastError 0, so that pair is the contract under test.
+static void escapeStopsTheQuery() {
+    const std::vector<std::string> cols = split("imgwhratio,imgframes", ',');
+    const std::wstring sql = widen(newSQL(cols, 1, "dHash", true, false, true));
+    dupesQueryBegin(sql.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 1, 1024, 1);
+    qpvT_escapeDown = 1;
+    const int r = dupesQueryStep(150);
+    qpvT_escapeDown = 0;
+    check(r==-1, "Escape held during the query ends it the way a cancel does");
+    check(dupesScanState.phase==-1, "... and the phase says so");
+    check(dupesScanState.lastError==0, "... with no error code, which is how the interpreter tells a stop from a failure");
+    wchar_t err[256];
+    const int len = dupesEngineLastError(err, 256);
+    check(len > 0, "... and leaves a message for the journal");
+    if (getenv("QPV_TEST_VERBOSE")) { std::string s; for (int i = 0; i < len; i++) s.push_back((char)err[i]); printf("    [dbg] %s\n", s.c_str()); }
+
+    // the key is up again: the next query runs to the end
+    dupesQueryBegin(sql.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 1, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesQueryRowCount() > 0, "the engine recovers once the key is released");
+    check(dupesScanState.lastError==0 && dupesScanState.queryDone==1, "... and that run reaches the end");
+}
+
 static void rejectsBadInput() {
     const std::wstring bad = L"SELECT imgidu FROM images";
     check(dupesQueryBegin(bad.c_str(), 2, 0, 0, 0, 0, 0, 1)==0, "a SELECT with the wrong column count is rejected");
@@ -771,6 +798,7 @@ int main(int argc, char **argv) {
     keepMaskRecutsGroups();
     printf("  cancellation and bad input\n");
     cancelStopsTheQuery();
+    escapeStopsTheQuery();
     rejectsBadInput();
     // both query shapes, every time: the keyset cursor the interpreter sends this build,
     // and the plain LIMIT it falls back to for a qpvmain.dll without dupesHashHasKeyset()

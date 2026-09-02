@@ -201,10 +201,13 @@ The fourth is an argument adapter shared by two callers — cheap to inline, har
   `trackMouseDragging` (stamps `lastWinDrag`), `miniGDIupdater` (two actions).
 - Real logic with a small body: the six `dispatch*` window-root dispatchers, `isUIrootWin`,
   `preventSillyGui`, `TestDraggableWindow`, `WM_MOUSELEAVE`, `PreventKeyPressBeep`,
-  `updateWindowColor`, `destroyMenuFlyout`, `stopDupesEngineNow` (a named DllCall with one
-  caller — inline it if you like). `MenuBonusOptions` (a `SoundBeep` placeholder menu handler) was
-  listed here until 2026-09-02, when it went with the dormant `applyFilter` branch of `BuildMenuBar`
-  (see footnote 3).
+  `updateWindowColor`, `destroyMenuFlyout`. `MenuBonusOptions` (a `SoundBeep` placeholder menu
+  handler) was listed here until 2026-09-02, when it went with the dormant `applyFilter` branch of
+  `BuildMenuBar` (see footnote 3). `stopDupesEngineNow` (a named DllCall of `dupesEngineCancel`
+  with one caller, the abort prompt) was listed here until 2026-09-03: on one interpreter it could
+  only ever run between step budgets, where the dupes loops already cancel themselves, so it was
+  removed; the sort it once stopped from the other thread is now covered by an Escape poll inside
+  the DLL's `dupesProgressCB`.
 - The main script gained only five functions in the merge: the three facades above, plus
   `armSQLiteAbortHandler` and `sqliteAbortProgressCB` (the SQLite abort hook, real code).
 
