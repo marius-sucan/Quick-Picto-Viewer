@@ -78830,7 +78830,6 @@ ActPaintBrushNow() {
          setHugeImageActionsCount(viewportQPVimage.actions + 1)
       }
       dummyTimerDelayiedImageDisplay(500)
-      SoundBeep, 900, 100
    } Else If (isLarge=1)
       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
 
