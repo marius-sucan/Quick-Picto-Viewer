@@ -617,16 +617,24 @@ drainUIinput() {
 }
 
 pumpPenMessages() {
-; The brush loops hold Critical, so WM_POINTER* messages queue up instead of
-; reaching the WM_PENpressure monitor - read them here directly. The handler is
-; called for its side effect on penPressureRaw, then the message is dispatched
-; anyway so DefWindowProc keeps promoting pen input to the legacy mouse messages
-; [see the note in WM_PENpressure]. The handler's own «Critical, off» is undone
-; by restoring the caller's state afterwards.
+; Checkpoint for the brush loop, which holds Critical: reads the queued WM_POINTER*
+; messages directly for their side effect on penPressureRaw, then hands each one to
+; DefWindowProc so Windows keeps promoting the pen input to the legacy mouse
+; messages [see the note in WM_PENpressure]. DefWindowProc is the API that performs
+; the promotion, so calling it is what the window procedure would have done with
+; these numbers anyway. The reader touches no Critical state, so the caller's
+; setting survives untouched.
+; RULE: never DispatchMessage from a checkpoint inside a Critical loop. Dispatching
+; runs the window procedure, and for a monitored number GuiWindowProc launches the
+; OnMessage thread even under Critical [MsgMonitor gates on INTERRUPTIBLE_IN_EMERGENCY
+; only] - and every launch resets the interpreter's peek clock [mLastPeekTime]. A pen
+; streams WM_POINTERUPDATE every few ms, so the loop's 16 ms message check never came
+; due, the promoted WM_LBUTTONUP stayed queued and the thread-synchronous
+; GetKeyState("LButton") kept reporting the button down: the brush went on painting
+; along the hover path for as long as the lifted pen kept moving [2026-09-02].
    If (hasPenPressureAPI!=1)
       Return
    VarSetCapacity(msgu, 48, 0)
-   prevCrit := A_IsCritical
    Loop, 20
    {
       If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", 0, "UInt", 0x0245, "UInt", 0x024A, "UInt", 1)
@@ -635,13 +643,10 @@ pumpPenMessages() {
       mnum := NumGet(msgu, A_PtrSize, "UInt")
       mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
       mlp := NumGet(msgu, 3*A_PtrSize, "Ptr")
-      WM_PENpressure(mwp, mlp, mnum, mhwnd)
-      DllCall("user32\DispatchMessageW", "Ptr", &msgu)
+      readPenPointerMsg(mwp, mnum)
+      If mhwnd
+         DllCall("user32\DefWindowProcW", "Ptr", mhwnd, "UInt", mnum, "Ptr", mwp, "Ptr", mlp, "Ptr")
    }
-   If (prevCrit)
-      Critical, %prevCrit%
-   Else
-      Critical, Off
 }
 
 updateWindowColor() {
@@ -1581,10 +1586,20 @@ theSlideShowCore(paramu:=0) {
 }
 
 WM_PENpressure(wp, lp, msg, hwnd) {
-; Records the current pen pressure so the painting loops in the main thread can poll it.
-; Never returns a value: the message must keep flowing to DefWindowProc, otherwise
-; Windows stops promoting pen input to the legacy mouse messages the app relies on.
+; OnMessage monitor for WM_POINTERUPDATE/DOWN/UP/LEAVE: records the current pen
+; pressure so the painting loop in the main script can poll it. Never returns a
+; value: the message must keep flowing to DefWindowProc, otherwise Windows stops
+; promoting pen input to the legacy mouse messages the app relies on. The reading
+; itself lives in readPenPointerMsg(), which pumpPenMessages() calls directly from
+; inside the Critical brush loop - a direct call of THIS function would switch
+; Critical off on the calling thread.
    Critical, off
+   readPenPointerMsg(wp, msg)
+}
+
+readPenPointerMsg(wp, msg) {
+; Updates penPressureRaw from one WM_POINTER* message [wp carries the pointer id].
+; Touches no Critical state: callable from a monitor thread and from a checkpoint alike.
    Static penInfoBuf, bufReady := 0
 
    If (msg=0x0247 || msg=0x024A) ; WM_POINTERUP / WM_POINTERLEAVE

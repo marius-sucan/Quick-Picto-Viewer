@@ -4310,6 +4310,11 @@ determineLClickState() {
 ; polled the interface thread's LbtnDwn mirror, which is derived from the same
 ; promoted input stream, so the direct read covers mouse, pen and touch alike.
 ; The LbtnDwn mirror itself stays - the interface-side click handlers rely on it.
+; The read is thread-synchronous [Win32 GetKeyState]: it changes only when THIS
+; thread retrieves the queued WM_LBUTTONUP, which inside a Critical loop is the
+; interpreter's own 16 ms message check. A checkpoint that dispatches queued
+; messages through the window procedure resets that clock on every OnMessage
+; launch and can starve it - see the RULE in pumpPenMessages() [module-interface].
    If (slideShowRunning=1)
       Return 0
 
@@ -4318,12 +4323,15 @@ determineLClickState() {
 
 getBrushPenPressure(ByRef rawPressure) {
 ; Returns the shaped pen pressure as a 0-1 factor, or -1 when there is no live pen
-; input. The pressure itself is collected in the interface thread by 
-; WM_PENpressure(), see lib\module-interface.ahk
+; input; rawPressure receives the 0-1024 reading [0 = no pen in contact, or the
+; option is off]. The pressure is collected by the WM_PENpressure() monitor and,
+; while the brush loop holds Critical, by pumpPenMessages() - both in
+; lib\module-interface.ahk
+   rawPressure := 0
    If (BrushToolPenPressure!=1)
       Return -1
 
-   pumpPenMessages()  ; [merge] the queued WM_POINTER* cannot reach the monitor while the brush loop holds Critical
+   pumpPenMessages()  ; [merge] the queued WM_POINTER* only reach the monitor at the interpreter's periodic message check; read them now
    rawPressure := penPressureRaw
    If (rawPressure<1)
       Return -1
@@ -78573,6 +78581,7 @@ ActPaintBrushNow() {
    If (isLarge=1)
       CreateOSDinfoLine(0, 1)
    lastBrushDecreaseZeit := A_TickCount
+   penInContact := 0
    whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index<2)
    {
@@ -78585,6 +78594,18 @@ ActPaintBrushNow() {
 
       GetMouseCoord2wind(PVhwnd, mX, mY)
       thisPenPressure := getBrushPenPressure(rawPressure)
+      If (rawPressure>0)
+         penInContact := 1
+      Else If (penInContact=1)
+      {
+         ; the pointer stream already reported the lift [WM_POINTERUP, WM_POINTERLEAVE or a
+         ; hover update]: the stroke is over. Ending it here avoids one more stamp at full
+         ; size and opacity [no pressure = factors of 1] in the up to 16 ms until the
+         ; promoted WM_LBUTTONUP is retrieved and determineLClickState() sees the release.
+         ; Mouse, touch and pressureless pens never set penInContact, so they are unaffected.
+         OutputDebug, % "QPVMERGE: " A_ThisFunc " ended by pen lift"
+         Break
+      }
       penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
       penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       If (BrushToolRandomPosX>0 && BrushToolType<6)

@@ -236,7 +236,8 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | function | lines | what it does |
 |---|---|---|
 | `drainUIinput()` | 82 | selective PeekMessage drain of the PVwin family's input while a loop holds Critical: abort gestures (Escape, viewport clicks, the title-bar ✗) reach their handlers inline, the keyboard tail runs only when a keydown was drained, everything else stays queued. The one checkpoint pump — the full pump was deleted (see the footnote) |
-| `pumpPenMessages()` | 27 | pen/touch message pump for the paint loops: pre-dispatch read plus DispatchMessage, so pressure and coordinates keep flowing while painting |
+| `pumpPenMessages()` | 32 | pen message checkpoint for the brush loop: reads the queued WM_POINTER* through `readPenPointerMsg()` and hands each one to DefWindowProc for the mouse promotion — never DispatchMessage: the OnMessage launch it triggers resets the interpreter's peek clock, which starved the loop's 16 ms message check while a pen streamed updates and kept the brush painting 300–600 ms after the lift (fixed 2026-09-02, see the RULE in the function) |
+| `readPenPointerMsg()` | 35 | the pressure reader shared by the `WM_PENpressure` monitor and the checkpoint above; touches no Critical state, so the checkpoint no longer switches Critical off on the brush thread (2026-09-02) |
 
 ### Native menus and the hook-based menu reader — lib/module-interface.ahk (phase D, `138b6b0` and its fixes)
 
