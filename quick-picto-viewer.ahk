@@ -73187,13 +73187,22 @@ restartEntireGui() {
 }
 
 disableWindowPenServices(hwnd) {
-   If (isWinXP || (A_TickCount - scriptStartTime<500))
+; Sets MicrosoftTabletPenServiceProperty on the window, so the tablet input service leaves
+; its system gestures off there: press-and-hold [the long-tap right-click emulation of pen
+; and touch, which also holds the emulated mouse-down back while it decides], the pen tap
+; and barrel feedback animations, flicks and the rest of the set qpv-main.h lists. The
+; property is per HWND and Windows consults the window under the pen, so a window built
+; from child controls needs it on every control as well [see tlbrAddNewIcon].
+; Written in-process since 2026-09-02: the qpvmain.dll export SetTabletPenServiceProperties
+; did the same, but behind a 500 ms start-up guard [there to keep this helper from loading
+; the DLL early] that silently skipped the windows created at start-up - the toolbar, and
+; PVwin itself on a fast machine. The export stays in the DLL, unused by the scripts.
+   If (isWinXP || !hwnd)
       Return
 
-   If !qpvMainDll
-      initQPVmainDLL(1)
-
-   Return DllCall("qpvmain.dll\SetTabletPenServiceProperties", "uptr", hwnd)
+   ; TABLET_DISABLE_PRESSANDHOLD 0x1 | PENTAPFEEDBACK 0x8 | PENBARRELFEEDBACK 0x10 | TOUCHUIFORCEON 0x100
+   ; | FLICKS 0x10000 | SMOOTHSCROLLING 0x80000 | FLICKFALLBACKKEYS 0x100000 [tpcshrd.h]
+   Return DllCall("user32\SetPropW", "Ptr", hwnd, "WStr", "MicrosoftTabletPenServiceProperty", "Ptr", 0x190119)
 }
 
 handleUIhwnd(initGui) {
@@ -101779,6 +101788,10 @@ tlbrAddNewIcon(obju, wi, he, IconSpacing, noSpacing, simpleRefresh) {
     } Else
     {
        Gui, OSDguiToolbar: Add, Button, w%wi% h%he% %otherz% vtlbrValueIcon%IndexBtn% +hwndhwndul gtlbrInvokeFunction +0x8000, % btnID ; Windows Narrator friendly buttons 
+       ; the tablet property is per HWND and Windows checks the window under the pen: set on the
+       ; button itself it keeps a pen or touch long-press from turning into a right-click, so the
+       ; type-1 buttons [undo/redo, pan, zoom] get their button-down at once and repeat while held
+       disableWindowPenServices(hwndul)
        ; Gui, OSDguiToolbar: Add, Text,  w%wi% h%he% %otherz% BackgroundTrans +0xE +0x200 vtlbrValueIcon%IndexBtn% +hwndhwndul gtlbrInvokeFunction, icon%IndexBtn% ; Windows Narrator friendly buttons 
        tlbrSetImageIcon(icoFile, hwndul, wi, he)
     }
@@ -103746,6 +103759,7 @@ CoreGUItoolbar(scopul:=0, whichList:=0) {
        Gui, OSDguiToolbar: Default
        Gui, OSDguiToolbar: Margin, 0, 0
        Gui, OSDguiToolbar: -DPIScale -Caption -MinimizeBox -MaximizeBox +ToolWindow +hwndhQPVtoolbar +Owner%PVhwnd%
+       disableWindowPenServices(hQPVtoolbar) ; press-and-hold off on the toolbar surface as well; every button gets its own in tlbrAddNewIcon()
        Gui, OSDguiToolbar: Color, % ToolbarBgrColor, % ToolbarBgrColor
     }
 
