@@ -553,9 +553,19 @@ Class SQLiteDB {
             Return False
          }
          RC := DllCall("SQlite3.dll\sqlite3_reset", "UPtr", This._Handle, "Cdecl Int")
-         If (ErrorLevel) {
+         EL := ErrorLevel
+         ; the bindings are cleared regardless of the reset result: with prepare_v2 statements
+         ; sqlite3_reset() reports the error of the PREVIOUS sqlite3_step() [a UNIQUE constraint,
+         ; for instance], and a writer that binds only the values it has relies on every parameter
+         ; it skips being NULL again for the next row - an early return here would let the next
+         ; row inherit the failed row's values in every column it does not bind
+         If (ClearBindings) {
+            RC2 := DllCall("SQlite3.dll\sqlite3_clear_bindings", "UPtr", This._Handle, "Cdecl Int")
+            EL2 := ErrorLevel
+         }
+         If (EL) {
             This.ErrorMsg := "DllCall sqlite3_reset failed!"
-            This.ErrorCode := ErrorLevel
+            This.ErrorCode := EL
             Return False
          }
          If (RC) {
@@ -564,15 +574,14 @@ Class SQLiteDB {
             Return False
          }
          If (ClearBindings) {
-            RC := DllCall("SQlite3.dll\sqlite3_clear_bindings", "UPtr", This._Handle, "Cdecl Int")
-            If (ErrorLevel) {
+            If (EL2) {
                This.ErrorMsg := "DllCall sqlite3_clear_bindings failed!"
-               This.ErrorCode := ErrorLevel
+               This.ErrorCode := EL2
                Return False
             }
-            If (RC) {
+            If (RC2) {
                This.ErrorMsg := This._DB._ErrMsg()
-               This.ErrorCode := RC
+               This.ErrorCode := RC2
                Return False
             }
          }
