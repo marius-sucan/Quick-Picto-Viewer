@@ -27704,6 +27704,12 @@ mouseTurnOFFtooltip() {
    MouseGetPos, ,, OutputVarWin
    If (OutputVarWin=hGuiTip)
       Global lastWinDrag := A_TickCount - 125
+   ; the click handler calls this ahead of the abort prompt's gate, as a fresh monitor
+   ; thread when a loop's per-line peek dispatched the click: a pump here would launch
+   ; the queued timers [ResetImgLoadStatus clears the flags the gate reads]. Critical on a
+   ; thread that already had it costs nothing; a monitor thread ends with it.
+   If (runningLongOperation=1 || imageLoading=1)
+      Critical
    Sleep, 10
    Gui, mouseToolTipGuia: Destroy
    Global mouseToolTipWinCreated := 0
@@ -35427,7 +35433,21 @@ doStartLongOpDance(affectTlbr:=0) {
      imageLoading := runningLongOperation := 1
      initAppBusyMode()
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1 && affectTlbr!="no")
+     {
+        ; redrawToolbarGUI() ends in a Sleep. On a thread that is not yet Critical [an
+        ; operation launched from the menu bar, no panel to close first] that sleep runs
+        ; every timer due at this instant - a ResetImgLoadStatus or a "normal-extra" cursor
+        ; relay left over from the previous image or operation would clear the flags set
+        ; two lines above, and the whole run would proceed with no abort prompt. Critical
+        ; covers the redraw's own sleep only, and the restore hands the thread back as it
+        ; was: an operation that stays interruptible remains exposed to its timers at
+        ; every per-line peek, exactly as it was pre-merge on the main thread - making
+        ; every operation Critical from here is not this hook's call [86 callers].
+        prevCrit := A_IsCritical
+        Critical
         redrawToolbarGUI()
+        Critical, %prevCrit%
+     }
 }
 
 cleanDeadFilesList(dummy:=0) {
