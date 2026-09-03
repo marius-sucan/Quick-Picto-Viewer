@@ -111,7 +111,7 @@ initInterfaceModule() {
 
 MT_post(funcName, args*) {
    fn := Func("IF_postRelay").Bind(funcName, args)
-   SetTimer, % fn, -1
+   SetTimer, % fn, -10
 }
 
 ; ______ merged-thread input routing [merge phase C] ______
@@ -971,7 +971,7 @@ uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:
 
    msgu := "Info-box. Image in view:`n" StrReplace(msgu, "`n", ".`n") ".`nThis viewport area is click-through."
    GuiControl, PVwin:, ImgInfoBox, % msgu
-   GetClientSize(GuiW, GuiH, PVhwnd)
+   vpWinClientSize(GuiW, GuiH)
    tX := (flipH=1 && thumbsDisplaying!=1) ? GuiW - tW : 0
    tY := (flipV=1 && thumbsDisplaying!=1) ? GuiH - tH : 0
    If (flipH!=1 || thumbsDisplaying=1)
@@ -1090,7 +1090,7 @@ uiAccessUpdateOSDmsg(stringu, tW, tH) {
        Return
     }
 
-    GetClientSize(GuiW, GuiH, PVhwnd)
+    vpWinClientSize(GuiW, GuiH)
     GuiControl, PVwin:, OSDmsgsLine, % "OSD: " stringu
     GuiControl, PVwin: Move, OSDmsgsLine, % " x1 y1 w" GuiW " h" tH 
 }
@@ -1114,7 +1114,7 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
    } Else If (mustResize="list")
    {
       thumbsDisplaying := 1
-      GetClientSize(GuiW, GuiH, PVhwnd)
+      vpWinClientSize(GuiW, GuiH)
       thisState := "a" mustResize GuiW GuiH heightu imgHUDbaseUnit
       If (thisState!=prevState)
       {
@@ -1143,7 +1143,7 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
    {
       uiUpdateUIctrl("kill")
       prevState := mustResize
-      GetClientSize(GuiW, GuiH, PVhwnd)
+      vpWinClientSize(GuiW, GuiH)
       GuiControl, PVwin: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
       GuiControl, PVwin: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
       stringu := StrReplace(stringu, " | ", "`n")
@@ -1347,13 +1347,13 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
-       MT_post("WinClickAction", "remClick", "n", mX, mY)
+       WinClickAction("remClick", "n", mX, mY)
     Else If (imgEditPanelOpened=1 && AnyWindowOpen)
-       MT_post("toggleImgEditPanelWindow")
+       toggleImgEditPanelWindow()
     Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
        askAboutStoppingOperations()
     Else If (!AnyWindowOpen && isOkay)
-       MT_post("ToggleThumbsMode")
+       ToggleThumbsMode()
     Return 0
 }
 
@@ -1515,10 +1515,8 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
         JEE_ScreenToClient(whichWin, mXo, mYo, mX, mY)
      }
 
-     If (prefix="^" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1 && thumbsDisplaying!=1)
-        MT_post("restartGIFplayback")
-     Else If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
-        MT_post("BuildSecondMenu")
+     If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
+        BuildSecondMenu()
      Else
         uiInitGuiContextMenu(mX, mY, oX, oY)
   }
@@ -1557,7 +1555,7 @@ uiToggleMenuBaru() {
 
 uiInitGuiContextMenu(mX, mY, oX, oY) {
     ctrl := IdentifyCtrlUnderMouse(oX, oY)
-    MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)
+    InitGuiContextMenu("extern", mX, mY, 0, ctrl)
 }
 
 ; [merge] infosSlideShow() and initSlidesModes() are gone: they only mirrored the
@@ -1616,14 +1614,14 @@ theSlideShowCore(paramu:=0) {
   prevFullIMGload := A_TickCount
   Try DllCall("user32\SetCursor", "Ptr", 0)
   If (slideShowRunning=1 && slidesFXrandomize=1)
-     MT_post("VPimgFXrandomizer")
+     VPimgFXrandomizer()
 
   If (SlideHowMode=1)
-     MT_post("RandomPicture")
+     RandomPicture()
   Else If (SlideHowMode=2)
-     MT_post("PreviousPicture")
+     PreviousPicture()
   Else If (SlideHowMode=3)
-     MT_post("NextPicture")
+     NextPicture()
 }
 
 WM_PENpressure(wp, lp, msg, hwnd) {
@@ -1675,12 +1673,8 @@ readPenPointerMsg(wp, msg) {
 }
 
 updateGDIwinPos() {
-  ; thumbsDisplaying := thumbsDisplaying
-  ; If (A_OSVersion="WIN_7")
   JEE_ClientToScreen(hPicOnGui1, 0, 0, GuiX, GuiY)
-  ; Else GuiX := GuiY := 1
-
-  GetClientSize(mainWidth, mainHeight, PVhwnd)
+  vpWinClientSize(mainWidth, mainHeight)
   If (thumbsDisplaying=1)
   {
      WinMove, ahk_id %hGDIthumbsWin%,, %GuiX%, %GuiY% ; , %mainWidth%, %mainHeight%
@@ -1727,8 +1721,6 @@ uiWinClickAction(thisEvent:="normal") {
     lastInvoked := A_TickCount
     If (slideShowRunning=1)
        turnOffSlideshow()
-    ; Else If (A_TickCount - lastZeitPanCursor<350) && (thumbsDisplaying=0)
-    ;    MT_post("simplePanIMGonClick", 0, 1, 1)
     Else
        MT_post("WinClickAction", thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
 }
@@ -2059,7 +2051,7 @@ dummyTimerProcessDroppedFiles() {
       sldFile := vectorShape
 
    groppedFiles := []
-   MT_post("GuiDroppedFiles", imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
+   GuiDroppedFiles(imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
    lastInvoked := A_TickCount
 }
 
@@ -2103,31 +2095,19 @@ byeByeRoutine() {
        drawingShapeNow := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MT_post("stopDrawingShape", "cancel")
+       stopDrawingShape("cancel")
    } Else If (colorPickerModeNow=1)
    {
        colorPickerModeNow := 0
        colorPickerMustEnd := -1
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-   } Else If (VisibleQuickMenuSearchWin=1)
-   {
-       VisibleQuickMenuSearchWin := omniBoxMode := 0
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-       MT_post("closeQuickSearch")
    } Else If (mustCaptureCloneBrush=1)
    {
        mustCaptureCloneBrush := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       MT_post("StopCaptureClickStuff", "Escape")
-   } Else If (folderTreeWinOpen=1)
-   {
-       folderTreeWinOpen := 0
-       lastInvokedThis := A_TickCount
-       lastOtherWinClose := A_TickCount
-       MT_post("fdTreeClose")
+       StopCaptureClickStuff("Escape")
    } Else If ((AnyWindowOpen || thumbsDisplaying=1 || slideShowRunning=1) && (imageLoading!=1 && runningLongOperation!=1)) || (animGIFplaying=1)
    {
       lastInvokedThis := A_TickCount
@@ -2135,7 +2115,7 @@ byeByeRoutine() {
       {
          lastOtherWinClose := A_TickCount
          AnyWindowOpen := 0
-         MT_post("CloseWindow")
+         CloseWindow()
       } Else If (animGIFplaying=1)
       {
          lastOtherWinClose := A_TickCount
@@ -2156,11 +2136,11 @@ byeByeRoutine() {
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
-      MT_post("exitAppu", "external")
+      exitAppu("external")
       ;  lastCloseInvoked++
    } Else If (markedSelectFile>50 && maxFilesIndex>100)
    {
-      MT_post("exitAppu", "select-external")
+      exitAppu("select-external")
       ;  lastCloseInvoked++
    } Else lastCloseInvoked := 5
 
@@ -2530,9 +2510,7 @@ uiKeyboardResponder(givenKey, abusive) {
     isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
     ; ToolTip, % callMain "=" isOkay "(" imageLoading "|" animGIFplaying ")=" runningLongOperation "=" whileLoopExec "=" givenKey , , , 2
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
-    {
        MT_post("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
-    }
 }
 
 uiPreProcessKbdKey() {
@@ -2761,20 +2739,3 @@ AccGetLocation(Acc, ChildId=0) {
   ; AccCoord[1]:=NumGet(x,0,"int"), AccCoord[2]:=NumGet(y,0,"int"), AccCoord[3]:=NumGet(w,0,"int"), AccCoord[4]:=NumGet(h,0,"int")
   Return coord
 }
-
-GetClientSize(ByRef w, ByRef h, hwnd) {
-; by Lexikos http://www.autohotkey.com/forum/post-170475.html
-    Static prevW, prevH, lastInvoked := 1
-    If (A_TickCount - lastInvoked<95)
-    {
-       W := prevW
-       H := prevH
-       Return
-    }
-
-    VarSetCapacity(rc, 16, 0)
-    DllCall("GetClientRect", "uint", hwnd, "uint", &rc)
-    prevW := W := NumGet(rc, 8, "int")
-    prevH := H := NumGet(rc, 12, "int")
-    lastInvoked := A_TickCount
-} 

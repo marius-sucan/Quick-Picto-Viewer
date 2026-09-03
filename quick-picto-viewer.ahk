@@ -35417,13 +35417,10 @@ sqliteAbortProgressCB(unusedArg) {
    prevCrit := A_IsCritical
    Critical
    r := 0
-   If (runningLongOperation=1 || allowSQLiteAbort=1)
+   If ((runningLongOperation=1 || allowSQLiteAbort=1) && (mustAbandonCurrentOperations=1))
    {
-      If (mustAbandonCurrentOperations=1 || GetKeyState("Escape", "P"))
-      {
-         OutputDebug, % "QPVMERGE: sqlite statement aborted [progress handler]"
-         r := 1
-      }
+      OutputDebug, % "QPVMERGE: sqlite statement aborted [progress handler]"
+      r := 1
    }
    Critical, %prevCrit%
    Return r
@@ -36688,6 +36685,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    prevDone := -1
    saidThrottled := 0
    ErrorMsgS := ""
+   doStartLongOpDance()
    ; A backstop, not the mechanism: the keyset cursor above already means a row is offered
    ; at most once, so this can only trip if that ever stops being true.
    maxHandouts := filesToBeSorted*2 + 128
@@ -64825,7 +64823,7 @@ detectFileID(imgPath, zeroStart:=0) {
     Return good
 }
 
-GuiDroppedFiles(imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
+GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) {
    Critical, on
    Static lastInvoked := 1, noAsking := 0
    If (A_TickCount - lastInvoked<900)
