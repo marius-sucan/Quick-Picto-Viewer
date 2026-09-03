@@ -1,4 +1,4 @@
-﻿
+
 SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
 ; ==================================================================================================================================
 ; Shows a dialog to select a folder.
@@ -1192,14 +1192,25 @@ CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenW
 ; Links.........: http://msdn.microsoft.com/en-us/library/windows/desktop/ms683198(v=vs.85).aspx
 ; =================================================================================================
 
-GetModuleFileNameEx(PID) {
+GetModuleFileNameEx(PID:=0) {
 ; found on: https://autohotkey.com/board/topic/109557-processid-a-scriptfullpath/
 
-    hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001F0FFF, "UInt", 0, "UInt", PID)
-    If (ErrorLevel || hProcess = 0)
-       Return
-    Static lpFilename, nSize := 2260, int := VarSetCapacity(lpFilename, nSize, 0)
-    DllCall("Psapi.dll\GetModuleFileNameEx", "Ptr", hProcess, "Ptr", 0, "Str", lpFilename, "UInt", nSize)
+    curPID := DllCall("Kernel32.dll\GetCurrentProcessId")
+    If (!PID || PID = curPID)
+    {
+        If A_AhkPath
+           Return A_AhkPath
+        VarSetCapacity(lpFilename, 2048, 0)
+        DllCall("Kernel32.dll\GetModuleFileName", "Ptr", 0, "Str", lpFilename, "UInt", 1024)
+        Return lpFilename
+    }
+    hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x1410, "UInt", 0, "UInt", PID, "Ptr")
+    If (!hProcess)
+       hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001FFFFF, "UInt", 0, "UInt", PID, "Ptr")
+    If (ErrorLevel || !hProcess)
+       Return ""
+    VarSetCapacity(lpFilename, 2048, 0)
+    DllCall("Psapi.dll\GetModuleFileNameEx", "Ptr", hProcess, "Ptr", 0, "Str", lpFilename, "UInt", 1024)
     DllCall("Kernel32.dll\CloseHandle", "Ptr", hProcess)
     Return lpFilename
 }

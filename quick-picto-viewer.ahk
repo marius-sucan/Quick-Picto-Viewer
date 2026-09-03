@@ -1,4 +1,4 @@
-﻿; Script details:
+; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -398,6 +398,32 @@ EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
 If (realSystemCores>6)
    realSystemCores := 6
+; a worker of the multi-threaded batches announces itself on its command line, see
+; launchExternalCoreThread()
+coreThreadArg1 := ""
+coreArg := A_Args[1] ? A_Args[1] : 1
+If (!RegExMatch(coreArg, "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg) && A_Args.Length())
+{
+   For idx, arg in A_Args
+   {
+      If RegExMatch(arg, "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg)
+         Break
+   }
+}
+If coreThreadArg1
+{
+   initCompiled(A_IsCompiled)
+   GDIPToken := Gdip_Startup()
+   thisGDIPversion := Gdip_LibrarySubVersion()
+   If (!GDIPToken || thisGDIPversion<1.97)
+   {
+      hasInitSpecialMode := 1
+      ForceExitNow()
+      ExitApp
+   }
+   initExternalCoreMode(coreThreadArg1)
+   Return
+}
 
 RegRead, InitCheckReg, %QPVregEntry%, Running
 RegRead, InitTimeReg, %QPVregEntry%, LastStartTime
@@ -422,15 +448,6 @@ If (!GDIPToken || thisGDIPversion<1.97)
    hasInitSpecialMode := 1
    ForceExitNow()
    ExitApp
-}
-
-; RegRead, initArgu, %QPVregEntry%, initArgu
-; a worker of the multi-threaded batches announces itself on its command line, see
-; launchExternalCoreThread()
-If RegExMatch(A_Args[1], "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg)
-{
-   initExternalCoreMode(coreThreadArg1)
-   Return
 }
 
 RegWrite, REG_SZ, %QPVregEntry%, Running, 1
@@ -3029,7 +3046,8 @@ OpenNewQPVinstance(imgPath:="") {
    Else If !FileRexists(imgPath)
       imgPath := ""
 
-   thisPath := A_IsCompiled ? Chr(34) fullPath2exe Chr(34) : unCompiledExePath
+   exeToUse := A_IsCompiled ? (fullPath2exe ? fullPath2exe : A_ScriptFullPath) : (A_AhkPath ? A_AhkPath : fullPath2exe)
+   thisPath := A_IsCompiled ? Chr(34) exeToUse Chr(34) : Chr(34) exeToUse Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
    Try Run, %thisPath% "%imgPath%"
    Catch wasError
          msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening a new instance of " appTitle ".", 0, 0, "error")
@@ -38264,7 +38282,7 @@ multiCoreThreadJpegLL(coreThread, arguments, filesList) {
        } Else Continue
 
        RegRead, mustAbortAllOperations, %QPVregEntry%\multicore, mustAbortAllOperations
-       If (!WinExist("ahk_id" mainThreadHwnd) || mustAbortAllOperations=1)
+       If (mustAbortAllOperations=1 || (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd)))
        {
           abandonAll := 1
           Break
@@ -38319,7 +38337,7 @@ multiCoreThreadSimpleImgProcessing(coreThread, arguments, filesList) {
        } Else Continue
 
        RegRead, mustAbortAllOperations, %QPVregEntry%\multicore, mustAbortAllOperations
-       If (!WinExist("ahk_id" mainThreadHwnd) || mustAbortAllOperations=1)
+       If (mustAbortAllOperations=1 || (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd)))
        {
           abandonAll := 1
           Break
@@ -38437,7 +38455,7 @@ multiCoreThreadFormatConvert(coreThread, filesList) {
       } Else Continue
 
       RegRead, mustAbortAllOperations, %QPVregEntry%\multicore, mustAbortAllOperations
-      If (!WinExist("ahk_id" mainThreadHwnd) || mustAbortAllOperations=1)
+      If (mustAbortAllOperations=1 || (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd)))
       {
          abandonAll := 1
          Break
@@ -97355,7 +97373,7 @@ isWinStore() {
 }
 
 initCompiled(mode) {
-   fullPath2exe := GetModuleFileNameEx(QPVpid)
+   fullPath2exe := A_IsCompiled ? A_ScriptFullPath : (A_AhkPath ? A_AhkPath : GetModuleFileNameEx(QPVpid))
    zPlitPath(fullPath2exe, 0, OutFileName, OutDir)
    mainExecPath := OutDir
    If (mode=1 || isWinStore())
@@ -97394,7 +97412,7 @@ initCompiled(mode) {
       mainCompiledPath := A_ScriptDir
    }
 
-   unCompiledExePath := Chr(34) fullPath2exe Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
+   unCompiledExePath := Chr(34) (A_AhkPath ? A_AhkPath : fullPath2exe) Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
 }
 
 MenuInvokeSHopenWith() {
@@ -100167,6 +100185,8 @@ adjustNumbersEditFields(OutputVal, OutputVname) {
 
 prepareExternalCoreThread(thisIndex, args, thisList) {
 ; The parameters and the files list are per thread, and the worker learns which thread it is from its command line.
+   If !FolderExist(thumbsCacheFolder)
+      FileCreateDir, % thumbsCacheFolder
    Try FileDelete, %thumbsCacheFolder%\tempList%thisIndex%.txt
    Try FileDelete, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt
    Sleep, 0
@@ -100174,8 +100194,11 @@ prepareExternalCoreThread(thisIndex, args, thisList) {
    Catch wasErrorA
          Sleep, 1
 
-   If wasErrorA
+   If (wasErrorA || !FileExist(thumbsCacheFolder "\tempFilesList" thisIndex ".txt"))
+   {
+      OutputDebug, % "QPVMERGE: prepareExternalCoreThread failed for slot " thisIndex " (folder=" thumbsCacheFolder ")"
       Return 0
+   }
 
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%thisIndex%, 0
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%thisIndex%, 0
@@ -100185,11 +100208,13 @@ prepareExternalCoreThread(thisIndex, args, thisList) {
 
 launchExternalCoreThread(thisIndex) {
    pidThread := 0
-   thisPath := A_IsCompiled ? Chr(34) fullPath2exe Chr(34) : unCompiledExePath
-   Try Run, %thisPath% qpv-core-thread=%thisIndex%,,, pidThread
+   exeToUse := A_IsCompiled ? (fullPath2exe ? fullPath2exe : A_ScriptFullPath) : (A_AhkPath ? A_AhkPath : fullPath2exe)
+   thisCmd := A_IsCompiled ? (Chr(34) exeToUse Chr(34)) : (Chr(34) exeToUse Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34))
+   Try Run, % thisCmd " qpv-core-thread=" thisIndex,,, pidThread
    Catch wasErrorB
        Sleep, 0
 
+   OutputDebug, % "QPVMERGE: launch worker " thisIndex ": cmd=" thisCmd " pid=" pidThread " err=" wasErrorB
    If (wasErrorB || !pidThread)
       Return 0
    Return pidThread
@@ -100210,7 +100235,10 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
               Continue
 
            If (thisThreadStarted=-1 || testProcessExists(pidsArray[A_Index])!=1)
+           {
+              OutputDebug, % "QPVMERGE: worker slot " A_Index " reported fatal start or died (status=" thisThreadStarted ", pid=" pidsArray[A_Index] ", exists=" testProcessExists(pidsArray[A_Index]) ")"
               Return A_Index
+           }
 
            If !firstPending
               firstPending := A_Index
@@ -100221,7 +100249,10 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
           Return 0
 
        If (A_TickCount - startZeit>deadlineMs)
+       {
+          OutputDebug, % "QPVMERGE: worker slot " firstPending " timed out after " (A_TickCount - startZeit) "ms"
           Return firstPending
+       }
        Sleep, 25
    }
 }
@@ -100237,34 +100268,46 @@ cleanupExternalCoreThreadsFiles() {
 initExternalCoreMode(coreThread) {
   Critical, on
   hasInitSpecialMode := 1
+  OutputDebug, % "QPVMERGE: initExternalCoreMode entered for worker " coreThread " (pid=" DllCall("GetCurrentProcessId") ")"
   RegRead, mainThreadHwnd, %QPVregEntry%\multicore, mainThreadHwnd
-  If !WinExist("ahk_id" mainThreadHwnd)
+  If (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd))
   {
-     RegWrite, REG_SZ, %QPVregEntry%, Running, 0
+     OutputDebug, % "QPVMERGE: main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread
      fatalError := 1
   }
 
   RegRead, threadParams, %QPVregEntry%\multicore, threadParams%coreThread%
   If !threadParams
+  {
+     OutputDebug, % "QPVMERGE: empty threadParams for worker " coreThread
      fatalError := 1
+  }
 
   args := StrSplit(threadParams, "||")
   If (args[1]!=coreThread)
+  {
+     OutputDebug, % "QPVMERGE: threadParams mismatch for worker " coreThread ": " threadParams
      fatalError := 1
+  }
 
   Try FileRead, filesList, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
   Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
   If !filesList
+  {
+     OutputDebug, % "QPVMERGE: filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)"
      fatalError := 1
+  }
 
   If (fatalError=1)
   {
+     OutputDebug, % "QPVMERGE: fatalError=1 in initExternalCoreMode for worker " coreThread
      RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, -1
      ForceExitNow()
      Return
   }
 
   RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
+  OutputDebug, % "QPVMERGE: worker " coreThread " set ThreadRunning=1, job=" args[2]
   ; this thread is critical, so the watchdog only gets to run while a modal dialog - an
   ; AHK runtime error, a library fault - is up: the one situation in which the per-file
   ; abort check of the loops below cannot run, and the main thread would otherwise have
@@ -100279,13 +100322,14 @@ initExternalCoreMode(coreThread) {
   Else If (args[2]="batch-fmtconv")
      multiCoreThreadFormatConvert(args[1], filesList)
 
+  OutputDebug, % "QPVMERGE: worker " coreThread " completed work, exiting"
   ForceExitNow()
   Return
 }
 
 watchExternalCoreAbort() {
   RegRead, mustAbort, %QPVregEntry%\multicore, mustAbortAllOperations
-  If (mustAbort=1 || !WinExist("ahk_id" mainThreadHwnd))
+  If (mustAbort=1 || (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd)))
      ForceExitNow()
 }
 
