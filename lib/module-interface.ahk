@@ -544,8 +544,8 @@ drainUIinput() {
 ; PeekMessage with the PVwin handle also drains its children [the hit-test
 ; controls and the reparented GDI viewport windows].
    Static busy := 0
-   If busy  ; re-entrancy guard: a drained Escape can show a modal dialog that pumps,
-      Return ; and the interrupted operation then reaches its next checkpoint mid-drain
+   If busy  ; re-entrancy guard: a drained gesture can open the abort prompt, whose own pump
+      Return ; still launches OnMessage monitors [uiNativeYesNoPrompt() holds Critical: nothing queued runs]
    busy := 1
    gotKeyDown := 0
    dcount := 0
@@ -1408,19 +1408,59 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     Return 0
 }
 
+uiNativeYesNoPrompt(msg) {
+; The Yes/No box behind the two checkpoint dialogs [askAboutStoppingOperations()
+; and the force-exit branch of byeByeRoutine()]. It must NOT lift Critical while it
+; is on screen. AHK's own MsgBox does [window.cpp MsgBox(): DIALOG_PREP clears
+; ThreadIsCritical and sets AllowThreadToBeInterrupted before MessageBox(), DIALOG_END
+; restores them after], and while the box pumps, MainWindowProc's WM_TIMER runs
+; MsgSleep(-1), whose CheckScriptTimers() bails only on !IsInterruptible(): every
+; timer, MT_post relay, g-label and hotkey a Critical worker loop had queued ran
+; INSIDE the abort prompt. A queued ResetImgLoadStatus [263 SetTimer sites, -50 ms,
+; armed by nearly every image display] or drawWelcomeImg clears runningLongOperation
+; and imageLoading, the gates in front of askAboutStoppingOperations() close, and
+; after a "No" no click, Escape or title-bar X reopens the prompt [Marius, 2026-09-03].
+; Pre-merge nothing queued ran: the main thread spun Critical while the interface
+; thread showed the box. A DllCall'd MessageBoxW under Critical is that on one
+; interpreter: its modal loop dispatches window messages [paint, the OnMessage
+; monitors - MsgMonitor gates only on INTERRUPTIBLE_IN_EMERGENCY], while AHK's own
+; posted events and timers stay queued until the operation unwinds. Critical is set
+; here too, because the same handlers also run as fresh, non-critical monitor
+; threads [a Critical loop's 16 ms peek dispatches the click as well]. Owned by
+; PVhwnd, so the main window is disabled for the box's lifetime and a second
+; viewport click cannot nest a prompt; the explicit Enable first is the old
+; behaviour [an open panel may have disabled the window].
+   prevCrit := A_IsCritical
+   Critical
+   WinSet, Enable,, ahk_id %PVhwnd%
+   ; MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND - the flags AHK's MsgBox used here
+   r := DllCall("user32\MessageBoxW", "Ptr", PVhwnd, "WStr", msg, "WStr", appTitle, "UInt", 0x10024, "Int")
+   If (prevCrit)
+      Critical, %prevCrit%
+   ; else: deliberately left ON, breaking the save/restore idiom of the "F" callbacks
+   ; on purpose. A zero here means a real, short-lived thread: a monitor launched by
+   ; the loop's 16 ms peek [the usual way a viewport click arrives], or a drain from
+   ; a loop that does not hold Critical. Turned off, the few lines left before the
+   ; thread ends [the answer check, the flag reset, the caller's Return] each run the
+   ; per-line peek, and one MsgSleep(-1) in a non-critical thread launches the very
+   ; timers the box kept out. Ending Critical costs nothing: ResumeUnderlyingThread
+   ; only pops g, so the resumed loop keeps its own flag, and drainUIinput() restores
+   ; its own saved state at its end.
+   Return (r=6) ? "yes" : "no"   ; IDYES=6; IDNO=7 and a failed call [0] both mean no
+}
+
 askAboutStoppingOperations() {
+     If (userPendingAbortOperations=1)  ; the prompt is already up [a monitor launched from its own pump]
+        Return
      If (mustAbandonCurrentOperations!=1)
      {
         userPendingAbortOperations := 1
         lastCloseInvoked := 0
-        WinSet, Enable,, ahk_id %PVhwnd%
-        msgResult := simpleMsgBoxWrapper(appTitle, "Do you want to stop the currently executing operation ?", 4, 0, "question")
+        msgResult := uiNativeYesNoPrompt("Do you want to stop the currently executing operation ?")
         If (msgResult="yes")
-        {
            mustAbandonCurrentOperations := 1
-           userPendingAbortOperations := 0
-        } Else
-           userPendingAbortOperations := 0
+        userPendingAbortOperations := 0
+        OutputDebug, % "QPVMERGE: abort prompt answered " msgResult " [runningLongOperation=" runningLongOperation " imageLoading=" imageLoading "]"
      } Else userPendingAbortOperations := 0
       ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
 }
@@ -2036,8 +2076,8 @@ byeByeRoutine() {
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
       canCancelImageLoad := 4
-      WinSet, Enable,, ahk_id %PVhwnd%
-      msgResult := simpleMsgBoxWrapper(appTitle, "The main window seems to be busy at the moment. Do you want to force exit this application ?", 4, 0, "question")
+      ; native box under Critical, like the abort prompt: nothing queued may run in here
+      msgResult := uiNativeYesNoPrompt("The main window seems to be busy at the moment. Do you want to force exit this application ?")
       If (msgResult="yes")
       {
          ; [merge] the old force-exit killed the process within 10ms - issued from

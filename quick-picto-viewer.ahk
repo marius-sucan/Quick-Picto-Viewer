@@ -35383,9 +35383,12 @@ determineTerminateOperation() {
 ; canvas under QPV_ShowThumbnails' feet [trGdip_DrawImage Invalid_Parameter, the
 ; error Marius hit]. drainUIinput restores the faithful semantics: only the abort
 ; GESTURES [Escape, viewport clicks, the title-bar X] reach their handlers, inline
-; and still under Critical; the abort-confirm dialog works fine from here [MsgBox
-; pumps its own window without launching AHK timers while Critical holds]; all
-; other queued work stays queued until the operation unwinds, as before the merge.
+; and still under Critical; the abort-confirm dialog is a DllCall'd MessageBoxW
+; [uiNativeYesNoPrompt() in the module] because AHK's own MsgBox lifts Critical for
+; its lifetime [DIALOG_PREP] and its pump then ran every queued timer - a pending
+; ResetImgLoadStatus cleared runningLongOperation inside the prompt and no later
+; gesture could reopen it; all other queued work stays queued until the operation
+; unwinds, as before the merge.
   Static lastInvoked := 1
   If (A_TickCount - lastInvoked < 200)
      Return 0
