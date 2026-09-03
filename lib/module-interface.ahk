@@ -543,17 +543,6 @@ drainUIinput() {
 ; matches the old queued-post semantics. No timers or posts fire in here.
 ; PeekMessage with the PVwin handle also drains its children [the hit-test
 ; controls and the reparented GDI viewport windows].
-; Which path a click takes depends on the loop. AHK's own per-line peek [MsgSleep(-1)
-; once 16 ms have passed since the last peek] fires at the first script line after a
-; DllCall and dispatches everything queued - the click then runs as a monitor thread.
-; A DLL step that writes through the AHK SQLite connection [collectImgDataViaPool's
-; dupesPixStep] invokes sqliteAbortProgressCB every ~9000 opcodes, and a fast-mode
-; callback resets g_script.mLastPeekTime on entry [RegisterCallbackCStub]: the peek
-; clock is fresh when the step returns, the per-line peek stays quiet, and the click
-; waits here for the checkpoint. A step that computes and writes nothing
-; [filterDupeResultsByHdist's dupesScanStep] leaves the clock stale, so its clicks
-; arrive as monitors. Both end in the same handlers; the handlers must not depend on
-; which thread runs them [Marius, 2026-09-03].
    Static busy := 0
    If busy  ; re-entrancy guard: a drained gesture can open the abort prompt, whose own pump
       Return ; still launches OnMessage monitors [uiNativeYesNoPrompt() holds Critical: nothing queued runs]
@@ -1258,8 +1247,6 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
 
     pp := 0
     thisWin := isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin)
-    If (runningLongOperation=1 || imageLoading=1)
-       OutputDebug, % "QPVMERGE: click during op: thisWin=" thisWin " active=" WinActive("A") " gui=" A_Gui " anim=" animGIFplaying " slide=" slideShowRunning " age=" A_TickCount - lastLongOperationStart " drag=" A_TickCount - lastWinDrag " pending=" userPendingAbortOperations " abandon=" mustAbandonCurrentOperations " crit=" A_IsCritical
     If (preventSillyGui(A_Gui) || !thisWin)
        Return
 
@@ -1292,17 +1279,9 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     SetTimer, ResetLbtn, -55
     ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
-    If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
-    {
-       ; a slideshow or animation flag still up from before the operation began cannot be
-       ; animating anything [the thread is inside the operation's loop]. It used to swallow
-       ; the click - stop the playback, no prompt - and the stop's own cursor reset cleared
-       ; every operation flag [stopGiFsPlayback], so no later click reached the prompt either.
-       ; The title-bar X and Escape never looked at these flags; a click now behaves the same.
-       If (slideShowRunning=1 || animGIFplaying=1)
-          turnOffSlideshow()
+    If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
-    } Else If (slideShowRunning=1 || animGIFplaying=1)
+    Else If (slideShowRunning=1 || animGIFplaying=1)
        turnOffSlideshow()
     Else If isOkay
        uiWinClickAction()
@@ -1980,15 +1959,6 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
       colorPickerMustEnd := 1
 
    LbtnDwn := 0
-   ; this monitor is a fresh, non-critical thread, and the pump below launches every
-   ; script timer that is due. On top of a long operation or an image load that is the
-   ; one thing it must not do: the operation's loop holds Critical precisely so that a
-   ; queued ResetImgLoadStatus or a "normal-extra" cursor relay cannot clear the busy
-   ; flags under it - and the abort prompt itself lands here twice [the box takes the
-   ; activation, then gives it back]. Critical keeps them queued; the thread ends with it
-   ; [ResumeUnderlyingThread only pops g, see uiNativeYesNoPrompt].
-   If (runningLongOperation=1 || imageLoading=1)
-      Critical
    Sleep, -1
    MouseGetPos, ,, winu
    ; z := identifyThisWin()
@@ -2318,17 +2288,8 @@ stopGiFsPlayback() {
    If (animGIFplaying!=0)
    {
       OutputDebug, % "QPVMERGE: stopGiFsPlayback via " Exception("", -2).What
-
       lastOtherWinClose := A_TickCount
-      animGIFplaying := 0
-      MT_post("autoChangeDesiredFrame", "stop")
-      ; "normal-extra" clears runningLongOperation, imageLoading, mustAbandonCurrentOperations
-      ; and userPendingAbortOperations along with the cursor and the taskbar animation. While
-      ; a long operation runs those belong to the operation - its own end resets them through
-      ; ResetImgLoadStatus - and clearing them here shut the abort prompt's gates for the rest
-      ; of the run [a click on the viewport did nothing, the title-bar X fell through to the
-      ; exit routine]. Pre-merge this reset only the interface thread's mirrors, with the same
-      ; effect on its gates; the merge made it clear the one shared truth.
+      autoChangeDesiredFrame("stop")
       If (runningLongOperation!=1)
          uiChangeMcursor("normal-extra")
    }
@@ -2340,9 +2301,8 @@ turnOffSlideshow() {
    If (slideShowRunning!=1)
       Return
 
-   slideShowRunning := 0
    SetTimer, theSlideShowCore, Off
-   MT_post("dummyInfoToggleSlideShowu", "stop")
+   dummyInfoToggleSlideShowu("stop")
    If (slideShowCadence<950)
       SoundBeep , 900, 100
    lastOtherWinClose := A_TickCount
@@ -2359,16 +2319,6 @@ invokeGivenMenuBarPopup(n) {
       lastMenuZeit := A_TickCount
       %funcu%(n)
    }
-}
-
-uiAlphaMaskTrigger(a, b, c, d, e) {
-  AnyWindowOpen := a
-  liveDrawingBrushTool := b
-  editingSelectionNow := c
-  UserMemBMP := d
-  showMainMenuBar := e
-  thumbsDisplaying := 0
-  UpdateMenuBar()
 }
 
 BuildMenuBar(modus:=0) {
@@ -2828,4 +2778,3 @@ GetClientSize(ByRef w, ByRef h, hwnd) {
     prevH := H := NumGet(rc, 12, "int")
     lastInvoked := A_TickCount
 } 
-
