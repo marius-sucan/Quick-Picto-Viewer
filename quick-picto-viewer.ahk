@@ -48453,6 +48453,8 @@ showOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
     WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
     ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
     SetTimer, mouseTurnOFFtooltip, % -delayu
+    If (menuLoopActive=1)
+       menuReaderOSDdeadline := A_TickCount + delayu
 }
 
 adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {

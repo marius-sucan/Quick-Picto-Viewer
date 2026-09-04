@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart, menuRButtonEaten
+     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -43,7 +43,7 @@ initInterfaceModule() {
    winGDIcreated := 0, ThumbsWinGDIcreated := 0
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0, menuRButtonEaten := 0
+   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
    flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0, menuNativeTimerID2 := 0
    ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
    ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
@@ -345,6 +345,7 @@ uiMenuLoopEnter(fromPopup:=0) {
    ; wrecked the open context menu [broken/missing items on reopen].
    barMenuSession := fromPopup ? 0 : 1
    menuRButtonEaten := 0
+   menuReaderOSDdeadline := 0
    If !hLLmouseHook
    {
       Static cbLL := 0
@@ -358,6 +359,7 @@ uiMenuLoopExit() {
    menuLoopActive := 0
    barMenuSession := 0
    menuRButtonEaten := 0
+   menuReaderOSDdeadline := 0
    uiMenuReaderLastMsg := ""
    If menuNativeTimerID
    {
@@ -435,7 +437,15 @@ uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
    prevCrit := A_IsCritical
    Critical
    If (menuLoopActive=1)
+   {
       uiTryPlaceFlyout()
+      If (menuReaderOSDdeadline && A_TickCount >= menuReaderOSDdeadline)
+      {
+         menuReaderOSDdeadline := 0
+         If (mouseToolTipWinCreated=1)
+            mouseTurnOFFtooltip()
+      }
+   }
    Critical, %prevCrit%
 }
 
@@ -505,6 +515,12 @@ uiMenuMouseLL(nCode, wP, lP) {
       ; covers a session where the user clicks and then never changes the
       ; highlight [no WM_MENUSELECT] on a loop that may not dispatch timers
       uiTryPlaceFlyout()
+      If (menuReaderOSDdeadline && A_TickCount >= menuReaderOSDdeadline)
+      {
+         menuReaderOSDdeadline := 0
+         If (mouseToolTipWinCreated=1)
+            mouseTurnOFFtooltip()
+      }
       If (wP=0x20A && uiVisibleMenuWin())
       {
          delta := NumGet(lP+0, 8, "Int") >> 16
@@ -521,6 +537,7 @@ uiMenuMouseLL(nCode, wP, lP) {
          {
             mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
             showOSDinfoLineNow(1500)
+            menuReaderOSDdeadline := A_TickCount + 1500
             menuRButtonEaten := 1
             r := 1
          } Else

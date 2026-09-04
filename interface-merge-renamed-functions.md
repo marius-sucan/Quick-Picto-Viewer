@@ -253,7 +253,7 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `uiMenuLoopEnter()` | 35 | menu-session start: session type from the ENTERMENULOOP wParam, the two native TIMERPROC tickers, the WH_MOUSE_LL hook |
 | `uiMenuLoopExit()` | 31 | menu-session end: kills the tickers and the hook, arms the 350 ms flyout grace, schedules the self-healing pass |
 | `uiMenuMouseLL()` | 44 | the WH_MOUSE_LL callback active only during menus: eats wheel notches and posts the equivalent arrow keys, balanced RButton down/up re-announce with hit-testing, flyout placement |
-| `uiMenuNativeTick()` | 7 | the TIMERPROC fired by the modal loop itself (AHK timers never tick there): calls the flyout placement (`642f8ca`) |
+| `uiMenuNativeTick()` | 15 | the TIMERPROC fired by the modal loop itself (AHK timers never tick there): calls flyout placement and auto-hides the reader OSD tooltip after its deadline |
 | `uiTryPlaceFlyout()` | 48 | positions the S/T/M flyout beside the root popup, found by HMENU identity through MN_GETHMENU so a fading ghost window cannot capture it (`826986b`) |
 | `uiRefreshBarAttachments()` | 41 | self-healing pass after every menu loop: re-resolves each bar attachment by name, repairs changed handles, rebuilds the JIT map (`f6a3b99`) |
 | `uiMenuNameForBuilder()` | 12 | maps a menu-builder function name to the menu name it builds, for the attachment repair above |
