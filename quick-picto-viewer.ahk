@@ -27906,6 +27906,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     ; tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa " : ""
     combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     lastFilterEditSearch := ""
+    hideMenuFlyoutNow()
     If (thumbsDisplaying=1 && isImgLiveEditor=1)
     {
        openingPanelNow := 0
@@ -65405,6 +65406,7 @@ closeDocuments() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
+   hideMenuFlyoutNow()
    If (animGIFplaying=1)
    {
       DestroyGIFuWin()
@@ -70813,6 +70815,7 @@ OpenRecentImage(menuItem) {
 OpenRecentEntry(menuItem, modus:=0) {
   testOs := SubStr(menuItem, 1, 3)
   initQPVmainDLL()
+  hideMenuFlyoutNow()
   If askAboutFileSave(" and another image will be loaded")
      Return
 
@@ -70881,6 +70884,7 @@ OpenRecentEntry(menuItem, modus:=0) {
 
 OpenFavesEntry(menuItem) {
   testOs := menuItem
+  hideMenuFlyoutNow()
   openThisu := SubStr(testOs, 2, InStr(testOs, ". ")-2)
   If (InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") && maxFilesIndex>500)
   {
