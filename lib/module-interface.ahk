@@ -2208,11 +2208,10 @@ guiCreateMenuFlyout() {
    wasMenuFlierCreated := 1
 }
 
-menuFlyoutDisplay(actu, mX, mY, isOkay, darkMode:=0, thisHwnd:=0, idu:=0) {
+menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0) {
    Critical, on
    lastOtherWinClose := A_TickCount
    lastContextMenuZeit := A_TickCount
-   uiUseDarkMode := (darkMode="yes") ? 1 : 0
    ; [phase D fix] «allowMenuReader := actu» is GONE: setWinCloseZeit posts a "no"
    ; after every menu-item selection, and pre-merge the next programmatic menu
    ; open re-armed the flag - native bar opens never do, so choosing any item

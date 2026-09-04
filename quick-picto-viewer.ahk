@@ -1,4 +1,4 @@
-; Script details:
+﻿; Script details:
 ;   Name:     Quick Picto Viewer
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
@@ -398,8 +398,8 @@ EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
 If (realSystemCores>6)
    realSystemCores := 6
-; a worker of the multi-threaded batches announces itself on its command line, see
-; launchExternalCoreThread()
+
+; a worker of the multi-threaded batches announces itself on its command line, see launchExternalCoreThread()
 coreThreadArg1 := ""
 coreArg := A_Args[1] ? A_Args[1] : 1
 If (!RegExMatch(coreArg, "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg) && A_Args.Length())
@@ -412,15 +412,6 @@ If (!RegExMatch(coreArg, "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg) && A_Ar
 }
 If coreThreadArg1
 {
-   initCompiled(A_IsCompiled)
-   GDIPToken := Gdip_Startup()
-   thisGDIPversion := Gdip_LibrarySubVersion()
-   If (!GDIPToken || thisGDIPversion<1.97)
-   {
-      hasInitSpecialMode := 1
-      ForceExitNow()
-      ExitApp
-   }
    initExternalCoreMode(coreThreadArg1)
    Return
 }
@@ -482,7 +473,7 @@ IF_post(funcName, args*) {
 ; queued execution, like the old cross-interpreter post: the target runs from a
 ; one-shot timer when this thread next pumps messages, never inline
    fn := Func("IF_postRelay").Bind(funcName, args)
-   SetTimer, % fn, -1
+   SetTimer, % fn, -5
 }
 
 IF_postRelay(funcName, args) {
@@ -33319,7 +33310,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
        Return
 
     msgBoxed := 1
-    setWinCloseZeit()
+    hideMenuFlyoutNow()
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
        IF_post("setTaskbarIconState", iconz)
 
@@ -33384,7 +33375,6 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
        IF_post("setTaskbarIconState", "normal")
 
-    ; SetTimer, setWinCloseZeit, -200, 900
     msgBoxed := 0
     Return (checkBoxuCaption || dropListu || edithu || 2ndDropListu) ? zr : r
 }
@@ -34376,7 +34366,7 @@ deleteSQLdbEntry(fullPath, dbIndex) {
 }
 
 openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIndex:="", chooseFilterIndex:=1, defaultEditField:="") {
-   setWinCloseZeit()
+   hideMenuFlyoutNow()
    thisHwnd := (AnyWindowOpen) ? hSetWinGui : PVhwnd
    ; If (p_type="o")
    ;    pattern .= "|All files (*.*)"
@@ -34419,7 +34409,7 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
       r := ""
 
    SetWorkingDir, % mainCompiledPath
-   SetTimer, setWinCloseZeit, -150, 900
+   SetTimer, hideMenuFlyoutNow, -150, 900
    lastLongOperationAbort := A_TickCount
    Return r
 }
@@ -37829,6 +37819,7 @@ spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
   Loop, % systemCores
   {
+      Sleep, 10
       If !prepareExternalCoreThread(A_Index, argsToGive, filesListu[A_Index])
       {
          addJournalEntry("Execution thread " A_Index " of " systemCores ": failed to write its files list.")
@@ -37839,6 +37830,7 @@ spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
 
   Loop, % systemCores
   {
+      Sleep, 10
       pidsArray[A_Index] := launchExternalCoreThread(A_Index)
       If (StrLen(pidsArray[A_Index])<2)
       {
@@ -37892,6 +37884,7 @@ stopExternalCoreThreads(pidsArray, graceMs, reason:="") {
   closedThreads := 0
   For slotu, pidu in pidsArray
   {
+      Sleep, 1
       If (StrLen(pidu)>1 && testProcessExists(pidu)=1)
       {
          Process, Close, % pidu
@@ -37920,6 +37913,7 @@ scanExternalCoreThreads(pidsArray, spawnZeit, ByRef jobsRunning, ByRef jobDone, 
   jobsRunning := jobDone := threadsCrashed := 0
   Loop, % systemCores
   {
+     Sleep, 1
      thisThreadStatus := 1
      RegRead, thisThreadStatus, %QPVregEntry%\multicore, ThreadRunning%A_Index%
      isPIDalive := (A_TickCount - spawnZeit > 2500) ? testProcessExists(pidsArray[A_Index]) : 1
@@ -37941,6 +37935,7 @@ countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
   leftoverFiles := 0
   Loop, % systemCores
   {
+     Sleep, 1
      slotu := A_Index
      givenFiles := 0
      thisList := filesListu[slotu]
@@ -37972,6 +37967,7 @@ sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef fail
   processedFiles := failedFiles := theseFailures := skippedFiles := 0
   Loop, % systemCores
   {
+     Sleep, 1
      RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%A_Index%
      filesStatusArr := StrSplit(filesStatus, "/")
      If (filesStatusArr[1]>0)
@@ -53975,14 +53971,14 @@ PanelIMGselProperties() {
     ; Gui, Add, Text, x+3 wp h1 Hide, Rotation
     ; Gui, Add, ComboBox, xp yp wp limit9 -multi -wrap gupdateUIselPropPanel vNewVProt, 0|45|90|105|135|150|180|200|225|250|270|300|315|%VPselRotation%||
     Gui, Add, Text, xs y+10, Adjust current selection coordinates:
-    Gui, Add, Button, xs+15 y+7 w%btnWid2% gOffsetSelProperPanel vbtnFldr6, &Align
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gOffsetSelProperPanel vBtnPosX1m, X1
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gOffsetSelProperPanel vBtnPosY1m, Y1
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gOffsetSelProperPanel vBtnPosX2m, X2
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gOffsetSelProperPanel vBtnPosY2m, Y2
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gOffsetSelProperPanel vBtnPosXm, V
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gOffsetSelProperPanel vBtnPosYm, H
-    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp+10 gOffsetSelProperPanel vBtnPosZm, Size
+    Gui, Add, Button, xs+15 y+7 w%btnWid2% gUIoffsetSelProperPanel vbtnFldr6, &Align
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosX1m, X1
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosY1m, Y1
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosX2m, X2
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosY2m, Y2
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosXm, V
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp gUIoffsetSelProperPanel vBtnPosYm, H
+    Gui, Add, Text, Border +TabStop Center +0x200 x+3 hp wp+10 gUIoffsetSelProperPanel vBtnPosZm, Size
     slideWid := (PrefsLargeFonts=1) ? 215 : 150
     userUIshapeCavity := Round((innerSelectionCavityX + innerSelectionCavityY) / 2 * 400)
     GuiAddSlider("userUIshapeCavity", 0,400, 0, "Cavity", "updateFillInnerCavity", 1, "xs y+7 w" slideWid " hp")
@@ -54095,11 +54091,11 @@ BTNselectNoneImg() {
    dummyTimerDelayiedImageDisplay(50)
 }
 
-dummyOffsetSelProperPanel() {
+dummyUIoffsetSelProperPanel() {
     If (determineLClickState()=1)
     {
-       SetTimer, dummyOffsetSelProperPanel, -25
-       OffsetSelProperPanel("usePrev")
+       SetTimer, dummyUIoffsetSelProperPanel, -25
+       UIoffsetSelProperPanel("usePrev")
     }
 }
 
@@ -54125,7 +54121,7 @@ updateUIselEditsPropPanel() {
    }
 }
 
-OffsetSelProperPanel(dummy:=0) {
+UIoffsetSelProperPanel(dummy:=0) {
    Static prevVaru, lastInvoked := 1
    If (AnyWindowOpen!=34)
       Return
@@ -54180,9 +54176,9 @@ OffsetSelProperPanel(dummy:=0) {
    }
 
    cX := 0, cY := 0
-   GetPhysicalCursorPos(oX, oY)
    whileLoopExec := 1
-   ToolTip, Move up/down relative to this point on screen to adjust %varu%
+   GetPhysicalCursorPos(oX, oY)
+   ToolTip, Move the mouse cursor to adjust value(s) while holding L-Click
    While, (determineLClickState()=1 || A_Index=1)
    {
       GetPhysicalCursorPos(mX, mY)
@@ -54227,7 +54223,7 @@ OffsetSelProperPanel(dummy:=0) {
    prevVaru := varu
    SetTimer, updateUIselEditsPropPanel, -150
    If !givenStep
-      SetTimer, dummyOffsetSelProperPanel, -250
+      SetTimer, dummyUIoffsetSelProperPanel, -250
 }
 
 updateUIchangeSelectionType() {
@@ -54291,9 +54287,6 @@ updateUIselPropPanel() {
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    actuA := (userDefinedSelCoords=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    INIaction(1, "LimitSelectBoundsImg", "General")
-   ; If (userDefinedSelCoords=1)
-   ;    lockSelectionAspectRatio := 0
-
    If (lockSelectionAspectRatio>1)
    {
       GuiControl, SettingsGUIA: Disable, BtnPosX1m
@@ -54355,10 +54348,6 @@ updateUIselPropPanel() {
       }
    }
 
-   ; If !IsNumber(NewVProt)
-   ;    NewVProt := 0
-
-   ; VPselRotation := clampInRange(Round(NewVProt), 0, 360, 1)
    dummyTimerDelayiedImageDisplay(50)
    Return
 }
@@ -63124,7 +63113,7 @@ OpenFolders(dummy:="") {
 
 openFoldersDialogWrapper(startPath, msg:="") {
    Static defaultu := "<Use current folder>"
-   setWinCloseZeit()
+   hideMenuFlyoutNow()
    thisHwnd := (AnyWindowOpen>0) ? hSetWinGui : PVhwnd
    entriesList := defaultu "`n" recentOpenedFolders()
    r := SelectFolderEx(startPath, msg, thisHwnd, nullLabel, entriesList, 1, "History", entriesList)
@@ -63133,7 +63122,7 @@ openFoldersDialogWrapper(startPath, msg:="") {
    Else If (StrLen(r.SelectedDir)>1)
       z := r.SelectedDir
 
-   SetTimer, setWinCloseZeit, -150, 900
+   SetTimer, hideMenuFlyoutNow, -150, 900
    lastLongOperationAbort := A_TickCount
    Return z
 }
@@ -69967,7 +69956,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
      ; ToolTip, % items "==" prevItems "|" menarg "==" prevMenu, , , 2
    } Else
    {
-      SetTimer, setWinCloseZeit, Off
+      SetTimer, hideMenuFlyoutNow, Off
       hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
       If !hMenuBar
          addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
@@ -69992,29 +69981,23 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    globalMenuOptions := 0
    okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
    idu := (manubarMode=1) ? klop[2] : "reset"
-   darkMode := (uiUseDarkMode=1) ? "yes" : "no"
-   menuFlyoutDisplay("yes", mX, mY, okay, darkMode, A_ScriptHwnd, idu)
-   Sleep, 0
+   menuFlyoutDisplay("yes", mX, mY, okay, idu)
+   Sleep, 1
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
    Global lastMenuZeit := A_TickCount
    Menu, % menarg, Show, % mX, % mY
    Global lastMenuZeit := A_TickCount
    ; showDelayedTooltip("Menu item selected:`n" A_ThisMenuItem " [" A_ThisMenu "]")
-
    isFakeWin := (isNowFakeWinOpen=1 && AnyWindowOpen>0) ? 1 : 0
-   ; If (isFakeWin=0)
-      ; SetTimer, setWinCloseZeit, -185, 900
-   setWinCloseZeit()
+   hideMenuFlyoutNow()
    If (manubarMode!=1)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
    Global lastWinDrag := A_TickCount
    Global lastOtherWinClose := A_TickCount + 100
 }
 
-setWinCloseZeit() {
-   darkMode := (uiUseDarkMode=1) ? "yes" : "no"
-   IF_post("menuFlyoutDisplay", "no", 1, 1, 0, darkMode, A_ScriptHwnd, "reset")
-   ; doSuspendu(0)
+hideMenuFlyoutNow() {
+   IF_post("menuFlyoutDisplay", "no", 1, 1, 0, "reset")
 }
 
 deleteMenus() {
@@ -100189,7 +100172,7 @@ prepareExternalCoreThread(thisIndex, args, thisList) {
       FileCreateDir, % thumbsCacheFolder
    Try FileDelete, %thumbsCacheFolder%\tempList%thisIndex%.txt
    Try FileDelete, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt
-   Sleep, 0
+   Sleep, 1
    Try FileAppend, % thisList, %thumbsCacheFolder%\tempFilesList%thisIndex%.txt, utf-16
    Catch wasErrorA
          Sleep, 1
@@ -100210,9 +100193,10 @@ launchExternalCoreThread(thisIndex) {
    pidThread := 0
    exeToUse := A_IsCompiled ? (fullPath2exe ? fullPath2exe : A_ScriptFullPath) : (A_AhkPath ? A_AhkPath : fullPath2exe)
    thisCmd := A_IsCompiled ? (Chr(34) exeToUse Chr(34)) : (Chr(34) exeToUse Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34))
+   Sleep, 1
    Try Run, % thisCmd " qpv-core-thread=" thisIndex,,, pidThread
    Catch wasErrorB
-       Sleep, 0
+       Sleep, 1
 
    OutputDebug, % "QPVMERGE: launch worker " thisIndex ": cmd=" thisCmd " pid=" pidThread " err=" wasErrorB
    If (wasErrorB || !pidThread)
@@ -100230,6 +100214,7 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
        pending := firstPending := 0
        Loop, % systemCores
        {
+           Sleep, 10
            RegRead, thisThreadStarted, %QPVregEntry%\multicore, ThreadRunning%A_Index%
            If (thisThreadStarted=1 || thisThreadStarted=2)
               Continue
@@ -100262,69 +100247,79 @@ cleanupExternalCoreThreadsFiles() {
    {
       Try FileDelete, %thumbsCacheFolder%\tempFilesList%A_Index%.txt
       Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
+      Sleep, 1
    }
 }
 
 initExternalCoreMode(coreThread) {
-  Critical, on
-  hasInitSpecialMode := 1
-  OutputDebug, % "QPVMERGE: initExternalCoreMode entered for worker " coreThread " (pid=" DllCall("GetCurrentProcessId") ")"
-  RegRead, mainThreadHwnd, %QPVregEntry%\multicore, mainThreadHwnd
-  If (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd))
-  {
-     OutputDebug, % "QPVMERGE: main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread
-     fatalError := 1
-  }
+   Critical, on
+   hasInitSpecialMode := 1
+   initCompiled(A_IsCompiled)
+   GDIPToken := Gdip_Startup()
+   thisGDIPversion := Gdip_LibrarySubVersion()
+   If (!GDIPToken || thisGDIPversion<1.97)
+   {
+      OutputDebug, % "QPVMERGE: failed to init GDIP for worker " coreThread
+      fatalError := 1
+   }
 
-  RegRead, threadParams, %QPVregEntry%\multicore, threadParams%coreThread%
-  If !threadParams
-  {
-     OutputDebug, % "QPVMERGE: empty threadParams for worker " coreThread
-     fatalError := 1
-  }
-
-  args := StrSplit(threadParams, "||")
-  If (args[1]!=coreThread)
-  {
-     OutputDebug, % "QPVMERGE: threadParams mismatch for worker " coreThread ": " threadParams
-     fatalError := 1
-  }
-
-  Try FileRead, filesList, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
-  Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
-  If !filesList
-  {
-     OutputDebug, % "QPVMERGE: filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)"
-     fatalError := 1
-  }
-
-  If (fatalError=1)
-  {
-     OutputDebug, % "QPVMERGE: fatalError=1 in initExternalCoreMode for worker " coreThread
-     RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, -1
-     ForceExitNow()
-     Return
-  }
-
-  RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
-  OutputDebug, % "QPVMERGE: worker " coreThread " set ThreadRunning=1, job=" args[2]
-  ; this thread is critical, so the watchdog only gets to run while a modal dialog - an
-  ; AHK runtime error, a library fault - is up: the one situation in which the per-file
-  ; abort check of the loops below cannot run, and the main thread would otherwise have
-  ; to close the process from outside
-  initFIMGmodule()
-  SetTimer, watchExternalCoreAbort, 750
-  RegRead, hGDIwin, %QPVregEntry%\multicore, mainWindowID
-  If (args[2]="batch-jpegll")
-     multiCoreThreadJpegLL(args[1], args[3], filesList)
-  Else If (args[2]="batch-simpleimgproc")
-     multiCoreThreadSimpleImgProcessing(args[1], args[3], filesList)
-  Else If (args[2]="batch-fmtconv")
-     multiCoreThreadFormatConvert(args[1], filesList)
-
-  OutputDebug, % "QPVMERGE: worker " coreThread " completed work, exiting"
-  ForceExitNow()
-  Return
+   OutputDebug, % "QPVMERGE: initExternalCoreMode entered for worker " coreThread " (pid=" DllCall("GetCurrentProcessId") ")"
+   RegRead, mainThreadHwnd, %QPVregEntry%\multicore, mainThreadHwnd
+   If (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd))
+   {
+      OutputDebug, % "QPVMERGE: main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread
+      fatalError := 1
+   }
+ 
+   RegRead, threadParams, %QPVregEntry%\multicore, threadParams%coreThread%
+   If !threadParams
+   {
+      OutputDebug, % "QPVMERGE: empty threadParams for worker " coreThread
+      fatalError := 1
+   }
+ 
+   args := StrSplit(threadParams, "||")
+   If (args[1]!=coreThread)
+   {
+      OutputDebug, % "QPVMERGE: threadParams mismatch for worker " coreThread ": " threadParams
+      fatalError := 1
+   }
+ 
+   Try FileRead, filesList, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
+   Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
+   If !filesList
+   {
+      OutputDebug, % "QPVMERGE: filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)"
+      fatalError := 1
+   }
+ 
+   If (fatalError=1)
+   {
+      OutputDebug, % "QPVMERGE: fatalError=1 in initExternalCoreMode for worker " coreThread
+      RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, -1
+      ForceExitNow()
+      Return
+   }
+ 
+   RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
+   OutputDebug, % "QPVMERGE: worker " coreThread " set ThreadRunning=1, job=" args[2]
+   ; this thread is critical, so the watchdog only gets to run while a modal dialog - an
+   ; AHK runtime error, a library fault - is up: the one situation in which the per-file
+   ; abort check of the loops below cannot run, and the main thread would otherwise have
+   ; to close the process from outside
+   initFIMGmodule()
+   SetTimer, watchExternalCoreAbort, 750
+   RegRead, hGDIwin, %QPVregEntry%\multicore, mainWindowID
+   If (args[2]="batch-jpegll")
+      multiCoreThreadJpegLL(args[1], args[3], filesList)
+   Else If (args[2]="batch-simpleimgproc")
+      multiCoreThreadSimpleImgProcessing(args[1], args[3], filesList)
+   Else If (args[2]="batch-fmtconv")
+      multiCoreThreadFormatConvert(args[1], filesList)
+ 
+   OutputDebug, % "QPVMERGE: worker " coreThread " completed work, exiting"
+   ForceExitNow()
+   Return
 }
 
 watchExternalCoreAbort() {
