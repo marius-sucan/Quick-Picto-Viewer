@@ -93,7 +93,7 @@ initInterfaceModule() {
    If !cbCWP
       cbCWP := RegisterCallback("uiCallWndProc", "F")
    If !hCWPhook
-      hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "Ptr", cbCWP, "Ptr", 0, "UInt", DllCall("GetCurrentThreadId"), "Ptr")
+      hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "UPtr", cbCWP, "UPtr", 0, "UInt", DllCall("GetCurrentThreadId"), "UPtr")
 
    ; numbers both sides monitored - composed dispatchers [see below]
    OnMessage(0x100, "dispatchKeyDown")
@@ -210,7 +210,7 @@ uiCallWndProc(nCode, wP, lP) {
    {
       msg := NumGet(lP+0, 2*A_PtrSize, "UInt")
       If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
-         uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "Ptr"))
+         uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"))
       Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
       {
          hMinit := NumGet(lP+0, A_PtrSize, "UPtr")
@@ -246,7 +246,7 @@ uiCallWndProc(nCode, wP, lP) {
       Else If (msg=0x212) ; WM_EXITMENULOOP
          uiMenuLoopExit()
    }
-   r := DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+   r := DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
    Critical, %prevCrit%
    Return r
 }
@@ -293,9 +293,9 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
       Return
    VarSetCapacity(bufu, 520, 0)
    If (flags & 0x10)  ; MF_POPUP: the loword is the item POSITION
-      DllCall("user32\GetMenuStringW", "Ptr", hMenuSel, "UInt", item, "Ptr", &bufu, "Int", 255, "UInt", 0x400)
+      DllCall("user32\GetMenuStringW", "UPtr", hMenuSel, "UInt", item, "UPtr", &bufu, "Int", 255, "UInt", 0x400)
    Else               ; otherwise the loword is the command id
-      DllCall("user32\GetMenuStringW", "Ptr", hMenuSel, "UInt", item, "Ptr", &bufu, "Int", 255, "UInt", 0x000)
+      DllCall("user32\GetMenuStringW", "UPtr", hMenuSel, "UInt", item, "UPtr", &bufu, "Int", 255, "UInt", 0x000)
    txt := StrGet(&bufu, "UTF-16")
    If !StrLen(txt)
       Return
@@ -334,13 +334,13 @@ uiMenuLoopEnter(fromPopup:=0) {
    ; INITMENUPOPUP [which raises it] can precede ENTERMENULOOP - a reset here wiped
    ; the flag and the bar flyout never showed; the ticker consumes the flag itself
    If !menuNativeTimerID
-      menuNativeTimerID := DllCall("user32\SetTimer", "Ptr", 0, "UPtr", 0, "UInt", 90, "Ptr", cbTick, "UPtr")
+      menuNativeTimerID := DllCall("user32\SetTimer", "UPtr", 0, "UPtr", 0, "UInt", 90, "UPtr", cbTick, "UPtr")
    ; belt: a second, WINDOW-bound native timer. A NULL-hwnd timer is a thread
    ; message; if the menu-BAR tracking loop retrieves only window messages it
    ; never dispatches the first one - the PVwin-bound WM_TIMER is dispatched by
    ; any GetMessage the loop runs, and DispatchMessage calls the TIMERPROC
    If !menuNativeTimerID2
-      menuNativeTimerID2 := DllCall("user32\SetTimer", "Ptr", PVhwnd, "UPtr", 0xF17E, "UInt", 90, "Ptr", cbTick, "UPtr")
+      menuNativeTimerID2 := DllCall("user32\SetTimer", "UPtr", PVhwnd, "UPtr", 0xF17E, "UInt", 90, "UPtr", cbTick, "UPtr")
    ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
    ; [Menu, Show popups] attach the same shared submenus [PVview, PVnav, PVslide...]
    ; but pre-build everything before showing; letting the hook rebuild them
@@ -354,7 +354,7 @@ uiMenuLoopEnter(fromPopup:=0) {
       Static cbLL := 0
       If !cbLL
          cbLL := RegisterCallback("uiMenuMouseLL", "F")
-      hLLmouseHook := DllCall("SetWindowsHookEx", "Int", 14, "Ptr", cbLL, "Ptr", DllCall("GetModuleHandle", "Ptr", 0, "Ptr"), "UInt", 0, "Ptr")
+      hLLmouseHook := DllCall("SetWindowsHookEx", "Int", 14, "UPtr", cbLL, "UPtr", DllCall("GetModuleHandle", "UPtr", 0, "UPtr"), "UInt", 0, "UPtr")
    }
 }
 
@@ -366,12 +366,12 @@ uiMenuLoopExit() {
    uiMenuReaderLastMsg := ""
    If menuNativeTimerID
    {
-      DllCall("user32\KillTimer", "Ptr", 0, "UPtr", menuNativeTimerID)
+      DllCall("user32\KillTimer", "UPtr", 0, "UPtr", menuNativeTimerID)
       menuNativeTimerID := 0
    }
    If menuNativeTimerID2
    {
-      DllCall("user32\KillTimer", "Ptr", PVhwnd, "UPtr", 0xF17E)
+      DllCall("user32\KillTimer", "UPtr", PVhwnd, "UPtr", 0xF17E)
       menuNativeTimerID2 := 0
    }
    If (menusflyOutVisible=1)
@@ -383,7 +383,7 @@ uiMenuLoopExit() {
    }
    If hLLmouseHook
    {
-      DllCall("user32\UnhookWindowsHookEx", "Ptr", hLLmouseHook)
+      DllCall("user32\UnhookWindowsHookEx", "UPtr", hLLmouseHook)
       hLLmouseHook := 0
    }
    If (allowMenuReader="yes")
@@ -478,7 +478,7 @@ uiTryPlaceFlyout() {
          w := menuWins%A_Index%
          If !DllCall("user32\IsWindowVisible", "UPtr", w)
             Continue
-         hm := DllCall("user32\SendMessageW", "Ptr", w, "UInt", 0x01E1, "Ptr", 0, "Ptr", 0, "UPtr") ; MN_GETHMENU
+         hm := DllCall("user32\SendMessageW", "UPtr", w, "UInt", 0x01E1, "UPtr", 0, "UPtr", 0, "UPtr") ; MN_GETHMENU
          If (hm = flyoutAnchorMenu)
          {
             a := w
@@ -528,9 +528,9 @@ uiMenuMouseLL(nCode, wP, lP) {
       {
          delta := NumGet(lP+0, 8, "Int") >> 16
          vk := (delta > 0) ? 0x26 : 0x28
-         DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
-         DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
-         DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
+         DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x100, "UPtr", vk, "UPtr", 1)
+         DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x100, "UPtr", vk, "UPtr", 1)
+         DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x100, "UPtr", vk, "UPtr", 1)
          r := 1
       } Else If (wP=0x204)
       {
@@ -555,7 +555,7 @@ uiMenuMouseLL(nCode, wP, lP) {
       }
    }
    If (r="")
-      r := DllCall("user32\CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wP, "Ptr", lP, "Ptr")
+      r := DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
    Critical, %prevCrit%
    Return r
 }
@@ -590,16 +590,16 @@ drainUIinput() {
    prevCrit := A_IsCritical
    Loop, 40  ; hard cap per checkpoint, so an input flood cannot stall the operation
    {
-      If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x100, "UInt", 0x108, "UInt", 1) ; PM_REMOVE
+      If !DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x100, "UInt", 0x108, "UInt", 1) ; PM_REMOVE
       {
-         If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x200, "UInt", 0x20E, "UInt", 1)
+         If !DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x200, "UInt", 0x20E, "UInt", 1)
             Break
       }
       dcount++
       mhwnd := NumGet(msgu, 0, "UPtr")
       mnum := NumGet(msgu, A_PtrSize, "UInt")
       mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
-      mlp := NumGet(msgu, 3*A_PtrSize, "Ptr")
+      mlp := NumGet(msgu, 3*A_PtrSize, "UPtr")
       If (mnum=0x100 || mnum=0x104)
       {
          gotKeyDown := 1
@@ -625,23 +625,23 @@ drainUIinput() {
    ; the title-bar close button, which the old interface thread answered live: a
    ; queued non-client click on the X becomes the same escalating close routine;
    ; other non-client input stays queued untouched
-   If DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 0)  ; WM_NCLBUTTONDOWN, peek only
+   If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 0)  ; WM_NCLBUTTONDOWN, peek only
    {
       If (NumGet(msgu, 2*A_PtrSize, "UPtr") = 20)  ; HTCLOSE
       {
-         DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 1)
+         DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 1)
          preByeRoutine()
       }
    }
-   If DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 0)  ; WM_SYSCOMMAND, peek only
+   If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 0)  ; WM_SYSCOMMAND, peek only
    {
       If ((NumGet(msgu, 2*A_PtrSize, "UPtr") & 0xFFF0) = 0xF060)  ; SC_CLOSE
       {
-         DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 1)
+         DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 1)
          preByeRoutine()
       }
    }
-   If DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x0010, "UInt", 0x0010, "UInt", 1)  ; WM_CLOSE, remove
+   If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0010, "UInt", 0x0010, "UInt", 1)  ; WM_CLOSE, remove
       preByeRoutine()
    ; the keyboard handler defers its work to a 3ms timer that cannot fire while
    ; the caller holds Critical - run it now, then disarm the pending timer.
@@ -684,15 +684,15 @@ pumpPenMessages() {
    VarSetCapacity(msgu, 48, 0)
    Loop, 20
    {
-      If !DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", 0, "UInt", 0x0245, "UInt", 0x024A, "UInt", 1)
+      If !DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", 0, "UInt", 0x0245, "UInt", 0x024A, "UInt", 1)
          Break
       mhwnd := NumGet(msgu, 0, "UPtr")
       mnum := NumGet(msgu, A_PtrSize, "UInt")
       mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
-      mlp := NumGet(msgu, 3*A_PtrSize, "Ptr")
+      mlp := NumGet(msgu, 3*A_PtrSize, "UPtr")
       readPenPointerMsg(mwp, mnum)
       If mhwnd
-         DllCall("user32\DefWindowProcW", "Ptr", mhwnd, "UInt", mnum, "Ptr", mwp, "Ptr", mlp, "Ptr")
+         DllCall("user32\DefWindowProcW", "UPtr", mhwnd, "UInt", mnum, "UPtr", mwp, "UPtr", mlp, "UPtr")
    }
 }
 
@@ -1478,7 +1478,7 @@ uiNativeYesNoPrompt(msg) {
    Critical
    WinSet, Enable,, ahk_id %PVhwnd%
    ; MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND - the flags AHK's MsgBox used here
-   r := DllCall("user32\MessageBoxW", "Ptr", PVhwnd, "WStr", msg, "WStr", appTitle, "UInt", 0x10024, "Int")
+   r := DllCall("user32\MessageBoxW", "UPtr", PVhwnd, "WStr", msg, "WStr", appTitle, "UInt", 0x10024, "Int")
    If (prevCrit)
       Critical, %prevCrit%
    ; else: deliberately left ON, breaking the save/restore idiom of the "F" callbacks
@@ -1656,7 +1656,7 @@ theSlideShowCore(paramu:=0) {
 
   mouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
-  Try DllCall("user32\SetCursor", "Ptr", 0)
+  Try DllCall("user32\SetCursor", "UPtr", 0)
   If (slideShowRunning=1 && slidesFXrandomize=1)
      VPimgFXrandomizer()
 
@@ -1804,11 +1804,11 @@ WM_WINDOWPOSCHANGED(wP:=0, lP:=0, msg:=0, hwnd:=0) {
 }
 
 uiChangeMcursor(whichCursor) {
-   Static hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
-        , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "Ptr")  ; IDC_ARROW
-        , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "Ptr")  ; IDC_Hand
-        , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "Ptr")  ; IDC_Cross
-        , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "Ptr")
+   Static hCursBusy := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32514, "UPtr")  ; IDC_WAIT
+        , hCursN := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32512, "UPtr")  ; IDC_ARROW
+        , hCursMove := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32646, "UPtr")  ; IDC_Hand
+        , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "UPtr")  ; IDC_Cross
+        , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "UPtr")
 
   If (slideShowRunning=1 || animGIFplaying=1)
      Return
@@ -1896,7 +1896,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
   isSamePos := (isInRange(mX, prevArrayPos[1] + 3, prevArrayPos[1] - 3) && isInRange(mY, prevArrayPos[2] + 3, prevArrayPos[2] - 3)) ? 1 : 0
   thisWin := isVarEqualTo(hwnd, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin) ? 1 : 0
   If (slideShowRunning=1 && isSamePos=1)
-     Try DllCall("user32\SetCursor", "Ptr", 0)
+     Try DllCall("user32\SetCursor", "UPtr", 0)
   Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1)
      uiChangeMcursor("cross")
   Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
@@ -1937,7 +1937,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
         If (InStr(classu, "tooltips") && HTT!=darked)
         {
            darked := HTT
-           DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
+           DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "Uptr", 0)
         }
         ; ToolTip, % "p=" classu "`n" xu "|" yu "`n" xu2 "|" yu2 , , , 2
      } 
@@ -2630,7 +2630,7 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     {
        If InStr(menuHotkeys, "!" Chr(wParam + 32) "|")
        {
-          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x0112, "Ptr", 0xF100, "Ptr", wParam + 32)
+          DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", wParam + 32)
           Return 0
        }
     }
@@ -2643,7 +2643,7 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
        ; opening anything after the merge and was deleted; Win_ShowSysMenu in
        ; shell-stuff.ahk stays as the library helper for a programmatic sys menu.
        OutputDebug, % "QPVMERGE: Alt+Space -> native SC_KEYMENU sysmenu post"
-       DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x0112, "Ptr", 0xF100, "Ptr", 0x20)
+       DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", 0x20)
        Return 0
     }
     vk_code := Format("{1:x}", wParam)
