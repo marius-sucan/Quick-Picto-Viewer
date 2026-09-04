@@ -27903,10 +27903,8 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     Critical, on
-    ; tabzDarkModus := (uiUseDarkMode=1) ? "-Border +Buttons cFFFFaa " : ""
     combosDarkModus := (uiUseDarkMode=1) ? "-theme -border " : ""
     lastFilterEditSearch := ""
-    hideMenuFlyoutNow()
     If (thumbsDisplaying=1 && isImgLiveEditor=1)
     {
        openingPanelNow := 0
@@ -33310,9 +33308,8 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
        Return
 
     msgBoxed := 1
-    hideMenuFlyoutNow()
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
-       IF_post("setTaskbarIconState", iconz)
+       setTaskbarIconState(iconz)
 
     panelMode := 0
     fontSize := (PrefsLargeFonts=1) ? LargeUIfontValue : 0
@@ -34366,7 +34363,6 @@ deleteSQLdbEntry(fullPath, dbIndex) {
 }
 
 openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIndex:="", chooseFilterIndex:=1, defaultEditField:="") {
-   hideMenuFlyoutNow()
    thisHwnd := (AnyWindowOpen) ? hSetWinGui : PVhwnd
    ; If (p_type="o")
    ;    pattern .= "|All files (*.*)"
@@ -34408,7 +34404,6 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
    If (StrLen(r)<3)
       r := ""
 
-   hideMenuFlyoutNow()
    SetWorkingDir, % mainCompiledPath
    lastLongOperationAbort := A_TickCount
    Return r
@@ -63115,7 +63110,6 @@ OpenFolders(dummy:="") {
 
 openFoldersDialogWrapper(startPath, msg:="") {
    Static defaultu := "<Use current folder>"
-   hideMenuFlyoutNow()
    thisHwnd := (AnyWindowOpen>0) ? hSetWinGui : PVhwnd
    entriesList := defaultu "`n" recentOpenedFolders()
    r := SelectFolderEx(startPath, msg, thisHwnd, nullLabel, entriesList, 1, "History", entriesList)
@@ -63124,7 +63118,6 @@ openFoldersDialogWrapper(startPath, msg:="") {
    Else If (StrLen(r.SelectedDir)>1)
       z := r.SelectedDir
 
-   hideMenuFlyoutNow()
    lastLongOperationAbort := A_TickCount
    Return z
 }
@@ -65406,7 +65399,6 @@ closeDocuments() {
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
-   hideMenuFlyoutNow()
    If (animGIFplaying=1)
    {
       DestroyGIFuWin()
@@ -69959,7 +69951,6 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
      ; ToolTip, % items "==" prevItems "|" menarg "==" prevMenu, , , 2
    } Else
    {
-      SetTimer, hideMenuFlyoutNow, Off
       hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
       If !hMenuBar
          addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
@@ -69992,7 +69983,11 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    Global lastMenuZeit := A_TickCount
    ; showDelayedTooltip("Menu item selected:`n" A_ThisMenuItem " [" A_ThisMenu "]")
    isFakeWin := (isNowFakeWinOpen=1 && AnyWindowOpen>0) ? 1 : 0
-   SetTimer, hideMenuFlyOut, -350
+   MouseGetPos,,, OutputVarWin
+   If (OutputVarWin!=hFlyOut)
+      hideMenuFlyoutNow()
+   Else
+      SetTimer, hideMenuFlyOut, -350
    If (manubarMode!=1)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
    Global lastWinDrag := A_TickCount
@@ -70815,7 +70810,6 @@ OpenRecentImage(menuItem) {
 OpenRecentEntry(menuItem, modus:=0) {
   testOs := SubStr(menuItem, 1, 3)
   initQPVmainDLL()
-  hideMenuFlyoutNow()
   If askAboutFileSave(" and another image will be loaded")
      Return
 
@@ -70884,7 +70878,6 @@ OpenRecentEntry(menuItem, modus:=0) {
 
 OpenFavesEntry(menuItem) {
   testOs := menuItem
-  hideMenuFlyoutNow()
   openThisu := SubStr(testOs, 2, InStr(testOs, ". ")-2)
   If (InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") && maxFilesIndex>500)
   {
