@@ -69955,6 +69955,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
      ; ToolTip, % items "==" prevItems "|" menarg "==" prevMenu, , , 2
    } Else
    {
+      SetTimer, hideMenuFlyoutNow, Off
       hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
       If !hMenuBar
          addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
@@ -69987,7 +69988,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    Global lastMenuZeit := A_TickCount
    ; showDelayedTooltip("Menu item selected:`n" A_ThisMenuItem " [" A_ThisMenu "]")
    isFakeWin := (isNowFakeWinOpen=1 && AnyWindowOpen>0) ? 1 : 0
-   hideMenuFlyoutNow()
+   SetTimer, hideMenuFlyOut, -350
    If (manubarMode!=1)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
    Global lastWinDrag := A_TickCount
