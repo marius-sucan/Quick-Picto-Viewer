@@ -187,6 +187,23 @@ dispatchMouseWheel(wP, lP, msg, hwnd) {
 ; restores Critical, %prevCrit% on EVERY return path. A bare Critical left the
 ; interrupted thread uninterruptible for good [2026-09-02: MsgBox2 boxes pumping in
 ; InputHook.Wait lost their buttons, Escape, X and watchdog timers].
+; RULE 2 [2026-09-04] for a callback that runs INSIDE a synchronous send - the
+; WH_CALLWNDPROC hook, and any future window subclass, WH_CBT or WH_CALLWNDPROCRET:
+; it has NO deref buffer of its own either. Its own lines expand into the buffer
+; of the command it interrupted, from offset 0, while that command may still be
+; reading its argument from there [ToolTip keeps ti.lpszText across TTM_ADDTOOL
+; and TTM_UPDATETIPTEXT; ControlSetText and WinSetTitle pass theirs through
+; WM_SETTEXT]. The interpreter privatizes that buffer only around Gui commands and
+; while an expression is being evaluated - so a CALLEE gets a fresh buffer, the
+; callback body itself never does. Hence the body is a numeric trampoline
+; [uiCallWndProc]: parameter reads, NumGet, numeric compares, one call into a
+; worker that returns nothing, a numeric Return. Never in the body: a built-in A_
+; variable read [prevCrit := A_IsCritical placed first wrote "16", the Critical
+; peek interval, into every expression-built ToolTip], concatenation, a call
+; returning a non-empty string, OutputDebug with %. The TIMERPROC and WH_MOUSE_LL
+; callbacks fire at message-retrieval points only [modal menu loop, MsgSleep],
+; where the interrupted command has already consumed its arguments, so they keep
+; the plain save/restore shape.
 
 uiMenuNameForBuilder(suffix) {
 ; every InvokeMenuBar<suffix> builder rebuilds exactly one named menu - extracted
@@ -203,52 +220,65 @@ uiMenuNameForBuilder(suffix) {
 
 uiCallWndProc(nCode, wP, lP) {
 ; permanent same-thread hook: EVERY sent message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND,
-; WM_ACTIVATE...] of every window on this thread passes here - see the RULE above
-   prevCrit := A_IsCritical
-   Critical
+; WM_ACTIVATE...] of every window on this thread passes here - see the RULES above.
+; TRAMPOLINE ONLY [RULE 2]: this body runs inside the interrupted command's own
+; SendMessage, on that command's deref buffer. Nothing here may produce a string;
+; all work is in uiCallWndProcWork. 2*A_PtrSize is folded to a literal at load
+; time [ExpressionToPostfix, stock and _H alike], so it is not a runtime A_ read.
    If (nCode >= 0)
    {
       msg := NumGet(lP+0, 2*A_PtrSize, "UInt")
-      If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
-         uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"))
-      Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
+      If (msg=0x11F || msg=0x117 || msg=0x211 || msg=0x212)
+         uiCallWndProcWork(msg, lP)
+   }
+   Return DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
+}
+
+uiCallWndProcWork(msg, lP) {
+; the four menu messages only; lP is the CWPSTRUCT [reversed: lParam@0,
+; wParam@PtrSize]. Critical is saved and restored HERE, never in the trampoline:
+; A_IsCritical is a built-in-variable read [RULE 2 above]. This function must
+; return NOTHING - a non-empty string result would be copied back into the
+; interrupted command's buffer by the trampoline's call line.
+   prevCrit := A_IsCritical
+   Critical
+   If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
+      uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"))
+   Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
+   {
+      hMinit := NumGet(lP+0, A_PtrSize, "UPtr")
+      isMapped := (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit)) ? 1 : 0
+      ; ORDER-PROOFING: menu-BAR tracking can deliver the first INITMENUPOPUP
+      ; BEFORE ENTERMENULOOP [TrackPopupMenu sends ENTER first], so when no loop
+      ; is active yet the session type is inferred here: a mapped HMENU is a bar
+      ; dropdown, anything else is a programmatic popup's root
+      If (menuLoopActive!=1)
+         barMenuSession := isMapped
+      ; the flyout anchors to ROOT popups only: bar dropdowns [mapped menus] and
+      ; the FIRST popup of a right-click/AppsKey session - never to submenus,
+      ; which used to drag it around the screen
+      If (barMenuSession=1)
       {
-         hMinit := NumGet(lP+0, A_PtrSize, "UPtr")
-         isMapped := (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit)) ? 1 : 0
-         ; ORDER-PROOFING: menu-BAR tracking can deliver the first INITMENUPOPUP
-         ; BEFORE ENTERMENULOOP [TrackPopupMenu sends ENTER first], so when no loop
-         ; is active yet the session type is inferred here: a mapped HMENU is a bar
-         ; dropdown, anything else is a programmatic popup's root
-         If (menuLoopActive!=1)
-            barMenuSession := isMapped
-         ; the flyout anchors to ROOT popups only: bar dropdowns [mapped menus] and
-         ; the FIRST popup of a right-click/AppsKey session - never to submenus,
-         ; which used to drag it around the screen
-         If (barMenuSession=1)
+         If isMapped
          {
-            If isMapped
-            {
-               flyoutNeedsPos := 1
-               flyoutAnchorMenu := hMinit
-               OutputDebug, % "QPVMERGE: flyout flag raised [bar] anchor=" hMinit
-            }
-         } Else If (popupRootSeen!=1)
-         {
-            popupRootSeen := 1
             flyoutNeedsPos := 1
             flyoutAnchorMenu := hMinit
-            OutputDebug, % "QPVMERGE: flyout flag raised [popup] anchor=" hMinit
+            OutputDebug, % "QPVMERGE: flyout flag raised [bar] anchor=" hMinit
          }
-         uiMenuJITrebuild(hMinit)
+      } Else If (popupRootSeen!=1)
+      {
+         popupRootSeen := 1
+         flyoutNeedsPos := 1
+         flyoutAnchorMenu := hMinit
+         OutputDebug, % "QPVMERGE: flyout flag raised [popup] anchor=" hMinit
       }
-      Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
-         uiMenuLoopEnter(NumGet(lP+0, A_PtrSize, "UPtr"))
-      Else If (msg=0x212) ; WM_EXITMENULOOP
-         uiMenuLoopExit()
+      uiMenuJITrebuild(hMinit)
    }
-   r := DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
+   Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
+      uiMenuLoopEnter(NumGet(lP+0, A_PtrSize, "UPtr"))
+   Else If (msg=0x212) ; WM_EXITMENULOOP
+      uiMenuLoopExit()
    Critical, %prevCrit%
-   Return r
 }
 
 uiMenuJITrebuild(hMenu) {
