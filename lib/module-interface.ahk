@@ -59,7 +59,9 @@ initInterfaceModule() {
    OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
    OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE
    OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
-   OnMessage(0x010, "uiWM_CLOSE")       ; WM_CLOSE
+   OnMessage(0x0A1, "uiWM_NCLBUTTONDOWN") ; WM_NCLBUTTONDOWN (title-bar close button)
+   OnMessage(0x112, "uiWM_SYSCOMMAND")    ; WM_SYSCOMMAND (SC_CLOSE from sysmenu/taskbar)
+   OnMessage(0x010, "uiWM_CLOSE")         ; WM_CLOSE
 
    ; pen pressure [requires Windows 8 or newer]. The handler stays message-driven;
    ; the brush loops additionally drain the queue themselves while they hold
@@ -628,6 +630,14 @@ drainUIinput() {
       If (NumGet(msgu, 2*A_PtrSize, "UPtr") = 20)  ; HTCLOSE
       {
          DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 1)
+         preByeRoutine()
+      }
+   }
+   If DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 0)  ; WM_SYSCOMMAND, peek only
+   {
+      If ((NumGet(msgu, 2*A_PtrSize, "UPtr") & 0xFFF0) = 0xF060)  ; SC_CLOSE
+      {
+         DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 1)
          preByeRoutine()
       }
    }
@@ -2093,6 +2103,29 @@ PVwinGuiClose:
    byeByeRoutine()
 Return
 
+uiWM_NCLBUTTONDOWN(wParam, lParam, msg, hwnd) {
+   If !isUIrootWin(hwnd)
+      Return
+   If (wParam = 20)  ; HTCLOSE: title-bar close button [X]
+   {
+      If (runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
+      {
+         preByeRoutine()
+         Return 0
+      }
+   }
+}
+
+uiWM_SYSCOMMAND(wParam, lParam, msg, hwnd) {
+   If !isUIrootWin(hwnd)
+      Return
+   If ((wParam & 0xFFF0) = 0xF060)  ; SC_CLOSE
+   {
+      preByeRoutine()
+      Return 0
+   }
+}
+
 uiWM_CLOSE(wParam, lParam, msg, hwnd) {
    If !isUIrootWin(hwnd)
       Return
@@ -2132,6 +2165,7 @@ byeByeRoutine() {
          askAboutStoppingOperations()
       Else
          lastCloseInvoked++
+      Return
    } Else If (drawingShapeNow=1)
    {
        drawingShapeNow := 0

@@ -233,6 +233,8 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `dispatchLButtonDbl()` | 5 | same split for WM_LBUTTONDBLCLK |
 | `dispatchMouseWheel()` | 5 | WM_MOUSEWHEEL → `WM_MOUSEWHEEL` for the PVwin family, `adjustWheelNumbersEditFields` for panels |
 | `uiVisibleMenuWin(ptX:="", ptY:="")` | 24 | the visibility-aware `#32768` probe: returns the menu hwnd filtering on visibility; when screen coordinates are passed, hit-tests all visible `#32768` windows of this process |
+| `uiWM_NCLBUTTONDOWN()` | 10 | WM_NCLBUTTONDOWN monitor for the PVwin family: intercepts HTCLOSE (20) during busy states (`runningLongOperation`, `imageLoading`, `whileLoopExec`) to immediately invoke `preByeRoutine()` on mouse down and return 0; idle clicks pass through to DefWindowProc for standard caption tracking |
+| `uiWM_SYSCOMMAND()` | 9 | WM_SYSCOMMAND monitor for the PVwin family: intercepts SC_CLOSE (`0xF060`) from sysmenu, taskbar close, or mouse-up release on caption [X], invokes `preByeRoutine()`, and returns 0 |
 | `uiWM_CLOSE()` | 6 | WM_CLOSE monitor for the PVwin family: calls `preByeRoutine()` and returns 0 to prevent AHK from closing the window underneath worker loops; non-interface windows fall through to their own GuiClose labels |
 
 ### Liveness shims for Critical worker loops — lib/module-interface.ahk (phase C, `c629bc2`)
