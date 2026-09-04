@@ -232,7 +232,7 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `dispatchLButtonUp()` | 8 | same split for WM_LBUTTONUP (plus the tooltip window) |
 | `dispatchLButtonDbl()` | 5 | same split for WM_LBUTTONDBLCLK |
 | `dispatchMouseWheel()` | 5 | WM_MOUSEWHEEL → `WM_MOUSEWHEEL` for the PVwin family, `adjustWheelNumbersEditFields` for panels |
-| `uiVisibleMenuWin()` | 10 | the visibility-aware `#32768` probe: a hidden menu-class window persists per process, and the main script runs DetectHiddenWindows On, so a bare WinExist matches forever. Successor of the deleted thread-era probe, not a rename: it returns the hwnd and filters on visibility |
+| `uiVisibleMenuWin(ptX:="", ptY:="")` | 24 | the visibility-aware `#32768` probe: returns the menu hwnd filtering on visibility; when screen coordinates are passed, hit-tests all visible `#32768` windows of this process |
 
 ### Liveness shims for Critical worker loops — lib/module-interface.ahk (phase C, `c629bc2`)
 
@@ -252,7 +252,7 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `uiMenuJITrebuild()` | 30 | rebuilds a bar dropdown's content just-in-time at WM_INITMENUPOPUP via the `menuJITmap` (HMENU → builder); menu-bar sessions only, busy-guarded |
 | `uiMenuLoopEnter()` | 35 | menu-session start: session type from the ENTERMENULOOP wParam, the two native TIMERPROC tickers, the WH_MOUSE_LL hook |
 | `uiMenuLoopExit()` | 31 | menu-session end: kills the tickers and the hook, arms the 350 ms flyout grace, schedules the self-healing pass |
-| `uiMenuMouseLL()` | 31 | the WH_MOUSE_LL callback active only during menus: eats wheel notches and posts the equivalent arrow keys, RButton re-announce, flyout placement |
+| `uiMenuMouseLL()` | 44 | the WH_MOUSE_LL callback active only during menus: eats wheel notches and posts the equivalent arrow keys, balanced RButton down/up re-announce with hit-testing, flyout placement |
 | `uiMenuNativeTick()` | 7 | the TIMERPROC fired by the modal loop itself (AHK timers never tick there): calls the flyout placement (`642f8ca`) |
 | `uiTryPlaceFlyout()` | 48 | positions the S/T/M flyout beside the root popup, found by HMENU identity through MN_GETHMENU so a fading ghost window cannot capture it (`826986b`) |
 | `uiRefreshBarAttachments()` | 41 | self-healing pass after every menu loop: re-resolves each bar attachment by name, repairs changed handles, rebuilds the JIT map (`f6a3b99`) |

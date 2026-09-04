@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart
+     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart, menuRButtonEaten
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -43,7 +43,7 @@ initInterfaceModule() {
    winGDIcreated := 0, ThumbsWinGDIcreated := 0
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0
+   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0, menuRButtonEaten := 0
    flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0, menuNativeTimerID2 := 0
    ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
    ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
@@ -344,6 +344,7 @@ uiMenuLoopEnter(fromPopup:=0) {
    ; mid-popup swapped in the BAR variants and the builders' deleteMenus() calls
    ; wrecked the open context menu [broken/missing items on reopen].
    barMenuSession := fromPopup ? 0 : 1
+   menuRButtonEaten := 0
    If !hLLmouseHook
    {
       Static cbLL := 0
@@ -356,6 +357,8 @@ uiMenuLoopEnter(fromPopup:=0) {
 uiMenuLoopExit() {
    menuLoopActive := 0
    barMenuSession := 0
+   menuRButtonEaten := 0
+   uiMenuReaderLastMsg := ""
    If menuNativeTimerID
    {
       DllCall("user32\KillTimer", "Ptr", 0, "UPtr", menuNativeTimerID)
@@ -510,11 +513,25 @@ uiMenuMouseLL(nCode, wP, lP) {
          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
          DllCall("user32\PostMessageW", "Ptr", PVhwnd, "UInt", 0x100, "Ptr", vk, "Ptr", 1)
          r := 1
-      } Else If (wP=0x205 && allowMenuReader="yes" && uiVisibleMenuWin() && StrLen(uiMenuReaderLastMsg)>1)
+      } Else If (wP=0x204)
       {
-         mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
-         showOSDinfoLineNow(1500)
-         r := 1
+         ptX := NumGet(lP+0, 0, "Int")
+         ptY := NumGet(lP+0, 4, "Int")
+         If (allowMenuReader="yes" && StrLen(uiMenuReaderLastMsg)>1 && uiVisibleMenuWin(ptX, ptY))
+         {
+            mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
+            showOSDinfoLineNow(1500)
+            menuRButtonEaten := 1
+            r := 1
+         } Else
+            menuRButtonEaten := 0
+      } Else If (wP=0x205)
+      {
+         If menuRButtonEaten
+         {
+            menuRButtonEaten := 0
+            r := 1
+         }
       }
    }
    If (r="")
@@ -2603,11 +2620,26 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     ; TulTip("|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
 }
 
-uiVisibleMenuWin() {
+uiVisibleMenuWin(ptX:="", ptY:="") {
 ; [merge] The main script runs DetectHiddenWindows ON, and a HIDDEN #32768 window
 ; persists in the process once any menu has ever shown - probing without a
 ; visibility check matches it forever. Every menu-window probe in this module
 ; goes through here, so it sees what the old interface interpreter [DHW off] saw.
+; When screen coordinates are passed, hit-tests all visible #32768 windows of this process.
+   If (ptX != "" && ptY != "")
+   {
+      WinGet, menuWins, List, % "ahk_class #32768 ahk_pid " QPVpid
+      Loop, % menuWins
+      {
+         w := menuWins%A_Index%
+         If !DllCall("user32\IsWindowVisible", "UPtr", w)
+            Continue
+         WinGetPos, mX, mY, mW, mH, ahk_id %w%
+         If (ptX >= mX && ptX < mX + mW && ptY >= mY && ptY < mY + mH)
+            Return w
+      }
+      Return 0
+   }
    h := WinExist("ahk_class #32768 ahk_pid " QPVpid)
    If (h && DllCall("user32\IsWindowVisible", "UPtr", h))
       Return h
