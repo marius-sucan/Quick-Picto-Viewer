@@ -216,5 +216,14 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
   - `quick-picto-viewer.ahk`: `showOSDinfoLineNow` arms `menuReaderOSDdeadline := A_TickCount + delayu` whenever `menuLoopActive=1`.
   - `menuRButtonEaten` and `menuReaderOSDdeadline` module globals declared and reset in `initInterfaceModule()`, `uiMenuLoopEnter()`, and `uiMenuLoopExit()` (which also clears `uiMenuReaderLastMsg`).
 
+**2026-09-04 (later) — window close invokes askAboutStoppingOperations during long operations (fixed).**
+- Report: when a long-running operation is being executed and it is interruptible, pressing Escape or clicking the viewport invokes `askAboutStoppingOperations()`, but clicking to close the window does not ask anything.
+- Cause: Escape and viewport clicks are intercepted via `OnMessage(0x100)` (`uiWM_KEYDOWN`) and `OnMessage(0x201)` (`uiWM_LBUTTONDOWN`). Messages `< 0x0312` are treated as emergencies by AutoHotkey's message monitor, interrupting running threads immediately. In contrast, closing the window generates `WM_CLOSE` (`0x0010`), which had no `OnMessage` registration and relied solely on the `PVwinGuiClose:` GUI event subroutine label. In AutoHotkey, GUI event subroutines run with default priority 0 and cannot interrupt an executing thread of equal priority (the long operation loop). Consequently, `PVwinGuiClose:` remained queued and never fired while an interruptible operation was running. Additionally, `byeByeRoutine()` guarded its long operation abort gate with `&& (A_TickCount - lastLongOperationStart > 900)`, which would cause operations closed within 900ms to fall through to `lastCloseInvoked := 5` (clean exit).
+- Fix:
+  - `lib/module-interface.ahk`: Registered `OnMessage(0x010, "uiWM_CLOSE")` in `initInterfaceModule()`. `uiWM_CLOSE(wParam, lParam, msg, hwnd)` guards on `isUIrootWin(hwnd)`, calls `preByeRoutine()`, and returns 0 to suppress window closure. Non-interface windows (panels, dialogs) return empty to let AutoHotkey run their own `GuiClose` labels.
+  - `drainUIinput()`: Added `PeekMessageW` with `PM_REMOVE` for `0x0010` (`WM_CLOSE`) to drain any posted close requests during Critical loops.
+  - `byeByeRoutine()`: Simplified `Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))` to `Else If (runningLongOperation=1)` so long operations always route to `askAboutStoppingOperations()` and never fall through to force application exit.
+
 ## Critical files
+
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).

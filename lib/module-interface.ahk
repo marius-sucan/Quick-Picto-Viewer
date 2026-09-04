@@ -59,6 +59,7 @@ initInterfaceModule() {
    OnMessage(0x047, "WM_WINDOWPOSCHANGED") ; window moving
    OnMessage(0x06, "activateMainWin")   ; WM_ACTIVATE
    OnMessage(0x08, "activateMainWin")   ; WM_KILLFOCUS
+   OnMessage(0x010, "uiWM_CLOSE")       ; WM_CLOSE
 
    ; pen pressure [requires Windows 8 or newer]. The handler stays message-driven;
    ; the brush loops additionally drain the queue themselves while they hold
@@ -630,6 +631,8 @@ drainUIinput() {
          preByeRoutine()
       }
    }
+   If DllCall("user32\PeekMessageW", "Ptr", &msgu, "Ptr", PVhwnd, "UInt", 0x0010, "UInt", 0x0010, "UInt", 1)  ; WM_CLOSE, remove
+      preByeRoutine()
    ; the keyboard handler defers its work to a 3ms timer that cannot fire while
    ; the caller holds Critical - run it now, then disarm the pending timer.
    ; ONLY when a key-down was actually drained: uiPreProcessKbdKey() processes the
@@ -2090,6 +2093,13 @@ PVwinGuiClose:
    byeByeRoutine()
 Return
 
+uiWM_CLOSE(wParam, lParam, msg, hwnd) {
+   If !isUIrootWin(hwnd)
+      Return
+   preByeRoutine()
+   Return 0
+}
+
 byeByeRoutine() {
    Static lastInvokedThis := 1
    If (A_TickCount - lastInvokedThis < 250)
@@ -2115,7 +2125,7 @@ byeByeRoutine() {
          Try Run, %ComSpec% /c ping -n 9 127.0.0.1 >nul 2>&1 && taskkill /PID %QPVpid% /T /F,, Hide
       } Else lastCloseInvoked := -1
       lastCloseInvoked++
-   } Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
+   } Else If (runningLongOperation=1)
    {
 ; ToolTip, % "yaaaaaaaaaaaaaaaaay="  , , , 2
       If (mustAbandonCurrentOperations!=1)
