@@ -3558,14 +3558,13 @@ CopyImagePath(modus:=0) {
       imgPath := StrReplace(imgPath, "||")
       zPlitPath(imgPath, 0, fileNamu, folderu)
       If (modus="dirs")
-         Try Clipboard := folderu
+         txt := folderu
       Else If (modus="files")
-         Try Clipboard := fileNamu
+         txt := fileNamu
       Else
-         Try Clipboard := imgPath
-      Catch wasError
-          Sleep, 1
- 
+         txt := imgPath
+      
+      wasOkay := copyTextToClippy(txt)
       folderu := PathCompact(folderu, "a", 1, OSDfontSize)
       thisu := (modus="dirs") ? folderu "\" : fileNamu "`n" folderu "\"
       If (modus="files")
@@ -3574,7 +3573,7 @@ CopyImagePath(modus:=0) {
       If (userPrivateMode=1)
          thisu := "****************"
 
-      infoText := wasError ? "ERROR: Failed to copy to clipboard as text the active entry" : "The active entry was copied to clipboard as text"
+      infoText := (wasOkay=0) ? "ERROR: Failed to copy to clipboard as text the active entry" : "The active entry was copied to clipboard as text"
       showTOOLtip(infoText "`n" thisu)
       If InStr(infoText, "error: failed")
          SoundBeep 300, 100 
@@ -3641,15 +3640,12 @@ CopyImagePath(modus:=0) {
     If (modus="files")
        friendly := "file names"
 
-    Try Clipboard := listu
-    Catch wasError
-          Sleep, 1
-
-    If wasError
+    If !copyTextToClippy(listu)
     {
        showTOOLtip("Failed to copy to clipboard as text the " friendly)
        SoundBeep , 300, 100
-    } Else showTOOLtip(groupDigits(counter) " selected " friendly " copied to clipboard as text")
+    } Else
+       showTOOLtip(groupDigits(counter) " selected " friendly " copied to clipboard as text")
 
     SetTimer, RemoveTooltip, % -msgDisplayTime
     ResetImgLoadStatus()
@@ -27253,11 +27249,7 @@ omniBoxFolderCopyPath() {
    If !folderPath
       Return
 
-   Try Clipboard := folderPath
-   Catch wasError
-       Sleep, 1
-
-   If !wasError
+   If copyTextToClippy(folderPath)
    {
       showTOOLtip("Folder path copied to the clipboard:`n" folderPath)
    } Else
@@ -27266,6 +27258,15 @@ omniBoxFolderCopyPath() {
       SoundBeep 300, 100
    }
    SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+copyTextToClippy(textu) {
+   Try Clipboard := textu
+   Catch wasError
+       Sleep, 1
+
+   r := wasError ? 0 : 1
+   Return r
 }
 
 createOmniBoxFoldersContextMenu(folderPath) {
@@ -28962,18 +28963,14 @@ BtnCopySeenStats() {
    textu .= getListViewData("SettingsGUIA", "LViewMetaD", 4)
    textu .= "`nHOURLY SEEN IMAGES:`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaH", 4)
-
    If (StrLen(textu)>10)
    {
-      Try Clipboard := Trimmer(textu)
-      Catch wasError
-          Sleep, 1
-
-      If wasError
+      If !copyTextToClippy(textu)
       {
          showTOOLtip("ERROR: Failed to copy to clipboard")
          SoundBeep , 300, 100
-      } Else showTOOLtip("Images seen statistics copied to the clipboard")
+      } Else
+         showTOOLtip("Images seen statistics copied to the clipboard")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -29021,18 +29018,14 @@ BtnCopyFileStats() {
    Gui, SettingsGUIA: Default
    GuiControlGet, infoLine
    textu .= "`n" infoLine "`n"
-
    If (StrLen(textu)>10)
    {
-      Try Clipboard := Trimmer(textu)
-      Catch wasError
-          Sleep, 1
-
-      If wasError
+      If !copyTextToClippy(textu)
       {
-         showTOOLtip("ERROR: Failed to copy to clipboard")
+         showTOOLtip("ERROR: Failed to copy the statistics to the clipboard")
          SoundBeep , 300, 100
-      } Else showTOOLtip("Image file properties statistics copied to the clipboard")
+      } Else
+         showTOOLtip("Image file properties statistics copied to the clipboard")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -29065,18 +29058,14 @@ BtnCopyImageFileStats() {
    textu .= getListViewData("SettingsGUIA", "LViewMetaI", 4)
    textu .= "`nIMAGES: HISTOGRAM - TOTAL (RANGE)`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaR", 4)
-
    If (StrLen(textu)>10)
    {
-      Try Clipboard := Trimmer(textu)
-      Catch wasError
-          Sleep, 1
-
-      If wasError
+      If !copyTextToClippy(textu)
       {
-         showTOOLtip("ERROR: Failed to copy to clipboard")
+         showTOOLtip("ERROR: Failed to copy the statistics to the clipboard")
          SoundBeep , 300, 100
-      } Else showTOOLtip("Image file properties statistics copied to the clipboard")
+      } Else
+         showTOOLtip("Image file properties statistics copied to the clipboard")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -30615,7 +30604,6 @@ folderTreeMiniBtn() {
 
 folderTreeCopyPath(dummy:=0) {
    Static lastInvoked := 1
-
    If ((A_TickCount - lastInvoked<356) || (dummy="forced") || InStr(dummy, "copy"))
    {
       Gui, fdTreeGuia: Default
@@ -30629,11 +30617,7 @@ folderTreeCopyPath(dummy:=0) {
          Return
       }
 
-      Try Clipboard := folderPath
-      Catch wasError
-          Sleep, 1
-
-      If !wasError
+      If copyTextToClippy(folderPath)
       {
          showTOOLtip("Folder path copied to the clipboard:`n" folderPath)
       } Else
@@ -32392,18 +32376,14 @@ copyIMGinfos2clip() {
    textu .= getListViewData("SettingsGUIA", "LViewMetaOthers", 2, ": ")
    textu .= "`n `nMETADATA:`n"
    textu .= getListViewData("SettingsGUIA", "LViewMetaM", 2, ": ")
-
    If (StrLen(textu)>10)
    {
-      Try Clipboard := Trimmer(textu)
-      Catch wasError
-          Sleep, 1
-
-      If wasError
+      If !copyTextToClippy(textu)
       {
-         showTOOLtip("ERROR: Unable to copy to clipboard file details")
+         showTOOLtip("ERROR: Unable to copy to clipboard the file details")
          SoundBeep , 300, 100
-      } Else showTOOLtip("File details copied to the clipboard")
+      } Else
+         showTOOLtip("File details copied to the clipboard")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
 }
@@ -54007,16 +53987,13 @@ PanelIMGselProperties() {
 
 BTNcopySelCoords() {
    txt := imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" innerSelectionCavityX "|" innerSelectionCavityY
-   Try Clipboard := txt
-   Catch wasError
-         Sleep, 1
-
-   If wasError
+   If !copyTextToClippy(txt)
    {
       showTOOLtip("Failed to copy selection coordinates to the clipboard")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
-   } Else SoundBeep 900, 100
+   } Else
+      SoundBeep 900, 100
 }
 
 BTNpasteSelCoords() {
@@ -56722,15 +56699,12 @@ BTNcopyPDFtexts(CtrlHwnd:=0, b:=0, c:=0) {
 
     If (StrLen(textu)>5)
     {
-       Try Clipboard := Trimmer(textu)
-       Catch wasError
-           Sleep, 1
- 
-       If wasError
+       If !copyTextToClippy(textu)
        {
           showTOOLtip("ERROR: Failed to copy the text data to the clipboard")
           SoundBeep , 300, 100
-       } Else showTOOLtip("Data from the current tab was copied to the clipboard")
+       } Else
+          showTOOLtip("Data from the current tab was copied to the clipboard")
        SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 }
@@ -58283,11 +58257,8 @@ InvokeStandardDialogColorPicker(hC, event, c) {
      msg2show := "HEX color: " %ctrl% "`nShift + L-click to copy`nAlt+Click to paste"
      If GetKeyState("Shift", "P")
      {
-        Try Clipboard := %ctrl%
-        Catch wasError
-              Sleep, 1
-
-        msg2show := (wasError) ? " Failed to copy the color to clipboard" : "HEX color copied to clipboard: " %ctrl%
+        wasOkay := copyTextToClippy(%ctrl%)
+        msg2show := (wasOkay=0) ? " Failed to copy the color to clipboard" : "HEX color copied to clipboard: " %ctrl%
      } Else If GetKeyState("Alt", "P")
      {
         Try clr := Trimmer(Clipboard)
@@ -59522,9 +59493,6 @@ IdentifyFileFolderRoots(modus) {
          counter++
       }
    }
-
-   ; Sort, nList, D`n
-   ; Try Clipboard := gList "`n===`n" nList "`n====`n" flist
    Return [glist, counter]
 }
 
@@ -94357,15 +94325,11 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
     If !listu
        Return
 
-    Try Clipboard := listu
-    Catch wasError
-          Sleep, 1
-
     thisu := (modus="dirs") ? "containing folders" : "complete paths"
     If (modus="files")
        thisu := "file names"
 
-    If wasError
+    If !copyTextToClippy(listu)
     {
        showTOOLtip("Failed to copy to clipboard as text the selected " thisu)
        SoundBeep , 300, 100
@@ -94900,11 +94864,8 @@ BTNcopyStaticFolderPath() {
           Return
     } Else counter := 1
 
-    Try Clipboard := (AnyWindowOpen=2) ? foldersListArray : folderu
-    Catch wasError
-          Sleep, 1
-
-    If wasError
+    txtu := (AnyWindowOpen=2) ? foldersListArray : folderu
+    If !copyTextToClippy(txtu)
     {
        showTOOLtip("Failed to copy the folder path(s) to clipboard as text")
        SoundBeep , 300, 100
@@ -94971,11 +94932,7 @@ BTNcopyAllStaticFolderPaths() {
     If !counter
        Return
 
-    Try Clipboard := finalListu
-    Catch wasError
-          Sleep, 1
-
-    If wasError
+    If !copyTextToClippy(finalListu)
     {
        showTOOLtip("Failed to copy the folder paths to clipboard as text")
        SoundBeep , 300, 100
@@ -95264,13 +95221,10 @@ BTNcopyDynaFoldersList() {
     If !newFoldersList
        Return
 
-    Try Clipboard := newFoldersList
-    Catch wasError
-          Sleep, 1
-
-    If !wasError
+    If copyTextToClippy(newFoldersList)
     {
        showTOOLtip("Dynamic folders list copied to clipboard")
+       SoundBeep , 900, 100
     } Else
     {
        showTOOLtip("Failed to copy to clipboard the dynamic folders list")
