@@ -5759,7 +5759,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       If doFrameChange
       {
          friendly := (doFrameChange=1) ? "Next" : "Previous"
-         showTOOLtip(friendly " frame", 0, "swipe-mode")
+         showTOOLtip(friendly " frame", 0, "swipe-mode", desiredFrameIndex/totalFramesIndex)
       } Else If (doNextSlide || doPrevSlide)
       {
          friendly := (doNextSlide=1) ? "Next" : "Previous"
@@ -5768,7 +5768,7 @@ winSwipeAction(thisCtrlClicked, mainParam) {
       {
          friendly := (doZoomChange=1) ? "in" : "out"
          zl := decideNewVPzoomLevel(zoomLevel, 0, doZoomChange, stepFactor)
-         showTOOLtip("Zoom " friendly ": " Round(zl*100) "%", 0, "swipe-mode")
+         showTOOLtip("Zoom " friendly ": " Round(zl*100) "%", 0, "swipe-mode", zl/20)
       } Else If dblClick
       {
          If (editingSelectionNow=1)
@@ -5790,8 +5790,6 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    }
 
    whileLoopExec := 0
-   lastSwipeZeitGesture := A_TickCount
-
    didSomething := 1
    If doFrameChange
       changeDesiredFrame(doFrameChange)
@@ -5804,8 +5802,9 @@ winSwipeAction(thisCtrlClicked, mainParam) {
    Else 
       didSomething := 0
 
-   lastSwipeZeitGesture := A_TickCount
-   If (!didSomething)
+   If didSomething
+      lastSwipeZeitGesture := A_TickCount
+   Else
       zeitSillyPrevent := 1
 
    Return didSomething
@@ -10106,7 +10105,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       closeQuickSearch()
       Return "none"
    }
-
+fnOutputDebug(A_ThisFunc " l=" winEventu)
    displayingImageNow := (thumbsDisplaying!=1 && useGdiBitmap()) ? 1 : 0
    If isVarEqualTo(AnyWindowOpen, 1, 33, 39, 59, 48, 61)
    {
@@ -12352,7 +12351,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          OutputDebug, % "QPVMERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen " flag=" animGIFplaying
          SetTimer, autoChangeDesiredFrame, Off
          SetTimer, ResetImgLoadStatus, -50
-         If StrLen(prevImgPath)
+         If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
          prevImgPath := ""
          Global lastGIFdestroy := A_TickCount
@@ -12395,7 +12394,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          ; tick] was undone by the next re-render: the "toggle" Marius reported.
          ; Guarded: this branch can run twice [ShowTheImage re-arms the timer after
          ; a "start" that landed here], and a second pass must not wipe the latch
-         If StrLen(prevImgPath)
+         If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
          prevImgPath := ""
          lastFrameChange := A_TickCount
@@ -34405,11 +34404,11 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
    }
 
    r := Trimmer(r)
-   If (StrLen(r)<4)
+   If (StrLen(r)<3)
       r := ""
 
+   hideMenuFlyoutNow()
    SetWorkingDir, % mainCompiledPath
-   SetTimer, hideMenuFlyoutNow, -150, 900
    lastLongOperationAbort := A_TickCount
    Return r
 }
@@ -63122,7 +63121,7 @@ openFoldersDialogWrapper(startPath, msg:="") {
    Else If (StrLen(r.SelectedDir)>1)
       z := r.SelectedDir
 
-   SetTimer, hideMenuFlyoutNow, -150, 900
+   hideMenuFlyoutNow()
    lastLongOperationAbort := A_TickCount
    Return z
 }
@@ -69956,7 +69955,6 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
      ; ToolTip, % items "==" prevItems "|" menarg "==" prevMenu, , , 2
    } Else
    {
-      SetTimer, hideMenuFlyoutNow, Off
       hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
       If !hMenuBar
          addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
@@ -69997,7 +69995,9 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
 }
 
 hideMenuFlyoutNow() {
-   IF_post("menuFlyoutDisplay", "no", 1, 1, 0, "reset")
+   lastOtherWinClose := A_TickCount
+   lastContextMenuZeit := A_TickCount
+   coreHideMenuFlyout()
 }
 
 deleteMenus() {

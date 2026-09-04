@@ -1250,9 +1250,6 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     If (preventSillyGui(A_Gui) || !thisWin)
        Return
 
-    ; If (runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
-    ;    Return
- 
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
     If (A_TickCount - lastSwipeZeitGesture<350)
        pp := 0
@@ -2063,7 +2060,7 @@ byeByeRoutine() {
    Static lastInvokedThis := 1
    If (A_TickCount - lastInvokedThis < 250)
       Return
-
+; ToolTip, % "yay="  , , , 2
    If (runningLongOperation!=1 && imageLoading=1 && animGIFplaying!=1)
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
@@ -2086,6 +2083,7 @@ byeByeRoutine() {
       lastCloseInvoked++
    } Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
    {
+; ToolTip, % "yaaaaaaaaaaaaaaaaay="  , , , 2
       If (mustAbandonCurrentOperations!=1)
          askAboutStoppingOperations()
       Else
@@ -2224,7 +2222,6 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0) {
 
    If (idu="reset")
       menuCurrentIndex := 0
-   Else
 
    If (!isOkay && actu="yes")
       Return
@@ -2253,14 +2250,18 @@ hideMenuFlyOut() {
     ; WinGetTitle, titlu, ahk_id %OutputVarWin%
     ; ToolTip, % OutputVarWin "==" hFlyOut "`n" glassu "==" titlu , , , 2
     If (OutputVarWin!=hFlyOut && !uiVisibleMenuWin())
-    {
-       Tooltip
-       menusflyOutVisible := 0
-       Gui, menuFlier: Hide
-       Gui, MclickH: Hide
-       SetTimer, hideMenuFlyOut, Off
-    } Else If (menusflyOutVisible=1)
+       coreHideMenuFlyout()
+    Else If (menusflyOutVisible=1)
        SetTimer, hideMenuFlyOut, -35
+}
+
+coreHideMenuFlyout() {
+    Tooltip
+    menuCurrentIndex := 0
+    menusflyOutVisible := 0
+    Gui, menuFlier: Hide
+    Gui, MclickH: Hide
+    SetTimer, hideMenuFlyOut, Off
 }
 
 stopGiFsPlayback() {
@@ -2417,16 +2418,9 @@ UpdateMenuBar(modus:=0, tt:=0) {
    ; ToolTip, % thisState "`n" prevState , , , 2
    If (prevState=thisState)
    {
-      ; updateTlbrPosition()
       SetTimer, updateTlbrPosition, -300
       Return
    }
-
-   ; ToolTip, % "l = " modus , , , 2
-   ; If (thumbsDisplaying=1)
-   ;    uiAccessUpdateUiStatusBar(0, 0, "list", 0)
-   ; Else 
-   ;    uiUpdateUIctrl()
 
    lastMenuBarUpdate := A_TickCount
    Gui, PVwin: Menu, PVmanu
@@ -2440,14 +2434,9 @@ UpdateMenuBar(modus:=0, tt:=0) {
 
    ; Sleep, -1
    BuildMenuBar(modus)
-   ; SetMenuInfo(MenuGetHandle("PVbar"), 2, 1, 0, 1)
-   ; Sleep, -1
-   ; Gui, PVwin: Menu, PVmanu
    Gui, PVwin: Menu, PVbar
    lastMenuBarUpdate := A_TickCount
-
    prevState := thisState
-   ; updateTlbrPosition()
    SetTimer, updateTlbrPosition, -300
 }
 
