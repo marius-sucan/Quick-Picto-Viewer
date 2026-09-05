@@ -106,8 +106,6 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
  
         btnText := Trim(A_LoopField)
         newBtnList .= btnText "|"
-        If (A_Index=btnDefault)
-           textbtnDefault := btnText
         btnCount++
         btnDimensions[btnCount] := GetMsgDimensions(btnText, fontFace, fontSize, rMaxW, rMaxH, 1, doBold)
         btnTotalWidth += btnDimensions[btnCount].w + bH
@@ -151,7 +149,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
         {
            2ndlistRows++
            listDim := GetMsgDimensions(A_LoopField, fontFace, fontSize, rMaxW, rMaxH, 1, doBold)
-           2ndlistWidth := max(listDim.w, listWidth, btnDim.w)
+           2ndlistWidth := max(listDim.w, 2ndlistWidth, btnDim.w) ; was listWidth: the width came from the last row only
         }
      }
      2ndlistWidth += bH
@@ -171,21 +169,6 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   marginsGui := bH//2
   marginz := bH//3
 
-  msg := GetMsgDimensions(sMsg, fontFace, fontSize, rMaxW - bH//2, rMaxH - bH*2, 0, doBold)
-  msgW := (icon && btnCount>0) ? msg.w - bH : msg.w
-  If (msgW<btnTotalWidth)
-     msgW := btnTotalWidth + bH//2
-
-  If (Abs(setWidth)>bH)
-     msgW := Abs(setWidth)
-
-  If (DropListMode=1)
-     2ndlistWidth := listWidth := msgW
-  Else
-     2ndlistWidth := listWidth := max(listWidth, 2ndlistWidth, btnTotalWidth)
-
-  msgH := msg.h - bH//2
-  msgH := (msgH>rMaxH) ? "h" maxH : ""
   thisBold := (doBold=1) ? " Bold " : ""
   Gui, WinMsgBox: Default
   Gui, WinMsgBox: -MinimizeBox -DPIScale +HwndMsgBox2hwnd
@@ -243,11 +226,11 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
        iconLabel := "Search icon."
      } Else If (icon="checkbox")
      {
-       iconFile := "imagres.dll", iconNum := 233
+       iconFile := "imageres.dll", iconNum := 233
        iconLabel := "Checkbox icon."
      } Else If (icon="cloud")
      {
-       iconFile := "imagres.dll", iconNum := 232
+       iconFile := "imageres.dll", iconNum := 232
        iconLabel := "Cloud icon."
      } Else If (icon="recycle" || icon="refresh")
      {
@@ -313,18 +296,51 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
    If (iconFile)
    {
-      If (iconLabel)
-         Try Gui, Add, Text, x%marginsGui% y%marginsGui% h1 w1, % iconLabel
-      If (iconHandle)
-         Try Gui, Add, Picture, AltSubmit x%marginsGui% y%marginsGui% h%bH% w-1 vBoxIcon, %iconFile%
-      Else If (iconNum)
-         Try Gui, Add, Picture, AltSubmit x%marginsGui% y%marginsGui% h%bH% vBoxIcon Icon%iconNum% w-1, %iconFile%
-      Else
-         Try Gui, Add, Picture, AltSubmit x%marginsGui% y%marginsGui% h%bH% vBoxIcon w-1  %iconFile%
-      Catch wasError
-         Sleep, 1
-      If wasError
+      ; Gui, Add, Picture does not raise when an image cannot be loaded [it leaves an empty control that still anchors the layout]
+      ; and the old Catch covered only the last of the three branches; load the image first and add the control only with a
+      ; valid handle [the control takes ownership of a handle given without the * prefix and frees it on destroy]
+      iconOpts := "w-1 h" bH " GDI+" ((iconHandle || !iconNum) ? "" : " Icon" iconNum)
+      hIconImg := 0, iconImgType := 0
+      Try hIconImg := LoadPicture(iconFile, iconOpts, iconImgType)
+      If !hIconImg
+      {
          iconFile := ""
+      } Else
+      {
+         If (iconLabel)
+            Try Gui, Add, Text, x%marginsGui% y%marginsGui% h1 w1, % iconLabel
+         Try Gui, Add, Picture, x%marginsGui% y%marginsGui% vBoxIcon, % ((iconImgType=0) ? "HBITMAP:" : "HICON:") hIconImg
+         Catch wasError
+            iconFile := ""
+      }
+  }
+
+  msg := GetMsgDimensions(sMsg, fontFace, fontSize, rMaxW - bH//2, rMaxH - bH*2, 0, doBold)
+  msgW := (iconFile && btnCount>0) ? msg.w - bH : msg.w ; iconFile, not icon: an icon that failed to load must not reserve space
+  If (msgW<btnTotalWidth)
+     msgW := btnTotalWidth + bH//2
+
+  If (Abs(setWidth)>bH)
+     msgW := Abs(setWidth)
+
+  If (DropListMode=1)
+     2ndlistWidth := listWidth := msgW
+  Else
+     2ndlistWidth := listWidth := max(listWidth, 2ndlistWidth, btnTotalWidth)
+
+  msgH := "", msgScroll := "-VScroll"
+  If (btnCount>0)
+  {
+     ; the prompt Edit has no scrollbar and its height is not capped, so it grows with the text [wide rather than tall is wanted];
+     ; only when the message cannot fit the work area even at the width chosen above, cap the height and give it a scrollbar.
+     ; This replaces the old guard, which compared against an undefined variable and could never trigger.
+     msgDim := GetStringSize(fontFace, fontSize, doBold, sMsg, 1, msgW)
+     maxMsgH := Round((rMaxH - bH*2)*0.9)
+     If (msgDim.h>maxMsgH)
+     {
+        msgH := "h" maxMsgH
+        msgScroll := "+VScroll"
+     }
   }
 
   yPos := iconFile ? "" : "y+" marginsGui
@@ -333,7 +349,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   {
      moar := InStr(iconLabel, "message box") ? StrReplace(iconLabel, ".") " prompt." : "Message box prompt."
      Gui, Add, Text, %xPos% %yPos% w1 h1, %moar%
-     Gui, Add, Edit, %xPos% %yPos% w%msgW% %msgH% ReadOnly -WantReturn vprompt -E0x200 -HScroll -VScroll, %sMsg%
+     Gui, Add, Edit, %xPos% %yPos% w%msgW% %msgH% ReadOnly -WantReturn vprompt -E0x200 -HScroll %msgScroll%, %sMsg%
   } Else
      Gui, Add, Text, %xPos% %yPos% w%msgW% %msgH% vprompt gKillMsgbox2Win, %sMsg%
 
@@ -383,7 +399,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   Else If (2ndDropListu && (2ndDropListMode=2 || 2ndDropListMode=3))
      Gui, Add, ListBox, xp y+%marginz% r%2ndlistRows% w%2ndlistWidth% AltSubmit %2ndmultisel% v2ndDropListuChoice, % 2ndDropListu
 
-  hDefBtn := ""
+  hDefBtn := textbtnDefault := ""
   ledH := (PrefsLargeFonts=1) ? 10 : 6
   Loop, Parse, btnList, | ; list specified buttons
   {
@@ -392,6 +408,8 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
       btnText := A_LoopField
       def := (A_Index=btnDefault) ? " +Default +hwndhDefBtn" : ""
+      If (A_Index=btnDefault)
+         textbtnDefault := btnText ; assigned here, on the cleaned list and the normalised btnDefault; it used to be set only for lists containing "|" and a non-zero default, and it counted blank fields
       thisBW := btnDimensions[A_Index].w + bH
       If (thisBW<minBW)
          thisBW := minBW
@@ -611,7 +629,10 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
        r.w := maxW
 
     If (btnMode!=1)
-       dimz := GetStringSize(FaceName, FntSize, bBold, sString, mustWrap, r.w)
+    {
+       r.w := Round(r.w) ; ctlSizeW//1.7 yields a float, and Fnt_GetSizeForEdit() wraps only at an integer width
+       dimz := GetStringSize(FaceName, FontSize, bBold, sString, mustWrap, r.w) ; was FntSize [undefined]: measured at the default font size
+    }
 
     scaledH := Round((ctlSizeW / r.w) * ctlSizeH)
     If (scaledH>maxH*0.9) || (dimz.h>maxH*0.9)
