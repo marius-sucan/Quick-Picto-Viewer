@@ -23,6 +23,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
      , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
+     , sentMsgProbeSeen
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -44,7 +45,7 @@ initInterfaceModule() {
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
-   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0, menuNativeTimerID2 := 0
+   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0, menuNativeTimerID2 := 0, sentMsgProbeSeen := 0
    ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
    ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
    ; flag was on from the first menu of a session; native bar opens never call it,
@@ -250,11 +251,12 @@ uiInstallSentMsgHook() {
       {
          If !cbSentMsg
             cbSentMsg := RegisterCallback("uiSentMenuMsg", "F")
-         VarSetCapacity(msgList, 16, 0)
+         VarSetCapacity(msgList, 20, 0)
          NumPut(0x117, msgList, 0, "UInt")   ; WM_INITMENUPOPUP - JIT dropdown rebuild
          NumPut(0x11F, msgList, 4, "UInt")   ; WM_MENUSELECT - reader tracking, flyout
          NumPut(0x211, msgList, 8, "UInt")   ; WM_ENTERMENULOOP - session start
          NumPut(0x212, msgList, 12, "UInt")  ; WM_EXITMENULOOP - session end
+         NumPut(0x85EE, msgList, 16, "UInt") ; install-time probe [WM_APP range, nothing else uses it]
          If hCWPhook
          {
             ; the script procedure carried the menus until now; no message can be
@@ -262,14 +264,28 @@ uiInstallSentMsgHook() {
             DllCall("UnhookWindowsHookEx", "UPtr", hCWPhook)
             hCWPhook := 0
          }
-         hCWPhook := DllCall("qpvmain.dll\qpvHookSentMessages", "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 4, "UPtr")
+         hCWPhook := DllCall("qpvmain.dll\qpvHookSentMessages", "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 5, "UPtr")
          If hCWPhook
          {
-            nativeHook := 1
-            OutputDebug, % "QPV: MERGE: native CALLWNDPROC filter installed [qpvmain.dll] hook=" hCWPhook
-            Return
-         }
-         OutputDebug, % "QPV: MERGE: qpvHookSentMessages failed [LastError=" A_LastError "] - script hook procedure re-installed"
+            ; END-TO-END SELF-TEST: a message SENT to our own hidden main window must
+            ; travel kernel -> native procedure -> uiSentMenuMsg -> uiCallWndProcWork
+            ; before this call returns. If it does not, the native path is not
+            ; delivering on this machine and the menus would silently lose their JIT
+            ; rebuilds, the reader and the wheel hook - so the native hook is removed
+            ; and the script procedure takes over, LOUDLY [DebugView]
+            sentMsgProbeSeen := 0
+            DllCall("user32\SendMessageW", "UPtr", A_ScriptHwnd, "UInt", 0x85EE, "UPtr", 0, "UPtr", 0, "UPtr")
+            If (sentMsgProbeSeen=1)
+            {
+               nativeHook := 1
+               OutputDebug, % "QPV: MERGE: native CALLWNDPROC filter installed [qpvmain.dll] hook=" hCWPhook " - probe delivered"
+               Return
+            }
+            OutputDebug, % "QPV: MERGE: native CALLWNDPROC filter did NOT deliver the probe [hook=" hCWPhook "] - removed, script hook procedure re-installed"
+            DllCall("qpvmain.dll\qpvUnhookSentMessages")
+            hCWPhook := 0
+         } Else
+            OutputDebug, % "QPV: MERGE: qpvHookSentMessages failed [LastError=" A_LastError "] - script hook procedure re-installed"
       } Else If (missingLogged!=1)
       {
          missingLogged := 1
@@ -322,6 +338,16 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
 ; interrupted command's buffer by the trampoline's call line.
    prevCrit := A_IsCritical
    Critical
+   ; trace of every entry [DebugView]: which message, from which procedure, with
+   ; which values, against the session state - the menus can only be diagnosed from
+   ; here, no OnMessage monitor ever sees these messages [RULE 3]
+   OutputDebug, % "QPV: MERGE: sent msg 0x" Format("{:X}", msg) " wP=" wP " lP=" lP " hwnd=" hwnd " loop=" menuLoopActive " bar=" barMenuSession
+   If (msg=0x85EE)     ; the install-time probe of uiInstallSentMsgHook()
+   {
+      sentMsgProbeSeen := 1
+      Critical, %prevCrit%
+      Return
+   }
    If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
       uiMenuSelectTrack(wP, lP)
    Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
@@ -364,7 +390,10 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
 uiMenuJITrebuild(hMenu) {
    Static busy := 0
    If (busy=1 || !IsObject(menuJITmap) || !menuJITmap.HasKey(hMenu))
+   {
+      OutputDebug, % "QPV: MERGE: menu JIT not run for hMenu=" hMenu " busy=" busy " mapped=" (IsObject(menuJITmap) ? menuJITmap.HasKey(hMenu) : "no-map")
       Return
+   }
    If (barMenuSession!=1)
    {
       OutputDebug, % "QPV: MERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]

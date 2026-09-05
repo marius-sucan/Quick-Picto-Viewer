@@ -54,6 +54,11 @@ static LRESULT CALLBACK qpvSentMsgHookProc(int nCode, WPARAM wParam, LPARAM lPar
         const CWPSTRUCT *cwp = reinterpret_cast<const CWPSTRUCT *>(lParam);
         for (int i = 0; i < qpvSentMsgFilterCount; i++) {
             if (qpvSentMsgFilter[i] == cwp->message) {
+                // DebugView trace of every forwarded message, next to the script's own
+                // "QPV: MERGE: sent msg" line - the pair shows where a message is lost
+                char trace[128];
+                wsprintfA(trace, "QPV: DLL hook fwd 0x%X w=%p l=%p h=%p", cwp->message, (void *)cwp->wParam, (void *)cwp->lParam, (void *)cwp->hwnd);
+                OutputDebugStringA(trace);
                 qpvSentMsgCallback((UINT_PTR)cwp->wParam, (UINT_PTR)cwp->lParam, (UINT_PTR)cwp->message, (UINT_PTR)cwp->hwnd);
                 break;
             }
@@ -81,6 +86,9 @@ DLL_API UINT_PTR DLL_CALLCONV qpvHookSentMessages(UINT_PTR callback, const UINT 
         qpvSentMsgCallback = NULL;
         qpvSentMsgFilterCount = 0;
     }
+    char trace[128];
+    wsprintfA(trace, "QPV: DLL hook install thread=%u hook=%p count=%d cb=%p", GetCurrentThreadId(), (void *)qpvSentMsgHook, count, (void *)callback);
+    OutputDebugStringA(trace);
     return (UINT_PTR)qpvSentMsgHook;
 }
 
