@@ -75574,7 +75574,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
    x2 -= kX,   y2 -= kY
    x2 += 3,    y2 += 3
 
-   QPV_post("ShowClickHalo", x2, y2, w, h, 1)
+   ShowClickHalo(x2, y2, w, h, 1)
    If (InStr(modus, "space") && (ctrlClassNN ~= "i)(static|combobox|syslistview32)"))
    {
       If (thisHwnd=hSetWinGui)

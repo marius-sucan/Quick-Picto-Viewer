@@ -137,8 +137,7 @@ dispatchLButtonDown(wP, lP, msg, hwnd) {
 }
 
 dispatchLButtonUp(wP, lP, msg, hwnd) {
-   root := DllCall("user32\GetAncestor", "UPtr", hwnd, "UInt", 2, "UPtr")  ; GA_ROOT
-   If isVarEqualTo(root, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin, hGuiTip, hFlyOut)
+   If isUIrootWin(hwnd)
       Return uiWM_LBUTTONUP(wP, lP, msg, hwnd)
    Return WM_LBUTTONup(wP, lP, msg, hwnd)
 }
@@ -1369,6 +1368,18 @@ preventSillyGui(thisGui) {
   Return r
 }
 
+uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY) {
+   adjX := rawX := lastLclickX := lastALclickX := lParam & 0xFFFF
+   adjY := rawY := lastLclickY := lastALclickY := lParam >> 16
+   If detectToolbar()
+   {
+      whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
+      JEE_ClientToScreen(PVhwnd, rawX, rawY, mXo, mYo)
+      JEE_ScreenToClient(whichWin, mXo, mYo, adjX, adjY)
+      lastALclickX := adjX, lastALclickY := adjY
+   }
+}
+
 uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     Static lastInvoked := 1
     If TestDraggableWindow()
@@ -1385,32 +1396,29 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     Else If ((drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1 && isOkay=1))
        pp := 1
 
-    If ((A_TickCount - scriptStartTime<500) || (A_TickCount - lastWinDrag<400) || (A_TickCount - lastDoubleClickZeit<400) && pp=1)
+    If ((A_TickCount - lastInvoked<25) || (A_TickCount - scriptStartTime<500) || (A_TickCount - lastWinDrag<400) || (A_TickCount - lastDoubleClickZeit<400) && pp=1)
+       Return 0
+
+    MouseGetPos, ,, OutputVarWin
+    If (OutputVarWin=hGuiTip)
        Return 0
 
     LbtnDwn := 1
     lastInvoked := A_TickCount
-    lastALclickX := lastLclickX := lP & 0xFFFF
-    lastALclickY := lastLclickY := lP >> 16
-    If detectToolbar()
-    {
-       whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
-       JEE_ClientToScreen(PVhwnd, lastLclickX, lastLclickY, mXo, mYo)
-       JEE_ScreenToClient(whichWin, mXo, mYo, lastALclickX, lastALclickY)
-    }
+    uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
 
-    If (mouseToolTipWinCreated=1)
+    If (mouseToolTipWinCreated=1 || statusBarTooltipVisible=1)
        mouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
-    ; ToolTip, % OutputVarControl "|" hFlyBtn1 , , , 2
+    canCancelImageLoad := 4
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
     Else If stopPlayback()
        Return 0
     Else If isOkay
-       uiWinClickAction()
+       WinClickAction("normal", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)
     Return 0
 }
 
@@ -1434,14 +1442,14 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
           If (hwnd=hFlyBtn1)
           {
              If (VisibleQuickMenuSearchWin=1)
-                QPV_post("closeQuickSearch")
+                closeQuickSearch()
              Else
-                QPV_post("PanelQuickSearchMenuOptions")
+                PanelQuickSearchMenuOptions()
           }
           Else If (hwnd=hFlyBtn2)
-             QPV_post("toggleAppToolbar")
+             toggleAppToolbar()
           Else If (hwnd=hFlyBtn3)
-             QPV_post("ToggleMenuBaru")
+             ToggleMenuBaru()
        }
     }
     Return 0
@@ -1453,33 +1461,23 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
     If (A_TickCount - scriptStartTime<500)
        Return 0
 
-    If (statusBarTooltipVisible=1)
+    If (mouseToolTipWinCreated=1 || statusBarTooltipVisible=1)
        mouseTurnOFFtooltip()
 
     colorPickerMustEnd := -1
     If preventSillyGui(A_Gui)
        Return
 
-    If (mouseToolTipWinCreated=1)
-       mouseTurnOFFtooltip()
-
     LbtnDwn := 0
     canCancelImageLoad := 4
     If stopPlayback()
        Return 0
 
-    mX := lP & 0xFFFF
-    mY := lP >> 16
-    If detectToolbar()
-    {
-       whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
-       JEE_ClientToScreen(PVhwnd, mX, mY, mXo, mYo)
-       JEE_ScreenToClient(whichWin, mXo, mYo, mX, mY)
-    }
+    uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
 
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
-       WinClickAction("remClick", "n", mX, mY)
+       WinClickAction("remClick", "n", adjX, adjY)
     Else If (imgEditPanelOpened=1 && AnyWindowOpen)
        toggleImgEditPanelWindow()
     Else If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900))
@@ -1494,26 +1492,18 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     LbtnDwn := 0
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
     thisWin := isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin)
-    oX := mX := lP & 0xFFFF
-    oY := mY := lP >> 16
+    uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
     If (!thisX || !thisY || (A_TickCount - lastInvoked>500))
        mm := 0
     Else
-       mm := isDotInRect(mX, mY, 15, 15, thisX, thisY, 1)
+       mm := isDotInRect(adjX, adjY, 15, 15, thisX, thisY, 1)
 
-    thisX := mX, thisY := mY
+    thisX := adjX, thisY := adjY
     If ((drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1 && isOkay=1 && mm=1))
     {
-       If detectToolbar()
-       {
-          whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
-          JEE_ClientToScreen(PVhwnd, mX, mY, mXo, mYo)
-          JEE_ScreenToClient(whichWin, mXo, mYo, mX, mY)
-       }
-
        Sleep, 1
        lastDoubleClickZeit := A_TickCount
-       InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))
+       InitGuiContextMenu("extern", adjX, adjY, 0, IdentifyCtrlUnderMouse(rawX, rawY))
        Return 0
     }
 
@@ -1528,11 +1518,12 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     lastDoubleClickZeit := A_TickCount
     If stopPlayback()
        Return 0
-    ; ToolTip, % "z=" zz , , , 2
+
+    canCancelImageLoad := 4
     If (zz=1)
-       uiWinClickAction()
+       WinClickAction("normal", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)
     Else If (A_TickCount - lastMouseLeave>350)
-       uiWinClickAction("DoubleClick")
+       WinClickAction("DoubleClick", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)
 
     Return 0
 }
@@ -1601,7 +1592,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If (A_TickCount - scriptStartTime<500)
      Return 0
 
-  If (statusBarTooltipVisible=1)
+  If (mouseToolTipWinCreated=1 || statusBarTooltipVisible=1)
      mouseTurnOFFtooltip()
 
   colorPickerMustEnd := -1
@@ -1611,12 +1602,6 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If stopPlayback()
      Return 0
 
-  If (mouseToolTipWinCreated=1)
-     mouseTurnOFFtooltip()
-
-  ; thumbsDisplaying := thumbsDisplaying
-  ; AnyWindowOpen := AnyWindowOpen
-  ; maxFilesIndex := maxFilesIndex
   If !identifyThisWin()
      Return 0
 
@@ -1630,21 +1615,13 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   ; masked one modifier at a time, see WM_MOUSEWHEEL() for why
   prefix .= (wParam & 4) ? "+" : "" ; shift
   prefix .= (wParam & 8) ? "^" : "" ; ctrl
-  oX := mX := lP & 0xFFFF
-  oY := mY := lP >> 16
   If (whileLoopExec!=1 && runningLongOperation!=1)
   {
-     If detectToolbar()
-     {
-        whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
-        JEE_ClientToScreen(PVhwnd, mX, mY, mXo, mYo)
-        JEE_ScreenToClient(whichWin, mXo, mYo, mX, mY)
-     }
-
+     uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
      If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
         BuildSecondMenu()
      Else
-        InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))
+        InitGuiContextMenu("extern", adjX, adjY, 0, IdentifyCtrlUnderMouse(rawX, rawY))
   }
   Return 0
 }
@@ -1752,27 +1729,6 @@ IdentifyCtrlUnderMouse(mX, mY) {
   }
   ; ToolTip, % ctrlName , , , 2
   Return ctrlName "|"
-}
-
-uiWinClickAction(thisEvent:="normal") {
-    Static lastInvoked := 1
-    MouseGetPos, ,, OutputVarWin
-    If ((A_TickCount - lastInvoked<25) || (OutputVarWin=hGuiTip))
-       Return
-
-    ; GetMouseCoord2wind(PVhwnd, mX, mY, mXo, mYo)
-    mX := lastALclickX,    mY := lastALclickY
-    ; ToolTip, % mX "=" mY "`n" lastLclickX "=" lastLclickY , , , 2
-    canCancelImageLoad := 4
-    If (mouseToolTipWinCreated=1)
-       mouseTurnOFFtooltip()
-
-    ; ToolTip, % mX "=" mY "=" param "==" ctrlName "--" A_GuiControl "--" A_GuiControlEvent , , , 2
-    lastInvoked := A_TickCount
-    If (slideShowRunning=1)
-       turnOffSlideshow()
-    Else
-       QPV_post("WinClickAction", thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
 }
 
 ResetLbtn() {
@@ -1956,7 +1912,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
      If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1 && whileLoopExec!=1)
-        QPV_post("MouseMoveResponder")
+        MouseMoveResponder()
  
      prevPos := mX "-" mY
   }
@@ -2005,7 +1961,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    ; z := identifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
    && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
-      QPV_post("MouseMoveResponder", "krill")
+      MouseMoveResponder("krill")
 
    If (menusflyOutVisible=1 && !uiVisibleMenuWin())
       SetTimer, hideMenuFlyOut, -50

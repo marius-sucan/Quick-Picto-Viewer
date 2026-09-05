@@ -251,6 +251,17 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
 - GIF slide force-advance simplified: in `autoChangeDesiredFrame`, replacing `QPV_post("theSlideShowCore", "force")` + `invokeExternalSlideshowHandler()` with a direct `SetTimer, theSlideShowCore, -1`.
 - Module function count reduced from 105 to 104 (`slideshowsHandler` and `dummySlideshow` deleted, `stopPlayback` added).
 
+**2026-09-05 (later) — Subsystem B (Mouse Input) simplification: click relays, timer hops, and coordinate duplication eliminated.**
+- Left-click dispatch cascade collapsed: `uiWM_LBUTTONDOWN` -> `uiWinClickAction()` -> `QPV_post("WinClickAction", ...)` -> `QPV_postRelay` -> `WinClickAction(...)` replaced with direct synchronous call `WinClickAction("normal", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)` in `uiWM_LBUTTONDOWN`. Deleted `uiWinClickAction()` stub from `lib/module-interface.ahk`.
+- Double-click routing simplified: in `WM_LBUTTON_DBL`, replaced `uiWinClickAction()` / `uiWinClickAction("DoubleClick")` calls with direct `WinClickAction("normal" / "DoubleClick", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)`. Eliminates stale coordinate reads from prior single click.
+- Centralized coordinate resolver: added `uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY)` in `lib/module-interface.ahk`. Consolidated repeated 8-line toolbar coordinate translations across `uiWM_LBUTTONDOWN`, `WM_MBUTTONDOWN`, `WM_LBUTTON_DBL`, and `WM_RBUTTONUP`.
+- Flyout buttons on mouse-up: in `uiWM_LBUTTONUP`, replaced `QPV_post` timer relays for `closeQuickSearch`, `PanelQuickSearchMenuOptions`, `toggleAppToolbar`, and `ToggleMenuBaru` with direct function calls.
+- Hover tracking latency eliminated: in `uiWM_MOUSEMOVE` and `activateMainWin`, replaced `QPV_post("MouseMoveResponder")` and `QPV_post("MouseMoveResponder", "krill")` with direct calls, making brush outline tracking and cursor updates instantaneous without a 5 ms timer delay.
+- Halo relay in main script: in `quick-picto-viewer.ahk` line 75577, replaced `QPV_post("ShowClickHalo", ...)` with direct call `ShowClickHalo(...)`.
+- Consolidated tooltip disarm: merged separate `statusBarTooltipVisible` and `mouseToolTipWinCreated` checks in `WM_MBUTTONDOWN` and `WM_RBUTTONUP`.
+- Simplified `dispatchLButtonUp` root guard to use canonical `isUIrootWin(hwnd)`.
+- Module function count preserved at 104 (`uiWinClickAction` deleted, `uiGetMouseCoords` added).
+
 ## Critical files
 
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).
