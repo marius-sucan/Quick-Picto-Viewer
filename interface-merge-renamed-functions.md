@@ -29,7 +29,7 @@ behaviour-neutral, and with a single interpreter they are now consolidation cand
 | `addJournalEntry` | `uiAddJournalEntry` | quick-picto-viewer.ahk | main: the 37-line journal writer; module: a 4-line stub | 0.04 | 0.05 | **0** / 384 |
 | `changeMcursor` | `uiChangeMcursor` | quick-picto-viewer.ahk | module: viewport cursor shapes (49 lines); main: panel/generic cursor (17) | 0.11 | 0.10 | 8 / 101 |
 | `InitGuiContextMenu` | `uiInitGuiContextMenu` | quick-picto-viewer.ahk | main: the 85-line context-menu builder; module: 4-line trigger | 0.03 | 0.01 | 2 / 3 | *(module copy inlined/deleted 2026-09-05, Step 1)*
-| `KeyboardResponder` | `uiKeyboardResponder` | quick-picto-viewer.ahk | module: 46-line PVwin pre-filter (nav-key stop, Space, Escape); main: the 233-line command dispatcher | 0.03 | 0.03 | 1 / 4 |
+| `KeyboardResponder` | `uiKeyboardResponder` | quick-picto-viewer.ahk | module: 46-line PVwin pre-filter (nav-key stop, Space, Escape); main: the 233-line command dispatcher | 0.03 | 0.03 | 1 / 4 | *(module copy absorbed into uiPreProcessKbdKey 2026-09-05, Subsystem A)*
 | `kMenu` | `uiKmenu` | quick-picto-viewer.ahk | main: the menu-item helper used 1707 times; module: bar-menu variant with a different signature | 0.02 | – | 1 / 1707 |
 | `mouseTurnOFFtooltip` | `uiMouseTurnOFFtooltip` | quick-picto-viewer.ahk | module: hides the viewport tooltip GUI (15 lines); main: 5-line panel variant | 0.29 | 0.26 | 18 / 17 |
 | `PanelQuickSearchMenuOptions` | `uiPanelQuickSearchMenuOptions` | quick-picto-viewer.ahk | main: the 81-line panel; module: 11-line opener | 0.02 | 0.02 | 1 / 25 | *(module copy deleted 2026-09-05, Step 1)*
@@ -280,6 +280,10 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `stopGiFsPlayback()` | lib/module-interface.ahk | 10 | user-gesture GIF teardown; triggers when actively playing (`animGIFplaying != 0`) and delegates internal frame teardown to `DestroyGIFuWin()` |
 
 *Eliminated cross-thread / multi-hop functions:* `slideshowsHandler()` (MI, stop/start cascade absorbed into `stopSlideshow` and `ToggleSlideShowu`), `dummySlideshow()` (MI, load completion relay), and `invokeExternalSlideshowHandler()` (QPV, replaced by `scheduleNextSlide`).
+
+### Keyboard input simplification (2026-09-05)
+
+*Eliminated cross-thread / multi-hop functions:* `uiKeyboardResponder()` (MI, absorbed directly into `uiPreProcessKbdKey()`, eliminating the intermediate relay, duplicate checks, and the `QPV_post` timer hop to `KeyboardResponder`).
 
 ### SQLite abort hatch — quick-picto-viewer.ahk (phase D3, `2bc4cb1`)
 

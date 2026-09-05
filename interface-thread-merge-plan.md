@@ -262,6 +262,14 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
 - Simplified `dispatchLButtonUp` root guard to use canonical `isUIrootWin(hwnd)`.
 - Module function count preserved at 104 (`uiWinClickAction` deleted, `uiGetMouseCoords` added).
 
+**2026-09-05 (later) — Subsystem A (Keyboard Input) simplification: double-timer hops, intermediate relays, and duplicate checks eliminated.**
+- Keystroke dispatch cascade collapsed: `uiWM_KEYDOWN` -> `SetTimer, uiPreProcessKbdKey, -3` -> `uiKeyboardResponder()` -> `QPV_post("KeyboardResponder", ...)` -> `QPV_postRelay` -> `KeyboardResponder(...)` replaced with a single direct call `KeyboardResponder(hotkate, PVhwnd, abusive, navKeysCounter)` from `uiPreProcessKbdKey()`.
+- Intermediate relay deleted: eliminated `uiKeyboardResponder()` from `lib/module-interface.ahk`, absorbing navigation key handling, image load cancellation (`canCancelImageLoad := 4`, `alterFilesIndex++`), Space key pan cursor, and playback stopping directly into `uiPreProcessKbdKey()`.
+- Playback stop unified: consolidated duplicate GIF/slideshow stop routines for Escape, Enter, and Space using canonical `stopPlayback()`.
+- Latent bug fixed: in `uiPreProcessKbdKey()`, corrected debounce bypass check to test `hotkate` instead of undefined `givenKey`.
+- Menu bar popup return hop eliminated: in `KeyboardResponder()` (`quick-picto-viewer.ahk`), replaced `QPV_post("invokeGivenMenuBarPopup", n)` with direct `invokeGivenMenuBarPopup(n)`.
+- Module function count reduced from 104 to 103 (`uiKeyboardResponder` deleted).
+
 ## Critical files
 
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).

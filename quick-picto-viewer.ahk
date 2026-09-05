@@ -978,7 +978,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
              }
           }
           If n
-             QPV_post("invokeGivenMenuBarPopup", n)
+             invokeGivenMenuBarPopup(n)
        }
    }
 

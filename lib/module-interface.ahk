@@ -2485,47 +2485,6 @@ preByeRoutine() {
     byeByeRoutine()
 }
 
-uiKeyboardResponder(givenKey, abusive) {
-    ; ToolTip, % givenKey "=" abusive "=" runningLongOperation "|" mustAbandonCurrentOperations , , , 2
-    If isVarEqualTo(givenKey, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
-    {
-       If (runningLongOperation=1 && givenKey="Enter")
-       {
-          preByeRoutine()
-       } Else If (slideShowRunning=1)
-       {
-          turnOffSlideshow()
-       } Else If (animGIFplaying!=0 || canCancelImageLoad=1) || (thumbsDisplaying=1 && imageLoading=1)
-       {
-          alterFilesIndex++
-          canCancelImageLoad := 4
-          If (givenKey!="PLUS" && givenKey!="MINUS")   ; plus/minus
-             stopGiFsPlayback()
-
-       } Else callMain := 1
-    } Else If (givenKey="Escape" || givenKey="!F4")
-    {
-       preByeRoutine()
-    } Else If (givenKey="Space")
-    {
-       isOkay := AnyWindowOpen ? 0 : 1
-       If (AnyWindowOpen && imgEditPanelOpened=1)
-          isOkay := 1
-
-       stopGiFsPlayback()
-       If (slideShowRunning=1)
-          turnOffSlideshow()
-       Else If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && slideShowRunning!=1 && IMGresizingMode=4)
-          uiChangeMcursor("move")
-       Else callMain := 1
-    } Else callMain := 1
-
-    isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
-    ; ToolTip, % callMain "=" isOkay "(" imageLoading "|" animGIFplaying ")=" runningLongOperation "=" whileLoopExec "=" givenKey , , , 2
-    If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
-       QPV_post("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
-}
-
 uiPreProcessKbdKey() {
    Static lastInvoked := 1, counter := 0, prevKey
    If (!identifyThisWin() || (A_TickCount - lastOtherWinClose<300))
@@ -2535,24 +2494,48 @@ uiPreProcessKbdKey() {
    If (A_TickCount - lastInvoked>250)
       counter := 0
 
-   If isVarEqualTo(hotkate, "Escape","Enter","Space")
-   {
-       pp := (animGIFplaying=1 || slideShowRunning=1) ? 1 : 0
-       If (animGIFplaying=1)
-          stopGiFsPlayback()
-       If (slideShowRunning=1)
-          turnOffSlideshow()
-       If pp
-          Return
-   }
-
-   If ((A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0 || isVarEqualTo(givenKey, "Escape", "Enter","!F4")))
+   If ((A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0 || isVarEqualTo(hotkate, "Escape", "Enter", "!F4")))
    {
       lastInvoked := A_TickCount
       abusive := (counter>25) ? 1 : 0
       OutputDebug, % "QPV: MERGE: kbd dispatch hotkate=" hotkate " via " Exception("", -2).What
-      uiKeyboardResponder(hotkate, abusive)
-      ; QPV_post("KeyboardResponder", hotkate, PVhwnd, abusive)
+
+      callMain := 0
+      If isVarEqualTo(hotkate, "Escape", "Enter", "Space") && stopPlayback()
+      {
+         ; user gesture stopped active GIF or slideshow playback
+      } Else If (hotkate="Escape" || hotkate="!F4")
+      {
+         preByeRoutine()
+      } Else If (hotkate="Enter" && runningLongOperation=1)
+      {
+         preByeRoutine()
+      } Else If (hotkate="Space")
+      {
+         isOkay := (!AnyWindowOpen || imgEditPanelOpened=1)
+         If (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && IMGresizingMode=4)
+            uiChangeMcursor("move")
+         Else
+            callMain := 1
+      } Else If isVarEqualTo(hotkate, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
+      {
+         If (slideShowRunning=1)
+         {
+            stopPlayback()
+         } Else If (animGIFplaying!=0 || canCancelImageLoad=1 || (thumbsDisplaying=1 && imageLoading=1))
+         {
+            alterFilesIndex++
+            canCancelImageLoad := 4
+            stopGiFsPlayback()
+         } Else
+            callMain := 1
+      } Else
+         callMain := 1
+
+      isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
+      If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && hotkate)
+         KeyboardResponder(hotkate, PVhwnd, abusive, navKeysCounter)
+
       If (hotkate=prevKey)
          counter++
       Else 
