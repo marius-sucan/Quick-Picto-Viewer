@@ -69,6 +69,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
   MsgBox2hwnd := 0
   MsgBox2Result := ""
+  UsrCheckBoxu := DropListuChoice := 2ndDropListuChoice := EditUserMsg := "" ; a GuiControlGet against a destroyed window leaves these untouched; without the reset a box closed with Escape/X returns the previous box's answers
   If (btnList=-1)
      btnList := ""
   Else If (btnList=0)
@@ -345,10 +346,12 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If editOptions
      Gui, Add, Edit, xp y+%marginz% wp %addLabelu% -WantReturn r1 -multi -HScroll -VScroll %editOptions% vEditUserMsg, %editDefaultLine%
 
+  checkBoxState := (checkBoxState=1) ? 1 : 0 ; a blank state would expand to a bare Checked option, i.e. ticked
   If checkBoxCaption
      Gui, Add, Checkbox, xp y+%marginz% wp Checked%checkBoxState% vUsrCheckBoxu, %checkBoxCaption%
 
   multiSel := (DropListMode=3) ? 8 : " gMsgBox2ListBoxEvent "
+  2ndMultiSel := (2ndDropListMode=3) ? 8 : " gMsgBox2ListBoxEvent " ; read as %2ndmultisel% by the second ListBox; it used to be an undefined [blank] variable
   If (dropListu || 2ndDropListu)
      Gui, +Delimiter`f
 
@@ -440,7 +443,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   SetTimer, WatchMsgBox2Win, 300
   lastMsgBox2win := [modalHwnd, thisHwnd]
   Gui, WinMsgBox: Default
-  MsgBox2InputHook := InputHook("V") ; "V" for not blocking input
+  MsgBox2InputHook := InputHook("V L0") ; "V" for not blocking input; "L0" collects no text, so the [system-wide] hook can never end by itself at the default 1023-character limit and close the box with a blank answer; OnKeyDown still fires for the KeyOpt keys
   MsgBox2InputHook.KeyOpt("{BackSpace}{Delete}{PgUp}{PgDn}{Enter}{Escape}{F4}{NumpadEnter}","N")
   MsgBox2InputHook.OnKeyDown := Func("MsgBox2InputHookKeyDown")
   MsgBox2InputHook.Start()
@@ -456,7 +459,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If (MsgBox2Result="usr-dbl-clk")
      r.btn := StrReplace(textbtnDefault, "&")
 
-  r.check := !checkBoxCaption ? 0 : UsrCheckboxu
+  r.check := (checkBoxCaption && UsrCheckBoxu=1) ? 1 : 0
   r.list := !dropListu ? 0 : DropListuChoice
   r.2ndlist := !2ndDropListu ? 0 : 2ndDropListuChoice
   r.edit := !editOptions ? 0 : EditUserMsg
@@ -476,6 +479,17 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 }
 
 KillMsgbox2Win() {
+   Global UsrCheckBoxu, DropListuChoice, 2ndDropListuChoice, EditUserMsg
+   If (MsgBox2hwnd && WinExist("ahk_id " MsgBox2hwnd))
+   {
+      ; the WinMsgBoxGuiClose/GuiEscape labels destroy the window right after this call, before MsgBox2() reads its controls,
+      ; and a GuiControlGet against a destroyed GUI leaves the variables untouched; take the snapshot while the window exists
+      GuiControlGet, UsrCheckBoxu, WinMsgBox:
+      GuiControlGet, DropListuChoice, WinMsgBox:
+      GuiControlGet, 2ndDropListuChoice, WinMsgBox:
+      GuiControlGet, EditUserMsg, WinMsgBox:
+   }
+
    modalHwnd := lastMsgBox2win[1]
    If modalHwnd
       WinSet, Enable,, ahk_id %modalHwnd%
