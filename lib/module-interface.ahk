@@ -360,17 +360,19 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
          If isMapped
          {
             flyoutAnchorMenu := hMinit
+            menusflyOutVisible := 0
             OutputDebug, % "QPV: MERGE: flyout flag raised [bar] anchor=" hMinit
          }
       } Else If (popupRootSeen!=1)
       {
          popupRootSeen := 1
          flyoutAnchorMenu := hMinit
+         menusflyOutVisible := 0
          OutputDebug, % "QPV: MERGE: flyout flag raised [popup] anchor=" hMinit
       }
 
       uiMenuJITrebuild(hMinit)
-      uiTryPlaceFlyout()
+      uiStartMenuTimer()
    } Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
       uiMenuLoopEnter(wP)
    Else If (msg=0x212) ; WM_EXITMENULOOP
@@ -476,6 +478,8 @@ uiMenuLoopExit() {
    menuRButtonEaten := 0
    menuReaderOSDdeadline := 0
    uiMenuReaderLastMsg := ""
+   flyoutAnchorMenu := 0
+   uiStopMenuTimer()
    If hLLmouseHook
    {
       DllCall("user32\UnhookWindowsHookEx", "UPtr", hLLmouseHook)
@@ -531,12 +535,40 @@ uiRefreshBarAttachments() {
       OutputDebug, % "QPV: MERGE: bar attachments repaired: " repaired
 }
 
-uiTryPlaceFlyout() {
-   If (allowMenuReader!="yes")
+uiStartMenuTimer() {
+   Static cb := 0
+   If !cb
+      cb := RegisterCallback("uiMenuTimerProc", "F")
+   DllCall("user32\SetTimer", "UPtr", PVhwnd, "UPtr", 0xF17E, "UInt", 20, "UPtr", cb, "UPtr")
+}
+
+uiStopMenuTimer() {
+   DllCall("user32\KillTimer", "UPtr", PVhwnd, "UPtr", 0xF17E)
+}
+
+uiMenuTimerProc(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
+   prevCrit := A_IsCritical
+   Critical
+   If (menusflyOutVisible!=1)
+      uiTryPlaceFlyout()
+   If menusflyOutVisible
+      uiStopMenuTimer()
+   Critical, %prevCrit%
+}
+
+uiTryPlaceFlyout(anchor:=0) {
+   If (allowMenuReader!="yes" || menusflyOutVisible=1)
       Return
 
+   If anchor
+      flyoutAnchorMenu := anchor
+
    a := 0
-   If flyoutAnchorMenu
+   If (flyoutAnchorMenu && DllCall("user32\IsWindow", "UPtr", flyoutAnchorMenu))
+   {
+      If DllCall("user32\IsWindowVisible", "UPtr", flyoutAnchorMenu)
+         a := flyoutAnchorMenu
+   } Else If flyoutAnchorMenu
    {
       WinGet, menuWins, List, % "ahk_class #32768 ahk_pid " QPVpid
       Loop, % menuWins
@@ -551,10 +583,13 @@ uiTryPlaceFlyout() {
             Break
          }
       }
-   } Else a := uiVisibleMenuWin()
-   SoundBeep , % a ? 300 : 900, 100
+   }
+   If (!a && !flyoutAnchorMenu)
+      a := uiVisibleMenuWin()
    If !a
       Return
+
+   flyoutAnchorMenu := a
 
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
@@ -2337,17 +2372,12 @@ guiCreateMenuFlyout() {
    wasMenuFlierCreated := 1
 }
 
-menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0) {
+menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0, anchor:=0) {
    Critical, on
    lastOtherWinClose := A_TickCount
    lastContextMenuZeit := A_TickCount
-   ; [phase D fix] «allowMenuReader := actu» is GONE: setWinCloseZeit posts a "no"
-   ; after every menu-item selection, and pre-merge the next programmatic menu
-   ; open re-armed the flag - native bar opens never do, so choosing any item
-   ; [e.g. opening a favourites image] killed the bar flyout until the next
-   ; right-click menu. The flag stays a stable "yes" [seeded]; a non-"yes" call
-   ; still performs its hide/reset duties below.
-   ; ToolTip, % "d=" darkMode , , , 2
+   If anchor
+      flyoutAnchorMenu := anchor
    If (IsNumber(idu) && idu>0)
       menuCurrentIndex := idu
 
@@ -2360,7 +2390,10 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0) {
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
 
-   uiTryPlaceFlyout()
+   If (actu="yes")
+      uiStartMenuTimer()
+   Else
+      SetTimer, hideMenuFlyOut, -35
 }
 
 hideMenuFlyOut() {
@@ -2375,6 +2408,8 @@ coreHideMenuFlyout() {
     Tooltip
     menuCurrentIndex := 0
     menusflyOutVisible := 0
+    flyoutAnchorMenu := 0
+    uiStopMenuTimer()
     Gui, menuFlier: Hide
     Gui, MclickH: Hide
     SetTimer, hideMenuFlyOut, Off
@@ -2720,28 +2755,20 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
 }
 
 uiVisibleMenuWin(ptX:="", ptY:="") {
-; [merge] The main script runs DetectHiddenWindows ON, and a HIDDEN #32768 window
-; persists in the process once any menu has ever shown - probing without a
-; visibility check matches it forever. Every menu-window probe in this module
-; goes through here, so it sees what the old interface interpreter [DHW off] saw.
-; When screen coordinates are passed, hit-tests all visible #32768 windows of this process.
-   If (ptX != "" && ptY != "")
+   WinGet, menuWins, List, % "ahk_class #32768 ahk_pid " QPVpid
+   Loop, % menuWins
    {
-      WinGet, menuWins, List, % "ahk_class #32768 ahk_pid " QPVpid
-      Loop, % menuWins
+      w := menuWins%A_Index%
+      If !DllCall("user32\IsWindowVisible", "UPtr", w)
+         Continue
+      If (ptX != "" && ptY != "")
       {
-         w := menuWins%A_Index%
-         If !DllCall("user32\IsWindowVisible", "UPtr", w)
-            Continue
          WinGetPos, mX, mY, mW, mH, ahk_id %w%
          If (ptX >= mX && ptX < mX + mW && ptY >= mY && ptY < mY + mH)
             Return w
-      }
-      Return 0
+      } Else
+         Return w
    }
-   h := WinExist("ahk_class #32768 ahk_pid " QPVpid)
-   If (h && DllCall("user32\IsWindowVisible", "UPtr", h))
-      Return h
    Return 0
 }
 
