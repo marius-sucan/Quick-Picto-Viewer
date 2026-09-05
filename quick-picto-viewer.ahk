@@ -27377,7 +27377,7 @@ WinMsgBoxGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     If (!MsgBox2hwnd)
        Return
 
-    If (isRightClick=1 && A_GuiControl!="vprompt")
+    If (isRightClick=1 && A_GuiControl!="prompt")
     {
        If SettingsToolTips()
           Return

@@ -69,7 +69,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
   MsgBox2hwnd := 0
   MsgBox2Result := ""
-  UsrCheckBoxu := DropListuChoice := 2ndDropListuChoice := EditUserMsg := "" ; a GuiControlGet against a destroyed window leaves these untouched; without the reset a box closed with Escape/X returns the previous box's answers
+  UsrCheckBoxu := DropListuChoice := 2ndDropListuChoice := EditUserMsg := ""
   If (btnList=-1)
      btnList := ""
   Else If (btnList=0)
@@ -149,7 +149,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
         {
            2ndlistRows++
            listDim := GetMsgDimensions(A_LoopField, fontFace, fontSize, rMaxW, rMaxH, 1, doBold)
-           2ndlistWidth := max(listDim.w, 2ndlistWidth, btnDim.w) ; was listWidth: the width came from the last row only
+           2ndlistWidth := max(listDim.w, 2ndlistWidth, btnDim.w)
         }
      }
      2ndlistWidth += bH
@@ -296,9 +296,6 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
 
    If (iconFile)
    {
-      ; Gui, Add, Picture does not raise when an image cannot be loaded [it leaves an empty control that still anchors the layout]
-      ; and the old Catch covered only the last of the three branches; load the image first and add the control only with a
-      ; valid handle [the control takes ownership of a handle given without the * prefix and frees it on destroy]
       iconOpts := "w-1 h" bH " GDI+" ((iconHandle || !iconNum) ? "" : " Icon" iconNum)
       hIconImg := 0, iconImgType := 0
       Try hIconImg := LoadPicture(iconFile, iconOpts, iconImgType)
@@ -331,9 +328,6 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   msgH := "", msgScroll := "-VScroll"
   If (btnCount>0)
   {
-     ; the prompt Edit has no scrollbar and its height is not capped, so it grows with the text [wide rather than tall is wanted];
-     ; only when the message cannot fit the work area even at the width chosen above, cap the height and give it a scrollbar.
-     ; This replaces the old guard, which compared against an undefined variable and could never trigger.
      msgDim := GetStringSize(fontFace, fontSize, doBold, sMsg, 1, msgW)
      maxMsgH := Round((rMaxH - bH*2)*0.9)
      If (msgDim.h>maxMsgH)
@@ -362,12 +356,12 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If editOptions
      Gui, Add, Edit, xp y+%marginz% wp %addLabelu% -WantReturn r1 -multi -HScroll -VScroll %editOptions% vEditUserMsg, %editDefaultLine%
 
-  checkBoxState := (checkBoxState=1) ? 1 : 0 ; a blank state would expand to a bare Checked option, i.e. ticked
+  checkBoxState := (checkBoxState=1) ? 1 : 0
   If checkBoxCaption
      Gui, Add, Checkbox, xp y+%marginz% wp Checked%checkBoxState% vUsrCheckBoxu, %checkBoxCaption%
 
   multiSel := (DropListMode=3) ? 8 : " gMsgBox2ListBoxEvent "
-  2ndMultiSel := (2ndDropListMode=3) ? 8 : " gMsgBox2ListBoxEvent " ; read as %2ndmultisel% by the second ListBox; it used to be an undefined [blank] variable
+  2ndMultiSel := (2ndDropListMode=3) ? 8 : " gMsgBox2ListBoxEvent "
   If (dropListu || 2ndDropListu)
      Gui, +Delimiter`f
 
@@ -409,7 +403,8 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
       btnText := A_LoopField
       def := (A_Index=btnDefault) ? " +Default +hwndhDefBtn" : ""
       If (A_Index=btnDefault)
-         textbtnDefault := btnText ; assigned here, on the cleaned list and the normalised btnDefault; it used to be set only for lists containing "|" and a non-zero default, and it counted blank fields
+         textbtnDefault := btnText
+
       thisBW := btnDimensions[A_Index].w + bH
       If (thisBW<minBW)
          thisBW := minBW
@@ -424,12 +419,10 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
       If RegExMatch(StrReplace(btnText, "&"), "i)(discard|remove|delete|erase|wipe)")
       {
          Gui, Add, Text, xp+0 y+0 wp h%ledH% -border +0xE +hwndhTemp +Disabled, Destructive option indicator
-         ; oldupdateColoredRectCtrl("FF5500", hTemp)
          addedLine := 1
       } Else If InStr(def, "+def")
       {
          Gui, Add, Text, xp+0 y+0 wp h%ledH% -border +0xE +hwndhTemp +Disabled, Default option indicator
-         ; oldupdateColoredRectCtrl("2288FF", hTemp)
          addedLine := 1
       }
   }
@@ -438,7 +431,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
      Gui, Add, Button, gMsgBox2event x+0 w1 h1 Default, --
 
   Gui, Add, Text, xp yp w1 h1 BackgroundTrans,% A_Space
-  If StrLen(ownerHwnd)>1
+  If (StrLen(ownerHwnd)>1)
      Try Gui, +Owner%ownerHwnd%
 
   If modalHwnd
@@ -500,8 +493,6 @@ KillMsgbox2Win() {
    Global UsrCheckBoxu, DropListuChoice, 2ndDropListuChoice, EditUserMsg
    If (MsgBox2hwnd && WinExist("ahk_id " MsgBox2hwnd))
    {
-      ; the WinMsgBoxGuiClose/GuiEscape labels destroy the window right after this call, before MsgBox2() reads its controls,
-      ; and a GuiControlGet against a destroyed GUI leaves the variables untouched; take the snapshot while the window exists
       GuiControlGet, UsrCheckBoxu, WinMsgBox:
       GuiControlGet, DropListuChoice, WinMsgBox:
       GuiControlGet, 2ndDropListuChoice, WinMsgBox:
@@ -585,7 +576,6 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     dims := GetStringSize(FaceName, FontSize, bBold, sString, mustWrap, maxW + 100)
     ctlSizeW := dims.w
     ctlSizeH := dims.h
-
     thisFontSize := !fontSize ? 8 : fontSize
     r := []
     r.l := ctlSizeH ; line height
@@ -628,11 +618,9 @@ GetMsgDimensions(sString, FaceName, FontSize, maxW, maxH, btnMode:=0, bBold:=0) 
     Else If (ctlSizeH>maxH*0.9 && modifiedW=1)
        r.w := maxW
 
+    r.w := Round(r.w)
     If (btnMode!=1)
-    {
-       r.w := Round(r.w) ; ctlSizeW//1.7 yields a float, and Fnt_GetSizeForEdit() wraps only at an integer width
-       dimz := GetStringSize(FaceName, FontSize, bBold, sString, mustWrap, r.w) ; was FntSize [undefined]: measured at the default font size
-    }
+       dimz := GetStringSize(FaceName, FontSize, bBold, sString, mustWrap, r.w)
 
     scaledH := Round((ctlSizeW / r.w) * ctlSizeH)
     If (scaledH>maxH*0.9) || (dimz.h>maxH*0.9)
@@ -692,9 +680,6 @@ GetStringSize(FontFace, fontSize, doBold, p_String, mustWrap, l_Width:=0) {
 
     Fnt_GetSizeForEdit(hFont, p_String, l_Width, r_Width, r_Height, mustWrap)
     Fnt_DeleteFont(hFont)
-    ; If (r_Height>15*fontSize && mustWrap!=1)
-    ;    r_Height := fontSize * 3
-
     result := []
     result.w := (mustWrap=1) ? r_Width + Round(fontSize*1.5) : r_Width
     result.h := r_Height ? r_Height : fontSize * 2
@@ -762,4 +747,3 @@ calcScreenLimits(whichHwnd:="main") {
     ; ToolTip, % ActiveMon "`n" pActiveMon "`n" hMon , , , 2
     Return prevActiveMon
 }
-
