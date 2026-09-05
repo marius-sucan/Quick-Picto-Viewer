@@ -14,6 +14,11 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     case DLL_PROCESS_ATTACH:
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
+        // NOTHING may run here: lpReserved is NULL for every thread attach and
+        // detach as well, and this DLL starts and ends threads all the time
+        // [thumbnails pool, WIC, OpenMP]. A fall-through into the unhook below
+        // [2026-09-05] destroyed the menu hook a moment after it was installed.
+        break;
     case DLL_PROCESS_DETACH:
         // A dynamic unload [lpReserved == NULL] with the WH_CALLWNDPROC hook still
         // installed would leave Windows calling code that is gone; at process exit
