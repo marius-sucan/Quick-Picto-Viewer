@@ -15,15 +15,14 @@
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
      , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray, menuCurrentIndex, menuTotalIndex, menusList
-     , menusflyOutVisible, wasMenuFlierCreated, prevMenuBarItem, lastMenuBarUpdate, lastMenuHoverZeit, lastContextMenuZeit
+     , menusflyOutVisible, wasMenuFlierCreated, prevMenuBarItem, lastMenuBarUpdate, lastContextMenuZeit
      , allowMenuReader, taskBarUI, groppedFiles, LbtnDwn, penPressureRaw, hasPenPressureAPI
      , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
-     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated
-     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession, menuNativeTimerID
-     , flyoutNeedsPos, popupRootSeen, flyoutGraceZeit, flyoutAnchorMenu, menuNativeTimerID2, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
-     , sentMsgProbeSeen
+     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, popupRootSeen
+     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession
+     , flyoutAnchorMenu, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -37,21 +36,15 @@ initInterfaceModule() {
    LbtnDwn := 0, penPressureRaw := 0, canCancelImageLoad := 0, alterFilesIndex := 0
    mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0, allowMenuReader := 0
    lastCloseInvoked := -1, lastALclickX := 0, lastALclickY := 0, statusBarTooltipVisible := 0
-   lastContextMenuZeit := 1, lastDoubleClickZeit := 1, lastMenuBarUpdate := 1, lastMenuHoverZeit := 1
+   lastContextMenuZeit := 1, lastDoubleClickZeit := 1, lastMenuBarUpdate := 1,
    lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1, lastLongOperationStart := 1
    doNormalCursor := 1, prevFullIMGload := 1, prevMenuBarItem := 1
    menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuCurrentIndex := 0, menuTotalIndex := 0
    winGDIcreated := 0, ThumbsWinGDIcreated := 0
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuNativeTimerID := 0, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
-   flyoutNeedsPos := 0, popupRootSeen := 0, flyoutGraceZeit := 1, flyoutAnchorMenu := 0, menuNativeTimerID2 := 0, sentMsgProbeSeen := 0
-   ; "yes" matches the pre-merge de-facto state: showThisMenu passed a literal
-   ; "yes" into menuFlyoutDisplay on EVERY programmatic menu open, so the reader
-   ; flag was on from the first menu of a session; native bar opens never call it,
-   ; and a 0 seed left bar sessions without the flyout or announcements until the
-   ; first right-click menu. The "no" reset path still turns it off when main asks.
-   allowMenuReader := "yes"
+   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
+   flyoutAnchorMenu := 0, allowMenuReader := "yes"
 
    ; input handlers. Module-only message numbers first:
    OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -344,13 +337,14 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    OutputDebug, % "QPV: MERGE: sent msg 0x" Format("{:X}", msg) " wP=" wP " lP=" lP " hwnd=" hwnd " loop=" menuLoopActive " bar=" barMenuSession
    If (msg=0x85EE)     ; the install-time probe of uiInstallSentMsgHook()
    {
-      sentMsgProbeSeen := 1
       Critical, %prevCrit%
       Return
    }
+
    If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
+   {
       uiMenuSelectTrack(wP, lP)
-   Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
+   } Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
    {
       hMinit := wP
       isMapped := (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit)) ? 1 : 0
@@ -360,27 +354,24 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
       ; dropdown, anything else is a programmatic popup's root
       If (menuLoopActive!=1)
          barMenuSession := isMapped
-      ; the flyout anchors to ROOT popups only: bar dropdowns [mapped menus] and
-      ; the FIRST popup of a right-click/AppsKey session - never to submenus,
-      ; which used to drag it around the screen
+
       If (barMenuSession=1)
       {
          If isMapped
          {
-            flyoutNeedsPos := 1
             flyoutAnchorMenu := hMinit
             OutputDebug, % "QPV: MERGE: flyout flag raised [bar] anchor=" hMinit
          }
       } Else If (popupRootSeen!=1)
       {
          popupRootSeen := 1
-         flyoutNeedsPos := 1
          flyoutAnchorMenu := hMinit
          OutputDebug, % "QPV: MERGE: flyout flag raised [popup] anchor=" hMinit
       }
+
       uiMenuJITrebuild(hMinit)
-   }
-   Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
+      uiTryPlaceFlyout()
+   } Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
       uiMenuLoopEnter(wP)
    Else If (msg=0x212) ; WM_EXITMENULOOP
       uiMenuLoopExit()
@@ -426,8 +417,10 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
    flags := (mwParam >> 16) & 0xFFFF
    If (flags=0xFFFF && !hMenuSel)  ; the menu was dismissed
       Return
-   lastMenuHoverZeit := A_TickCount
-   uiTryPlaceFlyout()
+
+   If (menusflyOutVisible!=1)
+      uiTryPlaceFlyout()
+
    If (allowMenuReader!="yes" || !hMenuSel)
       Return
    VarSetCapacity(bufu, 520, 0)
@@ -466,28 +459,8 @@ uiMenuLoopEnter(fromPopup:=0) {
    ; this is what positions the flyout beside the open menu, the job the old 25ms
    ; AHK timer did from the second interpreter
    Static cbTick := 0
-   If !cbTick
-      cbTick := RegisterCallback("uiMenuNativeTick", "F")
-   popupRootSeen := 0
-   ; flyoutNeedsPos is deliberately NOT reset here: on menu-BAR sessions the first
-   ; INITMENUPOPUP [which raises it] can precede ENTERMENULOOP - a reset here wiped
-   ; the flag and the bar flyout never showed; the ticker consumes the flag itself
-   If !menuNativeTimerID
-      menuNativeTimerID := DllCall("user32\SetTimer", "UPtr", 0, "UPtr", 0, "UInt", 90, "UPtr", cbTick, "UPtr")
-   ; belt: a second, WINDOW-bound native timer. A NULL-hwnd timer is a thread
-   ; message; if the menu-BAR tracking loop retrieves only window messages it
-   ; never dispatches the first one - the PVwin-bound WM_TIMER is dispatched by
-   ; any GetMessage the loop runs, and DispatchMessage calls the TIMERPROC
-   If !menuNativeTimerID2
-      menuNativeTimerID2 := DllCall("user32\SetTimer", "UPtr", PVhwnd, "UPtr", 0xF17E, "UInt", 90, "UPtr", cbTick, "UPtr")
-   ; JIT dropdown rebuilding applies ONLY to menu-bar sessions. The context menus
-   ; [Menu, Show popups] attach the same shared submenus [PVview, PVnav, PVslide...]
-   ; but pre-build everything before showing; letting the hook rebuild them
-   ; mid-popup swapped in the BAR variants and the builders' deleteMenus() calls
-   ; wrecked the open context menu [broken/missing items on reopen].
    barMenuSession := fromPopup ? 0 : 1
-   menuRButtonEaten := 0
-   menuReaderOSDdeadline := 0
+   menuRButtonEaten := menuReaderOSDdeadline := popupRootSeen := 0
    If !hLLmouseHook
    {
       Static cbLL := 0
@@ -503,28 +476,12 @@ uiMenuLoopExit() {
    menuRButtonEaten := 0
    menuReaderOSDdeadline := 0
    uiMenuReaderLastMsg := ""
-   If menuNativeTimerID
-   {
-      DllCall("user32\KillTimer", "UPtr", 0, "UPtr", menuNativeTimerID)
-      menuNativeTimerID := 0
-   }
-   If menuNativeTimerID2
-   {
-      DllCall("user32\KillTimer", "UPtr", PVhwnd, "UPtr", 0xF17E)
-      menuNativeTimerID2 := 0
-   }
-   If (menusflyOutVisible=1)
-   {
-      ; hold the flyout 350ms after the menu closes [per Marius] so the click that
-      ; dismissed the menu can land on the S/T/M buttons; then the hide pass runs
-      flyoutGraceZeit := A_TickCount
-      SetTimer, hideMenuFlyOut, -350
-   }
    If hLLmouseHook
    {
       DllCall("user32\UnhookWindowsHookEx", "UPtr", hLLmouseHook)
       hLLmouseHook := 0
    }
+   SetTimer, hideMenuFlyOut, -350
    If (allowMenuReader="yes")
       mouseTurnOFFtooltip()
    ; self-healing pass, deferred until the loop is fully gone [timers work again]:
@@ -574,40 +531,10 @@ uiRefreshBarAttachments() {
       OutputDebug, % "QPV: MERGE: bar attachments repaired: " repaired
 }
 
-uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
-; TIMERPROC [raw callback] fired BY the modal menu loop every ~90ms - see the RULE above
-   prevCrit := A_IsCritical
-   Critical
-   If (menuLoopActive=1)
-   {
-      uiTryPlaceFlyout()
-      If (menuReaderOSDdeadline && A_TickCount >= menuReaderOSDdeadline)
-      {
-         menuReaderOSDdeadline := 0
-         If (mouseToolTipWinCreated=1)
-            mouseTurnOFFtooltip()
-      }
-   }
-   Critical, %prevCrit%
-}
-
 uiTryPlaceFlyout() {
-; Places the menuFlier flyout under the menu window ONCE PER ROOT POPUP
-; [flyoutNeedsPos is raised by the WM_INITMENUPOPUP hook for bar dropdowns and
-; for the first popup of a context-menu session]; submenus never move it. The
-; flag clears only after a successful placement, so an attempt made before the
-; menu window is visible simply retries. Called from the native ticker AND from
-; every WM_MENUSELECT - the menu-BAR tracking loop may not dispatch NULL-hwnd
-; thread timers at all, while MENUSELECT is SENT on every highlight change in
-; both loop kinds, keyboard navigation included.
-   If (flyoutNeedsPos!=1 || allowMenuReader!="yes")
+   If (allowMenuReader!="yes")
       Return
-   ; anchor by IDENTITY, not mere visibility: dismissed menus FADE OUT, so during
-   ; fast context<->bar alternation the previous session's #32768 is still visible
-   ; when this runs, and placing against it consumed the flag on a dying window's
-   ; rectangle [the intermittent missing-flyout Marius reported]. Every #32768
-   ; answers MN_GETHMENU with the menu it hosts - demand the one hosting the menu
-   ; the flag was raised for; ghosts host the OLD menu and are skipped, retried past.
+
    a := 0
    If flyoutAnchorMenu
    {
@@ -624,16 +551,18 @@ uiTryPlaceFlyout() {
             Break
          }
       }
-   } Else
-      a := uiVisibleMenuWin()
+   } Else a := uiVisibleMenuWin()
+   SoundBeep , % a ? 300 : 900, 100
    If !a
       Return
+
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
+
    WinGetPos, mX, mY, , Height, ahk_id %a%
    If (mX="" || Height="")
       Return
-   flyoutNeedsPos := 0
+
    menusflyOutVisible := 1
    y := mY + Round(Height) + 2
    OutputDebug, % "QPV: MERGE: flyout placed x" mX " y" y " bar=" barMenuSession
@@ -656,7 +585,6 @@ uiMenuMouseLL(nCode, wP, lP) {
       ; physical mouse event during menu sessions, hover jitter included - it
       ; covers a session where the user clicks and then never changes the
       ; highlight [no WM_MENUSELECT] on a loop that may not dispatch timers
-      uiTryPlaceFlyout()
       If (menuReaderOSDdeadline && A_TickCount >= menuReaderOSDdeadline)
       {
          menuReaderOSDdeadline := 0
@@ -2125,7 +2053,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    MouseGetPos, ,, winu
    ; z := identifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
-   && (A_TickCount - lastMenuHoverZeit>300) && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
+   && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
       MT_post("MouseMoveResponder", "krill")
 
    If (menusflyOutVisible=1 && !uiVisibleMenuWin())
@@ -2361,7 +2289,6 @@ byeByeRoutine() {
    }
 }
 
-
 TimerExit() {
    ; SoundBeep , 900, 2000
    thisPID := GetCurrentProcessId()
@@ -2433,26 +2360,11 @@ menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0) {
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
 
-   ; [merge fix] the old display leg armed dummyMenuFlyoutDisplay on a -25 AHK
-   ; timer. Post-merge that timer sat PENT UP through the modal loop and fired the
-   ; moment the menu closed - found no visible menu and HID the flyout right under
-   ; the user's finger, so the S/T/M buttons never received their click. Display
-   ; belongs to the native ticker now [uiMenuNativeTick]; a non-"yes" call still
-   ; requests the hide pass.
-   If (actu!="yes")
-      SetTimer, hideMenuFlyOut, -35
+   uiTryPlaceFlyout()
 }
 
 hideMenuFlyOut() {
-    If (A_TickCount - flyoutGraceZeit < 350)  ; post-menu-close grace: keep the buttons clickable
-    {
-       SetTimer, hideMenuFlyOut, -120
-       Return
-    }
     MouseGetPos,,, OutputVarWin
-    ; WinGetClass, glassu, ahk_id %OutputVarWin%
-    ; WinGetTitle, titlu, ahk_id %OutputVarWin%
-    ; ToolTip, % OutputVarWin "==" hFlyOut "`n" glassu "==" titlu , , , 2
     If (OutputVarWin!=hFlyOut && !uiVisibleMenuWin())
        coreHideMenuFlyout()
     Else If (menusflyOutVisible=1)

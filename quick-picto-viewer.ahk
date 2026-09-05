@@ -69945,6 +69945,7 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    globalMenuOptions := 0
    okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
    idu := (manubarMode=1) ? klop[2] : "reset"
+   flyoutAnchorMenu := MenuGetHandle("menarg")
    menuFlyoutDisplay("yes", mX, mY, okay, idu)
    Sleep, 1
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
