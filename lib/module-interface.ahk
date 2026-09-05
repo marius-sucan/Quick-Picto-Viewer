@@ -2327,16 +2327,12 @@ stopGiFsPlayback() {
    If (mustPreventMenus=1 || simulateMenusMode=1)
       Return
 
-   If (animGIFplaying!=0 || StrLen(prevAnimGIFwas))
+   If (animGIFplaying!=0)
    {
       OutputDebug, % "QPV: MERGE: stopGiFsPlayback via " Exception("", -2).What
-      If (slideShowRunning=1 || animGIFplaying=1)
-         SetTimer, ResetImgLoadStatus, -15
-      SetTimer, autoChangeDesiredFrame, Off
-      autoChangeDesiredFrame("stop")
+      DestroyGIFuWin()
       If (runningLongOperation!=1)
          uiChangeMcursor("normal-extra")
-      lastOtherWinClose := A_TickCount
    }
 }
 
@@ -2352,6 +2348,8 @@ stopPlayback() {
       stopGiFsPlayback()
       wasPlaying := 1
    }
+   If wasPlaying
+      lastOtherWinClose := A_TickCount
    Return wasPlaying
 }
 

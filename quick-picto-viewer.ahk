@@ -10987,7 +10987,6 @@ stopSlideshow(resetMode:=0) {
    userSeenSlideImages := userSeenSessionImagesArray.Count()
    showTOOLtip("Slideshow: STOPPED`nImages seen in this session: " groupDigits(userSeenSlideImages))
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   lastOtherWinClose := A_TickCount
    prevSlideShowStop := A_TickCount
 }
 
@@ -12323,7 +12322,15 @@ changeDesiredFrame(dir:=1) {
 }
 
 DestroyGIFuWin() {
-   stopGiFsPlayback()
+    Critical, on
+    If (mustPreventMenus=1 || simulateMenusMode=1)
+       Return
+
+    If (slideShowRunning=1 || animGIFplaying=1)
+       SetTimer, ResetImgLoadStatus, -15
+
+    SetTimer, autoChangeDesiredFrame, Off
+    autoChangeDesiredFrame("stop")
 }
 
 restartGIFplayback() {

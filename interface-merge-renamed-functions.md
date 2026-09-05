@@ -277,7 +277,7 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `scheduleNextSlide()` | quick-picto-viewer.ahk | 9 | directly arms `theSlideShowCore` timer after image load completion; replaces `invokeExternalSlideshowHandler()` and `dummySlideshow()`, eliminating the queued `QPV_post` relay |
 | `stopSlideshow(resetMode:=0)` | quick-picto-viewer.ahk | 34 | canonical single-entry slideshow teardown: kills `theSlideShowCore`, stops audio, restores toolbar transparency and region, resets UI controls/labels, and displays the stopped tooltip |
 | `stopPlayback()` | lib/module-interface.ahk | 14 | playback interceptor for viewport events and window close/escape: stops active slideshow (`stopSlideshow`) and/or active GIF (`stopGiFsPlayback`), returning whether anything was running |
-| `stopGiFsPlayback()` | lib/module-interface.ahk | 14 | consolidated GIF playback teardown; absorbs `DestroyGIFuWin()` logic (`SetTimer, ResetImgLoadStatus, -15`) so all 43 `DestroyGIFuWin()` call sites route here |
+| `stopGiFsPlayback()` | lib/module-interface.ahk | 10 | user-gesture GIF teardown; triggers when actively playing (`animGIFplaying != 0`) and delegates internal frame teardown to `DestroyGIFuWin()` |
 
 *Eliminated cross-thread / multi-hop functions:* `slideshowsHandler()` (MI, stop/start cascade absorbed into `stopSlideshow` and `ToggleSlideShowu`), `dummySlideshow()` (MI, load completion relay), and `invokeExternalSlideshowHandler()` (QPV, replaced by `scheduleNextSlide`).
 
