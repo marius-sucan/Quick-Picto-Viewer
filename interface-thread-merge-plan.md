@@ -228,6 +228,20 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
     - `drainUIinput()`: Added peeks with remove for `0x00A1` (`HTCLOSE`), `0x0112` (`SC_CLOSE`), and `0x0010` (`WM_CLOSE`) for Critical worker loops.
     - `byeByeRoutine()`: Added explicit `Return` in `Else If (runningLongOperation=1)` after `askAboutStoppingOperations()` to prevent fall-through. Simplified the gate check to `Else If (runningLongOperation=1)` so long operations always prompt to abort.
 
+**2026-09-05 — queued dispatch facades unified (MT_post and IF_post merged into QPV_post).**
+- As analyzed in `interface-merge-renamed-functions.md` §7-B, the two opposing names `IF_post` and `MT_post` were the two directions of a cross-thread bridge that no longer has two sides.
+- `MT_post` (11 active call sites in `lib/module-interface.ahk`) and `IF_post` (37 active call sites in `quick-picto-viewer.ahk`) are now unified into a single `QPV_post(funcName, args*)` defined in `quick-picto-viewer.ahk`.
+- `MT_post` function definition deleted from `lib/module-interface.ahk` (reducing module function count from 112 to 111).
+- `IF_postRelay` renamed to `QPV_postRelay` and bound by `QPV_post`.
+- All 48 active call sites across both files retargeted to `QPV_post`; arity and variadic dispatch rules preserved; CRLF+BOM and LF+BOM intact.
+
+**2026-09-05 (later) — Step 1 cleanup: dead code, duplicate centering, thin relays, and pipe-marshaling eliminated.**
+- Dead code: deleted dead MSAA orphan function `AccGetLocation(Acc, ChildId=0)` from `lib/module-interface.ahk`.
+- Duplicate window centering retired: `uiRepositionWindowCenter` deleted from `lib/module-interface.ahk`; its sole caller in `BuildGUI()` retargeted to `repositionWindowCenter("PVwin", PVhwnd, "mouse", appTitle)`.
+- 4 thin relays eliminated: `uiToggleAppToolbar()`, `uiToggleMenuBaru()`, and `uiPanelQuickSearchMenuOptions()` deleted; their 300 ms debounce logic and `QPV_post` calls inlined directly into the `uiWM_LBUTTONUP` flyout buttons handler (`hFlyBtn1`, `hFlyBtn2`, `hFlyBtn3`). `uiInitGuiContextMenu(mX, mY, oX, oY)` deleted; inlined as `InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))` at its two call sites (`WM_LBUTTON_DBL` and `WM_RBUTTONUP`).
+- Pipe-string marshaling dropped: `BuildGUI()` now returns `PVhwnd` directly (truthy on successful creation of all 6 core GUI HWNDs, 0 on failure) instead of packing 8 fields into a `"|"` string. `handleUIhwnd(initGui:="")` reads shared globals directly, with backwards-compatible `InStr(initGui, "|")` fallback. Callers in startup and `restartEntireGui()` simplified.
+- Module function count reduced from 111 to 105 (7 functions eliminated across Step 1). All static verification gates passed (BOM/CRLF in MI, BOM/LF in QPV, balanced braces at 284 in MI, zero dangling symbol references).
+
 ## Critical files
 
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).

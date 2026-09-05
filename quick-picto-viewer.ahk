@@ -459,24 +459,22 @@ If (FirstRun!=0)
 ; there; the old separate ahkthread interpreter is gone.
 initInterfaceModule()
 
-; ______ interface facade [merged - phases C+E] ______
-; IF_post and MT_post preserve the old cross-interpreter queued semantics [a
-; post executed when the receiving thread pumped] via one-shot BoundFunc timers
-; through IF_postRelay. IF_call, the direct-call facade, was retired 2026-09-02:
-; its sites are plain calls now. The former IF_set/IF_get/MT_set/MT_get variable facades were
-; retired at phase E - every site is a plain global assignment or read now.
+; ______ queued asynchronous dispatch [merged - phases C+E] ______
+; QPV_post preserves the old cross-interpreter queued semantics [a post
+; executed when the receiving thread pumped] via one-shot BoundFunc timers
+; through QPV_postRelay. Unifies the former IF_post and MT_post facades.
 ; PARSER RULE for this runtime [see interface-thread-merge-plan.md]: no args*
 ; expansion into METHOD calls and no args[N] inside call arguments - hoist into
 ; plain locals and dispatch on the count, as below.
 
-IF_post(funcName, args*) {
+QPV_post(funcName, args*) {
 ; queued execution, like the old cross-interpreter post: the target runs from a
 ; one-shot timer when this thread next pumps messages, never inline
-   fn := Func("IF_postRelay").Bind(funcName, args)
+   fn := Func("QPV_postRelay").Bind(funcName, args)
    SetTimer, % fn, -5
 }
 
-IF_postRelay(funcName, args) {
+QPV_postRelay(funcName, args) {
    n := args.Length()
    a1 := args[1], a2 := args[2], a3 := args[3], a4 := args[4], a5 := args[5]
    a6 := args[6], a7 := args[7], a8 := args[8], a9 := args[9]
@@ -505,9 +503,7 @@ IF_postRelay(funcName, args) {
 ; the interface windows, menus and input handling live in Lib\module-interface.ahk
 ; [merged into this interpreter in 2026-08; the settings handshake string is gone -
 ; BuildGUI() reads the shared globals directly]
-initGUI := BuildGUI()
-fnOutputDebug("extern UI HWNDs: " initGUI)
-If !InStr(initGUI, "|")
+If !BuildGUI()
 {
    MsgBox, 48, %appTitle%, ERROR: Unable to initialize the interface. The application will now exit...
    hasInitSpecialMode := 1
@@ -515,7 +511,7 @@ If !InStr(initGUI, "|")
    Return
 } Else
 {
-   handleUIhwnd(initGui)
+   handleUIhwnd()
    externObj := ""
 }
 
@@ -542,7 +538,7 @@ If (qpvCanvasHasInit=1)
 If (doWelcomeNow=1 && qpvCanvasHasInit=1)
 {
    drawWelcomeImg()
-   IF_post("uiAccessWelcomeView")
+   QPV_post("uiAccessWelcomeView")
 }
 
 If (A_Is64bitOS=1 && A_PtrSize!=8)
@@ -982,7 +978,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
              }
           }
           If n
-             IF_post("invokeGivenMenuBarPopup", n)
+             QPV_post("invokeGivenMenuBarPopup", n)
        }
    }
 
@@ -2643,7 +2639,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
 endCaptureCloneBrush() {
    mustCaptureCloneBrush := 0
-   IF_post("setMenuBarState", "Enable", "PVbar")
+   QPV_post("setMenuBarState", "Enable", "PVbar")
    createGUItoolbar()
 }
 
@@ -2705,7 +2701,7 @@ resetMainWin2Welcome() {
      prevOpenedWindow := ""
      drawWelcomeImg()
      SetTimer, createGUItoolbar, -100
-     IF_post("uiAccessWelcomeView")
+     QPV_post("uiAccessWelcomeView")
      SetTimer, TriggerMenuBarUpdate, -90
      SetTimer, ResetImgLoadStatus, -50
      If (lockToolbar2Win=1 && ShowAdvToolbar=1)
@@ -4937,7 +4933,7 @@ ToggleThumbsMode() {
       ToggleVisibilityWindow("hide", hGDIthumbsWin)
       fnOutputDebug("Image view initialized")
       dummyTimerDelayiedImageDisplay(50)
-      IF_post("uiAccessUpdateUiStatusBar", 0, 0, "image")
+      QPV_post("uiAccessUpdateUiStatusBar", 0, 0, "image")
       If hSNDmediaFile
          MCI_Resume(hSNDmedia)
       lastTimeToggleThumbs := A_TickCount
@@ -4991,7 +4987,7 @@ TriggerMenuBarUpdate(modus:=0, tt:=0) {
       modus := "freeform"
 
    lastMenuBarUpdated := A_TickCount
-   IF_post("UpdateMenuBar", modus, tt)
+   QPV_post("UpdateMenuBar", modus, tt)
    SetTimer, refreshEntireViewport, -450
 }
 
@@ -5925,7 +5921,7 @@ BtnSetBrushSymmetryCoords() {
    showTOOLtip("Please click inside the image area to set the symmetry axis")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   IF_post("setMenuBarState", "Disable", "PVbar")
+   QPV_post("setMenuBarState", "Disable", "PVbar")
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -12428,7 +12424,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       lastInvoked := A_TickCount
       prevImgPath := ""
       OutputDebug, % "QPV: MERGE: gifForceNextSlide"
-      IF_post("theSlideShowCore", "force")
+      QPV_post("theSlideShowCore", "force")
       ; theSlideShowCore()
       invokeExternalSlideshowHandler()
    } Else If (A_TickCount - lastFrameChange > thisFrameDelay)
@@ -33352,7 +33348,7 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
     createGUItoolbar()
     lastLongOperationAbort := A_TickCount
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
-       IF_post("setTaskbarIconState", "normal")
+       QPV_post("setTaskbarIconState", "normal")
 
     msgBoxed := 0
     Return (checkBoxuCaption || dropListu || edithu || 2ndDropListu) ? zr : r
@@ -45285,7 +45281,7 @@ BtnSetClonerBrushSource() {
    showTOOLtip("Please click inside the image area to set the cloner brush source")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   IF_post("setMenuBarState", "Disable", "PVbar")
+   QPV_post("setMenuBarState", "Disable", "PVbar")
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -45333,7 +45329,7 @@ BtnSetTextureSource() {
    showTOOLtip("Please click inside the image area to set the texture source coordinates")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   IF_post("setMenuBarState", "Disable", "PVbar")
+   QPV_post("setMenuBarState", "Disable", "PVbar")
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -48503,7 +48499,7 @@ StopColorPicker() {
    Gui, LEDgui: Destroy
    colorPickerModeNow := 0
    Global lastOtherWinClose := A_TickCount
-   IF_post("setMenuBarState", "Enable", "PVbar")
+   QPV_post("setMenuBarState", "Enable", "PVbar")
 }
 
 StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
@@ -48524,7 +48520,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
 
    Sleep, 1
    diffH := diffW := 0
-   IF_post("setMenuBarState", "Disable", "PVbar")
+   QPV_post("setMenuBarState", "Disable", "PVbar")
    CoordMode, Pixel, Screen
    LEDu := imgHUDbaseUnit
    hColorPrev := createLEDgui(LEDu)
@@ -69432,7 +69428,7 @@ StopCaptureClickStuff(dummy:=0) {
    If (dummy!="escape" && panelWinCollapsed=1 && imgEditPanelOpened=1 && AnyWindowOpen)
       toggleImgEditPanelWindow()
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   IF_post("setMenuBarState", "Enable", "PVbar")
+   QPV_post("setMenuBarState", "Enable", "PVbar")
 }
 
 BuildMainMenu(dummy:=0, givenCoords:=0) {
@@ -72057,7 +72053,7 @@ ToggleDarkModus() {
     friendly := (uiUseDarkMode=1) ? "ACTIVATED" : "DEACTIVATED"
     AddTooltip2Ctrl("reset")
     setMenusTheme(uiUseDarkMode)
-    IF_post("destroyMenuFlyout")
+    QPV_post("destroyMenuFlyout")
     showDelayedTooltip("Dark mode: " friendly)
     thisFunc := prevOpenedWindow[2]
     If (VisibleQuickMenuSearchWin=1)
@@ -73177,22 +73173,23 @@ restartEntireGui() {
    destroyGDIPcanvas()
    destroyAllGUIs()
    Sleep, 25
-   initGUI := BuildGUI()  ; [merge] reads the live globals; the old 9-of-16-field handshake bug is gone
-   fnOutputDebug("RESTARTED extern UI HWNDs: " initGUI)
-   If InStr(initGui, "|")
-      handleUIhwnd(InitGui)
+   If BuildGUI()
+      handleUIhwnd()
 
    createGDIPcanvas()
 }
 
-handleUIhwnd(initGui) {
-   externObj := StrSplit(initGUI, "|")
-   PVhwnd := externObj[1]
-   hGDIinfosWin := externObj[2]
-   hGDIwin := externObj[3]
-   hGDIthumbsWin := externObj[4]
-   hGDIselectWin := externObj[5]
-   hPicOnGui1 := externObj[6]
+handleUIhwnd(initGui:="") {
+   If InStr(initGui, "|")
+   {
+      externObj := StrSplit(initGui, "|")
+      PVhwnd := externObj[1]
+      hGDIinfosWin := externObj[2]
+      hGDIwin := externObj[3]
+      hGDIthumbsWin := externObj[4]
+      hGDIselectWin := externObj[5]
+      hPicOnGui1 := externObj[6]
+   }
    If (!PVhwnd || !hGDIinfosWin || !hGDIwin || !hGDIthumbsWin || !hGDIselectWin || !hPicOnGui1)
    {
       handleFatalWinInitErrors()
@@ -74550,7 +74547,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
           trGdip_DrawImage(A_ThisFunc, Gu, infoBoxGdiCached, scX, scY)
           lastInfoBoxBMP[1] := [imgW, imgH]
        }
-       IF_post("uiAccessUpdateInfoBox", entireString, imgW, imgH, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
+       QPV_post("uiAccessUpdateInfoBox", entireString, imgW, imgH, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
        Return
     }
 
@@ -74725,7 +74722,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     txtOptions.x := (FlipImgH=1 && thumbsDisplaying!=1) ? - scX : borderSize*1.1
     txtOptions.y := (FlipImgV=1 && thumbsDisplaying!=1) ? mainHeight - dimsFh + borderSize - scY : borderSize*1.1
     Gdip_FillRectangle(Gu, OSDwinFadedBrushBGR, scX, scY, dimsFw, dimsFh)
-    IF_post("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
+    QPV_post("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
     If (thumbsDisplaying!=1)
        Gdip_ResetWorldTransform(Gu)
 
@@ -74809,7 +74806,7 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
           thisPosX += tlbrBonusX
           thisPosY += tlbrBonusY
           hasDrawnAnnoBox := 1
-          IF_post("uiAccessUpdateAnnoBox", entireString, imgW, imgH, thisPosX, thisPosY)
+          QPV_post("uiAccessUpdateAnnoBox", entireString, imgW, imgH, thisPosX, thisPosY)
        }
        textBoxBMP := trGdip_DisposeImage(textBoxBMP, 1)
     } Else
@@ -75577,7 +75574,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
    x2 -= kX,   y2 -= kY
    x2 += 3,    y2 += 3
 
-   IF_post("ShowClickHalo", x2, y2, w, h, 1)
+   QPV_post("ShowClickHalo", x2, y2, w, h, 1)
    If (InStr(modus, "space") && (ctrlClassNN ~= "i)(static|combobox|syslistview32)"))
    {
       If (thisHwnd=hSetWinGui)
@@ -75657,7 +75654,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
      allowCaching := 0
 
   If (slideShowRunning!=1 && (A_TickCount - lastInvoked>2000))
-     IF_post("uiAccessImgViewSetUIlabels")
+     QPV_post("uiAccessImgViewSetUIlabels")
 
   oBitmap := LoadBitmapForScreen(thisImgPath, allowCaching, desiredFrameIndex)
   ; fnOutputDebug(A_ThisFunc ": " allowCaching "|" desiredFrameIndex "|" currIMGdetails.OpenedWith)
@@ -75904,7 +75901,7 @@ OnImgFileChangeActions(forceThis) {
 invokeExternalSlideshowHandler() {
    OutputDebug, % "QPV: MERGE: invokeExtSlides via " Exception("", -2).What " animGIF=" animGIFplaying
    allowNextSlide := 1
-   IF_post("dummySlideshow")
+   QPV_post("dummySlideshow")
 }
 
 identifyAudioMediaLength() {
@@ -76364,7 +76361,7 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
        HUDobjNavBoxu := [zImgW, zImgH, thisPosX + diffX - tlbrBonusX, thisPosY + diffY - tlbrBonusY, imgW, imgH, thisPosX - tlbrBonusX, thisPosY - tlbrBonusY]
 
     thisString := hasDrawnImageMap ? entireString : "hide"
-    IF_post("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX, thisPosY)
+    QPV_post("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX, thisPosY)
     trGdip_DisposeImage(navBoxu, 1)
 }
 
@@ -79487,7 +79484,7 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     } Else 
     {
        prevImgCall := 0
-       IF_post("uiAccessUpdateHistoBox", "hide", 1, 1, 0, 0)
+       QPV_post("uiAccessUpdateHistoBox", "hide", 1, 1, 0, 0)
     }
 
     Gdip_SetClipRect(glPG, 0, 0, mainWidth, mainHeight)
@@ -79673,11 +79670,11 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
        HUDobjHistoBoxu[4] := thisPosY - tlbrBonusY
        hasDrawnHistoMap := (E="fail") ? 0 : 1
        thisString := (prevHistoBoxString && hasDrawnHistoMap=1) ? prevHistoBoxString : "hide"
-       IF_post("uiAccessUpdateHistoBox", thisString, imgW, imgH, thisPosX, thisPosY)
+       QPV_post("uiAccessUpdateHistoBox", thisString, imgW, imgH, thisPosX, thisPosY)
     } Else 
     {
        hasDrawnHistoMap := 0
-       IF_post("uiAccessUpdateHistoBox", "hide", 0, 0, 0, 0)
+       QPV_post("uiAccessUpdateHistoBox", "hide", 0, 0, 0, 0)
     }
 
     additionalHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, 1)
@@ -80947,21 +80944,21 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        drawAnnotationBox(mainWidth, mainHeight, 2NDglPG)
     } Else
     {
-       IF_post("uiAccessUpdateAnnoBox", "hide", 1, 1, 0, 0)
+       QPV_post("uiAccessUpdateAnnoBox", "hide", 1, 1, 0, 0)
        hasDrawnAnnoBox := 0
     }
 
     If (showInfoBoxHUD>=1 && drawingShapeNow!=1)
        drawinfoBox(mainWidth, mainHeight, directRefresh, 2NDglPG)
     Else
-       IF_post("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
+       QPV_post("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
     If (showHUDnavIMG=1 && IMGlargerViewPort=1 && slideShowRunning!=1)
     {
        VPnavBoxWrapper(mainWidth, mainHeight, 2NDglPG)
     } Else
     {
-       IF_post("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
+       QPV_post("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
        hasDrawnImageMap := 0
     }
 
@@ -82903,9 +82900,9 @@ getTopMopStyle(hwnd) {
 updateUIctrl() {
    modus := (validBMP(UserMemBMP) || isImgEditingNow() || (maxFilesIndex>0 && CurrentSLD)) ? modus : "welcome"
    If (modus="welcome")
-      IF_post("uiAccessWelcomeView")
+      QPV_post("uiAccessWelcomeView")
    Else
-      IF_post("uiUpdateUIctrl")
+      QPV_post("uiUpdateUIctrl")
 }
 
 coreSelectRandomFiles(howMany, a, b) {
@@ -84299,7 +84296,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
        If (A_TickCount - lastInfoBoxZeitToggle<800 || thumbsListViewMode>1 || actu="scroll")
           Gdip_SetClipRect(2NDglPG, 0, 0, lastInfoBoxBMP[1, 1], lastInfoBoxBMP[1, 2], 4)
     } Else
-       IF_post("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
+       QPV_post("uiAccessUpdateInfoBox", "hide", 1, 1, 0, 0)
 
     listedItems := ""
     theMsg := theMsg2 := itemInfos := ""
@@ -84562,7 +84559,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
 
           listInfos := "Files list container: " maxItemsPage " elements in view. Listing mode: " defineListViewModes() ". Tap and hold, or Control+Left-Click, on any listed item to select it. Items listed:`n" listedItems
           If (actu!="scroll")
-             IF_post("uiAccessUpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, listInfos, OSDfontSize, maxFilesIndex)
+             QPV_post("uiAccessUpdateUiStatusBar", theMSG2, ThumbsStatusBarH, 0, listInfos, OSDfontSize, maxFilesIndex)
 
           trGdip_DisposeImage(infoBoxBMP, 1)
           If (showHUDnavIMG=1 && actu!="scroll") ;  && (thumbsListViewMode>1 || isDupesList=1))
@@ -84570,7 +84567,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
              VPnavBoxWrapper(mainWidth, mainHeight - ThumbsStatusBarH, 2NDglPG)
           } Else If (actu!="scroll")
           {
-             IF_post("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
+             QPV_post("uiAccessUpdateNavBox", "hide", 1, 1, 0, 0)
              hasDrawnImageMap := 0
           }
        }
@@ -97151,7 +97148,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
        }
 
        toolTipGuiCreated := 0
-       IF_post("uiAccessUpdateOSDmsg", "-", 0, 0)
+       QPV_post("uiAccessUpdateOSDmsg", "-", 0, 0)
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
        hudBTNtypeFuncu := hudBTNfuncu := 0
        preventKill := 0
@@ -97241,7 +97238,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If hudBTNfuncu
        omsg .= "`nTemporarily clickable area."
 
-    IF_post("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
+    QPV_post("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
     If (hudBTNfuncu && hudBTNtypeFuncu=1)
        Gdip_FillRectangle(2NDglPG, pBrushD, posXu, posYu, knobSize//2, imgH)
 
@@ -99833,10 +99830,10 @@ changeMcursor(whichCursor:=0) {
   If (whichCursor)
   {
      prevCursor := whichCursor
-     IF_post("uiChangeMcursor", whichCursor)
+     QPV_post("uiChangeMcursor", whichCursor)
   } Else If (A_TickCount - lastInvoked > 400) ; && (imageLoading!=1)
   {
-     IF_post("uiChangeMcursor", "busy")
+     QPV_post("uiChangeMcursor", "busy")
      ; imageLoading := 1 ; [was IF_set - plain global since phase E]
      ; Try DllCall("user32\SetCursor", "Ptr", hCursBusy)
      lastInvoked := A_TickCount

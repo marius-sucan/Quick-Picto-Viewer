@@ -101,15 +101,8 @@ initInterfaceModule() {
 }
 
 
-; ______ main-thread facade [merged - phase C] ______
-; The MT_* wrappers survive the merge so this module's call sites stay untouched;
-; they now delegate to the IF_* facades in quick-picto-viewer.ahk - one interpreter,
-; one implementation. Queued posts share IF_postRelay.
-
-MT_post(funcName, args*) {
-   fn := Func("IF_postRelay").Bind(funcName, args)
-   SetTimer, % fn, -10
-}
+; ______ queued asynchronous dispatch [merged - phases C+E] ______
+; Queued calls use QPV_post() defined in quick-picto-viewer.ahk.
 
 ; ______ merged-thread input routing [merge phase C] ______
 ; Before the merge, each interpreter's OnMessage monitors received messages ONLY
@@ -895,7 +888,7 @@ BuildGUI() {
       ; empty, visible-styled window titled with the app name - the phantom
       ; taskbar button Marius reported. The A1 rename sweep could not see a
       ; number that only exists as a call argument.
-      uiRepositionWindowCenter("PVwin", PVhwnd, "mouse", appTitle)
+      repositionWindowCenter("PVwin", PVhwnd, "mouse", appTitle)
       Sleep, 50
       Gui, PVwin: Show, Maximize
    } Else
@@ -905,8 +898,7 @@ BuildGUI() {
       Sleep, 2
    }
 
-   r := PVhwnd "|" hGDIinfosWin "|" hGDIwin "|" hGDIthumbsWin "|" hGDIselectWin "|" hPicOnGui1 "|" winGDIcreated "|" ThumbsWinGDIcreated
-   Return r
+   Return (PVhwnd && hGDIinfosWin && hGDIwin && hGDIthumbsWin && hGDIselectWin && hPicOnGui1) ? PVhwnd : 0
 }
 
 setMenuBarState(modus, mena:="PVbar") {
@@ -1339,7 +1331,7 @@ createGDIselectorWin() {
 
 miniGDIupdater() {
    uiUpdateUIctrl(0)
-   MT_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
+   QPV_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
 }
 
 WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
@@ -1371,7 +1363,7 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    Else
       direction := (mouseData>0 && mouseData<51234) ? "WheelUp" : "WheelDown"
 
-   MT_post("KeyboardResponder", prefix direction, PVhwnd, 0, navKeysCounter)
+   QPV_post("KeyboardResponder", prefix direction, PVhwnd, 0, navKeysCounter)
    Return 0
 }
 
@@ -1438,13 +1430,22 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
        If isVarEqualTo(hwnd, hFlyBtn1, hFlyBtn2, hFlyBtn3)
           Gui, MclickH: Destroy
 
-       If (hwnd=hFlyBtn1)
-          ; testPDFloader()
-          uiPanelQuickSearchMenuOptions()
-       Else If (hwnd=hFlyBtn2)
-          uiToggleAppToolbar()
-       Else If (hwnd=hFlyBtn3)
-          uiToggleMenuBaru()
+       Static lastFlyBtn := 1
+       If (A_TickCount - lastFlyBtn >= 300)
+       {
+          lastFlyBtn := A_TickCount
+          If (hwnd=hFlyBtn1)
+          {
+             If (VisibleQuickMenuSearchWin=1)
+                QPV_post("closeQuickSearch")
+             Else
+                QPV_post("PanelQuickSearchMenuOptions")
+          }
+          Else If (hwnd=hFlyBtn2)
+             QPV_post("toggleAppToolbar")
+          Else If (hwnd=hFlyBtn3)
+             QPV_post("ToggleMenuBaru")
+       }
     }
     Return 0
 }
@@ -1518,7 +1519,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
 
        Sleep, 1
        lastDoubleClickZeit := A_TickCount
-       uiInitGuiContextMenu(mX, mY, oX, oY)
+       InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))
        Return 0
     }
 
@@ -1552,7 +1553,7 @@ uiNativeYesNoPrompt(msg) {
 ; ThreadIsCritical and sets AllowThreadToBeInterrupted before MessageBox(), DIALOG_END
 ; restores them after], and while the box pumps, MainWindowProc's WM_TIMER runs
 ; MsgSleep(-1), whose CheckScriptTimers() bails only on !IsInterruptible(): every
-; timer, MT_post relay, g-label and hotkey a Critical worker loop had queued ran
+; timer, QPV_post relay, g-label and hotkey a Critical worker loop had queued ran
 ; INSIDE the abort prompt. A queued ResetImgLoadStatus [263 SetTimer sites, -50 ms,
 ; armed by nearly every image display] or drawWelcomeImg clears runningLongOperation
 ; and imageLoading, the gates in front of askAboutStoppingOperations() close, and
@@ -1655,45 +1656,11 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
      If (prefix="+" && !AnyWindowOpen && drawingShapeNow!=1 && mustCaptureCloneBrush!=1)
         BuildSecondMenu()
      Else
-        uiInitGuiContextMenu(mX, mY, oX, oY)
+        InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))
   }
   Return 0
 }
 
-uiPanelQuickSearchMenuOptions() {
-    Static lastInvoked := 1
-    If (A_TickCount - lastInvoked<300)
-       Return
- 
-    If (VisibleQuickMenuSearchWin=1)
-       MT_post("closeQuickSearch")
-    Else
-       MT_post("PanelQuickSearchMenuOptions")
-    lastInvoked := A_TickCount
-}
-
-uiToggleAppToolbar() {
-    Static lastInvoked := 1
-    If (A_TickCount - lastInvoked<300)
-       Return
-
-    MT_post("toggleAppToolbar")
-    lastInvoked := A_TickCount
-}
-
-uiToggleMenuBaru() {
-    Static lastInvoked := 1
-    If (A_TickCount - lastInvoked<300)
-       Return
-
-    MT_post("ToggleMenuBaru")
-    lastInvoked := A_TickCount
-}
-
-uiInitGuiContextMenu(mX, mY, oX, oY) {
-    ctrl := IdentifyCtrlUnderMouse(oX, oY)
-    InitGuiContextMenu("extern", mX, mY, 0, ctrl)
-}
 
 ; [merge] infosSlideShow() and initSlidesModes() are gone: they only mirrored the
 ; slideshow flags into this interpreter, and the globals are shared now.
@@ -1856,7 +1823,7 @@ uiWinClickAction(thisEvent:="normal") {
     If (slideShowRunning=1)
        turnOffSlideshow()
     Else
-       MT_post("WinClickAction", thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
+       QPV_post("WinClickAction", thisEvent, IdentifyCtrlUnderMouse(lastLclickX, lastLclickY), mX, mY)
 }
 
 ResetLbtn() {
@@ -2040,7 +2007,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
      If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1 && whileLoopExec!=1)
-        MT_post("MouseMoveResponder")
+        QPV_post("MouseMoveResponder")
  
      prevPos := mX "-" mY
   }
@@ -2089,7 +2056,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    ; z := identifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
    && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
-      MT_post("MouseMoveResponder", "krill")
+      QPV_post("MouseMoveResponder", "krill")
 
    If (menusflyOutVisible=1 && !uiVisibleMenuWin())
       SetTimer, hideMenuFlyOut, -50
@@ -2243,7 +2210,7 @@ byeByeRoutine() {
          ; then it kills the PID - a no-op if the clean path exited first.
          mustAbandonCurrentOperations := 1
          SetTimer, TimerExit, -8000
-         MT_post("TrueCleanup")
+         QPV_post("TrueCleanup")
          Try Run, %ComSpec% /c ping -n 9 127.0.0.1 >nul 2>&1 && taskkill /PID %QPVpid% /T /F,, Hide
       } Else lastCloseInvoked := -1
       lastCloseInvoked++
@@ -2297,7 +2264,7 @@ byeByeRoutine() {
          lastCloseInvoked := 5 ; exit application 
          ; thumbsDisplaying := 0
          ; lastOtherWinClose := A_TickCount
-         ; MT_post("MenuReturnIMGedit")
+         ; QPV_post("MenuReturnIMGedit")
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
@@ -2649,7 +2616,7 @@ uiKeyboardResponder(givenKey, abusive) {
     isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
     ; ToolTip, % callMain "=" isOkay "(" imageLoading "|" animGIFplaying ")=" runningLongOperation "=" whileLoopExec "=" givenKey , , , 2
     If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && givenKey)
-       MT_post("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
+       QPV_post("KeyboardResponder", givenKey, PVhwnd, abusive, navKeysCounter)
 }
 
 uiPreProcessKbdKey() {
@@ -2678,7 +2645,7 @@ uiPreProcessKbdKey() {
       abusive := (counter>25) ? 1 : 0
       OutputDebug, % "QPV: MERGE: kbd dispatch hotkate=" hotkate " via " Exception("", -2).What
       uiKeyboardResponder(hotkate, abusive)
-      ; MT_post("KeyboardResponder", hotkate, PVhwnd, abusive)
+      ; QPV_post("KeyboardResponder", hotkate, PVhwnd, abusive)
       If (hotkate=prevKey)
          counter++
       Else 
@@ -2831,57 +2798,4 @@ displayClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu, hwnd, stay) {
 
 DestroyClickHalo() {
     Gui, MclickH: Hide
-}
-
-uiRepositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:="") {
-    If !winPos
-    {
-       SysGet, MonitorCount, 80
-       ActiveMonDetails := calcScreenLimits(referencePoint)
-       ResWidth := ActiveMonDetails.w, ResHeight:= ActiveMonDetails.h
-       mCoordLeft := ActiveMonDetails.mCLeft
-       mCoordTop := ActiveMonDetails.mCTop
-    }
-
-    If (MonitorCount>1 && !winPos && A_OSVersion!="WIN_XP")
-    {
-       ; center window on the monitor/screen where the mouse cursor is
-       semiFinal_x := mCoordLeft + 2
-       semiFinal_y := mCoordTop + 2
-       If !semiFinal_y
-          semiFinal_y := 1
-       If !semiFinal_x
-          semiFinal_x := 1
-
-       Gui, %whichGUI%: Show, Hide AutoSize x%semiFinal_x% y%semiFinal_y%, % winTitle
-       Sleep, 25
-       GetWinClientSize(msgWidth, msgHeight, hwndGUI, 1)
-       If !msgWidth
-          msgWidth := 1
-       If !msgHeight
-          msgHeight := 1
-
-       Final_x := Round(mCoordLeft + ResWidth/2 - msgWidth/2)
-       Final_y := Round(mCoordTop + ResHeight/2 - msgHeight/2)
-       If (!Final_x) || (Final_x + 1<mCoordLeft)
-          Final_x := mCoordLeft + 1
-       If (!Final_y) || (Final_y + 1<mCoordTop)
-          Final_y := mCoordTop + 1
-       If !Final_y
-          Final_y := A_ScreenHeight//3
-       If !Final_x
-          Final_x := A_ScreenWidth//3
-       Gui, %whichGUI%: Show, x%Final_x% y%Final_y%, % Chr(160) winTitle
-    } Else Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
-
-}
-
-AccGetLocation(Acc, ChildId=0) {
-  Static x := 0, y := 0, w := 0, h := 0
-  coord := []
-  try Acc.accLocation(ComObj(0x4003,&x), ComObj(0x4003,&y), ComObj(0x4003,&w), ComObj(0x4003,&h), ChildId)
-  coord.x := NumGet(x,0,"int"),  coord.y := NumGet(y,0,"int")
-  coord.w := NumGet(w,0,"int"),  coord.h := NumGet(h,0,"int")
-  ; AccCoord[1]:=NumGet(x,0,"int"), AccCoord[2]:=NumGet(y,0,"int"), AccCoord[3]:=NumGet(w,0,"int"), AccCoord[4]:=NumGet(h,0,"int")
-  Return coord
 }

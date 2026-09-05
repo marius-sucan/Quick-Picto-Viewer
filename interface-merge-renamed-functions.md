@@ -28,16 +28,16 @@ behaviour-neutral, and with a single interpreter they are now consolidation cand
 |---|---|---|---|---|---|---|
 | `addJournalEntry` | `uiAddJournalEntry` | quick-picto-viewer.ahk | main: the 37-line journal writer; module: a 4-line stub | 0.04 | 0.05 | **0** / 384 |
 | `changeMcursor` | `uiChangeMcursor` | quick-picto-viewer.ahk | module: viewport cursor shapes (49 lines); main: panel/generic cursor (17) | 0.11 | 0.10 | 8 / 101 |
-| `InitGuiContextMenu` | `uiInitGuiContextMenu` | quick-picto-viewer.ahk | main: the 85-line context-menu builder; module: 4-line trigger | 0.03 | 0.01 | 2 / 3 |
+| `InitGuiContextMenu` | `uiInitGuiContextMenu` | quick-picto-viewer.ahk | main: the 85-line context-menu builder; module: 4-line trigger | 0.03 | 0.01 | 2 / 3 | *(module copy inlined/deleted 2026-09-05, Step 1)*
 | `KeyboardResponder` | `uiKeyboardResponder` | quick-picto-viewer.ahk | module: 46-line PVwin pre-filter (nav-key stop, Space, Escape); main: the 233-line command dispatcher | 0.03 | 0.03 | 1 / 4 |
 | `kMenu` | `uiKmenu` | quick-picto-viewer.ahk | main: the menu-item helper used 1707 times; module: bar-menu variant with a different signature | 0.02 | – | 1 / 1707 |
 | `mouseTurnOFFtooltip` | `uiMouseTurnOFFtooltip` | quick-picto-viewer.ahk | module: hides the viewport tooltip GUI (15 lines); main: 5-line panel variant | 0.29 | 0.26 | 18 / 17 |
-| `PanelQuickSearchMenuOptions` | `uiPanelQuickSearchMenuOptions` | quick-picto-viewer.ahk | main: the 81-line panel; module: 11-line opener | 0.02 | 0.02 | 1 / 25 |
+| `PanelQuickSearchMenuOptions` | `uiPanelQuickSearchMenuOptions` | quick-picto-viewer.ahk | main: the 81-line panel; module: 11-line opener | 0.02 | 0.02 | 1 / 25 | *(module copy deleted 2026-09-05, Step 1)*
 | `RepositionTempBtnGui` | `uiRepositionTempBtnGui` | quick-picto-viewer.ahk | main: 35-line positioner; module: 3-line post | 0.03 | 0.03 | 1 / 2 | *(module copy deleted 2026-09-02, §7-A)*
-| `repositionWindowCenter` | `uiRepositionWindowCenter` | quick-picto-viewer.ahk | main: 136-line general window centering; module: 42-line PVwin-family variant | 0.41 | 0.41 | 1 / 77 |
+| `repositionWindowCenter` | `uiRepositionWindowCenter` | quick-picto-viewer.ahk | main: 136-line general window centering; module: 42-line PVwin-family variant | 0.41 | 0.41 | 1 / 77 | *(module copy deleted 2026-09-05, Step 1)*
 | `saveMainWinPos` | `uiSaveMainWinPos` | quick-picto-viewer.ahk | main: writes the INI; module: 3-line trigger | 0.18 | 0.18 | 1 / 1 | *(module copy deleted 2026-09-02, §7-A)*
-| `toggleAppToolbar` | `uiToggleAppToolbar` | quick-picto-viewer.ahk | main: the 20-line toggle; module: 8-line trigger | 0.05 | 0.07 | 1 / 11 |
-| `ToggleMenuBaru` | `uiToggleMenuBaru` | quick-picto-viewer.ahk | main: the 18-line toggle; module: 8-line trigger | 0.18 | 0.13 | 1 / 4 |
+| `toggleAppToolbar` | `uiToggleAppToolbar` | quick-picto-viewer.ahk | main: the 20-line toggle; module: 8-line trigger | 0.05 | 0.07 | 1 / 11 | *(module copy deleted 2026-09-05, Step 1)*
+| `ToggleMenuBaru` | `uiToggleMenuBaru` | quick-picto-viewer.ahk | main: the 18-line toggle; module: 8-line trigger | 0.18 | 0.13 | 1 / 4 | *(module copy deleted 2026-09-05, Step 1)*
 | `updateUIctrl` | `uiUpdateUIctrl` | quick-picto-viewer.ahk | module: 52-line viewport-controls layout; main: 7-line panel helper | 0.02 | 0.03 | 11 / 21 |
 | `Win_ShowSysMenu` | `uiShowSysMenu` | lib/shell-stuff.ahk | both emulate Alt+Space with TrackPopupMenu; signatures differ (1 vs 3 params) | 0.10 | 0.10 | 1 / **0** |
 | `WinClickAction` | `uiWinClickAction` | quick-picto-viewer.ahk | module: 22-line click pre-dispatcher; main: the 728-line click body | 0.01 | 0.01 | 3 / 2 |
@@ -175,24 +175,26 @@ the main script was checked for the functions the merge added there.
 
 > **Applied 2026-09-02, `IF_call` only:** the facade is deleted and its 11 sites are direct calls (every arity
 > re-checked against the target's signature first — direct calls are load-time checked, the dynamic ones were not).
-> `IF_post` and `MT_post` stay as they are, by request.
+>
+> **Applied 2026-09-05, `IF_post` and `MT_post` unified:** `MT_post` (11 active call sites in `module-interface.ahk`)
+> and `IF_post` (37 active call sites in `quick-picto-viewer.ahk`) merged into a single `QPV_post(funcName, args*)`
+> defined in `quick-picto-viewer.ahk` dispatching through `QPV_postRelay`. `MT_post` deleted from `module-interface.ahk`.
 
 | facade | what it is today | sites | replacement |
 |---|---|---|---|
 | `IF_call(funcName, args*)` | a 23-line arity-dispatched dynamic call, `%funcName%(a1 … a9)` | 11, every one with a literal function name | the plain direct call `funcName(args)`. The facade exists because the target used to live in the other interpreter; now it is only a slower, arity-capped way to write a normal call |
-| `IF_post` and `MT_post` | byte-identical bodies: `Func("IF_postRelay").Bind(funcName, args)` + `SetTimer, % fn, -1` | 41 + 32 | one name is enough — they were the two directions of a bridge that no longer has two sides. The queued semantics are real and stay; pick one name and rename the other's sites (a whole-word rename). `IF_postRelay` stays, it is the relay both use |
+| `IF_post` and `MT_post` | unified into `QPV_post` (`QPV_postRelay`) | 37 + 11 | **Unified 2026-09-05 into `QPV_post`**: one name is enough — they were the two directions of a bridge that no longer has two sides. `MT_post` deleted, all 48 sites retargeted to `QPV_post`. `QPV_postRelay` stays as the relay |
 
-### C. Thin relays — not useless, but only a 300 ms debounce away from it
+### C. Thin relays — eliminated 2026-09-05
 
-| relay | body | callers |
-|---|---|---|
-| `uiToggleAppToolbar()` | 300 ms debounce, then `MT_post("toggleAppToolbar")` | 1 |
-| `uiToggleMenuBaru()` | 300 ms debounce, then `MT_post("ToggleMenuBaru")` | 1 |
-| `uiPanelQuickSearchMenuOptions()` | 300 ms debounce, then `MT_post` of `closeQuickSearch` or `PanelQuickSearchMenuOptions` depending on `VisibleQuickMenuSearchWin` | 1 |
-| `uiInitGuiContextMenu(mX, mY, oX, oY)` | `IdentifyCtrlUnderMouse(oX, oY)`, then `MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)` | 2 |
+> **Status 2026-09-05:** all 4 thin relays eliminated. The 3 flyout buttons in `uiWM_LBUTTONUP` handle debouncing directly with `QPV_post`, and `uiInitGuiContextMenu` was inlined into its two callers (`WM_LBUTTON_DBL` and `WM_RBUTTONUP`).
 
-If the three targets took over their own debounce, the first three relays would fall into group A.
-The fourth is an argument adapter shared by two callers — cheap to inline, harmless to keep.
+| relay | body | callers | status |
+|---|---|---|---|
+| `uiToggleAppToolbar()` | 300 ms debounce, then `MT_post("toggleAppToolbar")` | 1 | **Eliminated**: inlined debounce + `QPV_post` in `uiWM_LBUTTONUP` |
+| `uiToggleMenuBaru()` | 300 ms debounce, then `MT_post("ToggleMenuBaru")` | 1 | **Eliminated**: inlined debounce + `QPV_post` in `uiWM_LBUTTONUP` |
+| `uiPanelQuickSearchMenuOptions()` | 300 ms debounce, then `MT_post` of `closeQuickSearch` or `PanelQuickSearchMenuOptions` depending on `VisibleQuickMenuSearchWin` | 1 | **Eliminated**: inlined debounce + `QPV_post` in `uiWM_LBUTTONUP` |
+| `uiInitGuiContextMenu(mX, mY, oX, oY)` | `IdentifyCtrlUnderMouse(oX, oY)`, then `MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)` | 2 | **Eliminated**: inlined `InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))` |
 
 ### D. Looked like wrappers, are not — keep
 
@@ -265,9 +267,8 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 
 | function | file | lines | what it does |
 |---|---|---|---|
-| `MT_post(funcName, args*)` | lib/module-interface.ahk | 4 | module-side queued call: binds the target and its arguments to `IF_postRelay` on a one-shot timer, preserving the old cross-interpreter "runs when the receiver pumps" semantics (`5d32ff5`) |
-| `IF_post(funcName, args*)` | quick-picto-viewer.ahk | 6 | the main-side twin of `MT_post` (kept by request, see section 7-B) (`5d32ff5`) |
-| `IF_postRelay(funcName, args)` | quick-picto-viewer.ahk | 25 | the relay both posts run through: hoists the bound arguments into plain locals and dispatches on their count — the runtime rejects `args*` and `args[N]` inside call arguments (`c629bc2`) |
+| `QPV_post(funcName, args*)` | quick-picto-viewer.ahk | 6 | unified queued call (replaces `IF_post` and `MT_post`): binds the target and its arguments to `QPV_postRelay` on a one-shot timer, preserving queued dispatch semantics (`5d32ff5`, unified 2026-09-05) |
+| `QPV_postRelay(funcName, args)` | quick-picto-viewer.ahk | 25 | the relay that queued posts run through: hoists the bound arguments into plain locals and dispatches on their count — the runtime rejects `args*` and `args[N]` inside call arguments (`c629bc2`) |
 
 ### SQLite abort hatch — quick-picto-viewer.ahk (phase D3, `2bc4cb1`)
 
