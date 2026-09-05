@@ -73179,17 +73179,7 @@ restartEntireGui() {
    createGDIPcanvas()
 }
 
-handleUIhwnd(initGui:="") {
-   If InStr(initGui, "|")
-   {
-      externObj := StrSplit(initGui, "|")
-      PVhwnd := externObj[1]
-      hGDIinfosWin := externObj[2]
-      hGDIwin := externObj[3]
-      hGDIthumbsWin := externObj[4]
-      hGDIselectWin := externObj[5]
-      hPicOnGui1 := externObj[6]
-   }
+handleUIhwnd() {
    If (!PVhwnd || !hGDIinfosWin || !hGDIwin || !hGDIthumbsWin || !hGDIselectWin || !hPicOnGui1)
    {
       handleFatalWinInitErrors()
