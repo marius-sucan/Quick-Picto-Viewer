@@ -2386,11 +2386,8 @@ initQPVmainDLL(modus:=0) {
       Return
    }
 
-   ; the menu machinery's WH_CALLWNDPROC hook: swap the script procedure that
-   ; carried the menus since startup for the native one in this DLL
-   ; [callwndproc-hook.h, lib/module-interface.ahk RULE 3]
+   ; the menu machinery's WH_CALLWNDPROC hook, see callwndproc-hook.h and lib/module-interface.ahk
    uiInstallSentMsgHook()
-
    If (modus!=1)
       disableWindowPenServices(PVhwnd)
 
@@ -11068,7 +11065,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      ; ResetImgLoadStatus()
      ; SetTimer, theSlideShowCore, Off
      prevSlideShowStop := A_TickCount
-     slideshowsHandler(0, "stop", SlideHowMode)
+     slideshowsHandler(0, "stop")
      SetTimer, ResetImgLoadStatus, -150
   } Else If (thumbsDisplaying!=1 || actu="start")
   {
@@ -11112,7 +11109,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         msgu .= "`nAlready seen images will be skipped."
 
      msgu .= "`nPress Escape or click to stop the slideshow."
-     slideshowsHandler(thisSlideSpeed, "start", SlideHowMode, msgu)
+     slideshowsHandler(thisSlideSpeed, "start", msgu)
      ; SetTimer, theSlideShowCore, % thisSlideSpeed
   }
   Return
@@ -12349,7 +12346,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       ; with the shared flag the old flag-only gate skipped this branch for them]
       If (animGIFplaying=1 || StrLen(prevImgPath))
       {
-         OutputDebug, % "QPVMERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen " flag=" animGIFplaying
+         OutputDebug, % "QPV: MERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen " flag=" animGIFplaying
          SetTimer, autoChangeDesiredFrame, Off
          SetTimer, ResetImgLoadStatus, -50
          If (StrLen(prevImgPath)>2)
@@ -12370,7 +12367,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 
    If (act="start" && imgPath && prevImgPath!=imgPath)
    {
-      OutputDebug, % "QPVMERGE: gifStart " imgPath " via " Exception("", -2).What
+      OutputDebug, % "QPV: MERGE: gifStart " imgPath " via " Exception("", -2).What
       SetTimer, ResetImgLoadStatus, -15
       lastFrameChange := A_TickCount
       prevImgPath := imgPath
@@ -12383,7 +12380,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       ; mustHalt := mustProcessKeys
       If (animGIFplaying<=0)
       {
-         OutputDebug, % "QPVMERGE: gifKill [flag read <=0]"
+         OutputDebug, % "QPV: MERGE: gifKill [flag read <=0]"
          SetTimer, ResetImgLoadStatus, -10
          SetTimer, autoChangeDesiredFrame, Off
          animGIFplaying := 0
@@ -12430,7 +12427,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       ; allowNextSlide := 0
       lastInvoked := A_TickCount
       prevImgPath := ""
-      OutputDebug, % "QPVMERGE: gifForceNextSlide"
+      OutputDebug, % "QPV: MERGE: gifForceNextSlide"
       IF_post("theSlideShowCore", "force")
       ; theSlideShowCore()
       invokeExternalSlideshowHandler()
@@ -35407,7 +35404,7 @@ sqliteAbortProgressCB(unusedArg) {
    r := 0
    If ((runningLongOperation=1 || allowSQLiteAbort=1) && (mustAbandonCurrentOperations=1))
    {
-      OutputDebug, % "QPVMERGE: sqlite statement aborted [progress handler]"
+      OutputDebug, % "QPV: MERGE: sqlite statement aborted [progress handler]"
       r := 1
    }
    Critical, %prevCrit%
@@ -75902,7 +75899,7 @@ OnImgFileChangeActions(forceThis) {
 }
 
 invokeExternalSlideshowHandler() {
-   OutputDebug, % "QPVMERGE: invokeExtSlides via " Exception("", -2).What " animGIF=" animGIFplaying
+   OutputDebug, % "QPV: MERGE: invokeExtSlides via " Exception("", -2).What " animGIF=" animGIFplaying
    allowNextSlide := 1
    IF_post("dummySlideshow")
 }
@@ -78592,7 +78589,7 @@ ActPaintBrushNow() {
          ; size and opacity [no pressure = factors of 1] in the up to 16 ms until the
          ; promoted WM_LBUTTONUP is retrieved and determineLClickState() sees the release.
          ; Mouse, touch and pressureless pens never set penInContact, so they are unaffected.
-         OutputDebug, % "QPVMERGE: " A_ThisFunc " ended by pen lift"
+         OutputDebug, % "QPV: MERGE: " A_ThisFunc " ended by pen lift"
          Break
       }
       penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
@@ -82905,7 +82902,7 @@ updateUIctrl() {
    If (modus="welcome")
       IF_post("uiAccessWelcomeView")
    Else
-      IF_post("updateUIctrlFromOutside", editingSelectionNow "|" isAlwaysOnTop "|" drawingShapeNow "|" IMGresizingMode)
+      IF_post("uiUpdateUIctrl")
 }
 
 coreSelectRandomFiles(howMany, a, b) {
@@ -100138,7 +100135,7 @@ prepareExternalCoreThread(thisIndex, args, thisList) {
 
    If (wasErrorA || !FileExist(thumbsCacheFolder "\tempFilesList" thisIndex ".txt"))
    {
-      OutputDebug, % "QPVMERGE: prepareExternalCoreThread failed for slot " thisIndex " (folder=" thumbsCacheFolder ")"
+      OutputDebug, % "QPV: MERGE: prepareExternalCoreThread failed for slot " thisIndex " (folder=" thumbsCacheFolder ")"
       Return 0
    }
 
@@ -100157,7 +100154,7 @@ launchExternalCoreThread(thisIndex) {
    Catch wasErrorB
        Sleep, 1
 
-   OutputDebug, % "QPVMERGE: launch worker " thisIndex ": cmd=" thisCmd " pid=" pidThread " err=" wasErrorB
+   OutputDebug, % "QPV: MERGE: launch worker " thisIndex ": cmd=" thisCmd " pid=" pidThread " err=" wasErrorB
    If (wasErrorB || !pidThread)
       Return 0
    Return pidThread
@@ -100180,7 +100177,7 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
 
            If (thisThreadStarted=-1 || testProcessExists(pidsArray[A_Index])!=1)
            {
-              OutputDebug, % "QPVMERGE: worker slot " A_Index " reported fatal start or died (status=" thisThreadStarted ", pid=" pidsArray[A_Index] ", exists=" testProcessExists(pidsArray[A_Index]) ")"
+              OutputDebug, % "QPV: MERGE: worker slot " A_Index " reported fatal start or died (status=" thisThreadStarted ", pid=" pidsArray[A_Index] ", exists=" testProcessExists(pidsArray[A_Index]) ")"
               Return A_Index
            }
 
@@ -100194,7 +100191,7 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
 
        If (A_TickCount - startZeit>deadlineMs)
        {
-          OutputDebug, % "QPVMERGE: worker slot " firstPending " timed out after " (A_TickCount - startZeit) "ms"
+          OutputDebug, % "QPV: MERGE: worker slot " firstPending " timed out after " (A_TickCount - startZeit) "ms"
           Return firstPending
        }
        Sleep, 25
@@ -100218,29 +100215,29 @@ initExternalCoreMode(coreThread) {
    thisGDIPversion := Gdip_LibrarySubVersion()
    If (!GDIPToken || thisGDIPversion<1.97)
    {
-      OutputDebug, % "QPVMERGE: failed to init GDIP for worker " coreThread
+      OutputDebug, % "QPV: MERGE: failed to init GDIP for worker " coreThread
       fatalError := 1
    }
 
-   OutputDebug, % "QPVMERGE: initExternalCoreMode entered for worker " coreThread " (pid=" DllCall("GetCurrentProcessId") ")"
+   OutputDebug, % "QPV: MERGE: initExternalCoreMode entered for worker " coreThread " (pid=" DllCall("GetCurrentProcessId") ")"
    RegRead, mainThreadHwnd, %QPVregEntry%\multicore, mainThreadHwnd
    If (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd))
    {
-      OutputDebug, % "QPVMERGE: main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread
+      OutputDebug, % "QPV: MERGE: main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread
       fatalError := 1
    }
  
    RegRead, threadParams, %QPVregEntry%\multicore, threadParams%coreThread%
    If !threadParams
    {
-      OutputDebug, % "QPVMERGE: empty threadParams for worker " coreThread
+      OutputDebug, % "QPV: MERGE: empty threadParams for worker " coreThread
       fatalError := 1
    }
  
    args := StrSplit(threadParams, "||")
    If (args[1]!=coreThread)
    {
-      OutputDebug, % "QPVMERGE: threadParams mismatch for worker " coreThread ": " threadParams
+      OutputDebug, % "QPV: MERGE: threadParams mismatch for worker " coreThread ": " threadParams
       fatalError := 1
    }
  
@@ -100248,20 +100245,20 @@ initExternalCoreMode(coreThread) {
    Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
    If !filesList
    {
-      OutputDebug, % "QPVMERGE: filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)"
+      OutputDebug, % "QPV: MERGE: filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)"
       fatalError := 1
    }
  
    If (fatalError=1)
    {
-      OutputDebug, % "QPVMERGE: fatalError=1 in initExternalCoreMode for worker " coreThread
+      OutputDebug, % "QPV: MERGE: fatalError=1 in initExternalCoreMode for worker " coreThread
       RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, -1
       ForceExitNow()
       Return
    }
  
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
-   OutputDebug, % "QPVMERGE: worker " coreThread " set ThreadRunning=1, job=" args[2]
+   OutputDebug, % "QPV: MERGE: worker " coreThread " set ThreadRunning=1, job=" args[2]
    ; this thread is critical, so the watchdog only gets to run while a modal dialog - an
    ; AHK runtime error, a library fault - is up: the one situation in which the per-file
    ; abort check of the loops below cannot run, and the main thread would otherwise have
@@ -100276,7 +100273,7 @@ initExternalCoreMode(coreThread) {
    Else If (args[2]="batch-fmtconv")
       multiCoreThreadFormatConvert(args[1], filesList)
  
-   OutputDebug, % "QPVMERGE: worker " coreThread " completed work, exiting"
+   OutputDebug, % "QPV: MERGE: worker " coreThread " completed work, exiting"
    ForceExitNow()
    Return
 }

@@ -151,8 +151,6 @@ dispatchLButtonDown(wP, lP, msg, hwnd) {
 
 dispatchLButtonUp(wP, lP, msg, hwnd) {
    root := DllCall("user32\GetAncestor", "UPtr", hwnd, "UInt", 2, "UPtr")  ; GA_ROOT
-   If (root = hFlyOut)
-      OutputDebug, % "QPVMERGE: btn-up on flyout window, flyVisible=" menusflyOutVisible
    If isVarEqualTo(root, PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin, hGuiTip, hFlyOut)
       Return uiWM_LBUTTONUP(wP, lP, msg, hwnd)
    Return WM_LBUTTONup(wP, lP, msg, hwnd)
@@ -264,18 +262,18 @@ uiInstallSentMsgHook() {
             DllCall("UnhookWindowsHookEx", "UPtr", hCWPhook)
             hCWPhook := 0
          }
-         hCWPhook := DllCall(fnAddr, "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 4, "UPtr")
+         hCWPhook := DllCall("qpvmain.dll\qpvHookSentMessages", "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 4, "UPtr")
          If hCWPhook
          {
             nativeHook := 1
-            OutputDebug, % "QPVMERGE: native CALLWNDPROC filter installed [qpvmain.dll] hook=" hCWPhook
+            OutputDebug, % "QPV: MERGE: native CALLWNDPROC filter installed [qpvmain.dll] hook=" hCWPhook
             Return
          }
-         OutputDebug, % "QPVMERGE: qpvHookSentMessages failed [LastError=" A_LastError "] - script hook procedure re-installed"
+         OutputDebug, % "QPV: MERGE: qpvHookSentMessages failed [LastError=" A_LastError "] - script hook procedure re-installed"
       } Else If (missingLogged!=1)
       {
          missingLogged := 1
-         OutputDebug, % "QPVMERGE: qpvmain.dll has no qpvHookSentMessages [rebuild the DLL] - script hook procedure in use"
+         OutputDebug, % "QPV: MERGE: qpvmain.dll has no qpvHookSentMessages [rebuild the DLL] - script hook procedure in use"
       }
    }
    If hCWPhook
@@ -345,14 +343,14 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
          {
             flyoutNeedsPos := 1
             flyoutAnchorMenu := hMinit
-            OutputDebug, % "QPVMERGE: flyout flag raised [bar] anchor=" hMinit
+            OutputDebug, % "QPV: MERGE: flyout flag raised [bar] anchor=" hMinit
          }
       } Else If (popupRootSeen!=1)
       {
          popupRootSeen := 1
          flyoutNeedsPos := 1
          flyoutAnchorMenu := hMinit
-         OutputDebug, % "QPVMERGE: flyout flag raised [popup] anchor=" hMinit
+         OutputDebug, % "QPV: MERGE: flyout flag raised [popup] anchor=" hMinit
       }
       uiMenuJITrebuild(hMinit)
    }
@@ -369,12 +367,12 @@ uiMenuJITrebuild(hMenu) {
       Return
    If (barMenuSession!=1)
    {
-      OutputDebug, % "QPVMERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]
+      OutputDebug, % "QPV: MERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]
       Return
    }
    busy := 1
    funcu := menuJITmap[hMenu]
-   OutputDebug, % "QPVMERGE: menu JIT rebuild " funcu
+   OutputDebug, % "QPV: MERGE: menu JIT rebuild " funcu
    If (VisibleQuickMenuSearchWin=1)
       Try closeQuickSearch()
    mouseTurnOFFtooltip()
@@ -390,7 +388,7 @@ uiMenuJITrebuild(hMenu) {
          %funcu%(0, 1)
    }
    Catch weh
-      OutputDebug, % "QPVMERGE: menu JIT rebuild FAILED for " funcu ": " weh.message
+      OutputDebug, % "QPV: MERGE: menu JIT rebuild FAILED for " funcu ": " weh.message
    busy := 0
 }
 
@@ -544,7 +542,7 @@ uiRefreshBarAttachments() {
    }
    menuJITmap := newMap
    If (repaired)
-      OutputDebug, % "QPVMERGE: bar attachments repaired: " repaired
+      OutputDebug, % "QPV: MERGE: bar attachments repaired: " repaired
 }
 
 uiMenuNativeTick(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
@@ -609,7 +607,7 @@ uiTryPlaceFlyout() {
    flyoutNeedsPos := 0
    menusflyOutVisible := 1
    y := mY + Round(Height) + 2
-   OutputDebug, % "QPVMERGE: flyout placed x" mX " y" y " bar=" barMenuSession
+   OutputDebug, % "QPV: MERGE: flyout placed x" mX " y" y " bar=" barMenuSession
    Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
 }
 
@@ -767,7 +765,7 @@ drainUIinput() {
       SetTimer, uiPreProcessKbdKey, Off
    }
    If (dcount)
-      OutputDebug, % "QPVMERGE: drained " dcount " msgs, keydown=" gotKeyDown ", hotkate=" hotkate
+      OutputDebug, % "QPV: MERGE: drained " dcount " msgs, keydown=" gotKeyDown ", hotkate=" hotkate
    If (prevCrit)
       Critical, %prevCrit%
    Else
@@ -974,15 +972,6 @@ setTaskbarIconState(mode) {
    Else If (mode="question" && runningLongOperation!=1)
       taskBarUI.flashTaskbarIcon("green", 3, 150, 150)
       ; taskBarUI.setTaskbarIconColor("green")
-}
-
-updateUIctrlFromOutside(paramA) {
-    p := StrSplit(paramA, "|")
-    editingSelectionNow := p[1]
-    isAlwaysOnTop := p[2]
-    drawingShapeNow := p[3]
-    IMGresizingMode := p[4]
-    uiUpdateUIctrl(0)
 }
 
 detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
@@ -1453,7 +1442,7 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
     If (menusflyOutVisible=1)
     {
        MouseGetPos, , , OutputVarWin, hwnd, 2
-       OutputDebug, % "QPVMERGE: flyout btn-up ctrl=" hwnd " [S=" hFlyBtn1 " T=" hFlyBtn2 " M=" hFlyBtn3 "] win=" OutputVarWin
+       OutputDebug, % "QPV: MERGE: flyout btn-up ctrl=" hwnd " [S=" hFlyBtn1 " T=" hFlyBtn2 " M=" hFlyBtn3 "] win=" OutputVarWin
        If isVarEqualTo(hwnd, hFlyBtn1, hFlyBtn2, hFlyBtn3)
           Gui, MclickH: Destroy
 
@@ -1616,7 +1605,7 @@ askAboutStoppingOperations() {
         If (msgResult="yes")
            mustAbandonCurrentOperations := 1
         userPendingAbortOperations := 0
-        OutputDebug, % "QPVMERGE: abort prompt answered " msgResult " [runningLongOperation=" runningLongOperation " imageLoading=" imageLoading "]"
+        OutputDebug, % "QPV: MERGE: abort prompt answered " msgResult " [runningLongOperation=" runningLongOperation " imageLoading=" imageLoading "]"
      } Else userPendingAbortOperations := 0
       ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
 }
@@ -1717,9 +1706,8 @@ uiInitGuiContextMenu(mX, mY, oX, oY) {
 ; [merge] infosSlideShow() and initSlidesModes() are gone: they only mirrored the
 ; slideshow flags into this interpreter, and the globals are shared now.
 
-slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
-   OutputDebug, % "QPVMERGE: slideshowsHandler act=" act " speed=" thisSlideSpeed " mode=" how
-   SlideHowMode := how
+slideshowsHandler(thisSlideSpeed, act, msgu:=0) {
+   OutputDebug, % "QPV: MERGE: slideshowsHandler act=" act " speed=" thisSlideSpeed " mode=" how
    ; [merge fix] this line was «slideShowDelay := thisSlideSpeed». Pre-merge it set
    ; only the interface interpreter's own copy - the effective cadence, possibly
    ; stretched to the music length. On one interpreter it clobbered the USER
@@ -1731,7 +1719,6 @@ slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
    {
       slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
       setTaskbarIconState("normal")
-      slideShowRunning := 1
       SetTimer, theSlideShowCore, % -slideShowCadence
       If msgu
       {
@@ -1744,7 +1731,6 @@ slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
    } Else If (act="stop")
    {
       allowNextSlide := 1
-      slideShowRunning := 0
       SetTimer, theSlideShowCore, Off
       uiUpdateUIctrl()
       uiAccessImgViewSetUIlabels()
@@ -1752,7 +1738,7 @@ slideshowsHandler(thisSlideSpeed, act, how, msgu:=0) {
 }
 
 dummySlideshow() {
-   OutputDebug, % "QPVMERGE: dummySlideshow running=" slideShowRunning " allowNext=" allowNextSlide
+   OutputDebug, % "QPV: MERGE: dummySlideshow running=" slideShowRunning " allowNext=" allowNextSlide
    If (slideShowRunning=1 && allowNextSlide=1)
    {
       setTaskbarIconState("Normal")
@@ -1762,7 +1748,7 @@ dummySlideshow() {
 
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
-  OutputDebug, % "QPVMERGE: slideCore param=" paramu " zeit=" thisZeit " cadence=" slideShowCadence " allowNext=" allowNextSlide " running=" slideShowRunning
+  OutputDebug, % "QPV: MERGE: slideCore param=" paramu " zeit=" thisZeit " cadence=" slideShowCadence " allowNext=" allowNextSlide " running=" slideShowRunning
   If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
 
@@ -1987,7 +1973,6 @@ showMouseTooltipStatusbar() {
     mouseCreateOSDinfoLine(lastWinStatus, thisSize)
     SetTimer, mouseTurnOFFtooltip, -4500
 }
-
 
 uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
   Static lastInvoked := 1, prevPos, lastTip := 1, prevArrayPos := [], darked := 0
@@ -2457,7 +2442,7 @@ coreHideMenuFlyout() {
 stopGiFsPlayback() {
    If (animGIFplaying!=0)
    {
-      OutputDebug, % "QPVMERGE: stopGiFsPlayback via " Exception("", -2).What
+      OutputDebug, % "QPV: MERGE: stopGiFsPlayback via " Exception("", -2).What
       lastOtherWinClose := A_TickCount
       autoChangeDesiredFrame("stop")
       If (runningLongOperation!=1)
@@ -2466,7 +2451,7 @@ stopGiFsPlayback() {
 }
 
 turnOffSlideshow() {
-   OutputDebug, % "QPVMERGE: turnOffSlideshow via " Exception("", -2).What " running=" slideShowRunning
+   OutputDebug, % "QPV: MERGE: turnOffSlideshow via " Exception("", -2).What " running=" slideShowRunning
    stopGiFsPlayback()
    If (slideShowRunning!=1)
       Return
@@ -2715,7 +2700,7 @@ uiPreProcessKbdKey() {
    {
       lastInvoked := A_TickCount
       abusive := (counter>25) ? 1 : 0
-      OutputDebug, % "QPVMERGE: kbd dispatch hotkate=" hotkate " via " Exception("", -2).What
+      OutputDebug, % "QPV: MERGE: kbd dispatch hotkate=" hotkate " via " Exception("", -2).What
       uiKeyboardResponder(hotkate, abusive)
       ; MT_post("KeyboardResponder", hotkate, PVhwnd, abusive)
       If (hotkate=prevKey)
@@ -2754,7 +2739,7 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
        ; native]. It replaced the thread-era TrackPopupMenu emulation, which stopped
        ; opening anything after the merge and was deleted; Win_ShowSysMenu in
        ; shell-stuff.ahk stays as the library helper for a programmatic sys menu.
-       OutputDebug, % "QPVMERGE: Alt+Space -> native SC_KEYMENU sysmenu post"
+       OutputDebug, % "QPV: MERGE: Alt+Space -> native SC_KEYMENU sysmenu post"
        DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", 0x20)
        Return 0
     }
