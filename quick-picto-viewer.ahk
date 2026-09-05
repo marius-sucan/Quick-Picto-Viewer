@@ -10810,7 +10810,7 @@ fnOutputDebug(A_ThisFunc " l=" winEventu)
 
       SetTimer, drawWelcomeImg, Off
       Sleep, 5
-      If (A_TickCount - lastWinDrag>300)
+      If ((A_TickCount - lastWinDrag>300) && (A_TickCount - lastContextMenuZeit<300))
          OpenDialogFiles()
    }
    lastInvoked := A_TickCount
@@ -63537,6 +63537,7 @@ OpenDialogFiles() {
 
     lastInvoked := A_TickCount
     initQPVmainDLL()
+    hideMenuFlyoutNow()
     If (slideShowRunning=1)
        ToggleSlideShowu()
 
