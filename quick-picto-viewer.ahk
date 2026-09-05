@@ -10955,42 +10955,51 @@ VPimgFXrandomizer() {
     lastFX := imgFxMode
 }
 
+stopSlideshow(resetMode:=0) {
+   If (slideShowRunning!=1)
+      Return
+
+   OutputDebug, % "QPV: MERGE: stopSlideshow via " Exception("", -2).What
+   slideShowRunning := 0
+   allowNextSlide := 1
+   SetTimer, theSlideShowCore, Off
+
+   If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
+   {
+      WinSet, Region,, ahk_id %hQPVtoolbar%
+      Loop, % tlbrIconzList["counter"]
+      {
+          h := tlbrIconzList[A_Index, 1]
+          WinSet, Transparent, 255, ahk_id %h%
+      }
+   }
+
+   If (StrLen(SlidesMusicSong)>3 && hSNDsong && resetMode!=1)
+      StopMediaPlaying(1)
+
+   If (slideShowCadence<950)
+      SoundBeep, 900, 100
+
+   uiUpdateUIctrl()
+   uiAccessImgViewSetUIlabels()
+   SetTimer, ResetImgLoadStatus, -150
+
+   userSeenSlideImages := userSeenSessionImagesArray.Count()
+   showTOOLtip("Slideshow: STOPPED`nImages seen in this session: " groupDigits(userSeenSlideImages))
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+   lastOtherWinClose := A_TickCount
+   prevSlideShowStop := A_TickCount
+}
+
 dummyInfoToggleSlideShowu(actu:=0) {
-  Static lastInvoked := 1
-  If (StrLen(mustOpenStartFolder)>1)
-     currentFileIndex := doOpenStartFolder()
+   If (StrLen(mustOpenStartFolder)>1)
+      currentFileIndex := doOpenStartFolder()
 
-  GIFframesPlayied := 0
-  r := ToggleSlideShowu(actu)
-  If (r="lulz")
-     Return
-
-  If (slideShowRunning!=1 || actu="stop")
-  {
-     userSeenSlideImages := userSeenSessionImagesArray.Count()
-     ; userSeenSlideImages := (userSeenSlideImages>maxFilesIndex - 1) ? maxFilesIndex : userSeenSlideImages
-     showTOOLtip("Slideshow: STOPPED`nImages seen in this session: " groupDigits(userSeenSlideImages))
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     lastInvoked := A_TickCount
-  } Else ;  If (A_TickCount - lastInvoked > 450)
-  {
-     delayu := DefineSlidesRate()
-     friendly := DefineSlideShowType()
-     etaTime := "`nEstimated time: " EstimateSlideShowLength()
-     If (slidesFXrandomize=1)
-        etaTime .= "`nViewport colour effects are randomized for each image."
-
-     If (skipSeenImageSlides=1)
-        etaTime .= "`nAlready seen images will be skipped."
-
-     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime)
-     SetTimer, RemoveTooltip, % -msgDisplayTime, 900
-     If (slideShowDelay < 900)
-     {
-        Sleep, 550
-        RemoveTooltip()
-     } Else SetTimer, RemoveTooltip, % -msgDisplayTime, 900
-  } ; Else  SetTimer, dummyInfoToggleSlideShowu, Off
+   GIFframesPlayied := 0
+   If (actu="stop")
+      stopSlideshow()
+   Else
+      ToggleSlideShowu(actu)
 }
 
 InfoToggleSlideShowu() {
@@ -11004,7 +11013,7 @@ InfoToggleSlideShowu() {
 
    lastInvoked := A_TickCount
    If !(IMGlargerViewPort=1 && IMGresizingMode=4)
-      SetTimer, dummyInfoToggleSlideShowu, -80
+      dummyInfoToggleSlideShowu()
    Return
 }
 
@@ -11044,25 +11053,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
 
   If (slideShowRunning=1 || actu="stop") && (actu!="start")
   {
-     If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
-     {
-        WinSet, Region,, ahk_id %hQPVtoolbar%
-        Loop, % tlbrIconzList["counter"]
-        {
-            h := tlbrIconzList[A_Index, 1]
-            WinSet, Transparent, 255, ahk_id %h%
-        }
-     }
-
-     If (StrLen(SlidesMusicSong)>3 && hSNDsong && resetMode!=1)
-        StopMediaPlaying(1)
-
-     slideShowRunning := 0
-     ; ResetImgLoadStatus()
-     ; SetTimer, theSlideShowCore, Off
-     prevSlideShowStop := A_TickCount
-     slideshowsHandler(0, "stop")
-     SetTimer, ResetImgLoadStatus, -150
+     stopSlideshow(resetMode)
   } Else If (thumbsDisplaying!=1 || actu="start")
   {
      If (A_TickCount - prevSlideShowStop<500) && (actu!="start")
@@ -11072,11 +11063,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         ToggleEditImgSelection()
 
      If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && slideShowRunning!=1)
-     {
         SetWindowRegion(hQPVtoolbar, 1, 1, 1, 1)
-        ; DelayiedImageDisplay()
-        ; dummyResizeImageGDIwin()
-     }
 
      Static lastInvoked := 1
      If ((A_TickCount - lastInvoked>100) && TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && lockToolbar2Win=1)
@@ -11092,11 +11079,15 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         startSlidesMusicNow()
 
      slideShowRunning := 1
-     allowNextSlide := 1 ; [was IF_set - plain global since phase E]
+     allowNextSlide := 1
      If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
         milisec := MCI_Length(hSNDmedia) 
 
      thisSlideSpeed := (milisec>slideShowDelay) ? milisec : slideShowDelay
+     slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
+     prevFullIMGload := 1
+     setTaskbarIconState("normal")
+
      msgu := "Slideshow is running. Direction: " DefineSlideShowType() ". Speed: " DefineSlidesRate() "."
      If (slidesFXrandomize=1)
         msgu .= "`nViewport colour effects are randomized for each image."
@@ -11105,8 +11096,31 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         msgu .= "`nAlready seen images will be skipped."
 
      msgu .= "`nPress Escape or click to stop the slideshow."
-     slideshowsHandler(thisSlideSpeed, "start", msgu)
-     ; SetTimer, theSlideShowCore, % thisSlideSpeed
+
+     GuiControl, PVwin:, PicOnGUI1, % msgu
+     GuiControl, PVwin:, PicOnGUI2a, % msgu
+     GuiControl, PVwin:, PicOnGUI2b, % msgu
+     GuiControl, PVwin:, PicOnGUI2c, % msgu
+     GuiControl, PVwin:, PicOnGUI3, % msgu
+
+     SetTimer, theSlideShowCore, % -slideShowCadence
+
+     delayu := DefineSlidesRate()
+     friendly := DefineSlideShowType()
+     etaTime := "`nEstimated time: " EstimateSlideShowLength()
+     If (slidesFXrandomize=1)
+        etaTime .= "`nViewport colour effects are randomized for each image."
+
+     If (skipSeenImageSlides=1)
+        etaTime .= "`nAlready seen images will be skipped."
+
+     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime)
+     SetTimer, RemoveTooltip, % -msgDisplayTime, 900
+     If (slideShowDelay < 900)
+     {
+        Sleep, 550
+        RemoveTooltip()
+     } Else SetTimer, RemoveTooltip, % -msgDisplayTime, 900
   }
   Return
 }
@@ -12309,15 +12323,7 @@ changeDesiredFrame(dir:=1) {
 }
 
 DestroyGIFuWin() {
-    Critical, on
-    If (mustPreventMenus=1 || simulateMenusMode=1)
-       Return
-
-    If (slideShowRunning=1 || animGIFplaying=1)
-       SetTimer, ResetImgLoadStatus, -15
-
-    SetTimer, autoChangeDesiredFrame, Off
-    autoChangeDesiredFrame("stop")
+   stopGiFsPlayback()
 }
 
 restartGIFplayback() {
@@ -12420,13 +12426,10 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 
    If (slideShowRunning=1 && (A_TickCount - lastInvoked>slideShowDelay + 1) && allowNextSlide=1)
    {
-      ; allowNextSlide := 0
       lastInvoked := A_TickCount
       prevImgPath := ""
       OutputDebug, % "QPV: MERGE: gifForceNextSlide"
-      QPV_post("theSlideShowCore", "force")
-      ; theSlideShowCore()
-      invokeExternalSlideshowHandler()
+      SetTimer, theSlideShowCore, -1
    } Else If (A_TickCount - lastFrameChange > thisFrameDelay)
    {
       lastFrameChange := A_TickCount
@@ -74018,7 +74021,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
          If (hSNDmedia && autoPlaySNDs!=1)
             StopMediaPlaying()
          If (slideShowRunning=1)
-            invokeExternalSlideshowHandler()
+            scheduleNextSlide()
 
          If (WinActive("A")=PVhwnd)
          {
@@ -74066,7 +74069,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
           If (hSNDmedia && autoPlaySNDs!=1)
              StopMediaPlaying()
           If (slideShowRunning=1)
-             invokeExternalSlideshowHandler()
+             scheduleNextSlide()
 
           friendly := (A_PtrSize=4) ? "`nOr, insufficient memory." : ""
           errMsg := "ERROR: Unable to display the image: " groupDigits(currentFileIndex) "`nPossibly malformed image file format or access denied." friendly "`n" r2 "`n" OutFileName "`n" OutDir "\"
@@ -75882,16 +75885,20 @@ OnImgFileChangeActions(forceThis) {
      If (hSNDmedia && autoPlaySNDs!=1)
         StopMediaPlaying()
      If (slideShowRunning=1) ;  && (animGIFplaying!=1 || totalFramesIndex<2))
-        invokeExternalSlideshowHandler()
+        scheduleNextSlide()
   }
 
   prevImgPath := imgPath
 }
 
-invokeExternalSlideshowHandler() {
-   OutputDebug, % "QPV: MERGE: invokeExtSlides via " Exception("", -2).What " animGIF=" animGIFplaying
-   allowNextSlide := 1
-   QPV_post("dummySlideshow")
+scheduleNextSlide() {
+   OutputDebug, % "QPV: MERGE: scheduleNextSlide running=" slideShowRunning
+   If (slideShowRunning=1)
+   {
+      allowNextSlide := 1
+      setTaskbarIconState("Normal")
+      SetTimer, theSlideShowCore, % -slideShowCadence
+   }
 }
 
 identifyAudioMediaLength() {

@@ -242,6 +242,15 @@ Async current-image decode via the thumbs-pool `wantBitmap` mode (the #1 freeze 
 - Pipe-string marshaling dropped: `BuildGUI()` now returns `PVhwnd` directly (truthy on successful creation of all 6 core GUI HWNDs, 0 on failure) instead of packing 8 fields into a `"|"` string. `handleUIhwnd(initGui:="")` reads shared globals directly, with backwards-compatible `InStr(initGui, "|")` fallback. Callers in startup and `restartEntireGui()` simplified.
 - Module function count reduced from 111 to 105 (7 functions eliminated across Step 1). All static verification gates passed (BOM/CRLF in MI, BOM/LF in QPV, balanced braces at 284 in MI, zero dangling symbol references).
 
+**2026-09-05 (later) — Slideshows and GIFs playback simplification: cross-thread ping-pongs and redundant relays eliminated.**
+- Slideshow load-completion ping-pong eliminated: `ShowTheImage()` -> `invokeExternalSlideshowHandler()` -> `QPV_post("dummySlideshow")` -> `QPV_postRelay` -> `dummySlideshow()` -> `SetTimer, theSlideShowCore, % -slideShowCadence` replaced with a single direct `scheduleNextSlide()`. Deleted `dummySlideshow()` from `lib/module-interface.ahk` and `invokeExternalSlideshowHandler()` from `quick-picto-viewer.ahk`.
+- Slideshow stop cascade eliminated: `turnOffSlideshow()` in MI -> `dummyInfoToggleSlideShowu("stop")` in QPV -> `ToggleSlideShowu("stop")` -> `slideshowsHandler(0, "stop")` in MI replaced with a single canonical `stopSlideshow(resetMode:=0)` in QPV.
+- Start logic consolidated: `slideshowsHandler(thisSlideSpeed, "start", msgu)` in MI absorbed directly into `ToggleSlideShowu("start")`, deleting `slideshowsHandler()` entirely.
+- Slideshow and GIF stopping decoupled: added `stopPlayback()` in MI to cleanly stop `stopSlideshow()` if `slideShowRunning=1` and `stopGiFsPlayback()` if `animGIFplaying!=0`. `turnOffSlideshow()` now redirects to `stopPlayback()`. Viewport event handlers (`uiWM_LBUTTONDOWN`, `WM_MBUTTONDOWN`, `WM_LBUTTON_DBL`, `WM_RBUTTONUP`, `WM_MOUSEWHEEL`) and `byeByeRoutine()` / `PVwinGuiEscape` use `If stopPlayback() Return 0`.
+- GIF playback stop unified: `DestroyGIFuWin()` in QPV retargeted to directly call `stopGiFsPlayback()`. Added `SetTimer, ResetImgLoadStatus, -15` to `stopGiFsPlayback()` so all 43 `DestroyGIFuWin()` callers retain exact behavior while consolidating GIF teardown into one routine.
+- GIF slide force-advance simplified: in `autoChangeDesiredFrame`, replacing `QPV_post("theSlideShowCore", "force")` + `invokeExternalSlideshowHandler()` with a direct `SetTimer, theSlideShowCore, -1`.
+- Module function count reduced from 105 to 104 (`slideshowsHandler` and `dummySlideshow` deleted, `stopPlayback` added).
+
 ## Critical files
 
 `quick-picto-viewer.ahk`, `lib/module-interface.ahk`, `lib/shell-stuff.ahk` (16 collisions + GetRes + setMenusTheme), `lib/Gdip_All.ahk` (MDMF_*), `lib/msgbox2.ahk` (calcScreenLimits). No qpvmain.dll changes expected; the sole contingency is D3's dupes-engine progress handler (DLL-internal connection).

@@ -270,6 +270,17 @@ i.e. none came from Marius' own commits on this branch. Phase letters refer to t
 | `QPV_post(funcName, args*)` | quick-picto-viewer.ahk | 6 | unified queued call (replaces `IF_post` and `MT_post`): binds the target and its arguments to `QPV_postRelay` on a one-shot timer, preserving queued dispatch semantics (`5d32ff5`, unified 2026-09-05) |
 | `QPV_postRelay(funcName, args)` | quick-picto-viewer.ahk | 25 | the relay that queued posts run through: hoists the bound arguments into plain locals and dispatches on their count — the runtime rejects `args*` and `args[N]` inside call arguments (`c629bc2`) |
 
+### Slideshows and GIFs playback simplification (2026-09-05)
+
+| function | file | lines | what it does |
+|---|---|---|---|
+| `scheduleNextSlide()` | quick-picto-viewer.ahk | 9 | directly arms `theSlideShowCore` timer after image load completion; replaces `invokeExternalSlideshowHandler()` and `dummySlideshow()`, eliminating the queued `QPV_post` relay |
+| `stopSlideshow(resetMode:=0)` | quick-picto-viewer.ahk | 34 | canonical single-entry slideshow teardown: kills `theSlideShowCore`, stops audio, restores toolbar transparency and region, resets UI controls/labels, and displays the stopped tooltip |
+| `stopPlayback()` | lib/module-interface.ahk | 14 | playback interceptor for viewport events and window close/escape: stops active slideshow (`stopSlideshow`) and/or active GIF (`stopGiFsPlayback`), returning whether anything was running |
+| `stopGiFsPlayback()` | lib/module-interface.ahk | 14 | consolidated GIF playback teardown; absorbs `DestroyGIFuWin()` logic (`SetTimer, ResetImgLoadStatus, -15`) so all 43 `DestroyGIFuWin()` call sites route here |
+
+*Eliminated cross-thread / multi-hop functions:* `slideshowsHandler()` (MI, stop/start cascade absorbed into `stopSlideshow` and `ToggleSlideShowu`), `dummySlideshow()` (MI, load completion relay), and `invokeExternalSlideshowHandler()` (QPV, replaced by `scheduleNextSlide`).
+
 ### SQLite abort hatch — quick-picto-viewer.ahk (phase D3, `2bc4cb1`)
 
 | function | lines | what it does |

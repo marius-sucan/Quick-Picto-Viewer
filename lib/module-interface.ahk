@@ -1342,11 +1342,8 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    If preventSillyGui(A_Gui)
       Return
 
-   If (slideShowRunning=1 || animGIFplaying=1)
-   {
-      turnOffSlideshow()
+   If stopPlayback()
       Return 0
-   }
 
    prefix := ""
    prefix .= (wParam & 4) ? "+" : "" ; shift
@@ -1410,8 +1407,8 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
-    Else If (slideShowRunning=1 || animGIFplaying=1)
-       turnOffSlideshow()
+    Else If stopPlayback()
+       Return 0
     Else If isOkay
        uiWinClickAction()
     Return 0
@@ -1468,11 +1465,8 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 
     LbtnDwn := 0
     canCancelImageLoad := 4
-    If (slideShowRunning=1 || animGIFplaying=1)
-    {
-       turnOffSlideshow()
+    If stopPlayback()
        Return 0
-    }
 
     mX := lP & 0xFFFF
     mY := lP >> 16
@@ -1532,11 +1526,8 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
 
     lastInvoked := A_TickCount
     lastDoubleClickZeit := A_TickCount
-    If (slideShowRunning=1 || animGIFplaying=1)
-    {
-       turnOffSlideshow()
+    If stopPlayback()
        Return 0
-    }
     ; ToolTip, % "z=" zz , , , 2
     If (zz=1)
        uiWinClickAction()
@@ -1617,11 +1608,8 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If preventSillyGui(A_Gui)
      Return
 
-  If (slideShowRunning=1 || animGIFplaying=1)
-  {
-     turnOffSlideshow()
+  If stopPlayback()
      Return 0
-  }
 
   If (mouseToolTipWinCreated=1)
      mouseTurnOFFtooltip()
@@ -1665,45 +1653,6 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
 ; [merge] infosSlideShow() and initSlidesModes() are gone: they only mirrored the
 ; slideshow flags into this interpreter, and the globals are shared now.
 
-slideshowsHandler(thisSlideSpeed, act, msgu:=0) {
-   OutputDebug, % "QPV: MERGE: slideshowsHandler act=" act " speed=" thisSlideSpeed " mode=" how
-   ; [merge fix] this line was «slideShowDelay := thisSlideSpeed». Pre-merge it set
-   ; only the interface interpreter's own copy - the effective cadence, possibly
-   ; stretched to the music length. On one interpreter it clobbered the USER
-   ; PREFERENCE: the "stop" call passes 0, so every stop zeroed the speed and the
-   ; next start ran wrong until the user set the speed again. The cadence is its
-   ; own module variable now and only a "start" updates it.
-   prevFullIMGload := 1
-   If (act="start")
-   {
-      slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
-      setTaskbarIconState("normal")
-      SetTimer, theSlideShowCore, % -slideShowCadence
-      If msgu
-      {
-         GuiControl, PVwin:, PicOnGUI1, % msgu
-         GuiControl, PVwin:, PicOnGUI2a, % msgu
-         GuiControl, PVwin:, PicOnGUI2b, % msgu
-         GuiControl, PVwin:, PicOnGUI2c, % msgu
-         GuiControl, PVwin:, PicOnGUI3, % msgu
-      }
-   } Else If (act="stop")
-   {
-      allowNextSlide := 1
-      SetTimer, theSlideShowCore, Off
-      uiUpdateUIctrl()
-      uiAccessImgViewSetUIlabels()
-   }
-}
-
-dummySlideshow() {
-   OutputDebug, % "QPV: MERGE: dummySlideshow running=" slideShowRunning " allowNext=" allowNextSlide
-   If (slideShowRunning=1 && allowNextSlide=1)
-   {
-      setTaskbarIconState("Normal")
-      SetTimer, theSlideShowCore, % -slideShowCadence
-   }
-}
 
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
@@ -2248,17 +2197,9 @@ byeByeRoutine() {
          lastOtherWinClose := A_TickCount
          AnyWindowOpen := 0
          CloseWindow()
-      } Else If (animGIFplaying=1)
+      } Else If stopPlayback()
       {
          lastOtherWinClose := A_TickCount
-         If (slideShowRunning=1)
-            turnOffSlideshow()
-
-         stopGiFsPlayback()
-      } Else If (slideShowRunning=1)
-      {
-         lastOtherWinClose := A_TickCount
-         turnOffSlideshow()
       } Else If (thumbsDisplaying=1)
       {
          lastCloseInvoked := 5 ; exit application 
@@ -2383,27 +2324,39 @@ coreHideMenuFlyout() {
 }
 
 stopGiFsPlayback() {
-   If (animGIFplaying!=0)
+   If (mustPreventMenus=1 || simulateMenusMode=1)
+      Return
+
+   If (animGIFplaying!=0 || StrLen(prevAnimGIFwas))
    {
       OutputDebug, % "QPV: MERGE: stopGiFsPlayback via " Exception("", -2).What
-      lastOtherWinClose := A_TickCount
+      If (slideShowRunning=1 || animGIFplaying=1)
+         SetTimer, ResetImgLoadStatus, -15
+      SetTimer, autoChangeDesiredFrame, Off
       autoChangeDesiredFrame("stop")
       If (runningLongOperation!=1)
          uiChangeMcursor("normal-extra")
+      lastOtherWinClose := A_TickCount
    }
 }
 
-turnOffSlideshow() {
-   OutputDebug, % "QPV: MERGE: turnOffSlideshow via " Exception("", -2).What " running=" slideShowRunning
-   stopGiFsPlayback()
-   If (slideShowRunning!=1)
-      Return
+stopPlayback() {
+   wasPlaying := 0
+   If (slideShowRunning=1)
+   {
+      stopSlideshow()
+      wasPlaying := 1
+   }
+   If (animGIFplaying!=0)
+   {
+      stopGiFsPlayback()
+      wasPlaying := 1
+   }
+   Return wasPlaying
+}
 
-   SetTimer, theSlideShowCore, Off
-   dummyInfoToggleSlideShowu("stop")
-   If (slideShowCadence<950)
-      SoundBeep , 900, 100
-   lastOtherWinClose := A_TickCount
+turnOffSlideshow() {
+   stopPlayback()
 }
 
 invokeGivenMenuBarPopup(n) {
