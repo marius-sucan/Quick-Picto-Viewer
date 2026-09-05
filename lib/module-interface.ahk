@@ -88,12 +88,12 @@ initInterfaceModule() {
    ; [phase D] permanent same-thread WH_CALLWNDPROC hook [probes p7/p8]: receives
    ; the SENT menu messages during modal menu loops - where OnMessage monitors,
    ; timers and hotkey subroutines never run - and powers the JIT dropdown
-   ; rebuilds, the menu reader and the menu-scoped wheel hook install
-   Static cbCWP := 0
-   If !cbCWP
-      cbCWP := RegisterCallback("uiCallWndProc", "F")
-   If !hCWPhook
-      hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "UPtr", cbCWP, "UPtr", 0, "UInt", DllCall("GetCurrentThreadId"), "UPtr")
+   ; rebuilds, the menu reader and the menu-scoped wheel hook install. Since
+   ; 2026-09-05 the hook PROCEDURE is native [qpvmain.dll, callwndproc-hook.h]
+   ; and calls the script only for the four menu messages; the DLL is not loaded
+   ; yet at this point, so the script procedure carries the menus until
+   ; initQPVmainDLL() calls uiInstallSentMsgHook() again and swaps it out.
+   uiInstallSentMsgHook()
 
    ; numbers both sides monitored - composed dispatchers [see below]
    OnMessage(0x100, "dispatchKeyDown")
@@ -196,14 +196,26 @@ dispatchMouseWheel(wP, lP, msg, hwnd) {
 ; WM_SETTEXT]. The interpreter privatizes that buffer only around Gui commands and
 ; while an expression is being evaluated - so a CALLEE gets a fresh buffer, the
 ; callback body itself never does. Hence the body is a numeric trampoline
-; [uiCallWndProc]: parameter reads, NumGet, numeric compares, one call into a
-; worker that returns nothing, a numeric Return. Never in the body: a built-in A_
-; variable read [prevCrit := A_IsCritical placed first wrote "16", the Critical
-; peek interval, into every expression-built ToolTip], concatenation, a call
-; returning a non-empty string, OutputDebug with %. The TIMERPROC and WH_MOUSE_LL
-; callbacks fire at message-retrieval points only [modal menu loop, MsgSleep],
-; where the interrupted command has already consumed its arguments, so they keep
-; the plain save/restore shape.
+; [uiSentMenuMsg, and uiCallWndProc for the fallback]: parameter reads, NumGet,
+; numeric compares, one call into a worker that returns nothing, a numeric
+; Return. Never in the body: a built-in A_ variable read [prevCrit := A_IsCritical
+; placed first wrote "16", the Critical peek interval, into every expression-built
+; ToolTip], concatenation, a call returning a non-empty string, OutputDebug with %.
+; The TIMERPROC and WH_MOUSE_LL callbacks fire at message-retrieval points only
+; [modal menu loop, MsgSleep], where the interrupted command has already consumed
+; its arguments, so they keep the plain save/restore shape.
+; RULE 3 [2026-09-05]: the hook PROCEDURE itself must be native. Every script line
+; starts with CLOSE_CLIPBOARD_IF_OPEN [Line::ExecUntil, script.cpp], so a script
+; procedure that is entered for EVERY sent message closed the clipboard under the
+; interpreter's own "Clipboard := text": EmptyClipboard() sends WM_DESTROYCLIPBOARD
+; to the clipboard owner - our window whenever the previous copy was ours - the
+; callback ran a line, the clipboard closed, SetClipboardData failed and the
+; clipboard came out EMPTY [every other copy failed, the 50% Marius reported].
+; qpvHookSentMessages in qpvmain.dll [callwndproc-hook.h] is the procedure now and
+; enters the script only for the messages uiInstallSentMsgHook() lists; the script
+; procedure uiCallWndProc is the fallback for the seconds before the DLL is loaded
+; and for a DLL built before the export existed - the hazard stays open on that
+; path, so an AHK-level clipboard write must never be made to depend on it.
 
 uiMenuNameForBuilder(suffix) {
 ; every InvokeMenuBar<suffix> builder rebuilds exactly one named menu - extracted
@@ -218,35 +230,105 @@ uiMenuNameForBuilder(suffix) {
    Return mapu.HasKey(suffix) ? mapu[suffix] : ""
 }
 
+uiInstallSentMsgHook() {
+; Installs the WH_CALLWNDPROC hook that feeds the menu machinery and picks its
+; PROCEDURE: the native one in qpvmain.dll [qpvHookSentMessages, which enters the
+; script through uiSentMenuMsg only for the four menu messages listed below] once
+; the DLL is loaded; the script one [uiCallWndProc] before that, or when the DLL
+; predates the export [RULE 3 above]. Called from initInterfaceModule() at
+; startup - the DLL is not loaded yet and the menus must work from the first
+; click - and again from initQPVmainDLL() right after LoadLibrary, which swaps
+; the script procedure out. The export is resolved through the module HANDLE on
+; purpose: a DllCall("qpvmain.dll\...") by name before initQPVmainDLL() would load
+; whatever copy the search path finds and pin it under that name, bypassing the
+; developer-build override in initQPVmainDLL().
+   Static cbSentMsg := 0, cbCWP := 0, nativeHook := 0, missingLogged := 0
+   If (nativeHook=1)
+      Return
+   If qpvMainDll
+   {
+      fnAddr := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvHookSentMessages", "UPtr")
+      If fnAddr
+      {
+         If !cbSentMsg
+            cbSentMsg := RegisterCallback("uiSentMenuMsg", "F")
+         VarSetCapacity(msgList, 16, 0)
+         NumPut(0x117, msgList, 0, "UInt")   ; WM_INITMENUPOPUP - JIT dropdown rebuild
+         NumPut(0x11F, msgList, 4, "UInt")   ; WM_MENUSELECT - reader tracking, flyout
+         NumPut(0x211, msgList, 8, "UInt")   ; WM_ENTERMENULOOP - session start
+         NumPut(0x212, msgList, 12, "UInt")  ; WM_EXITMENULOOP - session end
+         If hCWPhook
+         {
+            ; the script procedure carried the menus until now; no message can be
+            ; delivered between these two calls [nothing here pumps]
+            DllCall("UnhookWindowsHookEx", "UPtr", hCWPhook)
+            hCWPhook := 0
+         }
+         hCWPhook := DllCall(fnAddr, "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 4, "UPtr")
+         If hCWPhook
+         {
+            nativeHook := 1
+            OutputDebug, % "QPVMERGE: native CALLWNDPROC filter installed [qpvmain.dll] hook=" hCWPhook
+            Return
+         }
+         OutputDebug, % "QPVMERGE: qpvHookSentMessages failed [LastError=" A_LastError "] - script hook procedure re-installed"
+      } Else If (missingLogged!=1)
+      {
+         missingLogged := 1
+         OutputDebug, % "QPVMERGE: qpvmain.dll has no qpvHookSentMessages [rebuild the DLL] - script hook procedure in use"
+      }
+   }
+   If hCWPhook
+      Return
+   If !cbCWP
+      cbCWP := RegisterCallback("uiCallWndProc", "F")
+   hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "UPtr", cbCWP, "UPtr", 0, "UInt", DllCall("GetCurrentThreadId"), "UPtr")
+}
+
+uiSentMenuMsg(wP, lP, msg, hwnd) {
+; RegisterCallback "F" target of the native WH_CALLWNDPROC procedure in qpvmain.dll
+; [qpvHookSentMessages]: entered ONLY for the messages uiInstallSentMsgHook()
+; listed, inside the SendMessage that delivers each of them, with the CWPSTRUCT
+; already decoded into OnMessage order. TRAMPOLINE ONLY [RULE 2]: this body runs
+; on the interrupted command's deref buffer. Nothing here may produce a string;
+; all work is in uiCallWndProcWork.
+   uiCallWndProcWork(msg, wP, lP, hwnd)
+   Return 0
+}
+
 uiCallWndProc(nCode, wP, lP) {
-; permanent same-thread hook: EVERY sent message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND,
-; WM_ACTIVATE...] of every window on this thread passes here - see the RULES above.
-; TRAMPOLINE ONLY [RULE 2]: this body runs inside the interrupted command's own
-; SendMessage, on that command's deref buffer. Nothing here may produce a string;
-; all work is in uiCallWndProcWork. 2*A_PtrSize is folded to a literal at load
-; time [ExpressionToPostfix, stock and _H alike], so it is not a runtime A_ read.
+; FALLBACK script hook procedure [RULE 3]: in place only until qpvmain.dll is
+; loaded, or for good when the DLL predates qpvHookSentMessages. EVERY sent
+; message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND, WM_ACTIVATE...] of every window
+; on this thread passes here - see the RULES above. TRAMPOLINE ONLY [RULE 2]:
+; this body runs inside the interrupted command's own SendMessage, on that
+; command's deref buffer. Nothing here may produce a string; all work is in
+; uiCallWndProcWork. A_PtrSize is folded to a literal at load time
+; [ExpressionToPostfix, stock and _H alike], so it is not a runtime A_ read.
+; CWPSTRUCT is REVERSED: lParam@0, wParam@PtrSize, message@2*PtrSize, hwnd@3*PtrSize.
    If (nCode >= 0)
    {
       msg := NumGet(lP+0, 2*A_PtrSize, "UInt")
       If (msg=0x11F || msg=0x117 || msg=0x211 || msg=0x212)
-         uiCallWndProcWork(msg, lP)
+         uiCallWndProcWork(msg, NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"), NumGet(lP+0, 3*A_PtrSize, "UPtr"))
    }
    Return DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
 }
 
-uiCallWndProcWork(msg, lP) {
-; the four menu messages only; lP is the CWPSTRUCT [reversed: lParam@0,
-; wParam@PtrSize]. Critical is saved and restored HERE, never in the trampoline:
+uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
+; the four menu messages only, with the sent message's own wParam / lParam / hwnd
+; [decoded by the native procedure, or by the fallback trampoline from the
+; CWPSTRUCT]. Critical is saved and restored HERE, never in the trampoline:
 ; A_IsCritical is a built-in-variable read [RULE 2 above]. This function must
 ; return NOTHING - a non-empty string result would be copied back into the
 ; interrupted command's buffer by the trampoline's call line.
    prevCrit := A_IsCritical
    Critical
    If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
-      uiMenuSelectTrack(NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"))
+      uiMenuSelectTrack(wP, lP)
    Else If (msg=0x117) ; WM_INITMENUPOPUP - the message wParam is the HMENU about to display
    {
-      hMinit := NumGet(lP+0, A_PtrSize, "UPtr")
+      hMinit := wP
       isMapped := (IsObject(menuJITmap) && menuJITmap.HasKey(hMinit)) ? 1 : 0
       ; ORDER-PROOFING: menu-BAR tracking can deliver the first INITMENUPOPUP
       ; BEFORE ENTERMENULOOP [TrackPopupMenu sends ENTER first], so when no loop
@@ -275,7 +357,7 @@ uiCallWndProcWork(msg, lP) {
       uiMenuJITrebuild(hMinit)
    }
    Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
-      uiMenuLoopEnter(NumGet(lP+0, A_PtrSize, "UPtr"))
+      uiMenuLoopEnter(wP)
    Else If (msg=0x212) ; WM_EXITMENULOOP
       uiMenuLoopExit()
    Critical, %prevCrit%

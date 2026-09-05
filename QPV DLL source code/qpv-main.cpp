@@ -354,6 +354,9 @@ int inline gammaMathsInt16(int i, double gamma) {
 // and it brings in sqlite-dynamic.h, whose binding is static and has to be the same one
 // dupes-pixels.h uses further down.
 #include "dupes-search.h"
+// The native WH_CALLWNDPROC procedure that feeds the script's menu machinery
+// [see the header]. #included like the rest: it uses DLL_API / DLL_CALLCONV.
+#include "callwndproc-hook.h"
 
 std::string ucs2_to_utf8(const unsigned short* ucs2_data, std::size_t length) {
 // Converts a UCS2 buffer (array of unsigned short) to a UTF-8 encoded std::string.

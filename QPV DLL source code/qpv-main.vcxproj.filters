@@ -42,6 +42,9 @@
     <ClInclude Include="sqlite-dynamic.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
+    <ClInclude Include="callwndproc-hook.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="qpv-main.cpp">

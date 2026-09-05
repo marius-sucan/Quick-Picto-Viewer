@@ -2386,6 +2386,11 @@ initQPVmainDLL(modus:=0) {
       Return
    }
 
+   ; the menu machinery's WH_CALLWNDPROC hook: swap the script procedure that
+   ; carried the menus since startup for the native one in this DLL
+   ; [callwndproc-hook.h, lib/module-interface.ahk RULE 3]
+   uiInstallSentMsgHook()
+
    If (modus!=1)
       disableWindowPenServices(PVhwnd)
 

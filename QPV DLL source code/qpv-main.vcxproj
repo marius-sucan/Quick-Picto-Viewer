@@ -186,6 +186,7 @@
     <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="callwndproc-hook.h" />
     <ClInclude Include="dupes-pixels.h" />
     <ClInclude Include="dupes-search.h" />
     <ClInclude Include="framework.h" />
