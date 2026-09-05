@@ -1961,7 +1961,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
    ; z := identifyThisWin()
    If (winu!=hQPVtoolbar && editingSelectionNow=1 && slideShowRunning!=1 && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1
    && (A_TickCount - lastMenuZeit>300) && (A_TickCount - lastContextMenuZeit>200))
-      MouseMoveResponder("krill")
+      QPV_post("MouseMoveResponder", "krill")
 
    If (menusflyOutVisible=1 && !uiVisibleMenuWin())
       SetTimer, hideMenuFlyOut, -50
