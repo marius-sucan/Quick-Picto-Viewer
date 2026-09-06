@@ -10061,7 +10061,7 @@ UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, startValue, snap) {
 WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    Critical, on
    Static thisZeit := 1, anotherZeit := 1, lastInvoked := 1, lastInvokedSwipe := 1
-   If (isToolbarKBDnav=1 || (A_TickCount - lastOtherWinClose<300))
+   If (isToolbarKBDnav=1 || (A_TickCount - lastContextMenuZeit<300))
    {
       If (isToolbarKBDnav=1)
          deactivateTlbrKbdMode()
@@ -65495,6 +65495,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
       If (thumbsDisplaying=1 && maxFilesIndex>1 && !InStr(keyu, "appskey"))
       {
          delayu := 10
+         lastContextMenuZeit := 1
          r := WinClickAction("rclick", "nona", mX, mY)
          dummyTimerDelayiedImageDisplay(50)
       }

@@ -366,6 +366,8 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
       DllCall("user32\GetMenuStringW", "UPtr", hMenuSel, "UInt", item, "UPtr", &bufu, "Int", 255, "UInt", 0x400)
    Else               ; otherwise the loword is the command id
       DllCall("user32\GetMenuStringW", "UPtr", hMenuSel, "UInt", item, "UPtr", &bufu, "Int", 255, "UInt", 0x000)
+
+   lastContextMenuZeit := A_TickCount
    txt := StrGet(&bufu, "UTF-16")
    If !StrLen(txt)
       Return
@@ -409,6 +411,7 @@ uiMenuLoopEnter(fromPopup:=0) {
 }
 
 uiMenuLoopExit() {
+   lastContextMenuZeit := A_TickCount
    menuLoopActive := 0
    barMenuSession := 0
    menuRButtonEaten := 0
@@ -1414,7 +1417,6 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return 0
 
     uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
-
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (drawingShapeNow=1)
        WinClickAction("remClick", "n", adjX, adjY)
