@@ -76253,7 +76253,7 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     If navBoxu
        ERR := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, thisPosX, thisPosY)
 
-    hasDrawnImageMap := (navBoxu && !ERR && IMGlargerViewPort=1) ? 1 : 0
+    hasDrawnImageMap := (navBoxu && !ERR && (IMGlargerViewPort=1 || thumbsDisplaying=1)) ? 1 : 0
     If (thumbsDisplaying=0)
     {
        If (FlipImgH=1)
@@ -76310,8 +76310,16 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
       Return
    }
 
-   entireString := (thumbsDisplaying=1) ? "Image preview area: " : "Image navigator box: "
-   entireString .= (HUDnavBoxSize<76) ? "small size." : "large size."
+   If (thumbsDisplaying=1)
+   {
+      zPlitPath(StrReplace(getIDimage(currentFileIndex), "||"), 1, fileNamu, folderu)
+      entireString := "Image preview box.`n" ((userPrivateMode=1) ? "******.***" : fileNamu) "."
+      If missing
+         entireString .= " Missing file."
+      entireString .= (HUDnavBoxSize<76) ? "`nSmall size." : "`nLarge size."
+   } Else
+      entireString := "Image navigator box: " ((HUDnavBoxSize<76) ? "small size." : "large size.")
+
    If (usrColorDepth>1 || imgFxMode>1) 
       entireString .= "`nViewport color effects are applied."
 
