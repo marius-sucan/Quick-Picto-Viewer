@@ -3156,9 +3156,9 @@ resetSlideshowTimer(ignoreEasyStop:=0) {
       Return
 
    If (slideShowRunning=1 && ignoreEasyStop=0)
-      ToggleSlideShowu("stop", 0)
+      ToggleSlideShowu("stop", 0, 1)
    Else If (slideShowRunning=1)
-      ToggleSlideShowu("start", 1)
+      ToggleSlideShowu("start", 1, 1)
 }
 
 showSlideShowInfosNow(showProgress) {
@@ -10931,7 +10931,7 @@ VPimgFXrandomizer() {
     lastFX := imgFxMode
 }
 
-stopSlideshow(resetMode:=0) {
+stopSlideshow(resetMode:=0, silentModus:=0) {
    If (slideShowRunning!=1)
       Return
 
@@ -10939,30 +10939,22 @@ stopSlideshow(resetMode:=0) {
    slideShowRunning := 0
    allowNextSlide := 1
    SetTimer, theSlideShowCore, Off
-
-   If (TouchToolbarGUIcreated=1 && ShowAdvToolbar=1)
-   {
-      WinSet, Region,, ahk_id %hQPVtoolbar%
-      Loop, % tlbrIconzList["counter"]
-      {
-          h := tlbrIconzList[A_Index, 1]
-          WinSet, Transparent, 255, ahk_id %h%
-      }
-   }
-
    If (StrLen(SlidesMusicSong)>3 && hSNDsong && resetMode!=1)
       StopMediaPlaying(1)
 
-   If (slideShowCadence<950)
-      SoundBeep, 900, 100
-
+   WinSet, Region,, ahk_id %hQPVtoolbar%
+   redrawToolbarGUI()
    uiUpdateUIctrl()
    uiAccessImgViewSetUIlabels()
    SetTimer, ResetImgLoadStatus, -150
-
    userSeenSlideImages := userSeenSessionImagesArray.Count()
-   showTOOLtip("Slideshow: STOPPED`nImages seen in this session: " groupDigits(userSeenSlideImages))
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   If (silentModus!=1)
+   {
+      showTOOLtip("Slideshow: STOPPED`nImages seen in this session: " groupDigits(userSeenSlideImages))
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      If (slideShowCadence<950)
+         SoundBeep, 900, 100
+   }
    prevSlideShowStop := A_TickCount
 }
 
@@ -11009,7 +11001,7 @@ preventScreenOff() {
   ; ToolTip, % "L=" z , , , 2
 }
 
-ToggleSlideShowu(actu:=0, resetMode:=0) {
+ToggleSlideShowu(actu:=0, resetMode:=0, silentModus:=0) {
   If (maxFilesIndex<3 && slideShowRunning!=1)
   {
      showTOOLtip("WARNING: Insufficient indexed files to start a slideshow")
@@ -11028,7 +11020,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
 
   If (slideShowRunning=1 || actu="stop") && (actu!="start")
   {
-     stopSlideshow(resetMode)
+     stopSlideshow(resetMode, silentModus)
   } Else If (thumbsDisplaying!=1 || actu="start")
   {
      If (A_TickCount - prevSlideShowStop<500) && (actu!="start")
@@ -11041,7 +11033,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
         SetWindowRegion(hQPVtoolbar, 1, 1, 1, 1)
 
      Static lastInvoked := 1
-     If ((A_TickCount - lastInvoked>100) && TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && lockToolbar2Win=1)
+     If ((A_TickCount - lastInvoked>100) && TouchToolbarGUIcreated=1 && ShowAdvToolbar=1 && lockToolbar2Win=1 && silentModus!=1)
      {
         createGDIPcanvas()
         lastInvoked := A_TickCount
@@ -11053,49 +11045,46 @@ ToggleSlideShowu(actu:=0, resetMode:=0) {
      If (StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && resetMode!=1)
         startSlidesMusicNow()
 
-     slideShowRunning := 1
-     allowNextSlide := 1
+     slideShowRunning := allowNextSlide := prevFullIMGload := 1
      If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
         milisec := MCI_Length(hSNDmedia) 
 
      thisSlideSpeed := (milisec>slideShowDelay) ? milisec : slideShowDelay
      slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
-     prevFullIMGload := 1
      setTaskbarIconState("normal")
-
-     msgu := "Slideshow is running. Direction: " DefineSlideShowType() ". Speed: " DefineSlidesRate() "."
-     If (slidesFXrandomize=1)
-        msgu .= "`nViewport colour effects are randomized for each image."
-
-     If (skipSeenImageSlides=1)
-        msgu .= "`nAlready seen images will be skipped."
-
-     msgu .= "`nPress Escape or click to stop the slideshow."
-
-     GuiControl, PVwin:, PicOnGUI1, % msgu
-     GuiControl, PVwin:, PicOnGUI2a, % msgu
-     GuiControl, PVwin:, PicOnGUI2b, % msgu
-     GuiControl, PVwin:, PicOnGUI2c, % msgu
-     GuiControl, PVwin:, PicOnGUI3, % msgu
-
      SetTimer, theSlideShowCore, % -slideShowCadence
-
-     delayu := DefineSlidesRate()
-     friendly := DefineSlideShowType()
-     etaTime := "`nEstimated time: " EstimateSlideShowLength()
-     If (slidesFXrandomize=1)
-        etaTime .= "`nViewport colour effects are randomized for each image."
-
-     If (skipSeenImageSlides=1)
-        etaTime .= "`nAlready seen images will be skipped."
-
-     showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime)
-     SetTimer, RemoveTooltip, % -msgDisplayTime, 900
-     If (slideShowDelay < 900)
+     If (silentModus!=1)
      {
-        Sleep, 550
-        RemoveTooltip()
-     } Else SetTimer, RemoveTooltip, % -msgDisplayTime, 900
+        msgu := "Slideshow is running. Direction: " DefineSlideShowType() ". Speed: " DefineSlidesRate() "."
+        If (slidesFXrandomize=1)
+           msgu .= "`nViewport colour effects are randomized for each image."
+
+        If (skipSeenImageSlides=1)
+           msgu .= "`nAlready seen images will be skipped."
+
+        msgu .= "`nPress Escape or click to stop the slideshow."
+        GuiControl, PVwin:, PicOnGUI1, % msgu
+        GuiControl, PVwin:, PicOnGUI2a, % msgu
+        GuiControl, PVwin:, PicOnGUI2b, % msgu
+        GuiControl, PVwin:, PicOnGUI2c, % msgu
+        GuiControl, PVwin:, PicOnGUI3, % msgu
+        delayu := DefineSlidesRate()
+        friendly := DefineSlideShowType()
+        etaTime := "`nEstimated time: " EstimateSlideShowLength()
+        If (slidesFXrandomize=1)
+           etaTime .= "`nViewport colour effects are randomized for each image."
+
+        If (skipSeenImageSlides=1)
+           etaTime .= "`nAlready seen images will be skipped."
+
+        showTOOLtip("Started " friendly " slideshow`nSpeed: " delayu "`nTotal files: " groupDigits(maxFilesIndex) etaTime)
+        SetTimer, RemoveTooltip, % -msgDisplayTime, 900
+        If (slideShowDelay<900)
+        {
+           Sleep, 550
+           RemoveTooltip()
+        } Else SetTimer, RemoveTooltip, % -msgDisplayTime, 900
+     }
   }
   Return
 }
@@ -102462,10 +102451,10 @@ tlbrZoomINout(dummy:=0) {
    Return "m"
 }
 
-invokeFilesSelectionMenu() {
+invokeFilesSelectionMenu(modus:=0) {
    deleteMenus()
    createMenuFilesSelections("PVfileSel")
-   showThisMenu("PVfileSel")
+   showThisMenu("PVfileSel", 0, modus)
 }
 
 MenuCycleSelectionShapes() {
@@ -102822,7 +102811,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       } Else If (btnID="BTNselectShape")
       {
          If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD && !AnyWindowOpen) 
-            func2Call := ["invokeFilesSelectionMenu"]
+            func2Call := ["invokeFilesSelectionMenu", "tlbr"]
          Else If (isImgEditingNow()=1)
             func2Call := ["ToggleEditImgSelection"]
       } Else If (btnID="BTNselectFileu")
@@ -102830,7 +102819,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
          func2Call := ["dropFilesSelection"]
       } Else If (btnID="BTNselectFreeform")
       {
-         func2Call := ["InvokeSelShapesMenu"]
+         func2Call := ["InvokeSelShapesMenu", "tlbr"]
       } Else If (btnID="BTNloupe")
       {
          If (thumbsDisplaying=1 && maxFilesIndex>0 && CurrentSLD)
@@ -102855,9 +102844,9 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNrefreshList")
          func2Call := ["DeepRefreshThumbsNow"]
       Else If (btnID="BTNfolderTree")
-         func2Call := ["invokeFoldersListerMenu"]
+         func2Call := ["invokeFoldersListerMenu", "tlbr"]
       Else If (btnID="BTNrecentOpened")
-         func2Call := ["invokeFoldersListerMenu"]
+         func2Call := ["invokeFoldersListerMenu", "tlbr"]
       Else If (btnID="BTNinfozHud")
          func2Call := ["PanelImageInfos"]
       Else If (btnID="BTNmngFolderz")
