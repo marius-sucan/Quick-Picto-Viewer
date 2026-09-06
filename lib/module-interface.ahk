@@ -14,7 +14,7 @@
 ; initInterfaceModule() because control never flows through an #Include'd file.
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray, menuCurrentIndex, menuTotalIndex, menusList
+     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray, menuTotalIndex, menusList
      , menusflyOutVisible, wasMenuFlierCreated, prevMenuBarItem, lastMenuBarUpdate, lastContextMenuZeit
      , allowMenuReader, taskBarUI, groppedFiles, LbtnDwn, penPressureRaw, hasPenPressureAPI
      , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
@@ -39,7 +39,7 @@ initInterfaceModule() {
    lastContextMenuZeit := 1, lastDoubleClickZeit := 1, lastMenuBarUpdate := 1,
    lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1, lastLongOperationStart := 1
    doNormalCursor := 1, prevFullIMGload := 1, prevMenuBarItem := 1
-   menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuCurrentIndex := 0, menuTotalIndex := 0
+   menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuTotalIndex := 0
    winGDIcreated := 0, ThumbsWinGDIcreated := 0
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
@@ -582,7 +582,6 @@ uiTryPlaceFlyout(anchor:=0) {
       Return
 
    flyoutAnchorMenu := a
-
    If (wasMenuFlierCreated!=1)
       guiCreateMenuFlyout()
 
@@ -590,6 +589,8 @@ uiTryPlaceFlyout(anchor:=0) {
    If (mX="" || Height="")
       Return
 
+   lastOtherWinClose := A_TickCount
+   lastContextMenuZeit := A_TickCount
    menusflyOutVisible := 1
    y := mY + Round(Height) + 2
    OutputDebug, % "QPV: MERGE: flyout placed x" mX " y" y " bar=" barMenuSession
@@ -2236,30 +2237,6 @@ guiCreateMenuFlyout() {
    wasMenuFlierCreated := 1
 }
 
-menuFlyoutDisplay(actu, mX, mY, isOkay, idu:=0, anchor:=0) {
-   Critical, on
-   lastOtherWinClose := A_TickCount
-   lastContextMenuZeit := A_TickCount
-   If anchor
-      flyoutAnchorMenu := anchor
-   If (IsNumber(idu) && idu>0)
-      menuCurrentIndex := idu
-
-   If (idu="reset")
-      menuCurrentIndex := 0
-
-   If (!isOkay && actu="yes")
-      Return
-
-   If (wasMenuFlierCreated!=1)
-      guiCreateMenuFlyout()
-
-   If (actu="yes")
-      uiStartMenuTimer()
-   Else
-      SetTimer, hideMenuFlyOut, -35
-}
-
 hideMenuFlyOut() {
     MouseGetPos,,, OutputVarWin
     If (OutputVarWin!=hFlyOut && !uiVisibleMenuWin())
@@ -2270,7 +2247,6 @@ hideMenuFlyOut() {
 
 coreHideMenuFlyout() {
     Tooltip
-    menuCurrentIndex := 0
     menusflyOutVisible := 0
     flyoutAnchorMenu := 0
     uiStopMenuTimer()

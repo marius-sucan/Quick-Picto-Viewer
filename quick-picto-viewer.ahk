@@ -248,7 +248,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , ResizeCropAfterRotation := 1, usrColorDepth := 1, ColorDepthDithering := 1, mediaSNDvolume := 80
    , borderAroundImage := 0, usrAutoCropColorTolerance := 5, userActionAdvImgProcConflictingFile := 4
    , SimpleOperationsDoCrop := 0, SimpleOperationsRotateAngle := 1, SimpleOperationsScaleYImgFactor := "100 %"
-   , SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0, PasteInPlaceCropAngular := 0, globalMenuOptions := 0
+   , SimpleOperationsFlipV := 0, SimpleOperationsFlipH := 0, PasteInPlaceCropAngular := 0
    , usrAutoCropDeviationPixels := 0, multilineStatusBar := 0, AutoCropAdaptiveMode := 1, allowGIFsPlayEntirely := 0
    , allowMultiCoreMode := 0, minimizeMemUsage := 0, GIFspeedDelay := 35, userImgAdjustAltBright := 1
    , maxMemThumbsCache := 420, resetImageViewOnChange := 0, FillAreaRemBGR := 0, blurAreaPixelizeMethod := 1
@@ -452,20 +452,53 @@ If (FirstRun!=0)
    IniWrite, % FirstRun, % mainSettingsFile, General, FirstRun
 } Else readMainSettingsApp(0)
 
-; [merge phase C] Input-handler registration for BOTH the former interface-thread
-; windows and this script's own windows lives in initInterfaceModule() - see
-; Lib\module-interface.ahk, #Include'd at the bottom of this file. The message
-; numbers both sides used to monitor route through per-window-root dispatchers
-; there; the old separate ahkthread interpreter is gone.
 initInterfaceModule()
+If !BuildGUI()
+{
+   MsgBox, 48, %appTitle%, ERROR: Unable to initialize the interface. The application will now exit...
+   hasInitSpecialMode := 1
+   ForceExitNow()
+   Return
+} Else handleUIhwnd()
 
-; ______ queued asynchronous dispatch [merged - phases C+E] ______
-; QPV_post preserves the old cross-interpreter queued semantics [a post
-; executed when the receiving thread pumped] via one-shot BoundFunc timers
-; through QPV_postRelay. Unifies the former IF_post and MT_post facades.
-; PARSER RULE for this runtime [see interface-thread-merge-plan.md]: no args*
-; expansion into METHOD calls and no args[N] inside call arguments - hoist into
-; plain locals and dispatch on the count, as below.
+createGDIPcanvas()
+InitGDIpStuff()
+
+Global multiCoreThumbsInitGood := "n", thumbsPoolState := 0, thumbsPoolWantBMP := 1
+If (A_PtrSize=4)
+{
+   allowMultiCoreMode := 0
+   minimizeMemUsage := 1
+   maxUndoLevels := 2
+   coreDesiredPixFmt := "0x21808"
+}
+
+; OnMessage(0x205, "WM_RBUTTONUP")
+TriggerMenuBarUpdate()
+addJournalEntry("Finished initialization of " appTitle " v" appVersion ".")
+If (qpvCanvasHasInit=1)
+   doWelcomeNow := initializeAppWithGivenArguments()
+
+; MsgBox, % A_TickCount - scriptStartTime
+If (doWelcomeNow=1 && qpvCanvasHasInit=1)
+{
+   drawWelcomeImg()
+   uiAccessWelcomeView()
+}
+
+If (A_Is64bitOS=1 && A_PtrSize!=8)
+   SetTimer, giveWarningX64, -500
+
+If (uiUseDarkMode=1)
+{
+   setMenusTheme(uiUseDarkMode)
+   setDarkWinAttribs(PVhwnd, uiUseDarkMode)
+}
+
+SetTimer, createGUItoolbar, -250
+; initQPVmainDLL()
+; createDummyTestGui()
+Return
 
 QPV_post(funcName, args*) {
 ; queued execution, like the old cross-interpreter post: the target runs from a
@@ -499,61 +532,6 @@ QPV_postRelay(funcName, args) {
    Else
       %funcName%(a1, a2, a3, a4, a5, a6, a7, a8, a9)
 }
-
-; the interface windows, menus and input handling live in Lib\module-interface.ahk
-; [merged into this interpreter in 2026-08; the settings handshake string is gone -
-; BuildGUI() reads the shared globals directly]
-If !BuildGUI()
-{
-   MsgBox, 48, %appTitle%, ERROR: Unable to initialize the interface. The application will now exit...
-   hasInitSpecialMode := 1
-   ForceExitNow()
-   Return
-} Else
-{
-   handleUIhwnd()
-   externObj := ""
-}
-
-createGDIPcanvas()
-InitGDIpStuff()
-
-Global multiCoreThumbsInitGood := "n", thumbsPoolState := 0, thumbsPoolWantBMP := 1
-
-If (A_PtrSize=4)
-{
-   allowMultiCoreMode := 0
-   minimizeMemUsage := 1
-   maxUndoLevels := 2
-   coreDesiredPixFmt := "0x21808"
-}
-
-; OnMessage(0x205, "WM_RBUTTONUP")
-TriggerMenuBarUpdate()
-addJournalEntry("Finished initialization of " appTitle " v" appVersion ".")
-If (qpvCanvasHasInit=1)
-   doWelcomeNow := initializeAppWithGivenArguments()
-
-; MsgBox, % A_TickCount - scriptStartTime
-If (doWelcomeNow=1 && qpvCanvasHasInit=1)
-{
-   drawWelcomeImg()
-   QPV_post("uiAccessWelcomeView")
-}
-
-If (A_Is64bitOS=1 && A_PtrSize!=8)
-   SetTimer, giveWarningX64, -500
-
-If (uiUseDarkMode=1)
-{
-   setMenusTheme(uiUseDarkMode)
-   setDarkWinAttribs(PVhwnd, uiUseDarkMode)
-}
-
-SetTimer, createGUItoolbar, -100
-; initQPVmainDLL()
-; createDummyTestGui()
-Return
 
 ;_____________________________________ Hotkeys _________________
 ; the hotkeys are registered since v5.4.5 in the
@@ -2639,7 +2617,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
 endCaptureCloneBrush() {
    mustCaptureCloneBrush := 0
-   QPV_post("setMenuBarState", "Enable", "PVbar")
+   setMenuBarState("Enable", "PVbar")
    createGUItoolbar()
 }
 
@@ -5921,7 +5899,7 @@ BtnSetBrushSymmetryCoords() {
    showTOOLtip("Please click inside the image area to set the symmetry axis")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   QPV_post("setMenuBarState", "Disable", "PVbar")
+   setMenuBarState("Disable", "PVbar")
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -7043,8 +7021,7 @@ createContextMenuCustomShapeDrawing(mX, mY, dontAddPoint, indexu, bK, givenCoord
       }
    }
 
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVnav") : givenCoords
-   showThisMenu("PVnav")
+   showThisMenu("PVnav", 0, givenCoords)
 }
 
 MenuSplitVectorPoint() {
@@ -45291,7 +45268,7 @@ BtnSetClonerBrushSource() {
    showTOOLtip("Please click inside the image area to set the cloner brush source")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   QPV_post("setMenuBarState", "Disable", "PVbar")
+   setMenuBarState("Disable", "PVbar")
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -45339,7 +45316,7 @@ BtnSetTextureSource() {
    showTOOLtip("Please click inside the image area to set the texture source coordinates")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
    mustCaptureCloneBrush := 1
-   QPV_post("setMenuBarState", "Disable", "PVbar")
+   setMenuBarState("Disable", "PVbar")
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
@@ -48509,7 +48486,7 @@ StopColorPicker() {
    Gui, LEDgui: Destroy
    colorPickerModeNow := 0
    Global lastOtherWinClose := A_TickCount
-   QPV_post("setMenuBarState", "Enable", "PVbar")
+   setMenuBarState("Enable", "PVbar")
 }
 
 StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
@@ -48530,7 +48507,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
 
    Sleep, 1
    diffH := diffW := 0
-   QPV_post("setMenuBarState", "Disable", "PVbar")
+   setMenuBarState("Disable", "PVbar")
    CoordMode, Pixel, Screen
    LEDu := imgHUDbaseUnit
    hColorPrev := createLEDgui(LEDu)
@@ -58366,8 +58343,7 @@ createStandardColorzDialog(coloru, hwnd, ctrlName) {
 OpenUImenu(givenCoords:=0) {
    deleteMenus()
    createMenuInterfaceOptions()
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvUIprefs") : givenCoords
-   showThisMenu("PvUIprefs")
+   showThisMenu("PvUIprefs", 0, givenCoords)
 }
 
 createTlbrContextMenu() {
@@ -58442,8 +58418,7 @@ invokeTlbrContextMenu(givenCoords:=0) {
    {
       Menu, PvUItoolbarMenu, Add
       kMenu("PvUItoolbarMenu", "Add", "Help", "btnHelpToolbar")
-      globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvUItoolbarMenu") : givenCoords
-      showThisMenu("PvUItoolbarMenu")
+      showThisMenu("PvUItoolbarMenu", 0 givenCoords)
    }
 }
 
@@ -58459,8 +58434,7 @@ InvokeOpenRecentMenu(givenCoords:=0) {
 
    deleteMenus()
    createMenuOpenRecents()
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVopenF") : givenCoords
-   showThisMenu("PVopenF")
+   showThisMenu("PVopenF", 0, givenCoords)
 }
 
 PanelDefineEntireSlideshowLength() {
@@ -65482,7 +65456,6 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
    If !isNumber(mX)
       GetMouseCoord2wind(PVhwnd, mX, mY)
 
-   globalMenuOptions := givenCoords
    If (keyu!="forced")
    {
       If (A_TickCount - lastInvoked<250) && (keyu="extern") || (A_TickCount - zeitSillyPrevent<250)
@@ -69426,8 +69399,7 @@ BuildSecondMenu(givenCoords:=0) {
       kMenu("PVmenu", "Add", "&Help", ":PVhelp")
    }
 
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVmenu") : givenCoords
-   showThisMenu("PVmenu")
+   showThisMenu("PVmenu", 0, givenCoords)
 }
 
 StopCaptureClickStuff(dummy:=0) {
@@ -69438,16 +69410,13 @@ StopCaptureClickStuff(dummy:=0) {
    If (dummy!="escape" && panelWinCollapsed=1 && imgEditPanelOpened=1 && AnyWindowOpen)
       toggleImgEditPanelWindow()
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   QPV_post("setMenuBarState", "Enable", "PVbar")
+   setMenuBarState("Enable", "PVbar")
 }
 
 BuildMainMenu(dummy:=0, givenCoords:=0) {
    Static lastInvoked := 1
    If (toolTipGuiCreated=2)
       RemoveTooltip()
-
-   If givenCoords
-      globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVmenu") : givenCoords
 
    If (drawingShapeNow=1)
    {
@@ -69682,7 +69651,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    Menu, PVmenu, Add,
    kMenu("PVmenu", "Add", "Restart`tShift+Esc", "restartAppu", "close renew")
    kMenu("PVmenu", "Add", "Exit`tEscape", "exitAppu", "close")
-   showThisMenu("PVmenu")
+   showThisMenu("PVmenu", 0, givenCoords)
 }
 
 createMenuSeenImages() {
@@ -69902,6 +69871,9 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
 
 showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    Static prevMenu, prevItems
+   If (mustPreventMenus=1)
+      Return
+
    If (VisibleQuickMenuSearchWin=1 && mustPreventMenus!=1 && forceIT!=1 && omniBoxMode=0)
       closeQuickSearch()
 
@@ -69909,52 +69881,22 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       destroySoloSliderWidget()
 
    SetTimer, drawWelcomeImg, Off
-   items := DllCall("GetMenuItemCount", "uptr", MenuGetHandle(menarg))
-   If (manubarMode!=1)
-   {
-      If ((A_TickCount - lastOtherWinClose<100) && prevMenu=menarg && prevItems=items) || (mustPreventMenus=1)
-         Return
-
-      GetPhysicalCursorPos(mX, mY)
-      If InStr(globalMenuOptions, "|")
-      {
-         klop := StrSplit(globalMenuOptions, "|")
-         If (klop[1]=menarg)
-         {
-            mX := klop[2]
-            mY := klop[3]
-         }
-      }
-     ; ToolTip, % items "==" prevItems "|" menarg "==" prevMenu, , , 2
-   } Else
-   {
-      hMenuBar := DllCall("GetMenu", "UPtr", PVhwnd, "UPtr")
-      If !hMenuBar
-         addJournalEntry("ERROR: Failed to get menu bar handle, from the main window.")
-
-      hMenuBar := "0x" Format("{:x}", hMenuBar)
-      rect := GetMenuItemRect(PVhwnd, hMenuBar, manuID - 1)
-      mX := Trim(rect.left)
-      mY := Trim(rect.bottom)
-      mYz := Trim(rect.top)
-      mH := max(rect.bottom, rect.top) - min(rect.bottom, rect.top)
-      mW := max(rect.left, rect.right) - min(rect.left, rect.right)
-      ; [phase D, per Marius] the blue bar-item halo is gone - native menu-bar
-      ; opens render their own highlight and the programmatic path no longer
-      ; needs to imitate one
-   }
-
    mouseTurnOFFtooltip()
    addJournalEntry("Invoked UI menu: " menarg)
    Global lastOtherWinClose := A_TickCount
    prevItems := items
    prevMenu := menarg
-   globalMenuOptions := 0
    okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
    idu := (manubarMode=1) ? klop[2] : "reset"
    flyoutAnchorMenu := MenuGetHandle(menarg)
    menusflyOutVisible := 0
-   menuFlyoutDisplay("yes", mX, mY, okay, idu)
+   uiTryPlaceFlyout()
+   If isVarEqualTo(manubarMode, "hwnd", "tlbr")
+   {
+      hwnd := (manubarMode="tlbr") ? lastTlbrClicked : manuID
+      WinGetPos, mX, mY, ww, hh, ahk_id %hwnd%
+      mY += hh
+   }
    Sleep, 1
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
    Global lastMenuZeit := A_TickCount
@@ -70323,15 +70265,13 @@ createMenuFilesSelections(whichMenu) {
 InvokeRecentMenu(givenCoords:=0) {
    deleteMenus()
    createMenuOpenRecents("simple")
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVopenF") : givenCoords
-   showThisMenu("PVopenF")
+   showThisMenu("PVopenF", 0, givenCoords)
 }
 
 InvokeFavesMenu(givenCoords:=0) {
    deleteMenus()
    createMenuFavourites()
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVfaves") : givenCoords
-   showThisMenu("PVfaves")
+   showThisMenu("PVfaves", 0, givenCoords)
 }
 
 createMenuOpenRecents(modus:=0) {
@@ -71312,22 +71252,19 @@ ToggleMultiLineStatus() {
 invokeFileOptionsMenu(givenCoords:=0) {
    deleteMenus()
    createMenuCurrentFilesActs("rclick")
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVfilesActs") : givenCoords
-   showThisMenu("PVfilesActs")
+   showThisMenu("PVfilesActs", 0, givenCoords)
 }
 
 invokeSelectionAreaMenu(modus:=0, givenCoords:=0) {
    deleteMenus()
    createMenuSelectionArea(modus)
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVselv") : givenCoords
-   showThisMenu("PVselv")
+   showThisMenu("PVselv", 0, givenCoords)
 }
 
 invokeNavigationMenu(givenCoords:=0) {
    deleteMenus()
    createMenuNavigation()
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVnav") : givenCoords
-   showThisMenu("PVnav")
+   showThisMenu("PVnav", 0, givenCoords)
 }
 
 folderzNavLoadAllSiblings() {
@@ -72139,15 +72076,13 @@ tlbrVectorDrawingModeContextMenu() {
 invokeHistoMenu(givenCoords:=0) {
    deleteMenus()
    createMenuVPhudHisto()
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVimgHistos") : givenCoords
-   showThisMenu("PVimgHistos")
+   showThisMenu("PVimgHistos", 0, givenCoords)
 }
 
 InvokeMenuImgSizeVP(givenCoords:=0) {
    deleteMenus()
    createMenuImgSizeAdapt()
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvImgAdapt") : givenCoords
-   showThisMenu("PvImgAdapt")
+   showThisMenu("PvImgAdapt", 0, givenCoords)
 }
 
 invokeMenuNavBoxImgSizeVP(givenCoords:=0) {
@@ -72157,8 +72092,7 @@ invokeMenuNavBoxImgSizeVP(givenCoords:=0) {
    Else
       createMenuImgSizeAdapt("bonus")
 
-   globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PvImgAdapt") : givenCoords
-   showThisMenu("PvImgAdapt")
+   showThisMenu("PvImgAdapt", 0, givenCoords)
 }
 
 ToggleImgHistogram(direction:=1, dummy:=0) {
@@ -72304,8 +72238,10 @@ ToggleColorProfileManage() {
 
 ToggleImgQuality(modus:=0) {
     If (AnyWindowOpen=14)
+    {
+       Gui, SettingsGUIA: Default
        GuiControlGet, userimgQuality
-    Else
+    } Else
        userimgQuality := !userimgQuality
 
     If (modus="lowu")
@@ -72315,7 +72251,7 @@ ToggleImgQuality(modus:=0) {
     Else If (AnyWindowOpen!=14)
        INIaction(1, "userimgQuality", "General")
 
-    fnOutputDebug("Set viewport quality: " modus "--" forceIT "==" userimgQuality)
+    fnOutputDebug("Set viewport quality: " modus "--" userimgQuality)
     imgQuality := (userimgQuality=1) ? 6 : 5
     smoothMode := (userimgQuality=1) ? 4 : 1
     compositingQuality := 1 ; (userimgGammaCorrect=1) ? 2 : 1
@@ -99834,12 +99770,10 @@ changeMcursor(whichCursor:=0) {
   If (whichCursor)
   {
      prevCursor := whichCursor
-     QPV_post("uiChangeMcursor", whichCursor)
+     uiChangeMcursor(whichCursor)
   } Else If (A_TickCount - lastInvoked > 400) ; && (imageLoading!=1)
   {
-     QPV_post("uiChangeMcursor", "busy")
-     ; imageLoading := 1 ; [was IF_set - plain global since phase E]
-     ; Try DllCall("user32\SetCursor", "Ptr", hCursBusy)
+     uiChangeMcursor("busy")
      lastInvoked := A_TickCount
   }
 }
@@ -101941,8 +101875,6 @@ tlbrInvokeFunction(a, b, c) {
    ; ToolTip, % z "=" a "=" b "=" c "=" func2Call , , , 2
    WinGetPos, aX, aY,,, ahk_id %hwnd%
    ; ShowClickHalo(aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
-   globalMenuOptions := !tlbrIconzList[hwnd, 12] ? "tlbrMenu|" aX "|" aY + ToolBarBtnWidth : 0
-   ; ToolTip, % globalMenuOptions , , , 2
    lastTlbrClicked := hwnd
    If IsFunc(func2Call[1])
    {
@@ -102397,8 +102329,7 @@ InvokeSelectAreaAlignMenu(givenCoords:=0) {
    {
       deleteMenus()
       createMenuSelectionAlign()
-      globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVselAlign") : givenCoords
-      showThisMenu("PVselAlign")
+      showThisMenu("PVselAlign", 0, givenCoords)
    }
 }
 
@@ -102667,8 +102598,7 @@ InvokeSelShapesMenu(givenCoords:=0) {
    {
       deleteMenus()
       createMenuSelectSizeShapes()
-      globalMenuOptions := (givenCoords="tlbr") ? StrReplace(globalMenuOptions, "tlbrMenu", "PVselSize") : givenCoords
-      showThisMenu("PVselSize")
+      showThisMenu("PVselSize", 0, givenCoords)
    }
    Return "m"
 }
@@ -102735,18 +102665,17 @@ tlbrRedoAction() {
    Return "m"
 }
 
-invokeSortListMenu() {
+tlbrInvokeSortListMenu() {
    If (maxFilesIndex>1 && CurrentSLD && !AnyWindowOpen)
    {
       deleteMenus()
       createMenuFilesSort()
-      globalMenuOptions := StrReplace(globalMenuOptions, "tlbrMenu", "PVsort")
-      showThisMenu("PVsort")
+      showThisMenu("PVsort", 0, "tlbr")
       Return "m"
    } Else If (StrLen(mustOpenStartFolder)>1)
    {
       currentFileIndex := doOpenStartFolder()
-      SetTimer, invokeSortListMenu, -200
+      SetTimer, tlbrInvokeSortListMenu, -200
    } Else If (maxFilesIndex<3)
    {
       showTOOLtip("WARNING: Insufficient files are currently indexed.")
@@ -103346,7 +103275,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNstatsList")
          func2Call := ["PanelWrapperFilesStats"]
       Else If (btnID="BTNsortList")
-         func2Call := ["invokeSortListMenu"]
+         func2Call := ["tlbrInvokeSortListMenu"]
       Else If (btnID="BTNrefreshList")
          func2Call := ["RefreshFilesList"]
       Else If (btnID="BTNfolderTree")
