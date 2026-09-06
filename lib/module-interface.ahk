@@ -673,7 +673,7 @@ drainUIinput() {
       If (NumGet(msgu, 2*A_PtrSize, "UPtr") = 20)  ; HTCLOSE
       {
          DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 1)
-         preByeRoutine()
+         preByeRoutine("win-close")
       }
    }
    If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 0)  ; WM_SYSCOMMAND, peek only
@@ -681,11 +681,11 @@ drainUIinput() {
       If ((NumGet(msgu, 2*A_PtrSize, "UPtr") & 0xFFF0) = 0xF060)  ; SC_CLOSE
       {
          DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 1)
-         preByeRoutine()
+         preByeRoutine("win-close")
       }
    }
    If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0010, "UInt", 0x0010, "UInt", 1)  ; WM_CLOSE, remove
-      preByeRoutine()
+      preByeRoutine("win-close")
    ; the keyboard handler defers its work to a 3ms timer that cannot fire while
    ; the caller holds Critical - run it now, then disarm the pending timer.
    ; ONLY when a key-down was actually drained: uiPreProcessKbdKey() processes the
@@ -2011,7 +2011,7 @@ uiWM_NCLBUTTONDOWN(wParam, lParam, msg, hwnd) {
    {
       If (runningLongOperation=1 || imageLoading=1 || whileLoopExec=1)
       {
-         preByeRoutine()
+         preByeRoutine("win-close")
          Return 0
       }
    }
@@ -2022,7 +2022,7 @@ uiWM_SYSCOMMAND(wParam, lParam, msg, hwnd) {
       Return
    If ((wParam & 0xFFF0) = 0xF060)  ; SC_CLOSE
    {
-      preByeRoutine()
+      preByeRoutine("win-close")
       Return 0
    }
 }
@@ -2030,15 +2030,26 @@ uiWM_SYSCOMMAND(wParam, lParam, msg, hwnd) {
 uiWM_CLOSE(wParam, lParam, msg, hwnd) {
    If !isUIrootWin(hwnd)
       Return
-   preByeRoutine()
+   preByeRoutine("win-close")
    Return 0
+}
+
+preByeRoutine(eventu:=0) {
+    canCancelImageLoad := 4
+    If (thumbsDisplaying=1 && runningLongOperation!=1 && eventu="escape")
+    {
+       ToggleThumbsMode()
+       Return
+    } Else If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
+       lastOtherWinClose := A_TickCount
+    byeByeRoutine()
 }
 
 byeByeRoutine() {
    Static lastInvokedThis := 1
    If (A_TickCount - lastInvokedThis < 250)
       Return
-; ToolTip, % "yay="  , , , 2
+
    If (runningLongOperation!=1 && imageLoading=1 && animGIFplaying!=1)
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
@@ -2061,7 +2072,6 @@ byeByeRoutine() {
       lastCloseInvoked++
    } Else If (runningLongOperation=1)
    {
-; ToolTip, % "yaaaaaaaaaaaaaaaaay="  , , , 2
       If (mustAbandonCurrentOperations!=1)
          askAboutStoppingOperations()
       Else
@@ -2098,7 +2108,8 @@ byeByeRoutine() {
          lastOtherWinClose := A_TickCount
       } Else If (thumbsDisplaying=1)
       {
-         lastCloseInvoked := 5 ; exit application 
+         lastCloseInvoked++
+         exitAppu()
          ; thumbsDisplaying := 0
          ; lastOtherWinClose := A_TickCount
          ; QPV_post("MenuReturnIMGedit")
@@ -2393,13 +2404,6 @@ VarContainsThis(value, vals*) {
    Return yay
 }
 
-preByeRoutine() {
-    canCancelImageLoad := 4
-    If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1 || thumbsDisplaying=1)
-       lastOtherWinClose := A_TickCount
-    byeByeRoutine()
-}
-
 uiPreProcessKbdKey() {
    Static lastInvoked := 1, counter := 0, prevKey
    If (!identifyThisWin() || (A_TickCount - lastOtherWinClose<300))
@@ -2421,10 +2425,10 @@ uiPreProcessKbdKey() {
          ; user gesture stopped active GIF or slideshow playback
       } Else If (hotkate="Escape" || hotkate="!F4")
       {
-         preByeRoutine()
+         preByeRoutine(hotkate)
       } Else If (hotkate="Enter" && runningLongOperation=1)
       {
-         preByeRoutine()
+         preByeRoutine(hotkate)
       } Else If (hotkate="Space")
       {
          isOkay := (!AnyWindowOpen || imgEditPanelOpened=1)
@@ -2508,7 +2512,7 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     } Else
     {
        ; escape key was pressed
-       preByeRoutine()
+       preByeRoutine("Escape")
        Return 0
     }
 
@@ -2522,7 +2526,6 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
        SetTimer, uiPreProcessKbdKey, -3
        Return 0
     }
-
     ; TulTip("|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
 }
 
