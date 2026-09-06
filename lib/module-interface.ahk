@@ -171,21 +171,21 @@ uiInstallSentMsgHook() {
 ; Installs the WH_CALLWNDPROC hook that feeds the menu machinery and picks its
 ; PROCEDURE: the native one is in qpvmain.dll.
 ;    WH_CALLWNDPROC hook is registered via qpvHookSentMessages().
-;    uiDLLsentMenuMsg() is registered as a callback to the DLL and the function is
+;    uiCallWndProcWork() is registered as a callback to the DLL and the function is
 ;    invoked for the 4 four menu WM messages.
 ; fallback: all in AHK. registered callback for uiCallWndProc() using SetWindowsHookEx().
-
 
    Static cbSentMsg := 0, cbCWP := 0, nativeHook := 0, missingLogged := 0
    If (nativeHook=1)
       Return
+
    If qpvMainDll
    {
       fnAddr := DllCall("GetProcAddress", "UPtr", qpvMainDll, "AStr", "qpvHookSentMessages", "UPtr")
       If fnAddr
       {
          If !cbSentMsg
-            cbSentMsg := RegisterCallback("uiDLLsentMenuMsg", "F")
+            cbSentMsg := RegisterCallback("uiCallWndProcWork", "F")
          VarSetCapacity(msgList, 20, 0)
          NumPut(0x117, msgList, 0, "UInt")   ; WM_INITMENUPOPUP - JIT dropdown rebuild
          NumPut(0x11F, msgList, 4, "UInt")   ; WM_MENUSELECT - reader tracking, flyout
@@ -229,17 +229,6 @@ uiInstallSentMsgHook() {
    hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "UPtr", cbCWP, "UPtr", 0, "UInt", DllCall("GetCurrentThreadId"), "UPtr")
 }
 
-uiDLLsentMenuMsg(msg, wP, lP, hwnd) {
-; RegisterCallback "F" target of the native WH_CALLWNDPROC procedure in qpvmain.dll
-; [qpvHookSentMessages]: entered ONLY for the messages uiInstallSentMsgHook()
-; listed, inside the SendMessage that delivers each of them, with the CWPSTRUCT
-; already decoded into OnMessage order. TRAMPOLINE ONLY [RULE 2]: this body runs
-; on the interrupted command's deref buffer. Nothing here may produce a string;
-; all work is in uiCallWndProcWork.
-   uiCallWndProcWork(msg, wP, lP, hwnd)
-   Return 0
-}
-
 uiCallWndProc(nCode, wP, lP) {
 ; FALLBACK script hook procedure,in place only until qpvmain.dll is
 ; loaded. EVERY sent message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND,
@@ -273,7 +262,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    {
       sentMsgProbeSeen := 1
       Critical, %prevCrit%
-      Return
+      Return 0
    }
 
    If (runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
@@ -284,7 +273,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
          DllCall("user32\EndMenu")
       }
       Critical, %prevCrit%
-      Return
+      Return 0
    }
 
    If (msg=0x11F)      ; WM_MENUSELECT - sent to the owner during the modal loop
@@ -324,6 +313,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    Else If (msg=0x212) ; WM_EXITMENULOOP
       uiMenuLoopExit()
    Critical, %prevCrit%
+   Return 0
 }
 
 uiMenuJITrebuild(hMenu) {
@@ -431,7 +421,7 @@ uiMenuLoopExit() {
       DllCall("user32\UnhookWindowsHookEx", "UPtr", hLLmouseHook)
       hLLmouseHook := 0
    }
-   SetTimer, hideMenuFlyOut, -350
+   hideMenuFlyOut()
    If (allowMenuReader="yes")
       mouseTurnOFFtooltip()
    ; self-healing pass, deferred until the loop is fully gone [timers work again]:
@@ -1901,9 +1891,7 @@ WM_MOUSELEAVE(wP, lP, msg, hwnd) {
 }
 
 activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
-   If (hwnd && !isUIrootWin(hwnd))  ; pre-merge this handler saw only the interface windows
-      Return
-   If (A_TickCount - scriptStartTime<2000)
+   If (A_TickCount - scriptStartTime<2000) || (hwnd && !isUIrootWin(hwnd))  ; pre-merge this handler saw only the interface windows
       Return
 
    lastMouseLeave := A_TickCount

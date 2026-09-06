@@ -10061,9 +10061,10 @@ UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, startValue, snap) {
 WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    Critical, on
    Static thisZeit := 1, anotherZeit := 1, lastInvoked := 1, lastInvokedSwipe := 1
-   If (isToolbarKBDnav=1)
+   If (isToolbarKBDnav=1 || (A_TickCount - lastOtherWinClose<300))
    {
-      deactivateTlbrKbdMode()
+      If (isToolbarKBDnav=1)
+         deactivateTlbrKbdMode()
       Return
    }
 
@@ -10074,7 +10075,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       closeQuickSearch()
       Return "none"
    }
-fnOutputDebug(A_ThisFunc " l=" winEventu)
+
    displayingImageNow := (thumbsDisplaying!=1 && useGdiBitmap()) ? 1 : 0
    If isVarEqualTo(AnyWindowOpen, 1, 33, 39, 59, 48, 61)
    {
@@ -10781,7 +10782,7 @@ fnOutputDebug(A_ThisFunc " l=" winEventu)
 
       SetTimer, drawWelcomeImg, Off
       Sleep, 5
-      If ((A_TickCount - lastWinDrag>300) && (A_TickCount - lastContextMenuZeit<300))
+      If ((A_TickCount - lastWinDrag>300) && (A_TickCount - lastContextMenuZeit>300))
          OpenDialogFiles()
    }
    lastInvoked := A_TickCount
