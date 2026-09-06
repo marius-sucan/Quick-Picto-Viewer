@@ -2000,10 +2000,6 @@ dummyTimerProcessDroppedFiles() {
    lastInvoked := A_TickCount
 }
 
-PVwinGuiClose:
-   byeByeRoutine()
-Return
-
 uiWM_NCLBUTTONDOWN(wParam, lParam, msg, hwnd) {
    If !isUIrootWin(hwnd)
       Return
@@ -2035,8 +2031,15 @@ uiWM_CLOSE(wParam, lParam, msg, hwnd) {
 }
 
 preByeRoutine(eventu:=0) {
+    If (WinActive("A")=MsgBox2hwnd)
+    {
+       Gosub, WinMsgBoxGuiClose
+       Gui, PVwin: Show
+       Return
+    }
+
     canCancelImageLoad := 4
-    If (thumbsDisplaying=1 && runningLongOperation!=1 && eventu="escape")
+    If (thumbsDisplaying=1 && imageLoading!=1 && runningLongOperation!=1 && eventu="escape")
     {
        ToggleThumbsMode()
        Return
@@ -2079,10 +2082,9 @@ byeByeRoutine() {
       Return
    } Else If (drawingShapeNow=1)
    {
-       drawingShapeNow := 0
+       stopDrawingShape("cancel")
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
-       stopDrawingShape("cancel")
    } Else If (colorPickerModeNow=1)
    {
        colorPickerModeNow := 0
@@ -2091,7 +2093,6 @@ byeByeRoutine() {
        lastOtherWinClose := A_TickCount
    } Else If (mustCaptureCloneBrush=1)
    {
-       mustCaptureCloneBrush := 0
        lastInvokedThis := A_TickCount
        lastOtherWinClose := A_TickCount
        StopCaptureClickStuff("Escape")
@@ -2100,23 +2101,21 @@ byeByeRoutine() {
       lastInvokedThis := A_TickCount
       If AnyWindowOpen
       {
-         lastOtherWinClose := A_TickCount
-         AnyWindowOpen := 0
          CloseWindow()
       } Else If stopPlayback()
       {
          lastOtherWinClose := A_TickCount
       } Else If (thumbsDisplaying=1)
       {
-         lastCloseInvoked++
          exitAppu()
+         ; lastCloseInvoked++
          ; thumbsDisplaying := 0
          ; lastOtherWinClose := A_TickCount
          ; QPV_post("MenuReturnIMGedit")
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
-      exitAppu("external")
+      exitAppu()
       ;  lastCloseInvoked++
    } Else If (markedSelectFile>50 && maxFilesIndex>100)
    {

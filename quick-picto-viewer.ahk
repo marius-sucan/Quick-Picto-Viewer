@@ -5892,7 +5892,7 @@ BtnSetBrushSymmetryCoords() {
    If (AnyWindowOpen!=64 || !isImgEditingNow())
       Return
 
-   BrushToolSymmetryX .= "c"
+   tinyPrevAreaCoordX := "n"
    liveDrawingBrushTool := 1
    showTOOLtip("Please click inside the image area to set the symmetry axis")
    ; SetTimer, RemoveTooltip, % -msgDisplayTime//2
@@ -5909,7 +5909,7 @@ setNewBrushSymmetryPoints() {
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
    thisZeit := kX := kY := 0
-   BrushToolSymmetryX := SubStr(BrushToolSymmetryX, 1, 1)
+   tinyPrevAreaCoordX := ""
    whileLoopExec := 1
    While, (determineLClickState()=1)
    {
@@ -10115,7 +10115,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       Return
    } Else If (AnyWindowOpen=64 && liveDrawingBrushTool=1`&& (mustCaptureCloneBrush=1 || isCtrlShift=1))
    {
-      If (StrLen(BrushToolSymmetryX)>1)
+      If (tinyPrevAreaCoordX="n")
       {
          setNewBrushSymmetryPoints()
       } Else
@@ -10143,10 +10143,8 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
             thisZeit := A_TickCount
          }
       }
-
       whileLoopExec := 0
       endCaptureCloneBrush()
-
       SoundBeep , 900, 100
       dummyRefreshImgSelectionWindow()
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
@@ -33317,13 +33315,12 @@ msgBoxWrapper(winTitle, msg, buttonz:=0, defaultBTN:=1, iconz:=0, checkBoxuCapti
        addJournalEntry("HELP BOX CLOSED: " winTitle)
 
     If (panelMode=1) ; fake window panel
-    {
        AnyWindowOpen := isNowFakeWinOpen := 0
-    }
+
     createGUItoolbar()
     lastLongOperationAbort := A_TickCount
     If ((iconz="error" || iconz="exclamation" || iconz="question") && runningLongOperation!=1)
-       QPV_post("setTaskbarIconState", "normal")
+       setTaskbarIconState("normal")
 
     msgBoxed := 0
     Return (checkBoxuCaption || dropListu || edithu || 2ndDropListu) ? zr : r
@@ -65387,14 +65384,6 @@ restartAppu() {
 }
 
 exitAppu(dummy:=0) {
-   If (MsgBox2hwnd && InStr(dummy, "external"))
-   {
-      SetTimer, TimerExit, -8000  ; [merge] watchdog while the synchronous cleanup below runs
-      terminateIMGediting()
-      TrueCleanup()
-      Return
-   }
-
    If (slideShowRunning=1)
       ToggleSlideShowu()
 
@@ -65461,15 +65450,15 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
 
       If (showHUDnavIMG=1 && hasDrawnImageMap=1 && !dotActiveObj.n && (IMGlargerViewPort=1 && thumbsDisplaying=0 || thumbsDisplaying=1) && InStr(ctrlu, "|ImgNavBox|"))
       {
-         invokeMenuNavBoxImgSizeVP()
+         invokeMenuNavBoxImgSizeVP(givenCoords)
          lastInvoked := A_TickCount
          Return
       } Else If (dotActiveObj.n>0 && dotActiveObj.n!=9 && editingSelectionNow=1 && adjustNowSel=0 && imgSelLargerViewPort!=1)
       {
          If (imgEditPanelOpened=1)
-            BuildImgLiveEditMenu()
+            BuildImgLiveEditMenu(givenCoords)
          Else
-            invokeSelectionAreaMenu("DoubleClick")
+            invokeSelectionAreaMenu("DoubleClick", givenCoords)
          lastInvoked := A_TickCount
          Return
       } Else If (showHistogram>1 && hasDrawnHistoMap=1 && !dotActiveObj.n && thumbsDisplaying=0 && drawingShapeNow=0 && InStr(ctrlu, "|ImgHistoBox|"))
@@ -67414,7 +67403,6 @@ createMenuBonusImageLiveEditMode() {
    kMenu("PVtActFile", "Add", "Cop&y file path(s) as text", "CopyImagePath", "clipboard")
    kMenu("PVtActFile", "Add", "Open file in a new &QPV instance", "SoloNewQPVinstance")
    kMenu("PVtActFile", "Add", "&Explore the containing folder", "OpenThisFileFolder", "external open")
-
    If !isVarEqualTo(AnyWindowOpen, 31, 24)
    {
       createMenuImageEditSubMenus("filters")
@@ -68984,7 +68972,7 @@ addMenuBonusesBrushTools() {
    }
 }
 
-BuildImgLiveEditMenu() {
+BuildImgLiveEditMenu(givenCoords:=0) {
    If (editingSelectionNow!=1 && !AnyWindowOpen) || (thumbsDisplaying=1)
       Return
 
@@ -69183,7 +69171,7 @@ BuildImgLiveEditMenu() {
    If (imgEditPanelOpened=1 && !isVarEqualTo(AnyWindowOpen, 10, 64, 66, 12) && drawing!=1)
       kMenu("PVmenu", "Add", "&Hide dynamic object`tD", "toggleLiveEditObject", "preview")
 
-   showThisMenu("PVmenu")
+   showThisMenu("PVmenu", 0, givenCoords)
 }
 
 MenuSelectEndFiles() {
@@ -69218,7 +69206,7 @@ BuildSecondMenu(givenCoords:=0) {
       Sleep, -1
    } Else If (editingSelectionNow=1 && validBMP(useGdiBitmap()) && StrLen(getIDimage(currentFileIndex))>4 && imgEditPanelOpened!=1)
    {
-      invokeSelectionAreaMenu("DoubleClick")
+      invokeSelectionAreaMenu("DoubleClick", givenCoords)
       Return
    }
 
@@ -69279,7 +69267,7 @@ BuildSecondMenu(givenCoords:=0) {
       If (AnyWindowOpen=10 || AnyWindowOpen=74)
          kMenu("PVmenu", "Add", "Toggle colour &effects", "BtnToggleNoColorsFX",, " (viewport)")
 
-      showThisMenu("PVmenu")
+      showThisMenu("PVmenu", 0, givenCoords)
       Return
    }
 
@@ -69410,7 +69398,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    } Else If (imgEditPanelOpened=1)
    {
       deleteMenus()
-      BuildImgLiveEditMenu()
+      BuildImgLiveEditMenu(givenCoords)
       Return
    }
 
