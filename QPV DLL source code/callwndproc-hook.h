@@ -55,7 +55,7 @@ static LRESULT CALLBACK qpvSentMsgHookProc(int nCode, WPARAM wParam, LPARAM lPar
         for (int i = 0; i < qpvSentMsgFilterCount; i++) {
             if (qpvSentMsgFilter[i] == cwp->message) {
 
-                qpvSentMsgCallback((UINT_PTR)cwp->wParam, (UINT_PTR)cwp->lParam, (UINT_PTR)cwp->message, (UINT_PTR)cwp->hwnd);
+                qpvSentMsgCallback((UINT_PTR)cwp->message, (UINT_PTR)cwp->wParam, (UINT_PTR)cwp->lParam, (UINT_PTR)cwp->hwnd);
                 break;
             }
         }

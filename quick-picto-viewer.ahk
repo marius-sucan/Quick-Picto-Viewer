@@ -474,18 +474,15 @@ If (A_PtrSize=4)
 }
 
 ; OnMessage(0x205, "WM_RBUTTONUP")
-TriggerMenuBarUpdate()
 addJournalEntry("Finished initialization of " appTitle " v" appVersion ".")
 If (qpvCanvasHasInit=1)
    doWelcomeNow := initializeAppWithGivenArguments()
 
 ; MsgBox, % A_TickCount - scriptStartTime
 If (doWelcomeNow=1 && qpvCanvasHasInit=1)
-{
    drawWelcomeImg()
-   uiAccessWelcomeView()
-}
 
+refreshUImainWinElements()
 If (A_Is64bitOS=1 && A_PtrSize!=8)
    SetTimer, giveWarningX64, -500
 
@@ -495,9 +492,6 @@ If (uiUseDarkMode=1)
    setDarkWinAttribs(PVhwnd, uiUseDarkMode)
 }
 
-SetTimer, createGUItoolbar, -250
-; initQPVmainDLL()
-; createDummyTestGui()
 Return
 
 QPV_post(funcName, args*) {
@@ -2678,12 +2672,16 @@ resetMainWin2Welcome() {
      ForceRefreshNowThumbsList()
      prevOpenedWindow := ""
      drawWelcomeImg()
-     SetTimer, createGUItoolbar, -100
-     QPV_post("uiAccessWelcomeView")
-     SetTimer, TriggerMenuBarUpdate, -90
      SetTimer, ResetImgLoadStatus, -50
-     If (lockToolbar2Win=1 && ShowAdvToolbar=1)
-        SetTimer, tlbrResetPosition, -100
+     SetTimer, refreshUImainWinElements, -250
+}
+
+refreshUImainWinElements() {
+   TriggerMenuBarUpdate()
+   createGUItoolbar()
+   uiAccessWelcomeView()
+   If (lockToolbar2Win=1 && ShowAdvToolbar=1)
+      SetTimer, tlbrResetPosition, -100
 }
 
 activateFilesListFilterBasedOnFolder(thisIndex) {
@@ -35399,15 +35397,6 @@ doStartLongOpDance(affectTlbr:=0) {
      initAppBusyMode()
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1 && affectTlbr!="no")
      {
-        ; redrawToolbarGUI() ends in a Sleep. On a thread that is not yet Critical [an
-        ; operation launched from the menu bar, no panel to close first] that sleep runs
-        ; every timer due at this instant - a ResetImgLoadStatus or a "normal-extra" cursor
-        ; relay left over from the previous image or operation would clear the flags set
-        ; two lines above, and the whole run would proceed with no abort prompt. Critical
-        ; covers the redraw's own sleep only, and the restore hands the thread back as it
-        ; was: an operation that stays interruptible remains exposed to its timers at
-        ; every per-line peek, exactly as it was pre-merge on the main thread - making
-        ; every operation Critical from here is not this hook's call [86 callers].
         prevCrit := A_IsCritical
         Critical
         redrawToolbarGUI()
@@ -104547,6 +104536,12 @@ readSettingsToolbar(actu) {
 createGUItoolbar(dummy:=0) {
    Critical, on
    Static prevState, hasEverDisplayed := 0, mustDoRefresh := 1
+   If (A_TickCount - scriptStartTime<350)
+   {
+      SetTimer, createGUItoolbar, -150
+      Return
+   }
+
    If (dummy="refresh-later")
    {
       mustDoRefresh := 1

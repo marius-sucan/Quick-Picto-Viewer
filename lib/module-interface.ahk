@@ -154,53 +154,6 @@ dispatchMouseWheel(wP, lP, msg, hwnd) {
    Return adjustWheelNumbersEditFields(wP, lP, msg)  ; it declares 3 params [the loader enforces arity on direct calls; monitors never did]
 }
 
-; ______ native menu machinery [merge phase D] ______
-; The menu bar carries REAL attached submenus [BuildMenuBar], so hover-switching,
-; F10 and Alt-accelerators are native. Dropdown content is rebuilt just-in-time
-; when Windows sends WM_INITMENUPOPUP, and the reader announcements ride
-; WM_MENUSELECT - both received by the permanent same-thread WH_CALLWNDPROC hook
-; below, because during any same-interpreter menu modal loop OnMessage monitors,
-; timers and hotkey subroutines NEVER run [probe rounds 1-2], while raw Win32
-; callbacks do [probes p7/p8/p11/p13]. The in-menu wheel rides a menu-scoped
-; WH_MOUSE_LL hook [p13]. CWPSTRUCT is REVERSED: lParam@0, wParam@PtrSize,
-; message@2*PtrSize, hwnd@3*PtrSize.
-; RULE for every raw callback in this file [all are RegisterCallback "F", fast mode]:
-; a fast callback has NO thread of its own - it executes inside whichever script
-; thread is current, and the interpreter restores only the idle thread afterwards.
-; So each one saves prevCrit := A_IsCritical, turns Critical on for its body, and
-; restores Critical, %prevCrit% on EVERY return path. A bare Critical left the
-; interrupted thread uninterruptible for good [2026-09-02: MsgBox2 boxes pumping in
-; InputHook.Wait lost their buttons, Escape, X and watchdog timers].
-; RULE 2 [2026-09-04] for a callback that runs INSIDE a synchronous send - the
-; WH_CALLWNDPROC hook, and any future window subclass, WH_CBT or WH_CALLWNDPROCRET:
-; it has NO deref buffer of its own either. Its own lines expand into the buffer
-; of the command it interrupted, from offset 0, while that command may still be
-; reading its argument from there [ToolTip keeps ti.lpszText across TTM_ADDTOOL
-; and TTM_UPDATETIPTEXT; ControlSetText and WinSetTitle pass theirs through
-; WM_SETTEXT]. The interpreter privatizes that buffer only around Gui commands and
-; while an expression is being evaluated - so a CALLEE gets a fresh buffer, the
-; callback body itself never does. Hence the body is a numeric trampoline
-; [uiSentMenuMsg, and uiCallWndProc for the fallback]: parameter reads, NumGet,
-; numeric compares, one call into a worker that returns nothing, a numeric
-; Return. Never in the body: a built-in A_ variable read [prevCrit := A_IsCritical
-; placed first wrote "16", the Critical peek interval, into every expression-built
-; ToolTip], concatenation, a call returning a non-empty string, OutputDebug with %.
-; The TIMERPROC and WH_MOUSE_LL callbacks fire at message-retrieval points only
-; [modal menu loop, MsgSleep], where the interrupted command has already consumed
-; its arguments, so they keep the plain save/restore shape.
-; RULE 3 [2026-09-05]: the hook PROCEDURE itself must be native. Every script line
-; starts with CLOSE_CLIPBOARD_IF_OPEN [Line::ExecUntil, script.cpp], so a script
-; procedure that is entered for EVERY sent message closed the clipboard under the
-; interpreter's own "Clipboard := text": EmptyClipboard() sends WM_DESTROYCLIPBOARD
-; to the clipboard owner - our window whenever the previous copy was ours - the
-; callback ran a line, the clipboard closed, SetClipboardData failed and the
-; clipboard came out EMPTY [every other copy failed, the 50% Marius reported].
-; qpvHookSentMessages in qpvmain.dll [callwndproc-hook.h] is the procedure now and
-; enters the script only for the messages uiInstallSentMsgHook() lists; the script
-; procedure uiCallWndProc is the fallback for the seconds before the DLL is loaded
-; and for a DLL built before the export existed - the hazard stays open on that
-; path, so an AHK-level clipboard write must never be made to depend on it.
-
 uiMenuNameForBuilder(suffix) {
 ; every InvokeMenuBar<suffix> builder rebuilds exactly one named menu - extracted
 ; from the builders' own showThisMenu tails at phase D
@@ -216,16 +169,13 @@ uiMenuNameForBuilder(suffix) {
 
 uiInstallSentMsgHook() {
 ; Installs the WH_CALLWNDPROC hook that feeds the menu machinery and picks its
-; PROCEDURE: the native one in qpvmain.dll [qpvHookSentMessages, which enters the
-; script through uiSentMenuMsg only for the four menu messages listed below] once
-; the DLL is loaded; the script one [uiCallWndProc] before that, or when the DLL
-; predates the export [RULE 3 above]. Called from initInterfaceModule() at
-; startup - the DLL is not loaded yet and the menus must work from the first
-; click - and again from initQPVmainDLL() right after LoadLibrary, which swaps
-; the script procedure out. The export is resolved through the module HANDLE on
-; purpose: a DllCall("qpvmain.dll\...") by name before initQPVmainDLL() would load
-; whatever copy the search path finds and pin it under that name, bypassing the
-; developer-build override in initQPVmainDLL().
+; PROCEDURE: the native one is in qpvmain.dll.
+;    WH_CALLWNDPROC hook is registered via qpvHookSentMessages().
+;    uiDLLsentMenuMsg() is registered as a callback to the DLL and the function is
+;    invoked for the 4 four menu WM messages.
+; fallback: all in AHK. registered callback for uiCallWndProc() using SetWindowsHookEx().
+
+
    Static cbSentMsg := 0, cbCWP := 0, nativeHook := 0, missingLogged := 0
    If (nativeHook=1)
       Return
@@ -235,7 +185,7 @@ uiInstallSentMsgHook() {
       If fnAddr
       {
          If !cbSentMsg
-            cbSentMsg := RegisterCallback("uiSentMenuMsg", "F")
+            cbSentMsg := RegisterCallback("uiDLLsentMenuMsg", "F")
          VarSetCapacity(msgList, 20, 0)
          NumPut(0x117, msgList, 0, "UInt")   ; WM_INITMENUPOPUP - JIT dropdown rebuild
          NumPut(0x11F, msgList, 4, "UInt")   ; WM_MENUSELECT - reader tracking, flyout
@@ -249,15 +199,10 @@ uiInstallSentMsgHook() {
             DllCall("UnhookWindowsHookEx", "UPtr", hCWPhook)
             hCWPhook := 0
          }
+
          hCWPhook := DllCall("qpvmain.dll\qpvHookSentMessages", "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 5, "UPtr")
          If hCWPhook
          {
-            ; END-TO-END SELF-TEST: a message SENT to our own hidden main window must
-            ; travel kernel -> native procedure -> uiSentMenuMsg -> uiCallWndProcWork
-            ; before this call returns. If it does not, the native path is not
-            ; delivering on this machine and the menus would silently lose their JIT
-            ; rebuilds, the reader and the wheel hook - so the native hook is removed
-            ; and the script procedure takes over, LOUDLY [DebugView]
             sentMsgProbeSeen := 0
             DllCall("user32\SendMessageW", "UPtr", A_ScriptHwnd, "UInt", 0x85EE, "UPtr", 0, "UPtr", 0, "UPtr")
             If (sentMsgProbeSeen=1)
@@ -284,32 +229,36 @@ uiInstallSentMsgHook() {
    hCWPhook := DllCall("SetWindowsHookEx", "Int", 4, "UPtr", cbCWP, "UPtr", 0, "UInt", DllCall("GetCurrentThreadId"), "UPtr")
 }
 
-uiSentMenuMsg(wP, lP, msg, hwnd) {
+uiDLLsentMenuMsg(msg, wP, lP, hwnd) {
 ; RegisterCallback "F" target of the native WH_CALLWNDPROC procedure in qpvmain.dll
 ; [qpvHookSentMessages]: entered ONLY for the messages uiInstallSentMsgHook()
 ; listed, inside the SendMessage that delivers each of them, with the CWPSTRUCT
 ; already decoded into OnMessage order. TRAMPOLINE ONLY [RULE 2]: this body runs
 ; on the interrupted command's deref buffer. Nothing here may produce a string;
 ; all work is in uiCallWndProcWork.
+   If (runningLongOperation=1 || imageLoading=1)
+      Return 0
    uiCallWndProcWork(msg, wP, lP, hwnd)
    Return 0
 }
 
 uiCallWndProc(nCode, wP, lP) {
-; FALLBACK script hook procedure [RULE 3]: in place only until qpvmain.dll is
-; loaded, or for good when the DLL predates qpvHookSentMessages. EVERY sent
-; message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND, WM_ACTIVATE...] of every window
-; on this thread passes here - see the RULES above. TRAMPOLINE ONLY [RULE 2]:
-; this body runs inside the interrupted command's own SendMessage, on that
-; command's deref buffer. Nothing here may produce a string; all work is in
-; uiCallWndProcWork. A_PtrSize is folded to a literal at load time
-; [ExpressionToPostfix, stock and _H alike], so it is not a runtime A_ read.
-; CWPSTRUCT is REVERSED: lParam@0, wParam@PtrSize, message@2*PtrSize, hwnd@3*PtrSize.
+; FALLBACK script hook procedure,in place only until qpvmain.dll is
+; loaded. EVERY sent message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND,
+; WM_ACTIVATE...] of every window on this thread passes here and
+; it is undesirabled. The fallback exists because I want to delay 
+; the DLL init.
+
    If (nCode >= 0)
    {
       msg := NumGet(lP+0, 2*A_PtrSize, "UInt")
       If (msg=0x11F || msg=0x117 || msg=0x211 || msg=0x212)
+      {
+         If (runningLongOperation=1 || imageLoading=1)
+            Return 0
+
          uiCallWndProcWork(msg, NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"), NumGet(lP+0, 3*A_PtrSize, "UPtr"))
+      }
    }
    Return DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
 }
@@ -871,7 +820,6 @@ BuildGUI() {
    Sleep, 1
    createGDIinfosWin()
    Sleep, 2
-   uiUpdateUIctrl(1)
    WinSet, AlwaysOnTop, % isAlwaysOnTop, ahk_id %PVhwnd%
    Sleep, 1
    WinActivate, ahk_id %PVhwnd%
@@ -898,6 +846,7 @@ BuildGUI() {
       Sleep, 2
    }
 
+   uiUpdateUIctrl(1)
    Return (PVhwnd && hGDIinfosWin && hGDIwin && hGDIthumbsWin && hGDIselectWin && hPicOnGui1) ? PVhwnd : 0
 }
 
@@ -1329,11 +1278,6 @@ createGDIselectorWin() {
    UnregisterTouchWindow(hGDIselectWin)
 }
 
-miniGDIupdater() {
-   uiUpdateUIctrl(0)
-   QPV_post("GuiGDIupdaterResize", PrevGuiSizeEvent)
-}
-
 WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
    If !isOkay
@@ -1760,8 +1704,13 @@ WM_WINDOWPOSCHANGED(wP:=0, lP:=0, msg:=0, hwnd:=0) {
       Global lastWinDrag := A_TickCount
       If (A_OSVersion="WIN_7" || isWinXP=1)
          SetTimer, updateGDIwinPos, -5
-      If (ShowAdvToolbar=1 && lockToolbar2Win=1)
-         SetTimer, updateTlbrPosition, -10
+      If (ShowAdvToolbar=1 && lockToolbar2Win=1 && (A_TickCount - scriptStartTime>350))
+      {
+         If (runningLongOperation=1)
+            updateTlbrPosition()
+         Else
+            SetTimer, updateTlbrPosition, -10
+      }
       b := a
   }
 }
@@ -1973,15 +1922,19 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
 }
 
 PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
-    If (A_TickCount - lastMenuBarUpdate < 150)
-       Return
+    ; If (A_TickCount - lastMenuBarUpdate < 100)
+    ;    Return
 
     PrevGuiSizeEvent := EventInfo
     ; ToolTip, % "l=" EventInfo , , , 2
     turnOffSlideshow()
     canCancelImageLoad := 4
     delayu := (isWinXP=1 || thumbsDisplaying=1) ? -15 : -5
-    SetTimer, miniGDIupdater, % delayu
+    If (A_TickCount - scriptStartTime > 350)
+    {
+       uiUpdateUIctrl(0)
+       GuiGDIupdaterResize(PrevGuiSizeEvent)
+    }
 }
 
 PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
