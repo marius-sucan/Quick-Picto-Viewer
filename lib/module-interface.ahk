@@ -644,8 +644,10 @@ drainUIinput() {
       mlp := NumGet(msgu, 3*A_PtrSize, "UPtr")
       If (mnum=0x100 || mnum=0x104)
       {
-         gotKeyDown := 1
+         hotkate := ""
          uiWM_KEYDOWN(mwp, mlp, mnum, mhwnd)
+         If (hotkate!="")
+            gotKeyDown := 1
       }
       Else If (mnum=0x200)
          uiWM_MOUSEMOVE(mwp, mlp, mnum, mhwnd)
@@ -687,10 +689,13 @@ drainUIinput() {
       preByeRoutine()
    ; the keyboard handler defers its work to a 3ms timer that cannot fire while
    ; the caller holds Critical - run it now, then disarm the pending timer.
-   ; ONLY when a key-down was actually drained: uiPreProcessKbdKey() processes the
-   ; global hotkate, which otherwise still holds the LAST key ever pressed - an
-   ; unconditional call here re-fired that stale key on every checkpoint [killing
-   ; slideshows after one advance and making GIF playback flicker uninterruptibly].
+   ; ONLY when uiWM_KEYDOWN() stored a key: uiPreProcessKbdKey() processes the
+   ; global hotkate, which otherwise still holds the LAST key ever stored [by the
+   ; panel handler too]. uiWM_KEYDOWN() handles Escape itself and declines every
+   ; other key while an operation runs, so a call for a declined key re-fired that
+   ; stale key: an unconditional call did it on every checkpoint [killing slideshows
+   ; after one advance, GIF playback flickering uninterruptibly], a call per drained
+   ; key-down did it for a stale Enter [the abort prompt for any key, twice for Escape].
    If (gotKeyDown)
    {
       uiPreProcessKbdKey()
