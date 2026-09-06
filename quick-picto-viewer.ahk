@@ -76254,9 +76254,6 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
        ERR := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, thisPosX, thisPosY)
 
     hasDrawnImageMap := (navBoxu && !ERR && IMGlargerViewPort=1) ? 1 : 0
-    ; where the box landed, in viewport coordinates: in the image view the canvas transform
-    ; mirrors a box drawn at x to mainWidth - x - imgW [same for y]; the list view is never
-    ; mirrored, its box always sits bottom-left, above the status bar
     If (thumbsDisplaying=0)
     {
        If (FlipImgH=1)
@@ -76269,9 +76266,6 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     If navBoxu
        HUDobjNavBoxu := [zImgW, zImgH, thisPosX + diffX, thisPosY + diffY, imgW, imgH, thisPosX, thisPosY]
 
-    ; the screen-reader/hit-test control lives in PVwin client space, shifted by the docked
-    ; toolbar [both views: the list view used to drop the vertical shift, so with the
-    ; toolbar docked at the top its preview box could not be clicked]
     thisString := hasDrawnImageMap ? entireString : "hide"
     QPV_post("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX + tlbrBonusX, thisPosY + tlbrBonusY)
     trGdip_DisposeImage(navBoxu, 1)
@@ -76348,11 +76342,9 @@ createVPnavBox(ByRef pBitmap, ByRef imgW, ByRef imgH, ByRef posX, ByRef posY, By
       Else If (imgSelOutViewPort=1)
          entireString .= "`nIt is situated outside the viewport area, but a handle to retrieve it is available in the viewport. "
 
-      trGdip_GetImageDimensions(zBitmap, W, H)
-      entireString .= "`nResolution: " groupDigits(W) " x " groupDigits(H) " pixels. " Round((W * H)/1000000,2) " megapixels. "
-      If (currIMGdetails.TooLargeGDI=1)
-         entireString .= "`nOriginal resolution: " groupDigits(currIMGdetails.Width) " x " groupDigits(currIMGdetails.Height) " pixels. " Round((currIMGdetails.Width * currIMGdetails.Height)/1000000,2) " megapixels."
-
+      trGdip_GetImageDimensions(useGdiBitmap(), W, H)
+      If (w && h)
+         entireString .= "`nResolution: " groupDigits(W) " x " groupDigits(H) " pixels. " Round((W * H)/1000000,2) " megapixels. "
       entireString .= "`nAlt+Left click to toggle size. Ctrl+Left-click and drag to adjust zoom level."
    }
 
