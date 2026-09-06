@@ -4977,6 +4977,10 @@ refreshEntireViewport() {
       ForceRefreshNowThumbsList()
       recalculateThumbsSizes()
       dummyTimerDelayiedImageDisplay(15)
+      ; the screen-reader/hit-test zones follow the viewport: this is the one hook every
+      ; toolbar dock/undock, show/hide and drag ends in [the repaint re-posts the HUD boxes
+      ; and the list view's status bar, but nothing else re-lays out the image view zones]
+      updateUIctrl()
       prevState := thisState
    }
 }
@@ -11044,6 +11048,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0, silentModus:=0) {
         startSlidesMusicNow()
 
      slideShowRunning := allowNextSlide := prevFullIMGload := 1
+     uiUpdateUIctrl()   ; the viewport ignores the docked toolbar while the slideshow runs; stopSlideshow() mirrors this
      If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
         milisec := MCI_Length(hSNDmedia) 
 
@@ -74411,30 +74416,21 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
 
     knobSize := getScrollWidth()
     scX := scY := 0
+    ; the box is drawn at the viewport origin; when the view is mirrored the canvas
+    ; transform sends it to the opposite edge, so leave room for the scrollbar there
+    hasTrans := adjustCanvas2Toolbar()
+    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
+    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
+    If (thumbsDisplaying!=1)
+    {
+       If (FlipImgH=1 && scrollBarVx>1)
+          scX := knobSize
+       If (FlipImgV=1 && scrollBarHy>1)
+          scY := knobSize
+    }
+
     If (showInfoBoxHUD=1 || showInfoBoxHUD=2 && bonusInfo="scroll")
     {
-       hasTrans := adjustCanvas2Toolbar()
-       If (thumbsDisplaying=1)
-       {
-          tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-          tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
-       } Else
-       {
-          tlbrBonusX := (hasTrans=1 && FlipImgH=0) ? ToolbarWinW : 0
-          If (FlipImgH=1 && scrollBarVx>1)
-          {
-             tlbrBonusX += knobSize
-             scX := knobSize
-          }
-
-          tlbrBonusY := (hasTrans=2 && FlipImgV=0) ? ToolbarWinH : 0
-          If (FlipImgV=1 && scrollBarHy>1)
-          {
-             tlbrBonusY += knobSize
-             scY := knobSize
-          }
-       }
-
        entireString := infoEditing fileRelatedInfos infoRes infoSizing infoFrames
        thisOSDfnt := OSDFontName FlipImgH FlipImgV OSDfontSize OSDbgrColor OSDtextColor
        If (prevMsg!=entireString || prevOSDfnt!=thisOSDfnt || !validBMP(infoBoxGdiCached))
@@ -74451,7 +74447,8 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
           trGdip_DrawImage(A_ThisFunc, Gu, infoBoxGdiCached, scX, scY)
           lastInfoBoxBMP[1] := [imgW, imgH]
        }
-       QPV_post("uiAccessUpdateInfoBox", entireString, imgW, imgH, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
+       infoBoxAccessCtrlPos(mainWidth, mainHeight, imgW, imgH, scX, scY, tlbrBonusX, tlbrBonusY, ctrlX, ctrlY)
+       QPV_post("uiAccessUpdateInfoBox", entireString, imgW, imgH, ctrlX, ctrlY)
        Return
     }
 
@@ -74608,31 +74605,28 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     txtOptions.h := mainHeight - borderSize
     lastInfoBoxBMP[1] := [dimsFw, dimsFh]
 
-    hasTrans := adjustCanvas2Toolbar()
-    tlbrBonusX := (hasTrans=1 && (FlipImgH=0 || thumbsDisplaying=1)) ? ToolbarWinW : 0
-    tlbrBonusY := (hasTrans=2 && (FlipImgV=0 || thumbsDisplaying=1)) ? ToolbarWinH : 0
-    If (FlipImgH=1 && thumbsDisplaying=0 && scrollBarVx>1)
-    {
-       tlbrBonusX += knobSize
-       scX := knobSize
-    }
-
-    If (FlipImgV=1 && thumbsDisplaying=0 && scrollBarHy>1)
-    {
-       tlbrBonusY += knobSize
-       scY := knobSize
-    }
-
     txtOptions.x := (FlipImgH=1 && thumbsDisplaying!=1) ? - scX : borderSize*1.1
     txtOptions.y := (FlipImgV=1 && thumbsDisplaying!=1) ? mainHeight - dimsFh + borderSize - scY : borderSize*1.1
     Gdip_FillRectangle(Gu, OSDwinFadedBrushBGR, scX, scY, dimsFw, dimsFh)
-    QPV_post("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, FlipImgV, FlipImgH, tlbrBonusX, tlbrBonusY, scX, scY)
+    infoBoxAccessCtrlPos(mainWidth, mainHeight, dimsFw, dimsFh, scX, scY, tlbrBonusX, tlbrBonusY, ctrlX, ctrlY)
+    QPV_post("uiAccessUpdateInfoBox", entireString, dimsFw, dimsFh, ctrlX, ctrlY)
     If (thumbsDisplaying!=1)
        Gdip_ResetWorldTransform(Gu)
 
     drawInPlaceTextInBox(Gu, entireString, txtOptions)
     If (thumbsDisplaying!=1)
        setMainCanvasTransform(mainWidth, mainHeight, Gu)
+}
+
+infoBoxAccessCtrlPos(mainWidth, mainHeight, boxW, boxH, scX, scY, tlbrBonusX, tlbrBonusY, ByRef ctrlX, ByRef ctrlY) {
+; PVwin client coordinates of the info box drawn at [scX, scY] by drawinfoBox(), for the
+; screen-reader control: setMainCanvasTransform() mirrors the canvas in the image view,
+; so a box drawn at x lands at mainWidth - x - boxW [same for y]; the list view is never
+; mirrored. The viewport itself sits at [tlbrBonusX, tlbrBonusY] when the toolbar is docked.
+    ctrlX := (FlipImgH=1 && thumbsDisplaying!=1) ? mainWidth - scX - boxW : scX
+    ctrlY := (FlipImgV=1 && thumbsDisplaying!=1) ? mainHeight - scY - boxH : scY
+    ctrlX += tlbrBonusX
+    ctrlY += tlbrBonusY
 }
 
 drawAnnotationBox(mainWidth, mainHeight, Gu) {
@@ -74689,21 +74683,30 @@ drawAnnotationBox(mainWidth, mainHeight, Gu) {
           thisPosY -= scrollBarHy
 
        If (usrTextAlign="Left")
-          thisPosX := 0
-       Else If (usrTextAlign="Center")
+       {
+          ; mirrored, the left-aligned box lands at the right edge: keep it clear of the
+          ; vertical scrollbar like the info and nav boxes do [scrollBarVx is 0 without one;
+          ; the dodge existed before v5.9.88 and the hit-test control always assumed it]
+          thisPosX := (FlipImgH=1 && thumbsDisplaying=0) ? scrollBarVx : 0
+       } Else If (usrTextAlign="Center")
           thisPosX := Round(mainWidth/2 - imgW/2)
 
        ERR := trGdip_DrawImage(A_ThisFunc, Gu, textBoxBMP, thisPosX, thisPosY)
        If !ERR
        {
-          If (FlipImgH=1 && usrTextAlign="Left")
-             thisPosX := mainWidth - imgW - scrollBarVx
-          Else If (FlipImgH=1 && usrTextAlign="Right")
-             thisPosX := 0
+          ; where the box landed, in viewport coordinates: in the image view the canvas
+          ; transform mirrors a box drawn at x to mainWidth - x - imgW [same for y]; the
+          ; list view is never mirrored [FlipImgH is a persisted setting, so it can be on
+          ; while the list is displayed - the control used to jump to the far edge then]
+          If (thumbsDisplaying=0)
+          {
+             If (FlipImgH=1)
+                thisPosX := mainWidth - thisPosX - imgW
+             If (FlipImgV=1)
+                thisPosY := mainHeight - thisPosY - imgH
+          }
 
-          If (FlipImgV=1 && thumbsDisplaying=0)
-             thisPosY := 0
-
+          ; the screen-reader/hit-test control lives in PVwin client space
           hasTrans := adjustCanvas2Toolbar()
           tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
           tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
@@ -76244,32 +76247,33 @@ VPnavBoxWrapper(mainWidth, mainHeight, Gu) {
     scrbV := (thumbsDisplaying=1 && FlipImgH=1) ? 0 : scrollBarVx
     hasTrans := adjustCanvas2Toolbar()
     tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-    tlbrBonusY := (hasTrans=2 && thumbsDisplaying=0) ? ToolbarWinH : 0
+    tlbrBonusY := (hasTrans=2) ? ToolbarWinH : 0
     thisPosX := (FlipImgH=1 && scrbV>0) ? scrbV : 0
     thisPosY := (FlipImgV=0 && scrbH>0 && thumbsDisplaying!=1) ? mainHeight - scrbH - imgH : mainHeight - imgH 
     If navBoxu
        ERR := trGdip_DrawImage(A_ThisFunc, Gu, navBoxu, thisPosX, thisPosY)
 
     hasDrawnImageMap := (navBoxu && !ERR && IMGlargerViewPort=1) ? 1 : 0
-    thisPosX := (FlipImgH=1 && scrbV>0) ? tlbrBonusX + scrbV : tlbrBonusX
-    thisPosY := (FlipImgV=0 && scrbH>0 && thumbsDisplaying!=1) ? mainHeight - scrbH - imgH - tlbrBonusY : mainHeight - imgH - tlbrBonusY
+    ; where the box landed, in viewport coordinates: in the image view the canvas transform
+    ; mirrors a box drawn at x to mainWidth - x - imgW [same for y]; the list view is never
+    ; mirrored, its box always sits bottom-left, above the status bar
     If (thumbsDisplaying=0)
     {
-       thisPosX := tlbrBonusX
-       thisPosY := (scrbH>0) ? mainHeight - scrbH - imgH + tlbrBonusY : mainHeight - imgH + tlbrBonusY
        If (FlipImgH=1)
-          thisPosX := mainWidth - imgW - scrbV + tlbrBonusX
+          thisPosX := mainWidth - thisPosX - imgW
        If (FlipImgV=1)
-          thisPosY := tlbrBonusY
-    } Else 
-       thisPosY += tlbrBonusY*2
+          thisPosY := mainHeight - thisPosY - imgH
+    }
 
     ; ToolTip, % scrollBarVx "==" scrollBarHy "/" tlbrBonusX "|" tlbrBonusY , , , 2
     If navBoxu
-       HUDobjNavBoxu := [zImgW, zImgH, thisPosX + diffX - tlbrBonusX, thisPosY + diffY - tlbrBonusY, imgW, imgH, thisPosX - tlbrBonusX, thisPosY - tlbrBonusY]
+       HUDobjNavBoxu := [zImgW, zImgH, thisPosX + diffX, thisPosY + diffY, imgW, imgH, thisPosX, thisPosY]
 
+    ; the screen-reader/hit-test control lives in PVwin client space, shifted by the docked
+    ; toolbar [both views: the list view used to drop the vertical shift, so with the
+    ; toolbar docked at the top its preview box could not be clicked]
     thisString := hasDrawnImageMap ? entireString : "hide"
-    QPV_post("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX, thisPosY)
+    QPV_post("uiAccessUpdateNavBox", thisString, imgW, imgH, thisPosX + tlbrBonusX, thisPosY + tlbrBonusY)
     trGdip_DisposeImage(navBoxu, 1)
 }
 
@@ -96964,10 +96968,11 @@ isTlbrVertical() {
 adjustCanvas2Toolbar() {
 ; Returns 0 when the viewport must ignore the toolbar, 1 when it has to give up ToolbarWinW
 ; on the left, and 2 when it has to give up ToolbarWinH at the top.
-; detectToolbar() in lib\module-interface.ahk answers the same question for the
-; hit-test controls with a different contract [ByRef dims + self-measuring]; both
-; read the same shared globals since the merge, so there is no sync hazard - the
-; two were deliberately NOT unified [phase E: contract mismatch, risk over value].
+; This is THE rule for where the layered viewport windows sit [doLayeredWinUpdate()], and
+; since 2026-09 also for where the screen-reader/hit-test controls go: the module's
+; uiAccessViewportOrigin() calls it directly. detectToolbar() in lib\module-interface.ahk
+; [a self-measuring twin with a different contract] now only gates the click-coordinate
+; conversion in uiGetMouseCoords(), where an over-eager "docked" answer is harmless.
     Static lastX := "", lastY := ""
     If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || !ToolbarWinW || !ToolbarWinH || slideShowRunning=1)
        Return 0
@@ -97146,7 +97151,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     If hudBTNfuncu
        omsg .= "`nTemporarily clickable area."
 
-    QPV_post("uiAccessUpdateOSDmsg", omsg, mainWidth, imgH)
+    QPV_post("uiAccessUpdateOSDmsg", omsg, mainWidth, hudBTNheightFuncu)   ; the box plus the progress bar above it
     If (hudBTNfuncu && hudBTNtypeFuncu=1)
        Gdip_FillRectangle(2NDglPG, pBrushD, posXu, posYu, knobSize//2, imgH)
 

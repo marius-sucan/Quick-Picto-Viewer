@@ -897,10 +897,14 @@ setTaskbarIconState(mode) {
 }
 
 detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
-; Interface thread twin of adjustCanvas2Toolbar() in quick-picto-viewer.ahk; the two must
-; agree, otherwise the painted viewport and the mouse hit-test controls end up offset
-; differently. Keep both in sync, including the IsWindowVisible() test - this thread runs
-; with DetectHiddenWindows off while the main one has it on, so WinExist() would not match.
+; Interface thread twin of adjustCanvas2Toolbar() in quick-picto-viewer.ahk. Since 2026-09
+; it only gates the click-coordinate conversion in uiGetMouseCoords(), where answering
+; "docked" for a toolbar that is being re-created [or is hidden by a running slideshow] is
+; harmless: JEE_ScreenToClient() against the layered window is exact either way. The
+; screen-reader/hit-test controls no longer depend on it - uiAccessViewportOrigin() reads
+; the painter's adjustCanvas2Toolbar() directly, so the two can no longer disagree there.
+; The IsWindowVisible() test stays: this thread runs with DetectHiddenWindows off while
+; the main one has it on, so WinExist() would not match.
     Static lastX := "", lastY := "", lW, lH
     If (ShowAdvToolbar!=1 || lockToolbar2Win!=1)
        Return 0
@@ -945,6 +949,10 @@ detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
 }
 
 uiUpdateUIctrl(forceThis:=0) {
+; Image view: lays out the five screen-reader/hit-test zones [left, top, centre, bottom,
+; right] and the two scrollbar strips over the painted viewport. The viewport is the
+; client area minus the docked toolbar and the layered GDI windows sit at its origin,
+; so every control is placed in PVwin client space as [viewport origin + viewport coords].
    Static prevState
    If (forceThis="kill" || thumbsDisplaying=1 && maxFilesIndex>0)
    {
@@ -952,15 +960,8 @@ uiUpdateUIctrl(forceThis:=0) {
       Return
    }
 
-   GetWinClientSize(GuiW, GuiH, PVhwnd, 0)
-   hasTrans := detectToolbar(tW, tH)   ; guards ShowAdvToolbar / lockToolbar2Win itself
-   tX := (hasTrans=1) ? tW : 0
-   tY := (hasTrans=2) ? tH : 0
-   If (hasTrans=1)
-      GuiW -= tW
-   If (hasTrans=2)
-      GuiH -= tH
-
+   vpWinClientSize(GuiW, GuiH)      ; the viewport size, exactly as the painters see it
+   uiAccessViewportOrigin(tX, tY)   ; and where it sits inside the PVwin client area
    lastWinStatus := ""
    ctrlW := (editingSelectionNow=1) ? GuiW//8 : GuiW//7
    ctrlH2 := (editingSelectionNow=1) ? GuiH//6 : GuiH//5
@@ -972,7 +973,7 @@ uiUpdateUIctrl(forceThis:=0) {
    ctrlX1 := tX + ctrlW
    ctrlX2 := tX + ctrlW + ctrlW2
    calcHUDsize()
-   thisState := "a" GuiW GuiH ctrlW2 ctrlH2 ctrlY3 editingSelectionNow isAlwaysOnTop TouchScreenMode drawingShapeNow IMGresizingMode OSDfontSize imgHUDbaseUnit
+   thisState := "a" GuiW "|" GuiH "|" tX "|" tY "|" ctrlW2 "|" ctrlH2 "|" ctrlY3 "|" editingSelectionNow isAlwaysOnTop TouchScreenMode drawingShapeNow IMGresizingMode "|" OSDfontSize "|" imgHUDbaseUnit
    If (thisState!=prevState)
    {
       k := imgHUDbaseUnit//3 ; the thickness of scrollbars
@@ -984,8 +985,9 @@ uiUpdateUIctrl(forceThis:=0) {
       GuiControl, PVwin: Move, PicOnGUI3, % "w" ctrlW " h" GuiH " x" ctrlX2 " y" tY
       If (IMGresizingMode=4)
       {
-         GuiControl, PVwin: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k + tX " y" tY
-         GuiControl, PVwin: Move, picHscroll, % "w" GuiW " h" k " x " tX " y" GuiH - k + tY
+         ; the painter keeps both scrollbars at the far edges whatever the mirroring
+         GuiControl, PVwin: Move, picVscroll, % "w" k " h" GuiH " x" tX + GuiW - k " y" tY
+         GuiControl, PVwin: Move, picHscroll, % "w" GuiW " h" k " x" tX " y" tY + GuiH - k
       } Else
       {
          GuiControl, PVwin: Move, picVscroll, w1 h1 x1 y1
@@ -995,6 +997,19 @@ uiUpdateUIctrl(forceThis:=0) {
       prevState := thisState
       uiAccessUpdateUiStatusBar(0, 0, "kill", 0)
    }
+}
+
+uiAccessViewportOrigin(ByRef oX, ByRef oY) {
+; The PVwin client-space origin of the viewport, i.e. where the layered GDI windows
+; [hGDIwin, hGDIinfosWin, hGDIselectWin, hGDIthumbsWin] sit: the same offsets
+; doLayeredWinUpdate() hands to UpdateLayeredWindow(), decided by the same
+; adjustCanvas2Toolbar() call, so the screen-reader/hit-test controls land on the
+; painted elements whether or not the toolbar is docked [and reserving viewport space].
+; Before the interpreters merged this thread had to mirror that decision with its own
+; detectToolbar(); post-merge the painter's rule is read directly.
+   hasTrans := adjustCanvas2Toolbar()
+   oX := (hasTrans=1) ? ToolbarWinW : 0
+   oY := (hasTrans=2) ? ToolbarWinH : 0
 }
 
 uiAccessUpdateHistoBox(msgu, tW, tH, tX, tY) {
@@ -1032,7 +1047,12 @@ uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
    GuiControl, PVwin: Move, ImgNavBox, % " x" tX " y" tY " w" tW " h" tH 
 }
 
-uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:=0, scrollY:=0) {
+uiAccessUpdateInfoBox(msgu, tW, tH, tX, tY) {
+; tX/tY: PVwin client coordinates of the painted box, computed by drawinfoBox() like the
+; nav/histogram/caption boxes do [mirroring and the docked toolbar already applied].
+; Until 2026-09 this function rebuilt the position itself from flip flags and offsets,
+; assuming GuiW/GuiH were the CLIENT size; 67a2699 made them the viewport size and the
+; mirrored placements drifted by the toolbar width/height.
    If (msgu="hide" || !tW || !tH)
    {
       GuiControl, PVwin: Move, ImgInfoBox, x1 y1 w1 h1
@@ -1041,17 +1061,7 @@ uiAccessUpdateInfoBox(msgu, tW, tH, flipV, flipH, bonusX:=0, bonusY:=0, scrollX:
 
    msgu := "Info-box. Image in view:`n" StrReplace(msgu, "`n", ".`n") ".`nThis viewport area is click-through."
    GuiControl, PVwin:, ImgInfoBox, % msgu
-   vpWinClientSize(GuiW, GuiH)
-   tX := (flipH=1 && thumbsDisplaying!=1) ? GuiW - tW : 0
-   tY := (flipV=1 && thumbsDisplaying!=1) ? GuiH - tH : 0
-   If (flipH!=1 || thumbsDisplaying=1)
-      tX += Round(bonusX)
-   If (flipV!=1 || thumbsDisplaying=1)
-      tY += Round(bonusY)
-
-   tX -= Round(scrollX)
-   tY -= Round(scrollY)
-   GuiControl, PVwin: Move, ImgInfoBox, % " x" tX " y" tY " w" tW " h" tH 
+   GuiControl, PVwin: Move, ImgInfoBox, % " x" Round(tX) " y" Round(tY) " w" Round(tW) " h" Round(tH)
 }
 
 uiAccessWelcomeView() {
@@ -1154,6 +1164,8 @@ uiAccessImgViewSetUIlabels() {
 }
 
 uiAccessUpdateOSDmsg(stringu, tW, tH) {
+; the OSD strip: full viewport width along its top edge, tH tall [showTOOLtip() paints the
+; message box at the viewport origin, below the optional progress bar]
     If (stringu="-" || !tW || !tH)
     {
        GuiControl, PVwin: Move, OSDmsgsLine, x1 y1 w1 h1
@@ -1161,8 +1173,9 @@ uiAccessUpdateOSDmsg(stringu, tW, tH) {
     }
 
     vpWinClientSize(GuiW, GuiH)
+    uiAccessViewportOrigin(oX, oY)
     GuiControl, PVwin:, OSDmsgsLine, % "OSD: " stringu
-    GuiControl, PVwin: Move, OSDmsgsLine, % " x1 y1 w" GuiW " h" tH 
+    GuiControl, PVwin: Move, OSDmsgsLine, % " x" oX " y" oY " w" GuiW " h" Round(tH)
 }
 
 uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSize:="n", itemz:="n") {
@@ -1184,21 +1197,7 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
    } Else If (mustResize="list")
    {
       thumbsDisplaying := 1
-      vpWinClientSize(GuiW, GuiH)
-      thisState := "a" mustResize GuiW GuiH heightu imgHUDbaseUnit
-      If (thisState!=prevState)
-      {
-         k := imgHUDbaseUnit//3 ; the thickness of scrollbars
-         GuiControl, PVwin: Move, picVscroll, % "w" k " h" GuiH " x" GuiW - k " y0"
-         GuiControl, PVwin: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-         GuiControl, PVwin: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
-         GuiControl, PVwin: Move, PicOnGUI2b, w1 h1 x1 y1
-         GuiControl, PVwin: Move, PicOnGUI2c, w1 h1 x1 y1
-         GuiControl, PVwin: Move, PicOnGUI3, w1 h1 x1 y1
-         GuiControl, PVwin: Move, picHscroll, w1 h1 x1 y1
-         prevState := thisState
-      }
-
+      uiAccessListViewLayout(heightu, prevState)
       GuiControl, PVwin:, PicOnGUI1, Files list container
       GuiControl, PVwin:, PicOnGUI2a, Status bar
       uiAccessUpdateHistoBox("hide", 1, 1, 0, 0)
@@ -1212,15 +1211,40 @@ uiAccessUpdateUiStatusBar(stringu:=0, heightu:=0, mustResize:=0, infos:=0, fntSi
    } Else If (stringu && heightu)
    {
       uiUpdateUIctrl("kill")
-      prevState := mustResize
-      vpWinClientSize(GuiW, GuiH)
-      GuiControl, PVwin: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu
-      GuiControl, PVwin: Move, PicOnGUI2a, % "w" GuiW - heightu//2 " h" heightu " x1 y" GuiH - heightu
+      uiAccessListViewLayout(heightu, prevState)
       stringu := StrReplace(stringu, " | ", "`n")
       GuiControl, PVwin:, PicOnGUI2a, % "Status bar:`n" stringu
       lastWinStatus := stringu
       GuiControl, PVwin:, PicOnGUI1, % infos
    }
+}
+
+uiAccessListViewLayout(heightu, ByRef prevState) {
+; Thumbnails/list view: the files list container fills the viewport above the status bar,
+; the status bar [heightu tall, ThumbsStatusBarH] runs along the bottom edge and the list
+; scrollbar down the right edge - the same three regions thumbsListClickResponder() tests
+; in viewport coordinates [a click right of mainWidth - knobSize is a scrollbar click on
+; any row, hence the status bar stops where the scrollbar starts]. Everything is shifted
+; by the viewport origin: the list view is painted into a layered window that sits next
+; to [or below] the docked toolbar, and until 2026-09 these controls ignored that shift.
+; Re-applied only when the geometry changes: this runs on every status bar update, and it
+; is also the only path that follows a window resize while the list view is displayed
+; [uiUpdateUIctrl() bows out in that mode].
+   vpWinClientSize(GuiW, GuiH)
+   uiAccessViewportOrigin(oX, oY)
+   thisState := "list|" GuiW "|" GuiH "|" heightu "|" imgHUDbaseUnit "|" oX "|" oY
+   If (thisState=prevState)
+      Return
+
+   k := imgHUDbaseUnit//3 ; the thickness of scrollbars
+   GuiControl, PVwin: Move, picVscroll, % "w" k " h" GuiH " x" oX + GuiW - k " y" oY
+   GuiControl, PVwin: Move, PicOnGUI1, % "w" GuiW " h" GuiH - heightu " x" oX " y" oY
+   GuiControl, PVwin: Move, PicOnGUI2a, % "w" GuiW - k " h" heightu " x" oX " y" oY + GuiH - heightu
+   GuiControl, PVwin: Move, PicOnGUI2b, w1 h1 x1 y1
+   GuiControl, PVwin: Move, PicOnGUI2c, w1 h1 x1 y1
+   GuiControl, PVwin: Move, PicOnGUI3, w1 h1 x1 y1
+   GuiControl, PVwin: Move, picHscroll, w1 h1 x1 y1
+   prevState := thisState
 }
 
 createGDIwin() {
