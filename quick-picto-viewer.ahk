@@ -58407,7 +58407,7 @@ invokeTlbrContextMenu(givenCoords:=0) {
    {
       Menu, PvUItoolbarMenu, Add
       kMenu("PvUItoolbarMenu", "Add", "Help", "btnHelpToolbar")
-      showThisMenu("PvUItoolbarMenu", 0 givenCoords)
+      showThisMenu("PvUItoolbarMenu", 0, givenCoords)
    }
 }
 
@@ -69860,7 +69860,7 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
 
 showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    Static prevMenu, prevItems
-   If (mustPreventMenus=1)
+   If (mustPreventMenus=1 || runningLongOperation=1 || imageLoading=1)
       Return
 
    If (VisibleQuickMenuSearchWin=1 && mustPreventMenus!=1 && forceIT!=1 && omniBoxMode=0)
@@ -104646,7 +104646,7 @@ redrawToolbarGUI() {
 }
 
 tlbrResetPosition() {
-  If (ShowAdvToolbar!=1)
+  If (ShowAdvToolbar!=1 || TouchToolbarGUIcreated!=1)
      Return
 
   JEE_ClientToScreen(PVhwnd, 0, 0, UserToolbarX, UserToolbarY)

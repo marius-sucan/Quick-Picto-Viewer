@@ -22,7 +22,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
      , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, popupRootSeen
      , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession
-     , flyoutAnchorMenu, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
+     , flyoutAnchorMenu, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline, sentMsgProbeSeen
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -44,7 +44,7 @@ initInterfaceModule() {
    lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
    menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
    menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
-   flyoutAnchorMenu := 0, allowMenuReader := "yes"
+   flyoutAnchorMenu := 0, allowMenuReader := "yes", sentMsgProbeSeen := 0
 
    ; input handlers. Module-only message numbers first:
    OnMessage(0x2a3, "WM_MOUSELEAVE")
@@ -236,8 +236,6 @@ uiDLLsentMenuMsg(msg, wP, lP, hwnd) {
 ; already decoded into OnMessage order. TRAMPOLINE ONLY [RULE 2]: this body runs
 ; on the interrupted command's deref buffer. Nothing here may produce a string;
 ; all work is in uiCallWndProcWork.
-   If (runningLongOperation=1 || imageLoading=1)
-      Return 0
    uiCallWndProcWork(msg, wP, lP, hwnd)
    Return 0
 }
@@ -253,12 +251,7 @@ uiCallWndProc(nCode, wP, lP) {
    {
       msg := NumGet(lP+0, 2*A_PtrSize, "UInt")
       If (msg=0x11F || msg=0x117 || msg=0x211 || msg=0x212)
-      {
-         If (runningLongOperation=1 || imageLoading=1)
-            Return 0
-
          uiCallWndProcWork(msg, NumGet(lP+0, A_PtrSize, "UPtr"), NumGet(lP+0, 0, "UPtr"), NumGet(lP+0, 3*A_PtrSize, "UPtr"))
-      }
    }
    Return DllCall("user32\CallNextHookEx", "UPtr", 0, "Int", nCode, "UPtr", wP, "UPtr", lP, "UPtr")
 }
@@ -278,6 +271,18 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    OutputDebug, % "QPV: MERGE: sent msg 0x" Format("{:X}", msg) " wP=" wP " lP=" lP " hwnd=" hwnd " loop=" menuLoopActive " bar=" barMenuSession
    If (msg=0x85EE)     ; the install-time probe of uiInstallSentMsgHook()
    {
+      sentMsgProbeSeen := 1
+      Critical, %prevCrit%
+      Return
+   }
+
+   If (runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
+   {
+      If (msg!=0x11F)
+      {
+         OutputDebug, % "QPV: MERGE: menu cancelled [busy] msg=0x" Format("{:X}", msg) " runningLongOperation=" runningLongOperation " imageLoading=" imageLoading
+         DllCall("user32\EndMenu")
+      }
       Critical, %prevCrit%
       Return
    }
