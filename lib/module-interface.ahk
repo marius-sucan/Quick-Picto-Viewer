@@ -644,10 +644,11 @@ drainUIinput() {
       mlp := NumGet(msgu, 3*A_PtrSize, "UPtr")
       If (mnum=0x100 || mnum=0x104)
       {
-         gotKeyDown := 1
+         hotkate := ""
          uiWM_KEYDOWN(mwp, mlp, mnum, mhwnd)
-      }
-      Else If (mnum=0x200)
+         If (hotkate!="")
+            gotKeyDown := 1
+      } Else If (mnum=0x200)
          uiWM_MOUSEMOVE(mwp, mlp, mnum, mhwnd)
       Else If (mnum=0x201)
          uiWM_LBUTTONDOWN(mwp, mlp, mnum, mhwnd)
