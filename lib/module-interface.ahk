@@ -8,12 +8,12 @@
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
      , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0, menusList := ""
-     , menusflyOutVisible := 0, wasMenuFlierCreated := 0, prevMenuBarItem := 1, lastMenuBarUpdate := 1, lastContextMenuZeit := 1
-     , allowMenuReader := "yes", taskBarUI, groppedFiles := [], LbtnDwn := 0, penPressureRaw := 0, hasPenPressureAPI
+     , menusflyOutVisible := 0, wasMenuFlierCreated := 0, lastContextMenuZeit := 1
+     , taskBarUI, groppedFiles := [], LbtnDwn := 0, penPressureRaw := 0, hasPenPressureAPI
      , canCancelImageLoad := 0, alterFilesIndex := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
-     , lastCloseInvoked := -1, lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
+     , lastCloseInvoked := -1, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
      , lastWinStatus := "", lastZeitPanCursor := 1, lastZeitToolTip := 1, statusBarTooltipVisible := 0, doNormalCursor := 1
-     , prevFullIMGload := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0, popupRootSeen, sentMsgProbeSeen := 0, barMenuSession := 0
+     , prevFullIMGload := 1, popupRootSeen, sentMsgProbeSeen := 0, barMenuSession := 0
      , menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0, menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
      , flyoutAnchorMenu := 0, lastLongOperationStart := 1, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
 
@@ -338,7 +338,7 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
    If (menusflyOutVisible!=1)
       uiTryPlaceFlyout()
 
-   If (allowMenuReader!="yes" || !hMenuSel)
+   If !hMenuSel
       Return
    VarSetCapacity(bufu, 520, 0)
    If (flags & 0x10)  ; MF_POPUP: the loword is the item POSITION
@@ -402,8 +402,7 @@ uiMenuLoopExit() {
       hLLmouseHook := 0
    }
    hideMenuFlyOut()
-   If (allowMenuReader="yes")
-      mouseTurnOFFtooltip()
+   mouseTurnOFFtooltip()
    ; self-healing pass, deferred until the loop is fully gone [timers work again]:
    ; re-resolve every bar attachment by NAME and repair any whose handle changed
    SetTimer, uiRefreshBarAttachments, -50
@@ -474,7 +473,7 @@ uiMenuTimerProc(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
 }
 
 uiTryPlaceFlyout(anchor:=0) {
-   If (allowMenuReader!="yes" || menusflyOutVisible=1)
+   If (menusflyOutVisible=1)
       Return
 
    If anchor
@@ -558,7 +557,7 @@ uiMenuMouseLL(nCode, wP, lP) {
       {
          ptX := NumGet(lP+0, 0, "Int")
          ptY := NumGet(lP+0, 4, "Int")
-         If (allowMenuReader="yes" && StrLen(uiMenuReaderLastMsg)>1 && uiVisibleMenuWin(ptX, ptY))
+         If (StrLen(uiMenuReaderLastMsg)>1 && uiVisibleMenuWin(ptX, ptY))
          {
             mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
             showOSDinfoLineNow(1500)
@@ -1249,7 +1248,6 @@ createGDIwin() {
       SetParentID(PVhwnd, hGDIwin)
 
    UnregisterTouchWindow(hGDIwin)
-   winGDIcreated := 1
 }
 
 createGDIwinThumbs() {
@@ -1261,7 +1259,6 @@ createGDIwinThumbs() {
       SetParentID(PVhwnd, hGDIthumbsWin)
 
    UnregisterTouchWindow(hGDIthumbsWin)
-   ThumbsWinGDIcreated := 1
 }
 
 createGDIinfosWin() {
@@ -1317,14 +1314,13 @@ preventSillyGui(thisGui) {
 }
 
 uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY) {
-   adjX := rawX := lastLclickX := lastALclickX := lParam & 0xFFFF
-   adjY := rawY := lastLclickY := lastALclickY := lParam >> 16
+   adjX := rawX := lastLclickX := lParam & 0xFFFF
+   adjY := rawY := lastLclickY := lParam >> 16
    If detectToolbar()
    {
       whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
       JEE_ClientToScreen(PVhwnd, rawX, rawY, mXo, mYo)
       JEE_ScreenToClient(whichWin, mXo, mYo, adjX, adjY)
-      lastALclickX := adjX, lastALclickY := adjY
    }
 }
 
@@ -1923,9 +1919,6 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
 }
 
 PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
-    ; If (A_TickCount - lastMenuBarUpdate < 100)
-    ;    Return
-
     PrevGuiSizeEvent := EventInfo
     ; ToolTip, % "l=" EventInfo , , , 2
     stopGifORslidesPlayback()
@@ -2369,7 +2362,6 @@ UpdateMenuBar(modus:=0, tt:=0) {
       Return
    }
 
-   lastMenuBarUpdate := A_TickCount
    Gui, PVwin: Menu, PVmanu
    Try Menu, PVbar, Delete
    If (showMainMenuBar!=1)
@@ -2382,7 +2374,6 @@ UpdateMenuBar(modus:=0, tt:=0) {
    ; Sleep, -1
    BuildMenuBar(modus)
    Gui, PVwin: Menu, PVbar
-   lastMenuBarUpdate := A_TickCount
    prevState := thisState
    SetTimer, updateTlbrPosition, -300
 }

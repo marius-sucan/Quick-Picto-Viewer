@@ -171,7 +171,7 @@ grouped by role.
 
 | function | lines | what it does |
 |---|---|---|
-| `initInterfaceModule()` | 59 | called once from the main script's start-up before `BuildGUI()` (the module-owned globals are declared and seeded by the module's top-level `Global` line, which runs when the file is included in the auto-exec section): registers the module-only `OnMessage` handlers (`WM_MOUSELEAVE`, `WM_RBUTTONUP`, `WM_MBUTTONDOWN`, `WM_WINDOWPOSCHANGED`, `WM_ACTIVATE` / `WM_KILLFOCUS` → `activateMainWin`, `uiWM_NCLBUTTONDOWN`, `uiWM_SYSCOMMAND`, `uiWM_CLOSE`), the four `WM_POINTER*` numbers → `WM_PENpressure` when `GetPointerPenInfo` exists, and the keystroke-beep suppression (0x101–0x103, 0x105–0x108 → `PreventKeyPressBeep`); installs the sent-message hook (`uiInstallSentMsgHook()`) and the composed dispatchers for 0x100/0x104, 0x200–0x203 and 0x20A/0x20E |
+| `initInterfaceModule()` | 57 | called once from the main script's start-up before `BuildGUI()` (the module-owned globals are declared and seeded by the module's top-level `Global` line, which runs when the file is included in the auto-exec section): registers the module-only `OnMessage` handlers (`WM_MOUSELEAVE`, `WM_RBUTTONUP`, `WM_MBUTTONDOWN`, `WM_WINDOWPOSCHANGED`, `WM_ACTIVATE` / `WM_KILLFOCUS` → `activateMainWin`, `uiWM_NCLBUTTONDOWN`, `uiWM_SYSCOMMAND`, `uiWM_CLOSE`), the four `WM_POINTER*` numbers → `WM_PENpressure` when `GetPointerPenInfo` exists, and the keystroke-beep suppression (0x101–0x103, 0x105–0x108 → `PreventKeyPressBeep`); installs the sent-message hook (`uiInstallSentMsgHook()`) and the composed dispatchers for 0x100/0x104, 0x200–0x203 and 0x20A/0x20E |
 | `isUIrootWin(hwnd)` | 2 | true when the window's `GA_ROOT` is PVwin, one of the four GDI containers, the tooltip or the flyout; the test the dispatchers and most module-only monitors branch on (13 callers) |
 | `dispatchKeyDown()` | 3 | `WM_KEYDOWN` / `WM_SYSKEYDOWN` → `uiWM_KEYDOWN` or `WM_KEYDOWN` |
 | `dispatchMouseMove()` | 3 | `WM_MOUSEMOVE` → `uiWM_MOUSEMOVE` or `WM_MOUSEMOVE` |
@@ -229,7 +229,7 @@ launches, so the machinery rides the messages Windows SENDS to the menu owner, s
 
 | function | lines | what it does |
 |---|---|---|
-| `uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY)` | 9 | splits a mouse message's `lParam` into PVwin client coordinates, stamps `lastLclickX/Y` and `lastALclickX/Y`, and when the toolbar is docked (`detectToolbar()`) converts them into the GDI container's client space; four callers (`uiWM_LBUTTONDOWN`, `WM_MBUTTONDOWN`, `WM_LBUTTON_DBL`, `WM_RBUTTONUP`) |
+| `uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY)` | 8 | splits a mouse message's `lParam` into PVwin client coordinates, stamps `lastLclickX/Y`, and when the toolbar is docked (`detectToolbar()`) converts them into the GDI container's client space; four callers (`uiWM_LBUTTONDOWN`, `WM_MBUTTONDOWN`, `WM_LBUTTON_DBL`, `WM_RBUTTONUP`) |
 
 ### Slideshow and GIF playback (4)
 
