@@ -1727,7 +1727,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           If ((thumbsDisplaying=1 || markedSelectFile) && slideShowRunning!=1)
              func2Call := ["markThisFileNow"]
           Else If (slideShowRunning=1)
-             func2Call := ["dummyInfoToggleSlideShowu", "stop"]
+             func2Call := ["InformToggledSlideShowu", "stop"]
           Else If (A_TickCount - lastOtherWinClose>350) && (A_TickCount - prevSlideShowStop>950) ; && (drawingShapeNow!=1)
              func2Call := ["MenuGoPlaySlidesNow"]
        } Else if (!CurrentSLD && !maxFilesIndex && !validBMP(UserMemBMP))
@@ -1909,7 +1909,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           If (thumbsDisplaying=1)
              func2Call := ["dropFilesSelection"]
           Else If (slideShowRunning=1)
-             func2Call := ["dummyInfoToggleSlideShowu", "stop"]
+             func2Call := ["InformToggledSlideShowu", "stop"]
           Else If (A_TickCount - prevSlideShowStop>950)
              func2Call := ["MenuGoPlaySlidesNow"]
        }
@@ -1918,7 +1918,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If HKifs("imgsLoaded")
        {
           If (slideShowRunning=1)
-             func2Call := ["dummyInfoToggleSlideShowu", "stop"]
+             func2Call := ["InformToggledSlideShowu", "stop"]
           Else If (StrLen(filesFilter)>1)
              func2Call := ["MenuRemFilesListFilter"]
        }
@@ -2028,7 +2028,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        } Else If HKifs("imgsLoaded")
        {
           If (animGIFplaying=1)
-             func2Call := ["DestroyGIFuWin"]
+             func2Call := ["stopGIFsPlayback"]
           Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
              func2Call := ["moveMarkedEntryNow", currentFileIndex]
           Else
@@ -2039,7 +2039,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        If HKifs("imgsLoaded")
        {
           If (animGIFplaying=1)
-             func2Call := ["DestroyGIFuWin"]
+             func2Call := ["stopGIFsPlayback"]
           Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0 && markedSelectFile>1)
              func2Call := ["regroupSelectedFiles"]
           Else If (thumbsDisplaying=1 && maxFilesIndex>1 && currentFileIndex>0)
@@ -2525,7 +2525,6 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
         prevOpenFolderPath := OutDir
         INIaction(1, "prevOpenFolderPath", "General")
         RandomPicture()
-        ; InfoToggleSlideShowu()
      } Else resetMainWin2Welcome()
      SetTimer, createGUItoolbar, -100
      SetTimer, TriggerMenuBarUpdate, -90
@@ -2599,7 +2598,6 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   If (maxFilesIndex>2)
   {
      RandomPicture()
-     ; InfoToggleSlideShowu()
   } Else If (maxFilesIndex>0)
   {
      currentFileIndex := 1
@@ -2788,9 +2786,7 @@ OpenThisFilePropFolder() {
     If (currentFileIndex=0)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     resultu := StrReplace(getIDimage(currentFileIndex), "||")
     If resultu
     {
@@ -2803,9 +2799,7 @@ OpenThisFileFolder() {
     If (currentFileIndex=0)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     resultu := StrReplace(getIDimage(currentFileIndex), "||")
     If resultu
     {
@@ -2823,9 +2817,7 @@ OpenQPVfileFolder() {
     If (currentFileIndex=0)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     imgPath := getIDimage(currentFileIndex)
     imgPath := StrReplace(imgPath, "||")
     zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
@@ -2922,10 +2914,8 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
 }
 
 OpenThisFileMenu() {
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
-  DestroyGIFuWin()
+  stopSlideshow()
+  stopGIFsPlayback()
   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
   InvokeOpenWithMenu(imgPath)
 }
@@ -3155,10 +3145,13 @@ resetSlideshowTimer(ignoreEasyStop:=0) {
    If (slideShowRunning!=1)
       Return
 
-   If (slideShowRunning=1 && ignoreEasyStop=0)
-      ToggleSlideShowu("stop", 0, 1)
-   Else If (slideShowRunning=1)
-      ToggleSlideShowu("start", 1, 1)
+   slideShowRunning := allowNextSlide := prevFullIMGload := 1
+   If (hSNDmediaFile && hSNDmediaDuration && hSNDmedia)
+      milisec := MCI_Length(hSNDmedia) 
+
+   thisSlideSpeed := (milisec>slideShowDelay) ? milisec : slideShowDelay
+   slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
+   SetTimer, theSlideShowCore, % -slideShowCadence
 }
 
 showSlideShowInfosNow(showProgress) {
@@ -3433,10 +3426,8 @@ copyMoveStructuredFolders(srcDir, finalDest) {
 }
 
 CalculateSelectedFilesSizes() {
-  DestroyGIFuWin()
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopGIFsPlayback()
+  stopSlideshow()
   getSelectedFiles(0, 1)
   If !markedSelectFile
   {
@@ -3518,10 +3509,8 @@ CopyImageFolderPaths() {
 }
 
 CopyImagePath(modus:=0) {
-   DestroyGIFuWin()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopGIFsPlayback()
+   stopSlideshow()
    getSelectedFiles(0, 1)
    If !markedSelectFile
    {
@@ -3648,10 +3637,8 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
   If (currentFileIndex=0)
      Return
 
-  DestroyGIFuWin()
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopGIFsPlayback()
+  stopSlideshow()
   friendly := (onWhat="folderu") ? "folder" : "file"
   showTOOLtip("Copying " friendly "(s) to clipboard")
   getSelectedFiles(0, 1)
@@ -3741,10 +3728,8 @@ CopyImage2clip() {
      Return "fail"
 
   whichBitmap := useGdiBitmap()
-  DestroyGIFuWin()
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopGIFsPlayback()
+  stopSlideshow()
   friendly := (editingSelectionNow=1) ? " selected area" : ""
   If (editingSelectionNow=1 && validBMP(whichBitmap))
   {
@@ -3966,10 +3951,8 @@ CopyAlphaMask2clippy(modus:=0, allowAsk:=0) {
   If throwErrorNoImageLoaded()
      Return 
 
-  DestroyGIFuWin()
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopGIFsPlayback()
+  stopSlideshow()
   infoMask := defineCurrentAlphaMask()
   If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
   {
@@ -4143,10 +4126,8 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
   If throwWarningHugeImagesFeatureNotAvailable()
      Return
 
-  DestroyGIFuWin()
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopGIFsPlayback()
+  stopSlideshow()
   r := 1
   whichBitmap := (wasGiven=1) ? externBMP : useGdiBitmap()
   friendly := (editingSelectionNow=1 && wasGiven=0) ? " selected area " : ""
@@ -4392,10 +4373,8 @@ coreReloadThisPicture() {
 }
 
 FirstPicture() { 
-   DestroyGIFuWin()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopGIFsPlayback()
+   stopSlideshow()
    If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
@@ -4410,10 +4389,8 @@ FirstPicture() {
 }
 
 LastPicture() { 
-   DestroyGIFuWin()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopGIFsPlayback()
+   stopSlideshow()
    If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
@@ -4476,8 +4453,8 @@ TrueCleanup() {
    WinSet, Region, 0-0 w1 h1, ahk_id %PVhwnd%
    RegWrite, REG_SZ, %QPVregEntry%, Running, 0
    lastInvoked := A_TickCount
-   If (slideShowRunning=1)
-      DestroyGIFuWin()
+   stopGIFsPlayback()
+   stopSlideshow()
    Sleep, 1
    QPV_ThumbsPoolShutdown() ; must happen before FreeImage and GDI+ are let go
    If (wasInitFIMlib=1)
@@ -4835,10 +4812,8 @@ ToggleThumbsMode() {
       Return
    }
 
-   DestroyGIFuWin()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopGIFsPlayback()
+   stopSlideshow()
    If (soloSliderWinVisible=1)
       destroySoloSliderWidget()
 
@@ -5280,10 +5255,8 @@ UpdateThumbsScreen(forceReload:=0, forceFastMode:=0) {
 
    Gdip_ResetWorldTransform(glPG)
    IMGlargerViewPort := IMGentirelylargerThanVP := 0
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   DestroyGIFuWin()
+   stopSlideshow()
+   stopGIFsPlayback()
    moda := modus := 0
    skippedKeys := navKeysCounter - prevNavKeysu
    ; ToolTip, % navKeysCounter "|" prevNavKeysu "|" skippedKeys , , , 2
@@ -5357,9 +5330,7 @@ panIMGonScrollBar(doX, doY) {
       Return
    }
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    vpWinClientSize(mainWidth, mainHeight)
    If (allowFreeIMGpanning=1)
    {
@@ -5639,9 +5610,7 @@ limitPanningDist(ByRef oDx, ByRef oDy, minTopCornerX, minTopCornerY) {
 }
 
 winSwipeAction(thisCtrlClicked, mainParam) {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    didSomething := 1
    infoImgEditingMode := (editingSelectionNow=1 || imgEditPanelOpened=1) ? 1 : 0
    infoPannable := ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && thumbsDisplaying!=1 && IMGresizingMode=4) ? 1 : 0
@@ -6061,10 +6030,10 @@ MouseMoveResponder(actu:=0) {
         Gdip_SetPenWidth(pPen1d, SelDotsSize/3 + 1)
         Gdip_SetPenWidth(pPen2, SelDotsSize/5 + 1)
         Gdip_ResetWorldTransform(2NDglPG)
-        If (showHUDnavIMG=1)
+        If (showHUDnavIMG=1 && hasDrawnImageMap=1)
            Gdip_SetClipRect(2NDglPG, HUDobjNavBoxu[7], HUDobjNavBoxu[8], HUDobjNavBoxu[5], HUDobjNavBoxu[6], 4)
 
-        If (showHistogram>1)
+        If (showHistogram>1 && hasDrawnHistoMap=1)
            Gdip_SetClipRect(2NDglPG, HUDobjHistoBoxu[3], HUDobjHistoBoxu[4], HUDobjHistoBoxu[1], HUDobjHistoBoxu[2], 4)
 
         knobSize := getScrollWidth()
@@ -10753,7 +10722,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       lastInvoked := A_TickCount
       If (slideShowRunning=1)
       {
-         InfoToggleSlideShowu()
+         InformToggledSlideShowu()
       } Else If (InStr(thisCtrlClicked, "|PicOnGUI2b|") && TouchScreenMode=1 || TouchScreenMode!=1)
       {
          If ((IMGresizingMode=1 || IMGresizingMode=2) && zoomLevel<1)
@@ -10933,7 +10902,7 @@ VPimgFXrandomizer() {
     lastFX := imgFxMode
 }
 
-stopSlideshow(resetMode:=0, silentModus:=0) {
+stopSlideshow(resetMode:=0, silentModus:=1) {
    If (slideShowRunning!=1)
       Return
 
@@ -10948,7 +10917,7 @@ stopSlideshow(resetMode:=0, silentModus:=0) {
    redrawToolbarGUI()
    uiUpdateUIctrl()
    uiAccessImgViewSetUIlabels()
-   SetTimer, ResetImgLoadStatus, -150
+   SetTimer, ResetImgLoadStatus, -15
    userSeenSlideImages := userSeenSessionImagesArray.Count()
    If (silentModus!=1)
    {
@@ -10958,32 +10927,20 @@ stopSlideshow(resetMode:=0, silentModus:=0) {
          SoundBeep, 900, 100
    }
    prevSlideShowStop := A_TickCount
+   Return 1
 }
 
-dummyInfoToggleSlideShowu(actu:=0) {
-   If (StrLen(mustOpenStartFolder)>1)
-      currentFileIndex := doOpenStartFolder()
-
+InformToggledSlideShowu(actu:=0) {
    GIFframesPlayied := 0
    If (actu="stop")
-      stopSlideshow()
-   Else
-      ToggleSlideShowu(actu)
-}
-
-InfoToggleSlideShowu() {
-   Critical, on
-   Static lastInvoked := 1
-   If (A_TickCount - lastInvoked < 350) && (slideShowRunning!=1) || (maxFilesIndex<3 && StrLen(mustOpenStartFolder)<4)
    {
-     lastInvoked := A_TickCount
-     Return
+      stopSlideshow(0, 0)
+   } Else
+   {
+      If (StrLen(mustOpenStartFolder)>1)
+         currentFileIndex := doOpenStartFolder()
+      ToggleSlideShowu(actu)
    }
-
-   lastInvoked := A_TickCount
-   If !(IMGlargerViewPort=1 && IMGresizingMode=4)
-      dummyInfoToggleSlideShowu()
-   Return
 }
 
 preventScreenOff() {
@@ -10999,7 +10956,6 @@ preventScreenOff() {
      MouseMove, -2, 0, 2, R
      ; SendEvent, {Up}
   }
-  ; z := DllCall("user32\SetCursor", "Ptr", hCursBusy)
   ; ToolTip, % "L=" z , , , 2
 }
 
@@ -11042,7 +10998,7 @@ ToggleSlideShowu(actu:=0, resetMode:=0, silentModus:=0) {
      }
 
      imageLoading := 0
-     changeMcursor("normal-extra")
+     uiChangeMcursor("normal-extra")
      SetTimer, ResetImgLoadStatus, Off
      If (StrLen(SlidesMusicSong)>3 && autoPlaySlidesAudio=1 && resetMode!=1)
         startSlidesMusicNow()
@@ -11056,21 +11012,9 @@ ToggleSlideShowu(actu:=0, resetMode:=0, silentModus:=0) {
      slideShowCadence := (thisSlideSpeed>0) ? thisSlideSpeed : slideShowDelay
      setTaskbarIconState("normal")
      SetTimer, theSlideShowCore, % -slideShowCadence
+     uiAccessImgViewSetUIlabels()
      If (silentModus!=1)
      {
-        msgu := "Slideshow is running. Direction: " DefineSlideShowType() ". Speed: " DefineSlidesRate() "."
-        If (slidesFXrandomize=1)
-           msgu .= "`nViewport colour effects are randomized for each image."
-
-        If (skipSeenImageSlides=1)
-           msgu .= "`nAlready seen images will be skipped."
-
-        msgu .= "`nPress Escape or click to stop the slideshow."
-        GuiControl, PVwin:, PicOnGUI1, % msgu
-        GuiControl, PVwin:, PicOnGUI2a, % msgu
-        GuiControl, PVwin:, PicOnGUI2b, % msgu
-        GuiControl, PVwin:, PicOnGUI2c, % msgu
-        GuiControl, PVwin:, PicOnGUI3, % msgu
         delayu := DefineSlidesRate()
         friendly := DefineSlideShowType()
         etaTime := "`nEstimated time: " EstimateSlideShowLength()
@@ -12256,13 +12200,11 @@ changeDesiredFrame(dir:=1) {
    If (thumbsDisplaying=1 || !totalFramesIndex || currentImgModified=1 || undoLevelsRecorded>0)
       Return
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If askAboutFileSave(" and the current image frame will be changed")
       Return
 
-   DestroyGIFuWin()
+   stopGIFsPlayback()
    resetSlideshowTimer()
    desiredFrameIndex := clampInRange(desiredFrameIndex + dir, 0, totalFramesIndex, 1)
    If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$")
@@ -12289,9 +12231,8 @@ changeDesiredFrame(dir:=1) {
    }
 }
 
-DestroyGIFuWin() {
-    Critical, on
-    If (mustPreventMenus=1 || simulateMenusMode=1)
+stopGIFsPlayback() {
+    If (mustPreventMenus=1 || simulateMenusMode=1 || animGIFplaying=0)
        Return
 
     If (slideShowRunning=1 || animGIFplaying=1)
@@ -12299,6 +12240,7 @@ DestroyGIFuWin() {
 
     SetTimer, autoChangeDesiredFrame, Off
     autoChangeDesiredFrame("stop")
+    Return 1
 }
 
 restartGIFplayback() {
@@ -12646,8 +12588,7 @@ PreviousPicture(dummy:=0, selForbidden:=0) {
       Return
 
    If (InStr(dummy, "key-") && slideShowRunning=1)
-      ToggleSlideShowu()
-
+      stopSlideshow()
    prevFileIndex := currentFileIndex
    If (GetKeyState("Shift", "P") && thumbsDisplaying!=1 && slideShowRunning!=1 && selForbidden!=1)
       shiftPressed := 1
@@ -12664,8 +12605,7 @@ NextPicture(dummy:=0, selForbidden:=0) {
       Return
 
    If (InStr(dummy, "key-") && slideShowRunning=1)
-      ToggleSlideShowu()
-
+      stopSlideshow()
    prevFileIndex := currentFileIndex
    If (GetKeyState("Shift", "P") && slideShowRunning!=1 && thumbsDisplaying!=1 && selForbidden!=1)
       shiftPressed := 1
@@ -17366,9 +17306,7 @@ downscaleHugeImagesForEditing() {
 }
 
 mergeViewPortEffectsImgEditing(funcu:=0, recordUndoAfter:=0, allowOutside:=0, allowAlerts:=1) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     If (downscaleHugeImagesForEditing()<0)
        Return 1
 
@@ -22594,9 +22532,7 @@ dummyInfoImgResizeVP() {
 }
 
 DrawLinesInSelectedArea(modus) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     allowOutside := 0
     whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -25052,9 +24988,7 @@ MenuRotateEditImageMinus() {
 }
 
 RotateEditedImage(modus:=0) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (!validBMP(whichBitmap) || thumbsDisplaying=1)
@@ -25088,9 +25022,7 @@ RotateEditedImage(modus:=0) {
 }
 
 CropImageInViewPortToSelection(modus:=0) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
@@ -25363,13 +25295,8 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     If (AnyWindowOpen>0)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
-    DestroyGIFuWin()
-    ; If askAboutFileSave(" and the clipboard image or files entries are going to be pasted")
-    ;    Return
-
+    stopSlideshow()
+    stopGIFsPlayback()
     setImageLoading()
     changeMcursor()
     calcScreenLimits()
@@ -25689,9 +25616,7 @@ PanIMGonScreen(direction, thisKey) {
    If (toolTipGuiCreated=2)
       RemoveTooltip()
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    vpWinClientSize(mainWidth, mainHeight)
    fastMode := (InStr(thisKey, "+") || InStr(thisKey, "-/")) ? 1 : 0
    If (fastMode=1)
@@ -27931,9 +27856,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
 
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
     setLVrowsCount()
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     mouseTurnOFFtooltip()
     ; If (editingSelectionNow=1 && imgEditPanelOpened!=1)
     ;    ToggleEditImgSelection()
@@ -27972,7 +27895,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
 
-       DestroyGIFuWin()
+       stopGIFsPlayback()
        Gui, SettingsGUIA: Destroy
        Sleep, 5
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
@@ -30503,15 +30426,11 @@ PanelFoldersTree() {
     If MsgBox2hwnd
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
 
-    If (animGIFplaying)
-       DestroyGIFuWin()
-
+    stopGIFsPlayback()
     mouseTurnOFFtooltip()
     setLVrowsCount()
     thisSize := 300 + PrefsLargeFonts + uiUseDarkMode
@@ -33878,9 +33797,7 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
    maxFilesIndex--
    currentFilesListModified := 1
    ForceRefreshNowThumbsList()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If (silentus!=1)
    {
       If (thumbsDisplaying!=1)
@@ -34366,9 +34283,7 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
 
 LoadPrefsFromSLD() {
    Critical, on
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
    {
       showTOOLtip("ERROR: No valid files list currently opened")
@@ -34398,9 +34313,7 @@ LoadPrefsFromSLD() {
 
 WritePrefsIntoSLD() {
    Critical, on
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
    {
       showTOOLtip("ERROR: No valid files list currently opened")
@@ -34640,9 +34553,7 @@ rebuildDBfilesList() {
 }
 
 SaveDBfilesList(enforceFile:=0) {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If (maxFilesIndex>1)
    {
       If (StrLen(filesFilter)>1)
@@ -34721,7 +34632,6 @@ SaveDBfilesList(enforceFile:=0) {
       recreateDynaFoldersSQLdbList(saveDynaFolders)
       saveSlideSettingsInDB()
       IniSLDBwrite("dbVersion", dbExpectedVersion)
-
       currentFilesListModified := 0
       If (SLDtypeLoaded!=3)
       {
@@ -34882,9 +34792,7 @@ SaveDBfilesList(enforceFile:=0) {
 
 SaveFilesList(enforceFile:=0) {
    Critical, on
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If (!CurrentSLD || maxFilesIndex<2)
    {
       showTOOLtip("WARNING: No files are presently indexed")
@@ -35065,6 +34973,12 @@ SaveFilesList(enforceFile:=0) {
    }
 }
 
+setWhileLoopBusy() {
+   pp := whileLoopExec
+   whileLoopExec := 1
+   Return pp
+}
+
 LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
     countStaticFolders := newStaticFoldersListCache.MaxIndex()
     ths := newStaticFoldersListCache.Count()
@@ -35073,6 +34987,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
 
     countStaticFolders := 0
     hash := new hashtable()
+    owle := setWhileLoopBusy()
     If (SLDtypeLoaded=3 && (fileNamu=CurrentSLD || allowAsk="f"))
     {
        SQL := "SELECT imgfolder, fmodified FROM staticfolders;"
@@ -35094,7 +35009,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
               newStaticFoldersListCache[countStaticFolders] := [Rowu[1], Rowu[2]]
            }
        }
-
+       whileLoopExec := owle
        RecordSet.Free()
        hash := ""
        iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
@@ -35141,12 +35056,13 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        }
     }
 
+    whileLoopExec := owle
     iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
-    changeMcursor("normal")
 }
 
 regenerateStaticFoldersList() {
    BtnCloseWindow()
+   owle := setWhileLoopBusy()
    If (SLDtypeLoaded=3)
    {
       zr := SQLdbGenerateStaticFolders()
@@ -35158,6 +35074,7 @@ regenerateStaticFoldersList() {
 
       lastFilterEditSearch := StaticListViewFilteru := ""
       newStaticFoldersListCache := []
+      whileLoopExec := owle
       PanelStaticFolderzManager()
       Return
    }
@@ -35167,7 +35084,7 @@ regenerateStaticFoldersList() {
 
    lastFilterEditSearch := StaticListViewFilteru := ""
    GenerateStaticFoldersListNow()
-   changeMcursor("normal")
+   whileLoopExec := owle
    PanelStaticFolderzManager()
 }
 
@@ -35398,9 +35315,7 @@ doStartLongOpDance(affectTlbr:=0) {
 
 cleanDeadFilesList(dummy:=0) {
    Critical, on
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If (maxFilesIndex>1)
    {
       If warnFramesActionPrevented("CLEAR DUPLICATES")
@@ -35594,9 +35509,7 @@ removeFilesListFavouritedImages() {
 removeFilesListSeenImages(modus:=0) {
    ; Critical, on
    Static hasAskedFilter := 0
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    countSeen := 0
    friendlyLabel := (modus="faves") ? "favourite" : "already seen"
    If (maxFilesIndex>1)
@@ -35777,9 +35690,7 @@ SelectFilesAlreadySeen() {
 findFavesInList(modus:=0, doSel:=0) {
    ; Critical, on
    Static hasAskedFilter := 0
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    countSeen := 0
    setImageLoading()
    friendlyLabel := (modus="faves") ? "favourite" : "already seen"
@@ -35881,9 +35792,7 @@ findFavesInList(modus:=0, doSel:=0) {
 retrieveAlreadySeenImageFromCurrentList() {
    ; Critical, on
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    initSeenImagesListDB()
    If (sqlFailedInit=1)
    {
@@ -39240,6 +39149,7 @@ retrieveFavesAsList(dummy:=0) {
     ; ToolTip, % "f=" userAddedFavesCount , , , 2
     mustRenewList := countItemz := thisIndexu := 0
     ;  realCount := List_MakeUnique(historyList, "`n", 0, 0)
+    whileLoopExec := 1
     Loop, Parse, historyList, `n,`r
     {
        imgu := Trimmer(A_LoopField)
@@ -39280,7 +39190,7 @@ retrieveFavesAsList(dummy:=0) {
              hash[z] := 1
        } Else mustRenewList := 1
     }
-
+    whileLoopExec := 0
    hash := ""
    If (thisIndexu> maxFavesEntries - 1)
       msgBoxWrapper(appTitle ": WARNING", "Please take note, you have exceeded the limit of favourite image entries: " maxFavesEntries ".", 0, 0, "exclamation")
@@ -39390,39 +39300,29 @@ saveFavesListBasedOnIndexList() {
    setImageLoading()
    changeMcursor()
    showTOOLtip("Saving favourites list, please wait")
+   whileLoopExec := 1
    Loop, % maxFilesIndex
    {
-       ; isFaved := resultedFilesList[currentFileIndex, 5]
-       ; If !isFaved
-       ;    Continue
-
        If (realCount>maxFavesEntries)
           Break
 
-       ; If (StrLen(filesFilter)>1)
-       ;    thisImg := bckpResultedFilesList[filteredMap2mainList[A_Index], 1]
-       ; Else
-          thisImg := resultedFilesList[A_Index, 1]
-
+       thisImg := resultedFilesList[A_Index, 1]
        If (StrLen(thisImg)>3 && !InStr(thisImg, "||"))
        {
           realCount++
           If (A_Index<20)
              miniFile.Write(thisImg "`n")
-             ; miniList .= thisImg "`n"
           Else
              mainFile.Write(thisImg "`n")
-             ; newListu .= thisImg "`n"
        }
    }
-
+   whileLoopExec := 0
    mainFile.Close()
    miniFile.Close()
    userAddedFavesCount := realCount
    IniAction(1, "userAddedFavesCount", "General")
    showTOOLtip("Favourites list saved")
    SoundBeep, 900, 100
-
    currentFilesListModified := 0
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, ResetImgLoadStatus, -150
@@ -39501,8 +39401,8 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
       ; ToolTip, % thisIDcount "`n" lastIDcount , , , 2
       lastIDcount := thisIDcount
       firstItem := lastItem := markedSelectFile := 0
-      changeMcursor()
       startZeit := A_TickCount
+      owle := setWhileLoopBusy()
       Loop, % maxFilesIndex
       {
          If (resultedFilesList[A_Index, 2]=1)
@@ -39522,7 +39422,7 @@ getSelectedFiles(getItem:=0, forceSort:=0) {
          If (thumbsDisplaying=1)
             QPV_ListViewGridHUDoverlay()
       }
-      changeMcursor("normal")
+      whileLoopExec := owle
       Return markedSelectFile
    }
 }
@@ -39597,7 +39497,7 @@ markThisFileNow(thisFileIndex:=0) {
   If !thisFileIndex
      thisFileIndex := currentFileIndex
 
-  DestroyGIFuWin()
+  stopGIFsPlayback()
   oSel := resultedFilesList[thisFileIndex, 2]
   sel := oSel ? 0 : 1
   resultedFilesList[thisFileIndex, 2] := sel
@@ -39630,10 +39530,7 @@ jumpToFilesSelBorderLast() {
 
 jumpToFilesSelBorder(destination) {
   Static prevImgIndex, prevIndexu
-
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopSlideshow()
   totalCount := getSelectedFiles(0, 1)
   If !totalCount
      Return
@@ -39658,14 +39555,11 @@ navSelectedFilesPrev() {
 navSelectedFiles(direction) {
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
-   changeMcursor()
-
    If !markedSelectFile
    {
       getSelectedFiles(0, 1)
       If !markedSelectFile
       {
-         changeMcursor("normal")
          CurrentSLD := backCurrentSLD
          showTOOLtip("No files are currently selected")
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -39674,6 +39568,7 @@ navSelectedFiles(direction) {
    }
 
    startIndex := currentFileIndex
+   owle := setWhileLoopBusy()
    newIndex := 0
    Loop, % maxFilesIndex
    {
@@ -39688,7 +39583,7 @@ navSelectedFiles(direction) {
    }
 
    CurrentSLD := backCurrentSLD
-   changeMcursor("normal")
+   whileLoopExec := owle
    If (!newIndex && direction=-1)
    {
       jumpToFilesSelBorderLast()
@@ -40421,11 +40316,8 @@ DeletePicture(dummy:=0) {
      Return
   }
 
-  If (slideShowRunning=1)
-  {
-     ToggleSlideShowu()
+  If stopGifORslidesPlayback()
      Return
-  }
 
   If (A_TickCount - lastInvoked<200) && (askDeleteFiles!=1)
   {
@@ -40473,14 +40365,6 @@ DeletePicture(dummy:=0) {
   }
 
   Sleep, 2
-  If (animGIFplaying=1)
-  {
-     DestroyGIFuWin()
-     showDelayedTooltip("GIF animation stopped", 0, 250)
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
-
   If (userPrivateMode=1)
   {
      showTOOLtip("WARNING: You are not allowed to delete images when private mode is enabled")
@@ -41693,15 +41577,11 @@ UIeditQuickMenuSearchTrigger() {
 PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn, UImenuQSbtn
     Static lastState := 0
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
 
-    If (animGIFplaying)
-       DestroyGIFuWin()
-
+    stopGIFsPlayback()
     mouseTurnOFFtooltip()
     If (given="yes" && StrLen(whatu)>1 && createdQuickMenuSearchWin=1)
     {
@@ -42982,10 +42862,8 @@ fileImgFormatsOpenDialog(modus:=0) {
 }
 
 BrowseReplaceIndexEntry() {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   DestroyGIFuWin()
+   stopSlideshow()
+   stopGIFsPlayback()
    ; pattern := "Common image formats (" openFptrn1 ";" openFptrn2 ";" openFptrn3 ")"
    ; pattern .= "|Camera RAW files (" openFptrn3 ";*.sti)"
    patternObj := fileImgFormatsOpenDialog(0)
@@ -46219,11 +46097,8 @@ triggerQuickFileAction(keyu, forceIT:=0) {
    If (allowUserQuickFileActions=0 && forceIT=0)
       Return
 
-   If (slideShowRunning=1)
-   {
-      ToggleSlideShowu()
+   If stopSlideshow()
       Return
-   }
 
    If ((!resultedFilesList[currentFileIndex, 1] || AnyWindowOpen || drawingShapeNow=1)
    || (A_TickCount - lastInvoked<250))
@@ -46371,10 +46246,8 @@ BtnCopyImageClip() {
 }
 
 fakeWinCreator(idWin, thisCaller, allowReopen) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
-    DestroyGIFuWin()
+    stopSlideshow()
+    stopGIFsPlayback()
     mouseTurnOFFtooltip()
     AnyWindowOpen := idWin
     prevOpenedWindow := []
@@ -46754,9 +46627,7 @@ PanelEditImgCaption() {
     If (currentFileIndex=0)
        Return
 
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     imgPath := getIDimage(currentFileIndex)
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
     If !FileExist(imgPath)
@@ -47727,15 +47598,13 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        Return
 
     calcScreenLimits()
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     If throwErrorSelectionOutsideBounds()
        Return
 
     PasteInPlaceRevealOriginal := 0
     openingPanelNow := 1
-    DestroyGIFuWin()
+    stopGIFsPlayback()
     changeMcursor()
     setImageLoading()
     vpWinClientSize(mainWidth, mainHeight)
@@ -54450,7 +54319,7 @@ BtnCreateNewImage() {
     RegAction(1, "NewDocUseColor")
     RegAction(1, "PredefinedDocsSizes")
     RegAction(1, "NewImageReverseDimensions")
-    DestroyGIFuWin()
+    stopGIFsPlayback()
     BtnCloseWindow()
     isImgOpen := isImgEditingNow()
     If (viewportQPVimage.imgHandle)
@@ -58543,7 +58412,7 @@ StartSlideINtotalTimeBTNaction() {
    lastOtherWinClose := 1
    If (thumbsDisplaying=1)
       ToggleThumbsMode()
-   Settimer, dummyInfoToggleSlideShowu, % -delayu
+   Settimer, InformToggledSlideShowu, % -delayu
 }
 
 UpdateSlideshowPanel() {
@@ -58613,9 +58482,7 @@ EstimateSlideShowLength(noPrecision:=0, totalu:=0) {
 }
 
 jumpPreviousImage() {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2) ? 1 : 0
     If !okayu
        Return
@@ -58822,10 +58689,8 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
    If throwErrorNoImageLoaded()
       Return
 
-   DestroyGIFuWin()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopGIFsPlayback()
+   stopSlideshow()
    initFIMGmodule()
    RegAction(0, "userDesireWriteFMT",, 2, 1, 16)
    INIaction(0, "prevFileSavePath", "General", 6)
@@ -60356,9 +60221,7 @@ RecentCopyMoveManager(entry2add) {
 }
 
 QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
- 
+    stopSlideshow() 
     getSelectedFiles(0, 1)
     If (markedSelectFile>1)
     {
@@ -61390,9 +61253,7 @@ convert2format(givenIndex) {
   If (givenIndex=0)
      Return "err"
 
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopSlideshow()
   file2rem := getIDimage(givenIndex)
   If (RegExMatch(file2rem, "i)(.\.(" rDesireWriteFMT "))$") && convertFormatAutoSkip=1)
   {
@@ -63009,9 +62870,7 @@ OpenFolders(dummy:="") {
       Return
 
    initQPVmainDLL()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If FolderExist(StrReplace(dummy, "|"))
       SelectedDir := dummy
    Else
@@ -63396,9 +63255,7 @@ addStaticFolderSQLdb(whichFolder, fileMdate, renewList) {
 
 RefreshImageFileAction() {
    imgPath := getIDimage(currentFileIndex)
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If (thumbsDisplaying!=1)
    {
       If throwErrorNoImageLoaded(0, 0)
@@ -63456,9 +63313,7 @@ RefreshFilesList() {
      Return
   }
 
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopSlideshow()
   If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
   {
      retrieveFavesAsList()
@@ -63499,9 +63354,7 @@ OpenDialogFiles() {
     lastInvoked := A_TickCount
     initQPVmainDLL()
     hideMenuFlyoutNow()
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     pattern := "Common image formats (" openFptrn1 ";" openFptrn2 ";" openFptrn4 ";*.sld*)"
     patternObj := fileImgFormatsOpenDialog(1)
     If isWinXP
@@ -63609,9 +63462,7 @@ askAboutSlidesListSave() {
    If (currentFilesListModified=1 && RegExMatch(CurrentSLD, "i)(.\.sld)$") && FileExist(CurrentSLD) && maxFilesIndex>1 && SLDtypeLoaded=2)
    || (currentFilesListModified=1 && maxFilesIndex>1 && InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
    {
-      If (slideShowRunning=1)
-         ToggleSlideShowu()
-
+      stopSlideshow()
       zPlitPath(CurrentSLD, 0, OutFileName, OutDir)
       msgResult := msgBoxWrapper(appTitle ": Save files list", "The currently opened files list has been modified and the changes have not been saved. To continue with the action you chose, select the Discard button.`n`nWould like to save the currently opened files list?`n`n" OutFileName, "&Save|&Discard|&Cancel", 0, "question")
       If (msgResult="Save")
@@ -63645,9 +63496,7 @@ askAboutFileSave(msg:="", dontOpen:=0) {
    imgPath := getIDimage(imgIndexEditing)
    If (isOkay=1 && imgPath && currentImgModified=1)
    {
-      If (slideShowRunning=1)
-         ToggleSlideShowu()
-
+      stopSlideshow()
       zPlitPath(imgPath, 0, OutFileName, OutDir)
       msgResult := msgBoxWrapper(appTitle ": Save image", "The currently modified image is about to be discarded" msg ".`n`nWould you like to save the current image?`n`n" OutFileName, "&Save|&Discard|&Cancel", 0, "question")
       If (msgResult="Save")
@@ -63791,10 +63640,8 @@ OpenArgFile(inputu) {
 }
 
 addNewFile2list() {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   DestroyGIFuWin()
+   stopSlideshow()
+   stopGIFsPlayback()
    pattern := "Common image formats (" openFptrn1 ";" openFptrn2 ";" openFptrn4 ")"
    pattern .= "|Camera RAW files (" openFptrn3 ";*.sti)"
    pattern .= "|QPV files lists / slideshows (*.sld;*.sldb)"
@@ -64619,9 +64466,7 @@ askFolderImportMode(SelectedDir, foldersListu:=0, actu:=0, coveredModus:=0, allo
 }
 
 addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    If (FolderExist(givenPath) && externMode="yes")
    {
       SelectImg := givenPath
@@ -64772,10 +64617,8 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
    }
 
    ; ToolTip, % imgsListu "|" foldersListu "|" sldFile , , , 2
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   DestroyGIFuWin()
+   stopSlideshow()
+   stopGIFsPlayback()
    lastInvoked := A_TickCount
    If (imgsListu && isCtrlDown=1)
    {
@@ -65328,15 +65171,8 @@ associateWithImages(modus) {
 }
 
 closeDocuments() {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   If (animGIFplaying=1)
-   {
-      DestroyGIFuWin()
-      Return
-   }
-
+   stopSlideshow()
+   stopGIFsPlayback()
    If askAboutFileSave(". The current files list will be discarded as well")
       Return
 
@@ -65353,8 +65189,6 @@ closeDocuments() {
       Return
    }
 
-   trackImageListButtons("kill")
-   createGUItoolbar("refresh-later")
    terminateIMGediting()
    PopulateIndexFilesStatsInfos("kill")
    SLDtypeLoaded := 1
@@ -65364,10 +65198,8 @@ closeDocuments() {
 }
 
 restartAppu() {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   DestroyGIFuWin()
+   stopSlideshow()
+   stopGIFsPlayback()
    If askAboutFileSave(" and the application will restart")
       Return
 
@@ -65389,10 +65221,8 @@ restartAppu() {
 }
 
 exitAppu(dummy:=0) {
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
-   DestroyGIFuWin()
+   stopSlideshow()
+   stopGIFsPlayback()
    If askAboutFileSave(" and the application will exit")
       Return
 
@@ -65446,10 +65276,8 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
          Return 1
 
       whileLoopExec := 0
-      If (slideShowRunning=1)
-         ToggleSlideShowu()
-
-      DestroyGIFuWin()
+      stopSlideshow()
+      stopGIFsPlayback()
       If (thumbsDisplaying=0 && editingSelectionNow=1 && adjustNowSel=0 && drawingShapeNow=0)
          dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize, mainWidth, mainHeight, 1)
 
@@ -69205,7 +69033,7 @@ MenuChangeImgZoomPlus() {
 
 BuildSecondMenu(givenCoords:=0) {
    ; main menu
-   DestroyGIFuWin()
+   stopGIFsPlayback()
    If (thumbsDisplaying=1)
    {
       Sleep, -1
@@ -71184,9 +71012,7 @@ ToggleInfoBoxu() {
 
 ToggleImgCaptions() {
     Static lastInvoked := 1
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     showImgAnnotations := !showImgAnnotations
     INIaction(1, "showImgAnnotations", "General")
     If (thumbsDisplaying!=1)
@@ -72010,7 +71836,7 @@ ToggleImgNavBox() {
     showHUDnavIMG := !showHUDnavIMG
     INIaction(1, "showHUDnavIMG", "General")
     dummyTimerDelayiedImageDisplay(25)
-    SetTimer, dummyNavBoxInfo, -150
+    SetTimer, dummyNavBoxInfo, -50
     lastInvoked := A_TickCount
 }
 
@@ -72587,9 +72413,7 @@ drawWelcomeImg() {
     Gdip_DisposeEffect(pEffect)
     Gdip_DisposeEffect(zEffect)
     ; updateUIctrl()
-    runningLongOperation := 0
-    mustAbandonCurrentOperations := imageLoading := 0
-    changeMcursor("normal-extra")
+    uiChangeMcursor("normal-extra")
     addJournalEntry("Welcome screen rendered in " A_TickCount - thisZeit " ms." r2 " - " r1)
     setWindowTitle(appTitle " v" appVersion, 1)
     If (A_TickCount - thisZeit<250) || (screenSaverMode=1)
@@ -73289,9 +73113,7 @@ ToggleSeenIMGstatus() {
    If (thumbsDisplaying!=1 || sqlFailedInit=1)
       Return
 
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopSlideshow()
    mustRem := 0 
    imgPath := getIDimage(currentFileIndex)
    cachedAllSessionsSeen[Format("{:L}", imgPath)] := "-"
@@ -73378,9 +73200,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
   If (sqlFailedInit=1)
      Return
 
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopSlideshow()
   If AnyWindowOpen
      BtnCloseWindow()
 
@@ -73769,9 +73589,7 @@ ResetImgLoadStatus() {
 
   If !GetKeyState("LButton")
   {
-     changeMcursor("normal-extra")
-     runningLongOperation := 0
-     mustAbandonCurrentOperations := imageLoading := 0
+     uiChangeMcursor("normal-extra")
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1)
         SetTimer, createGUItoolbar, -100
   } Else If (imageLoading=1)
@@ -73874,9 +73692,8 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    WinGet, winStateu, MinMax, ahk_id %PVhwnd%
    If (winStateu=-1)
    {
-      If (slideShowRunning=1)
-         ToggleSlideShowu()
-      DestroyGIFuWin()
+      stopSlideshow()
+      stopGIFsPlayback()
       Return
    }
 
@@ -73933,12 +73750,11 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
       If !FileRexists(imgPath)
       {
          destroyGDIfileCache()
-         DestroyGIFuWin()
+         stopGIFsPlayback()
          If (hSNDmedia && autoPlaySNDs!=1)
             StopMediaPlaying()
-         If (slideShowRunning=1)
-            scheduleNextSlide()
 
+         scheduleNextSlide()
          If (WinActive("A")=PVhwnd)
          {
             winTitle := "[*] " winTitle
@@ -73980,13 +73796,12 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
        ; msgbox, % r2
        If InStr(r2, "error")
        {
-          DestroyGIFuWin()
+          stopGIFsPlayback()
           destroyGDIfileCache()
           If (hSNDmedia && autoPlaySNDs!=1)
              StopMediaPlaying()
-          If (slideShowRunning=1)
-             scheduleNextSlide()
 
+          scheduleNextSlide()
           friendly := (A_PtrSize=4) ? "`nOr, insufficient memory." : ""
           errMsg := "ERROR: Unable to display the image: " groupDigits(currentFileIndex) "`nPossibly malformed image file format or access denied." friendly "`n" r2 "`n" OutFileName "`n" OutDir "\"
           currIMGdetails := []
@@ -75481,7 +75296,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
    x2 -= kX,   y2 -= kY
    x2 += 3,    y2 += 3
 
-   ShowClickHalo(x2, y2, w, h, 1)
+   QPV_post("ShowClickHalo", x2, y2, w, h, 1)
    If (InStr(modus, "space") && (ctrlClassNN ~= "i)(static|combobox|syslistview32)"))
    {
       If (thisHwnd=hSetWinGui)
@@ -75798,19 +75613,16 @@ OnImgFileChangeActions(forceThis) {
         prevAnimGIFwas := ""
      If (hSNDmedia && autoPlaySNDs!=1)
         StopMediaPlaying()
-     If (slideShowRunning=1) ;  && (animGIFplaying!=1 || totalFramesIndex<2))
-        scheduleNextSlide()
+     scheduleNextSlide()
   }
 
   prevImgPath := imgPath
 }
 
 scheduleNextSlide() {
-   OutputDebug, % "QPV: MERGE: scheduleNextSlide running=" slideShowRunning
    If (slideShowRunning=1)
    {
       allowNextSlide := 1
-      setTaskbarIconState("Normal")
       SetTimer, theSlideShowCore, % -slideShowCadence
    }
 }
@@ -82060,7 +81872,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
        allowVPcacheOptimizations := 0
     } Else
     {
-       DestroyGIFuWin()
+       stopGIFsPlayback()
        gdiSmallSize := determineGDIsmallCacheSize(mainWidth, mainHeight)
        totalNewSize := Round((newW * newH)/1000000, 2)
        If (IMGresizingMode=3 || zoomLevel=1)
@@ -82912,16 +82724,14 @@ ToggleEditImgSelection(modus:=0) {
   If throwWarningAlphaPaintMode()
      Return
 
-  If (slideShowRunning=1)
-     ToggleSlideShowu()
-
+  stopSlideshow()
   vpWinClientSize(mainWidth, mainHeight)
   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
   If (!imgW || !imgH)
      r := -1
 
   ; fnOutputDebug(A_ThisFunc "(A=" modus ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
-  DestroyGIFuWin()
+  stopGIFsPlayback()
   If (editingSelectionNow!=1 && r!=-1)
   {
      If (imgSelX2=-1 || ImgSelX2="C")
@@ -83007,10 +82817,8 @@ selectEntireImage(act:=0) {
    If throwWarningAlphaPaintMode()
       Return
 
-   DestroyGIFuWin()
-   If (slideShowRunning=1)
-      ToggleSlideShowu()
-
+   stopGIFsPlayback()
+   stopSlideshow()
    pBitmap := useGdiBitmap()
    If !validBMP(pBitmap)
       Return -1
@@ -84827,7 +84635,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     maxImgSize := maxZeit := columnIndex := -1
     fnOutputDebug("Begin show " maxItemsPage " thumbs from index " startIndex)
     setPriorityThread(-2)
-    DestroyGIFuWin()
+    stopGIFsPlayback()
     createThumbsFolder()
     Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
     If (highlightAlreadySeenImages=1 && mustRecordSeenImgs=1)
@@ -85803,16 +85611,14 @@ GuiGDIupdaterResize(eventu:=0) {
 
    SetTimer, dummyTimerReloadThisPicture, Off
    SetTimer, dummyTimerDelayiedImageDisplay, Off
-   DestroyGIFuWin()
+   stopGIFsPlayback()
    resetSlideshowTimer()
    imgPath := getIDimage(currentFileIndex)
    thisClippyIMG := isImgEditingNow()
 
    If (!imgPath || !maxFilesIndex || PrevGuiSizeEvent=1 || !CurrentSLD) && (thisClippyIMG!=1)
    {
-      If (slideShowRunning=1)
-         ToggleSlideShowu()
-
+      stopSlideshow()
       If (A_OSVersion="WIN_7" || isWinXP=1)
          GDIwindowsPosCorrections()
 
@@ -87311,7 +87117,6 @@ sldGenerateFilesList(readThisFile, doFilesCheck, mustRemQuotes, doOptionals:=1) 
        }
     }
 
-    ; Clipboard := tempu
     etaTime := "Elapsed time to open TXT files list: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)) ". Files: " maxFilesIndex
     addJournalEntry(etaTime)
     If (A_TickCount - startZeit>7000) && (maxFilesIndex>2 && abandonAll!=1)
@@ -95781,7 +95586,6 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
    thisIndex := 0
    showTOOLtip("Updating static folders list")
    LoadStaticFoldersCached(CurrentSLD, countStaticFolders, "f")
-
    If !IsObject(mainFolderu)
    {
       foldersListArray := new hashtable()
@@ -96168,7 +95972,6 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     getSelectedFiles(0, 1)
     If (onlySelected=1 && markedSelectFile<1)
     {
-       changeMcursor("normal")
        showTOOLtip("WARNING: No files are currently selected")
        SoundBeep , 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -96178,9 +95981,11 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     changeMcursor()
+    owle := setWhileLoopBusy()
     If (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && onlySelected!=1)
        remFilesListFilter("simple")
 
+    setWhileLoopBusy()
     selectedFiles := totalAffected := doneFiles := 0
     If (SLDtypeLoaded=3 && onlySelected!=1)
     {
@@ -96203,10 +96008,10 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
              errorOccured := activeSQLdb.ErrorMsg
 
           changeMcursor()
+          setWhileLoopBusy()
           totalFiles := RecordSet.RowCount
           Loop, % RecordSet.RowCount
           {
-              changeMcursor()
               Row := RecordSet.Rows[A_Index]
               If (A_TickCount - prevMSGdisplay>1500)
               {
@@ -96254,6 +96059,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        If (writeSQLrows=1)
           activeSQLdb.Exec("BEGIN TRANSACTION;")
 
+       setWhileLoopBusy()
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
@@ -96330,6 +96136,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     If (SLDtypeLoaded=3)
        getMaxRowIDsqlDB()
 
+    whileLoopExec := owle
     If errorOccured
     {
        showTOOLtip("Failed to update the files list database`n" errorOccured)
@@ -96365,6 +96172,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     startOperation := A_TickCount
     modeInfo := (folderMode=1) ? "`nFolder paths only" : ""
     showTOOLtip("Performing search and replace in the seen database list:`n" what "`n" replacer modeInfo)
+    owle := setWhileLoopBusy()
     changeMcursor()
     seenImagesDB.Exec("BEGIN TRANSACTION;")
     SQLstr := "SELECT ROWID, imgfile FROM images WHERE imgfile LIKE '%" Trimmer(SQLescapeStr(what, 1)) "%' ESCAPE '>';"
@@ -96377,7 +96185,6 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     {
        Loop, % RecordSet.RowCount
        {
-           changeMcursor()
            Row := RecordSet.Rows[A_Index]
            If (A_TickCount - prevMSGdisplay>1500)
            {
@@ -96416,7 +96223,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
        }
        RecordSet.Free()
     }
-
+    whileLoopExec := owle
     k := seenImagesDB.Exec("COMMIT TRANSACTION;")
     If (errorOccured || !k)
     {
@@ -96645,7 +96452,6 @@ PopulateStaticSQLfolderzList(modus:=0) {
 }
 
 PopulateStaticFolderzList(listFilter:=0, modus:=0) {
-
     EM_SETCUEBANNER(hEditField, "Preparing folders list - please wait", 1)
     startOperation := A_TickCount
     setImageLoading()
@@ -96884,7 +96690,7 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
     Global lastOtherWinClose := A_TickCount
     panelWinCollapsed := forceLiveAlphaPreviewMode := FloodFillSelectionAdj := liveDrawingBrushTool := isNowFakeWinOpen := ForceNoColorMatrix := 0
     uiPanelOpenCloseEvent(1)
-    DestroyGIFuWin()
+    stopGIFsPlayback()
 
     Gui, SettingsGUIA: Destroy
     WinActivate, ahk_id %PVhwnd%
@@ -100786,9 +100592,7 @@ RenderSVGfile(imgPath, noBPPconv, screenMode, sizesDesired:=0) {
 }
 
 coreChangePDFchapter(dir) {
-    If (slideShowRunning=1)
-       ToggleSlideShowu()
-
+    stopSlideshow()
     If (thumbsDisplaying!=1 && totalFramesIndex>0 && viewportPDFbookMarks.total>5 && viewportPDFbookMarks.Count()>1)
     {
        p := identifyPDFbookmarkIndex(desiredFrameIndex, 0)
@@ -101847,7 +101651,6 @@ tlbrInvokeFunction(a, b, c) {
    func2Call := processToolbarFunctions(btnID, b)
    ; ToolTip, % z "=" a "=" b "=" c "=" func2Call , , , 2
    WinGetPos, aX, aY,,, ahk_id %hwnd%
-   ; ShowClickHalo(aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    lastTlbrClicked := hwnd
    If IsFunc(func2Call[1])
    {
@@ -101924,7 +101727,7 @@ MenuGoPlaySlidesNow() {
    If (thumbsDisplaying=1)
       ToggleThumbsMode()
  
-   SetTimer, dummyInfoToggleSlideShowu, -250
+   SetTimer, InformToggledSlideShowu, -250
 }
 
 tlbrActColorsSwatch() {
@@ -105262,19 +105065,15 @@ DelayedToolbarTooltips(msgu, idu) {
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
-  Critical, off
-  Static lastInvoked := 1, prevCtrlHover, prevState, prevMsg, lkmu
-       , hCursBusy := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32514, "Ptr")  ; IDC_WAIT
-       , hCursFinger := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32649, "Ptr")
-       , hCursMove := DllCall("user32\LoadCursorW", "Ptr", NULL, "Int", 32646, "Ptr")
-
+   Critical, off
+   Static lastInvoked := 1, prevCtrlHover, prevState, prevMsg, lkmu
    If (A_TickCount - scriptStartTime < 900)
       Return
 
    If ((whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 || slideShowRunning=1) && mustCaptureCloneBrush!=1 && colorPickerModeNow!=1)
    {
       If (MsgBox2hwnd!=WinActive("A"))
-         DllCall("user32\SetCursor", "UPtr", hCursBusy)
+         uiChangeMcursor("busy")
       Return
    }
 
@@ -105282,12 +105081,12 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
    {
       hwnd := Format("{1:#x}", hwnd)
       WinGetClass, ctrlClassNN, ahk_id %hwnd%
-         ; ToolTip, % hwnd "|`n" whichHwnd "`n=" ctrlClassNN "`n=" ctrlClassNE , , , 2
+      ; ToolTip, % hwnd "|`n" whichHwnd "`n=" ctrlClassNN "`n=" ctrlClassNE , , , 2
       If (InStr(ctrlClassNN, "static") && !InStr(A_GuiControl, "tlbrValueIcon"))
       || (InStr(ctrlClassNN, "syslistview") && InStr(A_GuiControl, "color"))
       {
          If getTabStopStyle(A_GuiControl) ; I do not know why it works with A_GuiControl ; it should work with the hwnd
-            DllCall("user32\SetCursor", "UPtr", hCursFinger)
+            uiChangeMcursor("finger")
       }
   }
   ; ToolTip, % ctrlClassNN "=" A_GuiControl "=" whichHwnd , , , 2
@@ -105310,7 +105109,7 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
         msgu := tlbrDecideTooltips(ctrlHover)
 
      If InStr(tlbrIconzList[ctrlHover, 2], "dragger")
-        DllCall("user32\SetCursor", "UPtr", hCursMove)
+        uiChangeMcursor("move")
      
      If (!msgu && ShowToolTipsToolbar=1)
         mouseTurnOFFtooltip()
@@ -105497,33 +105296,8 @@ KeyboardMoveMouseToolbar(thisu:=0, l:=0) {
 
    msgu := tlbrDecideTooltips(hwndu)
    thisSize := OSDfontSize//3 + 2
-   ; ShowClickHalo(aX, aY, ToolBarBtnWidth, ToolBarBtnWidth, 1)
    If msgu
       mouseCreateOSDinfoLine(msgu, thisSize, 0, posu)
-}
-
-testHistoDLL() {
-   initQPVmainDLL()
-   VarSetCapacity(resultsArray, 4*7, 0)
-   trGdip_GetImageDimensions(useGdiBitmap(), w, h)
-   err := DllCall("qpvmain.dll\getPBitmapistoInfos", "UPtr", useGdiBitmap(), "int", w, "int", h, "UPtr", &resultsArray)
-
-   avgu := NumGet(resultsArray, 0 * 4, "uint")
-   medianValue := NumGet(resultsArray, 1 * 4, "uint")
-   peakPointK := NumGet(resultsArray, 2 * 4, "uint")
-   minBrLvlK := NumGet(resultsArray, 3 * 4, "uint")
-   rmsu := NumGet(resultsArray, 4 * 4, "uint")
-   modePointK := NumGet(resultsArray, 5 * 4, "uint")
-   minPointK := NumGet(resultsArray, 6 * 4, "uint")
-
-   fnOutputDebug("avgu: " avgu)
-   fnOutputDebug("medianValue: " medianValue)
-   fnOutputDebug("peakPointK: " peakPointK)
-   fnOutputDebug("minBrLvlK: " minBrLvlK)
-   fnOutputDebug("rmsu: " rmsu)
-   fnOutputDebug("modePointK: " modePointK)
-   fnOutputDebug("minPointK: " minPointK)
-   resultsArray := ""
 }
 
 

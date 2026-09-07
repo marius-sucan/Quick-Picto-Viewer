@@ -1096,11 +1096,24 @@ uiAccessWelcomeView() {
 
 uiAccessImgViewSetUIlabels() {
    zr := (IMGresizingMode=4) ? " Hold the Space key plus left-click and drag to pan the image. Use the mouse wheel to change the zoom level." : " Use Control + mouse wheel to change the image zoom level."
-   If (drawingShapeNow=1 || AnyWindowOpen)
+   If (drawingShapeNow=1 || AnyWindowOpen || slideShowRunning=1)
    {
-      msgu := AnyWindowOpen ? "Image view. A panel window is opened. " : "Image view. Drawing vector shape mode is activated. " zr " Press Escape to cancel. Press Enter to accept defined path or modifications. Swipe gestures are not allowed."
-      If (imgEditPanelOpened=1)
-         msgu := "Image view. An image editing live tool is currently in use. " zr " Swipe gestures are not allowed."
+      If (slideShowRunning=1)
+      {
+         msgu := "Slideshow is running. Direction: " DefineSlideShowType() ". Speed: " DefineSlidesRate() "."
+         If (slidesFXrandomize=1)
+            msgu .= "`nViewport colour effects are randomized for each image."
+ 
+         If (skipSeenImageSlides=1)
+            msgu .= "`nAlready seen images will be skipped."
+
+         msgu .= "`nPress Escape or click to stop the slideshow."
+      } Else
+      {
+         msgu := AnyWindowOpen ? "Image view. A panel window is opened. " : "Image view. Drawing vector shape mode is activated. " zr " Press Escape to cancel. Press Enter to accept defined path or modifications. Swipe gestures are not allowed."
+         If (imgEditPanelOpened=1)
+            msgu := "Image view. An image editing live tool is currently in use. " zr " Swipe gestures are not allowed."
+      }
 
       GuiControl, PVwin:, PicOnGUI1, % msgu
       GuiControl, PVwin:, PicOnGUI2a, % msgu
@@ -1299,7 +1312,7 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    If preventSillyGui(A_Gui)
       Return
 
-   If stopPlayback()
+   If stopGifORslidesPlayback(1)
       Return 0
 
    prefix := ""
@@ -1309,9 +1322,6 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    ; HI := (Value >> 16) & 0xFFFF
    ; LO := Value & 0xFFFF
    mouseData := (wParam >> 16)      ; return the HIWORD -  high-order word 
-   ; TulTip(" == ", result, resultA, resultB, resultC, resultD, resultE)
-   ; stepping := Round(Abs(mouseData) / 120)
-   ; ToolTip, % prefix , , , 2
    If (msg=526) ; horizontal mouse wheel
       direction := (mouseData>0 && mouseData<51234) ? "Right" : "Left"
    Else
@@ -1373,7 +1383,7 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
-    Else If stopPlayback()
+    Else If stopGifORslidesPlayback(1)
        Return 0
     Else If isOkay
        WinClickAction("normal", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)
@@ -1428,7 +1438,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
 
     LbtnDwn := 0
     canCancelImageLoad := 4
-    If stopPlayback()
+    If stopGifORslidesPlayback(1)
        Return 0
 
     uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
@@ -1473,7 +1483,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
 
     lastInvoked := A_TickCount
     lastDoubleClickZeit := A_TickCount
-    If stopPlayback()
+    If stopGifORslidesPlayback(1)
        Return 0
 
     canCancelImageLoad := 4
@@ -1556,7 +1566,7 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   If preventSillyGui(A_Gui)
      Return
 
-  If stopPlayback()
+  If stopGifORslidesPlayback(1)
      Return 0
 
   If !identifyThisWin()
@@ -1749,7 +1759,6 @@ uiChangeMcursor(whichCursor) {
      thisCursor := hCursN
   } Else If (whichCursor="busy-img")
   {
-     imageLoading := 1
      lastCloseInvoked := 0
      setTaskbarIconState("anim")
      thisCursor := hCursBusy
@@ -1759,7 +1768,7 @@ uiChangeMcursor(whichCursor) {
      thisCursor := hCursBusy
   } Else If (whichCursor="normal")
   {
-     imageLoading := 0
+     lastCloseInvoked := 0
      setTaskbarIconState("normal")
      thisCursor := hCursN
   } Else If (whichCursor="finger")
@@ -1822,14 +1831,16 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
      Try DllCall("user32\SetCursor", "UPtr", 0)
   Else If (drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1)
      uiChangeMcursor("cross")
-  Else If ((runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
+  Else If ((whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) && slideShowRunning!=1)
      uiChangeMcursor("busy")
   Else If (thumbsDisplaying=1 && !AnyWindowOpen && runningLongOperation!=2 && imageLoading!=1 && lastWinStatus)
   {
      ctrlu := IdentifyCtrlUnderMouse(mX, mY) 
      If VarContainsThis(ctrlu, "|PicOnGUI2a|", "|picVscroll|", "|ImgNavBox|")
      {
-        uiChangeMcursor("finger")
+        pp := (thumbsDisplaying=1 && InStr(ctrlu, "ImgNavBox")) ? 0 : 1
+        If pp
+           uiChangeMcursor("finger")
         If (isSamePos=0 && (A_TickCount - lastZeitToolTip>1000) && InStr(ctrlu, "|PicOnGUI2a|"))
            SetTimer, showMouseTooltipStatusbar, -500
      } Else If (isSamePos=0)
@@ -1937,7 +1948,7 @@ PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
 
     PrevGuiSizeEvent := EventInfo
     ; ToolTip, % "l=" EventInfo , , , 2
-    turnOffSlideshow()
+    stopGifORslidesPlayback()
     canCancelImageLoad := 4
     delayu := (isWinXP=1 || thumbsDisplaying=1) ? -15 : -5
     If (A_TickCount - scriptStartTime > 350)
@@ -1974,7 +1985,7 @@ dummyTimerProcessDroppedFiles() {
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    vectorShape := imgFiles := foldersList := sldFile := ""
-   turnOffSlideshow()
+   stopGifORslidesPlayback()
    canCancelImageLoad := 4
    countD := countV := countF := countFiles := 0
    ToolTip, Please wait - processing dropped files list , , , 2
@@ -2126,7 +2137,7 @@ byeByeRoutine() {
       If AnyWindowOpen
       {
          CloseWindow()
-      } Else If stopPlayback()
+      } Else If stopGifORslidesPlayback(1)
       {
          lastOtherWinClose := A_TickCount
       } Else If (thumbsDisplaying=1)
@@ -2135,7 +2146,6 @@ byeByeRoutine() {
          ; lastCloseInvoked++
          ; thumbsDisplaying := 0
          ; lastOtherWinClose := A_TickCount
-         ; QPV_post("MenuReturnIMGedit")
       } Else lastCloseInvoked++
    } Else If (StrLen(UserMemBMP)>3 && undoLevelsRecorded>1) || (currentFilesListModified=1)
    {
@@ -2228,38 +2238,21 @@ coreHideMenuFlyout() {
     SetTimer, hideMenuFlyOut, Off
 }
 
-stopGiFsPlayback() {
-   If (mustPreventMenus=1 || simulateMenusMode=1)
-      Return
-
-   If (animGIFplaying!=0)
-   {
-      OutputDebug, % "QPV: MERGE: stopGiFsPlayback via " Exception("", -2).What
-      DestroyGIFuWin()
-      If (runningLongOperation!=1)
-         uiChangeMcursor("normal-extra")
-   }
-}
-
-stopPlayback() {
+stopGifORslidesPlayback(loudly:=0) {
    wasPlaying := 0
    If (slideShowRunning=1)
    {
-      stopSlideshow()
+      stopSlideshow(0, !loudly)
       wasPlaying := 1
    }
    If (animGIFplaying!=0)
    {
-      stopGiFsPlayback()
+      stopGIFsPlayback()
       wasPlaying := 1
    }
    If wasPlaying
       lastOtherWinClose := A_TickCount
    Return wasPlaying
-}
-
-turnOffSlideshow() {
-   stopPlayback()
 }
 
 invokeGivenMenuBarPopup(n) {
@@ -2443,7 +2436,7 @@ uiPreProcessKbdKey() {
       OutputDebug, % "QPV: MERGE: kbd dispatch hotkate=" hotkate " via " Exception("", -2).What
 
       callMain := 0
-      If isVarEqualTo(hotkate, "Escape", "Enter", "Space") && stopPlayback()
+      If (isVarEqualTo(hotkate, "Escape", "Enter", "Space") && stopGifORslidesPlayback(1))
       {
          ; user gesture stopped active GIF or slideshow playback
       } Else If (hotkate="Escape" || hotkate="!F4")
@@ -2463,12 +2456,12 @@ uiPreProcessKbdKey() {
       {
          If (slideShowRunning=1)
          {
-            stopPlayback()
+            stopGifORslidesPlayback(1)
          } Else If (animGIFplaying!=0 || canCancelImageLoad=1 || (thumbsDisplaying=1 && imageLoading=1))
          {
             alterFilesIndex++
             canCancelImageLoad := 4
-            stopGiFsPlayback()
+            stopGIFsPlayback()
          } Else
             callMain := 1
       } Else
