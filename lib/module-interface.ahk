@@ -3,7 +3,7 @@
 ; ahk_h interface thread in 2026-08 [interface-thread-merge-plan.md].
 ;
 ; Module-owned super-globals, declared and seeded here. quick-picto-viewer.ahk
-; #Include's this file with the other libs, inside its auto-exec section, so the
+; #Include's this file right after its own Global block, inside the auto-exec section, so the
 ; initializers run at start-up; initInterfaceModule() is then called once, before BuildGUI().
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
@@ -1699,7 +1699,7 @@ WM_WINDOWPOSCHANGED(wP:=0, lP:=0, msg:=0, hwnd:=0) {
          SetTimer, RepositionTempBtnGui, -95
 
       SetTimer, saveMainWinPos, -35
-      Global lastWinDrag := A_TickCount
+      lastWinDrag := A_TickCount
       If (A_OSVersion="WIN_7" || isWinXP=1)
          SetTimer, updateGDIwinPos, -5
       If (ShowAdvToolbar=1 && lockToolbar2Win=1 && (A_TickCount - scriptStartTime>350))
@@ -1872,8 +1872,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
   If (specials=1 && (wP&0x1) && (A_TickCount - lastWinDrag>45))
   {
      PostMessage, 0xA1, 2,,, ahk_id %PVhwnd%
-     Global lastWinDrag := A_TickCount
-     ; lastWinDrag := lastWinDrag ; [was MT_set - plain global since phase E]
+     lastWinDrag := A_TickCount
      SetTimer, trackMouseDragging, -55
   } 
 }
@@ -1885,7 +1884,7 @@ TestDraggableWindow() {
 }
 
 trackMouseDragging() {
-    Global lastWinDrag := A_TickCount
+    lastWinDrag := A_TickCount
 }
 
 WM_MOUSELEAVE(wP, lP, msg, hwnd) {

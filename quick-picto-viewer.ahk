@@ -87,7 +87,6 @@ SetWorkingDir, %A_ScriptDir%
 #Include %A_ScriptDir%\Lib\file-get-prop-lib.ahk  ; used to get file properties on Alt+Enter [ File Information panel ]
 #Include %A_ScriptDir%\Lib\Class_screenQPVimage.ahk
 #Include %A_ScriptDir%\Lib\Class_taskbarInterface.ahk ; by Helgef
-#Include %A_ScriptDir%\Lib\module-interface.ahk  ; the user-interface module; its Global line seeds the module state here, in the auto-exec section
 ; #Include %A_ScriptDir%\Lib\json.ahk
 
 SetWinDelay, 1
@@ -390,6 +389,13 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
    , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0
    , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0
+
+; the user-interface module. Included right after the Global block above, inside the
+; auto-exec section: its own Global line seeds the module state here, and every
+; super-global of both files is declared before any function body is parsed [a function
+; that reads a name and then declares it Global is a load error unless the name was
+; already a super-global at that point].
+#Include %A_ScriptDir%\Lib\module-interface.ahk
 
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
@@ -27600,13 +27606,13 @@ mouseTurnOFFtooltip() {
 ; [2026-09-02] the one tooltip window since the module's uiMouseTipGuia pair was
 ; folded into this one; the body is the module's richer variant [statusbar flag,
 ; the lastWinDrag guard when the pointer sits on the tip, its own timer disarm]
-   Global statusBarTooltipVisible := 0
+   statusBarTooltipVisible := 0
    If (mouseToolTipWinCreated!=1)
       Return
 
    MouseGetPos, ,, OutputVarWin
    If (OutputVarWin=hGuiTip)
-      Global lastWinDrag := A_TickCount - 125
+      lastWinDrag := A_TickCount - 125
    ; the click handler calls this ahead of the abort prompt's gate, as a fresh monitor
    ; thread when a loop's per-line peek dispatched the click: a pump here would launch
    ; the queued timers [ResetImgLoadStatus clears the flags the gate reads]. Critical on a
@@ -27615,9 +27621,9 @@ mouseTurnOFFtooltip() {
       Critical
    Sleep, 10
    Gui, mouseToolTipGuia: Destroy
-   Global mouseToolTipWinCreated := 0
-   Global statusBarTooltipVisible := 0
-   Global lastZeitToolTip := A_TickCount
+   mouseToolTipWinCreated := 0
+   statusBarTooltipVisible := 0
+   lastZeitToolTip := A_TickCount
    SetTimer, mouseTurnOFFtooltip, Off
 }
 
@@ -69693,12 +69699,12 @@ deleteMenus() {
     ; [DeleteAll empties them in place] - a whole-menu Delete would orphan the bar
     ; attachment and the WM_INITMENUPOPUP JIT map; the rest still fully delete
     Static menusKeepHandle := "PValpha|PVslide|PVnav|PVview|PVprefs|PvUIprefs|PVsort|PVselv|PVsounds|PVlTools|PVhelp"
-         , menusList := "PVmenu|PVtFileOpen|PVtFileImgAct|PVselSize|PVselRatio|PVimgTransform|PVimgCreate|PVimgFilters|PVimgDraw|PVperfs|PVfileSel|PVfList|PVtActFile|PVfilesActs|PVfaves|PVopenF|PVedit|PvImgAdapt|PVimgColorsFX|PVimgSdepth|PVimgVProt|PVimgHistos|PVstats|PvUItoolbarMenu|PVshapeTension|PVselAlign"
+         , menusDeleteWhole := "PVmenu|PVtFileOpen|PVtFileImgAct|PVselSize|PVselRatio|PVimgTransform|PVimgCreate|PVimgFilters|PVimgDraw|PVperfs|PVfileSel|PVfList|PVtActFile|PVfilesActs|PVfaves|PVopenF|PVedit|PvImgAdapt|PVimgColorsFX|PVimgSdepth|PVimgVProt|PVimgHistos|PVstats|PvUItoolbarMenu|PVshapeTension|PVselAlign"
     menuCustomNames := []
     kMenu(0, "Reset", 0)
     Loop, Parse, menusKeepHandle, |
         Try Menu, % A_LoopField, DeleteAll
-    Loop, Parse, menusList, |
+    Loop, Parse, menusDeleteWhole, |
     {
         ; empty the parent BEFORE whole-deleting it: Win32 DestroyMenu recursively
         ; destroys every ATTACHED submenu, so whole-deleting PVmenu while it still
@@ -71041,8 +71047,8 @@ folderzNavLoadAllSiblings() {
 }
 
 invokeFoldersListerMenu() {
-    Static menusList := "PVmFsibs|PVmFsubs|PVmFparents|PVmFexplorer"
-    Loop, Parse, menusList, |
+    Static foldersMenusList := "PVmFsibs|PVmFsubs|PVmFparents|PVmFexplorer"
+    Loop, Parse, foldersMenusList, |
         Try Menu, % A_LoopField, Delete
 
     If (userPrivateMode=1)
