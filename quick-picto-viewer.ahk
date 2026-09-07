@@ -218,7 +218,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
-   , PDFpwdsCache := []
+   , PDFpwdsCache := [], multiCoreThumbsInitGood := "n", thumbsPoolState := 0
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := (A_IsCompiled) ? "" : "(dev) "
    , appVersion := "6.3.00", vReleaseDate := "2026/08/31" ; yyyy-mm-dd
 
@@ -390,13 +390,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0
    , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0
 
-; the user-interface module. Included right after the Global block above, inside the
-; auto-exec section: its own Global line seeds the module state here, and every
-; super-global of both files is declared before any function body is parsed [a function
-; that reads a name and then declares it Global is a load error unless the name was
-; already a super-global at that point].
 #Include %A_ScriptDir%\Lib\module-interface.ahk
-
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
 addJournalEntry("Application started: PID " QPVpid ".`nCPU cores identified: " realSystemCores ".")
 If (realSystemCores>6)
@@ -466,8 +460,6 @@ If !BuildGUI()
 
 createGDIPcanvas()
 InitGDIpStuff()
-
-Global multiCoreThumbsInitGood := "n", thumbsPoolState := 0
 If (A_PtrSize=4)
 {
    allowMultiCoreMode := 0
@@ -44161,15 +44153,14 @@ generateThumbsSheet() {
       Return
    }
 
+   Tooltip
    If askOverwriteDestFile(file2save)
    {
-      Tooltip
       Gdip_DeleteGraphics(Gu)
       trGdip_DisposeImage(pBitmap)
       Return
    }
 
-   Tooltip
    BtnCloseWindow()
    If (userThumbsSheetShowLabel=1)
    {
@@ -44197,7 +44188,6 @@ generateThumbsSheet() {
    destroyGDIfileCache()
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
-   doStartLongOpDance()
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    sizesDesired := []
@@ -44206,18 +44196,18 @@ generateThumbsSheet() {
    frame := Round((userThumbsSheetFrame/100) * userThumbsSheetSpacing)
    px := py := frame
    cols := 1
-   whileLoopExec := 1
-   getSelectedFiles(0, 1)
    framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
    imgPath := StrReplace(resultedFilesList[currentFileIndex, 1], "|")
    imgzSelected := InStr(filesFilter, "QPV:PAGES:") ? maxFilesIndex : markedSelectFile 
+   whileLoopExec := 1
+   getSelectedFiles(0, 1)
+   doStartLongOpDance()
    Loop, % maxFilesIndex
    {
       If (framePreviewsMode!=1 && resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
       countTFilez++
-      changeMcursor()
       If (framePreviewsMode!=1)
       {
          imgPath := StrReplace(resultedFilesList[A_Index, 1], "|")
@@ -44226,6 +44216,12 @@ generateThumbsSheet() {
             failedFiles++
             Continue
          }
+      }
+
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
       }
 
       frameLoad := (framePreviewsMode=1) ? A_Index - 1 : 0
@@ -44281,14 +44277,7 @@ generateThumbsSheet() {
          px := frame
          py := py + userThumbsSheetHeight + userThumbsSheetSpacing + labelHeight
       }
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
    }
-
    whileLoopExec := 0
    If pBrush
       Gdip_DeleteBrush(pBrush)
@@ -44302,6 +44291,7 @@ generateThumbsSheet() {
       SoundBeep 300, 100
       CurrentSLD := backCurrentSLD
       trGdip_DisposeImage(pBitmap)
+      SetTimer, ResetImgLoadStatus, -50
       Return
    }
 
@@ -59086,7 +59076,7 @@ CopyMovePanelWindow() {
        If (A_Index>10)
           Break 
 
-       If (StrLen(A_LoopField<4))
+       If (StrLen(A_LoopField)<3)
           Continue 
 
        changeMcursor()
@@ -98907,10 +98897,10 @@ printArrayStr(whichArray, delim:="|", forMode:=0) {
 }
 
 printLargeStrArray(whichArray, maxList, delim) {
+; function unused
   Static trenchSize := 15000
   startZeit := A_TickCount
   filesListu := ""
-  changeMcursor()
   If (maxList<trenchSize)
   {
      Loop, % maxList
