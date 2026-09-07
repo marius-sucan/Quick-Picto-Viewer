@@ -13,7 +13,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , canCancelImageLoad := 0, alterFilesIndex := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
      , lastCloseInvoked := -1, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
      , lastWinStatus := "", lastZeitPanCursor := 1, lastZeitToolTip := 1, statusBarTooltipVisible := 0, doNormalCursor := 1
-     , prevFullIMGload := 1, popupRootSeen, sentMsgProbeSeen := 0, barMenuSession := 0
+     , prevFullIMGload := 1, popupRootSeen, barMenuSession := 0
      , menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0, menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
      , flyoutAnchorMenu := 0, lastLongOperationStart := 1, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
 
@@ -183,9 +183,12 @@ uiInstallSentMsgHook() {
          hCWPhook := DllCall("qpvmain.dll\qpvHookSentMessages", "UPtr", cbSentMsg, "UPtr", &msgList, "Int", 5, "UPtr")
          If hCWPhook
          {
-            sentMsgProbeSeen := 0
-            DllCall("user32\SendMessageW", "UPtr", A_ScriptHwnd, "UInt", 0x85EE, "UPtr", 0, "UPtr", 0, "UPtr")
-            If (sentMsgProbeSeen=1)
+            ; the probe carries its own acknowledgement slot as lParam: the native
+            ; procedure hands uiCallWndProcWork() the sent message's lParam untouched
+            ; and the probe branch writes 1 into it, all inside this SendMessageW
+            VarSetCapacity(probeAck, 4, 0)
+            DllCall("user32\SendMessageW", "UPtr", A_ScriptHwnd, "UInt", 0x85EE, "UPtr", 0, "UPtr", &probeAck, "UPtr")
+            If (NumGet(probeAck, 0, "UInt")=1)
             {
                nativeHook := 1
                OutputDebug, % "QPV: MERGE: native CALLWNDPROC filter installed [qpvmain.dll] hook=" hCWPhook " - probe delivered"
@@ -238,9 +241,10 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    ; which values, against the session state - the menus can only be diagnosed from
    ; here, no OnMessage monitor ever sees these messages [RULE 3]
    OutputDebug, % "QPV: MERGE: sent msg 0x" Format("{:X}", msg) " wP=" wP " lP=" lP " hwnd=" hwnd " loop=" menuLoopActive " bar=" barMenuSession
-   If (msg=0x85EE)     ; the install-time probe of uiInstallSentMsgHook()
+   If (msg=0x85EE)     ; the install-time probe of uiInstallSentMsgHook(): its lParam is the acknowledgement slot
    {
-      sentMsgProbeSeen := 1
+      If lP
+         NumPut(1, lP+0, 0, "UInt")
       Critical, %prevCrit%
       Return 0
    }

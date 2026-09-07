@@ -1,7 +1,7 @@
 // callwndproc-hook.h
 //
 // The native WH_CALLWNDPROC procedure behind the script's menu machinery
-// [lib/module-interface.ahk: uiInstallSentMsgHook / uiSentMenuMsg / uiCallWndProcWork].
+// [lib/module-interface.ahk: uiInstallSentMsgHook / uiCallWndProcWork].
 //
 // Why the procedure lives here and not in the script. Since the interface-thread
 // merge the script drives its native menus from the messages Windows SENDS to
@@ -34,10 +34,12 @@
 #ifndef QPV_CALLWNDPROC_HOOK_H
 #define QPV_CALLWNDPROC_HOOK_H
 
-// The script callback, in OnMessage parameter order [wParam, lParam, msg, hwnd]
-// so the handler reads like every other message handler in the module. Its
-// return value is dropped: Windows ignores what a CALLWNDPROC hook returns.
-typedef UINT_PTR (DLL_CALLCONV *QPV_SENTMSG_CALLBACK)(UINT_PTR wParam, UINT_PTR lParam, UINT_PTR msg, UINT_PTR hwnd);
+// The script callback, uiCallWndProcWork(msg, wParam, lParam, hwnd): the message
+// number first, then the sent message's own wParam, lParam and window, passed
+// through untouched - the install-time probe [0x85EE] relies on that: its lParam
+// is the address of the script's acknowledgement slot, which the callback writes.
+// Its return value is dropped: Windows ignores what a CALLWNDPROC hook returns.
+typedef UINT_PTR (DLL_CALLCONV *QPV_SENTMSG_CALLBACK)(UINT_PTR msg, UINT_PTR wParam, UINT_PTR lParam, UINT_PTR hwnd);
 
 #define QPV_SENTMSG_MAX_FILTER 16
 

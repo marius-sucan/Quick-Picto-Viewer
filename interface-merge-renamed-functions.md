@@ -1,7 +1,9 @@
 # module-interface.ahk — function inventory after the interface-thread merge
 
-Snapshot: branch `interface-thread-merge-phase-c` at `993d5b3` (the working tree has no `.ahk`
-changes), compiled 2026-09-07 from the sources, not from memory. Every function defined at
+Snapshot: branch `interface-thread-merge-phase-c` at `993d5b3` plus the 2026-09-07 working-tree
+edit of `uiInstallSentMsgHook()` / `uiCallWndProcWork()` (the probe acknowledgement moved from the
+`sentMsgProbeSeen` module global to a slot passed as the probe's lParam; the global is gone),
+compiled 2026-09-07 from the sources, not from memory. Every function defined at
 column 0 in `quick-picto-viewer.ahk` and `lib/*.ahk` was parsed. The 58-name set that §1 and §2
 partition is the set of names that `lib/module-interface.ahk` and the other source files both
 define on `master`; that branch is the comparison baseline and nothing else is taken from it.
@@ -123,12 +125,6 @@ The 58 baseline names minus the 8 pairs above: each has exactly one definition t
 - `Win_ShowSysMenu()` in `lib/shell-stuff.ahk` has no caller; the comment in `uiWM_KEYDOWN`
   names it as the library helper for a programmatic system menu. Alt+Space itself goes through
   `SC_KEYMENU`.
-- The header comment of `QPV DLL source code/callwndproc-hook.h` names `uiSentMenuMsg` as the
-  script side of the hook; no such function exists — the callback `uiInstallSentMsgHook()`
-  registers with `qpvHookSentMessages` is `uiCallWndProcWork`. The same header's callback
-  typedef labels its parameters `(wParam, lParam, msg, hwnd)` while the procedure passes the
-  message first, which is the order `uiCallWndProcWork(msg, wP, lP, hwnd)` expects. Both are
-  comment-only.
 - `changeMcursor` / `uiChangeMcursor` are one mechanism with two entry points (§1-A): the gate
   and the throttle live under the main-script name, the cursor work under the module's, and 6
   main-script sites bypass the gate. The other seven pairs are separated by window family or by
@@ -201,9 +197,9 @@ launches, so the machinery rides the messages Windows SENDS to the menu owner, s
 
 | function | lines | what it does |
 |---|---|---|
-| `uiInstallSentMsgHook()` | 59 | installs the `WH_CALLWNDPROC` hook and picks its procedure. With `qpvmain.dll` loaded: registers `uiCallWndProcWork` with `qpvHookSentMessages` for `WM_INITMENUPOPUP`, `WM_MENUSELECT`, `WM_ENTERMENULOOP`, `WM_EXITMENULOOP` and the `0x85EE` probe, sends the probe to the script's own window and keeps the native procedure only when `sentMsgProbeSeen` came back set (otherwise it unhooks and logs). Without the DLL, or when the probe fails: `SetWindowsHookEx` with the script procedure `uiCallWndProc`. Called from `initInterfaceModule()`, where the DLL is not loaded yet, and again from `initQPVmainDLL()`, which swaps the native procedure in |
+| `uiInstallSentMsgHook()` | 62 | installs the `WH_CALLWNDPROC` hook and picks its procedure. With `qpvmain.dll` loaded: registers `uiCallWndProcWork` with `qpvHookSentMessages` for `WM_INITMENUPOPUP`, `WM_MENUSELECT`, `WM_ENTERMENULOOP`, `WM_EXITMENULOOP` and the `0x85EE` probe, sends the probe to the script's own window with the address of a 4-byte local as lParam and keeps the native procedure only when that slot came back set to 1 (otherwise it unhooks and logs). Without the DLL, or when the probe fails: `SetWindowsHookEx` with the script procedure `uiCallWndProc`. Called from `initInterfaceModule()`, where the DLL is not loaded yet, and again from `initQPVmainDLL()`, which swaps the native procedure in |
 | `uiCallWndProc(nCode, wP, lP)` | 13 | the fallback script hook procedure, in place only until the DLL loads: a numeric trampoline that decodes the `CWPSTRUCT` and calls `uiCallWndProcWork` for the four menu messages, then `CallNextHookEx`; every other sent message of the thread passes through untouched |
-| `uiCallWndProcWork(msg, wP, lP, hwnd:=0)` | 68 | the worker for the four menu messages, entered from the native procedure or the trampoline: saves and restores Critical; acknowledges the install probe; while `runningLongOperation` or `imageLoading` is set, `WM_INITMENUPOPUP` and `WM_ENTERMENULOOP` end the menu with `EndMenu`, `WM_MENUSELECT` is ignored and `WM_EXITMENULOOP` still runs its exit; `WM_MENUSELECT` → `uiMenuSelectTrack`; `WM_INITMENUPOPUP` → infers the session type when no loop is active yet (a mapped HMENU is a bar dropdown), records the flyout anchor, `uiMenuJITrebuild(hMenu)`, `uiStartMenuTimer()`; `WM_ENTERMENULOOP` → `uiMenuLoopEnter(wP)`; `WM_EXITMENULOOP` → `uiMenuLoopExit()`; returns 0 |
+| `uiCallWndProcWork(msg, wP, lP, hwnd:=0)` | 69 | the worker for the four menu messages, entered from the native procedure or the trampoline: saves and restores Critical; acknowledges the install probe by writing 1 into the slot its lParam points at; while `runningLongOperation` or `imageLoading` is set, `WM_INITMENUPOPUP` and `WM_ENTERMENULOOP` end the menu with `EndMenu`, `WM_MENUSELECT` is ignored and `WM_EXITMENULOOP` still runs its exit; `WM_MENUSELECT` → `uiMenuSelectTrack`; `WM_INITMENUPOPUP` → infers the session type when no loop is active yet (a mapped HMENU is a bar dropdown), records the flyout anchor, `uiMenuJITrebuild(hMenu)`, `uiStartMenuTimer()`; `WM_ENTERMENULOOP` → `uiMenuLoopEnter(wP)`; `WM_EXITMENULOOP` → `uiMenuLoopExit()`; returns 0 |
 | `uiMenuJITrebuild(hMenu)` | 31 | rebuilds a bar dropdown's content in place at `WM_INITMENUPOPUP` through `menuJITmap` (HMENU → `InvokeMenuBar*` builder, `justBuild=1`); bar sessions only, busy-guarded; closes the quick search and the tooltip first |
 | `uiMenuSelectTrack(mwParam, hMenuSel)` | 39 | tracks the highlighted item for the menu reader: reads the item text with `GetMenuStringW` (by position for `MF_POPUP`, by command id otherwise), appends the submenu / unavailable / checked state and the accelerator, and keeps it in `uiMenuReaderLastMsg` for the on-demand announcement; also triggers the flyout placement while the flyout is not visible |
 | `uiMenuLoopEnter(fromPopup:=0)` | 15 | menu-session start: `menuLoopActive`, the session type from the `WM_ENTERMENULOOP` wParam (0 = bar tracking, 1 = popup), the reader and flyout state reset, and the `WH_MOUSE_LL` hook (`uiMenuMouseLL`) installed |
