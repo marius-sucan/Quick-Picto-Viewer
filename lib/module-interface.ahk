@@ -1,50 +1,27 @@
-﻿; module-interface.ahk - the QPV user-interface module.
-; Until 2026-08 this file ran as a separate AutoHotkey_H interpreter thread
-; [ahkthread] so the UI stayed responsive while the main thread worked; it is now
-; #Include'd at the BOTTOM of quick-picto-viewer.ahk and everything runs on one
-; interpreter. initInterfaceModule() replaces the old thread auto-exec section and
-; is called once from the main script startup, before BuildGUI().
-; Merge plan and phase log: interface-thread-merge-plan.md
-
-; State OWNED by this module - these names existed only in this file's interpreter
-; before the merge [the 84 names both sides mirrored were deleted from here; the
-; main script's Global blocks are authoritative for those]. This declaration stays
-; at the TOP of the file, before any function, so the loader registers the names
-; as super-globals regardless of include position. Initial values are seeded in
-; initInterfaceModule() because control never flows through an #Include'd file.
+﻿; module-interface.ahk - the QPV user-interface module: main window, viewport
+; windows, menu bar, input handlers, taskbar integration. Merged from the former
+; ahk_h interface thread in 2026-08 [interface-thread-merge-plan.md].
+;
+; Module-owned super-globals, declared and seeded here. quick-picto-viewer.ahk
+; #Include's this file with the other libs, inside its auto-exec section, so the
+; initializers run at start-up; initInterfaceModule() is then called once, before BuildGUI().
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
-     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray, menuTotalIndex, menusList
-     , menusflyOutVisible, wasMenuFlierCreated, prevMenuBarItem, lastMenuBarUpdate, lastContextMenuZeit
-     , allowMenuReader, taskBarUI, groppedFiles, LbtnDwn, penPressureRaw, hasPenPressureAPI
-     , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
-     , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
-     , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
-     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, popupRootSeen, sentMsgProbeSeen, barMenuSession
-     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence
-     , flyoutAnchorMenu, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
+     , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0, menusList := ""
+     , menusflyOutVisible := 0, wasMenuFlierCreated := 0, prevMenuBarItem := 1, lastMenuBarUpdate := 1, lastContextMenuZeit := 1
+     , allowMenuReader := "yes", taskBarUI, groppedFiles := [], LbtnDwn := 0, penPressureRaw := 0, hasPenPressureAPI
+     , canCancelImageLoad := 0, alterFilesIndex := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
+     , lastCloseInvoked := -1, lastALclickX := 0, lastALclickY := 0, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
+     , lastWinStatus := "", lastZeitPanCursor := 1, lastZeitToolTip := 1, statusBarTooltipVisible := 0, doNormalCursor := 1
+     , prevFullIMGload := 1, winGDIcreated := 0, ThumbsWinGDIcreated := 0, popupRootSeen, sentMsgProbeSeen := 0, barMenuSession := 0
+     , menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0, menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
+     , flyoutAnchorMenu := 0, lastLongOperationStart := 1, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
 
 initInterfaceModule() {
-; Replaces this module's old thread auto-exec: seeds the module state, detects the
-; pen api and registers the input handlers. Message numbers that BOTH sides used
-; to monitor go through the dispatch* composers defined below; the module-only
-; numbers register their handlers directly. setPriorityThread(2) from the thread
-; era is deliberately gone - there is only one thread now - and the tray icon is
-; the main script's job [quick-picto-viewer.ahk sets it during its startup].
-
-   ; module state seeds [the former Global-block initializers]
-   LbtnDwn := 0, penPressureRaw := 0, canCancelImageLoad := 0, alterFilesIndex := 0
-   mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0, allowMenuReader := 0
-   lastCloseInvoked := -1, lastALclickX := 0, lastALclickY := 0, statusBarTooltipVisible := 0
-   lastContextMenuZeit := 1, lastDoubleClickZeit := 1, lastMenuBarUpdate := 1,
-   lastMouseLeave := 1, lastSwipeZeitGesture := 1, lastZeitPanCursor := 1, lastZeitToolTip := 1, lastLongOperationStart := 1
-   doNormalCursor := 1, prevFullIMGload := 1, prevMenuBarItem := 1
-   menusflyOutVisible := 0, wasMenuFlierCreated := 0, menuTotalIndex := 0
-   winGDIcreated := 0, ThumbsWinGDIcreated := 0
-   lastWinStatus := "", menusList := "", groppedFiles := [], menuArray := []
-   menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0
-   menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000, barMenuSession := 0, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
-   flyoutAnchorMenu := 0, allowMenuReader := "yes", sentMsgProbeSeen := 0
+; Called once from the main script's start-up, before BuildGUI(): detects the pen
+; api and registers the input handlers. Message numbers that BOTH sides used to
+; monitor go through the dispatch* composers defined below; the module-only
+; numbers register their handlers directly.
 
    ; input handlers. Module-only message numbers first:
    OnMessage(0x2a3, "WM_MOUSELEAVE")

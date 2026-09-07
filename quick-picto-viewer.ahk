@@ -87,6 +87,7 @@ SetWorkingDir, %A_ScriptDir%
 #Include %A_ScriptDir%\Lib\file-get-prop-lib.ahk  ; used to get file properties on Alt+Enter [ File Information panel ]
 #Include %A_ScriptDir%\Lib\Class_screenQPVimage.ahk
 #Include %A_ScriptDir%\Lib\Class_taskbarInterface.ahk ; by Helgef
+#Include %A_ScriptDir%\Lib\module-interface.ahk  ; the user-interface module; its Global line seeds the module state here, in the auto-exec section
 ; #Include %A_ScriptDir%\Lib\json.ahk
 
 SetWinDelay, 1
@@ -105614,11 +105615,3 @@ testKeysStuff() {
 
    ToolTip, % ppA "`n" ppB , , , 2
 }
-
-; ______________________________________________________________________________
-; The user-interface module: main window, viewport windows, menu bar, input
-; handlers, taskbar integration. Merged from the former ahk-h interface thread
-; [2026-08, see interface-thread-merge-plan.md]. It sits at the BOTTOM of the
-; script because it contains labels and context-gated hotkeys; control never
-; flows into it - everything is invoked by name.
-#Include %A_ScriptDir%\Lib\module-interface.ahk
