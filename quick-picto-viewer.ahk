@@ -27811,6 +27811,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        Return
     }
 
+    initQPVmainDLL()
     If (isImgLiveEditor=1)
     {
        If throwErrorNoImageLoaded()
@@ -30418,10 +30419,10 @@ PanelFoldersTree() {
        Return
 
     stopSlideshow()
+    stopGIFsPlayback()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
 
-    stopGIFsPlayback()
     mouseTurnOFFtooltip()
     setLVrowsCount()
     thisSize := 300 + PrefsLargeFonts + uiUseDarkMode
