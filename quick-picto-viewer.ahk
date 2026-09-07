@@ -91,11 +91,8 @@ SetWorkingDir, %A_ScriptDir%
 
 SetWinDelay, 1
 SetBatchLines, -1
-; every SQLite connection the class opens arms this progress callback [defined next to
-; SaveDBfilesList]: while a long operation runs, Escape interrupts the executing statement
-SQLiteDB.AbortCallback := "sqliteAbortProgressCB"
 
-Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", unCompiledExePath := "", pBrushZ := ""
+Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", pPen6 := "", pBrushZ := ""
    , glPG := "", glOBM := "", glHbitmap := "", glHDC := "", pPen1 := "", pPen1d, pPen2 := "", pPen3 := "", pPen8 := ""
    , pBrushWinBGR := "", pBrushA := "", pBrushB := "", pBrushC := "", pBrushD := ""
    , pBrushE := "", pBrushHatchLow, hGuiTip := 1, hSetWinGui := 1, undoSelLevelsArray := []
@@ -129,29 +126,28 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , dialogSaveIndexes := {1:"hdp", 2:"jng", 3:"jpg", 4:"jp2", 5:"j2k", 6:"jxr", 7:"gif", 8:"png", 9:"ppm", 10:"tif", 11:"tga", 12:"wdp", 13:"webp", 14:"bmp", 15:"xpm", 16:"ico"}
    , userPossibleWriteFMTs := ".BMP|.GIF|.HDP|.J2K|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM"
    , saveimgformatslist := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jng", 6:"jp2", 7:"jpg", 8:"jxr", 9:"png", 10:"ppm", 11:"tga", 12:"tif", 13:"wdp", 14:"webp", 15:"xpm"}
-   , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0, brushAclrAlpha := "ffFFff"
-   , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", initialCustomShapeCoords := ""
-   , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := "", brushBclrAlpha := "010101"
-   , mustGenerateStaticFolders := 1, lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0
-   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", prevFilesSortMode
+   , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0
+   , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC"
+   , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := ""
+   , lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0, prevFilesSortMode, brushAclrAlpha := "ffFFff"
+   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", cachedAllSessionsSeen := new hashtable()
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
-   , othumbsW := 300, othumbsH := 300, VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := ""
-   , CountFilesFolderzList := 0, imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, colorPickerMustEnd := 0
-   , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := [], allowSQLiteAbort := 0
-   , prevFileSavePath := "", imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1
+   , VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := "", lastSelPrinterName := ""
+   , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, colorPickerMustEnd := 0
+   , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := [], prevFileSavePath := ""
+   , imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1, brushBclrAlpha := "010101"
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0, hasHamDistCached := 0
    , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
    , selDotX := "", selDotY := "", selDotAx := "", selDotAy := "", selDotBx := "", selDotBy := "", selDotCx := "", selDotCy := "", selDotDx := "", selDotDy := ""
    , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, pBrushF := "", lastWasLowQuality := 0
-   , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0, cachedAllSessionsSeen := new hashtable()
+   , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", hGuiBtn
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := ""
    , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
-   , currIMGdetails := [], AbackupIMGdetails := [], BbackupIMGdetails := [], mainLoadedIMGdetails := [], lastSelPrinterName := ""
    , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
    , drawModeAzeit := 1, drawModeCzeit := 1, prevColorAdjustZeit := 1, liveDrawingBrushTool := 0
@@ -162,9 +158,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
    , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], viewportIDstampBMP := 0, qpvMainDll, sqlDBrowID := 1
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1
-   , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := ""
+   , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := "", hamLowLim := 0, hamUppLim := 0
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
-   , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := ""
+   , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := "", highDesiredPixFmt := "0xE200B"
    , runningLongOperation := 0, hasReachedMaxUndoLevels := 0, GIFframesPlayied := 0, allImagesWereSeen := 0
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 0, hGDIinfosWin := ""
@@ -175,42 +171,42 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, userDefinedSelCoords := 0, thisSearchString := ""
    , SelectionCoordsType := 1, alphaMaskRefBMP := 1, infoBoxGdiCached := "", watchFolderDetails := "", isNowFakeWinOpen := 0
    , FilteruMinRange, FilteruMaxRange, userFilterSizeProperty := 1, qpvCanvasHasInit := 0, coreDesiredPixFmt := "0xE200B"
-   , FilteruDateMinRange, FilteruDateMaxRange, InternalFilterString, userFilterProperty := 1, userFindDupePresets := 1
+   , FilteruDateMinRange, FilteruDateMaxRange, userFilterProperty := 1, userFindDupePresets := 1
    , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := 0, userAddedFavesCount := 0, bckpCurrentFileIndex := 0
    , maxFavesEntries := 987654, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0, lastZeitFileSelect := 1
-   , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0, highDesiredPixFmt := "0xE200B"
-   , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394, delayiedHUDmsg := "", hamLowLim := 0, hamUppLim := 0
-   , delayiedHUDperc := 0, delayedfunc2exec := 0, lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
-   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := []
-   , oldCustomShapePoints := [], oldVectorShapeSymmetry := [], TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
+   , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
+   , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394
+   , lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
+   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], VPstampBMPx := 0, VPstampBMPy := 0
+   , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
-   , gdiAmbientalTexBrush := "", GDIbrushWinBGR := "", GDIbrushHatch := "", vpImgPanningNow := 0, viewportDynamicOBJcoords := []
+   , gdiAmbientalTexBrush := "", GDIbrushWinBGR := "", vpImgPanningNow := 0, viewportDynamicOBJcoords := []
    , mustCaptureCloneBrush := 0, hCropCornersPic2, userAlphaMaskBmpPainted := "", lastPaintEventID := 1
    , prevImgEditZeit := 1, hudBTNfuncu, hudBTNtypeFuncu, hudBTNheightFuncu, hudBTNwidthFuncu, TouchToolbarGUIcreated := 0
    , tlbrIconzList := [], ToolBarBtnWidth := 45, UserToolbarY := 60, UserToolbarX := 200, prevFolderSortMode := 0
-   , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := []
+   , ToolbarWinW := 0, ToolbarWinH := 0, isToolbarKBDnav := 0, lastZeitIMGsaved := [], navKeysCounter := 0
    , CustomShapeSymmetry := 0, CustomShapeLockedSymmetry := 0, viewportQPVimage := new screenQPVimage
-   , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0, userSeenSessionImagesIndex := 0, FloodFillSelectionAdj := 0
+   , vpSymmetryPointXdp := 0, vpSymmetryPointYdp := 0, FloodFillSelectionAdj := 0
    , createdQuickMenuSearchWin := 0, lastUserRclickVPx := 0, lastUserRclickVPy := 0, vpFreeformShapeOffset := []
    , customShapeHasSelectedPoints := 0, currentVectorUndoLevel := 1, undoVectorShapesLevelsArray := []
-   , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := [], navKeysCounter := 0
+   , hGradientAlphaMSKpreview, hGradientFillpreview, userMonitorImgPos, uiSlidersArray := []
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
    , thisBMPdummy := 0, dummyGu := 9, whileLoopExec := 0, WICmoduleHasInit := 0, dupesDCTcoeffsInit := 0
    , dupesPixInitGood := 0, dupesPixState := 0, hTVlistFolders := "", SearchedStringz := ""
-   , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := "", lastTippyWin := 0
+   , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
    , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
-   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0
+   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, currIMGdetails := [], mainLoadedIMGdetails := []
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
    , iduStaticFoldersListCache := 0, lastFilterEditSearch := "", additionalLVrows := 1, uLVr := 12, hSliderWidget
    , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := [], lastSymmetryCoords := []
-   , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, wasVPfxBefore := 0
+   , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, prevPasteInPlaceVPcoords := []
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0, hCollapseWidget := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, OnExtractConflictOverwrite := 4
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, lastMenuZeit := 1, viewportPDFbookMarks := []
@@ -220,7 +216,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , userImgChannelRlvl, userImgChannelGlvl, userImgChannelBlvl, userImgChannelAlvl, combosDarkModus := ""
    , sillySeparator :=  "▪", menuCustomNames := new hashtable(), clrGradientCoffX := 0, clrGradientCoffY := 0
    , userBlendModesList := "Darken*|Multiply*|Linear burn*|Color burn|Lighten*|Screen*|Linear dodge* [Add]|Hard light|Soft light|Overlay|Hard mix*|Linear light|Color dodge|Vivid light|Average*|Divide|Exclusion*|Difference*|Substract|Luminosity|Ghosting|Inverted difference*|Clip to alpha*|Replace*|Behind*"
-   , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := [], prevPasteInPlaceVPcoords := []
+   , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := []
    , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := (A_IsCompiled) ? "" : "(dev) "
@@ -464,7 +460,7 @@ If !BuildGUI()
 createGDIPcanvas()
 InitGDIpStuff()
 
-Global multiCoreThumbsInitGood := "n", thumbsPoolState := 0, thumbsPoolWantBMP := 1
+Global multiCoreThumbsInitGood := "n", thumbsPoolState := 0
 If (A_PtrSize=4)
 {
    allowMultiCoreMode := 0
@@ -2417,7 +2413,7 @@ initQPVmainDLL(modus:=0) {
 }
 
 initializeAppWithGivenArguments() {
-   thisCounter := folderOpened := sldOpened := doWelcomeNow := 0
+   delayedfunc2exec := thisCounter := folderOpened := sldOpened := doWelcomeNow := 0
    disCount := A_Args.Count()
    Loop, % disCount
    {
@@ -2471,12 +2467,15 @@ initializeAppWithGivenArguments() {
    Else Return 1
 
    If delayedfunc2exec
-      SetTimer, runDelayedfunc2exec, -950
+   {
+      fn := Func("runDelayedStartFunction").Bind(delayedfunc2exec)
+      SetTimer, % fn, -1000
+   }
 
    Return doWelcomeNow
 }
 
-runDelayedfunc2exec() {
+runDelayedStartFunction(delayedfunc2exec) {
    If IsFunc(delayedfunc2exec)
       %delayedfunc2exec%()
    Else If delayedfunc2exec
@@ -2516,7 +2515,6 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      If (maxFilesIndex>0 && r!=-1)
      {
         SLDcacheFilesList := 1
-        mustGenerateStaticFolders := 0
         GenerateRandyList()
         SetTimer, ResetImgLoadStatus, -50
         CurrentSLD := fileNamu
@@ -2551,10 +2549,6 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      If (tstSLDcacheFilesList=1 || tstSLDcacheFilesList=0)
         SLDcacheFilesList := tstSLDcacheFilesList
   }
-
-  mustGenerateStaticFolders := (InStr(firstLine, "[General]") && StrLen(testStaticFolderz)>8) ? 0 : 1
-  If (tstSLDcacheFilesList=0)
-     mustGenerateStaticFolders := 0
 
   If (SLDcacheFilesList=1 && InStr(firstLine, "[General]")) || !InStr(firstLine, "[General]")
      res := sldGenerateFilesList(fileNamu, 0, mustRemQuotes)
@@ -2656,6 +2650,7 @@ resetMainWin2Welcome() {
      gdiBitmapIDcall := viewportIDstampBMP := AprevImgCall := BprevImgCall := ""
      UserMemBMP := trGdip_DisposeImage(UserMemBMP, 1)
      killQPVscreenImgSection()
+     startDrawingShape("kill")
      getImgSelectedAreaEditMode("kill", 1, 1, 1, 1, 1, 1)
      corePasteInPlaceActNow("kill")
      livePreviewInsertTextinArea("kill")
@@ -3263,7 +3258,6 @@ copyMoveStructuredFolders(srcDir, finalDest) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      changeMcursor()
       thisFileIndex := A_Index
       file2rem := resultedFilesList[thisFileIndex, 1]
       countTFilez++
@@ -3444,6 +3438,7 @@ CalculateSelectedFilesSizes() {
   minCdate := minMdate := minSizeu := 99999999999999
   backCurrentSLD := CurrentSLD
   CurrentSLD := ""
+  whileLoopExec := 1
   Loop, % maxFilesIndex
   {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -3483,6 +3478,7 @@ CalculateSelectedFilesSizes() {
      minCdate := min(minCdate, fileInfos.ctime)
      maxCdate := max(maxCdate, fileInfos.ctime)
   }
+  whileLoopExec := 0
   ; ToolTip, % minCdate , , , 2
   totalSize := fileSizeFriendly(totalSize)
   minSizeu := fileSizeFriendly(minSizeu)
@@ -3646,6 +3642,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
   countTFilez := 0
   If (markedSelectFile>1)
   {
+     whileLoopExec := 1
      itemsList := new hashtable()
      Loop, % maxFilesIndex
      {
@@ -3669,7 +3666,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
         countTFilez++
         newFilesList[countTFilez] := imgPath
      }
-
+     whileLoopExec := 0
      If countTFilez
      {
         modus := (onWhat="folderu") ? 1 : 0
@@ -4636,7 +4633,6 @@ QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSav
     If (multiCoreThumbsInitGood!=1 || !thumbsPoolState)
        Return 0
 
-    thumbsPoolWantBMP := wantBitmap
     paramz := thumbSize "|" timePerImg "|" enableThumbsCaching "|" userHQraw "|" allowToneMappingImg
     paramz .= "|" allowWICloader "|" allowFIMloader "|" thisImgQuality "|" cmrRAWtoneMapAlgo
     paramz .= "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
@@ -4679,7 +4675,7 @@ QPV_ThumbsPoolPending() {
    Return queued + busy + ready
 }
 
-QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
+QPV_ThumbsPoolDrain(wantBitmap, ByRef thumbsArray, ByRef imgsHavePainted) {
 ; collects the finished thumbnails; the GDI+ bitmaps become ours, there is nothing to clone
     Static maxItems := 32, resultSize := 72, resultsBuffer
     If !VarSetCapacity(resultsBuffer)
@@ -4711,7 +4707,7 @@ QPV_ThumbsPoolDrain(ByRef thumbsArray, ByRef imgsHavePainted) {
            recordGdipBitmaps(thisPBitmap, "QPV_ShowThumbnails<-ThumbsPool")
            thumbsArray[thisIndex, 1] := "fim"
            thumbsArray[thisIndex, 2] := thisPBitmap
-        } Else If (thisStatus=0 && thumbsPoolWantBMP!=1)
+        } Else If (thisStatus=0 && wantBitmap!=1)
         {
            ; generate all thumbnails mode; only the cache file was wanted
            thumbsArray[thisIndex, 1] := "d"
@@ -4970,7 +4966,7 @@ defineThumbsAratio() {
 
 recalculateThumbsSizes() {
    Static theString := "WAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAWAW"
-   , prevDimensions, columnsPossible, txtResH
+        , prevDimensions, columnsPossible, txtResH, othumbsW := 300, othumbsH := 300
 
    If (thumbsAratio=1)
    {
@@ -11496,8 +11492,6 @@ coreResetIMGview(dummy:=0) {
      thumbsZoomLevel := 1
      thumbsColumns := 7
      recalculateThumbsSizes()
-     ; thumbsH := othumbsH + 1
-     ; thumbsW := othumbsW + 1
      ForceRefreshNowThumbsList()
   }
 
@@ -15485,10 +15479,8 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        pEffect := Gdip_CreateEffect(1, alphaMaskClrAintensity, 0)
        alphaPath := Gdip_CreatePath()
        fAgScal := (alphaMaskGradientScale + 2)/100
-       tempArray := StrSplit(initialCustomShapeCoords, "|")
-       calcIMGdimensions(tempArray[3], tempArray[4], rImgW, rImgH, rW, rH)
-       tRimgW := (tempArray[3]>1) ? Round(rW*fAgScal) : Round(rImgW*fAgScal)
-       tRimgH := (tempArray[4]>1) ? Round(rH*fAgScal) : Round(rImgH*fAgScal)
+       tRimgW := Round(rImgW*fAgScal)
+       tRimgH := Round(rImgH*fAgScal)
        offX := rImgW - tRimgW + Round((rImgW*alphaMaskOffsetX)*(fAgScal+1))
        offY := rImgH - tRimgH + Round((rImgH*alphaMaskOffsetY)*(fAgScal+1))
        PointsList := convertCustomShape2givenArea(customShapePoints, 1 + offX//2, 1 + offY//2, tRimgW - 2, tRimgH - 2, 1)
@@ -17638,7 +17630,6 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        trGdip_DisposeImage(newBitmap)
     }
 
-    wasVPfxBefore := 0
     imgFxMode := o_imgFxMode
     dummyTimerDelayiedImageDisplay(50)
     SetTimer, ResetImgLoadStatus, -150
@@ -25499,13 +25490,14 @@ selectFilesRange(pA, pB, sel) {
 
 selectSeenFilesSession() {
     wasSelect := (markedSelectFile>2) ? 1 : 0
+    whileLoopExec := 1
     Loop, % maxFilesIndex
     {
         imgPath := resultedFilesList[A_Index, 1]
         If userSeenSessionImagesArray[Format("{:L}", imgPath)]
            resultedFilesList[A_Index, 2] := 1
     }
-
+    whileLoopExec := 0
     lastZeitFileSelect := A_TickCount
     getSelectedFiles(0, 1)
     dummyTimerReloadThisPicture(50)
@@ -32768,7 +32760,7 @@ InitialFilterSettingsPanel(modus) {
 }
 
 PanelEnableFilesFilter() {
-    Global FilterTypeu := 0
+    Global FilterTypeu := 0, InternalFilterString := ""
     If (StrLen(mustOpenStartFolder)>1)
        currentFileIndex := doOpenStartFolder()
 
@@ -34754,9 +34746,7 @@ SaveDBfilesList(enforceFile:=0) {
    {
       showTOOLtip("Saving SQL files list database, please wait")
       saveSlideSettingsInDB()
-      allowSQLiteAbort := 1
       activeSQLdb.Exec("VACUUM main;")
-      allowSQLiteAbort := 0
       getMaxRowIDsqlDB()
       showTOOLtip("Slideshow database saved")
       SoundBeep, 900, 100
@@ -34777,9 +34767,7 @@ SaveDBfilesList(enforceFile:=0) {
       }
 
       saveSlideSettingsInDB()
-      allowSQLiteAbort := 1
       activeSQLdb.Exec("VACUUM main;")
-      allowSQLiteAbort := 0
       CurrentSLD := file2save
       getMaxRowIDsqlDB()
       showTOOLtip("Slideshow database saved")
@@ -34961,7 +34949,6 @@ SaveFilesList(enforceFile:=0) {
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       CurrentSLD := file2save
       DynamicFoldersList := "|hexists|"
-      mustGenerateStaticFolders := 0
       etaTime := "Elapsed time to save plain-text files list: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
       addJournalEntry(etaTime)
       SetTimer, ResetImgLoadStatus, -50
@@ -35200,7 +35187,6 @@ BTNcountFilesDiskDynaFolder() {
 GenerateStaticFoldersListNow() {
    foldersListArray := new hashtable()
    prevMSGdisplay := A_TickCount
-   mustGenerateStaticFolders := 0
    startOperation := A_TickCount
    getSelectedFiles(0, 1)
    foldersSelListArray := new hashtable()
@@ -35280,25 +35266,6 @@ determineTerminateOperation() {
   If theEnd
      lastLongOperationAbort := A_TickCount
   Return theEnd
-}
-
-sqliteAbortProgressCB(unusedArg) {
-; runs on this same thread every ~9000 sqlite opcodes DURING sqlite3_step; keep it
-; to flag reads and one async key probe - no Gui, no messages, no pumping. It is a
-; fast-mode ["F"] RegisterCallback: it executes INSIDE the querying thread and the
-; interpreter restores nothing afterwards, so Critical is saved and restored here -
-; a bare Critical left every thread that ran a query uninterruptible [same trap as
-; the module's hook callbacks, the 2026-09-02 MsgBox2 stall]
-   prevCrit := A_IsCritical
-   Critical
-   r := 0
-   If ((runningLongOperation=1 || allowSQLiteAbort=1) && (mustAbandonCurrentOperations=1))
-   {
-      OutputDebug, % "QPV: MERGE: sqlite statement aborted [progress handler]"
-      r := 1
-   }
-   Critical, %prevCrit%
-   Return r
 }
 
 doStartLongOpDance(affectTlbr:=0) {
@@ -47423,10 +47390,8 @@ importAlphaMaskFromClipboard() {
 
 ReadSettingsPasteInPlace(act:=0) {
     If (act=0)
-    {
-       RegAction(0, "initialCustomShapeCoords",, 5)
        loadSimplifiedPreviousVectorShape()
-    } Else If (act=1)
+    Else If (act=1)
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
     
     RegAction(act, "FillAreaRectRoundness",, 2, 4, 98)
@@ -47982,10 +47947,8 @@ WriteSettingsFillBehindAreaPanel() {
 
 ReadSettingsFillBehindAreaPanel(act:=0) {
     If (act=0)
-    {
-       RegAction(0, "initialCustomShapeCoords",, 5)
        loadSimplifiedPreviousVectorShape()
-    } Else If (act=1)
+    Else If (act=1)
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
 
     RegAction(act, "FillBehindOpacity",, 2, 1, 512)
@@ -47998,10 +47961,8 @@ ReadSettingsFillBehindAreaPanel(act:=0) {
 
 ReadSettingsFillAreaPanel(act:=0) {
     If (act=0)
-    {
-       RegAction(0, "initialCustomShapeCoords",, 5)
        loadSimplifiedPreviousVectorShape()
-    } Else If (act=1)
+    Else If (act=1)
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
 
     RegAction(act, "FillAreaColor",, 3)
@@ -48043,10 +48004,8 @@ ReadSettingsFillAreaPanel(act:=0) {
 
 ReadSettingsDrawShapeAreaPanel(act:=0) {
     If (act=0)
-    {
-       RegAction(0, "initialCustomShapeCoords",, 5)
        loadSimplifiedPreviousVectorShape()
-    } Else If (act=1)
+    Else If (act=1)
        RegAction(1, "FillAreaCurveTension",, 2, 1, 5)
 
     RegAction(act, "DrawLineAreaColor",, 3)
@@ -48094,10 +48053,7 @@ ReadSettingsVPgrid(act:=0) {
 
 ReadSettingsAlphaMaskPanel(act:=0) {
     If (customShapePoints.Count()<3 && act=0)
-    {
-       RegAction(0, "initialCustomShapeCoords",, 5)
        loadSimplifiedPreviousVectorShape()
-    }
 
     RegAction(act, "BrushToolDoubleSize",, 1)
     RegAction(act, "BrushToolOverDraw",, 1)
@@ -48167,8 +48123,14 @@ Return
 
 mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
     ; Critical, On
-    Static prevMsg, lastInvoked := 1
+    Static prevMsg, lastInvoked := 1, lastTippyWin
     Global TippyMsg
+    If (msg="win" && largus="last")
+    {
+       rr := lastTippyWin
+       lastTippyWin := ""
+       Return rr
+    }
 
     ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
     thisHwnd := PVhwnd
@@ -48295,10 +48257,9 @@ Return
 destroyMouseGuiTooltipu() {
    mouseTurnOFFtooltip()
    Sleep, 1
-   WinActivate, ahk_id %lastTippyWin%
-   ; MouseGetPos, ,, OutputVarWin
-   ; If (OutputVarWin=hQPVtoolbar && ShowAdvToolbar=1)
-   ;    MouseClick, Left
+   hh := mouseCreateOSDinfoLine("win", "last")
+   If (hh!="")
+      WinActivate, ahk_id %lastTippyWin%
 }
 
 LEDguiGuiClose:
@@ -48592,9 +48553,14 @@ stopDrawingShape(dummy:="") {
        EllipseSelectMode := vpFreeformShapeOffset[7]
        If vpFreeformShapeOffset[8]
           FillAreaCurveTension := vpFreeformShapeOffset[8]
+
        closedLineCustomShape := vpFreeformShapeOffset[9]
        bezierSplineCustomShape := vpFreeformShapeOffset[10]
-       customShapePoints := oldCustomShapePoints.Clone()
+       backupShapePoints := startDrawingShape("get-prev-shape")
+       If backupShapePoints.Count()
+          customShapePoints := backupShapePoints.Clone()
+
+       oldVectorShapeSymmetry := startDrawingShape("get-prev-sym-props")
        If oldVectorShapeSymmetry.Count()
        {
           CustomShapeSymmetry := oldVectorShapeSymmetry[1]
@@ -48981,9 +48947,19 @@ resumeCustomShapeSelection(thisZL) {
 }
 
 startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
+     Static backupShapePoints := [], backupSymmetryProperties := []
+     If (modus="kill")
+     {
+        backupShapePoints := ""
+        backupSymmetryProperties := ""
+        Return
+     } Else If (modus="get-prev-sym-props")
+        Return backupSymmetryProperties
+     Else If (modus="get-prev-shape")
+        Return backupShapePoints
+
      ; record symmetry mode infos to later restore if needed in stopDrawingShape()
-     oldVectorShapeSymmetry := [CustomShapeSymmetry, CustomShapeLockedSymmetry, vpSymmetryPointXdp, vpSymmetryPointYdp
-                              , Round(prevVectorShapeSymmetryMode[1, 1]), Round(prevVectorShapeSymmetryMode[1, 2])]
+     backupSymmetryProperties := [CustomShapeSymmetry, CustomShapeLockedSymmetry, vpSymmetryPointXdp, vpSymmetryPointYdp, Round(prevVectorShapeSymmetryMode[1, 1]), Round(prevVectorShapeSymmetryMode[1, 2])]
      If !CustomShapeSymmetry
         CustomShapeLockedSymmetry := 0
 
@@ -49036,7 +49012,7 @@ startDrawingShape(modus, dummy:=0, forcePanel:=0, wasOpen:=0, brr:=0) {
      drawingShapeNow := 1
      handleOpenCloseBezier("kill")
      If (customShapePoints.Count()>2)
-        oldCustomShapePoints := customShapePoints.Clone()
+        backupShapePoints := customShapePoints.Clone()
 
      CustomShapeSymmetry := CustomShapeLockedSymmetry := 0
      If (dummy="resume")
@@ -55921,7 +55897,6 @@ BtnAdjustColorsImgSelectedArea() {
    GuiControlGet, closeEditPanelOnApply, SettingsGUIA:, closeEditPanelOnApply
    ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
    prevImgEditZeit := A_TickCount
-   wasVPfxBefore := 0
    of := 0
    If (closeEditPanelOnApply=1)
       BtnCloseWindow()
@@ -56373,7 +56348,7 @@ BtnViewedImages2List() {
    AnyWindowOpen := 0
    CurrentSLD := "\QPV\viewed-images-history|current-session.SLD"
    For Key, Value in userSeenSessionImagesArray
-       resultedFilesList[Value] := [Key]
+       resultedFilesList[A_Index] := [Key]
 
    SLDtypeLoaded := 2
    maxFilesIndex := resultedFilesList.Count()
@@ -63180,7 +63155,6 @@ coreOpenFolder(thisFolder, doOptionals:=1, openFirst:=0, doReset:=0, safeMode:=0
       }
 
       GenerateRandyList()
-      mustGenerateStaticFolders := 1
       DynamicFoldersList := thisFolder "`n"
       CurrentSLD := thisFolder
       watchFolderDetails := ""
@@ -64529,8 +64503,6 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       z := wrapperAddNewFolderToList(isNotRecursive SelectedDir, !modus)
       If (z!="null" && RegExMatch(CurrentSLD, sldsPattern))
          updateCachedStaticFolders(SelectedDir, modus)
-      Else
-         mustGenerateStaticFolders := 1
 
       listu := DynamicFoldersList "`n" isNotRecursive SelectedDir "`n"
       Sort, listu, UD`n
@@ -64803,10 +64775,8 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       If (stuffAdded=1)
       {
          newStaticFoldersListCache := []
-         mustGenerateStaticFolders := 1
          GenerateRandyList()
       }
-
       whileLoopExec := 0
       If !CurrentSLD
       {
@@ -64893,7 +64863,6 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       mustOpenStartFolder := ""
       RecordImagesOpenedManager(Trimmer(imgsListu))
       coreAddNewFiles(imgsListu, countFiles, prevOpenFolderPath)
-      mustGenerateStaticFolders := 1
       ForceRefreshNowThumbsList()
       GenerateRandyList()
       SetTimer, ResetImgLoadStatus, -50
@@ -64913,21 +64882,12 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-dummyPrevShowToolTip() {
-   showTOOLtip("nully")
-}
-
-dummyDelayShowToolTip() {
-   showTOOLtip(delayiedHUDmsg, 0, 0, delayiedHUDperc)
-}
-
 showDelayedTooltip(msg, perc:=0, delayu:=450, expire:=0) {
     if InStr(msg, "error")
        addJournalEntry(msg)
 
-    delayiedHUDmsg := msg
-    delayiedHUDperc := perc
-    SetTimer, dummyDelayShowToolTip, % -delayu
+    fn := Func("showTOOLtip").Bind(msg, 0, 0, perc)
+    SetTimer, % fn, % -delayu
     expire := (expire<100) ? msgDisplayTime + delayu*2 : expire + delayu
     SetTimer, RemoveTooltip, % -expire
 }
@@ -65210,6 +65170,7 @@ restartAppu() {
       Return
 
    ; writeMainSettings()
+   unCompiledExePath := Chr(34) (A_AhkPath ? A_AhkPath : fullPath2exe) Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
    If (A_IsCompiled || isWinStore())
       Try Run, "%fullPath2exe%"
    Else
@@ -72362,7 +72323,6 @@ drawWelcomeImg() {
     Random, moduz, 1, 9
     Random, iterations, 10, 30
     Random, sweepRand, 1, 9
-
     BMPcache := coredrawWelcomeImg(modelu, iterations, moduz, sweepRand, mainWidth, mainHeight, 5, 5, 1)
     If !validBMP(BMPcache)
     {
@@ -72942,7 +72902,6 @@ InitGDIpStuff() {
    thisBMPdummy := trGdip_CreateBitmap(A_ThisFunc, 10, 10)
    dummyGu := Gdip_GraphicsFromImage(thisBMPdummy)
 
-; create pens and brushes
    pPen1 := Gdip_CreatePen("0xCCbbccbb", 3)
    pPen1d := Gdip_CreatePen("0xCCbbccbb", 3)
    ; Gdip_SetPenAlignment(pPen1d, 1)
@@ -72967,7 +72926,6 @@ InitGDIpStuff() {
    ; ToolTip, % "0x" rgb2bgr(WindowBgrColor) "`n" WindowBgrColor , , , 2
    Gdi_SetBgrColor(glHDC, "0x" rgb2bgr(WindowBgrColor))
    pBrushHatchLow := Gdip_BrushCreateHatch("0xffeeEEee", "0xff111111", 50)
-   GDIbrushHatch := convertGDIPbrushGDI(pBrushHatchLow, 8)
    refreshWinBGRbrush()
 }
 
@@ -73069,6 +73027,10 @@ refreshWinBGRbrush() {
 }
 
 useGdiHatchedBrush(dummy:=0) {
+   Static GDIbrushHatch := 0
+   If !GDIbrushHatch
+      GDIbrushHatch := convertGDIPbrushGDI(pBrushHatchLow, 8)
+
    If (dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha!=1)
       Return Gdi_GetStockObject(0)
    Else If (coreDesiredPixFmt="0x21808" || dummy="vp" && imgFxMode=8 && currIMGdetails.HasAlpha=1)
@@ -73290,13 +73252,8 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
         throwSQLqueryDBerror(A_ThisFunc)
 
      If (doPartial!="yesu")
-     {
-        allowSQLiteAbort := 1
         seenImagesDB.Exec("VACUUM main;")
-        allowSQLiteAbort := 0
-     }
   }
-
 
   zeitOperation := A_TickCount - startOperation
   etaTime := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3))
@@ -74957,10 +74914,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
         {
            zu := Format("{:L}", imgPath)
            If !userSeenSessionImagesArray[zu]
-           {
-              userSeenSessionImagesIndex++
-              userSeenSessionImagesArray[zu] := userSeenSessionImagesIndex
-           }
+              userSeenSessionImagesArray[zu] := 1
         }
 
         prevMD5nameB := prevMD5nameA
@@ -75316,7 +75270,7 @@ highlightActiveCtrl(modus:=0, givenHwnd:=0) {
 
 CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   Critical, on
-  Static prevFrame := -1, lastInvoked := 1
+  Static prevFrame := -1, lastInvoked := 1, BbackupIMGdetails := [], AbackupIMGdetails := []
 
   GDIbmpFileConnected := 1
   hasFullReloaded := CountGIFframes := totalFramesIndex := 0
@@ -80355,8 +80309,7 @@ getVPcustomShapePath(PointsListArray) {
 }
 
 convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
-    ; this function is executed when user exits vector path editing mode
-    ; called from stopDrawingShape()
+    ; this function is executed when user exits vector path editing mode called from stopDrawingShape()
     If (PointsListArray.Count()<3)
        Return
 
@@ -80372,7 +80325,6 @@ convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
     minXu := (Rect.W>0) ? Rect.X : Rect.X - 0.5
     minYu := (Rect.H>0) ? Rect.Y : Rect.Y - 0.5
     maxXu := minXu + boundsW, maxYu := minYu + boundsH
-
     MouseCoords2Image(minXu, minYu, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, ImgSelX1, imgSelY1)
     MouseCoords2Image(maxXu, maxYu, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, ImgSelX2, imgSelY2)
 
@@ -80385,17 +80337,8 @@ convertEditorCustomShape2viewerCoords(PointsListArray, editorMode:=0) {
 
     trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
     defineRelativeSelCoords(imgW, imgH)
-    initialCustomShapeCoords := imgSelX1 "|" imgSelY1 ; i forgot what this is for ^_^ 
-    RegAction(1, "initialCustomShapeCoords")
     mW := boundsW
     mH := maxYu - minYu
-
-    ; pp := Gdip_GetPathPointsCount(pPath)
-    ; ToolTip, % "l=" pp "|" PointsListArray.Count() , , , 2
-    ; Gdip_GraphicsClear(2NDglPG)
-    ; Gdip_DrawPath(2NDglPG, pPen5, pPath)
-    ; doLayeredWinUpdate(A_ThisFunc, hGDIselectwin, 2NDglHDC)
-    ; Sleep, 800
     newShape := []
     Gdip_DeletePath(pPath)
     Loop, % PointsListArray.Count()
@@ -84774,11 +84717,11 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    thisImgQuality := (userimgQuality=1) ? 6 : 5
    thumbsPoolOK := poolDrainOn := idleLaps := 0
    lastPoolProgress := A_TickCount
+   wantThumbBMP := (modus="all") ? 0 : 1
    If (mustDoMultiCore=1 && abandonAll!=1)
    {
       ; when generating every thumbnail of a list, nothing is ever drawn; asking the
       ; workers for no GDI+ bitmap at all spares a decode-sized allocation per file
-      wantThumbBMP := (modus="all") ? 0 : 1
       thumbsPoolOK := QPV_ThumbsPoolBegin(thumbsSizeQuality, timePerImgMultiCore, thisImgQuality, wantThumbBMP, (modus="all") ? 1 : 0)
       If (thumbsPoolOK!=1)
       {
@@ -84921,7 +84864,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              ; they hand over become ours, so there is nothing left to clone here
              If QPV_ThumbsPoolReady()
              {
-                If QPV_ThumbsPoolDrain(imgsListArrayThumbs, imgsHavePainted)
+                If QPV_ThumbsPoolDrain(wantThumbBMP, imgsListArrayThumbs, imgsHavePainted)
                    lastPoolProgress := A_TickCount
 
                 cacheType := imgsListArrayThumbs[thisFileIndex, 1]
@@ -85842,7 +85785,6 @@ RegenerateEntireList() {
     bckpResultedFilesList := []
     bckpMaxFilesIndex := 0
     renewCurrentFilesList()
-    mustGenerateStaticFolders := (SLDtypeLoaded=3) ? 0 : 1
     If (SLDtypeLoaded=3)
     {
        getMaxRowIDsqlDB()
@@ -85931,8 +85873,8 @@ RegenerateEntireList() {
 
 throwSQLqueryDBerror(funcu) {
    SetTimer, ResetImgLoadStatus, -150
-   showDelayedTooltip("ERROR: " funcu "() failed to query or commit changes the SQL database`n" activeSQLdb.ErrorMsg)
    SoundBeep, 300, 100
+   showDelayedTooltip("ERROR: " funcu "() failed to query or commit changes the SQL database`n" activeSQLdb.ErrorMsg)
    ; SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -89875,7 +89817,6 @@ coreColorsAdjusterWindow(modus:=0) {
     If !(thisBtnHeight := createSettingsGUI(idu, thisFuncu, 1, 1))
        Return
 
-    wasVPfxBefore := (imgFxMode>1) ? 1 : 0
     If (idu=74 && editingSelectionNow!=1)
        ToggleEditImgSelection()
 
@@ -89907,9 +89848,6 @@ coreColorsAdjusterWindow(modus:=0) {
        userImgChannelAlvl := 1
        DesaturateAreaLevels := usrColorDepth
        DesaturateAreaDither := ColorDepthDithering
-       If (usrColorDepth>1)
-          wasVPfxBefore := 1
-
        usrColorDepth := 1
        defineColorDepth()
        If (DesaturateAreaLevels>1 && UIimgFxMode=1)
@@ -92306,7 +92244,6 @@ PanelKeywordsDetector() {
     btnWid3 := (PrefsLargeFonts=1) ? btnWid + 40 : btnWid + 30
     btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
     sml := (PrefsLargeFonts=1) ? 120 : 90
-    CountFilesFolderzList := 0
     Gui, Add, Text, x15 y15 Section, This panel can help identify most used keywords in the indexed files list.
     hLVmainu := GuiAddListView("xs y+5 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid AltSubmit +multi guiLVkeywordsListResponder vLViewOthers", "Keywords|Files|`%|#", "Identified keywords")
     hEditField := GuiAddEdit("xs y+10 wp -multi -wantTab vkeywrdLVfilter", keywrdLVfilter, "Keywords string filter")
@@ -92629,7 +92566,6 @@ PanelStaticFolderzManager() {
     btnWid3 := (PrefsLargeFonts=1) ? btnWid + 40 : btnWid + 30
     btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
     sml := (PrefsLargeFonts=1) ? 120 : 90
-    CountFilesFolderzList := 0
     Gui, Add, Text, x15 y15, This folders list was generated based on the indexed files. Multiple items can be selected.
     hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 r" uLVr " Grid xp y+10 w" lstWid " +multi AltSubmit Count" totals " guiLVfolderzFilterListBTN vLViewOthers", "#|Date|(?)|Folder path|Files|Selected|`%|Files on disk|Difference|Size (MB)", "Referenced folders")
     hEditField := GuiAddEdit("xs y+10 wp-" sml " -multi -wantTab gUIeditsGenericAllowCtrlBksp vStaticListViewFilteru", staticListViewFilteru, "Folders string filter")
@@ -94451,14 +94387,6 @@ PanelDynamicFolderzWindow(dummy:=0) {
     Gui, Add, Button, x+5 hp wp+5 ginvokePanelDynaFoldersContextMenu, &More
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage seed folders list: " appTitle)
     uiPopulateDynamicFolderzList()
-}
-
-ToggleCountFilesFoldersList() {
-  GuiControlGet, CountFilesFolderzList
-  If (AnyWindowOpen=3)
-     PanelDynamicFolderzWindow()
-  Else If (AnyWindowOpen=2)
-     PanelStaticFolderzManager()
 }
 
 BTNaddNewFolder2list() {
@@ -96513,7 +96441,6 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
         If (determineTerminateOperation()=1)
         {
            abandonAll := 1
-           CountFilesFolderzList := 0
            Break
         }
 
@@ -96876,7 +96803,8 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
 
     If (A_TickCount - lastInvoked<95) && (forceDarker!=1)
     {
-       SetTimer, dummyPrevShowToolTip, -200
+       fn := Func("showTOOLtip").Bind("nully",0,0,0)
+       SetTimer, % fn, -200
        Return
     }
 
@@ -97069,8 +96997,6 @@ initCompiled(mode) {
       mainExecPath := A_ScriptDir
       mainCompiledPath := A_ScriptDir
    }
-
-   unCompiledExePath := Chr(34) (A_AhkPath ? A_AhkPath : fullPath2exe) Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
 }
 
 MenuInvokeSHopenWith() {

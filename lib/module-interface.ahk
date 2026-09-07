@@ -20,9 +20,9 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , canCancelImageLoad, alterFilesIndex, mustAbandonCurrentOperations, userPendingAbortOperations
      , lastCloseInvoked, lastALclickX, lastALclickY, lastDoubleClickZeit, lastMouseLeave, lastSwipeZeitGesture
      , lastWinStatus, lastZeitPanCursor, lastZeitToolTip, statusBarTooltipVisible, doNormalCursor
-     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, popupRootSeen
-     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence, barMenuSession
-     , flyoutAnchorMenu, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline, sentMsgProbeSeen
+     , prevFullIMGload, winGDIcreated, ThumbsWinGDIcreated, popupRootSeen, sentMsgProbeSeen, barMenuSession
+     , menuJITmap, menuJITlist, hCWPhook, hLLmouseHook, menuLoopActive, uiMenuReaderLastMsg, slideShowCadence
+     , flyoutAnchorMenu, lastLongOperationStart, menuRButtonEaten, menuReaderOSDdeadline
 
 initInterfaceModule() {
 ; Replaces this module's old thread auto-exec: seeds the module state, detects the
@@ -155,8 +155,11 @@ dispatchMouseWheel(wP, lP, msg, hwnd) {
 }
 
 uiMenuNameForBuilder(suffix) {
-; every InvokeMenuBar<suffix> builder rebuilds exactly one named menu - extracted
-; from the builders' own showThisMenu tails at phase D
+; every InvokeMenuBar<suffix> function builds one named menu
+; and then it is displayed using showThisMenu()
+; this list mpps InvokeMenuBar* function suffixes to their ahk menu names.
+; see also BuildMenuBar() to learn more
+
    Static mapu := {"File":"pvMenuBarFile", "Edit":"pvMenuBarEdit", "Selection":"pvMenuBarSelection"
       , "Image":"pvMenuBarImage", "Captions":"PVsounds", "Slides":"PVslide", "Find":"pvMenuBarFind"
       , "List":"pvMenuBarList", "Sort":"PVsort", "Navigate":"PVnav", "View":"PVview"
@@ -306,7 +309,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
          OutputDebug, % "QPV: MERGE: flyout flag raised [popup] anchor=" hMinit
       }
 
-      uiMenuJITrebuild(hMinit)
+      uiMenuBarJITrebuild(hMinit)
       uiStartMenuTimer()
    } Else If (msg=0x211) ; WM_ENTERMENULOOP - its wParam: 0 = menu bar tracking, 1 = TrackPopupMenu popup
       uiMenuLoopEnter(wP)
@@ -316,7 +319,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    Return 0
 }
 
-uiMenuJITrebuild(hMenu) {
+uiMenuBarJITrebuild(hMenu) {
    Static busy := 0
    If (busy=1 || !IsObject(menuJITmap) || !menuJITmap.HasKey(hMenu))
    {
@@ -344,8 +347,7 @@ uiMenuJITrebuild(hMenu) {
          InvokeMenuBarVectorView(0, 0, 1)   ; its 2nd parameter is modus, not justBuild
       Else
          %funcu%(0, 1)
-   }
-   Catch weh
+   } Catch weh
       OutputDebug, % "QPV: MERGE: menu JIT rebuild FAILED for " funcu ": " weh.message
    busy := 0
 }
@@ -412,10 +414,8 @@ uiMenuLoopEnter(fromPopup:=0) {
 
 uiMenuLoopExit() {
    lastContextMenuZeit := A_TickCount
-   menuLoopActive := 0
-   barMenuSession := 0
-   menuRButtonEaten := 0
-   menuReaderOSDdeadline := 0
+   menuRButtonEaten := menuReaderOSDdeadline := 0
+   menuLoopActive := barMenuSession := 0
    uiMenuReaderLastMsg := ""
    flyoutAnchorMenu := 0
    uiStopMenuTimer()
@@ -442,6 +442,7 @@ uiRefreshBarAttachments() {
 ; Normally a complete no-op; repairs are logged.
    If (!IsObject(menuJITlist) || !menuJITlist.Count() || menuLoopActive=1)
       Return
+
    newMap := {}
    repaired := 0
    Loop, % menuJITlist.Count()
@@ -544,6 +545,17 @@ uiTryPlaceFlyout(anchor:=0) {
    Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
 }
 
+autoTurnOffTooltipMenuReader() {
+; timers do not work while a menu is invoked.
+; this is called by the mouse hook, uiMenuMouseLL()
+   If (menuReaderOSDdeadline && A_TickCount >= menuReaderOSDdeadline)
+   {
+      menuReaderOSDdeadline := 0
+      If (mouseToolTipWinCreated=1)
+         mouseTurnOFFtooltip()
+   }
+}
+
 uiMenuMouseLL(nCode, wP, lP) {
 ; menu-scoped low-level mouse hook [probe p13]: while a menu of this process is
 ; visible, the wheel moves the highlight [eat the hardware event, post key-downs
@@ -556,16 +568,7 @@ uiMenuMouseLL(nCode, wP, lP) {
    r := ""
    If (nCode=0 && menuLoopActive=1)
    {
-      ; third placement consumer [p13-proven vehicle]: the LL hook runs on every
-      ; physical mouse event during menu sessions, hover jitter included - it
-      ; covers a session where the user clicks and then never changes the
-      ; highlight [no WM_MENUSELECT] on a loop that may not dispatch timers
-      If (menuReaderOSDdeadline && A_TickCount >= menuReaderOSDdeadline)
-      {
-         menuReaderOSDdeadline := 0
-         If (mouseToolTipWinCreated=1)
-            mouseTurnOFFtooltip()
-      }
+      autoTurnOffTooltipMenuReader()
       If (wP=0x20A && uiVisibleMenuWin())
       {
          delta := NumGet(lP+0, 8, "Int") >> 16
@@ -582,7 +585,7 @@ uiMenuMouseLL(nCode, wP, lP) {
          {
             mouseCreateOSDinfoLine(uiMenuReaderLastMsg, 1)
             showOSDinfoLineNow(1500)
-            menuReaderOSDdeadline := A_TickCount + 1500
+            menuReaderOSDdeadline := A_TickCount + 1500 ; use by autoTurnOffTooltipMenuReader()
             menuRButtonEaten := 1
             r := 1
          } Else
@@ -2269,25 +2272,31 @@ invokeGivenMenuBarPopup(n) {
 }
 
 BuildMenuBar(modus:=0) {
-   Static menusListView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
-        , menusListEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
+   ; the key and value pairs is: menu-name:func-name-suffix
+   ; menu-name is visible to the user, on the menu bar 
+   ; func-name-suffix is added to funcion names that begin with "InvokeMenuBar"
+   ; each list of pairs describe the menus for each app mode
+   ; also see: uiMenuNameForBuilder() where ahk menu names are listed.
+   ; the menuJITmap and menuJITlist are used by uiMenuBarJITrebuild()
+   Static menusListImgView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+        , menusListImgEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
         , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
-        , menusListVector := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
-        , menusListThumbs := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
-        , menusListWelcome := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
+        , menusListVectorEditor := "File:VectorFile|Edit:VectorEdit|Selection:VectorSelection|View:VectorView|Interface:VectorInterface"
+        , menusListThumbsMode := "File:File|Edit:Edit|Selection:Selection|Image:Image|Slides:Slides|Find:Find|List:List|Sort:Sort|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
+        , menusListWelcomeView := "File:File|Edit:Edit|Interface:Interface|Settings:Settings|Help:Help"
 
    If (modus="welcome")
-      menusList := menusListWelcome
+      menusList := menusListWelcomeView
    Else If (modus="freeform" || drawingShapeNow=1)
-      menusList := menusListVector
+      menusList := menusListVectorEditor
    Else If isNowAlphaPainting()
       menusList := menusListAlphaMasking
    Else If (imgEditPanelOpened=1 && AnyWindowOpen)
-      menusList := menusListEditor
+      menusList := menusListImgEditor
    Else If (thumbsDisplaying=1)
-      menusList := menusListThumbs
+      menusList := menusListThumbsMode
    Else
-      menusList := menusListView
+      menusList := menusListImgView
 
    menuArray := []
    menuTotalIndex := 0
@@ -2300,12 +2309,6 @@ BuildMenuBar(modus:=0) {
       n := SubStr(k[1], 1, 1)
       n2 := SubStr(k[1], 2, 1)
       lbl := (forbiddenAltKeys(n) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
-      ; [phase D] every bar item carries its REAL dropdown as an attached submenu, so
-      ; Windows provides hover-switching, F10 and Alt-accelerators natively; the
-      ; dropdown content is rebuilt just-in-time by the WM_INITMENUPOPUP hook via
-      ; menuJITmap [see uiCallWndProc / uiMenuJITrebuild]. The old flow [bar click ->
-      ; invokeMenuBarItem -> post -> builder -> Menu Show] and its MSAA hover
-      ; machinery are gone.
       suffix := k[2]
       menaName := uiMenuNameForBuilder(suffix)
       hSub := 0
@@ -2315,8 +2318,8 @@ BuildMenuBar(modus:=0) {
          Menu, % menaName, Add, building the menu..., dummy
          Try hSub := MenuGetHandle(menaName)
       }
-      uiKmenu(lbl, ":" menaName)
 
+      uiKmenu(lbl, ":" menaName)
       If hSub
       {
          menuJITmap[hSub] := "InvokeMenuBar" suffix
@@ -2439,10 +2442,7 @@ uiPreProcessKbdKey() {
       If (isVarEqualTo(hotkate, "Escape", "Enter", "Space") && stopGifORslidesPlayback(1))
       {
          ; user gesture stopped active GIF or slideshow playback
-      } Else If (hotkate="Escape" || hotkate="!F4")
-      {
-         preByeRoutine(hotkate)
-      } Else If (hotkate="Enter" && runningLongOperation=1)
+      } Else If (hotkate="Escape" || hotkate="!F4" || hotkate="Enter" && runningLongOperation=1)
       {
          preByeRoutine(hotkate)
       } Else If (hotkate="Space")
