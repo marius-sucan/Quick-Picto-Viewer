@@ -1,321 +1,288 @@
-# module-interface.ahk — functions renamed at the interface-thread merge
+# module-interface.ahk — function inventory after the interface-thread merge
 
-Branch `interface-thread-merge-phase-c`, compiled 2026-09-02 from git, not from memory:
-the function sets of `lib/module-interface.ahk` on `master` (the AutoHotkey_H thread era),
-at the phase-A commit `a850285` (where the renames happened) and at HEAD were parsed and
-compared against every function defined in `quick-picto-viewer.ahk` and `lib/*.ahk`.
-Body similarity = `difflib` ratio over comment- and whitespace-stripped bodies
-(`identical` = byte-identical after that normalisation). Reference counts are bare-word
-occurrences of the name in code (calls, `SetTimer` targets, `g`-labels, quoted names),
-definition lines excluded.
+Snapshot: branch `interface-thread-merge-phase-c` at `993d5b3` (the working tree has no `.ahk`
+changes), compiled 2026-09-07 from the sources, not from memory. Every function defined at
+column 0 in `quick-picto-viewer.ahk` and `lib/*.ahk` was parsed. The 58-name set that §1 and §2
+partition is the set of names that `lib/module-interface.ahk` and the other source files both
+define on `master`; that branch is the comparison baseline and nothing else is taken from it.
+`lines` = lines between a function's braces. `refs` = case-insensitive bare-word occurrences of
+the name in code (comments stripped: calls, `SetTimer` targets, quoted names for `OnMessage`,
+`QPV_post` and `RegisterCallback`), definition lines excluded, split into `module`
+(`lib/module-interface.ahk`) / `rest` (every other source file).
 
-Result: **58 function names existed on both sides**. 26 were resolved by renaming the
-module's copy with a `ui` prefix (section 1); the other 32 were resolved without a rename
-(section 2). Two more functions were renamed for a different reason (section 3).
+Result: `lib/module-interface.ahk` defines 100 functions, 38 of them `ui`-prefixed. **8 names
+exist twice** (§1: the module's copy carries the `ui` prefix). **50 baseline names exist once**
+(§2). §3 lists the windows and menus the module owns, §4 what the inventory surfaced, §5 the
+wrapper check, §6 the 59 functions that exist on this branch and not on `master`.
 
-## 1. The 26 renamed functions (module copy got the `ui` prefix)
+## 1. Names defined on both sides: the eight `ui` pairs
 
-Why a rename and not a merge: at phase A the app was still two-threaded and each side had to
-keep every function it calls, so twins were either converged byte-identical (and deleted at
-the flip) or renamed when the two bodies did different jobs. 18 pairs are genuinely different
-jobs under one name (group A). 8 pairs are the same job that had drifted apart in the two
-interpreters (group B) — those were renamed rather than converged to keep phase A
-behaviour-neutral, and with a single interpreter they are now consolidation candidates.
+The main script owns the plain name; the module's copy carries the `ui` prefix. Each pair is
+reached differently, and that is what keeps both alive.
 
-### Group A — same name, different job (18): the rename was the right call; two of them are dead today (see §4)
+### A. Different jobs under one name (3)
 
-| thread-era name | module name now | main twin lives in | what the two do | bodies at master | bodies now | refs ui / main |
-|---|---|---|---|---|---|---|
-| `addJournalEntry` | `uiAddJournalEntry` | quick-picto-viewer.ahk | main: the 37-line journal writer; module: a 4-line stub | 0.04 | 0.05 | **0** / 384 |
-| `changeMcursor` | `uiChangeMcursor` | quick-picto-viewer.ahk | module: viewport cursor shapes (49 lines); main: panel/generic cursor (17) | 0.11 | 0.10 | 8 / 101 |
-| `InitGuiContextMenu` | `uiInitGuiContextMenu` | quick-picto-viewer.ahk | main: the 85-line context-menu builder; module: 4-line trigger | 0.03 | 0.01 | 2 / 3 | *(module copy inlined/deleted 2026-09-05, Step 1)*
-| `KeyboardResponder` | `uiKeyboardResponder` | quick-picto-viewer.ahk | module: 46-line PVwin pre-filter (nav-key stop, Space, Escape); main: the 233-line command dispatcher | 0.03 | 0.03 | 1 / 4 | *(module copy absorbed into uiPreProcessKbdKey 2026-09-05, Subsystem A)*
-| `kMenu` | `uiKmenu` | quick-picto-viewer.ahk | main: the menu-item helper used 1707 times; module: bar-menu variant with a different signature | 0.02 | – | 1 / 1707 |
-| `mouseTurnOFFtooltip` | `uiMouseTurnOFFtooltip` | quick-picto-viewer.ahk | module: hides the viewport tooltip GUI (15 lines); main: 5-line panel variant | 0.29 | 0.26 | 18 / 17 |
-| `PanelQuickSearchMenuOptions` | `uiPanelQuickSearchMenuOptions` | quick-picto-viewer.ahk | main: the 81-line panel; module: 11-line opener | 0.02 | 0.02 | 1 / 25 | *(module copy deleted 2026-09-05, Step 1)*
-| `RepositionTempBtnGui` | `uiRepositionTempBtnGui` | quick-picto-viewer.ahk | main: 35-line positioner; module: 3-line post | 0.03 | 0.03 | 1 / 2 | *(module copy deleted 2026-09-02, §7-A)*
-| `repositionWindowCenter` | `uiRepositionWindowCenter` | quick-picto-viewer.ahk | main: 136-line general window centering; module: 42-line PVwin-family variant | 0.41 | 0.41 | 1 / 77 | *(module copy deleted 2026-09-05, Step 1)*
-| `saveMainWinPos` | `uiSaveMainWinPos` | quick-picto-viewer.ahk | main: writes the INI; module: 3-line trigger | 0.18 | 0.18 | 1 / 1 | *(module copy deleted 2026-09-02, §7-A)*
-| `toggleAppToolbar` | `uiToggleAppToolbar` | quick-picto-viewer.ahk | main: the 20-line toggle; module: 8-line trigger | 0.05 | 0.07 | 1 / 11 | *(module copy deleted 2026-09-05, Step 1)*
-| `ToggleMenuBaru` | `uiToggleMenuBaru` | quick-picto-viewer.ahk | main: the 18-line toggle; module: 8-line trigger | 0.18 | 0.13 | 1 / 4 | *(module copy deleted 2026-09-05, Step 1)*
-| `updateUIctrl` | `uiUpdateUIctrl` | quick-picto-viewer.ahk | module: 52-line viewport-controls layout; main: 7-line panel helper | 0.02 | 0.03 | 11 / 21 |
-| `Win_ShowSysMenu` | `uiShowSysMenu` | lib/shell-stuff.ahk | both emulate Alt+Space with TrackPopupMenu; signatures differ (1 vs 3 params) | 0.10 | 0.10 | 1 / **0** |
-| `WinClickAction` | `uiWinClickAction` | quick-picto-viewer.ahk | module: 22-line click pre-dispatcher; main: the 728-line click body | 0.01 | 0.01 | 3 / 2 |
-| `WM_LBUTTONDOWN` | `uiWM_LBUTTONDOWN` | quick-picto-viewer.ahk | per-window message handlers: module = PVwin family, main = panels; the merged dispatcher branches by window root | 0.08 | 0.08 | 2 / 1 |
-| `WM_LBUTTONUP` | `uiWM_LBUTTONUP` | quick-picto-viewer.ahk | same split as above | 0.07 | 0.04 | 2 / 1 |
-| `WM_MOUSEMOVE` | `uiWM_MOUSEMOVE` | quick-picto-viewer.ahk | same split as above | 0.10 | 0.10 | 2 / 1 |
+| module function | main-script twin | what each does | lines ui / main | refs ui / main |
+|---|---|---|---|---|
+| `uiChangeMcursor(whichCursor)` | `changeMcursor(whichCursor:=0)` | module: the viewport cursor setter (`SetCursor` with cached `LoadCursor` handles for normal, busy, finger, move, cross); `"normal-extra"` also clears the busy flags (`imageLoading`, `runningLongOperation`, `mustAbandonCurrentOperations`, `userPendingAbortOperations`, `lastCloseInvoked`) and resets the taskbar icon, `"busy"` / `"busy-img"` start the taskbar animation; inert while a slideshow or a GIF plays. Main: a gated, throttled entry onto the module's function: unless an image is loading it returns while a shape is being drawn, playback runs, `hasInitSpecialMode=1` or `zeitSillyPrevent` is fresh; with a name it forwards it, without one it asks for `"busy"` at most every 400 ms. 6 main-script sites call `uiChangeMcursor` directly, 88 go through `changeMcursor` | 46 / 13 | 13 / 88 |
+| `uiKmenu(labelu, funcu, mena:="PVbar", actu:="Add")` | `kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0)` | module: adds one bar item with its `:submenu` attachment to `PVbar` and records it in `menuArray` by index and by label; `BuildMenuBar()` is its only caller. Main: the general menu-item helper (add, separators, reset, the searchable registry behind the quick search) | 12 / 196 | 1 / 1707 |
+| `uiUpdateUIctrl(forceThis:=0)` | `updateUIctrl()` | module: lays out the five screen-reader/hit-test zones and the two scrollbar strips over the painted viewport, in PVwin client space (viewport origin + viewport coordinates), state-diffed; `"kill"` clears the memo; bows out while the thumbnails list is displayed. Main: decides between the welcome layout and the image layout and posts `uiAccessWelcomeView` or `uiUpdateUIctrl` through `QPV_post` | 48 / 5 | 12 / 22 |
 
-### Group B — same job, drifted bodies (8): consolidation candidates now that there is one interpreter
+### B. Same message, one handler per window family (5)
 
-> **Status 2026-09-02:** the first six rows were consolidated (section 6); the two keyboard rows stay split by window.
+`initInterfaceModule()` registers one `dispatch*` composer per message number (§6); each routes
+on `isUIrootWin()` — the message's window root is PVwin, one of the four GDI containers, the
+tooltip or the flyout — to the `ui` handler, and to the plain one for panels, the toolbar and
+every other window. `drainUIinput()` calls the `ui` handlers directly for queued PVwin input.
 
-| thread-era name | module name now | bodies at master | bodies now | refs ui / main | what differs today | verdict |
-|---|---|---|---|---|---|---|
-| `constructKbdKey` | `uiConstructKbdKey` | identical | identical | 1 / 2 | nothing (only the line-wrapping of the `vkList` literal) | delete `uiConstructKbdKey`, point `uiWM_KEYDOWN` at `constructKbdKey`; zero risk |
-| `identifyThisWin` | `uiIdentifyThisWin` | 0.88 | 0.88 | 2 / 7 | the module copy also accepts `otherAscriptHwnd`, which since the merge is always the script's own hidden window (`initInterfaceModule` seeds it with `A_ScriptHwnd`, and both callers of `menuFlyoutDisplay`, its only runtime setter, pass `A_ScriptHwnd`) — never the active window in practice | consolidate onto `identifyThisWin` |
-| `isAlphaMaskWindow` | `uiIsAlphaMaskWindow` | 0.54 | 0.54 | 1 / 29 | main's ID set is `23,24,31,32,70,74,89` (+ a `m` param); the module's stopped at `70` — the thread copy was never updated when panels 74 and 89 appeared | consolidate onto `isAlphaMaskWindow()`; fixes a latent drift on the UI side |
-| `isNowAlphaPainting` | `uiIsNowAlphaPainting` | 0.78 | 0.77 | 2 / 69 | main tests `isImgEditingNow()`; the module approximated it with mirrored flags (`imgEditPanelOpened=1 && editingSelectionNow=1`) because it could not call main | consolidate onto `isNowAlphaPainting()` after checking the two UI call sites accept `isImgEditingNow()` semantics |
-| `mouseCreateOSDinfoLine` | `uiMouseCreateOSDinfoLine` | 0.90 | 0.83 | 2 / 9 | two tooltip GUIs: the module pair drives `uiMouseTipGuia` (newer: OSD font name/bold prefs, `Critical`), main's drives `mouseToolTipGuia` for the panels | possible, but it means unifying the two tooltip windows — a medium job, not a free win |
-| `showOSDinfoLineNow` | `uiShowOSDinfoLineNow` | 0.98 | 0.88 | 2 / 5 | the placement half of the pair above; same two-GUI split | goes with the row above |
-| `PreProcessKbdKey` | `uiPreProcessKbdKey` | 0.62 | 0.53 | 3 / 1 | main's serves the non-PVwin windows; the module's serves the PVwin family and carries the GIF/slideshow stop logic and the QPVMERGE dispatch log | keep both (they gate on different windows); a fold-in would need a window test at the top |
-| `WM_KEYDOWN` | `uiWM_KEYDOWN` | 0.61 | 0.43 | 2 / 1 | per-window handlers again; the module's grew the SC_KEYMENU Alt+letter / Alt+Space entry in phase D | keep both |
+| module function | main-script twin | what each does | lines ui / main | refs ui / main |
+|---|---|---|---|---|
+| `uiWM_KEYDOWN` | `WM_KEYDOWN` | module: Alt+letter posts `SC_KEYMENU` with the mnemonic so the bar opens as native keyboard tracking, Alt+Space posts `SC_KEYMENU` with a space for the system menu; counts navigation keys, hides the status-bar tooltip, Escape → `preByeRoutine("Escape")`, other keys are dropped while busy (unless a GIF or a slideshow plays) and for 300 ms after a window close; else `hotkate := constructKbdKey(...)` and `uiPreProcessKbdKey` is armed on a 3 ms timer. Main: while a MsgBox2 conflict prompt waits the key goes to `MsgBoxConflictKeysResponder`; returns for PVwin, busy states (Escape excepted) and the 300 ms after a window close; else builds `hotkate`, records `vk_hwnd`, arms `PreProcessKbdKey` on a 25 ms timer and lets `decideBlockKbdKeys()` swallow the keys that edit fields, sliders, the quick search or the toolbar own | 59 / 25 | 2 / 1 |
+| `uiPreProcessKbdKey` | `PreProcessKbdKey` | module: the keyboard tail of the PVwin family (also run inline by the drain): 30 ms rate limit and the abusive-repeat counter; Escape/Enter/Space first stop playback through `stopGifORslidesPlayback(1)`; Escape, Alt+F4 and Enter-while-busy go to `preByeRoutine`; Space sets the pan cursor in zoom mode; navigation keys stop a slideshow or cancel a running image load (`alterFilesIndex`, `canCancelImageLoad`, `stopGIFsPlayback()`); everything else reaches `KeyboardResponder(hotkate, PVhwnd, abusive, navKeysCounter)`. Main: the tail for every other window: returns when PVwin is active or the active window changed since the key-down (`vk_hwnd`); same rate limit and counter, then `KeyboardResponder(hotkate, parent-or-active hwnd, abusive, "n")` | 60 / 30 | 3 / 1 |
+| `uiWM_LBUTTONDOWN` | `WM_LBUTTONdown` | module: viewport button-down: the drag-window test, the silly-GUI and active-window gates, the 25 ms / start-up / window-drag / double-click debounce, `LbtnDwn` with its `ResetLbtn` timer, `canCancelImageLoad := 4`, coordinates through `uiGetMouseCoords()`, tooltip off; while busy for more than 900 ms → `askAboutStoppingOperations()`, else stop playback, else `WinClickAction("normal", IdentifyCtrlUnderMouse(...), adjX, adjY)`. Main: panels and toolbar: closes the solo slider widget, fires toolbar buttons from `tlbrIconzList` through `tlbrInvokeFunction`, expands a collapsed edit panel, and a click into a numeric edit field arms `adjustNumbersEditFields` | 39 / 41 | 2 / 1 |
+| `uiWM_LBUTTONUP` | `WM_LBUTTONup` | module: tooltip off, `LbtnDwn := 0`, `colorPickerMustEnd := 1`; the three flyout buttons (300 ms debounce): S opens or closes the quick search, T `toggleAppToolbar()`, M `ToggleMenuBaru()`. Main: resolves a waiting MsgBox2 button, `colorPickerMustEnd`, settings panel → `GuiUpdateFocusedSliders()` + `highlightActiveCtrl("click")`, toolbar → `decideWinReactivation()` | 30 / 24 | 2 / 1 |
+| `uiWM_MOUSEMOVE` | `WM_MOUSEMOVE` | module: viewport hover: the pan-cursor hold, the `isQPVactive()` gate, `LbtnDwn` from the button state, the cursor shape (cross while drawing, busy, finger over the thumbnails status bar), the status-bar tooltip timer, the flyout button tooltips and their dark-mode theming, `MouseMoveResponder()` at most every 55 ms, and the Shift+Ctrl window drag (a `WM_NCLBUTTONDOWN` post plus `trackMouseDragging`) when the title bar is hidden. Main: panels and toolbar: busy cursor while busy, finger cursor over tab-stop statics and colour list views, toolbar hover tooltips (`tlbrDecideTooltips`, `DelayedToolbarTooltips`), the dragger cursor, and the accessible name pushed into the hovered button | 90 / 80 | 2 / 1 |
 
-## 2. The other 32 collisions — resolved without a rename
+## 2. Names defined once
 
-At phase A each pair was converged to a byte-identical body (authoritative side = the most
-recently fixed one), the module copy was tagged `; MERGEDEL`, and at the phase-C flip the
-tagged copy was deleted. Where the module's body was the better one, its text was adopted by
-the main side first (15 of them; e.g. `calcScreenLimits`' blank-coordinates mouse fallback
-was backported into msgbox2.ahk, `GetWinClientSize` adopted shell-stuff's superset body).
+The 58 baseline names minus the 8 pairs above: each has exactly one definition today.
+`refs` = module / rest. Notes only where they add something.
 
-| name | surviving copy | bodies at master | resolution |
-|---|---|---|---|
-| `adjustWin2MonLimits` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `calcHUDsize` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `calcScreenLimits` | lib/msgbox2.ahk | 0.95 | converged (module's mouse-pos fallback backported), module copy deleted |
-| `clampInRange` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `dummy` | quick-picto-viewer.ahk | 0.82 | converged, module copy deleted |
-| `GetMenuItemRect` | lib/shell-stuff.ahk | 0.99 | converged, module copy deleted |
-| `GetPhysicalCursorPos` | lib/shell-stuff.ahk | 0.95 | converged, module copy deleted |
-| `GetWinClientSize` | lib/shell-stuff.ahk | 0.46 | shell-stuff's superset body kept, module copy deleted |
-| `GetWindowBounds` | lib/shell-stuff.ahk | 0.99 | converged, module copy deleted |
-| `GetWindowFromPos` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `GetWindowPlacement` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `GetWinHwndAtPoint` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `isDotInRect` | quick-picto-viewer.ahk | 0.92 | converged, module copy deleted |
-| `isInRange` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `IsNumber` | lib/Gdip_All.ahk | identical | module copy deleted |
-| `isTlbrVertical` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `isVarEqualTo` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `JEE_ClientToScreen` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `JEE_ScreenToClient` | lib/shell-stuff.ahk | 1.00 | converged, module copy deleted |
-| `MDMF_FromHWND` | lib/Gdip_All.ahk | 0.99 | converged, module copy deleted |
-| `MDMF_FromPoint` | lib/Gdip_All.ahk | 1.00 | converged, module copy deleted |
-| `MDMF_GetInfo` | lib/Gdip_All.ahk | 1.00 | converged, module copy deleted |
-| `msgBoxWrapper` | quick-picto-viewer.ahk (14-param, msgbox2-based) | 0.04 | **absorbed**: the module's 7-param native-MsgBox version was dropped and its two callers retargeted to `simpleMsgBoxWrapper` |
-| `MWAGetMonitorMouseIsIn` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `PreventKeyPressBeep` | **lib/module-interface.ahk** | identical | inverse case: main's copy was the dead one and was deleted |
-| `SetMenuInfo` | lib/shell-stuff.ahk | 1.00 | converged, module copy deleted |
-| `setMenusTheme` | lib/shell-stuff.ahk | 0.94 | converged, module copy deleted (with shell-stuff's forwarder line) |
-| `SetParentID` | quick-picto-viewer.ahk | 0.93 | converged, module copy deleted |
-| `setPriorityThread` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `Trimmer` | quick-picto-viewer.ahk | identical | module copy deleted |
-| `UnregisterTouchWindow` | lib/shell-stuff.ahk | identical | module copy deleted |
-| `WinMoveZ` | lib/shell-stuff.ahk | 1.00 | converged, module copy deleted |
+| name | defined in | lines | refs | note |
+|---|---|---|---|---|
+| `addJournalEntry` | quick-picto-viewer.ahk | 35 | 0 / 384 | the module writes no journal entries |
+| `adjustWin2MonLimits` | quick-picto-viewer.ahk | 16 | 0 / 3 | |
+| `calcHUDsize` | quick-picto-viewer.ahk | 1 | 3 / 4 | |
+| `calcScreenLimits` | lib/msgbox2.ahk | 59 | 0 / 11 | |
+| `clampInRange` | quick-picto-viewer.ahk | 15 | 1 / 506 | |
+| `constructKbdKey` | quick-picto-viewer.ahk | 23 | 1 / 2 | called by both `uiWM_KEYDOWN` and `WM_KEYDOWN` |
+| `dummy` | quick-picto-viewer.ahk | 1 | 3 / 344 | |
+| `GetMenuItemRect` | lib/shell-stuff.ahk | 13 | 0 / 1 | |
+| `GetPhysicalCursorPos` | lib/shell-stuff.ahk | 26 | 1 / 31 | |
+| `GetWinClientSize` | lib/shell-stuff.ahk | 30 | 0 / 10 | |
+| `GetWindowBounds` | lib/shell-stuff.ahk | 22 | 0 / 1 | |
+| `GetWindowFromPos` | lib/shell-stuff.ahk | 6 | 1 / 0 | module-only caller (`uiWM_MOUSEMOVE`, dark-mode theming of the flyout tooltip) |
+| `GetWindowPlacement` | lib/shell-stuff.ahk | 16 | 1 / 9 | |
+| `GetWinHwndAtPoint` | lib/shell-stuff.ahk | 4 | 0 / 0 | no caller anywhere (§4) |
+| `identifyThisWin` | quick-picto-viewer.ahk | 7 | 2 / 7 | the active window is one of the five PVwin-family windows, memoised for 50 ms |
+| `InitGuiContextMenu` | quick-picto-viewer.ahk | 81 | 2 / 2 | called from `WM_RBUTTONUP` and `WM_LBUTTON_DBL` with `IdentifyCtrlUnderMouse()` |
+| `isAlphaMaskWindow` | quick-picto-viewer.ahk | 2 | 0 / 29 | the module reaches it only through `isNowAlphaPainting()` |
+| `isDotInRect` | quick-picto-viewer.ahk | 4 | 2 / 56 | |
+| `isInRange` | quick-picto-viewer.ahk | 4 | 5 / 209 | |
+| `isNowAlphaPainting` | quick-picto-viewer.ahk | 1 | 2 / 69 | `isAlphaMaskWindow()` + `liveDrawingBrushTool` + `isImgEditingNow()`; used by `BuildMenuBar` and `UpdateMenuBar` |
+| `IsNumber` | lib/Gdip_All.ahk | 4 | 0 / 96 | |
+| `isTlbrVertical` | quick-picto-viewer.ahk | 4 | 1 / 1 | |
+| `isVarEqualTo` | quick-picto-viewer.ahk | 10 | 11 / 120 | |
+| `JEE_ClientToScreen` | lib/shell-stuff.ahk | 9 | 3 / 11 | |
+| `JEE_ScreenToClient` | lib/shell-stuff.ahk | 9 | 2 / 5 | |
+| `KeyboardResponder` | quick-picto-viewer.ahk | 231 | 2 / 2 | called by both keyboard tails (`uiPreProcessKbdKey`, `PreProcessKbdKey`) and posted by `WM_MOUSEWHEEL` |
+| `MDMF_FromHWND` | lib/Gdip_All.ahk | 1 | 0 / 1 | |
+| `MDMF_FromPoint` | lib/Gdip_All.ahk | 9 | 0 / 1 | |
+| `MDMF_GetInfo` | lib/Gdip_All.ahk | 14 | 0 / 2 | |
+| `mouseCreateOSDinfoLine` | quick-picto-viewer.ahk | 35 | 2 / 9 | one tooltip window for the viewport and the panels (`mouseToolTipGuia`, §3) |
+| `mouseTurnOFFtooltip` | quick-picto-viewer.ahk | 22 | 11 / 18 | the hide path of that window (`mouseCreateOSDinfoLine` destroys and recreates it); 11 module sites |
+| `msgBoxWrapper` | quick-picto-viewer.ahk | 74 | 0 / 292 | the module shows no MsgBox2 dialog; its two prompts use `uiNativeYesNoPrompt()` |
+| `MWAGetMonitorMouseIsIn` | lib/shell-stuff.ahk | 22 | 0 / 3 | |
+| `PanelQuickSearchMenuOptions` | quick-picto-viewer.ahk | 75 | 1 / 28 | module-side reach: the flyout S button in `uiWM_LBUTTONUP` |
+| `PreventKeyPressBeep` | lib/module-interface.ahk | 1 | 1 / 0 | the one name whose single copy lives in the module; registered by `initInterfaceModule()` |
+| `RepositionTempBtnGui` | quick-picto-viewer.ahk | 33 | 1 / 1 | module-side reach: `SetTimer` from `WM_WINDOWPOSCHANGED` |
+| `repositionWindowCenter` | quick-picto-viewer.ahk | 134 | 1 / 77 | module-side reach: `BuildGUI()` centres PVwin with it |
+| `saveMainWinPos` | quick-picto-viewer.ahk | 5 | 1 / 0 | module-only caller (`SetTimer` from `WM_WINDOWPOSCHANGED`) |
+| `SetMenuInfo` | lib/shell-stuff.ahk | 29 | 0 / 1 | |
+| `setMenusTheme` | lib/shell-stuff.ahk | 11 | 0 / 2 | |
+| `SetParentID` | lib/shell-stuff.ahk | 2 | 4 / 0 | module-only callers (the four GDI containers) |
+| `setPriorityThread` | lib/shell-stuff.ahk | 3 | 0 / 8 | |
+| `showOSDinfoLineNow` | quick-picto-viewer.ahk | 62 | 1 / 5 | the placement half of the tooltip pair |
+| `toggleAppToolbar` | quick-picto-viewer.ahk | 18 | 1 / 10 | module-side reach: the flyout T button in `uiWM_LBUTTONUP` |
+| `ToggleMenuBaru` | quick-picto-viewer.ahk | 16 | 1 / 3 | module-side reach: the flyout M button in `uiWM_LBUTTONUP` |
+| `Trimmer` | quick-picto-viewer.ahk | 5 | 1 / 292 | |
+| `UnregisterTouchWindow` | lib/shell-stuff.ahk | 1 | 6 / 2 | called for PVwin, four of its hit-test controls and the four GDI containers |
+| `Win_ShowSysMenu` | lib/shell-stuff.ahk | 12 | 0 / 0 | no caller anywhere (§4) |
+| `WinClickAction` | quick-picto-viewer.ahk | 725 | 4 / 1 | the module hands it every viewport click (`uiWM_LBUTTONDOWN`, `WM_LBUTTON_DBL`, `WM_MBUTTONDOWN`) |
+| `WinMoveZ` | lib/shell-stuff.ahk | 20 | 1 / 1 | |
 
-## 3. Renamed for another reason: the numbered GUIs got names
+## 3. Windows and menus the module owns
 
-The module's GUIs 1-5 became `PVwin`, `PVgdiPic`, `PVgdiThumbs`, `PVgdiInfos`, `PVgdiSelect`
-(main has 1,059 bare `Gui, Add` lines that rely on named defaults, so two sets of numbered
-GUIs could not coexist). AutoHotkey derives the implicit event handlers from the GUI name, so:
+- GUIs: `PVwin` (the main window), `PVgdiPic`, `PVgdiThumbs`, `PVgdiInfos`, `PVgdiSelect` (the
+  layered containers `BuildGUI()` creates; reparented into PVwin except on Windows 7),
+  `menuFlier` (the S/T/M flyout, `hFlyOut`) and `MclickH` (the click halo).
+- AutoHotkey derives implicit handlers from the GUI name: `PVwinGuiSize()` and
+  `PVwinGuiDropFiles()` are those handlers for PVwin, so their zero textual references are by
+  design. There is no `PVwinGuiClose` label: `WM_CLOSE` on the PVwin family is answered by the
+  `uiWM_CLOSE` monitor (§6), which returns 0 after `preByeRoutine("win-close")`.
+- Menus: `PVbar` is the menu bar; `BuildMenuBar()` fills it through `uiKmenu`, every item
+  carrying its real dropdown as an attached submenu, and `UpdateMenuBar()` rebuilds it behind the
+  placeholder menu `PVmanu`. `PVmenu` is the main script's context menu.
+- Tooltip: one window, `mouseToolTipGuia`, owned by the main script's `mouseCreateOSDinfoLine()`,
+  `showOSDinfoLineNow()` and `mouseTurnOFFtooltip()`; the module uses it for the thumbnails
+  status-bar tooltip and the menu reader's announcements.
 
-| thread-era name | name now | kind |
-|---|---|---|
-| `GuiSize()` | `PVwinGuiSize()` | implicit size handler of GUI 1 |
-| `GuiDropFiles()` | `PVwinGuiDropFiles()` | implicit drop handler of GUI 1 |
-| `1GuiClose:` | `PVwinGuiClose:` | label |
-| GUI `mouseToolTipGuia` | `uiMouseTipGuia` | the viewport tooltip window (main keeps its own `mouseToolTipGuia` for panels) |
-| menu `PVmenu` (the bar) | `PVbar` | main's `PVmenu` is the context menu — two different menus under one name |
+## 4. What the inventory surfaced
 
-## 4. Leftovers this inventory surfaced
+- `GetWinHwndAtPoint()` in `lib/shell-stuff.ahk` has no caller anywhere.
+- `Win_ShowSysMenu()` in `lib/shell-stuff.ahk` has no caller; the comment in `uiWM_KEYDOWN`
+  names it as the library helper for a programmatic system menu. Alt+Space itself goes through
+  `SC_KEYMENU`.
+- The header comment of `QPV DLL source code/callwndproc-hook.h` names `uiSentMenuMsg` as the
+  script side of the hook; no such function exists — the callback `uiInstallSentMsgHook()`
+  registers with `qpvHookSentMessages` is `uiCallWndProcWork`. The same header's callback
+  typedef labels its parameters `(wParam, lParam, msg, hwnd)` while the procedure passes the
+  message first, which is the order `uiCallWndProcWork(msg, wP, lP, hwnd)` expects. Both are
+  comment-only.
+- `changeMcursor` / `uiChangeMcursor` are one mechanism with two entry points (§1-A): the gate
+  and the throttle live under the main-script name, the cursor work under the module's, and 6
+  main-script sites bypass the gate. The other seven pairs are separated by window family or by
+  job.
+- The module has no dead function: each of its 100 functions is referenced, or is an implicit GUI
+  handler.
 
-- `uiConstructKbdKey` is a byte-for-byte duplicate of `constructKbdKey` (one caller).
-- `uiAddJournalEntry` is dead: every reference to it is a commented-out line.
-- The Alt+Space emulation chain is dead since Alt+Space rides `SC_KEYMENU`: `Win_ShowSysMenu`
-  (shell-stuff, zero references), `uiShowSysMenu` (only reachable from the `!Space` branch of
-  `uiKeyboardResponder`, which `uiWM_KEYDOWN` now intercepts first) and `coreShowSysMenu`.
-  *Resolved 2026-09-02, see section 6 — `Win_ShowSysMenu` kept by request.*
-- `uiIsAlphaMaskWindow` still carries the thread-era window-ID set without panels 74 and 89.
-- The group-B rows are the natural next consolidation pass; group A stays as it is by design
-  (each pair is two contracts that happened to share a name).
+## 5. Wrapper check
 
-## 6. Consolidation pass — 2026-09-02 (per Marius)
+Criterion: a wrapper is useless when its body only forwards to another function, directly or
+through a queued post, and every caller could name the target itself with no change in
+behaviour. Every module function with three or fewer code lines (18 of 100; code lines =
+non-blank, non-comment) was classified by body shape and by how it is referenced (direct call,
+`SetTimer` target, quoted name); the 4–12-line functions were read; the main-script functions
+of §6 were checked the same way.
 
-- `uiConstructKbdKey` and `uiAddJournalEntry` deleted; `uiWM_KEYDOWN` calls `constructKbdKey`.
-- `uiIdentifyThisWin` → `identifyThisWin` (the extra `otherAscriptHwnd` test dropped; that
-  write-only global is gone with it).
-- `uiIsAlphaMaskWindow` and `uiIsNowAlphaPainting` → `isAlphaMaskWindow` / `isNowAlphaPainting`,
-  main's predicates winning as asked: panels 74 and 89 now count as alpha-mask windows on the
-  UI side too, and `isImgEditingNow()` replaces the mirrored `imgEditPanelOpened`/`editingSelectionNow` pair.
-- The tooltip pair → **one window**, `mouseToolTipGuia` (main's names for the GUI, the
-  `mouseToolTipWinCreated` flag and `lastTippyWin`): `mouseCreateOSDinfoLine` keeps main's styling
-  (Arial Bold, 1.25× margin — per Marius, tooltips never use the OSD font), main's deliberate
-  no-`Critical` choice and its click handler; `showOSDinfoLineNow` was already identical; `mouseTurnOFFtooltip` took the module's
-  richer body (statusbar flag, `lastWinDrag` guard, timer disarm) and replaces `uiMouseTurnOFFtooltip`
-  at its 14 module sites — one window needs one owner of the destroy, which is why that function
-  joined the pass; `mouseClickTurnOFFtooltip`, `destroyTooltipu` and the `uiMouseTipGuia` close/escape
-  labels are gone. `hGuiTip` finally has a single owner (both windows used to write it).
-- The dead Alt+Space emulation: `uiShowSysMenu` and `coreShowSysMenu` deleted together with the
-  unreachable `!Space` branch of `uiKeyboardResponder`; `Win_ShowSysMenu` in shell-stuff.ahk is kept
-  on purpose as the library helper for a programmatic system menu.
+Result: **no pure forward exists.** The 18 small functions are:
 
-## 7. Useless wrappers — inventory of 2026-09-02
+- the six `dispatch*` composers (they route by window root, §1-B) and `isUIrootWin` (the root
+  test they share, 13 callers);
+- timer adapters, needed because `SetTimer` passes no arguments and runs no bare command:
+  `DestroyClickHalo` (`Gui, MclickH: Hide`), `trackMouseDragging` (stamps `lastWinDrag`), and
+  `uiStopMenuTimer` (the `KillTimer` of the menu ticker, three callers);
+- small predicates and handlers: `preventSillyGui`, `TestDraggableWindow`, `WM_MOUSELEAVE`,
+  `PreventKeyPressBeep`, `updateWindowColor`, `destroyMenuFlyout`, `uiAccessViewportOrigin`
+  (three assignments derived from `adjustCanvas2Toolbar()`) and `WM_PENpressure`
+  (`Critical, off` plus the shared pressure reader).
 
-Criterion: a wrapper is useless when its body only forwards to another function — directly, or
-through the `MT_post`/`IF_post` queue — and every caller could name the target itself with no
-change in behaviour. Two facts decide most rows: a `SetTimer` target already runs as a queued
-thread, so a *timer → wrapper → `MT_post`* chain defers twice for nothing; and `? 1 : 0` adds
-nothing to a value that is only ever tested as a boolean. Method: every module function with
-three or fewer code lines (23 of 111) was classified by body shape and by how it is referenced
-(direct call, `SetTimer` target, quoted name, `g`-label); the 4–12-line relays were read by hand;
-the main script was checked for the functions the merge added there.
+Main-script functions that look like wrappers and are not: `QPV_post` (the queued-call facade,
+§6), `updateUIctrl` and `changeMcursor` (§1-A: a mode choice, a gate and a throttle),
+`hideMenuFlyoutNow` (two stamps, then `coreHideMenuFlyout()`), `setWhileLoopBusy` (returns the
+previous flag) and `scheduleNextSlide` (a gated timer arm).
 
-### A. Pure forwards in module-interface.ahk — delete and retarget
+## 6. Functions that exist on this branch and not on `master`
 
-> **Applied 2026-09-02:** all four deleted and their callers retargeted as listed.
+59 names: 8 are the `ui` pairs of §1 and 2 the implicit handlers of §3. The remaining **49**,
+grouped by role.
 
-| wrapper | body | referenced by | replacement |
-|---|---|---|---|
-| `identifyMenus()` | `Return uiVisibleMenuWin() ? 1 : 0` | 2 direct calls, both `!identifyMenus()` | `uiVisibleMenuWin()` — it returns the menu hwnd or 0, which is all a boolean test needs |
-| `sendWinClickAct(ctrlEvent, guiCtrl, mX, mY)` | `MT_post("WinClickAction", ctrlEvent, guiCtrl, mX, mY)` | 2 direct calls (the LButton-up handler, `uiWinClickAction`) | `MT_post("WinClickAction", …)` written at the two sites |
-| `uiRepositionTempBtnGui()` | `MT_post("RepositionTempBtnGui")` | 1 `SetTimer … -95` | `SetTimer, RepositionTempBtnGui, -95` — `RepositionTempBtnGui(mm:=0)` is timer-callable |
-| `uiSaveMainWinPos()` | `MT_post("saveMainWinPos")` | 1 `SetTimer … -35` | `SetTimer, saveMainWinPos, -35` |
-
-### B. Merge facades in quick-picto-viewer.ahk
-
-> **Applied 2026-09-02, `IF_call` only:** the facade is deleted and its 11 sites are direct calls (every arity
-> re-checked against the target's signature first — direct calls are load-time checked, the dynamic ones were not).
->
-> **Applied 2026-09-05, `IF_post` and `MT_post` unified:** `MT_post` (11 active call sites in `module-interface.ahk`)
-> and `IF_post` (37 active call sites in `quick-picto-viewer.ahk`) merged into a single `QPV_post(funcName, args*)`
-> defined in `quick-picto-viewer.ahk` dispatching through `QPV_postRelay`. `MT_post` deleted from `module-interface.ahk`.
-
-| facade | what it is today | sites | replacement |
-|---|---|---|---|
-| `IF_call(funcName, args*)` | a 23-line arity-dispatched dynamic call, `%funcName%(a1 … a9)` | 11, every one with a literal function name | the plain direct call `funcName(args)`. The facade exists because the target used to live in the other interpreter; now it is only a slower, arity-capped way to write a normal call |
-| `IF_post` and `MT_post` | unified into `QPV_post` (`QPV_postRelay`) | 37 + 11 | **Unified 2026-09-05 into `QPV_post`**: one name is enough — they were the two directions of a bridge that no longer has two sides. `MT_post` deleted, all 48 sites retargeted to `QPV_post`. `QPV_postRelay` stays as the relay |
-
-### C. Thin relays — eliminated 2026-09-05
-
-> **Status 2026-09-05:** all 4 thin relays eliminated. The 3 flyout buttons in `uiWM_LBUTTONUP` handle debouncing directly with `QPV_post`, and `uiInitGuiContextMenu` was inlined into its two callers (`WM_LBUTTON_DBL` and `WM_RBUTTONUP`).
-
-| relay | body | callers | status |
-|---|---|---|---|
-| `uiToggleAppToolbar()` | 300 ms debounce, then `MT_post("toggleAppToolbar")` | 1 | **Eliminated**: inlined debounce + `QPV_post` in `uiWM_LBUTTONUP` |
-| `uiToggleMenuBaru()` | 300 ms debounce, then `MT_post("ToggleMenuBaru")` | 1 | **Eliminated**: inlined debounce + `QPV_post` in `uiWM_LBUTTONUP` |
-| `uiPanelQuickSearchMenuOptions()` | 300 ms debounce, then `MT_post` of `closeQuickSearch` or `PanelQuickSearchMenuOptions` depending on `VisibleQuickMenuSearchWin` | 1 | **Eliminated**: inlined debounce + `QPV_post` in `uiWM_LBUTTONUP` |
-| `uiInitGuiContextMenu(mX, mY, oX, oY)` | `IdentifyCtrlUnderMouse(oX, oY)`, then `MT_post("InitGuiContextMenu", "extern", mX, mY, 0, ctrl)` | 2 | **Eliminated**: inlined `InitGuiContextMenu("extern", mX, mY, 0, IdentifyCtrlUnderMouse(oX, oY))` |
-
-### D. Looked like wrappers, are not — keep
-
-- Timer adapters that exist because `SetTimer` cannot pass arguments or run a bare command:
-  `DestroyClickHalo` (`Gui, MclickH: Hide`; `ShowClickHalo` is still posted from the main script),
-  `trackMouseDragging` (stamps `lastWinDrag`), `miniGDIupdater` (two actions).
-- Real logic with a small body: the six `dispatch*` window-root dispatchers, `isUIrootWin`,
-  `preventSillyGui`, `TestDraggableWindow`, `WM_MOUSELEAVE`, `PreventKeyPressBeep`,
-  `updateWindowColor`, `destroyMenuFlyout`. `MenuBonusOptions` (a `SoundBeep` placeholder menu
-  handler) was listed here until 2026-09-02, when it went with the dormant `applyFilter` branch of
-  `BuildMenuBar` (see footnote 3). `stopDupesEngineNow` (a named DllCall of `dupesEngineCancel`
-  with one caller, the abort prompt) was listed here until 2026-09-03: on one interpreter it could
-  only ever run between step budgets, where the dupes loops already cancel themselves, so it was
-  removed; the sort it once stopped from the other thread is now covered by an Escape poll inside
-  the DLL's `dupesProgressCB`.
-- The main script gained only five functions in the merge: the three facades above, plus
-  `armSQLiteAbortHandler` and `sqliteAbortProgressCB` (the SQLite abort hook, real code).
-
-## 8. Functions the merge added (no renames in this list)
-
-Derived from git on 2026-09-02: the column-0 function sets of `quick-picto-viewer.ahk` and
-`lib/*.ahk` on `master` versus HEAD give 43 names that did not exist before the branch; 17 of
-them are the `ui`-prefixed collision renames and the two GUI-name renames (sections 1 and 3),
-which are excluded here. The remaining **26** are genuinely new. Each was traced to the first
-commit in which it appears; every one of those commits carries the merge's co-author trailer,
-i.e. none came from Marius' own commits on this branch. Phase letters refer to the plan.
-
-### Module bootstrap and message dispatch — lib/module-interface.ahk (phase C, `c629bc2`)
+### Module bootstrap and message dispatch — lib/module-interface.ahk (12)
 
 | function | lines | what it does |
 |---|---|---|
-| `initInterfaceModule()` | 78 | the module's auto-exec replacement: seeds the module-owned globals, registers the OnMessage dispatchers and the module-only messages, installs the WH_CALLWNDPROC hook |
-| `isUIrootWin(hwnd)` | 4 | true when a window's root is PVwin, one of the four GDI windows, the tooltip or the flyout — the test every dispatcher branches on |
-| `dispatchKeyDown()` | 5 | WM_KEYDOWN/WM_SYSKEYDOWN → `uiWM_KEYDOWN` for the PVwin family, main's `WM_KEYDOWN` for everything else |
-| `dispatchMouseMove()` | 5 | same split for WM_MOUSEMOVE |
-| `dispatchLButtonDown()` | 5 | same split for WM_LBUTTONDOWN |
-| `dispatchLButtonUp()` | 8 | same split for WM_LBUTTONUP (plus the tooltip window) |
-| `dispatchLButtonDbl()` | 5 | same split for WM_LBUTTONDBLCLK |
-| `dispatchMouseWheel()` | 5 | WM_MOUSEWHEEL → `WM_MOUSEWHEEL` for the PVwin family, `adjustWheelNumbersEditFields` for panels |
-| `uiVisibleMenuWin(ptX:="", ptY:="")` | 24 | the visibility-aware `#32768` probe: returns the menu hwnd filtering on visibility; when screen coordinates are passed, hit-tests all visible `#32768` windows of this process |
-| `uiWM_NCLBUTTONDOWN()` | 10 | WM_NCLBUTTONDOWN monitor for the PVwin family: intercepts HTCLOSE (20) during busy states (`runningLongOperation`, `imageLoading`, `whileLoopExec`) to immediately invoke `preByeRoutine()` on mouse down and return 0; idle clicks pass through to DefWindowProc for standard caption tracking |
-| `uiWM_SYSCOMMAND()` | 9 | WM_SYSCOMMAND monitor for the PVwin family: intercepts SC_CLOSE (`0xF060`) from sysmenu, taskbar close, or mouse-up release on caption [X], invokes `preByeRoutine()`, and returns 0 |
-| `uiWM_CLOSE()` | 6 | WM_CLOSE monitor for the PVwin family: calls `preByeRoutine()` and returns 0 to prevent AHK from closing the window underneath worker loops; non-interface windows fall through to their own GuiClose labels |
+| `initInterfaceModule()` | 73 | the module's auto-exec replacement, called once from the main script's start-up before `BuildGUI()`: seeds the module-owned globals; registers the module-only `OnMessage` handlers (`WM_MOUSELEAVE`, `WM_RBUTTONUP`, `WM_MBUTTONDOWN`, `WM_WINDOWPOSCHANGED`, `WM_ACTIVATE` / `WM_KILLFOCUS` → `activateMainWin`, `uiWM_NCLBUTTONDOWN`, `uiWM_SYSCOMMAND`, `uiWM_CLOSE`), the four `WM_POINTER*` numbers → `WM_PENpressure` when `GetPointerPenInfo` exists, and the keystroke-beep suppression (0x101–0x103, 0x105–0x108 → `PreventKeyPressBeep`); installs the sent-message hook (`uiInstallSentMsgHook()`) and the composed dispatchers for 0x100/0x104, 0x200–0x203 and 0x20A/0x20E |
+| `isUIrootWin(hwnd)` | 2 | true when the window's `GA_ROOT` is PVwin, one of the four GDI containers, the tooltip or the flyout; the test the dispatchers and most module-only monitors branch on (13 callers) |
+| `dispatchKeyDown()` | 3 | `WM_KEYDOWN` / `WM_SYSKEYDOWN` → `uiWM_KEYDOWN` or `WM_KEYDOWN` |
+| `dispatchMouseMove()` | 3 | `WM_MOUSEMOVE` → `uiWM_MOUSEMOVE` or `WM_MOUSEMOVE` |
+| `dispatchLButtonDown()` | 3 | `WM_LBUTTONDOWN` → `uiWM_LBUTTONDOWN` or `WM_LBUTTONdown` |
+| `dispatchLButtonUp()` | 3 | `WM_LBUTTONUP` → `uiWM_LBUTTONUP` or `WM_LBUTTONup` |
+| `dispatchLButtonDbl()` | 3 | `WM_LBUTTONDBLCLK` → `WM_LBUTTON_DBL` or `OnLButtonDblClk` |
+| `dispatchMouseWheel()` | 3 | `WM_MOUSEWHEEL` / `WM_MOUSEHWHEEL` → `WM_MOUSEWHEEL` or `adjustWheelNumbersEditFields` (called with its three declared parameters: the loader arity-checks direct calls) |
+| `uiVisibleMenuWin(ptX:="", ptY:="")` | 15 | the first visible `#32768` window of this process, or the one under the given screen point; 0 when none |
+| `uiWM_NCLBUTTONDOWN()` | 10 | the title-bar ✗ (`HTCLOSE`) on the PVwin family while `runningLongOperation`, `imageLoading` or `whileLoopExec` is set → `preByeRoutine("win-close")` and 0; idle clicks fall through to the default caption handling |
+| `uiWM_SYSCOMMAND()` | 7 | `SC_CLOSE` (system menu, taskbar, or the ✗ release) on the PVwin family → `preByeRoutine("win-close")` and 0 |
+| `uiWM_CLOSE()` | 4 | `WM_CLOSE` on the PVwin family → `preByeRoutine("win-close")` and 0, so the window never closes underneath a worker loop; every other window keeps its own `GuiClose` label |
 
-### Liveness shims for Critical worker loops — lib/module-interface.ahk (phase C, `c629bc2`)
-
-| function | lines | what it does |
-|---|---|---|
-| `drainUIinput()` | 93 | selective PeekMessage drain of the PVwin family's input while a loop holds Critical: abort gestures (Escape, viewport clicks, the title-bar ✗) reach their handlers inline, the keyboard tail runs only when a keydown was drained, everything else stays queued. The one checkpoint pump — the full pump was deleted (see the footnote) (2026-09-03: this is the click path for loops whose DLL step writes through the AHK SQLite connection — the progress fast-callback resets AHK's peek clock, so the per-line peek after the DllCall stays quiet; loops that only compute get their clicks as monitor threads) |
-| `pumpPenMessages()` | 32 | pen message checkpoint for the brush loop: reads the queued WM_POINTER* through `readPenPointerMsg()` and hands each one to DefWindowProc for the mouse promotion — never DispatchMessage: the OnMessage launch it triggers resets the interpreter's peek clock, which starved the loop's 16 ms message check while a pen streamed updates and kept the brush painting 300–600 ms after the lift (fixed 2026-09-02, see the RULE in the function) |
-| `readPenPointerMsg()` | 35 | the pressure reader shared by the `WM_PENpressure` monitor and the checkpoint above; touches no Critical state, so the checkpoint no longer switches Critical off on the brush thread (2026-09-02) |
-| `uiNativeYesNoPrompt()` | 40 | the Yes/No box behind `askAboutStoppingOperations()` and the force-exit branch of `byeByeRoutine()`: a DllCall'd `MessageBoxW` owned by PVhwnd, shown with Critical held (saved/restored), so nothing queued runs while it is up. AHK's own `MsgBox` lifts Critical for its lifetime (`DIALOG_PREP`, window.cpp) and its pump runs every pending timer/MT_post relay/g-label - a queued `ResetImgLoadStatus` cleared the busy flags inside the first prompt and after a "No" the gates never reopened (2026-09-03). `askAboutStoppingOperations()` also refuses to nest while `userPendingAbortOperations=1` |
-
-### Native menus and the hook-based menu reader — lib/module-interface.ahk (phase D, `138b6b0` and its fixes)
+### Liveness for loops that hold Critical — lib/module-interface.ahk (4)
 
 | function | lines | what it does |
 |---|---|---|
-| `uiCallWndProc()` | 44 | the WH_CALLWNDPROC callback: sees the SENT menu messages (WM_MENUSELECT, WM_INITMENUPOPUP, WM_ENTER/EXITMENULOOP) that no AHK pseudo-thread can see during a modal menu loop, and routes them to the four functions below |
-| `uiMenuSelectTrack()` | 37 | tracks the highlighted item for the reader (announcements are track-only; RButton re-announces) and triggers flyout placement |
-| `uiMenuJITrebuild()` | 30 | rebuilds a bar dropdown's content just-in-time at WM_INITMENUPOPUP via the `menuJITmap` (HMENU → builder); menu-bar sessions only, busy-guarded |
-| `uiMenuLoopEnter()` | 35 | menu-session start: session type from the ENTERMENULOOP wParam, the two native TIMERPROC tickers, the WH_MOUSE_LL hook |
-| `uiMenuLoopExit()` | 31 | menu-session end: kills the tickers and the hook, arms the 350 ms flyout grace, schedules the self-healing pass |
-| `uiMenuMouseLL()` | 44 | the WH_MOUSE_LL callback active only during menus: eats wheel notches and posts the equivalent arrow keys, balanced RButton down/up re-announce with hit-testing, flyout placement |
-| `uiMenuNativeTick()` | 15 | the TIMERPROC fired by the modal loop itself (AHK timers never tick there): calls flyout placement and auto-hides the reader OSD tooltip after its deadline |
-| `uiTryPlaceFlyout()` | 48 | positions the S/T/M flyout beside the root popup, found by HMENU identity through MN_GETHMENU so a fading ghost window cannot capture it (`826986b`) |
-| `uiRefreshBarAttachments()` | 41 | self-healing pass after every menu loop: re-resolves each bar attachment by name, repairs changed handles, rebuilds the JIT map (`f6a3b99`) |
-| `uiMenuNameForBuilder()` | 12 | maps a menu-builder function name to the menu name it builds, for the attachment repair above |
+| `drainUIinput()` | 91 | the one checkpoint pump, 8 call sites in the main script's long loops: removes up to 40 queued key and mouse messages of PVwin and its children and hands them to the `ui` handlers inline (`uiWM_KEYDOWN` with `hotkate` blanked first, `uiWM_MOUSEMOVE`, `uiWM_LBUTTONDOWN` / `UP`, `WM_LBUTTON_DBL`, `WM_RBUTTONUP`, `WM_MBUTTONDOWN`, `WM_MOUSEWHEEL`), so the abort and cancel flags keep working while Critical is held; a queued ✗ click, `SC_CLOSE` or `WM_CLOSE` becomes `preByeRoutine("win-close")`; the keyboard tail `uiPreProcessKbdKey()` runs only when a drained key-down produced a `hotkate`, and its pending timer is then disarmed; input for other windows stays queued; re-entrancy-guarded; restores the caller's Critical state; nothing is dispatched to a window procedure |
+| `pumpPenMessages()` | 30 | the brush loop's checkpoint: removes up to 20 queued `WM_POINTER*` messages, reads each through `readPenPointerMsg()` and hands it to `DefWindowProc` so Windows keeps promoting the pen to mouse messages; never `DispatchMessage` (its `OnMessage` launches reset the interpreter's peek clock and starve the loop's 16 ms message check) |
+| `readPenPointerMsg(wp, msg)` | 33 | `penPressureRaw` from `GetPointerPenInfo` (0 on up / leave and while hovering); shared by the `WM_PENpressure` monitor and the checkpoint; touches no Critical state |
+| `uiNativeYesNoPrompt(msg)` | 38 | the Yes/No box behind `askAboutStoppingOperations()` and the force-exit branch of `byeByeRoutine()`: a DllCall'd `MessageBoxW` (`MB_YESNO` \| `MB_ICONQUESTION` \| `MB_SETFOREGROUND`) owned by PVhwnd and shown with Critical held, so nothing queued (timers, posts, g-labels) runs while it is up; when Critical was off before, it is left on afterwards on purpose; returns `"yes"` or `"no"` |
 
-### Queued-call facades — phase B/C
+### Native menus: the sent-message hook and the menu session — lib/module-interface.ahk (16)
+
+The menu bar carries real attached submenus. During a modal menu loop no AutoHotkey thread
+launches, so the machinery rides the messages Windows SENDS to the menu owner, seen through a
+`WH_CALLWNDPROC` hook.
+
+| function | lines | what it does |
+|---|---|---|
+| `uiInstallSentMsgHook()` | 59 | installs the `WH_CALLWNDPROC` hook and picks its procedure. With `qpvmain.dll` loaded: registers `uiCallWndProcWork` with `qpvHookSentMessages` for `WM_INITMENUPOPUP`, `WM_MENUSELECT`, `WM_ENTERMENULOOP`, `WM_EXITMENULOOP` and the `0x85EE` probe, sends the probe to the script's own window and keeps the native procedure only when `sentMsgProbeSeen` came back set (otherwise it unhooks and logs). Without the DLL, or when the probe fails: `SetWindowsHookEx` with the script procedure `uiCallWndProc`. Called from `initInterfaceModule()`, where the DLL is not loaded yet, and again from `initQPVmainDLL()`, which swaps the native procedure in |
+| `uiCallWndProc(nCode, wP, lP)` | 13 | the fallback script hook procedure, in place only until the DLL loads: a numeric trampoline that decodes the `CWPSTRUCT` and calls `uiCallWndProcWork` for the four menu messages, then `CallNextHookEx`; every other sent message of the thread passes through untouched |
+| `uiCallWndProcWork(msg, wP, lP, hwnd:=0)` | 68 | the worker for the four menu messages, entered from the native procedure or the trampoline: saves and restores Critical; acknowledges the install probe; while `runningLongOperation` or `imageLoading` is set, `WM_INITMENUPOPUP` and `WM_ENTERMENULOOP` end the menu with `EndMenu`, `WM_MENUSELECT` is ignored and `WM_EXITMENULOOP` still runs its exit; `WM_MENUSELECT` → `uiMenuSelectTrack`; `WM_INITMENUPOPUP` → infers the session type when no loop is active yet (a mapped HMENU is a bar dropdown), records the flyout anchor, `uiMenuJITrebuild(hMenu)`, `uiStartMenuTimer()`; `WM_ENTERMENULOOP` → `uiMenuLoopEnter(wP)`; `WM_EXITMENULOOP` → `uiMenuLoopExit()`; returns 0 |
+| `uiMenuJITrebuild(hMenu)` | 31 | rebuilds a bar dropdown's content in place at `WM_INITMENUPOPUP` through `menuJITmap` (HMENU → `InvokeMenuBar*` builder, `justBuild=1`); bar sessions only, busy-guarded; closes the quick search and the tooltip first |
+| `uiMenuSelectTrack(mwParam, hMenuSel)` | 39 | tracks the highlighted item for the menu reader: reads the item text with `GetMenuStringW` (by position for `MF_POPUP`, by command id otherwise), appends the submenu / unavailable / checked state and the accelerator, and keeps it in `uiMenuReaderLastMsg` for the on-demand announcement; also triggers the flyout placement while the flyout is not visible |
+| `uiMenuLoopEnter(fromPopup:=0)` | 15 | menu-session start: `menuLoopActive`, the session type from the `WM_ENTERMENULOOP` wParam (0 = bar tracking, 1 = popup), the reader and flyout state reset, and the `WH_MOUSE_LL` hook (`uiMenuMouseLL`) installed |
+| `uiMenuLoopExit()` | 19 | menu-session end: clears the state, stops the menu timer, removes the mouse hook, calls `hideMenuFlyOut()` and, with the reader on, `mouseTurnOFFtooltip()`, and arms `uiRefreshBarAttachments` on a 50 ms timer |
+| `uiMenuMouseLL(nCode, wP, lP)` | 55 | the `WH_MOUSE_LL` procedure, active only inside a menu session: expires the reader OSD; a wheel notch over a visible menu window is eaten and replaced by three posted arrow key-downs to PVwin; right button down over a menu window shows the tracked item text as a 1500 ms OSD and eats the click (and the matching button-up); Critical saved and restored |
+| `uiStartMenuTimer()` | 4 | arms the native 20 ms `TIMERPROC` timer (`0xF17E` on PVhwnd) → `uiMenuTimerProc`; the modal loop dispatches `WM_TIMER`, unlike AutoHotkey timers |
+| `uiStopMenuTimer()` | 1 | its `KillTimer`; called from the loop exit, the timer procedure and `coreHideMenuFlyout` |
+| `uiMenuTimerProc()` | 7 | the timer procedure: retries `uiTryPlaceFlyout()` until the flyout is visible, then stops the timer; Critical saved and restored |
+| `uiTryPlaceFlyout(anchor:=0)` | 46 | positions the S/T/M flyout below the anchored popup: the anchor is an HMENU resolved to its visible `#32768` window through `MN_GETHMENU` (or a window handle, or the first visible menu window when there is no anchor); creates `menuFlier` on first use; one main-script caller, `showThisMenu()` |
+| `uiRefreshBarAttachments()` | 39 | the self-healing pass after every menu loop: re-resolves each bar attachment by name through `uiMenuNameForBuilder`, re-adds to `PVbar` the ones whose handle changed, rebuilds `menuJITmap`; a no-op when nothing changed |
+| `uiMenuNameForBuilder(suffix)` | 10 | the static map from an `InvokeMenuBar<suffix>` builder to the menu name it builds |
+| `coreHideMenuFlyout()` | 7 | the flyout hide itself: clears the visible flag and the anchor, stops the menu timer, hides `menuFlier` and the click halo, disarms `hideMenuFlyOut` |
+| `hideMenuFlyoutNow()` — quick-picto-viewer.ahk | 3 | stamps `lastOtherWinClose` and `lastContextMenuZeit`, then `coreHideMenuFlyout()`: the immediate variant `showThisMenu()` uses when the mouse is not over the flyout (`hideMenuFlyOut` is the deferred, mouse-position-gated one) |
+
+### Queued calls — quick-picto-viewer.ahk (2)
+
+| function | lines | what it does |
+|---|---|---|
+| `QPV_post(funcName, args*)` | 4 | queued execution: binds `QPV_postRelay(funcName, args)` to a 5 ms one-shot timer, so the target runs when the thread next pumps messages, never inline; 25 call sites (22 in the main script, 3 in the module) |
+| `QPV_postRelay(funcName, args)` | 23 | the relay: hoists `args[1..9]` into plain locals and calls the target by name with the matching arity (the parser accepts neither `args*` nor `args[N]` inside a call's argument list) |
+
+### Input coordinates — lib/module-interface.ahk (1)
+
+| function | lines | what it does |
+|---|---|---|
+| `uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY)` | 9 | splits a mouse message's `lParam` into PVwin client coordinates, stamps `lastLclickX/Y` and `lastALclickX/Y`, and when the toolbar is docked (`detectToolbar()`) converts them into the GDI container's client space; four callers (`uiWM_LBUTTONDOWN`, `WM_MBUTTONDOWN`, `WM_LBUTTON_DBL`, `WM_RBUTTONUP`) |
+
+### Slideshow and GIF playback (4)
 
 | function | file | lines | what it does |
 |---|---|---|---|
-| `QPV_post(funcName, args*)` | quick-picto-viewer.ahk | 6 | unified queued call (replaces `IF_post` and `MT_post`): binds the target and its arguments to `QPV_postRelay` on a one-shot timer, preserving queued dispatch semantics (`5d32ff5`, unified 2026-09-05) |
-| `QPV_postRelay(funcName, args)` | quick-picto-viewer.ahk | 25 | the relay that queued posts run through: hoists the bound arguments into plain locals and dispatches on their count — the runtime rejects `args*` and `args[N]` inside call arguments (`c629bc2`) |
+| `stopSlideshow(resetMode:=0, silentModus:=1)` | quick-picto-viewer.ahk | 25 | the single slideshow teardown, 73 call sites: clears the flag, stops the `theSlideShowCore` timer and the music (unless `resetMode=1`), restores the toolbar region and redraws it, relayouts the accessibility controls, schedules `ResetImgLoadStatus`, updates the seen-images counter, and when not silent shows the "STOPPED" tooltip (plus a beep for sub-second cadences) |
+| `scheduleNextSlide()` | quick-picto-viewer.ahk | 5 | after an image load completes while a slideshow runs: `allowNextSlide := 1` and `theSlideShowCore` armed at `-slideShowCadence` |
+| `stopGifORslidesPlayback(loudly:=0)` | lib/module-interface.ahk | 14 | the user-gesture stop the module's handlers share (11 call sites: viewport clicks, wheel, keys, resize, drop, close, plus the main script's delete-file action): stops a running slideshow (`stopSlideshow(0, !loudly)`) and a playing GIF (`stopGIFsPlayback()`), stamps `lastOtherWinClose`, returns whether anything was playing |
+| `InformToggledSlideShowu(actu:=0)` | quick-picto-viewer.ahk | 10 | the menu and toolbar entry: resets `GIFframesPlayied`; `"stop"` → a loud `stopSlideshow(0, 0)`; otherwise opens a pending start folder and `ToggleSlideShowu(actu)` |
 
-### Slideshows and GIFs playback simplification (2026-09-05)
-
-| function | file | lines | what it does |
-|---|---|---|---|
-| `scheduleNextSlide()` | quick-picto-viewer.ahk | 9 | directly arms `theSlideShowCore` timer after image load completion; replaces `invokeExternalSlideshowHandler()` and `dummySlideshow()`, eliminating the queued `QPV_post` relay |
-| `stopSlideshow(resetMode:=0)` | quick-picto-viewer.ahk | 34 | canonical single-entry slideshow teardown: kills `theSlideShowCore`, stops audio, restores toolbar transparency and region, resets UI controls/labels, and displays the stopped tooltip |
-| `stopPlayback()` | lib/module-interface.ahk | 14 | playback interceptor for viewport events and window close/escape: stops active slideshow (`stopSlideshow`) and/or active GIF (`stopGiFsPlayback`), returning whether anything was running |
-| `stopGiFsPlayback()` | lib/module-interface.ahk | 10 | user-gesture GIF teardown; triggers when actively playing (`animGIFplaying != 0`) and delegates internal frame teardown to `DestroyGIFuWin()` |
-
-*Eliminated cross-thread / multi-hop functions:* `slideshowsHandler()` (MI, stop/start cascade absorbed into `stopSlideshow` and `ToggleSlideShowu`), `dummySlideshow()` (MI, load completion relay), and `invokeExternalSlideshowHandler()` (QPV, replaced by `scheduleNextSlide`).
-
-### Keyboard input simplification (2026-09-05)
-
-*Eliminated cross-thread / multi-hop functions:* `uiKeyboardResponder()` (MI, absorbed directly into `uiPreProcessKbdKey()`, eliminating the intermediate relay, duplicate checks, and the `QPV_post` timer hop to `KeyboardResponder`).
-
-### SQLite abort hatch — quick-picto-viewer.ahk (phase D3, `2bc4cb1`)
+### SQLite abort hatch — quick-picto-viewer.ahk (1)
 
 | function | lines | what it does |
 |---|---|---|
-| `armSQLiteAbortHandler(dbObj)` | 14 | installed `sqlite3_progress_handler` on every connection `Class_SQLiteDB.OpenDB` opens. *Moved into the class on 2026-09-02 as `SQLiteDB.ArmAbortHandler(CallbackFunc, Opcodes)`; `OpenDB` arms the class-wide `SQLiteDB.AbortCallback`, which the main script sets to `sqliteAbortProgressCB` at startup* |
-| `sqliteAbortProgressCB()` | 14 | the progress callback: during long operations, Escape or the abort flag makes SQLite interrupt the running statement — the hatch the interface thread used to provide |
+| `sqliteAbortProgressCB(unusedArg)` | 16 | the `sqlite3_progress_handler` callback: `Class_SQLiteDB.OpenDB()` arms it on every connection through the class-wide `SQLiteDB.AbortCallback` (set to this name at start-up) and `ArmAbortHandler()`; runs inside the querying thread about every 9,000 opcodes, saves and restores Critical, and returns 1 (interrupt the statement) when a long operation or `allowSQLiteAbort=1` coincides with `mustAbandonCurrentOperations=1` |
 
-Also on 2026-09-02, per Marius: the seven `SQLstmt*` raw-handle helpers that lived in the main
-script next to `addSQLdbEntry()` (prepare / finalize / step / reset / bind int, double, text — not
-merge additions, they predate it) were folded into the class's statement object: `Prepare()` +
-`_Statement.BindInt64/BindDouble/BindText/Step/Reset/Free`. `SaveDBfilesList` and
-`SQLdbStoreFilesListEntry` now go through that object; `CloseDB()` finalizes `Prepare()`'d
-statements as well, `Free()` will not finalize a handle twice, `Bind()` can reach its Int64/Null
-branches and binds Int64 as 64-bit, and `_ErrMsg()` reads the message at the pointer.
+### Screen-reader / hit-test control placement (3)
 
-Footnotes. (1) Added on the branch and gone again: the variable facades `IF_set`, `IF_get`,
-`MT_set`, `MT_get` (phase B, retired at phase E for plain globals), the direct-call facade
-`IF_call` (retired in section 7), and `pumpUIevents` (the full Critical-off pump, deleted after it
-let queued canvas rebuilds run inside the thumbnails loop). (2) `merge-probes/` holds thirteen
-standalone probe scripts (p1–p13) with a README of verdicts; they established what runs during a
-same-interpreter menu loop and are not part of the application. (3) Retired 2026-09-02,
-pre-merge code rather than branch additions: the dormant `applyFilter` width-fit branch of
-`BuildMenuBar` (it arrived in 6.0 alpha 2 and no caller ever enabled it) together with its
-single-use helpers `simpleGetMenuItemRect` and `MenuBonusOptions`, the `hMenuBar` super-global
-only that branch read, and the two pass-through parameters of `uiKmenu`.
+| function | file | lines | what it does |
+|---|---|---|---|
+| `uiAccessViewportOrigin(ByRef oX, ByRef oY)` | lib/module-interface.ahk | 10 | the PVwin client-space origin of the viewport, read from the painter's own `adjustCanvas2Toolbar()` (toolbar width or height when it is docked), so the controls land on the painted elements |
+| `uiAccessListViewLayout(heightu, ByRef prevState)` | lib/module-interface.ahk | 25 | thumbnails / list view: the files-list container above the status bar, the status bar along the bottom edge (stopping where the scrollbar starts) and the scrollbar strip down the right edge, all shifted by the viewport origin; state-diffed; the only path that follows a resize while the list is displayed |
+| `infoBoxAccessCtrlPos(...)` | quick-picto-viewer.ahk | 8 | PVwin client coordinates of the info box for its screen-reader control: applies the canvas mirroring (`FlipImgH` / `FlipImgV`, image view only) and the docked-toolbar offset |
+
+### Other names that exist only on this branch (6)
+
+Outside the merge machinery; listed so the count reconciles.
+
+| function | file | lines | what it does |
+|---|---|---|---|
+| `copyTextToClippy(textu)` | quick-picto-viewer.ahk | 6 | `Clipboard := textu` under `Try`; returns 1 on success, 0 on failure; 15 call sites |
+| `setWhileLoopBusy()` | quick-picto-viewer.ahk | 3 | sets `whileLoopExec := 1` and returns the previous value; 9 call sites |
+| `refreshUImainWinElements()` | quick-picto-viewer.ahk | 5 | menu bar update, toolbar re-creation, the welcome-view controls, and the toolbar reposition timer when it is docked |
+| `tlbrInvokeSortListMenu()` | quick-picto-viewer.ahk | 16 | the toolbar's sort button: shows `PVsort` at the button, opens a pending start folder first and retries, or warns when fewer than three files are indexed |
+| `UIoffsetSelProperPanel(dummy:=0)` | quick-picto-viewer.ahk | 102 | the selection-properties panel's nudge buttons: steps the selection coordinates or size, Ctrl+click prompts for a value, `&align` opens the alignment menu |
+| `dummyUIoffsetSelProperPanel()` | quick-picto-viewer.ahk | 5 | repeats the nudge every 25 ms while the button stays pressed |
+
+Not functions of the application: `merge-probes/` holds thirteen standalone probe scripts
+(p1–p13) with a README of verdicts on what runs during a same-interpreter menu loop.
 
 ## Appendix — reproducing the numbers
 
-Parse column-0 `name(...)` definitions (body to the next column-0 `}`) from
-`git show master:lib/module-interface.ahk`, `git show a850285:lib/module-interface.ahk`,
-HEAD's `lib/module-interface.ahk`, and from `quick-picto-viewer.ahk` + `lib/*.ahk` at master
-and HEAD. Collisions = master module names ∩ master main/lib names (58). A collision is a
-rename when the name is absent from the phase-A module and `ui` + name is present (26); the
-rest kept their name (32). Similarities and reference counts as described at the top.
+- Definitions: a column-0 `name(` line followed by a column-0 `{` (on the same line or the next
+  non-blank one); the body runs to the next column-0 `}`. Parsed from `quick-picto-viewer.ahk`
+  and `lib/*.ahk` at HEAD, and from the same files at `master` for the baseline.
+- Baseline set: the `master` names defined in `lib/module-interface.ahk` ∩ the `master` names
+  defined in the other files = 58. Today a baseline name with `ui<name>` in the module and
+  `<name>` elsewhere is a §1 pair (8); one with a single definition is a §2 row (50); none is
+  undefined.
+- §6: HEAD names − `master` names = 59.
+- `lines`: between the braces, blank and comment lines included. Code lines (§5): non-blank,
+  non-comment lines between the braces.
+- `refs`: case-insensitive whole-word matches in code after stripping `;` comments (at line
+  start or preceded by whitespace, outside double quotes) and column-0 `/* */` blocks,
+  definition lines excluded. The comment stripping is approximate: a `;` inside a string that
+  follows a space cuts that line early.
