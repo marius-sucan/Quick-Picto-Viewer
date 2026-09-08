@@ -206,7 +206,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
    , iduStaticFoldersListCache := 0, lastFilterEditSearch := "", additionalLVrows := 1, uLVr := 12, hSliderWidget
    , omniBoxMode := 0, hLVquickSearchMenus := "", hotkate, vk_hwnd, lastInfoBoxBMP := [], lastSymmetryCoords := []
-   , userFriendlyPrevImgSelAction, keywordsListArray := new hashtable(), keywrdLVfilter, prevPasteInPlaceVPcoords := []
+   , userFriendlyPrevImgSelAction, keywrdLVfilter, prevPasteInPlaceVPcoords := []
    , lastLclickX, lastLclickY, lastTlbrClicked := 0, uiLVoffset := 0, repositionedWindow := 0, hCollapseWidget := 0
    , selDotMaX, selDotMaY, selDotMbX, selDotMbY, selDotMcX, selDotMcY, selDotMdX, selDotMdY, OnExtractConflictOverwrite := 4
    , lastInfoBoxZeitToggle := 1, prevHistoBoxString := "", menuHotkeys, lastMenuZeit := 1, viewportPDFbookMarks := []
@@ -3259,6 +3259,12 @@ copyMoveStructuredFolders(srcDir, finalDest) {
 
       thisFileIndex := A_Index
       file2rem := resultedFilesList[thisFileIndex, 1]
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       countTFilez++
       If !FileExist(file2rem)
       {
@@ -3275,7 +3281,6 @@ copyMoveStructuredFolders(srcDir, finalDest) {
       originalMtime := ""
       FileGetTime, originalMtime, % file2rem, M
       FileGetTime, originalCtime, % file2rem, C
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
@@ -3369,12 +3374,6 @@ copyMoveStructuredFolders(srcDir, finalDest) {
          }
       } Else If (operationExecuted=1)
          failedFiles++
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
    }
 
    whileLoopExec := 0
@@ -3443,7 +3442,6 @@ CalculateSelectedFilesSizes() {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-     executingCanceableOperation := A_TickCount
      If (determineTerminateOperation()=1)
      {
         abandonAll := 1
@@ -21703,7 +21701,6 @@ HugeImagesDrawParametricLines() {
                rect := Gdip_GetPathWorldBounds(pPath)
                outlier := testSelectOutsideImgEntirely(bmp, [o_imgSelX1 + rect.x - tk, o_imgSelY1 + rect.y - tk, o_imgSelX1 + rect.x + rect.w + tk, o_imgSelY1 + rect.y + rect.h + tk])
                ; fnOutputDebug(overlaps " | subPath #" ppk " | " round(rect.x) " | " round(rect.y)  " ||| " round(rect.w) " | " round(rect.h) )
-               executingCanceableOperation := A_TickCount
                etaTime := ETAinfos(ppk, subs, startOperation)
                If (ppzX || ppzY)
                   Gdip_TransformPath(pPath, pMatrix)
@@ -29150,7 +29147,6 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
     zEffect := (modus=11) ? Gdip_CreateEffect(6, 0, -100, 0) : 0
     Loop, % thisMaxCount
     {
-       executingCanceableOperation := A_TickCount
        If (determineTerminateOperation()=1)
        {
           abandonAll := 1
@@ -29245,7 +29241,6 @@ collectFileInfosNow(queryString:=0) {
     abandonAll := 0
     Loop, % thisMaxCount
     {
-       executingCanceableOperation := A_TickCount
        If (determineTerminateOperation()=1)
        {
           abandonAll := 1
@@ -29460,7 +29455,6 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
             }
          }
 
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -29898,7 +29892,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             entriesU["z" dpiu] := [entriezU%dpiu%, dpiu]
          }
 
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -30124,7 +30117,6 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
             entriesD[dateuD] := [entriez%dateuD%, Rowu[1]] ; SubStr(Row[1], 1, 8)]
             entriesM[dateuM] := [entriez%dateuM%, SubStr(Rowu[1], 1, 6)]
             entriesY[dateuY] := [entriez%dateuY%, SubStr(Rowu[1], 1, 4)]
-            executingCanceableOperation := A_TickCount
             If (determineTerminateOperation()=1)
             {
                abandonAll := 1
@@ -30341,7 +30333,6 @@ uiFileIndexStatsRetrieveSizeRangeDB(zr, ByRef totalSizeu, indexu, labelu, minu, 
             thisTotalSizeRange := Rowu[1]
             ; thisSizeFiles++
             ; thisTotalSizeRange += Row[1]
-            executingCanceableOperation := A_TickCount
             If (determineTerminateOperation()=1)
             {
                abandonAll := 1
@@ -31706,10 +31697,11 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
       Return 1
    }
 
-   destroyGDIfileCache()
-   changeMcursor()
    line := ""
+   changeMcursor()
+   destroyGDIfileCache()
    zr := loopsCount := 0
+   whileLoopExec := 1
    Loop, Parse, listu, `n,`r
    {
         line := Trimmer(Trimmer(A_LoopField), "\")
@@ -31729,6 +31721,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    }
 
    folderTreeScanSubbies()
+   whileLoopExec := 0
    If (!zr && !loopsCount)
    {
       friendly2 := InStr(msgResult, "Copy") ? "COPY" : "MOVE"
@@ -32120,6 +32113,12 @@ PasteFilesIntoGivenFolder(folderPath) {
       countTFilez++
       file2rem := A_LoopField
       zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       If !FileExist(file2rem)
       {
          failedFiles++
@@ -32135,7 +32134,6 @@ PasteFilesIntoGivenFolder(folderPath) {
       originalMtime := ""
       FileGetTime, originalMtime, % file2rem, M
       FileGetTime, originalCtime, % file2rem, C
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(countTFilez, foundFiles, startOperation)
@@ -32203,12 +32201,6 @@ PasteFilesIntoGivenFolder(folderPath) {
          recordUndoFileActs(file2save, file2rem, extraMarker, filesActu, startZeit, originalFileInfos)
       } Else If (operationExecuted=1)
          failedFiles++
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
    }
 
    whileLoopExec := 0
@@ -33668,6 +33660,12 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
             isSelected := 0
       }
 
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       If (preventDeleteFromProtectedPath=1 && protectedFolderPath)
       {
          If (preventDeleteFromProtectedSubPaths=1)
@@ -33696,13 +33694,6 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
       countTFilez++
       If (updateMainu=1)
          updateMainUnfilteredList(thisFileIndex, 1, "")
-
-      executingCanceableOperation := A_TickCount
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
 
       If !startPoint
          startPoint := thisFileIndex
@@ -34704,7 +34695,6 @@ SaveDBfilesList(enforceFile:=0) {
             prevMSGdisplay := A_TickCount
          }
 
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -34779,7 +34769,7 @@ SaveDBfilesList(enforceFile:=0) {
 }
 
 SaveFilesList(enforceFile:=0) {
-   Critical, on
+   ; Critical, on
    stopSlideshow()
    If (!CurrentSLD || maxFilesIndex<2)
    {
@@ -34888,11 +34878,10 @@ SaveFilesList(enforceFile:=0) {
 
       thisTmpFile := !newTmpFile ? backCurrentSLD : newTmpFile
       ; ToolTip, % thisTmpFile "=" , , , 2
-
       saveDynaFolders := getDynamicFoldersList(thisTmpFile)
       If !mainFile.Write("`n[DynamicFolderz]`n")
          wasErrorC := 1
-
+      whileLoopExec := 1
       Loop, Parse, saveDynaFolders, `n
       {
           fileTest := StrReplace(A_LoopField, "|")
@@ -34902,10 +34891,8 @@ SaveFilesList(enforceFile:=0) {
           countDynas++
           If !mainFile.Write("DF" countDynas "=" A_LoopField "`n")
              wasErrorC := 1
-          changeMcursor()
       }
 
-      changeMcursor()
       If !mainFile.Write("`n[Folders]`n")
          wasErrorC := 1
 
@@ -34941,7 +34928,7 @@ SaveFilesList(enforceFile:=0) {
                wasErrorC := 1
          }
       }
-
+      whileLoopExec := 0
       mainFile.Close()
       SLDtypeLoaded := 2
       FileDelete, % newTmpFile
@@ -34980,6 +34967,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        SQL := "SELECT imgfolder, fmodified FROM staticfolders;"
        If !activeSQLdb.GetTable(SQL, RecordSet)
        {
+          whileLoopExec := owle
           throwSQLqueryDBerror(A_ThisFunc)
           Return 0
        }
@@ -35023,7 +35011,6 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
              hash[z] := 1
              countStaticFolders++
              newStaticFoldersListCache[countStaticFolders] := [folderu, oldDateu]
-             changeMcursor()
           }
        }
     }
@@ -35042,7 +35029,6 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
           countStaticFolders := newStaticFoldersListCache.MaxIndex()
        }
     }
-
     whileLoopExec := owle
     iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
 }
@@ -35188,6 +35174,7 @@ GenerateStaticFoldersListNow() {
    foldersListArray := new hashtable()
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
+   owle := setWhileLoopBusy()
    getSelectedFiles(0, 1)
    foldersSelListArray := new hashtable()
    Loop, % maxFilesIndex + 1
@@ -35196,7 +35183,6 @@ GenerateStaticFoldersListNow() {
         If (InStr(imgPath, "||") || !imgPath)
            Continue
 
-        changeMcursor()
         OutDir := Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1))
         foldersListArray[OutDir] := Round(foldersListArray[OutDir]) + 1
         If markedSelectFile
@@ -35235,28 +35221,15 @@ GenerateStaticFoldersListNow() {
           prevMSGdisplay := A_TickCount
        }
    }
-
+   whileLoopExec := owle
    RemoveTooltip()
    iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
    foldersListArray := ""
 }
 
 determineTerminateOperation() {
-; [merge] The old body pinged the interface thread and spun while THAT thread
-; showed the abort dialog - and the spinning main thread stayed Critical, so NO
-; queued main-side work ran mid-operation. The first merged version full-pumped
-; here [Sleep -1 with Critical off], which let queued posts and timers run INSIDE
-; Critical worker loops - a queued GuiGDIupdaterResize would recreate the GDI+
-; canvas under QPV_ShowThumbnails' feet [trGdip_DrawImage Invalid_Parameter, the
-; error Marius hit]. drainUIinput restores the faithful semantics: only the abort
-; GESTURES [Escape, viewport clicks, the title-bar X] reach their handlers, inline
-; and still under Critical; the abort-confirm dialog is a DllCall'd MessageBoxW
-; [uiNativeYesNoPrompt() in the module] because AHK's own MsgBox lifts Critical for
-; its lifetime [DIALOG_PREP] and its pump then ran every queued timer - a pending
-; ResetImgLoadStatus cleared runningLongOperation inside the prompt and no later
-; gesture could reopen it; all other queued work stays queued until the operation
-; unwinds, as before the merge.
   Static lastInvoked := 1
+  executingCanceableOperation := A_TickCount
   If (A_TickCount - lastInvoked < 200)
      Return 0
 
@@ -35314,7 +35287,6 @@ cleanDeadFilesList(dummy:=0) {
             If !imgPath
                Continue
 
-            executingCanceableOperation := A_TickCount
             If (determineTerminateOperation()=1)
             {
                skipDuplicatesCheck := 1
@@ -35362,7 +35334,6 @@ cleanDeadFilesList(dummy:=0) {
             If (updateMainu=1)
                updateMainUnfilteredList(A_Index, 1, "")
 
-            executingCanceableOperation := A_TickCount
             If (determineTerminateOperation()=1)
             {
                skipDuplicatesCheck := 1
@@ -35552,6 +35523,12 @@ removeFilesListSeenImages(modus:=0) {
              prevMSGdisplay := A_TickCount
           }
 
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
+
           If (seenEntries[Format("{:L}", r)]=1)
           {
              If (SLDtypeLoaded=3 && remFromDb=1)
@@ -35571,14 +35548,6 @@ removeFilesListSeenImages(modus:=0) {
 
           If resultedFilesList[A_Index, 2]
              selectedFiles++
-
-          changeMcursor()
-          executingCanceableOperation := A_TickCount
-          If (determineTerminateOperation()=1)
-          {
-             abandonAll := 1
-             Break
-          }
       }
 
       seenEntries := ""
@@ -35635,9 +35604,8 @@ removeFilesListSeenImages(modus:=0) {
       newMappingList := ""
       GenerateRandyList()
       getSelectedFiles(0, 1)
-
-      SetTimer, ResetImgLoadStatus, -50
       SoundBeep, 900, 100
+      SetTimer, ResetImgLoadStatus, -50
       etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
       CurrentSLD := backCurrentSLD
       RandomPicture()
@@ -35659,7 +35627,6 @@ findFavesInList(modus:=0, doSel:=0) {
    Static hasAskedFilter := 0
    stopSlideshow()
    countSeen := 0
-   setImageLoading()
    friendlyLabel := (modus="faves") ? "favourite" : "already seen"
    friendly2 := (modus="faves") ? "added to favourites" : "seen"
    If (maxFilesIndex>1)
@@ -35713,8 +35680,6 @@ findFavesInList(modus:=0, doSel:=0) {
              resultedFilesList[A_Index, idIndex] := 0
           }
 
-          executingCanceableOperation := A_TickCount
-          changeMcursor()
           If (determineTerminateOperation()=1)
           {
              abandonAll := 1
@@ -35737,14 +35702,11 @@ findFavesInList(modus:=0, doSel:=0) {
          Return
       }
 
-      ; renewCurrentFilesList()
       ForceRefreshNowThumbsList()
-      ; GenerateRandyList()
       updateFilesSelectionInfos()
       dummyTimerDelayiedImageDisplay(100)
-
-      SetTimer, ResetImgLoadStatus, -50
       SoundBeep, 900, 100
+      SetTimer, ResetImgLoadStatus, -50
       etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
       CurrentSLD := backCurrentSLD
       dummyTimerDelayiedImageDisplay(100)
@@ -35758,7 +35720,6 @@ findFavesInList(modus:=0, doSel:=0) {
 
 retrieveAlreadySeenImageFromCurrentList() {
    ; Critical, on
-
    stopSlideshow()
    initSeenImagesListDB()
    If (sqlFailedInit=1)
@@ -35853,8 +35814,6 @@ retrieveAlreadySeenImageFromCurrentList() {
              countSeen++
           }
 
-          executingCanceableOperation := A_TickCount
-          changeMcursor()
           If (determineTerminateOperation()=1)
           {
              abandonAll := 1
@@ -35900,9 +35859,8 @@ retrieveAlreadySeenImageFromCurrentList() {
       newMappingList := []
       GenerateRandyList()
       getSelectedFiles(0, 1)
-
-      SetTimer, ResetImgLoadStatus, -50
       SoundBeep, 900, 100
+      SetTimer, ResetImgLoadStatus, -50
       etaTime := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
       CurrentSLD := backCurrentSLD
       RandomPicture()
@@ -36024,7 +35982,6 @@ uiPopulateCachesOverview(modus:=0) {
        Loop, % totalu
        {
            Sleep, 5
-           executingCanceableOperation := A_TickCount
            If (determineTerminateOperation()=1)
            {
               abandonAll := 1
@@ -36034,7 +35991,6 @@ uiPopulateCachesOverview(modus:=0) {
            showTOOLtip("Gathering database information: " rowsDef[A_Index, 4], 0, 0, A_Index/13)
            rowsDef[A_Index, 5] := getTotalIMGsSQLdb(rowsDef[A_Index, 2])
            Sleep, 5
-           executingCanceableOperation := A_TickCount
            If (determineTerminateOperation()=1)
            {
               abandonAll := 1
@@ -36390,7 +36346,6 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
                 ErrorMsgS := ""
           }
 
-          executingCanceableOperation := A_TickCount
           If (determineTerminateOperation()=1)
           {
              abandonAll := 1
@@ -36613,8 +36568,6 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
          Break
       }
 
-
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -36848,7 +36801,6 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
              ErrorMsgS := ""
        }
 
-       executingCanceableOperation := A_TickCount
        If (determineTerminateOperation()=1)
        {
           abandonAll := 1
@@ -37266,6 +37218,12 @@ SortFilesList(SortCriterion) {
           If (InStr(r, "||") || !r)
              Continue
 
+          If (determineTerminateOperation()=1)
+          {
+             abandonAll := 1
+             Break
+          }
+
           If (filterBehaviour=1 || filterBehaviour=2)
           {
              If !resultedFilesList[A_Index, 10]
@@ -37277,7 +37235,6 @@ SortFilesList(SortCriterion) {
              }
           }
 
-          changeMcursor()
           countTFilez++
           If (A_TickCount - prevMSGdisplay>2000)
           {
@@ -37391,13 +37348,6 @@ SortFilesList(SortCriterion) {
              }
           }
 
-          executingCanceableOperation := A_TickCount
-          If (determineTerminateOperation()=1)
-          {
-             abandonAll := 1
-             Break
-          }
-
           sortedFiles++
           filesListu%sortPages% .= SortBy "|!\!|" A_Index "`n"
           If (sortedFiles>3102)
@@ -37464,7 +37414,8 @@ SortFilesList(SortCriterion) {
 
       showTOOLtip("Preparing gathered data`n" unSortPages " / " sortPages)
       prevMSGdisplay := A_TickCount
-      changeMcursor()
+      runningLongOperation := 0
+      whileLoopExec := 1
       Loop, % sortPages + 1
       {
          thisIndex := A_Index - 1
@@ -37502,7 +37453,6 @@ SortFilesList(SortCriterion) {
 
           If (A_TickCount - prevMSGdisplay>1500)
           {
-             changeMcursor()
              etaTime := ETAinfos(A_Index, countTFilez, startOperation)
              showTOOLtip("Generating sorted files list index" etaTime, 0, 0, A_Index/countTFilez)
              prevMSGdisplay := A_TickCount
@@ -37534,6 +37484,7 @@ SortFilesList(SortCriterion) {
          filesFilter := backfilesFilter
 
       GenerateRandyList()
+      whileLoopExec := 0
       entireString := entireNotSortedString := ""
       currentFilesListModified := 1
       zeitOperation := A_TickCount - startOperation
@@ -38008,7 +37959,6 @@ WorkLoadMultiCoreHandler(job) {
          prevMSGdisplay := A_TickCount
       }
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
@@ -40021,7 +39971,6 @@ batchRemoveMetaData() {
 
    Loop
    {
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -40139,7 +40088,6 @@ batchFileDelete(dontAlterIndex:=0) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -40944,7 +40892,6 @@ coreBatchMultiRenameFiles() {
      Return
   }
 
-  backCurrentSLD := CurrentSLD
   If (StrLen(OriginalNewFileName)>1)
   {
      filesElected := getSelectedFiles(0, 1)
@@ -40956,13 +40903,13 @@ coreBatchMultiRenameFiles() {
      }
 
      BtnCloseWindow()
+     backCurrentSLD := CurrentSLD
      showTOOLtip("Renaming " groupDigits(filesElected) " files, please wait`nPattern: " OriginalNewFileName)
      startOperation := A_TickCount
      prevMSGdisplay := A_TickCount
      startZeit := A_Now
      destroyGDIfileCache()
      RecordUsedMultiRenamesQueriesManager(OriginalNewFileName)
-     doStartLongOpDance()
      If (SLDtypeLoaded=3)
         activeSQLdb.Exec("BEGIN TRANSACTION;")
 
@@ -40972,6 +40919,7 @@ coreBatchMultiRenameFiles() {
      if (objuTemp.IndexModeCount=1)
         OutDirAsc := "a"
 
+     doStartLongOpDance()
      counterFilez := new hashtable()
      CurrentSLD := ""
      whileLoopExec := 1
@@ -40980,7 +40928,12 @@ coreBatchMultiRenameFiles() {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
             Continue
 
-         changeMcursor()
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+
          wasError := 0
          thisFileIndex := A_Index
          file2rem := resultedFilesList[thisFileIndex, 1]
@@ -40995,7 +40948,6 @@ coreBatchMultiRenameFiles() {
             Continue
          }
 
-         executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>2000)
          {
             someErrors := ETAinfos(countTFilez, filesElected, startOperation)
@@ -41104,14 +41056,7 @@ coreBatchMultiRenameFiles() {
             ; resultedFilesList[thisFileIndex, 2] := 1
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
-
-         If (determineTerminateOperation()=1)
-         {
-            abandonAll := 1
-            Break
-         }
      }
-
      whileLoopExec := 0
      counterFilez := someErrors := ""
      CurrentSLD := backCurrentSLD
@@ -42384,7 +42329,6 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       LV_Add(A_Index, "...\", xu, "-", "Folder: up-one level", "", "!OmniNavigateUpFolder", 0, 0)
       Loop, Files, % Trimmer(userQuickMenusEdit, "\") "\*", DF
       {
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -42425,7 +42369,6 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
          {
             Loop, Files, % Trimmer(OutDir, "\") "\*", DF
             {
-               executingCanceableOperation := A_TickCount
                If (determineTerminateOperation()=1)
                   Break
 
@@ -43861,7 +43804,6 @@ CombineImgsIntoPDF(file2save) {
          imgPath := resultedFilesList[A_Index, 1]
          ; zPlitPath(file2save, 0, OutFileName, OutDir)
          pBitmap := LoadBitmapFromFileu(imgPath)
-         executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>3000)
          {
             etaTime := ETAinfos(A_Index, markedSelectFile, startOperation)
@@ -44208,6 +44150,12 @@ generateThumbsSheet() {
       If (framePreviewsMode!=1 && resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       countTFilez++
       If (framePreviewsMode!=1)
       {
@@ -44219,12 +44167,6 @@ generateThumbsSheet() {
          }
       }
 
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
-
       frameLoad := (framePreviewsMode=1) ? A_Index - 1 : 0
       nBitmap := LoadBitmapFromFileu(imgPath, 0, 0, frameLoad, sizesDesired)
       If !validBMP(nBitmap)
@@ -44233,7 +44175,6 @@ generateThumbsSheet() {
          Continue
       }
 
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(countTFilez, imgzSelected, startOperation)
@@ -44300,25 +44241,24 @@ generateThumbsSheet() {
    If (failedFiles>0)
       someErrors .= "`nFailed to load " groupDigits(failedFiles) " images."
 
+   CurrentSLD := backCurrentSLD
    If (abandonAll=1)
    {
-      CurrentSLD := backCurrentSLD
       showTOOLtip("Operation aborted. The thumbnails sheet was not generated." someErrors)
-      SoundBeep , 300, 100
+      SoundBeep, 300, 100
    } Else
    {
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       showTOOLtip("Saving the thumbnails sheet image:`n" OutFileName "`n" PathCompact(OutDir, 35) "\`nResolution: " groupDigits(width) " x " groupDigits(height) " pixels.")
       r := QPV_SaveImageFile(A_ThisFunc, pBitmap, file2save, userJpegQuality, 2)
-      CurrentSLD := backCurrentSLD
       If !r
       {
          showTOOLtip("Finished generating the thumbnails sheet for " groupDigits(imgzSelected) " images." someErrors "`nFile saved: " OutFileName "`n" PathCompact(OutDir, 35) "\")
-         SoundBeep , 900, 100
+         SoundBeep, 900, 100
       } Else
       {
          showTOOLtip("Failed to save the generated thumbnails sheet comprised of " groupDigits(imgzSelected) " images." someErrors)
-         SoundBeep , 300, 100
+         SoundBeep, 300, 100
       }
    }
 
@@ -46299,7 +46239,6 @@ SearchIndexSelectAll(modus:="") {
 
    Loop, % maxFilesIndex
    {
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -46364,7 +46303,6 @@ SelectFilesDead() {
    thisIndex := 0
    Loop, % maxFilesIndex
    {
-       executingCanceableOperation := A_TickCount
        If (determineTerminateOperation()=1)
        {
           abandonAll := 1
@@ -53627,7 +53565,6 @@ batchImgPrinting(PrintOptions, multiFramesMode:=0, givenFile:=0, totalPages:=0) 
    showTOOLtip("Printing " groupDigits(filesElected) A_Space labelu ", please wait")
    Loop
    {
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -56773,7 +56710,6 @@ BTNextractALLtextsCurrentPDF() {
             txt .= "`n `nPAGE " A_Index ": " friendlyPDFerrorCodes(err, pwd) ".`n `n"
          }
 
-         executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>1000)
          {
             etaTime := ETAinfos(A_Index, pageCount, startOperation)
@@ -59066,12 +59002,12 @@ CopyMovePanelWindow() {
 
     EditWid -= sml
     lstWid := sml + editWid
-
     ToolTip, Please wait...,,, 2
     listu := readRecentFileDesties()
     listu .= "--={ other destinations }=--`n"
     setImageLoading()
     historyList := readRecentOpenedFolderEntries()
+    whileLoopExec := 1
     Loop, Parse, historyList, `n
     {
        If (A_Index>10)
@@ -59080,7 +59016,6 @@ CopyMovePanelWindow() {
        If (StrLen(A_LoopField)<3)
           Continue 
 
-       changeMcursor()
        OutDir := StrReplace(A_LoopField, "|")
        If InStr(listu, OutDir "`n") || !FolderExist(OutDir)
           Continue
@@ -59088,10 +59023,12 @@ CopyMovePanelWindow() {
        listu .= OutDir "`n"
     } 
 
+    whileLoopExec := 1
     thisDynaList := getDynamicFoldersList()
     ; DynamicFoldersList := mainDynaFoldersListu
     prevCurrentSLD := CurrentSLD
     lastInvoked := A_TickCount
+    whileLoopExec := 1
     Loop, Parse, thisDynaList, `n
     {
         If (A_Index>15)
@@ -59100,7 +59037,6 @@ CopyMovePanelWindow() {
         If (StrLen(A_LoopField)<4)
            Continue
 
-        changeMcursor()
         folderu := StrReplace(A_LoopField, "|")
         If InStr(listu, folderu "`n") || !FolderExist(folderu)
            Continue
@@ -59108,14 +59044,13 @@ CopyMovePanelWindow() {
         listu .= folderu "`n"
     }
 
+    whileLoopExec := 1
     List_MakeUnique(listu, "`n", 0, 0)
     Loop, Parse, listu, `n
     {
         If !A_LoopField
            Continue
 
-        changeMcursor()
-        ; indexu := InStr(A_LoopField, "{ other dest") ? "" : A_Index - 1 "; "
         finalListu .= A_LoopField "`n"
         If (A_Index=1)
            finalListu .= "`n"
@@ -59214,6 +59149,7 @@ IdentifyFileFolderRoots(modus) {
       Return [gList, counter]
 
    foldersListArray := new hashtable()
+   owle := setWhileLoopBusy()
    Loop, % maxFilesIndex + 1
    {
         imgPath := resultedFilesList[A_Index, 1]
@@ -59294,6 +59230,7 @@ IdentifyFileFolderRoots(modus) {
          counter++
       }
    }
+   whileLoopExec := owle
    Return [glist, counter]
 }
 
@@ -60425,7 +60362,12 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      changeMcursor()
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       thisFileIndex := A_Index
       file2rem := getIDimage(thisFileIndex)
       zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
@@ -60465,7 +60407,6 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          } Else oFinalDest := finalDest
       }
 
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
@@ -60566,12 +60507,6 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          }
       } Else If (operationExecuted=1)
          failedFiles++
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
    }
 
    whileLoopExec := 0
@@ -60686,7 +60621,6 @@ batchConvert2format(modus:=0) {
 
       thisFileIndex := A_Index
       imgPath := getIDimage(thisFileIndex)
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
@@ -60794,7 +60728,6 @@ batchConvert2format(modus:=0) {
          }
       }
 
-      changeMcursor()
       r := coreConvertImgFormat(imgPath, file2save)
       If r
          failedFiles++
@@ -61316,7 +61249,6 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -61430,7 +61362,6 @@ coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       Loop, % tFrames
       {
          file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -61720,7 +61651,6 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
    Loop, % tFrames
    {
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -61823,7 +61753,6 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
    txt := ""
    Loop, % tFrames
    {
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -61935,7 +61864,6 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       Loop, % tFrames
       {
          file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -62024,7 +61952,6 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       Loop, % tFrames
       {
          file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -62207,7 +62134,6 @@ combineImagesMultiTiffGDIp(destFilePath) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1 || abandonAll=1)
       {
          abandonAll := 1
@@ -62428,7 +62354,6 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -62540,7 +62465,6 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    Loop, % tFrames
    {
       i := A_Index
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -64196,7 +64120,6 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
-    doStartLongOpDance()
     If (SLDtypeLoaded=3)
     {
        getMaxRowIDsqlDB()
@@ -64206,6 +64129,7 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     isFaves := InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") ? 1 : 0
     prevMSGdisplay := A_TickCount
     startOperation := A_TickCount
+    doStartLongOpDance()
     Loop, Parse, imgsListu, `n`r
     {
        line := Trimmer(A_LoopField)
@@ -64219,14 +64143,12 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
           prevMSGdisplay := A_TickCount
        }
 
-       executingCanceableOperation := A_TickCount
        If (determineTerminateOperation()=1)
        {
           abandonAll := 1
           Break
        }
 
-       changeMcursor()
        If RegExMatch(line, RegExFilesPattern)
        {
           If (SLDtypeLoaded=3 && maxFilesIndex>0)
@@ -64658,15 +64580,15 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
          Return
 
       mustOpenStartFolder := ""
+      owle := setWhileLoopBusy()
       mainFoldersListu := getDynamicFoldersList()
-      doStartLongOpDance()
       dropFilesSelection(1)
-      whileLoopExec := 1
       showTOOLtip("Preparing to import dropped folders, please wait")
       If (StrLen(filesFilter)>1)
          remFilesListFilter("simple")
 
       prlist := ""
+      whileLoopExec := 1
       mainListu := retrieveListFoldersIndexed()
       For zKey, zValue in mainListu
           prlist .= zKey "\`n"
@@ -64683,8 +64605,10 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       coverListu := mainFoldersListu
       rescannedu := new hashtable()
       newListu := DynamicFoldersList "`n"
+      doStartLongOpDance()
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
+      whileLoopExec := 1
       Loop, Parse, foldersListu,`n,`r
       {
           linea := Trimmer(A_LoopField)
@@ -64731,7 +64655,6 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
           ; a folder indexed non recursively only gives up the files placed
           ; directly in it, while rescanning an entry clears its entire subtree
           forceRemAll := (decisionu.action="rescan" || !InStr(thisEntry, "|")) ? 1 : 0
-          changeMcursor()
           r := wrapperAddNewFolderToList(thisEntry, forceRemAll, 1, noRemAtAll)
           If (r="abandoned")
              Break
@@ -64770,6 +64693,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       }
 
       ForceRefreshNowThumbsList()
+      whileLoopExec := 1
       If (stuffAdded=1)
       {
          newStaticFoldersListCache := []
@@ -73097,7 +73021,6 @@ ToggleSeenIMGstatus() {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
             Continue
 
-         executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>2000)
          {
             etaTime := ETAinfos(countFilez, markedSelectFile, startOperation)
@@ -73206,7 +73129,6 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
       }
 
       entriesScanned++
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(entriesScanned, entriesCount, startOperation)
@@ -73226,12 +73148,12 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
   totalu := deadList.Count()
   If (abandonAll!=1)
   {
+     doStartLongOpDance()
      seenImagesDB.Exec("BEGIN TRANSACTION;")
      Loop, % totalu
      {
          imgPath := deadList[A_Index]
          deleteSQLseenEntry(imgPath, 0)
-         executingCanceableOperation := A_TickCount
          If (A_TickCount - prevMSGdisplay>2000)
          {
             etaTime := ETAinfos(A_Index, totalu, kp)
@@ -84132,7 +84054,10 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
     }
 
     If (countSel>markedSelectFile && countSel>1 && markedSelectFile>1)
-       SetTimer, dummyRecountSelectedFiles, -100
+    {
+       fn := Func("getSelectedFiles").Bind(0, 1)
+       SetTimer, % fn, -100
+    }
 
     filesSelInfo := (markedSelectFile>0) ? "[ " markedSelectFile " ] " : ""
     pVwinTitle := defineWinTitlePrefix() filesSelInfo currentFileIndex "/" maxFilesIndex " | List mode: " defineListViewModes()
@@ -84368,10 +84293,6 @@ generateFilesListMap(dummy:=0) {
    Return [sFinal, thisVal, doubled]
 }
 
-dummyRecountSelectedFiles() {
-   getSelectedFiles(0, 1)
-}
-
 EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
    startZeit := A_TickCount
    showTOOLtip("Emptying thumbnails cache, please wait")
@@ -84383,7 +84304,12 @@ EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
       If !isVarEqualTo(A_LoopFileExt, "tiff", "png", "jpg")
          Continue
 
-      changeMcursor()
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       timeNow := %A_Now%
       EnvSub, timeNow, %A_LoopFileTimeCreated%, Days
       mustRem := (timeNow>remCacheOldDays && dummy="daysITis") ? 1 : 0
@@ -84395,17 +84321,10 @@ EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
             countFilez++
       }
 
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
          showTOOLtip("Emptying thumbnails cache, please wait`n" countFilez " removed until now.")
          prevMSGdisplay := A_TickCount
-      }
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
       }
    }
 
@@ -84414,7 +84333,6 @@ EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
       moreInfo := " out of " countTFilez
       friendly := " older than " remCacheOldDays " days"
    }
-
 
    If (abandonAll=1)
       showTOOLtip("Operation aborted. Removed " countFilez " cached thumbnails until now")
@@ -84908,7 +84826,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           }
 
           ; Sleep, 1
-          changeMcursor()
           startZeit := A_TickCount
           cacheType := imgsListArrayThumbs[thisFileIndex, 1]
           ; fnOutputDebug("thumbs inner cT" cacheType " -- loops infos " A_Index " -- " innerLoops " -- " lapsOccured " -- " totalLoops " -- " imgsHavePainted " -- " imgsMustPaint)
@@ -85632,6 +85549,7 @@ ReloadDynamicFolderz(fileNamu) {
 coreLoadDynaFolders(fileNamu) {
     If (SLDtypeLoaded=3 && fileNamu=CurrentSLD)
     {
+       owle := setWhileLoopBusy()
        listu := DynamicFoldersList "`n"
        SQL := "SELECT imgfolder FROM dynamicfolders;"
        activeSQLdb.GetTable(SQL, RecordSet)
@@ -85646,9 +85564,11 @@ coreLoadDynaFolders(fileNamu) {
        listu := cleanDynamicFoldersList(listu)
        DynamicFoldersList := listu
        RecordSet.Free()
+       whileLoopExec := owle
        Return listu
     }
 
+    owle := setWhileLoopBusy()
     FileRead, tehFileVar, %fileNamu%
     Loop, Parse, tehFileVar,`n,`r
     {
@@ -85662,10 +85582,10 @@ coreLoadDynaFolders(fileNamu) {
  
     DynamicFoldersList := StrReplace(DynamicFoldersList, "|hexists|")
     listu .= "`n" Trimmer(DynamicFoldersList) "`n"
-    changeMcursor()
     Sort, listu, UD`n
     listu := cleanDynamicFoldersList(listu)
     DynamicFoldersList := listu
+    whileLoopExec := owle
     Return listu
 }
 
@@ -86707,7 +86627,6 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       If (gotu<1 || gotu="")
          Break
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -89231,7 +89150,6 @@ PurgeCachedDataModifiedFiles() {
       If Rowu[2]
       {
          obj := GetFileAttributesEx(Rowu[2])
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -89330,7 +89248,6 @@ PurgeCachedDataSelectedFiles() {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
             Continue
 
-         executingCanceableOperation := A_TickCount
          If (determineTerminateOperation()=1)
          {
             abandonAll := 1
@@ -89663,7 +89580,6 @@ batchJpegLLoperations() {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -91290,7 +91206,6 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
          Continue
       }
 
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
@@ -92364,6 +92279,7 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
   GuiControl, -Redraw, LViewOthers
   setImageLoading()
   showTOOLtip("Preparing the dictionary, please wait")
+  whileLoopExec := 1
   If (LangKeywordsFilter=1 && prevLang!=LangKeywordsFilter)
   {
      ; i intended to add more languages/dictionaries
@@ -92376,7 +92292,7 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
            dictionary[A_LoopField] := 1
      }
   }
-
+  whileLoopExec := 0
   showTOOLtip("Populating the list view, please wait")
   EM_SETCUEBANNER(hEditField, "Preparing keywords list - please wait", 1)
   LV_Delete()
@@ -92395,10 +92311,10 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
   doStartLongOpDance()
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
+  keywordsListArray := GenerateKeywordsListNow("cached")
   thisMaxCount := keywordsListArray.Count()
   For Key, Value in keywordsListArray
   {
-     executingCanceableOperation := A_TickCount
      If (determineTerminateOperation()=1)
      {
         abandonAll := 1
@@ -92498,11 +92414,16 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
   RemoveTooltip()
 }
 
-GenerateKeywordsListNow() {
-   ; keywordsListArray := ""
-   keywordsListArray := new hashtable()
+GenerateKeywordsListNow(modus:=0) {
+   Static lastIDu, keywordsListArray := new hashtable()
+   thisIDu := "a0" CurrentSLD SLDtypeLoaded maxFilesIndex
+   If (modus="cached" && thisIDu=lastIDu)
+      Return keywordsListArray
+
+   abandonAll := 0
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
+   doStartLongOpDance()
    Loop, % maxFilesIndex + 1
    {
         thisIndexu := A_Index
@@ -92510,7 +92431,6 @@ GenerateKeywordsListNow() {
         If (InStr(imgPath, "||") || !imgPath)
            Continue
 
-        changeMcursor()
         OutDir := Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, ".", 0, -1) - 1))
         OutDir := RegExReplace(OutDir, "[[:digit:]]", A_Space)
         OutDir := RegExReplace(OutDir, "[[:punct:]]", A_Space)
@@ -92532,8 +92452,16 @@ GenerateKeywordsListNow() {
            showTOOLtip("Generating folders list based on the indexed files" etaTime, 0, 0, A_Index/maxFilesIndex)
            prevMSGdisplay := A_TickCount
         }
+
+        If (determineTerminateOperation()=1)
+        {
+           SoundBeep 300, 100
+           abandonAll := 1
+           Break
+        }
    }
 
+   thisIDu := "a" abandonAll CurrentSLD SLDtypeLoaded maxFilesIndex
    ResetImgLoadStatus()
    RemoveTooltip()
 }
@@ -93335,7 +93263,6 @@ batchUndoFileActs(modus) {
    whileLoopExec := 1
    Loop, % totalu
    {
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -95262,12 +95189,12 @@ countAllFilesPerStaticFolders(dummy:=0) {
     getSelectedFiles(0, 1)
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
-    doStartLongOpDance()
     startOperation := A_TickCount
     prevMSGdisplay := A_TickCount
     totalLoops := newStaticFoldersListCache.MaxIndex()
     folderMapArray := new hashtable()
     thisIndex := 0
+    whileLoopExec := 1
     Loop, % totalLoops
     {
         If (SLDtypeLoaded!=3)
@@ -95277,12 +95204,14 @@ countAllFilesPerStaticFolders(dummy:=0) {
         folderMapArray[OutDir] := A_Index
     }
 
+    whileLoopExec := 0
     foldersListArray := new hashtable()
     foldersSelListArray := new hashtable()
+    doStartLongOpDance()
+    abandonAll := 0
     Loop, % maxFilesIndex
     {
         imgPath := resultedFilesList[A_Index, 1]
-        executingCanceableOperation := A_TickCount
         If (determineTerminateOperation()=1)
         {
            abandonAll := 1
@@ -95305,10 +95234,13 @@ countAllFilesPerStaticFolders(dummy:=0) {
         }
     }
  
+    If !abandonAll
+       doStartLongOpDance()
+
     totalLoops := foldersListArray.Count()
     For folderu, Value in foldersListArray
     {
-        If (folderu="")
+        If (folderu="" || abandonAll=1)
            Continue
 
         If (A_TickCount - prevMSGdisplay>1000)
@@ -95318,7 +95250,6 @@ countAllFilesPerStaticFolders(dummy:=0) {
            prevMSGdisplay := A_TickCount
         }
 
-        executingCanceableOperation := A_TickCount
         If (determineTerminateOperation()=1)
         {
            abandonAll := 1
@@ -95933,8 +95864,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
              errorOccured := activeSQLdb.ErrorMsg
 
-          changeMcursor()
-          setWhileLoopBusy()
+          owle :=setWhileLoopBusy()
           totalFiles := RecordSet.RowCount
           Loop, % RecordSet.RowCount
           {
@@ -95975,6 +95905,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
        showTOOLtip("Finishing search and replace in the files list, please wait")
        activeSQLdb.Exec("COMMIT TRANSACTION;")
+       whileLoopExec := owle
     }
 
     If !errorOccured
@@ -95985,7 +95916,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        If (writeSQLrows=1)
           activeSQLdb.Exec("BEGIN TRANSACTION;")
 
-       setWhileLoopBusy()
+       owle := setWhileLoopBusy()
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
@@ -96051,6 +95982,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           If !activeSQLdb.Exec("COMMIT TRANSACTION;")
              errorOccured := activeSQLdb.ErrorMsg
        }
+       whileLoopExec := owle
     }
 
     If totalAffected
@@ -96062,7 +95994,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     If (SLDtypeLoaded=3)
        getMaxRowIDsqlDB()
 
-    whileLoopExec := owle
+    whileLoopExec := 0
     If errorOccured
     {
        showTOOLtip("Failed to update the files list database`n" errorOccured)
@@ -97712,7 +97644,6 @@ batchAutoCropFiles() {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -97770,7 +97701,6 @@ batchAutoCropFiles() {
          Break
       }
 
-      changeMcursor()
       r := coreAutoCropFileProcessing(imgPath, destImgPath, 1)
       If !r
          countFilez++
@@ -97791,8 +97721,9 @@ batchAutoCropFiles() {
       showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
    Else
       showTOOLtip(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected images were automatically cropped" someErrors)
-   SetTimer, ResetImgLoadStatus, -50
+
    SoundBeep, % (abandonAll=1) ? 300 : 900, 100
+   SetTimer, ResetImgLoadStatus, -100
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -97808,19 +97739,16 @@ batchAutoColorsFiles() {
 
    BtnCloseWindow()
    Sleep, 25
-
    startOperation := A_TickCount
    prevMSGdisplay := A_TickCount
    showTOOLtip("Performing auto-adjust colors for " groupDigits(filesElected) " files, please wait")
    doStartLongOpDance()
    countFilez := countTFilez := skippedFiles := failedFiles := 0
-
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
-      executingCanceableOperation := A_TickCount
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -97850,7 +97778,6 @@ batchAutoColorsFiles() {
       }
 
       destImgPath := imgPath
-      changeMcursor()
       r := coreAutoColorsFileProcessing(imgPath, destImgPath)
       If !r
          countFilez++
@@ -97869,8 +97796,9 @@ batchAutoColorsFiles() {
       showTOOLtip("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
    Else
       showTOOLtip(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected images were processed" someErrors)
-   SetTimer, ResetImgLoadStatus, -50
+
    SoundBeep, % (abandonAll=1) ? 300 : 900, 100
+   SetTimer, ResetImgLoadStatus, -100
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -98692,6 +98620,12 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       imgPath := resultedFilesList[A_Index, 1]
       If !RegExMatch(imgPath, thisRegEXsaveFmts)
       {
@@ -98700,7 +98634,6 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       }
 
       countTFilez++
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
@@ -98711,12 +98644,6 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
 
          showTOOLtip("Processing image files, please wait" destInfo etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
-      }
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
       }
 
       imgPath := StrReplace(imgPath, "||")
@@ -98807,6 +98734,12 @@ batchSimpleColorsAdjusts() {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
          Continue
 
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
       imgPath := resultedFilesList[A_Index, 1]
       If !RegExMatch(imgPath, saveTypesRegEX)
       {
@@ -98815,7 +98748,6 @@ batchSimpleColorsAdjusts() {
       }
 
       countTFilez++
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>3000)
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
@@ -98826,12 +98758,6 @@ batchSimpleColorsAdjusts() {
 
          showTOOLtip("Processing image files, please wait" destInfo etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
-      }
-
-      If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
       }
 
       imgPath := StrReplace(imgPath, "||")
@@ -98920,10 +98846,6 @@ printLargeStrArray(whichArray, maxList, delim) {
   splitParts := maxList//trenchSize
   Loop, % splitParts - 1
   {
-      If (A_TickCount - startZeit>2500)
-         executingCanceableOperation := A_TickCount
-
-      changeMcursor()
       thisIndex := A_Index
       Loop, % trenchSize
       {
@@ -105593,22 +105515,3 @@ dummyAutoScroller() {
       restartAppu()
    Return
 #If
-
-
-testKeysStuff() {
-   ; Static fMods := {0x10:"Shift",0x11:"Ctrl",0x12:"Alt",0xA0:"LShift"
-   Static fMods := {0xA0:"LShift"
-   ,0xA1:"RShift",0xA2:"LCtrl",0xA3:"RCtrl",0xA4:"LAlt",0xA5:"RAlt"
-   ,0x5B:"LWin",0x5C:"RWin"}
-   ppA := ppB := "|"
-   For Key, Value in fmods
-   {
-        b := DllCall("user32\GetAsyncKeyState", "uint", Key)
-        If b
-           ppA .= Value "|"
-        If (b & 0x01)
-           ppB .= Value "|"
-   }
-
-   ToolTip, % ppA "`n" ppB , , , 2
-}
