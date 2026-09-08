@@ -2908,8 +2908,7 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
 }
 
 OpenThisFileMenu() {
-  stopSlideshow()
-  stopGIFsPlayback()
+  stopGifORslidesPlayback()
   imgPath := StrReplace(getIDimage(currentFileIndex), "||")
   InvokeOpenWithMenu(imgPath)
 }
@@ -3418,8 +3417,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
 }
 
 CalculateSelectedFilesSizes() {
-  stopGIFsPlayback()
-  stopSlideshow()
+  stopGifORslidesPlayback()
   getSelectedFiles(0, 1)
   If !markedSelectFile
   {
@@ -3502,8 +3500,7 @@ CopyImageFolderPaths() {
 }
 
 CopyImagePath(modus:=0) {
-   stopGIFsPlayback()
-   stopSlideshow()
+   stopGifORslidesPlayback()
    getSelectedFiles(0, 1)
    If !markedSelectFile
    {
@@ -3630,8 +3627,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
   If (currentFileIndex=0)
      Return
 
-  stopGIFsPlayback()
-  stopSlideshow()
+  stopGifORslidesPlayback()
   friendly := (onWhat="folderu") ? "folder" : "file"
   showTOOLtip("Copying " friendly "(s) to clipboard")
   getSelectedFiles(0, 1)
@@ -3722,8 +3718,7 @@ CopyImage2clip() {
      Return "fail"
 
   whichBitmap := useGdiBitmap()
-  stopGIFsPlayback()
-  stopSlideshow()
+  stopGifORslidesPlayback()
   friendly := (editingSelectionNow=1) ? " selected area" : ""
   If (editingSelectionNow=1 && validBMP(whichBitmap))
   {
@@ -3945,8 +3940,7 @@ CopyAlphaMask2clippy(modus:=0, allowAsk:=0) {
   If throwErrorNoImageLoaded()
      Return 
 
-  stopGIFsPlayback()
-  stopSlideshow()
+  stopGifORslidesPlayback()
   infoMask := defineCurrentAlphaMask()
   If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
   {
@@ -4120,8 +4114,7 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
   If throwWarningHugeImagesFeatureNotAvailable()
      Return
 
-  stopGIFsPlayback()
-  stopSlideshow()
+  stopGifORslidesPlayback()
   r := 1
   whichBitmap := (wasGiven=1) ? externBMP : useGdiBitmap()
   friendly := (editingSelectionNow=1 && wasGiven=0) ? " selected area " : ""
@@ -4358,8 +4351,7 @@ coreReloadThisPicture() {
 }
 
 FirstPicture() { 
-   stopGIFsPlayback()
-   stopSlideshow()
+   stopGifORslidesPlayback()
    If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
@@ -4374,8 +4366,7 @@ FirstPicture() {
 }
 
 LastPicture() { 
-   stopGIFsPlayback()
-   stopSlideshow()
+   stopGifORslidesPlayback()
    If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
 
@@ -4438,8 +4429,7 @@ TrueCleanup() {
    WinSet, Region, 0-0 w1 h1, ahk_id %PVhwnd%
    RegWrite, REG_SZ, %QPVregEntry%, Running, 0
    lastInvoked := A_TickCount
-   stopGIFsPlayback()
-   stopSlideshow()
+   stopGifORslidesPlayback()
    Sleep, 1
    QPV_ThumbsPoolShutdown() ; must happen before FreeImage and GDI+ are let go
    If (wasInitFIMlib=1)
@@ -4796,8 +4786,6 @@ ToggleThumbsMode() {
       Return
    }
 
-   stopGIFsPlayback()
-   stopSlideshow()
    If (soloSliderWinVisible=1)
       destroySoloSliderWidget()
 
@@ -4807,6 +4795,7 @@ ToggleThumbsMode() {
       Return
    }
 
+   stopGifORslidesPlayback()
    mouseTurnOFFtooltip()
    If (StrLen(mustOpenStartFolder)>1 && !ar)
    {
@@ -5239,8 +5228,7 @@ UpdateThumbsScreen(forceReload:=0, forceFastMode:=0) {
 
    Gdip_ResetWorldTransform(glPG)
    IMGlargerViewPort := IMGentirelylargerThanVP := 0
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    moda := modus := 0
    skippedKeys := navKeysCounter - prevNavKeysu
    ; ToolTip, % navKeysCounter "|" prevNavKeysu "|" skippedKeys , , , 2
@@ -12181,11 +12169,10 @@ changeDesiredFrame(dir:=1) {
    If (thumbsDisplaying=1 || !totalFramesIndex || currentImgModified=1 || undoLevelsRecorded>0)
       Return
 
-   stopSlideshow()
+   stopGifORslidesPlayback()
    If askAboutFileSave(" and the current image frame will be changed")
       Return
 
-   stopGIFsPlayback()
    resetSlideshowTimer()
    desiredFrameIndex := clampInRange(desiredFrameIndex + dir, 0, totalFramesIndex, 1)
    If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$")
@@ -25272,8 +25259,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     If (AnyWindowOpen>0)
        Return
 
-    stopSlideshow()
-    stopGIFsPlayback()
+    stopGifORslidesPlayback()
     setImageLoading()
     changeMcursor()
     calcScreenLimits()
@@ -27835,7 +27821,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
 
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
     setLVrowsCount()
-    stopSlideshow()
+    stopGifORslidesPlayback()
     mouseTurnOFFtooltip()
     ; If (editingSelectionNow=1 && imgEditPanelOpened!=1)
     ;    ToggleEditImgSelection()
@@ -27874,7 +27860,6 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
 
-       stopGIFsPlayback()
        Gui, SettingsGUIA: Destroy
        Sleep, 5
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
@@ -30431,8 +30416,7 @@ PanelFoldersTree() {
     If MsgBox2hwnd
        Return
 
-    stopSlideshow()
-    stopGIFsPlayback()
+    stopGifORslidesPlayback()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
 
@@ -41511,8 +41495,7 @@ UIeditQuickMenuSearchTrigger() {
 PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn, UImenuQSbtn
     Static lastState := 0
-    stopSlideshow()
-    stopGIFsPlayback()
+    stopGifORslidesPlayback()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
     initQPVmainDLL()
@@ -42794,8 +42777,7 @@ fileImgFormatsOpenDialog(modus:=0) {
 }
 
 BrowseReplaceIndexEntry() {
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    ; pattern := "Common image formats (" openFptrn1 ";" openFptrn2 ";" openFptrn3 ")"
    ; pattern .= "|Camera RAW files (" openFptrn3 ";*.sti)"
    patternObj := fileImgFormatsOpenDialog(0)
@@ -46173,8 +46155,7 @@ BtnCopyImageClip() {
 }
 
 fakeWinCreator(idWin, thisCaller, allowReopen) {
-    stopSlideshow()
-    stopGIFsPlayback()
+    stopGifORslidesPlayback()
     mouseTurnOFFtooltip()
     AnyWindowOpen := idWin
     prevOpenedWindow := []
@@ -47521,13 +47502,12 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        Return
 
     calcScreenLimits()
-    stopSlideshow()
+    stopGifORslidesPlayback()
     If throwErrorSelectionOutsideBounds()
        Return
 
     PasteInPlaceRevealOriginal := 0
     openingPanelNow := 1
-    stopGIFsPlayback()
     changeMcursor()
     setImageLoading()
     vpWinClientSize(mainWidth, mainHeight)
@@ -58620,8 +58600,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
    If throwErrorNoImageLoaded()
       Return
 
-   stopGIFsPlayback()
-   stopSlideshow()
+   stopGifORslidesPlayback()
    initFIMGmodule()
    RegAction(0, "userDesireWriteFMT",, 2, 1, 16)
    INIaction(0, "prevFileSavePath", "General", 6)
@@ -63558,8 +63537,7 @@ OpenArgFile(inputu) {
 }
 
 addNewFile2list() {
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    pattern := "Common image formats (" openFptrn1 ";" openFptrn2 ";" openFptrn4 ")"
    pattern .= "|Camera RAW files (" openFptrn3 ";*.sti)"
    pattern .= "|QPV files lists / slideshows (*.sld;*.sldb)"
@@ -64531,8 +64509,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
    }
 
    ; ToolTip, % imgsListu "|" foldersListu "|" sldFile , , , 2
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    lastInvoked := A_TickCount
    If (imgsListu && isCtrlDown=1)
    {
@@ -65075,8 +65052,7 @@ associateWithImages(modus) {
 }
 
 closeDocuments() {
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    If askAboutFileSave(". The current files list will be discarded as well")
       Return
 
@@ -65102,8 +65078,7 @@ closeDocuments() {
 }
 
 restartAppu() {
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    If askAboutFileSave(" and the application will restart")
       Return
 
@@ -65126,8 +65101,7 @@ restartAppu() {
 }
 
 exitAppu(dummy:=0) {
-   stopSlideshow()
-   stopGIFsPlayback()
+   stopGifORslidesPlayback()
    If askAboutFileSave(" and the application will exit")
       Return
 
@@ -65181,8 +65155,7 @@ InitGuiContextMenu(keyu:=0, mX:="-", mY:=0, givenCoords:=0, ctrlu:=0) {
          Return 1
 
       whileLoopExec := 0
-      stopSlideshow()
-      stopGIFsPlayback()
+      stopGifORslidesPlayback()
       If (thumbsDisplaying=0 && editingSelectionNow=1 && adjustNowSel=0 && drawingShapeNow=0)
          dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize, mainWidth, mainHeight, 1)
 
@@ -73591,8 +73564,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    WinGet, winStateu, MinMax, ahk_id %PVhwnd%
    If (winStateu=-1)
    {
-      stopSlideshow()
-      stopGIFsPlayback()
+      stopGifORslidesPlayback()
       Return
    }
 
@@ -82609,14 +82581,13 @@ ToggleEditImgSelection(modus:=0) {
   If throwWarningAlphaPaintMode()
      Return
 
-  stopSlideshow()
+  stopGifORslidesPlayback()
   vpWinClientSize(mainWidth, mainHeight)
   trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
   If (!imgW || !imgH)
      r := -1
 
   ; fnOutputDebug(A_ThisFunc "(A=" modus ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
-  stopGIFsPlayback()
   If (editingSelectionNow!=1 && r!=-1)
   {
      If (imgSelX2=-1 || ImgSelX2="C")
@@ -82702,8 +82673,7 @@ selectEntireImage(act:=0) {
    If throwWarningAlphaPaintMode()
       Return
 
-   stopGIFsPlayback()
-   stopSlideshow()
+   stopGifORslidesPlayback()
    pBitmap := useGdiBitmap()
    If !validBMP(pBitmap)
       Return -1
