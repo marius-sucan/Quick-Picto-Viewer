@@ -92238,6 +92238,9 @@ filterListByKeywords() {
 }
 
 UIremKeywordsFilter() {
+   If (imageLoading=1)
+      Return
+
    Gui, SettingsGUIA: Default
    keywrdLVfilter := ""
    minKeywordLength := 3
@@ -92263,12 +92266,13 @@ UIfilterListKeywords() {
 }
 
 BtnUiKeywordsLister() {
-   EM_SETCUEBANNER(hEditField, "Generating keywords list - please wait", 1)
-   GenerateKeywordsListNow()
-   UIpopulateKeywordsListPanel()
+   If (imageLoading=1)
+      Return
+
+   UIpopulateKeywordsListPanel(0, 1)
 }
 
-UIpopulateKeywordsListPanel(listFilter:=0) {
+UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
   Static dictionary := [], prevLang := 0
 
   Gui, SettingsGUIA: Default
@@ -92276,6 +92280,10 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
   GuiControlGet, thresholdKeywords
   GuiControlGet, minKeywordLength
   GuiControlGet, LangKeywordsFilter
+  ; the build is its own long operation [it ends with ResetImgLoadStatus(), which
+  ; clears the busy flags], so it runs BEFORE this function's own busy dance
+  EM_SETCUEBANNER(hEditField, "Preparing keywords list - please wait", 1)
+  keywordsListArray := GenerateKeywordsListNow(regenList=1 ? 0 : "cached")
   GuiControl, -Redraw, LViewOthers
   setImageLoading()
   showTOOLtip("Preparing the dictionary, please wait")
@@ -92294,7 +92302,6 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
   }
   whileLoopExec := 0
   showTOOLtip("Populating the list view, please wait")
-  EM_SETCUEBANNER(hEditField, "Preparing keywords list - please wait", 1)
   LV_Delete()
   LV_ModifyCol(2, "Integer")
   LV_ModifyCol(3, "Integer")
@@ -92311,7 +92318,6 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
   doStartLongOpDance()
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
-  keywordsListArray := GenerateKeywordsListNow("cached")
   thisMaxCount := keywordsListArray.Count()
   For Key, Value in keywordsListArray
   {
@@ -92415,11 +92421,15 @@ UIpopulateKeywordsListPanel(listFilter:=0) {
 }
 
 GenerateKeywordsListNow(modus:=0) {
-   Static lastIDu, keywordsListArray := new hashtable()
+; Returns the keyword -> files count table for the current files list. With
+; modus="cached" the table built last time is served when the list is the same;
+; an aborted [partial] build is returned, but never cached.
+   Static lastIDu := "", keywordsListArray := ""
    thisIDu := "a0" CurrentSLD SLDtypeLoaded maxFilesIndex
    If (modus="cached" && thisIDu=lastIDu)
       Return keywordsListArray
 
+   keywordsListArray := new hashtable()
    abandonAll := 0
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
@@ -92461,9 +92471,10 @@ GenerateKeywordsListNow(modus:=0) {
         }
    }
 
-   thisIDu := "a" abandonAll CurrentSLD SLDtypeLoaded maxFilesIndex
+   lastIDu := "a" abandonAll CurrentSLD SLDtypeLoaded maxFilesIndex
    ResetImgLoadStatus()
    RemoveTooltip()
+   Return keywordsListArray
 }
 
 PanelStaticFolderzManager() {
