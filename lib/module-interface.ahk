@@ -1,10 +1,9 @@
 ﻿; module-interface.ahk - the QPV user-interface module: main window, viewport
-; windows, menu bar, input handlers, taskbar integration. Merged from the former
-; ahk_h interface thread in 2026-08 [interface-thread-merge-plan.md].
+; windows, menu bar, input handlers, taskbar integration.
 ;
-; Module-owned super-globals, declared and seeded here. quick-picto-viewer.ahk
-; #Include's this file right after its own Global block, inside the auto-exec section, so the
-; initializers run at start-up; initInterfaceModule() is then called once, before BuildGUI().
+; Initializers run at start-up: initInterfaceModule() is called once, before BuildGUI()
+; from quick-picto-viewer.ahk
+
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
      , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0, menusList := ""
@@ -18,11 +17,6 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , flyoutAnchorMenu := 0, lastLongOperationStart := 1, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
 
 initInterfaceModule() {
-; Called once from the main script's start-up, before BuildGUI(): detects the pen
-; api and registers the input handlers. Message numbers that BOTH sides used to
-; monitor go through the dispatch* composers defined below; the module-only
-; numbers register their handlers directly.
-
    ; input handlers. Module-only message numbers first:
    OnMessage(0x2a3, "WM_MOUSELEAVE")
    OnMessage(0x205, "WM_RBUTTONUP")
@@ -34,8 +28,7 @@ initInterfaceModule() {
    OnMessage(0x112, "uiWM_SYSCOMMAND")    ; WM_SYSCOMMAND (SC_CLOSE from sysmenu/taskbar)
    OnMessage(0x010, "uiWM_CLOSE")         ; WM_CLOSE
 
-   ; pen pressure [requires Windows 8 or newer]. The handler stays message-driven;
-   ; the brush loops additionally drain the queue themselves while they hold
+   ; pen pressure [requires Windows 8 or newer].
    ; Critical - see pumpPenMessages() / getBrushPenPressure().
    hasPenPressureAPI := DllCall("GetProcAddress", "UPtr", DllCall("GetModuleHandle", "Str", "user32", "UPtr"), "AStr", "GetPointerPenInfo", "UPtr") ? 1 : 0
    If (hasPenPressureAPI=1)
@@ -46,9 +39,7 @@ initInterfaceModule() {
       OnMessage(0x024A, "WM_PENpressure")  ; WM_POINTERLEAVE
    }
 
-   ; keystroke-beep suppression for 0x101-0x103 and 0x105-0x108 - matching the
-   ; pre-merge effective state, where the thread re-registered 0x100/0x104 onto
-   ; its keyboard handler [string-mode OnMessage REPLACES, never chains]
+   ; keystroke-beep suppression for 0x101-0x103 and 0x105-0x108
    Loop, 9
    {
       If (A_Index=1 || A_Index=5)  ; 0x100 WM_KEYDOWN / 0x104 WM_SYSKEYDOWN
@@ -56,17 +47,10 @@ initInterfaceModule() {
       OnMessage(255+A_Index, "PreventKeyPressBeep")
    }
 
-   ; [phase D] permanent same-thread WH_CALLWNDPROC hook [probes p7/p8]: receives
-   ; the SENT menu messages during modal menu loops - where OnMessage monitors,
-   ; timers and hotkey subroutines never run - and powers the JIT dropdown
-   ; rebuilds, the menu reader and the menu-scoped wheel hook install. Since
-   ; 2026-09-05 the hook PROCEDURE is native [qpvmain.dll, callwndproc-hook.h]
-   ; and calls the script only for the four menu messages; the DLL is not loaded
-   ; yet at this point, so the script procedure carries the menus until
-   ; initQPVmainDLL() calls uiInstallSentMsgHook() again and swaps it out.
+   ; permanent WH_CALLWNDPROC hook to handle menus
    uiInstallSentMsgHook()
 
-   ; numbers both sides monitored - composed dispatchers [see below]
+   ; composed dispatchers
    OnMessage(0x100, "dispatchKeyDown")
    OnMessage(0x104, "dispatchKeyDown")
    OnMessage(0x200, "dispatchMouseMove")
@@ -78,17 +62,13 @@ initInterfaceModule() {
 }
 
 
-; ______ queued asynchronous dispatch [merged - phases C+E] ______
-; Queued calls use QPV_post() defined in quick-picto-viewer.ahk.
-
-; ______ merged-thread input routing [merge phase C] ______
-; Before the merge, each interpreter's OnMessage monitors received messages ONLY
-; for its own windows, and every handler's guards assume exactly that universe.
-; The dispatchers below preserve those universes by routing on the receiving
-; window's top-level root: interface-owned roots go to the ui-side handler, all
-; other windows [panels, toolbar, tooltips of the main script] go to the
-; main-side handler. Never convert these to sequential chaining - the guards on
-; either side were not written to see the other side's windows.
+; thread input routing:
+; Before the merge, I was using AHK-H.
+; The main AHK thread and another thread for the interface.
+; Each thread received messages only for its own windows.
+;
+; The six dispatchers below preserve that "universe" by routing the messages 
+; to their corresponding windows/GUIs as it previously was.
 
 isUIrootWin(hwnd) {
    root := DllCall("user32\GetAncestor", "UPtr", hwnd, "UInt", 2, "UPtr")  ; GA_ROOT
@@ -216,7 +196,7 @@ uiCallWndProc(nCode, wP, lP) {
 ; FALLBACK script hook procedure,in place only until qpvmain.dll is
 ; loaded. EVERY sent message [WM_SETCURSOR, WM_CTLCOLOR*, WM_COMMAND,
 ; WM_ACTIVATE...] of every window on this thread passes here and
-; it is undesirabled. The fallback exists because I want to delay 
+; it is UNDESIRABLED. The fallback exists because I want to delay 
 ; the DLL init.
 
    If (nCode >= 0)
@@ -1733,7 +1713,7 @@ uiChangeMcursor(whichCursor) {
   If (whichCursor="normal-extra")
   {
      userPendingAbortOperations := imageLoading := mustAbandonCurrentOperations := 0
-     runningLongOperation := lastCloseInvoked := 0
+     runningLongOperation := lastCloseInvoked := whileLoopExec := 0
      setTaskbarIconState("normal")
      ; setMenuBarState("Enable")
      thisCursor := hCursN
@@ -1761,9 +1741,14 @@ uiChangeMcursor(whichCursor) {
   } Else If (whichCursor="cross")
   {
      thisCursor := hCursCross
-  } Else Return
+     setTaskbarIconState("normal")
+  } Else 
+  {
+     setTaskbarIconState("normal")
+     thisCursor := hCursN
+  }     
 
-  Try DllCall("user32\SetCursor", "UPtr", thisCursor)
+  DllCall("user32\SetCursor", "UPtr", thisCursor)
 }
 
 isQPVactive() {

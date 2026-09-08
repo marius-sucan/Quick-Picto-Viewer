@@ -3,7 +3,7 @@
 ;   Platform: Windows 7 or later, preferred is Windows 10.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
 ;   GitHub:   https://github.com/marius-sucan/Quick-Picto-Viewer
-;   Requires: AHK-H v1.1.33.01+.
+;   Requires: AHK-L v1.1.33.01+.
 ;   Code overview: https://raw.githubusercontent.com/marius-sucan/Quick-Picto-Viewer/master/general-code-overview.txt
 ;
 ; QPV main functionalities:
@@ -2309,9 +2309,9 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        Return 0
 
     If (r=1)
-       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " fn "() for " givenKey ". Too many parameters.")
+       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " fn "() for " givenKey ". Too many parameters.")
     Else If r
-       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " r "() function for " givenKey ".")
+       simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " r "() function for " givenKey ".")
 
     Return r ? -1 : allowLoop + 1
 } ; // processDefaultKbdCombos
@@ -2802,7 +2802,7 @@ OpenThisFileFolder() {
        Catch wasError
        {
           If !AnyWindowOpen
-             msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderu "\", 0, 0, "error")
+             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu "\", 0, 0, "error")
        }
     }
 }
@@ -2871,7 +2871,7 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
          imgPath := file2save
       } Else
       {
-         showTOOLtip("ERROR: An undefined error occured during image file conversion. The desktop wallpaper was not changed.`n" fileNamu "`n" folderu "\")
+         showTOOLtip("ERROR: An undefined error occurred during image file conversion. The desktop wallpaper was not changed.`n" fileNamu "`n" folderu "\")
          SoundBeep, 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -2999,7 +2999,7 @@ OpenNewQPVinstance(imgPath:="") {
    thisPath := A_IsCompiled ? Chr(34) exeToUse Chr(34) : Chr(34) exeToUse Chr(34) A_Space Chr(34) A_ScriptFullPath Chr(34)
    Try Run, %thisPath% "%imgPath%"
    Catch wasError
-         msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening a new instance of " appTitle ".", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening a new instance of " appTitle ".", 0, 0, "error")
 }
 
 OpenWithDefaultApp() {
@@ -3012,7 +3012,7 @@ OpenWithDefaultApp() {
     {
        Try Run, "%imgPath%"
        Catch wasError
-             msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the default application.", 0, 0, "error")
+             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the default application.", 0, 0, "error")
     }
 }
 
@@ -3026,7 +3026,7 @@ OpenFileProperties() {
     {
        Try Run, Properties "%imgPath%"
        Catch wasError
-             msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the system file properties.", 0, 0, "error")
+             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the system file properties.", 0, 0, "error")
     }
 }
 
@@ -3125,7 +3125,7 @@ OpenImgWithUserExternApp(modus:=0) {
 
    Try Run, %thisAPPpath% "%imgPath%"
    Catch wasError
-         msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the external application.", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the external application.", 0, 0, "error")
 }
 
 incDecSlidesSpeed(direction) {
@@ -4089,7 +4089,7 @@ PanelOfferAlphaMaskMerger(oldBitmap, newBitmap) {
       r := QPV_BlendBitmaps(zBitmap, newBitmap, thisu)
       if !r
       {
-         addJournalEntry(A_ThisFunc "(): An error occured when blending the bitmaps.")
+         addJournalEntry(A_ThisFunc "(): An error occurred when blending the bitmaps.")
          SoundBeep , 300, 100
       }
       userAlphaMaskBmpPainted := zBitmap
@@ -4260,15 +4260,6 @@ extraDummyReloadThisPicture() {
 }
 
 determineLClickState() {
-; Reads the logical button state directly since merge phase B; previously this also
-; polled the interface thread's LbtnDwn mirror, which is derived from the same
-; promoted input stream, so the direct read covers mouse, pen and touch alike.
-; The LbtnDwn mirror itself stays - the interface-side click handlers rely on it.
-; The read is thread-synchronous [Win32 GetKeyState]: it changes only when THIS
-; thread retrieves the queued WM_LBUTTONUP, which inside a Critical loop is the
-; interpreter's own 16 ms message check. A checkpoint that dispatches queued
-; messages through the window procedure resets that clock on every OnMessage
-; launch and can starve it - see the RULE in pumpPenMessages() [module-interface].
    If (slideShowRunning=1)
       Return 0
 
@@ -5387,7 +5378,6 @@ panIMGonScrollBar(doX, doY) {
       If (thisIndex<4)
          Sleep, 70
    }
-
    whileLoopExec := 0
    vpImgPanningNow := 0
    diffIMGdecX := diffIMGdecY := 0
@@ -10043,7 +10033,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
    }
 
    displayingImageNow := (thumbsDisplaying!=1 && useGdiBitmap()) ? 1 : 0
-   If isVarEqualTo(AnyWindowOpen, 1, 33, 39, 59, 48, 61)
+   If isVarEqualTo(AnyWindowOpen, 1, 33, 61)
    {
       If ((prevOpenedWindow[1, 1]=-1) || (A_TickCount - lastZeitOpenWin<400))
          Return
@@ -13248,7 +13238,7 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
 
        If !validBMP(thisBMP)
        {
-          fnOutputDebug(A_ThisFunc "(): an error occured rendering txt line=" A_Index)
+          fnOutputDebug(A_ThisFunc "(): an error occurred rendering txt line=" A_Index)
           imgW := prevImgW, imgH := prevImgH
           ; trGdip_DisposeImage(pBitmapContours)
           ; addJournalEntry(A_ThisFunc "(): ERROR. No valid bitmap generated for text line = " A_Index)
@@ -13525,7 +13515,7 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
 
        If (!validBMP(thisBMP) && !validBMP(pBitmapContours))
        {
-          fnOutputDebug(A_ThisFunc "(): an error occured rendering txt line=" A_Index)
+          fnOutputDebug(A_ThisFunc "(): an error occurred rendering txt line=" A_Index)
        } Else
        {
           If (imgW>maxW)
@@ -14161,7 +14151,7 @@ realtimePasteInPlaceRotator(previewMode, clipBMP, ByRef newBitmap) {
     prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
     If (!validBMP(userClipBMPpaste) || !validBMP(viewportStampBMP))
     {
-       addJournalEntry("An error occured in " A_ThisFunc "(). userClipBMPpaste and/or viewportStampBMP are invalid bitmaps.")
+       addJournalEntry("An error occurred in " A_ThisFunc "(). userClipBMPpaste and/or viewportStampBMP are invalid bitmaps.")
        Return "fail"
     }
 
@@ -14244,7 +14234,7 @@ realtimePasteInPlaceBlurrator(previewMode, clipBMP, ByRef newBitmap) {
 
     If (!validBMP(userClipBMPpaste) || !validBMP(viewportStampBMP))
     {
-       addJournalEntry("An error occured in " A_ThisFunc "(). userClipBMPpaste and/or viewportStampBMP are invalid bitmaps.")
+       addJournalEntry("An error occurred in " A_ThisFunc "(). userClipBMPpaste and/or viewportStampBMP are invalid bitmaps.")
        Return "fail"
     }
 
@@ -15204,7 +15194,7 @@ OpenCV_FimResizeBitmap(hFIFimgA, resizedW, resizedH, rx, ry, rw, rh, Interpolati
     {
        PixelFormat := FreeImage_GetImageType(hFIFimgX, 0)
        bpp := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgX), "-"))
-       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; an opencv or qpv dll failure occured: " PixelFormat " | " bpp " | " hFIFimgX)
+       addJournalEntry(A_ThisFunc "(): failed to resize bitmap; an opencv or qpv dll failure occurred: " PixelFormat " | " bpp " | " hFIFimgX)
        FreeImage_UnLoad(hFIFimgX)
        Return 0
     }
@@ -15248,7 +15238,7 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, altExpo) {
     r := DllCall("qpvmain.dll\openCVapplyToneMappingAlgos", "UPtr", pBitsAll, "int", hStride, "int", width, "int", height, "UPtr", pBits, "int", lStride, "int", algo, "float", paramA, "float", paramB, "float", paramC, "float", paramD, "int", altExpo)
     If !r 
     {
-       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occured")
+       addJournalEntry(A_ThisFunc "(): failed to perform tone-mapping; an opencv or qpv dll failure occurred")
        FreeImage_UnLoad(hFIFimgX)
        Return 0
     }
@@ -15610,7 +15600,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     {
        newBitmap := trGdip_CloneBitmap(A_ThisFunc, prevBMPu)
        If !validBMP(newBitmap)
-          addJournalEntry("An error occured in " A_ThisFunc "(). Invalid cached bitmap cloned.")
+          addJournalEntry("An error occurred in " A_ThisFunc "(). Invalid cached bitmap cloned.")
 
        Return
     }
@@ -15620,7 +15610,7 @@ realtimePasteInPlaceAlphaMasker(previewMode, clipBMP, givenID, ByRef newBitmap, 
     newBitmap := (doMerger=1) ? trGdip_CloneBitmap(A_ThisFunc, initialBitmap) : trGdip_CloneBitmap(A_ThisFunc, clipBMP)
     If !validBMP(newBitmap)
     {
-       addJournalEntry("An error occured in " A_ThisFunc "(). Invalid bitmap to process. doMerger=" doMerger)
+       addJournalEntry("An error occurred in " A_ThisFunc "(). Invalid bitmap to process. doMerger=" doMerger)
        Return
     }
 
@@ -17288,7 +17278,7 @@ downscaleHugeImagesForEditing() {
       Return 1
    } Else
    {
-      msgBoxWrapper(appTitle ": ERROR", "An internal error occured making the image available for editing. The application will malfunction.", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "An internal error occurred making the image available for editing. The application will malfunction.", 0, 0, "error")
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return -2
    }
@@ -17809,7 +17799,7 @@ InsertTextSelectedArea() {
              textBoxu := xBitmap
           }
        } Else
-          addJournalEntry(A_ThisFunc "(). ERROR. Unable to rotate the text bitmap. It exceeds 536 megapixels or another error occured.")
+          addJournalEntry(A_ThisFunc "(). ERROR. Unable to rotate the text bitmap. It exceeds 536 megapixels or another error occurred.")
     }
 
     trGdip_GetImageDimensions(textBoxu, nImgW, nImgH)
@@ -18436,7 +18426,7 @@ trGdip_DrawImage(funcu, pGraphics, pBitmap, dx:="", dy:="", dw:="", dh:="", sx:=
 
   If r
   {
-     baseMsg := "Unable to draw the processed image in the internal graphics object... Error occured in " A_ThisFunc "() invoked by " funcu "() for pG=" pGraphics " and pBMP=" pBitmap ". "
+     baseMsg := "Unable to draw the processed image in the internal graphics object... Error occurred in " A_ThisFunc "() invoked by " funcu "() for pG=" pGraphics " and pBMP=" pBitmap ". "
      generalInternalErrorMsgBox(r, baseMsg)
      Return "fail"
   }
@@ -18452,7 +18442,7 @@ trGdip_GraphicsFromImage(funcu, pBitmap, InterpolationMode:="", SmoothingMode:="
   r := Gdip_GraphicsFromImage(pBitmap, InterpolationMode, SmoothingMode, PageUnit, CompositingQuality)
   If (!r || gdipLastError)
   {
-     baseMsg := "Unable to create virtual graphics object required for processing the image... Error occured in " A_ThisFunc "() invoked by " funcu "() for pBMP=" pBitmap ". "
+     baseMsg := "Unable to create virtual graphics object required for processing the image... Error occurred in " A_ThisFunc "() invoked by " funcu "() for pBMP=" pBitmap ". "
      generalInternalErrorMsgBox(gdipLastError, baseMsg)
      Return
   } Else Return r
@@ -18487,7 +18477,7 @@ trGdip_DrawImageFX(funcu, pGraphics, pBitmap, dX:="", dY:="", sX:="", sY:="", sW
 
    If r
    {
-      baseMsg := "Unable to modify the image graphics object... Error occured in " A_ThisFunc "() invoked by " funcu "(). "
+      baseMsg := "Unable to modify the image graphics object... Error occurred in " A_ThisFunc "() invoked by " funcu "(). "
       generalInternalErrorMsgBox(r, baseMsg)
       Return "fail"
    }
@@ -18506,7 +18496,7 @@ trGdip_GraphicsClear(funcu, pGraphics, coloru:=0x00ffFFff, silentMode:=0) {
 
   If r
   {
-     baseMsg := "Unable to apply operations on image graphics object... Error occured in " A_ThisFunc "() invoked by " funcu "() for pG=" pGraphics ". "
+     baseMsg := "Unable to apply operations on image graphics object... Error occurred in " A_ThisFunc "() invoked by " funcu "() for pG=" pGraphics ". "
      generalInternalErrorMsgBox(r, baseMsg, silentMode)
      Return "fail"
   }
@@ -18558,7 +18548,7 @@ warnUserFatalBitmapError(pBitmap, funcu) {
     If (!validBMP(pBitmap) || pBitmap="err" || pBitmap="fail")
     {
        r := (pBitmap="no-gdip") ? 0 : gdipLastError
-       baseMsg := "Unable to create internal bitmap to apply operations on image... Error occured in Gdip_CreateBitmap() invoked by " funcu  "(). "
+       baseMsg := "Unable to create internal bitmap to apply operations on image... Error occurred in Gdip_CreateBitmap() invoked by " funcu  "(). "
        generalInternalErrorMsgBox(r, baseMsg)
        Return "fail"
     }
@@ -20266,7 +20256,7 @@ SymmetrySelectedArea() {
        dummyTimerDelayiedImageDisplay(50)
     } Else
     {
-       showTOOLtip("Failed to apply tool: symmetry generator.`nAn unexpected asymmetry occured.")
+       showTOOLtip("Failed to apply tool: symmetry generator.`nAn unexpected asymmetry occurred.")
        trGdip_DisposeImage(metaBitmap)
        SoundBeep 300, 100
        SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -23874,7 +23864,7 @@ BlurSelectedArea(modus:="") {
 
     ; ToolTip, % "l=" isUni " | " maxLevelIndex , , , 2
     ; ToolTip, % blurAreaPixelizeAmount "==" blurAreaPixelizeMethod "==" modus , , , 2
-    errorsOccured := 0
+    errorsOccurred := 0
     QPV_PrepareAlphaChannelBlur(zBitmap, 1, 1)
     If (blurAreaPixelizeAmount>1 && blurAreaPixelizeMethod>1 && modus="pixelate")
     {
@@ -23891,7 +23881,7 @@ BlurSelectedArea(modus:="") {
        {
           trGdip_DisposeImage(zBitmap, 1)
           zBitmap := newBitmap
-       } else errorsOccured := 1
+       } else errorsOccurred := 1
        trGdip_DisposeImage(pixiBMP, 1)
     } Else If (blurAreaPixelizeAmount>1 && modus="pixelate")
     {
@@ -23957,7 +23947,7 @@ BlurSelectedArea(modus:="") {
        {
           trGdip_DisposeImage(zBitmap)
           zBitmap := zzBitmap
-       } Else errorsOccured := 1
+       } Else errorsOccurred := 1
     } Else If (modus="pixelate" && blurAreaAmount>2)
        zko := QPV_BlurBitmapFilters(zBitmap, Round(blurAreaAmount*0.5), Round(blurAreaAmount*0.5), 0)
     Else If (thisBlurMode>=2) ; opencv blur filters
@@ -23966,16 +23956,16 @@ BlurSelectedArea(modus:="") {
        ApplySpecialFixedBlur(A_ThisFunc, zBitmap, o_blurAreaAmount, pEffect)
     
     If (zko!=1)
-       errorsOccured := 1
+       errorsOccurred := 1
     
     If (isUni && modus="pixelate")
        QPV_PrepareAlphaChannelBlur(zBitmap, avgLevelAlpha, 0)
 
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
-    If (errorsOccured=0 && BlurAreaBlendMode>1)
+    If (errorsOccurred=0 && BlurAreaBlendMode>1)
        applyBlurColorsFX(zBitmap)
 
-    If (errorsOccured=0 && blurAreaSoftEdges=1 && modus!="pixelate" && BlurAreaInverted=0)
+    If (errorsOccurred=0 && blurAreaSoftEdges=1 && modus!="pixelate" && BlurAreaInverted=0)
     {
        setWindowTitle("APPLYING SOFT EDGES MASK, please wait", 1)
        thisAmount := (o_blurAreaAmount + o_blurAreaYamount)/2
@@ -23985,7 +23975,7 @@ BlurSelectedArea(modus:="") {
        maskBitmap := carvePathFromBitmap(zBitmap, pPath, imgSelPx, imgSelPy, 0, 2, thisAmount, 0, !BlurAreaInverted, !BlurAreaInverted, 2)
     }
 
-    If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
+    If (errorsOccurred=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
     {
        ; SoundBeep 900, 1010
        ; setWindowTitle("APPLYING ALPHA MASK, please wait", 1)
@@ -24002,13 +23992,13 @@ BlurSelectedArea(modus:="") {
        ; QPV_SetBitmapAsAlphaChannel(zBitmap, alphaMaskGray, alphaMaskColorReversed)
        ; trGdip_DisposeImage(alphaMaskGray)
        thisAlphaInvert := alphaMaskColorReversed
-    } Else If (errorsOccured=0 && validBMP(maskBitmap))
+    } Else If (errorsOccurred=0 && validBMP(maskBitmap))
     {
        alphaMaskGray := maskBitmap
        thisAlphaInvert := !BlurAreaInverted
     }
 
-    If (errorsOccured=0 && BlurAreaBlendMode>0)
+    If (errorsOccurred=0 && BlurAreaBlendMode>0)
     {
        setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
        rzp := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, thisAlphaInvert)
@@ -24032,7 +24022,7 @@ BlurSelectedArea(modus:="") {
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rzp=1 && errorsOccured=0)
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rzp=1 && errorsOccurred=0)
     {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
@@ -24123,7 +24113,7 @@ ZoomBlurSelectedArea() {
     prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelPx + imgSelW) - imgSelPx)/imgSelW
     prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelPy + imgSelH) - imgSelPy)/imgSelH
     thisIntensity := calcZoomBlurIntensity()
-    errorsOccured := 0
+    errorsOccurred := 0
     doStartLongOpDance()
     Static zblr := {1:"radial", 2:"horizontal", 3:"vertical", 4: "rotate"}
     showTOOLtip("Applying " zblr[zoomBlurMode] " blur, please wait...")
@@ -24133,18 +24123,18 @@ ZoomBlurSelectedArea() {
        trGdip_DisposeImage(gBitmap, 1)
        gBitmap := zoomedBMP
     } Else
-       errorsOccured := 1
+       errorsOccurred := 1
 
-    If (BlurAreaBlendMode>1 && errorsOccured=0)
+    If (BlurAreaBlendMode>1 && errorsOccurred=0)
        applyBlurColorsFX(gBitmap)
 
     trGdip_GetImageDimensions(gBitmap, zzw, zzh)
-    If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
+    If (errorsOccurred=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
        alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
 
     setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
     rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, alphaMaskColorReversed)
-    If (errorsOccured=0 && allowAlphaMasking=1 && alphaMaskingMode>1 && BlurAreaBlendMode=25 && validBMP(rz))
+    If (errorsOccurred=0 && allowAlphaMasking=1 && alphaMaskingMode>1 && BlurAreaBlendMode=25 && validBMP(rz))
     {
        xBitmap := rz
        swapVars(bgrBMPu, xBitmap)
@@ -24160,7 +24150,7 @@ ZoomBlurSelectedArea() {
     Gdip_DeletePath(pPath)
     Gdip_DeleteGraphics(G2)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
-    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rz=1 && errorsOccured=0)
+    If (r1!="fail" && r0!="fail" && validBMP(metaBitmap) && rz=1 && errorsOccurred=0)
     {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
@@ -26974,7 +26964,7 @@ omniBoxFolderExplorerOpen() {
    Catch wasError
    {
       If !AnyWindowOpen
-         msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderPath, 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderPath, 0, 0, "error")
    }
 }
 
@@ -27751,7 +27741,7 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
        }
     }
 
-    If (ShowAdvToolbar=1)
+    If (ShowAdvToolbar=1 && (A_TickCount - scriptStartTime>1000))
     {
        createGUItoolbar()
        SetTimer, fromCurrentPanelToColorsSwatch, -25
@@ -27788,7 +27778,7 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
        ; ToolTip, % winPos , , , 2
        Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
     }
-    SetTimer, highlightActiveCtrl, -100
+    ; SetTimer, highlightActiveCtrl, -100
 }
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
@@ -29590,7 +29580,10 @@ PopulateIndexFilesStatsInfos(dummy:=0) {
   SetTimer, ResetImgLoadStatus, -200
 }
 
-retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth", noDeads:=0) {
+retrieveGroupSQLimgInfos(ByRef abandonAll, which, thisGroup, totalgroups, constrain:="imgwidth", noDeads:=0) {
+   If (abandonAll=1)
+      Return
+
    showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
    delu := (noDeads=1) ? "isDeleted=0 AND " : ""
    SQL := "SELECT " which ", Count(*) FROM images WHERE " delu constrain " IS NOT NULL GROUP BY " which ";"
@@ -29599,6 +29592,12 @@ retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth", n
       newArrayu := []
       Loop, % RecordSet.RowCount
       {
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            Break
+         }
+
          Rowu := RecordSet.Rows[A_Index]
          If (Rowu[1]!="")
             newArrayu[A_Index] := [Rowu[2], Rowu[1]]
@@ -29609,7 +29608,10 @@ retrieveGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgwidth", n
    }
 }
 
-retrieveHistoGroupSQLimgInfos(which, thisGroup, totalgroups, constrain:="imgavg", noDeads:=0) {
+retrieveHistoGroupSQLimgInfos(ByRef abandonAll, which, thisGroup, totalgroups, constrain:="imgavg", noDeads:=0) {
+   If (abandonAll=1)
+      Return
+
    showTOOLtip("Retrieving statistics from the database, please wait`n" thisGroup " / " totalgroups " ( " which " )", 0, 0, thisGroup/totalgroups)
    delu := (noDeads=1) ? "isDeleted=0 AND " : ""
    SQL := "SELECT Round(" which "*256), Count(*) FROM images WHERE " delu constrain " IS NOT NULL GROUP BY " which ";"
@@ -29660,8 +29662,8 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   isFilter := StrLen(filesFilter)>2 ? 1 : 0
   If (dummy!="kill")
   {
-     doStartLongOpDance()
      showTOOLtip("Generating statistics on images details, please wait`n" groupDigits(thisMaxCount) " files")
+     doStartLongOpDance()
      setImageLoading()
      thisState := "z" CurrentSLD DynamicFoldersList SLDtypeLoaded thisMaxCount
   } Else prevState := ""
@@ -29670,7 +29672,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
   {
      entriesCount := totalSizeu := entriezHM1 := entriezHM2 := entriezHM3 := entriezHM4 := entriezHM5 := prevMaxu := 0
      entriezHL1 := entriezHP1 := entriezHA1 := entriezHL2 := entriezHP2 := entriezHA2 := entriezHL3 := entriezHP3 := entriezHA3 := entriezHL4 := entriezHP4 := entriezHA4 := entriezHL5 := entriezHP5 := entriezHA5 := 0
-
      entriesD := []
      entriesM := []
      entriesY := []
@@ -29693,18 +29694,35 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
         ; prevMaxu := getTotalIMGsSQLdb("WHERE imgwidth IS NOT NULL")
         thisMaxCount := prevMaxu
         If !prevMaxu
+        {
+           prevState := ""
+           showTOOLtip("AN error occurred User abandoned operation...")
+           GuiControl, SettingsGUIA:, infoLine, Indexed images: ERROR.
+           SetTimer, ResetImgLoadStatus, -100
            Return 0
+        }
 
-        entriesS := retrieveGroupSQLimgInfos("imgpixfmt", 2, 12)
-        entriesM := retrieveGroupSQLimgInfos("imgframes", 3, 12)
-        entriesU := retrieveGroupSQLimgInfos("imgdpi", 4, 12)
-        entriesD := retrieveGroupSQLimgInfos("Round(imgmegapix, 1)", 5, 12)
-        entriesY := retrieveGroupSQLimgInfos("Round(imgwhratio, 1)", 6, 12)
-        entriesT := retrieveHistoGroupSQLimgInfos("imgavg", 7, 12)
-        entriesG := retrieveHistoGroupSQLimgInfos("imgmedian", 8, 12)
-        entriesA := retrieveHistoGroupSQLimgInfos("imghpeak", 9, 12)
-        entriesI := retrieveHistoGroupSQLimgInfos("imghlow", 10, 12)
-        entriesR := retrieveHistoGroupSQLimgInfos("imghrange", 11, 12)
+        abandonAll := 0
+        entriesS := retrieveGroupSQLimgInfos(abandonAll, "imgpixfmt", 2, 12)
+        entriesM := retrieveGroupSQLimgInfos(abandonAll, "imgframes", 3, 12)
+        entriesU := retrieveGroupSQLimgInfos(abandonAll, "imgdpi", 4, 12)
+        entriesD := retrieveGroupSQLimgInfos(abandonAll, "Round(imgmegapix, 1)", 5, 12)
+        entriesY := retrieveGroupSQLimgInfos(abandonAll, "Round(imgwhratio, 1)", 6, 12)
+        entriesT := retrieveHistoGroupSQLimgInfos(abandonAll, "imgavg", 7, 12)
+        entriesG := retrieveHistoGroupSQLimgInfos(abandonAll, "imgmedian", 8, 12)
+        entriesA := retrieveHistoGroupSQLimgInfos(abandonAll, "imghpeak", 9, 12)
+        entriesI := retrieveHistoGroupSQLimgInfos(abandonAll, "imghlow", 10, 12)
+        entriesR := retrieveHistoGroupSQLimgInfos(abandonAll, "imghrange", 11, 12)
+        If (abandonAll=1)
+        {
+           prevState := ""
+           showTOOLtip("User abandoned operation...")
+           GuiControl, SettingsGUIA:, infoLine, Indexed images: user abandoned operation
+           SoundBeep 300, 100
+           SetTimer, RemoveTooltip, % -msgDisplayTime
+           SetTimer, ResetImgLoadStatus, -100
+           Return
+        }
      }
 
      prevMSGdisplay := A_TickCount
@@ -29718,6 +29736,13 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             etaTime := ETAinfos(A_Index, thisMaxCount, startZeit)
             showTOOLtip("Generating statistics, please wait" etaTime, 0, 0, A_Index/thisMaxCount)
             prevMSGdisplay := A_TickCount
+         }
+
+         If (determineTerminateOperation()=1)
+         {
+            abandonAll := 1
+            prevState := ""
+            Break
          }
 
          If (isFilter=1)
@@ -29890,13 +29915,6 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
             entriesY[ratiou] := [entriez%ratiou%, ratio]
             entriesM["z" frames] := [entriezFram%frames%, frames]
             entriesU["z" dpiu] := [entriezU%dpiu%, dpiu]
-         }
-
-         If (determineTerminateOperation()=1)
-         {
-            abandonAll := 1
-            prevState := ""
-            Break
          }
      }
 
@@ -30090,6 +30108,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
 
      RecordSet := ""
      tableu := (uiPreferedFileStats=1) ? "fmodified" : "Fcreated"
+     showTOOLtip("Retrieving statistics data, please wait", 0, 0, 0.3/10)
      SQL := "SELECT substr(" tableu ", 1, 8), COUNT(*) FROM images GROUP BY substr(" tableu ", 1, 8);"
      If !activeSQLdb.GetTable(SQL, RecordSet)
      {
@@ -30098,10 +30117,9 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
         Return 0
      }
 
-     doStartLongOpDance()
-     showTOOLtip("Generating statistics, please wait", 0, 0, 0.4/10)
      setImageLoading()
-
+     doStartLongOpDance()
+     showTOOLtip("Generating statistics, please wait", 0, 0, 0.7/10)
      Loop, % RecordSet.RowCount
      {
          Rowu := RecordSet.Rows[A_Index]
@@ -30139,7 +30157,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
      Return
   }
 
-  showTOOLtip("Generating statistics, please wait", 0, 0, 1.5/10)
+  showTOOLtip("Generating statistics: DAILY, please wait", 0, 0, 1.5/10)
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewMetaD
   GuiControl, -Redraw, LViewMetaD
@@ -30147,7 +30165,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   GuiControl, -Redraw, LViewMetaY
   GuiControl, -Redraw, LViewMetaS
   GuiControl, -Redraw, LViewMetaT
-
+  whileLoopExec := 1
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
   LV_ModifyCol(4, "Float")
@@ -30174,6 +30192,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   }
 
   Gui, SettingsGUIA: ListView, LViewMetaM
+  showTOOLtip("Generating statistics: MONTHLY/YEARLY, please wait", 0, 0, 1.5/10)
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
   LV_ModifyCol(4, "Float")
@@ -30222,8 +30241,8 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   LV_ModifyCol(1, "Integer")
   LV_ModifyCol(3, "Integer")
   LV_ModifyCol(4, "Float")
-
-  showTOOLtip("Generating statistics, please wait", 0, 0, 3/10)
+  whileLoopExec := 1
+  showTOOLtip("Generating statistics: FILE TYPES, please wait", 0, 0, 3/10)
   Loop, % thisMaxCount
   {
       If (determineTerminateOperation()=1)
@@ -30261,6 +30280,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
      Return
   }
 
+  whileLoopExec := 1
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewMetaS
   LV_ModifyCol(1, "Integer")
@@ -30269,26 +30289,27 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   LV_ModifyCol(5, "Float")
   zr := (cachedMode=1) ? "c" : 0
   j := 0
-  showTOOLtip("Generating statistics, please wait", 0, 0, 4/10)
+  showTOOLtip("Generating statistics: FILE SIZES, please wait", 0, 0, 4/10)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 1, "<5 KB", 0, 4998)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 2, "5-10 KB", 4999, 10001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 3, "10-25 KB", 10002, 25001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 4, "25-50 KB", 25002, 50001)
-  showTOOLtip("Generating statistics, please wait", 0, 0, 6/10)
+  showTOOLtip("Generating statistics: FILE SIZES, please wait", 0, 0, 6/10)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 5, "50-100 KB", 50002, 100001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 6, "100-250 KB", 100002, 250001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 7, "250-500 KB", 250002, 500001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 8, "0.5-1.0 MB", 500002, 1000001)
-  showTOOLtip("Generating statistics, please wait", 0, 0, 8/10)
+  showTOOLtip("Generating statistics: FILE SIZES, please wait", 0, 0, 8/10)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 9, "1.0-2.5 MB", 1000002, 2500001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 10, "2.5-5.0 MB", 2500002, 5000001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 11, "5-10 MB", 5000002, 10000001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 12, "10-25 MB", 10000002, 25000001)
-  showTOOLtip("Generating statistics, please wait", 0, 0, 9/10)
+  showTOOLtip("Generating statistics: FILE SIZES, please wait", 0, 0, 9/10)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 13, "25-50 MB", 25000002, 50000001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 14, "50-100 MB", 50000002, 100000001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 15, "100-250 MB", 100000002, 250000001)
   zr := uiFileIndexStatsRetrieveSizeRangeDB(zr, j, 16, "250-500 MB", 250000002, 500000001)
+  showTOOLtip("Generating statistics, finalizing...", 0, 0, 9.5/10)
   Loop, 5
      LV_ModifyCol(A_Index, "AutoHdr Center")
 
@@ -30299,6 +30320,7 @@ PopulateIndexSQLFilesStatsInfos(dummy:=0) {
   GuiControl, +Redraw, LViewMetaY
   GuiControl, +Redraw, LViewMetaS
   GuiControl, +Redraw, LViewMetaT
+  whileLoopExec := 0
   GuiControl, SettingsGUIA:, infoLine, Total images: %friendlyCount% [%totalFsize% GB]
   zeitOperation := A_TickCount - startZeit
   addJournalEntry(A_ThisFunc "() operation elapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)))
@@ -30551,7 +30573,7 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       Catch wasError
       {
          If !AnyWindowOpen
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderPath, 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderPath, 0, 0, "error")
       }
    } Else If (z=2 && folderPath)
    {
@@ -31509,7 +31531,7 @@ UIcoreFolderNew(thisFolder, ByRef newFileName) {
          Return 1
       } Else
       {
-         showTOOLtip("ERROR: An unknown error occured creating the new folder in:`n" thisFolder "\")
+         showTOOLtip("ERROR: An unknown error occurred creating the new folder in:`n" thisFolder "\")
          SoundBeep, 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
@@ -31534,7 +31556,7 @@ folderTreeCreateFolder() {
          FileCreateDir, %thisFolder%
          If ErrorLevel
          {
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while creating the folder:`n`n" thisFolder "\`n`nPossibly access denied.", 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while creating the folder:`n`n" thisFolder "\`n`nPossibly access denied.", 0, 0, "error")
             Return
          }
       } Else Return
@@ -31654,7 +31676,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
          FileCreateDir, %thisFolder%
          If ErrorLevel
          {
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while creating the folder:`n`n" thisFolder "\`n`nPossibly access denied.", 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while creating the folder:`n`n" thisFolder "\`n`nPossibly access denied.", 0, 0, "error")
             Return
          }
       } Else Return
@@ -31846,7 +31868,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
          Return 1
       } Else
       {
-         showTOOLtip("ERROR: An unknown error occured renaming the folder:`n" thisFolder "\")
+         showTOOLtip("ERROR: An unknown error occurred renaming the folder:`n" thisFolder "\")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
@@ -34847,7 +34869,7 @@ SaveFilesList(enforceFile:=0) {
 
             If (wasErrorA || wasErrorB)
             {
-               msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file. Permission denied or another error occured.`n`n" OutFileName "`n" OutDir "\", 0, 0, "error")
+               msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file. Permission denied or another error occurred.`n`n" OutFileName "`n" OutDir "\", 0, 0, "error")
                Return
             }
          } Else Return
@@ -34859,7 +34881,7 @@ SaveFilesList(enforceFile:=0) {
       mainFile := FileOpen(file2save, "a", "UTF-16")
       If !IsObject(mainFile)
       {
-         msgBoxWrapper(appTitle ": ERROR", "Unable to write file in the given location. Permission denied or another error occured.`n`n" OutFileName "`n" OutDir "\", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "Unable to write file in the given location. Permission denied or another error occurred.`n`n" OutFileName "`n" OutDir "\", 0, 0, "error")
          Return
       }
 
@@ -34941,7 +34963,7 @@ SaveFilesList(enforceFile:=0) {
       SetTimer, ResetImgLoadStatus, -50
       SoundBeep, % wasErrorC ? 300 : 900, 100
       If wasErrorC
-         msgBoxWrapper(appTitle ": ERROR", "Errors occured when writing the files list to disk. Permission denied or not enough disk space.", 0, 0, "error")
+         msgBoxWrapper(appTitle ": ERROR", "Errors occurred when writing the files list to disk. Permission denied or not enough disk space.", 0, 0, "error")
 
       dummyTimerDelayiedImageDisplay(50)
    }
@@ -41490,10 +41512,10 @@ PanelQuickSearchMenuOptions(whatu:=0,given:=0) {
     Global LVsearchMenus, StatusLineQuickSearch, UIclearBtn, UImenuQSbtn
     Static lastState := 0
     stopSlideshow()
+    stopGIFsPlayback()
     If (AnyWindowOpen=61 || AnyWindowOpen=83)
        CloseWindow()
-
-    stopGIFsPlayback()
+    initQPVmainDLL()
     mouseTurnOFFtooltip()
     If (given="yes" && StrLen(whatu)>1 && createdQuickMenuSearchWin=1)
     {
@@ -44013,7 +44035,7 @@ BTNperformExtractFrames(a) {
       Else If (r>=1)
          showTOOLtip("Succesfully extracted " groupDigits(extractedFrames) " frames out of " r)
       Else 
-         showTOOLtip("ERROR: An undefined error has occured.`nNo frames or pages were extracted.")
+         showTOOLtip("ERROR: An undefined error has occurred.`nNo frames or pages were extracted.")
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
    }
@@ -48264,7 +48286,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    If (panelWinCollapsed!=1 && AnyWindowOpen)
       toggleImgEditPanelWindow("forced")
 
-   ll := pll := pX := pY := errorOccured := 0
+   ll := pll := pX := pY := errorOccurred := 0
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
    Global lastOtherWinClose := A_TickCount
    WinActivate, ahk_id %PVhwnd%
@@ -48272,12 +48294,12 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    whileLoopExec := 1
    While, (colorPickerModeNow=1)
    {
-      If (errorOccured>700)
+      If (errorOccurred>700)
          Break
 
       If (A_Index>2950)
       {
-         errorOccured := 750
+         errorOccurred := 750
          Break
       }
 
@@ -48288,7 +48310,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
 
       If (cc=-1 || colorPickerMustEnd=-1 || GetKeyState("Escape") || GetKeyState("Space") || GetKeyState("Tab") || GetKeyState("MButton") || GetKeyState("RButton"))
       {
-         errorOccured := 750
+         errorOccurred := 750
          Break
       }
 
@@ -48302,7 +48324,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
          If (h="")
          {
             Sleep, 5
-            errorOccured++
+            errorOccurred++
             Continue
          }
    
@@ -48316,14 +48338,14 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
       Sleep, 5
    }
 
-   h := (errorOccured>685) ? initialColor : showLEDgui("prev", pX, pY)
+   h := (errorOccurred>685) ? initialColor : showLEDgui("prev", pX, pY)
    whileLoopExec := 0
    StopColorPicker()
    createGUItoolbar()
    If (panelWinCollapsed=1 && AnyWindowOpen && d!="leave-it")
       toggleImgEditPanelWindow("forced")
 
-   ; If (errorOccured>690)
+   ; If (errorOccurred>690)
    ;    Return
 
    If (a="isGiven")
@@ -48335,7 +48357,7 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    ; https://autohotkey.com/board/topic/43945-fast-pixelgetcolor-workaround-for-aero-windows-7-and-vista/
    o := %ctrl%
    SoundBeep, 900, 100
-   ; ToolTip, % errorOccured " h = " h "`n" o " | " ctrl , , , 2
+   ; ToolTip, % errorOccurred " h = " h "`n" o " | " ctrl , , , 2
    ; ToolTip, % r "`n" ctrl "`n" o "`n" h "`n" g "`n" z , , , 2
    %ctrl% := h
    If ctrl
@@ -50721,7 +50743,7 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    {
       FileCreateDir, %mainCompiledPath%\resources\vector-shapes
       If ErrorLevel
-         errorOccured := 1
+         errorOccurred := 1
 
       Sleep, 1
    }
@@ -50745,11 +50767,11 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    FileDelete, % thisFile
    FileAppend, % contentu, % thisFile , UTF-8
    If ErrorLevel
-      errorOccured := 1
+      errorOccurred := 1
 
    If (allowMsg=1)
    {
-      If (errorOccured=1)
+      If (errorOccurred=1)
       {
          showTOOLtip("Failed to save vector shape into:`n" mainCompiledPath "\")
          SoundBeep 300, 100
@@ -50757,7 +50779,7 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
       } Else prevNameSavedVectorShape := givenName
    }
 
-   Return errorOccured
+   Return errorOccurred
 }
 
 updateLabelPasteImgOpacity() {
@@ -56607,7 +56629,7 @@ RetrievePDFbookmarks(imgPath, pwd, allowBonuses, ByRef pageCount, ByRef errorTyp
    If (errorType=-2)
       txt := "No bookmarks retrieved."
    Else If errorType
-      txt := "An error occured retrieving the PDF embedded bookmarks: " errorType "."
+      txt := "An error occurred retrieving the PDF embedded bookmarks: " errorType "."
    Else If (buffer && bufferSize>1)
    {
       If (asked=1)
@@ -59831,7 +59853,7 @@ BTNuiProceedStructuredOperation() {
             FileCreateDir, %dS%
             If ErrorLevel
             {
-               msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while creating the folder:`n`n" dS "\`n`nPossibly access denied.", 0, 0, "error")
+               msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while creating the folder:`n`n" dS "\`n`nPossibly access denied.", 0, 0, "error")
                Return
             }
          } Else Return
@@ -60082,7 +60104,7 @@ BtnCopyMoveAction(dummy:=0) {
            If (dummy="quick-actu")
               showTOOLtip("Failed to create the destination folder:`n" OutDir "\")
            Else
-              msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while creating the folder:`n" folderu "\", 0, 0, "error")
+              msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while creating the folder:`n" folderu "\", 0, 0, "error")
            Return 0
         } Else
         {
@@ -63920,8 +63942,8 @@ importSLDBintoSLDB(whichFile) {
       If (A_TickCount - prevMSGdisplay>1500)
       {
          etaTime := ETAinfos(A_Index, countFiles, startOperation)
-         If errorsOccured
-            moreSpam := "`n" groupDigits(errorsOccured) " errors occured until now"
+         If errorsOccurred
+            moreSpam := "`n" groupDigits(errorsOccurred) " errors occurred until now"
 
          showTOOLtip("Merging databases contents, please wait" moreSpam etaTime, 0, 0, A_Index/countFiles)
          prevMSGdisplay := A_TickCount
@@ -63962,7 +63984,7 @@ importSLDBintoSLDB(whichFile) {
       moreSQL := baseSQLstr "'" sqlDBrowID "', " k1 ", " k2 ", '" k3 "', '" k4 "', '" k5 "', '" k6 "', '" k7 "', '" k8 "', '" k9 "', '" k10 "', '" k11 "', '" k12 "', '" k13 "', '" k14 "', '" k15 "', '" k16 "', '" k17 "', '" k18 "', '" k19 "', '" k20 "', '" k21 "');"
       If !activeSQLdb.Exec(moreSQL)
       {
-         errorsOccured++
+         errorsOccurred++
       } Else
       {
          If (pixelsCarried=1 && (srcMainID || srcOtherID))
@@ -63974,7 +63996,7 @@ importSLDBintoSLDB(whichFile) {
             If (pixMapCount>=500)
             {
                If !activeSQLdb.Exec("INSERT INTO pixMap (newID, mainID, otherID) VALUES " pixMapRows ";")
-                  errorsOccured++
+                  errorsOccurred++
                pixMapRows := ""
                pixMapCount := 0
             }
@@ -63988,7 +64010,7 @@ importSLDBintoSLDB(whichFile) {
    If (pixelsCarried=1 && pixMapCount>0)
    {
       If !activeSQLdb.Exec("INSERT INTO pixMap (newID, mainID, otherID) VALUES " pixMapRows ";")
-         errorsOccured++
+         errorsOccurred++
       pixMapRows := ""
    }
 
@@ -64026,7 +64048,7 @@ importSLDBintoSLDB(whichFile) {
       pixSQL .= " WHERE o.imgidu IS NOT NULL OR x.imgidu IS NOT NULL;"
       If !activeSQLdb.Exec(pixSQL)
       {
-         errorsOccured++
+         errorsOccurred++
          addJournalEntry(A_ThisFunc "(): failed to carry the fingerprints across the merge; they will have to be collected again.`n" activeSQLdb.ErrorMsg "`n" pixSQL)
       }
 
@@ -64038,7 +64060,7 @@ importSLDBintoSLDB(whichFile) {
    Loop, Parse, cols, CSV
    {
       If !activeSQLdb.Exec("UPDATE images SET " A_LoopField " = NULL WHERE " A_LoopField "='';")
-         errorsOccured++
+         errorsOccurred++
    }
 
    If !activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -64071,15 +64093,15 @@ importSLDBintoSLDB(whichFile) {
    Sort, DynamicFoldersList, UD`n
    newListu := cleanDynamicFoldersList(DynamicFoldersList)
    recreateDynaFoldersSQLdbList(newListu)
-   If errorsOccured
-      someErrors := "`n" groupDigits(errorsOccured) " errors occured during merger."
+   If errorsOccurred
+      someErrors := "`n" groupDigits(errorsOccurred) " errors occurred during merger."
 
    zeitOperation := A_TickCount - startZeit
    etaTime := SecToHHMMSS(Round(zeitOperation/1000, 3))
    OpenSLD(CurrentSLD, 1)
    showDelayedTooltip("Databases merger has finished in " etaTime someErrors "`nTotal files: " groupDigits(maxFilesIndex))
    ; res := sldGenerateFilesList(whichFile, 0, mustRemQuotes, 0)
-   SoundBeep , % errorsOccured ? 300 : 900, 100
+   SoundBeep , % errorsOccurred ? 300 : 900, 100
    ; GenerateRandyList()
    ; RandomPicture()
    SetTimer, ResetImgLoadStatus, -200
@@ -64942,7 +64964,7 @@ associateWithExplorer(modus, bza:=-1) {
    {
       FileCreateDir, %mainCompiledPath%\regFiles
       If ErrorLevel
-         errorOccured := 1
+         errorOccurred := 1
 
       Sleep, 1
    }
@@ -64952,21 +64974,21 @@ associateWithExplorer(modus, bza:=-1) {
    Sleep, 1
    FileAppend, % regFile, %mainCompiledPath%\regFiles\RegExplGeneral.reg, UTF-16
    If ErrorLevel
-      errorOccured := 1
+      errorOccurred := 1
 
    runTarget := "Reg Import " q mainCompiledPath "\regFiles\RegExplGeneral.reg" q "`n"
    FileAppend, % runTarget, %mainCompiledPath%\regFiles\runThis.bat
    If ErrorLevel
-      errorOccured := 1
+      errorOccurred := 1
 
    ;  msgbox, % "loool=" A_ThisFunc "==" modus
-   If !errorOccured
+   If !errorOccurred
       Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
    Sleep, 1
    FileDelete, %mainCompiledPath%\regFiles\RegExplGeneral.reg
    FileDelete, %mainCompiledPath%\regFiles\runThis.bat
-   If (errorOccured && modus!=2)
-      msgBoxWrapper(appTitle ": ERROR", "An unknown error occured while associating " appTitle " with Explorer context menu options.", 0, 0, "error")
+   If (errorOccurred && modus!=2)
+      msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while associating " appTitle " with Explorer context menu options.", 0, 0, "error")
 
 }
 
@@ -64976,7 +64998,7 @@ associateSLDsNow() {
     If z
        ShellFileAssociate("QPVslideshow",".sldb", fullPath2exe, 0, mainCompiledPath, bonus)
     Else
-       msgBoxWrapper(appTitle ": ERROR", "An unknown error occured when associating " appTitle " with slideshow / files list formats.", 0, 0, "error")
+       msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred when associating " appTitle " with slideshow / files list formats.", 0, 0, "error")
 }
 
 associateWithImages(modus) {
@@ -65006,13 +65028,13 @@ associateWithImages(modus) {
       z := ShellFileAssociate("QPVimg." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
       If !z
       {
-         errorOccured := 1
+         errorOccurred := 1
          Break
       }
   }
 
   Sleep, 25
-  If !errorOccured
+  If !errorOccurred
      Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
   Sleep, 5
   FileDelete, %mainCompiledPath%\regFiles\*.reg
@@ -65020,7 +65042,7 @@ associateWithImages(modus) {
 
   ; msgResult := msgBoxWrapper(appTitle, appTitle " was now associated with common image file formats. Would you like to associate it with all the 85 supported file formats?", 4, 0, "question")
   ; If (msgResult="yes")
-  If (modus=2 && !errorOccured)
+  If (modus=2 && !errorOccurred)
   {
      Loop, Parse, allFormats, |
      {
@@ -65030,22 +65052,22 @@ associateWithImages(modus) {
          z := ShellFileAssociate("QPVimg." A_LoopField,"." A_LoopField, fullPath2exe, 1, mainCompiledPath, bonus)
          If !z
          {
-            errorOccured := 1
+            errorOccurred := 1
             Break
          }
      }
  
      Sleep, 25
-     If !errorOccured
+     If !errorOccurred
         Try RunWait, *RunAs "%mainCompiledPath%\regFiles\runThis.bat"
      Sleep, 5
      FileDelete, %mainCompiledPath%\regFiles\*.reg
      FileDelete, %mainCompiledPath%\regFiles\*.bat
   }
 
-  If errorOccured
+  If errorOccurred
   {
-     msgBoxWrapper(appTitle ": ERROR", "An unknown error occured during associating " appTitle " with image file formats.", 0, 0, "error")
+     msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred during associating " appTitle " with image file formats.", 0, 0, "error")
      Return
   } Else associateWithExplorer(2, modus)
 
@@ -70718,7 +70740,7 @@ ToggleRecordSeenImages() {
    If (sqlFailedInit=1 && mustRecordSeenImgs=1)
    {
       mustRecordSeenImgs := 0
-      msgBoxWrapper(appTitle ": ERROR", "An unknown error occured when attempting to initialize SqlLite Database.`n`nFeature not available.", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred when attempting to initialize SqlLite Database.`n`nFeature not available.", 0, 0, "error")
    }
 
    INIaction(1, "mustRecordSeenImgs", "General")
@@ -75019,7 +75041,7 @@ Gdip_CloneBmpPargbArea(funcu, pBitmap, x:="", y:="", w:=0, h:=0, PixelFormat:=0,
 
    If !validBMP(newBitmap)
    {
-      baseMsg := "Unable to create internal PARGB bitmap clone to apply operations on image... Error occured in " A_ThisFunc "() invoked by " funcu  "() for pBMP=" pBitmap ". w,h=" w " | " h ". x,y=" x " | " y
+      baseMsg := "Unable to create internal PARGB bitmap clone to apply operations on image... Error occurred in " A_ThisFunc "() invoked by " funcu  "() for pBMP=" pBitmap ". w,h=" w " | " h ". x,y=" x " | " y
       generalInternalErrorMsgBox(gdipLastError, baseMsg)
       newBitmap := ""
    }
@@ -77931,7 +77953,7 @@ ActPaintBrushNow() {
       FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
       If (!imgW || !imgH)
       {
-         showTOOLtip("ERROR: Main FreeImage bitmap seems to be invalid. Failure occured in " A_ThisFunc "()")
+         showTOOLtip("ERROR: Main FreeImage bitmap seems to be invalid. Failure occurred in " A_ThisFunc "()")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -77955,7 +77977,7 @@ ActPaintBrushNow() {
       trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
       If (!imgW || !imgH)
       {
-         showTOOLtip("ERROR: Main bitmap seems to be inexistent. Failure occured in " A_ThisFunc "()")
+         showTOOLtip("ERROR: Main bitmap seems to be inexistent. Failure occurred in " A_ThisFunc "()")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -77993,7 +78015,7 @@ ActPaintBrushNow() {
          E1 := trGdip_LockBits(whichBitmap, 0, 0, 1, 1, imgPitch, imgBits, imgData, 3, "0x26200A")
          If E1
          {
-            showTOOLtip("ERROR: Unable to lock bitmap data. Failure occured in " A_ThisFunc "()")
+            showTOOLtip("ERROR: Unable to lock bitmap data. Failure occurred in " A_ThisFunc "()")
             SoundBeep 300, 100
             SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
@@ -78607,7 +78629,7 @@ DrawPaintBrushNowStep:
          , "int", lockW
          , "int", lockH)
       If !rr
-         fnOutputDebug("An error occured in calling PaintBrushLarge() from the QPV DLL.")
+         fnOutputDebug("An error occurred in calling PaintBrushLarge() from the QPV DLL.")
       If (isLarge=0)
          Gdip_UnlockBits(whichBitmap, imgData)
    }
@@ -78675,7 +78697,7 @@ ActDrawAlphaMaskBrushNow() {
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    If (!imgW || !imgH)
    {
-      showTOOLtip("ERROR: Main bitmap seems to be inexistent or invalid.`nFailure occured in " A_ThisFunc "()")
+      showTOOLtip("ERROR: Main bitmap seems to be inexistent or invalid.`nFailure occurred in " A_ThisFunc "()")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -78695,7 +78717,7 @@ ActDrawAlphaMaskBrushNow() {
    liveDrawingBrushTool := 1
    If !validBMP(userAlphaMaskBmpPainted)
    {
-      showTOOLtip("ERROR: No alpha mask bitmap. Failure occured in " A_ThisFunc "()")
+      showTOOLtip("ERROR: No alpha mask bitmap. Failure occurred in " A_ThisFunc "()")
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -78753,7 +78775,7 @@ ActDrawAlphaMaskBrushNow() {
 
    If (!validBMP(brushu) && BrushToolType>1)
    {
-      addJournalEntry("ERROR: no brush image. Failure occured in " A_ThisFunc "()")
+      addJournalEntry("ERROR: no brush image. Failure occurred in " A_ThisFunc "()")
       Return
    }
 
@@ -78765,7 +78787,7 @@ ActDrawAlphaMaskBrushNow() {
       trGdip_DisposeImage(brushu, 1)
       If gdipbrushu
          Gdip_DeleteBrush(gdipbrushu)
-      addJournalEntry("ERROR: failed to create graphics object on " whichBitmap ". Failure occured in " A_ThisFunc "()")
+      addJournalEntry("ERROR: failed to create graphics object on " whichBitmap ". Failure occurred in " A_ThisFunc "()")
       Return
    }
 
@@ -81620,7 +81642,7 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
 } ; // drawImgSelectionOnWindow()
 
 dummyRefreshImgSelectionWindow(mm:=0) {
-     Static prevStatus, loopsOccured := 0
+     Static prevStatus, loopsOccurred := 0
      If (thumbsDisplaying=1)
         Return
 
@@ -81644,8 +81666,8 @@ dummyRefreshImgSelectionWindow(mm:=0) {
      thisState := "a" mX mY mainWidth mainHeight closedLineCustomShape tensionCurveCustomShape cardinalCurveCustomShape customShapePoints.Count() lastZeitFileSelect imgSelX1 imgSelY1 imgSelX2 imgSelY2 BrushToolSymmetryX BrushToolSymmetryY BrushToolSymmetryPointX BrushToolSymmetryPointY customShapeHasSelectedPoints showNewVectorPointPreview vpGridSize showViewPortGrid bezierSplineCustomShape showContextualStatusBar CustomShapeSymmetry CustomShapeLockedSymmetry FillAreaCurveTension
      If (thisState!=prevStatus || drawingShapeNow!=1 || mm="forced")
      {
-        loopsOccured++
-        ; ToolTip, % loopsOccured "==" thisState " -- " A_TickCount , , , 2
+        loopsOccurred++
+        ; ToolTip, % loopsOccurred "==" thisState " -- " A_TickCount , , , 2
         additionalHUDelements(3, mainWidth, mainHeight)
         prevStatus := thisState
      }
@@ -81660,7 +81682,7 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
     {
        r1 := trGdip_DrawImage(A_ThisFunc, Gu, whichBitmap, brickVPx, brickVPy, brickVPw, brickVPh, brickIMGx, brickIMGy, brickIMGw, brickIMGh, clrMatrix, 2, imageAttribs)
        if r1
-          fnOutputDebug("an error occured drawing bitmap in " A_ThisFunc)
+          fnOutputDebug("an error occurred drawing bitmap in " A_ThisFunc)
     }
 
     ; kBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, whichBitmap, brickIMGx, brickIMGy, brickIMGw, brickIMGh, 0, 0, 1, 0)
@@ -81710,9 +81732,9 @@ drawVPpartialIMGsection(brickVPx, brickVPy, brickVPw, brickVPh, DestPosX, DestPo
           trGdip_DisposeImage(kBitmap)
        }
        If r1
-          fnOutputDebug("an error occured drawing bitmap in " A_ThisFunc)
+          fnOutputDebug("an error occurred drawing bitmap in " A_ThisFunc)
     } Else 
-       fnOutputDebug("invalid bitmap after resize, an error occured in " A_ThisFunc)
+       fnOutputDebug("invalid bitmap after resize, an error occurred in " A_ThisFunc)
 
     ; ToolTip, % brickVPx "=" brickVPy "`n" brickVPw "==" brickVPh , , , 2
 }
@@ -84656,7 +84678,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    sizesDesired := []
    sizesDesired[1] := [thumbsSizeQuality, thumbsSizeQuality, 1, 0, thisImgQuality]
    thisFileIndex := MD5name := Bindex := rowIndex := imgsListed := lastMsg := 0
-   imgsHavePainted := thisNonCachedImg := memCached := lapsOccured := totalLoops := 0
+   imgsHavePainted := thisNonCachedImg := memCached := lapsOccurred := totalLoops := 0
    maxIndexu := maxImgSize := maxZeit := columnIndex := -1
     ; MsgBox, % imgsMustPaint "--" imgsNotCached "--" imgsListArrayThumbs.Length()
    If (thumbsPoolOK=1 || modus="all")
@@ -84714,7 +84736,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              drainUIinput()  ; [merge] lets nav-keys advance alterFilesIndex while this loop holds Critical
           }
 
-          If (alterFilesIndex>1 && lapsOccured>3)
+          If (alterFilesIndex>1 && lapsOccurred>3)
           {
              fnOutputDebug("ThumbsMode. User abandoned the operation by scrolling.")
              userScrolled := 1
@@ -84734,14 +84756,14 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           Bindex++
           If (Bindex>imgsMustPaint)
           {
-             lapsOccured++
+             lapsOccurred++
              Bindex := 1
           }
 
           thisFileIndex := startIndex + Bindex - 1
           If (mustEndLoop=1)
           {
-             ; fnOutputDebug("ThumbsMode. Must end loop = 1. laps " lapsOccured "  -- loops " totalLoops "  -- inner " innerLoops " ")
+             ; fnOutputDebug("ThumbsMode. Must end loop = 1. laps " lapsOccurred "  -- loops " totalLoops "  -- inner " innerLoops " ")
              Break
           }
 
@@ -84828,7 +84850,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           ; Sleep, 1
           startZeit := A_TickCount
           cacheType := imgsListArrayThumbs[thisFileIndex, 1]
-          ; fnOutputDebug("thumbs inner cT" cacheType " -- loops infos " A_Index " -- " innerLoops " -- " lapsOccured " -- " totalLoops " -- " imgsHavePainted " -- " imgsMustPaint)
+          ; fnOutputDebug("thumbs inner cT" cacheType " -- loops infos " A_Index " -- " innerLoops " -- " lapsOccurred " -- " totalLoops " -- " imgsHavePainted " -- " imgsMustPaint)
           fimCached := mustDisposeImgNow := 0
           frameLoad := (framePreviewsMode=1) ? thisFileIndex - 1 : 0
           thumbCachable := WasMemCached := hasNowMemCached := 0
@@ -85075,7 +85097,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           addJournalEntry(A_ThisFunc "(): failed to commit the image properties collected while listing thumbnails - " activeSQLdb.ErrorMsg)
     }
 
-    If (alterFilesIndex>1 && mustEndLoop!=1 && lapsOccured>3 && modus!="all")
+    If (alterFilesIndex>1 && mustEndLoop!=1 && lapsOccurred>3 && modus!="all")
     {
        mustReloadThumbsList := 1
        ; QPV_ListViewGridHUDoverlay()
@@ -85132,7 +85154,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
     prevFullThumbsUpdate := A_TickCount
     addJournalEntry(maxItemsPage " thumbnails listed in " SecToHHMMSS((A_TickCount - mainStartZeit)/1000) ".")
-    ; ToolTip, % lapsOccured "|"  totalLoops " | " innerLoops " | " extendedLoops " | " imgsNotCached "`nZeit: " A_TickCount - mainStartZeit , , , 2
+    ; ToolTip, % lapsOccurred "|"  totalLoops " | " innerLoops " | " extendedLoops " | " imgsNotCached "`nZeit: " A_TickCount - mainStartZeit , , , 2
 
     ; the page is done only if it was drawn whole and reached the window - the same test
     ; this function applies to its own bookkeeping just above
@@ -88051,14 +88073,14 @@ OpenGitHub() {
   Static thisURL := "https://github.com/marius-sucan/Quick-Picto-Viewer"
   Try Run, % thisURL
   Catch wasError
-        msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL:`n" thisURL, 0, 0, "error")
+        msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the URL:`n" thisURL, 0, 0, "error")
 }
 
 OpenGitHubReleases() {
   Static thisURL := "https://github.com/marius-sucan/Quick-Picto-Viewer/releases/latest"
   Try Run, % thisURL
   Catch wasError
-        msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the URL:`n" thisURL, 0, 0, "error")
+        msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the URL:`n" thisURL, 0, 0, "error")
 }
 
 MenuDrawViewportHelpMap() {
@@ -92158,23 +92180,24 @@ PanelKeywordsDetector() {
     btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
     sml := (PrefsLargeFonts=1) ? 120 : 90
     Gui, Add, Text, x15 y15 Section, This panel can help identify most used keywords in the indexed files list.
-    hLVmainu := GuiAddListView("xs y+5 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid AltSubmit +multi guiLVkeywordsListResponder vLViewOthers", "Keywords|Files|`%|#", "Identified keywords")
-    hEditField := GuiAddEdit("xs y+10 wp -multi -wantTab vkeywrdLVfilter", keywrdLVfilter, "Keywords string filter")
-
     sml := (PrefsLargeFonts=1) ? 70 : 55
+    editWid := lstWid - sml - 53
+    hLVmainu := GuiAddListView("xs y+5 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid AltSubmit +multi guiLVkeywordsListResponder vLViewOthers", "Keywords|Files|`%|#", "Identified keywords")
+    hEditField := GuiAddEdit("xs y+10 w" editWid " -multi -wantTab vkeywrdLVfilter", keywrdLVfilter, "Keywords string filter")
+    Gui, Add, Button, x+1 hp w%sml% Default gUIfilterListKeywords, &Apply
+    GuiAddButton("x+1 hp w50 gUIremKeywordsFilter", "X", "Clear edit field")
+
     Gui, Add, Text, xs y+7 hp +0x200, Min. length:
     GuiAddEdit("x+5 w" sml " number -multi limit2 veditF5", minKeywordLength, "Minimum keyword length")
     Gui, Add, UpDown, vminKeywordLength Range3-25, % minKeywordLength
-
     Gui, Add, Text, x+10 hp +0x200, Min. files:
     GuiAddEdit("x+5 w" sml " number -multi limit3 veditF6", thresholdKeywords, "Minimum files per keyword")
     Gui, Add, UpDown, vthresholdKeywords Range2-987, % thresholdKeywords
     Gui, Add, Checkbox, x+10 hp Checked%LangKeywordsFilter% vLangKeywordsFilter, Dictionary filter (English)
-    Gui, Add, Button, x+1 hp w%sml% Default gUIfilterListKeywords, &Apply
-    GuiAddButton("x+1 hp w50 gUIremKeywordsFilter", "X", "Clear edit field")
+
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% gBtnUiKeywordsLister w%btnWid2% , &Generate list
     Gui, Add, Button, x+5 hp w80 gBtnCloseWindow, &Close
-    Gui, Add, Text, x+7 hp +0x200 vtxtLine1, Keywords omitted: 987 129 millions gazillions
+    Gui, Add, Text, x+7 hp +0x200 vtxtLine1, Keywords omitted: ----------------------------------
 
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Keywords list: " appTitle)
     UIpopulateKeywordsListPanel(keywrdLVfilter)
@@ -92222,6 +92245,7 @@ filterListByKeywords() {
        listu .= StrReplace(Trim(keyword), A_Space, "|") "|"
    }
 
+   ResetImgLoadStatus()
    listu := StrReplace(Trim(listu, "|"), "||", "|")
    If !listu
       Return
@@ -92280,8 +92304,7 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
   GuiControlGet, thresholdKeywords
   GuiControlGet, minKeywordLength
   GuiControlGet, LangKeywordsFilter
-  ; the build is its own long operation [it ends with ResetImgLoadStatus(), which
-  ; clears the busy flags], so it runs BEFORE this function's own busy dance
+
   EM_SETCUEBANNER(hEditField, "Preparing keywords list - please wait", 1)
   keywordsListArray := GenerateKeywordsListNow(regenList=1 ? 0 : "cached")
   GuiControl, -Redraw, LViewOthers
@@ -92327,14 +92350,14 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
         Break
      }
  
-     If (A_TickCount - prevMSGdisplay>1000)
+     If (A_TickCount - prevMSGdisplay>500)
      {
         etaTime := ETAinfos(A_Index, thisMaxCount, startOperation)
         showTOOLtip("Filtering the keywords list, please wait" etaTime, 0, 0, A_Index/thisMaxCount)
         prevMSGdisplay := A_TickCount
      }
- 
-     If (Value>=thresholdKeywords && !isInRange(Value, maxFilesIndex - 1, maxFilesIndex) && StrLen(Key)>=minKeywordLength)
+     Sleep, -1
+      If (Value>=thresholdKeywords && !isInRange(Value, maxFilesIndex - 1, maxFilesIndex) && StrLen(Key)>=minKeywordLength)
      {
         If (isStrFilter=1 && FilterSimple=1)
         {
@@ -92407,13 +92430,14 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
      }
   }
 
+  showTOOLtip("Keywords list view reflowing, please wait")
   Loop, 4
       LV_ModifyCol(A_Index, "AutoHdr Left")
+  LV_ModifyCol(2, "SortDesc")
 
   fperc := Round((skippedFiles/maxu)*100, 1)
   wperc := Round((wordSkipped/keywordsListArray.Count())*100, 1)
   GuiControl, SettingsGUIA:, txtLine1, % "Keywords omitted: " groupDigits(wordSkipped) " ( " wperc "% )"
-  LV_ModifyCol(2, "SortDesc")
   EM_SETCUEBANNER(hEditField, "Type a string here to filter the keywords list. " groupDigits(counter) " keywords are listed", 1)
   GuiControl, +Redraw, LViewOthers
   ResetImgLoadStatus()
@@ -92421,9 +92445,6 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
 }
 
 GenerateKeywordsListNow(modus:=0) {
-; Returns the keyword -> files count table for the current files list. With
-; modus="cached" the table built last time is served when the list is the same;
-; an aborted [partial] build is returned, but never cached.
    Static lastIDu := "", keywordsListArray := ""
    thisIDu := "a0" CurrentSLD SLDtypeLoaded maxFilesIndex
    If (modus="cached" && thisIDu=lastIDu)
@@ -92441,6 +92462,13 @@ GenerateKeywordsListNow(modus:=0) {
         If (InStr(imgPath, "||") || !imgPath)
            Continue
 
+        If (A_TickCount - prevMSGdisplay>500)
+        {
+           etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
+           showTOOLtip("Generating folders list based on the indexed files" etaTime, 0, 0, A_Index/maxFilesIndex)
+           prevMSGdisplay := A_TickCount
+        }
+
         OutDir := Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, ".", 0, -1) - 1))
         OutDir := RegExReplace(OutDir, "[[:digit:]]", A_Space)
         OutDir := RegExReplace(OutDir, "[[:punct:]]", A_Space)
@@ -92454,13 +92482,6 @@ GenerateKeywordsListNow(modus:=0) {
               Continue
 
            keywordsListArray[thisu] := Round(keywordsListArray[thisu]) + 1
-        }
-
-        If (A_TickCount - prevMSGdisplay>1500)
-        {
-           etaTime := ETAinfos(A_Index, maxFilesIndex, startOperation)
-           showTOOLtip("Generating folders list based on the indexed files" etaTime, 0, 0, A_Index/maxFilesIndex)
-           prevMSGdisplay := A_TickCount
         }
 
         If (determineTerminateOperation()=1)
@@ -93023,7 +93044,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
       Else If (r=-2)
          showTOOLtip("ERROR: Undo DELETE action failed. COM object error.")
       Else
-         showTOOLtip("ERROR: Undo DELETE action failed. An undefined error occured.")
+         showTOOLtip("ERROR: Undo DELETE action failed. An undefined error occurred.")
 
       If (r=1)
       {
@@ -93662,7 +93683,7 @@ PanelReviewSelectedFiles() {
     }
 
     listViewReviewFilteru := ""
-    edithu := lstWid - btnWid - 35
+    edithu := lstWid - btnWid - 47
     addCol := testIsDupesList() ? "|Dupe ID" : ""
     Gui, Add, Text, x15 y15 w%lstWid%, This list allows multiple items to be selected. The actions available in the context menu or below will be applied on the selected items.
     hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -WantF2 y+10 w" lstWid " AltSubmit Count" markedSelectFile " guiLVreviewSelFilesResponder r" uLVr " Grid vLViewOthers", "S|File name|Folder path|#" addCol, "Files to review")
@@ -94014,7 +94035,7 @@ BTNreviewLVselAll() {
       Gui, SettingsGUIA: ListView, % whichLV
    }
    ToolTip, Selecting all the items in list
-   loopsOccured := RowNumber := 0
+   loopsOccurred := RowNumber := 0
    LV_Modify(0, "+Select")
    ToolTip
 }
@@ -95013,7 +95034,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       Catch wasError
       {
          If !AnyWindowOpen
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the folder:`n" folderu, 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu, 0, 0, "error")
       }
    } Else If (z=2 && folderPath)
    {
@@ -95046,7 +95067,7 @@ invokeStandardFolderProperties(thisFolder) {
    {
       Try Run, Properties "%thisFolder%"
       Catch wasError
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occured opening the system file properties.", 0, 0, "error")
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the system file properties.", 0, 0, "error")
    } Else
    {
       showTOOLtip("WARNING: The folder seems to no longer exist`n" thisFolder "\")
@@ -95873,7 +95894,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
              SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE fullPath LIKE '%" Format("{:L}", SQLescapeStr(whatu, 1)) "%' ESCAPE '>';"
 
           If !activeSQLdb.GetTable(SQLstr, RecordSet)
-             errorOccured := activeSQLdb.ErrorMsg
+             errorOccurred := activeSQLdb.ErrorMsg
 
           owle :=setWhileLoopBusy()
           totalFiles := RecordSet.RowCount
@@ -95912,14 +95933,14 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               }
           }
           RecordSet.Free()
-       } Else errorOccured := activeSQLdb.ErrorMsg
+       } Else errorOccurred := activeSQLdb.ErrorMsg
 
        showTOOLtip("Finishing search and replace in the files list, please wait")
        activeSQLdb.Exec("COMMIT TRANSACTION;")
        whileLoopExec := owle
     }
 
-    If !errorOccured
+    If !errorOccurred
     {
        writeSQLrows := (SLDtypeLoaded=3 && onlySelected=1) ? 1 : 0
        startOperation := A_TickCount
@@ -95991,7 +96012,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        {
           showTOOLtip("Finishing search and replace in the files list, please wait")
           If !activeSQLdb.Exec("COMMIT TRANSACTION;")
-             errorOccured := activeSQLdb.ErrorMsg
+             errorOccurred := activeSQLdb.ErrorMsg
        }
        whileLoopExec := owle
     }
@@ -96006,9 +96027,9 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        getMaxRowIDsqlDB()
 
     whileLoopExec := 0
-    If errorOccured
+    If errorOccurred
     {
-       showTOOLtip("Failed to update the files list database`n" errorOccured)
+       showTOOLtip("Failed to update the files list database`n" errorOccurred)
        SoundBeep , 300, 100
     } Else
     {
@@ -96046,11 +96067,11 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     seenImagesDB.Exec("BEGIN TRANSACTION;")
     SQLstr := "SELECT ROWID, imgfile FROM images WHERE imgfile LIKE '%" Trimmer(SQLescapeStr(what, 1)) "%' ESCAPE '>';"
     If !seenImagesDB.GetTable(SQLstr, RecordSet)
-       errorOccured := seenImagesDB.ErrorMsg
+       errorOccurred := seenImagesDB.ErrorMsg
 
     totalAffected := failedFiles := 0
     totalFiles := RecordSet.RowCount
-    If !errorOccured
+    If !errorOccurred
     {
        Loop, % RecordSet.RowCount
        {
@@ -96094,9 +96115,9 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     }
     whileLoopExec := owle
     k := seenImagesDB.Exec("COMMIT TRANSACTION;")
-    If (errorOccured || !k)
+    If (errorOccurred || !k)
     {
-       showTOOLtip("Failed to update the seen images database`n" errorOccured)
+       showTOOLtip("Failed to update the seen images database`n" errorOccurred)
        SoundBeep , 300, 100
     } Else
     {
@@ -96221,7 +96242,6 @@ UIfilterListViewStaticFolderzList() {
 
 retrieveListFoldersIndexed() {
    foldersListArray := new hashtable()
-
    If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
    {
       SQL := "SELECT imgfolder, COUNT(*) FROM images GROUP BY imgfolder;"
@@ -97667,7 +97687,7 @@ batchAutoCropFiles() {
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If failedFiles
-            etaTime .= "`nErrors occured for " groupDigits(failedFiles) " files"
+            etaTime .= "`nErrors occurred for " groupDigits(failedFiles) " files"
          If skippedFiles
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -97722,7 +97742,7 @@ batchAutoCropFiles() {
    }
 
    If failedFiles
-      someErrors := "`nErrors occured for " groupDigits(failedFiles) " files"
+      someErrors := "`nErrors occurred for " groupDigits(failedFiles) " files"
    If skippedFiles
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -97772,7 +97792,7 @@ batchAutoColorsFiles() {
       {
          etaTime := ETAinfos(countTFilez, filesElected, startOperation)
          If failedFiles
-            etaTime .= "`nErrors occured for " groupDigits(failedFiles) " files"
+            etaTime .= "`nErrors occurred for " groupDigits(failedFiles) " files"
          If skippedFiles
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -97797,7 +97817,7 @@ batchAutoColorsFiles() {
    }
 
    If failedFiles
-      someErrors := "`nErrors occured for " groupDigits(failedFiles) " files"
+      someErrors := "`nErrors occurred for " groupDigits(failedFiles) " files"
    If skippedFiles
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
 
@@ -100110,7 +100130,7 @@ AcquireWIAimage() {
        infos := SubStr(errMsg.message, 1, InStr(errMsg.message, "`nhelpfile:") - 1)
        infos := StrReplace(infos, "`t", A_Space)
        infos := StrReplace(infos, "  ", A_Space)
-       msgBoxWrapper(appTitle ": ERROR", "An error has occured. Failed to acquire image from device.`n`nError details: " infos, 0, 0, "error")
+       msgBoxWrapper(appTitle ": ERROR", "An error has occurred. Failed to acquire image from device.`n`nError details: " infos, 0, 0, "error")
        Return
     } Else If (obju=-1 || obju=-2)
     {
@@ -100656,7 +100676,7 @@ LoadWICscreenImage(imgPath, noBPPconv, frameu, useICM, ByRef pwd) {
             z := DllCall("qpvmain.dll\WICtestPreloadedImage", "Int", 12, "Int")
             If !z
             {
-               addJournalEntry(A_ThisFunc ": ERROR: failed to load image via WIC... error occured likely in coreWICgetBufferImage() in qpvMainDll")
+               addJournalEntry(A_ThisFunc ": ERROR: failed to load image via WIC... error occurred likely in coreWICgetBufferImage() in qpvMainDll")
                Return
             }
          }
@@ -100740,7 +100760,7 @@ teleportWICtoFIM(imgW, imgH, bitsDepth, useICM, simpleMode) {
       addJournalEntry(A_ThisFunc ": no buffer was returned by WICgetBufferImage() in qpvMainDll")
 
    If (!hFIFimgA && buffer)
-      addJournalEntry(A_ThisFunc ": an error occured with FreeImage_ConvertFromRawBitsEx - unable to wrap FIM object around the image data buffer")
+      addJournalEntry(A_ThisFunc ": an error occurred with FreeImage_ConvertFromRawBitsEx - unable to wrap FIM object around the image data buffer")
 
    ; FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
    If (hFIFimgA && buffer)
@@ -101133,10 +101153,10 @@ trGdip_ResizeBitmap(funcu, pBitmap, givenW, givenH, KeepRatio, InterpolationMode
     {
        If (checkTooLarge!=1)
        {
-          baseMsg := "Unable to resize internal bitmap to given size: W" givenW " - H" givenH " for obj=" pBitmap ".`n`nError occured in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k
+          baseMsg := "Unable to resize internal bitmap to given size: W" givenW " - H" givenH " for obj=" pBitmap ".`n`nError occurred in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k
           generalInternalErrorMsgBox(gdipLastError, baseMsg)
        } Else
-          addJournalEntry("ERROR: Unable to resize internal bitmap to given size: W" givenW " - H" givenH " for obj=" pBitmap ".`n`nError occured in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k)
+          addJournalEntry("ERROR: Unable to resize internal bitmap to given size: W" givenW " - H" givenH " for obj=" pBitmap ".`n`nError occurred in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k)
        Return
     } Else
        recordGdipBitmaps(r, A_ThisFunc "<-" funcu " {" k "}")
@@ -101187,7 +101207,7 @@ trGdip_RotateBitmapAtCenter(funcu, pBitmap, Angle, pBrush:=0, InterpolationMode:
     r := Gdip_RotateBitmapAtCenter(pBitmap, Angle, pBrush, InterpolationMode, thisPixFmt)
     If (StrLen(r)<3)
     {
-       baseMsg := "Unable to rotate internal bitmap to given angle: " angle "° for obj=" pBitmap ".`n`nError occured in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k
+       baseMsg := "Unable to rotate internal bitmap to given angle: " angle "° for obj=" pBitmap ".`n`nError occurred in " A_ThisFunc "() called by " funcu "()`n`nUnknown error. Details: " k
        generalInternalErrorMsgBox(gdipLastError, baseMsg)
        Return
     } Else
@@ -101527,9 +101547,9 @@ tlbrInvokeFunction(a, b, c) {
       r := func2Call[1]
 
    If (r=1)
-      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " fn "() for " btnID ". Too many parameters.")
+      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " fn "() for " btnID ". Too many parameters.")
    Else If r
-      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occured calling " r "() function for " btnID ".")
+      simpleMsgBoxWrapper(appTitle ": ERROR", "An error occurred calling " r "() function for " btnID ".")
 
    lastInvoked := A_TickCount
    MouseGetPos, OutputVarX, OutputVarY, OutputVarWin, OutputVarControl, 2
@@ -105051,12 +105071,12 @@ toggleToolbarTwoColumns() {
 }
 
 tlbrDraggyNow() {
+   ; Critical, on
    GetPhysicalCursorPos(oX, oY)
    WinGetPos, winX, winY,,, ahk_id %hQPVtoolbar%
    Dx := Dy := 0
    lastInvoked := A_TickCount
    ; ToolTip, % "l=" thisZL , , , 2
-   whileLoopExec := 1
    While, (determineLClickState()=1)
    {
       Global zeitSillyPrevent := A_TickCount
@@ -105066,8 +105086,6 @@ tlbrDraggyNow() {
       WinMove, ahk_id %hQPVtoolbar%, , % winX + Dx, % winY + Dy
       Sleep, -1
    }
-
-   whileLoopExec := 0
    WinGetPos, winX, winY,,, ahk_id %hQPVtoolbar%
    UserToolbarY := winY
    UserToolbarX := winX
