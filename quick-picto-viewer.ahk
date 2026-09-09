@@ -27568,9 +27568,6 @@ openPreviousPanel(mode:="") {
 }
 
 mouseTurnOFFtooltip() {
-; [2026-09-02] the one tooltip window since the module's uiMouseTipGuia pair was
-; folded into this one; the body is the module's richer variant [statusbar flag,
-; the lastWinDrag guard when the pointer sits on the tip, its own timer disarm]
    statusBarTooltipVisible := 0
    If (mouseToolTipWinCreated!=1)
       Return
@@ -27578,13 +27575,7 @@ mouseTurnOFFtooltip() {
    MouseGetPos, ,, OutputVarWin
    If (OutputVarWin=hGuiTip)
       lastWinDrag := A_TickCount - 125
-   ; the click handler calls this ahead of the abort prompt's gate, as a fresh monitor
-   ; thread when a loop's per-line peek dispatched the click: a pump here would launch
-   ; the queued timers [ResetImgLoadStatus clears the flags the gate reads]. Critical on a
-   ; thread that already had it costs nothing; a monitor thread ends with it.
-   If (runningLongOperation=1 || imageLoading=1)
-      Critical
-   Sleep, 10
+
    Gui, mouseToolTipGuia: Destroy
    mouseToolTipWinCreated := 0
    statusBarTooltipVisible := 0
@@ -96818,11 +96809,7 @@ CreateOSDinfoLine(msg:=0, killWin:=0, forceDarker:=0, perc:=0, funcu:=0, typeFun
     }
 
     If (typeFuncu="swipe-mode" && TouchScreenMode=1)
-    {
-       ; draw the viewport sections
        drawLiveViewportSection(2NDglPG, mainWidth, mainHeight)
-       Sleep, 1
-    }
 
     tzGdip_DrawImage(2NDglPG, BoxBMP, posXu, posYu, imgW, imgH)
     hudBTNheightFuncu := imgH + posYu

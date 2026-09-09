@@ -725,8 +725,8 @@ infosUIAbtns(msgu) {
 
    lastu := !lastu
    GuiControl, PVwin:, UIAbtn%lastu%, % msgu
-   Sleep, 1
-   If (WinActive("A")=PVhwnd)
+   ; Sleep, 1
+   If (WinActive("A")=PVhwnd) ; makes narrator announce the text
       GuiControl, PVwin: Focus, UIAbtn%lastu%
    prevMsg := msgu
 }
