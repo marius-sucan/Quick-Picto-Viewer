@@ -12,7 +12,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , canCancelImageLoad := 0, alterFilesIndex := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
      , lastCloseInvoked := -1, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
      , lastWinStatus := "", lastZeitPanCursor := 1, lastZeitToolTip := 1, statusBarTooltipVisible := 0, doNormalCursor := 1
-     , prevFullIMGload := 1, popupRootSeen, barMenuSession := 0
+     , prevFullIMGload := 1, popupRootSeen, barMenuSession := 0, PrevGuiSizeEvent := 0
      , menuJITmap := {}, menuJITlist := [], hCWPhook := 0, hLLmouseHook := 0, menuLoopActive := 0, uiMenuReaderLastMsg := "", slideShowCadence := 9000
      , flyoutAnchorMenu := 0, lastLongOperationStart := 1, menuRButtonEaten := 0, menuReaderOSDdeadline := 0
 
@@ -792,14 +792,8 @@ BuildGUI() {
    ; ToolTip, % mainWinPos "==" mainWinSize "==" mainWinMaximized , , , 2
    If (mainWinMaximized=2 || pX="" || pY="" || sW="" || sH="")
    {
-      ; [merge fix] this passed the literal gui number 1 - correct when this file's
-      ; interpreter owned Gui "1" [the main window], but on the merged interpreter
-      ; the dynamic «Gui, %whichGUI%:» inside created a NEW anonymous Gui 1: an
-      ; empty, visible-styled window titled with the app name - the phantom
-      ; taskbar button Marius reported. The A1 rename sweep could not see a
-      ; number that only exists as a call argument.
       repositionWindowCenter("PVwin", PVhwnd, "mouse", appTitle)
-      Sleep, 50
+      Sleep, 10
       Gui, PVwin: Show, Maximize
    } Else
    {
@@ -859,58 +853,6 @@ setTaskbarIconState(mode) {
       ; taskBarUI.setTaskbarIconColor("green")
 }
 
-detectToolbar(ByRef ToolbarWinW:=0, ByRef ToolbarWinH:=0) {
-; Interface thread twin of adjustCanvas2Toolbar() in quick-picto-viewer.ahk. Since 2026-09
-; it only gates the click-coordinate conversion in uiGetMouseCoords(), where answering
-; "docked" for a toolbar that is being re-created [or is hidden by a running slideshow] is
-; harmless: JEE_ScreenToClient() against the layered window is exact either way. The
-; screen-reader/hit-test controls no longer depend on it - uiAccessViewportOrigin() reads
-; the painter's adjustCanvas2Toolbar() directly, so the two can no longer disagree there.
-; The IsWindowVisible() test stays: this thread runs with DetectHiddenWindows off while
-; the main one has it on, so WinExist() would not match.
-    Static lastX := "", lastY := "", lW, lH
-    If (ShowAdvToolbar!=1 || lockToolbar2Win!=1)
-       Return 0
-
-    thisX := thisY := ""
-    If (hQPVtoolbar && DllCall("IsWindowVisible", "UPtr", hQPVtoolbar))
-       WinGetPos, thisX, thisY, ToolbarWinW, ToolbarWinH, ahk_id %hQPVtoolbar%
-
-    If (!ToolbarWinW || !ToolbarWinH)
-    {
-       ToolbarWinW := lW
-       ToolbarWinH := lH
-    } Else
-    {
-       lW := ToolbarWinW
-       lH := ToolbarWinH
-    }
-
-    If (!ToolbarWinW || !ToolbarWinH)
-       Return 0
-
-    If (thisX="" || thisY="")
-    {
-       ; the toolbar GUI is being destroyed and re-created; bridge the gap
-       If (lastX="" || lastY="")
-          Return 0
-
-       thisX := lastX, thisY := lastY
-    } Else
-    {
-       lastX := thisX   ; kept in SCREEN space; converted to client space just below
-       lastY := thisY
-    }
-
-    JEE_ScreenToClient(PVhwnd, thisX, thisY, cX, cY)
-    tolerance := ToolBarBtnWidth//3 + 5
-    ; ToolTip, % "t=" tolerance "||" cX "|" cY "|" ToolbarWinW "|" hQPVtoolbar , , , 2
-    If (!isInRange(cX, -tolerance, tolerance) || !isInRange(cY, -tolerance, tolerance))
-       Return 0
-
-    Return isTlbrVertical() ? 1 : 2
-}
-
 uiUpdateUIctrl(forceThis:=0) {
 ; Image view: lays out the five screen-reader/hit-test zones [left, top, centre, bottom,
 ; right] and the two scrollbar strips over the painted viewport. The viewport is the
@@ -963,13 +905,6 @@ uiUpdateUIctrl(forceThis:=0) {
 }
 
 uiAccessViewportOrigin(ByRef oX, ByRef oY) {
-; The PVwin client-space origin of the viewport, i.e. where the layered GDI windows
-; [hGDIwin, hGDIinfosWin, hGDIselectWin, hGDIthumbsWin] sit: the same offsets
-; doLayeredWinUpdate() hands to UpdateLayeredWindow(), decided by the same
-; adjustCanvas2Toolbar() call, so the screen-reader/hit-test controls land on the
-; painted elements whether or not the toolbar is docked [and reserving viewport space].
-; Before the interpreters merged this thread had to mirror that decision with its own
-; detectToolbar(); post-merge the painter's rule is read directly.
    hasTrans := adjustCanvas2Toolbar()
    oX := (hasTrans=1) ? ToolbarWinW : 0
    oY := (hasTrans=2) ? ToolbarWinH : 0
@@ -1013,9 +948,6 @@ uiAccessUpdateNavBox(msgu, tW, tH, tX, tY) {
 uiAccessUpdateInfoBox(msgu, tW, tH, tX, tY) {
 ; tX/tY: PVwin client coordinates of the painted box, computed by drawinfoBox() like the
 ; nav/histogram/caption boxes do [mirroring and the docked toolbar already applied].
-; Until 2026-09 this function rebuilt the position itself from flip flags and offsets,
-; assuming GuiW/GuiH were the CLIENT size; 67a2699 made them the viewport size and the
-; mirrored placements drifted by the toolbar width/height.
    If (msgu="hide" || !tW || !tH)
    {
       GuiControl, PVwin: Move, ImgInfoBox, x1 y1 w1 h1
@@ -1140,7 +1072,7 @@ uiAccessImgViewSetUIlabels() {
 }
 
 uiAccessUpdateOSDmsg(stringu, tW, tH) {
-; the OSD strip: full viewport width along its top edge, tH tall [showTOOLtip() paints the
+; the OSD message strip: full viewport width along its top edge, tH tall [showTOOLtip() paints the
 ; message box at the viewport origin, below the optional progress bar]
     If (stringu="-" || !tW || !tH)
     {
@@ -1199,10 +1131,8 @@ uiAccessListViewLayout(heightu, ByRef prevState) {
 ; Thumbnails/list view: the files list container fills the viewport above the status bar,
 ; the status bar [heightu tall, ThumbsStatusBarH] runs along the bottom edge and the list
 ; scrollbar down the right edge - the same three regions thumbsListClickResponder() tests
-; in viewport coordinates [a click right of mainWidth - knobSize is a scrollbar click on
-; any row, hence the status bar stops where the scrollbar starts]. Everything is shifted
-; by the viewport origin: the list view is painted into a layered window that sits next
-; to [or below] the docked toolbar, and until 2026-09 these controls ignored that shift.
+; in viewport coordinates. Everything is shifted by the viewport origin:
+; the list view is painted into a layered window that sits next to [or below] the docked toolbar.
 ; Re-applied only when the geometry changes: this runs on every status bar update, and it
 ; is also the only path that follows a window resize while the list view is displayed
 ; [uiUpdateUIctrl() bows out in that mode].
@@ -1300,7 +1230,7 @@ preventSillyGui(thisGui) {
 uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY) {
    adjX := rawX := lastLclickX := lParam & 0xFFFF
    adjY := rawY := lastLclickY := lParam >> 16
-   If detectToolbar()
+   If adjustCanvas2Toolbar()
    {
       whichWin := (thumbsDisplaying=1) ? hGDIthumbsWin : hGDIwin
       JEE_ClientToScreen(PVhwnd, rawX, rawY, mXo, mYo)
@@ -1553,11 +1483,6 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
   Return 0
 }
 
-
-; [merge] infosSlideShow() and initSlidesModes() are gone: they only mirrored the
-; slideshow flags into this interpreter, and the globals are shared now.
-
-
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
   OutputDebug, % "QPV: MERGE: slideCore param=" paramu " zeit=" thisZeit " cadence=" slideShowCadence " allowNext=" allowNextSlide " running=" slideShowRunning
@@ -1720,11 +1645,13 @@ uiChangeMcursor(whichCursor) {
   } Else If (whichCursor="busy-img")
   {
      lastCloseInvoked := 0
-     setTaskbarIconState("anim")
+     If (runningLongOperation=1)
+        setTaskbarIconState("anim")
      thisCursor := hCursBusy
   } Else If (whichCursor="busy" && LbtnDwn!=1)
   {
-     setTaskbarIconState("anim")
+     If (runningLongOperation=1)
+        setTaskbarIconState("anim")
      thisCursor := hCursBusy
   } Else If (whichCursor="normal")
   {
@@ -1850,7 +1777,7 @@ uiWM_MOUSEMOVE(wP, lP, msg, hwnd) {
      thisPrefsWinOpen := (imgEditPanelOpened=1) ? 0 : AnyWindowOpen
      lastInvoked := A_TickCount
      If (slideShowRunning!=1 && !thisPrefsWinOpen && imageLoading!=1 && runningLongOperation!=1 && thumbsDisplaying!=1 && whileLoopExec!=1)
-        MouseMoveResponder()
+        QPV_post("MouseMoveResponder")
  
      prevPos := mX "-" mY
   }
@@ -1908,15 +1835,15 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
 
 PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
     PrevGuiSizeEvent := EventInfo
-    ; ToolTip, % "l=" EventInfo , , , 2
     stopGifORslidesPlayback()
     canCancelImageLoad := 4
-    delayu := (isWinXP=1 || thumbsDisplaying=1) ? -15 : -5
     If (A_TickCount - scriptStartTime > 350)
-    {
-       uiUpdateUIctrl(0)
-       GuiGDIupdaterResize(PrevGuiSizeEvent)
-    }
+       SetTimer, delayedGuiResizeUpdater, -15
+}
+
+delayedGuiResizeUpdater() {
+    uiUpdateUIctrl(0)
+    GuiGDIupdaterResize(PrevGuiSizeEvent)
 }
 
 PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
@@ -1941,8 +1868,6 @@ dummyTimerProcessDroppedFiles() {
    If (!totalGroppy || (A_TickCount - lastInvoked<400))
       Return
 
-   ; [merge] RegExFilesPattern is the live main-script global now - the registry
-   ; round-trip existed only for the separate interpreter
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    vectorShape := imgFiles := foldersList := sldFile := ""
@@ -1950,9 +1875,9 @@ dummyTimerProcessDroppedFiles() {
    canCancelImageLoad := 4
    countD := countV := countF := countFiles := 0
    ToolTip, Please wait - processing dropped files list , , , 2
+   whileLoopExec := 1
    Loop, % totalGroppy
    {
-      uiChangeMcursor("busy")
       line := groppedFiles[A_Index]
       If !line
          Continue
@@ -1980,7 +1905,7 @@ dummyTimerProcessDroppedFiles() {
          imgFiles .= line "`n"
       }
    }
-
+   whileLoopExec := 0
    ; fnOutDebug("regex: " RegExFilesPattern)
    If (countFiles>1 || countF>1)
       sldFile := ""
@@ -2057,12 +1982,6 @@ byeByeRoutine() {
       msgResult := uiNativeYesNoPrompt("The main window seems to be busy at the moment. Do you want to force exit this application ?")
       If (msgResult="yes")
       {
-         ; [merge] the old force-exit killed the process within 10ms - issued from
-         ; the RESPONSIVE interface interpreter. On one thread, a truly stuck
-         ; operation [blocked inside a long DllCall] pumps nothing, so neither a
-         ; queued TrueCleanup nor the TimerExit watchdog can fire. The detached
-         ; taskkill below is therefore the only guaranteed force-exit: ~8s grace,
-         ; then it kills the PID - a no-op if the clean path exited first.
          mustAbandonCurrentOperations := 1
          SetTimer, TimerExit, -8000
          QPV_post("TrueCleanup")
@@ -2123,11 +2042,6 @@ byeByeRoutine() {
 
    If (lastCloseInvoked>3)
    {
-      ; [merge] the old exit posted TrueCleanup to the main thread and hard-killed
-      ; the shared process ~10ms later - RACING the seen-images DB COMMIT inside
-      ; TrueCleanup. One interpreter now: run the cleanup synchronously [it ends in
-      ; ForceExitNow -> ExitApp]; TimerExit stays armed as a watchdog in case the
-      ; cleanup hangs at one of its pump points.
       SetTimer, TimerExit, -8000
       TrueCleanup()
    }
@@ -2141,8 +2055,6 @@ TimerExit() {
    ExitApp
 }
 
-; the sole PreventKeyPressBeep [the main script's dead unregistered copy was deleted
-; at merge phase C]; registered for 0x101-0x103 and 0x105-0x108 in initInterfaceModule()
 PreventKeyPressBeep() {
    IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
 }
@@ -2174,10 +2086,6 @@ guiCreateMenuFlyout() {
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x0 y0 w%h% h%h% hwndhFlyBtn1 +TabStop, S
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp hwndhFlyBtn2 +TabStop, T
    Gui, menuFlier: Add, Text, %brd% Center +0x200 x+%m% wp hp hwndhFlyBtn3 +TabStop, M
-   ; AddTooltip2Ctrl(hFlyBtn1, "Search through the available options [ `; ]",, uiUseDarkMode)
-   ; AddTooltip2Ctrl(hFlyBtn2, "Toggle app toolbar [ Shift+F10 ]",, uiUseDarkMode)
-   ; AddTooltip2Ctrl(hFlyBtn3, "Toggle menu bar [ F10 ]",, uiUseDarkMode)
-   ; AddTooltip2Ctrl("AutoPop", 0.1)
    wasMenuFlierCreated := 1
 }
 
@@ -2217,9 +2125,6 @@ stopGifORslidesPlayback(loudly:=0) {
 }
 
 invokeGivenMenuBarPopup(n) {
-; [phase D] menuArray[n,2] now holds the ":menuName" submenu attachment, so the
-; builder comes from menuJITlist instead; the builder shows at the bar-item rect
-; itself [showThisMenu manubarMode], no F10 focus dance needed
    n := clampInRange(n, 1, menuTotalIndex, 1)
    funcu := menuJITlist[n]
    If IsFunc(funcu)
@@ -2314,9 +2219,6 @@ uiKmenu(labelu, funcu, mena:="PVbar", actu:="Add") {
       menuArray[t] := [funcu, menuTotalIndex, labelu]
    }
 }
-
-; [merge] tlbrInitPrefs() is gone: it re-parsed the 7 toolbar prefs the main script
-; pushed across the thread boundary; detectToolbar() reads the shared globals now.
 
 updateTlbrPosition() {
   If (lockToolbar2Win!=1 || ShowAdvToolbar!=1)
@@ -2518,11 +2420,6 @@ uiVisibleMenuWin(ptX:="", ptY:="") {
    }
    Return 0
 }
-
-; [phase D] the menu-reader #If hotkey block is gone: hotkey subroutines never
-; run during same-interpreter menu loops [probe p4], so it could not function
-; after the merge. Its features ride the hooks now: wheel + RButton-announce via
-; uiMenuMouseLL, announcements via uiMenuSelectTrack, native Left/Right/F10.
 
 ShowClickHalo(mX, mY, BoxW, BoxH, boxMode, msgu:="", stay:=0) {
     Static lastInvoked := 1, wasCreated := 0, hClickHalo

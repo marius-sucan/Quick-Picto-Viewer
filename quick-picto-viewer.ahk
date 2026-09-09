@@ -89488,6 +89488,7 @@ BtnPerformJpegOp(modus:=0) {
        SetTimer, reactivateMainBtnACT, -800
     }
 
+    SetTimer, ResetImgLoadStatus, -100
     If r
     {
        resultedFilesList[currentFileIndex, 4] := 1
@@ -92146,7 +92147,7 @@ PanelKeywordsDetector() {
     Gui, Add, Text, x15 y15 Section, This panel can help identify most used keywords in the indexed files list.
     sml := (PrefsLargeFonts=1) ? 70 : 55
     editWid := lstWid - sml - 53
-    hLVmainu := GuiAddListView("xs y+5 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid AltSubmit +multi guiLVkeywordsListResponder vLViewOthers", "Keywords|Files|`%|#", "Identified keywords")
+    hLVmainu := GuiAddListView("xs y+5 w" lstWid " +LV0x10000 +LV0x400 r" uLVr " Grid +multi guiLVkeywordsListResponder vLViewOthers", "Keywords|Files|`%|#", "Identified keywords")
     hEditField := GuiAddEdit("xs y+10 w" editWid " -multi -wantTab vkeywrdLVfilter", keywrdLVfilter, "Keywords string filter")
     Gui, Add, Button, x+1 hp w%sml% Default gUIfilterListKeywords, &Apply
     GuiAddButton("x+1 hp w50 gUIremKeywordsFilter", "X", "Clear edit field")
@@ -96653,17 +96654,10 @@ isTlbrVertical() {
 adjustCanvas2Toolbar() {
 ; Returns 0 when the viewport must ignore the toolbar, 1 when it has to give up ToolbarWinW
 ; on the left, and 2 when it has to give up ToolbarWinH at the top.
-; This is THE rule for where the layered viewport windows sit [doLayeredWinUpdate()], and
-; since 2026-09 also for where the screen-reader/hit-test controls go: the module's
-; uiAccessViewportOrigin() calls it directly. detectToolbar() in lib\module-interface.ahk
-; [a self-measuring twin with a different contract] now only gates the click-coordinate
-; conversion in uiGetMouseCoords(), where an over-eager "docked" answer is harmless.
     Static lastX := "", lastY := ""
     If (ShowAdvToolbar!=1 || lockToolbar2Win!=1 || !ToolbarWinW || !ToolbarWinH || slideShowRunning=1)
        Return 0
 
-    ; IsWindowVisible() rather than WinExist(), because the two threads run with different
-    ; DetectHiddenWindows settings and would otherwise disagree about a hidden toolbar
     thisX := thisY := ""
     If (hQPVtoolbar && DllCall("IsWindowVisible", "UPtr", hQPVtoolbar))
     {
