@@ -43203,7 +43203,10 @@ PanelRenameThisFile(dummy:=0) {
       doLastOption := msgResult.check
       newFileName := Trimmer(msgResult.edit)
       file2rem := getIDimage(currentFileIndex)
-      zPlitPath(file2rem, 0, OutFileName, OutDir)
+      zPlitPath(file2rem, 0, OutFileName, OutDir, OutFileNameNoExt, extu)
+      If !InStr(newFileName, ".")
+         newFileName .= "." extu
+
       If ((Trimmer(OutFileName)==newFileName) || !newFileName)   ; == so that a change of case alone goes through
          Return
 
@@ -92275,8 +92278,16 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
   GuiControlGet, minKeywordLength
   GuiControlGet, LangKeywordsFilter
 
+  abandonAll := 0
   EM_SETCUEBANNER(hEditField, "Preparing keywords list - please wait", 1)
-  keywordsListArray := GenerateKeywordsListNow(regenList=1 ? 0 : "cached")
+  keywordsListArray := GenerateKeywordsListNow(regenList=1 ? 0 : "cached", abandonAll)
+  If (abandonAll=1)
+  {
+     LV_Delete()
+     GuiControl, SettingsGUIA:, txtLine1, User abandoned operation.
+     Return
+  }
+
   GuiControl, -Redraw, LViewOthers
   setImageLoading()
   showTOOLtip("Preparing the dictionary, please wait")
@@ -92294,7 +92305,7 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
      }
   }
   whileLoopExec := 0
-  showTOOLtip("Populating the list view, please wait")
+  showTOOLtip("Filtering the keywords list, please wait")
   LV_Delete()
   LV_ModifyCol(2, "Integer")
   LV_ModifyCol(3, "Integer")
@@ -92306,8 +92317,10 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
   isStrFilter := StrLen(thisString)>1 ? 1 : 0
   FilterSimple := (InStr(thisString, "|") || InStr(thisString, "*") || InStr(thisString, "?")) ? 0 : 1
   rowsCounter := counter := skippedFiles := wordSkipped := 0
-  maxu := StrLen(filesFilter)>1 ? bckpMaxFilesIndex : maxFilesIndex
-  newArrayu := []
+  maxu := (StrLen(filesFilter)>1) ? bckpMaxFilesIndex : maxFilesIndex
+  rowsList := []     ; the rows to add, in creation order: [keywords text, files count, percent, index of the first keyword]
+  rowsByCount := []  ; per files count: [row index in rowsList, keywords already in that row]
+  abandonAll := 0
   doStartLongOpDance()
   startOperation := A_TickCount
   prevMSGdisplay := A_TickCount
@@ -92326,8 +92339,9 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
         showTOOLtip("Filtering the keywords list, please wait" etaTime, 0, 0, A_Index/thisMaxCount)
         prevMSGdisplay := A_TickCount
      }
+
      Sleep, -1
-      If (Value>=thresholdKeywords && !isInRange(Value, maxFilesIndex - 1, maxFilesIndex) && StrLen(Key)>=minKeywordLength)
+     If (Value>=thresholdKeywords && !isInRange(Value, maxFilesIndex - 1, maxFilesIndex) && StrLen(Key)>=minKeywordLength)
      {
         If (isStrFilter=1 && FilterSimple=1)
         {
@@ -92382,22 +92396,38 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
         counter++
         thisKey := (userPrivateMode=1) ? "*****" : Key
         perc := Value ? Round((Round(Value)/maxu)*100, 1) : 0
-        If (!newArrayu[Value, 1] || newArrayu[Value, 3]>5)
+        If (!rowsByCount[Value, 1] || rowsByCount[Value, 2]>5)
         {
+           ; a new row for this files count; up to six keywords share one row
            rowsCounter++
-           newArrayu[Value] := [rowsCounter, thisKey, 1]
-           LV_Add(A_Index, thisKey, Value, perc, A_Index)
+           rowsByCount[Value] := [rowsCounter, 1]
+           rowsList[rowsCounter] := [thisKey, Value, perc, A_Index]
         } Else
         {
-           newArrayu[Value, 2] := newArrayu[Value, 2] A_Space thisKey
-           newArrayu[Value, 3] := newArrayu[Value, 3] + 1
-           LV_Modify(newArrayu[Value, 1], "Col1", newArrayu[Value, 2])
+           ; append the keyword to the row this files count is still filling
+           thisRowIndex := rowsByCount[Value, 1]
+           thisRow := rowsList[thisRowIndex]
+           thisRow[1] := thisRow[1] A_Space thisKey
+           rowsByCount[Value, 2] := rowsByCount[Value, 2] + 1
         }
      } Else
      {
         wordSkipped++
         skippedFiles += Value
      }
+  }
+
+  showTOOLtip("Populating the list view, please wait")
+  Loop, % rowsCounter
+  {
+     If (abandonAll=1 || determineTerminateOperation()=1)
+     {
+        abandonAll := 1
+        Break
+     }
+
+     thisRow := rowsList[A_Index]
+     LV_Add("", thisRow[1], thisRow[2], thisRow[3], thisRow[4])
   }
 
   showTOOLtip("Keywords list view reflowing, please wait")
@@ -92414,14 +92444,14 @@ UIpopulateKeywordsListPanel(listFilter:=0, regenList:=0) {
   RemoveTooltip()
 }
 
-GenerateKeywordsListNow(modus:=0) {
+GenerateKeywordsListNow(modus, ByRef abandonAll) {
    Static lastIDu := "", keywordsListArray := ""
-   thisIDu := "a0" CurrentSLD SLDtypeLoaded maxFilesIndex
+   thisIDu := "a0" CurrentSLD SLDtypeLoaded maxFilesIndex filesFilter
    If (modus="cached" && thisIDu=lastIDu)
       Return keywordsListArray
 
-   keywordsListArray := new hashtable()
    abandonAll := 0
+   keywordsListArray := new hashtable()
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
    doStartLongOpDance()
