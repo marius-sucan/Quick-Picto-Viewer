@@ -2252,7 +2252,11 @@ UpdateMenuBar(modus:=0, tt:=0) {
       hasRan := 1
    }
 
-   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting()
+   ; openingPanelNow and whileLoopExec are part of the state: while either is up, HKifs()
+   ; answers 0 for every combo and forbiddenAltKeys() hands the bound letters to the menus;
+   ; resetOpeningPanel() triggers again once the panel settled, and that build must not be
+   ; taken for a repeat of the one made while the flag was up
+   thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting() openingPanelNow whileLoopExec
    ; ToolTip, % "lol"  isNowAlphaPainting() isAlphaMaskWindow()  , , , 2
    If !showMainMenuBar
       prevState := thisState
@@ -2368,19 +2372,13 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
     If (msg=0x104 && showMainMenuBar=1 && wParam>=0x41 && wParam<=0x5A && !vk_shift && !vk_ctrl)
     {
+       ; the letters the bar may claim are decided when it is built [forbiddenAltKeys()],
+       ; and UpdateMenuBar() rebuilds it whenever the bindings or the state behind them
+       ; change, so no key lookup happens here: this handler must stay fast
        If InStr(menuHotkeys, "!" Chr(wParam + 32) "|")
        {
-          ; the bar claimed this letter when it was built [forbiddenAltKeys()], from the
-          ; state of that moment; the bar is rebuilt from a timer and cached, so a key bound
-          ; since [a custom key, or a default combo whose guard is open now] must still win,
-          ; in the order KeyboardResponder() dispatches: it falls through to the normal path.
-          ; Never assign the global hotkate here: the drain loop takes a set hotkate as a
-          ; key-down to dispatch.
-          If !testKbdComboBound("!" Chr(wParam + 32))
-          {
-             DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", wParam + 32)
-             Return 0
-          }
+          DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", wParam + 32)
+          Return 0
        }
     }
     If (msg=0x104 && wParam=0x20 && !vk_shift && !vk_ctrl)

@@ -26184,21 +26184,6 @@ testCustomKBDcontexts(givenKey) {
       Return r . givenKey
 }
 
-testKbdComboBound(givenKey, contextID:=0) {
-; returns 1 when givenKey [AHK key syntax, e.g. "!e" or "+!e"] triggers an action right
-; now, in the order KeyboardResponder() dispatches it: a custom user key of the keyboard
-; context [loadCustomUserKbds()], else a default combo of processDefaultKbdCombos() the
-; user has not disabled. Any entry at context.key claims the key, so a "?" marker [the
-; user disabled the shortcut, or moved the default action to another key] makes it dead.
-; uiWM_KEYDOWN() asks this before it opens a menu bar item for Alt+letter.
-   c := contextID ? contextID : defineKBDcontexts(0)
-   thisu := userCustomKeysDefined[c . givenKey, 1]
-   If (thisu!="")
-      Return IsFunc(thisu) ? 1 : 0
-
-   Return testDefaultKbdComboBound(givenKey, c)
-}
-
 testDefaultKbdComboBound(givenKey, contextID) {
 ; returns 1 when processDefaultKbdCombos() dispatches givenKey in the current state and
 ; the user has not disabled the default shortcut of that function. Only meaningful when
@@ -90196,6 +90181,11 @@ BtnToggleNoColorsFX() {
 
 resetOpeningPanel() {
     openingPanelNow := 0
+    ; createSettingsGUI() builds the menu bar while the flag is still up [each panel
+    ; constructor clears it through this timer], and HKifs() answers 0 for every combo
+    ; until then, so that bar claimed the bound Alt letters for its menus; build it again
+    ; now that the shortcuts are live - see forbiddenAltKeys() and UpdateMenuBar()
+    TriggerMenuBarUpdate()
 }
 
 BtnNextImg() {

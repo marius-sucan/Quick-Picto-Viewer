@@ -45,29 +45,33 @@ A user who bound Alt+F to anything got the File menu instead.
    for the context first; otherwise `testDefaultKbdComboBound("!" n, c)`.
    `BuildMenuBar()` computes the context once with `defineKBDcontexts(-1)` (the id, bypassing
    the 100 ms cache - the bar is built from a timer right after the key that changed the mode).
-3. New helpers next to `testCustomKBDcontexts()`:
-   - `testKbdComboBound(givenKey, contextID:=0)`: custom entry (any entry claims the key,
-     `IsFunc` decides bound/dead), else the default probe.
-   - `testDefaultKbdComboBound(givenKey, contextID)`: `processDefaultKbdCombos(key, PVhwnd, 0,
-     PVhwnd, 1)` simulacrum, then the same "disabled default" check the real dispatch makes
-     (the simulacrum returns before it). Side-effect free: every Else-If condition of the chain
-     is a plain compare on givenKey, only the matching branch runs, all 376 assignments are
-     arrays, and it returns before dispatching.
-4. `uiWM_KEYDOWN()`: only plain Alt+letter is treated as a bar mnemonic now. With Ctrl or
+3. New helper next to `testCustomKBDcontexts()`: `testDefaultKbdComboBound(givenKey,
+   contextID)`: `processDefaultKbdCombos(key, PVhwnd, 0, PVhwnd, 1)` simulacrum, then the same
+   "disabled default" check the real dispatch makes (the simulacrum returns before it).
+   Side-effect free: every Else-If condition of the chain is a plain compare on givenKey,
+   only the matching branch runs, all 376 assignments are arrays, and it returns before
+   dispatching. Its only caller is `forbiddenAltKeys()`, at bar-build time.
+4. `uiWM_KEYDOWN()`: only plain Alt+letter is treated as a bar mnemonic. With Ctrl or
    Shift down the block is skipped and the key takes the normal dispatch path as `^!x` /
    `+!x` (Windows itself never opens a menu on Ctrl+Alt+letter; before this, Ctrl+Alt+F and
    Shift+Alt+F opened File whenever 'f' was claimed, and AltGr+letter on layouts that report
-   it as Ctrl+Alt did too). For a plain Alt+letter the bar claimed, `testKbdComboBound("!"
-   letter)` runs before the SC_KEYMENU post; a bound key falls through to the dispatch path.
-   That check exists because the bar is now built from live state: `thisState` in `UpdateMenuBar()` does not
-   cover `openingPanelNow`, `whileLoopExec`, `CurrentSLD` or bitmap validity, all of which zero
-   `HKifs()`. A bar built in such a window would claim a letter that is bound once the state
-   settles, and without this guard the shortcut would be shadowed until the next rebuild.
-   The check never assigns the global `hotkate`: the drain loop treats a set `hotkate` as
-   a key-down to dispatch. The Alt+Space block (system menu) has the same rule, by request:
-   only plain Alt+Space opens it; Shift+Alt+Space and Ctrl+Alt+Space reach the dispatcher
-   as `+!SPACE` / `^!SPACE`, where no default combo exists. The two modifier reads moved
-   to the top of the function and feed both blocks and the later `constructKbdKey()` call.
+   it as Ctrl+Alt did too). The Alt+Space block (system menu) has the same rule, by request.
+   The two modifier reads sit at the top of the function and feed both blocks and the later
+   `constructKbdKey()` call. No key lookup happens in the handler (Marius: it must stay
+   fast; the bindings cannot change without a bar rebuild).
+5. Transient bar builds, fixed at the source instead of at key-press time. `createSettingsGUI()`
+   triggers the bar rebuild while the calling panel constructor still holds
+   `openingPanelNow=1`, which every constructor clears through a 300 ms
+   `resetOpeningPanel` timer; `HKifs()` answers 0 for every combo while the flag is up, so
+   that bar claimed e, p, y, g for its menus (`&Edit` in the editor, with Alt+E opening
+   Edit instead of the properties panel until the next rebuild). Now `resetOpeningPanel()`
+   triggers a rebuild after clearing the flag, and `UpdateMenuBar()` includes
+   `openingPanelNow` and `whileLoopExec` in its state key so that corrective build is not
+   deduplicated. Cost: one extra bar build per panel open; the mnemonics are wrong only
+   during the 300 ms in which the shortcuts are disabled anyway. Loops: a `-50` bar timer
+   armed by the first stroke's undo record can fire inside the stroke loop, but the
+   end-of-stroke record re-triggers after `whileLoopExec` drops, and the state key now tells
+   the two builds apart.
 
 ## Behaviour changes (model of BuildMenuBar over the six menu lists, no custom keys)
 
@@ -104,11 +108,10 @@ claimable by the bar. Disabling the Alt+E properties shortcut makes Alt+E open E
 
 ## Not changed, worth knowing
 
-- Shift+Alt+letter and Ctrl+Alt+letter no longer open a bar menu (see 4). Unbound ones now
-  do nothing, as in Windows; before, they opened the menu of any claimed letter.
+- Shift+Alt+letter, Ctrl+Alt+letter, Shift+Alt+Space and Ctrl+Alt+Space no longer open a
+  menu (see 4). Unbound ones now do nothing, as in Windows.
 - `KeyboardResponder()`'s third branch (`invokeGivenMenuBarPopup`, the pre-merge detached
-  popup) is reachable again only if the state flips within the 3 ms between the press-time
-  check and the dispatch.
+  popup) stays unreachable for letters: a claimed letter never gets past `uiWM_KEYDOWN()`.
 - `userCustomAltKeys` is a loaded data table like `userCustomKeysDefined`, not a flag threaded
   through a call chain. If a new global is unwanted, the index can live under a reserved key
   inside `userCustomKeysDefined` (`updateUIKeysListManager()` skips keys with "." at position 2
