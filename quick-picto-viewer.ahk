@@ -26202,11 +26202,7 @@ testKbdComboBound(givenKey, contextID:=0) {
 testDefaultKbdComboBound(givenKey, contextID) {
 ; returns 1 when processDefaultKbdCombos() dispatches givenKey in the current state and
 ; the user has not disabled the default shortcut of that function. Only meaningful when
-; no custom entry claims the key [testKbdComboBound(), forbiddenAltKeys()].
-; The simulacrum call is side-effect free: every Else-If condition of the combos chain
-; is a plain compare on givenKey, only the matching branch runs [its guards read state],
-; and the function returns before it dispatches anything. It also returns before the
-; check for a disabled default, so that check is repeated here.
+; no custom entry claims the key
    defaultu := processDefaultKbdCombos(givenKey, PVhwnd, 0, PVhwnd, 1)
    If (StrLen(defaultu[1])<3)
       Return 0
