@@ -198,7 +198,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
-   , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := []
+   , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := [], userCustomAltKeys := []
    , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
    , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, currIMGdetails := [], mainLoadedIMGdetails := []
 
@@ -25858,7 +25858,7 @@ MenuDisableKbdShortcut() {
           Settimer, RemoveTooltip, % -msgDisplayTime
        }
        Sleep, 5
-       loadCustomUserKbds()
+       loadCustomUserKbds(1)
        PanelQuickSearchMenuOptions()
        Return
     }
@@ -25869,7 +25869,7 @@ MenuDisableKbdShortcut() {
        humanKbd := sillySeparator processKkbdNameToHuman(shortcut)
        FileAppend, % shortcut txtLine humanKbd "`n", % customKbdFile, UTF-8
        Sleep, 5
-       loadCustomUserKbds()
+       loadCustomUserKbds(1)
     }
 
     PanelQuickSearchMenuOptions()
@@ -25897,7 +25897,7 @@ MenuRestoreDefaultKBD(modus:=0) {
        Settimer, RemoveTooltip, % -msgDisplayTime
     }
 
-    loadCustomUserKbds()
+    loadCustomUserKbds(1)
     Sleep, 5
     closeQuickSearch()
     PanelQuickSearchMenuOptions()
@@ -26036,7 +26036,7 @@ BtnApplyNewKbdShortcut() {
     }
 
     If (reupdate=1)
-       loadCustomUserKbds()
+       loadCustomUserKbds(1)
 
     If (shortcut=txtLine4 && txtLine4!="")
     {
@@ -26051,7 +26051,7 @@ BtnApplyNewKbdShortcut() {
        pk := StrSplit(finalu, sillySeparator)
        updateCustomUserKbds(finalu, userCustomKeysDefined[cshortcut, 7], 0, bonusLine)
        Sleep, 5
-       loadCustomUserKbds()
+       loadCustomUserKbds(1)
        PanelQuickSearchMenuOptions()
        Return
     } Else If IsFunc(userCustomKeysDefined[cshortcut, 1])
@@ -26078,7 +26078,7 @@ BtnApplyNewKbdShortcut() {
        lineRem := userCustomKeysDefined[cshortcut, 7]
        updateCustomUserKbds(pk, lineRem, bonusRem, bonusLine)
        Sleep, 5
-       loadCustomUserKbds()
+       loadCustomUserKbds(1)
        PanelQuickSearchMenuOptions()
        Return
     }
@@ -26086,7 +26086,7 @@ BtnApplyNewKbdShortcut() {
     ; ToolTip, % finalu , , , 2
     FileAppend, % finalu "`n", % customKbdFile, UTF-8
     Sleep, 5
-    loadCustomUserKbds()
+    loadCustomUserKbds(1)
     PanelQuickSearchMenuOptions()
 }
 
@@ -26129,6 +26129,8 @@ CloseKbdDefinePanel() {
 }
 
 defineKBDcontexts(humanMode) {
+; humanMode: 0 = the context id, served from a 100 ms cache; 1 = its label; 2 = the count
+; of contexts; 3 = the labels list; any other value [-1] = the id, recomputed [BuildMenuBar()]
    Static lastInvoked := 1, lastState
    Static lp := {5:"Vector shape drawing", 4:"Paint brush tools", 3:"Live image editor tools", 2:"Image view / welcome screen", 1:"Files list/thumbnails mode", 100:"Unknown"}
 
@@ -26180,6 +26182,36 @@ testCustomKBDcontexts(givenKey) {
    r := defineKBDcontexts(0)
    If (StrLen(userCustomKeysDefined[r . givenKey, 1])>0)
       Return r . givenKey
+}
+
+testKbdComboBound(givenKey, contextID:=0) {
+; returns 1 when givenKey [AHK key syntax, e.g. "!e" or "+!e"] triggers an action right
+; now, in the order KeyboardResponder() dispatches it: a custom user key of the keyboard
+; context [loadCustomUserKbds()], else a default combo of processDefaultKbdCombos() the
+; user has not disabled. Any entry at context.key claims the key, so a "?" marker [the
+; user disabled the shortcut, or moved the default action to another key] makes it dead.
+; uiWM_KEYDOWN() asks this before it opens a menu bar item for Alt+letter.
+   c := contextID ? contextID : defineKBDcontexts(0)
+   thisu := userCustomKeysDefined[c . givenKey, 1]
+   If (thisu!="")
+      Return IsFunc(thisu) ? 1 : 0
+
+   Return testDefaultKbdComboBound(givenKey, c)
+}
+
+testDefaultKbdComboBound(givenKey, contextID) {
+; returns 1 when processDefaultKbdCombos() dispatches givenKey in the current state and
+; the user has not disabled the default shortcut of that function. Only meaningful when
+; no custom entry claims the key [testKbdComboBound(), forbiddenAltKeys()].
+; The simulacrum call is side-effect free: every Else-If condition of the combos chain
+; is a plain compare on givenKey, only the matching branch runs [its guards read state],
+; and the function returns before it dispatches anything. It also returns before the
+; check for a disabled default, so that check is repeated here.
+   defaultu := processDefaultKbdCombos(givenKey, PVhwnd, 0, PVhwnd, 1)
+   If (StrLen(defaultu[1])<3)
+      Return 0
+
+   Return (SubStr(userCustomKeysDefined[contextID "." defaultu[1], 1], 1, 1)="?") ? 0 : 1
 }
 
 DragCollapsedWidget() {
@@ -38410,12 +38442,16 @@ writeMainSettingsApp() {
     lastInvoked := A_TickCount
 }
 
-loadCustomUserKbds() {
+loadCustomUserKbds(refreshMenuBar:=0) {
+; refreshMenuBar=1: rebuild the menu bar when the Alt+letter index [below] changed,
+; so its mnemonics follow the user's keys; callers that run before BuildGUI() leave it 0.
+    Static prevAltKeysIndex := ""
     userCustomKeysDefined := []
-    If (allowCustomKeys!=1)
-       Return
+    userCustomAltKeys := []
+    pk := ""
+    If (allowCustomKeys=1)
+       FileRead, pk, % customKbdFile
 
-    FileRead, pk, % customKbdFile
     Loop, Parse, pk,`n,`r
     {
        If !A_LoopField
@@ -38429,11 +38465,39 @@ loadCustomUserKbds() {
 
        kbdu := c . sp[1]
        userCustomKeysDefined[kbdu] := [funcu, sp[3], sp[4], c, defu, sp[7], A_Index, sp[1]] ; [funcu, menu-name, menu-location, context-id, default-kbd, new-kbd-human, file-line, user-kbdu]
-       If (defu!="" && StrLen(userCustomKeysDefined[defu, 1])<3 && !InStr(funcu, "?") && sp[1]!=sp[6])
+       If (defu!="" && StrLen(userCustomKeysDefined[c . defu, 1])<3 && !InStr(funcu, "?") && sp[1]!=sp[6])
        {
+          ; the default key of a moved function becomes a dead marker, unless another
+          ; line already binds that key in this context [the entries are keyed context.key]
           kp := processKkbdNameToHuman(defu)
           userCustomKeysDefined[c . defu] := ["?_" funcu, "generic", "anywhere", c, defu, kp, A_Index, sp[1]]  ; [funcu, menu-name, menu-location, context-id, default-kbd, new-kbd-human, file-line, user-kbdu]
        }
+    }
+
+    ; index the plain Alt+letter keys the file touches, per keyboard context [defineKBDcontexts()],
+    ; for forbiddenAltKeys(): a menu bar item must not claim Alt+letter as its mnemonic when the
+    ; letter is bound, because uiWM_KEYDOWN() opens the menu before the key can reach
+    ; KeyboardResponder(). Derived from the entries above, so it says what the custom keys
+    ; branch of KeyboardResponder() does with the key: 1 = bound to a custom function,
+    ; 0 = dead [the user disabled the shortcut, or moved the default action to another key;
+    ; the "?" marker entry swallows the key]. Letters absent here are ruled by the default
+    ; combos of processDefaultKbdCombos() alone.
+    thisIndex := ""
+    For kbdu, entry in userCustomKeysDefined
+    {
+       If RegExMatch(kbdu, "i)^\d+![a-z]$")
+       {
+          userCustomAltKeys[kbdu] := IsFunc(entry[1]) ? 1 : 0
+          thisIndex .= kbdu "=" userCustomAltKeys[kbdu] "|"
+       }
+    }
+
+    ; the signature advances only on refresh calls: writeMainSettingsApp() reloads from a
+    ; throttle timer and must not record a panel's save before the panel's own refresh call
+    If (refreshMenuBar=1 && thisIndex!=prevAltKeysIndex)
+    {
+       prevAltKeysIndex := thisIndex
+       TriggerMenuBarUpdate("forced", A_TickCount)
     }
 }
 
@@ -57904,7 +57968,7 @@ updateUIsettings() {
      SetVolume(mediaSNDvolume)
      If (CurrentPanelTab=4)
      {
-        loadCustomUserKbds()
+        loadCustomUserKbds(1)
      } Else If (CurrentPanelTab=1)
      {
         If !throwErrorNoImageLoaded(1)
@@ -57934,7 +57998,7 @@ WriteSettingsUI() {
 BtnSavePreferencesClose() {
    updateUIsettings()
    WriteSettingsUI()
-   loadCustomUserKbds()
+   loadCustomUserKbds(1)
    updateWindowColor()
    realSystemCores := userMultiCoresLimit
    INIaction(1, "userPerformColorManagement", "General")
@@ -71642,7 +71706,7 @@ ToggleCustomKBDsMode() {
     INIaction(1, "allowCustomKeys", "General")
     friendly := (allowCustomKeys=1) ? "ACTIVATED" : "DEACTIVATED"
     showTOOLtip("User customized keyboard shortcuts: " friendly, A_ThisFunc, 1)
-    loadCustomUserKbds()
+    loadCustomUserKbds(1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 

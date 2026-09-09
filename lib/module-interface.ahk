@@ -2165,13 +2165,16 @@ BuildMenuBar(modus:=0) {
    menuTotalIndex := 0
    menuHotkeys := "|"
    menuJITmap := {}, menuJITlist := []  ; [phase D] HMENU -> builder map for the WM_INITMENUPOPUP hook
+   ; the keyboard context the mnemonics are checked against, see forbiddenAltKeys(); -1 bypasses
+   ; the 100 ms cache: the bar is built from a timer right after the key that changed the mode
+   kbdContext := defineKBDcontexts(-1)
    Loop, Parse, menusList, |
    {
       ; generate the list of hotkeys for the menu bar items: eg. alt + f
       k := StrSplit(A_LoopField, ":")
       n := SubStr(k[1], 1, 1)
       n2 := SubStr(k[1], 2, 1)
-      lbl := (forbiddenAltKeys(n) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
+      lbl := (forbiddenAltKeys(n, kbdContext) || InStr(menuHotkeys, "!" n "|")) ? k[1] : "&" k[1]
       suffix := k[2]
       menaName := uiMenuNameForBuilder(suffix)
       hSub := 0
@@ -2191,18 +2194,27 @@ BuildMenuBar(modus:=0) {
 
       If !InStr(lbl, "&")
       {
-         lbl := (forbiddenAltKeys(n2) || InStr(menuHotkeys, "!" n2 "|")) ? k[1] : n "&" SubStr(k[1], 2)
+         lbl := (forbiddenAltKeys(n2, kbdContext) || InStr(menuHotkeys, "!" n2 "|")) ? k[1] : n "&" SubStr(k[1], 2)
          menuHotkeys .= (!InStr(menuHotkeys, "!" n2 "|") && InStr(lbl, "&")) ? "!" n2 "|" : ".|"
       } Else
          menuHotkeys .= (!InStr(menuHotkeys, "!" n "|") && InStr(lbl, "&")) ? "!" n "|" : ".|"
    }
 }
 
-forbiddenAltKeys(n) {
-   If (thumbsDisplaying=1)
-      Return isVarEqualTo(n, "e","u")
-   Else
-      Return isVarEqualTo(n, "a","e","u","p","r","y","g")
+forbiddenAltKeys(n, kbdContext:=0) {
+; a menu bar item must not claim Alt+n as its mnemonic when Alt+n is bound to an action,
+; because uiWM_KEYDOWN() opens the bar menu for every claimed letter before the key can
+; reach KeyboardResponder(). Bound means: a custom user key of the keyboard context
+; [userCustomAltKeys, indexed by loadCustomUserKbds(): 1 = a custom function; 0 = the user
+; disabled the shortcut or moved the default action to another key, the key is dead and
+; the menu may take it], else a default combo of processDefaultKbdCombos() that dispatches
+; in the state the bar is built in. No letter is listed here: the two sources above are
+; the only ones that know what Alt+letter does.
+   c := kbdContext ? kbdContext : defineKBDcontexts(0)
+   If (userCustomAltKeys[c "!" n]!="")
+      Return userCustomAltKeys[c "!" n]
+
+   Return testDefaultKbdComboBound("!" n, c)
 }
 
 uiKmenu(labelu, funcu, mena:="PVbar", actu:="Add") {
@@ -2349,15 +2361,29 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     ; controls and the SYSCHAR chain never completes - Alt+I went dead]; the
     ; mechanism Windows itself uses is posted instead: WM_SYSCOMMAND SC_KEYMENU
     ; with the character enters keyboard menu mode for that mnemonic natively.
-    If (msg=0x104 && showMainMenuBar=1 && wParam>=0x41 && wParam<=0x5A)
+    ; Only a plain Alt combo is a mnemonic, for the bar letters and for Alt+Space alike;
+    ; with Ctrl or Shift held the key is another combo [^!x, +!x] and takes the dispatch
+    ; path like any key, so the modifier states are read here, ahead of both menu blocks.
+    vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
+    vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
+    If (msg=0x104 && showMainMenuBar=1 && wParam>=0x41 && wParam<=0x5A && !vk_shift && !vk_ctrl)
     {
        If InStr(menuHotkeys, "!" Chr(wParam + 32) "|")
        {
-          DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", wParam + 32)
-          Return 0
+          ; the bar claimed this letter when it was built [forbiddenAltKeys()], from the
+          ; state of that moment; the bar is rebuilt from a timer and cached, so a key bound
+          ; since [a custom key, or a default combo whose guard is open now] must still win,
+          ; in the order KeyboardResponder() dispatches: it falls through to the normal path.
+          ; Never assign the global hotkate here: the drain loop takes a set hotkate as a
+          ; key-down to dispatch.
+          If !testKbdComboBound("!" Chr(wParam + 32))
+          {
+             DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", wParam + 32)
+             Return 0
+          }
        }
     }
-    If (msg=0x104 && wParam=0x20)
+    If (msg=0x104 && wParam=0x20 && !vk_shift && !vk_ctrl)
     {
        ; Alt+Space: the very same mechanism - SC_KEYMENU with the SPACE character
        ; is what DefWindowProc generates for the real Alt+Space, and Windows opens
@@ -2390,8 +2416,6 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
        Return 0
     }
 
-    vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
-    vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
     vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
     hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
     ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying "|" hotkate , , , 2
