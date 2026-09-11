@@ -133,7 +133,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", cachedAllSessionsSeen := new hashtable()
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := "", lastSelPrinterName := ""
-   , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, colorPickerMustEnd := 0
+   , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1
    , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := [], prevFileSavePath := ""
    , imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1, brushBclrAlpha := "010101"
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
@@ -584,7 +584,7 @@ PreProcessKbdKey() {
    Static lastInvoked := 1, counter := 0, prevKey
 
    Awin := WinActive("A")
-   If (A_TickCount - lastOtherWinClose<300) || (Awin=PVhwnd) || (Awin!=vk_hwnd)
+   If ((A_TickCount - lastOtherWinClose<300) || Awin!=vk_hwnd)
    {
       lastInvoked := 1, counter := 0, prevKey := 0
       Return
@@ -597,15 +597,15 @@ PreProcessKbdKey() {
    ; addJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
    If (A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0)
    {
-      lastInvoked := A_TickCount
       abusive := (counter>25) ? 1 : 0
       thisHwnd := identifyParentWind() ? "parentu" : Awin
-      KeyboardResponder(hotkate, thisHwnd, abusive, "n")
+      KeyboardResponder(hotkate, thisHwnd, abusive)
       If (hotkate=prevKey)
          counter++
       Else 
          counter := 0
 
+      lastInvoked := A_TickCount
       prevKey := hotkate
    } Else If (hotkate=prevKey)
       counter++
@@ -708,7 +708,7 @@ WM_KEYDOWN(wParam, lParam, msg, ctrlHwnd) {
     hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
     vk_hwnd := Awin
 
-    If (vk_code!=10 && vk_code!=11 && vk_code!=12)
+    If (vk_code!=10 && vk_code!=11 && vk_code!=12) ; shift, control, alt
     {
        SetTimer, PreProcessKbdKey, -25
        If decideBlockKbdKeys(Awin, hotkate)
@@ -723,11 +723,8 @@ deactivateTlbrKbdMode(m:=0) {
       WinActivate, ahk_id %PVhwnd%
 }
 
-KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
+KeyboardResponder(givenKey, thisWin, abusive) {
    Static lastInvoked := 1
-   If isNumber(externCounter)
-      navKeysCounter := externCounter
-
    Az := WinActive("A")
    If (Az!=hQPVtoolbar)
       deactivateTlbrKbdMode()
@@ -951,7 +948,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
    }
 
    If (abusive=1 && allowLoop=1)
-      KeyboardResponder(givenKey, thisWin, 0, "n")
+      KeyboardResponder(givenKey, thisWin, 0)
    ; [removed] an auto-resume block for animGIFplaying=-1 stood here; nothing has
    ; ever produced that value [master included], and a stopped animation must
    ; only resume on an explicit play [X key, Ctrl+click]
@@ -26203,7 +26200,7 @@ testDefaultKbdComboBound(givenKey, contextID) {
 
 forbiddenAltKeys(n, kbdContext:=0) {
 ; a menu bar item, invoked by uiWM_KEYDOWN(), must not claim Alt+n as its mnemonic when Alt+n is bound to an action.
-; user defined custom keyboad shortcuts are loaded via loadCustomUserKbds()
+; user defined custom keyboard shortcuts are loaded via loadCustomUserKbds()
 ; userCustomAltKeys holds user-assigned alt+n keys.
 
    c := kbdContext ? kbdContext : defineKBDcontexts(0)
@@ -26283,13 +26280,10 @@ CreateCollapsedPanelWidget(modus:=0) {
     ToolTip2ctrl(hTemp, "Click and drag to reposition this widget")
     ll := hCollapseWidget "|" hTemp "|"
     ll .= GuiAddButton("x+2 yp w" w " hp gtoggleImgEditPanelWindow", pp "triangle-down" pk ".png", "Show tool panel. F11", "Show panel for the current tool [F11]", "collapseWidgetGUIA") "|"
-    If (mustCaptureCloneBrush!=1 && colorPickerModeNow!=1)
-    {
-       ll .= GuiAddButton("x+2 yp wp hp gPanelQuickSearchMenuOptions", pp "loupe" pk ".png", "Quick search panel options. Semi-colon", "Quick search menu options [ `; ]", "collapseWidgetGUIA") "|"
-       ll .= GuiAddButton("x+2 yp wp hp gtoggleAppToolbar", pp "toolbar" pk ".png", "Toggle toolbar. Shift+F10", "Toggle toolbar [Shift+F10]", "collapseWidgetGUIA") "|"
-       ll .= GuiAddButton("x+2 yp wp hp gToggleMenuBaru", pp "menu" pk ".png", "Toggle menu bar. F10", "Toggle menu bar [F10]", "collapseWidgetGUIA") "|"
-       ll .= GuiAddButton("x+2 yp wp hp gBtnCloseWindow", pp "cancel-tool.png", "Cancel tool and close panel. Escape", "Close / cancel current tool [Esc]", "collapseWidgetGUIA") "|"
-    }
+    ll .= GuiAddButton("x+2 yp wp hp gPanelQuickSearchMenuOptions", pp "loupe" pk ".png", "Quick search panel options. Semi-colon", "Quick search menu options [ `; ]", "collapseWidgetGUIA") "|"
+    ll .= GuiAddButton("x+2 yp wp hp gtoggleAppToolbar", pp "toolbar" pk ".png", "Toggle toolbar. Shift+F10", "Toggle toolbar [Shift+F10]", "collapseWidgetGUIA") "|"
+    ll .= GuiAddButton("x+2 yp wp hp gToggleMenuBaru", pp "menu" pk ".png", "Toggle menu bar. F10", "Toggle menu bar [F10]", "collapseWidgetGUIA") "|"
+    ll .= GuiAddButton("x+2 yp wp hp gBtnCloseWindow", pp "cancel-tool.png", "Cancel tool and close panel. Escape", "Close / cancel current tool [Esc]", "collapseWidgetGUIA") "|"
 
     lastState := thisState
     Loop, Parse, % ll, "|"
@@ -44733,7 +44727,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddDropDownList("x+15 y+15 w" slideWid " Section AltSubmit gupdateUIbrushTool Choose" BrushToolType " vBrushToolType", "Simple solid color|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge", "Brush type")
     wo := (PrefsLargeFonts=1) ? slideWid // 2 + 75 : slideWid // 2 + 30
     Gui, Add, Checkbox, x+10 hp w%wo% +0x1000 gupdateUIbrushTool Checked%BrushToolEraserRestore% vBrushToolEraserRestore , Redefine opacity
-    Gui, Add, Button, xp yp hp wp gBtnSetClonerBrushSource vuiBtnSetCloner, &Define source
+    Gui, Add, Button, xp yp hp wp gBtnSetClonerBrushSource vuiBtnSetCloner +hwndhTemp, &Define source
+    ToolTip2ctrl(hTemp, "Shortcut in viewport: S")
     Gui, Add, Text, xs y+10 h%hasa% w%sml% +0x200 Center gBtnToggleBrushColors vUIbtnBrushColorA +TabStop +hwndhBtnTglClrA, [X]
     ToolTip2ctrl(hBtnTglClrA, "Toggle active color")
     GuiAddPickerColor("x+5 hp w" sml, "BrushToolAcolor")
@@ -44748,7 +44743,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddColor("x+5 hp w60", "BrushToolBcolor")
     GuiAddSlider("BrushToolBopacity", 2,255, 255, "Opacity", "updateUIbrushTool", 1, "x+5 w" opaciSlideW " hp")
     kk := (viewportQPVimage.imgHandle) ? 4 : 2
-    Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%BrushToolDoubleSize% vBrushToolDoubleSize, Size × %kk%
+    Gui, Add, Checkbox, x+5 hp wp gupdateUIbrushTool Checked%BrushToolDoubleSize% vBrushToolDoubleSize +hwndhTemp, Size × %kk%
+    ToolTip2ctrl(hTemp, "Shortcut in viewport: Shift + S")
 
     GuiAddSlider("BrushToolSize", 1,990, 25, ".updateLabelBrushSize", "updateUIbrushTool", 1, "xs y+15 w" slideWid " hp")
     GuiAddSlider("BrushToolStepping", 0,251, 0, ".updateLabelBrushStep", "updateUIbrushTool", 1, "x+10 wp hp")
@@ -44757,7 +44753,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     GuiAddSlider("BrushToolSoftness", 1,100, 35, "Softness", "updateUIbrushTool", 1, "xs y+10 wp hp")
     GuiAddSlider("BrushToolDryingRate", 0,20, 0, "Dry-out rate", "updateUIbrushTool", 1, "x+10 wp hp")
     GuiAddDropDownList("xs y+10 wp AltSubmit gupdateUIbrushTool Choose" BrushToolTexture " vBrushToolTexture", "Soft circle|Decals A|Cloudies|Scratchy|Decals B|Decals C|Gradial|Dots|Vertical dots", "Brush texture")
-    GuiAddDropDownList("x+10 wp gupdateUIbrushTool AltSubmit Choose" BrushToolOutsideSelection " vBrushToolOutsideSelection", "Ignore selection area|Paint inside selection|Paint outside selection", "Selection fill mode")
+    GuiAddDropDownList("x+10 wp gupdateUIbrushTool AltSubmit Choose" BrushToolOutsideSelection " vBrushToolOutsideSelection", "Ignore selection area|Paint inside selection|Paint outside selection", "Selection fill mode`nShortcut in viewport: Shift + K")
 
     gW := gH := (PrefsLargeFonts=1) ? 60 : 45
     Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
@@ -44786,7 +44782,8 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Text, x+10 h%hasa% +0x200 vinfoSymmetryLabel, Apply symmetry on: 
     Gui, Add, Checkbox, y+5 w%sml% hp gupdateUIbrushTool Checked%BrushToolSymmetryX% vBrushToolSymmetryX, X
     Gui, Add, Checkbox, x+5 wp hp gupdateUIbrushTool Checked%BrushToolSymmetryY% vBrushToolSymmetryY, Y
-    Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry, S&et center
+    Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry +hwndhTemp, S&et center
+    ToolTip2ctrl(hTemp, "Shortcut in viewport: Shit + Y`nCycle modes: Y")
     Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport color effects on image
 
     Gui, Tab, 3 ; randomize
@@ -48306,7 +48303,6 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    hColorPrev := createLEDgui(LEDu)
    Sleep, 1
    colorPickerModeNow := 1
-   colorPickerMustEnd := 0
    If (panelWinCollapsed!=1 && AnyWindowOpen)
       toggleImgEditPanelWindow("forced")
 
@@ -48316,27 +48312,19 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    WinActivate, ahk_id %PVhwnd%
    createGUItoolbar()
    whileLoopExec := 1
-   While, (colorPickerModeNow=1)
+   While, (colorPickerModeNow>=1)
    {
       If (errorOccurred>700)
          Break
 
-      If (A_Index>2950)
+      If (A_Index>2950 || colorPickerModeNow=3 || WinActive("A")!=PVhwnd)
       {
          errorOccurred := 750
          Break
       }
 
-      drainUIinput()  ; [merge] processes the viewport clicks that set colorPickerMustEnd while this loop holds Critical
-      cc := colorPickerMustEnd
-      If (cc=1 || colorPickerMustEnd=1 || (determineLClickState() && hwnd=hColorPrev) || GetKeyState("Enter") || GetKeyState("Numpad5"))
+      If (colorPickerModeNow=2 || (determineLClickState() && hwnd=hColorPrev))
          Break
-
-      If (cc=-1 || colorPickerMustEnd=-1 || GetKeyState("Escape") || GetKeyState("Space") || GetKeyState("Tab") || GetKeyState("MButton") || GetKeyState("RButton"))
-      {
-         errorOccurred := 750
-         Break
-      }
 
       Sleep, -1
       GetPhysicalCursorPos(pX, pY)
@@ -48369,20 +48357,15 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
    If (panelWinCollapsed=1 && AnyWindowOpen && d!="leave-it")
       toggleImgEditPanelWindow("forced")
 
-   ; If (errorOccurred>690)
-   ;    Return
-
    If (a="isGiven")
       BrushToolWetness := clampInRange(BrushToolWetness, 0, 19)
 
    If (isNowAlphaPainting()=1 && InStr(ctrl, "brushtool"))
       h := convertColorToGrayscale(h)
 
-   ; https://autohotkey.com/board/topic/43945-fast-pixelgetcolor-workaround-for-aero-windows-7-and-vista/
    o := %ctrl%
    SoundBeep, 900, 100
    ; ToolTip, % errorOccurred " h = " h "`n" o " | " ctrl , , , 2
-   ; ToolTip, % r "`n" ctrl "`n" o "`n" h "`n" g "`n" z , , , 2
    %ctrl% := h
    If ctrl
    {
@@ -85497,14 +85480,11 @@ GuiGDIupdaterResize(eventu:=0) {
 
    SetTimer, dummyTimerReloadThisPicture, Off
    SetTimer, dummyTimerDelayiedImageDisplay, Off
-   stopGIFsPlayback()
-   resetSlideshowTimer()
+   stopGifORslidesPlayback()
    imgPath := getIDimage(currentFileIndex)
    thisClippyIMG := isImgEditingNow()
-
    If (!imgPath || !maxFilesIndex || PrevGuiSizeEvent=1 || !CurrentSLD) && (thisClippyIMG!=1)
    {
-      stopSlideshow()
       If (A_OSVersion="WIN_7" || isWinXP=1)
          GDIwindowsPosCorrections()
 
@@ -99613,7 +99593,6 @@ WM_LBUTTONup(wP, lP, msg, hwnd) {
        Return
     }
 
-    colorPickerMustEnd := 1
     If (thisWin=hSetWinGui && AnyWindowOpen)
     {
        GuiUpdateFocusedSliders()
@@ -99628,7 +99607,6 @@ WM_LBUTTONdown(wP, lP, msg, hwnd) {
     If (!isVarEqualTo(thisWin, hSliderWidget, hQPVtoolbar, PVhwnd) && soloSliderWinVisible=1)
        destroySoloSliderWidget()
 
-    colorPickerMustEnd := 1
     If (ShowAdvToolbar=1)
     {
        MouseGetPos, ,, OutputVarWin, OutputVarControl, 2
@@ -99637,6 +99615,7 @@ WM_LBUTTONdown(wP, lP, msg, hwnd) {
           btnMode := tlbrIconzList[OutputVarControl, 4]
     }
 
+    colorPickerModeNow := (colorPickerModeNow=1) ? 2 : 0
     If (btnMode=1)
     {
        phwnd := Format("0x{1:x}", hwnd)
