@@ -536,18 +536,19 @@ identifyThisWin() {
   Return prevR
 }
 
-HKifs(q:=0, whichWin:=-1) {
+HKifs(q:=0, simulacrum:=0, whichWin:=-1) {
    whichBitmap := (validBMP(useGdiBitmap()) && resultedFilesList[currentFileIndex, 1]) ? 1 : 0
+   asz := (simulacrum=1) ? 0 : openingPanelNow
    If (q="imgEditSolo")
-      r := (!AnyWindowOpen && openingPanelNow!=1 && !CurrentSLD && whichBitmap=1 && thumbsDisplaying!=1) ? 1 : 0
+      r := (!AnyWindowOpen && asz!=1 && !CurrentSLD && whichBitmap=1 && thumbsDisplaying!=1) ? 1 : 0
    Else If (q="imgsLoaded")
-      r := (!AnyWindowOpen && openingPanelNow!=1 && CurrentSLD && maxFilesIndex>0) ? 1 : 0
+      r := (!AnyWindowOpen && asz!=1 && CurrentSLD && maxFilesIndex>0) ? 1 : 0
    Else If (q="liveEdit")
-      r := (AnyWindowOpen && openingPanelNow!=1 && imgEditPanelOpened=1 && whichBitmap=1 && thumbsDisplaying!=1) ? 1 : 0
+      r := (AnyWindowOpen && asz!=1 && imgEditPanelOpened=1 && whichBitmap=1 && thumbsDisplaying!=1) ? 1 : 0
    Else If (q="general")
       r := (!AnyWindowOpen && imgEditPanelOpened!=1) ? 1 : 0
 
-   If (drawingShapeNow=1 || whileLoopExec=1 || whichWin=AnyWindowOpen)
+   If (drawingShapeNow=1 || whileLoopExec=1 && simulacrum!=1 || whichWin=AnyWindowOpen)
       r := 0
 
    Return r
@@ -930,7 +931,7 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
              If testFuncIsInMenus(thisu) ; prevent execution of functions that are no available in the current context
                 %thisu%()
           }
-       } Else If (allowLoop := processDefaultKbdCombos(givenKey, thisWin, abusive, Az, 0))
+       } Else If (allowLoop := processDefaultKbdCombos(givenKey, thisWin, abusive, Az, 0, 0))
        {
           allowLoop := (allowLoop=-1) ? 0 : allowLoop - 1
        } Else If (InStr(menuHotkeys, givenKey "|") && showMainMenuBar=1 && InStr(givenKey, "!") && StrLen(givenKey)=2)
@@ -956,21 +957,21 @@ KeyboardResponder(givenKey, thisWin, abusive, externCounter) {
    ; only resume on an explicit play [X key, Ctrl+click]
 } ; // KeyboardResponder()
 
-processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
+processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
     func2Call := []
     allowLoop := 0
     If (givenKey="^o")
     {
-        If HKifs("general")
+        If HKifs("general", deepSim)
            func2Call := ["OpenDialogFiles"]
     } Else If (givenKey="o")
     {
         imgPath := getIDimage(currentFileIndex)
         If (isImgEditingNow()=1 && drawingShapeNow=1)
            func2Call := ["toggleOpenClosedLineEditorCustomShape"]
-        Else If HKifs("imgsLoaded")
+        Else If HKifs("imgsLoaded", deepSim)
            func2Call := ["OpenThisFileMenu"]
-        Else If ((HKifs("general") && (!CurrentSLD || !validBMP(gdiBitmap))) && !FileRexists(imgPath))
+        Else If ((HKifs("general", deepSim) && (!CurrentSLD || !validBMP(gdiBitmap))) && !FileRexists(imgPath))
            func2Call := ["OpenDialogFiles"]
     } Else If (givenKey="w")
     {
@@ -979,7 +980,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         ; testFIMrgb16toRGBF()
         If (isImgEditingNow()=1 && drawingShapeNow=1)
            func2Call := ["focusVectorEndPoint"]
-        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 && thumbsDisplaying!=1)
+        Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (editingSelectionNow=1 && thumbsDisplaying!=1)
            func2Call := ["flipSelectionWH"]
         Else If (thumbsDisplaying=1 && maxFilesIndex>10 && CurrentSLD && !z)
            func2Call := ["invokeFilesListMapNow"]
@@ -988,21 +989,21 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         ; SetTimer, testKeysStuff, 50
     } Else If (givenKey="+^n")
     {
-        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+        If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["OpenNewQPVinstance"]
     } Else If (givenKey="^n")
     {
-        If HKifs("general")
+        If HKifs("general", deepSim)
            func2Call := ["PanelNewImage"]
     } Else If (givenKey="+tilda")
     {
-        If HKifs("general")
+        If HKifs("general", deepSim)
            func2Call := ["PanelJournalWindow"]
     } Else If (givenKey="F12")
     {
-        If HKifs("liveEdit")
+        If HKifs("liveEdit", deepSim)
            func2Call := ["ActToggleLivePreview"]
-        Else If HKifs("general")
+        Else If HKifs("general", deepSim)
            func2Call := ["PanelPreferencesWindow"]
     } Else If (givenKey="p")
     {
@@ -1010,19 +1011,19 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["togglePreviewVectorNewPoint"]
         Else If (liveDrawingBrushTool=1 && isImgEditingNow()=1 && AnyWindowOpen=64)
           func2Call := ["toggleBrushDeformers"]
-        Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 64) || HKifs("imgsLoaded")) && AnyWindowOpen!=31 && AnyWindowOpen!=24)
+        Else If ((HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim, 64) || HKifs("imgsLoaded", deepSim)) && AnyWindowOpen!=31 && AnyWindowOpen!=24)
           func2Call := ["PanelBrushTool"]
     } Else If (givenKey="!p")
     {
-        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+        If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["MenuRealStartDrawingLines"]
     } Else If (givenKey="+p")
     {
-        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+        If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["MenuRealStartDrawingShapes"]
     } Else If (givenKey="^p")
     {
-        If (imageLoading!=1 && (HKifs("imgEditSolo") || HKifs("imgsLoaded")))
+        If (imageLoading!=1 && (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)))
            func2Call := ["PanelPrintImage"]
     } Else If (givenKey="COLON")
     {
@@ -1041,7 +1042,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         func2Call := ["MenuChangeOSDZoomMinus"]
     } Else If (givenKey="+o")
     {
-        If HKifs("general")
+        If HKifs("general", deepSim)
            func2Call := ["OpenFolders"]
     } Else If (givenKey="^F10" || givenKey="+F10" || givenKey="+!F10")
     {
@@ -1057,11 +1058,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         func2Call := ["InitGuiContextMenu", givenKey]
     } Else If (givenKey="Insert")
     {
-        If (HKifs("general") && imageLoading!=1)
+        If (HKifs("general", deepSim) && imageLoading!=1)
            func2Call := ["addNewFile2list"]
     } Else If (givenKey="^v")
     {
-        If (HKifs("general") && imageLoading!=1)
+        If (HKifs("general", deepSim) && imageLoading!=1)
            func2Call := (thumbsDisplaying=1) ? ["MenuPasteHDropFiles"] : ["PasteClipboardIMG"]
     } Else If (givenKey="Escape")
     {
@@ -1074,7 +1075,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
         func2Call := ["showQuickHelp"]
     } Else If (givenKey="F9")
     {
-       If (HKifs("imgsLoaded") && folderTreeWinOpen=1)
+       If (HKifs("imgsLoaded", deepSim) && folderTreeWinOpen=1)
           func2Call := ["FolderTreeFindActiveFile"]
     } Else If (givenKey="^F4")
     {
@@ -1088,121 +1089,121 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["closeDocuments"]
     } Else If (givenKey="d")
     {
-        If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+        If (HKifs("liveEdit", deepSim) && liveDrawingBrushTool=1)
            func2Call := ["ResetColorsToBW"]
-        Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
+        Else If (HKifs("liveEdit", deepSim) && AnyWindowOpen!=10)
            func2Call := ["toggleLiveEditObject"]
     } Else If (givenKey="l")
     {
-        If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1 || showViewPortGrid=1) && thumbsDisplaying!=1)
+        If ((HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (editingSelectionNow=1 || showViewPortGrid=1) && thumbsDisplaying!=1)
            func2Call := ["toggleLimitSelection"]
-        Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+        Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
            func2Call := ["toggleListViewModeThumbs"]
     } Else If (givenKey="+^v")
     {
-        If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+        If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["PanelPasteInPlace"]
     } Else If (givenKey="^d")
     {
         If (isImgEditingNow()=1 && drawingShapeNow=1)
            func2Call := ["MenuSelNoVectorPoints"]
-        Else If (HKifs("imgsLoaded") && ((thumbsDisplaying=1) || (editingSelectionNow!=1 && markedSelectFile)))
+        Else If (HKifs("imgsLoaded", deepSim) && ((thumbsDisplaying=1) || (editingSelectionNow!=1 && markedSelectFile)))
            func2Call := ["dropFilesSelection"]
-        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+        Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["resetImgSelection"]
     } Else If (givenKey="^c")
     {
-        If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+        If (thumbsDisplaying=1 && HKifs("imgsLoaded", deepSim))
            func2Call := ["MenuExplorerCopyFiles"]
-        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+        Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["CopyImage2clip"]
     } Else If (givenKey="^x")
     {
-        If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+        If (thumbsDisplaying=1 && HKifs("imgsLoaded", deepSim))
            func2Call := ["MenuExplorerCutFiles"]
-        Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+        Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["CutSelectedArea"]
     } Else If (givenKey="^z")
     {
         allowLoop := 1
         If (isImgEditingNow()=1 && drawingShapeNow=1)
            func2Call := ["ImgVectorUndoAct"]
-        Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+        Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
            func2Call := ["ImgUndoAction"]
     } Else If (givenKey="z")
     {
-        If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (isImgEditingNow()=1 && drawingShapeNow=1))
+        If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || (isImgEditingNow()=1 && drawingShapeNow=1))
           func2Call := ["ToggleImgNavBox"]
     } Else If (givenKey="^y")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["ImgVectorRedoAct"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ImgRedoAction"]
     } Else If (givenKey="+^z")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["doUndoFileActsChronos"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ImgSelUndoAct"]
     } Else If (givenKey="+^y")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ImgSelRedoAct"]
     } Else If (givenKey="^!z")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuUndoImgJumpy"]
     } Else If (givenKey="^!y")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuRedoImgJumpy"]
     } Else If (givenKey="e")
     {
        If (isVarEqualTo(AnyWindowOpen, 64, 66, 12, 10) && imgEditPanelOpened=1) ; Brush, Fill and Jpeg Crop
           func2Call := ["ToggleEditImgSelection", "key"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["QuickSelectFilesSameFolder"]
-       Else If (HKifs("liveEdit") && AnyWindowOpen!=10)
+       Else If (HKifs("liveEdit", deepSim) && AnyWindowOpen!=10)
           func2Call := ["livePreviewsImageEditing", 1]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ToggleEditImgSelection", "key"]
     } Else If (givenKey="+e")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && currentFileIndex>0 && maxFilesIndex>2)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && currentFileIndex>0 && maxFilesIndex>2)
           func2Call := ["activateFilesListFilterBasedOnFolder", currentFileIndex]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuCycleSelectionShapes"]
     } Else If (givenKey="!e")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded") || HKifs("liveEdit") && !isTransPanel)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim) || HKifs("liveEdit", deepSim) && !isTransPanel)
           func2Call := ["PanelIMGselProperties"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["OpenQPVfileFolder"]
     } Else If (givenKey="^s")
     {
        If (drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["MenuSaveEditorVectorShape"]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelSaveImg"]
     } Else If (givenKey="^l")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgEditSolo") || (HKifs("liveEdit", 65) && !isTransPanel) || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || (HKifs("liveEdit", deepSim, 65) && !isTransPanel) || HKifs("imgsLoaded", deepSim))
           func2Call := ["tlbrDrawShapesContour"]
     } Else If (givenKey="+l")
     {
-       If (HKifs("imgsLoaded") && (thumbsDisplaying=1))
+       If (HKifs("imgsLoaded", deepSim) && (thumbsDisplaying=1))
           func2Call := ["CalculateSelectedFilesSizes"]
-       Else If (HKifs("liveEdit") && EllipseSelectMode=2 && editingSelectionNow=1 && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
+       Else If (HKifs("liveEdit", deepSim) && EllipseSelectMode=2 && editingSelectionNow=1 && isVarEqualTo(AnyWindowOpen, 74, 68, 66, 65, 64, 55, 25, 23, 10))
           func2Call := ["MenuResumeDrawingShapes"]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (thumbsDisplaying!=1)
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && (thumbsDisplaying!=1)
        {
           If (editingSelectionNow!=1 || EllipseSelectMode!=2)
              func2Call := ["MenuStartDrawingSelectionArea"]
@@ -1212,12 +1213,12 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="!BackSpace")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || (HKifs("liveEdit", deepSim) && !isTransPanel) || HKifs("imgsLoaded", deepSim))
           func2Call := ["tlbrFillShape"]
     } Else If (givenKey="!y")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || (HKifs("liveEdit", deepSim) && !isTransPanel) || HKifs("imgsLoaded", deepSim))
          func2Call := ["PanelImgAutoCrop"]
     } Else If (givenKey="y")
     {
@@ -1231,94 +1232,94 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        If (drawingShapeNow=1 && isImgEditingNow()=1)
           func2Call := ["ToggleContextStatusBar"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (AnyWindowOpen>1 && isImgEditingNow()))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || (AnyWindowOpen>1 && isImgEditingNow()))
           func2Call := ["ToggleInfoBoxu"]
     } Else If (givenKey="LBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuDecBrushSize"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()=1)
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow()=1)
           func2Call := ["MenuChangeDecBright"]
     } Else If (givenKey="RBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuIncBrushSize"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()=1)
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow()=1)
           func2Call := ["MenuChangeIncBright"]
     } Else If (givenKey="+LBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuDecBrushSoftness"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuChangeDecContrast"]
     } Else If (givenKey="+RBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuIncBrushSoftness"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuChangeIncContrast"]
     } Else If (givenKey="^LBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuDecBrushAngle"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuChangeDecSaturat"]
     } Else If (givenKey="^RBRACKET")
     {
        allowLoop := 1 
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuIncBrushAngle"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuChangeIncSaturat"]
     } Else If (givenKey="!LBRACKET")
     {
        allowLoop := 1
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuDecBrushAspectRatio"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuChangeDecGamma"]
     } Else If (givenKey="!RBRACKET")
     {
        allowLoop := 1
        If (liveDrawingBrushTool=1 && isImgEditingNow()=1)
           func2Call := ["MenuIncBrushAspectRatio"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuChangeIncGamma"]
     } Else If (givenKey="BSLASH")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["ResetImageView"]
-       Else If (HKifs("liveEdit") && (AnyWindowOpen=10 || AnyWindowOpen=74))
+       Else If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=10 || AnyWindowOpen=74))
           func2Call := ["BtnToggleNoColorsFX"]
-       Else If ((HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && vpIMGrotation!=0)
+       Else If ((HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && vpIMGrotation!=0)
           func2Call := ["MenuResetVProtation"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ResetImageView"]
     } Else If (givenKey="^BSLASH")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["HardResetImageView"]
-       Else If (HKifs("liveEdit") && AnyWindowOpen=10)
+       Else If (HKifs("liveEdit", deepSim) && AnyWindowOpen=10)
           func2Call := ["btnResetImageView"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["HardResetImageView"]
     } Else If (givenKey="+BSLASH")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
        {
           func2Call := ["toggleColorAdjustments"]
-       } Else If HKifs("liveEdit")
+       } Else If HKifs("liveEdit", deepSim)
        {
           If (innerSelectionCavityX>0 && innerSelectionCavityY>0)
              func2Call := ["resetSelectionAreaCavity"]
           Else
              func2Call := ["resetSelectionRotation"]
-       } Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       } Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
        {
           If (innerSelectionCavityX>0 && innerSelectionCavityY>0 && editingSelectionNow=1)
              func2Call := ["resetSelectionAreaCavity"]
@@ -1329,141 +1330,141 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="SLASH" || givenKey="NumpadDiv") ; /
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
           func2Call := ["MenuSetImageAdaptAll"]
     } Else If (givenKey="NumpadMult" || givenKey="^SLASH") ; Ctrl+/
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow()) && (thumbsDisplaying!=1)
           func2Call := ["toggleCustomZLmodes"]
     } Else If (givenKey="!BSLASH")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuResetSelAreaCavityRotation"]
     } Else If (givenKey="+NumpadAdd" || givenKey="+equal")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuIncSelAreaSize"]
     } Else If (givenKey="+NumpadSub" || givenKey="+minus")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuDecSelAreaSize"]
     } Else If (givenKey="!minus")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["MenuDecVPgridSize"]
     } Else If (givenKey="!equal")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["MenuIncVPgridSize"]
     } Else If (givenKey="NumpadAdd" || givenKey="equal")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["MenuChangeImgZoomPlus"]
     } Else If (givenKey="NumpadSub" || givenKey="minus")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["MenuChangeImgZoomMinus"]
     } Else If (givenKey="g")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["toggleViewPortGridu"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ToggleImgHistogram", 1]
     } Else If (givenKey="+g")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ToggleImgHistogram", -1]
     } Else If (givenKey="!g")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ToggleHistogramMode"]
     } Else If (givenKey="^r")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["PanelSimpleResizeRotate"]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelEditorImgResize"]
     } Else If (givenKey="!r")
     {
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && (!AnyWindowOpen)
           func2Call := ["ResizeIMGviewportSelection"]
     } Else If (givenKey="r")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1 && bezierSplineCustomShape=1)
           func2Call := ["toggleAutoReflectAnchors"]
-       Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
+       Else If (HKifs("liveEdit", deepSim) && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
           func2Call := ["toggleBrushTypeEraser"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && markedSelectFile)
           func2Call := ["PanelReviewSelectedFiles"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["makeSquareSelection"]
     } Else If (givenKey="+r")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuSelRotation"]
     } Else If (givenKey="+^r")
     {
-       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && !AnyWindowOpen)
+       If ((HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && !AnyWindowOpen)
           func2Call := ["MenuRotateEditImagePlus"]
     } Else If (givenKey="^t")
     {
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelTransformSelectedArea"]
     } Else If (givenKey="+t")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgEditSolo") || (HKifs("liveEdit", 32) && !isTransPanel) || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || (HKifs("liveEdit", deepSim, 32) && !isTransPanel) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelInsertTextArea"]
     } Else If (givenKey="+i")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["MenuSelInvertVectorPoints"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && markedSelectFile>1)
           func2Call := ["invertFilesSelection"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["InvertSelectedArea"]
     } Else If (givenKey="^g")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgEditSolo") || (HKifs("liveEdit", 55) && !isTransPanel) || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || (HKifs("liveEdit", deepSim, 55) && !isTransPanel) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelDesatureSelectedArea"]
     } Else If (givenKey="+b")
     {
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelBlurSelectedArea"]
     } Else If (givenKey="b")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["MenuToggleBezierMode"]
-       Else If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
+       Else If (HKifs("liveEdit", deepSim) && (liveDrawingBrushTool=1 || AnyWindowOpen=64))
           func2Call := ["toggleBrushTypes"]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["KbdToggleImgFavourites"]
     } Else If (givenKey="^h")
     {
-       If (HKifs("imgsLoaded") && maxFilesIndex>1)
+       If (HKifs("imgsLoaded", deepSim) && maxFilesIndex>1)
           func2Call := ["PanelSearchAndReplaceIndex"]
     } Else If (givenKey="h")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["VPflipImgH"]
     } Else If (givenKey="v")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["VPflipImgV"]
     } Else If (givenKey="+h")
     {
-       If (HKifs("liveEdit") && isNowAlphaPainting()=1)
+       If (HKifs("liveEdit", deepSim) && isNowAlphaPainting()=1)
           func2Call := ["FlipHalphaMask"]
-       Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+       Else If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=31 || AnyWindowOpen=24))
           func2Call := ["FlipHtransformedIMGpanel"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["filesListFlipHimage"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
        {
           If (editingSelectionNow=1 && EllipseSelectMode=2 && AnyWindowOpen)
              func2Call := ["MenuSelectionFlipH"]
@@ -1472,13 +1473,13 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="+v")
     {
-       If (HKifs("liveEdit") && isNowAlphaPainting()=1)
+       If (HKifs("liveEdit", deepSim) && isNowAlphaPainting()=1)
           func2Call := ["FlipValphaMask"]
-       Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+       Else If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=31 || AnyWindowOpen=24))
           func2Call := ["FlipVtransformedIMGpanel"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["filesListFlipVimage"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
        {
           If (editingSelectionNow=1 && EllipseSelectMode=2 && AnyWindowOpen)
              func2Call := ["MenuSelectionFlipV"]
@@ -1487,41 +1488,41 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="u")
     {
-       If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+       If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=31 || AnyWindowOpen=24))
           func2Call := ["togglePasteInPlaceColorsFX"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && thumbsListViewMode=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && thumbsListViewMode=1)
           func2Call := ["PanelSetThumbColumnOptions"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelAdjustColorsSimpleWindow"]
     } Else If (givenKey="+u")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["filesListApplyColors"]
-       Else If (HKifs("imgEditSolo") || (HKifs("liveEdit") && !isTransPanel) || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || (HKifs("liveEdit", deepSim) && !isTransPanel) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelColorsAdjusterVPwindow"]
     } Else If (givenKey="+^u")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ApplyVPcolorAdjustSelectedArea"]
     } Else If (givenKey="f")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["ToggleImgFX", 1]
     } Else If (givenKey="+f")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || drawingShapeNow=1 && isImgEditingNow())
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["ToggleImgFX", -1]
     } Else If (givenKey="+q")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (liveDrawingBrushTool!=1)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (liveDrawingBrushTool!=1)
           func2Call := ["ToggleImgColorDepth", -1]
     } Else If (givenKey="q")
     {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-       If (HKifs("liveEdit") && (liveDrawingBrushTool=1 || AnyWindowOpen=64) && !isTransPanel)
+       If (HKifs("liveEdit", deepSim) && (liveDrawingBrushTool=1 || AnyWindowOpen=64) && !isTransPanel)
           func2Call := ["toggleBrushTypeFX"]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["ToggleImgColorDepth", 1]
        Else If (isImgEditingNow() && drawingShapeNow=1)
           func2Call := ["MenuCycleVectToolMode"]
@@ -1530,59 +1531,59 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        isTransPanel := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["MenuRemSelVectorPoints"]
-       Else If ((HKifs("imgEditSolo") || HKifs("liveEdit", 25) || HKifs("imgsLoaded")) && thumbsDisplaying!=1 && editingSelectionNow=1 && !isTransPanel)
+       Else If ((HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim, 25) || HKifs("imgsLoaded", deepSim)) && thumbsDisplaying!=1 && editingSelectionNow=1 && !isTransPanel)
           func2Call := ["PanelEraseSelectedArea"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying!=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying!=1)
           func2Call := ["DeleteActivePicture"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["DeletePicture"]
     } Else If (givenKey="!Delete")
     {
-       If (HKifs("imgsLoaded") && maxFilesIndex>1 && currentFileIndex>0)
+       If (HKifs("imgsLoaded", deepSim) && maxFilesIndex>1 && currentFileIndex>0)
           func2Call := ["singleInListEntriesRemover"]
     } Else If (givenKey="+Delete")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["DeleteActiveImgFileAndEntry"]
     } Else If (givenKey="^Delete")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["DeleteActivePicture"]
     } Else If (givenKey="a")
     {
-       If HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || (AnyWindowOpen>1) || (isImgEditingNow()=1 && drawingShapeNow=1)
+       If HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || (AnyWindowOpen>1) || (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["ToggleIMGalign"]
     } Else If (givenKey="+a")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["toggleImgSelectionAspectRatio"]
     } Else If (givenKey="+^a")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["toggleImgSelectLockedRatio"]
     } Else If (givenKey="!a")
     {
-       If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["PanelAdjustImageCanvasSize"]
     } Else If (givenKey="^a")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["tlbrSelAllVectorPoints"]
-       Else If (HKifs("liveEdit") || isImgEditingNow()=1 && editingSelectionNow=1 && AnyWindowOpen && imgEditPanelOpened!=1)
+       Else If (HKifs("liveEdit", deepSim) || isImgEditingNow()=1 && editingSelectionNow=1 && AnyWindowOpen && imgEditPanelOpened!=1)
           func2Call := ["selectEntireImage"]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim))
        {
-          If (thumbsDisplaying=1 && HKifs("imgsLoaded"))
+          If (thumbsDisplaying=1 && HKifs("imgsLoaded", deepSim))
              func2Call := ["selectAllFiles"]
           Else
              func2Call := ["selectEntireImage"]
        }
     } Else If (givenKey="+9")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
        {
           func2Call := ["filesListFlipRotateMinus"]
-       } Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1)
+       } Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (editingSelectionNow=1)
        {
           allowLoop := 1
           func2Call := ["MenuSelDecRotation"]
@@ -1590,26 +1591,26 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="8")
     {
        allowLoop := 1
-       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+       If (HKifs("liveEdit", deepSim) && liveDrawingBrushTool=1)
           func2Call := ["changeBrushOpacity", givenKey, 1]
     } Else If (givenKey="9")
     {
        allowLoop := 1
-       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+       If (HKifs("liveEdit", deepSim) && liveDrawingBrushTool=1)
           func2Call := ["changeBrushOpacity", givenKey, 1]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuDecVProtation"]
     } Else If (givenKey="!9")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["changeLittleImgRotationInVP", -1]
     } Else If (givenKey="+00.1")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
        {
           func2Call := ["filesListFlipRotatePlus"]
-       } Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (editingSelectionNow=1)
+       } Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (editingSelectionNow=1)
        {
           allowLoop := 1
           func2Call := ["MenuSelIncRotation"]
@@ -1617,107 +1618,107 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If (givenKey="00.1")
     {
        allowLoop := 1
-       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+       If (HKifs("liveEdit", deepSim) && liveDrawingBrushTool=1)
           func2Call := ["changeBrushOpacity", givenKey, 1]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["MenuIncVProtation"]
     } Else If (givenKey="!00.1")
     {
        allowLoop := 1
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["changeLittleImgRotationInVP", 1]
     } Else If (givenKey="Up" || givenKey="+Up")
     {
        okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) ? 1 : 0
-       If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+       If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
           func2Call := ["PanIMGonScreen", "U", givenKey]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Upu", givenKey]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["MenuNextDesiredFrame"]
     } Else If (givenKey="Down" || givenKey="+Down")
     {
        okayu := (thumbsDisplaying=1 || undoLevelsRecorded<2 || currentImgModified!=1) ? 1 : 0
-       If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+       If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
           func2Call := ["PanIMGonScreen", "D", givenKey]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Down", givenKey]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["MenuPrevDesiredFrame"]
     } Else If (givenKey="WheelUp")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
           func2Call := ["VPchangeZoom", 1, "WheelUp"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Upu", givenKey]
     } Else If (givenKey="WheelDown")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded") || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim) || isImgEditingNow()=1 && drawingShapeNow=1) && (thumbsDisplaying!=1)
           func2Call := ["VPchangeZoom", -1, "WheelDown"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Down", givenKey]
     } Else If (givenKey="!Left")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", -1, 1]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", -1, 1]
     } Else If (givenKey="!Right")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", 1, 1]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", 1, 1]
     } Else If (givenKey="!Up")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", -2, 1]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", -2, 1]
     } Else If (givenKey="!Down")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", 2, 1]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", 2, 1]
     } Else If (givenKey="+!Left")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", -1, 2]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", -1, 2]
     } Else If (givenKey="+!Right")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", 1, 2]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", 1, 2]
     } Else If (givenKey="+!Up")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", -2, 2]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", -2, 2]
     } Else If (givenKey="+!Down")
     {
        allowLoop := 1
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["arrowKeysAdjustPrevPointPath", 2, 2]
-       Else If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded"))
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
           func2Call := ["arrowKeysAdjustSelectionArea", 2, 2]
     } Else If (givenKey="F8")
     {
-       If HKifs("general")
+       If HKifs("general", deepSim)
           func2Call := ["openPreviousPanel"]
     } Else If (givenKey="Space")
     {
-       If (HKifs("imgsLoaded") && drawingShapeNow!=1)
+       If (HKifs("imgsLoaded", deepSim) && drawingShapeNow!=1)
        {
           If ((thumbsDisplaying=1 || markedSelectFile) && slideShowRunning!=1)
              func2Call := ["markThisFileNow"]
@@ -1729,17 +1730,17 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["toggleScreenSaverMode"]
     } Else If (givenKey="+n")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelEditImgCaption"]
     } Else If (givenKey="n")
     {
-       If (HKifs("liveEdit") && (isAlphaMaskWindow()=1 || isAlphaMaskPartialWin()=1))
+       If (HKifs("liveEdit", deepSim) && (isAlphaMaskWindow()=1 || isAlphaMaskPartialWin()=1))
           func2Call := ["toggleInvertAlphaMask"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["ToggleImgCaptions"]
     } Else If (SubStr(givenKey, 1, 1)="^" && isInRange(SubStr(givenKey, 2, 1), 0, 8))
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
        {
           If (givenKey="^1")
              func2Call := ["ActSortName"]
@@ -1762,13 +1763,13 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="j")
     {
-       If (liveDrawingBrushTool=1 || AnyWindowOpen=64) && HKifs("liveEdit")
+       If (liveDrawingBrushTool=1 || AnyWindowOpen=64) && HKifs("liveEdit", deepSim)
           func2Call := ["toggleBrushTypeCloner"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelJump2index"]
     } Else If (givenKey="+Insert")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["addNewFolder2list"]
     } Else If (givenKey="Tab")
     {
@@ -1779,47 +1780,47 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["focusToolbarNavKeys"]
     } Else If (givenKey="^Tab")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && markedSelectFile>1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && markedSelectFile>1)
           func2Call := ["filterToFilesSelection"]
     } Else If (givenKey="F11")
     {
-       If HKifs("liveEdit")
+       If HKifs("liveEdit", deepSim)
           func2Call := ["toggleImgEditPanelWindow"]
        Else If !AnyWindowOpen
           func2Call := ["ToggleFullScreenMode"]
     } Else If (givenKey="+Enter")
     {
-       If HKifs("liveEdit")
+       If HKifs("liveEdit", deepSim)
           func2Call := ["applyIMGeditKeepWin"]
-       Else If (HKifs("imgEditSolo") || HKifs("imgsLoaded")) && (!AnyWindowOpen)
+       Else If (HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && (!AnyWindowOpen)
           func2Call := ["CropImageInViewPortToSelection"]
     } Else If (givenKey="^Enter")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["OpenWithNewQPVinstance"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["SoloNewQPVinstance"]
     } Else If (givenKey="Enter")
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["stopDrawingShape"]
-       Else If HKifs("liveEdit")
+       Else If HKifs("liveEdit", deepSim)
           func2Call := ["applyIMGeditFunction"]
-       Else If (HKifs("imgsLoaded") && (A_TickCount - lastOtherWinClose>250))
+       Else If (HKifs("imgsLoaded", deepSim) && (A_TickCount - lastOtherWinClose>250))
           func2Call := ["ToggleThumbsMode"]
     } Else If (givenKey="!Enter")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelImageInfos"]
     } Else If (givenKey="c")
     {
-       If HKifs("liveEdit")
+       If HKifs("liveEdit", deepSim)
           func2Call := ["changeBrushColorPicker"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["InvokeCopyFiles"]
     } Else If (givenKey="^u")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelStaticFolderzManager"]
     } Else If (givenKey="!u")
     {
@@ -1827,13 +1828,13 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
            func2Call := ["PanelDynamicFolderzWindow"]
     } Else If (givenKey="^k")
     {
-       If (HKifs("liveEdit") && (AnyWindowOpen=64 || AnyWindowOpen=66 || isAlphaMaskWindow()=1))
+       If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=64 || AnyWindowOpen=66 || isAlphaMaskWindow()=1))
           func2Call := ["toggleAlphaPaintingMode"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelFileFormatConverter"]
     } Else If (givenKey="k")
     {
-       If (HKifs("imgsLoaded") || HKifs("liveEdit") || HKifs("imgEditSolo"))
+       If (HKifs("imgsLoaded", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgEditSolo", deepSim))
           func2Call := ["PanelFloodFillTool"]
     } Else If (givenKey="+k")
     {
@@ -1841,30 +1842,30 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["toggleBrushDrawInOutModes"]
     } Else If (givenKey="+j")
     {
-       If (HKifs("imgsLoaded") && !AnyWindowOpen)
+       If (HKifs("imgsLoaded", deepSim) && !AnyWindowOpen)
        {
           If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(jpg|jpeg))$") || markedSelectFile)
              func2Call := ["PanelJpegPerformOperation"]
        }
     } Else If (givenKey="+c")
     {
-       If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+       If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=31 || AnyWindowOpen=24))
           func2Call := ["togglePasteInPlaceCropShapes"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["CopyImagePath"]
     } Else If (givenKey="^e")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["OpenThisFileFolder"]
     } Else If (givenKey="^f")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelEnableFilesFilter"]
     } Else If (givenKey="s")
     {
        If (drawingShapeNow=1 && isImgEditingNow())
           func2Call := ["toggleVectorSelectMmde"]
-       Else If (HKifs("liveEdit"))
+       Else If (HKifs("liveEdit", deepSim))
        {
           If (AnyWindowOpen=31 || AnyWindowOpen=24)
              func2Call := ["togglePasteInPlaceAdaptModes"]
@@ -1872,7 +1873,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
              func2Call := ["BtnSetClonerBrushSource"]
           Else If (AnyWindowOpen=23 && FillAreaColorMode=6)
              func2Call := ["BtnSetTextureSource"]
-       } Else If HKifs("imgsLoaded")
+       } Else If HKifs("imgsLoaded", deepSim)
        {
           If (thumbsDisplaying=1)
              func2Call := ["keepSelectedDupeInGroup"]
@@ -1881,13 +1882,13 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="+s")
     {
-       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+       If (HKifs("liveEdit", deepSim) && liveDrawingBrushTool=1)
           func2Call := ["toggleBrushDoubleSize"]
-       Else If (HKifs("imgsLoaded") && mustRecordSeenImgs=1 && thumbsDisplaying=1)
+       Else If (HKifs("imgsLoaded", deepSim) && mustRecordSeenImgs=1 && thumbsDisplaying=1)
           func2Call := ["ToggleSeenIMGstatus"]
     } Else If (givenKey="+^s")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelSaveSlideShowu"]
     } Else If (givenKey="T")
     {
@@ -1895,11 +1896,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["toggleBrushAirMode"]
        Else If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["togglePathCurveTension"]
-       Else If (HKifs("imgsLoaded") || HKifs("liveEdit"))
+       Else If (HKifs("imgsLoaded", deepSim) || HKifs("liveEdit", deepSim))
           func2Call := ["ToggleImageSizingMode"]
     } Else If (givenKey="+Space")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If (thumbsDisplaying=1)
              func2Call := ["dropFilesSelection"]
@@ -1910,7 +1911,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="^Space")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If (slideShowRunning=1)
              func2Call := ["InformToggledSlideShowu", "stop"]
@@ -1921,22 +1922,22 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
          func2Call := ["reduceCustomShapeLength"]
-       Else If (HKifs("liveEdit") && (AnyWindowOpen=31 || AnyWindowOpen=24))
+       Else If (HKifs("liveEdit", deepSim) && (AnyWindowOpen=31 || AnyWindowOpen=24))
          func2Call := ["toggleErasePasteInPlace"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
          func2Call := ["PrevRandyPicture", "key"]
     } Else If (givenKey="+BackSpace")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["RandomPicture", "key"]
     } Else If (givenKey="^Backspace")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["jumpPreviousImage"]
     } Else If (givenKey="!period")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && animGIFsSupport=1)
+       If (HKifs("imgsLoaded", deepSim) && animGIFsSupport=1)
           func2Call := ["MenuIncGIFspeed"]
     } Else If (givenKey="+period")
     {
@@ -1956,19 +1957,19 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        allowLoop := 1
        If (liveDrawingBrushTool=1)
           func2Call := ["MenuIncBrushOpacity"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["IncreaseSlideSpeed"]
     } Else If (givenKey="comma")
     {
        allowLoop := 1
        If (liveDrawingBrushTool=1)
           func2Call := ["MenuDecBrushOpacity"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["DecreaseSlideSpeed"]
     } Else If (givenKey="!comma")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && animGIFsSupport=1)
+       If (HKifs("imgsLoaded", deepSim) && animGIFsSupport=1)
           func2Call := ["MenuDecGIFspeed"]
     } Else If (givenKey="+comma")
     {
@@ -1979,48 +1980,48 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["MenuSetVolumeDown"]
     } Else If (givenKey="+SLASH") ; Shift+/
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelDefineEntireSlideshowLength"]
     } Else If (givenKey="F5")
     {
-       If HKifs("imgsLoaded") || (liveDrawingBrushTool=1 && AnyWindowOpen=64)
+       If HKifs("imgsLoaded", deepSim) || (liveDrawingBrushTool=1 && AnyWindowOpen=64)
           func2Call := ["RefreshImageFileAction"]
     } Else If (givenKey="!F5")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["DeepRefreshThumbsNow"]
     } Else If (givenKey="+F5")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["RefreshFilesList"]
     } Else If (givenKey="^F5")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["invertCurrentFolderRecursiveness"]
     } Else If (givenKey="F2")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelRenameThisFile"]
     } Else If (givenKey="+F2")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["SingularRenameFile"]
     } Else If (givenKey="^F2")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelUpdateThisFileIndex"]
     } Else If (givenKey="m")
     {
-       If (HKifs("imgEditSolo") || HKifs("liveEdit") || HKifs("imgsLoaded")) && ((editingSelectionNow=1 || AnyWindowOpen=66) && thumbsDisplaying!=1 && AnyWindowOpen!=70)
+       If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim)) && ((editingSelectionNow=1 || AnyWindowOpen=66) && thumbsDisplaying!=1 && AnyWindowOpen!=70)
           func2Call := ["ViewAlphaMaskNow"]
-       Else If HKifs("imgsLoaded")
+       Else If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelMoveCopyFiles"]
     } Else If (givenKey="x")
     {
-       If HKifs("liveEdit")
+       If HKifs("liveEdit", deepSim)
        {
           func2Call := ["ToggleBrushColors"]
-       } Else If HKifs("imgsLoaded")
+       } Else If HKifs("imgsLoaded", deepSim)
        {
           If (animGIFplaying=1)
              func2Call := ["stopGIFsPlayback"]
@@ -2031,7 +2032,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="+x")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If (animGIFplaying=1)
              func2Call := ["stopGIFsPlayback"]
@@ -2045,31 +2046,31 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
     } Else If ((isInRange(givenKey, 1, 7) && isNumber(givenKey))
            || (SubStr(givenKey, 1, 1)="+" && isInRange(SubStr(givenKey, 2, 1), 1, 7)))
     {
-       If (HKifs("liveEdit") && liveDrawingBrushTool=1)
+       If (HKifs("liveEdit", deepSim) && liveDrawingBrushTool=1)
        {
           allowLoop := 1
           func2Call := ["changeBrushOpacity", givenKey, 1]
-       } Else If (HKifs("imgsLoaded") && !InStr(givenKey, "8"))
+       } Else If (HKifs("imgsLoaded", deepSim) && !InStr(givenKey, "8"))
           func2Call := ["triggerQuickFileAction", givenKey]
     } Else If (givenKey="^Left")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["navSelectedFilesPrev"]
     } Else If (givenKey="^Right")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["navSelectedFilesNext"]
     } Else If (givenKey="F3")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["MenuSearchNextIndex"]
     } Else If (givenKey="+F3")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["MenuSearchPrevIndex"]
     } Else If (givenKey="^F3")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["PanelSearchIndex"]
     } Else If (givenKey="F4")
     {
@@ -2077,25 +2078,25 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
           func2Call := ["PanelFoldersTree"]
     } Else If (givenKey="+F4")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["invokeFoldersListerMenu"]
     } Else If (givenKey="^WheelUp")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Upu", givenKey]
-       Else If (HKifs("imgsLoaded"))
+       Else If (HKifs("imgsLoaded", deepSim))
           func2Call := ["PreviousPicture", "key-" givenKey]
     } Else If (givenKey="^WheelDown")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1)
           func2Call := ["ThumbsNavigator", "Down", givenKey]
-       Else If (HKifs("imgsLoaded"))
+       Else If (HKifs("imgsLoaded", deepSim))
           func2Call := ["NextPicture", "key-" givenKey]
     } Else If (givenKey="Right" || givenKey="+Right")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
           {
@@ -2109,11 +2110,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
              Else If (okayu=1)
                 func2Call := ["NextPicture", "key-" givenKey]
          }
-       } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+       } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim)) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
          func2Call := ["PanIMGonScreen", "R", givenKey]
     } Else If (givenKey="Left" || givenKey="+Left")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If ((IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
           {
@@ -2127,7 +2128,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
              Else If (okayu=1)
                 func2Call := ["PreviousPicture", "key-" givenKey]
          }
-       } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo") || HKifs("liveEdit")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
+       } Else If ((isImgEditingNow()=1 && drawingShapeNow=1 || HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim)) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && IMGresizingMode=4 && thumbsDisplaying=0)
          func2Call := ["PanIMGonScreen", "L", givenKey]
     } Else If (givenKey="PgDn")
     {
@@ -2135,11 +2136,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        {
           allowLoop := 1
           func2Call := ["adjustCustomShapePositionLive", 1]
-       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       } Else If (HKifs("liveEdit", deepSim) && editingSelectionNow=1)
        {
           allowLoop := 1
           func2Call := ["MenuSelAreaMoveRight"]
-       } Else If HKifs("imgsLoaded")
+       } Else If HKifs("imgsLoaded", deepSim)
        {
           func2Call := ["resetSlideshowTimer"]
           If (thumbsDisplaying=1)
@@ -2154,11 +2155,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        {
           allowLoop := 1
           func2Call := ["adjustCustomShapePositionLive", -1]
-       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       } Else If (HKifs("liveEdit", deepSim) && editingSelectionNow=1)
        {
           allowLoop := 1
           func2Call := ["MenuSelAreaMoveLeft"]
-       } Else If HKifs("imgsLoaded")
+       } Else If HKifs("imgsLoaded", deepSim)
        {
           func2Call := ["resetSlideshowTimer"]
           If (thumbsDisplaying=1)
@@ -2169,7 +2170,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="+PgDn")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If (thumbsDisplaying=1)
           {
@@ -2180,7 +2181,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="+PgUp")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
        {
           If (thumbsDisplaying=1)
           {
@@ -2191,59 +2192,59 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        }
     } Else If (givenKey="+^Up")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying!=1 && totalFramesIndex>0)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying!=1 && totalFramesIndex>0)
           func2Call := ["MenuNextPDFchapter"]
     } Else If (givenKey="+^Down")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying!=1 && totalFramesIndex>0)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying!=1 && totalFramesIndex>0)
           func2Call := ["MenuPrevPDFchapter"]
     } Else If (givenKey="^Up")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying!=1 && totalFramesIndex>0)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying!=1 && totalFramesIndex>0)
           func2Call := ["MenuNextDesiredFrame"]
     } Else If (givenKey="^Down")
     {
-       If (HKifs("imgsLoaded") && thumbsDisplaying!=1 && totalFramesIndex>0)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying!=1 && totalFramesIndex>0)
           func2Call := ["MenuPrevDesiredFrame"]
     } Else If (givenKey="^PgUp")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && SLDtypeLoaded=1)
           func2Call := ["FileExploreUpDownLevel", -1]
     } Else If (givenKey="^PgDn")
     {
        allowLoop := 1
-       If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+       If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && SLDtypeLoaded=1)
           func2Call := ["FileExploreUpDownLevel", 1]
     } Else If (givenKey="!PgUp")
     {
        allowLoop := 1
-       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && editingSelectionNow=1 && thumbsDisplaying!=1)
+       If ((HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && editingSelectionNow=1 && thumbsDisplaying!=1)
           func2Call := ["MenuSelAreaMoveLeft"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && SLDtypeLoaded=1)
           func2Call := ["FileExploreSiblingsNav", -1]
     } Else If (givenKey="!PgDn")
     {
        allowLoop := 1
-       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && editingSelectionNow=1 && thumbsDisplaying!=1)
+       If ((HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && editingSelectionNow=1 && thumbsDisplaying!=1)
           func2Call := ["MenuSelAreaMoveRight"]
-       Else If (HKifs("imgsLoaded") && thumbsDisplaying=1 && SLDtypeLoaded=1)
+       Else If (HKifs("imgsLoaded", deepSim) && thumbsDisplaying=1 && SLDtypeLoaded=1)
           func2Call := ["FileExploreSiblingsNav", 1]
     } Else If (givenKey="^Home")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["jumpToFilesSelBorder", -1]
     } Else If (givenKey="^End")
     {
-       If HKifs("imgsLoaded")
+       If HKifs("imgsLoaded", deepSim)
           func2Call := ["jumpToFilesSelBorder", 1]
     } Else If (givenKey="!End")
     {
-       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && editingSelectionNow=1 && thumbsDisplaying!=1)
+       If ((HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && editingSelectionNow=1 && thumbsDisplaying!=1)
           func2Call := ["MenuSelAreaMoveDown"]
     } Else If (givenKey="!Home")
     {
-       If ((HKifs("imgEditSolo") || HKifs("imgsLoaded")) && editingSelectionNow=1 && thumbsDisplaying!=1)
+       If ((HKifs("imgEditSolo", deepSim) || HKifs("imgsLoaded", deepSim)) && editingSelectionNow=1 && thumbsDisplaying!=1)
           func2Call := ["MenuSelAreaMoveUp"]
     } Else If (givenKey="Home" || givenKey="+Home")
     {
@@ -2251,11 +2252,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        {
           allowLoop := 1
           func2Call := ["adjustCustomShapePositionLive", -2]
-       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       } Else If (HKifs("liveEdit", deepSim) && editingSelectionNow=1)
        {
           allowLoop := 1
           func2Call := ["MenuSelAreaMoveUp"]
-       } Else If HKifs("imgsLoaded")
+       } Else If HKifs("imgsLoaded", deepSim)
        {
           If (thumbsDisplaying=1)
           {
@@ -2269,11 +2270,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum) {
        {
           allowLoop := 1
           func2Call := ["adjustCustomShapePositionLive", 2]
-       } Else If (HKifs("liveEdit") && editingSelectionNow=1)
+       } Else If (HKifs("liveEdit", deepSim) && editingSelectionNow=1)
        {
           allowLoop := 1
           func2Call := ["MenuSelAreaMoveDown"]
-       } Else If HKifs("imgsLoaded")
+       } Else If HKifs("imgsLoaded", deepSim)
        {
           If (thumbsDisplaying=1)
           {
@@ -25846,7 +25847,7 @@ MenuDisableKbdShortcut() {
        oldShortcut := userCustomKeysDefined[cshortcut, 5]
        humanKbd := sillySeparator processKkbdNameToHuman(oldShortcut)
        newLine := (oldShortcut!="") ? oldShortcut txtLine humanKbd : ""
-       defaultu := processDefaultKbdCombos(shortcut, PVhwnd, 0, PVhwnd, 1)
+       defaultu := processDefaultKbdCombos(shortcut, PVhwnd, 0, PVhwnd, 1, 1)
        If (StrLen(defaultu[1])>2)
           bonusLine := (oldShortcut!=shortcut) ? shortcut sillySeparator "?_generic" sillySeparator "ALL" sillySeparator "\ANYWHERE" sillySeparator c sillySeparator shortcut sillySeparator oshortcut : ""
    
@@ -25858,7 +25859,7 @@ MenuDisableKbdShortcut() {
           Settimer, RemoveTooltip, % -msgDisplayTime
        }
        Sleep, 5
-       loadCustomUserKbds(1)
+       loadCustomUserKbds()
        PanelQuickSearchMenuOptions()
        Return
     }
@@ -25869,7 +25870,7 @@ MenuDisableKbdShortcut() {
        humanKbd := sillySeparator processKkbdNameToHuman(shortcut)
        FileAppend, % shortcut txtLine humanKbd "`n", % customKbdFile, UTF-8
        Sleep, 5
-       loadCustomUserKbds(1)
+       loadCustomUserKbds()
     }
 
     PanelQuickSearchMenuOptions()
@@ -25897,7 +25898,7 @@ MenuRestoreDefaultKBD(modus:=0) {
        Settimer, RemoveTooltip, % -msgDisplayTime
     }
 
-    loadCustomUserKbds(1)
+    loadCustomUserKbds()
     Sleep, 5
     closeQuickSearch()
     PanelQuickSearchMenuOptions()
@@ -26036,7 +26037,7 @@ BtnApplyNewKbdShortcut() {
     }
 
     If (reupdate=1)
-       loadCustomUserKbds(1)
+       loadCustomUserKbds()
 
     If (shortcut=txtLine4 && txtLine4!="")
     {
@@ -26051,7 +26052,7 @@ BtnApplyNewKbdShortcut() {
        pk := StrSplit(finalu, sillySeparator)
        updateCustomUserKbds(finalu, userCustomKeysDefined[cshortcut, 7], 0, bonusLine)
        Sleep, 5
-       loadCustomUserKbds(1)
+       loadCustomUserKbds()
        PanelQuickSearchMenuOptions()
        Return
     } Else If IsFunc(userCustomKeysDefined[cshortcut, 1])
@@ -26078,7 +26079,7 @@ BtnApplyNewKbdShortcut() {
        lineRem := userCustomKeysDefined[cshortcut, 7]
        updateCustomUserKbds(pk, lineRem, bonusRem, bonusLine)
        Sleep, 5
-       loadCustomUserKbds(1)
+       loadCustomUserKbds()
        PanelQuickSearchMenuOptions()
        Return
     }
@@ -26086,7 +26087,7 @@ BtnApplyNewKbdShortcut() {
     ; ToolTip, % finalu , , , 2
     FileAppend, % finalu "`n", % customKbdFile, UTF-8
     Sleep, 5
-    loadCustomUserKbds(1)
+    loadCustomUserKbds()
     PanelQuickSearchMenuOptions()
 }
 
@@ -26129,8 +26130,13 @@ CloseKbdDefinePanel() {
 }
 
 defineKBDcontexts(humanMode) {
-; humanMode: 0 = the context id, served from a 100 ms cache; 1 = its label; 2 = the count
-; of contexts; 3 = the labels list; any other value [-1] = the id, recomputed [BuildMenuBar()]
+; humanMode: 
+; 0 = the context id, served from a 100 ms cache
+; 1 = its label
+; 2 = the total count of possible contexts
+; 3 = the context labels list;
+; any other value [-1] = the context id, recomputed, no cache
+
    Static lastInvoked := 1, lastState
    Static lp := {5:"Vector shape drawing", 4:"Paint brush tools", 3:"Live image editor tools", 2:"Image view / welcome screen", 1:"Files list/thumbnails mode", 100:"Unknown"}
 
@@ -26188,11 +26194,23 @@ testDefaultKbdComboBound(givenKey, contextID) {
 ; returns 1 when processDefaultKbdCombos() dispatches givenKey in the current state and
 ; the user has not disabled the default shortcut of that function. Only meaningful when
 ; no custom entry claims the key
-   defaultu := processDefaultKbdCombos(givenKey, PVhwnd, 0, PVhwnd, 1)
+   defaultu := processDefaultKbdCombos(givenKey, PVhwnd, 0, PVhwnd, 1, 1)
    If (StrLen(defaultu[1])<3)
       Return 0
 
    Return (SubStr(userCustomKeysDefined[contextID "." defaultu[1], 1], 1, 1)="?") ? 0 : 1
+}
+
+forbiddenAltKeys(n, kbdContext:=0) {
+; a menu bar item, invoked by uiWM_KEYDOWN(), must not claim Alt+n as its mnemonic when Alt+n is bound to an action.
+; user defined custom keyboad shortcuts are loaded via loadCustomUserKbds()
+; userCustomAltKeys holds user-assigned alt+n keys.
+
+   c := kbdContext ? kbdContext : defineKBDcontexts(0)
+   If (userCustomAltKeys[c "!" n]!="")
+      Return userCustomAltKeys[c "!" n]
+
+   Return testDefaultKbdComboBound("!" n, c)
 }
 
 DragCollapsedWidget() {
@@ -27769,6 +27787,7 @@ repositionWindowCenter(whichGUI, hwndGUI, referencePoint, winTitle:="", winPos:=
        Gui, %whichGUI%: Show, AutoSize %winPos%, % Chr(160) winTitle
     }
     ; SetTimer, highlightActiveCtrl, -100
+    SetTimer, resetOpeningPanel, -5
 }
 
 createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
@@ -38423,9 +38442,7 @@ writeMainSettingsApp() {
     lastInvoked := A_TickCount
 }
 
-loadCustomUserKbds(refreshMenuBar:=0) {
-; refreshMenuBar=1: rebuild the menu bar when the Alt+letter index [below] changed,
-; so its mnemonics follow the user's keys; callers that run before BuildGUI() leave it 0.
+loadCustomUserKbds(refreshMenuBar:=1) {
     Static prevAltKeysIndex := ""
     userCustomKeysDefined := []
     userCustomAltKeys := []
@@ -38455,14 +38472,6 @@ loadCustomUserKbds(refreshMenuBar:=0) {
        }
     }
 
-    ; index the plain Alt+letter keys the file touches, per keyboard context [defineKBDcontexts()],
-    ; for forbiddenAltKeys(): a menu bar item must not claim Alt+letter as its mnemonic when the
-    ; letter is bound, because uiWM_KEYDOWN() opens the menu before the key can reach
-    ; KeyboardResponder(). Derived from the entries above, so it says what the custom keys
-    ; branch of KeyboardResponder() does with the key: 1 = bound to a custom function,
-    ; 0 = dead [the user disabled the shortcut, or moved the default action to another key;
-    ; the "?" marker entry swallows the key]. Letters absent here are ruled by the default
-    ; combos of processDefaultKbdCombos() alone.
     thisIndex := ""
     For kbdu, entry in userCustomKeysDefined
     {
@@ -38473,9 +38482,7 @@ loadCustomUserKbds(refreshMenuBar:=0) {
        }
     }
 
-    ; the signature advances only on refresh calls: writeMainSettingsApp() reloads from a
-    ; throttle timer and must not record a panel's save before the panel's own refresh call
-    If (refreshMenuBar=1 && thisIndex!=prevAltKeysIndex)
+    If (refreshMenuBar=1 && thisIndex!=prevAltKeysIndex && showMainMenuBar=1)
     {
        prevAltKeysIndex := thisIndex
        TriggerMenuBarUpdate("forced", A_TickCount)
@@ -38612,7 +38619,7 @@ readMainSettingsApp(act) {
     RegAction(act, "userVPsvgScale",, 2, 1, 10)
     RegAction(act, "userVPpdfDPI",, 2, 72, 3500)
     ReadSettingsAdjustToneMapPanel(act)
-    loadCustomUserKbds()
+    loadCustomUserKbds(0)
     If (act=0)
     {
        calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
@@ -44818,7 +44825,6 @@ PanelBrushTool(dummy:=0, modus:=0) {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Brushes tool: " appTitle, winPos)
     SetTimer, updateUIbrushTool, -125
-    SetTimer, resetOpeningPanel, -300
 }
 
 BtnHelpPenPressureBrushes() {
@@ -47662,7 +47668,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
        showTOOLtip("ERROR: Failed to retrieve and prepare image to perform transformations")
        SoundBeep , 300, 100
-       SetTimer, resetOpeningPanel, -200
+       SetTimer, resetOpeningPanel, -100
        SetTimer, RemoveTooltip, % -msgDisplayTime
        ResetImgLoadStatus()
        Return
@@ -47821,7 +47827,6 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, friendlyTitle appTitle, winPos)
     SetTimer, updateUIpastePanel, -350
-    SetTimer, resetOpeningPanel, -300
 }
 
 BtnHelpTransform() {
@@ -50990,7 +50995,6 @@ PanelFillSelectedArea(dummy:=0, which:=0) {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Fill shapes in selected area: " appTitle, winPos)
     SetTimer, updateUIfillPanel, -50
-    SetTimer, resetOpeningPanel, -300
 }
 
 PanelSoloAlphaMasker() {
@@ -57116,7 +57120,6 @@ PanelInsertTextArea() {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Insert text in image: " appTitle, winPos)
     SetTimer, updateUIInsertTextPanel, -250
-    SetTimer, resetOpeningPanel, -300
 }
 
 BTNuiToggleLiveInsertTextPreview() {
@@ -57949,7 +57952,7 @@ updateUIsettings() {
      SetVolume(mediaSNDvolume)
      If (CurrentPanelTab=4)
      {
-        loadCustomUserKbds(1)
+        loadCustomUserKbds()
      } Else If (CurrentPanelTab=1)
      {
         If !throwErrorNoImageLoaded(1)
@@ -57979,7 +57982,7 @@ WriteSettingsUI() {
 BtnSavePreferencesClose() {
    updateUIsettings()
    WriteSettingsUI()
-   loadCustomUserKbds(1)
+   loadCustomUserKbds()
    updateWindowColor()
    realSystemCores := userMultiCoresLimit
    INIaction(1, "userPerformColorManagement", "General")
@@ -59136,7 +59139,6 @@ CopyMovePanelWindow() {
     Gui, Add, Button, x+5 hp w70 gBtnHelpCopyMovePanel, Hel&p
     Gui, Add, Button, x+5 hp wp+10 gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
-    SetTimer, resetOpeningPanel, -300
 }
 
 BtnIdentifyFileRoots() {
@@ -59345,7 +59347,6 @@ PanelCustomizeToolbar() {
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     Tooltip
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Customize toolbar: " appTitle)
-    SetTimer, resetOpeningPanel, -300
     GuiRefreshSliders()
     BTNtglCustoTlbr(pp)
 }
@@ -59388,7 +59389,6 @@ PanelCustomKeysMiniManager() {
     Gui, Add, Button, x+5 hp wp-25 gBtnCloseWindow, &Cancel
     Tooltip
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Customized keyboard shortcuts overview: " appTitle)
-    SetTimer, resetOpeningPanel, -300
     updateUIKeysListManager()
 }
 
@@ -59593,7 +59593,6 @@ PanelAutoColors() {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     Tooltip
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Auto-adjust image colors: " appTitle)
-    SetTimer, resetOpeningPanel, -300
     GuiRefreshSliders()
 }
 
@@ -59731,7 +59730,6 @@ PanelSharpenImage() {
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Sharpen image selected area: " appTitle)
     SetTimer, updateUIsharpenPanel, -200
-    SetTimer, resetOpeningPanel, -300
 }
 
 testAllowSelInvert(imgW:=0, imgH:=0) {
@@ -59824,7 +59822,6 @@ PanelStructuredCopyMoveWindow() {
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
     Gui, Add, Text, x+5 hp +0x200, % infoSelection
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Structured copy/move file(s): " appTitle)
-    SetTimer, resetOpeningPanel, -300
 }
 
 BtnHelpStructuredCopyMove() {
@@ -71687,7 +71684,7 @@ ToggleCustomKBDsMode() {
     INIaction(1, "allowCustomKeys", "General")
     friendly := (allowCustomKeys=1) ? "ACTIVATED" : "DEACTIVATED"
     showTOOLtip("User customized keyboard shortcuts: " friendly, A_ThisFunc, 1)
-    loadCustomUserKbds(1)
+    loadCustomUserKbds()
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -89913,7 +89910,6 @@ coreColorsAdjusterWindow(modus:=0) {
     Sleep, 1
     updatePanelColorSliderz()
     UpdateUIadjustVPcolors()
-    SetTimer, resetOpeningPanel, -300
     SetTimer, RemoveTooltip, -100
     SetTimer, ResetImgLoadStatus, -50
 } ; coreColorsAdjusterWindow()
@@ -90121,7 +90117,6 @@ PanelAdjustColorsSimpleWindow() {
     dummyTimerDelayiedImageDisplay(150)
     winPos := (prevSetWinPosY && prevSetWinPosX && thumbsDisplaying!=1) ? " x" prevSetWinPosX " y" prevSetWinPosY : 1
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Adjust image colors: " appTitle, winPos)
-    SetTimer, resetOpeningPanel, -100
     GuiRefreshSliders()
     SetTimer, RemoveTooltip, -100
     SetTimer, ResetImgLoadStatus, -50
@@ -90181,11 +90176,6 @@ BtnToggleNoColorsFX() {
 
 resetOpeningPanel() {
     openingPanelNow := 0
-    ; createSettingsGUI() builds the menu bar while the flag is still up [each panel
-    ; constructor clears it through this timer], and HKifs() answers 0 for every combo
-    ; until then, so that bar claimed the bound Alt letters for its menus; build it again
-    ; now that the shortcuts are live - see forbiddenAltKeys() and UpdateMenuBar()
-    TriggerMenuBarUpdate()
 }
 
 BtnNextImg() {
@@ -104933,8 +104923,8 @@ coreprocessTlbrTooltip(msgu, lf) {
       remKey := (shu && StrLen(userCustomKeysDefined[shu, 1])>0 && userCustomKeysDefined[shu, 1]!=lf) ? 1 : 0
       If !shu
       {
-         defaultu := processDefaultKbdCombos(thisKey, PVhwnd, 0, PVhwnd, 1)
-         remKey := StrLen(defaultu[1])>2 ? 0 : 1
+         defaultu := processDefaultKbdCombos(thisKey, PVhwnd, 0, PVhwnd, 1, 1)
+         remKey := (StrLen(defaultu[1])>2) ? 0 : 1
          ; fnOutputDebug("yay= " remKey "|" defaultu[1] "|" thiskey "|" lf)
       }
       ; ToolTip, % shu "|" thisKey "|" thisHumanKey "|" remKey  , , , 2

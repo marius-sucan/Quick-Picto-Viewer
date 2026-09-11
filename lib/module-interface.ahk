@@ -2137,7 +2137,7 @@ invokeGivenMenuBarPopup(n) {
 BuildMenuBar(modus:=0) {
    ; the key and value pairs is: menu-name:func-name-suffix
    ; menu-name is visible to the user, on the menu bar 
-   ; func-name-suffix is added to funcion names that begin with "InvokeMenuBar"
+   ; func-name-suffix is added to function names that begin with "InvokeMenuBar"
    ; each list of pairs describe the menus for each app mode
    ; also see: uiMenuNameForBuilder() where ahk menu names are listed.
    ; the menuJITmap and menuJITlist are used by uiMenuBarJITrebuild()
@@ -2164,9 +2164,7 @@ BuildMenuBar(modus:=0) {
    menuArray := []
    menuTotalIndex := 0
    menuHotkeys := "|"
-   menuJITmap := {}, menuJITlist := []  ; [phase D] HMENU -> builder map for the WM_INITMENUPOPUP hook
-   ; the keyboard context the mnemonics are checked against, see forbiddenAltKeys(); -1 bypasses
-   ; the 100 ms cache: the bar is built from a timer right after the key that changed the mode
+   menuJITmap := {}, menuJITlist := []  ; HMENU -> builder map for the WM_INITMENUPOPUP hook
    kbdContext := defineKBDcontexts(-1)
    Loop, Parse, menusList, |
    {
@@ -2199,22 +2197,6 @@ BuildMenuBar(modus:=0) {
       } Else
          menuHotkeys .= (!InStr(menuHotkeys, "!" n "|") && InStr(lbl, "&")) ? "!" n "|" : ".|"
    }
-}
-
-forbiddenAltKeys(n, kbdContext:=0) {
-; a menu bar item must not claim Alt+n as its mnemonic when Alt+n is bound to an action,
-; because uiWM_KEYDOWN() opens the bar menu for every claimed letter before the key can
-; reach KeyboardResponder(). Bound means: a custom user key of the keyboard context
-; [userCustomAltKeys, indexed by loadCustomUserKbds(): 1 = a custom function; 0 = the user
-; disabled the shortcut or moved the default action to another key, the key is dead and
-; the menu may take it], else a default combo of processDefaultKbdCombos() that dispatches
-; in the state the bar is built in. No letter is listed here: the two sources above are
-; the only ones that know what Alt+letter does.
-   c := kbdContext ? kbdContext : defineKBDcontexts(0)
-   If (userCustomAltKeys[c "!" n]!="")
-      Return userCustomAltKeys[c "!" n]
-
-   Return testDefaultKbdComboBound("!" n, c)
 }
 
 uiKmenu(labelu, funcu, mena:="PVbar", actu:="Add") {
@@ -2252,10 +2234,6 @@ UpdateMenuBar(modus:=0, tt:=0) {
       hasRan := 1
    }
 
-   ; openingPanelNow and whileLoopExec are part of the state: while either is up, HKifs()
-   ; answers 0 for every combo and forbiddenAltKeys() hands the bound letters to the menus;
-   ; resetOpeningPanel() triggers again once the panel settled, and that build must not be
-   ; taken for a repeat of the one made while the flag was up
    thisState := "a" imgEditPanelOpened tt AnyWindowOpen thumbsDisplaying maxFilesIndex drawingShapeNow modus undoLevelsRecorded showMainMenuBar isNowAlphaPainting() openingPanelNow whileLoopExec
    ; ToolTip, % "lol"  isNowAlphaPainting() isAlphaMaskWindow()  , , , 2
    If !showMainMenuBar
@@ -2358,41 +2336,28 @@ uiPreProcessKbdKey() {
 }
 
 uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
-    ; [phase D, per Marius] Alt+letter must open the bar menu as NATIVE bar
-    ; tracking [so Left/Right switch menus, like a mouse open] instead of the old
-    ; detached positioned popup. Merely returning empty and hoping DefWindowProc
-    ; activates the mnemonic does NOT work here [focus sits on PVwin's hidden
-    ; controls and the SYSCHAR chain never completes - Alt+I went dead]; the
-    ; mechanism Windows itself uses is posted instead: WM_SYSCOMMAND SC_KEYMENU
-    ; with the character enters keyboard menu mode for that mnemonic natively.
-    ; Only a plain Alt combo is a mnemonic, for the bar letters and for Alt+Space alike;
-    ; with Ctrl or Shift held the key is another combo [^!x, +!x] and takes the dispatch
-    ; path like any key, so the modifier states are read here, ahead of both menu blocks.
+    ; WM_SYSKEYDOWN is message 0x104
     vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
     vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16
     If (msg=0x104 && showMainMenuBar=1 && wParam>=0x41 && wParam<=0x5A && !vk_shift && !vk_ctrl)
     {
-       ; the letters the bar may claim are decided when it is built [forbiddenAltKeys()],
-       ; and UpdateMenuBar() rebuilds it whenever the bindings or the state behind them
-       ; change, so no key lookup happens here: this handler must stay fast
+       ; open menu bar when alt + n is pressed.
+       ; the letters the bar may claim are decided when it is built via UpdateMenuBar() and forbiddenAltKeys()
        If InStr(menuHotkeys, "!" Chr(wParam + 32) "|")
        {
+          ; send WM_SYSCOMMAND message with SC_KEYMENU
           DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", wParam + 32)
           Return 0
        }
     }
+
     If (msg=0x104 && wParam=0x20 && !vk_shift && !vk_ctrl)
     {
-       ; Alt+Space: the very same mechanism - SC_KEYMENU with the SPACE character
-       ; is what DefWindowProc generates for the real Alt+Space, and Windows opens
-       ; the SYSTEM menu natively [position, Alt-held semantics, keyboard nav all
-       ; native]. It replaced the thread-era TrackPopupMenu emulation, which stopped
-       ; opening anything after the merge and was deleted; Win_ShowSysMenu in
-       ; shell-stuff.ahk stays as the library helper for a programmatic sys menu.
-       OutputDebug, % "QPV: MERGE: Alt+Space -> native SC_KEYMENU sysmenu post"
+       ; on Alt+Space: send WM_SYSCOMMAND message with SC_KEYMENU
        DllCall("user32\PostMessageW", "UPtr", PVhwnd, "UInt", 0x0112, "UPtr", 0xF100, "UPtr", 0x20)
        Return 0
     }
+
     vk_code := Format("{1:x}", wParam)
     If (isInRange(vk_code, 21, 28) || isVarEqualTo(vk_code, "6B", "6D", "BB", "BD", "D"))
        navKeysCounter++
@@ -2416,13 +2381,11 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
 
     vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
     hotkate := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
-    ; ToolTip, % vk_code "|" whileLoopExec "|" runningLongOperation "|" imageLoading "|" animGIFplaying "|" hotkate , , , 2
     If (vk_code!=10 && vk_code!=11 && vk_code!=12)
     {
        SetTimer, uiPreProcessKbdKey, -3
        Return 0
     }
-    ; TulTip("|   ", wParam, vk_shift, vk_ctrl, vk_alt, msg, "ui thread")
 }
 
 uiVisibleMenuWin(ptX:="", ptY:="") {
