@@ -1,0 +1,1 @@
+do not write lengthy comments in the code. add comments only when necessary. when you do add comments, make the comments concise and avoid explaining what is already obvious in the nearby code. never explain how the code was before, never mention how the code was in the past. in ahk code, when using value constants from windows apis, name the constants in comments. 
