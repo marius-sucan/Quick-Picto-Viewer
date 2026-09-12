@@ -595,8 +595,12 @@ PreProcessKbdKey() {
       counter := 0
 
    ; addJournalEntry(A_ThisFunc "(): " thisWin "|" hotkate)
-   If (A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0)
+   If (A_TickCount - lastInvoked>30) && (whileLoopExec=0 && runningLongOperation=0 && hotkate!="")
    {
+      obju := ProcessCriticalKeys("give-back")
+      If (hotkate=obju[1])
+         counter := max(counter, obju[2])
+
       abusive := (counter>25) ? 1 : 0
       thisHwnd := identifyParentWind() ? "parentu" : Awin
       KeyboardResponder(hotkate, thisHwnd, abusive)
@@ -607,6 +611,7 @@ PreProcessKbdKey() {
 
       lastInvoked := A_TickCount
       prevKey := hotkate
+      hotkate := ""
    } Else If (hotkate=prevKey)
       counter++
    Else 
@@ -4834,8 +4839,8 @@ ToggleThumbsMode() {
       Return
    }
 
+   lastCloseInvoked := 0
    currentFileIndex := clampInRange(currentFileIndex, 1, maxFilesIndex)
-   lastCloseInvoked := 0 ; [was IF_set - plain global since phase E]
    thisIndexu := resultedFilesList[currentFileIndex, 1] currentFileIndex
    clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIselectWin)
    If (thumbsDisplaying=1)
@@ -10871,6 +10876,23 @@ VPimgFXrandomizer() {
     lastFX := imgFxMode
 }
 
+stopGifORslidesPlayback(loudly:=0) {
+   wasPlaying := 0
+   If (slideShowRunning=1)
+   {
+      stopSlideshow(0, !loudly)
+      wasPlaying := 1
+   }
+   If (animGIFplaying!=0)
+   {
+      stopGIFsPlayback()
+      wasPlaying := 1
+   }
+   If wasPlaying
+      lastOtherWinClose := A_TickCount
+   Return wasPlaying
+}
+
 stopSlideshow(resetMode:=0, silentModus:=1) {
    If (slideShowRunning!=1)
       Return
@@ -10926,6 +10948,25 @@ preventScreenOff() {
      ; SendEvent, {Up}
   }
   ; ToolTip, % "L=" z , , , 2
+}
+
+theSlideShowCore(paramu:=0) {
+  thisZeit :=  A_TickCount - prevFullIMGload
+  If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
+     Return
+
+  mouseTurnOFFtooltip()
+  prevFullIMGload := A_TickCount
+  Try DllCall("user32\SetCursor", "UPtr", 0)
+  If (slideShowRunning=1 && slidesFXrandomize=1)
+     VPimgFXrandomizer()
+
+  If (SlideHowMode=1)
+     RandomPicture()
+  Else If (SlideHowMode=2)
+     PreviousPicture()
+  Else If (SlideHowMode=3)
+     NextPicture()
 }
 
 ToggleSlideShowu(actu:=0, resetMode:=0, silentModus:=0) {
@@ -27592,22 +27633,6 @@ openPreviousPanel(mode:="") {
    }
 }
 
-mouseTurnOFFtooltip() {
-   statusBarTooltipVisible := 0
-   If (mouseToolTipWinCreated!=1)
-      Return
-
-   MouseGetPos, ,, OutputVarWin
-   If (OutputVarWin=hGuiTip)
-      lastWinDrag := A_TickCount - 125
-
-   Gui, mouseToolTipGuia: Destroy
-   mouseToolTipWinCreated := 0
-   statusBarTooltipVisible := 0
-   lastZeitToolTip := A_TickCount
-   SetTimer, mouseTurnOFFtooltip, Off
-}
-
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="", guiu:="") {
    Static dopt1 := [0, "0xFF373737","0xFF373737", "0xFFffFFff",,,"0xff778877", 2] ; normal
    , dopt2 := [0, "0xFF656565","0xFF656565", "0xFFffFFff",,,"0xffaaAAaa", 2] ; hover
@@ -27872,8 +27897,6 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        If (closeEditPanelOnApply=-1)
           INIaction(0, "closeEditPanelOnApply", "General", 1)
 
-       ; AnyWindowOpen := IDwin ; [was IF_set - plain global since phase E]
-       ; TriggerMenuBarUpdate()
        If AnyWindowOpen
           Try WinGetPos, prevSetWinPosX, prevSetWinPosY,,, ahk_id %hSetWinGui%
 
@@ -30637,12 +30660,16 @@ fdTreeGuiaGuiClose:
    fdTreeClose()
 Return
 
-
 fdTreeGuiaGuiEscape:
    If (A_TickCount - lastOtherWinClose < 400)
       Return
 
    fdTreeClose()
+Return
+
+mouseToolTipGuiaGuiClose:
+mouseToolTipGuiaGuiEscape:
+   mouseTurnOFFtooltip()
 Return
 
 FolderTreeResponder(a, b, c) {
@@ -35257,9 +35284,7 @@ determineTerminateOperation() {
      Return 0
 
   lastInvoked := A_TickCount
-  drainUIinput()
-  theEnd := mustAbandonCurrentOperations
-  If theEnd
+  If mustAbandonCurrentOperations
      lastLongOperationAbort := A_TickCount
   Return theEnd
 }
@@ -44783,7 +44808,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     Gui, Add, Checkbox, y+5 w%sml% hp gupdateUIbrushTool Checked%BrushToolSymmetryX% vBrushToolSymmetryX, X
     Gui, Add, Checkbox, x+5 wp hp gupdateUIbrushTool Checked%BrushToolSymmetryY% vBrushToolSymmetryY, Y
     Gui, Add, Button, x+5 hp gBtnSetBrushSymmetryCoords vBTNuiSetLabelSymmetry +hwndhTemp, S&et center
-    ToolTip2ctrl(hTemp, "Shortcut in viewport: Shit + Y`nCycle modes: Y")
+    ToolTip2ctrl(hTemp, "Shortcut in viewport: Shift + Y`nCycle modes: Y")
     Gui, Add, Checkbox, xs y+9 gupdateUIbrushTool Checked%autoApplyVPcolors% vautoApplyVPcolors, Auto-apply viewport color effects on image
 
     Gui, Tab, 3 ; randomize
@@ -48099,147 +48124,6 @@ customKbdGUIAGuiClose:
 customKbdGUIAGuiEscape:
    BtnCloseKbdDefine()
 Return
-
-mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
-    ; Critical, On
-    Static prevMsg, lastInvoked := 1, lastTippyWin
-    Global TippyMsg
-    If (msg="win" && largus="last")
-    {
-       rr := lastTippyWin
-       lastTippyWin := ""
-       Return rr
-    }
-
-    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
-    thisHwnd := PVhwnd
-    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
-       Return
-
-    lastInvoked := A_TickCount
-    Gui, mouseToolTipGuia: Destroy
-    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
-    If (thisFntSize<5)
-       thisFntSize := 5
-    If (largus>5)
-       thisFntSize := largus
-
-    bgrColor := OSDbgrColor
-    txtColor := OSDtextColor
-    lastTippyWin := WinActive("A")
-    Sleep, 25
-    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
-    Gui, mouseToolTipGuia: Margin, % thisFntSize * 1.25, % thisFntSize * 1.25
-    Gui, mouseToolTipGuia: Color, c%bgrColor%
-    Gui, mouseToolTipGuia: Font, s%thisFntSize% Bold Q5, Arial   ; always Arial Bold, never the OSD font [per Marius]
-    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyMouseGuiTooltipu vTippyMsg, % msg
-    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
-    prevMsg := msg
-    If (unClickable=1)
-      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-
-    mouseToolTipWinCreated := 1
-    delayu := StrLen(msg) * 75 + 950
-    lastZeitToolTip := A_TickCount
-    showOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
-}
-
-showOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
-    If !mouseToolTipWinCreated
-       Return
-
-    ; the branch further below re-creates the text control to re-wrap a tooltip wider
-    ; than the monitor, so it needs the caption and the colour of the control it
-    ; replaces. Both belong to mouseCreateOSDinfoLine() and are invisible here, so it
-    ; hands them over now; the callers that merely reposition an existing tooltip have
-    ; neither at hand and read back what is already on screen instead
-    If (msgu="")
-       GuiControlGet, msgu, mouseToolTipGuia:, TippyMsg
-    If (txtClr="")
-       txtClr := OSDtextColor
-
-    GetPhysicalCursorPos(mX, mY)
-    If IsObject(givenCoords)
-    {
-       If (givenCoords.x && givenCoords.y)
-       {
-          forced := 1
-          mX := givenCoords.x 
-          mY := givenCoords.y + givenCoords.h
-       }
-    } Else If InStr(givenCoords, "|")
-    {
-       pk := StrSplit(givenCoords, "|")
-       mX := pk[1], mY := pk[2]
-    }
-
-    If (!isWinXP && forced!=1)
-    {
-       GetWinClientSize(Wid, Heig, hGuiTip, 1)
-       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
-       Final_x := k[1], Final_y := k[2]
-    } Else
-    {
-       tipX := (forced=1) ?  mX : mX + 20
-       tipY := (forced=1) ?  mY : mY + 20
-       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-       MaxWidth := Floor(ResWidth*0.85)
-       ; an empty caption means the tooltip was already re-wrapped by an earlier call:
-       ; TippyMsg was emptied then, and wrapping it again would only blank it out
-       If (MaxWidth<Wid && MaxWidth>10 && msgu!="")
-       {
-          GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
-          GuiControl, mouseToolTipGuia:, TippyMsg,
-          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtClr% gdestroyMouseGuiTooltipu w%MaxWidth%, % msgu
-          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
-          ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
-       }
-    }
-
-    If (Final_x!="" && Final_y!="")
-       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
-
-    WinSet, Transparent, 225, ahk_id %hGuiTip%
-    If (delayu<msgDisplayTime/2)
-       delayu := msgDisplayTime//2 + 1
-    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
-    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
-    SetTimer, mouseTurnOFFtooltip, % -delayu
-    If (menuLoopActive=1)
-       menuReaderOSDdeadline := A_TickCount + delayu
-}
-
-adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
-   GetWinClientSize(Wid, Heig, winHwnd, 1)
-   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
-   If ActiveMon
-   {
-      SysGet, bCoord, Monitor, %ActiveMon%
-      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
-      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
-      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
-      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
-   } Else
-   {
-      rX := winX
-      rY := winY
-   }
-
-   Return ResWidth
-}
-
-mouseToolTipGuiaGuiClose:
-mouseToolTipGuiaGuiEscape:
-   mouseTurnOFFtooltip()
-Return
-
-destroyMouseGuiTooltipu() {
-   mouseTurnOFFtooltip()
-   Sleep, 1
-   hh := mouseCreateOSDinfoLine("win", "last")
-   If (hh!="")
-      WinActivate, ahk_id %lastTippyWin%
-}
 
 LEDguiGuiClose:
 LEDguiGuiEscape:
@@ -69597,9 +69481,9 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    }
    Sleep, 1
    ; SetMenuInfo(MenuGetHandle(menarg), 0, 1)
-   Global lastMenuZeit := A_TickCount
+   lastMenuZeit := A_TickCount
    Menu, % menarg, Show, % mX, % mY
-   Global lastMenuZeit := A_TickCount
+   lastMenuZeit := A_TickCount
    ; showDelayedTooltip("Menu item selected:`n" A_ThisMenuItem " [" A_ThisMenu "]")
    isFakeWin := (isNowFakeWinOpen=1 && AnyWindowOpen>0) ? 1 : 0
    MouseGetPos,,, OutputVarWin
@@ -69609,8 +69493,8 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
       SetTimer, hideMenuFlyOut, -350
    If (manubarMode!=1)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
-   Global lastWinDrag := A_TickCount
-   Global lastOtherWinClose := A_TickCount + 100
+   lastWinDrag := A_TickCount
+   lastOtherWinClose := A_TickCount
 }
 
 hideMenuFlyoutNow() {
@@ -73822,9 +73706,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        changeMcursor()
        r1 := CloneScreenMainBMP(imgPath, mustReloadIMG, hasFullReloaded)
        ; fnOutputDebug(A_ThisFunc ": " mustReloadIMG "|" hasFullReloaded)
-       drainUIinput()
-       abortImgLoad := canCancelImageLoad
-       If (abortImgLoad>2)
+       If (canCancelImageLoad=4)
        {
           o_ImgQuality := userimgQuality
           If (userimgQuality=1)
@@ -73848,7 +73730,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
           ToggleImgQuality("highu")
 
        prevImgPath := ""
-       canCancelImageLoad := 0 ; [was IF_set - plain global since phase E]
+       canCancelImageLoad := 0
        FadeMainWindow()
        SetTimer, ResetImgLoadStatus, -15
        ; r := (r1="error") ? r1 : 0
@@ -74001,6 +73883,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
    ResizedW := Round(ResizedW)
    ResizedH := Round(ResizedH)
    r := QPV_ShowImgonGui(ResizedW, ResizedH, GuiW, GuiH, usePrevious, imgPath, ForceIMGload, hasFullReloaded, gdiBMPchanged)
+   canCancelImageLoad := 0
    infoFilesSel := (markedSelectFile>0) ? "[ " markedSelectFile " ] " : ""
    If (totalFramesIndex>0)
       infoFrames := "["  desiredFrameIndex "/" totalFramesIndex "] "
@@ -75223,6 +75106,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   ; fnOutputDebug(A_ThisFunc "(): prevA=" SubStr(AprevImgCall, 3, InStr(AprevImgCall, "|==|") - 3))
   ; fnOutputDebug(A_ThisFunc "(): prevB=" SubStr(BprevImgCall, 3, InStr(BprevImgCall, "|==|") - 3))
   ; MsgBox, % imgPath "`n" AbackupIMGdetails.File "`n" BbackupIMGdetails.File "`n" CbackupIMGdetails.File
+  canCancelImageLoad := 1
   aOK := (thisImgCall="A" || SubStr(AprevImgCall, 3, InStr(AprevImgCall, "|==|") - 3)=thisImgCall) ? 1 : 0
   bOK := (thisImgCall="B" || SubStr(BprevImgCall, 3, InStr(BprevImgCall, "|==|") - 3)=thisImgCall) ? 1 : 0
   If (aOK=1 && validBMP(AprevGdiBitmap) && ignoreCache=0)
@@ -75255,7 +75139,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250) && animGIFplaying!=1)
      GdipCleanMain(6)
 
-  canCancelImageLoad := 1 ; [was IF_set - plain global since phase E]
   changeMcursor()
   thisImgPath := imgPath
   allowCaching := !minimizeMemUsage
@@ -75275,9 +75158,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   hasFullReloaded := 1
   rawFmt := Gdip_GetImageRawFormat(oBitmap)
   rawFmt := (rawFmt="MEMORYBMP" && fimMultiPage) ? fimMultiPage : rawFmt
-  drainUIinput()
-  abortImgLoad := canCancelImageLoad
-
   ; If (RegExMatch(rawFmt, "i)(gif|tiff)$") && totalFramesIndex>0)
   If (currIMGdetails.frames>0)
      totalFramesIndex := currIMGdetails.Frames
@@ -75341,16 +75221,14 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   {
      trGdip_GetImageDimensions(rBitmap, imgW, imgH)
      Gdip_GetRotatedDimensions(imgW, imgH, 45, ResizedW, ResizedH)
-     If isImgSizeTooLarge(ResizedW, ResizedH)
+     If (isImgSizeTooLarge(ResizedW, ResizedH) || canCancelImageLoad=4)
      {
         vpIMGrotation := 0
         INIaction(1, "vpIMGrotation", "General")
      }
   }
 
-  drainUIinput()
-  abortImgLoad := canCancelImageLoad
-  If (abortImgLoad<3 && vpIMGrotation>0)
+  If (canCancelImageLoad<3 && vpIMGrotation>0)
   {
      setWindowTitle("Rotating image at " vpIMGrotation "°")
      thisImgQuality := (userimgQuality=1) ? 6 : 5
@@ -75367,16 +75245,16 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
         currIMGdetails.HasAlpha := 1
         trGdip_DisposeImage(rBitmap, 1)
         rBitmap := nBitmap
-     } Else 
+     }
+
+     If (!validBMP(nBitmap) || canCancelImageLoad=4)
      {
         vpIMGrotation := 0
         INIaction(1, "vpIMGrotation", "General")
      }
   }
 
-  drainUIinput()
-  abortImgLoad := canCancelImageLoad
-  If (abortImgLoad<3 && bwDithering=1 && imgFxMode=4)
+  If (canCancelImageLoad<3 && bwDithering=1 && imgFxMode=4)
   {
      GDIbmpFileConnected := 0
      setWindowTitle("Converting image to black and white with dithering")
@@ -75432,9 +75310,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
-  drainUIinput()
-  abortImgLoad := canCancelImageLoad
-  extractAmbientalTexture(abortImgLoad)
+  extractAmbientalTexture(canCancelImageLoad)
   prevFrame := desiredFrameIndex
   BprevGdiBitmap := trGdip_DisposeImage(BprevGdiBitmap, 1)
   If (allowCaching=1)
@@ -79106,8 +78982,8 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     {
        ; highlight action areas
        calculateTouchMargins(thisX, thisY, thisW, thisH)
-       thisThick := imgHUDbaseUnit//10
-       Gdip_SetPenWidth(pPen1d, thisThick)
+       thisThick := imgHUDbaseUnit//20
+       Gdip_SetPenWidth(pPen1d, 0.7)
        Gdip_DrawRectangle(glPG, pPen1d, thisX, thisY, thisW, thisH)
     } Else If (mode=1 && slideShowRunning!=1)
     {
@@ -79163,19 +79039,6 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
           Gdip_DrawRectangle(glPG, pPen3, 0, 0, mainWidth, mainHeight)
           Gdip_DrawRectangle(glPG, pPen1d, 0, 0, mainWidth, mainHeight)
        }
-    }
-
-; highlight usePrevious=1 mode
-
-    lineThickns := (mode=2) ? imgHUDbaseUnit//10 : imgHUDbaseUnit//9
-    If (mode=2 && imgFxMode=1)
-    {
-       indicWidth := (zoomLevel<1) ? Round(120 * zoomLevel) : 110
-       If (indicWidth<50)
-          indicWidth := 50
-       Gdip_SetPenWidth(pPen2, lineThickns)
-       Gdip_FillRectangle(glPG, pBrush, mainWidth//2 - lineThickns2//2, mainHeight//2 - indicWidth//4, indicWidth//2, indicWidth//2)
-       Gdip_DrawRectangle(glPG, pPen2, mainWidth//2 - lineThickns2//2, mainHeight//2 - indicWidth//4, indicWidth//2, indicWidth//2)
     }
 
 ; draw the scrollbar indicators
@@ -81800,9 +81663,9 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If !validBMP(whichBitmap)
        Return "invalid screen bitmap"
 
-    prevNewW := newW, prevNewH := newH
     ; ToolTip, % "resized cache = " mustGenerate " | " oldZoomLevel "==" zoomLevel  , , , 2
-    canCancelImageLoad := 0 ; [was IF_set - plain global since phase E]
+    prevNewW := newW, prevNewH := newH
+    canCancelImageLoad := 0
     startZeit := A_TickCount
     oldZoomLevel := ""
     thisVPpanningNow := (vpImgPanningNow=2) ? 1 : 0
@@ -84521,8 +84384,8 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     Loop, % maxItemsW*maxItemsH*2
     {
         ; identify what needs to be done; are thumbs cached in memory?
-        ; load thumbnails or read the original image files
-        ; it creates the imgsListArrayThumbs[] array
+        ; load thumbnails or read the original image files,
+        ; this loop fills the imgsListArrayThumbs[] array
         If (modus="all" && maxFilesIndex>100)
         {
            If (determineTerminateOperation()=1)
@@ -84542,11 +84405,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         }
 
         If (rowIndex>=maxItemsH || thisFileIndex>maxFilesIndex) || (modus="all" && thisFileIndex>allStarter)
-        {
-           ; If (thisFileIndex>maxFilesIndex)
-           ;    SoundBeep , 300, 100
            Break
-        }
 
         If (modus="all") && (A_TickCount - lastMsg > 450)
         {
@@ -84653,11 +84512,8 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       If (thumbsPoolOK!=1)
       {
          mustDoMultiCore := 0
-         addJournalEntry("The thumbnails workers refused to start. Falling back to single threaded processing.")
+         addJournalEntry(A_ThisFunc "(): ERROR. The thumbnails workers refused to start. Falling back to single threaded processing.")
       }
-
-      ; thumbsPoolOK says a run was started and has to be ended; poolDrainOn says the loop
-      ; below still expects images from it. The loop may give up on the workers halfway
       poolDrainOn := (thumbsPoolOK=1) ? 1 : 0
    }
 
@@ -84697,8 +84553,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       }
    }
 
-   lastScrollCheck := lastPoolProgress := A_TickCount
-   alterFilesIndex := 0 ; [was IF_set - plain global since phase E]
+   lastPoolProgress := A_TickCount
    If (userPrivateMode=1)
       blurEffect := Gdip_CreateEffect(1, clampInRange(thumbsSizeQuality//2, 30, thumbsSizeQuality*2), 0, 0)
 
@@ -84716,22 +84571,9 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
    If (abandonAll!=1)
    {
+      doStartLongOpDance("no")
       Loop
       {
-          ; in this loop, the thumbnails are drawn on screen
-          If (A_TickCount - lastScrollCheck>100)
-          {
-             lastScrollCheck := A_TickCount
-             drainUIinput()  ; [merge] lets nav-keys advance alterFilesIndex while this loop holds Critical
-          }
-
-          If (alterFilesIndex>1 && lapsOccurred>3)
-          {
-             fnOutputDebug("ThumbsMode. User abandoned the operation by scrolling.")
-             userScrolled := 1
-             Break
-          }
-
           totalLoops++
           If (determineTerminateOperation()=1)
           {
@@ -85086,14 +84928,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           addJournalEntry(A_ThisFunc "(): failed to commit the image properties collected while listing thumbnails - " activeSQLdb.ErrorMsg)
     }
 
-    If (alterFilesIndex>1 && mustEndLoop!=1 && lapsOccurred>3 && modus!="all")
-    {
-       mustReloadThumbsList := 1
-       ; QPV_ListViewGridHUDoverlay()
-       SetTimer, ForceRefreshNowThumbsList, -350
-       ; Return
-    }
-
     executingCanceableOperation := 0
     mainEndZeit := A_TickCount
     setPriorityThread(0)
@@ -85118,7 +84952,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
     executingCanceableOperation := 0
     If (modus!="all")
-       SetTimer, ResetImgLoadStatus, -25
+       ResetImgLoadStatus()
 
     If (modus!="all")
     {

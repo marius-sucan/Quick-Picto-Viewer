@@ -9,7 +9,7 @@ Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, Img
      , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0, menusList := ""
      , menusflyOutVisible := 0, wasMenuFlierCreated := 0, lastContextMenuZeit := 1
      , taskBarUI, groppedFiles := [], LbtnDwn := 0, penPressureRaw := 0, hasPenPressureAPI
-     , canCancelImageLoad := 0, alterFilesIndex := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
+     , canCancelImageLoad := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
      , lastCloseInvoked := -1, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
      , lastWinStatus := "", lastZeitPanCursor := 1, lastZeitToolTip := 1, statusBarTooltipVisible := 0, doNormalCursor := 1
      , prevFullIMGload := 1, popupRootSeen, barMenuSession := 0, PrevGuiSizeEvent := 0
@@ -231,8 +231,8 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
 
    If (whileLoopExec=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
    {
-      iF (mustCaptureCloneBrush=1 || colorPickerModeNow=1)
-         byeByeRoutine("win-close")
+      ; iF (mustCaptureCloneBrush=1 || colorPickerModeNow=1)
+      ;    byeByeRoutine("win-close")
 
       If (msg!=0x11F)
       {
@@ -568,98 +568,6 @@ uiMenuMouseLL(nCode, wP, lP) {
    Return r
 }
 
-; ______ liveness shims [merge phase C] ______
-; Pre-merge, a busy main thread never stopped the interface interpreter from
-; processing input - abort flags, pen pressure and click state stayed live. On one
-; interpreter, a long operation holding Critical blocks all of that; these shims
-; restore it at the operations' existing checkpoints.
-
-; [merge] pumpUIevents() [the full Critical-off pump] was retired: its one caller
-; [determineTerminateOperation] moved to drainUIinput after the full pump let queued
-; canvas-rebuilds run inside Critical worker loops [the thumbnails GDI+ error].
-
-drainUIinput() {
-; SELECTIVE drain for long operations that hold Critical: reads the queued input
-; of the interface windows and hands it straight to the ui handlers, so the
-; abort/cancel flags [canCancelImageLoad, alterFilesIndex,
-; mustAbandonCurrentOperations] keep working exactly as when a separate
-; interpreter processed this input live. Input for OTHER windows [panels,
-; toolbar] stays queued - their handlers run when the operation unwinds, which
-; matches the old queued-post semantics. No timers or posts fire in here.
-; PeekMessage with the PVwin handle also drains its children [the hit-test
-; controls and the reparented GDI viewport windows].
-   Static busy := 0
-   If busy  ; re-entrancy guard: a drained gesture can open the abort prompt, whose own pump
-   {
-      fnOutputDebug(A_ThisFunc "(): busy")
-      Return ; still launches OnMessage monitors [uiNativeYesNoPrompt() holds Critical: nothing queued runs]
-   }
-
-   busy := 1
-   dcount := 0
-   VarSetCapacity(msgu, 48, 0)  ; MSG is 48 bytes on x64, 28 on x86
-   prevCrit := A_IsCritical
-   Loop, 40  ; hard cap per checkpoint, so an input flood cannot stall the operation
-   {
-      If !DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x100, "UInt", 0x108, "UInt", 1) ; PM_REMOVE
-      {
-         If !DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x200, "UInt", 0x20E, "UInt", 1)
-            Break
-      }
-      dcount++
-      mhwnd := NumGet(msgu, 0, "UPtr")
-      mnum := NumGet(msgu, A_PtrSize, "UInt")
-      mwp := NumGet(msgu, 2*A_PtrSize, "UPtr")
-      mlp := NumGet(msgu, 3*A_PtrSize, "UPtr")
-      If (mnum=0x100 || mnum=0x104)
-         uiWM_KEYDOWN(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x200)
-         uiWM_MOUSEMOVE(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x201)
-         uiWM_LBUTTONDOWN(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x202)
-         uiWM_LBUTTONUP(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x203)
-         WM_LBUTTON_DBL(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x205)
-         WM_RBUTTONUP(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x207)
-         WM_MBUTTONDOWN(mwp, mlp, mnum, mhwnd)
-      Else If (mnum=0x20A || mnum=0x20E)
-         WM_MOUSEWHEEL(mwp, mlp, mnum, mhwnd)
-      ; remaining numbers in the ranges [key-ups, dead moves] are swallowed: their
-      ; consumers read async state via GetKeyState, which removal cannot alter
-   }
-   ; the title-bar close button, which the old interface thread answered live: a
-   ; queued non-client click on the X becomes the same escalating close routine;
-   ; other non-client input stays queued untouched
-   If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 0)  ; WM_NCLBUTTONDOWN, peek only
-   {
-      If (NumGet(msgu, 2*A_PtrSize, "UPtr") = 20)  ; HTCLOSE
-      {
-         DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x00A1, "UInt", 0x00A1, "UInt", 1)
-         byeByeRoutine("win-close")
-      }
-   }
-   If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 0)  ; WM_SYSCOMMAND, peek only
-   {
-      If ((NumGet(msgu, 2*A_PtrSize, "UPtr") & 0xFFF0) = 0xF060)  ; SC_CLOSE
-      {
-         DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0112, "UInt", 0x0112, "UInt", 1)
-         byeByeRoutine("win-close")
-      }
-   }
-   If DllCall("user32\PeekMessageW", "UPtr", &msgu, "UPtr", PVhwnd, "UInt", 0x0010, "UInt", 0x0010, "UInt", 1)  ; WM_CLOSE, remove
-      byeByeRoutine("win-close")
-
-   If (dcount)
-      OutputDebug, % "QPV: MERGE: drained " dcount " msgs"
-   If (prevCrit)
-      Critical, %prevCrit%
-   Else
-      Critical, Off
-   busy := 0
-}
 
 pumpPenMessages() {
 ; Checkpoint for the brush loop, which holds Critical: reads the queued WM_POINTER*
@@ -724,11 +632,6 @@ infosUIAbtns(msgu) {
 }
 
 BuildGUI() {
-; De-parameterized at the merge [phase C]: the 16-field "$"-string handshake and
-; its MT_get fallback existed only to marshal the main thread's settings into the
-; interface interpreter - everything below now reads the shared globals directly.
-; [This also retires the old restartEntireGui() bug that re-sent only 9 of the 16
-; fields and blanked the OSD font preferences on every GUI rebuild.]
    Critical, on
    calcHUDsize()
    MinGUISize := "+MinSize" A_ScreenWidth//4 "x" A_ScreenHeight//4
@@ -1125,9 +1028,6 @@ uiAccessListViewLayout(heightu, ByRef prevState) {
 ; scrollbar down the right edge - the same three regions thumbsListClickResponder() tests
 ; in viewport coordinates. Everything is shifted by the viewport origin:
 ; the list view is painted into a layered window that sits next to [or below] the docked toolbar.
-; Re-applied only when the geometry changes: this runs on every status bar update, and it
-; is also the only path that follows a window resize while the list view is displayed
-; [uiUpdateUIctrl() bows out in that mode].
    vpWinClientSize(GuiW, GuiH)
    uiAccessViewportOrigin(oX, oY)
    thisState := "list|" GuiW "|" GuiH "|" heightu "|" imgHUDbaseUnit "|" oX "|" oY
@@ -1190,7 +1090,7 @@ createGDIselectorWin() {
 WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    Static lastInvoked := 1
    isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1 && animGIFplaying!=1) ? 0 : 1
-   If !isOkay || (A_TickCount - lastInvoked<200)
+   If !isOkay || (A_TickCount - lastInvoked<70)
       Return 0
 
    If preventSillyGui(A_Gui)
@@ -1211,7 +1111,7 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
    Else
       direction := (mouseData>0 && mouseData<51234) ? "WheelUp" : "WheelDown"
 
-   QPV_post("KeyboardResponder", prefix direction, PVhwnd, 0, navKeysCounter)
+   QPV_post("KeyboardResponder", prefix direction, PVhwnd, 0)
    lastInvoked := A_TickCount
    Return 0
 }
@@ -1219,6 +1119,153 @@ WM_MOUSEWHEEL(wParam, lParam, msg, hwnd) {
 preventSillyGui(thisGui) {
   r := (thisGui="mouseToolTipGuia" || thisGui="menuFlier") ? 1 : 0
   Return r
+}
+
+mouseCreateOSDinfoLine(msg:=0, largus:=0, unClickable:=0, givenCoords:=0) {
+    ; Critical, On
+    Static prevMsg, lastInvoked := 1, lastTippyWin
+    Global TippyMsg
+    If (msg="win" && largus="last")
+    {
+       rr := lastTippyWin
+       lastTippyWin := ""
+       Return rr
+    }
+
+    ; ToolTip, % givenCoords "===" largus "==" msg , , , 2
+    thisHwnd := PVhwnd
+    If (StrLen(msg)<3) || (prevMsg=msg && mouseToolTipWinCreated=1) || (A_TickCount - lastInvoked<100) || !thisHwnd
+       Return
+
+    lastInvoked := A_TickCount
+    Gui, mouseToolTipGuia: Destroy
+    thisFntSize := (largus=1) ? Round(LargeUIfontValue*1.55) : LargeUIfontValue
+    If (thisFntSize<5)
+       thisFntSize := 5
+    If (largus>5)
+       thisFntSize := largus
+
+    bgrColor := OSDbgrColor
+    txtColor := OSDtextColor
+    lastTippyWin := WinActive("A")
+    Sleep, 25
+    Gui, mouseToolTipGuia: -Caption -DPIScale +Owner%thisHwnd% +ToolWindow +hwndhGuiTip
+    Gui, mouseToolTipGuia: Margin, % thisFntSize * 1.25, % thisFntSize * 1.25
+    Gui, mouseToolTipGuia: Color, c%bgrColor%
+    Gui, mouseToolTipGuia: Font, s%thisFntSize% Bold Q5, Arial   ; always Arial Bold, never the OSD font [per Marius]
+    Gui, mouseToolTipGuia: Add, Text, c%txtColor% gdestroyMouseGuiTooltipu vTippyMsg, % msg
+    Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+    prevMsg := msg
+    If (unClickable=1)
+      WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+
+    mouseToolTipWinCreated := 1
+    delayu := StrLen(msg) * 75 + 950
+    lastZeitToolTip := A_TickCount
+    showOSDinfoLineNow(delayu, givenCoords, msg, txtColor)
+}
+
+showOSDinfoLineNow(delayu, givenCoords:=0, msgu:="", txtClr:="") {
+    If !mouseToolTipWinCreated
+       Return
+
+    If (msgu="")
+       GuiControlGet, msgu, mouseToolTipGuia:, TippyMsg
+    If (txtClr="")
+       txtClr := OSDtextColor
+
+    GetPhysicalCursorPos(mX, mY)
+    If IsObject(givenCoords)
+    {
+       If (givenCoords.x && givenCoords.y)
+       {
+          forced := 1
+          mX := givenCoords.x 
+          mY := givenCoords.y + givenCoords.h
+       }
+    } Else If InStr(givenCoords, "|")
+    {
+       pk := StrSplit(givenCoords, "|")
+       mX := pk[1], mY := pk[2]
+    }
+
+    If (!isWinXP && forced!=1)
+    {
+       GetWinClientSize(Wid, Heig, hGuiTip, 1)
+       k := WinMoveZ(hGuiTip, 0, mX + 20, mY + 29, Wid, Heig, 2)
+       Final_x := k[1], Final_y := k[2]
+    } Else
+    {
+       tipX := (forced=1) ?  mX : mX + 20
+       tipY := (forced=1) ?  mY : mY + 20
+       ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+       MaxWidth := Floor(ResWidth*0.85)
+       ; an empty caption means the tooltip was already re-wrapped by an earlier call:
+       ; TippyMsg was emptied then, and wrapping it again would only blank it out
+       If (MaxWidth<Wid && MaxWidth>10 && msgu!="")
+       {
+          GuiControl, mouseToolTipGuia: Move, TippyMsg, w1 h1
+          GuiControl, mouseToolTipGuia:, TippyMsg,
+          Gui, mouseToolTipGuia: Add, Text, xp yp c%txtClr% gdestroyMouseGuiTooltipu w%MaxWidth%, % msgu
+          Gui, mouseToolTipGuia: Show, NoActivate AutoSize Hide x1 y1, QPV tooltip window
+          ResWidth := adjustWin2MonLimits(hGuiTip, tipX, tipY, Final_x, Final_y, Wid, Heig)
+       }
+    }
+
+    If (Final_x!="" && Final_y!="")
+       Gui, mouseToolTipGuia: Show, NoActivate AutoSize x%Final_x% y%Final_y%, QPV tooltip window
+
+    WinSet, Transparent, 225, ahk_id %hGuiTip%
+    If (delayu<msgDisplayTime/2)
+       delayu := msgDisplayTime//2 + 1
+    WinSet, AlwaysOnTop, On, ahk_id %hGuiTip%
+    ; WinSet, ExStyle, +0x20, ahk_id %hGuiTip%
+    SetTimer, mouseTurnOFFtooltip, % -delayu
+    If (menuLoopActive=1)
+       menuReaderOSDdeadline := A_TickCount + delayu
+}
+
+adjustWin2MonLimits(winHwnd, winX, winY, ByRef rX, ByRef rY, ByRef Wid, ByRef Heig) {
+   GetWinClientSize(Wid, Heig, winHwnd, 1)
+   ActiveMon := MWAGetMonitorMouseIsIn(winX, winY)
+   If ActiveMon
+   {
+      SysGet, bCoord, Monitor, %ActiveMon%
+      rX := max(bCoordLeft, min(winX, bCoordRight - Wid))
+      rY := max(bCoordTop, min(winY, bCoordBottom - Heig*1.2))
+      ResWidth := Abs(max(bCoordRight, bCoordLeft) - min(bCoordRight, bCoordLeft))
+      ; ResHeight := Abs(max(bCoordTop, bCoordBottom) - min(bCoordTop, bCoordBottom))
+   } Else
+   {
+      rX := winX
+      rY := winY
+   }
+
+   Return ResWidth
+}
+
+destroyMouseGuiTooltipu() {
+   mouseTurnOFFtooltip()
+   Sleep, 1
+   hh := mouseCreateOSDinfoLine("win", "last")
+   If (hh!="")
+      WinActivate, ahk_id %lastTippyWin%
+}
+
+mouseTurnOFFtooltip() {
+   statusBarTooltipVisible := 0
+   If (mouseToolTipWinCreated!=1)
+      Return
+
+   MouseGetPos, ,, OutputVarWin
+   If (OutputVarWin=hGuiTip)
+      lastWinDrag := A_TickCount - 125
+
+   Gui, mouseToolTipGuia: Destroy
+   mouseToolTipWinCreated := 0
+   statusBarTooltipVisible := 0
+   lastZeitToolTip := A_TickCount
+   SetTimer, mouseTurnOFFtooltip, Off
 }
 
 uiGetMouseCoords(lParam, ByRef rawX, ByRef rawY, ByRef adjX, ByRef adjY) {
@@ -1258,12 +1305,11 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     LbtnDwn := 1
     lastInvoked := A_TickCount
     uiGetMouseCoords(lP, rawX, rawY, adjX, adjY)
-
     If (mouseToolTipWinCreated=1 || statusBarTooltipVisible=1)
        mouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
-    canCancelImageLoad := 4
+    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
@@ -1322,7 +1368,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return
 
     LbtnDwn := 0
-    canCancelImageLoad := 4
+    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
     If (colorPickerModeNow>=1)
     {
        colorPickerModeNow := 3
@@ -1379,7 +1425,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     If stopGifORslidesPlayback(1)
        Return 0
 
-    canCancelImageLoad := 4
+    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
     If (zz=1)
        WinClickAction("normal", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)
     Else If (A_TickCount - lastMouseLeave>350)
@@ -1424,14 +1470,14 @@ uiNativeYesNoPrompt(msg) {
    ; thread ends [the answer check, the flag reset, the caller's Return] each run the
    ; per-line peek, and one MsgSleep(-1) in a non-critical thread launches the very
    ; timers the box kept out. Ending Critical costs nothing: ResumeUnderlyingThread
-   ; only pops g, so the resumed loop keeps its own flag, and drainUIinput() restores
-   ; its own saved state at its end.
+   ; only pops g, so the resumed loop keeps its own flag
    Return (r=6) ? "yes" : "no"   ; IDYES=6; IDNO=7 and a failed call [0] both mean no
 }
 
 askAboutStoppingOperations() {
      If (userPendingAbortOperations=1)  ; the prompt is already up [a monitor launched from its own pump]
         Return
+
      If (mustAbandonCurrentOperations!=1)
      {
         userPendingAbortOperations := 1
@@ -1490,26 +1536,6 @@ WM_RBUTTONUP(wParam, lP, msg, hwnd) {
         InitGuiContextMenu("extern", adjX, adjY, 0, IdentifyCtrlUnderMouse(rawX, rawY))
   }
   Return 0
-}
-
-theSlideShowCore(paramu:=0) {
-  thisZeit :=  A_TickCount - prevFullIMGload
-  OutputDebug, % "QPV: MERGE: slideCore param=" paramu " zeit=" thisZeit " cadence=" slideShowCadence " allowNext=" allowNextSlide " running=" slideShowRunning
-  If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
-     Return
-
-  mouseTurnOFFtooltip()
-  prevFullIMGload := A_TickCount
-  Try DllCall("user32\SetCursor", "UPtr", 0)
-  If (slideShowRunning=1 && slidesFXrandomize=1)
-     VPimgFXrandomizer()
-
-  If (SlideHowMode=1)
-     RandomPicture()
-  Else If (SlideHowMode=2)
-     PreviousPicture()
-  Else If (SlideHowMode=3)
-     NextPicture()
 }
 
 WM_PENpressure(wp, lp, msg, hwnd) {
@@ -1843,7 +1869,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
 PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
     PrevGuiSizeEvent := EventInfo
     stopGifORslidesPlayback()
-    canCancelImageLoad := 4
+    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
     If (A_TickCount - scriptStartTime > 350)
        SetTimer, delayedGuiResizeUpdater, -15
 }
@@ -1856,8 +1882,13 @@ delayedGuiResizeUpdater() {
 PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    Static lastInvoked := 1
    If (AnyWindowOpen>0 || colorPickerModeNow=1 || mustCaptureCloneBrush=1 || whileLoopExec=1 || drawingShapeNow=1 || imageLoading=1 || runningLongOperation=1 || groppedFiles.Count()>0) || (A_TickCount - lastInvoked<300)
+   {
+      showDelayedTooltip("WARNING: The main window is busy, files dropped ignored.")
       Return
+   }
 
+   stopGifORslidesPlayback()
+   canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
    lastInvoked := A_TickCount
    GuiHwnd := Format("{1:#x}", GuiHwnd)
    ; ToolTip, % GuiHwnd "`n" PVhwnd "`n" hGDIwin "`n" hGDIthumbsWin "`n" hGDIselectWin "`n" hGDIinfosWin, , , 2
@@ -1878,8 +1909,6 @@ dummyTimerProcessDroppedFiles() {
    isCtrlDown := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    vectorShape := imgFiles := foldersList := sldFile := ""
-   stopGifORslidesPlayback()
-   canCancelImageLoad := 4
    countD := countV := countF := countFiles := 0
    ToolTip, Please wait - processing dropped files list , , , 2
    whileLoopExec := 1
@@ -1969,27 +1998,25 @@ byeByeRoutine(eventu:=0, keyMode:=0) {
       Gui, PVwin: Show
       Return
    }
-fnOutputDebug(A_ThisFunc "(): " eventu " | " keyMode)
+
+   ; fnOutputDebug(A_ThisFunc "(): " eventu " | " keyMode)
    If (keyMode!=1)
    {
       If !ProcessCriticalKeys(eventu, 1)
          Return
    }
 
-   canCancelImageLoad := 4
-   If (AnyWindowOpen || animGIFplaying=1 || slideShowRunning=1)
-      lastOtherWinClose := A_TickCount
-
+   canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
    If (A_TickCount - lastInvokedThis < 250)
       Return
 
    If (runningLongOperation!=1 && (imageLoading=1 || whileLoopExec=1) && animGIFplaying!=1)
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
-      canCancelImageLoad := 4
+      canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
       lastInvokedThis := A_TickCount
       ; native box under Critical, like the abort prompt: nothing queued may run in here
-      msgResult := uiNativeYesNoPrompt(eventu "The main window seems to be busy at the moment. Do you want to force exit this application ?")
+      msgResult := uiNativeYesNoPrompt("The main window seems to be busy at the moment. Do you want to force exit this application ?")
       If (msgResult="yes")
       {
          mustAbandonCurrentOperations := 1
@@ -2108,23 +2135,6 @@ coreHideMenuFlyout() {
     SetTimer, hideMenuFlyOut, Off
 }
 
-stopGifORslidesPlayback(loudly:=0) {
-   wasPlaying := 0
-   If (slideShowRunning=1)
-   {
-      stopSlideshow(0, !loudly)
-      wasPlaying := 1
-   }
-   If (animGIFplaying!=0)
-   {
-      stopGIFsPlayback()
-      wasPlaying := 1
-   }
-   If wasPlaying
-      lastOtherWinClose := A_TickCount
-   Return wasPlaying
-}
-
 invokeGivenMenuBarPopup(n) {
    n := clampInRange(n, 1, menuTotalIndex, 1)
    funcu := menuJITlist[n]
@@ -2136,12 +2146,12 @@ invokeGivenMenuBarPopup(n) {
 }
 
 BuildMenuBar(modus:=0) {
-   ; the key and value pairs is: menu-name:func-name-suffix
-   ; menu-name is visible to the user, on the menu bar 
-   ; func-name-suffix is added to function names that begin with "InvokeMenuBar"
-   ; each list of pairs describe the menus for each app mode
-   ; also see: uiMenuNameForBuilder() where ahk menu names are listed.
-   ; the menuJITmap and menuJITlist are used by uiMenuBarJITrebuild()
+; the key and value pairs is: menu-name:func-name-suffix
+; menu-name is visible to the user, on the menu bar 
+; func-name-suffix is added to function names that begin with "InvokeMenuBar"
+; each list of pairs describe the menus for each app mode
+; also see: uiMenuNameForBuilder() where ahk menu names are listed.
+; the menuJITmap and menuJITlist are used by uiMenuBarJITrebuild()
    Static menusListImgView := "File:File|Edit:Edit|Selection:Selection|Image:Image|Captions:Captions|Slides:Slides|Find:Find|List:List|Navigate:Navigate|View:View|Interface:Interface|Settings:Settings|Help:Help"
         , menusListImgEditor := "File:EditorFile|Edit:Edit|Selection:EditorSelection|Image:Image|Live tools:EditorTools|View:View|Interface:Interface"
         , menusListAlphaMasking := "Alpha mask:AlphaMask|View:View|Interface:Interface"
@@ -2278,7 +2288,10 @@ VarContainsThis(value, vals*) {
 
 ProcessCriticalKeys(keyu, closeMode:=0) {
    Static lastInvoked := 1, counter := 0, prevKey
-   If (!identifyThisWin() || (A_TickCount - lastOtherWinClose<300))
+   If (keyu="give-back")
+      Return [prevKey, counter]
+
+   If (!identifyThisWin() && closeMode=0 || (A_TickCount - lastOtherWinClose<300) || (A_TickCount - lastInvoked<40) || !keyu)
       Return
 
    If (A_TickCount - lastInvoked>250)
@@ -2286,73 +2299,48 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
 
    ; fnOutputDebug(A_ThisFunc "(): " keyu)
    callMain := 0
-   If (keyu="win-close")
-      keyu := "Escape"
-
-   If ((A_TickCount - lastInvoked>30) && (colorPickerModeNow>=1 || mustCaptureCloneBrush=1))
+   isSpaceOkay := (!AnyWindowOpen || imgEditPanelOpened=1) ? 1 0
+   isSpaceOkay := (thumbsDisplaying!=1 && isSpaceOkay=1 && maxFilesIndex>0 && IMGresizingMode=4) ? 1 : 0
+   If (colorPickerModeNow>=1 || mustCaptureCloneBrush=1)
    {
-      If isVarEqualTo(keyu, "Escape", "Enter", "Space", "Tab", "Delete", "BackSpace")
+      If isVarEqualTo(keyu, "Escape", "win-close", "Enter", "Space", "Tab", "Delete", "BackSpace")
       {
+          lastOtherWinClose := A_TickCount
           If (colorPickerModeNow>=1)
              colorPickerModeNow := (keyu="Enter" && colorPickerModeNow>=1) ? 2 : 3
-          lastInvokedThis := A_TickCount
-          lastOtherWinClose := A_TickCount
           If (mustCaptureCloneBrush=1)
              StopCaptureClickStuff(keyu)
-      }
-      lastInvoked := A_TickCount
-   } Else If (isVarEqualTo(keyu, "Escape", "Enter", "Space", "Tab") && stopGifORslidesPlayback(1))
+      } Else callMain := 1
+   } Else If (slideShowRunning=1 || animGIFplaying=1)
    {
-      ; stopped active GIF or slideshow playback
-      lastInvoked := A_TickCount
-   } Else If (keyu="Escape" || keyu="!F4" || keyu="Enter" && runningLongOperation=1)
+      If isVarEqualTo(keyu, "Escape","win-close","Enter","Space","Tab","Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete")
+         stopGifORslidesPlayback(1)
+      Else If (slideShowCadence>=1000 && animGIFplaying=0)
+         callMain := 1
+   } Else If (keyu="Escape" || keyu="win-close" || keyu="!F4" || keyu="Enter" && runningLongOperation=1)
    {
       byeByeRoutine(keyu, 1)
-   } Else If (A_TickCount - lastInvoked>30)
+   } Else If (keyu="Space" && isSpaceOkay=1 && isImgEditingNow()=1 && runningLongOperation=0)
    {
-      lastInvoked := A_TickCount
-      abusive := (counter>25) ? 1 : 0
-      OutputDebug, % "QPV: MERGE: kbd dispatch keyu=" keyu " via " Exception("", -2).What
-      isOkay := (!AnyWindowOpen || imgEditPanelOpened=1)
-      isOkay := (thumbsDisplaying!=1 && isOkay && maxFilesIndex>0 && IMGresizingMode=4) ? 1 : 0
-      If (keyu="Space" && isOkay=1)
-      {
-         uiChangeMcursor("move")
-      } Else If isVarEqualTo(keyu, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
-      {
-         If stopGifORslidesPlayback(1)
-         {
-            callMain := 0
-         } Else If (canCancelImageLoad=1 || thumbsDisplaying=1 && imageLoading=1)
-         {
-            alterFilesIndex++
-            canCancelImageLoad := 4
-            stopGIFsPlayback()
-         } Else
-            callMain := 1
-      } Else
+      uiChangeMcursor("move")
+   } Else If (canCancelImageLoad=1 && runningLongOperation=0 && !AnyWindowOpen)
+   {
+      If isVarEqualTo(keyu, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
+         canCancelImageLoad := 4
+      Else If (canCancelImageLoad=0)
          callMain := 1
+   } Else callMain := 1
 
-      If (closeMode=0)
-      {
-         isOkay := (imageLoading=1 && animGIFplaying!=1) ? 0 : 1
-         If (callMain=1 && isOkay=1 && runningLongOperation!=1 && whileLoopExec!=1 && keyu!="")
-            callMain := 1  ; KeyboardResponder(keyu, PVhwnd, abusive, navKeysCounter)
-         Else
-            callMain := 0
+   If (runningLongOperation=1 && callMain=1)
+      callMain := 0
 
-         If (keyu=prevKey)
-            counter++
-         Else 
-            counter := 0
-
-         prevKey := keyu
-      }
-   } Else If (keyu=prevKey)
+   ; ToolTip, % keyu "|" counter "|" callMain, , , 2
+   If (keyu=prevKey && keyu)
       counter++
    Else 
       counter := 0
-
+   lastInvoked := A_TickCount
+   prevKey := keyu
    Return callMain
 }
 
@@ -2392,16 +2380,14 @@ uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
     vk_hwnd := WinActive("A")
     vk_alt := (msg=260) ? -1 : DllCall("GetKeyState","Int", 0x12, "short") >> 16
     keyu := constructKbdKey(vk_shift, vk_ctrl, vk_alt, vk_code)
-    If (vk_code!=10 && vk_code!=11 && vk_code!=12) ; shift, control, alt
+    If (vk_code!=10 && vk_code!=11 && vk_code!=12 && keyu!="") ; shift, control, alt
     {
-       callMain := ProcessCriticalKeys(keyu)
+       callMain := ProcessCriticalKeys(keyu, 0)
        If (callMain=1)
        {
           hotkate := keyu
           SetTimer, PreProcessKbdKey, -15
-       } Else
-          hotkate := ""
-
+       } 
        Return 0
     }
 }
