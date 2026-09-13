@@ -35958,7 +35958,8 @@ PanelCachesOverview() {
    ; NoSortHdr: the row order carries meaning and groupDigits() writes a thin space into the
    ; numeric cells, so a header click would sort them as text and get it wrong.
    hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Remaining|%", "Database caches overview")
-   Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Gathering database information`, please wait . . .
+   Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200 gBTNcachesOverviewEstimate +hwndhTemp, Gathering database information`, please wait . . .
+   ToolTip2ctrl(hTemp, "Click to see how large this database can grow once all the data is collected")
    Gui, Add, Button, xs+0 y+15 h%thisBtnHeight% w%btnWid% gBTNignoredEntriesActs vbtn1, &Ignored entries
    If hostPanel
       Gui, Add, Button, x+5 hp w%btnWid2% gBTNcachesOverviewBack, &Back
@@ -35987,7 +35988,7 @@ BTNlistDeadEntries() {
 }
 
 uiPopulateCachesOverview(modus:=0) {
-    Static rowsDef := [], totalz := 0
+    Static rowsDef := [], totalz := 0, busyu := 0
     If (modus="kill")
     {
        totalz := 0
@@ -35995,9 +35996,25 @@ uiPopulateCachesOverview(modus:=0) {
        Return
     }
 
+    If (modus="estimate")
+    {
+       ; the counting below yields to other threads, so the click can land in the middle of
+       ; a refresh, when only a part of rowsDef is filled in and CurrentSLD is blanked
+       If (busyu=1 || !totalz)
+       {
+          showTOOLtip("The database information is still being gathered, please wait . . .")
+          SetTimer, RemoveTooltip, % -msgDisplayTime
+          Return
+       }
+
+       uiCachesOverviewSizeEstimate(totalz, rowsDef)
+       Return
+    }
+
     If (AnyWindowOpen!=91)
        Return
 
+    busyu := 1
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewCaches
 
@@ -36080,6 +36097,7 @@ uiPopulateCachesOverview(modus:=0) {
     {
        RemoveTooltip()
        SetTimer, ResetImgLoadStatus, -50
+       busyu := 0
        Return
     }
 
@@ -36096,6 +36114,76 @@ uiPopulateCachesOverview(modus:=0) {
     GuiControl, SettingsGUIA:, infoLine, % "Database version: " dbVersion infou ". Files: " groupDigits(totalz) ". Cache size: " fileSizeFriendly(szu) "."
     SetTimer, RemoveTooltip, -150
     SetTimer, ResetImgLoadStatus, -50
+    busyu := 0
+}
+
+BTNcachesOverviewEstimate() {
+   uiPopulateCachesOverview("estimate")
+}
+
+uiCachesOverviewSizeEstimate(totalz, rowsDef) {
+; How large the database can grow once every kind of data the panel lists has been collected
+; for every file it indexes: the bytes each image has yet to add, on top of the size the
+; file already has.
+;
+; A column that is still NULL already owns its serial type in the record header, so what an
+; image adds are only the values themselves: the three file stamps (4 + 6 + 6 bytes), the
+; image details (2 + 2 + 1 and the pixel format string; imgframes=1 is held by the serial
+; type itself), the eight histogram REALs and one 64 bit hash written in hexadecimal.
+   Static bytesFileDetails := 16, bytesImgDetails := 15, bytesHistogram := 64, bytesHash := 16
+   Static treeOverhead := 1.1   ; b-trees do not fill their pages to the last byte
+   pageSize := getSQLdbPragmaValue("page_size")
+   If (pageSize<512)
+      pageSize := 4096
+
+   missu := []
+   Loop, % rowsDef.Count()
+   {
+       thisRow := rowsDef[A_Index]
+       countu := thisRow[5] ? thisRow[5] : 0    ; getTotalIMGsSQLdb() returns blank, not zero, on a failed query
+       If (thisRow[3]=1)
+          countu := totalz - countu
+
+       missu[A_Index] := (totalz>countu) ? totalz - countu : 0
+   }
+
+   ; 9x8 plus 32x32 gray samples, one byte each, and the two of the flipped image
+   pixAll := SQLpixelsPageFootprint(pageSize, 2192, 4)
+   pixHalf := SQLpixelsPageFootprint(pageSize, 1096, 2)
+   growthInfos := (missu[2]*bytesFileDetails + missu[3]*bytesImgDetails + missu[4]*bytesHistogram)*treeOverhead
+   growthHashes := (missu[7] + missu[8] + missu[9] + missu[10] + missu[11] + missu[12])*bytesHash*treeOverhead
+   ; an image with no pixels data at all is counted in both figures, and the two of them add
+   ; up to what its record ends up holding: all four blobs
+   growthPixels := missu[5]*pixHalf
+   growthFlipped := missu[6]*(pixAll - pixHalf)
+   growthTotal := growthInfos + growthHashes + growthPixels + growthFlipped
+   FileGetSize, currentSize, % CurrentSLD
+   estimatedSize := currentSize + growthTotal
+   perImage := Round(estimatedSize/totalz/1024, 1)
+   ignoredu := rowsDef[1, 5] ? rowsDef[1, 5] : 0
+   msgu := "Estimated maximum size of this database: " fileSizeFriendly(estimatedSize)
+   msgu .= "`n`nThis is the size the file is expected to reach once every kind of data listed in the panel has been collected for all the " groupDigits(totalz) " indexed files."
+   msgu .= "`n`nCurrent size: " fileSizeFriendly(currentSize)
+   If (growthTotal>0)
+   {
+      msgu .= "`nStill to be collected: " fileSizeFriendly(growthTotal)
+      If (growthInfos>0)
+         msgu .= "`n   - file details, image details and histograms: " fileSizeFriendly(growthInfos)
+      If (growthHashes>0)
+         msgu .= "`n   - image hashes: " fileSizeFriendly(growthHashes)
+      If (growthPixels>0)
+         msgu .= "`n   - pixels data: " fileSizeFriendly(growthPixels)
+      If (growthFlipped>0)
+         msgu .= "`n   - flipped pixels data: " fileSizeFriendly(growthFlipped)
+   } Else
+      msgu .= "`nEverything the panel lists has already been collected for all the indexed files."
+
+   msgu .= "`n`nOne fully collected image takes up about " perImage " KB, of which around " Round(pixAll/1024, 1) " KB is its pixels data. The flipped pixels data is collected only while the option «Identify images horizontally flipped» is active in the duplicates panel."
+   If (ignoredu>0)
+      msgu .= "`n`nThe figures above include the " groupDigits(ignoredu) " ignored or dead file entries, which nothing is collected for unless they are revalidated."
+
+   msgu .= "`n`nThese figures are estimates. The database can also end up somewhat smaller."
+   msgBoxWrapper(appTitle ": Database size estimation", msgu, 0, 1, "info")
 }
 
 BTNpurgeIgnoredSQLentries() {
@@ -73337,6 +73425,20 @@ SQLpixelsMissingClause(colu, tableAlias:="images") {
    Return "NOT EXISTS (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=" tableAlias ".imgidu AND px." SQLpixelsColumn(colu) " IS NOT NULL)"
 }
 
+SQLpixelsPageFootprint(pageSize, blobBytes, blobsCount) {
+; What one row of imagesPixels costs in the database file, page packing included: these
+; records take up a large part of a page, and whatever is left over once the next one no
+; longer fits is space nothing else can use.
+;   blobBytes: how many pixels the row holds, blobsCount: over how many of the four columns
+   ; the record header: its own length, then a serial type per column - one byte for the
+   ; NULL imgidu and for every NULL blob, two bytes for a blob of this size
+   payload := 6 + blobsCount + blobBytes
+   cellu := payload + 6                      ; the cell adds the payload length and the row id, as varints
+   perPage := (pageSize - 8)//(cellu + 2)    ; the page keeps 8 bytes for its header and 2 per cell pointer
+   ; a record that does not fit a page of its own goes into a chain of overflow pages
+   Return (perPage>0) ? pageSize/perPage : Ceil(payload/(pageSize - 4))*pageSize
+}
+
 isSQLpixelsColumn(colu) {
 ; True when the given data-collection target names one of the fingerprints rather than a column of "images".
    Return RegExMatch(colu, "i)^\s*(H?pixelzF(small|big)|small|big|smallH|bigH)\s*$") ? 1 : 0
@@ -85634,6 +85736,27 @@ throwSQLqueryDBerror(funcu) {
    SoundBeep, 300, 100
    showDelayedTooltip("ERROR: " funcu "() failed to query or commit changes the SQL database`n" activeSQLdb.ErrorMsg)
    ; SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+getSQLdbPragmaValue(pragmau) {
+  ; only one row retrieved
+  SQL := "PRAGMA " pragmau ";"
+  If !activeSQLdb.GetTable(SQL, RecordSet)
+  {
+     addJournalEntry(A_ThisFunc "() " activeSQLdb.ErrorMsg)
+     Return
+  }
+
+  value := 0
+  Loop, % RecordSet.RowCount
+  {
+      Rowu := RecordSet.Rows[A_Index]
+      If IsNumber(Rowu[1])
+         value := Rowu[1]
+  }
+
+  RecordSet.Free()
+  Return value
 }
 
 getMaxRowIDsqlDB() {
