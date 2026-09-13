@@ -231,7 +231,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
 
    If (whileLoopExec=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
    {
-      ; iF (mustCaptureCloneBrush=1 || colorPickerModeNow=1)
+      ; If (mustCaptureCloneBrush=1 || colorPickerModeNow=1)
       ;    byeByeRoutine("win-close")
 
       If (msg!=0x11F)
@@ -1249,7 +1249,7 @@ destroyMouseGuiTooltipu() {
    Sleep, 1
    hh := mouseCreateOSDinfoLine("win", "last")
    If (hh!="")
-      WinActivate, ahk_id %lastTippyWin%
+      WinActivate, ahk_id %hh%
 }
 
 mouseTurnOFFtooltip() {
@@ -1309,7 +1309,7 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
        mouseTurnOFFtooltip()
 
     SetTimer, ResetLbtn, -55
-    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+    canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
     isOkay := (whileLoopExec=1 || runningLongOperation=1 || imageLoading=1) ? 0 : 1
     If (runningLongOperation=1 && (A_TickCount - lastLongOperationStart > 900) && slideShowRunning!=1 && animGIFplaying!=1)
        askAboutStoppingOperations()
@@ -1368,7 +1368,7 @@ WM_MBUTTONDOWN(wP, lP, msg, hwnd) {
        Return
 
     LbtnDwn := 0
-    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+    canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
     If (colorPickerModeNow>=1)
     {
        colorPickerModeNow := 3
@@ -1425,7 +1425,7 @@ WM_LBUTTON_DBL(wP, lP, msg, hwnd) {
     If stopGifORslidesPlayback(1)
        Return 0
 
-    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+    canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
     If (zz=1)
        WinClickAction("normal", IdentifyCtrlUnderMouse(rawX, rawY), adjX, adjY)
     Else If (A_TickCount - lastMouseLeave>350)
@@ -1869,7 +1869,7 @@ activateMainWin(wP:=0, lP:=0, msg:=0, hwnd:=0) {
 PVwinGuiSize(GuiHwnd, EventInfo, Width, Height) {
     PrevGuiSizeEvent := EventInfo
     stopGifORslidesPlayback()
-    canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+    canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
     If (A_TickCount - scriptStartTime > 350)
        SetTimer, delayedGuiResizeUpdater, -15
 }
@@ -1888,7 +1888,7 @@ PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    }
 
    stopGifORslidesPlayback()
-   canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+   canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
    lastInvoked := A_TickCount
    GuiHwnd := Format("{1:#x}", GuiHwnd)
    ; ToolTip, % GuiHwnd "`n" PVhwnd "`n" hGDIwin "`n" hGDIthumbsWin "`n" hGDIselectWin "`n" hGDIinfosWin, , , 2
@@ -2006,14 +2006,14 @@ byeByeRoutine(eventu:=0, keyMode:=0) {
          Return
    }
 
-   canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+   canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
    If (A_TickCount - lastInvokedThis < 250)
       Return
 
    If (runningLongOperation!=1 && (imageLoading=1 || whileLoopExec=1) && animGIFplaying!=1)
    {
       ; SoundBeep , % 250 + 100*lastCloseInvoked, 100
-      canCancelImageLoad := (canCancelImageLoad=1) ? 4 : 0
+      canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
       lastInvokedThis := A_TickCount
       ; native box under Critical, like the abort prompt: nothing queued may run in here
       msgResult := uiNativeYesNoPrompt("The main window seems to be busy at the moment. Do you want to force exit this application ?")
@@ -2299,11 +2299,11 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
 
    ; fnOutputDebug(A_ThisFunc "(): " keyu)
    callMain := 0
-   isSpaceOkay := (!AnyWindowOpen || imgEditPanelOpened=1) ? 1 0
+   isSpaceOkay := (!AnyWindowOpen || imgEditPanelOpened=1) ? 1 : 0
    isSpaceOkay := (thumbsDisplaying!=1 && isSpaceOkay=1 && maxFilesIndex>0 && IMGresizingMode=4) ? 1 : 0
    If (colorPickerModeNow>=1 || mustCaptureCloneBrush=1)
    {
-      If isVarEqualTo(keyu, "Escape", "win-close", "Enter", "Space", "Tab", "Delete", "BackSpace")
+      If isVarEqualTo(keyu, "Escape", "win-close", "!F4", "Enter", "Space", "Tab", "Delete", "BackSpace")
       {
           lastOtherWinClose := A_TickCount
           If (colorPickerModeNow>=1)
@@ -2313,11 +2313,11 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
       } Else callMain := 1
    } Else If (slideShowRunning=1 || animGIFplaying=1)
    {
-      If isVarEqualTo(keyu, "Escape","win-close","Enter","Space","Tab","Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete")
+      If isVarEqualTo(keyu, "Escape","win-close","!F4","Enter","Space","Tab","Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete")
          stopGifORslidesPlayback(1)
-      Else If (slideShowCadence>=1000 && animGIFplaying=0)
+      Else
          callMain := 1
-   } Else If (keyu="Escape" || keyu="win-close" || keyu="!F4" || keyu="Enter" && runningLongOperation=1)
+   } Else If (isVarEqualTo(keyu, "Escape", "win-close", "!F4") || ((keyu="Enter" || keyu="Space") && runningLongOperation=1))
    {
       byeByeRoutine(keyu, 1)
    } Else If (keyu="Space" && isSpaceOkay=1 && isImgEditingNow()=1 && runningLongOperation=0)
@@ -2327,19 +2327,20 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
    {
       If isVarEqualTo(keyu, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
          canCancelImageLoad := 4
-      Else If (canCancelImageLoad=0)
-         callMain := 1
+      Else If (keyu="Escape" || keyu="win-close" || keyu="!F4")
+         byeByeRoutine(keyu, 1)
    } Else callMain := 1
 
    If (runningLongOperation=1 && callMain=1)
       callMain := 0
 
    ; ToolTip, % keyu "|" counter "|" callMain, , , 2
+   lastInvoked := A_TickCount
    If (keyu=prevKey && keyu)
       counter++
    Else 
       counter := 0
-   lastInvoked := A_TickCount
+
    prevKey := keyu
    Return callMain
 }

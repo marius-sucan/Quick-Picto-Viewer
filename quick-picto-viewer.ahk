@@ -10033,7 +10033,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       lastTimeToggleThumbs := A_TickCount 
       BtnCloseWindow()
       Return
-   } Else If ((InStr(winEventu, "normal") || InStr(winEventu, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1) && thumbsDisplaying!=1)
+   } Else If ((InStr(winEventu, "normal") || InStr(winEventu, "DoubleClick")) && (IMGlargerViewPort=1 || allowFreeIMGpanning=1) && runningLongOperation=0 && displayingImageNow=1 && IMGresizingMode=4 && (scrollBarHy>1 || scrollBarVx>1))
    {
       ; handle clicks on the H/V scrollbars for images larger than the viewport
       knobSize := getScrollWidth()
@@ -35286,7 +35286,7 @@ determineTerminateOperation() {
   lastInvoked := A_TickCount
   If mustAbandonCurrentOperations
      lastLongOperationAbort := A_TickCount
-  Return theEnd
+  Return mustAbandonCurrentOperations
 }
 
 doStartLongOpDance(affectTlbr:=0) {
@@ -37985,7 +37985,6 @@ WorkLoadMultiCoreHandler(job) {
       }
 
       Sleep, 200
-      executingCanceableOperation := A_TickCount
       If (A_TickCount - prevMSGdisplay>1500)
       {
          sumExternalCoreThreadsCounters(job.hasRemovalField, processedFiles, failedFiles, theseFailures, skippedFiles)
@@ -38011,7 +38010,6 @@ WorkLoadMultiCoreHandler(job) {
       {
          RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 1
          abandonAll := 1
-         lastLongOperationAbort := A_TickCount
          If !abortRequestedZeit
             abortRequestedZeit := A_TickCount
       }
@@ -48267,6 +48265,8 @@ StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
       updateUIgridPanel()
    } Else If (imgEditPanelOpened=1 && g)
    {
+      If (AnyWindowOpen=64)
+         createLivePreviewBrush()
       SetTimer, fromCurrentPanelToColorsSwatch, -200
       livePreviewsImageEditing()
    }
@@ -78982,7 +78982,6 @@ drawHUDelements(mode, mainWidth, mainHeight, newW, newH, DestPosX, DestPosY, img
     {
        ; highlight action areas
        calculateTouchMargins(thisX, thisY, thisW, thisH)
-       thisThick := imgHUDbaseUnit//20
        Gdip_SetPenWidth(pPen1d, 0.7)
        Gdip_DrawRectangle(glPG, pPen1d, thisX, thisY, thisW, thisH)
     } Else If (mode=1 && slideShowRunning!=1)
@@ -84940,7 +84939,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
 
     ; ToolTip, %imgW% -- %imgH% == %newW% -- %newH%
     prevFullThumbsUpdate := A_TickCount
-    pageIsWhole := (!userScrolled && !abandonAll && alterFilesIndex!=1) ? 1 : 0
     If (pageIsWhole=1)
     {
        mustReloadThumbsList := 0
@@ -84964,7 +84962,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              abortedPageRetries := 0
           }
 
-          If (abortedPageRetries<1)
+          If (abortedPageRetries<0)
           {
              abortedPageRetries++
              fnOutputDebug("ThumbsMode. The page was left unfinished; asking for it again [" abortedPageRetries "].")
