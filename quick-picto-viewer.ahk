@@ -20473,14 +20473,16 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
         quality := clampInRange(Ceil(quality*2.5), 32, 148)
   }
 
-  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData)
+  ; read-only lock: the DLL alters these bits in place and pBitmap is discarded, so GDI+ must not convert them back
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
+  dllFunc := (modus=4) ? "rotateBlurBitmap" : "zoomBlurBitmap"
   If (!E1 && !E2)
   {
      If (modus=4)
-        r := DllCall("qpvmain.dll\rotateBlurBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", intensity, "Int", quality, "Int")
+        r := DllCall("qpvmain.dll\" dllFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", intensity, "Int", quality, "Int")
      Else
-        r := DllCall("qpvmain.dll\zoomBlurBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", modus, "Int", intensity, "Int", quality, "Int")
+        r := DllCall("qpvmain.dll\" dllFunc, "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "Int", stride, "Int", 32, "Int", cx, "Int", cy, "Int", modus, "Int", intensity, "Int", quality, "Int")
   } Else
      addJournalEntry(funcu "(): ERROR. Unable to process the image. Failed to lock the bitmap bits.")
 
@@ -20491,7 +20493,7 @@ QPV_ZoomBlurBitmap(funcu, pBitmap, cx, cy, modus, intensity, quality:=0) {
 
   If (r!=1)
   {
-     addJournalEntry(funcu "(): ERROR. zoomBlurBitmap() failed to process the image. Result = " r)
+     addJournalEntry(funcu "(): ERROR. " dllFunc "() failed to process the image. Result = " r)
      trGdip_DisposeImage(newBitmap)
      Return
   }
@@ -24136,14 +24138,15 @@ ZoomBlurSelectedArea() {
     Gdip_SetClipPath(G2, pPath, modus)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
-    prcX := (clampInRange(tinyPrevAreaCoordX, imgSelPx, imgSelPx + imgSelW) - imgSelPx)/imgSelW
-    prcY := (clampInRange(tinyPrevAreaCoordY, imgSelPy, imgSelPy + imgSelH) - imgSelPy)/imgSelH
+    ; the anchor may sit outside the selection; the DLL clamps its taps to the bitmap
+    anchorX := Round(tinyPrevAreaCoordX - imgSelPx)
+    anchorY := Round(tinyPrevAreaCoordY - imgSelPy)
     thisIntensity := calcZoomBlurIntensity()
     errorsOccurred := 0
     doStartLongOpDance()
     Static zblr := {1:"radial", 2:"horizontal", 3:"vertical", 4: "rotate"}
     showTOOLtip("Applying " zblr[zoomBlurMode] " blur, please wait...")
-    zoomedBMP := QPV_ZoomBlurBitmap(A_ThisFunc, gBitmap, Round(prcX*imgSelW), Round(prcY*imgSelH), zoomBlurMode, thisIntensity)
+    zoomedBMP := QPV_ZoomBlurBitmap(A_ThisFunc, gBitmap, anchorX, anchorY, zoomBlurMode, thisIntensity)
     If validBMP(zoomedBMP)
     {
        trGdip_DisposeImage(gBitmap, 1)
@@ -54719,6 +54722,7 @@ PanelsPanIMGpreviewClick(a:=0) {
       Return
 
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
+   minCoord := (AnyWindowOpen=69) ? 0 : 120   ; the zoom blur anchor must reach the image edges
    ; vpWinClientSize(mainWidth, mainHeight)
    Sleep, 0
    GetPhysicalCursorPos(oX, oY)
@@ -54741,8 +54745,8 @@ PanelsPanIMGpreviewClick(a:=0) {
       Dy := mY - oY + 1
       tinyPrevAreaCoordX := oDx - Dx
       tinyPrevAreaCoordY := oDy - Dy
-      tinyPrevAreaCoordX := clampInRange(tinyPrevAreaCoordX, 120, imgW)
-      tinyPrevAreaCoordY := clampInRange(tinyPrevAreaCoordY, 120, imgH)
+      tinyPrevAreaCoordX := clampInRange(tinyPrevAreaCoordX, minCoord, imgW)
+      tinyPrevAreaCoordY := clampInRange(tinyPrevAreaCoordY, minCoord, imgH)
       If (A_TickCount - newPosZeit>750) || (mX=oX && mY=oY)
       {
          newPosZeit := A_TickCount
