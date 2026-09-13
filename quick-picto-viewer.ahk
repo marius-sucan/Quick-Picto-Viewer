@@ -35955,8 +35955,6 @@ PanelCachesOverview() {
    }
 
    Gui, Add, Text, x15 y15 w%lstWid%, An overview of the data collected on the indexed files.
-   ; NoSortHdr: the row order carries meaning and groupDigits() writes a thin space into the
-   ; numeric cells, so a header click would sort them as text and get it wrong.
    hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 +ReadOnly -Multi -WantF2 NoSortHdr y+10 w" lstWid " r12 Grid vLViewCaches", "#|Cached data|Files|Remaining|%", "Database caches overview")
    Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200 gBTNcachesOverviewEstimate +hwndhTemp, Gathering database information`, please wait . . .
    ToolTip2ctrl(hTemp, "Click to see how large this database can grow once all the data is collected")
@@ -35968,7 +35966,6 @@ PanelCachesOverview() {
    Gui, Add, Edit, x+1 h1 w1 vEditF5 -wantTab +ReadOnly, % hostPanel
    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Database cache overview: " appTitle)
    Sleep, 5
-   ; on a timer, so the window is painted before the counting queries block the thread
    SetTimer, uiPopulateCachesOverview, -50
 }
 
@@ -35998,16 +35995,12 @@ uiPopulateCachesOverview(modus:=0) {
 
     If (modus="estimate")
     {
-       ; the counting below yields to other threads, so the click can land in the middle of
-       ; a refresh, when only a part of rowsDef is filled in and CurrentSLD is blanked
        If (busyu=1 || !totalz)
        {
           showTOOLtip("The database information is still being gathered, please wait . . .")
           SetTimer, RemoveTooltip, % -msgDisplayTime
-          Return
-       }
-
-       uiCachesOverviewSizeEstimate(totalz, rowsDef)
+       } Else
+          uiCachesOverviewSizeEstimate(totalz, rowsDef)
        Return
     }
 
@@ -36018,9 +36011,6 @@ uiPopulateCachesOverview(modus:=0) {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewCaches
 
-    ; One table for the whole overview: label | SQL tail | 1 = the query counts the rows that
-    ; are still MISSING the data, so it has to be subtracted from the total | progress message
-    ; | 1 = the "Missing" cell means something for this row.
     If !totalz
     {
        setImageLoading()
@@ -36028,10 +36018,6 @@ uiPopulateCachesOverview(modus:=0) {
        rowsDef := []
        rowsDef[1] := ["Ignored or deleted file entries", "WHERE isDeleted IS NOT 0", 0, "ignored files", 0]
        rowsDef[2] := ["File details", "WHERE ifnull(fsize, '')='' ", 1, "file details", 1]
-       ; imgpixfmt, not imgmegapix, for the reason collectSQLFileInfosNow() gives: imgmegapix is
-       ; generated from imgwidth, so it can carry a value for an image whose properties are only
-       ; half collected. This figure has to describe the same population that "collect image
-       ; details" would go and scan, or the panel reports 100% for work that is still pending.
        rowsDef[3] := ["Image details", "WHERE ifnull(imgwidth, '')='' AND ifnull(imgheight, '')='' ", 1, "image details", 1]
        rowsDef[4] := ["Image histogram details", "WHERE ifnull(imgmedian, '')='' ", 1, "image histograms", 1]
        rowsDef[5] := ["Pixels data (9x8, 32x32)", SQLpixelsJoinClause() " WHERE " SQLpixelsPresentClause("small"), 0, "pixel data", 1]
@@ -36121,15 +36107,18 @@ BTNcachesOverviewEstimate() {
    uiPopulateCachesOverview("estimate")
 }
 
+SQLpixelsPageFootprint(pageSize, blobBytes, blobsCount) {
+; blobBytes: how many pixels the row holds, blobsCount: over how many of the four columns
+   payload := 6 + blobsCount + blobBytes
+   cellu := payload + 6                      ; the cell adds the payload length and the row id, as varints
+   perPage := (pageSize - 8)//(cellu + 2)    ; the page keeps 8 bytes for its header and 2 per cell pointer
+   ; a record that does not fit a page of its own goes into a chain of overflow pages
+   Return (perPage>0) ? pageSize/perPage : Ceil(payload/(pageSize - 4))*pageSize
+}
+
 uiCachesOverviewSizeEstimate(totalz, rowsDef) {
 ; How large the database can grow once every kind of data the panel lists has been collected
-; for every file it indexes: the bytes each image has yet to add, on top of the size the
-; file already has.
-;
-; A column that is still NULL already owns its serial type in the record header, so what an
-; image adds are only the values themselves: the three file stamps (4 + 6 + 6 bytes), the
-; image details (2 + 2 + 1 and the pixel format string; imgframes=1 is held by the serial
-; type itself), the eight histogram REALs and one 64 bit hash written in hexadecimal.
+; for every file it indexes.
    Static bytesFileDetails := 16, bytesImgDetails := 15, bytesHistogram := 64, bytesHash := 16
    Static treeOverhead := 1.1   ; b-trees do not fill their pages to the last byte
    pageSize := getSQLdbPragmaValue("page_size")
@@ -36156,34 +36145,29 @@ uiCachesOverviewSizeEstimate(totalz, rowsDef) {
    ; up to what its record ends up holding: all four blobs
    growthPixels := missu[5]*pixHalf
    growthFlipped := missu[6]*(pixAll - pixHalf)
+   growthTpixelz := growthPixels + growthFlipped
    growthTotal := growthInfos + growthHashes + growthPixels + growthFlipped
    FileGetSize, currentSize, % CurrentSLD
    estimatedSize := currentSize + growthTotal
    perImage := Round(estimatedSize/totalz/1024, 1)
    ignoredu := rowsDef[1, 5] ? rowsDef[1, 5] : 0
    msgu := "Estimated maximum size of this database: " fileSizeFriendly(estimatedSize)
-   msgu .= "`n`nThis is the size the file is expected to reach once every kind of data listed in the panel has been collected for all the " groupDigits(totalz) " indexed files."
-   msgu .= "`n`nCurrent size: " fileSizeFriendly(currentSize)
+   msgu .= "`n`nCurrent database size: " fileSizeFriendly(currentSize)
    If (growthTotal>0)
    {
-      msgu .= "`nStill to be collected: " fileSizeFriendly(growthTotal)
+      msgu .= "`n`nStill to be collected: " fileSizeFriendly(growthTotal)
       If (growthInfos>0)
-         msgu .= "`n   - file details, image details and histograms: " fileSizeFriendly(growthInfos)
+         msgu .= "`n   - file and image properties: " fileSizeFriendly(growthInfos)
       If (growthHashes>0)
          msgu .= "`n   - image hashes: " fileSizeFriendly(growthHashes)
-      If (growthPixels>0)
-         msgu .= "`n   - pixels data: " fileSizeFriendly(growthPixels)
-      If (growthFlipped>0)
-         msgu .= "`n   - flipped pixels data: " fileSizeFriendly(growthFlipped)
+      If (growthTpixelz>0)
+         msgu .= "`n   - pixels data: " fileSizeFriendly(growthTpixelz)
+      If (ignoredu>0)
+         msgu .= "`n`nThe figures above include the " groupDigits(ignoredu) " ignored or dead file entries."
    } Else
-      msgu .= "`nEverything the panel lists has already been collected for all the indexed files."
+      msgu .= "`nThe data seems to be already collected for all the indexed files."
 
-   msgu .= "`n`nOne fully collected image takes up about " perImage " KB, of which around " Round(pixAll/1024, 1) " KB is its pixels data. The flipped pixels data is collected only while the option «Identify images horizontally flipped» is active in the duplicates panel."
-   If (ignoredu>0)
-      msgu .= "`n`nThe figures above include the " groupDigits(ignoredu) " ignored or dead file entries, which nothing is collected for unless they are revalidated."
-
-   msgu .= "`n`nThese figures are estimates. The database can also end up somewhat smaller."
-   msgBoxWrapper(appTitle ": Database size estimation", msgu, 0, 1, "info")
+   msgBoxWrapper(appTitle ": Database size estimation", msgu, -1, 0, 0)
 }
 
 BTNpurgeIgnoredSQLentries() {
@@ -36207,8 +36191,6 @@ BTNcachesOverviewBack() {
 coreCachesOverviewIgnoredAct(modus) {
 ; The two actions the caches overview offers on the file entries marked isDeleted, see
 ; SQLdeleteEntriesMarked() for what the two states of that column mean.
-   ; counted again here rather than read back from the list view: one COUNT is cheap, and this
-   ; way the figure the user is asked to confirm can never be a stale one
    ogn := getTotalIMGsSQLdb("WHERE isDeleted IS NOT 0")
    If (ogn<1)
    {
@@ -36239,8 +36221,6 @@ coreCachesOverviewIgnoredAct(modus) {
       SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted IS NOT 0;"
       If !activeSQLdb.Exec(SQLStr)
       {
-         ; a failed UPDATE changed nothing, so the list view is still accurate; returning here
-         ; leaves the error message on screen instead of having the repopulate overwrite it
          showTOOLtip("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -73425,19 +73405,6 @@ SQLpixelsMissingClause(colu, tableAlias:="images") {
    Return "NOT EXISTS (SELECT 1 FROM imagesPixels AS px WHERE px.imgidu=" tableAlias ".imgidu AND px." SQLpixelsColumn(colu) " IS NOT NULL)"
 }
 
-SQLpixelsPageFootprint(pageSize, blobBytes, blobsCount) {
-; What one row of imagesPixels costs in the database file, page packing included: these
-; records take up a large part of a page, and whatever is left over once the next one no
-; longer fits is space nothing else can use.
-;   blobBytes: how many pixels the row holds, blobsCount: over how many of the four columns
-   ; the record header: its own length, then a serial type per column - one byte for the
-   ; NULL imgidu and for every NULL blob, two bytes for a blob of this size
-   payload := 6 + blobsCount + blobBytes
-   cellu := payload + 6                      ; the cell adds the payload length and the row id, as varints
-   perPage := (pageSize - 8)//(cellu + 2)    ; the page keeps 8 bytes for its header and 2 per cell pointer
-   ; a record that does not fit a page of its own goes into a chain of overflow pages
-   Return (perPage>0) ? pageSize/perPage : Ceil(payload/(pageSize - 4))*pageSize
-}
 
 isSQLpixelsColumn(colu) {
 ; True when the given data-collection target names one of the fingerprints rather than a column of "images".
@@ -82209,7 +82176,8 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
 performFadeTransition(imgPath, gifAnim) {
     Static prevImgPath
-    If (gifAnim=1 && prevImgPath=imgPath)
+    thisImgPath := imgPath currentFileIndex
+    If (prevImgPath=thisImgPath)
        Return 0
 
     setWindowTitle(pVwinTitle, 1)
@@ -82236,7 +82204,7 @@ performFadeTransition(imgPath, gifAnim) {
     trGdip_DrawImage(A_ThisFunc, glPG, tempBMP)
     trGdip_DisposeImage(tempBMP, 1)
     trGdip_GraphicsClear(A_ThisFunc, 2NDglPG, "0xFF" WindowBGRcolor)
-    prevImgPath := imgPath
+    prevImgPath := thisImgPath
     Return 1
 }
 

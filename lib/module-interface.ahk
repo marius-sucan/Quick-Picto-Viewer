@@ -1891,6 +1891,7 @@ PVwinGuiDropFiles(GuiHwnd, FileArray, CtrlHwnd, X, Y) {
    canCancelImageLoad := (canCancelImageLoad>=1) ? 4 : 0
    lastInvoked := A_TickCount
    GuiHwnd := Format("{1:#x}", GuiHwnd)
+   ToolTip, Please wait - processing dropped files list , , , 2
    ; ToolTip, % GuiHwnd "`n" PVhwnd "`n" hGDIwin "`n" hGDIthumbsWin "`n" hGDIselectWin "`n" hGDIinfosWin, , , 2
    For i, file in FileArray
        groppedFiles[A_Index] := Trimmer(file)
@@ -2301,26 +2302,31 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
    callMain := 0
    isSpaceOkay := (!AnyWindowOpen || imgEditPanelOpened=1) ? 1 : 0
    isSpaceOkay := (thumbsDisplaying!=1 && isSpaceOkay=1 && maxFilesIndex>0 && IMGresizingMode=4) ? 1 : 0
-   If (colorPickerModeNow>=1 || mustCaptureCloneBrush=1)
+   imgEdit := isImgEditingNow()
+   If ((colorPickerModeNow>=1 || mustCaptureCloneBrush=1) && imgEdit=1)
    {
       If isVarEqualTo(keyu, "Escape", "win-close", "!F4", "Enter", "Space", "Tab", "Delete", "BackSpace")
       {
-          lastOtherWinClose := A_TickCount
-          If (colorPickerModeNow>=1)
-             colorPickerModeNow := (keyu="Enter" && colorPickerModeNow>=1) ? 2 : 3
-          If (mustCaptureCloneBrush=1)
-             StopCaptureClickStuff(keyu)
-      } Else callMain := 1
-   } Else If (slideShowRunning=1 || animGIFplaying=1)
+         lastOtherWinClose := A_TickCount
+         If (colorPickerModeNow>=1)
+            colorPickerModeNow := (keyu="Enter" && colorPickerModeNow>=1) ? 2 : 3
+         If (mustCaptureCloneBrush=1)
+            StopCaptureClickStuff(keyu)
+      } Else If (mustCaptureCloneBrush=1)
+      {
+         If isVarEqualTo(keyu, "A", "SLASH", "BSLASH", "V", "H", "T", "+T", "F", "+F", "EQUAL", "MINUS", "Left","Right","Up","Down")
+            callMain := 1
+      }
+   } Else If ((slideShowRunning=1 || animGIFplaying=1) && imgEdit=1)
    {
       If isVarEqualTo(keyu, "Escape","win-close","!F4","Enter","Space","Tab","Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete")
          stopGifORslidesPlayback(1)
-      Else
+      Else If isVarEqualTo(keyu, "A", "SLASH", "BSLASH", "+BSLASH", "V", "H", "T", "+T", "F", "+F", "EQUAL", "MINUS", "COMMA", "PERIOD", "+COMMA", "+PERIOD", "NUMPADMULT")
          callMain := 1
    } Else If (isVarEqualTo(keyu, "Escape", "win-close", "!F4") || ((keyu="Enter" || keyu="Space") && runningLongOperation=1))
    {
       byeByeRoutine(keyu, 1)
-   } Else If (keyu="Space" && isSpaceOkay=1 && isImgEditingNow()=1 && runningLongOperation=0)
+   } Else If (keyu="Space" && isSpaceOkay=1 && imgEdit=1 && runningLongOperation=0)
    {
       uiChangeMcursor("move")
    } Else If (canCancelImageLoad=1 && runningLongOperation=0 && !AnyWindowOpen)
