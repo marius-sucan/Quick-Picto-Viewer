@@ -8569,16 +8569,19 @@ inline bool blurNeedsAlphaWeighting(const unsigned char *data, const int &w, con
       return opaque==0;
 }
 
-// c*(a+1)>>8 -- exact for a=255, ~c*a/255 otherwise; alpha passes through untouched.
-inline void blurWeighByAlpha(const unsigned char *src, unsigned char *dst, const int &w, const int &h, const int &Stride) {
-      #pragma omp parallel for schedule(static) default(none) shared(src, dst, w, h, Stride)
+// c*(a+1)>>8 -- exact for a=255, ~c*a/255 otherwise; alpha passes through untouched. keep receives
+// the untouched pixels, so src and dst may be the same buffer; keep must be a third one.
+inline void blurWeighByAlpha(const unsigned char *src, unsigned char *dst, unsigned char *keep, const int &w, const int &h, const int &Stride) {
+      #pragma omp parallel for schedule(static) default(none) shared(src, dst, keep, w, h, Stride)
       for (int y = 0; y < h; y++)
       {
          const unsigned char *p = src + (INT64)y*Stride;
          unsigned char *q = dst + (INT64)y*Stride;
-         for (int x = 0; x < w; x++, p += 4, q += 4)
+         unsigned char *k = keep + (INT64)y*Stride;
+         for (int x = 0; x < w; x++, p += 4, q += 4, k += 4)
          {
             const unsigned int a = (unsigned int)p[3] + 1;
+            *(UINT32 *)k = *(const UINT32 *)p;
             q[0] = (unsigned char)((p[0]*a) >> 8);
             q[1] = (unsigned char)((p[1]*a) >> 8);
             q[2] = (unsigned char)((p[2]*a) >> 8);
@@ -8624,12 +8627,17 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
       }
 
       // straight-ARGB sources get weighted by their own alpha once, up front, so the streaks mix
-      // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out
+      // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out.
+      // The weighting runs in place; newData is idle until the gather starts, so it keeps the
+      // untouched pixels for the pass-through reads and the output alpha: every pixel reads only
+      // its own original before overwriting it
       const unsigned char *srcData = imageData;
+      const unsigned char *origData = imageData;
       if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
       {
          fnOutputDebug("zoomBlurBitmap weighted");
-         blurWeighByAlpha(imageData, imageData, w, h, Stride);
+         blurWeighByAlpha(imageData, imageData, newData, w, h, Stride);
+         origData = newData;
       }
 
       if (mode==2 || mode==3)
@@ -8641,14 +8649,14 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
          const INT64 laneStep = (mode==2) ? Stride : chan;
          const double cLane = (mode==2) ? (double)cx : (double)cy;
 
-         #pragma omp parallel shared(imageData, srcData, newData, lanes, lanePix, pixStep, laneStep, cLane, chan, f)
+         #pragma omp parallel shared(origData, srcData, newData, lanes, lanePix, pixStep, laneStep, cLane, chan, f)
          {
             std::vector<double> pre((INT64)(lanePix + 1)*chan, 0.0);
             #pragma omp for schedule(static)
             for (int L = 0; L < lanes; L++)
             {
                const unsigned char *lane = srcData + L*laneStep;      // alpha-weighted, for the sums
-               const unsigned char *oLane = imageData + L*laneStep;   // untouched, for pass-through pixels
+               const unsigned char *oLane = origData + L*laneStep;    // untouched, for pass-through pixels
                unsigned char *outLane = newData + L*laneStep;
                double sum[4] = { 0.0, 0.0, 0.0, 0.0 };
                for (int i = 0; i < lanePix; i++)
@@ -8697,10 +8705,11 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                      {
                         const double sc = 255.0 / sums[3];
                         const double avgA = sums[3] * inv;
+                        const double srcA = (double)px[3];   // read before out[] is written: px may alias out
                         out[0] = (unsigned char)(min(255.0, sums[0] * sc) + 0.5);
                         out[1] = (unsigned char)(min(255.0, sums[1] * sc) + 0.5);
                         out[2] = (unsigned char)(min(255.0, sums[2] * sc) + 0.5);
-                        out[3] = (unsigned char)(((double)px[3]>avgA ? (double)px[3] : avgA) + 0.5);
+                        out[3] = (unsigned char)((srcA>avgA ? srcA : avgA) + 0.5);
                      }
                   } else
                   {
@@ -8723,7 +8732,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
       const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
       const double cxf = (double)cx, cyf = (double)cy;
 
-      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, srcData, newData, w, h, Stride, bpp, chan, f, maxS, cxf, cyf)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, origData, srcData, newData, w, h, Stride, bpp, chan, f, maxS, cxf, cyf)
       for (int y = 0; y < h; y++)
       {
          unsigned char *out = newData + (INT64)y*Stride;
@@ -8734,7 +8743,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
             const double len = sqrt(tx*tx + ty*ty);
             if (len<0.0001)
             {
-               const unsigned char *p = imageData + CalcPixOffset(x, y, Stride, bpp);
+               const unsigned char *p = origData + CalcPixOffset(x, y, Stride, bpp);
                for (int c = 0; c < chan; c++)
                    out[c] = p[c];
                continue;
@@ -8810,7 +8819,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                // average as always
                int lanes[4];
                _mm_storeu_si128((__m128i *)lanes, acc);
-               const unsigned char *sp = imageData + (INT64)y*Stride + (INT64)x*4;
+               const unsigned char *sp = origData + (INT64)y*Stride + (INT64)x*4;
                if (lanes[3]<1)
                {
                   *(UINT32 *)out = *(const UINT32 *)sp;   // the streak saw nothing visible; keep the pixel
@@ -8818,10 +8827,11 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
                {
                   const double sc = 255.0 / (double)lanes[3];
                   const double avgA = (double)lanes[3] / ((double)n * 32768.0);
+                  const double srcA = (double)sp[3];   // read before out[] is written: sp may alias out
                   out[0] = (unsigned char)(min(255.0, (double)lanes[0] * sc) + 0.5);
                   out[1] = (unsigned char)(min(255.0, (double)lanes[1] * sc) + 0.5);
                   out[2] = (unsigned char)(min(255.0, (double)lanes[2] * sc) + 0.5);
-                  out[3] = (unsigned char)(((double)sp[3]>avgA ? (double)sp[3] : avgA) + 0.5);
+                  out[3] = (unsigned char)((srcA>avgA ? srcA : avgA) + 0.5);
                }
             } else
             {
@@ -8892,8 +8902,9 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 // content that is actually visible. Output alpha is the arc average but never below the source
 // pixel's own. Together that keeps transparency from either diluting the effect into
 // invisibility or bleeding the RGB hidden under it [usually white] over the image.
-// imageData is the untouched source and newData receives the result; a gather filter cannot
-// work in place, so the two must be distinct buffers.
+// imageData is the source and newData receives the result; a gather filter cannot work in place,
+// so the two must be distinct buffers. A 32-bpp source carrying transparency gets weighted in
+// place by blurWeighByAlpha(), to avoid a third buffer.
 
       if (!imageData || !newData || imageData==newData || w<1 || h<1 || Stride<1 || (bpp!=24 && bpp!=32))
          return 0;
@@ -8910,10 +8921,17 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
       }
 
       // straight-ARGB sources get weighted by their own alpha once, up front, so the arcs mix
-      // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out
+      // only what is actually visible [see blurWeighByAlpha]; the resolve divides it back out.
+      // The weighting runs in place; newData is idle until the gather starts, so it keeps the
+      // untouched pixels for the pass-through reads and the output alpha: every pixel reads only
+      // its own original before overwriting it
       const unsigned char *srcData = imageData;
+      const unsigned char *origData = imageData;
       if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
-         blurWeighByAlpha(imageData, imageData, w, h, Stride);
+      {
+         blurWeighByAlpha(imageData, imageData, newData, w, h, Stride);
+         origData = newData;
+      }
 
       const int maxS = (quality<1) ? 128 : clamp(quality, 8, 256);
       const double cxf = (double)cx, cyf = (double)cy;
@@ -8929,7 +8947,7 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
       }
 
       // rows far from the anchor carry longer arcs, hence schedule(dynamic)
-      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, srcData, newData, w, h, Stride, bpp, chan, A, maxS, cxf, cyf, cH, sH, stepC, stepS)
+      #pragma omp parallel for schedule(dynamic) default(none) shared(imageData, origData, srcData, newData, w, h, Stride, bpp, chan, A, maxS, cxf, cyf, cH, sH, stepC, stepS)
       for (int y = 0; y < h; y++)
       {
          unsigned char *out = newData + (INT64)y*Stride;
@@ -8940,7 +8958,7 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
             const double r2 = dx*dx + dy*dy;
             if (r2<0.00000001)
             {
-               const unsigned char *p = imageData + CalcPixOffset(x, y, Stride, bpp);
+               const unsigned char *p = origData + CalcPixOffset(x, y, Stride, bpp);
                for (int c = 0; c < chan; c++)
                    out[c] = p[c];
                continue;
@@ -9034,7 +9052,7 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                // sum and a faint fringe can never outvote it
                int lanes[4];
                _mm_storeu_si128((__m128i *)lanes, acc);
-               const unsigned char *sp = imageData + (INT64)y*Stride + (INT64)x*4;
+               const unsigned char *sp = origData + (INT64)y*Stride + (INT64)x*4;
                if (lanes[3]<1)
                {
                   *(UINT32 *)out = *(const UINT32 *)sp;   // the arc saw nothing visible; keep the pixel
@@ -9042,10 +9060,11 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
                {
                   const double sc = 255.0 / (double)lanes[3];
                   const double avgA = (double)lanes[3] / ((double)n * 32768.0);
+                  const double srcA = (double)sp[3];   // read before out[] is written: sp may alias out
                   out[0] = (unsigned char)(min(255.0, (double)lanes[0] * sc) + 0.5);
                   out[1] = (unsigned char)(min(255.0, (double)lanes[1] * sc) + 0.5);
                   out[2] = (unsigned char)(min(255.0, (double)lanes[2] * sc) + 0.5);
-                  out[3] = (unsigned char)(((double)sp[3]>avgA ? (double)sp[3] : avgA) + 0.5);
+                  out[3] = (unsigned char)((srcA>avgA ? srcA : avgA) + 0.5);
                }
             } else
             {
