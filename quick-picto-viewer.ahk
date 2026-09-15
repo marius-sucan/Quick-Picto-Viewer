@@ -111,9 +111,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
-   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
+   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
-   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|AVIF|HEIC|HEIF|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
@@ -2860,7 +2860,7 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
       file2save := mainCompiledPath "\wallpaper-" OutNameNoExt ".jpg"
       If !FileRexists(file2save)
       {
-         frameLoad := InStr(filesFilter, "QPV:PAGES:") ? currentFileIndex - 1 : 0
+         frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
          zBitmap := LoadBitmapFromFileu(imgPath, 0, 0, frameLoad)
          If validBMP(zBitmap)
             r := QPV_SaveImageFile(A_ThisFunc, zBitmap, file2save, 90, 2)
@@ -11657,7 +11657,7 @@ defineFilesListType() {
     } Else If (SLDtypeLoaded=3)
        infou := testIsDupesList() ?  "SQLITE DATABASE | Image duplicates list | Cached list" : "SQLITE DATABASE | Cached list"
 
-    If InStr(filesFilter, "QPV:PAGES:")
+    If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
        infou .= " | Frames / pages list"
 
     Return infou
@@ -12217,7 +12217,7 @@ changeDesiredFrame(dir:=1) {
    If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tiff|tif))$")
       dir := -1
 
-   If InStr(filesFilter, "QPV:PAGES:")
+   If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
       currentFileIndex := clampInRange(desiredFrameIndex + 1, 0, maxFilesIndex)
 
    If ((A_TickCount - lastInvoked > 350) || dir=-1 || drawModeCzeit>450)
@@ -25407,8 +25407,7 @@ thumbsSelector(keyu, aKey, prevFileIndex) {
   ; ToolTip, % prevFileIndex "--" markedSelectFile 
   If (InStr(aKey, "+") && (keyu="Left" || keyu="Upu" || keyu="Home") && prevFileIndex<=1)
   || (InStr(aKey, "+") && (keyu="Right" || keyu="Down" || keyu="End") && prevFileIndex>=maxFilesIndex)
-     Return
-  If InStr(filesFilter, "QPV:PAGES:")
+  || (InStr(filesFilter, "i)(QPV:PAGES:")=1)
      Return
 
   selA := resultedFilesList[currentFileIndex, 2]
@@ -33504,7 +33503,7 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
          remFilesListFilter("simple")
       } Else bckpResultedFilesList := []
       Return
-   } Else If InStr(filesFilter, "QPV:PAGES:")
+   } Else If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
    {
       imgPath := getIDimage(currentFileIndex)
       frames := resultedFilesList[currentFileIndex, 9]
@@ -39545,7 +39544,7 @@ markThisFileNow(thisFileIndex:=0) {
   if !IsNumber(thisFileIndex)
      thisFileIndex := 0
 
-  If (currentFileIndex=0 || maxFilesIndex<2 || AnyWindowOpen>0 || InStr(filesFilter, "QPV:PAGES:"))
+  If (currentFileIndex=0 || maxFilesIndex<2 || AnyWindowOpen>0 || (InStr(filesFilter, "i)(QPV:PAGES:")=1))
      Return
 
   If !thisFileIndex
@@ -40348,7 +40347,7 @@ batchFileDelete(dontAlterIndex:=0) {
 }
 
 warnFramesActionPrevented(actu) {
-  If InStr(filesFilter, "QPV:PAGES:")
+  If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
   {
      showTOOLtip("WARNING: Illegal operation: " actu ".`nThe action is not permitted on image frames/pages.`nYou can deactivate this mode with Ctrl+Space.")
      SoundBeep 300, 100
@@ -44162,7 +44161,7 @@ WriteSettingsThumbsSheetPanel() {
 }
 
 calculateThumbsSheetDimensions(ByRef width, ByRef height) {
-   imgs := InStr(filesFilter, "QPV:PAGES:") ? maxFilesIndex : markedSelectFile 
+   imgs := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? maxFilesIndex : markedSelectFile 
    frame := Round((userThumbsSheetFrame/100) * userThumbsSheetSpacing)
    thisFntSize := clampInRange(TextInAreaFontSize, 5, userThumbsSheetHeight//1.7)
    labelHeight := (userThumbsSheetShowLabel=1) ? Round(thisFntSize*1.25) : 0
@@ -44277,9 +44276,9 @@ generateThumbsSheet() {
    frame := Round((userThumbsSheetFrame/100) * userThumbsSheetSpacing)
    px := py := frame
    cols := 1
-   framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
+   framePreviewsMode := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? 1 : 0
    imgPath := StrReplace(resultedFilesList[currentFileIndex, 1], "|")
-   imgzSelected := InStr(filesFilter, "QPV:PAGES:") ? maxFilesIndex : markedSelectFile 
+   imgzSelected := (framePreviewsMode=1) ? maxFilesIndex : markedSelectFile 
    whileLoopExec := 1
    getSelectedFiles(0, 1)
    doStartLongOpDance()
@@ -44406,7 +44405,7 @@ generateThumbsSheet() {
 }
 
 PanelCreateIMGthumbsSheet() {
-    filesElected := InStr(filesFilter, "QPV:PAGES:") ? maxFilesIndex : getSelectedFiles(0, 1)
+    filesElected := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? maxFilesIndex : getSelectedFiles(0, 1)
     If (!filesElected || filesElected>50109)
     {
        If !filesElected
@@ -44496,7 +44495,7 @@ PanelCreateIMGthumbsSheet() {
     Gui, Add, Checkbox, xs y+15 Section gupdateUIthumbsSheet Checked%userThumbsSheetHideExt% vuserThumbsSheetHideExt, &Hide file extensions
 
     Gui, Tab
-    If InStr(filesFilter, "QPV:PAGES:")
+    If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
        Gui, Add, Text, xm+15 y+15 Section, %mk% frames / pages in the current multi-page file.
     Else
        Gui, Add, Text, xm+15 y+15 Section, %mk% images selected.
@@ -47409,7 +47408,7 @@ importEditGivenImageFile() {
       Return
    }
 
-   frameLoad := InStr(filesFilter, "QPV:PAGES:") ? currentFileIndex - 1 : 0
+   frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
    currentFileIndex := prevLoadedImageIndex
    MenuReturnIMGedit()
    Sleep, 2
@@ -47433,7 +47432,7 @@ importAlphaMaskGivenImageFile() {
       Return
    }
 
-   frameLoad := InStr(filesFilter, "QPV:PAGES:") ? currentFileIndex - 1 : 0
+   frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
    zBitmap := LoadBitmapFromFileu(imgPath, 0, 0, frameLoad)
    SetImageAsAlphaMask("yes-bitmap", zBitmap)
    trGdip_DisposeImage(zBitmap)
@@ -47702,7 +47701,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
 
        If (wasGiven=1)
        {
-          frameLoad := InStr(filesFilter, "QPV:PAGES:") ? givenIndex : 0
+          frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? givenIndex : 0
           If (viewportQPVimage.imgHandle)
           {
              hFIFimgA := LoadBitmapAsFreeImage(dummy, -1, oImgW, oImgH, imgBPP)
@@ -53280,7 +53279,7 @@ PanelPrintImage() {
     GuiAddEdit("x+5 w" EditWid " hp gupdateUIprintPreview r1 limit2 +number -multi -wantTab -wrap veditFc", PrintCopies, "Copies")
     Gui, Add, UpDown, vPrintCopies gupdateUIprintPreview Range1-99, % PrintCopies
     Gui, Add, Text, x+5 hp +0x200, copies to print
-    If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf|tiff|tif)$") && totalFramesIndex>1 || InStr(filesFilter, "QPV:PAGES:"))
+    If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf|tiff|tif)$") && totalFramesIndex>1 || (InStr(filesFilter, "i)(QPV:PAGES:")=1))
     {
        Gui, Add, Text, xs y+10 +0x200 +hwndhTemp, Pages to print
        GuiAddDropDownList("x+5 wp gupdateUIprintPreview AltSubmit Choose" PrintPDFpagesRange " vPrintPDFpagesRange", "Current|All|Given range", [hTemp])
@@ -53492,7 +53491,7 @@ BtnStartPrintingNow(a, b) {
    If (multiFramesMode=1 && markedSelectFile<2 && PrintPDFpagesRange>1)
    || (multiFramesMode=1 && InStr(c, "active") && PrintPDFpagesRange>1)
       batchImgPrinting(PrintOptions, 1, imgPath, totalFramesIndex)
-   Else If (InStr(filesFilter, "QPV:PAGES:") && PrintPDFpagesRange>1)
+   Else If (InStr(filesFilter, "i)(QPV:PAGES:")=1 && PrintPDFpagesRange>1)
       batchImgPrinting(PrintOptions, 1, imgPath, maxFilesIndex)
    Else If (markedSelectFile>1 && !InStr(c, "active"))
       batchImgPrinting(PrintOptions)
@@ -56364,7 +56363,7 @@ PanelPDFreadTexts() {
     Gui, Tab, 3
     Gui, Add, Text, x+15 y+15 Section w%txtWid%, Press space or double-click a PDF embedded bookmark to jump through the document.
     GuiAddListView("xs y+5 w" txtWid " +LV0x10000 r11 Grid -multi AltSubmit vLViewPDFbookmarks gLVactPDFtexts", "#|Page|Section title", "PDF bookmars")
-    If (thumbsDisplaying=1 && InStr(filesFilter, "QPV:PAGES:"))
+    If (thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")=1)
        userActivePDFpage := currentFileIndex - 1
 
     If (filesElected>1)
@@ -56454,7 +56453,7 @@ LVactPDFtexts(CtrlHwnd:=0, b:=0, c:=0) {
         Try Run, % url
      } Else If (CurrentPanelTab=3)
      {
-        If (thumbsDisplaying=1 && InStr(filesFilter, "QPV:PAGES:"))
+        If (thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")=1)
         {
            currentFileIndex := url + 1
            desiredFrameIndex := url - 1
@@ -56503,7 +56502,7 @@ BTNbatchExtractTextsPDFs() {
 }
 
 BTNnextPDFpage() {
-   If (thumbsDisplaying=1 && InStr(filesFilter, "QPV:PAGES:"))
+   If (thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")=1)
       BtnNextImg()
    Else If (thumbsDisplaying=1)
       userActivePDFpage++
@@ -56514,7 +56513,7 @@ BTNnextPDFpage() {
 }
 
 BTNprevPDFpage() {
-   If (thumbsDisplaying=1 && InStr(filesFilter, "QPV:PAGES:"))
+   If (thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")=1)
       BtnPrevImg()
    Else If (thumbsDisplaying=1)
       userActivePDFpage--
@@ -56540,7 +56539,7 @@ UIpopulatePDFtexts() {
    Gui, SettingsGUIA: Default
    imgPath := getIDimage(currentFileIndex)
    pwd := PDFpwdsCache[imgPath]
-   If (thumbsDisplaying=1 && InStr(filesFilter, "QPV:PAGES:"))
+   If (thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")=1)
    {
       userActivePDFpage := currentFileIndex - 1
    } Else If (thumbsDisplaying=1)
@@ -66087,7 +66086,7 @@ InvokeMenuBarEdit(manuID:=0, justBuild:=0) {
          kMenu("pvMenuBarEdit", "Add", "Re&group selected dispersed files", "regroupSelectedFiles")
       }
 
-      If !InStr(filesFilter, "QPV:PAGES:")
+      If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
       {
          kMenu("pvMenuBarEdit", "AddSeparator", 0)
          If !EntryMarkedMoveIndex
@@ -66389,12 +66388,12 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         Menu, pvMenuBarImage, Add
      }
 
-     If !InStr(filesFilter, "QPV:PAGES:")
+     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
         createMenuImageFileActions("pvMenuBarImage")
 
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
-     If (!InStr(filesFilter, "QPV:PAGES:") && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tif|tiff))$"))
+     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tif|tiff))$"))
         kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
      If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
         kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
@@ -66407,7 +66406,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarImage", "Disable", "Join images into...")
 
      kMenu("pvMenuBarImage", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet", "generate")
-     If (!InStr(filesFilter, "QPV:PAGES:") && !markedSelectFile)
+     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && !markedSelectFile)
         kMenu("pvMenuBarImage", "Disable", "&Create a thumbnails sheet")
 
      If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
@@ -67972,7 +67971,7 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    If markedSelectFile
       kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create tiff document")
-   If (InStr(filesFilter, "QPV:PAGES:") || markedSelectFile)
+   If (InStr(filesFilter, "i)(QPV:PAGES:")=1 || markedSelectFile)
       kMenu("PVfilesActs", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet", "generate")
 
    If (!markedSelectFile && FileRexists(resultedFilesList[currentFileIndex, 1]) && thumbsDisplaying=1)
@@ -67983,7 +67982,7 @@ createMenuCurrentFilesActs(dummy:=0) {
       Menu, PVfilesActs, Add
    }
 
-   If !InStr(filesFilter, "QPV:PAGES:")
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
    {
       createMenuImageFileActions("PVtFileImgAct")
       kMenu("PVfilesActs", "Add", "Modify image(s)", ":PVtFileImgAct")
@@ -68011,7 +68010,7 @@ createMenuCurrentFilesActs(dummy:=0) {
       } Else kMenu("PVfilesActs", "Add", "&File information`tAlt+Enter", "PanelImageInfos", "properties image details")
    }
 
-   If (!markedSelectFile && !InStr(filesFilter, "QPV:PAGES:"))
+   If (!markedSelectFile && InStr(filesFilter, "i)(QPV:PAGES:")!=1)
    {
       friendly := resultedFilesList[currentFileIndex, 2] ? "De&select" : "&Select"
       kMenu("PVfilesActs", "Add", friendly " file`tTab", "markThisFileNow")
@@ -68025,12 +68024,12 @@ createMenuCurrentFilesActs(dummy:=0) {
       }
    }
 
-   If (mustRecordSeenImgs=1 && thumbsDisplaying=1 && !InStr(filesFilter, "QPV:PAGES:"))
+   If (mustRecordSeenImgs=1 && thumbsDisplaying=1 && InStr(filesFilter, "i)(QPV:PAGES:")!=1)
       kMenu("PVfilesActs", "Add", "&Toggle Image(s) Seen status`tShift+S", "ToggleSeenIMGstatus")
 }
 
 createMenuFilesSort() {
-   If InStr(filesFilter, "QPV:PAGES:")
+   If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
    {
       kMenu("PVsort", "Add", "Action not allowed", "dummy")
       kMenu("PVsort", "Disable", "Action not allowed")
@@ -69887,10 +69886,10 @@ createMenuFilesSelections(whichMenu) {
       kMenu(whichMenu, "Add", "Invert selection`tShift+I", "invertFilesSelection", "files list")
    }
 
-   If (markedSelectFile>1 || EntryMarkedMoveIndex || InStr(filesFilter, "QPV:PAGES:"))
+   If (markedSelectFile>1 || EntryMarkedMoveIndex || InStr(filesFilter, "i)(QPV:PAGES:")=1)
       kMenu(whichMenu, "Add", "Select none`tCtrl+D", "dropFilesSelection", "files list")
 
-   If !InStr(filesFilter, "QPV:PAGES:")
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
    {
       kMenu(whichMenu, "Add", "Select all`tCtrl+A", "selectAllFiles", "files list")
       keyu := (thumbsDisplaying=1 || markedSelectFile>1) ? "Space" : "Tab"
@@ -70042,7 +70041,7 @@ createMenuDirsFaved(howMany, extendedMode) {
    }
 
    Menu, PVdirsFaved, Add
-   If !InStr(filesFilter, "QPV:PAGES:")
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
       kMenu("PVdirsFaved", "Add", "&Add/remove current files list to favourites", "MenuAddThisListAtFaves")
    If (counter>0)
       kMenu("PVdirsFaved", "Add", "&Remove inexistent entries", "removeDeadFavedFolders")
@@ -70055,7 +70054,6 @@ createMenuDirsFaved(howMany, extendedMode) {
 createMenuFavourites() {
    createMenuDirsFaved(15, 0)
    kMenu("PVfaves", "Add", "Files lists and folders", ":PVdirsFaved")
-
    If (mustPreventMenus!=1)
       favesList := readMiniFavesEntries()
 
@@ -70095,7 +70093,7 @@ createMenuFavourites() {
    If (cycleFavesOpenIMG=1)
       kMenu("PVfaves", "Check", "&Cycle favourites list on open")
 
-   If !InStr(filesFilter, "QPV:PAGES:")
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
    {
       kMenu("PVfaves", "Add", "&Add/remove current image to favourites`tB", "ToggleImgFavourites")
       If !(maxFilesIndex>0 && CurrentSLD)
@@ -73738,7 +73736,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
     imgPath := StrReplace(imgPath, "||")
     fldr := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
     filu := SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1)
-    If InStr(filesFilter, "QPV:PAGES:")
+    If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
        desiredFrameIndex := currentFileIndex - 1
 
     pfn := (userPrivateMode=1) ? "Loading file..." : "<> " filu " | " fldr "\"
@@ -73759,7 +73757,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        If (thisImgPath!=prevImgPath && currentFileIndex!=0)
        {
           terminateIMGediting()
-          If InStr(filesFilter, "QPV:PAGES:")
+          If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
              desiredFrameIndex := currentFileIndex - 1
           ; Else If (SubStr(prevImgPath, InStr(prevImgPath, "|"))!=SubStr(thisImgPath, InStr(thisImgPath, "|")))
           Else If (prevImgPath!=thisImgPath)
@@ -74171,7 +74169,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     If (StrLen(filesFilter)>1)
     {
        modus := (userFilterInvertThis=1) ? ": (inverted)`n" : ":`n"
-       If !InStr(filesFilter, "QPV:PAGES:")
+       If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
           infoFilteru := "`nFiles list filtered from " groupDigits(bckpMaxFilesIndex) " down to " groupDigits(maxFilesIndex) " ( " Round(maxFilesIndex/bckpMaxFilesIndex*100, 2) "% )."
        oldIndex := filteredMap2mainList[currentFileIndex]
        If oldIndex
@@ -76132,7 +76130,7 @@ coreCreateVPnavBox(modus:=0) {
       If !FileRexists(imgPath)
          Return
 
-      frameLoad := InStr(filesFilter, "QPV:PAGES:") ? currentFileIndex - 1 : 0
+      frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
       MD5name := generateThumbName(imgPath, 1, frameLoad)
       file2save := thumbsCacheFolder "\500-" MD5name ".png"
       If FileExist(file2save)
@@ -82515,7 +82513,7 @@ selectAllFiles() {
        Return
 
     selMode := (markedSelectFile < maxFilesIndex || !markedSelectFile) ? 1 : 0
-    If InStr(filesFilter, "QPV:PAGES:")
+    If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
        selMode := 0
 
     Loop, % maxFilesIndex
@@ -83532,7 +83530,7 @@ recordFilesListImgProps(imgIndex, widthu, heightu, framesu, pixFmt, dpiu, isFilt
 }
 
 recordSQLimgPropsNow(imgIndex, imgPath) {
-   If (SLDtypeLoaded!=3 || !resultedFilesList[imgIndex, 13] || InStr(filesFilter, "QPV:PAGES:"))
+   If (SLDtypeLoaded!=3 || !resultedFilesList[imgIndex, 13] || InStr(filesFilter, "i)(QPV:PAGES:")=1)
       Return 0
 
    Return updateSQLdbEntryImgRes(imgPath, 1, 1, resultedFilesList[imgIndex, 12], imgIndex)
@@ -83627,6 +83625,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
        activeSQLdb.Exec("BEGIN TRANSACTION;")
 
     borderSize := imgHUDbaseUnit//5
+    listedFrames := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? 1 : 0
     txtOptions := initInPlaceTextOptions(thisGu, OSDFontBolded, OSDfontItalica, 1, 0, OSDFontName, OSDfontSize//1.25, "0xEE" OSDtextColor, borderSize)
     otherTxtObj := TextuToGraphics(thisGu, "initing", txtOptions, OSDFontName, "begin", 0, 0, 1)
     Loop, % maxItemsW*maxItemsH*2
@@ -83654,7 +83653,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
         {
            ; no details mode
            entireString := (userPrivateMode=1) ? "******.***`n*:\***\******\`n" : fileNamu "`n" sfolderu "\"
-           If (userSearchString && markSearchMatches=1)
+           If (userSearchString && markSearchMatches=1 && listedFrames=0)
            {
               If coreSearchIndex(imgPath, thisSearchString, userSearchWhat)
                  Gdip_FillRectangle(thisGu, pBrushD, DestPosX + thumbsW - Ceil(thumbsW*0.05) - 4, DestPosY + 4, Ceil(thumbsW*0.05), thumbsH - 8)
@@ -83669,11 +83668,13 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
            Try FormatTime, FileDateM, % FileDateM, dd/MM/yyyy, HH:mm
            Try FormatTime, FileDateC, % FileDateC, dd/MM/yyyy, HH:mm
            fileMsg := FileExist(imgPath) ? FileDateC " | " FileDateM " | " fileSizu : "Error gathering data..."
-           entireString := (userPrivateMode=1) ?  mgpx "******.***`n*:\***\******\`n" fileMsg : mgpx fileNamu "`n" sfolderu "\`n" fileMsg
+           If (listedFrames=1)
+              fileMsg := thisFileIndex " | " fileMsg
+           entireString := (userPrivateMode=1) ?  "******.***`n*:\***\******\`n" fileMsg : fileNamu "`n" sfolderu "\`n" fileMsg
            If (ofileSizu<50 && !InStr(fileMsg, "error"))
            {
               Gdip_FillRectangle(thisGu, zBru, DestPosX + thumbsW - Ceil(thumbsW*0.05) - 4, DestPosY + 4, Ceil(thumbsW*0.05), thumbsH - 8)
-           } Else If (userSearchString && markSearchMatches=1)
+           } Else If (userSearchString && markSearchMatches=1 && listedFrames=0)
            {
               If coreSearchIndex(imgPath, thisSearchString, userSearchWhat)
                  Gdip_FillRectangle(thisGu, pBrushD, DestPosX + thumbsW - Ceil(thumbsW*0.05) - 4, DestPosY + 4, Ceil(thumbsW*0.05), thumbsH - 8)
@@ -83683,22 +83684,24 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
            ; image details mode
            If FileExist(imgPath)
            {
-              If !resultedFilesList[thisFileIndex, 9]
+              If (!resultedFilesList[thisFileIndex, 9] && listedFrames=0)
               {
                  If !retrieveSQLdbEntryImgInfos(imgPath, thisFileIndex, resultedFilesList[thisFileIndex, 12])
                     GetCachableImgFileDetails(imgPath, thisFileIndex)
 
-                 If (SLDtypeLoaded=3 && resultedFilesList[thisFileIndex, 13] && !InStr(filesFilter, "QPV:PAGES:"))
+                 If (SLDtypeLoaded=3 && resultedFilesList[thisFileIndex, 13] && InStr(filesFilter, "i)(QPV:PAGES:")!=1)
                     updateSQLdbEntryImgRes(imgPath, 1, 1, resultedFilesList[thisFileIndex, 12], thisFileIndex)
               }
 
               Width := resultedFilesList[thisFileIndex, 13]
               Height := resultedFilesList[thisFileIndex, 14]
-              CountFrames := (resultedFilesList[thisFileIndex, 9]>1) ? " | " resultedFilesList[thisFileIndex, 9] " f" : ""
+              CountFrames := (listedFrames=0 && resultedFilesList[thisFileIndex, 9]>1) ? " | " resultedFilesList[thisFileIndex, 9] " F" : ""
               mgpx := " | " resultedFilesList[thisFileIndex, 17] " MPx | " Round(Width/Height, 2)
               ofileSizu := QPV_FileGetSizeTime(imgPath, "S", thisFileIndex)
-              fileSizu := " | " fileSizeFriendly(ofileSizu)
+              fileSizu := (listedFrames=0) ? " | " fileSizeFriendly(ofileSizu) : ""
               fileMsg := groupDigits(Width) " x " groupDigits(Height) CountFrames mgpx fileSizu
+              If (listedFrames=1)
+                 fileMsg := thisFileIndex " | " fileMsg
            } Else fileMsg := "Error gathering data"
 
            entireString := (userPrivateMode=1) ? "******.***`n*:\***\******\`n" fileMsg : fileNamu "`n" sfolderu "\`n" fileMsg
@@ -83830,7 +83833,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
 
     listedItems := ""
     theMsg := theMsg2 := itemInfos := ""
-    framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
+    framePreviewsMode := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? 1 : 0
     Loop, % maxItemsW*maxItemsH*2
     {
         thisFileIndex := startIndex + A_Index - 1
@@ -84453,7 +84456,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     prevGUIupdate := A_TickCount
     whichCoreBusy := hasDrawn := lastMsg := imgsMustPaint := imgsNotCached := imgsFileCached := 0
     paintedOnScreen := pageIncomplete := drawErrors := 0
-    framePreviewsMode := InStr(filesFilter, "QPV:PAGES:") ? 1 : 0
+    framePreviewsMode := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? 1 : 0
     Loop, % maxItemsW*maxItemsH*2
     {
         ; identify what needs to be done; are thumbs cached in memory?
@@ -84545,7 +84548,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
    limitCores := realSystemCores + 1
    maxLimitReached := (minimizeMemUsage=1) && (maxFilesIndex>654321 || bckpMaxFilesIndex>654321) ? 1 : 0
    mustDoMultiCore := (allowMultiCoreMode=1 && maxLimitReached!=1 && multiCoreThumbsInitGood=1 && thumbsPoolState) ? 1 : 0
-   If ((imgsNotCached + imgsFileCached < 2) || InStr(filesFilter, "qpv:pages:"))
+   If ((imgsNotCached + imgsFileCached < 2) || framePreviewsMode=1)
       mustDoMultiCore := 0
 
    fnOutputDebug("ThumbsMode. Init. doMultiCore=" mustDoMultiCore " cores=" limitCores " imgsNotCached=" imgsNotCached " fileCached=" imgsFileCached " imgsMustPaint=" imgsMustPaint)
@@ -95275,7 +95278,7 @@ MenuPreviewFramesFilterList() {
      imgPath := getIDimage(currentFileIndex)
      zPlitPath(imgPath, 1, OutFileName, OutDir, OutFileNameNoExt, OutFileExt)
      folderu := PathCompact(OutDir, "a", 1, OSDfontSize)
-     If InStr(filesFilter, "QPV:PAGES:")
+     If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
      {
         If (thumbsDisplaying!=1)
         {

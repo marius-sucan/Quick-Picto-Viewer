@@ -529,7 +529,7 @@ FreeImage_GetFileType(ImgPath, humanReadable:=0) {
 ; the given ImgPath can be fictional / inexistent.
 ; returns FREE_IMAGE_FORMAT enumeration if humanReadable=0.
 
-   Static fileTypes := {-1:"unknown", 0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR"}
+   Static fileTypes := {-1:"unknown", 0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR", 37:"AVIF", 38:"HEIF"}
    r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImgPath, "Int", 0)
    If (r=-1)
       r := FreeImage_GetFIFFromFilename(ImgPath)
@@ -809,12 +809,14 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ; to save a newly created multi-page image, use FreeImage_CloseMultiBitmap()
 
 /*
-imgFormat parameter takes integer values from 0 to 36
+imgFormat parameter takes integer values from 0 to 37
 relevant I/O image format identifiers.
    FIF_ICO      = 1,
    FIF_TIFF     = 18,
    FIF_GIF      = 25,
    FIF_WEBP     = 35,
+   FIF_AVIF     = 37, (read-only: AVIF image sequences open as multi-page bitmaps)
+   FIF_HEIF     = 38, (read-only: HEIC files with several top-level images open as multi-page bitmaps, the primary image first)
 */
 
    Return DllCall(getFIMfunc("OpenMultiBitmap"), "int", imgFormat, "AStr", ImgPath, "int", create_new, "int", read_only, "int", keep_cache, "int", flags, "uptr")
