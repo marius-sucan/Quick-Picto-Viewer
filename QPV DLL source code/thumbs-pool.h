@@ -178,6 +178,7 @@ struct ThumbsConfig {
     int   tmAltExpo        = 0;
     int   wantBitmap       = 1;
     int   alwaysSave       = 0;
+    int   firstFIM         = 0;
 };
 
 struct ThumbJob {
@@ -1431,8 +1432,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
         } else
         {
            const std::wstring ext = tpFileExtension(job.src);
-           const bool fimHandles  = (FIM.ok && cfg->allowFIM==1 && tpFimExts.count(ext)>0);
-
+           const bool fimHandles  = (FIM.ok && (cfg->allowFIM==1 && tpFimExts.count(ext)>0 || cfg->firstFIM==1));
            if (ext==L"svg")
            {
               // a factory of this worker's own, made on first use so a session that never opens
@@ -1477,7 +1477,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            }
 
            int hasFIMtried = 0;
-           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && fimHandles && cfg->allowFIM==1)
+           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && fimHandles && (cfg->allowFIM==1 || cfg->firstFIM==1))
            {
               int status = TP_ERR_LOAD, saved = 0;
               int fw = 0, fh = 0;
@@ -1494,7 +1494,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               }
            }
 
-           if (bmp==NULL && tpWicExts.count(ext)>0 && res.status!=TP_ERR_PDFLOCKED)
+           if (bmp==NULL && (tpWicExts.count(ext)>0 || hasFIMtried==1) && res.status!=TP_ERR_PDFLOCKED)
            {
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
               // WIC always serializes image processing operations
@@ -1795,6 +1795,7 @@ DLL_API int DLL_CALLCONV thumbsPoolBegin(const wchar_t *packedOptions) {
        cfg->tmAltExpo        = (int)TPOPT(15, 0);
        cfg->wantBitmap       = (int)TPOPT(16, 1);
        cfg->alwaysSave       = (int)TPOPT(17, 0);
+       cfg->firstFIM         = (int)TPOPT(18, 0);
        #undef TPOPT
     }
 

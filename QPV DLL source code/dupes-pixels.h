@@ -104,6 +104,7 @@ struct DupePixCfg {
     float tmOCVparamA      = 0.0f;
     float tmOCVparamB      = 0.0f;
     int   tmAltExpo        = 0;
+    int   firstFIM         = 0;
     int smallW = 9, smallH = 8;
     int bigW  = 32, bigH  = 32;
 };
@@ -713,14 +714,15 @@ static void dpWorkerBody(size_t mySlot) {
         tcfg.allowWIC         = cfg->allowWIC;
         tcfg.allowFIM         = cfg->allowFIM;
         tcfg.imgQuality       = cfg->wicQuality;
-        tcfg.toneMapAlgo     = cfg->toneMapAlgo;
-        tcfg.tmParamA        = cfg->tmParamA;
-        tcfg.tmParamB        = cfg->tmParamB;
-        tcfg.tmParamC        = cfg->tmParamC;
-        tcfg.tmParamD        = cfg->tmParamD;
-        tcfg.tmOCVparamA     = cfg->tmOCVparamA;
-        tcfg.tmOCVparamB     = cfg->tmOCVparamB;
-        tcfg.tmAltExpo       = cfg->tmAltExpo;
+        tcfg.toneMapAlgo      = cfg->toneMapAlgo;
+        tcfg.tmParamA         = cfg->tmParamA;
+        tcfg.tmParamB         = cfg->tmParamB;
+        tcfg.tmParamC         = cfg->tmParamC;
+        tcfg.tmParamD         = cfg->tmParamD;
+        tcfg.tmOCVparamA      = cfg->tmOCVparamA;
+        tcfg.tmOCVparamB      = cfg->tmOCVparamB;
+        tcfg.tmAltExpo        = cfg->tmAltExpo;
+        tcfg.firstFIM         = cfg->firstFIM;
 
         DupePixResult res;
         bool ranIt = false;
@@ -1260,14 +1262,14 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
        }
 
        #define DPOPT(i, def) ((v.size() > (size_t)(i)) ? v[i] : (double)(def))
-       cfg->boxSize       = (int)DPOPT(0, 350);
-       cfg->interpolation = (int)DPOPT(1, 5);
-       cfg->applyBlur     = (int)DPOPT(2, 0);
-       cfg->wantFlipped   = (int)DPOPT(3, 0);
-       cfg->allowWIC      = (int)DPOPT(4, 1);
-       cfg->allowFIM      = (int)DPOPT(5, 1);
-       cfg->userHQraw     = (int)DPOPT(6, 1);
-       cfg->allowToneMap  = (int)DPOPT(7, 1);
+       cfg->boxSize        = (int)DPOPT(0, 350);
+       cfg->interpolation  = (int)DPOPT(1, 5);
+       cfg->applyBlur      = (int)DPOPT(2, 0);
+       cfg->wantFlipped    = (int)DPOPT(3, 0);
+       cfg->allowWIC       = (int)DPOPT(4, 1);
+       cfg->allowFIM       = (int)DPOPT(5, 1);
+       cfg->userHQraw      = (int)DPOPT(6, 1);
+       cfg->allowToneMap   = (int)DPOPT(7, 1);
        cfg->toneMapAlgo    = (int)DPOPT(8, 0);
        cfg->tmParamA       = (float)DPOPT(9, 0);
        cfg->tmParamB       = (float)DPOPT(10, 0);
@@ -1276,6 +1278,7 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
        cfg->tmOCVparamA    = (float)DPOPT(13, 0);
        cfg->tmOCVparamB    = (float)DPOPT(14, 0);
        cfg->tmAltExpo      = (int)DPOPT(15, 0);
+       cfg->firstFIM       = (int)DPOPT(16, 0);
        #undef DPOPT
     }
 

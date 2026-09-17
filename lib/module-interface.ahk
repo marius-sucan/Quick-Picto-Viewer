@@ -229,10 +229,10 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
       Return 0
    }
 
-   If (whileLoopExec=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
+   If (whileLoopExec=1 || animGIFplaying=1 || slideShowRunning=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
    {
-      ; If (mustCaptureCloneBrush=1 || colorPickerModeNow=1)
-      ;    byeByeRoutine("win-close")
+      If (slideShowRunning=1 || animGIFplaying=1 || colorPickerModeNow=1)
+         ProcessCriticalKeys("Enter")
 
       If (msg!=0x11F)
       {

@@ -111,9 +111,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
-   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
+   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|APNG|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
-   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|AVIF|HEIC|HEIF|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|AVIF|HEIC|HEIF|APNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
@@ -4585,7 +4585,7 @@ initThumbsPool() {
     initQPVmainDLL()
     If (!qpvMainDll || WICmoduleHasInit!=1 || wasInitFIMlib!=1)
     {
-       addJournalEntry("Failed to initialize the thumbnails workers: qpvMain.dll or FreeImmage and WIC modules are unavailable. FIM=" wasInitFIMlib ". WIC=" WICmoduleHasInit ". Main DLL=" qpvMainDll)
+       addJournalEntry("Failed to initialize the thumbnails workers: qpvMain.dll or FreeImage and WIC modules are unavailable. FIM=" wasInitFIMlib ". WIC=" WICmoduleHasInit ". Main DLL=" qpvMainDll)
        multiCoreThumbsInitGood := 0
        Return
     }
@@ -4618,7 +4618,7 @@ QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSav
     paramz .= "|" allowWICloader "|" allowFIMloader "|" thisImgQuality "|" cmrRAWtoneMapAlgo
     paramz .= "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
     paramz .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
-    paramz .= "|" wantBitmap "|" alwaysSave
+    paramz .= "|" wantBitmap "|" alwaysSave "|" alwaysOpenWithFIM
     r := DllCall("qpvmain.dll\thumbsPoolBegin", "Str", paramz, "Int")
     Return r
 }
@@ -21000,6 +21000,13 @@ HugeImagesConvertClrDepth(modus) {
    If warnHugeImageNotFIM()
       Return
 
+   If (modus!=24 && modus!=32)
+   {
+      msgResult := msgBoxWrapper(appTitle ": IMAGE EDITING WARNING", "For the selected color depth, image editing tools will not work. Do you want to continue?", "&Continue|C&ancel", 1, "exclamation")
+      If (msgResult!="Continue")
+         Return
+   }
+
    sTime := A_TickCount
    hFIFimgX := viewportQPVimage.imgHandle
    oimgBPP := FreeImage_GetBPP(hFIFimgX)
@@ -22268,7 +22275,13 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       {
          zrr := recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
+         IF (EllipseSelectMode=0 && VPselRotation=0 && innerSelectionCavityX=0 && innerSelectionCavityY=0)
+         {
+            fimu := FreeImage_CreateView(viewportQPVimage.imgHandle, obju.x1, imgH - obju.y1, obju.x2, imgH - obju.y2)
+            r := FreeImage_Invert(fimu)
+            FreeImage_UnLoad(fimu)
+         } Else
+            r := DllCall("qpvmain.dll\AdjustImageColorsPrecise", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 255, "int", 1, "int", 0, "int", 0, "int", 1, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 0, "int", 300, "int", 0, "int", 0, "int", 0, "int", 0, "int", -1, "int", -1, "int", -1, "int", -1, "int", 1, "int", 0, "int", 0, "int", 65535, "int", 0, "int", 0, "UPtr", mScan, "int", mStride)
       } Else If InStr(modus, "flood")
       {
          inverter := (FloodFillSelectionMode=3) ? 1 : 0
@@ -36568,7 +36581,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    thisPolation := (hamDistInterpolation=1) ? 6 : 5
    packedOptions := thumbSize "|" thisPolation "|" dupesApplyBlur "|" findFlippedDupes "|" allowWICloader "|" allowFIMloader "|" userHQraw "|" allowToneMappingImg
    packedOptions .= "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
-   packedOptions .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
+   packedOptions .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo "|" alwaysOpenWithFIM
    If !DllCall("qpvmain.dll\dupesPixBegin", "UPtr", activeSQLdb._Handle, "WStr", selectSQL, "WStr", packedOptions, "int")
    {
       addJournalEntry(A_ThisFunc "(): qpvmain.dll refused the collection query - " readDupesEngineError() "`n" selectSQL)
@@ -75235,7 +75248,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   Else If (rawFmt="MEMORYBMP")
      GDIbmpFileConnected := 0
 
-  If ((InStr(currIMGdetails.RawFormat, "webp") || InStr(currIMGdetails.RawFormat, "gif")) && totalFramesIndex>0)
+  If (varContains(currIMGdetails.RawFormat, "webp", "gif", "png") && totalFramesIndex>0)
   {
      gifLoaded := 1
      CountGIFframes := (animGIFsSupport=1) ? totalFramesIndex : 0
@@ -99164,10 +99177,12 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   }
 
   changeMcursor()
-  If ((GFT=18 || GFT=25) && noBPPconv=0 && noBMP=0)
+  If (isVarEqualTo(GFT, 18, 25, 35, 37, 38, 39) && noBPPconv=0 && noBMP=0)
   {
-     ; open multi-page GIF and TIFFs
-     multiFlags := (GFT=25) ? 2 : 0
+     ; open multi-page GIF, WEBP, APNG, AVIF, HEIC and TIFFs
+     multiFlags := (GFT=25 || GFT=39) ? 2 : 0
+     If (GFT=35)
+        multiFlags := 1
      hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
   }
 
