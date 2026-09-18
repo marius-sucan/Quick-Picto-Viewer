@@ -2288,9 +2288,10 @@ VarContainsThis(value, vals*) {
 }
 
 ProcessCriticalKeys(keyu, closeMode:=0) {
+   Critical, on
    Static lastInvoked := 1, counter := 0, prevKey
    If (keyu="give-back")
-      Return [prevKey, counter]
+      Return [prevKey, counter, lastInvoked]
 
    If (!identifyThisWin() && closeMode=0 || (A_TickCount - lastOtherWinClose<300) || (A_TickCount - lastInvoked<40) || !keyu)
       Return
@@ -2298,8 +2299,8 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
    If (A_TickCount - lastInvoked>250)
       counter := 0
 
-   ; fnOutputDebug(A_ThisFunc "(): " keyu)
    callMain := 0
+   ; fnOutputDebug(A_ThisFunc "(): " keyu)
    isSpaceOkay := (!AnyWindowOpen || imgEditPanelOpened=1) ? 1 : 0
    isSpaceOkay := (thumbsDisplaying!=1 && isSpaceOkay=1 && maxFilesIndex>0 && IMGresizingMode=4) ? 1 : 0
    imgEdit := isImgEditingNow()
@@ -2319,9 +2320,11 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
       }
    } Else If ((slideShowRunning=1 || animGIFplaying=1) && imgEdit=1)
    {
-      If isVarEqualTo(keyu, "Escape","win-close","!F4","Enter","Space","Tab","Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete")
+      If (keyu ~= "i)(Escape|win\-close|\!F4|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+      {
          stopGifORslidesPlayback(1)
-      Else If isVarEqualTo(keyu, "A", "SLASH", "BSLASH", "+BSLASH", "V", "H", "T", "+T", "F", "+F", "EQUAL", "MINUS", "COMMA", "PERIOD", "+COMMA", "+PERIOD", "NUMPADMULT")
+         lastInvoked := A_TickCount ; GIFs stop inside autoChangeDesiredFrame() and slides in theSlideShowCore()
+      } Else If (keyu ~= "i)(A|.?SLASH|\+BSLASH|G|\+G|I|V|H|T|\+T|F|\+F|EQUAL|MINUS|COMMA|PERIOD|\+COMMA|\+PERIOD|NUMPADMULT)")
          callMain := 1
    } Else If (isVarEqualTo(keyu, "Escape", "win-close", "!F4") || ((keyu="Enter" || keyu="Space") && runningLongOperation=1))
    {
@@ -2352,6 +2355,7 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
 }
 
 uiWM_KEYDOWN(wParam, lParam, msg, hwnd) {
+    Critical, on
     ; WM_SYSKEYDOWN is message 0x104
     vk_shift := DllCall("GetKeyState","Int", 0x10, "short") >> 16
     vk_ctrl := DllCall("GetKeyState","Int", 0x11, "short") >> 16

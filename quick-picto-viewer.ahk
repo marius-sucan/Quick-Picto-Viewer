@@ -10877,6 +10877,7 @@ VPimgFXrandomizer() {
 }
 
 stopGifORslidesPlayback(loudly:=0) {
+   Critical, on
    wasPlaying := 0
    If (slideShowRunning=1)
    {
@@ -10954,6 +10955,14 @@ theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
   If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
      Return
+
+  obju := ProcessCriticalKeys("give-back")
+  If (obju[1] ~= "i)(Escape|win\-close|\!F4|\+Space|Enter|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+  && (A_TickCount - obju[3]<(A_TickCount - prevFullIMGload) + 300)
+  {
+     stopSlideshow()
+     Return
+  }
 
   mouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
@@ -12265,12 +12274,16 @@ restartGIFplayback() {
 autoChangeDesiredFrame(act:=0, imgPath:=0) {
    Critical, on
    Static prevImgPath, lastInvoked := 1, lastFrameChange := 1
+   obju := ProcessCriticalKeys("give-back")
+   If (obju[1] ~= "i)(Escape|win\-close|\!F4|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+      act := (A_TickCount - obju[3]<(A_TickCount - lastFrameChange) + 300) ? "stop" : act
+
    If (thumbsDisplaying=1 || act="stop" || AnyWindowOpen || animGIFsSupport!=1 || !maxFilesIndex || !CurrentSLD)
    {
       ; a non-empty prevImgPath means a playback exists that was not torn down yet,
       ; whoever zeroed the flag [the ui-side stops zero it before posting "stop";
       ; with the shared flag the old flag-only gate skipped this branch for them]
-      If (animGIFplaying=1 || StrLen(prevImgPath))
+      If (animGIFplaying=1 || animGIFplaying=-1 || StrLen(prevImgPath))
       {
          OutputDebug, % "QPV: MERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen " flag=" animGIFplaying
          SetTimer, autoChangeDesiredFrame, Off
@@ -12278,7 +12291,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
          prevImgPath := ""
-         Global lastGIFdestroy := A_TickCount
+         lastGIFdestroy := A_TickCount
          lastFrameChange := A_TickCount
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
@@ -12320,9 +12333,10 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          ; a "start" that landed here], and a second pass must not wipe the latch
          If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
+
          prevImgPath := ""
          lastFrameChange := A_TickCount
-         Global lastGIFdestroy := A_TickCount
+         lastGIFdestroy := A_TickCount
          Return
       }
    }
@@ -12354,7 +12368,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       prevImgPath := ""
       OutputDebug, % "QPV: MERGE: gifForceNextSlide"
       SetTimer, theSlideShowCore, -1
-   } Else If (A_TickCount - lastFrameChange > thisFrameDelay)
+   } Else If ((A_TickCount - lastFrameChange > thisFrameDelay) && animGIFplaying=1)
    {
       lastFrameChange := A_TickCount
       SetTimer, RefreshImageFile, -1
@@ -83641,8 +83655,10 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
     listedFrames := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? 1 : 0
     txtOptions := initInPlaceTextOptions(thisGu, OSDFontBolded, OSDfontItalica, 1, 0, OSDFontName, OSDfontSize//1.25, "0xEE" OSDtextColor, borderSize)
     otherTxtObj := TextuToGraphics(thisGu, "initing", txtOptions, OSDFontName, "begin", 0, 0, 1)
+    doStartLongOpDance()
     Loop, % maxItemsW*maxItemsH*2
     {
+        prevFullThumbsUpdate := A_TickCount
         thisFileIndex := startIndex + A_Index - 1
         imgPath := StrReplace(resultedFilesList[thisFileIndex, 1], "||")
         columnIndex++
@@ -83756,6 +83772,7 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
            abandonAll := 1
            Break
         }
+        prevFullThumbsUpdate := A_TickCount
     }
 
     If (SLDtypeLoaded=3 && thumbsListViewMode=4 && forceMode!=1)
@@ -83769,9 +83786,9 @@ QPV_listThumbnailsGridMode(forceMode, thisGu, thisHDC, thisHwnd) {
     If (forceMode!=1)
     {
        prevFullIndexThumbsUpdate := thisPageSig
-       SetTimer, ResetImgLoadStatus, -15
        prevFullThumbsUpdate := A_TickCount
     } Else prevTryThumbsUpdate := A_TickCount
+    SetTimer, ResetImgLoadStatus, -15
 }
 
 QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, actu:="", mapOffset:=0) {
@@ -84457,7 +84474,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
     maxImgSize := maxZeit := columnIndex := -1
     fnOutputDebug("Begin show " maxItemsPage " thumbs from index " startIndex)
     setPriorityThread(-2)
-    stopGIFsPlayback()
+    stopGifORslidesPlayback()
     createThumbsFolder()
     Gdip_GraphicsClear(glPG, "0xFF" WindowBgrColor)
     If (highlightAlreadySeenImages=1 && mustRecordSeenImgs=1)
@@ -84475,6 +84492,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         ; identify what needs to be done; are thumbs cached in memory?
         ; load thumbnails or read the original image files,
         ; this loop fills the imgsListArrayThumbs[] array
+        prevFullThumbsUpdate := A_TickCount
         If (modus="all" && maxFilesIndex>100)
         {
            If (determineTerminateOperation()=1)
@@ -84664,6 +84682,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
       Loop
       {
           totalLoops++
+          prevFullThumbsUpdate := A_TickCount
           If (determineTerminateOperation()=1)
           {
              fnOutputDebug("ThumbsMode. User abandoned the operation.")
@@ -84835,7 +84854,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
           imgPath := imgsListArrayThumbs[thisFileIndex, 3]
           MD5name := imgsListArrayThumbs[thisFileIndex, 7]
           trGdip_GetImageDimensions(oBitmap, imgW, imgH)
-
           If (!validBMP(oBitmap) || !FileExist(imgPath) || !imgW || !imgH)
           {
              If (WasMemCached=1)
@@ -84986,6 +85004,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
                 Gdip_FillRectangle(G2, pBrushD, DestPosX - thumbsW//2, DestPosY - thumbsH//2, Ceil(thumbsW*0.05), thumbsH - 8)
           }
 
+          prevFullThumbsUpdate := A_TickCount
           If ((A_TickCount - prevGUIupdate>350) && modus!="all" && paintedOnScreen>0)
           {
              ; nothing is put on screen before the first thumbnail is on the canvas: while
@@ -99180,7 +99199,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   If (isVarEqualTo(GFT, 18, 25, 35, 37, 38, 39) && noBPPconv=0 && noBMP=0)
   {
      ; open multi-page GIF, WEBP, APNG, AVIF, HEIC and TIFFs
-     multiFlags := (GFT=25 || GFT=39) ? 2 : 0
+     multiFlags := isVarEqualTo(GFT, 25, 37, 39) ? 2 : 0
      If (GFT=35)
         multiFlags := 1
      hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
@@ -100184,6 +100203,9 @@ GetTextsFromPDF(imgPath, frameu, linkz, pwd:="", ByRef pageCount:=0, ByRef error
 promptUserPDFpassword(funcu, imgPath, errorType, ByRef pwd) {
     Static prevImgPath, lastPwd, lastInvoked := 1
     isOkay := (prevImgPath=imgPath && (A_TickCount - lastInvoked>950) || prevImgPath!=imgPath) ? 1 : 0
+    If (A_TickCount - prevFullThumbsUpdate<950 && (thumbsDisplaying=1 && runningLongOperation=1) && (A_TickCount - executingCanceableOperation<950))
+       isOkay := 0
+
     If (errorType=4 && imgPath && isOkay=1)
     {
        prevImgPath := imgPath
@@ -100234,7 +100256,7 @@ RenderPDFpage(imgPath, noBPPconv, frameu, ByRef pwd:="", maxW:=0, maxH:=0, dpi:=
 
     If (StrLen(pBitmap)>2)
     {
-       If (asked=1)
+       If (asked=1 && pwd!="")
           PDFpwdsCache[imgPath] := pwd
 
        recordGdipBitmaps(pBitmap, A_ThisFunc)
