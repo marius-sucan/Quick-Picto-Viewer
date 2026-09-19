@@ -61,8 +61,7 @@ initInterfaceModule() {
    OnMessage(0x20E, "dispatchMouseWheel")
 }
 
-
-; thread input routing:
+; THREAD INPUT ROUTING:
 ; Before the merge, I was using AHK-H.
 ; The main AHK thread and another thread for the interface.
 ; Each thread received messages only for its own windows.
@@ -1331,7 +1330,6 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
     } Else If (menusflyOutVisible=1)
     {
        MouseGetPos, , , OutputVarWin, hwnd, 2
-       OutputDebug, % "QPV: MERGE: flyout btn-up ctrl=" hwnd " [S=" hFlyBtn1 " T=" hFlyBtn2 " M=" hFlyBtn3 "] win=" OutputVarWin
        If isVarEqualTo(hwnd, hFlyBtn1, hFlyBtn2, hFlyBtn3)
           Gui, MclickH: Destroy
 
@@ -1485,8 +1483,8 @@ askAboutStoppingOperations() {
         msgResult := uiNativeYesNoPrompt("Do you want to stop the currently executing operation ?")
         If (msgResult="yes")
            mustAbandonCurrentOperations := 1
+
         userPendingAbortOperations := 0
-        OutputDebug, % "QPV: MERGE: abort prompt answered " msgResult " [runningLongOperation=" runningLongOperation " imageLoading=" imageLoading "]"
      } Else userPendingAbortOperations := 0
       ; Else SoundBeep , % 250 + 100*lastCloseInvoked, 100
 }
@@ -2289,9 +2287,9 @@ VarContainsThis(value, vals*) {
 
 ProcessCriticalKeys(keyu, closeMode:=0) {
    Critical, on
-   Static lastInvoked := 1, counter := 0, prevKey
+   Static lastInvoked := 1, counter := 0, prevKey, prevID
    If (keyu="give-back")
-      Return [prevKey, counter, lastInvoked]
+      Return [prevKey, counter, lastInvoked, prevID]
 
    If (!identifyThisWin() && closeMode=0 || (A_TickCount - lastOtherWinClose<300) || (A_TickCount - lastInvoked<40) || !keyu)
       Return
@@ -2306,7 +2304,7 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
    imgEdit := isImgEditingNow()
    If ((colorPickerModeNow>=1 || mustCaptureCloneBrush=1) && imgEdit=1)
    {
-      If isVarEqualTo(keyu, "Escape", "win-close", "!F4", "Enter", "Space", "Tab", "Delete", "BackSpace")
+      If (keyu ~= "i)(Escape|win\-close|\!F4|\^F4|F10|COLON|Enter|Space|Tab|Delete|BackSpace)")
       {
          lastOtherWinClose := A_TickCount
          If (colorPickerModeNow>=1)
@@ -2315,16 +2313,17 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
             StopCaptureClickStuff(keyu)
       } Else If (mustCaptureCloneBrush=1)
       {
-         If isVarEqualTo(keyu, "A", "SLASH", "BSLASH", "V", "H", "T", "+T", "F", "+F", "EQUAL", "MINUS", "Left","Right","Up","Down")
+         If (keyu ~= "i)(A|.?SLASH|V|H|T|\+T|F|\+F|EQUAL|MINUS|Left|Right|Up|Down)")
             callMain := 1
       }
    } Else If ((slideShowRunning=1 || animGIFplaying=1) && imgEdit=1)
    {
-      If (keyu ~= "i)(Escape|win\-close|\!F4|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+      If (keyu ~= "i)(Escape|win\-close|\!F4|\^F4|F10|COLON|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
       {
+         prevID := "a" currentFileIndex resultedFilesList[currentFileIndex, 1]
          stopGifORslidesPlayback(1)
          lastInvoked := A_TickCount ; GIFs stop inside autoChangeDesiredFrame() and slides in theSlideShowCore()
-      } Else If (keyu ~= "i)(A|.?SLASH|\+BSLASH|G|\+G|I|V|H|T|\+T|F|\+F|EQUAL|MINUS|COMMA|PERIOD|\+COMMA|\+PERIOD|NUMPADMULT)")
+      } Else If (keyu ~= "i)(A|X|.?SLASH|\+BSLASH|G|\+G|I|V|H|T|\+T|F|\+F|EQUAL|MINUS|COMMA|PERIOD|\+COMMA|\+PERIOD|NUMPADMULT)")
          callMain := 1
    } Else If (isVarEqualTo(keyu, "Escape", "win-close", "!F4") || ((keyu="Enter" || keyu="Space") && runningLongOperation=1))
    {
@@ -2334,7 +2333,7 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
       uiChangeMcursor("move")
    } Else If (canCancelImageLoad=1 && runningLongOperation=0 && !AnyWindowOpen)
    {
-      If isVarEqualTo(keyu, "Left","Right","Up","Down","PgUp","PgDn","Home","End","BackSpace","Delete","Enter")
+      If (keyu ~= "i)(Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete|Enter)")
          canCancelImageLoad := 4
       Else If (keyu="Escape" || keyu="win-close" || keyu="!F4")
          byeByeRoutine(keyu, 1)

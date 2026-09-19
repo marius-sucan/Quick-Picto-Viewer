@@ -133,14 +133,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", cachedAllSessionsSeen := new hashtable()
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := "", lastSelPrinterName := ""
-   , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1
+   , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
    , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := [], prevFileSavePath := ""
    , imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1, brushBclrAlpha := "010101"
    , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0, hasHamDistCached := 0
-   , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
-   , selDotX := "", selDotY := "", selDotAx := "", selDotAy := "", selDotBx := "", selDotBy := "", selDotCx := "", selDotCy := "", selDotDx := "", selDotDy := ""
+   , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, selDotCy := "", selDotDx := "", selDotDy := ""
+   , selDotX := "", selDotY := "", selDotAx := "", selDotAy := "", selDotBx := "", selDotBy := "", selDotCx := ""
    , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, pBrushF := "", lastWasLowQuality := 0
    , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
@@ -177,8 +177,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394
    , lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
-   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], VPstampBMPx := 0, VPstampBMPy := 0
-   , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0
+   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := []
+   , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
@@ -195,12 +195,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , mseUppLim := 0, mseLowLim := 0, userHamDistStringStringPos := 1, userHamDistStringFilterWhat := 1
    , thisBMPdummy := 0, dummyGu := 9, whileLoopExec := 0, WICmoduleHasInit := 0, dupesDCTcoeffsInit := 0
    , dupesPixInitGood := 0, dupesPixState := 0, hTVlistFolders := "", SearchedStringz := ""
-   , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := ""
+   , dbVersion := 0, dbExpectedVersion := 3, userPrevAlphaMaskBmpPainted := "", mainLoadedIMGdetails := []
    , clrGradientOffX := 0, clrGradientOffY := 0, userAllowClrGradientRecenter := 0, TabsPerWindow := []
    , darkWindowColor := 0x202020, darkControlColor := 0xEDedED, allowWICloader := 1, allowFIMloader := 1
    , monitorBgrColor := darkWindowColor, lastSlidersPainted := [], userCustomKeysDefined := [], userCustomAltKeys := []
    , simulateMenusMode := 0, lastLVquickSearchSortCol := [], soloSliderWinVisible := 0, backupGdiBMP := 0
-   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, currIMGdetails := [], mainLoadedIMGdetails := []
+   , lastFastImgChangeHUDzeit := 1, forceProtectLoadedImg := 0, currIMGdetails := []
 
 Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameSavedVectorShape := ""
    , postVectorWinOpen := 0, isWelcomeScreenu := 0, prevVectorShapeSymmetryMode := [], AllowDarkModeForWindow := ""
@@ -262,15 +262,15 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaBorderLeft := 1, DrawLineAreaBorderRight := 0, DrawLineAreaBorderCenter := 1, DrawLineAreaBorderArcA := 0
    , DrawLineAreaBorderArcC := 0, DrawLineAreaBorderArcD := 1, DrawLineAreaCapsStyle := 3, DrawLineAreaDoubles := 0
    , PasteInPlaceEraseInitial := 1, doImgEditLivePreview := 1, DrawLineAreaBorderArcB := 0, EraseAreaInvert := 0
-   , PasteInPlaceToolMode := 0, NewDocUseColor := 1, PredefinedDocsSizes := 1, NewImageReverseDimensions := 0, FillAreaGlassy := 1
+   , PasteInPlaceToolMode := 0, NewDocUseColor := 1, PredefinedDocsSizes := 1, NewImageReverseDimensions := 0
    , FillAreaColorMode := 1, FillAreaColorReversed := 0, FillArea2ndColor := "FF2211", FillArea2ndOpacity := 200
    , FillAreaGradientPosA := 5, FillAreaGradientPosB := 100, FillAreaGradientScale := 100, FillAreaGradientWrapped := 5
    , TextInAreaFontName := "Arial", TextInAreaFontSize := 15, TextInAreaBorderSize := 5, GammosGrayAdjust := 0
-   , TextInAreaFontBold := 0, TextInAreaFontItalic := 0, TextInAreaFontUline := 0, TextInAreaAlign := 1, TextInAreaBgrUnified := 0
+   , TextInAreaFontBold := 0, TextInAreaFontItalic := 0, TextInAreaFontUline := 0, TextInAreaAlign := 1, FillAreaGlassy := 1
    , TextInAreaFontColor := "eeFFaa", TextInAreaFontOpacity := 250, TextInAreaRoundBoxBgr := 1, TextInAreaValign := 1
    , TextInAreaBgrColor := "229933", TextInAreaBgrOpacity := 100, TextInAreaOnlyBorder := 0, TextInAreaBlurAmount := 0
    , TextInAreaBorderOut := 1, TextInAreaBorderColor := "334400", TextInAreaBorderOpacity := 200, TextInAreaCharSpacing := 0
-   , TextInAreaUsrMarginz := 0, TextInAreaBlurBorderAmount := 0, TextInAreaDoBlurs := 0
+   , TextInAreaUsrMarginz := 0, TextInAreaBlurBorderAmount := 0, TextInAreaDoBlurs := 0, TextInAreaBgrUnified := 0
    , TextInAreaFontLineSpacing := 0, TextInAreaCutOutMode := 0, TextInAreaBgrEntire := 0, TextInAreaFontStrike := 0
    , showMainMenuBar := 1, markSearchMatches := 1, showSelectionGrid := 0, blurAreaTwice := 0, TextInAreaFlipV := 0
    , allowRecordHistory := 1, TextInAreaPaintBgr := 1, rotateSelBoundsKeepRatio := 1, TextInAreaFlipH := 0
@@ -340,9 +340,9 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , combinePDFpageLandscape := 0, combinePDFpageHighQuality := 0, usePrevSaveFolder := 0
    , userCombineSubFrames := 0, blurAreaYamount := 10, blurAreaEqualXY := 1, UserAddNoiseMode := 1
    , UserAddNoiseDetails := 10, slidesRandoMode := 1, convertOnAutoCrop := 0, AutoCropStrongAdaptiveMode := 0
-   , usrAutoCropErrThreshold := 5, onConflictMultiRenameAct := 4
-   , userCopyMoveStructuredConflictMode := 4, SeenIMGprivateFolder := "", FillAreaRectRoundness := 45
-   , FillAreaEllipseSection := 1440, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6, DrawLineAreaGridY := 6
+   , usrAutoCropErrThreshold := 5, onConflictMultiRenameAct := 4, FillAreaRectRoundness := 45
+   , userCopyMoveStructuredConflictMode := 4, SeenIMGprivateFolder := "", DrawLineAreaGridY := 6
+   , FillAreaEllipseSection := 1440, FillAreaEllipsePie := 1, DrawLineAreaGridX := 6
    , DrawLineAreaSpiralLength := 350, DrawLineAreaRaysLimit := 0, DrawLineAreaSpiralCenterMode := 1
    , DrawLineAreaCenterCut := 0, blurAreaCircular := 0, ImageSharpenAmount := 25, ImageSharpenRadius := 10
    , ImageSharpenMode := 1, ImageSharpenXuAmount := 6, ImageSharpenYuAmount := 5, ImageSharpenCenterAmount := 2
@@ -407,6 +407,7 @@ If (!RegExMatch(coreArg, "i)^\-*qpv-core-thread\=(\d+)$", coreThreadArg) && A_Ar
          Break
    }
 }
+
 If coreThreadArg1
 {
    initExternalCoreMode(coreThreadArg1)
@@ -516,15 +517,10 @@ QPV_postRelay(funcName, args) {
       %funcName%(a1, a2, a3, a4, a5, a6)
    Else If (n=7)
       %funcName%(a1, a2, a3, a4, a5, a6, a7)
-   Else If (n=8)
-      %funcName%(a1, a2, a3, a4, a5, a6, a7, a8)
-   Else
-      %funcName%(a1, a2, a3, a4, a5, a6, a7, a8, a9)
 }
 
 ;_____________________________________ Hotkeys _________________
-; the hotkeys are registered since v5.4.5 in the
-; Lib\module-interface.ahk [merged into this interpreter at phase C]
+; the hotkeys are registered since v5.4.5 in Lib\module-interface.ahk
 
 identifyThisWin() {
   Static prevR, lastInvoked := 1
@@ -4536,6 +4532,15 @@ TulTip(debugger, sep, params*) {
 
 fnOutputDebug(msg) {
    Static prevMsg
+   If (hasInitSpecialMode=1 && varContains(msg, "error", "fail"))
+   {
+      If (prevMsg!=msg)
+      {
+         OutputDebug, % "QPV: " msg 
+         prevMsg := msg
+      }
+      Return
+   }
 
    If (debugModa=1)
    {
@@ -10898,7 +10903,6 @@ stopSlideshow(resetMode:=0, silentModus:=1) {
    If (slideShowRunning!=1)
       Return
 
-   OutputDebug, % "QPV: MERGE: stopSlideshow via " Exception("", -2).What
    slideShowRunning := 0
    allowNextSlide := 1
    SetTimer, theSlideShowCore, Off
@@ -10953,16 +10957,19 @@ preventScreenOff() {
 
 theSlideShowCore(paramu:=0) {
   thisZeit :=  A_TickCount - prevFullIMGload
-  If (thisZeit < slideShowCadence//1.25) || (allowNextSlide!=1 && paramu!="force")
+  If (thisZeit < slideShowCadence//1.25)
      Return
 
   obju := ProcessCriticalKeys("give-back")
-  If (obju[1] ~= "i)(Escape|win\-close|\!F4|\+Space|Enter|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+  If (obju[1] ~= "i)(Escape|win\-close|\!F4|\^F4|F10|COLON|\+Space|Enter|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
   && (A_TickCount - obju[3]<(A_TickCount - prevFullIMGload) + 300)
   {
      stopSlideshow()
      Return
   }
+
+  If (allowNextSlide!=1 && paramu!="force")
+     Return
 
   mouseTurnOFFtooltip()
   prevFullIMGload := A_TickCount
@@ -12085,7 +12092,7 @@ VPchangeGIFsDelayu(dir) {
    stepu := (dir=1) ? factoru : -factoru
    UserGIFsDelayu := clampInRange(UserGIFsDelayu + stepu, -9500, 9500, 1)
    SetTimer, postPonedWriteGifSpeed, -150
-   showTOOLtip("GIF frames playback delay: " UserGIFsDelayu " ms", A_ThisFunc, 2, (UserGIFsDelayu + 9500)/19000)
+   showTOOLtip("Animation playback delay per frame: " UserGIFsDelayu " ms", A_ThisFunc, 2, (UserGIFsDelayu + 9500)/19000)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    lastInvoked := A_TickCount
 }
@@ -12260,7 +12267,8 @@ stopGIFsPlayback() {
 }
 
 restartGIFplayback() {
-   If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && totalFramesIndex>1 && thumbsDisplaying!=1)
+   CountGIFframes := totalFramesIndex
+   If (CountGIFframes>1 && !AnyWindowOpen && totalFramesIndex>1 && thumbsDisplaying!=1)
    {
       autoChangeDesiredFrame("stop", 0)
       Sleep, 5
@@ -12268,31 +12276,34 @@ restartGIFplayback() {
       ; setGIFframesDelay()
       autoChangeDesiredFrame("start", getIDimage(currentFileIndex))
       SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
+      Return 1
    }
+   Return 0
 }
 
 autoChangeDesiredFrame(act:=0, imgPath:=0) {
    Critical, on
    Static prevImgPath, lastInvoked := 1, lastFrameChange := 1
    obju := ProcessCriticalKeys("give-back")
-   If (obju[1] ~= "i)(Escape|win\-close|\!F4|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
-      act := (A_TickCount - obju[3]<(A_TickCount - lastFrameChange) + 300) ? "stop" : act
+   thisID := "a" currentFileIndex resultedFilesList[currentFileIndex, 1]
+   If (obju[4]=thisID)
+   {
+      If (obju[1] ~= "i)(Escape|win\-close|\!F4|\^F4|F10|COLON|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+         act := (A_TickCount - obju[3]<(A_TickCount - lastFrameChange) + 300) ? "stop" : act
+   }
 
    If (thumbsDisplaying=1 || act="stop" || AnyWindowOpen || animGIFsSupport!=1 || !maxFilesIndex || !CurrentSLD)
    {
-      ; a non-empty prevImgPath means a playback exists that was not torn down yet,
-      ; whoever zeroed the flag [the ui-side stops zero it before posting "stop";
-      ; with the shared flag the old flag-only gate skipped this branch for them]
       If (animGIFplaying=1 || animGIFplaying=-1 || StrLen(prevImgPath))
       {
-         OutputDebug, % "QPV: MERGE: gifStop act=" act " thumbs=" thumbsDisplaying " AnyWin=" AnyWindowOpen " flag=" animGIFplaying
          SetTimer, autoChangeDesiredFrame, Off
          SetTimer, ResetImgLoadStatus, -50
          If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
          prevImgPath := ""
          lastGIFdestroy := A_TickCount
-         lastFrameChange := A_TickCount
+         lastFrameChange := A_TickCoun
+         allowNextSlide := 1
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
          ResetImgLoadStatus()
@@ -12306,7 +12317,6 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
 
    If (act="start" && imgPath && prevImgPath!=imgPath)
    {
-      OutputDebug, % "QPV: MERGE: gifStart " imgPath " via " Exception("", -2).What
       SetTimer, ResetImgLoadStatus, -15
       lastFrameChange := A_TickCount
       prevImgPath := imgPath
@@ -12315,22 +12325,15 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       Return
    } Else
    {
+
       Sleep, -1
-      ; mustHalt := mustProcessKeys
       If (animGIFplaying<=0)
       {
-         OutputDebug, % "QPV: MERGE: gifKill [flag read <=0]"
          SetTimer, ResetImgLoadStatus, -10
          SetTimer, autoChangeDesiredFrame, Off
          animGIFplaying := 0
          allowNextSlide := 1
-         ; the latch that keeps ShowTheImage from auto-playing this image again
-         ; must capture the path BEFORE it is cleared [the stop branch's order];
-         ; the old order latched an empty string, so every ui-initiated stop
-         ; [nav keys, Space, Escape - they zero the flag and land here at the next
-         ; tick] was undone by the next re-render: the "toggle" Marius reported.
-         ; Guarded: this branch can run twice [ShowTheImage re-arms the timer after
-         ; a "start" that landed here], and a second pass must not wipe the latch
+         scheduleNextSlide()
          If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
 
@@ -12341,10 +12344,13 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
       }
    }
 
+   If (act="start" && animGIFplaying=1)
+      Return
+
    allowNextSlide := 0
    desiredFrameIndex++
    GIFframesPlayied++
-   If (allowGIFsPlayEntirely=1 && GIFframesPlayied>totalFramesIndex - 1) || (totalFramesIndex<3) || (allowGIFsPlayEntirely!=1)
+   If (allowGIFsPlayEntirely=1 && GIFframesPlayied>totalFramesIndex - 1) || (totalFramesIndex<2) || (allowGIFsPlayEntirely!=1)
       allowNextSlide := 1
    ; ToolTip, % allowGIFsPlayEntirely "--" allowNextSlide , , , 2
    prevAnimGIFwas := ""
@@ -12366,14 +12372,12 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    {
       lastInvoked := A_TickCount
       prevImgPath := ""
-      OutputDebug, % "QPV: MERGE: gifForceNextSlide"
       SetTimer, theSlideShowCore, -1
    } Else If ((A_TickCount - lastFrameChange > thisFrameDelay) && animGIFplaying=1)
    {
       lastFrameChange := A_TickCount
       SetTimer, RefreshImageFile, -1
    }
-   ; [merge] the infosSlideShow mirror-post is gone; the flags are shared globals now
 }
 
 infoShowCurrentFrameIndex() {
@@ -36559,7 +36563,7 @@ collectImgDataViaPool(thisWhere, filesToBeSorted, startOperation, ByRef abandonA
    ; The longest the whole pool may go without finishing a single image before this stops
    ; waiting for it. 
 
-   Static stallLimit := 180000   ; in miliseconds
+   Static stallLimit := 180000   ; in milliseconds
    ; on a machine short of memory the DLL hands out one decode at a time to BOTH pools,
    ; so a collection of workers are all queued, it can go a long while without finishing
    ; anything, with nothing whatsoever wrong with it if decoding is slow. This case is 
@@ -41286,6 +41290,43 @@ EraseMultiRenameHisto() {
   PanelRenameThisFile()
 }
 
+PanelSetFrameDelay() {
+   If AnyWindowOpen
+      Return
+
+   filesElected := getSelectedFiles(0, 1)
+   delay := resultedFilesList[currentFileIndex, 29]
+   If !delay 
+      delay := 0
+
+   infou := (filesElected>0) ? "`n `nImages selected: " groupDigits(filesElected) "."
+   fakeWinCreator(92, A_ThisFunc, 1)
+   msgResult := msgBoxWrapper("panelu|Set frame delay: " appTitle, "Set custom frame delay for the currently selected image frame, in milliseconds.`n `nWhen the value is 0, the value set in the panel to join images is used." infou, "&Apply|&Cancel|&Help", 0, "image", 0, 0, 0, "limit5 number -multi", delay)
+   value := Trimmer(msgResult.edit)
+   If InStr(msgResult.btn, "apply")
+   {
+      value := clampInRange(value, 0, 99500)
+      If filesElected 
+      {
+         Loop, % maxFilesIndex
+         {
+            If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
+               Continue
+
+            resultedFilesList[A_Index, 29] := value
+         }
+      } Else
+         resultedFilesList[currentFileIndex, 29] := value
+
+      showTOOLtip("Frame delay set to " value " ms." infou)
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+   } Else If InStr(msgResult.btn, "help")
+   {
+      msgBoxWrapper(appTitle ": HELP", "QPV can create animated GIFs, WebP, APNG, and other animated image formats through the tool «Join images». In this panel, you can set the delay per frame in milliseconds. If the value is zero or never set, the user defined frames delay in the «Join images» panel will be used.`n`nYou can select multiple files to set their delay in one go.", -1, 0, 0)
+      SetTimer, PanelSetFrameDelay, -250
+   }
+}
+
 PanelfolderThanEraseThumbsCache() {
    If AnyWindowOpen
       Return
@@ -42378,8 +42419,11 @@ buildQuickSearchMenus() {
    deleteMenus()
    mustPreventMenus := 1   ; this prevents popping the actual menus when generated; it is also used to generate hidden menu entries that the user can access through searches; such as addMenuBonusesSelectionArea()
    BuildMainMenu("forced")
-   If (maxFilesIndex>0)
+   If (maxFilesIndex>0 && currentFileIndex)
+   {
       kMenu("PVmenu", "Add", "Show file header", "PanelDisplayFileHeaderRaw")
+      kMenu("PVmenu", "Add", "Set frame delay (Join images)", "PanelSetFrameDelay", "animation apng webp gif")
+   }
    
    kMenu("PVmenu", "Add/Uncheck", "Load settings from QPV slideshow files", "ToggleIgnoreSLDprefs")
    If (MustLoadSLDprefs=1)
@@ -43681,8 +43725,8 @@ PanelExtractFrames() {
     depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 190 : 150
-    Gui, Add, Text, x15 y15 Section, This tool can extract frames or pages from`nGIFs, TIFFs, PDFs and WEBP files.
-    Gui, Add, Text, y+7,Image output options:
+    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF, APNG or WEBP files.
+    Gui, Add, Text, y+7, Image output options:
     Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, Render PDF pages (DPI):
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
     Gui, Add, UpDown, vuserPDFdpi Range72-3500, % userPDFdpi
@@ -43701,7 +43745,7 @@ PanelExtractFrames() {
     Gui, Add, Text, xs y+10 hp w%ml% +0x200, Folder destination:
     thisWid := (PrefsLargeFonts=1) ? 105 : 65
     ml := (PrefsLargeFonts=1) ? 250 : 205
-    GuiAddEdit("xp+15 y+5 w" ml " r1 -Border right -wrap vResizeDestFolder", ResizeDestFolder)
+    GuiAddEdit("xp+15 y+5 w" ml " r1 -border -wrap vResizeDestFolder", ResizeDestFolder)
     Gui, Add, Button, x+5 hp w%thisWid% gBTNchangeResizeDestFolder vbtnFldr, C&hoose
 
     thisW := (PrefsLargeFonts=1) ? 155 : 115
@@ -43726,7 +43770,7 @@ BtnChangeMultiPageFmt() {
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
-   actu := (userCombineFramesFmt=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt=1 || userCombineFramesFmt>3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine2
    GuiControl, % actu, userCombineGIFframeDelay
    GuiControl, % actu, editF5
@@ -43739,7 +43783,7 @@ BtnChangeMultiPageFmt() {
    actu := (userCombineFramesFmt=2 && userSaveBitsDepth>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userCombineDepthDithering
 
-   actu := (userCombineFramesFmt=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt=2 || userCombineFramesFmt>3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine1
    GuiControl, % actu, userSaveBitsDepth
 
@@ -43801,17 +43845,19 @@ PanelCombineImagesMultipage() {
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
     Gui, Add, Text, xs+15 y+10 w%ml% +0x200 +hwndhTemp, File format on save:
-    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".gif|.tiff|.pdf", [hTemp])
+    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".gif|.tiff|.pdf|.webp|.apng", [hTemp])
     Gui, Add, Checkbox, xs+15 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, TIFF maximum color depth:
+    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
     GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, GIFs frames delay (in milisec.)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF5", userCombineGIFframeDelay)
+    sml := (PrefsLargeFonts=1) ? 40 : 30
+    GuiAddButton("x+5 w" sml " hp gBtnHelpJoinIMGsframeDelay", " ?", "Help")
     Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
-    Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% vuserJoinIMGres, Set GIF dimensions (W x H):
+    Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% gBtnChangeMultiPageFmt vuserJoinIMGres, Set GIF dimensions (W x H):
     thisWid += 20
     GuiAddEdit("x+1 w" thisWid " number -multi limit5 veditF7", userJoinIMGsW)
     Gui, Add, UpDown, vuserJoinIMGsW Range2-32000, % userJoinIMGsW
@@ -43860,11 +43906,15 @@ PanelCombineImagesMultipage() {
 }
 
 BtnHelpCombineImgs() {
-   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. GIF, TIFF and PDF formats are the supported destination formats.`n`nIf any of the selected files has multiple frames or pages and the option «Join contained frames from selected files», these pages will be processed and become part of the newly created file.`n`nThe resulted order of the pages will reflect the order of originally selected files.`n`nFor proper GIF animations, please select files having the same resolution. Please note, GIF export option is EXPERIMENTAL.`n`nPDFs without the «high resolution» option selected will have a DPI of 96. The images are embedded as JPEGs in the PDF. To influence the size of the resulted PDF, you must change the JPEG quality level.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. GIF, TIFF and PDF formats are the supported destination formats.`n`nIf any of the selected files has multiple frames or pages and the option «Join contained frames from selected files», these pages will be processed and become part of the newly created file.`n`nThe resulted order of the pages will reflect the order of originally selected files.`n`nFor proper GIF animations, please select files having the same resolution.`n`nPDFs without the «high resolution» option selected will have a DPI of 96. The images are embedded as JPEGs in the PDF. To influence the size of the resulted PDF, you must change the JPEG quality level.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
+}
+
+BtnHelpJoinIMGsframeDelay() {
+   msgBoxWrapper(appTitle ": HELP", "To set custom delay per frames, close this panel first. Open quick search options (S button below menus). In the search box type «join» and select «Set frame delay». To reopen the panel press `; or F8. The delay option from the currently opened panel will be ignored for the images you have set a custom delay.", -1, 0, 0)
 }
 
 BTNperformCombineIMGs() {
-   Static fmtz := {1:"gif", 2:"tiff", 3:"pdf"}
+   Static fmtz := {1:"gif", 2:"tiff", 3:"pdf", 4:"webp", 5:"apng"}
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
    GuiControlGet, userJpegQuality
@@ -43872,7 +43922,6 @@ BTNperformCombineIMGs() {
    f := fmtz[userCombineFramesFmt]
    IniAction(1, "prevFileSavePath", "General", 6)
    RegAction(1, "userJpegQuality")
-   animus := (userCombineFramesFmt=1) ? 1 : 0
    file2save := openFileDialogWrapper("S", "PathMustExist", prevFileSavePath, "Choose ." f " file destination", f " files (*." f ")|All (*.*)", 1, 1)
    If !file2save
    {
@@ -43893,8 +43942,8 @@ BTNperformCombineIMGs() {
       combineImagesMultiTiffGDIp(file2save)
    Else If (userCombineFramesFmt=3)
       CombineImgsIntoPDF(file2save)
-   Else ; used only for GIFs
-      combineImagesFimMultiPage(userSaveBitsDepth, animus, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
+   Else ; used for GIFs / WEBP / APNG
+      combineImagesFimMultiPage(userSaveBitsDepth, userCombineFramesFmt, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
 }
 
 CombineImgsIntoPDF(file2save) {
@@ -48130,7 +48179,7 @@ ReadSettingsCombineIMGs(act:=0) {
     RegAction(act, "UserCombinePDFpageSize",, 2, 1, 6)
     RegAction(act, "userCombineDepthDithering",, 1)
     RegAction(act, "userSaveBitsDepth",, 2, 1, 4)
-    RegAction(act, "userCombineFramesFmt",, 2, 1, 3)
+    RegAction(act, "userCombineFramesFmt",, 2, 1, 5)
     RegAction(act, "UserCombinePDFbgrColor",, 3)
     RegAction(act, "combinePDFpageLandscape",, 1)
     RegAction(act, "combinePDFpageHighQuality",, 1)
@@ -57431,7 +57480,7 @@ PanelPreferencesWindow() {
     ToolTip2ctrl(hTemp, "When this option is deactivated, QPV attempts to retain the dimensions`nin the viewport even if it is a larger or a smaller one,`nto improve the user experience.")
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%resetImageViewOnChange% vresetImageViewOnChange, Auto-reset viewport color adjustments on image change
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%LimitSelectBoundsImg% vLimitSelectBoundsImg, Limit selection area to image boundaries 
-    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely, Wait for GIFs to play once during slideshows
+    Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%allowGIFsPlayEntirely% vallowGIFsPlayEntirely, Wait for animations to play once during slideshows
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%doSlidesTransitions% vdoSlidesTransitions, Smooth slideshow transitions
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%skipSeenImageSlides% vskipSeenImageSlides, Skip already seen images during slideshows
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%syncSlideShow2Audios% vsyncSlideShow2Audios, Slideshow speed based on audio length
@@ -58256,7 +58305,7 @@ PanelDefineEntireSlideshowLength() {
 }
 
 TimeLapseInfoBox() {
-    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " miliseconds to load an image.`n `nIf the option to allow GIFs play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom at 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "The estimated slideshow duration displayed in the panel includes the time estimated to load each image. Based on previously loaded images, it takes about " groupDigits(drawModeCzeit) " milliseconds to load an image.`n `nIf the option to allow GIFs play entirely during slideshows is selected, the duration of the slideshow will be influenced by how many GIFs are indexed and how long they are.`n `nFor optimal timelapses [or very fast slideshows] set zoom at 100`%, disable image rotation and color adjustments and «skip already seen images».", -1, 0, 0)
 }
 
 SetTimeLapseMode() {
@@ -62313,14 +62362,14 @@ combineImagesMultiTiffGDIp(destFilePath) {
    CurrentSLD := backCurrentSLD
 }
 
-combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
+combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    zPlitPath(destFilePath, 0, OutFileName, OutDir)
    If !FolderExist(OutDir)
    {
       FileCreateDir, % OutDir
       If ErrorLevel
       {
-         showTOOLtip("ERROR: Unable to create destination folder of the multipaged file.`nOperation abandoned.")
+         showTOOLtip("ERROR: Unable to create destination folder of the multipage file.`nOperation abandoned.")
          SoundBeep 300, 100
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
@@ -62347,8 +62396,11 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    startOperation := A_TickCount
    doStartLongOpDance()
    CurrentSLD := ""
-   formatu := (animus=1) ? 25 : 18
-   extFile := (animus=1) ? ".gif" : ".tiff"
+   Static zpu := {1:25, 2:18, 3:0, 4:35, 5:39}
+         fmtz := {1:"gif", 2:"tiff", 3:"pdf", 4:"webp", 5:"apng"}
+   formatu := zpu[userFmt]
+   extFile := "." fmtz[userFmt]
+   GIFanimus := (userFmt=1) ? 1 : 0 
    imgList := []
    BMPmemSize := 0
    Loop, % maxFilesIndex
@@ -62383,9 +62435,9 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       If (otherFrames.Count()>0)
       {
          Loop, % otherFrames.Count()
-            combineImgsAddPage(otherFrames[A_Index], modus, animus, setW, setH, setRes, imgList, tFrames, BMPmemSize)
+            combineFimImgsAddPage(otherFrames[A_Index], modus, GIFanimus, setW, setH, setRes, imgList, tFrames, BMPmemSize, thisFileIndex)
       } Else If (r && r!="f")
-         combineImgsAddPage(r, modus, animus, setW, setH, setRes, imgList, tFrames, BMPmemSize)
+         combineFimImgsAddPage(r, modus, GIFanimus, setW, setH, setRes, imgList, tFrames, BMPmemSize, thisFileIndex)
       Else ; nothing loaded, or a multi-page file whose every page failed to lock
          failedFiles++
 
@@ -62393,7 +62445,7 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       {
          SoundBeep , 300, 100
          msgu := (BMPmemSize>maxMemLimitMultiPage) ? "The maximum allowed file size limit was reached: " fileSizeFriendly(maxMemLimitMultiPage) : "The limit of maximum allowed pages was reached: " maxMultiPagesAllowed
-         msgResult := msgBoxWrapper(appTitle ": ERROR", msgu ". If you choose to continue, the remaining selected files will be skipped and the multipaged file will be created. It will have " groupDigits(tFrames) " pages.", "&Continue|&Abort", 0, "error")
+         msgResult := msgBoxWrapper(appTitle ": ERROR", msgu ". If you choose to continue, the remaining selected files will be skipped and the multipage file will be created. It will have " groupDigits(tFrames) " pages.", "&Continue|&Abort", 0, "error")
          If (msgResult!="continue")   ; closing the dialog is not a licence to carry on
             abandonAll := 1
          Break
@@ -62407,17 +62459,17 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
 
    If (abandonAll=1)
    {
-      showTOOLtip("Operation aborted. No multipaged image file created.")
+      showTOOLtip("Operation aborted. No multipage image file created.")
       Loop, % tFrames
-         FreeImage_UnLoad(imgList[A_Index])
+         FreeImage_UnLoad(imgList[A_Index, 1])
 
       mustEnd := 1
    } Else If (tFrames<2)
    {
-      msgu := (tFrames=1) ? "ERROR: At least two images or frames are required to create a multipaged file." : "ERROR: Failed to load selected images. No multipaged image file created."
+      msgu := (tFrames=1) ? "ERROR: At least two images or frames are required to create a multipaged file." : "ERROR: Failed to load selected images. No multipage image file created."
       showTOOLtip(msgu someErrors)
       Loop, % tFrames
-         FreeImage_UnLoad(imgList[A_Index])
+         FreeImage_UnLoad(imgList[A_Index, 1])
 
       mustEnd := 1
    } Else
@@ -62448,11 +62500,10 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    multiFim := FreeImage_OpenMultiBitmap(file2save, formatu, 1, 0)
    If !multiFim
    {
-      showTOOLtip("ERROR: Unable to create the multipaged image file:`n" OutFileName "`n" OutDir "\")
+      showTOOLtip("ERROR: Unable to create the multipage image file:`n" OutFileName "`n" OutDir "\")
       SoundBeep, 300, 100
-      addJournalEntry("Failed to create the multipaged image file: " file2save)
       Loop, % tFrames
-         FreeImage_UnLoad(imgList[A_Index])
+         FreeImage_UnLoad(imgList[A_Index, 1])
 
       SetTimer, ResetImgLoadStatus, -50
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -62460,10 +62511,11 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
    }
 
    dwFrameTime := userCombineGIFframeDelay
-   showTOOLtip("Phase 2: Creating the multipaged image: " groupDigits(tFrames) " pages`n" OutFileName)
+   showTOOLtip("Phase 2: Creating the multipage image file: " groupDigits(tFrames) " pages`n" OutFileName)
    prevMSGdisplay := 1
    startOperation := A_TickCount
    doStartLongOpDance()
+   failedFrames := 0
    Loop, % tFrames
    {
       i := A_Index
@@ -62476,55 +62528,62 @@ combineImagesFimMultiPage(modus, animus, destFilePath, setW, setH, setRes) {
       If (A_TickCount - prevMSGdisplay>2000)
       {
          etaTime := ETAinfos(A_Index, tFrames, startOperation)
-         showTOOLtip("Phase 2: Adding pages to the multipaged " extFile " image:" etaTime, 0, 0, A_Index / tFrames)
+         If failedFrames
+            etaTime .= "`nFailed to add " failedFrames " frames"
+         showTOOLtip("Phase 2: Adding pages to the multipage " extFile " image:" etaTime, 0, 0, A_Index / tFrames)
          prevMSGdisplay := A_TickCount
       }
 
-      g := FreeImage_SetMetadata(imgList[i], 0, 9, "")   ; FIMD_ANIMATION = 9
-      If (animus=1)
+      g := FreeImage_SetMetadata(imgList[i, 1], 0, 9, "")   ; FIMD_ANIMATION = 9
+      If (extFile!=".tiff" && extFile!=".pdf")
       {
          tag := FreeImage_CreateTag()
-         if tag
+         If tag
          {
-            ; add animation tags to dib[i]
+            ctf := imgList[i, 2]
+            dwft := (ctf>0) ? resultedFilesList[ctf, 29] : dwFrameTime ; custom frame delay
             p := FreeImage_SetTagKey(tag, "FrameTime")
             FreeImage_SetTagType(tag, 4)        ; FIDT_LONG = 4
             FreeImage_SetTagCount(tag, 1)
             FreeImage_SetTagLength(tag, 4)
-            k := FreeImage_SetTagValue(tag, dwFrameTime)
+            k := FreeImage_SetTagValue(tag, dwft)
             h := FreeImage_GetTagKey(tag)
-            j := FreeImage_SetMetadata(imgList[i], tag, 9, h)   ; FIMD_ANIMATION = 9
+            j := FreeImage_SetMetadata(imgList[i, 1], tag, 9, h)   ; FIMD_ANIMATION = 9
             FreeImage_DeleteTag(tag)
          }
       }
 
-      FreeImage_AppendPage(multiFim, imgList[i])
+      rz := FreeImage_AppendPage(multiFim, imgList[i, 1])
+      FreeImage_UnLoad(imgList[i, 1])
+      imgList[i, 1] := ""
+      If !rz 
+         failedFrames++
       ; fnOutputDebug(A_ThisFunc ": " i " | " g "." p "." k "." j "." t "." h " | " imgW " x " imgH)
    }
 
    addedPages := FreeImage_GetPageCount(multiFim)
-   showTOOLtip("Phase 3: Saving multipaged image file: " groupDigits(addedPages) " pages`n" OutFileName)
+   showTOOLtip("Phase 3: Saving multipage image file: " groupDigits(addedPages) " pages`n" OutFileName)
    ; fnOutputDebug(multiFim "|" addedPages "==" file2save)
    r := FreeImage_CloseMultiBitmap(multiFim, 0)
    ; fnOutputDebug("closed and saved = " r)
    Loop, % tFrames
-      FreeImage_UnLoad(imgList[A_Index])
+      FreeImage_UnLoad(imgList[A_Index, 1])
 
    If (abandonAll=1)
    {
-      showTOOLtip("Operation aborted by user. Multipaged image file not created.")
+      showTOOLtip("Operation aborted by user. Multipage image file not created.")
       SoundBeep, 300, 100
       FileDelete, % file2save
    } Else If (!r || !addedPages || !FileExist(file2save))
    {
-      showTOOLtip("ERROR: Failed to create the multipaged image file. No page could be embedded.`n" OutFileName "`n" OutDir "\")
+      showTOOLtip("ERROR: Failed to create the multipage image file. No page could be embedded.`n" OutFileName "`n" OutDir "\")
       SoundBeep, 300, 100
-      addJournalEntry("No page could be embedded into the multipaged image file: " file2save ". Pages offered: " tFrames ". Pages accepted: " addedPages ". Saved: " r)
+      addJournalEntry("No page could be embedded into the multipage image file: " file2save ". Pages offered: " tFrames ". Pages accepted: " addedPages ". Saved: " r)
    } Else
    {
-      lostPages := (tFrames>addedPages) ? "`nFailed to embed " groupDigits(tFrames - addedPages) " pages" : ""
+      lostPages := (tFrames>addedPages) ? "`nFailed to include " groupDigits(tFrames - addedPages) " pages" : ""
       FileGetSize, OutputVar, % file2save
-      showTOOLtip("Finished creating the multipaged image file: " groupDigits(addedPages) " pages`n" OutFileName "`nFile size: " fileSizeFriendly(OutputVar) lostPages "`n" OutDir "\")
+      showTOOLtip("Finished creating the multipage image file: " groupDigits(addedPages) " pages`n" OutFileName "`nFile size: " fileSizeFriendly(OutputVar) lostPages "`n" OutDir "\")
       SoundBeep, 900, 100
    }
 
@@ -62635,7 +62694,7 @@ coreImgCombinerLoadFimFile(imgPath, loadSubFrames, ByRef otherFrames) {
 ; Returns the loaded and tone-mapped bitmap, or "f" when the file was a multi-page one and
 ; its pages were handed over in otherFrames instead, or "" when nothing could be loaded.
 ; The caller owns everything returned. Depth conversion and rescaling happen in
-; combineImgsAddPage(), so that single-page and multi-page sources go through one path.
+; combineFimImgsAddPage(), so that single-page and multi-page sources go through one path.
 
   Critical, on
   sTime := A_TickCount
@@ -62697,7 +62756,7 @@ coreImgCombinerLoadFimFile(imgPath, loadSubFrames, ByRef otherFrames) {
   }
 }
 
-combineImgsAddPage(k, modus, animus, setW, setH, setRes, ByRef imgList, ByRef tFrames, ByRef BMPmemSize) {
+combineFimImgsAddPage(k, modus, GIFanimus, setW, setH, setRes, ByRef imgList, ByRef tFrames, ByRef BMPmemSize, thisFileIndex) {
 ; Prepares one page and appends it to imgList. It takes ownership of k: whatever it does not store is unloaded here.
    If !k
       Return
@@ -62712,7 +62771,7 @@ combineImgsAddPage(k, modus, animus, setW, setH, setRes, ByRef imgList, ByRef tF
       }
    }
 
-   hFIFimgC := combineImgsConvertDepth(k, modus, animus)
+   hFIFimgC := combineFimImgsConvertDepth(k, modus, GIFanimus)
    If hFIFimgC
    {
       FreeImage_UnLoad(k)
@@ -62721,18 +62780,18 @@ combineImgsAddPage(k, modus, animus, setW, setH, setRes, ByRef imgList, ByRef tF
 
    tFrames++
    BMPmemSize += FreeImage_GetMemorySize(k)
-   imgList[tFrames] := k
+   imgList[tFrames] := [k, thisFileIndex]
 }
 
-combineImgsConvertDepth(k, modus, animus) {
-; animus=1 means the page is bound for a GIF, and the GIF encoder accepts 1, 4 or 8 bits
+combineFimImgsConvertDepth(k, modus, GIFanimus) {
+; GIFanimus=1 means the page is bound for a GIF, and the GIF encoder accepts 1, 4 or 8 bits
 ; only. The modus branches below are the TIFF colour depth choice and must never be reached
 ; in that case: a page that is already 8 bits used to fall through to them and come back
 ; 32 bits, which FreeImage_AppendPage() then dropped without a word.
 
   imgBPPc := Trimmer(StrReplace(FreeImage_GetBPP(k), "-"))
-  ; fnOutputDebug("depth=" imgBPPc "| m=" modus "| a=" animus)
-  If (animus=1)
+  ; fnOutputDebug("depth=" imgBPPc "| m=" modus "| a=" GIFanimus)
+  If (GIFanimus=1)
   {
      If (imgBPPc=8)
         Return   ; already palettised; keep the source palette
@@ -66385,6 +66444,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
         {
            kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+           kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create tiff document")
         } Else
         {
            kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
@@ -66397,7 +66457,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
         If (!RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && !markedSelectFile)
            kMenu("pvMenuBarImage", "Disable", "&JPEG lossless operations`tShift+J")
-  
+
         If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
         {
            Menu, pvMenuBarImage, Add
@@ -67103,8 +67163,8 @@ createMenuBonusNoImageOpened() {
 
    If (isImgEditingNow()=1 && animGIFsSupport=1)
    {
-      kMenu("PVmenu", "Add", "&Increase GIFs playback speed`tAlt+.", "MenuIncGIFspeed",,,1)
-      kMenu("PVmenu", "Add", "&Decrease GIFs playback speed`tAlt+,", "MenuDecGIFspeed",,,1)
+      kMenu("PVmenu", "Add", "&Increase animation playback speed`tAlt+.", "MenuIncGIFspeed",,,1)
+      kMenu("PVmenu", "Add", "&Decrease animation playback speed`tAlt+,", "MenuDecGIFspeed",,,1)
    }
 }
 
@@ -67594,11 +67654,9 @@ createMenuMainPreferences() {
    Menu, PVprefs, Add
    If (thumbsDisplaying!=1)
    {
-      kMenu("PVprefs", "Add/Uncheck", "Auto-play an&imated GIFs", "ToggleAnimGIFsupport")
+      kMenu("PVprefs", "Add/Uncheck", "Auto-play an&imations", "ToggleAnimGIFsupport")
       If (animGIFsSupport=1)
-         kMenu("PVprefs", "Check", "Auto-play an&imated GIFs")
-      If (alwaysOpenWithFIM=1)
-         kMenu("PVprefs", "Disable", "Auto-play an&imated GIFs")
+         kMenu("PVprefs", "Check", "Auto-play an&imations")
    }
 
    kMenu("PVprefs", "Add/Uncheck", "Load an&y image format using FreeImage", "ToggleAlwaysFIMus")
@@ -68203,11 +68261,11 @@ createMenuSlideshows() {
    If (slidesFXrandomize=1)
       kMenu("PVslide", "Check", "&Randomize colour effects",,, " during slideshows")
 
-   kMenu("PVslide", "Add/Uncheck", "&Wait for GIFs to play once", "ToggleGIFsPlayEntirely", "animations")
-   If (animGIFsSupport!=1 || alwaysOpenWithFIM=1)
-      kMenu("PVslide", "Disable", "&Wait for GIFs to play once")
+   kMenu("PVslide", "Add/Uncheck", "&Wait for animations to play once", "ToggleGIFsPlayEntirely", "animations")
+   If (animGIFsSupport!=1)
+      kMenu("PVslide", "Disable", "&Wait for animations to play once")
    If (allowGIFsPlayEntirely=1)
-      kMenu("PVslide", "Check", "&Wait for GIFs to play once")
+      kMenu("PVslide", "Check", "&Wait for animations to play once")
 
    kMenu("PVslide", "Add/Uncheck", "S&kip already seen images", "ToggleSkipSeenIMGs")
    If (mustRecordSeenImgs!=1)
@@ -70701,10 +70759,11 @@ ToggleSelKeepRatioRotation() {
 }
 
 ToggleGIFsPlayEntirely() {
+   GIFframesPlayied := 0
    allowGIFsPlayEntirely := !allowGIFsPlayEntirely
    INIaction(1, "allowGIFsPlayEntirely", "General")
    friendly := (allowGIFsPlayEntirely=1) ? "ACTIVATED" : "DEACTIVATED"
-   showTOOLtip("Allow GIFs play entirely during slideshows:`n" friendly, A_ThisFunc, 1)
+   showTOOLtip("Allow animations play entirely during slideshows:`n" friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -71486,7 +71545,7 @@ ToggleAnimGIFsupport() {
    animGIFsSupport := !animGIFsSupport
    INIaction(1, "animGIFsSupport", "General")
    friendly := (animGIFsSupport=1) ? "ACTIVATED" : "DEACTIVATED"
-   showTOOLtip("Automatically play animated GIFs: " friendly, A_ThisFunc, 1)
+   showTOOLtip("Automatically play animations: " friendly, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -72663,7 +72722,11 @@ addJournalEntry(msg) {
        Return
 
     If (hasInitSpecialMode=1 || prevEntry=msg)
+    {
+       If (hasInitSpecialMode=1)
+          fnOutputDebug(msg)
        Return
+    }
 
     prevEntry := msg
     fnOutputDebug("User journal: " StrReplace(msg, "`n", " | "))
@@ -74242,7 +74305,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     }
 
     If ((animGIFplaying=1 || CountGIFframes>1 && animGIFsSupport=1) && thumbsDisplaying=0)
-       infoAnim := "`nGIF animation speed: " GIFspeedDelay + UserGIFsDelayu " ms / frame."
+       infoAnim := "`nAnimation speed: " GIFspeedDelay + UserGIFsDelayu " ms / frame."
 
     If (imgFxMode>1 || usrColorDepth>1)
        infoColors := "`nColors display mode: " DefineFXmodes()
@@ -75201,8 +75264,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   ignoreCache := (prevFrame!=desiredFrameIndex || minimizeMemUsage=1 || validBMP(UserMemBMP)) ? 1 : mustReloadIMG
   ; fnOutputDebug(A_ThisFunc "(): " ignoreCache " | " mustReloadIMG "|" validBMP(AprevGdiBitmap) "|" validBMP(BprevGdiBitmap))
   ; fnOutputDebug(A_ThisFunc "(): thisCall=" thisImgCall)
-  ; fnOutputDebug(A_ThisFunc "(): prevA=" SubStr(AprevImgCall, 3, InStr(AprevImgCall, "|==|") - 3))
-  ; fnOutputDebug(A_ThisFunc "(): prevB=" SubStr(BprevImgCall, 3, InStr(BprevImgCall, "|==|") - 3))
   ; MsgBox, % imgPath "`n" AbackupIMGdetails.File "`n" BbackupIMGdetails.File "`n" CbackupIMGdetails.File
   canCancelImageLoad := 1
   aOK := (thisImgCall="A" || SubStr(AprevImgCall, 3, InStr(AprevImgCall, "|==|") - 3)=thisImgCall) ? 1 : 0
@@ -75512,7 +75573,6 @@ IdentifyAudioFileAssociated() {
     audioFile1 := OutDir "\" OutNameNoExt ".WAv"
     audioFile2 := OutDir "\" OutNameNoExt ".WMA"
     audioFile3 := OutDir "\" OutNameNoExt ".MP3"
-
     If FileRexists(audioFile1)
        thisSNDfile := audioFile1
     Else If FileRexists(audioFile2)
@@ -75525,10 +75585,10 @@ IdentifyAudioFileAssociated() {
 }
 
 PlayAudioFileAssociatedNow() {
-    If (thumbsDisplaying=1)
+    If (thumbsDisplaying=1 || stopGifORslidesPlayback(1))
        Return
 
-    restartGIFplayback()
+    rz := restartGIFplayback()
     ohSNDmediaFile := hSNDmediaFile
     ohSNDmedia := hSNDmedia
     StopMediaPlaying()
@@ -75552,7 +75612,6 @@ PlayAudioFileAssociatedNow() {
        thisMsg := (E || !hSNDmedia) ? "ERROR: " E " - " hSNDmedia ". Unable to play media file: `n" : "Media file now playing: `n(" hSNDmediaDuration ") " 
        showTOOLtip(thisMsg OutFileName "`n" OutDir "\")
        SetTimer, RemoveTooltip, % -msgDisplayTime
-
        If (E || !hSNDmedia)
           StopMediaPlaying()
        dummyTimerDelayiedImageDisplay(50)
@@ -75560,7 +75619,8 @@ PlayAudioFileAssociatedNow() {
     {
        imgPath := getIDimage(currentFileIndex)
        zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
-       showTOOLtip("WARNING: No media file found to play`n" OutNameNoExt " (.WAV / .WMA / .MP3)`n" OutDir "\")
+       If !rz
+          showTOOLtip("WARNING: No media file found to play`n" OutNameNoExt " (.WAV / .WMA / .MP3)`n" OutDir "\")
        SetTimer, RemoveTooltip, % -msgDisplayTime
     }
 }
@@ -78151,6 +78211,7 @@ ActPaintBrushNow() {
    thisEffectBlur  := BrushToolBlurStrength
    If (isLarge=1)
       CreateOSDinfoLine(0, 1)
+
    lastBrushDecreaseZeit := A_TickCount
    penInContact := 0
    whileLoopExec := 1
@@ -78168,15 +78229,8 @@ ActPaintBrushNow() {
       If (rawPressure>0)
          penInContact := 1
       Else If (penInContact=1)
-      {
-         ; the pointer stream already reported the lift [WM_POINTERUP, WM_POINTERLEAVE or a
-         ; hover update]: the stroke is over. Ending it here avoids one more stamp at full
-         ; size and opacity [no pressure = factors of 1] in the up to 16 ms until the
-         ; promoted WM_LBUTTONUP is retrieved and determineLClickState() sees the release.
-         ; Mouse, touch and pressureless pens never set penInContact, so they are unaffected.
-         OutputDebug, % "QPV: MERGE: " A_ThisFunc " ended by pen lift"
          Break
-      }
+
       penOpacityFactor := penPressureFactor(thisPenPressure, BrushToolPressureOpacity)
       penSizeFactor := penPressureFactor(thisPenPressure, BrushToolPressureSize)
       If (BrushToolRandomPosX>0 && BrushToolType<6)
@@ -99693,7 +99747,7 @@ prepareExternalCoreThread(thisIndex, args, thisList) {
 
    If (wasErrorA || !FileExist(thumbsCacheFolder "\tempFilesList" thisIndex ".txt"))
    {
-      OutputDebug, % "QPV: MERGE: prepareExternalCoreThread failed for slot " thisIndex " (folder=" thumbsCacheFolder ")"
+      addJournalEntry(A_ThisFunc "(): failed for core slot " thisIndex)
       Return 0
    }
 
@@ -99712,7 +99766,6 @@ launchExternalCoreThread(thisIndex) {
    Catch wasErrorB
        Sleep, 1
 
-   OutputDebug, % "QPV: MERGE: launch worker " thisIndex ": cmd=" thisCmd " pid=" pidThread " err=" wasErrorB
    If (wasErrorB || !pidThread)
       Return 0
    Return pidThread
@@ -99735,7 +99788,7 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
 
            If (thisThreadStarted=-1 || testProcessExists(pidsArray[A_Index])!=1)
            {
-              OutputDebug, % "QPV: MERGE: worker slot " A_Index " reported fatal start or died (status=" thisThreadStarted ", pid=" pidsArray[A_Index] ", exists=" testProcessExists(pidsArray[A_Index]) ")"
+              addJournalEntry(A_ThisFunc "(): ERROR. Worker slot " A_Index " reported fatal start or died (status=" thisThreadStarted ", pid=" pidsArray[A_Index] ", exists=" testProcessExists(pidsArray[A_Index]))
               Return A_Index
            }
 
@@ -99749,7 +99802,7 @@ waitExternalCoreThreadsStart(pidsArray, deadlineMs) {
 
        If (A_TickCount - startZeit>deadlineMs)
        {
-          OutputDebug, % "QPV: MERGE: worker slot " firstPending " timed out after " (A_TickCount - startZeit) "ms"
+          addJournalEntry(A_ThisFunc "(): ERROR. Worker slot " firstPending " timed out after " (A_TickCount - startZeit) "ms")
           Return firstPending
        }
        Sleep, 25
@@ -99773,29 +99826,28 @@ initExternalCoreMode(coreThread) {
    thisGDIPversion := Gdip_LibrarySubVersion()
    If (!GDIPToken || thisGDIPversion<1.97)
    {
-      OutputDebug, % "QPV: MERGE: failed to init GDIP for worker " coreThread
+      addJournalEntry(A_ThisFunc "(): failed to init GDIP for worker " coreThread)
       fatalError := 1
    }
 
-   OutputDebug, % "QPV: MERGE: initExternalCoreMode entered for worker " coreThread " (pid=" DllCall("GetCurrentProcessId") ")"
    RegRead, mainThreadHwnd, %QPVregEntry%\multicore, mainThreadHwnd
    If (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd))
    {
-      OutputDebug, % "QPV: MERGE: main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread
+      addJournalEntry(A_ThisFunc "(). ERROR. Main window hwnd " mainThreadHwnd " does not exist, aborting worker " coreThread)
       fatalError := 1
    }
  
    RegRead, threadParams, %QPVregEntry%\multicore, threadParams%coreThread%
    If !threadParams
    {
-      OutputDebug, % "QPV: MERGE: empty threadParams for worker " coreThread
+      addJournalEntry(A_ThisFunc "(). ERROR. Empty threadParams for worker " coreThread)
       fatalError := 1
    }
  
    args := StrSplit(threadParams, "||")
    If (args[1]!=coreThread)
    {
-      OutputDebug, % "QPV: MERGE: threadParams mismatch for worker " coreThread ": " threadParams
+      addJournalEntry(A_ThisFunc "(). ERROR. ThreadParams mismatch for worker " coreThread ": " threadParams)
       fatalError := 1
    }
  
@@ -99803,24 +99855,19 @@ initExternalCoreMode(coreThread) {
    Try FileDelete, %thumbsCacheFolder%\tempFilesList%coreThread%.txt
    If !filesList
    {
-      OutputDebug, % "QPV: MERGE: filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)"
+      addJournalEntry(A_ThisFunc "(): filesList empty for worker " coreThread " (path=" thumbsCacheFolder "\tempFilesList" coreThread ".txt)")
       fatalError := 1
    }
  
    If (fatalError=1)
    {
-      OutputDebug, % "QPV: MERGE: fatalError=1 in initExternalCoreMode for worker " coreThread
+      addJournalEntry(A_ThisFunc "(): fatal error occurred in initExternalCoreMode for worker " coreThread "... exiting now.")
       RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, -1
       ForceExitNow()
       Return
    }
  
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
-   OutputDebug, % "QPV: MERGE: worker " coreThread " set ThreadRunning=1, job=" args[2]
-   ; this thread is critical, so the watchdog only gets to run while a modal dialog - an
-   ; AHK runtime error, a library fault - is up: the one situation in which the per-file
-   ; abort check of the loops below cannot run, and the main thread would otherwise have
-   ; to close the process from outside
    initFIMGmodule()
    SetTimer, watchExternalCoreAbort, 750
    RegRead, hGDIwin, %QPVregEntry%\multicore, mainWindowID
@@ -99831,7 +99878,6 @@ initExternalCoreMode(coreThread) {
    Else If (args[2]="batch-fmtconv")
       multiCoreThreadFormatConvert(args[1], filesList)
  
-   OutputDebug, % "QPV: MERGE: worker " coreThread " completed work, exiting"
    ForceExitNow()
    Return
 }
