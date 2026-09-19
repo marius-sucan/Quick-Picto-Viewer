@@ -130,7 +130,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC"
    , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := ""
    , lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0, prevFilesSortMode, brushAclrAlpha := "ffFFff"
-   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", cachedAllSessionsSeen := new hashtable()
+   , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", forcedAnimPlayPath := ""
+   , cachedAllSessionsSeen := new hashtable()
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := "", lastSelPrinterName := ""
    , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
@@ -12273,6 +12274,7 @@ restartGIFplayback() {
       autoChangeDesiredFrame("stop", 0)
       Sleep, 5
       prevAnimGIFwas := ""   ; explicit play intent [X key, Ctrl+click]: lift the user-stopped latch
+      forcedAnimPlayPath := StrReplace(getIDimage(currentFileIndex), "||")
       ; setGIFframesDelay()
       autoChangeDesiredFrame("start", getIDimage(currentFileIndex))
       SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
@@ -12292,7 +12294,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          act := (A_TickCount - obju[3]<(A_TickCount - lastFrameChange) + 300) ? "stop" : act
    }
 
-   If (thumbsDisplaying=1 || act="stop" || AnyWindowOpen || animGIFsSupport!=1 || !maxFilesIndex || !CurrentSLD)
+   If (thumbsDisplaying=1 || act="stop" || AnyWindowOpen || (animGIFsSupport!=1 && !StrLen(forcedAnimPlayPath)) || !maxFilesIndex || !CurrentSLD)
    {
       If (animGIFplaying=1 || animGIFplaying=-1 || StrLen(prevImgPath))
       {
@@ -12301,8 +12303,9 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
          If (StrLen(prevImgPath)>2)
             prevAnimGIFwas := prevImgPath
          prevImgPath := ""
+         forcedAnimPlayPath := ""
          lastGIFdestroy := A_TickCount
-         lastFrameChange := A_TickCoun
+         lastFrameChange := A_TickCount
          allowNextSlide := 1
          animGIFplaying := 0
          ; lastInvoked := A_TickCount
@@ -12338,6 +12341,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
             prevAnimGIFwas := prevImgPath
 
          prevImgPath := ""
+         forcedAnimPlayPath := ""
          lastFrameChange := A_TickCount
          lastGIFdestroy := A_TickCount
          Return
@@ -75326,7 +75330,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   If (varContains(currIMGdetails.RawFormat, "webp", "gif", "png") && totalFramesIndex>0)
   {
      gifLoaded := 1
-     CountGIFframes := (animGIFsSupport=1) ? totalFramesIndex : 0
+     CountGIFframes := (animGIFsSupport=1 || forcedAnimPlayPath=imgPath) ? totalFramesIndex : 0
      setGIFframesDelay(oBitmap)
   }
 
@@ -75531,6 +75535,7 @@ OnImgFileChangeActions(forceThis) {
 
      GIFframesPlayied := 0
      allowNextSlide := 1
+     forcedAnimPlayPath := ""
      If (A_TickCount - lastGIFdestroy > 950)
         prevAnimGIFwas := ""
      If (hSNDmedia && autoPlaySNDs!=1)
@@ -81751,7 +81756,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     prevLoadedImageIndex := currentFileIndex
     createGDIPcanvas(mainWidth, mainHeight)
-    If (CountGIFframes>1 && !AnyWindowOpen && animGIFsSupport=1 && prevAnimGIFwas!=imgPath)
+    If (CountGIFframes>1 && !AnyWindowOpen && (animGIFsSupport=1 || forcedAnimPlayPath=imgPath) && prevAnimGIFwas!=imgPath)
        mustPlayAnim := 1
 
     liveBrushModeUpdates := (liveDrawingBrushTool=1 && whileLoopExec=1 && AnyWindowOpen) ? 1 : 0
