@@ -12085,7 +12085,7 @@ VPchangeGIFsDelayu(dir) {
    If (A_TickCount - lastInvoked < 50)
       Return
 
-   If (thumbsDisplaying=1 || !isImgEditingNow() || animGIFsSupport!=1)
+   If (thumbsDisplaying=1 || !isImgEditingNow() || (animGIFsSupport!=1 && !StrLen(forcedAnimPlayPath)))
       Return
 
    resetSlideshowTimer(1)
