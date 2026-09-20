@@ -324,6 +324,7 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
 
    If !hMenuSel
       Return
+
    VarSetCapacity(bufu, 520, 0)
    If (flags & 0x10)  ; MF_POPUP: the loword is the item POSITION
       DllCall("user32\GetMenuStringW", "UPtr", hMenuSel, "UInt", item, "UPtr", &bufu, "Int", 255, "UInt", 0x400)
@@ -332,8 +333,9 @@ uiMenuSelectTrack(mwParam, hMenuSel) {
 
    lastContextMenuZeit := A_TickCount
    txt := StrGet(&bufu, "UTF-16")
-   If !StrLen(txt)
+   If !txt
       Return
+
    accel := ""
    If InStr(txt, "`t")
    {
@@ -1292,7 +1294,7 @@ uiWM_LBUTTONDOWN(wP, lP, msg, hwnd) {
     Else If ((drawingShapeNow=1 && doNormalCursor=0 || liveDrawingBrushTool=1 || AnyWindowOpen=66 && FloodFillSelectionAdj=0) && (thisWin=1 && isOkay=1))
        pp := 1
 
-    If ((A_TickCount - lastInvoked<25) || (A_TickCount - scriptStartTime<500) || (A_TickCount - lastWinDrag<400) || (A_TickCount - lastDoubleClickZeit<400) && pp=1)
+    If ((A_TickCount - lastInvoked<25) || (A_TickCount - lastContextMenuZeit<95) || (A_TickCount - scriptStartTime<500) || (A_TickCount - lastWinDrag<400) || (A_TickCount - lastDoubleClickZeit<400) && pp=1)
        Return 0
 
     MouseGetPos, ,, OutputVarWin

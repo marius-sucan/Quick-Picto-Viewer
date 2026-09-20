@@ -113,7 +113,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
    , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|APNG|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
-   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|GIF|WEBP|AVIF|HEIC|HEIF|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|WEBP|AVIF|HEIC|HEIF|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
@@ -12291,10 +12291,6 @@ restartGIFplayback() {
 }
 
 animPlaybackDelay() {
-; The period between two frames of an animation. SetTimer treats a negative period as
-; run-once and the user can drive UserGIFsDelayu down to -9500, so without the floor
-; the playback ends after a single frame.
-
    Return max(GIFspeedDelay + UserGIFsDelayu, 50)
 }
 
@@ -74631,6 +74627,23 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
      Return gdiBMPvPsize
 }
 
+setGIFframesDelay(rawFmt, oBitmap) {
+   base := (totalFramesIndex>75) ? 35 : 45
+   If (totalFramesIndex>195)
+      base := 20
+   Else If (totalFramesIndex<15)
+      base := 60
+
+   If (totalFramesIndex<8)
+      base := 85
+
+   If (rawFmt="gif")
+   {
+      g := Gdip_GetFrameDelay(oBitmap, desiredFrameIndex)
+      GIFspeedDelay := clampInRange(g + base, 15, 9500)
+   } Else GIFspeedDelay := base
+}
+
 multiPageFileManaging(imgPath, oBitmap, frameu) {
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If RegExMatch(rawFmt, "i)(gif|tiff)$")
@@ -74642,6 +74655,7 @@ multiPageFileManaging(imgPath, oBitmap, frameu) {
       If (frameu>=tFrames)
          frameu := tFrames
 
+      setGIFframesDelay(rawFmt, oBitmap)
       If (tFrames>0 && slideShowRunning=1 && SlideHowMode=1 && animGIFsSupport!=1)
          Random, frameu, 0, % tFrames
 
@@ -75351,7 +75365,8 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   {
      gifLoaded := 1
      CountGIFframes := (isAnimFile=1 && (animGIFsSupport=1 || forcedAnimPlayPath=imgPath)) ? totalFramesIndex : 0
-     multiPageFileManaging(imgPath, oBitmap, desiredFrameIndex)
+     If InStr(rawFmt, "gif")
+        setGIFframesDelay(rawFmt, oBitmap)
   }
 
   If (viewportQPVimage.imgHandle)
