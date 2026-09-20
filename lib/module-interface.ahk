@@ -219,7 +219,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
    ; trace of every entry [DebugView]: which message, from which procedure, with
    ; which values, against the session state - the menus can only be diagnosed from
    ; here, no OnMessage monitor ever sees these messages [RULE 3]
-   OutputDebug, % "QPV: MERGE: sent msg 0x" Format("{:X}", msg) " wP=" wP " lP=" lP " hwnd=" hwnd " loop=" menuLoopActive " bar=" barMenuSession
+   ; OutputDebug, % "QPV: MERGE: sent msg 0x" Format("{:X}", msg) " wP=" wP " lP=" lP " hwnd=" hwnd " loop=" menuLoopActive " bar=" barMenuSession
    If (msg=0x85EE)     ; the install-time probe of uiInstallSentMsgHook(): its lParam is the acknowledgement slot
    {
       If lP
@@ -262,14 +262,12 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
          {
             flyoutAnchorMenu := hMinit
             menusflyOutVisible := 0
-            OutputDebug, % "QPV: MERGE: flyout flag raised [bar] anchor=" hMinit
          }
       } Else If (popupRootSeen!=1)
       {
          popupRootSeen := 1
          flyoutAnchorMenu := hMinit
          menusflyOutVisible := 0
-         OutputDebug, % "QPV: MERGE: flyout flag raised [popup] anchor=" hMinit
       }
 
       uiMenuBarJITrebuild(hMinit)
@@ -286,17 +284,17 @@ uiMenuBarJITrebuild(hMenu) {
    Static busy := 0
    If (busy=1 || !IsObject(menuJITmap) || !menuJITmap.HasKey(hMenu))
    {
-      OutputDebug, % "QPV: MERGE: menu JIT not run for hMenu=" hMenu " busy=" busy " mapped=" (IsObject(menuJITmap) ? menuJITmap.HasKey(hMenu) : "no-map")
+      ; OutputDebug, % "QPV: MERGE: menu JIT not run for hMenu=" hMenu " busy=" busy " mapped=" (IsObject(menuJITmap) ? menuJITmap.HasKey(hMenu) : "no-map")
       Return
    }
    If (barMenuSession!=1)
    {
-      OutputDebug, % "QPV: MERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]
+      ; OutputDebug, % "QPV: MERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]
       Return
    }
    busy := 1
    funcu := menuJITmap[hMenu]
-   OutputDebug, % "QPV: MERGE: menu JIT rebuild " funcu
+   ; OutputDebug, % "QPV: MERGE: menu JIT rebuild " funcu
    If (VisibleQuickMenuSearchWin=1)
       Try closeQuickSearch()
    mouseTurnOFFtooltip()
@@ -503,7 +501,7 @@ uiTryPlaceFlyout(anchor:=0) {
    lastContextMenuZeit := A_TickCount
    menusflyOutVisible := 1
    y := mY + Round(Height) + 2
-   OutputDebug, % "QPV: MERGE: flyout placed x" mX " y" y " bar=" barMenuSession
+   ; OutputDebug, % "QPV: MERGE: flyout placed x" mX " y" y " bar=" barMenuSession
    Gui, menuFlier: Show, AutoSize x%mX% y%y% NoActivate
 }
 
@@ -1343,8 +1341,7 @@ uiWM_LBUTTONUP(wP, lP, msg, hwnd) {
                 closeQuickSearch()
              Else
                 PanelQuickSearchMenuOptions()
-          }
-          Else If (hwnd=hFlyBtn2)
+          } Else If (hwnd=hFlyBtn2)
              toggleAppToolbar()
           Else If (hwnd=hFlyBtn3)
              ToggleMenuBaru()
@@ -2318,7 +2315,7 @@ ProcessCriticalKeys(keyu, closeMode:=0) {
       }
    } Else If ((slideShowRunning=1 || animGIFplaying=1) && imgEdit=1)
    {
-      If (keyu ~= "i)(Escape|win\-close|\!F4|\^F4|F10|COLON|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+      If (keyu ~= "i)(Escape|win\-close|\!F4|\^F4|.?F..?|COLON|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
       {
          prevID := "a" currentFileIndex resultedFilesList[currentFileIndex, 1]
          stopGifORslidesPlayback(1)

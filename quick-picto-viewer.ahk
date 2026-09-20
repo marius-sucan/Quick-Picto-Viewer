@@ -180,7 +180,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := []
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
-   , reviewSelectedIndexes := [], toBeExcludedIndexes := [], fimMultiPage := 0, staticListViewFilteru
+   , reviewSelectedIndexes := [], toBeExcludedIndexes := [], staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
    , VisibleQuickMenuSearchWin := 0, userQuickMenusEdit := "", preventHUDelements := 0, OSDwinFadedBrushBGR := 0
    , gdiAmbientalTexBrush := "", GDIbrushWinBGR := "", vpImgPanningNow := 0, viewportDynamicOBJcoords := []
@@ -12089,11 +12089,17 @@ VPchangeGIFsDelayu(dir) {
       Return
 
    resetSlideshowTimer(1)
-   factoru := (A_TickCount - lastInvoked<450) ? 150 : 15
+   factoru := isInRange(UserGIFsDelayu, -100, 100) ? 15 : 105
+   If ((A_TickCount - lastInvoked<200) && factoru!=15 && !isInRange(UserGIFsDelayu, -400, 400))
+      factoru := 210
+
    stepu := (dir=1) ? factoru : -factoru
    UserGIFsDelayu := clampInRange(UserGIFsDelayu + stepu, -9500, 9500, 1)
-   SetTimer, postPonedWriteGifSpeed, -150
+   If isInRange(UserGIFsDelayu, -10, 10)
+      UserGIFsDelayu := 0
+
    showTOOLtip("Animation playback delay per frame: " UserGIFsDelayu " ms", A_ThisFunc, 2, (UserGIFsDelayu + 9500)/19000)
+   SetTimer, postPonedWriteGifSpeed, -150
    SetTimer, RemoveTooltip, % -msgDisplayTime
    lastInvoked := A_TickCount
 }
@@ -12274,8 +12280,7 @@ restartGIFplayback() {
       autoChangeDesiredFrame("stop", 0)
       Sleep, 5
       prevAnimGIFwas := ""   ; explicit play intent [X key, Ctrl+click]: lift the user-stopped latch
-      forcedAnimPlayPath := StrReplace(getIDimage(currentFileIndex), "||")
-      ; setGIFframesDelay()
+      forcedAnimPlayPath := (animGIFsSupport!=1) ? StrReplace(getIDimage(currentFileIndex), "||") : ""
       autoChangeDesiredFrame("start", getIDimage(currentFileIndex))
       SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
       Return 1
@@ -12290,7 +12295,7 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    thisID := "a" currentFileIndex resultedFilesList[currentFileIndex, 1]
    If (obju[4]=thisID)
    {
-      If (obju[1] ~= "i)(Escape|win\-close|\!F4|\^F4|F10|COLON|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
+      If (obju[1] ~= "i)(Escape|win\-close|\!F4|\^F4|.?F..?|COLON|Enter|Space|Tab|Left|Right|Up|Down|PgUp|PgDn|Home|End|BackSpace|Delete)")
          act := (A_TickCount - obju[3]<(A_TickCount - lastFrameChange) + 300) ? "stop" : act
    }
 
@@ -43858,9 +43863,9 @@ PanelCombineImagesMultipage() {
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, GIFs frames delay (in milisec.)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF5", userCombineGIFframeDelay)
+    Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gBtnHelpJoinIMGsframeDelay", " ?", "Help")
-    Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
     Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% gBtnChangeMultiPageFmt vuserJoinIMGres, Set GIF dimensions (W x H):
     thisWid += 20
     GuiAddEdit("x+1 w" thisWid " number -multi limit5 veditF7", userJoinIMGsW)
@@ -43914,7 +43919,7 @@ BtnHelpCombineImgs() {
 }
 
 BtnHelpJoinIMGsframeDelay() {
-   msgBoxWrapper(appTitle ": HELP", "To set custom delay per frames, close this panel first. Open quick search options (S button below menus). In the search box type «join» and select «Set frame delay». To reopen the panel press `; or F8. The delay option from the currently opened panel will be ignored for the images you have set a custom delay.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "To set custom delays for specific frames:`n `n1. Close this panel.`n2. Open the «Quick search options» panel (S button below menus).`n3. In the search box type «join» and select «Set frame delay».`n `nTIP:Tto quickly reopen the panel press `; or F8.`n `nThe delay option from the currently opened panel will be ignored for the images you have set a custom delay.", -1, 0, 0)
 }
 
 BTNperformCombineIMGs() {
@@ -66459,6 +66464,10 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image") 
         kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
+        If (RegExMatch(imgPath, "i)(.\.(apng|png|webp|gif|avif|heif|heic))$") && totalFramesIndex>1 && animGIFplaying!=1)
+           kMenu("pvMenuBarImage", "Add", "&Play animation`tX", "restartGIFplayback")
+
+        kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
         If (!RegExMatch(imgPath, "i)(.\.(jpg|jpeg))$") && !markedSelectFile)
            kMenu("pvMenuBarImage", "Disable", "&JPEG lossless operations`tShift+J")
 
@@ -69249,6 +69258,12 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    createMenuOpenRecents()
 
 ; main menu
+  If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(apng|png|webp|gif|avif|heif|heic))$") && totalFramesIndex>1 && animGIFplaying!=1)
+  {
+     kMenu("PVmenu", "Add", "&Play animation`tX", "restartGIFplayback")
+     Menu, PVmenu, Add
+  }
+
    kMenu("PVmenu", "Add", "&Open...", ":PVopenF")
    kMenu("PVmenu", "Add", "Fa&vourites", ":PVfaves")
    If (StrLen(mustOpenStartFolder)>1)
@@ -69265,7 +69280,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
 
    If ((validBMP(UserMemBMP) || currentImgModified=1 && viewportQPVimage.imgHandle) && thumbsDisplaying!=1 && (showMainMenuBar!=1 || mustPreventMenus=1))
    {
-      Menu, PVmenu, Add,
+      Menu, PVmenu, Add
       If (undoLevelsRecorded>1 && undoLevelsRecorded!="" || currentImgModified=1 && viewportQPVimage.imgHandle)
       {
          kMenu("PVmenu", "Add", "&Undo`tCtrl+Z", "ImgUndoAction", "image edit")
@@ -74309,7 +74324,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     }
 
     If ((animGIFplaying=1 || CountGIFframes>1 && animGIFsSupport=1) && thumbsDisplaying=0)
-       infoAnim := "`nAnimation speed: " GIFspeedDelay + UserGIFsDelayu " ms / frame."
+       infoAnim := "`nAnimation speed: " UserGIFsDelayu " ms / frame."
 
     If (imgFxMode>1 || usrColorDepth>1)
        infoColors := "`nColors display mode: " DefineFXmodes()
@@ -74599,29 +74614,27 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
      Return gdiBMPvPsize
 }
 
-setGIFframesDelay(oBitmap) {
-   base := (totalFramesIndex>75) ? 35 : 45
-   If (totalFramesIndex>195)
+setGIFframesDelay(oBitmap, rawFmt, tFrames) {
+   base := (tFrames>75) ? 35 : 45
+   If (tFrames>195)
       base := 20
-   Else If (totalFramesIndex<15)
+   Else If (tFrames<15)
       base := 60
 
-   If (totalFramesIndex<8)
+   If (tFrames<8)
       base := 85
 
-   rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If (rawFmt="gif")
    {
       g := Gdip_GetFrameDelay(oBitmap, desiredFrameIndex)
       ; d := Gdip_GetPropertyItem(oBitmap, 0x5100)
-      ; GIFspeedDelay := clampInRange(Round(SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10) + base, 15, 9500)
-      GIFspeedDelay := clampInRange(g + base, 15, 9500)
-      ; ToolTip, % GIFspeedDelay "==" g "==" d.value , , , 2
-      ; ToolTip, % "d=" SubStr(d.value, 1, InStr(d.value, A_Space) - 1)*10 "|" GIFspeedDelay , , , 2
-   } Else GIFspeedDelay := base
+      delay := clampInRange(g + base, 15, 29500)
+   } Else delay := base
+
+   Return delay
 }
 
-multiPageFileManaging(oBitmap, frameu) {
+multiPageFileManaging(imgPath, oBitmap, frameu) {
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If RegExMatch(rawFmt, "i)(gif|tiff)$")
    {
@@ -74632,7 +74645,7 @@ multiPageFileManaging(oBitmap, frameu) {
       If (frameu>=tFrames)
          frameu := tFrames
 
-      setGIFframesDelay(oBitmap)
+      GIFspeedDelay := setGIFframesDelay(oBitmap, rawFmt, tFrames)
       If (tFrames>0 && slideShowRunning=1 && SlideHowMode=1 && animGIFsSupport!=1)
          Random, frameu, 0, % tFrames
 
@@ -74776,27 +74789,30 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      MD5name := generateThumbName(imgPath, 1)
      ; fimStuff := (alwaysOpenWithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
      thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapAltExpo allowToneMappingImg
+     If (globalhFIFimg!="" && totalFramesIndex>1)
+     {
+        GDIcacheSRCfileA := trGdip_DisposeImage(GDIcacheSRCfileA)
+        GDIcacheSRCfileB := trGdip_DisposeImage(GDIcacheSRCfileB)
+     }
+
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
      isFramesA := (tFramesA = prevImgDetailsA.Frames) ? 1 : 0
      isFramesB := (tFramesB = prevImgDetailsB.Frames) ? 1 : 0
-     ; fnOutputDebug(A_ThisFunc ": " thisMD5name)
-     ; fnOutputDebug(A_ThisFunc ": " prevMD5nameA)
-     ; fnOutputDebug(A_ThisFunc ": " prevMD5nameB) 
      ; fnOutputDebug(A_ThisFunc ": " isFramesA "=" isFramesB " | " tFramesA "=" tFramesB " || " AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames)
      ; fnOutputDebug(AbackupIMGdetails.File " | " BbackupIMGdetails.File)
      ; ToolTip, % thisMD5name "`n" prevMD5nameA "`n" prevMD5nameB "`n" isFramesA "=" isFramesB "`n" tFramesA "=" tFramesB "`n" AbackupIMGdetails.Frames "=" BbackupIMGdetails.Frames "`n" AbackupIMGdetails.File "=" BbackupIMGdetails.File , , , 2
      If (thisMD5name=prevMD5nameA && validBMP(GDIcacheSRCfileA) && StrLen(prevMD5nameA)>2 && isFramesA=1)
      {
         addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileA "`n" imgPath)
-        totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileA, desiredFrameIndex)
+        totalFramesIndex := multiPageFileManaging(imgPath, GDIcacheSRCfileA, desiredFrameIndex)
         currIMGdetails := prevImgDetailsA.Clone()
         If totalFramesIndex
            Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileA)
      } Else If (thisMD5name=prevMD5nameB && validBMP(GDIcacheSRCfileB) && StrLen(prevMD5nameB)>2 && isFramesB=1)
      {
         addJournalEntry("Using unprocessed cached GDI bitmap ID: " GDIcacheSRCfileB "`n" imgPath)
-        totalFramesIndex := multiPageFileManaging(GDIcacheSRCfileB, desiredFrameIndex)
+        totalFramesIndex := multiPageFileManaging(imgPath, GDIcacheSRCfileB, desiredFrameIndex)
         currIMGdetails := prevImgDetailsB.Clone()
         If totalFramesIndex
            Return trGdip_CloneBitmap(A_ThisFunc, GDIcacheSRCfileB)
@@ -75254,6 +75270,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   Static prevFrame := -1, lastInvoked := 1, BbackupIMGdetails := [], AbackupIMGdetails := []
 
   GDIbmpFileConnected := 1
+  otfi := totalFramesIndex
   hasFullReloaded := CountGIFframes := totalFramesIndex := 0
   MD5name := generateThumbName(imgPath, 1)
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
@@ -75265,7 +75282,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   prevLastImg[1] := [currentFileIndex, resultedFilesList[currentFileIndex, 1]]
   gdiBitmap := trGdip_DisposeImage(gdiBitmap, 1)
   backupGdiBMP := trGdip_DisposeImage(backupGdiBMP, 1)
-  ignoreCache := (prevFrame!=desiredFrameIndex || minimizeMemUsage=1 || validBMP(UserMemBMP)) ? 1 : mustReloadIMG
+  ignoreCache := (prevFrame!=desiredFrameIndex || minimizeMemUsage=1 || validBMP(UserMemBMP) || globalhFIFimg!="" && otfi>1) ? 1 : mustReloadIMG
   ; fnOutputDebug(A_ThisFunc "(): " ignoreCache " | " mustReloadIMG "|" validBMP(AprevGdiBitmap) "|" validBMP(BprevGdiBitmap))
   ; fnOutputDebug(A_ThisFunc "(): thisCall=" thisImgCall)
   ; MsgBox, % imgPath "`n" AbackupIMGdetails.File "`n" BbackupIMGdetails.File "`n" CbackupIMGdetails.File
@@ -75320,18 +75337,17 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   lastInvoked := A_TickCount
   hasFullReloaded := 1
   rawFmt := Gdip_GetImageRawFormat(oBitmap)
-  rawFmt := (rawFmt="MEMORYBMP" && fimMultiPage) ? fimMultiPage : rawFmt
   ; If (RegExMatch(rawFmt, "i)(gif|tiff)$") && totalFramesIndex>0)
   If (currIMGdetails.frames>0)
      totalFramesIndex := currIMGdetails.Frames
   Else If (rawFmt="MEMORYBMP")
      GDIbmpFileConnected := 0
 
-  If (varContains(currIMGdetails.RawFormat, "webp", "gif", "png") && totalFramesIndex>0)
+  If (RegExMatch(imgPath, "i)(.\.(|apng|png|tif|tiff|gif|webp|avif))$") && totalFramesIndex>0)
   {
      gifLoaded := 1
      CountGIFframes := (animGIFsSupport=1 || forcedAnimPlayPath=imgPath) ? totalFramesIndex : 0
-     setGIFframesDelay(oBitmap)
+     multiPageFileManaging(imgPath, oBitmap, desiredFrameIndex)
   }
 
   If (viewportQPVimage.imgHandle)
@@ -81797,7 +81813,7 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
     If (((A_TickCount - lastZeitLowQuality<thisDelayu + prevDelayu) || (drawModeAzeit>70 && mustPlayAnim=1 && desiredFrameIndex>1) || (usePrevious=1)) && (userimgQuality=1 && usePrevious!=2 && zoomLevel!=1) || (zoomLevel>10 && userimgQuality=1))
        mustGoIntoLowQuality := 1
 
-    If ((mustPlayAnim=1 || liveDrawingBrushTool=1 || imgEditPanelOpened=1 || drawingShapeNow=1) && userimgQuality=1)
+    If ((liveDrawingBrushTool=1 || imgEditPanelOpened=1 || drawingShapeNow=1) && userimgQuality=1)
        mustGoIntoLowQuality := 2
 
     If (mustGoIntoLowQuality=1 && minimizeMemUsage!=1 && mustGenerate=0 && usePrevious!=2 && mustPlayAnim!=1 && imgFxMode>1 && vpImgPanningNow!=2)
@@ -82215,7 +82231,6 @@ QPV_ShowImgonGui(newW, newH, mainWidth, mainHeight, usePrevious, imgPath, ForceI
 
     If (mustPlayAnim=1 && !AnyWindowOpen)
     {
-       ; setGIFframesDelay()
        autoChangeDesiredFrame("start", imgPath)
        SetTimer, autoChangeDesiredFrame, % GIFspeedDelay + UserGIFsDelayu
        If (mustRecordSeenImgs=1 && desiredFrameIndex=2 && gdiBMPchanged=1 && !InStr(r, "error"))
@@ -99212,6 +99227,7 @@ initFIMGmodule() {
 
 LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newBitmap:=0, nofall:=0, screenMode:=0) {
   Critical, on
+  Static lastMultiPGfile := ""
   sTime := A_TickCount
   initFIMGmodule()
   forceWic := (RegExMatch(imgPath, "i)(.\.(tiff|tif|gif))$") && noBMP=1) ? 1 : 0
@@ -99261,11 +99277,27 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      multiFlags := isVarEqualTo(GFT, 25, 37, 39) ? 2 : 0
      If (GFT=35)
         multiFlags := 1
-     hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
+
+     testMultiPG := "a" globalhFIFimg imgPath multiFlags GFT
+     If (screenMode=1 && lastMultiPGfile=testMultiPG)
+     {
+        hMultiBMP := globalhFIFimg
+     } Else
+     {
+        If (screenMode=1 && globalhFIFimg!="")
+        {
+           FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+           globalhFIFimg := ""
+        }
+
+        hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
+     }
+
+     If (screenMode=1)
+        lastMultiPGfile := "a" hMultiBMP imgPath multiFlags GFT
   }
 
   tFrames := 0
-  fimMultiPage := ""
   mainLoadedIMGdetails.Frames := 0
   If (StrLen(hMultiBMP)>1)
   {
@@ -99276,7 +99308,6 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
 
      If (tFrames>1)
      {
-        fimMultiPage := (GFT=18) ? "tiff" : "gif"
         frameu := clampInRange(frameu, 0, tFrames - 1)
         mainLoadedIMGdetails.Frames := tFrames - 1
         ; msgbox, % a_thisfunc "=" totalFramesIndex "==" desiredFrameIndex
@@ -99284,14 +99315,21 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         If (hPage!="")
         {
            ; fnOutputDebug("multipage FIM: " hMultiBMP "| h=" hpage "|" frameu "/" tFrames)
+           If (screenMode=1)
+              GIFspeedDelay := FreeImage_GetFrameTime(hPage)
            hFIFimgA := FreeImage_Clone(hPage)
            If hFIFimgA
               hasMultiTrans := FreeImage_GetTransparencyCount(hFIFimgA)
 
            FreeImage_UnlockPage(hMultiBMP, hPage, 0)
-        }
+        } Else
+           GIFspeedDelay := 90
+
         ; ToolTip, % hasMultiTrans "==" frameu "==" frameu , , , 2
-        FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+        If (screenMode=1)
+           globalhFIFimg := hMultiBMP
+        Else
+           FreeImage_CloseMultiBitmap(hMultiBMP, 0)
      } Else
      {
         FreeImage_CloseMultiBitmap(hMultiBMP, 0)

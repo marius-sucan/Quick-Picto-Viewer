@@ -5,7 +5,7 @@
 // Related: general-code-overview.txt
 
 - v6.3.10 (2026-10-**)
-  - [new] support for APNG, HEIC and AVIF images and animations
+  - [new] support for APNG, HEIC and AVIF images and animations, in addition to WEBP and GIF
   - [new] ability to join images as animated WEBP or APNG, in addition to GIF, TIFF and PDF
   - [new] ability to set delay per frame when creating animated images
   - much improved joining images as PDF
