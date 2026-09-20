@@ -10,7 +10,7 @@
   - [new] ability to set delay per frame when creating animated images
   - much improved joining images as PDF
   - fixed the animations playback: the frames counter advanced without the viewport rendering them, and speeding up the playback could stop it after a single frame
-  - animated GIFs are no longer loaded with WIC, which returns the raw undisposed frames and no frame delays
+  - animations in GIFs and WebP images are now played back solely with the FreeImage library; it composes the frames and uses the delay declared for each one of them
 
 
 - v6.3.00 (2026-08-31)

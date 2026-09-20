@@ -16523,6 +16523,7 @@ getImgSelectedAreaEditMode(previewMode, imgSelPx, imgSelPy, oImgW, oImgH, imgSel
 }
 
 destroyGDIfileCache(remAll:=1, makeBackup:=0) {
+    multiPageFIMcache("")   ; the multi-page FreeImage handle keeps the file open as well
     If (remAll=0)
     {
        imgPath := StrReplace(getIDimage(currentFileIndex), "||")
@@ -74630,7 +74631,13 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
      Return gdiBMPvPsize
 }
 
-setGIFframesDelay(oBitmap, rawFmt, tFrames, frameu) {
+isFIMonlyAnimFile(imgPath) {
+; .gif and .webp play back through FreeImage alone: it composes their frames and carries
+; the per-frame delays, while WIC returns raw undisposed frames and GDI+ cannot read a WebP
+   Return RegExMatch(imgPath, "i)(.\.(gif|webp))$") ? 1 : 0
+}
+
+setGIFframesDelay(tFrames) {
    base := (tFrames>75) ? 35 : 45
    If (tFrames>195)
       base := 20
@@ -74640,19 +74647,13 @@ setGIFframesDelay(oBitmap, rawFmt, tFrames, frameu) {
    If (tFrames<8)
       base := 85
 
-   If (rawFmt="gif")
-   {
-      g := Gdip_GetFrameDelay(oBitmap, frameu)
-      ; d := Gdip_GetPropertyItem(oBitmap, 0x5100)
-      delay := (g<0) ? 100 : clampInRange(g + base, 15, 29500)
-   } Else delay := base
-
-   Return delay
+   Return base
 }
 
 multiPageFileManaging(imgPath, oBitmap, frameu) {
+; only multi-page TIFFs are paged through GDI+; see isFIMonlyAnimFile()
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
-   If RegExMatch(rawFmt, "i)(gif|tiff)$")
+   If RegExMatch(rawFmt, "i)(tiff)$")
    {
       tFrames := Gdip_GetBitmapFramesCount(oBitmap) - 1
       If (tFrames<0 || !tFrames)
@@ -74661,7 +74662,7 @@ multiPageFileManaging(imgPath, oBitmap, frameu) {
       If (frameu>=tFrames)
          frameu := tFrames
 
-      GIFspeedDelay := setGIFframesDelay(oBitmap, rawFmt, tFrames, frameu)
+      GIFspeedDelay := setGIFframesDelay(tFrames)
       If (tFrames>0 && slideShowRunning=1 && SlideHowMode=1 && animGIFsSupport!=1)
          Random, frameu, 0, % tFrames
 
@@ -74841,7 +74842,12 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   viewportPDFbookMarks := []
   viewportQPVimage.DiscardImage()
   recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-  If ((RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) && allowFIMloader=1)
+  isAnimFmt := isFIMonlyAnimFile(imgPath)
+  useFIMloader := (RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) ? 1 : 0
+  If (isAnimFmt=1 && FIMfailed2init!=1)
+     useFIMloader := 1
+
+  If (useFIMloader=1 && allowFIMloader=1)
   {
      If (thumbsDisplaying!=1 && runningLongOperation!=1 && slideShowRunning!=1)
         setWindowTitle("Loading file using the FreeImage library")
@@ -74852,10 +74858,8 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
      totalFramesIndex := mainLoadedIMGdetails.Frames
      desiredFrameIndex := clampInRange(frameu, 0, totalFramesIndex)
      GDIbmpFileConnected := 0
-  } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && !RegExMatch(imgPath, "i)(.\.gif)$"))
+  } Else If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1)
   {
-     ; GIFs are left out on purpose: WIC returns the raw, undisposed frame of an
-     ; animation and knows nothing of the frame delays, while GDI+ composes the frames
      totalFramesIndex := 0
      thisImgQuality := (userimgQuality=1) ? 6 : 5
      tt := A_TickCount
@@ -74874,8 +74878,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   } Else
   {
      totalFramesIndex := 0
-     isGIFfile := RegExMatch(imgPath, "i)(.\.gif)$") ? 1 : 0
-     oBitmap := LoadFileWithGDIp(imgPath, 0, frameu, userPerformColorManagement, 0, n, isGIFfile)
+     oBitmap := LoadFileWithGDIp(imgPath, 0, frameu, userPerformColorManagement)
      If (!validBMP(oBitmap) && wasInitFIMlib=1 && allowFIMloader=1)
         oBitmap := LoadFimFile(imgPath, 0, 0, frameu, 0, n, 1, 1)
 
@@ -74944,12 +74947,20 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
 
      currIMGdetails := mainLoadedIMGdetails.Clone()
   }
+
+  If (isAnimFmt=1 && !InStr(currIMGdetails.OpenedWith, "[FIM]"))
+  {
+     ; a loader that cannot compose the frames shows the first one and nothing else
+     currIMGdetails.Frames := 0
+     totalFramesIndex := desiredFrameIndex := 0
+  }
+
   If (slideShowRunning!=1 && animGIFplaying!=1)
      UpdateFilesListImgIDinfos(currentFileIndex)
   Return oBitmap
 }
 
-LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, ByRef newBitmap:=0, noWICfallback:=0) {
+LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, ByRef newBitmap:=0) {
   changeMcursor()
   mustOpenWithWIC := 0
   oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, useICM)
@@ -75000,14 +75011,6 @@ LoadFileWithGDIp(imgPath, noBPPconv:=0, frameu:=0, useICM:=0, sizesDesired:=0, B
         } Else mustOpenWithWIC := 1
      }
   } Else mustOpenWithWIC := 1
-
-   If (mustOpenWithWIC=1 && noWICfallback=1)
-   {
-      ; WIC and WIA both hand back the raw, undisposed frames of an animation; the
-      ; caller retries with the FreeImage loader instead
-      oBitmap := trGdip_DisposeImage(oBitmap, 1)
-      Return
-   }
 
    If (mustOpenWithWIC=1 && noBPPconv=0 && allowWICloader=1) ; || (allowCaching=1)
    {
