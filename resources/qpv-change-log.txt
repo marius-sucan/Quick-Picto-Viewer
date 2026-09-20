@@ -9,6 +9,8 @@
   - [new] ability to join images as animated WEBP or APNG, in addition to GIF, TIFF and PDF
   - [new] ability to set delay per frame when creating animated images
   - much improved joining images as PDF
+  - fixed the animations playback: the frames counter advanced without the viewport rendering them, and speeding up the playback could stop it after a single frame
+  - animated GIFs are no longer loaded with WIC, which returns the raw undisposed frames and no frame delays
 
 
 - v6.3.00 (2026-08-31)

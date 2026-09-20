@@ -3309,7 +3309,9 @@ Gdip_GetFrameDelay(pBitmap, FrameIndex) {
      If R
         Return -1
      Else
-        FrameDelay := ((g := NumGet(NumGet(item, 8 + A_PtrSize, "UPtr")+0, (FrameIndex - 1)*4, "UInt") * 10 ) ? g : 100)
+        ; the value holds one UInt per frame, in hundredths of a second, indexed
+        ; from zero just like FrameIndex
+        FrameDelay := ((g := NumGet(NumGet(item, 8 + A_PtrSize, "UPtr")+0, FrameIndex*4, "UInt") * 10 ) ? g : 100)
      item := ""
      Return FrameDelay
 }
@@ -3326,9 +3328,9 @@ Gdip_BitmapSelectActiveFrame(pBitmap, FrameIndex) {
     VarSetCapacity(dIDs, 16, 0)
     DllCall("gdiplus\GdipImageGetFrameDimensionsList", "UPtr", pBitmap, "UPtr", &dIDs, "UInt", Countu)
     DllCall("gdiplus\GdipImageGetFrameCount", "UPtr", pBitmap, "UPtr", &dIDs, "UInt*", CountFrames)
-    If (FrameIndex>CountFrames)
-       FrameIndex := CountFrames
-    Else If (FrameIndex<1)
+    If (FrameIndex>CountFrames - 1)   ; the last frame is CountFrames - 1
+       FrameIndex := CountFrames - 1
+    If (FrameIndex<1)
        FrameIndex := 0
 
     gdipLastError := DllCall("gdiplus\GdipImageSelectActiveFrame", "UPtr", pBitmap, "UPtr", &dIDs, "UInt", FrameIndex)
