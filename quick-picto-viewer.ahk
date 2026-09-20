@@ -113,7 +113,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
    , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|APNG|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
-   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|AVIF|HEIC|HEIF|APNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|GIF|WEBP|AVIF|HEIC|HEIF|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
@@ -12295,7 +12295,7 @@ animPlaybackDelay() {
 ; run-once and the user can drive UserGIFsDelayu down to -9500, so without the floor
 ; the playback ends after a single frame.
 
-   Return max(GIFspeedDelay + UserGIFsDelayu, 10)
+   Return max(GIFspeedDelay + UserGIFsDelayu, 50)
 }
 
 autoChangeDesiredFrame(act:=0, imgPath:=0) {
@@ -74631,29 +74631,9 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
      Return gdiBMPvPsize
 }
 
-isFIMonlyAnimFile(imgPath) {
-; .gif and .webp play back through FreeImage alone: it composes their frames and carries
-; the per-frame delays, while WIC returns raw undisposed frames and GDI+ cannot read a WebP
-   Return RegExMatch(imgPath, "i)(.\.(gif|webp))$") ? 1 : 0
-}
-
-setGIFframesDelay(tFrames) {
-   base := (tFrames>75) ? 35 : 45
-   If (tFrames>195)
-      base := 20
-   Else If (tFrames<15)
-      base := 60
-
-   If (tFrames<8)
-      base := 85
-
-   Return base
-}
-
 multiPageFileManaging(imgPath, oBitmap, frameu) {
-; only multi-page TIFFs are paged through GDI+; see isFIMonlyAnimFile()
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
-   If RegExMatch(rawFmt, "i)(tiff)$")
+   If RegExMatch(rawFmt, "i)(gif|tiff)$")
    {
       tFrames := Gdip_GetBitmapFramesCount(oBitmap) - 1
       If (tFrames<0 || !tFrames)
@@ -74662,7 +74642,6 @@ multiPageFileManaging(imgPath, oBitmap, frameu) {
       If (frameu>=tFrames)
          frameu := tFrames
 
-      GIFspeedDelay := setGIFframesDelay(tFrames)
       If (tFrames>0 && slideShowRunning=1 && SlideHowMode=1 && animGIFsSupport!=1)
          Random, frameu, 0, % tFrames
 
@@ -74842,11 +74821,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   viewportPDFbookMarks := []
   viewportQPVimage.DiscardImage()
   recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-  isAnimFmt := isFIMonlyAnimFile(imgPath)
   useFIMloader := (RegExMatch(imgPath, RegExFIMformPtrn) || (alwaysOpenWithFIM=1 && forceGDIp=0)) ? 1 : 0
-  If (isAnimFmt=1 && FIMfailed2init!=1)
-     useFIMloader := 1
-
   If (useFIMloader=1 && allowFIMloader=1)
   {
      If (thumbsDisplaying!=1 && runningLongOperation!=1 && slideShowRunning!=1)
@@ -75374,7 +75349,6 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   isAnimFile := RegExMatch(imgPath, "i)(.\.(apng|png|gif|webp|avif|heic|heif))$") ? 1 : 0
   If ((isAnimFile=1 || RegExMatch(imgPath, "i)(.\.(tif|tiff))$")) && totalFramesIndex>0)
   {
-     ; a multi-page TIFF is paged through by the user, never played back
      gifLoaded := 1
      CountGIFframes := (isAnimFile=1 && (animGIFsSupport=1 || forcedAnimPlayPath=imgPath)) ? totalFramesIndex : 0
      multiPageFileManaging(imgPath, oBitmap, desiredFrameIndex)
@@ -75391,8 +75365,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   defineRelativeSelCoords(imgW, imgH)
   changeMcursor()
   newW := imgW,  newH := imgH
-  isGIFgdip := ((animGIFplaying=1 || gifLoaded=1) && currIMGdetails.OpenedWith="[GDI+]") ? 1 : 0
-  If (userPrivateMode=1 || isGIFgdip=1 || minimizeMemUsage!=1 && rawFmt!="MEMORYBMP")
+  If (userPrivateMode=1 || minimizeMemUsage!=1 && rawFmt!="MEMORYBMP")
   {
      If (userPrivateMode=1)
      {
@@ -75406,7 +75379,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
            trGdip_DisposeImage(rBitmap)
            rBitmap := klBitmap
         }
-     } Else ; If (isGIFgdip=1)
+     } Else
         rBitmap := cloneGDItoMem(A_ThisFunc, oBitmap)
 
      If validBMP(rBitmap)
