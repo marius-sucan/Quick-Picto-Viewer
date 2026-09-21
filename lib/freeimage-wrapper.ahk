@@ -808,8 +808,7 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ;
 ; On file open, pass one of these flags to retrieve the composited frames:
 ;     WEBP_PLAYBACK = 1
-;     GIF_PLAYBACK = 2
-;     APNG_PLAYBACK = 2
+;     GIF/APNG/MNG/HEIF/AVIF_PLAYBACK = 2
 ; Alternatively, to retrieve only the animation properties: 
 ;     FIF_LOAD_NOPIXELS = 0x8000
 ;
@@ -817,6 +816,7 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 /*
 imgFormat parameter takes integer values from 0 to 39 relevant I/O image format identifiers.
    FIF_ICO      = 1,
+   FIF_MNG      = 6,  (read, write, anim)
    FIF_TIFF     = 18, (read, write)
    FIF_GIF      = 25, (read, write, anim)
    FIF_WEBP     = 35, (read, write, anim)
@@ -1116,8 +1116,8 @@ FreeImage_GetMetadata(hImage, metaModel, key, ByRef fiTag) {
 FreeImage_GetFrameTime(hImage) {
 ; How long this frame of an animation stays on screen, in milliseconds.
 ;
-; GIF, APNG, animated WebP and AVIF image sequences all describe a frame with
-; the same FIMD_ANIMATION tags, in the "FrameTime" value.
+; GIF, APNG, MNG, animated WebP, HEIF and AVIF image sequences all describe
+; a frame with the same FIMD_ANIMATION tags, in the "FrameTime" value.
 ;
 ; It returns 0 when the page declares no duration.
 
@@ -1173,7 +1173,6 @@ FreeImage_GetFrameDelays(ImgPath, ByRef delaysArray, ByRef totalTime:=0) {
    FreeImage_CloseMultiBitmap(hMultiImg, 0)
    Return frameCount
 }
-
 
 ; === Toolkit functions ===
 ; 34 functions available in the FreeImage Library

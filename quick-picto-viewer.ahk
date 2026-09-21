@@ -41325,14 +41325,14 @@ PanelSetFrameDelay() {
    If !delay 
       delay := 0
 
-   infou := (filesElected>0) ? "`n `nImages selected: " groupDigits(filesElected) "."
+   infou := (filesElected>0) ? "`n `nImages selected: " groupDigits(filesElected) "." : ""
    fakeWinCreator(92, A_ThisFunc, 1)
    msgResult := msgBoxWrapper("panelu|Set frame delay: " appTitle, "Set custom frame delay for the currently selected image frame, in milliseconds.`n `nWhen the value is 0, the value set in the panel to join images is used." infou, "&Apply|&Cancel|&Help", 0, "image", 0, 0, 0, "limit5 number -multi", delay)
    value := Trimmer(msgResult.edit)
    If InStr(msgResult.btn, "apply")
    {
       value := clampInRange(value, 0, 99500)
-      If filesElected 
+      If (filesElected>0) 
       {
          Loop, % maxFilesIndex
          {
@@ -43796,27 +43796,29 @@ BtnChangeMultiPageFmt() {
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
-   actu := (userCombineFramesFmt=1 || userCombineFramesFmt>3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt>2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine2
    GuiControl, % actu, userCombineGIFframeDelay
    GuiControl, % actu, editF5
+   GuiControl, % actu, userJoinIMGres
+
+   actu := (userCombineFramesFmt>2 && userJoinIMGres=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, editF7
    GuiControl, % actu, editF8
    GuiControl, % actu, userJoinIMGsW
    GuiControl, % actu, userJoinIMGsH
-   GuiControl, % actu, userJoinIMGres
 
-   actu := (userCombineFramesFmt=2 && userSaveBitsDepth>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   actu := (userCombineFramesFmt=1 && userSaveBitsDepth>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userCombineDepthDithering
 
-   actu := (userCombineFramesFmt=2 || userCombineFramesFmt>3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt=1 || userCombineFramesFmt>2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine1
    GuiControl, % actu, userSaveBitsDepth
 
-   actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   actu := (userCombineFramesFmt=2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, UserCombinePDFbgrColor
 
-   actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt=2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine3
    GuiControl, % actu, txtLine5
    GuiControl, % actu, txtLine6
@@ -43878,7 +43880,7 @@ PanelCombineImagesMultipage() {
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
     Gui, Add, Text, xs+15 y+10 w%ml% +0x200 +hwndhTemp, File format on save:
-    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".gif|.tiff|.pdf|.webp|.apng", [hTemp])
+    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".tiff|.pdf|.apng|.gif|.webp|.mng", [hTemp])
     Gui, Add, Checkbox, xs+15 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
@@ -43947,11 +43949,12 @@ BtnHelpCombineImgs() {
 }
 
 BtnHelpJoinIMGsframeDelay() {
-   msgBoxWrapper(appTitle ": HELP", "To set custom delays for specific frames:`n `n1. Close this panel.`n2. Open the «Quick search options» panel (S button below menus).`n3. In the search box type «join» and select «Set frame delay».`n `nTIP:Tto quickly reopen the panel press `; or F8.`n `nThe delay option from the currently opened panel will be ignored for the images you have set a custom delay.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "To set custom delays for specific frames:`n `n1. Close this panel.`n2. Open the «Quick search options» panel (S button below menus).`n3. In the search box type «join» and select «Set frame delay».`n `nTIP: To quickly reopen the panel press `; or F8.`n `nThe delay option from the currently opened panel will be ignored for the images you have set a custom delay.", -1, 0, 0)
 }
 
 BTNperformCombineIMGs() {
-   Static fmtz := {1:"gif", 2:"tiff", 3:"pdf", 4:"webp", 5:"apng"}
+   Static fmtz := {1:"tiff", 2:"pdf", 3:"apng", 4:"gif", 5:"webp", 6:"mng"}
+
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
    GuiControlGet, userJpegQuality
@@ -43975,11 +43978,11 @@ BTNperformCombineIMGs() {
    WriteSettingsCombineIMGs()
    ; prevFileSavePath := file2save
    ; MsgBox, % A_ThisFunc "()`n" file2save
-   If (userCombineFramesFmt=2)
+   If (userCombineFramesFmt=1)
       combineImagesMultiTiffGDIp(file2save)
-   Else If (userCombineFramesFmt=3)
+   Else If (userCombineFramesFmt=2)
       CombineImgsIntoPDF(file2save)
-   Else ; used for GIFs / WEBP / APNG
+   Else ; used for GIFs / WEBP / APNG / MNG
       combineImagesFimMultiPage(userSaveBitsDepth, userCombineFramesFmt, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
 }
 
@@ -44003,6 +44006,7 @@ CombineImgsIntoPDF(file2save) {
       FileSetAttrib, -R, % file2save
 
    initQPVmainDLL()
+   initFIMGmodule()
    hPdf := DllCall("qpvmain.dll\PdfWriterBegin", "WStr", file2save, "Int*", errCode, "UPtr")
    If !hPdf
    {
@@ -44024,7 +44028,6 @@ CombineImgsIntoPDF(file2save) {
    dpi := clampInRange(userCombinePDFdpi, 50, 1200)
    quality := clampInRange(userJpegQuality, 1, 100)
    bgColor := "0x" UserCombinePDFbgrColor
-   initFIMGmodule()
    ; of the loaders, only FreeImage turns JPEGs by their EXIF orientation [FIMdecideLoadArgs]
    exifTurns := (alwaysOpenWithFIM=1 && allowFIMloader=1 && wasInitFIMlib=1) ? 1 : 0
    doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
@@ -44137,34 +44140,27 @@ CombineImgsIntoPDF(file2save) {
       moreInfos := "`nFailed to add " groupDigits(failedPages) " images"
 
    If (abandonAll=1)
-   {
-      showTOOLtip("Operation aborted by user. No .PDF file was created.")
-      SoundBeep 300, 100
-   } Else If (writeFailed=1 || r=2)
-   {
-      showTOOLtip("ERROR: Failed to write the .PDF file; the disk may be full.`n" OutFileName)
-      SoundBeep 300, 100
-   } Else If (pagesAdded<1 || r=1)
-   {
-      showTOOLtip("ERROR: No image could be added to the .PDF file." moreInfos)
-      SoundBeep 300, 100
-   } Else If (r=3)
-   {
-      showTOOLtip("ERROR: The new .PDF file could not replace the existing one, which may be in use.`n" OutFileName)
-      SoundBeep 300, 100
-   } Else If (r=0)
+      showTOOLtip("Operation aborted by user. No PDF file was created.")
+   Else If (writeFailed=1 || r=2)
+      showTOOLtip("ERROR: Failed to write the PDF file; the disk may be full.`n" OutFileName)
+   Else If (pagesAdded<1 || r=1)
+      showTOOLtip("ERROR: No image could be added to the PDF file." moreInfos)
+   Else If (r=3)
+      showTOOLtip("ERROR: The new PDF file could not replace the existing one, which may be in use.`n" OutFileName)
+   Else If (r=0)
    {
       FileGetSize, fileSize, % file2save
       If (keptJpegs>0)
          moreInfos := "`nJPEG files kept as they are: " groupDigits(keptJpegs) moreInfos
 
-      showTOOLtip("Finished creating the .PDF file:`n" OutFileName "`nPages: " groupDigits(pagesAdded) moreInfos "`nFile size: " fileSizeFriendly(fileSize))
+      showTOOLtip("Finished creating the PDF file:`n" OutFileName "`nPages: " groupDigits(pagesAdded) moreInfos "`nFile size: " fileSizeFriendly(fileSize))
       SoundBeep 900, 100
+      yay := 1
    } Else
-   {
-      showTOOLtip("ERROR: Failed to finish the .PDF file.`n" OutFileName)
+      showTOOLtip("ERROR: Failed to finish the PDF file. Unknown error.`n" OutFileName)
+
+   If (yay!=1)
       SoundBeep 300, 100
-   }
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
@@ -48263,7 +48259,7 @@ ReadSettingsCombineIMGs(act:=0) {
     RegAction(act, "UserCombinePDFpageSize",, 2, 1, 9)
     RegAction(act, "userCombineDepthDithering",, 1)
     RegAction(act, "userSaveBitsDepth",, 2, 1, 4)
-    RegAction(act, "userCombineFramesFmt",, 2, 1, 5)
+    RegAction(act, "userCombineFramesFmt",, 2, 1, 6)
     RegAction(act, "UserCombinePDFbgrColor",, 3)
     RegAction(act, "combinePDFpageLandscape",, 1)
     RegAction(act, "userCombinePDFdpi",, 2, 50, 1200)
@@ -62475,8 +62471,8 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    startOperation := A_TickCount
    doStartLongOpDance()
    CurrentSLD := ""
-   Static zpu := {1:25, 2:18, 3:0, 4:35, 5:39}
-         fmtz := {1:"gif", 2:"tiff", 3:"pdf", 4:"webp", 5:"apng"}
+   Static zpu := {1:18, 2:0, 3:39, 4:25, 5:35, 6:6}
+         fmtz := {1:"tiff", 2:"pdf", 3:"apng", 4:"gif", 5:"webp", 6:"mng"}
    formatu := zpu[userFmt]
    extFile := "." fmtz[userFmt]
    GIFanimus := (userFmt=1) ? 1 : 0 
@@ -75416,7 +75412,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   Else If (rawFmt="MEMORYBMP")
      GDIbmpFileConnected := 0
 
-  isAnimFile := RegExMatch(imgPath, "i)(.\.(apng|png|gif|webp|avif|heic|heif))$") ? 1 : 0
+  isAnimFile := RegExMatch(imgPath, "i)(.\.(apng|png|gif|mng|webp|avif|heic|heif))$") ? 1 : 0
   If ((isAnimFile=1 || RegExMatch(imgPath, "i)(.\.(tif|tiff))$")) && totalFramesIndex>0)
   {
      gifLoaded := 1
@@ -99364,9 +99360,9 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   }
 
   changeMcursor()
-  If (isVarEqualTo(GFT, 18, 25, 35, 37, 38, 39) && noBPPconv=0 && noBMP=0)
+  If (isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39) && noBPPconv=0 && noBMP=0)
   {
-     ; open multi-page GIF, WEBP, APNG, AVIF, HEIC and TIFFs
+     ; open multi-page MNG, GIF, WEBP, APNG, AVIF, HEIC and TIFFs
      multiFlags := isVarEqualTo(GFT, 25, 37, 39) ? 2 : 0
      If (GFT=35)
         multiFlags := 1
