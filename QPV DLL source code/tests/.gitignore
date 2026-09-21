@@ -1,6 +1,5 @@
 # regenerated from the shipped sources on every run
-jpeg2pdf_mutant.h
-jpeg2pdf_mutant.cpp
+pdf_writer_mutant.h
 msd_extract.cpp
 decode_extract.cpp
 header_extract.h
@@ -35,9 +34,11 @@ throttle_slots
 throttle_mutant
 gdip_loader
 gdip_mutant
-pdf_document
-pdf_mutant
+pdf_writer
+pdf_writer_mutant
 hash_bench
 freeimage_gif_oracle
 # built by hash_bench.cpp, which makes its own library-sized database
 hash_bench.sldb
+# written by pdf_writer.cpp
+pdf_writer_out/

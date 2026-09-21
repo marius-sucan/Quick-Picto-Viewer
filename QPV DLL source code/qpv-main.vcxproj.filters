@@ -45,6 +45,9 @@
     <ClInclude Include="callwndproc-hook.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
+    <ClInclude Include="pdf-writer.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="qpv-main.cpp">

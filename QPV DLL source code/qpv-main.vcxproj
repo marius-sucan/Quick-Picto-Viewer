@@ -192,6 +192,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="freeimage-dynamic.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="pdf-writer.h" />
     <ClInclude Include="qpv-main.h" />
     <ClInclude Include="sqlite-dynamic.h" />
     <ClInclude Include="thumbs-pool.h" />

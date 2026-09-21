@@ -339,7 +339,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , uiZoomBlurAreaXamount := 15, zoomBlurMode := 1, DesaturateAreaLevels := 1, DesaturateAreaDither := 0
    , BlurAreaHue := 0, BlurAreaSaturation := 0, BlurAreaLight := 0, BlurAreaGamma := 0
    , userCombineGIFframeDelay := 100, userCombineFramesFmt := 2, UserCombinePDFpageSize := 1
-   , combinePDFpageLandscape := 0, combinePDFpageHighQuality := 0, usePrevSaveFolder := 0
+   , combinePDFpageLandscape := 0, userCombinePDFdpi := 200, usePrevSaveFolder := 0
+   , userCombinePDFkeepJpegs := 1, userCombinePDFenlarge := 1, userCombinePDFalignH := 2, userCombinePDFalignV := 2
    , userCombineSubFrames := 0, blurAreaYamount := 10, blurAreaEqualXY := 1, UserAddNoiseMode := 1
    , UserAddNoiseDetails := 10, slidesRandoMode := 1, convertOnAutoCrop := 0, AutoCropStrongAdaptiveMode := 0
    , usrAutoCropErrThreshold := 5, onConflictMultiRenameAct := 4, FillAreaRectRoundness := 45
@@ -24901,6 +24902,8 @@ applyVPeffectsOnBMP(zBitmap, doClrDepths:=0, isAlpha:=0, isG:=0) {
              trGdip_DisposeImage(xBitmap, 1)
        }
     }
+
+    Gdip_DisposeImageAttributes(imageAttribs)
     Return zBitmap
 }
 
@@ -43814,26 +43817,33 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, UserCombinePDFbgrColor
 
    actu := (userCombineFramesFmt=3) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
-   GuiControl, % actu, combinePDFpageLandscape
    GuiControl, % actu, txtLine3
-   GuiControl, % actu, txtLine4
    GuiControl, % actu, txtLine5
    GuiControl, % actu, txtLine6
+   GuiControl, % actu, txtLine7
    GuiControl, % actu, UserCombinePDFpageSize
    GuiControl, % actu, ResizeApplyEffects
-   GuiControl, % actu, combinePDFpageHighQuality
    GuiControl, % actu, editF6
+   GuiControl, % actu, editF9
    GuiControl, % actu, userJpegQuality
-   GuiControl, % actu, TextInAreaAlign
-   GuiControl, % actu, TextInAreaValign
+   GuiControl, % actu, userCombinePDFdpi
+   GuiControl, % actu, userCombinePDFkeepJpegs
+
+   ; a page the size of the image leaves nothing to turn, align or enlarge
+   actu := (userCombineFramesFmt=3 && UserCombinePDFpageSize!=9) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, combinePDFpageLandscape
+   GuiControl, % actu, txtLine4
+   GuiControl, % actu, userCombinePDFalignH
+   GuiControl, % actu, userCombinePDFalignV
+   GuiControl, % actu, userCombinePDFenlarge
 }
 
 PanelCombineImagesMultipage() {
+    Global txtLine7
     Static hasOpened := 0
     If !hasOpened
     {
        hasOpened := 1
-       TextInAreaAlign := TextInAreaValign := 2
        userSaveBitsDepth := 5
     }
 
@@ -43890,19 +43900,23 @@ PanelCombineImagesMultipage() {
     Gui, Tab, 2
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, x+15 y+15 w%ml% Section vtxtLine3 +hwndhTemp, PDF page size:
-    GuiAddDropDownList("xs+15 y+10 w" thisWid + 35 " AltSubmit Choose" UserCombinePDFpageSize " vUserCombinePDFpageSize", "A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)", [hTemp])
+    GuiAddDropDownList("xs+15 y+10 w" thisWid + 35 " gBtnChangeMultiPageFmt AltSubmit Choose" UserCombinePDFpageSize " vUserCombinePDFpageSize", "A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)|A3 (1.41)|A5 (1.41)|Same as the image", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%combinePDFpageLandscape% vcombinePDFpageLandscape, Landscape
     thisWid := (PrefsLargeFonts=1) ? 90 : 65
     ml -= 15
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
-    GuiAddDropDownList("x+1 w" thisWid " Choose" TextInAreaAlign " AltSubmit vTextInAreaAlign", "Left|Center|Right", "Text horizontal alignment")
-    GuiAddDropDownList("x+5 wp Choose" TextInAreaValign " AltSubmit vTextInAreaValign", "Top|Center|Bottom", "Text vertical alignment")
+    GuiAddDropDownList("x+1 w" thisWid " Choose" userCombinePDFalignH " AltSubmit vuserCombinePDFalignH", "Left|Center|Right", "Horizontal alignment of the image")
+    GuiAddDropDownList("x+5 wp Choose" userCombinePDFalignV " AltSubmit vuserCombinePDFalignV", "Top|Center|Bottom", "Vertical alignment of the image")
     zml := (PrefsLargeFonts=1) ? 65 : 50
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine6, Background color:
     GuiAddColor("x+1 hp w" zml, "UserCombinePDFbgrColor", "PDF background color")
-    Gui, Add, Checkbox, xs y+10 Checked%combinePDFpageHighQuality% vcombinePDFpageHighQuality, High resolution pages (192 dpi)
-    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
+    Gui, Add, Checkbox, xs y+10 Checked%userCombinePDFenlarge% vuserCombinePDFenlarge, Enlarge small images to fit the page
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
+    Gui, Add, Text, xs y+7 w%ml% hp+5 +0x200 vtxtLine7, Image resolution (DPI):
+    GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF9", userCombinePDFdpi)
+    Gui, Add, UpDown, +0x80 vuserCombinePDFdpi Range50-1200, % userCombinePDFdpi   ; UDS_NOTHOUSANDS
+    Gui, Add, Checkbox, xs y+7 Checked%userCombinePDFkeepJpegs% vuserCombinePDFkeepJpegs, Keep JPEG files as they are, when suitable
+    Gui, Add, Checkbox, xs y+10 gTglRszApplyEffects Checked%ResizeApplyEffects% vResizeApplyEffects, Apply viewport color adjustments and effects
     Gui, Add, Text, xs y+7 w%ml% hp+5 +0x200 vtxtLine5, Image quality `%:
     GuiAddEdit("x+1 w" thisWid " number -multi limit3 veditF6", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range3-97, % userJpegQuality
@@ -43915,7 +43929,7 @@ PanelCombineImagesMultipage() {
        Gui, Add, Text, xs y+%ml%, % groupDigits(filesElected) " files are selected."
 
     If (filesElected>=maxMultiPagesAllowed)
-       Gui, Add, Text, xs y+%ml%, The resulted file will be limited to %maxMultiPagesAllowed% frames / pages.
+       Gui, Add, Text, xs y+%ml%, Files other than PDF will be limited to %maxMultiPagesAllowed% frames / pages.
 
     Gui, Font, Normal
     ; GuiControl, SettingsGUIA: Disable, ResizeDestFolder
@@ -43929,7 +43943,7 @@ PanelCombineImagesMultipage() {
 }
 
 BtnHelpCombineImgs() {
-   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. GIF, TIFF and PDF formats are the supported destination formats.`n`nIf any of the selected files has multiple frames or pages and the option «Join contained frames from selected files», these pages will be processed and become part of the newly created file.`n`nThe resulted order of the pages will reflect the order of originally selected files.`n`nFor proper GIF animations, please select files having the same resolution.`n`nPDFs without the «high resolution» option selected will have a DPI of 96. The images are embedded as JPEGs in the PDF. To influence the size of the resulted PDF, you must change the JPEG quality level.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. GIF, TIFF and PDF formats are the supported destination formats.`n`nIf any of the selected files has multiple frames or pages and the option «Join contained frames from selected files», these pages will be processed and become part of the newly created file.`n`nThe resulted order of the pages will reflect the order of originally selected files.`n`nFor proper GIF animations, please select files having the same resolution.`n`nIn PDF files, every image is stored at the chosen resolution [DPI], or at its own when it has fewer pixels than that asks for. JPEG files are kept as they are, with no loss of quality, unless viewport effects apply to them or they are more than 1.5 times as detailed as the chosen resolution. The other images are stored as JPEGs of the chosen quality. The new PDF replaces the destination file only once it is complete.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
 }
 
 BtnHelpJoinIMGsframeDelay() {
@@ -43970,236 +43984,283 @@ BTNperformCombineIMGs() {
 }
 
 CombineImgsIntoPDF(file2save) {
-   If (markedSelectFile>1)
+; The pages are written one at a time by the PDF writer of qpvmain.dll [pdf-writer.h], to a
+; file next to the destination that replaces it only once the document is complete.
+   filesElected := getSelectedFiles(0, 1)
+   If !filesElected
    {
-      zPlitPath(file2save, 0, OutFileName, OutDir)
-      tempusDir := OutDir "\qpv-tmp-pdf-generator"
-      If !FolderExist(tempusDir)
+      showTOOLtip("WARNING: Insufficient files selected to join.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   If askOverwriteDestFile(file2save, 0)
+      Return
+
+   zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt)
+   If FileExist(file2save)
+      FileSetAttrib, -R, % file2save
+
+   initQPVmainDLL()
+   hPdf := DllCall("qpvmain.dll\PdfWriterBegin", "WStr", file2save, "Int*", errCode, "UPtr")
+   If !hPdf
+   {
+      If (ErrorLevel || !qpvMainDll)
+         msgu := "The PDF writer of qpvmain.dll is missing. The DLL may be outdated."
+      Else If (errCode=2)
+         msgu := "The destination file is in use by another application, or it is read-only."
+      Else If (errCode=3)
+         msgu := "Unable to create a file in the destination folder."
+      Else
+         msgu := "Unable to start the PDF file."
+
+      showTOOLtip("ERROR: " msgu "`n" OutFileName)
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
+   }
+
+   dpi := clampInRange(userCombinePDFdpi, 50, 1200)
+   quality := clampInRange(userJpegQuality, 1, 100)
+   bgColor := "0x" UserCombinePDFbgrColor
+   initFIMGmodule()
+   ; of the loaders, only FreeImage turns JPEGs by their EXIF orientation [FIMdecideLoadArgs]
+   exifTurns := (alwaysOpenWithFIM=1 && allowFIMloader=1 && wasInitFIMlib=1) ? 1 : 0
+   doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
+   keepJpegs := (userCombinePDFkeepJpegs=1 && doFX=0) ? 1 : 0
+
+   destroyGDIfileCache()
+   backCurrentSLD := CurrentSLD
+   CurrentSLD := ""
+   startOperation := A_TickCount
+   prevMSGdisplay := 1
+   doStartLongOpDance()
+   countTFilez := pagesAdded := keptJpegs := failedPages := 0
+   Loop, % maxFilesIndex
+   {
+      If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
+         Continue
+
+      If (determineTerminateOperation()=1)
       {
-         FileCreateDir, % tempusDir
-         If ErrorLevel
+         abandonAll := 1
+         Break
+      }
+
+      imgPath := resultedFilesList[A_Index, 1]
+      If (InStr(imgPath, "||") || !imgPath)
+         Continue
+
+      countTFilez++
+      If (A_TickCount - prevMSGdisplay>1500)
+      {
+         etaTime := ETAinfos(countTFilez, filesElected, startOperation)
+         If (failedPages>0)
+            etaTime .= "`nFailed to add " groupDigits(failedPages) " images"
+
+         showTOOLtip("Creating the PDF file, please wait`n" OutFileName "`nPages added: " groupDigits(pagesAdded) etaTime, 0, 0, countTFilez / filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      If (keepJpegs=1 && RegExMatch(imgPath, "i)\.(jpg|jpeg|jpe|jfif)$"))
+      {
+         r := pdfAddOriginalJpeg(hPdf, imgPath, dpi, bgColor, exifTurns)
+         If (r=0)
          {
-            showTOOLtip("ERROR: Unable to create temporary folder required to generate the PDF.`nOperation abandoned.")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
-      }
-
-      ; process images to suit the desired page layout
-      Static pageSizesH := {1:2245, 2:416, 3:3840, 4:2112, 5:3264, 6:2688}
-           , pageSizesW := {1:1587, 2:657, 3:2880, 4:1632, 5:2112, 6:1632}
-      Static pageSizesInchH := {1:11.69, 2:2.16, 3:20, 4:11, 5:17, 6:14}
-           , pageSizesInchW := {1:8.27, 2:3.42, 3:15, 4:8.5, 5:11, 6:8.5}
-
-      pageW := (combinePDFpageLandscape=1) ? pageSizesH[UserCombinePDFpageSize] : pageSizesW[UserCombinePDFpageSize]
-      pageH := (combinePDFpageLandscape=1) ? pageSizesW[UserCombinePDFpageSize] : pageSizesH[UserCombinePDFpageSize]
-      If (combinePDFpageHighQuality!=1)
-      {
-         pageW := pageW // 2
-         pageH := pageH // 2
-      }
-
-      dpi := (combinePDFpageHighQuality=1) ? 192 : 96
-      newBitmap := trGdip_CreateBitmap(A_ThisFunc, pageW, pageH)
-      If validBMP(newBitmap)
-         G := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap)
-
-      If G
-         abandoned := askOverwriteDestFile(file2save)
-
-      If (!G || abandoned=1)
-      {
-         If tempusDir
-            FileRemoveDir, % tempusDir, 1
-
-         If (abandoned!=1)
-            showTOOLtip("ERROR: Failed to create the PDF page layout required to process images")
-
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         ResetImgLoadStatus()
-         Return
-      }
-
-      Gdip_BitmapSetResolution(newBitmap, dpi, dpi)
-      prevMSGdisplay := A_TickCount
-      startOperation := A_TickCount
-      doStartLongOpDance()
-      fileIndex := thisIndex := failedFiles := 0
-      backCurrentSLD := CurrentSLD
-      CurrentSLD := ""
-      tempList := []
-      showTOOLtip("Phase 1: Processing the PDF pages, please wait")
-      Loop, % maxFilesIndex
-      {
-         If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
+            pagesAdded++
+            keptJpegs++
             Continue
-
-         mainIndex := A_Index
-         imgPath := resultedFilesList[A_Index, 1]
-         ; zPlitPath(file2save, 0, OutFileName, OutDir)
-         pBitmap := LoadBitmapFromFileu(imgPath)
-         If (A_TickCount - prevMSGdisplay>3000)
+         } Else If (r=2)
          {
-            etaTime := ETAinfos(A_Index, markedSelectFile, startOperation)
-            If (failedFiles>0)
-               etaTime .= "`nFailed to process " groupDigits(failedFiles) " images"
-
-            showTOOLtip("Phase 1: Processing images into PDF pages, please wait`n" OutFileName "`nImages processed: " groupDigits(thisIndex) etaTime, 0, 0, A_Index / markedSelectFile)
-            prevMSGdisplay := A_TickCount
-         }
-
-         If (determineTerminateOperation()=1 || abandonAll=1)
-         {
-            abandonAll := 1
+            writeFailed := 1
             Break
          }
-
-         If validBMP(pBitmap)
-         {
-            totalFlames := (userCombineSubFrames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
-            Loop, % totalFlames
-            {
-               If (A_Index>1)
-               {
-                  pBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
-                  If (determineTerminateOperation()=1)
-                  {
-                     abandonAll := 1
-                     Break
-                  }
-               }
-
-               If ((A_TickCount - prevMSGdisplay>3500) && yay=1)
-               {
-                  etaTime := ETAinfos(mainIndex, markedSelectFile, startOperation)
-                  If (failedFiles>0)
-                     etaTime .= "`nFailed to process " groupDigits(failedFiles) " images"
-
-                  showTOOLtip("Phase 1: Processing images into PDF pages, please wait`n" OutFileName "`nImages processed: " groupDigits(thisIndex) etaTime, 0, 0, A_Index / totalFlames)
-               }
-
-               yay := !yay
-               Gdip_GraphicsClear(G, "0xff" UserCombinePDFbgrColor)
-               trGdip_GetImageDimensions(pBitmap, imgW, imgH)
-               calcIMGdimensions(imgW, imgH, pageW, pageH, ResizedW, ResizedH)
-               posX := posY := 0
-               If (TextInAreaAlign=2)
-                  posX := Round(pageW/2 - ResizedW/2)
-               If (TextInAreaValign=2)
-                  posY := Round(pageH/2 - ResizedH/2)
-               If (TextInAreaAlign=3)
-                  posX := pageW - ResizedW
-               If (TextInAreaValign=3)
-                  posY := pageH - ResizedH
-
-               If (ResizeApplyEffects=1)
-               {
-                  pBitmap := applyVPeffectsOnBMP(pBitmap, 1, mainLoadedIMGdetails.HasAlpha, "y")
-                  flipBitmapAccordingToViewPort(pBitmap)
-               }
- 
-               fileIndex++
-               trGdip_DrawImage(A_ThisFunc, G, pBitmap, posX, posY, ResizedW, ResizedH)
-               pBitmap := trGdip_DisposeImage(pBitmap, 1)
-               f := Gdip_SaveBitmapToFile(newBitmap, tempusDir "\" fileIndex ".jpg", userJpegQuality)
-               If f
-               {
-                  failedFiles++
-               } Else
-               {
-                  thisIndex++
-                  tempList[thisIndex] := fileIndex
-               }
-
-               If (thisIndex>=maxMultiPagesAllowed)
-               {
-                  showTOOLtip("WARNING: Maximum allowed pages limit reached: " maxMultiPagesAllowed)
-                  SoundBeep 300, 100
-                  fattalErr := 1
-                  Sleep, 2000
-                  Break
-               }
-            }
-            If fattalErr
-               Break
-         } Else failedFiles++
-         ; fnOutputDebug("zzz=" pBitmap " | " f " | " A_LoopFileLongPath)
       }
 
-      z := Round(tempList.Count())
-      Gdip_DeleteGraphics(G)
-      trGdip_DisposeImage(newBitmap)
-      ResetImgLoadStatus()
-      If (z>1 && abandonAll!=1)
+      pBitmap := LoadBitmapFromFileu(imgPath)
+      If !validBMP(pBitmap)
       {
-         setImageLoading()
-         VarSetCapacity(fListArray, 8 * z + 1, 0)
-         Loop, % z
-            NumPut(tempList[A_Index], fListArray, (A_Index - 1) * 4, "uint")
+         failedPages++
+         Continue
+      }
 
-         showTOOLtip("Phase 2: Saving the PDF file, please wait`n" groupDigits(z) " images to be embedded")
-         pageWpdf := (combinePDFpageLandscape=1) ? pageSizesInchH[UserCombinePDFpageSize] : pageSizesInchW[UserCombinePDFpageSize]
-         pageHpdf := (combinePDFpageLandscape=1) ? pageSizesInchW[UserCombinePDFpageSize] : pageSizesInchH[UserCombinePDFpageSize]
-         ; fnOutputDebug("pdf dll precall = " z)
-         r := DllCall("qpvmain.dll\CreatePDFfile", "AStr", tempusDir, "AStr", file2save, "AStr", mainCompiledPath, "UPtr", &fListArray, "int", z, "float", pageWpdf, "float", pageHpdf, "Int", dpi)
-         ; fnOutputDebug("pdf dll call = " r)
-      } Else If (abandonAll=1)
-         z := 0
+      totalFrames := (userCombineSubFrames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
+      If (totalFrames<1)   ; a loader that reported no frame at all leaves .Frames at -1
+         totalFrames := 1
 
-      If (failedFiles>0)
-         rr .= "`nFailed to load " groupDigits(failedFiles) " images out of " groupDigits(filesElected)
-
-      OutputVar := "a"
-      erm := "Failed to create the PDF file. "
-      If (z<=1 && abandonAll!=1)
+      Loop, % totalFrames
       {
-         showTOOLtip(erm "No image was succesfully processed.")
-      } Else If (r<0)
-      {
-         If (r=-1)
-            showTOOLtip(erm "Init_BeginPDFdocument() failure. Error code: " r)
-         Else If (r=-2)
-            showTOOLtip(erm "Unable to locate the destination folder. Error code: " r)
-         Else If (r=-6)
-            showTOOLtip(erm "Error encountered when writing to the disk. Error code: " r)
-         Else If (r=-7)
-            showTOOLtip(erm "PDF_GetFinalDocument() failure. Error code: " r)
-         Else
-            showTOOLtip("Failed to properly create the PDF file. Error code: " r rr)
-      } Else If (abandonAll=1)
-      {
-         showTOOLtip("Operation aborted by user. No .PDF file was created.")
-      } Else If z
-      {
-         FileGetSize, OutputVar, % file2save
-         If (r>0)
-            moreInfos := " out of " groupDigits(z)
-
-         xu := (r>=0) ? groupDigits(z - r) : 0
-         If (OutputVar>400)
+         If (A_Index>1)
          {
-            showTOOLtip("Finished creating the .PDF file:`n" OutFileName "`nImages embedded: " xu moreInfos "`nFile size: " fileSizeFriendly(OutputVar) rr)
-            SoundBeep , 900, 100
+            If (determineTerminateOperation()=1)
+            {
+               abandonAll := 1
+               Break
+            }
+
+            pBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
+            If !validBMP(pBitmap)
+            {
+               failedPages++
+               Continue
+            }
+         }
+
+         r := pdfAddBitmapPage(hPdf, pBitmap, dpi, quality, bgColor, doFX, mainLoadedIMGdetails.HasAlpha)
+         If (r=0)
+         {
+            pagesAdded++
+         } Else If (r=2)
+         {
+            writeFailed := 1
+            Break
          } Else
+            failedPages++
+
+         If (A_TickCount - prevMSGdisplay>1500)
          {
-            showTOOLtip("ERROR: Malformed .PDF file generated:`n" OutFileName "`nImages embedded: NONE`nFile size: " fileSizeFriendly(OutputVar) rr)
-            SoundBeep , 300, 100
+            showTOOLtip("Creating the PDF file, please wait`n" OutFileName "`nPages added: " groupDigits(pagesAdded) "`nPages of the current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
+            prevMSGdisplay := A_TickCount
          }
       }
 
-      fListArray := ""
-      If (OutputVar!="a")
-         SoundBeep , % (z>1) ? 900 : 300, 100
-      fnOutputDebug("delete temp dir=" tempusDir)
-      If tempusDir
-         FileRemoveDir, % tempusDir, 1
-
-      CurrentSLD := backCurrentSLD
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      ResetImgLoadStatus()
+      If (writeFailed=1 || abandonAll=1)
+         Break
    }
+
+   commit := (abandonAll!=1 && writeFailed!=1 && pagesAdded>0) ? 1 : 0
+   r := DllCall("qpvmain.dll\PdfWriterEnd", "UPtr", hPdf, "Int", commit, "WStr", OutNameNoExt, "WStr", appTitle " v" appVersion, "WStr", "D:" A_Now, "Int")
+   CurrentSLD := backCurrentSLD
+   ResetImgLoadStatus()
+   If (failedPages>0)
+      moreInfos := "`nFailed to add " groupDigits(failedPages) " images"
+
+   If (abandonAll=1)
+   {
+      showTOOLtip("Operation aborted by user. No .PDF file was created.")
+      SoundBeep 300, 100
+   } Else If (writeFailed=1 || r=2)
+   {
+      showTOOLtip("ERROR: Failed to write the .PDF file; the disk may be full.`n" OutFileName)
+      SoundBeep 300, 100
+   } Else If (pagesAdded<1 || r=1)
+   {
+      showTOOLtip("ERROR: No image could be added to the .PDF file." moreInfos)
+      SoundBeep 300, 100
+   } Else If (r=3)
+   {
+      showTOOLtip("ERROR: The new .PDF file could not replace the existing one, which may be in use.`n" OutFileName)
+      SoundBeep 300, 100
+   } Else If (r=0)
+   {
+      FileGetSize, fileSize, % file2save
+      If (keptJpegs>0)
+         moreInfos := "`nJPEG files kept as they are: " groupDigits(keptJpegs) moreInfos
+
+      showTOOLtip("Finished creating the .PDF file:`n" OutFileName "`nPages: " groupDigits(pagesAdded) moreInfos "`nFile size: " fileSizeFriendly(fileSize))
+      SoundBeep 900, 100
+   } Else
+   {
+      showTOOLtip("ERROR: Failed to finish the .PDF file.`n" OutFileName)
+      SoundBeep 300, 100
+   }
+
+   SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+pdfPlaceImage(imgW, imgH, dpi) {
+; Where an image of imgW x imgH pixels, shown at dpi, goes on the page set in the panel, in
+; PDF points [1/72 inch] from the bottom left corner. rw x rh is the size its pixels are stored
+; at: never more than the image has, as the PDF reader does any enlarging.
+   Static paperSizes := {1:[595.28, 841.89], 2:[246.24, 155.52], 3:[1080, 1440], 4:[612, 792], 5:[792, 1224], 6:[612, 1008], 7:[841.89, 1190.55], 8:[419.53, 595.28]}
+   natW := imgW * 72 / dpi
+   natH := imgH * 72 / dpi
+   If (UserCombinePDFpageSize=9)   ; same as the image
+   {
+      ; PDF readers want pages between 3 and 14400 points [200 inches] a side
+      s := (natW>14400 || natH>14400) ? 14400 / max(natW, natH) : 1
+      If (natW*s<3 || natH*s<3)
+         s := 3 / min(natW, natH)
+
+      pw := natW * s
+      ph := natH * s
+      x := y := 0
+   } Else
+   {
+      paper := paperSizes[UserCombinePDFpageSize]
+      If !IsObject(paper)
+         paper := paperSizes[1]
+
+      pw := (combinePDFpageLandscape=1) ? paper[2] : paper[1]
+      ph := (combinePDFpageLandscape=1) ? paper[1] : paper[2]
+      s := min(pw / natW, ph / natH)
+      If (userCombinePDFenlarge!=1 && s>1)
+         s := 1
+
+      x := (userCombinePDFalignH=2) ? (pw - natW*s)/2 : (userCombinePDFalignH=3) ? pw - natW*s : 0
+      y := (userCombinePDFalignV=2) ? (ph - natH*s)/2 : (userCombinePDFalignV=1) ? ph - natH*s : 0
+   }
+
+   rw := (s<1) ? max(Round(imgW * s), 1) : imgW
+   rh := (s<1) ? max(Round(imgH * s), 1) : imgH
+   Return {pw: pw, ph: ph, x: x, y: y, w: natW*s, h: natH*s, scale: s, rw: rw, rh: rh}
+}
+
+pdfAddOriginalJpeg(hPdf, imgPath, dpi, bgColor, exifTurns) {
+; Embeds a JPEG file as it is. Returns 0 when the page was added, 1 when the file does not
+; suit [the caller decodes it instead] and 2 when writing failed.
+   VarSetCapacity(info, 20, 0)
+   If !DllCall("qpvmain.dll\PdfJpegFileInfo", "WStr", imgPath, "UPtr", &info, "Int")
+      Return 1
+
+   imgW := NumGet(info, 0, "UInt")
+   imgH := NumGet(info, 4, "UInt")
+   If (exifTurns=1 && NumGet(info, 12, "UInt")>4)   ; EXIF orientations 5 to 8 turn the image by 90°
+   {
+      imgW := NumGet(info, 4, "UInt")
+      imgH := NumGet(info, 0, "UInt")
+   }
+
+   L := pdfPlaceImage(imgW, imgH, dpi)
+   ; a file more than 1.5 times as dense as the chosen DPI is resampled instead
+   If (L.scale*1.5<1)
+      Return 1
+
+   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", exifTurns, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", bgColor, "Int")
+}
+
+pdfAddBitmapPage(hPdf, pBitmap, dpi, quality, bgColor, doFX, hasAlpha) {
+; Adds a page showing a loaded bitmap, which it disposes. Returns 0 when the page was added,
+; 1 when it could not be and 2 when writing failed.
+   trGdip_GetImageDimensions(pBitmap, imgW, imgH)
+   If (imgW<1 || imgH<1)
+   {
+      trGdip_DisposeImage(pBitmap, 1)
+      Return 1
+   }
+
+   L := pdfPlaceImage(imgW, imgH, dpi)
+   If (doFX=1)
+   {
+      ; at the size the page shows the image, as the viewport applies them
+      If (L.rw<imgW || L.rh<imgH)
+      {
+         zBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, L.rw, L.rh, 0, 7, -1, 1)
+         If validBMP(zBitmap)
+         {
+            trGdip_DisposeImage(pBitmap, 1)
+            pBitmap := zBitmap
+         }
+      }
+
+      pBitmap := applyVPeffectsOnBMP(pBitmap, 1, hasAlpha, "y")
+      flipBitmapAccordingToViewPort(pBitmap)
+   }
+
+   r := DllCall("qpvmain.dll\PdfWriterAddBitmap", "UPtr", hPdf, "UPtr", pBitmap, "Int", L.rw, "Int", L.rh, "Int", quality, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", bgColor, "Int")
+   trGdip_DisposeImage(pBitmap, 1)
+   Return r
 }
 
 BTNperformExtractFrames(a) {
@@ -48197,15 +48258,17 @@ WriteSettingsCombineIMGs() {
 }
 
 ReadSettingsCombineIMGs(act:=0) {
-    RegAction(act, "TextInAreaAlign",, 2, 1, 3)
-    RegAction(act, "TextInAreaValign",, 2, 1, 3)
-    RegAction(act, "UserCombinePDFpageSize",, 2, 1, 6)
+    RegAction(act, "userCombinePDFalignH",, 2, 1, 3)
+    RegAction(act, "userCombinePDFalignV",, 2, 1, 3)
+    RegAction(act, "UserCombinePDFpageSize",, 2, 1, 9)
     RegAction(act, "userCombineDepthDithering",, 1)
     RegAction(act, "userSaveBitsDepth",, 2, 1, 4)
     RegAction(act, "userCombineFramesFmt",, 2, 1, 5)
     RegAction(act, "UserCombinePDFbgrColor",, 3)
     RegAction(act, "combinePDFpageLandscape",, 1)
-    RegAction(act, "combinePDFpageHighQuality",, 1)
+    RegAction(act, "userCombinePDFdpi",, 2, 50, 1200)
+    RegAction(act, "userCombinePDFkeepJpegs",, 1)
+    RegAction(act, "userCombinePDFenlarge",, 1)
     RegAction(act, "ResizeApplyEffects",, 1)
     RegAction(act, "userCombineSubFrames",, 1)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
@@ -60626,9 +60689,9 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    Return 0
 }
 
-batchConvert2format(modus:=0) {
+batchConvert2format() {
    filesElected := getSelectedFiles(0, 1)
-   If (filesElected>50 && modus!="pdf")
+   If (filesElected>50)
    {
       msgInfos := "Are you sure you want to convert " groupDigits(filesElected) " files to the ." rDesireWriteFMT " format ? "
       If (ResizeUseDestDir=1)
@@ -60657,12 +60720,11 @@ batchConvert2format(modus:=0) {
 
    setImageLoading()
    filesPerCore := calculateCoresRequired(filesElected)
-   bonusInfo := (modus="pdf") ? "Preparing files for the PDF: Phase 1`n" : ""
-   showTOOLtip(bonusInfo "Converting to ." rDesireWriteFMT " format " groupDigits(filesElected) " files, please wait")
+   showTOOLtip("Converting to ." rDesireWriteFMT " format " groupDigits(filesElected) " files, please wait")
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    mustDoMultiCore := (convertFormatUseMultiThreads=1 && systemCores>1 && filesPerCore>=2) ? 1 : 0
-   If (mustDoMultiCore=1 && modus!="pdf")
+   If (mustDoMultiCore=1)
    {
       setPriorityThread(-2)
       addJournalEntry("Preparing " systemCores " threads to start. " filesPerCore " files per thread.")
@@ -60705,7 +60767,7 @@ batchConvert2format(modus:=0) {
          If (skippedFiles>0)
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
-         showTOOLtip(bonusInfo "Converting to ." rDesireWriteFMT " format, please wait" destInfo etaTime, 0, 0, countTFilez / filesElected)
+         showTOOLtip("Converting to ." rDesireWriteFMT " format, please wait" destInfo etaTime, 0, 0, countTFilez / filesElected)
          prevMSGdisplay := A_TickCount
       }
 
@@ -60721,24 +60783,18 @@ batchConvert2format(modus:=0) {
          Continue
       }
 
-      If (filesConverted>=maxMultiPagesAllowed && modus="pdf")
-      {
-         SoundBeep 300, 100
-         Break
-      }
-
       countTFilez++
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
-      file2save := (modus="pdf") ? destImgPath "\" thisFileIndex "." rDesireWriteFMT : destImgPath "\" OutNameNoExt "." rDesireWriteFMT
+      file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
       isSameFormat := RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") ? 1 : 0
-      If (isSameFormat=1 && convertFormatAutoSkip=1 && modus!="pdf")
+      If (isSameFormat=1 && convertFormatAutoSkip=1)
       {
          If (ResizeUseDestDir=1)
          {
             ; if the user defined destination format is the same with the initial file format
             ; perform only a move file, ONLY IF ResizeUseDestDir=1 and convertFormatAutoSkip=1
-            If (FileExist(file2save) && !FolderExist(file2save) && modus!="pdf")
+            If (FileExist(file2save) && !FolderExist(file2save))
                file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
             If (file2save="abort")
@@ -60783,7 +60839,7 @@ batchConvert2format(modus:=0) {
       }
 
       of := file2save
-      If (FileExist(file2save) && !FolderExist(file2save) && modus!="pdf")
+      If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
       If (file2save="abort")
@@ -60808,7 +60864,7 @@ batchConvert2format(modus:=0) {
       Else
          filesConverted++
 
-      If (OnConvertKeepOriginals=0 && !r && modus!="pdf" && imgPath!=file2save)
+      If (OnConvertKeepOriginals=0 && !r && imgPath!=file2save)
       {
          FileSetAttrib, -R, % imgPath
          Sleep, 2

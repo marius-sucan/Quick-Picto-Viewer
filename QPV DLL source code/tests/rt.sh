@@ -222,52 +222,58 @@ else
 fi
 
 echo
-echo "== the PDF exporter's page geometry and document structure =="
-# Jpeg2PDF.cpp is #included into qpv-main.cpp rather than compiled on its own, and it needs
-# nothing from windows.h beyond three typedefs, so pdf_document.cpp compiles it VERBATIM.
-# No slicing and no anchors to drift: what is tested is the whole shipped file.
-if g++ $CXXFLAGS -o pdf_document pdf_document.cpp 2>&1; then
-    ./pdf_document || fail=1
+echo "== the PDF writer: document structure, kept JPEGs, placement, the destination =="
+# pdf-writer.h is #included into qpv-main.cpp rather than compiled on its own, and all it
+# needs from windows.h is a handful of file calls, which shim/pdf-env.h maps onto POSIX; so
+# pdf_writer.cpp compiles the whole shipped file VERBATIM. With pdftoppm installed, the test
+# also renders pages.
+rm -rf pdf_writer_out
+if g++ $CXXFLAGS -o pdf_writer pdf_writer.cpp 2>&1; then
+    ./pdf_writer pdf_writer_out || fail=1
 else
-    echo "  ERROR: pdf_document.cpp did not compile"; fail=1
+    echo "  ERROR: pdf_writer.cpp did not compile"; fail=1
 fi
 
 echo
-echo "== mutation check: the page box must be rejected at any unit but the point =="
-# Both mutants restore a bug the exporter actually shipped with. They go into COPIES - the
-# shipped sources are never edited, so an interrupted run cannot leave them broken.
-#   A - the page box scaled by the render DPI instead of 72, which is what made every
-#       exported page (dpi/72) times too large while the layout still looked correct;
-#   B - the truncating cast that rounds A4's 841.68 pt down to a 841 pt page.
-sed 's|#define PDF_UNITS_PER_INCH    72.0|#define PDF_UNITS_PER_INCH    192.0|' \
-    ../Jpeg2PDF.h > jpeg2pdf_mutant.h
-sed 's|\* PDF_UNITS_PER_INCH + 0.5|* PDF_UNITS_PER_INCH|g' ../Jpeg2PDF.cpp > jpeg2pdf_mutant.cpp
-for mutant in A B; do
+echo "== mutation check: the PDF writer's mistakes must be caught =="
+# The mutants go into a COPY of pdf-writer.h - the shipped source is never edited, so an
+# interrupted run cannot leave it broken.
+#   A - orientation 6 drawn with the matrix of orientation 8;
+#   B - an xref offset one byte off its object;
+#   C - EOI not recognised, so the copy of the scans runs on;
+#   D - a page that failed is not rolled back;
+#   E - the Exif segment embedded along with the JPEG.
+for mutant in A B C D E; do
     case $mutant in
-      A) defs="-DQPV_JPEG2PDF_HEADER='\"jpeg2pdf_mutant.h\"'"
-         orig=../Jpeg2PDF.h;   copy=jpeg2pdf_mutant.h
-         label="the page box is scaled by the render DPI" ;;
-      B) defs="-DQPV_JPEG2PDF_SOURCE='\"jpeg2pdf_mutant.cpp\"'"
-         orig=../Jpeg2PDF.cpp; copy=jpeg2pdf_mutant.cpp
-         label="the page size is truncated rather than rounded" ;;
+      A) sed 's|case 6:  m\[0\] = 0;  m\[1\] = -h; m\[2\] = w;|case 6:  m[0] = 0;  m[1] = h; m[2] = -w;|' ../pdf-writer.h > pdf_writer_mutant.h
+         label="orientation 6 is drawn as 8" ;;
+      B) sed 's|w->offsets\[n\] = pdfwTell(w);|w->offsets[n] = pdfwTell(w) + 1;|' ../pdf-writer.h > pdf_writer_mutant.h
+         label="an xref offset misses its object" ;;
+      C) sed 's|else if (c==0xD9)$|else if (c==0xD9 \&\& false)|' ../pdf-writer.h > pdf_writer_mutant.h
+         label="the scans are copied past EOI" ;;
+      D) sed 's|^       pdfwRollback(w, mark);|       ;|' ../pdf-writer.h > pdf_writer_mutant.h
+         label="a page that failed stays in the file" ;;
+      E) sed 's#c==0xE0 || c==0xEE;#c==0xE0 || c==0xEE || c==0xE1;#' ../pdf-writer.h > pdf_writer_mutant.h
+         label="Exif is embedded with the JPEG" ;;
     esac
 
-    if cmp -s "$copy" "$orig"; then
+    if cmp -s pdf_writer_mutant.h ../pdf-writer.h; then
         echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
         continue
     fi
 
-    if ! eval g++ \$CXXFLAGS $defs -o pdf_mutant pdf_document.cpp 2>/dev/null; then
+    rm -rf pdf_writer_out
+    if ! g++ $CXXFLAGS -DQPV_PDF_WRITER_SOURCE='"pdf_writer_mutant.h"' -o pdf_writer_mutant pdf_writer.cpp 2>/dev/null; then
         echo "  ERROR: mutant $mutant did not compile"; fail=1
         continue
     fi
-    if ./pdf_mutant > /dev/null 2>&1; then
+    if ./pdf_writer_mutant pdf_writer_out > /dev/null 2>&1; then
         echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
     else
         echo "   ok - mutant $mutant is caught ($label)"
     fi
 done
-rm -f pdf_mutant jpeg2pdf_mutant.h jpeg2pdf_mutant.cpp
+rm -rf pdf_writer_mutant pdf_writer_mutant.h pdf_writer_out
 
 if [ "${1:-}" = "--bench" ]; then
     echo

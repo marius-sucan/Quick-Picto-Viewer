@@ -35,12 +35,9 @@
 #define GDIPVER 0x110
 #include <gdiplus.h>
 #include <gdiplusflat.h>
-#include <direct.h> // for CreatePDFfile() > _chdir()
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include "Jpeg2PDF.h"
-#include "Jpeg2PDF.cpp"
 #include <locale>
 #include <codecvt>
 #define cimg_use_openmp 1
@@ -7681,142 +7678,132 @@ int myRound(double x) {
     return (x<0) ? (int)(x-0.5) : (int)(x+0.5);
 }
 
-STATUS InsertJPEGFile2PDF(const char *fileName, int fileSize, PJPEG2PDF pdfId) {
-  FILE *fp;
-  unsigned char *jpegBuf;
-  int readInSize; 
-  unsigned short jpegImgW, jpegImgH;
-  STATUS r = IDOK;
+// The PDF writer of "Join images into a single file"; its GDI+ and OpenCV part follows.
+#include "pdf-writer.h"
 
-  jpegBuf = (unsigned char *)malloc(fileSize);
-  if (jpegBuf==NULL)
-  {
-     fnOutputDebug("InsertJPEGFile2PDF: failed to allocate buffer for file: " + std::string(fileName));
-     return ERROR;
-  }
+// Adds a page that shows a GDI+ bitmap: scaled down to rasterW x rasterH when it is larger
+// [the pixels are never enlarged; the PDF reader does that], laid over bgColor where it is
+// transparent and stored as a JPEG of the given quality. The caller keeps the bitmap.
+// Returns PDFW_ADDED, PDFW_SKIPPED [the document stays as it was] or PDFW_LOST.
+DLL_API int DLL_CALLCONV PdfWriterAddBitmap(PdfWriter *w, Gdiplus::GpBitmap *bmp, int rasterW, int rasterH, int quality, double pageW, double pageH, double x, double y, double width, double height, UINT bgColor) {
+    static CLSID jpegEncoder;
+    static int hasEncoder = 0;
+    if (!pdfwValid(w) || w->failed)
+       return PDFW_LOST;
 
-  fp = fopen(fileName, "rb");
-  if (fp==NULL)
-  {
-     fnOutputDebug("InsertJPEGFile2PDF: failed to open file: " + std::string(fileName));
-     free(jpegBuf);
-     return ERROR;
-  }
+    const PdfwPlace p = { pageW, pageH, x, y, width, height, bgColor, 1 };
+    UINT srcW = 0, srcH = 0;
+    if (bmp==NULL || !pdfwPlaceUsable(p)
+        || Gdiplus::DllExports::GdipGetImageWidth(bmp, &srcW)!=Gdiplus::Ok
+        || Gdiplus::DllExports::GdipGetImageHeight(bmp, &srcH)!=Gdiplus::Ok || srcW==0 || srcH==0)
+       return PDFW_SKIPPED;
 
-  readInSize = (int)fread(jpegBuf, sizeof(UINT8), fileSize, fp);
-  fclose(fp);
+    if (hasEncoder==0)
+    {
+       UINT count = 0, size = 0;
+       Gdiplus::DllExports::GdipGetImageEncodersSize(&count, &size);
+       std::vector<BYTE> list(size + 1);
+       Gdiplus::ImageCodecInfo *codecs = (Gdiplus::ImageCodecInfo*)list.data();
+       if (size>0 && Gdiplus::DllExports::GdipGetImageEncoders(count, size, codecs)==Gdiplus::Ok)
+       {
+          for (UINT i = 0; i < count; i++)
+          {
+              if (codecs[i].MimeType!=NULL && wcscmp(codecs[i].MimeType, L"image/jpeg")==0)
+              {
+                 jpegEncoder = codecs[i].Clsid;
+                 hasEncoder = 1;
+                 break;
+              }
+          }
+       }
 
-  if (readInSize != fileSize) 
-     fnOutputDebug("file size in bytes mismatched: " + std::to_string(readInSize) + " / " + std::to_string(fileSize));
+       if (hasEncoder==0)
+       {
+          fnOutputDebug("PdfWriterAddBitmap: GDI+ has no JPEG encoder");
+          return PDFW_SKIPPED;
+       }
+    }
 
-  // Add JPEG File into PDF
-  if (1 == get_jpeg_size(jpegBuf, readInSize, &jpegImgW, &jpegImgH))
-  {
-     std::string s = fileName;
-     r = Jpeg2PDF_AddJpeg(pdfId, jpegImgW, jpegImgH, readInSize, jpegBuf, 1);
-     fnOutputDebug("Image dimensions: " + std::to_string(jpegImgW) + " x " + std::to_string(jpegImgH) + " | " + s);
-  } else
-  {
-     std::string s = fileName;
-     fnOutputDebug("failed to obtain image dimensions from file: " + s);
-     r = ERROR;
-  }
+    const UINT rw = (rasterW<1) ? 1 : std::min<UINT>((UINT)rasterW, srcW);
+    const UINT rh = (rasterH<1) ? 1 : std::min<UINT>((UINT)rasterH, srcH);
+    Gdiplus::Rect rect(0, 0, (INT)srcW, (INT)srcH);
+    Gdiplus::BitmapData bd;
+    if (Gdiplus::DllExports::GdipBitmapLockBits(bmp, &rect, Gdiplus::ImageLockModeRead, PixelFormat32bppPARGB, &bd)!=Gdiplus::Ok)
+       return PDFW_SKIPPED;
 
-  free(jpegBuf);
-  return r;
-}
+    bool locked = true;
+    int result = PDFW_SKIPPED;
+    IStream *stream = NULL;
+    Gdiplus::GpBitmap *rgbBitmap = NULL;
+    std::vector<BYTE> topDown, scaled, rgb;
+    try
+    {
+       const BYTE *px = (const BYTE*)bd.Scan0;
+       int stride = bd.Stride;
+       if (stride<0)
+       {
+          // a bottom-up bitmap; OpenCV wants the rows top-down in memory
+          topDown.resize((size_t)srcW * 4 * srcH);
+          for (UINT row = 0; row < srcH; row++)
+              memcpy(&topDown[(size_t)row * srcW * 4], px + (ptrdiff_t)row * stride, (size_t)srcW * 4);
+          px = topDown.data();
+          stride = (int)srcW * 4;
+       }
 
-DLL_API int DLL_CALLCONV CreatePDFfile(const char* tempDir, const char* destinationPDFfile, const char* scriptDir, UINT *fListArray, int arraySize, float pageW, float pageH, int dpi) {
-// based on https://www.codeproject.com/Articles/29879/Simplest-PDF-Generating-API-for-JPEG-Image-Content
+       if (rw!=srcW || rh!=srcH)
+       {
+          // premultiplied, so that transparent pixels add nothing to their neighbours
+          scaled.resize((size_t)rw * 4 * rh);
+          const cv::Mat src(srcH, srcW, CV_8UC4, (void*)px, (size_t)stride);
+          cv::Mat dst(rh, rw, CV_8UC4, scaled.data(), (size_t)rw * 4);
+          cv::resize(src, dst, dst.size(), 0, 0, cv::INTER_AREA);
+          px = scaled.data();
+          stride = (int)rw * 4;
+       }
 
-  // Initialize the PDF Object with Page Size Information
-  fnOutputDebug("function CreatePDFfile called" + std::to_string(pageW) + " x " + std::to_string(pageH) );
-  // dpi is no longer part of the page geometry - see Jpeg2PDF_BeginDocument(). It stays in
-  // the exported signature because AutoHotkey's DllCall passes it, and it still describes
-  // the pixel size AHK rendered each page at, which is what sets the PDF's effective DPI.
-  PJPEG2PDF pdfId;
-  pdfId = Jpeg2PDF_BeginDocument(pageW, pageH);
-  if (pdfId == NULL)
-     return -1;
- 
-  UINT32 pdfSize, pdfFinalSize;
-  UINT8  *pdfBuf;
+       const int rgbStride = (int)((rw * 3 + 3) & ~3u);
+       rgb.resize((size_t)rgbStride * rh);
+       pdfwOverColor(px, stride, rw, rh, bgColor, rgb.data(), rgbStride);
+       Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bd);
+       locked = false;
 
-  int dirErr = 0;
-  if (_chdir(tempDir))
-  {
-      switch (errno)
-      {
-        case ENOENT:
-           dirErr = -2;
-           break;
-        case EINVAL:
-           dirErr = -3;
-           break;
-        default:
-           dirErr = -4;
-      }
-      return dirErr;
-  }
+       if (Gdiplus::DllExports::GdipCreateBitmapFromScan0((INT)rw, (INT)rh, rgbStride, PixelFormat24bppRGB, rgb.data(), &rgbBitmap)==Gdiplus::Ok
+           && CreateStreamOnHGlobal(NULL, TRUE, &stream)==S_OK)
+       {
+          static const GUID encoderQuality = { 0x1d5be4b5, 0xfa4a, 0x452d, { 0x9c, 0xdd, 0x5d, 0xb3, 0x51, 0x05, 0xe7, 0xeb } };
+          ULONG q = (ULONG)std::min<int>(std::max<int>(quality, 1), 100);
+          Gdiplus::EncoderParameters params;
+          params.Count = 1;
+          params.Parameter[0].Guid = encoderQuality;
+          params.Parameter[0].Type = Gdiplus::EncoderParameterValueTypeLong;
+          params.Parameter[0].NumberOfValues = 1;
+          params.Parameter[0].Value = &q;
+          STATSTG st;
+          HGLOBAL mem = NULL;
+          if (Gdiplus::DllExports::GdipSaveImageToStream(rgbBitmap, stream, &jpegEncoder, &params)==Gdiplus::Ok
+              && stream->Stat(&st, STATFLAG_NONAME)==S_OK && GetHGlobalFromStream(stream, &mem)==S_OK)
+          {
+             const BYTE *jpeg = (const BYTE*)GlobalLock(mem);
+             if (jpeg!=NULL)
+             {
+                result = pdfwAddJpegData(w, jpeg, (size_t)st.cbSize.QuadPart, p);
+                GlobalUnlock(mem);
+             }
+          } else fnOutputDebug("PdfWriterAddBitmap: GDI+ failed to encode the page");
+       }
+    } catch (...)
+    {
+       fnOutputDebug("PdfWriterAddBitmap: failed to prepare the page");
+       result = PDFW_SKIPPED;
+    }
 
-  // Process the jpeg files
-  fnOutputDebug("about to load images pointed by fListArray.size=" + std::to_string(arraySize));
-  struct _finddata_t jpeg_file;
-  long hFile;
-  int somePagesError = 0;
-  for (int i = 0; i < arraySize; ++i)
-  {
-      std::string s = std::to_string(fListArray[i]) + ".jpg";
-      // const char * c = str.c_str();
-      // fnOutputDebug("looping array " + std::to_string(i) + " file=" + s);
-      if ( (hFile = _findfirst(s.c_str(), &jpeg_file )) == -1L )
-         continue;
- 
-      // fnOutputDebug("found file: " + s);
-      STATUS z = InsertJPEGFile2PDF(jpeg_file.name, jpeg_file.size, pdfId);
-      if (z==ERROR)
-      {
-         fnOutputDebug("Failed to add image to PDF: " + s);
-         somePagesError++;
-      }
-      _findclose( hFile );
-  }
-
-  // Finalize the PDF and get the PDF Size
-  fnOutputDebug("Finalize the PDF and get the PDF Size");
-  pdfSize = Jpeg2PDF_EndDocument(pdfId);
-  // Prepare the PDF Data Buffer based on the PDF Size
-  pdfBuf = (UINT8 * )malloc(pdfSize);
-
-  fnOutputDebug("PDF size = " + std::to_string(pdfSize) + "; next function Jpeg2PDF_GetFinalDocumentAndCleanup()");
-  // Get the PDF into the Data Buffer and do the cleanup
-  // Output the PDF Data Buffer to file
-  STATUS g = Jpeg2PDF_GetFinalDocumentAndCleanup(pdfId, pdfBuf, &pdfFinalSize, pdfSize);
-  if (g==IDOK)
-  {
-     fnOutputDebug("writing PDF: final size =" + std::to_string(pdfFinalSize));
-     FILE *fp = fopen(destinationPDFfile, "wb");
-     if (fp!=NULL)
-     {
-        fwrite(pdfBuf, sizeof(UINT8), pdfFinalSize, fp);
-        fclose(fp);
-     } else 
-     {
-        fnOutputDebug("Failed to create PDF file");
-        dirErr = -6;
-     }
-  } else 
-  {
-     fnOutputDebug("Failed to PDF GetFinalDocument");
-     dirErr = -7;
-  }
-
-  _chdir(scriptDir);
-  free(pdfBuf);
-  if (dirErr == 0 && somePagesError != 0)
-     dirErr = somePagesError;
-
-  return dirErr;
+    if (locked)
+       Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bd);
+    if (rgbBitmap!=NULL)
+       Gdiplus::DllExports::GdipDisposeImage(rgbBitmap);
+    if (stream!=NULL)
+       stream->Release();
+    return w->failed ? PDFW_LOST : result;
 }
 
 Gdiplus::GpBitmap* CreateGdipBitmapFromCImg(CImg<float> & img, int width, int height) {

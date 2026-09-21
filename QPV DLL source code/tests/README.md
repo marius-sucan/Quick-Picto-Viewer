@@ -6,7 +6,7 @@ that carry the meaning are self-contained, though, so these tests slice the func
 test straight out of the shipped sources and compile *those* against minimal Windows shims.
 
 Most of the suite covers the duplicate-identification pipeline, which is what it was written
-for; `pdf_document.cpp` covers the PDF exporter.
+for; `pdf_writer.cpp` covers the PDF writer of "Join images into a single file".
 
 The slicing is the point. A scratch copy of an algorithm drifts from the shipped one and
 then proves nothing; `run-tests.sh` re-extracts from `../dupes-search.h` on every run and
@@ -247,33 +247,39 @@ literal in `quick-picto-viewer.ahk`; when this test fails, the AHK is what has t
 and `initThumbsPool()` refuses a `qpvmain.dll` that predates the current record, because a
 version mismatch is the same corruption from the other side.
 
-**`pdf_document.cpp`** — the PDF exporter's page geometry and document structure. This one
-does not slice: `Jpeg2PDF.cpp` is `#include`d into `qpv-main.cpp` rather than compiled on its
-own and needs nothing from `windows.h` beyond `UINT32`, `IDOK` and `ERROR`, so the whole
-shipped file is compiled **verbatim** — no anchors, nothing to drift.
+**`pdf_writer.cpp`** — the PDF writer behind "Join images into a single file". This one does
+not slice: `pdf-writer.h` is `#include`d into `qpv-main.cpp` rather than compiled on its own,
+and all it needs from `windows.h` is a handful of file calls, which `shim/pdf-env.h` maps onto
+POSIX. So the whole shipped file is compiled **verbatim** — no anchors, nothing to drift. The
+GDI+ and OpenCV half of `PdfWriterAddBitmap()` stays in `qpv-main.cpp` and is not covered; the
+page it hands over, `pdfwAddJpegData()`, is.
 
-What it pins is a unit that is invisible in the output. `MediaBox` is written in PDF user
-space units, which the spec fixes at 1/72 inch, but the file emits bare integers — so when
-`Jpeg2PDF_BeginDocument()` scaled the page by the DPI the pages were *rasterised* at, every
-exported page came out `(dpi/72)` times too large and nothing looked wrong: a Letter page
-measured 22.7 × 29.3 in at the high quality setting, while the layout stayed correct because
-the image placement matrix is driven by the same two fields. Only a reader's page properties
-showed it. Hence the checks that Letter, A4 and landscape land on their canonical point
-sizes, that the placement matrix agrees with `MediaBox`, and that the render DPI still comes
-out as the printed resolution via the embedded JPEG's own pixel count.
+The writer streams: every page goes to `<destination>.part` as it is added, and only a
+finished document replaces the destination. What the test pins:
 
-Two more things it guards:
+- the file a reader walks: every xref offset lands on its own object, every stream is as long
+  as its `/Length` says, the page tree counts every page. Offsets are kept in 64 bits; an
+  offset past 4 GiB still fits the ten digits of an xref entry, and one past them makes the
+  document fail rather than come out corrupt;
+- rollback: a page that fails half way — a JPEG without EOI, 3 MB of scan data of which part
+  had already been flushed to disk — leaves no byte and no object behind;
+- kept JPEGs are embedded byte for byte, minus what a decoder does not need: Exif, XMP,
+  comments and Photoshop segments are dropped, an ICC profile becomes an `ICCBased` colour
+  space written once per document, and the copy stops at EOI, so a video or a second image
+  appended to the file stays out. Arithmetic, lossless and 12-bit coding, CMYK, and RGB that
+  only the component IDs mark as such are refused, so AHK decodes those files instead;
+- the eight EXIF orientations are drawn with the right matrix, and with `pdftoppm` installed
+  the pages are rendered and their four coloured quadrants checked;
+- the destination: left alone when the document is abandoned or the disk fills up, refused
+  up front when another program holds it open, and replaced only by a complete file.
 
-- A4 is 8.27 × 11.69 in, so its height is 841.68 pt. The cast to `UINT32` truncates, which
-  gives a page one point short of the canonical 842 — the rounding is deliberate.
-- the xref offsets are accumulated by hand from `sprintf` return values, and the fix changed
-  the page size's digit count. The test walks the table the way a reader does and requires
-  every offset to land on its own object.
+The JPEGs come from a small encoder in the test itself — baseline, progressive, greyscale and
+with restart markers — so no image library is needed.
 
-**The mutation check** — `run-tests.sh` restores both bugs in *copies* of the shipped sources
-(the DPI-scaled page box, and the truncating cast) and requires the test to fail. The
-`QPV_JPEG2PDF_HEADER` / `QPV_JPEG2PDF_SOURCE` defines exist for that; they default to the
-shipped files.
+**The mutation check** — `run-tests.sh` puts five mistakes into a *copy* of `pdf-writer.h`
+(orientation 6 drawn as 8, an xref offset one byte off, EOI not recognised, no rollback, Exif
+kept) and requires the test to fail on each. The `QPV_PDF_WRITER_SOURCE` define exists for
+that; it defaults to the shipped file.
 
 **`import_merge.py`** — the database import, executed by SQLite rather than simulated.
 `importSLDBintoSLDB()` renumbers every `imgidu`, so fingerprints keyed by it have to be
