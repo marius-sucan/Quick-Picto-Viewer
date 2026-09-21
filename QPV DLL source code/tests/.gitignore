@@ -38,7 +38,10 @@ pdf_writer
 pdf_writer_mutant
 hash_bench
 freeimage_gif_oracle
+freeimage_multipage_oracle
 # built by hash_bench.cpp, which makes its own library-sized database
 hash_bench.sldb
 # written by pdf_writer.cpp
 pdf_writer_out/
+# written by freeimage_multipage_oracle.cpp
+freeimage_multipage_out/

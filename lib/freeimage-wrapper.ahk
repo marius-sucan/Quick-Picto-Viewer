@@ -660,7 +660,7 @@ FreeImage_SetPixelColor(hImage, xPos, yPos, RGBArray:="255,255,255,0") {
 }
 
 ; === Conversion functions ===
-; missing functions: ColorQuantizeEx, ConvertToType
+; missing functions: ColorQuantizeEx
 
 FreeImage_ConvertTo(hImage, MODE) {
 ; This is a wrapper for multiple FreeImage functions.
@@ -722,6 +722,12 @@ FreeImage_ConvertFromRawBitsEx(copySource, pBits, FimType, imgW, imgH, PitchStri
 
 FreeImage_ConvertToStandardType(hImage, bScaleLinear:=1) {
    Return DllCall(getFIMfunc("ConvertToStandardType"), "uptr", hImage, "int", bScaleLinear, "uptr")
+}
+
+FreeImage_ConvertToType(hImage, imgType, bScaleLinear:=1) {
+; imgType is the FREE_IMAGE_TYPE enumeration, see FreeImage_GetImageType().
+; There is no conversion from floating point RGB [11, 12] to FIT_BITMAP [1]; tone map those.
+   Return DllCall(getFIMfunc("ConvertToType"), "uptr", hImage, "int", imgType, "int", bScaleLinear, "uptr")
 }
 
 FreeImage_ConvertToGreyscale(hImage) {
@@ -849,7 +855,14 @@ FreeImage_SimpleGetPageCount(hImage) {
 }
 
 FreeImage_AppendPage(hFIMULTIBITMAP, hImage) {
+; It returns nothing; FreeImage_AppendPageEx() says whether the page was added.
    Return DllCall(getFIMfunc("AppendPage"), "uptr", hFIMULTIBITMAP, "uptr", hImage)
+}
+
+FreeImage_AppendPageEx(hFIMULTIBITMAP, hImage) {
+; Returns TRUE when the page was added. It is refused when the format cannot encode the
+; bitmap, and FreeImage_CloseMultiBitmap() then returns FALSE, although it saves the other pages.
+   Return DllCall(getFIMfunc("AppendPageEx"), "uptr", hFIMULTIBITMAP, "uptr", hImage, "int")
 }
 
 FreeImage_InsertPage(hFIMULTIBITMAP, PageNumber, hImage) {
@@ -873,7 +886,7 @@ FreeImage_LockPage(hFIMULTIBITMAP, PageNumber) {
    ; FreeImage_UnlockPage() instead
 
    ; On succes, the function returns a common FIBITMAP.
-   Return DllCall(getFIMfunc("LockPage"), "uptr", hFIMULTIBITMAP, "Int", PageNumber)
+   Return DllCall(getFIMfunc("LockPage"), "uptr", hFIMULTIBITMAP, "Int", PageNumber, "uptr")
 }
 
 FreeImage_UnlockPage(hFIMULTIBITMAP, hImage, changed) {
@@ -1360,7 +1373,7 @@ getFIMfunc(funct) {
 
    Static fList0 := "|CreateTag|DeInitialise|GetCopyrightMessage|GetFIFCount|GetVersion|IsLittleEndian|"
         , fList4 := "|Clone|CloneTag|CloseMemory|ConvertTo16Bits555|ConvertTo16Bits565|ConvertTo24Bits|ConvertTo32Bits|ConvertTo4Bits|ConvertTo8Bits|ConvertToFloat|ConvertToGreyscale|ConvertToRGB16|ConvertToRGBA16|ConvertToRGBAF|ConvertToRGBF|ConvertToUINT16|DeleteTag|DestroyICCProfile|FIFSupportsICCProfiles|FIFSupportsNoPixels|FIFSupportsReading|FIFSupportsWriting|FindCloseMetadata|FlipHorizontal|FlipVertical|GetBits|GetBlueMask|GetBPP|GetColorsUsed|GetColorType|GetDIBSize|GetDotsPerMeterX|GetDotsPerMeterY|GetFIFDescription|GetFIFExtensionList|GetFIFFromFilename|GetFIFFromFilenameU|GetFIFFromFormat|GetFIFFromMime|GetFIFMimeType|GetFIFRegExpr|GetFormatFromFIF|GetGreenMask|GetHeight|GetICCProfile|GetImageType|GetInfo|GetInfoHeader|GetLine|GetMemorySize|GetPageCount|GetPalette|GetPitch|GetRedMask|GetTagCount|GetTagDescription|GetTagID|GetTagKey|GetTagLength|GetTagType|GetTagValue|GetThumbnail|GetTransparencyCount|GetTransparencyTable|GetTransparentIndex|GetWidth|HasBackgroundColor|HasPixels|HasRGBMasks|Initialise|Invert|IsPluginEnabled|IsTransparent|PreMultiplyWithAlpha|SetOutputMessage|SetOutputMessageStdCall|TellMemory|Unload|"
-        , fList8 := "|AppendPage|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToStandardType|DeletePage|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetChannel|GetComplexChannel|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
+        , fList8 := "|AppendPage|AppendPageEx|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToStandardType|DeletePage|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetChannel|GetComplexChannel|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
         , fList12 := "|AcquireMemory|AdjustBrightness|AdjustContrast|AdjustCurve|AdjustGamma|ConvertLine16_555_To16_565|ConvertLine16_565_To16_555|ConvertLine16To24_555|ConvertLine16To24_565|ConvertLine16To32_555|ConvertLine16To32_565|ConvertLine16To4_555|ConvertLine16To4_565|ConvertLine16To8_555|ConvertLine16To8_565|ConvertLine1To4|ConvertLine1To8|ConvertLine24To16_555|ConvertLine24To16_565|ConvertLine24To32|ConvertLine24To4|ConvertLine24To8|ConvertLine32To16_555|ConvertLine32To16_565|ConvertLine32To24|ConvertLine32To4|ConvertLine32To8|ConvertLine4To8|ConvertToType|CreateICCProfile|FillBackground|FindFirstMetadata|GetFileTypeFromHandle|GetHistogram|GetLockedPageNumbers|InsertPage|Load|LoadFromMemory|LoadMultiBitmapFromMemory|LoadU|MakeThumbnail|MovePage|SeekMemory|SetChannel|SetComplexChannel|SetTransparencyTable|SwapPaletteIndices|TagToString|UnlockPage|ValidateFromHandle|ZLibCRC32|"
         , fList16 := "|Composite|ConvertLine1To16_555|ConvertLine1To16_565|ConvertLine1To24|ConvertLine1To32|ConvertLine4To16_555|ConvertLine4To16_565|ConvertLine4To24|ConvertLine4To32|ConvertLine8To16_555|ConvertLine8To16_565|ConvertLine8To24|ConvertLine8To32|ConvertLine8To4|GetMetadata|GetPixelColor|GetPixelIndex|JPEGTransform|JPEGTransformU|LoadFromHandle|LookupSVGColor|LookupX11Color|OpenMultiBitmapFromHandle|ReadMemory|Rescale|Rotate|Save|SaveMultiBitmapToMemory|SaveToMemory|SaveU|SetMetadata|SetMetadataKeyValue|SetPixelColor|SetPixelIndex|SwapColors|WriteMemory|ZLibCompress|ZLibGUnzip|ZLibGZip|ZLibUncompress|"
         , fList20 := "|ApplyPaletteIndexMapping|ColorQuantizeEx|Copy|CreateView|Paste|RegisterExternalPlugin|RegisterLocalPlugin|SaveMultiBitmapToHandle|SaveToHandle|TmoDrago03|TmoFattal02|TmoReinhard05|"
