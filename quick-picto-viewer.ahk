@@ -43832,7 +43832,7 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, userCombinePDFkeepJpegs
 
    ; a page the size of the image leaves nothing to turn, align or enlarge
-   actu := (userCombineFramesFmt=3 && UserCombinePDFpageSize!=9) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt=2 && UserCombinePDFpageSize!=9) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, combinePDFpageLandscape
    GuiControl, % actu, txtLine4
    GuiControl, % actu, userCombinePDFalignH
@@ -44092,6 +44092,7 @@ CombineImgsIntoPDF(file2save) {
       If (totalFrames<1)   ; a loader that reported no frame at all leaves .Frames at -1
          totalFrames := 1
 
+      thisZeit := A_TickCount
       Loop, % totalFrames
       {
          If (A_Index>1)
@@ -44123,7 +44124,8 @@ CombineImgsIntoPDF(file2save) {
 
          If (A_TickCount - prevMSGdisplay>1500)
          {
-            showTOOLtip("Creating the PDF file, please wait`n" OutFileName "`nPages added: " groupDigits(pagesAdded) "`nPages of the current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
+            etaTime := ETAinfos(A_Index, totalFrames, thisZeit)
+            showTOOLtip("Creating the PDF file, please wait`n" OutFileName etaTime "`nPages added: " groupDigits(pagesAdded) "`nPages of the current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
             prevMSGdisplay := A_TickCount
          }
       }
@@ -62478,7 +62480,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    {
       tmpFile := combineImgsTempFile(destFilePath)
       If !tmpFile
-         msgu := "The path of the destination folder holds characters the FreeImage library cannot use. Please choose another folder."
+         msgu := "The destination temp file could not be allocated."
    }
 
    If msgu
@@ -62516,7 +62518,6 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    doStartLongOpDance()
    memStart := GetProcessMemoryUsage(QPVpid).PrivateUsage
    addedPages := failedPages := countTFilez := 0
-   Critical, on
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -62647,10 +62648,10 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    If (abandonAll=1)
       showTOOLtip("Operation aborted by user. No ." fmt " file was created.")
    Else If (addedPages<2)
-      showTOOLtip(((addedPages=1) ? "ERROR: At least two images or frames are required to create a multipage file." : "ERROR: Failed to load the selected images. No ." fmt " file was created.") moreInfos)
+      showTOOLtip(((addedPages=1) ? "ERROR: At least two images are required to create a multipage file." : "ERROR: Failed to load the selected images. No ." fmt " file was created.") moreInfos)
    Else If (savedPages!=addedPages)
    {
-      showTOOLtip("ERROR: Failed to write the ." fmt " file; the disk may be full.`n" OutFileName)
+      showTOOLtip("ERROR: Failed to write the ." fmt " file. The disk may be full.`n" OutFileName)
       addJournalEntry("Failed to write the multipage image file: " destFilePath ". Pages added: " addedPages ". Pages in the file: " savedPages ". Closed: " r)
    } Else If moveFailed
       showTOOLtip("ERROR: The new ." fmt " file could not replace the existing one, which may be in use.`n" OutFileName)
@@ -62767,21 +62768,13 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
 }
 
 combineImgsTempFile(destFilePath) {
-; A free name for the file FreeImage writes before it replaces destFilePath. FreeImage takes
-; the path as ANSI, which cannot hold every character and may even be best-fit mapped onto
-; another existing file, so the path must be plain ASCII: in the destination folder, by its
-; 8.3 path if need be, or else in the Temp folder.
    zPlitPath(destFilePath, 0, OutFileName, OutDir)
-   baseName := RegExMatch(OutFileName, "[^\x00-\x7F]") ? "qpv-joined-images" : OutFileName
-   dirs := [OutDir, GetShortPathNameU(OutDir), A_Temp, GetShortPathNameU(A_Temp)]
+   dirs := [OutDir, A_Temp]
    For each, thisDir in dirs
    {
-      If RegExMatch(thisDir, "[^\x00-\x7F]")
-         Continue
-
       Loop, 99
       {
-         tmpFile := thisDir "\" baseName "." QPVpid "-" A_Index ".part"
+         tmpFile := thisDir "\" OutFileName "-tmp-" QPVpid "-" A_Index ".part"
          If !FileExist(tmpFile)
             Return tmpFile
       }
@@ -62797,15 +62790,7 @@ combineFimOpenPages(imgPath, GFT, ByRef tPages) {
 
    ; animations are read as they are played: WEBP_PLAYBACK = 1, GIF/APNG/MNG/AVIF/HEIF_PLAYBACK = 2
    multiFlags := (GFT=18) ? 0 : (GFT=35) ? 1 : 2
-   ; FreeImage takes the path as ANSI, see combineImgsTempFile()
-   mPath := RegExMatch(imgPath, "[^\x00-\x7F]") ? GetShortPathNameU(imgPath) : imgPath
-   If RegExMatch(mPath, "[^\x00-\x7F]")
-   {
-      addJournalEntry("Only the first frame of this file can be joined; FreeImage cannot open its path: " imgPath)
-      Return
-   }
-
-   hMultiBMP := FreeImage_OpenMultiBitmap(mPath, GFT, 0, 1, 1, multiFlags)
+   hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
    If hMultiBMP
    {
       tPages := FreeImage_GetPageCount(hMultiBMP)
@@ -99532,7 +99517,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   mainLoadedIMGdetails.DPI := Round((dpix + dpiy)/2)
   mainLoadedIMGdetails.Width := imgW
   mainLoadedIMGdetails.Height := imgH
-  mainLoadedIMGdetails.Frames := (hasOpenedMulti!=1) ? FreeImage_SimpleGetPageCount(hFIFimgA) - 1 : tFrames - 1
+  mainLoadedIMGdetails.Frames := (hasOpenedMulti!=1) ? 0 : tFrames - 1
   mainLoadedIMGdetails.HasAlpha := (InStr(ColorsType, "rgba") || hasMultiTrans) ? 1 : 0
   mainLoadedIMGdetails.RawFormat := fileType " | " imgType
   mainLoadedIMGdetails.PixelFormat := StrReplace(oimgBPP, "-", "+") "-" ColorsType toneMapped

@@ -8578,27 +8578,6 @@ inline void blurWeighByAlpha(const unsigned char *src, unsigned char *dst, unsig
 }
 
 DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char *newData, int w, int h, int Stride, int bpp, int cx, int cy, int mode, int intensity, int quality) {
-// Zoom blur anchored on (cx, cy): every pixel is streaked along the segment running from itself
-// toward the anchor, over intensity% of its distance to it -- 100 smears all the way to the
-// anchor, higher values keep going past it (clamp-to-edge supplies the samples once the segment
-// leaves the bitmap), so very high intensities are safe. The anchor may sit outside the bitmap.
-// mode: 2 = x axis only, 3 = y axis only, anything else = both axes [true radial zoom].
-// The axis-only modes are computed exactly in O(1) per pixel from prefix sums, whatever the
-// intensity. The radial mode gathers along the segment with a per-pixel sample count matched to
-// the streak length, so pixels near the anchor stay nearly free; quality caps the samples per
-// pixel (<=0 picks 128; hard ceiling 256 -- the integer accumulators overflow past that).
-// 32-bpp data is straight [non-premultiplied] ARGB -- what Gdip_LockBits hands over as
-// PixelFormat32bppARGB, whatever the bitmap's own format is -- so a bitmap carrying any
-// transparency is weighted by its own alpha up front and every streak resolves to
-// sum(c*a)/sum(a), the average of the content that is actually visible. Output alpha is the
-// streak average but never below the source pixel's own. Together that keeps transparency from
-// either diluting the effect into invisibility or bleeding the RGB hidden under it [usually
-// white] over the image.
-// imageData is the source and newData receives the result; a gather filter cannot
-// work in place, so the two must be distinct buffers.
-// if the image is 32 bits, imageData gets modified by blurWeighByAlpha() if blurNeedsAlphaWeighting() returns true
-// this happens to avoid increasing the memory usage
-
       if (!imageData || !newData || imageData==newData || w<1 || h<1 || Stride<1 || (bpp!=24 && bpp!=32))
          return 0;
 
