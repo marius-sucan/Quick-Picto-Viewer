@@ -12382,6 +12382,18 @@ autoChangeDesiredFrame(act:=0, imgPath:=0) {
    {
       desiredFrameIndex := clampInRange(desiredFrameIndex + 1, 0, totalFramesIndex, 1)
       GIFframesPlayied++
+      If ((UserGIFsDelayu - delayu<-150) && totalFramesIndex>70)
+      {
+         ; skip a beat if the user wants it fast
+         desiredFrameIndex := clampInRange(desiredFrameIndex + 1, 0, totalFramesIndex, 1)
+         GIFframesPlayied++
+         If ((UserGIFsDelayu - delayu<-450) && totalFramesIndex>150)
+         {
+            ; skip another beat if the user wants it fast
+            desiredFrameIndex := clampInRange(desiredFrameIndex + 1, 0, totalFramesIndex, 1)
+            GIFframesPlayied++
+         }
+      }
    }
 
    If (allowGIFsPlayEntirely=1 && GIFframesPlayied>totalFramesIndex - 1) || (totalFramesIndex<2) || (allowGIFsPlayEntirely!=1)
@@ -43886,13 +43898,14 @@ PanelCombineImagesMultipage() {
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
     GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
-    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, GIFs frames delay (in milisec.)
+    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, Frames delay (in milisec.)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF5", userCombineGIFframeDelay)
     Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gBtnHelpJoinIMGsframeDelay", " ?", "Help")
-    Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% gBtnChangeMultiPageFmt vuserJoinIMGres, Set GIF dimensions (W x H):
+    Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% gBtnChangeMultiPageFmt vuserJoinIMGres +hwndhTemp, Set dimensions (W x H):
+    ToolTip2ctrl(hTemp, "For best results, all frames should have the same width and height.")
     thisWid += 20
     GuiAddEdit("x+1 w" thisWid " number -multi limit5 veditF7", userJoinIMGsW)
     Gui, Add, UpDown, vuserJoinIMGsW Range2-32000, % userJoinIMGsW
@@ -44122,10 +44135,10 @@ CombineImgsIntoPDF(file2save) {
          } Else
             failedPages++
 
-         If (A_TickCount - prevMSGdisplay>1500)
+         If ((A_TickCount - prevMSGdisplay>1500) && A_Index>4)
          {
             etaTime := ETAinfos(A_Index, totalFrames, thisZeit)
-            showTOOLtip("Creating the PDF file, please wait`n" OutFileName etaTime "`nPages added: " groupDigits(pagesAdded) "`nPages of the current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
+            showTOOLtip("Creating the PDF file, please wait`n" OutFileName etaTime "`nPages added: " groupDigits(pagesAdded) "`nPages in current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
             prevMSGdisplay := A_TickCount
          }
       }
@@ -74401,7 +74414,7 @@ drawinfoBox(mainWidth, mainHeight, directRefresh, Gu, bonusInfo:=0) {
     }
 
     If ((animGIFplaying=1 || CountGIFframes>1 && animGIFsSupport=1) && thumbsDisplaying=0)
-       infoAnim := "`nAnimation speed: " UserGIFsDelayu " ms / frame."
+       infoAnim := "`nAnimation speed: " animPlaybackDelay() + Round(totalZeit) " ms / frame."
 
     If (imgFxMode>1 || usrColorDepth>1)
        infoColors := "`nColors display mode: " DefineFXmodes()
