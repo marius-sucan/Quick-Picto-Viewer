@@ -8,6 +8,9 @@
 ; Change log:
 ; =============================
 ;
+; 23 September 2026 - v2.01
+; - FreeImage_FillBackground() takes three parameters again, as in FreeImage 3.18; options 8 (FI_COLOR_SET_ALPHA) replaces applyAlpha
+;
 ; 22 September 2026 - v2.00
 ; - implemented all the remaining functions, except the ANSI variants
 ; - bug fixes: FreeImage_Rotate(), the JPEG transforms, FreeImage_DeletePageEx(), FreeImage_SimpleGetPageCount(), the memory stream functions, and pointers truncated on x64
@@ -175,7 +178,7 @@ FreeImage_GetVersion() {
 }
 
 FreeImage_GetLibVersion() {
-   Return 2.00 ; mardi 22 septembre 2026
+   Return 2.01 ; mercredi 23 septembre 2026
 }
 
 FreeImage_GetCopyrightMessage() {
@@ -634,13 +637,13 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
    Return DllCall(getFIMfunc("SetBackgroundColor"), "UPtr", hImage, "UPtr", pColor)
 }
 
-FreeImage_FillBackground(hImage, RGBArray:="255,255,255,0", options:=1, applyAlpha:=0) {
-; applyAlpha  - for 32-bits RGBA, sets the alpha channel to specified value, must be above 0.
+FreeImage_FillBackground(hImage, RGBArray:="255,255,255,0", options:=1) {
 ; options     - it affect the color search process for palletized images.
 ;   FI_COLOR_IS_RGB_COLOR     = 0   // RGBQUAD color is a RGB color (contains no valid alpha channel)
 ;   FI_COLOR_IS_RGBA_COLOR    = 1   // RGBQUAD color is a RGBA color (contains a valid alpha channel)
 ;   FI_COLOR_FIND_EQUAL_COLOR = 2   // For palettized images: lookup equal RGB color from palette
 ;   FI_COLOR_ALPHA_IS_INDEX   = 4   // The color's rgbReserved member (alpha) contains the palette index to be used
+;   FI_COLOR_SET_ALPHA        = 8   // No blending: a 32-bit image gets the color's alpha
 
    pColor := 0
    If (RGBArray!="")
@@ -652,10 +655,8 @@ FreeImage_FillBackground(hImage, RGBArray:="255,255,255,0", options:=1, applyAlp
       NumPut(RGBA[1], RGBQUAD, 2, "UChar")
       NumPut(RGBA[4], RGBQUAD, 3, "UChar")
       pColor := &RGBQUAD
-      If (applyAlpha=-1)
-         applyAlpha := RGBA[4]
    }
-   Return DllCall(getFIMfunc("FillBackground"), "UPtr", hImage, "UPtr", pColor, "Int", options, "Int", applyAlpha)
+   Return DllCall(getFIMfunc("FillBackground"), "UPtr", hImage, "UPtr", pColor, "Int", options)
 }
 
 ; === File type functions ===
@@ -1842,8 +1843,8 @@ getFIMfunc(funct) {
    Static fList0 := "|CreateTag|DeInitialise|GetCopyrightMessage|GetFIFCount|GetVersion|IsLittleEndian|"
         , fList4 := "|Clone|CloneTag|CloseMemory|ConvertTo16Bits555|ConvertTo16Bits565|ConvertTo24Bits|ConvertTo32Bits|ConvertTo4Bits|ConvertTo8Bits|ConvertToFloat|ConvertToGreyscale|ConvertToRGB16|ConvertToRGBA16|ConvertToRGBAF|ConvertToRGBF|ConvertToUINT16|DeleteTag|DestroyICCProfile|FIFSupportsICCProfiles|FIFSupportsNoPixels|FIFSupportsReading|FIFSupportsWriting|FindCloseMetadata|FlipHorizontal|FlipVertical|GetBits|GetBlueMask|GetBPP|GetColorsUsed|GetColorType|GetDIBSize|GetDotsPerMeterX|GetDotsPerMeterY|GetFIFDescription|GetFIFExtensionList|GetFIFFromFilename|GetFIFFromFilenameU|GetFIFFromFormat|GetFIFFromMime|GetFIFMimeType|GetFIFRegExpr|GetFormatFromFIF|GetGreenMask|GetHeight|GetICCProfile|GetImageType|GetInfo|GetInfoHeader|GetLine|GetMemorySize|GetPageCount|GetPalette|GetPitch|GetRedMask|GetTagCount|GetTagDescription|GetTagID|GetTagKey|GetTagLength|GetTagType|GetTagValue|GetThumbnail|GetTransparencyCount|GetTransparencyTable|GetTransparentIndex|GetWidth|HasBackgroundColor|HasPixels|HasRGBMasks|Initialise|Invert|IsPluginEnabled|IsTransparent|PreMultiplyWithAlpha|SetOutputMessage|SetOutputMessageStdCall|TellMemory|Unload|"
         , fList8 := "|AppendPage|AppendPageEx|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToStandardType|DeletePage|DeletePageEx|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetChannel|GetComplexChannel|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
-        , fList12 := "|AcquireMemory|AdjustBrightness|AdjustContrast|AdjustCurve|AdjustGamma|ConvertLine16_555_To16_565|ConvertLine16_565_To16_555|ConvertLine16To24_555|ConvertLine16To24_565|ConvertLine16To32_555|ConvertLine16To32_565|ConvertLine16To4_555|ConvertLine16To4_565|ConvertLine16To8_555|ConvertLine16To8_565|ConvertLine1To4|ConvertLine1To8|ConvertLine24To16_555|ConvertLine24To16_565|ConvertLine24To32|ConvertLine24To4|ConvertLine24To8|ConvertLine32To16_555|ConvertLine32To16_565|ConvertLine32To24|ConvertLine32To4|ConvertLine32To8|ConvertLine4To8|ConvertToType|CreateICCProfile|FindFirstMetadata|GetFileTypeFromHandle|GetHistogram|GetLockedPageNumbers|InsertPage|InsertPageEx|Load|LoadFromMemory|LoadMultiBitmapFromMemory|LoadU|MakeThumbnail|MovePage|SeekMemory|SetChannel|SetComplexChannel|SetTransparencyTable|SwapPaletteIndices|TagToString|UnlockPage|ValidateFromHandle|ZLibCRC32|"
-        , fList16 := "|Composite|ConvertLine1To16_555|ConvertLine1To16_565|ConvertLine1To24|ConvertLine1To32|ConvertLine4To16_555|ConvertLine4To16_565|ConvertLine4To24|ConvertLine4To32|ConvertLine8To16_555|ConvertLine8To16_565|ConvertLine8To24|ConvertLine8To32|ConvertLine8To4|FillBackground|GetMetadata|GetPixelColor|GetPixelIndex|JPEGTransform|JPEGTransformU|LoadFromHandle|LookupSVGColor|LookupX11Color|OpenMultiBitmapFromHandle|ReadMemory|Rescale|Rotate|Save|SaveMultiBitmapToMemory|SaveToMemory|SaveU|SetMetadata|SetMetadataKeyValue|SetPixelColor|SetPixelIndex|SwapColors|WriteMemory|ZLibCompress|ZLibGUnzip|ZLibGZip|ZLibUncompress|"
+        , fList12 := "|AcquireMemory|AdjustBrightness|AdjustContrast|AdjustCurve|AdjustGamma|ConvertLine16_555_To16_565|ConvertLine16_565_To16_555|ConvertLine16To24_555|ConvertLine16To24_565|ConvertLine16To32_555|ConvertLine16To32_565|ConvertLine16To4_555|ConvertLine16To4_565|ConvertLine16To8_555|ConvertLine16To8_565|ConvertLine1To4|ConvertLine1To8|ConvertLine24To16_555|ConvertLine24To16_565|ConvertLine24To32|ConvertLine24To4|ConvertLine24To8|ConvertLine32To16_555|ConvertLine32To16_565|ConvertLine32To24|ConvertLine32To4|ConvertLine32To8|ConvertLine4To8|ConvertToType|CreateICCProfile|FillBackground|FindFirstMetadata|GetFileTypeFromHandle|GetHistogram|GetLockedPageNumbers|InsertPage|InsertPageEx|Load|LoadFromMemory|LoadMultiBitmapFromMemory|LoadU|MakeThumbnail|MovePage|SeekMemory|SetChannel|SetComplexChannel|SetTransparencyTable|SwapPaletteIndices|TagToString|UnlockPage|ValidateFromHandle|ZLibCRC32|"
+        , fList16 := "|Composite|ConvertLine1To16_555|ConvertLine1To16_565|ConvertLine1To24|ConvertLine1To32|ConvertLine4To16_555|ConvertLine4To16_565|ConvertLine4To24|ConvertLine4To32|ConvertLine8To16_555|ConvertLine8To16_565|ConvertLine8To24|ConvertLine8To32|ConvertLine8To4|GetMetadata|GetPixelColor|GetPixelIndex|JPEGTransform|JPEGTransformU|LoadFromHandle|LookupSVGColor|LookupX11Color|OpenMultiBitmapFromHandle|ReadMemory|Rescale|Rotate|Save|SaveMultiBitmapToMemory|SaveToMemory|SaveU|SetMetadata|SetMetadataKeyValue|SetPixelColor|SetPixelIndex|SwapColors|WriteMemory|ZLibCompress|ZLibGUnzip|ZLibGZip|ZLibUncompress|"
         , fList20 := "|ApplyPaletteIndexMapping|ColorQuantizeEx|Copy|CreateView|Paste|RegisterExternalPlugin|RegisterLocalPlugin|SaveMultiBitmapToHandle|SaveToHandle|TmoDrago03|TmoFattal02|TmoReinhard05|"
         , fList24 := "|Allocate|ApplyColorMapping|ConvertLine1To32MapTransparency|ConvertLine4To32MapTransparency|ConvertLine8To32MapTransparency|JPEGCrop|JPEGCropU|OpenMultiBitmap|OpenMultiBitmapU|ToneMapping|"
         , fList28 := "|AllocateHeader|AllocateT|EnlargeCanvas|"

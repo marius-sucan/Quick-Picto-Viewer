@@ -22452,8 +22452,8 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       nmgpx := Round((w * h)/1000000, 1)
       showTOOLtip("Creating a new " givenQuality "-bits image:`n" w " x " h " pixels`n" nmgpx " megapixels`nPlease wait...")
       hFIFimgA := FreeImage_Allocate(w, h, givenQuality)
-      If hFIFimgA
-         FreeImage_FillBackground(hFIFimgA, allowUndo, 1, -1)
+      If (hFIFimgA && allowUndo)
+         FreeImage_FillBackground(hFIFimgA, allowUndo, 8) ; FI_COLOR_SET_ALPHA
    } Else If (modus="crop")
    {
       nmgpx := Round((zw * zh)/1000000, 1)
