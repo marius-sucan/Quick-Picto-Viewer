@@ -19,7 +19,8 @@
 // 2 a refused page; 3 the discard on abort; 4 the EXIF WebP and MNG take from the first
 // page unless it is dropped; 5 sub-frames of an animation; 6 memory, collected vs streamed;
 // 7 (added 2026-09-23) TIFF: every image type reads back as it went in, whatever the depth
-// choice, except the ones TIFF cannot store; EXIF thumbnails; the tags libtiff reads.
+// choice, except the ones TIFF cannot store; EXIF thumbnails; the tags libtiff reads, which
+// need a fork build from aae78cf on (the TIFF writer's ExtraSamples fix).
 // The .part renaming and the non-ASCII path handling are Windows-only and not covered.
 // written by Marius Șucan with Claude Opus 5
 
@@ -701,9 +702,10 @@ static void partTiff(const char *jpegPath) {
             CHECK(dirs.size() == src.size(), "tiff: libtiff reads %zu directories", dirs.size());
             for (size_t i = 0; i < dirs.size() && i < src.size(); i++) {
                 printTiffDir(src[i].name, dirs[i]);
-                // known fork defects: these pages go out without their ExtraSamples tag
-                const bool known = (strstr(src[i].name, "8-bit") && strstr(src[i].name, "+tRNS")) || !strcmp(src[i].name, "RGBAF");
-                CHECK(!dirs[i].warnings == !known, "tiff: \"%s\" %s", src[i].name, known ? "no longer warns, the writer may be fixed" : "warned");
+                CHECK(!dirs[i].warnings, "tiff: libtiff warned about \"%s\"", src[i].name);
+                // 8-bit + alpha and RGBAF pages carry the tag since the fork's aae78cf
+                const bool alpha = (dirs[i].spp == 2) || (dirs[i].spp == 4 && dirs[i].photo == PHOTOMETRIC_RGB);
+                CHECK(!alpha || (dirs[i].extra == 1 && dirs[i].extraType == EXTRASAMPLE_UNASSALPHA), "tiff: \"%s\" does not mark its alpha", src[i].name);
                 CHECK(!dirs[i].subifd, "tiff: \"%s\" has a SubIFD", src[i].name);
                 CHECK(dirs[i].comp == ((dirs[i].bps == 1) ? COMPRESSION_CCITTFAX4 : COMPRESSION_LZW), "tiff: \"%s\" compression %u", src[i].name, dirs[i].comp);
             }
