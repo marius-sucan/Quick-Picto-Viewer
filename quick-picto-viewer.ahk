@@ -62456,7 +62456,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
 ; Every page goes into the multi-page bitmap as soon as it is loaded, and is unloaded right
 ; after: FreeImage keeps the pages in its cache, compressed in the format of the file. The
 ; file is written under a temporary name and replaces the destination only once complete.
-   Static fmtz := {3:[39, "apng"], 4:[25, "gif"], 5:[35, "webp"], 6:[6, "mng"]}   ; FIF_APNG, FIF_GIF, FIF_WEBP, FIF_MNG
+   Static fmtz := {1:[18, "tiff"], 3:[39, "apng"], 4:[25, "gif"], 5:[35, "webp"], 6:[6, "mng"]}   ; FIF_TIFF, FIF_APNG, FIF_GIF, FIF_WEBP, FIF_MNG
    fif := fmtz[userFmt, 1]
    fmt := fmtz[userFmt, 2]
    If !fif
@@ -62823,23 +62823,29 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
    If !k
       Return 0
 
-   k := FIMapplyToneMapper(k, GFT, FreeImage_GetBPP(k), FreeImage_GetColorType(k), 1, hasAppliedToneMap)
-   imgType := FreeImage_GetImageType(k)
-   If (imgType!=1)   ; FIT_BITMAP
+   ; TIFF [FIF_TIFF=18] stores every image type as it is: 16 bits per channel, floating point...
+   If (fif!=18)
    {
-      ; floating point RGB [FIT_RGBF=11, FIT_RGBAF=12] can only be tone mapped [FITMO_DRAGO03=0] into FIT_BITMAP [1]
-      hFIFimgX := (imgType=11 || imgType=12) ? FreeImage_ToneMapping(k, 0) : FreeImage_ConvertToType(k, 1)
-      FreeImage_UnLoad(k)
-      k := hFIFimgX
-      If !k
-         Return 0
+      k := FIMapplyToneMapper(k, GFT, FreeImage_GetBPP(k), FreeImage_GetColorType(k), 1, hasAppliedToneMap)
+      imgType := FreeImage_GetImageType(k)
+      If (imgType!=1)   ; FIT_BITMAP
+      {
+         ; floating point RGB [FIT_RGBF=11, FIT_RGBAF=12] can only be tone mapped [FITMO_DRAGO03=0] into FIT_BITMAP [1]
+         hFIFimgX := (imgType=11 || imgType=12) ? FreeImage_ToneMapping(k, 0) : FreeImage_ConvertToType(k, 1)
+         FreeImage_UnLoad(k)
+         k := hFIFimgX
+         If !k
+            Return 0
+      }
    }
 
    FreeImage_GetImageDimensions(k, imgW, imgH)
    newW := setW ? setW : imgW
    newH := setH ? setH : imgH
    capIMGdimensionsFormatlimits(fmt, 1, newW, newH)
-   If (newW!=imgW || newH!=imgH)
+   ; FreeImage_Rescale() returns a blank page for FIT_INT16, FIT_UINT32, FIT_INT32, FIT_DOUBLE and
+   ; FIT_COMPLEX [3, 4, 5, 7, 8], which only TIFF keeps as they are: such a page keeps its size
+   If ((newW!=imgW || newH!=imgH) && !isVarEqualTo(FreeImage_GetImageType(k), 3, 4, 5, 7, 8))
    {
       ; before the colour depth conversion: resizing turns palettised pages into 24 bits
       hFIFimgX := trFreeImage_Rescale(k, newW, newH)
@@ -62862,6 +62868,9 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
    Loop, 12
       FreeImage_SetMetadata(k, 0, A_Index - 1, "")
 
+   ; so does an embedded thumbnail [EXIF, PSD...], which TIFF would store along with the page
+   FreeImage_SetThumbnail(k, 0)
+
    tag := FreeImage_CreateTag()
    If tag
    {
@@ -62881,11 +62890,25 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
 
 combineFimImgsConvertDepth(k, modus, fif) {
 ; Returns the page at the colour depth chosen in the panel, or nothing when k can go in as it
-; is. GIF [FIF_GIF=25] holds 1, 4 or 8 bits only and ignores the choice. A depth the format
-; cannot hold [16 bits in any, 8 bits in WebP] goes in as 24 bits, with its colours reduced.
+; is. GIF [FIF_GIF=25] holds 1, 4 or 8 bits only and ignores the choice. TIFF [FIF_TIFF=18]
+; ignores it too, and converts only the pages it cannot store. A depth the format cannot
+; hold [16 bits in any, 8 bits in WebP] goes in as 24 bits, with its colours reduced.
    bpp := FreeImage_GetBPP(k)
    If (fif=25)
       Return (bpp=1 || bpp=4 || bpp=8) ? "" : combineFimQuantize(k)
+
+   If (fif=18)
+   {
+      ; the depth check would flatten the other image types [RGB16, RGBF...] into 24 bits
+      If (FreeImage_GetImageType(k)!=1)   ; FIT_BITMAP
+         Return
+
+      ; TIFF keeps the transparency of 8 bits pages only, and FreeImage_ConvertTo8Bits() drops it
+      If (bpp<8 && FreeImage_IsTransparent(k))
+         Return FreeImage_ConvertTo(k, "32Bits")
+
+      Return FreeImage_FIFSupportsExportBPP(fif, bpp) ? "" : FreeImage_ConvertTo(k, "24Bits")
+   }
 
    If (modus=1 && bpp!=32)
       hFIFimgC := FreeImage_ConvertTo(k, "32Bits")
