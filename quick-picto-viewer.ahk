@@ -60979,6 +60979,26 @@ FIMrescaleOBJbmp(hFIFimgC, imgW, imgH, indexu, sizesDesired) {
    Return hFIFimgX
 }
 
+FIMdropMismatchedICC(hImage) {
+; Drops an ICC profile too short to be one, or made for another colour space than the pixels:
+; the PNG writer refuses to save it, the others embed it. FreeImage builds older than the fork's
+; cd91101 leave the profile of a CMYK JPEG on the RGB pixels they load.
+   pProfile := FreeImage_GetICCProfile(hImage)
+   size := pProfile ? NumGet(pProfile+0, 4, "UInt") : 0
+   pData := size ? NumGet(pProfile+0, 8, "UPtr") : 0
+   If !pData
+      Return
+
+   If (NumGet(pProfile+0, 0, "UShort") & 1)   ; FIICC_COLOR_IS_CMYK
+      space := "CMYK"
+   Else   ; FIC_MINISWHITE = 0, FIC_MINISBLACK = 1
+      space := (FreeImage_GetColorType(hImage, 0)<=1) ? "GRAY" : "RGB "
+
+   ; the colour space is at byte 16 of the 128-byte header; a profile holds at least 132 bytes
+   If (size<132 || StrGet(pData + 16, 4, "CP0")!=space)
+      FreeImage_DestroyICCProfile(hImage)
+}
+
 FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
    loadArgs := 0
    GFT := FreeImage_GetFileType(imgPath)
@@ -61114,6 +61134,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
       Return -1
    }
 
+   FIMdropMismatchedICC(hFIFimgA)
    If (doVPflips=1)
    {
       If (FlipImgH=1)
@@ -62863,6 +62884,7 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
       k := hFIFimgX
    }
 
+   FIMdropMismatchedICC(k)
    ; the metadata describes the source image, not the new file: FIMD_COMMENTS [0] to FIMD_EXIF_RAW [11];
    ; WebP would carry the EXIF of the first page, GPS and orientation included
    Loop, 12
@@ -98168,6 +98190,7 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
        Return "err"
     }
 
+    FIMdropMismatchedICC(hFIFimgA)
     If (SimpleOperationsDoCrop=1 && editingSelectionNow=1)
     {
        If (relativeImgSelCoords=1 && editingSelectionNow=1)
@@ -98313,6 +98336,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
        Return "err"
     }
 
+    FIMdropMismatchedICC(hFIFimgA)
     bpp := FreeImage_GetBPP(hFIFimgA)
     If (bpp!=24 && bpp!=32)
     {

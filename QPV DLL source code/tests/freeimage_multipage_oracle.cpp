@@ -9,18 +9,20 @@
 //   FI=~/repos/FreeImage-library
 //   g++ -O2 freeimage_multipage_oracle.cpp -o freeimage_multipage_oracle -I$FI/Dist -I$FI/Source/LibTIFF4 $FI/Dist/libfreeimage.a -fopenmp -lpthread
 //   ./freeimage_multipage_oracle ~/repos/FreeImage-library/TestAPI/exif.jpg
-//   ./freeimage_multipage_oracle --tiff ~/repos/FreeImage-library/TestAPI/exif.jpg   (part 7 only)
+//   ./freeimage_multipage_oracle --tiff ~/repos/FreeImage-library/TestAPI/exif.jpg   (parts 7 and 8 only)
 //
 // Each prepare step mirrors an AHK function:
 //   normalize()      - combineFimImgsAddPage(): tone mapping or ConvertToType() for non-FIT_BITMAP pages
 //   convertDepth()   - combineFimImgsConvertDepth()
 //   tagPage()        - combineFimImgsAddPage(): metadata models 0-11 and the thumbnail dropped, FrameTime set
+//   dropMismatchedICC() - FIMdropMismatchedICC()
 // Parts: 1 every source kind x depth x format goes in and reads back with its FrameTime;
 // 2 a refused page; 3 the discard on abort; 4 the EXIF WebP and MNG take from the first
 // page unless it is dropped; 5 sub-frames of an animation; 6 memory, collected vs streamed;
 // 7 (added 2026-09-23) TIFF: every image type reads back as it went in, whatever the depth
 // choice, except the ones TIFF cannot store; EXIF thumbnails; the tags libtiff reads, which
-// need a fork build from aae78cf on (the TIFF writer's ExtraSamples fix).
+// need a fork build from aae78cf on (the TIFF writer's ExtraSamples fix); 8 ICC profiles made
+// for another colour space than the page, which the PNG writer refuses.
 // The .part renaming and the non-ASCII path handling are Windows-only and not covered.
 // written by Marius Șucan with Claude Opus 5
 
@@ -35,6 +37,7 @@
 #include <vector>
 #include <string>
 #include <stdarg.h>
+#include <stddef.h>
 #include "FreeImage.h"
 #include "tiffio.h"
 
@@ -185,11 +188,24 @@ static void tagPage(FIBITMAP *k, LONG frameTime, bool strip) {
 }
 
 // combineFimImgsAddPage(): takes ownership of k
-static BOOL addPage(FIMULTIBITMAP *multi, FIBITMAP *k, FREE_IMAGE_FORMAT fif, int modus, LONG frameTime, bool strip = true) {
+// FIMdropMismatchedICC(): the AHK reads the FIICCPROFILE fields at these offsets
+static_assert(offsetof(FIICCPROFILE, flags) == 0 && offsetof(FIICCPROFILE, size) == 4 && offsetof(FIICCPROFILE, data) == 8, "FIICCPROFILE layout");
+
+static void dropMismatchedICC(FIBITMAP *k) {
+    FIICCPROFILE *p = FreeImage_GetICCProfile(k);
+    const unsigned size = p ? p->size : 0;
+    const BYTE *data = size ? (const BYTE*)p->data : NULL;
+    if (!data) return;
+    const char *space = (p->flags & FIICC_COLOR_IS_CMYK) ? "CMYK" : (FreeImage_GetColorType(k) <= FIC_MINISBLACK) ? "GRAY" : "RGB ";
+    if (size < 132 || memcmp(data + 16, space, 4) != 0) FreeImage_DestroyICCProfile(k);
+}
+
+static BOOL addPage(FIMULTIBITMAP *multi, FIBITMAP *k, FREE_IMAGE_FORMAT fif, int modus, LONG frameTime, bool strip = true, bool dropICC = true) {
     k = normalize(k, fif);
     if (!k) return FALSE;
     FIBITMAP *c = convertDepth(k, modus, fif);
     if (c) { FreeImage_Unload(k); k = c; }
+    if (dropICC) dropMismatchedICC(k);
     tagPage(k, frameTime, strip);
     BOOL r = FreeImage_AppendPageEx(multi, k);
     FreeImage_Unload(k);
@@ -829,6 +845,104 @@ static void partTiff(const char *jpegPath) {
     for (size_t i = 0; i < src.size(); i++) FreeImage_Unload(src[i].dib);
 }
 
+// ---- part 8: an ICC profile made for another colour space than the page ----
+// FreeImage builds older than the fork's cd91101 leave the CMYK profile of a CMYK JPEG on
+// the RGB pixels they load: a PNG save and the MNG writer refuse such a page, TIFF embeds it.
+// APNG does not: it converts its frames to 32 bits, which drops the profile.
+
+// a header libpng accepts in every field but, where it does not fit, the colour space
+static void attachProfile(FIBITMAP *d, const char *space, unsigned size) {
+    static const BYTE d50[12] = {0, 0, 0xF6, 0xD6, 0, 1, 0, 0, 0, 0, 0xD3, 0x2D};
+    std::vector<BYTE> icc(size, 0);
+    icc[0] = (BYTE)(size >> 24);
+    icc[1] = (BYTE)(size >> 16);
+    icc[2] = (BYTE)(size >> 8);
+    icc[3] = (BYTE)size;
+    if (size >= 20) memcpy(&icc[16], space, 4);
+    if (size >= 132) {
+        icc[8] = 2;
+        icc[9] = 0x10;
+        memcpy(&icc[12], "mntr", 4);
+        memcpy(&icc[20], "XYZ ", 4);
+        memcpy(&icc[36], "acsp", 4);
+        memcpy(&icc[68], d50, sizeof d50);
+    }
+    FreeImage_CreateICCProfile(d, icc.data(), (long)size);
+}
+
+struct IccCase { const char *name; FIBITMAP *dib; bool keep; };
+
+static void partICC() {
+    printf("\n== part 8: ICC profiles made for another colour space than the page ==\n");
+    FIBITMAP *s24 = make24(64, 48, 3);
+    FIBITMAP *grey = FreeImage_ConvertToGreyscale(s24);
+    FIBITMAP *pal = FreeImage_ColorQuantize(s24, FIQ_WUQUANT);
+    std::vector<IccCase> cases;
+    auto add = [&](const char *n, FIBITMAP *d, const char *space, unsigned size, bool keep) {
+        attachProfile(d, space, size);
+        cases.push_back({n, d, keep});
+    };
+    add("24-bit + CMYK", FreeImage_Clone(s24), "CMYK", 1024, false);
+    add("24-bit + RGB", FreeImage_Clone(s24), "RGB ", 1024, true);
+    add("24-bit + short RGB", FreeImage_Clone(s24), "RGB ", 100, false);
+    add("8-bit grey + RGB", FreeImage_Clone(grey), "RGB ", 1024, false);
+    add("8-bit grey + GRAY", FreeImage_Clone(grey), "GRAY", 1024, true);
+    add("8-bit palette + RGB", FreeImage_Clone(pal), "RGB ", 1024, true);
+    add("8-bit palette + GRAY", FreeImage_Clone(pal), "GRAY", 1024, false);
+    add("UINT16 + GRAY", FreeImage_ConvertToUINT16(s24), "GRAY", 1024, true);
+    add("RGB16 + RGB", FreeImage_ConvertToRGB16(s24), "RGB ", 1024, true);
+    add("RGBF + CMYK", FreeImage_ConvertToRGBF(s24), "CMYK", 1024, false);
+    add("32-bit + Lab", FreeImage_ConvertTo32Bits(s24), "Lab ", 1024, false);
+
+    // TIFF keeps every page as it is, so the guard alone decides what each one carries
+    char tmp[256];
+    snprintf(tmp, sizeof tmp, "%s/p8-icc.tif.part", OUT);
+    unlink(tmp);
+    FIMULTIBITMAP *m = FreeImage_OpenMultiBitmap(FIF_TIFF, tmp, TRUE, FALSE, TRUE, 0);
+    for (auto &c : cases) CHECK(addPage(m, FreeImage_Clone(c.dib), FIF_TIFF, 2, 100), "tiff: \"%s\" refused", c.name);
+    CHECK(FreeImage_CloseMultiBitmap(m, 0), "tiff: the close failed");
+    m = FreeImage_OpenMultiBitmap(FIF_TIFF, tmp, FALSE, TRUE, TRUE, 0);
+    for (int i = 0; m && i < (int)cases.size(); i++) {
+        FIBITMAP *p = FreeImage_LockPage(m, i);
+        const unsigned got = p ? (unsigned)FreeImage_GetICCProfile(p)->size : 0;
+        const unsigned want = cases[i].keep ? (unsigned)FreeImage_GetICCProfile(cases[i].dib)->size : 0;
+        printf("    %-22s profile %s\n", cases[i].name, got ? "kept" : "dropped");
+        CHECK(p && got == want, "tiff: \"%s\" has a %u-byte profile, expected %u", cases[i].name, got, want);
+        if (p) FreeImage_UnlockPage(m, p, FALSE);
+    }
+    if (m) FreeImage_CloseMultiBitmap(m, 0);
+
+    // a plain PNG save, as the format converter makes one, takes a page only with a fitting profile
+    for (auto &c : cases) {
+        if (!FreeImage_FIFSupportsExportType(FIF_PNG, FreeImage_GetImageType(c.dib))) continue;
+        for (int guard = 0; guard <= 1; guard++) {
+            FIBITMAP *k = FreeImage_Clone(c.dib);
+            if (guard) dropMismatchedICC(k);
+            snprintf(tmp, sizeof tmp, "%s/p8-png.part", OUT);
+            const BOOL saved = FreeImage_Save(FIF_PNG, k, tmp, 0);
+            FreeImage_Unload(k);
+            CHECK(saved == (guard || c.keep), "png: \"%s\" %s %s", c.name, guard ? "with the guard" : "without it", saved ? "saved" : "was refused");
+        }
+    }
+
+    // at 24 bits a 24-bit page goes into MNG unconverted, profile and all
+    for (int guard = 0; guard <= 1; guard++) {
+        snprintf(tmp, sizeof tmp, "%s/p8-cmyk-guard%d.mng.part", OUT, guard);
+        unlink(tmp);
+        m = FreeImage_OpenMultiBitmap(FIF_MNG, tmp, TRUE, FALSE, TRUE, 0);
+        BOOL a = addPage(m, FreeImage_Clone(cases[0].dib), FIF_MNG, 2, 100, true, guard == 1);
+        BOOL b = addPage(m, FreeImage_Clone(s24), FIF_MNG, 2, 100, true, guard == 1);
+        FreeImage_CloseMultiBitmap(m, 0);
+        printf("mng  %-15s the page with a CMYK profile %s\n", guard ? "with the guard:" : "without it:", a ? "goes in" : "is REFUSED");
+        CHECK(b, "mng: a plain page was refused");
+        CHECK(guard ? a : !a, "mng: the CMYK page %s", guard ? "was refused with the guard" : "went in without the guard, so the check proves nothing");
+    }
+    for (auto &c : cases) FreeImage_Unload(c.dib);
+    FreeImage_Unload(s24);
+    FreeImage_Unload(grey);
+    FreeImage_Unload(pal);
+}
+
 int main(int argc, char **argv) {
     FreeImage_Initialise(FALSE);
     FreeImage_SetOutputMessage(quietMessages);
@@ -842,6 +956,7 @@ int main(int argc, char **argv) {
     printf("FreeImage %s\n", FreeImage_GetVersion());
     if (argc >= 2 && strcmp(argv[1], "--tiff") == 0) {
         partTiff(argc > 2 ? argv[2] : "exif.jpg");
+        partICC();
         printf("\n%s: %d failure(s)\n", g_fail ? "FAILED" : "PASSED", g_fail);
         FreeImage_DeInitialise();
         return g_fail ? 1 : 0;
@@ -854,6 +969,7 @@ int main(int argc, char **argv) {
     partMetadata(argc > 1 ? argv[1] : "exif.jpg");
     partSubFrames();
     partTiff(argc > 1 ? argv[1] : "exif.jpg");
+    partICC();
     partMemory(argv[0]);
 
     for (size_t i = 0; i < src.size(); i++) FreeImage_Unload(src[i].dib);
