@@ -1229,13 +1229,19 @@ FreeImage_SetDisplayICCProfile(pProfile:=0, profileSize:=0, flags:=0x101) {
    Return DllCall(getFIMfunc("SetDisplayICCProfile"), "UPtr", pProfile, "UInt", profileSize, "Int", flags)
 }
 
-FreeImage_GetDisplayICCProfile(ByRef buf) {
-; copies the profile FIF_LOAD_DISPLAY_ICC converts to into buf; returns its byte count
+FreeImage_GetDisplayICCProfile(ByRef size) {
+; returns a pointer to the profile FIF_LOAD_DISPLAY_ICC converts to, valid until the next call; size receives its byte count
+   Static buf
    size := DllCall(getFIMfunc("GetDisplayICCProfile"), "UPtr", 0, "UInt", 0, "UInt")
    VarSetCapacity(buf, size, 0)
-   Return size ? DllCall(getFIMfunc("GetDisplayICCProfile"), "UPtr", &buf, "UInt", size, "UInt") : 0
+   ; 0 when the profile changed between the two calls
+   If (!size || DllCall(getFIMfunc("GetDisplayICCProfile"), "UPtr", &buf, "UInt", size, "UInt")!=size)
+   {
+      size := 0
+      Return 0
+   }
+   Return &buf
 }
-
 
 ; === Plugin functions ===
 
