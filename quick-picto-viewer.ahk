@@ -99422,9 +99422,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      loadArgs := 0x8000  ; FIF_LOAD_NOPIXELS
   Else If (userPerformColorManagement=1)
      loadArgs := loadArgs | 0x4000  ; FIF_LOAD_DISPLAY_ICC
-pfsize := FreeImage_GetDisplayICCProfile(&pzvu)
-pfname := FreeImage_GetICCProfileDescription(pzvu, pfsize)
-fnOutputDebug(A_ThisFunc ": " pfsize "|" pfname)
+
   If (FreeImage_FIFSupportsNoPixels(GFT) && loadArgs!=0x8000 && screenMode=1)
   {
      ; test image size, load no pixels data, flag 0x8000

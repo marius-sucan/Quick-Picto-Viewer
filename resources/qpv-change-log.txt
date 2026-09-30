@@ -9,6 +9,7 @@
   - [new] ability to join images as animated WEBP, APNG or MNG, in addition to GIF, TIFF and PDF
   - [new] ability to set delay per frame when creating animated images
   - much improved joining images as PDF
+  - color management works through FreeImage loaded files as well 
   - fixed the animations playback
 
 - v6.3.00 (2026-08-31)
