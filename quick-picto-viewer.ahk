@@ -127,9 +127,9 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , userPossibleWriteFMTs := ".BMP|.GIF|.HDP|.J2K|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM"
    , saveimgformatslist := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jng", 6:"jp2", 7:"jpg", 8:"jxr", 9:"png", 10:"ppm", 11:"tga", 12:"tif", 13:"wdp", 14:"webp", 15:"xpm"}
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0
-   , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC"
+   , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", brushAclrAlpha := "ffFFff"
    , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := ""
-   , lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0, prevFilesSortMode, brushAclrAlpha := "ffFFff"
+   , lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0, prevFilesSortMode
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", forcedAnimPlayPath := ""
    , cachedAllSessionsSeen := new hashtable()
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
@@ -254,7 +254,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , FillAreaOpacity := 250, FillAreaColor := OSDbgrColor, FillAreaShape := 1, FillAreaInverted := 0
    , PasteInPlaceAlignment := 3, PasteInPlaceOpacity := 255, PasteInPlaceAdaptMode := 1, PasteInPlaceQuality := 1
    , PasteInPlaceOrientation := 4, showImgAnnotations := 0, blurAreaSoftEdges := 1, BlurAreaInverted := 0
-   , PasteInPlaceBlurAmount := 0, PasteInPlaceCropSel := 1
+   , PasteInPlaceBlurAmount := 0, PasteInPlaceCropSel := 1, userCombineTiffKeepOrig := 1
 
 Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0, PasteInPlaceLight := 0
    , EllipseSelectMode := 0, thumbsListViewMode := 1, userimgGammaCorrect := 0, FillAreaGradientAngle := 0
@@ -15211,7 +15211,11 @@ trFreeImage_Rescale(hImage, w, h, filter:=3) {
    z := A_TickCount
    a := OpenCV_FimResizeBitmap(hImage, w, h, 0, 0, 0, 0, clampInRange(filter - 1, 0, 3))
    If !a
+   {
+      If (filter=0)
+         filter := -1 ; nearest neighbour
       a := FreeImage_Rescale(hImage, w, h, filter)
+   }
    ; fnOutputDebug(A_ThisFunc ": q=" filter " zeit " A_TickCount - z)
    Return a
 }
@@ -17744,7 +17748,7 @@ AdjustColorsSimpleSelectedArea() {
     pB := GetPathRelativeBounds(pPath, imgSelPx, imgSelPy)
     imgSelPx := pB.x,  imgSelPy := pB.y
     imgSelW  := pB.w,  imgSelH  := pB.h
-    If (EraseAreaInvert=1)
+    If (userImgAdjustInvertArea=1)
     {
        imgSelPx := 0,     imgSelPy := 0
        imgSelW  := imgW,  imgSelH  := imgH
@@ -17756,14 +17760,13 @@ AdjustColorsSimpleSelectedArea() {
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, newBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     xBitmap := trGdip_CloneBitmap(A_ThisFunc, zBitmap)
 
-    thisMode := (EraseAreaInvert=1) ? 4 : 0
+    thisMode := (userImgAdjustInvertArea=1) ? 4 : 0
     Gdip_SetClipPath(G2, pPath, thisMode)
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
 
     threB := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreB
     threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
     QPV_AdjustImageColors(zBitmap, imgColorsFXopacity, userImgAdjustInvertColors, userImgAdjustAltSat, userImgAdjustSat, userImgAdjustAltBright, userImgAdjustBright, userImgAdjustAltContra, userImgAdjustContra, userImgAdjustAltHiLows, userImgAdjustShadows, userImgAdjustHighs, userImgAdjustHue, userImgAdjustTintDeg, userImgAdjustTintAmount, userImgAdjustAltTint, userImgAdjustGamma, userImgAdjustOffR, userImgAdjustOffG, userImgAdjustOffB, userImgAdjustOffA, userImgAdjustThreR, ThreG, ThreB, userImgAdjustThreA, userImgAdjustSeeThrough, userImgAdjustInvertArea, userImgAdjustNoClamp, userImgAdjustWhitePoint, userImgAdjustBlackPoint, userImgAdjustNoisePoints, 0)
-
     If (allowAlphaMasking=1)
     {
        realtimePasteInPlaceAlphaMasker(0, zBitmap, "lol", nowBitmap, 0, 0, 0, 0, 0, xBitmap, 0)
@@ -22000,7 +22003,6 @@ HugeImagesApplyPasteInPlace() {
                hFIFimgA := FreeImage_Crop(viewportQPVimage.imgHandle, x1, y1, w, h)
             Else
                hFIFimgA := FreeImage_CroppedView(viewportQPVimage.imgHandle, x1, y1, w, h)
-            ; hFIFimgA := FreeImage_RescaleRect(viewportQPVimage.imgHandle, dw, dh, x1, y1, w, h, thisQuality)
          }
       } Else If oldSelectionArea[11]
       {
@@ -43820,10 +43822,13 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, userJoinIMGsW
    GuiControl, % actu, userJoinIMGsH
 
-   actu := (userCombineFramesFmt=1 && userSaveBitsDepth>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   actu := (userCombineFramesFmt=1 && userSaveBitsDepth>2 && userCombineTiffKeepOrig=0) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userCombineDepthDithering
 
-   actu := (userCombineFramesFmt=1 || userCombineFramesFmt>2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (userCombineFramesFmt=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   GuiControl, % actu, userCombineTiffKeepOrig
+
+   actu := (userCombineFramesFmt=1 && userCombineTiffKeepOrig=0 || userCombineFramesFmt>2) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, txtLine1
    GuiControl, % actu, userSaveBitsDepth
 
@@ -43893,6 +43898,7 @@ PanelCombineImagesMultipage() {
     Gui, Add, Text, x+15 y+15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
     Gui, Add, Text, xs+15 y+10 w%ml% +0x200 +hwndhTemp, File format on save:
     GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".tiff|.pdf|.apng|.gif|.webp|.mng", [hTemp])
+    Gui, Add, Checkbox, x+5 hp gBtnChangeMultiPageFmt Checked%userCombineTiffKeepOrig% vuserCombineTiffKeepOrig, Embed originals
     Gui, Add, Checkbox, xs+15 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
@@ -43913,12 +43919,11 @@ PanelCombineImagesMultipage() {
     Gui, Add, UpDown, vuserJoinIMGsH Range2-32000, % userJoinIMGsH
 
     Gui, Tab, 2
-    thisWid := (PrefsLargeFonts=1) ? 145 : 115
+    ml -= 15
     Gui, Add, Text, x+15 y+15 w%ml% Section vtxtLine3 +hwndhTemp, PDF page size:
-    GuiAddDropDownList("xs+15 y+10 w" thisWid + 35 " gBtnChangeMultiPageFmt AltSubmit Choose" UserCombinePDFpageSize " vUserCombinePDFpageSize", "A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)|A3 (1.41)|A5 (1.41)|Same as the image", [hTemp])
+    GuiAddDropDownList("xs y+10 w" ml " gBtnChangeMultiPageFmt AltSubmit Choose" UserCombinePDFpageSize " vUserCombinePDFpageSize", "A4 (1.41)|Business Card (0.63)|Poster (1.33)|Letter (1.29)|Ledger (1.54)|Legal (1.65)|A3 (1.41)|A5 (1.41)|Same as the image", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%combinePDFpageLandscape% vcombinePDFpageLandscape, Landscape
     thisWid := (PrefsLargeFonts=1) ? 90 : 65
-    ml -= 15
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine4, Image alignment on page:
     GuiAddDropDownList("x+1 w" thisWid " Choose" userCombinePDFalignH " AltSubmit vuserCombinePDFalignH", "Left|Center|Right", "Horizontal alignment of the image")
     GuiAddDropDownList("x+5 wp Choose" userCombinePDFalignV " AltSubmit vuserCombinePDFalignV", "Top|Center|Bottom", "Vertical alignment of the image")
@@ -43991,9 +43996,9 @@ BTNperformCombineIMGs() {
    WriteSettingsCombineIMGs()
    ; prevFileSavePath := file2save
    ; MsgBox, % A_ThisFunc "()`n" file2save
-   If (userCombineFramesFmt=1)
+   If (userCombineFramesFmt=1 && userCombineTiffKeepOrig=0)
       combineImagesMultiTiffGDIp(file2save)
-   Else If (userCombineFramesFmt=2)
+   If (userCombineFramesFmt=2)
       CombineImgsIntoPDF(file2save)
    Else ; used for GIFs / WEBP / APNG / MNG
       combineImagesFimMultiPage(userSaveBitsDepth, userCombineFramesFmt, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
@@ -48280,6 +48285,7 @@ ReadSettingsCombineIMGs(act:=0) {
     RegAction(act, "userCombinePDFdpi",, 2, 50, 1200)
     RegAction(act, "userCombinePDFkeepJpegs",, 1)
     RegAction(act, "userCombinePDFenlarge",, 1)
+    RegAction(act, "userCombineTiffKeepOrig",, 1)
     RegAction(act, "ResizeApplyEffects",, 1)
     RegAction(act, "userCombineSubFrames",, 1)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
@@ -60983,8 +60989,7 @@ FIMdropMismatchedICC(hImage) {
 ; Drops an ICC profile too short to be one, or made for another colour space than the pixels:
 ; the PNG writer refuses to save it, the others embed it. FreeImage builds older than the fork's
 ; cd91101 leave the profile of a CMYK JPEG on the RGB pixels they load.
-   pProfile := FreeImage_GetICCProfile(hImage)
-   size := pProfile ? NumGet(pProfile+0, 4, "UInt") : 0
+   pProfile := FreeImage_GetICCProfile(hImage, size)
    pData := size ? NumGet(pProfile+0, 8, "UPtr") : 0
    If !pData
       Return
@@ -62864,11 +62869,8 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
    newW := setW ? setW : imgW
    newH := setH ? setH : imgH
    capIMGdimensionsFormatlimits(fmt, 1, newW, newH)
-   ; FreeImage_Rescale() returns a blank page for FIT_INT16, FIT_UINT32, FIT_INT32, FIT_DOUBLE and
-   ; FIT_COMPLEX [3, 4, 5, 7, 8], which only TIFF keeps as they are: such a page keeps its size
-   If ((newW!=imgW || newH!=imgH) && !isVarEqualTo(FreeImage_GetImageType(k), 3, 4, 5, 7, 8))
+   If ((newW!=imgW || newH!=imgH) && fif!=18) ; for FIF_TIFF we do not rescale images
    {
-      ; before the colour depth conversion: resizing turns palettised pages into 24 bits
       hFIFimgX := trFreeImage_Rescale(k, newW, newH)
       If hFIFimgX
       {
@@ -62885,14 +62887,10 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
    }
 
    FIMdropMismatchedICC(k)
-   ; the metadata describes the source image, not the new file: FIMD_COMMENTS [0] to FIMD_EXIF_RAW [11];
-   ; WebP would carry the EXIF of the first page, GPS and orientation included
-   Loop, 12
+   Loop, 12   ; clear the metadata 
       FreeImage_SetMetadata(k, 0, A_Index - 1, "")
 
-   ; so does an embedded thumbnail [EXIF, PSD...], which TIFF would store along with the page
-   FreeImage_SetThumbnail(k, 0)
-
+   FreeImage_SetThumbnail(k, 0)   ; and embedded thumbnail
    tag := FreeImage_CreateTag()
    If tag
    {
@@ -62905,7 +62903,7 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
       FreeImage_DeleteTag(tag)
    }
 
-   r := FreeImage_AppendPageEx(multiFim, k)
+   r := FreeImage_AppendPage(multiFim, k)
    FreeImage_UnLoad(k)
    Return r
 }
@@ -99391,7 +99389,13 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   Static lastMultiPGfile := ""
   sTime := A_TickCount
   initFIMGmodule()
-  forceWic := (RegExMatch(imgPath, "i)(.\.(tiff|tif|gif))$") && noBMP=1) ? 1 : 0
+  forceWic := (RegExMatch(imgPath, "i)(.\.(tiff|tif))$") && noBMP=1) ? 1 : 0
+  If wasInitFIMlib
+     loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
+
+  If (RegExMatch(imgPath, "i)(.\.png)$") && allowWICloader=1 && alwaysOpenWithFIM=0 && GFT=13)
+     forceWic := 1
+
   If (!wasInitFIMlib || forceWic=1)
   {
      If (RegExMatch(imgPath, RegExWICfmtPtrn) && (allowWICloader=1 || forceWic=1) && nofall=0)
@@ -99414,13 +99418,18 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   If !wasInitFIMlib
      Return addJournalEntry("Failed to load image. FreeImage failed to initialize. " imgPath)
 
-  loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
   If (noBPPconv=1 || noBMP=1)
-     loadArgs := -1  ; FIF_LOAD_NOPIXELS
-
-  If (FreeImage_FIFSupportsNoPixels(GFT) && loadArgs!=-1 && screenMode=1)
+     loadArgs := 0x8000  ; FIF_LOAD_NOPIXELS
+  Else
+     loadArgs := loadArgs | 0x4000  ; FIF_LOAD_DISPLAY_ICC
+pzvu := ""
+pfsize := FreeImage_GetDisplayICCProfile(pzvu)
+pfname := FreeImage_GetICCProfileDescription(pzvu, pfsize)
+fnOutputDebug(A_ThisFunc ": " pfsize "|" pfname)
+  If (FreeImage_FIFSupportsNoPixels(GFT) && loadArgs!=0x8000 && screenMode=1)
   {
-     hFIFimgA := FreeImage_Load(imgPath, GFT, -1)
+     ; test image size, load no pixels data, flag 0x8000
+     hFIFimgA := FreeImage_Load(imgPath, GFT, 0x8000)
      FreeImage_GetImageDimensions(hFIFimgA, zw, zh)
      bpp := FreeImage_GetBPP(hFIFimgA)
      If (bpp<24)
@@ -99438,6 +99447,8 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      multiFlags := isVarEqualTo(GFT, 25, 37, 39) ? 2 : 0
      If (GFT=35)
         multiFlags := 1
+     If (userPerformColorManagement=1)
+        multiFlags := multiFlags | 0x4000
 
      testMultiPG := "a" globalhFIFimg imgPath multiFlags GFT
      If (screenMode=1 && lastMultiPGfile=testMultiPG && globalhFIFimg!="")

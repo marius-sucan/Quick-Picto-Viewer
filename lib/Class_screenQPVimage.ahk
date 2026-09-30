@@ -68,15 +68,16 @@ Class screenQPVimage {
      ; FreeImage_GetImageDimensions(This.imgHandle, zw, zh)
      ; fnOutputDebug(A_ThisFunc "(): " zw "|" zh "||" x2 "|" y2 "||" x "|" y "|" mgpx)
      thisStartZeit := A_TickCount
-     interpo := (highQuality=1) ? 3 : 0
+     interpoOCV := (highQuality=1) ? 3 : 0
+     interpoFIM := (highQuality=1) ? 3 : -1
      FreeImage_GetImageDimensions(this.imgHandle, ow, oh)
      ay := oh - y
      by := oh - (y + h)
      ny := min(ay, by)
-     hFIFimgZ := OpenCV_FimResizeBitmap(This.imgHandle, newW, newH, x, ny, w, h, interpo)
-     If !hFIFimgZ
-        hFIFimgZ := FreeImage_RescaleRect(This.imgHandle, newW, newH, x, y, w, h, interpo)
-     ; fnOutputDebug(A_ThisFunc "(): " A_TickCount - thisStartZeit)
+     ; hFIFimgZ := OpenCV_FimResizeBitmap(This.imgHandle, newW, newH, x, ny, w, h, interpoOCV)
+     ; If !hFIFimgZ
+        hFIFimgZ := FreeImage_RescaleRect(This.imgHandle, newW, newH, x, y, w, h, interpoFIM)
+     fnOutputDebug(A_ThisFunc "(dev-fim): " A_TickCount - thisStartZeit)
      If !hFIFimgZ
         Return 0
 

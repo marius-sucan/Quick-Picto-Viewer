@@ -1,6 +1,6 @@
 ﻿; FreeImage v3.18+ library wrapper for AHK v1.1.
 ; Available at:
-; https://github.com/marius-sucan/FreeImage-library/tree/qpv/Wrapper
+; https://github.com/marius-sucan/FreeImage-library/tree/qpv/
 ; Dependency:
 ; AHK v1.1 GDI+ library wrapper: https://github.com/marius-sucan/AHK-GDIp-Library-Compilation
 ; Author: Marius Șucan
@@ -8,12 +8,19 @@
 ; Change log:
 ; =============================
 ;
-; 23 September 2026 - v2.01
-; - FreeImage_FillBackground() takes three parameters again, as in FreeImage 3.18; options 8 (FI_COLOR_SET_ALPHA) replaces applyAlpha
+; 29 September 2026 - v2.01
+; - added the color management functions (ICC profiles, Little CMS): FreeImage_ConvertToICCProfile(), FreeImage_ApplyICCProfile(),
+;   FreeImage_ConvertToCMYK(), FreeImage_ConvertCMYKToRGB(), FreeImage_SoftProof(), FreeImage_GetBuiltInICCProfile(),
+;   FreeImage_GetICCProfileDescription(), FreeImage_GetICCProfileColorSpace() and FreeImage_GetICCProfileData()
+;
+; - added FreeImage_OpenMemory64(), FreeImage_AcquireMemory64(), FreeImage_SeekMemory64() and FreeImage_TellMemory64():
+;   memory streams of 4 GB and more, and positions past 2 GB
+;
+; - added the FIF_LOAD_DISPLAY_ICC load flag, FreeImage_SetDisplayICCProfile() and FreeImage_GetDisplayICCProfile():
+;   images loaded in the display's colors
 ;
 ; 22 September 2026 - v2.00
 ; - implemented all the remaining functions, except the ANSI variants
-; - bug fixes: FreeImage_Rotate(), the JPEG transforms, FreeImage_DeletePageEx(), FreeImage_SimpleGetPageCount(), the memory stream functions, and pointers truncated on x64
 ; - FreeImage_OpenMultiBitmap() takes Unicode paths; added FreeImage_GetFrameDelays() and the *PageEx() functions
 ; - AVIF, HEIF and APNG in FreeImage_GetFileType()
 ;
@@ -178,7 +185,7 @@ FreeImage_GetVersion() {
 }
 
 FreeImage_GetLibVersion() {
-   Return 2.01 ; mercredi 23 septembre 2026
+   Return 2.01 ; mardi 29 septembre 2026
 }
 
 FreeImage_GetCopyrightMessage() {
@@ -230,6 +237,12 @@ FreeImage_Allocate(width, height, bpp:=32, imageType:=1, red_mask:=0xFF000000, g
 
 FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00, hPalette:=0) {
 ; function useful to create a new / empty bitmap
+; options - 0, or these combined with |:
+; FI_COLOR_IS_RGB_COLOR = 0x00; the color's alpha is ignored: a 32-bit image gets alpha 255; a palettized one gets the nearest palette color
+; FI_COLOR_IS_RGBA_COLOR = 0x01; 8-bit grey, 24 and 32-bit: the alpha blends the color over black; alpha 0 leaves the new area black (transparent at 32-bit)
+; FI_COLOR_FIND_EQUAL_COLOR = 0x02; palettized: the palette entry equal to the color, else the color's alpha as the index
+; FI_COLOR_ALPHA_IS_INDEX = 0x04; palettized: the color's alpha is the palette index to fill with; without a palette, a greyscale one is made
+; FI_COLOR_SET_ALPHA = 0x08; no blending: a 32-bit image gets the color's alpha as its alpha
    pColor := 0
    If (RGBArray!="")
    {
@@ -247,6 +260,7 @@ FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:
 
 FreeImage_AllocateExT(imageType, width, height, bpp, color:="", options:=0, red_mask:=0, green_mask:=0, blue_mask:=0, hPalette:=0) {
 ; color - "R,G,B,A" for a standard bitmap, else a pointer to a pixel of imageType; blank leaves it black
+; options - see FreeImage_AllocateEx()
    pColor := FIMcolorPointer(color, colorBuf)
    Return DllCall(getFIMfunc("AllocateExT"), "Int", imageType, "Int", width, "Int", height, "Int", bpp, "UPtr", pColor, "Int", options, "UPtr", hPalette, "UInt", red_mask, "UInt", green_mask, "UInt", blue_mask, "UPtr")
 }
@@ -267,6 +281,32 @@ FreeImage_AllocateHeaderForBits(pBits, pitch, imageType, width, height, bpp, red
 }
 
 FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
+; flag - 0, or the flags of the file's format below, combined with |:
+; FIF_LOAD_NOPIXELS = 0x8000; retrieve only the image properties: size, type, metadata, ICC profile, thumbnail; see FreeImage_FIFSupportsNoPixels()
+; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to the display's colors, see FreeImage_SetDisplayICCProfile(); ignored with FIF_LOAD_NOPIXELS
+;
+; GIF_LOAD256 = 1; a GIF with a palette of 16 colours or fewer loads as 8-bit, not as 1-bit or 4-bit
+; ICO_MAKEALPHA = 1; load an icon of under 32 bits as 32-bit, with an alpha channel made from its AND mask
+; JPEG_DEFAULT = 0; fast DCT, as JPEG_FAST; add size << 16 to decode at 1/2, 1/4 or 1/8, the smallest keeping the longest side >= size
+; JPEG_FAST = 0x0001; fast DCT: faster, a little less accurate; the default anyway, unless JPEG_ACCURATE is given
+; JPEG_ACCURATE = 0x0002; accurate DCT and upsampling: the best quality, a little slower
+; JPEG_CMYK = 0x0004; keep a CMYK JPEG as 32-bit CMYK, not converted to 24-bit RGB
+; JPEG_EXIFROTATE = 0x0008; turn the image upright as its Exif Orientation tag says
+; JPEG_GREYSCALE = 0x0010; load as an 8-bit greyscale image
+; PCD_BASE = 1; the 768 x 512 image, as by default
+; PCD_BASEDIV4 = 2; the 384 x 256 image
+; PCD_BASEDIV16 = 3; the 192 x 128 image
+; PNG_IGNOREGAMMA = 1; keep the stored values: no gamma correction from a gAMA chunk (done only without an ICC profile); APNG, MNG frames too
+; PSD_CMYK = 1; keep a CMYK or multichannel PSD as CMYK, not converted to RGB
+; PSD_LAB = 2; keep a Lab PSD's Lab values, not converted to RGB
+; RAW_DEFAULT = 0; linear RGB 48-bit, or 16-bit greyscale from a monochrome camera
+; RAW_PREVIEW = 1; the embedded preview, turned upright; RGB 24-bit from the raw data when there is none
+; RAW_DISPLAY = 2; RGB 24-bit, or 8-bit greyscale from a monochrome camera
+; RAW_HALFSIZE = 4; half the size, decoded faster; combine with RAW_DEFAULT or RAW_DISPLAY
+; RAW_UNPROCESSED = 8; the raw sensor data, not demosaiced, as FIT_UINT16
+; TARGA_LOAD_RGB888 = 1; load 16-bit (RGB555) and 32-bit TGA files as 24-bit RGB, dropping the alpha
+; TIFF_CMYK = 0x0001; keep a CMYK TIFF as CMYK, not converted to RGB
+
    If !ImgPath
       Return
 
@@ -281,23 +321,86 @@ FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 
 FreeImage_LoadFromHandle(FIF, pIO, hHandle, flags:=0) {
 ; pIO - a FreeImageIO: pointers to the stdcall read, write, seek and tell procs, which get hHandle; FIF=-1 detects the format
+; pIO - a FreeImageIO: pointers to the stdcall read, write, seek and tell procs, which get hHandle;
+; seek takes an Int64 offset and tell returns Int64;
+; FIF=-1 detects the format
+; on 32-bit AutoHotkey a RegisterCallback() returns 32 bits.
+; flags: see FreeImage_Load()
+
    If (FIF=-1 || FIF="")
       FIF := FreeImage_GetFileTypeFromHandle(pIO, hHandle)
    Return DllCall(getFIMfunc("LoadFromHandle"), "Int", FIF, "UPtr", pIO, "UPtr", hHandle, "Int", flags, "UPtr")
 }
 
-FreeImage_Save(hImage, ImgPath, ImgArg:=0) {
+FreeImage_Save(hImage, ImgPath, flags:=0) {
 ; Return 0 = failed; 1 = success
-; FIMfrmt := {"BMP":0, "JPG":2, "JPEG":2, "PNG":13, "TIF":18, "TIFF":18, "GIF":25}
-   If (!hImage || !ImgPath)
+; flags - 0, or the flags of the file's format below, combined with |
+; (JNG takes the JPEG flags, APNG and MNG the PNG ones)
+;
+; BMP_SAVE_RLE = 1; RLE-compress an 8-bit image; other bit depths are saved uncompressed
+; EXR_DEFAULT = 0; half floats with PIZ wavelet compression
+; EXR_FLOAT = 0x0001; 32-bit floats instead of half floats (larger files)
+; EXR_NONE = 0x0002; no compression
+; EXR_ZIP = 0x0004; zlib compression, in blocks of 16 scan lines
+; EXR_PIZ = 0x0008; PIZ wavelet compression, the default
+; EXR_PXR24 = 0x0010; lossy 24-bit float compression
+; EXR_B44 = 0x0020; lossy 44% float compression, 22% with EXR_LC
+; EXR_LC = 0x0040; one luminance and two chroma channels, lossy; RGBF/RGBAF of even width and height only, without EXR_FLOAT
+; J2K_DEFAULT = 0; a 16:1 compression rate; or pass the rate itself, 1 to 1023, where 1 is lossless
+; JP2_DEFAULT = 0; a 16:1 compression rate; or pass the rate itself, 1 to 1023, where 1 is lossless
+; JPEG_DEFAULT = 0; quality 75 with 4:2:0 subsampling; or pass the quality itself, 1 to 100, instead of a JPEG_QUALITY* flag
+; JPEG_QUALITYSUPERB = 0x80; quality 100
+; JPEG_QUALITYGOOD = 0x0100; quality 75, the default
+; JPEG_QUALITYNORMAL = 0x0200; quality 50
+; JPEG_QUALITYAVERAGE = 0x0400; quality 25
+; JPEG_QUALITYBAD = 0x0800; quality 10
+; JPEG_PROGRESSIVE = 0x2000; a progressive JPEG
+; JPEG_SUBSAMPLING_411 = 0x1000; 4:1:1 chroma subsampling, the strongest
+; JPEG_SUBSAMPLING_420 = 0x4000; 4:2:0 chroma subsampling, the default
+; JPEG_SUBSAMPLING_422 = 0x8000; 4:2:2 chroma subsampling
+; JPEG_SUBSAMPLING_444 = 0x10000; no chroma subsampling (4:4:4)
+; JPEG_OPTIMIZE = 0x20000; optimal Huffman tables: a few percent smaller, a little slower
+; JPEG_BASELINE = 0x40000; a basic JPEG: no metadata, ICC profile or other markers
+; JXR_DEFAULT = 0; quality 80, 4:4:4; or pass the quality itself, 1 to 99; under 50, 8-bit images get 4:2:0
+; JXR_LOSSLESS = 0x0064; lossless, the same as quality 100
+; JXR_PROGRESSIVE = 0x2000; a progressive JPEG XR
+; PNG_Z_BEST_SPEED = 0x0001; zlib level 1, the fastest; any level 1 to 9 may be given
+; PNG_Z_DEFAULT_COMPRESSION = 0x0006; zlib level 6, the default
+; PNG_Z_BEST_COMPRESSION = 0x0009; zlib level 9, the smallest
+; PNG_Z_NO_COMPRESSION = 0x0100; no zlib compression
+; PNG_INTERLACED = 0x0200; Adam7 interlacing
+; PNM_SAVE_RAW = 0; binary PBM, PGM or PPM (P4, P5, P6), the default
+; PNM_SAVE_ASCII = 1; text PBM, PGM or PPM (P1, P2, P3)
+; PSD_DEFAULT = 0; RLE compression at 8 bits per channel, none above
+; PSD_CMYK = 1; save a 32- or 64-bit image as CMYK
+; PSD_NONE = 0x0100; no compression
+; PSD_RLE = 0x0200; RLE compression, also at 16 bits per channel; 32-bit float channels stay uncompressed
+; PSD_PSB = 0x2000; Large Document Format (PSB); used anyway past 30000 pixels a side or 2 GB of pixels
+; TARGA_SAVE_RLE = 2; RLE compression
+; TIFF_DEFAULT = 0; CCITT Group 4 compression for 1-bit images, LZW for the others
+; TIFF_CMYK = 0x0001; save a 32- or 64-bit image as CMYK
+; TIFF_PACKBITS = 0x0100; PackBits compression
+; TIFF_DEFLATE = 0x0200; Deflate compression, written as TIFF_ADOBE_DEFLATE
+; TIFF_ADOBE_DEFLATE = 0x0400; Adobe Deflate (zlib) compression
+; TIFF_NONE = 0x0800; no compression
+; TIFF_CCITTFAX3 = 0x1000; CCITT Group 3 fax compression, 1-bit images only
+; TIFF_CCITTFAX4 = 0x2000; CCITT Group 4 fax compression, 1-bit images only
+; TIFF_LZW = 0x4000; LZW compression
+; TIFF_JPEG = 0x8000; JPEG compression, 8-bit greyscale and 24-bit images only; the others get LZW
+; TIFF_LOGLUV = 0x10000; LogLuv compression, RGBF images only
+; TIFF_BIGTIFF_FORMAT = 0x20000; BigTIFF, with 64-bit offsets; used anyway for a file that would pass 4 GB
+; WEBP_DEFAULT = 0; lossy, quality 75; or pass the quality itself, 1 to 100
+; WEBP_LOSSLESS = 0x100; lossless
+   If (hImage="" || !ImgPath)
       Return
 
    FormatID := FreeImage_GetFIFFromFilename(ImgPath)
-   Return DllCall(getFIMfunc("SaveU"), "Int", FormatID, "UPtr", hImage, "WStr", ImgPath, "Int", ImgArg)
+   Return DllCall(getFIMfunc("SaveU"), "Int", FormatID, "UPtr", hImage, "WStr", ImgPath, "Int", flags)
 }
 
 FreeImage_SaveToHandle(FIF, hImage, pIO, hHandle, flags:=0) {
-; see FreeImage_LoadFromHandle()
+; see also FreeImage_LoadFromHandle()
+; flags: see FreeImage_Save()
    Return DllCall(getFIMfunc("SaveToHandle"), "Int", FIF, "UPtr", hImage, "UPtr", pIO, "UPtr", hHandle, "Int", flags)
 }
 
@@ -349,13 +452,13 @@ FreeImage_GetColorsUsed(hImage) {
 }
 
 FreeImage_GetHistogram(hImage, channel, ByRef histoArray) {
-   ; RGB    = 0 ; red, green and blue channels
-   ; RED    = 1 ; red channel
-   ; GREEN  = 2 ; green channel
-   ; BLUE   = 3 ; blue channel
-   ; ALPHA  = 4 ; alpha channel
-   ; BLACK  = 5 ; black channel
-   ; the function works only on 8, 24 and 32 bits images
+; RGB    = 0 ; red, green and blue channels
+; RED    = 1 ; red channel
+; GREEN  = 2 ; green channel
+; BLUE   = 3 ; blue channel
+; ALPHA  = 4 ; alpha channel
+; BLACK  = 5 ; black channel
+; the function works only on 8, 24 and 32 bits images
 
    VarSetCapacity(histo, 1024, 0)
    E := DllCall(getFIMfunc("GetHistogram"), "UPtr", hImage, "UPtr", &histo, "Int", channel)
@@ -638,12 +741,12 @@ FreeImage_SetBackgroundColor(hImage, RGBArray:="255,255,255,0") {
 }
 
 FreeImage_FillBackground(hImage, RGBArray:="255,255,255,0", options:=1) {
-; options     - it affect the color search process for palletized images.
-;   FI_COLOR_IS_RGB_COLOR     = 0   // RGBQUAD color is a RGB color (contains no valid alpha channel)
-;   FI_COLOR_IS_RGBA_COLOR    = 1   // RGBQUAD color is a RGBA color (contains a valid alpha channel)
-;   FI_COLOR_FIND_EQUAL_COLOR = 2   // For palettized images: lookup equal RGB color from palette
-;   FI_COLOR_ALPHA_IS_INDEX   = 4   // The color's rgbReserved member (alpha) contains the palette index to be used
-;   FI_COLOR_SET_ALPHA        = 8   // No blending: a 32-bit image gets the color's alpha
+; options - 0, or these combined with |:
+; FI_COLOR_IS_RGB_COLOR = 0x00; the color's alpha is ignored: a 32-bit image gets alpha 255; a palettized one gets the nearest palette color
+; FI_COLOR_IS_RGBA_COLOR = 0x01; 8-bit grey, 24 and 32-bit: the alpha blends the color over the bottom-left pixel; alpha 0 leaves the image unchanged
+; FI_COLOR_FIND_EQUAL_COLOR = 0x02; palettized: the palette entry equal to the color, else the color's alpha as the index
+; FI_COLOR_ALPHA_IS_INDEX = 0x04; palettized: the color's alpha is the palette index to fill with
+; FI_COLOR_SET_ALPHA = 0x08; no blending: a 32-bit image gets the color's alpha as its alpha
 
    pColor := 0
    If (RGBArray!="")
@@ -694,6 +797,9 @@ FreeImage_FIFSupportsICCProfiles(FIF) {
 }
 
 FreeImage_FIFSupportsNoPixels(FIF) {
+; To retrieve only the image properties
+; pass the flag FIF_LOAD_NOPIXELS = 0x8000
+; to FreeImage_Load() or FreeImage_OpenMultiBitmap()
    Return DllCall(getFIMfunc("FIFSupportsNoPixels"), "Int", FIF)
 }
 
@@ -738,7 +844,7 @@ FreeImage_GetBits(hImage) {
 ; correctly, according to the results of FreeImage_GetBPP, FreeImage_GetRedMask,
 ; FreeImage_GetGreenMask and FreeImage_GetBlueMask.
 ; For performance reasons, the address returned by FreeImage_GetBits is aligned on
-; a 16 bytes alignment boundary
+; a 16 bytes alignment boundary.
 ; This function returns a pointer to the equivalent of Scan0
 ; when one locks the bits of a bitmap in GDI+.
 
@@ -758,7 +864,7 @@ FreeImage_GetPixelIndex(hImage, xPos, yPos) {
    RetValue := DllCall(getFIMfunc("GetPixelIndex"), "UPtr", hImage, "Uint", xPos, "Uint", yPos, "UPtr", &IndexNum)
    If RetValue
       return NumGet(IndexNum, 0, "Uchar")
-   else
+   Else
       return RetValue
 }
 
@@ -1017,9 +1123,18 @@ FreeImage_TmoFattal02(hImage, colorSaturation:=0.5, attenuation:=0.85) {
 
 ; === ICC profile functions ===
 
-FreeImage_GetICCProfile(hImage) {
+FreeImage_GetICCProfile(hImage, ByRef size) {
 ; FIICCPROFILE: flags UShort at 0, size UInt at 4, data pointer at 8
-   Return DllCall(getFIMfunc("GetICCProfile"), "UPtr", hImage, "UPtr") ; returns a pointer to it
+   pICC := DllCall(getFIMfunc("GetICCProfile"), "UPtr", hImage, "UPtr")
+   size := pICC ? NumGet(pICC+0, 4, "UInt") : 0
+   Return pICC
+}
+
+FreeImage_GetICCProfileData(hImage, ByRef size) {
+; returns a pointer to the image's own ICC profile data
+; returns 0 if it has none; size receives its byte count
+   pICC := FreeImage_GetICCProfile(hImage, size)
+   Return (pICC && size) ? NumGet(pICC + 0, 8, "UPtr") : 0
 }
 
 FreeImage_CreateICCProfile(hImage, pData, size) {
@@ -1030,6 +1145,97 @@ FreeImage_CreateICCProfile(hImage, pData, size) {
 FreeImage_DestroyICCProfile(hImage) {
    Return DllCall(getFIMfunc("DestroyICCProfile"), "UPtr", hImage)
 }
+
+; === Color management (ICC profiles, Little CMS) ===
+; A profile is a block of ICC bytes: pProfile and profileSize; pProfile 0 means FreeImage's default space
+; (sRGB, linear sRGB for float images, grey sRGB for greyscale ones) and leaves the result untagged.
+; The source is the image's embedded profile when it describes the pixels, else the default of its type.
+
+FreeImage_ConvertToICCProfile(hImage, pProfile:=0, profileSize:=0, flags:=0) {
+; returns a new image in the color model of the profile (RGB, grey or CMYK), tagged with it
+; flags - one rendering intent, and the options combined with |:
+; FICMS_INTENT_PERCEPTUAL = 0x00; perceptual rendering intent, the default
+; FICMS_INTENT_RELATIVE_COLORIMETRIC = 0x01; media-relative colorimetric rendering intent
+; FICMS_INTENT_SATURATION = 0x02; saturation rendering intent
+; FICMS_INTENT_ABSOLUTE_COLORIMETRIC = 0x03; ICC-absolute colorimetric rendering intent
+; FICMS_BLACKPOINT_COMPENSATION = 0x0100; map the black point of the source to the black point of the destination
+   Return DllCall(getFIMfunc("ConvertToICCProfile"), "UPtr", hImage, "UPtr", pProfile, "UInt", profileSize, "Int", flags, "UPtr")
+}
+
+FreeImage_ApplyICCProfile(hImage, pProfile:=0, profileSize:=0, flags:=0) {
+; FreeImage_ConvertToICCProfile() in place, for showing an image: a palette changes its colors,
+; a CMYK image becomes RGBA with opaque alpha.
+; NOTE: ApplyICCProfile can't convert images where the pixel format would have to change, such as 16-bit or float greyscale to an RGB display profile.
+; Return value: 1 -- succes; 0 -- fail, or the pixel format would change
+; flags: see FreeImage_ConvertToICCProfile()
+   Return DllCall(getFIMfunc("ApplyICCProfile"), "UPtr", hImage, "UPtr", pProfile, "UInt", profileSize, "Int", flags)
+}
+
+FreeImage_ConvertToCMYK(hImage, pProfile:=0, profileSize:=0, flags:=0) {
+; pProfile - a CMYK profile; 0 - the device CMYK of FreeImage's loaders; returns 32-bit or 64-bit CMYK
+; with pProfile 0, an image that is already CMYK comes back as a copy, its profile kept
+; flags: see FreeImage_ConvertToICCProfile()
+   Return DllCall(getFIMfunc("ConvertToCMYK"), "UPtr", hImage, "UPtr", pProfile, "UInt", profileSize, "Int", flags, "UPtr")
+}
+
+FreeImage_ConvertCMYKToRGB(hImage, pProfile:=0, profileSize:=0, flags:=0) {
+; for a CMYK image (loaded with JPEG_CMYK, TIFF_CMYK or PSD_CMYK); pProfile - an RGB profile, 0 - sRGB
+; flags: see FreeImage_ConvertToICCProfile()
+   Return DllCall(getFIMfunc("ConvertCMYKToRGB"), "UPtr", hImage, "UPtr", pProfile, "UInt", profileSize, "Int", flags, "UPtr")
+}
+
+FreeImage_SoftProof(hImage, pProofProfile, proofSize, pDisplayProfile:=0, displaySize:=0, flags:=0) {
+; shows how the proofing device (a printer profile) would reproduce the image on the display
+; flags - one rendering intent, and the options combined with |:
+; FICMS_INTENT_PERCEPTUAL = 0x00; perceptual rendering intent, the default
+; FICMS_INTENT_RELATIVE_COLORIMETRIC = 0x01; media-relative colorimetric rendering intent
+; FICMS_INTENT_SATURATION = 0x02; saturation rendering intent
+; FICMS_INTENT_ABSOLUTE_COLORIMETRIC = 0x03; ICC-absolute colorimetric rendering intent
+; FICMS_BLACKPOINT_COMPENSATION = 0x0100; map the black point of the source to the black point of the destination
+; FICMS_GAMUT_CHECK = 0x0200; paint grey the colors the proofing device cannot reproduce; fails if its profile has no gamut table
+; FICMS_SIMULATE_PAPER = 0x0400; show the paper white of the proofing device (absolute colorimetric proofing)
+   Return DllCall(getFIMfunc("SoftProof"), "UPtr", hImage, "UPtr", pProofProfile, "UInt", proofSize, "UPtr", pDisplayProfile, "UInt", displaySize, "Int", flags, "UPtr")
+}
+
+FreeImage_GetBuiltInICCProfile(profileID, ByRef size) {
+; profileID: 0 sRGB, 1 linear sRGB, 2 grey, 3 linear grey, 4 Adobe RGB (1998) compatible, 5 Display P3, 6 ProPhoto RGB
+; returns a pointer owned by FreeImage, valid until it unloads; size receives its byte count
+   Return DllCall(getFIMfunc("GetBuiltInICCProfile"), "Int", profileID, "UInt*", size, "UPtr")
+}
+
+FreeImage_GetICCProfileDescription(pProfile, profileSize) {
+; returns the profile's description, e.g. "Adobe RGB (1998)"; empty for an invalid profile
+   n := DllCall(getFIMfunc("GetICCProfileDescription"), "UPtr", pProfile, "UInt", profileSize, "UPtr", 0, "UInt", 0, "UInt")
+   If !n
+      Return ""
+
+   VarSetCapacity(buf, n, 0)
+   DllCall(getFIMfunc("GetICCProfileDescription"), "UPtr", pProfile, "UInt", profileSize, "UPtr", &buf, "UInt", n, "UInt")
+   Return StrGet(&buf, "UTF-8")
+}
+
+FreeImage_GetICCProfileColorSpace(pProfile, profileSize) {
+; returns 0x52474220 RGB, 0x434D594B CMYK, 0x47524159 grey, 0x4C616220 Lab, other ICC color spaces; 0 -- not a valid profile
+   Return DllCall(getFIMfunc("GetICCProfileColorSpace"), "UPtr", pProfile, "UInt", profileSize, "UInt")
+}
+
+FreeImage_SetDisplayICCProfile(pProfile:=0, profileSize:=0, flags:=0x101) {
+; the profile the FIF_LOAD_DISPLAY_ICC load flag converts images to; images carry it afterwards
+; pProfile - an RGB profile, e.g. of the monitor showing the images; 0 - detect it: on Windows the primary monitor's profile,
+;   on Linux the X11 screen's; sRGB when there is none, or when Windows' HDR or Auto Color Management is on
+; CMYK JPEG, TIFF and PSD files are read as CMYK first and come back as RGB; grey images stay grey; float images are not changed
+; flags - a rendering intent, with FICMS_BLACKPOINT_COMPENSATION or not; see FreeImage_ConvertToICCProfile()
+; Return value: 1 -- success; 0 -- not an RGB profile Little CMS can convert to, the last one stays
+   Return DllCall(getFIMfunc("SetDisplayICCProfile"), "UPtr", pProfile, "UInt", profileSize, "Int", flags)
+}
+
+FreeImage_GetDisplayICCProfile(ByRef buf) {
+; copies the profile FIF_LOAD_DISPLAY_ICC converts to into buf; returns its byte count
+   size := DllCall(getFIMfunc("GetDisplayICCProfile"), "UPtr", 0, "UInt", 0, "UInt")
+   VarSetCapacity(buf, size, 0)
+   Return size ? DllCall(getFIMfunc("GetDisplayICCProfile"), "UPtr", &buf, "UInt", size, "UInt") : 0
+}
+
 
 ; === Plugin functions ===
 
@@ -1096,11 +1302,20 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ;              it already exists; use read_only=0 as param
 ; keep_cache - keep in memory the cache
 ;
-; On file open, pass one of these flags to retrieve the composited frames:
-;     WEBP_PLAYBACK = 1
-;     GIF/APNG/MNG/HEIF/AVIF_PLAYBACK = 2
-; Alternatively, to retrieve only the animation properties: 
-;     FIF_LOAD_NOPIXELS = 0x8000
+; flags - 0, or these combined with |; a single-page format takes its FreeImage_Load() flags:
+; FIF_LOAD_NOPIXELS = 0x8000; retrieve only the properties: each page's size, type, metadata and frame time; no pixels
+; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to the display's colors, see FreeImage_SetDisplayICCProfile(); ignored with FIF_LOAD_NOPIXELS
+;
+; APNG_PLAYBACK = 2; APNG: every frame as a viewer shows it, composited on the canvas, as 32-bit
+; AVIF_PLAYBACK = 2; AVIF image sequence: every frame as 32-bit RGBA, 8 bits per channel, whatever its own format
+; GIF_LOAD256 = 1; GIF: frames with a palette of 16 colours or fewer load as 8-bit, not as 1-bit or 4-bit
+; GIF_PLAYBACK = 2; GIF: every frame as a viewer shows it, composited on the logical screen, as 32-bit
+; HEIF_PLAYBACK = 2; HEIF image sequence: every frame as 32-bit RGBA, 8 bits per channel, whatever its own format
+; ICO_MAKEALPHA = 1; ICO: icons of under 32 bits load as 32-bit, with an alpha channel made from the AND mask
+; MNG_PLAYBACK = 2; MNG: every frame as a viewer shows it, composited on the canvas, as 32-bit; not for canvases over 2^28 pixels
+; PNG_IGNOREGAMMA = 1; APNG, MNG: no gamma correction from a frame's gAMA chunk
+; TIFF_CMYK = 0x0001; TIFF: CMYK pages stay CMYK, not converted to RGB
+; WEBP_PLAYBACK = 0x0001; animated WebP: every frame as a viewer shows it, composited on the canvas, as 32-bit
 ;
 ; To save a newly created multi-page image, use FreeImage_CloseMultiBitmap().
 /*
@@ -1120,12 +1335,36 @@ imgFormat parameter takes integer values from 0 to 39 relevant I/O image format 
 
 FreeImage_OpenMultiBitmapFromHandle(FIF, pIO, hHandle, flags:=0) {
 ; see FreeImage_LoadFromHandle(); hHandle must stay valid until FreeImage_CloseMultiBitmap(), which discards edits: save them with FreeImage_SaveMultiBitmapToHandle()
+; flags: see FreeImage_OpenMultiBitmap()
    Return DllCall(getFIMfunc("OpenMultiBitmapFromHandle"), "Int", FIF, "UPtr", pIO, "UPtr", hHandle, "Int", flags, "UPtr")
 }
 
 FreeImage_CloseMultiBitmap(hFIMULTIBITMAP, flags:=0) {
 ; If the multi-page image was opened with read_only=0, any modifications
 ; to the image will be saved to disk; do not use FreeImage_Save() to save a multi-page image.
+; flags - 0, or these combined with |; GIF and ICO take none:
+; PNG_Z_BEST_SPEED = 0x0001; APNG, MNG: zlib level 1, the fastest; any level 1 to 9 may be given
+; PNG_Z_DEFAULT_COMPRESSION = 0x0006; APNG, MNG: zlib level 6, the default
+; PNG_Z_BEST_COMPRESSION = 0x0009; APNG, MNG: zlib level 9, the smallest
+; PNG_Z_NO_COMPRESSION = 0x0100; APNG, MNG: no zlib compression
+; PNG_INTERLACED = 0x0200; MNG: Adam7-interlaced frames
+; TIFF_DEFAULT = 0; CCITT Group 4 compression for 1-bit images, LZW for the others
+; TIFF_CMYK = 0x0001; save a 32- or 64-bit image as CMYK
+; TIFF_PACKBITS = 0x0100; PackBits compression
+; TIFF_DEFLATE = 0x0200; Deflate compression, written as TIFF_ADOBE_DEFLATE
+; TIFF_ADOBE_DEFLATE = 0x0400; Adobe Deflate (zlib) compression
+; TIFF_NONE = 0x0800; no compression
+; TIFF_CCITTFAX3 = 0x1000; CCITT Group 3 fax compression, 1-bit images only
+; TIFF_CCITTFAX4 = 0x2000; CCITT Group 4 fax compression, 1-bit images only
+; TIFF_LZW = 0x4000; LZW compression
+; TIFF_JPEG = 0x8000; JPEG compression, 8-bit greyscale and 24-bit images only; the others get LZW
+; TIFF_LOGLUV = 0x10000; LogLuv compression, RGBF images only
+; TIFF_BIGTIFF_FORMAT = 0x20000; BigTIFF, with 64-bit offsets; used anyway for a file that would pass 4 GB
+; WEBP_DEFAULT = 0; lossy, quality 75; or pass the quality itself, 1 to 100
+; WEBP_LOSSLESS = 0x100; lossless
+;
+; Returns FALSE when the changes could not be written; the file is then left as it was.
+
    If (hFIMULTIBITMAP="")
       Return
 
@@ -1134,6 +1373,7 @@ FreeImage_CloseMultiBitmap(hFIMULTIBITMAP, flags:=0) {
 
 FreeImage_SaveMultiBitmapToHandle(FIF, hFIMULTIBITMAP, pIO, hHandle, flags:=0) {
 ; see FreeImage_LoadFromHandle()
+; flags: see FreeImage_CloseMultiBitmap()
    Return DllCall(getFIMfunc("SaveMultiBitmapToHandle"), "Int", FIF, "UPtr", hFIMULTIBITMAP, "UPtr", pIO, "UPtr", hHandle, "Int", flags)
 }
 
@@ -1142,31 +1382,18 @@ FreeImage_GetPageCount(hFIMULTIBITMAP) {
 }
 
 FreeImage_AppendPage(hFIMULTIBITMAP, hImage) {
-   DllCall(getFIMfunc("AppendPage"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage)
-}
-
-FreeImage_AppendPageEx(hFIMULTIBITMAP, hImage) {
-   ; Returns TRUE when the page was added. It is refused when the format cannot encode the
-   ; bitmap, and FreeImage_CloseMultiBitmap() then returns FALSE, although it saves the other pages.
-   Return DllCall(getFIMfunc("AppendPageEx"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage, "Int")
+  ; Returns TRUE when the page was added. It is refused when the format cannot encode the bitmap.
+  Return DllCall(getFIMfunc("AppendPage"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage, "Int")
 }
 
 FreeImage_InsertPage(hFIMULTIBITMAP, PageNumber, hImage) {
-   DllCall(getFIMfunc("InsertPage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "UPtr", hImage)
-}
-
-FreeImage_InsertPageEx(hFIMULTIBITMAP, PageNumber, hImage) {
    ; Returns TRUE when the page was inserted.
-   Return DllCall(getFIMfunc("InsertPageEx"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "UPtr", hImage, "Int")
+   Return DllCall(getFIMfunc("InsertPage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "UPtr", hImage, "Int")
 }
 
 FreeImage_DeletePage(hFIMULTIBITMAP, PageNumber) {
-   DllCall(getFIMfunc("DeletePage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber)
-}
-
-FreeImage_DeletePageEx(hFIMULTIBITMAP, PageNumber) {
    ; Returns TRUE when the page was deleted.
-   Return DllCall(getFIMfunc("DeletePageEx"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "Int")
+   Return DllCall(getFIMfunc("DeletePage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "Int")
 }
 
 FreeImage_MovePage(hFIMULTIBITMAP, Target, PageNumber) {
@@ -1179,7 +1406,7 @@ FreeImage_LockPage(hFIMULTIBITMAP, PageNumber) {
    ; into another multi-page bitmap. When you are done with the bitmap you have to call
    ; FreeImage_UnlockPage to give the page back to the bitmap and/or apply any changes made
    ; in the page. It is forbidden to use FreeImage_Unload on a locked page: you must use
-   ; FreeImage_UnlockPage() instead
+   ; FreeImage_UnlockPage() instead.
 
    ; On succes, the function returns a common FIBITMAP.
    Return DllCall(getFIMfunc("LockPage"), "UPtr", hFIMULTIBITMAP, "Int", PageNumber, "UPtr")
@@ -1189,8 +1416,9 @@ FreeImage_UnlockPage(hFIMULTIBITMAP, hImage, changed) {
    ; Unlocks a previously locked page and gives it back to the multi-page engine. When the last
    ; parameter is 1, the page is marked changed and the new page data is applied in the
    ; multi-page bitmap.
+   ; Returns FALSE when hImage is not a locked page, or when its changes could not be kept.
 
-   Return DllCall(getFIMfunc("UnlockPage"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage, "Int", changed)
+   Return DllCall(getFIMfunc("UnlockPage"), "UPtr", hFIMULTIBITMAP, "UPtr", hImage, "Int", changed, "Int")
 }
 
 FreeImage_GetLockedPageNumbers(hFIMULTIBITMAP) {
@@ -1220,12 +1448,22 @@ FreeImage_OpenMemory(pData:=0, size:=0) {
    Return DllCall(getFIMfunc("OpenMemory"), "UPtr", pData, "UInt", size, "UPtr")
 }
 
+FreeImage_OpenMemory64(pData:=0, size:=0) {
+; as FreeImage_OpenMemory(), for buffers of 4 GB and more
+   Return DllCall(getFIMfunc("OpenMemory64"), "UPtr", pData, "Int64", size, "UPtr")
+}
+
 FreeImage_CloseMemory(hMemory) {
    Return DllCall(getFIMfunc("CloseMemory"), "UPtr", hMemory)
 }
 
 FreeImage_TellMemory(hMemory) {
    Return DllCall(getFIMfunc("TellMemory"), "UPtr", hMemory)
+}
+
+FreeImage_TellMemory64(hMemory) {
+; the position past 2 GB too; -1 on failure
+   Return DllCall(getFIMfunc("TellMemory64"), "UPtr", hMemory, "Int64")
 }
 
 FreeImage_SeekMemory(hMemory, offset, origin) {
@@ -1241,19 +1479,32 @@ FreeImage_SeekMemory(hMemory, offset, origin) {
    Return DllCall(getFIMfunc("SeekMemory"), "UPtr", hMemory, "Int", offset, "Int", origin)
 }
 
+FreeImage_SeekMemory64(hMemory, offset, origin) {
+; as FreeImage_SeekMemory(), with a 64-bit offset
+   Return DllCall(getFIMfunc("SeekMemory64"), "UPtr", hMemory, "Int64", offset, "Int", origin)
+}
+
 FreeImage_AcquireMemory(hMemory, ByRef BufAdr, ByRef BufSize) {
 ; BufAdr receives a pointer owned by the stream, valid until it is closed or written to
    BufAdr := 0, BufSize := 0
    Return DllCall(getFIMfunc("AcquireMemory"), "UPtr", hMemory, "UPtr*", BufAdr, "UInt*", BufSize)
 }
 
+FreeImage_AcquireMemory64(hMemory, ByRef BufAdr, ByRef BufSize) {
+; as FreeImage_AcquireMemory(), for streams of 4 GB and more
+   BufAdr := 0, BufSize := 0
+   Return DllCall(getFIMfunc("AcquireMemory64"), "UPtr", hMemory, "UPtr*", BufAdr, "Int64*", BufSize)
+}
+
 FreeImage_SaveToMemory(FIF, hImage, hMemory, Flags:=0) {
 ; 0:BMP 2:JPG 13:PNG 18:TIF 25:GIF
+; Flags: FreeImage_Save()
    Return DllCall(getFIMfunc("SaveToMemory"), "Int", FIF, "UPtr", hImage, "UPtr", hMemory, "Int", Flags)
 }
 
 FreeImage_LoadFromMemory(FIF, hMemory, flags:=0) {
-; FIF=-1 detects the format
+; pass FIF = -1 to detect the format
+; flags: see FreeImage_Load()
    If (FIF=-1 || FIF="")
       FIF := FreeImage_GetFileTypeFromMemory(hMemory)
    Return DllCall(getFIMfunc("LoadFromMemory"), "Int", FIF, "UPtr", hMemory, "Int", flags, "UPtr")
@@ -1271,12 +1522,14 @@ FreeImage_WriteMemory(pBuffer, size, count, hMemory) {
 
 FreeImage_LoadMultiBitmapFromMemory(FIF, hMemory, flags:=0) {
 ; FIF=-1 detects the format; hMemory must stay open until FreeImage_CloseMultiBitmap(), which discards edits: save them with FreeImage_SaveMultiBitmapToMemory()
+; flags: see FreeImage_OpenMultiBitmap()
    If (FIF=-1 || FIF="")
       FIF := FreeImage_GetFileTypeFromMemory(hMemory)
    Return DllCall(getFIMfunc("LoadMultiBitmapFromMemory"), "Int", FIF, "UPtr", hMemory, "Int", flags, "UPtr")
 }
 
 FreeImage_SaveMultiBitmapToMemory(FIF, hFIMULTIBITMAP, hMemory, flags:=0) {
+; flags: FreeImage_CloseMultiBitmap()
    Return DllCall(getFIMfunc("SaveMultiBitmapToMemory"), "Int", FIF, "UPtr", hFIMULTIBITMAP, "UPtr", hMemory, "Int", flags)
 }
 
@@ -1590,6 +1843,7 @@ FreeImage_FlipVertical(hImage) {
 
 FreeImage_Rescale(hImage, w, h, filter:=3) {
 ; Filter parameter options
+; -1 = FILTER_NEAREST;   Nearest neighbour, the fastest mode
 ; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
 ; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
 ; 2 = FILTER_BILINEAR;   Bilinear filter
@@ -1603,13 +1857,12 @@ FreeImage_Rescale(hImage, w, h, filter:=3) {
 }
 
 FreeImage_RescaleRect(hImage, dstW, dstH, x, y, w, h, filter:=0, flags:=2) {
-; Filter parameter options
-; see FreeImage_Rescale()
-
-; Flags options:
-; FI_RESCALE_DEFAULT         0x00   // default options; none of the following other options apply
-; FI_RESCALE_TRUE_COLOR      0x01   // for non-transparent greyscale images, convert to 24-bit if src bitdepth <= 8 (default is a 8-bit greyscale image). 
-; FI_RESCALE_OMIT_METADATA   0x02   // do not copy metadata to the rescaled image
+; Filter parameter options, see FreeImage_Rescale()
+;
+; flags - 0, or these combined with |:
+; FI_RESCALE_DEFAULT = 0x00; none of the options below
+; FI_RESCALE_TRUE_COLOR = 0x01; an image of 8 bits or less comes back 24-bit (32-bit if transparent), not 8-bit greyscale
+; FI_RESCALE_OMIT_METADATA = 0x02; do not copy the metadata to the rescaled image
 
    If (hImage="")
       Return
@@ -1626,13 +1879,7 @@ FreeImage_RescaleRectRawBits(srcBits, dstBits, FimType, imgW, imgH, srcStride, d
 }
 
 FreeImage_MakeThumbnail(hImage, squareSize, convert:=1) {
-; Filter parameter options
-; 0 = FILTER_BOX;        Box, pulse, Fourier window, 1st order (constant) B-Spline
-; 1 = FILTER_BICUBIC;    Mitchell and Netravali's two-param cubic filter
-; 2 = FILTER_BILINEAR;   Bilinear filter
-; 3 = FILTER_BSPLINE;    4th order (cubic) B-Spline
-; 4 = FILTER_CATMULLROM; Catmull-Rom spline, Overhauser spline
-; 5 = FILTER_LANCZOS3;   Lanczos-windowed sinc filter
+; Filter parameter options, see FreeImage_Rescale()
 
    Return DllCall(getFIMfunc("MakeThumbnail"), "UPtr", hImage, "Int", squareSize, "Int", convert, "UPtr")
 }
@@ -1745,6 +1992,12 @@ FreeImage_Composite(hImage, useFileBkg:=0, RGBArray:="255,255,255", hImageBkg:=0
 
 FreeImage_EnlargeCanvas(hImage, left, top, right, bottom, color:="", options:=0) {
 ; Returns a new image with the margins added, negative ones crop; color - as in FreeImage_AllocateExT(), required unless it only crops
+; options - 0, or these combined with |:
+; FI_COLOR_IS_RGB_COLOR = 0x00; the color's alpha is ignored: a 32-bit image gets alpha 255; a palettized one gets the nearest palette color
+; FI_COLOR_IS_RGBA_COLOR = 0x01; 8-bit grey, 24 and 32-bit: the alpha blends the color over black; alpha 0 leaves the new area black (transparent at 32-bit)
+; FI_COLOR_FIND_EQUAL_COLOR = 0x02; palettized: the palette entry equal to the color, else the color's alpha as the index
+; FI_COLOR_ALPHA_IS_INDEX = 0x04; palettized: the color's alpha is the palette index to fill with
+; FI_COLOR_SET_ALPHA = 0x08; no blending: a 32-bit image gets the color's alpha as its alpha
    pColor := FIMcolorPointer(color, colorBuf)
    Return DllCall(getFIMfunc("EnlargeCanvas"), "UPtr", hImage, "Int", left, "Int", top, "Int", right, "Int", bottom, "UPtr", pColor, "Int", options, "UPtr")
 }
@@ -1841,12 +2094,12 @@ getFIMfunc(funct) {
 ; this function is meant to enable 32 bits compatibility
 
    Static fList0 := "|CreateTag|DeInitialise|GetCopyrightMessage|GetFIFCount|GetVersion|IsLittleEndian|"
-        , fList4 := "|Clone|CloneTag|CloseMemory|ConvertTo16Bits555|ConvertTo16Bits565|ConvertTo24Bits|ConvertTo32Bits|ConvertTo4Bits|ConvertTo8Bits|ConvertToFloat|ConvertToGreyscale|ConvertToRGB16|ConvertToRGBA16|ConvertToRGBAF|ConvertToRGBF|ConvertToUINT16|DeleteTag|DestroyICCProfile|FIFSupportsICCProfiles|FIFSupportsNoPixels|FIFSupportsReading|FIFSupportsWriting|FindCloseMetadata|FlipHorizontal|FlipVertical|GetBits|GetBlueMask|GetBPP|GetColorsUsed|GetColorType|GetDIBSize|GetDotsPerMeterX|GetDotsPerMeterY|GetFIFDescription|GetFIFExtensionList|GetFIFFromFilename|GetFIFFromFilenameU|GetFIFFromFormat|GetFIFFromMime|GetFIFMimeType|GetFIFRegExpr|GetFormatFromFIF|GetGreenMask|GetHeight|GetICCProfile|GetImageType|GetInfo|GetInfoHeader|GetLine|GetMemorySize|GetPageCount|GetPalette|GetPitch|GetRedMask|GetTagCount|GetTagDescription|GetTagID|GetTagKey|GetTagLength|GetTagType|GetTagValue|GetThumbnail|GetTransparencyCount|GetTransparencyTable|GetTransparentIndex|GetWidth|HasBackgroundColor|HasPixels|HasRGBMasks|Initialise|Invert|IsPluginEnabled|IsTransparent|PreMultiplyWithAlpha|SetOutputMessage|SetOutputMessageStdCall|TellMemory|Unload|"
-        , fList8 := "|AppendPage|AppendPageEx|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToStandardType|DeletePage|DeletePageEx|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetChannel|GetComplexChannel|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
-        , fList12 := "|AcquireMemory|AdjustBrightness|AdjustContrast|AdjustCurve|AdjustGamma|ConvertLine16_555_To16_565|ConvertLine16_565_To16_555|ConvertLine16To24_555|ConvertLine16To24_565|ConvertLine16To32_555|ConvertLine16To32_565|ConvertLine16To4_555|ConvertLine16To4_565|ConvertLine16To8_555|ConvertLine16To8_565|ConvertLine1To4|ConvertLine1To8|ConvertLine24To16_555|ConvertLine24To16_565|ConvertLine24To32|ConvertLine24To4|ConvertLine24To8|ConvertLine32To16_555|ConvertLine32To16_565|ConvertLine32To24|ConvertLine32To4|ConvertLine32To8|ConvertLine4To8|ConvertToType|CreateICCProfile|FillBackground|FindFirstMetadata|GetFileTypeFromHandle|GetHistogram|GetLockedPageNumbers|InsertPage|InsertPageEx|Load|LoadFromMemory|LoadMultiBitmapFromMemory|LoadU|MakeThumbnail|MovePage|SeekMemory|SetChannel|SetComplexChannel|SetTransparencyTable|SwapPaletteIndices|TagToString|UnlockPage|ValidateFromHandle|ZLibCRC32|"
-        , fList16 := "|Composite|ConvertLine1To16_555|ConvertLine1To16_565|ConvertLine1To24|ConvertLine1To32|ConvertLine4To16_555|ConvertLine4To16_565|ConvertLine4To24|ConvertLine4To32|ConvertLine8To16_555|ConvertLine8To16_565|ConvertLine8To24|ConvertLine8To32|ConvertLine8To4|GetMetadata|GetPixelColor|GetPixelIndex|JPEGTransform|JPEGTransformU|LoadFromHandle|LookupSVGColor|LookupX11Color|OpenMultiBitmapFromHandle|ReadMemory|Rescale|Rotate|Save|SaveMultiBitmapToMemory|SaveToMemory|SaveU|SetMetadata|SetMetadataKeyValue|SetPixelColor|SetPixelIndex|SwapColors|WriteMemory|ZLibCompress|ZLibGUnzip|ZLibGZip|ZLibUncompress|"
+        , fList4 := "|Clone|CloneTag|CloseMemory|ConvertTo16Bits555|ConvertTo16Bits565|ConvertTo24Bits|ConvertTo32Bits|ConvertTo4Bits|ConvertTo8Bits|ConvertToFloat|ConvertToGreyscale|ConvertToRGB16|ConvertToRGBA16|ConvertToRGBAF|ConvertToRGBF|ConvertToUINT16|DeleteTag|DestroyICCProfile|FIFSupportsICCProfiles|FIFSupportsNoPixels|FIFSupportsReading|FIFSupportsWriting|FindCloseMetadata|FlipHorizontal|FlipVertical|GetBits|GetBlueMask|GetBPP|GetColorsUsed|GetColorType|GetDIBSize|GetDotsPerMeterX|GetDotsPerMeterY|GetFIFDescription|GetFIFExtensionList|GetFIFFromFilename|GetFIFFromFilenameU|GetFIFFromFormat|GetFIFFromMime|GetFIFMimeType|GetFIFRegExpr|GetFormatFromFIF|GetGreenMask|GetHeight|GetICCProfile|GetImageType|GetInfo|GetInfoHeader|GetLine|GetMemorySize|GetPageCount|GetPalette|GetPitch|GetRedMask|GetTagCount|GetTagDescription|GetTagID|GetTagKey|GetTagLength|GetTagType|GetTagValue|GetThumbnail|GetTransparencyCount|GetTransparencyTable|GetTransparentIndex|GetWidth|HasBackgroundColor|HasPixels|HasRGBMasks|Initialise|Invert|IsPluginEnabled|IsTransparent|PreMultiplyWithAlpha|SetOutputMessage|SetOutputMessageStdCall|TellMemory|TellMemory64|Unload|"
+        , fList8 := "|AppendPage|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToStandardType|DeletePage|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetBuiltInICCProfile|GetChannel|GetComplexChannel|GetDisplayICCProfile|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetICCProfileColorSpace|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
+        , fList12 := "|AcquireMemory|AcquireMemory64|AdjustBrightness|AdjustContrast|AdjustCurve|AdjustGamma|ConvertLine16_555_To16_565|ConvertLine16_565_To16_555|ConvertLine16To24_555|ConvertLine16To24_565|ConvertLine16To32_555|ConvertLine16To32_565|ConvertLine16To4_555|ConvertLine16To4_565|ConvertLine16To8_555|ConvertLine16To8_565|ConvertLine1To4|ConvertLine1To8|ConvertLine24To16_555|ConvertLine24To16_565|ConvertLine24To32|ConvertLine24To4|ConvertLine24To8|ConvertLine32To16_555|ConvertLine32To16_565|ConvertLine32To24|ConvertLine32To4|ConvertLine32To8|ConvertLine4To8|ConvertToType|CreateICCProfile|FillBackground|FindFirstMetadata|GetFileTypeFromHandle|GetHistogram|GetLockedPageNumbers|InsertPage|Load|LoadFromMemory|LoadMultiBitmapFromMemory|LoadU|MakeThumbnail|MovePage|OpenMemory64|SeekMemory|SetChannel|SetComplexChannel|SetDisplayICCProfile|SetTransparencyTable|SwapPaletteIndices|TagToString|UnlockPage|ValidateFromHandle|ZLibCRC32|"
+        , fList16 := "|ApplyICCProfile|Composite|ConvertCMYKToRGB|ConvertLine1To16_555|ConvertLine1To16_565|ConvertLine1To24|ConvertLine1To32|ConvertLine4To16_555|ConvertLine4To16_565|ConvertLine4To24|ConvertLine4To32|ConvertLine8To16_555|ConvertLine8To16_565|ConvertLine8To24|ConvertLine8To32|ConvertLine8To4|ConvertToCMYK|ConvertToICCProfile|GetICCProfileDescription|GetMetadata|GetPixelColor|GetPixelIndex|JPEGTransform|JPEGTransformU|LoadFromHandle|LookupSVGColor|LookupX11Color|OpenMultiBitmapFromHandle|ReadMemory|Rescale|Rotate|Save|SaveMultiBitmapToMemory|SaveToMemory|SaveU|SeekMemory64|SetMetadata|SetMetadataKeyValue|SetPixelColor|SetPixelIndex|SwapColors|WriteMemory|ZLibCompress|ZLibGUnzip|ZLibGZip|ZLibUncompress|"
         , fList20 := "|ApplyPaletteIndexMapping|ColorQuantizeEx|Copy|CreateView|Paste|RegisterExternalPlugin|RegisterLocalPlugin|SaveMultiBitmapToHandle|SaveToHandle|TmoDrago03|TmoFattal02|TmoReinhard05|"
-        , fList24 := "|Allocate|ApplyColorMapping|ConvertLine1To32MapTransparency|ConvertLine4To32MapTransparency|ConvertLine8To32MapTransparency|JPEGCrop|JPEGCropU|OpenMultiBitmap|OpenMultiBitmapU|ToneMapping|"
+        , fList24 := "|Allocate|ApplyColorMapping|ConvertLine1To32MapTransparency|ConvertLine4To32MapTransparency|ConvertLine8To32MapTransparency|JPEGCrop|JPEGCropU|OpenMultiBitmap|OpenMultiBitmapU|SoftProof|ToneMapping|"
         , fList28 := "|AllocateHeader|AllocateT|EnlargeCanvas|"
         , fList32 := "|AdjustColors|AllocateHeaderT|ConvertToRawBits|GetAdjustColorsLookupTable|JPEGTransformCombined|JPEGTransformCombinedFromMemory|JPEGTransformCombinedU|"
         , fList36 := "|AllocateEx|AllocateHeaderForBits|ConvertFromRawBits|RescaleRect|TmoReinhard05Ex|"
