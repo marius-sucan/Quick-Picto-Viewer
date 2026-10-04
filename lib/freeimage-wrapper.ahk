@@ -8,20 +8,24 @@
 ; Change log:
 ; =============================
 ;
-; 29 September 2026 - v2.01
+; 1 October 2026 - v2.00
+; - added FreeImage_OpenMemory64(), FreeImage_AcquireMemory64(), FreeImage_SeekMemory64() and FreeImage_TellMemory64():
+;   memory streams of 4 GB and more, and positions past 2 GB
+;
 ; - added the color management functions (ICC profiles, Little CMS): FreeImage_ConvertToICCProfile(), FreeImage_ApplyICCProfile(),
 ;   FreeImage_ConvertToCMYK(), FreeImage_ConvertCMYKToRGB(), FreeImage_SoftProof(), FreeImage_GetBuiltInICCProfile(),
 ;   FreeImage_GetICCProfileDescription(), FreeImage_GetICCProfileColorSpace() and FreeImage_GetICCProfileData()
 ;
-; - added FreeImage_OpenMemory64(), FreeImage_AcquireMemory64(), FreeImage_SeekMemory64() and FreeImage_TellMemory64():
-;   memory streams of 4 GB and more, and positions past 2 GB
-;
 ; - added the FIF_LOAD_DISPLAY_ICC load flag, FreeImage_SetDisplayICCProfile() and FreeImage_GetDisplayICCProfile():
 ;   images loaded in the display's colors
-;
-; 22 September 2026 - v2.00
+; - APNG_LINEAR_BLEND flag for FreeImage_OpenMultiBitmap(): animated PNG frames blended in linear light
+; - added FreeImage_MustTonemap(): whether an image needs tone mapping to be displayed
+; - added FreeImage_ConvertToLinear(): an image in linear light, its transfer curve undone, PQ included
+; - the J2K_UNSCALED and JP2_UNSCALED load flags
+
 ; - implemented all the remaining functions, except the ANSI variants
-; - FreeImage_OpenMultiBitmap() takes Unicode paths; added FreeImage_GetFrameDelays() and the *PageEx() functions
+; - FreeImage_OpenMultiBitmap() takes Unicode paths
+; - added FreeImage_GetFrameDelays()
 ; - AVIF, HEIF and APNG in FreeImage_GetFileType()
 ;
 ; 10 January 2025 - v1.91
@@ -185,7 +189,7 @@ FreeImage_GetVersion() {
 }
 
 FreeImage_GetLibVersion() {
-   Return 2.01 ; mardi 29 septembre 2026
+   Return 2.00 ; 1st of October 2026
 }
 
 FreeImage_GetCopyrightMessage() {
@@ -306,6 +310,7 @@ FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 ; RAW_UNPROCESSED = 8; the raw sensor data, not demosaiced, as FIT_UINT16
 ; TARGA_LOAD_RGB888 = 1; load 16-bit (RGB555) and 32-bit TGA files as 24-bit RGB, dropping the alpha
 ; TIFF_CMYK = 0x0001; keep a CMYK TIFF as CMYK, not converted to RGB
+; J2K_UNSCALED = 1, JP2_UNSCALED = 1; keep samples of 1 to 7 and 9 to 15 bits as the file holds them, not spread over 8 or 16 bits; tagged "UnscaledBits"
 
    If !ImgPath
       Return
@@ -1044,12 +1049,12 @@ FreeImage_ConvertToGreyscale(hImage) {
 }
 
 FreeImage_ColorQuantize(hImage, quantizeAlgo:=0) {
-   ; hImage - input must be a 24 or a 32 bits image
-   ; quantizeAlgo:
-      ; 0 = FIQ_WUQUANT  - Xiaolin Wu color quantization algorithm
-      ; 1 = FIQ_NNQUANT  - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
-      ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
-   ; the function returns an 8 bit image
+; hImage - input must be a 24 or a 32 bits image
+; quantizeAlgo:
+   ; 0 = FIQ_WUQUANT  - Xiaolin Wu color quantization algorithm
+   ; 1 = FIQ_NNQUANT  - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
+   ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
+; the function returns an 8 bit image
    Return DllCall(getFIMfunc("ColorQuantize"), "UPtr", hImage, "Int", quantizeAlgo, "UPtr")
 }
 
@@ -1066,30 +1071,30 @@ FreeImage_Threshold(hImage, TT:=0) { ; TT: 0 - 255
 }
 
 FreeImage_Dither(hImage, ditherAlgo:=0) {
-   ; ditherAlgo parameter: dithering method
-   ; FID_FS           = 0   // Floyd & Steinberg error diffusion
-   ; FID_BAYER4x4     = 1   // Bayer ordered dispersed dot dithering (order 2 dithering matrix)
-   ; FID_BAYER8x8     = 2   // Bayer ordered dispersed dot dithering (order 3 dithering matrix)
-   ; FID_CLUSTER6x6   = 3   // Ordered clustered dot dithering (order 3 - 6x6 matrix)
-   ; FID_CLUSTER8x8   = 4   // Ordered clustered dot dithering (order 4 - 8x8 matrix)
-   ; FID_CLUSTER16x16 = 5   // Ordered clustered dot dithering (order 8 - 16x16 matrix)
-   ; FID_BAYER16x16   = 6   // Bayer ordered dispersed dot dithering (order 4 dithering matrix)
-   ; it returns an 1-bit image
+; ditherAlgo parameter: dithering method
+; FID_FS           = 0   // Floyd & Steinberg error diffusion
+; FID_BAYER4x4     = 1   // Bayer ordered dispersed dot dithering (order 2 dithering matrix)
+; FID_BAYER8x8     = 2   // Bayer ordered dispersed dot dithering (order 3 dithering matrix)
+; FID_CLUSTER6x6   = 3   // Ordered clustered dot dithering (order 3 - 6x6 matrix)
+; FID_CLUSTER8x8   = 4   // Ordered clustered dot dithering (order 4 - 8x8 matrix)
+; FID_CLUSTER16x16 = 5   // Ordered clustered dot dithering (order 8 - 16x16 matrix)
+; FID_BAYER16x16   = 6   // Bayer ordered dispersed dot dithering (order 4 dithering matrix)
+; it returns an 1-bit image
 
    Return DllCall(getFIMfunc("Dither"), "UPtr", hImage, "Int", ditherAlgo, "UPtr")
 }
 
 FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
-   ; Converts a High Dynamic Range image (48-bit RGB or 96-bit RGBF) to a 24-bit RGB image, suitable for display.
-   ; function required to properly display HDR and RAW images
+; Converts a High Dynamic Range image (48-bit RGB or 96-bit RGBF) to a 24-bit RGB image, suitable for display.
+; function required to properly display HDR and RAW images
 
-   ; algo parameter and p1/p2 intervals and meaning 
-   ; 0 = FITMO_DRAGO03    ; Adaptive logarithmic mapping (F. Drago, 2003)
-         ; p1 = gamma [0.0, 9.9]; p2 = exposure [-8, 8]
-   ; 1 = FITMO_REINHARD05 ; Dynamic range reduction inspired by photoreceptor physiology (E. Reinhard, 2005)
-         ; p1 = intensity [-8, 8]; p2 = contrast [0.3, 1.0]
-   ; 2 = FITMO_FATTAL02   ; Gradient domain High Dynamic Range compression (R. Fattal, 2002)
-         ; p1 = saturation [0.4, 0.6]; p2 = attenuation [0.8, 0.9]
+; algo parameter and p1/p2 intervals and meaning 
+; 0 = FITMO_DRAGO03    ; Adaptive logarithmic mapping (F. Drago, 2003)
+      ; p1 = gamma [0.0, 9.9]; p2 = exposure [-8, 8]
+; 1 = FITMO_REINHARD05 ; Dynamic range reduction inspired by photoreceptor physiology (E. Reinhard, 2005)
+      ; p1 = intensity [-8, 8]; p2 = contrast [0.3, 1.0]
+; 2 = FITMO_FATTAL02   ; Gradient domain High Dynamic Range compression (R. Fattal, 2002)
+      ; p1 = saturation [0.4, 0.6]; p2 = attenuation [0.8, 0.9]
 
    Return DllCall(getFIMfunc("ToneMapping"), "UPtr", hImage, "Int", algo, "Double", p1, "Double", p2, "UPtr")
 }
@@ -1119,6 +1124,29 @@ FreeImage_TmoReinhard05Ex(hImage, intensity:=0, contrast:=0, adaptation:=1, colo
 FreeImage_TmoFattal02(hImage, colorSaturation:=0.5, attenuation:=0.85) {
 ; colorSaturation [0.4, 0.6], attenuation [0.8, 0.9]
    Return DllCall(getFIMfunc("TmoFattal02"), "UPtr", hImage, "Double", colorSaturation, "Double", attenuation, "UPtr")
+}
+
+FreeImage_MustTonemap(hImage, FIF) {
+; Whether the image needs tone mapping to be displayed.
+; FIF is the format type [ FREE_IMAGE_FORMAT ] returned by FreeImage_GetFileType().
+; -1 = FITM_ERROR    ; no image, or an unknown image type
+;  0 = FITM_NONE     ; tone mapping is not required
+;  1 = FITM_OPTIONAL ; linear light within the display's range, or an uncertain encoding: shown as it is, it may look dark or flat
+;  2 = FITM_REQUIRED ; HDR or floating-point RGB: use FreeImage_ToneMapping() to display it
+;  3 = FITM_PQ       ; a PQ image (SMPTE ST 2084): use FreeImage_ConvertToLinear() to undo its curve, then FreeImage_ToneMapping()
+;  4 = FITM_UNSCALED ; samples of fewer bits than the image type holds, loaded with J2K_UNSCALED: load the file without it to correct it
+;
+; The tone mapping operators take linear light: FreeImage_ConvertToLinear() gives it.
+   Return DllCall(getFIMfunc("MustTonemap"), "UPtr", hImage, "Int", FIF, "Int")
+}
+
+FreeImage_ConvertToLinear(hImage, flags:=0) {
+; Returns an RGBF image (RGBAF with alpha) in linear light, 1.0 = SDR reference white, 203 cd/m2.
+; To display the image, feed it to FreeImage_ToneMapping().
+; The type of curves undone: the CICP tag's (PQ, HLG, sRGB, BT.709...), else the ICC profile's, else sRGB; floating-point images stay as they are.
+; flags: FI_LINEAR_SRGB_PRIMARIES = 0x01; convert the colors to sRGB's primaries, e.g. BT.2020 ones; otherwise they keep the image's.
+; Accepts standard bitmaps, UINT16, RGB16, RGBA16, FLOAT, RGBF and RGBAF images; returns 0 for the others.
+   Return DllCall(getFIMfunc("ConvertToLinear"), "UPtr", hImage, "Int", flags, "UPtr")
 }
 
 ; === ICC profile functions ===
@@ -1312,6 +1340,7 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ; FIF_LOAD_NOPIXELS = 0x8000; retrieve only the properties: each page's size, type, metadata and frame time; no pixels
 ; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to the display's colors, see FreeImage_SetDisplayICCProfile(); ignored with FIF_LOAD_NOPIXELS
 ;
+; APNG_LINEAR_BLEND = 4; APNG, with APNG_PLAYBACK: translucent frames blended in linear light, not on the stored values
 ; APNG_PLAYBACK = 2; APNG: every frame as a viewer shows it, composited on the canvas, as 32-bit
 ; AVIF_PLAYBACK = 2; AVIF image sequence: every frame as 32-bit RGBA, 8 bits per channel, whatever its own format
 ; GIF_LOAD256 = 1; GIF: frames with a palette of 16 colours or fewer load as 8-bit, not as 1-bit or 4-bit
@@ -1370,7 +1399,6 @@ FreeImage_CloseMultiBitmap(hFIMULTIBITMAP, flags:=0) {
 ; WEBP_LOSSLESS = 0x100; lossless
 ;
 ; Returns FALSE when the changes could not be written; the file is then left as it was.
-
    If (hFIMULTIBITMAP="")
       Return
 
@@ -2101,7 +2129,7 @@ getFIMfunc(funct) {
 
    Static fList0 := "|CreateTag|DeInitialise|GetCopyrightMessage|GetFIFCount|GetVersion|IsLittleEndian|"
         , fList4 := "|Clone|CloneTag|CloseMemory|ConvertTo16Bits555|ConvertTo16Bits565|ConvertTo24Bits|ConvertTo32Bits|ConvertTo4Bits|ConvertTo8Bits|ConvertToFloat|ConvertToGreyscale|ConvertToRGB16|ConvertToRGBA16|ConvertToRGBAF|ConvertToRGBF|ConvertToUINT16|DeleteTag|DestroyICCProfile|FIFSupportsICCProfiles|FIFSupportsNoPixels|FIFSupportsReading|FIFSupportsWriting|FindCloseMetadata|FlipHorizontal|FlipVertical|GetBits|GetBlueMask|GetBPP|GetColorsUsed|GetColorType|GetDIBSize|GetDotsPerMeterX|GetDotsPerMeterY|GetFIFDescription|GetFIFExtensionList|GetFIFFromFilename|GetFIFFromFilenameU|GetFIFFromFormat|GetFIFFromMime|GetFIFMimeType|GetFIFRegExpr|GetFormatFromFIF|GetGreenMask|GetHeight|GetICCProfile|GetImageType|GetInfo|GetInfoHeader|GetLine|GetMemorySize|GetPageCount|GetPalette|GetPitch|GetRedMask|GetTagCount|GetTagDescription|GetTagID|GetTagKey|GetTagLength|GetTagType|GetTagValue|GetThumbnail|GetTransparencyCount|GetTransparencyTable|GetTransparentIndex|GetWidth|HasBackgroundColor|HasPixels|HasRGBMasks|Initialise|Invert|IsPluginEnabled|IsTransparent|PreMultiplyWithAlpha|SetOutputMessage|SetOutputMessageStdCall|TellMemory|TellMemory64|Unload|"
-        , fList8 := "|AppendPage|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToStandardType|DeletePage|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetBuiltInICCProfile|GetChannel|GetComplexChannel|GetDisplayICCProfile|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetICCProfileColorSpace|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
+        , fList8 := "|AppendPage|CloneMetadata|CloseMultiBitmap|ColorQuantize|ConvertToLinear|ConvertToStandardType|DeletePage|Dither|FIFSupportsExportBPP|FIFSupportsExportType|FindNextMetadata|GetBackgroundColor|GetBuiltInICCProfile|GetChannel|GetComplexChannel|GetDisplayICCProfile|GetFileType|GetFileTypeFromMemory|GetFileTypeU|GetICCProfileColorSpace|GetMetadataCount|GetScanLine|LockPage|MultigridPoissonSolver|MustTonemap|OpenMemory|SetBackgroundColor|SetDotsPerMeterX|SetDotsPerMeterY|SetPluginEnabled|SetTagCount|SetTagDescription|SetTagID|SetTagKey|SetTagLength|SetTagType|SetTagValue|SetThumbnail|SetTransparent|SetTransparentIndex|Threshold|Validate|ValidateFromMemory|ValidateU|"
         , fList12 := "|AcquireMemory|AcquireMemory64|AdjustBrightness|AdjustContrast|AdjustCurve|AdjustGamma|ConvertLine16_555_To16_565|ConvertLine16_565_To16_555|ConvertLine16To24_555|ConvertLine16To24_565|ConvertLine16To32_555|ConvertLine16To32_565|ConvertLine16To4_555|ConvertLine16To4_565|ConvertLine16To8_555|ConvertLine16To8_565|ConvertLine1To4|ConvertLine1To8|ConvertLine24To16_555|ConvertLine24To16_565|ConvertLine24To32|ConvertLine24To4|ConvertLine24To8|ConvertLine32To16_555|ConvertLine32To16_565|ConvertLine32To24|ConvertLine32To4|ConvertLine32To8|ConvertLine4To8|ConvertToType|CreateICCProfile|FillBackground|FindFirstMetadata|GetFileTypeFromHandle|GetHistogram|GetLockedPageNumbers|InsertPage|Load|LoadFromMemory|LoadMultiBitmapFromMemory|LoadU|MakeThumbnail|MovePage|OpenMemory64|SeekMemory|SetChannel|SetComplexChannel|SetDisplayICCProfile|SetTransparencyTable|SwapPaletteIndices|TagToString|UnlockPage|ValidateFromHandle|ZLibCRC32|"
         , fList16 := "|ApplyICCProfile|Composite|ConvertCMYKToRGB|ConvertLine1To16_555|ConvertLine1To16_565|ConvertLine1To24|ConvertLine1To32|ConvertLine4To16_555|ConvertLine4To16_565|ConvertLine4To24|ConvertLine4To32|ConvertLine8To16_555|ConvertLine8To16_565|ConvertLine8To24|ConvertLine8To32|ConvertLine8To4|ConvertToCMYK|ConvertToICCProfile|GetICCProfileDescription|GetMetadata|GetPixelColor|GetPixelIndex|JPEGTransform|JPEGTransformU|LoadFromHandle|LookupSVGColor|LookupX11Color|OpenMultiBitmapFromHandle|ReadMemory|Rescale|Rotate|Save|SaveMultiBitmapToMemory|SaveToMemory|SaveU|SeekMemory64|SetMetadata|SetMetadataKeyValue|SetPixelColor|SetPixelIndex|SwapColors|WriteMemory|ZLibCompress|ZLibGUnzip|ZLibGZip|ZLibUncompress|"
         , fList20 := "|ApplyPaletteIndexMapping|ColorQuantizeEx|Copy|CreateView|Paste|RegisterExternalPlugin|RegisterLocalPlugin|SaveMultiBitmapToHandle|SaveToHandle|TmoDrago03|TmoFattal02|TmoReinhard05|"

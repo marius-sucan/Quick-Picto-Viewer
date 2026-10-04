@@ -12208,7 +12208,7 @@ dummyChangeVProtation() {
    showTOOLtip("Image rotation: " vpIMGrotation "° ", "changeImgRotationInVP", 2, vpIMGrotation/360)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    INIaction(1, "vpIMGrotation", "General")
-   GdipCleanMain(4)
+   BusyUIvpIndicator(4)
    If (AnyWindowOpen=10 && imgEditPanelOpened=1)
    {
       uiSlidersArray["vpIMGrotation", 14] := -1
@@ -61007,10 +61007,10 @@ FIMdropMismatchedICC(hImage) {
 FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
    loadArgs := 0
    GFT := FreeImage_GetFileType(imgPath)
-   If (GFT=34 && loadArgs=0 && RegExMatch(imgPath, "i)(.\.(dng))$"))
+   If (GFT=34 && RegExMatch(imgPath, "i)(.\.(dng))$"))
       loadArgs := (qualityRaw=1) ? 0 : 2
    Else If (GFT=34)
-      loadArgs := (qualityRaw=1) ? 0 : 1
+      loadArgs := (qualityRaw=1) ? 0 : 2
    Else If (GFT=2)
       loadArgs := 8
    Return loadArgs
@@ -61018,14 +61018,27 @@ FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
 
 FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef hasAppliedToneMap) {
    hasAppliedToneMap := ""
-   thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
-   mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>=48) ? 1 : 0
-   ; ToolTip, % mustApplyToneMapping "|" thisAllow "|" externCondition , , , 2
+   tm := FreeImage_MustTonemap(hFIFimgA, GFT)
+   thisAllow := mustApplyToneMapping := (tm=1 && allowToneMappingImg=1 || tm=2 || tm=3) ? 1 : 0
+
+   ; thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
+   ; mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>=48) ? 1 : 0
+   ; ToolTip, % tm "|" mustApplyToneMapping "|" thisAllow "|" externCondition , , , 2
    If (mustApplyToneMapping=1 && thisAllow=1 && externCondition=1)
    {
       ; setWindowTitle("Applying adaptive logarithmic tone mapping to display high color depth image")
       changeMcursor()
       thisStartZeit := A_TickCount
+      If (tm=3) ; PQ curve image 
+      {
+         pqi := FreeImage_ConvertToLinear(hFIFimgA)
+         If pqi 
+         {
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := pqi
+         }
+      }
+
       PixelFormat := FreeImage_GetImageType(hFIFimgA, 1)
       If (!InStr(PixelFormat, "RGBF") && cmrRAWtoneMapAlgo>2)
       {
@@ -72118,9 +72131,8 @@ ToggleCycleFavesOpen() {
 ToggleColorProfileManage() {
     userPerformColorManagement := !userPerformColorManagement
     INIaction(1, "userPerformColorManagement", "General")
-    pp := (alwaysOpenWithFIM=1) ? "WARNING: This option has no effect when images are loaded through FreeImage.`nThe option to load any image format through FreeImage is currently activated."
     friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
-    showTOOLtip(pp "Color management on image load: " friendly, A_ThisFunc, 1)
+    showTOOLtip("Color management on image load: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -73955,7 +73967,7 @@ calcImgSizeForVP(modus, imgW, imgH, GuiW, GuiH, ByRef ResizedW, ByRef ResizedH) 
 }
 
 defineZoomLevel() {
-   Return (zoomLevel<0.1) ? Round(zoomLevel*100, 1) : Round(zoomLevel*100)
+   Return (zoomLevel<0.1) ? Round(zoomLevel * 100, 1) : Round(zoomLevel * 100)
 }
 
 ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
@@ -74012,7 +74024,7 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
           usePrevious := 0
           mustReloadIMG := ForceIMGload := 1
           If (currentFileIndex!=0 && animGIFplaying!=1)
-             GdipCleanMain(6)
+             BusyUIvpIndicator(6)
        }
 
        disposeCacheIMGs()
@@ -75454,7 +75466,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
 
   pargbPixFmt := (coreDesiredPixFmt="0xE200B") ? -1 : 0
   If (slideShowRunning!=1 && desiredFrameIndex<1 && (A_TickCount - lastInvoked>250) && animGIFplaying!=1)
-     GdipCleanMain(6)
+     BusyUIvpIndicator(6)
 
   changeMcursor()
   thisImgPath := imgPath
@@ -83609,7 +83621,10 @@ FadeMainWindow() {
    r2 := doLayeredWinUpdate(A_ThisFunc, whichWin, glHDC, 125)
 }
 
-GdipCleanMain(modus:=0) {
+BusyUIvpIndicator(modus:=0) {
+    If (AnyWindowOpen=42) ; PanelAdjustToneMapping()
+       Return
+
     If (modus=2)
     {
        vpWinClientSize(mainWidth, mainHeight)
@@ -102031,7 +102046,7 @@ tlbrChangeStuffRotation(modus) {
       {
          If (mouseMode && A_Index>1)
             vpIMGrotation := UIcalculateNewAngleOnMouseCoords(mXo, mYo, mX, mY, ovpIMGrotation, snap)
-         GdipCleanMain(4)
+         BusyUIvpIndicator(4)
          showTOOLtip("Image rotation: " Round(vpIMGrotation, 1) bonusMsg)
       }
    }
