@@ -134,14 +134,19 @@ Class screenQPVimage {
      changeMcursor()
      If (externMode=0)
      {
-         If ((GFT=18 || GFT=25) && noBMP=0)
-         {
-            ; open multi-page GIF and TIFFs
-            multiFlags := (GFT=25) ? 2 : 0
-            hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
-         }
+        If (isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39) && noBMP=0)
+        {
+           ; open multi-page MNG, GIF, WEBP, APNG, AVIF, HEIC and TIFFs
+           multiFlags := isVarEqualTo(GFT, 25, 37, 39) ? 2 : 0
+           If (GFT=35)
+              multiFlags := 1
+           If (userPerformColorManagement=1)
+              multiFlags := multiFlags | 0x4000
 
-         If StrLen(hMultiBMP)>1
+           hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
+        }
+
+         If (StrLen(hMultiBMP)>1)
          {
             hasOpenedMulti := 1
             tFrames := FreeImage_GetPageCount(hMultiBMP)
@@ -151,7 +156,6 @@ Class screenQPVimage {
             If (tFrames>1)
             {
                This.Frames := tFrames
-               fimMultiPage := (GFT=18) ? "tiff" : "gif"
                frameu := clampInRange(frameu, 0, tFrames - 1)
                hPage := FreeImage_LockPage(hMultiBMP, frameu)
                If (hPage!="")

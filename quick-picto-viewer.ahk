@@ -99434,7 +99434,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
      Return addJournalEntry("Failed to load image. FreeImage failed to initialize. " imgPath)
 
   If (noBPPconv=1 || noBMP=1)
-     loadArgs := 0x8000  ; FIF_LOAD_NOPIXELS
+     loadArgs := loadArgs | 0x8000  ; FIF_LOAD_NOPIXELS
   Else If (userPerformColorManagement=1)
      loadArgs := loadArgs | 0x4000  ; FIF_LOAD_DISPLAY_ICC
 
