@@ -47152,7 +47152,7 @@ updateViewportCachesID(oMD5name, indexu, file2rem, file2save) {
    nMD5name := generateThumbName(file2save, 1)
    o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
    trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
-   base := o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
+   base := o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
    newCall := "a0" nMD5name file2save base
    prevCall := "a0" oMD5name file2rem base
    ec := prevCall useGdiBitmap()
@@ -74746,7 +74746,7 @@ RescaleBMPtiny(imgPath, mainWidth, mainHeight) {
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
   partID := "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH useGdiBitmap()
-  thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
+  thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
   If (validBMP(gdiBitmapSmall) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID))
      Return gdiBitmapSmall
 
@@ -74780,7 +74780,7 @@ RescaleBMPtinyVPsize(imgPath, GuiW, GuiH) {
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
   trGdip_GetImageDimensions(useGdiBitmap(), fimgW, fimgH)
   partID := "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH useGdiBitmap()
-  thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
+  thisID := resultedFilesList[currentFileIndex, 1] o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
   If (validBMP(gdiBMPvPsize) && prevImgID=gdiBitmapIDentire && InStr(gdiBitmapIDentire, thisID))
      Return gdiBMPvPsize
 
@@ -74973,7 +74973,7 @@ LoadBitmapForScreen(imgPath, allowCaching, frameu, forceGDIp:=0) {
   {
      MD5name := generateThumbName(imgPath, 1)
      ; fimStuff := (alwaysOpenWithFIM=1) ? 1 desiredFrameIndex totalFramesIndex : 0
-     thisMD5name := MD5name imgPath userHQraw cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapAltExpo allowToneMappingImg
+     thisMD5name := MD5name imgPath userHQraw userPerformColorManagement cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapAltExpo allowToneMappingImg
      tFramesA := Gdip_GetBitmapFramesCount(GDIcacheSRCfileA) - 1
      tFramesB := Gdip_GetBitmapFramesCount(GDIcacheSRCfileB) - 1
      isFramesA := (tFramesA = prevImgDetailsA.Frames) ? 1 : 0
@@ -75462,7 +75462,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   hasFullReloaded := CountGIFframes := totalFramesIndex := 0
   MD5name := generateThumbName(imgPath, 1)
   o_bwDithering := (imgFxMode=4 && bwDithering=1) ? 1 : 0
-  thisImgCall := MD5name imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
+  thisImgCall := MD5name imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex
   If !FileRexists(imgPath) && (InStr(AprevImgCall, imgPath) || InStr(BprevImgCall, imgPath))
      thisImgCall := InStr(AprevImgCall, imgPath) ? "A" : "B"
 
@@ -75674,7 +75674,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   BbackupIMGdetails := AbackupIMGdetails.Clone()
   AbackupIMGdetails := currIMGdetails.Clone()
   p := viewportQPVimage.imgHandle ? 1 : ""     ; this is meant to block caching the dummy GDI+ bitmap when images are loaded through «very-large» mode; see LoadBitmapForScreen()
-  AprevImgCall := "a" GDIbmpFileConnected MD5name p imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
+  AprevImgCall := "a" GDIbmpFileConnected MD5name p imgPath o_bwDithering ColorDepthDithering vpIMGrotation userHQraw userPerformColorManagement cmrRAWtoneMapAlgo allowToneMappingImg cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo desiredFrameIndex "|==|" totalFramesIndex currentUndoLevel undoLevelsRecorded fimgW fimgH
   gdiBitmapIDcall := AprevImgCall
   gdiBitmapIDentire := AprevImgCall rBitmap
   gdiBitmap := rBitmap
