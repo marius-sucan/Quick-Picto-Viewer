@@ -862,7 +862,8 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
     WICsafeRelease(pTransform);
     WICsafeRelease(pFrame);
     WICsafeRelease(pDecoder);
-    // a transform the chain could not read after all must not cost the image its thumbnail
+    // a transform the chain could not read after all must not cost the image its thumbnail;
+    // with useICM=0 the retry builds none, so this recurses once at most
     if (retryPlain)
        return tpWICload(fac, szFileName, targetW, targetH, frameIndex, givenQuality, isFIMokay, srcW, srcH, meta, 0);
 
