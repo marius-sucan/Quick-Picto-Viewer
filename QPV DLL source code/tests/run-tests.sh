@@ -60,6 +60,9 @@ slice mem_sample.part     ../thumbs-pool.h '^\/\/ qpv-mem-sample-begin' '^\/\/ q
 slice slots_extract.part  ../thumbs-pool.h '^\/\/ One attempt at taking a slot' '^\/\/ qpv-job-slot-end' 40 || exit 1
 slice calc_dims.part      ../thumbs-pool.h '^\/\/ qpv-calc-dims-begin'   '^\/\/ qpv-calc-dims-end' 30 || exit 1
 slice gdip_loader.part    ../thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\/\/ qpv-gdip-loader-end' 120 || exit 1
+slice fim_defs.part       ../thumbs-pool.h '^#define TP_JOB_THUMB'      '^#define TP_ERR_PDFLOCKED' 8 || exit 1
+slice fim_config.part     ../thumbs-pool.h '^struct ThumbsConfig {'  '^};' 20 || exit 1
+slice fim_loader.part     ../thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
 echo "   ok"
 
 echo
@@ -266,6 +269,72 @@ else
     echo "  ERROR: the mutation did not apply - update the sed pattern"; fail=1
 fi
 mv -f gdip_loader.orig gdip_loader.part
+
+echo
+echo "== the FreeImage loader of the two worker pools, against the real FreeImage =="
+# tpFIMthumb() and the tone mapping decision FIMapplyToneMapper() makes in the viewer, run
+# against the Linux build of the FreeImage fork QPV ships - checked out and built next to this
+# repository, or wherever QPV_FREEIMAGE_DIR says. Skipped without it: the fork's sample images
+# and FreeImage_MustTonemap() are what is being tested against.
+fimDir=${QPV_FREEIMAGE_DIR:-}
+if [ -z "$fimDir" ]; then
+    gitCommon=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    [ -n "$gitCommon" ] && fimDir="$(dirname "$gitCommon")/../FreeImage-library"
+fi
+fimSo=$(ls -t "$fimDir"/Dist/libfreeimage-*.so 2>/dev/null | head -1)
+if [ -z "$fimSo" ]; then
+    echo "  SKIPPED: no FreeImage fork build found (set QPV_FREEIMAGE_DIR to its checkout)"
+elif g++ $CXXFLAGS -Ishim/fim -o fim_thumb fim_thumb.cpp -ldl -lpthread 2>&1; then
+    mkdir -p fim_thumb_out
+    QPV_FREEIMAGE_SO="$fimSo" ./fim_thumb "$fimDir" fim_thumb_out
+    case $? in
+      0) ;;
+      2) echo "  SKIPPED: $fimSo predates FreeImage_MustTonemap()"; fimSo="" ;;
+      *) fail=1 ;;
+    esac
+else
+    echo "  ERROR: fim_thumb.cpp did not compile"; fail=1
+fi
+
+if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
+    echo
+    echo "== mutation check: the FreeImage loader must reject a misplaced tone mapping decision =="
+    #   A - the verdict asked of the thumbnail: the rescale dropped the ICC profile and the CICP
+    #       tag, so a PQ image is shown as its code values and a colour managed RAW is tone
+    #       mapped a second time;
+    #   B - a PQ image tone mapped without being linearised first;
+    #   C - UINT16 asked for a verdict, which LoadFimFile() never does;
+    #   D - userPerformColorManagement never reaching the decoder.
+    cp fim_loader.part fim_loader.orig
+    for mutant in A B C D; do
+        cp fim_loader.orig fim_loader.part
+        extra=""
+        case $mutant in
+          A) sed -i 's|    const int verdict = tpFIMtoneMapVerdict(dib, GFT);|    const int verdict = tpFIMtoneMapVerdictOnThumb(dib, GFT);|' fim_loader.part
+             extra="-DQPV_FIM_MUTANT"; label="the verdict taken on the thumbnail" ;;
+          B) sed -i 's|    if (toneMap \&\& verdict==FITM_PQ \&\& FIM.ConvertToLinear!=NULL)|    if (false \&\& toneMap)|' fim_loader.part
+             label="PQ code values tone mapped as they are" ;;
+          C) sed -i '/    if (FIM.GetImageType(dib)==FIT_UINT16)/{N;d;}' fim_loader.part
+             label="UINT16 given a verdict" ;;
+          D) sed -i 's|       loadArgs \|= FIF_LOAD_DISPLAY_ICC;|       ;|' fim_loader.part
+             label="FIF_LOAD_DISPLAY_ICC left out" ;;
+        esac
+
+        if cmp -s fim_loader.part fim_loader.orig; then
+            echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
+            continue
+        fi
+
+        g++ $CXXFLAGS -Ishim/fim $extra -o fim_mutant fim_thumb.cpp -ldl -lpthread 2>/dev/null
+        if QPV_FREEIMAGE_SO="$fimSo" ./fim_mutant "$fimDir" fim_thumb_out > /dev/null 2>&1; then
+            echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
+        else
+            echo "   ok - mutant $mutant is caught ($label)"
+        fi
+        rm -f fim_mutant
+    done
+    mv -f fim_loader.orig fim_loader.part
+fi
 
 echo
 echo "== the records the thumbnails pool shares with AutoHotkey =="

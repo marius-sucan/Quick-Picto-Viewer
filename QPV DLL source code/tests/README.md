@@ -236,6 +236,24 @@ function: the bitmap handed back is a **copy** and the file-backed original is d
 bitmap a GIF decodes into into the 32bpp one the effects and the histogram need), and the
 frame is selected *before* the size is read, because the frames of an animated GIF need not
 all be the size of the first. The mutation check hands the file-backed bitmap straight back.
+It also checks that `useICM=1` opens the file through `GdipCreateBitmapFromFileICM()`.
+
+**`fim_thumb.cpp`** — `tpFIMthumb()`, the FreeImage loader both pools share, sliced out of the
+shipped `thumbs-pool.h` and run against the **real** FreeImage: the Linux build of the fork
+QPV ships, bound by the shipped `freeimage-dynamic.h` through `dlopen()` (`shim/fim/windows.h`),
+on the fork's own sample images. It runs when the fork is checked out and built next to this
+repository, or where `QPV_FREEIMAGE_DIR` points, and is skipped otherwise.
+
+It pins the decision `FIMapplyToneMapper()` makes in the viewer, and where in the loader it
+can be made. `FreeImage_MustTonemap()` has to be asked about the bitmap *as loaded*: the
+rescale keeps neither the ICC profile nor, through OpenCV, the CICP tag, so asked afterwards a
+PQ AVIF reads as display encoded and is shown as its code values, and a RAW that colour
+management already made display encoded is tone mapped a second time. The PQ thumbnail must
+equal the one tone mapped from linear light, which is measured, as is the brightness a RAW
+gains from `FIF_LOAD_DISPLAY_ICC`. `shim/fim-env.h` resizes like OpenCV does, keeping nothing
+but the pixels, because a stand-in that kept the metadata would hide exactly that mistake.
+The four mutants take the verdict from the thumbnail, skip the linearisation, give UINT16 a
+verdict, and leave `FIF_LOAD_DISPLAY_ICC` out.
 
 **`thumbs_record.cpp`** — the layout of `ThumbResult` and `ThumbsPoolState`, sliced out of
 the shipped `thumbs-pool.h`. Nothing else pins them: `thumbsPoolFetch()` fills an array of

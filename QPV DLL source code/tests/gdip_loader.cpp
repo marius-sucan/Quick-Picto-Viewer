@@ -153,6 +153,23 @@ int main() {
         if (out!=NULL) Gdiplus::DllExports::GdipDisposeImage(out);
     }
 
+    // ---- colour management -----------------------------------------------------------------
+    printf("  colour management\n");
+    {
+        gShimReset();
+        int srcW = 0, srcH = 0;
+        Gdiplus::GpBitmap *out = tpGDIPload(L"C:\\p\\photo.gif", 250, 250, 0, 6, srcW, srcH, NULL);
+        check(out!=NULL && gShimOpenedICM==0, "left out by default, as the collection pool calls it");
+        if (out!=NULL) Gdiplus::DllExports::GdipDisposeImage(out);
+
+        gShimReset();
+        out = tpGDIPload(L"C:\\p\\photo.gif", 250, 250, 0, 6, srcW, srcH, NULL, 1);
+        check(out!=NULL && gShimOpenedICM==1 && gShimCreatedFromFile==1,
+              "useICM=1 opens through GdipCreateBitmapFromFileICM(), once");
+        check(gShimLiveCount()==1, "and lets go of the file just the same");
+        if (out!=NULL) Gdiplus::DllExports::GdipDisposeImage(out);
+    }
+
     // ---- what is refused, and what it costs ----------------------------------------------
     printf("  the files it refuses\n");
     {

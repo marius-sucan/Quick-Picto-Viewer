@@ -84,6 +84,7 @@ namespace Gdiplus {
 static std::vector<Gdiplus::GpBitmap*> gShimAlive;
 static int gShimCreatedFromFile = 0, gShimCreatedBlank = 0;
 static int gShimDisposed = 0;
+static int gShimOpenedICM = 0;          // of gShimCreatedFromFile, through GdipCreateBitmapFromFileICM()
 
 // what the next GdipCreateBitmapFromFile() hands back
 static int  gShimFileW = 400, gShimFileH = 300;
@@ -105,7 +106,7 @@ static inline void gShimReset() {
         delete gShimAlive[i];
 
     gShimAlive.clear();
-    gShimCreatedFromFile = gShimCreatedBlank = gShimDisposed = 0;
+    gShimCreatedFromFile = gShimCreatedBlank = gShimDisposed = gShimOpenedICM = 0;
     gShimLoadFails = gShimDimensionsFail = gShimResolutionFails = gShimGraphicsFails = 0;
     gShimSelectedFrame = -1;
     gShimLastCreateFormat = 0;
@@ -145,6 +146,13 @@ static inline Status GdipCreateBitmapFromFile(const wchar_t *path, GpBitmap **ou
     gShimCreatedFromFile++;
     *out = b;
     return Ok;
+}
+
+static inline Status GdipCreateBitmapFromFileICM(const wchar_t *path, GpBitmap **out) {
+    const Status st = GdipCreateBitmapFromFile(path, out);
+    if (st==Ok)
+       gShimOpenedICM++;
+    return st;
 }
 
 static inline Status GdipCreateBitmapFromScan0(int w, int h, int, PixelFormat fmt, BYTE*, GpBitmap **out) {

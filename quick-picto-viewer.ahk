@@ -4626,7 +4626,7 @@ QPV_ThumbsPoolBegin(thumbSize, timePerImg, thisImgQuality, wantBitmap, alwaysSav
     paramz .= "|" allowWICloader "|" allowFIMloader "|" thisImgQuality "|" cmrRAWtoneMapAlgo
     paramz .= "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD
     paramz .= "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
-    paramz .= "|" wantBitmap "|" alwaysSave "|" alwaysOpenWithFIM
+    paramz .= "|" wantBitmap "|" alwaysSave "|" alwaysOpenWithFIM "|" userPerformColorManagement
     r := DllCall("qpvmain.dll\thumbsPoolBegin", "Str", paramz, "Int")
     Return r
 }

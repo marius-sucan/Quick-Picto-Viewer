@@ -179,6 +179,7 @@ struct ThumbsConfig {
     int   wantBitmap       = 1;
     int   alwaysSave       = 0;
     int   firstFIM         = 0;
+    int   colorManage      = 0;   // userPerformColorManagement
 };
 
 struct ThumbJob {
@@ -762,13 +763,17 @@ struct TpGdipFacts {
 // behind the same guard the WIC helpers use: a worker that faults on a malformed file takes
 // the whole application down with it. Nothing in here owns anything that would need
 // unwinding, which is what lets __try wrap it at all.
-static Gdiplus::Status tpGuardedGdipOpen(const wchar_t *path, int frameIndex, Gdiplus::GpBitmap **ppBmp,
+static Gdiplus::Status tpGuardedGdipOpen(const wchar_t *path, int frameIndex, int useICM, Gdiplus::GpBitmap **ppBmp,
                                          TpGdipFacts *facts, DWORD *sehCode) {
     Gdiplus::Status st = Gdiplus::GenericError;
     *sehCode = 0;
     __try
     {
-        st = Gdiplus::DllExports::GdipCreateBitmapFromFile(path, ppBmp);
+        // trGdip_CreateBitmapFromFile()'s choice: the embedded ICC profile applied by GDI+
+        if (useICM==1)
+           st = Gdiplus::DllExports::GdipCreateBitmapFromFileICM(path, ppBmp);
+        else
+           st = Gdiplus::DllExports::GdipCreateBitmapFromFile(path, ppBmp);
         if (st==Gdiplus::Ok && *ppBmp==NULL)
            st = Gdiplus::GenericError;
 
@@ -847,14 +852,15 @@ static Gdiplus::GpBitmap* tpGdipResizeCopy(Gdiplus::GpBitmap *src, int w, int h,
 }
 
 static Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int targetW, int targetH, int frameIndex,
-                                     int interpolation, int &srcW, int &srcH, TpSrcMeta *meta = NULL) {
+                                     int interpolation, int &srcW, int &srcH, TpSrcMeta *meta = NULL,
+                                     int useICM = 0) {
     if (path.empty())
        return NULL;
 
     Gdiplus::GpBitmap *loaded = NULL;
     TpGdipFacts facts;
     DWORD sehCode = 0;
-    const Gdiplus::Status st = tpGuardedGdipOpen(path.c_str(), frameIndex, &loaded, &facts, &sehCode);
+    const Gdiplus::Status st = tpGuardedGdipOpen(path.c_str(), frameIndex, useICM, &loaded, &facts, &sehCode);
     if (sehCode!=0)
     {
        // whatever the codec left behind is abandoned on purpose: the object most likely to
@@ -1098,6 +1104,7 @@ static Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int givenW, int 
     return LoadSVGimageEx((UINT)w, (UINT)h, fScaleX, fScaleY, path.c_str(), d2dFac, wicFac);
 }
 
+// qpv-fim-loader-begin
 // ---------------------------------------------------------------------------------------
 //  FreeImage loader; port of the FreeImage branch of MonoGenerateThumb()
 // ---------------------------------------------------------------------------------------
@@ -1195,6 +1202,23 @@ static Gdiplus::GpBitmap* tpFIMtoGdip(FIBITMAPptr dib, int w, int h) {
     return pBitmap;
 }
 
+// The verdict FIMapplyToneMapper() asks FreeImage_MustTonemap() for. UINT16 never gets one:
+// LoadFimFile() turns it into 24 bits grey before asking, and tpFIMthumb() does the same.
+// A FreeImage.dll without the function is left with the bit depth rule, as verdicts.
+static int tpFIMtoneMapVerdict(FIBITMAPptr dib, int GFT) {
+    if (FIM.GetImageType(dib)==FIT_UINT16)
+       return FITM_NONE;
+
+    if (FIM.MustTonemap!=NULL)
+       return FIM.MustTonemap(dib, GFT);
+
+    const int bpp = (int)FIM.GetBPP(dib);
+    if (!((bpp>32 && FIM.GetColorType(dib)!=FIC_RGBALPHA && GFT!=FIF_PNG) || bpp>64))
+       return FITM_NONE;
+
+    return (GFT==FIF_PFM || GFT==FIF_HDR || GFT==FIF_EXR) ? FITM_REQUIRED : FITM_OPTIONAL;
+}
+
 static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring &path, const std::wstring &dst,
                                      DWORD startTick, int &srcW, int &srcH, int &status, int &savedToFile,
                                      TpSrcMeta *meta = NULL) {
@@ -1213,6 +1237,9 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_DISPLAY;
     else if (GFT==FIF_RAW)
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_PREVIEW;
+
+    if (cfg->colorManage==1)
+       loadArgs |= FIF_LOAD_DISPLAY_ICC;
 
     FIBITMAPptr dib = FIM.LoadU(GFT, path.c_str(), loadArgs);
     if (dib==NULL)
@@ -1260,6 +1287,24 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        }
     }
 
+    // Decided on the bitmap as loaded, as FIMapplyToneMapper() decides: the ICC profile and
+    // the CICP tag that tell PQ, linear and display encoded samples apart do not survive
+    // the rescale below. The tone mapping itself runs on the thumbnail.
+    const int verdict = tpFIMtoneMapVerdict(dib, GFT);
+    const bool toneMap = (verdict==FITM_OPTIONAL && cfg->allowToneMapping==1)
+                       || verdict==FITM_REQUIRED || verdict==FITM_PQ;
+    if (toneMap && verdict==FITM_PQ && FIM.ConvertToLinear!=NULL)
+    {
+       // full size, for the same reason; failing, the PQ samples are tone mapped as they
+       // are, like FIMapplyToneMapper() does
+       FIBITMAPptr linear = FIM.ConvertToLinear(dib, 0);
+       if (linear!=NULL)
+       {
+          FIM.Unload(dib);
+          dib = linear;
+       }
+    }
+
     int resizedW = 0, resizedH = 0;
     tpCalcIMGdimensions((int)imgW, (int)imgH, cfg->thumbSize, cfg->thumbSize, resizedW, resizedH);
 
@@ -1273,9 +1318,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     }
     dib = tmp;
 
-    int colorType   = FIM.GetColorType(dib);
-    int imgBPP      = (int)FIM.GetBPP(dib);
-    int imageType   = FIM.GetImageType(dib);
+    int imageType = FIM.GetImageType(dib);
     if (imageType==FIT_UINT16)
     {
        tmp = FIM.ConvertToGreyscale ? FIM.ConvertToGreyscale(dib) : NULL;
@@ -1299,14 +1342,10 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        }
        FIM.Unload(dib);
        dib = tmp;
-       imgBPP    = (int)FIM.GetBPP(dib);
        imageType = FIM.GetImageType(dib);
-       colorType = FIM.GetColorType(dib);
     }
 
-    const int thisAllow = ((GFT==FIF_PFM || GFT==FIF_HDR || GFT==FIF_EXR) && imgBPP>32) ? 1 : cfg->allowToneMapping;
-    const int mustToneMap = ((imgBPP>32 && colorType!=FIC_RGBALPHA && GFT!=FIF_PNG) || imgBPP>64) ? 1 : 0;
-    if (mustToneMap==1 && thisAllow==1)
+    if (toneMap)
     {
        if (imageType!=FIT_RGBF && cfg->toneMapAlgo>2 && FIM.ConvertToRGBF!=NULL)
        {
@@ -1338,17 +1377,12 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
           meta->fimToneMap = 1;    // " (TONE-MAPPED)"
     }
 
-    // The rest of the suffix FIMapplyToneMapper() appends to mainLoadedIMGdetails.PixelFormat,
-    // decided the way the interpreter decides it - off the bit depth and colour type of the
-    // ORIGINAL bitmap, which is why they were kept above. The pool's own tone-mapping test a
-    // few lines up runs on the rescaled one and is left exactly as it was: changing which
-    // images get tone mapped would change the thumbnails, and the histogram the collection
-    // pool measures on this very bitmap.
+    // the rest of the suffix FIMapplyToneMapper() appends to mainLoadedIMGdetails.PixelFormat,
+    // off the bit depth of the bitmap as loaded
     if (meta!=NULL && meta->fimToneMap==0)
     {
-       const int ahkMust = ((fimSrcBPP>32 && fimSrcColor!=FIC_RGBALPHA && GFT!=FIF_PNG) || fimSrcBPP>=48) ? 1 : 0;
        const bool hdrish = (GFT==FIF_PFM || GFT==FIF_RAW || GFT==FIF_JXR || GFT==FIF_HDR || GFT==FIF_EXR);
-       if ((ahkMust==1 || hdrish) && fimSrcBPP>32)
+       if (hdrish && fimSrcBPP>32)
           meta->fimToneMap = 2;    // " (TONE-MAPPABLE)"
        else if (GFT==FIF_RAW && cfg->userHQraw!=1)
           meta->fimToneMap = 2;    // LoadFimFile() marks a low quality RAW the same way
@@ -1367,7 +1401,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        dib = tmp;
     }
 
-    imgBPP = (int)FIM.GetBPP(dib);
+    const int imgBPP = (int)FIM.GetBPP(dib);
     if (imgBPP!=24 && imgBPP!=32)
     {
        tmp = FIM.ConvertTo24Bits(dib);
@@ -1396,6 +1430,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     status = TP_OK;
     return result;
 }
+// qpv-fim-loader-end
 
 // ---------------------------------------------------------------------------------------
 //  one job
@@ -1528,7 +1563,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            {
               res.meta = TpSrcMeta();
               bmp = tpGDIPload(job.src, cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                               res.srcW, res.srcH, &res.meta);
+                               res.srcW, res.srcH, &res.meta, cfg->colorManage);
               res.loaderUsed = 6;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
            }
@@ -1796,6 +1831,7 @@ DLL_API int DLL_CALLCONV thumbsPoolBegin(const wchar_t *packedOptions) {
        cfg->wantBitmap       = (int)TPOPT(16, 1);
        cfg->alwaysSave       = (int)TPOPT(17, 0);
        cfg->firstFIM         = (int)TPOPT(18, 0);
+       cfg->colorManage      = (int)TPOPT(19, 0);
        #undef TPOPT
     }
 

@@ -723,6 +723,8 @@ static void dpWorkerBody(size_t mySlot) {
         tcfg.tmOCVparamB      = cfg->tmOCVparamB;
         tcfg.tmAltExpo        = cfg->tmAltExpo;
         tcfg.firstFIM         = cfg->firstFIM;
+        // the stored statistics and fingerprints must not depend on the user's display
+        tcfg.colorManage      = 0;
 
         DupePixResult res;
         bool ranIt = false;

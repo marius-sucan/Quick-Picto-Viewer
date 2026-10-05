@@ -279,7 +279,7 @@ struct ThumbsConfig {
     int thumbSize = 250, timePerImg = 25, enableCaching = 1, userHQraw = 1, allowToneMapping = 1;
     int allowWIC = 1, allowFIM = 1, imgQuality = 5, toneMapAlgo = 0;
     float tmParamA = 0, tmParamB = 0, tmParamC = 0, tmParamD = 0, tmOCVparamA = 0, tmOCVparamB = 0;
-    int tmAltExpo = 0, wantBitmap = 1, alwaysSave = 0;
+    int tmAltExpo = 0, wantBitmap = 1, alwaysSave = 0, firstFIM = 0, colorManage = 0;
 };
 
 static std::unordered_set<std::wstring> tpWicExts;

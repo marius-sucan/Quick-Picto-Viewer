@@ -6,7 +6,7 @@
 // finds the very same module. If it is absent, LoadLibraryW() is tried once and, failing
 // that, FIM.ok stays false and the pool simply behaves as if wasInitFIMlib=0
 //
-// Only the entry points MonoGenerateThumb() used are bound. Signatures match the DllCall
+// Only the entry points the worker pools use are bound. Signatures match the DllCall
 // argument sizes encoded in getFIMfunc()'s fList tables.
 //
 // written by Marius Șucan with Claude Opus 5
@@ -71,6 +71,15 @@ typedef void* FIBITMAPptr;   // opaque FIBITMAP*
 #define RAW_DEFAULT       0
 #define RAW_PREVIEW       1
 #define RAW_DISPLAY       2
+#define FIF_LOAD_DISPLAY_ICC 0x4000   // the pixels converted to the display's ICC profile
+
+// FreeImage_MustTonemap() verdicts
+#define FITM_ERROR       (-1)
+#define FITM_NONE          0
+#define FITM_OPTIONAL      1   // allowToneMappingImg decides
+#define FITM_REQUIRED      2
+#define FITM_PQ            3   // FreeImage_ConvertToLinear() first, then tone mapped
+#define FITM_UNSCALED      4
 
 // ---- entry points --------------------------------------------------------------------
 
@@ -104,6 +113,8 @@ struct FreeImageAPI {
     FIBITMAPptr (__stdcall *ConvertToRGBF)(FIBITMAPptr) = NULL;
     FIBITMAPptr (__stdcall *ToneMapping)(FIBITMAPptr, int, double, double) = NULL;
     BOOL        (__stdcall *FlipVertical)(FIBITMAPptr) = NULL;
+    int         (__stdcall *MustTonemap)(FIBITMAPptr, int) = NULL;
+    FIBITMAPptr (__stdcall *ConvertToLinear)(FIBITMAPptr, int) = NULL;
 };
 
 static FreeImageAPI FIM;
@@ -162,11 +173,15 @@ static void bindFreeImageOnce() {
         BINDFIM(ConvertToRGBF, 4);
         BINDFIM(ToneMapping, 24);
         BINDFIM(FlipVertical, 4);
+        BINDFIM(MustTonemap, 8);
+        BINDFIM(ConvertToLinear, 8);
         #undef BINDFIM
 
         // GetDotsPerMeterX/Y are deliberately not in this list: they only fill in the
         // imgdpi the collection pool records, and an image whose resolution could not be
         // read is worth far less than the whole FreeImage loader. Their callers test them.
+        // So are MustTonemap and ConvertToLinear, which older FreeImage.dll builds do not
+        // export; tpFIMthumb() falls back to the bit depth rule without them.
         FIM.ok = (FIM.GetFileTypeU && FIM.LoadU && FIM.Unload && FIM.GetWidth && FIM.GetHeight
                && FIM.GetBPP && FIM.GetPitch && FIM.GetBits && FIM.GetInfo && FIM.GetImageType
                && FIM.GetColorType && FIM.Rescale && FIM.ConvertTo24Bits && FIM.FlipVertical);
