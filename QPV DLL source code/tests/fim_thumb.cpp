@@ -71,6 +71,8 @@ static struct {
     FIBITMAPptr (*ConvertToRGB16)(FIBITMAPptr);
     FIBITMAPptr (*ConvertToUINT16)(FIBITMAPptr);
     BYTE*       (*GetScanLine)(FIBITMAPptr, int);
+    const void* (*GetBuiltInICCProfile)(int, DWORD*);
+    BOOL        (*SetDisplayICCProfile)(const void*, DWORD, int);
 } X;
 
 static int gLastLoadFlags = -1;
@@ -94,7 +96,7 @@ static BOOL shimSaveU(int fif, FIBITMAPptr dib, const wchar_t *p, int flags) {
 
 struct Thumb {
     int status = -1, srcW = 0, srcH = 0, outW = 0, outH = 0, saved = 0;
-    double mean = -1;
+    double mean = -1, bgr[3] = {-1, -1, -1}, chroma = -1;
     TpSrcMeta meta;
 };
 
@@ -118,7 +120,8 @@ static Thumb thumb(const std::string &path, const ThumbsConfig &cfg) {
     {
        t.outW = b->w;
        t.outH = b->h;
-       t.mean = shimMeanBGR(b);
+       t.mean = shimMeanBGR(b, t.bgr);
+       t.chroma = shimMeanChroma(b);
        Gdiplus::DllExports::GdipDisposeImage(b);
     }
     return t;
@@ -136,27 +139,51 @@ static bool have(const std::string &path) {
     return true;
 }
 
-static double meanOfDib(FIBITMAPptr dib) {
+struct Means {
+    double all = -1, bgr[3] = {-1, -1, -1}, chroma = -1;
+};
+
+static Means meansOfDib(FIBITMAPptr dib) {
     const int w = (int)FIM.GetWidth(dib), h = (int)FIM.GetHeight(dib), step = (int)FIM.GetBPP(dib)/8;
-    double sum = 0;
+    double sum[3] = {0, 0, 0}, chroma = 0;
     for (int y = 0; y < h; y++)
     {
         const BYTE *row = X.GetScanLine(dib, y);
         for (int x = 0; x < w; x++)
-            sum += row[x*step] + row[x*step + 1] + row[x*step + 2];
+        {
+            const BYTE *p = row + x*step;
+            for (int c = 0; c < 3; c++)
+                sum[c] += p[c];
+            chroma += max(p[0], max(p[1], p[2])) - min(p[0], min(p[1], p[2]));
+        }
     }
-    return sum/(3.0*w*h);
+
+    Means m;
+    for (int c = 0; c < 3; c++)
+        m.bgr[c] = sum[c]/((double)w*h);
+    m.all = (m.bgr[0] + m.bgr[1] + m.bgr[2])/3.0;
+    m.chroma = chroma/((double)w*h);
+    return m;
 }
 
-// a PQ image tone mapped at thumbnail size, from linear light or from its code values
-static double toneMappedMean(const std::string &path, bool linear) {
+static double largestChannelGap(const double *a, const double *b) {
+    double gap = 0;
+    for (int c = 0; c < 3; c++)
+        gap = max(gap, fabs(a[c] - b[c]));
+    return gap;
+}
+
+// a PQ image tone mapped at thumbnail size, from linear light made with these
+// FreeImage_ConvertToLinear() flags, or from its code values when linearFlags is -1
+static Means toneMapped(const std::string &path, int linearFlags) {
+    Means m;
     FIBITMAPptr dib = X.Load(FIF_AVIF_, path.c_str(), 0);
     if (dib==NULL)
-       return -1;
+       return m;
 
-    if (linear)
+    if (linearFlags>=0)
     {
-       FIBITMAPptr lin = FIM.ConvertToLinear(dib, 0);
+       FIBITMAPptr lin = FIM.ConvertToLinear(dib, linearFlags);
        FIM.Unload(dib);
        dib = lin;
     }
@@ -167,10 +194,67 @@ static double toneMappedMean(const std::string &path, bool linear) {
     FIM.Unload(dib);
     FIBITMAPptr mapped = FIM.ToneMapping(small, 0, 0, 0);
     FIM.Unload(small);
-    const double m = (mapped!=NULL) ? meanOfDib(mapped) : -1;
     if (mapped!=NULL)
+    {
+       m = meansOfDib(mapped);
        FIM.Unload(mapped);
+    }
     return m;
+}
+
+// a horizontal ramp from lo to hi in a one-channel type, saved as TIFF, which keeps every type
+static std::string makeScalarTiff(const std::string &scratch, const char *name, int type, int bpp, double lo, double hi) {
+    const int w = 300, h = 200;
+    FIBITMAPptr dib = FIM.AllocateT(type, w, h, bpp, 0, 0, 0);
+    if (dib==NULL)
+       return "";
+
+    for (int y = 0; y < h; y++)
+    {
+        BYTE *row = X.GetScanLine(dib, y);
+        for (int x = 0; x < w; x++)
+        {
+            const double v = lo + (hi - lo)*x/(w - 1);
+            if (type==FIT_FLOAT)        ((float*)row)[x] = (float)v;
+            else if (type==FIT_DOUBLE)  ((double*)row)[x] = v;
+            else if (type==FIT_INT16)   ((short*)row)[x] = (short)v;
+        }
+    }
+
+    const std::string out = scratch + "/" + name;
+    const BOOL ok = X.Save(FIF_TIFF_, dib, out.c_str(), 0);
+    FIM.Unload(dib);
+    return ok ? out : "";
+}
+
+// whether every pixel of a thumbnail is grey, and the darkest and brightest of them
+struct GreyRange {
+    bool grey = false;
+    int lo = 255, hi = 0;
+};
+
+static GreyRange greyRange(const std::string &path, const ThumbsConfig &cfg, int &status) {
+    GreyRange g;
+    int sw = 0, sh = 0, saved = 0;
+    TpSrcMeta meta;
+    const std::wstring w(path.begin(), path.end());
+    Gdiplus::GpBitmap *b = tpFIMthumb(&cfg, w, L"", GetTickCount(), sw, sh, status, saved, &meta);
+    if (b==NULL)
+       return g;
+
+    g.grey = true;
+    const int step = b->bpp/8;
+    for (int y = 0; y < b->h; y++)
+        for (int x = 0; x < b->w; x++)
+        {
+            const BYTE *p = &b->px[(size_t)y*b->stride + (size_t)x*step];
+            if (p[0]!=p[1] || p[1]!=p[2] || (step==4 && p[3]!=255))
+               g.grey = false;
+            g.lo = min(g.lo, (int)p[0]);
+            g.hi = max(g.hi, (int)p[0]);
+        }
+    Gdiplus::DllExports::GdipDisposeImage(b);
+    return g;
 }
 
 // test.jpg widened to 16 bits a channel, as FreeImage widens: display encoded samples
@@ -224,11 +308,14 @@ int main(int argc, char **argv) {
     BINDX(ConvertToRGB16, "FreeImage_ConvertToRGB16");
     BINDX(ConvertToUINT16, "FreeImage_ConvertToUINT16");
     BINDX(GetScanLine, "FreeImage_GetScanLine");
+    BINDX(GetBuiltInICCProfile, "FreeImage_GetBuiltInICCProfile");
+    BINDX(SetDisplayICCProfile, "FreeImage_SetDisplayICCProfile");
     #undef BINDX
 
     check(FIM.MustTonemap!=NULL && FIM.ConvertToLinear!=NULL,
           "freeimage-dynamic.h binds FreeImage_MustTonemap and FreeImage_ConvertToLinear");
-    if (FIM.MustTonemap==NULL || !X.Load || !X.Save || !X.ConvertToRGB16 || !X.ConvertToUINT16 || !X.GetScanLine)
+    if (FIM.MustTonemap==NULL || !X.Load || !X.Save || !X.ConvertToRGB16 || !X.ConvertToUINT16 || !X.GetScanLine
+     || !X.GetBuiltInICCProfile || !X.SetDisplayICCProfile)
     {
        printf("  ERROR: this FreeImage build predates FreeImage_MustTonemap()\n");
        return 2;
@@ -253,15 +340,19 @@ int main(int argc, char **argv) {
     {
         ThumbsConfig cfg = baseConfig();
         Thumb t = thumb(pq, cfg);
-        const double fromLinear = toneMappedMean(pq, true), fromCodes = toneMappedMean(pq, false);
-        printf("      thumbnail mean %.2f; tone mapped from linear light %.2f, from the PQ code values %.2f\n",
-               t.mean, fromLinear, fromCodes);
+        const Means inSRGB = toneMapped(pq, FI_LINEAR_SRGB_PRIMARIES), inBT2020 = toneMapped(pq, 0);
+        const Means fromCodes = toneMapped(pq, -1);
+        printf("      thumbnail mean %.2f, chroma %.2f; from linear light in sRGB's primaries %.2f, %.2f;\n"
+               "      in BT.2020's %.2f, %.2f; from the PQ code values %.2f\n",
+               t.mean, t.chroma, inSRGB.all, inSRGB.chroma, inBT2020.all, inBT2020.chroma, fromCodes.all);
         check(t.status==TP_OK && t.outW==250 && t.outH==188, "the 400x300 AVIF comes back as a 250x188 thumbnail");
         check(t.meta.fimToneMap==1, "it is tone mapped: \" (TONE-MAPPED)\"");
         check(t.meta.fimBPP==48 && t.meta.fimColor==FIC_RGB,
               "its pixel format is spelled as loaded, 48-RGB, not as linearised");
-        check(fabs(fromLinear - fromCodes)>10.0, "the two orders give visibly different thumbnails");
-        check(fabs(t.mean - fromLinear)<0.5, "and the thumbnail is the one tone mapped from linear light");
+        check(fabs(inSRGB.all - fromCodes.all)>10.0, "the two orders give visibly different thumbnails");
+        check(inSRGB.chroma>inBT2020.chroma*1.15, "BT.2020's primaries read as sRGB's wash the colours out");
+        check(largestChannelGap(t.bgr, inSRGB.bgr)<0.5 && fabs(t.chroma - inSRGB.chroma)<0.5,
+              "the thumbnail is the one tone mapped from linear light, in sRGB's primaries");
 
         cfg.allowToneMapping = 0;
         t = thumb(pq, cfg);
@@ -273,12 +364,23 @@ int main(int argc, char **argv) {
         check((gLastLoadFlags & FIF_LOAD_DISPLAY_ICC)!=0, "colorManage=1 loads with FIF_LOAD_DISPLAY_ICC");
         check(t.status==TP_OK && t.meta.fimToneMap==1, "on an sRGB display it is still a PQ image, tone mapped");
 
+        DWORD p3size = 0;
+        const void *p3 = X.GetBuiltInICCProfile(5, &p3size);   // FICMS_PROFILE_DISPLAY_P3
+        // FICMS_INTENT_RELATIVE_COLORIMETRIC | FICMS_BLACKPOINT_COMPENSATION
+        if (p3!=NULL && X.SetDisplayICCProfile(p3, p3size, 0x101))
+        {
+           t = thumb(pq, cfg);
+           check(t.status==TP_OK && t.meta.fimToneMap==1,
+                 "and on a Display P3 one: the display conversion leaves PQ alone");
+           X.SetDisplayICCProfile(NULL, 0, 0x101);
+        } else check(false, "a Display P3 display could be set up");
+
         // a library with the verdict but without the linearisation tone maps the code values
         FIBITMAPptr (__stdcall *keep)(FIBITMAPptr, int) = FIM.ConvertToLinear;
         FIM.ConvertToLinear = NULL;
         t = thumb(pq, baseConfig());
         FIM.ConvertToLinear = keep;
-        check(t.status==TP_OK && t.meta.fimToneMap==1 && fabs(t.mean - fromCodes)<0.5,
+        check(t.status==TP_OK && t.meta.fimToneMap==1 && fabs(t.mean - fromCodes.all)<0.5,
               "without FreeImage_ConvertToLinear() the code values are tone mapped, as the AHK does");
     }
 
@@ -353,6 +455,33 @@ int main(int argc, char **argv) {
               "UINT16 is greyed to 24 bits, never tone mapped, as LoadFimFile() does");
     }
 
+    // ---- floating point grey and the scalar types, when nothing tone maps them ----------------
+    printf("  one-channel float and integer images that are not tone mapped\n");
+    std::vector<std::string> scalars;
+    {
+        struct { const char *name; int type, bpp; double lo, hi; int allow; const char *what; } cases[] = {
+            { "fim_thumb_float_signed.tif", FIT_FLOAT,  32, -0.5,   0.5, 1, "signed FLOAT, verdict 0, is scaled into 8 bits grey" },
+            { "fim_thumb_float_unit.tif",   FIT_FLOAT,  32,  0.0,   1.0, 0, "FLOAT within 0..1, tone mapping off, too" },
+            { "fim_thumb_int16.tif",        FIT_INT16,  16, -9000, 9000, 1, "INT16 too" },
+            { "fim_thumb_double.tif",       FIT_DOUBLE, 64, -3.0,   7.0, 1, "DOUBLE too" },
+        };
+        for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++)
+        {
+            const std::string path = makeScalarTiff(scratch, cases[i].name, cases[i].type, cases[i].bpp, cases[i].lo, cases[i].hi);
+            if (path.empty())
+            {
+               check(false, (std::string("written: ") + cases[i].name).c_str());
+               continue;
+            }
+            scalars.push_back(path);
+            ThumbsConfig cfg = baseConfig();
+            cfg.allowToneMapping = cases[i].allow;
+            int status = -1;
+            const GreyRange g = greyRange(path, cfg, status);
+            check(status==TP_OK && g.grey && g.lo<=2 && g.hi>=253, cases[i].what);
+        }
+    }
+
     // ---- a FreeImage.dll without FreeImage_MustTonemap() -------------------------------------
     printf("  the bit depth rule, for a FreeImage.dll that predates FreeImage_MustTonemap()\n");
     {
@@ -389,6 +518,8 @@ int main(int argc, char **argv) {
     check(gShimLiveBitmaps==0, "every GDI+ bitmap handed back was disposed");
     if (!rgb16.empty())  remove(rgb16.c_str());
     if (!uint12.empty()) remove(uint12.c_str());
+    for (size_t i = 0; i < scalars.size(); i++)
+        remove(scalars[i].c_str());
 
     if (skipped)
        printf("\n  %d test(s) skipped for want of a sample image\n", skipped);

@@ -193,8 +193,30 @@ static inline Status GdipDisposeImage(GpBitmap *b) {
 
 } } // namespace Gdiplus::DllExports
 
-// the average of the blue, green and red samples of a bitmap, 0 to 255
-static inline double shimMeanBGR(const Gdiplus::GpBitmap *b) {
+// the average of the blue, green and red samples of a bitmap, 0 to 255, and of each of them
+static inline double shimMeanBGR(const Gdiplus::GpBitmap *b, double *perChannel = NULL) {
+    if (!b || b->w<1 || b->h<1)
+       return -1;
+
+    const int step = b->bpp/8;
+    double sum[3] = {0, 0, 0};
+    for (int y = 0; y < b->h; y++)
+    {
+        const BYTE *row = &b->px[(size_t)y*b->stride];
+        for (int x = 0; x < b->w; x++)
+            for (int c = 0; c < 3; c++)
+                sum[c] += row[x*step + c];
+    }
+
+    const double n = (double)b->w*b->h;
+    if (perChannel)
+       for (int c = 0; c < 3; c++)
+           perChannel[c] = sum[c]/n;
+    return (sum[0] + sum[1] + sum[2])/(3.0*n);
+}
+
+// how colourful a bitmap is: the average of each pixel's largest channel minus its smallest
+static inline double shimMeanChroma(const Gdiplus::GpBitmap *b) {
     if (!b || b->w<1 || b->h<1)
        return -1;
 
@@ -204,9 +226,12 @@ static inline double shimMeanBGR(const Gdiplus::GpBitmap *b) {
     {
         const BYTE *row = &b->px[(size_t)y*b->stride];
         for (int x = 0; x < b->w; x++)
-            sum += row[x*step] + row[x*step + 1] + row[x*step + 2];
+        {
+            const BYTE *p = row + x*step;
+            sum += max(p[0], max(p[1], p[2])) - min(p[0], min(p[1], p[2]));
+        }
     }
-    return sum/(3.0*b->w*b->h);
+    return sum/((double)b->w*b->h);
 }
 
 #endif // QPV_TEST_FIM_ENV_H

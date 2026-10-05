@@ -1396,7 +1396,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     }
 
     // Read off the bitmap as it came out of the decoder. Everything below rescales it,
-    // greyscales UINT16, tone maps and forces 24 or 32 bits, and LoadFimFile() reads the
+    // greyscales UINT16, tone maps or scales into 8 bits, and forces 24 or 32 bits, and LoadFimFile() reads the
     // same three at the same point - before any of that - which is what makes the values
     // the pool writes comparable with the ones the interpreter writes for the same file.
     //
@@ -1431,14 +1431,31 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
                        || verdict==FITM_REQUIRED || verdict==FITM_PQ;
     if (toneMap && verdict==FITM_PQ && FIM.ConvertToLinear!=NULL)
     {
-       // full size, for the same reason; failing, the PQ samples are tone mapped as they
-       // are, like FIMapplyToneMapper() does
-       FIBITMAPptr linear = FIM.ConvertToLinear(dib, 0);
+       // full size, for the same reason, and in sRGB's primaries, which the tone mapped
+       // thumbnail is shown in; failing, the PQ samples are tone mapped as they are, like
+       // FIMapplyToneMapper() does
+       FIBITMAPptr linear = FIM.ConvertToLinear(dib, FI_LINEAR_SRGB_PRIMARIES);
        if (linear!=NULL)
        {
           FIM.Unload(dib);
           dib = linear;
        }
+    }
+
+    // FIT_FLOAT and the scalar types hold light or measurements, not display samples: what is
+    // not tone mapped is scaled into 8 bits grey, as verdict 0 asks. UINT16 is greyed below.
+    const int loadedType = FIM.GetImageType(dib);
+    if (!toneMap && loadedType>=FIT_INT16 && loadedType<=FIT_COMPLEX)
+    {
+       FIBITMAPptr standard = (FIM.ConvertToStandardType!=NULL) ? FIM.ConvertToStandardType(dib, TRUE) : NULL;
+       FIM.Unload(dib);
+       if (standard==NULL)
+       {
+          status = TP_ERR_CONVERT;
+          fnOutputDebug("thumbsPool: failed to scale a type " + std::to_string(loadedType) + " bitmap into 8 bits");
+          return NULL;
+       }
+       dib = standard;
     }
 
     int resizedW = 0, resizedH = 0;

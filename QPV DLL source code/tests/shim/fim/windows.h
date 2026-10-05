@@ -24,6 +24,8 @@ typedef unsigned char  BYTE;
 typedef void*          HMODULE;
 typedef void*          FARPROC;
 
+#define TRUE  1
+#define FALSE 0
 #define __stdcall
 #define sprintf_s snprintf
 

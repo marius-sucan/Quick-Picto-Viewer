@@ -81,6 +81,9 @@ typedef void* FIBITMAPptr;   // opaque FIBITMAP*
 #define FITM_PQ            3   // FreeImage_ConvertToLinear() first, then tone mapped
 #define FITM_UNSCALED      4
 
+// FreeImage_ConvertToLinear() flags
+#define FI_LINEAR_SRGB_PRIMARIES 0x01   // BT.2020 and other primaries converted to sRGB's
+
 // ---- entry points --------------------------------------------------------------------
 
 struct FreeImageAPI {
@@ -115,6 +118,7 @@ struct FreeImageAPI {
     BOOL        (__stdcall *FlipVertical)(FIBITMAPptr) = NULL;
     int         (__stdcall *MustTonemap)(FIBITMAPptr, int) = NULL;
     FIBITMAPptr (__stdcall *ConvertToLinear)(FIBITMAPptr, int) = NULL;
+    FIBITMAPptr (__stdcall *ConvertToStandardType)(FIBITMAPptr, BOOL) = NULL;
 };
 
 static FreeImageAPI FIM;
@@ -175,6 +179,7 @@ static void bindFreeImageOnce() {
         BINDFIM(FlipVertical, 4);
         BINDFIM(MustTonemap, 8);
         BINDFIM(ConvertToLinear, 8);
+        BINDFIM(ConvertToStandardType, 8);
         #undef BINDFIM
 
         // GetDotsPerMeterX/Y are deliberately not in this list: they only fill in the

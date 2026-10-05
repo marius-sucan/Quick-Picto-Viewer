@@ -61030,9 +61030,9 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
       ; setWindowTitle("Applying adaptive logarithmic tone mapping to display high color depth image")
       changeMcursor()
       thisStartZeit := A_TickCount
-      If (tm=3) ; PQ curve image 
+      If (tm=3) ; PQ curve image
       {
-         pqi := FreeImage_ConvertToLinear(hFIFimgA)
+         pqi := FreeImage_ConvertToLinear(hFIFimgA, 1) ; FI_LINEAR_SRGB_PRIMARIES; BT.2020 colors left as they are would look washed out
          If pqi 
          {
             FreeImage_UnLoad(hFIFimgA)
@@ -61066,6 +61066,18 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
       }
    } Else If ((mustApplyToneMapping=1 || isVarEqualTo(GFT, 32, 34, 36, 26, 29)) && imgBPP>32)
       hasAppliedToneMap := " (TONE-MAPPABLE)"
+
+   ; FIT_INT16 [3] to FIT_COMPLEX [8], grey FIT_FLOAT [6] among them, hold light or measurements:
+   ; what is not tone mapped is scaled linearly into 8 bits grey, or nothing downstream can show it
+   If (externCondition=1 && !InStr(hasAppliedToneMap, "TONE-MAPPED") && isInRange(FreeImage_GetImageType(hFIFimgA), 3, 8))
+   {
+      hFIFimgS := FreeImage_ConvertToStandardType(hFIFimgA, 1)
+      If hFIFimgS
+      {
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgS
+      }
+   }
 
    Return hFIFimgA
 }
@@ -99578,6 +99590,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   }
   ; msgbox, % GFT "=l=" mustApplyToneMapping
   ; fnOutputDebug(A_ThisFunc "(): " imgBPP "|" ColorsType "|" imgType "|" mustApplyToneMapping "|" GFT "|" imgPath)
+  imgTypeID := FreeImage_GetImageType(hFIFimgA, 0) ; before FIMapplyToneMapper() scales the one-channel types into 8 bits
   If (noBPPconv=0 && noBMP=0)
      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, toneMapped)
 
@@ -99589,7 +99602,6 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
         toneMapped := " (TONE-MAPPABLE)"
   }
 
-  imgTypeID := FreeImage_GetImageType(hFIFimgA, 0)
   If isInRange(imgTypeID, 2, 8)
      Channels := 1
   Else If InStr(ColorsType, "rgba")

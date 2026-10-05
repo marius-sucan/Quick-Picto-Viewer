@@ -307,9 +307,12 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
     #       mapped a second time;
     #   B - a PQ image tone mapped without being linearised first;
     #   C - UINT16 asked for a verdict, which LoadFimFile() never does;
-    #   D - userPerformColorManagement never reaching the decoder.
+    #   D - userPerformColorManagement never reaching the decoder;
+    #   E - a PQ image linearised in its own primaries, BT.2020's, then shown as sRGB;
+    #   F - a float or scalar image that is not tone mapped handed on as it is: GDI+ reads its
+    #       bytes as colours.
     cp fim_loader.part fim_loader.orig
-    for mutant in A B C D; do
+    for mutant in A B C D E F; do
         cp fim_loader.orig fim_loader.part
         extra=""
         case $mutant in
@@ -321,6 +324,10 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
              label="UINT16 given a verdict" ;;
           D) sed -i 's|       loadArgs \|= FIF_LOAD_DISPLAY_ICC;|       ;|' fim_loader.part
              label="FIF_LOAD_DISPLAY_ICC left out" ;;
+          E) sed -i 's|FIM.ConvertToLinear(dib, FI_LINEAR_SRGB_PRIMARIES)|FIM.ConvertToLinear(dib, 0)|' fim_loader.part
+             label="PQ linearised in BT.2020's primaries" ;;
+          F) sed -i 's|    if (!toneMap \&\& loadedType>=FIT_INT16 \&\& loadedType<=FIT_COMPLEX)|    if (false)|' fim_loader.part
+             label="float and scalar images left as they are" ;;
         esac
 
         if cmp -s fim_loader.part fim_loader.orig; then

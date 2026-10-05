@@ -194,6 +194,7 @@ Class screenQPVimage {
      imgType := FreeImage_GetImageType(hFIFimgA, 1)
      ; msgbox, % GFT "=l=" mustApplyToneMapping
      ; fnOutputDebug(A_ThisFunc "(): " imgBPP "|" ColorsType "|" imgType "|" mustApplyToneMapping "|" GFT "|" imgPath)
+     imgTypeID := FreeImage_GetImageType(hFIFimgA, 0) ; before FIMapplyToneMapper() scales the one-channel types into 8 bits
      If (noBMP=0)
         hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, toneMapped)
 
@@ -205,7 +206,6 @@ Class screenQPVimage {
            toneMapped := " (TONE-MAPPABLE)"
      }
 
-     imgTypeID := FreeImage_GetImageType(hFIFimgA, 0)
      If isInRange(imgTypeID, 2, 8)
         Channels := 1
      Else If InStr(ColorsType, "rgba")
