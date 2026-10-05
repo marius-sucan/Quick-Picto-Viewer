@@ -44345,9 +44345,9 @@ calculateThumbsSheetDimensions(ByRef width, ByRef height) {
    height := frame*2 + (userThumbsSheetHeight + userThumbsSheetSpacing + labelHeight) * Ceil(imgs / userThumbsSheetColumns) - userThumbsSheetSpacing
 }
 
-getSaveDialogIndexForFile(imgPath, ByRef defFMTindex, allowExtended:=0) {
+getSaveDialogIndexForFile(imgPath, ByRef defFMTindex, allowExtended:=0, defaultu:=0) {
    Static extended := {"hdr":17, "exr":18, "pfm":19}
-   defFMTindex := 3
+   defFMTindex := (defaultu>0) ? defaultu : 3
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    Loop, Parse, dialogSaveFptrn, |
    {
@@ -58772,8 +58772,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       defaultu := prevFileSavePath "\" OutNameNoExt
    If FolderExist(dummy)
       defaultu := dummy "\" OutNameNoExt
-
-   getSaveDialogIndexForFile(imgPath, defFMTindex)
+   getSaveDialogIndexForFile(imgPath, defFMTindex, 0, userDesireWriteFMT)
    extendedMode := (testWasImageEditedInVP()=1 && FileRexists(imgPath)) ? 1 : 0
    thisDialogSavePtrns := (extendedMode=1) ? StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)") : dialogSaveFptrn
    thisRegEXsaveFmts := (extendedMode=1) ? StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$") : saveTypesRegEX
@@ -58784,6 +58783,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
 
    If file2save
    {
+      asad := dialogFmtIndex
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       If !nExt
       {
@@ -58792,11 +58792,17 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          OutFileName := OutNameNoExt "." nExt
       }
 
+ToolTip, % userDesireWriteFMT "|" dialogFmtIndex "|" asad , , , 2
       If !RegExMatch(file2save, thisRegEXsaveFmts)
       {
          msgBoxWrapper(appTitle ": ERROR", "Please save the file in one of the supported file format extensions: " saveTypesFriendly ". ", 0, 0, "error")
          Return
       }
+
+      prevFileSavePath := OutDir
+      userDesireWriteFMT := dialogFmtIndex 
+      INIaction(1, "prevFileSavePath", "General")
+      RegAction(1, "userDesireWriteFMT")
 
       huge := (viewportQPVimage.imgHandle) ? 1 : 0
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -58871,8 +58877,6 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          }
       }
 
-      prevFileSavePath := OutDir
-      INIaction(1, "prevFileSavePath", "General")
       If FileExist(imgPath)
       {
          FileGetTime, originalMtime, % imgPath, M
