@@ -57554,7 +57554,7 @@ PanelPreferencesWindow() {
 
     Gui, Tab, 2
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply color management
-    ToolTip2ctrl(hTemp, "Color management is not applied on images loaded through FreeImage.")
+    ToolTip2ctrl(hTemp, "Images are converted from their color profile, or from sRGB when they have none:`nto the primary monitor's profile when FreeImage loads them, to sRGB when WIC does.`nCamera RAW images loaded at high quality are then not tone mapped.")
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction (image editing)
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on color depth changes
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%preventUndoLevels% vpreventUndoLevels, Record undo levels
@@ -57639,6 +57639,7 @@ ReadSettingsAdjustToneMapPanel(actu:=0) {
     IniAction(actu, "cmrRAWtoneMapAlgo", "General", 2, 1, 5)
     IniAction(actu, "allowToneMappingImg", "General", 1)
     IniAction(actu, "userHQraw", "General", 1)
+    IniAction(actu, "userPerformColorManagement", "General", 1)
     RegAction(actu, "cmrRAWtoneMapAltExpo",, 1)
     RegAction(actu, "UIuserToneMapParamA", , 2, 0, 400)
     RegAction(actu, "UIuserToneMapParamB", , 2, 0, 400)
@@ -57681,7 +57682,7 @@ PanelAdjustToneMapping() {
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
     Gui, SettingsGUIA: +DPIScale
-    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: -----
+    Gui, Add, Text, x15 y+10 Section w%txtWid% r5 vinfoLine, Pixel format: -----
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
     GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)|Simple mode (OpenCV)", "HDR tone mapping algorithm")
     GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Additional exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
@@ -57692,6 +57693,7 @@ PanelAdjustToneMapping() {
     GuiAddSlider("UIuserToneMapOCVparamB", 1,400, 200, "Parameter OCV-B", "updateUItoneMappingPanel", 1, "xp yp wp hp")
     GuiAddSlider("UIuserToneMapParamC", 1,400, 74, "Parameter C", "updateUItoneMappingPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 wp gupdateUItoneMappingPanel Checked%userHQraw% vuserHQraw, Load camera RAW images at high quality
+    Gui, Add, Checkbox, xs y+5 wp gupdateUItoneMappingPanel Checked%userPerformColorManagement% vuserPerformColorManagement, Apply color management
 
     initializeFimPreviewIMG(getIDimage(currentFileIndex))
     ml := (PrefsLargeFonts=1) ? 35 : 25
@@ -57710,7 +57712,7 @@ PanelAdjustToneMapping() {
 }
 
 BtnHelpToneMapping() {
-   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and produce much better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well, if color management is deactivated. Color management converts them to the display's colors, after which they no longer need tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and produce much better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
 }
 
 killToneMapImageCacheObj() {
@@ -57720,15 +57722,45 @@ killToneMapImageCacheObj() {
        FreeImage_UnLoad(globalhFIFtoneMap)
        globalhFIFtoneMap := ""
     }
-    toneMapPreviewVerdict(0)
+    toneMapPreviewFacts([])
 }
 
-toneMapPreviewVerdict(verdict:="") {
-; the FreeImage_MustTonemap() verdict of the image PanelAdjustToneMapping() previews
-    Static v := 0
-    If (verdict!="")
-       v := verdict
-    Return v
+toneMapPreviewFacts(facts:="") {
+; what initializeFimPreviewIMG() learnt of the image PanelAdjustToneMapping() previews, and the load options it used
+    Static f := []
+    If IsObject(facts)
+       f := facts
+    Return f
+}
+
+toneMapPanelInfoLine() {
+; the pixel format of the previewed image, and whether tone mapping applies to it and why
+    f := toneMapPreviewFacts()
+    If !f.loaded
+    {
+       GuiControl, SettingsGUIA:, infoLine, Pixel format: unknown.`nFreeImage failed to load the image: tone mapping applies only to the images it loads.
+       Return
+    }
+
+    tm := f.tm
+    If (tm="")
+       msg := "This FreeImage.dll cannot tell which images need tone mapping: none is tone mapped. Update FreeImage.dll."
+    Else If (tm=3)
+       msg := "A PQ (HDR) image: it is converted to linear light, then tone mapped."
+    Else If (tm=2)
+       msg := "An HDR or floating-point image: it is always tone mapped."
+    Else If (tm=1)
+       msg := (allowToneMappingImg=1) ? "Tone mapping is optional for this image (linear light, or an uncertain encoding); it is applied." : "Tone mapping is optional for this image (linear light, or an uncertain encoding); activate it below to apply it."
+    Else If (f.GFT=34 && userHQraw!=1)
+       msg := "A camera RAW image loaded at low quality, in 8 bits: it is not tone mapped. Load it at high quality" ((userPerformColorManagement=1) ? " and deactivate color management" : "") " to tone map it."
+    Else If (userPerformColorManagement=1 && isVarEqualTo(f.tmNoCM, 1, 2, 3))
+       msg := "Color management converted the image from linear light to the display's colors: it is not tone mapped. Deactivate color management to tone map it."
+    Else If isInRange(f.type, 2, 8)
+       msg := "A single-channel image: it is shown in 8-bit grey, not tone mapped."
+    Else
+       msg := "The image holds display colors: tone mapping does not apply to it."
+
+    GuiControl, SettingsGUIA:, infoLine, % "Pixel format: " f.fmt ".`n" msg
 }
 
 BtnNextToneMapPic() {
@@ -57753,62 +57785,48 @@ initializeFimPreviewIMG(imgPath) {
   If !wasInitFIMlib
      Return 0
 
-  loadArgs := 0
   killToneMapImageCacheObj()
-  GFT := FreeImage_GetFileType(imgPath)
-  pk := FreeImage_GetFileType(imgPath, 1)
-  If (GFT=2 && loadArgs=0)
-     loadArgs := 8
-
-  hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+  ; decoded as LoadFimFile() decodes it for the viewer
+  loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
+  pixelsArgs := (userPerformColorManagement=1) ? loadArgs | 0x4000 : loadArgs ; FIF_LOAD_DISPLAY_ICC
+  facts := {loaded: 0, opts: userHQraw "|" userPerformColorManagement, GFT: GFT}
+  hFIFimgA := FreeImage_Load(imgPath, GFT, pixelsArgs)
   If hFIFimgA
   {
      FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
      calcIMGdimensions(imgW, imgH, uiBoxW, uiBoxH, thisW, thisH)
-     imgType := FreeImage_GetImageType(hFIFimgA, 1)
-     imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
-     ColorsType := FreeImage_GetColorType(hFIFimgA)
+     imgTypeID := FreeImage_GetImageType(hFIFimgA)
      ; asked before the rescale, which drops the ICC profile and the CICP tag the verdict reads;
      ; FIT_UINT16 [2] is never tone mapped, LoadFimFile() greys it
-     tm := (FreeImage_GetImageType(hFIFimgA)=2) ? 0 : FreeImage_MustTonemap(hFIFimgA, GFT)
-     globalInfohFIFbmp := imgBPP "-" ColorsType " | " imgType ; ".`nFile format: " pk
-     If isVarEqualTo(tm, 1, 2, 3) ; FITM_OPTIONAL, FITM_REQUIRED, FITM_PQ
+     tm := (imgTypeID=2) ? 0 : FreeImage_MustTonemap(hFIFimgA, GFT)
+     If (tm=0 && userPerformColorManagement=1 && isVarEqualTo(imgTypeID, 9, 10) && FreeImage_FIFSupportsNoPixels(GFT))
      {
-        If (tm=3)
-        {
-           pqi := FreeImage_ConvertToLinear(hFIFimgA, 1) ; FI_LINEAR_SRGB_PRIMARIES
-           If pqi
-           {
-              FreeImage_UnLoad(hFIFimgA)
-              hFIFimgA := pqi
-           }
-        }
-
-        hFIFimgB := trFreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
-        FreeImage_UnLoad(hFIFimgA)
-        hFIFimgA := ""
-        If hFIFimgB
-           toneMapPreviewVerdict(tm)
+        ; FIT_RGB16 and FIT_RGBA16, the types color management converts that can be tone mapped:
+        ; the verdict without it, read off the file's header, tells whether it made the image display encoded
+        hFIFimgH := FreeImage_Load(imgPath, GFT, loadArgs | 0x8000) ; FIF_LOAD_NOPIXELS
+        facts.tmNoCM := FreeImage_MustTonemap(hFIFimgH, GFT)
+        FreeImage_UnLoad(hFIFimgH)
      }
-  } Else
-     globalInfohFIFbmp := "Failed to load the image file."
 
-  GuiControl, SettingsGUIA:, infoLine, Pixel format: %globalInfohFIFbmp%.
-  If !hFIFimgB
-  {
-     FreeImage_UnLoad(globalhFIFtoneMap)
-     If hFIFimgA
-        FreeImage_UnLoad(hFIFimgA)
-     globalInfohFIFbmp := ""
-     globalhFIFtoneMap := ""
-     Return 0
+     facts.loaded := 1, facts.tm := tm, facts.type := imgTypeID
+     facts.fmt := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-")) "-" FreeImage_GetColorType(hFIFimgA) " | " FreeImage_GetImageType(hFIFimgA, 1)
+     If (tm=3)
+     {
+        pqi := FreeImage_ConvertToLinear(hFIFimgA, 1) ; FI_LINEAR_SRGB_PRIMARIES
+        If pqi
+        {
+           FreeImage_UnLoad(hFIFimgA)
+           hFIFimgA := pqi
+        }
+     }
+
+     globalhFIFtoneMap := trFreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
+     FreeImage_UnLoad(hFIFimgA)
   }
 
-  globalhFIFtoneMap := hFIFimgB
-  If !globalhFIFtoneMap
-     Return 0
-  Else
-     Return 1
+  toneMapPreviewFacts(facts)
+  toneMapPanelInfoLine()
+  Return globalhFIFtoneMap ? 1 : 0
 }
 
 updateUIfimBeforeIMG(modus:=0) {
@@ -57857,7 +57875,7 @@ updateUIfimToneMappedIMG() {
    Static uiBoxW := 460, uiBoxH := 320
    If !globalhFIFtoneMap
    {
-      showTOOLtip("ERROR: The image failed to be loaded, or it is not an image tone mapping applies to.")
+      showTOOLtip("ERROR: The image failed to be loaded with FreeImage.")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -57865,7 +57883,8 @@ updateUIfimToneMappedIMG() {
 
    updateUIfimBeforeIMG()
    ; as FIMapplyToneMapper() decides: FITM_REQUIRED [2] and FITM_PQ [3] always, FITM_OPTIONAL [1] when allowed
-   tm := toneMapPreviewVerdict()
+   facts := toneMapPreviewFacts()
+   tm := facts.tm
    thisAllow := (tm=2 || tm=3 || tm=1 && allowToneMappingImg=1) ? 1 : 0
    If (thisAllow=1)
    {
@@ -57882,7 +57901,9 @@ updateUIfimToneMappedIMG() {
          hFIFimgE := FreeImage_ToneMapping(hFIFimgZ, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
 
       FreeImage_UnLoad(hFIFimgZ)
-   } Else If isInRange(FreeImage_GetImageType(globalhFIFtoneMap), 3, 8)
+   } Else If (FreeImage_GetImageType(globalhFIFtoneMap)=2)
+      hFIFimgE := FreeImage_ConvertToGreyscale(globalhFIFtoneMap) ; FIT_UINT16, as LoadFimFile() greys it
+   Else If isInRange(FreeImage_GetImageType(globalhFIFtoneMap), 3, 8)
       hFIFimgE := FreeImage_ConvertToStandardType(globalhFIFtoneMap, 1) ; FIT_INT16 to FIT_COMPLEX, as the viewer shows them
    Else
       hFIFimgE := FreeImage_Clone(globalhFIFtoneMap)
@@ -57893,6 +57914,8 @@ updateUIfimToneMappedIMG() {
 
    hFIFimgZ := hFIFimgD ? hFIFimgD : hFIFimgE
    pBitmap := ConvertFIMtoPBITMAP(hFIFimgZ, coreDesiredPixFmt)
+   FreeImage_UnLoad(hFIFimgE)
+   FreeImage_UnLoad(hFIFimgD)
    If (StrLen(pBitmap)>2)
       recordGdipBitmaps(pBitmap, A_ThisFunc)
    Else
@@ -57925,10 +57948,6 @@ updateUIfimToneMappedIMG() {
    trGdip_DisposeImage(tempBMP, 1)
    Gdip_DeleteGraphics(Gu)
    trGdip_DisposeImage(pBitmap, 1)
-
-   FreeImage_UnLoad(hFIFimgE)
-   If hFIFimgD
-      FreeImage_UnLoad(hFIFimgD)
 }
 
 BTNtoneMapRefresh() {
@@ -58045,7 +58064,14 @@ updateUItoneMappingPanel() {
    GuiControlGet, cmrRAWtoneMapAlgo
    GuiControlGet, cmrRAWtoneMapAltExpo
    GuiControlGet, userHQraw
+   GuiControlGet, userPerformColorManagement
    GuiControlGet, allowToneMappingImg
+   facts := toneMapPreviewFacts()
+   If (facts.opts!=userHQraw "|" userPerformColorManagement)
+      initializeFimPreviewIMG(getIDimage(currentFileIndex))
+   Else
+      toneMapPanelInfoLine()
+
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    actu := (cmrRAWtoneMapAlgo>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiUpdateVisibilitySliders(actu, "UIuserToneMapOCVparamA")
@@ -72177,6 +72203,12 @@ ToggleCycleFavesOpen() {
 ToggleColorProfileManage() {
     userPerformColorManagement := !userPerformColorManagement
     INIaction(1, "userPerformColorManagement", "General")
+    If (AnyWindowOpen=42) ; PanelAdjustToneMapping() would read its stale checkbox back
+    {
+       GuiControl, SettingsGUIA:, userPerformColorManagement, % userPerformColorManagement
+       SetTimer, updateUItoneMappingPanel, -150
+    }
+
     friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
     showTOOLtip("Color management on image load: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -72243,6 +72275,12 @@ toggleScreenSaverMode() {
 ToggleRAWquality() {
     userHQraw := !userHQraw
     INIaction(1, "userHQraw", "General")
+    If (AnyWindowOpen=42) ; PanelAdjustToneMapping() would read its stale checkbox back
+    {
+       GuiControl, SettingsGUIA:, userHQraw, % userHQraw
+       SetTimer, updateUItoneMappingPanel, -150
+    }
+
     friendly := (userHQraw=1) ? "ACTIVATED" : "DEACTIVATED"
     showTOOLtip("Load Camera RAW images at high quality: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
