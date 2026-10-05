@@ -640,15 +640,10 @@ static int tpWICguardedColorTransform(IWICImagingFactory *fac, IWICBitmapFrameDe
            if (SUCCEEDED(pSrcContext->GetType(&type)) && type==WICColorContextExifColorSpace
             && SUCCEEDED(pSrcContext->GetExifColorSpace(&exifSpace)) && exifSpace==1)
               skip = 1;
-        } else if (pSrcContext!=NULL)
+        } else
         {
-           // no profile: CMYK and 64bppRGBA are given one, as applyColorManagement() gives it
-           if (isCMYK)
-              hr = pSrcContext->InitializeFromExifColorSpace(5);
-           else if (f==GUID_WICPixelFormat64bppRGBA)
-              hr = pSrcContext->InitializeFromExifColorSpace(2);   // Adobe RGB
-           else
-              hr = E_FAIL;
+           // no profile: an RGB image is sRGB already, CMYK is given the standard one
+           hr = (isCMYK && pSrcContext!=NULL) ? pSrcContext->InitializeFromExifColorSpace(5) : E_FAIL;
            count = SUCCEEDED(hr) ? 1 : 0;
         }
 

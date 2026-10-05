@@ -66,6 +66,8 @@ slice fim_loader.part     ../thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ q
 slice wic_loader.part     ../thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
 slice wic_guards.part     ../qpv-main.cpp '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
 slice adapt_size.part     ../qpv-main.cpp '^auto adaptImageGivenSize' '^}' 50 || exit 1
+slice safe_release.part   ../qpv-main.cpp '^template <typename T> inline void SafeRelease(T \*&p, std::string infos, int d) {' '^}' 10 || exit 1
+slice icm_viewer.part     ../qpv-main.cpp '^int applyColorManagement(IWICBitmapSource\* &thisWICbitmap' '^}' 100 || exit 1
 echo "   ok"
 
 echo
@@ -347,25 +349,32 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
 fi
 
 echo
-echo "== WIC colour management in the thumbnails pool =="
+echo "== WIC colour management in the thumbnails pool and the viewer =="
 # The colour transform tpWICload() builds per call, against fake WIC objects that keep real
 # reference counts: which frames get one, that it is read by the scaler and never sits under
 # it, that every failure ends in a plain decode, and that nothing leaks or is released twice.
-if g++ $CXXFLAGS -Wno-unused-function -o wic_icm wic_icm.cpp 2>&1; then
+# The viewer's applyColorManagement() is run too, for its fallbacks.
+if g++ $CXXFLAGS -Wno-unused-function -Wno-unused-variable -o wic_icm wic_icm.cpp 2>&1; then
     ./wic_icm || fail=1
 else
     echo "  ERROR: wic_icm.cpp did not compile"; fail=1
 fi
 
 echo
-echo "== mutation check: the WIC loader must keep a failed colour transform harmless =="
+echo "== mutation check: WIC colour management must keep its failures harmless =="
 #   A - a chain that cannot read the transform is not decoded again without it;
 #   B - the scaler reads the frame, past the transform that was built;
 #   C - the transform is never released;
-#   D - an EXIF sRGB frame is given a transform, and loses its scaled decode for nothing.
+#   D - an EXIF sRGB frame is given a transform, and loses its scaled decode for nothing;
+#   E - applyColorManagement() falls back on a colour context CreateColorContext() never made;
+#   F - applyColorManagement() takes an untagged 64bppRGBA image for Adobe RGB;
+#   G - so does the pool.
 cp wic_loader.part wic_loader.orig
-for mutant in A B C D; do
+cp icm_viewer.part icm_viewer.orig
+for mutant in A B C D E F G; do
     cp wic_loader.orig wic_loader.part
+    cp icm_viewer.orig icm_viewer.part
+    target=wic_loader
     case $mutant in
       A) sed -i 's|    if (retryPlain)|    if (false \&\& retryPlain)|' wic_loader.part
          label="no plain decode after a failed transform" ;;
@@ -375,14 +384,23 @@ for mutant in A B C D; do
          label="the transform leaked" ;;
       D) sed -i 's|              skip = 1;|              skip = 0;|' wic_loader.part
          label="EXIF sRGB given a transform" ;;
+      E) target=icm_viewer
+         sed -i 's|if (isCMYKimg==1 \&\& pSrcColorContext!=NULL) {|if (isCMYKimg==1) {|' icm_viewer.part
+         label="the viewer dereferences a context that was never made" ;;
+      F) target=icm_viewer
+         sed -i 's|if (isCMYKimg==1 \&\& pSrcColorContext!=NULL) {|if (sFmt==GUID_WICPixelFormat64bppRGBA \&\& pSrcColorContext!=NULL) { hr = pSrcColorContext->InitializeFromExifColorSpace(2); } else if (isCMYKimg==1 \&\& pSrcColorContext!=NULL) {|' icm_viewer.part
+         label="the viewer takes untagged 64bppRGBA for Adobe RGB" ;;
+      G) sed -i 's|hr = (isCMYK \&\& pSrcContext!=NULL) ? pSrcContext->InitializeFromExifColorSpace(5) : E_FAIL;|hr = (pSrcContext!=NULL) ? pSrcContext->InitializeFromExifColorSpace(isCMYK ? 5 : 2) : E_FAIL;|' wic_loader.part
+         label="the pool takes untagged RGB for Adobe RGB" ;;
     esac
 
-    if cmp -s wic_loader.part wic_loader.orig; then
+    if cmp -s $target.part $target.orig; then
         echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
         continue
     fi
 
-    g++ $CXXFLAGS -Wno-unused-function -o wic_mutant wic_icm.cpp 2>/dev/null
+    g++ $CXXFLAGS -Wno-unused-function -Wno-unused-variable -o wic_mutant wic_icm.cpp 2>/dev/null
+    # mutant E is a NULL dereference: it is caught by the crash, not by a FAILED line
     if ./wic_mutant > /dev/null 2>&1; then
         echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
     else
@@ -391,6 +409,7 @@ for mutant in A B C D; do
     rm -f wic_mutant
 done
 mv -f wic_loader.orig wic_loader.part
+mv -f icm_viewer.orig icm_viewer.part
 
 echo
 echo "== the records the thumbnails pool shares with AutoHotkey =="

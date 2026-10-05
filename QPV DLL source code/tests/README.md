@@ -271,8 +271,13 @@ the fallbacks `applyColorManagement()` applies, not EXIF sRGB. Where it sits: on
 read by the scaler, never under a scaler that interpolates. That every failure, including
 a transform that only fails in `CopyPixels()`, ends as a plain thumbnail rather than a failed
 or a full size one. And that each decode releases every object it made, exactly once. The
-mutants drop the plain retry, let the scaler read the frame past the transform, leak the
-transform, and give EXIF sRGB a transform.
+viewer's own `applyColorManagement()` is sliced in too, with `qpv-main.cpp`'s `SafeRelease()`,
+and driven the way `LoadWICimage()` drives it, cleanup call included: an untagged RGB image is
+sRGB and gets no transform, and a failed `CreateColorContext()` leaves nothing to fall back
+on, which the code it replaced dereferenced. The mutants drop the plain retry, let the scaler
+read the frame past the transform, leak the transform, give EXIF sRGB a transform, restore
+that dereference (caught by the crash), and take untagged RGB for Adobe RGB in the viewer and
+in the pool.
 
 **`thumbs_record.cpp`** — the layout of `ThumbResult` and `ThumbsPoolState`, sliced out of
 the shipped `thumbs-pool.h`. Nothing else pins them: `thumbsPoolFetch()` fills an array of

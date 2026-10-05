@@ -5751,15 +5751,12 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
 
          if (FAILED(hr) || colorContextCount==0)
          {
-             // fallback to some built-in color profile based on the pixel format of the image
+             // without a profile an RGB image is sRGB already; only CMYK is given one, and only
+             // when CreateColorContext() produced the context to give it in
              fnOutputDebug("fallback icc profile");
-             if (isCMYKimg==1) {
+             if (isCMYKimg==1 && pSrcColorContext!=NULL) {
                  isCMYKimg = 2;
                  hr = pSrcColorContext->InitializeFromExifColorSpace(5); // Default CMYK
-             } else if (sFmt == GUID_WICPixelFormat48bppRGB || sFmt == GUID_WICPixelFormat64bppRGBA) {
-                 hr = pSrcColorContext->InitializeFromExifColorSpace(2); // Adobe RGB
-             } else if (sFmt == GUID_WICPixelFormat96bppRGBFloat) {
-                 hr = pSrcColorContext->InitializeFromExifColorSpace(3); // ProPhoto RGB
              } else {
                  hr = E_FAIL;
              }

@@ -84,6 +84,9 @@ static inline DWORD GetExceptionCode() { return 0; }
 #define __try            if (true)
 #define __except(filter) else if (!(filter))
 
+// MSVC's overload for arrays, which applyColorManagement() writes into
+#define sprintf_s(buf, ...) snprintf(buf, sizeof(buf), __VA_ARGS__)
+
 static inline HRESULT UIntMult(UINT a, UINT b, UINT *out) {
     const UINT64 r = (UINT64)a*b;
     if (r>0xFFFFFFFFull)
@@ -125,7 +128,12 @@ SHIM_GUID(GUID_WICPixelFormat32bppPRGBA, 0x2e)
 SHIM_GUID(GUID_WICPixelFormat48bppBGR, 0x31)
 SHIM_GUID(GUID_WICPixelFormat64bppBGRA, 0x32)
 SHIM_GUID(GUID_WICPixelFormat64bppPBGRA, 0x33)
+SHIM_GUID(GUID_WICPixelFormat64bppCMYK, 0x1f)
+SHIM_GUID(GUID_WICPixelFormat40bppCMYKAlpha, 0x2c)
+SHIM_GUID(GUID_WICPixelFormat80bppCMYKAlpha, 0x2f)
+SHIM_GUID(GUID_WICPixelFormat96bppRGBFloat, 0x27)
 SHIM_GUID(GUID_ContainerFormatJpeg, 0xf0)
+SHIM_GUID(IID_IWICBitmapSource, 0xfe)
 SHIM_GUID(shimIID, 0xff)
 #define IID_PPV_ARGS(pp) shimIID, reinterpret_cast<void**>(pp)
 
@@ -227,10 +235,18 @@ static inline void shimResetCounters() {
     memset(&gTransformDestFmt, 0, sizeof(GUID));
 }
 
+// applyColorManagement() asks the transform for its IWICBitmapSource, the one interface answered
 #define SHIM_IUNKNOWN(cls) \
     LONG refs = 1; \
     cls() { gLiveCom++; } \
-    HRESULT QueryInterface(REFIID, void **ppv) override { if (ppv) *ppv = NULL; return E_NOINTERFACE; } \
+    HRESULT QueryInterface(REFIID riid, void **ppv) override { \
+        IWICBitmapSource *src = (riid==IID_IWICBitmapSource) ? dynamic_cast<IWICBitmapSource*>(this) : NULL; \
+        if (ppv) *ppv = NULL; \
+        if (src==NULL || ppv==NULL) return E_NOINTERFACE; \
+        AddRef(); \
+        *ppv = src; \
+        return S_OK; \
+    } \
     ULONG AddRef() override { return (ULONG)++refs; } \
     ULONG Release() override { \
         if (refs<=0) { gOverRelease++; return 0; } \
