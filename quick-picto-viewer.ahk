@@ -57711,6 +57711,15 @@ killToneMapImageCacheObj() {
        FreeImage_UnLoad(globalhFIFtoneMap)
        globalhFIFtoneMap := ""
     }
+    toneMapPreviewVerdict(0)
+}
+
+toneMapPreviewVerdict(verdict:="") {
+; the FreeImage_MustTonemap() verdict of the image PanelAdjustToneMapping() previews
+    Static v := 0
+    If (verdict!="")
+       v := verdict
+    Return v
 }
 
 BtnNextToneMapPic() {
@@ -57750,13 +57759,27 @@ initializeFimPreviewIMG(imgPath) {
      imgType := FreeImage_GetImageType(hFIFimgA, 1)
      imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
      ColorsType := FreeImage_GetColorType(hFIFimgA)
-     mustApplyToneMapping := (imgBPP>32 && !InStr(ColorsType, "rgba") && GFT!=13) || (imgBPP>64) ? 1 : 0
+     ; asked before the rescale, which drops the ICC profile and the CICP tag the verdict reads;
+     ; FIT_UINT16 [2] is never tone mapped, LoadFimFile() greys it
+     tm := (FreeImage_GetImageType(hFIFimgA)=2) ? 0 : FreeImage_MustTonemap(hFIFimgA, GFT)
      globalInfohFIFbmp := imgBPP "-" ColorsType " | " imgType ; ".`nFile format: " pk
-     If (mustApplyToneMapping=1)
+     If isVarEqualTo(tm, 1, 2, 3) ; FITM_OPTIONAL, FITM_REQUIRED, FITM_PQ
      {
+        If (tm=3)
+        {
+           pqi := FreeImage_ConvertToLinear(hFIFimgA, 1) ; FI_LINEAR_SRGB_PRIMARIES
+           If pqi
+           {
+              FreeImage_UnLoad(hFIFimgA)
+              hFIFimgA := pqi
+           }
+        }
+
         hFIFimgB := trFreeImage_Rescale(hFIFimgA, thisW, thisH, 0)
         FreeImage_UnLoad(hFIFimgA)
         hFIFimgA := ""
+        If hFIFimgB
+           toneMapPreviewVerdict(tm)
      }
   } Else
      globalInfohFIFbmp := "Failed to load the image file."
@@ -57825,16 +57848,16 @@ updateUIfimToneMappedIMG() {
    Static uiBoxW := 460, uiBoxH := 320
    If !globalhFIFtoneMap
    {
-      showTOOLtip("ERROR: The image failed to be loaded or does not have a high color depth required for tone mapping.")
+      showTOOLtip("ERROR: The image failed to be loaded, or it is not an image tone mapping applies to.")
       SoundBeep , 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
    }
 
    updateUIfimBeforeIMG()
-   GFT := FreeImage_GetFileType(getIDimage(currentFileIndex))
-   imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgE), "-"))
-   thisAllow := (isVarEqualTo(GFT, 32, 26, 29) && imgBPP>32) ? 1 : allowToneMappingImg
+   ; as FIMapplyToneMapper() decides: FITM_REQUIRED [2] and FITM_PQ [3] always, FITM_OPTIONAL [1] when allowed
+   tm := toneMapPreviewVerdict()
+   thisAllow := (tm=2 || tm=3 || tm=1 && allowToneMappingImg=1) ? 1 : 0
    If (thisAllow=1)
    {
       PixelFormat := FreeImage_GetImageType(globalhFIFtoneMap, 1)
@@ -57850,9 +57873,12 @@ updateUIfimToneMappedIMG() {
          hFIFimgE := FreeImage_ToneMapping(hFIFimgZ, clampInRange(cmrRAWtoneMapAlgo - 1, 0, 1), cmrRAWtoneMapParamA, cmrRAWtoneMapParamB)
 
       FreeImage_UnLoad(hFIFimgZ)
-   } Else
+   } Else If isInRange(FreeImage_GetImageType(globalhFIFtoneMap), 3, 8)
+      hFIFimgE := FreeImage_ConvertToStandardType(globalhFIFtoneMap, 1) ; FIT_INT16 to FIT_COMPLEX, as the viewer shows them
+   Else
       hFIFimgE := FreeImage_Clone(globalhFIFtoneMap)
 
+   imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgE), "-"))
    If !isVarEqualTo(imgBPP, 8, 16, 24, 32)
       hFIFimgD := FreeImage_ConvertTo(hFIFimgE, "32Bits")
 
