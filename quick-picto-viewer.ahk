@@ -34373,8 +34373,7 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
       If InStr(p_type, "m")
          p_Type := "o"
 
-      r := Dlg_OpenSaveFile(p_Type, thisHwnd, msg, pattern, chooseFilterIndex, startPath pathSymbol, "", optionz)
-      n_FilterIndex := NumGet(optionz, (A_PtrSize=8) ? 44:24,"UInt")
+      r := Dlg_OpenSaveFile(p_Type, thisHwnd, msg, pattern, chooseFilterIndex, startPath pathSymbol, "", optionz,, n_FilterIndex)
       optionz := ""
    }
 

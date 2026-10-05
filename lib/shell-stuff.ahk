@@ -456,7 +456,7 @@
 ;   be modal.  See the scripts included with this project for an example.
 ;
 ;-------------------------------------------------------------------------------
-Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_Root:="",p_DfltExt:="",ByRef r_Flags:=0,p_HelpHandler:="") {
+Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_Root:="",p_DfltExt:="",ByRef r_Flags:=0,p_HelpHandler:="",ByRef r_FilterIndex:="") {
 ; function source: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=462
 ; by jballi
 ; modified by Marius Șucan
@@ -668,8 +668,9 @@ Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_R
     ;-- Rebuild r_Flags for output
     r_Flags  :=0
     l_Flags:=NumGet(OPENFILENAME,(A_PtrSize=8) ? 96:52,"UInt")
-    ; n_FilterIndex := NumGet(OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
-    ;-- Flags
+        ;-- Flags
+    r_FilterIndex:=NumGet(OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
+        ;-- nFilterIndex
 
     if p_DfltExt is not Space  ;-- Flag is ignored unless p_DfltExt contains a value
     {
