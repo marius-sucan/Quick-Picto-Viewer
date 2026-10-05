@@ -58782,7 +58782,6 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
 
    If file2save
    {
-      asad := dialogFmtIndex
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       If !nExt
       {
@@ -58791,7 +58790,6 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
          OutFileName := OutNameNoExt "." nExt
       }
 
-ToolTip, % userDesireWriteFMT "|" dialogFmtIndex "|" asad , , , 2
       If !RegExMatch(file2save, thisRegEXsaveFmts)
       {
          msgBoxWrapper(appTitle ": ERROR", "Please save the file in one of the supported file format extensions: " saveTypesFriendly ". ", 0, 0, "error")
