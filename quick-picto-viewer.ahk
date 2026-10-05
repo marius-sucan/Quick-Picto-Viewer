@@ -76428,7 +76428,7 @@ coreCreateVPnavBox(modus:=0) {
          Return
 
       frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
-      MD5name := generateThumbName(imgPath, 1, frameLoad)
+      MD5name := generateThumbName(imgPath, 1, frameLoad) thumbsCacheTag(imgPath)
       file2save := thumbsCacheFolder "\500-" MD5name ".png"
       If FileExist(file2save)
       {
@@ -84186,7 +84186,7 @@ QPV_ListViewGridHUDoverlay(mustDestroyBrushes:=0, simpleMode:=0, listMap:=0, act
            If (thumbsListViewMode=1 && userPrivateMode=0 && simpleMode=0 && showInfoBoxHUD>0)
            {
               frameLoad := (framePreviewsMode=1) ? thisFileIndex - 1 : 0
-              MD5name := generateThumbName(imgPath, 1, frameLoad)
+              MD5name := generateThumbName(imgPath, 1, frameLoad) thumbsCacheTag(imgPath)
               If (StrLen(imgThumbsCacheIDsArray[MD5name])>0)
                  thisThumb := imgThumbsCacheArray[imgThumbsCacheIDsArray[MD5name], 1]
 
@@ -84792,7 +84792,7 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
         DestPosY := thumbsH//2 + thumbsH*rowIndex
         memCached := wasThumbCached := 0
         frameLoad := (framePreviewsMode=1) ? thisFileIndex - 1 : 0
-        MD5name := generateThumbName(imgPath, 1, frameLoad)
+        MD5name := generateThumbName(imgPath, 1, frameLoad) thumbsCacheTag(imgPath)
         isForceRefresh := resultedFilesList[thisFileIndex, 4]
         If (thisFileDead=1)
         {
@@ -99841,6 +99841,25 @@ generateThumbName(imgPath, forceThis:=0, bonusID:="") {
    prevMD5name := MD5name
    prevBonus := bonusID
    Return MD5name
+}
+
+thumbsCacheTag(imgPath) {
+; Appended to generateThumbName() in the names of cached thumbnails, so that a thumbnail is
+; made again when the settings it was made with change: colour management, for every image,
+; and the tone mapping and camera RAW options, for the formats that can be tone mapped.
+   Static lastSettings := "", lastHash := ""
+   tag := (userPerformColorManagement=1) ? "-c" : ""
+   If (RegExMatch(imgPath, RegExFIMformPtrn) || RegExMatch(imgPath, "i)(.\.(tif|tiff))$"))
+   {
+      settings := userHQraw "|" allowToneMappingImg "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
+      If (settings!=lastSettings)
+      {
+         lastHash := SubStr(CalcStringHash(settings, 0x8003), 1, 8) ; CALG_MD5
+         lastSettings := settings
+      }
+      tag .= "-t" lastHash
+   }
+   Return tag
 }
 
 decideWinReactivation() {
