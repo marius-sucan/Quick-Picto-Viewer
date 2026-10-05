@@ -58084,6 +58084,7 @@ updateUIsettings() {
      If (AnyWindowOpen!=14)
         Return
 
+     o_colorManage := userPerformColorManagement
      Gui, SettingsGUIA: Default
      Gui, SettingsGUIA: Submit, NoHide
 
@@ -58100,6 +58101,9 @@ updateUIsettings() {
         If !throwErrorNoImageLoaded(1)
            dummyTimerDelayiedImageDisplay(250)
      }
+
+     If (o_colorManage!=userPerformColorManagement)
+        reloadColorManagedImage()
 }
 
 WriteSettingsUI() {
@@ -72171,8 +72175,22 @@ ToggleColorProfileManage() {
     userPerformColorManagement := !userPerformColorManagement
     INIaction(1, "userPerformColorManagement", "General")
     friendly := (userPerformColorManagement=1) ? "ACTIVATED`nThe viewport performance may decrease." : "DEACTIVATED"
+    If (reloadColorManagedImage()="edited")
+       friendly .= "`nThe edited image was not reloaded."
+
     showTOOLtip("Color management on image load: " friendly, A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
+}
+
+reloadColorManagedImage() {
+; edited images are skipped: the reload would discard the edits of huge images
+    If (thumbsDisplaying=1 || throwErrorNoImageLoaded(1))
+       Return
+
+    If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0)
+       Return "edited"
+
+    RefreshImageFile()
 }
 
 ToggleImgQuality(modus:=0) {
