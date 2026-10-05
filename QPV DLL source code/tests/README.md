@@ -257,9 +257,12 @@ quarter of its colourfulness, which is what the chroma comparison catches, since
 means barely move. With a Display P3 display set, the PQ image must still be tone mapped -
 the fork's `FIF_LOAD_DISPLAY_ICC` leaves PQ alone. Float and integer one-channel images that
 are not tone mapped must come back as an even grey ramp: handed on as they are, GDI+ reads
-their bytes as colours. The six mutants take the verdict from the thumbnail, skip the
-linearisation, give UINT16 a verdict, leave `FIF_LOAD_DISPLAY_ICC` out, linearise in BT.2020's
-primaries, and hand float images on unconverted.
+their bytes as colours. The ` (TONE-MAPPABLE)` marker follows the verdict too: a RAW that
+colour management made display encoded carries none, because no option tone maps it, and a low
+quality RAW is marked only without colour management. The eight mutants take the verdict from
+the thumbnail, skip the linearisation, give UINT16 a verdict, leave `FIF_LOAD_DISPLAY_ICC` out,
+linearise in BT.2020's primaries, hand float images on unconverted, mark by format and bit
+depth, and mark a colour managed low quality RAW.
 
 **`wic_icm.cpp`** — the colour transform `tpWICload()` builds when colour management is on,
 sliced out of `thumbs-pool.h` together with the WIC guards of `qpv-main.cpp` and

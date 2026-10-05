@@ -1525,15 +1525,14 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
           meta->fimToneMap = 1;    // " (TONE-MAPPED)"
     }
 
-    // the rest of the suffix FIMapplyToneMapper() appends to mainLoadedIMGdetails.PixelFormat,
-    // off the bit depth of the bitmap as loaded
+    // the rest of the suffix FIMapplyToneMapper() appends to mainLoadedIMGdetails.PixelFormat:
+    // a verdict the tone mapping options apply to, when they did not tone map it
     if (meta!=NULL && meta->fimToneMap==0)
     {
-       const bool hdrish = (GFT==FIF_PFM || GFT==FIF_RAW || GFT==FIF_JXR || GFT==FIF_HDR || GFT==FIF_EXR);
-       if (hdrish && fimSrcBPP>32)
+       if (verdict==FITM_OPTIONAL || verdict==FITM_REQUIRED || verdict==FITM_PQ)
           meta->fimToneMap = 2;    // " (TONE-MAPPABLE)"
-       else if (GFT==FIF_RAW && cfg->userHQraw!=1)
-          meta->fimToneMap = 2;    // LoadFimFile() marks a low quality RAW the same way
+       else if (GFT==FIF_RAW && cfg->userHQraw!=1 && cfg->colorManage!=1)
+          meta->fimToneMap = 2;    // as LoadFimFile() marks a low quality RAW: colour managed, it would be display encoded
     }
 
     if ((int)FIM.GetWidth(dib)!=resizedW || (int)FIM.GetHeight(dib)!=resizedH)

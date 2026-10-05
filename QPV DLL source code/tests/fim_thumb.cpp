@@ -403,8 +403,8 @@ int main(int argc, char **argv) {
         cfg.colorManage = 1;
         Thumb managed = thumb(cr2, cfg);
         printf("      means: tone mapped %.1f, linear %.1f, display encoded %.1f\n", toned.mean, linear.mean, managed.mean);
-        check(managed.status==TP_OK && managed.meta.fimToneMap==2,
-              "with colour management it comes back display encoded, and is not tone mapped");
+        check(managed.status==TP_OK && managed.meta.fimToneMap==0,
+              "with colour management it comes back display encoded: not tone mapped, and no marker");
         check(managed.mean>linear.mean + 20.0, "so it is shown with its tone curve rather than as linear light");
 
         cfg = baseConfig();
@@ -412,6 +412,11 @@ int main(int argc, char **argv) {
         Thumb preview = thumb(cr2, cfg);
         check(preview.status==TP_OK && preview.meta.fimToneMap==2 && preview.meta.fimBPP==24,
               "the embedded preview of a low quality load is marked as LoadFimFile() marks it");
+
+        cfg.colorManage = 1;
+        Thumb managedPreview = thumb(cr2, cfg);
+        check(managedPreview.status==TP_OK && managedPreview.meta.fimToneMap==0,
+              "but not with colour management, which keeps it display encoded at high quality too");
     }
 
     // ---- floating point: always tone mapped ------------------------------------------------
@@ -500,7 +505,7 @@ int main(int argc, char **argv) {
            ThumbsConfig cfg = baseConfig();
            check(thumb(heif, cfg).meta.fimToneMap==1, "a 48-bit HEIF is tone mapped when allowed");
            cfg.allowToneMapping = 0;
-           check(thumb(heif, cfg).meta.fimToneMap==0, "and left alone when not");
+           check(thumb(heif, cfg).meta.fimToneMap==2, "and left alone when not, marked \" (TONE-MAPPABLE)\"");
         }
         if (!rgb16.empty())
            check(thumb(rgb16, baseConfig()).meta.fimToneMap==1, "so is a 48-bit TIFF");

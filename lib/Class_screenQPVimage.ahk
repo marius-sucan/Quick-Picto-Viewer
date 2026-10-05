@@ -202,7 +202,8 @@ Class screenQPVimage {
      If (fileType="raw" && qualityRaw!=1)
      {
         fileType .= " [LOW QUALITY]"
-        If !toneMapped
+        ; tone mappable once loaded at high quality, unless color management makes it display encoded
+        If (!toneMapped && userPerformColorManagement!=1)
            toneMapped := " (TONE-MAPPABLE)"
      }
 

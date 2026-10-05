@@ -57648,6 +57648,15 @@ ReadSettingsAdjustToneMapPanel(actu:=0) {
     RegAction(actu, "UIuserToneMapParamD", , 2, 0, 400)
 }
 
+toneMapPanelApplies() {
+; the image on screen is one the HDR tone-mapping panel can change: tone mapped or tone mappable,
+; HDR, or a camera RAW image, whose load options the panel holds
+   If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || SubStr(currIMGdetails.RawFormat, 1, 4)="raw ")
+      Return 1
+
+   Return varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
+}
+
 PanelAdjustToneMapping() {
     If AnyWindowOpen
        Return
@@ -61090,7 +61099,7 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
          FreeImage_UnLoad(hFIFimgA)
          hFIFimgA := hFIFimgB
       }
-   } Else If ((mustApplyToneMapping=1 || isVarEqualTo(GFT, 32, 34, 36, 26, 29)) && imgBPP>32)
+   } Else If isVarEqualTo(tm, 1, 2, 3) ; FITM_OPTIONAL, FITM_REQUIRED, FITM_PQ: not tone mapped here, but the options apply to it
       hasAppliedToneMap := " (TONE-MAPPABLE)"
 
    ; FIT_INT16 [3] to FIT_COMPLEX [8], grey FIT_FLOAT [6] among them, hold light or measurements:
@@ -66643,7 +66652,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
         } Else
         {
            kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
-           If (!testWasImageEditedInVP() || !InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && !varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF"))
+           If (!testWasImageEditedInVP() || !toneMapPanelApplies())
               kMenu("pvMenuBarImage", "Disable", "Adjust &HDR tone-mapping")
         }
 
@@ -67740,8 +67749,7 @@ createMenuImgSizeAdapt(dummy:=0) {
 
       If (drawingShapeNow=0 && mustCaptureCloneBrush=0)
       {
-         yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
-         If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen && testWasImageEditedInVP())
+         If (toneMapPanelApplies() && !AnyWindowOpen && testWasImageEditedInVP())
             kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
 
          If !AnyWindowOpen
@@ -67985,8 +67993,7 @@ createMenuMainView() {
    {
       createMenuImgSizeAdapt()
       createMenuImgVProtation()
-      yayz := varContains(currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat, "hdr", "exr", "128-bit", "96-bit", "RGBF", "RGBAF")
-      If ((InStr(currIMGdetails.PixelFormat, "TONE-MAPP") || yayz=1) && !AnyWindowOpen && testWasImageEditedInVP())
+      If (toneMapPanelApplies() && !AnyWindowOpen && testWasImageEditedInVP())
          kMenu("PVview", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw")
 
       If (!AnyWindowOpen || isNowAlphaPainting()!=1 && imgEditPanelOpened=1 && AnyWindowOpen!=24 && AnyWindowOpen!=31)
@@ -90033,7 +90040,7 @@ coreColorsAdjusterWindow(modus:=0) {
     If (idu=10)
     {
        Gui, Add, Checkbox, xs y+10 w%thisWS% h%thisBtnHeight% gUpdateUIadjustVPcolors Checked%bwDithering% vbwDithering, Black/white
-       If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && testWasImageEditedInVP())
+       If (toneMapPanelApplies() && testWasImageEditedInVP())
           Gui, Add, Button, x+5 wp hp gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     } Else
     {
@@ -90086,7 +90093,7 @@ coreColorsAdjusterWindow(modus:=0) {
     } Else
     {
        ; Gui, Add, Checkbox, xs y+5 w%slide3Wid% h%thisBtnHeight% Checked%EraseAreaUseAlpha% vEraseAreaUseAlpha gUpdateUIadjustVPcolors, Apply alpha mas&k
-       If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && testWasImageEditedInVP())
+       If (toneMapPanelApplies() && testWasImageEditedInVP())
           Gui, Add, Button, xs y+5 w%slide3Wid% h%thisBtnHeight% gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
        uiADDalphaMaskTabs(3, 4, "UpdateUIadjustVPcolors")
     }
@@ -90217,7 +90224,7 @@ PanelAdjustColorsSimpleWindow() {
 
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Colors|Threshold%bonusTabs%
     Gui, Tab, 1 ; general
-    If (InStr(currIMGdetails.PixelFormat, "TONE-MAPP") && testWasImageEditedInVP())
+    If (toneMapPanelApplies() && testWasImageEditedInVP())
        Gui, Add, Button, x+15 y+15 Section h%thisBtnHeight% w%thisW% gBtnOpenPanelAdjustToneMapping, &HDR tone-mapping
     Else
        Gui, Add, Button, x+15 y+15 Section h%thisBtnHeight% w%thisW% gPanelAutoColors, A&uto-adjust panel
@@ -99624,7 +99631,8 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   If (fileType="raw" && userHQraw!=1)
   {
      fileType .= " [LOW QUALITY]"
-     If !toneMapped
+     ; tone mappable once loaded at high quality, unless color management makes it display encoded
+     If (!toneMapped && userPerformColorManagement!=1)
         toneMapped := " (TONE-MAPPABLE)"
   }
 

@@ -312,9 +312,13 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
     #   D - userPerformColorManagement never reaching the decoder;
     #   E - a PQ image linearised in its own primaries, BT.2020's, then shown as sRGB;
     #   F - a float or scalar image that is not tone mapped handed on as it is: GDI+ reads its
-    #       bytes as colours.
+    #       bytes as colours;
+    #   G - " (TONE-MAPPABLE)" decided by the format and the bit depth, not by the verdict: a
+    #       colour managed RAW is marked although no option tone maps it;
+    #   H - a low quality RAW marked with colour management on, where high quality would not
+    #       tone map it either.
     cp fim_loader.part fim_loader.orig
-    for mutant in A B C D E F; do
+    for mutant in A B C D E F G H; do
         cp fim_loader.orig fim_loader.part
         extra=""
         case $mutant in
@@ -330,6 +334,10 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
              label="PQ linearised in BT.2020's primaries" ;;
           F) sed -i 's|    if (!toneMap \&\& loadedType>=FIT_INT16 \&\& loadedType<=FIT_COMPLEX)|    if (false)|' fim_loader.part
              label="float and scalar images left as they are" ;;
+          G) sed -i 's/       if (verdict==FITM_OPTIONAL || verdict==FITM_REQUIRED || verdict==FITM_PQ)/       if ((GFT==FIF_PFM || GFT==FIF_RAW || GFT==FIF_JXR || GFT==FIF_HDR || GFT==FIF_EXR) \&\& fimSrcBPP>32)/' fim_loader.part
+             label="the marker decided by the format and the bit depth" ;;
+          H) sed -i 's|       else if (GFT==FIF_RAW \&\& cfg->userHQraw!=1 \&\& cfg->colorManage!=1)|       else if (GFT==FIF_RAW \&\& cfg->userHQraw!=1)|' fim_loader.part
+             label="a colour managed low quality RAW marked" ;;
         esac
 
         if cmp -s fim_loader.part fim_loader.orig; then
