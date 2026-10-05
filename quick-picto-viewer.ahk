@@ -122,8 +122,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
    , openFptrn4 := "*.targa;*.dib;*.pict;*.rle", openFptrnWIC := "", forceLiveAlphaPreviewMode := 0
-   , dialogSaveFptrn := "HD Photo (*.hdp;*.jxr)|Network Graphics JPEG (*.jng)|JPEG Common (*.jpg;*.jpeg)|JPEG 2000 (*.jp2)|JPEG 2000 codestream (*.j2k)|JPEG-XR (*.jxr)|Non-animated Compuserve GIF (*.gif)|Portable Network Graphics (*.png)|Portable PixelMap (*.ppm)|Tagged Image File Format (*.tif;*.tiff)|TrueVision Targa (*.tga)|Windows Photo (*.wdp;*.jxr)|Google WebP (*.webp)|Windows Bitmap (*.bmp)|X-PixMap (*.xpm)|Icon (*.ico)"
-   , dialogSaveIndexes := {1:"hdp", 2:"jng", 3:"jpg", 4:"jp2", 5:"j2k", 6:"jxr", 7:"gif", 8:"png", 9:"ppm", 10:"tif", 11:"tga", 12:"wdp", 13:"webp", 14:"bmp", 15:"xpm", 16:"ico"}
+   , dialogSaveFptrn := "Windows Bitmap (*.bmp)|Non-animated Compuserve GIF (*.gif)|HD Photo (*.hdp;*.jxr)|JPEG 2000 codestream (*.j2k)|Network Graphics JPEG (*.jng)|JPEG 2000 (*.jp2)|JPEG Common (*.jpg;*.jpeg)|JPEG-XR (*.jxr)|Portable Network Graphics (*.png)|Portable PixelMap (*.ppm)|TrueVision Targa (*.tga)|Tagged Image File Format (*.tif;*.tiff)|Windows Photo (*.wdp;*.jxr)|Google WebP (*.webp)|X-PixMap (*.xpm)|Icon (*.ico)"
+   , dialogSaveIndexes := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jng", 6:"jp2", 7:"jpg", 8:"jxr", 9:"png", 10:"ppm", 11:"tga", 12:"tif", 13:"wdp", 14:"webp", 15:"xpm", 16:"ico", 17:"hdr", 18:"exr", 19:"pfm"}
    , userPossibleWriteFMTs := ".BMP|.GIF|.HDP|.J2K|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM"
    , saveimgformatslist := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jng", 6:"jp2", 7:"jpg", 8:"jxr", 9:"png", 10:"ppm", 11:"tga", 12:"tif", 13:"wdp", 14:"webp", 15:"xpm"}
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0
@@ -44346,7 +44346,7 @@ calculateThumbsSheetDimensions(ByRef width, ByRef height) {
 
 getSaveDialogIndexForFile(imgPath, ByRef defFMTindex, allowExtended:=0, defaultu:=0) {
    Static extended := {"hdr":17, "exr":18, "pfm":19}
-   defFMTindex := (defaultu>0) ? defaultu : 3
+   defFMTindex := (defaultu>0) ? defaultu : 7
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    Loop, Parse, dialogSaveFptrn, |
    {
