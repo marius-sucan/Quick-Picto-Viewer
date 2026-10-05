@@ -581,9 +581,118 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
     return (ULONGLONG)res.outW * (ULONGLONG)res.outH * 4ull;
 }
 
+// qpv-wic-loader-begin
 // ---------------------------------------------------------------------------------------
 //  WIC loader
 // ---------------------------------------------------------------------------------------
+
+// The colour transform applyColorManagement() builds for LoadWICimage(): the frame's own
+// profile into sRGB, with the same fallbacks, but made of objects that belong to this call.
+// That function keeps its colour contexts in statics, which worker threads cannot share.
+//
+// The transform reads the frame itself: under a scaler that interpolates, the colours come
+// out wrong (see coreWICgetBufferImage()), so the thumbnail is scaled after it. That costs a
+// JPEG its scaled decode, which is why an EXIF sRGB context, sRGB into sRGB, gets none.
+//
+// Returns 1 with a transform the caller releases, 0 with nothing to do or nothing built.
+// Plain data only, like the guards in qpv-main.cpp; after a fault the objects are abandoned.
+static int tpWICguardedColorTransform(IWICImagingFactory *fac, IWICBitmapFrameDecode *pFrame,
+                                      const WICPixelFormatGUID *srcFmt, IWICColorTransform **ppTransform,
+                                      DWORD *sehCode) {
+    IWICColorContext   *pSrcContext  = NULL;
+    IWICColorContext   *pCmykContext = NULL;
+    IWICColorContext   *pDestContext = NULL;
+    IWICColorTransform *pTransform   = NULL;
+    *ppTransform = NULL;
+    *sehCode = 0;
+    if (fac==NULL || pFrame==NULL || srcFmt==NULL)
+       return 0;
+
+    const WICPixelFormatGUID &f = *srcFmt;
+    if (!(f==GUID_WICPixelFormat8bppGray    || f==GUID_WICPixelFormat16bppGray
+       || f==GUID_WICPixelFormat16bppBGR555 || f==GUID_WICPixelFormat16bppBGR565
+       || f==GUID_WICPixelFormat24bppBGR    || f==GUID_WICPixelFormat24bppRGB
+       || f==GUID_WICPixelFormat32bppBGR    || f==GUID_WICPixelFormat32bppBGRA
+       || f==GUID_WICPixelFormat32bppPBGRA  || f==GUID_WICPixelFormat32bppPRGBA
+       || f==GUID_WICPixelFormat32bppRGBA   || f==GUID_WICPixelFormat32bppBGR101010
+       || f==GUID_WICPixelFormat32bppCMYK   || f==GUID_WICPixelFormat48bppBGR
+       || f==GUID_WICPixelFormat64bppBGRA   || f==GUID_WICPixelFormat64bppPBGRA
+       || f==GUID_WICPixelFormat64bppPRGBA  || f==GUID_WICPixelFormat64bppRGBA))
+       return 0;
+
+    const int isCMYK = (f==GUID_WICPixelFormat32bppCMYK) ? 1 : 0;
+    int built = 0;
+    __try
+    {
+        UINT count = 0;
+        int embedded = 0, skip = 0;
+        HRESULT hr = fac->CreateColorContext(&pSrcContext);
+        if (SUCCEEDED(hr) && pSrcContext!=NULL)
+           hr = pFrame->GetColorContexts(1, &pSrcContext, &count);
+        else
+           hr = E_FAIL;
+
+        if (SUCCEEDED(hr) && count>0)
+        {
+           embedded = 1;
+           WICColorContextType type = WICColorContextUninitialized;
+           UINT exifSpace = 0;
+           if (SUCCEEDED(pSrcContext->GetType(&type)) && type==WICColorContextExifColorSpace
+            && SUCCEEDED(pSrcContext->GetExifColorSpace(&exifSpace)) && exifSpace==1)
+              skip = 1;
+        } else if (pSrcContext!=NULL)
+        {
+           // no profile: CMYK and 64bppRGBA are given one, as applyColorManagement() gives it
+           if (isCMYK)
+              hr = pSrcContext->InitializeFromExifColorSpace(5);
+           else if (f==GUID_WICPixelFormat64bppRGBA)
+              hr = pSrcContext->InitializeFromExifColorSpace(2);   // Adobe RGB
+           else
+              hr = E_FAIL;
+           count = SUCCEEDED(hr) ? 1 : 0;
+        }
+
+        if (!skip && count>0)
+        {
+           if (isCMYK && embedded && SUCCEEDED(fac->CreateColorContext(&pCmykContext)) && pCmykContext!=NULL)
+              pCmykContext->InitializeFromExifColorSpace(5);
+
+           hr = fac->CreateColorContext(&pDestContext);
+           if (SUCCEEDED(hr) && pDestContext!=NULL)
+              hr = pDestContext->InitializeFromExifColorSpace(1);   // sRGB
+           else
+              hr = E_FAIL;
+
+           if (SUCCEEDED(hr))
+              hr = fac->CreateColorTransformer(&pTransform);
+
+           if (SUCCEEDED(hr) && pTransform!=NULL)
+           {
+              hr = pTransform->Initialize(pFrame, pSrcContext, pDestContext, GUID_WICPixelFormat32bppPBGRA);
+              if (FAILED(hr) && pCmykContext!=NULL)
+                 hr = pTransform->Initialize(pFrame, pCmykContext, pDestContext, GUID_WICPixelFormat32bppPBGRA);
+
+              if (SUCCEEDED(hr))
+              {
+                 *ppTransform = pTransform;
+                 pTransform = NULL;
+                 built = 1;
+              }
+           }
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return 0;
+    }
+
+    WICguardedRelease(pTransform);
+    WICguardedRelease(pDestContext);
+    WICguardedRelease(pCmykContext);
+    WICguardedRelease(pSrcContext);
+    return built;
+}
 
 // Decodes szFileName and returns a 32bppPARGB GDI+ bitmap.
 // When targetW/targetH are below 2 the image is decoded at its native size; otherwise the
@@ -597,10 +706,11 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 // file in a folder without anyone asking it to.
 static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFileName, int targetW, int targetH,
                                     int frameIndex, int givenQuality, int isFIMokay, int &srcW, int &srcH,
-                                    TpSrcMeta *meta = NULL) {
+                                    TpSrcMeta *meta = NULL, int useICM = 0) {
     Gdiplus::GpBitmap     *myBitmap    = NULL;
     IWICBitmapDecoder     *pDecoder    = NULL;
     IWICBitmapFrameDecode *pFrame      = NULL;
+    IWICColorTransform    *pTransform  = NULL;
     IWICBitmapScaler      *pScaler     = NULL;
     IWICFormatConverter   *pConverter  = NULL;
     IWICBitmapSource      *pSource     = NULL;
@@ -663,6 +773,19 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
     if (SUCCEEDED(hr))
     {
        pSource = pFrame;
+       if (useICM==1 && facts.gotPixelFmt)
+       {
+          static std::atomic<bool> reported{false};
+          DWORD icmSeh = 0;
+          if (tpWICguardedColorTransform(fac, pFrame, &facts.pixelFmt, &pTransform, &icmSeh)==1)
+          {
+             pSource = pTransform;
+             if (!reported.exchange(true))
+                fnOutputDebug("thumbsPool: WIC colour management applied, first to " + WideCharToString(szFileName));
+          } else if (icmSeh!=0)
+             fnOutputDebug("thumbsPool: the codec faulted on the colour profile of " + WideCharToString(szFileName));
+       }
+
        if (targetW>1 && targetH>1)
        {
           auto nSize = adaptImageGivenSize(1, 0, owidth, oheight, (UINT)targetW, (UINT)targetH);
@@ -671,21 +794,26 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
              if (SUCCEEDED(fac->CreateBitmapScaler(&pScaler)) && pScaler!=NULL)
              {
                 WICBitmapInterpolationMode mode = (givenQuality==7) ? WICBitmapInterpolationModeHighQualityCubic : WICBitmapInterpolationModeFant;
-                HRESULT hrs = WICguardedScalerInit(pScaler, pFrame, nSize[0], nSize[1], mode, &sehCode);
+                HRESULT hrs = WICguardedScalerInit(pScaler, pSource, nSize[0], nSize[1], mode, &sehCode);
                 // the retry is for HighQualityCubic being unavailable before WIC2, which
                 // reports an error; a codec that faulted is not asked a second time
                 if (FAILED(hrs) && sehCode==0 && mode!=WICBitmapInterpolationModeFant)
-                   hrs = WICguardedScalerInit(pScaler, pFrame, nSize[0], nSize[1], WICBitmapInterpolationModeFant, &sehCode);
+                   hrs = WICguardedScalerInit(pScaler, pSource, nSize[0], nSize[1], WICBitmapInterpolationModeFant, &sehCode);
 
                 if (SUCCEEDED(hrs))
                    pSource = pScaler;
                 else
+                {
                    WICsafeRelease(pScaler);
+                   if (pTransform!=NULL)
+                      hr = E_FAIL;   // decoded again below, without the transform
+                }
              }
           }
        }
 
-       hr = fac->CreateFormatConverter(&pConverter);
+       if (SUCCEEDED(hr))
+          hr = fac->CreateFormatConverter(&pConverter);
        if (SUCCEEDED(hr))
           hr = WICguardedConverterInit(pConverter, pSource, &GUID_WICPixelFormat32bppPBGRA, &sehCode);
     }
@@ -728,12 +856,19 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
        }
     }
 
+    const bool retryPlain = (myBitmap==NULL && pTransform!=NULL);
     WICsafeRelease(pConverter);
     WICsafeRelease(pScaler);
+    WICsafeRelease(pTransform);
     WICsafeRelease(pFrame);
     WICsafeRelease(pDecoder);
+    // a transform the chain could not read after all must not cost the image its thumbnail
+    if (retryPlain)
+       return tpWICload(fac, szFileName, targetW, targetH, frameIndex, givenQuality, isFIMokay, srcW, srcH, meta, 0);
+
     return myBitmap;
 }
+// qpv-wic-loader-end
 
 // qpv-gdip-loader-begin
 // ---------------------------------------------------------------------------------------
@@ -1535,7 +1670,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               // WIC always serializes image processing operations
               res.meta = TpSrcMeta();  // reset the record
               bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                              0, res.srcW, res.srcH, &res.meta);
+                              0, res.srcW, res.srcH, &res.meta, cfg->colorManage);
               res.loaderUsed = 1;
               res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
               if (bmp==NULL && FIM.ok && cfg->allowFIM==1 && hasFIMtried!=1)

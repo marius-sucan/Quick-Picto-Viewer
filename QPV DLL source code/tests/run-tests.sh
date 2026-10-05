@@ -63,6 +63,9 @@ slice gdip_loader.part    ../thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\/\/ 
 slice fim_defs.part       ../thumbs-pool.h '^#define TP_JOB_THUMB'      '^#define TP_ERR_PDFLOCKED' 8 || exit 1
 slice fim_config.part     ../thumbs-pool.h '^struct ThumbsConfig {'  '^};' 20 || exit 1
 slice fim_loader.part     ../thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
+slice wic_loader.part     ../thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
+slice wic_guards.part     ../qpv-main.cpp '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
+slice adapt_size.part     ../qpv-main.cpp '^auto adaptImageGivenSize' '^}' 50 || exit 1
 echo "   ok"
 
 echo
@@ -335,6 +338,52 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
     done
     mv -f fim_loader.orig fim_loader.part
 fi
+
+echo
+echo "== WIC colour management in the thumbnails pool =="
+# The colour transform tpWICload() builds per call, against fake WIC objects that keep real
+# reference counts: which frames get one, that it is read by the scaler and never sits under
+# it, that every failure ends in a plain decode, and that nothing leaks or is released twice.
+if g++ $CXXFLAGS -Wno-unused-function -o wic_icm wic_icm.cpp 2>&1; then
+    ./wic_icm || fail=1
+else
+    echo "  ERROR: wic_icm.cpp did not compile"; fail=1
+fi
+
+echo
+echo "== mutation check: the WIC loader must keep a failed colour transform harmless =="
+#   A - a chain that cannot read the transform is not decoded again without it;
+#   B - the scaler reads the frame, past the transform that was built;
+#   C - the transform is never released;
+#   D - an EXIF sRGB frame is given a transform, and loses its scaled decode for nothing.
+cp wic_loader.part wic_loader.orig
+for mutant in A B C D; do
+    cp wic_loader.orig wic_loader.part
+    case $mutant in
+      A) sed -i 's|    if (retryPlain)|    if (false \&\& retryPlain)|' wic_loader.part
+         label="no plain decode after a failed transform" ;;
+      B) sed -i 's|HRESULT hrs = WICguardedScalerInit(pScaler, pSource, nSize\[0\], nSize\[1\], mode, \&sehCode);|HRESULT hrs = WICguardedScalerInit(pScaler, pFrame, nSize[0], nSize[1], mode, \&sehCode);|' wic_loader.part
+         label="the scaler reads the frame past the transform" ;;
+      C) sed -i '/^    WICsafeRelease(pTransform);$/d' wic_loader.part
+         label="the transform leaked" ;;
+      D) sed -i 's|              skip = 1;|              skip = 0;|' wic_loader.part
+         label="EXIF sRGB given a transform" ;;
+    esac
+
+    if cmp -s wic_loader.part wic_loader.orig; then
+        echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
+        continue
+    fi
+
+    g++ $CXXFLAGS -Wno-unused-function -o wic_mutant wic_icm.cpp 2>/dev/null
+    if ./wic_mutant > /dev/null 2>&1; then
+        echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
+    else
+        echo "   ok - mutant $mutant is caught ($label)"
+    fi
+    rm -f wic_mutant
+done
+mv -f wic_loader.orig wic_loader.part
 
 echo
 echo "== the records the thumbnails pool shares with AutoHotkey =="

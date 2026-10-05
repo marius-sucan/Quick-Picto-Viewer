@@ -255,6 +255,19 @@ but the pixels, because a stand-in that kept the metadata would hide exactly tha
 The four mutants take the verdict from the thumbnail, skip the linearisation, give UINT16 a
 verdict, and leave `FIF_LOAD_DISPLAY_ICC` out.
 
+**`wic_icm.cpp`** — the colour transform `tpWICload()` builds when colour management is on,
+sliced out of `thumbs-pool.h` together with the WIC guards of `qpv-main.cpp` and
+`adaptImageGivenSize()`, and compiled against `shim/wic-env.h`: the WIC interfaces with the
+SDK's signatures, and fakes behind them that keep real reference counts (`HRESULT` is 32 bits
+there, or every `FAILED()` is false under LP64). Colour fidelity needs Windows; what is pinned
+is the rest. Which frames get a transform: an embedded profile, a non-sRGB EXIF colour space,
+the fallbacks `applyColorManagement()` applies, not EXIF sRGB. Where it sits: on the frame,
+read by the scaler, never under a scaler that interpolates. That every failure, including
+a transform that only fails in `CopyPixels()`, ends as a plain thumbnail rather than a failed
+or a full size one. And that each decode releases every object it made, exactly once. The
+mutants drop the plain retry, let the scaler read the frame past the transform, leak the
+transform, and give EXIF sRGB a transform.
+
 **`thumbs_record.cpp`** — the layout of `ThumbResult` and `ThumbsPoolState`, sliced out of
 the shipped `thumbs-pool.h`. Nothing else pins them: `thumbsPoolFetch()` fills an array of
 records and `QPV_ThumbsPoolDrain()` / `poolRecordImgProps()` / `QPV_ThumbsPoolPending()`

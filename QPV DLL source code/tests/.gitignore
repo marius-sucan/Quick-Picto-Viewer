@@ -36,6 +36,8 @@ gdip_loader
 gdip_mutant
 fim_thumb
 fim_mutant
+wic_icm
+wic_mutant
 pdf_writer
 pdf_writer_mutant
 hash_bench
