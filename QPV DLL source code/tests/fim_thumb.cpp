@@ -173,6 +173,18 @@ static double largestChannelGap(const double *a, const double *b) {
     return gap;
 }
 
+// FreeImage's Display P3 profile as the display's; false when it was refused
+static bool pinDisplayP3() {
+    DWORD size = 0;
+    const void *p3 = X.GetBuiltInICCProfile(5, &size);   // FICMS_PROFILE_DISPLAY_P3
+    // FICMS_INTENT_RELATIVE_COLORIMETRIC | FICMS_BLACKPOINT_COMPENSATION
+    return p3!=NULL && X.SetDisplayICCProfile(p3, size, 0x101);
+}
+
+static void unpinDisplay() {
+    X.SetDisplayICCProfile(NULL, 0, 0x101);
+}
+
 // a PQ image tone mapped at thumbnail size, from linear light made with these
 // FreeImage_ConvertToLinear() flags, or from its code values when linearFlags is -1
 static Means toneMapped(const std::string &path, int linearFlags) {
@@ -364,15 +376,15 @@ int main(int argc, char **argv) {
         check((gLastLoadFlags & FIF_LOAD_DISPLAY_ICC)!=0, "colorManage=1 loads with FIF_LOAD_DISPLAY_ICC");
         check(t.status==TP_OK && t.meta.fimToneMap==1, "on an sRGB display it is still a PQ image, tone mapped");
 
-        DWORD p3size = 0;
-        const void *p3 = X.GetBuiltInICCProfile(5, &p3size);   // FICMS_PROFILE_DISPLAY_P3
-        // FICMS_INTENT_RELATIVE_COLORIMETRIC | FICMS_BLACKPOINT_COMPENSATION
-        if (p3!=NULL && X.SetDisplayICCProfile(p3, p3size, 0x101))
+        const Thumb onSRGB = t;
+        if (pinDisplayP3())
         {
            t = thumb(pq, cfg);
+           unpinDisplay();
            check(t.status==TP_OK && t.meta.fimToneMap==1,
                  "and on a Display P3 one: the display conversion leaves PQ alone");
-           X.SetDisplayICCProfile(NULL, 0, 0x101);
+           printf("      Display P3: chroma %.2f, against %.2f on sRGB\n", t.chroma, onSRGB.chroma);
+           check(t.chroma<onSRGB.chroma*0.95, "then converts the tone mapped thumbnail to it");
         } else check(false, "a Display P3 display could be set up");
 
         // a library with the verdict but without the linearisation tone maps the code values
@@ -384,7 +396,7 @@ int main(int argc, char **argv) {
               "without FreeImage_ConvertToLinear() the code values are tone mapped, as the AHK does");
     }
 
-    // ---- camera RAW at 16 bits: linear light, or display encoded with colour management -------
+    // ---- camera RAW at 16 bits: linear light, tone mapped before the display's colours ---------
     printf("  a 16-bit camera RAW\n");
     if (have(cr2))
     {
@@ -402,10 +414,44 @@ int main(int argc, char **argv) {
         cfg = baseConfig();
         cfg.colorManage = 1;
         Thumb managed = thumb(cr2, cfg);
-        printf("      means: tone mapped %.1f, linear %.1f, display encoded %.1f\n", toned.mean, linear.mean, managed.mean);
-        check(managed.status==TP_OK && managed.meta.fimToneMap==0,
-              "with colour management it comes back display encoded: not tone mapped, and no marker");
-        check(managed.mean>linear.mean + 20.0, "so it is shown with its tone curve rather than as linear light");
+        check((gLastLoadFlags & FIF_LOAD_DISPLAY_ICC)==0, "colour managed, it is still loaded as linear light");
+        check(managed.status==TP_OK && managed.meta.fimToneMap==1 && fabs(managed.mean - toned.mean)<0.5,
+              "and tone mapped first: on an sRGB display it looks as without colour management");
+
+        // the thumbnail the load flag gives, as with a FreeImage.dll without FreeImage_ApplyDisplayICCProfile()
+        BOOL (__stdcall *keepApply)(FIBITMAPptr) = FIM.ApplyDisplayICCProfile;
+        cfg.allowToneMapping = 0;
+        Thumb plain = thumb(cr2, cfg);
+        FIM.ApplyDisplayICCProfile = NULL;
+        Thumb onLoad = thumb(cr2, cfg);
+        const bool flagged = (gLastLoadFlags & FIF_LOAD_DISPLAY_ICC)!=0;
+        FIM.ApplyDisplayICCProfile = keepApply;
+        printf("      means: tone mapped %.1f, linear %.1f, display encoded %.1f, by the load flag %.1f\n",
+               toned.mean, linear.mean, plain.mean, onLoad.mean);
+        check(plain.status==TP_OK && plain.meta.fimToneMap==2, "not tone mapped when it is not allowed, still \" (TONE-MAPPABLE)\"");
+        check(plain.mean>linear.mean + 20.0, "and shown with the display's tone curve rather than as linear light");
+        check(onLoad.status==TP_OK && largestChannelGap(plain.bgr, onLoad.bgr)<0.5,
+              "the display's colours given after the load are the ones the load flag gives");
+        check(flagged && onLoad.meta.fimToneMap==0,
+              "a library without FreeImage_ApplyDisplayICCProfile() gets them on load, display encoded, no marker");
+
+        if (pinDisplayP3())
+        {
+           cfg = baseConfig();
+           cfg.colorManage = 1;
+           Thumb wide = thumb(cr2, cfg);
+           cfg.allowToneMapping = 0;
+           Thumb widePlain = thumb(cr2, cfg);
+           FIM.ApplyDisplayICCProfile = NULL;
+           Thumb wideOnLoad = thumb(cr2, cfg);
+           FIM.ApplyDisplayICCProfile = keepApply;
+           unpinDisplay();
+           printf("      Display P3: chroma tone mapped %.2f, against %.2f on sRGB\n", wide.chroma, managed.chroma);
+           check(wide.status==TP_OK && wide.meta.fimToneMap==1 && wide.chroma<managed.chroma*0.95,
+                 "on a Display P3 display the tone mapped thumbnail is converted to it");
+           check(widePlain.status==TP_OK && wideOnLoad.status==TP_OK && largestChannelGap(widePlain.bgr, wideOnLoad.bgr)<0.5,
+                 "and, not tone mapped, it gets the colours the load flag gives there");
+        } else check(false, "a Display P3 display could be set up");
 
         cfg = baseConfig();
         cfg.userHQraw = 0;
@@ -415,8 +461,13 @@ int main(int argc, char **argv) {
 
         cfg.colorManage = 1;
         Thumb managedPreview = thumb(cr2, cfg);
+        check(managedPreview.status==TP_OK && managedPreview.meta.fimToneMap==2,
+              "with colour management too: at high quality it is tone mapped first");
+        FIM.ApplyDisplayICCProfile = NULL;
+        managedPreview = thumb(cr2, cfg);
+        FIM.ApplyDisplayICCProfile = keepApply;
         check(managedPreview.status==TP_OK && managedPreview.meta.fimToneMap==0,
-              "but not with colour management, which keeps it display encoded at high quality too");
+              "but not when the display's colours could only come on load");
     }
 
     // ---- floating point: always tone mapped ------------------------------------------------
@@ -427,6 +478,20 @@ int main(int argc, char **argv) {
         cfg.allowToneMapping = 0;
         Thumb t = thumb(exr, cfg);
         check(t.status==TP_OK && t.meta.fimToneMap==1, "an OpenEXR image is tone mapped even when it is not allowed");
+
+        cfg = baseConfig();
+        const Thumb plain = thumb(exr, cfg);
+        cfg.colorManage = 1;
+        t = thumb(exr, cfg);
+        check(t.status==TP_OK && largestChannelGap(t.bgr, plain.bgr)<0.5,
+              "colour managed on an sRGB display, it looks as without colour management");
+        if (pinDisplayP3())
+        {
+           t = thumb(exr, cfg);
+           unpinDisplay();
+           printf("      Display P3: chroma %.2f, against %.2f on sRGB\n", t.chroma, plain.chroma);
+           check(t.status==TP_OK && t.chroma<plain.chroma*0.95, "on a Display P3 one it is converted after the tone mapping");
+        } else check(false, "a Display P3 display could be set up");
     }
     if (have(hdr))
     {

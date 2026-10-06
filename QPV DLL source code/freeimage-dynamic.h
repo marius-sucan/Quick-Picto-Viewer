@@ -119,6 +119,7 @@ struct FreeImageAPI {
     int         (__stdcall *MustTonemap)(FIBITMAPptr, int) = NULL;
     FIBITMAPptr (__stdcall *ConvertToLinear)(FIBITMAPptr, int) = NULL;
     FIBITMAPptr (__stdcall *ConvertToStandardType)(FIBITMAPptr, BOOL) = NULL;
+    BOOL        (__stdcall *ApplyDisplayICCProfile)(FIBITMAPptr) = NULL;
 };
 
 static FreeImageAPI FIM;
@@ -180,13 +181,15 @@ static void bindFreeImageOnce() {
         BINDFIM(MustTonemap, 8);
         BINDFIM(ConvertToLinear, 8);
         BINDFIM(ConvertToStandardType, 8);
+        BINDFIM(ApplyDisplayICCProfile, 4);
         #undef BINDFIM
 
         // GetDotsPerMeterX/Y are deliberately not in this list: they only fill in the
         // imgdpi the collection pool records, and an image whose resolution could not be
         // read is worth far less than the whole FreeImage loader. Their callers test them.
         // So are MustTonemap and ConvertToLinear, which older FreeImage.dll builds do not
-        // export; tpFIMthumb() falls back to the bit depth rule without them.
+        // export; tpFIMthumb() falls back to the bit depth rule without them. Without
+        // ApplyDisplayICCProfile it leaves the display's colours to FIF_LOAD_DISPLAY_ICC.
         FIM.ok = (FIM.GetFileTypeU && FIM.LoadU && FIM.Unload && FIM.GetWidth && FIM.GetHeight
                && FIM.GetBPP && FIM.GetPitch && FIM.GetBits && FIM.GetInfo && FIM.GetImageType
                && FIM.GetColorType && FIM.Rescale && FIM.ConvertTo24Bits && FIM.FlipVertical);

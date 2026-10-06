@@ -248,21 +248,28 @@ It pins the decision `FIMapplyToneMapper()` makes in the viewer, and where in th
 can be made. `FreeImage_MustTonemap()` has to be asked about the bitmap *as loaded*: the
 rescale keeps neither the ICC profile nor, through OpenCV, the CICP tag, so asked afterwards a
 PQ AVIF reads as display encoded and is shown as its code values, and a RAW that colour
-management already made display encoded is tone mapped a second time. The PQ thumbnail must
+management made display encoded on load is tone mapped a second time. The PQ thumbnail must
 equal the one tone mapped from linear light, which is measured, as is the brightness a RAW
-gains from `FIF_LOAD_DISPLAY_ICC`. `shim/fim-env.h` resizes like OpenCV does, keeping nothing
+gains from the display's colours. `shim/fim-env.h` resizes like OpenCV does, keeping nothing
 but the pixels, because a stand-in that kept the metadata would hide exactly that mistake.
 The PQ image is linearised in sRGB's primaries: left in BT.2020's and shown as sRGB it loses a
 quarter of its colourfulness, which is what the chroma comparison catches, since the channel
-means barely move. With a Display P3 display set, the PQ image must still be tone mapped -
-the fork's `FIF_LOAD_DISPLAY_ICC` leaves PQ alone. Float and integer one-channel images that
+means barely move. With colour management on, a RAW decoded at high quality is loaded as
+linear light and tone mapped first; `FreeImage_ApplyDisplayICCProfile()` then gives the
+thumbnail the display's colours, or, when it is not tone mapped, gives them to the full-size
+bitmap before the rescale drops its ICC profile, matching what `FIF_LOAD_DISPLAY_ICC` gives
+a library without the function. With a Display P3 display set, the PQ image must still be
+tone mapped - the fork's `FIF_LOAD_DISPLAY_ICC` leaves PQ alone - and the tone mapped
+thumbnails of the PQ image, the OpenEXR image and the RAW must then be converted to it. Float and integer one-channel images that
 are not tone mapped must come back as an even grey ramp: handed on as they are, GDI+ reads
-their bytes as colours. The ` (TONE-MAPPABLE)` marker follows the verdict too: a RAW that
-colour management made display encoded carries none, because no option tone maps it, and a low
-quality RAW is marked only without colour management. The eight mutants take the verdict from
-the thumbnail, skip the linearisation, give UINT16 a verdict, leave `FIF_LOAD_DISPLAY_ICC` out,
+their bytes as colours. The ` (TONE-MAPPABLE)` marker follows the verdict too: a RAW colour
+managed on load carries none, because no option tone maps it, and a low quality RAW is marked
+unless colour management could only come on load. The eleven mutants take the verdict from the
+thumbnail, skip the linearisation, give UINT16 a verdict, leave `FIF_LOAD_DISPLAY_ICC` out,
 linearise in BT.2020's primaries, hand float images on unconverted, mark by format and bit
-depth, and mark a colour managed low quality RAW.
+depth, leave a colour managed low quality RAW unmarked, colour manage a linear RAW on load,
+leave tone mapped thumbnails in sRGB's colours, and leave a linear RAW that is not tone mapped
+without the display's colours.
 
 **`wic_icm.cpp`** — the colour transform `tpWICload()` builds when colour management is on,
 sliced out of `thumbs-pool.h` together with the WIC guards of `qpv-main.cpp` and

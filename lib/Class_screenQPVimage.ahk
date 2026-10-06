@@ -196,14 +196,14 @@ Class screenQPVimage {
      ; fnOutputDebug(A_ThisFunc "(): " imgBPP "|" ColorsType "|" imgType "|" mustApplyToneMapping "|" GFT "|" imgPath)
      imgTypeID := FreeImage_GetImageType(hFIFimgA, 0) ; before FIMapplyToneMapper() scales the one-channel types into 8 bits
      If (noBMP=0)
-        hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, toneMapped)
+        hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, toneMapped, externHandle[5])
 
      fileType := FreeImage_GetFileType(imgPath, 1)
      If (fileType="raw" && qualityRaw!=1)
      {
         fileType .= " [LOW QUALITY]"
-        ; tone mappable once loaded at high quality, unless color management makes it display encoded
-        If (!toneMapped && userPerformColorManagement!=1)
+        ; tone mappable once loaded at high quality, unless color management would make it display encoded on load
+        If (!toneMapped && FIMdisplayICCmode(34, 0)!=1) ; FIF_RAW, RAW_DEFAULT
            toneMapped := " (TONE-MAPPABLE)"
      }
 

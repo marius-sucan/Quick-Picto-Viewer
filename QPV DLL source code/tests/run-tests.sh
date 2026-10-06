@@ -314,11 +314,14 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
     #   F - a float or scalar image that is not tone mapped handed on as it is: GDI+ reads its
     #       bytes as colours;
     #   G - " (TONE-MAPPABLE)" decided by the format and the bit depth, not by the verdict: a
-    #       colour managed RAW is marked although no option tone maps it;
-    #   H - a low quality RAW marked with colour management on, where high quality would not
-    #       tone map it either.
+    #       RAW colour managed on load is marked although no option tone maps it;
+    #   H - a low quality RAW not marked with colour management on, although high quality would
+    #       tone map it before the display's colours;
+    #   I - a linear RAW colour managed on load, so never tone mapped;
+    #   J - a tone mapped thumbnail left in sRGB's colours on a wide gamut display;
+    #   K - a linear RAW that is not tone mapped left without the display's colours.
     cp fim_loader.part fim_loader.orig
-    for mutant in A B C D E F G H; do
+    for mutant in A B C D E F G H I J K; do
         cp fim_loader.orig fim_loader.part
         extra=""
         case $mutant in
@@ -336,8 +339,14 @@ if [ -n "$fimSo" ] && [ -x fim_thumb ]; then
              label="float and scalar images left as they are" ;;
           G) sed -i 's/       if (verdict==FITM_OPTIONAL || verdict==FITM_REQUIRED || verdict==FITM_PQ)/       if ((GFT==FIF_PFM || GFT==FIF_RAW || GFT==FIF_JXR || GFT==FIF_HDR || GFT==FIF_EXR) \&\& fimSrcBPP>32)/' fim_loader.part
              label="the marker decided by the format and the bit depth" ;;
-          H) sed -i 's|       else if (GFT==FIF_RAW \&\& cfg->userHQraw!=1 \&\& cfg->colorManage!=1)|       else if (GFT==FIF_RAW \&\& cfg->userHQraw!=1)|' fim_loader.part
-             label="a colour managed low quality RAW marked" ;;
+          H) sed -i 's/(cfg->colorManage!=1 || FIM.ApplyDisplayICCProfile!=NULL)/(cfg->colorManage!=1)/' fim_loader.part
+             label="a colour managed low quality RAW left unmarked" ;;
+          I) sed -i 's|    if (displayICC==1)|    if (displayICC!=0)|' fim_loader.part
+             label="a linear RAW colour managed on load" ;;
+          J) sed -i 's/       if ((displayICC==2 || (displayICC==1 \&\& keptLight)) \&\& FIM.ApplyDisplayICCProfile!=NULL)/       if (false)/' fim_loader.part
+             label="tone mapped thumbnails left in sRGB's colours" ;;
+          K) sed -i 's|    if (displayICC==2 \&\& !toneMap)|    if (false)|' fim_loader.part
+             label="an untone mapped linear RAW left without the display's colours" ;;
         esac
 
         if cmp -s fim_loader.part fim_loader.orig; then

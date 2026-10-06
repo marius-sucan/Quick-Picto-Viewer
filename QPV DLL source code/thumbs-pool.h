@@ -1369,7 +1369,12 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     else if (GFT==FIF_RAW)
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_PREVIEW;
 
-    if (cfg->colorManage==1)
+    // as FIMdisplayICCmode() decides: a camera RAW decoded at high quality is linear light, tone
+    // mapped before FreeImage_ApplyDisplayICCProfile() gives it the display's colours (2); the
+    // rest get them on load (1)
+    const int displayICC = (cfg->colorManage!=1) ? 0
+                         : (GFT==FIF_RAW && loadArgs==RAW_DEFAULT && FIM.ApplyDisplayICCProfile!=NULL) ? 2 : 1;
+    if (displayICC==1)
        loadArgs |= FIF_LOAD_DISPLAY_ICC;
 
     FIBITMAPptr dib = FIM.LoadU(GFT, path.c_str(), loadArgs);
@@ -1424,6 +1429,16 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     const int verdict = tpFIMtoneMapVerdict(dib, GFT);
     const bool toneMap = (verdict==FITM_OPTIONAL && cfg->allowToneMapping==1)
                        || verdict==FITM_REQUIRED || verdict==FITM_PQ;
+
+    // FIF_LOAD_DISPLAY_ICC leaves float and PQ images to the tone mapping, which gives them their
+    // display colours after it, as FIMapplyToneMapper() does
+    const int typeAsLoaded = FIM.GetImageType(dib);
+    const bool keptLight = verdict==FITM_PQ || typeAsLoaded==FIT_FLOAT || typeAsLoaded==FIT_RGBF || typeAsLoaded==FIT_RGBAF;
+
+    // a linear RAW that is not tone mapped, a monochrome one among them, gets the display's colours
+    // at full size, while it still has the ICC profile the rescale drops
+    if (displayICC==2 && !toneMap)
+       FIM.ApplyDisplayICCProfile(dib);
     if (toneMap && verdict==FITM_PQ && FIM.ConvertToLinear!=NULL)
     {
        // full size, for the same reason, and in sRGB's primaries, which the tone mapped
@@ -1523,6 +1538,9 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        dib = mapped;
        if (meta!=NULL)
           meta->fimToneMap = 1;    // " (TONE-MAPPED)"
+
+       if ((displayICC==2 || (displayICC==1 && keptLight)) && FIM.ApplyDisplayICCProfile!=NULL)
+          FIM.ApplyDisplayICCProfile(dib);
     }
 
     // the rest of the suffix FIMapplyToneMapper() appends to mainLoadedIMGdetails.PixelFormat:
@@ -1531,8 +1549,8 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     {
        if (verdict==FITM_OPTIONAL || verdict==FITM_REQUIRED || verdict==FITM_PQ)
           meta->fimToneMap = 2;    // " (TONE-MAPPABLE)"
-       else if (GFT==FIF_RAW && cfg->userHQraw!=1 && cfg->colorManage!=1)
-          meta->fimToneMap = 2;    // as LoadFimFile() marks a low quality RAW: colour managed, it would be display encoded
+       else if (GFT==FIF_RAW && cfg->userHQraw!=1 && (cfg->colorManage!=1 || FIM.ApplyDisplayICCProfile!=NULL))
+          meta->fimToneMap = 2;    // as LoadFimFile() marks a low quality RAW, unless colour management would make it display encoded on load
     }
 
     if ((int)FIM.GetWidth(dib)!=resizedW || (int)FIM.GetHeight(dib)!=resizedH)
