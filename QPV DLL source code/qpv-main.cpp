@@ -10099,7 +10099,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                outA = weighTwoValues(opacity, tgtA, mask_fval);
             } else
             {
-               outA = 255 - clamp(max(srcA, weightInt) - min(srcA, weightInt), 0, 255);
+               outA = (srcA * weightInt + 127) / 255;
                RGBAColor Orgb = { srcB, srcG, srcR, outA };
                RGBAColor Brgb = { tgtB, tgtG, tgtR, tgtA };
                RGBAColor blended = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, eraserMode, imgBpp, 0);
