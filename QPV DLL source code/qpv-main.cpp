@@ -6816,14 +6816,20 @@ void AppendCounters(std::vector<unsigned short>& out, const std::vector<unsigned
 
 void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
                        std::vector<unsigned short>& out,
-                       const std::vector<unsigned int>& parentCounters) {
+                       const std::vector<unsigned int>& parentCounters,
+                       std::unordered_set<FPDF_BOOKMARK>& visited) {
 
 // Recursive helper function to traverse the bookmark tree.
 // 'parentCounters' holds the numbering from parent bookmarks.
+// PDFium does not stop an outline whose /First or /Next leads back to an earlier item: each
+// item is listed once, and the item count and the depth are capped
 
     unsigned int siblingCounter = 1;
     while (bookmark)
     {
+        if (visited.size()>=100000 || !visited.insert(bookmark).second)
+           return;
+
         // Build the current numbering chain: parent's counters + current sibling counter.
         std::vector<unsigned int> currentCounters = parentCounters;
         currentCounters.push_back(siblingCounter);
@@ -6867,8 +6873,8 @@ void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
 
         // Recurse into any child bookmarks.
         FPDF_BOOKMARK child = FPDFBookmark_GetFirstChild(doc, bookmark);
-        if (child)
-           TraverseBookmarks(doc, child, out, currentCounters);
+        if (child && currentCounters.size()<256)
+           TraverseBookmarks(doc, child, out, currentCounters, visited);
         
         // Move to the next sibling.
         siblingCounter++;
@@ -6917,7 +6923,8 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     if (root)
     {
         std::vector<unsigned int> emptyChain;  // At root level, no parent numbering.
-        TraverseBookmarks(doc, root, out, emptyChain);
+        std::unordered_set<FPDF_BOOKMARK> visited;
+        TraverseBookmarks(doc, root, out, emptyChain, visited);
     } else
     {
         *errorType = -2;
