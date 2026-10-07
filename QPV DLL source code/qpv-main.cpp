@@ -6007,6 +6007,29 @@ static HRESULT WICguardedPixelFormatInfo(IWICImagingFactory *fac, const WICPixel
     return hr;
 }
 
+// 1 when the frame's palette has an entry that is not opaque; a frame without a palette has none
+static int WICguardedPaletteHasAlpha(IWICImagingFactory *fac, IWICBitmapFrameDecode *frame, DWORD *sehCode) {
+    IWICPalette *pPalette = NULL;
+    BOOL hasAlpha = FALSE;
+    *sehCode = 0;
+    __try
+    {
+        if (SUCCEEDED(fac->CreatePalette(&pPalette)) && pPalette!=NULL)
+        {
+           if (FAILED(frame->CopyPalette(pPalette)) || FAILED(pPalette->HasAlpha(&hasAlpha)))
+              hasAlpha = FALSE;
+        }
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return 0;   // the palette is abandoned on purpose
+    }
+
+    WICguardedRelease(pPalette);
+    return hasAlpha ? 1 : 0;
+}
+
 // size and pixel format of whatever is at the end of a scaler/converter chain; the call
 // walks back down that chain into the codec
 static HRESULT WICguardedSourceInfo(IWICBitmapSource *src, UINT *width, UINT *height,
@@ -6507,15 +6530,9 @@ bool IsWicDecoderAvailable(const GUID& formatGuid) {
 }
 
 int decideWICtoFIMpixelFormat(GUID fmt) {
+      // grey, palette and 16-bit RGB formats get 24 bits as well: a 16-bit FreeImage bitmap
+      // keeps 5 bits per channel
       int d = 24;
-      if (fmt == GUID_WICPixelFormat16bppBGR555 || fmt == GUID_WICPixelFormat1bppIndexed
-      || fmt == GUID_WICPixelFormat2bppIndexed  || fmt == GUID_WICPixelFormat4bppIndexed
-      || fmt == GUID_WICPixelFormat8bppIndexed  || fmt == GUID_WICPixelFormatBlackWhite
-      || fmt == GUID_WICPixelFormat2bppGray     || fmt == GUID_WICPixelFormat4bppGray
-      || fmt == GUID_WICPixelFormat8bppGray     || fmt == GUID_WICPixelFormat8bppAlpha
-      || fmt == GUID_WICPixelFormat16bppBGR565  || fmt == GUID_WICPixelFormat16bppGray)
-         d = 16;  // 1 = FIT_BITMAP | 16 bits
-
       if (fmt == GUID_WICPixelFormat24bppBGR           || fmt == GUID_WICPixelFormat24bppRGB
       || fmt == GUID_WICPixelFormat24bpp3Channels      || fmt == GUID_WICPixelFormat32bppBGR
       || fmt == GUID_WICPixelFormat32bppRGB            || fmt == GUID_WICPixelFormat32bppCMYK
@@ -6525,7 +6542,8 @@ int decideWICtoFIMpixelFormat(GUID fmt) {
       if (fmt == GUID_WICPixelFormat32bppBGRA          || fmt == GUID_WICPixelFormat16bppBGRA5551
       || fmt == GUID_WICPixelFormat32bppPBGRA          || fmt == GUID_WICPixelFormat32bppRGBA
       || fmt == GUID_WICPixelFormat32bppPRGBA          || fmt == GUID_WICPixelFormat32bpp4Channels
-      || fmt == GUID_WICPixelFormat32bpp3ChannelsAlpha || fmt == GUID_WICPixelFormat40bppCMYKAlpha)
+      || fmt == GUID_WICPixelFormat32bpp3ChannelsAlpha || fmt == GUID_WICPixelFormat40bppCMYKAlpha
+      || fmt == GUID_WICPixelFormat8bppAlpha)
          d = 32;  // 1 = FIT_BITMAP | 32 bits
 
       if (fmt == GUID_WICPixelFormat48bppBGR          || fmt == GUID_WICPixelFormat32bppGrayFixedPoint
@@ -6650,6 +6668,18 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
          }
 
          destinationFormat = decideWICtoFIMpixelFormat(facts.pixelFmt);
+         const GUID &pf = facts.pixelFmt;
+         if (SUCCEEDED(hr) && (pf==GUID_WICPixelFormat1bppIndexed || pf==GUID_WICPixelFormat2bppIndexed
+             || pf==GUID_WICPixelFormat4bppIndexed || pf==GUID_WICPixelFormat8bppIndexed))
+         {
+            // transparent palette entries need the alpha channel
+            DWORD palSehCode = 0;
+            if (WICguardedPaletteHasAlpha(m_pIWICFactory, pWICclassFrameDecoded, &palSehCode)==1)
+               destinationFormat = 32;
+            else if (palSehCode!=0)
+               fnOutputDebug("WICpreLoadImage: the codec faulted on the palette");
+         }
+
          int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
          if (tif==1 && destinationFormat>32 && isFIMokay==1)
          {
