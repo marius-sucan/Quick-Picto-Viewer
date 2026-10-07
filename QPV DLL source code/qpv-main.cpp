@@ -7657,6 +7657,10 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
 // per worker ones, so several SVGs render at the same time. pD2D1Factory is created
 // MULTI_THREADED, which makes it safe to share but also puts a lock around the factory and
 // every resource made from it, so workers sharing it would take turns
+// -1 not known yet; 0 Direct2D cannot render SVG on this system [before Windows 10 1703]; 1 it can
+static std::atomic<int> d2dSvgSupport{-1};
+
+// NULL unless the document was drawn: a bitmap nothing was drawn into must not pass for the image
 IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, float fSx, float fSy,
                             ID2D1Factory *d2dFac = NULL, IWICImagingFactory *wicFac = NULL) {
     // Create file stream and SVG document
@@ -7698,8 +7702,10 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
 
     // Create SVG Document
     ID2D1DeviceContext5* pDeviceContext = nullptr;
+    bool rendered = false;
     hr = pRenderTarget->QueryInterface(IID_ID2D1DeviceContext5, reinterpret_cast<void **>(&pDeviceContext));
-    if (SUCCEEDED(hr))
+    d2dSvgSupport = (SUCCEEDED(hr) && pDeviceContext!=NULL) ? 1 : 0;
+    if (SUCCEEDED(hr) && pDeviceContext!=NULL)
     {
         D2D1_SIZE_F size = D2D1::SizeF((float)width, (float)height);
         hr = pDeviceContext->CreateSvgDocument(pStream, size, &pSvgDocument);
@@ -7723,7 +7729,9 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
             // pRenderTarget->DrawLine({10, 10}, {310, 246}, D2D1Brush, 10);
             pDeviceContext->DrawSvgDocument(pSvgDocument);
             hr = pRenderTarget->EndDraw();
-            if (!(SUCCEEDED(hr)))
+            if (SUCCEEDED(hr))
+               rendered = true;
+            else
                fnOutputDebug("WicD2DrenderSVG: failed EndDraw()");
 
             // D2D1Brush->Release();
@@ -7735,6 +7743,8 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
     SafeRelease(pSvgDocument, "WicD2DrenderSVG: pSvgDocument", 0);
     SafeRelease(pRenderTarget, "WicD2DrenderSVG: pRenderTarget", 0);
     SafeRelease(pStream, "WicD2DrenderSVG: pStream", 0);
+    if (!rendered)
+       SafeRelease(pWICBitmap, "WicD2DrenderSVG: pWICBitmap", 0);
     return pWICBitmap; // Caller is responsible for releasing this
 }
 

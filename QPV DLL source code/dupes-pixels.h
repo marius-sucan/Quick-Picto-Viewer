@@ -563,7 +563,12 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
         int srcW = 0, srcH = 0;
         bmp = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta);
         if (bmp==NULL)
+        {
+           // where Direct2D cannot render SVG at all, the file is not to blame
+           if (d2dSvgSupport.load()==0 && tpFileExtension(job.path)==L"svg")
+              res.status = DP_ERR_PROCESS;
            return;
+        }
 
         res.width  = srcW;
         res.height = srcH;
