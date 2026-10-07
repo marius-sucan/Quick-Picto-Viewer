@@ -25,10 +25,15 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
+**Fixed: #1 to #8**, one commit each, named under each item; qpvmain.dll must be rebuilt for them to
+take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46.**
+
 
 ## High
 
 ### 1. Flood fill at low tolerance leaves part of a large region unfilled
+- **Fixed in `c2ba1af`:** the two `!= oldColor` tests are back, and the loop budget is
+  `3*w*h + 1`, held in 64 bits; with the tests restored, `w*h + w` still cut 6% of random fills short.
 - **Where:** `qpv-main.cpp:3209-3227` (`FloodFillScanlineStack`), with the loop budget at 3146/3186.
 - **What's wrong:** the two `else if (spanAbove && y>0)` / `(spanBelow && y<h-1)` branches reset the
   span flag without testing that the pixel above/below stopped matching, so a seed is pushed for every
@@ -47,6 +52,8 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
   `int` multiply that wraps above 4.29 Gpx.)
 
 ### 2. Painting "inside/outside the selection" is mirrored vertically on normal images
+- **Fixed in `eabf2d4`:** `PaintBrushLarge()` asks `clipMaskFilter()` about the bottom-up row `py`
+  when the buffer is a GDI+ lock rect (`lockW>0`); huge images are unchanged.
 - **Where:** `qpv-main.cpp:9576` (`clipMaskFilter(px, iy, NULL, 0)`) with ahk:78418-78430
   (`InitHugeImgSelPath()` + `QPV_PrepareHugeImgSelectionArea()`) and ahk:78893 (`dll_tkY = imgH-1-cur_tkY`).
 - **What's wrong:** the selection is always prepared in bottom-up rows (`Y1 := imgH - imgSelPy`), which
@@ -60,6 +67,7 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
   prepare top-down coordinates for `isLarge=0`, or flip `iy` in the DLL when `lockW>0`.
 
 ### 3. Any hue change washes out light colours
+- **Fixed in `cae77ac`:** `S = del_Max / (2.0 - max - min)`.
 - **Where:** `qpv-main.h:311` (`RGBA16color::ConvertRGBtoHSL`).
 - **What's wrong:** for L ≥ 0.5 it computes `S = del_Max / (2.0 - del_Max)`; the formula is
   `del_Max / (2.0 - max - min)`. The two agree only when min = 0, which is why saturated primaries and
@@ -73,6 +81,9 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
   bit-identical to the older code, so it carried this over.
 
 ### 4. The smudge brush reads outside the locked pixels on normal images
+- **Fixed in `b265651`:** the DLL clamps the clone region to the lock rect (a sample past it takes the
+  edge pixel; a GDI+ stamp without the copy is skipped), and `DrawPaintBrushNowStep` pads the smudge
+  lock by `cur_off * scale` on the side the samples come from, with the DLL's scale formula.
 - **Where:** `qpv-main.cpp:9213-9228` (the clone region is the brush box plus `offX*scale`, scale 3 at
   wetness 0 up to ~26), `9232-9254` (the `memcpy` at 9248 copies all of it), fallback reads at 9903-9912;
   ahk:78813-78820 (type-6 lock padding `|factor|*2 + 10`) and ahk:78895-78905 (lock rect, virtual base).
@@ -92,6 +103,8 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
   also what c0bcb1f's earlier out-of-lock crash fix relied on).
 
 ### 5. Auto-adjust colours, "RGB levels": a flat channel is wiped, an all-transparent crop inverts
+- **Fixed in `0fbedaa`:** a flat channel keeps its values (factor 1 from 0), and when no pixel of the
+  copy is counted the image is left alone, in both modes.
 - **Where:** `qpv-main.cpp:8308` (the flat-range guard applies to `modus==1` only), 8311-8320,
   8346-8348 (`autoContrastBitmap`).
 - **What's wrong:** with `modus==2` a channel whose range in the analysed copy is 0 gives `255/0 = inf`,
@@ -106,6 +119,9 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
 - **Evidence:** reading + reviewer harness (UBSan flags the NaN→int) — confirmed.
 
 ### 6. Grey and palette images lose their tones on the WIC→FreeImage path (5 bits per channel)
+- **Fixed in `06a00c9`:** those formats answer 24, and 8bppAlpha 32; `WICpreLoadImage()` answers 32
+  for an indexed frame whose palette has an entry that is not opaque. WIC is never asked for
+  16bppBGR555 now, so the link below that was not run no longer matters.
 - **Where:** `qpv-main.cpp:6508-6516` (`decideWICtoFIMpixelFormat` answers 16 for 1/2/4/8bppIndexed,
   BlackWhite, 2/4/8bppGray, 8bppAlpha, 16bppBGR565 and 16bppGray) and `6279-6280`
   (`coreWICgetBufferImage` turns 16 into `GUID_WICPixelFormat16bppBGR555`).
@@ -126,6 +142,10 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
   8-bit-and-up members of that group.
 
 ### 7. PDFium is called from two threads at once
+- **Fixed in `f4d01a9`:** every PDFium caller takes one `std::timed_mutex pdfiumMutex`, declared ahead
+  of the PDF exports. The pools block on it and call `coreRenderPdfPageAsBitmap()`; the four exports
+  wait for it at most 15 s, then return the error code -8, which `friendlyPDFerrorCodes()` names
+  "PDFium is busy with another document". The viewer asks PDFium for the bookmarks of `.pdf` files only.
 - **Where:** `ExtractPDFBookmarks` (qpv-main.cpp:6847), `RenderPdfPageAsTextLinks` (6891),
   `RenderPdfPageAsText` (7016), `RenderPdfPageAsBitmap` (7103) take no lock; `tpPdfMutex` is declared
   later (thumbs-pool.h:205) and only the two worker pools take it (thumbs-pool.h:1660,
@@ -144,6 +164,7 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
   would freeze the UI behind a stuck worker; a timed lock or one PDFium thread avoids that.
 
 ### 8. A PDF whose outline loops freezes or crashes QPV when it is opened
+- **Fixed in `c7a7662`:** each outline item is listed once; at most 100000 items and 256 levels.
 - **Where:** `qpv-main.cpp:6793-6843` (`TraverseBookmarks`).
 - **What's wrong:** no cycle guard. PDFium only refuses `/Next` pointing at the item itself, and
   fpdf_doc.h leaves circular references to the caller. A sibling loop grows `out` without limit; a
@@ -488,7 +509,8 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
 ## Seen on the AHK side while tracing (not DLL code)
 - `generateViewPortPDFbookmarks()` (ahk:75120, 99553) runs after every WIC-loaded image, so the viewer
   asks PDFium to open every JPEG/PNG/TIFF it shows — wasted I/O, and one more way into PDFium for #7
-  (a small one: a non-PDF fails at the header).
+  (a small one: a non-PDF fails at the header). **Fixed in `f4d01a9`**, with #7: it opens
+  `.pdf` files only.
 - `HugeImagesApplyAutoColors()`: "Both" runs pass 2 against the small copy made before pass 1 stretched
   the image (ahk:21233, 21252-21256), so levels are stretched twice (input 90 → 9, 150 → 255; the normal
   path gives 64 and 191); "Image contrast" there reads the green channel of a colour copy instead of a
