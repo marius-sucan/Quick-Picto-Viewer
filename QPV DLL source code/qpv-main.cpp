@@ -9574,7 +9574,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             // 1. Calculate selection constraints
             if (useSelArea)
             {
-                if (clipMaskFilter(px, iy, NULL, 0) == 1)
+                // the selection is prepared in bottom-up rows; the rows of a GDI+ lock [lockW>0] are top-down
+                if (clipMaskFilter(px, (lockW>0) ? py : iy, NULL, 0) == 1)
                    continue;
             }
 
