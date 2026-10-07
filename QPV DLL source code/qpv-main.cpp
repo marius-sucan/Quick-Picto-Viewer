@@ -1762,10 +1762,14 @@ DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px
      return 0;
   }
 
-  const int mw = min((int)px2 + thickness, (int)polyW - 1);
-  const int mh = min((int)py2 + thickness, (int)polyH - 1);
-  const int mx = max(px1 - thickness, 0);
-  const int my = max(py1 - thickness, 0);
+  // the window comes in the coordinates of the points NewDrawLinesOnMask() was given: map it the same way
+  const INT64 offY = polyOffYa - polyOffYb - polyY;
+  const int mw = (int)min((INT64)px2 - polyX + thickness, polyW - 1);
+  const int mh = (int)min((INT64)py2 + offY + thickness, polyH - 1);
+  const int mx = (int)max((INT64)px1 - polyX - thickness, (INT64)0);
+  const int my = (int)max((INT64)py1 + offY - thickness, (INT64)0);
+  if (mx>mw || my>mh)
+     return 1; // the stroke lies off the mask
 
   #pragma omp parallel for schedule(static) default(none) num_threads(4)
   for (int y = my; y <= mh; y++) {
