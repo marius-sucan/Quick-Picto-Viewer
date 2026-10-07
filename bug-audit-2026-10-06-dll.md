@@ -25,9 +25,9 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
-**Fixed: #1 to #16, and #27**, one commit each (#27 with #11), named under each item; qpvmain.dll must
+**Fixed: #1 to #22, and #27**, one commit each (#27 with #11), named under each item; qpvmain.dll must
 be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-picto-viewer.ahk.
-**Open: #17 to #26, and #28 to #46.**
+**Open: #23 to #26, and #28 to #46.**
 
 
 ## High
@@ -287,6 +287,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
   mapping), or the table and per-pixel paths will disagree.
 
 ### 17. Luminosity blend mode is wrong with gamma correction on
+- **Fixed in `32a871a`:** with gamma correction both lumas are taken from the linear values, with the
+  same weights (modes 20 and 21): grey 50 over 200 now gives 50, 24 over 231 gives 23, 128 over 200
+  gives 128. Without gamma correction nothing changes.
 - **Where:** `qpv-main.cpp:2600-2611` (`CalculateNewBlendModes`, modes 20/21).
 - **What's wrong:** `lO`/`lB` are sRGB-space lumas, but with gamma correction the channels are linear
   (`char_to_floatGamma`), so a gamma-space difference is added to linear values.
@@ -296,6 +299,8 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reading + reviewer harness — confirmed (inherited, not from the lookup tables).
 
 ### 18. The PDF links list keeps only the first web link
+- **Fixed in `c823683`:** the copy stops at the terminator; two link annotations and three web links
+  now list all five.
 - **Where:** `qpv-main.cpp:6977-6989` (`RenderPdfPageAsTextLinks`).
 - **What's wrong:** `FPDFLink_GetURL()`'s count includes the terminator and the loop copies it before
   appending `|`; AHK reads the buffer with `StrGet(&textBuffer, bufferSize)` (ahk:100624), which stops
@@ -305,6 +310,10 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reviewer harness — confirmed.
 
 ### 19. A failed SVG render comes back as a blank image, as if it had worked
+- **Fixed in `b0bdf3c`:** `WicD2DrenderSVG()` returns NULL unless the document was drawn, so the viewer
+  reports a load error and the thumbnails pool a failed tile. Where Direct2D cannot render SVG at all
+  (`d2dSvgSupport`), the collection pool reports the file as a failed attempt (`DP_ERR_PROCESS`, tried
+  again on the next run) instead of marking it dead.
 - **Where:** `qpv-main.cpp:7603-7641` (`WicD2DrenderSVG`).
 - **What's wrong:** when the `ID2D1DeviceContext5` query fails (Windows 7/8.x, Windows 10 before
   1703), `CreateSvgDocument()` fails (malformed/truncated SVG) or `EndDraw()` fails, the never-drawn WIC
@@ -315,6 +324,10 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reading — confirmed code path (Direct2D not run).
 
 ### 20. "Generate all thumbnails" reports FreeImage-only files as failed and decodes the rest twice
+- **Fixed in `6b02fd1`:** with no bitmap wanted, a NULL with `TP_OK` and the cache file saved ends the
+  chain: such files are decoded once, reported done, and record loader 2 with FreeImage's properties,
+  as viewing mode does. With a bitmap wanted, a NULL (saved, but the conversion to GDI+ failed) still
+  falls back to WIC.
 - **Where:** `thumbs-pool.h:1584-1596` with 1697 and 1727 (`tpRunJob`).
 - **What's wrong:** with `wantBitmap=0` (no bitmap wanted back) a successful FreeImage save returns NULL
   with success status (`TP_OK`); the chain
@@ -326,6 +339,10 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reviewer harness with the real FreeImage fork — confirmed.
 
 ### 21. Sharpen (CImg mode) ignores transparency
+- **Fixed in `4cd6477`:** the DLL runs the same inverse diffusion itself, each neighbour weighted by its
+  opacity; transparent pixels and alpha are left as they are, and a clone padded with transparency
+  sharpens exactly like the image alone. Opaque images, 32 and 24 bits, get CImg 3.4.3's bytes
+  (harness, 2160 cases).
 - **Where:** `qpv-main.cpp:8012-8019` (`cImgSharpenBitmap`).
 - **What's wrong:** `img.sharpen()` runs on all four straight-ARGB planes; transparent pixels (RGB 0)
   are sharpened in as black, and CImg normalises the velocity by the maximum over all planes, alpha
@@ -336,6 +353,10 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reviewer harness with CImg 3.4.3 — confirmed.
 
 ### 22. "Replace" blend mode at partial opacity: wrong alpha with gamma correction, colour bleed
+- **Fixed in `2271b06`:** the colours mix by how much of each layer is visible (a cross-fade of the
+  premultiplied layers) and alpha is interpolated without gamma correction: red over transparent
+  white at 50% gives (255,0,0, a127) with gamma correction off and on. Opaque and 24-bit images get
+  the same bytes as before, and layers of equal alpha the same colours.
 - **Where:** `qpv-main.cpp:2507-2530` (`CalculateNewBlendModes`, modes 24/100).
 - **What's wrong:** straight RGB is interpolated without alpha weighting, and with gamma correction the
   *alpha* is pushed through `gamma_to_linear`/`linear_to_gamma` too.
