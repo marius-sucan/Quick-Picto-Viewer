@@ -3143,8 +3143,9 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
   fnOutputDebug("FloodFillScanlineStack()");
   int x1;
   bool spanAbove, spanBelow;
-  UINT maxPixels = w*h + w;
-  UINT loopsOccured = 0;
+  // every pass fills a pixel or ends a span, and every filled pixel pushes at most two seeds
+  const UINT64 maxPixels = 3 * (UINT64)w * h + 1;
+  UINT64 loopsOccured = 0;
   int oR = oldColor.r;
   int oG = oldColor.g;
   int oB = oldColor.b;
@@ -3211,7 +3212,7 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
           starkX.push(x1);
           starkY.push(y - 1);
           spanAbove = 1;
-       } else if (spanAbove && y>0)
+       } else if (spanAbove && y>0 && !(imageData[clrA + 2] == oR && imageData[clrA + 1] == oG && imageData[clrA] == oB))
        {
           spanAbove = 0;
        }
@@ -3221,14 +3222,14 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
           starkX.push(x1);
           starkY.push(y + 1);
           spanBelow = 1;
-       } else if (spanBelow && (y<h-1))
+       } else if (spanBelow && (y<h-1) && !(imageData[clrB + 2] == oR && imageData[clrB + 1] == oG && imageData[clrB] == oB))
        {
           spanBelow = 0;
        }
        x1++;
     }
   }
-  return loopsOccured;
+  return (loopsOccured>INT_MAX) ? INT_MAX : (int)loopsOccured;
 }
 
 int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
