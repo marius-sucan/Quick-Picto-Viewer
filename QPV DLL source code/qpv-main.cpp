@@ -2606,9 +2606,12 @@ inline RGBAColor CalculateNewBlendModes(
     if (blendMode == 20 || blendMode == 21)
     {
        // Luminosity and ghosting (scalar float fallback)
-       const float lO = blend_grayscale_float(Orgb.r, Orgb.g, Orgb.b);
-       const float lB = blend_grayscale_float(Brgb.r, Brgb.g, Brgb.b);
        const float* const lut = (linearGamma == 1) ? char_to_floatGamma : char_to_float;
+       // the lumas are taken in the space of the channels they are added to
+       const float lO = (linearGamma == 1) ? lut[Orgb.r] * 0.299701f + lut[Orgb.g] * 0.587130f + lut[Orgb.b] * 0.114180f
+                                           : blend_grayscale_float(Orgb.r, Orgb.g, Orgb.b);
+       const float lB = (linearGamma == 1) ? lut[Brgb.r] * 0.299701f + lut[Brgb.g] * 0.587130f + lut[Brgb.b] * 0.114180f
+                                           : blend_grayscale_float(Brgb.r, Brgb.g, Brgb.b);
 
        float rT, gT, bT;
        if (blendMode == 20)
