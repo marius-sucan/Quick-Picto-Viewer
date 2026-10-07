@@ -48,6 +48,8 @@ typedef const wchar_t* LPCWSTR;
 #define E_INVALIDARG   ((HRESULT)0x80070057)
 #define SUCCEEDED(hr)  (((HRESULT)(hr)) >= 0)
 #define FAILED(hr)     (((HRESULT)(hr)) < 0)
+#define TRUE           1
+#define FALSE          0
 #define GENERIC_READ   0x80000000u
 
 #define EXCEPTION_ACCESS_VIOLATION      0xC0000005u
@@ -155,6 +157,9 @@ struct IUnknown {
     virtual ULONG AddRef() = 0;
     virtual ULONG Release() = 0;
 };
+struct IWICPalette : IUnknown {
+    virtual HRESULT HasAlpha(BOOL *pfHasAlpha) = 0;
+};
 struct IWICBitmapSource : IUnknown {
     virtual HRESULT GetSize(UINT *puiWidth, UINT *puiHeight) = 0;
     virtual HRESULT GetPixelFormat(WICPixelFormatGUID *pPixelFormat) = 0;
@@ -204,6 +209,7 @@ struct IWICImagingFactory : IUnknown {
     virtual HRESULT CreateBitmapClipper(IWICBitmapClipper **ppIBitmapClipper) = 0;
     virtual HRESULT CreateColorContext(IWICColorContext **ppIWICColorContext) = 0;
     virtual HRESULT CreateColorTransformer(IWICColorTransform **ppIWICColorTransform) = 0;
+    virtual HRESULT CreatePalette(IWICPalette **ppIPalette) = 0;
 };
 
 // ---- what the test scripts, and what it reads back ----------------------------------------------
@@ -455,6 +461,7 @@ struct FakeFactory final : IWICImagingFactory {
         *pp = new FakeTransform();
         return S_OK;
     }
+    HRESULT CreatePalette(IWICPalette **pp) override { *pp = NULL; return E_NOTIMPL; }
 };
 
 // ---- the GDI+ calls tpWICload() makes ---------------------------------------------------------
