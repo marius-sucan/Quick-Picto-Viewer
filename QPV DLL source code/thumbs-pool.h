@@ -15,9 +15,9 @@
 //
 // This file is #included by qpv-main.cpp after LoadSVGimage(), so it can use
 // adaptImageGivenSize(), indexedWICcontainerFormats(), decideWICtoFIMpixelFormat(),
-// IsFileExtension(), LoadSVGimage(), RenderPdfPageAsBitmap(), openCVresizeBitmapExtended(),
-// openCVapplyToneMappingAlgos() and the SEH filter of the WIC guards, WICcodecCrashFilter(),
-// directly.
+// IsFileExtension(), LoadSVGimage(), coreRenderPdfPageAsBitmap() and its pdfiumMutex,
+// openCVresizeBitmapExtended(), openCVapplyToneMappingAlgos() and the SEH filter of the
+// WIC guards, WICcodecCrashFilter(), directly.
 //
 // written by Marius Șucan with Claude Opus 5
 
@@ -202,7 +202,6 @@ static std::deque<ThumbResult>           tpResults;
 static std::mutex                        tpMutex;
 static std::condition_variable           tpJobCV;
 static std::condition_variable           tpExitCV;        // a worker announces it is leaving
-static std::mutex                        tpPdfMutex;      // PDFium is not thread safe
 static std::atomic<bool>                 tpStopping{false};
 static std::atomic<LONG>                 tpGeneration{1};
 static std::shared_ptr<const ThumbsConfig> tpConfig = std::make_shared<ThumbsConfig>();
@@ -1656,9 +1655,9 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            {
               int maxW = cfg->thumbSize, maxH = cfg->thumbSize, pageCount = 0, errorType = -100;
               {
-                 // PDFium keeps global state;
-                 std::lock_guard<std::mutex> pdfLock(tpPdfMutex);
-                 bmp = RenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
+                 // PDFium keeps global state
+                 std::lock_guard<std::timed_mutex> pdfLock(pdfiumMutex);
+                 bmp = coreRenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
               }
               res.loaderUsed = 4;
               res.srcW = maxW;

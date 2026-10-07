@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <atomic>
+#include <mutex>
 #include <stack>
 #include <map>
 #include <unordered_set>
@@ -6875,6 +6876,13 @@ void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
    }
 }
 
+// PDFium serves one call at a time in the whole process. The pools' workers wait for it;
+// the exports AHK calls give up after pdfiumWaitMs with pdfiumBusy, so a render that does
+// not end cannot freeze the interface
+static std::timed_mutex pdfiumMutex;
+static const int pdfiumWaitMs = 15000;
+static const int pdfiumBusy = -8;
+
 DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath, const wchar_t *password, int* pageCount, int* errorType, int* bufferSize) {
 // Main function that loads the PDF, traverses bookmarks, and returns the data
 // in an unsigned short buffer (UTF‑16 encoded).
@@ -6883,6 +6891,13 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
 // The caller must free the returned buffer
 
     *errorType = 0;
+    std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::chrono::milliseconds(pdfiumWaitMs));
+    if (!pdfLock.owns_lock())
+    {
+        *errorType = pdfiumBusy;
+        return NULL;
+    }
+
     FPDF_DOCUMENT doc = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
     if (!doc)
     {
@@ -6920,6 +6935,10 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
 }
 
 DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
+    std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::chrono::milliseconds(pdfiumWaitMs));
+    if (!pdfLock.owns_lock())
+       return pdfiumBusy;
+
     int errorType = 0;
     FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
     if (!document)
@@ -7045,6 +7064,10 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
 }
 
 DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
+    std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::chrono::milliseconds(pdfiumWaitMs));
+    if (!pdfLock.owns_lock())
+       return pdfiumBusy;
+
     int errorType = 0;
     FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
     if (!document)
@@ -7131,8 +7154,9 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
     return errorType;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, int do24bits) {
+static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, int do24bits) {
 // https://github.com/bblanchon/pdfium-binaries
+// the caller holds pdfiumMutex
     int act = *varOut;
     *errorType = 0;
     // act == -1; retrieve the total page count 
@@ -7143,6 +7167,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     // errorType = -4; failed to allocate the GDI+ bitmap
     // errorType = -5; failed to create the FPDF bitmap to render PDF
     // errorType = -6; failed to retrieve PDF text page from PDF page 
+    // errorType = -8; [pdfiumBusy] RenderPdfPageAsBitmap() did not get pdfiumMutex in time
 
     Gdiplus::GpBitmap *myBitmap = NULL;
     FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
@@ -7247,7 +7272,18 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdf
     FPDF_ClosePage(PDFpage);
     FPDF_CloseDocument(document);
     return myBitmap;
-}; // RenderPdfPageAsBitmap
+}; // coreRenderPdfPageAsBitmap
+
+DLL_API Gdiplus::GpBitmap* DLL_CALLCONV RenderPdfPageAsBitmap(const wchar_t *pdfPath, int pageIndex, float dpi, int* givenW, int* givenH, int fillBehind, int bgrColor, int *varOut, int *errorType, const wchar_t* password, int do24bits) {
+    std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::chrono::milliseconds(pdfiumWaitMs));
+    if (!pdfLock.owns_lock())
+    {
+        *errorType = pdfiumBusy;
+        return NULL;
+    }
+
+    return coreRenderPdfPageAsBitmap(pdfPath, pageIndex, dpi, givenW, givenH, fillBehind, bgrColor, varOut, errorType, password, do24bits);
+}
 
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPconv, int givenQuality, UINT givenW, UINT givenH, UINT keepAratio, UINT ScaleAnySize, UINT givenFrame, int doFlipHV, int useICM, const wchar_t *szFileName, UINT *&resultsArray, int isFIMokay) {
@@ -7695,7 +7731,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW,
 }
 
 // multi-threaded thumbnails generator; it must sit here because it calls LoadSVGimage(),
-// RenderPdfPageAsBitmap(), adaptImageGivenSize() and the openCV* helpers defined above
+// coreRenderPdfPageAsBitmap(), adaptImageGivenSize() and the openCV* helpers defined above
 #include "thumbs-pool.h"
 
 // the fingerprint / histogram collector; it reuses the thumbnails pool's two loaders and

@@ -514,9 +514,9 @@ static inline HRESULT D2D1CreateFactory(int, ID2D1Factory **f) {
     return S_OK;
 }
 
-// the real one lives in thumbs-pool.h and is shared BETWEEN the two pools, because PDFium
-// keeps global state
-static std::mutex tpPdfMutex;
+// the real one lives in qpv-main.cpp, ahead of the PDF exports, and every PDFium caller of
+// the DLL takes it, because PDFium keeps global state
+static std::timed_mutex pdfiumMutex;
 
 static int gShimSvgCalls = 0, gShimPdfCalls = 0, gShimGdipCalls = 0;
 static int gShimSvgFails = 0, gShimPdfFails = 0, gShimGdipFails = 0;
@@ -533,8 +533,8 @@ static inline Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int, int,
     return shimMakeBitmap(gShimDecodeW, gShimDecodeH, (unsigned char)(path.size() & 0xFF));
 }
 
-static inline Gdiplus::GpBitmap* RenderPdfPageAsBitmap(const wchar_t *path, int, float, int *givenW, int *givenH,
-                                                       int, int, int *varOut, int *errorType, const wchar_t*, int) {
+static inline Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *path, int, float, int *givenW, int *givenH,
+                                                           int, int, int *varOut, int *errorType, const wchar_t*, int) {
     gShimPdfCalls++;
     *errorType = 0;
     if (gShimPdfFails)

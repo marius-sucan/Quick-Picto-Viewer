@@ -35,8 +35,8 @@
 // rows written inside AHK's open transaction and would hand them out again forever.
 //
 // This file is #included by qpv-main.cpp after thumbs-pool.h, so it can reuse that pool's
-// loaders (tpRenderSVG, tpWICload, tpFIMthumb, tpGDIPload), its extension sets, its PDFium
-// lock and its memory throttle rather than growing a second copy of them. dpDecodeFile()
+// loaders (tpRenderSVG, tpWICload, tpFIMthumb, tpGDIPload), its extension sets, the DLL's
+// PDFium lock and its memory throttle rather than growing a second copy of them. dpDecodeFile()
 // runs the same chain, in the same order, as tpRunJob(): what a thumbnail was drawn from
 // and what a fingerprint was measured on should never be two different decodes of one file.
 //
@@ -447,20 +447,20 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
     {
        int maxW = cfg.boxSize, maxH = cfg.boxSize, pageCount = 0, errorType = -100;
        {
-          // PDFium keeps global state; this is the thumbnails pool's own mutex, so the two
-          // pools serialise against each other rather than each against itself
-          std::lock_guard<std::mutex> pdfLock(tpPdfMutex);
+          // PDFium keeps global state; every PDFium caller of the DLL takes this one lock,
+          // so the two pools and AHK's calls serialise against each other
+          std::lock_guard<std::timed_mutex> pdfLock(pdfiumMutex);
           // 32bpp rather than the 24 the thumbnails pool asks for: the chain after the
           // decode applies a GDI+ effect and reads a histogram, and both want 32bpp.
           // The white fill behind the page is RenderPDFpage()'s own default.
-          bmp = RenderPdfPageAsBitmap(path.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff,
-                                      &pageCount, &errorType, L"", 0);
+          bmp = coreRenderPdfPageAsBitmap(path.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff,
+                                          &pageCount, &errorType, L"", 0);
        }
 
        if (bmp!=NULL)
        {
           loaderUsed = 4;
-          // maxW/maxH come back as the size of the PAGE in points - RenderPdfPageAsBitmap()
+          // maxW/maxH come back as the size of the PAGE in points - coreRenderPdfPageAsBitmap()
           // overwrites them with it - which is what RenderPDFpage() leaves in
           // mainLoadedIMGdetails.Width/Height too, and is independent of the DPI this
           // render happened to use. The page count is real; the pixel format is not named

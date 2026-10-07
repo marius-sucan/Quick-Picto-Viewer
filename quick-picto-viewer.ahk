@@ -100590,6 +100590,8 @@ friendlyPDFerrorCodes(errorType, pwd) {
        r := "Failed to retrieve PDF text page from PDF page"
     else If (errorType=-7)
        r := "The characters on the page have invalid unicode mapping"
+    else If (errorType=-8)
+       r := "PDFium is busy with another document"
     else if (errorType=-100)
        r := "RenderPdfPageAsBitmap() from qpvmain.dll failed to execute"
     else if (errorType!=0)
@@ -100973,6 +100975,10 @@ identifyPDFbookmarkIndex(p, friendly) {
 generateViewPortPDFbookmarks(imgPath, pwd) {
   thisIndex := pkA := pkB := 0
   viewportPDFbookMarks := []
+  ; every image LoadWICscreenImage() loads arrives here; only a PDF has bookmarks
+  If !RegExMatch(imgPath, "i)(.\.pdf)$")
+     Return
+
   txt := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
   minpka := pageCount
   If (!errorType && pageCount>3)
