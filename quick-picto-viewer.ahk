@@ -57554,7 +57554,7 @@ PanelPreferencesWindow() {
 
     Gui, Tab, 2
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply color management
-    ToolTip2ctrl(hTemp, "Images are converted from their color profile, or from sRGB when they have none:`nto the primary monitor's profile when FreeImage loads them, to sRGB when WIC does.`nHDR and camera RAW images are converted after they are tone mapped.")
+    ToolTip2ctrl(hTemp, "Convert images from their embedded color profile, or from sRGB when none is embedded, to the primary monitor's color profile")
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction (image editing)
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on color depth changes
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%preventUndoLevels% vpreventUndoLevels, Record undo levels
@@ -57682,7 +57682,7 @@ PanelAdjustToneMapping() {
     Gui, Add, Text, x15 y15 w460 h320 +0x1000 +0xE +hwndhLVmainu, Image before 
     Gui, Add, Text, x480 y15 w460 h320 +0x1000 +0xE +hwndhCropCornersPic, Image after
     Gui, SettingsGUIA: +DPIScale
-    Gui, Add, Text, x15 y+10 Section w%txtWid% r5 vinfoLine, Pixel format: -----
+    Gui, Add, Text, x15 y+10 Section w%txtWid% vinfoLine, Pixel format: -----------. Image in linear light converted to display colors. Deactivate color management to tone-map it.
     Gui, Add, Checkbox, xs y+10 gupdateUItoneMappingPanel Checked%allowToneMappingImg% vallowToneMappingImg, Apply tone mapping to image(s)
     GuiAddDropDownList("xs y+10 w" txtWid//2 - 2 " AltSubmit gupdateUItoneMappingPanel Choose" cmrRAWtoneMapAlgo " vcmrRAWtoneMapAlgo", "F. Drago (FreeImage)|E. Reinhard (FreeImage)|F. Drago (OpenCV)|E. Reinhard (OpenCV)|Simple mode (OpenCV)", "HDR tone mapping algorithm")
     GuiAddSlider("UIuserToneMapParamD", 0,400, 0, "Additional exposure", "updateUItoneMappingPanel", 1, "x+1 w" txtWid//2 - 2 " hp")
@@ -57712,7 +57712,7 @@ PanelAdjustToneMapping() {
 }
 
 BtnHelpToneMapping() {
-   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well. Color management, when activated, is applied after the tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and produce much better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "High-dynamic range images (HDRIs) must be converted to 24 bits to be displayed on screen. You can choose the algorithm to use for this and also configure it.`n`nWhen the option to load Camera RAW images with high quality is activated, the tone-mapping options can be applied on these as well. Color management, when activated, is applied after the tone mapping.`n`nDeactivating tone-mapping for HDR, EXR and PFM image file formats is not possible.`n`nThe OpenCV implementations execute faster and may produce better results, but the alpha channel, if present, will not be preserved.`n`nUse the reset button to identify commonly used settings for each algorithm implementation.`n`nPlease note: the preview may not accurately match the output in the viewport.", -1, 0, 0)
 }
 
 killToneMapImageCacheObj() {
@@ -57733,33 +57733,34 @@ toneMapPreviewFacts(facts:="") {
     Return f
 }
 
-toneMapPanelInfoLine() {
+SetUItoneMapPanelInfoLine() {
 ; the pixel format of the previewed image, and whether tone mapping applies to it and why
     f := toneMapPreviewFacts()
     If !f.loaded
     {
-       GuiControl, SettingsGUIA:, infoLine, Pixel format: unknown.`nFreeImage failed to load the image: tone mapping applies only to the images it loads.
+       GuiControl, SettingsGUIA:, infoLine, Pixel format: UNKNOWN.`nFailed to load the image.
        Return
     }
 
     tm := f.tm
-    thenCM := ((f.displayICC=2 || f.displayICC=1 && f.keptLight) && FIMcanApplyDisplayICC()) ? ", then color managed." : "."
+    thenCM := (f.displayICC=2 || f.displayICC=1 && f.keptLight) ? ", then color managed." : "."
+    ptmi := (allowToneMappingImg=1) ? "Tone-mapped (optional)" thenCM A_Space : "Tone-mapping optional. "
     If (tm="")
-       msg := "This FreeImage.dll cannot tell which images need tone mapping: none is tone mapped. Update FreeImage.dll."
+       msg := "ERROR. Unable to execute function in FreeImage.DLL."
     Else If (tm=3)
-       msg := "A PQ (HDR) image: it is converted to linear light, then tone mapped" thenCM
+       msg := "PQ HDR: converted to linear light and tone-mapped" thenCM
     Else If (tm=2)
-       msg := "An HDR or floating-point image: it is always tone mapped" thenCM
+       msg := "HDR or floating-point image. Tone-mapped" thenCM
     Else If (tm=1)
-       msg := "Tone mapping is optional for this image (linear light, or an uncertain encoding); " ((allowToneMappingImg=1) ? "it is applied" thenCM : "activate it below to apply it" ((f.displayICC>0) ? "; the image is color managed either way." : "."))
+       msg := ptmi "Linear light, or an uncertain encoding."
     Else If (f.GFT=34 && userHQraw!=1)
-       msg := "A camera RAW image loaded at low quality, in 8 bits: it is not tone mapped. Load it at high quality" ((FIMdisplayICCmode(34, 0)=1) ? " and deactivate color management" : "") " to tone map it."
+       msg := "Camera RAW loaded in low quality with no tone-mapping."
     Else If (userPerformColorManagement=1 && isVarEqualTo(f.tmNoCM, 1, 2, 3))
-       msg := "Color management converted the image from linear light to the display's colors: it is not tone mapped. Deactivate color management to tone map it."
+       msg := "Image in linear light converted to display colors. Deactivate color management to tone-map it."
     Else If isInRange(f.type, 2, 8)
-       msg := "A single-channel image: it is shown in 8-bit grey, not tone mapped."
+       msg := "A single-channel image: Displayed as 8-bit grey, not tone-mapped."
     Else
-       msg := "The image holds display colors: tone mapping does not apply to it."
+       msg := "Tone-mapping does not apply to this image."
 
     GuiControl, SettingsGUIA:, infoLine, % "Pixel format: " f.fmt ".`n" msg
 }
@@ -57842,7 +57843,7 @@ initializeFimPreviewIMG(imgPath) {
   }
 
   toneMapPreviewFacts(facts)
-  toneMapPanelInfoLine()
+  SetUItoneMapPanelInfoLine()
   Return globalhFIFtoneMap ? 1 : 0
 }
 
@@ -57926,7 +57927,7 @@ updateUIfimToneMappedIMG() {
       hFIFimgE := FreeImage_Clone(globalhFIFtoneMap)
 
    ; the display's colors after the tone mapping, as FIMapplyToneMapper() gives them
-   If ((facts.displayICC=2 || facts.displayICC=1 && facts.keptLight && thisAllow=1) && FIMcanApplyDisplayICC())
+   If (facts.displayICC=2 || facts.displayICC=1 && facts.keptLight && thisAllow=1)
       FreeImage_ApplyDisplayICCProfile(hFIFimgE)
 
    imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgE), "-"))
@@ -58091,7 +58092,7 @@ updateUItoneMappingPanel() {
    If (facts.opts!=userHQraw "|" userPerformColorManagement)
       initializeFimPreviewIMG(getIDimage(currentFileIndex))
    Else
-      toneMapPanelInfoLine()
+      SetUItoneMapPanelInfoLine()
 
    calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
    actu := (cmrRAWtoneMapAlgo>2) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -61101,23 +61102,11 @@ FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
 
 FIMdisplayICCmode(GFT, loadArgs) {
 ; how an image decoded for display gets the display's colors when color management is on:
-; 1 = on load, by FIF_LOAD_DISPLAY_ICC; 2 = after FIMapplyToneMapper() tone maps the linear light of a camera RAW decoded at high quality
+; 1 = on load, by FIF_LOAD_DISPLAY_ICC
+; 2 = after FIMapplyToneMapper() tone maps the linear light of a camera RAW decoded at high quality
    If (userPerformColorManagement!=1)
       Return 0
-   Return (GFT=34 && !(loadArgs & 0xB) && FIMcanApplyDisplayICC()) ? 2 : 1 ; RAW_PREVIEW, RAW_DISPLAY, RAW_UNPROCESSED
-}
-
-FIMcanApplyDisplayICC() {
-; FreeImage.dll builds without FreeImage_ApplyDisplayICCProfile() give images the display's colors only on load;
-; asked of the export table, as a DllCall() to a missing function would throw inside a Try
-   Static r := 0
-   If (r!=1 && wasInitFIMlib)
-   {
-      fn := getFIMfunc("ApplyDisplayICCProfile")
-      h := DllCall("GetModuleHandleW", "WStr", FreeImage_FoxInit("lastDllName"), "UPtr")
-      r := (h && DllCall("GetProcAddress", "UPtr", h, "AStr", SubStr(fn, InStr(fn, "\", 0, -1) + 1), "UPtr")) ? 1 : 0
-   }
-   Return r
+   Return (GFT=34 && !(loadArgs & 0xB)) ? 2 : 1 ; RAW_PREVIEW, RAW_DISPLAY, RAW_UNPROCESSED
 }
 
 FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef hasAppliedToneMap, displayICC:=0) {
@@ -61185,7 +61174,7 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
       }
    }
 
-   If ((displayICC=2 || displayICC=1 && keptLight && InStr(hasAppliedToneMap, "TONE-MAPPED")) && FIMcanApplyDisplayICC())
+   If (displayICC=2 || displayICC=1 && keptLight && InStr(hasAppliedToneMap, "TONE-MAPPED"))
       FreeImage_ApplyDisplayICCProfile(hFIFimgA)
 
    Return hFIFimgA
@@ -73560,7 +73549,6 @@ retrieveEntireSeenImagesDB(ByRef entriesCount, doSorting, applyFilter:=0) {
   Loop, % RecordSet.RowCount
   {
       Rowu := RecordSet.Rows[A_Index]
-      ; entries[CalcStringHash(Row[1], 0x8003)] := Row[1]
       If RegExMatch(Rowu[1], RegExFilesPattern)
       {
          entriesCount++
@@ -99951,10 +99939,11 @@ thumbsCacheTag(imgPath) {
 ; and the tone mapping and camera RAW options, for the formats that can be tone mapped.
    Static lastSettings := "", lastHash := ""
         , rawPtrn := "i)\.(dng|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f)$"
+
    tag := (userPerformColorManagement=1) ? "-c" : ""
    If (RegExMatch(imgPath, RegExFIMformPtrn) || RegExMatch(imgPath, "i)(.\.(tif|tiff))$"))
    {
-      settings := userHQraw "|" allowToneMappingImg "|" cmrRAWtoneMapAlgo "|" cmrRAWtoneMapParamA "|" cmrRAWtoneMapParamB "|" cmrRAWtoneMapParamC "|" cmrRAWtoneMapParamD "|" cmrRAWtoneMapOCVparamA "|" cmrRAWtoneMapOCVparamB "|" cmrRAWtoneMapAltExpo
+      settings := "|" userHQraw allowToneMappingImg cmrRAWtoneMapAlgo cmrRAWtoneMapParamA cmrRAWtoneMapParamB cmrRAWtoneMapParamC cmrRAWtoneMapParamD cmrRAWtoneMapOCVparamA cmrRAWtoneMapOCVparamB cmrRAWtoneMapAltExpo
       If (settings!=lastSettings)
       {
          lastHash := SubStr(CalcStringHash(settings, 0x8003), 1, 8) ; CALG_MD5
