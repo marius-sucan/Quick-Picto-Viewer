@@ -3156,6 +3156,17 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
   int nG = newColor.g;
   int nB = newColor.b;
 
+  // a masked pixel counts as another color: it is neither filled nor crossed
+  auto isOld = [&](const int &px, const int &py) -> bool {
+       INT64 o = CalcPixOffset(px, py, Stride, bpp);
+       if (!(imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB))
+          return 0;
+       return (useSelArea==1) ? clipMaskFilter(px, py, NULL, 0)!=1 : 1;
+  };
+
+  if (!isOld(x, y))
+     return 0;
+
   // std::vector<int> stack;
   // push(stack, x, y);
   std::stack<int> starkX;
@@ -3169,14 +3180,8 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
     int y = starkY.top();
     x1 = x;
 
-    while (x1 >= 0)
-    {
-       INT64 o = CalcPixOffset(x1, y, Stride, bpp);
-       if (imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB)
-          x1--;
-       else 
-          break;
-    }
+    while (x1 >= 0 && isOld(x1, y))
+       x1--;
 
     x1++;
     spanAbove = spanBelow = 0;
@@ -3189,41 +3194,31 @@ int FloodFillScanlineStack(unsigned char *imageData, int w, int h, int x, int y,
           break;
 
        loopsOccured++;
-       if (useSelArea==1)
-       {
-          // a masked pixel ends the span, like a color mismatch;
-          // "continue" here would retest the same x1 forever
-          if (clipMaskFilter(x1, y, NULL, 0)==1)
-             break;
-       }
-
-       INT64 o = CalcPixOffset(x1, y, Stride, bpp);
-       if (!(imageData[o + 2] == oR && imageData[o + 1] == oG && imageData[o] == oB))
+       if (!isOld(x1, y))
           break;
 
+       INT64 o = CalcPixOffset(x1, y, Stride, bpp);
        if (bpp==32 && keepAlpha==0)
           imageData[o + 3] = nA;
        imageData[o + 2] = nR;
        imageData[o + 1] = nG;
        imageData[o] = nB;
-       INT64 clrA = CalcPixOffset(x1, y - 1, Stride, bpp); // imageData[(y - 1) * w + x1];
-       INT64 clrB = CalcPixOffset(x1, y + 1, Stride, bpp); // imageData[(y + 1) * w + x1];
-       if (!spanAbove && y>0 && imageData[clrA + 2] == oR && imageData[clrA + 1] == oG && imageData[clrA] == oB)
+       if (!spanAbove && y>0 && isOld(x1, y - 1))
        {
           starkX.push(x1);
           starkY.push(y - 1);
           spanAbove = 1;
-       } else if (spanAbove && y>0 && !(imageData[clrA + 2] == oR && imageData[clrA + 1] == oG && imageData[clrA] == oB))
+       } else if (spanAbove && y>0 && !isOld(x1, y - 1))
        {
           spanAbove = 0;
        }
 
-       if (!spanBelow && (y<h-1) && imageData[clrB + 2] == oR && imageData[clrB + 1] == oG && imageData[clrB] == oB)
+       if (!spanBelow && (y<h-1) && isOld(x1, y + 1))
        {
           starkX.push(x1);
           starkY.push(y + 1);
           spanBelow = 1;
-       } else if (spanBelow && (y<h-1) && !(imageData[clrB + 2] == oR && imageData[clrB + 1] == oG && imageData[clrB] == oB))
+       } else if (spanBelow && (y<h-1) && !isOld(x1, y + 1))
        {
           spanBelow = 0;
        }
