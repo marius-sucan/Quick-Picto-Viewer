@@ -308,7 +308,7 @@ struct RGBA16color {
             if (L < 0.5)
                 S = del_Max / (maxu + minu);
             else
-                S = del_Max / (2.0 - del_Max);
+                S = del_Max / (2.0 - maxu - minu);
 
             const double del_R = (((maxu - rf) / 6.0) + (del_Max / 2.0)) / del_Max;
             const double del_G = (((maxu - gf) / 6.0) + (del_Max / 2.0)) / del_Max;
