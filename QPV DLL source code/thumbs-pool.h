@@ -1693,7 +1693,9 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               }
            }
 
-           if (bmp==NULL && (tpWicExts.count(ext)>0 || hasFIMtried==1) && res.status!=TP_ERR_PDFLOCKED)
+           // with no bitmap wanted back, FreeImage hands over none once it wrote the cache file
+           auto fimSavedOnly = [&]() { return bmp==NULL && cfg->wantBitmap!=1 && res.status==TP_OK && res.savedToFile==1; };
+           if (bmp==NULL && !fimSavedOnly() && (tpWicExts.count(ext)>0 || hasFIMtried==1) && res.status!=TP_ERR_PDFLOCKED)
            {
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
               // WIC always serializes image processing operations
@@ -1723,7 +1725,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            // FreeImage plugin nor a WIC codec, and the GIFs those two refuse are read here
            // as well - LoadFileWithGDIp() is what draws them in the viewport. A file this
            // cannot open either is unreadable in every sense the product has.
-           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED)
+           if (bmp==NULL && !fimSavedOnly() && res.status!=TP_ERR_PDFLOCKED)
            {
               res.meta = TpSrcMeta();
               bmp = tpGDIPload(job.src, cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
