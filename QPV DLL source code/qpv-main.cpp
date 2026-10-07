@@ -8117,11 +8117,101 @@ DLL_API int DLL_CALLCONV cImgAddGaussianNoiseOnBitmap(unsigned char *imageData, 
 }
 
 DLL_API int DLL_CALLCONV cImgSharpenBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
-  int channels = (bpp==32) ? 4 : 3;
-  CImg<unsigned char> img(imageData, channels, width, height, 1);
-  img.permute_axes("yzcx");
-  img.sharpen(intensity); // shock filters do not work?!
-  FillGdipLockedBitmapDataFromCImg(imageData, img, width, height, Stride, bpp);
+  // inverse diffusion; neighbours count by their opacity, transparent pixels and alpha are left as they are
+  const int nc = bpp/8;
+  if (imageData==NULL || width<1 || height<1 || (bpp!=32 && bpp!=24) || Stride<width*nc)
+     return 0;
+
+  std::vector<unsigned char> src;
+  std::vector<float> rowVmax;
+  std::vector<int> rowLo, rowHi;
+  try {
+      src.assign(imageData, imageData + (size_t)Stride*height);
+      rowVmax.assign(height, 0.0f);
+      rowLo.assign(height, 255);
+      rowHi.assign(height, 0);
+  } catch (const std::bad_alloc&) {
+      return 0;
+  }
+
+  float opacity[256];
+  for (int a = 0; a < 256; a++)
+      opacity[a] = a / 255.0f;
+
+  // the 4 neighbours laplacian; a neighbour past the edges is the pixel itself, which adds nothing
+  auto velocity = [&](const unsigned char *p, const int x, const int y, float v[3]) {
+      const int l = (x>0) ? -nc : 0, r = (x<width - 1) ? nc : 0;
+      const int u = (y>0) ? -Stride : 0, d = (y<height - 1) ? Stride : 0;
+      const float wl = (nc==4) ? opacity[p[l + 3]] : 1.0f, wr = (nc==4) ? opacity[p[r + 3]] : 1.0f;
+      const float wu = (nc==4) ? opacity[p[u + 3]] : 1.0f, wd = (nc==4) ? opacity[p[d + 3]] : 1.0f;
+      for (int c = 0; c < 3; c++)
+          v[c] = wl * (float)(p[c] - p[l + c]) + wr * (float)(p[c] - p[r + c])
+               + wu * (float)(p[c] - p[u + c]) + wd * (float)(p[c] - p[d + c]);
+  };
+
+  #pragma omp parallel for schedule(dynamic)
+  for (int y = 0; y < height; y++)
+  {
+      float vm = 0;
+      int lo = 255, hi = 0;
+      for (int x = 0; x < width; x++)
+      {
+          const unsigned char *p = &src[CalcPixOffset(x, y, Stride, bpp)];
+          if (nc==4 && p[3]==0)
+             continue;
+
+          float v[3];
+          velocity(p, x, y, v);
+          for (int c = 0; c < 3; c++)
+          {
+              const float av = fabs(v[c]);
+              if (av>vm)
+                 vm = av;
+              if (p[c]<lo)
+                 lo = p[c];
+              if (p[c]>hi)
+                 hi = p[c];
+          }
+      }
+      rowVmax[y] = vm;
+      rowLo[y] = lo;
+      rowHi[y] = hi;
+  }
+
+  float vmax = 0;
+  int lo = 255, hi = 0;
+  for (int y = 0; y < height; y++)
+  {
+      vmax = max(vmax, rowVmax[y]);
+      lo = min(lo, rowLo[y]);
+      hi = max(hi, rowHi[y]);
+  }
+
+  if (vmax<=0)
+     return 1;
+
+  // results stay within [darkest visible colour, 255], or the brightest colour in 24 bits
+  const float lowest = (float)lo, highest = (nc==4) ? 255.0f : (float)hi;
+  const float f = (float)intensity / vmax;
+  #pragma omp parallel for schedule(dynamic)
+  for (int y = 0; y < height; y++)
+  {
+      for (int x = 0; x < width; x++)
+      {
+          const INT64 o = CalcPixOffset(x, y, Stride, bpp);
+          if (nc==4 && src[o + 3]==0)
+             continue;
+
+          float v[3];
+          velocity(&src[o], x, y, v);
+          for (int c = 0; c < 3; c++)
+          {
+              float t = v[c] * f;
+              t += src[o + c];
+              imageData[o + c] = (unsigned char)((t<=lowest) ? lowest : (t>=highest) ? highest : t);
+          }
+      }
+  }
   return 1;
 }
 
