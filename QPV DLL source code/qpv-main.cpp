@@ -8278,6 +8278,16 @@ DLL_API int DLL_CALLCONV symmetricaBitmap(int *imageData, int Width, int Height,
       return 1;
 }
 
+// the factor that stretches minL..maxL over 0..255; a flat channel is left as it is
+static inline double autoLevelsFactor(int &minL, const int maxL) {
+      if (maxL<=minL)
+      {
+         minL = 0;
+         return 1.0;
+      }
+      return 255.0f / (maxL - minL);
+}
+
 DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned char *miniData, int Width, int Height, int mw, int mh, int modus, int intensity, int linearGamma, int Stride, int StrideMini, int bpp, unsigned char *maskBitmap, int mStride) {
       int maxRLevel = 0;      int minRLevel = 255;
       int maxGLevel = 0;      int minGLevel = 255;
@@ -8306,19 +8316,17 @@ DLL_API int DLL_CALLCONV autoContrastBitmap(unsigned char *imageData, unsigned c
          }
       }
 
-      if ((maxGLevel==minGLevel || maxGLevel==0 && minGLevel==255) && modus==1)
+      // max < min: no pixel was counted, every one being nearly transparent
+      if (maxGLevel<minGLevel || maxGLevel==minGLevel && modus==1)
          return 1;
 
-      maxGLevel -= minGLevel;
-      double fG = 255.0f / maxGLevel;
+      double fG = autoLevelsFactor(minGLevel, maxGLevel);
       double fR = fG;
       double fB = fG;
       if (modus==2)
       {
-         maxRLevel -= minRLevel;
-         fR = 255.0f / maxRLevel;
-         maxBLevel -= minBLevel;
-         fB = 255.0f / maxBLevel;
+         fR = autoLevelsFactor(minRLevel, maxRLevel);
+         fB = autoLevelsFactor(minBLevel, maxBLevel);
       } else
       {
          minRLevel = minGLevel;
