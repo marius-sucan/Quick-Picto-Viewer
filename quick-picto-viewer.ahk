@@ -78880,10 +78880,18 @@ DrawPaintBrushNowStep:
       dll_bpp := 32
       dll_tkY := imgH - 1 - cur_tkY
       dll_offY := -cur_offY
-      lockX := Round(Max(0, Floor(cur_tkX - dllRad)))
-      lockY := Round(Max(0, Floor(cur_tkY - dllRad)))
-      lockW := Round(Min(imgW - lockX, Ceil(dllRad * 2)))
-      lockH := Round(Min(imgH - lockY, Ceil(dllRad * 2)))
+      padX1 := padX2 := padY1 := padY2 := dllRad
+      If (BrushToolType=6)
+      {
+         ; the smudge samples the pixels cur_off * scale behind the stamp, scale as in PaintBrushLarge()
+         smudgeScale := (thisBulgePinchFactor>0) ? 1 + 26 * (thisBulgePinchFactor - 1)/22 : 3
+         padX1 += Max(0, cur_offX * smudgeScale), padX2 += Max(0, -cur_offX * smudgeScale)
+         padY1 += Max(0, cur_offY * smudgeScale), padY2 += Max(0, -cur_offY * smudgeScale)
+      }
+      lockX := Round(Max(0, Floor(cur_tkX - padX1)))
+      lockY := Round(Max(0, Floor(cur_tkY - padY1)))
+      lockW := Round(Min(imgW - lockX, Ceil(padX1 + padX2)))
+      lockH := Round(Min(imgH - lockY, Ceil(padY1 + padY2)))
       okBits := 0
       If (lockW>0 && lockH>0)
       {

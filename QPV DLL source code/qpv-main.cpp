@@ -9228,6 +9228,15 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         cloneEndY = clamp((int)ceil(endY - std::min(0.0, cloneOffsetY)) + 2, 0, imgH - 1);
     }
 
+    if (lockW>0)
+    {
+        // a GDI+ lock holds only its rect, with top-down rows; samples past it take its edge pixels
+        cloneStartX = max(cloneStartX, lockX);
+        cloneEndX = min(cloneEndX, lockX + lockW - 1);
+        cloneStartY = max(cloneStartY, imgH - lockY - lockH);
+        cloneEndY = min(cloneEndY, imgH - 1 - lockY);
+    }
+
     int cloneW = cloneEndX - cloneStartX + 1;
     int cloneH = cloneEndY - cloneStartY + 1;
     std::vector<unsigned char> localClone;
@@ -9253,6 +9262,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
             localClone.clear();
         }
     }
+
+    // without the copy, the samplers below read the image directly, past the lock rect
+    if (lockW>0 && !cloneData && brushType>=6 && localClone.empty())
+       return 0;
 
     // Parse foreground color channels
     int brushA = (brushColor >> 24) & 0xFF;
