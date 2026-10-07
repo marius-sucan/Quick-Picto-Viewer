@@ -1350,6 +1350,8 @@ static std::string dupesGroupID(UINT root, UINT tag) {
     return std::string(buf);
 }
 
+DLL_API int DLL_CALLCONV dupesHaveMSD();
+
 // Applies the four threshold bounds to the pair list, groups what survives, drops the
 // groups that are too small, and orders the result exactly as sortDupeGroups() did.
 // Returns the number of result rows.
@@ -1364,10 +1366,9 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
     if (n < 1)
        return 0;
 
-    // testWasMSEdupes(): the MSD bounds only apply when the scan actually computed one.
-    // The first two pairs standing in for the whole list is what the AHK did.
-    const bool allowMSE = (n >= 2 && dupesPairsList[0].mse < QPV_MSD_NONE
-                                  && dupesPairsList[1].mse < QPV_MSD_NONE);
+    // the MSD bounds apply when the scan computed scores, judged the way the panel judges it
+    // before it enables the MSD fields
+    const bool allowMSE = (dupesHaveMSD()==1);
 
     UINT maxId = 0;
     for ( size_t i = 0 ; i < n ; i++)

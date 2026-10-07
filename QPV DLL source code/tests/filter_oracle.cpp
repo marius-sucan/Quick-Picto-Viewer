@@ -77,8 +77,17 @@ static std::string gidRoot(const std::string &gid) {
 static std::vector< std::pair<long long, RefRow> >
 refFilter(const std::vector<DupePairRec> &pairs, int hamLo, int hamHi, int mseLo, int mseHi,
           int breakGroups, int remSingles, const std::vector<unsigned char> &imgKeep) {
-    // allowMSE := testWasMSEdupes()
-    const bool allowMSE = (pairs.size() >= 2 && pairs[0].mse < 2500 && pairs[1].mse < 2500);
+    // allowMSE: the test the panel enables the MSD fields on, dupesHaveMSD() - two scored
+    // pairs in the first half of the list; testWasMSEdupes() looked at the first two only
+    bool allowMSE = false;
+    if (pairs.size() >= 2)
+    {
+        const size_t half = std::max<size_t>(pairs.size() / 2, 2);
+        int scored = 0;
+        for (size_t i = 0; i < half && !allowMSE; i++)
+            if (pairs[i].mse < 2500 && ++scored > 1)
+               allowMSE = true;
+    }
     const bool doUnion = (breakGroups!=1);
 
     std::map<long long, RefRow> newArrayu;   // newArrayu[idu]
@@ -309,6 +318,24 @@ int main() {
     check(mismatches==0, msg);
     check(nonEmpty > cases / 2, "most cases actually produce a filtered list");
     check(totalRows > 2000, "enough rows compared to be worth something");
+
+    // unscored leading pairs must not switch the MSD bounds off for the rest of the list
+    {
+        std::vector<DupePairRec> pairs;
+        DupePairRec a = {2, 1, 1, 2500}; pairs.push_back(a);
+        DupePairRec b = {4, 3, 1, 2500}; pairs.push_back(b);
+        DupePairRec c = {6, 5, 1, 300};  pairs.push_back(c);
+        DupePairRec d = {8, 7, 1, 30};   pairs.push_back(d);
+        DupePairRec e = {10, 9, 1, 40};  pairs.push_back(e);
+        DupePairRec f = {12, 11, 1, 50}; pairs.push_back(f);
+        DupePairRec g = {14, 13, 1, 60}; pairs.push_back(g);
+        DupePairRec h = {16, 15, 1, 70}; pairs.push_back(h);   // two scored pairs in the first half
+        const std::vector<unsigned char> none;
+        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 100, 0, 1, none);
+        bool has5 = false, has7 = false, has1 = false;
+        for (const DupeResultRow &r : got) { has5 |= (r.imgIndex==5); has7 |= (r.imgIndex==7); has1 |= (r.imgIndex==1); }
+        check(!has5 && !has1 && has7, "unscored leading pairs leave the MSD bounds on: 300 and 2500 out, 30 in");
+    }
 
     // the mutation check: a union-find that does not force the smaller index to be the
     // root still groups correctly but labels the groups differently, and the oracle has
