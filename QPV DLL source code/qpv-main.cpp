@@ -767,7 +767,8 @@ void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, con
              if (max(xa,xb) < ppx1 || min(xa,xb) >= ppx2)
                 continue;
 
-             if (listu.size()>2 && simpleMode==0)
+             // two crossings left can be two tips of the shape touching this row, with the gap between them outside
+             if (simpleMode==0)
              {
                   if (!isPointInPolygonOptimized((xa + xb)/2, y, PointsList, activeEdges, PointsCount))
                      continue;
