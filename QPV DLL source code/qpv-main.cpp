@@ -7058,7 +7058,8 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
                      {
                         std::vector<unsigned short> buffer(url_buffer_size);
                         FPDFLink_GetURL(pageWebLinks, i, buffer.data(), url_buffer_size);
-                        for (int z = 0; z < url_buffer_size; ++z)
+                        // the count includes the terminator, and AHK's StrGet() stops at a NUL
+                        for (unsigned long z = 0; z < url_buffer_size && buffer[z]!=0; ++z)
                         {
                             textBuffer[index] = buffer[z];
                             index++;
