@@ -3613,6 +3613,25 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
     return 1;
 }
 
+// The area of the w x h image that the small bitmap of GenerateRandomNoiseOnBitmap() and
+// PixelateHugeBitmap() stands for: the whole image when the selection is inverted, else the
+// selection box clipped to the image. AHK shifts the start row of a freeform selection by
+// polyOffYb; a rotated ellipse's box is the rescaled one prepareSelectionArea() received.
+static void smallBitmapArea(const int w, const int h, int &x, int &y, int &bw, int &bh) {
+    if (invertSelection==1)
+    {
+       x = y = 0;
+       bw = w;
+       bh = h;
+       return;
+    }
+
+    x = max(0, imgSelX1);
+    y = max(0, (int)(imgSelY1 - polyOffYb));
+    bw = max(1, min(imgSelX2 + 1, w) - x);
+    bh = max(1, min(imgSelY2 + 1, h) - y);
+}
+
 DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int pixelize, unsigned char *newBitmap, int StrideMini, int mw, int mh, int blendMode, int flipLayers, int keepAlpha, int linearGamma) {
     // newBitmap must be 24 bits
     time_t nTime;
@@ -3623,14 +3642,14 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
     {
         std::vector<int> pixelzMapW(w + 2, 0);
         std::vector<int> pixelzMapH(h + 2, 0);
-        const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
-        const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+        int bmpX, bmpY, bmpW, bmpH;
+        smallBitmapArea(w, h, bmpX, bmpY, bmpW, bmpH);
         // fnOutputDebug("add noise step -1");
         for (int x = 0; x < w + 1; x++)
-            pixelzMapW[x] = clamp( (float)mw*((x - bmpX)/(float)w), 0.0f, (float)mw - 1.0f);
+            pixelzMapW[x] = clamp( (float)mw*((x - bmpX)/(float)bmpW), 0.0f, (float)mw - 1.0f);
 
         for (int y = 0; y < h + 1; y++)
-            pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)h), 0.0f, (float)mh - 1.0f);
+            pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)bmpH), 0.0f, (float)mh - 1.0f);
 
         // fnOutputDebug("add noise step 0");
         #pragma omp parallel for schedule(dynamic)
@@ -5280,13 +5299,13 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
 
     std::vector<int> pixelzMapW(w + 2, 0);
     std::vector<int> pixelzMapH(h + 2, 0);
-    const int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
-    const int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    int bmpX, bmpY, bmpW, bmpH;
+    smallBitmapArea(w, h, bmpX, bmpY, bmpW, bmpH);
     for (int x = 0; x < w + 1; x++)
-        pixelzMapW[x] = clamp( (float)mw*((x - bmpX)/(float)w), 0.0f, (float)mw - 1.0f);
+        pixelzMapW[x] = clamp( (float)mw*((x - bmpX)/(float)bmpW), 0.0f, (float)mw - 1.0f);
 
     for (int y = 0; y < h + 1; y++)
-        pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)h), 0.0f, (float)mh - 1.0f);
+        pixelzMapH[y] = clamp( (float)mh*((y - bmpY)/(float)bmpH), 0.0f, (float)mh - 1.0f);
     // fnOutputDebug("PixelateHugeBitmap step 1; min = " + std::to_string( pixelzMapW[0] ) + " x " + std::to_string( pixelzMapH[0] ));
     // fnOutputDebug("PixelateHugeBitmap step 1; max = " + std::to_string( pixelzMapW[w] ) + " x " + std::to_string( pixelzMapH[h] ));
     maskOpacity = 255 - maskOpacity;

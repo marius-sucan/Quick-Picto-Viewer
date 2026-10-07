@@ -22358,8 +22358,8 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       {
          If (UserAddNoisePixelizeAmount>0)
          {
-            thisImgW := (BlurAreaInverted=1) ? Ceil(ImgW/UserAddNoisePixelizeAmount) : Ceil(obju.bImgSelW/UserAddNoisePixelizeAmount)
-            thisImgH := (BlurAreaInverted=1) ? Ceil(ImgH/UserAddNoisePixelizeAmount) : Ceil(obju.bImgSelH/UserAddNoisePixelizeAmount)
+            thisImgW := Ceil(obju.bImgSelW/UserAddNoisePixelizeAmount)
+            thisImgH := Ceil(obju.bImgSelH/UserAddNoisePixelizeAmount)
             If memoryUsageWarning(thisImgW, thisImgH, bpp)
             {
                showTOOLtip("Add noise: operation abandoned by user.`nMemory limit reached.")
