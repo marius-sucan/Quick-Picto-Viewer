@@ -25,8 +25,9 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
-**Fixed: #1 to #8**, one commit each, named under each item; qpvmain.dll must be rebuilt for them to
-take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46.**
+**Fixed: #1 to #16, and #27**, one commit each (#27 with #11), named under each item; qpvmain.dll must
+be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-picto-viewer.ahk.
+**Open: #17 to #26, and #28 to #46.**
 
 
 ## High
@@ -178,6 +179,8 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
 ## Medium
 
 ### 9. Exact flood fill with "Flood inside/outside" on huge images ignores the selection on one side
+- **Fixed in `429cb86`:** one test - the old colour and not masked - drives the left scan, the right
+  scan and the seeds above and below; a click on a masked pixel fills nothing and returns 0.
 - **Where:** `qpv-main.cpp:3170-3177` against `3190-3196` (`FloodFillScanlineStack`).
 - **What's wrong:** the left scan walks over masked pixels; the right scan then starts at the leftmost
   pixel of the run and stops at the first masked one. Any row whose run reaches left past the
@@ -188,6 +191,10 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
 - **Evidence:** harness on the shipped function — confirmed.
 
 ### 10. Pixelate and pixelated noise on huge images use blocks too large by image ÷ selection
+- **Fixed in `ad3f998`:** `smallBitmapArea()` maps the small bitmap over the selection box clipped to
+  the image (the whole image when inverted), its start row corrected by `polyOffYb` for freeform
+  shapes; Add noise sizes its small bitmap from the selection. Rotated ellipses stay off: the DLL gets
+  a rescaled box for them, and the small bitmap is made from the unrotated rectangle.
 - **Where:** `qpv-main.cpp:3633/3636` (`GenerateRandomNoiseOnBitmap`) and `5289/5292`
   (`PixelateHugeBitmap`): `mw*((x - bmpX)/(float)w)` divides by the whole image width/height.
 - **What's wrong:** AHK sizes the small bitmap from the *selection* (`Ceil(obju.bImgSelW/amount)`,
@@ -200,6 +207,8 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
 - **Evidence:** two reviewers independently; harness on `PixelateHugeBitmap` — confirmed.
 
 ### 11. "Separated line segments" lose most of each stroke on huge images
+- **Fixed in `1774b87`:** the merge window is mapped the way `NewDrawLinesOnMask()` maps the points,
+  and a window wholly off the mask returns before touching it (which also fixes #27).
 - **Where:** `qpv-main.cpp:1764-1767` (`mergePolyMaskIntoHighDepthMask`) against 1357-1373
   (`NewDrawLinesOnMask`).
 - **What's wrong:** `NewDrawLinesOnMask()` places a point at mask (x−polyX, y+polyOffYa−polyOffYb−polyY);
@@ -217,6 +226,7 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
   are merged) — confirmed.
 
 ### 12. Polygon selections fill a straight span outside the shape (huge images)
+- **Fixed in `469395e`:** every span is tested against the polygon, two crossings or more.
 - **Where:** `qpv-main.cpp:769` (`fillMaskPolyBounds`): `if (listu.size()>2 && simpleMode==0)`.
 - **What's wrong:** when a scanline holds exactly two distinct crossings after `unique()` — two tips on
   one row, each deduplicated to one entry — the span between them is filled without the inside test.
@@ -227,6 +237,8 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
   the shipped code, 0 with the shortcut removed — confirmed.
 
 ### 13. Cloner, effects, smudge and pinch/bulge brushes put opaque halos on transparent areas
+- **Fixed in `6d0e50c`:** the layer's alpha is `srcA * weight / 255`, rounded; opaque sources are
+  byte-identical to before.
 - **Where:** `qpv-main.cpp:9987`: `outA = 255 - clamp(max(srcA,weightInt) - min(srcA,weightInt), 0, 255)`.
 - **What's wrong:** this equals the brush weight only when `srcA` is 255; for a transparent source it
   inverts (`srcA=0` → `255-weight`), so the soft rim of the stamp becomes the most opaque part.
@@ -238,6 +250,8 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
   change 0 pixels and every `srcA=255` case is byte-identical.
 
 ### 14. The MSD (mean squared difference) bounds are silently skipped
+- **Fixed in `f35d44d`:** `dupesApplyFilter()` applies the MSD bounds whenever `dupesHaveMSD()`, the
+  panel's test, finds scores; `tests/filter_oracle.cpp` follows.
 - **Where:** `dupes-search.h:1369-1370` (`dupesApplyFilter`'s `allowMSE`) against 1577-1598
   (`dupesHaveMSD`).
 - **What's wrong:** 736de91 widened `dupesHaveMSD()` because "a sweep can legitimately leave the leading
@@ -249,6 +263,9 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
 - **Evidence:** reading + reviewer harness — confirmed.
 
 ### 15. Re-filtering duplicates brings deleted images back and can drop a live one
+- **Fixed in `33e3611`:** the mask has two bits: the search string (first image of a pair, cached)
+  and deleted entries (refreshed on every pass), which link their group but are not listed nor
+  counted towards hiding single-member groups.
 - **Where:** `dupes-search.h:1390-1392` (`imgKeep` is tested on `idA` only) and ahk:86573-86583
   (`maskKey` does not change when an image is deleted).
 - **What's wrong:** AHK now puts the "deleted entry" test (`!InStr(imgPath,"||")`) into the same mask
@@ -260,6 +277,7 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
 - **Evidence:** reviewer harness — confirmed. Needs a per-image mask in the DLL or an AHK post-filter.
 
 ### 16. Desaturate: "Green" and "Blue" are swapped
+- **Fixed in `da24af0`:** both DLL sites map 3 to green and 4 to blue.
 - **Where:** `qpv-main.h:698-700` (`saturation()`: 2→r, 3→b, else g) and `qpv-main.cpp:4679-4681` (the
   table shortcut, same mapping).
 - **What's wrong:** the panel list is "All channels|All (alt)|Red|Green|Blue" with AltSubmit and AHK
@@ -365,6 +383,7 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
 - **Evidence:** arithmetic + reviewer harness; likely (the non-inverted branch is the documented model).
 
 ### 27. Heap writes past the selection mask with "Separated line segments"
+- **Fixed in `1774b87`**, with #11: a window wholly off the mask returns before touching it.
 - **Where:** `qpv-main.cpp:1765, 1778-1780` (`mergePolyMaskIntoHighDepthMask`).
 - **What's wrong:** a subpath lying wholly below mask row 0 makes `mh` negative; `rend + 1` is then a
   negative INT64 turned into a huge `size_t`, `fill_zero()`'s `start >= end` test passes, and its
@@ -515,12 +534,18 @@ take effect, and #4 and #7 also change quick-picto-viewer.ahk. **Open: #9 to #46
   the image (ahk:21233, 21252-21256), so levels are stretched twice (input 90 → 9, 150 → 255; the normal
   path gives 64 and 191); "Image contrast" there reads the green channel of a colour copy instead of a
   grey one.
-- `changeHdistLevelCached()`'s `maskKey` (ahk:86574) does not change when entries are deleted — half of #15.
+- `changeHdistLevelCached()`'s `maskKey` (ahk:86574) does not change when entries are deleted — half of #15. **Fixed in
+  `33e3611`**, with #15: the deleted bit is refreshed on every pass.
 - The paint brush loads `brush-texture-<BrushToolTexture>.png` when painting (ahk:78440) but
   `<BrushToolTexture - 1>` for the panel preview (ahk:77748); the list starts with "Soft circle", so the
   preview is right and every textured stroke paints the next texture — "Vertical dots" finds no file and
   paints a plain circle.
-- Add noise sizes its small bitmap with the blur panel's `BlurAreaInverted` (ahk:22361-22362) — half of #10.
+- Add noise sizes its small bitmap with the blur panel's `BlurAreaInverted` (ahk:22361-22362) — half of #10. **Fixed in
+  `ad3f998`**, with #10.
+- `QPV_PrepareHugeImgSelectionArea()` takes `zkw`/`zkh` for the freeform offsets (`ppofYb` etc.) from
+  `useGdiBitmap()`, which is `gdiBitmap` or `UserMemBMP`, not the huge image; whether their size matches
+  a huge image's was not checked. The #10 fix does not depend on it: AHK adds the same `ppofYb` to
+  `y1` and to `polyOffYb`.
 
 ## Checked and found correct
 By the reviewers, with harnesses: `FloodFill8Stack` traversal (4000-run differential against a BFS
