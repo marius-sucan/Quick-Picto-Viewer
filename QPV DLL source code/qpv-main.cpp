@@ -2517,20 +2517,23 @@ inline RGBAColor CalculateNewBlendModes(
           return Brgb;
 
        const float f = char_to_float[255 - opacity];
-       int fR, fG, fB, fA;
+       // the colours mix by how much of each layer is visible; with equal alphas that is f exactly
+       const float wO = f * Orgb.a, wB = (1.0f - f) * Brgb.a;
+       const float g = (Orgb.a == Brgb.a || wO + wB <= 0) ? f : wO / (wO + wB);
+       int fR, fG, fB;
        if (linearGamma == 1)
        {
-          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
-          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
-          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
-          fA = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.a], gamma_to_linear[Brgb.a], f)];
+          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], g)];
+          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], g)];
+          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], g)];
        } else
        {
-          fR = weighTwoValues(Orgb.r, Brgb.r, f);
-          fG = weighTwoValues(Orgb.g, Brgb.g, f);
-          fB = weighTwoValues(Orgb.b, Brgb.b, f);
-          fA = weighTwoValues(Orgb.a, Brgb.a, f);
+          fR = weighTwoValues(Orgb.r, Brgb.r, g);
+          fG = weighTwoValues(Orgb.g, Brgb.g, g);
+          fB = weighTwoValues(Orgb.b, Brgb.b, g);
        }
+
+       int fA = weighTwoValues(Orgb.a, Brgb.a, f);
        if (keepAlpha == 1)
           fA = max(fA - (255 - Brgb.a), 0);
        return {fB, fG, fR, fA};
