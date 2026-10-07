@@ -1356,8 +1356,11 @@ DLL_API int DLL_CALLCONV dupesHaveMSD();
 // groups that are too small, and orders the result exactly as sortDupeGroups() did.
 // Returns the number of result rows.
 //
-// imgKeep is the one filter AHK still owns - the path search string, which is a PCRE the
-// DLL cannot evaluate - as one byte per image row index. NULL keeps everything.
+// imgKeep holds what AHK still owns, one byte per image row index; NULL keeps everything.
+// Bit 1: the path passes the search string, a PCRE the DLL cannot evaluate; a pair is kept
+// when its FIRST image passes, as the AHK always did. Bit 2: the entry was deleted; it still
+// links its group, but is not listed nor counted towards remSingles, as sortDupeGroups()
+// was handed the list without it.
 // remSingles: a group survives when it has MORE than this many members, so 0 keeps
 // everything and 1 is the "hide mono groups" setting.
 DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int mseHi, int breakGroups, int remSingles, const unsigned char *imgKeep, UINT imgKeepCount) {
@@ -1389,7 +1392,7 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
            continue;
 
         // the string filter was tested against the FIRST image of the pair only
-        if (imgKeep!=NULL && (p.idA >= imgKeepCount || imgKeep[p.idA]==0))
+        if (imgKeep!=NULL && (p.idA >= imgKeepCount || (imgKeep[p.idA] & 1)==0))
            continue;
 
         kept.push_back(i);
@@ -1505,6 +1508,9 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
     for ( UINT idu = 0 ; idu <= maxId ; idu++)
     {
         if (rowRoot[idu]==NONE)
+           continue;
+
+        if (imgKeep!=NULL && idu < imgKeepCount && (imgKeep[idu] & 2))
            continue;
 
         position++;   // the 1-based index of this row in ascending-idu order

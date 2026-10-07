@@ -101,8 +101,9 @@ refFilter(const std::vector<DupePairRec> &pairs, int hamLo, int hamHi, int mseLo
         const long long hamDist = pairs[i].hamDist, MSE = pairs[i].mse;
         if (!isInRange(hamDist, hamLo, hamHi)) continue;
         if (allowMSE && !isInRange(MSE, mseLo, mseHi)) continue;
+        // bit 1 of imgKeep: coreSearchIndex() on the first image's path
         if (!imgKeep.empty()) {
-            if ((size_t)idRa >= imgKeep.size() || imgKeep[idRa]==0) continue;
+            if ((size_t)idRa >= imgKeep.size() || (imgKeep[idRa] & 1)==0) continue;
         }
 
         if (doUnion) {
@@ -171,6 +172,8 @@ refFilter(const std::vector<DupePairRec> &pairs, int hamLo, int hamHi, int mseLo
     for (std::map<long long, RefRow>::const_iterator it = newArrayu.begin(); it != newArrayu.end(); ++it) {
         const std::string &gid = it->second.gid;
         if (gid.empty() || gid.find('_')==std::string::npos) continue;
+        // bit 2 of imgKeep: a deleted entry, its path marked "||"; fnewArrayu was built without it
+        if (!imgKeep.empty() && (size_t)it->first < imgKeep.size() && (imgKeep[it->first] & 2)) continue;
         index++;
         const std::string tg = gidRoot(gid);
         grpIDv[tg]++;
@@ -293,6 +296,7 @@ int main() {
             {
                keep.assign(images + 2, 1);
                for (size_t i = 0; i < keep.size(); i += 3) keep[i] = 0;
+               for (size_t i = 1; i < keep.size(); i += 5) keep[i] |= 2;   // deleted entries
             }
 
             const std::vector<std::pair<long long, RefRow> > ref =
@@ -318,6 +322,24 @@ int main() {
     check(mismatches==0, msg);
     check(nonEmpty > cases / 2, "most cases actually produce a filtered list");
     check(totalRows > 2000, "enough rows compared to be worth something");
+
+    // a deleted entry still links its group but is not listed: A~B and B~C with B deleted give {A, C}
+    {
+        std::vector<DupePairRec> pairs;
+        DupePairRec a = {2, 1, 1, 2500}; pairs.push_back(a);
+        DupePairRec b = {3, 2, 1, 2500}; pairs.push_back(b);
+        const std::vector<unsigned char> keep = {1, 1, 1 | 2, 1};
+        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 400, 0, 1, keep);
+        bool ok = got.size()==2 && got[0].imgIndex==1 && got[1].imgIndex==3 && got[0].groupRoot==1 && got[1].groupRoot==1;
+        check(ok, "a deleted image links its group but is not listed: {A, C}");
+        const std::vector<unsigned char> keep2 = {1, 1, 1, 1 | 2};
+        const std::vector<DupeResultRow> got2 = runShipped(pairs, 0, 12, 0, 400, 0, 1, keep2);
+        check(got2.size()==2 && got2[0].imgIndex==1 && got2[1].imgIndex==2, "deleting C instead leaves {A, B}");
+        DupePairRec c = {4, 3, 1, 2500};
+        std::vector<DupePairRec> one = {c};
+        const std::vector<unsigned char> keep3 = {1, 1, 1, 1, 1 | 2};
+        check(runShipped(one, 0, 12, 0, 400, 0, 1, keep3).empty(), "a pair whose other image was deleted is a single, hidden as one");
+    }
 
     // unscored leading pairs must not switch the MSD bounds off for the rest of the list
     {

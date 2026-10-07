@@ -86520,9 +86520,9 @@ filterDupeResultsByHdist(threshold) {
 changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:=0) {
    ; The pair list stays in qpvmain.dll after the sweep, so re-filtering it is one DllCall
    ; instead of a full interpreted pass.
-   ; imgKeep is the one part of the filter that cannot move: the search string is a PCRE.
-   ; One byte per image row index, rebuilt only when the filter itself changes, where the
-   ; old loop re-tested the regex once per surviving PAIR.
+   ; imgKeep is the part of the filter that cannot move, one byte per image row index: the
+   ; search string is a PCRE, retested only when the filter itself changes, where the old
+   ; loop re-tested the regex once per surviving PAIR; and the deleted entries.
    Static maskFor := "", imgKeep, keepCount := 0, fltSize := 20, fltMax := 4096, fltBuf
    If (modus="kill")
    {
@@ -86570,19 +86570,26 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
    If (maskFor!=maskKey)
    {
       ; index 0 is unused: image row indexes are 1-based, and the DLL rejects any pair
-      ; whose first image falls outside the mask
+      ; whose first image falls outside the mask; bit 1 = the path passes the string filter
       keepCount := bckpMaxFilesIndex + 1
       VarSetCapacity(imgKeep, keepCount + 1, 0)
       Loop, % bckpMaxFilesIndex
       {
-          imgPath := bckpResultedFilesList[A_Index, 1]
-          okay := (imgPath && !InStr(imgPath, "||")) ? 1 : 0
-          If (okay=1 && isStrFilter=1)
-             okay := coreSearchIndex(imgPath, givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert) ? 1 : 0
+          okay := 1
+          If (isStrFilter=1)
+             okay := coreSearchIndex(bckpResultedFilesList[A_Index, 1], givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert) ? 1 : 0
 
           NumPut(okay, imgKeep, A_Index, "UChar")
       }
       maskFor := maskKey
+   }
+
+   ; bit 2 = a deleted entry, refreshed on every pass: it still links its group, but is not listed
+   Loop, % bckpMaxFilesIndex
+   {
+       imgPath := bckpResultedFilesList[A_Index, 1]
+       gone := (!imgPath || InStr(imgPath, "||")) ? 2 : 0
+       NumPut((NumGet(imgKeep, A_Index, "UChar") & 1) | gone, imgKeep, A_Index, "UChar")
    }
 
    ; BreakDupesGroups deliberately splits the groups by similarity, so the DLL keeps the
