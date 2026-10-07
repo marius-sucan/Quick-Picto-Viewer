@@ -695,8 +695,9 @@ struct RGBA16color {
     QPV_FORCEINLINE void saturation(int level, int altMode, int linearGamma, float saturation) {
         if (altMode>1)
         {
+           // the Desaturate panel's channels: 2 = red, 3 = green, 4 = blue
            int gray = (altMode==2) ? r : g;
-           if (altMode==3)
+           if (altMode>=4)
               gray = b;
            r = gray;
            g = gray;

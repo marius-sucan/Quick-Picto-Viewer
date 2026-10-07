@@ -4697,9 +4697,9 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
     p.swapIdx  = 0;
     if (p.lutPath)
     {
-        int c = 1;                       // altSat 4,5.. -> G
+        int c = 1;                       // altSat 3 -> G
         if (caseB && altSat==2) c = 2;   // -> R
-        if (caseB && altSat==3) c = 0;   // -> B
+        if (caseB && altSat>=4) c = 0;   // -> B
         p.chanSwap = caseB;
         p.swapIdx  = c;
         for (int i = 0; i < 256; i++)
