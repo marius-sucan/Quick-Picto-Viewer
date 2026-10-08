@@ -1369,6 +1369,12 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
     if (n < 1)
        return 0;
 
+    // the bounds come in either order, as AHK's isInRange() took them
+    if (hamLo > hamHi)
+       std::swap(hamLo, hamHi);
+    if (mseLo > mseHi)
+       std::swap(mseLo, mseHi);
+
     // the MSD bounds apply when the scan computed scores, judged the way the panel judges it
     // before it enables the MSD fields
     const bool allowMSE = (dupesHaveMSD()==1);

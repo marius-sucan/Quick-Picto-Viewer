@@ -53,7 +53,12 @@ void dupesQueryFreeRows() {}
 
 struct RefRow { std::string gid; long long ham; long long mse; };
 
-static bool isInRange(long long v, long long lo, long long hi) { return (v >= lo && v <= hi); }
+// AHK's isInRange(): the two bounds may come in either order
+static bool isInRange(long long v, long long a, long long b) {
+    if (v==a || v==b)
+       return true;
+    return (v >= std::min(a, b) && v <= std::max(a, b));
+}
 
 static long long refFindRoot(std::map<long long,long long> &parentu, long long x) {
     long long r = x;
@@ -286,8 +291,14 @@ int main() {
         for (int variant = 0; variant < 6; variant++)
         {
             rngSeed(seed * 31 + variant);
-            const int hamLo = 0, hamHi = (int)rndBelow(13);
-            const int mseLo = 0, mseHi = (int)(50 + rndBelow(400));
+            int hamLo = 0, hamHi = (int)rndBelow(13);
+            int mseLo = 0, mseHi = (int)(50 + rndBelow(400));
+            // the panel's Lower/Upper fields can be typed the wrong way round
+            if ((seed + variant) & 1)
+            {
+               std::swap(hamLo, hamHi);
+               std::swap(mseLo, mseHi);
+            }
             const int breakGroups = (variant & 1);
             const int remSingles = (variant >> 1) & 1;
 
@@ -371,6 +382,17 @@ int main() {
         const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none);
         check(sameResult(ref, got, why), "A~B then B~C makes ONE group of three");
         check(got.size()==3 && got[0].groupRoot==2, "and its ID is the smallest image index");
+    }
+
+    // Lower 5 / Upper 2 filters 2..5, as the AHK did
+    {
+        const std::vector<DupePairRec> pairs = makePairs(4242, 20, true);
+        const std::vector<unsigned char> none;
+        const std::vector<DupeResultRow> fwd = runShipped(pairs, 2, 5, 0, 2500, 0, 0, none);
+        const std::vector<DupeResultRow> rev = runShipped(pairs, 5, 2, 2500, 0, 0, 0, none);
+        check(!fwd.empty() && fwd.size()==rev.size() &&
+              memcmp(fwd.data(), rev.data(), fwd.size()*sizeof(DupeResultRow))==0,
+              "reversed bounds (Lower 5, Upper 2) give the 2..5 list");
     }
 
     // re-filtering must be repeatable: the same bounds twice give the same list, and a
