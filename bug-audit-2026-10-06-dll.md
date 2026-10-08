@@ -25,9 +25,9 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
-**Fixed: #1 to #22, and #27**, one commit each (#27 with #11), named under each item; qpvmain.dll must
-be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-picto-viewer.ahk.
-**Open: #23 to #26, and #28 to #46.**
+**Fixed: #1 to #22, and #24 to #30**, one commit each (#27 with #11), named under each item; qpvmain.dll
+must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-picto-viewer.ahk.
+**Open: #23, and #31 to #46.**
 
 
 ## High
@@ -376,6 +376,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reading + reviewer harness — confirmed. No AHK caller compensates.
 
 ### 24. Huge-image insert text at reduced opacity loses its anti-aliased edges
+- **Fixed in `62ff06f`:** over a transparent pixel the shortcut writes the alpha `CalculateNewBlendModes()`
+  gives, coverage times opacity: coverage 128 at text opacity 128 now gives alpha 64 (1 before). Full
+  opacity is unchanged.
 - **Where:** `qpv-main.cpp:5372-5379` (`DrawTextBitmapInPlace`).
 - **What's wrong:** over a destination pixel with alpha 0 it writes `nA - opacity` (subtractive); over
   alpha ≥ 1 it goes through `CalculateNewBlendModes()`, which multiplies. The canvas is a zeroed
@@ -385,6 +388,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reading + reviewer harness — confirmed.
 
 ### 25. The effects brush's blur paints nothing on normal images at wetness ≥ 10
+- **Fixed in `a076a71`:** the blur's region is clamped to the pixels the Mat holds (the GDI+ lock rect on
+  normal images), and an exception from the blur fails the stamp (returns 0) instead of leaving the
+  export. Every painted pixel's blur window lies inside the lock, so no result changes.
 - **Where:** `qpv-main.cpp:9200-9205` (`halfW/halfH` include `|bulgePinchFactor|`) and 9320-9347 (the ROI —
   the region of interest it blurs — is clamped to the image, not to the locked Mat; `srcMat(roi)` has no
   try/catch); ahk:78819 (type-5
@@ -398,6 +404,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
   throw at wetness 10, all at ≥ 11); likely (OpenCV itself not run).
 
 ### 26. Inverted freeform selections land shifted on huge images
+- **Fixed in `1ab6fb5`:** the inverted freeform branch uses the plain branch's box and row mapping
+  (`+ polyOffYa`), so it is the exact complement of it; the mask-bitmap path and the other shapes keep
+  their box.
 - **Where:** `qpv-main.cpp:1872-1873` (`clipMaskFilter`, inverted `EllipseSelectMode==2` branch).
 - **What's wrong:** the mask row is `y−imgSelY1−polyY`; the non-inverted branch (fixed in 52b9183) and
   `FillMaskPolygon()` both add `polyOffYa`.
@@ -418,6 +427,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reviewer harness under ASan (heap-buffer-overflow write in `fill_zero`) — confirmed.
 
 ### 28. Collection pool: a failed grey effect stores the blue channel as the fingerprint
+- **Fixed in `b359805`:** every step the run asks for is checked - the grey effect, the histogram, the
+  blur, both fingerprint dumps, and the mirror with its dumps - and the row is DP_OK only when all of
+  them worked; otherwise it is DP_ERR_PROCESS, retried by the next run.
 - **Where:** `dupes-pixels.h:581-582` (status of `GdipBitmapApplyEffect` ignored; NULL `fx.gray`
   skipped silently), 236-241.
 - **What you see:** under memory pressure, rows are written as successes (DP_OK) with fingerprints of the colour
@@ -426,6 +438,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reading + reviewer harness — confirmed path; needs an allocation failure.
 
 ### 29. Collection pool: a new run cannot finish while the previous run's decodes are still running
+- **Fixed in `71bcf6d`:** the idle test counts only the jobs held for the current run (`dpRunInFlight`,
+  zeroed by `dpCancelLocked()`); `dpState.inFlight` still counts every job held, for AHK's display. The
+  run after an abandoned two-second decode now finishes in 25 ms (1995 ms before).
 - **Where:** `dupes-pixels.h:1428` (the idle test uses `inFlight`, which counts jobs of every
   generation).
 - **What you see:** abort a collection and start another at once: the new run's rows are written in
@@ -435,6 +450,10 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reviewer harness (2984 ms vs 50-103 ms) — confirmed mechanism.
 
 ### 30. A crash at exit when a FreeImage decode outlives the 5 s shutdown wait
+- **Fixed in `958684f`:** `bindFreeImageOnce()` takes a reference of its own (`GetModuleHandleExW`, flags
+  0), so AHK's `FreeLibrary()` at exit no longer unmaps FreeImage under an abandoned worker, and
+  `TrueCleanup()` skips that unload when either pool shutdown returns 0 - which also covers a
+  qpvmain.dll that has not been rebuilt.
 - **Where:** `thumbs-pool.h:2108-2147` (detach, return 0), `freeimage-dynamic.h:144` (`GetModuleHandleW`
   takes no reference), ahk:4436-4438 (return ignored, then `FreeLibrary` on FreeImage.dll);
   `dupesPixShutdown()` (dupes-pixels.h:1487-1504) has the same shape.
