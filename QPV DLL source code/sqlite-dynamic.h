@@ -73,6 +73,7 @@ struct SQLiteAPI {
     int          (__cdecl *exec)(sqlite3*, const char*, void*, void*, char**) = NULL;
     void         (__cdecl *interrupt)(sqlite3*) = NULL;
     const void*  (__cdecl *errmsg16)(sqlite3*) = NULL;
+    int          (__cdecl *errcode)(sqlite3*) = NULL;
 
     int          (__cdecl *column_count)(sqlite3_stmt*) = NULL;
     int          (__cdecl *column_type)(sqlite3_stmt*, int) = NULL;
@@ -121,6 +122,7 @@ static void bindSQLiteOnce() {
         BINDSQ(exec,              "sqlite3_exec");
         BINDSQ(interrupt,         "sqlite3_interrupt");
         BINDSQ(errmsg16,          "sqlite3_errmsg16");
+        BINDSQ(errcode,           "sqlite3_errcode");
         BINDSQ(column_count,      "sqlite3_column_count");
         BINDSQ(column_type,       "sqlite3_column_type");
         BINDSQ(column_int64,      "sqlite3_column_int64");

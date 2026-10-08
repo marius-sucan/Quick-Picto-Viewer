@@ -578,6 +578,6 @@ static inline Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int, int, 
 #include "../../sqlite-dynamic.h"
 static std::wstring dupesEngineError;
 static std::atomic<int> dupesPixCancel(0);
-static inline void dupesSetError(const wchar_t *what) { dupesEngineError = (what!=NULL) ? what : L""; }
+static inline void dupesSetError(const wchar_t *what, sqlite3 *) { dupesEngineError = (what!=NULL) ? what : L""; }
 
 #endif // QPV_TEST_PIXELS_ENV_H

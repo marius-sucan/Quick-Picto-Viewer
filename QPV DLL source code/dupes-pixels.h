@@ -1003,7 +1003,7 @@ static int dpTopUpQueue(int want) {
         {
            if (rc!=SQLITE_DONE && rc!=SQLITE_INTERRUPT)
            {
-              dupesSetError(L"the pixel-collection query failed");
+              dupesSetError(L"the pixel-collection query failed", dpDB);
               dpState.lastError = 6;
               SQ.reset(dpSelect);
               return -1;
@@ -1315,7 +1315,7 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
 
     if (SQ.prepare16_v2(dpDB, selectSQL, -1, &dpSelect, NULL)!=SQLITE_OK || dpSelect==NULL)
     {
-       dupesSetError(L"could not prepare the pixel-collection query");
+       dupesSetError(L"could not prepare the pixel-collection query", dpDB);
        dpSelect = NULL;
        return 0;
     }
@@ -1349,7 +1349,7 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
      || SQ.prepare16_v2(dpDB, updPixSQL, -1, &dpUpdPix, NULL)!=SQLITE_OK
      || SQ.prepare16_v2(dpDB, markDeadSQL, -1, &dpMarkDead, NULL)!=SQLITE_OK)
     {
-       dupesSetError(L"could not prepare the pixel-collection updates");
+       dupesSetError(L"could not prepare the pixel-collection updates", dpDB);
        dpFinalizeStatements();
        return 0;
     }

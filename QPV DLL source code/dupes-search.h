@@ -1672,16 +1672,23 @@ static size_t dupesRunStart = 0;
 static bool   dupesRunOpen = false;
 static std::vector<unsigned char> dupesKeyCur, dupesKeyPrev;
 
-static void dupesSetError(const wchar_t *what) {
+// db is the connection the failed call ran on: the engine's own, or AHK's for the hash and
+// pixel-collection statements. Its message is added only when its last call really failed;
+// "not an error" and the row/done notices say nothing about the failure.
+static void dupesSetError(const wchar_t *what, sqlite3 *db) {
     dupesEngineError = (what!=NULL) ? what : L"";
-    if (dupesDB!=NULL && SQ.errmsg16!=NULL)
+    if (db==NULL || SQ.errmsg16==NULL)
+       return;
+
+    const int code = (SQ.errcode!=NULL) ? (SQ.errcode(db) & 0xFF) : SQLITE_ERROR;
+    if (code==SQLITE_OK || code==SQLITE_ROW || code==SQLITE_DONE)
+       return;
+
+    const wchar_t *m = (const wchar_t*)SQ.errmsg16(db);
+    if (m!=NULL && m[0]!=0)
     {
-       const wchar_t *m = (const wchar_t*)SQ.errmsg16(dupesDB);
-       if (m!=NULL && m[0]!=0)
-       {
-          dupesEngineError += L": ";
-          dupesEngineError += m;
-       }
+       dupesEngineError += L": ";
+       dupesEngineError += m;
     }
 }
 
@@ -1718,7 +1725,7 @@ DLL_API int DLL_CALLCONV dupesEngineInit(const wchar_t *dbPath) {
     const int rc = SQ.open_v2(utf8.data(), &dupesDB, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, NULL);
     if (rc!=SQLITE_OK || dupesDB==NULL)
     {
-       dupesSetError(L"could not open the database read-only");
+       dupesSetError(L"could not open the database read-only", dupesDB);
        if (dupesDB!=NULL) { SQ.close_v2(dupesDB); dupesDB = NULL; }
        return 0;
     }
@@ -2024,7 +2031,7 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
     const int rc = SQ.prepare16_v2(dupesDB, sql, -1, &dupesStmt, NULL);
     if (rc!=SQLITE_OK || dupesStmt==NULL)
     {
-       dupesSetError(L"could not prepare the duplicates query");
+       dupesSetError(L"could not prepare the duplicates query", dupesDB);
        dupesStmt = NULL;
        dupesScanState.lastError = 3;
        dupesScanState.phase = -1;
@@ -2036,7 +2043,7 @@ DLL_API int DLL_CALLCONV dupesQueryBegin(const wchar_t *sql, int keyCount, UINT 
     const int want = 4 + dupesQCfg.hasHash + dupesQCfg.hasFlip + dupesQCfg.hasPix + keyCount;
     if (SQ.column_count!=NULL && SQ.column_count(dupesStmt)!=want)
     {
-       dupesSetError(L"the duplicates query does not have the expected column layout");
+       dupesSetError(L"the duplicates query does not have the expected column layout", dupesDB);
        SQ.finalize(dupesStmt);
        dupesStmt = NULL;
        dupesScanState.lastError = 4;
@@ -2168,7 +2175,7 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
         }
 
         // SQLITE_INTERRUPT is the cancel path; anything else is a real failure
-        dupesSetError((rc==SQLITE_INTERRUPT) ? L"the duplicates query was cancelled" : L"the duplicates query failed");
+        dupesSetError((rc==SQLITE_INTERRUPT) ? L"the duplicates query was cancelled" : L"the duplicates query failed", dupesDB);
         SQ.finalize(dupesStmt);
         dupesStmt = NULL;
         dupesScanState.lastError = (rc==SQLITE_INTERRUPT) ? 0 : 5;
@@ -2499,14 +2506,14 @@ DLL_API int DLL_CALLCONV dupesHashBegin(void *ahkDb, const wchar_t *selectSQL, c
 
     if (SQ.prepare16_v2(dupesHashDB, selectSQL, -1, &dupesHashSel, NULL)!=SQLITE_OK || dupesHashSel==NULL)
     {
-       dupesSetError(L"could not prepare the hash-generation query");
+       dupesSetError(L"could not prepare the hash-generation query", dupesHashDB);
        dupesHashSel = NULL;
        return 0;
     }
 
     if (SQ.prepare16_v2(dupesHashDB, updateSQL, -1, &dupesHashUpd, NULL)!=SQLITE_OK || dupesHashUpd==NULL)
     {
-       dupesSetError(L"could not prepare the hash-generation update");
+       dupesSetError(L"could not prepare the hash-generation update", dupesHashDB);
        SQ.finalize(dupesHashSel);
        dupesHashSel = NULL;
        dupesHashUpd = NULL;
@@ -2535,7 +2542,7 @@ static int dupesHashStillMoving(INT64 cursorWas, INT64 wroteWas, INT64 skippedWa
     if (++dupesHashStall < QPV_HASH_STALL_BATCHES)
        return 1;
 
-    dupesSetError(L"the hash generation stopped making progress - the database is refusing every write");
+    dupesSetError(L"the hash generation stopped making progress - the database is refusing every write", dupesHashDB);
     return -1;
 }
 
@@ -2609,7 +2616,7 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
         if (rc==SQLITE_DONE || rc==SQLITE_INTERRUPT)
            break;
 
-        dupesSetError(L"the hash-generation query failed");
+        dupesSetError(L"the hash-generation query failed", dupesHashDB);
         SQ.reset(dupesHashSel);
         return -1;
     }
