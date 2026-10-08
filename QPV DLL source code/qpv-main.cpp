@@ -4581,9 +4581,10 @@ struct AdjustColorsFXplan {
         OutRGB o;
         if (linearGamma==1 && fintensity<1.0f)
         {
-            o.r = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[px.r], gamma_to_linearInt16[char_to_int[oR]], fintensity)]];
-            o.g = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[px.g], gamma_to_linearInt16[char_to_int[oG]], fintensity)]];
-            o.b = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[px.b], gamma_to_linearInt16[char_to_int[oB]], fintensity)]];
+            // rounded back from linear light: the 16-bit round trip of a shadow level can land just below it
+            o.r = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[px.r], gamma_to_linearInt16[char_to_int[oR]], fintensity)];
+            o.g = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[px.g], gamma_to_linearInt16[char_to_int[oG]], fintensity)];
+            o.b = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[px.b], gamma_to_linearInt16[char_to_int[oB]], fintensity)];
         } else
         {
             o.r = weighTwoValues(int_to_char[px.r], oR, fintensity);
@@ -4685,7 +4686,7 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
            else                    a = (a>aThreshold) ? 65535 : 0;
         }
         if (linearGamma==1 && p.fintensity<1.0f)
-           p.aLUT[i] = int_to_char[linear_to_gammaInt16[weighTwoValues(gamma_to_linearInt16[a], gamma_to_linearInt16[char_to_int[i]], p.fintensity)]];
+           p.aLUT[i] = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[a], gamma_to_linearInt16[char_to_int[i]], p.fintensity)];
         else
            p.aLUT[i] = weighTwoValues(int_to_char[a], i, p.fintensity);
     }
