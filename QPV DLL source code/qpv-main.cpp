@@ -10196,10 +10196,14 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                outA = weighTwoValues(srcA, tgtA, weight);
             } else if (blendMode==24)
             {
-               outR = weighTwoValues(srcR, tgtR, mask_fval);
-               outG = weighTwoValues(srcG, tgtG, mask_fval);
-               outB = weighTwoValues(srcB, tgtB, mask_fval);
-               outA = weighTwoValues(opacity, tgtA, mask_fval);
+               // the stroke's opacity becomes the alpha and the mask the weight [the opacity argument is subtractive]
+               RGBAColor Orgb = { srcB, srcG, srcR, (bytesPerPixel==4) ? opacity : 255 };
+               RGBAColor Brgb = { tgtB, tgtG, tgtR, tgtA };
+               RGBAColor replaced = CalculateNewBlendModes(Orgb, Brgb, 24, 0, linearGamma, 0, imgBpp, 255 - mask_val);
+               outR = replaced.r;
+               outG = replaced.g;
+               outB = replaced.b;
+               outA = replaced.a;
             } else
             {
                outA = (srcA * weightInt + 127) / 255;
