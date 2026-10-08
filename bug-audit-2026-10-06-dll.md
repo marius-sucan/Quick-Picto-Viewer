@@ -310,10 +310,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Evidence:** reviewer harness — confirmed.
 
 ### 19. A failed SVG render comes back as a blank image, as if it had worked
-- **Fixed in `b0bdf3c`:** `WicD2DrenderSVG()` returns NULL unless the document was drawn, so the viewer
-  reports a load error and the thumbnails pool a failed tile. Where Direct2D cannot render SVG at all
-  (`d2dSvgSupport`), the collection pool reports the file as a failed attempt (`DP_ERR_PROCESS`, tried
-  again on the next run) instead of marking it dead.
+- **Fixed in `b0bdf3c` and `bedbd2e`:** `WicD2DrenderSVG()` returns NULL unless the document was
+  drawn, so the viewer reports a load error, the thumbnails pool a failed tile, and the collection pool
+  marks the file dead (`isDeleted=1`), on every system.
 - **Where:** `qpv-main.cpp:7603-7641` (`WicD2DrenderSVG`).
 - **What's wrong:** when the `ID2D1DeviceContext5` query fails (Windows 7/8.x, Windows 10 before
   1703), `CreateSvgDocument()` fails (malformed/truncated SVG) or `EndDraw()` fails, the never-drawn WIC
@@ -356,7 +355,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
 - **Fixed in `2271b06`:** the colours mix by how much of each layer is visible (a cross-fade of the
   premultiplied layers) and alpha is interpolated without gamma correction: red over transparent
   white at 50% gives (255,0,0, a127) with gamma correction off and on. Opaque and 24-bit images get
-  the same bytes as before, and layers of equal alpha the same colours.
+  the same bytes as before, and layers of equal alpha the same colours. The paint brush's own Replace
+  (`PaintBrushLarge()`) goes through the same code since `b5131b2`: its soft edges no longer take the
+  colour of transparent pixels, and it honours gamma correction.
 - **Where:** `qpv-main.cpp:2507-2530` (`CalculateNewBlendModes`, modes 24/100).
 - **What's wrong:** straight RGB is interpolated without alpha weighting, and with gamma correction the
   *alpha* is pushed through `gamma_to_linear`/`linear_to_gamma` too.
