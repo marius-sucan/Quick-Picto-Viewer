@@ -5583,7 +5583,7 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
      size[1] = givenH;
   }
 
-  double mpx = (size[0] * size[1])/1000000.0f;
+  double mpx = ((UINT64)size[0] * size[1])/1000000.0f;
   // fnOutputDebug(std::to_string(mpx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
   float g = 536.4f / mpx;
   if (mpx>maxMPX)
