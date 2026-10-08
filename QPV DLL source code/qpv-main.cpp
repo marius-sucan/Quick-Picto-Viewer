@@ -1318,6 +1318,29 @@ void prepareTranslatedLineSegments(const float &thickness, vector<double> &offse
    }
 }
 
+// cv::polylines() asserts a thickness of at most 32767, which the live preview passes at extreme thickness x zoom.
+// Past it the line is drawn the way OpenCV builds a thick one: a filled band per segment and a disc on each point.
+static void drawThickPolylineRound(cv::Mat &img, const std::vector<cv::Point> &pts, bool closed, const cv::Scalar &color, int thickness) {
+    const double r = thickness / 2.0;
+    const size_t n = pts.size();
+    const size_t segs = closed ? n : n - 1;
+    for (size_t i = 0; i < segs; i++)
+    {
+        const cv::Point a = pts[i], b = pts[(i + 1) % n];
+        const double dx = b.x - a.x, dy = b.y - a.y, len = sqrt(dx*dx + dy*dy);
+        if (len<=0)
+           continue;
+
+        const double nx = -dy / len * r, ny = dx / len * r;
+        const cv::Point band[4] = { cv::Point(cvRound(a.x + nx), cvRound(a.y + ny)), cv::Point(cvRound(b.x + nx), cvRound(b.y + ny)),
+                                    cv::Point(cvRound(b.x - nx), cvRound(b.y - ny)), cv::Point(cvRound(a.x - nx), cvRound(a.y - ny)) };
+        cv::fillConvexPoly(img, band, 4, color, cv::LINE_8);
+    }
+
+    for (size_t i = 0; i < n; i++)
+        cv::circle(img, pts[i], cvRound(r), color, cv::FILLED, cv::LINE_8);
+}
+
 DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY) {
     // Uses OpenCV drawing functions to render thick polylines onto polygonMaskMap.
     // The function renders onto a temporary cv::Mat using OpenCV's optimized line
@@ -1442,8 +1465,12 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
             for (size_t i = 0; i < cvPoints.size(); i++)
                 tilePoints[i] = cv::Point(cvPoints[i].x - tileOffX, cvPoints[i].y - tileOffY);
 
-            std::vector<std::vector<cv::Point>> polyContours = { tilePoints };
-            cv::polylines(tileMat, polyContours, (closed == 1), drawColor, cvThickness, cv::LINE_8);
+            if (cvThickness <= 32767)
+            {
+               std::vector<std::vector<cv::Point>> polyContours = { tilePoints };
+               cv::polylines(tileMat, polyContours, (closed == 1), drawColor, cvThickness, cv::LINE_8);
+            } else
+               drawThickPolylineRound(tileMat, tilePoints, (closed == 1), drawColor, cvThickness);
 
             // For an open path, handle cap styles at the two endpoints
             if (closed != 1 && PointsCount >= 2)
