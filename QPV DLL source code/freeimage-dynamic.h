@@ -141,7 +141,10 @@ static FARPROC FIMresolve(HMODULE h, const char* name, int argBytes) {
 
 static void bindFreeImageOnce() {
     std::call_once(FIMbindOnce, []() {
-        FIM.hLib = GetModuleHandleW(L"FreeImage.dll");
+        // a reference of its own [flags 0]: AHK frees its reference at exit, and a decode that a
+        // pool shutdown had to abandon may still be running inside FreeImage by then
+        if (!GetModuleHandleExW(0, L"FreeImage.dll", &FIM.hLib))
+           FIM.hLib = NULL;
         if (FIM.hLib==NULL)
            FIM.hLib = LoadLibraryW(L"FreeImage.dll");
 

@@ -4413,10 +4413,12 @@ TrueCleanup() {
    If (maxFilesIndex>1 && userSeenSlideImages>1 && mustRecordSeenImgs=1)
       seenImagesDB.Exec("COMMIT TRANSACTION;")
 
+   poolsOut := 1
    If (dupesPixInitGood=1)
    {
       DllCall("qpvmain.dll\dupesEngineCancel", "int")
-      DllCall("qpvmain.dll\dupesPixShutdown", "int")
+      If (DllCall("qpvmain.dll\dupesPixShutdown", "int")=0)
+         poolsOut := 0
       DllCall("qpvmain.dll\dupesEngineRelease")
       dupesPixInitGood := 0
       dupesPixState := 0
@@ -4433,8 +4435,10 @@ TrueCleanup() {
    lastInvoked := A_TickCount
    stopGifORslidesPlayback()
    Sleep, 1
-   QPV_ThumbsPoolShutdown() ; must happen before FreeImage and GDI+ are let go
-   If (wasInitFIMlib=1)
+   If (QPV_ThumbsPoolShutdown()=0) ; must happen before FreeImage and GDI+ are let go
+      poolsOut := 0
+   ; a worker a pool shutdown had to abandon may still be decoding inside FreeImage
+   If (wasInitFIMlib=1 && poolsOut=1)
       FreeImage_FoxInit(0) ; Unload Dll
 
    tlbrSetImageIcon("kill", "kill", 0, 0)
@@ -4775,10 +4779,13 @@ QPV_ThumbsPoolEnd() {
 }
 
 QPV_ThumbsPoolShutdown() {
+   ; 0 when a worker was still busy and had to be abandoned
+   r := 1
    If (multiCoreThumbsInitGood=1 && thumbsPoolState)
-      DllCall("qpvmain.dll\thumbsPoolShutdown", "Int")
+      r := DllCall("qpvmain.dll\thumbsPoolShutdown", "Int")
 
    thumbsPoolState := 0
+   Return r
 }
 
 getFolderDetails(pathu) {

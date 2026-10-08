@@ -47,7 +47,7 @@ struct RGBQUAD { BYTE rgbBlue, rgbGreen, rgbRed, rgbReserved; };
 struct BITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; };
 
 // nothing is loaded before the binding runs, so it always reaches LoadLibraryW()
-static inline HMODULE GetModuleHandleW(const wchar_t*) { return NULL; }
+static inline BOOL GetModuleHandleExW(DWORD, const wchar_t*, HMODULE *h) { *h = NULL; return FALSE; }
 static inline HMODULE LoadLibraryW(const wchar_t*) {
     const char *so = getenv("QPV_FREEIMAGE_SO");
     return (so && so[0]) ? dlopen(so, RTLD_NOW) : NULL;
