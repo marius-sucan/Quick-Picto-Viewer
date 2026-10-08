@@ -2989,7 +2989,7 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
       } else if (tolerance>0)
       {
          uint32_t colorTag = (thisColor.r << 16) | (thisColor.g << 8) | thisColor.b;
-         uint32_t hash = ((thisColor.r * 73856093) ^ (thisColor.g * 19349663) ^ (thisColor.b * 83492791)) & 8191;
+         uint32_t hash = (((uint32_t)thisColor.r * 73856093u) ^ ((uint32_t)thisColor.g * 19349663u) ^ ((uint32_t)thisColor.b * 83492791u)) & 8191;
          if (cacheTags[hash] == colorTag)
          {
              matched = cacheMatched[hash];
