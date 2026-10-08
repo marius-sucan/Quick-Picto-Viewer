@@ -5605,6 +5605,11 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
 
   // double npx = (size[0] * size[1])/1000000;
   // fnOutputDebug( std::to_string(g) + "f ; " + std::to_string(npx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
+  // past an aspect ratio of twice the box the short side rounds to 0, which no caller can allocate or scale to
+  if (size[0]<1)
+     size[0] = 1;
+  if (size[1]<1)
+     size[1] = 1;
   return size;
 }
 
