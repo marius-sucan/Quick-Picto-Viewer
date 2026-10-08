@@ -78432,7 +78432,7 @@ ActPaintBrushNow() {
    texW := texH := 0
    If (BrushToolTexture>1 && isInRange(BrushToolType, 2, 6) && brushSize>3)
    {
-      texPath := mainExecPath "\resources\brush-texture-" BrushToolTexture ".png"
+      texPath := mainExecPath "\resources\brush-texture-" BrushToolTexture - 1 ".png"
       hFIFtex := FreeImage_Load(texPath)
       If hFIFtex
       {
