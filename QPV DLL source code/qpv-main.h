@@ -597,17 +597,18 @@ struct RGBA16color {
     QPV_FORCEINLINE void contrast(int level, int linearGamma, float fintensity, int noClamping, float fip) {
         if (noClamping==1)
         {
-           const float minu = min(r, min(g, b));
+           // a channel below 0 goes through the same formula as any other value
            float maxu = max(r, max(g, b));
            float nr = r;
            float ng = g;
            float nb = b;
-           float offset = 0;
-           const float thisMin = (level>0) ? minu : abs(minu);
            float fi;
            if (level>=0)
            {
+              // getGrayscaleAdvanced() lifts a pixel with a channel below 0; the mix needs its own grey
               int gray = getGrayscaleAdvanced();
+              if (min(r, min(g, b))<0)
+                 gray = (int)(r*0.299701f + g*0.587130f + b*0.114180f);
               nr = weighTwoValues(gray, r, fintensity);
               ng = weighTwoValues(gray, g, fintensity);
               nb = weighTwoValues(gray, b, fintensity);
@@ -625,23 +626,15 @@ struct RGBA16color {
              }
            }
 
-           if (minu<0)
-           {
-              nr = r + thisMin;
-              ng = g + thisMin;
-              nb = b + thisMin;
-              offset = thisMin*2 + level;
-           }
-
            if (maxu<65535)
               maxu = 65535.0f;
 
            float mid = maxu/2.0f;
            if (level>0)
            {
-              nr = floor( (float)fip * (nr - mid) ) + mid - offset;
-              ng = floor( (float)fip * (ng - mid) ) + mid - offset;
-              nb = floor( (float)fip * (nb - mid) ) + mid - offset;
+              nr = floor( (float)fip * (nr - mid) ) + mid;
+              ng = floor( (float)fip * (ng - mid) ) + mid;
+              nb = floor( (float)fip * (nb - mid) ) + mid;
               if (level<16000)
               {
                  fi = level/16000.0f;
