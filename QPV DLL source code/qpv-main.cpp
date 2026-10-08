@@ -6906,6 +6906,21 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     return buffer;
 }
 
+// A link annotation's URI is bytes: 7-bit ASCII as the PDF spec asks, or the UTF-8 some producers
+// write. Bytes that are not valid UTF-8 are taken one code unit each, never sign-extended.
+static int pdfUriToUTF16(const char *s, int n, unsigned short *out) {
+    if (n<=0)
+       return 0;
+
+    const int w = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, n, (wchar_t*)out, n);
+    if (w>0)
+       return w;
+
+    for (int i = 0; i < n; i++)
+        out[i] = (unsigned char)s[i];
+    return n;
+}
+
 DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
     std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::chrono::milliseconds(pdfiumWaitMs));
     if (!pdfLock.owns_lock())
@@ -6942,7 +6957,6 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
        if (textPage)
        {
            int index = 0;
-           const int buffSize = 1024;
            int annotCount = FPDFPage_GetAnnotCount(PDFpage);
            for (int i = 0; i < annotCount; ++i)
            {
@@ -6962,27 +6976,25 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
                    FPDF_ACTION action = FPDFLink_GetAction(link);
                    if (action)
                    {
+                       // bytes the URI takes, its NUL included; 0 for an action that is not a URI
+                       const unsigned long need = FPDFAction_GetURIPath(document, action, NULL, 0);
                        if (textBuffer==NULL)
                        {
-                          index += buffSize;
+                          // probe pass: UTF-8 never decodes to more UTF-16 units than it has bytes
+                          index += (int)need + 1;
                           FPDFPage_CloseAnnot(annot);
                           continue;
                        }
-  
-                       char buffer[buffSize] = {0};
-                       FPDFAction_GetURIPath(document, action, buffer, sizeof(buffer));
-                       for (int z = 0; z < buffSize; ++z)
+
+                       if (need>1)
                        {
-                           if (buffer[z]==0)
-                           {
-                              textBuffer[index] = '|';
-                              index++;
-                              break;
-                           }
-  
-                           textBuffer[index] = buffer[z];
-                           index++;
+                          std::vector<char> uri(need, 0);
+                          FPDFAction_GetURIPath(document, action, uri.data(), need);
+                          index += pdfUriToUTF16(uri.data(), (int)strnlen(uri.data(), need), textBuffer + index);
                        }
+
+                       textBuffer[index] = '|';
+                       index++;
                    }
                }
                FPDFPage_CloseAnnot(annot);
@@ -7012,7 +7024,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *g
                      }
                  }
               } else {
-                 // probe pass: report the real space needed; URLs can exceed buffSize
+                 // probe pass: report the real space needed
                  for (int i = 0; i < link_count; i++)
                  {
                      unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
