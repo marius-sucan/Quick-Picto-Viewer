@@ -10196,8 +10196,9 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                outA = weighTwoValues(srcA, tgtA, weight);
             } else if (blendMode==24)
             {
-               // the stroke's opacity becomes the alpha and the mask the weight [the opacity argument is subtractive]
-               RGBAColor Orgb = { srcB, srcG, srcR, (bytesPerPixel==4) ? opacity : 255 };
+               // the stroke's opacity, capped by the source's alpha, becomes the alpha and the mask the weight [the
+               // opacity argument is subtractive]; a product would compound where a brush samples its own output
+               RGBAColor Orgb = { srcB, srcG, srcR, (bytesPerPixel==4) ? min(srcA, opacity) : 255 };
                RGBAColor Brgb = { tgtB, tgtG, tgtR, tgtA };
                RGBAColor replaced = CalculateNewBlendModes(Orgb, Brgb, 24, 0, linearGamma, 0, imgBpp, 255 - mask_val);
                outR = replaced.r;
