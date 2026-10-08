@@ -5398,7 +5398,8 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
                oA = originalData[3 + o];
             if (oA<1 && bpp==32)
             {
-                originalData[3 + o] = clamp(oA + clamp(nA - opacity, 0, 255), 0, 255);
+                // the alpha CalculateNewBlendModes() gives over a transparent pixel; opacity is subtractive
+                originalData[3 + o] = clamp((nA * (255 - opacity)) / 255, 0, 255);
                 originalData[2 + o] = nR;
                 originalData[1 + o] = nG;
                 originalData[o] = nB;
