@@ -3867,152 +3867,64 @@ https://autohotkey.com/board/topic/29449-gdi-standard-library-145-by-tic/page-55
 */
 
 DLL_API int DLL_CALLCONV PixelateBitmap(unsigned char* sBitmap, unsigned char* dBitmap, int w, int h, int Stride, int Size, int bpp) {
-    int sA, sR, sG, sB;
-    UINT o;
-    for (int y1 = 0; y1 < h / Size; ++y1)
-    {
-        for (int x1 = 0; x1 < w / Size; ++x1)
+    const int bpc = bpp / 8;
+    // a block takes the alpha-weighted mean of its colours [straight ARGB], so semi-transparent pixels count as much as they show
+    auto pixelateBlock = [&](const int bx, const int by, const int bw, const int bh) {
+        const INT64 n = (INT64)bw * bh;
+        if (n<1)
+           return;
+
+        INT64 sA = 0, sR = 0, sG = 0, sB = 0, wR = 0, wG = 0, wB = 0;
+        for (int y = by; y < by + bh; ++y)
         {
-            sA = sR = sG = sB = 0;
-            for (int y2 = 0; y2 < Size; ++y2)
+            for (int x = bx; x < bx + bw; ++x)
             {
-                for (int x2 = 0; x2 < Size; ++x2)
-                {
-                    o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + y1 * Size);
-                    if (bpp==32)
-                       sA += sBitmap[3 + o];
-                    sR += sBitmap[2 + o];
-                    sG += sBitmap[1 + o];
-                    sB += sBitmap[o];
-                }
-            }
-
-            if (bpp==32)
-               sA /= Size * Size;
-            sR /= Size * Size;
-            sG /= Size * Size;
-            sB /= Size * Size;
-            for (int y2 = 0; y2 < Size; ++y2)
-            {
-                for (int x2 = 0; x2 < Size; ++x2)
-                {
-                    o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + y1 * Size);
-                    if (bpp==32)
-                       dBitmap[3 + o] = sA;
-                    dBitmap[2 + o] = sR;
-                    dBitmap[1 + o] = sG;
-                    dBitmap[o] = sB;
-                }
-            }
-        }
-
-        if (w % Size != 0)
-        {
-            sA = sR = sG = sB = 0;
-            for (int y2 = 0; y2 < Size; ++y2)
-            {
-                for (int x2 = 0; x2 < w % Size; ++x2)
-                {
-                    o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + y1 * Size);
-                    if (bpp==32)
-                       sA += sBitmap[3 + o];
-                    sR += sBitmap[2 + o];
-                    sG += sBitmap[1 + o];
-                    sB += sBitmap[o];
-                }
-            }
-
-            int tmp = (w % Size) * Size;
-            if (bpp==32)
-               sA = tmp ? (sA / tmp) : 0;
-            sR = tmp ? (sR / tmp) : 0;
-            sG = tmp ? (sG / tmp) : 0;
-            sB = tmp ? (sB / tmp) : 0;
-            for (int y2 = 0; y2 < Size; ++y2)
-            {
-                for (int x2 = 0; x2 < w % Size; ++x2)
-                {
-                    o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + y1 * Size);
-                    if (bpp==32)
-                       dBitmap[3 + o] = sA;
-                    dBitmap[2 + o] = sR;
-                    dBitmap[1 + o] = sG;
-                    dBitmap[o] = sB;
-                }
-            }
-        }
-    }
-
-    for (int x1 = 0; x1 < w / Size; ++x1)
-    {
-        sA = sR = sG = sB = 0;
-        for (int y2 = 0; y2 < h % Size; ++y2)
-        {
-            for (int x2 = 0; x2 < Size; ++x2)
-            {
-                o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + (h / Size) * Size);
-                if (bpp==32)
-                   sA += sBitmap[3 + o];
+                const INT64 o = (INT64)bpc * x + (INT64)Stride * y;
+                const int a = (bpp==32) ? sBitmap[3 + o] : 255;
+                sA += a;
                 sR += sBitmap[2 + o];
                 sG += sBitmap[1 + o];
                 sB += sBitmap[o];
+                wR += sBitmap[2 + o] * a;
+                wG += sBitmap[1 + o] * a;
+                wB += sBitmap[o] * a;
             }
         }
 
-        int tmp = Size * (h % Size);
-        if (bpp==32)
-           sA = tmp ? (sA / tmp) : 0;
-        sR = tmp ? (sR / tmp) : 0;
-        sG = tmp ? (sG / tmp) : 0;
-        sB = tmp ? (sB / tmp) : 0;
-
-        for (int y2 = 0; y2 < h % Size; ++y2)
+        // a block with nothing visible keeps the plain mean
+        const bool weighted = (bpp==32 && sA>0);
+        const unsigned char nA = (unsigned char)(sA / n);
+        const unsigned char nR = (unsigned char)(weighted ? wR / sA : sR / n);
+        const unsigned char nG = (unsigned char)(weighted ? wG / sA : sG / n);
+        const unsigned char nB = (unsigned char)(weighted ? wB / sA : sB / n);
+        for (int y = by; y < by + bh; ++y)
         {
-            for (int x2 = 0; x2 < Size; ++x2)
+            for (int x = bx; x < bx + bw; ++x)
             {
-                o = (bpp/8) * (x2 + x1 * Size) + Stride * (y2 + (h / Size) * Size);
+                const INT64 o = (INT64)bpc * x + (INT64)Stride * y;
                 if (bpp==32)
-                   dBitmap[3 + o] = sA;
-                dBitmap[2 + o] = sR;
-                dBitmap[1 + o] = sG;
-                dBitmap[o] = sB;
+                   dBitmap[3 + o] = nA;
+                dBitmap[2 + o] = nR;
+                dBitmap[1 + o] = nG;
+                dBitmap[o] = nB;
             }
         }
-    }
+    };
 
-    sA = sR = sG = sB = 0;
-    for (int y2 = 0; y2 < h % Size; ++y2)
+    const int fullW = (w / Size) * Size;
+    const int fullH = (h / Size) * Size;
+    for (int y1 = 0; y1 < fullH; y1 += Size)
     {
-        for (int x2 = 0; x2 < w % Size; ++x2)
-        {
-            o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + (h / Size) * Size);
-            if (bpp==32)
-               sA += sBitmap[3 + o];
-            sR += sBitmap[2 + o];
-            sG += sBitmap[1 + o];
-            sB += sBitmap[o];
-        }
+        for (int x1 = 0; x1 < fullW; x1 += Size)
+            pixelateBlock(x1, y1, Size, Size);
+
+        pixelateBlock(fullW, y1, w % Size, Size);
     }
 
-    int tmp = (w % Size) * (h % Size);
-    if (bpp==32)
-       sA = tmp ? (sA / tmp) : 0;
-    sR = tmp ? (sR / tmp) : 0;
-    sG = tmp ? (sG / tmp) : 0;
-    sB = tmp ? (sB / tmp) : 0;
+    for (int x1 = 0; x1 < fullW; x1 += Size)
+        pixelateBlock(x1, fullH, Size, h % Size);
 
-    for (int y2 = 0; y2 < h % Size; ++y2)
-    {
-        for (int x2 = 0; x2 < w % Size; ++x2)
-        {
-            o = (bpp/8) * (x2 + (w / Size) * Size) + Stride * (y2 + (h / Size) * Size);
-            if (bpp==32)
-               dBitmap[3 + o] = sA;
-            dBitmap[2 + o] = sR;
-            dBitmap[1 + o] = sG;
-            dBitmap[o] = sB;
-        }
-    }
+    pixelateBlock(fullW, fullH, w % Size, h % Size);
     return 1;
 }
 
