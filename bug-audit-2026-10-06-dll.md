@@ -8,7 +8,7 @@ Branch `interface-thread-merge-phase-c` @ 5673b2b. Scope: every C++ source of th
 against the source, and its AHK caller was traced to confirm a user can reach it. "Harness" means
 the shipped function was text-sliced into a g++ program (ASan/UBSan) and run. "Reading" means the
 defect is visible in the code and the trigger was traced by hand. Nothing was built with MSVC and
-nothing was run on Windows. Every fix needs a qpvmain.dll rebuild.
+nothing was run on Windows. Every fix of a numbered item needs a qpvmain.dll rebuild.
 
 Terms:
 - **huge image**: an image over the GDI+ size limit, held in `viewportQPVimage` as a FreeImage bitmap;
@@ -27,7 +27,8 @@ fill at the default tolerance), #2 (painting inside a selection), #3 (any hue ch
 
 **Fixed: all 46**, one commit each (#27 with #11, and one per bullet of #46), named under each item;
 qpvmain.dll must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change
-quick-picto-viewer.ahk. Two of the AHK-side notes after the list (not numbered items) are still open.
+quick-picto-viewer.ahk. The AHK-side notes after the list (not numbered items) are fixed as well, in
+quick-picto-viewer.ahk only.
 
 
 ## High
@@ -631,13 +632,14 @@ quick-picto-viewer.ahk. Two of the AHK-side notes after the list (not numbered i
 - `HugeImagesApplyAutoColors()`: "Both" runs pass 2 against the small copy made before pass 1 stretched
   the image (ahk:21233, 21252-21256), so levels are stretched twice (input 90 → 9, 150 → 255; the normal
   path gives 64 and 191); "Image contrast" there reads the green channel of a colour copy instead of a
-  grey one.
+  grey one. **Fixed in `a0186b7`:** each pass makes its own copy from the image as the previous pass
+  left it, and "Image contrast" greys its copy as `QPV_autoContrastBitmap()` does.
 - `changeHdistLevelCached()`'s `maskKey` (ahk:86574) does not change when entries are deleted — half of #15. **Fixed in
   `33e3611`**, with #15: the deleted bit is refreshed on every pass.
 - The paint brush loads `brush-texture-<BrushToolTexture>.png` when painting (ahk:78440) but
   `<BrushToolTexture - 1>` for the panel preview (ahk:77748); the list starts with "Soft circle", so the
   preview is right and every textured stroke paints the next texture — "Vertical dots" finds no file and
-  paints a plain circle.
+  paints a plain circle. **Fixed in `f968c2e`:** painting loads the same file as the preview.
 - Add noise sizes its small bitmap with the blur panel's `BlurAreaInverted` (ahk:22361-22362) — half of #10. **Fixed in
   `ad3f998`**, with #10.
 - `QPV_PrepareHugeImgSelectionArea()` takes `zkw`/`zkh` for the freeform offsets (`ppofYb` etc.) from
