@@ -2494,7 +2494,8 @@ inline RGBAColor CalculateNewBlendModes(
 // CalculateNewBlendModes - Optimized blend mode computation
 
     // ---------- Special modes: Replace / Replace-with-blend / Alpha-clip ----------
-    if (blendMode < 24)
+    // Behind [25] fades the new layer here, before the swap below puts it underneath
+    if (blendMode < 24 || blendMode == 25)
        Orgb.a = (Orgb.a * (255 - opacity)) / 255;
 
     const int oA = (blendMode >= 23 || blendMode == 0) ? -1 : Brgb.a;
