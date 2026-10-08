@@ -6411,8 +6411,15 @@ Gdiplus::GpBitmap* BYTEconvertGdip(BYTE* &m_pbBuffer, UINT &width, UINT &height,
          bitmapDatu.Scan0 = m_pbBuffer;
          bitmapDatu.PixelFormat = PixelFormat32bppPARGB;
 
-         Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu);
-         Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+         // ImageLockModeWrite | ImageLockModeUserInputBuf: the unlock copies m_pbBuffer in, so a failed
+         // lock or unlock leaves a blank bitmap that must not pass for the image
+         if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu)!=Gdiplus::Ok
+          || Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu)!=Gdiplus::Ok)
+         {
+            fnOutputDebug("BYTEconvertGdip: failed to copy the pixels into the GDI+ bitmap");
+            Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+            myBitmap = NULL;
+         }
      } else fnOutputDebug("BYTEconvertGdip: failed to create GDI+ bitmap object");
 
      return myBitmap;
@@ -7113,7 +7120,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     // errorType > 0; error codes from PDFium
     // errorType = -2; PDF seems to have no pages
     // errorType = -3; failed to retrieve PDF page from document 
-    // errorType = -4; failed to allocate the GDI+ bitmap
+    // errorType = -4; failed to allocate or lock the GDI+ bitmap
     // errorType = -5; failed to create the FPDF bitmap to render PDF
     // errorType = -6; failed to retrieve PDF text page from PDF page 
     // errorType = -8; [pdfiumBusy] RenderPdfPageAsBitmap() did not get pdfiumMutex in time
@@ -7197,7 +7204,17 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     Gdiplus::BitmapData bitmapDatu;
     Gdiplus::Rect rect(0, 0, bitmapWidth, bitmapHeight);
     destinationGdipFormat = (do24bits==1) ? PixelFormat24bppRGB : PixelFormat32bppARGB;
-    Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationGdipFormat, &bitmapDatu);
+    // locking the PARGB bitmap as ARGB takes a second full-size buffer, so this can fail where the bitmap did not
+    if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationGdipFormat, &bitmapDatu)!=Gdiplus::Ok)
+    {
+       fnOutputDebug("failed to load PDF page; unable to lock the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
+       Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+       FPDF_ClosePage(PDFpage);
+       FPDF_CloseDocument(document);
+       *errorType = -4;
+       return NULL;
+    }
+
     int PDFcolorFormat = (do24bits==1) ? FPDFBitmap_BGR : FPDFBitmap_BGRA;
     // Create bitmap for PDFium to render into over the GDI+ Scan0
     FPDF_BITMAP pdfBitmap = FPDFBitmap_CreateEx(bitmapWidth, bitmapHeight, PDFcolorFormat, bitmapDatu.Scan0, bitmapDatu.Stride);
