@@ -408,6 +408,11 @@ static bool dpHistogram(Gdiplus::GpBitmap *bmp, int w, int h, DupePixResult &res
 //  one job
 // ---------------------------------------------------------------------------------------
 
+// the job's run was cancelled, replaced by another, or the pool is shutting down
+static bool dpJobAbandoned(LONG jobGeneration) {
+    return dpStopping.load() || dupesPixCancel.load()!=0 || jobGeneration!=dpGeneration.load();
+}
+
 // The decode, and only the decode. The chain is tpRunJob()'s, loader for loader: the two
 // formats that carry a renderer of their own go to it, then FreeImage for the extensions it
 // claims, then WIC for the ones it declares, then GDI+ for whatever is left over - EMF, WMF
@@ -419,7 +424,7 @@ static bool dpHistogram(Gdiplus::GpBitmap *bmp, int w, int h, DupePixResult &res
 // left there describes an image that was not the one finally decoded.
 static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const DupePixCfg &cfg,
                                        const std::wstring &path, const ThumbsConfig &tcfg,
-                                       int &srcW, int &srcH, int &loaderUsed, TpSrcMeta &meta) {
+                                       int &srcW, int &srcH, int &loaderUsed, TpSrcMeta &meta, LONG jobGeneration) {
     Gdiplus::GpBitmap *bmp = NULL;
     const std::wstring ext = tpFileExtension(path);
     const bool fimHandles  = (FIM.ok && cfg.allowFIM==1 && tpFimExts.count(ext) > 0);
@@ -453,6 +458,10 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
           // PDFium keeps global state; every PDFium caller of the DLL takes this one lock,
           // so the two pools and AHK's calls serialise against each other
           std::lock_guard<std::timed_mutex> pdfLock(pdfiumMutex);
+          // the wait for the lock can outlast the run; the other loaders must not try it either
+          if (dpJobAbandoned(jobGeneration))
+             return NULL;
+
           // 32bpp rather than the 24 the thumbnails pool asks for: the chain after the
           // decode applies a GDI+ effect and reads a histogram, and both want 32bpp.
           // The white fill behind the page is RenderPDFpage()'s own default.
@@ -564,9 +573,14 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
     try
     {
         int srcW = 0, srcH = 0;
-        bmp = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta);
+        bmp = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta, job.generation);
         if (bmp==NULL)
+        {
+           // a decode cut short by a cancel says nothing about the file: retried, never marked dead
+           if (dpJobAbandoned(job.generation))
+              res.status = DP_ERR_PROCESS;
            return;
+        }
 
         res.width  = srcW;
         res.height = srcH;
@@ -663,9 +677,7 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
 // lets it. tpActiveJobs counts decodes actually running, and a worker waiting here is not
 // one of them - which is also why dupesPixWorkStates() exists.
 static bool dpAcquireJobSlot(LONG jobGeneration) {
-    return tpWaitForJobSlot([jobGeneration] {
-        return dpStopping.load() || dupesPixCancel.load()!=0 || jobGeneration!=dpGeneration.load();
-    });
+    return tpWaitForJobSlot([jobGeneration] { return dpJobAbandoned(jobGeneration); });
 }
 
 static void dpWorkerBody(size_t mySlot) {

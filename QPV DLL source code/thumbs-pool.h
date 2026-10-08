@@ -1657,7 +1657,9 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               {
                  // PDFium keeps global state
                  std::lock_guard<std::timed_mutex> pdfLock(pdfiumMutex);
-                 bmp = coreRenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
+                 // the wait for the lock can outlast the page this job was listed for
+                 if (job.generation==tpGeneration.load())
+                    bmp = coreRenderPdfPageAsBitmap(job.src.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff, &pageCount, &errorType, L"", 1);
               }
               res.loaderUsed = 4;
               res.srcW = maxW;

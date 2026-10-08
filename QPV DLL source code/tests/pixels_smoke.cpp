@@ -248,7 +248,8 @@ static void resizeAsksForTheRightModes() {
 //  one job, end to end
 // ---------------------------------------------------------------------------------------
 
-static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &res) {
+// a worker only runs a job of the current run; abandoned gives it the previous run's generation
+static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &res, bool abandoned = false) {
     DpEffects fx;
     dpMakeEffects(fx, (cfg.applyBlur==1) ? 3 : 0);
     ThumbsConfig tcfg;
@@ -256,6 +257,7 @@ static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &re
     DupePixJob job;
     job.imgidu = 42;
     job.path = path;
+    job.generation = dpGeneration.load() - (abandoned ? 1 : 0);
     ID2D1Factory *d2dFac = NULL;      // the per-worker factory dpWorkerBody() keeps
     dpRunJob(NULL, d2dFac, fx, cfg, tcfg, job, res);
     if (d2dFac!=NULL)
@@ -379,6 +381,14 @@ static void jobPipeline() {
     runOne(L"locked.pdf", cfg, res3c);
     check(res3c.status==DP_ERR_LOAD && gShimPdfCalls==1, "a PDF that will not render fails the decode");
     gShimPdfFails = gShimGdipFails = 0;
+
+    // a PDF whose run was abandoned while it waited for PDFium is not rendered, no other
+    // loader is tried, and the row is left for the next run instead of being marked dead
+    gShimWicCalls = gShimFimCalls = gShimGdipCalls = gShimPdfCalls = 0;
+    DupePixResult resGone;
+    runOne(L"doc.pdf", cfg, resGone, true);
+    check(resGone.status==DP_ERR_PROCESS && gShimPdfCalls==0, "an abandoned run's PDF is not rendered and is not marked dead");
+    check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "and no other loader is tried");
 
     // an SVG that will not render fails the decode, which marks it dead like any other file
     gShimSvgFails = gShimGdipFails = 1;
