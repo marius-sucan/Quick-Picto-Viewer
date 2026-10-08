@@ -7789,8 +7789,23 @@ DLL_API int DLL_CALLCONV PdfWriterAddBitmap(PdfWriter *w, Gdiplus::GpBitmap *bmp
        }
     }
 
-    const UINT rw = (rasterW<1) ? 1 : std::min<UINT>((UINT)rasterW, srcW);
-    const UINT rh = (rasterH<1) ? 1 : std::min<UINT>((UINT)rasterH, srcH);
+    UINT rw = (rasterW<1) ? 1 : std::min<UINT>((UINT)rasterW, srcW);
+    UINT rh = (rasterH<1) ? 1 : std::min<UINT>((UINT)rasterH, srcH);
+    // the JPEG encoder takes no side over 65500 px: the raster shrinks to fit, the page keeps its size
+    const UINT jpegMax = 65500;
+    if (rw>jpegMax || rh>jpegMax)
+    {
+       if (rw>=rh)
+       {
+          rh = std::max<UINT>(1, (UINT)((UINT64)rh * jpegMax / rw));
+          rw = jpegMax;
+       } else
+       {
+          rw = std::max<UINT>(1, (UINT)((UINT64)rw * jpegMax / rh));
+          rh = jpegMax;
+       }
+    }
+
     Gdiplus::Rect rect(0, 0, (INT)srcW, (INT)srcH);
     Gdiplus::BitmapData bd;
     if (Gdiplus::DllExports::GdipBitmapLockBits(bmp, &rect, Gdiplus::ImageLockModeRead, PixelFormat32bppPARGB, &bd)!=Gdiplus::Ok)
