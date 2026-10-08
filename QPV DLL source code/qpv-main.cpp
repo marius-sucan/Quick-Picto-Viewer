@@ -9225,6 +9225,29 @@ DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
     activeBrushChunks.clear();
 }
 
+// bilinear sample of straight ARGB: taps of unequal alpha weigh their colours by it, so a transparent tap's colour stays hidden
+static inline void brushBilinearSample(const unsigned char* p11, const unsigned char* p21, const unsigned char* p12, const unsigned char* p22,
+    const double w11, const double w21, const double w12, const double w22, const int bytesPerPixel, int& b, int& g, int& r, int& a) {
+    if (bytesPerPixel==4 && !(p11[3]==p21[3] && p11[3]==p12[3] && p11[3]==p22[3]))
+    {
+        const double a11 = w11 * p11[3], a21 = w21 * p21[3], a12 = w12 * p12[3], a22 = w22 * p22[3];
+        const double sa = a11 + a21 + a12 + a22;
+        if (sa>0)
+        {
+            b = (int)round((a11 * p11[0] + a21 * p21[0] + a12 * p12[0] + a22 * p22[0]) / sa);
+            g = (int)round((a11 * p11[1] + a21 * p21[1] + a12 * p12[1] + a22 * p22[1]) / sa);
+            r = (int)round((a11 * p11[2] + a21 * p21[2] + a12 * p12[2] + a22 * p22[2]) / sa);
+            a = (int)round(sa);
+            return;
+        }
+    }
+
+    b = (int)round(w11 * p11[0] + w21 * p21[0] + w12 * p12[0] + w22 * p22[0]);
+    g = (int)round(w11 * p11[1] + w21 * p21[1] + w12 * p12[1] + w22 * p22[1]);
+    r = (int)round(w11 * p11[2] + w21 * p21[2] + w12 * p12[2] + w22 * p22[2]);
+    a = (bytesPerPixel==4) ? (int)round(w11 * p11[3] + w21 * p21[3] + w12 * p12[3] + w22 * p22[3]) : 255;
+}
+
 DLL_API int DLL_CALLCONV PaintBrushLarge(
     unsigned char* imgData,  // FreeImage pixel buffer (from FreeImage_GetBits)
     int imgW,                // Image width
@@ -9411,6 +9434,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     cv::Mat blurredRoi;
     int roiStartX = 0, roiEndX = 0, roiStartY = 0, roiEndY = 0;
     bool hasBlurredRoi = false;
+    bool blurIsWeighted = false;
 
     // LUT and scaling variables for brush type 5
     int brushHue = effectHue;
@@ -9484,7 +9508,43 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     cv::Mat srcRoi = srcMat(roi);
 
                     int kernelSize = 2 * radius + 1;
-                    cv::blur(srcRoi, blurredRoi, cv::Size(kernelSize, kernelSize));
+                    bool hasTransparency = false;
+                    for (int y = 0; y < roiH && !hasTransparency && bytesPerPixel==4; y++)
+                    {
+                        const unsigned char* row = srcRoi.ptr<unsigned char>(y);
+                        for (int x = 0; x < roiW; x++)
+                        {
+                            if (row[x * 4 + 3]<255)
+                            {
+                               hasTransparency = true;
+                               break;
+                            }
+                        }
+                    }
+
+                    if (hasTransparency)
+                    {
+                        // straight ARGB: blur the colours weighted by alpha, so the colour under transparent pixels stays hidden
+                        cv::Mat weighted(roiH, roiW, CV_32FC4);
+                        for (int y = 0; y < roiH; y++)
+                        {
+                            const unsigned char* s = srcRoi.ptr<unsigned char>(y);
+                            float* d = weighted.ptr<float>(y);
+                            for (int x = 0; x < roiW * 4; x += 4)
+                            {
+                                const float a = s[x + 3];
+                                d[x] = s[x] * a;
+                                d[x + 1] = s[x + 1] * a;
+                                d[x + 2] = s[x + 2] * a;
+                                d[x + 3] = a;
+                            }
+                        }
+                        cv::blur(weighted, blurredRoi, cv::Size(kernelSize, kernelSize));
+                        blurIsWeighted = true;
+                    } else
+                    {
+                        cv::blur(srcRoi, blurredRoi, cv::Size(kernelSize, kernelSize));
+                    }
                     hasBlurredRoi = true;
                 } catch (...)
                 {
@@ -9983,12 +10043,27 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     int localY = roiEndY - py;
                     if (localX >= 0 && localX < blurredRoi.cols && localY >= 0 && localY < blurredRoi.rows)
                     {
-                        const unsigned char* blurredPixel = blurredRoi.ptr<unsigned char>(localY, localX);
-                        effB = blurredPixel[0];
-                        effG = blurredPixel[1];
-                        effR = blurredPixel[2];
-                        if (bytesPerPixel == 4)
-                           effA = blurredPixel[3];
+                        if (blurIsWeighted)
+                        {
+                            // colour = blur(c*a) / blur(a); with nothing visible around, the pixel keeps its own colour
+                            const float* blurredPixel = blurredRoi.ptr<float>(localY, localX);
+                            const float ba = blurredPixel[3];
+                            if (ba>=0.5f)
+                            {
+                               effB = clamp((int)(blurredPixel[0] / ba + 0.5f), 0, 255);
+                               effG = clamp((int)(blurredPixel[1] / ba + 0.5f), 0, 255);
+                               effR = clamp((int)(blurredPixel[2] / ba + 0.5f), 0, 255);
+                            }
+                            effA = clamp((int)(ba + 0.5f), 0, 255);
+                        } else
+                        {
+                            const unsigned char* blurredPixel = blurredRoi.ptr<unsigned char>(localY, localX);
+                            effB = blurredPixel[0];
+                            effG = blurredPixel[1];
+                            effR = blurredPixel[2];
+                            if (bytesPerPixel == 4)
+                               effA = blurredPixel[3];
+                        }
                     }
                 }
 
@@ -10055,13 +10130,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     p22 = srcData + (INT64)s_iy2 * srcPitch + x2 * bytesPerPixel;
                 }
 
-                srcB = (int)round(w11 * p11[0] + w21 * p21[0] + w12 * p12[0] + w22 * p22[0]);
-                srcG = (int)round(w11 * p11[1] + w21 * p21[1] + w12 * p12[1] + w22 * p22[1]);
-                srcR = (int)round(w11 * p11[2] + w21 * p21[2] + w12 * p12[2] + w22 * p22[2]);
-                if (bytesPerPixel == 4)
-                   srcA = (int)round(w11 * p11[3] + w21 * p21[3] + w12 * p12[3] + w22 * p22[3]);
-                else
-                   srcA = 255;
+                brushBilinearSample(p11, p21, p12, p22, w11, w21, w12, w22, bytesPerPixel, srcB, srcG, srcR, srcA);
             } else if (brushType==7 || brushType==8)
             {
                 // Pinch / Bulge brush: scale coordinate mapping with bilinear interpolation
@@ -10107,13 +10176,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     p22 = srcData + (INT64)s_iy2 * srcPitch + x2 * bytesPerPixel;
                 }
 
-                srcB = (int)round(w11 * p11[0] + w21 * p21[0] + w12 * p12[0] + w22 * p22[0]);
-                srcG = (int)round(w11 * p11[1] + w21 * p21[1] + w12 * p12[1] + w22 * p22[1]);
-                srcR = (int)round(w11 * p11[2] + w21 * p21[2] + w12 * p12[2] + w22 * p22[2]);
-                if (bytesPerPixel == 4)
-                   srcA = (int)round(w11 * p11[3] + w21 * p21[3] + w12 * p12[3] + w22 * p22[3]);
-                else
-                   srcA = 255;
+                brushBilinearSample(p11, p21, p12, p22, w11, w21, w12, w22, bytesPerPixel, srcB, srcG, srcR, srcA);
             }
 
             if (brushType==4 && bytesPerPixel==4)
