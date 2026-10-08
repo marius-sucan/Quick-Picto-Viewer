@@ -757,13 +757,15 @@ struct RGBA16color {
 
         HSLColor newHSL = {hue, HSLu.s + 0.01, HSLu.l};
         RGBColorI newRGB = newHSL.ConvertHSLtoRGBint16();
+        // small angles fade in; AdjustImageColorsPrecise() passes -15..-1 as 345..359
+        const int sd = (degrees>180) ? degrees - 360 : degrees;
         float fi = 0.0f;
-        if (inRange(0, 15, degrees))
-           fi = degrees/15.0f;
-        else if (inRange(-15, 0, degrees))
-           fi = abs(degrees)/15.0f;
+        if (inRange(0, 15, sd))
+           fi = sd/15.0f;
+        else if (inRange(-15, 0, sd))
+           fi = abs(sd)/15.0f;
 
-        if (inRange(-15, 15, degrees))
+        if (inRange(-15, 15, sd))
         {
            r = weighTwoValues(newRGB.r, r, fi);
            g = weighTwoValues(newRGB.g, g, fi);
