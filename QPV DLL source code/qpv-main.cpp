@@ -4819,13 +4819,16 @@ DLL_API int DLL_CALLCONV openCVdiffBlendBitmap(unsigned char* bgrImageData, int 
     if (preblur>0)
        cv::stackBlur(otherData, otherData, cv::Size(preblur, preblur));
 
-    // Define the region of interest (ROI) for shifting
-    cv::Rect sourceROI(max(0, offsetX), max(0, offsetY),
-                       bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
-    cv::Rect destROI(max(0, -offsetX), max(0, -offsetY),
-                     bitmap.cols - abs(offsetX), bitmap.rows - abs(offsetY));
-
-    otherData(sourceROI).copyTo(bitmap(destROI));
+    // Define the region of interest (ROI) for shifting; an offset as large as the selection
+    // [3 px or less] leaves nothing to shift, and a negative ROI would throw
+    const int roiW = bitmap.cols - abs(offsetX);
+    const int roiH = bitmap.rows - abs(offsetY);
+    if (roiW>0 && roiH>0)
+    {
+       cv::Rect sourceROI(max(0, offsetX), max(0, offsetY), roiW, roiH);
+       cv::Rect destROI(max(0, -offsetX), max(0, -offsetY), roiW, roiH);
+       otherData(sourceROI).copyTo(bitmap(destROI));
+    }
     cv::subtract(bitmap, otherData, bitmap);
     if (postcontrast!=1 || postbrighten!=0)
        bitmap.convertTo(bitmap, -1, postcontrast, postbrighten);
