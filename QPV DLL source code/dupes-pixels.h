@@ -261,14 +261,14 @@ static void dpFreeEffects(DpEffects &fx) {
     if (fx.blurB!=NULL) { Gdiplus::GdipDeleteEffect(fx.blurB); fx.blurB = NULL; }
 }
 
-static void dpApplyGaussian(Gdiplus::GpBitmap *bmp, const DpEffects &fx) {
+static bool dpApplyGaussian(Gdiplus::GpBitmap *bmp, const DpEffects &fx) {
     if (bmp==NULL || fx.blurA==NULL || fx.blurB==NULL)
-       return;
+       return false;
 
-    Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::Rotate90FlipNone);
-    Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.blurA, NULL, FALSE, NULL, NULL);
-    Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::Rotate270FlipNone);
-    Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.blurB, NULL, FALSE, NULL, NULL);
+    return Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::Rotate90FlipNone)==Gdiplus::Ok
+        && Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.blurA, NULL, FALSE, NULL, NULL)==Gdiplus::Ok
+        && Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::Rotate270FlipNone)==Gdiplus::Ok
+        && Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.blurB, NULL, FALSE, NULL, NULL)==Gdiplus::Ok;
 }
 
 // trGdip_ResizeBitmap(..., KeepRatio 0, InterpolationMode, KeepPixelFormat -1) ->
@@ -577,42 +577,52 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
            return;
         }
 
+        // Every step the run asks for has to work: the fingerprint of a colour image's blue
+        // channel, of an unblurred or of an unmirrored image would be stored as collected and
+        // never taken again. A failure here is DP_ERR_PROCESS, retried by the next run.
         res.status = DP_ERR_PROCESS;
-        if (fx.gray!=NULL)
-           Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.gray, NULL, FALSE, NULL, NULL);
+        bool ok = (fx.gray!=NULL && Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.gray, NULL, FALSE, NULL, NULL)==Gdiplus::Ok);
 
         // the histogram is measured before the blur, exactly where calcHistoAvgFile()
         // measures it
-        const bool gotHisto = dpHistogram(bmp, (int)bw, (int)bh, res);
-        if (cfg.applyBlur==1)
-           dpApplyGaussian(bmp, fx);
+        ok = ok && dpHistogram(bmp, (int)bw, (int)bh, res);
+        if (ok && cfg.applyBlur==1)
+           ok = dpApplyGaussian(bmp, fx);
 
-        Gdiplus::GpBitmap *x1 = dpResizeBitmap(bmp, cfg.smallW, cfg.smallH, cfg.interpolation);
-        Gdiplus::GpBitmap *x2 = dpResizeBitmap(bmp, cfg.bigW, cfg.bigH, cfg.interpolation);
-        bool okSmall = dpDumpBlue(x1, cfg.smallW, cfg.smallH, res.small);
-        bool okBig   = dpDumpBlue(x2, cfg.bigW, cfg.bigH, res.big);
-        if (x1!=NULL) Gdiplus::DllExports::GdipDisposeImage(x1);
-        if (x2!=NULL) Gdiplus::DllExports::GdipDisposeImage(x2);
+        if (ok)
+        {
+           Gdiplus::GpBitmap *x1 = dpResizeBitmap(bmp, cfg.smallW, cfg.smallH, cfg.interpolation);
+           Gdiplus::GpBitmap *x2 = dpResizeBitmap(bmp, cfg.bigW, cfg.bigH, cfg.interpolation);
+           const bool okSmall = dpDumpBlue(x1, cfg.smallW, cfg.smallH, res.small);
+           const bool okBig   = dpDumpBlue(x2, cfg.bigW, cfg.bigH, res.big);
+           ok = okSmall && okBig;
+           if (x1!=NULL) Gdiplus::DllExports::GdipDisposeImage(x1);
+           if (x2!=NULL) Gdiplus::DllExports::GdipDisposeImage(x2);
+        }
 
-        if (cfg.wantFlipped==1 && okSmall && okBig)
+        if (ok && cfg.wantFlipped==1)
         {
            // AHK decoded the file a second time with the loader's flip flag; mirroring the
            // bitmap that is already in hand is the same picture and one decode cheaper.
            // It is also blurred here, which the AHK path did not manage to do: its call
            // passed the flipped bitmap POINTER as the blur radius and blurred the wrong
            // bitmap, so with blur on the flipped fingerprints were the only unblurred ones.
-           Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::RotateNoneFlipX);
-           x1 = dpResizeBitmap(bmp, cfg.smallW, cfg.smallH, cfg.interpolation);
-           x2 = dpResizeBitmap(bmp, cfg.bigW, cfg.bigH, cfg.interpolation);
-           dpDumpBlue(x1, cfg.smallW, cfg.smallH, res.smallH);
-           dpDumpBlue(x2, cfg.bigW, cfg.bigH, res.bigH);
-           if (x1!=NULL) Gdiplus::DllExports::GdipDisposeImage(x1);
-           if (x2!=NULL) Gdiplus::DllExports::GdipDisposeImage(x2);
+           ok = (Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::RotateNoneFlipX)==Gdiplus::Ok);
+           if (ok)
+           {
+              Gdiplus::GpBitmap *x1 = dpResizeBitmap(bmp, cfg.smallW, cfg.smallH, cfg.interpolation);
+              Gdiplus::GpBitmap *x2 = dpResizeBitmap(bmp, cfg.bigW, cfg.bigH, cfg.interpolation);
+              const bool okSmall = dpDumpBlue(x1, cfg.smallW, cfg.smallH, res.smallH);
+              const bool okBig   = dpDumpBlue(x2, cfg.bigW, cfg.bigH, res.bigH);
+              ok = okSmall && okBig;
+              if (x1!=NULL) Gdiplus::DllExports::GdipDisposeImage(x1);
+              if (x2!=NULL) Gdiplus::DllExports::GdipDisposeImage(x2);
+           }
         }
 
         Gdiplus::DllExports::GdipDisposeImage(bmp);
         bmp = NULL;
-        if (okSmall && okBig && gotHisto)
+        if (ok)
            res.status = DP_OK;
     } catch (...)
     {

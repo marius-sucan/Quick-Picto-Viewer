@@ -112,7 +112,11 @@ static inline HRESULT CoCreateInstance(GUID&, void*, int, void**) { return E_FAI
 static IWICImagingFactory *m_pIWICFactory = NULL;
 
 // ---- GDI+ ------------------------------------------------------------------------------
-//
+
+// set by a test: GdipCreateEffect() fails; GdipBitmapApplyEffect() fails for the grey [1] or
+// the blur [2] effect; the mirroring GdipImageRotateFlip() fails
+static int gShimEffectCreateFails = 0, gShimEffectApplyFails = 0, gShimFlipFails = 0;
+
 // One synthetic bitmap type. It carries real pixels, so dpDumpBlue() and the resize can be
 // checked; the effects and the histogram are driven from the test rather than computed.
 namespace Gdiplus {
@@ -142,7 +146,11 @@ namespace Gdiplus {
     // where the real SDK puts them: gdiplus.h includes gdipluseffects.h outside the
     // namespace DllExports { #include "gdiplusflat.h" } block. GdipBitmapApplyEffect(),
     // which does come from gdiplusflat.h, stays in DllExports.
-    static inline Status GdipCreateEffect(const GUID, CGpEffect **fx) { *fx = new CGpEffect(); return Ok; }
+    static inline Status GdipCreateEffect(const GUID, CGpEffect **fx) {
+        if (gShimEffectCreateFails) { *fx = NULL; return GenericError; }
+        *fx = new CGpEffect();
+        return Ok;
+    }
     static inline Status GdipSetEffectParameters(CGpEffect *fx, const void *p, unsigned int size) {
         // 12 bytes is the hue/saturation/lightness struct, 8 the blur one
         if (fx!=NULL) fx->kind = (size==12) ? 1 : 2;
@@ -202,7 +210,7 @@ static inline Status GdipBitmapGetHistogram(GpBitmap *b, HistogramFormat, unsign
 }
 
 static inline Status GdipBitmapApplyEffect(GpBitmap *b, CGpEffect *fx, void*, BOOL, void**, int*) {
-    if (b==NULL || fx==NULL)
+    if (b==NULL || fx==NULL || fx->kind==gShimEffectApplyFails)
        return GenericError;
 
     if (fx->kind==1) { b->grays++; gShimGrayCalls++; }
@@ -210,7 +218,7 @@ static inline Status GdipBitmapApplyEffect(GpBitmap *b, CGpEffect *fx, void*, BO
     return Ok;
 }
 static inline Status GdipImageRotateFlip(GpBitmap *b, RotateFlipType t) {
-    if (b==NULL)
+    if (b==NULL || (gShimFlipFails && t==RotateNoneFlipX))
        return GenericError;
 
     if (t==RotateNoneFlipX)

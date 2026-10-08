@@ -440,6 +440,36 @@ static void jobPipeline() {
     check(gShimFlipCalls==1, "the decoded bitmap is mirrored once");
     check(res6.smallH.size()==72 && res6.bigH.size()==1024, "both flipped fingerprints are full length");
     check(res6.smallH!=res6.small && res6.bigH!=res6.big, "and they are not copies of the unflipped ones");
+    cfg.wantFlipped = 0;
+
+    // a row is stored only when every step its run asks for worked; anything else is left
+    // for the next run, never written as the fingerprint of some other picture
+    gShimEffectCreateFails = 1;
+    DupePixResult res7a;
+    runOne(L"img7.jpg", cfg, res7a);
+    check(res7a.status==DP_ERR_PROCESS, "no grey effect: retried, not stored as the blue channel");
+    gShimEffectCreateFails = 0;
+    gShimEffectApplyFails = 1;
+    DupePixResult res7b;
+    runOne(L"img7.jpg", cfg, res7b);
+    check(res7b.status==DP_ERR_PROCESS, "a grey effect that fails: retried");
+    gShimEffectApplyFails = 2;
+    cfg.applyBlur = 1;
+    DupePixResult res7c;
+    runOne(L"img7.jpg", cfg, res7c);
+    check(res7c.status==DP_ERR_PROCESS, "a blur that fails: retried, not stored unblurred");
+    gShimEffectApplyFails = 0;
+    DupePixResult res7d;
+    runOne(L"img7.jpg", cfg, res7d);
+    check(res7d.status==DP_OK, "the same file with the effects working is collected");
+    cfg.applyBlur = 0;
+    cfg.wantFlipped = 1;
+    gShimFlipFails = 1;
+    DupePixResult res7e;
+    runOne(L"img7.jpg", cfg, res7e);
+    check(res7e.status==DP_ERR_PROCESS, "a mirror that fails: retried, not stored unmirrored");
+    gShimFlipFails = 0;
+    cfg.wantFlipped = 0;
 }
 
 // ---------------------------------------------------------------------------------------
