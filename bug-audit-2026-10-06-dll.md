@@ -25,9 +25,9 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
-**Fixed: #1 to #38**, one commit each (#27 with #11), named under each item; qpvmain.dll must be
+**Fixed: #1 to #45**, one commit each (#27 with #11), named under each item; qpvmain.dll must be
 rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-picto-viewer.ahk.
-**Open: #39 to #46.**
+**Open: #46.**
 
 
 ## High
@@ -533,16 +533,25 @@ rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-
   lightened (to RGB 121). Reviewer harness — confirmed.
 
 ### 39. Hamming/MSD lower bound above the upper bound finds nothing
+- **Fixed in `8a1a160`:** `dupesApplyFilter()` swaps reversed Hamming and MSD bounds, as `isInRange()` did.
+  `tests/filter_oracle.cpp` now transcribes `isInRange()` with the swap and passes half its cases
+  reversed; against HEAD it failed.
 - **Where:** `dupes-search.h:1331-1334` (`dupesInRange` needs lo ≤ hi; AHK's `isInRange()` swaps).
   "Change hashes threshold" with Lower 5 / Upper 2 → "Found no duplicate images"; the old code filtered
   2..5. (`tests/filter_oracle.cpp` transcribed `isInRange()` without the swap, so it cannot see this.)
 
 ### 40. Hash-generation and collection errors show another connection's SQLite message
+- **Fixed in `9c46032`:** `dupesSetError()` takes the connection the failed call ran on (`dupesDB`,
+  `dupesHashDB`, `dpDB`) and appends its message only when `sqlite3_errcode` (bound as optional) reports a
+  real error: "...: near "SELEC": syntax error" instead of "...: not an error".
 - **Where:** `dupes-search.h:1662-1673` (`dupesSetError` always reads `errmsg16(dupesDB)`, the
   engine's read-only connection), called from 2489, 2496, 2525, 2599 and dupes-pixels.h:988, 1300, 1334,
   whose statements live on AHK's connection. Journal shows "…: not an error" or no reason at all.
 
 ### 41. `RenderPdfPageAsBitmap` does not check `GdipBitmapLockBits`
+- **Fixed in `696957d`:** a failed lock disposes the bitmap, closes the page and the document, and
+  returns NULL with error -4 ("Failed to allocate the GDI+ bitmap"). `BYTEconvertGdip()` returns NULL
+  when its lock or its unlock (which copies the pixels) fails.
 - **Where:** `qpv-main.cpp:7195`. On failure `bitmapDatu` (no constructor, so not even /sdl zeroes it)
   hands PDFium an uninitialised `Scan0`/`Stride`; the PARGB-as-ARGB lock needs a second full-size
   buffer, so a large page at high DPI under memory pressure can make it fail → access violation or
@@ -550,22 +559,32 @@ rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-
   (6448) ignores the same status too; there a failed lock only yields a blank bitmap.
 
 ### 42. An OpenCV tone-mapping exception leaks two bitmaps and skips the fallback in the pools
+- **Fixed in `c6e79f0`:** the export wraps `coreOpenCVapplyToneMappingAlgos()` in try/catch and returns 0;
+  the pool then unloads its output and falls back to FreeImage's tone mapper, and nothing leaks.
 - **Where:** `qpv-main.cpp:5171-5211` (no try/catch), `thumbs-pool.h:1280-1301`, 1525-1537.
   "F. Drago (OpenCV)" on an all-black EXR/HDR/PFM: `CV_Assert(max > 0)` throws; `tpRunJob()`'s catch
   shows a broken tile, leaks `dib` and `out` (~0.5 MB) on every listing and never tries FreeImage's tone
   mapper; the viewer is fine (DllCall catches it). Reviewer harness — confirmed propagation and leak.
 
 ### 43. PDF thumbnail jobs keep rendering after a cancel or shutdown
+- **Fixed in `dea3a4f`:** both pools look at the job's generation again once they hold `pdfiumMutex`.
+  An abandoned thumbnail job returns `TP_ERR_PDFLOCKED` without rendering; the collection pool's
+  `dpJobAbandoned()` skips the render and every other loader, and reports `DP_ERR_PROCESS` (retried,
+  never marked dead). `pixels_smoke` stamps its jobs with the current generation and checks this.
 - **Where:** `thumbs-pool.h:1655-1662`, `dupes-pixels.h:452`: the generation is checked before the slot
   wait but not after `tpPdfMutex` is acquired, so queued PDF renders run one after another after the
   page was abandoned — delaying the next page, widening #7 and pushing exits into #30.
 
 ### 44. Very wide or tall images are thumbnailed at full size by WIC
+- **Fixed in `dcaaf28`:** `adaptImageGivenSize()` keeps both sides at least 1 pixel: a 100000x100 panorama
+  fits 250x250 as 250x1 (250x0 before, which the scaler refused). Every other result is unchanged.
 - **Where:** `thumbs-pool.h:784-808` with `adaptImageGivenSize()` (qpv-main.cpp:5585): above an aspect
   ratio of 2×thumbSize (500:1 at 250 px) the short side rounds to 0, the scaler is dropped, and the full
   image is delivered and cached as the "thumbnail". Likely; rare.
 
 ### 45. `MaskBitMap::resize()` reports the new size after a failed allocation
+- **Fixed in `8d09dd3`:** `resize()` zeroes the size before the allocation and sets it after; after a
+  failure `size()` is 0, so the next call allocates again instead of writing past the old buffer.
 - **Where:** `qpv-main.h:68-69` sets `num_bits` before `data.assign()`. After a `bad_alloc` (caught in
   `initBoolMaskData`, `prepareDrawLinesMask`) every `s == size()` guard passes over an empty/old
   buffer; a later cached use reads past it. Needs memory exhaustion.
