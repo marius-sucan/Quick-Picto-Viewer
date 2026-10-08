@@ -5356,17 +5356,16 @@ DLL_API int DLL_CALLCONV UndoAiderSwapPixelRegions(unsigned char* BitmapData, in
     const INT64 bytesPerPixel = (bpp==32) ? 4 : 3;
     const INT64 opx = x1 * bytesPerPixel;
     const INT64 chunk = (x2 - x1) * bytesPerPixel;
+    if (chunk<0)
+       return 0;
+
+    // swapped in place: an exception cannot leave an OpenMP loop, so a failed allocation here would end the process
     #pragma omp parallel for schedule(dynamic) default(none)
     for (int y = y1; y < y2; y++)
     {
             INT64 o = y * Stride + opx;
             INT64 n = (y - y1) * mStride;
-            // Swap pixels
-            BYTE *temp = new BYTE[chunk];
-            memcpy(temp, &BitmapData[o], chunk);
-            memcpy(&BitmapData[o], &otherData[n], chunk);
-            memcpy(&otherData[n], temp, chunk);
-            delete[] temp;
+            std::swap_ranges(&BitmapData[o], &BitmapData[o] + chunk, &otherData[n]);
     }
     return 1;
 }
