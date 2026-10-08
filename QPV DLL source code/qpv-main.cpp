@@ -5110,7 +5110,7 @@ DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, un
   return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int hStride, int width, int height, unsigned char* ldrData, int lStride, int algo, float paramA, float paramB, float paramC, float addExposure, int altModeExposure) {
+static int coreOpenCVapplyToneMappingAlgos(float* hdrData, int hStride, int width, int height, unsigned char* ldrData, int lStride, int algo, float paramA, float paramB, float paramC, float addExposure, int altModeExposure) {
 // the tone-mapping algorithms do not give correct results with 4 channels [RGBA]
 
     // fnOutputDebug("openCVapplyToneMappingAlgos: hStride=" + std::to_string(hStride));
@@ -5150,6 +5150,18 @@ DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int hStride
     ldrImage.convertTo(ldrFinal, CV_8UC3);
     cv::cvtColor(ldrFinal, ldrFinal, cv::COLOR_RGB2BGR);
     return 1;
+}
+
+// nothing may be thrown out of an exported function, and the thumbnail pool calls this one directly:
+// Drago asserts on an all-black image, and any of the algorithms can run out of memory
+DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int hStride, int width, int height, unsigned char* ldrData, int lStride, int algo, float paramA, float paramB, float paramC, float addExposure, int altModeExposure) {
+    try
+    {
+        return coreOpenCVapplyToneMappingAlgos(hdrData, hStride, width, height, ldrData, lStride, algo, paramA, paramB, paramC, addExposure, altModeExposure);
+    } catch (...)
+    {
+        return 0;
+    }
 }
 
 DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {

@@ -1614,9 +1614,9 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
     res.loaderUsed  = 0;
     res.meta        = TpSrcMeta();
 
-    // OpenCV happily throws out of openCVapplyToneMappingAlgos(), and allocations may
-    // throw when memory is scarce; letting that escape would tear the worker thread down
-    // and silently shrink the pool for the rest of the session
+    // OpenCV and the allocations may throw when memory is scarce; letting that escape
+    // would tear the worker thread down and silently shrink the pool for the rest of the
+    // session
     try
     {
         if (job.kind==TP_JOB_LOADCACHE)
