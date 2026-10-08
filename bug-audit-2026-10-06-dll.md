@@ -25,9 +25,9 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
-**Fixed: #1 to #45**, one commit each (#27 with #11), named under each item; qpvmain.dll must be
-rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-picto-viewer.ahk.
-**Open: #46.**
+**Fixed: all 46**, one commit each (#27 with #11, and one per bullet of #46), named under each item;
+qpvmain.dll must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change
+quick-picto-viewer.ahk. Two of the AHK-side notes after the list (not numbered items) are still open.
 
 
 ## High
@@ -568,7 +568,8 @@ rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-
 
 ### 43. PDF thumbnail jobs keep rendering after a cancel or shutdown
 - **Fixed in `dea3a4f`:** both pools look at the job's generation again once they hold `pdfiumMutex`.
-  An abandoned thumbnail job returns `TP_ERR_PDFLOCKED` without rendering; the collection pool's
+  An abandoned thumbnail job renders nothing and tries no other loader (its result is discarded; since
+  `56aca0e` it ends as `TP_ERR_LOAD`); the collection pool's
   `dpJobAbandoned()` skips the render and every other loader, and reports `DP_ERR_PROCESS` (retried,
   never marked dead). `pixels_smoke` stamps its jobs with the current generation and checks this.
 - **Where:** `thumbs-pool.h:1655-1662`, `dupes-pixels.h:452`: the generation is checked before the slot
@@ -591,25 +592,36 @@ rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-
 
 ### 46. Smaller items
 - `qpv-main.cpp:5631` `adaptImageGivenSize()` multiplies `size[0]*size[1]` as UINT: ≥ 4.29 Gpx images
-  skip the 536 Mpx cap and fail to load instead of loading downscaled.
+  skip the 536 Mpx cap and fail to load instead of loading downscaled. **Fixed in `e02dbe5`:** the
+  product is taken in UINT64; 65536x65536 is capped at 536 Mpx.
 - `qpv-main.cpp:6950-6962` link annotations: `char` sign-extends non-ASCII URI bytes (U+FFC3…); URIs of
-  1024 bytes or more come back empty.
+  1024 bytes or more come back empty. **Fixed in `a3ea644`:** each URI is read at its full length and
+  decoded as UTF-8, a byte per code unit when it is not valid UTF-8.
 - `qpv-main.cpp:7724-7725` `PdfWriterAddBitmap()` never caps the raster at JPEG's 65 500 px: "Same as
   the image" pages ≥ 328 dpi of a 70 000-px-wide image are refused ("Failed to add 1 images").
+  **Fixed in `26f125d`:** the raster shrinks in proportion to 65 500 px on its long side.
 - `qpv-main.cpp:4881-4886` `openCVdiffBlendBitmap()`: an offset ≥ the selection's size gives an empty
-  ROI → cv::Exception after `convertTo` already changed the bitmap (≤ 3 px selections).
+  ROI → cv::Exception after `convertTo` already changed the bitmap (≤ 3 px selections). **Fixed in
+  `46bc0eb`:** with no overlap the shifted copy is skipped.
 - `qpv-main.cpp:5407` `UndoAiderSwapPixelRegions()` allocates per row inside an OpenMP loop; a
-  `bad_alloc` there terminates the process.
+  `bad_alloc` there terminates the process. **Fixed in `e0e3902`:** the rows are swapped in place
+  (`std::swap_ranges`), with no allocation.
 - `qpv-main.cpp:1364/1444` live preview of round-join lines: `cv::polylines` asserts thickness ≤ 32767,
-  reached at extreme thickness × zoom (no preview, journal error; applying is fine).
+  reached at extreme thickness × zoom (no preview, journal error; applying is fine). **Fixed in
+  `98af2f3`:** past 32767 the line is drawn as bands and discs (`drawThickPolylineRound()`).
 - `qpv-main.cpp:5662-5667` `WICdestroyPreloadedImage()` releases with `SafeRelease`, not the
-  crash-guarded `WICsafeRelease` the file's own rule asks for after a decode began.
+  crash-guarded `WICsafeRelease` the file's own rule asks for after a decode began. **Fixed in
+  `29e37e7`:** both go through `WICguardedRelease()`.
 - `dupes-search.h:2109-2133` a `bad_alloc` part-way through a row of `dupesQueryStep()` leaves the
   candidate vectors at different lengths; `dupesScanBuildFromQuery()` then indexes past them.
+  **Fixed in `4e5f4bb`:** a row goes in whole or not at all; a failure truncates back and fails the
+  query (lastError 1).
 - `thumbs-pool.h:1985` / dupes-pixels.h: `cfg->allowWIC` is parsed and never read — unticking "Allow WIC
-  loader" does not keep either pool off WIC.
+  loader" does not keep either pool off WIC. **Fixed in `296b9d1`:** with it off neither pool calls
+  WIC; cached thumbnails are read through GDI+.
 - `thumbs-pool.h` PDF branch: every PDF failure (corrupt, missing, no pages) is reported as
-  `TP_ERR_PDFLOCKED`, so the journal says "password protected".
+  `TP_ERR_PDFLOCKED`, so the journal says "password protected". **Fixed in `56aca0e`:** only PDFium's
+  4 and 5 (encrypted) are `TP_ERR_PDFLOCKED`; anything else is `TP_ERR_LOAD`.
 
 ## Seen on the AHK side while tracing (not DLL code)
 - `generateViewPortPDFbookmarks()` (ahk:75120, 99553) runs after every WIC-loaded image, so the viewer
