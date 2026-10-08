@@ -528,6 +528,7 @@ static std::timed_mutex pdfiumMutex;
 
 static int gShimSvgCalls = 0, gShimPdfCalls = 0, gShimGdipCalls = 0;
 static int gShimSvgFails = 0, gShimPdfFails = 0, gShimGdipFails = 0;
+static int gShimPdfError = 4;    // what a failed render reports: PDFium's 4 is a password
 
 static inline Gdiplus::GpBitmap* tpRenderSVG(const std::wstring &path, int, int, int &srcW, int &srcH,
                                              ID2D1Factory*, IWICImagingFactory*) {
@@ -547,7 +548,7 @@ static inline Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *path, 
     *errorType = 0;
     if (gShimPdfFails)
     {
-       *errorType = 4;            // FPDF: the document wants a password
+       *errorType = gShimPdfError;
        return NULL;
     }
 

@@ -1668,7 +1668,9 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               res.loaderUsed = 4;
               res.srcW = maxW;
               res.srcH = maxH;
-              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_PDFLOCKED;
+              // only an encrypted document [PDFium 4 = password, 5 = unsupported security] is spared as
+              // locked; a corrupt, missing or empty one failed like any other file
+              res.status = (bmp!=NULL) ? TP_OK : ((errorType==4 || errorType==5) ? TP_ERR_PDFLOCKED : TP_ERR_LOAD);
               // No TpSrcMeta for a PDF, deliberately, and QPV_ThumbsPoolDrain() ignores
               // loader 4 for the same reason. Not one of the five columns would say
               // anything about the document: srcW and srcH above are the size of THIS
@@ -1682,7 +1684,9 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            }
 
            int hasFIMtried = 0;
-           if (bmp==NULL && res.status!=TP_ERR_PDFLOCKED && FIM.ok && fimHandles && (cfg->allowFIM==1 || cfg->firstFIM==1))
+           // no other loader reads a PDF
+           const bool isPdf = (ext==L"pdf");
+           if (bmp==NULL && !isPdf && FIM.ok && fimHandles && (cfg->allowFIM==1 || cfg->firstFIM==1))
            {
               int status = TP_ERR_LOAD, saved = 0;
               int fw = 0, fh = 0;
@@ -1701,7 +1705,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
 
            // with no bitmap wanted back, FreeImage hands over none once it wrote the cache file
            auto fimSavedOnly = [&]() { return bmp==NULL && cfg->wantBitmap!=1 && res.status==TP_OK && res.savedToFile==1; };
-           if (bmp==NULL && !fimSavedOnly() && (tpWicExts.count(ext)>0 || hasFIMtried==1) && res.status!=TP_ERR_PDFLOCKED)
+           if (bmp==NULL && !fimSavedOnly() && (tpWicExts.count(ext)>0 || hasFIMtried==1) && !isPdf)
            {
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
               // WIC always serializes image processing operations. Unless the user
@@ -1736,7 +1740,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            // FreeImage plugin nor a WIC codec, and the GIFs those two refuse are read here
            // as well - LoadFileWithGDIp() is what draws them in the viewport. A file this
            // cannot open either is unreadable in every sense the product has.
-           if (bmp==NULL && !fimSavedOnly() && res.status!=TP_ERR_PDFLOCKED)
+           if (bmp==NULL && !fimSavedOnly() && !isPdf)
            {
               res.meta = TpSrcMeta();
               bmp = tpGDIPload(job.src, cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
