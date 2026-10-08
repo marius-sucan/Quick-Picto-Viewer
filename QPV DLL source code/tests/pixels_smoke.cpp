@@ -772,6 +772,109 @@ static void processFailureIsNotMarkedDead() {
 
 // ---------------------------------------------------------------------------------------
 //
+// A run abandoned while one of its decodes is still going - a huge file, a slow share - and
+// another started at once. The new run's rows are written as fast as ever, and it must say
+// so: the abandoned decode is nothing it waits for, and nothing it writes either.
+//
+static void abandonedDecodeDoesNotHoldTheNextRun() {
+    printf("  a run started while an abandoned decode is still going\n");
+    bindSQLiteOnce();
+    if (!SQ.ok || SQ.exec==NULL || SQ.bind_double==NULL || SQ.bind_blob==NULL)
+    {
+       printf("    SKIPPED: libsqlite3.so.0 is not available\n");
+       return;
+    }
+
+    const char *path = "pixels_abandon.sldb";
+    remove(path);
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(path, &db, SQLITE_OPEN_READWRITE | QPV_SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK || db==NULL)
+    {
+       printf("    could not create the scratch database\n");
+       failures++;
+       return;
+    }
+
+    execOrDie(db,
+        "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
+        " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
+        " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
+        " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
+        " smallH BLOB, bigH BLOB);", "create the v3 schema");
+
+    // one straggler for the first run, forty ordinary files for the second
+    const int fast = 40;
+    std::string ins = "BEGIN;INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (1,'slow1.jpg','C:\\p');";
+    for ( int i = 2 ; i <= fast + 1 ; i++)
+    {
+        char row[160];
+        snprintf(row, sizeof(row), "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (%d,'img%d.jpg','C:\\p');", i, i);
+        ins += row;
+    }
+    ins += "COMMIT;";
+    execOrDie(db, ins.c_str(), "insert the rows");
+
+    for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 4;
+    tpWicExts.clear();
+    tpFimExts.clear();
+    tpWicExts.insert(L"jpg");
+    FIM.ok = true;
+    m_pIWICFactory = (IWICImagingFactory*)1;
+    // every decode takes a millisecond, the straggler two seconds
+    gShimDecodeSleepMs = 1;
+    gShimStragglerFactor = 2000;
+    check(dupesPixInit(3) >= 1, "the pool starts");
+
+    const wchar_t *selSlow = L"SELECT imgidu, fullPath FROM images WHERE imgfile LIKE 'slow%'"
+                             L" AND imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
+                             L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    const wchar_t *selFast = L"SELECT imgidu, fullPath FROM images WHERE imgfile LIKE 'img%'"
+                             L" AND imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
+                             L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    typedef std::chrono::steady_clock Clock;
+    auto msSince = [](Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); };
+
+    check(dupesPixBegin(db, selSlow, L"350|5|0|0|1|1|1|1")==1, "the first run starts");
+    execOrDie(db, "BEGIN;", "open the transaction");
+    const Clock::time_point t0 = Clock::now();
+    while (dpState.inFlight < 1 && msSince(t0) < 1000)
+        dupesPixStep(5);
+    check(dpState.inFlight==1, "a worker is decoding the straggler");
+    dupesPixEnd();       // abandoned, as the Stop button of the panel leaves a run
+
+    check(dupesPixBegin(db, selFast, L"350|5|0|0|1|1|1|1")==1, "a second run starts at once");
+    const Clock::time_point t1 = Clock::now();
+    int r;
+    while ((r = dupesPixStep(5))==1)
+        if (msSince(t1) > 10000) break;
+
+    const double took = msSince(t1);
+    const LONG heldThen = dpState.inFlight;
+    execOrDie(db, "COMMIT;", "commit the collected data");
+    check(r==0 && dpState.phase==5, "the second run finishes");
+    check(dpState.written==fast, "with every one of its rows written");
+    check(took < 1000, "without waiting for the abandoned decode, which takes two seconds");
+    check(heldThen==1, "which is still running then, and still counted as held");
+    dupesPixEnd();
+
+    const Clock::time_point t2 = Clock::now();
+    while (dpState.inFlight > 0 && msSince(t2) < 5000)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    check(dpState.inFlight==0, "the straggler ends");
+    check(scalar(db, "SELECT count(*) FROM imagesPixels WHERE imgidu=1")==0, "and writes nothing for the run it belonged to");
+
+    gShimDecodeSleepMs = 0;
+    gShimStragglerFactor = 25;
+    check(dupesPixShutdown()==1, "the pool shuts down cleanly");
+    SQ.close_v2(db);
+    remove(path);
+}
+
+// ---------------------------------------------------------------------------------------
+//
 // A collection run on a machine that is short of memory. Decoding then narrows to one image
 // at a time - tpTryTakeJobSlot() in thumbs-pool.h, one count for both pools of the DLL -
 // and the whole point of narrowing rather than stopping is that the run still finishes:
@@ -1003,6 +1106,7 @@ int main() {
     poolPlumbing();
     collectionAgainstRealSQLite();
     processFailureIsNotMarkedDead();
+    abandonedDecodeDoesNotHoldTheNextRun();
     gdipLoaderAndTheColumnsItCannotFill();
     collectionSurvivesMemoryPressure();
 

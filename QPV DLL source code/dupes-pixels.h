@@ -158,6 +158,9 @@ static std::atomic<LONG>                   dpGeneration(1);
 static std::shared_ptr<const DupePixCfg>   dpConfig = std::make_shared<DupePixCfg>();
 static DupePixState                        dpState = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static size_t                              dpExited = 0;        // guarded by dpMutex
+// the jobs held for the current generation, guarded by dpMutex; dpState.inFlight counts
+// abandoned runs' jobs as well, which a run must not wait for
+static LONG                                dpRunInFlight = 0;
 
 // The names the database stores in imgpixfmt, exactly as the interpreter spells them:
 // dpWicNames is indexed by indexedWICpixelFormats() and holds what WicPixelFormats()
@@ -703,6 +706,8 @@ static void dpWorkerBody(size_t mySlot) {
             cfg = dpConfig;
             dpState.queued   = (LONG)dpQueue.size();
             dpState.inFlight = dpState.inFlight + 1;
+            if (job.generation==dpGeneration.load())
+               dpRunInFlight++;
         }
 
         // the effect objects belong to the settings they were made with; a new run with
@@ -764,6 +769,8 @@ static void dpWorkerBody(size_t mySlot) {
             dpBusy[mySlot].path.clear();
             if (dpState.inFlight > 0)
                dpState.inFlight = dpState.inFlight - 1;
+            if (job.generation==dpGeneration.load() && dpRunInFlight > 0)
+               dpRunInFlight--;
 
             if (ranIt && job.generation==dpGeneration.load())
             {
@@ -792,6 +799,7 @@ static void dpWorkerBody(size_t mySlot) {
 // flight carry the old generation and are discarded by their worker
 static void dpCancelLocked() {
     dpGeneration.fetch_add(1);
+    dpRunInFlight = 0;
     dpQueue.clear();
     dpResults.clear();
     dpState.queued = 0;
@@ -1433,7 +1441,7 @@ DLL_API int DLL_CALLCONV dupesPixStep(int msBudget) {
         bool idle;
         {
             std::lock_guard<std::mutex> lk(dpMutex);
-            idle = dpQueue.empty() && dpState.inFlight==0 && dpResults.empty();
+            idle = dpQueue.empty() && dpRunInFlight==0 && dpResults.empty();
         }
         if (idle && dpSelectDrained)
         {
