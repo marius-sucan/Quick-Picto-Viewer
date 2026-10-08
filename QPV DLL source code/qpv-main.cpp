@@ -2946,9 +2946,6 @@ void goPixelFloodFill8Stack(unsigned char *imageData, INT64 pix, float index, RG
 int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, float *nC, RGBAColor oldColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
 // Scanline/Span Flood Fill implementation for optimized performance and memory
 
-  if (newColor.r==oldColor.r && newColor.g==oldColor.g && newColor.b==oldColor.b)
-     return 0; //avoid infinite loop
-
   const INT64 totalPixels = (INT64)w * h;
   MaskBitMap pixelzMap;
   pixelzMap.resize(totalPixels);
