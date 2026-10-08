@@ -380,18 +380,11 @@ static void jobPipeline() {
     check(res3c.status==DP_ERR_LOAD && gShimPdfCalls==1, "a PDF that will not render fails the decode");
     gShimPdfFails = gShimGdipFails = 0;
 
-    // an SVG that will not render is a broken file where Direct2D renders SVG, but where it
-    // cannot render SVG at all, the file is not to blame and must not be marked dead
+    // an SVG that will not render fails the decode, which marks it dead like any other file
     gShimSvgFails = gShimGdipFails = 1;
-    d2dSvgSupport = 1;
     DupePixResult res3d;
     runOne(L"broken.svg", cfg, res3d);
     check(res3d.status==DP_ERR_LOAD, "a broken SVG fails the decode");
-    d2dSvgSupport = 0;
-    DupePixResult res3e;
-    runOne(L"vector2.svg", cfg, res3e);
-    check(res3e.status==DP_ERR_PROCESS, "without SVG support in Direct2D it is retried, not marked");
-    d2dSvgSupport = -1;
     gShimSvgFails = gShimGdipFails = 0;
 
     // the thumbnails pool asks for the same name through this export, so that a thumbnail

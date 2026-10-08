@@ -7660,9 +7660,6 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
 // per worker ones, so several SVGs render at the same time. pD2D1Factory is created
 // MULTI_THREADED, which makes it safe to share but also puts a lock around the factory and
 // every resource made from it, so workers sharing it would take turns
-// -1 not known yet; 0 Direct2D cannot render SVG on this system [before Windows 10 1703]; 1 it can
-static std::atomic<int> d2dSvgSupport{-1};
-
 // NULL unless the document was drawn: a bitmap nothing was drawn into must not pass for the image
 IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, float fSx, float fSy,
                             ID2D1Factory *d2dFac = NULL, IWICImagingFactory *wicFac = NULL) {
@@ -7707,7 +7704,6 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
     ID2D1DeviceContext5* pDeviceContext = nullptr;
     bool rendered = false;
     hr = pRenderTarget->QueryInterface(IID_ID2D1DeviceContext5, reinterpret_cast<void **>(&pDeviceContext));
-    d2dSvgSupport = (SUCCEEDED(hr) && pDeviceContext!=NULL) ? 1 : 0;
     if (SUCCEEDED(hr) && pDeviceContext!=NULL)
     {
         D2D1_SIZE_F size = D2D1::SizeF((float)width, (float)height);

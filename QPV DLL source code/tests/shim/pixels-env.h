@@ -518,9 +518,6 @@ static inline HRESULT D2D1CreateFactory(int, ID2D1Factory **f) {
 // the DLL takes it, because PDFium keeps global state
 static std::timed_mutex pdfiumMutex;
 
-// the real one lives in qpv-main.cpp, next to WicD2DrenderSVG(), which sets it
-static std::atomic<int> d2dSvgSupport{-1};
-
 static int gShimSvgCalls = 0, gShimPdfCalls = 0, gShimGdipCalls = 0;
 static int gShimSvgFails = 0, gShimPdfFails = 0, gShimGdipFails = 0;
 
