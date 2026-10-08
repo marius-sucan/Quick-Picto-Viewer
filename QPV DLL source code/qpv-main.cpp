@@ -9538,10 +9538,16 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         if (effectBlur>2 && brushType==5)
         {
             int radius = effectBlur;
-            roiStartX = clamp(startX - radius, 0, imgW - 1);
-            roiEndX = clamp(endX + radius, 0, imgW - 1);
-            roiStartY = clamp(startY - radius, 0, imgH - 1);
-            roiEndY = clamp(endY + radius, 0, imgH - 1);
+            int use_lockX = (lockW > 0 && !cloneData) ? lockX : 0;
+            int use_lockY = (lockH > 0 && !cloneData) ? lockY : 0;
+            int use_lockW = (lockW > 0 && !cloneData) ? lockW : imgW;
+            int use_lockH = (lockH > 0 && !cloneData) ? lockH : imgH;
+
+            // the ROI must stay inside the Mat below, which holds only the GDI+ lock rect on normal images
+            roiStartX = clamp(startX - radius, use_lockX, use_lockX + use_lockW - 1);
+            roiEndX = clamp(endX + radius, use_lockX, use_lockX + use_lockW - 1);
+            roiStartY = clamp(startY - radius, imgH - use_lockY - use_lockH, imgH - 1 - use_lockY);
+            roiEndY = clamp(endY + radius, imgH - use_lockY - use_lockH, imgH - 1 - use_lockY);
 
             int roiW = roiEndX - roiStartX + 1;
             int roiH = roiEndY - roiStartY + 1;
@@ -9551,22 +9557,25 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 int srcPitch = cloneData ? clonePitch : pitch;
                 int clr = (bytesPerPixel == 4) ? CV_8UC4 : CV_8UC3;
 
-                int use_lockX = (lockW > 0 && !cloneData) ? lockX : 0;
-                int use_lockY = (lockH > 0 && !cloneData) ? lockY : 0;
-                int use_lockW = (lockW > 0 && !cloneData) ? lockW : imgW;
-                int use_lockH = (lockH > 0 && !cloneData) ? lockH : imgH;
+                // nothing may be thrown out of an exported function
+                try
+                {
+                    cv::Mat srcMat(use_lockH, use_lockW, clr, srcData + (INT64)use_lockY * srcPitch + use_lockX * bytesPerPixel, srcPitch);
+                    // Translate the vertical range [roiStartY, roiEndY] from bottom-up image coordinates
+                    // to standard memory coordinates.
+                    // py = roiStartY (bottom row) -> memory row = imgH - 1 - roiStartY (largest memory index)
+                    // py = roiEndY (top row) -> memory row = imgH - 1 - roiEndY (smallest memory index)
+                    cv::Rect roi(roiStartX - use_lockX, imgH - 1 - roiEndY - use_lockY, roiW, roiH);
+                    cv::Mat srcRoi = srcMat(roi);
 
-                cv::Mat srcMat(use_lockH, use_lockW, clr, srcData + (INT64)use_lockY * srcPitch + use_lockX * bytesPerPixel, srcPitch);
-                // Translate the vertical range [roiStartY, roiEndY] from bottom-up image coordinates 
-                // to standard memory coordinates.
-                // py = roiStartY (bottom row) -> memory row = imgH - 1 - roiStartY (largest memory index)
-                // py = roiEndY (top row) -> memory row = imgH - 1 - roiEndY (smallest memory index)
-                cv::Rect roi(roiStartX - use_lockX, imgH - 1 - roiEndY - use_lockY, roiW, roiH);
-                cv::Mat srcRoi = srcMat(roi);
-
-                int kernelSize = 2 * radius + 1;
-                cv::blur(srcRoi, blurredRoi, cv::Size(kernelSize, kernelSize));
-                hasBlurredRoi = true;
+                    int kernelSize = 2 * radius + 1;
+                    cv::blur(srcRoi, blurredRoi, cv::Size(kernelSize, kernelSize));
+                    hasBlurredRoi = true;
+                } catch (...)
+                {
+                    fnOutputDebug("PaintBrushLarge(): the blur of the effects brush failed");
+                    return 0;
+                }
             }
         }
     }
