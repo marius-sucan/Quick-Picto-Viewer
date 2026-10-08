@@ -6855,7 +6855,7 @@ void TraverseBookmarks(FPDF_DOCUMENT doc, FPDF_BOOKMARK bookmark,
     unsigned int siblingCounter = 1;
     while (bookmark)
     {
-        if (visited.size()>=100000 || !visited.insert(bookmark).second)
+        if (visited.size()>=50000 || !visited.insert(bookmark).second)
            return;
 
         // Build the current numbering chain: parent's counters + current sibling counter.
@@ -9575,7 +9575,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     hasBlurredRoi = true;
                 } catch (...)
                 {
-                    fnOutputDebug("PaintBrushLarge(): the blur of the effects brush failed");
+                    // fnOutputDebug("PaintBrushLarge(): the blur of the effects brush failed");
                     return 0;
                 }
             }
