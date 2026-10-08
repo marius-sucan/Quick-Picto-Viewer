@@ -1865,7 +1865,9 @@ unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *ma
     // see comments for prepareSelectionArea()
     if (invertSelection==1)
     {
-       if (inRange(imgSelX1, imgSelX2, x) && inRange(imgSelY1, imgSelY2, y))
+       // the polygon mask maps its rows as in the branch below: from polyOffYa rows under imgSelY1
+       const INT64 selY1 = (maskBitmap==NULL && EllipseSelectMode==2) ? imgSelY1 - polyOffYa : imgSelY1;
+       if (inRange(imgSelX1, imgSelX2, x) && inRange(selY1, imgSelY2, y))
        {
           if (maskBitmap!=NULL)
           {
@@ -1875,8 +1877,8 @@ unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *ma
           } else if (EllipseSelectMode==2)
           {
              bool r = 0;
-             if (inRange(0, polyH - 1, y - imgSelY1 - polyY) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
-                r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY) * polyW + x - imgSelX1 - polyX];
+             if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
+                r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
              return r;
           } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
           {
