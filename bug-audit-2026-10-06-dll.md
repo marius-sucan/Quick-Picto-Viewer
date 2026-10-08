@@ -25,9 +25,9 @@ Terms:
 fill at the default tolerance), #2 (painting inside a selection), #3 (any hue change) and #6
 (converting a grey JPEG). Memory-safety: #4, #27, #41, #45. Crashes: #7, #8, #30.
 
-**Fixed: #1 to #22, and #24 to #30**, one commit each (#27 with #11), named under each item; qpvmain.dll
-must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-picto-viewer.ahk.
-**Open: #23, and #31 to #46.**
+**Fixed: #1 to #38**, one commit each (#27 with #11), named under each item; qpvmain.dll must be
+rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also change quick-picto-viewer.ahk.
+**Open: #39 to #46.**
 
 
 ## High
@@ -369,6 +369,9 @@ must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also chang
 - **Evidence:** reading + reviewer harness — confirmed.
 
 ### 23. "Behind" blend mode ignores the opacity slider
+- **Fixed in `61c8883`:** Behind fades the new layer by the opacity before the layer swap puts it
+  underneath. Red behind blue at alpha 128 gives (84,0,171) at alpha 191 at slider 127. On 24-bit images
+  Behind already acted as Normal; it is now Normal at the slider's opacity (only pixelate on huge images).
 - **Where:** `qpv-main.cpp:2489` (opacity applied only for `blendMode < 24`) and 2550 (mode 25 swaps
   the layers).
 - **What you see:** red over half-transparent blue gives (127,0,128,a255) at opacity 0, 128 and 250
@@ -465,6 +468,8 @@ must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also chang
 ## Low
 
 ### 31. Tolerance flood fill does nothing when the fill colour equals the clicked colour
+- **Fixed in `35c197d`:** the early return is gone; the visited bitmap already stops any loop. Fills
+  with any other colour are byte-identical.
 - **Where:** `qpv-main.cpp:2934-2935` (`FloodFill8Stack`). The "avoid infinite loop" early return is a
   leftover from the scanline fill; this one has a visited bitmap.
 - **What you see:** fill white at tolerance 20 on a near-white area clicked on a pure-white pixel:
@@ -472,37 +477,56 @@ must be rebuilt for them to take effect, and #4, #7, #10, #15 and #30 also chang
   apply the flood fill".
 
 ### 32. Tolerance flood fill paints the clicked pixel even when it is outside the selection
+- **Fixed in `5771408`:** the seed passes `checkPixel()` before the fill starts. A click on a masked
+  pixel fills nothing and returns 0, the rule the exact fill follows since #9; the forced match is gone.
 - **Where:** `qpv-main.cpp:3013-3016` — the seed is force-matched, and the only way a seed fails
   `checkPixel()` is the selection mask. Huge images, "Flood inside/outside": one pixel changed on the
   wrong side, occasionally a whole fill started from just outside the edge.
 
 ### 33. "Replace similar colors anywhere" ignores the fill opacity at tolerance 0
+- **Fixed in `bbfab04`:** a colour at distance 0 keeps the full fill opacity, so 0/0 is never
+  computed; every other input gives the same result as before.
 - **Where:** `qpv-main.cpp:2772-2776` (`mixColorsFloodFill`): `0/0` → NaN → `(unsigned char)NaN`
   (undefined; 0 on MSVC x64 = full strength). Only with "L*a*b-based grayscale" (the one algorithm that
   passes tolerance 0 through), dynamic opacity left ticked (the panel disables it below 3 but keeps the
   value) and opacity < 255 or a blend mode.
 
 ### 34. "Avoid clamping" with contrast makes a hard edge where a channel goes negative
+- **Fixed in `1d6c8e7`:** the negative-channel branch is gone, and the grey mix uses the pixel's own
+  grey instead of `getGrayscaleAdvanced()`'s lifted one (shadows/highlights keep that). Both pixels of the
+  example give (94,0,0). Only pixels with a channel below 0 at a positive contrast step change.
 - **Where:** `qpv-main.h:628-634` (`contrast()`, noClamping): the slider value is folded into a
   per-pixel offset when a channel is below 0, and the shifted grey is never shifted back.
 - **What you see:** Brightness −20000, Contrast +20000: (200,120,78) → (94,0,0) but (200,120,77) →
   (16,0,0); the clamped path gives (116,11,0) for both. Reviewer harness — confirmed.
 
 ### 35. Small negative hue values skip the fade-in that positive ones get
+- **Fixed in `c243ebb`:** `hueRotate()`'s fade reads 345..359 as -15..-1: -5 gives (255,0,6). Every
+  other angle, and the brushes, are byte-identical.
 - **Where:** `qpv-main.cpp:4590-4591` turns −5 into 355 before `hueRotate()` (qpv-main.h:766-776), whose
   fade-in covers −15..15 only. (255,0,0): +5 → (255,6,0), −5 → (255,0,20).
 
 ### 36. Gamma correction with opacity < 255 darkens 31 shadow levels by one per application
+- **Fixed in `10abdbc`:** the linear mix goes back through `blend_degamma_lut[]`, which rounds, for the
+  colours and the alpha table. Neutral sliders keep every level at every opacity. With real adjustments
+  this path (gamma on, opacity < 255) now rounds where it truncated: about 2.5% of bytes are one higher.
 - **Where:** `qpv-main.cpp:252` (`int_to_char` truncates) with the 16-bit gamma tables (257-260), via
   `pixelRGB` (4553-4557) and the alpha table (4659). Neutral sliders, opacity 200: 2→1, 7→6, 9→8 ...
   118→117; repeated edits accumulate. Reviewer harness — confirmed.
 
 ### 37. Pixelate (default method) averages colours without alpha weighting
+- **Fixed in `463f6de`:** a block takes the alpha-weighted mean of its colours, with 64-bit sums (the
+  int sums overflowed for blocks above ~2900 px a side). Opaque, 24-bit and uniform-alpha images are
+  byte-identical.
 - **Where:** `qpv-main.cpp:3843-3986` (`PixelateBitmap`). Fully transparent pixels are pre-filled by
   `PrepareAlphaChannelBlur()`, so only semi-transparent ones bleed: two opaque black + two white at
   alpha 10 → grey 127 instead of ≈10.
 
 ### 38. The effects brush's blur bleeds hidden colour into cut-out edges
+- **Fixed in `d1eb566`:** where its region has transparency, the blur runs on alpha-weighted colours in
+  float and divides back out (opaque regions and 24-bit images keep the 8-bit `cv::blur`). The smudge and
+  pinch/bulge samplers weight their taps by alpha when the alphas differ (`brushBilinearSample()`).
+  Checked with a box-blur stand-in, not OpenCV.
 - **Where:** `qpv-main.cpp:9341-9350` (`cv::blur` on the straight-ARGB ROI), used at 9837-9849; the 4-tap
   bilinear samplers at 9915-9919 and 9967-9971 do it slightly too.
 - **What you see:** an edge between opaque black and transparent white, blur 10: up to 311 opaque pixels
