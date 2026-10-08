@@ -5648,9 +5648,12 @@ DLL_API int DLL_CALLCONV WICtestPreloadedImage(int id) {
   return 0;
 }
 
+static void WICguardedRelease(IUnknown *p);
+
 DLL_API int DLL_CALLCONV WICdestroyPreloadedImage(int id) {
-  SafeRelease(pWICclassFrameDecoded, "WICdestroyPreloadedImage: pWICclassFrameDecoded", 0);
-  SafeRelease(pWICclassDecoder, "WICdestroyPreloadedImage: pWICclassDecoder", 0);
+  // a codec has decoded through these, and one that faulted may fault again in Release()
+  WICguardedRelease(pWICclassFrameDecoded);
+  WICguardedRelease(pWICclassDecoder);
   pWICclassFrameDecoded = NULL;
   pWICclassDecoder = NULL;
   return id;
