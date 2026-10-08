@@ -357,7 +357,9 @@ be rebuilt for them to take effect, and #4, #7, #10 and #15 also change quick-pi
   white at 50% gives (255,0,0, a127) with gamma correction off and on. Opaque and 24-bit images get
   the same bytes as before, and layers of equal alpha the same colours. The paint brush's own Replace
   (`PaintBrushLarge()`) goes through the same code since `b5131b2`: its soft edges no longer take the
-  colour of transparent pixels, and it honours gamma correction.
+  colour of transparent pixels, and it honours gamma correction. Since `7f11a0a` the alpha it paints is
+  the stroke's opacity capped by the source's alpha, so the cloner, effects, smudge, pinch and bulge
+  brushes no longer reveal colour hidden under transparency.
 - **Where:** `qpv-main.cpp:2507-2530` (`CalculateNewBlendModes`, modes 24/100).
 - **What's wrong:** straight RGB is interpolated without alpha weighting, and with gamma correction the
   *alpha* is pushed through `gamma_to_linear`/`linear_to_gamma` too.
