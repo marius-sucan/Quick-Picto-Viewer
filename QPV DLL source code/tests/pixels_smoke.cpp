@@ -316,6 +316,23 @@ static void jobPipeline() {
     check(qpvPixelFormatName(res2.loaderUsed, res2.meta)==L"48-RGB (TONE-MAPPABLE)",
           "a FreeImage format is named bit depth, colour type and tone mapping marker");
 
+    // the WIC loader disallowed in the settings: a WIC format never reaches WIC, and
+    // FreeImage, then GDI+, are what is left
+    {
+        DupePixCfg noWic = cfg;
+        noWic.allowWIC = 0;
+        gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;
+        DupePixResult resNoWic;
+        runOne(L"img1.jpg", noWic, resNoWic);
+        check(resNoWic.status==DP_OK && gShimWicCalls==0 && gShimFimCalls==1 && resNoWic.loaderUsed==2,
+              "with the WIC loader disallowed, a WIC format goes to FreeImage");
+        noWic.allowFIM = 0;
+        gShimWicCalls = gShimFimCalls = gShimGdipCalls = 0;
+        runOne(L"img1.jpg", noWic, resNoWic);
+        check(resNoWic.status==DP_OK && gShimWicCalls==0 && gShimGdipCalls==1 && resNoWic.loaderUsed==6,
+              "and with FreeImage disallowed as well, to GDI+");
+    }
+
     // whatever the loader that claimed the file cannot open falls through to the next one,
     // and the last one is GDI+ - the loader that reads EMF, WMF and the GIFs the other two
     // refuse, and the reason a file the viewport displays is no longer marked dead here

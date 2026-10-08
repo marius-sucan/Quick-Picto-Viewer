@@ -514,8 +514,13 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
        // TIFF over to FreeImage, and by this line FreeImage has either had the file and
        // failed or does not claim the format at all - either way there is nothing to hand
        // it to
-       meta = TpSrcMeta();
-       bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
+       // unless the user disallowed the WIC loader
+       if (cfg.allowWIC==1)
+       {
+          meta = TpSrcMeta();
+          bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
+       }
+
        if (bmp!=NULL)
        {
           loaderUsed = 1;

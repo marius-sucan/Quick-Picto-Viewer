@@ -1624,8 +1624,12 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            // no TpSrcMeta, deliberately: this opens the cached thumbnail PNG, so its frame
            // count, resolution and pixel format are the cache file's own and describe
            // nothing about the image it was made from. loaderUsed 5 is what tells
-           // QPV_ThumbsPoolDrain() to leave the files list alone.
-           bmp = tpWICload(fac, job.src.c_str(), 0, 0, 0, cfg->imgQuality, 0, res.srcW, res.srcH);
+           // QPV_ThumbsPoolDrain() to leave the files list alone. With the WIC loader
+           // disallowed, GDI+ reads the cache's own PNGs.
+           if (cfg->allowWIC==1)
+              bmp = tpWICload(fac, job.src.c_str(), 0, 0, 0, cfg->imgQuality, 0, res.srcW, res.srcH);
+           else
+              bmp = tpGDIPload(job.src, 0, 0, 0, cfg->imgQuality, res.srcW, res.srcH);
            res.loaderUsed = 5;
            res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
         } else
@@ -1700,12 +1704,17 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            if (bmp==NULL && !fimSavedOnly() && (tpWicExts.count(ext)>0 || hasFIMtried==1) && res.status!=TP_ERR_PDFLOCKED)
            {
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
-              // WIC always serializes image processing operations
-              res.meta = TpSrcMeta();  // reset the record
-              bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                              0, res.srcW, res.srcH, &res.meta, cfg->colorManage);
-              res.loaderUsed = 1;
-              res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+              // WIC always serializes image processing operations. Unless the user
+              // disallowed the WIC loader: then FreeImage and GDI+ are all there is.
+              if (cfg->allowWIC==1)
+              {
+                 res.meta = TpSrcMeta();  // reset the record
+                 bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
+                                 0, res.srcW, res.srcH, &res.meta, cfg->colorManage);
+                 res.loaderUsed = 1;
+                 res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
+              }
+
               if (bmp==NULL && FIM.ok && cfg->allowFIM==1 && hasFIMtried!=1)
               {
                  int status = TP_ERR_LOAD, saved = 0;
