@@ -3022,10 +3022,6 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
           
           bool matched; float usedIndex;
           checkPixel(cx, startY, tpx, matched, usedIndex);
-          if (!matched && cx == startX) {
-             matched = true; // force match for seed or guaranteed start point
-             usedIndex = defIndex;
-          }
           if (!matched) break;
 
           pixelzMap.set_unsafe(pixIdx);
@@ -3078,11 +3074,14 @@ int FloodFill8Stack(unsigned char *imageData, int w, int h, int x, int y, RGBACo
       return x2;
   };
 
-  // Seed the fill
+  // Seed the fill; a click on a masked pixel fills nothing
   if (x >= 0 && x < w && y >= 0 && y < h) {
-      if (!pixelzMap[(INT64)y * w + x]) {
-          fillSpan(x, y);
-      }
+      bool matched; float usedIndex;
+      checkPixel(x, y, (INT64)y * Stride + (INT64)x * bytesPerPix, matched, usedIndex);
+      if (!matched)
+         return 0;
+
+      fillSpan(x, y);
   }
 
   while (!spanStack.empty())
