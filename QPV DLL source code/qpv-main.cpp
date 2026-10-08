@@ -2779,13 +2779,16 @@ RGBAColor mixColorsFloodFill(RGBAColor &colorB, RGBAColor &colorA, float &fillOp
   int opacity = 0;
   if (dynamicOpacity==1)
   {
-     float fz;
+     // a colour equal to the clicked one keeps the full opacity; at tolerance 0 it would be 0/0
+     float fz = 0.0f;
      if (alternateMode==3) {
-        fz = clamp ( (float)thisCLRindex/tolerance, 0.0f, 1.0f);
+        if (thisCLRindex>0)
+           fz = clamp ( (float)thisCLRindex/tolerance, 0.0f, 1.0f);
      } else 
      {
         float diffu = max(thisCLRindex, prevCLRindex) - min(thisCLRindex, prevCLRindex);
-        fz = clamp( (float)diffu/tolerance, 0.0f, 1.0f);
+        if (diffu>0)
+           fz = clamp( (float)diffu/tolerance, 0.0f, 1.0f);
      }
      float f = 1.0f - clamp(fillOpacity - fz, 0.0f, 1.0f);
      opacity = (unsigned char)(f * 255.0f + 0.5f);
