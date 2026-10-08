@@ -21228,43 +21228,22 @@ HugeImagesApplyAutoColors() {
          Return
 
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
-      mw := imgW//6,    mh := imgH//6
       If memoryUsageWarning(imgW//5, imgH//5, bpp)
          Return
 
       showTOOLtip("Applying auto-adjust image colors, please wait...")
       setImageLoading()
       obju := InitHugeImgSelPath(0, imgW, imgH)
-      pBitsAll := FreeImage_GetBits(hFIFimgX)
-      Stride := FreeImage_GetStride(hFIFimgX)
-      hFIFimgA := trFreeImage_Rescale(hFIFimgX, mw, mh, 0)
-      If (userAutoColorAdjustAll=0 && editingSelectionNow=1 && testAllowSelInvert())
-      {
-         calcImgSelection2bmp(0, mw, mh, mw, mh, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, zX1, zY1, zX2, zY2, 0, 0, "a")
-         hFIFimgD := FreeImage_Copy(hFIFimgA, zx1, zy1, zx2, zy2)
-         ; fnOutputDebug(A_ThisFunc "(area): " mw "|" mh "//" zx1 "|" zy1 "//" zx2 "|" zy2)
-         If hFIFimgD
-         {
-            FreeImage_GetImageDimensions(hFIFimgD, mw, mh)
-            FreeImage_UnLoad(hFIFimgA)
-            hFIFimgA := hFIFimgD
-            ; fnOutputDebug(A_ThisFunc "(area after): " mw "|" mh)
-         }
-      }
-
-      pBitsMini := FreeImage_GetBits(hFIFimgA)
-      strideMini := FreeImage_GetStride(hFIFimgA)
       recordUndoLevelHugeImagesNow(obju.bX1, obju.bY1, obju.bImgSelW, obju.bImgSelH, 0, 0)
-      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
       If (userAutoColorAdjustMode=3)
       {
-         r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 1, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
-         If r
-            r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", 2, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
+         r := HugeImagesAutoColorsPass(hFIFimgX, imgW, imgH, bpp, 1, obju)
+         ; the contrast pass has changed the image, so a failed second pass must keep its undo level
+         If (r && !HugeImagesAutoColorsPass(hFIFimgX, imgW, imgH, bpp, 2, obju))
+            addJournalEntry("ERROR: " A_ThisFunc "(): the RGB levels pass failed; only the image contrast was adjusted")
       } Else
-         r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", userAutoColorAdjustMode, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
+         r := HugeImagesAutoColorsPass(hFIFimgX, imgW, imgH, bpp, userAutoColorAdjustMode, obju)
 
-      FreeImage_UnLoad(hFIFimgA)
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       If r 
       {
@@ -21281,6 +21260,44 @@ HugeImagesApplyAutoColors() {
          SetTimer, RemoveTooltip, % -msgDisplayTime
       }
       ResetImgLoadStatus()
+}
+
+HugeImagesAutoColorsPass(hFIFimgX, imgW, imgH, bpp, modus, obju) {
+      ; measured on a small copy of the image as the previous pass left it
+      mw := imgW//6,    mh := imgH//6
+      hFIFimgA := trFreeImage_Rescale(hFIFimgX, mw, mh, 0)
+      If !hFIFimgA
+         Return 0
+
+      If (userAutoColorAdjustAll=0 && editingSelectionNow=1 && testAllowSelInvert())
+      {
+         calcImgSelection2bmp(0, mw, mh, mw, mh, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, zX1, zY1, zX2, zY2, 0, 0, "a")
+         hFIFimgD := FreeImage_Copy(hFIFimgA, zx1, zy1, zx2, zy2)
+         ; fnOutputDebug(A_ThisFunc "(area): " mw "|" mh "//" zx1 "|" zy1 "//" zx2 "|" zy2)
+         If hFIFimgD
+         {
+            FreeImage_GetImageDimensions(hFIFimgD, mw, mh)
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := hFIFimgD
+            ; fnOutputDebug(A_ThisFunc "(area after): " mw "|" mh)
+         }
+      }
+
+      pBitsMini := FreeImage_GetBits(hFIFimgA)
+      strideMini := FreeImage_GetStride(hFIFimgA)
+      If (modus=1)
+      {
+         ; image contrast is measured on a grey copy, as in QPV_autoContrastBitmap(); the selection must not clip the copy
+         QPV_PrepareHugeImgSelectionArea(0, 0, mw, mh, mw, mh, -1, 0, 0, 0)
+         DllCall("qpvmain.dll\ConvertToGrayScale", "UPtr", pBitsMini, "Int", mw, "Int", mh, "int", 5, "int", 100, "int", strideMini, "int", bpp, "UPtr", 0, "int", 0)
+      }
+
+      pBitsAll := FreeImage_GetBits(hFIFimgX)
+      Stride := FreeImage_GetStride(hFIFimgX)
+      QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
+      r := DllCall("qpvmain.dll\autoContrastBitmap", "UPtr", pBitsAll, "UPtr", pBitsMini, "Int", imgW, "Int", imgH, "int", mw, "int", mh, "int", modus, "int", userAutoColorIntensity, "int", userimgGammaCorrect, "int", Stride, "int", strideMini, "int", bpp, "UPtr", mScan, "int", mStride)
+      FreeImage_UnLoad(hFIFimgA)
+      Return r
 }
 
 HugeImagesApplyInsertText() {
