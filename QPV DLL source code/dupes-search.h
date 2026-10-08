@@ -2130,26 +2130,48 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
 
                  const wchar_t *p = (const wchar_t*)SQ.column_text16(dupesStmt, 1);
                  const int plen = (p!=NULL) ? SQ.column_bytes16(dupesStmt, 1) / (int)sizeof(wchar_t) : 0;
-                 if (plen > 0)
-                    dupesPathBuf.append(p, (size_t)plen);
-
-                 dupesPathBuf.push_back(L'\0');
-                 dupesCandRows.push_back(row);
-                 dupesScanHashes.push_back(hash);
-                 if (colFlip >= 0)
-                    dupesScanFlipped.push_back(flip);
-
-                 if (colPix >= 0)
+                 // the parallel arrays must stay the same length, so a row goes in whole or not at
+                 // all: dupesScanBuildFromQuery() indexes them in step
+                 const size_t nPath = dupesPathBuf.size(), nRows = dupesCandRows.size(), nHash = dupesScanHashes.size();
+                 const size_t nFlip = dupesScanFlipped.size(), nPixData = dupesPixData.size(), nPixOK = dupesPixOK.size();
+                 try
                  {
-                    const size_t slot = dupesCandRows.size() - 1;
-                    dupesPixData.resize((slot + 1) * stride, 0);
-                    dupesPixOK.resize(slot + 1, 0);
-                    const unsigned char *px = (const unsigned char*)SQ.column_blob(dupesStmt, colPix);
-                    const int pxlen = (px!=NULL) ? SQ.column_bytes(dupesStmt, colPix) : 0;
-                    // a fingerprint of the wrong length is treated as absent rather than
-                    // decoded short: a partial one would score as a near-perfect match
-                    if (px!=NULL && pxlen==(int)stride)
-                       decodeFingerprintBytes(px, (UINT)slot, 1);
+                    if (plen > 0)
+                       dupesPathBuf.append(p, (size_t)plen);
+
+                    dupesPathBuf.push_back(L'\0');
+                    dupesCandRows.push_back(row);
+                    dupesScanHashes.push_back(hash);
+                    if (colFlip >= 0)
+                       dupesScanFlipped.push_back(flip);
+
+                    if (colPix >= 0)
+                    {
+                       const size_t slot = dupesCandRows.size() - 1;
+                       dupesPixData.resize((slot + 1) * stride, 0);
+                       dupesPixOK.resize(slot + 1, 0);
+                       const unsigned char *px = (const unsigned char*)SQ.column_blob(dupesStmt, colPix);
+                       const int pxlen = (px!=NULL) ? SQ.column_bytes(dupesStmt, colPix) : 0;
+                       // a fingerprint of the wrong length is treated as absent rather than
+                       // decoded short: a partial one would score as a near-perfect match
+                       if (px!=NULL && pxlen==(int)stride)
+                          decodeFingerprintBytes(px, (UINT)slot, 1);
+                    }
+                 } catch (...)
+                 {
+                    dupesPathBuf.resize(nPath);
+                    dupesCandRows.resize(nRows);
+                    dupesScanHashes.resize(nHash);
+                    dupesScanFlipped.resize(nFlip);
+                    dupesPixData.resize(nPixData);
+                    dupesPixOK.resize(nPixOK);
+                    SQ.finalize(dupesStmt);
+                    dupesStmt = NULL;
+                    dupesScanState.lastError = 1;
+                    dupesScanState.phase = -1;
+                    // last: the message is a string, which can fail to allocate as well
+                    dupesSetError(L"the duplicates query ran out of memory", NULL);
+                    return -1;
                  }
               }
            }
