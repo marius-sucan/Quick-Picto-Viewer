@@ -65,8 +65,10 @@ private:
 
 public:
     void resize(size_t size) {
-        num_bits = size;
+        // a failed allocation must leave size() at 0: MSVC's assign() frees the old buffer first
+        num_bits = 0;
         data.assign((size + 63) / 64, 0ULL);
+        num_bits = size;
     }
 
     void clear() {
