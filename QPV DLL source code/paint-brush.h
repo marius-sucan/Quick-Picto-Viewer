@@ -147,8 +147,8 @@ static void brushSetupChunkGrid(BrushStamp &s) {
     }
 }
 
-// the brush box, and the rectangle the smudge, pinch and bulge brushes sample, copied when no clone was
-// handed over; false when the image is a GDI+ lock rect and there is no copy
+// the brush box, and the rectangle the cloner, smudge, pinch and bulge brushes sample, copied when no clone
+// was handed over; false when the image is a GDI+ lock rect and there is no copy
 static bool brushSetupClone(BrushStamp &s) {
     int halfW = (s.texData && s.texW > 0) ? (s.texW / 2 + abs(s.bulgePinchFactor)) : (s.brushSize / 2 + abs(s.bulgePinchFactor));
     int halfH = (s.texData && s.texH > 0) ? (s.texH / 2 + abs(s.bulgePinchFactor)) : (s.brushSize / 2 + abs(s.bulgePinchFactor));
@@ -178,11 +178,18 @@ static bool brushSetupClone(BrushStamp &s) {
         s.cloneEndX = clamp((int)ceil(s.endX - std::min(0.0, s.cloneOffsetX)) + 2, 0, s.imgW - 1);
         s.cloneStartY = clamp((int)floor(s.startY - std::max(0.0, s.cloneOffsetY)) - 2, 0, s.imgH - 1);
         s.cloneEndY = clamp((int)ceil(s.endY - std::min(0.0, s.cloneOffsetY)) + 2, 0, s.imgH - 1);
+    } else if (s.brushType==3)
+    {
+        // the cloner reads round(p - off) for every p of the box
+        s.cloneStartX = max((int)round(s.startX - s.offX), 0);
+        s.cloneEndX = min((int)round(s.endX - s.offX), s.imgW - 1);
+        s.cloneStartY = max((int)round(s.startY - s.offY), 0);
+        s.cloneEndY = min((int)round(s.endY - s.offY), s.imgH - 1);
     }
 
     if (s.lockW>0)
     {
-        // a GDI+ lock holds only its rect, with top-down rows; samples past it take its edge pixels
+        // a GDI+ lock holds only its rect, with top-down rows; samples past it take its edge pixels [the cloner skips them]
         s.cloneStartX = max(s.cloneStartX, s.lockX);
         s.cloneEndX = min(s.cloneEndX, s.lockX + s.lockW - 1);
         s.cloneStartY = max(s.cloneStartY, s.imgH - s.lockY - s.lockH);
@@ -192,7 +199,7 @@ static bool brushSetupClone(BrushStamp &s) {
     s.cloneW = s.cloneEndX - s.cloneStartX + 1;
     s.cloneH = s.cloneEndY - s.cloneStartY + 1;
     s.localPitch = s.cloneW * s.bytesPerPixel;
-    if (!s.cloneData && s.brushType>=6 && s.cloneW>0 && s.cloneH>0)
+    if (!s.cloneData && (s.brushType>=6 || s.brushType==3) && s.cloneW>0 && s.cloneH>0)
     {
         try
         {
@@ -215,7 +222,7 @@ static bool brushSetupClone(BrushStamp &s) {
     }
 
     // without the copy, the samplers would read the image directly, past the lock rect
-    return !(s.lockW>0 && !s.cloneData && s.brushType>=6 && s.localClone.empty());
+    return !(s.lockW>0 && !s.cloneData && (s.brushType>=6 || s.brushType==3) && s.localClone.empty());
 }
 
 // the colour, and the rotated ellipse of the brush tip
@@ -559,7 +566,8 @@ static QPV_FORCEINLINE void brushAdjust(const BrushStamp &s, const int effB, con
     srcA = int_to_char[pixel.a];
 }
 
-// Cloner brush: sample from srcData; false when the source pixel is off the image
+// Cloner brush: sample from the clone, or from the copy of the source made before the stamp; false when
+// the source pixel is off the image or out of that copy
 static QPV_FORCEINLINE bool brushSourceCloner(const BrushStamp &s, const int px, const int py, int &srcB, int &srcG, int &srcR, int &srcA) {
     int srcX_raw = (int)round(px - s.offX);
     int srcY_raw = (int)round(py - s.offY);
@@ -568,10 +576,20 @@ static QPV_FORCEINLINE bool brushSourceCloner(const BrushStamp &s, const int px,
 
     int srcX = srcX_raw;
     int srcY = srcY_raw;
-    const unsigned char* srcData = s.cloneData ? s.cloneData : s.imgData;
-    int srcPitch = s.cloneData ? s.clonePitch : s.pitch;
-    int s_iy = s.imgH - 1 - srcY;
-    const unsigned char* srcPixel = srcData + (INT64)s_iy * srcPitch + srcX * s.bytesPerPixel;
+    const unsigned char* srcPixel;
+    if (!s.localClone.empty())
+    {
+        if (srcX<s.cloneStartX || srcX>s.cloneEndX || srcY<s.cloneStartY || srcY>s.cloneEndY)
+           return false;
+
+        srcPixel = s.localClone.data() + (INT64)(srcY - s.cloneStartY) * s.localPitch + (srcX - s.cloneStartX) * s.bytesPerPixel;
+    } else
+    {
+        const unsigned char* srcData = s.cloneData ? s.cloneData : s.imgData;
+        int srcPitch = s.cloneData ? s.clonePitch : s.pitch;
+        int s_iy = s.imgH - 1 - srcY;
+        srcPixel = srcData + (INT64)s_iy * srcPitch + srcX * s.bytesPerPixel;
+    }
 
     const int effB = srcPixel[0];
     const int effG = srcPixel[1];
