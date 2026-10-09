@@ -694,6 +694,10 @@ void traceMaskPolyBoundaries(const int &w, const int &h, const float* PointsList
             polygonMapMin[yy] = INT_MAX;
         }
 
+        // a tip pointing right has both runs starting left of it: the vertex is a crossing too
+        if (ya >= minu && ya <= maxu)
+           polygonMapEdges[ya].push_back(xa);
+
         xa = xb;
         ya = yb;
     }
