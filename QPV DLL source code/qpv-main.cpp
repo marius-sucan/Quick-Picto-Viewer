@@ -17,6 +17,9 @@ void fnOutputDebug(std::string input) {
     OutputDebugStringA(line.c_str());
 }
 
+// a message for fnOutputDebug(), built only when debugInfos is on
+#define QPV_DBG(...) do { if (debugInfos==1) fnOutputDebug(__VA_ARGS__); } while (0)
+
 #if defined(_MSC_VER)
   #define QPV_FORCEINLINE __forceinline
 #else
@@ -645,7 +648,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
     time_t nTime;
     opacity = 255 - opacity;
     srand((unsigned) time(&nTime));
-    fnOutputDebug("add noise; grayscale==" + std::to_string(doGrayScale) + " / " + std::to_string(blendMode));
+    QPV_DBG("add noise; grayscale==" + std::to_string(doGrayScale) + " / " + std::to_string(blendMode));
     if (pixelize>0)
     {
         std::vector<int> pixelzMapW(w + 2, 0);
@@ -768,7 +771,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
         }
     }
 
-    fnOutputDebug("add noise step DONE");
+    QPV_DBG("add noise step DONE");
     return 1;
 } // GenerateRandomNoiseOnBitmap()
 
@@ -1106,7 +1109,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     // every one of its pixels; opacityMultiplier stays 32bpp-only because an overlay that
     // is opaque everywhere has no partially visible pixels left to restore
 
-    fnOutputDebug("FillSelectArea() Stride=" + std::to_string(Stride) + " opacity=" + std::to_string(opacity));
+    QPV_DBG("FillSelectArea() Stride=" + std::to_string(Stride) + " opacity=" + std::to_string(opacity));
     // fnOutputDebug("clipMaskFilter=zx=" + std::to_string(zx1) + "/" + std::to_string(zx2) + "=w=" + std::to_string(max(zx1, zx2) - min(zx1, zx2)));
     // fnOutputDebug("clipMaskFilter=zy=" + std::to_string(zy1) + "/" + std::to_string(zy2) + "=h=" + std::to_string(max(zy1, zy2) - min(zy1, zy2)));
     RGBAColor initialColor;
@@ -1172,9 +1175,9 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
        double jitB = 0.0, jitC = 0.0;
        jitCubic = jitFilterBC(jitFilter, jitB, jitC);
        if (!jitCubic && jitFilter!=2)
-          fnOutputDebug("FillSelectArea(): interpolation filter " + std::to_string(jitFilter) + " is not supported, falling back to bilinear");
+          QPV_DBG("FillSelectArea(): interpolation filter " + std::to_string(jitFilter) + " is not supported, falling back to bilinear");
 
-       fnOutputDebug("FillSelectArea(): JIT rescale mode " + std::to_string(rescaleBitmapJIT) + ", filter " + std::to_string(jitFilter) + "; " + std::to_string(nBmpW) + "x" + std::to_string(nBmpH) + " onto " + std::to_string(jitW) + "x" + std::to_string(jitH) + " at " + std::to_string(jitX) + "|" + std::to_string(jitY));
+       QPV_DBG("FillSelectArea(): JIT rescale mode " + std::to_string(rescaleBitmapJIT) + ", filter " + std::to_string(jitFilter) + "; " + std::to_string(nBmpW) + "x" + std::to_string(nBmpH) + " onto " + std::to_string(jitW) + "x" + std::to_string(jitH) + " at " + std::to_string(jitX) + "|" + std::to_string(jitY));
        buildJITaxis(jitMapX, w, jitX, jitW, nBmpW, (INT64)gbpc, jitFilter);
        buildJITaxis(jitMapY, h, jitY, jitH, nBmpH, (INT64)gStride, jitFilter);
     }
@@ -1420,8 +1423,8 @@ DLL_API int DLL_CALLCONV openCVdiffBlendBitmap(unsigned char* bgrImageData, int 
 DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, int h, int xa, int ya, int ks, int preblur, int postblur, int invert, float prebrighten, float precontrast, float postbrighten, float postcontrast, int modus, int Stride, int bpp) {
     int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
     cv::Mat image(h, w, clr, imageData, Stride);
-    fnOutputDebug("openCVedgeDetection step 1; modus = " + std::to_string( modus ) + " | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya ) + " | ks= " + std::to_string( ks ) );
-    fnOutputDebug("openCVedgeDetection step 1; prebrighten = " + std::to_string( prebrighten ) + " | precontrast = " + std::to_string( precontrast ) );
+    QPV_DBG("openCVedgeDetection step 1; modus = " + std::to_string( modus ) + " | xa = " + std::to_string( xa ) + " | ya = " + std::to_string( ya ) + " | ks= " + std::to_string( ks ) );
+    QPV_DBG("openCVedgeDetection step 1; prebrighten = " + std::to_string( prebrighten ) + " | precontrast = " + std::to_string( precontrast ) );
 
     cv::Mat grayImage;
     if (precontrast!=1 || prebrighten!=0)
@@ -1516,7 +1519,7 @@ DLL_API int DLL_CALLCONV openCVedgeDetection(unsigned char *imageData, int w, in
     // Convert edge image to RGB
     clr = (bpp==32) ? cv::COLOR_GRAY2BGRA : cv::COLOR_GRAY2BGR;
     cv::cvtColor(edgeImage, image, clr);
-    fnOutputDebug("openCVedgeDetection() done");
+    QPV_DBG("openCVedgeDetection() done");
     return 1;
 }
 
@@ -1536,7 +1539,7 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
     if (equal==1)
        intensityX = intensityY = min(intensityX, intensityY);
 
-    fnOutputDebug("openCVblurFilters step 1; modus = " + std::to_string( modus ) + " | inX = " + std::to_string( intensityX ) + " | inY = " + std::to_string( intensityY )  + " | w = " + std::to_string( w ) + " | h = " + std::to_string( h ) );
+    QPV_DBG("openCVblurFilters step 1; modus = " + std::to_string( modus ) + " | inX = " + std::to_string( intensityX ) + " | inY = " + std::to_string( intensityY )  + " | w = " + std::to_string( w ) + " | h = " + std::to_string( h ) );
     int type = (circle==1) ? cv::MORPH_ELLIPSE : cv::MORPH_RECT;
     // cv::blur(image, image, cv::Size(951, 951));
     if (modus==0) {
@@ -1561,7 +1564,7 @@ DLL_API int DLL_CALLCONV openCVblurFilters(unsigned char *imageData, int w, int 
        cv::morphologyEx(image, image, cv::MORPH_CLOSE, shape);
     }
 
-    fnOutputDebug("openCVblurFilters done");
+    QPV_DBG("openCVblurFilters done");
     return 1;
 }
 
@@ -1578,7 +1581,7 @@ DLL_API int DLL_CALLCONV openCVresizeBlendEachChannel(unsigned char *imageData, 
     int validWidth = std::min(newWidth - (startX - posX), image.cols - startX);
     int validHeight = std::min(newHeight - (startY - posY), image.rows - startY);
     if (validWidth <= 0 || validHeight <= 0) {
-        fnOutputDebug("openCVresizeBitmap: No valid overlap between resized channel and image");
+        QPV_DBG("openCVresizeBitmap: No valid overlap between resized channel and image");
         return 0;
     }
 
@@ -1635,8 +1638,8 @@ DLL_API int DLL_CALLCONV openCVresizeBitmapExtended(unsigned char *imageData, un
       cv::resize(cropped, other, cv::Size(nw, nh), 0, 0, interpolation);
   } catch (const cv::Exception &e)
   {
-      fnOutputDebug("OpenCV: error attempting to resize bitmap in openCVresizeBitmapExtended: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
-      fnOutputDebug( e.what() );
+      QPV_DBG("OpenCV: error attempting to resize bitmap in openCVresizeBitmapExtended: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
+      QPV_DBG( e.what() );
       return 0;
   }
   return 1;
@@ -1698,7 +1701,7 @@ DLL_API int DLL_CALLCONV openCVapplyToneMappingAlgos(float* hdrData, int hStride
 
 DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {
     // Get system information to know memory ranges
-    fnOutputDebug("ListProcessMemoryBlocks A");
+    QPV_DBG("ListProcessMemoryBlocks A");
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
 
@@ -1715,7 +1718,7 @@ DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {
     std::vector<MemoryBlock> blocks;
     int mi = 0;
 
-    fnOutputDebug("ListProcessMemoryBlocks B");
+    QPV_DBG("ListProcessMemoryBlocks B");
     // Query memory regions until we reach maximum address
     while(address < sysInfo.lpMaximumApplicationAddress) {
         MEMORY_BASIC_INFORMATION memInfo;
@@ -1747,17 +1750,17 @@ DLL_API uintptr_t DLL_CALLCONV ListProcessMemoryBlocks(int a) {
         });
 
     // Print results
-    fnOutputDebug("ListProcessMemoryBlocks C; mi=" + std::to_string(mi));
-    fnOutputDebug("Memory Blocks...");
-    fnOutputDebug("Address, Size");
+    QPV_DBG("ListProcessMemoryBlocks C; mi=" + std::to_string(mi));
+    QPV_DBG("Memory Blocks...");
+    QPV_DBG("Address, Size");
     int index = 0;
     for(const auto& block : blocks) {
         index++;
-        fnOutputDebug( std::to_string(index) + " = " 
+        QPV_DBG( std::to_string(index) + " = " 
                      + std::to_string( (uintptr_t)block.address ) + ", "
                      + std::to_string(block.size) + ", " );
     }
-    fnOutputDebug("ListProcessMemoryBlocks D; index=" + std::to_string(index));
+    QPV_DBG("ListProcessMemoryBlocks D; index=" + std::to_string(index));
     if (blocks.empty())
        return 0;
     return (uintptr_t)blocks[0].address;
@@ -1982,7 +1985,7 @@ DLL_API int DLL_CALLCONV PdfWriterAddBitmap(PdfWriter *w, Gdiplus::GpBitmap *bmp
 
        if (hasEncoder==0)
        {
-          fnOutputDebug("PdfWriterAddBitmap: GDI+ has no JPEG encoder");
+          QPV_DBG("PdfWriterAddBitmap: GDI+ has no JPEG encoder");
           return PDFW_SKIPPED;
        }
     }
@@ -2067,11 +2070,11 @@ DLL_API int DLL_CALLCONV PdfWriterAddBitmap(PdfWriter *w, Gdiplus::GpBitmap *bmp
                 result = pdfwAddJpegData(w, jpeg, (size_t)st.cbSize.QuadPart, p);
                 GlobalUnlock(mem);
              }
-          } else fnOutputDebug("PdfWriterAddBitmap: GDI+ failed to encode the page");
+          } else QPV_DBG("PdfWriterAddBitmap: GDI+ failed to encode the page");
        }
     } catch (...)
     {
-       fnOutputDebug("PdfWriterAddBitmap: failed to prepare the page");
+       QPV_DBG("PdfWriterAddBitmap: failed to prepare the page");
        result = PDFW_SKIPPED;
     }
 
@@ -2356,7 +2359,7 @@ DLL_API int DLL_CALLCONV cImgSharpenBitmap(unsigned char *imageData, int width, 
 DLL_API int DLL_CALLCONV cImgBlurBitmapFilters(unsigned char *imageData, int width, int height, int intensityX, int intensityY, int modus, int circle, int preview, int Stride, int bpp) {
   int ow = width;  int oh = height;
   int channels = (bpp==32) ? 4 : 3;
-  fnOutputDebug("cImgBlurBitmapFilters invoked | modus = " + std::to_string(modus));
+  QPV_DBG("cImgBlurBitmapFilters invoked | modus = " + std::to_string(modus));
   CImg<unsigned char> img(imageData, channels, width, height, 1);
   // If I set is_Shared==1, it does not work; no idea why; it results in a messed up image.
   // Note: I pass the wrong parameters and then i fix it with permute_axes().
@@ -2910,7 +2913,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
 
       const int chan = bpp / 8;
       const double f = clamp(intensity, 0, 20000) / 100.0;
-      fnOutputDebug("zoomBlurBitmap invoked; mode=" + std::to_string(mode) + "; intensity=" + std::to_string(intensity) + "; quality=" + std::to_string(quality));
+      QPV_DBG("zoomBlurBitmap invoked; mode=" + std::to_string(mode) + "; intensity=" + std::to_string(intensity) + "; quality=" + std::to_string(quality));
       if (f==0.0)
       {
          #pragma omp parallel for schedule(static) default(none) shared(imageData, newData, h, Stride, w, chan)
@@ -2928,7 +2931,7 @@ DLL_API int DLL_CALLCONV zoomBlurBitmap(unsigned char *imageData, unsigned char 
       const unsigned char *origData = imageData;
       if (bpp==32 && blurNeedsAlphaWeighting(imageData, w, h, Stride))
       {
-         fnOutputDebug("zoomBlurBitmap weighted");
+         QPV_DBG("zoomBlurBitmap weighted");
          blurWeighByAlpha(imageData, imageData, newData, w, h, Stride);
          origData = newData;
       }
@@ -3204,7 +3207,7 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 
       const int chan = bpp / 8;
       const double A = deg2rad(clamp(intensity, 0, 360));
-      fnOutputDebug("rotateBlurBitmap invoked; intensity=" + std::to_string(intensity) + "; quality=" + std::to_string(quality));
+      QPV_DBG("rotateBlurBitmap invoked; intensity=" + std::to_string(intensity) + "; quality=" + std::to_string(quality));
       if (A==0.0)
       {
          #pragma omp parallel for schedule(static) default(none) shared(imageData, newData, h, Stride, w, chan)

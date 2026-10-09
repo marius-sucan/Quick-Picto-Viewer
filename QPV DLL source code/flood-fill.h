@@ -1705,7 +1705,7 @@ static int floodClampCount(INT64 r) {
 }
 
 static int floodFillRun(const FloodParams &q) {
-    fnOutputDebug("floodFillRun(): exact=" + std::to_string(q.exact) + " sel=" + std::to_string(q.useSelArea) + " blendMode=" + std::to_string(q.blendMode));
+    QPV_DBG("floodFillRun(): exact=" + std::to_string(q.exact) + " sel=" + std::to_string(q.useSelArea) + " blendMode=" + std::to_string(q.blendMode));
     FloodJob *job = new (std::nothrow) FloodJob(q);
     if (!job)
        return 0;
@@ -1713,14 +1713,14 @@ static int floodFillRun(const FloodParams &q) {
     INT64 r = job->find();
     if (r > 0)
        r = job->paint();
-    fnOutputDebug("floodFillRun(): pixels=" + std::to_string(r) + " bands=" + std::to_string(job->bands) + " threads=" + std::to_string(job->T));
+    QPV_DBG("floodFillRun(): pixels=" + std::to_string(r) + " bands=" + std::to_string(job->bands) + " threads=" + std::to_string(job->T));
     delete job;
     return (r > 0) ? floodClampCount(r) : 0;
 }
 
 // "Replace similar colours anywhere"
 int ReplaceGivenColor(const FloodParams &q) {
-    fnOutputDebug("ReplaceGivenColor: o=" + std::to_string(q.opacity) + " ; t=" + std::to_string(q.tolerance) + " ; b=" + std::to_string(q.blendMode) + " ; c=" + std::to_string(q.cartoonMode));
+    QPV_DBG("ReplaceGivenColor: o=" + std::to_string(q.opacity) + " ; t=" + std::to_string(q.tolerance) + " ; b=" + std::to_string(q.blendMode) + " ; c=" + std::to_string(q.cartoonMode));
     FloodJob *job = new (std::nothrow) FloodJob(q);
     if (!job)
        return 0;

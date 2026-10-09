@@ -289,7 +289,7 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
 
       if (!thisWICbitmap || !pFrame)
       {
-         fnOutputDebug("applyColorManagement: no valid bitmaps given");
+         QPV_DBG("applyColorManagement: no valid bitmaps given");
          return 0;
       }
 
@@ -297,7 +297,7 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
       HRESULT hr = thisWICbitmap->GetPixelFormat(&sFmt);
       if (FAILED(hr))
       {
-         fnOutputDebug("applyColorManagement: failed GetPixelFormat on source bitmap");
+         QPV_DBG("applyColorManagement: failed GetPixelFormat on source bitmap");
          return 0;
       }
 
@@ -330,16 +330,16 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
          if (SUCCEEDED(hr))
             hr = pFrame->GetColorContexts(1, &pSrcColorContext, &colorContextCount);
          else
-            fnOutputDebug("failed CreateColorContext"); 
+            QPV_DBG("failed CreateColorContext"); 
 
          if (!(SUCCEEDED(hr)))
-            fnOutputDebug("failed GetColorContexts: " + std::to_string(colorContextCount));
+            QPV_DBG("failed GetColorContexts: " + std::to_string(colorContextCount));
 
          if (FAILED(hr) || colorContextCount==0)
          {
              // without a profile an RGB image is sRGB already; only CMYK is given one, and only
              // when CreateColorContext() produced the context to give it in
-             fnOutputDebug("fallback icc profile");
+             QPV_DBG("fallback icc profile");
              if (isCMYKimg==1 && pSrcColorContext!=NULL) {
                  isCMYKimg = 2;
                  hr = pSrcColorContext->InitializeFromExifColorSpace(5); // Default CMYK
@@ -361,7 +361,7 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
             {
                 hr = pCmykColorContext->InitializeFromExifColorSpace(5); // Standard CMYK
                 if (SUCCEEDED(hr))
-                   fnOutputDebug("yay cmyk color context backup");
+                   QPV_DBG("yay cmyk color context backup");
             }
          }
 
@@ -380,7 +380,7 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
                if (FAILED(hr) && isCMYKimg==1 && pCmykColorContext!=NULL)
                {
                   hr = pColorTransform->Initialize(thisWICbitmap, pCmykColorContext, pDestColorContext, destPixFormat);
-                  fnOutputDebug("icm mode, clr transform, trying again");
+                  QPV_DBG("icm mode, clr transform, trying again");
                }
 
                if (SUCCEEDED(hr))
@@ -389,15 +389,15 @@ int applyColorManagement(IWICBitmapSource* &thisWICbitmap, IWICBitmapFrameDecode
                   hr = pColorTransform->QueryInterface(IID_IWICBitmapSource, reinterpret_cast<void **>(&thisWICbitmap));
                   okay = (SUCCEEDED(hr)) ? 1 : 0;
                   if (okay==0)
-                     fnOutputDebug("applyColorManagement: pColorTransform > QueryInterface failed");
+                     QPV_DBG("applyColorManagement: pColorTransform > QueryInterface failed");
                } else 
                {
                   char errorMsg[256];
                   sprintf_s(errorMsg, "applyColorManagement: pColorTransform Initialize failed: 0x%08X\n", hr);
-                  fnOutputDebug(errorMsg);
+                  QPV_DBG(errorMsg);
                }
-            } else fnOutputDebug("applyColorManagement: failed CreateColorTransformer");
-         } else fnOutputDebug("applyColorManagement: failed CreateColorContext.Init destination");
+            } else QPV_DBG("applyColorManagement: failed CreateColorTransformer");
+         } else QPV_DBG("applyColorManagement: failed CreateColorContext.Init destination");
       }
 
       return okay;
@@ -781,7 +781,7 @@ Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UIN
          Gdiplus::Status lockSt = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationFormat, &bitmapDatu);
          if (lockSt!=Gdiplus::Ok)
          {
-            fnOutputDebug("WICbmpSourceConvertGdip: failed to lock the GDI+ bitmap");
+            QPV_DBG("WICbmpSourceConvertGdip: failed to lock the GDI+ bitmap");
             Gdiplus::DllExports::GdipDisposeImage(myBitmap);
             return (Gdiplus::GpBitmap*)NULL;
          }
@@ -794,11 +794,11 @@ Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UIN
                     : WICguardedCopyPixels(thisWICbitmap, NULL, bitmapDatu.Stride, (UINT)bufSize, (BYTE*)bitmapDatu.Scan0, &sehCode);
          Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
          if (sehCode!=0)
-            fnOutputDebug("WICbmpSourceConvertGdip: the codec faulted while decoding the pixels");
+            QPV_DBG("WICbmpSourceConvertGdip: the codec faulted while decoding the pixels");
 
          if (!(SUCCEEDED(hr)))
          {
-            fnOutputDebug("WICbmpSourceConvertGdip: copy pixels FAILED: " + std::to_string(cbStride) + "|" + std::to_string(cbBufferSize));
+            QPV_DBG("WICbmpSourceConvertGdip: copy pixels FAILED: " + std::to_string(cbStride) + "|" + std::to_string(cbBufferSize));
             // a half written bitmap is not worth handing back; it used to be returned as
             // though the decode had worked
             Gdiplus::DllExports::GdipDisposeImage(myBitmap);
@@ -815,7 +815,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
   {
      // reached whenever a preload failed or was discarded and the caller asked for pixels
      // anyway; without this the frame is dereferenced below at GetSize()
-     fnOutputDebug("coreWICgetBufferImage: there is no preloaded WIC image to read from");
+     QPV_DBG("coreWICgetBufferImage: there is no preloaded WIC image to read from");
      return NULL;
   }
 
@@ -874,7 +874,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
 
   if (FAILED(hr) || pFinalBitmapSource==NULL)
   {
-     fnOutputDebug("coreWICgetBufferImage: init failed");
+     QPV_DBG("coreWICgetBufferImage: init failed");
      WICsafeRelease(pFinalBitmapSource);
      WICsafeRelease(pScaler);
      WICsafeRelease(pIClipper);
@@ -898,7 +898,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
 
   int hasICM = (useICM!=1) ? 0 : WICguardedColorManagement(pFinalBitmapSource, pWICclassFrameDecoded, destFmt, useICM, &sehCode);
   if (sehCode!=0)
-     fnOutputDebug("coreWICgetBufferImage: the codec faulted on the embedded colour profile");
+     QPV_DBG("coreWICgetBufferImage: the codec faulted on the embedded colour profile");
 
   if (hasICM!=1)
   {
@@ -917,7 +917,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
            hr = WICguardedConverterInit(pConverter, pFinalBitmapSource, &destFmt, &sehCode);
         } else
         {
-           fnOutputDebug("coreWICgetBufferImage failed: cannot convert source to destination format (pixel formats)");
+           QPV_DBG("coreWICgetBufferImage failed: cannot convert source to destination format (pixel formats)");
            hr = E_FAIL;
         }
      }
@@ -939,7 +939,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
 
   if (FAILED(hr) || FAILED(phr) || pFinalBitmapSource==NULL || !width || !height)
   {
-     fnOutputDebug("coreWICgetBufferImage: early failure");
+     QPV_DBG("coreWICgetBufferImage: early failure");
      WICsafeRelease(pFinalBitmapSource);
      WICsafeRelease(pConverter);
      applyColorManagement(pFinalBitmapSource, pWICclassFrameDecoded, destFmt, 100);
@@ -969,13 +969,13 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
       int indexu = 0;
       UINT64 buffOffset = 0;
       if (m_pbBuffer==NULL)
-         fnOutputDebug("coreWICgetBufferImage: failed to allocate the pixel buffer");
+         QPV_DBG("coreWICgetBufferImage: failed to allocate the pixel buffer");
       else
       {
           // fnOutputDebug("WIC buffer created: " + std::to_string(cbBufferSize));
           if (sliceHeight>0)
           {
-             fnOutputDebug("WIC copy pixels in slices of h=" + std::to_string(sliceHeight));
+             QPV_DBG("WIC copy pixels in slices of h=" + std::to_string(sliceHeight));
              while (y<(int)height)
              {
                  if (indexu>0)
@@ -991,7 +991,7 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
                  UINT64 tmpBufferSize = cbStride * (UINT64)h;
                  if (tmpBufferSize<1 || tmpBufferSize>0xFFFFFFFFull || buffOffset+tmpBufferSize>cbBufferSize)
                  {
-                    fnOutputDebug("coreWICgetBufferImage: the slice does not fit the buffer");
+                    QPV_DBG("coreWICgetBufferImage: the slice does not fit the buffer");
                     hr = E_FAIL;
                     break;
                  }
@@ -1013,20 +1013,20 @@ BYTE* coreWICgetBufferImage(int bitsDepth, UINT64 cbStride, UINT64 cbBufferSize,
           }
 
           if (sehCode!=0)
-             fnOutputDebug("coreWICgetBufferImage: the codec faulted while decoding the pixels");
+             QPV_DBG("coreWICgetBufferImage: the codec faulted while decoding the pixels");
 
           if (SUCCEEDED(hr)) {
-             fnOutputDebug("coreWICgetBufferImage: WIC copy pixels to buffer: yay");
+             QPV_DBG("coreWICgetBufferImage: WIC copy pixels to buffer: yay");
           } else
           {
              // the buffer is handed to FreeImage_ConvertFromRawBitsEx() as a finished image;
              // returning it half written means displaying uninitialized heap
-             fnOutputDebug("coreWICgetBufferImage: copy pixels to buffer: FAILED");
+             QPV_DBG("coreWICgetBufferImage: copy pixels to buffer: FAILED");
              delete[] m_pbBuffer;
              m_pbBuffer = NULL;
           }
       }
-  } else fnOutputDebug("coreWICgetBufferImage: the stride and buffer size given do not describe an image");
+  } else QPV_DBG("coreWICgetBufferImage: the stride and buffer size given do not describe an image");
 
   WICsafeRelease(pFinalBitmapSource);
   WICsafeRelease(pConverter);
@@ -1059,11 +1059,11 @@ Gdiplus::GpBitmap* BYTEconvertGdip(BYTE* &m_pbBuffer, UINT &width, UINT &height,
          if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu)!=Gdiplus::Ok
           || Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu)!=Gdiplus::Ok)
          {
-            fnOutputDebug("BYTEconvertGdip: failed to copy the pixels into the GDI+ bitmap");
+            QPV_DBG("BYTEconvertGdip: failed to copy the pixels into the GDI+ bitmap");
             Gdiplus::DllExports::GdipDisposeImage(myBitmap);
             myBitmap = NULL;
          }
-     } else fnOutputDebug("BYTEconvertGdip: failed to create GDI+ bitmap object");
+     } else QPV_DBG("BYTEconvertGdip: failed to create GDI+ bitmap object");
 
      return myBitmap;
 }
@@ -1116,7 +1116,7 @@ bool IsWicDecoderAvailable(const GUID& formatGuid) {
         pEnum->Release();
     }
     if (!isAvailable)
-       fnOutputDebug("IsWicDecoderAvailable: no decoder identified by given GUID");
+       QPV_DBG("IsWicDecoderAvailable: no decoder identified by given GUID");
 
     return isAvailable;
 }
@@ -1194,7 +1194,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
 
   if (m_pIWICFactory==NULL)
   {
-     fnOutputDebug("WICpreLoadImage: WIC was never initialized; initWICnow() must succeed first");
+     QPV_DBG("WICpreLoadImage: WIC was never initialized; initWICnow() must succeed first");
      return 0;
   }
 
@@ -1214,7 +1214,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       if (sehCode!=0)
       {
          sprintf_s(sehTxt, "0x%08X", (unsigned int)sehCode);
-         fnOutputDebug("WICpreLoadImage: the WIC codec faulted (" + std::string(sehTxt) + ") on file: " + WideCharToString(szFileName));
+         QPV_DBG("WICpreLoadImage: the WIC codec faulted (" + std::string(sehTxt) + ") on file: " + WideCharToString(szFileName));
          WICguardedRelease(pWICclassFrameDecoded);
          WICguardedRelease(pWICclassDecoder);
          pWICclassFrameDecoded = NULL;
@@ -1226,7 +1226,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       // records and acts on, so unlike the thumbnailer it cannot proceed without either
       if (SUCCEEDED(hr) && (!facts.gotContainerFmt || !facts.gotPixelFmt))
       {
-         fnOutputDebug("WICpreLoadImage: error: the frame reports no container or pixel format");
+         QPV_DBG("WICpreLoadImage: error: the frame reports no container or pixel format");
          hr = E_FAIL;
       }
 
@@ -1235,7 +1235,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
 
       if (SUCCEEDED(hr) && ((!facts.width || !facts.height) || (facts.width==1 && facts.height==1)))
       {
-         fnOutputDebug("WICpreLoadImage: error: no width and height for the decoded frame");
+         QPV_DBG("WICpreLoadImage: error: no width and height for the decoded frame");
          hr = E_FAIL;
       }
 
@@ -1243,7 +1243,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       {
          // GDI+, FreeImage and the AHK side all carry these as signed ints further down;
          // a header claiming more than that is malformed by definition
-         fnOutputDebug("WICpreLoadImage: error: the frame declares an impossible size");
+         QPV_DBG("WICpreLoadImage: error: the frame declares an impossible size");
          hr = E_FAIL;
       }
 
@@ -1256,7 +1256,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
          if (infoSehCode!=0)
          {
             sprintf_s(sehTxt, "0x%08X", (unsigned int)infoSehCode);
-            fnOutputDebug("WICpreLoadImage: the pixel format component faulted (" + std::string(sehTxt) + ")");
+            QPV_DBG("WICpreLoadImage: the pixel format component faulted (" + std::string(sehTxt) + ")");
          }
 
          destinationFormat = decideWICtoFIMpixelFormat(facts.pixelFmt);
@@ -1269,18 +1269,18 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
             if (WICguardedPaletteHasAlpha(m_pIWICFactory, pWICclassFrameDecoded, &palSehCode)==1)
                destinationFormat = 32;
             else if (palSehCode!=0)
-               fnOutputDebug("WICpreLoadImage: the codec faulted on the palette");
+               QPV_DBG("WICpreLoadImage: the codec faulted on the palette");
          }
 
          int tif = (IsFileExtension(szFileName, L".tif")==1 || IsFileExtension(szFileName, L".tiff")==1) ? 1 : 0;
          if (tif==1 && destinationFormat>32 && isFIMokay==1)
          {
-            fnOutputDebug("WICpreLoadImage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
+            QPV_DBG("WICpreLoadImage: abandon loading HDR TIFF image with WIC; pass it to FreeImage");
             destinationFormat = 0;
             hr = E_FAIL;
          } else if (ucontainerFmt==9 && facts.width==256 && facts.height==192)
          {
-            fnOutputDebug("WICpreLoadImage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
+            QPV_DBG("WICpreLoadImage: error: DNG loaded could not be decoded properly; an icon was retrieved - to be discarded");
             hr = E_FAIL;
          }
          // fnOutputDebug("WICpreLoadImage: container format = " + std::to_string(ucontainerFmt));
@@ -1307,7 +1307,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       if (FAILED(hr))
       {
          WICdestroyPreloadedImage(1);
-         fnOutputDebug("WICpreLoadImage: WIC decoder error on file: " + WideCharToString(szFileName));
+         QPV_DBG("WICpreLoadImage: WIC decoder error on file: " + WideCharToString(szFileName));
          return 0;
       }
 
@@ -1320,7 +1320,7 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
       // function and into AHK, which has nothing to catch it with
       try
       {
-          fnOutputDebug("WICpreLoadImage: an undefined error occured");
+          QPV_DBG("WICpreLoadImage: an undefined error occured");
           WICdestroyPreloadedImage(1);
       } catch (...) { }
       return 0;
@@ -1347,8 +1347,8 @@ static int openCVresizeBitmap(unsigned char *imageData, unsigned char *otherData
       cv::resize(image, other, other.size(), 0, 0, interpolation);
   } catch (const cv::Exception &e)
   {
-      fnOutputDebug("OpenCV: error attempting to resize bitmap in openCVresizeBitmap: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
-      fnOutputDebug( e.what() );
+      QPV_DBG("OpenCV: error attempting to resize bitmap in openCVresizeBitmap: " + std::to_string(w) + " x " + std::to_string(h) + " to " + std::to_string(rw) + " x " + std::to_string(rh));
+      QPV_DBG( e.what() );
       return 0;
   }
   return 1;
@@ -1383,7 +1383,7 @@ struct WICload {
 };
 
 static void wicLoadLog(const WICload &ld, const std::string &msg) {
-    fnOutputDebug(std::to_string(ld.threadIDu) + "# | LoadWICimage: " + msg);
+    QPV_DBG(std::to_string(ld.threadIDu) + "# | LoadWICimage: " + msg);
 }
 
 // the decoder and the frame, with the frame's header in facts; on a codec fault both are released
@@ -1617,7 +1617,7 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadWICimage(int threadIDu, int noBPPcon
 
     if (m_pIWICFactory==NULL)
     {
-       fnOutputDebug(std::to_string(threadIDu) + "# | LoadWICimage: WIC was never initialized; initWICnow() must succeed first");
+       QPV_DBG(std::to_string(threadIDu) + "# | LoadWICimage: WIC was never initialized; initWICnow() must succeed first");
        return NULL;
     }
 

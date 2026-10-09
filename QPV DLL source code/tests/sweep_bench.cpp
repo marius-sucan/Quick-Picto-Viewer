@@ -54,6 +54,7 @@ typedef const wchar_t*     LPCWSTR;
 #define QPV_FORCEINLINE inline __attribute__((always_inline))
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "header_extract.h"    // verbatim from dupes-search.h

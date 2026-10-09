@@ -73,6 +73,7 @@ template <typename T> static inline T clamp(T v, T lo, T hi) { return (v < lo) ?
 
 static std::vector<std::string> gShimDebug;
 static inline void fnOutputDebug(std::string s) { gShimDebug.push_back(s); }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static inline std::string WideCharToString(const wchar_t *w) {
     std::string o;
     for (; w && *w; w++) o.push_back((char)(*w & 0x7F));

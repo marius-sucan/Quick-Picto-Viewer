@@ -95,7 +95,7 @@ static void pdfwWriteRaw(PdfWriter *w, const char *data, size_t n) {
         const DWORD chunk = (DWORD)std::min<size_t>(n, 1u << 30);
         if (!WriteFile(w->file, data, chunk, &wrote, NULL) || wrote==0)
         {
-           fnOutputDebug("PdfWriter: failed to write the file");
+           QPV_DBG("PdfWriter: failed to write the file");
            w->failed = true;
            return;
         }
@@ -231,7 +231,7 @@ static void pdfwRollback(PdfWriter *w, const PdfwMark &m) {
        pos.QuadPart = (LONGLONG)m.offset;
        if (!SetFilePointerEx(w->file, pos, NULL, FILE_BEGIN) || !SetEndOfFile(w->file))
        {
-          fnOutputDebug("PdfWriter: failed to cut an unfinished page off the file");
+          QPV_DBG("PdfWriter: failed to cut an unfinished page off the file");
           w->failed = true;
           return;
        }
@@ -872,7 +872,7 @@ static bool pdfwFinish(PdfWriter *w, const wchar_t *title, const wchar_t *produc
         UINT64 v = w->offsets[i];
         if (v==0 || v>PDFW_MAX_OFFSET)
         {
-           fnOutputDebug("PdfWriter: an object has no usable offset in the cross-reference table");
+           QPV_DBG("PdfWriter: an object has no usable offset in the cross-reference table");
            return false;
         }
 
@@ -1130,7 +1130,7 @@ DLL_API int DLL_CALLCONV PdfWriterEnd(PdfWriter *w, int commit, const wchar_t *t
 
     if (commit==1 && result==0 && !MoveFileExW(w->temp.c_str(), w->dest.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
-       fnOutputDebug("PdfWriter: failed to replace the destination file");
+       QPV_DBG("PdfWriter: failed to replace the destination file");
        result = 3;
     }
 

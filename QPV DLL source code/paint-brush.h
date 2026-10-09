@@ -1058,14 +1058,14 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 ) {
     if (!imgData || imgW<=0 || imgH<=0 || pitch<=0 || brushSize<=0)
     {
-       fnOutputDebug("PaintBrushLarge(): incorrect data provided");
+       QPV_DBG("PaintBrushLarge(): incorrect data provided");
        return 0;
     }
 
     int bytesPerPixel = imgBpp / 8;
     if (bytesPerPixel!=3 && bytesPerPixel!=4)
     {
-       fnOutputDebug("PaintBrushLarge() only supports 24-bit (BGR) and 32-bit (BGRA) formats.");
+       QPV_DBG("PaintBrushLarge() only supports 24-bit (BGR) and 32-bit (BGRA) formats.");
        return 0;
     }
 

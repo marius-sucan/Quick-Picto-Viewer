@@ -15,7 +15,7 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
     Gdiplus::GpBitmap *myBitmap = NULL;
     if (!thisWICbitmap)
     {
-       fnOutputDebug("WICBitmapToGdipBitmap: no WIC bitmap given");
+       QPV_DBG("WICBitmapToGdipBitmap: no WIC bitmap given");
        return myBitmap;
     }
 
@@ -26,7 +26,7 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
     thisWICbitmap->GetSize(&width, &height);
     if (!width || !height || height<2 || width<2 || FAILED(hr))
     {
-       fnOutputDebug("WICBitmapToGdipBitmap: invalid WIC bitmap dimensions");
+       QPV_DBG("WICBitmapToGdipBitmap: invalid WIC bitmap dimensions");
        return myBitmap;
     }
 
@@ -44,7 +44,7 @@ Gdiplus::GpBitmap* WICBitmapToGdipBitmap(IWICBitmap* &thisWICbitmap) {
        SafeRelease(convertedWICbitmap, "WICBitmapToGdipBitmap: convertedWICbitmap", 0);
     } else
     {
-       fnOutputDebug("WICBitmapToGdipBitmap: QueryInterface or WICConvertBitmapSource failed");
+       QPV_DBG("WICBitmapToGdipBitmap: QueryInterface or WICConvertBitmapSource failed");
        Gdiplus::DllExports::GdipDisposeImage(myBitmap);
        myBitmap = NULL;
     }
@@ -71,14 +71,14 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
 
     HRESULT hr = SHCreateStreamOnFile(szFileName, STGM_READ | STGM_SHARE_DENY_WRITE, &pStream);
     if (pStream==NULL) {
-        fnOutputDebug("WicD2DrenderSVG: failed SHCreateStreamOnFile()");
+        QPV_DBG("WicD2DrenderSVG: failed SHCreateStreamOnFile()");
         return NULL;
     }
 
     // Create WIC Bitmap
     hr = wicFac->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnDemand, &pWICBitmap);
     if (!(SUCCEEDED(hr))) {
-        fnOutputDebug("WicD2DrenderSVG: failed WIC factory - CreateBitmap()");
+        QPV_DBG("WicD2DrenderSVG: failed WIC factory - CreateBitmap()");
         pStream->Release();
         return NULL;
     }
@@ -90,7 +90,7 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
     // Create WIC Bitmap render target
     hr = d2dFac->CreateWicBitmapRenderTarget(pWICBitmap, props, &pRenderTarget);
     if (!(SUCCEEDED(hr))) {
-        fnOutputDebug("WicD2DrenderSVG: failed CreateWicBitmapRenderTarget()");
+        QPV_DBG("WicD2DrenderSVG: failed CreateWicBitmapRenderTarget()");
         pStream->Release();
         pWICBitmap->Release();
         return NULL;
@@ -127,13 +127,13 @@ IWICBitmap* WicD2DrenderSVG(const wchar_t* szFileName, UINT width, UINT height, 
             if (SUCCEEDED(hr))
                rendered = true;
             else
-               fnOutputDebug("WicD2DrenderSVG: failed EndDraw()");
+               QPV_DBG("WicD2DrenderSVG: failed EndDraw()");
 
             // D2D1Brush->Release();
-        } else fnOutputDebug("WicD2DrenderSVG: failed pDeviceContext->CreateSvgDocument(pStream)");
+        } else QPV_DBG("WicD2DrenderSVG: failed pDeviceContext->CreateSvgDocument(pStream)");
 
         SafeRelease(pDeviceContext, "WicD2DrenderSVG: pDeviceContext", 0);
-    } else fnOutputDebug("WicD2DrenderSVG: failed pRenderTarget->QueryInterface(&pDeviceContext)");
+    } else QPV_DBG("WicD2DrenderSVG: failed pRenderTarget->QueryInterface(&pDeviceContext)");
 
     SafeRelease(pSvgDocument, "WicD2DrenderSVG: pSvgDocument", 0);
     SafeRelease(pRenderTarget, "WicD2DrenderSVG: pRenderTarget", 0);

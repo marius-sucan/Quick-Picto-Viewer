@@ -52,6 +52,7 @@ typedef unsigned long long ULONGLONG;
 struct GUID { unsigned int Data1; unsigned short Data2, Data3; unsigned char Data4[8]; };
 
 static inline void fnOutputDebug(std::string s) { (void)s; }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static inline std::string WideCharToString(const wchar_t *w) {
     std::string o;
     for (; w && *w; w++) o.push_back((char)(*w & 0x7F));

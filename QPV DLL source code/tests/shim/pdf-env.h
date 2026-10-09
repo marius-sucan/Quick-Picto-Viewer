@@ -53,6 +53,7 @@ typedef union { struct { DWORD LowPart; int HighPart; } u; LONGLONG QuadPart; } 
 
 static std::string gShimDebug;
 static inline void fnOutputDebug(std::string s) { gShimDebug = s; }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 
 // the hooks
 static long long   gShimDiskLeft = -1;       // bytes the disk still takes; -1 = unlimited

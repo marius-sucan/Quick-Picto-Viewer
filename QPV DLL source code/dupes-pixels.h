@@ -481,7 +481,7 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
           srcH = maxH;
           meta.frames = (pageCount > 0) ? pageCount : 1;
        } else if (errorType!=0)
-          fnOutputDebug("dupesPixels: PDFium could not render " + WideCharToString(path.c_str())
+          QPV_DBG("dupesPixels: PDFium could not render " + WideCharToString(path.c_str())
                       + ", error " + std::to_string(errorType));
        // A PDF that will not render is DP_ERR_LOAD like anything else here, so the row is
        // marked the way markSQLdbEntryDeleted() marks it. That is deliberately unlike
@@ -655,7 +655,7 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
            Gdiplus::DllExports::GdipDisposeImage(bmp);
 
         res.status = DP_ERR_PROCESS;
-        fnOutputDebug("dupesPixels: an exception escaped while processing " + WideCharToString(job.path.c_str()));
+        QPV_DBG("dupesPixels: an exception escaped while processing " + WideCharToString(job.path.c_str()));
     }
 }
 
@@ -1086,7 +1086,7 @@ DLL_API int DLL_CALLCONV dupesPixInit(int nThreads) {
     bindFreeImageOnce();
     if (m_pIWICFactory==NULL)
     {
-       fnOutputDebug("dupesPixels: cannot start, WIC was not initialized; call initWICnow() first");
+       QPV_DBG("dupesPixels: cannot start, WIC was not initialized; call initWICnow() first");
        return 0;
     }
 
@@ -1098,7 +1098,7 @@ DLL_API int DLL_CALLCONV dupesPixInit(int nThreads) {
         dpWorkers.push_back(std::thread(dpWorkerBody, (size_t)i));
 
     dpState.alive = (LONG)dpWorkers.size();
-    fnOutputDebug("dupesPixels: started with " + std::to_string(dpWorkers.size()) + " workers");
+    QPV_DBG("dupesPixels: started with " + std::to_string(dpWorkers.size()) + " workers");
     return (int)dpWorkers.size();
 }
 
@@ -1278,7 +1278,7 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
 
     if (SQ.bind_double==NULL || SQ.bind_blob==NULL || SQ.bind_null==NULL)
     {
-       fnOutputDebug("dupesPixels: sqlite3.dll is missing the bind entry points this needs");
+       QPV_DBG("dupesPixels: sqlite3.dll is missing the bind entry points this needs");
        return 0;
     }
 
@@ -1549,7 +1549,7 @@ DLL_API int DLL_CALLCONV dupesPixShutdown() {
 
     dpFinalizeStatements();
     dpDB = NULL;
-    fnOutputDebug(allOut ? "dupesPixels: shut down" : "dupesPixels: shut down with a worker still busy");
+    QPV_DBG(allOut ? "dupesPixels: shut down" : "dupesPixels: shut down with a worker still busy");
     return allOut ? 1 : 0;
 }
 

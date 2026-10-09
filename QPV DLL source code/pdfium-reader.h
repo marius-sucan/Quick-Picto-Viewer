@@ -179,9 +179,9 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
     {
         errorType = FPDF_GetLastError();
         if (errorType==4)
-           fnOutputDebug("failed to load PDF document: incorrect password " + std::to_string(errorType));
+           QPV_DBG("failed to load PDF document: incorrect password " + std::to_string(errorType));
         else
-           fnOutputDebug("failed to load PDF document: " + std::to_string(errorType) );
+           QPV_DBG("failed to load PDF document: " + std::to_string(errorType) );
 
         return errorType;
     }
@@ -189,7 +189,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
     int pageCount = FPDF_GetPageCount(document);
     if (pageCount<=0)
     {
-       fnOutputDebug("failed to load PDF: no pages found");
+       QPV_DBG("failed to load PDF: no pages found");
        errorType = -2;
        FPDF_CloseDocument(document);
        return errorType;
@@ -202,7 +202,7 @@ DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenI
     if (*givenIndex==-1)
     {
        unsigned long permissions = FPDF_GetDocPermissions(document);
-       fnOutputDebug("perms=" + std::to_string(permissions));
+       QPV_DBG("perms=" + std::to_string(permissions));
        if (!(permissions & 0x0010))
           *givenIndex = 1; // copy not allowed
 
@@ -280,9 +280,9 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     {
         *errorType = FPDF_GetLastError();
         if (*errorType==4)
-           fnOutputDebug("failed to load PDF document: incorrect password " + std::to_string(*errorType));
+           QPV_DBG("failed to load PDF document: incorrect password " + std::to_string(*errorType));
         else
-           fnOutputDebug("failed to load PDF document: " + std::to_string(*errorType) );
+           QPV_DBG("failed to load PDF document: " + std::to_string(*errorType) );
 
         return myBitmap;
     }
@@ -292,7 +292,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     {
         if (pageCount<=0)
         {
-           fnOutputDebug("failed to load PDF: no pages found");
+           QPV_DBG("failed to load PDF: no pages found");
            *errorType = -2;
         }
         *varOut = pageCount;
@@ -304,7 +304,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     pageIndex = std::clamp(pageIndex, 0, pageCount - 1);
     FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
     if (!PDFpage) {
-        fnOutputDebug("failed to load PDF page");
+        QPV_DBG("failed to load PDF page");
         FPDF_CloseDocument(document);
         *errorType = -3;
         return myBitmap;
@@ -343,7 +343,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     Gdiplus::DllExports::GdipCreateBitmapFromScan0(bitmapWidth, bitmapHeight, cbStride, destinationGdipFormat, NULL, &myBitmap);
     if (myBitmap==NULL)
     {
-       fnOutputDebug("failed to load PDF page; unable to allocate the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
+       QPV_DBG("failed to load PDF page; unable to allocate the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
        FPDF_ClosePage(PDFpage);
        FPDF_CloseDocument(document);
        *errorType = -4;
@@ -356,7 +356,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     // locking the PARGB bitmap as ARGB takes a second full-size buffer, so this can fail where the bitmap did not
     if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationGdipFormat, &bitmapDatu)!=Gdiplus::Ok)
     {
-       fnOutputDebug("failed to load PDF page; unable to lock the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
+       QPV_DBG("failed to load PDF page; unable to lock the GDI+ bitmap: " + std::to_string(bitmapWidth) + " x " + std::to_string(bitmapHeight));
        Gdiplus::DllExports::GdipDisposeImage(myBitmap);
        FPDF_ClosePage(PDFpage);
        FPDF_CloseDocument(document);
@@ -378,7 +378,7 @@ static Gdiplus::GpBitmap* coreRenderPdfPageAsBitmap(const wchar_t *pdfPath, int 
     } else
     {
         *errorType = -5;
-        fnOutputDebug("failed to create the FPDF bitmap to render PDF");
+        QPV_DBG("failed to create the FPDF bitmap to render PDF");
         Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
         Gdiplus::DllExports::GdipDisposeImage(myBitmap);
         myBitmap = NULL;

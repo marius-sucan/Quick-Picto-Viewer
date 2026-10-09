@@ -272,18 +272,18 @@ bool initBoolMaskData() {
        } catch(const std::bad_alloc& e)
        {
           imgSel.shape = 0;
-          fnOutputDebug("imgSel.mask failed. bad_alloc =" + std::to_string(s));
+          QPV_DBG("imgSel.mask failed. bad_alloc =" + std::to_string(s));
           return 0;
        } catch(const std::length_error& e)
        {
           imgSel.shape = 0;
-          fnOutputDebug("imgSel.mask failed. length_error =" + std::to_string(s));
+          QPV_DBG("imgSel.mask failed. length_error =" + std::to_string(s));
           return 0;
        }
-       fnOutputDebug("imgSel.mask RESIZED=" + std::to_string(s) + "||" + std::to_string(imgSel.mask.size()));
+       QPV_DBG("imgSel.mask RESIZED=" + std::to_string(s) + "||" + std::to_string(imgSel.mask.size()));
     } else
     {
-       fnOutputDebug("imgSel.mask size=" + std::to_string(s) + "||" + std::to_string(imgSel.mask.size()));
+       QPV_DBG("imgSel.mask size=" + std::to_string(s) + "||" + std::to_string(imgSel.mask.size()));
     }
 
     imgSel.mask.fill_zero();
@@ -458,7 +458,7 @@ void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, con
 }
 
 int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, int ppy1, int ppx2, int ppy2) {
-    fnOutputDebug("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
+    QPV_DBG("FillMaskPolygon() invoked; PointsCount=" + std::to_string(PointsCount));
     if (!PointsList || PointsCount < 3)
        return 0;
 
@@ -481,15 +481,15 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
 
     int hmax = max(boundMaxY, h) + 1;
     polygonMapMin.resize(hmax);
-    fnOutputDebug("polygonMapMin reserved");
+    QPV_DBG("polygonMapMin reserved");
     
     polygonMapEdges.resize(hmax);
-    fnOutputDebug("polygonMapEdges reserved");
+    QPV_DBG("polygonMapEdges reserved");
 
     traceMaskPolyBoundaries(w, h, localPoints.data(), PointsCount, ppx1, ppy1, ppx2, ppy2, polygonMapEdges, polygonMapMin);
-    fnOutputDebug("traceMaskPolyBoundaries done");
+    QPV_DBG("traceMaskPolyBoundaries done");
     fillMaskPolyBounds(w, h, localPoints.data(), PointsCount, ppx1, ppy1, ppx2, ppy2, 0, polygonMapEdges);
-    fnOutputDebug("fillMaskPolyBounds done");
+    QPV_DBG("fillMaskPolyBounds done");
 
     polygonMapEdges.clear();
     polygonMapEdges.shrink_to_fit();
@@ -547,7 +547,7 @@ DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount
 // function invoked by coreAddUnorderedVectorPointCurveMode() in Quick Picto Viewer AHK file
 
     std::vector<int> PathsMap(fPointsCount + 3);
-    fnOutputDebug("step 0: " + std::to_string(oPointsCount) + " / " + std::to_string(fPointsCount));
+    QPV_DBG("step 0: " + std::to_string(oPointsCount) + " / " + std::to_string(fPointsCount));
     for ( int i = 0; i < oPointsCount*2; i+=2)
     {
         oPointsList[i] = round( oPointsList[i] );
@@ -666,7 +666,7 @@ DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount
         *l = last;
     }
 
-    fnOutputDebug("a=" + std::to_string(zza) + "; b=" + std::to_string(zzb) + "; f=" + std::to_string(first) + "; l=" + std::to_string(last));
+    QPV_DBG("a=" + std::to_string(zza) + "; b=" + std::to_string(zzb) + "; f=" + std::to_string(first) + "; l=" + std::to_string(last));
     // fnOutputDebug("f=" + std::to_string(first) + "; h=" + std::to_string(hasFound) + "; l=" + std::to_string(last));
     return r;
 }
@@ -1237,7 +1237,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     //   clipMode      - 2 = no clipping, 1/3 = clip against imgSel.clipShape
     //   offsetY       - vertical pixel offset applied during drawing
 
-    fnOutputDebug(std::to_string(clipMode) + " NewDrawLinesOnMask() invoked; PointsCount=" + std::to_string(PointsCount));
+    QPV_DBG(std::to_string(clipMode) + " NewDrawLinesOnMask() invoked; PointsCount=" + std::to_string(PointsCount));
     if (PointsCount < 2)
        return 0;
 
@@ -1245,7 +1245,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2;
     if (s != imgSel.mask.size())
     {
-       fnOutputDebug("NewDrawLinesOnMask: imgSel.mask[] incorrect size=" + std::to_string(s) + " != " + std::to_string(imgSel.mask.size()));
+       QPV_DBG("NewDrawLinesOnMask: imgSel.mask[] incorrect size=" + std::to_string(s) + " != " + std::to_string(imgSel.mask.size()));
        return 0;
     }
 
@@ -1254,7 +1254,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 
     if (clipMode!=2 && s!=imgSel.clipShape.size())
     {
-       fnOutputDebug("NewDrawLinesOnMask: imgSel.clipShape[] incorrect size; it should match the size of imgSel.mask[] size=" + std::to_string(s) + " != " + std::to_string(imgSel.clipShape.size()));
+       QPV_DBG("NewDrawLinesOnMask: imgSel.clipShape[] incorrect size; it should match the size of imgSel.mask[] size=" + std::to_string(s) + " != " + std::to_string(imgSel.clipShape.size()));
        return 0;
     }
 
@@ -1319,16 +1319,16 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 
 DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px2, int py2, int imgW, int imgH, int thickness) {
   INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2; // variables set by prepareSelectionArea()
-  fnOutputDebug("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "; SIZE desired=" + std::to_string(s));
+  QPV_DBG("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "; SIZE desired=" + std::to_string(s));
   if (s!=imgSel.mask.size())
   {
-     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED imgSel.mask=" + std::to_string(imgSel.mask.size()));
+     QPV_DBG("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED imgSel.mask=" + std::to_string(imgSel.mask.size()));
      return 0;
   }
 
   if (s!=imgSel.depthMask.size())
   {
-     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED imgSel.depthMask=" + std::to_string(imgSel.depthMask.size()));
+     QPV_DBG("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED imgSel.depthMask=" + std::to_string(imgSel.depthMask.size()));
      return 0;
   }
 
@@ -1362,7 +1362,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
      imgSel.inverted = 0;
      imgSel.highDepth = highDepth;
      INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2; // variables set by prepareSelectionArea()
-     fnOutputDebug("prepareDrawLinesMask() invoked: w / h= " + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "; size=" + std::to_string(s));
+     QPV_DBG("prepareDrawLinesMask() invoked: w / h= " + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "; size=" + std::to_string(s));
 
      if (s!=imgSel.mask.size())
      {
@@ -1371,15 +1371,15 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
            imgSel.mask.resize(s);
         } catch(const std::bad_alloc& e)
         {
-           fnOutputDebug("imgSel.mask failed. bad_alloc");
+           QPV_DBG("imgSel.mask failed. bad_alloc");
            return 0;
         } catch(const std::length_error& e)
         {
-           fnOutputDebug("imgSel.mask failed. length_error");
+           QPV_DBG("imgSel.mask failed. length_error");
            return 0;
         }
  
-        fnOutputDebug("imgSel.mask RESIZED");
+        QPV_DBG("imgSel.mask RESIZED");
      }
 
      if (clipMode!=2)
@@ -1389,17 +1389,17 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
            imgSel.clipShape.resize(s);
         } catch(const std::bad_alloc& e)
         {
-           fnOutputDebug("imgSel.clipShape failed. bad_alloc");
+           QPV_DBG("imgSel.clipShape failed. bad_alloc");
            return 0;
         } catch(const std::length_error& e)
         {
-           fnOutputDebug("imgSel.clipShape failed. length_error");
+           QPV_DBG("imgSel.clipShape failed. length_error");
            return 0;
         }
  
         imgSel.clipShape = imgSel.mask;
         bool pp = (imgSel.mask.size()==s) ? 1 : 0;
-        fnOutputDebug(std::to_string(clipMode) + "imgSel.clipShape RESIZED " + std::to_string(pp) + " size = " + std::to_string(imgSel.mask.size()));
+        QPV_DBG(std::to_string(clipMode) + "imgSel.clipShape RESIZED " + std::to_string(pp) + " size = " + std::to_string(imgSel.mask.size()));
     }
 
     if (s!=imgSel.depthMask.size() && imgSel.highDepth==1)
@@ -1409,15 +1409,15 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
           imgSel.depthMask.resize(s);
        } catch(const std::bad_alloc& e)
        {
-          fnOutputDebug("imgSel.depthMask failed. bad_alloc");
+          QPV_DBG("imgSel.depthMask failed. bad_alloc");
           return 0;
        } catch(const std::length_error& e)
        {
-          fnOutputDebug("imgSel.depthMask failed. length_error");
+          QPV_DBG("imgSel.depthMask failed. length_error");
           return 0;
        }
 
-       fnOutputDebug("imgSel.depthMask RESIZED");
+       QPV_DBG("imgSel.depthMask RESIZED");
        fill(imgSel.depthMask.begin(), imgSel.depthMask.end(), 0);
     } else if (imgSel.highDepth==0)
     {
@@ -1426,7 +1426,7 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
     }
 
     imgSel.mask.fill_zero();
-    fnOutputDebug("prepareDrawLinesMask() - imgSel.mask DONE; radius = " + std::to_string(radius));
+    QPV_DBG("prepareDrawLinesMask() - imgSel.mask DONE; radius = " + std::to_string(radius));
     return 1;
 }
 
