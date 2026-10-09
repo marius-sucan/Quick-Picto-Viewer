@@ -9,8 +9,8 @@
 //    FloodFillDiscardRegion()                              drops it
 //
 // #included by qpv-main.cpp after selection-mask.h, whose selection state and clipMaskFilter() it
-// uses; it also uses CalculateNewBlendModes(), CalcPixOffset(), RGBtoGray() and the
-// LUT_X/Y/Z_* tables of qpv-main.cpp.
+// uses; it also uses CalculateNewBlendModes() from blend-modes.h, and CalcPixOffset(), RGBtoGray()
+// and the LUT_X/Y/Z_* tables of qpv-main.cpp.
 //
 // written by Marius Șucan with Claude Opus 5.5
 

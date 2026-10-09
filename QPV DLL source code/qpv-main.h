@@ -84,10 +84,6 @@ struct HSLColor {
     };
   };
 
-struct RGBAColor {
-    int b, g, r, a;
-};
-
 
 // ---------------------------------------------------------------------------
 // RGBA16color - the 16-bit-internal pixel used by AdjustImageColorsPrecise().
