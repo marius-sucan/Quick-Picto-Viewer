@@ -832,6 +832,395 @@ static void drawThickPolylineRound(cv::Mat &img, const std::vector<cv::Point> &p
         cv::circle(img, pts[i], cvRound(r), color, cv::FILLED, cv::LINE_8);
 }
 
+// the stroke's box in mask-local coordinates, and the height of the bands it is drawn in
+struct LinesBox {
+    int bbMinX, bbMinY, bbMaxX, bbMaxY;
+    int roiW, bandHeight;
+};
+
+// a band of the box: the pixels drawn into it, and where it sits in the mask
+struct LinesTile {
+    cv::Mat mat;
+    int offX = 0;
+    int offY = 0;
+};
+
+// false when the stroke misses the mask
+static bool linesStrokeBox(const std::vector<cv::Point> &cvPoints, const int cvThickness, const int thickness, LinesBox &box) {
+    // --- Bounding-box + row-band tiling to reduce temporary memory ---
+    // Compute the bounding box of all points in mask-local space.
+    // Only allocate a cv::Mat for this region (and tile it if still too large).
+    int bbMinX = cvPoints[0].x, bbMaxX = cvPoints[0].x;
+    int bbMinY = cvPoints[0].y, bbMaxY = cvPoints[0].y;
+    for (size_t i = 1; i < cvPoints.size(); i++)
+    {
+        if (cvPoints[i].x < bbMinX) bbMinX = cvPoints[i].x;
+        if (cvPoints[i].x > bbMaxX) bbMaxX = cvPoints[i].x;
+        if (cvPoints[i].y < bbMinY) bbMinY = cvPoints[i].y;
+        if (cvPoints[i].y > bbMaxY) bbMaxY = cvPoints[i].y;
+    }
+
+    // Expand by a margin for line thickness, caps, and miter join extensions
+    const int bbMargin = max(cvThickness * 4, thickness + 10);
+    bbMinX = max(0, bbMinX - bbMargin);
+    bbMinY = max(0, bbMinY - bbMargin);
+    bbMaxX = min((int)imgSel.maskW - 1, bbMaxX + bbMargin);
+    bbMaxY = min((int)imgSel.maskH - 1, bbMaxY + bbMargin);
+
+    if (bbMinX > bbMaxX || bbMinY > bbMaxY)
+        return false; // all points are outside the mask bounds
+
+    const int roiW = bbMaxX - bbMinX + 1;
+    const int roiH = bbMaxY - bbMinY + 1;
+
+    // Keep each tile under 64 MB to limit peak temporary memory
+    const INT64 maxTileBytes = 64LL * 1024 * 1024;
+    const int bandHeight = (roiW > 0)
+        ? max(64, (int)min((INT64)roiH, maxTileBytes / (INT64)roiW))
+        : roiH;
+    box = {bbMinX, bbMinY, bbMaxX, bbMaxY, roiW, bandHeight};
+    return true;
+}
+
+// the ends of an open path with round joins: square (2), flat (0, 1: the round ends polylines() draws are erased) or round (3)
+static void drawRoundJoinCaps(cv::Mat &tileMat, const std::vector<cv::Point> &tilePoints, const int PointsCount, const int thickness, const int roundCaps) {
+    const cv::Scalar drawColor(255);
+    const cv::Scalar drawBlackColor(0);
+    if (roundCaps <= 2)
+    {
+        // Box/square caps: extend the line at each endpoint by 'thickness' pixels
+        // and draw a filled rectangle for the cap
+        for (int capIdx = 0; capIdx < 2; capIdx++)
+        {
+            cv::Point pA, pB;
+            if (capIdx == 0)
+            {
+               pA = tilePoints[0];
+               pB = tilePoints[1];
+            } else
+            {
+               pA = tilePoints[PointsCount - 1];
+               pB = tilePoints[PointsCount - 2];
+            }
+
+            // Direction from the interior toward the endpoint
+            double dx = (double)(pA.x - pB.x);
+            double dy = (double)(pA.y - pB.y);
+            double len = sqrt(dx * dx + dy * dy);
+            if (len < 0.01)
+               continue;
+
+            // Normalize direction
+            double nx = dx / len;
+            double ny = dy / len;
+            // Perpendicular
+            double px = -ny;
+            double py = nx;
+
+            // Start the cap 2 pixels earlier (overlap with the line) to prevent seams
+            double startX = (roundCaps == 2) ? pA.x - nx : pA.x - nx * 4.0;
+            double startY = (roundCaps == 2) ? pA.y - ny : pA.y - ny * 4.0;
+
+            // Cap extends 'thickness' + 2 pixels beyond the endpoint,
+            // making it 2 pixels longer
+            double extX = pA.x + nx * (thickness + 2.0);
+            double extY = pA.y + ny * (thickness + 2.0);
+
+            // Build the 4 corners of the box cap rectangle
+            cv::Point capRect[4];
+            int tk = (roundCaps == 2) ? thickness : thickness + 1;
+            capRect[0] = cv::Point((int)round(startX + px * tk), (int)round(startY + py * tk));
+            capRect[1] = cv::Point((int)round(startX - px * tk), (int)round(startY - py * tk));
+            capRect[2] = cv::Point((int)round(extX - px * tk), (int)round(extY - py * tk));
+            capRect[3] = cv::Point((int)round(extX + px * tk), (int)round(extY + py * tk));
+
+            std::vector<std::vector<cv::Point>> capContour = { {capRect[0], capRect[1], capRect[2], capRect[3]} };
+            if (roundCaps == 2)
+               cv::fillPoly(tileMat, capContour, drawColor);
+            else
+               cv::fillPoly(tileMat, capContour, drawBlackColor);
+        }
+    } else if (roundCaps == 3)
+    {
+        // Round caps: draw a filled circle at the endpoints
+        for (int capIdx = 0; capIdx < 2; capIdx++)
+        {
+            cv::Point pEnd = (capIdx == 0) ? tilePoints[0] : tilePoints[PointsCount - 1];
+            cv::circle(tileMat, pEnd, thickness, drawColor, cv::FILLED, cv::LINE_8);
+        }
+    }
+}
+
+// OpenCV's thick polyline, round at every point, then the ends of an open path
+static void drawRoundJoinedLines(LinesTile &tile, const std::vector<cv::Point> &cvPoints, const int PointsCount, const int cvThickness,
+                                 const int thickness, const int closed, const int roundCaps) {
+    const cv::Scalar drawColor(255);
+    // Round joins mode: offset cvPoints to tile-local coordinates
+    std::vector<cv::Point> tilePoints(cvPoints.size());
+    for (size_t i = 0; i < cvPoints.size(); i++)
+        tilePoints[i] = cv::Point(cvPoints[i].x - tile.offX, cvPoints[i].y - tile.offY);
+
+    if (cvThickness <= 32767)
+    {
+       std::vector<std::vector<cv::Point>> polyContours = { tilePoints };
+       cv::polylines(tile.mat, polyContours, (closed == 1), drawColor, cvThickness, cv::LINE_8);
+    } else
+       drawThickPolylineRound(tile.mat, tilePoints, (closed == 1), drawColor, cvThickness);
+
+    // For an open path, handle cap styles at the two endpoints
+    if (closed != 1 && PointsCount >= 2)
+       drawRoundJoinCaps(tile.mat, tilePoints, PointsCount, thickness, roundCaps);
+}
+
+// a degenerate segment becomes a disc
+static void drawMiterSegments(LinesTile &tile, const float* PointsList, const int PointsCount, const int thickness, const int closed, const int offsetY) {
+    const cv::Scalar drawColor(255);
+    const int pci = PointsCount - 1;
+
+    // Draw each line segment as a filled rectangle
+    for (int pts = 0; pts < PointsCount; pts++)
+    {
+        int i = pts * 2;
+        float xa = PointsList[i];
+        float ya = PointsList[i + 1];
+        float xb, yb;
+        if (pts == pci)
+        {
+            if (closed != 1)
+               break;
+            xb = PointsList[0];
+            yb = PointsList[1];
+        } else
+        {
+            xb = PointsList[i + 2];
+            yb = PointsList[i + 3];
+        }
+
+        double orig_dx = xb - xa;
+        double orig_dy = yb - ya;
+        if (fabs(orig_dx) < 0.01f && fabs(orig_dy) < 0.01f)
+        {
+            // Degenerate segment: stamp a circle
+            int cx = (int)round(xa - imgSel.maskX) - tile.offX;
+            int cy = (int)round(ya - imgSel.maskY + offsetY) - tile.offY;
+            cv::circle(tile.mat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
+            continue;
+        }
+
+        // Compute the 4 corners of the thick rectangle for this segment
+        Point npA, npB, np1, np2, np3, np4;
+        extendLine({xa, ya}, {xb, yb}, 1.0f, npA, npB);
+        double dx = npB.x - npA.x;
+        double dy = npB.y - npA.y;
+        translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
+
+        // Convert to mask-local coordinates with tile offset, and draw as filled polygon
+        cv::Point rectPts[4];
+        rectPts[0] = cv::Point((int)round(np1.x - imgSel.maskX) - tile.offX, (int)round(np1.y - imgSel.maskY + offsetY) - tile.offY);
+        rectPts[1] = cv::Point((int)round(np3.x - imgSel.maskX) - tile.offX, (int)round(np3.y - imgSel.maskY + offsetY) - tile.offY);
+        rectPts[2] = cv::Point((int)round(np4.x - imgSel.maskX) - tile.offX, (int)round(np4.y - imgSel.maskY + offsetY) - tile.offY);
+        rectPts[3] = cv::Point((int)round(np2.x - imgSel.maskX) - tile.offX, (int)round(np2.y - imgSel.maskY + offsetY) - tile.offY);
+        std::vector<std::vector<cv::Point>> segContour = { {rectPts[0], rectPts[1], rectPts[2], rectPts[3]} };
+        cv::fillPoly(tile.mat, segContour, drawColor);
+    }
+}
+
+// the ends of an open path with miter joins: round (3) or square (2)
+static void drawMiterCaps(LinesTile &tile, const float* PointsList, const int PointsCount, const int thickness, const int roundCaps, const int offsetY) {
+    const cv::Scalar drawColor(255);
+    for (int capIdx = 0; capIdx < 2; capIdx++)
+    {
+        float pxA, pyA, pxB, pyB;
+        if (capIdx == 0)
+        {
+            pxA = PointsList[0];
+            pyA = PointsList[1];
+            pxB = PointsList[2];
+            pyB = PointsList[3];
+        } else
+        {
+            pxA = PointsList[(PointsCount - 1) * 2];
+            pyA = PointsList[(PointsCount - 1) * 2 + 1];
+            pxB = PointsList[(PointsCount - 2) * 2];
+            pyB = PointsList[(PointsCount - 2) * 2 + 1];
+        }
+
+        if (roundCaps == 3)
+        {
+            // Round cap: draw a filled circle at the endpoint
+            int cx = (int)round(pxA - imgSel.maskX) - tile.offX;
+            int cy = (int)round(pyA - imgSel.maskY + offsetY) - tile.offY;
+            cv::circle(tile.mat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
+        } else if (roundCaps == 2)
+        {
+            // Box/square cap: extend the line and fill a rectangle
+            double dx = pxA - pxB;
+            double dy = pyA - pyB;
+            double len = sqrt(dx * dx + dy * dy);
+            if (len >= 0.01)
+            {
+                double nx = dx / len;
+                double ny = dy / len;
+                double px = -ny;
+                double py = nx;
+                double extX = pxA + nx * thickness;
+                double extY = pyA + ny * thickness;
+
+                cv::Point capPts[4];
+                capPts[0] = cv::Point((int)round(pxA + px * thickness - imgSel.maskX) - tile.offX, (int)round(pyA + py * thickness - imgSel.maskY + offsetY) - tile.offY);
+                capPts[1] = cv::Point((int)round(pxA - px * thickness - imgSel.maskX) - tile.offX, (int)round(pyA - py * thickness - imgSel.maskY + offsetY) - tile.offY);
+                capPts[2] = cv::Point((int)round(extX - px * thickness - imgSel.maskX) - tile.offX, (int)round(extY - py * thickness - imgSel.maskY + offsetY) - tile.offY);
+                capPts[3] = cv::Point((int)round(extX + px * thickness - imgSel.maskX) - tile.offX, (int)round(extY + py * thickness - imgSel.maskY + offsetY) - tile.offY);
+
+                std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
+                cv::fillPoly(tile.mat, capContour, drawColor);
+            }
+        }
+    }
+}
+
+// the wedges between consecutive segments: a miter where the offset edges meet, a bevel where they do not
+static void fillMiterJoins(LinesTile &tile, const float* PointsList, const int PointsCount, const int thickness, const int closed, const int offsetY,
+                           const std::vector<double> &offsetPointsListA, const std::vector<double> &offsetPointsListB) {
+    const cv::Scalar drawColor(255);
+    const int pci = PointsCount - 1;
+    for (int pts = 0; pts < PointsCount; pts++)
+    {
+        if (pts == 0 && closed == 0)
+           continue;
+
+        if (pts == pci)
+        {
+           if (closed != 1)
+              break;
+        }
+
+        int i = pts * 2;
+        int z = (pts == 0) ? (PointsCount - 1) * 4 : (pts - 1) * 4;
+        int k = (pts == 0) ? (PointsCount - 1) * 2 : (pts - 1) * 2;
+        int n = (pts == pci) ? 0 : (pts + 1) * 2;
+        Point c  = {PointsList[i], PointsList[i + 1]};
+        Point cp = {PointsList[k], PointsList[k + 1]};
+        Point cn = {PointsList[n], PointsList[n + 1]};
+        Point a, b, az, bz;
+        short orientation = testPointsOrientation(cp, c, cn);
+
+        if (orientation == 2)
+        {
+            a = (pts == 0) ? Point{offsetPointsListB[0], offsetPointsListB[1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
+            b = {offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
+        } else if (orientation == 1)
+        {
+            a = (pts == 0) ? Point{offsetPointsListA[0], offsetPointsListA[1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
+            b = {offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
+        } else
+        {
+            // Colinear: stamp a circle at the vertex
+            if (pts == 0 || pts == pci)
+            {
+                int cx = (int)round(c.x - imgSel.maskX) - tile.offX;
+                int cy = (int)round(c.y - imgSel.maskY + offsetY) - tile.offY;
+                cv::circle(tile.mat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
+            }
+        }
+
+        if (orientation == 2 || orientation == 1)
+        {
+            z = (pts == 0) ? (PointsCount - 1) * 4 : (pts - 2) * 4;
+            if (orientation == 2)
+               bz = (pts == 0) ? Point{offsetPointsListB[z], offsetPointsListB[z + 1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
+            else
+               bz = (pts == 0) ? Point{offsetPointsListA[z], offsetPointsListA[z + 1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
+
+            z = pts * 4;
+            if (orientation == 2)
+               az = (pts == 0) ? Point{offsetPointsListB[2], offsetPointsListB[3]} : Point{offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
+            else
+               az = (pts == 0) ? Point{offsetPointsListA[2], offsetPointsListA[3]} : Point{offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
+
+            float nx_f, ny_f;
+            bool hasIntersection = findLinesIntersection(a, az, b, bz, nx_f, ny_f);
+
+            if (hasIntersection)
+            {
+                // Miter join: 4-point polygon (a, intersection, b, center)
+                cv::Point joinPts[4];
+                joinPts[0] = cv::Point((int)round(a.x - imgSel.maskX) - tile.offX,    (int)round(a.y - imgSel.maskY + offsetY) - tile.offY);
+                joinPts[1] = cv::Point((int)round(nx_f - imgSel.maskX) - tile.offX,   (int)round(ny_f - imgSel.maskY + offsetY) - tile.offY);
+                joinPts[2] = cv::Point((int)round(b.x - imgSel.maskX) - tile.offX,    (int)round(b.y - imgSel.maskY + offsetY) - tile.offY);
+                joinPts[3] = cv::Point((int)round(c.x - imgSel.maskX) - tile.offX,    (int)round(c.y - imgSel.maskY + offsetY) - tile.offY);
+                std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2], joinPts[3]} };
+                cv::fillPoly(tile.mat, joinContour, drawColor);
+            } else
+            {
+                // Bevel join fallback: 3-point triangle (a, b, center)
+                cv::Point joinPts[3];
+                joinPts[0] = cv::Point((int)round(a.x - imgSel.maskX) - tile.offX,  (int)round(a.y - imgSel.maskY + offsetY) - tile.offY);
+                joinPts[1] = cv::Point((int)round(b.x - imgSel.maskX) - tile.offX,  (int)round(b.y - imgSel.maskY + offsetY) - tile.offY);
+                joinPts[2] = cv::Point((int)round(c.x - imgSel.maskX) - tile.offX,  (int)round(c.y - imgSel.maskY + offsetY) - tile.offY);
+                std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2]} };
+                cv::fillPoly(tile.mat, joinContour, drawColor);
+            }
+        }
+    }
+}
+
+static void drawMiterJoinedLines(LinesTile &tile, const float* PointsList, const int PointsCount, const int thickness, const int closed, const int roundCaps,
+                                 const int offsetY, const std::vector<double> &offsetPointsListA, const std::vector<double> &offsetPointsListB) {
+    // Miter joins mode: draw each segment as a filled rectangle (the thick line body),
+    // then fill the miter join regions between consecutive segments.
+    drawMiterSegments(tile, PointsList, PointsCount, thickness, closed, offsetY);
+
+    // Handle open-path caps
+    if (closed == 0 && PointsCount >= 2)
+       drawMiterCaps(tile, PointsList, PointsCount, thickness, roundCaps, offsetY);
+
+    // Fill miter join regions between consecutive segments
+    if (PointsCount > 2)
+       fillMiterJoins(tile, PointsList, PointsCount, thickness, closed, offsetY, offsetPointsListA, offsetPointsListB);
+}
+
+// the tile's drawn pixels [> 0] set or clear imgSel.mask per fillMode, clipped to imgSel.clipShape unless clipMode is 2
+static void transferLinesTile(const LinesTile &tile, const bool useFill, const int clipMode) {
+    const int tileH = tile.mat.rows;
+    const int roiW = tile.mat.cols;
+    if (clipMode == 2)
+    {
+        // No clipping: fastest path
+        #pragma omp parallel for schedule(static) num_threads(4)
+        for (int y = 0; y < tileH; y++)
+        {
+            const unsigned char* row = tile.mat.ptr<unsigned char>(y);
+            const int globalY = tile.offY + y;
+            const INT64 rowStart = (INT64)globalY * imgSel.maskW;
+            for (int x = 0; x < roiW; x++)
+            {
+                if (row[x] > 0)
+                   imgSel.mask[rowStart + tile.offX + x] = useFill;
+            }
+        }
+    } else
+    {
+        // Clipping against imgSel.clipShape
+        #pragma omp parallel for schedule(static) num_threads(4)
+        for (int y = 0; y < tileH; y++)
+        {
+            const unsigned char* row = tile.mat.ptr<unsigned char>(y);
+            const int globalY = tile.offY + y;
+            const INT64 rowStart = (INT64)globalY * imgSel.maskW;
+            for (int x = 0; x < roiW; x++)
+            {
+                if (row[x] > 0)
+                {
+                    const int globalX = tile.offX + x;
+                    if (isPointInOtherMask(globalX, globalY, clipMode) == 1)
+                       imgSel.mask[rowStart + globalX] = useFill;
+                }
+            }
+        }
+    }
+}
+
 DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY) {
     // Uses OpenCV drawing functions to render thick polylines onto imgSel.mask.
     // The function renders onto a temporary cv::Mat using OpenCV's optimized line
@@ -890,42 +1279,10 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
         cvPoints.push_back(cv::Point(lx, ly));
     }
 
-    const cv::Scalar drawColor(255);
-    const cv::Scalar drawBlackColor(0);
     const bool useFill = (fillMode != 0);
-
-    // --- Bounding-box + row-band tiling to reduce temporary memory ---
-    // Compute the bounding box of all points in mask-local space.
-    // Only allocate a cv::Mat for this region (and tile it if still too large).
-    int bbMinX = cvPoints[0].x, bbMaxX = cvPoints[0].x;
-    int bbMinY = cvPoints[0].y, bbMaxY = cvPoints[0].y;
-    for (size_t i = 1; i < cvPoints.size(); i++)
-    {
-        if (cvPoints[i].x < bbMinX) bbMinX = cvPoints[i].x;
-        if (cvPoints[i].x > bbMaxX) bbMaxX = cvPoints[i].x;
-        if (cvPoints[i].y < bbMinY) bbMinY = cvPoints[i].y;
-        if (cvPoints[i].y > bbMaxY) bbMaxY = cvPoints[i].y;
-    }
-
-    // Expand by a margin for line thickness, caps, and miter join extensions
-    const int bbMargin = max(cvThickness * 4, thickness + 10);
-    bbMinX = max(0, bbMinX - bbMargin);
-    bbMinY = max(0, bbMinY - bbMargin);
-    bbMaxX = min((int)imgSel.maskW - 1, bbMaxX + bbMargin);
-    bbMaxY = min((int)imgSel.maskH - 1, bbMaxY + bbMargin);
-
-    if (bbMinX > bbMaxX || bbMinY > bbMaxY)
+    LinesBox box;
+    if (!linesStrokeBox(cvPoints, cvThickness, thickness, box))
         return 1; // all points are outside the mask bounds
-
-    const int roiX = bbMinX;
-    const int roiW = bbMaxX - bbMinX + 1;
-    const int roiH = bbMaxY - bbMinY + 1;
-
-    // Keep each tile under 64 MB to limit peak temporary memory
-    const INT64 maxTileBytes = 64LL * 1024 * 1024;
-    const int bandHeight = (roiW > 0)
-        ? max(64, (int)min((INT64)roiH, maxTileBytes / (INT64)roiW))
-        : roiH;
 
     // Pre-compute translated line segments for miter joins (tile-independent)
     std::vector<double> offsetPointsListA;
@@ -939,328 +1296,22 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     }
 
     // --- Tile loop: process the bounding-box ROI in horizontal bands ---
-    cv::Mat tileMat;
-    for (int tileStartY = bbMinY; tileStartY <= bbMaxY; tileStartY += bandHeight)
+    LinesTile tile;
+    for (int tileStartY = box.bbMinY; tileStartY <= box.bbMaxY; tileStartY += box.bandHeight)
     {
-        const int tileH = min(bandHeight, bbMaxY - tileStartY + 1);
-        const int tileOffX = roiX;
-        const int tileOffY = tileStartY;
+        const int tileH = min(box.bandHeight, box.bbMaxY - tileStartY + 1);
+        tile.offX = box.bbMinX;
+        tile.offY = tileStartY;
 
         // Create (or re-create) tile-sized temporary mask
-        tileMat = cv::Mat::zeros(tileH, roiW, CV_8UC1);
-
+        tile.mat = cv::Mat::zeros(tileH, box.roiW, CV_8UC1);
         if (roundedJoins == 1)
-        {
-            // Round joins mode: offset cvPoints to tile-local coordinates
-            std::vector<cv::Point> tilePoints(cvPoints.size());
-            for (size_t i = 0; i < cvPoints.size(); i++)
-                tilePoints[i] = cv::Point(cvPoints[i].x - tileOffX, cvPoints[i].y - tileOffY);
+           drawRoundJoinedLines(tile, cvPoints, PointsCount, cvThickness, thickness, closed, roundCaps);
+        else
+           drawMiterJoinedLines(tile, PointsList, PointsCount, thickness, closed, roundCaps, offsetY, offsetPointsListA, offsetPointsListB);
 
-            if (cvThickness <= 32767)
-            {
-               std::vector<std::vector<cv::Point>> polyContours = { tilePoints };
-               cv::polylines(tileMat, polyContours, (closed == 1), drawColor, cvThickness, cv::LINE_8);
-            } else
-               drawThickPolylineRound(tileMat, tilePoints, (closed == 1), drawColor, cvThickness);
-
-            // For an open path, handle cap styles at the two endpoints
-            if (closed != 1 && PointsCount >= 2)
-            {
-                if (roundCaps <= 2)
-                {
-                    // Box/square caps: extend the line at each endpoint by 'thickness' pixels
-                    // and draw a filled rectangle for the cap
-                    for (int capIdx = 0; capIdx < 2; capIdx++)
-                    {
-                        cv::Point pA, pB;
-                        if (capIdx == 0)
-                        {
-                           pA = tilePoints[0];
-                           pB = tilePoints[1];
-                        } else
-                        {
-                           pA = tilePoints[PointsCount - 1];
-                           pB = tilePoints[PointsCount - 2];
-                        }
-
-                        // Direction from the interior toward the endpoint
-                        double dx = (double)(pA.x - pB.x);
-                        double dy = (double)(pA.y - pB.y);
-                        double len = sqrt(dx * dx + dy * dy);
-                        if (len < 0.01)
-                           continue;
-
-                        // Normalize direction
-                        double nx = dx / len;
-                        double ny = dy / len;
-                        // Perpendicular
-                        double px = -ny;
-                        double py = nx;
-
-                        // Start the cap 2 pixels earlier (overlap with the line) to prevent seams
-                        double startX = (roundCaps == 2) ? pA.x - nx : pA.x - nx * 4.0;
-                        double startY = (roundCaps == 2) ? pA.y - ny : pA.y - ny * 4.0;
-
-                        // Cap extends 'thickness' + 2 pixels beyond the endpoint,
-                        // making it 2 pixels longer
-                        double extX = pA.x + nx * (thickness + 2.0);
-                        double extY = pA.y + ny * (thickness + 2.0);
-
-                        // Build the 4 corners of the box cap rectangle
-                        cv::Point capRect[4];
-                        int tk = (roundCaps == 2) ? thickness : thickness + 1;
-                        capRect[0] = cv::Point((int)round(startX + px * tk), (int)round(startY + py * tk));
-                        capRect[1] = cv::Point((int)round(startX - px * tk), (int)round(startY - py * tk));
-                        capRect[2] = cv::Point((int)round(extX - px * tk), (int)round(extY - py * tk));
-                        capRect[3] = cv::Point((int)round(extX + px * tk), (int)round(extY + py * tk));
-
-                        std::vector<std::vector<cv::Point>> capContour = { {capRect[0], capRect[1], capRect[2], capRect[3]} };
-                        if (roundCaps == 2)
-                           cv::fillPoly(tileMat, capContour, drawColor);
-                        else
-                           cv::fillPoly(tileMat, capContour, drawBlackColor);
-                    }
-                } else if (roundCaps == 3)
-                {
-                    // Round caps: draw a filled circle at the endpoints
-                    for (int capIdx = 0; capIdx < 2; capIdx++)
-                    {
-                        cv::Point pEnd = (capIdx == 0) ? tilePoints[0] : tilePoints[PointsCount - 1];
-                        cv::circle(tileMat, pEnd, thickness, drawColor, cv::FILLED, cv::LINE_8);
-                    }
-                }
-            }
-        } else
-        {
-            // Miter joins mode: draw each segment as a filled rectangle (the thick line body),
-            // then fill the miter join regions between consecutive segments.
-
-            const int pci = PointsCount - 1;
-
-            // Draw each line segment as a filled rectangle
-            for (int pts = 0; pts < PointsCount; pts++)
-            {
-                int i = pts * 2;
-                float xa = PointsList[i];
-                float ya = PointsList[i + 1];
-                float xb, yb;
-                if (pts == pci)
-                {
-                    if (closed != 1)
-                       break;
-                    xb = PointsList[0];
-                    yb = PointsList[1];
-                } else
-                {
-                    xb = PointsList[i + 2];
-                    yb = PointsList[i + 3];
-                }
-
-                double orig_dx = xb - xa;
-                double orig_dy = yb - ya;
-                if (fabs(orig_dx) < 0.01f && fabs(orig_dy) < 0.01f)
-                {
-                    // Degenerate segment: stamp a circle
-                    int cx = (int)round(xa - imgSel.maskX) - tileOffX;
-                    int cy = (int)round(ya - imgSel.maskY + offsetY) - tileOffY;
-                    cv::circle(tileMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
-                    continue;
-                }
-
-                // Compute the 4 corners of the thick rectangle for this segment
-                Point npA, npB, np1, np2, np3, np4;
-                extendLine({xa, ya}, {xb, yb}, 1.0f, npA, npB);
-                double dx = npB.x - npA.x;
-                double dy = npB.y - npA.y;
-                translateLine(npA, npB, dx, dy, thickness, np1, np2, np3, np4);
-
-                // Convert to mask-local coordinates with tile offset, and draw as filled polygon
-                cv::Point rectPts[4];
-                rectPts[0] = cv::Point((int)round(np1.x - imgSel.maskX) - tileOffX, (int)round(np1.y - imgSel.maskY + offsetY) - tileOffY);
-                rectPts[1] = cv::Point((int)round(np3.x - imgSel.maskX) - tileOffX, (int)round(np3.y - imgSel.maskY + offsetY) - tileOffY);
-                rectPts[2] = cv::Point((int)round(np4.x - imgSel.maskX) - tileOffX, (int)round(np4.y - imgSel.maskY + offsetY) - tileOffY);
-                rectPts[3] = cv::Point((int)round(np2.x - imgSel.maskX) - tileOffX, (int)round(np2.y - imgSel.maskY + offsetY) - tileOffY);
-                std::vector<std::vector<cv::Point>> segContour = { {rectPts[0], rectPts[1], rectPts[2], rectPts[3]} };
-                cv::fillPoly(tileMat, segContour, drawColor);
-            }
-
-            // Handle open-path caps
-            if (closed == 0 && PointsCount >= 2)
-            {
-                for (int capIdx = 0; capIdx < 2; capIdx++)
-                {
-                    float pxA, pyA, pxB, pyB;
-                    if (capIdx == 0)
-                    {
-                        pxA = PointsList[0];
-                        pyA = PointsList[1];
-                        pxB = PointsList[2];
-                        pyB = PointsList[3];
-                    } else
-                    {
-                        pxA = PointsList[(PointsCount - 1) * 2];
-                        pyA = PointsList[(PointsCount - 1) * 2 + 1];
-                        pxB = PointsList[(PointsCount - 2) * 2];
-                        pyB = PointsList[(PointsCount - 2) * 2 + 1];
-                    }
-
-                    if (roundCaps == 3)
-                    {
-                        // Round cap: draw a filled circle at the endpoint
-                        int cx = (int)round(pxA - imgSel.maskX) - tileOffX;
-                        int cy = (int)round(pyA - imgSel.maskY + offsetY) - tileOffY;
-                        cv::circle(tileMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
-                    } else if (roundCaps == 2)
-                    {
-                        // Box/square cap: extend the line and fill a rectangle
-                        double dx = pxA - pxB;
-                        double dy = pyA - pyB;
-                        double len = sqrt(dx * dx + dy * dy);
-                        if (len >= 0.01)
-                        {
-                            double nx = dx / len;
-                            double ny = dy / len;
-                            double px = -ny;
-                            double py = nx;
-                            double extX = pxA + nx * thickness;
-                            double extY = pyA + ny * thickness;
-
-                            cv::Point capPts[4];
-                            capPts[0] = cv::Point((int)round(pxA + px * thickness - imgSel.maskX) - tileOffX, (int)round(pyA + py * thickness - imgSel.maskY + offsetY) - tileOffY);
-                            capPts[1] = cv::Point((int)round(pxA - px * thickness - imgSel.maskX) - tileOffX, (int)round(pyA - py * thickness - imgSel.maskY + offsetY) - tileOffY);
-                            capPts[2] = cv::Point((int)round(extX - px * thickness - imgSel.maskX) - tileOffX, (int)round(extY - py * thickness - imgSel.maskY + offsetY) - tileOffY);
-                            capPts[3] = cv::Point((int)round(extX + px * thickness - imgSel.maskX) - tileOffX, (int)round(extY + py * thickness - imgSel.maskY + offsetY) - tileOffY);
-
-                            std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
-                            cv::fillPoly(tileMat, capContour, drawColor);
-                        }
-                    }
-                }
-            }
-
-            // Fill miter join regions between consecutive segments
-            if (PointsCount > 2)
-            {
-                for (int pts = 0; pts < PointsCount; pts++)
-                {
-                    if (pts == 0 && closed == 0)
-                       continue;
-
-                    if (pts == pci)
-                    {
-                       if (closed != 1)
-                          break;
-                    }
-
-                    int i = pts * 2;
-                    int z = (pts == 0) ? (PointsCount - 1) * 4 : (pts - 1) * 4;
-                    int k = (pts == 0) ? (PointsCount - 1) * 2 : (pts - 1) * 2;
-                    int n = (pts == pci) ? 0 : (pts + 1) * 2;
-                    Point c  = {PointsList[i], PointsList[i + 1]};
-                    Point cp = {PointsList[k], PointsList[k + 1]};
-                    Point cn = {PointsList[n], PointsList[n + 1]};
-                    Point a, b, az, bz;
-                    short orientation = testPointsOrientation(cp, c, cn);
-
-                    if (orientation == 2)
-                    {
-                        a = (pts == 0) ? Point{offsetPointsListB[0], offsetPointsListB[1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
-                        b = {offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
-                    } else if (orientation == 1)
-                    {
-                        a = (pts == 0) ? Point{offsetPointsListA[0], offsetPointsListA[1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
-                        b = {offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
-                    } else
-                    {
-                        // Colinear: stamp a circle at the vertex
-                        if (pts == 0 || pts == pci)
-                        {
-                            int cx = (int)round(c.x - imgSel.maskX) - tileOffX;
-                            int cy = (int)round(c.y - imgSel.maskY + offsetY) - tileOffY;
-                            cv::circle(tileMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
-                        }
-                    }
-
-                    if (orientation == 2 || orientation == 1)
-                    {
-                        z = (pts == 0) ? (PointsCount - 1) * 4 : (pts - 2) * 4;
-                        if (orientation == 2)
-                           bz = (pts == 0) ? Point{offsetPointsListB[z], offsetPointsListB[z + 1]} : Point{offsetPointsListB[z + 4], offsetPointsListB[z + 5]};
-                        else
-                           bz = (pts == 0) ? Point{offsetPointsListA[z], offsetPointsListA[z + 1]} : Point{offsetPointsListA[z + 4], offsetPointsListA[z + 5]};
-
-                        z = pts * 4;
-                        if (orientation == 2)
-                           az = (pts == 0) ? Point{offsetPointsListB[2], offsetPointsListB[3]} : Point{offsetPointsListB[z + 2], offsetPointsListB[z + 3]};
-                        else
-                           az = (pts == 0) ? Point{offsetPointsListA[2], offsetPointsListA[3]} : Point{offsetPointsListA[z + 2], offsetPointsListA[z + 3]};
-
-                        float nx_f, ny_f;
-                        bool hasIntersection = findLinesIntersection(a, az, b, bz, nx_f, ny_f);
-
-                        if (hasIntersection)
-                        {
-                            // Miter join: 4-point polygon (a, intersection, b, center)
-                            cv::Point joinPts[4];
-                            joinPts[0] = cv::Point((int)round(a.x - imgSel.maskX) - tileOffX,    (int)round(a.y - imgSel.maskY + offsetY) - tileOffY);
-                            joinPts[1] = cv::Point((int)round(nx_f - imgSel.maskX) - tileOffX,   (int)round(ny_f - imgSel.maskY + offsetY) - tileOffY);
-                            joinPts[2] = cv::Point((int)round(b.x - imgSel.maskX) - tileOffX,    (int)round(b.y - imgSel.maskY + offsetY) - tileOffY);
-                            joinPts[3] = cv::Point((int)round(c.x - imgSel.maskX) - tileOffX,    (int)round(c.y - imgSel.maskY + offsetY) - tileOffY);
-                            std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2], joinPts[3]} };
-                            cv::fillPoly(tileMat, joinContour, drawColor);
-                        } else
-                        {
-                            // Bevel join fallback: 3-point triangle (a, b, center)
-                            cv::Point joinPts[3];
-                            joinPts[0] = cv::Point((int)round(a.x - imgSel.maskX) - tileOffX,  (int)round(a.y - imgSel.maskY + offsetY) - tileOffY);
-                            joinPts[1] = cv::Point((int)round(b.x - imgSel.maskX) - tileOffX,  (int)round(b.y - imgSel.maskY + offsetY) - tileOffY);
-                            joinPts[2] = cv::Point((int)round(c.x - imgSel.maskX) - tileOffX,  (int)round(c.y - imgSel.maskY + offsetY) - tileOffY);
-                            std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2]} };
-                            cv::fillPoly(tileMat, joinContour, drawColor);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Transfer this tile's pixels into imgSel.mask, respecting fillMode and clipMode.
-        // tileMat pixels with value > 0 correspond to drawn areas.
-        if (clipMode == 2)
-        {
-            // No clipping: fastest path
-            #pragma omp parallel for schedule(static) num_threads(4)
-            for (int y = 0; y < tileH; y++)
-            {
-                const unsigned char* row = tileMat.ptr<unsigned char>(y);
-                const int globalY = tileOffY + y;
-                const INT64 rowStart = (INT64)globalY * imgSel.maskW;
-                for (int x = 0; x < roiW; x++)
-                {
-                    if (row[x] > 0)
-                       imgSel.mask[rowStart + tileOffX + x] = useFill;
-                }
-            }
-        } else
-        {
-            // Clipping against imgSel.clipShape
-            #pragma omp parallel for schedule(static) num_threads(4)
-            for (int y = 0; y < tileH; y++)
-            {
-                const unsigned char* row = tileMat.ptr<unsigned char>(y);
-                const int globalY = tileOffY + y;
-                const INT64 rowStart = (INT64)globalY * imgSel.maskW;
-                for (int x = 0; x < roiW; x++)
-                {
-                    if (row[x] > 0)
-                    {
-                        const int globalX = tileOffX + x;
-                        if (isPointInOtherMask(globalX, globalY, clipMode) == 1)
-                           imgSel.mask[rowStart + globalX] = useFill;
-                    }
-                }
-            }
-        }
-    } // end tile loop
+        transferLinesTile(tile, useFill, clipMode);
+    }
 
     // fnOutputDebug("NewDrawLinesOnMask() - done");
     return 1;
