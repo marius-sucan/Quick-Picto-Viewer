@@ -1952,17 +1952,6 @@ unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *ma
     return 0;
 }
 
-double inverseGamma(double X) {
-  // Inverse sRGB gamma correction
-  // unused function
-  if (X>0.0404482362771076)
-     X = pow((X + 0.055)/1.055, 2.4);
-  else
-     X = X / 12.92;
-
-  return X;
-}
-
 double toLABfx(double Y) {
   // if (Y >= 0.00885645167903563082) // CIE epsilon = 216/24389
   if (Y >= 8.88564517) // intentionally chosen value
@@ -1985,11 +1974,6 @@ double rad2deg(double radian) {
     return (radian * p);
 }
 
-int fastRGBtoGray(int n) {
-   return (((n&0xf0f0f0)*0x20a05)>>20)&255;
-   // return (n&0xf0f0f0)*133637>>20&255;
-}
-
 int RGBtoGray(int &sR, int &sG, int &sB, int &alternateMode) {
   // https://getreuer.info/posts/colorspace/index.html
   // http://www.easyrgb.com/en/math.php
@@ -2005,80 +1989,6 @@ int RGBtoGray(int &sR, int &sG, int &sB, int &alternateMode) {
   Y = toLABfx(Y);
   double L = 116.0*Y - 16.0;
   return round(L/2); // return derived luminosity in pseudo-LAB color space
-}
-
-double CieLab2Hue(double &var_a, double &var_b ) {
-// Function returns CIE-H° value
-   double var_bias = 0;
-   if ( var_a >= 0 && var_b == 0 ) return 0;
-   if ( var_a <  0 && var_b == 0 ) return 180;
-   if ( var_a == 0 && var_b >  0 ) return 90;
-   if ( var_a == 0 && var_b <  0 ) return 270;
-   if ( var_a >  0 && var_b >  0 ) var_bias = 0;
-   if ( var_a <  0               ) var_bias = 180;
-   if ( var_a >  0 && var_b <  0 ) var_bias = 360;
-   return ( rad2deg( atan( var_b / var_a ) ) + var_bias );
-}
-
-float testCIEdeltaE2000(double Lab1_L, double Lab1_a, double Lab1_b, double Lab2_L, double Lab2_a, double Lab2_b, float k_L, float k_C, float k_H) {
-// Cl_1,  Ca_1,  Cb_1   - Color #1 CIE-L*ab values
-// Cl_2,  Ca_2,  Cb_2   - Color #2 CIE-L*ab values
-// WHT_L, WHT_C, WHT_H  - Weight factors: luminance, chroma and hue
-// https://github.com/tajmone/name-that-color/blob/master/ntc.color-funcs.pbi
-
-    double LBar, deltaLPrime, aPrime1, aPrime2;
-    double C1, C2, CPrime1, CPrime2, CBar, CBarPrime, deltaCPrime;
-    double hPrime1, hPrime2, HBarPrime, deltahPrime;
-    double SsubL, SsubC, SsubH, RsubC, RsubT;
-    double g, Tvar, deltaRO, deltaE00;
-
-    LBar      = (Lab1_L + Lab2_L) / 2;
-    C1        = sqrt(pow(Lab1_a, 2) + pow(Lab1_b, 2));
-    C2        = sqrt(pow(Lab2_a, 2) + pow(Lab2_b, 2));
-    CBar      = (C1 + C2) / 2;
-    g = (1 - sqrt(pow(CBar, 7) / (pow(CBar, 7) + pow(25.0, 7)))) / 2;
-    aPrime1   = Lab1_a * (1 + g);
-    aPrime2   = Lab2_a * (1 + g);
-    CPrime1   = sqrt(pow(aPrime1, 2) + pow(Lab1_b, 2));
-    CPrime2   = sqrt(pow(aPrime2, 2) + pow(Lab2_b, 2));
-    CBarPrime = (CPrime1 + CPrime2) / 2;
-
-    hPrime1 = rad2deg(atan2(Lab1_b, aPrime1));
-    if (hPrime1 < 0) hPrime1 += 360;
-
-    hPrime2 = rad2deg(atan2(Lab2_b, aPrime2));
-    if (hPrime2 < 0) hPrime2 += 360;
-
-    if (fabs(hPrime1 - hPrime2) > 180)
-       HBarPrime = (hPrime1 + hPrime2 + 360) / 2;
-    else
-       HBarPrime = (hPrime1 + hPrime2) / 2;
-
-    Tvar = 1 - 0.17 * cos(deg2rad(HBarPrime - 30)) + 0.24 * cos(deg2rad(2 * HBarPrime)) + 0.32 * cos(deg2rad(3 * HBarPrime + 6)) - 0.2 * cos(deg2rad(4 * HBarPrime - 63));
-
-    deltahPrime = hPrime2 - hPrime1;
-    if (fabs(deltahPrime) > 180)
-    {
-       if (hPrime2 <= hPrime1) 
-          deltahPrime += 360;
-       else 
-          deltahPrime -= 360;
-    }
-
-    deltaLPrime = Lab2_L - Lab1_L;
-    deltaCPrime = CPrime2 - CPrime1;
-    deltahPrime = 2 * sqrt(CPrime1 * CPrime2) * sin(deg2rad(deltahPrime) / 2);
-    SsubL = 1 + ((0.015 * pow(LBar - 50, 2)) / sqrt(20 + pow(LBar - 50, 2)));
-    SsubC = 1 + 0.045 * CBarPrime;
-    SsubH = 1 + 0.015 * CBarPrime * Tvar;
-
-    // compute R sub T (RT)
-    deltaRO = 30 * exp(-(pow((HBarPrime - 275) / 25, 2)));
-    RsubC = 2 * sqrt(pow(CBarPrime, 7) / (pow(CBarPrime, 7) + pow(25.0, 7)));
-    RsubT = -RsubC * sin(2 * deg2rad(deltaRO));
-
-    deltaE00 = sqrt(pow(deltaLPrime / (SsubL * k_L), 2) + pow(deltaCPrime / (SsubC * k_C), 2) + pow(deltahPrime / (SsubH * k_H), 2) + RsubT * (deltaCPrime / (SsubC * k_C)) * (deltahPrime / (SsubH * k_H)));
-    return deltaE00;
 }
 
 RGBAColor calculateBlendModes(
@@ -2627,51 +2537,6 @@ inline RGBAColor CalculateNewBlendModes(
     if (keepAlpha == 1 && oA != -1)
        result.a = oA;
     return result;
-}
-
-void toCMYK(float red, float green, float blue, float* cmyk) {
-  float k = min(255-red, min(255-green,255-blue));
-  if (k >= 255.0f)
-  {
-     // pure black; the general formula would divide by zero
-     cmyk[0] = 0;  cmyk[1] = 0;  cmyk[2] = 0;  cmyk[3] = 255;
-     return;
-  }
-  float c = 255*(255-red-k)/(255-k);
-  float m = 255*(255-green-k)/(255-k); 
-  float y = 255*(255-blue-k)/(255-k); 
-
-  cmyk[0] = c;
-  cmyk[1] = m;
-  cmyk[2] = y;
-  cmyk[3] = k;
-}
-
-void toRGB(float c, float m, float y, float k, float *rgb) {
-  rgb[0] = -((c * (255.0 - k)) / 255.0 + k - 255.0);
-  rgb[1] = -((m * (255.0 - k)) / 255.0 + k - 255.0);
-  rgb[2] = -((y * (255.0 - k)) / 255.0 + k - 255.0);
-}
-
-RGBAColor blendRGBAcolors(const RGBAColor &c1, const RGBAColor &c2) {
-    float alpha1 = c1.a / 255.0f;
-    float alpha2 = c2.a / 255.0f;
-
-    float outAlpha = alpha1 + alpha2 * (1.0f - alpha1);
-    // Avoid division by zero when alpha is 0
-    if (outAlpha == 0.0f)
-       return {0, 0, 0, 0};
-
-    // Compute blended RGB channels
-    unsigned char outR = static_cast<unsigned char>(
-        ((c1.r * alpha1 + c2.r * alpha2 * (1.0f - alpha1)) / outAlpha) + 0.5f);
-    unsigned char outG = static_cast<unsigned char>(
-        ((c1.g * alpha1 + c2.g * alpha2 * (1.0f - alpha1)) / outAlpha) + 0.5f);
-    unsigned char outB = static_cast<unsigned char>(
-        ((c1.b * alpha1 + c2.b * alpha2 * (1.0f - alpha1)) / outAlpha) + 0.5f);
-
-    unsigned char outA = static_cast<unsigned char>(outAlpha * 255.0f + 0.5f);
-    return {outB, outG, outR, outA};
 }
 
 DLL_API int DLL_CALLCONV prepareSelectionArea(
