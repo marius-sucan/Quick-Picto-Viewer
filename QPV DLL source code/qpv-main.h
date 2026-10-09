@@ -6,9 +6,3 @@
 // définis avec cette macro comme étant exportés.
 
 const double M_PI = 3.14159265358979323846;  // PI
-
-std::vector<unsigned char*> brushOpacityChunks;
-std::vector<unsigned char*> brushOriginalPixelChunks;
-std::vector<size_t> activeBrushChunks;
-// std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
-int chunkGridW = 0;
