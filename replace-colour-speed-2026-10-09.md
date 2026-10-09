@@ -11,7 +11,7 @@ on the flood fill engine (`FloodJob`). It paints exactly the bytes, and returns 
 that the shipped function does. Against the shipped function, which already ran on all cores with
 OpenMP, it is 2.5–3.4× faster on photos in the default "Grayscale [fast]" mode, 8× on flat colour,
 25–30× with CIEDE2000, and 3–5× inside a selection; a small selection on a big image is 20–58×
-faster. CIEDE2000 on a single flat colour reaches 150–270×, but only because one colour is decided
+faster. CIEDE2000 on a single flat colour reaches 180–270×, but only because one colour is decided
 once; a photo gets the 25–30×. Memory stays small: at most 124 MiB on a 900 MP image.
 
 On huge images the undo level of a replacement now covers only the rectangle of the replaced
@@ -162,4 +162,5 @@ Against the shipped code at `c26999f`, sliced unchanged into the g++ harness use
 3. On a normal image: replace a colour with and without a selection, with opacity and blend modes.
 
 The harness is in `.claude/scratch/floodfill-impl-2026-10-09/replace/` (git-excluded):
-`bash verify_all.sh` reruns every check.
+`bash verify_all.sh "<the branch's QPV DLL source code folder>"` reruns every check. With no
+argument it reads the main checkout, which has the replacement mode only after the merge.
