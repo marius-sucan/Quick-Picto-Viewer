@@ -10,8 +10,9 @@ rebuilt for any of it to take effect. This follows the flood fill work in
 on the flood fill engine (`FloodJob`). It paints exactly the bytes, and returns exactly the count,
 that the shipped function does. Against the shipped function, which already ran on all cores with
 OpenMP, it is 2.5–3.4× faster on photos in the default "Grayscale [fast]" mode, 8× on flat colour,
-25–30× with CIEDE2000, 150–270× with CIEDE2000 on flat colour, and 3–5× inside a selection; a small
-selection on a big image is 20–58× faster. Memory stays small: at most 124 MiB on a 900 MP image.
+25–30× with CIEDE2000, and 3–5× inside a selection; a small selection on a big image is 20–58×
+faster. CIEDE2000 on a single flat colour reaches 150–270×, but only because one colour is decided
+once; a photo gets the 25–30×. Memory stays small: at most 124 MiB on a 900 MP image.
 
 On huge images the undo level of a replacement now covers only the rectangle of the replaced
 pixels: a colour that appears in one 400 × 300 patch of a 900 MP image no longer copies the whole
@@ -113,6 +114,8 @@ Against the shipped code at `c26999f`, sliced unchanged into the g++ harness use
   so the second test runs), and count and bounds against a per-pixel reference.
 - The blue ranges against `decideColorsEqual()` on all 16.7 million colours, ten configurations.
 - CIEDE2000 with dynamic opacity on the clicked colour's own distance: 4 000 cases.
+- A click on a masked pixel, normal and inverted selections, 24/32 bpp, all three colour tests, one
+  call and two steps: the same 10 000 pixels replaced as by the shipped function.
 - The flood fill checks from its report all pass again (it shares the changed word test and paint).
 - AddressSanitizer + UBSan (2 500 cases) and ThreadSanitizer (2 000 cases + 20 large parallel ones):
   no reports.
@@ -125,9 +128,15 @@ Against the shipped code at `c26999f`, sliced unchanged into the g++ harness use
   largest int; the shipped OpenMP sum could overflow above 2.1 billion matches.
 - `FloodFillFindRegion()` answers the replacement instead of -1. The AHK treats an error or a
   negative answer as "use the one-step call", so an older qpvmain.dll still works.
+- Between `FloodFillFindRegion()` and `FloodFillPaintRegion()` a replacement holds its map of
+  matches (112 MiB at 900 MP, within the budget), until the paint, the next find or
+  `FloodFillDiscardRegion()`, as a flood fill holds its region.
 - When the map of matches does not fit the budget (above about 3.5 GP), paint tests the pixels
   again: between the two calls the image and the selection must not change (AHK only records the
   undo level in between).
+- The flood fill's CIEDE2000 rule is unchanged: only the replacement measures the clicked colour.
+- A click on a pixel the selection masks still replaces every match the selection leaves open, as
+  the shipped function did (the flood fill fills nothing there).
 - The colour replacement no longer uses OpenMP.
 
 ## Tried and rejected
