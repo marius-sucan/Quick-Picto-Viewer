@@ -188,6 +188,7 @@
   <ItemGroup>
     <ClInclude Include="blend-modes.h" />
     <ClInclude Include="callwndproc-hook.h" />
+    <ClInclude Include="color-adjust.h" />
     <ClInclude Include="dupes-pixels.h" />
     <ClInclude Include="dupes-search.h" />
     <ClInclude Include="flood-fill.h" />
