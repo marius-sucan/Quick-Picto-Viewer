@@ -15,6 +15,7 @@
 #include <array>
 #include <chrono>
 #include <map>
+#include <memory>
 #include <new>
 #include <string>
 #include <thread>
@@ -781,8 +782,9 @@ Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UIN
          Gdiplus::Status lockSt = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rect, Gdiplus::ImageLockModeWrite, destinationFormat, &bitmapDatu);
          if (lockSt!=Gdiplus::Ok)
          {
-            QPV_DBG("WICbmpSourceConvertGdip: failed to lock the GDI+ bitmap");
+            // disposed ahead of the message: building one can throw
             Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+            QPV_DBG("WICbmpSourceConvertGdip: failed to lock the GDI+ bitmap");
             return (Gdiplus::GpBitmap*)NULL;
          }
 
@@ -793,17 +795,18 @@ Gdiplus::GpBitmap* WICbmpSourceConvertGdip(IWICBitmapSource* &thisWICbitmap, UIN
          HRESULT hr = (bufSize>0xFFFFFFFFull) ? E_INVALIDARG
                     : WICguardedCopyPixels(thisWICbitmap, NULL, bitmapDatu.Stride, (UINT)bufSize, (BYTE*)bitmapDatu.Scan0, &sehCode);
          Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
+         if (!(SUCCEEDED(hr)))
+         {
+            // a half written bitmap is not worth handing back; disposed ahead of the messages, which can throw
+            Gdiplus::DllExports::GdipDisposeImage(myBitmap);
+            myBitmap = NULL;
+         }
+
          if (sehCode!=0)
             QPV_DBG("WICbmpSourceConvertGdip: the codec faulted while decoding the pixels");
 
          if (!(SUCCEEDED(hr)))
-         {
             QPV_DBG("WICbmpSourceConvertGdip: copy pixels FAILED: " + std::to_string(cbStride) + "|" + std::to_string(cbBufferSize));
-            // a half written bitmap is not worth handing back; it used to be returned as
-            // though the decode had worked
-            Gdiplus::DllExports::GdipDisposeImage(myBitmap);
-            myBitmap = NULL;
-         }
     }
     return myBitmap;
 }
@@ -1059,9 +1062,10 @@ Gdiplus::GpBitmap* BYTEconvertGdip(BYTE* &m_pbBuffer, UINT &width, UINT &height,
          if (Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 6, PixelFormat32bppPARGB, &bitmapDatu)!=Gdiplus::Ok
           || Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu)!=Gdiplus::Ok)
          {
-            QPV_DBG("BYTEconvertGdip: failed to copy the pixels into the GDI+ bitmap");
+            // disposed ahead of the message: building one can throw
             Gdiplus::DllExports::GdipDisposeImage(myBitmap);
             myBitmap = NULL;
+            QPV_DBG("BYTEconvertGdip: failed to copy the pixels into the GDI+ bitmap");
          }
      } else QPV_DBG("BYTEconvertGdip: failed to create GDI+ bitmap object");
 
@@ -1560,22 +1564,20 @@ static void wicLoadResized(WICload &ld, BYTE *m_pbBuffer, UINT width, UINT heigh
        UIntMult(nSize[0], sizeof(Gdiplus::ARGB), &NcbStride);
        UIntMult(NcbStride, nSize[1], &NcbBufferSize);
 
-       BYTE *otherData = NULL;  // the GDI+ bitmap buffer ... resized ^_^
+       std::unique_ptr<BYTE[]> otherData;  // the GDI+ bitmap buffer ... resized ^_^
        if (NcbStride>0 && NcbBufferSize>=NcbStride)
-          otherData = new (std::nothrow) BYTE[NcbBufferSize];
+          otherData.reset(new (std::nothrow) BYTE[NcbBufferSize]);
 
-       hr = (otherData!=NULL) ? S_OK : E_FAIL;
+       hr = otherData ? S_OK : E_FAIL;
        if (SUCCEEDED(hr))
        {
+           BYTE *resized = otherData.get();
            int k = (ld.givenQuality==7) ? 3 : 0;
-           k = openCVresizeBitmap(m_pbBuffer, otherData, width, height, cbStride, nSize[0], nSize[1], NcbStride, 32, k, ld.doFlipHV);
+           k = openCVresizeBitmap(m_pbBuffer, resized, width, height, cbStride, nSize[0], nSize[1], NcbStride, 32, k, ld.doFlipHV);
            if (k==1)
-              ld.myBitmap = BYTEconvertGdip(otherData, nSize[0], nSize[1], NcbStride);
+              ld.myBitmap = BYTEconvertGdip(resized, nSize[0], nSize[1], NcbStride);
            else
               wicLoadLog(ld, "failed to rescale bitmap using OpenCV");
-
-           delete[] otherData;
-           otherData = NULL;
        } else wicLoadLog(ld, "failed to allocate buffer for the resized bitmap");
     } else wicLoadLog(ld, "failed to copy pixels to the allocated buffer");
 }
@@ -1591,21 +1593,18 @@ static void wicLoadToGdip(WICload &ld, UINT width, UINT height) {
 
     if (SUCCEEDED(hr) && width>0 && height>0 && cbStride>0 && cbBufferSize>=cbStride)
     {
-        BYTE *m_pbBuffer = NULL;  // the GDI+ bitmap buffer
+        std::unique_ptr<BYTE[]> m_pbBuffer;  // the GDI+ bitmap buffer
         if (ld.mustResize==1)
-           m_pbBuffer = new (std::nothrow) BYTE[cbBufferSize];
+           m_pbBuffer.reset(new (std::nothrow) BYTE[cbBufferSize]);
 
-        hr = (m_pbBuffer!=NULL || ld.mustResize!=1) ? S_OK : E_FAIL;
+        hr = (m_pbBuffer || ld.mustResize!=1) ? S_OK : E_FAIL;
         if (SUCCEEDED(hr))
         {
             if (ld.mustResize==1)
-               wicLoadResized(ld, m_pbBuffer, width, height, cbStride, cbBufferSize);
+               wicLoadResized(ld, m_pbBuffer.get(), width, height, cbStride, cbBufferSize);
             else
                ld.myBitmap = WICbmpSourceConvertGdip(ld.pFinalBitmapSource, width, height, cbStride, cbBufferSize, ld.destinationGdipFormat);
         } else wicLoadLog(ld, "failed to allocate the buffer for copy pixels");
-
-        delete[] m_pbBuffer;
-        m_pbBuffer = NULL;
     } else wicLoadLog(ld, "failed to prepare buffer for copy pixels");
 }
 
