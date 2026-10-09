@@ -21,33 +21,6 @@
 #include <utility>
 #include <vector>
 
-float imgSelExclW = 0.0f;
-float imgSelExclH = 0.0f;
-float imgSelExclX = 0.0f;
-float imgSelExclY = 0.0f;
-int imgSelX1 = 0;
-int imgSelY1 = 0;
-int imgSelX2 = 0;
-int imgSelY2 = 0;
-int EllipseSelectMode = 0;
-int flippedSelection = 0;
-int invertSelection = 0;
-int highDepthModeMask = 0;
-float excludeSelectScale = 0;
-float vpSelRotation = 0;
-float cosVPselRotation = 0;
-float sinVPselRotation = 0;
-float hImgSelW = 0.0f;
-float hImgSelH = 0.0f;
-float imgSelXscale = 0.0f;
-float imgSelYscale = 0.0f;
-INT64 polyW = 0;
-INT64 polyH = 0;
-INT64 polyX = 0;
-INT64 polyY = 0;
-INT64 polyOffYa = 0;
-INT64 polyOffYb = 0;
-
 class MaskBitMap {
 private:
     std::vector<uint64_t> data;
@@ -174,9 +147,46 @@ public:
     }
 };
 
-std::vector<unsigned char>  highDephMaskMap;
-MaskBitMap  polygonMaskMap;
-MaskBitMap  polygonOtherMaskMap;
+// The selection the editing tools clip to. prepareSelectionArea() sets it; the line tools
+// draw into its masks through prepareDrawLinesMask().
+struct ImgSelection {
+    // the bounding box within the image
+    int x1 = 0;
+    int y1 = 0;
+    int x2 = 0;
+    int y2 = 0;
+    float halfW = 0.0f;
+    float halfH = 0.0f;
+    int shape = 0;              // 0 = rectangle, 1 = ellipse, 2 = the polygon mask
+    int inverted = 0;
+    int flipped = 0;            // a Y-flipped FreeImage bitmap; rotated rectangles and ellipses only
+
+    // rotated rectangles and ellipses
+    float angle = 0;            // radians
+    float cosAngle = 0;
+    float sinAngle = 0;
+    float scaleX = 0.0f;
+    float scaleY = 0.0f;
+
+    // the cavity cut out of a rectangle or an ellipse
+    float exclusion = 0;        // 0 = none
+    float exclX = 0.0f;
+    float exclY = 0.0f;
+    float exclHalfW = 0.0f;
+    float exclHalfH = 0.0f;
+
+    // the polygon mask: a maskW x maskH window of the box
+    INT64 maskX = 0;
+    INT64 maskY = 0;
+    INT64 maskW = 0;
+    INT64 maskH = 0;
+    INT64 maskRowShift = 0;     // mask row = y - y1 - maskY + maskRowShift
+    INT64 y1Push = 0;           // how far QPV_PrepareHugeImgSelectionArea() pushed y1 for a polygon
+    MaskBitMap mask;
+    MaskBitMap clipShape;       // the shape the lines are clipped to, kept by prepareDrawLinesMask()
+    int highDepth = 0;          // clipMaskFilter() reads depthMask instead of mask
+    std::vector<unsigned char> depthMask;
+} imgSel;
 // vector<pair<int, int>> DrawLineGrid;
 
 struct Point {
@@ -185,27 +195,27 @@ struct Point {
 
 bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
     // Translate the coordinates
-    const float tw = (modus==2) ? imgSelExclW : hImgSelW;
-    const float th = (modus==2) ? imgSelExclH : hImgSelH;
-    float x = (modus==2) ? ox - tw - imgSelExclX : ox - tw;
-    float y = (modus==2) ? oy - th - imgSelExclY : oy - th;
-    x *= imgSelXscale;
-    y *= imgSelYscale;
+    const float tw = (modus==2) ? imgSel.exclHalfW : imgSel.halfW;
+    const float th = (modus==2) ? imgSel.exclHalfH : imgSel.halfH;
+    float x = (modus==2) ? ox - tw - imgSel.exclX : ox - tw;
+    float y = (modus==2) ? oy - th - imgSel.exclY : oy - th;
+    x *= imgSel.scaleX;
+    y *= imgSel.scaleY;
 
     // Apply rotation to the coordinates
     float rotatedX, rotatedY;
-    if (flippedSelection==1)
+    if (imgSel.flipped==1)
     {
-       rotatedX = x * cosVPselRotation + y * sinVPselRotation;
-       rotatedY = x * sinVPselRotation - y * cosVPselRotation;
+       rotatedX = x * imgSel.cosAngle + y * imgSel.sinAngle;
+       rotatedY = x * imgSel.sinAngle - y * imgSel.cosAngle;
     } else
     {
-       rotatedX = x * cosVPselRotation - y * sinVPselRotation;
-       rotatedY = x * sinVPselRotation + y * cosVPselRotation;
+       rotatedX = x * imgSel.cosAngle - y * imgSel.sinAngle;
+       rotatedY = x * imgSel.sinAngle + y * imgSel.cosAngle;
     }
 
     bool f;
-    if (EllipseSelectMode==1)
+    if (imgSel.shape==1)
     {
        const float result = (rotatedX * rotatedX) / (tw * tw) + (rotatedY * rotatedY) / (th * th);
        f = (result <= 1.0f);
@@ -214,7 +224,7 @@ bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
        f = ((fabs(rotatedX) < tw) && (fabs(rotatedY) < th));
     }
 
-    if (f && modus==1 && excludeSelectScale!=0)
+    if (f && modus==1 && imgSel.exclusion!=0)
     {
        bool nf = isInsideRectOval(ox, oy, 2);
        return (f && nf) ? 0 : 1;
@@ -239,8 +249,8 @@ void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &
          // polygonMapMax[y0] = max(polygonMapMax[y0], x0);
          polygonMapMin[y0] = min(polygonMapMin[y0], x0);
          // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[y0]) + " | minu=" + std::to_string(polygonMapMin[y0]));
-         if (x0 >= polyX && x0 < polyX + polyW && y0 >= polyY && y0 < polyY + polyH)
-            polygonMaskMap[(UINT64)(y0 - polyY) * polyW + (x0 - polyX)] = 1;
+         if (x0 >= imgSel.maskX && x0 < imgSel.maskX + imgSel.maskW && y0 >= imgSel.maskY && y0 < imgSel.maskY + imgSel.maskH)
+            imgSel.mask[(UINT64)(y0 - imgSel.maskY) * imgSel.maskW + (x0 - imgSel.maskX)] = 1;
       }
 
       if (x0 == x1 && y0 == y1)
@@ -253,31 +263,31 @@ void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &
 }
 
 bool initBoolMaskData() {
-    INT64 s = (INT64)polyW * polyH + 2;
-    if (s!=polygonMaskMap.size())
+    INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2;
+    if (s!=imgSel.mask.size())
     {
        try
        {
-          polygonMaskMap.resize(s);
+          imgSel.mask.resize(s);
        } catch(const std::bad_alloc& e)
        {
-          EllipseSelectMode = 0;
-          fnOutputDebug("polygonMaskMap failed. bad_alloc =" + std::to_string(s));
+          imgSel.shape = 0;
+          fnOutputDebug("imgSel.mask failed. bad_alloc =" + std::to_string(s));
           return 0;
        } catch(const std::length_error& e)
        {
-          EllipseSelectMode = 0;
-          fnOutputDebug("polygonMaskMap failed. length_error =" + std::to_string(s));
+          imgSel.shape = 0;
+          fnOutputDebug("imgSel.mask failed. length_error =" + std::to_string(s));
           return 0;
        }
-       fnOutputDebug("polygonMaskMap RESIZED=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+       fnOutputDebug("imgSel.mask RESIZED=" + std::to_string(s) + "||" + std::to_string(imgSel.mask.size()));
     } else
     {
-       fnOutputDebug("polygonMaskMap size=" + std::to_string(s) + "||" + std::to_string(polygonMaskMap.size()));
+       fnOutputDebug("imgSel.mask size=" + std::to_string(s) + "||" + std::to_string(imgSel.mask.size()));
     }
 
-    polygonMaskMap.fill_zero();
-    // fnOutputDebug("polygonMaskMap refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(polyW) + " x " + std::to_string(polyH) + "|" + std::to_string(polyX) + " x " + std::to_string(polyY));
+    imgSel.mask.fill_zero();
+    // fnOutputDebug("imgSel.mask refilled to zero ; size = " + std::to_string(s) + "|" + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "|" + std::to_string(imgSel.maskX) + " x " + std::to_string(imgSel.maskY));
     return 1;
 }
 inline bool isPointInPolygonOptimized(const INT64 pX, const INT64 pY, const float* PointsList, const std::vector<int>& activeEdges, const int PointsCount) {
@@ -396,7 +406,7 @@ void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, con
         }
     }
 
-    #pragma omp parallel for schedule(dynamic) default(none) shared(polygonMapEdges, crossingEdges, PointsList, ppy1, ppy2, ppx1, ppx2, simpleMode, PointsCount, polyY, polyW, polyX, polygonMaskMap)
+    #pragma omp parallel for schedule(dynamic) default(none) shared(polygonMapEdges, crossingEdges, PointsList, ppy1, ppy2, ppx1, ppx2, simpleMode, PointsCount, imgSel.maskY, imgSel.maskW, imgSel.maskX, imgSel.mask)
     for (int y = 0; y < h; ++y)
     {
         if (polygonMapEdges[y].empty())
@@ -438,9 +448,9 @@ void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, con
              INT64 end_x = min(xb, (INT64)(ppx2 - 1));
              if (start_x <= end_x)
              {
-                  polygonMaskMap.set_range_to_1(
-                      (INT64)(y - polyY) * polyW + start_x - polyX,
-                      (INT64)(y - polyY) * polyW + end_x - polyX
+                  imgSel.mask.set_range_to_1(
+                      (INT64)(y - imgSel.maskY) * imgSel.maskW + start_x - imgSel.maskX,
+                      (INT64)(y - imgSel.maskY) * imgSel.maskW + end_x - imgSel.maskX
                   );
              }
         }
@@ -462,7 +472,7 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
     for ( int i = 0; i < PointsCount*2; i+=2)
     {
         localPoints[i] = round(PointsList[i]);
-        localPoints[i + 1] = round(PointsList[i + 1]) + polyOffYa - polyOffYb;
+        localPoints[i + 1] = round(PointsList[i + 1]) + imgSel.maskRowShift - imgSel.y1Push;
         boundMaxY = max((int)localPoints[i + 1], boundMaxY);
     }
 
@@ -489,20 +499,20 @@ int FillMaskPolygon(int w, int h, float* PointsList, int PointsCount, int ppx1, 
 }
 
 bool inline isPointInOtherMask(const int &x, const int &y, const int &clipMode) {
-    bool p = polygonOtherMaskMap[(INT64)y * polyW + x];
+    bool p = imgSel.clipShape[(INT64)y * imgSel.maskW + x];
     return (clipMode==3) ? !p : p;
 }
 
 DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     // polygonMapMin.clear();
     // polygonMapMin.shrink_to_fit();
-    polygonMaskMap.clear();
-    polygonMaskMap.shrink_to_fit();
-    highDephMaskMap.clear();
-    highDephMaskMap.shrink_to_fit();
-    polygonOtherMaskMap.clear();
-    polygonOtherMaskMap.shrink_to_fit();
-    highDepthModeMask = 0;
+    imgSel.mask.clear();
+    imgSel.mask.shrink_to_fit();
+    imgSel.depthMask.clear();
+    imgSel.depthMask.shrink_to_fit();
+    imgSel.clipShape.clear();
+    imgSel.clipShape.shrink_to_fit();
+    imgSel.highDepth = 0;
     return 1;
 }
 
@@ -663,7 +673,7 @@ DLL_API int DLL_CALLCONV traverseCurvedPath(float* oPointsList, int oPointsCount
 
 DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     int r = 1;
-    if (polygonMaskMap.size()<2000) // || polygonMapMin.size()<100)
+    if (imgSel.mask.size()<2000) // || polygonMapMin.size()<100)
        r = 0;
     return r;
 }
@@ -823,9 +833,9 @@ static void drawThickPolylineRound(cv::Mat &img, const std::vector<cv::Point> &p
 }
 
 DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, int thickness, int closed, int roundedJoins, int fillMode, int roundCaps, int clipMode, int offsetY) {
-    // Uses OpenCV drawing functions to render thick polylines onto polygonMaskMap.
+    // Uses OpenCV drawing functions to render thick polylines onto imgSel.mask.
     // The function renders onto a temporary cv::Mat using OpenCV's optimized line
-    // rasterizer, then transfers the result into the bit-packed polygonMaskMap.
+    // rasterizer, then transfers the result into the bit-packed imgSel.mask.
     //
     // Parameters:
     //   PointsList    - flat array of float [x0,y0, x1,y1, ...] in image-space
@@ -835,34 +845,34 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     //   roundedJoins  - 1 = round joins, otherwise = miter joins
     //   fillMode      - value to write into the mask (1 = draw, 0 = erase)
     //   roundCaps     - 1 = no caps; 2 = box/square caps, 3 = round caps (only for open paths)
-    //   clipMode      - 2 = no clipping, 1/3 = clip against polygonOtherMaskMap
+    //   clipMode      - 2 = no clipping, 1/3 = clip against imgSel.clipShape
     //   offsetY       - vertical pixel offset applied during drawing
 
     fnOutputDebug(std::to_string(clipMode) + " NewDrawLinesOnMask() invoked; PointsCount=" + std::to_string(PointsCount));
     if (PointsCount < 2)
        return 0;
 
-    // Validate polygonMaskMap size
-    INT64 s = (INT64)polyW * polyH + 2;
-    if (s != polygonMaskMap.size())
+    // Validate imgSel.mask size
+    INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2;
+    if (s != imgSel.mask.size())
     {
-       fnOutputDebug("NewDrawLinesOnMask: polygonMaskMap[] incorrect size=" + std::to_string(s) + " != " + std::to_string(polygonMaskMap.size()));
+       fnOutputDebug("NewDrawLinesOnMask: imgSel.mask[] incorrect size=" + std::to_string(s) + " != " + std::to_string(imgSel.mask.size()));
        return 0;
     }
 
-    if (polyW < 1 || polyH < 1)
+    if (imgSel.maskW < 1 || imgSel.maskH < 1)
        return 0;
 
-    if (clipMode!=2 && s!=polygonOtherMaskMap.size())
+    if (clipMode!=2 && s!=imgSel.clipShape.size())
     {
-       fnOutputDebug("NewDrawLinesOnMask: polygonOtherMaskMap[] incorrect size; it should match the size of polygonMaskMap[] size=" + std::to_string(s) + " != " + std::to_string(polygonOtherMaskMap.size()));
+       fnOutputDebug("NewDrawLinesOnMask: imgSel.clipShape[] incorrect size; it should match the size of imgSel.mask[] size=" + std::to_string(s) + " != " + std::to_string(imgSel.clipShape.size()));
        return 0;
     }
 
-    // Adjust Y-coordinates by polyOffYa - polyOffYb (same as drawLineAllSegmentsMask)
+    // Adjust Y-coordinates by imgSel.maskRowShift - imgSel.y1Push (same as drawLineAllSegmentsMask)
     for (int i = 0; i < PointsCount * 2; i += 2)
     {
-        PointsList[i + 1] = PointsList[i + 1] + polyOffYa - polyOffYb;
+        PointsList[i + 1] = PointsList[i + 1] + imgSel.maskRowShift - imgSel.y1Push;
     }
 
     // OpenCV thickness is the full diameter; the input 'thickness' is a radius.
@@ -870,13 +880,13 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     const int cvThickness = max(1, thickness * 2 + 1);
 
     // Convert points from image-space to mask-local coordinates.
-    // In mask-local coords: localX = imageX - polyX, localY = imageY - polyY + offsetY
+    // In mask-local coords: localX = imageX - imgSel.maskX, localY = imageY - imgSel.maskY + offsetY
     std::vector<cv::Point> cvPoints;
     cvPoints.reserve(PointsCount);
     for (int i = 0; i < PointsCount; i++)
     {
-        int lx = (int)round(PointsList[i * 2]     - polyX);
-        int ly = (int)round(PointsList[i * 2 + 1]  - polyY + offsetY);
+        int lx = (int)round(PointsList[i * 2]     - imgSel.maskX);
+        int ly = (int)round(PointsList[i * 2 + 1]  - imgSel.maskY + offsetY);
         cvPoints.push_back(cv::Point(lx, ly));
     }
 
@@ -901,8 +911,8 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
     const int bbMargin = max(cvThickness * 4, thickness + 10);
     bbMinX = max(0, bbMinX - bbMargin);
     bbMinY = max(0, bbMinY - bbMargin);
-    bbMaxX = min((int)polyW - 1, bbMaxX + bbMargin);
-    bbMaxY = min((int)polyH - 1, bbMaxY + bbMargin);
+    bbMaxX = min((int)imgSel.maskW - 1, bbMaxX + bbMargin);
+    bbMaxY = min((int)imgSel.maskH - 1, bbMaxY + bbMargin);
 
     if (bbMinX > bbMaxX || bbMinY > bbMaxY)
         return 1; // all points are outside the mask bounds
@@ -1051,8 +1061,8 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                 if (fabs(orig_dx) < 0.01f && fabs(orig_dy) < 0.01f)
                 {
                     // Degenerate segment: stamp a circle
-                    int cx = (int)round(xa - polyX) - tileOffX;
-                    int cy = (int)round(ya - polyY + offsetY) - tileOffY;
+                    int cx = (int)round(xa - imgSel.maskX) - tileOffX;
+                    int cy = (int)round(ya - imgSel.maskY + offsetY) - tileOffY;
                     cv::circle(tileMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
                     continue;
                 }
@@ -1066,10 +1076,10 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 
                 // Convert to mask-local coordinates with tile offset, and draw as filled polygon
                 cv::Point rectPts[4];
-                rectPts[0] = cv::Point((int)round(np1.x - polyX) - tileOffX, (int)round(np1.y - polyY + offsetY) - tileOffY);
-                rectPts[1] = cv::Point((int)round(np3.x - polyX) - tileOffX, (int)round(np3.y - polyY + offsetY) - tileOffY);
-                rectPts[2] = cv::Point((int)round(np4.x - polyX) - tileOffX, (int)round(np4.y - polyY + offsetY) - tileOffY);
-                rectPts[3] = cv::Point((int)round(np2.x - polyX) - tileOffX, (int)round(np2.y - polyY + offsetY) - tileOffY);
+                rectPts[0] = cv::Point((int)round(np1.x - imgSel.maskX) - tileOffX, (int)round(np1.y - imgSel.maskY + offsetY) - tileOffY);
+                rectPts[1] = cv::Point((int)round(np3.x - imgSel.maskX) - tileOffX, (int)round(np3.y - imgSel.maskY + offsetY) - tileOffY);
+                rectPts[2] = cv::Point((int)round(np4.x - imgSel.maskX) - tileOffX, (int)round(np4.y - imgSel.maskY + offsetY) - tileOffY);
+                rectPts[3] = cv::Point((int)round(np2.x - imgSel.maskX) - tileOffX, (int)round(np2.y - imgSel.maskY + offsetY) - tileOffY);
                 std::vector<std::vector<cv::Point>> segContour = { {rectPts[0], rectPts[1], rectPts[2], rectPts[3]} };
                 cv::fillPoly(tileMat, segContour, drawColor);
             }
@@ -1097,8 +1107,8 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                     if (roundCaps == 3)
                     {
                         // Round cap: draw a filled circle at the endpoint
-                        int cx = (int)round(pxA - polyX) - tileOffX;
-                        int cy = (int)round(pyA - polyY + offsetY) - tileOffY;
+                        int cx = (int)round(pxA - imgSel.maskX) - tileOffX;
+                        int cy = (int)round(pyA - imgSel.maskY + offsetY) - tileOffY;
                         cv::circle(tileMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
                     } else if (roundCaps == 2)
                     {
@@ -1116,10 +1126,10 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                             double extY = pyA + ny * thickness;
 
                             cv::Point capPts[4];
-                            capPts[0] = cv::Point((int)round(pxA + px * thickness - polyX) - tileOffX, (int)round(pyA + py * thickness - polyY + offsetY) - tileOffY);
-                            capPts[1] = cv::Point((int)round(pxA - px * thickness - polyX) - tileOffX, (int)round(pyA - py * thickness - polyY + offsetY) - tileOffY);
-                            capPts[2] = cv::Point((int)round(extX - px * thickness - polyX) - tileOffX, (int)round(extY - py * thickness - polyY + offsetY) - tileOffY);
-                            capPts[3] = cv::Point((int)round(extX + px * thickness - polyX) - tileOffX, (int)round(extY + py * thickness - polyY + offsetY) - tileOffY);
+                            capPts[0] = cv::Point((int)round(pxA + px * thickness - imgSel.maskX) - tileOffX, (int)round(pyA + py * thickness - imgSel.maskY + offsetY) - tileOffY);
+                            capPts[1] = cv::Point((int)round(pxA - px * thickness - imgSel.maskX) - tileOffX, (int)round(pyA - py * thickness - imgSel.maskY + offsetY) - tileOffY);
+                            capPts[2] = cv::Point((int)round(extX - px * thickness - imgSel.maskX) - tileOffX, (int)round(extY - py * thickness - imgSel.maskY + offsetY) - tileOffY);
+                            capPts[3] = cv::Point((int)round(extX + px * thickness - imgSel.maskX) - tileOffX, (int)round(extY + py * thickness - imgSel.maskY + offsetY) - tileOffY);
 
                             std::vector<std::vector<cv::Point>> capContour = { {capPts[0], capPts[1], capPts[2], capPts[3]} };
                             cv::fillPoly(tileMat, capContour, drawColor);
@@ -1165,8 +1175,8 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                         // Colinear: stamp a circle at the vertex
                         if (pts == 0 || pts == pci)
                         {
-                            int cx = (int)round(c.x - polyX) - tileOffX;
-                            int cy = (int)round(c.y - polyY + offsetY) - tileOffY;
+                            int cx = (int)round(c.x - imgSel.maskX) - tileOffX;
+                            int cy = (int)round(c.y - imgSel.maskY + offsetY) - tileOffY;
                             cv::circle(tileMat, cv::Point(cx, cy), thickness, drawColor, cv::FILLED, cv::LINE_8);
                         }
                     }
@@ -1192,19 +1202,19 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
                         {
                             // Miter join: 4-point polygon (a, intersection, b, center)
                             cv::Point joinPts[4];
-                            joinPts[0] = cv::Point((int)round(a.x - polyX) - tileOffX,    (int)round(a.y - polyY + offsetY) - tileOffY);
-                            joinPts[1] = cv::Point((int)round(nx_f - polyX) - tileOffX,   (int)round(ny_f - polyY + offsetY) - tileOffY);
-                            joinPts[2] = cv::Point((int)round(b.x - polyX) - tileOffX,    (int)round(b.y - polyY + offsetY) - tileOffY);
-                            joinPts[3] = cv::Point((int)round(c.x - polyX) - tileOffX,    (int)round(c.y - polyY + offsetY) - tileOffY);
+                            joinPts[0] = cv::Point((int)round(a.x - imgSel.maskX) - tileOffX,    (int)round(a.y - imgSel.maskY + offsetY) - tileOffY);
+                            joinPts[1] = cv::Point((int)round(nx_f - imgSel.maskX) - tileOffX,   (int)round(ny_f - imgSel.maskY + offsetY) - tileOffY);
+                            joinPts[2] = cv::Point((int)round(b.x - imgSel.maskX) - tileOffX,    (int)round(b.y - imgSel.maskY + offsetY) - tileOffY);
+                            joinPts[3] = cv::Point((int)round(c.x - imgSel.maskX) - tileOffX,    (int)round(c.y - imgSel.maskY + offsetY) - tileOffY);
                             std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2], joinPts[3]} };
                             cv::fillPoly(tileMat, joinContour, drawColor);
                         } else
                         {
                             // Bevel join fallback: 3-point triangle (a, b, center)
                             cv::Point joinPts[3];
-                            joinPts[0] = cv::Point((int)round(a.x - polyX) - tileOffX,  (int)round(a.y - polyY + offsetY) - tileOffY);
-                            joinPts[1] = cv::Point((int)round(b.x - polyX) - tileOffX,  (int)round(b.y - polyY + offsetY) - tileOffY);
-                            joinPts[2] = cv::Point((int)round(c.x - polyX) - tileOffX,  (int)round(c.y - polyY + offsetY) - tileOffY);
+                            joinPts[0] = cv::Point((int)round(a.x - imgSel.maskX) - tileOffX,  (int)round(a.y - imgSel.maskY + offsetY) - tileOffY);
+                            joinPts[1] = cv::Point((int)round(b.x - imgSel.maskX) - tileOffX,  (int)round(b.y - imgSel.maskY + offsetY) - tileOffY);
+                            joinPts[2] = cv::Point((int)round(c.x - imgSel.maskX) - tileOffX,  (int)round(c.y - imgSel.maskY + offsetY) - tileOffY);
                             std::vector<std::vector<cv::Point>> joinContour = { {joinPts[0], joinPts[1], joinPts[2]} };
                             cv::fillPoly(tileMat, joinContour, drawColor);
                         }
@@ -1213,7 +1223,7 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
             }
         }
 
-        // Transfer this tile's pixels into polygonMaskMap, respecting fillMode and clipMode.
+        // Transfer this tile's pixels into imgSel.mask, respecting fillMode and clipMode.
         // tileMat pixels with value > 0 correspond to drawn areas.
         if (clipMode == 2)
         {
@@ -1223,29 +1233,29 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
             {
                 const unsigned char* row = tileMat.ptr<unsigned char>(y);
                 const int globalY = tileOffY + y;
-                const INT64 rowStart = (INT64)globalY * polyW;
+                const INT64 rowStart = (INT64)globalY * imgSel.maskW;
                 for (int x = 0; x < roiW; x++)
                 {
                     if (row[x] > 0)
-                       polygonMaskMap[rowStart + tileOffX + x] = useFill;
+                       imgSel.mask[rowStart + tileOffX + x] = useFill;
                 }
             }
         } else
         {
-            // Clipping against polygonOtherMaskMap
+            // Clipping against imgSel.clipShape
             #pragma omp parallel for schedule(static) num_threads(4)
             for (int y = 0; y < tileH; y++)
             {
                 const unsigned char* row = tileMat.ptr<unsigned char>(y);
                 const int globalY = tileOffY + y;
-                const INT64 rowStart = (INT64)globalY * polyW;
+                const INT64 rowStart = (INT64)globalY * imgSel.maskW;
                 for (int x = 0; x < roiW; x++)
                 {
                     if (row[x] > 0)
                     {
                         const int globalX = tileOffX + x;
                         if (isPointInOtherMask(globalX, globalY, clipMode) == 1)
-                           polygonMaskMap[rowStart + globalX] = useFill;
+                           imgSel.mask[rowStart + globalX] = useFill;
                     }
                 }
             }
@@ -1257,140 +1267,140 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
 }
 
 DLL_API int DLL_CALLCONV mergePolyMaskIntoHighDepthMask(int px1, int py1, int px2, int py2, int imgW, int imgH, int thickness) {
-  INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
-  fnOutputDebug("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; SIZE desired=" + std::to_string(s));
-  if (s!=polygonMaskMap.size())
+  INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2; // variables set by prepareSelectionArea()
+  fnOutputDebug("mergePolyMaskIntoHighDepthMask() invoked: w / h= " + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "; SIZE desired=" + std::to_string(s));
+  if (s!=imgSel.mask.size())
   {
-     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED polygonMaskMap=" + std::to_string(polygonMaskMap.size()));
+     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED imgSel.mask=" + std::to_string(imgSel.mask.size()));
      return 0;
   }
 
-  if (s!=highDephMaskMap.size())
+  if (s!=imgSel.depthMask.size())
   {
-     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED highDephMaskMap=" + std::to_string(highDephMaskMap.size()));
+     fnOutputDebug("mergePolyMaskIntoHighDepthMask() error: SIZE MISMATCHED imgSel.depthMask=" + std::to_string(imgSel.depthMask.size()));
      return 0;
   }
 
   // the window comes in the coordinates of the points NewDrawLinesOnMask() was given: map it the same way
-  const INT64 offY = polyOffYa - polyOffYb - polyY;
-  const int mw = (int)min((INT64)px2 - polyX + thickness, polyW - 1);
-  const int mh = (int)min((INT64)py2 + offY + thickness, polyH - 1);
-  const int mx = (int)max((INT64)px1 - polyX - thickness, (INT64)0);
+  const INT64 offY = imgSel.maskRowShift - imgSel.y1Push - imgSel.maskY;
+  const int mw = (int)min((INT64)px2 - imgSel.maskX + thickness, imgSel.maskW - 1);
+  const int mh = (int)min((INT64)py2 + offY + thickness, imgSel.maskH - 1);
+  const int mx = (int)max((INT64)px1 - imgSel.maskX - thickness, (INT64)0);
   const int my = (int)max((INT64)py1 + offY - thickness, (INT64)0);
   if (mx>mw || my>mh)
      return 1; // the stroke lies off the mask
 
   #pragma omp parallel for schedule(static) default(none) num_threads(4)
   for (int y = my; y <= mh; y++) {
-      const INT64 start = (INT64)y * polyW;
+      const INT64 start = (INT64)y * imgSel.maskW;
       for (INT64 i = start + mx; i <= start + mw; i++) {
-          if (polygonMaskMap[i]==1)
-             highDephMaskMap[i] = clamp(highDephMaskMap[i] + polygonMaskMap[i], 0, 255);
+          if (imgSel.mask[i]==1)
+             imgSel.depthMask[i] = clamp(imgSel.depthMask[i] + imgSel.mask[i], 0, 255);
      }
   }
 
-  const INT64 rstart = (INT64)my * polyW + mx;
-  const INT64 rend = (INT64)mh * polyW + mw;
-  polygonMaskMap.fill_zero(rstart, rend + 1); // fill_zero() treats the end as exclusive
+  const INT64 rstart = (INT64)my * imgSel.maskW + mx;
+  const INT64 rend = (INT64)mh * imgSel.maskW + mw;
+  imgSel.mask.fill_zero(rstart, rend + 1); // fill_zero() treats the end as exclusive
   return 1;
 }
 
 DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int highDepth) {
      // relies on prepareSelectionArea()
-     EllipseSelectMode = 2;
-     invertSelection = 0;
-     highDepthModeMask = highDepth;
-     INT64 s = (INT64)polyW * polyH + 2; // variables set by prepareSelectionArea()
-     fnOutputDebug("prepareDrawLinesMask() invoked: w / h= " + std::to_string(polyW) + " x " + std::to_string(polyH) + "; size=" + std::to_string(s));
+     imgSel.shape = 2;
+     imgSel.inverted = 0;
+     imgSel.highDepth = highDepth;
+     INT64 s = (INT64)imgSel.maskW * imgSel.maskH + 2; // variables set by prepareSelectionArea()
+     fnOutputDebug("prepareDrawLinesMask() invoked: w / h= " + std::to_string(imgSel.maskW) + " x " + std::to_string(imgSel.maskH) + "; size=" + std::to_string(s));
 
-     if (s!=polygonMaskMap.size())
+     if (s!=imgSel.mask.size())
      {
         try
         {
-           polygonMaskMap.resize(s);
+           imgSel.mask.resize(s);
         } catch(const std::bad_alloc& e)
         {
-           fnOutputDebug("polygonMaskMap failed. bad_alloc");
+           fnOutputDebug("imgSel.mask failed. bad_alloc");
            return 0;
         } catch(const std::length_error& e)
         {
-           fnOutputDebug("polygonMaskMap failed. length_error");
+           fnOutputDebug("imgSel.mask failed. length_error");
            return 0;
         }
  
-        fnOutputDebug("polygonMaskMap RESIZED");
+        fnOutputDebug("imgSel.mask RESIZED");
      }
 
      if (clipMode!=2)
      {
         try
         {
-           polygonOtherMaskMap.resize(s);
+           imgSel.clipShape.resize(s);
         } catch(const std::bad_alloc& e)
         {
-           fnOutputDebug("polygonOtherMaskMap failed. bad_alloc");
+           fnOutputDebug("imgSel.clipShape failed. bad_alloc");
            return 0;
         } catch(const std::length_error& e)
         {
-           fnOutputDebug("polygonOtherMaskMap failed. length_error");
+           fnOutputDebug("imgSel.clipShape failed. length_error");
            return 0;
         }
  
-        polygonOtherMaskMap = polygonMaskMap;
-        bool pp = (polygonMaskMap.size()==s) ? 1 : 0;
-        fnOutputDebug(std::to_string(clipMode) + "polygonOtherMaskMap RESIZED " + std::to_string(pp) + " size = " + std::to_string(polygonMaskMap.size()));
+        imgSel.clipShape = imgSel.mask;
+        bool pp = (imgSel.mask.size()==s) ? 1 : 0;
+        fnOutputDebug(std::to_string(clipMode) + "imgSel.clipShape RESIZED " + std::to_string(pp) + " size = " + std::to_string(imgSel.mask.size()));
     }
 
-    if (s!=highDephMaskMap.size() && highDepthModeMask==1)
+    if (s!=imgSel.depthMask.size() && imgSel.highDepth==1)
     {
        try
        {
-          highDephMaskMap.resize(s);
+          imgSel.depthMask.resize(s);
        } catch(const std::bad_alloc& e)
        {
-          fnOutputDebug("highDephMaskMap failed. bad_alloc");
+          fnOutputDebug("imgSel.depthMask failed. bad_alloc");
           return 0;
        } catch(const std::length_error& e)
        {
-          fnOutputDebug("highDephMaskMap failed. length_error");
+          fnOutputDebug("imgSel.depthMask failed. length_error");
           return 0;
        }
 
-       fnOutputDebug("highDephMaskMap RESIZED");
-       fill(highDephMaskMap.begin(), highDephMaskMap.end(), 0);
-    } else if (highDepthModeMask==0)
+       fnOutputDebug("imgSel.depthMask RESIZED");
+       fill(imgSel.depthMask.begin(), imgSel.depthMask.end(), 0);
+    } else if (imgSel.highDepth==0)
     {
-       highDephMaskMap.clear();
-       highDephMaskMap.shrink_to_fit();
+       imgSel.depthMask.clear();
+       imgSel.depthMask.shrink_to_fit();
     }
 
-    polygonMaskMap.fill_zero();
-    fnOutputDebug("prepareDrawLinesMask() - polygonMaskMap DONE; radius = " + std::to_string(radius));
+    imgSel.mask.fill_zero();
+    fnOutputDebug("prepareDrawLinesMask() - imgSel.mask DONE; radius = " + std::to_string(radius));
     return 1;
 }
 
 unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *maskBitmap, const int &mStride) {
     // see comments for prepareSelectionArea()
-    if (invertSelection==1)
+    if (imgSel.inverted==1)
     {
-       // the polygon mask maps its rows as in the branch below: from polyOffYa rows under imgSelY1
-       const INT64 selY1 = (maskBitmap==NULL && EllipseSelectMode==2) ? imgSelY1 - polyOffYa : imgSelY1;
-       if (inRange(imgSelX1, imgSelX2, x) && inRange(selY1, imgSelY2, y))
+       // the polygon mask maps its rows as in the branch below: from imgSel.maskRowShift rows under imgSel.y1
+       const INT64 selY1 = (maskBitmap==NULL && imgSel.shape==2) ? imgSel.y1 - imgSel.maskRowShift : imgSel.y1;
+       if (inRange(imgSel.x1, imgSel.x2, x) && inRange(selY1, imgSel.y2, y))
        {
           if (maskBitmap!=NULL)
           {
-             INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
+             INT64 mo = CalcPixOffset(x - imgSel.x1, y - imgSel.y1, mStride, 24);
              if (maskBitmap[mo]>128)
                 return 1;
-          } else if (EllipseSelectMode==2)
+          } else if (imgSel.shape==2)
           {
              bool r = 0;
-             if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
-                r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
+             if (inRange(0, imgSel.maskH - 1, y - imgSel.y1 - imgSel.maskY + imgSel.maskRowShift) && inRange(0, imgSel.maskW - 1, x - imgSel.x1 - imgSel.maskX))
+                r = imgSel.mask[(INT64)(y - imgSel.y1 - imgSel.maskY + imgSel.maskRowShift) * imgSel.maskW + x - imgSel.x1 - imgSel.maskX];
              return r;
-          } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
+          } else if (imgSel.shape==1 || imgSel.shape==0 && (imgSel.angle!=0 || imgSel.exclusion!=0))
           {
-             return isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
+             return isInsideRectOval(x - imgSel.x1, y - imgSel.y1, 1);
           } else 
           {
              return 1;
@@ -1398,30 +1408,30 @@ unsigned char clipMaskFilter(const int &x, const int &y, const unsigned char *ma
        }
     } else
     {
-       if (!inRange(imgSelX1, imgSelX2, x) || !inRange(imgSelY1 - polyOffYa, imgSelY2, y))
-          return (highDepthModeMask==1) ? 0 : 1;
+       if (!inRange(imgSel.x1, imgSel.x2, x) || !inRange(imgSel.y1 - imgSel.maskRowShift, imgSel.y2, y))
+          return (imgSel.highDepth==1) ? 0 : 1;
 
        if (maskBitmap!=NULL)
        {
-          INT64 mo = CalcPixOffset(x - imgSelX1, y - imgSelY1, mStride, 24);
+          INT64 mo = CalcPixOffset(x - imgSel.x1, y - imgSel.y1, mStride, 24);
           if (maskBitmap[mo]<128)
              return 1;
-       } else if (EllipseSelectMode==2)
+       } else if (imgSel.shape==2)
        {
-          bool r = (highDepthModeMask==1) ? 1 : 0;
-          if (inRange(0, polyH - 1, y - imgSelY1 - polyY + polyOffYa) && inRange(0, polyW - 1, x - imgSelX1 - polyX))
+          bool r = (imgSel.highDepth==1) ? 1 : 0;
+          if (inRange(0, imgSel.maskH - 1, y - imgSel.y1 - imgSel.maskY + imgSel.maskRowShift) && inRange(0, imgSel.maskW - 1, x - imgSel.x1 - imgSel.maskX))
           {
-             if (highDepthModeMask==1) // flag set by prepareDrawLinesMask() and used by mergePolyMaskIntoHighDepthMask() invoked from AHK by HugeImagesDrawParametricLines()
-                return highDephMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
+             if (imgSel.highDepth==1) // flag set by prepareDrawLinesMask() and used by mergePolyMaskIntoHighDepthMask() invoked from AHK by HugeImagesDrawParametricLines()
+                return imgSel.depthMask[(INT64)(y - imgSel.y1 - imgSel.maskY + imgSel.maskRowShift) * imgSel.maskW + x - imgSel.x1 - imgSel.maskX];
 
-             r = polygonMaskMap[(INT64)(y - imgSelY1 - polyY + polyOffYa) * polyW + x - imgSelX1 - polyX];
+             r = imgSel.mask[(INT64)(y - imgSel.y1 - imgSel.maskY + imgSel.maskRowShift) * imgSel.maskW + x - imgSel.x1 - imgSel.maskX];
           }
 
-          // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSelY1 - polyY + polyOffYa));
+          // fnOutputDebug("clipMaskFilter y=" + std::to_string(y - imgSel.y1 - imgSel.maskY + imgSel.maskRowShift));
           return !r;
-       } else if (EllipseSelectMode==1 || EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0))
+       } else if (imgSel.shape==1 || imgSel.shape==0 && (imgSel.angle!=0 || imgSel.exclusion!=0))
        {
-          return !isInsideRectOval(x - imgSelX1, y - imgSelY1, 1);
+          return !isInsideRectOval(x - imgSel.x1, y - imgSel.y1, 1);
        }
     }
     return 0;
@@ -1455,7 +1465,7 @@ Parameters relevant only for selection areas based on freeform vector paths:
     PointsList             / a pointer to a freeform polygonal shape created with GDI+; the points are in image/pixel coordinates, but are relative to the image selection are bounding box
     PointsCount            / the number of points the vector shape has 
     ppx1, ppy1, ppx2, ppy2 / the coordinates of the subsection of the selection area bounding box intended to be drawn; it is used primarily when dealing with viewport live previews, but also when the selection area exceeds the image bounding box; with these coordinates i can avoid excessive memory usage and drastically reduce computations
-    useCache               / if TRUE then polygonMaskMap[] will be reused
+    useCache               / if TRUE then imgSel.mask[] will be reused
     ppofYa, ppofYb         / Y offsets used to accomodate FreeImage's Y-flipped crap
 
 How selection areas work:
@@ -1469,10 +1479,10 @@ be modified or not. It works with different types of selection areas or sources:
 ellipses, polygonal shapes, and bitmaps.
 
 When (mode==2) a polygonal shape is used, FillMaskPolygon() is invoked by prepareSelectionArea().
-FillMaskPolygon() fills the polygonMaskMap boolean vector with 0/1 values. The vector is 
+FillMaskPolygon() fills the imgSel.mask boolean vector with 0/1 values. The vector is 
 sized according to the ppxy subsection coordinates in order to minimize memory usage.
 
-When clipMaskFilter() is called, it uses the polygonMaskMap vector precalculated data.
+When clipMaskFilter() is called, it uses the imgSel.mask vector precalculated data.
 
 If the selection area shape is set to be a rect or an ellipse, isInsideRectOval() is used
 to determine if the pixel is to be modified or not, in clipMaskFilter(). In this case, no 
@@ -1481,39 +1491,39 @@ precalculated data is used.
 clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it.
 */
 
-    imgSelX1 = x1;
-    imgSelY1 = y1;
-    imgSelX2 = x2;
-    imgSelY2 = y2;
-    imgSelExclX = w - (w*exclusion);
-    imgSelExclY = h - (h*exclusion);
-    imgSelExclW = (w - imgSelExclX*2) / 2.0f;
-    imgSelExclH = (h - imgSelExclY*2) / 2.0f;
-    imgSelXscale = xf;
-    imgSelYscale = yf;
-    hImgSelW = w / 2.0f;
-    hImgSelH = h / 2.0f;
-    EllipseSelectMode = mode;
-    flippedSelection = flip;
-    invertSelection = invertArea;
-    excludeSelectScale = exclusion;
-    vpSelRotation = (angle * M_PI) / 180.0f; // convert to radians
-    cosVPselRotation = cos(vpSelRotation);
-    sinVPselRotation = sin(vpSelRotation);
-    polyX = ppx1;
-    polyY = ppy1;
-    polyW = ppx2 - ppx1;
-    polyH = ppy2 - ppy1;
-    polyOffYa = ppofYa;
-    polyOffYb = ppofYb;
-    if (polygonMaskMap.size()<2000) // || polygonMapMin.size()<100)
+    imgSel.x1 = x1;
+    imgSel.y1 = y1;
+    imgSel.x2 = x2;
+    imgSel.y2 = y2;
+    imgSel.exclX = w - (w*exclusion);
+    imgSel.exclY = h - (h*exclusion);
+    imgSel.exclHalfW = (w - imgSel.exclX*2) / 2.0f;
+    imgSel.exclHalfH = (h - imgSel.exclY*2) / 2.0f;
+    imgSel.scaleX = xf;
+    imgSel.scaleY = yf;
+    imgSel.halfW = w / 2.0f;
+    imgSel.halfH = h / 2.0f;
+    imgSel.shape = mode;
+    imgSel.flipped = flip;
+    imgSel.inverted = invertArea;
+    imgSel.exclusion = exclusion;
+    imgSel.angle = (angle * M_PI) / 180.0f; // convert to radians
+    imgSel.cosAngle = cos(imgSel.angle);
+    imgSel.sinAngle = sin(imgSel.angle);
+    imgSel.maskX = ppx1;
+    imgSel.maskY = ppy1;
+    imgSel.maskW = ppx2 - ppx1;
+    imgSel.maskH = ppy2 - ppy1;
+    imgSel.maskRowShift = ppofYa;
+    imgSel.y1Push = ppofYb;
+    if (imgSel.mask.size()<2000) // || polygonMapMin.size()<100)
        useCache = 0;
 
     int z = 1;
-    if (mode==2 && PointsList!=NULL && useCache!=1 && polyW>1 && polyH>1)
+    if (mode==2 && PointsList!=NULL && useCache!=1 && imgSel.maskW>1 && imgSel.maskH>1)
        z = FillMaskPolygon(w, h, PointsList, PointsCount, ppx1, ppy1, ppx2, ppy2);
     else if (mode==2 && useCache!=1)
-       EllipseSelectMode = 0;
+       imgSel.shape = 0;
 
     return z;
 }

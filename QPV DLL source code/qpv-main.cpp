@@ -678,9 +678,9 @@ DLL_API int DLL_CALLCONV GenerateRandomNoise(int* bgrImageData, int w, int h, in
 // The area of the w x h image that the small bitmap of GenerateRandomNoiseOnBitmap() and
 // PixelateHugeBitmap() stands for: the whole image when the selection is inverted, else the
 // selection box clipped to the image. AHK shifts the start row of a freeform selection by
-// polyOffYb; a rotated ellipse's box is the rescaled one prepareSelectionArea() received.
+// imgSel.y1Push; a rotated ellipse's box is the rescaled one prepareSelectionArea() received.
 static void smallBitmapArea(const int w, const int h, int &x, int &y, int &bw, int &bh) {
-    if (invertSelection==1)
+    if (imgSel.inverted==1)
     {
        x = y = 0;
        bw = w;
@@ -688,10 +688,10 @@ static void smallBitmapArea(const int w, const int h, int &x, int &y, int &bw, i
        return;
     }
 
-    x = max(0, imgSelX1);
-    y = max(0, (int)(imgSelY1 - polyOffYb));
-    bw = max(1, min(imgSelX2 + 1, w) - x);
-    bh = max(1, min(imgSelY2 + 1, h) - y);
+    x = max(0, imgSel.x1);
+    y = max(0, (int)(imgSel.y1 - imgSel.y1Push));
+    bw = max(1, min(imgSel.x2 + 1, w) - x);
+    bh = max(1, min(imgSel.y2 + 1, h) - y);
 }
 
 DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData, int w, int h, int Stride, int bpp, int intensity, int opacity, int brightness, int doGrayScale, int pixelize, unsigned char *newBitmap, int StrideMini, int mw, int mh, int blendMode, int flipLayers, int keepAlpha, int linearGamma) {
@@ -1184,17 +1184,17 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     // where a 1:1 overlay starts. The rescaleBitmapJIT=0 call sites hand over an
     // overlay they cropped themselves to the on-image part of the selection box, so
     // for them the origin is the clamped one; the JIT modes below re-anchor it
-    int bmpX = (imgSelX1<0 || invertSelection==1) ? 0 : imgSelX1;
-    int bmpY = (imgSelY1<0 || invertSelection==1) ? 0 : imgSelY1;
+    int bmpX = (imgSel.x1<0 || imgSel.inverted==1) ? 0 : imgSel.x1;
+    int bmpY = (imgSel.y1<0 || imgSel.inverted==1) ? 0 : imgSel.y1;
     // ... and the selection box as the caller actually declared it, off-image parts
-    // included. QPV_PrepareHugeImgSelectionArea() pushes y1 up by polyOffYb for mode 2
+    // included. QPV_PrepareHugeImgSelectionArea() pushes y1 up by imgSel.y1Push for mode 2
     // to accomodate FreeImage's Y-flipped crap, so subtracting it recovers the origin
-    const int selX = imgSelX1;
-    const int selY = imgSelY1 - (int)polyOffYb;
-    const int mw = (EllipseSelectMode==2 && invertSelection==0) ? min(w - 1, imgSelX2) : w - 1;
-    const int mh = (EllipseSelectMode==2 && invertSelection==0) ? min(h - 1, imgSelY2) : h - 1;
-    const int mx = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelX1, 0, w - 1) : 0;
-    const int my = (EllipseSelectMode==2 && invertSelection==0) ? clamp(imgSelY1 - (int)polyOffYa, 0, h - 1) : 0;
+    const int selX = imgSel.x1;
+    const int selY = imgSel.y1 - (int)imgSel.y1Push;
+    const int mw = (imgSel.shape==2 && imgSel.inverted==0) ? min(w - 1, imgSel.x2) : w - 1;
+    const int mh = (imgSel.shape==2 && imgSel.inverted==0) ? min(h - 1, imgSel.y2) : h - 1;
+    const int mx = (imgSel.shape==2 && imgSel.inverted==0) ? clamp(imgSel.x1, 0, w - 1) : 0;
+    const int my = (imgSel.shape==2 && imgSel.inverted==0) ? clamp(imgSel.y1 - (int)imgSel.maskRowShift, 0, h - 1) : 0;
     // fnOutputDebug("offsets X/Y: " + std::to_string(bmpX) + "|" + std::to_string(bmpY));
     // fnOutputDebug("colorBitmap W/H: " + std::to_string(nBmpW) + "|" + std::to_string(nBmpH));
 
@@ -1203,7 +1203,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
     // and only the short-circuit keeps it from being read
     bool useJIT = (colorBitmap!=NULL && (rescaleBitmapJIT==1 || rescaleBitmapJIT==2) && nBmpW>0 && nBmpH>0);
     int jitX = 0, jitY = 0, jitW = w, jitH = h;
-    if (useJIT && rescaleBitmapJIT==2 && invertSelection!=1)
+    if (useJIT && rescaleBitmapJIT==2 && imgSel.inverted!=1)
     {
        // the overlay spans the whole selection box, so the box is what it is stretched
        // onto -- and the loop below simply never visits the part of it that falls off
@@ -1212,8 +1212,8 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
        // still gather their real neighbours instead of a replicated edge
        jitX = selX;
        jitY = selY;
-       jitW = imgSelX2 - selX + 1;
-       jitH = imgSelY2 - selY + 1;
+       jitW = imgSel.x2 - selX + 1;
+       jitH = imgSel.y2 - selY + 1;
        if (jitW<1 || jitH<1)
           useJIT = false;
     }
@@ -1262,7 +1262,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             INT64 kx = (INT64)x * bpc;
             INT64 kzx = (INT64)(x - bmpX) * gbpc;
             float opacityDepth = clipMaskFilter(x, y, NULL, 0);
-            if (opacityDepth==1 && highDepthModeMask==0 || opacityDepth==0 && highDepthModeMask==1)
+            if (opacityDepth==1 && imgSel.highDepth==0 || opacityDepth==0 && imgSel.highDepth==1)
                continue;
 
             if (opacityDepth>1)
@@ -1314,7 +1314,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                if (opacityMultiplier>0 && gBpp==32)
                   thisOpacity = clamp(thisOpacity + opacityMultiplier, 0, 255);
 
-               if (highDepthModeMask==1)
+               if (imgSel.highDepth==1)
                   thisOpacity = clamp(thisOpacity * opacityDepth, 0.0f, 255.0f);
 
                userColor.a = thisOpacity;
@@ -1326,7 +1326,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
             } else
             {
                userColor = initialColor;
-               userColor.a = (highDepthModeMask==0) ? initialColor.a : clamp(initialColor.a * opacityDepth, 0.0f, 255.0f);
+               userColor.a = (imgSel.highDepth==0) ? initialColor.a : clamp(initialColor.a * opacityDepth, 0.0f, 255.0f);
             }
 
             if (eraser==1)

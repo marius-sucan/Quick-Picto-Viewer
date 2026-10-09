@@ -327,43 +327,43 @@ struct FloodSel {
         if (useSelArea!=1)
            return;
 
-        inv = (invertSelection==1) ? 1 : 0;
-        if (!inv && highDepthModeMask==1)
+        inv = (imgSel.inverted==1) ? 1 : 0;
+        if (!inv && imgSel.highDepth==1)
         {
            kind = 1;
            return;
         }
 
-        selX1 = imgSelX1;
-        selY1 = imgSelY1;
-        bx1 = imgSelX1;
-        bx2 = imgSelX2;
-        by1 = (inv && EllipseSelectMode!=2) ? imgSelY1 : (int)(imgSelY1 - polyOffYa);
-        by2 = imgSelY2;
-        if (EllipseSelectMode==2)
+        selX1 = imgSel.x1;
+        selY1 = imgSel.y1;
+        bx1 = imgSel.x1;
+        bx2 = imgSel.x2;
+        by1 = (inv && imgSel.shape!=2) ? imgSel.y1 : (int)(imgSel.y1 - imgSel.maskRowShift);
+        by2 = imgSel.y2;
+        if (imgSel.shape==2)
         {
            kind = 3;
-           pRowOff = polyOffYa - polyY;
-           pColOff = -polyX;
-           pW = polyW;
-           pWlast = (int)(polyW - 1);
-           pHlast = (int)(polyH - 1);
-           pWords = polygonMaskMap.words();
-           pWordCount = polygonMaskMap.word_count();
-        } else if (EllipseSelectMode==1 || (EllipseSelectMode==0 && (vpSelRotation!=0 || excludeSelectScale!=0)))
+           pRowOff = imgSel.maskRowShift - imgSel.maskY;
+           pColOff = -imgSel.maskX;
+           pW = imgSel.maskW;
+           pWlast = (int)(imgSel.maskW - 1);
+           pHlast = (int)(imgSel.maskH - 1);
+           pWords = imgSel.mask.words();
+           pWordCount = imgSel.mask.word_count();
+        } else if (imgSel.shape==1 || (imgSel.shape==0 && (imgSel.angle!=0 || imgSel.exclusion!=0)))
         {
            kind = 4;
-           ellipse = (EllipseSelectMode==1) ? 1 : 0;
-           flip = (flippedSelection==1) ? 1 : 0;
-           cavity = (excludeSelectScale!=0) ? 1 : 0;
-           tw = hImgSelW;      th = hImgSelH;
-           tw2 = imgSelExclW;  th2 = imgSelExclH;
+           ellipse = (imgSel.shape==1) ? 1 : 0;
+           flip = (imgSel.flipped==1) ? 1 : 0;
+           cavity = (imgSel.exclusion!=0) ? 1 : 0;
+           tw = imgSel.halfW;      th = imgSel.halfH;
+           tw2 = imgSel.exclHalfW;  th2 = imgSel.exclHalfH;
            twq = tw * tw;      thq = th * th;
            tw2q = tw2 * tw2;   th2q = th2 * th2;
-           exX = imgSelExclX;  exY = imgSelExclY;
-           scX = imgSelXscale; scY = imgSelYscale;
-           cs = cosVPselRotation;
-           sn = sinVPselRotation;
+           exX = imgSel.exclX;  exY = imgSel.exclY;
+           scX = imgSel.scaleX; scY = imgSel.scaleY;
+           cs = imgSel.cosAngle;
+           sn = imgSel.sinAngle;
         } else
         {
            kind = 2;
@@ -1736,7 +1736,7 @@ static int floodFillPrepare(FloodParams &q, unsigned char *imageData, int modus,
     if ((x < 0) || (x >= w) || (y < 0) || (y >= h))  // out of bounds
        return 0;
 
-    invertSelection = invertSel;
+    imgSel.inverted = invertSel;
     float toleranza = (alternateMode==3) ? (float)tolerance/10.0 + 1 : tolerance;
     INT64 oc = CalcPixOffset(x, y, Stride, bpp);
     int aB = (bpp==32) ? imageData[oc + 3] : 255;
