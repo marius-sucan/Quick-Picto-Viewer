@@ -22376,23 +22376,19 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          x := hFIFimgExtern[1], y := imgH - hFIFimgExtern[2]
          tolerance := (FloodFillAltToler=1) ? Ceil(FloodFillTolerance*0.7) + 1 : FloodFillTolerance
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
-         r := ""
-         If (FloodFillModus!=1)
+         ; the pixels to paint are found first, so the undo level holds only the rectangle that changes
+         VarSetCapacity(floodBounds, 16, 0)
+         r := DllCall("qpvmain.dll\FloodFillFindRegion", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", blendMode, "int", cartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter, "int", BlendModesPreserveAlpha, "UPtr", &floodBounds)
+         If (ErrorLevel!=0 || r<0)   ; a qpvmain.dll without the export, or one that cannot do a replacement in two steps
          {
-            ; the region is found first, so the undo level holds only the rectangle the fill changes
-            VarSetCapacity(floodBounds, 16, 0)
-            r := DllCall("qpvmain.dll\FloodFillFindRegion", "UPtr", pBitsAll, "Int", FloodFillModus, "Int", imgW, "Int", imgH, "Int", x, "Int", y, "Int", newColor, "int", tolerance, "int", FloodFillOpacity, "int", FloodFillDynamicOpacity, "int", blendMode, "int", cartoonMode, "int", FloodFillAltToler, "int", FloodFillEightWays, "int", userimgGammaCorrect, "int", BlendModesFlipped, "int", Stride, "int", bpp, "int", use, "int", inverter, "int", BlendModesPreserveAlpha, "UPtr", &floodBounds)
-            If (ErrorLevel!=0)   ; a qpvmain.dll without the export
-            {
-               r := ""
-            } Else If (r>0)
-            {
-               ; bounds in FreeImage rows, as recordUndoLevelHugeImagesNow() takes them
-               floodX1 := NumGet(floodBounds, 0, "int"), floodY1 := NumGet(floodBounds, 4, "int")
-               floodX2 := NumGet(floodBounds, 8, "int"), floodY2 := NumGet(floodBounds, 12, "int")
-               zrr := recordUndoLevelHugeImagesNow(floodX1, floodY1, floodX2 - floodX1 + 1, floodY2 - floodY1 + 1, 0)
-               r := DllCall("qpvmain.dll\FloodFillPaintRegion", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", Stride, "int", bpp)
-            }
+            r := ""
+         } Else If (r>0)
+         {
+            ; bounds in FreeImage rows, as recordUndoLevelHugeImagesNow() takes them
+            floodX1 := NumGet(floodBounds, 0, "int"), floodY1 := NumGet(floodBounds, 4, "int")
+            floodX2 := NumGet(floodBounds, 8, "int"), floodY2 := NumGet(floodBounds, 12, "int")
+            zrr := recordUndoLevelHugeImagesNow(floodX1, floodY1, floodX2 - floodX1 + 1, floodY2 - floodY1 + 1, 0)
+            r := DllCall("qpvmain.dll\FloodFillPaintRegion", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", Stride, "int", bpp)
          }
 
          If (r="")

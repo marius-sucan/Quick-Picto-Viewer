@@ -3010,7 +3010,7 @@ static uint64_t* floodAlloc(size_t words) {
     return (uint64_t*)VirtualAlloc(NULL, std::max<size_t>(words, 1) * sizeof(uint64_t), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 
-static void floodRelease(uint64_t *&p) {
+template <class T> static void floodRelease(T *&p) {
     if (p)
        VirtualFree(p, 0, MEM_RELEASE);
     p = NULL;
@@ -3034,7 +3034,7 @@ static constexpr uint32_t floodMulInverse(uint32_t a) {
 struct FloodParams {
     unsigned char *img = NULL;
     int w = 0, h = 0, stride = 0, bpp = 0, bpx = 0;
-    int sx = 0, sy = 0, exact = 0, eightWay = 0;
+    int sx = 0, sy = 0, exact = 0, eightWay = 0, replace = 0;
     RGBAColor newColor = {0, 0, 0, 0}, oldColor = {0, 0, 0, 0};
     float nC[7] = {0, 0, 0, 0, 0, 0, 0};
     float tolerance = 0, prevCLRindex = 0, opacity = 0;
@@ -3185,6 +3185,7 @@ struct FloodSpan {
 struct FloodPaintMemo {
     std::vector<uint64_t> e;
     int bits = 0;
+    uint32_t lookups = 0, misses = 0;
     void init(int b) {
         bits = b;
         e.resize((size_t)1 << b);
@@ -3192,6 +3193,14 @@ struct FloodPaintMemo {
         // an empty slot holds a key that hashes to the next slot, so it never matches
         for (uint32_t s = 0; s <= mask; s++)
             e[s] = (uint64_t)((((s + 1) & mask) << (32 - b)) * inv) << 32;
+    }
+    // a memo that mostly misses, as with alpha that varies per pixel, costs more than it saves
+    bool worthKeeping() {
+        if (lookups < 65536)
+           return true;
+        const bool keep = (uint64_t)misses * 4 <= (uint64_t)lookups * 3;
+        lookups = misses = 0;
+        return keep;
     }
 };
 
@@ -3215,7 +3224,6 @@ struct FloodWalker {
     int minX = INT_MAX, minY = INT_MAX, maxX = -1, maxY = -1;
 
     FloodWalker(FloodJob *job, FloodShared *shared) : j(job), sh(shared) {}
-    uint64_t evalWord(int y, int k);
     inline uint64_t mword(int y, int k);
     inline uint64_t avail(int y, int k);
     void push(const FloodSpan &s);
@@ -3232,14 +3240,17 @@ struct FloodJob {
     FloodParams p;
     FloodSel sel;
     int T = 1, paintT = 1, wpr = 0, stripW = 0;
-    int constPaint = 0, writeAlpha = 0, wantIndex = 0;
+    int constPaint = 0, writeAlpha = 0, wantIndex = 0, seedByDistance = 0;
     uint32_t oldRGB = 0, constBGRA = 0;
     float defIndex = 0;
     uint64_t *colourTable = NULL, *indexMemo = NULL;
+    uint32_t *grayRanges = NULL;      // "Grayscale [fast]": the matching blues of each (red, green)
+    int grayLo = 0, grayHi = -1;
     uint64_t *F = NULL, *M = NULL, *K = NULL;
     int bandRows = 0, bands = 1, r0 = 0, r1 = 0, heldBand = -1, usedRow0 = 0, usedRow1 = -1;
     size_t kWords = 0, spanCap = 0, localCap = 0, dirtyWords = 0;
     uint64_t *dirty = NULL;           // rows of the band whose spans were dropped
+    uint64_t *rowHits = NULL;         // colour replacement: rows with a pixel to paint
     std::atomic<int> anyDirty{0};
     std::vector<uint64_t> edgeTop, edgeBot;
     std::vector<INT64> bandCount;
@@ -3252,10 +3263,12 @@ struct FloodJob {
     ~FloodJob() {
         floodRelease(colourTable);
         floodRelease(indexMemo);
+        floodRelease(grayRanges);
         floodRelease(F);
         floodRelease(M);
         floodRelease(K);
         floodRelease(dirty);
+        floodRelease(rowHits);
     }
 
     // rows y-1..y+1 need another look: a span of row y was dropped with the stack full
@@ -3265,8 +3278,89 @@ struct FloodJob {
         anyDirty.store(1, std::memory_order_relaxed);
     }
 
-    bool colourMatches(uint32_t rgb, const unsigned char *q) {
-        if (rgb==oldRGB)
+    // the weighted grayscale only grows with blue, so the blues that match form one range;
+    // bits 0-8 hold its first blue, 9-17 its last, 31 that it was worked out
+    uint32_t grayRange(uint32_t rg) {
+        int r = rg >> 8, g = rg & 255, alt = 1;
+        int lo = 0, hi = 256;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (RGBtoGray(r, g, mid, alt) >= grayLo)
+               hi = mid;
+            else
+               lo = mid + 1;
+        }
+        const int bLo = lo;
+        lo = -1;
+        hi = 255;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) >> 1;
+            if (RGBtoGray(r, g, mid, alt) <= grayHi)
+               lo = mid;
+            else
+               hi = mid - 1;
+        }
+        const int bHi = lo;
+        const uint32_t e = 0x80000000u | (uint32_t)((bHi < bLo) ? 511 : bLo) | ((uint32_t)std::max(bHi, 0) << 9);
+        reinterpret_cast<std::atomic<uint32_t>*>(grayRanges + rg)->store(e, std::memory_order_relaxed);
+        return e;
+    }
+
+    QPV_FORCEINLINE bool grayMatches(uint32_t rgb) {
+        uint32_t e = reinterpret_cast<std::atomic<uint32_t>*>(grayRanges + (rgb >> 8))->load(std::memory_order_relaxed);
+        if (!e)
+           e = grayRange(rgb >> 8);
+        const int b = rgb & 255, bFirst = e & 511, bLast = (e >> 9) & 511;
+        return b >= bFirst && b <= bLast;
+    }
+
+    // whether the 64 pixels from px on share one colour, alpha aside
+    inline bool wordIsOneColour(const unsigned char *px) const {
+        if (p.bpx==3)
+           return memcmp(px, px + 3, 63 * 3)==0;
+        if (p.bpx!=4)
+           return false;
+
+        uint32_t first;
+        memcpy(&first, px, 4);
+        const __m128i rgbMask = _mm_set1_epi32(0x00FFFFFF);
+        const __m128i key = _mm_and_si128(_mm_set1_epi32((int)first), rgbMask);
+        for (int i = 0; i < 64; i += 4)
+        {
+            const __m128i v = _mm_and_si128(_mm_loadu_si128((const __m128i*)(px + i * 4)), rgbMask);
+            if (_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(v, key)))!=15)
+               return false;
+        }
+        return true;
+    }
+
+    // a lookup table of the colour decisions: blue ranges for "Grayscale [fast]", else every colour
+    bool setupColourDecisions() {
+        if (p.exact)
+           return true;
+        if (p.alternateMode==1 && p.tolerance >= 1 && !seedByDistance)
+        {
+           for (int g = 0; g < 256; g++)
+           {
+               const float index = (float)g;
+               if (inRange(index - p.tolerance, index + p.tolerance, p.prevCLRindex))
+               {
+                  if (grayHi < grayLo)
+                     grayLo = g;
+                  grayHi = g;
+               }
+           }
+           grayRanges = (uint32_t*)floodAlloc(65536 / 2);
+           return grayRanges!=NULL;
+        }
+        colourTable = floodAlloc((size_t)1 << 19);
+        return colourTable!=NULL;
+    }
+
+    QPV_FORCEINLINE bool colourMatches(uint32_t rgb, const unsigned char *q) {
+        if (rgb==oldRGB && !seedByDistance)
            return 1;
         if (!(p.tolerance > 0))
            return 0;
@@ -3294,7 +3388,7 @@ struct FloodJob {
         RGBAColor prev = {(int)(key & 255), (int)((key >> 8) & 255), (int)((key >> 16) & 255), (int)(key >> 24)};
         const uint32_t rgb = key & 0xFFFFFF;
         float index = defIndex;
-        if (wantIndex && rgb!=oldRGB)
+        if (wantIndex && (rgb!=oldRGB || seedByDistance))
         {
            const uint64_t e = floodAtom(indexMemo + ((rgb * floodHashMul) >> (32 - floodIndexMemoBits)))->load(std::memory_order_relaxed);
            if ((uint32_t)(e >> 32)==(rgb | (1u << 24)))
@@ -3343,8 +3437,12 @@ struct FloodJob {
             if (memo)
             {
                uint64_t &e = memo->e[(key * floodHashMul) >> shift];
+               memo->lookups++;
                if ((uint32_t)(e >> 32)!=key)
+               {
+                  memo->misses++;
                   e = ((uint64_t)key << 32) | paintedColour(key);
+               }
                v = (uint32_t)e;
             } else
             {
@@ -3357,7 +3455,12 @@ struct FloodJob {
         }
     }
 
+    uint64_t testWord(int y, int k);
+    void setupPaint();
     bool setup();
+    bool setupReplace();
+    INT64 replaceScan(bool paintIt);
+    INT64 replaceAll();
     void beginBand(int b);
     void runWalk(FloodWalker &w);
     bool walkParallel(FloodWalker &w);
@@ -3369,14 +3472,14 @@ struct FloodJob {
     INT64 paint();
 };
 
-uint64_t FloodWalker::evalWord(int y, int k) {
-    const FloodParams &p = j->p;
+// a word's pixels that match the colour and that the selection leaves open
+uint64_t FloodJob::testWord(int y, int k) {
     const int x0 = k << 6, n = std::min(64, p.w - x0);
     const unsigned char *px = p.img + (INT64)y * p.stride + (INT64)x0 * p.bpx;
     uint64_t m = 0;
     if (p.exact && p.bpx==4)
     {
-       const __m128i key = _mm_set1_epi32((int)j->oldRGB), rgbMask = _mm_set1_epi32(0x00FFFFFF);
+       const __m128i key = _mm_set1_epi32((int)oldRGB), rgbMask = _mm_set1_epi32(0x00FFFFFF);
        int i = 0;
        for (; i + 4 <= n; i += 4)
        {
@@ -3386,7 +3489,7 @@ uint64_t FloodWalker::evalWord(int y, int k) {
        for (; i < n; i++)
        {
            const unsigned char *q = px + i * 4;
-           if ((((uint32_t)q[2] << 16) | ((uint32_t)q[1] << 8) | q[0])==j->oldRGB)
+           if ((((uint32_t)q[2] << 16) | ((uint32_t)q[1] << 8) | q[0])==oldRGB)
               m |= 1ULL << i;
        }
     } else if (p.exact)
@@ -3394,8 +3497,28 @@ uint64_t FloodWalker::evalWord(int y, int k) {
        for (int i = 0; i < n; i++)
        {
            const unsigned char *q = px + (INT64)i * p.bpx;
-           if ((((uint32_t)q[2] << 16) | ((uint32_t)q[1] << 8) | q[0])==j->oldRGB)
+           if ((((uint32_t)q[2] << 16) | ((uint32_t)q[1] << 8) | q[0])==oldRGB)
               m |= 1ULL << i;
+       }
+    } else if (n==64 && wordIsOneColour(px))
+    {
+       // a flat area: one decision for the whole word
+       const uint32_t rgb = ((uint32_t)px[2] << 16) | ((uint32_t)px[1] << 8) | px[0];
+       m = (grayRanges ? grayMatches(rgb) : colourMatches(rgb, px)) ? ~0ULL : 0;
+    } else if (grayRanges)
+    {
+       uint32_t last = 0xFFFFFFFF;
+       uint64_t lastBit = 0;
+       for (int i = 0; i < n; i++)
+       {
+           const unsigned char *q = px + (INT64)i * p.bpx;
+           const uint32_t rgb = ((uint32_t)q[2] << 16) | ((uint32_t)q[1] << 8) | q[0];
+           if (rgb!=last)
+           {
+              last = rgb;
+              lastBit = grayMatches(rgb) ? 1 : 0;
+           }
+           m |= lastBit << i;
        }
     } else
     {
@@ -3408,14 +3531,14 @@ uint64_t FloodWalker::evalWord(int y, int k) {
            if (rgb!=last)
            {
               last = rgb;
-              lastBit = j->colourMatches(rgb, q) ? 1 : 0;
+              lastBit = colourMatches(rgb, q) ? 1 : 0;
            }
            m |= lastBit << i;
        }
     }
 
-    if (m && j->sel.kind)
-       m &= ~j->sel.masked(y, x0, n);
+    if (m && sel.kind)
+       m &= ~sel.masked(y, x0, n);
     return m;
 }
 
@@ -3426,7 +3549,7 @@ inline uint64_t FloodWalker::mword(int y, int k) {
     if (kw->load(std::memory_order_acquire) & bit)
        return floodAtom(j->M + i)->load(std::memory_order_relaxed);
 
-    const uint64_t v = evalWord(y, k);
+    const uint64_t v = j->testWord(y, k);
     floodAtom(j->M + i)->store(v, std::memory_order_relaxed);
     kw->fetch_or(bit, std::memory_order_release);
     return v;
@@ -3685,24 +3808,31 @@ static void floodWorkerLoop(FloodWalker *w) {
     }
 }
 
+void FloodJob::setupPaint() {
+    T = floodThreads();
+    paintT = std::min(T, 32);
+    wpr = (int)(((INT64)p.w + 63) >> 6);
+    oldRGB = ((uint32_t)p.oldColor.r << 16) | ((uint32_t)p.oldColor.g << 8) | (uint32_t)p.oldColor.b;
+    writeAlpha = (p.bpp==32 && p.keepAlpha==0) ? 1 : 0;
+    defIndex = (p.alternateMode==3) ? 0.0f : p.prevCLRindex;
+    // the exact fill paints a colour mixed beforehand; the replacement mixes per pixel like the tolerance fill
+    const bool exactFill = p.exact && !p.replace;
+    const int simpleMode = (p.opacity==1 && p.blendMode==0 && p.cartoonMode==0) ? 1 : 0;
+    constPaint = (exactFill || simpleMode || p.cartoonMode==1) ? 1 : 0;
+    const RGBAColor &c = (!exactFill && !simpleMode && p.cartoonMode==1) ? p.oldColor : p.newColor;
+    constBGRA = (uint32_t)(unsigned char)c.b | ((uint32_t)(unsigned char)c.g << 8) | ((uint32_t)(unsigned char)c.r << 16) | ((uint32_t)(unsigned char)c.a << 24);
+    wantIndex = (!constPaint && p.dynamicOpacity==1) ? 1 : 0;
+    // the replacement measures the clicked colour too: its CIEDE2000 distance is not exactly 0
+    seedByDistance = (p.replace && p.alternateMode==3) ? 1 : 0;
+}
+
 bool FloodJob::setup() {
     const INT64 w = p.w, h = p.h;
-    wpr = (int)((w + 63) >> 6);
-    T = floodThreads();
+    setupPaint();
     // strips of whole words, so threads can take parts of a wide row
     stripW = (int)(((INT64)wpr + 1) << 6);
     if (T > 1)
        stripW = std::max(1024, (int)((((w + 4 * T - 1) / (4 * T)) + 63) & ~(INT64)63));
-
-    oldRGB = ((uint32_t)p.oldColor.r << 16) | ((uint32_t)p.oldColor.g << 8) | (uint32_t)p.oldColor.b;
-    writeAlpha = (p.bpp==32 && p.keepAlpha==0) ? 1 : 0;
-    defIndex = (p.alternateMode==3) ? 0.0f : p.prevCLRindex;
-    const int simpleMode = (p.opacity==1 && p.blendMode==0 && p.cartoonMode==0) ? 1 : 0;
-    constPaint = (p.exact || simpleMode || p.cartoonMode==1) ? 1 : 0;
-    const RGBAColor &c = (!p.exact && !simpleMode && p.cartoonMode==1) ? p.oldColor : p.newColor;
-    constBGRA = (uint32_t)(unsigned char)c.b | ((uint32_t)(unsigned char)c.g << 8) | ((uint32_t)(unsigned char)c.r << 16) | ((uint32_t)(unsigned char)c.a << 24);
-    wantIndex = (!constPaint && p.dynamicOpacity==1) ? 1 : 0;
-    paintT = std::min(T, 32);
 
     // spans: a stack of up to spanCap, plus as many again shared between threads
     size_t fixedBytes = floodSpanReserve * sizeof(FloodSpan) * 2 + ((size_t)T << 16) + ((size_t)1 << 20);
@@ -3761,11 +3891,9 @@ bool FloodJob::setup() {
     M = floodAlloc(mapWords);
     K = floodAlloc(kWords);
     dirty = floodAlloc(dirtyWords);
-    if (!p.exact)
-       colourTable = floodAlloc((size_t)1 << 19);
     if (wantIndex)
        indexMemo = floodAlloc((size_t)1 << floodIndexMemoBits);
-    return F && M && K && dirty && (p.exact || colourTable) && (!wantIndex || indexMemo);
+    return F && M && K && dirty && setupColourDecisions() && (!wantIndex || indexMemo);
 }
 
 // readies the maps for band b, rows r0..r1-1
@@ -3893,14 +4021,13 @@ void FloodJob::rescan() {
 // past the pixels known to be filled there already
 bool FloodJob::edgeSeeds(int y, const uint64_t *edge, const uint64_t *known) {
     const int e = (p.eightWay==1) ? 1 : 0;
-    FloodWalker w(this, NULL);
     for (int k = 0; k < wpr; k++)
     {
         uint64_t v = edge[k];
         if (e)
            v |= (v << 1) | (v >> 1) | (k > 0 ? edge[k - 1] >> 63 : 0) | (k + 1 < wpr ? edge[k + 1] << 63 : 0);
         v &= ~known[k];
-        if (v && (w.evalWord(y, k) & v))
+        if (v && (testWord(y, k) & v))
            return true;
     }
     return false;
@@ -3956,6 +4083,30 @@ void FloodJob::walkBand(int b) {
 INT64 FloodJob::find() {
     if (p.w < 1 || p.h < 1 || p.bpx < 3 || p.sx < 0 || p.sx >= p.w || p.sy < 0 || p.sy >= p.h)
        return 0;
+    if (p.replace)
+    {
+       // the matches are counted and bounded; a map of them, when the budget has room for it,
+       // spares paint() a second test
+       sel.init(p.useSelArea);
+       if (!setupReplace())
+          return -1;
+       const size_t words = (size_t)p.h * wpr;
+       size_t fixedBytes = ((size_t)1 << 20) + (size_t)paintT * (((size_t)1 << floodPaintMemoBits) * 8);
+       if (!p.exact)
+          fixedBytes += ((size_t)1 << 19) * 8;
+       if (wantIndex)
+          fixedBytes += ((size_t)1 << floodIndexMemoBits) * 8;
+       if (fixedBytes + words * 8 <= floodFillBudget)
+          F = floodAlloc(words);
+       if (!F)
+       {
+          rowHits = floodAlloc(((size_t)p.h + 63) >> 6);
+          if (!rowHits)
+             return -1;
+       }
+       count = replaceScan(false);
+       return count;
+    }
     if (p.exact && p.oldColor.r==p.newColor.r && p.oldColor.g==p.newColor.g && p.oldColor.b==p.newColor.b)
        return 0;
     if (p.exact)
@@ -4025,6 +4176,7 @@ INT64 FloodJob::find() {
        floodRelease(M);
        floodRelease(K);
        floodRelease(colourTable);
+       floodRelease(grayRanges);
     }
     return count;
 }
@@ -4084,6 +4236,8 @@ void FloodJob::paintRows(int y1, int y2, int x1, int x2) {
                 }
                 if (open >= 0)
                    paintRun(px, open, std::min(p.w - 1, (k2 << 6) + 63), mp);
+                if (mp && !mp->worthKeeping())
+                   mp = NULL;
             }
         }
     };
@@ -4105,6 +4259,15 @@ void FloodJob::paintRows(int y1, int y2, int x1, int x2) {
 }
 
 INT64 FloodJob::paint() {
+    if (p.replace)
+    {
+       if (!F)
+          return replaceScan(true);
+       r0 = 0;
+       paintRows(boxY1, boxY2, boxX1, boxX2);
+       return count;
+    }
+
     INT64 painted = 0;
     const int first = heldBand;
     for (int i = -1; i < bands; i++)
@@ -4125,6 +4288,141 @@ INT64 FloodJob::paint() {
     }
     count = painted;
     return painted;
+}
+
+bool FloodJob::setupReplace() {
+    setupPaint();
+    if (wantIndex)
+       indexMemo = floodAlloc((size_t)1 << floodIndexMemoBits);
+    return setupColourDecisions() && (!wantIndex || indexMemo);
+}
+
+// "Replace similar colours anywhere": every pixel the selection leaves open is tested on its own.
+// Without paintIt the matches are counted, bounded and kept in F, or their rows marked in rowHits
+// when F did not fit; with it, they are painted, only in the marked rows when a count came first.
+INT64 FloodJob::replaceScan(bool paintIt) {
+    int y1 = 0, y2 = p.h - 1, x1 = 0, x2 = p.w - 1;
+    if (paintIt && rowHits)
+    {
+       y1 = boxY1;  y2 = boxY2;
+       x1 = boxX1;  x2 = boxX2;
+    } else if (sel.kind >= 2 && !sel.inv)
+    {
+       // outside its box the selection leaves nothing open
+       y1 = std::max(y1, sel.by1);  y2 = std::min(y2, sel.by2);
+       x1 = std::max(x1, sel.bx1);  x2 = std::min(x2, sel.bx2);
+    }
+    if (!paintIt)
+    {
+       boxX1 = boxY1 = INT_MAX;
+       boxX2 = boxY2 = -1;
+    }
+    if (y1 > y2 || x1 > x2)
+       return 0;
+
+    const int k1 = x1 >> 6, k2 = x2 >> 6;
+    const bool onlyHits = paintIt && rowHits;
+    std::atomic<int> nextRow(y1);
+    std::atomic<INT64> total(0);
+    std::mutex boxLock;
+    const int chunk = std::max(1, 4096 / (k2 - k1 + 1));
+    auto body = [&]() {
+        FloodPaintMemo memo;
+        FloodPaintMemo *mp = NULL;
+        if (paintIt && !constPaint)
+        {
+           try {
+              memo.init(floodPaintMemoBits);
+              mp = &memo;
+           } catch (...) {
+              mp = NULL;
+           }
+        }
+
+        INT64 n = 0;
+        int lx1 = INT_MAX, ly1 = INT_MAX, lx2 = -1, ly2 = -1;
+        for (;;)
+        {
+            const int ya = nextRow.fetch_add(chunk, std::memory_order_relaxed);
+            if (ya > y2)
+               break;
+            const int yb = std::min(y2, ya + chunk - 1);
+            for (int y = ya; y <= yb; y++)
+            {
+                if (onlyHits && !((rowHits[y >> 6] >> (y & 63)) & 1))
+                   continue;
+
+                unsigned char *row = p.img + (INT64)y * p.stride;
+                bool hit = false;
+                for (int k = k1; k <= k2; k++)
+                {
+                    uint64_t m = testWord(y, k);
+                    if (!m)
+                       continue;
+
+                    hit = true;
+                    if (!paintIt && F)
+                       F[(size_t)y * wpr + k] = m;
+                    lx1 = std::min(lx1, (k << 6) + floodLowBit(m));
+                    lx2 = std::max(lx2, (k << 6) + floodHighBit(m));
+                    while (m)
+                    {
+                        const int s = floodLowBit(m);
+                        const uint64_t gap = ~m & (~0ULL << s);
+                        const int e = gap ? floodLowBit(gap) : 64;
+                        if (paintIt)
+                           paintRun(row, (k << 6) + s, (k << 6) + e - 1, mp);
+                        n += e - s;
+                        m = (e < 64) ? m & (~0ULL << e) : 0;
+                    }
+                }
+                if (mp && !mp->worthKeeping())
+                   mp = NULL;
+                if (hit)
+                {
+                   ly1 = std::min(ly1, y);
+                   ly2 = std::max(ly2, y);
+                   if (!paintIt && rowHits)
+                      floodAtom(rowHits + (y >> 6))->fetch_or(1ULL << (y & 63), std::memory_order_relaxed);
+                }
+            }
+        }
+
+        total.fetch_add(n, std::memory_order_relaxed);
+        if (!paintIt && n > 0)
+        {
+           std::lock_guard<std::mutex> lk(boxLock);
+           boxX1 = std::min(boxX1, lx1);  boxY1 = std::min(boxY1, ly1);
+           boxX2 = std::max(boxX2, lx2);  boxY2 = std::max(boxY2, ly2);
+        }
+    };
+
+    const INT64 rows = (INT64)y2 - y1 + 1;
+    const INT64 area = rows * (k2 - k1 + 1) * 64;
+    const int threadsWanted = (paintT > 1 && rows > 1 && area >= floodParallelMin) ? (int)std::min<INT64>(paintT, rows) : 1;
+    std::vector<std::thread> threads;
+    for (int i = 1; i < threadsWanted; i++)
+    {
+        try {
+           threads.emplace_back(body);
+        } catch (...) {
+           break;
+        }
+    }
+    body();
+    for (auto &t : threads)
+        t.join();
+    return total.load();
+}
+
+INT64 FloodJob::replaceAll() {
+    if (p.w < 1 || p.h < 1 || p.bpx < 3)
+       return 0;
+
+    sel.init(p.useSelArea);
+    if (!setupReplace())
+       return -1;
+    return replaceScan(true);
 }
 
 static FloodJob *floodPending = NULL;
@@ -4152,67 +4450,16 @@ static int floodFillRun(const FloodParams &q) {
     return (r > 0) ? floodClampCount(r) : 0;
 }
 
-int ReplaceGivenColor(unsigned char *imageData, int w, int h, int x, int y, RGBAColor newColor, RGBAColor nC, RGBAColor prevColor, float tolerance, float prevCLRindex, float opacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int linearGamma, float *labClr, int flipLayers, int Stride, int bpp, int useSelArea, int keepAlpha) {
-    if ((x < 0) || (x >= w) || (y < 0) || (y >= h))  // out of bounds
+// "Replace similar colours anywhere"
+int ReplaceGivenColor(const FloodParams &q) {
+    fnOutputDebug("ReplaceGivenColor: o=" + std::to_string(q.opacity) + " ; t=" + std::to_string(q.tolerance) + " ; b=" + std::to_string(q.blendMode) + " ; c=" + std::to_string(q.cartoonMode));
+    FloodJob *job = new (std::nothrow) FloodJob(q);
+    if (!job)
        return 0;
 
-    int loopsOccured = 0;
-    int simpleMode = (opacity==1 && blendMode==0 && cartoonMode==0) ? 1 : 0;
-    fnOutputDebug("ReplaceGivenColor: simpleMode=" + std::to_string(simpleMode) + " ; o=" + std::to_string(opacity) + " ; t=" + std::to_string(tolerance) + " ; b=" + std::to_string(blendMode) + " ; c=" + std::to_string(cartoonMode));
-    const int bpc = bpp / 8;
-    #pragma omp parallel for schedule(static) reduction(+: loopsOccured)
-    for (int zy = 0; zy < h; zy++)
-    {
-        INT64 ky = (INT64)zy * Stride;
-        for (int zx = 0; zx < w; zx++)
-        {
-            if (useSelArea==1)
-            {
-               if (clipMaskFilter(zx, zy, NULL, 0)==1)
-                  continue;
-            }
-
-            float index = -4100;
-            RGBAColor oldColor = prevColor;
-            RGBAColor thisColor = {0, 0, 0, 0};
-            INT64 o = ky + (INT64)zx * bpc;
-            int oA = (bpp==32) ? imageData[3 + o] : 255;
-            int oR = imageData[2 + o];
-            int oG = imageData[1 + o];
-            int oB = imageData[o];
-            RGBAColor clr = {oB, oG, oR, oA};
-            // int debug = (zx>=425 && zx<=495 && zy>=925 && zy<=995) ? 1 : 0;
-            // if (debug==1)
-            //    fnOutputDebug(std::to_string(prevCLRindex) + "= prevCLRindex; clr=" + std::to_string(clr.r) + "," + std::to_string(clr.g) + "," + std::to_string(clr.b) + "  | index=" + std::to_string(index) );
-
-            if (decideColorsEqual(clr, prevColor, tolerance, prevCLRindex, alternateMode, labClr, index))
-            {
-               if (simpleMode==1)
-               {
-                  if (bpp==32 && keepAlpha==0)
-                     imageData[3 + o] = newColor.a;
-                  imageData[2 + o] = newColor.r;
-                  imageData[1 + o] = newColor.g;
-                  imageData[o] = newColor.b;
-               } else
-               {
-                  if (cartoonMode==1)
-                     thisColor = oldColor;
-                  else
-                     thisColor = mixColorsFloodFill(clr, nC, opacity, dynamicOpacity, blendMode, prevCLRindex, tolerance, alternateMode, index, linearGamma, flipLayers);
-
-                  if (bpp==32 && keepAlpha==0)
-                     imageData[3 + o] = thisColor.a;
-                  imageData[2 + o] = thisColor.r;
-                  imageData[1 + o] = thisColor.g;
-                  imageData[o] = thisColor.b;
-
-               }
-               loopsOccured++;
-            }
-        }
-    }
-    return loopsOccured;
+    const INT64 r = job->replaceAll();
+    delete job;
+    return (r > 0) ? floodClampCount(r) : 0;
 }
 
 // The setup the flood fill entry points share. Returns 0 when the seed is outside the image,
@@ -4256,7 +4503,8 @@ static int floodFillPrepare(FloodParams &q, unsigned char *imageData, int modus,
     q.sx = x;
     q.sy = y;
     q.eightWay = eightWay;
-    q.exact = (toleranza>2) ? 0 : 1;
+    q.replace = (modus==1) ? 1 : 0;
+    q.exact = q.replace ? ((alternateMode!=3 && toleranza<1) ? 1 : 0) : ((toleranza>2) ? 0 : 1);
     q.newColor = newColorI;
     q.oldColor = prevColor;
     q.tolerance = toleranza;
@@ -4277,21 +4525,22 @@ DLL_API int DLL_CALLCONV FloodFillWrapper(unsigned char *imageData, int modus, i
     FloodParams q;
     const int kind = floodFillPrepare(q, imageData, modus, w, h, x, y, newColor, tolerance, fillOpacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma, flipLayers, Stride, bpp, useSelArea, invertSel, keepAlpha);
     if (kind==1)
-       return ReplaceGivenColor(imageData, w, h, x, y, q.newColor, q.newColor, q.oldColor, q.tolerance, q.prevCLRindex, q.opacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, linearGamma, q.nC, flipLayers, Stride, bpp, useSelArea, keepAlpha);
+       return ReplaceGivenColor(q);
 
     return (kind > 1) ? floodFillRun(q) : 0;
 }
 
-// A flood fill in two steps, so the caller can record an undo level of just the area that changes.
-// FloodFillFindRegion() keeps the region and returns its pixel count, with its bounds in
-// bounds[0..3] = x1, y1, x2, y2 (inclusive, rows as in imageData); FloodFillPaintRegion() paints it.
-// "Replace similar colours anywhere" has no region: -1.
+// A flood fill or colour replacement in two steps, so the caller can record an undo level of just
+// the area that changes. FloodFillFindRegion() keeps the pixels to paint and returns their count,
+// with their bounds in bounds[0..3] = x1, y1, x2, y2 (inclusive, rows as in imageData);
+// FloodFillPaintRegion() paints them. A replacement whose map of matches did not fit the budget
+// tests the pixels again when it paints, so the image and the selection must stay as they were.
 DLL_API int DLL_CALLCONV FloodFillFindRegion(unsigned char *imageData, int modus, int w, int h, int x, int y, int newColor, int tolerance, int fillOpacity, int dynamicOpacity, int blendMode, int cartoonMode, int alternateMode, int eightWay, int linearGamma, int flipLayers, int Stride, int bpp, int useSelArea, int invertSel, int keepAlpha, int *bounds) {
     floodDiscardPending();
     FloodParams q;
     const int kind = floodFillPrepare(q, imageData, modus, w, h, x, y, newColor, tolerance, fillOpacity, dynamicOpacity, blendMode, cartoonMode, alternateMode, eightWay, linearGamma, flipLayers, Stride, bpp, useSelArea, invertSel, keepAlpha);
-    if (kind < 2)
-       return (kind==1) ? -1 : 0;
+    if (kind==0)
+       return 0;
 
     FloodJob *job = new (std::nothrow) FloodJob(q);
     if (!job)
