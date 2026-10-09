@@ -623,16 +623,10 @@ DLL_API int DLL_CALLCONV BlendBitmaps(unsigned char* bgrImageData, unsigned char
         for (int x = 0; x < w; x++)
         {
             INT64 o = ky + (INT64)x * bpc;
-            int aB = (bpp==32) ? bgrImageData[3 + o] : 255;
-            int aO = (bpp==32) ? otherData[3 + o] : 255;
-            RGBAColor Brgb = {bgrImageData[o], bgrImageData[o + 1], bgrImageData[o + 2], aB};
-            RGBAColor Orgb = {otherData[o], otherData[o + 1], otherData[o + 2], aO};
+            RGBAColor Brgb = readBGRA(bgrImageData + o, bpp);
+            RGBAColor Orgb = readBGRA(otherData + o, bpp);
             RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, opacity);
-            bgrImageData[2 + o] = newColor.r;
-            bgrImageData[1 + o] = newColor.g;
-            bgrImageData[o]     = newColor.b;
-            if (bpp==32)
-               bgrImageData[3 + o] = newColor.a;
+            writeBGRA(bgrImageData + o, newColor, bpp);
         }
     }
     return 1;
@@ -774,14 +768,9 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                    continue;
      
                 INT64 o = ky + (INT64)x * bpc;
-                int oA = (bpp==32) ? bgrImageData[3 + o] : 255;
-                RGBAColor Brgb = {bgrImageData[o], bgrImageData[1 + o], bgrImageData[2 + o], oA};
+                RGBAColor Brgb = readBGRA(bgrImageData + o, bpp);
                 RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 1, bpp, opacity);
-                bgrImageData[2 + o] = newColor.r;
-                bgrImageData[1 + o] = newColor.g;
-                bgrImageData[o]     = newColor.b;
-                if (bpp==32)
-                   bgrImageData[3 + o] = newColor.a;
+                writeBGRA(bgrImageData + o, newColor, bpp);
             }
         }
 
@@ -822,15 +811,10 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
                nB = clamp((int)(qpvThreadRand(rngState) % 256) + brightness, 0, 255);
             }
  
-            int oA = (bpp==32) ? bgrImageData[3 + o] : 255;
             RGBAColor Orgb = {nR, nG, nB, 255};
-            RGBAColor Brgb = {bgrImageData[o], bgrImageData[1 + o], bgrImageData[2 + o], oA};
+            RGBAColor Brgb = readBGRA(bgrImageData + o, bpp);
             RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 1, bpp, opacity);
-            bgrImageData[2 + o] = newColor.r;
-            bgrImageData[1 + o] = newColor.g;
-            bgrImageData[o]     = newColor.b;
-            if (bpp==32)
-               bgrImageData[3 + o] = newColor.a;
+            writeBGRA(bgrImageData + o, newColor, bpp);
         }
     }
 
@@ -1346,15 +1330,10 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
                continue;
             }
 
-            int oA = (bpp==32) ? BitmapData[3 + o] : 255;
             RGBAColor Orgb = {userColor.b, userColor.g, userColor.r, userColor.a};
-            RGBAColor Brgb = {BitmapData[o], BitmapData[1 + o], BitmapData[2 + o], oA};
+            RGBAColor Brgb = readBGRA(BitmapData + o, bpp);
             RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, 0);
-            BitmapData[2 + o] = newColor.r;
-            BitmapData[1 + o] = newColor.g;
-            BitmapData[o]     = newColor.b;
-            if (bpp==32)
-               BitmapData[3 + o] = newColor.a;
+            writeBGRA(BitmapData + o, newColor, bpp);
         }
     }
     return 1;
@@ -1868,16 +1847,10 @@ DLL_API int DLL_CALLCONV PixelateHugeBitmap(unsigned char *originalData, int w, 
 
             INT64 on = ky_mini + (INT64)px * bpc;
             INT64 o = ky + (INT64)x * bpc;
-            int nA = (bpp==32) ? newBitmap[3 + on] : 255;
-            int oA = (bpp==32) ? originalData[3 + o] : 255;
-            RGBAColor Orgb = {newBitmap[on], newBitmap[1 + on], newBitmap[2 + on], nA};
-            RGBAColor Brgb = {originalData[o], originalData[1 + o], originalData[2 + o], oA};
+            RGBAColor Orgb = readBGRA(newBitmap + on, bpp);
+            RGBAColor Brgb = readBGRA(originalData + o, bpp);
             RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, maskOpacity);
-            originalData[2 + o] = newColor.r;
-            originalData[1 + o] = newColor.g;
-            originalData[o]     = newColor.b;
-            if (bpp==32)
-               originalData[3 + o] = newColor.a;
+            writeBGRA(originalData + o, newColor, bpp);
         }
     }
     return 1;
@@ -1936,17 +1909,10 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
                 continue;
             }
 
-            int oR = originalData[2 + o];
-            int oG = originalData[1 + o];
-            int oB = originalData[o];
             RGBAColor Orgb = {nB, nG, nR, nA};
-            RGBAColor Brgb = {oB, oG, oR, oA};
+            RGBAColor Brgb = readBGRA(originalData + o, bpp);
             RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, opacity);
-            originalData[2 + o] = newColor.r;
-            originalData[1 + o] = newColor.g;
-            originalData[o]     = newColor.b;
-            if (bpp==32)
-               originalData[3 + o] = newColor.a;
+            writeBGRA(originalData + o, newColor, bpp);
         }
     }
     return 1;

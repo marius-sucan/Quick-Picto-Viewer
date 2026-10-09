@@ -99,6 +99,20 @@ struct RGBAColor {
     int b, g, r, a;
 };
 
+// a pixel of a 24 or 32-bit buffer; a 24-bit one is opaque
+QPV_FORCEINLINE RGBAColor readBGRA(const unsigned char *px, const int bpp) {
+    return {px[0], px[1], px[2], (bpp==32) ? px[3] : 255};
+}
+
+// the alpha is written to 32-bit pixels only
+QPV_FORCEINLINE void writeBGRA(unsigned char *px, const RGBAColor &c, const int bpp) {
+    px[2] = c.r;
+    px[1] = c.g;
+    px[0] = c.b;
+    if (bpp==32)
+       px[3] = c.a;
+}
+
 static inline float blend_grayscale_float(int r, int g, int b) {
     return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
 }
