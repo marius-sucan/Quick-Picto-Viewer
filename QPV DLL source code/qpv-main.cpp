@@ -56,6 +56,8 @@ using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
 #define DLL_CALLCONV __stdcall
 
+const double M_PI = 3.14159265358979323846;  // PI
+
 int debugInfos = 0;
 void fnOutputDebug(std::string input) {
     if (debugInfos!=1)
@@ -239,7 +241,6 @@ int inline contraMathsInt16(int i, float fintensity, float deviation) {
     return clamp((int)(floor(fintensity * (i - 32768.0f)) + deviation), 0, 65535);
 }
 
-#include "qpv-main.h"
 // The duplicate-identification pipeline used to sit right here, between ColorizeGrayImage()
 // and SafeRelease(): the Hamming/MSD sweep, the whole-scan cursor, the threshold filter and
 // grouping, the candidate query engine, hash generation and the DCT that pHash is built on.

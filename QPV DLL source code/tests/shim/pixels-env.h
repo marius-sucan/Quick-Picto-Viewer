@@ -34,7 +34,7 @@
 #include <chrono>
 #include <algorithm>
 
-// ---- odds and ends from framework.h / qpv-main.h --------------------------------------
+// ---- odds and ends from framework.h / qpv-main.cpp ------------------------------------
 #define DLL_API
 #define DLL_CALLCONV
 #ifndef TRUE

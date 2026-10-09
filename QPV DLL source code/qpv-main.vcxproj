@@ -198,7 +198,6 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="pdf-writer.h" />
     <ClInclude Include="pdfium-reader.h" />
-    <ClInclude Include="qpv-main.h" />
     <ClInclude Include="selection-mask.h" />
     <ClInclude Include="sqlite-dynamic.h" />
     <ClInclude Include="svg-render.h" />
