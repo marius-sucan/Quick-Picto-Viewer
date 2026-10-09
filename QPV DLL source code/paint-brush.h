@@ -4,8 +4,8 @@
 // ResetBrushOpacityMap(), which drops them.
 //
 // #included by qpv-main.cpp after color-adjust.h; it blends through CalculateNewBlendModes(),
-// clips through clipMaskFilter(), runs its effects brush through RGBA16color and fills
-// LUTbright and LUTcontra of qpv-main.cpp for it.
+// clips through clipMaskFilter() and runs its effects brush through RGBA16color, with tables
+// of its own (brushLUTs).
 //
 // written by Marius Șucan with Claude Opus 5.5
 
@@ -22,6 +22,9 @@ std::vector<unsigned char*> brushOriginalPixelChunks;
 std::vector<size_t> activeBrushChunks;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 int chunkGridW = 0;
+
+// the effects brush's brightness and contrast tables
+static AdjustLUTs brushLUTs;
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
     for (unsigned char* ptr : brushOpacityChunks)
@@ -268,14 +271,14 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     {
         // Effects and cloner brushes
         // Prepare LUT tables as in AdjustImageColorsPrecise()
-        // (no LUTgammaBright build: brightness() is called with altMode==1 below,
+        // (no gammaBright build: brightness() is called with altMode==1 below,
         //  which never reads that table)
         fiBright = (brushBright > 0) ? brushBright / 32768.0f : -1.0f * int_to_float[-brushBright];
         if (brushBright!=0)
         {
             for (int i = 0; i < 65536; i++)
             {
-                LUTbright[i] = brightMathsInt16(i, fiBright);
+                brushLUTs.bright[i] = brightMathsInt16(i, fiBright);
             }
         }
 
@@ -285,7 +288,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
         {
             for (int i = 0; i < 65536; i++)
             {
-                LUTcontra[i] = contraMathsInt16(i, fiContra, 32768);
+                brushLUTs.contra[i] = contraMathsInt16(i, fiContra, 32768);
             }
         }
 
@@ -812,10 +815,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
 
                 RGBA16color pixel = { char_to_int[effB], char_to_int[effG], char_to_int[effR], char_to_int[effA] };
                 if (brushBright!=0)
-                   pixel.brightness<true>(brushBright, 1, 0, fiBright, 0.0);
+                   pixel.brightness<true>(brushBright, 1, 0, fiBright, 0.0, brushLUTs);
 
                 if (brushContra!=0)
-                   pixel.contrast<true>(brushContra, linearGamma, factorContrast, 0, fiContra);
+                   pixel.contrast<true>(brushContra, linearGamma, factorContrast, 0, fiContra, brushLUTs);
 
                 if (brushHue!=0)
                    pixel.hueRotate(brushHue);
@@ -886,10 +889,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 // 2. Lightness, Gamma/Contrast, Hue, Saturation adjustments using RGBA16color
                 RGBA16color pixel = { char_to_int[effB], char_to_int[effG], char_to_int[effR], char_to_int[effA] };
                 if (brushBright!=0)
-                   pixel.brightness<true>(brushBright, 1, 0, fiBright, 0.0);
+                   pixel.brightness<true>(brushBright, 1, 0, fiBright, 0.0, brushLUTs);
 
                 if (brushContra!=0)
-                   pixel.contrast<true>(brushContra, linearGamma, factorContrast, 0, fiContra);
+                   pixel.contrast<true>(brushContra, linearGamma, factorContrast, 0, fiContra, brushLUTs);
 
                 if (brushHue!=0)
                    pixel.hueRotate(brushHue);

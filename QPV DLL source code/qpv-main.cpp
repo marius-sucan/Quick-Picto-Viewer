@@ -119,8 +119,6 @@ static float char_to_grayRfloat[256];
 static float char_to_grayGfloat[256];
 static float char_to_grayBfloat[256];
 static float int_to_float[65536];
-static int LUTbright[65536];
-static int LUTcontra[65536];
 static int int_to_char[65536];
 static int char_to_int[256];
 static int int_to_grayRi[65536];

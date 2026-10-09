@@ -17,9 +17,14 @@
 const float div2s3 = 2.0f/3.0f;      // used in ConvertRGBtoHSL()
 const float div1s3 = 1.0f/3.0f;      // used in ConvertRGBtoHSL()
 
-static int LUTgammaBright[65536];
-static int LUTshadows[65536];
-static int LUThighs[65536];
+// the 65536-entry tables of the 16-bit kernel, filled per call; the plan and the brush each own a set
+struct AdjustLUTs {
+    int gammaBright[65536];
+    int bright[65536];
+    int shadows[65536];
+    int highs[65536];
+    int contra[65536];
+};
 
 int inline getInt16grayscale(int r, int g, int b) {
     return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
@@ -109,8 +114,8 @@ struct HSLColor {
 //   UseLUT=true  -> the per-pixel path, reads the tables.
 //   UseLUT=false -> the 256-entry table builders in AdjustPlan, which evaluate
 //                   the closed form directly and so need no 65536-entry build.
-// gammaMathsInt16(i,z)==LUTgammaBright[i], brightMathsInt16(i,f)==
-// LUTbright[i] and contraMathsInt16(i,f,32768)==LUTcontra[i] by construction,
+// gammaMathsInt16(i,z)==L.gammaBright[i], brightMathsInt16(i,f)==
+// L.bright[i] and contraMathsInt16(i,f,32768)==L.contra[i] by construction,
 // so the two modes are bit-identical.
 //
 // Alpha is gone from the RGB ops: it never reads r/g/b and r/g/b never read it,
@@ -216,16 +221,16 @@ struct RGBA16color {
     }
 
     template<bool UseLUT>
-    QPV_FORCEINLINE void brightness(int level, int altMode, int noClamping, float fintensity, double zammaBright) {
+    QPV_FORCEINLINE void brightness(int level, int altMode, int noClamping, float fintensity, double zammaBright, const AdjustLUTs &L) {
         if (altMode==0)
         {
            if (level<0 && noClamping==0)
            {
               if (UseLUT)
               {
-                 r = LUTgammaBright[r];
-                 g = LUTgammaBright[g];
-                 b = LUTgammaBright[b];
+                 r = L.gammaBright[r];
+                 g = L.gammaBright[g];
+                 b = L.gammaBright[b];
               } else
               {
                  r = gammaMathsInt16(r, zammaBright);
@@ -245,9 +250,9 @@ struct RGBA16color {
               b = b + (float)b*fintensity;
            } else if (UseLUT)
            {
-              r = LUTbright[r];
-              g = LUTbright[g];
-              b = LUTbright[b];
+              r = L.bright[r];
+              g = L.bright[g];
+              b = L.bright[b];
            } else
            {
               r = brightMathsInt16(r, fintensity);
@@ -285,7 +290,7 @@ struct RGBA16color {
 
     // shadows/highlights force the per-pixel path (they read the pixel's
     // grayscale), so they always use the tables.
-    QPV_FORCEINLINE void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi) {
+    QPV_FORCEINLINE void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi, const AdjustLUTs &L) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -311,9 +316,9 @@ struct RGBA16color {
            else
               gray = clamp(65535 - (gray*2), 0, 65535);
 
-           nr = LUTshadows[r];
-           ng = LUTshadows[g];
-           nb = LUTshadows[b];
+           nr = L.shadows[r];
+           ng = L.shadows[g];
+           nb = L.shadows[b];
            float fintensity = int_to_float[gray];
            if (linearGamma==1)
            {
@@ -330,7 +335,7 @@ struct RGBA16color {
        }
     }
 
-    QPV_FORCEINLINE void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi) {
+    QPV_FORCEINLINE void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi, const AdjustLUTs &L) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -358,9 +363,9 @@ struct RGBA16color {
            else
               gray = contraMathsInt16(gray, factor, 32768);
 
-           nr = LUThighs[r];
-           ng = LUThighs[g];
-           nb = LUThighs[b];
+           nr = L.highs[r];
+           ng = L.highs[g];
+           nb = L.highs[b];
            float fintensity = int_to_float[gray];
            if (linearGamma==1)
            {
@@ -424,7 +429,7 @@ struct RGBA16color {
 
     // RGB half only; altContra==1 touched nothing but alpha, which is a LUT now.
     template<bool UseLUT>
-    QPV_FORCEINLINE void contrast(int level, int linearGamma, float fintensity, int noClamping, float fip) {
+    QPV_FORCEINLINE void contrast(int level, int linearGamma, float fintensity, int noClamping, float fip, const AdjustLUTs &L) {
         if (noClamping==1)
         {
            // a channel below 0 goes through the same formula as any other value
@@ -503,9 +508,9 @@ struct RGBA16color {
 
            if (UseLUT)
            {
-              r = LUTcontra[r];
-              g = LUTcontra[g];
-              b = LUTcontra[b];
+              r = L.contra[r];
+              g = L.contra[g];
+              b = L.contra[b];
            } else
            {
               r = contraMathsInt16(r, fip, 32768);
@@ -714,6 +719,9 @@ struct AdjustColorsFXplan {
     int swapIdx;
     unsigned char chanLUT[3][256];
 
+    // what the per-pixel path reads, filled by buildAdjustColorsFXplan()
+    inline static AdjustLUTs luts;
+
     template<bool UseLUT>
     QPV_FORCEINLINE void applyRGB(RGBA16color& px) const {
         if (!headCoversGamma && gammaLvl!=300)
@@ -724,17 +732,17 @@ struct AdjustColorsFXplan {
            {
               int gray = (noClamping==1) ? 0 : getInt16grayscale(px.r, px.g, px.b);
               if (shadows!=0)
-                 px.shadows(shadows, altHiLows, linearGamma, gray, noClamping, fiShadows);
+                 px.shadows(shadows, altHiLows, linearGamma, gray, noClamping, fiShadows, luts);
               if (highs!=0)
-                 px.highlights(highs, altHiLows, linearGamma, factorHiLows, gray, noClamping, fiHighs);
+                 px.highlights(highs, altHiLows, linearGamma, factorHiLows, gray, noClamping, fiHighs, luts);
            }
            if (anyOffset)
               px.channelOffsetRGB(rOffset, gOffset, bOffset, noClamping);
            if (brightness!=0)
-              px.brightness<UseLUT>(brightness, altBright, noClamping, fiBright, zammaBright);
+              px.brightness<UseLUT>(brightness, altBright, noClamping, fiBright, zammaBright, luts);
         }
         if (contrast!=0 && altContra==0)
-           px.contrast<UseLUT>(contrast, linearGamma, factorContrast, noClamping, fiContra);
+           px.contrast<UseLUT>(contrast, linearGamma, factorContrast, noClamping, fiContra, luts);
         if (noClamping==1)
         {
            px.r = clamp(px.r, 0, 65535);
@@ -860,7 +868,7 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
                 if (brightness!=0)
                 {
                     RGBA16color t; t.r = t.g = t.b = v; t.a = 0;
-                    t.brightness<false>(brightness, altBright, noClamping, p.fiBright, p.zammaBright);
+                    t.brightness<false>(brightness, altBright, noClamping, p.fiBright, p.zammaBright, p.luts);
                     v = t.r;
                 }
             }
@@ -875,7 +883,7 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
         if (p.anyOffset)
            a = clamp(a + aOffset, 0, 65535);
         if (contrast!=0 && altContra==1)
-           a = contraMathsInt16(a, p.fiContra, 32768);        // == LUTcontra[a]
+           a = contraMathsInt16(a, p.fiContra, 32768);        // == luts.contra[a]
         if (p.anyThreshold && aThreshold>=0)
         {
            if (seeThrough==2)      a = (a>aThreshold) ? a : 0;
@@ -922,12 +930,12 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
         if (shadows!=0)
         {
            // #pragma omp parallel for schedule(static)
-           for (int i = 0; i < 65536; i++) LUTshadows[i] = brightMathsInt16(i, p.fiShadows);
+           for (int i = 0; i < 65536; i++) p.luts.shadows[i] = brightMathsInt16(i, p.fiShadows);
         }
         if (highs!=0)
         {
            // #pragma omp parallel for schedule(static)
-           for (int i = 0; i < 65536; i++) LUThighs[i] = brightMathsInt16(i, p.fiHighs);
+           for (int i = 0; i < 65536; i++) p.luts.highs[i] = brightMathsInt16(i, p.fiHighs);
         }
     }
     if (!p.headCoversBright && brightness!=0 && noClamping==0)
@@ -935,17 +943,17 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
         if (altBright==1)
         {
            // #pragma omp parallel for schedule(static)
-           for (int i = 0; i < 65536; i++) LUTbright[i] = brightMathsInt16(i, p.fiBright);
+           for (int i = 0; i < 65536; i++) p.luts.bright[i] = brightMathsInt16(i, p.fiBright);
         } else if (brightness<0)
         {
            // #pragma omp parallel for schedule(static)
-           for (int i = 0; i < 65536; i++) LUTgammaBright[i] = gammaMathsInt16(i, p.zammaBright);
+           for (int i = 0; i < 65536; i++) p.luts.gammaBright[i] = gammaMathsInt16(i, p.zammaBright);
         }
     }
     if (contrast!=0 && altContra==0 && noClamping==0)
     {
         // #pragma omp parallel for schedule(static)
-        for (int i = 0; i < 65536; i++) LUTcontra[i] = contraMathsInt16(i, p.fiContra, 32768);
+        for (int i = 0; i < 65536; i++) p.luts.contra[i] = contraMathsInt16(i, p.fiContra, 32768);
     }
 }
 
