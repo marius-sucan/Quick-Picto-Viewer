@@ -30,7 +30,7 @@
 #include "shim/pixels-env.h"
 
 #ifndef QPV_PIXELS_HEADER
-#define QPV_PIXELS_HEADER "../dupes-pixels.h"
+#define QPV_PIXELS_HEADER "../lib/dupes-pixels.h"
 #endif
 #include QPV_PIXELS_HEADER
 

@@ -20,7 +20,7 @@
 
 #include "shim/pdf-env.h"
 #ifndef QPV_PDF_WRITER_SOURCE
-#define QPV_PDF_WRITER_SOURCE "../pdf-writer.h"
+#define QPV_PDF_WRITER_SOURCE "../lib/pdf-writer.h"
 #endif
 #include QPV_PDF_WRITER_SOURCE
 

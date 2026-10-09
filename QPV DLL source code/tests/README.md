@@ -9,7 +9,7 @@ Most of the suite covers the duplicate-identification pipeline, which is what it
 for; `pdf_writer.cpp` covers the PDF writer of "Join images into a single file".
 
 The slicing is the point. A scratch copy of an algorithm drifts from the shipped one and
-then proves nothing; `run-tests.sh` re-extracts from `../dupes-search.h` on every run and
+then proves nothing; `run-tests.sh` re-extracts from `../lib/dupes-search.h` on every run and
 fails loudly if an anchor stops matching. The markers it anchors on
 (`qpv-dupes-block-end`, `qpv-dupes-query-begin`, `qpv-dupes-state-end`, `qpv-dct-block-end`,
 `qpv-job-slot-end` and friends) are comments in the sources; leave them there.

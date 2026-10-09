@@ -18,55 +18,55 @@
     <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
+    <ClInclude Include="lib\framework.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="pch.h">
+    <ClInclude Include="lib\pch.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="freeimage-dynamic.h">
+    <ClInclude Include="lib\freeimage-dynamic.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="thumbs-pool.h">
+    <ClInclude Include="lib\thumbs-pool.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="dupes-pixels.h">
+    <ClInclude Include="lib\dupes-pixels.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="dupes-search.h">
+    <ClInclude Include="lib\dupes-search.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="sqlite-dynamic.h">
+    <ClInclude Include="lib\sqlite-dynamic.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="callwndproc-hook.h">
+    <ClInclude Include="lib\callwndproc-hook.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="pdf-writer.h">
+    <ClInclude Include="lib\pdf-writer.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="flood-fill.h">
+    <ClInclude Include="lib\flood-fill.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="wic-loader.h">
+    <ClInclude Include="lib\wic-loader.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="pdfium-reader.h">
+    <ClInclude Include="lib\pdfium-reader.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="svg-render.h">
+    <ClInclude Include="lib\svg-render.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="selection-mask.h">
+    <ClInclude Include="lib\selection-mask.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="blend-modes.h">
+    <ClInclude Include="lib\blend-modes.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="color-adjust.h">
+    <ClInclude Include="lib\color-adjust.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
-    <ClInclude Include="paint-brush.h">
+    <ClInclude Include="lib\paint-brush.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,6 +1,6 @@
 // qpv-main.cpp : Définit les fonctions exportées de la DLL.
 
-#include "pch.h"
+#include "lib/pch.h"
 using namespace std;
 using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
@@ -94,7 +94,7 @@ static double LUT_Z_G[256];
 static double LUT_Z_B[256];
 
 // CalculateNewBlendModes() and its tables; initWICnow() fills them through initBlendLUTs()
-#include "blend-modes.h"
+#include "lib/blend-modes.h"
 
 // the tables the pixel code reads; initWICnow() fills them once
 static void initColorLUTs() {
@@ -203,10 +203,10 @@ int inline contraMathsInt16(int i, float fintensity, float deviation) {
 // fnOutputDebug(), the DLL_API / QPV_FORCEINLINE macros and M_PI with this translation unit,
 // and it brings in sqlite-dynamic.h, whose binding is static and has to be the same one
 // dupes-pixels.h uses further down.
-#include "dupes-search.h"
+#include "lib/dupes-search.h"
 // The native WH_CALLWNDPROC procedure that feeds the script's menu machinery
 // [see the header]. #included like the rest: it uses DLL_API / DLL_CALLCONV.
-#include "callwndproc-hook.h"
+#include "lib/callwndproc-hook.h"
 
 std::string WideCharToString(const wchar_t* inwstr) {
     if (!inwstr)
@@ -223,7 +223,7 @@ inline INT64 CalcPixOffset(const int &x, const int &y, const int &Stride, const 
 
 // the selection: its state, the polygon masks and clipMaskFilter(), which every effect below
 // and flood-fill.h clip through
-#include "selection-mask.h"
+#include "lib/selection-mask.h"
 
 DLL_API int DLL_CALLCONV SetBitmapAsAlphaChannel(unsigned char *imageData, unsigned char *maskData, int w, int h, int Stride, int bpp, int invert, int replaceAlpha, int whichChannel) {
 /*
@@ -348,7 +348,7 @@ int RGBtoGray(int &sR, int &sG, int &sB, int &alternateMode) {
 
 // the flood fill and "Replace similar colours anywhere"; it must sit here because it uses
 // prepareSelectionArea()'s selection state, clipMaskFilter() and the colour helpers above
-#include "flood-fill.h"
+#include "lib/flood-fill.h"
 
 // Auto-crop pixel metric. A pixel is (luma, alpha): two fully transparent pixels must
 // read as identical whatever their RGB is, and a transparent pixel must never be mistaken
@@ -1293,7 +1293,7 @@ DLL_API int DLL_CALLCONV FillSelectArea(unsigned char *BitmapData, int w, int h,
 }
 
 // AdjustImageColorsPrecise() and its 16-bit pixel kernel, which the effects brush reuses
-#include "color-adjust.h"
+#include "lib/color-adjust.h"
 
 DLL_API int DLL_CALLCONV MergeBitmapsWithMask(unsigned char *originalData, unsigned char *newBitmap, unsigned char *maskBitmap, int invert, int w, int h, int maskOpacity, int invertMaskOpacity, int Stride, int bpp, int linearGamma, int whichChannel) {
     const int bpc = bpp / 8;
@@ -1928,24 +1928,24 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
 }
 
 // WIC decoding; the PDF and SVG readers and both pools below use its guards and helpers
-#include "wic-loader.h"
+#include "lib/wic-loader.h"
 
 // PDFium: bookmarks, text and pages; thumbs-pool.h and dupes-pixels.h render pages through it
-#include "pdfium-reader.h"
+#include "lib/pdfium-reader.h"
 
 // SVG through Direct2D; thumbs-pool.h draws its SVG thumbnails with LoadSVGimageEx()
-#include "svg-render.h"
+#include "lib/svg-render.h"
 
 // multi-threaded thumbnails generator; it must sit here because it calls LoadSVGimage(),
 // coreRenderPdfPageAsBitmap(), adaptImageGivenSize() and the openCV* helpers defined above
-#include "thumbs-pool.h"
+#include "lib/thumbs-pool.h"
 
 // the fingerprint / histogram collector; it reuses the thumbnails pool's two loaders and
 // its extension sets, so it has to come after them
-#include "dupes-pixels.h"
+#include "lib/dupes-pixels.h"
 
 // The PDF writer of "Join images into a single file"; its GDI+ and OpenCV part follows.
-#include "pdf-writer.h"
+#include "lib/pdf-writer.h"
 
 // Adds a page that shows a GDI+ bitmap: scaled down to rasterW x rasterH when it is larger
 // [the pixels are never enlarged; the PDF reader does that], laid over bgColor where it is
@@ -3412,7 +3412,7 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 }
 
 // the brush tool: PaintBrushLarge() and its per-stroke opacity chunks
-#include "paint-brush.h"
+#include "lib/paint-brush.h"
 
 
 

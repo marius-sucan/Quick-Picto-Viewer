@@ -577,7 +577,7 @@ static inline Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int, int, 
 }
 
 // ---- the two names dupes-pixels.h borrows from the query engine ------------------------
-#include "../../sqlite-dynamic.h"
+#include "../../lib/sqlite-dynamic.h"
 static std::wstring dupesEngineError;
 static std::atomic<int> dupesPixCancel(0);
 static inline void dupesSetError(const wchar_t *what, sqlite3 *) { dupesEngineError = (what!=NULL) ? what : L""; }

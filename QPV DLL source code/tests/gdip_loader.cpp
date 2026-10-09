@@ -27,7 +27,7 @@
 
 #include "shim/gdip-env.h"
 
-// sliced out of ../thumbs-pool.h by run-tests.sh
+// sliced out of ../lib/thumbs-pool.h by run-tests.sh
 #include "calc_dims.part"
 #include "gdip_loader.part"
 

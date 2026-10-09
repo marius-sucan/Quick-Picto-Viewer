@@ -43,7 +43,7 @@ __attribute__((unused)) static void fnOutputDebug(std::string) {}
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static void SetWindowText(HWND, LPCWSTR) {}
 
-#include "../sqlite-dynamic.h"
+#include "../lib/sqlite-dynamic.h"
 #include "header_extract.h"
 
 // The DCT table and its two scale factors live in dupes-search.h outside the sliced region;

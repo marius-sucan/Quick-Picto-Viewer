@@ -1,6 +1,6 @@
 // pch.h: the system and third-party headers, compiled once into the precompiled header every .cpp
 // of the DLL starts with [/Yu]. The project's own headers stay out: an edit to anything here rebuilds it.
-// /Yu skips whatever comes before #include "pch.h", so the macros these headers read [GDIPVER,
+// /Yu skips whatever comes before #include "lib/pch.h", so the macros these headers read [GDIPVER,
 // cimg_use_openmp] are defined here.
 
 #ifndef PCH_H
@@ -47,13 +47,13 @@
 #include <locale>
 #include <codecvt>
 #define cimg_use_openmp 1
-#include "includes\CImg-3.4.3\CImg.h"
+#include "..\includes\CImg-3.4.3\CImg.h"
 // #include <opencv2/opencv.hpp>
-#include "includes\opencv2\opencv.hpp"
-#include "includes\pdfium\fpdfview.h"
-#include "includes\pdfium\fpdf_text.h"
-#include "includes\pdfium\fpdf_annot.h"
-#include "includes\pdfium\fpdf_doc.h"
-#include "includes\pdfium\fpdf_edit.h"
+#include "..\includes\opencv2\opencv.hpp"
+#include "..\includes\pdfium\fpdfview.h"
+#include "..\includes\pdfium\fpdf_text.h"
+#include "..\includes\pdfium\fpdf_annot.h"
+#include "..\includes\pdfium\fpdf_doc.h"
+#include "..\includes\pdfium\fpdf_edit.h"
 
 #endif //PCH_H

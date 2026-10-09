@@ -94,7 +94,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -112,7 +112,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
@@ -139,7 +139,7 @@
       <PreprocessorDefinitions>_DEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -157,7 +157,7 @@
       <PreprocessorDefinitions>NDEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
       <Optimization>Full</Optimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OpenMPSupport>true</OpenMPSupport>
@@ -186,23 +186,23 @@
     <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="blend-modes.h" />
-    <ClInclude Include="callwndproc-hook.h" />
-    <ClInclude Include="color-adjust.h" />
-    <ClInclude Include="dupes-pixels.h" />
-    <ClInclude Include="dupes-search.h" />
-    <ClInclude Include="flood-fill.h" />
-    <ClInclude Include="framework.h" />
-    <ClInclude Include="freeimage-dynamic.h" />
-    <ClInclude Include="paint-brush.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="pdf-writer.h" />
-    <ClInclude Include="pdfium-reader.h" />
-    <ClInclude Include="selection-mask.h" />
-    <ClInclude Include="sqlite-dynamic.h" />
-    <ClInclude Include="svg-render.h" />
-    <ClInclude Include="thumbs-pool.h" />
-    <ClInclude Include="wic-loader.h" />
+    <ClInclude Include="lib\blend-modes.h" />
+    <ClInclude Include="lib\callwndproc-hook.h" />
+    <ClInclude Include="lib\color-adjust.h" />
+    <ClInclude Include="lib\dupes-pixels.h" />
+    <ClInclude Include="lib\dupes-search.h" />
+    <ClInclude Include="lib\flood-fill.h" />
+    <ClInclude Include="lib\framework.h" />
+    <ClInclude Include="lib\freeimage-dynamic.h" />
+    <ClInclude Include="lib\paint-brush.h" />
+    <ClInclude Include="lib\pch.h" />
+    <ClInclude Include="lib\pdf-writer.h" />
+    <ClInclude Include="lib\pdfium-reader.h" />
+    <ClInclude Include="lib\selection-mask.h" />
+    <ClInclude Include="lib\sqlite-dynamic.h" />
+    <ClInclude Include="lib\svg-render.h" />
+    <ClInclude Include="lib\thumbs-pool.h" />
+    <ClInclude Include="lib\wic-loader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />

@@ -21,7 +21,7 @@
 
 #include "shim/wic-env.h"
 
-// sliced out of ../wic-loader.h and ../thumbs-pool.h by run-tests.sh
+// sliced out of ../lib/wic-loader.h and ../lib/thumbs-pool.h by run-tests.sh
 #include "thumbs_structs.part"
 #include "wic_guards.part"
 #include "adapt_size.part"

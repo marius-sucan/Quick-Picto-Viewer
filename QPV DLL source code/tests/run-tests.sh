@@ -20,7 +20,7 @@ CXXFLAGS="-O2 -std=c++17 -msse2 -mfpmath=sse -Wall"
 # One file now: the pipeline, the records AHK reads by byte offset and the DCT all moved
 # out of qpv-main.cpp/.h into dupes-search.h, so every slice below comes from the same
 # place. thumbs-pool.h is named inline by the one slice that needs it.
-SRC="../dupes-search.h"
+SRC="../lib/dupes-search.h"
 fail=0
 
 for f in "$SRC"; do
@@ -54,20 +54,20 @@ slice header_extract.h   "$SRC" '^\/\/ One record per surviving image pair' '^\/
 slice block_extract.cpp  "$SRC" '^\/\/ SWAR population count'          '^\/\/ qpv-dupes-block-end' 450 || exit 1
 slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qpv-dupes-query-end' 350 || exit 1
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1
-slice thumbs_structs.part ../thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
-slice mem_limits.part     ../thumbs-pool.h '^\/\/ Memory pressure'   '^#define TP_SLOT_POLL_MS' 20 || exit 1
-slice mem_sample.part     ../thumbs-pool.h '^\/\/ qpv-mem-sample-begin' '^\/\/ qpv-mem-sample-end' 30 || exit 1
-slice slots_extract.part  ../thumbs-pool.h '^\/\/ One attempt at taking a slot' '^\/\/ qpv-job-slot-end' 40 || exit 1
-slice calc_dims.part      ../thumbs-pool.h '^\/\/ qpv-calc-dims-begin'   '^\/\/ qpv-calc-dims-end' 30 || exit 1
-slice gdip_loader.part    ../thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\/\/ qpv-gdip-loader-end' 120 || exit 1
-slice fim_defs.part       ../thumbs-pool.h '^#define TP_JOB_THUMB'      '^#define TP_ERR_PDFLOCKED' 8 || exit 1
-slice fim_config.part     ../thumbs-pool.h '^struct ThumbsConfig {'  '^};' 20 || exit 1
-slice fim_loader.part     ../thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
-slice wic_loader.part     ../thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
-slice wic_guards.part     ../wic-loader.h '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
-slice adapt_size.part     ../wic-loader.h '^auto adaptImageGivenSize' '^}' 50 || exit 1
-slice safe_release.part   ../wic-loader.h '^template <typename T> inline void SafeRelease(T \*&p, std::string infos, int d) {' '^}' 10 || exit 1
-slice icm_viewer.part     ../wic-loader.h '^int applyColorManagement(IWICBitmapSource\* &thisWICbitmap' '^}' 100 || exit 1
+slice thumbs_structs.part ../lib/thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
+slice mem_limits.part     ../lib/thumbs-pool.h '^\/\/ Memory pressure'   '^#define TP_SLOT_POLL_MS' 20 || exit 1
+slice mem_sample.part     ../lib/thumbs-pool.h '^\/\/ qpv-mem-sample-begin' '^\/\/ qpv-mem-sample-end' 30 || exit 1
+slice slots_extract.part  ../lib/thumbs-pool.h '^\/\/ One attempt at taking a slot' '^\/\/ qpv-job-slot-end' 40 || exit 1
+slice calc_dims.part      ../lib/thumbs-pool.h '^\/\/ qpv-calc-dims-begin'   '^\/\/ qpv-calc-dims-end' 30 || exit 1
+slice gdip_loader.part    ../lib/thumbs-pool.h '^\/\/ qpv-gdip-loader-begin' '^\/\/ qpv-gdip-loader-end' 120 || exit 1
+slice fim_defs.part       ../lib/thumbs-pool.h '^#define TP_JOB_THUMB'      '^#define TP_ERR_PDFLOCKED' 8 || exit 1
+slice fim_config.part     ../lib/thumbs-pool.h '^struct ThumbsConfig {'  '^};' 20 || exit 1
+slice fim_loader.part     ../lib/thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
+slice wic_loader.part     ../lib/thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
+slice wic_guards.part     ../lib/wic-loader.h '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
+slice adapt_size.part     ../lib/wic-loader.h '^auto adaptImageGivenSize' '^}' 50 || exit 1
+slice safe_release.part   ../lib/wic-loader.h '^template <typename T> inline void SafeRelease(T \*&p, std::string infos, int d) {' '^}' 10 || exit 1
+slice icm_viewer.part     ../lib/wic-loader.h '^int applyColorManagement(IWICBitmapSource\* &thisWICbitmap' '^}' 100 || exit 1
 echo "   ok"
 
 echo
@@ -454,14 +454,14 @@ echo "== mutation check: the collector must reject wrong maths and a wedged pool
 for mutant in A B; do
     case $mutant in
       A) sed 's|const double avgu     = (double)sumTotalBr/totalPixelz - 1.0;|const double avgu     = (double)sumTotalBr/totalPixelz;|' \
-             ../dupes-pixels.h > pixels_mutant.h
+             ../lib/dupes-pixels.h > pixels_mutant.h
          label="the mean is computed without its offset" ;;
       B) sed 's|    return tpWaitForJobSlot(\[jobGeneration\] {|    while (tpMemoryIsTight() \&\& dpState.inFlight > 1)\n       std::this_thread::sleep_for(std::chrono::milliseconds(2));\n    return tpWaitForJobSlot([jobGeneration] {|' \
-             ../dupes-pixels.h > pixels_mutant.h
+             ../lib/dupes-pixels.h > pixels_mutant.h
          label="a worker waits for a count that includes itself" ;;
     esac
 
-    if cmp -s pixels_mutant.h ../dupes-pixels.h; then
+    if cmp -s pixels_mutant.h ../lib/dupes-pixels.h; then
         echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
         continue
     fi
@@ -579,19 +579,19 @@ echo "== mutation check: the PDF writer's mistakes must be caught =="
 #   E - the Exif segment embedded along with the JPEG.
 for mutant in A B C D E; do
     case $mutant in
-      A) sed 's|case 6:  m\[0\] = 0;  m\[1\] = -h; m\[2\] = w;|case 6:  m[0] = 0;  m[1] = h; m[2] = -w;|' ../pdf-writer.h > pdf_writer_mutant.h
+      A) sed 's|case 6:  m\[0\] = 0;  m\[1\] = -h; m\[2\] = w;|case 6:  m[0] = 0;  m[1] = h; m[2] = -w;|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="orientation 6 is drawn as 8" ;;
-      B) sed 's|w->offsets\[n\] = pdfwTell(w);|w->offsets[n] = pdfwTell(w) + 1;|' ../pdf-writer.h > pdf_writer_mutant.h
+      B) sed 's|w->offsets\[n\] = pdfwTell(w);|w->offsets[n] = pdfwTell(w) + 1;|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="an xref offset misses its object" ;;
-      C) sed 's|else if (c==0xD9)$|else if (c==0xD9 \&\& false)|' ../pdf-writer.h > pdf_writer_mutant.h
+      C) sed 's|else if (c==0xD9)$|else if (c==0xD9 \&\& false)|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="the scans are copied past EOI" ;;
-      D) sed 's|^       pdfwRollback(w, mark);|       ;|' ../pdf-writer.h > pdf_writer_mutant.h
+      D) sed 's|^       pdfwRollback(w, mark);|       ;|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="a page that failed stays in the file" ;;
-      E) sed 's#c==0xE0 || c==0xEE;#c==0xE0 || c==0xEE || c==0xE1;#' ../pdf-writer.h > pdf_writer_mutant.h
+      E) sed 's#c==0xE0 || c==0xEE;#c==0xE0 || c==0xEE || c==0xE1;#' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="Exif is embedded with the JPEG" ;;
     esac
 
-    if cmp -s pdf_writer_mutant.h ../pdf-writer.h; then
+    if cmp -s pdf_writer_mutant.h ../lib/pdf-writer.h; then
         echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
         continue
     fi

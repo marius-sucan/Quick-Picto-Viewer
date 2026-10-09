@@ -24,7 +24,7 @@
 // Normally the shipped header. run-tests.sh points this at a deliberately broken COPY for
 // the mutation check, so that the check never has to edit the source that ships.
 #ifndef QPV_PIXELS_HEADER
-#define QPV_PIXELS_HEADER "../dupes-pixels.h"
+#define QPV_PIXELS_HEADER "../lib/dupes-pixels.h"
 #endif
 #include QPV_PIXELS_HEADER
 
