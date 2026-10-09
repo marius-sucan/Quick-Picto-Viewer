@@ -522,7 +522,7 @@ static inline HRESULT D2D1CreateFactory(int, ID2D1Factory **f) {
     return S_OK;
 }
 
-// the real one lives in qpv-main.cpp, ahead of the PDF exports, and every PDFium caller of
+// the real one lives in pdfium-reader.h, ahead of the PDF exports, and every PDFium caller of
 // the DLL takes it, because PDFium keeps global state
 static std::timed_mutex pdfiumMutex;
 
