@@ -6,7 +6,7 @@ for any of it to take effect.
 ## Summary
 
 `FloodFill8Stack()` (the tolerance fill) and `FloodFillScanlineStack()` (the exact fill) are
-replaced by one engine, `FloodJob` in `qpv-main.cpp`. It paints exactly the bytes the shipped
+replaced by one engine, `FloodJob` in `flood-fill.h`. It paints exactly the bytes the shipped
 fills paint, but 4–24× faster on typical fills with all cores, and 1.5–17× on one core for all
 but two kinds of fill (see Known limits). A 900-megapixel fill that took 9.6 s takes 0.87 s; CIEDE2000 with blending went from 51.6 s
 to 1.8 s.
