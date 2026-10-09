@@ -594,7 +594,7 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 // JPEG its scaled decode, which is why an EXIF sRGB context, sRGB into sRGB, gets none.
 //
 // Returns 1 with a transform the caller releases, 0 with nothing to do or nothing built.
-// Plain data only, like the guards in qpv-main.cpp; after a fault the objects are abandoned.
+// Plain data only, like the guards in wic-loader.h; after a fault the objects are abandoned.
 static int tpWICguardedColorTransform(IWICImagingFactory *fac, IWICBitmapFrameDecode *pFrame,
                                       const WICPixelFormatGUID *srcFmt, IWICColorTransform **ppTransform,
                                       DWORD *sehCode) {
@@ -694,7 +694,7 @@ static int tpWICguardedColorTransform(IWICImagingFactory *fac, IWICBitmapFrameDe
 // JPEG-XR decoders perform a scaled decode through IWICBitmapSourceTransform instead of
 // unpacking the full resolution image only to shrink it afterwards.
 //
-// Every call that reaches a codec goes through the SEH guards declared in qpv-main.cpp: a
+// Every call that reaches a codec goes through the SEH guards declared in wic-loader.h: a
 // worker thread that faults on a corrupt file kills the whole application just as surely
 // as the viewport thread would, and the pool is the part of QPV that walks over every
 // file in a folder without anyone asking it to.

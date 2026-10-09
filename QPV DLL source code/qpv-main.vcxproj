@@ -197,6 +197,7 @@
     <ClInclude Include="qpv-main.h" />
     <ClInclude Include="sqlite-dynamic.h" />
     <ClInclude Include="thumbs-pool.h" />
+    <ClInclude Include="wic-loader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />

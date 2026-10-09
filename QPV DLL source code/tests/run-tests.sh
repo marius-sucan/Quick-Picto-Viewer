@@ -64,10 +64,10 @@ slice fim_defs.part       ../thumbs-pool.h '^#define TP_JOB_THUMB'      '^#defin
 slice fim_config.part     ../thumbs-pool.h '^struct ThumbsConfig {'  '^};' 20 || exit 1
 slice fim_loader.part     ../thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
 slice wic_loader.part     ../thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
-slice wic_guards.part     ../qpv-main.cpp '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
-slice adapt_size.part     ../qpv-main.cpp '^auto adaptImageGivenSize' '^}' 50 || exit 1
-slice safe_release.part   ../qpv-main.cpp '^template <typename T> inline void SafeRelease(T \*&p, std::string infos, int d) {' '^}' 10 || exit 1
-slice icm_viewer.part     ../qpv-main.cpp '^int applyColorManagement(IWICBitmapSource\* &thisWICbitmap' '^}' 100 || exit 1
+slice wic_guards.part     ../wic-loader.h '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
+slice adapt_size.part     ../wic-loader.h '^auto adaptImageGivenSize' '^}' 50 || exit 1
+slice safe_release.part   ../wic-loader.h '^template <typename T> inline void SafeRelease(T \*&p, std::string infos, int d) {' '^}' 10 || exit 1
+slice icm_viewer.part     ../wic-loader.h '^int applyColorManagement(IWICBitmapSource\* &thisWICbitmap' '^}' 100 || exit 1
 echo "   ok"
 
 echo

@@ -3,7 +3,7 @@
 //
 // thumbs-pool.h cannot be compiled on this box, so run-tests.sh TEXT-SLICES the WIC loader
 // out of it, between qpv-wic-loader-begin and qpv-wic-loader-end, together with the guards of
-// qpv-main.cpp it calls, and both are compiled against shim/wic-env.h: WIC interfaces with
+// wic-loader.h it calls, and both are compiled against shim/wic-env.h: WIC interfaces with
 // the SDK's signatures and fakes behind them that keep real reference counts.
 //
 // Colour fidelity cannot be judged here - that takes Windows' colour management. What is
@@ -21,7 +21,7 @@
 
 #include "shim/wic-env.h"
 
-// sliced out of ../qpv-main.cpp and ../thumbs-pool.h by run-tests.sh
+// sliced out of ../wic-loader.h and ../thumbs-pool.h by run-tests.sh
 #include "thumbs_structs.part"
 #include "wic_guards.part"
 #include "adapt_size.part"

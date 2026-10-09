@@ -40,9 +40,6 @@ std::vector<unsigned char*> brushOriginalPixelChunks;
 std::vector<size_t> activeBrushChunks;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 int chunkGridW = 0;
-IWICBitmapDecoder      *pWICclassDecoder;
-IWICBitmapFrameDecode  *pWICclassFrameDecoded;
-// IWICFormatConverter *pWICclassConverter;
 
 class MaskBitMap {
 private:
@@ -174,12 +171,6 @@ std::vector<unsigned char>  highDephMaskMap;
 MaskBitMap  polygonMaskMap;
 MaskBitMap  polygonOtherMaskMap;
 // vector<pair<int, int>> DrawLineGrid;
-
-struct GUIDComparer {
-    bool operator()(const GUID& left, const GUID& right) const {
-        return memcmp(&left, &right, sizeof(GUID)) < 0;
-    }
-};
 
 struct Point {
     double x, y;

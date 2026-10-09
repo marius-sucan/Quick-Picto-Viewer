@@ -53,7 +53,7 @@ static inline DWORD GetTickCount() {
                   std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-// qpv-main.cpp's: the extension after the last dot, compared without regard to case
+// wic-loader.h's: the extension after the last dot, compared without regard to case
 static inline bool IsFileExtension(const wchar_t *szFileName, const wchar_t *extension) {
     if (!szFileName || !extension || extension[0]!=L'.')
        return false;
