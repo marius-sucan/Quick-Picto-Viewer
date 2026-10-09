@@ -54,7 +54,7 @@ the painted colour for each source colour.
    visited at all.
 7. **Two steps for huge images.** `FloodFillFindRegion()` now handles the replacement: it counts
    and bounds the matches and keeps a one-bit-per-pixel map of them when it fits the 512 MiB budget
-   (112 MiB at 900 MP), so `FloodFillPaintRegion()` paints without testing again. Above the budget it
+   (107 MiB at 900 MP), so `FloodFillPaintRegion()` paints without testing again. Above the budget it
    marks the rows with matches and tests those rows again. The huge-image flood tool now uses the
    two steps for this option too and records an undo level of the bounds.
 8. **For CIEDE2000 the clicked colour keeps its own distance.** The shipped function measured the
@@ -129,11 +129,11 @@ Against the shipped code at `c26999f`, sliced unchanged into the g++ harness use
 - `FloodFillFindRegion()` answers the replacement instead of -1. The AHK treats an error or a
   negative answer as "use the one-step call", so an older qpvmain.dll still works.
 - Between `FloodFillFindRegion()` and `FloodFillPaintRegion()` a replacement holds its map of
-  matches (112 MiB at 900 MP, within the budget), until the paint, the next find or
-  `FloodFillDiscardRegion()`, as a flood fill holds its region.
-- When the map of matches does not fit the budget (above about 3.5 GP), paint tests the pixels
-  again: between the two calls the image and the selection must not change (AHK only records the
-  undo level in between).
+  matches (107 MiB at 900 MP) until the paint, the next find or `FloodFillDiscardRegion()`, as a
+  flood fill holds its region.
+- When the map of matches does not fit the budget (above 3.7–4.2 GP, depending on the number of
+  threads), paint tests the pixels again: between the two calls the image and the selection must
+  not change (AHK only records the undo level in between).
 - The flood fill's CIEDE2000 rule is unchanged: only the replacement measures the clicked colour.
 - A click on a pixel the selection masks still replaces every match the selection leaves open, as
   the shipped function did (the flood fill fills nothing there).
