@@ -303,11 +303,11 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userFilterInvertThis := 0, UserHamDistStringFilter := "", UserHamDistCacheFilterMonoGroups := 1
    , UserHamDistStringInvert := 0, lockZoomLevel := 0, showViewPortGrid := 0, vpGridColor := "998899"
    , vpGridAlpha := 150, vpGridThickness := 1, vpGridSize := 35, vpGridStepu := 4, vpGridFixedSize := 0
-   , PasteInPlaceAutoExpandIMG := 0, SlidesMusicSong := "", PrintStrechedSize := 0, brushToolSize := 50
+   , PasteInPlaceAutoExpandIMG := 0, SlidesMusicSong := "", PrintStrechedSize := 0, BrushToolSize := 50
    , BrushToolAopacity := 200, BrushToolBopacity := 120, BrushToolAcolor := "ff9900", BrushToolBcolor := "3399FF"
    , BrushToolSoftness := 60, BrushToolWetness := 0, BrushToolDryingRate := 0, BrushToolType := 1
    , BrushToolUseSecondaryColor := 0, BrushToolAspectRatio := 0, BrushToolAngle := 0, BrushToolOutsideSelection := 1
-   , BrushToolBlurStrength := 0, brushToolStepping := 0, BrushToolDoubleSize := 0, BrushToolOverDraw := 1
+   , BrushToolBlurStrength := 0, BrushToolStepping := 0, BrushToolDoubleSize := 0, BrushToolOverDraw := 1
    , BrushToolDynamicCloner := 0, BrushToolEraserRestore := 0, BrushToolRandomSize := 0, BrushToolRandomSoftness := 0
    , BrushToolRandomAspectRatio := 0, BrushToolRandomAngle := 0, BrushToolRandomPosX := 0, BrushToolRandomPosY := 0
    , BrushToolRandomHue := 0, BrushToolRandomSat := 0, BrushToolRandomLight := 0, BrushToolRandomDark := 0 
@@ -45032,7 +45032,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
 
     sml := (PrefsLargeFonts=1) ? 30 : 20
     hasa := (PrefsLargeFonts=1) ? 27 : 18
-    Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects options|Randomize|Pen pressure
+    Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects|Randomize|Pen pressure
     Gui, Tab, 1 ; general
     GuiAddDropDownList("x+15 y+15 w" slideWid " Section AltSubmit gupdateUIbrushTool Choose" BrushToolType " vBrushToolType", "Simple solid color|Soft edges brush|Cloner|Eraser|Effects|Smudge|Pinch|Bulge", "Brush type")
     wo := (PrefsLargeFonts=1) ? slideWid // 2 + 75 : slideWid // 2 + 30
@@ -45650,10 +45650,20 @@ updateLabelAlgorithmSliderEdgesPanel(varu, valu) {
 }
 
 updateLabelBrushStep() {
-   stepu := (BrushToolStepping<=2 || BrushToolStepping=251) ? "AUTO" : BrushToolStepping " px"
+   If (AnyWindowOpen=64)
+   {
+      fstp := clampInRange(BrushToolStepping / 100, 0.05, 0.25)
+      stepu := (BrushToolStepping=0) ? 0 : BrushToolStepping / 251 + fstp
+      stepu := Round(stepu*100) " %"
+      If (BrushToolType>=7)
+         stepu := "AUTO"
+   } Else
+      stepu := (BrushToolStepping<=2 || BrushToolStepping=251) ? "AUTO" : BrushToolStepping " px"
+
    If (BrushToolStepping=0)
       stepu := "NONE"
-   Return "Steps interpolation: " stepu
+
+   Return "Stepping: " stepu
 }
 
 updateLabelBrushSize() {
@@ -45953,7 +45963,7 @@ createLivePreviewBrush() {
 
     Gdip_GraphicsClear(G, "0xFF888888")
     whichBitmap := useGdiBitmap()
-    brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+    brushSize := (BrushToolDoubleSize=1) ? BrushToolSize*2 : BrushToolSize
     If ((BrushToolType=3 || BrushToolType=5) && CurrentPanelTab=2 && !viewportQPVimage.imgHandle)
     {
        brushu := createClonedBrushBitmap(brushSize, 101 - BrushToolSoftness, BrushToolAngle, BrushToolAspectRatio, whichBitmap, 0, 0, 1, 1, 1)
@@ -48374,7 +48384,7 @@ ReadSettingsBrushPanel(act:=0) {
    RegAction(act, "BrushToolAutoAngle",, 1)
    RegAction(act, "BrushToolDoubleSize",, 1)
    RegAction(act, "BrushToolSoftness",, 2, 1, 100)
-   RegAction(act, "brushToolStepping",, 2, 0, 251)
+   RegAction(act, "BrushToolStepping",, 2, 0, 251)
    RegAction(act, "BrushToolType",, 2, 1, 8)
    RegAction(act, "BrushToolAngle",, 2, -180, 180)
    RegAction(act, "BrushToolAspectRatio",, 2, -100, 100)
@@ -76807,7 +76817,7 @@ wrapResizeImageGDIwin() {
 toggleBrushDoubleSize() {
    BrushToolDoubleSize := !BrushToolDoubleSize
    friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
-   showTOOLtip("Brush " friendly " size: " brushToolSize " px", A_ThisFunc, 1, brushToolSize/950)
+   showTOOLtip("Brush " friendly " size: " BrushToolSize " px", A_ThisFunc, 1, BrushToolSize/950)
    If isVarEqualTo(AnyWindowOpen, 64, 24, 31)
    {
       GuiControl, SettingsGUIA:, BrushToolDoubleSize, % BrushToolDoubleSize
@@ -78340,15 +78350,19 @@ ActPaintBrushNow() {
          SetTimer, RemoveTooltip, % -msgDisplayTime
          Return
       }
+   }
 
-      canApplyFXa := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
-      canApplyFXb := (PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
-      If (BrushToolBlurStrength<3 && canApplyFXa=0 && canApplyFXb=0 && BrushToolType=5)
-      {
-         showTOOLtip("WARNING: No brush effect to apply.")
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+   canApplyFX := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0 || PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
+   thisOpaTest := (BrushToolUseSecondaryColor=1 && BrushToolType<3) ? BrushToolBopacity : BrushToolAopacity
+   If (BrushToolBlurStrength<3 && canApplyFX=0 && BrushToolType=5 || BrushToolWetness<1 && BrushToolType>5 || thisOpaTest<5 && BrushToolType>4)
+   {
+      If (thisOpaTest<5 && BrushToolType>4)
+         showTOOLtip("WARNING: Brush opacity too low. Increase opacity to begin painting.")
+      Else
+         showTOOLtip("WARNING: No brush effect to apply.`nEdit brush settings in the Effects tab.")
+      SoundBeep 300, 100
+      SetTimer, RemoveTooltip, % -msgDisplayTime
+      Return
    }
 
    vpWinClientSize(mainWidth, mainHeight)
@@ -78453,6 +78467,7 @@ ActPaintBrushNow() {
       If (isLarge=1)
          recordUndoLevelHugeImagesNow(objuSel.bX1, objuSel.bY1, objuSel.bImgSelW, objuSel.bImgSelH)
    }
+
    If (useSelArea=1)
    {
       thisInvert := (BrushToolOutsideSelection=3) ? 1 : 0
@@ -78506,20 +78521,13 @@ ActPaintBrushNow() {
    dryZeit := A_TickCount
    dryRateZeit := (BrushToolOverDraw=1) ? 50 + BrushToolDryingRate//4 : 10 + BrushToolDryingRate
    thisDryRate := clampInRange(BrushToolDryingRate/4, 0.5, 20)
-   isUserStepu := (brushToolStepping=1 || brushToolStepping=2 || brushToolStepping=251) ? 0 : 1
-   If (brushSize<2)
-      isUserStepu := 0
-
-   stepu := (isUserStepu=0 || brushSize<2) ? Ceil(brushSize * 0.2)**1.09 : brushToolStepping
-   If (BrushToolType=5 && (isUserStepu=1 && stepu<brushSize/4 && isInRange(BrushToolAspectRatio, -5, 5) && isInRange(thisToolAngle, 0, 5)))
-      stepu := brushSize//4 + 1
-
-   If (!stepu || brushToolStepping=0 && brushSize>1)
-      stepu := 1
-
+   fstp := clampInRange(BrushToolStepping / 100, 0.05, 0.25)
+   stepu := (BrushToolStepping=0) ? 0 : Ceil(brushSize * (BrushToolStepping / 251 + fstp)) + Floor(BrushToolSize/10) + 1
+   fstp := Round(brushSize/stepu, 2)
    If (BrushToolType>=7)
       stepu := 2
 
+   ; ToolTip, % stepu "|" fstp, , , 2
    If !GetKeyState("Shift", "P")
       prevMX := prevMY := 0
 
@@ -78783,7 +78791,7 @@ ActPaintBrushNow() {
             }
 
             thisZeit := A_TickCount
-            If (Xgood=1 && Ygood=1 && A_Index>1 || stepu<=1 && BrushToolType>5 || brushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
+            If (Xgood=1 && Ygood=1 && A_Index>1 || stepu<=1 && BrushToolType>5 || BrushToolStepping=0 && brushSize>1 || BrushToolType>=7 || brushSize<1 || thisOpacity<0.005)
                Break
          }
          If (A_Index<3)
@@ -79092,7 +79100,7 @@ ActDrawAlphaMaskBrushNow() {
    pVPimgW := viewportDynamicOBJcoords.w,  pVPimgH := viewportDynamicOBJcoords.h
    MouseCoords2Image(mX, mY, 0, pDPX, pDPY, pVPimgW, pVPimgH, kX, kY, whichBitmap, 1, imgW, imgH)
    oMx := kX, oMy := kY
-   brushSize := (BrushToolDoubleSize=1) ? brushToolSize*2 : brushToolSize
+   brushSize := (BrushToolDoubleSize=1) ? BrushToolSize*2 : BrushToolSize
    arVP := Round(pVPimgW / pVPimgH, 2)
    arImg := Round(imgW / imgH, 2)
 
@@ -79170,12 +79178,12 @@ ActDrawAlphaMaskBrushNow() {
    dryZeit := A_TickCount
    dryRateZeit := 300 - BrushToolDryingRate**2
    thisDryRate := clampInRange(BrushToolDryingRate/4, 1, 20)
-   isUserStepu := (brushToolStepping=1 || brushToolStepping=2 || brushToolStepping=251) ? 0 : 1
-   stepu := (isUserStepu=0) ? Ceil(brushSize * 0.2)**1.09 : brushToolStepping
+   isUserStepu := (BrushToolStepping=1 || BrushToolStepping=2 || BrushToolStepping=251) ? 0 : 1
+   stepu := (isUserStepu=0) ? Ceil(brushSize * 0.2)**1.09 : BrushToolStepping
    If (BrushToolType>6 || BrushToolType=5) && (isUserStepu=1 && stepu<brushSize/4 && isInRange(BrushToolAspectRatio, -5, 5) && isInRange(BrushToolAngle + 180, 0, 5))
       stepu := brushSize//4 + 1
 
-   If (!stepu || BrushToolType>=7 || brushToolStepping=0)
+   If (!stepu || BrushToolType>=7 || BrushToolStepping=0)
       stepu := 1
 
    If !GetKeyState("Shift", "P")
@@ -79272,7 +79280,7 @@ ActDrawAlphaMaskBrushNow() {
                tzGdip_DrawImage(Gu, brushu, tkX - brushSize//2, tkY - brushSize//2, brushSize, brushSize, 0, 0, brushSize, brushSize, thisOpacity/255)
             }
 
-            ; tzGdip_DrawImageFast(Gu, brushu[1], tkX - brushToolSize//2, tkY - brushToolSize//2)
+            ; tzGdip_DrawImageFast(Gu, brushu[1], tkX - BrushToolSize//2, tkY - BrushToolSize//2)
             If (BrushToolDryingRate>0) && (A_TickCount - dryZeit>dryRateZeit)
             {
                dryZeit := A_TickCount
@@ -79286,7 +79294,7 @@ ActDrawAlphaMaskBrushNow() {
             }
             thisZeit := A_TickCount
             ; ToolTip, % A_TickCount - thisZeit , , , 2
-            If (Xgood=1 && Ygood=1 && A_index>1 || brushToolStepping=0 || brushSize<2 || thisOpacity<0.005)
+            If (Xgood=1 && Ygood=1 && A_index>1 || BrushToolStepping=0 || brushSize<2 || thisOpacity<0.005)
                Break
          } ; inner-loop end
          prevState := thisState
@@ -102162,10 +102170,10 @@ coreTlbrSlider(thisFunc, delayu, invertDir) {
       dir := (oY<mY) ? -1 : 1
       If (delayu="brushSize")
       {
-         delayu := (brushToolSize<100) ? 100 : 50
-         If (brushToolSize<25)
+         delayu := (BrushToolSize<100) ? 100 : 50
+         If (BrushToolSize<25)
             delayu := 200
-         Else If (brushToolSize<50)
+         Else If (BrushToolSize<50)
             delayu := 150
       }
 
@@ -105213,7 +105221,7 @@ tlbrDecideTooltips(hwnd) {
    {
       friendly := (BrushToolDoubleSize=1) ? "RADIUS" : "DIAMETER"
       friendly2 := (BrushToolDoubleSize!=1) ? "RADIUS" : "DIAMETER"
-      msgu := "L: Brush " friendly ": " brushToolSize " px « [ » `nR: Switch to " friendly2 " mode «Shift + S»"
+      msgu := "L: Brush " friendly ": " BrushToolSize " px « [ » `nR: Switch to " friendly2 " mode «Shift + S»"
    } Else If InStr(icoFile, "brush-set-angle")
    {
       If (BrushToolAutoAngle=1)
