@@ -197,6 +197,7 @@
     <ClInclude Include="pdfium-reader.h" />
     <ClInclude Include="qpv-main.h" />
     <ClInclude Include="sqlite-dynamic.h" />
+    <ClInclude Include="svg-render.h" />
     <ClInclude Include="thumbs-pool.h" />
     <ClInclude Include="wic-loader.h" />
   </ItemGroup>
