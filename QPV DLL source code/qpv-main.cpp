@@ -34,7 +34,6 @@
 #include <wincodec.h>
 #include <shlwapi.h>
 #include "Tchar.h"
-#include "Tpcshrd.h"
 #define GDIPVER 0x110
 #include <gdiplus.h>
 #include <gdiplusflat.h>
@@ -114,13 +113,10 @@ static unsigned short gamma_to_linear[256];
 static unsigned char linear_to_gamma[32769];
 static float char_to_float[256];
 static float char_to_floatGamma[256];
-static float char_to_float_sqrt[256];
-static float char_to_floatGamma_sqrt[256];
 static float char_to_grayRfloat[256];
 static float char_to_grayGfloat[256];
 static float char_to_grayBfloat[256];
 static float int_to_float[65536];
-static int LUTgamma[65536];
 static int LUTgammaBright[65536];
 static int LUTbright[65536];
 static int LUTshadows[65536];
@@ -225,8 +221,6 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
         char_to_grayBfloat[i] = i*0.114180f;
         char_to_int[i] = char_to_float[i] * 65535.0f;
         char_to_floatGamma[i] = pow(char_to_float[i], GAMMA);
-        char_to_float_sqrt[i] = sqrt(char_to_float[i]);
-        char_to_floatGamma_sqrt[i] = sqrt(char_to_floatGamma[i]);
 
         double val = char_to_float[i];
         if (val > 0.0404482362771076)
@@ -313,22 +307,6 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
     return (SUCCEEDED(hr)) ? 1 : 0;
 }
 
-int inline getGrayscale(int r, int g, int b) {
-    return clamp((int)round(char_to_grayRfloat[clamp(r, 0, 255)] + char_to_grayGfloat[clamp(g, 0, 255)] + char_to_grayBfloat[clamp(b, 0, 255)]), 0, 255);
-}
-
-int inline brightMaths(int i, float fintensity) {
-    return clamp((int)(i + round((float)i * fintensity)), 0, 255);
-}
-
-int inline contraMaths(int i, float fintensity, float deviation) {
-    return clamp((int)(floor(fintensity * (i - 128.0f)) + deviation), 0, 255);
-}
-
-int inline gammaMaths(int i, double gamma) {
-    return round(255.0f * pow(char_to_float[clamp(i, 0, 255)], gamma));
-}
-
 int inline getInt16grayscale(int r, int g, int b) {
     return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
 }
@@ -358,38 +336,6 @@ int inline gammaMathsInt16(int i, double gamma) {
 // [see the header]. #included like the rest: it uses DLL_API / DLL_CALLCONV.
 #include "callwndproc-hook.h"
 
-std::string ucs2_to_utf8(const unsigned short* ucs2_data, std::size_t length) {
-// Converts a UCS2 buffer (array of unsigned short) to a UTF-8 encoded std::string.
-    std::string utf8_result;
-    // Reserve some estimated space to improve performance
-    utf8_result.reserve(length * 3);  // worst-case each UCS2 char becomes 3 bytes
-    
-    for (std::size_t i = 0; i < length; ++i)
-    {
-        unsigned short code_point = ucs2_data[i];
-        
-        // For UCS2, code_point is guaranteed to be in the range [0, 0xFFFF]
-        if (code_point < 0x80)
-        {
-            // 1-byte sequence: 0xxxxxxx
-            utf8_result.push_back(static_cast<char>(code_point));
-        } else if (code_point < 0x800)
-        {
-            // 2-byte sequence: 110xxxxx 10xxxxxx
-            utf8_result.push_back(static_cast<char>(0xC0 | (code_point >> 6)));
-            utf8_result.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
-        } else
-        {
-            // 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx
-            utf8_result.push_back(static_cast<char>(0xE0 | (code_point >> 12)));
-            utf8_result.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)));
-            utf8_result.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
-        }
-    }
-    
-    return utf8_result;
-}
-
 std::string WideCharToString(const wchar_t* inwstr) {
     if (!inwstr)
        return "";
@@ -405,12 +351,6 @@ inline INT64 CalcPixOffset(const int &x, const int &y, const int &Stride, const 
 
 bool isInsideRectOval(const float &ox, const float &oy, const int &modus) {
     // Translate the coordinates
-    // if (excludeSelectScale!=0)
-    // {
-    //    if (inRange(imgSelX1 + imgSelExclX, imgSelX1 + imgSelW - imgSelExclX*2, ox) || inRange(imgSelY1 + imgSelExclY, imgSelY1 + imgSelH - imgSelExclY*2, oy))
-    //       return 0;
-    // }
-
     const float tw = (modus==2) ? imgSelExclW : hImgSelW;
     const float th = (modus==2) ? imgSelExclH : hImgSelH;
     float x = (modus==2) ? ox - tw - imgSelExclX : ox - tw;
@@ -532,21 +472,6 @@ DLL_API int DLL_CALLCONV AlterBitmapAlphaChannel(unsigned char *imageData, int w
     return 1;
 }
 
-void plotLineSetPixel(const int &width, const int &height, const int &nx, const int &ny) {
-    // unused
-    if (ny<0 || ny>height)
-       return;
-
-    // polygonMapMax[ny] = max(polygonMapMax[ny], nx);
-    // polygonMapMin[ny] = min(polygonMapMin[ny], nx);
-    // fnOutputDebug("maxu=" + std::to_string(polygonMapMax[ny]) + " | minu=" + std::to_string(polygonMapMin[ny]));
-
-    if ((nx - polyX)>=polyW || (ny - polyY)>=polyH || (nx - polyX)<polyX || (ny - polyY)<polyY || nx<0 || ny<0)
-       return;
-
-    polygonMaskMap[(UINT64)(ny - polyY) * polyW + (nx - polyX)] = 1;
-}
-
 void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &x1, const int &y1, std::vector<int> &polygonMapMin) {
 // based on https://zingl.github.io/bresenham.html
 //          https://github.com/zingl/Bresenham
@@ -558,7 +483,6 @@ void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &
 
    for (;;)
    {                                             /* loop */
-      // plotLineSetPixel(w, h, x0, y0);
       if (y0>=0 && y0<=h)
       {
          // polygonMapMax[y0] = max(polygonMapMax[y0], x0);
@@ -575,30 +499,6 @@ void bresenham_line_algo(const int &w, const int &h, int x0, int y0, const int &
       if (e2 >= dy) { err += dy; x0 += sx; }                        /* x step */
       if (e2 <= dx) { err += dx; y0 += sy; }                        /* y step */
    }
-}
-
-bool isPointInPolygon(const INT64 &pX, const INT64 &pY, const float* PointsList, const int &PointsCount) {
-// based on https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon
-// https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
-// thank you VERY MUCH , Michael Katz <3
-
-    bool inside = false;
-    for ( int i = 0; i < PointsCount*2; i+=2)
-    {
-        int j = i - 2;
-        if (j<0)
-           j = PointsCount*2 - 2;
-
-        const int xi = PointsList[i];
-        const int yi = PointsList[i + 1];
-        const int xj = PointsList[j];
-        const int yj = PointsList[j + 1];
-        // fnOutputDebug("xi/yi=" + std::to_string(xi) + "/" + std::to_string(yi));
-        // fnOutputDebug("xj/yj=" + std::to_string(xj) + "/" + std::to_string(yj));
-        if ( ( yi > pY ) != ( yj > pY ) && pX < ( xj - xi ) * ( pY - yi ) / ( yj - yi ) + xi )
-           inside = !inside;
-    }
-    return inside;
 }
 
 bool initBoolMaskData() {
@@ -842,52 +742,6 @@ bool inline isPointInOtherMask(const int &x, const int &y, const int &clipMode) 
     return (clipMode==3) ? !p : p;
 }
 
-void FillSimpleMaskPolygon(const int w, const int h, float* PointsList, const int PointsCount, const int offsetY, const int p, float* allPointsList, const int &allPointsCount, const int &clipMode) {
-    int boundMaxX = 0;
-    int boundMaxY = 0;
-    int boundMinX = w;
-    int boundMinY = h;
-    for ( int i = 0; i < PointsCount*2; i+=2)
-    {
-        boundMaxX = max((int)PointsList[i], boundMaxX);
-        boundMaxY = max((int)PointsList[i + 1], boundMaxY);
-        boundMinX = min((int)PointsList[i], boundMinX);
-        boundMinY = min((int)PointsList[i + 1], boundMinY);
-    }
-
-    boundMaxX = min(boundMaxX, w);
-    boundMaxY = min(boundMaxY, h);
-    boundMinX = max(boundMinX, 0);
-    boundMinY = max(boundMinY, 0);
-    for (int y = boundMinY; y < boundMaxY; y++)
-    {
-         for (int x = boundMinX; x < boundMaxX; x++)
-         {
-              if (isPointInPolygon(x, y, PointsList, PointsCount))
-              {
-                 bool okay = 1;
-                 const int gx = x - polyX;
-                 const int gy = y - polyY + offsetY;
- 
-                 if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-                 {                        
-                     if (clipMode!=2)
-                     {
-                        okay = isPointInOtherMask(gx, gy, clipMode);
-                        if (okay!=1)
-                           continue;
-                     }
-
-                     #pragma omp critical
-                     {
-                        polygonMaskMap[(INT64)gy * polyW + gx] = p;
-                     }
-                 }
-              }
-         }
-    }
-}
-
 DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     // polygonMapMin.clear();
     // polygonMapMin.shrink_to_fit();
@@ -897,8 +751,6 @@ DLL_API int DLL_CALLCONV discardFilledPolygonCache(int m) {
     highDephMaskMap.shrink_to_fit();
     polygonOtherMaskMap.clear();
     polygonOtherMaskMap.shrink_to_fit();
-    DrawLineCapsGrid.clear();
-    DrawLineCapsGrid.shrink_to_fit();
     highDepthModeMask = 0;
     return 1;
 }
@@ -1065,34 +917,6 @@ DLL_API int DLL_CALLCONV testFilledPolygonCache(int m) {
     return r;
 }
 
-bool isPointInParallelogram(Point A, Point B, Point D, Point P) {
-    // function unused
-    // Vector AB and AD
-    double ABx = B.x - A.x;
-    double ABy = B.y - A.y;
-    double ADx = D.x - A.x;
-    double ADy = D.y - A.y;
-    
-    // Vector AP
-    double APx = P.x - A.x;
-    double APy = P.y - A.y;
-
-    // Solve for u and v in the system: AP = u * AB + v * AD
-    // Using Cramer's rule to solve the system of linear equations:
-    double denominator = (ABx * ADy - ABy * ADx);
-
-    // To avoid division by zero, check if the parallelogram is degenerate
-    if (denominator == 0)
-       return false;  // Degenerate parallelogram (AB and AD are collinear)
-
-    // Calculate the coefficients u and v
-    double u = (APx * ADy - APy * ADx) / denominator;
-    double v = (ABx * APy - ABy * APx) / denominator;
-
-    // The point is inside the rectangle if 0 <= u <= 1 and 0 <= v <= 1
-    return (u >= 0 && u <= 1 && v >= 0 && v <= 1);
-}
-
 void extendLine(const Point p1, const Point p2, const double distance, Point &newP1, Point &newP2) {
 // Function to extend the line by a given parameter on both ends
     // Calculate the direction vector of the line
@@ -1111,97 +935,6 @@ void extendLine(const Point p1, const Point p2, const double distance, Point &ne
     newP1.y = p1.y - uy * distance;
     newP2.x = p2.x + ux * distance;
     newP2.y = p2.y + uy * distance;
-}
-
-bool isPointInCircle(Point center, double radius, Point testPoint) {
-    // function unused
-    // Calculate the distance between the center and the test point
-    double distance = std::sqrt(
-        std::pow(testPoint.x - center.x, 2) + 
-        std::pow(testPoint.y - center.y, 2)
-    );
-    
-    // If the distance is less than or equal to the radius, the point is inside the circle
-    return distance <= radius;
-}
-
-float calculateAngle(Point a, Point b, Point c) {
-    // function unused
-    // Vector AB
-    double u_x = a.x - b.x;
-    double u_y = a.y - b.y;
-    
-    // Vector BC
-    double v_x = c.x - b.x;
-    double v_y = c.y - b.y;
-    
-    // Dot product of vectors AB and BC
-    double dotProduct = (u_x * v_x) + (u_y * v_y);
-    
-    // Magnitudes of vectors AB and BC
-    double magnitudeU = sqrt(u_x * u_x + u_y * u_y);
-    double magnitudeV = sqrt(v_x * v_x + v_y * v_y);
-    
-    // Angle in radians using acos of the normalized dot product
-    double angleRadians = acos(dotProduct / (magnitudeU * magnitudeV));
-    float angleDeg = angleRadians * 180.0f / M_PI;
-
-    return angleDeg;
-}
-
-void dummyDrawPixelMask(const Point &d, const int offsetY, const int simple, const bool p) {
-// test function, should not be used in production
-    int gx = d.x - polyX;
-    int gy = d.y - polyY + offsetY;
-    if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-       polygonMaskMap[(INT64)gy * polyW + gx] = p;
-
-    if (simple==1)
-    {
-       return;
-    } else if (simple==2)
-    {
-       gx = d.x - polyX;
-       gy = d.y - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 0;
-
-       gy = d.y + 1 - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
-
-       gy = d.y - 1 - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
-
-       gx = d.x + 1 - polyX;
-       gy = d.y - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
-
-       gx = d.x - 1 - polyX;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = 1;
-       return;
-    }
-
-    for (int i = 0; i < 5; ++i)
-    {
-       gx = d.x + i - polyX;
-       gy = d.y - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = p;
-
-       gx = d.x + i - polyX;
-       gy = d.y + i - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = p;
-
-       gx = d.x - polyX;
-       gy = d.y + i - polyY + offsetY;
-       if (gy>=0 && gy<polyH && gx>=0 && gx<polyW)
-          polygonMaskMap[(INT64)gy * polyW + gx] = p;
-    }
 }
 
 void translateLine(const Point &p1, const Point &p2, const double &dx, const double &dy, const double distance, Point &np1, Point &np2, Point &np3, Point &np4) {
@@ -1232,11 +965,6 @@ void translateLine(const Point &p1, const Point &p2, const double &dx, const dou
     np2 = {p2.x + ppx, p2.y + ppy};
     np3 = {p1.x - ppx, p1.y - ppy};
     np4 = {p2.x - ppx, p2.y - ppy};
-}
-
-inline bool checkDistPoints(const float &x0, const float &y0, const float &x1, const float &y1, const float &limit, const float &f) {
-     const float p = sqrt( pow(x0 - x1, 2) + pow(y0 - y1, 2) );
-     return (p > limit && p < f) || (p < limit && p > 0);
 }
 
 short inline testPointsOrientation(Point p, Point q, Point r) {
@@ -1301,10 +1029,6 @@ void prepareTranslatedLineSegments(const float &thickness, vector<double> &offse
        else
           translateLine(a, b, dx, dy, thickness, np1, np2, np3, np4);
 
-       // dummyDrawPixelMask(np1, offsetY, 2, 1);
-       // dummyDrawPixelMask(np2, offsetY, 2, 1);
-       // dummyDrawPixelMask(np3, offsetY, 2, 1);
-       // dummyDrawPixelMask(np4, offsetY, 2, 1);
        offsetPointsListA.push_back(np1.x);
        offsetPointsListA.push_back(np1.y);
        offsetPointsListA.push_back(np2.x);
@@ -1991,302 +1715,6 @@ int RGBtoGray(int &sR, int &sG, int &sB, int &alternateMode) {
   return round(L/2); // return derived luminosity in pseudo-LAB color space
 }
 
-RGBAColor calculateBlendModes(
-  RGBAColor &Orgb,
-  RGBAColor &Brgb,
-  const int &blendMode,
-  const int &flipLayers,
-  const int &linearGamma,
-  const int &keepAlpha,
-  const int &bpp,
-  const int &opacity) {
-
-    float rT, gT, bT;
-    if (blendMode < 24)
-       Orgb.a = (Orgb.a * (255 - opacity)) / 255;
-
-    const int oA = (blendMode >= 23 || blendMode == 0) ? -1 : Brgb.a;
-    if (blendMode == 34 || blendMode == 110)
-    {
-       // replace bottom with top, no blending; conditional if blendMode=110
-       int opa = (blendMode == 34 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
-       if (bpp != 32 && opa == 1)
-       {
-          const int invA = 255 - Orgb.a;
-          Orgb.r = max(Orgb.r - invA, 0);
-          Orgb.g = max(Orgb.g - invA, 0);
-          Orgb.b = max(Orgb.g - invA, 0); // Keep original bug compatibility
-       }
-
-       if (keepAlpha == 1)
-          Orgb.a = max(Brgb.a - (255 - Orgb.a), 0);
-
-       return (opa == 1) ? Orgb : Brgb;
-    } else if (blendMode == 24 || blendMode == 100)
-    {
-       // replace bottom with top, with blending; conditional if blendMode=100
-       int fB, fG, fR, fA;
-       const int opa = (blendMode == 24 || (Orgb.a > 0 && bpp == 32) || (Orgb.r == 0 && Orgb.g == 0 && Orgb.b == 0 && bpp != 32)) ? 1 : 0;
-       if (opa != 1)
-          return Brgb;
-
-       const float f = char_to_float[255 - opacity];
-       if (linearGamma == 1)
-       {
-          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
-          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
-          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
-          fA = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.a], gamma_to_linear[Brgb.a], f)];
-       } else
-       {
-          fR = weighTwoValues(Orgb.r, Brgb.r, f);
-          fG = weighTwoValues(Orgb.g, Brgb.g, f);
-          fB = weighTwoValues(Orgb.b, Brgb.b, f);
-          fA = weighTwoValues(Orgb.a, Brgb.a, f);
-       }
-       if (keepAlpha == 1)
-          fA = max(fA - (255 - Brgb.a), 0);
-
-       return {fB, fG, fR, fA};
-    } else if (blendMode == 23)
-    {
-       // clip top to the alpha channel of the bottom
-       int fB, fG, fR;
-       const float f = char_to_float[Orgb.a];
-       if (linearGamma == 1)
-       {
-          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
-          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
-          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
-       } else
-       {
-          fR = weighTwoValues(Orgb.r, Brgb.r, f);
-          fG = weighTwoValues(Orgb.g, Brgb.g, f);
-          fB = weighTwoValues(Orgb.b, Brgb.b, f);
-       }
-
-       return {fB, fG, fR, Brgb.a};
-    }
-
-    const bool do_swap = (flipLayers == 1 && blendMode > 0) || (blendMode == 25 && bpp == 32);
-    if (do_swap)
-       swap(Orgb, Brgb);
-
-    // if top is transparent, return bottom
-    if (Orgb.a == 0)
-    {
-       if (keepAlpha == 1 && flipLayers == 1 && oA != -1 && (blendMode >= 1 && blendMode <= 22))
-          Brgb.a = oA;
-       return Brgb;
-    }
-
-    // if bottom is transparent, return top
-    // or when top is fully opaque, no need for complex blending
-    if ((Brgb.a == 0) || (Orgb.a == 255 && (blendMode == 0 || blendMode == 25)))
-    {
-       if (keepAlpha == 1 && oA != -1)
-          Orgb.a = oA;
-       return Orgb;
-    }
-
-    RGBAColor result = {0, 0, 0, 0};
-    result.a = Orgb.a + ((255 - Orgb.a) * Brgb.a) / 255;
-
-    // Convert everything to floats using loop-invariant selected LUT
-    const float* const lut = (linearGamma == 1) ? char_to_floatGamma : char_to_float;
-    const float rOf = lut[Orgb.r];
-    const float gOf = lut[Orgb.g];
-    const float bOf = lut[Orgb.b];
-    const float rBf = lut[Brgb.r];
-    const float gBf = lut[Brgb.g];
-    const float bBf = lut[Brgb.b];
-
-    // Alpha factors for blending
-    const float sa = char_to_float[Orgb.a];
-    const float da = char_to_float[Brgb.a];
-
-    switch (blendMode)
-    {
-        case 0:
-        case 25: // normal / behind
-            rT = rOf;
-            gT = gOf;
-            bT = bOf;
-            break;
-        case 1: // darken
-            rT = min(rOf, rBf);
-            gT = min(gOf, gBf);
-            bT = min(bOf, bBf);
-            break;
-        case 2: // multiply
-            rT = rOf * rBf;
-            gT = gOf * gBf;
-            bT = bOf * bBf;
-            break;
-        case 3: // linear burn
-            rT = rOf + rBf - 1.0f;
-            gT = gOf + gBf - 1.0f;
-            bT = bOf + bBf - 1.0f;
-            break;
-        case 4: // color burn
-            rT = (rOf > 0.0f) ? (1.0f - ((1.0f - rBf) / rOf)) : 0.0f;
-            gT = (gOf > 0.0f) ? (1.0f - ((1.0f - gBf) / gOf)) : 0.0f;
-            bT = (bOf > 0.0f) ? (1.0f - ((1.0f - bBf) / bOf)) : 0.0f;
-            break;
-        case 5: // lighten
-            rT = max(rOf, rBf);
-            gT = max(gOf, gBf);
-            bT = max(bOf, bBf);
-            break;
-        case 6: // screen
-            rT = 1.0f - ((1.0f - rBf) * (1.0f - rOf));
-            gT = 1.0f - ((1.0f - gBf) * (1.0f - gOf));
-            bT = 1.0f - ((1.0f - bBf) * (1.0f - bOf));
-            break;
-        case 7: // linear dodge [add]
-            rT = rOf + rBf;
-            gT = gOf + gBf;
-            bT = bOf + bBf;
-            break;
-        case 8: // hard light
-            rT = (rOf < 0.5f) ? (2.0f * rOf * rBf) : (1.0f - (2.0f * (1.0f - rOf) * (1.0f - rBf)));
-            gT = (gOf < 0.5f) ? (2.0f * gOf * gBf) : (1.0f - (2.0f * (1.0f - gOf) * (1.0f - gBf)));
-            bT = (bOf < 0.5f) ? (2.0f * bOf * bBf) : (1.0f - (2.0f * (1.0f - bOf) * (1.0f - bBf)));
-            break;
-        case 9: { // soft light B
-            const float* const lut_sqrt = (linearGamma == 1) ? char_to_floatGamma_sqrt : char_to_float_sqrt;
-            const float sqrt_rBf = lut_sqrt[Brgb.r];
-            const float sqrt_gBf = lut_sqrt[Brgb.g];
-            const float sqrt_bBf = lut_sqrt[Brgb.b];
-            rT = (rOf < 0.5f) ? ((1.0f - 2.0f * rOf) * (rBf * rBf) + 2.0f * rBf * rOf) : (2.0f * rBf * (1.0f - rOf) + sqrt_rBf * (2.0f * rOf - 1.0f));
-            gT = (gOf < 0.5f) ? ((1.0f - 2.0f * gOf) * (gBf * gBf) + 2.0f * gBf * gOf) : (2.0f * gBf * (1.0f - gOf) + sqrt_gBf * (2.0f * gOf - 1.0f));
-            bT = (bOf < 0.5f) ? ((1.0f - 2.0f * bOf) * (bBf * bBf) + 2.0f * bBf * bOf) : (2.0f * bBf * (1.0f - bOf) + sqrt_bBf * (2.0f * bOf - 1.0f));
-            break;
-        }
-        case 10: // overlay
-            rT = (rBf < 0.5f) ? (2.0f * rOf * rBf) : (1.0f - (2.0f * (1.0f - rOf) * (1.0f - rBf)));
-            gT = (gBf < 0.5f) ? (2.0f * gOf * gBf) : (1.0f - (2.0f * (1.0f - gOf) * (1.0f - gBf)));
-            bT = (bBf < 0.5f) ? (2.0f * bOf * bBf) : (1.0f - (2.0f * (1.0f - bOf) * (1.0f - bBf)));
-            break;
-        case 11: // hard mix
-            rT = (rOf <= (1.0f - rBf)) ? 0.0f : 1.0f;
-            gT = (gOf <= (1.0f - gBf)) ? 0.0f : 1.0f;
-            bT = (bOf <= (1.0f - bBf)) ? 0.0f : 1.0f;
-            break;
-        case 12: // linear light
-            rT = rBf + (2.0f * rOf) - 1.0f;
-            gT = gBf + (2.0f * gOf) - 1.0f;
-            bT = bBf + (2.0f * bOf) - 1.0f;
-            break;
-        case 13: // color dodge
-            rT = (rOf < 1.0f) ? (rBf / (1.0f - rOf)) : 1.0f;
-            gT = (gOf < 1.0f) ? (gBf / (1.0f - gOf)) : 1.0f;
-            bT = (bOf < 1.0f) ? (bBf / (1.0f - bOf)) : 1.0f;
-            break;
-        case 14: // vivid light
-            rT = (rOf < 0.5f) ? ((rOf > 0.0f) ? (1.0f - (1.0f - rBf) / (2.0f * rOf)) : 0.0f) : ((rOf < 1.0f) ? (rBf / (2.0f * (1.0f - rOf))) : 1.0f);
-            gT = (gOf < 0.5f) ? ((gOf > 0.0f) ? (1.0f - (1.0f - gBf) / (2.0f * gOf)) : 0.0f) : ((gOf < 1.0f) ? (gBf / (2.0f * (1.0f - gOf))) : 1.0f);
-            bT = (bOf < 0.5f) ? ((bOf > 0.0f) ? (1.0f - (1.0f - bBf) / (2.0f * bOf)) : 0.0f) : ((bOf < 1.0f) ? (bBf / (2.0f * (1.0f - bOf))) : 1.0f);
-            break;
-        case 15: // average
-            rT = (rBf + rOf) * 0.5f;
-            gT = (gBf + gOf) * 0.5f;
-            bT = (bBf + bOf) * 0.5f;
-            break;
-        case 16: // divide
-            rT = (rOf > 0.0f) ? (rBf / rOf) : 1.0f;
-            gT = (gOf > 0.0f) ? (gBf / gOf) : 1.0f;
-            bT = (bOf > 0.0f) ? (bBf / bOf) : 1.0f;
-            break;
-        case 17: // exclusion
-            rT = rOf + rBf - 2.0f * (rOf * rBf);
-            gT = gOf + gBf - 2.0f * (gOf * gBf);
-            bT = bOf + bBf - 2.0f * (bOf * bBf);
-            break;
-        case 18: // difference
-            rT = abs(rBf - rOf);
-            gT = abs(gBf - gOf);
-            bT = abs(bBf - bOf);
-            break;
-        case 19: // subtract
-            rT = rBf - rOf;
-            gT = gBf - gOf;
-            bT = bBf - bOf;
-            break;
-        case 20: { // luminosity
-            const float lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
-            const float lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
-            rT = lO + rBf - lB;
-            gT = lO + gBf - lB;
-            bT = lO + bBf - lB;
-            break;
-        }
-        case 21: { // ghosting
-            const float lO = char_to_float[getGrayscale(Orgb.r, Orgb.g, Orgb.b)];
-            const float lB = char_to_float[getGrayscale(Brgb.r, Brgb.g, Brgb.b)];
-            rT = lB - lO + rBf + rOf * 0.2f;
-            gT = lB - lO + gBf + gOf * 0.2f;
-            bT = lB - lO + bBf + bOf * 0.2f;
-            break;
-        }
-        case 22: // inverted difference
-            rT = 1.0f - abs(rOf - rBf);
-            gT = 1.0f - abs(gOf - gBf);
-            bT = 1.0f - abs(bOf - bBf);
-            break;
-        default:
-            rT = rOf;
-            gT = gOf;
-            bT = bOf;
-            break;
-    }
-
-    rT = clamp(rT, 0.0f, 1.0f);
-    gT = clamp(gT, 0.0f, 1.0f);
-    bT = clamp(bT, 0.0f, 1.0f); 
-
-    const bool mix = (keepAlpha != 1 || blendMode >= 22 || blendMode < 2);
-    if (Brgb.a < 255 && blendMode > 0 && mix)
-    {
-       const float w = 1.0f - da;
-       if (w >= 1.0f)
-       {
-          rT = rOf;
-          gT = gOf;
-          bT = bOf;
-       } else if (w > 0.0f)
-       {
-          rT = w * (rOf - rT) + rT;
-          gT = w * (gOf - gT) + gT;
-          bT = w * (bOf - bT) + bT;
-       }
-    }
-
-    // Alpha composite the RGB channels
-    const float da_1_sa = da * (1.0f - sa);
-    const float ra = sa + da_1_sa;
-    const float inv_ra = 1.0f / ra;
-    rT = (sa * rT + da_1_sa * rBf) * inv_ra;
-    gT = (sa * gT + da_1_sa * gBf) * inv_ra;
-    bT = (sa * bT + da_1_sa * bBf) * inv_ra;
-
-    if (linearGamma == 1)
-    {
-       static const float pff = 1.0f / 2.1f;
-       rT = pow(rT, pff);
-       gT = pow(gT, pff);
-       bT = pow(bT, pff);
-    }
-
-    result.r = (unsigned char)(rT * 255.0f + 0.5f);
-    result.g = (unsigned char)(gT * 255.0f + 0.5f);
-    result.b = (unsigned char)(bT * 255.0f + 0.5f);
-    if (keepAlpha == 1 && oA != -1)
-       result.a = oA;
-    return result;
-}
-
-
 static inline float blend_grayscale_float(int r, int g, int b) {
     return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
 }
@@ -2597,8 +2025,6 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     imgSelY1 = y1;
     imgSelX2 = x2;
     imgSelY2 = y2;
-    imgSelW = w;
-    imgSelH = h;
     imgSelExclX = w - (w*exclusion);
     imgSelExclY = h - (h*exclusion);
     imgSelExclW = (w - imgSelExclX*2) / 2.0f;
@@ -3076,80 +2502,6 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
     fnOutputDebug("add noise step DONE");
     return 1;
 } // GenerateRandomNoiseOnBitmap()
-
-
-DLL_API int DLL_CALLCONV getPBitmapistoInfos(Gdiplus::GpBitmap* pBitmap, int w, int h, UINT* resultsArray) {
-// unused function
-     UINT entries = 256;
-     UINT elements[256];
-     // Gdiplus::DllExports::GetHistogramSize(3, entries);
-     Gdiplus::DllExports::GdipBitmapGetHistogram(pBitmap, Gdiplus::HistogramFormatR, entries, elements, NULL, NULL, NULL);
-     
-     int medianValue = -1;
-     int peakPointK = -1;
-     int minBrLvlK = -1;
-     UINT minPointK = 0;
-     UINT modePointV = 0;
-     UINT modePointK = 0;
-     UINT thisSum = 0;
-     UINT sumTotalBr = 0;
-     UINT pixRms = 0;
-     UINT TotalPixelz = w*h;
-     UINT pixMinu = TotalPixelz;
-
-     for (int thisIndex = 0; thisIndex < 256; thisIndex++)
-     {
-        // fnOutputDebug("histo [" + to_string(i) +  "] = " + to_string(elements[i])) ;
-        int nrPixelz = elements[thisIndex];
-        if (nrPixelz>modePointV)
-        {
-           modePointV = nrPixelz;
-           modePointK = thisIndex;
-        }
-
-        if (nrPixelz>0)
-        {
-           if (medianValue == -1)
-           {
-              thisSum += nrPixelz;
-              if (thisSum>TotalPixelz/2)
-                 medianValue = thisIndex;
-           }
-
-           sumTotalBr += nrPixelz * thisIndex;
-           peakPointK = thisIndex;     // max range in histogram
-           if (minBrLvlK == -1)
-              minBrLvlK = thisIndex;   // min range in histogram
-       
-           if (nrPixelz<pixMinu)
-           {
-              pixMinu = nrPixelz;
-              minPointK = thisIndex;
-           }
-        }
-
-        pixRms += pow(nrPixelz, 2);       // root-mean square
-     }
-
-     UINT avgu = round((sumTotalBr/TotalPixelz - 1)/2);
-     UINT rmsu = round(sqrt(pixRms / (peakPointK - minBrLvlK)));
-
-     resultsArray[0] = avgu;
-     resultsArray[1] = medianValue;
-     resultsArray[2] = peakPointK;
-     resultsArray[3] = minBrLvlK;
-     resultsArray[4] = rmsu;
-     resultsArray[5] = modePointK;
-     resultsArray[6] = minPointK;
-     // fnOutputDebug("histo avgu=" + to_string(avgu));
-     // fnOutputDebug("histo medianValue=" + to_string(medianValue));
-     // fnOutputDebug("histo peakPointK=" + to_string(peakPointK));
-     // fnOutputDebug("histo minBrLvlK=" + to_string(minBrLvlK));
-     // fnOutputDebug("histo rms=" + to_string(rmsu));
-     // fnOutputDebug("histo modePointK=" + to_string(modePointK));
-     // fnOutputDebug("histo minPointK=" + to_string(minPointK));
-     return 1;
-}
 
 /*
 Pixelate C/C++ Function by Tic and fixed by Fincs;
@@ -3857,7 +3209,7 @@ static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int inve
             if (invertColors==1)
                v = 65535 - v;
             if (p.headCoversGamma && gamma!=300)
-               v = gammaMathsInt16(v, p.zammaGamma);          // == LUTgamma[v]
+               v = gammaMathsInt16(v, p.zammaGamma);
             if (p.headCoversBright)
             {
                 if (p.anyOffset)
@@ -4340,7 +3692,7 @@ DLL_API int DLL_CALLCONV openCVresizeBlendEachChannel(unsigned char *imageData, 
     return 1;
 }
 
-DLL_API int DLL_CALLCONV openCVresizeBitmap(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rw, int rh, int mStride, int bpp, int interpolation, int doFlipHV) {
+static int openCVresizeBitmap(unsigned char *imageData, unsigned char *otherData, int w, int h, int Stride, int rw, int rh, int mStride, int bpp, int interpolation, int doFlipHV) {
   int clr = (bpp==32) ? CV_8UC4 : CV_8UC3;
   cv::Mat image(h, w, clr, imageData, Stride);
   if (doFlipHV==4)
@@ -5998,61 +5350,6 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
   return 0;
 }
 
-void ListWICdecoders() {
-    IWICComponentInfo      *pCompInfo = NULL;
-    IWICBitmapDecoderInfo  *pDecInfo  = NULL;
-    IEnumUnknown           *pEnum     = NULL;
-    
-    HRESULT hr = m_pIWICFactory->CreateComponentEnumerator(WICDecoder, WICComponentEnumerateDefault, &pEnum);
-    if (SUCCEEDED(hr)) {
-        IUnknown* pElement = nullptr;
-        ULONG fetched;
-        
-        while (pEnum->Next(1, &pElement, &fetched) == S_OK) {
-            hr = pElement->QueryInterface(IID_PPV_ARGS(&pCompInfo));
-            if (SUCCEEDED(hr)) {
-                hr = pCompInfo->QueryInterface(IID_PPV_ARGS(&pDecInfo));
-                if (SUCCEEDED(hr)) {
-                    GUID formatGUID;
-                    hr = pDecInfo->GetContainerFormat(&formatGUID);
-                    if (SUCCEEDED(hr)) {
-                        UINT nameSize = 0;
-                        hr = pDecInfo->GetFriendlyName(0, nullptr, &nameSize);
-                        if (SUCCEEDED(hr)) {
-                            std::vector<wchar_t> friendlyName(nameSize);
-                            hr = pDecInfo->GetFriendlyName(nameSize, friendlyName.data(), &nameSize);
-                            if (SUCCEEDED(hr)) {
-                                char buffer[512];
-                                
-                                // Convert wide string to narrow for friendly name
-                                char narrowName[256];
-                                WideCharToMultiByte(CP_ACP, 0, friendlyName.data(), -1, 
-                                                  narrowName, sizeof(narrowName), NULL, NULL);
-                                
-                                sprintf_s(buffer, "qpv: Format: %s\n", narrowName);
-                                OutputDebugStringA(buffer);
-                                
-                                sprintf_s(buffer, "qpv: GUID: {%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}\n\n",
-                                        formatGUID.Data1,    formatGUID.Data2,
-                                        formatGUID.Data3,    formatGUID.Data4[0],
-                                        formatGUID.Data4[1], formatGUID.Data4[2],
-                                        formatGUID.Data4[3], formatGUID.Data4[4],
-                                        formatGUID.Data4[5], formatGUID.Data4[6],
-                                        formatGUID.Data4[7]);
-                                OutputDebugStringA(buffer);
-                            }
-                        }
-                    }
-                    pDecInfo->Release();
-                }
-                pCompInfo->Release();
-            }
-            pElement->Release();
-        }
-        pEnum->Release();
-    }
-}
-
 void AppendUInt(std::vector<unsigned short>& out, unsigned int n) {
     // Helper: Append an unsigned integer as ASCII digits.
     // Use std::to_string to convert the number then push each digit.
@@ -6199,148 +5496,6 @@ DLL_API unsigned short* DLL_CALLCONV ExtractPDFBookmarks(const wchar_t *pdfPath,
     *bufferSize = out.size() + 1;    
     FPDF_CloseDocument(doc);
     return buffer;
-}
-
-// A link annotation's URI is bytes: 7-bit ASCII as the PDF spec asks, or the UTF-8 some producers
-// write. Bytes that are not valid UTF-8 are taken one code unit each, never sign-extended.
-static int pdfUriToUTF16(const char *s, int n, unsigned short *out) {
-    if (n<=0)
-       return 0;
-
-    const int w = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, n, (wchar_t*)out, n);
-    if (w>0)
-       return w;
-
-    for (int i = 0; i < n; i++)
-        out[i] = (unsigned char)s[i];
-    return n;
-}
-
-DLL_API int DLL_CALLCONV RenderPdfPageAsTextLinks(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
-    std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::chrono::milliseconds(pdfiumWaitMs));
-    if (!pdfLock.owns_lock())
-       return pdfiumBusy;
-
-    int errorType = 0;
-    FPDF_DOCUMENT document = FPDF_LoadDocument(WideCharToString(pdfPath).c_str(), WideCharToString(password).c_str());
-    if (!document)
-    {
-        errorType = FPDF_GetLastError();
-        if (errorType==4)
-           fnOutputDebug("failed to load PDF document: incorrect password " + std::to_string(errorType));
-        else
-           fnOutputDebug("failed to load PDF document: " + std::to_string(errorType) );
-
-        return errorType;
-    }
-
-    int pageCount = FPDF_GetPageCount(document);
-    if (pageCount<=0)
-    {
-       fnOutputDebug("failed to load PDF: no pages found");
-       errorType = -2;
-       FPDF_CloseDocument(document);
-       return errorType;
-    }
-
-    *pages = pageCount;
-    int pageIndex = std::clamp(*givenIndex, 0, pageCount - 1);
-    FPDF_PAGE PDFpage = FPDF_LoadPage(document, pageIndex);
-    if (PDFpage)
-    {
-       FPDF_TEXTPAGE textPage = FPDFText_LoadPage(PDFpage);
-       if (textPage)
-       {
-           int index = 0;
-           int annotCount = FPDFPage_GetAnnotCount(PDFpage);
-           for (int i = 0; i < annotCount; ++i)
-           {
-               FPDF_ANNOTATION annot = FPDFPage_GetAnnot(PDFpage, i);
-               if (!annot)
-                  continue;
-     
-               if (FPDFAnnot_GetSubtype(annot) == FPDF_ANNOT_LINK)
-               {
-                   FPDF_LINK link = FPDFAnnot_GetLink(annot);
-                   if (!link)
-                   {
-                      FPDFPage_CloseAnnot(annot);
-                      continue;
-                   }
-  
-                   FPDF_ACTION action = FPDFLink_GetAction(link);
-                   if (action)
-                   {
-                       // bytes the URI takes, its NUL included; 0 for an action that is not a URI
-                       const unsigned long need = FPDFAction_GetURIPath(document, action, NULL, 0);
-                       if (textBuffer==NULL)
-                       {
-                          // probe pass: UTF-8 never decodes to more UTF-16 units than it has bytes
-                          index += (int)need + 1;
-                          FPDFPage_CloseAnnot(annot);
-                          continue;
-                       }
-
-                       if (need>1)
-                       {
-                          std::vector<char> uri(need, 0);
-                          FPDFAction_GetURIPath(document, action, uri.data(), need);
-                          index += pdfUriToUTF16(uri.data(), (int)strnlen(uri.data(), need), textBuffer + index);
-                       }
-
-                       textBuffer[index] = '|';
-                       index++;
-                   }
-               }
-               FPDFPage_CloseAnnot(annot);
-           }
-
-           FPDF_PAGELINK pageWebLinks = FPDFLink_LoadWebLinks(textPage);
-           if (pageWebLinks)
-           {
-              int link_count = FPDFLink_CountWebLinks(pageWebLinks);
-              if (textBuffer!=NULL)
-              {
-                 for (int i = 0; i < link_count; i++)
-                 {
-                     unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
-                     if (url_buffer_size > 0)
-                     {
-                        std::vector<unsigned short> buffer(url_buffer_size);
-                        FPDFLink_GetURL(pageWebLinks, i, buffer.data(), url_buffer_size);
-                        // the count includes the terminator, and AHK's StrGet() stops at a NUL
-                        for (unsigned long z = 0; z < url_buffer_size && buffer[z]!=0; ++z)
-                        {
-                            textBuffer[index] = buffer[z];
-                            index++;
-                        }
-                        textBuffer[index] = '|';
-                        index++;
-                     }
-                 }
-              } else {
-                 // probe pass: report the real space needed
-                 for (int i = 0; i < link_count; i++)
-                 {
-                     unsigned long url_buffer_size = FPDFLink_GetURL(pageWebLinks, i, nullptr, 0);
-                     index += (int)url_buffer_size + 1;
-                 }
-              }
-              FPDFLink_CloseWebLinks(pageWebLinks);
-           }
-
-           *bufferSize = index;
-           FPDFText_ClosePage(textPage);
-       } else {
-           errorType = -6;
-       }
-       FPDF_ClosePage(PDFpage);
-    } else {
-       errorType = -3;
-    }
-
-    FPDF_CloseDocument(document);
-    return errorType;
 }
 
 DLL_API int DLL_CALLCONV RenderPdfPageAsText(const wchar_t *pdfPath, int *givenIndex, int *pages, const wchar_t* password, unsigned short* textBuffer, int *bufferSize) {
@@ -7034,10 +6189,6 @@ DLL_API Gdiplus::GpBitmap* DLL_CALLCONV LoadSVGimage(int threadIDu, UINT givenW,
 // its extension sets, so it has to come after them
 #include "dupes-pixels.h"
 
-int myRound(double x) {
-    return (x<0) ? (int)(x-0.5) : (int)(x+0.5);
-}
-
 // The PDF writer of "Join images into a single file"; its GDI+ and OpenCV part follows.
 #include "pdf-writer.h"
 
@@ -7342,42 +6493,6 @@ int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBit
     } else return 0;
 }
 
-int FillCImgFromLockedBitmapData(cimg_library::CImg<unsigned char> & img, unsigned char *myBitmap, int width, int height, int Stride, int bpp, int zx1, int zy1, int zx2, int zy2, int invertArea) {
-    // function unused
-    #pragma omp parallel for schedule(dynamic)
-    for (int y = 0; y < height; y++)
-    {
-        if (invertArea==1)
-        {
-           if (inRange(zy1, zy2, y))
-              continue;
-        } else
-        {
-           if (!inRange(zy1, zy2, y))
-              continue;
-        }
-
-        for (int x = 0; x < width; x++)
-        {
-            if (invertArea==1)
-            {
-               if (inRange(zx1, zx2, x))
-                  continue;
-            } else
-            {
-               if (!inRange(zx1, zx2, x))
-                  continue;
-            }
-
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            img(x,y,0,0) = myBitmap[2 + o];
-            img(x,y,0,1) = myBitmap[1 + o];
-            img(x,y,0,2) = myBitmap[o];
-            img(x,y,0,3) = myBitmap[3 + o];
-        }
-    }
-}
-
 DLL_API int DLL_CALLCONV cImgAddGaussianNoiseOnBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
   int channels = (bpp==32) ? 4 : 3;
   CImg<unsigned char> img(imageData, channels, width, height, 1);
@@ -7553,19 +6668,6 @@ DLL_API int DLL_CALLCONV cImgBlurBitmapFilters(unsigned char *imageData, int wid
 
   FillGdipLockedBitmapDataFromCImg(imageData, img, ow, oh, Stride, bpp);
   return 1;
-}
-
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgRotateBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, float angle, int interpolation, int bond) {
-// function unused
-  Gdiplus::GpBitmap *newBitmap = NULL;
-  CImg<float> img(width,height,1,4);
-  int r = FillCImgFromBitmap(img, myBitmap, width, height);
-  if (r==0)
-     return newBitmap;
-
-  img.rotate(angle, interpolation, bond);
-  newBitmap = CreateGdipBitmapFromCImg(img, img.width(), img.height());
-  return newBitmap;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int resizedW, int resizedH, int interpolation, int bond) {
@@ -8554,14 +7656,6 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
       return 1;
 }
 
-DLL_API int DLL_CALLCONV SetTabletPenServiceProperties(HWND hWnd) {
-    // https://learn.microsoft.com/en-us/windows/win32/tablet/wm-tablet-querysystemgesturestatus-message
-    ATOM atom = ::GlobalAddAtom(MICROSOFT_TABLETPENSERVICE_PROPERTY);    
-    ::SetProp(hWnd, MICROSOFT_TABLETPENSERVICE_PROPERTY, reinterpret_cast<HANDLE>(dwHwndTabletProperty));
-    ::GlobalDeleteAtom(atom);
-    return 1;
-}        
-
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
     for (unsigned char* ptr : brushOpacityChunks)
     {
@@ -8692,7 +7786,6 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                 brushOriginalPixelChunks.shrink_to_fit();
             }
             chunkGridW = numChunksX;
-            chunkGridH = numChunksY;
         }
     }
 
@@ -9714,13 +8807,6 @@ static INT64 qpvFileTimeToLocalStamp(INT64 ft) {
     return qpvStampFromLocalFileTime(ft + (INT64)offMin * QPV_FT_PER_MIN);
 }
 
-DLL_API INT64 DLL_CALLCONV FileTimeToLocalStamp(INT64 fileTime) {
-// One UTC file time to one local YYYYMMDDHHMISS number; zero when the value
-// cannot be converted, which is what file systems that do not record all the
-// dates hand out.
-    return qpvFileTimeToLocalStamp(fileTime);
-}
-
 DLL_API int DLL_CALLCONV DirEntryTimesToLocal(const unsigned char *dirEntry, INT64 *out) {
 // Reads the two file times straight out of one directory record as returned by
 // GetFileInformationByHandleEx(), and writes them back as local YYYYMMDDHHMISS
@@ -9737,11 +8823,4 @@ DLL_API int DLL_CALLCONV DirEntryTimesToLocal(const unsigned char *dirEntry, INT
     out[0] = qpvFileTimeToLocalStamp(mtime);
     out[1] = qpvFileTimeToLocalStamp(ctime);
     return 1;
-}
-
-DLL_API void DLL_CALLCONV ResetFileTimeCache() {
-// Throws the per day offset cache away. Only needed if the time zone of the
-// machine is changed while the application is running.
-    for (int i = 0; i < QPV_TZDAY_SLOTS; i++)
-        qpvTZdayCache[i].store(0, std::memory_order_relaxed);
 }

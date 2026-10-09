@@ -5,15 +5,6 @@
 // QPVMAIN_API comme étant importées à partir d'une DLL, tandis que cette DLL considère les symboles
 // définis avec cette macro comme étant exportés.
 
-const DWORD dwHwndTabletProperty = 
-    TABLET_DISABLE_PRESSANDHOLD |      // disables press and hold (right-click) gesture
-    TABLET_DISABLE_PENTAPFEEDBACK |    // disables UI feedback on pen up (waves)
-    TABLET_DISABLE_PENBARRELFEEDBACK | // disables UI feedback on pen button down (circle)
-    TABLET_DISABLE_FLICKFALLBACKKEYS |
-    TABLET_DISABLE_SMOOTHSCROLLING |
-    TABLET_DISABLE_TOUCHUIFORCEON |
-    TABLET_DISABLE_FLICKS;             // disables pen flicks (back, forward, drag down, drag up)
-
 const double M_PI = 3.14159265358979323846;  // PI
 const float div2s3 = 2.0f/3.0f;      // used in ConvertRGBtoHSL()
 const float div1s3 = 1.0f/3.0f;      // used in ConvertRGBtoHSL()
@@ -25,8 +16,6 @@ int imgSelX1 = 0;
 int imgSelY1 = 0;
 int imgSelX2 = 0;
 int imgSelY2 = 0;
-int imgSelW = 0;
-int imgSelH = 0;
 int EllipseSelectMode = 0;
 int flippedSelection = 0;
 int invertSelection = 0;
@@ -45,18 +34,15 @@ INT64 polyX = 0;
 INT64 polyY = 0;
 INT64 polyOffYa = 0;
 INT64 polyOffYb = 0;
-INT64 blahImgH = 0;
 
 std::vector<unsigned char*> brushOpacityChunks;
 std::vector<unsigned char*> brushOriginalPixelChunks;
 std::vector<size_t> activeBrushChunks;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 int chunkGridW = 0;
-int chunkGridH = 0;
 IWICBitmapDecoder      *pWICclassDecoder;
 IWICBitmapFrameDecode  *pWICclassFrameDecoded;
 // IWICFormatConverter *pWICclassConverter;
-IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
 class MaskBitMap {
 private:
@@ -187,8 +173,6 @@ public:
 std::vector<unsigned char>  highDephMaskMap;
 MaskBitMap  polygonMaskMap;
 MaskBitMap  polygonOtherMaskMap;
-// std::vector<std::vector<short>> DrawLineCapsGrid;
-vector<pair<float, float>> DrawLineCapsGrid;
 // vector<pair<int, int>> DrawLineGrid;
 
 struct GUIDComparer {
@@ -199,10 +183,6 @@ struct GUIDComparer {
 
 struct Point {
     double x, y;
-};
-
-struct RGBColor {
-    double r, g, b;
 };
 
 struct RGBColorI {
@@ -289,7 +269,7 @@ struct RGBAColor {
 //   UseLUT=true  -> the per-pixel path, reads the tables.
 //   UseLUT=false -> the 256-entry table builders in AdjustPlan, which evaluate
 //                   the closed form directly and so need no 65536-entry build.
-// gammaMathsInt16(i,z)==LUTgamma[i]/LUTgammaBright[i], brightMathsInt16(i,f)==
+// gammaMathsInt16(i,z)==LUTgammaBright[i], brightMathsInt16(i,f)==
 // LUTbright[i] and contraMathsInt16(i,f,32768)==LUTcontra[i] by construction,
 // so the two modes are bit-identical.
 //
@@ -558,7 +538,7 @@ struct RGBA16color {
 
     // The clamped branch only ever ran on the 256 values reachable straight out
     // of char_to_int[]+invert, so it is always folded into the head table and
-    // LUTgamma[] is never needed. zamma == 1.0/(gamma/300.0).
+    // needs no 65536-entry LUT. zamma == 1.0/(gamma/300.0).
     QPV_FORCEINLINE void gamma(int level, int bright, int altMode, int noClamping, double zamma) {
       if (noClamping==0)
       {
