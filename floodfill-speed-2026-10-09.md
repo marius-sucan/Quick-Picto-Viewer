@@ -60,7 +60,9 @@ per-pixel float test only with a proof of float error bounds near the shape's ed
 SSE2. The steps are the same IEEE operations, so the results are bit-identical by construction:
 the build targets SSE2, so no FMA contraction occurs. It is about 5–10× cheaper per pixel.
 Checked on 32.9 million pixels, including coordinates up to 600 000 px, scales from 0.01 to 3,
-every rotation, flips, cavities and inverted selections.
+every rotation, flips, cavities and inverted selections. This holds only while the DLL builds for
+SSE2 with `/fp:precise`. With `/arch:AVX2` plus `/fp:contract` or `/fp:fast`, MSVC may fuse
+`isInsideRectOval()`'s multiply-adds into FMA, and the two paths would disagree at shape edges.
 
 **Option 10, not implemented.** It is only correct if the image has not changed since the region
 was found, and the DLL cannot know that. AHK would have to version the image content through undo
@@ -144,6 +146,9 @@ All against the shipped code at `c26999f`, sliced unchanged into a g++ harness:
   ones): no reports. TSan was confirmed to catch a planted race.
 - The AHK script load-checks under Wine with AutoHotkey_H; the check was confirmed to reject a
   broken script.
+- The DLL's own suite (`tests/run-tests.sh`, run on a copy of the tree) gives the same results
+  as on `c26999f`: the 5 known WIC→GDI+ failures and nothing new. The FreeImage-fork suites were
+  skipped in both runs.
 
 ## Behaviour changes and contracts
 
@@ -157,6 +162,9 @@ All against the shipped code at `c26999f`, sliced unchanged into a g++ harness:
     -1 for "replace similar colours anywhere".
   - `FloodFillPaintRegion(imageData, w, h, stride, bpp)` paints the kept region.
   - `FloodFillDiscardRegion()` drops it.
+  - A found region (its visited map, up to the budget) stays in memory until
+    `FloodFillPaintRegion()`, the next `FloodFillFindRegion()` or `FloodFillDiscardRegion()`.
+    AHK calls the paint right after recording the undo level, so it never needs the discard.
 - The huge-image flood fill uses those exports and records an undo level of just the bounds,
   through the existing rectangle undo (`FreeImage_Crop` + `UndoAiderSwapPixelRegions`). With a
   qpvmain.dll that lacks the exports it falls back to the previous flow.
