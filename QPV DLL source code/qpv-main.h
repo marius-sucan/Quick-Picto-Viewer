@@ -84,6 +84,14 @@ public:
         return num_bits;
     }
 
+    const uint64_t* words() const {
+        return data.data();
+    }
+
+    size_t word_count() const {
+        return data.size();
+    }
+
     struct Reference {
         uint64_t* word;
         uint64_t mask;
