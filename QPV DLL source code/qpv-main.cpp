@@ -145,26 +145,8 @@ static double LUT_Z_B[256];
 // CalculateNewBlendModes() and its tables; initWICnow() fills them through initBlendLUTs()
 #include "blend-modes.h"
 
-DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
-    debugInfos = modus;
-    HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
-
-    // WICImagingFactory2 is unavailable on Windows 7 without the Platform Update,
-    // so the choice must be made at runtime, not via _WIN32_WINNT
-    hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER,
-                         IID_PPV_ARGS(&m_pIWICFactory));
-    if (FAILED(hr))
-        hr = CoCreateInstance(CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER,
-                             IID_PPV_ARGS(&m_pIWICFactory));
-
-
-    FPDF_LIBRARY_CONFIG config;
-    config.version = 2;
-    config.m_pUserFontPaths = nullptr;
-    config.m_pIsolate = nullptr;
-    config.m_v8EmbedderSlot = 0;
-    FPDF_InitLibraryWithConfig(&config);
-
+// the tables the pixel code reads; initWICnow() fills them once
+static void initColorLUTs() {
     // source https://www.teamten.com/lawrence/graphics/gamma/
     static const float GAMMA = 2.1;
     int result;
@@ -227,7 +209,29 @@ DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
         float v = (float)i / 65535.0f;
         blend_degamma_lut[i] = (unsigned char)(pow(v, invGAMMA) * 255.0f + 0.5f);
     }
+}
 
+DLL_API int DLL_CALLCONV initWICnow(UINT modus, int threadIDu) {
+    debugInfos = modus;
+    HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &pD2D1Factory);
+
+    // WICImagingFactory2 is unavailable on Windows 7 without the Platform Update,
+    // so the choice must be made at runtime, not via _WIN32_WINNT
+    hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER,
+                         IID_PPV_ARGS(&m_pIWICFactory));
+    if (FAILED(hr))
+        hr = CoCreateInstance(CLSID_WICImagingFactory1, NULL, CLSCTX_INPROC_SERVER,
+                             IID_PPV_ARGS(&m_pIWICFactory));
+
+
+    FPDF_LIBRARY_CONFIG config;
+    config.version = 2;
+    config.m_pUserFontPaths = nullptr;
+    config.m_pIsolate = nullptr;
+    config.m_v8EmbedderSlot = 0;
+    FPDF_InitLibraryWithConfig(&config);
+
+    initColorLUTs();
     initBlendLUTs();
 
     return (SUCCEEDED(hr)) ? 1 : 0;
