@@ -65206,6 +65206,11 @@ ForceRemoveTooltip() {
    CreateOSDinfoLine(2, 1)
 }
 
+isOSDmsgFresh() {
+; an OSD message younger than the 625 ms MouseMoveResponder() grants it; viewport refreshes leave it in hGDIinfosWin
+   Return (toolTipGuiCreated=1 && (A_TickCount - lastOSDtooltipInvoked<625)) ? 1 : 0
+}
+
 PanelAssociateQPV() {
    If isWinStore()
    {
@@ -80849,7 +80854,8 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
        {
           Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
           r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, 2NDglHDC)
-          r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+          If !isOSDmsgFresh()
+             r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
        } Else livePreviewsImageEditing("coords")
     }
     ; fnOutputDebug(A_ThisFunc "(" mode ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
@@ -81649,9 +81655,10 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         InfoW := InfoH := ""
      } Else If (operation="prev")
      {
-        ; i doubt this mode is ever called/invoked; too lazy to inspect and remove this
+        ; the plain outline of the low-quality frames, e.g. while zooming or panning
         createDefaultSizedSelectionArea(DestPosX, DestPosY, newW, newH, maxSelX, maxSelY, mainWidth, mainHeight)
-        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
+        If !isOSDmsgFresh()
+           clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
         prevNewH := newH, prevNewW := newW
         prevuDPx := DestPosX, prevuDPy := DestPosY
         objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, maxSelX, maxSelY, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
@@ -81950,7 +81957,9 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         ; ToolTip, % "br=" A_TickCount - startZeit , , , 2
         If (imgEditPanelOpened=1 && AnyWindowOpen!=10)
         {
-           r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+           ; the selection shares hGDIinfosWin with the OSD; while zooming or panning the OSD wins
+           If (vpImgPanningNow=0 || !isOSDmsgFresh())
+              r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
            livePreviewsImageEditing("live-selection")
         } Else r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
      } Else If (operation="end")
@@ -102548,6 +102557,12 @@ tlbrZoomINout(dummy:=0) {
                lastIndex := thisIndex
                MouseMove, % oX, % oY, 1
             }
+            Continue
+         } Else If (A_Index>1 && Abs(mY - oY)<2)
+         {
+            ; level with the origin, as after MouseMove brought the cursor back: no direction, only a new reference point
+            lastInvoked := A_TickCount
+            cX := mX, cY := mY
             Continue
          }
          lastInvoked := A_TickCount
