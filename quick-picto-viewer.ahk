@@ -50091,53 +50091,9 @@ BTNimgResizeEditor() {
     }
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, dpX, dpY, imgW, imgH)
-    If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1)
+    If (ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2)
     {
-       ; Gdip_SetClipRect(G2, dpX + 1, dpY + 1, imgW - 2, imgH - 2, 4)
-       If (adjustCanvasCentered!=1)
-       {
-          dpX := (imgW<tUserNewWidth) ? ImgW - 3 : imgW
-          dpY := (imgH<tUserNewHeight) ? ImgH - 3 : imgH
-       }
-
-       If (imgW<tUserNewWidth)
-       {
-          If (adjustCanvasCentered=1)
-          {
-             astripA := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, 0, 0, 1, oImgH)
-             stripA := cImg_GdipResizeBitmap(astripA, dpX + 3, imgH, 2)
-             tzGdip_DrawImageFast(G2, stripA, 0, 0)
-          }
-
-          lW := (adjustCanvasCentered=1) ? dpX + 1 : tUserNewWidth - imgW + 1
-          lX := (adjustCanvasCentered=1) ? dpX + imgW - 1 : dpX - 1
-          astripB := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, oImgW - 1, 0, 1, oImgH)
-          stripB := cImg_GdipResizeBitmap(astripB, lW, imgH, 2)
-          tzGdip_DrawImageFast(G2, stripB, lX, 0)
-          ; ToolTip, % imgW "|" tUserNewWidth "|" lX "|" offX , , , 2
-       }
-
-       If (imgH<tUserNewHeight)
-       {
-          If (adjustCanvasCentered=1)
-          {
-             astripA := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, 0, 0, oImgW, 1)
-             stripA := cImg_GdipResizeBitmap(astripA, imgW, dpY + 3, 2)
-             tzGdip_DrawImageFast(G2, stripA, 0, 0)
-          }
-
-          lY := (adjustCanvasCentered=1) ? dpY + imgH - 1 : dpY - 1
-          lH := (adjustCanvasCentered=1) ? dpY + imgH : tUserNewHeight - imgH + 1
-          astripB := trGdip_CloneBitmapArea(A_ThisFunc, whichBitmap, 0, oImgH - 1, oImgW, 1)
-          stripB := cImg_GdipResizeBitmap(astripB, imgW, lH, 2)
-          tzGdip_DrawImageFast(G2, stripB, 0, lY)
-       }
-       ; TulTip(0, " | ", stripA, stripB, dpX, dpY, modus, oImgW, oImgH)
-       trGdip_DisposeImage(stripA, 1)
-       trGdip_DisposeImage(stripB, 1)
-       trGdip_DisposeImage(astripA, 1)
-       trGdip_DisposeImage(astripB, 1)
-       Gdip_ResetClip(G2)
+       ; to-reimplement this mode
     }
 
     Gdip_DeleteGraphics(G2)
@@ -50178,7 +50134,7 @@ updateUIresizeImgEditPanel(dummy:=0) {
     actu1 := (ResizeKeepAratio=1 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu1, ResizeEnforceCanvas
 
-    actu1 := (ResizeEnforceCanvas=1 && ResizeKeepAratio=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu1 := (ResizeEnforceCanvas=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu1, ResizeFillCanvasMode
     GuiControl, % actu1, adjustCanvasCentered
 
