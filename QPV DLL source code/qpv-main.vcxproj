@@ -203,6 +203,7 @@
     <ClInclude Include="lib\svg-render.h" />
     <ClInclude Include="lib\thumbs-pool.h" />
     <ClInclude Include="lib\wic-loader.h" />
+    <ClInclude Include="lib\open-cv-func.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
