@@ -105957,30 +105957,6 @@ doClicku() {
    */
 }
 
-testFIMrgb16toRGBF() {
-   initQPVmainDLL()
-   initFIMGmodule()
-   hFIFimgA := FreeImage_Load("E:\Sucan twins\photos test\SLDs\freeimage-tests\leadenhall_market_4k.hdr")
-   SoundBeep 300, 100
-   a := FreeImage_Save(hFIFimgA, "E:\Sucan twins\photos test\SLDs\freeimage-tests\leadenhall_market_4k.tif")
-   SoundBeep 900, 100
-   FreeImage_UnLoad(hFIFimgA)
-   ToolTip, % a "|" b , , , 2
-}
-
-testWicLoader() {
-   Static indexu := 0, pBitmap
-   indexu++
-   initQPVmainDLL()
-   ; pBitmap := LoadAndResizeImageWIC("E:\Sucan twins\photos test\SLDs\freeimage-tests\test-rosar- (9a).webp", 800, 600)
-   pBitmap := Gdip_CreateBitmap(10900, 49000) 
-   Gdip_GetImageDimensions(pBitmap, w, h)
-   ToolTip, % pBitmap "|" w "|" h, , , 2
-   Gdip_GraphicsClear(2NDglPG)
-   Gdip_DrawImage(2NDglPG, pBitmap,  50, 50)
-   doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
-   Gdip_DisposeImage(pBitmap)
-}
 
 dummyAutoScroller() {
    WinGetActiveTitle, aa
