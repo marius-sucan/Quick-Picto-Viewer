@@ -21,6 +21,84 @@ static unsigned char* blend_lut_srgb = nullptr;
 static unsigned short* blend_lut_linear = nullptr;
 static unsigned short gamma_to_linear_16[256];
 
+static unsigned short gamma_to_linear[256];
+static unsigned char linear_to_gamma[32769];
+static float char_to_float[256];
+static float char_to_floatGamma[256];
+static float char_to_grayRfloat[256];
+static float char_to_grayGfloat[256];
+static float char_to_grayBfloat[256];
+static float int_to_float[65536];
+static int int_to_char[65536];
+static int char_to_int[256];
+static int int_to_grayRi[65536];
+static int int_to_grayGi[65536];
+static int int_to_grayBi[65536];
+static int linear_to_gammaInt16[65536];
+static int gamma_to_linearInt16[65536];
+
+// read by CalculateNewBlendModes() and the colour adjust; initialized in initWICnow
+static unsigned char blend_degamma_lut[65536]; // maps fixed16 [0..65535] -> degamma'd byte [0..255]
+
+static double LUT_X_R[256];
+static double LUT_X_G[256];
+static double LUT_X_B[256];
+static double LUT_Y_R[256];
+static double LUT_Y_G[256];
+static double LUT_Y_B[256];
+static double LUT_Z_R[256];
+static double LUT_Z_G[256];
+static double LUT_Z_B[256];
+
+struct RGBAColor {
+    int b, g, r, a;
+};
+
+// a pixel of a 24 or 32-bit buffer; a 24-bit one is opaque
+QPV_FORCEINLINE RGBAColor readBGRA(const unsigned char *px, const int bpp) {
+    return {px[0], px[1], px[2], (bpp==32) ? px[3] : 255};
+}
+
+// the alpha is written to 32-bit pixels only
+QPV_FORCEINLINE void writeBGRA(unsigned char *px, const RGBAColor &c, const int bpp) {
+    px[2] = c.r;
+    px[1] = c.g;
+    px[0] = c.b;
+    if (bpp==32)
+       px[3] = c.a;
+}
+
+static inline float blend_grayscale_float(int r, int g, int b) {
+    return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
+}
+
+inline double toLABfx(double Y) {
+  // if (Y >= 0.00885645167903563082) // CIE epsilon = 216/24389
+  if (Y >= 8.88564517) // intentionally chosen value
+     Y = cbrt(Y);  // 1/3
+  else
+     Y = 7.7870370 * Y + 0.1379310; // (841.0/108.0) * Y + ( 4.0 / 29.0 );
+
+  return Y;
+}
+
+inline int RGBtoGray(int &sR, int &sG, int &sB, int &alternateMode) {
+  // https://getreuer.info/posts/colorspace/index.html
+  // http://www.easyrgb.com/en/math.php
+  // sR, sG and sB (Standard RGB) input range [0, 255]
+  // X, Y and Z output refer to a D65/2° standard illuminant.
+  // return value is L* - Luminance from L*ab, based on D65 luminant
+
+  if (alternateMode==1)
+     return round(char_to_grayRfloat[sR] + char_to_grayGfloat[sG] + char_to_grayBfloat[sB]); // weighted grayscale conversion
+
+  double Y = LUT_Y_R[sR] + LUT_Y_G[sG] + LUT_Y_B[sB];
+
+  Y = toLABfx(Y);
+  double L = 116.0*Y - 16.0;
+  return round(L/2); // return derived luminosity in pseudo-LAB color space
+}
+
 static inline float compute_blend_float(int mode, float rOf, float rBf) {
     float rT = rOf;
     switch (mode)
@@ -95,26 +173,70 @@ static void initBlendLUTs() {
     }
 }
 
-struct RGBAColor {
-    int b, g, r, a;
-};
+// the tables the pixel code reads; initWICnow() fills them once
+static void initColorLUTs() {
+    // source https://www.teamten.com/lawrence/graphics/gamma/
+    static const float GAMMA = 2.1;
+    int result;
+    for (int i = 0; i < 32769; i++)
+    {
+        result = (int)(pow(i/32768.0, 1/GAMMA)*255.0 + 0.5);
+        linear_to_gamma[i] = (unsigned char)result;
+    }
 
-// a pixel of a 24 or 32-bit buffer; a 24-bit one is opaque
-QPV_FORCEINLINE RGBAColor readBGRA(const unsigned char *px, const int bpp) {
-    return {px[0], px[1], px[2], (bpp==32) ? px[3] : 255};
-}
+    for (int i = 0; i < 256; i++)
+    {
+        char_to_float[i] = i/255.0f;
+        result = (int)(pow(char_to_float[i], GAMMA)*32768.0f + 0.5f);
+        gamma_to_linear[i] = (unsigned short)result;
+        char_to_grayRfloat[i] = i*0.299701f;
+        char_to_grayGfloat[i] = i*0.587130f;
+        char_to_grayBfloat[i] = i*0.114180f;
+        char_to_int[i] = char_to_float[i] * 65535.0f;
+        char_to_floatGamma[i] = pow(char_to_float[i], GAMMA);
 
-// the alpha is written to 32-bit pixels only
-QPV_FORCEINLINE void writeBGRA(unsigned char *px, const RGBAColor &c, const int bpp) {
-    px[2] = c.r;
-    px[1] = c.g;
-    px[0] = c.b;
-    if (bpp==32)
-       px[3] = c.a;
-}
+        double val = char_to_float[i];
+        if (val > 0.0404482362771076)
+            val = pow((val + 0.055)/1.055, 2.4);
+        else
+            val = val / 12.92;
 
-static inline float blend_grayscale_float(int r, int g, int b) {
-    return blend_gray_R_float[r] + blend_gray_G_float[g] + blend_gray_B_float[b];
+        double val100 = val * 100.0;
+        
+        LUT_X_R[i] = val100 * 0.4123955889674142161 / 95.047;
+        LUT_X_G[i] = val100 * 0.3575834307637148171 / 95.047;
+        LUT_X_B[i] = val100 * 0.1804926473817015735 / 95.047;
+
+        LUT_Y_R[i] = val100 * 0.2125862307855955516 / 100.000;
+        LUT_Y_G[i] = val100 * 0.7151703037034108499 / 100.000;
+        LUT_Y_B[i] = val100 * 0.07220049864333622685 / 100.000;
+
+        LUT_Z_R[i] = val100 * 0.01929721549174694484 / 108.883;
+        LUT_Z_G[i] = val100 * 0.1191838645808485318 / 108.883;
+        LUT_Z_B[i] = val100 * 0.9504971251315797660 / 108.883;
+    }
+
+    for (int i = 0; i < 65536; i++)
+    {
+        int_to_float[i] = (float)i/65535.0f;
+        int_to_char[i] = int_to_float[i] * 255.0f;
+        int_to_grayRi[i] = i*0.299701f;
+        int_to_grayGi[i] = i*0.587130f;
+        int_to_grayBi[i] = i*0.114180f;
+
+        result = (int)(pow(int_to_float[i], 1.0f/GAMMA)*65535.0f + 0.5f);
+        linear_to_gammaInt16[i] = result;
+        result = (int)(pow(int_to_float[i], GAMMA)*65535.0f + 0.5f);
+        gamma_to_linearInt16[i] = result;
+    }
+
+    // Initialize LUTs for CalculateNewBlendModes
+    static const float invGAMMA = 1.0f / GAMMA;
+    for (int i = 0; i < 65536; i++)
+    {
+        float v = (float)i / 65535.0f;
+        blend_degamma_lut[i] = (unsigned char)(pow(v, invGAMMA) * 255.0f + 0.5f);
+    }
 }
 
 inline RGBAColor CalculateNewBlendModes(

@@ -17,14 +17,6 @@
 const float div2s3 = 2.0f/3.0f;      // used in ConvertRGBtoHSL()
 const float div1s3 = 1.0f/3.0f;      // used in ConvertRGBtoHSL()
 
-// the 65536-entry tables of the 16-bit kernel, filled per call; the plan and the brush each own a set
-struct AdjustLUTs {
-    int gammaBright[65536];
-    int bright[65536];
-    int shadows[65536];
-    int highs[65536];
-    int contra[65536];
-};
 
 int inline getInt16grayscale(int r, int g, int b) {
     return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
@@ -33,6 +25,23 @@ int inline getInt16grayscale(int r, int g, int b) {
 int inline gammaMathsInt16(int i, double gamma) {
     return round(65535.0f * pow(int_to_float[clamp(i, 0, 65535)], gamma));
 }
+
+int inline brightMathsInt16(int i, float fintensity) {
+    return clamp((int)(i + (float)i * fintensity), 0, 65535);
+}
+
+int inline contraMathsInt16(int i, float fintensity, float deviation) {
+    return clamp((int)(floor(fintensity * (i - 32768.0f)) + deviation), 0, 65535);
+}
+
+// the 65536-entry tables of the 16-bit kernel, filled per call; the plan and the brush each own a set
+struct AdjustLUTs {
+    int gammaBright[65536];
+    int bright[65536];
+    int shadows[65536];
+    int highs[65536];
+    int contra[65536];
+};
 
 struct RGBColorI {
     int r, g, b;

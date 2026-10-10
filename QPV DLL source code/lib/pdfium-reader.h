@@ -20,6 +20,91 @@
 #include <unordered_set>
 #include <vector>
 
+std::string WideCharToString(const wchar_t* inwstr) {
+    if (!inwstr)
+       return "";
+
+    std::wstring wstr(inwstr);
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.to_bytes(wstr);
+}
+
+auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const UINT imgW, const UINT imgH, const UINT givenW, const UINT givenH, const float maxMPX = 536.45) {
+  std::array<UINT, 3> size;
+  size[0] = 0;
+  size[1] = 0;
+  size[2] = 0;
+  if (keepAratio==2)
+  {
+     size[0] = imgW;
+     size[1] = imgH;
+     size[2] = 1;
+  } else if (keepAratio==1) 
+  {
+     if (imgW>givenW || imgH>givenH || ScaleAnySize==1)
+     {
+         const double PicRatio = (float)(imgW)/imgH;
+         const double givenRatio = (float)(givenW)/givenH;
+         if (imgW<=givenW && imgH<=givenH)
+         {
+            size[0] = givenW;
+            size[1] = round(size[0] / PicRatio);
+            if (size[1]>givenH)
+            {
+               size[1] = (imgH <= givenH) ? givenH : imgH;
+               size[0] = round(size[1] * PicRatio);
+            }
+         } else if (PicRatio>givenRatio)
+         {
+            size[0] = givenW;
+            size[1] = round(size[0] / PicRatio);
+         } else
+         {
+            size[1] = (imgH >= givenH) ? givenH : imgH;
+            size[0] = round(size[1] * PicRatio);
+         }
+     } else
+     {
+         size[0] = imgW;
+         size[1] = imgH;
+         size[2] = 1;
+     }
+  } else
+  {
+     size[0] = givenW;
+     size[1] = givenH;
+  }
+
+  double mpx = ((UINT64)size[0] * size[1])/1000000.0f;
+  // fnOutputDebug(std::to_string(mpx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
+  float g = 536.4f / mpx;
+  if (mpx>maxMPX)
+  {
+     const float fw = size[0];
+     const float fh = size[1];
+     g = 1.0f;
+     for (int i = 0; i < 987654321; i++)
+     {
+        g -= 0.0001;
+        float npx = ((fw*g) * (fh*g))/1000000.0f;
+        if (npx<maxMPX)
+           break;
+     }
+     size[0] = fw*g;
+     size[1] = fh*g;
+     // fnOutputDebug("booooooooooooooooooooonkerzzzzzzzzzzzzzzz");
+  }
+
+  // double npx = (size[0] * size[1])/1000000;
+  // fnOutputDebug( std::to_string(g) + "f ; " + std::to_string(npx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
+  // past an aspect ratio of twice the box the short side rounds to 0, which no caller can allocate or scale to
+  if (size[0]<1)
+     size[0] = 1;
+  if (size[1]<1)
+     size[1] = 1;
+  return size;
+}
+
 void AppendUInt(std::vector<unsigned short>& out, unsigned int n) {
     // Helper: Append an unsigned integer as ASCII digits.
     // Use std::to_string to convert the number then push each digit.
