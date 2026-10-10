@@ -15335,33 +15335,39 @@ OpenCV_FimToneMapping(hFIFimgA, algo, paramA, paramB, paramC, paramD, altExpo) {
     Return hFIFimgX
 }
 
-cImg_GdipResizeBitmap(pBitmap, newW, newH, interpolation:=1, bond:=2) {
+QPV_ExtendBitmapEdges(pBitmap, imgX, imgY, imgW, imgH) {
   ; function used by BTNimgResizeEditor() [resize image in editor mode, CTRL+R]
   initQPVmainDLL()
   If !qpvMainDll
   {
      addJournalEntry(A_ThisFunc "(): QPV dll file is missing or failed to initialize: qpvMain.dll")
-     Return
-  }
-
-  If !validBMP(pBitmap)
-  {
-     addJournalEntry(A_ThisFunc "(): invalid bitmap to process")
-     Return
+     Return 0
   }
 
   trGdip_GetImageDimensions(pBitmap, w, h)
-  If (w<1 || h<1)
-     Return 0
-
-  r := DllCall("qpvmain.dll\cImgResizeBitmap", "UPtr", pBitmap, "Int", w, "Int", h, "int", newW, "int", newH, "Int", interpolation, "int", bond, "UPtr")
-  If (StrLen(r)>2)
+  If (w<1 || h<1 || !validBMP(pBitmap))
   {
-     recordGdipBitmaps(r, A_ThisFunc)
-     Return r
+     addJournalEntry(A_ThisFunc "(): invalid bitmap to process")
+     Return 0
   }
 
-  Return 0
+  ; the pixels are only copied, so locking them in the bitmap's own format spares GDI+ converting the canvas twice
+  pixFmt := Gdip_GetImagePixelFormat(pBitmap, 1)
+  If !isVarEqualTo(pixFmt, "0x21808", "0x26200A", "0xE200B") ; PixelFormat24bppRGB, PixelFormat32bppARGB, PixelFormat32bppPARGB
+     pixFmt := "0x26200A"
+
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, pixFmt) ; ImageLockModeRead | ImageLockModeWrite
+  If !E1
+  {
+     bpp := (pixFmt="0x21808") ? 24 : 32
+     r := DllCall("qpvmain.dll\extendBitmapEdges", "UPtr", iScan, "int", w, "int", h, "int", stride, "int", bpp, "int", imgX, "int", imgY, "int", imgW, "int", imgH)
+     dllError := ErrorLevel
+     Gdip_UnlockBits(pBitmap, iData)
+  }
+
+  If !r
+     addJournalEntry(A_ThisFunc "(): failed to extend the image edges. LockBits error: " E1 ". DllCall ErrorLevel: " dllError)
+  Return r
 }
 
 QPV_CreateBitmapNoise(W, H, intensity, doGray, threads, fillBgr) {
@@ -50090,13 +50096,20 @@ BTNimgResizeEditor() {
        Gdip_ResetClip(G2)
     }
 
-    r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, dpX, dpY, imgW, imgH)
-    If (ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2)
+    extendEdges := (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1) ? 1 : 0
+    If (extendEdges=1)
     {
-       ; to-reimplement this mode
+       ; the edge pixels get replicated; mirrored wrapping keeps GDI+ from blending them with the transparent outside
+       imageAttribs := Gdip_CreateImageAttributes()
+       Gdip_SetImageAttributesWrapMode(imageAttribs, 3) ; WrapModeTileFlipXY
     }
 
+    r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, dpX, dpY, imgW, imgH,,,,,,, imageAttribs)
+    Gdip_DisposeImageAttributes(imageAttribs)
     Gdip_DeleteGraphics(G2)
+    If (extendEdges=1)
+       QPV_ExtendBitmapEdges(newBitmap, dpX, dpY, imgW, imgH)
+
     calcRelativeSelCoords(newBitmap)
     wrapRecordUndoLevelNow(newBitmap)
     SoundBeep 900, 100

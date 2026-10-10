@@ -1480,58 +1480,6 @@ void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned ch
     }
 }
 
-int FillCImgFromBitmap(cimg_library::CImg<float> & img, Gdiplus::GpBitmap *myBitmap, int width, int height) {
-
-    // fnOutputDebug("FillCImgFromBitmap called, yay");
-    // Size of a scan line represented in bytes: 4 bytes each pixel
-    UINT cbStride = 0;
-    UIntMult(width, sizeof(Gdiplus::ARGB), &cbStride);
-
-    // Size of the image, represented in bytes
-    UINT cbBufferSize = 0;
-    UIntMult(cbStride, height, &cbBufferSize);
-
-    Gdiplus::Rect rectu(0, 0, width, height);
-    Gdiplus::BitmapData bitmapDatu;
-    Gdiplus::Status s = Gdiplus::DllExports::GdipBitmapLockBits(myBitmap, &rectu, 1, PixelFormat32bppARGB, &bitmapDatu);
-    // fnOutputDebug("bits locked: FillCImgFromBitmap()");
-    if (s == Gdiplus::Ok)
-    {
-        // fnOutputDebug("for loops begin: FillCImgFromBitmap(); w=" + std::to_string(nPixels) + "; h=" + std::to_string(nLines) );
-        // fnOutputDebug("moar; Stride=" + std::to_string(dLineSrc) + "/scan0=" + std::to_string(*pStartSrc));
-        BYTE *pStartSrc = (BYTE *) bitmapDatu.Scan0;
-        UINT dPixelSrc = 4;          // pixel step in source ; nPlanes
-        UINT dLineSrc = cbStride;    // line step in source
-        #pragma omp parallel for schedule(dynamic)
-        for (int y = 0; y < height; y++)
-        {
-            // loop through lines
-            BYTE *pLineSrc = pStartSrc + dLineSrc*y;
-            BYTE *pPixelSrc = pLineSrc;
-            // fnOutputDebug("Y loop: " + std::to_string(y) + "//Stride=" + std::to_string(dLineSrc));
-            for (int x = 0; x < width; x++)
-            {
-                // loop through pixels on line
-                BYTE alphaComp = *(pPixelSrc+3);
-                BYTE redComp = *(pPixelSrc+2);
-                BYTE greenComp = *(pPixelSrc+1);
-                BYTE blueComp = *(pPixelSrc+0);
-                img(x,y,0,0) = float(redComp);
-                img(x,y,0,1) = float(greenComp);
-                img(x,y,0,2) = float(blueComp);
-                img(x,y,0,3) = float(alphaComp);
-                pPixelSrc += dPixelSrc;
-                // fnOutputDebug("x loop B: " + std::to_string(x));
-            }
-            // pLineSrc += dLineSrc;
-        }
-        // fnOutputDebug("for loops done: FillCImgFromBitmap()");
-        Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
-        // fnOutputDebug("gdip bmp unlocked: FillCImgFromBitmap()");
-        return 1;
-    } else return 0;
-}
-
 DLL_API int DLL_CALLCONV cImgAddGaussianNoiseOnBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
   int channels = (bpp==32) ? 4 : 3;
   CImg<unsigned char> img(imageData, channels, width, height, 1);
@@ -1709,18 +1657,63 @@ DLL_API int DLL_CALLCONV cImgBlurBitmapFilters(unsigned char *imageData, int wid
   return 1;
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV cImgResizeBitmap(Gdiplus::GpBitmap *myBitmap, int width, int height, int resizedW, int resizedH, int interpolation, int bond) {
-  // function invoked by QPV_ResizeBitmap() from AHK
-  Gdiplus::GpBitmap *newBitmap = NULL;
-  CImg<float> img(width,height,1,4);
-  int r = FillCImgFromBitmap(img, myBitmap, width, height);
-  if (r==0)
-     return newBitmap;
+static inline void repeatPixel(unsigned char *dst, const INT64 count, const unsigned char *px, const int bpc) {
+    if (bpc==4)
+    {
+        uint32_t c;
+        memcpy(&c, px, 4);
+        std::fill_n((uint32_t*)dst, count, c);
+        return;
+    }
 
-  img.resize(resizedW, resizedH, -100, -100, interpolation, bond);
+    for (INT64 i = 0; i < count; i++, dst += 3)
+    {
+        dst[0] = px[0];
+        dst[1] = px[1];
+        dst[2] = px[2];
+    }
+}
 
-  newBitmap = CreateGdipBitmapFromCImg(img, img.width(), img.height());
-  return newBitmap;
+DLL_API int DLL_CALLCONV extendBitmapEdges(unsigned char *imageData, int w, int h, int Stride, int bpp, int imgX, int imgY, int imgW, int imgH) {
+    // the canvas around the image rectangle takes the colour of the nearest image edge pixel;
+    // pixels are copied as they are, so straight and premultiplied alpha work alike
+    if (imageData==NULL || w<1 || h<1 || (bpp!=24 && bpp!=32))
+       return 0;
+
+    const int bpc = bpp / 8;
+    const INT64 rowSize = (INT64)w * bpc;
+    if (std::abs((INT64)Stride)<rowSize)
+       return 0;
+
+    const int x1 = clamp(imgX, 0, w);
+    const int y1 = clamp(imgY, 0, h);
+    const int x2 = (int)clamp((INT64)imgX + imgW, (INT64)x1, (INT64)w);
+    const int y2 = (int)clamp((INT64)imgY + imgH, (INT64)y1, (INT64)h);
+    if (x1>=x2 || y1>=y2)
+       return 0;
+
+    if (x1==0 && y1==0 && x2==w && y2==h)
+       return 1;
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = y1; y < y2; y++)
+    {
+        unsigned char *row = imageData + (INT64)y * Stride;
+        repeatPixel(row, x1, row + (INT64)x1 * bpc, bpc);
+        repeatPixel(row + (INT64)x2 * bpc, w - x2, row + (INT64)(x2 - 1) * bpc, bpc);
+    }
+
+    // rows above and below the image copy its first and last rows, already extended sideways, which also fills the corners
+    #pragma omp parallel for schedule(dynamic)
+    for (int y = 0; y < h; y++)
+    {
+        if (y>=y1 && y<y2)
+           continue;
+
+        const int fromY = (y<y1) ? y1 : y2 - 1;
+        memcpy(imageData + (INT64)y * Stride, imageData + (INT64)fromY * Stride, (size_t)rowSize);
+    }
+    return 1;
 }
 
 DLL_API Gdiplus::GpBitmap* DLL_CALLCONV GenerateCIMGnoiseBitmap(int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur) {
