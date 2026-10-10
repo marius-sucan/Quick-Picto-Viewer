@@ -406,7 +406,7 @@ void fillMaskPolyBounds(const int &w, const int &h, const float* PointsList, con
         }
     }
 
-    #pragma omp parallel for schedule(dynamic) default(none) shared(polygonMapEdges, crossingEdges, PointsList, ppy1, ppy2, ppx1, ppx2, simpleMode, PointsCount, imgSel.maskY, imgSel.maskW, imgSel.maskX, imgSel.mask)
+    #pragma omp parallel for schedule(dynamic) default(none) shared(polygonMapEdges, crossingEdges, PointsList, ppy1, ppy2, ppx1, ppx2, simpleMode, PointsCount)
     for (int y = 0; y < h; ++y)
     {
         if (polygonMapEdges[y].empty())
