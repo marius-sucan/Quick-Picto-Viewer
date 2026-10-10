@@ -50081,13 +50081,13 @@ BTNimgResizeEditor() {
     isOkay := (imgW<tUserNewWidth || imgH<tUserNewHeight) ? 1 : 0
     currIMGdetails.HasAlpha := 1
     ; TulTip(0, "-", ResizeKeepAratio, ResizeEnforceCanvas, ResizeFillCanvasMode, isOkay)
-    If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=3 && isOkay=1)
+    If (ResizeEnforceCanvas=1 && ResizeFillCanvasMode=3 && isOkay=1)
     {
        Gdip_SetClipRect(G2, dpX, dpY, imgW, imgH, 4)
        thisColor := makeRGBAcolor(OutlierFillColor, OutlierFillOpacity)
        trGdip_GraphicsClear(A_ThisFunc, G2, thisColor)
        Gdip_ResetClip(G2)
-    } Else If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=4 && isOkay=1)
+    } Else If (ResizeEnforceCanvas=1 && ResizeFillCanvasMode=4 && isOkay=1)
     {
        Gdip_SetClipRect(G2, dpX, dpY, imgW, imgH, 4)
        zBitmap := trGdip_ResizeBitmap(A_ThisFunc, whichBitmap, oImgW//2 + 1, oImgH//2, 0, 5)
@@ -50102,7 +50102,7 @@ BTNimgResizeEditor() {
     r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, dpX, dpY, imgW, imgH,,,,,,, imageAttribs)
     Gdip_DisposeImageAttributes(imageAttribs)
     Gdip_DeleteGraphics(G2)
-    If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1)
+    If (ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1)
        QPV_ExtendBitmapEdges(newBitmap, dpX, dpY, imgW, imgH)
 
     calcRelativeSelCoords(newBitmap)
@@ -50131,20 +50131,22 @@ updateUIresizeImgEditPanel(dummy:=0) {
     GuiControlGet, userEditWidth
     GuiControlGet, userEditHeight
 
-    actu2 := (ResizeFillCanvasMode=3 && ResizeEnforceCanvas=1 && ResizeKeepAratio=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu2 := (ResizeFillCanvasMode=3 && ResizeEnforceCanvas=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu2, PickuOutlierFillColor
-    actu2 := (ResizeFillCanvasMode=3 && ResizeEnforceCanvas=1 && ResizeKeepAratio=1) ? 1 : 0
+    actu2 := (ResizeFillCanvasMode=3 && ResizeEnforceCanvas=1) ? 1 : 0
     uiSlidersArray["OutlierFillOpacity", 10] := actu2
 
-    actu2 := (ResizeFillCanvasMode=3 && ResizeEnforceCanvas=1 && ResizeKeepAratio=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu2 := (ResizeFillCanvasMode=3 && ResizeEnforceCanvas=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu2, OutlierFillColor
 
-    actu1 := (ResizeKeepAratio=1 && !viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu1 := (!viewportQPVimage.imgHandle) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu1, ResizeEnforceCanvas
 
     actu1 := (ResizeEnforceCanvas=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu1, ResizeFillCanvasMode
     GuiControl, % actu1, adjustCanvasCentered
+    actu1 := (ResizeEnforceCanvas=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+    GuiControl, % actu1, ResizeKeepAratio
 
     actu := (PredefinedDocsSizes=13) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     If (PredefinedDocsSizes!=13)
@@ -50160,15 +50162,18 @@ updateUIresizeImgEditPanel(dummy:=0) {
     GuiControl, % actu, ResizeInPercentage
 
     trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
-    obju := calcIMGuserResizer(oImgW, oImgH, userEditWidth, userEditHeight, ResizeInPercentage, ResizeKeepAratio)
-    thisWidth := obju[1, 1], thisHeight := obju[1, 2]
-    canvasWidth := obju[1, 3], canvasHeight := obju[1, 4]
     doFriendly := 0
-    If (ResizeEnforceCanvas=1 && ResizeKeepAratio=1)
+    If (ResizeEnforceCanvas=1)
     {
+       ; the image keeps its aspect ratio inside the given canvas, regardless of ResizeKeepAratio
        doFriendly := 1
+       canvasWidth := (ResizeInPercentage=1) ? (oImgW/100)*userEditWidth : userEditWidth
+       canvasHeight := (ResizeInPercentage=1) ? (oImgH/100)*userEditHeight : userEditHeight
+       calcIMGdimensions(oImgW, oImgH, canvasWidth, canvasHeight, thisWidth, thisHeight)
     } Else
     {
+       obju := calcIMGuserResizer(oImgW, oImgH, userEditWidth, userEditHeight, ResizeInPercentage, ResizeKeepAratio)
+       thisWidth := obju[1, 1], thisHeight := obju[1, 2]
        canvasWidth := thisWidth
        canvasHeight := thisHeight
     }
