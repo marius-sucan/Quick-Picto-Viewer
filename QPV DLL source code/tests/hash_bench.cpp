@@ -49,9 +49,10 @@
 #define QPV_FORCEINLINE inline __attribute__((always_inline))
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static void SetWindowText(HWND, LPCWSTR) {}
 
-#include "../sqlite-dynamic.h"
+#include "../lib/sqlite-dynamic.h"
 #include "header_extract.h"
 
 const double div2sz = sqrt(2.0 / 32.0);

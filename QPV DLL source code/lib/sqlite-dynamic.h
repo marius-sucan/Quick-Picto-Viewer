@@ -108,7 +108,7 @@ static void bindSQLiteOnce() {
 
         if (SQ.hLib==NULL)
         {
-           fnOutputDebug("dupesEngine: sqlite3.dll not present; the DLL cannot read the database itself");
+           QPV_DBG("dupesEngine: sqlite3.dll not present; the DLL cannot read the database itself");
            return;
         }
 
@@ -156,9 +156,9 @@ static void bindSQLiteOnce() {
               && SQ.bind_int64 && SQ.bind_text16);
 
         if (SQ.ok)
-           fnOutputDebug("dupesEngine: sqlite3.dll bound successfully");
+           QPV_DBG("dupesEngine: sqlite3.dll bound successfully");
         else
-           fnOutputDebug("dupesEngine: sqlite3.dll found but required entry points are missing");
+           QPV_DBG("dupesEngine: sqlite3.dll found but required entry points are missing");
     });
 }
 

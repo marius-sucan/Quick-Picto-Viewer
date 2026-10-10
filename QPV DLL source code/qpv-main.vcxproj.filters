@@ -18,38 +18,59 @@
     <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\framework.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="qpv-main.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\pch.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\freeimage-dynamic.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="freeimage-dynamic.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\thumbs-pool.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="thumbs-pool.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\dupes-pixels.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="dupes-pixels.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\dupes-search.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="dupes-search.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\sqlite-dynamic.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="sqlite-dynamic.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\callwndproc-hook.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="callwndproc-hook.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\pdf-writer.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="pdf-writer.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\flood-fill.h">
+      <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="flood-fill.h">
-      <Filter>Fichiers d%27en-tête</Filter>
+    <ClInclude Include="lib\wic-loader.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\pdfium-reader.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\svg-render.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\selection-mask.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\blend-modes.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\color-adjust.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\open-cv-func.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\paint-brush.h">
+      <Filter>Header file</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

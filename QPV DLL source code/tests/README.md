@@ -9,7 +9,7 @@ Most of the suite covers the duplicate-identification pipeline, which is what it
 for; `pdf_writer.cpp` covers the PDF writer of "Join images into a single file".
 
 The slicing is the point. A scratch copy of an algorithm drifts from the shipped one and
-then proves nothing; `run-tests.sh` re-extracts from `../dupes-search.h` on every run and
+then proves nothing; `run-tests.sh` re-extracts from `../lib/dupes-search.h` on every run and
 fails loudly if an anchor stops matching. The markers it anchors on
 (`qpv-dupes-block-end`, `qpv-dupes-query-begin`, `qpv-dupes-state-end`, `qpv-dct-block-end`,
 `qpv-job-slot-end` and friends) are comments in the sources; leave them there.
@@ -272,7 +272,7 @@ leave tone mapped thumbnails in sRGB's colours, and leave a linear RAW that is n
 without the display's colours.
 
 **`wic_icm.cpp`** — the colour transform `tpWICload()` builds when colour management is on,
-sliced out of `thumbs-pool.h` together with the WIC guards of `qpv-main.cpp` and
+sliced out of `thumbs-pool.h` together with the WIC guards of `wic-loader.h` and
 `adaptImageGivenSize()`, and compiled against `shim/wic-env.h`: the WIC interfaces with the
 SDK's signatures, and fakes behind them that keep real reference counts (`HRESULT` is 32 bits
 there, or every `FAILED()` is false under LP64). Colour fidelity needs Windows; what is pinned
@@ -281,7 +281,7 @@ the fallbacks `applyColorManagement()` applies, not EXIF sRGB. Where it sits: on
 read by the scaler, never under a scaler that interpolates. That every failure, including
 a transform that only fails in `CopyPixels()`, ends as a plain thumbnail rather than a failed
 or a full size one. And that each decode releases every object it made, exactly once. The
-viewer's own `applyColorManagement()` is sliced in too, with `qpv-main.cpp`'s `SafeRelease()`,
+viewer's own `applyColorManagement()` is sliced in too, with `wic-loader.h`'s `SafeRelease()`,
 and driven the way `LoadWICimage()` drives it, cleanup call included: an untagged RGB image is
 sRGB and gets no transform, and a failed `CreateColorContext()` leaves nothing to fall back
 on, which the code it replaced dereferenced. The mutants drop the plain retry, let the scaler

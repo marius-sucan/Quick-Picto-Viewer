@@ -42,6 +42,7 @@ template <typename T> static inline T clamp(T v, T lo, T hi) { return (v < lo) ?
 
 static std::string gShimLastDebug;
 static inline void fnOutputDebug(std::string s) { gShimLastDebug = s; }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static inline std::string WideCharToString(const wchar_t *w) {
     std::string o;
     for (; w && *w; w++) o.push_back((char)(*w & 0x7F));
@@ -53,7 +54,7 @@ static inline DWORD GetTickCount() {
                   std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-// qpv-main.cpp's: the extension after the last dot, compared without regard to case
+// wic-loader.h's: the extension after the last dot, compared without regard to case
 static inline bool IsFileExtension(const wchar_t *szFileName, const wchar_t *extension) {
     if (!szFileName || !extension || extension[0]!=L'.')
        return false;

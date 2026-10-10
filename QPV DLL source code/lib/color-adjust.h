@@ -1,208 +1,46 @@
-// Le bloc ifdef suivant est la façon standard de créer des macros qui facilitent l'exportation
-// à partir d'une DLL plus simple. Tous les fichiers contenus dans cette DLL sont compilés avec le symbole QPVMAIN_EXPORTS
-// défini sur la ligne de commande. Ce symbole ne doit pas être défini pour un projet
-// qui utilise cette DLL. Ainsi, les autres projets dont les fichiers sources comprennent ce fichier considèrent les fonctions
-// QPVMAIN_API comme étant importées à partir d'une DLL, tandis que cette DLL considère les symboles
-// définis avec cette macro comme étant exportés.
+// color-adjust.h
+//
+// AdjustImageColorsPrecise(): the per-call plan, the 16-bit pixel kernel RGBA16color with its
+// HSL helpers, and the tables and helpers only they use.
+//
+// #included by qpv-main.cpp after selection-mask.h, whose clipMaskFilter() it uses, and ahead
+// of PaintBrushLarge(), whose effects brush runs its pixels through RGBA16color.
+//
+// written by Marius Șucan with Claude Opus 5.5
 
-const DWORD dwHwndTabletProperty = 
-    TABLET_DISABLE_PRESSANDHOLD |      // disables press and hold (right-click) gesture
-    TABLET_DISABLE_PENTAPFEEDBACK |    // disables UI feedback on pen up (waves)
-    TABLET_DISABLE_PENBARRELFEEDBACK | // disables UI feedback on pen button down (circle)
-    TABLET_DISABLE_FLICKFALLBACKKEYS |
-    TABLET_DISABLE_SMOOTHSCROLLING |
-    TABLET_DISABLE_TOUCHUIFORCEON |
-    TABLET_DISABLE_FLICKS;             // disables pen flicks (back, forward, drag down, drag up)
+#ifndef QPV_COLOR_ADJUST_H
+#define QPV_COLOR_ADJUST_H
 
-const double M_PI = 3.14159265358979323846;  // PI
+#include <algorithm>
+#include <cmath>
+
 const float div2s3 = 2.0f/3.0f;      // used in ConvertRGBtoHSL()
 const float div1s3 = 1.0f/3.0f;      // used in ConvertRGBtoHSL()
-float imgSelExclW = 0.0f;
-float imgSelExclH = 0.0f;
-float imgSelExclX = 0.0f;
-float imgSelExclY = 0.0f;
-int imgSelX1 = 0;
-int imgSelY1 = 0;
-int imgSelX2 = 0;
-int imgSelY2 = 0;
-int imgSelW = 0;
-int imgSelH = 0;
-int EllipseSelectMode = 0;
-int flippedSelection = 0;
-int invertSelection = 0;
-int highDepthModeMask = 0;
-float excludeSelectScale = 0;
-float vpSelRotation = 0;
-float cosVPselRotation = 0;
-float sinVPselRotation = 0;
-float hImgSelW = 0.0f;
-float hImgSelH = 0.0f;
-float imgSelXscale = 0.0f;
-float imgSelYscale = 0.0f;
-INT64 polyW = 0;
-INT64 polyH = 0;
-INT64 polyX = 0;
-INT64 polyY = 0;
-INT64 polyOffYa = 0;
-INT64 polyOffYb = 0;
-INT64 blahImgH = 0;
 
-std::vector<unsigned char*> brushOpacityChunks;
-std::vector<unsigned char*> brushOriginalPixelChunks;
-std::vector<size_t> activeBrushChunks;
-// std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
-int chunkGridW = 0;
-int chunkGridH = 0;
-IWICBitmapDecoder      *pWICclassDecoder;
-IWICBitmapFrameDecode  *pWICclassFrameDecoded;
-// IWICFormatConverter *pWICclassConverter;
-IWICBitmapSource       *pWICclassPixelsBitmapSource;
 
-class MaskBitMap {
-private:
-    std::vector<uint64_t> data;
-    size_t num_bits = 0;
+int inline getInt16grayscale(int r, int g, int b) {
+    return clamp((int)(int_to_grayRi[clamp(r, 0, 65535)] + int_to_grayGi[clamp(g, 0, 65535)] + int_to_grayBi[clamp(b, 0, 65535)]), 0, 65535);
+}
 
-public:
-    void resize(size_t size) {
-        // a failed allocation must leave size() at 0: MSVC's assign() frees the old buffer first
-        num_bits = 0;
-        data.assign((size + 63) / 64, 0ULL);
-        num_bits = size;
-    }
+int inline gammaMathsInt16(int i, double gamma) {
+    return round(65535.0f * pow(int_to_float[clamp(i, 0, 65535)], gamma));
+}
 
-    void clear() {
-        data.clear();
-        num_bits = 0;
-    }
+int inline brightMathsInt16(int i, float fintensity) {
+    return clamp((int)(i + (float)i * fintensity), 0, 65535);
+}
 
-    void shrink_to_fit() {
-        data.shrink_to_fit();
-    }
+int inline contraMathsInt16(int i, float fintensity, float deviation) {
+    return clamp((int)(floor(fintensity * (i - 32768.0f)) + deviation), 0, 65535);
+}
 
-    size_t size() const {
-        return num_bits;
-    }
-
-    const uint64_t* words() const {
-        return data.data();
-    }
-
-    size_t word_count() const {
-        return data.size();
-    }
-
-    struct Reference {
-        uint64_t* word;
-        uint64_t mask;
-
-        Reference(uint64_t* w, uint64_t m) : word(w), mask(m) {}
-
-        Reference& operator=(bool val) {
-            auto* atomic_word = reinterpret_cast<std::atomic<uint64_t>*>(word);
-            if (val) {
-                atomic_word->fetch_or(mask, std::memory_order_relaxed);
-            } else {
-                atomic_word->fetch_and(~mask, std::memory_order_relaxed);
-            }
-            return *this;
-        }
-
-        Reference& operator=(const Reference& other) {
-            return operator=(bool(other));
-        }
-
-        operator bool() const {
-            return (*word & mask) != 0;
-        }
-    };
-
-    Reference operator[](size_t idx) {
-        return Reference(&data[idx / 64], 1ULL << (idx % 64));
-    }
-
-    bool operator[](size_t idx) const {
-        return (data[idx / 64] & (1ULL << (idx % 64))) != 0;
-    }
-
-    void set_unsafe(size_t idx) {
-        data[idx / 64] |= (1ULL << (idx % 64));
-    }
-
-    void fill_zero() {
-        std::fill(data.begin(), data.end(), 0ULL);
-    }
-
-    void fill_zero(size_t start, size_t end) {
-        if (start >= end) return;
-        size_t start_word = start / 64;
-        size_t end_word = (end - 1) / 64;
-
-        if (start_word == end_word) {
-            uint64_t mask = (~0ULL << (start % 64)) & (~0ULL >> (63 - ((end - 1) % 64)));
-            auto* atomic_word = reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word]);
-            atomic_word->fetch_and(~mask, std::memory_order_relaxed);
-        } else {
-            // First word (partial)
-            uint64_t start_mask = (~0ULL << (start % 64));
-            reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word])->fetch_and(~start_mask, std::memory_order_relaxed);
-
-            // Middle words (full)
-            for (size_t w = start_word + 1; w < end_word; ++w) {
-                data[w] = 0ULL;
-            }
-
-            // Last word (partial)
-            uint64_t end_mask = (~0ULL >> (63 - ((end - 1) % 64)));
-            reinterpret_cast<std::atomic<uint64_t>*>(&data[end_word])->fetch_and(~end_mask, std::memory_order_relaxed);
-        }
-    }
-
-    void set_range_to_1(size_t start, size_t end) {
-        if (start > end) return;
-        size_t start_word = start / 64;
-        size_t end_word = end / 64;
-
-        if (start_word == end_word) {
-            uint64_t mask = (~0ULL << (start % 64)) & (~0ULL >> (63 - (end % 64)));
-            auto* atomic_word = reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word]);
-            atomic_word->fetch_or(mask, std::memory_order_relaxed);
-        } else {
-            // First word (partial)
-            uint64_t start_mask = (~0ULL << (start % 64));
-            reinterpret_cast<std::atomic<uint64_t>*>(&data[start_word])->fetch_or(start_mask, std::memory_order_relaxed);
-
-            // Middle words (full)
-            for (size_t w = start_word + 1; w < end_word; ++w) {
-                data[w] = ~0ULL;
-            }
-
-            // Last word (partial)
-            uint64_t end_mask = (~0ULL >> (63 - (end % 64)));
-            reinterpret_cast<std::atomic<uint64_t>*>(&data[end_word])->fetch_or(end_mask, std::memory_order_relaxed);
-        }
-    }
-};
-
-std::vector<unsigned char>  highDephMaskMap;
-MaskBitMap  polygonMaskMap;
-MaskBitMap  polygonOtherMaskMap;
-// std::vector<std::vector<short>> DrawLineCapsGrid;
-vector<pair<float, float>> DrawLineCapsGrid;
-// vector<pair<int, int>> DrawLineGrid;
-
-struct GUIDComparer {
-    bool operator()(const GUID& left, const GUID& right) const {
-        return memcmp(&left, &right, sizeof(GUID)) < 0;
-    }
-};
-
-struct Point {
-    double x, y;
-};
-
-struct RGBColor {
-    double r, g, b;
+// the 65536-entry tables of the 16-bit kernel, filled per call; the plan and the brush each own a set
+struct AdjustLUTs {
+    int gammaBright[65536];
+    int bright[65536];
+    int shadows[65536];
+    int highs[65536];
+    int contra[65536];
 };
 
 struct RGBColorI {
@@ -274,10 +112,6 @@ struct HSLColor {
     };
   };
 
-struct RGBAColor {
-    int b, g, r, a;
-};
-
 
 // ---------------------------------------------------------------------------
 // RGBA16color - the 16-bit-internal pixel used by AdjustImageColorsPrecise().
@@ -289,8 +123,8 @@ struct RGBAColor {
 //   UseLUT=true  -> the per-pixel path, reads the tables.
 //   UseLUT=false -> the 256-entry table builders in AdjustPlan, which evaluate
 //                   the closed form directly and so need no 65536-entry build.
-// gammaMathsInt16(i,z)==LUTgamma[i]/LUTgammaBright[i], brightMathsInt16(i,f)==
-// LUTbright[i] and contraMathsInt16(i,f,32768)==LUTcontra[i] by construction,
+// gammaMathsInt16(i,z)==L.gammaBright[i], brightMathsInt16(i,f)==
+// L.bright[i] and contraMathsInt16(i,f,32768)==L.contra[i] by construction,
 // so the two modes are bit-identical.
 //
 // Alpha is gone from the RGB ops: it never reads r/g/b and r/g/b never read it,
@@ -396,16 +230,16 @@ struct RGBA16color {
     }
 
     template<bool UseLUT>
-    QPV_FORCEINLINE void brightness(int level, int altMode, int noClamping, float fintensity, double zammaBright) {
+    QPV_FORCEINLINE void brightness(int level, int altMode, int noClamping, float fintensity, double zammaBright, const AdjustLUTs &L) {
         if (altMode==0)
         {
            if (level<0 && noClamping==0)
            {
               if (UseLUT)
               {
-                 r = LUTgammaBright[r];
-                 g = LUTgammaBright[g];
-                 b = LUTgammaBright[b];
+                 r = L.gammaBright[r];
+                 g = L.gammaBright[g];
+                 b = L.gammaBright[b];
               } else
               {
                  r = gammaMathsInt16(r, zammaBright);
@@ -425,9 +259,9 @@ struct RGBA16color {
               b = b + (float)b*fintensity;
            } else if (UseLUT)
            {
-              r = LUTbright[r];
-              g = LUTbright[g];
-              b = LUTbright[b];
+              r = L.bright[r];
+              g = L.bright[g];
+              b = L.bright[b];
            } else
            {
               r = brightMathsInt16(r, fintensity);
@@ -465,7 +299,7 @@ struct RGBA16color {
 
     // shadows/highlights force the per-pixel path (they read the pixel's
     // grayscale), so they always use the tables.
-    QPV_FORCEINLINE void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi) {
+    QPV_FORCEINLINE void shadows(int level, int altMode, int linearGamma, int gray, int noClamping, float fi, const AdjustLUTs &L) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -491,9 +325,9 @@ struct RGBA16color {
            else
               gray = clamp(65535 - (gray*2), 0, 65535);
 
-           nr = LUTshadows[r];
-           ng = LUTshadows[g];
-           nb = LUTshadows[b];
+           nr = L.shadows[r];
+           ng = L.shadows[g];
+           nb = L.shadows[b];
            float fintensity = int_to_float[gray];
            if (linearGamma==1)
            {
@@ -510,7 +344,7 @@ struct RGBA16color {
        }
     }
 
-    QPV_FORCEINLINE void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi) {
+    QPV_FORCEINLINE void highlights(int level, int altMode, int linearGamma, float factor, int gray, int noClamping, float fi, const AdjustLUTs &L) {
        int nr, ng, nb;
        if (noClamping==1)
        {
@@ -538,9 +372,9 @@ struct RGBA16color {
            else
               gray = contraMathsInt16(gray, factor, 32768);
 
-           nr = LUThighs[r];
-           ng = LUThighs[g];
-           nb = LUThighs[b];
+           nr = L.highs[r];
+           ng = L.highs[g];
+           nb = L.highs[b];
            float fintensity = int_to_float[gray];
            if (linearGamma==1)
            {
@@ -558,7 +392,7 @@ struct RGBA16color {
 
     // The clamped branch only ever ran on the 256 values reachable straight out
     // of char_to_int[]+invert, so it is always folded into the head table and
-    // LUTgamma[] is never needed. zamma == 1.0/(gamma/300.0).
+    // needs no 65536-entry LUT. zamma == 1.0/(gamma/300.0).
     QPV_FORCEINLINE void gamma(int level, int bright, int altMode, int noClamping, double zamma) {
       if (noClamping==0)
       {
@@ -604,7 +438,7 @@ struct RGBA16color {
 
     // RGB half only; altContra==1 touched nothing but alpha, which is a LUT now.
     template<bool UseLUT>
-    QPV_FORCEINLINE void contrast(int level, int linearGamma, float fintensity, int noClamping, float fip) {
+    QPV_FORCEINLINE void contrast(int level, int linearGamma, float fintensity, int noClamping, float fip, const AdjustLUTs &L) {
         if (noClamping==1)
         {
            // a channel below 0 goes through the same formula as any other value
@@ -683,9 +517,9 @@ struct RGBA16color {
 
            if (UseLUT)
            {
-              r = LUTcontra[r];
-              g = LUTcontra[g];
-              b = LUTcontra[b];
+              r = L.contra[r];
+              g = L.contra[g];
+              b = L.contra[b];
            } else
            {
               r = contraMathsInt16(r, fip, 32768);
@@ -847,3 +681,363 @@ struct RGBA16color {
         }
     }
 };
+
+// ---------------------------------------------------------------------------
+// AdjustImageColorsPrecise
+//
+// The entry point reads and writes 8-bit pixels and only computes at 16 bits,
+// so the whole filter is a pure 4-bytes-in / 4-bytes-out map. Two things fall
+// out of that, and they are where the speed comes from:
+//
+//  * alpha never reads r/g/b and r/g/b never read alpha  ->  alpha ALWAYS
+//    collapses to a 256-entry byte table, whatever the settings;
+//  * when no cross-channel op is live (no hue / saturation / tint / shadows /
+//    highlights, and contrast<=0) r/g/b are separable too, so the entire
+//    pipeline collapses to 4 byte tables and the inner loop is 4 lookups.
+//
+// AdjustColorsFXplan::pixelRGB() is the single scalar kernel. The table builders and
+// the per-pixel path both go through it, so the two cannot drift apart.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Per-call plan. Everything loop-invariant is resolved here, once.
+// ---------------------------------------------------------------------------
+struct OutRGB { unsigned char b, g, r; };
+
+struct AdjustColorsFXplan {
+    int invertColors, gammaLvl, brightness, altBright, altContra, contrast;
+    int altHiLows, shadows, highs, hue, tintDegrees, tintAmount, altTint;
+    int altSat, saturation, seeThrough, linearGamma, noClamping;
+    int whitePoint, blackPoint, noiseMode;
+    int rOffset, gOffset, bOffset, aOffset;
+    int rThreshold, gThreshold, bThreshold, aThreshold;
+    float fiBright, fiShadows, fiHighs, fiContra, factorContrast, factorHiLows;
+    float saturateFactor, fintensity;
+    double zammaGamma, zammaBright;
+    bool headCoversGamma, headCoversBright;
+    bool anyOffset, anyThreshold, doHiLows;
+    bool skipZeroAlpha;
+
+    // head[c] : source byte -> 16-bit channel value with every leading
+    // per-channel op already folded in.  c: 0=B 1=G 2=R.
+    int head[3][256];
+    unsigned char aLUT[256];
+
+    // Fast path: out_k = chanLUT[k][ q[k] ], or chanLUT[k][ q[swapIdx] ] when
+    // altSat>1 collapsed every channel onto one source channel.
+    bool lutPath, chanSwap;
+    int swapIdx;
+    unsigned char chanLUT[3][256];
+
+    // what the per-pixel path reads, filled by buildAdjustColorsFXplan()
+    inline static AdjustLUTs luts;
+
+    template<bool UseLUT>
+    QPV_FORCEINLINE void applyRGB(RGBA16color& px) const {
+        if (!headCoversGamma && gammaLvl!=300)
+           px.gamma(gammaLvl, brightness, altBright, noClamping, zammaGamma);
+        if (!headCoversBright)
+        {
+           if (doHiLows)
+           {
+              int gray = (noClamping==1) ? 0 : getInt16grayscale(px.r, px.g, px.b);
+              if (shadows!=0)
+                 px.shadows(shadows, altHiLows, linearGamma, gray, noClamping, fiShadows, luts);
+              if (highs!=0)
+                 px.highlights(highs, altHiLows, linearGamma, factorHiLows, gray, noClamping, fiHighs, luts);
+           }
+           if (anyOffset)
+              px.channelOffsetRGB(rOffset, gOffset, bOffset, noClamping);
+           if (brightness!=0)
+              px.brightness<UseLUT>(brightness, altBright, noClamping, fiBright, zammaBright, luts);
+        }
+        if (contrast!=0 && altContra==0)
+           px.contrast<UseLUT>(contrast, linearGamma, factorContrast, noClamping, fiContra, luts);
+        if (noClamping==1)
+        {
+           px.r = clamp(px.r, 0, 65535);
+           px.g = clamp(px.g, 0, 65535);
+           px.b = clamp(px.b, 0, 65535);
+        }
+        if (hue!=0)
+           px.hueRotate(hue);
+        if (saturation!=0)
+           px.saturation(saturation, altSat, linearGamma, saturateFactor);
+        if (blackPoint>0)
+           px.blackPoint(blackPoint, noiseMode);
+        if (whitePoint<65535)
+           px.whitePoint(whitePoint, noiseMode);
+        if (tintAmount>0)
+           px.tint(tintDegrees, tintAmount, altTint, linearGamma);
+        if (anyThreshold)
+           px.thresholdRGB(rThreshold, gThreshold, bThreshold, seeThrough);
+
+        if (blackPoint>0 || whitePoint<65535)
+        {
+           // blackPoint()/whitePoint() with noise can push a channel outside
+           // [0,65535]; the original then indexed int_to_char[] out of bounds.
+           px.r = clamp(px.r, 0, 65535);
+           px.g = clamp(px.g, 0, 65535);
+           px.b = clamp(px.b, 0, 65535);
+        }
+    }
+
+    // The one scalar kernel. The 256-entry table builders and the general loop
+    // both go through here, so the two paths cannot drift apart.
+    template<bool UseLUT>
+    QPV_FORCEINLINE OutRGB pixelRGB(int oR, int oG, int oB) const {
+        RGBA16color px;
+        px.b = head[0][oB];
+        px.g = head[1][oG];
+        px.r = head[2][oR];
+        px.a = 0;
+        applyRGB<UseLUT>(px);
+
+        OutRGB o;
+        if (linearGamma==1 && fintensity<1.0f)
+        {
+            // rounded back from linear light: the 16-bit round trip of a shadow level can land just below it
+            o.r = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[px.r], gamma_to_linearInt16[char_to_int[oR]], fintensity)];
+            o.g = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[px.g], gamma_to_linearInt16[char_to_int[oG]], fintensity)];
+            o.b = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[px.b], gamma_to_linearInt16[char_to_int[oB]], fintensity)];
+        } else
+        {
+            o.r = weighTwoValues(int_to_char[px.r], oR, fintensity);
+            o.g = weighTwoValues(int_to_char[px.g], oG, fintensity);
+            o.b = weighTwoValues(int_to_char[px.b], oB, fintensity);
+        }
+        return o;
+    }
+};
+
+static void buildAdjustColorsFXplan(AdjustColorsFXplan& p, int opacity, int invertColors, int altSat, int saturation,
+    int altBright, int brightness, int altContra, int contrast, int altHiLows, int shadows,
+    int highs, int hue, int tintDegrees, int tintAmount, int altTint, int gamma,
+    int rOffset, int gOffset, int bOffset, int aOffset, int rThreshold, int gThreshold,
+    int bThreshold, int aThreshold, int seeThrough, int linearGamma, int noClamping,
+    int whitePoint, int blackPoint, int noiseMode)
+{
+    // ---- scalars, in the exact order the original computed them ----
+    p.zammaGamma  = (gamma!=300) ? 1.0f / ((float)gamma/300.0f) : 1.0;
+    p.zammaBright = (altBright==0 && brightness<0) ? 1.0f / ((float)(77069.0f - brightness)/77069.0f) : 1.0;
+    p.fiBright    = (brightness>0) ? brightness/32768.0f : -1*int_to_float[-1*brightness];
+
+    float azx = (altHiLows==1) ? 25 : 95;
+    p.factorHiLows = (65536.5f * (azx + 65535.0f)) / (65535.0f * (65536.5f - azx));
+    p.fiShadows    = (shadows>0) ? shadows/32768.0f : -1*int_to_float[-1*shadows];
+    p.fiHighs      = (highs>0) ? highs/32768.0f : -1*int_to_float[-1*highs];
+
+    p.factorContrast = contrast/98302.0f;   // NOTE: pre-clamp, as in the original
+    if (contrast>65525)
+       contrast = 65525;
+    p.fiContra = (65536.5f * (contrast + 65535.0f)) / (65535.0f * (65536.5f - contrast));
+
+    if (hue<0)
+       hue += 360;
+    if (tintDegrees<0)
+       tintDegrees += 360;
+
+    p.saturateFactor = (saturation<0) ? (65535.0f - abs(saturation))/131070.0f : 0.5f + saturation/131070.0f;
+    p.fintensity = char_to_float[opacity];
+
+    p.invertColors = invertColors; p.gammaLvl = gamma; p.brightness = brightness;
+    p.altBright = altBright; p.altContra = altContra; p.contrast = contrast;
+    p.altHiLows = altHiLows; p.shadows = shadows; p.highs = highs; p.hue = hue;
+    p.tintDegrees = tintDegrees; p.tintAmount = tintAmount; p.altTint = altTint;
+    p.altSat = altSat; p.saturation = saturation; p.seeThrough = seeThrough;
+    p.linearGamma = linearGamma; p.noClamping = noClamping;
+    p.whitePoint = whitePoint; p.blackPoint = blackPoint; p.noiseMode = noiseMode;
+    p.rOffset = rOffset; p.gOffset = gOffset; p.bOffset = bOffset; p.aOffset = aOffset;
+    p.rThreshold = rThreshold; p.gThreshold = gThreshold; p.bThreshold = bThreshold;
+    p.aThreshold = aThreshold;
+
+    p.anyOffset    = (aOffset!=0 || rOffset!=0 || gOffset!=0 || bOffset!=0);
+    p.anyThreshold = (aThreshold>=0 || rThreshold>=0 || gThreshold>=0 || bThreshold>=0);
+    p.doHiLows     = (shadows!=0 || highs!=0);
+    p.skipZeroAlpha = (altContra==0 && aOffset==0);
+
+    // gamma()'s noClamping branch mixes channels, so it cannot be folded.
+    p.headCoversGamma  = (gamma==300 || noClamping==0);
+    p.headCoversBright = p.headCoversGamma && !p.doHiLows;
+
+    // ---- head tables (256 evaluations, so the closed forms are used) ----
+    const int chanOff[3] = { bOffset, gOffset, rOffset };
+    for (int c = 0; c < 3; c++)
+    {
+        for (int i = 0; i < 256; i++)
+        {
+            int v = char_to_int[i];
+            if (invertColors==1)
+               v = 65535 - v;
+            if (p.headCoversGamma && gamma!=300)
+               v = gammaMathsInt16(v, p.zammaGamma);
+            if (p.headCoversBright)
+            {
+                if (p.anyOffset)
+                   v = (noClamping==1) ? v + chanOff[c] : clamp(v + chanOff[c], 0, 65535);
+                if (brightness!=0)
+                {
+                    RGBA16color t; t.r = t.g = t.b = v; t.a = 0;
+                    t.brightness<false>(brightness, altBright, noClamping, p.fiBright, p.zammaBright, p.luts);
+                    v = t.r;
+                }
+            }
+            p.head[c][i] = v;
+        }
+    }
+
+    // ---- alpha: always a 256-entry LUT (alpha never reads r/g/b) ----
+    for (int i = 0; i < 256; i++)
+    {
+        int a = char_to_int[i];
+        if (p.anyOffset)
+           a = clamp(a + aOffset, 0, 65535);
+        if (contrast!=0 && altContra==1)
+           a = contraMathsInt16(a, p.fiContra, 32768);        // == luts.contra[a]
+        if (p.anyThreshold && aThreshold>=0)
+        {
+           if (seeThrough==2)      a = (a>aThreshold) ? a : 0;
+           else if (seeThrough==3) a = (a>aThreshold) ? 65535 : a;
+           else                    a = (a>aThreshold) ? 65535 : 0;
+        }
+        if (linearGamma==1 && p.fintensity<1.0f)
+           p.aLUT[i] = blend_degamma_lut[weighTwoValues(gamma_to_linearInt16[a], gamma_to_linearInt16[char_to_int[i]], p.fintensity)];
+        else
+           p.aLUT[i] = weighTwoValues(int_to_char[a], i, p.fintensity);
+    }
+
+    // ---- can the whole RGB pipeline collapse to 3 byte tables? ----
+    const bool noiseFree   = (noiseMode!=1 || (blackPoint<=0 && whitePoint>=65535));
+    const bool contraSep   = (contrast==0 || altContra==1 || contrast<0);
+    const bool preSatSep   = p.headCoversBright && contraSep && hue==0 && noiseFree;
+    const bool caseA       = preSatSep && saturation==0 && tintAmount<=0;
+    // altSat>1 collapses r=g=b to one source channel, so everything downstream
+    // becomes a function of that one byte - but only if opacity does not blend
+    // the per-channel original back in.
+    const bool caseB       = preSatSep && saturation!=0 && altSat>1 && p.fintensity>=1.0f;
+
+    p.lutPath  = caseA || caseB;
+    p.chanSwap = false;
+    p.swapIdx  = 0;
+    if (p.lutPath)
+    {
+        int c = 1;                       // altSat 3 -> G
+        if (caseB && altSat==2) c = 2;   // -> R
+        if (caseB && altSat>=4) c = 0;   // -> B
+        p.chanSwap = caseB;
+        p.swapIdx  = c;
+        for (int i = 0; i < 256; i++)
+        {
+            OutRGB o = p.pixelRGB<false>(i, i, i);
+            p.chanLUT[0][i] = o.b; p.chanLUT[1][i] = o.g; p.chanLUT[2][i] = o.r;
+        }
+        return;                          // no 65536-entry table is needed at all
+    }
+
+    // ---- 65536-entry tables: only what the per-pixel path will actually read ----
+    if (p.doHiLows)
+    {
+        if (shadows!=0)
+        {
+           // #pragma omp parallel for schedule(static)
+           for (int i = 0; i < 65536; i++) p.luts.shadows[i] = brightMathsInt16(i, p.fiShadows);
+        }
+        if (highs!=0)
+        {
+           // #pragma omp parallel for schedule(static)
+           for (int i = 0; i < 65536; i++) p.luts.highs[i] = brightMathsInt16(i, p.fiHighs);
+        }
+    }
+    if (!p.headCoversBright && brightness!=0 && noClamping==0)
+    {
+        if (altBright==1)
+        {
+           // #pragma omp parallel for schedule(static)
+           for (int i = 0; i < 65536; i++) p.luts.bright[i] = brightMathsInt16(i, p.fiBright);
+        } else if (brightness<0)
+        {
+           // #pragma omp parallel for schedule(static)
+           for (int i = 0; i < 65536; i++) p.luts.gammaBright[i] = gammaMathsInt16(i, p.zammaBright);
+        }
+    }
+    if (contrast!=0 && altContra==0 && noClamping==0)
+    {
+        // #pragma omp parallel for schedule(static)
+        for (int i = 0; i < 65536; i++) p.luts.contra[i] = contraMathsInt16(i, p.fiContra, 32768);
+    }
+}
+
+
+DLL_API int DLL_CALLCONV AdjustImageColorsPrecise(unsigned char *BitmapData, int w, int h, int Stride, int bpp, int opacity, int invertColors, int altSat, int saturation, int altBright, int brightness, int altContra, int contrast, int altHiLows, int shadows, int highs, int hue, int tintDegrees, int tintAmount, int altTint, int gamma, int rOffset, int gOffset, int bOffset, int aOffset, int rThreshold, int gThreshold, int bThreshold, int aThreshold, int seeThrough, int linearGamma, int noClamping, int whitePoint, int blackPoint, int noiseMode, unsigned char *maskBitmap, int mStride) {
+    if (opacity<2)
+      return 1;
+
+    AdjustColorsFXplan p;
+    buildAdjustColorsFXplan(p, opacity, invertColors, altSat, saturation, altBright, brightness, altContra,
+        contrast, altHiLows, shadows, highs, hue, tintDegrees, tintAmount, altTint, gamma,
+        rOffset, gOffset, bOffset, aOffset, rThreshold, gThreshold, bThreshold, aThreshold,
+        seeThrough, linearGamma, noClamping, whitePoint, blackPoint, noiseMode);
+
+    const int bpc = bpp/8;
+    const bool has32 = (bpp==32);
+
+    #pragma omp parallel for schedule(dynamic) if ((INT64)w*h >= 16384)
+    for (int y = 0; y < h; y++)
+    {
+        unsigned char* row = BitmapData + (INT64)y * Stride;
+        if (p.lutPath)
+        {
+            const unsigned char* LB = p.chanLUT[0];
+            const unsigned char* LG = p.chanLUT[1];
+            const unsigned char* LR = p.chanLUT[2];
+            for (int x = 0; x < w; x++)
+            {
+                if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+                   continue;
+
+                unsigned char* q = row + (INT64)x * bpc;
+                unsigned char na = 0;
+                if (has32)
+                {
+                   if (p.skipZeroAlpha && q[3]==0)
+                      continue;
+                   na = p.aLUT[q[3]];
+                }
+                if (p.chanSwap)
+                {
+                   const unsigned char v = q[p.swapIdx];
+                   const unsigned char nb = LB[v], ng = LG[v], nr = LR[v];
+                   q[0] = nb; q[1] = ng; q[2] = nr;
+                } else
+                {
+                   const unsigned char nb = LB[q[0]], ng = LG[q[1]], nr = LR[q[2]];
+                   q[0] = nb; q[1] = ng; q[2] = nr;
+                }
+                if (has32)
+                   q[3] = na;
+            }
+        } else
+        {
+            for (int x = 0; x < w; x++)
+            {
+                if (clipMaskFilter(x, y, maskBitmap, mStride)==1)
+                   continue;
+
+                unsigned char* q = row + (INT64)x * bpc;
+                unsigned char na = 0;
+                if (has32)
+                {
+                   if (p.skipZeroAlpha && q[3]==0)
+                      continue;
+                   na = p.aLUT[q[3]];
+                }
+                OutRGB o = p.pixelRGB<true>(q[2], q[1], q[0]);
+                q[0] = o.b; q[1] = o.g; q[2] = o.r;
+                if (has32)
+                   q[3] = na;
+            }
+        }
+    }
+    return 1;
+}
+
+#endif // QPV_COLOR_ADJUST_H

@@ -150,7 +150,7 @@ static void bindFreeImageOnce() {
 
         if (FIM.hLib==NULL)
         {
-           fnOutputDebug("thumbsPool: FreeImage.dll not present; FreeImage-only formats disabled");
+           QPV_DBG("thumbsPool: FreeImage.dll not present; FreeImage-only formats disabled");
            return;
         }
 
@@ -198,9 +198,9 @@ static void bindFreeImageOnce() {
                && FIM.GetColorType && FIM.Rescale && FIM.ConvertTo24Bits && FIM.FlipVertical);
 
         if (FIM.ok)
-           fnOutputDebug("thumbsPool: FreeImage.dll bound successfully");
+           QPV_DBG("thumbsPool: FreeImage.dll bound successfully");
         else
-           fnOutputDebug("thumbsPool: FreeImage.dll found but required entry points are missing");
+           QPV_DBG("thumbsPool: FreeImage.dll found but required entry points are missing");
     });
 }
 

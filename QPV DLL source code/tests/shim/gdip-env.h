@@ -3,7 +3,7 @@
 // In the real build that is qpv-main.cpp, with gdiplus.h and the WIC guards already seen.
 // None of that exists here, so this file supplies the flat GDI+ entry points tpGDIPload()
 // touches - as a synthetic image library the test drives - plus the two names it borrows
-// from qpv-main.cpp, WICcodecCrashFilter() and GetExceptionCode().
+// from the real build, WICcodecCrashFilter() [wic-loader.h] and GetExceptionCode().
 //
 // __try/__except are mapped onto a dead branch rather than dropped: both blocks and the
 // filter expression are then compiled and type-checked, which is the point of running this
@@ -40,6 +40,7 @@ template <typename T> static inline T clamp(T v, T lo, T hi) { return (v < lo) ?
 
 static std::string gShimLastDebug;
 static inline void fnOutputDebug(std::string s) { gShimLastDebug = s; }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static inline std::string WideCharToString(const wchar_t *w) {
     std::string o;
     for (; w && *w; w++) o.push_back((char)(*w & 0x7F));

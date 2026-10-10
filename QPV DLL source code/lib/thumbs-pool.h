@@ -329,7 +329,7 @@ static int tpSavePngGdip(Gdiplus::GpBitmap *bmp, const std::wstring &path) {
     if (st!=Gdiplus::Ok)
     {
        DeleteFileW(temp.c_str());
-       fnOutputDebug("thumbsPool: failed to save thumbnail: " + WideCharToString(path.c_str()));
+       QPV_DBG("thumbsPool: failed to save thumbnail: " + WideCharToString(path.c_str()));
        return 0;
     }
 
@@ -594,7 +594,7 @@ static ULONGLONG tpResultBytes(const ThumbResult &res) {
 // JPEG its scaled decode, which is why an EXIF sRGB context, sRGB into sRGB, gets none.
 //
 // Returns 1 with a transform the caller releases, 0 with nothing to do or nothing built.
-// Plain data only, like the guards in qpv-main.cpp; after a fault the objects are abandoned.
+// Plain data only, like the guards in wic-loader.h; after a fault the objects are abandoned.
 static int tpWICguardedColorTransform(IWICImagingFactory *fac, IWICBitmapFrameDecode *pFrame,
                                       const WICPixelFormatGUID *srcFmt, IWICColorTransform **ppTransform,
                                       DWORD *sehCode) {
@@ -694,7 +694,7 @@ static int tpWICguardedColorTransform(IWICImagingFactory *fac, IWICBitmapFrameDe
 // JPEG-XR decoders perform a scaled decode through IWICBitmapSourceTransform instead of
 // unpacking the full resolution image only to shrink it afterwards.
 //
-// Every call that reaches a codec goes through the SEH guards declared in qpv-main.cpp: a
+// Every call that reaches a codec goes through the SEH guards declared in wic-loader.h: a
 // worker thread that faults on a corrupt file kills the whole application just as surely
 // as the viewport thread would, and the pool is the part of QPV that walks over every
 // file in a folder without anyone asking it to.
@@ -716,7 +716,7 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
     HRESULT hr = WICguardedOpenFrame(fac, szFileName, frameIndex, &pDecoder, &pFrame, &facts, &sehCode);
     if (sehCode!=0)
     {
-       fnOutputDebug("thumbsPool: the WIC codec faulted while opening " + WideCharToString(szFileName));
+       QPV_DBG("thumbsPool: the WIC codec faulted while opening " + WideCharToString(szFileName));
        WICsafeRelease(pFrame);
        WICsafeRelease(pDecoder);
        return myBitmap;
@@ -775,9 +775,9 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
           {
              pSource = pTransform;
              if (!reported.exchange(true))
-                fnOutputDebug("thumbsPool: WIC colour management applied, first to " + WideCharToString(szFileName));
+                QPV_DBG("thumbsPool: WIC colour management applied, first to " + WideCharToString(szFileName));
           } else if (icmSeh!=0)
-             fnOutputDebug("thumbsPool: the codec faulted on the colour profile of " + WideCharToString(szFileName));
+             QPV_DBG("thumbsPool: the codec faulted on the colour profile of " + WideCharToString(szFileName));
        }
 
        if (targetW>1 && targetH>1)
@@ -837,16 +837,16 @@ static Gdiplus::GpBitmap* tpWICload(IWICImagingFactory *fac, const wchar_t *szFi
                     : WICguardedCopyPixels(pConverter, NULL, bitmapDatu.Stride, (UINT)bufSize, (BYTE*)bitmapDatu.Scan0, &sehCode);
                 Gdiplus::DllExports::GdipBitmapUnlockBits(myBitmap, &bitmapDatu);
                 if (sehCode!=0)
-                   fnOutputDebug("thumbsPool: the codec faulted while decoding " + WideCharToString(szFileName));
-             } else fnOutputDebug("thumbsPool: failed to lock the GDI+ bitmap for " + WideCharToString(szFileName));
+                   QPV_DBG("thumbsPool: the codec faulted while decoding " + WideCharToString(szFileName));
+             } else QPV_DBG("thumbsPool: failed to lock the GDI+ bitmap for " + WideCharToString(szFileName));
 
              if (FAILED(hrc))
              {
-                fnOutputDebug("thumbsPool: WIC failed to copy pixels for " + WideCharToString(szFileName));
+                QPV_DBG("thumbsPool: WIC failed to copy pixels for " + WideCharToString(szFileName));
                 Gdiplus::DllExports::GdipDisposeImage(myBitmap);
                 myBitmap = NULL;
              }
-          } else fnOutputDebug("thumbsPool: failed to allocate the GDI+ bitmap for " + WideCharToString(szFileName));
+          } else QPV_DBG("thumbsPool: failed to allocate the GDI+ bitmap for " + WideCharToString(szFileName));
        }
     }
 
@@ -995,7 +995,7 @@ static Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int targetW, int 
     {
        // whatever the codec left behind is abandoned on purpose: the object most likely to
        // fault on the way out is the one that just faulted on the way in
-       fnOutputDebug("thumbsPool: GDI+ faulted while opening " + WideCharToString(path.c_str()));
+       QPV_DBG("thumbsPool: GDI+ faulted while opening " + WideCharToString(path.c_str()));
        return NULL;
     }
 
@@ -1035,7 +1035,7 @@ static Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int targetW, int 
     Gdiplus::GpBitmap *out = tpGdipResizeCopy(loaded, outW, outH, interpolation);
     Gdiplus::DllExports::GdipDisposeImage(loaded);
     if (out==NULL)
-       fnOutputDebug("thumbsPool: failed to copy the GDI+ bitmap of " + WideCharToString(path.c_str()));
+       QPV_DBG("thumbsPool: failed to copy the GDI+ bitmap of " + WideCharToString(path.c_str()));
 
     return out;
 }
@@ -1323,7 +1323,7 @@ static Gdiplus::GpBitmap* tpFIMtoGdip(FIBITMAPptr dib, int w, int h) {
 
     if (nBitmap==NULL)
     {
-       fnOutputDebug("thumbsPool: failed to wrap the FreeImage bitmap into a GDI+ object");
+       QPV_DBG("thumbsPool: failed to wrap the FreeImage bitmap into a GDI+ object");
        return NULL;
     }
 
@@ -1380,7 +1380,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     if (dib==NULL)
     {
        status = TP_ERR_LOAD;
-       fnOutputDebug("thumbsPool: FreeImage failed to load " + WideCharToString(path.c_str()));
+       QPV_DBG("thumbsPool: FreeImage failed to load " + WideCharToString(path.c_str()));
        return NULL;
     }
 
@@ -1461,7 +1461,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        if (standard==NULL)
        {
           status = TP_ERR_CONVERT;
-          fnOutputDebug("thumbsPool: failed to scale a type " + std::to_string(loadedType) + " bitmap into 8 bits");
+          QPV_DBG("thumbsPool: failed to scale a type " + std::to_string(loadedType) + " bitmap into 8 bits");
           return NULL;
        }
        dib = standard;
@@ -1475,7 +1475,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
     if (tmp==NULL)
     {
        status = TP_ERR_RESIZE;
-       fnOutputDebug("thumbsPool: failed to rescale " + WideCharToString(path.c_str()));
+       QPV_DBG("thumbsPool: failed to rescale " + WideCharToString(path.c_str()));
        return NULL;
     }
     dib = tmp;
@@ -1488,7 +1488,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        {
           FIM.Unload(dib);
           status = TP_ERR_CONVERT;
-          fnOutputDebug("thumbsPool: failed to convert an UINT16 bitmap to greyscale");
+          QPV_DBG("thumbsPool: failed to convert an UINT16 bitmap to greyscale");
           return NULL;
        }
        FIM.Unload(dib);
@@ -1499,7 +1499,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        {
           FIM.Unload(dib);
           status = TP_ERR_CONVERT;
-          fnOutputDebug("thumbsPool: failed to convert a greyscale bitmap to 24 bits");
+          QPV_DBG("thumbsPool: failed to convert a greyscale bitmap to 24 bits");
           return NULL;
        }
        FIM.Unload(dib);
@@ -1531,7 +1531,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        if (mapped==NULL)
        {
           status = TP_ERR_TONEMAP;
-          fnOutputDebug("thumbsPool: failed to tone map " + WideCharToString(path.c_str()));
+          QPV_DBG("thumbsPool: failed to tone map " + WideCharToString(path.c_str()));
           return NULL;
        }
        dib = mapped;
@@ -1559,7 +1559,7 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        if (tmp==NULL)
        {
           status = TP_ERR_RESIZE;
-          fnOutputDebug("thumbsPool: failed to rescale [second attempt] " + WideCharToString(path.c_str()));
+          QPV_DBG("thumbsPool: failed to rescale [second attempt] " + WideCharToString(path.c_str()));
           return NULL;
        }
        dib = tmp;
@@ -1757,7 +1757,7 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
            bmp = NULL;
         }
         res.status = TP_ERR_LOAD;
-        fnOutputDebug("thumbsPool: an exception escaped while processing " + WideCharToString(job.src.c_str()));
+        QPV_DBG("thumbsPool: an exception escaped while processing " + WideCharToString(job.src.c_str()));
     }
 
     res.elapsedMs = (int)(GetTickCount() - startTick);
@@ -1823,7 +1823,7 @@ static void tpWorkerBody() {
     if (!ownFactory)
     {
        fac = m_pIWICFactory;
-       fnOutputDebug("thumbsPool: worker could not create its own WIC factory; sharing the global one");
+       QPV_DBG("thumbsPool: worker could not create its own WIC factory; sharing the global one");
     }
 
     // made on the first SVG this worker meets; see the tpRunJob() branch that creates it
@@ -1937,7 +1937,7 @@ DLL_API int DLL_CALLCONV thumbsPoolInit(int nThreads) {
     bindFreeImageOnce();
     if (m_pIWICFactory==NULL)
     {
-       fnOutputDebug("thumbsPool: cannot start, WIC was not initialized; call initWICnow() first");
+       QPV_DBG("thumbsPool: cannot start, WIC was not initialized; call initWICnow() first");
        return 0;
     }
 
@@ -1949,7 +1949,7 @@ DLL_API int DLL_CALLCONV thumbsPoolInit(int nThreads) {
 
     tpState.alive = (LONG)tpWorkers.size();
     tpState.generation = tpGeneration.load();
-    fnOutputDebug("thumbsPool: started with " + std::to_string(tpWorkers.size()) + " workers");
+    QPV_DBG("thumbsPool: started with " + std::to_string(tpWorkers.size()) + " workers");
     return (int)tpWorkers.size();
 }
 
@@ -2158,11 +2158,11 @@ DLL_API int DLL_CALLCONV thumbsPoolShutdown() {
 
     if (!allOut)
     {
-       fnOutputDebug("thumbsPool: shut down, but a worker was still busy and had to be abandoned");
+       QPV_DBG("thumbsPool: shut down, but a worker was still busy and had to be abandoned");
        return 0;
     }
 
-    fnOutputDebug("thumbsPool: shut down");
+    QPV_DBG("thumbsPool: shut down");
     return 1;
 }
 

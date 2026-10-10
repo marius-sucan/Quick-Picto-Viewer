@@ -22,9 +22,9 @@
 // written by Marius Șucan with Claude Opus 5
 
 #include "shim/fim-env.h"
-#include "../freeimage-dynamic.h"
+#include "../lib/freeimage-dynamic.h"
 
-// sliced out of ../thumbs-pool.h by run-tests.sh
+// sliced out of ../lib/thumbs-pool.h by run-tests.sh
 #include "fim_defs.part"
 #include "thumbs_structs.part"
 #include "fim_config.part"

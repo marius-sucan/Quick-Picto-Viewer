@@ -40,9 +40,10 @@
 __attribute__((unused)) static void fnOutputDebug(std::string s) {
     if (getenv("QPV_TEST_VERBOSE")) printf("    [dbg] %s\n", s.c_str());
 }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static void SetWindowText(HWND, LPCWSTR) {}
 
-#include "../sqlite-dynamic.h"   // verbatim, the shipped run-time binder
+#include "../lib/sqlite-dynamic.h"   // verbatim, the shipped run-time binder
 #include "header_extract.h"      // verbatim from dupes-search.h
 
 // three literal declarations from dupes-search.h, outside the sliced region

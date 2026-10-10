@@ -95,7 +95,7 @@ static void pdfwWriteRaw(PdfWriter *w, const char *data, size_t n) {
         const DWORD chunk = (DWORD)std::min<size_t>(n, 1u << 30);
         if (!WriteFile(w->file, data, chunk, &wrote, NULL) || wrote==0)
         {
-           fnOutputDebug("PdfWriter: failed to write the file");
+           QPV_DBG("PdfWriter: failed to write the file");
            w->failed = true;
            return;
         }
@@ -231,7 +231,7 @@ static void pdfwRollback(PdfWriter *w, const PdfwMark &m) {
        pos.QuadPart = (LONGLONG)m.offset;
        if (!SetFilePointerEx(w->file, pos, NULL, FILE_BEGIN) || !SetEndOfFile(w->file))
        {
-          fnOutputDebug("PdfWriter: failed to cut an unfinished page off the file");
+          QPV_DBG("PdfWriter: failed to cut an unfinished page off the file");
           w->failed = true;
           return;
        }
@@ -872,7 +872,7 @@ static bool pdfwFinish(PdfWriter *w, const wchar_t *title, const wchar_t *produc
         UINT64 v = w->offsets[i];
         if (v==0 || v>PDFW_MAX_OFFSET)
         {
-           fnOutputDebug("PdfWriter: an object has no usable offset in the cross-reference table");
+           QPV_DBG("PdfWriter: an object has no usable offset in the cross-reference table");
            return false;
         }
 
@@ -1130,7 +1130,7 @@ DLL_API int DLL_CALLCONV PdfWriterEnd(PdfWriter *w, int commit, const wchar_t *t
 
     if (commit==1 && result==0 && !MoveFileExW(w->temp.c_str(), w->dest.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
-       fnOutputDebug("PdfWriter: failed to replace the destination file");
+       QPV_DBG("PdfWriter: failed to replace the destination file");
        result = 3;
     }
 
@@ -1140,6 +1140,146 @@ DLL_API int DLL_CALLCONV PdfWriterEnd(PdfWriter *w, int commit, const wchar_t *t
     w->magic = 0;
     delete w;
     return result;
+}
+
+// Adds a GDI+ bitmap as a page: scaled down to rasterW x rasterH when it is larger
+// [the pixels are never enlarged; the PDF reader does that], laid over bgColor where it is
+// transparent and stored as a JPEG of the given quality. The caller keeps the bitmap.
+// Returns PDFW_ADDED, PDFW_SKIPPED [the document stays as it was] or PDFW_LOST.
+DLL_API int DLL_CALLCONV PdfWriterAddBitmap(PdfWriter *w, Gdiplus::GpBitmap *bmp, int rasterW, int rasterH, int quality, double pageW, double pageH, double x, double y, double width, double height, UINT bgColor) {
+    static CLSID jpegEncoder;
+    static int hasEncoder = 0;
+    if (!pdfwValid(w) || w->failed)
+       return PDFW_LOST;
+
+    const PdfwPlace p = { pageW, pageH, x, y, width, height, bgColor, 1 };
+    UINT srcW = 0, srcH = 0;
+    if (bmp==NULL || !pdfwPlaceUsable(p)
+        || Gdiplus::DllExports::GdipGetImageWidth(bmp, &srcW)!=Gdiplus::Ok
+        || Gdiplus::DllExports::GdipGetImageHeight(bmp, &srcH)!=Gdiplus::Ok || srcW==0 || srcH==0)
+       return PDFW_SKIPPED;
+
+    if (hasEncoder==0)
+    {
+       UINT count = 0, size = 0;
+       Gdiplus::DllExports::GdipGetImageEncodersSize(&count, &size);
+       std::vector<BYTE> list(size + 1);
+       Gdiplus::ImageCodecInfo *codecs = (Gdiplus::ImageCodecInfo*)list.data();
+       if (size>0 && Gdiplus::DllExports::GdipGetImageEncoders(count, size, codecs)==Gdiplus::Ok)
+       {
+          for (UINT i = 0; i < count; i++)
+          {
+              if (codecs[i].MimeType!=NULL && wcscmp(codecs[i].MimeType, L"image/jpeg")==0)
+              {
+                 jpegEncoder = codecs[i].Clsid;
+                 hasEncoder = 1;
+                 break;
+              }
+          }
+       }
+
+       if (hasEncoder==0)
+       {
+          QPV_DBG("PdfWriterAddBitmap: GDI+ has no JPEG encoder");
+          return PDFW_SKIPPED;
+       }
+    }
+
+    UINT rw = (rasterW<1) ? 1 : std::min<UINT>((UINT)rasterW, srcW);
+    UINT rh = (rasterH<1) ? 1 : std::min<UINT>((UINT)rasterH, srcH);
+    // the JPEG encoder takes no side over 65500 px: the raster shrinks to fit, the page keeps its size
+    const UINT jpegMax = 65500;
+    if (rw>jpegMax || rh>jpegMax)
+    {
+       if (rw>=rh)
+       {
+          rh = std::max<UINT>(1, (UINT)((UINT64)rh * jpegMax / rw));
+          rw = jpegMax;
+       } else
+       {
+          rw = std::max<UINT>(1, (UINT)((UINT64)rw * jpegMax / rh));
+          rh = jpegMax;
+       }
+    }
+
+    Gdiplus::Rect rect(0, 0, (INT)srcW, (INT)srcH);
+    Gdiplus::BitmapData bd;
+    if (Gdiplus::DllExports::GdipBitmapLockBits(bmp, &rect, Gdiplus::ImageLockModeRead, PixelFormat32bppPARGB, &bd)!=Gdiplus::Ok)
+       return PDFW_SKIPPED;
+
+    bool locked = true;
+    int result = PDFW_SKIPPED;
+    IStream *stream = NULL;
+    Gdiplus::GpBitmap *rgbBitmap = NULL;
+    std::vector<BYTE> topDown, scaled, rgb;
+    try
+    {
+       const BYTE *px = (const BYTE*)bd.Scan0;
+       int stride = bd.Stride;
+       if (stride<0)
+       {
+          // a bottom-up bitmap; OpenCV wants the rows top-down in memory
+          topDown.resize((size_t)srcW * 4 * srcH);
+          for (UINT row = 0; row < srcH; row++)
+              memcpy(&topDown[(size_t)row * srcW * 4], px + (ptrdiff_t)row * stride, (size_t)srcW * 4);
+          px = topDown.data();
+          stride = (int)srcW * 4;
+       }
+
+       if (rw!=srcW || rh!=srcH)
+       {
+          // premultiplied, so that transparent pixels add nothing to their neighbours
+          scaled.resize((size_t)rw * 4 * rh);
+          const cv::Mat src(srcH, srcW, CV_8UC4, (void*)px, (size_t)stride);
+          cv::Mat dst(rh, rw, CV_8UC4, scaled.data(), (size_t)rw * 4);
+          cv::resize(src, dst, dst.size(), 0, 0, cv::INTER_AREA);
+          px = scaled.data();
+          stride = (int)rw * 4;
+       }
+
+       const int rgbStride = (int)((rw * 3 + 3) & ~3u);
+       rgb.resize((size_t)rgbStride * rh);
+       pdfwOverColor(px, stride, rw, rh, bgColor, rgb.data(), rgbStride);
+       Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bd);
+       locked = false;
+
+       if (Gdiplus::DllExports::GdipCreateBitmapFromScan0((INT)rw, (INT)rh, rgbStride, PixelFormat24bppRGB, rgb.data(), &rgbBitmap)==Gdiplus::Ok
+           && CreateStreamOnHGlobal(NULL, TRUE, &stream)==S_OK)
+       {
+          static const GUID encoderQuality = { 0x1d5be4b5, 0xfa4a, 0x452d, { 0x9c, 0xdd, 0x5d, 0xb3, 0x51, 0x05, 0xe7, 0xeb } };
+          ULONG q = (ULONG)std::min<int>(std::max<int>(quality, 1), 100);
+          Gdiplus::EncoderParameters params;
+          params.Count = 1;
+          params.Parameter[0].Guid = encoderQuality;
+          params.Parameter[0].Type = Gdiplus::EncoderParameterValueTypeLong;
+          params.Parameter[0].NumberOfValues = 1;
+          params.Parameter[0].Value = &q;
+          STATSTG st;
+          HGLOBAL mem = NULL;
+          if (Gdiplus::DllExports::GdipSaveImageToStream(rgbBitmap, stream, &jpegEncoder, &params)==Gdiplus::Ok
+              && stream->Stat(&st, STATFLAG_NONAME)==S_OK && GetHGlobalFromStream(stream, &mem)==S_OK)
+          {
+             const BYTE *jpeg = (const BYTE*)GlobalLock(mem);
+             if (jpeg!=NULL)
+             {
+                result = pdfwAddJpegData(w, jpeg, (size_t)st.cbSize.QuadPart, p);
+                GlobalUnlock(mem);
+             }
+          } else QPV_DBG("PdfWriterAddBitmap: GDI+ failed to encode the page");
+       }
+    } catch (...)
+    {
+       QPV_DBG("PdfWriterAddBitmap: failed to prepare the page");
+       result = PDFW_SKIPPED;
+    }
+
+    if (locked)
+       Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bd);
+    if (rgbBitmap!=NULL)
+       Gdiplus::DllExports::GdipDisposeImage(rgbBitmap);
+    if (stream!=NULL)
+       stream->Release();
+    return w->failed ? PDFW_LOST : result;
 }
 
 #endif // QPV_PDF_WRITER_H

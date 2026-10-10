@@ -1,5 +1,5 @@
 // The environment the WIC loader of thumbs-pool.h expects to be #included into, for
-// wic_icm.cpp: the WIC interfaces tpWICload() and the guards of qpv-main.cpp call, declared
+// wic_icm.cpp: the WIC interfaces tpWICload() and the guards of wic-loader.h call, declared
 // with the Windows SDK's signatures, and scriptable fakes behind them.
 //
 // The fakes keep real reference counts and a count of the objects alive, so a test can
@@ -73,6 +73,7 @@ template <typename T> static inline T clamp(T v, T lo, T hi) { return (v < lo) ?
 
 static std::vector<std::string> gShimDebug;
 static inline void fnOutputDebug(std::string s) { gShimDebug.push_back(s); }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static inline std::string WideCharToString(const wchar_t *w) {
     std::string o;
     for (; w && *w; w++) o.push_back((char)(*w & 0x7F));
@@ -526,7 +527,7 @@ namespace Gdiplus {
     }
 }
 
-// ---- what tpWICload() borrows from qpv-main.cpp besides the guards ------------------------------
+// ---- what tpWICload() borrows from wic-loader.h besides the guards ------------------------------
 
 static inline INT indexedWICpixelFormats(const WICPixelFormatGUID) { return 1; }
 static inline UINT indexedWICcontainerFormats(const GUID) { return 1; }

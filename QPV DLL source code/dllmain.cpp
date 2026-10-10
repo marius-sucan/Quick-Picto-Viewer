@@ -1,5 +1,5 @@
 // dllmain.cpp : Définit le point d'entrée de l'application DLL.
-#include "pch.h"
+#include "lib/pch.h"
 
 // callwndproc-hook.h [qpv-main.cpp]: the WH_CALLWNDPROC hook behind the menus
 extern "C" __declspec(dllexport) int __stdcall qpvUnhookSentMessages();

@@ -34,7 +34,7 @@
 #include <chrono>
 #include <algorithm>
 
-// ---- odds and ends from framework.h / qpv-main.h --------------------------------------
+// ---- odds and ends from framework.h / qpv-main.cpp ------------------------------------
 #define DLL_API
 #define DLL_CALLCONV
 #ifndef TRUE
@@ -52,6 +52,7 @@ typedef unsigned long long ULONGLONG;
 struct GUID { unsigned int Data1; unsigned short Data2, Data3; unsigned char Data4[8]; };
 
 static inline void fnOutputDebug(std::string s) { (void)s; }
+#define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
 static inline std::string WideCharToString(const wchar_t *w) {
     std::string o;
     for (; w && *w; w++) o.push_back((char)(*w & 0x7F));
@@ -522,7 +523,7 @@ static inline HRESULT D2D1CreateFactory(int, ID2D1Factory **f) {
     return S_OK;
 }
 
-// the real one lives in qpv-main.cpp, ahead of the PDF exports, and every PDFium caller of
+// the real one lives in pdfium-reader.h, ahead of the PDF exports, and every PDFium caller of
 // the DLL takes it, because PDFium keeps global state
 static std::timed_mutex pdfiumMutex;
 
@@ -576,7 +577,7 @@ static inline Gdiplus::GpBitmap* tpGDIPload(const std::wstring &path, int, int, 
 }
 
 // ---- the two names dupes-pixels.h borrows from the query engine ------------------------
-#include "../../sqlite-dynamic.h"
+#include "../../lib/sqlite-dynamic.h"
 static std::wstring dupesEngineError;
 static std::atomic<int> dupesPixCancel(0);
 static inline void dupesSetError(const wchar_t *what, sqlite3 *) { dupesEngineError = (what!=NULL) ? what : L""; }

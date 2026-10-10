@@ -20,7 +20,7 @@ CXXFLAGS="-O2 -std=c++17 -msse2 -mfpmath=sse -Wall"
 # One file now: the pipeline, the records AHK reads by byte offset and the DCT all moved
 # out of qpv-main.cpp/.h into dupes-search.h, so every slice below comes from the same
 # place. thumbs-pool.h is named inline by the one slice that needs it.
-SRC="../dupes-search.h"
+SRC="../lib/dupes-search.h"
 fail=0
 
 for f in "$SRC"; do
@@ -54,7 +54,7 @@ slice header_extract.h   "$SRC" '^\/\/ One record per surviving image pair' '^\/
 slice block_extract.cpp  "$SRC" '^\/\/ SWAR population count'          '^\/\/ qpv-dupes-block-end' 450 || exit 1
 slice query_extract.cpp  "$SRC" '^\/\/ qpv-dupes-query-begin'          '^\/\/ qpv-dupes-query-end' 350 || exit 1
 slice dct_extract.cpp    "$SRC" '^double calcArrayAvgMedian'          '^\/\/ qpv-dct-block-end' 100 || exit 1
-slice thumbs_structs.part ../thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
+slice thumbs_structs.part ../lib/thumbs-pool.h '^#pragma pack(push, 8)'  '^#pragma pack(pop)' 40 || exit 1
 echo "   ok"
 
 echo
@@ -141,8 +141,8 @@ echo "== mutation check: the histogram oracle must reject wrong maths =="
 # The mutation goes into a COPY - the shipped header is never edited, so an interrupted
 # run cannot leave it broken.
 sed 's|const double avgu     = (double)sumTotalBr/totalPixelz - 1.0;|const double avgu     = (double)sumTotalBr/totalPixelz;|' \
-    ../dupes-pixels.h > pixels_mutant.h
-if ! cmp -s pixels_mutant.h ../dupes-pixels.h; then
+    ../lib/dupes-pixels.h > pixels_mutant.h
+if ! cmp -s pixels_mutant.h ../lib/dupes-pixels.h; then
     g++ $CXXFLAGS -Wno-sign-compare -Ishim -DQPV_PIXELS_HEADER='"pixels_mutant.h"' -o pixels_mutant pixels_smoke.cpp -ldl -lpthread 2>/dev/null
     if ./pixels_mutant > /dev/null 2>&1; then
         echo "  ERROR: the mutant passed - the histogram oracle proves nothing"; fail=1
@@ -245,19 +245,19 @@ echo "== mutation check: the PDF writer's mistakes must be caught =="
 #   E - the Exif segment embedded along with the JPEG.
 for mutant in A B C D E; do
     case $mutant in
-      A) sed 's|case 6:  m\[0\] = 0;  m\[1\] = -h; m\[2\] = w;|case 6:  m[0] = 0;  m[1] = h; m[2] = -w;|' ../pdf-writer.h > pdf_writer_mutant.h
+      A) sed 's|case 6:  m\[0\] = 0;  m\[1\] = -h; m\[2\] = w;|case 6:  m[0] = 0;  m[1] = h; m[2] = -w;|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="orientation 6 is drawn as 8" ;;
-      B) sed 's|w->offsets\[n\] = pdfwTell(w);|w->offsets[n] = pdfwTell(w) + 1;|' ../pdf-writer.h > pdf_writer_mutant.h
+      B) sed 's|w->offsets\[n\] = pdfwTell(w);|w->offsets[n] = pdfwTell(w) + 1;|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="an xref offset misses its object" ;;
-      C) sed 's|else if (c==0xD9)$|else if (c==0xD9 \&\& false)|' ../pdf-writer.h > pdf_writer_mutant.h
+      C) sed 's|else if (c==0xD9)$|else if (c==0xD9 \&\& false)|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="the scans are copied past EOI" ;;
-      D) sed 's|^       pdfwRollback(w, mark);|       ;|' ../pdf-writer.h > pdf_writer_mutant.h
+      D) sed 's|^       pdfwRollback(w, mark);|       ;|' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="a page that failed stays in the file" ;;
-      E) sed 's#c==0xE0 || c==0xEE;#c==0xE0 || c==0xEE || c==0xE1;#' ../pdf-writer.h > pdf_writer_mutant.h
+      E) sed 's#c==0xE0 || c==0xEE;#c==0xE0 || c==0xEE || c==0xE1;#' ../lib/pdf-writer.h > pdf_writer_mutant.h
          label="Exif is embedded with the JPEG" ;;
     esac
 
-    if cmp -s pdf_writer_mutant.h ../pdf-writer.h; then
+    if cmp -s pdf_writer_mutant.h ../lib/pdf-writer.h; then
         echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
         continue
     fi
