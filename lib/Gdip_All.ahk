@@ -3542,7 +3542,11 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
        {
           If pBrush
              Gdip_FillRectangle(G, pBrush, 0, 0, ResizedW, ResizedH)
-          r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH)
+          ; mirrored wrapping keeps GDI+ from blending the resampled edge pixels with the transparent outside
+          ImageAttr := Gdip_CreateImageAttributes()
+          Gdip_SetImageAttributesWrapMode(ImageAttr, 3) ; WrapModeTileFlipXY
+          r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH,,,,,,, ImageAttr)
+          Gdip_DisposeImageAttributes(ImageAttr)
        }
 
        newBitmap := !r ? Gdip_CreateBitmapFromHBITMAP(hbm) : ""
@@ -3564,7 +3568,10 @@ Gdip_ResizeBitmap(pBitmap, givenW, givenH, KeepRatio, InterpolationMode:="", Kee
           {
              If pBrush
                 Gdip_FillRectangle(G, pBrush, 0, 0, ResizedW, ResizedH)
-             r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH)
+             ImageAttr := Gdip_CreateImageAttributes()
+             Gdip_SetImageAttributesWrapMode(ImageAttr, 3) ; WrapModeTileFlipXY
+             r := Gdip_DrawImage(G, pBitmap, 0, 0, ResizedW, ResizedH,,,,,,, ImageAttr)
+             Gdip_DisposeImageAttributes(ImageAttr)
           }
 
           Gdip_DeleteGraphics(G)

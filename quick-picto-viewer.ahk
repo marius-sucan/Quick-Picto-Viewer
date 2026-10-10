@@ -50073,6 +50073,9 @@ BTNimgResizeEditor() {
 
     setImageLoading()
     Gdip_SetPixelOffsetMode(G2, 2)
+    ; mirrored wrapping keeps GDI+ from blending the resampled edge pixels with the transparent outside
+    imageAttribs := Gdip_CreateImageAttributes()
+    Gdip_SetImageAttributesWrapMode(imageAttribs, 3) ; WrapModeTileFlipXY
     dpX := (adjustCanvasCentered=1) ? Round(tUserNewWidth/2 - imgW/2) : 0
     dpY := (adjustCanvasCentered=1) ? Round(tUserNewHeight/2 - imgH/2) : 0
     isOkay := (imgW<tUserNewWidth || imgH<tUserNewHeight) ? 1 : 0
@@ -50090,24 +50093,16 @@ BTNimgResizeEditor() {
        zBitmap := trGdip_ResizeBitmap(A_ThisFunc, whichBitmap, oImgW//2 + 1, oImgH//2, 0, 5)
        zA := Gdip_CreateEffect(1, 250, 0, 0)
        Gdip_BitmapApplyEffect(zBitmap, zA)
-       r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, 0, 0, tUserNewWidth, tUserNewHeight)
+       r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, 0, 0, tUserNewWidth, tUserNewHeight,,,,,,, imageAttribs)
        Gdip_DisposeEffect(zA)
        trGdip_DisposeImage(zBitmap, 1)
        Gdip_ResetClip(G2)
     }
 
-    extendEdges := (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1) ? 1 : 0
-    If (extendEdges=1)
-    {
-       ; the edge pixels get replicated; mirrored wrapping keeps GDI+ from blending them with the transparent outside
-       imageAttribs := Gdip_CreateImageAttributes()
-       Gdip_SetImageAttributesWrapMode(imageAttribs, 3) ; WrapModeTileFlipXY
-    }
-
     r1 := trGdip_DrawImage(A_ThisFunc, G2, whichBitmap, dpX, dpY, imgW, imgH,,,,,,, imageAttribs)
     Gdip_DisposeImageAttributes(imageAttribs)
     Gdip_DeleteGraphics(G2)
-    If (extendEdges=1)
+    If (ResizeKeepAratio=1 && ResizeEnforceCanvas=1 && ResizeFillCanvasMode=2 && isOkay=1)
        QPV_ExtendBitmapEdges(newBitmap, dpX, dpY, imgW, imgH)
 
     calcRelativeSelCoords(newBitmap)
