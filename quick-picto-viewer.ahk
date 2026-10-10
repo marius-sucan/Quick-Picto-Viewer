@@ -105968,24 +105968,6 @@ testFIMrgb16toRGBF() {
    ToolTip, % a "|" b , , , 2
 }
 
-testIdentifyDIBbehindGDIPbmp() {
-   imgBPP := 32, kw := 25130, kh = 21350
-   pBitmap := Gdip_CreateBitmap(kw, kh, "0x26200A")
-   initQPVmainDLL()
-   sleep , 2000
-   r := DllCall("qpvmain.dll\ListProcessMemoryBlocks", "int", 2)
-   E1 := trGdip_LockBits(pBitmap, 5000, 5000, kw//2, kh//2, aStride, iScan, iData, 3)
-   sleep , 2000
-   Gdip_UnlockBits(pBitmap, iData)
-   sleep , 500
-   Stride := (imgBPP * kW) // 8
-   bufferSize := Round(Stride * kH)
-   Gdip_DisposeImage(pBitmap)
-   ; pbitmap :=  Gdip_CreateBitmapFromFileSimplified("F:\temp\torrents\Mrs.Davis.S01.COMPLETE.720p.PCOK.WEBRip.x264-GalaxyTV[TGx]\moar\gdi-plus-limit.png")
-   fnOutputDebug( "ptr=" r " | size = " bufferSize "| str= " stride " | " astride) 
-   SoundBeep, % E1 ? 900 : 300, 500
-}
-
 testWicLoader() {
    Static indexu := 0, pBitmap
    indexu++
