@@ -11843,6 +11843,33 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
          IMGdecalageY := Round(gmY - prcH * ImgH * zoomLevel)
          calcIMGcoordsInVP("setCenter", zoomLevel, 0, 0, 0, 0, 0, 0, 0, 0, 0)
       }
+   } Else If (EllipseSelectMode>0 && editingSelectionNow=1 && drawingShapeNow!=1)
+   {
+      vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
+      trGdip_GetImageDimensions(useGdiBitmap(), ImgW, ImgH)
+      If (zoomLevel!=oldZoomLevel && ImgW && ImgH && prevResizedVPimgW>1 && prevResizedVPimgH>1)
+      && !(imgSelX2="C" || imgSelY2="C" || imgSelX2=-1 && imgSelY2=-1)
+      {
+         ; zoom towards the selection area center, if it is inside the viewport;
+         ; no flip handling: mirroring maps the viewport onto itself;
+         ; on whole pixels, else the rounded image offsets make it creep on every step
+         prcW := (imgSelX1 + imgSelX2)/(2*ImgW)
+         prcH := (imgSelY1 + imgSelY2)/(2*ImgH)
+         gsX := Round(prevDestPosX + prcW * prevResizedVPimgW)
+         gsY := Round(prevDestPosY + prcH * prevResizedVPimgH)
+         If (isInRange(gsX, 0, GuiW) && isInRange(gsY, 0, GuiH))
+         {
+            If (allowFreeIMGpanning!=1)
+            {
+               prcW := clampInRange(prcW, 0, 1)
+               prcH := clampInRange(prcH, 0, 1)
+            }
+
+            IMGdecalageX := Round(gsX - prcW * ImgW * zoomLevel)
+            IMGdecalageY := Round(gsY - prcH * ImgH * zoomLevel)
+            calcIMGcoordsInVP("setCenter", zoomLevel, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+         }
+      }
    }
 
    ; If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && IMGresizingMode=4)
