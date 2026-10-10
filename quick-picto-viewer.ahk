@@ -11819,12 +11819,12 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    o_IMGresizingMode := IMGresizingMode
    IMGresizingMode := 4
    customZoomAdaptMode := 0
-   If InStr(key, "wheel")
+   If (InStr(key, "wheel") && zoomLevel!=oldZoomLevel)
    {
       GetMouseCoord2wind(PVhwnd, mX, mY)
       vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
       trGdip_GetImageDimensions(useGdiBitmap(), ImgW, ImgH)
-      If (zoomLevel!=oldZoomLevel && ImgW && ImgH && prevResizedVPimgW>1 && prevResizedVPimgH>1)
+      If (ImgW && ImgH && prevResizedVPimgW>1 && prevResizedVPimgH>1)
       {
          ; zoom towards the image point beneath the mouse pointer:
          ; it must remain at the same viewport coordinates on the new zoom level;
@@ -11843,12 +11843,11 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
          IMGdecalageY := Round(gmY - prcH * ImgH * zoomLevel)
          calcIMGcoordsInVP("setCenter", zoomLevel, 0, 0, 0, 0, 0, 0, 0, 0, 0)
       }
-   } Else If (EllipseSelectMode>0 && editingSelectionNow=1 && drawingShapeNow!=1)
+   } Else If (editingSelectionNow=1 && drawingShapeNow!=1 && zoomLevel!=oldZoomLevel && prevResizedVPimgW>1 && prevResizedVPimgH>1)
    {
       vpWinClientSize(GuiW, GuiH, PVhwnd, 0)
       trGdip_GetImageDimensions(useGdiBitmap(), ImgW, ImgH)
-      If (zoomLevel!=oldZoomLevel && ImgW && ImgH && prevResizedVPimgW>1 && prevResizedVPimgH>1)
-      && !(imgSelX2="C" || imgSelY2="C" || imgSelX2=-1 && imgSelY2=-1)
+      If (ImgW && ImgH && !(imgSelX2="C" || imgSelY2="C" || imgSelX2=-1 && imgSelY2=-1))
       {
          ; zoom towards the selection area center, if it is inside the viewport;
          ; no flip handling: mirroring maps the viewport onto itself;
@@ -11871,9 +11870,6 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
          }
       }
    }
-
-   ; If (allowFreeIMGpanning=1 && imageAlignVPtopLeft=0 && IMGresizingMode=4)
-   ;    PrintPosX := (o_IMGresizingMode=IMGresizingMode) ? "W" : "C"
 
    If (o_IMGresizingMode!=IMGresizingMode)
       uiPanelOpenCloseEvent()
