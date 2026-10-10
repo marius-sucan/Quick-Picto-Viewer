@@ -24838,7 +24838,7 @@ QPV_SharpenBitmap(pBitmap, amount, radius, typeu) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall("qpvmain.dll\cImgSharpenBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", round(amount**1.7), "int", stride, "int", 32)
+     r := DllCall("qpvmain.dll\sharpenBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", round(amount**1.7), "int", stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
   Return r

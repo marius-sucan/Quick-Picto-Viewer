@@ -2257,7 +2257,7 @@ DLL_API int DLL_CALLCONV cImgAddGaussianNoiseOnBitmap(unsigned char *imageData, 
   return 1;
 }
 
-DLL_API int DLL_CALLCONV cImgSharpenBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
+DLL_API int DLL_CALLCONV sharpenBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
   // inverse diffusion; neighbours count by their opacity, transparent pixels and alpha are left as they are
   const int nc = bpp/8;
   if (imageData==NULL || width<1 || height<1 || (bpp!=32 && bpp!=24) || Stride<width*nc)
