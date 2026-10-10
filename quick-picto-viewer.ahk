@@ -11794,6 +11794,9 @@ dummyForcedRefreshImgSelectionWindow() {
 
 VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
    Static prevValues, lastInvoked := 1, lastInvoked2 := 1, prevNavKeysu := 0
+   If (dir="last")
+      Return lastInvoked
+
    If InStr(key, "wheel")
    {
       MouseGetPos, , , OutputVarWin
@@ -80847,9 +80850,12 @@ additionalHUDelements(mode, mainWidth, mainHeight, newW:=0, newH:=0, DestPosX:=0
     {
        If (vpImgPanningNow>0)
        {
-          Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
-          r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, 2NDglHDC)
-          r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+          If (A_TickCount - VPchangeZoom("last")>300)
+          {
+             Gdip_GraphicsClear(2NDglPG, "0x00" WindowBGRcolor)
+             r2 := doLayeredWinUpdate(A_ThisFunc, hGDIwin, 2NDglHDC)
+             r2 := doLayeredWinUpdate(A_ThisFunc, hGDIinfosWin, 2NDglHDC)
+          }
        } Else livePreviewsImageEditing("coords")
     }
     ; fnOutputDebug(A_ThisFunc "(" mode ") sel y1=" imgSelY1 "// y2=" imgSelY2 " | " prcSelY1 " // " prcSelY2)
