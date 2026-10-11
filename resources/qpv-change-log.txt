@@ -11,6 +11,8 @@
   - much improved joining images as PDF
   - color management works through FreeImage loaded files as well 
   - fixed the animations playback
+  - fixed the brushes not painting correctly in selection areas
+  - ditched AHK-H in favour of AHK-L
 
 - v6.3.00 (2026-08-31)
   - [new] rotational/spin blur mode in the «Radial Blur» panel

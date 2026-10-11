@@ -78545,7 +78545,7 @@ ActPaintBrushNow() {
    fstp := clampInRange(BrushToolStepping / 100, 0.05, 0.25)
    stepu := (BrushToolStepping=0) ? 0 : Ceil(brushSize * (BrushToolStepping / 251 + fstp)) + Floor(BrushToolSize/10) + 1
    fstp := Round(brushSize/stepu, 2)
-   If (BrushToolType>=7)
+   If (BrushToolType>=6)
       stepu := 2
 
    ; ToolTip, % stepu "|" fstp, , , 2
