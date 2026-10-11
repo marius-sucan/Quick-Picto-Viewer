@@ -6039,7 +6039,7 @@ MouseMoveResponder(actu:=0) {
 
         brushSofty := (100 - BrushToolSoftness)/100
         brushSize := (brushSize*brushSofty)*zoomLevel
-        If (BrushToolType!=1 && isInRange(BrushToolSoftness, 2, 98) && brushSize>9)
+        If (BrushToolType!=1 && BrushToolType!=6 && isInRange(BrushToolSoftness, 2, 98) && brushSize>9)
         {
            tmpPath2 := createBrushShapePath(brushSize, mX, mY, thisAR, BrushToolAngle + 180)
            ; Gdip_DrawPath(2NDglPG, pPen2, tmpPath2)
@@ -45091,6 +45091,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
        BrushToolType := dummy
     }
 
+    smudgeIntensitySeed(BrushToolType)
     sml := (PrefsLargeFonts=1) ? 30 : 20
     hasa := (PrefsLargeFonts=1) ? 27 : 18
     Gui, Add, Tab3, %tabzDarkModus% AltSubmit Choose%thisPanelTab% vCurrentPanelTab gBtnTabsInfoUpdate hwndhCurrTab, General|Effects|Randomize|Pen pressure
@@ -45129,7 +45130,7 @@ PanelBrushTool(dummy:=0, modus:=0) {
     gW := gH := (PrefsLargeFonts=1) ? 60 : 45
     Gui, Add, Text, xs y+10 w1 h1 hide, Brush preview
     Gui, Add, Text, xp yp w%gW% h%gH% -border +0xE +hwndhCropCornersPic gUIresponderPanelsLivePreview +TabStop, Brush preview
-    Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw +hwndhTemp, &Airbrush mode / deformer option
+    Gui, Add, Checkbox, x+10 gupdateUIbrushTool Checked%BrushToolOverDraw% vBrushToolOverDraw +hwndhTemp, &Airbrush mode
     ToolTip2ctrl(hTemp, "When airbrush mode is activated, the paint gradually accumulates.`nIt allows the user to overdraw regions in a single stroke.")
     Gui, Add, Checkbox, y+10 gupdateUIbrushTool Checked%BrushToolDynamicCloner% vBrushToolDynamicCloner , D&ynamic X/Y source coordinates
 
@@ -45200,7 +45201,7 @@ BtnHelpPenPressureBrushes() {
 }
 
 BtnHelpBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nThe smudge brush drags the colors along the stroke. Its «Deform intensity» sets how far the paint travels: from a fraction of the brush diameter at 1 to about 12 diameters at 21; at 22 it never fades. It ignores the softness, stepping, dry-out rate, texture and airbrush mode. With a blending mode, the smudged pixels are blended over the image as it was before the stroke, and the opacity sets how strongly.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
 }
 
 BtnHelpToolbar() {
@@ -45716,13 +45717,13 @@ updateLabelBrushStep() {
       fstp := clampInRange(BrushToolStepping / 100, 0.05, 0.25)
       stepu := (BrushToolStepping=0) ? 0 : BrushToolStepping / 251 + fstp
       stepu := Round(stepu*100) " %"
-      If (BrushToolType>=7)
-         stepu := "AUTO"
    } Else
       stepu := (BrushToolStepping<=2 || BrushToolStepping=251) ? "AUTO" : BrushToolStepping " px"
 
    If (BrushToolStepping=0)
       stepu := "NONE"
+   If (AnyWindowOpen=64 && BrushToolType>=6)
+      stepu := "AUTO"
 
    Return "Stepping: " stepu
 }
@@ -45760,7 +45761,29 @@ updateLabelMaskCurvePath() {
    Return contrLvl
 }
 
+smudgeIntensitySeed(brushType) {
+; A smudge of deform intensity 0 does nothing: picking it seeds 11. The paint brushes read the same setting as
+; their wetness, so arriving at one takes the seed back, if it is still 11. Returns 1 when it changed the setting.
+   Static seeded := 0
+   If (brushType=6 && BrushToolWetness<1)
+   {
+      BrushToolWetness := 11
+      seeded := 1
+      Return 1
+   } Else If (brushType<=2 && seeded=1)
+   {
+      seeded := 0
+      If (BrushToolWetness=11)
+      {
+         BrushToolWetness := 0
+         Return 1
+      }
+   }
+   Return 0
+}
+
 updateUIbrushTool() {
+   Static prevBrushType := 0
    If (AnyWindowOpen!=64)
       Return
 
@@ -45768,11 +45791,16 @@ updateUIbrushTool() {
    If (BrushToolType>2)
       BrushToolUseSecondaryColor := 0
 
+   If (BrushToolType!=prevBrushType && smudgeIntensitySeed(BrushToolType))
+      GuiUpdateSliders("BrushToolWetness")
+   prevBrushType := BrushToolType
+
    liveDrawingBrushTool := 1
    If (CurrentPanelTab=1)
    {
       uiSlidersArray["BrushToolBopacity", 10] := (BrushToolUseSecondaryColor!=1) ? 0 : 1
-      uiSlidersArray["BrushToolAopacity", 10] := (BrushToolUseSecondaryColor=1) ? 0 : 1
+      ; the smudge's opacity is the strength of its blending mode [1 = none, 25 = Replace: no blending]
+      uiSlidersArray["BrushToolAopacity", 10] := (BrushToolUseSecondaryColor=1 || BrushToolType=6 && (BrushToolBlendMode=1 || BrushToolBlendMode=25)) ? 0 : 1
       actuA := (BrushToolUseSecondaryColor=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
       actuB := (BrushToolUseSecondaryColor!=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
       GuiControl, % actuB, PickuBrushToolBcolor
@@ -45810,16 +45838,16 @@ updateUIbrushTool() {
          }
       }
 
-      actu := (BrushToolType>6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      ; the smudge [type 6] ignores the stepping, softness, dry-out rate, texture and airbrush mode
+      actu := (BrushToolType>=6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
       GuiControl, % actu, BrushToolOverDraw
 
-      tehLabel := (BrushToolType=6) ? "&Auto-scale deformer" : "&Airbrush mode"
-      GuiControl, SettingsGUIA: Text, BrushToolOverDraw, %tehLabel%
-      uiSlidersArray["BrushToolStepping", 10] :=  (BrushToolType>=7) ? 0 : 1
-      uiSlidersArray["BrushToolSoftness", 10] := (BrushToolTexture>1 && BrushToolType<=6 || BrushToolType=1) ? 0 : 1
-      uiSlidersArray["BrushToolAspectRatio", 10] := (BrushToolTexture>1 && BrushToolType>1 || BrushToolType>6) ? 0 : 1
+      uiSlidersArray["BrushToolStepping", 10] :=  (BrushToolType>=6) ? 0 : 1
+      uiSlidersArray["BrushToolSoftness", 10] := (BrushToolTexture>1 && BrushToolType<=5 || BrushToolType=1 || BrushToolType=6) ? 0 : 1
+      uiSlidersArray["BrushToolAspectRatio", 10] := (BrushToolTexture>1 && isInRange(BrushToolType, 2, 5) || BrushToolType>6) ? 0 : 1
+      uiSlidersArray["BrushToolDryingRate", 10] := (BrushToolType=6) ? 0 : 1
 
-      actu := !isInRange(BrushToolType, 2, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+      actu := !isInRange(BrushToolType, 2, 5) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
       GuiControl, % actu, BrushToolTexture
 
       actu := (BrushToolType=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -45874,7 +45902,7 @@ updateUIbrushTool() {
       SetTimer, WriteSettingsBrushPanel, -300
    } Else If (CurrentPanelTab=3)
    {
-      actu := (BrushToolType>1 && BrushToolTexture=1) ? 1 : 0
+      actu := (BrushToolType>1 && BrushToolType!=6 && BrushToolTexture=1) ? 1 : 0
       uiSlidersArray["BrushToolRandomSoftness", 10] := actu
    } Else If (CurrentPanelTab=4)
    {
@@ -46038,16 +46066,17 @@ createLivePreviewBrush() {
     } Else
     {
        thisMainOpacity := 1
-       If (BrushToolTexture>1)
+       If (BrushToolTexture>1 && BrushToolType!=6)
           thisMainOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity / 255 : BrushToolAopacity / 255
 
        startToolColor := (BrushToolUseSecondaryColor=1) ? BrushToolBcolor : BrushToolAcolor
        If (BrushToolType>2)
           startToolColor := "ffFFff"
 
-       thisOpacity := (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
+       ; the smudge's own profile: softness 100, full opacity
+       thisOpacity := (BrushToolType=6) ? 255 : (BrushToolUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
        thisOpacity := Format("{1:#x}", thisOpacity)
-       brushSofty := (BrushToolType=1) ? 99 : 101 - BrushToolSoftness
+       brushSofty := (BrushToolType=1) ? 99 : (BrushToolType=6) ? 1 : 101 - BrushToolSoftness
        brushu := createGradientBrushBitmap(startToolColor, brushSofty, imgBoxSize, BrushToolAngle, BrushToolAspectRatio, thisOpacity)
     }
 
@@ -76852,7 +76881,7 @@ toggleBrushDoubleSize() {
 }
 
 toggleBrushAirMode() {
-   If (BrushToolType=2 || BrushToolType=3)
+   If (BrushToolType=2 || BrushToolType=3 || BrushToolType>=6)
    {
       showTOOLtip("WARNING: Airbrush mode is not available for the current brush type.")
       SoundBeep 300, 100
@@ -76862,12 +76891,11 @@ toggleBrushAirMode() {
 
    BrushToolOverDraw := !BrushToolOverDraw
    friendly := (BrushToolOverDraw=1) ? "ACTIVATED" : "DEACTIVATED"
-   labelu := (BrushToolType>=6) ? "Auto-scale brush deformer: " : "Airbrush mode: "
    If isVarEqualTo(AnyWindowOpen, 64, 24, 31)
       GuiControl, SettingsGUIA:, BrushToolOverDraw, % BrushToolOverDraw
 
    RegAction(1, "BrushToolOverDraw",, 1)
-   showTOOLtip(labelu friendly moreinfos, A_ThisFunc, 1)
+   showTOOLtip("Airbrush mode: " friendly moreinfos, A_ThisFunc, 1)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -78374,7 +78402,9 @@ ActPaintBrushNow() {
    }
 
    canApplyFX := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0 || PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
-   thisOpaTest := (BrushToolUseSecondaryColor=1 && BrushToolType<3) ? BrushToolBopacity : BrushToolAopacity
+   ; the smudge brush [type 6] ignores the softness, texture, stepping and dry-out rate: its own dab spacing and
+   ; profile, and the deform intensity [BrushToolWetness], make it; the opacity is the strength of a blending mode
+   thisOpaTest := (BrushToolType=6) ? 255 : (BrushToolUseSecondaryColor=1 && BrushToolType<3) ? BrushToolBopacity : BrushToolAopacity
    If (BrushToolBlurStrength<3 && canApplyFX=0 && BrushToolType=5 || BrushToolWetness<1 && BrushToolType>5 || thisOpaTest<5 && BrushToolType>4)
    {
       If (thisOpaTest<5 && BrushToolType>4)
@@ -78458,8 +78488,6 @@ ActPaintBrushNow() {
       gR := Randomizer(-gR, gR, 2, 3)
       thisToolSoftness := clampInRange(BrushToolSoftness + gR, 1, 100)
    }
-   If (BrushToolType=6)
-      thisToolSoftness := clampInRange(BrushToolSoftness, 50, 90)
 
    thisToolAngle := BrushToolAngle + 180
    If (BrushToolRandomAngle>0)
@@ -78479,7 +78507,7 @@ ActPaintBrushNow() {
    If (BrushToolType>6)
       thisToolAspectRatio := 0
 
-   thisOpacity := (thisUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
+   thisOpacity := (BrushToolType=6) ? 255 : (thisUseSecondaryColor=1) ? BrushToolBopacity : BrushToolAopacity
    useSelArea := (editingSelectionNow=1 && BrushToolOutsideSelection>1) ? 1 : 0
    If (isLarge=1 || useSelArea=1)
    {
@@ -78501,7 +78529,7 @@ ActPaintBrushNow() {
    hFIFtex := texBits := 0
    texPitch := texBpp := 0
    texW := texH := 0
-   If (BrushToolTexture>1 && isInRange(BrushToolType, 2, 6) && brushSize>3)
+   If (BrushToolTexture>1 && isInRange(BrushToolType, 2, 5) && brushSize>3)
    {
       texPath := mainExecPath "\resources\brush-texture-" BrushToolTexture - 1 ".png"
       hFIFtex := FreeImage_Load(texPath)
@@ -78545,16 +78573,17 @@ ActPaintBrushNow() {
    fstp := clampInRange(BrushToolStepping / 100, 0.05, 0.25)
    stepu := (BrushToolStepping=0) ? 0 : Ceil(brushSize * (BrushToolStepping / 251 + fstp)) + Floor(BrushToolSize/10) + 1
    fstp := Round(brushSize/stepu, 2)
-   If (BrushToolType>=6)
+   If (BrushToolType>=7)
       stepu := 2
+   Else If (BrushToolType=6)
+      stepu := Max(1, Round(brushSize * 0.012))   ; the smudge's dab spacing
 
    ; ToolTip, % stepu "|" fstp, , , 2
    If !GetKeyState("Shift", "P")
       prevMX := prevMY := 0
 
    offX := offY := 0
-   smudgeAccDist := 0
-   pdx := pdy := 0
+   smudgeDabX := smudgeDabY := ""
    ShowTheImage("set-prev", imgPath)
    DllCall("qpvmain.dll\ResetBrushOpacityMap")
    If (isLarge=1)
@@ -78574,7 +78603,6 @@ ActPaintBrushNow() {
    If (isLarge=1)
       CreateOSDinfoLine(0, 1)
 
-   lastBrushDecreaseZeit := A_TickCount
    penInContact := 0
    whileLoopExec := 1
    While, (determineLClickState()=1 || A_Index<2)
@@ -78677,29 +78705,52 @@ ActPaintBrushNow() {
          otherStepu := min(distX, distY)/steps2cover
          dirX := (kX>prevMX) ? 1 : ((kX<prevMX) ? -1 : 0)
          dirY := (kY>prevMY) ? 1 : ((kY<prevMY) ? -1 : 0)
-         If (BrushToolType=6) ; smudge brush tool
-         {
-            cdx := kX - prevMX
-            cdy := kY - prevMY
-            currDist := Sqrt(cdx*cdx + cdy*cdy)
-            prevDist := Sqrt(pdx*pdx + pdy*pdy)
-            If (currDist > 0.1 && prevDist > 0.1)
-            {
-               dot := cdx * pdx + cdy * pdy
-               cos_angle := dot / (currDist * prevDist)
-               If (cos_angle < 0.5)
-                  smudgeAccDist := 0
-            }
-            pdx := cdx
-            pdy := cdy
-         }
-
          distStepX := (maxDistuK=1) ? stepu : otherStepu
          distStepY := (maxDistuK=2) ? stepu : otherStepu
          tkX := prevMX
          tkY := prevMY
          thisIndex++
-         Loop
+         If (BrushToolType=6)
+         {
+            ; smudge brush: a dab every stepu px along the drag, on whole pixels, each pulling the pixels from
+            ; where the previous dab lay; at most 400 dabs a move, fewer for huge brushes: the steps grow
+            ; rather than the brush lag behind the pointer
+            If (smudgeDabX="")
+               smudgeDabX := smudgePrevX := prevMX, smudgeDabY := smudgePrevY := prevMY
+            ux := kX - smudgeDabX
+            uy := kY - smudgeDabY
+            distu := Sqrt(ux*ux + uy*uy)
+            dabStep := Max(stepu, distu / Max(1, Min(400, Floor(2500000 / (brushSize*brushSize)))))
+            If (distu>=dabStep)
+            {
+               ux := ux * dabStep / distu
+               uy := uy * dabStep / distu
+               Loop, % Floor(distu / dabStep)
+               {
+                  smudgeDabX += ux
+                  smudgeDabY += uy
+                  cur_tkX := Round(smudgeDabX)
+                  cur_tkY := Round(smudgeDabY)
+                  cur_offX := cur_tkX - smudgePrevX
+                  cur_offY := cur_tkY - smudgePrevY
+                  If (!cur_offX && !cur_offY)
+                     Continue
+
+                  cur_opacity := 255
+                  cur_brushSize := brushSize
+                  If (thisPenPressure>=0)
+                  {
+                     cur_opacity := clampInRange(Round(255 * penOpacityFactor), 1, 255)
+                     cur_brushSize := clampInRange(Round(brushSize * penSizeFactor), 1, brushSize)
+                  }
+
+                  Gosub, DrawPaintBrushNowStep
+                  smudgePrevX := cur_tkX
+                  smudgePrevY := cur_tkY
+               }
+            }
+            thisZeit := A_TickCount
+         } Else Loop
          {
             Xgood := Ygood := 0
             If (dirX=1)
@@ -78738,37 +78789,9 @@ ActPaintBrushNow() {
 
             cur_tkX := tkX
             cur_tkY := tkY
-            If (BrushToolType=6)
-            {
-               ; smudge brush
-               t_wet := thisWetness / 22.0
-               smudgeStrength := clampInRange(brushSize * (0.05 + 0.95 * t_wet), 5, brushSize)
-               cur_offX := dirX * clampInRange(distStepX, 1, smudgeStrength)
-               cur_offY := dirY * clampInRange(distStepY, 1, smudgeStrength)
-
-               stepDist := Sqrt(distStepX*distStepX + distStepY*distStepY)
-               smudgeAccDist += stepDist
-               If (thisWetness = 22)
-                  maxSmudgeDist := 99999999
-               Else
-                  maxSmudgeDist := brushSize * (0.5 + 10.0 * (thisWetness/21)**((isLarge=1) ? 4 : 3))
-
-               fadeFactor := 1.0 - (smudgeAccDist / maxSmudgeDist)
-               If (fadeFactor < 0.01)
-                  fadeFactor := 0.01
-
-               cur_opacity := Floor(thisOpacity * (0.05 + 0.95 * t_wet) * fadeFactor)
-               If (BrushToolTexture=1 && thisIndex>1 && (A_TickCount - lastBrushDecreaseZeit>450) && BrushToolOverDraw=1)
-               {
-                  lastBrushDecreaseZeit := A_TickCount
-                  brushSize -= Ceil(BrushToolSize*0.05) + 1
-               }
-            } Else
-            {
-               cur_offX := offX
-               cur_offY := offY
-               cur_opacity := thisOpacity
-            }
+            cur_offX := offX
+            cur_offY := offY
+            cur_opacity := thisOpacity
 
             ; pen pressure modulates whatever opacity/size the settings arrived at,
             ; so drying rate, wetness and the randomizers all keep working as before
@@ -78869,10 +78892,11 @@ DrawPaintBrushNowStep:
    ; the dllRad paddings for types 5/6/7 can never apply to the cloner [type 3],
    ; so computing them up front leaves the clone source region unchanged in both modes
    cloneBits := clonePitch := cloneBMP := 0
-   colorARGB := "0x" Format("{1:x}", 255) startToolColor
+   ; the smudge takes the colour's alpha as the strength of its blending mode
+   colorARGB := "0x" Format("{1:02x}", (BrushToolType=6) ? BrushToolAopacity : 255) startToolColor
    dllRad := (texW>0) ? texW // 2 + 2 : cur_brushSize // 2 + 2
    If (BrushToolType=6)
-      dllRad += Abs(thisBulgePinchFactor) * 2 + 10
+      dllRad += 4
    Else If (BrushToolType>=7)
       dllRad += Abs(thisBulgePinchFactor) + 10
    Else If (BrushToolType=5)
@@ -78954,10 +78978,9 @@ DrawPaintBrushNowStep:
       padX1 := padX2 := padY1 := padY2 := dllRad
       If (BrushToolType=6)
       {
-         ; the smudge samples the pixels cur_off * scale behind the stamp, scale as in PaintBrushLarge()
-         smudgeScale := (thisBulgePinchFactor>0) ? 1 + 26 * (thisBulgePinchFactor - 1)/22 : 3
-         padX1 += Max(0, cur_offX * smudgeScale), padX2 += Max(0, -cur_offX * smudgeScale)
-         padY1 += Max(0, cur_offY * smudgeScale), padY2 += Max(0, -cur_offY * smudgeScale)
+         ; the smudge reads the pixels where its previous dab lay, cur_off behind the stamp
+         padX1 += Max(0, cur_offX), padX2 += Max(0, -cur_offX)
+         padY1 += Max(0, cur_offY), padY2 += Max(0, -cur_offY)
       }
       lockX := Round(Max(0, Floor(cur_tkX - padX1)))
       lockY := Round(Max(0, Floor(cur_tkY - padY1)))

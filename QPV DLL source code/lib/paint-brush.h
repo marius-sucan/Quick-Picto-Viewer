@@ -23,8 +23,23 @@ std::vector<size_t> activeBrushChunks;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 int chunkGridW = 0;
 
+// the smudge with a blending mode paints a layer over the image as it was before the stroke: per 128 x 128 chunk,
+// the smudged pixels and the original ones [BGRA, 8 bytes a pixel], and how much the layer covers each [0 = untouched]
+std::vector<unsigned char*> smudgeLayerChunks;
+std::vector<unsigned char*> smudgeCoverChunks;
+int smudgeGridW = 0;
+
 // the effects brush's brightness and contrast tables
 static AdjustLUTs brushLUTs;
+
+static void freeSmudgeLayer() {
+    for (unsigned char* ptr : smudgeLayerChunks)
+        delete[] ptr;
+    for (unsigned char* ptr : smudgeCoverChunks)
+        delete[] ptr;
+    std::vector<unsigned char*>().swap(smudgeLayerChunks);
+    std::vector<unsigned char*>().swap(smudgeCoverChunks);
+}
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
     for (unsigned char* ptr : brushOpacityChunks)
@@ -43,6 +58,7 @@ DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
         }
     }
     activeBrushChunks.clear();
+    freeSmudgeLayer();
 }
 
 // bilinear sample of straight ARGB: taps of unequal alpha weigh their colours by it, so a transparent tap's colour stays hidden
@@ -103,6 +119,9 @@ struct BrushStamp {
     float opaf;
     double falloff_sq, dest_radius;
     int overDrawOkay;
+    float smudgeHold;
+    unsigned int smudgeSeed;
+    bool smudgeLayer;
     double invRx, invRy, A_coeff, B_term_factor, C_term_factor;
     int totalStepsY;
 };
@@ -148,10 +167,12 @@ static void brushSetupChunkGrid(BrushStamp &s) {
 }
 
 // the brush box, and the rectangle the cloner, smudge, pinch and bulge brushes sample, copied when no clone
-// was handed over; false when the image is a GDI+ lock rect and there is no copy
+// was handed over; false when there is no copy and the image is a GDI+ lock rect, or the brush is the smudge
 static bool brushSetupClone(BrushStamp &s) {
-    int halfW = (s.texData && s.texW > 0) ? (s.texW / 2 + abs(s.bulgePinchFactor)) : (s.brushSize / 2 + abs(s.bulgePinchFactor));
-    int halfH = (s.texData && s.texH > 0) ? (s.texH / 2 + abs(s.bulgePinchFactor)) : (s.brushSize / 2 + abs(s.bulgePinchFactor));
+    // the smudge's bulgePinchFactor is its intensity, not a reach
+    const int reach = (s.brushType==6) ? 1 : abs(s.bulgePinchFactor);
+    int halfW = (s.texData && s.texW > 0) ? (s.texW / 2 + reach) : (s.brushSize / 2 + reach);
+    int halfH = (s.texData && s.texH > 0) ? (s.texH / 2 + reach) : (s.brushSize / 2 + reach);
     s.startX = clamp((int)(s.tkX - halfW), 0, s.imgW - 1);
     s.endX = clamp((int)(s.tkX + halfW), 0, s.imgW - 1);
     s.startY = clamp((int)(s.tkY - halfH), 0, s.imgH - 1);
@@ -165,15 +186,7 @@ static bool brushSetupClone(BrushStamp &s) {
     s.cloneOffsetY = s.offY;
     if (s.brushType==6)
     {
-        double scale = 3.0;
-        if (s.bulgePinchFactor>0)
-        {
-            int wetness = s.bulgePinchFactor - 1;
-            scale = 1.0 + 26.0 * (wetness / 22.0);
-        }
-
-        s.cloneOffsetX = s.offX * scale;
-        s.cloneOffsetY = s.offY * scale;
+        // the smudge pulls the pixels from where its previous dab lay, offX, offY back
         s.cloneStartX = clamp((int)floor(s.startX - std::max(0.0, s.cloneOffsetX)) - 2, 0, s.imgW - 1);
         s.cloneEndX = clamp((int)ceil(s.endX - std::min(0.0, s.cloneOffsetX)) + 2, 0, s.imgW - 1);
         s.cloneStartY = clamp((int)floor(s.startY - std::max(0.0, s.cloneOffsetY)) - 2, 0, s.imgH - 1);
@@ -221,8 +234,65 @@ static bool brushSetupClone(BrushStamp &s) {
         }
     }
 
-    // without the copy, the samplers would read the image directly, past the lock rect
-    return !(s.lockW>0 && !s.cloneData && (s.brushType>=6 || s.brushType==3) && s.localClone.empty());
+    // without the copy, the samplers would read the image directly: past the lock rect, and for the smudge,
+    // pixels this stamp has already moved
+    const bool noCopy = !s.cloneData && s.localClone.empty();
+    return !(noCopy && (s.brushType==6 || (s.lockW>0 && (s.brushType>=7 || s.brushType==3))));
+}
+
+// smudge brush with a blending mode: the layer chunks of the stamp's box, and the copy taken from the layer where it
+// covers the image; false without a copy of its own, or when a chunk could not be allocated [the stamp then smudges
+// without the blending mode]
+static bool brushSetupSmudgeLayer(BrushStamp &s) {
+    if (s.localClone.empty())
+       return false;
+
+    const int gridW = (s.imgW + 127) >> 7;
+    const size_t totalChunks = (size_t)gridW * ((s.imgH + 127) >> 7);
+    if (smudgeLayerChunks.size()!=totalChunks || smudgeGridW!=gridW)
+    {
+        freeSmudgeLayer();
+        smudgeLayerChunks.assign(totalChunks, nullptr);
+        smudgeCoverChunks.assign(totalChunks, nullptr);
+        smudgeGridW = gridW;
+    }
+
+    try
+    {
+        for (int cy = s.startY >> 7; cy <= s.endY >> 7; ++cy)
+        {
+            for (int cx = s.startX >> 7; cx <= s.endX >> 7; ++cx)
+            {
+                const size_t ci = (size_t)cy * gridW + cx;
+                if (!smudgeLayerChunks[ci])
+                {
+                    smudgeCoverChunks[ci] = new unsigned char[128 * 128]();
+                    smudgeLayerChunks[ci] = new unsigned char[128 * 128 * 8];
+                }
+            }
+        }
+    } catch (const std::bad_alloc&) {
+        return false;
+    }
+
+    // the dabs pull the smudged pixels, not the blended ones the image shows
+    for (int ry = 0; ry < s.cloneH; ++ry)
+    {
+        const int py = s.cloneStartY + ry;
+        for (int x = s.cloneStartX; x <= s.cloneEndX; ++x)
+        {
+            const size_t ci = (size_t)(py >> 7) * gridW + (x >> 7);
+            const int li = ((py & 127) << 7) + (x & 127);
+            if (!smudgeCoverChunks[ci] || !smudgeCoverChunks[ci][li])
+               continue;
+
+            const unsigned char* L = smudgeLayerChunks[ci] + li * 8;
+            unsigned char* d = s.localClone.data() + (INT64)ry * s.localPitch + (x - s.cloneStartX) * s.bytesPerPixel;
+            for (int c = 0; c < s.bytesPerPixel; ++c)
+                d[c] = L[c];
+        }
+    }
+    return true;
 }
 
 // the colour, and the rotated ellipse of the brush tip
@@ -386,21 +456,16 @@ static bool brushSetupPass(BrushStamp &s) {
     s.sY = s.startY;
     s.ropacity = s.opacity;
     s.opaf = (s.opacity / 255.0f);
+    s.smudgeHold = 0.0f;
+    s.smudgeSeed = 0;
     if (s.brushType==6)
     {
-        // smudge brush
-        if (s.offX<0)
-        {
-           s.stepX = -1;
-           s.sX = s.endX;
-           s.eX = s.startX;
-        }
-
-        if (s.offY<0)
-        {
-           s.stepY = -1;
-           s.sY = s.endY;
-        }
+        // smudge brush: the share of the pulled pixels its centre keeps, from the intensity [bulgePinchFactor];
+        // the paint fades within 0.1 [1] to 12 [21] brush diameters, whatever the dab spacing; 22 never fades
+        const int intensity = clamp(s.bulgePinchFactor, 1, 22);
+        s.smudgeHold = (intensity==22) ? 1.0f : (float)(1.0 - 0.8 * pow(10.0, -(intensity - 1) / 8.7));
+        static unsigned int smudgeDabs = 0;
+        s.smudgeSeed = ++smudgeDabs * 0x9E3779B9u;
     }
 
     // Pre-calculate bulge/pinch constants
@@ -745,6 +810,97 @@ static QPV_FORCEINLINE bool brushWarpOffset(const BrushStamp &s, const double dx
     return true;
 }
 
+// smudge brush: the [0, 1) the rounding adds at a pixel, random per dab; 16 bits, so that a value just under 256
+// stays exact in a float
+static QPV_FORCEINLINE float brushSmudgeDither(const unsigned int seed, const int px, const int py) {
+    unsigned int h = seed ^ ((unsigned int)px * 0x8DA6B343u) ^ ((unsigned int)py * 0xD8163841u);
+    h ^= h >> 15;
+    h *= 0x2C1B3C6Du;
+    h ^= h >> 12;
+    h *= 0x297A2D39u;
+    h ^= h >> 15;
+    return (h >> 16) * (1.0f / 65536.0f);
+}
+
+// smudge brush: w of the pulled pixel over the target, colours weighted by alpha so the paint moves with its
+// opacity; "Protect alpha" [eraserMode] keeps the target's alpha. The rounding is random, unbiased: rounded to
+// nearest, the small moves of the dabs would stall
+static QPV_FORCEINLINE void brushSmudgeMix(const BrushStamp &s, const float w, const float rnd,
+                                           const int srcB, const int srcG, const int srcR, const int srcA,
+                                           const int tgtB, const int tgtG, const int tgtR, const int tgtA,
+                                           int &outB, int &outG, int &outR, int &outA) {
+    float sw = w, tw = 1.0f - w;
+    if (s.bytesPerPixel==4)
+    {
+        sw *= srcA;
+        tw *= tgtA;
+        if (s.eraserMode!=1)
+           outA = (int)(tgtA + (srcA - tgtA) * w + rnd);
+    }
+
+    const float sum = sw + tw;
+    if (sum<=0.0f)
+       return;   // nothing visible on either side: the hidden colour stays
+
+    // a channel the two pixels share keeps its value exactly
+    const float f = sw / sum;
+    if (s.linearGamma==1)
+    {
+        const float invGamma = 1.0f / 2.1f;
+        if (srcB!=tgtB)
+           outB = (int)(255.0f * powf(char_to_floatGamma[tgtB] + (char_to_floatGamma[srcB] - char_to_floatGamma[tgtB]) * f, invGamma) + rnd);
+        if (srcG!=tgtG)
+           outG = (int)(255.0f * powf(char_to_floatGamma[tgtG] + (char_to_floatGamma[srcG] - char_to_floatGamma[tgtG]) * f, invGamma) + rnd);
+        if (srcR!=tgtR)
+           outR = (int)(255.0f * powf(char_to_floatGamma[tgtR] + (char_to_floatGamma[srcR] - char_to_floatGamma[tgtR]) * f, invGamma) + rnd);
+    } else
+    {
+        outB = (int)(tgtB + (srcB - tgtB) * f + rnd);
+        outG = (int)(tgtG + (srcG - tgtG) * f + rnd);
+        outR = (int)(tgtR + (srcR - tgtR) * f + rnd);
+    }
+}
+
+// smudge brush with a blending mode: the dab smudges the layer, and the image shows the layer blended over the pixels
+// from before the stroke, as far as the layer covers them [cover, the brush profile] and the brush colour's alpha
+// [the opacity] asks; blended over its own output, a blending mode would compound from dab to dab
+static QPV_FORCEINLINE void brushSmudgeLayerPixel(const BrushStamp &s, const int px, const int py, const float w, const float cover,
+                                                  const int srcB, const int srcG, const int srcR, const int srcA,
+                                                  const int tgtB, const int tgtG, const int tgtR, const int tgtA,
+                                                  int &outB, int &outG, int &outR, int &outA) {
+    const size_t ci = (size_t)(py >> 7) * smudgeGridW + (px >> 7);
+    const int li = ((py & 127) << 7) + (px & 127);
+    unsigned char* L = smudgeLayerChunks[ci] + li * 8;
+    unsigned char* O = L + 4;
+    unsigned char &covered = smudgeCoverChunks[ci][li];
+    if (!covered)
+    {
+        // first touch: the layer and the original are the pixel as it is
+        L[0] = O[0] = tgtB;
+        L[1] = O[1] = tgtG;
+        L[2] = O[2] = tgtR;
+        L[3] = O[3] = tgtA;
+    }
+
+    int lB = L[0], lG = L[1], lR = L[2], lA = L[3];
+    brushSmudgeMix(s, w, brushSmudgeDither(s.smudgeSeed, px, py), srcB, srcG, srcR, srcA, L[0], L[1], L[2], L[3], lB, lG, lR, lA);
+    L[0] = lB;
+    L[1] = lG;
+    L[2] = lR;
+    L[3] = lA;
+    covered = (unsigned char)std::max((int)covered, std::max(1, (int)(255.0f * cover + 0.5f)));
+
+    const RGBAColor top = { lB, lG, lR, lA };
+    const RGBAColor base = { O[0], O[1], O[2], O[3] };
+    const RGBAColor b = CalculateNewBlendModes(top, base, s.blendMode, s.flipLayers, s.linearGamma, s.eraserMode, s.imgBpp, 0);
+    outB = lB;
+    outG = lG;
+    outR = lR;
+    outA = lA;
+    brushSmudgeMix(s, covered * s.brushA / 65025.0f, brushSmudgeDither(s.smudgeSeed ^ 0x5BD1E995u, px, py),
+                   b.b, b.g, b.r, b.a, lB, lG, lR, lA, outB, outG, outR, outA);
+}
+
 // the brush kinds the pixel loop is compiled for; Other is any other brushType, whose source is the pixel itself
 enum class BrushKind { Other, Paint, Cloner, Eraser, Effects, Smudge, Warp };
 
@@ -887,18 +1043,8 @@ static void brushRows(const BrushStamp &s) {
             float weight = mask_fval * s.opaf;
             if constexpr (K == BrushKind::Smudge)
             {
-                if (s.bulgePinchFactor>0)
-                {
-                    int wetness = s.bulgePinchFactor - 1;
-                    if (wetness>15)
-                    {
-                        double weight_boost = 1.0 + 1.5 * ((wetness - 15) / 7.0);
-                        weight = clamp((float)(weight * weight_boost), 0.0f, 1.0f);
-                    }
-                } else
-                {
-                    weight = clamp(weight * 1.5f, 0.0f, 1.0f);
-                }
+                // a smoothstep over the cone of softness 100
+                weight = mask_fval * mask_fval * (3.0f - 2.0f * mask_fval) * s.smudgeHold * s.opaf;
             }
 
             if (s.brushType<=5 && s.brushOverDraw==0 && s.overDrawOkay==1)
@@ -985,7 +1131,7 @@ static void brushRows(const BrushStamp &s) {
                 brushSourceEffects(s, px, py, tgtB, tgtG, tgtR, tgtA, srcB, srcG, srcR, srcA);
             } else if constexpr (K == BrushKind::Smudge)
             {
-                // Smudge brush: grab pixels from previous offset position with bilinear interpolation
+                // Smudge brush: the pixel from where the previous dab lay
                 double srcXf = clamp((double)px - s.cloneOffsetX, 0.0, (double)(s.imgW - 1));
                 double srcYf = clamp((double)py - s.cloneOffsetY, 0.0, (double)(s.imgH - 1));
                 brushSampleAt(s, srcXf, srcYf, srcB, srcG, srcR, srcA);
@@ -997,7 +1143,14 @@ static void brushRows(const BrushStamp &s) {
                 brushSampleAt(s, srcXf, srcYf, srcB, srcG, srcR, srcA);
             }
 
-            if (K == BrushKind::Eraser && s.bytesPerPixel==4)
+            if constexpr (K == BrushKind::Smudge)
+            {
+               if (s.smudgeLayer)
+                  brushSmudgeLayerPixel(s, px, py, weight, mask_fval * mask_fval * (3.0f - 2.0f * mask_fval) * s.opaf,
+                                        srcB, srcG, srcR, srcA, tgtB, tgtG, tgtR, tgtA, outB, outG, outR, outA);
+               else
+                  brushSmudgeMix(s, weight, brushSmudgeDither(s.smudgeSeed, px, py), srcB, srcG, srcR, srcA, tgtB, tgtG, tgtR, tgtA, outB, outG, outR, outA);
+            } else if (K == BrushKind::Eraser && s.bytesPerPixel==4)
             {
                outA = weighTwoValues(srcA, tgtA, weight);
             } else if (s.blendMode==24)
@@ -1046,7 +1199,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     int softness,            // BrushToolSoftness (0-100)
     double angle,            // BrushToolAngle (-180 to 180)
     double aspectRatio,      // BrushToolAspectRatio (-100 to 100)
-    int brushColor,          // ARGB color
+    int brushColor,          // ARGB color; the smudge reads its alpha as the strength of its blending mode
     int opacity,             // Stroke opacity (0-255)
     int blendMode,           // BlendMode index (0-25)
     double offX,             // Smudge/Cloner offset X
@@ -1092,9 +1245,19 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
                     flipLayers, bulgePinchFactor, effectHue, effectSat, effectLight, effectGamma, effectBlur,
                     texData, texW, texH, texPitch, texBpp, brushOverDraw, lockX, lockY, lockW, lockH};
     s.bytesPerPixel = bytesPerPixel;
+    if (brushType==6)
+    {
+        // the smudge has a profile of its own [brushRows()]: no texture, no softness
+        s.texData = nullptr;
+        s.softness = 100;
+    }
+
     brushSetupChunkGrid(s);
     if (!brushSetupClone(s))
        return 0;
+
+    // with a blending mode the smudge paints a layer; Replace [24] is what the smudge does anyway
+    s.smudgeLayer = (brushType==6 && blendMode>0 && blendMode!=24) && brushSetupSmudgeLayer(s);
 
     brushSetupShape(s);
     if (!brushSetupEffects(s) || !brushSetupPass(s))
