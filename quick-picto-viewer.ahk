@@ -78402,8 +78402,8 @@ ActPaintBrushNow() {
    }
 
    canApplyFX := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0 || PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
-   ; the smudge brush [type 6] ignores the softness, texture, stepping and dry-out rate: its own dab spacing and
-   ; profile, and the deform intensity [BrushToolWetness], make it; the opacity is the strength of a blending mode
+   ; the smudge brush [type 6] ignores the softness, texture, stepping and dry-out rate: its own profile and the
+   ; deform intensity [BrushToolWetness] make it; the opacity is the strength of a blending mode
    thisOpaTest := (BrushToolType=6) ? 255 : (BrushToolUseSecondaryColor=1 && BrushToolType<3) ? BrushToolBopacity : BrushToolAopacity
    If (BrushToolBlurStrength<3 && canApplyFX=0 && BrushToolType=5 || BrushToolWetness<1 && BrushToolType>5 || thisOpaTest<5 && BrushToolType>4)
    {
@@ -78576,14 +78576,14 @@ ActPaintBrushNow() {
    If (BrushToolType>=7)
       stepu := 2
    Else If (BrushToolType=6)
-      stepu := Max(1, Round(brushSize * 0.012))   ; the smudge's dab spacing
+      stepu := Max(1, Round(brushSize * 0.012))   ; the smudge's shortest move
 
    ; ToolTip, % stepu "|" fstp, , , 2
    If !GetKeyState("Shift", "P")
       prevMX := prevMY := 0
 
    offX := offY := 0
-   smudgeDabX := smudgeDabY := ""
+   smudgePrevX := smudgePrevY := ""
    ShowTheImage("set-prev", imgPath)
    DllCall("qpvmain.dll\ResetBrushOpacityMap")
    If (isLarge=1)
@@ -78712,42 +78712,26 @@ ActPaintBrushNow() {
          thisIndex++
          If (BrushToolType=6)
          {
-            ; smudge brush: a dab every stepu px along the drag, on whole pixels, each pulling the pixels from
-            ; where the previous dab lay; at most 400 dabs a move, fewer for huge brushes: the steps grow
-            ; rather than the brush lag behind the pointer
-            If (smudgeDabX="")
-               smudgeDabX := smudgePrevX := prevMX, smudgeDabY := smudgePrevY := prevMY
-            ux := kX - smudgeDabX
-            uy := kY - smudgeDabY
-            distu := Sqrt(ux*ux + uy*uy)
-            dabStep := Max(stepu, distu / Max(1, Min(400, Floor(2500000 / (brushSize*brushSize)))))
-            If (distu>=dabStep)
+            ; smudge brush: one call drags the paint along the whole move, however long
+            If (smudgePrevX="")
+               smudgePrevX := prevMX, smudgePrevY := prevMY
+            cur_tkX := kX
+            cur_tkY := kY
+            cur_offX := kX - smudgePrevX
+            cur_offY := kY - smudgePrevY
+            If (cur_offX || cur_offY)
             {
-               ux := ux * dabStep / distu
-               uy := uy * dabStep / distu
-               Loop, % Floor(distu / dabStep)
+               cur_opacity := 255
+               cur_brushSize := brushSize
+               If (thisPenPressure>=0)
                {
-                  smudgeDabX += ux
-                  smudgeDabY += uy
-                  cur_tkX := Round(smudgeDabX)
-                  cur_tkY := Round(smudgeDabY)
-                  cur_offX := cur_tkX - smudgePrevX
-                  cur_offY := cur_tkY - smudgePrevY
-                  If (!cur_offX && !cur_offY)
-                     Continue
-
-                  cur_opacity := 255
-                  cur_brushSize := brushSize
-                  If (thisPenPressure>=0)
-                  {
-                     cur_opacity := clampInRange(Round(255 * penOpacityFactor), 1, 255)
-                     cur_brushSize := clampInRange(Round(brushSize * penSizeFactor), 1, brushSize)
-                  }
-
-                  Gosub, DrawPaintBrushNowStep
-                  smudgePrevX := cur_tkX
-                  smudgePrevY := cur_tkY
+                  cur_opacity := clampInRange(Round(255 * penOpacityFactor), 1, 255)
+                  cur_brushSize := clampInRange(Round(brushSize * penSizeFactor), 1, brushSize)
                }
+
+               Gosub, DrawPaintBrushNowStep
+               smudgePrevX := kX
+               smudgePrevY := kY
             }
             thisZeit := A_TickCount
          } Else Loop
