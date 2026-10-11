@@ -2509,7 +2509,6 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   pfn := (userPrivateMode=1) ? "******." extname : OutFileName
   fdr := (userPrivateMode=1) ? "*:\******\***" : OutDir
   showTOOLtip("Loading slideshow, please wait`n" pfn "`n" fdr "\")
-  setWindowTitle("Loading slideshow, please wait", 1)
   If RegExMatch(fileNamu, "i)(.\.sldb)$")
   {
      r := OpenSLDBdataBase(fileNamu)
@@ -11905,6 +11904,7 @@ VPchangeZoom(dir, key:=0, stepFactor:=1, forceUpdate:=0) {
       dummyResizeImageGDIwin()
    Else 
       SetTimer, dummyResizeImageGDIwin, -50
+
    If (drawingShapeNow=1 && isNowSymmetricVectorShape())
       SetTimer, updateVectorSymmetryPoint, -100
 }
@@ -14276,7 +14276,6 @@ realtimePasteInPlaceRotator(previewMode, clipBMP, ByRef newBitmap) {
     fScale := JimgW/vpImgW
     ellipseModus := (prevEllipseSelectMode=1 && PasteInPlaceToolMode=1) ? 1 : 0
     trGdip_GetImageDimensions(clipBMP, eImgW, eImgH)
-
     If (PasteInPlaceOrientation>1)
        ER := Gdip_ImageRotateFlip(clipBMP, PasteInPlaceOrientation - 1)
 
@@ -24148,8 +24147,6 @@ BlurSelectedArea(modus:="") {
 
     If (errorsOccurred=0 && allowAlphaMasking=1 && alphaMaskingMode>1)
     {
-       ; SoundBeep 900, 1010
-       ; setWindowTitle("APPLYING ALPHA MASK, please wait", 1)
        trGdip_GetImageDimensions(zBitmap, zzw, zzh)
        alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
        If validBMP(maskBitmap)
@@ -24510,7 +24507,7 @@ addNoiseSelectedArea() {
        Return
     }
 
-    setWindowTitle("GENERATING NOISE :-), please wait", 1)
+    setWindowTitle("GENERATING NOISE, please wait", 1)
     rz := coreAddNoiseSelectedArea(whichBitmap, 0, G2)
     Gdip_DeleteGraphics(G2)
     If (rz!="fail" && validBMP(newBitmap))
@@ -28429,7 +28426,6 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
    {
       fsu := (StrLen(dateu)>40) ? SubStr(dateu, 1, 38) " [...]" : dateu
       showTOOLtip("Gathering entries matching " fsu ", please wait")
-      setWindowTitle("Gathering entries matching " fsu ", please wait...", 1)
       If (InStr(LVvaru, "metaT") && winOpen!=48)
       {
          If (SLDtypeLoaded=3)
@@ -34805,7 +34801,6 @@ SaveDBfilesList(enforceFile:=0) {
 
       setImageLoading()
       dbVersion := dbExpectedVersion
-      setWindowTitle("Saving SQL files list database, please wait", 1)
       showTOOLtip("Saving the list of folders into the SQL database`n" file2save "`nPlease wait")
       saveDynaFolders := getDynamicFoldersList()
       recreateDynaFoldersSQLdbList(saveDynaFolders)
@@ -35065,7 +35060,6 @@ SaveFilesList(enforceFile:=0) {
       CurrentSLD := ""
       setImageLoading()
       Sleep, 10
-      setWindowTitle("Saving files list index, please wait", 1)
       zPlitPath(file2save, 0, fileNamu, folderu)
       If (SLDcacheFilesList=1)
          showTOOLtip("Saving list of " groupDigits(maxFilesIndex) " entries as:`n" fileNamu "`n" folderu "\")
@@ -35460,7 +35454,6 @@ cleanDeadFilesList(dummy:=0) {
       startOperation := A_TickCount
       friendlyLabel := (dummy="noFilesCheck") ? "Removing duplicate entries" : "Scanning for missing files"
       friendlyLabel2 := (dummy="noFilesCheck") ? "duplicate entries" : "dead files"
-      setWindowTitle(friendlyLabel ", please wait", 1)
       showTOOLtip(friendlyLabel ", please wait")
       prevMSGdisplay := A_TickCount
       doStartLongOpDance()
@@ -35666,7 +35659,6 @@ removeFilesListSeenImages(modus:=0) {
       startOperation := A_TickCount
       backCurrentSLD := CurrentSLD
       CurrentSLD := ""
-      setWindowTitle("Removing " friendlyLabel " images, please wait", 1)
       showTOOLtip("Removing " friendlyLabel " images`nGathering data, please wait")
       setImageLoading()
       If (modus="faves")
@@ -37203,7 +37195,6 @@ dbSortingCached(SortCriterion) {
       sortMode := (reverseOrderOnSort=1) ? " DESC" : ""
       prevFilesSortMode := SortCriterion
       IniSLDBWrite("prevFilesSortMode", SortCriterion)
-      setWindowTitle("Sorting files list by " SortCriterion ", please wait", 1)
       If testIsDupesList()
       {
          retrieveDupesByProperties(0, SortCriterion)
@@ -37435,8 +37426,7 @@ SortFilesList(SortCriterion) {
       startOperation := A_TickCount
       setImageLoading()
       previmgPath := getIDimage(currentFileIndex)
-      showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files, please wait")
-      setWindowTitle("Sorting files list, please wait", 1)
+      showTOOLtip("Gathering information for " groupDigits(maxFilesIndex) " files to sort them, please wait")
       backCurrentSLD := CurrentSLD
       CurrentSLD := filterBehaviour := ""
       newIndex := 0
@@ -42535,6 +42525,7 @@ buildQuickSearchMenus() {
    If (maxFilesIndex>0 && currentFileIndex)
    {
       kMenu("PVmenu", "Add", "Show file header", "PanelDisplayFileHeaderRaw")
+      kMenu("PVmenu", "Add", "Convert active file to PDF", "convertFocusedFileToPDF", "pdf convert solo")
       kMenu("PVmenu", "Add", "Set frame delay (Join images)", "PanelSetFrameDelay", "animation apng webp gif")
    }
    
@@ -44077,40 +44068,71 @@ BTNperformCombineIMGs() {
       combineImagesFimMultiPage(userSaveBitsDepth, userCombineFramesFmt, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
 }
 
-CombineImgsIntoPDF(file2save) {
+convertFocusedFileToPDF() {
+    imgPath := getIDimage(currentFileIndex)
+    zPlitPath(imgPath, 1, OutFileName, OutDir, OutFileNameNoExt, OutFileExt)
+    If (OutFileExt="pdf")
+    {
+       showTOOLtip("WARNING: The selected file seems to already be a PDF:`n" OutFileName "`n" OutDir "\")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    If !FileExist(imgPath)
+    {
+       showTOOLtip("ERROR: The selected file seems to no longer exist:`n" OutFileName "`n" OutDir "\")
+       SoundBeep 300, 100
+       SetTimer, RemoveTooltip, % -msgDisplayTime
+       Return
+    }
+
+    file2save := OutDir "\" OutFileNameNoExt ".pdf"
+    UserCombinePDFpageSize := 9
+    userCombinePDFkeepJpegs := 1
+    ResizeApplyEffects := 0
+    userCombineSubFrames := 1
+    userCombineFramesFmt := 2
+    CombineImgsIntoPDF(file2save, currentFileIndex)
+}
+
+CombineImgsIntoPDF(file2save, forcedIndex:=0) {
 ; The pages are written one at a time by the PDF writer of qpvmain.dll [pdf-writer.h], to a
 ; file next to the destination that replaces it only once the document is complete.
-   filesElected := getSelectedFiles(0, 1)
-   If !filesElected
+   If (forcedIndex=0)
    {
-      showTOOLtip("WARNING: Insufficient files selected to join.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      filesElected := getSelectedFiles(0, 1)
+      If !filesElected
+      {
+         showTOOLtip("WARNING: Insufficient files selected to join.")
+         SoundBeep 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
    }
 
    If askOverwriteDestFile(file2save, 0)
       Return
 
-   zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt)
    If FileExist(file2save)
       FileSetAttrib, -R, % file2save
 
    initQPVmainDLL()
    initFIMGmodule()
    hPdf := DllCall("qpvmain.dll\PdfWriterBegin", "WStr", file2save, "Int*", errCode, "UPtr")
+   zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt)
    If !hPdf
    {
       If (ErrorLevel || !qpvMainDll)
          msgu := "The PDF writer of qpvmain.dll is missing. The DLL may be outdated."
       Else If (errCode=2)
-         msgu := "The destination file is in use by another application, or it is read-only."
+         msgu := "The destination file is in use by another application, or it is read-only:`n" OutFileName "`n" OutDir "\"
       Else If (errCode=3)
-         msgu := "Unable to create a file in the destination folder."
+         msgu := "Unable to create a file in the destination folder:`n" OutFileName "`n" OutDir "\"
       Else
-         msgu := "Unable to start the PDF file."
+         msgu := "Unable to start the PDF file:`n" OutFileName "`n" OutDir "\"
 
-      showTOOLtip("ERROR: " msgu "`n" OutFileName)
+      showTOOLtip("ERROR: " msgu)
       SoundBeep 300, 100
       SetTimer, RemoveTooltip, % -msgDisplayTime
       Return
@@ -44133,8 +44155,15 @@ CombineImgsIntoPDF(file2save) {
    countTFilez := pagesAdded := keptJpegs := failedPages := 0
    Loop, % maxFilesIndex
    {
-      If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
-         Continue
+      If (forcedIndex=0)
+      {
+         If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
+            Continue
+      } Else If (forcedIndex>0)
+      {
+         If (A_Index!=forcedIndex)
+            Continue
+      }
 
       If (determineTerminateOperation()=1)
       {
@@ -44221,7 +44250,7 @@ CombineImgsIntoPDF(file2save) {
          }
       }
 
-      If (writeFailed=1 || abandonAll=1)
+      If (writeFailed=1 || abandonAll=1 || forcedIndex>0)
          Break
    }
 
@@ -61169,7 +61198,6 @@ FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, externCondition, ByRef has
    ; ToolTip, % tm "|" mustApplyToneMapping "|" thisAllow "|" externCondition , , , 2
    If (mustApplyToneMapping=1 && thisAllow=1 && externCondition=1)
    {
-      ; setWindowTitle("Applying adaptive logarithmic tone mapping to display high color depth image")
       changeMcursor()
       thisStartZeit := A_TickCount
       If (tm=3) ; PQ curve image
@@ -63875,7 +63903,6 @@ OpenArgFile(inputu) {
     setImageLoading()
     Global scriptStartTime := A_TickCount
     currentFileIndex := maxFilesIndex := 1
-
     ; usrColorDepth := imgFxMode := 1
     ; vpIMGrotation := FlipImgH := FlipImgV := 0
     resultedFilesList[1, 1] := inputu
@@ -72618,6 +72645,7 @@ drawWelcomeImg() {
        If (identifyThisWin()!=1)
        {
           screenSaverMode := 0
+          setWindowTitle(appTitle " v" appVersion, 1)
           Return
        }
     }
@@ -74206,7 +74234,6 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
 
           If (desiredFrameIndex<1 && (usrColorDepth>1 || vpIMGrotation>0))
           {
-             setWindowTitle("Image processing aborted")
              showTOOLtip("Image processing aborted")
              SetTimer, RemoveTooltip, % -msgDisplayTime//2
           }
@@ -76042,7 +76069,6 @@ createHistogramBMP(whichBitmap) {
       ERR := Gdip_GetHistogram(whichBmp, 2, 0, 0, brLvlArray)
    } Else If (showHistogram=6)
    {
-      setWindowTitle("Calculating histogram")
       ERR := Gdip_GetHistogram(whichBmp, 3, brLvlArray, 0, 0)
       ERR := Gdip_GetHistogram(whichBmp, 2, brLvlR, 0, 0)
       ERR := Gdip_GetHistogram(whichBmp, 2, 0, brLvlG, 0)
