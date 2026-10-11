@@ -105,6 +105,59 @@ static bool brushSmudgeDriftTable(const float hold) {
     return true;
 }
 
+// smudge brush: per chord, like the drift table, the brush profile summed from the front of the chord to t
+static std::vector<float> smudgeSwept;
+
+static bool brushSmudgeSweptTable() {
+    if (!smudgeSwept.empty())
+       return true;
+
+    try
+    {
+        smudgeSwept.resize((size_t)SMUDGE_NY * SMUDGE_NT);
+    } catch (const std::bad_alloc&) {
+        return false;
+    }
+
+    const int sub = 8;
+    for (int j = 0; j < SMUDGE_NY; ++j)
+    {
+        const double Y = (double)j / (SMUDGE_NY - 1);
+        const double chord = sqrt(std::max(0.0, 1.0 - Y * Y));
+        const double du = 2.0 * chord / ((SMUDGE_NT - 1) * sub);
+        float* row = &smudgeSwept[(size_t)j * SMUDGE_NT];
+        double acc = 0.0;
+        row[0] = 0.0f;
+        for (int i = 1; i < SMUDGE_NT; ++i)
+        {
+            for (int k = 0; k < sub; ++k)
+            {
+                const double u = chord - ((i - 1) * sub + k + 0.5) * du;
+                const double m = std::max(0.0, 1.0 - sqrt(u * u + Y * Y));
+                acc += du * m * m * (3.0 - 2.0 * m);
+            }
+            row[i] = (float)acc;
+        }
+    }
+    return true;
+}
+
+// smudge brush: the swept profile to u on the chord at Y
+static QPV_FORCEINLINE double smudgeSweptAt(const double Y, const double c, const double u) {
+    const double fy = Y * (SMUDGE_NY - 1);
+    const int j = std::min((int)fy, SMUDGE_NY - 2);
+    const double wy = fy - j;
+    const double t = (c>0.0) ? clamp(u / c, -1.0, 1.0) : 0.0;
+    const double fi = (1.0 - t) * 0.5 * (SMUDGE_NT - 1);
+    const int i = std::min((int)fi, SMUDGE_NT - 2);
+    const double wi = fi - i;
+    const float* a = &smudgeSwept[(size_t)j * SMUDGE_NT];
+    const float* b = a + SMUDGE_NT;
+    const double va = a[i] + (a[i + 1] - a[i]) * wi;
+    const double vb = b[i] + (b[i + 1] - b[i]) * wi;
+    return va + (vb - va) * wy;
+}
+
 // smudge brush: the chord at Y across the move [c long each way], between two lines of the drift table
 struct SmudgeChord {
     const float* a;
@@ -419,7 +472,7 @@ static bool brushSetupSmudgeSegment(BrushStamp &s) {
     s.segDirX = ex / s.segK;
     s.segDirY = ey / s.segK;
     s.segLk = s.segL * s.segK;
-    return brushSmudgeDriftTable(std::min(1.0f, s.smudgeHold * s.opaf));
+    return brushSmudgeDriftTable(std::min(1.0f, s.smudgeHold * s.opaf)) && brushSmudgeSweptTable();
 }
 
 // the colour, and the rotated ellipse of the brush tip
@@ -1036,7 +1089,8 @@ static QPV_FORCEINLINE void brushSmudgeSample(const BrushStamp &s, const double 
 // its unit-brush path is solved from the drift table - paint ahead of the brush waits, enters at the front, drifts back
 // through the brush at 1 - hold * profile and is left where it comes out. One pass, whatever the length of the move.
 // With a blending mode the layer [LAYER] takes the drag, and the image shows the layer blended over the pixels from
-// before the stroke, as far as the layer covers them and the brush colour's alpha [the opacity] asks.
+// before the stroke, as far as the layer covers them and the brush colour's alpha [the opacity] asks; the blend
+// compounds as the brush goes over the pixel.
 template<bool LAYER>
 static void brushSmudgeRows(const BrushStamp &s) {
     #pragma omp parallel for schedule(dynamic)
@@ -1109,6 +1163,19 @@ static void brushSmudgeRows(const BrushStamp &s) {
                     L[1] = O[1] = tgtG;
                     L[2] = O[2] = tgtR;
                     L[3] = O[3] = tgtA;
+                } else
+                {
+                    // the blend compounds as if every second move took the image as it is for the original: each move
+                    // goes half way there, times the mean of the brush profile it swept over the pixel
+                    const double u1 = clamp(uf, -c, c), u2 = clamp(uf + s.segLk, -c, c);
+                    const double mean = (smudgeSweptAt(Y, c, u1) - smudgeSweptAt(Y, c, u2)) / s.segLk;
+                    const float e = (float)(0.5 * mean) * s.brushA / 255.0f;
+                    int oB = O[0], oG = O[1], oR = O[2], oA = O[3];
+                    brushSmudgeMix(s, e, brushSmudgeDither(s.smudgeSeed ^ 0x27D4EB2Fu, px, py), tgtB, tgtG, tgtR, tgtA, O[0], O[1], O[2], O[3], oB, oG, oR, oA);
+                    O[0] = oB;
+                    O[1] = oG;
+                    O[2] = oR;
+                    O[3] = oA;
                 }
 
                 int lB = L[0], lG = L[1], lR = L[2], lA = L[3];
