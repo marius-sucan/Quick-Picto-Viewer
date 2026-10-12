@@ -115,7 +115,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|WEBP|AVIF|HEIC|HEIF|JXL|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
-   , multiPageAnimTypesRegEx := "i)(.\.(apng|png|webp|gif|avif|heif|heic|jxl))$"
+   , multiPageAnimTypesRegEx := "i)(.\.(apng|png|mng|webp|gif|avif|heif|heic|jxl))$", multiPageFilesREGex := "i)(.\.(pdf|tif|tiff|jxl))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|ico|png|tga|tif|tiff|webp))$", userJpegQuality := 90
@@ -43830,7 +43830,7 @@ PanelExtractFrames() {
     depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 190 : 150
-    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF, JXL, MNG, APNG or WEBP files.
+    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF,`nJXL, MNG, APNG or WEBP files.
     Gui, Add, Text, y+7, Image output options:
     Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, Render PDF pages (DPI):
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
@@ -43961,21 +43961,21 @@ PanelCombineImagesMultipage() {
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, General|PDF options
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
-    Gui, Add, Text, xs+15 y+10 w%ml% +0x200 +hwndhTemp, File format on save:
-    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".tiff|.pdf|.apng|.gif|.webp|.mng|.jxl", [hTemp])
+    Gui, Add, Text, xs y+10 w%ml% +0x200 +hwndhTemp, File format on save:
+    GuiAddDropDownList("x+1 w" thisWid + 15 " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".TIFF|.PDF|.APNG|.GIF|.WEBP|.MNG|.JXL", [hTemp])
     Gui, Add, Checkbox, x+5 hp gBtnChangeMultiPageFmt Checked%userCombineTiffKeepOrig% vuserCombineTiffKeepOrig, Embed originals
-    Gui, Add, Checkbox, xs+15 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
+    Gui, Add, Checkbox, xs y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
     GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
-    Gui, Add, Text, xs+15 y+10 w%ml% hp +0x200 vtxtLine2, Frames delay (in milisec.)
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine2, Frames delay (in milisec.)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     GuiAddEdit("x+1 w" thisWid " number -multi limit4 veditF5", userCombineGIFframeDelay)
     Gui, Add, UpDown, vuserCombineGIFframeDelay Range1-9500, % userCombineGIFframeDelay
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gBtnHelpJoinIMGsframeDelay", " ?", "Help")
-    Gui, Add, Checkbox, xs+15 y+10 w%ml% hp Checked%userJoinIMGres% gBtnChangeMultiPageFmt vuserJoinIMGres +hwndhTemp, Set dimensions (W x H):
+    Gui, Add, Checkbox, xs y+10 w%ml% hp Checked%userJoinIMGres% gBtnChangeMultiPageFmt vuserJoinIMGres +hwndhTemp, Set dimensions (W x H):
     ToolTip2ctrl(hTemp, "For best results, all frames should have the same width and height.")
     thisWid += 20
     GuiAddEdit("x+1 w" thisWid " number -multi limit5 veditF7", userJoinIMGsW)
@@ -44028,7 +44028,7 @@ PanelCombineImagesMultipage() {
 }
 
 BtnHelpCombineImgs() {
-   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. GIF, TIFF and PDF formats are the supported destination formats.`n`nIf any of the selected files has multiple frames or pages and the option «Join contained frames from selected files», these pages will be processed and become part of the newly created file.`n`nThe resulted order of the pages will reflect the order of originally selected files.`n`nFor proper GIF animations, please select files having the same resolution.`n`nIn PDF files, every image is stored at the chosen resolution [DPI], or at its own when it has fewer pixels than that asks for. JPEG files are kept as they are, with no loss of quality, unless viewport effects apply to them or they are more than 1.5 times as detailed as the chosen resolution. The other images are stored as JPEGs of the chosen quality. The new PDF replaces the destination file only once it is complete.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This tool allows users to combine multiple images into one image. TIFF and PDF are multi-page file formats, the other destination formats are for animations.`n`nIf the selected files have multiple frames or pages, and you want them included in the new file, activate the option «Join contained frames from selected files».`n`nThe resulted order of the pages/frames will reflect the order of originally selected files.`n`nFor proper animations, please select files having the same resolution or activate «Set dimensions».`n`nIn PDF files, every image is stored at the chosen resolution [DPI], or at its own when it has fewer pixels than that asks for. JPEG files are kept as they are, with no loss of quality, unless viewport effects apply to them or they are more than 1.5 times as detailed as the chosen resolution. The other images are stored as JPEGs of the chosen quality. The new PDF replaces the destination file only once it is complete.`n`nThe TIFFs created use the LZW compression method.", -1, 0, 0)
 }
 
 BtnHelpJoinIMGsframeDelay() {
@@ -61628,7 +61628,7 @@ convert2format(givenIndex) {
 batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    labelu := (pdfTextMode=1) ? "text page" : "frame"
    alabelu := (pdfTextMode=1) ? "PDFs" : "images"
-   thisRegEX := (pdfTextMode=1) ? "i)(.\.pdf)$" : "i)(.\.(pdf|gif|tif|tiff|webp))$"
+   thisRegEX := (pdfTextMode=1) ? "i)(.\.pdf)$" : StrReplace(multiPageAnimTypesRegEx, "|avif", "|avif|pdf|tif|tiff")
    filesElected := getSelectedFiles(0, 1)
    showTOOLtip("Extracting " labelu "s from " groupDigits(filesElected) " files, please wait")
    prevMSGdisplay := A_TickCount
@@ -66807,21 +66807,20 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
      {
         Menu, pvMenuBarImage, Add
         imgPath := getIDimage(currentFileIndex)
-        If RegExMatch(imgPath, "i)(.\.(pdf|tif|tiff))$")
-           kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs")
-        If (RegExMatch(imgPath, "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
+        If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageFilesREGex))
+           kMenu("pvMenuBarImage", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs")
+        If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
            kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
         If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
-        {
            kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+
+        If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && markedSelectFile)
            kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create tiff document")
-        } Else
-        {
-           kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
-           If (!testWasImageEditedInVP() || !toneMapPanelApplies())
-              kMenu("pvMenuBarImage", "Disable", "Adjust &HDR tone-mapping")
-        }
+
+        kMenu("pvMenuBarImage", "Add", "Adjust &HDR tone-mapping", "PanelAdjustToneMapping", "colors dynamic exposure gamma hdr raw reinhard drago")
+        If (!testWasImageEditedInVP() || !toneMapPanelApplies())
+           kMenu("pvMenuBarImage", "Disable", "Adjust &HDR tone-mapping")
 
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image") 
         kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
@@ -66852,22 +66851,23 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
      If (InStr(filesFilter, "i)(QPV:PAGES:")!=1)
         createMenuImageFileActions("pvMenuBarImage")
 
+     imgPath := getIDimage(currentFileIndex)
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
-     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tif|tiff))$"))
-        kMenu("pvMenuBarImage", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
-     If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
+     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageFilesREGex))
+        kMenu("pvMenuBarImage", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
+     If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
         kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
-     If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") || markedSelectFile)
+     If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
         kMenu("pvMenuBarImage", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
 
      kMenu("pvMenuBarImage", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create tiff document")
-     If !markedSelectFile
+     If (InStr(filesFilter, "i)(QPV:PAGES:")=1 || !markedSelectFile)
         kMenu("pvMenuBarImage", "Disable", "Join images into...")
 
      kMenu("pvMenuBarImage", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet", "generate")
-     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && !markedSelectFile)
+     If (InStr(filesFilter, "i)(QPV:PAGES:")=1 || !markedSelectFile)
         kMenu("pvMenuBarImage", "Disable", "&Create a thumbnails sheet")
 
      If (ShowAdvToolbar=1 && userCustomizedToolbar!=1)
@@ -68416,19 +68416,21 @@ createMenuCurrentFilesActs(dummy:=0) {
    } Else
       kMenu("PVtFileOpen", "Add", "Open files in new &QPV instances`tCtrl+Enter", "OpenWithNewQPVinstance")
 
-   Menu, PVfilesActs, Add, 
+   Menu, PVfilesActs, Add
+   imgPath := getIDimage(currentFileIndex)
    kMenu("PVfilesActs", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
-   If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.pdf)$") || markedSelectFile)
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageFilesREGex))
+      kMenu("PVfilesActs", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
+
+   If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
       kMenu("PVfilesActs", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
 
-   If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|gif|tif|tiff|webp))$") || markedSelectFile)
+   If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
       kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
-   If RegExMatch(getIDimage(currentFileIndex), "i)(.\.(pdf|tif|tiff))$")
-      kMenu("PVfilesActs", "Add", "Preview all frames/pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
 
-   If markedSelectFile
+   If (markedSelectFile && InStr(filesFilter, "i)(QPV:PAGES:")!=1)
       kMenu("PVfilesActs", "Add", "Join images into...", "PanelCombineImagesMultipage", "pdf create tiff document")
-   If (InStr(filesFilter, "i)(QPV:PAGES:")=1 || markedSelectFile)
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && markedSelectFile)
       kMenu("PVfilesActs", "Add", "&Create a thumbnails sheet", "PanelCreateIMGthumbsSheet", "generate")
 
    If (!markedSelectFile && FileRexists(resultedFilesList[currentFileIndex, 1]) && thumbsDisplaying=1)
@@ -85238,7 +85240,6 @@ QPV_ShowThumbnails(modus:=0, allStarter:=0, allStartZeit:=0) {
              ; mustDisposeImgNow := 1
              thumbCachable := 1
              imgsListArrayThumbs[thisFileIndex, 1] := "f"
-             oBitmap := 0
              file2load := imgsListArrayThumbs[thisFileIndex, 3]
              oBitmap := LoadBitmapFromFileu(file2load, 0, 0, frameLoad, sizesDesired)
              If validBMP(oBitmap)
