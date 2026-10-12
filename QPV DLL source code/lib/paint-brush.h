@@ -23,23 +23,8 @@ std::vector<size_t> activeBrushChunks;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 int chunkGridW = 0;
 
-// the smudge with a blending mode paints a layer over the image as it was before the stroke: per 128 x 128 chunk,
-// the smudged pixels and the original ones [BGRA, 8 bytes a pixel], and how much the layer covers each [0 = untouched]
-std::vector<unsigned char*> smudgeLayerChunks;
-std::vector<unsigned char*> smudgeCoverChunks;
-int smudgeGridW = 0;
-
 // the effects brush's brightness and contrast tables
 static AdjustLUTs brushLUTs;
-
-static void freeSmudgeLayer() {
-    for (unsigned char* ptr : smudgeLayerChunks)
-        delete[] ptr;
-    for (unsigned char* ptr : smudgeCoverChunks)
-        delete[] ptr;
-    std::vector<unsigned char*>().swap(smudgeLayerChunks);
-    std::vector<unsigned char*>().swap(smudgeCoverChunks);
-}
 
 DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
     for (unsigned char* ptr : brushOpacityChunks)
@@ -58,7 +43,6 @@ DLL_API void DLL_CALLCONV ResetBrushOpacityMap() {
         }
     }
     activeBrushChunks.clear();
-    freeSmudgeLayer();
 }
 
 // smudge brush: in the unit brush [the brush ellipse scaled to the unit circle], the paint under the brush drifts back
@@ -103,59 +87,6 @@ static bool brushSmudgeDriftTable(const float hold) {
     }
     smudgeDriftHold = hold;
     return true;
-}
-
-// smudge brush: per chord, like the drift table, the brush profile summed from the front of the chord to t
-static std::vector<float> smudgeSwept;
-
-static bool brushSmudgeSweptTable() {
-    if (!smudgeSwept.empty())
-       return true;
-
-    try
-    {
-        smudgeSwept.resize((size_t)SMUDGE_NY * SMUDGE_NT);
-    } catch (const std::bad_alloc&) {
-        return false;
-    }
-
-    const int sub = 8;
-    for (int j = 0; j < SMUDGE_NY; ++j)
-    {
-        const double Y = (double)j / (SMUDGE_NY - 1);
-        const double chord = sqrt(std::max(0.0, 1.0 - Y * Y));
-        const double du = 2.0 * chord / ((SMUDGE_NT - 1) * sub);
-        float* row = &smudgeSwept[(size_t)j * SMUDGE_NT];
-        double acc = 0.0;
-        row[0] = 0.0f;
-        for (int i = 1; i < SMUDGE_NT; ++i)
-        {
-            for (int k = 0; k < sub; ++k)
-            {
-                const double u = chord - ((i - 1) * sub + k + 0.5) * du;
-                const double m = std::max(0.0, 1.0 - sqrt(u * u + Y * Y));
-                acc += du * m * m * (3.0 - 2.0 * m);
-            }
-            row[i] = (float)acc;
-        }
-    }
-    return true;
-}
-
-// smudge brush: the swept profile to u on the chord at Y
-static QPV_FORCEINLINE double smudgeSweptAt(const double Y, const double c, const double u) {
-    const double fy = Y * (SMUDGE_NY - 1);
-    const int j = std::min((int)fy, SMUDGE_NY - 2);
-    const double wy = fy - j;
-    const double t = (c>0.0) ? clamp(u / c, -1.0, 1.0) : 0.0;
-    const double fi = (1.0 - t) * 0.5 * (SMUDGE_NT - 1);
-    const int i = std::min((int)fi, SMUDGE_NT - 2);
-    const double wi = fi - i;
-    const float* a = &smudgeSwept[(size_t)j * SMUDGE_NT];
-    const float* b = a + SMUDGE_NT;
-    const double va = a[i] + (a[i + 1] - a[i]) * wi;
-    const double vb = b[i] + (b[i + 1] - b[i]) * wi;
-    return va + (vb - va) * wy;
 }
 
 // smudge brush: the chord at Y across the move [c long each way], between two lines of the drift table
@@ -275,7 +206,7 @@ struct BrushStamp {
     int overDrawOkay;
     float smudgeHold;
     unsigned int smudgeSeed;
-    bool smudgeLayer;
+    bool smudgeBlend;
     double segL, segK, segLk, segDirX, segDirY, segMoveX, segMoveY;
     double invRx, invRy, A_coeff, B_term_factor, C_term_factor;
     int totalStepsY;
@@ -402,61 +333,6 @@ static bool brushSetupClone(BrushStamp &s) {
     return !(noCopy && (s.brushType==6 || (s.lockW>0 && (s.brushType>=7 || s.brushType==3))));
 }
 
-// smudge brush with a blending mode: the layer chunks of the stamp's box, and the copy taken from the layer where it
-// covers the image; false without a copy of its own, or when a chunk could not be allocated [the stamp then smudges
-// without the blending mode]
-static bool brushSetupSmudgeLayer(BrushStamp &s) {
-    if (s.localClone.empty())
-       return false;
-
-    const int gridW = (s.imgW + 127) >> 7;
-    const size_t totalChunks = (size_t)gridW * ((s.imgH + 127) >> 7);
-    if (smudgeLayerChunks.size()!=totalChunks || smudgeGridW!=gridW)
-    {
-        freeSmudgeLayer();
-        smudgeLayerChunks.assign(totalChunks, nullptr);
-        smudgeCoverChunks.assign(totalChunks, nullptr);
-        smudgeGridW = gridW;
-    }
-
-    try
-    {
-        for (int cy = s.startY >> 7; cy <= s.endY >> 7; ++cy)
-        {
-            for (int cx = s.startX >> 7; cx <= s.endX >> 7; ++cx)
-            {
-                const size_t ci = (size_t)cy * gridW + cx;
-                if (!smudgeLayerChunks[ci])
-                {
-                    smudgeCoverChunks[ci] = new unsigned char[128 * 128]();
-                    smudgeLayerChunks[ci] = new unsigned char[128 * 128 * 8];
-                }
-            }
-        }
-    } catch (const std::bad_alloc&) {
-        return false;
-    }
-
-    // the dabs pull the smudged pixels, not the blended ones the image shows
-    for (int ry = 0; ry < s.cloneH; ++ry)
-    {
-        const int py = s.cloneStartY + ry;
-        for (int x = s.cloneStartX; x <= s.cloneEndX; ++x)
-        {
-            const size_t ci = (size_t)(py >> 7) * gridW + (x >> 7);
-            const int li = ((py & 127) << 7) + (x & 127);
-            if (!smudgeCoverChunks[ci] || !smudgeCoverChunks[ci][li])
-               continue;
-
-            const unsigned char* L = smudgeLayerChunks[ci] + li * 8;
-            unsigned char* d = s.localClone.data() + (INT64)ry * s.localPitch + (x - s.cloneStartX) * s.bytesPerPixel;
-            for (int c = 0; c < s.bytesPerPixel; ++c)
-                d[c] = L[c];
-        }
-    }
-    return true;
-}
-
 // smudge brush: the move in the unit brush, where the brush ellipse is the unit circle - its direction there
 // [segDir], and segK, the unit-brush length of one pixel of move; false when there is no move
 static bool brushSetupSmudgeSegment(BrushStamp &s) {
@@ -472,7 +348,7 @@ static bool brushSetupSmudgeSegment(BrushStamp &s) {
     s.segDirX = ex / s.segK;
     s.segDirY = ey / s.segK;
     s.segLk = s.segL * s.segK;
-    return brushSmudgeDriftTable(std::min(1.0f, s.smudgeHold * s.opaf)) && brushSmudgeSweptTable();
+    return brushSmudgeDriftTable(std::min(1.0f, s.smudgeHold * s.opaf));
 }
 
 // the colour, and the rotated ellipse of the brush tip
@@ -1088,10 +964,8 @@ static QPV_FORCEINLINE void brushSmudgeSample(const BrushStamp &s, const double 
 // smudge brush: the drag of the paint along the move. The paint at a pixel came from where it lay when the move began:
 // its unit-brush path is solved from the drift table - paint ahead of the brush waits, enters at the front, drifts back
 // through the brush at 1 - hold * profile and is left where it comes out. One pass, whatever the length of the move.
-// With a blending mode the layer [LAYER] takes the drag, and the image shows the layer blended over the pixels from
-// before the stroke, as far as the layer covers them and the brush colour's alpha [the opacity] asks; the blend
-// compounds as the brush goes over the pixel.
-template<bool LAYER>
+// With a blending mode, the dragged paint is blended over the pixel as it is, weighted by the brush profile where the
+// move came closest to the pixel and the brush colour's alpha [the opacity]; it builds up with every move.
 static void brushSmudgeRows(const BrushStamp &s) {
     #pragma omp parallel for schedule(dynamic)
     for (int i=0; i < s.totalStepsY; ++i)
@@ -1149,59 +1023,17 @@ static void brushSmudgeRows(const BrushStamp &s) {
             const int tgtA = (s.bytesPerPixel==4) ? targetPixel[3] : 255;
             int outB = tgtB, outG = tgtG, outR = tgtR, outA = tgtA;
             const float rnd = brushSmudgeDither(s.smudgeSeed, px, py);
-            if constexpr (LAYER)
+            brushSmudgeSample(s, px - moved * s.segMoveX, py - moved * s.segMoveY, rnd, outB, outG, outR, outA);
+            if (s.smudgeBlend)
             {
-                const size_t ci = (size_t)(py >> 7) * smudgeGridW + (px >> 7);
-                const int li = ((py & 127) << 7) + (px & 127);
-                unsigned char* L = smudgeLayerChunks[ci] + li * 8;
-                unsigned char* O = L + 4;
-                unsigned char &covered = smudgeCoverChunks[ci][li];
-                if (!covered)
-                {
-                    // the first touch takes the pixel as it is
-                    L[0] = O[0] = tgtB;
-                    L[1] = O[1] = tgtG;
-                    L[2] = O[2] = tgtR;
-                    L[3] = O[3] = tgtA;
-                } else
-                {
-                    // the blend compounds as if every second move took the image as it is for the original: each move
-                    // goes half way there, times the mean of the brush profile it swept over the pixel
-                    const double u1 = clamp(uf, -c, c), u2 = clamp(uf + s.segLk, -c, c);
-                    const double mean = (smudgeSweptAt(Y, c, u1) - smudgeSweptAt(Y, c, u2)) / s.segLk;
-                    const float e = (float)(0.5 * mean) * s.brushA / 255.0f;
-                    int oB = O[0], oG = O[1], oR = O[2], oA = O[3];
-                    brushSmudgeMix(s, e, brushSmudgeDither(s.smudgeSeed ^ 0x27D4EB2Fu, px, py), tgtB, tgtG, tgtR, tgtA, O[0], O[1], O[2], O[3], oB, oG, oR, oA);
-                    O[0] = oB;
-                    O[1] = oG;
-                    O[2] = oR;
-                    O[3] = oA;
-                }
-
-                int lB = L[0], lG = L[1], lR = L[2], lA = L[3];
-                brushSmudgeSample(s, px - moved * s.segMoveX, py - moved * s.segMoveY, rnd, lB, lG, lR, lA);
-                L[0] = lB;
-                L[1] = lG;
-                L[2] = lR;
-                L[3] = lA;
-
-                // the layer covers the pixel as much as the brush profile came closest to it
                 const double ua = (uf<=0.0 && uf + s.segLk>=0.0) ? 0.0 : std::min(fabs(uf), fabs(uf + s.segLk));
                 const float m = (float)std::max(0.0, 1.0 - sqrt(ua * ua + Y * Y));
-                covered = (unsigned char)std::max((int)covered, std::max(1, (int)(255.0f * m * m * (3.0f - 2.0f * m) * s.opaf + 0.5f)));
-
-                const RGBAColor top = { lB, lG, lR, lA };
-                const RGBAColor base = { O[0], O[1], O[2], O[3] };
+                const float w = m * m * (3.0f - 2.0f * m) * s.opaf * s.brushA / 255.0f;
+                const RGBAColor top = { outB, outG, outR, outA };
+                const RGBAColor base = { tgtB, tgtG, tgtR, tgtA };
                 const RGBAColor bl = CalculateNewBlendModes(top, base, s.blendMode, s.flipLayers, s.linearGamma, s.eraserMode, s.imgBpp, 0);
-                outB = lB;
-                outG = lG;
-                outR = lR;
-                outA = lA;
-                brushSmudgeMix(s, covered * s.brushA / 65025.0f, brushSmudgeDither(s.smudgeSeed ^ 0x5BD1E995u, px, py),
-                               bl.b, bl.g, bl.r, bl.a, lB, lG, lR, lA, outB, outG, outR, outA);
-            } else
-            {
-                brushSmudgeSample(s, px - moved * s.segMoveX, py - moved * s.segMoveY, rnd, outB, outG, outR, outA);
+                brushSmudgeMix(s, w, brushSmudgeDither(s.smudgeSeed ^ 0x5BD1E995u, px, py),
+                               bl.b, bl.g, bl.r, bl.a, top.b, top.g, top.r, top.a, outB, outG, outR, outA);
             }
 
             targetPixel[0] = clamp(outB, 0, 255);
@@ -1549,8 +1381,8 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     if (!brushSetupClone(s))
        return 0;
 
-    // with a blending mode the smudge paints a layer; Replace [24] is what the smudge does anyway
-    s.smudgeLayer = (brushType==6 && blendMode>0 && blendMode!=24) && brushSetupSmudgeLayer(s);
+    // Replace [24] is what the smudge does anyway
+    s.smudgeBlend = brushType==6 && blendMode>0 && blendMode!=24;
 
     brushSetupShape(s);
     if (!brushSetupEffects(s) || !brushSetupPass(s))
@@ -1560,12 +1392,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     if (brushType==6)
     {
         if (brushSetupSmudgeSegment(s))
-        {
-            if (s.smudgeLayer)
-               brushSmudgeRows<true>(s);
-            else
-               brushSmudgeRows<false>(s);
-        }
+           brushSmudgeRows(s);
         return 1;
     }
 
