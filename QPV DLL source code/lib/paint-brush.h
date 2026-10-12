@@ -207,6 +207,7 @@ struct BrushStamp {
     float smudgeHold;
     unsigned int smudgeSeed;
     bool smudgeBlend, smudgeBlendFull;
+    float smudgeBlendPace;
     double segL, segK, segLk, segDirX, segDirY, segMoveX, segMoveY;
     double invRx, invRy, A_coeff, B_term_factor, C_term_factor;
     int totalStepsY;
@@ -333,6 +334,17 @@ static bool brushSetupClone(BrushStamp &s) {
     return !(noCopy && (s.brushType==6 || (s.lockW>0 && (s.brushType>=7 || s.brushType==3))));
 }
 
+// smudge brush: the mean change one full application of a blending mode makes to a grey blended with itself
+static float smudgeSelfBlend(const int blendMode, const int linearGamma) {
+    int sum = 0;
+    for (int v = 0; v < 256; ++v)
+    {
+        const RGBAColor c = { v, v, v, 255 };
+        sum += abs(CalculateNewBlendModes(c, c, blendMode, 0, linearGamma, 0, 32, 0).g - v);
+    }
+    return sum / 256.0f;
+}
+
 // smudge brush: the move in the unit brush, where the brush ellipse is the unit circle - its direction there
 // [segDir], and segK, the unit-brush length of one pixel of move; false when there is no move
 static bool brushSetupSmudgeSegment(BrushStamp &s) {
@@ -348,6 +360,15 @@ static bool brushSetupSmudgeSegment(BrushStamp &s) {
     s.segDirX = ex / s.segK;
     s.segDirY = ey / s.segK;
     s.segLk = s.segL * s.segK;
+
+    // the modes that build up faster than Multiply [2] are slowed down to its pace; the others keep their own
+    s.smudgeBlendPace = 1.0f;
+    if (s.smudgeBlend && !s.smudgeBlendFull)
+    {
+        const float own = smudgeSelfBlend(s.blendMode, s.linearGamma);
+        if (own>0.0f)
+           s.smudgeBlendPace = std::min(1.0f, smudgeSelfBlend(2, s.linearGamma) / own);
+    }
     return brushSmudgeDriftTable(std::min(1.0f, s.smudgeHold * s.opaf));
 }
 
@@ -965,8 +986,8 @@ static QPV_FORCEINLINE void brushSmudgeSample(const BrushStamp &s, const double 
 // its unit-brush path is solved from the drift table - paint ahead of the brush waits, enters at the front, drifts back
 // through the brush at 1 - hold * profile and is left where it comes out. One pass, whatever the length of the move.
 // With a blending mode, the pixel moves only towards the blend of the dragged paint over it [the full blend]: all the
-// way when blending a pixel with itself leaves it as it is, else as far as the dragged paint goes, plus 9% of the
-// blend a dab [a tenth of the brush, along the move], under the brush profile where the move came closest to the pixel.
+// way where blending a pixel with itself leaves it as it is; the other modes, which would build up from move to move,
+// take the dragged paint half way, then build up slowly as the paint passes through the brush.
 static void brushSmudgeRows(const BrushStamp &s) {
     #pragma omp parallel for schedule(dynamic)
     for (int i=0; i < s.totalStepsY; ++i)
@@ -1035,26 +1056,37 @@ static void brushSmudgeRows(const BrushStamp &s) {
                     outB = bl.b;
                     outG = bl.g;
                     outR = bl.r;
+                    // the colour modes leave the alpha to the drag; Clip to alpha [23] and Behind [25, whose blend would
+                    // raise it] keep the pixel's
+                    if (s.blendMode>=23)
+                       outA = tgtA;
                 } else
                 {
-                    const double ua = (uf<=0.0 && uf + s.segLk>=0.0) ? 0.0 : std::min(fabs(uf), fabs(uf + s.segLk));
+                    // the dragged paint lands half way, never past the full blend nor against it
+                    const int dB = clamp(top.b, std::min(tgtB, bl.b), std::max(tgtB, bl.b));
+                    const int dG = clamp(top.g, std::min(tgtG, bl.g), std::max(tgtG, bl.g));
+                    const int dR = clamp(top.r, std::min(tgtR, bl.r), std::max(tgtR, bl.r));
+                    outB = tgtB;
+                    outG = tgtG;
+                    outR = tgtR;
+                    outA = tgtA;
+                    brushSmudgeMix(s, 0.5f, brushSmudgeDither(s.smudgeSeed ^ 0x27D4EB2Fu, px, py),
+                                   dB, dG, dR, top.a, tgtB, tgtG, tgtR, tgtA, outB, outG, outR, outA);
+
+                    // then the blend builds up as the paint passes through the brush, not while the brush carries it: 5% a
+                    // dab of the paint's own path [pa..pb in the unit brush; a dab is a tenth of the brush], under the
+                    // brush profile
+                    const double pa = std::max(uf, -c), pb = std::min(u0, c);
+                    const double ua = (pa<=0.0 && pb>=0.0) ? 0.0 : std::min(fabs(pa), fabs(pb));
                     const float m = (float)std::max(0.0, 1.0 - sqrt(ua * ua + Y * Y));
-                    const float w = m * m * (3.0f - 2.0f * m) * 0.09f * s.opaf * (float)std::min(1.0, s.segLk / 0.2);
+                    const float w = m * m * (3.0f - 2.0f * m) * 0.05f * s.smudgeBlendPace * s.opaf * (float)std::min(1.0, std::max(0.0, pb - pa) / 0.2);
+                    const int xB = outB, xG = outG, xR = outR, xA = outA;
                     brushSmudgeMix(s, w, brushSmudgeDither(s.smudgeSeed ^ 0x5BD1E995u, px, py),
-                                   bl.b, bl.g, bl.r, bl.a, top.b, top.g, top.r, top.a, outB, outG, outR, outA);
+                                   bl.b, bl.g, bl.r, xA, xB, xG, xR, xA, outB, outG, outR, outA);
                     outB = clamp(outB, std::min(tgtB, bl.b), std::max(tgtB, bl.b));
                     outG = clamp(outG, std::min(tgtG, bl.g), std::max(tgtG, bl.g));
                     outR = clamp(outR, std::min(tgtR, bl.r), std::max(tgtR, bl.r));
                 }
-
-                // the colour modes leave the alpha to the drag, as without a blending mode; Clip to alpha [23] and Behind
-                // [25] blend it too
-                if (s.blendMode<23)
-                   outA = top.a;
-                else if (s.smudgeBlendFull)
-                   outA = bl.a;
-                else
-                   outA = clamp(outA, std::min(tgtA, bl.a), std::max(tgtA, bl.a));
             }
 
             targetPixel[0] = clamp(outB, 0, 255);
@@ -1403,9 +1435,9 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
        return 0;
 
     // Replace [24] is what the smudge does anyway; a pixel blended with itself stays as it is in Darken [1], Lighten [5],
-    // Average [15], Luminosity [20] and Clip to alpha [23]
+    // Average [15], Luminosity [20], Clip to alpha [23] and Behind [25, with its alpha kept]
     s.smudgeBlend = brushType==6 && blendMode>0 && blendMode!=24;
-    s.smudgeBlendFull = blendMode==1 || blendMode==5 || blendMode==15 || blendMode==20 || blendMode==23;
+    s.smudgeBlendFull = blendMode==1 || blendMode==5 || blendMode==15 || blendMode==20 || blendMode==23 || blendMode==25;
 
     brushSetupShape(s);
     if (!brushSetupEffects(s) || !brushSetupPass(s))
