@@ -206,7 +206,7 @@ struct BrushStamp {
     int overDrawOkay;
     float smudgeHold;
     unsigned int smudgeSeed;
-    bool smudgeBlend;
+    bool smudgeBlend, smudgeBlendFull;
     double segL, segK, segLk, segDirX, segDirY, segMoveX, segMoveY;
     double invRx, invRy, A_coeff, B_term_factor, C_term_factor;
     int totalStepsY;
@@ -964,8 +964,9 @@ static QPV_FORCEINLINE void brushSmudgeSample(const BrushStamp &s, const double 
 // smudge brush: the drag of the paint along the move. The paint at a pixel came from where it lay when the move began:
 // its unit-brush path is solved from the drift table - paint ahead of the brush waits, enters at the front, drifts back
 // through the brush at 1 - hold * profile and is left where it comes out. One pass, whatever the length of the move.
-// With a blending mode, the dragged paint is blended over the pixel as it is, weighted by the brush profile where the
-// move came closest to the pixel and the brush colour's alpha [the opacity]; it builds up with every move.
+// With a blending mode, the pixel moves only towards the blend of the dragged paint over it [the full blend]: all the
+// way when blending a pixel with itself leaves it as it is, else as far as the dragged paint goes, plus 9% of the
+// blend a dab [a tenth of the brush, along the move], under the brush profile where the move came closest to the pixel.
 static void brushSmudgeRows(const BrushStamp &s) {
     #pragma omp parallel for schedule(dynamic)
     for (int i=0; i < s.totalStepsY; ++i)
@@ -1026,14 +1027,34 @@ static void brushSmudgeRows(const BrushStamp &s) {
             brushSmudgeSample(s, px - moved * s.segMoveX, py - moved * s.segMoveY, rnd, outB, outG, outR, outA);
             if (s.smudgeBlend)
             {
-                const double ua = (uf<=0.0 && uf + s.segLk>=0.0) ? 0.0 : std::min(fabs(uf), fabs(uf + s.segLk));
-                const float m = (float)std::max(0.0, 1.0 - sqrt(ua * ua + Y * Y));
-                const float w = m * m * (3.0f - 2.0f * m) * s.opaf * s.brushA / 255.0f;
                 const RGBAColor top = { outB, outG, outR, outA };
                 const RGBAColor base = { tgtB, tgtG, tgtR, tgtA };
                 const RGBAColor bl = CalculateNewBlendModes(top, base, s.blendMode, s.flipLayers, s.linearGamma, s.eraserMode, s.imgBpp, 0);
-                brushSmudgeMix(s, w, brushSmudgeDither(s.smudgeSeed ^ 0x5BD1E995u, px, py),
-                               bl.b, bl.g, bl.r, bl.a, top.b, top.g, top.r, top.a, outB, outG, outR, outA);
+                if (s.smudgeBlendFull)
+                {
+                    outB = bl.b;
+                    outG = bl.g;
+                    outR = bl.r;
+                } else
+                {
+                    const double ua = (uf<=0.0 && uf + s.segLk>=0.0) ? 0.0 : std::min(fabs(uf), fabs(uf + s.segLk));
+                    const float m = (float)std::max(0.0, 1.0 - sqrt(ua * ua + Y * Y));
+                    const float w = m * m * (3.0f - 2.0f * m) * 0.09f * s.opaf * (float)std::min(1.0, s.segLk / 0.2);
+                    brushSmudgeMix(s, w, brushSmudgeDither(s.smudgeSeed ^ 0x5BD1E995u, px, py),
+                                   bl.b, bl.g, bl.r, bl.a, top.b, top.g, top.r, top.a, outB, outG, outR, outA);
+                    outB = clamp(outB, std::min(tgtB, bl.b), std::max(tgtB, bl.b));
+                    outG = clamp(outG, std::min(tgtG, bl.g), std::max(tgtG, bl.g));
+                    outR = clamp(outR, std::min(tgtR, bl.r), std::max(tgtR, bl.r));
+                }
+
+                // the colour modes leave the alpha to the drag, as without a blending mode; Clip to alpha [23] and Behind
+                // [25] blend it too
+                if (s.blendMode<23)
+                   outA = top.a;
+                else if (s.smudgeBlendFull)
+                   outA = bl.a;
+                else
+                   outA = clamp(outA, std::min(tgtA, bl.a), std::max(tgtA, bl.a));
             }
 
             targetPixel[0] = clamp(outB, 0, 255);
@@ -1325,7 +1346,7 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     int softness,            // BrushToolSoftness (0-100)
     double angle,            // BrushToolAngle (-180 to 180)
     double aspectRatio,      // BrushToolAspectRatio (-100 to 100)
-    int brushColor,          // ARGB color; the smudge reads its alpha as the strength of its blending mode
+    int brushColor,          // ARGB color
     int opacity,             // Stroke opacity (0-255)
     int blendMode,           // BlendMode index (0-25)
     double offX,             // Smudge/Cloner offset X
@@ -1381,8 +1402,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     if (!brushSetupClone(s))
        return 0;
 
-    // Replace [24] is what the smudge does anyway
+    // Replace [24] is what the smudge does anyway; a pixel blended with itself stays as it is in Darken [1], Lighten [5],
+    // Average [15], Luminosity [20] and Clip to alpha [23]
     s.smudgeBlend = brushType==6 && blendMode>0 && blendMode!=24;
+    s.smudgeBlendFull = blendMode==1 || blendMode==5 || blendMode==15 || blendMode==20 || blendMode==23;
 
     brushSetupShape(s);
     if (!brushSetupEffects(s) || !brushSetupPass(s))

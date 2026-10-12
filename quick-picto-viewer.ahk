@@ -45201,7 +45201,7 @@ BtnHelpPenPressureBrushes() {
 }
 
 BtnHelpBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nThe smudge brush drags the colors along the stroke. Its «Deform intensity» sets how far the paint travels: from a fraction of the brush diameter at 1 to about 12 diameters at 21; at 22 it never fades. It ignores the softness, stepping, dry-out rate, texture and airbrush mode. With a blending mode, the smudged colors are blended over the image on every move, so slow strokes build it up more, and the opacity sets how strongly.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nThe smudge brush drags the colors along the stroke. Its «Deform intensity» sets how far the paint travels: from a fraction of the brush diameter at 1 to about 12 diameters at 21; at 22 it never fades. It ignores the opacity, softness, stepping, dry-out rate, texture and airbrush mode. With a blending mode, the pixels change only towards what the mode gives: Lighten and Screen never darken, Darken and Multiply never lighten. Darken, Lighten, Average, Luminosity and Clip to alpha apply in full; the other modes build up gradually with every pass of the brush, less on quick strokes.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
 }
 
 BtnHelpToolbar() {
@@ -45799,8 +45799,8 @@ updateUIbrushTool() {
    If (CurrentPanelTab=1)
    {
       uiSlidersArray["BrushToolBopacity", 10] := (BrushToolUseSecondaryColor!=1) ? 0 : 1
-      ; the smudge's opacity is the strength of its blending mode [1 = none, 25 = Replace: no blending]
-      uiSlidersArray["BrushToolAopacity", 10] := (BrushToolUseSecondaryColor=1 || BrushToolType=6 && (BrushToolBlendMode=1 || BrushToolBlendMode=25)) ? 0 : 1
+      ; the smudge has no opacity: its blending modes apply at fixed strengths
+      uiSlidersArray["BrushToolAopacity", 10] := (BrushToolUseSecondaryColor=1 || BrushToolType=6) ? 0 : 1
       actuA := (BrushToolUseSecondaryColor=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
       actuB := (BrushToolUseSecondaryColor!=1) ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
       GuiControl, % actuB, PickuBrushToolBcolor
@@ -78403,7 +78403,7 @@ ActPaintBrushNow() {
 
    canApplyFX := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0 || PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
    ; the smudge brush [type 6] ignores the softness, texture, stepping and dry-out rate: its own profile and the
-   ; deform intensity [BrushToolWetness] make it; the opacity is the strength of a blending mode
+   ; deform intensity [BrushToolWetness] make it; it has no opacity
    thisOpaTest := (BrushToolType=6) ? 255 : (BrushToolUseSecondaryColor=1 && BrushToolType<3) ? BrushToolBopacity : BrushToolAopacity
    If (BrushToolBlurStrength<3 && canApplyFX=0 && BrushToolType=5 || BrushToolWetness<1 && BrushToolType>5 || thisOpaTest<5 && BrushToolType>4)
    {
@@ -78876,8 +78876,7 @@ DrawPaintBrushNowStep:
    ; the dllRad paddings for types 5/6/7 can never apply to the cloner [type 3],
    ; so computing them up front leaves the clone source region unchanged in both modes
    cloneBits := clonePitch := cloneBMP := 0
-   ; the smudge takes the colour's alpha as the strength of its blending mode
-   colorARGB := "0x" Format("{1:02x}", (BrushToolType=6) ? BrushToolAopacity : 255) startToolColor
+   colorARGB := "0x" Format("{1:x}", 255) startToolColor
    dllRad := (texW>0) ? texW // 2 + 2 : cur_brushSize // 2 + 2
    If (BrushToolType=6)
       dllRad += 4
