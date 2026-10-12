@@ -111,10 +111,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ResolutionWidth := "", ResolutionHeight := "", prevStartIndex := 1, mustReloadThumbsList := 0
    , gdiBitmap := "", mainSettingsFile := "quick-picto-viewer.ini", mainRecentsFile := "quick-picto-viewer-recents.ini"
    , mustOpenStartFolder := "", mainFavesFile := "quick-picto-viewer-favourites.ini", miniFavesFile := "quick-picto-viewer-minifaves.ini"
-   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|APNG|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
+   , RegExAllFilesPattern := "ico|dib|dng|tif|tiff|emf|wmf|rle|png|bmp|gif|jpg|jpeg|jpe|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|PSD|PCD|AVIF|HEIC|HEIF|JXL|APNG|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f|jfif|webp|svg|pdf"
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
-   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|WEBP|AVIF|HEIC|HEIF|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
+   , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|WEBP|AVIF|HEIC|HEIF|JXL|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
+   , multiPageAnimTypesRegEx := "i)(.\.(apng|png|webp|gif|avif|heif|heic|jxl))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|ico|png|tga|tif|tiff|webp))$", userJpegQuality := 90
@@ -43829,7 +43830,7 @@ PanelExtractFrames() {
     depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 190 : 150
-    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF, APNG or WEBP files.
+    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF, JXL, MNG, APNG or WEBP files.
     Gui, Add, Text, y+7, Image output options:
     Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, Render PDF pages (DPI):
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
@@ -43961,7 +43962,7 @@ PanelCombineImagesMultipage() {
     Gui, Tab, 1
     Gui, Add, Text, x+15 y+15 Section, Please choose the multi-page format.`nThe newly created file will contain the selected images.
     Gui, Add, Text, xs+15 y+10 w%ml% +0x200 +hwndhTemp, File format on save:
-    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".tiff|.pdf|.apng|.gif|.webp|.mng", [hTemp])
+    GuiAddDropDownList("x+1 w" thisWid " gBtnChangeMultiPageFmt AltSubmit Choose" userCombineFramesFmt " vuserCombineFramesFmt", ".tiff|.pdf|.apng|.gif|.webp|.mng|.jxl", [hTemp])
     Gui, Add, Checkbox, x+5 hp gBtnChangeMultiPageFmt Checked%userCombineTiffKeepOrig% vuserCombineTiffKeepOrig, Embed originals
     Gui, Add, Checkbox, xs+15 y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
@@ -44035,7 +44036,7 @@ BtnHelpJoinIMGsframeDelay() {
 }
 
 BTNperformCombineIMGs() {
-   Static fmtz := {1:"tiff", 2:"pdf", 3:"apng", 4:"gif", 5:"webp", 6:"mng"}
+   Static fmtz := {1:"tiff", 2:"pdf", 3:"apng", 4:"gif", 5:"webp", 6:"mng", 7:"jxl"}
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: Submit, NoHide
@@ -45201,7 +45202,7 @@ BtnHelpPenPressureBrushes() {
 }
 
 BtnHelpBrushes() {
-   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nThe smudge brush drags the colors along the stroke. Its «Deform intensity» sets how far the paint travels: from a fraction of the brush diameter at 1 to about 12 diameters at 21; at 22 it never fades. It ignores the opacity, softness, stepping, dry-out rate, texture and airbrush mode. With a blending mode, the pixels change only towards what the mode gives: Lighten and Screen never darken, Darken and Multiply never lighten. Darken, Lighten, Average, Luminosity, Clip to alpha and Behind apply in full; with the other modes the smudged colors land half way and the mode builds up slowly with every pass, the strongest ones no faster than Multiply. Clip to alpha, Behind and «Protect alpha» keep the opacity of the pixels.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "Eight distinct brush types are available, each customizable in various ways. You can switch between brush types or adjust their settings using keyboard shortcuts when the main window is active. Please see the keyboard shortcuts help panel for more details.`n`nA low value for the «Stepping» option may cause QPV to freeze, as it applies brush strokes at every interval.`n`nSome of the brush randomize options apply only to some types of brushes. They might apply at the beginning of a brush stroke or continously during painting, based on brush settings.", -1, 0, 0)
 }
 
 BtnHelpToolbar() {
@@ -48420,7 +48421,7 @@ ReadSettingsCombineIMGs(act:=0) {
     RegAction(act, "UserCombinePDFpageSize",, 2, 1, 9)
     RegAction(act, "userCombineDepthDithering",, 1)
     RegAction(act, "userSaveBitsDepth",, 2, 1, 4)
-    RegAction(act, "userCombineFramesFmt",, 2, 1, 6)
+    RegAction(act, "userCombineFramesFmt",, 2, 1, 7)
     RegAction(act, "UserCombinePDFbgrColor",, 3)
     RegAction(act, "combinePDFpageLandscape",, 1)
     RegAction(act, "userCombinePDFdpi",, 2, 50, 1200)
@@ -62710,7 +62711,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
 ; Every page goes into the multi-page bitmap as soon as it is loaded, and is unloaded right
 ; after: FreeImage keeps the pages in its cache, compressed in the format of the file. The
 ; file is written under a temporary name and replaces the destination only once complete.
-   Static fmtz := {1:[18, "tiff"], 3:[39, "apng"], 4:[25, "gif"], 5:[35, "webp"], 6:[6, "mng"]}   ; FIF_TIFF, FIF_APNG, FIF_GIF, FIF_WEBP, FIF_MNG
+   Static fmtz := {1:[18, "tiff"], 3:[39, "apng"], 4:[25, "gif"], 5:[35, "webp"], 6:[6, "mng"], 7:[40, "jxl"]}
    fif := fmtz[userFmt, 1]
    fmt := fmtz[userFmt, 2]
    If !fif
@@ -63052,7 +63053,7 @@ combineFimOpenPages(imgPath, GFT, ByRef tPages) {
 ; Opens a file of several pages or frames, to be read one page at a time. Returns nothing
 ; for a file of one page, or of a format FreeImage does not read by pages.
    tPages := 0
-   If !isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39)   ; FIF_MNG, FIF_TIFF, FIF_GIF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG
+   If !isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39, 40)   ; FIF_MNG, FIF_TIFF, FIF_GIF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
       Return
 
    ; animations are read as they are played: WEBP_PLAYBACK = 1, GIF/APNG/MNG/AVIF/HEIF_PLAYBACK = 2
@@ -63905,7 +63906,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       SetTimer, TriggerMenuBarUpdate, -100
       SetTimer, ResetImgLoadStatus, -50
       SetTimer, createGUItoolbar, -200
-      If (RegExMatch(OutFileName, "i)(\.gif)$") && totalFramesIndex>1 && animGIFsSupport=1)
+      If (RegExMatch(OutFileName, multiPageAnimTypesRegEx) && totalFramesIndex>1 && animGIFsSupport=1)
       {
          animGIFplaying := 0
          allowNextSlide := 1
@@ -66824,7 +66825,7 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
 
         kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image") 
         kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
-        If (RegExMatch(imgPath, "i)(.\.(apng|png|webp|gif|avif|heif|heic))$") && totalFramesIndex>1 && animGIFplaying!=1)
+        If (RegExMatch(imgPath, multiPageAnimTypesRegEx) && totalFramesIndex>1 && animGIFplaying!=1)
            kMenu("pvMenuBarImage", "Add", "&Play animation`tX", "restartGIFplayback")
 
         kMenu("pvMenuBarImage", "Add", "&JPEG lossless operations`tShift+J", "PanelJpegPerformOperation")
@@ -69616,7 +69617,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    createMenuOpenRecents()
 
 ; main menu
-  If (RegExMatch(getIDimage(currentFileIndex), "i)(.\.(apng|png|webp|gif|avif|heif|heic))$") && totalFramesIndex>1 && animGIFplaying!=1)
+  If (RegExMatch(getIDimage(currentFileIndex), multiPageAnimTypesRegEx) && totalFramesIndex>1 && animGIFplaying!=1)
   {
      kMenu("PVmenu", "Add", "&Play animation`tX", "restartGIFplayback")
      Menu, PVmenu, Add
@@ -74234,11 +74235,11 @@ ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload) {
        gdiBMPchanged := 1
        If (thisImgPath!=prevImgPath && currentFileIndex!=0)
        {
+          prevAnimGIFwas := ""
           terminateIMGediting()
           If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
              desiredFrameIndex := currentFileIndex - 1
-          ; Else If (SubStr(prevImgPath, InStr(prevImgPath, "|"))!=SubStr(thisImgPath, InStr(thisImgPath, "|")))
-          Else If (prevImgPath!=thisImgPath)
+          Else
              desiredFrameIndex := 0
        } 
 
@@ -75715,7 +75716,7 @@ CloneScreenMainBMP(imgPath, mustReloadIMG, ByRef hasFullReloaded) {
   Else If (rawFmt="MEMORYBMP")
      GDIbmpFileConnected := 0
 
-  isAnimFile := RegExMatch(imgPath, "i)(.\.(apng|png|gif|mng|webp|avif|heic|heif))$") ? 1 : 0
+  isAnimFile := RegExMatch(imgPath, multiPageAnimTypesRegEx) ? 1 : 0
   If ((isAnimFile=1 || RegExMatch(imgPath, "i)(.\.(tif|tiff))$")) && totalFramesIndex>0)
   {
      gifLoaded := 1
@@ -83830,7 +83831,7 @@ FadeMainWindow() {
 }
 
 BusyUIvpIndicator(modus:=0) {
-    If (AnyWindowOpen=42) ; PanelAdjustToneMapping()
+    If (AnyWindowOpen=42 || animGIFplaying=1 || slideShowRunning=1) ; PanelAdjustToneMapping()
        Return
 
     If (modus=2)
@@ -83913,7 +83914,7 @@ BusyUIvpIndicator(modus:=0) {
        Gdip_SetPenColor(yPen, clr)
        Gdip_DrawRectangle(glPG, yPen, 0, 0, mainWidth, mainHeight)
        whichWin := (imgEditPanelOpened=1 && AnyWindowOpen!=10) ? hGDIthumbsWin : hGDIwin
-       r2 := doLayeredWinUpdate(A_ThisFunc, whichWin, glHDC, 225)
+       r2 := doLayeredWinUpdate(A_ThisFunc, whichWin, glHDC, 255)
        ; trGdip_DisposeImage(BMPcache)
     } Else 
     {
@@ -87529,7 +87530,7 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
      Loop, Files, %strDir%, %doRecursive%
      {
          fullPath := Trimmer(A_LoopFileFullPath)
-         If (RegExMatch(fullPath, RegExFilesPattern) && A_LoopFileSize>120)
+         If (RegExMatch(fullPath, RegExFilesPattern) && A_LoopFileSize>42) ; 42 bytes at least 
          {
             If (SLDtypeLoaded=3) ; SQLite database 
                erru := addSQLdbEntry(A_LoopFileName, A_LoopFileDir, A_LoopFileSize, A_LoopFileTimeModified, A_LoopFileTimeCreated)
@@ -87694,13 +87695,12 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
       VarSetCapacity(stampBuf, 32, 0)      ; the two time stamps the DLL returns
       stampAddr := (&stampBuf + 15) & -16
    }
-   bufEnd := dirBufAddr + BUFSZ
 
+   bufEnd := dirBufAddr + BUFSZ
    abandonAll := thisCounter := addedNow := 0
    prevMSGdisplay := A_TickCount
    prevDisplay := A_TickCount
    doStartLongOpDance()
-
    isSQLmode := (SLDtypeLoaded=3) ? 1 : 0
    storeExtras := (A_PtrSize=8 && minimizeMemUsage!=1) ? 1 : 0
    If (isSQLmode=1)
@@ -87773,7 +87773,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
                        subDirs[++nSub] := StrGet(p+nameOffset, nlen//2, "UTF-16")
                     }
                  }
-              } Else If (NumGet(p+0, 40, "Int64")>120)   ; EndOfFile; the >120 bytes filter
+              } Else If (NumGet(p+0, 40, "Int64")>42)   ; EndOfFile; >42 bytes filter
               {
                  fname := StrGet(p+nameOffset, nlen//2, "UTF-16")
                  dotPos := InStr(fname, ".", 0, -1)      ; the last dot
@@ -99669,10 +99669,10 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   }
 
   changeMcursor()
-  If (isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39) && noBPPconv=0 && noBMP=0)
+  If (isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39, 40) && noBPPconv=0 && noBMP=0)
   {
-     ; open multi-page MNG, GIF, WEBP, APNG, AVIF, HEIC and TIFFs
-     multiFlags := isVarEqualTo(GFT, 25, 37, 39) ? 2 : 0
+     ; open multi-page JXL, MNG, GIF, WEBP, APNG, AVIF, HEIC and TIFFs
+     multiFlags := isVarEqualTo(GFT, 25, 37, 39, 40) ? 2 : 0
      If (GFT=35)
         multiFlags := 1
      If (displayICC=1)

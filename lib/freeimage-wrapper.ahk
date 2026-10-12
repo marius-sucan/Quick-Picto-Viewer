@@ -777,7 +777,7 @@ FreeImage_GetFileType(ImgPath, humanReadable:=0) {
 ; the given ImgPath can be fictional / inexistent.
 ; returns FREE_IMAGE_FORMAT enumeration if humanReadable=0.
 
-   Static fileTypes := {-1:"unknown", 0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR", 37:"AVIF", 38:"HEIF", 39:"APNG"}
+   Static fileTypes := {-1:"unknown", 0:"BMP", 1:"ICO", 2:"JPEG", 3:"JNG", 4:"KOALA", 5:"LBM", 5:"IFF", 6:"MNG", 7:"PBM", 8:"PBMRAW", 9:"PCD", 10:"PCX", 11:"PGM", 12:"PGMRAW", 13:"PNG", 14:"PPM", 15:"PPMRAW", 16:"RAS", 17:"TARGA", 18:"TIFF", 19:"WBMP", 20:"PSD", 21:"CUT", 22:"XBM", 23:"XPM", 24:"DDS", 25:"GIF", 26:"HDR", 27:"FAXG3", 28:"SGI", 29:"EXR", 30:"J2K", 31:"JP2", 32:"PFM", 33:"PICT", 34:"RAW", 35:"WEBP", 36:"JXR", 37:"AVIF", 38:"HEIF", 39:"APNG", 40:"JXL"}
    r := DllCall(getFIMfunc("GetFileTypeU"), "WStr", ImgPath, "Int", 0)
    If (r=-1)
       r := FreeImage_GetFIFFromFilename(ImgPath)
