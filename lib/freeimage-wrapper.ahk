@@ -298,6 +298,7 @@ FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 ; JPEG_CMYK = 0x0004; keep a CMYK JPEG as 32-bit CMYK, not converted to 24-bit RGB
 ; JPEG_EXIFROTATE = 0x0008; turn the image upright as its Exif Orientation tag says
 ; JPEG_GREYSCALE = 0x0010; load as an 8-bit greyscale image
+; JXL_CMYK = 0x0004; keep a CMYK JPEG XL as 32- or 64-bit CMYK, not converted to RGB; its alpha is dropped
 ; PCD_BASE = 1; the 768 x 512 image, as by default
 ; PCD_BASEDIV4 = 2; the 384 x 256 image
 ; PCD_BASEDIV16 = 3; the 192 x 128 image
@@ -367,6 +368,8 @@ FreeImage_Save(hImage, ImgPath, flags:=0) {
 ; JPEG_SUBSAMPLING_444 = 0x10000; no chroma subsampling (4:4:4)
 ; JPEG_OPTIMIZE = 0x20000; optimal Huffman tables: a few percent smaller, a little slower
 ; JPEG_BASELINE = 0x40000; a basic JPEG: no metadata, ICC profile or other markers
+; JXL_DEFAULT = 0; lossy, quality 90, effort 7; or pass the quality itself, 1 to 100 (100 is lossless), plus the effort 1 to 10 times 0x10000
+; JXL_LOSSLESS = 0x100; lossless
 ; JXR_DEFAULT = 0; quality 80, 4:4:4; or pass the quality itself, 1 to 99; under 50, 8-bit images get 4:2:0
 ; JXR_LOSSLESS = 0x0064; lossless, the same as quality 100
 ; JXR_PROGRESSIVE = 0x2000; a progressive JPEG XR
@@ -1357,6 +1360,8 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ; GIF_PLAYBACK = 2; GIF: every frame as a viewer shows it, composited on the logical screen, as 32-bit
 ; HEIF_PLAYBACK = 2; HEIF image sequence: every frame as 32-bit RGBA, 8 bits per channel, whatever its own format
 ; ICO_MAKEALPHA = 1; ICO: icons of under 32 bits load as 32-bit, with an alpha channel made from the AND mask
+; JXL_CMYK = 0x0004; JPEG XL: CMYK images stay CMYK, not converted to RGB; their alpha is dropped
+; JXL_PLAYBACK = 2; JPEG XL animation: every frame as 32-bit RGBA, 8 bits per channel, whatever its own format
 ; MNG_PLAYBACK = 2; MNG: every frame as a viewer shows it, composited on the canvas, as 32-bit; not for canvases over 2^28 pixels
 ; PNG_IGNOREGAMMA = 1; APNG, MNG: no gamma correction from a frame's gAMA chunk
 ; TIFF_CMYK = 0x0001; TIFF: CMYK pages stay CMYK, not converted to RGB
@@ -1364,7 +1369,7 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ;
 ; To save a newly created multi-page image, use FreeImage_CloseMultiBitmap().
 /*
-imgFormat parameter takes integer values from 0 to 39 relevant I/O image format identifiers.
+imgFormat parameter takes integer values from 0 to 40 relevant I/O image format identifiers.
    FIF_ICO      = 1,
    FIF_MNG      = 6,  (read, write, anim)
    FIF_TIFF     = 18, (read, write)
@@ -1373,6 +1378,7 @@ imgFormat parameter takes integer values from 0 to 39 relevant I/O image format 
    FIF_AVIF     = 37, (read-only)
    FIF_HEIF     = 38, (read-only)
    FIF_APNG     = 39, (read, write, anim)
+   FIF_JXL      = 40, (read, write, anim)
 */
 
    Return DllCall(getFIMfunc("OpenMultiBitmapU"), "Int", imgFormat, "WStr", ImgPath, "Int", create_new, "Int", read_only, "Int", keep_cache, "Int", flags, "UPtr")
@@ -1388,6 +1394,8 @@ FreeImage_CloseMultiBitmap(hFIMULTIBITMAP, flags:=0) {
 ; If the multi-page image was opened with read_only=0, any modifications
 ; to the image will be saved to disk; do not use FreeImage_Save() to save a multi-page image.
 ; flags - 0, or these combined with |; GIF and ICO take none:
+; JXL_DEFAULT = 0; lossy, quality 90, effort 7; or pass the quality itself, 1 to 100 (100 is lossless), plus the effort 1 to 10 times 0x10000
+; JXL_LOSSLESS = 0x100; lossless
 ; PNG_Z_BEST_SPEED = 0x0001; APNG, MNG: zlib level 1, the fastest; any level 1 to 9 may be given
 ; PNG_Z_DEFAULT_COMPRESSION = 0x0006; APNG, MNG: zlib level 6, the default
 ; PNG_Z_BEST_COMPRESSION = 0x0009; APNG, MNG: zlib level 9, the smallest
