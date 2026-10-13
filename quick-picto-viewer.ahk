@@ -123,10 +123,10 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
    , openFptrn4 := "*.targa;*.dib;*.pict;*.rle", openFptrnWIC := "", forceLiveAlphaPreviewMode := 0
-   , dialogSaveFptrn := "Windows Bitmap (*.bmp)|Non-animated Compuserve GIF (*.gif)|HD Photo (*.hdp;*.jxr)|JPEG 2000 codestream (*.j2k)|Network Graphics JPEG (*.jng)|JPEG 2000 (*.jp2)|JPEG Common (*.jpg;*.jpeg)|JPEG-XR (*.jxr)|Portable Network Graphics (*.png)|Portable PixelMap (*.ppm)|TrueVision Targa (*.tga)|Tagged Image File Format (*.tif;*.tiff)|Windows Photo (*.wdp;*.jxr)|Google WebP (*.webp)|X-PixMap (*.xpm)|Icon (*.ico)"
-   , dialogSaveIndexes := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jng", 6:"jp2", 7:"jpg", 8:"jxr", 9:"png", 10:"ppm", 11:"tga", 12:"tif", 13:"wdp", 14:"webp", 15:"xpm", 16:"ico", 17:"hdr", 18:"exr", 19:"pfm"}
-   , userPossibleWriteFMTs := ".BMP|.GIF|.HDP|.J2K|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WDP|.WEBP|.XPM"
-   , saveimgformatslist := {1:"bmp", 2:"gif", 3:"hdp", 4:"j2k", 5:"jng", 6:"jp2", 7:"jpg", 8:"jxr", 9:"png", 10:"ppm", 11:"tga", 12:"tif", 13:"wdp", 14:"webp", 15:"xpm"}
+   , dialogSaveFptrn := "Windows Bitmap (*.bmp)|Graphics Interchange Format (*.gif)|JPEG XL (*.jxl)|JPEG Network Graphics (*.jng)|JPEG 2000 (*.jp2)|JPEG-1 (*.jpg;*.jpeg)|JPEG XR (*.jxr)|Portable Network Graphics (*.png)|Portable PixelMap (*.ppm)|TrueVision Targa (*.tga)|Tagged Image File Format (*.tif;*.tiff)|Google WebP (*.webp)|X-PixMap (*.xpm)|Icon (*.ico)"
+   , dialogSaveIndexes := {1:"bmp", 2:"gif", 3:"jxl", 4:"jng", 5:"jp2", 6:"jpg", 7:"jxr", 8:"png", 9:"ppm", 10:"tga", 11:"tif", 12:"webp", 13:"xpm", 14:"ico", 15:"hdr", 16:"exr", 17:"pfm"}
+   , userPossibleWriteFMTs := ".BMP|.GIF|.JXL|.JNG|.JP2|.JPG|.JXR|.PNG|.PPM|.TGA|.TIF|.WEBP|.XPM"
+   , saveimgformatslist := {1:"bmp", 2:"gif", 3:"jxl", 4:"jng", 5:"jp2", 6:"jpg", 7:"jxr", 8:"png", 9:"ppm", 10:"tga", 11:"tif", 12:"webp", 13:"xpm"}
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0
    , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", brushAclrAlpha := "ffFFff"
    , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := ""
@@ -44449,7 +44449,7 @@ calculateThumbsSheetDimensions(ByRef width, ByRef height) {
 }
 
 getSaveDialogIndexForFile(imgPath, ByRef defFMTindex, allowExtended:=0, defaultu:=0) {
-   Static extended := {"hdr":17, "exr":18, "pfm":19}
+   Static extended := {"hdr":15, "exr":16, "pfm":17}
    defFMTindex := (defaultu>0) ? defaultu : 7
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    Loop, Parse, dialogSaveFptrn, |
@@ -58960,10 +58960,10 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       defaultu := prevFileSavePath "\" OutNameNoExt
    If FolderExist(dummy)
       defaultu := dummy "\" OutNameNoExt
+
    getSaveDialogIndexForFile(imgPath, defFMTindex, 0, userDesireWriteFMT)
-   extendedMode := (testWasImageEditedInVP()=1 && FileRexists(imgPath)) ? 1 : 0
-   thisDialogSavePtrns := (extendedMode=1) ? StrReplace(dialogSaveFptrn, "|Icon (*.ico)", "|Icon (*.ico)|High-Dynamic Range Image (*.hdr)|OpenEXR (*.exr)|Portable FloatMap (*.pfm)") : dialogSaveFptrn
-   thisRegEXsaveFmts := (extendedMode=1) ? StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$") : saveTypesRegEX
+   thisDialogSavePtrns := dialogSaveFptrn
+   thisRegEXsaveFmts := saveTypesRegEX
    If (noDialog=1)
       file2save := getIMGsaveDestination(currentFileIndex)
    Else
