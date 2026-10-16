@@ -1,6 +1,6 @@
 ﻿; Script details:
 ;   Name:     Quick Picto Viewer
-;   Platform: Windows 7 or later, preferred is Windows 10.
+;   Platform: Windows 7 or later, preferred is Windows 10/11.
 ;   Author:   Marius Șucan - https://marius.sucan.ro/
 ;   GitHub:   https://github.com/marius-sucan/Quick-Picto-Viewer
 ;   Requires: AHK-L v1.1.33.01+.
