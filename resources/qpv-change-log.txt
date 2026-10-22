@@ -5,8 +5,9 @@
 // Related: general-code-overview.txt
 
 - v6.3.10 (2026-10-**)
-  - [new] added support for JPEG XL (JXL), APNG, HEIC and AVIF images and animations, in addition to WEBP and GIF
-  - [new] ability to join images as animated JXL, WEBP, APNG or MNG, in addition to GIF, TIFF and PDF
+  - [new] ability to extract text from images with the OCR engine preinstalled on Windows 10 / 11
+  - [new] added support for JPEG XL (JXL), APNG, MNG, HEIC and AVIF images and animations, in addition to WEBP and GIF
+  - [new] ability to join images as animated JXL, WEBP, APNG or MNG, in addition to the GIF, TIFF and PDF formats
   - [new] ability to set delay per frame when creating animated images
   - much improved joining images as PDF
   - color management works through FreeImage loaded files as well 

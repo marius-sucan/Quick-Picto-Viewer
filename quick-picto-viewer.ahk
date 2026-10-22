@@ -176,12 +176,11 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , FilteruMinRange, FilteruMaxRange, userFilterSizeProperty := 1, qpvCanvasHasInit := 0, coreDesiredPixFmt := "0xE200B"
    , FilteruDateMinRange, FilteruDateMaxRange, userFilterProperty := 1, userFindDupePresets := 1
    , HUDobjNavBoxu := [], HUDobjHistoBoxu := [], globalhFIFimg := "", globalhFIFtoneMap := "", userAddedFavesCount := 0
-   , bckpCurrentFileIndex := 0
    , maxFavesEntries := 987654, gdipLastError := 0, hasDrawnImageMap := 0, hasDrawnHistoMap := 0, lastZeitFileSelect := 1
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394
    , lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
-   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := []
+   , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], bckpCurrentFileIndex := 0
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], staticListViewFilteru
    , listViewReviewFilteru := "", IMGentirelylargerThanVP := 0, mustPreventMenus := 0, hQuickMenuSearchWin := 0
@@ -223,7 +222,7 @@ Global previnnerSelectionCavityX := 0, previnnerSelectionCavityY := 0, prevNameS
    , hasDrawnAnnoBox := 0, fileActsHistoryArray := new hashtable(), oldSelectionArea := []
    , freeHandPoints := [], customShapeCountPoints := 0, brushZeitung := 0, prevAlphaMaskCoordsPreview := []
    , PDFpwdsCache := [], multiCoreThumbsInitGood := "n", thumbsPoolState := 0
-   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := (A_IsCompiled) ? "" : "(dev) "
+   , QPVregEntry := "HKEY_CURRENT_USER\SOFTWARE\Quick Picto Viewer", verType := A_IsCompiled ? "" : "(dev) "
    , appVersion := "6.3.00", vReleaseDate := "2026/08/31" ; yyyy-mm-dd
 
  ; User settings
@@ -393,9 +392,8 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
    , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0
-   , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0
+   , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0, userOCRlimitSel := 0
    , userOCRlanguage := "", userOCRupscale := 1, userOCRoutputFmt := 1, userOCRjoinCJK := 1
-   , userOCRautoCopy := 0, userOCRwatchClipboard := 0
 
 #Include %A_ScriptDir%\Lib\module-interface.ahk
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
@@ -57051,13 +57049,14 @@ PanelOCRtextRecognition() {
        Return
     }
 
-    If !(thisBtnHeight := createSettingsGUI(93, A_ThisFunc))
+    panelMode := (thumbsDisplaying=0 && isImgEditingNow()) ? 1 : 0
+    If !(thisBtnHeight := createSettingsGUI(93, A_ThisFunc, 1, panelMode))
        Return
 
     ReadSettingsOCRpanel()
     btnWid := 125
-    txtWid := 530
-    ddlWid := 290
+    txtWid := 430
+    ddlWid := 210
     If (PrefsLargeFonts=1)
     {
        btnWid := btnWid + 70
@@ -57070,29 +57069,32 @@ PanelOCRtextRecognition() {
     imgDefault := isOCRimageAvailable() ? "Default" : ""
     clipDefault := imgDefault ? "" : "Default"
     ml := (PrefsLargeFonts=1) ? 110 : 75
-    Gui, Add, Text, x15 y15 Section +0x200 +hwndhTemp, Language:
+    lblWid := (PrefsLargeFonts=1) ? 110 : 75
+    Gui, Add, Text, x15 y15 Section +0x200 w%lblWid% +hwndhTemp, Language:
     GuiAddDropDownList("x+5 w" ddlWid " Choose" chosenLang " gupdateUIocrPanel vUIocrLanguage", langsList, [hTemp])
     Gui, Add, Button, x+5 hp gBTNocrRefreshLanguages, &Refresh
-    Gui, Add, Button, x+5 hp gBTNocrInstallLanguages, Install lan&guages
-    Gui, Add, Text, xs y+10 +0x200 +hwndhTemp, Upscale image:
-    GuiAddDropDownList("x+5 w" ml " AltSubmit Choose" userOCRupscale " gupdateUIocrPanel vuserOCRupscale", "Automatic|1x|1.5x|2x|3x|4x", [hTemp])
-    Gui, Add, Text, x+15 +0x200 +hwndhTemp, Output:
-    GuiAddDropDownList("x+5 w" ddlWid - 60 " AltSubmit Choose" userOCRoutputFmt " gupdateUIocrPanel vuserOCRoutputFmt", "Lines|Text as returned by the engine|Words, one per line|Words and their bounding boxes|Lines and their bounding boxes", [hTemp])
+    Gui, Font, Underline
+    Gui, Add, Text, x+5 hp +0x200 gBTNocrInstallLanguages, System options
+    Gui, Font, Normal
+    Gui, Add, Text, xs y+10 +0x200 w%lblWid% +hwndhTemp, Output:
+    GuiAddDropDownList("x+5 w" ddlWid " AltSubmit Choose" userOCRoutputFmt " gupdateUIocrPanel vuserOCRoutputFmt", "Lines|Text as returned by the engine|Words, one per line", [hTemp])
+    Gui, Add, Text, x+5 +0x200 +hwndhTemp, Upscaling:
+    GuiAddDropDownList("x+5 w" ml " AltSubmit Choose" userOCRupscale " gupdateUIocrPanel vuserOCRupscale", "Automatic|1x (as it is)|1.5x|2x|3x|4x", [hTemp])
     Gui, Add, Checkbox, xs y+10 gupdateUIocrPanel Checked%userOCRjoinCJK% vuserOCRjoinCJK, Re&move spaces between Chinese, Japanese and Korean characters
-    Gui, Add, Checkbox, xs y+5 gupdateUIocrPanel Checked%userOCRautoCopy% vuserOCRautoCopy, Copy the recognized &text to the clipboard
-    Gui, Add, Checkbox, xs y+5 gupdateUIocrPanel Checked%userOCRwatchClipboard% vuserOCRwatchClipboard, Recognize text in &new clipboard images automatically
+    Gui, Add, Checkbox, xs y+7 gupdateUIocrPanel Checked%userOCRlimitSel% vuserOCRlimitSel, Limit to selection area
+    If !isImgEditingNow()
+       GuiControl, SettingsGUIA: Disable, userOCRlimitSel
+
     Gui, Add, Text, xs y+10, Recognized text:
-    GuiAddEdit("xs y+5 w" txtWid " r14 vEditOCRresult", "")
-    Gui, Add, Text, xs y+5 w%txtWid% r3 vinfoLineOCR, Please wait...
+    Gui, Add, Edit, xs y+5 w%txtWid% r6 vEditOCRresult
+    Gui, Add, Text, xs y+5 w%txtWid% r2 vinfoLineOCR, . . .
     Gui, Add, Button, xs y+10 h%thisBtnHeight% w%btnWid% %imgDefault% gBTNocrRecognizeImage vbtnOCRimage, Recognize &image
     Gui, Add, Button, x+5 hp wp %clipDefault% gBTNocrRecognizeClipboard vbtnOCRclipboard, Recognize clip&board
     Gui, Add, Button, x+5 hp gBTNocrCopyText, &Copy
-    Gui, Add, Button, x+5 hp gBTNocrClearText, Cl&ear
     Gui, Add, Button, x+5 hp gBTNhelpOCRpanel, &Help
     Gui, Add, Button, x+5 hp gBtnCloseWindow, C&lose
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Text recognition (OCR): " appTitle)
-    toggleOCRclipboardWatch(userOCRwatchClipboard)
-    SetTimer, uiOCRpanelAutoStart, -100
+    ; SetTimer, uiOCRpanelAutoStart, -100
 }
 
 WriteSettingsOCRpanel() {
@@ -57102,14 +57104,13 @@ WriteSettingsOCRpanel() {
 ReadSettingsOCRpanel(act:=0) {
    RegAction(act, "userOCRlanguage")
    RegAction(act, "userOCRupscale",, 2, 1, 6)
-   RegAction(act, "userOCRoutputFmt",, 2, 1, 5)
+   RegAction(act, "userOCRoutputFmt",, 2, 1, 3)
    RegAction(act, "userOCRjoinCJK",, 1)
-   RegAction(act, "userOCRautoCopy",, 1)
-   RegAction(act, "userOCRwatchClipboard",, 1)
+   RegAction(act, "userOCRlimitSel",, 1)
 }
 
 BTNhelpOCRpanel() {
-    msgBoxWrapper(appTitle ": HELP", "This tool recognizes texts in images with the optical character recognition (OCR) engine of Windows 10 and newer.`n`n«Recognize image» reads the image in the viewport, or its selected area, as it is copied with Ctrl+C: with the viewport color adjustments and flips. In thumbnails mode, it reads the focused image file.`n`n«Recognize clipboard» reads the image from the clipboard or, when files were copied in a file manager, the first image file.`n`nWindows recognizes only the languages for which OCR language packs are installed. The automatic mode relies on the languages of the user profile. Use «Install languages» to add more, then «Refresh».`n`nWindows OCR often misses small texts. When upscaling is set to automatic, the image is recognized again at a larger size if nothing was found or if the words are small. Images larger than the engine allows are downscaled.`n`nThe bounding boxes are given in pixels of the image or of the selected area.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "This tool recognizes texts in images with the optical character recognition (OCR) engine of Windows 10 and newer.`n`n«Recognize image» reads the image in the viewport, or its selected area, as it is copied with Ctrl+C: with the viewport color adjustments and flips. In thumbnails mode, it reads the focused image file.`n`nWindows recognizes only the languages for which OCR language packs are installed. The automatic mode relies on the languages of the user profile. Use «System options» to add more, then «Refresh».`n`nWindows OCR often misses small texts. When upscaling is set to automatic, the image is recognized again at a larger size if nothing was found or if the words are small. Images larger than the engine allows are downscaled.", -1, 0, 0)
 }
 
 BTNocrInstallLanguages() {
@@ -57139,11 +57140,6 @@ BTNocrCopyText() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
-BTNocrClearText() {
-   uiOCRshowResult("kill")
-   GuiControl, SettingsGUIA:, EditOCRresult
-}
-
 BTNocrRefreshLanguages() {
    If (AnyWindowOpen!=93)
       Return
@@ -57161,16 +57157,10 @@ updateUIocrPanel(CtrlHwnd:=0, b:=0, c:=0) {
       Return
 
    Gui, SettingsGUIA: Default
-   GuiControlGet, UIocrLanguage
-   GuiControlGet, userOCRupscale
-   GuiControlGet, userOCRoutputFmt
-   GuiControlGet, userOCRjoinCJK
-   GuiControlGet, userOCRautoCopy
-   GuiControlGet, userOCRwatchClipboard
+   Gui, SettingsGUIA: Submit, NoHide
    oLang := userOCRlanguage
    userOCRlanguage := RegExMatch(UIocrLanguage, "\[([^\[\]]+)\]$", lang) ? lang1 : ""
    WriteSettingsOCRpanel()
-   toggleOCRclipboardWatch(userOCRwatchClipboard)
    If (oLang!=userOCRlanguage)
       uiOCRshowEngineInfo()
    Else If (A_GuiControl="userOCRoutputFmt" || A_GuiControl="userOCRjoinCJK")
@@ -57202,7 +57192,7 @@ getOCRlanguagesList(ByRef chosen) {
       listed := 1
    }
 
-   listu := "Automatic (the languages of the user profile)"
+   listu := "User's system language profile"
    For i, lang in langs
    {
       listu .= "|" lang.Name " [" lang.Tag "]"
@@ -57228,7 +57218,7 @@ uiOCRshowEngineInfo() {
    {
       ocr := getOCRengine()
       ocr.SetLanguage(userOCRlanguage)
-      msg := "Language: " ocr.EngineLangName " [" ocr.EngineLangTag "]. Images wider or taller than " groupDigits(ocr.MaxDim) " pixels are downscaled."
+      msg := "Images wider or taller than " groupDigits(ocr.MaxDim) " px will be downscaled."
       r := 1
    } Catch e
       msg := "ERROR: " e.Message
@@ -57260,35 +57250,8 @@ isOCRimageAvailable() {
    Return isImgEditingNow()
 }
 
-toggleOCRclipboardWatch(state) {
-   OnClipboardChange("uiOCRclipboardChanged", 0)
-   If (state=1)
-      OnClipboardChange("uiOCRclipboardChanged", 1)
-}
-
-uiOCRclipboardChanged(typeu) {
-   If (AnyWindowOpen!=93)
-   {
-      OnClipboardChange("uiOCRclipboardChanged", 0)
-      Return
-   }
-
-   If (typeu=2 && userOCRwatchClipboard=1)  ; 2 = the clipboard holds data that is not text
-      SetTimer, uiOCRclipboardTimer, -250
-}
-
-uiOCRclipboardTimer() {
-   If (AnyWindowOpen!=93 || userOCRwatchClipboard!=1 || !IsClipboardFormatAvailable(2))  ; CF_BITMAP
-      Return
-
-   If (coreOCRrecognize("clipboard")=-1)
-      SetTimer, uiOCRclipboardTimer, -400
-}
-
 cleanupOCRpanel() {
 ; invoked by CloseWindow()
-   toggleOCRclipboardWatch(0)
-   SetTimer, uiOCRclipboardTimer, Off
    SetTimer, uiOCRpanelAutoStart, Off
    uiOCRshowResult("kill")
    getOCRengine("kill")
@@ -57381,6 +57344,7 @@ coreOCRrecognize(modus) {
    If errMsg
    {
       GuiControl, SettingsGUIA:, infoLineOCR, % "ERROR: " errMsg
+      SoundBeep 300, 100
       Return
    }
 
@@ -57389,12 +57353,9 @@ coreOCRrecognize(modus) {
       res.Scale := res.Scale * imgW / srcW
 
    textu := uiOCRshowResult(res)
-   If (userOCRautoCopy=1 && textu!="")
-      copyTextToClippy(textu)
-
    angle := (res.Angle!="") ? " Text angle: " Round(res.Angle, 1) "°." : ""
-   msg := "Done in " groupDigits(A_TickCount - startZeit) " ms: " groupDigits(res.Lines.Length()) " lines, " groupDigits(WinOCR_CountWords(res)) " words." angle
-   msg .= "`n" srcInfo ": " groupDigits(srcW) " x " groupDigits(srcH) " px, recognized at " Round(res.Scale, 2) "x. Language: " langInfo "."
+   msg := "Done in " groupDigits(A_TickCount - startZeit) " ms." angle
+   msg .= "`n" srcInfo ": " groupDigits(srcW) " x " groupDigits(srcH) " px, recognized at " Round(res.Scale, 2) "x." ; " Language: " langInfo "."
    GuiControl, SettingsGUIA:, infoLineOCR, % msg
 }
 
@@ -57435,12 +57396,12 @@ getOCRimageBitmap(maxDim, ByRef srcInfo, ByRef srcW, ByRef srcH, ByRef errMsg) {
       Return
    }
 
-   srcInfo := (editingSelectionNow=1) ? "Selected area" : "Image"
+   srcInfo := (editingSelectionNow=1 && userOCRlimitSel=1) ? "Selected area" : "Image"
    If (viewportQPVimage.imgHandle)
    {
       ; too large for GDI+: the area is read already downscaled
       imgW := viewportQPVimage.Width, imgH := viewportQPVimage.Height
-      If (editingSelectionNow=1)
+      If (editingSelectionNow=1 && userOCRlimitSel=1)
          calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, "a")
       Else
          imgSelPx := imgSelPy := 0, imgSelW := imgW, imgSelH := imgH
@@ -57449,7 +57410,7 @@ getOCRimageBitmap(maxDim, ByRef srcInfo, ByRef srcW, ByRef srcH, ByRef errMsg) {
       If (max(imgSelW, imgSelH)>maxDim)
          calcIMGdimensions(imgSelW, imgSelH, maxDim, maxDim, rw, rh)
 
-      If (editingSelectionNow=1)
+      If (editingSelectionNow=1 && userOCRlimitSel=1)
       {
          zBitmap := getSelectedImageArea(whichBitmap, 1, 2, 0, rw, rh)
       } Else
@@ -57464,7 +57425,7 @@ getOCRimageBitmap(maxDim, ByRef srcInfo, ByRef srcW, ByRef srcH, ByRef errMsg) {
       Return zBitmap
    }
 
-   If (editingSelectionNow=1)
+   If (editingSelectionNow=1 && userOCRlimitSel=1)
    {
       zBitmap := getSelectedImageArea(whichBitmap, 1, 2, 0)
       If !validBMP(zBitmap)
@@ -57496,7 +57457,7 @@ getOCRimageBitmap(maxDim, ByRef srcInfo, ByRef srcW, ByRef srcH, ByRef errMsg) {
 
 getOCRclipboardBitmap(maxDim, ByRef srcInfo, ByRef srcW, ByRef srcH, ByRef errMsg) {
 ; the clipboard image or, when files were copied in a file manager, the first image file
-   Loop, 5
+   Loop, 3
    {
       clipBMP := Gdip_CreateBitmapFromClipboard()
       If (clipBMP!=-1)  ; -1 = another application holds the clipboard open
@@ -57514,28 +57475,8 @@ getOCRclipboardBitmap(maxDim, ByRef srcInfo, ByRef srcW, ByRef srcH, ByRef errMs
 
    If (clipBMP=-1)
    {
-      errMsg := "The clipboard is in use by another application. Please try again."
+      errMsg := "The clipboard seems to be in use by another application."
       Return
-   }
-
-   If !IsClipboardFormatAvailable(15)  ; CF_HDROP
-      Return
-
-   Try filesList := Clipboard
-   Loop, Parse, filesList, `n, `r
-   {
-      imgPath := Trimmer(A_LoopField)
-      If (!RegExMatch(imgPath, RegExFilesPattern) || !FileRexists(imgPath))
-         Continue
-
-      zBitmap := LoadBitmapFromFileu(imgPath)
-      If !validBMP(zBitmap)
-         Continue
-
-      zPlitPath(imgPath, 0, fileName, folderu)
-      srcInfo := "Clipboard file «" fileName "»"
-      trGdip_GetImageDimensions(zBitmap, srcW, srcH)
-      Return fitOCRbitmap(zBitmap, maxDim, errMsg)
    }
 }
 
@@ -68953,6 +68894,9 @@ createMenuCurrentFilesActs(dummy:=0) {
 
    If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
       kMenu("PVfilesActs", "Add", "Extract texts from PDF pages", "PanelPDFreadTexts", "convert retrieve read search links pdf get")
+
+   If WinOCR_IsSupported()
+      kMenu("PVfilesActs", "Add", "Text recognition (&OCR)", "PanelOCRtextRecognition", "optical character recognition extract read texts words clipboard")
 
    If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
       kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")

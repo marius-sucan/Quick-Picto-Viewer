@@ -5,6 +5,8 @@
 ; The asynchronous calls are awaited with Sleep, which pumps messages: other threads can run
 ; while a recognition is in progress. Call RecognizeBitmap() or Recognize() from a thread that
 ; is not Critical: under Critical, Sleep leaves the messages above WM_HOTKEY queued, COM's too.
+;
+; Code made by Marius Șucan with Claude Opus 5.5.
 
 Class WinOCR {
    __New() {
