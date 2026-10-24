@@ -198,6 +198,7 @@
     <ClInclude Include="lib\pch.h" />
     <ClInclude Include="lib\pdf-writer.h" />
     <ClInclude Include="lib\pdfium-reader.h" />
+    <ClInclude Include="lib\plasma-noise.h" />
     <ClInclude Include="lib\selection-mask.h" />
     <ClInclude Include="lib\sqlite-dynamic.h" />
     <ClInclude Include="lib\svg-render.h" />

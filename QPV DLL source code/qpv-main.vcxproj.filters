@@ -72,6 +72,9 @@
     <ClInclude Include="lib\paint-brush.h">
       <Filter>Header file</Filter>
     </ClInclude>
+    <ClInclude Include="lib\plasma-noise.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="qpv-main.cpp">
