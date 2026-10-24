@@ -15425,7 +15425,7 @@ QPV_CreateBitmapNoise(W, H, intensity, doGray, threads, fillBgr) {
   return pBitmap
 }
 
-cImg_CreatePlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBlur, fillBgr) {
+createPlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, blurY, doBlur, fillBgr) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
   {
@@ -24591,7 +24591,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     } Else If (UserAddNoiseMode=2) ; weird noise
        noiseBMP := QPV_CreateBitmapNoise(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseGrays, 1, !UserAddNoiseTransparent)
     Else ; plasma
-       noiseBMP := cImg_CreatePlasmaNoiseBitmap(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, !blurAreaEqualXY, !UserAddNoiseTransparent)
+       noiseBMP := createPlasmaNoiseBitmap(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, !blurAreaEqualXY, !UserAddNoiseTransparent)
 
     If !validBMP(noiseBMP)
     {
@@ -89158,7 +89158,8 @@ PanelAboutWindow() {
     Gui, Add, Text, y+10 wp h2 +0x1007, lol
     Gui, Add, Text, y+10 wp, Dedicated to people with really large image collections and slideshow needs.
     Gui, Add, Text, y+10 wp, This application contains code from various entities. You can find more details in the source code.
-    Gui, Add, Text, y+10 wp, QPV uses GDI+ [Windows APIs] to display images and FreeImage%thisVersion% to load exotic file formats. FreeImage is an open source library licensed under the GNU GPL v2.0 or v3.0`, and the FreeImage Public License (FIPL). For image processing`, some functions also rely on the cImg library, an open-source library distributed under the CeCILL-C license, by David Tschumperlé. 
+    Gui, Add, Text, y+10 wp, QPV relies on two open source libraries, which in turn also contain additional open source libraries:
+    Gui, Add, Link, y+10 wp, - a forked edition of <a href="https://github.com/marius-sucan/FreeImage-library">FreeImage</a> (%thisVersion%) that I maintain, it is used for loading exotic image formats. FreeImage is licensed under the GNU GPL v2.0`, and the FreeImage Public License (FIPL).`n- for image processing`, some functions rely on the <a href="https://github.com/opencv/opencv">OpenCV library</a>, distributed under the Apache 2.0 license.
 
     Gui, Add, Link, y+10 wp, To keep the development going, <a href="https://www.paypal.me/MariusSucan/10">please donate</a> or <a href="mailto:marius.sucan@gmail.com?subject=%appTitle% v%appVersion%">send me feedback</a>.
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid% gBtnOpenHelpWin, &Help

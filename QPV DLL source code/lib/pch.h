@@ -46,9 +46,6 @@
 #include <errno.h>
 #include <locale>
 #include <codecvt>
-#define cimg_use_openmp 1
-#include "..\includes\CImg-3.4.3\CImg.h"
-// #include <opencv2/opencv.hpp>
 #include "..\includes\opencv2\opencv.hpp"
 #include "..\includes\pdfium\fpdfview.h"
 #include "..\includes\pdfium\fpdf_text.h"

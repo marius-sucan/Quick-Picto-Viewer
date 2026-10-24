@@ -2,7 +2,6 @@
 
 #include "lib/pch.h"
 using namespace std;
-using namespace cimg_library;
 #define DLL_API extern "C" __declspec(dllexport)
 #define DLL_CALLCONV __stdcall
 
@@ -1371,7 +1370,7 @@ DLL_API int DLL_CALLCONV ColorizeGrayImage(unsigned char *originalData, int w, i
     return 1;
 }
 
-static inline uint64_t qpvMix64(uint64_t z) {
+static inline uint64_t splitMix64(uint64_t z) {
     // the splitmix64 finalizer
     z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
     z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
@@ -1412,7 +1411,7 @@ DLL_API int DLL_CALLCONV addGaussianNoiseOnBitmap(unsigned char *imageData, int 
 
   // one splitmix64 stream across the image, the pixel index is its counter
   static std::atomic<uint64_t> calls{0};
-  const uint64_t seed = qpvMix64((uint64_t)std::chrono::steady_clock::now().time_since_epoch().count() ^ qpvMix64(++calls));
+  const uint64_t seed = splitMix64((uint64_t)std::chrono::steady_clock::now().time_since_epoch().count() ^ splitMix64(++calls));
   const uint64_t step = 0x9E3779B97F4A7C15ULL;
   const short *lut = offsets.data();
   #pragma omp parallel for schedule(dynamic)
@@ -1426,7 +1425,7 @@ DLL_API int DLL_CALLCONV addGaussianNoiseOnBitmap(unsigned char *imageData, int 
           if (nc==4 && p[3]==0)
              continue;
 
-          const uint64_t r = qpvMix64(state);
+          const uint64_t r = splitMix64(state);
           for (int c = 0; c < 3; c++)
           {
               const int v = p[c] + lut[(r >> (16*c)) & 0xFFFF];
@@ -1536,7 +1535,7 @@ DLL_API int DLL_CALLCONV sharpenBitmap(unsigned char *imageData, int width, int 
   return 1;
 }
 
-static inline void repeatPixel(unsigned char *dst, const INT64 count, const unsigned char *px, const int bpc) {
+static inline void extendRepeatPixel(unsigned char *dst, const INT64 count, const unsigned char *px, const int bpc) {
     if (bpc==4)
     {
         uint32_t c;
@@ -1578,8 +1577,8 @@ DLL_API int DLL_CALLCONV extendBitmapEdges(unsigned char *imageData, int w, int 
     for (int y = y1; y < y2; y++)
     {
         unsigned char *row = imageData + (INT64)y * Stride;
-        repeatPixel(row, x1, row + (INT64)x1 * bpc, bpc);
-        repeatPixel(row + (INT64)x2 * bpc, w - x2, row + (INT64)(x2 - 1) * bpc, bpc);
+        extendRepeatPixel(row, x1, row + (INT64)x1 * bpc, bpc);
+        extendRepeatPixel(row + (INT64)x2 * bpc, w - x2, row + (INT64)(x2 - 1) * bpc, bpc);
     }
 
     // rows above and below the image copy its first and last rows, already extended sideways, which also fills the corners
@@ -1607,13 +1606,10 @@ static inline int plasmaWrap(const int a, const int m) {
     return (r<0) ? r + m : r;
 }
 
-// CImg's generator: a 64-bit LCG drawing its low 32 bits; each plasma continues the sequence from CImg's seed
+// a 64-bit LCG drawing its low 32 bits; each plasma continues the sequence from the seed
 static std::mutex plasmaRngMutex;
 static uint64_t plasmaRngState = 0xB16B00B5ULL;
 
-// CImg's draw_plasma(): midpoint displacement over a canvas rounded up to delta and wrapped around at its edges,
-// with the image centred in it. Every draw has a fixed place in the sequence, so a point depends only on its
-// coordinates, and the canvas is computed tile by tile, each tile from the coarsest grid down.
 struct PlasmaNoise {
     static constexpr uint64_t lcgA = 1103515245ULL, lcgC = 12345ULL;
     int W, H, delta, offX, offY;
@@ -1661,7 +1657,7 @@ struct PlasmaNoise {
         plasmaRngState = jump(s1, 4*perChannel);
     }
 
-    // draw k in [-1, 1], as cimg::rand(-1, 1) gives it
+    // draw k in [-1, 1]
     struct Draws {
         const PlasmaNoise &p;
         uint64_t state, last;
@@ -1745,7 +1741,7 @@ struct PlasmaNoise {
 
 static const int plasmaTileSize = 256;
 static const size_t plasmaGridSize = (size_t)(plasmaTileSize + 8) * (plasmaTileSize + 8);
-static const int plasmaChannelOffsets[4] = {2, 1, 0, 3};  // CImg's 4 channels are R, G, B and A; 24 bits pixels take the first 3
+static const int plasmaChannelOffsets[4] = {2, 1, 0, 3};  // 4 channels are R, G, B and A; 24 bits pixels take the first 3
 
 static inline BYTE plasmaByte(const float v) {
     return (BYTE)(((v<0.0f) ? 0.0f : (v>255.0f) ? 255.0f : v) + 0.4999f);
