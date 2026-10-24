@@ -2642,12 +2642,6 @@ SetParentID(Window_ID, theOther) {
 }
 
 disableWindowPenServices(hwnd) {
-; Sets MicrosoftTabletPenServiceProperty on the window, so the tablet input service leaves
-; its system gestures off there: press-and-hold [the long-tap right-click emulation of pen
-; and touch, which also holds the emulated mouse-down back while it decides], the pen tap
-; and barrel feedback animations, flicks and the rest of the set listed below. The
-; property is per HWND and Windows consults the window under the pen, so a window built
-; from child controls needs it on every control as well [see tlbrAddNewIcon].
    If !hwnd
       Return
 
@@ -2665,7 +2659,6 @@ ModifyMenuItem(hMenu, Pos, hSubMenu) {
          , "UPtr", hSubMenu
          , "UPtr", 0)
     Return res
-
 }
 
 GetMenuItemRect(hwnd, hMenu, nPos) {
