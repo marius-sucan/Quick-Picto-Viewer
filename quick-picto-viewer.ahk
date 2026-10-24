@@ -15437,15 +15437,18 @@ createPlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, blurY, 
   If (!w || !h)
      Return 0
 
-  pBitmap := trGdip_CreateBitmap(A_ThisFunc, W, H, "0x26200A") ; PixelFormat32bppARGB
+  ; without transparency, the bitmap is 24 bits and the DLL computes no alpha channel
+  bpp := (fillBgr=1) ? 24 : 32
+  pixFmt := (bpp=24) ? "0x21808" : "0x26200A" ; PixelFormat24bppRGB : PixelFormat32bppARGB
+  pBitmap := trGdip_CreateBitmap(A_ThisFunc, W, H, pixFmt)
   If !validBMP(pBitmap)
      Return 0
 
   r := 0
-  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3, pixFmt)
   If !E1
   {
-     r := DllCall("qpvmain.dll\generatePlasmaNoiseBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "int", stride, "int", 32)
+     r := DllCall("qpvmain.dll\generatePlasmaNoiseBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "int", stride, "int", bpp)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -15455,9 +15458,6 @@ createPlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, blurY, 
      trGdip_DisposeImage(pBitmap, 1)
      Return 0
   }
-
-  If (fillBgr=1)
-     Gdip_BitmapSetColorDepth(pBitmap, 24)
 
   If (doGray=1)
   {

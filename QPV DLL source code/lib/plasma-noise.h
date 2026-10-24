@@ -1,54 +1,33 @@
 // plasma-noise.h
 //
-// PlasmaNoise: CImg's draw_plasma() reproduced exactly, written straight into a bitmap's bits,
+// PlasmaNoise: a midpoint displacement plasma, written straight into a bitmap's bits,
 // optionally blurred first. Used by generatePlasmaNoiseBitmap().
 //
-// The canvas is the image rounded up to 2^scale, wrapped around, with the image centred in it.
-// Every draw has a fixed place in the generator's sequence, reached with a jump-ahead table, so
-// a point depends only on its coordinates and the canvas is computed in tiles, in parallel.
+// The plasma spans the whole plane, with the image at its origin. Each point's random value is a hash
+// of the seed, the channel and the point's coordinates, so the image is computed in tiles, in parallel.
 //
 // written by Marius Șucan with Claude Opus 5.5
 
 #ifndef QPV_PLASMA_NOISE_H
 #define QPV_PLASMA_NOISE_H
 
+#include <chrono>
 #include <cstdint>
-#include <mutex>
 #include <vector>
 
 class PlasmaNoise {
 public:
-    // each plasma continues the generator's sequence from the previous one
-    PlasmaNoise(const int w, const int h, const int intensity, const int details, const int scale) : width(w), height(h) {
+    PlasmaNoise(const int w, const int h, const int intensity, const int details, const int scale, const uint64_t seed) : width(w), height(h) {
         const float fs = (float)scale/9.5f;
         delta = 1 << ((fs>=12.0f) ? 12 : (fs>0.0f) ? (int)fs : 0);
-        W = (int)(((INT64)w + delta - 1) / delta * delta);
-        H = (int)(((INT64)h + delta - 1) / delta * delta);
-        offX = (W - w)/2;
-        offY = (H - h)/2;
         alpha = (float)intensity/2.0f;
         beta = (float)details/2.0f;
+        for (int c = 0; c < 4; c++)
+            keys[c] = mix(seed + (uint64_t)(c + 1)*golden);
+    }
 
-        uint64_t n = (uint64_t)(W/delta) * (H/delta);
-        int level = 0;
-        for (int s = delta; s>1; s >>= 1)
-        {
-            levelBase[level++] = n;
-            n += 3ULL * (W/s) * (H/s);
-        }
-        perChannel = n;
-
-        jumpA[0] = lcgA;
-        jumpC[0] = lcgC;
-        for (int k = 1; k < 64; k++)
-        {
-            jumpA[k] = jumpA[k - 1]*jumpA[k - 1];
-            jumpC[k] = jumpC[k - 1]*(jumpA[k - 1] + 1);
-        }
-
-        std::lock_guard<std::mutex> lock(rngMutex);
-        s1 = rngState*lcgA + lcgC;
-        rngState = jump(s1, 4*perChannel);
+    static uint64_t newSeed() {
+        return mix((uint64_t)std::chrono::high_resolution_clock::now().time_since_epoch().count());
     }
 
     // every channel is a plasma of its own, cut to [0, 255]; nc is 3 or 4 bytes per pixel. A blur above 0 is the
@@ -63,21 +42,15 @@ public:
     }
 
 private:
-    // a 64-bit LCG drawing its low 32 bits
-    static constexpr uint64_t lcgA = 1103515245ULL, lcgC = 12345ULL;
-    static inline std::mutex rngMutex;
-    static inline uint64_t rngState = 0xB16B00B5ULL;
-
+    static constexpr uint64_t golden = 0x9E3779B97F4A7C15ULL;
     static constexpr int tileSize = 256;
     static constexpr size_t gridSize = (size_t)(tileSize + 8) * (tileSize + 8);
     static constexpr int channelOffsets[4] = {2, 1, 0, 3};  // 4 channels are R, G, B and A; 24 bits pixels take the first 3
 
-    int width, height;  // the image
-    int W, H, delta, offX, offY;  // the canvas
+    int width, height;
+    int delta;  // the spacing of the coarsest grid
     float alpha, beta;
-    uint64_t s1, perChannel;
-    uint64_t levelBase[12];  // a channel's first draw at each level
-    uint64_t jumpA[64], jumpC[64];  // the generator advanced by 2^k draws
+    uint64_t keys[4];  // one per channel
 
     struct Blur {
         int ksize;
@@ -107,67 +80,45 @@ private:
         }
     };
 
-    // draw k in [-1, 1]
-    struct Draws {
-        const PlasmaNoise &p;
-        uint64_t state, last;
-        double operator()(const uint64_t k) {
-            if (k==last + 1)
-               state = state*lcgA + lcgC;
-            else
-               state = (k>last) ? p.jump(state, k - last) : p.jump(p.s1, k + 1);
-            last = k;
-            return -1.0 + 2.0*(uint32_t)state/4294967295.0;
-        }
-    };
-
-    static inline int floorDiv(const int a, const int b) {
-        return (a>=0) ? a / b : -((b - 1 - a) / b);
+    // SplitMix64's finalizer
+    static inline uint64_t mix(uint64_t z) {
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        return z ^ (z >> 31);
     }
 
-    static inline int wrap(const int a, const int m) {
-        if ((unsigned)a<(unsigned)m)
-           return a;
-
-        const int r = a % m;
-        return (r<0) ? r + m : r;
+    // the random value in [-1, 1] of the point (x, y)
+    static inline float draw(const uint64_t key, const INT64 x, const INT64 y) {
+        const uint64_t p = (uint32_t)x | ((uint64_t)(uint32_t)y << 32);
+        return (float)(int32_t)(mix(key + p*golden) >> 32) * (1.0f/2147483648.0f);
     }
 
     static inline BYTE toByte(const float v) {
         return (BYTE)(((v<0.0f) ? 0.0f : (v>255.0f) ? 255.0f : v) + 0.4999f);
     }
 
-    uint64_t jump(uint64_t s, uint64_t n) const {
-        for (int k = 0; n; n >>= 1, k++)
-            if (n & 1)
-               s = jumpA[k]*s + jumpC[k];
-        return s;
-    }
-
-    // channel c over the canvas rectangle [x0, x0 + tw) x [y0, y0 + th); returns the value at (x0, y0), rows gs apart.
+    // channel c over the image rectangle [x0, x0 + tw) x [y0, y0 + th); returns the value at (x0, y0), rows gs apart.
     // The grid of spacing s holds the points (kx*s, ky*s) for kx in [x0/s - 3, (x0 + tw - 1)/s + 3]. The next grid
     // reads it 2 points in from its edges, and its outer ring has no diamond points.
     const float* tile(const int c, const int x0, const int y0, const int tw, const int th, float *g, float *n, int &gs) const {
-        Draws draw = {*this, s1, UINT64_MAX};
-        const uint64_t base = (uint64_t)c * perChannel;
+        const uint64_t key = keys[c];
         int s = delta;
-        int kx0 = floorDiv(x0, s) - 3, ky0 = floorDiv(y0, s) - 3;
-        int nx = floorDiv(x0 + tw - 1, s) + 4 - kx0;
-        const int ny = floorDiv(y0 + th - 1, s) + 4 - ky0;
+        int kx0 = x0/s - 3, ky0 = y0/s - 3;
+        int nx = (x0 + tw - 1)/s + 4 - kx0;
+        const int ny = (y0 + th - 1)/s + 4 - ky0;
         float r = alpha*s + beta;
         for (int j = 0; j < ny; j++)
         {
-            const uint64_t row = base + (uint64_t)wrap(ky0 + j, H/s) * (W/s);
+            const INT64 y = (INT64)(ky0 + j)*s;
             for (int i = 0; i < nx; i++)
-                g[j*nx + i] = (float)(r*draw(row + wrap(kx0 + i, W/s)));
+                g[j*nx + i] = r*draw(key, (INT64)(kx0 + i)*s, y);
         }
 
-        for (int level = 0; s>1; s >>= 1, level++)
+        for (; s>1; s >>= 1)
         {
-            const int h = s>>1, cols = W/s, wx = W/h, wy = H/h;
-            const int mx0 = floorDiv(x0, h) - 3, my0 = floorDiv(y0, h) - 3;
-            const int mx = floorDiv(x0 + tw - 1, h) + 4 - mx0, my = floorDiv(y0 + th - 1, h) + 4 - my0;
-            const uint64_t squares = base + levelBase[level], diamonds = squares + (uint64_t)(H/s) * cols;
+            const int h = s>>1;
+            const int mx0 = x0/h - 3, my0 = y0/h - 3;
+            const int mx = (x0 + tw - 1)/h + 4 - mx0, my = (y0 + th - 1)/h + 4 - my0;
             r = alpha*s + beta;
 
             // the coarser grid's points and the squares' centres
@@ -182,11 +133,11 @@ private:
                         m[i] = o[((mx0 + i)>>1) - kx0];
                 } else
                 {
-                    const uint64_t row = squares + (uint64_t)(wrap(ky, wy)>>1) * cols;
+                    const INT64 y = (INT64)ky*h;
                     for (int i = 1 - (mx0 & 1); i < mx; i += 2)
                     {
                         const int a = ((mx0 + i)>>1) - kx0;
-                        m[i] = (float)(0.25f*(o[a] + o[a + 1] + o[nx + a + 1] + o[nx + a]) + r*draw(row + (wrap(mx0 + i, wx)>>1)));
+                        m[i] = 0.25f*(o[a] + o[a + 1] + o[nx + a + 1] + o[nx + a]) + r*draw(key, (INT64)(mx0 + i)*h, y);
                     }
                 }
             }
@@ -195,10 +146,10 @@ private:
             for (int j = 1; j < my - 1; j++)
             {
                 const int ky = my0 + j;
+                const INT64 y = (INT64)ky*h;
                 float *m = n + j*mx;
-                const uint64_t row = diamonds + (uint64_t)wrap(ky, wy) * cols;
                 for (int i = 2 - ((mx0 + 1 + ky) & 1); i < mx - 1; i += 2)
-                    m[i] = (float)(0.25f*(m[i - 1] + m[i + 1] + m[i - mx] + m[i + mx]) + r*draw(row + (wrap(mx0 + i, wx)>>1)));
+                    m[i] = 0.25f*(m[i - 1] + m[i + 1] + m[i - mx] + m[i + mx]) + r*draw(key, (INT64)(mx0 + i)*h, y);
             }
 
             std::swap(g, n);
@@ -222,7 +173,7 @@ private:
             for (int c = 0; c < nc; c++)
             {
                 int gs;
-                const float *v = tile(c, offX + tx, offY + ty, tw, th, g, g + gridSize, gs);
+                const float *v = tile(c, tx, ty, tw, th, g, g + gridSize, gs);
                 for (int j = 0; j < th; j++)
                 {
                     const float *row = v + (INT64)j*gs;
@@ -244,7 +195,7 @@ private:
             const int tx = (t % tilesX)*T, ty = (t / tilesX)*T;
             const int tw = min(T, w - tx), th = min(T, h - ty);
             int gs;
-            const float *v = tile(c, offX + x + tx, offY + y + ty, tw, th, g, g + gridSize, gs);
+            const float *v = tile(c, x + tx, y + ty, tw, th, g, g + gridSize, gs);
             for (int j = 0; j < th; j++)
                 memcpy(dst + (ty + j)*dstStride + tx, v + (INT64)j*gs, tw*sizeof(float));
         }
