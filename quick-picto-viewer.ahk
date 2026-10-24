@@ -24891,7 +24891,7 @@ QPV_AddGaussianNoiseOnBitmap(pBitmap, intensity) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
   If !E1
   {
-     r := DllCall("qpvmain.dll\cImgAddGaussianNoiseOnBitmap", "UPtr", iScan, "int", w, "int", h, "Int", intensity, "int", Stride, "int", 32)
+     r := DllCall("qpvmain.dll\addGaussianNoiseOnBitmap", "UPtr", iScan, "int", w, "int", h, "Int", intensity, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 

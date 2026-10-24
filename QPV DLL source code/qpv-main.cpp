@@ -1464,28 +1464,69 @@ Gdiplus::GpBitmap* CreateGdipBitmapFromCImg(CImg<float> & img, int width, int he
     return myBitmap;
 }
 
-void FillGdipLockedBitmapDataFromCImg(unsigned char *imageData, CImg<unsigned char> &img, int width, int height, int Stride, int bpp) {
-    #pragma omp parallel for schedule(dynamic)
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            INT64 o = CalcPixOffset(x, y, Stride, bpp);
-            imageData[o]     = img(x,y,0,0); // b
-            imageData[o + 1] = img(x,y,0,1); // g
-            imageData[o + 2] = img(x,y,0,2); // r
-            if (bpp==32)
-               imageData[o + 3] = img(x,y,0,3); // a
-        }
-    }
+static inline uint64_t qpvMix64(uint64_t z) {
+    // the splitmix64 finalizer
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    return z ^ (z >> 31);
 }
 
-DLL_API int DLL_CALLCONV cImgAddGaussianNoiseOnBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
-  int channels = (bpp==32) ? 4 : 3;
-  CImg<unsigned char> img(imageData, channels, width, height, 1);
-  img.permute_axes("yzcx");
-  img.noise(intensity, 0);
-  FillGdipLockedBitmapDataFromCImg(imageData, img, width, height, Stride, bpp);
+DLL_API int DLL_CALLCONV addGaussianNoiseOnBitmap(unsigned char *imageData, int width, int height, int intensity, int Stride, int bpp) {
+  // intensity is the standard deviation, in levels, of the noise each colour channel gets; transparent pixels and alpha are left as they are
+  const int nc = bpp/8;
+  if (imageData==NULL || width<1 || height<1 || (bpp!=32 && bpp!=24) || Stride<width*nc)
+     return 0;
+  if (intensity<1)
+     return 1;
+
+  // round(intensity * z) at 65536 evenly spaced quantiles z of the normal distribution;
+  // past +/-255 every channel saturates, so the offsets stop there
+  std::vector<short> offsets;
+  try {
+      offsets.resize(65536);
+  } catch (const std::bad_alloc&) {
+      return 0;
+  }
+
+  const double s = 1.0 / (intensity * sqrt(2.0));
+  int k = -256;
+  double cdf = 0.5 * erfc((k + 0.5) * -s);
+  for (int i = 0; i < 32768; i++)
+  {
+      const double q = (i + 0.5) / 65536.0;
+      while (cdf < q)
+      {
+          k++;
+          cdf = 0.5 * erfc((k + 0.5) * -s);
+      }
+      offsets[i] = (short)max(k, -255);
+      offsets[65535 - i] = (short)-offsets[i];
+  }
+
+  // one splitmix64 stream across the image, the pixel index is its counter
+  static std::atomic<uint64_t> calls{0};
+  const uint64_t seed = qpvMix64((uint64_t)std::chrono::steady_clock::now().time_since_epoch().count() ^ qpvMix64(++calls));
+  const uint64_t step = 0x9E3779B97F4A7C15ULL;
+  const short *lut = offsets.data();
+  #pragma omp parallel for schedule(dynamic)
+  for (int y = 0; y < height; y++)
+  {
+      uint64_t state = seed + (uint64_t)y * (uint64_t)width * step;
+      unsigned char *p = imageData + (INT64)y * Stride;
+      for (int x = 0; x < width; x++, p += nc)
+      {
+          state += step;
+          if (nc==4 && p[3]==0)
+             continue;
+
+          const uint64_t r = qpvMix64(state);
+          for (int c = 0; c < 3; c++)
+          {
+              const int v = p[c] + lut[(r >> (16*c)) & 0xFFFF];
+              p[c] = (unsigned char)((v<0) ? 0 : (v>255) ? 255 : v);
+          }
+      }
+  }
   return 1;
 }
 
