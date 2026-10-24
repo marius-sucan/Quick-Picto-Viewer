@@ -94,7 +94,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/qpv-main.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -112,7 +112,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/qpv-main.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
@@ -139,7 +139,7 @@
       <PreprocessorDefinitions>_DEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/qpv-main.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -157,7 +157,7 @@
       <PreprocessorDefinitions>NDEBUG;QPVMAIN_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>lib/pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>lib/qpv-main.h</PrecompiledHeaderFile>
       <Optimization>Full</Optimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OpenMPSupport>true</OpenMPSupport>
@@ -195,10 +195,10 @@
     <ClInclude Include="lib\framework.h" />
     <ClInclude Include="lib\freeimage-dynamic.h" />
     <ClInclude Include="lib\paint-brush.h" />
-    <ClInclude Include="lib\pch.h" />
     <ClInclude Include="lib\pdf-writer.h" />
     <ClInclude Include="lib\pdfium-reader.h" />
     <ClInclude Include="lib\plasma-noise.h" />
+    <ClInclude Include="lib\qpv-main.h" />
     <ClInclude Include="lib\selection-mask.h" />
     <ClInclude Include="lib\sqlite-dynamic.h" />
     <ClInclude Include="lib\svg-render.h" />
@@ -207,8 +207,7 @@
     <ClInclude Include="lib\open-cv-func.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="pch.cpp">
+    <ClCompile Include="dllmain.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

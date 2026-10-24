@@ -1,10 +1,10 @@
-// pch.h: the system and third-party headers, compiled once into the precompiled header every .cpp
-// of the DLL starts with [/Yu]. The project's own headers stay out: an edit to anything here rebuilds it.
-// /Yu skips whatever comes before #include "lib/pch.h", so the macros these headers read [GDIPVER,
-// cimg_use_openmp] are defined here.
+// qpv-main.h: the system and third-party headers, compiled once into the precompiled header every .cpp
+// of the DLL starts with; dllmain.cpp creates it [/Yc] and qpv-main.cpp uses it [/Yu]. The project's own
+// headers stay out: an edit to anything here rebuilds it. /Yu skips whatever comes before
+// #include "lib/qpv-main.h", so GDIPVER, which gdiplus.h reads, is defined here.
 
-#ifndef PCH_H
-#define PCH_H
+#ifndef QPV_MAIN_H
+#define QPV_MAIN_H
 
 #include "framework.h"
 #include <wchar.h>
@@ -53,4 +53,4 @@
 #include "..\includes\pdfium\fpdf_doc.h"
 #include "..\includes\pdfium\fpdf_edit.h"
 
-#endif //PCH_H
+#endif // QPV_MAIN_H

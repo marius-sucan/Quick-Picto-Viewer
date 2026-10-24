@@ -1,6 +1,6 @@
 // qpv-main.cpp : Définit les fonctions exportées de la DLL.
 
-#include "lib/pch.h"
+#include "lib/qpv-main.h"
 using namespace std;
 #define DLL_API extern "C" __declspec(dllexport)
 #define DLL_CALLCONV __stdcall

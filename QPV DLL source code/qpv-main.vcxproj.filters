@@ -21,7 +21,7 @@
     <ClInclude Include="lib\framework.h">
       <Filter>Header file</Filter>
     </ClInclude>
-    <ClInclude Include="lib\pch.h">
+    <ClInclude Include="lib\qpv-main.h">
       <Filter>Header file</Filter>
     </ClInclude>
     <ClInclude Include="lib\freeimage-dynamic.h">
@@ -81,9 +81,6 @@
       <Filter>Fichiers sources</Filter>
     </ClCompile>
     <ClCompile Include="dllmain.cpp">
-      <Filter>Fichiers sources</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
   </ItemGroup>
