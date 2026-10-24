@@ -15437,7 +15437,7 @@ cImg_CreatePlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, bl
   If (!w || !h)
      Return 0
 
-  pBitmap := DllCall("qpvmain.dll\GenerateCIMGnoiseBitmap", "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
+  pBitmap := DllCall("qpvmain.dll\generatePlasmaNoiseBitmap", "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
   If (StrLen(pBitmap)>2)
      recordGdipBitmaps(pBitmap, A_ThisFunc)
 
