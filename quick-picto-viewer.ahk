@@ -24781,7 +24781,6 @@ QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circ
   If !E1
   {
      r := DllCall("qpvmain.dll\openCVblurFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "int", Stride, "int", 32)
-     ; r := DllCall("qpvmain.dll\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -24808,7 +24807,6 @@ QPV_DetectEdgesFilters(pBitmap, modus, xa, ya, ksize, preblur, postblur, invert,
   {
      ; fnOutputDebug(A_ThisFunc ": xa=" xa  " | ya=" ya " | ks=" ks )
      r := DllCall("qpvmain.dll\openCVedgeDetection", "UPtr", iScan, "Int", w, "Int", h, "Int", xa, "Int", ya, "Int", ksize, "Int", preblur, "Int", postblur, "int", invert, "float", prebrighten, "float", precontrast, "float", postbrighten, "float", postcontrast, "Int", modus, "int", Stride, "int", 24)
-     ; r := DllCall("qpvmain.dll\cImgBlurBitmapFilters", "UPtr", iScan, "Int", w, "Int", h, "Int", passesX, "Int", passesY, "Int", modus, "Int", circular, "Int", preview, "int", Stride, "int", 32)
      Gdip_UnlockBits(pBitmap, iData)
   }
 
@@ -60461,11 +60459,11 @@ PanelSharpenImage() {
 
     thisW := (PrefsLargeFonts=1) ? 68 : 48
     Gui, SettingsGUIA: +DPIScale
-    CurrentPanelTab := 1  ; this panel always opens on its first tab, the live preview relies on it
+    CurrentPanelTab := 1  ; this panel must always opens on its first tab, the live preview relies on it
     Gui, Add, Tab3, %tabzDarkModus% x+20 ys gBtnUiSharpenTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab, General|Edges filter
     Gui, Tab, 1
     Gui, Add, Text, x+10 y+10 Section +hwndhTemp, Sharpen mode:
-    GuiAddDropDownList("x+5 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenMode " vImageSharpenMode", "cImg|GDI+|Advanced", [hTemp])
+    GuiAddDropDownList("x+5 wp gupdateUIsharpenPanel AltSubmit Choose" ImageSharpenMode " vImageSharpenMode", "Default|GDI+|Advanced", [hTemp])
     GuiAddSlider("ImageSharpenAmount", 0,100, 10, "Sharpen amount", "updateUIsharpenPanel", 1, "xs y+10 w" txtWid " hp")
     GuiAddSlider("ImageSharpenRadius", 0,255, 15, "Radius: $€", "updateUIsharpenPanel", 1, "xs y+10 wp hp")
     Gui, Add, Checkbox, xs y+10 Checked%BlurAreaInverted% vBlurAreaInverted gupdateUIsharpenPanel, &Invert selection area
