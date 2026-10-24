@@ -13,7 +13,8 @@
   - color management works through FreeImage loaded files as well 
   - fixed the animations playback
   - fixed the brushes not painting correctly in selection areas
-  - ditched AHK-H in favour of AHK-L
+  - no longer using AHK-H, it is now all in AHK-L v1.1
+  - no longer using cImg for image processing
 
 - v6.3.00 (2026-08-31)
   - [new] rotational/spin blur mode in the «Radial Blur» panel
