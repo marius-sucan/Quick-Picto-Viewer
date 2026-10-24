@@ -1745,14 +1745,14 @@ struct PlasmaNoise {
 
 static const int plasmaTileSize = 256;
 static const size_t plasmaGridSize = (size_t)(plasmaTileSize + 8) * (plasmaTileSize + 8);
-static const int plasmaChannelOffsets[4] = {2, 1, 0, 3};  // CImg's 4 channels are R, G, B and A
+static const int plasmaChannelOffsets[4] = {2, 1, 0, 3};  // CImg's 4 channels are R, G, B and A; 24 bits pixels take the first 3
 
 static inline BYTE plasmaByte(const float v) {
     return (BYTE)(((v<0.0f) ? 0.0f : (v>255.0f) ? 255.0f : v) + 0.4999f);
 }
 
-// scratch holds two grids for each thread
-static void plasmaToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64 stride, const int w, const int h, float *scratch) {
+// nc is 3 or 4 bytes per pixel; scratch holds two grids for each thread
+static void plasmaToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64 stride, const int w, const int h, const int nc, float *scratch) {
     const int T = plasmaTileSize, tilesX = (w + T - 1)/T, tiles = tilesX * ((h + T - 1)/T);
     #pragma omp parallel for schedule(dynamic)
     for (int t = 0; t < tiles; t++)
@@ -1760,15 +1760,15 @@ static void plasmaToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64 stride
         float *g = scratch + (size_t)omp_get_thread_num()*2*plasmaGridSize;
         const int tx = (t % tilesX)*T, ty = (t / tilesX)*T;
         const int tw = min(T, w - tx), th = min(T, h - ty);
-        for (int c = 0; c < 4; c++)
+        for (int c = 0; c < nc; c++)
         {
             int gs;
             const float *v = p.tile(c, p.offX + tx, p.offY + ty, tw, th, g, g + plasmaGridSize, gs);
             for (int j = 0; j < th; j++)
             {
                 const float *row = v + (INT64)j*gs;
-                BYTE *px = scan0 + (ty + j)*stride + (INT64)tx*4 + plasmaChannelOffsets[c];
-                for (int i = 0; i < tw; i++, px += 4)
+                BYTE *px = scan0 + (ty + j)*stride + (INT64)tx*nc + plasmaChannelOffsets[c];
+                for (int i = 0; i < tw; i++, px += nc)
                     *px = plasmaByte(row[i]);
             }
         }
@@ -1821,7 +1821,7 @@ static void plasmaBlurAxis(cv::Mat &m, const PlasmaBlur &b, const bool vertical)
 
 // the values are blurred before they are cut to bytes; a channel goes in bands across the axis blurred less,
 // each band computed with a margin as wide as that blur reaches
-static void plasmaBlurredToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64 stride, const int w, const int h, const PlasmaBlur &bx, const PlasmaBlur &by, float *scratch) {
+static void plasmaBlurredToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64 stride, const int w, const int h, const int nc, const PlasmaBlur &bx, const PlasmaBlur &by, float *scratch) {
     const int rx = bx.ksize/2, ry = by.ksize/2;
     // OpenCV's stack blur gets the last radius pixels of a row wrong, so rows go on that far, repeating their last pixel
     const int pad = bx.stack ? rx : 0;
@@ -1830,7 +1830,7 @@ static void plasmaBlurredToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64
     const int band = max(256, 2*reach), span = min(len, band + 2*reach);
     std::vector<float> plane((size_t)((rowBands ? w : span) + pad) * (rowBands ? span : h));
 
-    for (int c = 0; c < 4; c++)
+    for (int c = 0; c < nc; c++)
     {
         for (int b0 = 0; b0 < len; b0 += band)
         {
@@ -1859,53 +1859,34 @@ static void plasmaBlurredToBitmap(const PlasmaNoise &p, BYTE *scan0, const INT64
             for (int j = 0; j < bh; j++)
             {
                 const float *row = src + (INT64)j*pw;
-                BYTE *px = scan0 + (py0 + j)*stride + (INT64)px0*4 + plasmaChannelOffsets[c];
-                for (int i = 0; i < bw; i++, px += 4)
+                BYTE *px = scan0 + (py0 + j)*stride + (INT64)px0*nc + plasmaChannelOffsets[c];
+                for (int i = 0; i < bw; i++, px += nc)
                     *px = plasmaByte(row[i]);
             }
         }
     }
 }
 
-DLL_API Gdiplus::GpBitmap* DLL_CALLCONV generatePlasmaNoiseBitmap(int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur) {
-  // every channel of the 32-ARGB bitmap is a plasma of its own, cut to [0, 255]; with doBlur, the plasmas
-  // are first blurred by Gaussians of deviation blurX and blurY
-  if (width<1 || height<1 || width>INT_MAX - 4096 || height>INT_MAX - 4096)
-     return NULL;
-
-  Gdiplus::GpBitmap *bmp = NULL;
-  if (Gdiplus::DllExports::GdipCreateBitmapFromScan0(width, height, 0, PixelFormat32bppARGB, NULL, &bmp)!=Gdiplus::Ok || bmp==NULL)
-     return NULL;
-
-  Gdiplus::Rect rect(0, 0, width, height);
-  Gdiplus::BitmapData bd;
-  if (Gdiplus::DllExports::GdipBitmapLockBits(bmp, &rect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd)!=Gdiplus::Ok)
-  {
-     Gdiplus::DllExports::GdipDisposeImage(bmp);
-     return NULL;
-  }
+DLL_API int DLL_CALLCONV generatePlasmaNoiseBitmap(unsigned char *imageData, int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur, int Stride, int bpp) {
+  // every channel is a plasma of its own, cut to [0, 255]; with doBlur, the plasmas are first blurred
+  // by Gaussians of deviation blurX and blurY. Each pixel is overwritten, alpha too in 32 bits.
+  const int nc = bpp/8;
+  if (imageData==NULL || width<1 || height<1 || (bpp!=32 && bpp!=24) || Stride<(INT64)width*nc || width>INT_MAX - 4096 || height>INT_MAX - 4096)
+     return 0;
 
   PlasmaNoise p;
   p.init(width, height, intensity, details, scale);
   const PlasmaBlur bx = plasmaBlurOf((doBlur==1) ? blurX : 0), by = plasmaBlurOf((doBlur==1) ? blurY : 0);
-  bool ok = true;
   try {
       std::vector<float> scratch((size_t)omp_get_max_threads()*2*plasmaGridSize);
       if (bx.ksize>1 || by.ksize>1)
-         plasmaBlurredToBitmap(p, (BYTE*)bd.Scan0, bd.Stride, width, height, bx, by, scratch.data());
+         plasmaBlurredToBitmap(p, imageData, Stride, width, height, nc, bx, by, scratch.data());
       else
-         plasmaToBitmap(p, (BYTE*)bd.Scan0, bd.Stride, width, height, scratch.data());
+         plasmaToBitmap(p, imageData, Stride, width, height, nc, scratch.data());
   } catch (...) {
-      ok = false;
+      return 0;
   }
-
-  Gdiplus::DllExports::GdipBitmapUnlockBits(bmp, &bd);
-  if (!ok)
-  {
-     Gdiplus::DllExports::GdipDisposeImage(bmp);
-     return NULL;
-  }
-  return bmp;
+  return 1;
 }
 
 DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width, int Height, int rx, int ry) {

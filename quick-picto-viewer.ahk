@@ -15437,14 +15437,29 @@ cImg_CreatePlasmaNoiseBitmap(W, H, intensity, details, scaleu, doGray, blurX, bl
   If (!w || !h)
      Return 0
 
-  pBitmap := DllCall("qpvmain.dll\generatePlasmaNoiseBitmap", "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "UPtr")
-  If (StrLen(pBitmap)>2)
-     recordGdipBitmaps(pBitmap, A_ThisFunc)
+  pBitmap := trGdip_CreateBitmap(A_ThisFunc, W, H, "0x26200A") ; PixelFormat32bppARGB
+  If !validBMP(pBitmap)
+     Return 0
 
-  If (validBMP(pBitmap) && fillBgr=1)
+  r := 0
+  E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 3)
+  If !E1
+  {
+     r := DllCall("qpvmain.dll\generatePlasmaNoiseBitmap", "UPtr", iScan, "Int", w, "Int", h, "Int", intensity, "Int", details, "Int", scaleu, "int", blurX, "int", blurY, "int", doBlur, "int", stride, "int", 32)
+     Gdip_UnlockBits(pBitmap, iData)
+  }
+
+  If !r
+  {
+     addJournalEntry(A_ThisFunc "(): failed to generate the plasma noise: " w "x" h)
+     trGdip_DisposeImage(pBitmap, 1)
+     Return 0
+  }
+
+  If (fillBgr=1)
      Gdip_BitmapSetColorDepth(pBitmap, 24)
 
-  If (validBMP(pBitmap) && doGray=1)
+  If (doGray=1)
   {
      pEffectGray := Gdip_CreateEffect(6, 0, -100, 0)
      Gdip_BitmapApplyEffect(pBitmap, pEffectGray)
