@@ -53164,7 +53164,7 @@ BtnUIpresetsClouds() {
       UserAddNoiseContrast := 25
       UserAddNoiseOpacity := 255
       UserAddNoisePixelizeAmount := 55
-      UserAddNoiseBlurAmount := 40
+      UserAddNoiseBlurAmount := 25
    } Else
    {
       GuiControl, SettingsGUIA:, blurAreaEqualXY, 1
