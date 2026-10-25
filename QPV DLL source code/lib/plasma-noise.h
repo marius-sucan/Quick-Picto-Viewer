@@ -31,7 +31,7 @@ public:
     }
 
     // every channel is a plasma of its own, cut to [0, 255]; nc is 3 or 4 bytes per pixel. A blur above 0 is the
-    // deviation of a Gaussian the plasmas are blurred by before the cut. Throws on allocation and OpenCV failures.
+    // deviation of a Gaussian the cut plasmas are blurred by. Throws on allocation and OpenCV failures.
     void render(BYTE *scan0, const INT64 stride, const int nc, const int blurX, const int blurY) const {
         const Blur bx = Blur::ofSigma(blurX), by = Blur::ofSigma(blurY);
         std::vector<float> scratch((size_t)omp_get_max_threads()*2*gridSize);  // two grids for each thread
@@ -193,7 +193,7 @@ private:
         }
     }
 
-    // channel c over the image rectangle [x, x + w) x [y, y + h), rows dstStride floats apart
+    // channel c over the image rectangle [x, x + w) x [y, y + h), cut to [0, 255], rows dstStride floats apart
     void channelToFloats(const int c, const int x, const int y, const int w, const int h, float *dst, const INT64 dstStride, float *scratch) const {
         const int T = tileSize, tilesX = (w + T - 1)/T, tiles = tilesX * ((h + T - 1)/T);
         #pragma omp parallel for schedule(dynamic)
@@ -205,12 +205,17 @@ private:
             int gs;
             const float *v = tile(c, x + tx, y + ty, tw, th, g, g + gridSize, gs);
             for (int j = 0; j < th; j++)
-                memcpy(dst + (ty + j)*dstStride + tx, v + (INT64)j*gs, tw*sizeof(float));
+            {
+                const float *src = v + (INT64)j*gs;
+                float *row = dst + (ty + j)*dstStride + tx;
+                for (int i = 0; i < tw; i++)
+                    row[i] = (src[i]<0.0f) ? 0.0f : (src[i]>255.0f) ? 255.0f : src[i];
+            }
         }
     }
 
-    // the values are blurred before they are cut to bytes; a channel goes in bands across the axis blurred less,
-    // each band computed with a margin as wide as that blur reaches
+    // the plasma is cut to [0, 255] before the blur, which a zero centred plasma would otherwise darken; a channel
+    // goes in bands across the axis blurred less, each band computed with a margin as wide as that blur reaches
     void renderBlurred(BYTE *scan0, const INT64 stride, const int nc, const Blur &bx, const Blur &by, float *scratch) const {
         const int w = width, h = height;
         const int rx = bx.reach(), ry = by.reach();

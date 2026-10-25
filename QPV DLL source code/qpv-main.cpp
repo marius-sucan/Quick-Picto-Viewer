@@ -1596,7 +1596,7 @@ DLL_API int DLL_CALLCONV extendBitmapEdges(unsigned char *imageData, int w, int 
 }
 
 DLL_API int DLL_CALLCONV generatePlasmaNoiseBitmap(unsigned char *imageData, int width, int height, int intensity, int details, int scale, int blurX, int blurY, int doBlur, int Stride, int bpp) {
-  // every channel is a plasma of its own, cut to [0, 255]; with doBlur, the plasmas are first blurred
+  // every channel is a plasma of its own, cut to [0, 255]; with doBlur, the cut plasmas are then blurred
   // by Gaussians of deviation blurX and blurY. Each pixel is overwritten, alpha too in 32 bits; each call
   // gives a new plasma.
   const int nc = bpp/8;
