@@ -43,7 +43,7 @@ public:
 
 private:
     static constexpr uint64_t golden = 0x9E3779B97F4A7C15ULL;
-    static constexpr int tileSize = 256;
+    static constexpr int tileSize = 512;
     static constexpr size_t gridSize = (size_t)(tileSize + 8) * (tileSize + 8);
     static constexpr int channelOffsets[4] = {2, 1, 0, 3};  // 4 channels are R, G, B and A; 24 bits pixels take the first 3
 

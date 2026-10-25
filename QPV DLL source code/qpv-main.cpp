@@ -1614,8 +1614,11 @@ DLL_API int DLL_CALLCONV generatePlasmaNoiseBitmap(unsigned char *imageData, int
 
 DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width, int Height, int rx, int ry) {
       // fnOutputDebug("maxR===" + std::to_string(maxuRadius) + "; rS=" + std::to_string(rScale) + "; imgAR=" + std::to_string(imgAR));
-      if (rx<1) rx = 1; // radius 0 would be a modulo-by-zero below
-      if (ry<1) ry = 1;
+      if (rx<1)
+         rx = 1; // radius 0 would be a modulo-by-zero below
+      if (ry<1)
+         ry = 1;
+
       const UINT maxPixels = Width + Height * Width;
       MaskBitMap pixelzMap; // bit-packed with atomic writes; std::vector<bool> races between OpenMP threads
       pixelzMap.resize(maxPixels);
@@ -1628,6 +1631,7 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
          unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1));
          if (rngState==0)
             rngState = 0x9E3779B9u;
+
          for (int x = 0; x < Width; x++)
          {
             int gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
@@ -1655,6 +1659,7 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
              unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1)) ^ 0x55555555u;
              if (rngState==0)
                 rngState = 0x9E3779B9u;
+
              for (int x = 0; x < Width; x++)
              {
                 int gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
@@ -1683,6 +1688,7 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
              unsigned int rngState = (unsigned int)nTime ^ (2654435761u * (unsigned int)(y + 1)) ^ 0xAAAAAAAAu;
              if (rngState==0)
                 rngState = 0x9E3779B9u;
+
              for (int x = 0; x < Width; x++)
              {
                 int gx = (int)(qpvThreadRand(rngState) % (rx*2)) - rx;
