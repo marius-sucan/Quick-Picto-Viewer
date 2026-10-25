@@ -27,7 +27,7 @@
 ; ucrtbase.dll
 ; vcomp140.dll
 ; vcruntime140.dll
-; opencv_world4100.dll
+; opencv_world4140.dll
 ; qpvmain.dll [developed and compiled by me]
 ;
 ; * The FreeImage library DLL I use is a custom compiled one. The source code is 
