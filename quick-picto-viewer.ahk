@@ -24579,8 +24579,11 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     thisImgH := (thisPixelize>1 && UserAddNoiseMode!=3) ? Ceil(imgSelH/thisPixelize) : imgSelH
     thisBlurAmount := (doubleBlurPreviewArea=1 && previewMode=1) ? UserAddNoiseBlurAmount//2 : UserAddNoiseBlurAmount
     thisBlurAmountY := (doubleBlurPreviewArea=1 && previewMode=1) ? blurAreaYamount//2 : blurAreaYamount
-    thisBlurAmount := Round(thisBlurAmount*1.5)
-    thisBlurAmountY := Round(thisBlurAmountY*1.5)
+    If (UserAddNoiseMode!=3)
+    {
+       thisBlurAmount := Round(thisBlurAmount*1.5)
+       thisBlurAmountY := Round(thisBlurAmountY*1.5)
+    }
     If (blurAreaEqualXY=1)
        thisBlurAmountY := thisBlurAmount
 
@@ -24591,7 +24594,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     } Else If (UserAddNoiseMode=2) ; weird noise
        noiseBMP := QPV_CreateBitmapNoise(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseGrays, 1, !UserAddNoiseTransparent)
     Else ; plasma
-       noiseBMP := createPlasmaNoiseBitmap(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, !blurAreaEqualXY, !UserAddNoiseTransparent)
+       noiseBMP := createPlasmaNoiseBitmap(thisImgW, thisImgH, UserAddNoiseIntensity, UserAddNoiseDetails, plasmaScale, UserAddNoiseGrays, thisBlurAmount, thisBlurAmountY, max(thisBlurAmount, thisBlurAmountY)>0, !UserAddNoiseTransparent)
 
     If !validBMP(noiseBMP)
     {
@@ -24603,7 +24606,8 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     If (thisPixelize>1 && UserAddNoiseMode=2 && validBMP(noiseBMP))
        noiseBMP := resizeBitmapToGivenRef(noiseBMP, 0, imgSelW, imgSelH, 5)
 
-    If (max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode>1)
+    ; the plasma is blurred in the DLL
+    If (max(thisBlurAmount, thisBlurAmountY)>1 && UserAddNoiseMode=2)
        QPV_BlurBitmapFilters(noiseBMP, thisBlurAmount, thisBlurAmountY, 0)
 
     If ((UserAddNoiseEmphasis!=0 || UserAddNoiseContrast!=0) && UserAddNoiseMode>1)

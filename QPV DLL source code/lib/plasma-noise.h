@@ -57,15 +57,21 @@ private:
         double sigma;
         bool stack;
 
-        // a Gaussian of deviation sigma; past 4, a stack blur of the same variance, r*(r + 2)/6 for radius r
+        // a Gaussian of deviation sigma; past 4, two stack blurs of half its variance each, r*(r + 2)/6 for radius r.
+        // A single stack blur is a tent, whose separable 2D form is a square pyramid.
         static Blur ofSigma(const int sigma) {
             if (sigma<1)
                return {1, 0.0, false};
             if (sigma<=4)
                return {6*sigma + 1, (double)sigma, false};
 
-            const int r = (int)(sqrt(6.0*sigma*sigma + 1.0) - 0.5);
+            const int r = (int)(sqrt(3.0*sigma*sigma + 1.0) - 0.5);
             return {2*r + 1, (double)sigma, true};
+        }
+
+        // how far the blur reaches on either side
+        int reach() const {
+            return stack ? 2*(ksize/2) : ksize/2;
         }
 
         void apply(cv::Mat &m, const bool vertical) const {
@@ -74,8 +80,10 @@ private:
 
             const cv::Size k = vertical ? cv::Size(1, ksize) : cv::Size(ksize, 1);
             if (stack)
+            {
                cv::stackBlur(m, m, k);
-            else
+               cv::stackBlur(m, m, k);
+            } else
                cv::GaussianBlur(m, m, k, sigma, sigma, cv::BORDER_REPLICATE);
         }
     };
@@ -205,8 +213,9 @@ private:
     // each band computed with a margin as wide as that blur reaches
     void renderBlurred(BYTE *scan0, const INT64 stride, const int nc, const Blur &bx, const Blur &by, float *scratch) const {
         const int w = width, h = height;
-        const int rx = bx.ksize/2, ry = by.ksize/2;
-        // OpenCV's stack blur gets the last radius pixels of a row wrong, so rows go on that far, repeating their last pixel
+        const int rx = bx.reach(), ry = by.reach();
+        // OpenCV's stack blur gets the last radius pixels of a row wrong, so rows go on as far as both passes reach,
+        // repeating their last pixel
         const int pad = bx.stack ? rx : 0;
         const bool rowBands = (ry<rx);
         const int len = rowBands ? h : w, reach = rowBands ? ry : rx;
