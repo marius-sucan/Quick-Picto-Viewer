@@ -59597,13 +59597,17 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 
    thisDialogSavePtrns := dialogSaveFptrn
    thisRegEXsaveFmts := saveTypesRegEX
-   If (noDialog=1)
-      file2save := getIMGsaveDestination(currentFileIndex)
-   Else
-      file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save image as...", thisDialogSavePtrns, dialogFmtIndex, defFMTindex)
-
-   If file2save
+   Loop
    {
+      If (noDialog=1)
+         file2save := getIMGsaveDestination(currentFileIndex)
+      Else
+         file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save image as...", thisDialogSavePtrns, dialogFmtIndex, defFMTindex)
+
+      If !file2save
+         Break
+
+      typedPath := file2save
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       If !nExt
       {
@@ -59627,6 +59631,16 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
          RegAction(1, "userDesireWriteFMT")
       }
 
+      If (noDialog=1 || imgPath=file2save || !askOverwriteDestFile(file2save, 0))
+         Break
+
+      ; overwrite declined: reopen the dialog as the user left it
+      defaultu := typedPath
+      defFMTindex := dialogFmtIndex
+   }
+
+   If file2save
+   {
       huge := (viewportQPVimage.imgHandle) ? 1 : 0
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
       If (isImgSizeTooLarge(imgW, imgH, nExt, 0) && nExt="webp")
@@ -59675,12 +59689,6 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       {
          msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not have support for the alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
-            Return
-      }
-
-      If (noDialog!=1 && imgPath!=file2save)
-      {
-         If askOverwriteDestFile(file2save, 0)
             Return
       }
 
