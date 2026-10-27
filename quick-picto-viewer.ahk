@@ -34801,47 +34801,67 @@ SaveDBfilesList(enforceFile:=0) {
             Return
          }
       }
-
-      If !FileRexists(enforceFile)
-      {
-         fileWasGiven := 0
-         zPlitPath(CurrentSLD, 0, OutFileName, OutDir, OutFileNameNoExt)
-         file2save := openFileDialogWrapper("S", "PathMustExist", OutDir "\" OutFileNameNoExt, "Save files list as SQL slideshow database...", "Slideshow database (*.sldb)")
-         If (!RegExMatch(file2save, "i)(.\.sldb)$") && file2save)
-            file2save .= ".sldb"
-      } Else
-      {
-         fileWasGiven := 1
-         file2save := enforceFile
-      }
    } Else Return
 
-   If !file2save
-      Return
-
-   If AnyWindowOpen
-      BtnCloseWindow()
-
-   Sleep, 10
-   If (file2save && SLDtypeLoaded=3 && dbVersion!=dbExpectedVersion && maxFilesIndex>1 && CurrentSLD)
+   fileWasGiven := FileRexists(enforceFile) ? 1 : 0
+   zPlitPath(CurrentSLD, 0, OutFileName, OutDir, OutFileNameNoExt)
+   startPath := OutDir "\" OutFileNameNoExt
+   Loop
    {
-      msgResult := msgBoxWrapper(appTitle ": WARNING", "This database was saved by an older version of " appTitle ". The entire index structure needs to be rebuilt. QPV will now recreate this database with the new structure.`n`nPlease note: all the cached data pertaining to the indexed images will be lost.", "&Continue|C&ancel", 2, "exclamation")
-      If !InStr(msgResult, "continue")
+      If (fileWasGiven=1)
+      {
+         file2save := enforceFile
+      } Else
+      {
+         file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Save files list as SQL slideshow database...", "Slideshow database (*.sldb)")
+         typedPath := file2save
+         If (!RegExMatch(file2save, "i)(.\.sldb)$") && file2save)
+            file2save .= ".sldb"
+      }
+
+      If !file2save
+      {
+         ; the panel was closed before the declined overwrite prompt
+         If (A_Index>1)
+            SetTimer, PanelSaveSlideShowu, -200
          Return
+      }
 
-      SLDtypeLoaded := 2
-   }
+      If AnyWindowOpen
+         BtnCloseWindow()
 
-   startOperation := A_TickCount
-   If (SLDtypeLoaded!=3 && file2save)
-   {
-      activeSQLdb.CloseDB()
-      If askOverwriteDestFile(file2save)
+      Sleep, 10
+      If (file2save && SLDtypeLoaded=3 && dbVersion!=dbExpectedVersion && maxFilesIndex>1 && CurrentSLD)
+      {
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "This database was saved by an older version of " appTitle ". The entire index structure needs to be rebuilt. QPV will now recreate this database with the new structure.`n`nPlease note: all the cached data pertaining to the indexed images will be lost.", "&Continue|C&ancel", 2, "exclamation")
+         If !InStr(msgResult, "continue")
+            Return
+
+         SLDtypeLoaded := 2
+      }
+
+      If (SLDtypeLoaded!=3)
+      {
+         activeSQLdb.CloseDB()
+         declined := askOverwriteDestFile(file2save)
+      } Else declined := (CurrentSLD!=file2save) ? askOverwriteDestFile(file2save, 0) : 0
+
+      If !declined
+         Break
+
+      If (fileWasGiven=1)
       {
          SetTimer, PanelSaveSlideShowu, -200
          Return
       }
 
+      ; overwrite declined: reopen the dialog as the user left it
+      startPath := typedPath
+   }
+
+   startOperation := A_TickCount
+   If (SLDtypeLoaded!=3 && file2save)
+   {
       ; the two indexes are deliberately left out of the new database and built once over
       ; the finished table further down - see SLDBindexesSQL()
       err := SLDbInitSQLdb(file2save, 1)
@@ -35047,10 +35067,29 @@ SaveFilesList(enforceFile:=0) {
       {
          fileWasGiven := 0
          zPlitPath(CurrentSLD, 0, OutFileName, OutDir, OutFileNameNoExt)
-         file2save := openFileDialogWrapper("S", "PathMustExist", OutDir "\" OutFileNameNoExt, "Save files list as plain-text slideshow...", "Slideshow plain-text (*.sld)|All files (*.*)", 1, 1)
-         ; MsgBox, % A_ThisFunc "()`n" file2save
-         If (!RegExMatch(file2save, "i)(.\.sld)$") && file2save)
-            file2save .= ".sld"
+         startPath := OutDir "\" OutFileNameNoExt
+         Loop
+         {
+            file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Save files list as plain-text slideshow...", "Slideshow plain-text (*.sld)|All files (*.*)", 1, 1)
+            ; MsgBox, % A_ThisFunc "()`n" file2save
+            If !file2save
+               Break
+
+            typedPath := file2save
+            If (!RegExMatch(file2save, "i)(.\.sld)$") && file2save)
+               file2save .= ".sld"
+
+            If !FileExist(file2save)
+               Break
+
+            zPlitPath(file2save, 0, OutFileName, OutDir)
+            msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
+            If (msgResult="Yes")
+               Break
+
+            ; overwrite declined: reopen the dialog as the user left it
+            startPath := typedPath
+         }
       } Else
       {
          fileWasGiven := 1
@@ -35069,32 +35108,26 @@ SaveFilesList(enforceFile:=0) {
       zPlitPath(file2save, 0, OutFileName, OutDir)
       If FileExist(file2save)
       {
-         If !fileWasGiven
-            msgResult := msgBoxWrapper(appTitle ": Confirmation", "The selected file already exists. Do you want to overwrite the file?`n`n" OutFileName "`n`n" OutDir "\", 4, 0, "question")
-
-         If (msgResult="Yes" || fileWasGiven=1)
+         FileSetAttrib, -R, %file2save%
+         Sleep, 1
+         If (file2save=CurrentSLD)
          {
-            FileSetAttrib, -R, %file2save%
-            Sleep, 1
-            If (file2save=CurrentSLD)
-            {
-               newTmpFile := file2save "-bkcp"
-               Try FileMove, %file2save%, %newTmpFile%, 1
-               Catch wasErrorA
-                     Sleep, 1
-            } Else
-            {
-               Try FileDelete, %file2save%
-               Catch wasErrorB
-                     Sleep, 1
-            }
+            newTmpFile := file2save "-bkcp"
+            Try FileMove, %file2save%, %newTmpFile%, 1
+            Catch wasErrorA
+                  Sleep, 1
+         } Else
+         {
+            Try FileDelete, %file2save%
+            Catch wasErrorB
+                  Sleep, 1
+         }
 
-            If (wasErrorA || wasErrorB)
-            {
-               msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file. Permission denied or another error occurred.`n`n" OutFileName "`n" OutDir "\", 0, 0, "error")
-               Return
-            }
-         } Else Return
+         If (wasErrorA || wasErrorB)
+         {
+            msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file. Permission denied or another error occurred.`n`n" OutFileName "`n" OutDir "\", 0, 0, "error")
+            Return
+         }
       }
 
       Sleep, 2
@@ -44113,28 +44146,39 @@ BTNperformCombineIMGs() {
    f := fmtz[userCombineFramesFmt]
    IniAction(1, "prevFileSavePath", "General", 6)
    RegAction(1, "userJpegQuality")
-   file2save := openFileDialogWrapper("S", "PathMustExist", prevFileSavePath, "Choose ." f " file destination", f " files (*." f ")|All (*.*)", 1, 1)
-   If !file2save
+   startPath := prevFileSavePath
+   Loop
    {
-      SetTimer, PanelCombineImagesMultipage, -250
-      Return
+      file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Choose ." f " file destination", f " files (*." f ")|All (*.*)", 1, 1)
+      If !file2save
+      {
+         SetTimer, PanelCombineImagesMultipage, -250
+         Return
+      }
+
+      typedPath := file2save
+      If (!RegExMatch(file2save, "i)(.\." f ")$") && file2save)
+         file2save .= "." f
+
+      zPlitPath(file2save, 0, OutFileName, OutDir)
+      prevFileSavePath := OutDir
+      IniAction(1, "prevFileSavePath", "General", 6)
+      WriteSettingsCombineIMGs()
+      ; prevFileSavePath := file2save
+      ; MsgBox, % A_ThisFunc "()`n" file2save
+      If (userCombineFramesFmt=1 && userCombineTiffKeepOrig=0)
+         r := combineImagesMultiTiffGDIp(file2save)
+      Else If (userCombineFramesFmt=2)
+         r := CombineImgsIntoPDF(file2save)
+      Else ; used for GIFs / WEBP / APNG / MNG
+         r := combineImagesFimMultiPage(userSaveBitsDepth, userCombineFramesFmt, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
+
+      If (r!="declined")
+         Break
+
+      ; overwrite declined: reopen the dialog as the user left it
+      startPath := typedPath
    }
-
-   If (!RegExMatch(file2save, "i)(.\." f ")$") && file2save)
-      file2save .= "." f
-
-   zPlitPath(file2save, 0, OutFileName, OutDir)
-   prevFileSavePath := OutDir
-   IniAction(1, "prevFileSavePath", "General", 6)
-   WriteSettingsCombineIMGs()
-   ; prevFileSavePath := file2save
-   ; MsgBox, % A_ThisFunc "()`n" file2save
-   If (userCombineFramesFmt=1 && userCombineTiffKeepOrig=0)
-      combineImagesMultiTiffGDIp(file2save)
-   If (userCombineFramesFmt=2)
-      CombineImgsIntoPDF(file2save)
-   Else ; used for GIFs / WEBP / APNG / MNG
-      combineImagesFimMultiPage(userSaveBitsDepth, userCombineFramesFmt, file2save, userJoinIMGsW, userJoinIMGsH, userJoinIMGres)
 }
 
 convertFocusedFileToPDF() {
@@ -44181,7 +44225,7 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
    }
 
    If askOverwriteDestFile(file2save, 0)
-      Return
+      Return "declined"
 
    If FileExist(file2save)
       FileSetAttrib, -R, % file2save
@@ -44555,9 +44599,13 @@ generateThumbsSheet() {
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
    defaultu := !FolderExist(prevFileSavePath) ? OutDir "\thumbs-sheet" : prevFileSavePath "\thumbs-sheet"
    getSaveDialogIndexForFile(imgPath, defFMTindex)
-   file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save thumbnails sheet as...", dialogSaveFptrn, dialogFmtIndex, defFMTindex)
-   If file2save
+   Loop
    {
+      file2save := openFileDialogWrapper("S", "PathMustExist", defaultu, "Save thumbnails sheet as...", dialogSaveFptrn, dialogFmtIndex, defFMTindex)
+      If !file2save
+         Return
+
+      typedPath := file2save
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       prevFileSavePath := OutDir
       INIaction(1, "prevFileSavePath", "General", 6)
@@ -44575,29 +44623,32 @@ generateThumbsSheet() {
             msgResult := msgBoxWrapper(appTitle ": WARNING", "The thumbnails sheet image will have a dimension of " groupDigits(width) " x " groupDigits(height) " pixels. The image file format you chose cannot handle such large dimensions through QPV.`n`nPlease choose a different image file format, eg., TIFF.", "&OK", 1, "exclamation")
          Return
       }
-   } Else Return
 
-   Tooltip, Preparing thumbnails sheet...
-   pBitmap := trGdip_CreateBitmap(A_ThisFunc, width, height, "0x21808")
-   If validBMP(pBitmap)
-      Gu := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
+      Tooltip, Preparing thumbnails sheet...
+      pBitmap := trGdip_CreateBitmap(A_ThisFunc, width, height, "0x21808")
+      If validBMP(pBitmap)
+         Gu := trGdip_GraphicsFromImage(A_ThisFunc, pBitmap)
 
-   If !Gu
-   {
+      If !Gu
+      {
+         Tooltip
+         trGdip_DisposeImage(pBitmap)
+         showTOOLtip("ERROR: Failed to generate the thumbnails sheet.`nInit malfunction. No GDI+ Graphics object.")
+         SoundBeep , 300, 100
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
       Tooltip
-      trGdip_DisposeImage(pBitmap)
-      showTOOLtip("ERROR: Failed to generate the thumbnails sheet.`nInit malfunction. No GDI+ Graphics object.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      If !askOverwriteDestFile(file2save)
+         Break
 
-   Tooltip
-   If askOverwriteDestFile(file2save)
-   {
+      ; overwrite declined: reopen the dialog as the user left it
       Gdip_DeleteGraphics(Gu)
       trGdip_DisposeImage(pBitmap)
-      Return
+      Gu := ""
+      defaultu := typedPath
+      defFMTindex := dialogFmtIndex
    }
 
    BtnCloseWindow()
@@ -57180,18 +57231,29 @@ BTNextractALLtextsCurrentPDF() {
    }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, nExt)
-   file2save := openFileDialogWrapper("S", "PathMustExist", OutDir "\" OutNameNoExt, "Save extracted PDF texts...", "Text files (*.txt)|All files (*.*)", 1, 1)
-   If (!RegExMatch(file2save, "i)(.\.txt)$") && file2save)
-      file2save .= ".txt"
+   startPath := OutDir "\" OutNameNoExt
+   Loop
+   {
+      file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Save extracted PDF texts...", "Text files (*.txt)|All files (*.*)", 1, 1)
+      If !file2save
+         Break
+
+      typedPath := file2save
+      If (!RegExMatch(file2save, "i)(.\.txt)$") && file2save)
+         file2save .= ".txt"
+
+      ; the file removal matters here: the texts get FileAppend-ed below, so an undeleted
+      ; destination would keep its old content in front of the new one
+      If !askOverwriteDestFile(file2save)
+         Break
+
+      ; overwrite declined: reopen the dialog as the user left it
+      startPath := typedPath
+   }
 
    If file2save
    {
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
-      ; the file removal matters here: the texts get FileAppend-ed below, so an undeleted
-      ; destination would keep its old content in front of the new one
-      If askOverwriteDestFile(file2save)
-         Return
-
       b := RetrievePDFbookmarks(imgPath, pwd, 0, pageCount, errorType)
       If (errorType=0)
          txt := "PDF boookmarks:`n" b "`n`n" txt
@@ -63164,7 +63226,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
    }
 
    If askOverwriteDestFile(destFilePath)
-      Return
+      Return "declined"
 
    rg := Gdip_GetImageEncoder(".tif", pCodec, ci)
    If !pCodec
@@ -63435,7 +63497,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    }
 
    If askOverwriteDestFile(destFilePath, 0)
-      Return
+      Return "declined"
 
    If FileExist(destFilePath)
       FileSetAttrib, -R, % destFilePath
@@ -92656,9 +92718,13 @@ BTNsaveResizedIMG() {
       FileCreateDir, % ResizeDestFolder
 
    getSaveDialogIndexForFile(img2resizePath, defFMTindex)
-   file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Save processed image as...", dialogSaveFptrn, dialogFmtIndex, defFMTindex)
-   If file2save
+   Loop
    {
+      file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Save processed image as...", dialogSaveFptrn, dialogFmtIndex, defFMTindex)
+      If !file2save
+         Break
+
+      typedPath := file2save
       zPlitPath(img2resizePath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       If !nExt
@@ -92674,6 +92740,16 @@ BTNsaveResizedIMG() {
          Return
       }
 
+      If !askOverwriteDestFile(file2save, 0)
+         Break
+
+      ; overwrite declined: reopen the dialog as the user left it
+      startPath := typedPath
+      defFMTindex := dialogFmtIndex
+   }
+
+   If file2save
+   {
       zPlitPath(file2save, 0, OutFileName, OutDir)
       If (!RegExMatch(file2save, "i)(.\.(bmp|png|tif|tiff|gif|jpg|jpeg))$") && wasInitFIMlib!=1)
       {
@@ -92684,9 +92760,6 @@ BTNsaveResizedIMG() {
 
       z := advImgResizerCalcIMGsize(img2resizePath, file2save, userEditWidth, userEditHeight, newW, newH, imgW, imgH, givenAngle)
       If z
-         Return
-
-      If askOverwriteDestFile(file2save, 0)
          Return
 
       showTOOLtip("Processing and saving image file...`n" newW " x " newH " pixels`n" OutFileName)
@@ -99607,13 +99680,17 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
    thisRegEXsaveFmts := StrReplace(saveTypesRegEX, "|xpm))$", "|hdr|exr|pfm|xpm))$")
    getSaveDialogIndexForFile(imgPath, defFMTindex, 1)
    startPath := (ResizeUseDestDir=1) ? ResizeDestFolder "\" OutFileName : imgPath
-   If (dummy="no-prompt")
-      file2save := imgPath
-   Else
-      file2save := openFileDialogWrapper("S", "FileMustExist", startPath, "Save processed image as...", thisDialogSavePtrns, dialogFmtIndex, defFMTindex)
-
-   If file2save
+   Loop
    {
+      If (dummy="no-prompt")
+         file2save := imgPath
+      Else
+         file2save := openFileDialogWrapper("S", "PathMustExist", startPath, "Save processed image as...", thisDialogSavePtrns, dialogFmtIndex, defFMTindex)
+
+      If !file2save
+         Break
+
+      typedPath := file2save
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
       zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, nExt)
       If !nExt
@@ -99638,6 +99715,16 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
          Return
       }
 
+      If (dummy="no-prompt" || contextu="extern" || !askOverwriteDestFile(file2save, 0))
+         Break
+
+      ; overwrite declined: reopen the dialog as the user left it
+      startPath := typedPath
+      defFMTindex := dialogFmtIndex
+   }
+
+   If file2save
+   {
       doConversion := 0
       If (nExt!=oExt && StrLen(nExt)>0)
       {
@@ -99657,12 +99744,6 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
             SetTimer, RemoveTooltip, % -msgDisplayTime
          } Else msgBoxWrapper(appTitle ": ERROR", msgu "`n`n" OutFileName, 0, 0, "error")
          Return
-      }
-
-      If (dummy!="no-prompt" && contextu!="extern")
-      {
-         If askOverwriteDestFile(file2save, 0)
-            Return
       }
 
       destroyGDIfileCache()
