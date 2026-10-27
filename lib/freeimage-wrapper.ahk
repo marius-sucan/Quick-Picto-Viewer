@@ -23,6 +23,8 @@
 ; - added FreeImage_MustTonemap(): whether an image needs tone mapping to be displayed
 ; - added FreeImage_ConvertToLinear(): an image in linear light, its transfer curve undone, PQ included
 ; - the J2K_UNSCALED and JP2_UNSCALED load flags
+; - FreeImage_SetTagValue() writes the value as the tag's type: lists, rationals and strings; or takes a pointer
+; - 16-bit bitmaps get RGB 555 masks: FreeImage_Allocate(), FreeImage_AllocateEx() and ConvertPBITMAPtoFIM()
 
 ; - implemented all the remaining functions, except the ANSI variants
 ; - FreeImage_OpenMultiBitmap() takes Unicode paths
@@ -198,7 +200,7 @@ FreeImage_GetCopyrightMessage() {
 }
 
 FreeImage_SetOutputMessageStdCall(pCallback) {
-; pCallback := RegisterCallback("Func", "", 2): Func(fif, pMsg) gets StrGet(pMsg, "CP0"); JPEG 2000 may call it from a worker thread
+; pCallback := RegisterCallback("Func", "", 2): Func(fif, pMsg) gets StrGet(pMsg, "CP0")
    Return DllCall(getFIMfunc("SetOutputMessageStdCall"), "UPtr", pCallback)
 }
 
@@ -234,14 +236,17 @@ FreeImage_LookupSVGColor(colorName) {
 
 ; === Bitmap management functions ===
 
-FreeImage_Allocate(width, height, bpp:=32, imageType:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00) {
+FreeImage_Allocate(width, height, bpp:=32, imageType:=1, red_mask:="", green_mask:="", blue_mask:="") {
 ; function useful to create a new / empty bitmap
 ; for imageType see FreeImage_GetImageType()
+; blank masks: RGB 555 for a 16-bit bitmap, none at other depths
+   FIMdefaultMasks(bpp, red_mask, green_mask, blue_mask)
    Return DllCall(getFIMfunc("AllocateT"), "Int", imageType, "Int", width, "Int", height, "Int", bpp, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "UPtr")
 }
 
-FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:=1, red_mask:=0xFF000000, green_mask:=0x00FF0000, blue_mask:=0x0000FF00, hPalette:=0) {
+FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:=1, red_mask:="", green_mask:="", blue_mask:="", hPalette:=0) {
 ; function useful to create a new / empty bitmap
+; blank masks: see FreeImage_Allocate()
 ; options - 0, or these combined with |:
 ; FI_COLOR_IS_RGB_COLOR = 0x00; the color's alpha is ignored: a 32-bit image gets alpha 255; a palettized one gets the nearest palette color
 ; FI_COLOR_IS_RGBA_COLOR = 0x01; 8-bit grey, 24 and 32-bit: the alpha blends the color over black; alpha 0 leaves the new area black (transparent at 32-bit)
@@ -260,6 +265,7 @@ FreeImage_AllocateEx(width, height, bpp:=32, RGBArray:="255,255,255,0", options:
       pColor := &RGBQUAD
    }
 
+   FIMdefaultMasks(bpp, red_mask, green_mask, blue_mask)
    Return DllCall(getFIMfunc("AllocateEx"), "Int", width, "Int", height, "Int", bpp, "UPtr", pColor, "Int", options, "UPtr", hPalette, "uint", red_mask, "uint", green_mask, "uint", blue_mask, "UPtr")
 }
 
@@ -299,6 +305,7 @@ FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 ; JPEG_EXIFROTATE = 0x0008; turn the image upright as its Exif Orientation tag says
 ; JPEG_GREYSCALE = 0x0010; load as an 8-bit greyscale image
 ; JXL_CMYK = 0x0004; keep a CMYK JPEG XL as 32- or 64-bit CMYK, not converted to RGB; its alpha is dropped
+; JXR_CMYK = 0x0004; keep a CMYK JPEG XR as 32- or 64-bit CMYK, not converted to RGB; its alpha is dropped
 ; PCD_BASE = 1; the 768 x 512 image, as by default
 ; PCD_BASEDIV4 = 2; the 384 x 256 image
 ; PCD_BASEDIV16 = 3; the 192 x 128 image
@@ -381,13 +388,13 @@ FreeImage_Save(hImage, ImgPath, flags:=0) {
 ; PNM_SAVE_RAW = 0; binary PBM, PGM or PPM (P4, P5, P6), the default
 ; PNM_SAVE_ASCII = 1; text PBM, PGM or PPM (P1, P2, P3)
 ; PSD_DEFAULT = 0; RLE compression at 8 bits per channel, none above
-; PSD_CMYK = 1; save a 32- or 64-bit image as CMYK
+; PSD_CMYK = 1; save the 4 channels of a 32- or 64-bit image as C, M, Y, K, unconverted, unless it has a non-CMYK ICC profile
 ; PSD_NONE = 0x0100; no compression
 ; PSD_RLE = 0x0200; RLE compression, also at 16 bits per channel; 32-bit float channels stay uncompressed
 ; PSD_PSB = 0x2000; Large Document Format (PSB); used anyway past 30000 pixels a side or 2 GB of pixels
 ; TARGA_SAVE_RLE = 2; RLE compression
 ; TIFF_DEFAULT = 0; CCITT Group 4 compression for 1-bit images, LZW for the others
-; TIFF_CMYK = 0x0001; save a 32- or 64-bit image as CMYK
+; TIFF_CMYK = 0x0001; save the 4 channels of a 32- or 64-bit image as C, M, Y, K, unconverted, unless it has a non-CMYK ICC profile
 ; TIFF_PACKBITS = 0x0100; PackBits compression
 ; TIFF_DEFLATE = 0x0200; Deflate compression, written as TIFF_ADOBE_DEFLATE
 ; TIFF_ADOBE_DEFLATE = 0x0400; Adobe Deflate (zlib) compression
@@ -603,6 +610,16 @@ FIMcolorTypeNames(modus, indexu:=0) {
        packedu .= "|" ColorsTypes[A_Index]
 
    Return packedu
+}
+
+FIMdefaultMasks(bpp, ByRef red_mask, ByRef green_mask, ByRef blue_mask) {
+; a blank mask is RGB 555's at 16 bits, the layout FreeImage reads such bitmaps in, and 0 at other depths
+   If (red_mask="")
+      red_mask := (bpp=16) ? 0x7C00 : 0
+   If (green_mask="")
+      green_mask := (bpp=16) ? 0x03E0 : 0
+   If (blue_mask="")
+      blue_mask := (bpp=16) ? 0x001F : 0
 }
 
 FIMcolorPointer(color, ByRef buf) {
@@ -1099,6 +1116,7 @@ FreeImage_ToneMapping(hImage, algo:=0, p1:=0, p2:=0) {
       ; p1 = intensity [-8, 8]; p2 = contrast [0.3, 1.0]
 ; 2 = FITMO_FATTAL02   ; Gradient domain High Dynamic Range compression (R. Fattal, 2002)
       ; p1 = saturation [0.4, 0.6]; p2 = attenuation [0.8, 0.9]
+; The result carries an ICC profile of the image's primaries, its CICP tag's or else its ICC profile's, unless they are sRGB's.
 
    Return DllCall(getFIMfunc("ToneMapping"), "UPtr", hImage, "Int", algo, "Double", p1, "Double", p2, "UPtr")
 }
@@ -1148,7 +1166,7 @@ FreeImage_ConvertToLinear(hImage, flags:=0) {
 ; Returns an RGBF image (RGBAF with alpha) in linear light, 1.0 = SDR reference white, 203 cd/m2.
 ; To display the image, feed it to FreeImage_ToneMapping().
 ; The type of curves undone: the CICP tag's (PQ, HLG, sRGB, BT.709...), else the ICC profile's, else sRGB; floating-point images stay as they are.
-; flags: FI_LINEAR_SRGB_PRIMARIES = 0x01; convert the colors to sRGB's primaries, e.g. BT.2020 ones; otherwise they keep the image's.
+; flags: FI_LINEAR_SRGB_PRIMARIES = 0x01; convert the colors to sRGB's primaries, e.g. BT.2020 ones; otherwise they keep the image's, and the result carries their ICC profile.
 ; Accepts standard bitmaps, UINT16, RGB16, RGBA16, FLOAT, RGBF and RGBAF images; returns 0 for the others.
    Return DllCall(getFIMfunc("ConvertToLinear"), "UPtr", hImage, "Int", flags, "UPtr")
 }
@@ -1185,6 +1203,7 @@ FreeImage_DestroyICCProfile(hImage) {
 
 FreeImage_ConvertToICCProfile(hImage, pProfile:=0, profileSize:=0, flags:=0) {
 ; returns a new image in the color model of the profile (RGB, grey or CMYK), tagged with it
+; an image with alpha converted to a grey profile stays RGBA, red, green and blue its grey
 ; flags - one rendering intent, and the options combined with |:
 ; FICMS_INTENT_PERCEPTUAL = 0x00; perceptual rendering intent, the default
 ; FICMS_INTENT_RELATIVE_COLORIMETRIC = 0x01; media-relative colorimetric rendering intent
@@ -1255,7 +1274,7 @@ FreeImage_SetDisplayICCProfile(pProfile:=0, profileSize:=0, flags:=0x101) {
 ; the profile the FIF_LOAD_DISPLAY_ICC load flag converts images to; images carry it afterwards
 ; pProfile - an RGB profile, e.g. of the monitor showing the images; 0 - detect it: on Windows the primary monitor's profile,
 ;   on Linux the X11 screen's; sRGB when there is none, or when Windows' HDR or Auto Color Management is on
-; CMYK JPEG, TIFF and PSD files are read as CMYK first and come back as RGB; grey images stay grey; float images are not changed
+; CMYK JPEG, TIFF and PSD files are read as CMYK first and come back as RGB, or RGBA with their alpha channel; grey images stay grey; float images are not changed
 ; flags - a rendering intent, with FICMS_BLACKPOINT_COMPENSATION or not; see FreeImage_ConvertToICCProfile()
 ; Return value: 1 -- success; 0 -- not an RGB profile Little CMS can convert to, the last one stays
    Return DllCall(getFIMfunc("SetDisplayICCProfile"), "UPtr", pProfile, "UInt", profileSize, "Int", flags)
@@ -1402,7 +1421,7 @@ FreeImage_CloseMultiBitmap(hFIMULTIBITMAP, flags:=0) {
 ; PNG_Z_NO_COMPRESSION = 0x0100; APNG, MNG: no zlib compression
 ; PNG_INTERLACED = 0x0200; MNG: Adam7-interlaced frames
 ; TIFF_DEFAULT = 0; CCITT Group 4 compression for 1-bit images, LZW for the others
-; TIFF_CMYK = 0x0001; save a 32- or 64-bit image as CMYK
+; TIFF_CMYK = 0x0001; save the 4 channels of 32- or 64-bit pages as C, M, Y, K, unconverted, unless they have a non-CMYK ICC profile
 ; TIFF_PACKBITS = 0x0100; PackBits compression
 ; TIFF_DEFLATE = 0x0200; Deflate compression, written as TIFF_ADOBE_DEFLATE
 ; TIFF_ADOBE_DEFLATE = 0x0400; Adobe Deflate (zlib) compression
@@ -1719,9 +1738,48 @@ FreeImage_SetTagLength(fiTag, length) {
    Return DllCall(getFIMfunc("SetTagLength"), "UPtr", fiTag, "Int", length)
 }
 
-FreeImage_SetTagValue(fiTag, value) {
+FreeImage_SetTagValue(fiTag, value, valueIsPointer:=0) {
+; Set the tag's type, count and length first. value holds the tag's values as numbers of its type,
+; separated by commas: "numerator/denominator" for a RATIONAL, and a string for an ASCII tag.
+; valueIsPointer=1: value is the address of the tag's length in bytes, copied as they are.
 ; The function returns TRUE if successful and returns FALSE otherwise.
-   Return DllCall(getFIMfunc("SetTagValue"), "UPtr", fiTag, "uint*", value)
+   Static numTypes := {1: "UChar", 3: "UShort", 4: "UInt", 6: "Char", 7: "UChar", 8: "Short", 9: "Int", 11: "Float", 12: "Double", 13: "UInt", 14: "UInt", 16: "Int64", 17: "Int64", 18: "Int64"}
+        , numSizes := {UChar: 1, Char: 1, UShort: 2, Short: 2, UInt: 4, Int: 4, Float: 4, Double: 8, Int64: 8}
+
+   If valueIsPointer
+      Return DllCall(getFIMfunc("SetTagValue"), "UPtr", fiTag, "UPtr", value)
+
+   type := FreeImage_GetTagType(fiTag)
+   length := FreeImage_GetTagLength(fiTag)
+   If (type=2)   ; FIDT_ASCII: FreeImage copies length bytes and ends them
+   {
+      VarSetCapacity(buf, Max(length, StrPut(value, "CP0")) + 1, 0)
+      StrPut(value, &buf, "CP0")
+   } Else If (type=5 || type=10)   ; FIDT_RATIONAL, FIDT_SRATIONAL
+   {
+      VarSetCapacity(buf, length + 8, 0)
+      Loop, Parse, value, `,
+      {
+         If (A_Index*8 > length)
+            Break
+         fraction := StrSplit(A_LoopField, "/", " `t")
+         NumPut(fraction[1], buf, (A_Index - 1)*8, (type=5) ? "UInt" : "Int")
+         NumPut((fraction.Length()>1) ? fraction[2] : 1, buf, (A_Index - 1)*8 + 4, (type=5) ? "UInt" : "Int")
+      }
+   } Else If numTypes.HasKey(type)
+   {
+      numType := numTypes[type], size := numSizes[numType]
+      VarSetCapacity(buf, length + 8, 0)
+      Loop, Parse, value, `,, %A_Space%%A_Tab%
+      {
+         If (A_Index*size > length)
+            Break
+         NumPut(A_LoopField, buf, (A_Index - 1)*size, numType)
+      }
+   } Else
+      Return 0   ; FIDT_NOTYPE: pass a pointer
+
+   Return DllCall(getFIMfunc("SetTagValue"), "UPtr", fiTag, "UPtr", &buf)
 }
 
 FreeImage_SetMetadata(hImage, fiTag, metaModel, key) {
@@ -2279,17 +2337,19 @@ ConvertPBITMAPtoFIM(pBitmap, doLowerbits:=0) {
   Gdip_GetImageDimensions(pBitmap, imgW, imgH)
   pixelFormat := (doLowerbits=1) ? "0x21808" : "0x26200A"
   bitsDepth := (doLowerbits=1) ? 24 : 32
+  rMask := redMASK, gMask := greenMASK, bMask := blueMASK
   If (doLowerbits=2)
   {
      pixelFormat := "0x21005"
      bitsDepth := 16
+     rMask := 0x7C00, gMask := 0x03E0, bMask := 0x001F   ; FI16_555 masks
   }
 
   E := Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData, 1, pixelFormat)
   ; fnOutputDebug(A_ThisFunc "|" pixelFormat "|" bitsDepth "|" doLowerbits)
   IF !E
   {
-     hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, bitsDepth, redMASK, greenMASK, blueMASK, 1)
+     hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, bitsDepth, rMask, gMask, bMask, 1)
      Gdip_UnlockBits(pBitmap, BitmapData)
      Gdip_BitmapGetDPIresolution(pBitmap, dpiX, dpiY)
      FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
@@ -2341,3 +2401,4 @@ ConvertIndexedPBITMAPtoFIM(pBitmap) {
   FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
   Return hFIFimgA
 }
+

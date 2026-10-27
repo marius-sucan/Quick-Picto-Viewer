@@ -45089,7 +45089,7 @@ PanelSaveImg() {
     GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]" bonusChoice, "Color depth")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
-    Gui, Add, Checkbox, xs+15 y+8 gUIsaveFormatOptionsChanged Checked%userPaletteDithering% vuserPaletteDithering +hwndhTemp, Dithering
+    Gui, Add, Checkbox, xs+15 y+8 w%thisWid% gUIsaveFormatOptionsChanged Checked%userPaletteDithering% vuserPaletteDithering +hwndhTemp, Dithering
     ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
     Gui, Add, Checkbox, x+15 gUIsaveFormatOptionsChanged Checked%userPaletteTransparency% vuserPaletteTransparency +hwndhTemp, Keep transparency
     ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
@@ -45124,15 +45124,15 @@ GuiAddSaveFormatOptions(firstPos) {
 ; of all the formats overlap; updateSaveFormatOptions() shows those of the chosen format.
     Global uiSaveFmtNoOptions
     slotW := (PrefsLargeFonts=1) ? 190 : 140
-    slot2W := (PrefsLargeFonts=1) ? 125 : 90
+    slot2W := (PrefsLargeFonts=1) ? 135 : 95
     GuiAddDropDownList(firstPos " w" slotW " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "Chroma 4:2:0|Chroma 4:2:2|Chroma 4:4:4", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n4:2:0 - a quarter of the image resolution: the smallest files, fine for photos.`n4:2:2 - half of the horizontal resolution.`n4:4:4 - full resolution: sharp colored text and lines, larger files.")
-    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "One option for the PNG and TIFF file formats. Both are always lossless:`nthe compression only trades the saving speed for the file size.`nPNG: zlib levels 1, 6 and 9. TIFF: LZW for fast and normal, ZIP [Deflate] for best.`nBest can be very slow on large PNG photos; uncompressed TIFF files open in more applications.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
     Gui, Add, Checkbox, xp yp wp hp gUIsaveFormatOptionsChanged Checked%userSaveImgLossless% vuserSaveImgLossless +hwndhTemp, Lossless
-    ToolTip2ctrl(hTemp, "One option for the WebP, JPEG XL, JPEG XR and JPEG 2000 file formats:`nthe pixels are stored exactly and the quality setting does not apply.`nScreenshots and graphics often get smaller files this way.")
-    Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, No options for this format
+    ToolTip2ctrl(hTemp, "Screenshots and graphics often yield smaller files when saved with «Lossless» activated.")
+    Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
     Gui, Add, Checkbox, x+5 yp w%slot2W% hp gUIsaveFormatOptionsChanged Checked%userJpegProgressive% vuserJpegProgressive +hwndhTemp, Progressive
     ToolTip2ctrl(hTemp, "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
-    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "Effort 1|Effort 2|Effort 3|Effort 4|Effort 5|Effort 6|Effort 7|Effort 8|Effort 9", "JPEG XL effort", "JPEG XL encoder effort: 1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
 }
 
 updateSaveFormatOptions(fmt) {
@@ -45174,7 +45174,7 @@ updateUIsavePanel() {
    GuiControlGet, fmtIndex,, uiSaveFmtChoice
    fmt := dialogSaveIndexes[fmtIndex]
    updateSaveFormatOptions(fmt)
-   actu := (fmt="gif" || userSaveBitsDepth=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (fmt="gif" || userSaveBitsDepth=4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userPaletteDithering
    GuiControl, % actu, userPaletteTransparency
    GuiControl, % (fmt="gif") ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable", userSaveBitsDepth
@@ -63802,9 +63802,12 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
       FreeImage_SetTagKey(tag, "BlendMethod")
       FreeImage_SetTagValue(tag, 1)
       FreeImage_SetMetadata(k, tag, 9, "BlendMethod")
-      FreeImage_SetTagKey(tag, "DisposalMethod")
-      FreeImage_SetTagValue(tag, 2)
-      FreeImage_SetMetadata(k, tag, 9, "DisposalMethod")
+      If (fif!=39) ; apng 
+      {
+         FreeImage_SetTagKey(tag, "DisposalMethod")
+         FreeImage_SetTagValue(tag, 2)
+         FreeImage_SetMetadata(k, tag, 9, "DisposalMethod")
+      }
       FreeImage_DeleteTag(tag)
    }
 
