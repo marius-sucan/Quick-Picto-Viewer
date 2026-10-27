@@ -14,7 +14,7 @@
 // Each prepare step mirrors an AHK function:
 //   normalize()      - combineFimImgsAddPage(): tone mapping or ConvertToType() for non-FIT_BITMAP pages
 //   convertDepth()   - combineFimImgsConvertDepth()
-//   tagPage()        - combineFimImgsAddPage(): metadata models 0-11 and the thumbnail dropped, FrameTime set
+//   tagPage()        - combineFimImgsAddPage(): metadata models 0-11 and the thumbnail dropped, FrameTime, BlendMethod and DisposalMethod set
 //   dropMismatchedICC() - FIMdropMismatchedICC()
 // Parts: 1 every source kind x depth x format goes in and reads back with its FrameTime;
 // 2 a refused page; 3 the discard on abort; 4 the EXIF WebP and MNG take from the first
@@ -22,7 +22,9 @@
 // 7 (added 2026-09-23) TIFF: every image type reads back as it went in, whatever the depth
 // choice, except the ones TIFF cannot store; EXIF thumbnails; the tags libtiff reads, which
 // need a fork build from aae78cf on (the TIFF writer's ExtraSamples fix); 8 ICC profiles made
-// for another colour space than the page, which the PNG writer refuses.
+// for another colour space than the page, which the PNG writer refuses; 9 (added 2026-10-27)
+// nothing of a page shows while the next one is shown, through its transparent pixels or around
+// it when smaller, JPEG XL included.
 // The .part renaming and the non-ASCII path handling are Windows-only and not covered.
 // written by Marius Șucan with Claude Opus 5
 
@@ -170,7 +172,7 @@ static FIBITMAP* convertDepth(FIBITMAP *k, int modus, FREE_IMAGE_FORMAT fif) {
     return c;
 }
 
-static void tagPage(FIBITMAP *k, LONG frameTime, bool strip) {
+static void tagPage(FIBITMAP *k, LONG frameTime, bool strip, bool standalone = true) {
     if (strip) {
         for (int m = FIMD_COMMENTS; m <= FIMD_EXIF_RAW; m++) FreeImage_SetMetadata((FREE_IMAGE_MDMODEL)m, k, NULL, NULL);
         FreeImage_SetThumbnail(k, NULL);
@@ -184,6 +186,18 @@ static void tagPage(FIBITMAP *k, LONG frameTime, bool strip) {
     FreeImage_SetTagLength(tag, 4);
     FreeImage_SetTagValue(tag, &frameTime);
     FreeImage_SetMetadata(FIMD_ANIMATION, k, "FrameTime", tag);
+    if (standalone) {
+        // as the AHK passes them: 4 bytes, of which the tag keeps the first
+        const DWORD blendMethod = 1, disposalMethod = 2;
+        FreeImage_SetTagType(tag, FIDT_BYTE);
+        FreeImage_SetTagLength(tag, 1);
+        FreeImage_SetTagKey(tag, "BlendMethod");
+        FreeImage_SetTagValue(tag, &blendMethod);
+        FreeImage_SetMetadata(FIMD_ANIMATION, k, "BlendMethod", tag);
+        FreeImage_SetTagKey(tag, "DisposalMethod");
+        FreeImage_SetTagValue(tag, &disposalMethod);
+        FreeImage_SetMetadata(FIMD_ANIMATION, k, "DisposalMethod", tag);
+    }
     FreeImage_DeleteTag(tag);
 }
 
@@ -200,14 +214,14 @@ static void dropMismatchedICC(FIBITMAP *k) {
     if (size < 132 || memcmp(data + 16, space, 4) != 0) FreeImage_DestroyICCProfile(k);
 }
 
-static BOOL addPage(FIMULTIBITMAP *multi, FIBITMAP *k, FREE_IMAGE_FORMAT fif, int modus, LONG frameTime, bool strip = true, bool dropICC = true) {
+static BOOL addPage(FIMULTIBITMAP *multi, FIBITMAP *k, FREE_IMAGE_FORMAT fif, int modus, LONG frameTime, bool strip = true, bool dropICC = true, bool standalone = true) {
     k = normalize(k, fif);
     if (!k) return FALSE;
     FIBITMAP *c = convertDepth(k, modus, fif);
     if (c) { FreeImage_Unload(k); k = c; }
     if (dropICC) dropMismatchedICC(k);
-    tagPage(k, frameTime, strip);
-    BOOL r = FreeImage_AppendPageEx(multi, k);
+    tagPage(k, frameTime, strip, standalone);
+    BOOL r = FreeImage_AppendPage(multi, k);
     FreeImage_Unload(k);
     return r;
 }
@@ -286,7 +300,7 @@ static void partRefusedPage() {
     unlink(tmp);
     FIMULTIBITMAP *multi = FreeImage_OpenMultiBitmap(FIF_WEBP, tmp, TRUE, FALSE, TRUE, 0);
     FIBITMAP *good = make24(64, 64, 3), *bad = FreeImage_ColorQuantize(good, FIQ_WUQUANT);
-    BOOL a = FreeImage_AppendPageEx(multi, good), b = FreeImage_AppendPageEx(multi, bad), c = FreeImage_AppendPageEx(multi, good);
+    BOOL a = FreeImage_AppendPage(multi, good), b = FreeImage_AppendPage(multi, bad), c = FreeImage_AppendPage(multi, good);
     BOOL closed = FreeImage_CloseMultiBitmap(multi, 0);
     int n = verify(tmp, FIF_WEBP, NULL);
     printf("webp with one 8-bit page: appends %d/%d/%d, close=%d, file %ld bytes holding %d pages\n", a, b, c, closed, fileSize(tmp), n);
@@ -311,7 +325,7 @@ static void partAbort() {
         int count = FreeImage_GetPageCount(multi);
         double t0 = nowMs();
         int deleted = 0;
-        for (int i = 0; i < count - 1; i++) deleted += FreeImage_DeletePageEx(multi, 0) ? 1 : 0;
+        for (int i = 0; i < count - 1; i++) deleted += FreeImage_DeletePage(multi, 0) ? 1 : 0;
         BOOL closed = FreeImage_CloseMultiBitmap(multi, 0);
         double t1 = nowMs();
         int left = verify(tmp, f.fif, NULL);
@@ -327,7 +341,7 @@ static void partAbort() {
     unlink(tmp);
     FIMULTIBITMAP *multi = FreeImage_OpenMultiBitmap(FIF_GIF, tmp, TRUE, FALSE, TRUE, 0);
     addPage(multi, make24(32, 32, 1), FIF_GIF, 4, 100);
-    BOOL lastOne = FreeImage_DeletePageEx(multi, 0);
+    BOOL lastOne = FreeImage_DeletePage(multi, 0);
     BOOL closed = FreeImage_CloseMultiBitmap(multi, 0);
     printf("deleting the only page: %s, then close=%d\n", lastOne ? "ALLOWED" : "refused", closed);
     CHECK(!lastOne && !closed, "the last page is kept and the close reports the refused delete");
@@ -432,7 +446,7 @@ static int memoryCase(const Fmt& f, bool stream, int frames, int w, int h) {
         }
         for (FIBITMAP *k : list) {
             tagPage(k, 100, true);
-            FreeImage_AppendPageEx(multi, k);
+            FreeImage_AppendPage(multi, k);
             FreeImage_Unload(k);
         }
     }
@@ -804,7 +818,7 @@ static void partTiff(const char *jpegPath) {
     std::vector<size_t> rawIdx;
     for (size_t i = 0; i < src.size(); i++) {
         if (src[i].want != TO32) continue;
-        BOOL a = FreeImage_AppendPageEx(multi, src[i].dib);
+        BOOL a = FreeImage_AppendPage(multi, src[i].dib);
         printf("    %-20s append %d\n", src[i].name, a);
         if (a) rawIdx.push_back(i);
     }
@@ -835,7 +849,7 @@ static void partTiff(const char *jpegPath) {
     multi = FreeImage_OpenMultiBitmap(FIF_TIFF, r555, TRUE, FALSE, TRUE, 0);
     FIBITMAP *s555 = FreeImage_ConvertTo16Bits555(src[0].dib);
     FIBITMAP *s24 = FreeImage_ConvertTo24Bits(src[3].dib);
-    BOOL a1 = FreeImage_AppendPageEx(multi, s24), a2 = FreeImage_AppendPageEx(multi, s555), a3 = FreeImage_AppendPageEx(multi, s24);
+    BOOL a1 = FreeImage_AppendPage(multi, s24), a2 = FreeImage_AppendPage(multi, s555), a3 = FreeImage_AppendPage(multi, s24);
     closed = FreeImage_CloseMultiBitmap(multi, 0);
     printf("    a 555 page between two 24-bit ones: appends %d/%d/%d, close=%d, %d pages in the file\n", a1, a2, a3, closed, verify(r555, FIF_TIFF, NULL));
     CHECK(a1 && !a2 && a3, "the 555 page should be refused by this build");
@@ -943,6 +957,90 @@ static void partICC() {
     FreeImage_Unload(pal);
 }
 
+// ---- part 9: nothing of a page shows while the next one is shown ----
+// Untagged, the WebP, JPEG XL and MNG writers blend a page over the one before, and the APNG, WebP,
+// JPEG XL and MNG writers leave a page in place around a smaller next one. The GIF writer ignores
+// BlendMethod, and its pages restore the background unless they say otherwise.
+
+// 8 bits, opaque in the columns [x0, x1) and transparent elsewhere: GIF keeps it so, the others take it into 32 bits
+static FIBITMAP* blockPage(int w, int h, int x0, int x1, BYTE r, BYTE g, BYTE b) {
+    FIBITMAP *d = FreeImage_Allocate(w, h, 8);
+    RGBQUAD *pal = FreeImage_GetPalette(d);
+    memset(pal, 0, 256 * sizeof(RGBQUAD));
+    pal[1].rgbRed = r;
+    pal[1].rgbGreen = g;
+    pal[1].rgbBlue = b;
+    for (int y = 0; y < h; y++) {
+        BYTE *line = FreeImage_GetScanLine(d, y);
+        for (int x = 0; x < w; x++) line[x] = (x >= x0 && x < x1) ? 1 : 0;
+    }
+    BYTE table[2] = {0, 255};
+    FreeImage_SetTransparencyTable(d, table, 2);
+    return d;
+}
+
+// y counted from the top
+static void pixelAt(FIBITMAP *dib, int x, int y, BYTE rgba[4]) {
+    memset(rgba, 0, 4);
+    FIBITMAP *t = FreeImage_ConvertTo32Bits(dib);
+    if (!t) return;
+    const BYTE *p = FreeImage_GetScanLine(t, FreeImage_GetHeight(t) - 1 - y) + x * 4;
+    rgba[0] = p[FI_RGBA_RED];
+    rgba[1] = p[FI_RGBA_GREEN];
+    rgba[2] = p[FI_RGBA_BLUE];
+    rgba[3] = p[FI_RGBA_ALPHA];
+    FreeImage_Unload(t);
+}
+
+static void partStandalone() {
+    printf("\n== part 9: nothing of a page shows while the next one is shown ==\n");
+    struct PlayFmt { FREE_IMAGE_FORMAT fif; const char *ext; int playback; };
+    const PlayFmt fmts[] = { {FIF_APNG, "apng", APNG_PLAYBACK}, {FIF_GIF, "gif", GIF_PLAYBACK}, {FIF_WEBP, "webp", WEBP_PLAYBACK},
+                             {FIF_MNG, "mng", MNG_PLAYBACK}, {FIF_JXL, "jxl", JXL_PLAYBACK} };
+    const int w = 64, h = 32;
+    // a red first page, then a blue one: the right half of a page as large, or a page of a quarter its area
+    const char *cases[2] = {"through the transparent pixels of the second", "around a smaller second page"};
+    const int emptyAt[2][2] = { {w / 4, h / 2}, {w * 3 / 4, h / 2} };
+    const int blueAt[2][2] = { {w * 3 / 4, h / 2}, {w / 4, h / 4} };
+    for (const PlayFmt& f : fmts) {
+        for (int tagged = 0; tagged <= 1; tagged++) {
+            for (int c = 0; c < 2; c++) {
+                char tmp[256];
+                snprintf(tmp, sizeof tmp, "%s/p9-%s-%d-%s.part", OUT, f.ext, c, tagged ? "tagged" : "untagged");
+                unlink(tmp);
+                FIMULTIBITMAP *multi = FreeImage_OpenMultiBitmap(f.fif, tmp, TRUE, FALSE, TRUE, 0);
+                CHECK(multi, "%s: OpenMultiBitmap", f.ext);
+                if (!multi) continue;
+                FIBITMAP *second = c ? blockPage(w / 2, h / 2, 0, w / 2, 0, 0, 255) : blockPage(w, h, w / 2, w, 0, 0, 255);
+                BOOL a = addPage(multi, blockPage(w, h, 0, c ? w : w / 2, 255, 0, 0), f.fif, 1, 100, true, true, tagged == 1);
+                BOOL b = addPage(multi, second, f.fif, 1, 100, true, true, tagged == 1);
+                FreeImage_CloseMultiBitmap(multi, 0);
+                CHECK(a && b, "%s: a page was refused", f.ext);
+                // the count the AHK compares before it keeps the file
+                CHECK(verify(tmp, f.fif, NULL) == 2, "%s: the file does not hold two pages", f.ext);
+
+                // the second page as a viewer shows it
+                FIMULTIBITMAP *m = FreeImage_OpenMultiBitmap(f.fif, tmp, FALSE, TRUE, TRUE, f.playback);
+                FIBITMAP *p = (m && FreeImage_GetPageCount(m) == 2) ? FreeImage_LockPage(m, 1) : NULL;
+                const bool readBack = (p != NULL);
+                BYTE empty[4], blue[4];
+                if (p) {
+                    pixelAt(p, emptyAt[c][0], emptyAt[c][1], empty);
+                    pixelAt(p, blueAt[c][0], blueAt[c][1], blue);
+                    FreeImage_UnlockPage(m, p, FALSE);
+                }
+                if (m) FreeImage_CloseMultiBitmap(m, 0);
+                CHECK(readBack, "%s: the second page cannot be played", f.ext);
+                if (!readBack) continue;
+                const bool shows = empty[3] > 128;
+                printf("%-4s %-9s the first page shows %s: %s\n", f.ext, tagged ? "tagged:" : "untagged:", cases[c], shows ? "YES" : "no");
+                CHECK(blue[2] > 200 && blue[3] > 200, "%s: the second page is not drawn", f.ext);
+                if (tagged) CHECK(!shows, "%s: the first page shows %s", f.ext, cases[c]);
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     FreeImage_Initialise(FALSE);
     FreeImage_SetOutputMessage(quietMessages);
@@ -970,6 +1068,7 @@ int main(int argc, char **argv) {
     partSubFrames();
     partTiff(argc > 1 ? argv[1] : "exif.jpg");
     partICC();
+    partStandalone();
     partMemory(argv[0]);
 
     for (size_t i = 0; i < src.size(); i++) FreeImage_Unload(src[i].dib);

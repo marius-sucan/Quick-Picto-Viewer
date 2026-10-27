@@ -63605,6 +63605,16 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
       FreeImage_SetTagLength(tag, 4)
       FreeImage_SetTagValue(tag, frameTime)
       FreeImage_SetMetadata(k, tag, 9, "FrameTime")   ; FIMD_ANIMATION = 9
+      ; BlendMethod 1: the page replaces the one before, instead of being blended over it [the WebP, JPEG XL and MNG default]
+      ; DisposalMethod 2: the page is cleared after it is shown, so none of it stays around a smaller next page
+      FreeImage_SetTagType(tag, 1)        ; FIDT_BYTE = 1
+      FreeImage_SetTagLength(tag, 1)
+      FreeImage_SetTagKey(tag, "BlendMethod")
+      FreeImage_SetTagValue(tag, 1)
+      FreeImage_SetMetadata(k, tag, 9, "BlendMethod")
+      FreeImage_SetTagKey(tag, "DisposalMethod")
+      FreeImage_SetTagValue(tag, 2)
+      FreeImage_SetMetadata(k, tag, 9, "DisposalMethod")
       FreeImage_DeleteTag(tag)
    }
 
