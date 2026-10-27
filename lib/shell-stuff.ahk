@@ -140,8 +140,8 @@
    {
       ; labelled "name (parent)" through PKEY_ItemNameDisplay; each FDAP_TOP place goes above the previous one
       VarSetCapacity(pkey, 20, 0), VarSetCapacity(pv, 24, 0)
-      DllCall("ole32\IIDFromString", "WStr", "{B725F130-47EF-101A-A5F1-02608C9EEBAC}", "Ptr", &pkey)
-      NumPut(10, pkey, 16, "UInt")
+      DllCall("ole32\IIDFromString", "WStr", "{B725F130-47EF-101A-A5F1-02608C9EEBAC}", "Ptr", &pkey) ; FMTID_Storage
+      NumPut(10, pkey, 16, "UInt") ; PKEY_ItemNameDisplay = FMTID_Storage, PID 10
       Loop, % placesCount
       {
          folder := folders[placesCount - A_Index + 1]
