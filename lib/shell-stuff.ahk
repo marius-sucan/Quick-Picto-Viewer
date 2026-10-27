@@ -1,747 +1,337 @@
-﻿SelectFolderEx(StartingFolder:="", DlgTitle:="", OwnerHwnd:=0, OkBtnLabel:="", comboList:="", desiredDefault:=1, comboLabel:="", CustomPlaces:="", pickFoldersOnly:=1, usrFilters:="", defIndexFilter:=1, FileMustExist:=1, defaultEditField:="") {
-; ==================================================================================================================================
-; Shows a dialog to select a folder.
-; Depending on the OS version the function will use either the built-in FileSelectFolder command (XP and previous)
-; or the Common Item Dialog (Vista and later).
-;
-; Parameter:
-;     StartingFolder -  the full path of a folder which will be preselected.
-;     DlgTitle       -  a text used as window title (Common Item Dialog) or as text displayed withing the dialog.
-;     FileMustExist  -  [bool] to allow or not opening files that do not exist
-;     ----------------  Common Item Dialog only:
-;     OwnerHwnd      -  HWND of the Gui which owns the dialog. If you pass a valid HWND the dialog will become modal.
-;     BtnLabel       -  a text to be used as caption for the apply button.
-;     comboList      -  a string with possible drop-down options, separated by `n [new line]
-;     desiredDefault -  the default selected drop-down row
-;     comboLabel     -  the drop-down label to display
-;     CustomPlaces   -  custom directories that will be displayed in the left pane of the dialog; missing directories will be omitted; a string separated by `n [newline]
-;     pickFoldersOnly - boolean option [0, 1]
-;     defaultEditField - the text to display in the edit field by default when the open dialog shows up
-;
-;  Return values:
-;     On success the function returns an object with the full path of the selected/file folder
-;     and combobox selected [if any]; otherwise it returns an empty string.
-;
-; MSDN:
-;     Common Item Dialog -> msdn.microsoft.com/en-us/library/bb776913%28v=vs.85%29.aspx
-;     IFileDialog        -> msdn.microsoft.com/en-us/library/bb775966%28v=vs.85%29.aspx
-;     IShellItem         -> msdn.microsoft.com/en-us/library/bb761140%28v=vs.85%29.aspx
-; ==================================================================================================================================
-; Source https://www.autohotkey.com/boards/viewtopic.php?f=6&t=18939
-; by «just me»
-; modified by Marius Șucan on jeudi 7 mai 2020
-; to allow ComboBox and CustomPlaces
-;
-; options flags
-; FOS_OVERWRITEPROMPT  = 0x2,
-; FOS_STRICTFILETYPES  = 0x4,
-; FOS_NOCHANGEDIR  = 0x8,
-; FOS_PICKFOLDERS  = 0x20,
-; FOS_FORCEFILESYSTEM  = 0x40,
-; FOS_ALLNONSTORAGEITEMS  = 0x80,
-; FOS_NOVALIDATE  = 0x100,
-; FOS_ALLOWMULTISELECT  = 0x200,
-; FOS_PATHMUSTEXIST  = 0x800,
-; FOS_FILEMUSTEXIST  = 0x1000,
-; FOS_CREATEPROMPT  = 0x2000,
-; FOS_SHAREAWARE  = 0x4000,
-; FOS_NOREADONLYRETURN  = 0x8000,
-; FOS_NOTESTFILECREATE  = 0x10000,
-; FOS_HIDEMRUPLACES  = 0x20000,
-; FOS_HIDEPINNEDPLACES  = 0x40000,
-; FOS_NODEREFERENCELINKS  = 0x100000,
-; FOS_OKBUTTONNEEDSINTERACTION  = 0x200000,
-; FOS_DONTADDTORECENT  = 0x2000000,
-; FOS_FORCESHOWHIDDEN  = 0x10000000,
-; FOS_DEFAULTNOMINIMODE  = 0x20000000,
-; FOS_FORCEPREVIEWPANEON  = 0x40000000,
-; FOS_SUPPORTSTREAMABLEITEMS  = 0x80000000
+﻿ShellFileDialog(dlgMode, ownerHwnd:=0, dlgTitle:="", startPath:="", fileName:="", filters:="", typeIndex:=1, fileMustExist:=1, recentFolders:="", sidePlaces:=6, comboLabel:="", comboList:="") {
+; The Common Item Dialog [Windows Vista and later], with a "Recent folders" menu that moves
+; the dialog to the folder picked.
+;    dlgMode        - "open", "multi" [several files], "save" or "folder"
+;    startPath      - the folder to open; for "save" and "multi" it may end with a file name
+;    fileName       - the text of the file name box; it replaces the name from startPath
+;    filters        - "Text files (*.txt)|All files (*.*)" or an object {"Text files": "*.txt"}
+;    typeIndex      - the file type selected, 1-based
+;    recentFolders  - `n separated folders for the menu; the first sidePlaces also go in the navigation pane
+;    comboLabel, comboList - an optional combo box, its items `n separated
+; Returns {path, type, combo} or "" when cancelled; "multi" gives the paths `n separated.
+; Without the Common Item Dialog [Windows XP] it falls back to FileSelectFile / FileSelectFolder.
 
-; IFileDialog vtable offsets
-; 0   QueryInterface
-; 1   AddRef 
-; 2   Release 
-; 3   Show 
-; 4   SetFileTypes 
-; 5   SetFileTypeIndex 
-; 6   GetFileTypeIndex 
-; 7   Advise 
-; 8   Unadvise 
-; 9   SetOptions 
-; 10  GetOptions 
-; 11  SetDefaultFolder 
-; 12  SetFolder 
-; 13  GetFolder 
-; 14  GetCurrentSelection 
-; 15  SetFileName 
-; 16  GetFileName 
-; 17  SetTitle 
-; 18  SetOkButtonLabel 
-; 19  SetFileNameLabel 
-; 20  GetResult 
-; 21  AddPlace 
-; 22  SetDefaultExtension 
-; 23  Close 
-; 24  SetClientGuid 
-; 25  ClearClientData 
-; 26  SetFilter
-
-
-   Static IID_IShellItem := 0
-        , InitIID := 0
-        , ShowDialog := A_PtrSize * 3
-        , SetFileTypes := A_PtrSize * 4
-        , SetFileTypeIndex := A_PtrSize * 5
-        , SetOptions := A_PtrSize * 9
-        , SetFolder := A_PtrSize * 12
-        , SetDefaultEdit := A_PtrSize * 15 ; SetFileName
-        , SetWinTitle := A_PtrSize * 17
-        , SetOkButtonLabel := A_PtrSize * 18
-        , GetResult := A_PtrSize * 20
-        , AddPlaces := A_PtrSize * 21
-        , ComDlgObj := {COMDLG_FILTERSPEC: ""}
-
-   If !InitIID
+   Static dlgCount := 0
+   names := [], specs := []
+   If IsObject(filters)
    {
-      InitIID := 1
-      VarSetCapacity(IID_IShellItem, 16, 0)
-      DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
-   }
-
-   SelectedFolder := ""
-   OwnerHwnd := DllCall("IsWindow", "Ptr", OwnerHwnd, "UInt") ? OwnerHwnd : 0
-   Try FileDialog := ComObjCreate("{DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7}", "{42f85136-db7e-439c-85f1-e4075d135fc8}")
-   If !FileDialog
+      For desc, spec in filters
+         names.Push(Trim(desc)), specs.Push(Trim(StrReplace(spec, "`n")))
+   } Else
    {
-      thisOption := (FileMustExist=1) ? 3 : 2
-      FileSelectFolder, SelectedFolder, *%StartingFolder%, % thisOption, % DlgTitle
-      Return SelectedFolder
-   }
-
-   VTBL := NumGet(FileDialog + 0, "UPtr") ; virtual table addresses
-   dialogOptions := 0x8 | 0x800  ;  FOS_NOCHANGEDIR | FOS_PATHMUSTEXIST
-   If (pickFoldersOnly=1)
-      dialogOptions |= 0x20      ; FOS_PICKFOLDERS
-
-   If (FileMustExist=1)
-      dialogOptions |=  0x1000   ; FOS_FILEMUSTEXIST
-
-   DllCall(NumGet(VTBL + SetOptions, "UPtr"), "Ptr", FileDialog, "UInt", dialogOptions, "UInt")
-   If StartingFolder
-   {
-      If !DllCall("Shell32.dll\SHCreateItemFromParsingName", "WStr", StartingFolder, "Ptr", 0, "Ptr", &IID_IShellItem, "PtrP", FolderItem)
-         DllCall(NumGet(VTBL + SetFolder, "UPtr"), "Ptr", FileDialog, "Ptr", FolderItem, "UInt")
-   }
-
-   If DlgTitle
-      DllCall(NumGet(VTBL + SetWinTitle, "UPtr"), "Ptr", FileDialog, "WStr", DlgTitle, "UInt")
-   If OkBtnLabel
-      DllCall(NumGet(VTBL + SetOkButtonLabel, "UPtr"), "Ptr", FileDialog, "WStr", OkBtnLabel, "UInt")
-
-   If (pickFoldersOnly!=1)
-   {
-       Filters := IsObject(usrFilters) ? usrFilters : {"All files": "*.*"}
-       ObjSetCapacity(ComDlgObj, "COMDLG_FILTERSPEC", 2*Filters.Count() * A_PtrSize)
-       for Description, FileTypes in Filters
-       {
-           ObjRawSet(ComDlgObj, "#" . A_Index, Trimmer(Description))
-           , ObjRawSet(ComDlgObj, "@" . A_Index, Trimmer(StrReplace(FileTypes,"`n")))
-           , NumPut(ObjGetAddress(ComDlgObj,"#" . A_Index)
-           , ObjGetAddress(ComDlgObj,"COMDLG_FILTERSPEC") + A_PtrSize * 2*(A_Index-1))        ; COMDLG_FILTERSPEC.pszName
-           , NumPut(ObjGetAddress(ComDlgObj,"@" . A_Index)
-           , ObjGetAddress(ComDlgObj,"COMDLG_FILTERSPEC") + A_PtrSize * (2*(A_Index-1)+1))    ; COMDLG_FILTERSPEC.pszSpec
-       }
-
-       ; IFileDialog::SetFileName method 
-       ; https://docs.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setfilename
-       If defaultEditField
-          DllCall(NumGet(VTBL + SetDefaultEdit), "UPtr", FileDialog, "WStr", defaultEditField)
-
-       ; IFileDialog::SetFileTypes method
-       ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775980(v=vs.85).aspx
-       DllCall(NumGet(VTBL + SetFileTypes), "UPtr", FileDialog, "UInt", Filters.Count(), "UPtr", ObjGetAddress(ComDlgObj,"COMDLG_FILTERSPEC"))
-
-       ; IFileDialog::SetFileTypeIndex method
-       ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775978(v=vs.85).aspx
-       If defIndexFilter
-          DllCall(NumGet(VTBL + SetFileTypeIndex), "UPtr", FileDialog, "UInt", defIndexFilter)
-   }
-
-   If CustomPlaces
-   {
-      Loop, Parse, CustomPlaces, `n
+      Loop, Parse, filters, |
       {
-          Directory := Trim(A_LoopField, "`r `n `t`f`v`b")
-          If FolderExist(Directory)
-          {
-             foo := 1
-             DllCall("Shell32.dll\SHParseDisplayName", "UPtr", &Directory, "Ptr", 0, "UPtrP", PIDL, "UInt", 0, "UInt", 0)
-             DllCall("Shell32.dll\SHCreateShellItem", "Ptr", 0, "Ptr", 0, "UPtr", PIDL, "UPtrP", IShellItem)
-             ObjRawSet(ComDlgObj, IShellItem, PIDL)
-             ; IFileDialog::AddPlace method
-             ; https://msdn.microsoft.com/en-us/library/windows/desktop/bb775946(v=vs.85).aspx
-             DllCall(NumGet(VTBL + AddPlaces), "UPtr", FileDialog, "UPtr", IShellItem, "UInt", foo)
-          }
+         If RegExMatch(Trim(A_LoopField), "\(([^()]+)\)$", m)
+            names.Push(Trim(A_LoopField)), specs.Push(Trim(m1))
       }
    }
 
-   If (comboList && comboLabel)
+   If !specs.Length()
+      names.Push("All files (*.*)"), specs.Push("*.*")
+   typeIndex := (typeIndex>=1 && typeIndex<=specs.Length()) ? Round(typeIndex) : 1
+
+   If RegExMatch(startPath, "^[a-zA-Z]:$")
+      startPath .= "\"
+   startDir := startPath
+   If (dlgMode="save" || dlgMode="multi") && !InStr(FileExist(startPath), "D")
+      SplitPath, startPath, startName, startDir
+   If (fileName="")
+      fileName := startName
+
+   clsid := (dlgMode="save") ? "{C0B4E2F3-BA21-4773-8DBA-335EC946EB8B}" : "{DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7}" ; CLSID_FileSaveDialog, CLSID_FileOpenDialog
+   iid := (dlgMode="multi") ? "{d57c7288-d4ad-4768-be02-9d969532d960}" : "{42f85136-db7e-439c-85f1-e4075d135fc8}" ; IID_IFileOpenDialog, IID_IFileDialog
+   Try pDlg := ComObjCreate(clsid, iid)
+   If !pDlg
    {
-      Try If ((FileDialogCustomize := ComObjQuery(FileDialog, "{e6fdd21a-163f-4975-9c8c-a69f1ba37034}")))
+      If (dlgMode="folder")
       {
-         groupId := 616 ; arbitrarily chosen IDs
-         comboboxId := 93270
-         DllCall(NumGet(NumGet(FileDialogCustomize+0)+26*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", groupId, "WStr", comboLabel) ; IFileDialogCustomize::StartVisualGroup
-         DllCall(NumGet(NumGet(FileDialogCustomize+0)+6*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId) ; IFileDialogCustomize::AddComboBox
-         ; DllCall(NumGet(NumGet(FileDialogCustomize+0)+19*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt", itemOneId, "WStr", "Current folder") ; IFileDialogCustomize::AddControlItem
-         
-         entriesArray := []
-         Loop, Parse, comboList,`n
-         {
-             elementu := Trim(A_LoopField, "`r `n `t`f`v`b")
-             If elementu
-             {
-                Random, varA, 2, 900
-                Random, varB, 2, 900
-                thisID := varA varB
-                If (A_Index=desiredDefault)
-                   desiredIDdefault := thisID
-
-                entriesArray[thisId] := elementu
-                DllCall(NumGet(NumGet(FileDialogCustomize+0)+19*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt", thisID, "WStr", elementu)
-             }
-         }
-
-         DllCall(NumGet(NumGet(FileDialogCustomize+0)+25*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt", desiredIDdefault) ; IFileDialogCustomize::SetSelectedControlItem
-         DllCall(NumGet(NumGet(FileDialogCustomize+0)+27*A_PtrSize), "Ptr", FileDialogCustomize) ; IFileDialogCustomize::EndVisualGroup
-      }
-
-   }
-
-   If !DllCall(NumGet(VTBL + ShowDialog, "UPtr"), "Ptr", FileDialog, "Ptr", OwnerHwnd, "UInt")
-   {
-      If !DllCall(NumGet(VTBL + GetResult, "UPtr"), "Ptr", FileDialog, "PtrP", ShellItem, "UInt")
+         FileSelectFolder, picked, *%startDir%, 3, %dlgTitle%
+      } Else
       {
-         GetDisplayName := NumGet(NumGet(ShellItem + 0, "UPtr"), A_PtrSize * 5, "UPtr")
-         If !DllCall(GetDisplayName, "Ptr", ShellItem, "UInt", 0x80028000, "PtrP", StrPtr) ; SIGDN_DESKTOPABSOLUTEPARSING
+         filter := InStr(names[typeIndex], "(") ? names[typeIndex] : names[typeIndex] " (" specs[typeIndex] ")"
+         opts := ((dlgMode="save") ? "S" : (dlgMode="multi") ? "M" : "") . ((dlgMode="save" || !fileMustExist) ? 2 : 3) ; 1 = file must exist, 2 = path must exist
+         FileSelectFile, picked, %opts%, % startDir ((fileName!="") ? "\" fileName : ""), %dlgTitle%, %filter%
+         If (dlgMode="multi" && InStr(picked, "`n"))
          {
-            SelectedFolder := StrGet(StrPtr, "UTF-16")
-            DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
-         }
-
-         ObjRelease(ShellItem)
-         if (FileDialogCustomize && entriesArray.Count())
-         {
-            if (DllCall(NumGet(NumGet(FileDialogCustomize+0)+24*A_PtrSize), "Ptr", FileDialogCustomize, "UInt", comboboxId, "UInt*", selectedItemId) == 0)
-            { ; IFileDialogCustomize::GetSelectedControlItem
-               if selectedItemId
-                  thisComboSelected := entriesArray[selectedItemId]
-            }   
+            ; the folder comes first, then the file names
+            files := ""
+            Loop, Parse, picked, `n, `r
+            {
+               If (A_Index=1)
+                  folder := RTrim(A_LoopField, "\") "\"
+               Else If (A_LoopField!="")
+                  files .= ((files="") ? "" : "`n") folder A_LoopField
+            }
+            picked := files
          }
       }
+      Return (picked!="") ? {path: picked, type: typeIndex, combo: ""} : ""
    }
-   If (FolderItem)
-      ObjRelease(FolderItem)
 
-   if (FileDialogCustomize)
-      ObjRelease(FileDialogCustomize)
+   vt := NumGet(pDlg+0, "UPtr")
+   opts := 0x848 ; FOS_NOCHANGEDIR | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST
+   If (dlgMode="folder")
+      opts |= 0x1020 ; FOS_PICKFOLDERS | FOS_FILEMUSTEXIST
+   Else If (dlgMode!="save" && fileMustExist)
+      opts |= 0x1000 ; FOS_FILEMUSTEXIST
+   If (dlgMode="multi")
+      opts |= 0x200 ; FOS_ALLOWMULTISELECT
+   DllCall(NumGet(vt+9*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", opts) ; IFileDialog::SetOptions
 
-   ObjRelease(FileDialog)
-   r := []
-   r.SelectedDir := SelectedFolder
-   r.SelectedCombo := thisComboSelected
+   VarSetCapacity(iidItem, 16, 0)
+   DllCall("ole32\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &iidItem) ; IID_IShellItem
+   If (startDir!="" && !DllCall("shell32\SHCreateItemFromParsingName", "WStr", startDir, "Ptr", 0, "Ptr", &iidItem, "Ptr*", pItem))
+   {
+      DllCall(NumGet(vt+12*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", pItem) ; IFileDialog::SetFolder
+      ObjRelease(pItem)
+   }
+
+   If (dlgMode!="folder" && fileName!="")
+      DllCall(NumGet(vt+15*A_PtrSize, "UPtr"), "Ptr", pDlg, "WStr", fileName) ; IFileDialog::SetFileName
+   If (dlgTitle!="")
+      DllCall(NumGet(vt+17*A_PtrSize, "UPtr"), "Ptr", pDlg, "WStr", dlgTitle) ; IFileDialog::SetTitle
+
+   If (dlgMode!="folder")
+   {
+      ; COMDLG_FILTERSPEC array {pszName, pszSpec}, the strings in strBuf
+      chars := 0
+      For i, spec in specs
+         chars += StrLen(names[i]) + StrLen(spec) + 2
+      VarSetCapacity(strBuf, chars*2, 0), VarSetCapacity(specBuf, 2*A_PtrSize*specs.Length(), 0)
+      p := &strBuf
+      For i, spec in specs
+      {
+         NumPut(p, specBuf, (2*i - 2)*A_PtrSize, "Ptr")
+         p += 2*StrPut(names[i], p, "UTF-16")
+         NumPut(p, specBuf, (2*i - 1)*A_PtrSize, "Ptr")
+         p += 2*StrPut(spec, p, "UTF-16")
+      }
+      DllCall(NumGet(vt+4*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", specs.Length(), "Ptr", &specBuf) ; IFileDialog::SetFileTypes
+      DllCall(NumGet(vt+5*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", typeIndex) ; IFileDialog::SetFileTypeIndex
+      If (dlgMode="save")
+      {
+         ; names typed without an extension get the one of the chosen file type
+         If !RegExMatch(specs[typeIndex], "^\*\.(\w+)", m)
+         {
+            For i, spec in specs
+               If RegExMatch(spec, "^\*\.(\w+)", m)
+                  Break
+         }
+         If (m1!="")
+            DllCall(NumGet(vt+22*A_PtrSize, "UPtr"), "Ptr", pDlg, "WStr", m1) ; IFileDialog::SetDefaultExtension
+      }
+   }
+
+   folders := [], comboItems := []
+   Loop, Parse, recentFolders, `n, `r
+   {
+      If (A_LoopField!="")
+         folders.Push(A_LoopField)
+   }
+
+   Loop, Parse, comboList, `n, `r
+   {
+      If (Trim(A_LoopField)!="")
+         comboItems.Push(Trim(A_LoopField))
+   }
+
+   placesCount := (sidePlaces>0) ? Min(sidePlaces, folders.Length()) : 0
+   If placesCount
+   {
+      ; labelled "name (parent)" through PKEY_ItemNameDisplay; each FDAP_TOP place goes above the previous one
+      VarSetCapacity(pkey, 20, 0), VarSetCapacity(pv, 24, 0)
+      DllCall("ole32\IIDFromString", "WStr", "{B725F130-47EF-101A-A5F1-02608C9EEBAC}", "Ptr", &pkey)
+      NumPut(10, pkey, 16, "UInt")
+      Loop, % placesCount
+      {
+         folder := folders[placesCount - A_Index + 1]
+         If DllCall("shell32\SHCreateItemFromParsingName", "WStr", folder, "Ptr", 0, "Ptr", &iidItem, "Ptr*", pItem)
+            Continue
+
+         SplitPath, folder, leaf, parent
+         If (leaf!="" && parent!="")
+         {
+            label := leaf " (" parent ((SubStr(parent, 0)=":") ? "\" : "") ")"
+            NumPut(31, pv, 0, "UShort"), NumPut(&label, pv, 8, "Ptr") ; VT_LPWSTR
+            DllCall("shell32\SHSetTemporaryPropertyForItem", "Ptr", pItem, "Ptr", &pkey, "Ptr", &pv)
+         }
+         DllCall(NumGet(vt+21*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", pItem, "Int", 1) ; IFileDialog::AddPlace, FDAP_TOP
+         ObjRelease(pItem)
+      }
+   }
+
+   hasCombo := (comboLabel!="" && comboItems.Length()) ? 1 : 0
+   If (folders.Length() || hasCombo)
+      Try pCust := ComObjQuery(pDlg, "{e6fdd21a-163f-4975-9c8c-a69f1ba37034}") ; IID_IFileDialogCustomize
+   If pCust
+   {
+      cv := NumGet(pCust+0, "UPtr")
+      If hasCombo
+      {
+         DllCall(NumGet(cv+26*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 1, "WStr", comboLabel) ; IFileDialogCustomize::StartVisualGroup
+         DllCall(NumGet(cv+6*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2) ; IFileDialogCustomize::AddComboBox
+         For i, item in comboItems
+            DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt", i, "WStr", item) ; IFileDialogCustomize::AddControlItem
+         DllCall(NumGet(cv+25*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt", 1) ; IFileDialogCustomize::SetSelectedControlItem
+         DllCall(NumGet(cv+27*A_PtrSize, "UPtr"), "Ptr", pCust) ; IFileDialogCustomize::EndVisualGroup
+      }
+
+      If folders.Length()
+      {
+         ; unique per dialog: the menus of nested dialogs share the event sink
+         menuId := 1000 + (++dlgCount)
+         DllCall(NumGet(cv+4*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", menuId, "WStr", "Recent folders") ; IFileDialogCustomize::AddMenu
+         VarSetCapacity(buf, 404, 0)
+         For i, folder in folders
+         {
+            label := folder
+            If (StrLen(label)>100 && DllCall("shlwapi\PathCompactPathExW", "Ptr", &buf, "WStr", label, "UInt", 101, "UInt", 0))
+               label := StrGet(&buf, "UTF-16")
+            DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", menuId, "UInt", i, "WStr", StrReplace(label, "&", "&&")) ; IFileDialogCustomize::AddControlItem
+         }
+         DllCall(NumGet(cv+28*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", menuId) ; IFileDialogCustomize::MakeProminent
+         sink := ShellFileDialogSink(0, menuId, {dlg: pDlg, folders: folders})
+         If !DllCall(NumGet(vt+7*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", sink, "UInt*", cookie) ; IFileDialog::Advise
+            advised := 1
+      }
+   }
+
+   If !DllCall("IsWindow", "Ptr", ownerHwnd)
+      ownerHwnd := 0
+
+   r := ""
+   If !DllCall(NumGet(vt+3*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", ownerHwnd) ; IModalWindow::Show
+   {
+      paths := ""
+      If (dlgMode="multi")
+      {
+         If !DllCall(NumGet(vt+27*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr*", pItems) ; IFileOpenDialog::GetResults
+         {
+            av := NumGet(pItems+0, "UPtr")
+            DllCall(NumGet(av+7*A_PtrSize, "UPtr"), "Ptr", pItems, "UInt*", count) ; IShellItemArray::GetCount
+            Loop, % count
+            {
+               If DllCall(NumGet(av+8*A_PtrSize, "UPtr"), "Ptr", pItems, "UInt", A_Index - 1, "Ptr*", pItem) ; IShellItemArray::GetItemAt
+                  Continue
+
+               path := ShellItemFileSysPath(pItem)
+               ObjRelease(pItem)
+               If (path!="")
+                  paths .= ((paths="") ? "" : "`n") path
+            }
+            ObjRelease(pItems)
+         }
+      } Else If !DllCall(NumGet(vt+20*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr*", pItem) ; IFileDialog::GetResult
+      {
+         paths := ShellItemFileSysPath(pItem)
+         ObjRelease(pItem)
+      }
+
+      If (paths!="")
+      {
+         r := {path: paths, type: typeIndex, combo: ""}
+         If (dlgMode!="folder" && !DllCall(NumGet(vt+6*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt*", idx)) ; IFileDialog::GetFileTypeIndex
+            r.type := idx
+         If (hasCombo && pCust && !DllCall(NumGet(cv+24*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt*", sel)) ; IFileDialogCustomize::GetSelectedControlItem
+            r.combo := comboItems[sel]
+      }
+   }
+
+   If advised
+      DllCall(NumGet(vt+8*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", cookie) ; IFileDialog::Unadvise
+   If menuId
+      ShellFileDialogSink(0, menuId, "")
+   If pCust
+      ObjRelease(pCust)
+   ObjRelease(pDlg)
    Return r
 }
 
-;------------------------------
-;
-; Function: Dlg_OpenSaveFile
-;
-; Description:
-;
-;   Internal function used by <Dlg_OpenFile> and <Dlg_SaveFile> to create an
-;   Open or Save dialog.
-;
-; Type:
-;
-;   Internal function.  Subject to change.  Do not call directly.
-;
-; Parameters:
-;
-;   p_Type - [Internal function only] Set to "O" or "Open" to create a Open
-;       dialog.  Set to "S" or "Save" to create a Save dialog.
-;
-;   hOwner - A handle to the window that owns the dialog box.  This parameter
-;       can be any valid window handle or it can be set to 0 or null if the
-;       dialog box has no owner.  Note: A valid window handle must be specified
-;       if the OFN_SHOWHELP flag is included (explicitly or implicitly).
-;
-;   p_Title - A string to be placed in the title bar of the dialog box.  If set
-;       to null (the default), the system uses the default title (that is,
-;       "Open" or "Save As").
-;
-;   p_Filter - One or more filter strings that determine which files are
-;       displayed. [Optional] Each filter string is composed of two parts.
-;       The first part describes the filter.  For example: "Text Files".  The
-;       second part specifies the filter pattern and must be enclosed in
-;       parenthesis.  For example "(*.txt)".  To specify multiple filter
-;       patterns for a single display string, use a semicolon to separate the
-;       patterns.  For example: "(*.txt;*.doc;*.bak)".  A pattern string can be
-;       a combination of valid file name characters and the asterisk ("*")
-;       wildcard character.  Do not include spaces in the pattern string.
-;       Multiple filter strings are delimited by the "|" character.  For
-;       example: "Text Files (*.txt)|Backup Files (*.bak)".
-;
-;   p_FilterIndex - 1-based filter index.  If set to null (the default), 1 is
-;       used.  The index determines which filter string is pre-selected in the
-;       "File Types" control.
-;
-;   p_Root - Root (startup) directory and/or default file name.  To specify a
-;       root directory only, include the full path of the directory with a
-;       trailing "\" character.  Ex: "C:\Program Files\".  To specify a startup
-;       directory and a default file, include the full path of the default file.
-;       Ex: "C:\My Stuff\My Program.html".  To specify a default file only,
-;       include the file name without the path.  Ex: "My Program.html".  If a
-;       default file name is included, the file name (sans the path) is shown in
-;       the dialog's "File name:" edit field. If this parameter is set to null
-;       (the default), the startup directory will be set using the OS default
-;       for this dialog.  See the documentation for the OPENFILENAME structure
-;       (lpstrInitialDir member) for more information.
-;
-;   p_DfltExt - Extension to append when none is given.  Ex: "txt".  The string
-;       should not contain a period (".").  If this parameter is null (the
-;       default) and the user fails to type an extension, no extension is
-;       appended.
-;
-;   r_Flags - Flags used to initialize the dialog. [Optional, Input/Output] See
-;       the *Flags* section for the details.
-;
-;   p_HelpHandler - Name of a developer-created function that is called when the
-;       the user presses the Help button on the dialog. [Optional] See the *Help
-;       Handler* section for the details.  Note: The OFN_SHOWHELP flag is
-;       automatically added if this parameter contains a valid function name.
-;
-; Flags:
-;
-;   On input, the r_Flags parameter contains flags that are used to initialize
-;   and/or determine the behavior of the dialog.  If set to 0 or null and
-;   p_Type="O" (Open dialog), the OFN_FILEMUSTEXIST and OFN_HIDEREADONLY flags
-;   are added automatically.  If r_Flag contains an interger value, the
-;   parameter is assumed to contain bit flags.  See the function's static
-;   variables for a list a valid bit flags.  Otherwise, text flags are assumed.
-;   The following space-delimited text flags can be used.
-;
-;   AllowMultiSelect - Specifies that the File Name list box allows multiple
-;       selections.
-;
-;   CreatePrompt - [Open dialog only] If the user specifies a file that does not
-;       exist, this flag causes the dialog to prompt the user for permission to
-;       create the file.
-;
-;   DontAddToRecent - Prevents the system from adding a link to the selected
-;       file in the file system directory that contains the user's most recently
-;       used documents.
-;
-;   Ex_NoPlacesBar - If specified, the places bar is not displayed.  If not
-;       specified, Explorer-style dialog boxes include a places bar containing
-;       icons for commonly-used folders, such as Favorites and Desktop.
-;
-;   FileMustExist - [Open dialog only (with implicit exceptions)] This flag
-;       ensures that the user can only type names of existing files in the File
-;       Name entry.  A message box is generated if an invalid file is entered.
-;       Opinion: This flag should be specified in most circumstances.
-;       IMPORTANT: If this flag is specified (explicitly or implicitly), the
-;       PathMustExist flag is also used.  See the PathMustExist flag for the
-;       rules that are enforced for both the Open and Save dialogs.
-;
-;   ForceShowHidden - Forces the showing of system and hidden files, thus
-;       overriding the user setting to show or not show hidden files.  However,
-;       a file that is marked both system and hidden is not shown.  Observation:
-;       This flag does not work as expected on Windows XP (may also occur on
-;       other (or all) versions of Windows).  When a directory that includes a
-;       hidden file is first displayed (including the initial directory), hidden
-;       files are not shown.  Clicking on the "Open" or "Save" button without
-;       selecting a file will redisplay the list of files to include the hidden
-;       file(s).
-;
-;   HideReadOnly - [Open dialog only] Hides the Read Only check box.  This flag
-;       should be specified in most circumstances.
-;
-;   NoChangeDir - Restores the current directory to its original value if the
-;       user changed the directory while searching for files.
-;
-;   NoDereferenceLinks - Directs the dialog box to return the path and file name
-;       of the selected shortcut (.LNK) file.  If this value is not specified,
-;       the dialog box returns the path and file name of the file referenced by
-;       the shortcut.  Observation: For shortcuts to OS files, this works as
-;       expected.  However, for other types of shortcuts, Ex: shortcuts to a web
-;       site, the return value may not be what is expected.  Test thoroughly
-;       before using.
-;
-;   NoReadOnlyReturn - [Save dialog only] Prevents the dialog from returning
-;       names of existing files that have the read-only attribute.  If a
-;       read-only file is selected, a message dialog is generated.  The dialog
-;       will persist until the selection does not include a file with read-only
-;       attribute.
-;
-;   NoTestFileCreate - By default, the dialog box creates a zero-length test
-;       file to determine whether a new file can be created in the selected
-;       directory.  Set this flag to prevent the creation of this test file.
-;       This flag should be specified if the application saves the file on a
-;       network drive with Create but no Modify privileges.
-;
-;   NoValidate - Specifies that the common dialog boxes allow invalid characters
-;       in the returned file name.
-;
-;   OverwritePrompt - [Save dialog only] Causes the dialog to generate a message
-;       box if the selected file already exists.  The user must confirm whether
-;       to overwrite the file.
-;
-;   PathMustExist - Specifies that the user can type only existing paths in the
-;       File Name entry.  A message box is generated if an invalid path is
-;       entered.  Note: This flag is automatically added if the FileMustExist
-;       flag is used.
-;
-;   ReadOnly - [Open dialog only] Causes the Read Only check box to be selected
-;       initially when the dialog box is created.
-;
-;   ShowHelp - Causes the dialog to display the Help button.
-;
-;   On output, the r_Flag parameter may contain bit flags that inform the
-;   developer of conditions of the dialog at the time the dialog was closed.
-;   The following bit flags can be set.
-;
-;   OFN_READONLY (0x1) - [Open dialog only] This flag is set if the Read Only
-;       check box was checked when the dialog was closed.
-;
-;   OFN_EXTENSIONDIFFERENT (0x400) - This flag is set if the p_DfltExt parameter
-;       is not null and the user selected or typed a file name extension that
-;       differs from the p_DfltExt parameter.  Exception: This flag is not set
-;       if multiple files are selected.
-;
-; Returns:
-;
-;   Selected file name(s) or null if cancelled.  If more then one file is
-;   selected, each file is delimited by a new line ("`n") character.
-;
-; Remarks:
-;
-;   If the user changes the directory while using the Open or Save dialog, the
-;   script's working directory will also be changed.  If desired, use the
-;   "NoChangeDir" flag (r_Flags parameter) to prevent this from occurring or use
-;   the *SetWorkingDir* command to restore the working directory after calling
-;   this function.
-;
-; Help Handler:
-;
-;   The "Help Handler" is an optional developer-created function that is called
-;   when the user presses the Help button on the dialog.
-;
-;   The handler function must have at least 2 parameters.  Additional parameters
-;   are allowed but must be optional (defined with a default value).  The
-;   required parameters are defined/used as follows, and in the following order:
-;
-;       hDialog - The handle to the dialog window.
-;
-;       lpInitStructure - A pointer to the initialization structure for the
-;           common dialog box. For this handler, the pointer is to a
-;           OPENFILENAME structure.
-;
-;   It's up to the developer to determine what commands are performed in this
-;   function but displaying some sort of help message/document is what is
-;   expected.
-;
-;   To avoid interference with the operation of the dialog, the handler should
-;   either 1) finish quickly or 2) any dialogs displayed via the handler should
-;   be modal.  See the scripts included with this project for an example.
-;
-;-------------------------------------------------------------------------------
-Dlg_OpenSaveFile(p_Type,hOwner:=0,p_Title:="",p_Filter:="",p_FilterIndex:="",p_Root:="",p_DfltExt:="",ByRef r_Flags:=0,p_HelpHandler:="",ByRef r_FilterIndex:="") {
-; function source: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=462
-; by jballi
-; modified by Marius Șucan
+ShellFileDialogSink(this, a:=0, b:=0, c:=0) {
+; The IFileDialogEvents + IFileDialogControlEvents object of ShellFileDialog(); A_EventInfo tells the method.
+; Called with this=0, it registers b [{dlg, folders}] for the menu ID a, or removes it when b is not an
+; object, and returns the object. The dialog calls it only inside DllCalls, as a fast callback: it must
+; not touch Critical.
+   Static sink := 0, mem, iidItem, menus := {}, unk1, unk2, ev1, ev2, ct1, ct2
+   If !this
+   {
+      If !sink
+      {
+         VarSetCapacity(iidItem, 16, 0)
+         DllCall("ole32\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &iidItem) ; IID_IShellItem
+         VarSetCapacity(guid, 16, 0)
+         DllCall("ole32\IIDFromString", "WStr", "{00000000-0000-0000-C000-000000000046}", "Ptr", &guid) ; IID_IUnknown
+         unk1 := NumGet(guid, 0, "Int64"), unk2 := NumGet(guid, 8, "Int64")
+         DllCall("ole32\IIDFromString", "WStr", "{973510db-7d7f-452b-8975-74a85828d354}", "Ptr", &guid) ; IID_IFileDialogEvents
+         ev1 := NumGet(guid, 0, "Int64"), ev2 := NumGet(guid, 8, "Int64")
+         DllCall("ole32\IIDFromString", "WStr", "{36116642-d713-4b97-9b83-7484a9d00433}", "Ptr", &guid) ; IID_IFileDialogControlEvents
+         ct1 := NumGet(guid, 0, "Int64"), ct2 := NumGet(guid, 8, "Int64")
 
-    Static Dummy16963733
-          ,s_strFileMaxSize:=932768 ; ansi limit 32768
-                ;-- This is the ANSI byte limit.  For consistency, this value
-                ;   is also used to set the the maximum number characters that
-                ;   used in Unicode.  Note: Only the first entry contains the
-                ;   folder name so 32K characters can hold a very large number
-                ;   of file names.
+         fn := A_ThisFunc
+         qi := RegisterCallback(fn, "F", 3, 1), ref := RegisterCallback(fn, "F", 1, 2)
+         ok2 := RegisterCallback(fn, "F", 2, 0), ok3 := RegisterCallback(fn, "F", 3, 0), ok4 := RegisterCallback(fn, "F", 4, 0)
+         notImpl := RegisterCallback(fn, "F", 4, 3), itemSel := RegisterCallback(fn, "F", 4, 4)
+         ; [IFileDialogEvents vtable ptr][IFileDialogControlEvents vtable ptr][10 + 7 vtable slots]
+         VarSetCapacity(mem, 19*A_PtrSize, 0)
+         sink := &mem
+         NumPut(sink + 2*A_PtrSize, mem, 0, "Ptr"), NumPut(sink + 12*A_PtrSize, mem, A_PtrSize, "Ptr")
+         For i, p in [qi, ref, ref, ok2, ok3, ok2, ok2, notImpl, ok2, notImpl, qi, ref, ref, itemSel, ok3, ok4, ok3]
+            NumPut(p, mem, (i + 1)*A_PtrSize, "Ptr")
+      }
 
-          ,HELPMSGSTRING:="commdlg_help"
-                ;-- Registered message string for the Help button on common
-                ;   dialogs
+      If IsObject(b)
+         menus[a] := b
+      Else
+         menus.Delete(a)
+      Return sink
+   }
 
-          ,OPENFILENAME
-                ;-- Static OPENFILENAME structure.  Also used by the hook
-                ;   callback and the help message.
+   evt := A_EventInfo
+   If (evt=1)      ; QueryInterface: a = riid, b = ppv
+   {
+      i1 := NumGet(a+0, 0, "Int64"), i2 := NumGet(a+0, 8, "Int64")
+      If (i1=unk1 && i2=unk2) || (i1=ev1 && i2=ev2)
+      {
+         NumPut(sink, b+0, "Ptr")
+      } Else If (i1=ct1 && i2=ct2)
+      {
+         NumPut(sink + A_PtrSize, b+0, "Ptr")
+      } Else
+      {
+         NumPut(0, b+0, "Ptr")
+         Return 0x80004002 ; E_NOINTERFACE
+      }
+   } Else If (evt=2) ; AddRef, Release: the object is static
+   {
+      Return 1
+   } Else If (evt=3) ; OnShareViolation, OnOverwrite: the dialog's default answer
+   {
+      Return 0x80004001 ; E_NOTIMPL
+   } Else If (evt=4) ; OnItemSelected: b = control ID, c = item ID
+   {
+      entry := menus[b & 0xFFFFFFFF]
+      If !IsObject(entry)
+         Return 0
 
-          ;-- Open File Name flags
-          ,OFN_ALLOWMULTISELECT    :=0x200
-          ,OFN_CREATEPROMPT        :=0x2000
-          ,OFN_DONTADDTORECENT     :=0x2000000
-          ,OFN_ENABLEHOOK          :=0x20
+      folder := entry.folders[c & 0xFFFFFFFF]
+      pDlg := entry.dlg
+      If (folder!="" && !DllCall("shell32\SHCreateItemFromParsingName", "WStr", folder, "Ptr", 0, "Ptr", &iidItem, "Ptr*", pItem))
+      {
+         ; SetFolder moves a dialog already on screen
+         DllCall(NumGet(NumGet(pDlg+0, "UPtr")+12*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", pItem) ; IFileDialog::SetFolder
+         ObjRelease(pItem)
+      } Else SoundBeep, 300, 100
+   }
+   Return 0
+}
 
-          ,OFN_EXPLORER            :=0x80000
-                ;-- This flag is set by default.  This function does not work
-                ;   with the old-style dialog box.
+ShellItemFileSysPath(pItem) {
+   If DllCall(NumGet(NumGet(pItem+0, "UPtr")+5*A_PtrSize, "UPtr"), "Ptr", pItem, "UInt", 0x80058000, "Ptr*", pStr) ; IShellItem::GetDisplayName, SIGDN_FILESYSPATH
+      Return
 
-          ,OFN_EXTENSIONDIFFERENT  :=0x400
-                ;-- Output flag only.
-
-          ,OFN_FILEMUSTEXIST       :=0x1000
-          ,OFN_FORCESHOWHIDDEN     :=0x10000000
-          ,OFN_HIDEREADONLY        :=0x4
-
-          ,OFN_NOCHANGEDIR         :=0x8
-          ,OFN_NODEREFERENCELINKS  :=0x100000
-
-          ,OFN_NOREADONLYRETURN    :=0x8000
-          ,OFN_NOTESTFILECREATE    :=0x10000
-          ,OFN_NOVALIDATE          :=0x100
-          ,OFN_OVERWRITEPROMPT     :=0x2
-          ,OFN_PATHMUSTEXIST       :=0x800
-          ,OFN_READONLY            :=0x1
-          ,OFN_SHOWHELP            :=0x10
-
-          ;-- Open File Name extended flags
-          ,OFN_EX_NOPLACESBAR      :=0x1
-                ;-- Note: This flag is only available as a text flag, i.e.
-                ;   "NoPlacesBar".
-
-          ;-- Misc.
-          ,TCharSize:=A_IsUnicode ? 2:1
-
-    ;[==============]
-    ;[  Parameters  ]
-    ;[==============]
-    ;-- Type
-    p_Type:=SubStr(p_Type,1,1)
-    StringUpper p_Type,p_Type
-        ;-- Convert to uppercase to simplify processing
-
-    if p_Type not in O,S
-        p_Type:="O"
-
-    ;-- Filter
-    if p_Filter is Space
-        p_Filter:="All Files (*.*)"
-
-    ;-- Flags
-    l_Flags  :=OFN_EXPLORER
-    l_FlagsEx:=0
-    if not r_Flags  ;-- Zero, blank, or null
-    {
-        if (p_Type="O")  ;-- Open dialog only
-            l_Flags|=OFN_FILEMUSTEXIST|OFN_HIDEREADONLY
-    } else
-    {
-        ;-- Bit flags
-        if r_Flags is Integer
-        {
-            l_Flags|=r_Flags
-        } else
-        {
-            ;-- Convert text flags into bit flags
-            Loop Parse,r_Flags,%A_Tab%%A_Space%,%A_Tab%%A_Space%
-            {
-                if A_LoopField is not Space
-                {
-                    if OFN_%A_LoopField% is Integer
-                    {
-                        if InStr(A_LoopField,"ex_")
-                            l_FlagsEx|=OFN_%A_LoopField%
-                        else
-                            l_Flags|=OFN_%A_LoopField%
-                    }
-                }
-            }
-        }
-    }
-
-    if IsFunc(p_HelpHandler)
-        l_Flags|=OFN_SHOWHELP
-
-    ; if (p_Type="O") and (l_Flags & OFN_ALLOWMULTISELECT)
-    ;     l_Flags|=OFN_ENABLEHOOK
-
-    ;-- Create and, if needed, populate the buffer used to initialize the
-    ;   File Name Edit control.  The dialog will also use this buffer to return
-    ;   the file(s) selected.
-    VarSetCapacity(strFile,s_strFileMaxSize*TCharSize,0)
-    SplitPath p_Root,l_RootFileName,l_RootDir
-    if l_RootFileName is not Space
-    {
-        DllCall("RtlMoveMemory"
-            ,"Str",strFile
-            ,"Str",l_RootFileName
-            ,"UInt",(StrLen(l_RootFileName)+1)*TCharSize)
-    }
-
-    ;-- Convert p_Filter into the format required by the API
-    VarSetCapacity(strFilter,StrLen(p_Filter)*(A_IsUnicode ? 5:3),0)
-        ;-- Enough space for the full description _and_ file pattern(s) of all
-        ;   filter strings (ANSI and Unicode) plus null characters between all
-        ;   of the pieces and a double null at the end.
-
-    l_Offset:=&strFilter
-    Loop Parse,p_Filter,|
-    {
-        ;-- Break the filter string into 2 parts
-        l_LoopField:=Trim(A_LoopField," `f`n`r`t`v")
-            ;-- Assign and remove all leading/trailing white space
-
-        l_Part1:=l_LoopField
-            ;-- Part 1: The entire filter string which includes the description
-            ;   and the file pattern(s) in parenthesis.  This is what is
-            ;   displayed in  the "File Of Types" or the "Save As Type"
-            ;   drop-down.
-
-        l_Part2:=SubStr(l_LoopField,InStr(l_LoopField,"(")+1,-1)
-            ;-- Part 2: File pattern(s) sans parenthesis.  The dialog uses this
-            ;   to filter the files that are displayed.
-
-        ;-- Calculate the length of the pieces
-        l_lenPart1:=(StrLen(l_LoopField)+1)*TCharSize
-            ;-- Size includes terminating null
-
-        l_lenPart2:=(StrLen(l_Part2)+1)*TCharSize
-            ;-- Size includes terminating null
-
-        ;-- Copy the pieces to the filter string.  Each piece includes a
-        ;   terminating null character.
-        DllCall("RtlMoveMemory","Ptr",l_Offset,"Str",l_Part1,"UInt",l_lenPart1)
-        DllCall("RtlMoveMemory","Ptr",l_Offset+l_lenPart1,"Str",l_Part2,"UInt",l_lenPart2)                          ;-- Length
-
-        ;-- Calculate the offset of the next filter string
-        l_Offset+=l_lenPart1+l_lenPart2
-    }
-
-    ;[==================]
-    ;[  Pre-Processing  ]
-    ;[==================]
-    ;-- Create and populate the OPENFILENAME structure
-    lStructSize:=VarSetCapacity(OPENFILENAME,(A_PtrSize=8) ? 152:88,0)
-    NumPut(lStructSize,OPENFILENAME,0,"UInt")
-        ;-- lStructSize
-    NumPut(hOwner,OPENFILENAME,(A_PtrSize=8) ? 8:4,"Ptr")
-        ;-- hwndOwner
-    NumPut(&strFilter,OPENFILENAME,(A_PtrSize=8) ? 24:12,"Ptr")
-        ;-- lpstrFilter
-    NumPut(p_FilterIndex,OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
-        ;-- nFilterIndex
-    NumPut(&strFile,OPENFILENAME,(A_PtrSize=8) ? 48:28,"Ptr")
-        ;-- lpstrFile
-    NumPut(s_strFileMaxSize,OPENFILENAME,(A_PtrSize=8) ? 56:32,"UInt")
-        ;-- nMaxFile
-    NumPut(&l_RootDir,OPENFILENAME,(A_PtrSize=8) ? 80:44,"Ptr")
-        ;-- lpstrInitialDir
-    NumPut(&p_Title,OPENFILENAME,(A_PtrSize=8) ? 88:48,"Ptr")
-        ;-- lpstrTitle
-    NumPut(l_Flags,OPENFILENAME,(A_PtrSize=8) ? 96:52,"UInt")
-        ;-- Flags
-    NumPut(&p_DfltExt,OPENFILENAME,(A_PtrSize=8) ? 104:60,"Ptr")
-        ;-- lpstrDefExt
-    NumPut(l_FlagsEx,OPENFILENAME,(A_PtrSize=8) ? 148:84,"UInt")
-        ;-- FlagsEx
-
-    ;[===============]
-    ;[  Show dialog  ]
-    ;[===============]
-    if (p_type="O")
-        RC:=DllCall("comdlg32\GetOpenFileName" . (A_IsUnicode ? "W":"A"),"Ptr",&OPENFILENAME)
-    else
-        RC:=DllCall("comdlg32\GetSaveFileName" . (A_IsUnicode ? "W":"A"),"Ptr",&OPENFILENAME)
-
-    ;[===================]
-    ;[  Post-Processing  ]
-    ;[===================]
-    ;-- If needed, turn off monitoring of help message
-    if l_HelpMsg
-        OnMessage(l_HelpMsg,"")  ;-- Turn off monitoring
-
-    ;-- Dialog canceled?
-    if (RC=0)
-        Return
-
-    ;-- Rebuild r_Flags for output
-    r_Flags  :=0
-    l_Flags:=NumGet(OPENFILENAME,(A_PtrSize=8) ? 96:52,"UInt")
-        ;-- Flags
-    r_FilterIndex:=NumGet(OPENFILENAME,(A_PtrSize=8) ? 44:24,"UInt")
-        ;-- nFilterIndex
-
-    if p_DfltExt is not Space  ;-- Flag is ignored unless p_DfltExt contains a value
-    {
-        if l_Flags & OFN_EXTENSIONDIFFERENT
-            r_Flags|=OFN_EXTENSIONDIFFERENT
-    }
-
-    if (p_Type="O")  ;-- i.e. flag is ignored if using the Save dialog
-    {
-        if l_Flags & OFN_ALLOWMULTISELECT
-        {
-            ; Hook was used to collect ReadOnly status.  Collect the ReadOnly
-            ; status from the hook function.
-            Sleep, 1
-            ; if Dlg_OFNHookCallback("GetReadOnly","","","")
-            ; r_Flags|=OFN_READONLY
-        } else
-        {
-            ;-- Hook was NOT used to collect ReadOnly status.  Determine status from l_Flags
-            if l_Flags & OFN_READONLY
-                r_Flags|=OFN_READONLY
-        }
-    }
-
-    ;-- Extract file(s) from the buffer
-    l_FileList:=""
-    l_Offset  :=&strFile
-    Loop
-    {
-        ;-- Get next
-        l_Next:=StrGet(l_Offset,-1)
-
-        ;-- End of list?
-        if not StrLen(l_Next)
-        {
-            ;-- If end-of-list occurs on the 2nd iteration, it means that only
-            ;   one file was selected
-            if (A_Index=2)
-                l_FileList:=l_FileName
-            Break
-        }
-
-        ;-- Assign to working variable
-        l_FileName:=l_Next
-
-        ;-- Update the offset for the next iteration
-        l_Offset+=(StrLen(l_FileName)+1)*TCharSize
-
-        ;-- If this is the first iteration, we have to wait until the next loop
-        ;   before we can determine if this is a directory or file and if a
-        ;   file, if it is the only file selected.
-        if (A_Index=1)
-        {
-            l_Dir:=l_FileName
-            ;-- Windows adds "\" character when in root of the drive but doesn't
-            ;   add it otherwise.  Adjust if needed.
-            if (StrLen(l_Dir)<>3 && p_Type="O")
-                l_Dir.="\"
-
-            ;-- Continue to next
-            Continue
-        }
-
-        ;-- Add the file to the list
-        if (p_Type="O")
-           l_FileList.=(StrLen(l_FileList) ? "`n":"") . l_Dir . l_FileName
-        else
-           l_FileList := Trim(Trim(l_Dir, "\"))
-    }
-
-    Return l_FileList
+   path := StrGet(pStr, "UTF-16")
+   DllCall("ole32\CoTaskMemFree", "Ptr", pStr)
+   Return path
 }
 
 SHGetKnownFolderPath(FOLDERID, KF_FLAG:=0) {                  ;   By SKAN on D356 @ tiny.cc/t-75602 

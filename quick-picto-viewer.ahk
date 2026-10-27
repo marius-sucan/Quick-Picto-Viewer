@@ -34464,43 +34464,25 @@ deleteSQLdbEntry(fullPath, dbIndex) {
 }
 
 openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIndex:="", chooseFilterIndex:=1, defaultEditField:="") {
+; p_Type: O = open, O1 = open with the «Open mode» combo, M = several files, S = save.
+; n_FilterIndex receives the «Open mode» item for O and O1, the file type index for M and S.
    thisHwnd := (AnyWindowOpen) ? hSetWinGui : PVhwnd
-   ; If (p_type="o")
-   ;    pattern .= "|All files (*.*)"
-
-   If FolderExist(startPath)
-      pathSymbol := "\"
-
-   If !chooseFilterIndex
-      chooseFilterIndex := 1
-
-   optionz .= " NoChangeDir HideReadOnly"
-   If InStr(p_type, "o")
+   If (p_Type="O1")
    {
-      entriesList := recentOpenedFolders()
-      If (p_type="o1")
-      {
-         thisCombo := "Open selected file only"
-         thisCombo .= "`nOpen in a new QPV instance"
-         thisCombo .= "`nIndex all images in current folder as well"
-         thisCombo .= "`nPerform recursive folder(s) scan to index images"
-         thisGroup := "Open mode"
-      }
-
-      FileMustExist := InStr(optionz, "FileMustExist") ? 1 : 0
-      zr := SelectFolderEx(startPath, msg, thisHwnd, nullLabel, thisCombo, 1, thisGroup, entriesList, 0, pattern, chooseFilterIndex, FileMustExist, defaultEditField)
-      r := zr.SelectedDir
-      n_FilterIndex := zr.SelectedCombo
-   } Else
-   {
-      If InStr(p_type, "m")
-         p_Type := "o"
-
-      r := Dlg_OpenSaveFile(p_Type, thisHwnd, msg, pattern, chooseFilterIndex, startPath pathSymbol, "", optionz,, n_FilterIndex)
-      optionz := ""
+      thisCombo := "Open selected file only"
+      thisCombo .= "`nOpen in a new QPV instance"
+      thisCombo .= "`nIndex all images in current folder as well"
+      thisCombo .= "`nPerform recursive folder(s) scan to index images"
+      thisGroup := "Open mode"
    }
 
-   r := Trimmer(r)
+   modus := (p_Type="S") ? "save" : (p_Type="M") ? "multi" : "open"
+   mustExist := InStr(optionz, "FileMustExist") ? 1 : 0
+   zr := ShellFileDialog(modus, thisHwnd, msg, startPath, defaultEditField, pattern, chooseFilterIndex, mustExist, dialogRecentFolders(modus="save"), 6, thisGroup, thisCombo)
+   If IsObject(zr)
+      n_FilterIndex := (modus="open") ? zr.combo : zr.type
+
+   r := Trimmer(zr.path)
    If (StrLen(r)<3)
       r := ""
 
@@ -63979,17 +63961,10 @@ OpenFolders(dummy:="") {
 }
 
 openFoldersDialogWrapper(startPath, msg:="") {
-   Static defaultu := "<Use current folder>"
    thisHwnd := (AnyWindowOpen>0) ? hSetWinGui : PVhwnd
-   entriesList := defaultu "`n" recentOpenedFolders()
-   r := SelectFolderEx(startPath, msg, thisHwnd, nullLabel, entriesList, 1, "History", entriesList)
-   If (!InStr(r.SelectedCombo, defaultu) && StrLen(r.SelectedCombo)>1)
-      z := r.SelectedCombo
-   Else If (StrLen(r.SelectedDir)>1)
-      z := r.SelectedDir
-
+   r := ShellFileDialog("folder", thisHwnd, msg, startPath,,,,, dialogRecentFolders(0))
    lastLongOperationAbort := A_TickCount
-   Return z
+   Return r.path
 }
 
 renewCurrentFilesList() {
@@ -102214,6 +102189,40 @@ recentOpenedFolders() {
       Sort, entriesList, UD`n
    }
    Return Trimmer(entriesList)
+}
+
+dialogRecentFolders(forSave:=0) {
+; the folders of the file dialogs' «Recent folders» menu: the save dialogs list
+; the save and copy/move destinations first, the other dialogs the opened folders
+   If (allowRecordHistory!=1 || userPrivateMode=1)
+      Return
+
+   openedList := prevOpenFolderPath "`n" readRecentOpenedFolderEntries()
+   destList := prevFileSavePath "`n" prevFileMovePath "`n"
+   Loop, 15
+   {
+      IniRead, newEntry, % mainRecentsFile, RecentFDestinations, E%A_Index%, @
+      destList .= newEntry "`n"
+   }
+
+   allList := (forSave=1) ? destList openedList : openedList destList
+   seen := {}, roots := {}
+   Loop, Parse, allList, `n, `r
+   {
+      folderu := Trimmer(StrReplace(A_LoopField, "|"))
+      folderu := RegExMatch(folderu, "^[a-zA-Z]:\\?$") ? SubStr(folderu, 1, 2) "\" : RTrim(folderu, "\")
+      If (StrLen(folderu)<3 || seen.HasKey(folderu) || RegExMatch(folderu, sldsPattern))
+         Continue
+
+      seen[folderu] := 1
+      ; one probe per drive or network share, so an offline one does not stall the dialog once per folder
+      RegExMatch(folderu, "^(\\\\[^\\]+\\[^\\]+|[a-zA-Z]:)", root)
+      If !roots.HasKey(root)
+         roots[root] := FolderExist(root) ? 1 : 0
+      If (roots[root]=1 && FolderExist(folderu))
+         listu .= folderu "`n"
+   }
+   Return listu
 }
 
 isFileLocked(imgPath) {
