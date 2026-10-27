@@ -63549,8 +63549,8 @@ combineFimOpenPages(imgPath, GFT, ByRef tPages) {
 
 combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) {
 ; Prepares one page and appends it to multiFim. It takes ownership of k: everything is
-; unloaded here. setW and setH are 0 when the page keeps its size. Returns 1 when the page
-; went in.
+; unloaded here. setW and setH are 0 when the page keeps its size. Returns 1 on succes.
+
    If !k
       Return 0
 
