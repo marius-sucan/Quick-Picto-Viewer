@@ -2296,3 +2296,48 @@ ConvertPBITMAPtoFIM(pBitmap, doLowerbits:=0) {
   }
   Return hFIFimgA
 }
+
+ConvertIndexedPBITMAPtoFIM(pBitmap) {
+; Converts an 8 bits indexed GDI+ bitmap to an 8 bits FreeImage bitmap with the same palette.
+; Palette entries that are not opaque go into the FreeImage transparency table.
+  If DllCall("gdiplus\GdipGetImagePaletteSize", "UPtr", pBitmap, "int*", palSize)
+     Return
+
+  VarSetCapacity(palette, palSize, 0)
+  If DllCall("gdiplus\GdipGetImagePalette", "UPtr", pBitmap, "UPtr", &palette, "int", palSize)
+     Return
+
+  Gdip_GetImageDimensions(pBitmap, imgW, imgH)
+  If Gdip_LockBits(pBitmap, 0, 0, imgW, imgH, Stride, Scan0, BitmapData, 1, 0x30803)   ; PixelFormat8bppIndexed
+     Return
+
+  hFIFimgA := FreeImage_ConvertFromRawBits(Scan0, imgW, imgH, Stride, 8, 0, 0, 0, 1)
+  Gdip_UnlockBits(pBitmap, BitmapData)
+  pPalette := FreeImage_GetPalette(hFIFimgA)
+  If !pPalette
+  {
+     FreeImage_UnLoad(hFIFimgA)
+     Return
+  }
+
+  ; an ARGB value has the byte order of an RGBQUAD: blue, green, red, then alpha in its reserved byte
+  colorsCount := Min(NumGet(palette, 4, "uint"), 256)
+  VarSetCapacity(alphas, 256, 255)
+  isTransparent := 0
+  Loop, % colorsCount
+  {
+     argb := NumGet(palette, 4 + A_Index*4, "uint")
+     NumPut(argb & 0xFFFFFF, pPalette + 0, (A_Index - 1)*4, "uint")
+     alpha := argb >> 24
+     NumPut(alpha, alphas, A_Index - 1, "uchar")
+     If (alpha<255)
+        isTransparent := 1
+  }
+
+  If isTransparent
+     FreeImage_SetTransparencyTable(hFIFimgA, &alphas, colorsCount)
+
+  Gdip_BitmapGetDPIresolution(pBitmap, dpiX, dpiY)
+  FreeImage_SetDPIresolution(hFIFimgA, dpiX, dpiY)
+  Return hFIFimgA
+}
