@@ -121,7 +121,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXL, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxl|jxr|wdp|hdp|ico|jng|png|tga|tif|tiff|webp))$", userJpegQuality := 90
    , userJpegSubsampling := 1, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
-   , userTiffCompression := 1, userPngCompression := 2
+   , userSaveImgCompressionLvl := 3
    , userPaletteDithering := 1, userPaletteTransparency := 0
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg;*.pdf;*.svg;*.tiff;*.jpe;*.ico", prevLoadedImageIndex := 0, mainExecPath
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
@@ -38510,8 +38510,7 @@ ReadSettingsSaveFormatOptions(act) {
     RegAction(act, "userJpegProgressive",, 1)
     RegAction(act, "userSaveImgLossless",, 1)
     RegAction(act, "userJxlEffort",, 2, 1, 9)
-    RegAction(act, "userTiffCompression",, 2, 1, 3)
-    RegAction(act, "userPngCompression",, 2, 1, 3)
+    RegAction(act, "userSaveImgCompressionLvl",, 2, 1, 4)
     RegAction(act, "userPaletteDithering",, 1)
     RegAction(act, "userPaletteTransparency",, 1)
 }
@@ -45127,8 +45126,7 @@ GuiAddSaveFormatOptions(firstPos) {
     slotW := (PrefsLargeFonts=1) ? 190 : 140
     slot2W := (PrefsLargeFonts=1) ? 125 : 90
     GuiAddDropDownList(firstPos " w" slotW " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "Chroma 4:2:0|Chroma 4:2:2|Chroma 4:4:4", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n4:2:0 - a quarter of the image resolution: the smallest files, fine for photos.`n4:2:2 - half of the horizontal resolution.`n4:4:4 - full resolution: sharp colored text and lines, larger files.")
-    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userTiffCompression " vuserTiffCompression", "LZW compression|ZIP compression|No compression", "TIFF compression", "TIFF compression. Both methods are lossless.`nZIP [Deflate] files are often smaller; uncompressed files open in more applications.")
-    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userPngCompression " vuserPngCompression", "Fast compression|Normal compression|Best compression", "PNG compression", "PNG files are always lossless: the compression only trades the saving speed for the file size.`nBest compression can be very slow on large photos.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "One option for the PNG and TIFF file formats. Both are always lossless:`nthe compression only trades the saving speed for the file size.`nPNG: zlib levels 1, 6 and 9. TIFF: LZW for fast and normal, ZIP [Deflate] for best.`nBest can be very slow on large PNG photos; uncompressed TIFF files open in more applications.")
     Gui, Add, Checkbox, xp yp wp hp gUIsaveFormatOptionsChanged Checked%userSaveImgLossless% vuserSaveImgLossless +hwndhTemp, Lossless
     ToolTip2ctrl(hTemp, "One option for the WebP, JPEG XL, JPEG XR and JPEG 2000 file formats:`nthe pixels are stored exactly and the quality setting does not apply.`nScreenshots and graphics often get smaller files this way.")
     Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, No options for this format
@@ -45141,9 +45139,9 @@ updateSaveFormatOptions(fmt) {
 ; Shows the options of fmt [a dialogSaveIndexes value], dims the quality slider where the quality
 ; does not apply and stores the options.
    Static fmtControls := {"jpg":"userJpegSubsampling|userJpegProgressive", "jng":"userJpegSubsampling"
-        , "tif":"userTiffCompression", "png":"userPngCompression", "webp":"userSaveImgLossless"
+        , "tif":"userSaveImgCompressionLvl", "png":"userSaveImgCompressionLvl", "webp":"userSaveImgLossless"
         , "jxl":"userSaveImgLossless|userJxlEffort", "jxr":"userSaveImgLossless", "jp2":"userSaveImgLossless"}
-   allControls := "userJpegSubsampling|userJpegProgressive|userTiffCompression|userPngCompression|userSaveImgLossless|userJxlEffort|uiSaveFmtNoOptions"
+   allControls := "userJpegSubsampling|userJpegProgressive|userSaveImgCompressionLvl|userSaveImgLossless|userJxlEffort|uiSaveFmtNoOptions"
    shown := "|" (fmtControls.HasKey(fmt) ? fmtControls[fmt] : "uiSaveFmtNoOptions") "|"
    Loop, Parse, allControls, |
       GuiControl, % InStr(shown, "|" A_LoopField "|") ? "SettingsGUIA: Show" : "SettingsGUIA: Hide", % A_LoopField
@@ -45204,7 +45202,7 @@ btnHelpSaveImgPanel() {
    If (AnyWindowOpen!=15)
       p := "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
 
-   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nJPEG chroma subsampling: 4:2:0 stores the colors at a quarter of the image resolution, for the smallest files; 4:4:4 keeps them whole, for sharp colored text and lines. Progressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always lossless: their compression only trades the saving speed for the file size.`n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nJPEG chroma subsampling: 4:2:0 stores the colors at a quarter of the image resolution, for the smallest files; 4:4:4 keeps them whole, for sharp colored text and lines. Progressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always lossless: their compression, one option for both formats, only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one.`n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -62181,8 +62179,8 @@ getFIMsaveArgs(file2save, quality:="") {
 ; The FreeImage save flags for the format of file2save, built from the user's save options.
 ; quality - 1 to 100; userJpegQuality when omitted. With lossless off, 100 is the best lossy quality.
    Static jpegSubsampling := {1:0x4000, 2:0x8000, 3:0x10000}   ; JPEG_SUBSAMPLING_420, JPEG_SUBSAMPLING_422, JPEG_SUBSAMPLING_444
-        , pngLevels := {1:1, 2:6, 3:9}                         ; zlib levels
-        , tiffModes := {1:0, 2:0x400, 3:0x800}                 ; TIFF_DEFAULT [LZW], TIFF_ADOBE_DEFLATE, TIFF_NONE
+        , pngLevels := {1:0x100, 2:1, 3:6, 4:9}                ; PNG_Z_NO_COMPRESSION, then zlib levels
+        , tiffModes := {1:0x800, 2:0, 3:0, 4:0x400}            ; TIFF_NONE, TIFF_DEFAULT [LZW] twice, TIFF_ADOBE_DEFLATE
 
    q := clampInRange(Round((quality!="") ? quality : userJpegQuality), 1, 100)
    ext := RegExMatch(file2save, "i)\.([a-z0-9]+)$", m) ? Format("{:L}", m1) : ""
@@ -62207,9 +62205,9 @@ getFIMsaveArgs(file2save, quality:="") {
       ; the compression ratio, 1 = lossless; the curve follows the JPEG file sizes of photos at the same quality
       saveArg := (userSaveImgLossless=1) ? 1 : clampInRange(Round(5.3 * (101 - q)**0.68), 2, 1023)
    } Else If (ext="png")
-      saveArg := pngLevels[clampInRange(userPngCompression, 1, 3)]
+      saveArg := pngLevels[clampInRange(userSaveImgCompressionLvl, 1, 4)]
    Else If isVarEqualTo(ext, "tif", "tiff")
-      saveArg := tiffModes[clampInRange(userTiffCompression, 1, 3)]
+      saveArg := tiffModes[clampInRange(userSaveImgCompressionLvl, 1, 4)]
    Else If isVarEqualTo(ext, "tga", "targa")
       saveArg := 2   ; TARGA_SAVE_RLE
    Else
