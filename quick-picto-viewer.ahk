@@ -120,7 +120,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxl|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXL, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxl|jxr|wdp|hdp|ico|jng|png|tga|tif|tiff|webp))$", userJpegQuality := 90
-   , userJpegSubsampling := 1, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
+   , userJpegSubsampling := 2, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
    , userSaveImgCompressionLvl := 3
    , userPaletteDithering := 1, userPaletteTransparency := 0
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg;*.pdf;*.svg;*.tiff;*.jpe;*.ico", prevLoadedImageIndex := 0, mainExecPath
@@ -45073,13 +45073,13 @@ PanelSaveImg() {
        fmtChoice := isInRange(userDesireWriteFMT, 1, 14) ? userDesireWriteFMT : saveFormatIndexFromPath(".png")
 
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
-    Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFoderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open file dialog in a previous location
+    Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFolderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open file dialog in a previous location
     If !entriesList
        GuiControl, SettingsGUIA: Disable, usePrevSaveFolder
 
     GuiAddDropDownList("xp+15 y+7 wp+135 vuserDestinationFolder", entriesList, "Recent folders")
     Gui, Add, Text, xs y+10 hp +0x200, Save options:
-    Gui, Add, Checkbox, xp+15 y+10 hp Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
+    Gui, Add, Checkbox, xp+15 y+7 hp Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
 
     fmtWid := (PrefsLargeFonts=1) ? 110 : 80
     GuiAddDropDownList("xp y+8 w" fmtWid " AltSubmit gUIsaveFormatOptionsChanged Choose" fmtChoice " vuiSaveFmtChoice", userPossibleWriteFMTs "|.ICO", "File format", "File format: the options shown are those of this format.`nThe save dialog opens with it.")
@@ -45091,7 +45091,7 @@ PanelSaveImg() {
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     Gui, Add, Checkbox, xs+15 y+8 w%thisWid% gUIsaveFormatOptionsChanged Checked%userPaletteDithering% vuserPaletteDithering +hwndhTemp, Dithering
     ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
-    Gui, Add, Checkbox, x+15 gUIsaveFormatOptionsChanged Checked%userPaletteTransparency% vuserPaletteTransparency +hwndhTemp, Keep transparency
+    Gui, Add, Checkbox, x+20 gUIsaveFormatOptionsChanged Checked%userPaletteTransparency% vuserPaletteTransparency +hwndhTemp, Keep transparency
     ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
     Gui, Add, Text, xs y+10, Image file status
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
@@ -45125,14 +45125,15 @@ GuiAddSaveFormatOptions(firstPos) {
     Global uiSaveFmtNoOptions
     slotW := (PrefsLargeFonts=1) ? 190 : 140
     slot2W := (PrefsLargeFonts=1) ? 135 : 95
-    GuiAddDropDownList(firstPos " w" slotW " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "Chroma 4:2:0|Chroma 4:2:2|Chroma 4:4:4", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n4:2:0 - a quarter of the image resolution: the smallest files, fine for photos.`n4:2:2 - half of the horizontal resolution.`n4:4:4 - full resolution: sharp colored text and lines, larger files.")
+    GuiAddDropDownList(firstPos " w" slotW " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 color details|1/2 color details (recommended)|1/1 full color details", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
     GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
-    Gui, Add, Checkbox, xp yp wp hp gUIsaveFormatOptionsChanged Checked%userSaveImgLossless% vuserSaveImgLossless +hwndhTemp, Lossless
+    Gui, Add, Checkbox, xp yp wp hp gUIsaveFormatOptionsChanged Checked%userSaveImgLossless% vuserSaveImgLossless +hwndhTemp, Lossless save
     ToolTip2ctrl(hTemp, "Screenshots and graphics often yield smaller files when saved with «Lossless» activated.")
     Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
     Gui, Add, Checkbox, x+5 yp w%slot2W% hp gUIsaveFormatOptionsChanged Checked%userJpegProgressive% vuserJpegProgressive +hwndhTemp, Progressive
     ToolTip2ctrl(hTemp, "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
-    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
+    slot2W := (PrefsLargeFonts=1) ? 85 : 50
+    GuiAddDropDownList("xp yp w" slot2W " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
 }
 
 updateSaveFormatOptions(fmt) {
@@ -45202,7 +45203,7 @@ btnHelpSaveImgPanel() {
    If (AnyWindowOpen!=15)
       p := "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
 
-   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nJPEG chroma subsampling: 4:2:0 stores the colors at a quarter of the image resolution, for the smallest files; 4:4:4 keeps them whole, for sharp colored text and lines. Progressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always lossless: their compression, one option for both formats, only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one.`n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nProgressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always losslessly storing the image data. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -46736,7 +46737,7 @@ ReadSettingsQuickKeysActsPanel(act:=0) {
    INIaction(act, "allowUserQuickFileActions", "General", 1)
 }
 
-TglUsePrevSaveFoderu() {
+TglUsePrevSaveFolderu() {
    Gui, SettingsGUIA: Default
    GuiControlGet, usePrevSaveFolder
    actu := (usePrevSaveFolder=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
