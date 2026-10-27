@@ -228,6 +228,12 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
       Return 0
    }
 
+   If uiFileDialogShown()  ; the menus of an open/save dialog belong to Windows
+   {
+      Critical, %prevCrit%
+      Return 0
+   }
+
    If (whileLoopExec=1 || animGIFplaying=1 || slideShowRunning=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
    {
       If (slideShowRunning=1 || animGIFplaying=1 || colorPickerModeNow=1)
@@ -278,6 +284,16 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
       uiMenuLoopExit()
    Critical, %prevCrit%
    Return 0
+}
+
+uiFileDialogShown(newState:="") {
+; set while an open/save dialog is shown: it runs on this thread, so its menus
+; reach uiCallWndProcWork(). Returns the state from before the call.
+   Static shown := 0
+   prevState := shown
+   If (newState!="")
+      shown := newState
+   Return prevState
 }
 
 uiMenuBarJITrebuild(hMenu) {

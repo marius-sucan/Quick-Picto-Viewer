@@ -3080,7 +3080,9 @@ InvokeOpenWithMenu(imgPath) {
 
 browseExternalApp() {
    pattern := "Executable files (*.exe)"
+   prevDlgState := uiFileDialogShown(1)
    FileSelectFile, imgPath, 3, % prevOpenFolderPath, Choose EXE application file, % pattern
+   uiFileDialogShown(prevDlgState)
    If FileExist(imgPath)
    {
       UserExternalApp := imgPath
@@ -3091,7 +3093,9 @@ browseExternalApp() {
 
 browseExternalEditApp() {
    pattern := "Executable files (*.exe)"
+   prevDlgState := uiFileDialogShown(1)
    FileSelectFile, imgPath, 3, % prevOpenFolderPath, Choose EXE application file, % pattern
+   uiFileDialogShown(prevDlgState)
    If FileExist(imgPath)
    {
       UserExternalEditApp := imgPath
@@ -34464,23 +34468,26 @@ deleteSQLdbEntry(fullPath, dbIndex) {
 }
 
 openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIndex:="", chooseFilterIndex:=1, defaultEditField:="") {
-; p_Type: O = open, O1 = open with the «Open mode» combo, M = several files, S = save.
-; n_FilterIndex receives the «Open mode» item for O and O1, the file type index for M and S.
+; p_Type: O = open, O1 = open with the open modes on the Open button, M = several files, S = save.
+; n_FilterIndex receives the open mode picked for O1, the file type index for M and S.
    thisHwnd := (AnyWindowOpen) ? hSetWinGui : PVhwnd
    If (p_Type="O1")
    {
-      thisCombo := "Open selected file only"
-      thisCombo .= "`nOpen in a new QPV instance"
-      thisCombo .= "`nIndex all images in current folder as well"
-      thisCombo .= "`nPerform recursive folder(s) scan to index images"
-      thisGroup := "Open mode"
+      ; the Open button itself opens the selected file only
+      openModes := "&Open"
+      openModes .= "`nOpen in a new QPV instance"
+      openModes .= "`nIndex all images in current folder as well"
+      openModes .= "`nPerform recursive folder(s) scan to index images"
    }
 
    modus := (p_Type="S") ? "save" : (p_Type="M") ? "multi" : "open"
    mustExist := InStr(optionz, "FileMustExist") ? 1 : 0
-   zr := ShellFileDialog(modus, thisHwnd, msg, startPath, defaultEditField, pattern, chooseFilterIndex, mustExist, dialogRecentFolders(modus="save"), 6, thisGroup, thisCombo)
+   recentFolders := dialogRecentFolders(modus="save")
+   prevDlgState := uiFileDialogShown(1)
+   zr := ShellFileDialog(modus, thisHwnd, msg, startPath, defaultEditField, pattern, chooseFilterIndex, mustExist, recentFolders, 6, openModes)
+   uiFileDialogShown(prevDlgState)
    If IsObject(zr)
-      n_FilterIndex := (modus="open") ? zr.combo : zr.type
+      n_FilterIndex := (modus="open") ? zr.choice : zr.type
 
    r := Trimmer(zr.path)
    If (StrLen(r)<3)
@@ -63962,7 +63969,10 @@ OpenFolders(dummy:="") {
 
 openFoldersDialogWrapper(startPath, msg:="") {
    thisHwnd := (AnyWindowOpen>0) ? hSetWinGui : PVhwnd
-   r := ShellFileDialog("folder", thisHwnd, msg, startPath,,,,, dialogRecentFolders(0))
+   recentFolders := dialogRecentFolders(0)
+   prevDlgState := uiFileDialogShown(1)
+   r := ShellFileDialog("folder", thisHwnd, msg, startPath,,,,, recentFolders)
+   uiFileDialogShown(prevDlgState)
    lastLongOperationAbort := A_TickCount
    Return r.path
 }
@@ -64412,8 +64422,11 @@ OpenDialogFiles() {
     pattern := "Common image formats (" openFptrn1 ";" openFptrn2 ";" openFptrn4 ";*.sld*)"
     patternObj := fileImgFormatsOpenDialog(1)
     If isWinXP
+    {
+       prevDlgState := uiFileDialogShown(1)
        FileSelectFile, imgPath, 3, % prevOpenFolderPath, Open Image file, % pattern
-    Else
+       uiFileDialogShown(prevDlgState)
+    } Else
        imgPath := openFileDialogWrapper("O1", "-", prevOpenFolderPath, "Open image or slideshow...", patternObj, chosenOption, 3, "open-folder")
 
     lastInvoked := A_TickCount
@@ -64460,7 +64473,7 @@ OpenDialogFiles() {
       }
  
       doNotRecursive := InStr(chosenOption, "perform") ? "" : "|"
-      If (RegExMatch(imgPath, RegExFilesPattern) && FileRexists(imgPath) && InStr(chosenOption, "selected"))
+      If (RegExMatch(imgPath, RegExFilesPattern) && FileRexists(imgPath) && chosenOption="&Open")
       {
          SLDtypeLoaded := 1
          RecordImagesOpenedManager(imgPath)

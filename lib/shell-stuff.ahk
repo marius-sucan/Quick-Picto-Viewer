@@ -1,4 +1,4 @@
-﻿ShellFileDialog(dlgMode, ownerHwnd:=0, dlgTitle:="", startPath:="", fileName:="", filters:="", typeIndex:=1, fileMustExist:=1, recentFolders:="", sidePlaces:=6, comboLabel:="", comboList:="") {
+﻿ShellFileDialog(dlgMode, ownerHwnd:=0, dlgTitle:="", startPath:="", fileName:="", filters:="", typeIndex:=1, fileMustExist:=1, recentFolders:="", sidePlaces:=6, okChoices:="") {
 ; The Common Item Dialog [Windows Vista and later], with a "Recent folders" menu that moves
 ; the dialog to the folder picked.
 ;    dlgMode        - "open", "multi" [several files], "save" or "folder"
@@ -7,8 +7,8 @@
 ;    filters        - "Text files (*.txt)|All files (*.*)" or an object {"Text files": "*.txt"}
 ;    typeIndex      - the file type selected, 1-based
 ;    recentFolders  - `n separated folders for the menu; the first sidePlaces also go in the navigation pane
-;    comboLabel, comboList - an optional combo box, its items `n separated
-; Returns {path, type, combo} or "" when cancelled; "multi" gives the paths `n separated.
+;    okChoices      - `n separated items of a drop-down on the OK button; the first one is the button's label
+; Returns {path, type, choice} or "" when cancelled; "multi" gives the paths `n separated.
 ; Without the Common Item Dialog [Windows XP] it falls back to FileSelectFile / FileSelectFolder.
 
    Static dlgCount := 0
@@ -65,7 +65,7 @@
             picked := files
          }
       }
-      Return (picked!="") ? {path: picked, type: typeIndex, combo: ""} : ""
+      Return (picked!="") ? {path: picked, type: typeIndex, choice: ""} : ""
    }
 
    vt := NumGet(pDlg+0, "UPtr")
@@ -122,17 +122,17 @@
       }
    }
 
-   folders := [], comboItems := []
+   folders := [], choices := []
    Loop, Parse, recentFolders, `n, `r
    {
       If (A_LoopField!="")
          folders.Push(A_LoopField)
    }
 
-   Loop, Parse, comboList, `n, `r
+   Loop, Parse, okChoices, `n, `r
    {
       If (Trim(A_LoopField)!="")
-         comboItems.Push(Trim(A_LoopField))
+         choices.Push(Trim(A_LoopField))
    }
 
    placesCount := (sidePlaces>0) ? Min(sidePlaces, folders.Length()) : 0
@@ -160,20 +160,17 @@
       }
    }
 
-   hasCombo := (comboLabel!="" && comboItems.Length()) ? 1 : 0
-   If (folders.Length() || hasCombo)
+   If (folders.Length() || choices.Length())
       Try pCust := ComObjQuery(pDlg, "{e6fdd21a-163f-4975-9c8c-a69f1ba37034}") ; IID_IFileDialogCustomize
    If pCust
    {
       cv := NumGet(pCust+0, "UPtr")
-      If hasCombo
+      If choices.Length()
       {
-         DllCall(NumGet(cv+26*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 1, "WStr", comboLabel) ; IFileDialogCustomize::StartVisualGroup
-         DllCall(NumGet(cv+6*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2) ; IFileDialogCustomize::AddComboBox
-         For i, item in comboItems
+         ; picking an item closes the dialog like the button itself does
+         DllCall(NumGet(cv+3*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2) ; IFileDialogCustomize::EnableOpenDropDown
+         For i, item in choices
             DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt", i, "WStr", item) ; IFileDialogCustomize::AddControlItem
-         DllCall(NumGet(cv+25*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt", 1) ; IFileDialogCustomize::SetSelectedControlItem
-         DllCall(NumGet(cv+27*A_PtrSize, "UPtr"), "Ptr", pCust) ; IFileDialogCustomize::EndVisualGroup
       }
 
       If folders.Length()
@@ -229,11 +226,16 @@
 
       If (paths!="")
       {
-         r := {path: paths, type: typeIndex, combo: ""}
+         r := {path: paths, type: typeIndex, choice: ""}
          If (dlgMode!="folder" && !DllCall(NumGet(vt+6*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt*", idx)) ; IFileDialog::GetFileTypeIndex
             r.type := idx
-         If (hasCombo && pCust && !DllCall(NumGet(cv+24*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt*", sel)) ; IFileDialogCustomize::GetSelectedControlItem
-            r.combo := comboItems[sel]
+         If (choices.Length() && pCust)
+         {
+            ; the button itself stands for the first item
+            If (DllCall(NumGet(cv+24*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt*", sel) || !choices.HasKey(sel)) ; IFileDialogCustomize::GetSelectedControlItem
+               sel := 1
+            r.choice := choices[sel]
+         }
       }
    }
 
