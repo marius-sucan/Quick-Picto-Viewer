@@ -9495,12 +9495,11 @@ Gdip_BitmapConvertFormat(pBitmap, PixelFormat, DitherType, DitherPaletteType, Pa
 ; Ordered4x4 = 2
 ; Ordered8x8 = 3
 ; Ordered16x16 = 4
-; Ordered91x91 = 5
-; Spiral4x4 = 6
-; Spiral8x8 = 7
-; DualSpiral4x4 = 8
-; DualSpiral8x8 = 9
-; ErrorDiffusion = 10   ; may be used with any palette
+; Spiral4x4 = 5
+; Spiral8x8 = 6
+; DualSpiral4x4 = 7
+; DualSpiral8x8 = 8
+; ErrorDiffusion = 9   ; may be used with any palette
 ; Return 0 = OK - Success
 
    VarSetCapacity(hPalette, 4 * PaletteEntries + 8, 0)
