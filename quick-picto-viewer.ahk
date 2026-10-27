@@ -117,9 +117,12 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|WEBP|AVIF|HEIC|HEIF|JXL|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
    , multiPageAnimTypesRegEx := "i)(.\.(apng|png|mng|webp|gif|avif|heif|heic|jxl))$", multiPageFilesREGex := "i)(.\.(pdf|tif|tiff|jxl))$"
-   , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
-   , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
-   , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxr|wdp|hdp|ico|png|tga|tif|tiff|webp))$", userJpegQuality := 90
+   , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxl|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
+   , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXL, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
+   , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxl|jxr|wdp|hdp|ico|jng|png|tga|tif|tiff|webp))$", userJpegQuality := 90
+   , userJpegSubsampling := 1, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
+   , userSaveImgCompressionLvl := 3
+   , userPaletteDithering := 1, userPaletteTransparency := 0
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg;*.pdf;*.svg;*.tiff;*.jpe;*.ico", prevLoadedImageIndex := 0, mainExecPath
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
@@ -18641,6 +18644,39 @@ trGdip_GraphicsClear(funcu, pGraphics, coloru:=0x00ffFFff, silentMode:=0) {
 }
 
 QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
+; Saves pBitmap with FreeImage and the user's save options. GDI+ is used only when FreeImage is not available.
+; depthLevel: 1 = 32 bits, 2 = 24 bits, 3 = 16 bits [RGB555], 4 = 8 bits palette. GIF files are always 8 bits.
+; The color depth reductions change pBitmap.
+   Static dephtus := {1:32, 2:24, 3:16, 4:8}
+
+   initFIMGmodule()
+   If (wasInitFIMlib!=1)
+      Return QPV_SaveImageFileGDIp(funcu, pBitmap, file2save, jpegQuality, depthLevel)
+
+   depth := dephtus[depthLevel] ? dephtus[depthLevel] : 32
+   If (depth=8 || RegExMatch(file2save, "i)\.gif$"))
+   {
+      depth := 8
+      pf := Gdip_GetImagePixelFormat(pBitmap, 2)
+      If (pf!="8-INDEXED")
+      {
+         E := QPV_GdipPalettizeBitmap(pBitmap, userPaletteDithering, (userPaletteTransparency=1 && InStr(pf, "ARGB")))
+         If E
+            addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without dithering or transparency.")
+      }
+   } Else If (depth=16)
+   {
+      Gdip_BitmapSetColorDepth(pBitmap, 16, 1)   ; RGB555, ordered dithering
+   }
+
+   r := SaveFIMfile(file2save, pBitmap, depth, jpegQuality)
+   If r
+      addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed to save image with FreeImage: " file2save "`nError code: " r)
+   Return r
+}
+
+QPV_SaveImageFileGDIp(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
+; Without FreeImage, GDI+ can save BMP, GIF, JPEG, PNG and TIFF files, with the JPEG quality as the only option.
    Static dephtus := {1:32, 2:24, 3:16, 4:8, 5:0}
 
    If (dephtus[depthLevel]>1 && depthLevel!=1)
@@ -18658,7 +18694,6 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
          Gdip_BitmapSetColorDepth(pBitmap, 24, 1)
    }
 
-   ; fnOutputDebug(A_ThisFunc "|" pf "|" allow "|" depthLevel)
    r := Gdip_SaveBitmapToFile(pBitmap, file2save, jpegQuality)
    If (r=-5)
       r := Gdip_ErrorHandler(gdipLastError, 0)
@@ -18666,20 +18701,19 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
       r .= " / " A_LastError
 
    If r
-   {
-      pf := Gdip_GetImagePixelFormat(pBitmap, 2)
-      zg := (pf="24-RGB") ? 24 : 32
-      if (zg=24 && depthLevel=1)
-         depthLevel := 2
-
       addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed to save image with GDI+: " file2save "`nError code: " r)
-      zr := SaveFIMfile(file2save, pBitmap, dephtus[depthLevel], fileEXT, zg)
-      If (!zr && wasInitFIMlib=1)
-         r := zr
-      Else If (wasInitFIMlib=1)
-         addJournalEntry(A_ThisFunc "() invoked by " funcu "() failed to save image with FreeImage: " file2save "`nError code: " zr)
-   }
    Return r
+}
+
+QPV_GdipPalettizeBitmap(pBitmap, useDithering, keepTransparency) {
+; Converts pBitmap to 8 bits indexed with an optimal [median cut] palette.
+; keepTransparency=1: pixels less than half opaque take the palette's transparent entry.
+   VarSetCapacity(palette, 8 + 4*256, 0)
+   NumPut(256, palette, 4, "uint")
+   E := DllCall("gdiplus\GdipInitializePalette", "UPtr", &palette, "uint", 1, "uint", keepTransparency ? 255 : 256, "Int", keepTransparency ? 1 : 0, "UPtr", pBitmap)   ; PaletteTypeOptimal
+   If !E
+      E := DllCall("gdiplus\GdipBitmapConvertFormat", "UPtr", pBitmap, "uint", 0x30803, "uint", useDithering ? 9 : 1, "uint", 1, "UPtr", &palette, "float", keepTransparency ? 50 : 0)   ; PixelFormat8bppIndexed, DitherTypeErrorDiffusion or DitherTypeSolid, PaletteTypeOptimal
+   Return E
 }
 
 warnUserFatalBitmapError(pBitmap, funcu) {
@@ -38460,6 +38494,7 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "userVPsvgScale",, 2, 1, 10)
     RegAction(act, "userVPpdfDPI",, 2, 72, 3500)
     RegAction(act, "userPDFdpi",, 2, 72, 3500)
+    ReadSettingsSaveFormatOptions(act)
     ReadSettingsAdjustToneMapPanel(0)
     If (act=0)
     {
@@ -38467,6 +38502,17 @@ coreReadSettingsImageProcessing(act) {
        decideUserImgRotationOption()
        rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
     }
+}
+
+ReadSettingsSaveFormatOptions(act) {
+; the options of the file formats, used by getFIMsaveArgs() and QPV_SaveImageFile()
+    RegAction(act, "userJpegSubsampling",, 2, 1, 3)
+    RegAction(act, "userJpegProgressive",, 1)
+    RegAction(act, "userSaveImgLossless",, 1)
+    RegAction(act, "userJxlEffort",, 2, 1, 9)
+    RegAction(act, "userSaveImgCompressionLvl",, 2, 1, 4)
+    RegAction(act, "userPaletteDithering",, 1)
+    RegAction(act, "userPaletteTransparency",, 1)
 }
 
 multiCoreThreadFormatConvert(coreThread, filesList) {
@@ -38892,6 +38938,7 @@ readMainSettingsApp(act) {
        msgDisplayTime := DisplayTimeUser*1000
        calcHUDsize()
     }
+    ReadSettingsSaveFormatOptions(act)
     setLVrowsCount()
 }
 
@@ -43862,7 +43909,7 @@ PanelExtractFrames() {
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Color depth:
-    GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
+    GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     Gui, Add, Text, xs+15 y+7 w%ml% +0x200 +hwndhTemp -wrap, File format on save:
@@ -43988,7 +44035,7 @@ PanelCombineImagesMultipage() {
     Gui, Add, Checkbox, xs y+5 hp Checked%userCombineSubFrames% vuserCombineSubFrames, Join contained frames from selected files
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine1 +hwndhTemp, Maximum color depth:
-    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]", [hTemp])
+    GuiAddDropDownList("x+1 w" thisWid " AltSubmit Choose" userSaveBitsDepth " vuserSaveBitsDepth gBtnChangeMultiPageFmt", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
     Gui, Add, Checkbox, x+5 hp Checked%userCombineDepthDithering% vuserCombineDepthDithering, Dithering
     Gui, Add, Text, xs y+10 w%ml% hp +0x200 vtxtLine2, Frames delay (in milisec.)
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
@@ -44471,15 +44518,27 @@ calculateThumbsSheetDimensions(ByRef width, ByRef height) {
 
 getSaveDialogIndexForFile(imgPath, ByRef defFMTindex, allowExtended:=0, defaultu:=0) {
    Static extended := {"hdr":15, "exr":16, "pfm":17}
-   defFMTindex := (defaultu>0) ? defaultu : 7
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
-   Loop, Parse, dialogSaveFptrn, |
-   {
-        If InStr(A_LoopField, "." oEXT)
-           defFMTindex := A_Index
-   }
+   defFMTindex := saveFormatIndexFromPath(imgPath)
+   If !defFMTindex
+      defFMTindex := (defaultu>0) ? defaultu : saveFormatIndexFromPath(".png")
    If (allowExtended=1 && extended[oExt])
       defFMTindex := extended[oExt]
+}
+
+saveFormatIndexFromPath(imgPath) {
+; Returns the index in dialogSaveIndexes [1 to 14] of the file type of imgPath, or 0 when it cannot be saved.
+   Static aliases := {"jpeg":"jpg", "jpe":"jpg", "jif":"jpg", "tiff":"tif", "wdp":"jxr", "hdp":"jxr", "j2k":"jp2", "j2c":"jp2", "targa":"tga"}
+   ext := RegExMatch(imgPath, "i)\.([a-z0-9]+)$", m) ? Format("{:L}", m1) : ""
+   If aliases.HasKey(ext)
+      ext := aliases[ext]
+
+   Loop, 14
+   {
+      If (ext!="" && dialogSaveIndexes[A_Index]=ext)
+         Return A_Index
+   }
+   Return 0
 }
 
 generateThumbsSheet() {
@@ -44919,7 +44978,7 @@ BTNsetImgWallpaper() {
 }
 
 PanelSaveImg() {
-    Global userDestinationFolder, editF5
+    Global userDestinationFolder, editF5, uiSaveFmtChoice, btnSaveImgNow, btnSaveImgAs
     If (thumbsDisplaying=1)
     {
        PanelSaveSlideShowu()
@@ -45006,6 +45065,13 @@ PanelSaveImg() {
        bonusChoice := "|Original"
     }
 
+    ; the format the «Save image» button writes, else the last one chosen in the save dialog
+    ReadSettingsSaveFormatOptions(0)
+    isMemoryImg := (InStr(imgPath, "Q:\temporary memory object\") || !imgPath) ? 1 : 0
+    fmtChoice := isMemoryImg ? 0 : saveFormatIndexFromPath(getIMGsaveDestination(currentFileIndex))
+    If !fmtChoice
+       fmtChoice := isInRange(userDesireWriteFMT, 1, 14) ? userDesireWriteFMT : saveFormatIndexFromPath(".png")
+
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFoderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open file dialog in a previous location
     If !entriesList
@@ -45015,11 +45081,18 @@ PanelSaveImg() {
     Gui, Add, Text, xs y+10 hp +0x200, Save options:
     Gui, Add, Checkbox, xp+15 y+10 hp Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
 
+    fmtWid := (PrefsLargeFonts=1) ? 110 : 80
+    GuiAddDropDownList("xp y+8 w" fmtWid " AltSubmit gUIsaveFormatOptionsChanged Choose" fmtChoice " vuiSaveFmtChoice", userPossibleWriteFMTs "|.ICO", "File format", "File format: the options shown are those of this format.`nThe save dialog opens with it.")
+    GuiAddSaveFormatOptions("x+10 yp")
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "xp y+8 w" thisWid + 10 " hp", "This only applies to the JPEG and WEBP file formats")
-    GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB|8 bits RGB [256 colors]" bonusChoice, "Color depth")
+    GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "xs+15 y+8 w" thisWid + 10 " hp", saveQualityTip(1))
+    GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]" bonusChoice, "Color depth")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
+    Gui, Add, Checkbox, xs+15 y+8 gUIsaveFormatOptionsChanged Checked%userPaletteDithering% vuserPaletteDithering +hwndhTemp, Dithering
+    ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
+    Gui, Add, Checkbox, x+15 gUIsaveFormatOptionsChanged Checked%userPaletteTransparency% vuserPaletteTransparency +hwndhTemp, Keep transparency
+    ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
     Gui, Add, Text, xs y+10, Image file status
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
     Gui, Add, Text, xp+15 y+7 w%txtWid% -wrap, % "File size: " fileSizu FileDateM "`n" fileStatus
@@ -45033,26 +45106,103 @@ PanelSaveImg() {
        GuiControl, Disable, userDestinationFolder
 
     btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBTNsaveImgPanel +hwndhTemp, &Save image
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBTNsaveImgPanel vbtnSaveImgNow +hwndhTemp, &Save image
     imgPath := getIMGsaveDestination(currentFileIndex)
     imgPath := FileExist(imgPath) ? PathCompact(imgPath, 65) : "TO BE DECIDED"
-    ToolTip2ctrl(hTemp, "File save destination:`n" imgPath)
-    Gui, Add, Button, x+0 h%thisBtnHeight% w35 gBTNsaveImgPanel +hwndhTemp, &AS
+    ToolTip2ctrl(hTemp, "File save destination:`n" imgPath "`nThe file keeps its format. To save it in another format, use «As».")
+    Gui, Add, Button, x+0 h%thisBtnHeight% w35 gBTNsaveImgPanel vbtnSaveImgAs +hwndhTemp, &AS
     ToolTip2ctrl(hTemp, "Save image file as...")
     Gui, Add, Button, x+15 hp w%btnWid% gBtnCopyImageClip, &Copy to clipboard
     btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+5 hp w%btnWid2% gBtnCloseWindow, C&ancel
-    GuiRefreshSliders()
+    updateUIsavePanel()
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save image file: " appTitle)
+}
+
+GuiAddSaveFormatOptions(firstPos) {
+; Adds the file format options in two slots, beginning at firstPos [Gui option string]. The controls
+; of all the formats overlap; updateSaveFormatOptions() shows those of the chosen format.
+    Global uiSaveFmtNoOptions
+    slotW := (PrefsLargeFonts=1) ? 190 : 140
+    slot2W := (PrefsLargeFonts=1) ? 125 : 90
+    GuiAddDropDownList(firstPos " w" slotW " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "Chroma 4:2:0|Chroma 4:2:2|Chroma 4:4:4", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n4:2:0 - a quarter of the image resolution: the smallest files, fine for photos.`n4:2:2 - half of the horizontal resolution.`n4:4:4 - full resolution: sharp colored text and lines, larger files.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "One option for the PNG and TIFF file formats. Both are always lossless:`nthe compression only trades the saving speed for the file size.`nPNG: zlib levels 1, 6 and 9. TIFF: LZW for fast and normal, ZIP [Deflate] for best.`nBest can be very slow on large PNG photos; uncompressed TIFF files open in more applications.")
+    Gui, Add, Checkbox, xp yp wp hp gUIsaveFormatOptionsChanged Checked%userSaveImgLossless% vuserSaveImgLossless +hwndhTemp, Lossless
+    ToolTip2ctrl(hTemp, "One option for the WebP, JPEG XL, JPEG XR and JPEG 2000 file formats:`nthe pixels are stored exactly and the quality setting does not apply.`nScreenshots and graphics often get smaller files this way.")
+    Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, No options for this format
+    Gui, Add, Checkbox, x+5 yp w%slot2W% hp gUIsaveFormatOptionsChanged Checked%userJpegProgressive% vuserJpegProgressive +hwndhTemp, Progressive
+    ToolTip2ctrl(hTemp, "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "Effort 1|Effort 2|Effort 3|Effort 4|Effort 5|Effort 6|Effort 7|Effort 8|Effort 9", "JPEG XL effort", "JPEG XL encoder effort: 1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
+}
+
+updateSaveFormatOptions(fmt) {
+; Shows the options of fmt [a dialogSaveIndexes value], dims the quality slider where the quality
+; does not apply and stores the options.
+   Static fmtControls := {"jpg":"userJpegSubsampling|userJpegProgressive", "jng":"userJpegSubsampling"
+        , "tif":"userSaveImgCompressionLvl", "png":"userSaveImgCompressionLvl", "webp":"userSaveImgLossless"
+        , "jxl":"userSaveImgLossless|userJxlEffort", "jxr":"userSaveImgLossless", "jp2":"userSaveImgLossless"}
+   allControls := "userJpegSubsampling|userJpegProgressive|userSaveImgCompressionLvl|userSaveImgLossless|userJxlEffort|uiSaveFmtNoOptions"
+   shown := "|" (fmtControls.HasKey(fmt) ? fmtControls[fmt] : "uiSaveFmtNoOptions") "|"
+   Loop, Parse, allControls, |
+      GuiControl, % InStr(shown, "|" A_LoopField "|") ? "SettingsGUIA: Show" : "SettingsGUIA: Hide", % A_LoopField
+
+   hasLossless := isVarEqualTo(fmt, "webp", "jxl", "jxr", "jp2")
+   uiSlidersArray["userJpegQuality", 10] := (isVarEqualTo(fmt, "jpg", "jng") || hasLossless && userSaveImgLossless!=1) ? 1 : 0
+   ReadSettingsSaveFormatOptions(1)
+}
+
+UIsaveFormatOptionsChanged() {
+   If (AnyWindowOpen=35)
+   {
+      updateUIsavePanel()
+   } Else If (AnyWindowOpen=15)
+   {
+      Gui, SettingsGUIA: Default
+      Gui, SettingsGUIA: Submit, NoHide
+      RegAction(1, "userDesireWriteFMT")
+      updateSaveFormatOptions(saveImgFormatsList[userDesireWriteFMT])
+      GuiRefreshSliders()
+   }
+}
+
+updateUIsavePanel() {
+   If (AnyWindowOpen!=35)
+      Return
+
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: Submit, NoHide
+   GuiControlGet, fmtIndex,, uiSaveFmtChoice
+   fmt := dialogSaveIndexes[fmtIndex]
+   updateSaveFormatOptions(fmt)
+   actu := (fmt="gif" || userSaveBitsDepth=4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actu, userPaletteDithering
+   GuiControl, % actu, userPaletteTransparency
+   GuiControl, % (fmt="gif") ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable", userSaveBitsDepth
+
+   ; «Save image» writes the file in its own format; an image only in memory always opens the save dialog
+   imgPath := getIDimage(currentFileIndex)
+   isMemoryImg := (InStr(imgPath, "Q:\temporary memory object\") || !imgPath) ? 1 : 0
+   canSave := (isMemoryImg || saveFormatIndexFromPath(getIMGsaveDestination(currentFileIndex))=fmtIndex) ? 1 : 0
+   GuiControl, % canSave ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable", btnSaveImgNow
+   defaultBtn := canSave ? "btnSaveImgNow" : "btnSaveImgAs"
+   GuiControl, SettingsGUIA: +Default, % defaultBtn
+   GuiRefreshSliders()
+}
+
+saveQualityTip(inSavePanel:=0) {
+   r := "The quality applies to the JPG, JNG, WEBP, JXL, JXR and JP2 file formats.`nWith «Lossless» off, 100 gives the best lossy quality."
+   If !inSavePanel
+      r .= "`nThe other file format options are set in the «Save image» panel."
+   Return r
 }
 
 btnHelpSaveImgPanel() {
    If (AnyWindowOpen=84)
       f := "`n `nWhen pages are extracted from TIFF(s), QPV will attempt to preserve the original color depth, if the destination file format allows it."
    If (AnyWindowOpen!=15)
-      p := "`n`nThe color depth option is not applicable to all of the supported image file formats."
+      p := "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
 
-   msgBoxWrapper(appTitle ": HELP", "Quality level applies only for JPG, JP2, J2K, JXR and WEBP files." p f, -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nJPEG chroma subsampling: 4:2:0 stores the colors at a quarter of the image resolution, for the smallest files; 4:4:4 keeps them whole, for sharp colored text and lines. Progressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always lossless: their compression, one option for both formats, only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one.`n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -46605,17 +46755,19 @@ BTNsaveImgPanel(hwnd:=0,b:=0,c:=0) {
    GuiControlGet, PreserveDateTimeOnSave
    GuiControlGet, userDestinationFolder
    GuiControlGet, userSaveBitsDepth
+   GuiControlGet, fmtIndex,, uiSaveFmtChoice
    userJpegQuality := clampInRange(userJpegQuality, 1, 100)
    RegAction(1, "usePrevSaveFolder")
    RegAction(1, "PreserveDateTimeOnSave")
+   ReadSettingsSaveFormatOptions(1)
    imgPath := getIDimage(currentFileIndex)
    saveMode := InStr(txt, "&as") ? 0 : 1
    destin := (saveMode=0 && usePrevSaveFolder=1 && FolderExist(userDestinationFolder)) ? userDestinationFolder : "current"
 
    If InStr(imgPath, "Q:\temporary memory object\")
-      SaveClipboardImage(userDestinationFolder, 0)
+      SaveClipboardImage(userDestinationFolder, 0, fmtIndex)
    Else
-      SaveClipboardImage(destin, saveMode)
+      SaveClipboardImage(destin, saveMode, fmtIndex)
 }
 
 BtnCopyImageClip() {
@@ -59347,7 +59499,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
    }
 
    typu := FreeImage_GetFileType(file2save, 1)
-   If (isVarEqualTo(typu, "j2k","jp2","targa","bmp","jxr","tiff","png","ico","webp") && depth>0)
+   If (isVarEqualTo(typu, "j2k","jp2","jxl","targa","bmp","jxr","tiff","png","ico","webp") && depth>0)
    {
       objDepth := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       If (depth=32 && objDepth!=32)
@@ -59357,7 +59509,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
       Else If (depth=16 && objDepth!=16)
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "16Bits")
       Else If (depth=8 && objDepth!=8)
-         hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "8Bits")
+         hFIFimgB := FIMquantizeImage(hFIFimgA)
    }
 
    If hFIFimgB
@@ -59418,7 +59570,8 @@ getIMGsaveDestination(indexu) {
    Return imgPath
 }
 
-SaveClipboardImage(dummy:=0, noDialog:=0) {
+SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
+; fmtIndex - the file type the save dialog starts with, an index of dialogSaveIndexes
    Static lastInvoked := 1, dephtus := {1:32, 2:24, 3:16, 4:8, 5:0}
    If throwErrorNoImageLoaded()
       Return
@@ -59438,6 +59591,9 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       defaultu := dummy "\" OutNameNoExt
 
    getSaveDialogIndexForFile(imgPath, defFMTindex, 0, userDesireWriteFMT)
+   If (fmtIndex>0)
+      defFMTindex := fmtIndex
+
    thisDialogSavePtrns := dialogSaveFptrn
    thisRegEXsaveFmts := saveTypesRegEX
    If (noDialog=1)
@@ -59462,9 +59618,13 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       }
 
       prevFileSavePath := OutDir
-      userDesireWriteFMT := dialogFmtIndex 
       INIaction(1, "prevFileSavePath", "General")
-      RegAction(1, "userDesireWriteFMT")
+      ; the other panels read userDesireWriteFMT from saveImgFormatsList, which has no ICO
+      If saveImgFormatsList.HasKey(dialogFmtIndex)
+      {
+         userDesireWriteFMT := dialogFmtIndex
+         RegAction(1, "userDesireWriteFMT")
+      }
 
       huge := (viewportQPVimage.imgHandle) ? 1 : 0
       trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -59503,7 +59663,14 @@ SaveClipboardImage(dummy:=0, noDialog:=0) {
       Else If alertReduceSaveColorDepth()
          Return
 
-      If (noQualityWarnings!=1 && (!RegExMatch(file2save, saveAlphaTypesRegEX) || userSaveBitsDepth!=1 && currIMGdetails.HasAlpha=1 || userSaveBitsDepth!=1 && alphau=1))
+      ; GIF files are always 8 bits; the 24, 16 and 8 bits depths lose the alpha channel
+      hasAlpha := huge ? alphau : (currIMGdetails.HasAlpha=1)
+      If (nExt="gif")
+         lostAlpha := !(userPaletteTransparency=1 && wasInitFIMlib=1 && !huge)
+      Else
+         lostAlpha := !RegExMatch(file2save, saveAlphaTypesRegEX) || isInRange(userSaveBitsDepth, 2, 4)
+
+      If (noQualityWarnings!=1 && hasAlpha && lostAlpha)
       {
          msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not have support for the alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
@@ -61788,7 +61955,8 @@ FIMrescaleICOmode(hFIFimgA, imgW, imgH, icoSize, ByRef hasIconified) {
 
 coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
   Static gifOPT := "-s8-f1-",            ppmOPT := "-s24-f1-f9-"
-       , jngOPT := "-s24-f1-",           xpmOPT := "-s24-f1-"
+       , jngOPT := "-s32-s24-f1-",       xpmOPT := "-s24-f1-"
+       , jxlOPT := "-s32-s24-s16-s8-f1-f2-f6-f9-f10-f11-f12-"
        , jpegOPT := "-s24-s8-f1-",       hdrOPT := "-f11-"
        , webpOPT := "-s32-s24-f1-",      exrOPT := "-f6-f11-f12-"
        , pfmOPT := "-f6-f11-",           icoOPT := "-s32-s24-s16-s8-s4-f1-"
@@ -61939,7 +62107,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, hdrMode)
          If hFIFimgB
          {
-            r := FreeImage_Save(hFIFimgB, file2save)
+            r := FreeImage_Save(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
       } Else
@@ -61956,18 +62124,13 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
       If (typu="gif")
       {
          savedMode := "GIF"
-         hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
-         If hFIFimgB
-            hFIFimgX := FreeImage_ColorQuantize(hFIFimgB)
-
+         hFIFimgX := FIMquantizeImage(hFIFimgA)
          If hFIFimgX
          {
             r := FreeImage_Save(hFIFimgX, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgX)
          }
-         If hFIFimgB
-            FreeImage_UnLoad(hFIFimgB)
-      } Else If (!InStr(ColorsType, "rgba") && InStr(formatDepths, "-s24-") || isVarEqualTo(typu, "jpeg", "ppm", "jng", "xpm"))
+      } Else If (!InStr(ColorsType, "rgba") && InStr(formatDepths, "-s24-") || isVarEqualTo(typu, "jpeg", "ppm", "xpm"))
       {
          savedMode := "24Bits"
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
@@ -62012,16 +62175,43 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
    Return r
 }
 
-getFIMsaveArgs(file2save) {
-   saveArg := 0
-   If RegExMatch(file2save, "i)(.\.(jp2|j2c|j2k))$")
-      saveArg := clampInRange(512 - Round(userJpegQuality/100*512), 1, 512)
-   Else If RegExMatch(file2save, "i)(.\.(jpg|jpeg|jxr|webp))$")
-      saveArg := clampInRange(Round(userJpegQuality), 1, 100)
-   Else If RegExMatch(file2save, "i)(.\.bmp)$")
-      saveArg := 1 ; RLE compression
-   Else If RegExMatch(file2save, "i)(.\.(tga|targa))$")
-      saveArg := 2 ; RLE compression
+getFIMsaveArgs(file2save, quality:="") {
+; The FreeImage save flags for the format of file2save, built from the user's save options.
+; quality - 1 to 100; userJpegQuality when omitted. With lossless off, 100 is the best lossy quality.
+   Static jpegSubsampling := {1:0x4000, 2:0x8000, 3:0x10000}   ; JPEG_SUBSAMPLING_420, JPEG_SUBSAMPLING_422, JPEG_SUBSAMPLING_444
+        , pngLevels := {1:0x100, 2:1, 3:6, 4:9}                ; PNG_Z_NO_COMPRESSION, then zlib levels
+        , tiffModes := {1:0x800, 2:0, 3:0, 4:0x400}            ; TIFF_NONE, TIFF_DEFAULT [LZW] twice, TIFF_ADOBE_DEFLATE
+
+   q := clampInRange(Round((quality!="") ? quality : userJpegQuality), 1, 100)
+   ext := RegExMatch(file2save, "i)\.([a-z0-9]+)$", m) ? Format("{:L}", m1) : ""
+   If isVarEqualTo(ext, "jpg", "jpeg", "jpe", "jif", "jng")
+   {
+      saveArg := q | jpegSubsampling[clampInRange(userJpegSubsampling, 1, 3)] | 0x20000   ; JPEG_OPTIMIZE
+      ; JNG declares a sequential JPEG in its header
+      If (userJpegProgressive=1 && ext!="jng")
+         saveArg |= 0x2000   ; JPEG_PROGRESSIVE
+   } Else If (ext="webp")
+   {
+      saveArg := (userSaveImgLossless=1) ? 0x100 : q   ; WEBP_LOSSLESS
+   } Else If (ext="jxl")
+   {
+      ; the fork's JXL writer takes quality 100 as lossless; the effort goes in bits 16 to 19
+      saveArg := ((userSaveImgLossless=1) ? 0x100 : min(q, 99)) | (clampInRange(userJxlEffort, 1, 9) << 16)   ; JXL_LOSSLESS
+   } Else If isVarEqualTo(ext, "jxr", "wdp", "hdp")
+   {
+      saveArg := (userSaveImgLossless=1) ? 100 : min(q, 99)   ; JXR_LOSSLESS = 100
+   } Else If isVarEqualTo(ext, "jp2", "j2k", "j2c")
+   {
+      ; the compression ratio, 1 = lossless; the curve follows the JPEG file sizes of photos at the same quality
+      saveArg := (userSaveImgLossless=1) ? 1 : clampInRange(Round(5.3 * (101 - q)**0.68), 2, 1023)
+   } Else If (ext="png")
+      saveArg := pngLevels[clampInRange(userSaveImgCompressionLvl, 1, 4)]
+   Else If isVarEqualTo(ext, "tif", "tiff")
+      saveArg := tiffModes[clampInRange(userSaveImgCompressionLvl, 1, 4)]
+   Else If isVarEqualTo(ext, "tga", "targa")
+      saveArg := 2   ; TARGA_SAVE_RLE
+   Else
+      saveArg := 0
 
    Return saveArg
 }
@@ -88749,6 +88939,8 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
 
     Sleep, 0
     changeMcursor()
+    ; the color depth reductions on save convert the bitmap, which a graphics object would keep busy
+    Gdip_DeleteGraphics(G2)
     If validBMP(thumbBMP)
     {
        If (toClippy=1)
@@ -88756,13 +88948,9 @@ coreResizeIMG(imgPath, newW, newH, file2save, goFX, toClippy, rotateAngle, soloM
           hBitmap := trGdip_CreateHBITMAPFromBitmap(A_ThisFunc, thumbBMP)
           r := hBitmap ? Gdip_SetBitmapToClipboard(thumbBMP, hBitmap) : addJournalEntry("get_last_err")
        } Else
-          r := Gdip_SaveBitmapToFile(thumbBMP, file2save, userJpegQuality)
-
-       If (toClippy!=1) && (r=-2 || r=-1)
-          r := SaveFIMfile(file2save, thumbBMP)
+          r := QPV_SaveImageFile(A_ThisFunc, thumbBMP, file2save, userJpegQuality)
     } Else r := "err"
 
-    Gdip_DeleteGraphics(G2)
     Gdip_DisposeEffect(pEffect)
     Gdip_DisposeImageAttributes(imageAttribs)
     trGdip_DisposeImage(thumbBMP, 1)
@@ -90976,7 +91164,7 @@ PanelAdjustColorsSimpleWindow() {
        Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action on file name conflicts:
        GuiAddDropDownList("x+5 w" ml " gTglOverwriteFiles AltSubmit Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
        thisWid := (PrefsLargeFonts=1) ? 235 : 150
-       GuiAddSlider("userJpegQuality", 2,100, 95, "Image quality on save", "iniSaveJPGquality", 1, "xs y+5 w" thisWid " hp", "This only applies to the JPEG and WEBP file formats")
+       GuiAddSlider("userJpegQuality", 2,100, 95, "Image quality on save", "iniSaveJPGquality", 1, "xs y+5 w" thisWid " hp", saveQualityTip())
        If !ResizeUseDestDir
        {
           GuiControl, Disable, btnFldr
@@ -91522,9 +91710,11 @@ PanelFileFormatConverter() {
     Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, On file name conflicts:
     GuiAddDropDownList("x+5 w" pww " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
-    GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp")
+    GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", saveQualityTip(1))
     zml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel", " ?", "Help")
+    Gui, Add, Text, xs y+10 w%sml% hp +0x200, Format options:
+    GuiAddSaveFormatOptions("x+5 yp")
 
     Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, &Use multiple threads (experimental)
     If !(filesElected>1)
@@ -91558,12 +91748,13 @@ PanelFileFormatConverter() {
     sml := (PrefsLargeFonts=1) ? 85 : 60
     Gui, Add, Button, x+%ml% hp w%sml% gBTNhelpConvertImgFmt, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
+    updateSaveFormatOptions(saveImgFormatsList[userDesireWriteFMT])
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Image file format conversion: " appTitle)
     GuiRefreshSliders()
 }
 
 BTNhelpConvertImgFmt() {
-    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JP2, J2K, JXR and WEBP file formats.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JNG, WEBP, JXL, JXR and JP2 file formats. The options of the destination format are shown under «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
 }
 
 TglKeepOriginals() {
@@ -91579,6 +91770,8 @@ TglOverwriteFiles() {
 TglDesiredSaveFormat() {
     GuiControlGet, userDesireWriteFMT
     RegAction(1, "userDesireWriteFMT")
+    If (AnyWindowOpen=15)
+       UIsaveFormatOptionsChanged()
 }
 
 BTNconvertImgFmtSoloNow() {
@@ -91979,7 +92172,7 @@ PanelResizeImageWindow() {
     GuiAddDropDownList("xp+15 y+7 wp AltSubmit Choose" userActionAdvImgProcConflictingFile " vuserActionAdvImgProcConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
     thisW := (PrefsLargeFonts=1) ? 150 : 80
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    GuiAddSlider("userJpegQuality", 2,100, 95, "Quality on save", "iniSaveJPGquality", 1, "xs y+10 wp hp", "This only applies to the JPEG and WEBP file formats")
+    GuiAddSlider("userJpegQuality", 2,100, 95, "Quality on save", "iniSaveJPGquality", 1, "xs y+10 wp hp", saveQualityTip())
     thisW := (PrefsLargeFonts=1) ? 85 : 55
     If (multipleFilesMode=1)
     {
@@ -97974,7 +98167,7 @@ PanelImgAutoCrop() {
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     If (allowMulti=1)
     {
-       GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "x+5 w" thisWid + 20 " hp", "This only applies to the JPEG and WEBP file formats")
+       GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "x+5 w" thisWid + 20 " hp", saveQualityTip())
        Gui, Font, Bold
        Gui, Add, Text, xs y+15 Section, Files selected to process: %filesElected%.`nFiles in unsupported write formats will be skipped.
        Gui, Font, Normal
@@ -98478,9 +98671,7 @@ coreAutoColorsFileProcessing(imgPath, file2save) {
        Sleep, 1
     }
 
-    r := Gdip_SaveBitmapToFile(kBitmap, file2save, userJpegQuality)
-    If (r=-2 || r=-1)
-       r := SaveFIMfile(file2save, kBitmap)
+    r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality)
 
     trGdip_DisposeImage(kBitmap, 1)
     If (PreserveDateTimeOnSave=1 && !r && originalMtime)
@@ -98530,9 +98721,7 @@ coreAutoCropFileProcessing(imgPath, file2save, silentMode) {
        Sleep, 1
     }
 
-    r := Gdip_SaveBitmapToFile(kBitmap, file2save, userJpegQuality)
-    If (r=-2 || r=-1)
-       r := SaveFIMfile(file2save, kBitmap)
+    r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality)
 
     trGdip_DisposeImage(kBitmap, 1)
     If (PreserveDateTimeOnSave=1 && !r && originalMtime)
@@ -99248,7 +99437,7 @@ PanelSimpleResizeRotate(modus:="") {
 
     thisWid := (PrefsLargeFonts=1) ? 235 : 150
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
-    GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", "This only applies to the JPEG and WEBP file formats")
+    GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", saveQualityTip())
     Gui, Add, Text, xs y+7 w%sml% hp +0x200, Render PDF pages:
     GuiAddSlider("userVPpdfDPI", 72, 3500, 420, "DPI resolution: $€", "dummy", 1, "x+5 w" pww " hp")
     Gui, Add, Text, xs y+7 w%sml% hp +0x200, SVG rendered resolution:
@@ -99943,28 +100132,34 @@ GetCachableHistogramFile(imgPath, imgIndex, isFilter:=0, zEffect:=0) {
      Return histoObj
 }
 
-SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, fileEXT:=0, gdipDepth:=32) {
+SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
+; Saves a GDI+ bitmap with FreeImage, at the color depth closest to userGivenDepth [32, 24, 16 or 8]
+; that the file format allows. An 8 bits indexed bitmap keeps its palette and transparent entries.
   Static gifbitDp := "-8-",            ppmbitDp := "-24-"
-       , jngbitDp := "-24-",           xpmbitDp := "-24-"
+       , jngbitDp := "-32-24-",        xpmbitDp := "-24-"
        , jpegbitDp := "-24-8-",        jp2bitDp := "-32-24-*8-"
        , pngbitDp := "-32-24-8-4-",    icobitDp := "-32-24-16-8-4-"
        , tiffbitDp := "-32-24-8-4-",   jxrbitDp := "-32-24-16-*8-"
        , bmpbitDp := "-32-24-16-8-4-", targabitDp := "-32-24-*16-8-"
        , webpbitDp := "-32-24-"      , j2kbitDp := "-32-24-*8-"
+       , jxlbitDp := "-32-24-16-8-"
 
   initFIMGmodule()
   If !wasInitFIMlib
      Return 1
 
-  bits := (gdipDepth=24) ? 1 : 0
-  objDepth := (gdipDepth=24) ? 24 : 32
-  hFIFimgA := ConvertPBITMAPtoFIM(pBitmap, bits)
+  pf := Gdip_GetImagePixelFormat(pBitmap, 2)
+  If (pf="8-INDEXED")
+     hFIFimgA := ConvertIndexedPBITMAPtoFIM(pBitmap)
+  Else
+     hFIFimgA := ConvertPBITMAPtoFIM(pBitmap, (userGivenDepth=24 || userGivenDepth=16 || !InStr(pf, "ARGB")) ? 1 : 0)
+
   If !hFIFimgA
   {
      SoundBeep , 300, 100
      message := "Failed to convert GDI+ image object to FreeImage object..."
      addJournalEntry(message)
-     Return message 
+     Return message
   }
 
   If FileExist(file2save)
@@ -99977,75 +100172,47 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, fileEXT:=0, gdipDepth:=32) {
 
      Sleep, 0
   }
-  
-  If !fileEXT
-  {
-     fileEXTpos := InStr(file2save, ".", 0, -1) ; RegExMatch(fileNamu, "\.[^\^.\\/:*?<>|\r\n]+$")
-     If fileEXTpos
-        fileEXT := SubStr(file2save, fileEXTpos + 1)
-  }
 
-  saveArg := 0
-  If RegExMatch(file2save, "i)(.\.(jp2|j2c|j2k))$")
-     saveArg :=  clampInRange(512 - Round(userJpegQuality/100*512), 1, 512)
-  Else If RegExMatch(file2save, "i)(.\.(jpg|jpeg|jxr|webp))$")
-     saveArg :=  clampInRange(Round(userJpegQuality), 1, 100)
-
+  saveArg := getFIMsaveArgs(file2save, quality)
   typu := FreeImage_GetFileType(file2save, 1)
-  ; MsgBox, % objDepth "|" userGivenDepth "|" typu
   formatDepths := %typu%bitDp
-  highestDepth := Trim(formatDepths, "-")
-  highestDepth := SubStr(highestDepth, 1, InStr(highestDepth, "-") - 1)
-  userDepthOkay := InStr(formatDepths, "-" userGivenDepth "-") ? 1 : 0
-  ; MsgBox, % objDepth "|" userGivenDepth "|" userDepthOkay "|" typu "|" highestDepth
-  If (objDepth=24)
+  objDepth := FreeImage_GetBPP(hFIFimgA)
+  If (typu="gif" || userGivenDepth=8)
   {
-     If (userGivenDepth=8 && userDepthOkay=1 || typu="gif")
+     If (objDepth!=8)
      {
-        hFIFimgB := FreeImage_ColorQuantize(hFIFimgA, 1)
-        r := FreeImage_Save(hFIFimgB, file2save, saveArg)
-        FreeImage_UnLoad(hFIFimgB)
-     } Else If (userGivenDepth=16 && userDepthOkay=1)
-     {
-        hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "16Bits")
-        r := FreeImage_Save(hFIFimgB, file2save, saveArg)
-        FreeImage_UnLoad(hFIFimgB)
-     } Else If (InStr(formatDepths, "-" objDepth "-") || isVarEqualTo(typu, "jng", "ppm", "xpm"))
-     {
-        r := FreeImage_Save(hFIFimgA, file2save, saveArg)
-     } Else unsaved := 1
-  } Else If (objDepth=32)
+        hFIFimgB := FIMquantizeImage(hFIFimgA)
+        If hFIFimgB
+        {
+           FreeImage_UnLoad(hFIFimgA)
+           hFIFimgA := hFIFimgB
+           hFIFimgB := 0, objDepth := 8
+        }
+     }
+
+     ; formats without palettes keep the reduced colors at 24 or 32 bits
+     If (objDepth=8 && !InStr(formatDepths, "-8-"))
+        hFIFimgB := FreeImage_ConvertTo(hFIFimgA, (FreeImage_IsTransparent(hFIFimgA) && InStr(formatDepths, "-32-")) ? "32Bits" : "24Bits")
+  } Else If (userGivenDepth=16 && InStr(formatDepths, "-16-"))
   {
-     If (userGivenDepth=8 && userDepthOkay=1 || typu="gif")
-     {
-        hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
-        hFIFimgC := FreeImage_ColorQuantize(hFIFimgB, 1)
-        r := FreeImage_Save(hFIFimgC, file2save, saveArg)
-        ; msgbox, % hFIFimgC "|"  hFIFimgB "|" r
-        FreeImage_UnLoad(hFIFimgB)
-        FreeImage_UnLoad(hFIFimgC)
-     } Else If (userGivenDepth=16 && userDepthOkay=1)
-     {
-        hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "16Bits")
-        r := FreeImage_Save(hFIFimgB, file2save, saveArg)
-        FreeImage_UnLoad(hFIFimgB)
-     } Else If (userGivenDepth=24 && userDepthOkay=1 || isVarEqualTo(typu, "jpeg", "jng", "ppm", "xpm"))
-     {
-        hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
-        r := FreeImage_Save(hFIFimgB, file2save, saveArg)
-        FreeImage_UnLoad(hFIFimgB)
-     } Else If InStr(formatDepths, "-" objDepth "-")
-     {
-        r := FreeImage_Save(hFIFimgA, file2save, saveArg)
-     } Else unsaved := 1
+     hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "16Bits")
+  } Else If (objDepth=32 && !InStr(formatDepths, "-32-"))
+  {
+     hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
   }
 
-  If unsaved
+  hFIFimgS := hFIFimgB ? hFIFimgB : hFIFimgA
+  If InStr(formatDepths, "-" FreeImage_GetBPP(hFIFimgS) "-")
+  {
+     r := FreeImage_Save(hFIFimgS, file2save, saveArg)
+  } Else
   {
      SoundBeep 300, 100
      addJournalEntry("Failed to save image using FreeImage. No matching color depth for chosen format.")
   }
 
+  If hFIFimgB
+     FreeImage_UnLoad(hFIFimgB)
   FreeImage_UnLoad(hFIFimgA)
   If (!r && tempFileExists=1) || (!FileRexists(file2save, 0) && tempFileExists=1)
   {
@@ -100057,6 +100224,25 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, fileEXT:=0, gdipDepth:=32) {
      FileDelete, % file2save "-tmp"
 
   Return !r
+}
+
+FIMquantizeImage(hFIFimg) {
+; Returns a new 8 bits palettized image: the exact palette for images of up to 256 colors,
+; otherwise NeuQuant up to 16 megapixels and the much faster Wu quantizer above.
+  If (FreeImage_GetBPP(hFIFimg)!=24)
+     hFIFimgB := FreeImage_ConvertTo(hFIFimg, "24Bits")
+
+  hSource := hFIFimgB ? hFIFimgB : hFIFimg
+  hFIFimgQ := FreeImage_ColorQuantize(hSource, 2)   ; FIQ_LFPQUANT
+  If !hFIFimgQ
+  {
+     FreeImage_GetImageDimensions(hSource, imgW, imgH)
+     hFIFimgQ := FreeImage_ColorQuantize(hSource, (imgW*imgH>16000000) ? 0 : 1)   ; FIQ_WUQUANT, FIQ_NNQUANT
+  }
+
+  If hFIFimgB
+     FreeImage_UnLoad(hFIFimgB)
+  Return hFIFimgQ
 }
 
 initFIMGmodule() {
