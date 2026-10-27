@@ -59674,8 +59674,14 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       Else If alertReduceSaveColorDepth()
          Return
 
-      gifTransparency := (userPaletteTransparency=1 && nExt="gif" && wasInitFIMlib=1 && !huge) ? 1 : 0
-      If (noQualityWarnings!=1 && (!RegExMatch(file2save, saveAlphaTypesRegEX) && !gifTransparency || userSaveBitsDepth!=1 && currIMGdetails.HasAlpha=1 || userSaveBitsDepth!=1 && alphau=1))
+      ; GIF files are always 8 bits; the 24, 16 and 8 bits depths lose the alpha channel
+      hasAlpha := huge ? alphau : (currIMGdetails.HasAlpha=1)
+      If (nExt="gif")
+         lostAlpha := !(userPaletteTransparency=1 && wasInitFIMlib=1 && !huge)
+      Else
+         lostAlpha := !RegExMatch(file2save, saveAlphaTypesRegEX) || isInRange(userSaveBitsDepth, 2, 4)
+
+      If (noQualityWarnings!=1 && hasAlpha && lostAlpha)
       {
          msgResult := msgBoxWrapper(appTitle ": WARNING", "The selected image or color format does not have support for the alpha channel (RGBA). The image may look differently after saving it in this format. Do you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
