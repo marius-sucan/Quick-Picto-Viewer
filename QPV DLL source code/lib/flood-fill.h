@@ -1085,7 +1085,7 @@ void FloodJob::setupPaint() {
     defIndex = (p.alternateMode==3) ? 0.0f : p.prevCLRindex;
     // the exact fill paints a colour mixed beforehand; the replacement mixes per pixel like the tolerance fill
     const bool exactFill = p.exact && !p.replace;
-    const int simpleMode = (p.opacity==1 && p.blendMode==0 && p.cartoonMode==0) ? 1 : 0;
+    const int simpleMode = (p.opacity==1 && p.blendMode==0 && p.cartoonMode==0 && p.dynamicOpacity==0) ? 1 : 0;
     constPaint = (exactFill || simpleMode || p.cartoonMode==1) ? 1 : 0;
     const RGBAColor &c = (!exactFill && !simpleMode && p.cartoonMode==1) ? p.oldColor : p.newColor;
     constBGRA = (uint32_t)(unsigned char)c.b | ((uint32_t)(unsigned char)c.g << 8) | ((uint32_t)(unsigned char)c.r << 16) | ((uint32_t)(unsigned char)c.a << 24);

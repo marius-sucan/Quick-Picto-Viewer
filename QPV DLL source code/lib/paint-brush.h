@@ -956,7 +956,7 @@ static QPV_FORCEINLINE void brushSmudgeSample(const BrushStamp &s, const double 
         const bool sameA = same(3);
         const float a = w[0] * p[0][3] + w[1] * p[1][3] + w[2] * p[2][3] + w[3] * p[3][3];
         if (s.eraserMode!=1)
-           outA = sameA ? p[0][3] : (int)(a + rnd);
+           outA = sameA ? p[0][3] : std::min((int)(a + rnd), 255);
         if (a<=0.0f)
            return;   // nothing visible: the hidden colour stays
 
@@ -977,9 +977,10 @@ static QPV_FORCEINLINE void brushSmudgeSample(const BrushStamp &s, const double 
         else
            out[ch] = (int)(w[0] * p[0][ch] + w[1] * p[1][ch] + w[2] * p[2][ch] + w[3] * p[3][ch] + rnd);
     }
-    outB = out[0];
-    outG = out[1];
-    outR = out[2];
+    // the weights can sum a hair above 1 and round a channel up to 256, which the blend tables cannot take
+    outB = std::min(out[0], 255);
+    outG = std::min(out[1], 255);
+    outR = std::min(out[2], 255);
 }
 
 // smudge brush: the drag of the paint along the move. The paint at a pixel came from where it lay when the move began:
