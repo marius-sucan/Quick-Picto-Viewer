@@ -1624,7 +1624,11 @@ DLL_API int DLL_CALLCONV dissolveBitmap(int *imageData, int *newData, int Width,
 
       const UINT maxPixels = Width + Height * Width;
       MaskBitMap pixelzMap; // bit-packed with atomic writes; std::vector<bool> races between OpenMP threads
-      pixelzMap.resize(maxPixels);
+      try {
+          pixelzMap.resize(maxPixels);
+      } catch (const std::bad_alloc&) {
+          return 0;   // newData is left unwritten
+      }
       time_t nTime;
       time(&nTime);
 

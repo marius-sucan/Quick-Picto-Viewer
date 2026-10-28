@@ -352,7 +352,7 @@ static bool dpHistogram(Gdiplus::GpBitmap *bmp, int w, int h, DupePixResult &res
     int medianValue = -1, minBrLvlK = -1;
     int modePointK = 0, peakPointK = 0, minPointK = 0;
     UINT64 modePointV = 0, thisSum = 0, sumTotalBr = 0, sumSq = 0;
-    UINT64 pixMinu = (UINT64)((INT64)w * (INT64)h);
+    UINT64 pixMinu = (UINT64)((INT64)w * (INT64)h) + 1;   // above any count: a single level is the rarest too
 
     for ( int lvl = 0 ; lvl < 256 ; lvl++)
     {

@@ -1136,14 +1136,14 @@ static double tpConvertSVGunitsToPixels(std::string &length) {
        return floor(numeric*37.795275591 + 0.5);
     else if (s.find("mm")!=std::string::npos)
        return floor(numeric*3.7795275591 + 0.5);
+    else if (s.find("vmin")!=std::string::npos)   // before "in", which it contains
+       return min(w, h)*2.0;
     else if (s.find("in")!=std::string::npos)
        return floor(numeric*96.0 + 0.5);
     else if (s.find("vw")!=std::string::npos)
        return w*2.0;
     else if (s.find("vh")!=std::string::npos)
        return h*2.0;
-    else if (s.find("vmin")!=std::string::npos)
-       return min(w, h)*2.0;
     else if (s.find("vmax")!=std::string::npos)
        return max(w, h)*2.0;
     else if (s.find("%")!=std::string::npos)

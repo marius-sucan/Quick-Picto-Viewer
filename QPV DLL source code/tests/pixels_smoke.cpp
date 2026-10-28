@@ -64,7 +64,7 @@ static RefHisto refHistogram(const unsigned int *h, int w, int hh) {
     int medianValue = -1, minBrLvlK = -1;
     int modePointK = 0, peakPointK = 0, minPointK = 0;
     long long modePointV = 0, thisSum = 0, sumTotalBr = 0, sumSq = 0;
-    long long pixMinu = (long long)w*hh;
+    long long pixMinu = (long long)w*hh + 1;
 
     for ( int i = 0 ; i < 256 ; i++)
     {
@@ -169,6 +169,19 @@ static void histogramMatchesTheAHK() {
            bad++;
         }
         cases++;
+    }
+
+    // a solid-colour image: its one level is also its rarest
+    {
+        for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 0;
+        gShimHistogram[128] = 64*64;
+        Gdiplus::GpBitmap *b3 = NULL;
+        Gdiplus::DllExports::GdipCreateBitmapFromScan0(64, 64, 0, PixelFormat32bppARGB, NULL, &b3);
+        DupePixResult solid;
+        const bool ok = dpHistogram(b3, 64, 64, solid);
+        Gdiplus::DllExports::GdipDisposeImage(b3);
+        check(ok && solid.minu==solid.low && solid.minu==solid.peak && fabs(solid.minu - 129.0/256.0) < 1e-5,
+              "a solid-colour image stores its own level as the rarest");
     }
 
     Gdiplus::DllExports::GdipDisposeImage(bmp);

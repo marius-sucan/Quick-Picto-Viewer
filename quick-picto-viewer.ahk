@@ -20134,12 +20134,23 @@ QPV_DissolveBitmap(pBitmap, rx, ry) {
   E1 := trGdip_LockBits(pBitmap, 0, 0, w, h, stride, iScan, iData, 1)
   E2 := trGdip_LockBits(newBitmap, 0, 0, w, h, stride, mScan, mData)
   If (!E1 && !E2)
+  {
      r := DllCall("qpvmain.dll\dissolveBitmap", "UPtr", iScan, "UPtr", mScan, "Int", w, "Int", h, "int", Round(rx + 2), "int", Round(ry + 2), "int")
+     dllErr := ErrorLevel
+  }
 
   If !E1
      Gdip_UnlockBits(pBitmap, iData)
   If !E2
      Gdip_UnlockBits(newBitmap, mData)
+
+  ; a failed lock or call [0 when out of memory, blank after an older qpvmain.dll's exception] leaves newBitmap unwritten
+  If (r!=1)
+  {
+     addJournalEntry(A_ThisFunc "(): the dissolve failed. Locks: " E1 "/" E2 ". Result: " r ". ErrorLevel: " dllErr)
+     trGdip_DisposeImage(newBitmap, 1)
+     Return
+  }
 
   Return newBitmap
 }
@@ -100172,7 +100183,7 @@ calcHistoAvgFile(xBitmap, isFilter, imgIndex, zEffect:=0) {
     medianValue := minBrLvlK := -1
     modePointK := peakPointK := minPointK := 0
     modePointV := sumTotalBr := thisSum := sumSq := 0
-    pixMinu := TotalPixelz
+    pixMinu := TotalPixelz + 1   ; above any count: a single level is the rarest too
     halfPix := TotalPixelz // 2
     Loop, % numEntries
     {
@@ -101663,14 +101674,14 @@ convertSVGunitsToPixels(ByRef length) {
        Return Round(StrReplace(length, "cm")*37.795275591)
     Else If InStr(length, "mm")   ; millimeters
        Return Round(StrReplace(length, "mm")*3.7795275591)
+    Else If InStr(length, "vmin")   ; viewport minimum; before "in", which it contains
+       Return min(w, h)*2
     Else If InStr(length, "in")   ; inches
        Return Round(StrReplace(length, "in")*96)
     Else If InStr(length, "vw")   ; viewport width
        Return w*2
     Else If InStr(length, "vh")   ; viewport height
        Return h*2
-    Else If InStr(length, "vmin")   ; viewport minimum
-       Return min(w, h)*2
     Else If InStr(length, "vmax")   ; viewport maximum
        Return max(w, h)*2
     Else If InStr(length, "%")

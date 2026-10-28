@@ -43,8 +43,11 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
   {
      if (imgW>givenW || imgH>givenH || ScaleAnySize==1)
      {
-         const double PicRatio = (float)(imgW)/imgH;
-         const double givenRatio = (float)(givenW)/givenH;
+         // a side of 0 px [a malformed PDF page] counts as 1 px in the ratios
+         const UINT iw = imgW ? imgW : 1, ih = imgH ? imgH : 1;
+         const UINT gw = givenW ? givenW : 1, gh = givenH ? givenH : 1;
+         const double PicRatio = (float)(iw)/ih;
+         const double givenRatio = (float)(gw)/gh;
          if (imgW<=givenW && imgH<=givenH)
          {
             size[0] = givenW;
@@ -77,12 +80,11 @@ auto adaptImageGivenSize(const UINT keepAratio, const UINT ScaleAnySize, const U
 
   double mpx = ((UINT64)size[0] * size[1])/1000000.0f;
   // fnOutputDebug(std::to_string(mpx) + "mpx ; adapted: " + std::to_string(size[0]) + " x " + std::to_string(size[1]) );
-  float g = 536.4f / mpx;
   if (mpx>maxMPX)
   {
      const float fw = size[0];
      const float fh = size[1];
-     g = 1.0f;
+     float g = 1.0f;
      for (int i = 0; i < 987654321; i++)
      {
         g -= 0.0001;
