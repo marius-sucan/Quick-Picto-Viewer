@@ -168,6 +168,44 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
   nothing when a lock fails or the DLL call does not return 1 (an older DLL's exception included), so the blur tool
   reports an error instead of applying a transparent bitmap. Ordinary dissolves are byte-identical (300 cases), and
   under Wine the wrapper returns the dissolved bitmap from the real qpvmain.dll.
+- **3.1 (lib/selection-mask.h):** when the AHK asks prepareSelectionArea() to reuse the cached mask (useCache) and the
+  mask does not fit the new window, it becomes an empty mask of the window's size, so clipMaskFilter() reads inside it.
+  That is what prepareDrawLinesMask() did to such a mask anyway (MaskBitMap::resize() zeroes the mask), so the line
+  tools' reuse calls (mode 5, and the NULL points list) end as before: 4,000 random reuse sequences ending in prepareDrawLinesMask() (clip modes 1-3, high depth
+  on and off, 2,250 with unequal windows) leave the same mask, clip shape and depth mask as at efc2482. A window with a
+  side of 0 or less is left as it was. Marius chose this over widening the AHK cache key.
+- **3.2.1a, 3.2.3 (lib/selection-mask.h):** prepareSelectionArea() clears the high-depth flag, so a new selection no
+  longer reads a depth mask the parametric-lines tool left behind. With the flag stale, the depth mask was read past its
+  end, and clipMaskFilter() returned 0 outside the box, which the tools that skip a pixel on 1 take as "edit": with a
+  rectangle selection, all 209,599 pixels outside it on a 500 x 500 image.
+  - prepareDrawLinesMask() sets the flag after that call, and nothing in HugeImagesDrawParametricLines()'s loop prepares
+    another selection, so the tool works as before.
+  - prepareDrawLinesMask() also empties a depth mask it reuses at the same size; in the app,
+    discardFilledPolygonCache() has always emptied it first.
+- **3.7 (lib/flood-fill.h):** under a high-depth mask, the flood fill leaves out the pixels of depth 0 (off the lines)
+  instead of only those of depth 1. That branch runs only with a high-depth mask, which the 3.2.1a reset keeps away from
+  every fill; for 3,000 random rectangle, ellipse and polygon selections, FloodSel::masked() returns the same words as at
+  efc2482. Marius chose to fix it as well.
+- **2.7.1, 2.7.2 (lib/paint-brush.h):** the brush's grid of 128 x 128 tiles is rebuilt when the grid's width or the
+  bytes per pixel change, not only its tile count. Insurance: ActPaintBrushNow() empties the grid at both ends of every
+  stroke. 1,512 whole strokes (the eight brush types, 24 and 32 bits, seven blend modes, overdraw on and off, 32-bit
+  ones with and without a GDI+ lock rectangle) are byte-identical to efc2482 with 1 and 4 OpenMP threads, and run clean
+  under ASan/UBSan. The calls that overran a tile (24 bits, then 32) or the tile list (a grid of another shape) under
+  ASan now run clean.
+- **2.6 (lib/paint-brush.h):** PaintBrushLarge() drops a clone buffer handed to the smudge, which samples only its own
+  copy, so the smudge no longer reads a null pointer. Only the cloner gets a clone buffer today; a smudge stroke with one
+  handed over equals the same stroke without (168 strokes, also under ASan). Marius chose to ignore the buffer.
+- **1.6.1 (qpv-main.cpp):** UndoAiderSwapPixelRegions() returns 0 and swaps nothing for a rectangle past the image or
+  wider than the saved copy's rows. Insurance: undoRedoHugeImagesAct() already refuses such a level, and its check stays
+  needed, because the DLL never sees the saved copy's height. 13,657 random swaps inside the image are byte-identical to
+  efc2482; 6,343 past an edge or with a narrower copy are refused with both buffers untouched (efc2482: a SEGV under
+  ASan).
+- **2.4 (lib/color-adjust.h, quick-picto-viewer.ahk):** applyRGB() clamps the colour before tint() when a black or
+  white point is set, so their noise can no longer push tint() past its 65536-entry tables. Within the sliders the clamp
+  changes nothing: 6,000 random calls (5,658 with a black or white point, 3,414 of them with tint, two thirds with every
+  other slider random too, noise on and off) are byte-identical to efc2482. The registry loader also clamps the two
+  stored values to the sliders' ranges (black point 0-45535, white point 20100-65535), so a hand-edited 63000 loads as
+  45535. Marius chose both halves.
 
 **Found while checking, not in the report:**
 - **tests/run-tests.sh stopped at its slicing step from 16cd6d6 (2026-10-10) on:** adaptImageGivenSize() moved
@@ -228,6 +266,12 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
   - The smudge honours it.
 
   A consistency question rather than a DLL defect. Made consistent on 2026-10-28 (see «Fixed on 2026-10-28»).
+- **A window with a negative width can wrap MaskBitMap::resize() (not fixed):** prepareDrawLinesMask() sizes the mask
+  as maskW x maskH + 2 without checking the window. When that comes out between -63 and -1 (a negative width times a
+  small height), resize() wraps: it keeps no storage while size() claims about 2^64 bits. More negative sizes fail the
+  allocation, which prepareDrawLinesMask() catches. clipMaskFilter() never reads such a mask (its window test fails for
+  a negative width); whether a tool can produce such a window (a selection wholly right of or below the image) was not
+  checked.
 
 **The claims one by one.** Item numbers follow the report's sections; a third number or a letter marks one claim
 within a section. "Sliced DLL code" means the shipped function compiled unchanged into a test program. The rows are
@@ -249,19 +293,19 @@ grouped by verdict, and a * after a verdict marks a claim fixed on 2026-10-28 (s
 | 6.4 | Rarest level of a single-level image reported as level 0 | **Confirmed*** | Run, sliced DLL code | Real, in the DLL and in the AHK original it copies: any solid-colour image above black stores level 0. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 1.1.1 | PrepareAlphaChannelBlur pass 1 gives leading transparent pixels alpha before pass 2 (black halos) | Confirmed, latent | Run, sliced DLL code | Real in the DLL, but the only live call with fillMissingOnly 0 gets a bitmap that the call before it already filled, so no halo appears; the other such call is dead code. |
 | 1.1.2 | Same with givenLevel 0: opaque black loses alpha and is recoloured | Confirmed, latent | Run, sliced DLL code | Only changes hidden colour under zero alpha; the one caller passes level 0 only for already transparent selections. |
-| 1.6.1 | UndoAiderSwapPixelRegions does not clamp its rectangle (out of bounds) | Confirmed, latent | ASan, sliced DLL code | No clamps, but the claimed trigger cannot happen: the undo rectangle is a crop FreeImage accepted from the same image. A stale level from another image did reach it (see "a stale undo level" below); since 2026-10-28 undoRedoHugeImagesAct() refuses a level that does not fit. |
+| 1.6.1 | UndoAiderSwapPixelRegions does not clamp its rectangle (out of bounds) | Confirmed, latent* | ASan, sliced DLL code | No clamps, but the claimed trigger cannot happen: the undo rectangle is a crop FreeImage accepted from the same image. A stale level from another image did reach it (see "a stale undo level" below); since 2026-10-28 undoRedoHugeImagesAct() refuses a level that does not fit. Reproduced again at efc2482 and fixed 2026-10-28. |
 | 1.6.3 | dissolveBitmap / symmetricaBitmap index in 32-bit int | Confirmed, latent | UBSan, sliced DLL code | Overflows above 2.1 gigapixels, but both exports only get GDI+ bitmaps, which the app caps at 537 megapixels. |
-| 2.4 | Tint reads 65536-entry tables out of bounds after black/white point noise | Confirmed, latent | ASan, sliced DLL code | Real order (tint before the final clamp), but needs black point >= 62937 or white point <= 2598; the sliders stop at 45535 / 20100, so only a hand-edited registry value reaches it. |
-| 2.6 | Smudge brush with a clone buffer reads an empty copy (null pointer) | Confirmed, latent | ASan, sliced DLL code | The smudge crashes if handed a clone buffer, but the app passes one only to the cloner brush, never to the smudge. |
-| 2.7.1 | Brush chunk cache ignores a change of bits per pixel (heap overflow) | Confirmed, latent | ASan, sliced DLL code | The cache is keyed on the chunk count only, but the app clears it at every stroke's start and end, so it never meets a different image. |
-| 2.7.2 | Brush chunk cache ignores a change of grid shape (out-of-range chunk) | Confirmed, latent | ASan, sliced DLL code | Same per-stroke reset as 2.7.1, so the out-of-range chunk index never happens. |
-| 3.1 | Cached mask kept while the mask window grows (out-of-bounds read) | Confirmed, latent | ASan, sliced DLL code | Reproduced by calling the DLL directly; the app reuses the cache only for an identical selection, or right before prepareDrawLinesMask(), which resizes it. |
-| 3.2.1a | highDepth never reset by prepareSelectionArea (stale depth mask read out of bounds) | Confirmed, latent | ASan, sliced DLL code | Reproduced in the DLL; the high-depth flag exists only inside the parametric-lines tool, which clears it before any new selection is prepared. |
-| 3.2.3 | Same-size depth mask reused without zeroing | Confirmed, latent | Run, sliced DLL code | Reproduced in the DLL; the only high-depth tool empties the depth mask at the end of every run. |
+| 2.4 | Tint reads 65536-entry tables out of bounds after black/white point noise | Confirmed, latent* | ASan, sliced DLL code | Real order (tint before the final clamp), but needs black point >= 62937 or white point <= 2598; the sliders stop at 45535 / 20100, so only a hand-edited registry value reaches it. Reproduced again at efc2482 and fixed 2026-10-28. |
+| 2.6 | Smudge brush with a clone buffer reads an empty copy (null pointer) | Confirmed, latent* | ASan, sliced DLL code | The smudge crashes if handed a clone buffer, but the app passes one only to the cloner brush, never to the smudge. Reproduced again at efc2482 and fixed 2026-10-28. |
+| 2.7.1 | Brush chunk cache ignores a change of bits per pixel (heap overflow) | Confirmed, latent* | ASan, sliced DLL code | The cache is keyed on the chunk count only, but the app clears it at every stroke's start and end, so it never meets a different image. Reproduced again at efc2482 and fixed 2026-10-28. |
+| 2.7.2 | Brush chunk cache ignores a change of grid shape (out-of-range chunk) | Confirmed, latent* | ASan, sliced DLL code | Same per-stroke reset as 2.7.1, so the out-of-range chunk index never happens. Reproduced again at efc2482 and fixed 2026-10-28. |
+| 3.1 | Cached mask kept while the mask window grows (out-of-bounds read) | Confirmed, latent* | ASan, sliced DLL code | Reproduced by calling the DLL directly; the app reuses the cache only for an identical selection, or right before prepareDrawLinesMask(), which resizes it. Reproduced again at efc2482 and fixed 2026-10-28. |
+| 3.2.1a | highDepth never reset by prepareSelectionArea (stale depth mask read out of bounds) | Confirmed, latent* | ASan, sliced DLL code | Reproduced in the DLL; the high-depth flag exists only inside the parametric-lines tool, which clears it before any new selection is prepared. Reproduced again at efc2482 and fixed 2026-10-28. |
+| 3.2.3 | Same-size depth mask reused without zeroing | Confirmed, latent* | Run, sliced DLL code | Reproduced in the DLL; the only high-depth tool empties the depth mask at the end of every run. Reproduced again at efc2482 and fixed 2026-10-28. |
 | 3.3 | clipMaskFilter row shift with a mask bitmap reads before the bitmap | Confirmed, latent | ASan, sliced DLL code | Already recorded as latent in the 10-06 audit (#26): no caller passes a mask bitmap (the AHK variable is never assigned). |
 | 3.4b | NewDrawLinesOnMask shifts the caller's points in place | Confirmed, latent* | Run, sliced DLL code with the AHK's arguments (540 cases) | The points are shifted in place, but the second "Double line" call passes diffThick as offsetY, and in both huge-image line tools diffThick equals that shift (the selection top is clamped to 0 first, so maskRowShift is 0 and diffThick is y1Push). The second line lands on the first. Cleaned up 2026-10-28. |
 | 3.6.2 | Semi-transparent fill colour overwrites instead of blending | Confirmed, latent | Run, sliced DLL code | True in the DLL, but the app always sends the fill colour with alpha FF. |
-| 3.7 | Flood fill selection test wrong with high-depth masks | Confirmed, latent | Run, sliced DLL code | True if a fill ran with a high-depth mask, but that mask exists only inside the parametric-lines tool, which clears it before returning. |
+| 3.7 | Flood fill selection test wrong with high-depth masks | Confirmed, latent* | Run, sliced DLL code | True if a fill ran with a high-depth mask, but that mask exists only inside the parametric-lines tool, which clears it before returning. Reproduced again at efc2482 and fixed 2026-10-28. |
 | 4.1.1 | Static colour-management COM pointers race across threads | Confirmed, latent | Code reading | Not thread-safe, but only the one script thread reaches them; the worker pools use their own per-call copy. |
 | 4.3.2 | doFlipHV ignored when no resize is needed | Confirmed, latent | Code reading | True (the flip only happens on the resize path), but no caller ever asks LoadWICimage to flip. |
 | 4.4.2 | Text size query 1-2 units short, buffer overflow | Confirmed, latent | ASan, sliced DLL code + PDFium contract | The size can be short on malformed pages, but the only caller allocates eight times the reported size. |
@@ -421,7 +465,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 1.6. [`UndoAiderSwapPixelRegions`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1318-L1334), [`dissolveBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1731-L1832), & [`symmetricaBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1834-L1880) — Missing Region Clamping and Uncaught `resize` / 32-Bit Index Overflow
 
-> **Verified 2026-10-27:** 1.6.1 Confirmed, latent (the undo rectangle is always a valid crop; but see the stale-undo-level note in the verification section); 1.6.2 **Confirmed** (only when memory runs out: the failure is ignored and an unwritten bitmap applied); 1.6.3 Confirmed, latent (GDI+ caps the size). 1.6.2 fixed 2026-10-28.
+> **Verified 2026-10-27:** 1.6.1 Confirmed, latent (the undo rectangle is always a valid crop; but see the stale-undo-level note in the verification section); 1.6.2 **Confirmed** (only when memory runs out: the failure is ignored and an unwritten bitmap applied); 1.6.3 Confirmed, latent (GDI+ caps the size). 1.6.1 and 1.6.2 fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1318-L1334), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1740-L1817), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1844-L1875)
@@ -504,7 +548,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 2.4. [`AdjustColorsFXplan::applyRGB`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L765-L781) — Out-of-Bounds LUT Reads in `tint()` / `tinto()` After `blackPoint` / `whitePoint` With Noise
 
-> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan, but it needs a black or white point beyond the sliders' range (registry edit only).
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan, but it needs a black or white point beyond the sliders' range (registry edit only). Fixed 2026-10-28.
 
 - **Severity:** High
 - **Location:** [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L291-L343), [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L533-L619), [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L765-L781)
@@ -547,7 +591,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 2.6. [`brushSetupClone`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L306-L336) & [`brushSmudgeSample`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L947-L953) — Null-Pointer Dereference in Smudge Brush (`brushType == 6`) When `cloneData != nullptr`
 
-> **Verified 2026-10-27:** Confirmed, latent. Reproduced (null read under ASan), but the app hands a clone buffer only to the cloner, never to the smudge.
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced (null read under ASan), but the app hands a clone buffer only to the cloner, never to the smudge. Fixed 2026-10-28.
 
 - **Severity:** High (Crash)
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L309-L335), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L948-L950)
@@ -574,7 +618,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 2.7. [`brushSetupChunkGrid`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L222-L253) — Heap Buffer Overflow & Out-of-Bounds Vector Access When `totalChunks` Remains Constant Across Different Image Dimensions or BPP
 
-> **Verified 2026-10-27:** Confirmed, latent (2.7.1, 2.7.2). Reproduced with ASan, but the app resets the chunk cache at every stroke's start and end.
+> **Verified 2026-10-27:** Confirmed, latent (2.7.1, 2.7.2). Reproduced with ASan, but the app resets the chunk cache at every stroke's start and end. Both fixed 2026-10-28.
 
 - **Severity:** High
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L228-L252)
@@ -623,7 +667,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 3.1. [`prepareSelectionArea`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1564-L1575) — Out-of-Bounds Read on `imgSel.mask` When `useCache == 1` and New Dimensions Exceed Cached Mask Size
 
-> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan in the DLL; the app reuses the cache only for an identical selection or right before a resize.
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan in the DLL; the app reuses the cache only for an identical selection or right before a resize. Fixed 2026-10-28.
 
 - **Severity:** High
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1564-L1575)
@@ -650,7 +694,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 3.2. [`prepareSelectionArea`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1545-L1580) & [`prepareDrawLinesMask`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1361-L1413) — Stale `imgSel.highDepth` Flag and Unhandled `.resize()` Failure Cause Out-of-Bounds Reads in `clipMaskFilter`
 
-> **Verified 2026-10-27:** 3.2.1a Confirmed, latent; 3.2.1b Not a bug; 3.2.2 Not a bug; 3.2.3 Confirmed, latent. High depth lives only inside the parametric-lines tool, which clears it; allocation failures are caught.
+> **Verified 2026-10-27:** 3.2.1a Confirmed, latent; 3.2.1b Not a bug; 3.2.2 Not a bug; 3.2.3 Confirmed, latent. High depth lives only inside the parametric-lines tool, which clears it; allocation failures are caught. 3.2.1a and 3.2.3 fixed 2026-10-28.
 
 - **Severity:** High
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1395-L1412), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1429-L1487), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1545-L1580)
@@ -740,7 +784,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 3.7. [`FloodSel::masked`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L331-L335) — Broken Selection Masking in Flood Fill When `imgSel.highDepth == 1` (`kind == 1`)
 
-> **Verified 2026-10-27:** Confirmed, latent. A fill never runs while a high-depth mask is set.
+> **Verified 2026-10-27:** Confirmed, latent. A fill never runs while a high-depth mask is set. Fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L326-L335), [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L424-L431)
