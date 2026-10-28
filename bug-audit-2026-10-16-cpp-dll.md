@@ -82,6 +82,13 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
 - **3.4b (lib/selection-mask.h, quick-picto-viewer.ahk):** not a visible defect (see its row). NewDrawLinesOnMask()
   shifts a copy of the points, and both huge-image line tools pass 0 instead of diffThick; the output is unchanged.
   The two halves belong together: the new AHK with an older qpvmain.dll offsets the second line.
+- **"Protect alpha" with "No blend mode" (quick-picto-viewer.ahk only, no DLL build needed):**
+  - On an image with an alpha channel, No blend mode now blends as Clip to alpha in paste-in-place, draw lines,
+    parametric lines, Insert text and the brush types that show the box (soft edges, cloner, effects, smudge, pinch,
+    bulge), on regular and huge images. The simple solid color brush and the eraser are unchanged.
+  - Tools that auto-expand the canvas decide from the image before it grows, so on an opaque image paste-in-place now
+    fills the new margin as its preview shows.
+  - The smudge's Clip to alpha mixes the drag by the paint's alpha whether or not Protect alpha is ticked.
 
 **Found while checking, not in the report:**
 - **A stale undo level (possible heap overflow; traced in code, not run).**
@@ -114,7 +121,7 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
   - Brush types 2/3/5/7/8 ignore it.
   - The smudge honours it.
 
-  A consistency question rather than a DLL defect.
+  A consistency question rather than a DLL defect. Made consistent on 2026-10-28 (see «Fixed on 2026-10-28»).
 
 **The claims one by one.** Item numbers follow the report's sections; a third number or a letter marks one claim
 within a section. "Sliced DLL code" means the shipped function compiled unchanged into a test program.

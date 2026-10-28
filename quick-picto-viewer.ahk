@@ -14104,6 +14104,8 @@ PasteInPlaceSelectedArea() {
        Return
     }
 
+    ; before auto-expanding, which flags an opaque image as having alpha
+    thisBlendMode := protectAlphaBlendMode(PasteInPlaceBlendMode)
     If (allowOutside[1]=1)
     {
        xa := imgSelX1, ya := imgSelY1
@@ -14147,7 +14149,7 @@ PasteInPlaceSelectedArea() {
     }
 
     ; setImageLoading()
-    r1 := corePasteInPlaceActNow(G2, newBitmap)
+    r1 := corePasteInPlaceActNow(G2, newBitmap, 0, thisBlendMode)
     If (PasteInPlaceEraseInitial=1)
        currIMGdetails.HasAlpha := 1
 
@@ -15185,6 +15187,11 @@ QPV_FillBitmapHoles(pBitmap, newColor) {
   return r
 }
 
+protectAlphaBlendMode(blendMode) {
+  ; with «Protect alpha channel» on an image with alpha, no blend mode [1] blends as Clip to alpha [24]
+  Return (blendMode=1 && BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1) ? 24 : blendMode
+}
+
 QPV_BlendBitmaps(pBitmap, pBitmap2Blend, blendMode, protectAlpha:=0, flipLayers:=0, linearGamma:=0, specialReplace:=0, opacity:=0, advancedReplaceMode:=1, alphaMaskGray:=0, invertAlphaMask:=0) {
   initQPVmainDLL()
   If (!qpvMainDll || isWinXP=1)
@@ -15888,7 +15895,7 @@ recordPrevAlphaMaskCoords(imgSelPx, imgSelPy, ResizedW, ResizedH) {
    ; prevAlphaMaskCoordsPreview := [imgSelPx, imgSelPy, ResizedW, ResizedH]
 }
 
-corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
+corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0, blendMode:=0) {
     Critical, on
     Static prevImgCall, prevClipBMP, eImgW, eImgH, hasRotated, thisHasRan
          , lastInvoked := 1, blr := {0:0, 1:0, 2:15, 3:50, 4:120, 5:180, 6:254}
@@ -15916,7 +15923,7 @@ corePasteInPlaceActNow(G2:=0, whichBitmap:=0, brushingMode:=0) {
     If ((doImgEditLivePreview!=1 && !G2) || (G2="kill") || testSelectOutsideImgEntirely(useGdiBitmap()) && PasteInPlaceAutoExpandIMG=0 && !G2)
        Return
 
-    thisBlendMode := (BlendModesPreserveAlpha=1 && currIMGdetails.HasAlpha=1 && PasteInPlaceBlendMode=1) ? 24 : PasteInPlaceBlendMode
+    thisBlendMode := blendMode ? blendMode : protectAlphaBlendMode(PasteInPlaceBlendMode)
     If (G2)
     {
        If (PasteInPlaceEraseInitial=1)
@@ -17890,6 +17897,8 @@ InsertTextSelectedArea() {
     }
 
     startOperation := A_TickCount
+    ; before auto-expanding, which flags an opaque image as having alpha
+    thisBlendMode := protectAlphaBlendMode(TextInAreaBlendMode)
     If (allowOutside=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
@@ -17970,7 +17979,7 @@ InsertTextSelectedArea() {
     tX := imgSelPx,    tY := imgSelPy
     tW := zImgW,       tH := zImgH
     ; fnOutputDebug(A_ThisFunc "(): " tX "," tY "," wX "," hY "," tW "," tH)
-    If (TextInAreaBlendMode>1 || alphaMaskingMode>1)
+    If (thisBlendMode>1 || alphaMaskingMode>1)
     {
        bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, tX, tY, tW, tH, 0, 0, 1)
        newBitmap := trGdip_CreateBitmap(A_ThisFunc, tW, tH)
@@ -17990,7 +17999,7 @@ InsertTextSelectedArea() {
           }
        }
 
-       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
        trGdip_GetImageDimensions(bgrBMPu, oImgW, oImgH)
        Gdip_SetClipRect(G2, tX, tY, oImgW, oImgH)
        Gdip_GraphicsClear(G2)
@@ -18204,7 +18213,7 @@ livePreviewInsertTextinArea(actionu:=0, brushingMode:=0) {
           newBitmap := maskedBitmap
        }
 
-       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, TextInAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
+       zr := QPV_BlendBitmaps(bgrBMPu, newBitmap, protectAlphaBlendMode(TextInAreaBlendMode) - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
        trGdip_GetImageDimensions(bgrBMPu, oImgW, oImgH)
        Gdip_FillRectangle(G2, GDIPbrushHatch, tX, tY, oImgW, oImgH)
        r2 := trGdip_DrawImage(A_ThisFunc, G2, bgrBMPu, tX, tY)
@@ -19121,7 +19130,7 @@ livePreviewHugeImageDrawLineShapes() {
    If (rzb=1)
    {
       newColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
-      rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", imgW, "int", imgH, "int", 0, "int", 2)
+      rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", iScan, "Int", imgW, "Int", imgH, "int", Stride, "int", 32, "int", newColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", protectAlphaBlendMode(DrawLineAreaBlendMode) - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", imgW, "int", imgH, "int", 0, "int", 2)
    }
 
    ; the lines mask overwrites the polygon mask cache in the DLL;
@@ -21507,7 +21516,7 @@ HugeImagesApplyInsertText() {
             VPselRotation := innerSelectionCavityX := innerSelectionCavityY := 0
             shapeu := (TextInAreaPaintBgr=1 && TextInAreaBgrUnified=1 && TextInAreaRoundBoxBgr=1) ? 3 : 0
             QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, shapeu, 0, 0, 0, 0, 0, 1)
-            blendMode := (TextInAreaBlendMode=25) ? 100 : TextInAreaBlendMode - 1
+            blendMode := (TextInAreaBlendMode=25) ? 100 : protectAlphaBlendMode(TextInAreaBlendMode) - 1
             showTOOLtip("Applying insert text, please wait...`nFinalizing momentarily")
             r := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 0, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", blendMode, "int", BlendModesFlipped, "UPtr", pBits, "int", mStride, "int", mBpp, "int", 0, "int", BlendModesPreserveAlpha, "int", nImgW, "int", nImgH, "int", 0, "int", 2)
             FillAreaShape := orr
@@ -21677,7 +21686,7 @@ HugeImagesDrawLineShapes() {
       fnOutputDebug("Draw lines in mask finished in: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)))
       showTOOLtip("Drawing lines, please wait...`nStep: 3 / 3")
       If (rzb=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0, "int", 2)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", protectAlphaBlendMode(DrawLineAreaBlendMode) - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0, "int", 2)
 
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
       r := (rzc=1) ? 1 : 0
@@ -21939,7 +21948,7 @@ HugeImagesDrawParametricLines() {
       startFill := A_TickCount
       thisColor := "0x" Format("{1:x}", DrawLineAreaOpacity) DrawLineAreaColor
       If (rzb=1 && abandonAll!=1)
-         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", DrawLineAreaBlendMode - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0, "int", 2)
+         rzc := DllCall("qpvmain.dll\FillSelectArea", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", thisColor, "int", 255, "int", 0, "int", userimgGammaCorrect, "int", protectAlphaBlendMode(DrawLineAreaBlendMode) - 1, "int", BlendModesFlipped, "UPtr", 0, "int", 0, "int", 0, "int", 0, "int", BlendModesPreserveAlpha, "int", 0, "int", 0, "int", 0, "int", 2)
 
       fnOutputDebug("Fill lines mask finished in: " SecToHHMMSS(Round((A_TickCount - startFill)/1000, 3)))
       DllCall("qpvmain.dll\discardFilledPolygonCache", "int", 0)
@@ -22314,7 +22323,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
 
          opacityExtra := (transformTool=1 && PasteInPlaceOpacity>255) ? clampInRange(PasteInPlaceOpacity - 255, 0, 255) : 0
          eraser := (!InStr(modus, "behind") && FillAreaRemBGR=1 && fillTool=1 || PasteInPlaceBlendMode=25 && transformTool=1) ? -1 : 0
-         thisBlendMode := (fillTool=1) ? FillAreaBlendMode - 1 : PasteInPlaceBlendMode - 1
+         thisBlendMode := (fillTool=1) ? FillAreaBlendMode - 1 : protectAlphaBlendMode(PasteInPlaceBlendMode) - 1
          doBehind := (fillTool=1) ? FillAreaDoBehind : 0
          thisInvert := (fillTool=1) ? FillAreaInverted : 0
          shapeu := (fillTool=1) ? 3 : EllipseSelectMode
@@ -22753,6 +22762,8 @@ DrawLinesInSelectedArea(modus) {
     }
 
     startZeit := A_TickCount
+    ; before auto-expanding, which flags an opaque image as having alpha
+    thisBlendMode := protectAlphaBlendMode(DrawLineAreaBlendMode)
     If (allowOutside=1 && PasteInPlaceAutoExpandIMG=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
@@ -22794,7 +22805,7 @@ DrawLinesInSelectedArea(modus) {
     If (rz!=-1)
     {
        fBitmap := trGdip_CloneBitmap(A_ThisFunc, whichBitmap)
-       rzx := QPV_BlendBitmaps(fBitmap, newBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
+       rzx := QPV_BlendBitmaps(fBitmap, newBitmap, thisBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1)
        trGdip_DisposeImage(newBitmap)
        newBitmap := fBitmap
     }
@@ -23717,7 +23728,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
 
     If (previewMode=2 && !rz)
     {
-       rza := QPV_BlendBitmaps(bgrBMPu, xBitmap, DrawLineAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
+       rza := QPV_BlendBitmaps(bgrBMPu, xBitmap, protectAlphaBlendMode(DrawLineAreaBlendMode) - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 0, 0)
        If (currIMGdetails.HasAlpha=1)
           Gdip_FillRectangle(2NDglPG, GDIPbrushHatch, o_imgSelPx - tkx + bx, o_imgSelPy - tky + by, dw, dh)
 
@@ -79345,6 +79356,11 @@ ActPaintBrushNow() {
    If ((isLarge=1) ? (imgBpp=32 && BrushToolType=4) : (BrushToolType=4 || BrushToolBlendMode=25)) ; eraser brush
       currIMGdetails.HasAlpha := 1
 
+   ; the simple solid color brush [1] and the eraser [4] have no blending options
+   thisBlendMode := (BrushToolType=1 || BrushToolType=4) ? BrushToolBlendMode : protectAlphaBlendMode(BrushToolBlendMode)
+   ; Clip to alpha [24] keeps the alpha by itself; Protect alpha would make the smudge mix its drag by the pixel's alpha, not the paint's
+   thisKeepAlpha := (BrushToolType=4) ? BrushToolEraserRestore : (BrushToolType=6 && thisBlendMode=24) ? 0 : BlendModesPreserveAlpha
+
    thisEffectHue   := (BrushToolApplyColorFX=1) ? PasteInPlaceHue : 0
    thisEffectSat   := (BrushToolApplyColorFX=1) ? PasteInPlaceSaturation : 0
    thisEffectLight := (BrushToolApplyColorFX=1) ? PasteInPlaceLight : 0
@@ -79748,12 +79764,12 @@ DrawPaintBrushNowStep:
          , "double", thisToolAspectRatio
          , "int", colorARGB
          , "int", cur_opacity
-         , "int", BrushToolBlendMode - 1
+         , "int", thisBlendMode - 1
          , "double", cur_offX
          , "double", dll_offY
          , "UPtr", cloneBits
          , "int", clonePitch
-         , "int", (BrushToolType=4) ? BrushToolEraserRestore : BlendModesPreserveAlpha
+         , "int", thisKeepAlpha
          , "int", useSelArea
          , "int", userimgGammaCorrect
          , "int", BlendModesFlipped
