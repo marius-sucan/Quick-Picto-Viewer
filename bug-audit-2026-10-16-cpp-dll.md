@@ -145,6 +145,29 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
     FreeImage loader disabled are unchanged; nothing leaks.
   - Histograms and fingerprints of such TIFFs collected from now on come from FreeImage's tone mapping; older rows
     are not rewritten. Cached thumbnails stay until «Deep refresh».
+- **5.3.4 (lib/thumbs-pool.h, quick-picto-viewer.ahk):** both SVG unit converters test "vmin" before "in", so a width
+  or height in vmin follows the converters' viewport rule (twice the shorter screen side), as vw, vh and vmax do. The
+  pool read "10vmin" as 10 inches; the viewer's AHK twin returned 0 (StrReplace() left "10vm"). Old against new, only
+  strings holding "vmin" changed: the DLL converter sliced into g++, the AHK one run under Wine.
+- **6.3 (lib/dupes-search.h, tests):** dupesHaveMSD() answers whether the sweep computed MSD scores (MSD on and
+  fingerprints loaded) instead of sampling the scores, and dupesApplyFilter() and the «Change hashes threshold» panel
+  both follow it (Marius's choice). A single pair above the search's MSD threshold is now filtered out.
+  - Behaviour change: with MSD on, pairs without a fingerprint (score 2500) are always excluded, also in lists where
+    few or no pairs carry a score, which the sampling let through.
+  - Checked end to end through dupesScanBegin() ... dupesScanEnd() and the filter, on HEAD's code and the fix;
+    tests/filter_oracle.cpp and tests/sweep_smoke.cpp follow the new rule.
+- **6.4 (lib/dupes-pixels.h, quick-picto-viewer.ahk):** dpHistogram() and calcHistoAvgFile() start the rarest-level
+  search above the pixel count, so a solid-colour image stores its own level. Multi-level images give the same eight
+  statistics as before: 300,000 random histograms in the DLL, 40 drawn images in the AHK under Wine's GDI+. Rows
+  already stored keep 0.00391 until collected again (Marius's choice).
+- **4.5.1 (lib/pdfium-reader.h):** adaptImageGivenSize() counts a 0-px side as 1 px in its ratios, and its size cap
+  no longer divides by a 0-px area (a value nothing read). A 0 x 300 page in a 500-px contact-sheet box becomes
+  2 x 500 instead of 500 x 1. Inputs without a 0 side give the same sizes (2 M random cases), and UBSan stays quiet.
+- **1.6.2 (qpv-main.cpp, quick-picto-viewer.ahk):** dissolveBitmap() returns 0 when its pixel map cannot be allocated,
+  instead of letting std::bad_alloc out of the export. QPV_DissolveBitmap() disposes the new bitmap and returns
+  nothing when a lock fails or the DLL call does not return 1 (an older DLL's exception included), so the blur tool
+  reports an error instead of applying a transparent bitmap. Ordinary dissolves are byte-identical (300 cases), and
+  under Wine the wrapper returns the dissolved bitmap from the real qpvmain.dll.
 
 **Found while checking, not in the report:**
 - **tests/run-tests.sh stopped at its slicing step from 16cd6d6 (2026-10-10) on:** adaptImageGivenSize() moved
@@ -224,7 +247,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 1.4.3 | CreateGdipBitmapFromCImg: unchecked UIntMult, 32-bit row offset | Obsolete | Code reading | The function is gone; the replacement computes row offsets in 64-bit. |
 | 1.5 | Zoom/rotate blur leave the caller's source alpha-weighted | Intentional or known | Run, sliced DLL code | Deliberate memory saving (e6f3ddd); the source is documented as consumed and both callers discard it. |
 | 1.6.1 | UndoAiderSwapPixelRegions does not clamp its rectangle (out of bounds) | Confirmed, latent | ASan, sliced DLL code | No clamps, but the claimed trigger cannot happen: the undo rectangle is a crop FreeImage accepted from the same image. A stale level from another image did reach it (see "a stale undo level" below); since 2026-10-28 undoRedoHugeImagesAct() refuses a level that does not fit. |
-| 1.6.2 | dissolveBitmap lets std::bad_alloc escape the export | **Confirmed** | Run, sliced DLL code (failing allocation) | Only when memory runs out: DllCall catches the exception, but QPV_DissolveBitmap ignores the failure and the blur tool applies an unwritten bitmap. Low. |
+| 1.6.2 | dissolveBitmap lets std::bad_alloc escape the export | **Confirmed** | Run, sliced DLL code (failing allocation) | Only when memory runs out: DllCall catches the exception, but QPV_DissolveBitmap ignores the failure and the blur tool applies an unwritten bitmap. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 1.6.3 | dissolveBitmap / symmetricaBitmap index in 32-bit int | Confirmed, latent | UBSan, sliced DLL code | Overflows above 2.1 gigapixels, but both exports only get GDI+ bitmaps, which the app caps at 537 megapixels. |
 | 2.1.1 | Protect alpha ignored in Normal (blend mode 0) | Intentional or known | Run, sliced DLL code; git history | Accurate, but Marius excluded Normal on purpose (eb7ea93, 2025-03-24); the checkbox tooltip says "unaltered by blend modes". |
 | 2.1.2 | Protect alpha ignored in Behind (mode 25) | Intentional or known | Run, sliced DLL code; git history | Accurate, but deliberate (9df5106, 2025-03-17): Behind exists to paint under transparent pixels, which raises their alpha. |
@@ -260,7 +283,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 4.4.1 | CountChars -1 in a UINT: 4.29-billion-iteration loop | Not a bug | Reading + PDFium source | The text page is checked first, and PDFium returns -1 only for a missing text page; the quoted loop does not exist. |
 | 4.4.2 | Text size query 1-2 units short, buffer overflow | Confirmed, latent | ASan, sliced DLL code + PDFium contract | The size can be short on malformed pages, but the only caller allocates eight times the reported size. |
 | 4.4.3 | Pages with 1-2 characters skipped, buffer unterminated | Not a bug | Code reading | An explicit threshold; the caller zero-fills the buffer and does not read it when nothing was extracted. |
-| 4.5.1 | adaptImageGivenSize divides by zero | **Confirmed** | UBSan, sliced DLL code | Undefined behaviour for a malformed PDF page 0 px wide in a contact sheet; on x64 it ends as a 1-pixel-high image, not a crash. Low. |
+| 4.5.1 | adaptImageGivenSize divides by zero | **Confirmed** | UBSan, sliced DLL code | Undefined behaviour for a malformed PDF page 0 px wide in a contact sheet; on x64 it ends as a 1-pixel-high image, not a crash. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 4.5.2 | dpi 0 skips the size cap (32650 x 32650) | Confirmed, latent | Code reading | dpi 0 means "exactly this size" by design; the 32650 fallback only applies when a size is missing, and no caller combines the two. |
 | 4.5.3 | 24-bit stride not 4-aligned, bitmap creation fails | Not a bug | Code reading | The bitmap has no caller buffer, so GDI+ uses its own aligned stride; PDFium draws through the locked stride. |
 | 4.6.1 | WicD2DrenderSVG does not check its factories for NULL | Confirmed, latent | Code reading | True, but the factories exist whenever the DLL loads; only an out-of-memory start-up could leave them NULL. |
@@ -271,15 +294,15 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 5.3.1 | FreeImage thumbnails ignore EXIF orientation | **Confirmed** | Run, real FreeImage fork | With "Always open with FreeImage" on, the viewer turns JPEGs upright but their thumbnails stay sideways. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 5.3.2 | HDR TIFF hand-off to FreeImage is dead in the pools | **Confirmed** | Code reading | Every pool call passes 0, so high-bit-depth TIFF thumbnails come from WIC, not FreeImage's tone mapping as in the viewer. Low. Reproduced again at 104acc5 by running both sliced loader chains, and fixed 2026-10-28. |
 | 5.3.3 | Scaler failure gives a top-left crop | Intentional or known | Code reading | No crop: the whole frame is decoded unscaled; that fallback is the 10-06 audit's item 44, whose cause was fixed in dcaaf28. |
-| 5.3.4 | "in" tested before "vmin" in the SVG unit converter | **Confirmed** | Run, sliced DLL code | Real in the pool's converter and in the viewer's AHK twin: "10vmin" is read as 10 inches. svg-render.h has no converter. Low. |
+| 5.3.4 | "in" tested before "vmin" in the SVG unit converter | **Confirmed** | Run, sliced DLL code | Real in the pool's converter and in the viewer's AHK twin: "10vmin" is read as 10 inches. svg-render.h has no converter. Low. Correction: the AHK twin returns 0, not 10 inches (StrReplace() leaves "10vm"). Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 5.4 | openCVdiffBlendBitmap copies before subtracting: black at offset 0 | Not a bug | Run, sliced DLL code (OpenCV stand-ins) | The copy builds the shifted operand; the filter is "shifted image minus image", so zero shift gives a flat result by definition. |
 | 5.5.1 | openCVedgeDetection lets cv::Exception escape | Confirmed, latent | Reading + OpenCV source | No try/catch, but the panel always sends valid sizes and modes, and DllCall catches a throw on the script thread. The extractChannel part is code removed in 2024. |
 | 5.5.2 | openCVblurFilters throws for Sobel/Laplacian kernels > 31 | Not a bug | Code reading | The function has no Sobel or Laplacian mode. |
 | 5.5.3 | openCVresizeBitmapExtended crop outside the try | Confirmed, latent | Reading + OpenCV source | True, but every caller passes the whole image, so the crop rectangle is always valid. |
 | 6.1 | dupesEngineCancel races Release/Init on the database handle | Confirmed, latent | TSan, sliced DLL code | True only with two threads; since the interface-thread merge every call comes from the one script thread. |
 | 6.2 | An unusable hash splits a group and drops valid pairs | Confirmed, latent | Run, real SQLite + sliced engine | The flaw is real, but the app's query drops empty hashes and its writer only stores valid hex, so nothing triggers it. |
-| 6.3 | MSD filter skipped when only one pair exists | **Confirmed** | Run, sliced DLL code | The two-pair rule is deliberate, but it also gates the search's own MSD threshold: a single-pair result is listed even above the threshold. Low. |
-| 6.4 | Rarest level of a single-level image reported as level 0 | **Confirmed** | Run, sliced DLL code | Real, in the DLL and in the AHK original it copies: any solid-colour image above black stores level 0. Low. |
+| 6.3 | MSD filter skipped when only one pair exists | **Confirmed** | Run, sliced DLL code | The two-pair rule is deliberate, but it also gates the search's own MSD threshold: a single-pair result is listed even above the threshold. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
+| 6.4 | Rarest level of a single-level image reported as level 0 | **Confirmed** | Run, sliced DLL code | Real, in the DLL and in the AHK original it copies: any solid-colour image above black stores level 0. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 
 
 **Scope:** All C++ source and header files in `QPV DLL source code/` (`qpv-main.cpp`, `dllmain.cpp`, and `lib/*.h`). AutoHotkey (`.ahk`) files were excluded.
@@ -397,7 +420,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 1.6. [`UndoAiderSwapPixelRegions`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1318-L1334), [`dissolveBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1731-L1832), & [`symmetricaBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1834-L1880) — Missing Region Clamping and Uncaught `resize` / 32-Bit Index Overflow
 
-> **Verified 2026-10-27:** 1.6.1 Confirmed, latent (the undo rectangle is always a valid crop; but see the stale-undo-level note in the verification section); 1.6.2 **Confirmed** (only when memory runs out: the failure is ignored and an unwritten bitmap applied); 1.6.3 Confirmed, latent (GDI+ caps the size).
+> **Verified 2026-10-27:** 1.6.1 Confirmed, latent (the undo rectangle is always a valid crop; but see the stale-undo-level note in the verification section); 1.6.2 **Confirmed** (only when memory runs out: the failure is ignored and an unwritten bitmap applied); 1.6.3 Confirmed, latent (GDI+ caps the size). 1.6.2 fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1318-L1334), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1740-L1817), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1844-L1875)
@@ -826,7 +849,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 4.5. [`adaptImageGivenSize`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L46-L65) & [`coreRenderPdfPageAsBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L387-L445) — Division by Zero (`imgH == 0` / `givenH == 0`), `dpi == 0` Bypassing `maxMPX` Cap, and Unaligned 24-bpp GDI+ Stride
 
-> **Verified 2026-10-27:** 4.5.1 **Confirmed** (undefined behaviour on a malformed 0-px-wide PDF page in a contact sheet; harmless on x64); 4.5.2 Confirmed, latent; 4.5.3 Not a bug (GDI+ allocates with its own stride).
+> **Verified 2026-10-27:** 4.5.1 **Confirmed** (undefined behaviour on a malformed 0-px-wide PDF page in a contact sheet; harmless on x64); 4.5.2 Confirmed, latent; 4.5.3 Not a bug (GDI+ allocates with its own stride). 4.5.1 fixed 2026-10-28.
 
 - **Severity:** High
 - **Location:** [pdfium-reader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L46-L65), [pdfium-reader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L399-L445)
@@ -895,7 +918,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 5.3. [`tpFIMthumb`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1365-L1379), [`tpWICload`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L762-L805), & [`tpConvertSVGunitsToPixels`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1139-L1146) — Missing `JPEG_EXIFROTATE`, Dead HDR-TIFF FreeImage Fallback, Silent Scaler Fallback, and `"in"` Shadowing `"vmin"`
 
-> **Verified 2026-10-27:** 5.3.1 **Confirmed** (with "Always open with FreeImage" JPEG thumbnails ignore EXIF orientation); 5.3.2 **Confirmed** (HDR TIFF hand-off dead in the pools); 5.3.3 Intentional or known (no crop; the full-size fallback is 10-06 item 44); 5.3.4 **Confirmed** ("vmin" read as inches, also in the AHK). 5.3.1 and 5.3.2 fixed 2026-10-28.
+> **Verified 2026-10-27:** 5.3.1 **Confirmed** (with "Always open with FreeImage" JPEG thumbnails ignore EXIF orientation); 5.3.2 **Confirmed** (HDR TIFF hand-off dead in the pools); 5.3.3 Intentional or known (no crop; the full-size fallback is 10-06 item 44); 5.3.4 **Confirmed** ("vmin" read as inches, also in the AHK). 5.3.1, 5.3.2 and 5.3.4 fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L762-L805), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1139-L1146), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1365-L1379), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1717)
@@ -1006,7 +1029,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 6.3. [`dupesHaveMSD`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1380-L1387) & [`dupesApplyFilter`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1410-L1412) — `mseLo` / `mseHi` Filter Silently Ignored When Only 1 Duplicate Pair Exists
 
-> **Verified 2026-10-27:** **Confirmed.** The two-pair rule is deliberate, but it also skips the search's own MSD threshold for single-pair results.
+> **Verified 2026-10-27:** **Confirmed.** The two-pair rule is deliberate, but it also skips the search's own MSD threshold for single-pair results. Fixed 2026-10-28: the filter follows whether the sweep computed MSD.
 
 - **Severity:** Medium
 - **Location:** [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1380-L1387), [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1410-L1412)
@@ -1031,7 +1054,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 6.4. [`dpHistogram`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L350-L397) — Wrong Minimum Histogram Bin (`minu`) on Solid-Color / Single-Tone Images
 
-> **Verified 2026-10-27:** **Confirmed.** Single-level images store level 0 as their rarest level, in the DLL and in the AHK original.
+> **Verified 2026-10-27:** **Confirmed.** Single-level images store level 0 as their rarest level, in the DLL and in the AHK original. Fixed 2026-10-28.
 
 - **Severity:** Low
 - **Location:** [dupes-pixels.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L354), [dupes-pixels.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L382-L386)
