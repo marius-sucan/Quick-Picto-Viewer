@@ -151,7 +151,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
    , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
-   , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", hGuiBtn
+   , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := ""
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := ""
    , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
    , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
@@ -171,7 +171,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , 2NDglHbitmap := "", 2NDglHDC := "", 2NDglOBM := "", 2NDglPG := "", mainThreadHwnd := "", imgDecLX := "", imgDecLY := ""
    , undoLevelsArray := [], currentUndoLevel := 0, maxUndoLevels := 50, undoLevelsRecorded := 0, hGDIinfosWin := ""
    , zeitSillyPrevent := 1, PrintPosX, PrintPosY, PrintPosW, PrintPosH, tinyPrevAreaCoordX := 1, UsrEditFileDestination := ""
-   , hLVmainu := 0, hLViconsu := 0, tempBtnVisible := "null", tempBtnGuiBtnArray := [], userMultiCoresLimit := 100
+   , hLVmainu := 0, hLViconsu := 0, tempBtnVisible := "null", userMultiCoresLimit := 100
    , drawingShapeNow := 0, customShapePoints := [], prevResizedVPimgW := "", prevResizedVPimgH := "", PenuDrawLive := ""
    , customShapePropPoints := [], drawingVectorLiveMode := 0, cardinalCurveCustomShape := 0, openingPanelNow := 0
    , closedLineCustomShape := 1, tensionCurveCustomShape := 0.5, userDefinedSelCoords := 0, thisSearchString := ""
@@ -27684,63 +27684,82 @@ ST_Count(Haystack, searchFor) {
 }
 
 CreateTempGuiButton(btnList, killWin:=0, delayu:=950) {
+; btnList: "Label,,Function||Label,,Function" with any number of buttons; the functions are called without parameters
+; killWin: 1 destroys the bar, "force" shows it also outside the touch screen mode
+; delayu: ms until the bar hides; to keep it, turn off the DestroyTempBtnGui timer after the call
     Critical, On
-    Static lastCreated := 1, bgrColor := 112288, txtColor := "ddeeFF", thisOpacity := 200
-         , prevBtnList := "z"
-    Global BtnTemp1, BtnTemp2
-    
+    Static bgrColor := 112288, txtColor := "ddeeFF", prevBtnList := ""
     If (killWin=1)
     {
-       prevBtnList := ""
-       Gui, TempBtnGui: Destroy
-       tempBtnVisible := "null"
+       DestroyTempBtnGui("now")
        Return
     }
 
-    If (prevBtnList=btnList && tempBtnVisible!="null" && killWin!=1)
+    If (prevBtnList=btnList && tempBtnVisible!="null")
+    {
+       keepTempBtnGui(delayu)
+       SetTimer, DestroyTempBtnGui, 250
+       Return
+    }
+
+    If (TouchScreenMode!=1 && !InStr(killWin, "force"))
        Return
 
-    If (TouchScreenMode!=1 && killWin!="force") ; || MsgBox2hwnd
+    btns := []
+    btnArray := StrSplit(btnList, "||")
+    Loop, % btnArray.Count()
+    {
+       thisBtn := StrSplit(btnArray[A_Index], ",,")
+       If (thisBtn[1]="")
+          Continue
+
+       If (IsFunc(thisBtn[2])=1)
+          btns.Push(thisBtn)
+       Else
+          addJournalEntry("ERROR " A_ThisFunc "(): no function to call without parameters: " thisBtn[2] " [" thisBtn[1] "]")
+    }
+
+    DestroyTempBtnGui("now")
+    If (btns.Count()<1)
        Return
- 
+
     thisFntSize := Round(OSDfontSize*0.45)
     If (thisFntSize<9)
        thisFntSize := 9
 
-    Gui, TempBtnGui: Destroy
     Sleep, 25
-    Gui, TempBtnGui: -DPIScale -Caption +ToolWindow +E0x8000000 +hwndhGuiBtn +Owner%PVhwnd%
+    Gui, TempBtnGui: -DPIScale -Caption +ToolWindow +E0x8000000 +hwndhGuiBtn +Owner%PVhwnd%   ; WS_EX_NOACTIVATE
     Gui, TempBtnGui: Margin, % thisFntSize + 10, % thisFntSize
     Gui, TempBtnGui: Color, c%bgrColor%
     disableWindowPenServices(hGuiBtn)
     Gui, TempBtnGui: Font, s%thisFntSize% Bold Q5, Arial
-    btnArray := StrSplit(btnList, "||")
-    tempBtnGuiBtnArray := []
-    Loop, % btnArray.Count()
+    Loop, % btns.Count()
     {
-        thisBtnArr := StrSplit(btnArray[A_Index], ",,")
-        ; ToolTip, % thisBtnArr[1] "==" thisBtnArr[2] , , , 2
-        If (A_Index=1)
-           Gui, TempBtnGui: Add, Text, c%txtColor% gtempGuiBtnCall%A_Index% +hwndhTemp, % thisBtnArr[1]
-        Else If thisBtnArr[1]
-           Gui, TempBtnGui: Add, Text, x+%OSDfontSize% c%txtColor% gtempGuiBtnCall%A_Index% +hwndhTemp, % thisBtnArr[1]
- 
-        disableWindowPenServices(hTemp)
-        tempBtnGuiBtnArray[A_Index] := thisBtnArr[2]
+       thisLabel := btns[A_Index, 1], thisFunc := btns[A_Index, 2]
+       posu := (A_Index>1) ? "x+" OSDfontSize : ""
+       Gui, TempBtnGui: Add, Text, %posu% c%txtColor% +hwndhTemp, % thisLabel
+       fn := Func("tempBtnGuiClick").Bind(thisFunc)
+       GuiControl, TempBtnGui: +g, %hTemp%, % fn
+       disableWindowPenServices(hTemp)
     }
 
+    WinGetPos, winPosX, winPosY, , , ahk_id %PVhwnd%
+    ; AHK limits the first Show of a window to the work area; the second one fits all the buttons
+    Gui, TempBtnGui: Show, NoActivate Hide x%winPosX% y%winPosY%, GuiActionBtn
+    Gui, TempBtnGui: Show, NoActivate AutoSize Hide, GuiActionBtn
+    WinGetPos, , , gWid, gHeig, ahk_id %hGuiBtn%
+    roundedCsize := Round(thisFntSize/1.7) + 15
+    WinSet, Transparent, 230, ahk_id %hGuiBtn%
+    WinSet, Region, 0-0 R%roundedCsize%-%roundedCsize% w%gWid% h%gHeig%, ahk_id %hGuiBtn%
     tempBtnVisible := hGuiBtn
+    prevBtnList := btnList
     RepositionTempBtnGui()
-    If InStr(btnList, ",,")
-       prevBtnList := btnList
-    SetTimer, DestroyTempBtnGui, % - delayu
-    lastCreated := A_TickCount
+    keepTempBtnGui(delayu, 1)
+    SetTimer, DestroyTempBtnGui, 250
 }
 
-RepositionTempBtnGui(mm:=0) {
-    Static lastSize := []
-    If (mm="getLast")
-       Return lastSize
+RepositionTempBtnGui() {
+    Critical, On
     If (tempBtnVisible="null")
        Return
 
@@ -27748,84 +27767,50 @@ RepositionTempBtnGui(mm:=0) {
     If (thisFntSize<9)
        thisFntSize := 9
 
-    hGuiBtn := tempBtnVisible
-    WinGetPos, winPosX, winPosY, Wid, Heig, ahk_id %PVhwnd%
-    Gui, TempBtnGui: Default
-    Gui, TempBtnGui: Show, NoActivate AutoSize Hide x%winPosX% y%winPosY%, QPVGuiActionBtn
-    WinGetPos,,, gWid, gHeig, ahk_id %hGuiBtn%
-    If (gWid>Wid - thisFntSize*2.2)
-       gWid := Wid - Round(thisFntSize * 2.25) - 5
-    If (gWid<5)
-       gWid := 5
-
+    WinGetPos, winPosX, winPosY, , Heig, ahk_id %PVhwnd%
+    WinGetPos, , , , gHeig, ahk_id %tempBtnVisible%
     offsetuY := scrollBarHy ? scrollBarHy : 0
-    Final_y := winPosY + Heig - thisFntSize * 2 - gHeig - offsetuY//2
-    hasTrans := adjustCanvas2Toolbar()
-    tlbrBonusX := (hasTrans=1) ? ToolbarWinW : 0
-    ; ToolTip, % tlbrBonusX "|" hasTrans , , , 2
+    tlbrBonusX := (adjustCanvas2Toolbar()=1) ? ToolbarWinW : 0
     Final_x := winPosX + thisFntSize * 2 + tlbrBonusX
-    WinSet, Transparent, 230, ahk_id %hGuiBtn%
-    ; WinSet, AlwaysOnTop, On, ahk_id %hGuiBtn%
-    roundedCsize := Round(thisFntSize/1.7) + 15
-    WinSet, Region, 0-0 R%roundedCsize%-%roundedCsize% w%gWid% h%gHeig%, QPVGuiActionBtn
+    Final_y := winPosY + Heig - thisFntSize * 2 - gHeig - offsetuY//2
     Gui, TempBtnGui: Show, NoActivate AutoSize x%Final_x% y%Final_y%, GuiActionBtn
-    WinGetPos, x, y, ,, ahk_id %hGuiBtn%
-    lastSize := [Final_x, Final_y, Wid, Heig, x, y]
 }
 
-tempGuiBtnCall1() {
-    coretempGuiBtnCalls(1)
-}
-
-tempGuiBtnCall2() {
-    coretempGuiBtnCalls(2)
-}
-
-tempGuiBtnCall3() {
-    coretempGuiBtnCalls(3)
-}
-
-tempGuiBtnCall4() {
-    coretempGuiBtnCalls(4)
-}
-
-tempGuiBtnCall5() {
-    coretempGuiBtnCalls(5)
-}
-
-tempGuiBtnCall6() {
-    coretempGuiBtnCalls(6)
-}
-
-coretempGuiBtnCalls(indexu) {
-    Static listu := ",reduceCustomShapeLength,ImgVectorUndoAct,togglePathCurveTension,toggleOpenClosedLineEditorCustomShape,"
-    thisFunc := tempBtnGuiBtnArray[indexu]
-    z := InStr(listu, "," thisFunc ",")
-    If !z
-       SetTimer, DestroyTempBtnGui, -950
-
+tempBtnGuiClick(thisFunc) {
+; g-label of each button, bound to its function; the event arguments AHK appends are dropped
+    keepTempBtnGui(2000)
     If (WinActive("A")!=PVhwnd)
        WinActivate, ahk_id %PVhwnd%
-    ; ToolTip, % thisfunc "===" indexu , , , 2
-    If IsFunc(thisFunc)
-       %thisFunc%()
-    Else
-       addJournalEntry("ERROR " A_ThisFunc "(): no such function to call: " thisFunc)
 
-    If (drawingShapeNow!=1 && !z)
-       SetTimer, DestroyTempBtnGui, -950
+    %thisFunc%()
+    keepTempBtnGui(2000)
+}
+
+keepTempBtnGui(ms:="", fresh:=0) {
+; Keeps the bar for at least ms from now; returns the A_TickCount after which it may hide
+    Static hideAt := 0
+    If (ms!="")
+       hideAt := fresh ? A_TickCount + ms : Max(hideAt, A_TickCount + ms)
+    Return hideAt
 }
 
 DestroyTempBtnGui(dummy:=0) {
+; Every 250 ms: hides the bar once its keepTempBtnGui() time is up; the mouse over the bar adds 2 s.
+; dummy="now" hides it at once.
     Critical, On
-    MouseGetPos, , , OutputVarWin
-    thisWin := WinActive("A")
-    okay := (thisWin=PVhwnd || thisWin=hSetWinGui) ? 1 : 0
-    ; ToolTip, % OutputVarWin , , , 2
-    If (OutputVarWin!=tempBtnVisible) || (okay!=1) || (dummy="now")
-       CreateTempGuiButton("Die dummy", 1)  ;   ;-)
-    Else
-       SetTimer, DestroyTempBtnGui, -950
+    If (dummy!="now" && tempBtnVisible!="null")
+    {
+       MouseGetPos, , , OutputVarWin
+       thisWin := WinActive("A")
+       If (OutputVarWin=tempBtnVisible && (thisWin=PVhwnd || thisWin=hSetWinGui))
+          keepTempBtnGui(2000)
+       If (A_TickCount<keepTempBtnGui())
+          Return
+    }
+
+    SetTimer, DestroyTempBtnGui, Off
+    Gui, TempBtnGui: Destroy
+    tempBtnVisible := "null"
 }
 
 getHostPanelFunc() {
@@ -80812,13 +80797,9 @@ drawVisibleVectorPoints(gmx, gmy, mx, my, pWhite, totalz, Gu, mainWidth, mainHei
              posXu := Round(HUDobjNavBoxu[1])
 
           posYu := (FlipImgV=1) ? scrollBarHy : mainHeight - h - scrollBarHy
-          If (tempBtnVisible=hGuiBtn && showMainMenuBar!=1 && FlipImgV=0)
-          {
-             ; lastSize := RepositionTempBtnGui("getLast")
-             ; MouseCoords2Image(lastSize[5], lastSize[6], 1, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
+          If (tempBtnVisible!="null" && showMainMenuBar!=1 && FlipImgV=0)
              posYu := 0
-             ; ToolTip, % kY " kl=" lastSize[2] "|" h "|" posYu , , , 2
-          }
+
           tzGdip_DrawImage(Gu, BoxBMP, posXu, posYu, w, h)
           trGdip_DisposeImage(BoxBMP)
           prevMsg := thisIDu
