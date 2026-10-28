@@ -423,9 +423,10 @@ struct FloodSel {
         const uint64_t all = (n >= 64) ? ~0ULL : ((1ULL << n) - 1);
         if (kind==1)
         {
+           // a high-depth mask: clipMaskFilter() gives the line's depth, 0 off the lines
            uint64_t m = 0;
            for (int i = 0; i < n; i++)
-               if (clipMaskFilter(x0 + i, y, NULL, 0)==1)
+               if (clipMaskFilter(x0 + i, y, NULL, 0)==0)
                   m |= 1ULL << i;
            return m;
         }

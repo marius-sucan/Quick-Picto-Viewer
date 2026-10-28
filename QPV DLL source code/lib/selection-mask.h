@@ -1404,22 +1404,25 @@ DLL_API int DLL_CALLCONV prepareDrawLinesMask(int radius, int clipMode, int high
         QPV_DBG(std::to_string(clipMode) + "imgSel.clipShape RESIZED " + std::to_string(pp) + " size = " + std::to_string(imgSel.mask.size()));
     }
 
-    if (s!=imgSel.depthMask.size() && imgSel.highDepth==1)
+    if (imgSel.highDepth==1)
     {
-       try
+       if (s!=imgSel.depthMask.size())
        {
-          imgSel.depthMask.resize(s);
-       } catch(const std::bad_alloc& e)
-       {
-          QPV_DBG("imgSel.depthMask failed. bad_alloc");
-          return 0;
-       } catch(const std::length_error& e)
-       {
-          QPV_DBG("imgSel.depthMask failed. length_error");
-          return 0;
-       }
+          try
+          {
+             imgSel.depthMask.resize(s);
+          } catch(const std::bad_alloc& e)
+          {
+             QPV_DBG("imgSel.depthMask failed. bad_alloc");
+             return 0;
+          } catch(const std::length_error& e)
+          {
+             QPV_DBG("imgSel.depthMask failed. length_error");
+             return 0;
+          }
 
-       QPV_DBG("imgSel.depthMask RESIZED");
+          QPV_DBG("imgSel.depthMask RESIZED");
+       }
        fill(imgSel.depthMask.begin(), imgSel.depthMask.end(), 0);
     } else if (imgSel.highDepth==0)
     {
@@ -1559,6 +1562,7 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     imgSel.shape = mode;
     imgSel.flipped = flip;
     imgSel.inverted = invertArea;
+    imgSel.highDepth = 0; // prepareDrawLinesMask() sets it after this call
     imgSel.exclusion = exclusion;
     imgSel.angle = (angle * M_PI) / 180.0f; // convert to radians
     imgSel.cosAngle = cos(imgSel.angle);
@@ -1571,6 +1575,24 @@ clipMaskFilter() can also rely on a bitmap, but it must be passed directly to it
     imgSel.y1Push = ppofYb;
     if (imgSel.mask.size()<2000) // || polygonMapMin.size()<100)
        useCache = 0;
+
+    const INT64 s = imgSel.maskW * imgSel.maskH + 2;
+    if (useCache==1 && imgSel.maskW>0 && imgSel.maskH>0 && imgSel.mask.size()!=(size_t)s)
+    {
+       // a mask kept for another window would be read past its end; it starts empty, as prepareDrawLinesMask() would leave it
+       try
+       {
+          imgSel.mask.resize(s);
+       } catch(const std::bad_alloc& e)
+       {
+          QPV_DBG("imgSel.mask failed. bad_alloc");
+          return 0;
+       } catch(const std::length_error& e)
+       {
+          QPV_DBG("imgSel.mask failed. length_error");
+          return 0;
+       }
+    }
 
     int z = 1;
     if (mode==2 && PointsList!=NULL && useCache!=1 && imgSel.maskW>1 && imgSel.maskH>1)
