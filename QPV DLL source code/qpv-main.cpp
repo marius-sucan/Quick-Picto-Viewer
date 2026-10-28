@@ -575,7 +575,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
      
                 INT64 o = ky + (INT64)x * bpc;
                 RGBAColor Brgb = readBGRA(bgrImageData + o, bpp);
-                RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 1, bpp, opacity);
+                RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, opacity);
                 writeBGRA(bgrImageData + o, newColor, bpp);
             }
         }
@@ -619,7 +619,7 @@ DLL_API int DLL_CALLCONV GenerateRandomNoiseOnBitmap(unsigned char* bgrImageData
  
             RGBAColor Orgb = {nR, nG, nB, 255};
             RGBAColor Brgb = readBGRA(bgrImageData + o, bpp);
-            RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, 1, bpp, opacity);
+            RGBAColor newColor = CalculateNewBlendModes(Orgb, Brgb, blendMode, flipLayers, linearGamma, keepAlpha, bpp, opacity);
             writeBGRA(bgrImageData + o, newColor, bpp);
         }
     }

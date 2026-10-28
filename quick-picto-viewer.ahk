@@ -17429,6 +17429,7 @@ downscaleHugeImagesForEditing() {
       GDIfadeVPcache := trGdip_DisposeImage(GDIfadeVPcache, 1)
       infoBoxGdiCached := trGdip_DisposeImage(infoBoxGdiCached, 1)
       viewportQPVimage.DiscardImage()
+      recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
       retrieveQPVscreenImgSection("kill", 0, 0, 0, 0, 0)
       trGdip_DisposeImage(useGdiBitmap())
       gdiBitmap := thisBitmap
@@ -20702,7 +20703,11 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
    }
 
    If (imgSelPx="kill" || preventUndoLevels=1)
+   {
+      ; flip and invert levels hold no bitmap
+      lastu := []
       Return
+   }
 
    recordSelUndoLevelNow()
    bpp := FreeImage_GetBPP(viewportQPVimage.imgHandle)
@@ -20829,12 +20834,26 @@ undoRedoHugeImagesAct() {
          Return
       }
 
+      FreeImage_GetImageDimensions(hFIFimgX, imgW, imgH)
+      FreeImage_GetImageDimensions(hFIFimgA, mW, mH)
+      X1 := (inv=1) ? 0    : obju[3],         Y1 := (inv=1) ? 0    : obju[4]
+      X2 := (inv=1) ? imgW : X1 + obju[5],    Y2 := (inv=1) ? imgH : Y1 + obju[6]
+      ; UndoAiderSwapPixelRegions() does not clip: a level from another image would be written past this one
+      If (X1<0 || Y1<0 || X2>imgW || Y2>imgH || mW!=(X2 - X1) || mH!=(Y2 - Y1))
+      {
+         showTOOLtip("WARNING: The recorded undo level does not fit the image in the viewport.`nImpossible to perform undo.")
+         addJournalEntry("Error: undo level " X1 "," Y1 " - " X2 "," Y2 " [" mW "x" mH "] does not fit the viewport bitmap: " imgW "x" imgH)
+         recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
+         SoundBeep 300, 100
+         ResetImgLoadStatus()
+         SetTimer, RemoveTooltip, % -msgDisplayTime
+         Return
+      }
+
       EllipseSelectMode := obju[7],      VPselRotation := obju[8]
       innerSelectionCavityX := obju[9],  innerSelectionCavityY := obju[10]
       imgSelX1 := obju[3],            imgSelY1 := obju[4]
       imgSelX2 := imgSelX1 + obju[5], imgSelY2 := imgSelY1 + obju[6]
-      FreeImage_GetImageDimensions(hFIFimgX, imgW, imgH)
-      FreeImage_GetImageDimensions(hFIFimgA, mW, mH)
       defineRelativeSelCoords(imgW, imgH)
       if (inv!=1)
       {
@@ -20842,9 +20861,6 @@ undoRedoHugeImagesAct() {
          imgSelY2 := imgSelY1 - obju[6]
          flipVars(imgSelY1, imgSelY2)
       }
-
-      X1 := (inv=1) ? 0    : obju[3],         Y1 := (inv=1) ? 0    : obju[4]
-      X2 := (inv=1) ? imgW : X1 + obju[5],    Y2 := (inv=1) ? imgH : Y1 + obju[6]
 
       pBitsAll := FreeImage_GetBits(hFIFimgX)
       pBitsMini := FreeImage_GetBits(hFIFimgA)
@@ -21144,6 +21160,7 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
       Gdip_BitmapSetColorDepth(whichBitmap, "BW")
 
    viewportQPVimage.DiscardImage()
+   recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
    killQPVscreenImgSection()
    currentImgModified := 1
    imgIndexEditing := currentFileIndex
@@ -24091,7 +24108,7 @@ BlurSelectedArea(modus:="") {
     zBitmap := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 1)
     bgrBMPu := Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, imgSelPx, imgSelPy, imgSelW, imgSelH, 0, 0, 1, 0)
     If (modus="pixelate")
-       isUni := Gdip_TestBitmapUniformity(zBitmap, 7, maxLevelIndex, nimo, avgLevelAlpha)
+       isUni := Gdip_TestBitmapUniformity(zBitmap, 7, maxLevelIndex)
 
     ; ToolTip, % "l=" isUni " | " maxLevelIndex , , , 2
     ; ToolTip, % blurAreaPixelizeAmount "==" blurAreaPixelizeMethod "==" modus , , , 2
@@ -24189,8 +24206,9 @@ BlurSelectedArea(modus:="") {
     If (zko!=1)
        errorsOccurred := 1
     
-    If (isUni && modus="pixelate")
-       QPV_PrepareAlphaChannelBlur(zBitmap, avgLevelAlpha, 0)
+    ; a few odd pixels still count as uniform, so the alpha is the most common level
+    If (isUni=1 && modus="pixelate")
+       QPV_PrepareAlphaChannelBlur(zBitmap, maxLevelIndex, 0)
 
     r0 := trGdip_GraphicsClear(A_ThisFunc, G2)
     If (errorsOccurred=0 && BlurAreaBlendMode>1)

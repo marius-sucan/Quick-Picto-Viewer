@@ -94,25 +94,56 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
   low on average and long brush strokes darkened (up to 10 levels for pinch and bulge); with gamma correction, value 1
   became 0. Clip to alpha now uses Normal's fixed-point weights and 16-bit gamma tables, so over opaque pixels it
   equals No blend mode exactly; Replace rounds its colour and alpha mixes the same way. Every other mode is unchanged.
+- **Stale huge-image undo level (quick-picto-viewer.ahk only, no DLL build needed):**
+  - downscaleHugeImagesForEditing() and convertImageIntoHugeImage() clear the huge-image undo level when they replace
+    the viewport image, as loading a file does. A full copy of the image kept by a crop, resize or rotate is freed
+    then too, instead of staying in memory while the downscaled copy is edited.
+  - recordUndoLevelHugeImagesNow("kill") also clears flip and invert levels, which hold no bitmap and outlived every
+    clearing, the one at file load included: by the same code, Ctrl+Z after flipping one huge image and opening
+    another flipped the new one (traced, not run).
+  - undoRedoHugeImagesAct() refuses, and clears, a level whose rectangle or saved copy does not fit the current image.
+  - Ordinary undo and redo, inverted-selection levels included, are unchanged. After a downscale and a conversion back
+    into a huge image, Ctrl+Z finds no level to apply.
+- **Huge-image noise and "Protect alpha channel" (qpv-main.cpp; takes effect with the next qpvmain.dll build):**
+  - GenerateRandomNoiseOnBitmap() passes its keepAlpha argument to both blend calls. With a blend mode and the box
+    off, the noise now covers transparent pixels of 32-bit huge images and raises their alpha, as on regular images.
+  - Unchanged: the box ticked (byte-identical), None, Clip to alpha, and 24-bit images, except that with "Swap
+    blended layers" a 24-bit pixel can differ by one level (the two mixes round differently).
+- **Pixelate alpha (quick-picto-viewer.ahk only):**
+  - When the selection's alpha is nearly uniform, BlurSelectedArea() gives the pixelated area the most common alpha
+    level instead of the mean of the levels present, and only when Gdip_TestBitmapUniformity() succeeds (not on its
+    -1/-2 errors).
+  - A selection with a single alpha level gives the same bytes as before.
 
 **Found while checking, not in the report:**
-- **A stale undo level (possible heap overflow; traced in code, not run).**
-  - **Mechanism:** the huge-image undo level is cleared when a file is loaded, but not by
+- **A stale undo level (heap overflow; confirmed 2026-10-28 and fixed, see «Fixed on 2026-10-28»).**
+  - **Mechanism:** the huge-image undo level was cleared when a file is loaded, but not by
     downscaleHugeImagesForEditing() or convertImageIntoHugeImage(). Both replace the viewport image without loading a
-    file. undoRedoHugeImagesAct() then applies the old level to whatever image is current, checking only the colour
-    depth.
-  - **Effect:** with a smaller new image, UndoAiderSwapPixelRegions() (1.6.1) writes outside it; otherwise the old
-    pixels are pasted into the new image.
-  - **To test on Windows:**
-    1. Open a huge image and apply a filter to a selection near its far edge.
-    2. Downscale it for editing.
-    3. Convert it back to a huge image, or enlarge it in the resize panel.
-    4. Press Ctrl+Z.
-- **Noise and "Protect alpha channel" (code reading):** GenerateRandomNoiseOnBitmap() ignores its keepAlpha argument
-  (qpv-main.cpp:578 and 622 pass 1), so on huge images the noise tool's checkbox has no effect.
-- **Pixelate alpha (code reading):** pixelate sets the alpha to the mean of the alpha levels present, not the most
-  common one (avgLevel in lib/Gdip_All.ahk, used at quick-picto-viewer.ahk:24187). A mostly opaque selection with a few
-  transparent pixels gets alpha 127, so the pixelation lands at half strength.
+    file. undoRedoHugeImagesAct() then applied the old level to whatever image was current, checking only the colour
+    depth, and UndoAiderSwapPixelRegions() (1.6.1) does not clip.
+  - **Reproduced** in the app under Wine, with the prebuilt qpvmain.dll:
+    - The path above: a 200,100 x 30 px image opens as a huge image (wider than GDI+'s 199,000 px). Invert its
+      right 1,000 px, downscale it for editing (199,000 x 29), «Convert / teleport viewport image to Freeimage»,
+      Ctrl+Z: the app crashed with a page fault.
+    - A 400 x 300 image teleported, inverted at its top right, downscaled, cropped to 200 x 150 and teleported again:
+      Ctrl+Z hung the app. The same steps without the Ctrl+Z ran to the end.
+    - Enlarged to 800 x 600 instead of cropped: Ctrl+Z pasted the old image's original pixels into the new one.
+    - A horizontal flip of the whole image, then the same downscale, crop and teleport: Ctrl+Z flipped the cropped
+      image. Flip levels hold no bitmap, and "kill" did not clear them.
+    - ASan, on the sliced UndoAiderSwapPixelRegions() with the arguments the app passed: heap-buffer-overflow.
+- **Noise and "Protect alpha channel" (confirmed 2026-10-28 and fixed):** GenerateRandomNoiseOnBitmap() passed 1
+  instead of its keepAlpha argument to both blend calls (since 2384da5, where every other blend export passed it
+  through). On 32-bit huge images with a blend mode the noise never painted over transparent pixels, box ticked or
+  not. Under Wine, with Screen and the box off: 0 of 12,000 transparent pixels got noise on a huge image, 7,797 on a
+  regular one.
+- **Pixelate alpha (confirmed 2026-10-28 and fixed):** on regular images, when under 0.65 % of the selection's pixels
+  sit at other alpha levels, Gdip_TestBitmapUniformity() calls the alpha uniform, and pixelate set it to the mean of
+  the distinct levels present (avgLevel), not the most common one. Under Wine:
+  - 12 transparent pixels among 48,000 opaque ones gave alpha 127, and the stripes under the pixelation still showed
+    at half strength.
+  - So did a selection 2 px past the left edge of an RGB image without alpha (alpha 128; the padding counts as a
+    level). With «Limit selection to image area» off (the L key), no alpha channel is needed.
+  - Huge images take another path (FreeImage rescale, then PixelateHugeBitmap()) and pixelate at full strength.
 - **2.9 reaches further than 72aeac1 says:**
   - With Double size and Random size on a huge image, about a third of pinch and bulge strokes at size 990 pass the
     150 MB limit.
@@ -145,7 +176,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 1.4.2 | CreateGdipBitmapFromCImg returns a blank bitmap when locking fails | Obsolete | Code reading | The function is gone; the AHK wrapper now disposes the bitmap and reports the failure. |
 | 1.4.3 | CreateGdipBitmapFromCImg: unchecked UIntMult, 32-bit row offset | Obsolete | Code reading | The function is gone; the replacement computes row offsets in 64-bit. |
 | 1.5 | Zoom/rotate blur leave the caller's source alpha-weighted | Intentional or known | Run, sliced DLL code | Deliberate memory saving (e6f3ddd); the source is documented as consumed and both callers discard it. |
-| 1.6.1 | UndoAiderSwapPixelRegions does not clamp its rectangle (out of bounds) | Confirmed, latent | ASan, sliced DLL code | No clamps, but the claimed trigger cannot happen: the undo rectangle is a crop FreeImage accepted from the same image. See "a stale undo level" below for a path that may reach it. |
+| 1.6.1 | UndoAiderSwapPixelRegions does not clamp its rectangle (out of bounds) | Confirmed, latent | ASan, sliced DLL code | No clamps, but the claimed trigger cannot happen: the undo rectangle is a crop FreeImage accepted from the same image. A stale level from another image did reach it (see "a stale undo level" below); since 2026-10-28 undoRedoHugeImagesAct() refuses a level that does not fit. |
 | 1.6.2 | dissolveBitmap lets std::bad_alloc escape the export | **Confirmed** | Run, sliced DLL code (failing allocation) | Only when memory runs out: DllCall catches the exception, but QPV_DissolveBitmap ignores the failure and the blur tool applies an unwritten bitmap. Low. |
 | 1.6.3 | dissolveBitmap / symmetricaBitmap index in 32-bit int | Confirmed, latent | UBSan, sliced DLL code | Overflows above 2.1 gigapixels, but both exports only get GDI+ bitmaps, which the app caps at 537 megapixels. |
 | 2.1.1 | Protect alpha ignored in Normal (blend mode 0) | Intentional or known | Run, sliced DLL code; git history | Accurate, but Marius excluded Normal on purpose (eb7ea93, 2025-03-24); the checkbox tooltip says "unaltered by blend modes". |
