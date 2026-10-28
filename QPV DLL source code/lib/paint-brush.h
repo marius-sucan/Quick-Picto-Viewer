@@ -310,8 +310,8 @@ static bool brushSetupClone(BrushStamp &s) {
     {
         try
         {
-            // Limit allocation size to 150MB to prevent OOM
-            if ((size_t)s.cloneW * s.cloneH * s.bytesPerPixel < 150 * 1024 * 1024)
+            // Limit allocation size to 256MB to prevent OOM
+            if ((size_t)s.cloneW * s.cloneH * s.bytesPerPixel < 256 * 1024 * 1024)
             {
                 s.localClone.resize((size_t)s.cloneW * s.cloneH * s.bytesPerPixel);
                 for (int ry = 0; ry < s.cloneH; ++ry)
