@@ -1258,7 +1258,9 @@ DLL_API int DLL_CALLCONV NewDrawLinesOnMask(float* PointsList, int PointsCount, 
        return 0;
     }
 
-    // Adjust Y-coordinates by imgSel.maskRowShift - imgSel.y1Push (same as drawLineAllSegmentsMask)
+    // the rows map as in FillMaskPolygon(), on a copy: the caller may draw the same points again [Double line]
+    std::vector<float> shiftedPoints(PointsList, PointsList + (INT64)PointsCount * 2);
+    PointsList = shiftedPoints.data();
     for (int i = 0; i < PointsCount * 2; i += 2)
     {
         PointsList[i + 1] = PointsList[i + 1] + imgSel.maskRowShift - imgSel.y1Push;

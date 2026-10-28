@@ -1259,24 +1259,27 @@ DLL_API int DLL_CALLCONV DrawTextBitmapInPlace(unsigned char *originalData, int 
     const int gA = (StrideMini >> 8) & 0xFF;
     const int bA = StrideMini & 0xFF;
 
-    const INT64 data = CalcPixOffset(w - 1, h - 1, Stride, bpp);
     // fnOutputDebug("yay DrawTextBitmapInPlace; y = " + std::to_string(imgY));
     const int bpc = bpp / 8;
     const int nbpc = nbpp / 8;
+    // only what lies over the canvas: past its left or right edge a pixel would land on the next row
+    const int x1 = max(0, -imgX);
+    const int x2 = min(imgW, w - imgX);
     #pragma omp parallel for schedule(dynamic)
     for (int y = 0; y < imgH; y++)
     {
+        const int row = h - imgY + y - imgH;
+        if (row<0 || row>=h)
+           continue;
+
         INT64 ky_mini = (INT64)y * StrideMini;
-        INT64 ky = (INT64)(h - imgY + y - imgH) * Stride;
-        for (int x = 0; x < imgW; x++)
+        INT64 ky = (INT64)row * Stride;
+        for (int x = x1; x < x2; x++)
         {
             int nR, nG, nB;
             int nA = 255;
             int oA = 255;
             INT64 o = ky + (INT64)(imgX + x) * bpc;
-            if (o>data || o<0) // data is the offset of the last valid pixel, inclusive
-               continue;
-
             if (newBitmap!=NULL)
             {
                 INT64 on = ky_mini + (INT64)x * nbpc;

@@ -6,7 +6,7 @@ Every claim below was checked by Claude (Opus 5.5) on 2026-10-27 against the `de
 report's 37 sections hold 69 separate claims; the table numbers them one per row (1.1.1, 1.1.2, ...). The
 report's own text further down is left as Gemini wrote it, apart from one "Verified" line under each section heading.
 
-**Outcome:** 13 of the 69 claims are real bugs that a user can trigger today: 3 of medium severity, 10 low. Another 24 are real in the DLL code but nothing in the app triggers them now ("latent"). 14 are not bugs, 11 describe deliberate or already known behaviour, and 7 concern CImg code removed after the report was written. Of the 17 sections the report rates critical or high (its summary says 18), only three hold in the app (1.2.1, 4.5.1, 5.2), none of them as a likely crash.
+**Outcome:** 12 of the 69 claims are real bugs that a user can trigger today: 2 of medium severity, 10 low. Another 25 are real in the DLL code but nothing in the app triggers them now ("latent"). 14 are not bugs, 11 describe deliberate or already known behaviour, and 7 concern CImg code removed after the report was written. Of the 17 sections the report rates critical or high (its summary says 18), only three hold in the app (1.2.1, 4.5.1, 5.2), none of them as a likely crash.
 
 **How the claims were checked.** The DLL builds only with MSVC on Windows, so each claim was checked in three steps:
 1. **Code:** read at HEAD, together with the AutoHotkey code that calls it.
@@ -51,14 +51,12 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
 1. **2.2 (Medium):** "Swap blended layers" together with "Protect alpha channel" makes blend modes 2..21 ignore the
    new layer's opacity. The paste opacity slider, soft brush edges and antialiasing are lost in paste-in-place, brush
    types 2/3/5/7/8, fill, text and draw lines. Cause: the `mix` rule in CalculateNewBlendModes() was written for
-   unswapped layers.
-2. **3.4b (Medium):** NewDrawLinesOnMask() shifts the caller's point list in place. With "Double line" on,
-   HugeImagesDrawLineShapes() and HugeImagesDrawParametricLines() draw the second line offset by the selection's
-   overhang whenever the selection crosses the top or bottom edge of a huge image.
-3. **1.2.1 (Medium, cosmetic):** huge-image Insert text with letter spacing below -10. The canvas is sized from the
+   unswapped layers. Detect edges forces Protect alpha on, and the huge-image noise always passes it, so there
+   "Swap blended layers" alone voids the opacity slider.
+2. **1.2.1 (Medium, cosmetic):** huge-image Insert text with letter spacing below -10. The canvas is sized from the
    squeezed width, but lines and backgrounds are drawn at full width, so DrawTextBitmapInPlace() wraps a strip into the
    next row. The GDI+ renderer squeezes the line instead.
-4. **Low:**
+3. **Low:**
    - 2.8: the smudge brush can index a blend table at 256 (assuming MSVC rounds floats as the g++ test build did).
    - 3.6.1: "Flood opacity based on color similarity" does nothing at 100 % opacity.
    - 5.2: the thumbnail format lists are read by the workers without the lock.
@@ -69,6 +67,21 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
    - 6.4: the rarest level of a solid-colour image is wrong.
    - 4.5.1: a 0-px-wide PDF page triggers undefined behaviour.
    - 1.6.2: the dissolve blur applies an empty bitmap when memory runs out.
+
+**Fixed on 2026-10-28.** The DLL changes take effect with the next qpvmain.dll build.
+- **2.2 (lib/blend-modes.h):** with the layers swapped and Protect alpha on, the new layer's alpha weighs the swapped
+  blend against the image's own colour, as it does without the swap. Every other combination is byte-identical, and
+  swapping no longer changes the commutative modes, marked * in the blend-mode list (Hard mix aside: its table is
+  itself asymmetric in 190 cells).
+- **1.2.1 (quick-picto-viewer.ahk, qpv-main.cpp):**
+  - Both Insert text renderers align, size and back each line by its squeezed width.
+  - The huge-image renderer squeezes the line and border bitmaps as the preview draws them.
+  - The preview loses three quirks with letter spacing below -10: right-aligned shorter lines lost a strip at their
+    right end, centred ones sat off-centre, and backgrounds kept the unsqueezed width.
+  - DrawTextBitmapInPlace() clips at the canvas edges instead of wrapping into the next row.
+- **3.4b (lib/selection-mask.h, quick-picto-viewer.ahk):** not a visible defect (see its row). NewDrawLinesOnMask()
+  shifts a copy of the points, and both huge-image line tools pass 0 instead of diffThick; the output is unchanged.
+  The two halves belong together: the new AHK with an older qpvmain.dll offsets the second line.
 
 **Found while checking, not in the report:**
 - **A stale undo level (possible heap overflow; traced in code, not run).**
@@ -110,7 +123,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | --- | --- | --- | --- | --- |
 | 1.1.1 | PrepareAlphaChannelBlur pass 1 gives leading transparent pixels alpha before pass 2 (black halos) | Confirmed, latent | Run, sliced DLL code | Real in the DLL, but the only live call with fillMissingOnly 0 gets a bitmap that the call before it already filled, so no halo appears; the other such call is dead code. |
 | 1.1.2 | Same with givenLevel 0: opaque black loses alpha and is recoloured | Confirmed, latent | Run, sliced DLL code | Only changes hidden colour under zero alpha; the one caller passes level 0 only for already transparent selections. |
-| 1.2.1 | DrawTextBitmapInPlace has no per-row bound, so text past the right edge wraps into the next row | **Confirmed** | ASan, sliced DLL code; real qpvmain.dll under Wine | On huge images, Insert text with letter spacing below -10 makes the canvas narrower than its lines, so line backgrounds wrap a strip into the next row. Writes stay inside the canvas. The "o == data" point is wrong. Medium. |
+| 1.2.1 | DrawTextBitmapInPlace has no per-row bound, so text past the right edge wraps into the next row | **Confirmed** | ASan, sliced DLL code; real qpvmain.dll under Wine | On huge images, Insert text with letter spacing below -10 makes the canvas narrower than its lines, so line backgrounds wrap a strip into the next row. Writes stay inside the canvas. The "o == data" point is wrong. Medium. Fixed 2026-10-28. |
 | 1.2.2 | DrawTextBitmapInPlace's alpha-0 shortcut ignores Protect alpha, layer swap, blend mode | Intentional or known | Run, sliced DLL code | Accurate, but the shortcut is scoped on purpose to modes 0 and 5 (62ff06f, 10-06 audit #24), which are all the text tool uses; only hidden colour under zero alpha differs. |
 | 1.3.1 | CImg noise/blur ignore Stride | Obsolete | Run, successors | CImg was removed (5101af2); the blur export was already dead on 10-16. The successors honour Stride. |
 | 1.3.2 | CImg noise also noises alpha | Obsolete | Run, successor | The replacement leaves alpha and fully transparent pixels untouched. |
@@ -125,7 +138,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 1.6.3 | dissolveBitmap / symmetricaBitmap index in 32-bit int | Confirmed, latent | UBSan, sliced DLL code | Overflows above 2.1 gigapixels, but both exports only get GDI+ bitmaps, which the app caps at 537 megapixels. |
 | 2.1.1 | Protect alpha ignored in Normal (blend mode 0) | Intentional or known | Run, sliced DLL code; git history | Accurate, but Marius excluded Normal on purpose (eb7ea93, 2025-03-24); the checkbox tooltip says "unaltered by blend modes". |
 | 2.1.2 | Protect alpha ignored in Behind (mode 25) | Intentional or known | Run, sliced DLL code; git history | Accurate, but deliberate (9df5106, 2025-03-17): Behind exists to paint under transparent pixels, which raises their alpha. |
-| 2.2 | Swap blended layers + Protect alpha in modes 2..21 ignores the new layer's opacity | **Confirmed** | Run, sliced DLL code (all 40 mode/gamma cases) | With both boxes ticked, a layer at alpha 10 blends like alpha 255: the opacity slider and soft edges are lost in paste, brush, fill and text. Medium. |
+| 2.2 | Swap blended layers + Protect alpha in modes 2..21 ignores the new layer's opacity | **Confirmed** | Run, sliced DLL code (all 40 mode/gamma cases) | With both boxes ticked, a layer at alpha 10 blends like alpha 255: the opacity slider and soft edges are lost in paste, brush, fill and text. Medium. Fixed 2026-10-28. |
 | 2.3.1 | toLABfx epsilon wrong, RGBtoGray reaches 452 | Intentional or known | Run, sliced DLL code; git history | White does give 452, but Marius restored this constant on purpose (8f5cbb4, 2026-07-18, "intentionally chosen value"). |
 | 2.3.2 | toLABf epsilon has an extra e-3 (discontinuity) | Intentional or known | Run, sliced DLL code; git history | The jump (0.138 to 0.021) is real, but restored on purpose in the same 8f5cbb4. |
 | 2.4 | Tint reads 65536-entry tables out of bounds after black/white point noise | Confirmed, latent | ASan, sliced DLL code | Real order (tint before the final clamp), but needs black point >= 62937 or white point <= 2598; the sliders stop at 45535 / 20100, so only a hand-edited registry value reaches it. |
@@ -143,7 +156,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 3.2.3 | Same-size depth mask reused without zeroing | Confirmed, latent | Run, sliced DLL code | Reproduced in the DLL; the only high-depth tool empties the depth mask at the end of every run. |
 | 3.3 | clipMaskFilter row shift with a mask bitmap reads before the bitmap | Confirmed, latent | ASan, sliced DLL code | Already recorded as latent in the 10-06 audit (#26): no caller passes a mask bitmap (the AHK variable is never assigned). |
 | 3.4a | Line-merge window lacks the row offset and margin (stale mask bits) | Intentional or known | Code reading | The row offset is applied (10-06 fix #11); what remains is the known loss of miter tips beyond the merge margin. |
-| 3.4b | NewDrawLinesOnMask shifts the caller's points in place | **Confirmed** | Run, sliced DLL code | On huge images with "Double line" on and a selection crossing the top or bottom edge, the second line is drawn offset by the overhang (50, 70, 90 px). Medium. |
+| 3.4b | NewDrawLinesOnMask shifts the caller's points in place | Confirmed, latent | Run, sliced DLL code with the AHK's arguments (540 cases) | The points are shifted in place, but the second "Double line" call passes diffThick as offsetY, and in both huge-image line tools diffThick equals that shift (the selection top is clamped to 0 first, so maskRowShift is 0 and diffThick is y1Push). The second line lands on the first. Cleaned up 2026-10-28. |
 | 3.5 | traverseCurvedPath off by one, corrupts closed multi-path curves | Not a bug | Run, sliced DLL code | The loops the report describes do not exist; the returned insert position is correct. |
 | 3.6.1 | Flood fill ignores dynamic opacity at 100 % opacity, Normal | **Confirmed** | Run, sliced DLL code | Long-standing: at opacity 255 with Normal blending, "Flood opacity based on color similarity" has no effect (254 fades, 255 paints solid). Low. |
 | 3.6.2 | Semi-transparent fill colour overwrites instead of blending | Confirmed, latent | Run, sliced DLL code | True in the DLL, but the app always sends the fill colour with alpha FF. |
@@ -219,7 +232,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 1.2. [`DrawTextBitmapInPlace`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1256-L1316) — Missing Horizontal/Vertical Coordinate Bounds Check Causes Scanline Wrap-Around Corruption, Plus `oA < 1` Bypass of `keepAlpha` / `flipLayers`
 
-> **Verified 2026-10-27:** 1.2.1 **Confirmed** (huge-image Insert text with letter spacing below -10 wraps line backgrounds into the next row; the "o == data" point is wrong); 1.2.2 Intentional or known (shortcut scoped to the text tool's modes, 62ff06f).
+> **Verified 2026-10-27:** 1.2.1 **Confirmed** (huge-image Insert text with letter spacing below -10 wraps line backgrounds into the next row; the "o == data" point is wrong); 1.2.2 Intentional or known (shortcut scoped to the text tool's modes, 62ff06f). 1.2.1 fixed 2026-10-28.
 
 - **Severity:** High
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1273-L1308)
@@ -332,7 +345,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 2.2. [`CalculateNewBlendModes`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L319-L470) — `flipLayers == 1` Combined With `keepAlpha == 1` in Blend Modes `2..21` Ignores Brush / Top-Layer Opacity
 
-> **Verified 2026-10-27:** **Confirmed.** With "Swap blended layers" and "Protect alpha" both on, modes 2..21 ignore the new layer's opacity (reproduced for every mode).
+> **Verified 2026-10-27:** **Confirmed.** With "Swap blended layers" and "Protect alpha" both on, modes 2..21 ignore the new layer's opacity (reproduced for every mode). Fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L319-L325), [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L367-L469)
@@ -566,7 +579,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 3.4. [`mergePolyMaskIntoHighDepthMask`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1336-L1355) — Incomplete Bounding Box Margin and Missing `offsetY` Leave Stale Bits in `imgSel.mask`
 
-> **Verified 2026-10-27:** 3.4a Intentional or known (the row offset is applied; lost miter tips are known); 3.4b **Confirmed**: the caller's points are shifted in place, so "Double line" draws its second line offset when the selection crosses the image's top or bottom edge.
+> **Verified 2026-10-27:** 3.4a Intentional or known (the row offset is applied; lost miter tips are known); 3.4b Confirmed, latent: the caller's points are shifted in place, but the second "Double line" call's offsetY (diffThick) cancels that shift exactly. Cleaned up 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1260-L1281), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1336-L1355)

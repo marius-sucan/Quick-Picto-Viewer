@@ -13386,8 +13386,8 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
           }
        }
 
+       ; letter spacing below -10 squeezes the line; it is placed and backed at that width
        forceW := (imgW>=maxW) ? maxW : imgW
-       thisXbonus := (imgW>maxW) ? imgW - maxW : 0
        If (rescaleWidthCharSpacing<1)
        {
           phorceW := Round(forceW*rescaleWidthCharSpacing)
@@ -13395,9 +13395,9 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        }
 
        If (TextInAreaAlign=2)
-          thisX := Round(maxW/2 - imgW/2 + thisXbonus/2)
+          thisX := Round(maxW/2 - forceW/2)
        Else If (TextInAreaAlign=3)
-          thisX := maxW - imgW + thisXbonus
+          thisX := maxW - forceW
 
        If (TextInAreaValign=3)
        {
@@ -13410,12 +13410,12 @@ coreInsertTextInAreaBox(theString, maxW, maxH, previewMode, cropYa:=0, cropYb:=0
        If (TextInAreaBgrUnified!=1 && TextInAreaPaintBgr=1 && lineVisible=1 && validBMP(thisBMP))
        {
           If (TextInAreaCutOutMode!=1 && isOkay=1)
-             Gdip_FillRectangle(G, zBrush, thisX, thisY, imgW, imgH)
+             Gdip_FillRectangle(G, zBrush, thisX, thisY, forceW, imgH)
 
           If (TextInAreaBgrEntire=1)
           {
              Gdip_SetClipRect(G, 0, thisY, maxW, imgH)
-             Gdip_SetClipRect(G, thisX, thisY, imgW, imgH, 4)
+             Gdip_SetClipRect(G, thisX, thisY, forceW, imgH, 4)
              Gdip_FillRectangle(G, zBrush, 0, thisY, maxW, imgH)
              Gdip_ResetClip(G)
           }
@@ -13668,18 +13668,25 @@ coreInsertTextHugeImages(theString, maxW, maxH) {
           }
        }
 
+       ; letter spacing below -10 squeezes the line, as coreInsertTextInAreaBox() draws it
        forceW := (imgW>maxW) ? maxW : imgW
-       thisXbonus := (imgW>maxW) ? imgW - maxW : 0
        If (rescaleWidthCharSpacing<1)
        {
           phorceW := Round(forceW*rescaleWidthCharSpacing)
           forceW -= (forceW - phorceW)//2.5
        }
 
+       If (forceW<imgW)
+       {
+          thisBMP := resizeBitmapToGivenRef(thisBMP, 0, forceW, imgH, 7, 0)
+          pBitmapContours := resizeBitmapToGivenRef(pBitmapContours, 0, forceW, imgH, 7, 0)
+          imgW := forceW
+       }
+
        If (TextInAreaAlign=2)
-          thisX := Round(maxW/2 - imgW/2 + thisXbonus/2)
+          thisX := Round(maxW/2 - forceW/2)
        Else If (TextInAreaAlign=3)
-          thisX := maxW - imgW + thisXbonus
+          thisX := maxW - forceW
 
        If (TextInAreaValign=3)
        {
@@ -21632,12 +21639,6 @@ HugeImagesDrawLineShapes() {
       If (rzq=1)
       {
          otherThick := Round(thisThick*0.34)
-         diffThick := (imgSelY1<0) ? imgSelY1 : 0
-         If (imgSelY2>imgH)
-            diffThick := diffThick + (imgSelY2 - imgH)
-         If (imgSelY2>imgH && imgSelY1<0)
-            diffThick := thisThick + (imgSelY2 - thisThick - imgH)
-
          doClone := (innerSelectionCavityX>0 && innerSelectionCavityY>0 && FillAreaShape<7 && DrawLineAreaContourAlign<=2) ? 1 : 0
          pPath := coreCreateFillAreaShape(pfcX, 0, o_imgSelW, o_imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 2, 0)
          If pPath
@@ -21655,7 +21656,7 @@ HugeImagesDrawLineShapes() {
 
             rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
             If (rzb=1 && DrawLineAreaDoubles=1)
-               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
+               rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0)
 
             Gdip_DeletePath(pPath)
             If (doClone=1 && rzb=1)
@@ -21664,7 +21665,7 @@ HugeImagesDrawLineShapes() {
                processGdipPathForDLL(clonedPath, tk, o_imgSelH, subdivide, PointsCount, PointsF)
                rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", conturAlign, "int", 0)
                If (rzb=1 && DrawLineAreaDoubles=1)
-                  rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", diffThick)
+                  rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", conturAlign, "int", 0)
 
                Gdip_DeletePath(clonedPath)
             }
@@ -21862,12 +21863,6 @@ HugeImagesDrawParametricLines() {
 
          ; fnOutputDebug("a=" ppzX "|" ppzY " || " o_imgSelY1 " || " pfcY)
          otherThick := Round(thisThick*0.34)
-         diffThick := (imgSelY1<0) ? imgSelY1 : 0
-         If (imgSelY2>imgH)
-            diffThick := diffThick + (imgSelY2 - imgH)
-         If (imgSelY2>imgH && imgSelY1<0)
-            diffThick := thisThick + (imgSelY2 - thisThick - imgH)
-
          If kPath
          {
             closed := ppk := 0
@@ -21902,7 +21897,7 @@ HugeImagesDrawParametricLines() {
                   rect := processGdipPathForDLL(pPath, tk, r.h, subdivide, PointsCount, PointsF, DrawLineAreaAtomizedGrid)
                   rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", thisThick, "int", closed, "int", roundJoins, "int", 1, "int", roundCaps, "int", doCrop, "int", 0)
                   If (rzb=1 && DrawLineAreaDoubles=1)
-                     rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", diffThick)
+                     rzb := DllCall("qpvmain.dll\NewDrawLinesOnMask", "UPtr", &PointsF, "int", PointsCount, "int", otherThick, "int", closed, "int", roundJoins, "int", 0, "int", roundCaps, "int", doCrop, "int", 0)
 
                   If (DrawLineAreaAtomizedGrid=1 && rzb=1)
                      rzc := rzq := DllCall("qpvmain.dll\mergePolyMaskIntoHighDepthMask", "int", rect.x, "int", rect.y, "int", rect.x + rect.w, "int", rect.y + rect.h, "int", imgW, "int", imgH, "int", thisThick + 1)
