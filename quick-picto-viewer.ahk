@@ -7815,7 +7815,7 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
       zaa := zbb := firstu := lastu := -1
 
       gdipLastError := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "int*", PointsCount)
-      zz := DllCall("qpvmain.dll\traverseCurvedPath", "UPtr", &prevPointsF, "Int", prevPointsCount - 1, "UPtr", &PointsF, "Int", PointsCount - 1, "Int", gmx, "Int", gmy, "int", sl, "UPtr", pPen8, "int*", zaa, "int*", zbb, "int*", firstu, "int*", lastu)
+      zz := DllCall("qpvmain.dll\traverseCurvedPath", "UPtr", &prevPointsF, "Int", prevPointsCount - 1, "UPtr", &PointsF, "Int", PointsCount, "Int", gmx, "Int", gmy, "int", sl, "UPtr", pPen8, "int*", zaa, "int*", zbb, "int*", firstu, "int*", lastu)
       If (zz=2)
          hasFound := 1
       If (!zz)
@@ -7830,11 +7830,12 @@ coreAddUnorderedVectorPointCurveMode(gmx, gmy, sl) {
    thisIndex := 0
    If (hasFound)
    {
+      ; 1-based flattened points: firstu is the one before the segment, lastu its end
       diffu := abs(lastu - firstu)
       Loop, % diffu
       {
-          ti := firstu + A_Index - 1
-          If (ti>=PointsCount || ti<1)
+          ti := firstu + A_Index
+          If (ti>PointsCount || ti<1)
              Continue
 
           ax := NumGet(&PointsF, 8 * (ti - 1), "float")

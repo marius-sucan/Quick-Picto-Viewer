@@ -114,6 +114,9 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
     level instead of the mean of the levels present, and only when Gdip_TestBitmapUniformity() succeeds (not on its
     -1/-2 errors).
   - A selection with a single alpha level gives the same bytes as before.
+- **Curve hover highlight (quick-picto-viewer.ahk only):** coreAddUnorderedVectorPointCurveMode() draws the flash
+  from the segment's first flattened point through its last, and hands traverseCurvedPath() every flattened point, so
+  the last piece of a curve takes new points again. Insert positions elsewhere are unchanged.
 
 **Found while checking, not in the report:**
 - **A stale undo level (heap overflow; confirmed 2026-10-28 and fixed, see «Fixed on 2026-10-28»).**
@@ -149,8 +152,15 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
     150 MB limit.
   - The commit's "the same as for the smudge" is out of date: since 2026-10-11 the smudge refuses to paint without its
     copy.
-- **Curve hover highlight (cosmetic):** traverseCurvedPath()'s hover highlight starts one flattened point before the
-  segment it marks.
+- **Curve hover highlight (confirmed 2026-10-28 and fixed; not only cosmetic):** the flash that marks where «Add
+  point» put a new point on a curve was drawn from one flattened point too early, in coreAddUnorderedVectorPointCurveMode().
+  - On a curved segment that is one short piece off at each end. A straight segment flattens to a single piece, so it
+    showed the previous segment's piece instead, or nothing for the first segment.
+  - The curve's last flattened piece took no new point: the AHK hands traverseCurvedPath() one point fewer than the
+    path has, and since abc86f1 (2026-07-17) the DLL's segment scan stops at that count. On an open curve or Bezier
+    path whose last segment is straight, «Add point» did nothing on that segment.
+  - Reproduced under Wine with the real function, reading the overlay back after it drew (open and closed cardinal
+    curves, an open Bezier path).
 - **"Protect alpha" with "No blend mode" behaves differently per tool:**
   - Paste-in-place turns it into Clip to alpha.
   - Draw lines does not (since eb7ea93).
