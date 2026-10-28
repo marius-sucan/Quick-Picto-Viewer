@@ -90,6 +90,10 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
   - Tools that auto-expand the canvas decide from the image before it grows, so on an opaque image paste-in-place now
     fills the new margin as its preview shows.
   - The smudge's Clip to alpha mixes the drag by the paint's alpha whether or not Protect alpha is ticked.
+- **Clip to alpha and Replace rounding (lib/blend-modes.h):** both mixes truncated, so their colours sat half a level
+  low on average and long brush strokes darkened (up to 10 levels for pinch and bulge); with gamma correction, value 1
+  became 0. Clip to alpha now uses Normal's fixed-point weights and 16-bit gamma tables, so over opaque pixels it
+  equals No blend mode exactly; Replace rounds its colour and alpha mixes the same way. Every other mode is unchanged.
 
 **Found while checking, not in the report:**
 - **A stale undo level (possible heap overflow; traced in code, not run).**

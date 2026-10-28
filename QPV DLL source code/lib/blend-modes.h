@@ -239,6 +239,15 @@ static void initColorLUTs() {
     }
 }
 
+// a channel of one layer weighted t [of 65536] over another, rounded as Normal [0] rounds; in linear light through
+// the 16-bit tables, which give every byte back unchanged
+static QPV_FORCEINLINE int blendWeighChannel(const int o, const int b, const unsigned int t, const int linearGamma) {
+    const unsigned int u = 65536U - t;
+    if (linearGamma == 1)
+       return blend_degamma_lut[(t * gamma_to_linear_16[o] + u * gamma_to_linear_16[b] + 32768U) >> 16];
+    return (int)((t * o + u * b + 32768U) >> 16);
+}
+
 inline RGBAColor CalculateNewBlendModes(
   RGBAColor Orgb,
   RGBAColor Brgb,
@@ -276,43 +285,24 @@ inline RGBAColor CalculateNewBlendModes(
        if (opa != 1)
           return Brgb;
 
-       const float f = char_to_float[255 - opacity];
+       const unsigned int f = ((255 - opacity) * 65536U + 127) / 255;
        // the colours mix by how much of each layer is visible; with equal alphas that is f exactly
-       const float wO = f * Orgb.a, wB = (1.0f - f) * Brgb.a;
-       const float g = (Orgb.a == Brgb.a || wO + wB <= 0) ? f : wO / (wO + wB);
-       int fR, fG, fB;
-       if (linearGamma == 1)
-       {
-          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], g)];
-          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], g)];
-          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], g)];
-       } else
-       {
-          fR = weighTwoValues(Orgb.r, Brgb.r, g);
-          fG = weighTwoValues(Orgb.g, Brgb.g, g);
-          fB = weighTwoValues(Orgb.b, Brgb.b, g);
-       }
-
-       int fA = weighTwoValues(Orgb.a, Brgb.a, f);
+       const unsigned int wO = (255 - opacity) * Orgb.a, wB = opacity * Brgb.a;
+       const unsigned int g = (Orgb.a == Brgb.a || wO + wB == 0) ? f : (unsigned int)(wO * 65536.0f / (wO + wB) + 0.5f);
+       int fA = blendWeighChannel(Orgb.a, Brgb.a, f, 0);
        if (keepAlpha == 1)
           fA = max(fA - (255 - Brgb.a), 0);
-       return {fB, fG, fR, fA};
+       return {blendWeighChannel(Orgb.b, Brgb.b, g, linearGamma), blendWeighChannel(Orgb.g, Brgb.g, g, linearGamma),
+               blendWeighChannel(Orgb.r, Brgb.r, g, linearGamma), fA};
     } else if (blendMode == 23)
     {
-       const float f = char_to_float[Orgb.a];
-       int fR, fG, fB;
-       if (linearGamma == 1)
-       {
-          fR = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.r], gamma_to_linear[Brgb.r], f)];
-          fG = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.g], gamma_to_linear[Brgb.g], f)];
-          fB = linear_to_gamma[weighTwoValues(gamma_to_linear[Orgb.b], gamma_to_linear[Brgb.b], f)];
-       } else
-       {
-          fR = weighTwoValues(Orgb.r, Brgb.r, f);
-          fG = weighTwoValues(Orgb.g, Brgb.g, f);
-          fB = weighTwoValues(Orgb.b, Brgb.b, f);
-       }
-       return {fB, fG, fR, Brgb.a};
+       if (Orgb.a == 0)
+          return Brgb;
+
+       // Normal's weight: over an opaque pixel the colour is exactly Normal's
+       const unsigned int t = (Orgb.a * 65536U) / 255;
+       return {blendWeighChannel(Orgb.b, Brgb.b, t, linearGamma), blendWeighChannel(Orgb.g, Brgb.g, t, linearGamma),
+               blendWeighChannel(Orgb.r, Brgb.r, t, linearGamma), Brgb.a};
     }
 
     // ---------- Layer swap for flip / behind mode ----------
