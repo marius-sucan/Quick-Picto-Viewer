@@ -510,21 +510,19 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
 
     if (bmp==NULL && tpWicExts.count(ext) > 0)
     {
-       // isFIMokay is 0 here, as it is in tpRunJob(): it exists to hand a high bit depth
-       // TIFF over to FreeImage, and by this line FreeImage has either had the file and
-       // failed or does not claim the format at all - either way there is nothing to hand
-       // it to
-       // unless the user disallowed the WIC loader
+       // WIC, unless the user disallowed it; when FreeImage comes next, WIC hands it the high
+       // bit depth TIFFs, as in tpRunJob()
+       const int fimNext = (FIM.ok && cfg.allowFIM==1 && hasTriedFim!=1) ? 1 : 0;
        if (cfg.allowWIC==1)
        {
           meta = TpSrcMeta();
-          bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
+          bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, fimNext, srcW, srcH, &meta);
        }
 
        if (bmp!=NULL)
        {
           loaderUsed = 1;
-       } else if (FIM.ok && cfg.allowFIM==1 && hasTriedFim!=1)
+       } else if (fimNext==1)
        {
           meta = TpSrcMeta();
           int status = TP_ERR_LOAD, saved = 0, fw = 0, fh = 0;
@@ -537,6 +535,13 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
                 srcW = fw;
                 srcH = fh;
              }
+          } else if (cfg.allowWIC==1 && (ext==L"tif" || ext==L"tiff"))
+          {
+             // a TIFF handed over that FreeImage cannot read: WIC decodes it after all
+             meta = TpSrcMeta();
+             bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
+             if (bmp!=NULL)
+                loaderUsed = 1;
           }
        }
     }

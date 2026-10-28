@@ -1367,6 +1367,8 @@ static Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig *cfg, const std::wstring
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_DISPLAY;
     else if (GFT==FIF_RAW)
        loadArgs = (cfg->userHQraw==1) ? RAW_DEFAULT : RAW_PREVIEW;
+    else if (GFT==FIF_JPEG)
+       loadArgs = JPEG_EXIFROTATE;   // as FIMdecideLoadArgs() loads them
 
     // as FIMdisplayICCmode() decides: a camera RAW decoded at high quality is linear light, tone
     // mapped before FreeImage_ApplyDisplayICCProfile() gives it the display's colours (2); the
@@ -1710,16 +1712,18 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
               // if FreeImage failed, try with WIC; WIC is NOT entirely multi-thread ready.
               // WIC always serializes image processing operations. Unless the user
               // disallowed the WIC loader: then FreeImage and GDI+ are all there is.
+              // When FreeImage comes next, WIC hands it the high bit depth TIFFs, as LoadWICimage() does.
+              const int fimNext = (FIM.ok && cfg->allowFIM==1 && hasFIMtried!=1) ? 1 : 0;
               if (cfg->allowWIC==1)
               {
                  res.meta = TpSrcMeta();  // reset the record
                  bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
-                                 0, res.srcW, res.srcH, &res.meta, cfg->colorManage);
+                                 fimNext, res.srcW, res.srcH, &res.meta, cfg->colorManage);
                  res.loaderUsed = 1;
                  res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
               }
 
-              if (bmp==NULL && FIM.ok && cfg->allowFIM==1 && hasFIMtried!=1)
+              if (bmp==NULL && fimNext==1)
               {
                  int status = TP_ERR_LOAD, saved = 0;
                  int fw = 0, fh = 0;
@@ -1733,6 +1737,16 @@ static void tpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const Thumb
                     res.srcW = fw;
                     res.srcH = fh;
                  }
+              }
+
+              // a TIFF handed over that FreeImage cannot read: WIC decodes it after all
+              if (bmp==NULL && !fimSavedOnly() && fimNext==1 && cfg->allowWIC==1 && (ext==L"tif" || ext==L"tiff"))
+              {
+                 res.meta = TpSrcMeta();
+                 bmp = tpWICload(fac, job.src.c_str(), cfg->thumbSize, cfg->thumbSize, job.frameIndex, cfg->imgQuality,
+                                 0, res.srcW, res.srcH, &res.meta, cfg->colorManage);
+                 res.loaderUsed = 1;
+                 res.status = (bmp!=NULL) ? TP_OK : TP_ERR_LOAD;
               }
            }
 

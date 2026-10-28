@@ -117,8 +117,45 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
 - **Curve hover highlight (quick-picto-viewer.ahk only):** coreAddUnorderedVectorPointCurveMode() draws the flash
   from the segment's first flattened point through its last, and hands traverseCurvedPath() every flattened point, so
   the last piece of a curve takes new points again. Insert positions elsewhere are unchanged.
+- **2.8 (lib/paint-brush.h):** brushSmudgeSample() caps its sample at 255, so the smudge no longer hands the blend
+  tables a 256. Against HEAD, with g++: the new sample is min(old, 255) on 44 M random samples, and full smudge
+  strokes are byte-identical (5,760 calls: no blend and Replace on transparent images, every blend mode on opaque
+  ones). The stroke runs that hit ASan/UBSan at calls 18 to 205 now run 2,000 calls clean.
+- **3.6.1 (lib/flood-fill.h):** with «Flood opacity based on color similarity» on, the fill no longer takes its
+  constant-colour path at 100 % opacity with Normal blending, so it fades as it does at 254, in the flood fill and
+  in «Replace color» alike. Of 8,000 random fills and replacements against HEAD (one- and two-step entry points),
+  only that combination changed; tolerance-0 replacements and one-pixel fills in it give the same bytes.
+- **5.2 (quick-picto-viewer.ahk only, no DLL build needed):** the format lists are sent once a session, by whichever
+  pool starts first (sendPoolFormatLists()), so the second pool no longer rebuilds them under the first one's
+  running workers. Marius chose this over a lock in the DLL: the workers still read the lists without one, so a
+  future second call would bring the race back.
+- **5.3.1 (lib/thumbs-pool.h):** tpFIMthumb() loads JPEGs with JPEG_EXIFROTATE, as FIMdecideLoadArgs() does in the
+  viewer. With the FreeImage fork's Linux build, thumbnails of JPEGs tagged with each of the eight orientations now
+  match Pillow's exif_transpose(), with colour management on and off, and the recorded size is the turned one.
+  - Both pools, wherever FreeImage decodes a JPEG: «Always open with FreeImage» (thumbnails only, see below), a
+    JPEG WIC fails on, and the WIC loader disabled. In that last case the viewer reads JPEGs through GDI+, which
+    does not turn them, so those thumbnails now turn while the viewer does not.
+  - Thumbnails already cached keep their old orientation until «Deep refresh» (Marius's choice).
+- **5.3.2 (lib/thumbs-pool.h, lib/dupes-pixels.h):** both pools pass the hand-off flag when FreeImage comes next
+  (loaded, allowed and not tried yet), so WIC hands a TIFF of more than 32 bits per pixel to FreeImage, as
+  LoadWICimage() does in the viewer. If FreeImage cannot read it, WIC decodes it after all, so no TIFF loses its
+  thumbnail.
+  - Checked by running both sliced loader chains with the real tpWICload() on WIC stand-ins: only 48- and 64-bit
+    TIFFs with FreeImage loaded and allowed changed. 64-bit PNGs, «Always open with FreeImage», and the WIC or
+    FreeImage loader disabled are unchanged; nothing leaks.
+  - Histograms and fingerprints of such TIFFs collected from now on come from FreeImage's tone mapping; older rows
+    are not rewritten. Cached thumbnails stay until «Deep refresh».
 
 **Found while checking, not in the report:**
+- **tests/run-tests.sh stopped at its slicing step from 16cd6d6 (2026-10-10) on:** adaptImageGivenSize() moved
+  into pdfium-reader.h, so no test of the suite ran. Repaired 2026-10-28. Failures it now shows that predate the fixes
+  above: pixels_smoke's five known checks, three FreeImage-loader mutants (H, I, K) that pass because the camera RAW
+  sample is missing here, and pdf_writer.cpp, which no longer compiles (pdf-writer.h now uses GDI+ types its shim
+  lacks).
+- **«Always open with FreeImage» is not applied by the collection pool (not fixed):** 80b3676 passes it to both
+  pools, but only tpRunJob() puts FreeImage first with it; dpDecodeFile() never reads cfg.firstFIM. With the option
+  on, a JPEG's thumbnail comes from FreeImage (now turned upright) while its histogram, fingerprint and recorded
+  size come from WIC (not turned).
 - **A stale undo level (heap overflow; confirmed 2026-10-28 and fixed, see «Fixed on 2026-10-28»).**
   - **Mechanism:** the huge-image undo level was cleared when a file is loaded, but not by
     downscaleHugeImagesForEditing() or convertImageIntoHugeImage(). Both replace the viewport image without loading a
@@ -200,7 +237,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 2.6 | Smudge brush with a clone buffer reads an empty copy (null pointer) | Confirmed, latent | ASan, sliced DLL code | The smudge crashes if handed a clone buffer, but the app passes one only to the cloner brush, never to the smudge. |
 | 2.7.1 | Brush chunk cache ignores a change of bits per pixel (heap overflow) | Confirmed, latent | ASan, sliced DLL code | The cache is keyed on the chunk count only, but the app clears it at every stroke's start and end, so it never meets a different image. |
 | 2.7.2 | Brush chunk cache ignores a change of grid shape (out-of-range chunk) | Confirmed, latent | ASan, sliced DLL code | Same per-stroke reset as 2.7.1, so the out-of-range chunk index never happens. |
-| 2.8 | Smudge sample can reach 256 and index 256-entry tables | **Confirmed** | ASan + UBSan, full PaintBrushLarge smudge | Smudging with a blend mode across transparent edges of 32-bit images occasionally yields 256: one wrong pixel (another mode's value, or a read past the table), no crash. The report's all-255 example is wrong. The reproduction assumes MSVC rounds floats as the g++ build did; not run on Windows. Low. |
+| 2.8 | Smudge sample can reach 256 and index 256-entry tables | **Confirmed** | ASan + UBSan, full PaintBrushLarge smudge | Smudging with a blend mode across transparent edges of 32-bit images occasionally yields 256: one wrong pixel (another mode's value, or a read past the table), no crash. The report's all-255 example is wrong. The reproduction assumes MSVC rounds floats as the g++ build did; not run on Windows. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 2.9 | Cloner/pinch/bulge without a copy race the painting threads | Intentional or known | Run, sliced DLL code (8 threads) | Documented in 72aeac1: past a 150 MB sampled box a huge image is read directly. Reachable only with Double size plus Random size; nondeterministic pixels, no crash. |
 | 3.1 | Cached mask kept while the mask window grows (out-of-bounds read) | Confirmed, latent | ASan, sliced DLL code | Reproduced by calling the DLL directly; the app reuses the cache only for an identical selection, or right before prepareDrawLinesMask(), which resizes it. |
 | 3.2.1a | highDepth never reset by prepareSelectionArea (stale depth mask read out of bounds) | Confirmed, latent | ASan, sliced DLL code | Reproduced in the DLL; the high-depth flag exists only inside the parametric-lines tool, which clears it before any new selection is prepared. |
@@ -211,7 +248,7 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 3.4a | Line-merge window lacks the row offset and margin (stale mask bits) | Intentional or known | Code reading | The row offset is applied (10-06 fix #11); what remains is the known loss of miter tips beyond the merge margin. |
 | 3.4b | NewDrawLinesOnMask shifts the caller's points in place | Confirmed, latent | Run, sliced DLL code with the AHK's arguments (540 cases) | The points are shifted in place, but the second "Double line" call passes diffThick as offsetY, and in both huge-image line tools diffThick equals that shift (the selection top is clamped to 0 first, so maskRowShift is 0 and diffThick is y1Push). The second line lands on the first. Cleaned up 2026-10-28. |
 | 3.5 | traverseCurvedPath off by one, corrupts closed multi-path curves | Not a bug | Run, sliced DLL code | The loops the report describes do not exist; the returned insert position is correct. |
-| 3.6.1 | Flood fill ignores dynamic opacity at 100 % opacity, Normal | **Confirmed** | Run, sliced DLL code | Long-standing: at opacity 255 with Normal blending, "Flood opacity based on color similarity" has no effect (254 fades, 255 paints solid). Low. |
+| 3.6.1 | Flood fill ignores dynamic opacity at 100 % opacity, Normal | **Confirmed** | Run, sliced DLL code | Long-standing: at opacity 255 with Normal blending, "Flood opacity based on color similarity" has no effect (254 fades, 255 paints solid). Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
 | 3.6.2 | Semi-transparent fill colour overwrites instead of blending | Confirmed, latent | Run, sliced DLL code | True in the DLL, but the app always sends the fill colour with alpha FF. |
 | 3.6.3 | Cartoon mode ignores opacity, blend mode, dynamic opacity | Intentional or known | Run, sliced DLL code; AHK panel | By design: cartoon mode fills with the clicked colour, and the panel disables those controls while it is on. |
 | 3.7 | Flood fill selection test wrong with high-depth masks | Confirmed, latent | Run, sliced DLL code | True if a fill ran with a high-depth mask, but that mask exists only inside the parametric-lines tool, which clears it before returning. |
@@ -230,9 +267,9 @@ within a section. "Sliced DLL code" means the shipped function compiled unchange
 | 4.6.2 | viewBox SVGs scaled twice | Not a bug | Code reading (Direct2D not run) | Both callers use a scale of 1 for missing, percentage and viewport-unit sizes, so the viewBox is scaled once. |
 | 5.1.1 | Detached pool workers: use-after-free at DLL unload | Not a bug | Code reading | The pools shut down only on exit, and the app then terminates itself, so no destructor runs under a stray worker; the DLL is never unloaded early. |
 | 5.1.2 | Detached worker revived by a pool restart | Confirmed, latent | Code reading | True only if a pool restarted after a timed-out shutdown; both pools start once and shut down only at exit. |
-| 5.2 | Thumbnail format lists rewritten while workers read them | **Confirmed** | TSan, sliced DLL code | Real race, for a different reason than the report gives: the writer locks, the readers do not. Only the first duplicates scan of a session can hit it. Low. |
-| 5.3.1 | FreeImage thumbnails ignore EXIF orientation | **Confirmed** | Run, real FreeImage fork | With "Always open with FreeImage" on, the viewer turns JPEGs upright but their thumbnails stay sideways. Low. |
-| 5.3.2 | HDR TIFF hand-off to FreeImage is dead in the pools | **Confirmed** | Code reading | Every pool call passes 0, so high-bit-depth TIFF thumbnails come from WIC, not FreeImage's tone mapping as in the viewer. Low. |
+| 5.2 | Thumbnail format lists rewritten while workers read them | **Confirmed** | TSan, sliced DLL code | Real race, for a different reason than the report gives: the writer locks, the readers do not. Only the first duplicates scan of a session can hit it. Low. Reproduced again at 104acc5 and fixed 2026-10-28 (AHK side). |
+| 5.3.1 | FreeImage thumbnails ignore EXIF orientation | **Confirmed** | Run, real FreeImage fork | With "Always open with FreeImage" on, the viewer turns JPEGs upright but their thumbnails stay sideways. Low. Reproduced again at 104acc5 and fixed 2026-10-28. |
+| 5.3.2 | HDR TIFF hand-off to FreeImage is dead in the pools | **Confirmed** | Code reading | Every pool call passes 0, so high-bit-depth TIFF thumbnails come from WIC, not FreeImage's tone mapping as in the viewer. Low. Reproduced again at 104acc5 by running both sliced loader chains, and fixed 2026-10-28. |
 | 5.3.3 | Scaler failure gives a top-left crop | Intentional or known | Code reading | No crop: the whole frame is decoded unscaled; that fallback is the 10-06 audit's item 44, whose cause was fixed in dcaaf28. |
 | 5.3.4 | "in" tested before "vmin" in the SVG unit converter | **Confirmed** | Run, sliced DLL code | Real in the pool's converter and in the viewer's AHK twin: "10vmin" is read as 10 inches. svg-render.h has no converter. Low. |
 | 5.4 | openCVdiffBlendBitmap copies before subtracting: black at offset 0 | Not a bug | Run, sliced DLL code (OpenCV stand-ins) | The copy builds the shifted operand; the filter is "shifted image minus image", so zero shift gives a flat result by definition. |
@@ -535,7 +572,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 2.8. [`brushSmudgeSample`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L963-L982) & [`brushSmudgeRows`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L1051-L1053) — Unclamped `outB/G/R == 256` Indexes 256-Entry Blend LUTs Out-of-Bounds
 
-> **Verified 2026-10-27:** **Confirmed.** Not via the all-255 example (that case is exact): alpha-weighted smudge samples at transparent edges can round to 256, which the blend tables then read past (UBSan, ASan).
+> **Verified 2026-10-27:** **Confirmed.** Not via the all-255 example (that case is exact): alpha-weighted smudge samples at transparent edges can round to 256, which the blend tables then read past (UBSan, ASan). Fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L963-L982), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L1051-L1053)
@@ -659,7 +696,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 3.6. [`FloodJob::setupPaint`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1085-L1095) & [`floodFillPrepare`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1760-L1765) — `dynamicOpacity == 1`, Semi-Transparent `newColor`, and `cartoonMode == 1` Broken by `simpleMode` / `constPaint` Fast Path
 
-> **Verified 2026-10-27:** 3.6.1 **Confirmed** (dynamic opacity has no effect at 100 % opacity, Normal); 3.6.2 Confirmed, latent (the app always sends an opaque fill colour); 3.6.3 Intentional or known (the panel disables those controls in cartoon mode).
+> **Verified 2026-10-27:** 3.6.1 **Confirmed** (dynamic opacity has no effect at 100 % opacity, Normal); 3.6.2 Confirmed, latent (the app always sends an opaque fill colour); 3.6.3 Intentional or known (the panel disables those controls in cartoon mode). 3.6.1 fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1085-L1140), [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1760-L1765)
@@ -846,7 +883,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 5.2. [`thumbsPoolSetFormats`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1956-L1961) vs [`tpRunJob`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1638) — Unsynchronized Data Race on `tpWicExts` and `tpFimExts`
 
-> **Verified 2026-10-27:** **Confirmed**, for a different reason: the writer does lock; the workers read without the lock (reproduced with TSan).
+> **Verified 2026-10-27:** **Confirmed**, for a different reason: the writer does lock; the workers read without the lock (reproduced with TSan). Fixed 2026-10-28 on the AHK side: the lists are sent once a session.
 
 - **Severity:** High
 - **Location:** [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1638), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1708), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1956-L1961)
@@ -858,7 +895,7 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 
 ### 5.3. [`tpFIMthumb`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1365-L1379), [`tpWICload`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L762-L805), & [`tpConvertSVGunitsToPixels`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1139-L1146) — Missing `JPEG_EXIFROTATE`, Dead HDR-TIFF FreeImage Fallback, Silent Scaler Fallback, and `"in"` Shadowing `"vmin"`
 
-> **Verified 2026-10-27:** 5.3.1 **Confirmed** (with "Always open with FreeImage" JPEG thumbnails ignore EXIF orientation); 5.3.2 **Confirmed** (HDR TIFF hand-off dead in the pools); 5.3.3 Intentional or known (no crop; the full-size fallback is 10-06 item 44); 5.3.4 **Confirmed** ("vmin" read as inches, also in the AHK).
+> **Verified 2026-10-27:** 5.3.1 **Confirmed** (with "Always open with FreeImage" JPEG thumbnails ignore EXIF orientation); 5.3.2 **Confirmed** (HDR TIFF hand-off dead in the pools); 5.3.3 Intentional or known (no crop; the full-size fallback is 10-06 item 44); 5.3.4 **Confirmed** ("vmin" read as inches, also in the AHK). 5.3.1 and 5.3.2 fixed 2026-10-28.
 
 - **Severity:** Medium
 - **Location:** [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L762-L805), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1139-L1146), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1365-L1379), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1717)

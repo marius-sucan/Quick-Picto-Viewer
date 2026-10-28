@@ -4592,6 +4592,17 @@ extractFmtsFromRegEx(ptrn) {
    Return (posu>1) ? SubStr(listu, 1, posu - 1) : ""
 }
 
+sendPoolFormatLists() {
+; once a session, for initThumbsPool() and initDupesPixelsPool(): the workers of both
+; pools read these lists without a lock, so they must never be rebuilt while one decodes
+   Static sent := 0
+   If (sent=1)
+      Return
+
+   sent := 1
+   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+}
+
 initThumbsPool() {
 ; starts the thumbnails generator managed by qpvmain.dll; it replaces the ahk_h threads
 ; that used to run Lib\module-fim-thumbs.ahk / MonoGenerateThumb()
@@ -4621,7 +4632,7 @@ initThumbsPool() {
     }
 
     rz := DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
-    DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+    sendPoolFormatLists()
     multiCoreThumbsInitGood := 1
     addJournalEntry("Succesfully initialized " r " threads.")
 }
@@ -37011,7 +37022,7 @@ initDupesPixelsPool() {
    }
 
    initFIMGmodule()
-   DllCall("qpvmain.dll\thumbsPoolSetFormats", "Str", extractFmtsFromRegEx(StrReplace(RegExWICfmtPtrn, "|svg|pdf")), "Str", extractFmtsFromRegEx(RegExFIMformPtrn), "Int")
+   sendPoolFormatLists()
    DllCall("qpvmain.dll\qpvSetPixelFormatNames", "WStr", packWICpixelFormatNames(), "WStr", FIMcolorTypeNames("packed"), "WStr", "|||32-PARGB||", "Int")
 
    nThreads := (minimizeMemUsage=1 || allowMultiCoreMode!=1 || A_PtrSize=4) ? 2 : realSystemCores
