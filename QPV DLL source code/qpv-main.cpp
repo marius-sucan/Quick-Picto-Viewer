@@ -1322,7 +1322,8 @@ DLL_API int DLL_CALLCONV UndoAiderSwapPixelRegions(unsigned char* BitmapData, in
     const INT64 bytesPerPixel = (bpp==32) ? 4 : 3;
     const INT64 opx = x1 * bytesPerPixel;
     const INT64 chunk = (x2 - x1) * bytesPerPixel;
-    if (chunk<0)
+    // a rectangle past the image, or wider than the saved copy's rows, would be swapped out of bounds
+    if (chunk<0 || x1<0 || y1<0 || x2>w || y2>h || chunk>mStride)
        return 0;
 
     // swapped in place: an exception cannot leave an OpenMP loop, so a failed allocation here would end the process

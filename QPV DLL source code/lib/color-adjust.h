@@ -767,7 +767,16 @@ struct AdjustColorsFXplan {
         if (whitePoint<65535)
            px.whitePoint(whitePoint, noiseMode);
         if (tintAmount>0)
+        {
+           if (blackPoint>0 || whitePoint<65535)
+           {
+              // tint() indexes 65536-entry tables
+              px.r = clamp(px.r, 0, 65535);
+              px.g = clamp(px.g, 0, 65535);
+              px.b = clamp(px.b, 0, 65535);
+           }
            px.tint(tintDegrees, tintAmount, altTint, linearGamma);
+        }
         if (anyThreshold)
            px.thresholdRGB(rThreshold, gThreshold, bThreshold, seeThrough);
 

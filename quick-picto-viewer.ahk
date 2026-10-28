@@ -20861,7 +20861,7 @@ undoRedoHugeImagesAct() {
       FreeImage_GetImageDimensions(hFIFimgA, mW, mH)
       X1 := (inv=1) ? 0    : obju[3],         Y1 := (inv=1) ? 0    : obju[4]
       X2 := (inv=1) ? imgW : X1 + obju[5],    Y2 := (inv=1) ? imgH : Y1 + obju[6]
-      ; UndoAiderSwapPixelRegions() does not clip: a level from another image would be written past this one
+      ; UndoAiderSwapPixelRegions() refuses a rectangle past the image but cannot see the saved copy's height
       If (X1<0 || Y1<0 || X2>imgW || Y2>imgH || mW!=(X2 - X1) || mH!=(Y2 - Y1))
       {
          showTOOLtip("WARNING: The recorded undo level does not fit the image in the viewport.`nImpossible to perform undo.")
@@ -91135,8 +91135,8 @@ ReadSettingsSimpleColorAdjustsPanel(act:=0) {
    RegAction(act, "userImgAdjustThreB",, 2, -1, 65535)
    RegAction(act, "userImgAdjustThreG",, 2, -1, 65535)
    RegAction(act, "userImgAdjustThreR",, 2, -1, 65535)
-   RegAction(act, "userImgAdjustWhitePoint",, 2, 0, 65535)
-   RegAction(act, "userImgAdjustBlackPoint",, 2, 0, 65535)
+   RegAction(act, "userImgAdjustWhitePoint",, 2, 20100, 65535)
+   RegAction(act, "userImgAdjustBlackPoint",, 2, 0, 45535)
    RegAction(act, "userImgAdjustTintAmount",, 2, 0, 65535)
    RegAction(act, "userImgAdjustTintDeg",, 2, -180, 180)
    RegAction(act, "alphaMaskClrAintensity",, 2, 0, 255)
