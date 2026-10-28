@@ -22,6 +22,7 @@ std::vector<unsigned char*> brushOriginalPixelChunks;
 std::vector<size_t> activeBrushChunks;
 // std::unordered_map<UINT, unsigned char>  brushMoveImgData(1);
 int chunkGridW = 0;
+int chunkBytesPerPixel = 0;
 
 // the effects brush's brightness and contrast tables
 static AdjustLUTs brushLUTs;
@@ -224,7 +225,9 @@ static void brushSetupChunkGrid(BrushStamp &s) {
         int numChunksX = (s.imgW + 127) >> 7;
         int numChunksY = (s.imgH + 127) >> 7;
         size_t totalChunks = (size_t)numChunksX * numChunksY;
-        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks || (s.useBlendMode == 1 && brushOriginalPixelChunks.size() != totalChunks))
+        // a grid of the same count but another shape, or another pixel size, would be indexed or written out of bounds
+        if (brushOpacityChunks.empty() || brushOpacityChunks.size() != totalChunks || chunkGridW != numChunksX || chunkBytesPerPixel != s.bytesPerPixel
+            || (s.useBlendMode == 1 && brushOriginalPixelChunks.size() != totalChunks))
         {
             for (unsigned char* ptr : brushOpacityChunks)
             {
@@ -249,6 +252,7 @@ static void brushSetupChunkGrid(BrushStamp &s) {
                 brushOriginalPixelChunks.shrink_to_fit();
             }
             chunkGridW = numChunksX;
+            chunkBytesPerPixel = s.bytesPerPixel;
         }
     }
 }
@@ -1427,8 +1431,10 @@ DLL_API int DLL_CALLCONV PaintBrushLarge(
     s.bytesPerPixel = bytesPerPixel;
     if (brushType==6)
     {
-        // the smudge has a profile of its own [brushSmudgeRows()]: no texture
+        // the smudge has a profile of its own [brushSmudgeRows()]: no texture; it samples only its own copy
         s.texData = nullptr;
+        s.cloneData = nullptr;
+        s.clonePitch = 0;
     }
 
     brushSetupChunkGrid(s);
