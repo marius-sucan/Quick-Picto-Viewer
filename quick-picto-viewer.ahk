@@ -24760,7 +24760,7 @@ livePreviewSharpenPanel() {
 }
 
 livePreviewAddNoiser(modus:=0) {
-    cornersBMP := getTinyPreviewAreaBitmap(0, G, uiboxSizeW, uiboxSizeH, imgBoxSizeW, imgBoxSizeH)
+    cornersBMP := getTinyPreviewAreaBitmap(0, G, uiboxSizeW, uiboxSizeH, imgBoxSizeW, imgBoxSizeH, cX, cY)
     If !validBMP(cornersBMP)
        Return
 
@@ -24817,10 +24817,15 @@ livePreviewAddNoiser(modus:=0) {
              ; fnOutputDebug("i" thisImgW "|" thisImgH "s" thisSelW "|" thisSelH)
           }
 
-          QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
-          E1 := trGdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", protectAlphaBlendMode(UserAddNoiseBlendMode) - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
-          Gdip_UnlockBits(cornersBMP, iData)
+          ; noise only where the area was drawn; the pixelate grid (thisImgW/H) counts image pixels
+          QPV_PrepareHugeImgSelectionArea(0, 0, uiboxSizeW - 1, uiboxSizeH - 1, uiboxSizeW, uiboxSizeH, 0, 0, 0, 0, 0, 0, 1)
+          E1 := trGdip_LockBits(cornersBMP, cX, cY, uiboxSizeW, uiboxSizeH, stride, iScan, iData)
+          If !E1
+          {
+             r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", uiboxSizeW, "Int", uiboxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", protectAlphaBlendMode(UserAddNoiseBlendMode) - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
+             Gdip_UnlockBits(cornersBMP, iData)
+          }
+
           If (UserAddNoisePixelizeAmount>0)
              FreeImage_UnLoad(hFIFimgZ)
        } Else
