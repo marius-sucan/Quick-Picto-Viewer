@@ -1,5 +1,184 @@
 # C++ QPV DLL Deep Code Audit & Bug Report
 
+## Verification (2026-10-27)
+
+Every claim below was checked by Claude (Opus 5.5) on 2026-10-27 against the `development` branch at c695da0. The
+report's 37 sections hold 69 separate claims; the table numbers them one per row (1.1.1, 1.1.2, ...). The
+report's own text further down is left as Gemini wrote it, apart from one "Verified" line under each section heading.
+
+**Outcome:** 13 of the 69 claims are real bugs that a user can trigger today: 3 of medium severity, 10 low. Another 24 are real in the DLL code but nothing in the app triggers them now ("latent"). 14 are not bugs, 11 describe deliberate or already known behaviour, and 7 concern CImg code removed after the report was written. Of the 17 sections the report rates critical or high (its summary says 18), only three hold in the app (1.2.1, 4.5.1, 5.2), none of them as a likely crash.
+
+**How the claims were checked.** The DLL builds only with MSVC on Windows, so each claim was checked in three steps:
+1. **Code:** read at HEAD, together with the AutoHotkey code that calls it.
+2. **Run:** the shipped DLL functions were cut out of the source files unchanged and compiled with g++ into small test
+   programs that stand in for the Windows APIs.
+3. **Sanitizers:** compiler checks that stop a test program on bad behaviour:
+   - **ASan** (AddressSanitizer): a read or write outside a buffer.
+   - **UBSan** (UndefinedBehaviorSanitizer): undefined behaviour such as an out-of-range float conversion.
+   - **TSan** (ThreadSanitizer): two threads touching the same data without a lock.
+
+Some claims ran against real libraries instead of stand-ins: the duplicates engine against a real SQLite, the EXIF
+claim against the FreeImage fork's own build, and the Insert text case (1.2.1) through the repo's prebuilt
+qpvmain.dll under Wine. PDFium, OpenCV and Direct2D behaviour is quoted from their sources and documentation. The test programs and their outputs are in `.claude/scratch/gemini-audit-2026-10-27/`, which git
+ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll build and a Windows check.
+
+**Verdicts used in the table:**
+- **Confirmed:** the defect is real, it was reproduced, and something a user can do in the app triggers it today.
+- **Confirmed, latent:** the defect is real in the DLL code and was reproduced, but no current caller in the app
+  passes the input or creates the condition that triggers it. Such items only matter if a caller changes.
+- **Not a bug:** the claim misreads the code, or the consequence it describes does not follow.
+- **Intentional or known:** the behaviour is a documented decision or an already known limitation (commit cited).
+- **Obsolete:** the code was removed or rewritten after 2026-10-16, and its successor does not have the problem.
+- A sixth verdict, "Not verifiable here" (behaviour that only Windows can show), turned out not to be needed. The one
+  claim that leans on Direct2D (4.6.2) is settled by its callers.
+
+**How far the report can be trusted:**
+- **Quotes:** of the 100 lines it presents as code (in 23 sections), 66 do not exist in the source it audited (42ed05e),
+  even ignoring whitespace. Some are harmless paraphrases. Others describe code that is not there at all, such as a
+  `BrushCtx` struct, a `tpRunning` flag, a `tpFIMload` function, an `extractChannel` call removed in 2024, Sobel and
+  Laplacian modes in openCVblurFilters, or a "path-splitting loop". Its line numbers for the `lib/` headers are
+  approximate.
+- **Crashes:** several "crash" claims assume an exception kills the process. AutoHotkey's DllCall runs each call under
+  `__try/__except` (AutoHotkey v1.1 source, script2.cpp), so a C++ exception thrown on the script thread only sets
+  ErrorLevel. It ends the process only on a DLL worker thread or inside an OpenMP region.
+- **Races:** since the interface-thread merge the app has a single AutoHotkey thread, so a race between two exports
+  needs a second thread that no longer exists.
+- **Already settled:** some items were documented decisions before the report was written. The LAB constants were
+  restored on purpose in 8f5cbb4. The blank WIC tile was left on purpose on 2026-08-12. The 10-06 audit had already
+  recorded clipMaskFilter's mask-bitmap case (#26) and the full-size thumbnail fallback (#44).
+
+**The confirmed bugs, most important first:**
+1. **2.2 (Medium):** "Swap blended layers" together with "Protect alpha channel" makes blend modes 2..21 ignore the
+   new layer's opacity. The paste opacity slider, soft brush edges and antialiasing are lost in paste-in-place, brush
+   types 2/3/5/7/8, fill, text and draw lines. Cause: the `mix` rule in CalculateNewBlendModes() was written for
+   unswapped layers.
+2. **3.4b (Medium):** NewDrawLinesOnMask() shifts the caller's point list in place. With "Double line" on,
+   HugeImagesDrawLineShapes() and HugeImagesDrawParametricLines() draw the second line offset by the selection's
+   overhang whenever the selection crosses the top or bottom edge of a huge image.
+3. **1.2.1 (Medium, cosmetic):** huge-image Insert text with letter spacing below -10. The canvas is sized from the
+   squeezed width, but lines and backgrounds are drawn at full width, so DrawTextBitmapInPlace() wraps a strip into the
+   next row. The GDI+ renderer squeezes the line instead.
+4. **Low:**
+   - 2.8: the smudge brush can index a blend table at 256 (assuming MSVC rounds floats as the g++ test build did).
+   - 3.6.1: "Flood opacity based on color similarity" does nothing at 100 % opacity.
+   - 5.2: the thumbnail format lists are read by the workers without the lock.
+   - 5.3.1: JPEG thumbnails ignore EXIF orientation with "Always open with FreeImage".
+   - 5.3.2: high-bit-depth TIFF thumbnails skip FreeImage.
+   - 5.3.4: "vmin" is read as inches (DLL and AHK).
+   - 6.3: the MSD (mean squared difference) threshold is skipped for a single pair.
+   - 6.4: the rarest level of a solid-colour image is wrong.
+   - 4.5.1: a 0-px-wide PDF page triggers undefined behaviour.
+   - 1.6.2: the dissolve blur applies an empty bitmap when memory runs out.
+
+**Found while checking, not in the report:**
+- **A stale undo level (possible heap overflow; traced in code, not run).**
+  - **Mechanism:** the huge-image undo level is cleared when a file is loaded, but not by
+    downscaleHugeImagesForEditing() or convertImageIntoHugeImage(). Both replace the viewport image without loading a
+    file. undoRedoHugeImagesAct() then applies the old level to whatever image is current, checking only the colour
+    depth.
+  - **Effect:** with a smaller new image, UndoAiderSwapPixelRegions() (1.6.1) writes outside it; otherwise the old
+    pixels are pasted into the new image.
+  - **To test on Windows:**
+    1. Open a huge image and apply a filter to a selection near its far edge.
+    2. Downscale it for editing.
+    3. Convert it back to a huge image, or enlarge it in the resize panel.
+    4. Press Ctrl+Z.
+- **Noise and "Protect alpha channel" (code reading):** GenerateRandomNoiseOnBitmap() ignores its keepAlpha argument
+  (qpv-main.cpp:578 and 622 pass 1), so on huge images the noise tool's checkbox has no effect.
+- **Pixelate alpha (code reading):** pixelate sets the alpha to the mean of the alpha levels present, not the most
+  common one (avgLevel in lib/Gdip_All.ahk, used at quick-picto-viewer.ahk:24187). A mostly opaque selection with a few
+  transparent pixels gets alpha 127, so the pixelation lands at half strength.
+- **2.9 reaches further than 72aeac1 says:**
+  - With Double size and Random size on a huge image, about a third of pinch and bulge strokes at size 990 pass the
+    150 MB limit.
+  - The commit's "the same as for the smudge" is out of date: since 2026-10-11 the smudge refuses to paint without its
+    copy.
+- **Curve hover highlight (cosmetic):** traverseCurvedPath()'s hover highlight starts one flattened point before the
+  segment it marks.
+- **"Protect alpha" with "No blend mode" behaves differently per tool:**
+  - Paste-in-place turns it into Clip to alpha.
+  - Draw lines does not (since eb7ea93).
+  - Brush types 2/3/5/7/8 ignore it.
+  - The smudge honours it.
+
+  A consistency question rather than a DLL defect.
+
+**The claims one by one.** Item numbers follow the report's sections; a third number or a letter marks one claim
+within a section. "Sliced DLL code" means the shipped function compiled unchanged into a test program.
+
+| Item | Claim | Verdict | How it was checked | Note |
+| --- | --- | --- | --- | --- |
+| 1.1.1 | PrepareAlphaChannelBlur pass 1 gives leading transparent pixels alpha before pass 2 (black halos) | Confirmed, latent | Run, sliced DLL code | Real in the DLL, but the only live call with fillMissingOnly 0 gets a bitmap that the call before it already filled, so no halo appears; the other such call is dead code. |
+| 1.1.2 | Same with givenLevel 0: opaque black loses alpha and is recoloured | Confirmed, latent | Run, sliced DLL code | Only changes hidden colour under zero alpha; the one caller passes level 0 only for already transparent selections. |
+| 1.2.1 | DrawTextBitmapInPlace has no per-row bound, so text past the right edge wraps into the next row | **Confirmed** | ASan, sliced DLL code; real qpvmain.dll under Wine | On huge images, Insert text with letter spacing below -10 makes the canvas narrower than its lines, so line backgrounds wrap a strip into the next row. Writes stay inside the canvas. The "o == data" point is wrong. Medium. |
+| 1.2.2 | DrawTextBitmapInPlace's alpha-0 shortcut ignores Protect alpha, layer swap, blend mode | Intentional or known | Run, sliced DLL code | Accurate, but the shortcut is scoped on purpose to modes 0 and 5 (62ff06f, 10-06 audit #24), which are all the text tool uses; only hidden colour under zero alpha differs. |
+| 1.3.1 | CImg noise/blur ignore Stride | Obsolete | Run, successors | CImg was removed (5101af2); the blur export was already dead on 10-16. The successors honour Stride. |
+| 1.3.2 | CImg noise also noises alpha | Obsolete | Run, successor | The replacement leaves alpha and fully transparent pixels untouched. |
+| 1.3.3 | CImg blur: preview halving gives a 0-size kernel | Obsolete | Code reading | Dead code even when reported (no live caller), now deleted; the OpenCV replacement has no preview halving. |
+| 1.3.4 | CImg blur: "circle" blurs every mode | Obsolete | Code reading | Deleted; in the OpenCV replacement "circle" only selects the kernel shape. |
+| 1.4.1 | CImg plasma noise reads uninitialised floats (NaN) | Obsolete | Run, successor | The new plasma generator writes every grid point before reading it. |
+| 1.4.2 | CreateGdipBitmapFromCImg returns a blank bitmap when locking fails | Obsolete | Code reading | The function is gone; the AHK wrapper now disposes the bitmap and reports the failure. |
+| 1.4.3 | CreateGdipBitmapFromCImg: unchecked UIntMult, 32-bit row offset | Obsolete | Code reading | The function is gone; the replacement computes row offsets in 64-bit. |
+| 1.5 | Zoom/rotate blur leave the caller's source alpha-weighted | Intentional or known | Run, sliced DLL code | Deliberate memory saving (e6f3ddd); the source is documented as consumed and both callers discard it. |
+| 1.6.1 | UndoAiderSwapPixelRegions does not clamp its rectangle (out of bounds) | Confirmed, latent | ASan, sliced DLL code | No clamps, but the claimed trigger cannot happen: the undo rectangle is a crop FreeImage accepted from the same image. See "a stale undo level" below for a path that may reach it. |
+| 1.6.2 | dissolveBitmap lets std::bad_alloc escape the export | **Confirmed** | Run, sliced DLL code (failing allocation) | Only when memory runs out: DllCall catches the exception, but QPV_DissolveBitmap ignores the failure and the blur tool applies an unwritten bitmap. Low. |
+| 1.6.3 | dissolveBitmap / symmetricaBitmap index in 32-bit int | Confirmed, latent | UBSan, sliced DLL code | Overflows above 2.1 gigapixels, but both exports only get GDI+ bitmaps, which the app caps at 537 megapixels. |
+| 2.1.1 | Protect alpha ignored in Normal (blend mode 0) | Intentional or known | Run, sliced DLL code; git history | Accurate, but Marius excluded Normal on purpose (eb7ea93, 2025-03-24); the checkbox tooltip says "unaltered by blend modes". |
+| 2.1.2 | Protect alpha ignored in Behind (mode 25) | Intentional or known | Run, sliced DLL code; git history | Accurate, but deliberate (9df5106, 2025-03-17): Behind exists to paint under transparent pixels, which raises their alpha. |
+| 2.2 | Swap blended layers + Protect alpha in modes 2..21 ignores the new layer's opacity | **Confirmed** | Run, sliced DLL code (all 40 mode/gamma cases) | With both boxes ticked, a layer at alpha 10 blends like alpha 255: the opacity slider and soft edges are lost in paste, brush, fill and text. Medium. |
+| 2.3.1 | toLABfx epsilon wrong, RGBtoGray reaches 452 | Intentional or known | Run, sliced DLL code; git history | White does give 452, but Marius restored this constant on purpose (8f5cbb4, 2026-07-18, "intentionally chosen value"). |
+| 2.3.2 | toLABf epsilon has an extra e-3 (discontinuity) | Intentional or known | Run, sliced DLL code; git history | The jump (0.138 to 0.021) is real, but restored on purpose in the same 8f5cbb4. |
+| 2.4 | Tint reads 65536-entry tables out of bounds after black/white point noise | Confirmed, latent | ASan, sliced DLL code | Real order (tint before the final clamp), but needs black point >= 62937 or white point <= 2598; the sliders stop at 45535 / 20100, so only a hand-edited registry value reaches it. |
+| 2.5.1 | Contrast stage 2 uses the unfaded mix | Not a bug | Run, sliced DLL code | Stage 2 does read the unfaded mix, but the output is continuous and matches the clamped path from 16000 up; the proposed change would make the two modes disagree. |
+| 2.5.2 | Contrast level >= 16000 discards the 16000..19500 fade | Not a bug | Run, sliced DLL code | That stage-1 fade is dead code there, but nothing visible is lost: no jump at 16000 or 19500. |
+| 2.6 | Smudge brush with a clone buffer reads an empty copy (null pointer) | Confirmed, latent | ASan, sliced DLL code | The smudge crashes if handed a clone buffer, but the app passes one only to the cloner brush, never to the smudge. |
+| 2.7.1 | Brush chunk cache ignores a change of bits per pixel (heap overflow) | Confirmed, latent | ASan, sliced DLL code | The cache is keyed on the chunk count only, but the app clears it at every stroke's start and end, so it never meets a different image. |
+| 2.7.2 | Brush chunk cache ignores a change of grid shape (out-of-range chunk) | Confirmed, latent | ASan, sliced DLL code | Same per-stroke reset as 2.7.1, so the out-of-range chunk index never happens. |
+| 2.8 | Smudge sample can reach 256 and index 256-entry tables | **Confirmed** | ASan + UBSan, full PaintBrushLarge smudge | Smudging with a blend mode across transparent edges of 32-bit images occasionally yields 256: one wrong pixel (another mode's value, or a read past the table), no crash. The report's all-255 example is wrong. The reproduction assumes MSVC rounds floats as the g++ build did; not run on Windows. Low. |
+| 2.9 | Cloner/pinch/bulge without a copy race the painting threads | Intentional or known | Run, sliced DLL code (8 threads) | Documented in 72aeac1: past a 150 MB sampled box a huge image is read directly. Reachable only with Double size plus Random size; nondeterministic pixels, no crash. |
+| 3.1 | Cached mask kept while the mask window grows (out-of-bounds read) | Confirmed, latent | ASan, sliced DLL code | Reproduced by calling the DLL directly; the app reuses the cache only for an identical selection, or right before prepareDrawLinesMask(), which resizes it. |
+| 3.2.1a | highDepth never reset by prepareSelectionArea (stale depth mask read out of bounds) | Confirmed, latent | ASan, sliced DLL code | Reproduced in the DLL; the high-depth flag exists only inside the parametric-lines tool, which clears it before any new selection is prepared. |
+| 3.2.1b | Stale highDepth inverts rectangles/ellipses outside the box | Not a bug | Code reading | In high-depth mode the value is an opacity, so 0 outside means "leave untouched"; high depth always comes with a freeform shape. |
+| 3.2.2 | Mask resize failure unchecked, empty mask read | Not a bug | Code reading | Failures are caught: the polygon path falls back to a rectangle and returns 0, the lines path returns 0, and the AHK stops on 0. |
+| 3.2.3 | Same-size depth mask reused without zeroing | Confirmed, latent | Run, sliced DLL code | Reproduced in the DLL; the only high-depth tool empties the depth mask at the end of every run. |
+| 3.3 | clipMaskFilter row shift with a mask bitmap reads before the bitmap | Confirmed, latent | ASan, sliced DLL code | Already recorded as latent in the 10-06 audit (#26): no caller passes a mask bitmap (the AHK variable is never assigned). |
+| 3.4a | Line-merge window lacks the row offset and margin (stale mask bits) | Intentional or known | Code reading | The row offset is applied (10-06 fix #11); what remains is the known loss of miter tips beyond the merge margin. |
+| 3.4b | NewDrawLinesOnMask shifts the caller's points in place | **Confirmed** | Run, sliced DLL code | On huge images with "Double line" on and a selection crossing the top or bottom edge, the second line is drawn offset by the overhang (50, 70, 90 px). Medium. |
+| 3.5 | traverseCurvedPath off by one, corrupts closed multi-path curves | Not a bug | Run, sliced DLL code | The loops the report describes do not exist; the returned insert position is correct. |
+| 3.6.1 | Flood fill ignores dynamic opacity at 100 % opacity, Normal | **Confirmed** | Run, sliced DLL code | Long-standing: at opacity 255 with Normal blending, "Flood opacity based on color similarity" has no effect (254 fades, 255 paints solid). Low. |
+| 3.6.2 | Semi-transparent fill colour overwrites instead of blending | Confirmed, latent | Run, sliced DLL code | True in the DLL, but the app always sends the fill colour with alpha FF. |
+| 3.6.3 | Cartoon mode ignores opacity, blend mode, dynamic opacity | Intentional or known | Run, sliced DLL code; AHK panel | By design: cartoon mode fills with the clicked colour, and the panel disables those controls while it is on. |
+| 3.7 | Flood fill selection test wrong with high-depth masks | Confirmed, latent | Run, sliced DLL code | True if a fill ran with a high-depth mask, but that mask exists only inside the parametric-lines tool, which clears it before returning. |
+| 4.1.1 | Static colour-management COM pointers race across threads | Confirmed, latent | Code reading | Not thread-safe, but only the one script thread reaches them; the worker pools use their own per-call copy. |
+| 4.1.2 | Source bitmap released before QueryInterface | Not a bug | Code reading | The query cannot fail: a WIC colour transform is itself a bitmap source; even then the load would just fail. |
+| 4.2 | WICgetRectImage returns a blank 100x100 bitmap on failure | Intentional or known | Code reading | Accurate and already known (2026-08-12, left on purpose): a blank tile instead of an error; the bitmap is tracked, not leaked. |
+| 4.3.1 | LoadWICimage `UINT *&resultsArray` ABI mismatch | Not a bug | Code reading | The only caller passes "UPtr*", &buffer, a pointer to a pointer, which is what the reference expects. |
+| 4.3.2 | doFlipHV ignored when no resize is needed | Confirmed, latent | Code reading | True (the flip only happens on the resize path), but no caller ever asks LoadWICimage to flip. |
+| 4.4.1 | CountChars -1 in a UINT: 4.29-billion-iteration loop | Not a bug | Reading + PDFium source | The text page is checked first, and PDFium returns -1 only for a missing text page; the quoted loop does not exist. |
+| 4.4.2 | Text size query 1-2 units short, buffer overflow | Confirmed, latent | ASan, sliced DLL code + PDFium contract | The size can be short on malformed pages, but the only caller allocates eight times the reported size. |
+| 4.4.3 | Pages with 1-2 characters skipped, buffer unterminated | Not a bug | Code reading | An explicit threshold; the caller zero-fills the buffer and does not read it when nothing was extracted. |
+| 4.5.1 | adaptImageGivenSize divides by zero | **Confirmed** | UBSan, sliced DLL code | Undefined behaviour for a malformed PDF page 0 px wide in a contact sheet; on x64 it ends as a 1-pixel-high image, not a crash. Low. |
+| 4.5.2 | dpi 0 skips the size cap (32650 x 32650) | Confirmed, latent | Code reading | dpi 0 means "exactly this size" by design; the 32650 fallback only applies when a size is missing, and no caller combines the two. |
+| 4.5.3 | 24-bit stride not 4-aligned, bitmap creation fails | Not a bug | Code reading | The bitmap has no caller buffer, so GDI+ uses its own aligned stride; PDFium draws through the locked stride. |
+| 4.6.1 | WicD2DrenderSVG does not check its factories for NULL | Confirmed, latent | Code reading | True, but the factories exist whenever the DLL loads; only an out-of-memory start-up could leave them NULL. |
+| 4.6.2 | viewBox SVGs scaled twice | Not a bug | Code reading (Direct2D not run) | Both callers use a scale of 1 for missing, percentage and viewport-unit sizes, so the viewBox is scaled once. |
+| 5.1.1 | Detached pool workers: use-after-free at DLL unload | Not a bug | Code reading | The pools shut down only on exit, and the app then terminates itself, so no destructor runs under a stray worker; the DLL is never unloaded early. |
+| 5.1.2 | Detached worker revived by a pool restart | Confirmed, latent | Code reading | True only if a pool restarted after a timed-out shutdown; both pools start once and shut down only at exit. |
+| 5.2 | Thumbnail format lists rewritten while workers read them | **Confirmed** | TSan, sliced DLL code | Real race, for a different reason than the report gives: the writer locks, the readers do not. Only the first duplicates scan of a session can hit it. Low. |
+| 5.3.1 | FreeImage thumbnails ignore EXIF orientation | **Confirmed** | Run, real FreeImage fork | With "Always open with FreeImage" on, the viewer turns JPEGs upright but their thumbnails stay sideways. Low. |
+| 5.3.2 | HDR TIFF hand-off to FreeImage is dead in the pools | **Confirmed** | Code reading | Every pool call passes 0, so high-bit-depth TIFF thumbnails come from WIC, not FreeImage's tone mapping as in the viewer. Low. |
+| 5.3.3 | Scaler failure gives a top-left crop | Intentional or known | Code reading | No crop: the whole frame is decoded unscaled; that fallback is the 10-06 audit's item 44, whose cause was fixed in dcaaf28. |
+| 5.3.4 | "in" tested before "vmin" in the SVG unit converter | **Confirmed** | Run, sliced DLL code | Real in the pool's converter and in the viewer's AHK twin: "10vmin" is read as 10 inches. svg-render.h has no converter. Low. |
+| 5.4 | openCVdiffBlendBitmap copies before subtracting: black at offset 0 | Not a bug | Run, sliced DLL code (OpenCV stand-ins) | The copy builds the shifted operand; the filter is "shifted image minus image", so zero shift gives a flat result by definition. |
+| 5.5.1 | openCVedgeDetection lets cv::Exception escape | Confirmed, latent | Reading + OpenCV source | No try/catch, but the panel always sends valid sizes and modes, and DllCall catches a throw on the script thread. The extractChannel part is code removed in 2024. |
+| 5.5.2 | openCVblurFilters throws for Sobel/Laplacian kernels > 31 | Not a bug | Code reading | The function has no Sobel or Laplacian mode. |
+| 5.5.3 | openCVresizeBitmapExtended crop outside the try | Confirmed, latent | Reading + OpenCV source | True, but every caller passes the whole image, so the crop rectangle is always valid. |
+| 6.1 | dupesEngineCancel races Release/Init on the database handle | Confirmed, latent | TSan, sliced DLL code | True only with two threads; since the interface-thread merge every call comes from the one script thread. |
+| 6.2 | An unusable hash splits a group and drops valid pairs | Confirmed, latent | Run, real SQLite + sliced engine | The flaw is real, but the app's query drops empty hashes and its writer only stores valid hex, so nothing triggers it. |
+| 6.3 | MSD filter skipped when only one pair exists | **Confirmed** | Run, sliced DLL code | The two-pair rule is deliberate, but it also gates the search's own MSD threshold: a single-pair result is listed even above the threshold. Low. |
+| 6.4 | Rarest level of a single-level image reported as level 0 | **Confirmed** | Run, sliced DLL code | Real, in the DLL and in the AHK original it copies: any solid-colour image above black stores level 0. Low. |
+
+
 **Scope:** All C++ source and header files in `QPV DLL source code/` (`qpv-main.cpp`, `dllmain.cpp`, and `lib/*.h`). AutoHotkey (`.ahk`) files were excluded.
 
 ---
@@ -19,6 +198,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ## 1. Core Image Processing (`qpv-main.cpp`)
 
 ### 1.1. [`PrepareAlphaChannelBlur`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L370-L418) — Pass 1 Overwrites Alpha Before Pass 2 Runs, Breaking Leftward Color Propagation and Corrupting Opaque Black Pixels (`fillMissingOnly == 0`)
+
+> **Verified 2026-10-27:** Confirmed, latent (1.1.1, 1.1.2). The mechanism is real, but the only live call gets an already filled bitmap; the other call is dead code.
+
 - **Severity:** Medium
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L379-L416)
 - **Root Cause:**
@@ -36,6 +218,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 1.2. [`DrawTextBitmapInPlace`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1256-L1316) — Missing Horizontal/Vertical Coordinate Bounds Check Causes Scanline Wrap-Around Corruption, Plus `oA < 1` Bypass of `keepAlpha` / `flipLayers`
+
+> **Verified 2026-10-27:** 1.2.1 **Confirmed** (huge-image Insert text with letter spacing below -10 wraps line backgrounds into the next row; the "o == data" point is wrong); 1.2.2 Intentional or known (shortcut scoped to the text tool's modes, 62ff06f).
+
 - **Severity:** High
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1273-L1308)
 - **Root Cause:**
@@ -59,6 +244,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 1.3. [`cImgAddGaussianNoiseOnBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1483-L1490) & [`cImgBlurBitmapFilters`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1591-L1658) — `Stride` Ignored on Input Construction, Alpha Channel Corrupted by Noise, and `preview == 1` Zero-Size Structuring Element
+
+> **Verified 2026-10-27:** Obsolete (1.3.1-1.3.4). CImg was removed after the report (5101af2); the blur export was already dead on 10-16, and the successors do not have these problems.
+
 - **Severity:** High
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1485-L1488), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1597-L1651)
 - **Root Cause:**
@@ -75,6 +263,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 1.4. [`CreateGdipBitmapFromCImg`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1374-L1465) & [`GenerateCIMGnoiseBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1719-L1729) — Uninitialized `CImg<float>` Buffer, GDI+ Bitmap Leak on Failed `LockBits`, and Unchecked `UIntMult` / 32-Bit Row Offset Overflow
+
+> **Verified 2026-10-27:** Obsolete (1.4.1-1.4.3). The CImg functions are gone; the plasma generator and its AHK wrapper do not have these problems.
+
 - **Severity:** Medium
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1378-L1414), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1721-L1724)
 - **Root Cause:**
@@ -86,6 +277,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 1.5. [`zoomBlurBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L2200-L2215) & [`rotateBlurBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L2494-L2508) — Source Buffer `imageData` Mutated In-Place When `bpp == 32` Has Semi-Transparent Pixels
+
+> **Verified 2026-10-27:** Intentional or known. In-place weighting saves memory on purpose (e6f3ddd); both callers discard the source.
+
 - **Severity:** Medium
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L2209-L2214), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L2503-L2507)
 - **Root Cause:**
@@ -99,6 +293,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 1.6. [`UndoAiderSwapPixelRegions`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1318-L1334), [`dissolveBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1731-L1832), & [`symmetricaBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1834-L1880) — Missing Region Clamping and Uncaught `resize` / 32-Bit Index Overflow
+
+> **Verified 2026-10-27:** 1.6.1 Confirmed, latent (the undo rectangle is always a valid crop; but see the stale-undo-level note in the verification section); 1.6.2 **Confirmed** (only when memory runs out: the failure is ignored and an unwritten bitmap applied); 1.6.3 Confirmed, latent (GDI+ caps the size).
+
 - **Severity:** Medium
 - **Location:** [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1318-L1334), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1740-L1817), [qpv-main.cpp](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/qpv-main.cpp#L1844-L1875)
 - **Root Cause:**
@@ -111,6 +308,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ## 2. Blending, Color Adjustments & Paint Brush (`lib/blend-modes.h`, `lib/color-adjust.h`, `lib/paint-brush.h`)
 
 ### 2.1. [`CalculateNewBlendModes`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L251-L488) — `keepAlpha == 1` ("Protect Alpha") Fails in Normal (`0`) and Behind (`25`) Blend Modes
+
+> **Verified 2026-10-27:** Intentional or known (2.1.1, 2.1.2). Accurate, but Normal and Behind were excluded from "Protect alpha" on purpose (eb7ea93, 9df5106).
+
 - **Severity:** Medium
 - **Location:** [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L258), [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L334-L362), [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L485-L486)
 - **Root Cause:**
@@ -131,6 +331,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.2. [`CalculateNewBlendModes`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L319-L470) — `flipLayers == 1` Combined With `keepAlpha == 1` in Blend Modes `2..21` Ignores Brush / Top-Layer Opacity
+
+> **Verified 2026-10-27:** **Confirmed.** With "Swap blended layers" and "Protect alpha" both on, modes 2..21 ignore the new layer's opacity (reproduced for every mode).
+
 - **Severity:** Medium
 - **Location:** [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L319-L325), [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L367-L469)
 - **Root Cause:**
@@ -146,6 +349,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.3. [`toLABfx`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L75-L81) / [`RGBtoGray`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L83-L100) & [`toLABf`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L38-L46) — Misscaled CIE $L^*a^*b^*$ $\epsilon$ Constants
+
+> **Verified 2026-10-27:** Intentional or known (2.3.1, 2.3.2). The numbers are right, but Marius restored both constants on purpose (8f5cbb4, "intentionally chosen value"); the quoted code differs from the real code.
+
 - **Severity:** Low
 - **Location:** [blend-modes.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/blend-modes.h#L75-L100), [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L38-L46)
 - **Root Cause:**
@@ -170,6 +376,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.4. [`AdjustColorsFXplan::applyRGB`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L765-L781) — Out-of-Bounds LUT Reads in `tint()` / `tinto()` After `blackPoint` / `whitePoint` With Noise
+
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan, but it needs a black or white point beyond the sliders' range (registry edit only).
+
 - **Severity:** High
 - **Location:** [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L291-L343), [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L533-L619), [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L765-L781)
 - **Root Cause:**
@@ -192,6 +401,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.5. [`RGBA16color::contrast`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L450-L493) — Stage 2 Uses Unfaded `nr, ng, nb` Instead of Faded `r, g, b` When `noClamping == 1`
+
+> **Verified 2026-10-27:** Not a bug (2.5.1, 2.5.2). The stage-1 fade is dead code there, but the output is continuous and equals the clamped path.
+
 - **Severity:** Low
 - **Location:** [color-adjust.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/color-adjust.h#L460-L488)
 - **Root Cause:**
@@ -207,6 +419,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.6. [`brushSetupClone`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L306-L336) & [`brushSmudgeSample`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L947-L953) — Null-Pointer Dereference in Smudge Brush (`brushType == 6`) When `cloneData != nullptr`
+
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced (null read under ASan), but the app hands a clone buffer only to the cloner, never to the smudge.
+
 - **Severity:** High (Crash)
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L309-L335), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L948-L950)
 - **Root Cause:**
@@ -231,6 +446,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.7. [`brushSetupChunkGrid`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L222-L253) — Heap Buffer Overflow & Out-of-Bounds Vector Access When `totalChunks` Remains Constant Across Different Image Dimensions or BPP
+
+> **Verified 2026-10-27:** Confirmed, latent (2.7.1, 2.7.2). Reproduced with ASan, but the app resets the chunk cache at every stroke's start and end.
+
 - **Severity:** High
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L228-L252)
 - **Root Cause:**
@@ -250,6 +468,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.8. [`brushSmudgeSample`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L963-L982) & [`brushSmudgeRows`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L1051-L1053) — Unclamped `outB/G/R == 256` Indexes 256-Entry Blend LUTs Out-of-Bounds
+
+> **Verified 2026-10-27:** **Confirmed.** Not via the all-255 example (that case is exact): alpha-weighted smudge samples at transparent edges can round to 256, which the blend tables then read past (UBSan, ASan).
+
 - **Severity:** Medium
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L963-L982), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L1051-L1053)
 - **Root Cause:**
@@ -260,6 +481,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 2.9. [`brushRows`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L1359-L1363) — OpenMP Data Race on `s.imgData` in Cloner (`3`) and Pinch/Bulge (`7, 8`) When `localClone` Is Not Used
+
+> **Verified 2026-10-27:** Intentional or known. Documented in 72aeac1; it needs a huge image, Double size and Random size, and gives nondeterministic pixels, not a crash.
+
 - **Severity:** Medium
 - **Location:** [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L314-L335), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L730-L734), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L834-L844), [paint-brush.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/paint-brush.h#L1359-L1363)
 - **Root Cause:**
@@ -271,6 +495,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ## 3. Selection Masks & Flood Fill (`lib/selection-mask.h`, `lib/flood-fill.h`)
 
 ### 3.1. [`prepareSelectionArea`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1564-L1575) — Out-of-Bounds Read on `imgSel.mask` When `useCache == 1` and New Dimensions Exceed Cached Mask Size
+
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan in the DLL; the app reuses the cache only for an identical selection or right before a resize.
+
 - **Severity:** High
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1564-L1575)
 - **Root Cause:**
@@ -295,6 +522,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 3.2. [`prepareSelectionArea`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1545-L1580) & [`prepareDrawLinesMask`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1361-L1413) — Stale `imgSel.highDepth` Flag and Unhandled `.resize()` Failure Cause Out-of-Bounds Reads in `clipMaskFilter`
+
+> **Verified 2026-10-27:** 3.2.1a Confirmed, latent; 3.2.1b Not a bug; 3.2.2 Not a bug; 3.2.3 Confirmed, latent. High depth lives only inside the parametric-lines tool, which clears it; allocation failures are caught.
+
 - **Severity:** High
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1395-L1412), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1429-L1487), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1545-L1580)
 - **Root Cause:**
@@ -306,6 +536,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 3.3. [`clipMaskFilter`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1462-L1469) — Negative Offset Out-of-Bounds Read on `maskBitmap` When `imgSel.inverted == 0` and `imgSel.maskRowShift > 0`
+
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with ASan; already recorded in the 10-06 audit (#26): no caller passes a mask bitmap.
+
 - **Severity:** High
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1438-L1443), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1462-L1469)
 - **Root Cause:**
@@ -332,6 +565,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 3.4. [`mergePolyMaskIntoHighDepthMask`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1336-L1355) — Incomplete Bounding Box Margin and Missing `offsetY` Leave Stale Bits in `imgSel.mask`
+
+> **Verified 2026-10-27:** 3.4a Intentional or known (the row offset is applied; lost miter tips are known); 3.4b **Confirmed**: the caller's points are shifted in place, so "Double line" draws its second line offset when the selection crosses the image's top or bottom edge.
+
 - **Severity:** Medium
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1260-L1281), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L1336-L1355)
 - **Root Cause:**
@@ -344,6 +580,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 3.5. [`traverseCurvedPath`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L562-L660) — Off-by-One 1-Based Indexing in `PathsMap` Corrupts Closed Multi-Path Curves
+
+> **Verified 2026-10-27:** Not a bug. The loops described do not exist; the insert position the function returns is correct.
+
 - **Severity:** Low
 - **Location:** [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L575-L586), [selection-mask.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/selection-mask.h#L634-L659)
 - **Root Cause:**
@@ -353,6 +592,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 3.6. [`FloodJob::setupPaint`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1085-L1095) & [`floodFillPrepare`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1760-L1765) — `dynamicOpacity == 1`, Semi-Transparent `newColor`, and `cartoonMode == 1` Broken by `simpleMode` / `constPaint` Fast Path
+
+> **Verified 2026-10-27:** 3.6.1 **Confirmed** (dynamic opacity has no effect at 100 % opacity, Normal); 3.6.2 Confirmed, latent (the app always sends an opaque fill colour); 3.6.3 Intentional or known (the panel disables those controls in cartoon mode).
+
 - **Severity:** Medium
 - **Location:** [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1085-L1140), [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L1760-L1765)
 - **Root Cause:**
@@ -370,6 +612,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 3.7. [`FloodSel::masked`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L331-L335) — Broken Selection Masking in Flood Fill When `imgSel.highDepth == 1` (`kind == 1`)
+
+> **Verified 2026-10-27:** Confirmed, latent. A fill never runs while a high-depth mask is set.
+
 - **Severity:** Medium
 - **Location:** [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L326-L335), [flood-fill.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/flood-fill.h#L424-L431)
 - **Root Cause:**
@@ -385,6 +630,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ## 4. WIC, PDFium, PDF Writer & SVG Loaders (`lib/wic-loader.h`, `lib/pdfium-reader.h`, `lib/pdf-writer.h`, `lib/svg-render.h`)
 
 ### 4.1. [`applyColorManagement`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L199-L318) & [`LoadWICimage`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L1618) — Data Race, Use-After-Free, and COM Leaks via Function-Local `static` COM Pointers
+
+> **Verified 2026-10-27:** 4.1.1 Confirmed, latent (one script thread reaches the statics; the pools use their own copy); 4.1.2 Not a bug (that QueryInterface cannot fail).
+
 - **Severity:** High
 - **Location:** [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L199-L211), [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L252-L315), [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L1618)
 - **Root Cause:**
@@ -403,6 +651,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 4.2. [`WICgetRectImage`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L739-L887) — Returns Uninitialized Dummy `100x100` `GpBitmap*` on Error Instead of `nullptr`
+
+> **Verified 2026-10-27:** Intentional or known. Found 2026-08-12 and left on purpose: a blank tile, tracked, not leaked.
+
 - **Severity:** Medium
 - **Location:** [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L739-L887), [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L997-L1005)
 - **Root Cause:**
@@ -418,6 +669,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 4.3. [`LoadWICimage`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L1368-L1536) — `UINT *&resultsArray` Reference-to-Pointer ABI Mismatch and `doFlipHV` Ignored When Image Dimensions Match Target Size
+
+> **Verified 2026-10-27:** 4.3.1 Not a bug (the only caller passes a pointer to a pointer, as the reference expects); 4.3.2 Confirmed, latent (no caller asks for a flip).
+
 - **Severity:** High
 - **Location:** [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L1368), [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L1498), [wic-loader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/wic-loader.h#L1525-L1536)
 - **Root Cause:**
@@ -433,6 +687,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 4.4. [`RenderPdfPageAsText`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L294-L343) — `-1` Error Return Cast to `UINT` (`0xFFFFFFFF`) Causes 4.29-Billion-Iteration Freeze, Plus Heap Buffer Overflow on `FPDFText_GetText`
+
+> **Verified 2026-10-27:** 4.4.1 Not a bug; 4.4.2 Confirmed, latent (the only caller allocates 8x the reported size); 4.4.3 Not a bug. The quoted extraction loop does not exist.
+
 - **Severity:** Critical / High
 - **Location:** [pdfium-reader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L307-L335)
 - **Root Cause:**
@@ -465,6 +722,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 4.5. [`adaptImageGivenSize`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L46-L65) & [`coreRenderPdfPageAsBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L387-L445) — Division by Zero (`imgH == 0` / `givenH == 0`), `dpi == 0` Bypassing `maxMPX` Cap, and Unaligned 24-bpp GDI+ Stride
+
+> **Verified 2026-10-27:** 4.5.1 **Confirmed** (undefined behaviour on a malformed 0-px-wide PDF page in a contact sheet; harmless on x64); 4.5.2 Confirmed, latent; 4.5.3 Not a bug (GDI+ allocates with its own stride).
+
 - **Severity:** High
 - **Location:** [pdfium-reader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L46-L65), [pdfium-reader.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/pdfium-reader.h#L399-L445)
 - **Root Cause:**
@@ -487,6 +747,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 4.6. [`WicD2DrenderSVG`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/svg-render.h#L67-L125) — Null-Pointer Dereference on `wicFac` / `d2dFac` and Double-Scaling of SVGs With `viewBox`
+
+> **Verified 2026-10-27:** 4.6.1 Confirmed, latent (the factories exist whenever the DLL loads); 4.6.2 Not a bug (both callers use scale 1 for such SVGs).
+
 - **Severity:** Medium
 - **Location:** [svg-render.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/svg-render.h#L79-L124)
 - **Root Cause:**
@@ -499,6 +762,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ## 5. Thumbnail Worker Pool & OpenCV Filters (`lib/thumbs-pool.h`, `lib/open-cv-func.h`)
 
 ### 5.1. [`thumbsPoolShutdown`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L2106-L2167) & [`dupesPixShutdown`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L1503-L1554) — Detached Worker Threads Cause Use-After-Free at DLL Unload and Collide With New Workers on Re-Init
+
+> **Verified 2026-10-27:** 5.1.1 Not a bug (the pools stop only at exit and the app then terminates itself); 5.1.2 Confirmed, latent (the pools are never restarted).
+
 - **Severity:** High
 - **Location:** [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L2047-L2167), [dupes-pixels.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L1442-L1554)
 - **Root Cause:**
@@ -513,6 +779,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 5.2. [`thumbsPoolSetFormats`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1956-L1961) vs [`tpRunJob`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1638) — Unsynchronized Data Race on `tpWicExts` and `tpFimExts`
+
+> **Verified 2026-10-27:** **Confirmed**, for a different reason: the writer does lock; the workers read without the lock (reproduced with TSan).
+
 - **Severity:** High
 - **Location:** [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1638), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1708), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1956-L1961)
 - **Root Cause:**
@@ -522,6 +791,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 5.3. [`tpFIMthumb`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1365-L1379), [`tpWICload`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L762-L805), & [`tpConvertSVGunitsToPixels`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1139-L1146) — Missing `JPEG_EXIFROTATE`, Dead HDR-TIFF FreeImage Fallback, Silent Scaler Fallback, and `"in"` Shadowing `"vmin"`
+
+> **Verified 2026-10-27:** 5.3.1 **Confirmed** (with "Always open with FreeImage" JPEG thumbnails ignore EXIF orientation); 5.3.2 **Confirmed** (HDR TIFF hand-off dead in the pools); 5.3.3 Intentional or known (no crop; the full-size fallback is 10-06 item 44); 5.3.4 **Confirmed** ("vmin" read as inches, also in the AHK).
+
 - **Severity:** Medium
 - **Location:** [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L762-L805), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1139-L1146), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1365-L1379), [thumbs-pool.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/thumbs-pool.h#L1717)
 - **Root Cause:**
@@ -533,6 +805,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 5.4. [`openCVdiffBlendBitmap`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L8-L26) — Overwrites `bitmap(destROI)` With `otherData(sourceROI)` Before Computing `cv::subtract(bitmap, otherData, bitmap)`
+
+> **Verified 2026-10-27:** Not a bug. The copy builds the shifted operand of a shift-difference filter; zero shift gives a flat result by definition.
+
 - **Severity:** High
 - **Location:** [open-cv-func.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L8-L26)
 - **Root Cause:**
@@ -556,6 +831,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 5.5. [`openCVedgeDetection`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L28-L82), [`openCVblurFilters`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L155-L214), & [`openCVresizeBitmapExtended`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L261-L320) — Uncaught `cv::Exception` Across `DLL_API` Boundaries
+
+> **Verified 2026-10-27:** 5.5.1 Confirmed, latent (the panel sends valid values; extractChannel was removed in 2024); 5.5.2 Not a bug (no Sobel/Laplacian in that function); 5.5.3 Confirmed, latent (every caller passes the whole image).
+
 - **Severity:** High (Crash)
 - **Location:** [open-cv-func.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L28-L82), [open-cv-func.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L155-L214), [open-cv-func.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/open-cv-func.h#L266-L273)
 - **Root Cause:**
@@ -575,6 +853,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ## 6. Duplicate Search & Pixel Hashing (`lib/dupes-search.h`, `lib/dupes-pixels.h`)
 
 ### 6.1. [`dupesEngineCancel`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1772-L1778) vs [`dupesEngineRelease`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1711-L1715) / [`dupesEngineInit`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1754-L1765) — Data Race and Use-After-Free on `dupesDB`
+
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with TSan, but since the interface-thread merge only one thread calls the engine.
+
 - **Severity:** High
 - **Location:** [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1649), [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1711-L1715), [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1754-L1778)
 - **Root Cause:**
@@ -596,6 +877,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 6.2. [`dupesQueryStep`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L2109-L2113) — Single Row With Unusable Hash Splits the Current Key Run and Drops Valid Duplicate Pairs
+
+> **Verified 2026-10-27:** Confirmed, latent. Reproduced with a real SQLite; the app's query and hash writer never produce an unusable hash.
+
 - **Severity:** Medium
 - **Location:** [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L2109-L2127)
 - **Root Cause:**
@@ -618,6 +902,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 6.3. [`dupesHaveMSD`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1380-L1387) & [`dupesApplyFilter`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1410-L1412) — `mseLo` / `mseHi` Filter Silently Ignored When Only 1 Duplicate Pair Exists
+
+> **Verified 2026-10-27:** **Confirmed.** The two-pair rule is deliberate, but it also skips the search's own MSD threshold for single-pair results.
+
 - **Severity:** Medium
 - **Location:** [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1380-L1387), [dupes-search.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-search.h#L1410-L1412)
 - **Root Cause:**
@@ -640,6 +927,9 @@ A line-by-line static audit of the C++ QPV DLL codebase identified **38 verified
 ---
 
 ### 6.4. [`dpHistogram`](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L350-L397) — Wrong Minimum Histogram Bin (`minu`) on Solid-Color / Single-Tone Images
+
+> **Verified 2026-10-27:** **Confirmed.** Single-level images store level 0 as their rarest level, in the DLL and in the AHK original.
+
 - **Severity:** Low
 - **Location:** [dupes-pixels.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L354), [dupes-pixels.h](file:///home/marius/repos/Quick-Picto-Viewer/QPV%20DLL%20source%20code/lib/dupes-pixels.h#L382-L386)
 - **Root Cause:**
