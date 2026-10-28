@@ -82,18 +82,9 @@ static std::string gidRoot(const std::string &gid) {
 // Returns the final ordered list of (imgIndex, gid, col33, col34).
 static std::vector< std::pair<long long, RefRow> >
 refFilter(const std::vector<DupePairRec> &pairs, int hamLo, int hamHi, int mseLo, int mseHi,
-          int breakGroups, int remSingles, const std::vector<unsigned char> &imgKeep) {
-    // allowMSE: the test the panel enables the MSD fields on, dupesHaveMSD() - two scored
-    // pairs in the first half of the list; testWasMSEdupes() looked at the first two only
-    bool allowMSE = false;
-    if (pairs.size() >= 2)
-    {
-        const size_t half = std::max<size_t>(pairs.size() / 2, 2);
-        int scored = 0;
-        for (size_t i = 0; i < half && !allowMSE; i++)
-            if (pairs[i].mse < 2500 && ++scored > 1)
-               allowMSE = true;
-    }
+          int breakGroups, int remSingles, const std::vector<unsigned char> &imgKeep, bool msd) {
+    // allowMSE: whether the sweep computed MSD scores, what dupesHaveMSD() answers
+    const bool allowMSE = msd;
     const bool doUnion = (breakGroups!=1);
 
     std::map<long long, RefRow> newArrayu;   // newArrayu[idu]
@@ -265,8 +256,9 @@ static bool sameResult(const std::vector<std::pair<long long, RefRow> > &ref,
 static std::vector<DupeResultRow> runShipped(const std::vector<DupePairRec> &pairs,
                                              int hamLo, int hamHi, int mseLo, int mseHi,
                                              int breakGroups, int remSingles,
-                                             const std::vector<unsigned char> &imgKeep) {
+                                             const std::vector<unsigned char> &imgKeep, int msd) {
     dupesPairsList = pairs;
+    dupesPairsMSD = msd;
     dupesPairsRead = 0;
     dupesApplyFilter(hamLo, hamHi, mseLo, mseHi, breakGroups, remSingles,
                      imgKeep.empty() ? NULL : imgKeep.data(), (UINT)imgKeep.size());
@@ -281,7 +273,7 @@ int main() {
 
     int cases = 0, mismatches = 0, nonEmpty = 0, totalRows = 0;
     std::string why;
-    for (UINT64 seed = 1; seed <= 40; seed++)
+    for (UINT64 seed = 1; seed <= 48; seed++)
     {
         const bool withMSD = (seed % 3)!=0;
         const UINT images = 4 + (UINT)(seed % 22);
@@ -312,9 +304,9 @@ int main() {
             }
 
             const std::vector<std::pair<long long, RefRow> > ref =
-                refFilter(pairs, hamLo, hamHi, mseLo, mseHi, breakGroups, remSingles, keep);
+                refFilter(pairs, hamLo, hamHi, mseLo, mseHi, breakGroups, remSingles, keep, withMSD);
             const std::vector<DupeResultRow> got =
-                runShipped(pairs, hamLo, hamHi, mseLo, mseHi, breakGroups, remSingles, keep);
+                runShipped(pairs, hamLo, hamHi, mseLo, mseHi, breakGroups, remSingles, keep, withMSD);
 
             cases++;
             totalRows += (int)ref.size();
@@ -341,16 +333,16 @@ int main() {
         DupePairRec a = {2, 1, 1, 2500}; pairs.push_back(a);
         DupePairRec b = {3, 2, 1, 2500}; pairs.push_back(b);
         const std::vector<unsigned char> keep = {1, 1, 1 | 2, 1};
-        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 400, 0, 1, keep);
+        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 400, 0, 1, keep, 0);
         bool ok = got.size()==2 && got[0].imgIndex==1 && got[1].imgIndex==3 && got[0].groupRoot==1 && got[1].groupRoot==1;
         check(ok, "a deleted image links its group but is not listed: {A, C}");
         const std::vector<unsigned char> keep2 = {1, 1, 1, 1 | 2};
-        const std::vector<DupeResultRow> got2 = runShipped(pairs, 0, 12, 0, 400, 0, 1, keep2);
+        const std::vector<DupeResultRow> got2 = runShipped(pairs, 0, 12, 0, 400, 0, 1, keep2, 0);
         check(got2.size()==2 && got2[0].imgIndex==1 && got2[1].imgIndex==2, "deleting C instead leaves {A, B}");
         DupePairRec c = {4, 3, 1, 2500};
         std::vector<DupePairRec> one = {c};
         const std::vector<unsigned char> keep3 = {1, 1, 1, 1, 1 | 2};
-        check(runShipped(one, 0, 12, 0, 400, 0, 1, keep3).empty(), "a pair whose other image was deleted is a single, hidden as one");
+        check(runShipped(one, 0, 12, 0, 400, 0, 1, keep3, 0).empty(), "a pair whose other image was deleted is a single, hidden as one");
     }
 
     // unscored leading pairs must not switch the MSD bounds off for the rest of the list
@@ -365,10 +357,25 @@ int main() {
         DupePairRec g = {14, 13, 1, 60}; pairs.push_back(g);
         DupePairRec h = {16, 15, 1, 70}; pairs.push_back(h);   // two scored pairs in the first half
         const std::vector<unsigned char> none;
-        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 100, 0, 1, none);
+        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 100, 0, 1, none, 1);
         bool has5 = false, has7 = false, has1 = false;
         for (const DupeResultRow &r : got) { has5 |= (r.imgIndex==5); has7 |= (r.imgIndex==7); has1 |= (r.imgIndex==1); }
         check(!has5 && !has1 && has7, "unscored leading pairs leave the MSD bounds on: 300 and 2500 out, 30 in");
+    }
+
+    // the search's own MSD threshold holds whenever the sweep computed MSD, however few pairs it scored
+    {
+        const std::vector<unsigned char> none;
+        const std::vector<DupePairRec> one = {{2, 1, 1, 900}};
+        check(runShipped(one, 0, 12, 0, 300, 0, 0, none, 1).empty(), "a single pair at MSD 900 is filtered out by a threshold of 300");
+        check(runShipped(one, 0, 12, 0, 300, 0, 0, none, 0).size()==2, "and listed when the sweep computed no MSD");
+        const std::vector<DupePairRec> unscored = {{2, 1, 1, 2500}, {4, 3, 1, 2500}, {6, 5, 1, 2500}};
+        check(runShipped(unscored, 0, 12, 0, 300, 0, 0, none, 1).empty(), "pairs without a fingerprint fail the MSD bounds even when none is scored");
+        dupesPairsList = one;
+        dupesPairsMSD = 1;
+        const int before = dupesHaveMSD();
+        dupesClearPairs();
+        check(before==1 && dupesHaveMSD()==0, "dupesHaveMSD() follows the sweep, and dupesClearPairs() resets it");
     }
 
     // the mutation check: a union-find that does not force the smaller index to be the
@@ -379,8 +386,8 @@ int main() {
         DupePairRec a = {5, 9, 1, 2500}; pairs.push_back(a);
         DupePairRec b = {9, 2, 1, 2500}; pairs.push_back(b);
         const std::vector<unsigned char> none;
-        const std::vector<std::pair<long long, RefRow> > ref = refFilter(pairs, 0, 12, 0, 2500, 0, 0, none);
-        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none);
+        const std::vector<std::pair<long long, RefRow> > ref = refFilter(pairs, 0, 12, 0, 2500, 0, 0, none, false);
+        const std::vector<DupeResultRow> got = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none, 0);
         check(sameResult(ref, got, why), "A~B then B~C makes ONE group of three");
         check(got.size()==3 && got[0].groupRoot==2, "and its ID is the smallest image index");
     }
@@ -389,8 +396,8 @@ int main() {
     {
         const std::vector<DupePairRec> pairs = makePairs(4242, 20, true);
         const std::vector<unsigned char> none;
-        const std::vector<DupeResultRow> fwd = runShipped(pairs, 2, 5, 0, 2500, 0, 0, none);
-        const std::vector<DupeResultRow> rev = runShipped(pairs, 5, 2, 2500, 0, 0, 0, none);
+        const std::vector<DupeResultRow> fwd = runShipped(pairs, 2, 5, 0, 2500, 0, 0, none, 1);
+        const std::vector<DupeResultRow> rev = runShipped(pairs, 5, 2, 2500, 0, 0, 0, none, 1);
         check(!fwd.empty() && fwd.size()==rev.size() &&
               memcmp(fwd.data(), rev.data(), fwd.size()*sizeof(DupeResultRow))==0,
               "reversed bounds (Lower 5, Upper 2) give the 2..5 list");
@@ -401,9 +408,9 @@ int main() {
     {
         const std::vector<DupePairRec> pairs = makePairs(777, 20, true);
         const std::vector<unsigned char> none;
-        const std::vector<DupeResultRow> wide = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none);
-        const std::vector<DupeResultRow> again = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none);
-        const std::vector<DupeResultRow> tight = runShipped(pairs, 0, 2, 0, 2500, 0, 0, none);
+        const std::vector<DupeResultRow> wide = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none, 1);
+        const std::vector<DupeResultRow> again = runShipped(pairs, 0, 12, 0, 2500, 0, 0, none, 1);
+        const std::vector<DupeResultRow> tight = runShipped(pairs, 0, 2, 0, 2500, 0, 0, none, 1);
         check(wide.size()==again.size() &&
               (wide.empty() || memcmp(wide.data(), again.data(), wide.size()*sizeof(DupeResultRow))==0),
               "the same thresholds twice give byte-identical results");

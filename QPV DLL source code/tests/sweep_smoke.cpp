@@ -157,6 +157,7 @@ static void resultContract() {
     check(badHam == 0, "every pair is strictly under the threshold");
     check(sentinelPairs > 0, "a record with no fingerprint scores QPV_MSD_NONE, not 0");
     check(scoredPairs > 0, "pairs with fingerprints get a real MSD score");
+    check(dupesHaveMSD() == 1, "dupesHaveMSD() reports a sweep that computed MSD");
 
     // Batching must be transparent: the same input swept one outer index at a time has
     // to produce the same pairs, in the same order, as one batch covering everything.
@@ -191,6 +192,7 @@ static void resultContract() {
     for (size_t i = 0; i < nomsd.size(); i++)
         if (nomsd[i].mse != QPV_MSD_NONE) allSentinel = 0;
     check(allSentinel == 1, "every MSD reads as QPV_MSD_NONE when MSD is off");
+    check(dupesHaveMSD() == 0, "and dupesHaveMSD() reports that it computed none");
 
     // The crop mask must not empty out: an over-wide crop is documented to mean "no
     // crop", because an empty mask makes every distance 0 and every image a duplicate.
@@ -349,7 +351,7 @@ static bool samePairs(const std::vector<DupePairRec> &a, const std::vector<DupeP
 
 static void scanMatchesPerGroupSweep() {
     printf("  whole-scan sweep vs the per-group sweep\n");
-    int mismatches = 0, emptyCases = 0, totalPairs = 0;
+    int mismatches = 0, emptyCases = 0, totalPairs = 0, msdFlagBad = 0;
     for (UINT64 seed = 1; seed <= 12; seed++)
     {
         const ScanCase K = makeCase(seed * 7919, 60, 1024);
@@ -363,6 +365,11 @@ static void scanMatchesPerGroupSweep() {
         if (!samePairs(ref, got))
            mismatches++;
 
+        // the filter runs after dupesScanEnd(), so the scan's MSD setting must outlive it
+        dupesScanEnd();
+        if (dupesHaveMSD() != K.doMSD)
+           msdFlagBad++;
+
         // and again in one unbounded step, and with a feed chunk that covers everything
         const std::vector<DupePairRec> got2 = wholeScanSweep(K, (UINT)K.hashes.size(), 100000, NULL);
         if (!samePairs(ref, got2))
@@ -371,6 +378,7 @@ static void scanMatchesPerGroupSweep() {
     char msg[128];
     snprintf(msg, sizeof(msg), "12 candidate sets, %d pairs: identical record for record", totalPairs);
     check(mismatches == 0, msg);
+    check(msdFlagBad == 0, "dupesHaveMSD() follows each scan's MSD setting past dupesScanEnd()");
     check(emptyCases <= 2, "the test data actually produces pairs");
     check(totalPairs > 200, "enough pairs to be worth comparing");
 }

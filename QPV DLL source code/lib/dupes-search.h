@@ -70,6 +70,7 @@ struct DupePairRec {      // 16 bytes; AHK NumGet()s the fields at 0/4/8/12
 };
 
 std::vector<DupePairRec>    dupesPairsList;
+int                         dupesPairsMSD = 0;   // 1 when the sweep that filled dupesPairsList computed MSD scores
 std::vector<unsigned char>  dupesPixData;   // decoded fingerprints, arraySize * dupesPixStride
 std::vector<unsigned char>  dupesPixOK;     // 1 when that index carries a usable fingerprint
 UINT                        dupesPixStride = 0;
@@ -208,7 +209,7 @@ inline int hammingDistance(const UINT64 n1, const UINT64 n2, const UINT64 mask) 
 }
 
 // "MSD was not computed for this pair" - the same sentinel calcMSDvalues()'s caller
-// seeded MSE with, and the value testWasMSEdupes() tests against.
+// seeded MSE with; it is above every MSD bound the panel offers (0-400).
 #define QPV_MSD_NONE 2500
 
 // Sum of squared differences over two grayscale fingerprints.
@@ -319,6 +320,7 @@ DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     dupesFilterRows.shrink_to_fit();
     dupesPairsList.clear();
     dupesPairsList.shrink_to_fit();
+    dupesPairsMSD = 0;
     dupesPixData.clear();
     dupesPixData.shrink_to_fit();
     dupesPixOK.clear();
@@ -954,6 +956,8 @@ DLL_API UINT DLL_CALLCONV dupesSweepPairs(UINT64 *givenHashesArray, UINT64 *give
     C.checkInverted = checkInverted;
     C.checkFlipped  = checkFlipped;
     C.wantMSD  = (doMSD==1 && dupesPixStride > 0 && dupesPixOK.size() >= (size_t)arraySize);
+    if (C.wantMSD)
+       dupesPairsMSD = 1;
 
     // The caller walks the outer index in batches of "stepping" so it can show
     // progress and stay interruptible; the old code covered offsetu ..
@@ -1005,6 +1009,7 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
     dupesPixData.clear();
     dupesPixOK.clear();
     dupesPairsList.clear();
+    dupesPairsMSD = 0;
     dupesPairsRead = 0;
     dupesScanRows = 0;
     dupesScanOuter = 0;
@@ -1201,6 +1206,8 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
     C.checkInverted = checkInverted;
     C.checkFlipped  = (dupesScanFlipped.size() >= dupesScanRows) ? checkFlipped : 0;
     C.wantMSD  = (dupesScanWantMSD==1 && dupesPixStride > 0 && dupesPixOK.size() >= dupesScanRows);
+    if (C.wantMSD)
+       dupesPairsMSD = 1;
 
     if (msBudget < 1)
        msBudget = 1;
@@ -1375,8 +1382,7 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
     if (mseLo > mseHi)
        std::swap(mseLo, mseHi);
 
-    // the MSD bounds apply when the scan computed scores, judged the way the panel judges it
-    // before it enables the MSD fields
+    // the MSD bounds apply when the scan computed scores, as the panel decides its MSD fields
     const bool allowMSE = (dupesHaveMSD()==1);
 
     UINT maxId = 0;
@@ -1580,34 +1586,10 @@ DLL_API UINT DLL_CALLCONV dupesPairCount() {
     return (UINT)dupesPairsList.size();
 }
 
-// What testWasMSEdupes() answered: whether the scan actually computed similarity scores,
-// which is what decides if the MSD sliders mean anything. Sampling only the first two pairs
-// was too thin - a sweep can legitimately leave the leading pairs without a score. Sample
-// the first half of the list instead, but keep the old bar of two scored pairs so a single
-// stray score cannot switch the sliders on, and stop the moment the second one turns up:
-// only a genuinely score-less list pays for the whole walk. The sample never drops below
-// two entries, otherwise short lists could not clear the bar no matter what they hold.
+// Whether the sweep computed MSD scores, which decides if the MSD bounds apply and if the panel
+// offers its MSD fields. A pair missing a fingerprint keeps QPV_MSD_NONE and fails the bounds.
 DLL_API int DLL_CALLCONV dupesHaveMSD() {
-    size_t total = dupesPairsList.size();
-    if (total < 2)
-       return 0;
-
-    size_t n = total / 2;
-    if (n < 2)
-       n = 2;
-
-    int k = 0;
-    for (size_t i=0; i<n; i++)
-    {
-        if (dupesPairsList[i].mse < QPV_MSD_NONE)
-        {
-           k++;
-           if (k>1)
-              return 1;
-        }
-    }
-
-    return 0;
+    return dupesPairsMSD;
 }
 
 // qpv-dupes-block-end - tests/run-tests.sh slices from the SWAR comment above down to
@@ -1920,6 +1902,7 @@ static void dupesQueryReset() {
     dupesPixData.clear();
     dupesPixOK.clear();
     dupesPairsList.clear();
+    dupesPairsMSD = 0;
     dupesKeyCur.clear();
     dupesKeyPrev.clear();
     dupesPairsRead = 0;
