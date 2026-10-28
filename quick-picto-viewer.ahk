@@ -84506,9 +84506,9 @@ getTinyPreviewAreaBitmap(uniformScale, ByRef G, ByRef uiboxSizeW:=0, ByRef uibox
 }
 
 coreUpdateLiveTinyPreviewsWindow(isPanning:=0) {
-    If GetKeyState("LButton", "P")
+    If (GetKeyState("LButton", "P") && isPanning=1)
     {
-       If (isPanning=1 && isVarEqualTo(AnyWindowOpen, 26, 43, 44, 69, 78, 79))
+       If (isVarEqualTo(AnyWindowOpen, 26, 43, 44, 69, 78, 79))
        {
           cornersBMP := getTinyPreviewAreaBitmap(isVarEqualTo(AnyWindowOpen, 26, 69, 78), G)
           If validBMP(cornersBMP)
