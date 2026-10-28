@@ -24760,41 +24760,9 @@ livePreviewSharpenPanel() {
 }
 
 livePreviewAddNoiser(modus:=0) {
-    WinGetPos, , , uiboxSizeW, uiboxSizeH, ahk_id %hCropCornersPic%
-    imgBoxSizeW := (doubleBlurPreviewArea=1) ? uiboxSizeW*2 : uiboxSizeW
-    imgBoxSizeH := (doubleBlurPreviewArea=1) ? uiboxSizeH*2 : uiboxSizeH
-    whichBitmap := useGdiBitmap()
-    If !validBMP(whichBitmap)
-       Return
-
-    cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSizeW, uiboxSizeH, coreDesiredPixFmt)
+    cornersBMP := getTinyPreviewAreaBitmap(0, G, uiboxSizeW, uiboxSizeH, imgBoxSizeW, imgBoxSizeH)
     If !validBMP(cornersBMP)
        Return
-   
-    G := trGdip_GraphicsFromImage(A_ThisFunc, cornersBMP, 3)
-    If !G
-    {
-       trGdip_DisposeImage(cornersBMP, 1)
-       Return
-    }
-
-    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
-    cX := (uiboxSizeW<imgW) ? 0 : uiboxSizeW//2 - imgW//2
-    cY := (uiboxSizeH<imgH) ? 0 : uiboxSizeH//2 - imgH//2
-    imgBoxSizeW := min(imgW, imgBoxSizeW)
-    imgBoxSizeH := min(imgH, imgBoxSizeH)
-    uiBoxSizeW := min(imgW, uiBoxSizeW)
-    uiBoxSizeH := min(imgH, uiBoxSizeH)
-    thisPrevieCoordX := clampInRange(tinyPrevAreaCoordX - imgBoxSizeW//2, 0, imgW - imgBoxSizeW)
-    thisPrevieCoordY := clampInRange(tinyPrevAreaCoordY - imgBoxSizeH//2, 0, imgH - imgBoxSizeH)
-    Gdip_GraphicsClear(G, "0xFF666666")
-    If (viewportQPVimage.imgHandle)
-    {
-       thisBMP := viewportQPVimage.ImageGetResizedRect(thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH, imgBoxSizeW, imgBoxSizeH, userimgQuality)
-       r1 := trGdip_DrawImage(A_ThisFunc, G, thisBMP, cX, cY, uiboxSizeW, uiboxSizeH)
-       trGdip_DisposeImage(thisBMP)
-    } Else
-       r1 := trGdip_DrawImage(A_ThisFunc, G, whichBitmap, cX, cY, uiboxSizeW, uiboxSizeH, thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH)
 
     Gdip_DeleteGraphics(G)
     cornersBMP := applyVPeffectsOnBMP(cornersBMP)
@@ -24862,8 +24830,7 @@ livePreviewAddNoiser(modus:=0) {
     flipBitmapAccordingToViewPort(cornersBMP, 1)
     Gdip_SetPbitmapCtrl(hCropCornersPic, cornersBMP)
     trGdip_DisposeImage(cornersBMP, 1)
-    er := r1 ? r1 : r0
-    Return er
+    Return r0
 }
 
 QPV_BlurBitmapFilters(pBitmap, passesX, passesY:=0, modus:=1, forceCimg:=0, circular:=0, preview:=0) {
@@ -55306,7 +55273,7 @@ PanelsPanIMGpreviewClick(a:=0) {
          noPreview := 0
          ; If (A_TickCount - thisZeit>95)
          ; zeitSillyPrevent := A_TickCount
-         coreUpdateLiveTinyPreviewsWindow()
+         coreUpdateLiveTinyPreviewsWindow(1)
          dummyRefreshImgSelectionWindow()
          thisZeit := A_TickCount
       }
@@ -55339,42 +55306,12 @@ PanelsPanIMGpreviewClick(a:=0) {
 }
 
 livePreviewBlurPanel() {
-    WinGetPos, , , uiboxSizeW, uiboxSizeH, ahk_id %hCropCornersPic%
-    o_uiBoxSizeW := uiBoxSizeW,    o_uiBoxSizeH := uiBoxSizeH
-    imgBoxSizeW := (doubleBlurPreviewArea=1) ? uiboxSizeW*2 : uiboxSizeW
-    imgBoxSizeH := (doubleBlurPreviewArea=1) ? uiboxSizeH*2 : uiboxSizeH
     WriteSettingsBlurPanel()
-    whichBmp := useGdiBitmap()
-    If !validBMP(whichBmp)
-       Return
-
-    cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSizeW, uiboxSizeH, coreDesiredPixFmt)
+    cornersBMP := getTinyPreviewAreaBitmap(1, G, uiboxSizeW, uiboxSizeH)
     If !validBMP(cornersBMP)
        Return
-   
-    G := trGdip_GraphicsFromImage(A_ThisFunc, cornersBMP, 3)
-    If !G
-    {
-       trGdip_DisposeImage(cornersBMP, 1)
-       Return
-    }
 
-    Gdip_GraphicsClear(G, "0xFF666666")
     fnOutputDebug("redraw: " A_ThisFunc)
-    trGdip_GetImageDimensions(whichBmp, imgW, imgH)
-    cX := (uiboxSizeW<imgW) ? 0 : uiboxSizeW//2 - imgW//2
-    cY := (uiboxSizeH<imgH) ? 0 : uiboxSizeH//2 - imgH//2
-    ald := (uiboxSizeH<imgH) ? 1 : 0
-    imgBoxSizeW := min(imgW, imgBoxSizeW)
-    imgBoxSizeH := min(imgH, imgBoxSizeH)
-    uiBoxSizeW := min(imgW, uiBoxSizeW)
-    uiBoxSizeH := min(imgH, uiBoxSizeH)
-    thisPrevieCoordX := clampInRange(tinyPrevAreaCoordX - imgBoxSizeW//2, 0, imgW - imgBoxSizeW)
-    thisPrevieCoordY := clampInRange(tinyPrevAreaCoordY - imgBoxSizeH//2, 0, imgH - imgBoxSizeH)
-    uiBoxSizeW := o_uiBoxSizeW,    uiBoxSizeH := o_uiBoxSizeH
-    imgBoxSizeW := (doubleBlurPreviewArea=1 && ald=1) ? uiboxSizeW*2 : uiboxSizeW
-    imgBoxSizeH := (doubleBlurPreviewArea=1 && ald=1) ? uiboxSizeH*2 : uiboxSizeH
-
     thisBlurMode := blurAreaMode
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
     thisOpacity := blurAreaOpacity/255
@@ -55392,14 +55329,6 @@ livePreviewBlurPanel() {
 
     If (thisBlurMode=1)
        bEffect := Gdip_CreateEffect(1, thisBlurAmount, 0, 0)
-
-    If (viewportQPVimage.imgHandle)
-    {
-       thisBMP := viewportQPVimage.ImageGetResizedRect(thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH, imgBoxSizeW, imgBoxSizeH, userimgQuality)
-       r1 := trGdip_DrawImage(A_ThisFunc, G, thisBMP, cX, cY, uiboxSizeW, uiboxSizeH)
-       trGdip_DisposeImage(thisBMP)
-    } Else
-       r1 := trGdip_DrawImage(A_ThisFunc, G, whichBmp, cX, cY, uiboxSizeW, uiboxSizeH, thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH)
 
     If (BlurAreaBlendMode>1)
        bgrBMPu := trGdip_CloneBitmap(A_ThisFunc, cornersBMP)
@@ -55500,51 +55429,13 @@ livePreviewBlurPanel() {
 }
 
 livePreviewZoomBlurPanel() {
-    WinGetPos, , , uiboxSizeW, uiboxSizeH, ahk_id %hCropCornersPic%
-    o_uiBoxSizeW := uiBoxSizeW,    o_uiBoxSizeH := uiBoxSizeH
-    imgBoxSizeW := (doubleBlurPreviewArea=1) ? uiboxSizeW*2 : uiboxSizeW
-    imgBoxSizeH := (doubleBlurPreviewArea=1) ? uiboxSizeH*2 : uiboxSizeH
-    whichBmp := useGdiBitmap()
-    If !validBMP(whichBmp)
-       Return
-
-    cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSizeW, uiboxSizeH, coreDesiredPixFmt)
+    cornersBMP := getTinyPreviewAreaBitmap(1, G, uiboxSizeW, uiboxSizeH, imgBoxSizeW, imgBoxSizeH, cX, cY, thisPrevieCoordX, thisPrevieCoordY)
     If !validBMP(cornersBMP)
        Return
-   
-    G := trGdip_GraphicsFromImage(A_ThisFunc, cornersBMP, 3)
-    If !G
-    {
-       trGdip_DisposeImage(cornersBMP, 1)
-       Return
-    }
 
     fnOutputDebug("redraw: " A_ThisFunc)
-    Gdip_GraphicsClear(G, "0xFF666666")
-    trGdip_GetImageDimensions(whichBmp, imgW, imgH)
-    cX := (uiboxSizeW<imgW) ? 0 : uiboxSizeW//2 - imgW//2
-    cY := (uiboxSizeH<imgH) ? 0 : uiboxSizeH//2 - imgH//2
-    ald := (uiboxSizeH<imgH) ? 1 : 0
-    imgBoxSizeW := min(imgW, imgBoxSizeW)
-    imgBoxSizeH := min(imgH, imgBoxSizeH)
-    uiBoxSizeW := min(imgW, uiBoxSizeW)
-    uiBoxSizeH := min(imgH, uiBoxSizeH)
-    thisPrevieCoordX := clampInRange(tinyPrevAreaCoordX - imgBoxSizeW//2, 0, imgW - imgBoxSizeW)
-    thisPrevieCoordY := clampInRange(tinyPrevAreaCoordY - imgBoxSizeH//2, 0, imgH - imgBoxSizeH)
-    uiBoxSizeW := o_uiBoxSizeW,    uiBoxSizeH := o_uiBoxSizeH
-    imgBoxSizeW := (doubleBlurPreviewArea=1 && ald=1) ? uiboxSizeW*2 : uiboxSizeW
-    imgBoxSizeH := (doubleBlurPreviewArea=1 && ald=1) ? uiboxSizeH*2 : uiboxSizeH
-
     decideGDIPimageFX(matrix, imageAttribs, pEffect)
     thisOpacity := blurAreaOpacity/255
-    If (viewportQPVimage.imgHandle)
-    {
-       thisBMP := viewportQPVimage.ImageGetResizedRect(thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH, imgBoxSizeW, imgBoxSizeH, userimgQuality)
-       r1 := trGdip_DrawImage(A_ThisFunc, G, thisBMP, cX, cY, uiboxSizeW, uiboxSizeH)
-       trGdip_DisposeImage(thisBMP)
-    } Else
-       r1 := trGdip_DrawImage(A_ThisFunc, G, whichBmp, cX, cY, uiboxSizeW, uiboxSizeH, thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH)
-
     If (BlurAreaBlendMode>1)
        bgrBMPu := trGdip_CloneBitmap(A_ThisFunc, cornersBMP)
 
@@ -84560,10 +84451,70 @@ MouseCoords2Image(mX, mY, limitBounds, dPosX, dPosY, newW, newH, ByRef x, ByRef 
     ; ToolTip, % mX " -- " mY "`n" x " -- " y "`n" DestPosX " -- " DestPosY "`n" newW " -- " newH "`n" prcx1 " -- " prcy1, , , 2
 }
 
-coreUpdateLiveTinyPreviewsWindow() {
+getTinyPreviewAreaBitmap(uniformScale, ByRef G, ByRef uiboxSizeW:=0, ByRef uiboxSizeH:=0, ByRef imgBoxSizeW:=0, ByRef imgBoxSizeH:=0, ByRef cX:=0, ByRef cY:=0, ByRef thisPrevieCoordX:=0, ByRef thisPrevieCoordY:=0) {
+    WinGetPos, , , uiboxSizeW, uiboxSizeH, ahk_id %hCropCornersPic%
+    o_uiBoxSizeW := uiBoxSizeW,    o_uiBoxSizeH := uiBoxSizeH
+    imgBoxSizeW := (doubleBlurPreviewArea=1) ? uiboxSizeW*2 : uiboxSizeW
+    imgBoxSizeH := (doubleBlurPreviewArea=1) ? uiboxSizeH*2 : uiboxSizeH
+    whichBitmap := useGdiBitmap()
+    If !validBMP(whichBitmap)
+       Return
+
+    cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSizeW, uiboxSizeH, coreDesiredPixFmt)
+    If !validBMP(cornersBMP)
+       Return
+
+    G := trGdip_GraphicsFromImage(A_ThisFunc, cornersBMP, 3)
+    If !G
+    {
+       trGdip_DisposeImage(cornersBMP, 1)
+       Return
+    }
+
+    Gdip_GraphicsClear(G, "0xFF666666")
+    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
+    cX := (uiboxSizeW<imgW) ? 0 : uiboxSizeW//2 - imgW//2
+    cY := (uiboxSizeH<imgH) ? 0 : uiboxSizeH//2 - imgH//2
+    imgBoxSizeW := min(imgW, imgBoxSizeW)
+    imgBoxSizeH := min(imgH, imgBoxSizeH)
+    uiBoxSizeW := min(imgW, uiBoxSizeW)
+    uiBoxSizeH := min(imgH, uiBoxSizeH)
+    thisPrevieCoordX := clampInRange(tinyPrevAreaCoordX - imgBoxSizeW//2, 0, imgW - imgBoxSizeW)
+    thisPrevieCoordY := clampInRange(tinyPrevAreaCoordY - imgBoxSizeH//2, 0, imgH - imgBoxSizeH)
+    If (uniformScale=1)
+    {
+       ald := (o_uiBoxSizeH<imgH) ? 1 : 0
+       uiBoxSizeW := o_uiBoxSizeW,    uiBoxSizeH := o_uiBoxSizeH
+       imgBoxSizeW := (doubleBlurPreviewArea=1 && ald=1) ? uiboxSizeW*2 : uiboxSizeW
+       imgBoxSizeH := (doubleBlurPreviewArea=1 && ald=1) ? uiboxSizeH*2 : uiboxSizeH
+    }
+
+    If (viewportQPVimage.imgHandle)
+    {
+       thisBMP := viewportQPVimage.ImageGetResizedRect(thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH, imgBoxSizeW, imgBoxSizeH, userimgQuality)
+       trGdip_DrawImage(A_ThisFunc, G, thisBMP, cX, cY, uiboxSizeW, uiboxSizeH)
+       trGdip_DisposeImage(thisBMP)
+    } Else
+       trGdip_DrawImage(A_ThisFunc, G, whichBitmap, cX, cY, uiboxSizeW, uiboxSizeH, thisPrevieCoordX, thisPrevieCoordY, imgBoxSizeW, imgBoxSizeH)
+
+    Return cornersBMP
+}
+
+coreUpdateLiveTinyPreviewsWindow(isPanning:=0) {
     If GetKeyState("LButton", "P")
     {
-       ; here call the function that retrieves cornersBMP
+       If (isPanning=1 && isVarEqualTo(AnyWindowOpen, 26, 43, 44, 69, 78, 79))
+       {
+          cornersBMP := getTinyPreviewAreaBitmap(isVarEqualTo(AnyWindowOpen, 26, 69, 78), G)
+          If validBMP(cornersBMP)
+          {
+             Gdip_DeleteGraphics(G)
+             cornersBMP := applyVPeffectsOnBMP(cornersBMP)
+             flipBitmapAccordingToViewPort(cornersBMP, 1)
+             Gdip_SetPbitmapCtrl(hCropCornersPic, cornersBMP)
+             trGdip_DisposeImage(cornersBMP, 1)
+          }
+       }
        SetTimer, coreUpdateLiveTinyPreviewsWindow, -350
        Return
     }
@@ -84612,7 +84563,7 @@ updateTinyPreviewArea(DestPosX, DestPosY, newW, newH, urgent:=0) {
           If (A_TickCount - lastInvoked<90)
              Return
 
-          coreUpdateLiveTinyPreviewsWindow()
+          coreUpdateLiveTinyPreviewsWindow(1)
           lastInvoked := A_TickCount
        } Else
        {
