@@ -65,7 +65,7 @@ slice fim_config.part     ../lib/thumbs-pool.h '^struct ThumbsConfig {'  '^};' 2
 slice fim_loader.part     ../lib/thumbs-pool.h '^\/\/ qpv-fim-loader-begin' '^\/\/ qpv-fim-loader-end' 250 || exit 1
 slice wic_loader.part     ../lib/thumbs-pool.h '^\/\/ qpv-wic-loader-begin' '^\/\/ qpv-wic-loader-end' 250 || exit 1
 slice wic_guards.part     ../lib/wic-loader.h '^static int WICcodecCrashFilter(DWORD code) {' '^\/\/ applyColorManagement() parses the ICC profile' 250 || exit 1
-slice adapt_size.part     ../lib/wic-loader.h '^auto adaptImageGivenSize' '^}' 50 || exit 1
+slice adapt_size.part     ../lib/pdfium-reader.h '^auto adaptImageGivenSize' '^}' 50 || exit 1
 slice safe_release.part   ../lib/wic-loader.h '^template <typename T> inline void SafeRelease(T \*&p, std::string infos, int d) {' '^}' 10 || exit 1
 slice icm_viewer.part     ../lib/wic-loader.h '^int applyColorManagement(IWICBitmapSource\* &thisWICbitmap' '^}' 100 || exit 1
 echo "   ok"
