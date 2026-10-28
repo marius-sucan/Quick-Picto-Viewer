@@ -45160,7 +45160,7 @@ PanelSaveImg() {
        fmtChoice := isInRange(userDesireWriteFMT, 1, 14) ? userDesireWriteFMT : saveFormatIndexFromPath(".png")
 
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
-    Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFolderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open file dialog in a previous location
+    Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFolderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open dialog in:
     If !entriesList
        GuiControl, SettingsGUIA: Disable, usePrevSaveFolder
 
@@ -84561,6 +84561,13 @@ MouseCoords2Image(mX, mY, limitBounds, dPosX, dPosY, newW, newH, ByRef x, ByRef 
 }
 
 coreUpdateLiveTinyPreviewsWindow() {
+    If GetKeyState("LButton", "P")
+    {
+       ; here call the function that retrieves cornersBMP
+       SetTimer, coreUpdateLiveTinyPreviewsWindow, -350
+       Return
+    }
+
     If (AnyWindowOpen=26 || AnyWindowOpen=78)
        livePreviewBlurPanel()
     Else If (AnyWindowOpen=43)
