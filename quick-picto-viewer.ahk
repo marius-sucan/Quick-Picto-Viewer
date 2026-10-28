@@ -26754,7 +26754,7 @@ GuiAddCheckBox(options, readerLabel, uiLabel, guiu:="SettingsGUIA", ttip:=0) {
 }
 
 GuiAddFlipBlendLayers(options, guiu:="SettingsGUIA") {
-    Static p := "Swap blended layers: A with B.`nThis will not have any impact on commutative`nblending modes marked with * (asterisk)."
+    Static p := "Swap blended layers: A with B.`nIt has no impact on commutative`nblending modes marked with * (asterisk)."
     Gui, %guiu%: Add, Checkbox, % options " +hwndhTemp +0x1000 +0x8000 Checked" BlendModesFlipped " vBlendModesFlipped", Swap blended layers
     SetImgButtonStyle(hTemp, mainExecPath "\resources\toolbar\blending-layers.png", 1, 0, guiu)
     ToolTip2ctrl(hTemp, p)
