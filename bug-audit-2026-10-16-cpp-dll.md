@@ -84,8 +84,9 @@ ignores. Nothing was run in the app itself; a fix still needs a qpvmain.dll buil
   The two halves belong together: the new AHK with an older qpvmain.dll offsets the second line.
 - **"Protect alpha" with "No blend mode" (quick-picto-viewer.ahk only, no DLL build needed):**
   - On an image with an alpha channel, No blend mode now blends as Clip to alpha in paste-in-place, draw lines,
-    parametric lines, Insert text and the brush types that show the box (soft edges, cloner, effects, smudge, pinch,
-    bulge), on regular and huge images. The simple solid color brush and the eraser are unchanged.
+    parametric lines, Insert text, blur, zoom blur, pixelate, add noise and the brush types that show the box (soft
+    edges, cloner, effects, smudge, pinch, bulge), on regular and huge images. The simple solid color brush and the
+    eraser are unchanged; symmetry still ignores the box under None.
   - Tools that auto-expand the canvas decide from the image before it grows, so on an opaque image paste-in-place now
     fills the new margin as its preview shows.
   - The smudge's Clip to alpha mixes the drag by the paint's alpha whether or not Protect alpha is ticked.

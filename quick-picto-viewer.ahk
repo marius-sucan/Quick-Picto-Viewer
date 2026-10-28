@@ -22434,7 +22434,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
             showTOOLtip("Pixelating image`nPhase 3/3...", 1)
             fnOutputDebug(A_ThisFunc ": img = " imgW " x " imgH " | " bpp )
             fnOutputDebug(A_ThisFunc ": mini = " thisimgw " x " thisimgh )
-            r := DllCall("qpvmain.dll\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", BlurAreaBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH)
+            r := DllCall("qpvmain.dll\PixelateHugeBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", blurAreaOpacity, "int", protectAlphaBlendMode(BlurAreaBlendMode) - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH)
             FreeImage_UnLoad(hFIFimgZ)
          } Else
          {
@@ -22512,7 +22512,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
          ; fnOutputDebug(imgSelX1 "|" imgSelY1 "||" imgSelX2 "|" imgSelY2 "||" thisSelW "|" thisSelH)
          QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.imgSelW, obju.imgSelH, EllipseSelectMode, VPselRotation, 0, 0, "a", "a", 1)
          ; fnOutputDebug(A_ThisFunc ": " UserAddNoiseGrays " | " UserAddNoiseBlendMode - 1)
-         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", UserAddNoiseBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
+         r := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "int", stride, "int", bpp, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", protectAlphaBlendMode(UserAddNoiseBlendMode) - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
          If (UserAddNoisePixelizeAmount>0)
             FreeImage_UnLoad(hFIFimgZ)
       } Else If InStr(modus, "color")
@@ -24230,7 +24230,7 @@ BlurSelectedArea(modus:="") {
     If (errorsOccurred=0 && BlurAreaBlendMode>0)
     {
        setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
-       rzp := QPV_BlendBitmaps(bgrBMPu, zBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, thisAlphaInvert)
+       rzp := QPV_BlendBitmaps(bgrBMPu, zBitmap, protectAlphaBlendMode(BlurAreaBlendMode) - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, thisAlphaInvert)
        If ((allowAlphaMasking=1 && alphaMaskingMode>1 || validBMP(maskBitmap)) && BlurAreaBlendMode=25 && validBMP(rzp))
        {
           xBitmap := rzp
@@ -24363,7 +24363,7 @@ ZoomBlurSelectedArea() {
        alphaMaskGray := generateAlphaMaskBitmap(0, 0, zzw, zzh, 0, 0, 0, 1, 0)
 
     setWindowTitle("APPLYING BLENDING MODE, please wait", 1)
-    rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, BlurAreaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, alphaMaskColorReversed)
+    rz := QPV_BlendBitmaps(bgrBMPu, gBitmap, protectAlphaBlendMode(BlurAreaBlendMode) - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 0, 255 - blurAreaOpacity, 1, alphaMaskGray, alphaMaskColorReversed)
     If (errorsOccurred=0 && allowAlphaMasking=1 && alphaMaskingMode>1 && BlurAreaBlendMode=25 && validBMP(rz))
     {
        xBitmap := rz
@@ -24687,7 +24687,7 @@ coreAddNoiseSelectedArea(whichBitmap, previewMode, Gu:=0) {
     If (UserAddNoiseMode=1)
        rz := QPV_BlendBitmaps(thisBMP, noiseBMP, 23, 1, 0, userimgGammaCorrect, 1, 255 - UserAddNoiseOpacity)
     Else
-       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, UserAddNoiseBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 255 - UserAddNoiseOpacity)
+       rz := QPV_BlendBitmaps(thisBMP, noiseBMP, protectAlphaBlendMode(UserAddNoiseBlendMode) - 1, BlendModesPreserveAlpha, BlendModesFlipped, userimgGammaCorrect, 1, 255 - UserAddNoiseOpacity)
 
     r1 := trGdip_DrawImage(A_ThisFunc, G2, thisBMP, imgSelPx, imgSelPy, imgSelW, imgSelH)
     realtimePasteInPlaceAlphaMasker("kill", 2, 1, lol)
@@ -24810,7 +24810,7 @@ livePreviewAddNoiser(modus:=0) {
 
           QPV_PrepareHugeImgSelectionArea(0, 0, imgBoxSizeW - 1, imgBoxSizeH - 1, imgBoxSizeW, imgBoxSizeH, 0, 0, 0, 0, 0, 0, 1)
           E1 := trGdip_LockBits(cornersBMP, 0, 0, imgBoxSizeW, imgBoxSizeH, stride, iScan, iData)
-          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", UserAddNoiseBlendMode - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
+          r0 := DllCall("qpvmain.dll\GenerateRandomNoiseOnBitmap", "UPtr", iScan, "Int", imgBoxSizeW, "Int", imgBoxSizeH, "int", stride, "int", 32, "int", 100 - UserAddNoiseIntensity, "int", UserAddNoiseOpacity, "int", UserAddNoiseEmphasis, "int", UserAddNoiseGrays, "int", UserAddNoisePixelizeAmount, "UPtr", pBitsMini, "int", strideMini, "int", thisImgW, "int", thisImgH, "int", protectAlphaBlendMode(UserAddNoiseBlendMode) - 1, "int", BlendModesFlipped, "int", BlendModesPreserveAlpha, "int", userimgGammaCorrect)
           Gdip_UnlockBits(cornersBMP, iData)
           If (UserAddNoisePixelizeAmount>0)
              FreeImage_UnLoad(hFIFimgZ)
