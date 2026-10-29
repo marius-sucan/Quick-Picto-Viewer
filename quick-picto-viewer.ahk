@@ -2492,12 +2492,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
   mustOpenStartFolder := ""
   zPlitPath(fileNamu, 0, OutFileName, OutDir, extname)
   If !FileExist(fileNamu)
-  {
-     showTOOLtip("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
-     SoundBeep, 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
+     Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
 
   PopulateIndexFilesStatsInfos("kill")
   If (SLDtypeLoaded=3)
@@ -2822,12 +2817,7 @@ OpenQPVfileFolder() {
     imgPath := StrReplace(imgPath, "||")
     zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
     If !FolderExist(folderu)
-    {
-       showTOOLtip("ERROR: Folder not found or access denied`n" folderu "\")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("ERROR: Folder not found or access denied`n" folderu "\")
 
     If askAboutFileSave(" and the containing folder of the selected image will be opened")
        Return
@@ -2850,12 +2840,7 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
    imgPath := StrReplace(imgPath, "||")
    zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
    If !FileRexists(imgPath)
-   {
-      showTOOLtip("ERROR: File not found or access denied`n" fileNamu "`n" folderu "\")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: File not found or access denied`n" fileNamu "`n" folderu "\")
 
    If !RegExMatch(imgPath, "i)(.\.(bmp|jpg|jpeg|png|tif))$")
    {
@@ -2876,12 +2861,7 @@ setImageWallpaper(monitorIndex, imgPath, setPos) {
       {
          imgPath := file2save
       } Else
-      {
-         showTOOLtip("ERROR: An undefined error occurred during image file conversion. The desktop wallpaper was not changed.`n" fileNamu "`n" folderu "\")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: An undefined error occurred during image file conversion. The desktop wallpaper was not changed.`n" fileNamu "`n" folderu "\")
    }
 
    If (A_OSVersion="WIN_7" || isWinXP)
@@ -3115,21 +3095,13 @@ OpenImgWithUserExternApp(modus:=0) {
    imgPath := StrReplace(imgPath, "||")
    zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
    If !FileRexists(imgPath)
-   {
-      showTOOLtip("ERROR: File not found or access denied`n" fileNamu "`n" folderu "\")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: File not found or access denied`n" fileNamu "`n" folderu "\")
 
    thisAPPpath := (modus="editor") ? UserExternalEditApp : UserExternalApp
    If !FileExist(thisAPPpath)
    {
       zPlitPath(thisAPPpath, 0, fileNamu, folderu, OutNameNoExt)
-      showTOOLtip("ERROR: The file of the external application does not seem to exist anymore`n" fileNamu "`n" folderu "\")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer("ERROR: The file of the external application does not seem to exist anymore`n" fileNamu "`n" folderu "\")
    }
 
    Try Run, %thisAPPpath% "%imgPath%"
@@ -3420,8 +3392,7 @@ copyMoveStructuredFolders(srcDir, finalDest) {
    }
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    lastInvoked := A_TickCount
    Return 0
 }
@@ -3677,10 +3648,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
         Sleep, 5
         testClipType := IsClipboardFormatAvailable(15)
         infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to store the selected " friendly "s into the clipboard" : userOption " was applied on " groupDigits(countTFilez) A_Space friendly "s.`nThese can now be pasted in any file manager or in QPV."
-        showTOOLtip(infoText)
-        SoundBeep, % InStr(infoText, "error") ? 300 : 900, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
+        Return msgBeepTimer(infoText, InStr(infoText, "error") ? 300 : 900)
      } Else markedSelectFile := 0
   }
 
@@ -3699,9 +3667,7 @@ CopyMoveFilesExplorer(userOption:="copy", onWhat:=0) {
   Sleep, 5
   Try testClipType := IsClipboardFormatAvailable(15)
   infoText := (testClipType!=1 || !dataHandle) ? "ERROR: Failed to set " friendly " to clipboard" : userOption " [Explorer] was applied on the " friendly " `n"
-  showTOOLtip(infoText fileNamu "`n" folderu "\")
-  SoundBeep, % InStr(infoText, "error") ? 300 : 900, 100
-  SetTimer, RemoveTooltip, % -msgDisplayTime
+  msgBeepTimer(infoText fileNamu "`n" folderu "\", InStr(infoText, "error") ? 300 : 900)
 }
 
 throwErrorNoImageLoaded(noMSG:=0, stringent:=1) {
@@ -3711,11 +3677,7 @@ throwErrorNoImageLoaded(noMSG:=0, stringent:=1) {
    If (!validBMP(whichBitmap) && !stringent || !imgPath)
    {
       If (noMSG=0)
-      {
-         showTOOLtip("WARNING: No image file is currently loaded")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime//2
-      }
+         msgBeepTimer("WARNING: No image file is currently loaded", 300, msgDisplayTime//2)
       Return "fail"
    }
 }
@@ -3796,8 +3758,7 @@ CopyImage2clip() {
   Else
      showTOOLtip("Image" friendly " copied to clipboard")
 
-  SoundBeep, % r ? 300 : 900, 100
-  SetTimer, RemoveTooltip, % -msgDisplayTime
+  msgBeepTimer("", r ? 300 : 900)
   Return r
 }
 
@@ -3811,12 +3772,7 @@ ViewAlphaMaskNow(modus:=0) {
       Return
 
    If (!(isAlphaMaskWindow()=1 || isAlphaMaskPartialWin()=1) && imgEditPanelOpened=1 && AnyWindowOpen)
-   {
-      showTOOLtip("WARNING: The current tool does not support alpha masks")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: The current tool does not support alpha masks")
 
    If (isNowAlphaPainting() && isAlphaMaskWindow() && AnyWindowOpen!=70)
    {
@@ -3841,22 +3797,12 @@ ViewAlphaMaskNow(modus:=0) {
 
 ResizeAlphaMask2sel() {
    If !validBMP(userAlphaMaskBmpPainted)
-   {
-      showTOOLtip("WARNING: There is no user painted alpha mask available")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: There is no user painted alpha mask available")
 
    imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
    imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
    If (imgSelW<5 || imgSelH<5 || !imgSelW || !imgSelH)
-   {
-      showTOOLtip("ERROR: Invalid selection area")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Invalid selection area")
 
    z := downscaleHugeImagesForEditing()
    If (z<0 || z=1)
@@ -3872,11 +3818,7 @@ ResizeAlphaMask2sel() {
       showTOOLtip("Alpha mask bitmap resized to:`n" groupDigits(imgSelW) " x " groupDigits(imgSelH) " (" Round(imgSelW/imgSelH, 2) ")")
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } Else
-   {
-      showTOOLtip("ERROR: Failed to resize the alpha mask bitmap")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("ERROR: Failed to resize the alpha mask bitmap")
 }
 
 FlipHalphaMask() {
@@ -3889,12 +3831,7 @@ FlipValphaMask() {
 
 coreFlipuAlphaMask(modus) {
    If !validBMP(userAlphaMaskBmpPainted)
-   {
-      showTOOLtip("WARNING: There is no user painted alpha mask available")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: There is no user painted alpha mask available")
 
    Gdip_ImageRotateFlip(userAlphaMaskBmpPainted, modus)
    UItriggerBrushUpdate(1, 5)
@@ -3953,12 +3890,7 @@ CopyAlphaMask2clippy(modus:=0, allowAsk:=0) {
   stopGifORslidesPlayback()
   infoMask := defineCurrentAlphaMask()
   If (InStr(infoMask, "inexistent") || InStr(infoMask, "none"))
-  {
-     showTOOLtip("WARNING: There is no defined alpha mask")
-     SoundBeep 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
+     Return msgBeepTimer("WARNING: There is no defined alpha mask")
 
   If InStr(infoMask, "user painted")
   {
@@ -4208,8 +4140,7 @@ SetImageAsAlphaMask(isGiven:=0, externBMP:=0) {
      showTOOLtip("Image " friendly "is set as alpha mask`nDimensions: " groupDigits(w) " x " groupDigits(h) " (" Round(w/h, 2) ")")
   }
 
-  SoundBeep, % r ? 300 : 900, 100
-  SetTimer, RemoveTooltip, % -msgDisplayTime
+  msgBeepTimer("", r ? 300 : 900)
   Return r
 }
 
@@ -4866,12 +4797,7 @@ ToggleThumbsMode() {
 
    lastInvoked := A_TickCount
    If (maxFilesIndex<1 && thumbsDisplaying!=1)
-   {
-      showTOOLtip("WARNING: Insufficient indexed files to activate the list view mode")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient indexed files to activate the list view mode")
 
    lastCloseInvoked := 0
    currentFileIndex := clampInRange(currentFileIndex, 1, maxFilesIndex)
@@ -5863,12 +5789,7 @@ vpWinClientSize(ByRef w, ByRef h, hwnd:=0, mode:=0) {
 
 BtnSetBrushSymmetryCoords() {
    If !isPaintSymmetryModeAllowed()
-   {
-      showTOOLtip("WARNING: Symmetry painting mode not available for the current brush mode.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Symmetry painting mode not available for the current brush mode.")
 
    If (AnyWindowOpen!=64 || !isImgEditingNow())
       Return
@@ -7151,12 +7072,8 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0, allowRei
    }
 
    If (silentu!=1 && errMsgNow)
-   {
-      showTOOLtip(errMsgNow)
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime*2
-      Return
-   } Else If errMsgNow
+      Return msgBeepTimer(errMsgNow, 300, msgDisplayTime*2)
+   Else If errMsgNow
    {
       addJournalEntry(A_ThisFunc "(): " errMsgNow)
       Return
@@ -7473,9 +7390,7 @@ MenuRemSelVectorPoints() {
        Else
           friendly := "All " groupDigits(origCountu) " path points were selected and removed`nThe vector path is now empty"
 
-       showTOOLtip("WARNING: " friendly)
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("WARNING: " friendly)
     }
 
     SetTimer, dummyRefreshImgSelectionWindow, -10
@@ -7621,9 +7536,7 @@ MenuConvertShapeToPoly() {
       r2 := DllCall("gdiplus\GdipGetPathPoints", "UPtr", thisPath, "UPtr", &PointsF, "int*", PointsCount)
       If (r1!=0 || r2!=0 || PointsCount<totalCount)
       {
-         showTOOLtip("ERROR: Failed to convert the curved shape to a polygonal one.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: Failed to convert the curved shape to a polygonal one.")
          PointsF := ""
          Gdip_DeletePath(thisPath)
          PointsListArray := ""
@@ -7978,12 +7891,7 @@ MenuExpandVectorPointAnchors() {
 MenuSetStartVectorPoint(given:=0, isGiven:=0) {
   wasGiven := (given>0 && isGiven="yes") ? 1 : 0
   If (isNowSymmetricVectorShape() && wasGiven=0)
-  {
-     showTOOLtip("WARNING: The symmetry mode is currently activated. `nIt is not allowed to change the start point of the path.")
-     SoundBeep , 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
+     Return msgBeepTimer("WARNING: The symmetry mode is currently activated. `nIt is not allowed to change the start point of the path.")
 
   totalLoops := customShapePropPoints.Count()
   If (totalLoops<3)
@@ -8527,12 +8435,7 @@ splitPointGivenInPath(k, totalCount, thisIndex, oppoIndex, canDoSymmetry, gmX, g
    }
 
    If (isNowSymmetricVectorShape() && thisIndex=prevVectorShapeSymmetryMode[1, 1])
-   {
-      showTOOLtip("WARNING: The designated symmetry point cannot be divided.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: The designated symmetry point cannot be divided.")
 
    If (thisIndex<4 || thisIndex>(customShapePoints.Count() - 3))
       handleOpenCloseBezier("kill")
@@ -11018,9 +10921,7 @@ theSlideShowCore(paramu:=0) {
 ToggleSlideShowu(actu:=0, resetMode:=0, silentModus:=0) {
   If (maxFilesIndex<3 && slideShowRunning!=1)
   {
-     showTOOLtip("WARNING: Insufficient indexed files to start a slideshow")
-     SoundBeep, 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
+     msgBeepTimer("WARNING: Insufficient indexed files to start a slideshow")
      Return "lulz"
   }
 
@@ -11800,9 +11701,7 @@ blockBrokenIMGrefresh(allowThumbs:=0) {
 
    If !isImgEditingNow()
    {
-      showTOOLtip("ERROR: No image currently loaded or it has failed to load")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: No image currently loaded or it has failed to load")
       Return 1
    }
    Return 0
@@ -12242,9 +12141,7 @@ changeImgRotationInVP(dir, stepu:=5, doReset:=0) {
             showTOOLtip("WARNING: The image cannot be rotated in the viewport.`nTo rotate the image itself go to Image > Transform menu`nand select Rotate by 90°.")
          Else
             showTOOLtip("ERROR: The image dimensions exceed the maximum limits.`nThe image cannot be rotated in the viewport.")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
+         Return msgBeepTimer()
       }
    } Else Return
 
@@ -17601,12 +17498,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        imgFxMode := prevFXmode
 
     If (imgFxMode=1)
-    {
-       showTOOLtip("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press U to open color adjustments panel")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press U to open color adjustments panel")
 
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -17623,8 +17515,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        showTOOLtip("Failed to apply the viewport color adjustments to the image selected area")
        imgFxMode := o_imgFxMode
        trGdip_DisposeImage(newBitmap)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17635,8 +17526,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        showTOOLtip("Failed to apply the viewport color adjustments to the image selected area`nUnable to create selection path")
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17664,9 +17554,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        }
     } Else
     {
-       showTOOLtip("Failed to apply the viewport color adjustments to the image selected area`nError messages feel so desaturated...")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to apply the viewport color adjustments to the image selected area`nError messages feel so desaturated...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -17684,12 +17572,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        Return 
 
     If (prevFXmode<2 || !isNumber(prevFXmode))
-    {
-       showTOOLtip("No color adjustments to be applied on image`n`nPress U to open the color adjustments panel")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("No color adjustments to be applied on image`n`nPress U to open the color adjustments panel")
 
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -17708,8 +17591,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        showTOOLtip("Failed to apply the color adjustments to the image selected area")
        trGdip_DisposeImage(newBitmap)
        imgFxMode := o_imgFxMode
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17721,8 +17603,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
        imgFxMode := o_imgFxMode
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17784,9 +17665,7 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
        wrapRecordUndoLevelNow(newBitmap)
     } Else
     {
-       showTOOLtip("Failed to apply the color adjustments to the image selected area`nIt is all so blue in my coding...")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nIt is all so blue in my coding...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -17816,8 +17695,7 @@ AdjustColorsSimpleSelectedArea() {
     {
        showTOOLtip("Failed to apply the color adjustments to the image selected area")
        trGdip_DisposeImage(newBitmap)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17828,8 +17706,7 @@ AdjustColorsSimpleSelectedArea() {
        showTOOLtip("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17883,9 +17760,7 @@ AdjustColorsSimpleSelectedArea() {
        dummyTimerDelayiedImageDisplay(50)
     } Else
     {
-       showTOOLtip("Failed to apply the color adjustments to the image selected area`nIt is so vividly painful...")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nIt is so vividly painful...")
        trGdip_DisposeImage(newBitmap)
     }
 
@@ -18038,9 +17913,7 @@ InsertTextSelectedArea() {
     } Else
     {
        trGdip_DisposeImage(metaBitmap)
-       showTOOLtip("Failed to draw the text on the image")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to draw the text on the image")
     }
 
     SetTimer, ResetImgLoadStatus, -100
@@ -19472,9 +19345,7 @@ coreImageFillSelectedArea(whichBitmap:=0, ByRef hasAlpha:=0) {
       If invertPath
          Gdip_DeletePath(invertPath)
 
-      showTOOLtip("Failed to create gradient bitmap: drawFillSelGradient(). Tool cannot be applied.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("Failed to create gradient bitmap: drawFillSelGradient(). Tool cannot be applied.")
       Return "fail"
    }
 
@@ -19940,8 +19811,7 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        showTOOLtip("Failed to " infoFriendly " the selected area`nUnable to create selection path")
        trGdip_DisposeImage(metaBitmap)
        Gdip_DeleteGraphics(G2)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -20329,8 +20199,7 @@ SharpenSelectedArea() {
     {
        showTOOLtip("Failed to apply filter: sharpen.`nI aint so sharp to know why...")
        trGdip_DisposeImage(metaBitmap)
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
     }
     SetTimer, ResetImgLoadStatus, -250
 }
@@ -20370,8 +20239,7 @@ SymmetrySelectedArea() {
        pfu := !validBMP(metaBitmap) ? "Failed to allocate the new bitmap." : "Failed to create the GDI+ graphics object."
        showTOOLtip("Failed to process the selected area: symmetry tool.`n" pfu)
        trGdip_DisposeImage(metaBitmap)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -20379,9 +20247,7 @@ SymmetrySelectedArea() {
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
-       showTOOLtip("Failed to process the selected area: symmetry tool`nUnable to create selection path")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to process the selected area: symmetry tool`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Gdip_DeleteGraphics(G2)
        trGdip_DisposeImage(metaBitmap)
@@ -20393,9 +20259,7 @@ SymmetrySelectedArea() {
     zBitmap := coreSymmetricaImageGenerator(trGdip_CloneBitmap(A_ThisFunc, metaBitmap))
     If !validBMP(zBitmap)
     {
-       showTOOLtip("Failed to process the selected area: symmetry tool`nCoreSymmetricaImageGenerator() failed poetically.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to process the selected area: symmetry tool`nCoreSymmetricaImageGenerator() failed poetically.")
        SetTimer, ResetImgLoadStatus, -250
        Gdip_DeleteGraphics(G2)
        Gdip_DeletePath(pPath)
@@ -20474,8 +20338,7 @@ SymmetrySelectedArea() {
     {
        showTOOLtip("Failed to apply tool: symmetry generator.`nAn unexpected asymmetry occurred.")
        trGdip_DisposeImage(metaBitmap)
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
     }
     SetTimer, ResetImgLoadStatus, -100
     fnOutputDebug(A_ThisFunc "(): " A_TickCount - startZeit)
@@ -20511,8 +20374,7 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     {
        showTOOLtip("Failed to process the selected area:`n" funcu "()")
        trGdip_DisposeImage(newBitmap)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -20520,9 +20382,7 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY, 0)
     If !pPath
     {
-       showTOOLtip("Failed to process the selected area`nUnable to create selection path`n" funcu "()")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to process the selected area`nUnable to create selection path`n" funcu "()")
        SetTimer, ResetImgLoadStatus, -250
        Gdip_DeleteGraphics(G2)
        trGdip_DisposeImage(newBitmap)
@@ -20814,12 +20674,7 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 
 undoRedoHugeImagesAct() {
    If (preventUndoLevels=1)
-   {
-      showTOOLtip("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
  
    setImageLoading()
    prevVPselRotation := VPselRotation
@@ -20895,11 +20750,8 @@ undoRedoHugeImagesAct() {
       r := DllCall("qpvmain.dll\UndoAiderSwapPixelRegions", "UPtr", pBitsAll, "Int", imgW, "Int", imgH, "Int64", Stride, "UPtr", pBitsMini, "Int64", mStride, "int", bpp, "int", X1, "int", Y1, "int", X2, "int", Y2)
       ; ToolTip, % A_TickCount - startZeit , , , 2
       If !r
-      {
-         showTOOLtip("Failed to perform the undo action")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      } Else
+         msgBeepTimer("Failed to perform the undo action")
+      Else
       {
          SoundBeep 900, 100
          currentImgModified := 1
@@ -21028,11 +20880,7 @@ HugeImagesFlipHVinvert(modus) {
       dummyTimerDelayiedImageDisplay(250)
       SetTimer, RemoveTooltip, -500
    } Else
-   {
-      showTOOLtip("Failed to process the image...")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("Failed to process the image...")
    SetTimer, ResetImgLoadStatus, -250
 }
 
@@ -21108,9 +20956,7 @@ memoryUsageWarning(givenW:=0, givenH:=0, bitsDepth:=0, opener:=0, bonusBuffer:=0
 warnHugeImageNotFIM() {
    If (viewportQPVimage.LoadedWith!="FIM" || !viewportQPVimage.imgHandle)
    {
-      showTOOLtip("ERROR: The image seems to not be loaded through the FreeImage library.`nThe image cannot be processed.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: The image seems to not be loaded through the FreeImage library.`nThe image cannot be processed.")
       Return 1
    } Else
    {
@@ -21148,10 +20994,7 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
    whichBitmap := useGdiBitmap()
    If !validBMP(whichBitmap)
    {
-      showTOOLtip("ERROR: The image visible in the viewport seems to be lost.`nUnable to transfer it to FreeImage.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer("ERROR: The image visible in the viewport seems to be lost.`nUnable to transfer it to FreeImage.")
    }   
 
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -21161,12 +21004,7 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
 
    hFIFimgA := ConvertPBITMAPtoFIM(whichBitmap, !currIMGdetails.HasAlpha)
    If !hFIFimgA
-   {
-      showTOOLtip("ERROR: Unable to convert the GDI+ image to a FreeImage object.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Unable to convert the GDI+ image to a FreeImage object.")
 
    currIMGdetails.Frames := 0
    currIMGdetails.ActiveFrame := 0
@@ -21194,9 +21032,7 @@ convertImageIntoHugeImage(newW, newH, quality, clr:=0) {
       HugeImagesCropResizeRotate(newW, newH, modus, 0, 0, 0, 0, quality, clr)
    } Else
    {
-      showTOOLtip("ERROR: Unable to convert the GDI+ image to a FreeImage object.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: Unable to convert the GDI+ image to a FreeImage object.")
       FreeImage_UnLoad(hFIFimgA)
       dummyTimerDelayiedImageDisplay(250)
    }
@@ -21298,11 +21134,7 @@ HugeImagesConvertClrDepth(modus) {
       recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
       dummyTimerDelayiedImageDisplay(500)
    } Else
-   {
-      showTOOLtip("Failed to convert the color depth at " modus "-bit")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("Failed to convert the color depth at " modus "-bit")
    SetTimer, ResetImgLoadStatus, -200
 }
 
@@ -21346,9 +21178,7 @@ warnIncorrectColorDepthHugeImage(bpp, qpvMode){
    {
       If (bpp>64)
       {
-         showTOOLtip("WARNING: This tool can be applied only on images with`na color depths equal to or lower than 64-bits.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: This tool can be applied only on images with`na color depths equal to or lower than 64-bits.")
          Return 1
       }
    }
@@ -21397,9 +21227,7 @@ HugeImagesApplyAutoColors() {
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         showTOOLtip("ERROR: Failed to auto-adjust the image colors")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: Failed to auto-adjust the image colors")
       }
       ResetImgLoadStatus()
 }
@@ -21563,9 +21391,7 @@ HugeImagesApplyInsertText() {
             ; fnOutputDebug(r "E: " obju.x1 "|" obju.y1 "|" obju.x2 - 1 "|" obju.y2 - 1 "|" obju.ImgSelW "|" obju.ImgSelH "|" obju.bImgSelW "|" obju.bImgSelH)
          } Else
          {
-            showTOOLtip("WARNING: The text seems to be entirely out of the image boundaries. Nothing to draw.")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
+            msgBeepTimer("WARNING: The text seems to be entirely out of the image boundaries. Nothing to draw.")
             ResetImgLoadStatus()
          }
 
@@ -21579,11 +21405,7 @@ HugeImagesApplyInsertText() {
       If failure
       {
          If (failure=2)
-         {
-            showTOOLtip("ERROR: Unable to render texts. " tobju)
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-         }
+            msgBeepTimer("ERROR: Unable to render texts. " tobju)
          ResetImgLoadStatus()
          Return
       }
@@ -21599,8 +21421,7 @@ HugeImagesApplyInsertText() {
       {
          showTOOLtip("ERROR: Failed to draw the text on the image")
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer()
       }
       ResetImgLoadStatus()
 }
@@ -21753,8 +21574,7 @@ HugeImagesDrawLineShapes() {
          Else
             showTOOLtip("ERROR: Failed to draw the shape. Unknown cause[s].")
 
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer()
       }
       SetTimer, ResetImgLoadStatus, -150
       ResetImgLoadStatus()
@@ -21794,9 +21614,7 @@ HugeImagesDrawParametricLines() {
       rz := Gdip_GetPathPointsCount(xPath)
       If (DrawLineAreaBorderCenter<2 && !rz)
       {
-         showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: No lines configured to draw.`nIs this what they call a draw?")
          SetTimer, ResetImgLoadStatus, -150
          Gdip_DeletePath(xPath)
          Return -1
@@ -21820,9 +21638,7 @@ HugeImagesDrawParametricLines() {
          rz := Gdip_GetPathPointsCount(kPath)
          If (rz<2)
          {
-            showTOOLtip("WARNING: The object has no points - nothing to draw.")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
+            msgBeepTimer("WARNING: The object has no points - nothing to draw.")
             SetTimer, ResetImgLoadStatus, -150
             Gdip_DeletePath(kPath)
             Return -1
@@ -21834,9 +21650,7 @@ HugeImagesDrawParametricLines() {
          out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1 - oth, dSelY1 - oth, dSelX2 + oth, dSelY2 + oth])
          If (out=1)
          {
-            showTOOLtip("WARNING: The generated lines are all outside the image canvas.")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
+            msgBeepTimer("WARNING: The generated lines are all outside the image canvas.")
             SetTimer, ResetImgLoadStatus, -150
             Gdip_DeletePath(kPath)
             Return -1
@@ -21849,9 +21663,7 @@ HugeImagesDrawParametricLines() {
          ; fnOutputDebug("old coords: " o_imgSelX1 " | " o_imgSelY1)
       } Else
       {
-         showTOOLtip("ERROR: No lines configured to draw or failed to generate path object.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: No lines configured to draw or failed to generate path object.")
          SetTimer, ResetImgLoadStatus, -150
          Return -1
       }
@@ -22017,8 +21829,7 @@ HugeImagesDrawParametricLines() {
          Else
             showTOOLtip("ERROR: Failed to draw the lines. Unknown cause.")
 
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer()
       }
       SetTimer, ResetImgLoadStatus, -150
       ResetImgLoadStatus()
@@ -22169,10 +21980,7 @@ HugeImagesApplyPasteInPlace() {
       {
          terminatePasteInPlace()
          ResetImgLoadStatus()
-         showTOOLtip("ERROR: Failed to " friendly ":`nUnable to prepare image object.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
+         Return msgBeepTimer("ERROR: Failed to " friendly ":`nUnable to prepare image object.")
       }
 
       If (PasteInPlaceApplyColorFX=1 && applyCLRfxAfter=1)
@@ -22582,9 +22390,7 @@ HugeImagesApplyGenericFilters(modus, allowRecord:=1, hFIFimgExtern:=0, warnMem:=
       } Else
       {
          recordUndoLevelHugeImagesNow("kill", 0, 0, 0)
-         showTOOLtip("ERROR: Failed to apply the " modus " on the image")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: Failed to apply the " modus " on the image")
       }
 
       ResetImgLoadStatus()
@@ -22707,8 +22513,7 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       Else If InStr(modus, "rotate")
          showTOOLtip("Failed to rotate image to " deg "°")
 
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
    }
    SetTimer, ResetImgLoadStatus, -200
 }
@@ -23560,9 +23365,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
     rz := Gdip_GetPathPointsCount(pPath)
     If (DrawLineAreaBorderCenter<2 && !rz && previewMode=0)
     {
-       showTOOLtip("WARNING: No lines configured to draw.`nIs this what they call a draw?")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("WARNING: No lines configured to draw.`nIs this what they call a draw?")
        Gdip_DeletePath(pPath)
        Return -1
     }
@@ -23605,9 +23408,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
           out := testSelectOutsideImgEntirely(useGdiBitmap(), [dSelX1 - dR, dSelY1 - dR, dSelX2 + dR, dSelY2 + dR])
           If (out=1)
           {
-             showTOOLtip("WARNING: The generated lines are all outside the image canvas.")
-             SoundBeep 300, 100
-             SetTimer, RemoveTooltip, % -msgDisplayTime
+             msgBeepTimer("WARNING: The generated lines are all outside the image canvas.")
              SetTimer, ResetImgLoadStatus, -150
              Gdip_DeletePath(kPath)
              Return -2
@@ -23928,9 +23729,7 @@ ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, user
     xBitmap := trGdip_CreateBitmap(A_ThisFunc, newW, newH, coreDesiredPixFmt)
     If warnUserFatalBitmapError(xBitmap, A_ThisFunc)
     {
-       showTOOLtip("Failed to adjust the canvas size of the image")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to adjust the canvas size of the image")
        ResetImgLoadStatus()
        Return "fail"
     }
@@ -23938,9 +23737,7 @@ ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, user
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, xBitmap, 7, 4)
     If !G2
     {
-       showTOOLtip("Failed to adjust the canvas size of the image")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to adjust the canvas size of the image")
        ResetImgLoadStatus()
        trGdip_DisposeImage(xBitmap)
        Return "fail"
@@ -23970,8 +23767,7 @@ ChangeImageCanvasSize(userW, userH, userAddT, userAddB, userAddL, userAddR, user
     {
        showTOOLtip("Failed to adjust the canvas size of the image")
        trGdip_DisposeImage(xBitmap, 1)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
     }
     dummyTimerDelayiedImageDisplay(50)
     SetTimer, ResetImgLoadStatus, -250
@@ -24496,9 +24292,7 @@ detectEdgesSelectedArea() {
     } Else
     {
        trGdip_DisposeImage(newBitmap)
-       showTOOLtip("Failed to apply filter: detect edges")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to apply filter: detect edges")
     }
 
     SetTimer, ResetImgLoadStatus, -100
@@ -24618,9 +24412,7 @@ addNoiseSelectedArea() {
     } Else
     {
        trGdip_DisposeImage(newBitmap)
-       showTOOLtip("Failed to apply filter: add noise. How noisy!")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("Failed to apply filter: add noise. How noisy!")
     }
 
     SetTimer, ResetImgLoadStatus, -100
@@ -25239,8 +25031,7 @@ RotateEditedImage(modus:=0) {
        showTOOLtip("Failed to rotate image")
        If (preventUndoLevels!=1)
           trGdip_DisposeImage(newBitmap, 1)
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
     }
     SetTimer, ResetImgLoadStatus, -125
 }
@@ -25309,11 +25100,7 @@ CropImageInViewPortToSelection(modus:=0) {
           SetTimer, dummyInfoImgCropVP, -150
        }
     } Else
-    {
-       showTOOLtip("Failed to crop image to selected area")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-    }
+       msgBeepTimer("Failed to crop image to selected area")
     ResetImgLoadStatus()
 }
 
@@ -25489,9 +25276,7 @@ corePasteClipboardImg(modus, imgW, imgH, allowFilesPaste) {
           Tooltip
           showTOOLtip("ERROR: Unable to retrieve image from clipboard")
           SetTimer, ResetImgLoadStatus, -25
-          SoundBeep , 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-          Return
+          Return msgBeepTimer()
        }
     }
 
@@ -26073,12 +25858,7 @@ MenuDisableKbdShortcut() {
     LV_GetText(kwds, RowNumber, 5)
     posu := InStr(kwds, sillySeparator)
     If (oshortcut="" && !posu)
-    {
-       showTOOLtip("WARNING: No keyboard shortcut is associated with the selected option:`n" menuName)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: No keyboard shortcut is associated with the selected option:`n" menuName)
 
     c := defineKBDcontexts(0)
     shortcut := processHumanKkbdName(oshortcut)
@@ -26088,17 +25868,11 @@ MenuDisableKbdShortcut() {
     If ((SubStr(userCustomKeysDefined[cshortcut, 1], 1, 1)="?")
     || (SubStr(userCustomKeysDefined[c . defaultHotKateRaw, 1], 1, 1)="?" && defaultHotKateRaw && posu && shortcut=""))
     {
-       showTOOLtip("WARNING: The keyboard shortcut is already disabled")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
+       Return msgBeepTimer("WARNING: The keyboard shortcut is already disabled")
     } Else If (userCustomKeysDefined[cshortcut, 1]="?2")
     {
        pk := userCustomKeysDefined[cshortcut, 2]
-       showTOOLtip("WARNING: This keyboard shortcut is already replaced with: " pk "`n" userCustomKeysDefined[pk, 2])
-       SoundBeep , 300, 100
-       Settimer, RemoveTooltip, % -msgDisplayTime
-       Return
+       Return msgBeepTimer("WARNING: This keyboard shortcut is already replaced with: " pk "`n" userCustomKeysDefined[pk, 2])
     } Else If (IsFunc(userCustomKeysDefined[cshortcut, 1]) && shortcut!="")
     {
        closeQuickSearch()
@@ -26111,11 +25885,7 @@ MenuDisableKbdShortcut() {
    
        r := updateCustomUserKbds(newLine, userCustomKeysDefined[cshortcut, 7], 0, bonusLine)
        If !r
-       {
-          showTOOLtip("ERROR: Failed to update the custom keyboard settings file")
-          SoundBeep 300, 100
-          Settimer, RemoveTooltip, % -msgDisplayTime
-       }
+          msgBeepTimer("ERROR: Failed to update the custom keyboard settings file")
        Sleep, 5
        loadCustomUserKbds()
        PanelQuickSearchMenuOptions()
@@ -26150,11 +25920,7 @@ MenuRestoreDefaultKBD(modus:=0) {
 
     r := restoreDefaultCustomUserKbds(HotKateRaw, funcu, defineKBDcontexts(0), modus)
     If !r
-    {
-       showTOOLtip("ERROR: Failed to update the custom keyboard settings file")
-       SoundBeep 300, 100
-       Settimer, RemoveTooltip, % -msgDisplayTime
-    }
+       msgBeepTimer("ERROR: Failed to update the custom keyboard settings file")
 
     loadCustomUserKbds()
     Sleep, 5
@@ -26238,24 +26004,11 @@ BtnApplyNewKbdShortcut() {
     GuiControlGet, hwnd, hwnd, tehCustomKeysThing
     ControlGetText, info,, ahk_id %hwnd%
     If (info="(None)")
-    {
-       showTOOLtip("WARNING: No keyboard shortcut is defined.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    } Else If (info="escape" && (BtnModsShift=0 && BtnModsAlt=0 && BtnModsCtrl=0 || BtnModsShift=1 && BtnModsAlt=1 && BtnModsCtrl=1 || BtnModsShift=0 && BtnModsAlt=0 && BtnModsCtrl=1))
-    {
-       showTOOLtip("WARNING: Illegal shortcut defined.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    } Else If (isInRange(tehCustomKeysThing, 79, 89) && InStr(info, "numpad") && BtnModsShift=1)
-    {
-       showTOOLtip("WARNING: Numpad digits with Shift are not supported.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: No keyboard shortcut is defined.")
+    Else If (info="escape" && (BtnModsShift=0 && BtnModsAlt=0 && BtnModsCtrl=0 || BtnModsShift=1 && BtnModsAlt=1 && BtnModsCtrl=1 || BtnModsShift=0 && BtnModsAlt=0 && BtnModsCtrl=1))
+       Return msgBeepTimer("WARNING: Illegal shortcut defined.")
+    Else If (isInRange(tehCustomKeysThing, 79, 89) && InStr(info, "numpad") && BtnModsShift=1)
+       Return msgBeepTimer("WARNING: Numpad digits with Shift are not supported.")
 
     CloseKbdDefinePanel()
     If (info="Esc")
@@ -26582,12 +26335,7 @@ PanelDefineKbdShortcut() {
        Return
 
     If (SubStr(funcu, 1, 1)="!")
-    {
-       showTOOLtip("WARNING: Keyboard shortcuts cannot be associated with the selected entry:`n" menuName)
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Keyboard shortcuts cannot be associated with the selected entry:`n" menuName)
 
     lastZeitOpenWin := A_TickCount
     thisBtnHeight := (PrefsLargeFonts=1) ? 34 : 24
@@ -27085,12 +26833,7 @@ removeDeadFavedFolders() {
 
    FileDelete, % folderFavesFile
    If (ErrorLevel && counter>0)
-   {
-      showTOOLtip("ERROR: Failed to update the folder favorites list file. Access denied?")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Failed to update the folder favorites list file. Access denied?")
 
    FileAppend, % newListu, % folderFavesFile, UTF-8
    If ErrorLevel
@@ -27167,11 +26910,7 @@ OpenDirsFavedEntry(a, b, c) {
 
       BtnALLviewedImages2List(filteru)
    } Else
-   {
-      showTOOLtip("Failed to open favourited list:`n" folderu)
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("Failed to open favourited list:`n" folderu)
 }
 
 addFolderSldATfavorites(givenPath) {
@@ -27179,24 +26918,14 @@ addFolderSldATfavorites(givenPath) {
       Return
 
    If (InStr(givenPath, "\newFile.SLD") && !FileRexists(givenPath))
-   {
-      showTOOLtip("WARNING: This file list seems to be inexistend.`nIt was not added to favourites.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: This file list seems to be inexistend.`nIt was not added to favourites.")
 
    thisu := RegExMatch(givenPath, sldsPattern) ? ".SLD file" : "Folder"
    FileRead, OutputVar, % " *t " folderFavesFile
    Sleep, 5
    FileDelete, % folderFavesFile
    If ErrorLevel
-   {
-      showTOOLtip("ERROR: Failed to access the folder favorites list file.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Failed to access the folder favorites list file.")
 
    Sleep, 5
    If InStr(OutputVar, "`n" givenPath "`n")
@@ -28357,12 +28086,7 @@ PanelWrapperFilesStats() {
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3 && !filesFilter)
-    {
-       showTOOLtip("WARNING: Insufficient files are currently indexed.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
     thisBtnHeight := createSettingsGUI(58, A_ThisFunc)
     btnWid := 105
@@ -28640,9 +28364,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
       SQLstr := "SELECT imgidu, fullPath" moreCol " FROM images " theQuery reorder
       If !InitSQLgetTable(SQLstr, activeSQLdb._Handle, errMsg, Rows, Cols, hTable)
       {
-         showTOOLtip("ERROR: Failed to open the SQL database:`n" errMsg)
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: Failed to open the SQL database:`n" errMsg)
          Return -1
       }
    } Else Return theQueryNonDB
@@ -28651,8 +28373,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
    {
       showTOOLtip("WARNING: No records found in the database matching the query:`n" SQLstr)
       disposeSQLgetTableHandle(hTable)
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
       SetTimer, ResetImgLoadStatus, -200
       Return -1
    }
@@ -28704,12 +28425,7 @@ PlotSeenHourStatsNow() {
    widthu := maxValu := maxKvalu := aR := aC := totalu := 0
    totalz := LV_GetCount()
    If (totalz<3)
-   {
-      showTOOLtip("WARNING: Insufficient images recorded to generate a sensical graph.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient images recorded to generate a sensical graph.")
 
    dataArray := []
    namesLabel:= new hashtable()
@@ -28790,12 +28506,7 @@ PlotSeenMonthsStatsNow() {
    namesLabel:= []
    totalz := LV_GetCount()
    If (totalz<2)
-   {
-      showTOOLtip("WARNING: Insufficient images recorded to generate a sensical graph.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient images recorded to generate a sensical graph.")
 
    LV_GetText(endPeriod, 1, 2)
    LV_GetText(startPeriod, totalz, 2)
@@ -28918,12 +28629,7 @@ PlotSeenDaysStatsNow(modus:=0) {
    widthu := maxValu := maxKvalu := aR := aC := totalu := 0
    totalz := LV_GetCount()
    If (totalz<3)
-   {
-      showTOOLtip("WARNING: Insufficient images recorded to generate a sensical graph.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient images recorded to generate a sensical graph.")
 
    dataArray := []
    dataAvg := []
@@ -29947,8 +29653,7 @@ PopulateImagesIndexStatsInfos(dummy:=0) {
            prevState := ""
            showTOOLtip("User abandoned operation...")
            GuiControl, SettingsGUIA:, infoLine, Indexed images: user abandoned operation
-           SoundBeep 300, 100
-           SetTimer, RemoveTooltip, % -msgDisplayTime
+           msgBeepTimer()
            SetTimer, ResetImgLoadStatus, -100
            Return
         }
@@ -30608,10 +30313,7 @@ PanelImageInfos() {
     If !FileRexists(imgPath)
     {
        fileMsg := (userPrivateMode=1) ? "" : "`n" fileNamu "`n" folderu "\"
-       showTOOLtip("ERROR: File not found or access denied" fileMsg)
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
+       Return msgBeepTimer("ERROR: File not found or access denied" fileMsg)
     }
 
     thisBtnHeight := createSettingsGUI(5, A_ThisFunc)
@@ -31238,12 +30940,7 @@ FolderTreeFindActiveFile(givenPath:=0) {
        Return
 
     If (userPrivateMode=1)
-    {
-       showTOOLtip("WARNING: Private mode is activated. Access to this feature is denied,`nbecause it would be a breach of privacy.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Private mode is activated. Access to this feature is denied,`nbecause it would be a breach of privacy.")
 
     Gui, fdTreeGuia: Default
     Gui, fdTreeGuia: TreeView, TVlistFolders
@@ -31636,9 +31333,7 @@ folderTreeIsDriveRoot(folderPath) {
    If (StrLen(folderPath)>2 || SubStr(folderPath, 2, 1)!=":")
       Return 0
 
-   showTOOLtip("WARNING: An entire drive cannot be renamed, deleted or moved:`n" folderPath "\")
-   SoundBeep 300, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("WARNING: An entire drive cannot be renamed, deleted or moved:`n" folderPath "\")
    Return 1
 }
 
@@ -31750,23 +31445,14 @@ UIcoreFolderNew(thisFolder, ByRef newFileName) {
 
       newFileName := filterFileName(newFileName)
       If !newFileName
-      {
-         showTOOLtip("WARNING: Incorrect folder name given.")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: Incorrect folder name given.")
 
       FileCreateDir, %thisFolder%\%newFileName%
       If !ErrorLevel
       {
          Return 1
       } Else
-      {
-         showTOOLtip("ERROR: An unknown error occurred creating the new folder in:`n" thisFolder "\")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      }
+         msgBeepTimer("ERROR: An unknown error occurred creating the new folder in:`n" thisFolder "\")
    }
 }
 
@@ -31922,12 +31608,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    }
 
    If (StrLen(listu)<2)
-   {
-      showTOOLtip("WARNING: Found no folders in the clipboard")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Found no folders in the clipboard")
    
    If (quickMode!=1)  
    {
@@ -32027,11 +31708,7 @@ UIcoreFolderCutCopyExplorer(a, thisFolder) {
       showTOOLtip(infoText)
       SetTimer, RemoveTooltip, % -msgDisplayTime
    } Else
-   {
-      showTOOLtip("WARNING: The folder seems to no longer exist:`n" thisFolder "\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("WARNING: The folder seems to no longer exist:`n" thisFolder "\")
 }
 
 folderTreeRenameFolder() {
@@ -32058,12 +31735,7 @@ folderTreeRenameFolder() {
 UIcoreFolderRename(thisFolder, ByRef newFileName) {
    Static lastChecked := 1
    If !FolderExist(thisFolder)
-   {
-      showTOOLtip("WARNING: The folder seems to no longer exist:`n" thisFolder "\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: The folder seems to no longer exist:`n" thisFolder "\")
 
    baseu := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1))
    restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
@@ -32077,12 +31749,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       lastChecked := msgResult.check
       newFileName := filterFileName(newFileName)
       If !newFileName
-      {
-         showTOOLtip("WARNING: Incorrect folder name given")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: Incorrect folder name given")
 
       If FolderExist(thisFolder "\" newFileName)
       {
@@ -32099,11 +31766,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
             SearchAndReplaceThroughIndex(thisFolder "\", oldPath "\" newFileName "\", 0, 1)
          Return 1
       } Else
-      {
-         showTOOLtip("ERROR: An unknown error occurred renaming the folder:`n" thisFolder "\")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      }
+         msgBeepTimer("ERROR: An unknown error occurred renaming the folder:`n" thisFolder "\")
    }
 }
 
@@ -32312,12 +31975,7 @@ PasteFilesIntoGivenFolder(folderPath) {
    showTOOLtip("Importing clipboard content...")
    Try listu := Clipboard
    If (StrLen(listu)<5)
-   {
-      showTOOLtip("WARNING: Found no files in the clipboard")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Found no files in the clipboard")
    
    SetTimer, RemoveTooltip, -200
    msgResult := msgBoxWrapper(appTitle ": Paste files", "The files from the clipboard will be pasted into the selected folder. Please choose what operation to perform. Destination folder:`n`n" folderPath "\", "&Copy|&Move|C&ancel", 1, "question")
@@ -32343,9 +32001,7 @@ PasteFilesIntoGivenFolder(folderPath) {
       FileCreateDir, % folderPath
       If ErrorLevel
       {
-         showTOOLtip("ERROR: The folder seems to no longer exist.`nQPV failed to create the folder:`n" folderPath "\")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: The folder seems to no longer exist.`nQPV failed to create the folder:`n" folderPath "\")
          Return 0
       }
    }
@@ -32484,8 +32140,7 @@ PasteFilesIntoGivenFolder(folderPath) {
    }
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 BtnCloseWindow() {
@@ -33020,12 +32675,7 @@ PanelEnableFilesFilter() {
     }
 
     If (maxFilesIndex<3 && !filesFilter)
-    {
-       showTOOLtip("WARNING: Insufficient files are currently indexed.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
     thisBtnHeight := createSettingsGUI(6, A_ThisFunc)
     btnWid := 80
@@ -34506,12 +34156,7 @@ LoadPrefsFromSLD() {
    Critical, on
    stopSlideshow()
    If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
-   {
-      showTOOLtip("ERROR: No valid files list currently opened")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: No valid files list currently opened")
 
    If (SLDtypeLoaded=2)
    {
@@ -34536,12 +34181,7 @@ WritePrefsIntoSLD() {
    Critical, on
    stopSlideshow()
    If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
-   {
-      showTOOLtip("ERROR: No valid files list currently opened")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: No valid files list currently opened")
 
    If (SLDtypeLoaded=2)
    {
@@ -34995,9 +34635,7 @@ SaveDBfilesList(enforceFile:=0) {
       saveSlideSettingsInDB()
       activeSQLdb.Exec("VACUUM main;")
       getMaxRowIDsqlDB()
-      showTOOLtip("Slideshow database saved")
-      SoundBeep, 900, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("Slideshow database saved", 900)
    } Else If (CurrentSLD!=file2save && SLDtypeLoaded=3)
    {
       activeSQLdb.CloseDB()
@@ -35007,9 +34645,7 @@ SaveDBfilesList(enforceFile:=0) {
       activeSQLdb := new SQLiteDB
       If !activeSQLdb.OpenDB(file2save)
       {
-         showTOOLtip("ERROR: Failed to save the slideshow database")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: Failed to save the slideshow database")
          Return -1
       }
 
@@ -35029,12 +34665,7 @@ SaveFilesList(enforceFile:=0) {
    ; Critical, on
    stopSlideshow()
    If (!CurrentSLD || maxFilesIndex<2)
-   {
-      showTOOLtip("WARNING: No files are presently indexed")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: No files are presently indexed")
 
    If (maxFilesIndex>0)
    {
@@ -35089,12 +34720,7 @@ SaveFilesList(enforceFile:=0) {
          file2save := enforceFile
       }
    } Else
-   {
-      showTOOLtip("WARNING: Insufficient files added to the index")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient files added to the index")
 
    If file2save
    {
@@ -35833,8 +35459,7 @@ removeFilesListSeenImages(modus:=0) {
          Else
             showTOOLtip("Operation aborted. Files list left unchanged, no index entries removed.")
 
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer()
          CurrentSLD := backCurrentSLD
          SetTimer, ResetImgLoadStatus, -150
          newArrayu := ""
@@ -35846,9 +35471,7 @@ removeFilesListSeenImages(modus:=0) {
       If (newFilesIndex<1)
       {
          friendly := (modus="faves") ? "All images seem to have been added to favourites." : "It seems all the images were viewed."
-         showTOOLtip("WARNING: " friendly "`nTherefore, the files list is left unchanged.")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: " friendly "`nTherefore, the files list is left unchanged.")
          CurrentSLD := backCurrentSLD
          ; dummyTimerDelayiedImageDisplay(50)
          SetTimer, ResetImgLoadStatus, -150
@@ -35955,9 +35578,7 @@ findFavesInList(modus:=0, doSel:=0) {
       seenEntries := ""
       If (abandonAll=1)
       {
-         showTOOLtip("Operation aborted. " groupDigits(countSeen) " already marked until now")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("Operation aborted. " groupDigits(countSeen) " already marked until now")
          CurrentSLD := backCurrentSLD
          SetTimer, ResetImgLoadStatus, -150
          ForceRefreshNowThumbsList()
@@ -35989,9 +35610,7 @@ retrieveAlreadySeenImageFromCurrentList() {
    initSeenImagesListDB()
    If (sqlFailedInit=1)
    {
-      showTOOLtip("ERROR: Failed to initialize the SQL database engine.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: Failed to initialize the SQL database engine.")
       Return 0
    }
 
@@ -36149,12 +35768,7 @@ PanelCachesOverview() {
    Global LViewCaches, infoLine
    oka := (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern)) ? 1 : 0
    If (oka!=1)
-   {
-      showTOOLtip("WARNING: A .SLDB files list database must be opened first to invoke this panel.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: A .SLDB files list database must be opened first to invoke this panel.")
 
    hostPanel := getHostPanelFunc()
    If !(thisBtnHeight := createSettingsGUI(91, A_ThisFunc))
@@ -36410,12 +36024,7 @@ coreCachesOverviewIgnoredAct(modus) {
 ; SQLdeleteEntriesMarked() for what the two states of that column mean.
    ogn := getTotalIMGsSQLdb("WHERE isDeleted IS NOT 0")
    If (ogn<1)
-   {
-      showTOOLtip("There are no ignored or dead file entries in the database.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("There are no ignored or dead file entries in the database.")
 
    If (modus="purge")
    {
@@ -36437,12 +36046,7 @@ coreCachesOverviewIgnoredAct(modus) {
       showTOOLtip("Updating database: revalidate ignored " groupDigits(ogn) " files")
       SQLstr := "UPDATE images SET isDeleted=0 WHERE isDeleted IS NOT 0;"
       If !activeSQLdb.Exec(SQLStr)
-      {
-         showTOOLtip("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Failed to commit changes to the SQL database:`n" activeSQLdb.ErrorMsg)
 
       SoundBeep 900, 100
       RemoveTooltip()
@@ -36498,8 +36102,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
       {
          showTOOLtip("ERROR: No row ID retrieved from the database.")
          CurrentSLD := backCurrentSLD
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer()
          SetTimer, ResetImgLoadStatus, -200
          SetTimer, createGUItoolbar, -100
          Return -1
@@ -36594,9 +36197,7 @@ collectSQLFileInfosNow(scu, modus, asku, doFilterExtra:=1, showInfos:=1, stringu
          {
             addJournalEntry(A_ThisFunc "(): the in-DLL collection pool could not be started; no image data was collected.")
             CurrentSLD := backCurrentSLD
-            showTOOLtip("ERROR: Unable to collect the image data.`nMore details in the session journal.")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
+            msgBeepTimer("ERROR: Unable to collect the image data.`nMore details in the session journal.")
             SetTimer, ResetImgLoadStatus, -200
             SetTimer, createGUItoolbar, -150
             Return -1
@@ -36717,17 +36318,14 @@ reportCollectSQLoutcome(modus, abandonAll, countTFilez, filesToBeSorted, already
          showTOOLtip(ErrorMsg "Operation aborted. " groupDigits(countTFilez) " / " groupDigits(filesToBeSorted) percDone "`nFiles list not sorted, because data collection did not complete.")
       Else
          showTOOLtip(ErrorMsg "Operation aborted. " groupDigits(countTFilez) " / " groupDigits(filesToBeSorted) percDone)
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
       SetTimer, ResetImgLoadStatus, -200
       Return 1
    }
 
    If (modus!=1 && filesToBeSorted>2) ; do not show infos for few files
    {
-      showTOOLtip(ErrorMsg "Finished collecting data for " groupDigits(filesToBeSorted) " files`nFor " groupDigits(alreadySorted) " files the data was already collected" someErrors)
-      SoundBeep 900, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer(ErrorMsg "Finished collecting data for " groupDigits(filesToBeSorted) " files`nFor " groupDigits(alreadySorted) " files the data was already collected" someErrors, 900)
       SetTimer, ResetImgLoadStatus, -200
    } Else
       addJournalEntry(ErrorMsg "Finished collecting data for " groupDigits(filesToBeSorted) " files`nFor " groupDigits(alreadySorted) " files the data was already collected" someErrors)
@@ -37076,9 +36674,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    {
       CurrentSLD := backCurrentSLD
       addJournalEntry(A_ThisFunc "(): qpvmain.dll could not prepare the hash generation. SQL query: `n" selectSQL)
-      showTOOLtip("ERROR: Could not generate the image hashes. " readDupesEngineError())
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: Could not generate the image hashes. " readDupesEngineError())
       SetTimer, ResetImgLoadStatus, -200
       Return -1
    }
@@ -37172,9 +36768,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    If (abandonAll=1)
    {
       percDone := " ( " Round((countTFilez / filesToBeSorted) * 100, 1) "% )" someErrors
-      showTOOLtip(ErrorMsg "Operation aborted. " groupDigits(countTFilez) " / " groupDigits(filesToBeSorted) percDone)
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer(ErrorMsg "Operation aborted. " groupDigits(countTFilez) " / " groupDigits(filesToBeSorted) percDone)
       SetTimer, ResetImgLoadStatus, -200
       Return 1
    }
@@ -37239,12 +36833,7 @@ dbSortingCached(SortCriterion) {
    If (maxFilesIndex>0)
    {
       If (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_"))
-      {
-         showTOOLtip("WARNING: Files list sorting not allowed.`nThe files list is comprised of duplicate image pairs filtered by Hamming distance.")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: Files list sorting not allowed.`nThe files list is comprised of duplicate image pairs filtered by Hamming distance.")
 
       If warnFramesActionPrevented("SORT LIST")
          Return
@@ -37257,9 +36846,7 @@ dbSortingCached(SortCriterion) {
 
       If !getMaxRowIDsqlDB()
       {
-         showTOOLtip("ERROR: No row ID retrieved from the database.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: No row ID retrieved from the database.")
          SetTimer, ResetImgLoadStatus, -200
          Return
       }
@@ -37308,8 +36895,7 @@ dbSortingCached(SortCriterion) {
          CurrentSLD := backCurrentSLD
          showTOOLtip("No image records found in the database matching:`n" SQLstr)
          disposeSQLgetTableHandle(hTable)
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer()
          SetTimer, ResetImgLoadStatus, -200
          Return -1
       }
@@ -37734,9 +37320,7 @@ SortFilesList(SortCriterion) {
             markedSelectFile := selectedFiles
          }
 
-         showTOOLtip("Operation aborted. Files list unchanged. " msgInfos)
-         SoundBeep, 900, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("Operation aborted. Files list unchanged. " msgInfos, 900)
          CurrentSLD := backCurrentSLD
          lastLongOperationAbort := A_TickCount
          SetTimer, ResetImgLoadStatus, -50
@@ -39197,23 +38781,13 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      }
 
      If (userAddedFavesCount>maxFavesEntries - 1)
-     {
-        showTOOLtip("WARNING: You have reached the maximum allowed favourite images: " maxFavesEntries " entries.")
-        SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime//2
-        Return
-     }
+        Return msgBeepTimer("WARNING: You have reached the maximum allowed favourite images: " maxFavesEntries " entries.", 300, msgDisplayTime//2)
 
      lastInvoked := A_TickCount
      whichFile := (userAddedFavesCount>19) ? mainFavesFile : miniFavesFile
      FileAppend, % imgPath "`n", % whichFile, UTF-8
      If ErrorLevel
-     {
-        showTOOLtip("Failed to update the favourites list`nThe image was not added to favourites")
-        SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
-     }
+        Return msgBeepTimer("Failed to update the favourites list`nThe image was not added to favourites")
 
      whichFiled := (userAddedFavesCount>19) ? miniFavesFile : mainFavesFile
      If !FileExist(whichFiled)
@@ -39275,10 +38849,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      If ErrorLevel
      {
         Tooltip
-        showTOOLtip("Failed to read the favourites list file`nUnable to remove image from favourites")
-        SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
+        Return msgBeepTimer("Failed to read the favourites list file`nUnable to remove image from favourites")
      }
 
      historyList := StrReplace(miniList, imgPath) "`n" StrReplace(historyList, imgPath)
@@ -39292,10 +38863,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      If (!IsObject(miniF) || !IsObject(mainF))
      {
         Tooltip
-        showTOOLtip("Failed to read and write the favourites list file`nUnable to remove image from favourites")
-        SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
+        Return msgBeepTimer("Failed to read and write the favourites list file`nUnable to remove image from favourites")
      }
 
      If !thisImg
@@ -39344,12 +38912,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      IniAction(1, "userAddedFavesCount", "General")
      Tooltip
      If ErrorLevel
-     {
-        showTOOLtip("Failed to update the favourites list file`nThe image was not succesfully removed from favourites")
-        SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
-     }
+        Return msgBeepTimer("Failed to update the favourites list file`nThe image was not succesfully removed from favourites")
 
      If (doDeduplication=1)
         prevRemSpeed := A_TickCount - startZeit
@@ -39477,12 +39040,7 @@ retrieveFavesAsList(dummy:=0) {
    userAddedFavesCount := thisIndexu
    IniAction(1, "userAddedFavesCount", "General")
    If (thisIndexu<2)
-   {
-      showTOOLtip("WARNING: Found insufficient favourite images")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime//2
-      Return
-   }
+      Return msgBeepTimer("WARNING: Found insufficient favourite images", 300, msgDisplayTime//2)
 
    If (SLDtypeLoaded=3)
    {
@@ -39538,12 +39096,7 @@ saveFavesListBasedOnIndexList() {
       } Else If InStr(msgResult, "save")
       {
          If (A_TickCount - lastInvoked<950)
-         {
-            showTOOLtip("WARNING: The destructive option was chosen too fast.`nPlease elaborate allow yourself at least one second to read the message box.")
-            SoundBeep , 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
+            Return msgBeepTimer("WARNING: The destructive option was chosen too fast.`nPlease elaborate allow yourself at least one second to read the message box.")
          Sleep, 100
       } Else
       {
@@ -39555,12 +39108,7 @@ saveFavesListBasedOnIndexList() {
    realCount := 0
    testFile := FileOpen(mainFavesFile, "a", "UTF-8")
    If !IsObject(testFile)
-   {
-      showTOOLtip("ERROR: Unable to open the QPV favourites list file.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Unable to open the QPV favourites list file.")
 
    testFile.Close()
    Sleep, 5
@@ -39569,12 +39117,7 @@ saveFavesListBasedOnIndexList() {
    If IsObject(mainFile)
       miniFile := FileOpen(miniFavesFile, "w", "UTF-8")
    If (!IsObject(mainFile) || !IsObject(miniFile))
-   {
-      showTOOLtip("ERROR: Unable to open the QPV favourites list file.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Unable to open the QPV favourites list file.")
 
    setImageLoading()
    changeMcursor()
@@ -40276,12 +39819,7 @@ TglOptionMove2recycler() {
 batchRemoveMetaData() {
    Static doNotAskAgain := 0
    If !FileExist(mainExecPath "\exiftool.exe")
-   {
-      showTOOLtip("ERROR: Missing file: exiftool.exe. This feature is not available.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Missing file: exiftool.exe. This feature is not available.")
 
    imgPath := StrReplace(getIDimage(currentFileIndex), "||")
    zPlitPath(imgPath, 0, OutFileName, OutDir)
@@ -40575,9 +40113,7 @@ batchFileDelete(dontAlterIndex:=0) {
 warnFramesActionPrevented(actu) {
   If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
   {
-     showTOOLtip("WARNING: Illegal operation: " actu ".`nThe action is not permitted on image frames/pages.`nYou can deactivate this mode with Ctrl+Space.")
-     SoundBeep 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
+     msgBeepTimer("WARNING: Illegal operation: " actu ".`nThe action is not permitted on image frames/pages.`nYou can deactivate this mode with Ctrl+Space.")
      Return 1
   }
 }
@@ -41226,12 +40762,7 @@ coreBatchMultiRenameFiles() {
   RegAction(1, "PreserveDateTimeOnSave")
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
   If (OriginalNewFileName="[this]" || OriginalNewFileName="")
-  {
-     showTOOLtip("WARNING: Incorrect multi-rename pattern provided")
-     SoundBeep 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
+     Return msgBeepTimer("WARNING: Incorrect multi-rename pattern provided")
 
   OriginalNewFileName := UsrEditNewFileName
   objuTemp := decideMultiRename(OriginalNewFileName)
@@ -41239,20 +40770,10 @@ coreBatchMultiRenameFiles() {
      OriginalNewFileName := objuTemp.newName
   
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
-  {
-     showTOOLtip("WARNING: Incorrect multi-rename pattern provided")
-     SoundBeep 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
+     Return msgBeepTimer("WARNING: Incorrect multi-rename pattern provided")
 
   If (objuTemp.regExRemplaceMode=1 && !isValidRegEx(objuTemp.strArrA))
-  {
-     showTOOLtip("WARNING: The regular expression in the rename pattern is invalid.`nPlease correct the pattern before renaming.")
-     SoundBeep 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
-     Return
-  }
+     Return msgBeepTimer("WARNING: The regular expression in the rename pattern is invalid.`nPlease correct the pattern before renaming.")
 
   If (StrLen(OriginalNewFileName)>1)
   {
@@ -41445,8 +40966,7 @@ coreBatchMultiRenameFiles() {
         showTOOLtip("Finished renaming " groupDigits(filezRenamed) " out of " groupDigits(filesElected) " selected files" someErrors)
 
      SetTimer, ResetImgLoadStatus, -50
-     SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
+     msgBeepTimer("", (abandonAll=1) ? 300 : 900)
   }
 }
 
@@ -41600,12 +41120,7 @@ MenuMoveMarkedEntries() {
 
 moveMarkedEntryNow(indexu, modus:=0) {
    If (StrLen(filesFilter)>1)
-   {
-      showTOOLtip("WARNING: Index entries cannot be reordered when the files list is filtered.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Index entries cannot be reordered when the files list is filtered.")
 
    If (thumbsDisplaying!=1 || maxFilesIndex<2)
       Return
@@ -41851,9 +41366,7 @@ PanelBrowseAudioAnnotation() {
       If !FileExist(AudioFileu)
       {
          zPlitPath(AudioFileu, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
-         showTOOLtip("ERROR: Incorrect file path, inexistent audio file or access denied:`n" OutFileName "`n" OutDir "\")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: Incorrect file path, inexistent audio file or access denied:`n" OutFileName "`n" OutDir "\")
          SetTimer, PanelBrowseAudioAnnotation, -150
          Return
       }
@@ -42449,11 +41962,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
       Sleep, 3
       Gosub, %funcu%
    } Else
-   {
-      showTOOLtip("ERROR: Found no such function in the code to execute:`n" funcu "()")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("ERROR: Found no such function in the code to execute:`n" funcu "()")
 }
 
 closeQuickSearch() {
@@ -43751,12 +43260,7 @@ WriteThumbnailsSettingsPanel() {
 PanelSaveSlideShowu() {
     Global userDesiredSlideFMT := 1
     If (maxFilesIndex<2)
-    {
-       showTOOLtip("WARNING: Insufficient image files are indexed")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime//2
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient image files are indexed", 300, msgDisplayTime//2)
 
     thisBtnHeight := createSettingsGUI(36, A_ThisFunc)
     btnWid := 100
@@ -44027,12 +43531,7 @@ PanelCombineImagesMultipage() {
 
     filesElected := getSelectedFiles(0, 1)
     If !filesElected
-    {
-       showTOOLtip("WARNING: Insufficient files selected to join.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient files selected to join.")
 
     thisBtnHeight := createSettingsGUI(75, A_ThisFunc)
     btnWid := 100
@@ -44178,20 +43677,10 @@ convertFocusedFileToPDF() {
     imgPath := getIDimage(currentFileIndex)
     zPlitPath(imgPath, 1, OutFileName, OutDir, OutFileNameNoExt, OutFileExt)
     If (OutFileExt="pdf")
-    {
-       showTOOLtip("WARNING: The selected file seems to already be a PDF:`n" OutFileName "`n" OutDir "\")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: The selected file seems to already be a PDF:`n" OutFileName "`n" OutDir "\")
 
     If !FileExist(imgPath)
-    {
-       showTOOLtip("ERROR: The selected file seems to no longer exist:`n" OutFileName "`n" OutDir "\")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("ERROR: The selected file seems to no longer exist:`n" OutFileName "`n" OutDir "\")
 
     file2save := OutDir "\" OutFileNameNoExt ".pdf"
     UserCombinePDFpageSize := 9
@@ -44209,12 +43698,7 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
    {
       filesElected := getSelectedFiles(0, 1)
       If !filesElected
-      {
-         showTOOLtip("WARNING: Insufficient files selected to join.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: Insufficient files selected to join.")
    }
 
    If askOverwriteDestFile(file2save, 0)
@@ -44238,10 +43722,7 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
       Else
          msgu := "Unable to start the PDF file:`n" OutFileName "`n" OutDir "\"
 
-      showTOOLtip("ERROR: " msgu)
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer("ERROR: " msgu)
    }
 
    dpi := clampInRange(userCombinePDFdpi, 50, 1200)
@@ -44505,12 +43986,7 @@ BTNperformExtractFrames(a) {
    {
       FileCreateDir, % ResizeDestFolder
       If ErrorLevel
-      {
-         showTOOLtip("ERROR: Destination folder does not exist:`n" ResizeDestFolder)
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Destination folder does not exist:`n" ResizeDestFolder)
    }
 
    BtnCloseWindow()
@@ -44626,10 +44102,7 @@ generateThumbsSheet() {
       {
          Tooltip
          trGdip_DisposeImage(pBitmap)
-         showTOOLtip("ERROR: Failed to generate the thumbnails sheet.`nInit malfunction. No GDI+ Graphics object.")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
+         Return msgBeepTimer("ERROR: Failed to generate the thumbnails sheet.`nInit malfunction. No GDI+ Graphics object.")
       }
 
       Tooltip
@@ -44816,9 +44289,7 @@ PanelCreateIMGthumbsSheet() {
        Else
           showTOOLtip("WARNING: Too many images selected. A thumbnails sheet cannot be created with so many images.")
 
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
+       Return msgBeepTimer()
     }
 
     thisBtnHeight := createSettingsGUI(86, A_ThisFunc)
@@ -46325,9 +45796,7 @@ PanelChangeHamDistThreshold() {
 
     If msgu
     {
-       showTOOLtip(msgu)
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer(msgu)
        If (SLDtypeLoaded=3)
           SetTimer, PanelFindDupes, -200
        Return
@@ -46429,12 +45898,7 @@ PanelSearchAndReplaceIndex() {
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<3 && !filesFilter)
-    {
-       showTOOLtip("WARNING: Insufficient files are currently indexed.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
     getSelectedFiles(0, 1)
     thisBtnHeight := createSettingsGUI(56, A_ThisFunc)
@@ -46472,30 +45936,15 @@ BTNperformIndexSearchReplace() {
    GuiControlGet, performSRindexMode
    GuiControlGet, userSrcRplcIndexFolder
    If (editF5="")
-   {
-      showTOOLtip("WARNING: No search criteria given")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: No search criteria given")
 
    If (editF5==editF6)
-   {
-      showTOOLtip("WARNING: Both fields are equal: what to search for and replace with")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Both fields are equal: what to search for and replace with")
 
    If (performSRindexMode=1 || performSRindexMode=2)
    {
       If (!markedSelectFile && performSRindexMode=2)
-      {
-         showTOOLtip("WARNING: There are no files selected in the QPV list")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: There are no files selected in the QPV list")
 
       BtnCloseWindow()
       limitSearchReplaceSelected := (performSRindexMode=2) ? 1 : 0
@@ -46503,12 +45952,7 @@ BTNperformIndexSearchReplace() {
    } Else If (performSRindexMode=3)
    {
       If (mustRecordSeenImgs!=1)
-      {
-         showTOOLtip("WARNING: The option to record seen images is currently deactivated.")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: The option to record seen images is currently deactivated.")
 
       BtnCloseWindow()
       SearchAndReplaceSeenDB(editF5, editF6, userSrcRplcIndexFolder)
@@ -46516,12 +45960,7 @@ BTNperformIndexSearchReplace() {
    {
       listu := getDynamicFoldersList()
       If !InStr(listu, ":\")
-      {
-         showTOOLtip("WARNING: The seed folders list is empty")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: The seed folders list is empty")
 
       BtnCloseWindow()
       listu := StrReplace(listu, "`n", "\`n")
@@ -46840,9 +46279,7 @@ PanelAutoSelectDupes() {
    Static SearchdStringz
    If (maxFilesIndex<2)
    {
-      showTOOLtip("WARNING: Insufficient indexed files to search for")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("WARNING: Insufficient indexed files to search for")
       If filesFilter
          SetTimer, PanelEnableFilesFilter, -200
       Return
@@ -46850,9 +46287,7 @@ PanelAutoSelectDupes() {
 
    If !testIsDupesList()
    {
-      showTOOLtip("WARNING: The files list does not seem to contain pairs of images identified as duplicates")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("WARNING: The files list does not seem to contain pairs of images identified as duplicates")
       If (SLDtypeLoaded=3)
          SetTimer, PanelFindDupes, -200
       Return
@@ -47077,12 +46512,7 @@ PanelSearchIndex(dummy:="") {
        currentFileIndex := doOpenStartFolder()
 
     If (maxFilesIndex<2)
-    {
-       showTOOLtip("WARNING: Insufficient indexed files to search for")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient indexed files to search for")
  
     If (AnyWindowOpen=6)
        BtnCloseWindow()
@@ -47186,11 +46616,7 @@ BtnPerformSearchNow(a, b, c) {
          SearchIndexSelectAll()
       }
    } Else
-   {
-      showTOOLtip("WARNING: no valid search criteria was given.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("WARNING: no valid search criteria was given.")
 }
 
 OpenFilterPanelBTNaction() {
@@ -47298,22 +46724,15 @@ BTNdeleteCaptionAction() {
           Sleep, 2
 
     If (mustShowError && wasError)
-    {
-       showTOOLtip("ERROR: Unable to delete text file:`n" OutNameNoExt ".txt`n" OutDir "\")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-    } Else If (SLDtypeLoaded!=3)
+       msgBeepTimer("ERROR: Unable to delete text file:`n" OutNameNoExt ".txt`n" OutDir "\")
+    Else If (SLDtypeLoaded!=3)
        SoundBeep , 900, 100
 
     If (SLDtypeLoaded=3)
     {
        r := updateSQLdbEntryCaption(imgPath, "", "imgCaption")
        If (r=-1)
-       {
-          showTOOLtip("ERROR: Failed to update the image caption in the database.")
-          SoundBeep 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-       }
+          msgBeepTimer("ERROR: Failed to update the image caption in the database.")
     }
 
     INIaction(1, "showImgAnnotations", "General")
@@ -47343,11 +46762,7 @@ BTNsaveCaptionAction() {
     {
        r := updateSQLdbEntryCaption(imgPath, textu, "imgCaption")
        If (r=-1)
-       {
-          showTOOLtip("ERROR: Failed to update the image caption in the database.")
-          SoundBeep 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-       }
+          msgBeepTimer("ERROR: Failed to update the image caption in the database.")
     } Else
     {
        textFile := OutDir "\" OutNameNoExt ".txt"
@@ -47441,9 +46856,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         Sleep, 2
      } Else If (thisFileExists=1)
      {
-        showTOOLtip("WARNING: Rename operation abandoned.`nA file with the provided name already exists.`nFile name conflict`n" newFileName)
-        SoundBeep , 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
+        msgBeepTimer("WARNING: Rename operation abandoned.`nA file with the provided name already exists.`nFile name conflict`n" newFileName)
         Return 0
      }
 
@@ -47461,9 +46874,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      If moveFailed
      {
         OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
-        showTOOLtip("ERROR: Access denied. The file could not be renamed.`n" OutFileName "`n" OutDir "\")
-        SoundBeep, 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
+        msgBeepTimer("ERROR: Access denied. The file could not be renamed.`n" OutFileName "`n" OutDir "\")
         Return 0
      } Else
      {
@@ -47576,8 +46987,7 @@ UpdateIndexBTNaction(newFileName, whichIndex) {
         showTOOLtip("ERROR: The file index entry was not updated.`nFile not found or access denied`n" newFileName)
      Else
         showTOOLtip("ERROR: The file index entry was not updated.`nIncorrect file name provided:`n" newFileName)
-     SoundBeep, 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
+     msgBeepTimer()
      Return 0
   }
 }
@@ -47937,12 +47347,7 @@ importEditGivenImageFile() {
 
    imgPath := StrReplace(getIDimage(currentFileIndex), "||")
    If !FileExist(imgPath)
-   {
-      showTOOLtip("ERROR: The selected image cannot be imported`nFile does not exist or access denied.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: The selected image cannot be imported`nFile does not exist or access denied.")
 
    frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
    currentFileIndex := prevLoadedImageIndex
@@ -47961,12 +47366,7 @@ importAlphaMaskGivenImageFile() {
 
    imgPath := StrReplace(getIDimage(currentFileIndex), "||")
    If !FileExist(imgPath)
-   {
-      showTOOLtip("ERROR: The selected image cannot be imported`nFile does not exist or access denied.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: The selected image cannot be imported`nFile does not exist or access denied.")
 
    frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? currentFileIndex - 1 : 0
    zBitmap := LoadBitmapFromFileu(imgPath, 0, 0, frameLoad)
@@ -48115,17 +47515,13 @@ PanelPasteInPlace(dummy:="") {
 throwWarningHugeImagesFeatureNotAvailable() {
    If (viewportQPVimage.imgHandle)
    {
-      showTOOLtip("WARNING: A very large image is currently opened.`nThis option is not available at the moment.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("WARNING: A very large image is currently opened.`nThis option is not available at the moment.")
       Return 1
    }
 
    If (markedSelectFile && AnyWindowOpen=89)
    {
-      showTOOLtip("WARNING: Multiple files are selected for batch processing. Alpha masking not supported.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("WARNING: Multiple files are selected for batch processing. Alpha masking not supported.")
       Return 1
    }
 }
@@ -48162,12 +47558,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     imgPath := getIDimage(currentFileIndex)
     wasGiven := (FileRexists(dummy) && modalia="extern-file" && toolu="paste") ? 1 : 0
     If (wasGiven=0 && modalia="extern-file" && toolu="paste")
-    {
-       showTOOLtip("ERROR: Failed to import given file")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("ERROR: Failed to import given file")
 
     If (thumbsDisplaying=1 || editingSelectionNow!=1 || openingPanelNow=1)
        Return
@@ -49746,9 +49137,7 @@ handleOpenCloseBezier(mm:=0) {
          CustomShapeSymmetry := CustomShapeLockedSymmetry := vpSymmetryPointXdp := vpSymmetryPointYdp := 0
          prevVectorShapeSymmetryMode := []
          canDoSymmetry := 0
-         showTOOLtip(symDropMsg "`nThe symmetry mode had to be discarded.")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer(symDropMsg "`nThe symmetry mode had to be discarded.")
       }
    }
 
@@ -50116,12 +49505,7 @@ decideCustomShapeStyle() {
 
 togglePathCurveTension() {
    If (EllipseSelectMode!=2 || editingSelectionNow!=1)
-   {
-      showTOOLtip("WARNING: Please activate or create a freeform path.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Please activate or create a freeform path.")
 
    maxu := (customShapePropPoints.Count()>3 && drawingShapeNow=1) ? 4 : 5
    FillAreaCurveTension := clampInRange(FillAreaCurveTension + 1, 1, maxu, 1)
@@ -50252,12 +49636,7 @@ PanelEditorImgResize() {
 
     r1 := trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
     If (!oImgW || !oImgH)
-    {
-       showTOOLtip("ERROR: No image seems to be loaded or it is malformed")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("ERROR: No image seems to be loaded or it is malformed")
 
     ReadSettingsEditorResizePanel()
     thisBtnHeight := createSettingsGUI(73, A_ThisFunc)
@@ -50320,29 +49699,19 @@ BTNimgResizeEditor() {
           Return
        }
        ; showTOOLtip("WARNING: Resulted image cannot exceed 536.7 megapixels.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
+       Return msgBeepTimer()
     }
 
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
     If (oImgW=tUserNewWidth && oImgH=tUserNewHeight)
-    {
-       showTOOLtip("WARNING: The provided values are identical with the original size")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: The provided values are identical with the original size")
 
     If ((min(imgW, imgH, tUserNewWidth, tUserNewHeight)<3
     || max(imgW, imgH, tUserNewWidth, tUserNewHeight)>199000) && !viewportQPVimage.imgHandle)
     {
-       showTOOLtip("WARNING: Incorrect values provided to resize image.`nValues must be between 3 and 199000 pixels.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
+       Return msgBeepTimer("WARNING: Incorrect values provided to resize image.`nValues must be between 3 and 199000 pixels.")
     }
 
     WriteSettingsEditorResizePanel()
@@ -50700,12 +50069,7 @@ BTNrenameCustomShape() {
       Return
 
    If (StrLen(givenName)<2 || !FileExist(mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"))
-   {
-      showTOOLtip("ERROR: The file no longer seems to exist: " givenName ".vqpv`n" mainCompiledPath "\resources\vector-shapes\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: The file no longer seems to exist: " givenName ".vqpv`n" mainCompiledPath "\resources\vector-shapes\")
 
    oldName := givenName
    Static forbiddenChars := "<`~@>:""/\|?*.,;"
@@ -50867,12 +50231,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    {
       OutDir := PathCompact(mainCompiledPath "\resources\vector-shapes", "a", 1, OSDfontSize)
       If (StrLen(givenName)<2 || !FileExist(mainCompiledPath "\resources\vector-shapes\" givenName ".vqpv"))
-      {
-         showTOOLtip("ERROR: The file no longer seems to exist: " givenName ".vqpv`n" OutDir)
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: The file no longer seems to exist: " givenName ".vqpv`n" OutDir)
       BtnCloseWindow()
    } Else zPlitPath(whichFile, 0, fileNamu, Outdir, givenName)   ; the name, without the extension
 
@@ -50893,9 +50252,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
          showTOOLtip("Failed to read file contents: " givenName ".vqpv`n" OutDir)
          BTNopenPrevPanel(mustOpenWin, "yes")
       }
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer()
    }
 
    undoVectorShapesLevelsArray := []
@@ -50906,9 +50263,7 @@ BTNloadCustomShape(isGiven:=0, whichFile:=0) {
    newArrayu := convertShapePointsStrToArray(obju[1])
    If (newArrayu.Count()<3)
    {
-      showTOOLtip("ERROR: Incorrect file format. Found no points defining the vector shape")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: Incorrect file format. Found no points defining the vector shape")
       If (externMode!=1)
          BTNopenPrevPanel(mustOpenWin, "yes")
       Return
@@ -51160,12 +50515,7 @@ MenuSaveEditorVectorShape() {
 
    newPoints := getEditorVectorShapePoints2save()
    If !IsObject(newPoints)
-   {
-      showTOOLtip("WARNING: The vector path needs at least three points to be saved")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: The vector path needs at least three points to be saved")
 
    widthu := (PrefsLargeFonts=1) ? 950 : 460
    msgResult := msgBoxWrapper("Save vector shape: " appTitle, "Please type a name for the vector shape to be saved.", "&Save|&Cancel", 1, "save", 0, 0, 0, "limit350", prevNameSavedVectorShape, 0, widthu)
@@ -51235,11 +50585,8 @@ saveCurrentVectorShape(givenName, allowMsg:=1, givenPoints:=0) {
    If (allowMsg=1)
    {
       If (errorOccurred=1)
-      {
-         showTOOLtip("Failed to save vector shape into:`n" mainCompiledPath "\")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      } Else prevNameSavedVectorShape := givenName
+         msgBeepTimer("Failed to save vector shape into:`n" mainCompiledPath "\")
+      Else prevNameSavedVectorShape := givenName
    }
 
    Return errorOccurred
@@ -54127,9 +53474,7 @@ batchImgPrinting(PrintOptions, multiFramesMode:=0, givenFile:=0, totalPages:=0) 
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
-   Return
+   Return msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 PanelIMGselProperties() {
@@ -54218,11 +53563,8 @@ PanelIMGselProperties() {
 BTNcopySelCoords() {
    txt := imgSelX1 "|" imgSelY1 "|" imgSelX2 "|" imgSelY2 "|" VPselRotation "|" rotateSelBoundsKeepRatio "|" innerSelectionCavityX "|" innerSelectionCavityY
    If !copyTextToClippy(txt)
-   {
-      showTOOLtip("Failed to copy selection coordinates to the clipboard")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   } Else
+      msgBeepTimer("Failed to copy selection coordinates to the clipboard")
+   Else
       SoundBeep 900, 100
 }
 
@@ -56179,9 +55521,7 @@ livePreviewSimpleColorsAdjustImage(modus:=0, extraMode:=0) {
 throwErrorAllSelectedInvert(userBias) {
    If (!testAllowSelInvert() && userBias=1)
    {
-      showTOOLtip("WARNING: The entire canvas is selected,`nbut the option «Invert selection area» is activated.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("WARNING: The entire canvas is selected,`nbut the option «Invert selection area» is activated.")
       Return 1
    }   
 }
@@ -56267,12 +55607,7 @@ BtnAdjustColorsSimpleImgSelArea() {
    threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
    thisIDu := "a" userImgAdjustInvertColors userImgAdjustSat  userImgAdjustBright userImgAdjustContra userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintAmount userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustWhitePoint userImgAdjustBlackPoint
    If (thisIDu="a000000003000000-1-1-1-1655350")
-   {
-      showTOOLtip("WARNING: No color filters to apply.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: No color filters to apply.")
 
    WriteSettingsSimpleColorAdjustsPanel()
    getSelectedFiles(0, 1)
@@ -56313,12 +55648,7 @@ BtnPixelizeSelectedArea() {
    ;    Return
    updateUIblurPanel("no-preview")
    If (blurAreaPixelizeAmount<2)
-   {
-      showTOOLtip("WARNING: Pixelation amount is too low")
-      SoundBeep 300, 100 
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Pixelation amount is too low")
 
    BtnCloseWindow()
    If (viewportQPVimage.imgHandle)
@@ -56758,12 +56088,7 @@ BtnALLviewedImages2List(dummy:=0) {
 
 PanelPDFreadTexts() {
     If (currentUndoLevel>2 && thumbsDisplaying!=1)
-    {
-       showTOOLtip("WARNING: The current PDF page is being edited as a bitmap image.`nReload the initial PDF to access this functionality.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: The current PDF page is being edited as a bitmap image.`nReload the initial PDF to access this functionality.")
 
     RegAction(0, "ResizeDestFolder",, 6)
     thisBtnHeight := createSettingsGUI(90, A_ThisFunc)
@@ -56909,12 +56234,7 @@ BTNbatchExtractTextsPDFs() {
    {
       FileCreateDir, % ResizeDestFolder
       If ErrorLevel
-      {
-         showTOOLtip("ERROR: Destination folder does not exist:`n" ResizeDestFolder)
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Destination folder does not exist:`n" ResizeDestFolder)
    }
 
    filesElected := getSelectedFiles(0, 1)
@@ -57140,12 +56460,7 @@ BTNextractALLtextsCurrentPDF() {
    SetTimer, ResetImgLoadStatus, -150
    CurrentSLD := backCurrentSLD
    If (abandonAll=1)
-   {
-      showTOOLtip("User abandoned extracting texts from the PDF")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("User abandoned extracting texts from the PDF")
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, nExt)
    startPath := OutDir "\" OutNameNoExt
@@ -57191,12 +56506,7 @@ BTNextractALLtextsCurrentPDF() {
 PanelOCRtextRecognition() {
     Global UIocrLanguage, EditOCRresult, infoLineOCR, btnOCRimage, btnOCRclipboard
     If !WinOCR_IsSupported()
-    {
-       showTOOLtip("WARNING: Text recognition (OCR) requires Windows 10 or newer")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Text recognition (OCR) requires Windows 10 or newer")
 
     panelMode := (thumbsDisplaying=0 && isImgEditingNow()) ? 1 : 0
     If !(thisBtnHeight := createSettingsGUI(93, A_ThisFunc, 1, panelMode))
@@ -58606,12 +57916,7 @@ updateUIfimBeforeIMG(modus:=0) {
 updateUIfimToneMappedIMG() {
    Static uiBoxW := 460, uiBoxH := 320
    If !globalhFIFtoneMap
-   {
-      showTOOLtip("ERROR: The image failed to be loaded with FreeImage.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: The image failed to be loaded with FreeImage.")
 
    updateUIfimBeforeIMG()
    ; as FIMapplyToneMapper() decides: FITM_REQUIRED [2] and FITM_PQ [3] always, FITM_OPTIONAL [1] when allowed
@@ -59365,12 +58670,7 @@ PanelJump2index() {
       currentFileIndex := doOpenStartFolder()
 
    If (maxFilesIndex<2)
-   {
-      showTOOLtip("WARNING: Insufficient indexed files to open panel")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient indexed files to open panel")
 
    If (RandyIMGnow=-1 || !RandyIMGids.Count())
       coreGenerateRandomList()
@@ -60773,12 +60073,7 @@ BTNuiProceedStructuredOperation() {
    GuiControlGet, userCopyMoveStructuredConflictMode
    GuiControlGet, UsrCopyMoveOperation
    If (UsrCopyMoveOperation=1)
-   {
-      showTOOLtip("ERROR: Please select action to perform: copy or move files.") 
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Please select action to perform: copy or move files.")
 
    fS := Trim(UsrEditFileSource, "\")
    dS := Trim(UsrEditFileDestination, "\")
@@ -60790,10 +60085,7 @@ BTNuiProceedStructuredOperation() {
    If !FolderExist(fS)
    {
 
-      showTOOLtip("ERROR: Please choose an existing source folder.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer("ERROR: Please choose an existing source folder.")
    }
 
    If !FolderExist(dS)
@@ -60811,21 +60103,11 @@ BTNuiProceedStructuredOperation() {
             }
          } Else Return
       } Else
-      {
-         showTOOLtip("ERROR: Please choose an existing destination folder.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Please choose an existing destination folder.")
    }
 
    If (dS=fS)
-   {
-      showTOOLtip("ERROR: The source and destination folders cannot be the same.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: The source and destination folders cannot be the same.")
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS)
@@ -60960,9 +60242,7 @@ BtnCopyMoveAction(dummy:=0) {
      GuiControlGet, copyMoveDoLastOption, SettingsGUIA:, copyMoveDoLastOption
      If (UsrCopyMoveOperation=1)
      {
-        showTOOLtip("WARNING: Please choose an action to perform: copy or move")
-        SoundBeep, 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
+        msgBeepTimer("WARNING: Please choose an action to perform: copy or move")
         Return 0
      }
   }
@@ -61030,9 +60310,7 @@ BtnCopyMoveAction(dummy:=0) {
 
   If (!RegExMatch(folderu, "^(.\:\\.)") && !relativePath || wrongNames=1)
   {
-     showTOOLtip("WARNING: Incorrect file path given:`n" folderu)
-     SoundBeep, 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime
+     msgBeepTimer("WARNING: Incorrect file path given:`n" folderu)
      Return 0
   }
 
@@ -61163,9 +60441,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        If !file2save
        {
           OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
-          showTOOLtip("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" OutDir "\`nOperation aborted.")
-          SoundBeep , 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
+          msgBeepTimer("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" OutDir "\`nOperation aborted.")
           SetTimer, ResetImgLoadStatus, -200
           Return 0
        }
@@ -61195,9 +60471,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     } Else If (thisFileExists=1)
     {
        OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
-       showTOOLtip("WARNING: Operation aborted. A file with the same name already exists in the destination folder.`n" OldOutFileName "`n" OutDir "\")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("WARNING: Operation aborted. A file with the same name already exists in the destination folder.`n" OldOutFileName "`n" OutDir "\")
        SetTimer, ResetImgLoadStatus, -25
        Return
     } Else mustPerformOperation := 1
@@ -61521,8 +60795,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    }
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    lastInvoked := A_TickCount
    Return 0
 }
@@ -61548,12 +60821,7 @@ batchConvert2format() {
    {
       FileCreateDir, % ResizeDestFolder
       If ErrorLevel
-      {
-         showTOOLtip("ERROR: Destination folder does not seem to exist or permission denied.`nAn unsuccesful attempt was made to create the destination folder.`nOperation abandoned.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Destination folder does not seem to exist or permission denied.`nAn unsuccesful attempt was made to create the destination folder.`nOperation abandoned.")
    }
 
    setImageLoading()
@@ -61742,8 +61010,7 @@ batchConvert2format() {
       showTOOLtip("Finished converting to ." rDesireWriteFMT " format`n" groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors)
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    Return (abandonAll=1) ? -2 : filesConverted
 }
 
@@ -62379,9 +61646,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    ; ForceRefreshNowThumbsList()
    ; dummyTimerDelayiedImageDisplay(100)
    SetTimer, ResetImgLoadStatus, -100
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
-   Return
+   Return msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
@@ -63125,22 +62390,12 @@ combineImagesMultiTiffGDIp(destFilePath) {
    {
       FileCreateDir, % OutDir
       If ErrorLevel
-      {
-         showTOOLtip("ERROR: Unable to create destination folder of the multipaged file.`nOperation abandoned.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Unable to create destination folder of the multipaged file.`nOperation abandoned.")
    }
 
    filesElected := getSelectedFiles(0, 1)
    If !filesElected
-   {
-      showTOOLtip("WARNING: Insufficient files selected to join.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient files selected to join.")
 
    If askOverwriteDestFile(destFilePath)
       Return "declined"
@@ -63152,12 +62407,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
       rg := Gdip_GetImageEncoder(".tif", pCodec, ci)
 
    If !pCodec
-   {
-      showTOOLtip("ERROR: Unable to initialize the .TIFF encoder.`nOperation abandoned.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Unable to initialize the .TIFF encoder.`nOperation abandoned.")
 
    failedFiles := countTFilez := 0
    destroyGDIfileCache()
@@ -63376,22 +62626,12 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    {
       FileCreateDir, % OutDir
       If ErrorLevel
-      {
-         showTOOLtip("ERROR: Unable to create destination folder of the multipage file.`nOperation abandoned.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Unable to create destination folder of the multipage file.`nOperation abandoned.")
    }
 
    filesElected := getSelectedFiles(0, 1)
    If !filesElected
-   {
-      showTOOLtip("WARNING: Insufficient files selected to join.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient files selected to join.")
 
    initFIMGmodule()
    If (wasInitFIMlib!=1)
@@ -63406,12 +62646,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    }
 
    If msgu
-   {
-      showTOOLtip("ERROR: " msgu "`nOperation abandoned.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: " msgu "`nOperation abandoned.")
 
    If askOverwriteDestFile(destFilePath, 0)
       Return "declined"
@@ -63423,12 +62658,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    ; keep_cache=1: on Windows the cache file seeks with 32-bit offsets, and breaks past 2 GB
    multiFim := FreeImage_OpenMultiBitmap(tmpFile, fif, 1, 0, 1)
    If !multiFim
-   {
-      showTOOLtip("ERROR: Unable to create the multipage image file:`n" OutFileName "`n" OutDir "\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Unable to create the multipage image file:`n" OutFileName "`n" OutDir "\")
 
    If (setRes!=1 || setW<2 || setH<2)
       setW := setH := 0
@@ -64200,9 +63430,7 @@ coreOpenFolder(thisFolder, doOptionals:=1, openFirst:=0, doReset:=0, safeMode:=0
       Else
          FadeMainWindow()
 
-      showTOOLtip("ERROR: The folder seems to be inexistent`n" testThis "\")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: The folder seems to be inexistent`n" testThis "\")
    }
 }
 
@@ -64254,12 +63482,7 @@ RefreshImageFileAction() {
          Return
 
       If InStr(imgPath, "Q:\temporary memory object\")
-      {
-         showTOOLtip("WARNING: This image is currently unsaved. Unable to refresh object.")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("WARNING: This image is currently unsaved. Unable to refresh object.")
 
       If askAboutFileSave(" and the original file will be reloaded")
          Return
@@ -64298,12 +63521,7 @@ RefreshImageFile() {
 
 RefreshFilesList() {
   If !CurrentSLD
-  {
-     showTOOLtip("WARNING: No folder or files list index currently opened")
-     SoundBeep , 300, 100
-     SetTimer, RemoveTooltip, % -msgDisplayTime//2
-     Return
-  }
+     Return msgBeepTimer("WARNING: No folder or files list index currently opened", 300, msgDisplayTime//2)
 
   stopSlideshow()
   If InStr(CurrentSLD, "\QPV\favourite-images-list.SLD")
@@ -64590,8 +63808,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       Else
          showTOOLtip("ERROR: File not found or access denied.`n" OutFileName "`n" OutDir "\")
 
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
    }
 }
 
@@ -64698,12 +63915,7 @@ importSLDplainText(whichFile) {
       Return
 
    If (whichFile=CurrentSLD)
-   {
-      showTOOLtip("WARNING: Illegal operation. You cannot import the already opened files list`nNo one likes duplicates :-)")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Illegal operation. You cannot import the already opened files list`nNo one likes duplicates :-)")
 
    If (StrLen(filesFilter)>1)
    {
@@ -64763,29 +63975,14 @@ importSLDBintoSLDB(whichFile) {
    }
 
    If (whichFile=CurrentSLD)
-   {
-      showTOOLtip("WARNING: Illegal operation. You cannot import the already opened database")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Illegal operation. You cannot import the already opened database")
 
    If (dbVersion!=dbExpectedVersion)
-   {
-      showTOOLtip("WARNING: Illegal operation. You cannot import into the currently opened database, because it was saved with a different version of QPV. Please rebuild this database.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Illegal operation. You cannot import into the currently opened database, because it was saved with a different version of QPV. Please rebuild this database.")
 
    otherVersion := readSLDBsettingFrom(whichFile, "dbVersion")
    If (otherVersion!=dbExpectedVersion)
-   {
-      showTOOLtip("WARNING: Illegal operation. The database was saved with a different version of QPV (v" (otherVersion ? otherVersion : "unknown") ".`nThis QPV instance is v" dbExpectedVersion ").`nPlease rebuild it before importing.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Illegal operation. The database was saved with a different version of QPV (v" (otherVersion ? otherVersion : "unknown") ".`nThis QPV instance is v" dbExpectedVersion ").`nPlease rebuild it before importing.")
 
    startZeit := A_TickCount
    mustOpenStartFolder := ""
@@ -64845,8 +64042,7 @@ importSLDBintoSLDB(whichFile) {
       mainArrayu := ""
       totalArrayu := ""
       uniqueArrayu := ""
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
       ResetImgLoadStatus()
       Return
    }
@@ -65495,8 +64691,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
          }
 
          ResetImgLoadStatus()
-         SoundBeep 900, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("", 900)
          Return "rescan"
       }
 
@@ -65810,8 +65005,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       }
 
       SetTimer, ResetImgLoadStatus, -50
-      SoundBeep, 900, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("", 900)
       If (hasReopened!=1)
       {
          currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
@@ -65940,6 +65134,15 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
       ; ToolTip, % msg, % mX + 25, % mY + 25
    } Else If (AnyWindowOpen>0)
       ToolTip
+}
+
+msgBeepTimer(msg:="", freq:=300, delay:="") {
+   If (msg!="")
+      showTOOLtip(msg)
+   SoundBeep, % freq, 100
+   If (delay="")
+      delay := msgDisplayTime
+   SetTimer, RemoveTooltip, % -delay
 }
 
 RemoveTooltip() {
@@ -72081,12 +71284,7 @@ invokeFoldersListerMenu() {
         Try Menu, % A_LoopField, Delete
 
     If (userPrivateMode=1)
-    {
-       showTOOLtip("WARNING: Private mode is activated. Access to this feature is denied,`nbecause it would be a breach of privacy.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Private mode is activated. Access to this feature is denied,`nbecause it would be a breach of privacy.")
 
     baseFolder := (SLDtypeLoaded=1) ? CurrentSLD : resultedFilesList[currentFileIndex, 1]
     If (SLDtypeLoaded!=1)
@@ -72710,20 +71908,10 @@ ToggleTitleBaru() {
 
 ToggleLargeUIfonts() {
     If (AnyWindowOpen=31 || AnyWindowOpen=24)
-    {
-       showTOOLtip("WARNING: This option cannot be changed while the transform tool is activated.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: This option cannot be changed while the transform tool is activated.")
 
     If isNowAlphaPainting()
-    {
-       showTOOLtip("WARNING: This option cannot be changed while alpha mask painting mode is activated.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: This option cannot be changed while alpha mask painting mode is activated.")
 
     PrefsLargeFonts := !PrefsLargeFonts
     calcHUDsize()
@@ -72773,20 +71961,10 @@ ToggleCustomKBDsMode() {
 
 ToggleDarkModus() {
     If (AnyWindowOpen=31 || AnyWindowOpen=24)
-    {
-       showTOOLtip("WARNING: This option cannot be changed while the transform tool is activated.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: This option cannot be changed while the transform tool is activated.")
 
     If isNowAlphaPainting()
-    {
-       showTOOLtip("WARNING: This option cannot be changed while alpha mask painting mode is activated.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: This option cannot be changed while alpha mask painting mode is activated.")
 
     uiUseDarkMode := !uiUseDarkMode
     If ((isWinXP=1 || A_OSVersion="WIN_7") && uiUseDarkMode=1)
@@ -74183,8 +73361,7 @@ ToggleSeenIMGstatus() {
          showTOOLtip(someERR "Finished marking " groupDigits(countFilez) " images as " friendly ".")
 
       SetTimer, ResetImgLoadStatus, -50
-      SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    } Else
    {
       seenImagesDB.Exec("BEGIN TRANSACTION;")
@@ -74315,8 +73492,7 @@ CleanDeadFilesSeenImagesDB(doPartial:=0, partu:=0) {
      showTOOLtip(groupDigits(entriesRemCount) " entries of inexistent files were removed from the database" etaTime)
 
   SetTimer, ResetImgLoadStatus, -50
-  SoundBeep, 900, 100
-  SetTimer, RemoveTooltip, % -msgDisplayTime
+  msgBeepTimer("", 900)
   Return entries
 }
 
@@ -77565,12 +76741,7 @@ toggleBrushDoubleSize() {
 
 toggleBrushAirMode() {
    If (BrushToolType=2 || BrushToolType=3 || BrushToolType>=6)
-   {
-      showTOOLtip("WARNING: Airbrush mode is not available for the current brush type.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Airbrush mode is not available for the current brush type.")
 
    BrushToolOverDraw := !BrushToolOverDraw
    friendly := (BrushToolOverDraw=1) ? "ACTIVATED" : "DEACTIVATED"
@@ -77597,9 +76768,7 @@ MenuSetVectAutoSymmetryX() {
          pp := 1
       } Else
       {
-         showTOOLtip("WARNING: The vector path has an even number of points: " groupDigits(totalz) ".`nPlease add one additional point.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: The vector path has an even number of points: " groupDigits(totalz) ".`nPlease add one additional point.")
          Return 0
       }
    }
@@ -77622,9 +76791,7 @@ MenuSetVectAutoSymmetryY() {
          pp := 1
       } Else
       {
-         showTOOLtip("WARNING: The vector path has an even number of points: " groupDigits(totalz) ".`nPlease add one additional point.")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: The vector path has an even number of points: " groupDigits(totalz) ".`nPlease add one additional point.")
          Return 0
       }
    }
@@ -77678,12 +76845,7 @@ toggleBrushSymmetryModes() {
    }
 
    If (BrushToolType>5)
-   {
-      showTOOLtip("WARNING: Symmetry painting not available for the current brush type")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Symmetry painting not available for the current brush type")
 
    If (BrushToolSymmetryX=0 && BrushToolSymmetryY=0)
    {
@@ -78295,8 +77457,7 @@ preventColorChange() {
           showTOOLtip("WARNING: You are currently using the cloner brush tool`nTo define the source pattern, press D.")
        Else
           showTOOLtip("WARNING: You are currently using a brush that does not rely on a given color")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer()
        Return 1
     }
 }
@@ -79052,12 +78213,7 @@ ActPaintBrushNow() {
    {
       FreeImage_GetImageDimensions(viewportQPVimage.imgHandle, imgW, imgH)
       If (!imgW || !imgH)
-      {
-         showTOOLtip("ERROR: Main FreeImage bitmap seems to be invalid. Failure occurred in " A_ThisFunc "()")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Main FreeImage bitmap seems to be invalid. Failure occurred in " A_ThisFunc "()")
    } Else
    {
       If mergeViewPortRotationImgEditing()
@@ -79076,12 +78232,7 @@ ActPaintBrushNow() {
       whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
       trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
       If (!imgW || !imgH)
-      {
-         showTOOLtip("ERROR: Main bitmap seems to be inexistent. Failure occurred in " A_ThisFunc "()")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-         Return
-      }
+         Return msgBeepTimer("ERROR: Main bitmap seems to be inexistent. Failure occurred in " A_ThisFunc "()")
    }
 
    canApplyFX := (PasteInPlaceHue!=0 || PasteInPlaceSaturation!=0 || PasteInPlaceLight!=0 || PasteInPlaceGamma!=0) && (BrushToolApplyColorFX=1) ? 1 : 0
@@ -79094,9 +78245,7 @@ ActPaintBrushNow() {
          showTOOLtip("WARNING: Brush opacity too low. Increase opacity to begin painting.")
       Else
          showTOOLtip("WARNING: No brush effect to apply.`nEdit brush settings in the Effects tab.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer()
    }
 
    vpWinClientSize(mainWidth, mainHeight)
@@ -79120,12 +78269,7 @@ ActPaintBrushNow() {
       {
          E1 := trGdip_LockBits(whichBitmap, 0, 0, 1, 1, imgPitch, imgBits, imgData, 3, "0x26200A")
          If E1
-         {
-            showTOOLtip("ERROR: Unable to lock bitmap data. Failure occurred in " A_ThisFunc "()")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-            Return
-         }
+            Return msgBeepTimer("ERROR: Unable to lock bitmap data. Failure occurred in " A_ThisFunc "()")
          Gdip_UnlockBits(whichBitmap, imgData)
          imgBits := 0
       }
@@ -79779,12 +78923,7 @@ ActDrawAlphaMaskBrushNow() {
    Static lastInvoked := 1, prevMX, prevMY, countClicks
    trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
    If (!imgW || !imgH)
-   {
-      showTOOLtip("ERROR: Main bitmap seems to be inexistent or invalid.`nFailure occurred in " A_ThisFunc "()")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: Main bitmap seems to be inexistent or invalid.`nFailure occurred in " A_ThisFunc "()")
 
    If (A_TickCount - lastOtherWinClose<450)
       Return
@@ -79799,12 +78938,7 @@ ActDrawAlphaMaskBrushNow() {
    prevState := "a"
    liveDrawingBrushTool := 1
    If !validBMP(userAlphaMaskBmpPainted)
-   {
-      showTOOLtip("ERROR: No alpha mask bitmap. Failure occurred in " A_ThisFunc "()")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("ERROR: No alpha mask bitmap. Failure occurred in " A_ThisFunc "()")
 
    whichBitmap := userAlphaMaskBmpPainted
    trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
@@ -83754,9 +82888,7 @@ ToggleEditImgSelection(modus:=0) {
 throwWarningAlphaPaintMode() {
    If isNowAlphaPainting()
    {
-      showTOOLtip("WARNING: You are currently in alpha mask painting mode.`nThe selection area cannot be altered.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("WARNING: You are currently in alpha mask painting mode.`nThe selection area cannot be altered.")
       Return 1
    }
 }
@@ -85507,8 +84639,7 @@ EraseThumbsCache(dummy:=0, remCacheOldDays:=0) {
    
    remCacheOldDays := 0
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 createThumbsFolder() {
@@ -86823,12 +85954,7 @@ RegenerateEntireList() {
     showTOOLtip("Preparing to refresh the files list, please wait")
     listu := getDynamicFoldersList()
     If (StrLen(listu)<4)
-    {
-       showTOOLtip("WARNING: No list of dynamic folders found")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: No list of dynamic folders found")
 
     If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
@@ -87036,9 +86162,7 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
   SQL := "SELECT imgidu, imgfolder||'\'||imgfile " moreCol " FROM images" reorder
   If !InitSQLgetTable(SQL, activeSQLdb._Handle, errMsg, Rows, Cols, hTable)
   {
-      showTOOLtip("ERROR: Failed to open the SQL database:`n" errMsg)
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: Failed to open the SQL database:`n" errMsg)
       Return -1
   } Else
   {
@@ -87057,9 +86181,7 @@ OpenSLDBdataBase(fileNamu, importMode:=0) {
       } Else
       {
          disposeSQLgetTableHandle(hTable)
-         showTOOLtip("ERROR: No images indexed in the SQL database")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("ERROR: No images indexed in the SQL database")
          Return -1
       }
   }
@@ -87732,8 +86854,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
          showTOOLtip("Operation aborted by user")
       Else
          showTOOLtip("Found no image duplicates")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
       SetTimer, ResetImgLoadStatus, -150
       If !SortCriterion
          SetTimer, PanelFindDupes, -250
@@ -87889,8 +87010,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       Else
          showTOOLtip("Found no image duplicates after filtering the duplicates list")
 
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer()
       If !SortCriterion
          SetTimer, PanelFindDupes, -350
       Return
@@ -88816,8 +87936,7 @@ ReverseListNow() {
     ForceRefreshNowThumbsList()
     CurrentSLD := backCurrentSLD
     dummyTimerDelayiedImageDisplay(50)
-    SoundBeep, 900, 100
-    SetTimer, RemoveTooltip, % -msgDisplayTime
+    msgBeepTimer("", 900)
 }
 
 RandomizeListNow() {
@@ -88845,8 +87964,7 @@ RandomizeListNow() {
     currentFilesListModified := 1
     ForceRefreshNowThumbsList()
     dummyTimerDelayiedImageDisplay(50)
-    SoundBeep, 900, 100
-    SetTimer, RemoveTooltip, % -msgDisplayTime
+    msgBeepTimer("", 900)
 }
 
 Random_ShuffleArray(Array) {
@@ -89564,9 +88682,7 @@ PanelsCheckFileExists() {
    If !FileRexists(imgPath)
    {
       OutDir := PathCompact(OutDir, "a", 1, OSDfontSize)
-      showTOOLtip("ERROR: File not found or access denied`n" fileNamu "`n" OutDir "\")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
+      msgBeepTimer("ERROR: File not found or access denied`n" fileNamu "`n" OutDir "\")
       Return 0
    } Else Return 1
 }
@@ -89640,12 +88756,7 @@ PanelFindDupes(dummy:=0) {
     }
 
     If (maxFilesIndex<3 && !filesFilter)
-    {
-       showTOOLtip("WARNING: Insufficient indexed files to activate the list view mode")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: Insufficient indexed files to activate the list view mode")
 
     If (SLDtypeLoaded!=3)
     {
@@ -90093,12 +89204,7 @@ BTNfindDupesNow() {
    } Else theseCols := columnus
 
    If (StrLen(theseCols)<3)
-   {
-      showTOOLtip("WARNING: Insufficient properties selected by which to identify duplicates.")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient properties selected by which to identify duplicates.")
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
 
@@ -90388,12 +89494,7 @@ PurgeCachedDataModifiedFiles() {
 PurgeCachedDataSelectedFiles() {
    getSelectedFiles(0, 1)
    If !markedSelectFile
-   {
-      showTOOLtip("WARNING: No files are currently selected to perform given operation")
-      SoundBeep , 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: No files are currently selected to perform given operation")
 
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
@@ -90507,12 +89608,7 @@ PanelJpegPerformOperation() {
     If (filesElected>1)
     {
        If !CheckGivenFileTypesSelected("jpg|jpeg")
-       {
-          showTOOLtip("WARNING: No JPEG files are selected.")
-          SoundBeep 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-          Return
-       }
+          Return msgBeepTimer("WARNING: No JPEG files are selected.")
     }
 
     initFIMGmodule()
@@ -90619,20 +89715,10 @@ BtnPerformJpegOp(modus:=0) {
     }
 
     If ((A_TickCount - lastInvoked < 150) || (jpegDesiredOperation=1))
-    {
-       showTOOLtip("WARNING: No JPEG operation selected to perform")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: No JPEG operation selected to perform")
 
     If (jpegDesiredOperation=9 && editingSelectionNow!=1)
-    {
-       showTOOLtip("WARNING: No selection area is defined in the viewport.`nThe image cannot be cropped.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: No selection area is defined in the viewport.`nThe image cannot be cropped.")
 
     imgPath := getIDimage(currentFileIndex)
     initFIMGmodule()
@@ -90793,9 +89879,7 @@ batchJpegLLoperations() {
    ForceRefreshNowThumbsList()
    dummyTimerDelayiedImageDisplay(100)
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
-   Return
+   Return msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 coreJpegLossLessAction(imgPath, jpegOperation) {
@@ -91273,21 +90357,11 @@ BtnBatchSimpleColorAdjuster() {
    threG := (userImgAdjustLinkThresholds=1) ? userImgAdjustThreR : userImgAdjustThreG
    thisIDu := "a" userImgAdjustInvertColors userImgAdjustSat  userImgAdjustBright userImgAdjustContra userImgAdjustShadows userImgAdjustHighs userImgAdjustHue userImgAdjustTintAmount userImgAdjustGamma userImgAdjustOffR userImgAdjustOffG userImgAdjustOffB userImgAdjustOffA userImgAdjustThreR ThreG ThreB userImgAdjustThreA userImgAdjustWhitePoint userImgAdjustBlackPoint
    If (thisIDu="a000000003000000-1-1-1-1655350")
-   {
-      showTOOLtip("WARNING: No color filters to apply.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: No color filters to apply.")
 
    filesElected := getSelectedFiles(0, 1)
    If (filesElected<3)
-   {
-      showTOOLtip("WARNING: Insufficient files selected to batch process.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient files selected to batch process.")
 
    RegAction(1, "ResizeDestFolder",, 6)
    RegAction(1, "ResizeUseDestDir",, 1)
@@ -91904,12 +90978,7 @@ PanelAdjustImageCanvasSize() {
 
     r1 := trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
     If (!oImgW || !oImgH)
-    {
-       showTOOLtip("ERROR: No image seems to be loaded or it is malformed")
-       SoundBeep, 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("ERROR: No image seems to be loaded or it is malformed")
 
     If (viewportQPVimage.imgHandle)
     {
@@ -92112,12 +91181,7 @@ BTNadjustCanvasAction() {
           r := -1
 
        If (r<0)
-       {
-          showTOOLtip("Failed to adjust image canvas")
-          SoundBeep 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-          Return
-       }
+          Return msgBeepTimer("Failed to adjust image canvas")
     }
 
     ToggleEditImgSelection("show-edit")
@@ -92317,10 +91381,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
    If (!desiredH || !desiredW || desiredW<1 || desiredH<1)
    || ((desiredW<5 || desiredH<5) && (isPercntg!=1))
    {
-      showTOOLtip("WARNING: Incorrect dimensions given. Please increase the values.")
-      SoundBeep, 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer("WARNING: Incorrect dimensions given. Please increase the values.")
    }
 
    filesElected := getSelectedFiles(0, 1)
@@ -92474,8 +91535,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
       showTOOLtip("Finished processing " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files" someErrors)
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 WriteSettingsResizePanel() {
@@ -92526,12 +91586,7 @@ filesListApplyColors() {
        imgFxMode := prevFXmode
 
     If (imgFxMode=1)
-    {
-       showTOOLtip("No viewport color adjustments to be applied on image`n`nPress F to cycle through mode")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through mode")
 
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>1 && imgFxMode>1)
@@ -93855,12 +92910,7 @@ BtnDoMultiUndoFileActs() {
     Gui, SettingsGUIA: Submit, NoHide
     isOkay := (markedSelectFile>1) ? 1 : 0
     If (UserUndoMultiDesiredOperation=2 && isOkay=0)
-    {
-       showTOOLtip("WARNING: There are no files selected. Use the other drop-down option`nor the «Undo for active file» button option.")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: There are no files selected. Use the other drop-down option`nor the «Undo for active file» button option.")
 
     RegAction(1, "userUndoMustDoOverwrite")
     RegAction(1, "userUndoDeleteNonIdenticalCopy")
@@ -93962,12 +93012,7 @@ BTNhistoFileActsList() {
 
    tempus := ""
    If (thisIndex<2)
-   {
-      showTOOLtip("WARNING: Insufficient undo entries recorded.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
-   }
+      Return msgBeepTimer("WARNING: Insufficient undo entries recorded.")
  
    If askAboutFileSave(". The current files list will be discarded as well")
       Return
@@ -94010,9 +93055,7 @@ BTNundoFileActu() {
    {
       If indexu
          showTOOLtip("WARNING: This action is already undone.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer()
    }
    ; ToolTip, % indexu "|" value , , , 2
    corefileUndoAction(0, 0, indexu)
@@ -94239,9 +93282,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
             dummyTimerDelayiedImageDisplay(50)
       }
 
-      SoundBeep, (r=1) ? 900 : 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-      Return
+      Return msgBeepTimer("", (r=1) ? 900 : 300)
    }
 
    otherFile := obj.initialu
@@ -94261,9 +93302,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          } Else
          {
             zPlitPath(imgPath, 0, OutFileName, OutDir, extname)
-            showTOOLtip("ERROR: Failed to restore the selected file:`n" sOutFileName "`n" sOutDir "\")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
+            msgBeepTimer("ERROR: Failed to restore the selected file:`n" sOutFileName "`n" sOutDir "\")
          }
          ForceRefreshNowThumbsList()
          dummyTimerDelayiedImageDisplay(50)
@@ -94303,18 +93342,10 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
             undoFileActUpdateIMGindex(imgPath)
             SetTimer, RemoveTooltip, % -msgDisplayTime
          } Else
-         {
-            showTOOLtip("ERROR: Undo COPY failed. Unable to delete the copy of the selected file.`n" OutFileName "`n" OutDir "\")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-         }
+            msgBeepTimer("ERROR: Undo COPY failed. Unable to delete the copy of the selected file.`n" OutFileName "`n" OutDir "\")
          Sleep, 25   
       } Else If (imgPath!=otherFile)
-      {
-         showTOOLtip("WARNING: Undo COPY failed. The copy of the selected file is missing or access denied.`n" OutFileName "`n" OutDir "\")
-         SoundBeep 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      }
+         msgBeepTimer("WARNING: Undo COPY failed. The copy of the selected file is missing or access denied.`n" OutFileName "`n" OutDir "\")
    } Else If (obj.typu="move" || obj.typu="rename")
    {
       If !(imgPath==otherFile)
@@ -94386,9 +93417,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          } Else
          {
             zPlitPath(imgPath, 1, OutFileName, OutDir, extname)
-            showTOOLtip("ERROR: Undo " Format("{:U}", obj.typu) " failed for the selected file:`n" OutFileName "`n" OutDir "\")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
+            msgBeepTimer("ERROR: Undo " Format("{:U}", obj.typu) " failed for the selected file:`n" OutFileName "`n" OutDir "\")
          }
       } 
    }
@@ -94842,12 +93871,7 @@ PanelReviewSelectedFiles() {
 
     getSelectedFiles(0, 1)
     If !markedSelectFile
-    {
-       showTOOLtip("WARNING: There are no selected files to review.")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: There are no selected files to review.")
 
     thisBtnHeight := createSettingsGUI(60, A_ThisFunc)
     Global LViewFiltered
@@ -96176,11 +95200,7 @@ BtnPanelStaticJumpFirst() {
       currentFileIndex := thisIndex
       dummyTimerDelayiedImageDisplay(100)
    } Else
-   {
-      showTOOLtip("WARNING: No file found to be indexed from the selected folder:`n" folderPath "\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("WARNING: No file found to be indexed from the selected folder:`n" folderPath "\")
 }
 
 BtnPanelManageFoldersActus(modus:=0, g:=0) {
@@ -96249,11 +95269,7 @@ invokeStandardFolderProperties(thisFolder) {
       Catch wasError
             msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the system file properties.", 0, 0, "error")
    } Else
-   {
-      showTOOLtip("WARNING: The folder seems to no longer exist`n" thisFolder "\")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("WARNING: The folder seems to no longer exist`n" thisFolder "\")
 }
 
 uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
@@ -96543,12 +95559,7 @@ MenuPreviewFramesFilterList() {
      dropFilesSelection(1)
      thumbsListViewMode := 1
      If !FileExist(imgPath)
-     {
-        showTOOLtip("ERROR: Access denied or the selected file does not exist:`n" OutFileName "`n" folderu "\")
-        SoundBeep 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
-     }
+        Return msgBeepTimer("ERROR: Access denied or the selected file does not exist:`n" OutFileName "`n" folderu "\")
 
      thisFileIndex := currentFileIndex
      If !resultedFilesList[thisFileIndex, 9]
@@ -96562,12 +95573,7 @@ MenuPreviewFramesFilterList() {
 
      frames := resultedFilesList[currentFileIndex, 9]
      If (frames<2)
-     {
-        showTOOLtip("WARNING: The selected image does not seem to have any frame or pages:`n" OutFileName "`n" folderu "\")
-        SoundBeep 300, 100
-        SetTimer, RemoveTooltip, % -msgDisplayTime
-        Return
-     }
+        Return msgBeepTimer("WARNING: The selected image does not seem to have any frame or pages:`n" OutFileName "`n" folderu "\")
 
      userFilterStringPos := userFilterWhat := 1
      UsrEditFilter := "QPV:PAGES:" imgPath
@@ -96952,18 +95958,14 @@ PanelRenameStaticFolder() {
 
       If (!RegExMatch(newFileName, "i)^(.\:\\.)") || !newFileName)
       {
-         showTOOLtip("WARNING: Incorrect folder path provided")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: Incorrect folder path provided")
          SetTimer, PanelRenameStaticFolder, -300
          Return
       }
 
       If !FolderExist(newFileName)
       {
-         showTOOLtip("WARNING: Inexistent folder path provided")
-         SoundBeep , 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
+         msgBeepTimer("WARNING: Inexistent folder path provided")
          SetTimer, PanelRenameStaticFolder, -300
          Return
       }
@@ -97040,12 +96042,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
 
     getSelectedFiles(0, 1)
     If (onlySelected=1 && markedSelectFile<1)
-    {
-       showTOOLtip("WARNING: No files are currently selected")
-       SoundBeep , 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("WARNING: No files are currently selected")
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
@@ -97230,12 +96227,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     ; are left exactly as they are.
     initSeenImagesListDB()
     If (sqlFailedInit=1)
-    {
-       showTOOLtip("Failed to initialize database of seen images")
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
-       Return
-    }
+       Return msgBeepTimer("Failed to initialize database of seen images")
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
@@ -98442,11 +97434,7 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    If (selCoords="error")
    { 
       If (silentMode!=1)
-      {
-         showTOOLtip("ERROR: Auto-crop failed to process the image")
-         SoundBeep, 300, 100
-         SetTimer, RemoveTooltip, % -msgDisplayTime
-      }
+         msgBeepTimer("ERROR: Auto-crop failed to process the image")
       Return
    } Else If (selCoords="change")
    { 
@@ -98479,11 +97467,8 @@ AutoCropAction(zBitmap, varTolerance, threshold, silentMode, selMode) {
    }
 
    If (nothing2crop=1 && silentMode=0)
-   {
-      showTOOLtip("WARNING: The image is uniform within the given tolerance.`nThere is nothing to trim.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   } Else If (silentMode=0)
+      msgBeepTimer("WARNING: The image is uniform within the given tolerance.`nThere is nothing to trim.")
+   Else If (silentMode=0)
    {
       If (A_TickCount - startu > 3000)
          SoundBeep, 900, 100
@@ -99690,11 +98675,8 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
          If (dummy="no-prompt")
          {
             If (contextu="extern")
-            {
-               showTOOLtip("ERROR: Unsupported image file write format")
-               SoundBeep , 300, 100
-               SetTimer, RemoveTooltip, % -msgDisplayTime
-            } Else msgBoxWrapper(appTitle ": ERROR", "Unsupported file write format. Please use one of the allowed image file formats: .EXR, .HDR, .PFM, " saveTypesFriendly ". ", 0, 0, "error")
+               msgBeepTimer("ERROR: Unsupported image file write format")
+            Else msgBoxWrapper(appTitle ": ERROR", "Unsupported file write format. Please use one of the allowed image file formats: .EXR, .HDR, .PFM, " saveTypesFriendly ". ", 0, 0, "error")
          } Else msgBoxWrapper(appTitle ": ERROR", "Please save the file using one of the supported file format extensions: .EXR, .HDR, .PFM, " saveTypesFriendly ". ", 0, 0, "error")
          Return
       }
@@ -99901,8 +98883,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       showTOOLtip("Finished processing " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors)
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 batchSimpleColorsAdjusts() {
@@ -100012,8 +98993,7 @@ batchSimpleColorsAdjusts() {
       showTOOLtip("Finished processing " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors)
 
    SetTimer, ResetImgLoadStatus, -50
-   SoundBeep, % (abandonAll=1) ? 300 : 900, 100
-   SetTimer, RemoveTooltip, % -msgDisplayTime
+   msgBeepTimer("", (abandonAll=1) ? 300 : 900)
 }
 
 printArrayStr(whichArray, delim:="|", forMode:=0) {
@@ -101396,9 +100376,7 @@ AcquireWIAimage() {
        ResetImgLoadStatus()
        deviceu := ""
        infos := (obju=-1) ? "No device selected." : "No image was returned by scanner."
-       showTOOLtip("WARNING: No image acquired.`n" infos)
-       SoundBeep 300, 100
-       SetTimer, RemoveTooltip, % -msgDisplayTime
+       msgBeepTimer("WARNING: No image acquired.`n" infos)
     } Else If (obju<0 && !IsObject(obju))
     {
        RemoveTooltip()
@@ -101411,10 +100389,7 @@ AcquireWIAimage() {
        {
           ResetImgLoadStatus()
           Gdip_DisposeImage(pBitmap, 1)
-          showTOOLtip("Failed to acquire the correct image data`nPossibly malformed image format.")
-          SoundBeep , 300, 100
-          SetTimer, RemoveTooltip, % -msgDisplayTime
-          Return
+          Return msgBeepTimer("Failed to acquire the correct image data`nPossibly malformed image format.")
        }
 
        recordGdipBitmaps(pBitmap, A_ThisFunc "|recordUndoLevelNow")
@@ -103052,11 +102027,7 @@ tlbrChangeStuffRotation(modus) {
                vpIMGrotation := clampInRange(zl, 0, 360)
             dummyTimerDelayiedImageDisplay(50)
          } Else
-         {
-            showTOOLtip("WARNING: Incorrect angle provided")
-            SoundBeep 300, 100
-            SetTimer, RemoveTooltip, % -msgDisplayTime
-         }
+            msgBeepTimer("WARNING: Incorrect angle provided")
       }
       deactivateTlbrKbdMode(1)
       Return
@@ -103368,11 +102339,7 @@ tlbrZoomINout(dummy:=0) {
                   IMGdecalageX := IMGdecalageY := 1
                dummyTimerDelayiedImageDisplay(50)
             } Else
-            {
-               showTOOLtip("WARNING: Incorrect zoom level value provided")
-               SoundBeep 300, 100
-               SetTimer, RemoveTooltip, % -msgDisplayTime
-            }
+               msgBeepTimer("WARNING: Incorrect zoom level value provided")
          }
          deactivateTlbrKbdMode(1)
          Return
@@ -103631,11 +102598,7 @@ tlbrInvokeSortListMenu() {
       currentFileIndex := doOpenStartFolder()
       SetTimer, tlbrInvokeSortListMenu, -200
    } Else If (maxFilesIndex<3)
-   {
-      showTOOLtip("WARNING: Insufficient files are currently indexed.")
-      SoundBeep 300, 100
-      SetTimer, RemoveTooltip, % -msgDisplayTime
-   }
+      msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 }
 
 isTlbrViewModus(p:=0) {
