@@ -70766,7 +70766,7 @@ TglUseCacheSLDinfo() {
    Else
       showTOOLtip("SQL database cached data will NOT be used to sort the files list", A_ThisFunc, 1)
 
-   SetTimer, RemoveTooltip, % -msgDisplayTime + 1500
+   SetTimer, RemoveTooltip, % -(msgDisplayTime + 1500)
 }
 
 TglRvrSort() {
@@ -94558,16 +94558,9 @@ BTNcopyDynaFoldersList() {
        Return
 
     If copyTextToClippy(newFoldersList)
-    {
-       showTOOLtip("Dynamic folders list copied to clipboard")
-       SoundBeep , 900, 100
-    } Else
-    {
-       showTOOLtip("Failed to copy to clipboard the dynamic folders list")
-       SoundBeep , 300, 100
-    }
-
-    SetTimer, RemoveTooltip, % msgDisplayTime
+       msgBeepTimer("Dynamic folders list copied to clipboard", 900)
+    Else
+       msgBeepTimer("Failed to copy to clipboard the dynamic folders list")
 }
 
 BTNpasteDynaFoldersList() {
