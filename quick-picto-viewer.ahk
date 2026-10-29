@@ -1379,11 +1379,11 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
        If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["toggleViewPortGridu"]
        Else If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
-          func2Call := ["ToggleImgHistogram", 1]
+          func2Call := ["ToggleImgHistogram", 1, "bar"]
     } Else If (givenKey="+g")
     {
        If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
-          func2Call := ["ToggleImgHistogram", -1]
+          func2Call := ["ToggleImgHistogram", -1, "bar"]
     } Else If (givenKey="!g")
     {
        If (HKifs("imgEditSolo", deepSim) || HKifs("liveEdit", deepSim) || HKifs("imgsLoaded", deepSim))
@@ -1903,7 +1903,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
        Else If (isImgEditingNow()=1 && drawingShapeNow=1)
           func2Call := ["togglePathCurveTension"]
        Else If (HKifs("imgsLoaded", deepSim) || HKifs("liveEdit", deepSim))
-          func2Call := ["ToggleImageSizingMode"]
+          func2Call := ["ToggleImageSizingMode", "bar"]
     } Else If (givenKey="+Space")
     {
        If HKifs("imgsLoaded", deepSim)
@@ -10735,6 +10735,9 @@ ToggleImageSizingMode(modus:=0) {
        updatePanelColorsInfo()
        updatePanelColorSliderz()
     }
+
+    If (modus="bar")
+       CreateTempGuiButton("Fit options,,InvokeMenuImgSizeVP", 0, msgDisplayTime//1.5 + 500)
 }
 
 DefineImgSizing(modus:=1) {
@@ -50796,6 +50799,10 @@ toggleViewPortGridu(modus="") {
           Sleep, 5
       whileLoopExec := 0
    }
+
+   ; turned on from a menu or the toolbar, whose button acts inside the click handler
+   If (modus!="" && showViewPortGrid=1 && AnyWindowOpen!=63 && drawingShapeNow!=1)
+      quickBarLater("Grid options,,PanelConfigVPgrid")
 }
 
 toggleGridFixedSize() {
@@ -70832,6 +70839,7 @@ toggleListViewModeThumbs() {
       decideIconBTNthumbsList()
    showTOOLtip("List view: " friendly, A_ThisFunc, 1, thumbsListViewMode/4)
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   CreateTempGuiButton("View options,,invokeMenuNavBoxImgSizeVP", 0, msgDisplayTime//1.5 + 500)
 }
 
 defineListViewModes() {
@@ -70937,6 +70945,7 @@ ToggleInfoBoxu() {
     If (A_TickCount - lastInvoked < 85) ; || (thumbsDisplaying=1)
        Return
 
+    wasOff := (showInfoBoxHUD=0)
     showInfoBoxHUD++
     lastInvoked := A_TickCount
     lastInfoBoxZeitToggle := A_TickCount
@@ -70947,6 +70956,8 @@ ToggleInfoBoxu() {
     Else
        SetTimer, dummyRefreshImgSelectionWindow, -50
     ; dummyTimerDelayiedImageDisplay(50)
+    If (wasOff && showInfoBoxHUD>0)
+       CreateTempGuiButton("File information,,PanelImageInfos", 0, msgDisplayTime//1.5 + 500)
 }
 
 ToggleImgCaptions() {
@@ -71753,6 +71764,8 @@ ToggleImgNavBox() {
     dummyTimerDelayiedImageDisplay(25)
     SetTimer, dummyNavBoxInfo, -50
     lastInvoked := A_TickCount
+    If (showHUDnavIMG=1)
+       CreateTempGuiButton("View options,,invokeMenuNavBoxImgSizeVP", 0, msgDisplayTime//1.5 + 500)
 }
 
 ToggleImgNavSizeBox() {
@@ -71836,6 +71849,8 @@ ToggleImgHistogram(direction:=1, dummy:=0) {
        updatePanelColorSliderz()
     }
     lastInvoked := A_TickCount
+    If (dummy="bar" && showHistogram>1)
+       CreateTempGuiButton("Histogram options,,invokeHistoMenu", 0, msgDisplayTime//1.5 + 500)
 }
 
 ToggleHistogramMode() {
@@ -102954,7 +102969,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
             func2Call := ["toggleListViewModeThumbs"]
       } Else If (btnID="BTNimgSizers")
       {
-         func2Call := ["ToggleImageSizingMode"]
+         func2Call := ["ToggleImageSizingMode", "bar"]
       } Else If (btnID="BTNzoomInIMG")
       {
          If (simulacrum=1)
@@ -102978,7 +102993,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNalignVPimgu")
          func2Call := ["ToggleIMGalign"]
       Else If (btnID="BTNhudHisto")
-         func2Call := ["ToggleImgHistogram", 1]
+         func2Call := ["ToggleImgHistogram", 1, "bar"]
       Else If (btnID="BTNannotate")
          func2Call := ["PanelEditImgCaption"]
       Else If (btnID="BTNprivatModa")
