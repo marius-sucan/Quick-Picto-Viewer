@@ -76921,7 +76921,7 @@ preventColorChange() {
           Return
 
        If (BrushToolType=3)
-          msgBeepTimer("WARNING: You are currently using the cloner brush tool`nTo define the source pattern, press D.")
+          msgBeepTimer("WARNING: You are currently using the cloner brush tool`nTo define the source pattern, press S.")
        Else
           msgBeepTimer("WARNING: You are currently using a brush that does not rely on a given color")
 
