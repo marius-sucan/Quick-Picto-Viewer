@@ -7072,8 +7072,9 @@ configVectorShapeSymmetryPoint(modus, silentu, givenIndex, noChecks:=0, allowRei
    }
 
    If (silentu!=1 && errMsgNow)
+   {
       Return msgBeepTimer(errMsgNow, 300, msgDisplayTime*2)
-   Else If errMsgNow
+   } Else If errMsgNow
    {
       addJournalEntry(A_ThisFunc "(): " errMsgNow)
       Return
@@ -17512,10 +17513,9 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4)
     If !G2
     {
-       showTOOLtip("Failed to apply the viewport color adjustments to the image selected area")
        imgFxMode := o_imgFxMode
        trGdip_DisposeImage(newBitmap)
-       msgBeepTimer()
+       msgBeepTimer("Failed to apply the viewport color adjustments to the image selected area")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17523,10 +17523,9 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
-       showTOOLtip("Failed to apply the viewport color adjustments to the image selected area`nUnable to create selection path")
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer()
+       msgBeepTimer("Failed to apply the viewport color adjustments to the image selected area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17588,10 +17587,9 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4, compositingQuality)
     If !G2
     {
-       showTOOLtip("Failed to apply the color adjustments to the image selected area")
        trGdip_DisposeImage(newBitmap)
        imgFxMode := o_imgFxMode
-       msgBeepTimer()
+       msgBeepTimer("Failed to apply the color adjustments to the image selected area")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17599,11 +17597,10 @@ AdjustColorsLegacySelectedArea(prevFXmode:=0) {
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
-       showTOOLtip("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
        imgFxMode := o_imgFxMode
-       msgBeepTimer()
+       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17693,9 +17690,8 @@ AdjustColorsSimpleSelectedArea() {
     G2 := trGdip_GraphicsFromImage(A_ThisFunc, newBitmap, 7, 4, compositingQuality)
     If !G2
     {
-       showTOOLtip("Failed to apply the color adjustments to the image selected area")
+       msgBeepTimer("Failed to apply the color adjustments to the image selected area")
        trGdip_DisposeImage(newBitmap)
-       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17703,10 +17699,9 @@ AdjustColorsSimpleSelectedArea() {
     pPath := createImgSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, EllipseSelectMode, VPselRotation, rotateSelBoundsKeepRatio, 0, 1, 1, innerSelectionCavityX, innerSelectionCavityY)
     If !pPath
     {
-       showTOOLtip("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
        trGdip_DisposeImage(newBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer()
+       msgBeepTimer("Failed to apply the color adjustments to the image selected area`nUnable to create selection path")
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -17801,10 +17796,10 @@ InsertTextSelectedArea() {
     If !G2
     {
        If validBMP(metaBitmap)
-          showTOOLtip("Failed to insert text in the selected area.`nUnable to create GDI+ graphics object.")
+          msgBeepTimer("Failed to insert text in the selected area.`nUnable to create GDI+ graphics object.")
        Else
-          showTOOLtip("Failed to insert text in the selected area.`nUnable to allocate new bitmap.")
-       SoundBeep 300, 100
+          msgBeepTimer("Failed to insert text in the selected area.`nUnable to allocate new bitmap.")
+
        SetTimer, ResetImgLoadStatus, -100
        trGdip_DisposeImage(metaBitmap)
        Return
@@ -19792,10 +19787,8 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
     G2 := trGdip_GraphicsFromImage(funcu, metaBitmap, 7, 4)
     If !G2
     {
-       showTOOLtip("Failed to " infoFriendly " the selected area")
-       SoundBeep , 300, 100
+       msgBeepTimer("Failed to " infoFriendly " the selected area")
        trGdip_DisposeImage(metaBitmap)
-       SetTimer, RemoveTooltip, % -msgDisplayTime
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -19808,10 +19801,9 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
 
     If (pPath="")
     {
-       showTOOLtip("Failed to " infoFriendly " the selected area`nUnable to create selection path")
+       msgBeepTimer("Failed to " infoFriendly " the selected area`nUnable to create selection path")
        trGdip_DisposeImage(metaBitmap)
        Gdip_DeleteGraphics(G2)
-       msgBeepTimer()
        SetTimer, ResetImgLoadStatus, -250
        Return
     }
@@ -19973,11 +19965,10 @@ EraseOrInvertOrGraySelectedArea(actionu, funcu) {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
     {
-       showTOOLtip("Failed to " infoFriendly " the selected area")
-       SoundBeep , 300, 100
+       msgBeepTimer("Failed to " infoFriendly " the selected area")
        trGdip_DisposeImage(metaBitmap)
-       SetTimer, RemoveTooltip, % -msgDisplayTime
     }
+
     SetTimer, ResetImgLoadStatus, -250
     dummyTimerDelayiedImageDisplay(50)
 } ; // EraseOrInvertOrGraySelectedArea()
@@ -65137,11 +65128,15 @@ showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
 }
 
 msgBeepTimer(msg:="", freq:=300, delay:="") {
-   If (msg!="")
+   If msg
       showTOOLtip(msg)
-   SoundBeep, % freq, 100
+
+   If freq
+      SoundBeep, % freq, 100
+
    If (delay="")
       delay := msgDisplayTime
+
    SetTimer, RemoveTooltip, % -delay
 }
 
