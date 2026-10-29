@@ -62507,10 +62507,8 @@ combineImagesMultiTiffGDIp(destFilePath) {
 
             If !nCount
             {
-               showTOOLtip("ERROR: Failed to get TIFF encoder properties. Please try again.")
-               SoundBeep 300, 100
                fnOutputDebug("paramsCount=" nCount "|pCodec=" pCodec)
-               fattalErr := 1
+               fattalErr := "ERROR: Failed to get TIFF encoder properties. Please try again."
                Break
             }
 
@@ -62528,10 +62526,8 @@ combineImagesMultiTiffGDIp(destFilePath) {
 
             If !_p
             {
-               showTOOLtip("ERROR: The .TIFF encoder exposes no usable multi-frame parameter.")
-               SoundBeep 300, 100
                fnOutputDebug(A_ThisFunc "(): no long param; nCount=" nCount "|pCodec=" pCodec)
-               fattalErr := 1
+               fattalErr := "ERROR: The .TIFF encoder exposes no usable multi-frame parameter."
                Break
             }
 
@@ -62539,9 +62535,7 @@ combineImagesMultiTiffGDIp(destFilePath) {
             ; fnOutputDebug(rg " first img=" _E "p=" _p "; elem=" elem "; nCount=" nCount "; pCodec=" pCodec)
             If _E
             {
-               showTOOLtip("ERROR: Failed to create the multipaged .TIFF file. Error code: " _E)
-               SoundBeep 300, 100
-               fattalErr := 1
+               fattalErr := "ERROR: Failed to create the multipaged .TIFF file. Error code: " _E
                Break
             }
             selectedFiles++
@@ -62582,6 +62576,9 @@ combineImagesMultiTiffGDIp(destFilePath) {
    {
       msgBeepTimer("Operation aborted by user. Multipaged .TIFF file not created.")
       FileDelete, % destFilePath
+   } Else If fattalErr
+   {
+      msgBeepTimer(fattalErr "`n" OutFileName "`n" OutDir "\")
    } Else If !selectedFiles
    {
       msgBeepTimer("ERROR: Failed to create the multipaged .TIFF file. No image could be embedded.`n" OutFileName "`n" OutDir "\")
