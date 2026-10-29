@@ -58612,9 +58612,9 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       ; GIF files are always 8 bits; the 24, 16 and 8 bits depths lose the alpha channel
       hasAlpha := huge ? alphau : (currIMGdetails.HasAlpha=1)
       If (nExt="gif")
-         lostAlpha := !(userPaletteTransparency=1 && wasInitFIMlib=1 && !huge)
+         lostAlpha := (userPaletteTransparency=1 && wasInitFIMlib=1 && !huge) ? 0 : 1
       Else
-         lostAlpha := !RegExMatch(file2save, saveAlphaTypesRegEX) || isInRange(userSaveBitsDepth, 2, 4)
+         lostAlpha := (!RegExMatch(file2save, saveAlphaTypesRegEX) || isInRange(userSaveBitsDepth, 2, 4)) ? 1 : 0
 
       If (noQualityWarnings!=1 && hasAlpha && lostAlpha)
       {
