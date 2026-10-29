@@ -17411,8 +17411,11 @@ CutSelectedArea() {
    ; erase the copied area itself, whatever the Erase panel options
    eraseOpts := [EraseAreaInvert, EraseAreaFader, EraseAreaUseAlpha]
    EraseAreaInvert := EraseAreaFader := EraseAreaUseAlpha := 0
+   stamp := quickBarEditStamp()
    EraseSelectedArea()
    EraseAreaInvert := eraseOpts[1], EraseAreaFader := eraseOpts[2], EraseAreaUseAlpha := eraseOpts[3]
+   If (!viewportQPVimage.imgHandle && quickBarEditStamp()!=stamp)
+      CreateTempGuiButton("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace", 0, msgDisplayTime//1.5 + 500)
 }
 
 ApplyVPcolorAdjustSelectedArea(modus:=0) {
@@ -19670,10 +19673,12 @@ GraySelectedArea() {
 }
 
 InvertSelectedArea() {
+   stamp := quickBarEditStamp()
    If (viewportQPVimage.imgHandle)
       HugeImagesFlipHVinvert("i")
    Else
       EraseOrInvertOrGraySelectedArea("invert", A_ThisFunc)
+   quickBarUndoReopen("", stamp)
 }
 
 EraseSelectedArea() {
@@ -19681,17 +19686,21 @@ EraseSelectedArea() {
 }
 
 FlipSelectedAreaH() {
+   stamp := quickBarEditStamp()
    If (viewportQPVimage.imgHandle)
       HugeImagesFlipHVinvert("h")
    Else
       EraseOrInvertOrGraySelectedArea("flip-h", A_ThisFunc)
+   quickBarUndoReopen("", stamp)
 }
 
 FlipSelectedAreaV() {
+   stamp := quickBarEditStamp()
    If (viewportQPVimage.imgHandle)
       HugeImagesFlipHVinvert("v")
    Else
       EraseOrInvertOrGraySelectedArea("flip-v", A_ThisFunc)
+   quickBarUndoReopen("", stamp)
 }
 
 FillBehindSelectedArea() {
@@ -22459,8 +22468,9 @@ ResizeIMGviewportSelection() {
 
     If (viewportQPVimage.imgHandle)
     {
+       stamp := quickBarEditStamp()
        HugeImagesCropResizeRotate(imgSelW, imgSelH, "resize", 0, 0, 0, 0, userimgQuality)
-       Return
+       Return quickBarUndoReopen("", stamp)
     }
 
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
@@ -22491,6 +22501,7 @@ ResizeIMGviewportSelection() {
     dummyTimerDelayiedImageDisplay(50)
     SetTimer, ResetImgLoadStatus, -150
     SetTimer, dummyInfoImgResizeVP, -125
+    quickBarUndoReopen("", "")
 }
 
 dummyInfoImgResizeVP() {
@@ -24922,9 +24933,13 @@ RotateEditedImage(modus:=0) {
     If (!validBMP(whichBitmap) || thumbsDisplaying=1)
        Return
 
+    rotateBar := "Undo,,quickBarImgUndo||Rotate again,," ((modus=90) ? "MenuRotateEditImagePlus" : "MenuRotateEditImageMinus")
     If (viewportQPVimage.imgHandle)
     {
+       stamp := quickBarEditStamp()
        HugeImagesCropResizeRotate(0, 0, "rotate" modus)
+       If (quickBarEditStamp()!=stamp)
+          CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
        Return
     }
 
@@ -24938,6 +24953,7 @@ RotateEditedImage(modus:=0) {
        vpIMGrotation := 0
        SoundBeep 900, 100
        dummyTimerDelayiedImageDisplay(50)
+       CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
     } Else
     {
        If (preventUndoLevels!=1)
@@ -24948,6 +24964,8 @@ RotateEditedImage(modus:=0) {
 }
 
 CropImageInViewPortToSelection(modus:=0) {
+; modus: "simplex" for an internal crop; "no-bar" when the caller follows with its own step
+    Static cropBar := "Undo crop,,quickBarImgUndo||Save,,quickBarSaveImage||Copy,,CopyImage2clip"
     stopSlideshow()
     mergeViewPortRotationImgEditing()
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
@@ -24957,6 +24975,7 @@ CropImageInViewPortToSelection(modus:=0) {
     If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected(0, 0, 1))
        Return
 
+    stamp := quickBarEditStamp()
     If (viewportQPVimage.imgHandle)
     {
        trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -24975,6 +24994,8 @@ CropImageInViewPortToSelection(modus:=0) {
        calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        If (imgSelW!=imgW || imgSelH!=imgH)
           HugeImagesCropResizeRotate(Round(x2), Round(y2), "crop", Round(x1), Round(y1), imgSelW, imgSelH)
+       If (!isVarEqualTo(modus, "simplex", "no-bar") && quickBarEditStamp()!=stamp)
+          CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
        Return
     }
 
@@ -25009,6 +25030,8 @@ CropImageInViewPortToSelection(modus:=0) {
           MouseMoveResponder()
           dummyTimerDelayiedImageDisplay(50)
           SetTimer, dummyInfoImgCropVP, -150
+          If (modus!="no-bar")
+             CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
        }
     } Else
        msgBeepTimer("Failed to crop image to selected area")
@@ -27340,7 +27363,7 @@ quickBarImgUndo() {
 }
 
 quickBarReopenPanel(givenFunc:="") {
-; with a panel function: remembers it; bare [the bar's button]: reopens that panel
+; with a panel function [or a live editing panel ID]: remembers it; bare [the bar's button]: reopens that panel
    Static panelFunc := ""
    If (givenFunc!="")
    {
@@ -27348,12 +27371,11 @@ quickBarReopenPanel(givenFunc:="") {
       Return
    }
 
-   If !IsFunc(panelFunc)
-      Return
-
-   If (AnyWindowOpen && getHostPanelFunc()=panelFunc)
+   If isNumber(panelFunc)
+      BTNopenPrevPanel(panelFunc, "yes", "n")
+   Else If (AnyWindowOpen && getHostPanelFunc()=panelFunc)
       WinActivate, ahk_id %hSetWinGui%
-   Else
+   Else If IsFunc(panelFunc)
       %panelFunc%()
 }
 
@@ -27368,6 +27390,12 @@ quickBarUndoReopen(panelFunc, stamp) {
 
    btnReopen := panelFunc ? "||Reopen panel,,quickBarReopenPanel" : ""
    CreateTempGuiButton("Undo action,,quickBarImgUndo" btnReopen, 0, msgDisplayTime//1.5 + 500)
+}
+
+quickBarSaveImage() {
+; Save button: the bar goes away first, so its Undo cannot act behind the save panel
+   DestroyTempBtnGui("now")
+   PanelSaveImg()
 }
 
 quickBarFileUndo(labelu) {
@@ -48178,6 +48206,8 @@ stopDrawingShape(dummy:="") {
        dummyTimerDelayiedImageDisplay(100)
        If (!AnyWindowOpen && drawingVectorLiveMode!=3)
           BTNopenPrevPanel(StrReplace(postVectorWinOpen, "c"), "yes", "n")
+       Else If !AnyWindowOpen
+          freeformDone := 1, freeformPanel := StrReplace(postVectorWinOpen, "c")
     }
 
     postVectorWinOpen := currentVectorUndoLevel := 0
@@ -48189,6 +48219,17 @@ stopDrawingShape(dummy:="") {
     MouseMoveResponder()
     If (showMainMenuBar=1)
        TriggerMenuBarUpdate()
+
+    If (freeformDone=1)
+    {
+       ; the panel closed when the drawing began does not reopen by itself
+       If (isNumber(freeformPanel) && freeformPanel>0)
+       {
+          quickBarReopenPanel(freeformPanel)
+          CreateTempGuiButton("Reopen panel,,quickBarReopenPanel||Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+       } Else
+          CreateTempGuiButton("Crop to selection,,CropImageInViewPortToSelection||Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+    }
 }
 
 getPredefinedVectorShapeDef(whichShape) {
@@ -97237,7 +97278,7 @@ BTNsaveAutoCroppedFile() {
     If (r!="ok")
        Return
 
-    CropImageInViewPortToSelection()
+    CropImageInViewPortToSelection("no-bar")
     Sleep, 5
     PanelSaveImg()
 }
@@ -97548,7 +97589,7 @@ BTNautoCropVP() {
   ; and crop the image in the viewport to it; on abort or failure, no crop occurs
   r := BTNautoCropRealtime()
   If (r="ok")
-     CropImageInViewPortToSelection()
+     CropImageInViewPortToSelection("no-bar")
   quickBarUndoReopen(panelFunc, stamp)
 }
 
