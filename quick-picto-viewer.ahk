@@ -11116,7 +11116,7 @@ DefineFXmodes() {
 }
 
 ToggleImgColorDepth(dir:=0) {
-    Static lastInvoked := 1
+    Static lastInvoked := 1, depthBar := ""
     If (A_TickCount - lastInvoked < 50) || (thumbsDisplaying=1 && thumbsListViewMode>1)
        Return
 
@@ -11148,6 +11148,13 @@ ToggleImgColorDepth(dir:=0) {
       updatePanelColorsInfo()
       updatePanelColorSliderz()
    }
+
+   If (usrColorDepth>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
+   {
+      CreateTempGuiButton("Apply to image,,quickBarApplyColorDepth||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+      depthBar := tempBtnVisible
+   } Else If (usrColorDepth=1 && depthBar!="" && depthBar=tempBtnVisible)
+      DestroyTempBtnGui("now")
 }
 
 defineColorDepth() {
@@ -11166,7 +11173,7 @@ defineColorDepth() {
 }
 
 ToggleImgFX(dir:=0) {
-   Static lastInvoked := 1, moreFX := {1:"None", 2:"Brightness / Contrast", 3:"Hue / Saturation / Lightness", 4:"Levels adjust [High / Mid / Low]", 5:"Color tint [Hue / Amount]", 6:"Colors balance", 7:"Color curve per channel"}
+   Static fxBar := "", lastInvoked := 1, moreFX :={1:"None", 2:"Brightness / Contrast", 3:"Hue / Saturation / Lightness", 4:"Levels adjust [High / Mid / Low]", 5:"Color tint [Hue / Amount]", 6:"Colors balance", 7:"Color curve per channel"}
         , curvesFX := {1:"Brightness (density)", 2:"Contrast", 3:"Highlights", 4:"Shadows", 5:"Midtones", 6:"White saturation", 7:"Black saturation"}
         , curvesChannels := {1:"Red", 2:"Green", 3:"Blue", 4:"All"}
 
@@ -11246,6 +11253,17 @@ ToggleImgFX(dir:=0) {
       GuiControl, SettingsGUIA: Choose, UIimgFxMode, % m
       updatePanelColorsInfo()
       updatePanelColorSliderz()
+   }
+
+   If (imgFxMode>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
+   {
+      applyLabel := (editingSelectionNow=1 && !testEntireImgSelected()) ? "Apply to selection" : "Apply to image"
+      CreateTempGuiButton(applyLabel ",,ApplyVPcolorAdjustSelectedArea||Adjust colors,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+      fxBar := tempBtnVisible
+   } Else If (imgFxMode=1 && fxBar!="" && fxBar=tempBtnVisible)
+   {
+      ; with no mode left, Apply would reuse the previous one
+      DestroyTempBtnGui("now")
    }
 }
 
