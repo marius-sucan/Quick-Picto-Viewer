@@ -2990,7 +2990,8 @@ OpenWithDefaultApp() {
     imgPath := getIDimage(currentFileIndex)
     imgPath := StrReplace(imgPath, "||")
     If !FileRexists(imgPath)
-       informUserFileMissing()
+       Return informUserFileMissing()
+
     Sleep, 25
     If imgPath
     {
@@ -3003,7 +3004,7 @@ OpenWithDefaultApp() {
 OpenFileProperties() {
     imgPath := StrReplace(getIDimage(currentFileIndex), "||")
     If !FileRexists(imgPath)
-       informUserFileMissing()
+       Return informUserFileMissing()
 
     Sleep, 25
     If imgPath
@@ -4145,9 +4146,6 @@ invertCurrentFolderRecursiveness() {
 }
 
 MenuRemFilesListFilter() {
-   If (StrLen(filesFilter)<2)
-      Return
-
    remFilesListFilter()
    ; SetTimer, RandomPicture, -150
    dummyTimerDelayiedImageDisplay(50)
@@ -4293,7 +4291,7 @@ FirstPicture() {
    currentFileIndex := 1
    dummyTimerDelayiedImageDisplay(50)
    If (thumbsDisplaying!=1 && prevIndex!=currentFileIndex)
-      CreateTempGuiButton("Go back,,jumpPreviousImage", 0, msgDisplayTime//1.5 + 500)
+      quickBarGoBack(currentFileIndex)
 }
 
 LastPicture() {
@@ -4311,7 +4309,7 @@ LastPicture() {
    currentFileIndex := maxFilesIndex
    dummyTimerDelayiedImageDisplay(50)
    If (thumbsDisplaying!=1 && prevIndex!=currentFileIndex)
-      CreateTempGuiButton("Go back,,jumpPreviousImage", 0, msgDisplayTime//1.5 + 500)
+      quickBarGoBack(currentFileIndex)
 }
 
 SettingsGUIAGuiClose:
@@ -6078,13 +6076,13 @@ dummyAutoClearSelectionHighlight() {
 }
 
 applyIMGeditKeepWin() {
-   panelFunc := getHostPanelFunc()
+   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
    o := closeEditPanelOnApply
    closeEditPanelOnApply := 0
    GuiControl, SettingsGUIA:, closeEditPanelOnApply, 0
    applyIMGeditFunction()
    Sleep, 2
-   quickBarUndoReopen(panelFunc, "")
+   quickBarUndoReopen(panelFunc, stamp)
    closeEditPanelOnApply := o
    GuiControl, SettingsGUIA:, closeEditPanelOnApply, % o
 }
@@ -11171,7 +11169,7 @@ ToggleImgColorDepth(dir:=0) {
    If (usrColorDepth>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
    {
       CreateTempGuiButton("Apply to image,,quickBarApplyColorDepth||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
-      depthBar := tempBtnVisible
+      depthBar := (TouchScreenMode=1) ? tempBtnVisible : ""
    } Else If (usrColorDepth=1 && depthBar!="" && depthBar=tempBtnVisible)
       DestroyTempBtnGui("now")
 }
@@ -11277,8 +11275,8 @@ ToggleImgFX(dir:=0) {
    If (imgFxMode>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
    {
       applyLabel := (editingSelectionNow=1 && !testEntireImgSelected()) ? "Apply to selection" : "Apply to image"
-      CreateTempGuiButton(applyLabel ",,ApplyVPcolorAdjustSelectedArea||Adjust colors,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
-      fxBar := tempBtnVisible
+      CreateTempGuiButton(applyLabel ",,quickBarApplyColorMode||Adjust colors,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+      fxBar := (TouchScreenMode=1) ? tempBtnVisible : ""
    } Else If (imgFxMode=1 && fxBar!="" && fxBar=tempBtnVisible)
    {
       ; with no mode left, Apply would reuse the previous one
@@ -16966,7 +16964,7 @@ ImgUndoAction(dummy:=0) {
       showTOOLtip(friendly "Undo [ " currentUndoLevel " / " undoLevelsRecorded " ]", 0, 0, currentUndoLevel/undoLevelsRecorded)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
       If (preventUndoLevels=1)
-         quickBarLater("Record undo levels,,TogglePreventUndos")
+         quickBarLater("Record undo levels,,quickBarRecordUndos")
       Return
    }
 
@@ -17457,7 +17455,7 @@ CutSelectedArea() {
    EraseSelectedArea()
    EraseAreaInvert := eraseOpts[1], EraseAreaFader := eraseOpts[2], EraseAreaUseAlpha := eraseOpts[3]
    If (!viewportQPVimage.imgHandle && quickBarEditStamp()!=stamp)
-      CreateTempGuiButton("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace", 0, msgDisplayTime//1.5 + 500)
+      quickBarUndoBar("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace")
 }
 
 ApplyVPcolorAdjustSelectedArea(modus:=0) {
@@ -20667,7 +20665,7 @@ undoRedoHugeImagesAct() {
    If (preventUndoLevels=1)
    {
       msgBeepTimer("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
-      Return quickBarLater("Record undo levels,,TogglePreventUndos")
+      Return quickBarLater("Record undo levels,,quickBarRecordUndos")
    }
  
    setImageLoading()
@@ -24987,7 +24985,7 @@ RotateEditedImage(modus:=0) {
        stamp := quickBarEditStamp()
        HugeImagesCropResizeRotate(0, 0, "rotate" modus)
        If (quickBarEditStamp()!=stamp)
-          CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
+          quickBarUndoBar(rotateBar)
        Return
     }
 
@@ -25001,7 +24999,7 @@ RotateEditedImage(modus:=0) {
        vpIMGrotation := 0
        SoundBeep 900, 100
        dummyTimerDelayiedImageDisplay(50)
-       CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
+       quickBarUndoBar(rotateBar)
     } Else
     {
        If (preventUndoLevels!=1)
@@ -25043,7 +25041,7 @@ CropImageInViewPortToSelection(modus:=0) {
        If (imgSelW!=imgW || imgSelH!=imgH)
           HugeImagesCropResizeRotate(Round(x2), Round(y2), "crop", Round(x1), Round(y1), imgSelW, imgSelH)
        If (!isVarEqualTo(modus, "simplex", "no-bar") && quickBarEditStamp()!=stamp)
-          CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
+          quickBarUndoBar(cropBar)
        Return
     }
 
@@ -25079,7 +25077,7 @@ CropImageInViewPortToSelection(modus:=0) {
           dummyTimerDelayiedImageDisplay(50)
           SetTimer, dummyInfoImgCropVP, -150
           If (modus!="no-bar")
-             CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
+             quickBarUndoBar(cropBar)
        }
     } Else
        msgBeepTimer("Failed to crop image to selected area")
@@ -25382,7 +25380,11 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
        pasteBar .= "||Undo,,quickBarImgUndo"
     Else If (modus="scanner")
        pasteBar .= "||Scan again,,AcquireWIAimage"
-    CreateTempGuiButton(pasteBar, 0, msgDisplayTime//1.5 + 500)
+
+    If (isImgOpen=2)
+       quickBarUndoBar(pasteBar)
+    Else
+       CreateTempGuiButton(pasteBar, 0, msgDisplayTime//1.5 + 500)
 }
 
 thumbsSelector(keyu, aKey, prevFileIndex) {
@@ -27407,13 +27409,31 @@ quickBarEditStamp() {
    Return UserMemBMP "|" undoLevelsArray[currentUndoLevel, 1] "|" viewportQPVimage.imgHandle "|" viewportQPVimage.actions
 }
 
-quickBarImgUndo() {
-; Undo button: undoes an image edit, never a file action [ImgUndoAction() falls back to those]
-   If (thumbsDisplaying=1 || imageLoading=1)
+quickBarUndoBar(btnList) {
+; shows a bar whose Undo button [quickBarImgUndo] undoes the edit just made
+   quickBarImgUndo(quickBarEditStamp())
+   CreateTempGuiButton(btnList, 0, msgDisplayTime//1.5 + 500)
+}
+
+quickBarImgUndo(armStamp:="") {
+; with a stamp: arms the Undo button for that edit; bare [the button]: undoes it once, while it is still the newest edit
+; never a file action [ImgUndoAction() falls back to those] and never behind a panel that does not edit the image
+   Static editStamp := ""
+   If (armStamp!="")
+   {
+      editStamp := armStamp
+      Return
+   }
+
+   If (editStamp="" || quickBarEditStamp()!=editStamp || thumbsDisplaying=1 || imageLoading=1 || isNowAlphaPainting())
+   || (AnyWindowOpen && imgEditPanelOpened!=1)
       Return
 
    If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0)
+   {
+      editStamp := ""
       ImgUndoAction()
+   }
 }
 
 quickBarReopenPanel(givenFunc:="") {
@@ -27443,29 +27463,58 @@ quickBarUndoReopen(panelFunc, stamp) {
       quickBarReopenPanel(panelFunc)
 
    btnReopen := panelFunc ? "||Reopen panel,,quickBarReopenPanel" : ""
-   CreateTempGuiButton("Undo action,,quickBarImgUndo" btnReopen, 0, msgDisplayTime//1.5 + 500)
+   quickBarUndoBar("Undo action,,quickBarImgUndo" btnReopen)
 }
 
 quickBarSaveImage() {
-; Save button: the bar goes away first, so its Undo cannot act behind the save panel
-   DestroyTempBtnGui("now")
-   PanelSaveImg()
+; Save button; in the thumbnails list PanelSaveImg() saves the files list
+   If (thumbsDisplaying!=1 && AnyWindowOpen!=35)
+      PanelSaveImg()
 }
 
 quickBarFileUndo(labelu) {
-; bar after a file action recorded for undo [delete, rename, move, copy]
-   CreateTempGuiButton(labelu ",,doUndoFileActsChronos", 0, msgDisplayTime//1.5 + 500)
+; bar after a file action recorded for undo [delete, rename, move, copy]; an empty label returns 1 while that bar is visible
+   Static barHwnd := ""
+   If (labelu="")
+      Return (barHwnd && barHwnd=tempBtnVisible)
+
+   quickBarDoFileUndo(1)
+   CreateTempGuiButton(labelu ",,quickBarDoFileUndo", 0, msgDisplayTime//1.5 + 500)
+   barHwnd := (TouchScreenMode=1 && tempBtnVisible!="null") ? tempBtnVisible : ""
+}
+
+quickBarDoFileUndo(arm:=0) {
+; Undo button of quickBarFileUndo(): undoes the file action once, while it is still the newest one recorded
+   Static undoID := ""
+   blah := []
+   obj := identifyLastUndoFileAct(blah, 1)
+   thisID := obj[1] "|" obj[2] "|" obj[3]
+   If (arm=1)
+   {
+      undoID := thisID
+      Return
+   }
+
+   If (undoID="" || undoID!=thisID || AnyWindowOpen)
+      Return
+
+   undoID := ""
+   doUndoFileActsChronos()
 }
 
 openLastResultPath(givenPath:="", runFile:=0) {
 ; with a path: remembers it; bare [the bar's button]: shows it in Explorer, the file selected
-   Static lastPath := ""
+   Static lastPath := "", lastRun := 0
    If (givenPath!="")
    {
       lastPath := givenPath
       Return
    }
 
+   If (A_TickCount - lastRun<1500)
+      Return
+
+   lastRun := A_TickCount
    If FolderExist(lastPath)
       cmd := """" lastPath """"
    Else If FileExist(lastPath)
@@ -27493,30 +27542,81 @@ quickBarOpenResult(givenPath, withFile:=0) {
    CreateTempGuiButton(btnFile "Open folder,,openLastResultPath", 0, msgDisplayTime//1.5 + 500)
 }
 
-quickBarRemoveEntry(givenEntry:="") {
-; with a list entry: remembers it; bare [the bar's button]: removes it while it is still the current entry
+quickBarFailedEntry(givenEntry:="", forget:=0) {
+; remembers the list entry that failed to load; returns 1 while it is still the current entry
    Static thisEntry := ""
    If (givenEntry!="")
-   {
       thisEntry := givenEntry
+
+   r := (thisEntry!="" && getIDimage(currentFileIndex)==thisEntry)
+   If forget
+      thisEntry := ""
+   Return r
+}
+
+quickBarRemoveEntry() {
+; Remove entry button: removes the entry that failed to load, once, while it is still the current one
+   If quickBarFailedEntry("", 1)
+      singleInListEntriesRemover()
+}
+
+quickBarOpenFailedEntry() {
+; Open with default app button for the entry that failed to load
+   Static lastRun := 0
+   If (A_TickCount - lastRun<1500 || !quickBarFailedEntry())
+      Return
+
+   lastRun := A_TickCount
+   OpenWithDefaultApp()
+}
+
+quickBarLoadError(otherBtn, deferred:=0) {
+; Remove entry bar after the current entry failed to load; otherBtn: the second "Label,,Function"
+; the bar comes from a timer and only while that entry is still the current one
+   If (deferred=1)
+   {
+      If quickBarFailedEntry()
+         CreateTempGuiButton("Remove entry,,quickBarRemoveEntry||" otherBtn, 0, msgDisplayTime//1.5 + 500)
       Return
    }
 
-   If (thisEntry!="" && getIDimage(currentFileIndex)==thisEntry)
-   {
-      thisEntry := ""
-      singleInListEntriesRemover()
-   }
-}
-
-quickBarLoadError(otherBtn) {
-; Remove entry bar after the current entry failed to load; otherBtn: the second "Label,,Function"
    thisEntry := resultedFilesList[currentFileIndex, 1]
    If (thisEntry="")
       Return
 
-   quickBarRemoveEntry(thisEntry)
-   CreateTempGuiButton("Remove entry,,quickBarRemoveEntry||" otherBtn, 0, msgDisplayTime//1.5 + 500)
+   quickBarFailedEntry(thisEntry)
+   fn := Func("quickBarLoadError").Bind(otherBtn, 1)
+   SetTimer, % fn, -300
+}
+
+quickBarRemoveFilter() {
+; Remove filter button: acts only while a filter is set
+   If (StrLen(filesFilter)>1)
+      MenuRemFilesListFilter()
+}
+
+quickBarGoBack(givenIndex:="") {
+; with the index just jumped to: shows the Go back bar; bare [the button]: goes back once, while that image is still shown
+   Static jumpedTo := ""
+   If (givenIndex!="")
+   {
+      jumpedTo := givenIndex "|" getIDimage(givenIndex)
+      CreateTempGuiButton("Go back,,quickBarGoBack", 0, msgDisplayTime//1.5 + 500)
+      Return
+   }
+
+   thisImg := currentFileIndex "|" getIDimage(currentFileIndex)
+   If (jumpedTo!="" && jumpedTo==thisImg && thumbsDisplaying!=1)
+   {
+      jumpedTo := ""
+      jumpPreviousImage()
+   }
+}
+
+quickBarRecordUndos() {
+; Record undo levels button: turns the recording on, never off
+   If (preventUndoLevels=1)
+      TogglePreventUndos()
 }
 
 quickBarShowSelection() {
@@ -27529,8 +27629,8 @@ quickBarNextColorMode() {
 }
 
 quickBarSaveList() {
-; Save list bar after entries left a saved .SLD files list [the condition of the menu item]
-   If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1)
+; Save list bar after entries left a saved .SLD files list [the condition of the menu item]; an Undo delete bar stays
+   If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1 && !quickBarFileUndo(""))
       CreateTempGuiButton("Save list,,BTNsaveCurrentSlideshow", 0, msgDisplayTime//1.5 + 500)
 }
 
@@ -27540,9 +27640,15 @@ quickBarHiddenUI() {
       CreateTempGuiButton("Interface options,,OpenUImenu||Show menu bar,,ToggleMenuBaru", "force", msgDisplayTime + 500)
 }
 
+quickBarApplyColorMode() {
+; Apply button of the color mode bar; with no mode left, ApplyVPcolorAdjustSelectedArea() reapplies the previous one
+   If (imgFxMode>1 && thumbsDisplaying!=1 && imageLoading!=1 && !AnyWindowOpen && !viewportQPVimage.imgHandle)
+      ApplyVPcolorAdjustSelectedArea()
+}
+
 quickBarApplyColorDepth() {
 ; Apply to image button: writes the simulated color depth and the viewport rotation into the image
-   If (thumbsDisplaying=1 || imageLoading=1 || AnyWindowOpen || viewportQPVimage.imgHandle)
+   If (usrColorDepth<2 || thumbsDisplaying=1 || imageLoading=1 || AnyWindowOpen || viewportQPVimage.imgHandle)
       Return
 
    If mergeViewPortRotationImgEditing()
@@ -33219,7 +33325,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   SetTimer, createGUItoolbar, -100
   SetTimer, RemoveTooltip, % -msgDisplayTime
   If (StrLen(filesFilter)>1 && noStringProcessing!=1 && maxFilesIndex>0)
-     CreateTempGuiButton("Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
+     quickBarLater("Remove filter,,quickBarRemoveFilter")
 }
 
 FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
@@ -35685,7 +35791,7 @@ retrieveAlreadySeenImageFromCurrentList() {
       RandomPicture()
       showDelayedTooltip("Finished the identification process of " friendly2 " images`n" groupDigits(countSeen) " images were found in the initial files list" etaTime)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
-      CreateTempGuiButton("Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
+      quickBarLater("Remove filter,,quickBarRemoveFilter")
    }
 }
 
@@ -40019,7 +40125,7 @@ warnFramesActionPrevented(actu) {
   If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
   {
      msgBeepTimer("WARNING: Illegal operation: " actu ".`nThe action is not permitted on image frames/pages.`nYou can deactivate this mode with Ctrl+Space.")
-     CreateTempGuiButton("Exit frames mode,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
+     quickBarLater("Exit frames mode,,quickBarRemoveFilter")
      Return 1
   }
 }
@@ -43026,7 +43132,9 @@ PanelRenameThisFile(dummy:=0) {
          updateMainUnfilteredList(currentFileIndex, 5, 0)
          ForceRefreshNowThumbsList()
          dummyTimerDelayiedImageDisplay(50)
-         quickBarFileUndo("Undo rename")
+         ; a new name that differs only by dots, commas or spaces trimmed by filterFileName() renames nothing
+         If !(getIDimage(currentFileIndex)==file2rem)
+            quickBarFileUndo("Undo rename")
       }
    } Else If InStr(msgResult.btn, "modify")
    {
@@ -43897,7 +44005,7 @@ BTNperformExtractFrames(a) {
       Else
          msgBeepTimer("ERROR: An undefined error has occurred.`nNo frames or pages were extracted.", 0)
 
-      If (r>=1 || r=-5 && extractedFrames>0)
+      If (extractedFrames>0)
          quickBarOpenResult(ResizeDestFolder)
    }
 }
@@ -45760,7 +45868,7 @@ BtnChangeHamDistThreshold() {
    {
       currentFileIndex := 1
       dummyTimerDelayiedImageDisplay(150)
-      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0, msgDisplayTime//1.5 + 500)
    }
 }
 
@@ -58597,11 +58705,12 @@ PanelJump2index() {
          If (newJumpIndex=currentFileIndex && newJumpIndex>0 && msgResult.list!=4)
             Return
 
+         prevIndex := currentFileIndex
          newJumpIndex := clampInRange(usrJumpIndex, 1, maxFilesIndex)
          currentFileIndex := newJumpIndex
          dummyTimerDelayiedImageDisplay(50)
-         If (thumbsDisplaying!=1)
-            CreateTempGuiButton("Go back,,jumpPreviousImage", 0, msgDisplayTime//1.5 + 500)
+         If (thumbsDisplaying!=1 && prevIndex!=currentFileIndex)
+            quickBarGoBack(currentFileIndex)
       }
    }
 }
@@ -70938,7 +71047,7 @@ toggleListViewModeThumbs() {
       decideIconBTNthumbsList()
    showTOOLtip("List view: " friendly, A_ThisFunc, 1, thumbsListViewMode/4)
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   CreateTempGuiButton("View options,,invokeMenuNavBoxImgSizeVP", 0, msgDisplayTime//1.5 + 500)
+   quickBarLater("View options,,invokeMenuNavBoxImgSizeVP")
 }
 
 defineListViewModes() {
@@ -71086,7 +71195,7 @@ ToggleImgCaptions() {
     } Else showTOOLtip("Display image captions: DEACTIVATED", A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
     If (noCaption=1)
-       CreateTempGuiButton("Create caption,,PanelEditImgCaption||Caption options,,InvokeMenuBarCaptions", 0, msgDisplayTime//1.5 + 500)
+       quickBarLater("Create caption,,PanelEditImgCaption||Caption options,,InvokeMenuBarCaptions")
 }
 
 ToggleMultiLineStatus() {
@@ -71866,7 +71975,7 @@ ToggleImgNavBox() {
     SetTimer, dummyNavBoxInfo, -50
     lastInvoked := A_TickCount
     If (showHUDnavIMG=1)
-       CreateTempGuiButton("View options,,invokeMenuNavBoxImgSizeVP", 0, msgDisplayTime//1.5 + 500)
+       quickBarLater("View options,,invokeMenuNavBoxImgSizeVP")
 }
 
 ToggleImgNavSizeBox() {
@@ -73858,7 +73967,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
           If (slideShowRunning!=1)
           {
              SoundBeep, 300, 100
-             quickBarLoadError("Open with default app,,OpenWithDefaultApp")
+             quickBarLoadError("Open with default app,,quickBarOpenFailedEntry")
           }
           Return "fail"
        } Else prevImgPath := imgPath
@@ -76740,7 +76849,7 @@ toggleBrushSymmetryModes() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -200
    If (friendly3!="NONE" && isPaintSymmetryModeAllowed())
-      CreateTempGuiButton("Set symmetry center,,BtnSetBrushSymmetryCoords", 0, msgDisplayTime//1.5 + 500)
+      quickBarLater("Set symmetry center,,BtnSetBrushSymmetryCoords")
 }
 
 discardUserPaintedAlpha() {
@@ -77211,7 +77320,7 @@ toggleBrushDrawInOutModes() {
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -100
    If msgu
-      CreateTempGuiButton("Show selection,,quickBarShowSelection", 0, msgDisplayTime//1.5 + 500)
+      quickBarLater("Show selection,,quickBarShowSelection")
 }
 
 toggleBrushTypeCloner() {
@@ -86876,7 +86985,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
    If !SortCriterion
-      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0, msgDisplayTime//1.5 + 500)
 }
 
 keepSelectedDupeInGroup() {
