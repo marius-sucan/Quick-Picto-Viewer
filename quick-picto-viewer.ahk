@@ -31981,6 +31981,8 @@ PasteFilesIntoGivenFolder(folderPath) {
 
    SetTimer, ResetImgLoadStatus, -50
    msgBeepTimer("", (abandonAll=1) ? 300 : 900)
+   If (filezMoved>0)
+      quickBarFileUndo((filesActu=2) ? "Undo move" : "Undo copy")
 }
 
 BtnCloseWindow() {
@@ -39864,6 +39866,8 @@ batchFileDelete(dontAlterIndex:=0) {
    Else
       msgBeepTimer(someErrors groupDigits(filesRemoved) " out of " groupDigits(countTFilez) " selected files deleted", 900)
 
+   If (move2recycler=1 && filesRemoved>0)
+      quickBarFileUndo("Undo delete")
    Return abandonAll
 }
 
@@ -40009,6 +40013,7 @@ DeletePicture(dummy:=0) {
      {
         showTOOLtip("File moved to recycle bin" fileMsg)
         recordUndoFileActs(file2rem, "recycler", fSize "|" oFileDateM, 1, A_Now)
+        recycled := 1
      } Else
         showTOOLtip("File permanently deleted" fileMsg)
 
@@ -40027,6 +40032,8 @@ DeletePicture(dummy:=0) {
   SetTimer, ResetImgLoadStatus, -50
   If (thumbsDisplaying=1)
      QPV_ListViewGridHUDoverlay()
+  If (recycled=1)
+     quickBarFileUndo("Undo delete")
 }
 
 readRecentMultiRenameEntries() {
@@ -40709,6 +40716,8 @@ coreBatchMultiRenameFiles() {
         msgBeepTimer("Finished renaming " groupDigits(filezRenamed) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
      SetTimer, ResetImgLoadStatus, -50
+     If (filezRenamed>0)
+        quickBarFileUndo("Undo rename")
   }
 }
 
@@ -42872,6 +42881,7 @@ PanelRenameThisFile(dummy:=0) {
          updateMainUnfilteredList(currentFileIndex, 5, 0)
          ForceRefreshNowThumbsList()
          dummyTimerDelayiedImageDisplay(50)
+         quickBarFileUndo("Undo rename")
       }
    } Else If InStr(msgResult.btn, "modify")
    {
@@ -60189,6 +60199,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        }
        Sleep, 1
        SetTimer, ResetImgLoadStatus, -25
+       quickBarFileUndo((UsrCopyMoveOperation=2) ? "Undo move" : "Undo copy")
        Return 1
     } Else If (operationExecuted=1)
     {
@@ -60464,6 +60475,8 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    SetTimer, ResetImgLoadStatus, -50
    msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    lastInvoked := A_TickCount
+   If (filezMoved>0)
+      quickBarFileUndo((UsrCopyMoveOperation=2) ? "Undo move" : "Undo copy")
    Return 0
 }
 
