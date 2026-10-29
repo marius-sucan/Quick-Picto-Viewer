@@ -58407,31 +58407,37 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
    {
       If (usrColorDepth>1 || imgFxMode>1)
       {
-         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on such images.``n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": WARNING", "In the viewport, the image seems to be displayed with color adjustments. QPV cannot apply these on the image itself, because of the very large size. The image will be saved with its original colors.`n`nGo to Image > Filters > Adjust image colors, to apply color filters on such images.`n`nDo you want to continue?", "&Yes|&No", 2, "exclamation")
          If (msgResult!="Yes")
             Return "user-abort"
       }
 
       pixFmt := currIMGdetails.PixelFormat " | " currIMGdetails.RawFormat
-      thisImgBPP := SubStr(pixFmt, 1, InStr(pixFmt, "-") - 1)
+      RegExMatch(pixFmt, "^\d+", thisImgBPP)
       vpFmt := FreeImage_GetBPP(viewportQPVimage.imgHandle)
-      If (thisImgBPP!=24 && thisImgBPP!=32)
-         msgu := "The image you currently have opened has an unsupported color depth for editing: " pixFmt ".`n`nThe image was converted to " vpFmt " bits for display in the viewport. Therefore, some color information was likely lost. Please acknowledge this by choosing Continue before saving the file."
+      If (thisImgBPP && vpFmt<thisImgBPP)
+         msgu := "The color format of the image file is " pixFmt ".`n`nWhen the image was loaded, " appTitle " converted it to " vpFmt " bits. Therefore, some color information was lost. The file will be saved from the " vpFmt "-bit image."
 
       pff := msgu ? "The image " : "The image you currently have opened "
       If (currIMGdetails.Frames>1)
-         msgu := "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded upon save."
+         msgu .= "`n`n" pff "has " currIMGdetails.Frames " frames or pages.`n`nOnly the current frame will be preserved, the other frames will be discarded upon save."
 
       If msgu
       {
-         msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", Trimmer(msgu), "&Continue|&No", 1, "exclamation")
+         msgResult := msgBoxWrapper(appTitle ": IMAGE SAVE WARNING", Trimmer(msgu) "`n`nPlease acknowledge this by choosing Continue before saving the file.", "&Continue|&No", 1, "exclamation")
          If (msgResult!="Continue")
             Return "user-abort"
       }
    }
 
    typu := FreeImage_GetFileType(file2save, 1)
-   If (isVarEqualTo(typu, "j2k","jp2","jxl","targa","bmp","jxr","tiff","png","ico","webp") && depth>0)
+   ; as in SaveFIMfile(): GIF is always 8 bits and JPEG has no 32 bits mode
+   If (typu="gif")
+      depth := 8
+   Else If (typu="jpeg" && depth=32)
+      depth := 24
+
+   If (isVarEqualTo(typu, "j2k","jp2","jxl","targa","bmp","jxr","tiff","png","ico","webp","jpeg","jng","gif") && depth>0)
    {
       objDepth := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       If (depth=32 && objDepth!=32)
