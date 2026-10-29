@@ -3663,7 +3663,11 @@ throwErrorNoImageLoaded(noMSG:=0, stringent:=1) {
    If (!validBMP(whichBitmap) && !stringent || !imgPath)
    {
       If (noMSG=0)
+      {
          msgBeepTimer("WARNING: No image file is currently loaded", 300, msgDisplayTime//2)
+         If (!CurrentSLD || maxFilesIndex<1)
+            CreateTempGuiButton("Open image,,OpenDialogFiles||New image,,PanelNewImage", 0, msgDisplayTime//1.5 + 500)
+      }
       Return "fail"
    }
 }
@@ -16961,6 +16965,8 @@ ImgUndoAction(dummy:=0) {
       friendly := (preventUndoLevels=1) ? "WARNING: Undo levels are not being recorded (user option)`n" : ""
       showTOOLtip(friendly "Undo [ " currentUndoLevel " / " undoLevelsRecorded " ]", 0, 0, currentUndoLevel/undoLevelsRecorded)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
+      If (preventUndoLevels=1)
+         quickBarLater("Record undo levels,,TogglePreventUndos")
       Return
    }
 
@@ -20659,7 +20665,10 @@ recordUndoLevelHugeImagesNow(imgSelPx, imgSelPy, imgSelW, imgSelH, invertArea:=0
 
 undoRedoHugeImagesAct() {
    If (preventUndoLevels=1)
-      Return msgBeepTimer("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
+   {
+      msgBeepTimer("WARNING: Undo levels are not being recorded (user option).`nOne undo level is allowed with images over 536 mgpx.")
+      Return quickBarLater("Record undo levels,,TogglePreventUndos")
+   }
  
    setImageLoading()
    prevVPselRotation := VPselRotation
@@ -27476,6 +27485,9 @@ openLastResultFile() {
 
 quickBarOpenResult(givenPath, withFile:=0) {
 ; Open folder [and Open file] bar for a saved or generated file
+   If (givenPath="")
+      Return
+
    openLastResultPath(givenPath)
    btnFile := (withFile=1) ? "Open file,,openLastResultFile||" : ""
    CreateTempGuiButton(btnFile "Open folder,,openLastResultPath", 0, msgDisplayTime//1.5 + 500)
@@ -27495,6 +27507,16 @@ quickBarRemoveEntry(givenEntry:="") {
       thisEntry := ""
       singleInListEntriesRemover()
    }
+}
+
+quickBarLoadError(otherBtn) {
+; Remove entry bar after the current entry failed to load; otherBtn: the second "Label,,Function"
+   thisEntry := resultedFilesList[currentFileIndex, 1]
+   If (thisEntry="")
+      Return
+
+   quickBarRemoveEntry(thisEntry)
+   CreateTempGuiButton("Remove entry,,quickBarRemoveEntry||" otherBtn, 0, msgDisplayTime//1.5 + 500)
 }
 
 quickBarShowSelection() {
@@ -32497,6 +32519,8 @@ informUserFileMissing(clearScreen:=0) {
       QPV_ListViewGridHUDoverlay()
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   If (autoRemDeadEntry!=1 && slideShowRunning!=1)
+      quickBarLoadError("Clean dead entries,,cleanDeadFilesList")
 }
 
 JEE_StrRegExLiteral(vText) {
@@ -58918,6 +58942,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
          showTOOLtip("Failed to save image file`n" OutFileName "`n" sOutDir "\")
          SoundBeep 300, 100
          msgBoxWrapper(appTitle ": ERROR", appTitle " was unable to save the image file due to an undetermined cause.`n`n" OutFileName "`n" OutDir "\`nError code: " r, 0, 0, "error")
+         CreateTempGuiButton("Save as...,,quickBarSaveImage", 0, msgDisplayTime//1.5 + 500)
       } Else
       {
          RecordImagesOpenedManager(file2save)
@@ -73774,6 +73799,8 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
             setWindowTitle(pVwinTitle, 1)
             clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIwin)
             msgBeepTimer("ERROR: File not found or access denied`n" OutFileName "`n" OutDir "\", 0)
+            If (autoRemDeadEntry!=1 && slideShowRunning!=1)
+               quickBarLoadError("Clean dead entries,,cleanDeadFilesList")
          }
 
          If (thisImgPath!=prevImgPath)
@@ -73829,7 +73856,10 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
           setWindowTitle(pVwinTitle, 1)
           SetTimer, ResetImgLoadStatus, -15
           If (slideShowRunning!=1)
+          {
              SoundBeep, 300, 100
+             quickBarLoadError("Open with default app,,OpenWithDefaultApp")
+          }
           Return "fail"
        } Else prevImgPath := imgPath
        lastInvoked := A_TickCount
