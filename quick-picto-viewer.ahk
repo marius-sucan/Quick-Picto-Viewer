@@ -17461,7 +17461,10 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        imgFxMode := prevFXmode
 
     If (imgFxMode=1)
-       Return msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
+    {
+       msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
+       Return CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0, msgDisplayTime//1.5 + 500)
+    }
 
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
@@ -27461,6 +27464,10 @@ quickBarRemoveEntry(givenEntry:="") {
 quickBarShowSelection() {
    If (editingSelectionNow!=1)
       ToggleEditImgSelection("show-edit")
+}
+
+quickBarNextColorMode() {
+   ToggleImgFX(1)
 }
 
 quickBarApplyColorDepth() {
@@ -39916,6 +39923,7 @@ warnFramesActionPrevented(actu) {
   If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
   {
      msgBeepTimer("WARNING: Illegal operation: " actu ".`nThe action is not permitted on image frames/pages.`nYou can deactivate this mode with Ctrl+Space.")
+     CreateTempGuiButton("Exit frames mode,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
      Return 1
   }
 }
@@ -70960,11 +70968,15 @@ ToggleImgCaptions() {
           textFileContent := retrieveSQLdbEntryCaption(imgPath, "imgCaption")
 
        If (!FileExist(textFile) && SLDtypeLoaded!=3) || (!textFileContent && SLDtypeLoaded=3)
+       {
           showTOOLtip("Display image captions: ACTIVATED`n" OutNameNoExt ".txt (NOT FOUND)`nNo image caption / annotation file associated`nPress Shift+N to create/edit one.", A_ThisFunc, 1)
-       Else
+          noCaption := 1
+       } Else
           showTOOLtip("Display image captions: ACTIVATED", A_ThisFunc, 1)
     } Else showTOOLtip("Display image captions: DEACTIVATED", A_ThisFunc, 1)
     SetTimer, RemoveTooltip, % -msgDisplayTime
+    If (noCaption=1)
+       CreateTempGuiButton("Create caption,,PanelEditImgCaption||Caption options,,InvokeMenuBarCaptions", 0, msgDisplayTime//1.5 + 500)
 }
 
 ToggleMultiLineStatus() {
@@ -76602,6 +76614,8 @@ toggleBrushSymmetryModes() {
    showTOOLtip("Painting symmetry: " friendly3 moreInfos, A_ThisFunc, 1, levelu/3)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -200
+   If (friendly3!="NONE" && isPaintSymmetryModeAllowed())
+      CreateTempGuiButton("Set symmetry center,,BtnSetBrushSymmetryCoords", 0, msgDisplayTime//1.5 + 500)
 }
 
 discardUserPaintedAlpha() {
@@ -77071,6 +77085,8 @@ toggleBrushDrawInOutModes() {
    }
    SetTimer, RemoveTooltip, % -msgDisplayTime
    SetTimer, dummyRefreshImgSelectionWindow, -100
+   If msgu
+      CreateTempGuiButton("Show selection,,quickBarShowSelection", 0, msgDisplayTime//1.5 + 500)
 }
 
 toggleBrushTypeCloner() {
@@ -77165,8 +77181,10 @@ preventColorChange() {
           Return
 
        If (BrushToolType=3)
+       {
           msgBeepTimer("WARNING: You are currently using the cloner brush tool`nTo define the source pattern, press S.")
-       Else
+          CreateTempGuiButton("Define cloner source,,BtnSetClonerBrushSource", 0, msgDisplayTime//1.5 + 500)
+       } Else
           msgBeepTimer("WARNING: You are currently using a brush that does not rely on a given color")
 
        Return 1
