@@ -25329,6 +25329,12 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     SetTimer, createGUItoolbar, -100
     SetTimer, ResetImgLoadStatus, -55
     SetTimer, TriggerMenuBarUpdate, -95
+    pasteBar := "Save as...,,quickBarSaveImage"
+    If (isImgOpen=2)
+       pasteBar .= "||Undo,,quickBarImgUndo"
+    Else If (modus="scanner")
+       pasteBar .= "||Scan again,,AcquireWIAimage"
+    CreateTempGuiButton(pasteBar, 0, msgDisplayTime//1.5 + 500)
 }
 
 thumbsSelector(keyu, aKey, prevFileIndex) {
