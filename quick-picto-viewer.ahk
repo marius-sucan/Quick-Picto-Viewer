@@ -37771,6 +37771,8 @@ WorkLoadMultiCoreHandler(job) {
   If (abandonAll=1 && fatalError!=1)
      r := "abandoned"
 
+  If (fatalError!=1 && processedFiles>0 && ResizeUseDestDir=1 && job.mode!="batch-jpegll")
+     quickBarOpenResult(ResizeDestFolder)
   Return r
 }
 
@@ -43648,6 +43650,7 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
          moreInfos := "`nJPEG files kept as they are: " groupDigits(keptJpegs) moreInfos
 
       msgBeepTimer("Finished creating the PDF file:`n" OutFileName "`nPages: " groupDigits(pagesAdded) moreInfos "`nFile size: " fileSizeFriendly(fileSize), 900)
+      quickBarOpenResult(file2save, 1)
    } Else
       msgBeepTimer("ERROR: Failed to finish the PDF file. Unknown error.`n" OutFileName)
 }
@@ -43787,8 +43790,11 @@ BTNperformExtractFrames(a) {
          msgBeepTimer("The image has no frames or pages to extract", 0)
       Else If (r>=1)
          msgBeepTimer("Succesfully extracted " groupDigits(extractedFrames) " frames out of " r, 0)
-      Else 
+      Else
          msgBeepTimer("ERROR: An undefined error has occurred.`nNo frames or pages were extracted.", 0)
+
+      If (r>=1 || r=-5 && extractedFrames>0)
+         quickBarOpenResult(ResizeDestFolder)
    }
 }
 
@@ -44046,6 +44052,8 @@ generateThumbsSheet() {
 
    trGdip_DisposeImage(pBitmap)
    SetTimer, ResetImgLoadStatus, -50
+   If (abandonAll!=1 && !r)
+      quickBarOpenResult(file2save, 1)
 }
 
 PanelCreateIMGthumbsSheet() {
@@ -56239,8 +56247,10 @@ BTNextractALLtextsCurrentPDF() {
       {
          msgBoxWrapper(appTitle ": ERROR", "Unable to write or access the file: " OutFileName ". Permission denied.`n`nLocation:`n" OutDir "\", 0, 0, "error")
          Return
-      } Else 
-         msgBeepTimer("Text file succesfully saved:`n" OutFileName "`n" OutDir "\", 0)
+      }
+
+      msgBeepTimer("Text file succesfully saved:`n" OutFileName "`n" OutDir "\", 0)
+      quickBarOpenResult(file2save, 1)
    }
 }
 
@@ -58845,6 +58855,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
          imgIndexEditing := currentFileIndex
          currentImgModified := 2
          SoundBeep, 900, 100
+         quickBarOpenResult(file2save)
       }
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -60758,6 +60769,8 @@ batchConvert2format() {
       msgBeepTimer("Finished converting to ." rDesireWriteFMT " format`n" groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
    SetTimer, ResetImgLoadStatus, -50
+   If (ResizeUseDestDir=1 && filesConverted>0)
+      quickBarOpenResult(ResizeDestFolder)
    Return (abandonAll=1) ? -2 : filesConverted
 }
 
@@ -61291,6 +61304,8 @@ convert2format(givenIndex) {
   }
   SetTimer, RemoveTooltip, % -msgDisplayTime
   SetTimer, ResetImgLoadStatus, -150
+  If (!r && ResizeUseDestDir=1)
+     quickBarOpenResult(file2save)
 }
 
 batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
@@ -61393,6 +61408,8 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    ; ForceRefreshNowThumbsList()
    ; dummyTimerDelayiedImageDisplay(100)
    SetTimer, ResetImgLoadStatus, -100
+   If (tFrames - tFramFailed>0)
+      quickBarOpenResult(ResizeDestFolder)
 }
 
 coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
@@ -62351,6 +62368,8 @@ combineImagesMultiTiffGDIp(destFilePath) {
 
    ResetImgLoadStatus()
    CurrentSLD := backCurrentSLD
+   If (abandonAll!=1 && selectedFiles && !fattalErr)
+      quickBarOpenResult(destFilePath, 1)
 }
 
 combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
@@ -62553,6 +62572,7 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    {
       FileGetSize, fileSize, % destFilePath
       msgBeepTimer("Finished creating the ." fmt " file:`n" OutFileName "`nPages: " groupDigits(addedPages) moreInfos "`nFile size: " fileSizeFriendly(fileSize), 900)
+      quickBarOpenResult(destFilePath, 1)
    }
 }
 
@@ -91198,6 +91218,8 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
       msgBeepTimer("Finished processing " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
    SetTimer, ResetImgLoadStatus, -50
+   If (ResizeUseDestDir=1 && countFilez>0)
+      quickBarOpenResult(ResizeDestFolder)
 }
 
 WriteSettingsResizePanel() {
@@ -91491,6 +91513,7 @@ BTNsaveResizedIMG() {
 
       msgBeepTimer("Processed image saved`n" OutFileName "`n`n" OutDir "\", 900)
       SetTimer, ResetImgLoadStatus, -300
+      quickBarOpenResult(file2save)
    }
 }
 
@@ -97511,6 +97534,8 @@ batchAutoCropFiles() {
       msgBeepTimer(groupDigits(countFilez) " out of " groupDigits(countTFilez) " selected images were automatically cropped" someErrors, 900)
 
    SetTimer, ResetImgLoadStatus, -100
+   If (ResizeUseDestDir=1 && countFilez>0)
+      quickBarOpenResult(ResizeDestFolder)
 }
 
 batchAutoColorsFiles() {
@@ -98353,6 +98378,8 @@ BtnPerformSimpleProcessing(dummy:=0, contextu:="", losslessJpegs:=0) {
       msgBeepTimer("Processed image saved:`n" OutFileName, 0)
       If (dummy="no-prompt")
          SetTimer, RefreshImageFile, -150
+      Else
+         quickBarOpenResult(file2save)
 
       Return 1
    }
@@ -98483,6 +98510,8 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       msgBeepTimer("Finished processing " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
    SetTimer, ResetImgLoadStatus, -50
+   If (ResizeUseDestDir=1 && filesConverted>0)
+      quickBarOpenResult(ResizeDestFolder)
 }
 
 batchSimpleColorsAdjusts() {
@@ -98592,6 +98621,8 @@ batchSimpleColorsAdjusts() {
       msgBeepTimer("Finished processing " groupDigits(filesConverted) " out of " groupDigits(filesElected) " selected files" someErrors, 900)
 
    SetTimer, ResetImgLoadStatus, -50
+   If (ResizeUseDestDir=1 && filesConverted>0)
+      quickBarOpenResult(ResizeDestFolder)
 }
 
 printArrayStr(whichArray, delim:="|", forMode:=0) {
