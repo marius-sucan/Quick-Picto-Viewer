@@ -27314,6 +27314,143 @@ openPreviousPanel(mode:="") {
       msgBeepTimer("No previously opened panel", 0, msgDisplayTime//2)
 }
 
+quickBarLater(btnList, killWin:=0, waitMs:=300) {
+; shows the quick-action bar from a one-shot timer: outside message handlers and after window resizes
+   delayu := msgDisplayTime//1.5 + 500
+   fn := Func("CreateTempGuiButton").Bind(btnList, killWin, delayu)
+   SetTimer, % fn, % -waitMs
+}
+
+quickBarEditStamp() {
+; changes whenever an edit lands on the image in the viewport
+   Return UserMemBMP "|" undoLevelsArray[currentUndoLevel, 1] "|" viewportQPVimage.imgHandle "|" viewportQPVimage.actions
+}
+
+quickBarImgUndo() {
+; Undo button: undoes an image edit, never a file action [ImgUndoAction() falls back to those]
+   If (thumbsDisplaying=1 || imageLoading=1)
+      Return
+
+   If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0)
+      ImgUndoAction()
+}
+
+quickBarReopenPanel(givenFunc:="") {
+; with a panel function: remembers it; bare [the bar's button]: reopens that panel
+   Static panelFunc := ""
+   If (givenFunc!="")
+   {
+      panelFunc := givenFunc
+      Return
+   }
+
+   If !IsFunc(panelFunc)
+      Return
+
+   If (AnyWindowOpen && getHostPanelFunc()=panelFunc)
+      WinActivate, ahk_id %hSetWinGui%
+   Else
+      %panelFunc%()
+}
+
+quickBarUndoReopen(panelFunc, stamp) {
+; Undo / Reopen panel bar after an edit applied from a panel; stamp: quickBarEditStamp() taken before the edit
+   If (quickBarEditStamp()=stamp)
+      Return
+
+   If panelFunc
+      quickBarReopenPanel(panelFunc)
+
+   btnReopen := panelFunc ? "||Reopen panel,,quickBarReopenPanel" : ""
+   CreateTempGuiButton("Undo action,,quickBarImgUndo" btnReopen, 0, msgDisplayTime//1.5 + 500)
+}
+
+quickBarFileUndo(labelu) {
+; bar after a file action recorded for undo [delete, rename, move, copy]
+   CreateTempGuiButton(labelu ",,doUndoFileActsChronos", 0, msgDisplayTime//1.5 + 500)
+}
+
+openLastResultPath(givenPath:="", runFile:=0) {
+; with a path: remembers it; bare [the bar's button]: shows it in Explorer, the file selected
+   Static lastPath := ""
+   If (givenPath!="")
+   {
+      lastPath := givenPath
+      Return
+   }
+
+   If FolderExist(lastPath)
+      cmd := """" lastPath """"
+   Else If FileExist(lastPath)
+      cmd := (runFile=1) ? """" lastPath """" : "explorer.exe /select,""" lastPath """"
+   Else
+      Return msgBeepTimer("ERROR: File or folder not found" ((userPrivateMode=1) ? "" : "`n" lastPath))
+
+   Try Run, % cmd
+   Catch
+      msgBeepTimer("ERROR: Unable to open" ((userPrivateMode=1) ? "" : "`n" lastPath))
+}
+
+openLastResultFile() {
+; Open file button: runs the file remembered by openLastResultPath() with its default application
+   openLastResultPath("", 1)
+}
+
+quickBarOpenResult(givenPath, withFile:=0) {
+; Open folder [and Open file] bar for a saved or generated file
+   openLastResultPath(givenPath)
+   btnFile := (withFile=1) ? "Open file,,openLastResultFile||" : ""
+   CreateTempGuiButton(btnFile "Open folder,,openLastResultPath", 0, msgDisplayTime//1.5 + 500)
+}
+
+quickBarRemoveEntry(givenEntry:="") {
+; with a list entry: remembers it; bare [the bar's button]: removes it while it is still the current entry
+   Static thisEntry := ""
+   If (givenEntry!="")
+   {
+      thisEntry := givenEntry
+      Return
+   }
+
+   If (thisEntry!="" && getIDimage(currentFileIndex)==thisEntry)
+   {
+      thisEntry := ""
+      singleInListEntriesRemover()
+   }
+}
+
+quickBarShowSelection() {
+   If (editingSelectionNow!=1)
+      ToggleEditImgSelection("show-edit")
+}
+
+quickBarApplyColorDepth() {
+; Apply to image button: writes the simulated color depth and the viewport rotation into the image
+   If (thumbsDisplaying=1 || imageLoading=1 || AnyWindowOpen || viewportQPVimage.imgHandle)
+      Return
+
+   If mergeViewPortRotationImgEditing()
+      dummyTimerDelayiedImageDisplay(50)
+}
+
+quickBarPickCancel(modus) {
+; kept Cancel bar while a click picks a point [cloner source, symmetry center, texture]; modus: "show" or "end"
+   Static barHwnd := ""
+   If (modus="show")
+   {
+      If (TouchScreenMode!=1)
+         Return
+
+      CreateTempGuiButton("Cancel,,StopCaptureClickStuff", 0, msgDisplayTime)
+      SetTimer, DestroyTempBtnGui, Off
+      barHwnd := tempBtnVisible
+   } Else If (barHwnd && barHwnd=tempBtnVisible)
+   {
+      barHwnd := ""
+      DestroyTempBtnGui("now")
+   }
+}
+
 SetImgButtonStyle(hwnd, newLabel:="", checkMode:=0, protectedHwnd:="", guiu:="") {
    Static dopt1 := [0, "0xFF373737","0xFF373737", "0xFFffFFff",,,"0xff778877", 2] ; normal
    , dopt2 := [0, "0xFF656565","0xFF656565", "0xFFffFFff",,,"0xffaaAAaa", 2] ; hover
