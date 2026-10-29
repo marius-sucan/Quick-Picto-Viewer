@@ -43125,15 +43125,20 @@ PanelRenameThisFile(dummy:=0) {
          PanelRenameThisFile(dummy)
       } Else
       {
-         If (resultedFilesList[currentFileIndex, 5]=1)
-            ToggleImgFavourites(file2rem, "rem")
+         ; a new name that differs only by dots, commas or spaces trimmed by filterFileName() renames nothing
+         renamed := !(getIDimage(currentFileIndex)==file2rem)
+         If renamed
+         {
+            If (resultedFilesList[currentFileIndex, 5]=1)
+               ToggleImgFavourites(file2rem, "rem")
 
-         resultedFilesList[currentFileIndex, 5] := 0
-         updateMainUnfilteredList(currentFileIndex, 5, 0)
+            resultedFilesList[currentFileIndex, 5] := 0
+            updateMainUnfilteredList(currentFileIndex, 5, 0)
+         }
+
          ForceRefreshNowThumbsList()
          dummyTimerDelayiedImageDisplay(50)
-         ; a new name that differs only by dots, commas or spaces trimmed by filterFileName() renames nothing
-         If !(getIDimage(currentFileIndex)==file2rem)
+         If renamed
             quickBarFileUndo("Undo rename")
       }
    } Else If InStr(msgResult.btn, "modify")
