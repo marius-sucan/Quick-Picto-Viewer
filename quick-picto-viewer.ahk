@@ -4274,7 +4274,7 @@ coreReloadThisPicture() {
   }
 }
 
-FirstPicture() { 
+FirstPicture() {
    stopGifORslidesPlayback()
    If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
@@ -4285,11 +4285,14 @@ FirstPicture() {
          Return
    }
 
+   prevIndex := currentFileIndex
    currentFileIndex := 1
    dummyTimerDelayiedImageDisplay(50)
+   If (thumbsDisplaying!=1 && prevIndex!=currentFileIndex)
+      CreateTempGuiButton("Go back,,jumpPreviousImage", 0, msgDisplayTime//1.5 + 500)
 }
 
-LastPicture() { 
+LastPicture() {
    stopGifORslidesPlayback()
    If (StrLen(mustOpenStartFolder)>1)
       currentFileIndex := doOpenStartFolder()
@@ -4300,8 +4303,11 @@ LastPicture() {
          Return
    }
 
+   prevIndex := currentFileIndex
    currentFileIndex := maxFilesIndex
    dummyTimerDelayiedImageDisplay(50)
+   If (thumbsDisplaying!=1 && prevIndex!=currentFileIndex)
+      CreateTempGuiButton("Go back,,jumpPreviousImage", 0, msgDisplayTime//1.5 + 500)
 }
 
 SettingsGUIAGuiClose:
@@ -58570,6 +58576,8 @@ PanelJump2index() {
          newJumpIndex := clampInRange(usrJumpIndex, 1, maxFilesIndex)
          currentFileIndex := newJumpIndex
          dummyTimerDelayiedImageDisplay(50)
+         If (thumbsDisplaying!=1)
+            CreateTempGuiButton("Go back,,jumpPreviousImage", 0, msgDisplayTime//1.5 + 500)
       }
    }
 }
