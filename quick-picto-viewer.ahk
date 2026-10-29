@@ -76427,9 +76427,12 @@ toggleAlphaPaintingMode() {
       If !editingSelectionNow
          Return msgBeepTimer("WARNING: No selection area is activated.", 0)
       labelu := (AnyWindowOpen=66) ? "Flood fill" : "Paint brush"
-      friendly := (BrushToolOutsideSelection=1) ? "ANYWHERE" : "INSIDE SELECTION"
-      If (BrushToolOutsideSelection=3)
+      areaMode := (AnyWindowOpen=66) ? FloodFillSelectionMode : BrushToolOutsideSelection
+      friendly := (areaMode=1) ? "ANYWHERE" : "INSIDE SELECTION"
+      If (areaMode=3)
          friendly := "OUTSIDE SELECTION"
+      Else If (areaMode=4)
+         friendly := "ALPHA MASK SELECTION"
 
       If (AnyWindowOpen=64)
       {
