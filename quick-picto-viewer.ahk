@@ -17404,8 +17404,11 @@ CutSelectedArea() {
       Return
 
    Sleep, 350
-   EraseAreaFader := 0
+   ; erase the copied area itself, whatever the Erase panel options
+   eraseOpts := [EraseAreaInvert, EraseAreaFader, EraseAreaUseAlpha]
+   EraseAreaInvert := EraseAreaFader := EraseAreaUseAlpha := 0
    EraseSelectedArea()
+   EraseAreaInvert := eraseOpts[1], EraseAreaFader := eraseOpts[2], EraseAreaUseAlpha := eraseOpts[3]
 }
 
 ApplyVPcolorAdjustSelectedArea(modus:=0) {
