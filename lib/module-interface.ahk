@@ -2173,6 +2173,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=0) {
     WinSet, Transparent, 230, ahk_id %hGuiBtn%
     WinSet, Region, 0-0 R%roundedCsize%-%roundedCsize% w%gWid% h%gHeig%, ahk_id %hGuiBtn%
     tempBtnVisible := hGuiBtn
+    tempBtnBuiltAt(1)
     prevBtnList := btnList
     RepositionTempBtnGui()
     keepTempBtnGui(delayu, 1)
@@ -2199,12 +2200,24 @@ RepositionTempBtnGui() {
 
 tempBtnGuiClick(thisFunc) {
 ; g-label of each button, bound to its function; the event arguments AHK appends are dropped
+; taps in a new bar's first 450 ms are dropped: they belong to the double tap that made the bar
+    If (A_TickCount - tempBtnBuiltAt()<450)
+       Return
+
     keepTempBtnGui(defaultTempBtnDisplay)
     If (WinActive("A")!=PVhwnd)
        WinActivate, ahk_id %PVhwnd%
 
     %thisFunc%()
     keepTempBtnGui(defaultTempBtnDisplay)
+}
+
+tempBtnBuiltAt(setNow:=0) {
+; A_TickCount when the visible bar was built
+    Static builtAt := 0
+    If setNow
+       builtAt := A_TickCount
+    Return builtAt
 }
 
 keepTempBtnGui(ms:="", fresh:=0) {
