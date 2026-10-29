@@ -11219,7 +11219,7 @@ ToggleImgFX(dir:=0) {
       friendly .= "`nSimulated color depth: " defineColorDepth()
 
    If (imgFxMode=4 || imgFxMode=3 || imgFxMode=2)
-      friendly .= "`n `nPress U to adjust colors display options."
+      friendly .= "`n `nPress " ((thumbsDisplaying=1) ? "U" : "Shift + U") " to adjust colors display options."
 
    showTOOLtip("Image colors: " friendly, A_ThisFunc, 2, (imgFxMode - 0.999 + bonus)/9)
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -17451,7 +17451,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
        imgFxMode := prevFXmode
 
     If (imgFxMode=1)
-       Return msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press U to open color adjustments panel")
+       Return msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
 
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
