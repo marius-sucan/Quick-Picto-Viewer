@@ -2602,6 +2602,8 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 }
 
 endCaptureCloneBrush() {
+   If (mustCaptureCloneBrush=1)
+      quickBarPickCancel("end")
    mustCaptureCloneBrush := 0
    setMenuBarState("Enable", "PVbar")
    createGUItoolbar()
@@ -5782,6 +5784,7 @@ BtnSetBrushSymmetryCoords() {
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
    dummyTimerDelayiedImageDisplay(50)
+   quickBarPickCancel("show")
 }
 
 setNewBrushSymmetryPoints() {
@@ -10822,7 +10825,10 @@ stopSlideshow(resetMode:=0, silentModus:=1) {
    SetTimer, ResetImgLoadStatus, -15
    userSeenSlideImages := userSeenSessionImagesArray.Count()
    If (silentModus!=1)
+   {
       msgBeepTimer("Slideshow: STOPPED`nImages seen in this session: " groupDigits(userSeenSlideImages), (slideShowCadence<950) ? 900 : 0)
+      quickBarLater("Slideshow options,,InvokeMenuBarSlides")
+   }
    prevSlideShowStop := A_TickCount
    Return 1
 }
@@ -27491,6 +27497,12 @@ quickBarNextColorMode() {
    ToggleImgFX(1)
 }
 
+quickBarHiddenUI() {
+; bar once the menu bar and the toolbar are both hidden; full screen and a hidden title bar have their own
+   If (showMainMenuBar!=1 && ShowAdvToolbar!=1 && getCaptionStyle(PVhwnd)=0 && drawingShapeNow!=1)
+      CreateTempGuiButton("Interface options,,OpenUImenu||Show menu bar,,ToggleMenuBaru", "force", msgDisplayTime + 500)
+}
+
 quickBarApplyColorDepth() {
 ; Apply to image button: writes the simulated color depth and the viewport rotation into the image
    If (thumbsDisplaying=1 || imageLoading=1 || AnyWindowOpen || viewportQPVimage.imgHandle)
@@ -39148,6 +39160,9 @@ invertFilesSelection() {
       QPV_ListViewGridHUDoverlay()
    Else
       dummyTimerDelayiedImageDisplay(50)
+
+   If (markedSelectFile>0)
+      CreateTempGuiButton("File actions,,invokeFileOptionsMenu||Select none,,dropFilesSelection", 0, msgDisplayTime//1.5 + 500)
 }
 
 dropFilesSelection(silentMode:=0) {
@@ -44945,6 +44960,7 @@ BtnSetClonerBrushSource() {
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
    lastInvoked := A_TickCount
+   quickBarPickCancel("show")
 }
 
 BtnResetGradientCenter() {
@@ -44989,6 +45005,7 @@ BtnSetTextureSource() {
    createGUItoolbar()
    If (panelWinCollapsed=0)
       toggleImgEditPanelWindow()
+   quickBarPickCancel("show")
 }
 
 updateUIfloodFillPanel() {
@@ -71669,6 +71686,8 @@ ToggleMenuBaru() {
    lastInvoked := A_TickCount
    If (panelWinCollapsed=1 && AnyWindowOpen)
       SetTimer, collapseWidgetGUIAGuiEscape, -25
+   If (showMainMenuBar!=1 && ShowAdvToolbar!=1)
+      SetTimer, quickBarHiddenUI, -350
 }
 
 ToggleTitleBaru() {
@@ -72193,6 +72212,8 @@ toggleAppToolbar() {
     SetTimer, fromCurrentPanelToColorsSwatch, -150
     If (panelWinCollapsed=1 && AnyWindowOpen)
        SetTimer, collapseWidgetGUIAGuiEscape, -25
+    If (showMainMenuBar!=1 && ShowAdvToolbar!=1)
+       SetTimer, quickBarHiddenUI, -350
 }
 
 ToggleToolBarToolTips() {
@@ -72236,6 +72257,8 @@ ToggleTouchMode() {
 
     msgBeepTimer("Touch screen mode: " friendly, 0)
     INIaction(1, "TouchScreenMode", "General")
+    If (TouchScreenMode=1)
+       CreateTempGuiButton("Show touch areas,,MenuDrawViewportHelpMap", 0, msgDisplayTime//1.5 + 500)
 }
 
 defineWinTitlePrefix() {
@@ -82556,6 +82579,8 @@ selectAllFiles() {
     this := (selMode=1) ? maxFilesIndex : 0
     updateFilesSelectionInfos(this)
     SetTimer, QPV_ListViewGridHUDoverlay, -10
+    If (selMode=1 && thumbsDisplaying=1)
+       CreateTempGuiButton("File actions,,invokeFileOptionsMenu||Select none,,dropFilesSelection", 0, msgDisplayTime//1.5 + 500)
     warnFramesActionPrevented("SELECT ALL")
 }
 
