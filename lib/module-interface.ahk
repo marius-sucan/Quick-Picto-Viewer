@@ -7,7 +7,7 @@
 Global PicOnGUI1, PicOnGUI2a, PicOnGUI2b, PicOnGUI2c, PicOnGUI3, ImgAnnoBox, ImgHistoBox, ImgInfoBox, ImgNavBox, OSDmsgsLine
      , picVscroll, picHscroll, hPic0, hPic1, hPic2, hPic3, hPic4, hPic5, hPic6, hPic7, hPic8, hPic9, hPic10, hPic11
      , hFlyOut, hFlyBtn1, hFlyBtn2, hFlyBtn3, menuArray := [], menuTotalIndex := 0, menusList := ""
-     , menusflyOutVisible := 0, wasMenuFlierCreated := 0, lastContextMenuZeit := 1
+     , menusflyOutVisible := 0, wasMenuFlierCreated := 0, lastContextMenuZeit := 1, defaultTempBtnDisplay := 4000
      , taskBarUI, groppedFiles := [], LbtnDwn := 0, penPressureRaw := 0, hasPenPressureAPI
      , canCancelImageLoad := 0, mustAbandonCurrentOperations := 0, userPendingAbortOperations := 0
      , lastCloseInvoked := -1, lastDoubleClickZeit := 1, lastMouseLeave := 1, lastSwipeZeitGesture := 1
@@ -2099,6 +2099,139 @@ TimerExit() {
 
 PreventKeyPressBeep() {
    IfEqual,A_Gui,PVwin,Return 0 ; prevent keystrokes for the main window [PVwin] only
+}
+
+CreateTempGuiButton(btnList, killWin:=0, delayu:=0) {
+; btnList: "Label,,Function||Label,,Function" with any number of buttons; the functions are called without parameters
+; killWin: 1 destroys the bar, "force" shows it also outside the touch screen mode
+; delayu: ms until the bar hides; to keep it, turn off the DestroyTempBtnGui timer after the call
+    Critical, On
+    Static bgrColor := 112288, txtColor := "ddeeFF", prevBtnList := ""
+    If (killWin=1)
+    {
+       DestroyTempBtnGui("now")
+       Return
+    }
+
+    If !delayu
+       delayu := defaultTempBtnDisplay
+
+    If (prevBtnList=btnList && tempBtnVisible!="null")
+    {
+       keepTempBtnGui(delayu)
+       SetTimer, DestroyTempBtnGui, 250
+       Return
+    }
+
+    If (TouchScreenMode!=1 && !InStr(killWin, "force"))
+       Return
+
+    btns := []
+    btnArray := StrSplit(btnList, "||")
+    Loop, % btnArray.Count()
+    {
+       thisBtn := StrSplit(btnArray[A_Index], ",,")
+       If (thisBtn[1]="")
+          Continue
+
+       If (IsFunc(thisBtn[2])=1)
+          btns.Push(thisBtn)
+       Else
+          addJournalEntry("ERROR " A_ThisFunc "(): no function to call without parameters: " thisBtn[2] " [" thisBtn[1] "]")
+    }
+
+    DestroyTempBtnGui("now")
+    If (btns.Count()<1)
+       Return
+
+    thisFntSize := Round(OSDfontSize*0.45)
+    If (thisFntSize<9)
+       thisFntSize := 9
+
+    Sleep, 25
+    Gui, TempBtnGui: -DPIScale -Caption +ToolWindow +E0x8000000 +hwndhGuiBtn +Owner%PVhwnd%   ; WS_EX_NOACTIVATE
+    Gui, TempBtnGui: Margin, % thisFntSize + 10, % thisFntSize
+    Gui, TempBtnGui: Color, c%bgrColor%
+    disableWindowPenServices(hGuiBtn)
+    Gui, TempBtnGui: Font, s%thisFntSize% Bold Q5, Arial
+    Loop, % btns.Count()
+    {
+       thisLabel := btns[A_Index, 1], thisFunc := btns[A_Index, 2]
+       posu := (A_Index>1) ? "x+" OSDfontSize : ""
+       Gui, TempBtnGui: Add, Text, %posu% c%txtColor% +hwndhTemp, % thisLabel
+       fn := Func("tempBtnGuiClick").Bind(thisFunc)
+       GuiControl, TempBtnGui: +g, %hTemp%, % fn
+       disableWindowPenServices(hTemp)
+    }
+
+    WinGetPos, winPosX, winPosY, , , ahk_id %PVhwnd%
+    ; AHK limits the first Show of a window to the work area; the second one fits all the buttons
+    Gui, TempBtnGui: Show, NoActivate Hide x%winPosX% y%winPosY%, GuiActionBtn
+    Gui, TempBtnGui: Show, NoActivate AutoSize Hide, GuiActionBtn
+    WinGetPos, , , gWid, gHeig, ahk_id %hGuiBtn%
+    roundedCsize := Round(thisFntSize/1.7) + 15
+    WinSet, Transparent, 230, ahk_id %hGuiBtn%
+    WinSet, Region, 0-0 R%roundedCsize%-%roundedCsize% w%gWid% h%gHeig%, ahk_id %hGuiBtn%
+    tempBtnVisible := hGuiBtn
+    prevBtnList := btnList
+    RepositionTempBtnGui()
+    keepTempBtnGui(delayu, 1)
+    SetTimer, DestroyTempBtnGui, 250
+}
+
+RepositionTempBtnGui() {
+    Critical, On
+    If (tempBtnVisible="null")
+       Return
+
+    thisFntSize := Round(OSDfontSize*0.45)
+    If (thisFntSize<9)
+       thisFntSize := 9
+
+    WinGetPos, winPosX, winPosY, , Heig, ahk_id %PVhwnd%
+    WinGetPos, , , , gHeig, ahk_id %tempBtnVisible%
+    offsetuY := scrollBarHy ? scrollBarHy : 0
+    tlbrBonusX := (adjustCanvas2Toolbar()=1) ? ToolbarWinW : 0
+    Final_x := winPosX + thisFntSize * 2 + tlbrBonusX
+    Final_y := winPosY + Heig - thisFntSize * 2 - gHeig - offsetuY//2
+    Gui, TempBtnGui: Show, NoActivate AutoSize x%Final_x% y%Final_y%, GuiActionBtn
+}
+
+tempBtnGuiClick(thisFunc) {
+; g-label of each button, bound to its function; the event arguments AHK appends are dropped
+    keepTempBtnGui(defaultTempBtnDisplay)
+    If (WinActive("A")!=PVhwnd)
+       WinActivate, ahk_id %PVhwnd%
+
+    %thisFunc%()
+    keepTempBtnGui(defaultTempBtnDisplay)
+}
+
+keepTempBtnGui(ms:="", fresh:=0) {
+; Keeps the bar for at least ms from now; returns the A_TickCount after which it may hide
+    Static hideAt := 0
+    If (ms!="")
+       hideAt := fresh ? A_TickCount + ms : Max(hideAt, A_TickCount + ms)
+    Return hideAt
+}
+
+DestroyTempBtnGui(dummy:=0) {
+; Every 250 ms: hides the bar once its keepTempBtnGui() time is up; the mouse over the bar adds 4 s.
+; dummy="now" hides it at once.
+    Critical, On
+    If (dummy!="now" && tempBtnVisible!="null")
+    {
+       MouseGetPos, , , OutputVarWin
+       thisWin := WinActive("A")
+       If (OutputVarWin=tempBtnVisible && (thisWin=PVhwnd || thisWin=hSetWinGui))
+          keepTempBtnGui(defaultTempBtnDisplay)
+       If (A_TickCount<keepTempBtnGui())
+          Return
+    }
+
+    SetTimer, DestroyTempBtnGui, Off
+    Gui, TempBtnGui: Destroy
+    tempBtnVisible := "null"
 }
 
 destroyMenuFlyout() {
