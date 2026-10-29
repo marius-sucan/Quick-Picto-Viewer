@@ -4141,6 +4141,9 @@ invertCurrentFolderRecursiveness() {
 }
 
 MenuRemFilesListFilter() {
+   If (StrLen(filesFilter)<2)
+      Return
+
    remFilesListFilter()
    ; SetTimer, RandomPicture, -150
    dummyTimerDelayiedImageDisplay(50)
@@ -27497,6 +27500,12 @@ quickBarNextColorMode() {
    ToggleImgFX(1)
 }
 
+quickBarSaveList() {
+; Save list bar after entries left a saved .SLD files list [the condition of the menu item]
+   If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1)
+      CreateTempGuiButton("Save list,,BTNsaveCurrentSlideshow", 0, msgDisplayTime//1.5 + 500)
+}
+
 quickBarHiddenUI() {
 ; bar once the menu bar and the toolbar are both hidden; full screen and a hidden title bar have their own
    If (showMainMenuBar!=1 && ShowAdvToolbar!=1 && getCaptionStyle(PVhwnd)=0 && drawingShapeNow!=1)
@@ -33179,6 +33188,8 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   SetTimer, TriggerMenuBarUpdate, -50
   SetTimer, createGUItoolbar, -100
   SetTimer, RemoveTooltip, % -msgDisplayTime
+  If (StrLen(filesFilter)>1 && noStringProcessing!=1 && maxFilesIndex>0)
+     CreateTempGuiButton("Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
 }
 
 FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
@@ -33556,6 +33567,7 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
 
    msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    SetTimer, ResetImgLoadStatus, -50
+   quickBarSaveList()
 }
 
 remCurrentEntry(silentus:=0, whichIndex:=0) {
@@ -33607,12 +33619,14 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
          dummyTimerDelayiedImageDisplay(50)
          ; RandomPicture()
       } Else handleEmptyFilesList(CurrentSLD, "", 1)
-   } Else 
+   } Else
    {
       currentFileIndex--
       NextPicture()
    }
    SetTimer, RemoveTooltip, % -msgDisplayTime
+   If (silentus!=1)
+      quickBarSaveList()
 }
 
 addSQLdbEntry(fileNamu, imgPath, fileSizu, fileMdate, fileCdate, simple:=0, factCheck:=1) {
@@ -35188,6 +35202,7 @@ cleanDeadFilesList(dummy:=0) {
       currentFileIndex := clampInRange(currentFileIndex, 1, maxFilesIndex)
       dummyTimerDelayiedImageDisplay(50)
       ; RandomPicture()
+      quickBarSaveList()
    }
 }
 
@@ -35392,6 +35407,7 @@ removeFilesListSeenImages(modus:=0) {
       RandomPicture()
       showDelayedTooltip("Finished removing " friendlyLabel " images`n" groupDigits(countSeen) " images were removed from the files list" etaTime)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
+      quickBarSaveList()
    }
 }
 
@@ -35639,6 +35655,7 @@ retrieveAlreadySeenImageFromCurrentList() {
       RandomPicture()
       showDelayedTooltip("Finished the identification process of " friendly2 " images`n" groupDigits(countSeen) " images were found in the initial files list" etaTime)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
+      CreateTempGuiButton("Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
    }
 }
 
@@ -36715,7 +36732,7 @@ BtnCollectHistoInfos() {
       PanelWrapperFilesStats()
 }
 
-dbSortingCached(SortCriterion) {
+dbSortingCached(SortCriterion, userAct:=0) {
    If (maxFilesIndex>0)
    {
       If (testIsDupesList() && InStr(resultedFilesList[currentFileIndex, 23], "_"))
@@ -36839,6 +36856,8 @@ dbSortingCached(SortCriterion) {
       CurrentSLD := backCurrentSLD
       currentFileIndex := detectFileID(prevImgPath)
       IDshowImage(currentFileIndex)
+      If (userAct=1)
+         CreateTempGuiButton("Reverse order,,ReverseListNow||Sort options,,InvokeMenuBarSort", 0, msgDisplayTime//1.5 + 500)
       ; MsgBox, % maxFilesIndex "=" CurrentSLD
   }
   ; MsgBox, % ("Files: " maxFilesIndex "Query: " . SQL . " done in " . (A_TickCount - Start) . " ms`n`n" resultedFilesList[10])
@@ -36846,17 +36865,17 @@ dbSortingCached(SortCriterion) {
 
 ActSortName() {
    If (SLDtypeLoaded=3)
-      dbSortingCached("imgfolder, imgfile")
+      dbSortingCached("imgfolder, imgfile", 1)
    Else
-      SortFilesList("name-entire")
+      SortFilesList("name-entire", 1)
 }
 
 ActSortSize() {
    startOperation := A_TickCount
    If (SLDtypeLoaded=3 && useCachedSLDdata=1)
-      dbSortingCached("fsize")
+      dbSortingCached("fsize", 1)
    Else
-      SortFilesList("size")
+      SortFilesList("size", 1)
    etaTime := "Elapsed time to sort files list by file size: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
 }
@@ -36864,9 +36883,9 @@ ActSortSize() {
 ActSortPath() {
    startOperation := A_TickCount
    If (SLDtypeLoaded=3)
-      dbSortingCached("imgfolder")
+      dbSortingCached("imgfolder", 1)
    Else
-      SortFilesList("name-folder")
+      SortFilesList("name-folder", 1)
    etaTime := "Elapsed time to sort files list by folder name: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
 }
@@ -36883,9 +36902,9 @@ ActSortDupeGroups() {
 ActSortFileName() {
    startOperation := A_TickCount
    If (SLDtypeLoaded=3)
-      dbSortingCached("imgfile")
+      dbSortingCached("imgfile", 1)
    Else
-      SortFilesList("name-file")
+      SortFilesList("name-file", 1)
    etaTime := "Elapsed time to sort files list by file name: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
 }
@@ -36893,9 +36912,9 @@ ActSortFileName() {
 ActSortModified() {
    startOperation := A_TickCount
    If (SLDtypeLoaded=3 && useCachedSLDdata=1)
-      dbSortingCached("fmodified")
+      dbSortingCached("fmodified", 1)
    Else
-      SortFilesList("modified")
+      SortFilesList("modified", 1)
    etaTime := "Elapsed time to sort files list by file modified date: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
 }
@@ -36903,9 +36922,9 @@ ActSortModified() {
 ActSortCreated() {
    startOperation := A_TickCount
    If (SLDtypeLoaded=3 && useCachedSLDdata=1)
-      dbSortingCached("fcreated")
+      dbSortingCached("fcreated", 1)
    Else
-      SortFilesList("created")
+      SortFilesList("created", 1)
    etaTime := "Elapsed time to sort files list by file created date: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
 }
@@ -36916,9 +36935,9 @@ ActSortHistogram(modus) {
 
    startOperation := A_TickCount
    If (SLDtypeLoaded=3 && useCachedSLDdata=1 && listuA[modus])
-      dbSortingCached(listuA[modus])
+      dbSortingCached(listuA[modus], 1)
    Else If listuB[modus]
-      SortFilesList("histogram-" listuB[modus])
+      SortFilesList("histogram-" listuB[modus], 1)
 
    etaTime := "Elapsed time to sort files list by histogram mode " modus ": " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
@@ -36930,9 +36949,9 @@ ActSortImageProperties(modus) {
 
    startOperation := A_TickCount
    If (SLDtypeLoaded=3 && useCachedSLDdata=1 && listuA[modus])
-      dbSortingCached(listuA[modus])
+      dbSortingCached(listuA[modus], 1)
    Else If listuB[modus]
-      SortFilesList("image-" listuB[modus])
+      SortFilesList("image-" listuB[modus], 1)
 
    etaTime := "Elapsed time to sort files list by image properties mode " modus ": " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
    addJournalEntry(etaTime)
@@ -36946,7 +36965,7 @@ warnXPhistoSort() {
    }
 }
 
-SortFilesList(SortCriterion) {
+SortFilesList(SortCriterion, userAct:=0) {
    ; Critical, on
    Static hasAskedFilter := 0
    If warnFramesActionPrevented("SORT LIST")
@@ -37300,6 +37319,9 @@ SortFilesList(SortCriterion) {
          handleEmptyFilesList(CurrentSLD, "", 1)
       Else
          IDshowImage(currentFileIndex)
+
+      If (userAct=1 && maxFilesIndex>0)
+         CreateTempGuiButton("Reverse order,,ReverseListNow||Sort options,,InvokeMenuBarSort", 0, msgDisplayTime//1.5 + 500)
    }
 }
 
@@ -38664,7 +38686,12 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      }
 
      If (userAddedFavesCount>maxFavesEntries - 1)
-        Return msgBeepTimer("WARNING: You have reached the maximum allowed favourite images: " maxFavesEntries " entries.", 300, msgDisplayTime//2)
+     {
+        msgBeepTimer("WARNING: You have reached the maximum allowed favourite images: " maxFavesEntries " entries.", 300, msgDisplayTime//2)
+        If (directCall=1)
+           CreateTempGuiButton("Manage favourites,,retrieveFavesAsList", 0, msgDisplayTime//1.5 + 500)
+        Return
+     }
 
      lastInvoked := A_TickCount
      whichFile := (userAddedFavesCount>19) ? mainFavesFile : miniFavesFile
@@ -38814,6 +38841,8 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
 
   If (thumbsDisplaying=1)
      QPV_ListViewGridHUDoverlay()
+  If (directCall=1)
+     CreateTempGuiButton("Favourites,,InvokeFavesMenu", 0, msgDisplayTime//1.5 + 500)
 }
 
 retrieveFavesAsArray(ByRef countItemz) {
@@ -39481,13 +39510,14 @@ searchNextIndex(direction, inLoop:=0) {
    {
       msgBeepTimer("WARNING: No indexed file matched the search criteria:`n" userSearchString, 900)
       userSearchString := ""
-      Return
+      Return CreateTempGuiButton("Search again,,PanelSearchIndex", 0, msgDisplayTime//1.5 + 500)
    }
 
    RemoveTooltip()
    currentFileIndex := newIndex ? newIndex : originalIndex
    dummyTimerDelayiedImageDisplay(25)
    SetTimer, ResetImgLoadStatus, -100
+   CreateTempGuiButton("Previous match,,MenuSearchPrevIndex||Next match,,MenuSearchNextIndex||Search,,PanelSearchIndex", 0, msgDisplayTime//1.5 + 500)
 }
 
 setContaintFolderAsProtected(givenPath:=0) {
@@ -45696,10 +45726,11 @@ BtnChangeHamDistThreshold() {
    {
       msgBeepTimer("Found no duplicate images in the specified Hamming distance range.`nFiles list unchanged.")
       SetTimer, PanelChangeHamDistThreshold, -350
-   } Else 
+   } Else
    {
       currentFileIndex := 1
       dummyTimerDelayiedImageDisplay(150)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
    }
 }
 
@@ -86806,6 +86837,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    ; ToolTip, % "x=" x , , , 2
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
+   If !SortCriterion
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemFilesListFilter", 0, msgDisplayTime//1.5 + 500)
 }
 
 keepSelectedDupeInGroup() {
