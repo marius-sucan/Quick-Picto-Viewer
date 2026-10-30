@@ -3667,7 +3667,7 @@ throwErrorNoImageLoaded(noMSG:=0, stringent:=1) {
       {
          msgBeepTimer("WARNING: No image file is currently loaded", 300, msgDisplayTime//2)
          If (!CurrentSLD || maxFilesIndex<1)
-            CreateTempGuiButton("Open image,,OpenDialogFiles||New image,,PanelNewImage", 0, msgDisplayTime//1.5 + 500)
+            CreateTempGuiButton("Open image,,OpenDialogFiles||New image,,PanelNewImage", 0)
       }
       Return "fail"
    }
@@ -10751,7 +10751,7 @@ ToggleImageSizingMode(modus:=0) {
     }
 
     If (modus="bar")
-       CreateTempGuiButton("Fit options,,InvokeMenuImgSizeVP", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Fit options,,InvokeMenuImgSizeVP", 0)
 }
 
 DefineImgSizing(modus:=1) {
@@ -11168,7 +11168,7 @@ ToggleImgColorDepth(dir:=0) {
 
    If (usrColorDepth>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
    {
-      CreateTempGuiButton("Apply to image,,quickBarApplyColorDepth||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Apply to image,,quickBarApplyColorDepth||Reset,,HardResetImageView", 0)
       depthBar := (TouchScreenMode=1) ? tempBtnVisible : ""
    } Else If (usrColorDepth=1 && depthBar!="" && depthBar=tempBtnVisible)
       DestroyTempBtnGui("now")
@@ -11275,7 +11275,7 @@ ToggleImgFX(dir:=0) {
    If (imgFxMode>1 && thumbsDisplaying!=1 && !AnyWindowOpen && drawingShapeNow!=1 && !viewportQPVimage.imgHandle)
    {
       applyLabel := (editingSelectionNow=1 && !testEntireImgSelected()) ? "Apply to selection" : "Apply to image"
-      CreateTempGuiButton(applyLabel ",,quickBarApplyColorMode||Adjust colors,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton(applyLabel ",,quickBarApplyColorMode||Adjust colors,,PanelColorsAdjusterVPwindow||Reset,,HardResetImageView", 0)
       fxBar := (TouchScreenMode=1) ? tempBtnVisible : ""
    } Else If (imgFxMode=1 && fxBar!="" && fxBar=tempBtnVisible)
    {
@@ -11520,7 +11520,7 @@ VPchangeLumos(dir, dummy:=0) {
       If (dummy!="k" && showHardReset=1)
       {
          addMore := "`nReset all adjustments to defaults with Ctrl + \"
-         CreateTempGuiButton("Reset all adjustments,,HardResetImageView", 0, msgDisplayTime//1.5 + 100)
+         CreateTempGuiButton("Reset all adjustments,,HardResetImageView", 0)
       }
       showTOOLtip("Image display: UNALTERED " addMsg addMore)
    } Else showTOOLtip("Image brightness: " value2show, A_ThisFunc, 2, value2show / 25)
@@ -17454,7 +17454,7 @@ CutSelectedArea() {
    EraseSelectedArea()
    EraseAreaInvert := eraseOpts[1], EraseAreaFader := eraseOpts[2], EraseAreaUseAlpha := eraseOpts[3]
    If (!viewportQPVimage.imgHandle)
-      CreateTempGuiButton("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace", 0)
 }
 
 ApplyVPcolorAdjustSelectedArea(modus:=0) {
@@ -17502,7 +17502,7 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     If (imgFxMode=1)
     {
        msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
-       CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0)
        Return
     }
 
@@ -20190,7 +20190,7 @@ SharpenSelectedArea() {
     } Else
     {
        trGdip_DisposeImage(metaBitmap)
-       msgBeepTimer("Failed to apply filter: sharpen.`nI aint so sharp to know why...")
+       msgBeepTimer("Failed to apply filter: sharpen.`nI aint so sharp as to know why...")
     }
     SetTimer, ResetImgLoadStatus, -250
 }
@@ -20411,13 +20411,17 @@ PolarRectSelectedArea(funcu, actionu, extraMod:=0, entireImg:=0) {
     {
        wrapRecordUndoLevelNow(newBitmap)
        dummyTimerDelayiedImageDisplay(50)
+       allGood := 1
     } Else
     {
        msgBeepTimer("Failed to process the image selected area`n" funcu "()")
        trGdip_DisposeImage(newBitmap)
+       allGood := 0
     }
+
     SetTimer, ResetImgLoadStatus, -250
     addJournalEntry("Polar/rect coordinates transformation. Elapsed time: " SecToHHMMSS(Round((A_TickCount - startZeit)/1000, 3)))
+    Return allGood
 }
 
 QPV_PolarTransformBitmap(funcu, dllFunc, pBitmap) {
@@ -22476,15 +22480,13 @@ HugeImagesCropResizeRotate(w, h, modus, x:=0, y:=0, zw:=0, zh:=0, givenQuality:=
       Sleep, -1
       kp := "`n" groupDigits(w) " x " groupDigits(h) " pixels`n" nmgpx " megapixels"
       If (modus="new-image")
-         showTOOLtip("Failed to create the new image. Maybe insufficient memory." kp)
+         msgBeepTimer("Failed to create the new image. Maybe insufficient memory." kp)
       Else If (modus="resize")
-         showTOOLtip("Failed to resize image to" kp)
+         msgBeepTimer("Failed to resize image to" kp)
       Else If (modus="crop")
-         showTOOLtip("Failed to crop image to`n" groupDigits(zw) " x " groupDigits(zh) " pixels`n" nmgpx " megapixels")
+         msgBeepTimer("Failed to crop image to`n" groupDigits(zw) " x " groupDigits(zh) " pixels`n" nmgpx " megapixels")
       Else If InStr(modus, "rotate")
-         showTOOLtip("Failed to rotate image to " deg "°")
-
-      msgBeepTimer()
+         msgBeepTimer("Failed to rotate image to " deg "°")
    }
    SetTimer, ResetImgLoadStatus, -200
 }
@@ -24061,8 +24063,7 @@ BlurSelectedArea(modus:="") {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
     {
-       showTOOLtip("Failed to blur the selected image area.`nPlease do not tell anyone")
-       SoundBeep 300, 100
+       msgBeepTimer("Failed to blur the selected image area.`nPlease do not tell anyone")
        trGdip_DisposeImage(metaBitmap)
     }
 
@@ -24189,8 +24190,7 @@ ZoomBlurSelectedArea() {
        wrapRecordUndoLevelNow(metaBitmap)
     } Else
     {
-       showTOOLtip("Failed to apply filter: radial blur. It is all a blur...")
-       SoundBeep 300, 100
+       msgBeepTimer("Failed to apply the blur filter.`nIt is all such a blur...")
        trGdip_DisposeImage(metaBitmap)
     }
 
@@ -24979,7 +24979,7 @@ RotateEditedImage(modus:=0) {
     If (viewportQPVimage.imgHandle)
     {
        HugeImagesCropResizeRotate(0, 0, "rotate" modus)
-       CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton(rotateBar, 0)
        Return
     }
 
@@ -24993,7 +24993,7 @@ RotateEditedImage(modus:=0) {
        vpIMGrotation := 0
        SoundBeep 900, 100
        dummyTimerDelayiedImageDisplay(50)
-       CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton(rotateBar, 0)
     } Else
     {
        If (preventUndoLevels!=1)
@@ -25034,7 +25034,7 @@ CropImageInViewPortToSelection(modus:=0) {
        If (imgSelW!=imgW || imgSelH!=imgH)
           HugeImagesCropResizeRotate(Round(x2), Round(y2), "crop", Round(x1), Round(y1), imgSelW, imgSelH)
        If (!isVarEqualTo(modus, "simplex", "no-bar"))
-          CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
+          CreateTempGuiButton(cropBar, 0)
        Return
     }
 
@@ -25070,7 +25070,7 @@ CropImageInViewPortToSelection(modus:=0) {
           dummyTimerDelayiedImageDisplay(50)
           SetTimer, dummyInfoImgCropVP, -150
           If (modus!="no-bar")
-             CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
+             CreateTempGuiButton(cropBar, 0)
        }
     } Else
        msgBeepTimer("Failed to crop image to selected area")
@@ -25374,7 +25374,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     Else If (modus="scanner")
        pasteBar .= "||Scan again,,AcquireWIAimage"
 
-    CreateTempGuiButton(pasteBar, 0, msgDisplayTime//1.5 + 500)
+    CreateTempGuiButton(pasteBar, 0)
 }
 
 thumbsSelector(keyu, aKey, prevFileIndex) {
@@ -27365,14 +27365,27 @@ ST_Count(Haystack, searchFor) {
     Return OutputVarCount
 }
 
-getHostPanelFunc() {
+getHostPanelFunc(pp:=0) {
 ; Returns the function that opened the panel the current action was invoked from,
 ; or "" when it was invoked from a menu, the quick search or a hotkey with no panel
 ; open. Must be called *before* the action closes that panel: prevOpenedWindow only
 ; describes the panel while it is still the opened one.
+   Static ll := ""
+   If (pp="last")
+      Return ll
+
+   If (pp="rr")
+   {
+      ll := ""
+      Return
+   }
+
    thisFunc := prevOpenedWindow[2]
    If (AnyWindowOpen && prevOpenedWindow[1]=AnyWindowOpen && prevOpenedWindow[3]=1 && IsFunc(thisFunc))
+   {
+      ll := thisFunc
       Return thisFunc
+   }
 
    Return ""
 }
@@ -27396,8 +27409,7 @@ quickBarLater(btnList, killWin:=0, waitMs:=300) {
 
 quickBarImgUndo() {
 ; Undo button: never a file action [ImgUndoAction() falls back to those] and never behind a panel that does not edit the image
-   If (thumbsDisplaying=1 || imageLoading=1 || isNowAlphaPainting())
-   || (AnyWindowOpen && imgEditPanelOpened!=1)
+   If (thumbsDisplaying=1 || imageLoading=1 || isNowAlphaPainting() || AnyWindowOpen && imgEditPanelOpened!=1)
       Return
 
    If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0)
@@ -27426,8 +27438,12 @@ quickBarUndoReopen(panelFunc:="") {
    If panelFunc
       quickBarReopenPanel(panelFunc)
 
-   btnReopen := (panelFunc && !AnyWindowOpen) ? "||Reopen panel,,quickBarReopenPanel" : ""
-   CreateTempGuiButton("Undo action,,quickBarImgUndo" btnReopen, 0, msgDisplayTime//1.5 + 500)
+   pundo := (viewportQPVimage.imgHandle && viewportQPVimage.actions>0) ? viewportQPVimage.actions : undoLevelsRecorded
+   btnUndo := (pundo && preventUndoLevels=0) ? "Undo action,,quickBarImgUndo" : ""
+   pk := btnUndo ? "||" : ""
+   btnReopen := (panelFunc && !AnyWindowOpen) ? pk "Reopen panel,,quickBarReopenPanel" : ""
+   If (btnReopen || btnUndo)
+      CreateTempGuiButton(btnUndo btnReopen, 0)
 }
 
 quickBarSaveImage() {
@@ -27443,7 +27459,7 @@ quickBarFileUndo(labelu) {
       Return (barHwnd && barHwnd=tempBtnVisible)
 
    quickBarDoFileUndo(1)
-   CreateTempGuiButton(labelu ",,quickBarDoFileUndo", 0, msgDisplayTime//1.5 + 500)
+   CreateTempGuiButton(labelu ",,quickBarDoFileUndo", 0)
    barHwnd := (TouchScreenMode=1 && tempBtnVisible!="null") ? tempBtnVisible : ""
 }
 
@@ -27503,7 +27519,7 @@ quickBarOpenResult(givenPath, withFile:=0) {
 
    openLastResultPath(givenPath)
    btnFile := (withFile=1) ? "Open file,,openLastResultFile||" : ""
-   CreateTempGuiButton(btnFile "Open folder,,openLastResultPath", 0, msgDisplayTime//1.5 + 500)
+   CreateTempGuiButton(btnFile "Open folder,,openLastResultPath", 0)
 }
 
 quickBarFailedEntry(givenEntry:="", forget:=0) {
@@ -27540,7 +27556,7 @@ quickBarLoadError(otherBtn, deferred:=0) {
    If (deferred=1)
    {
       If quickBarFailedEntry()
-         CreateTempGuiButton("Remove entry,,quickBarRemoveEntry||" otherBtn, 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Remove entry,,quickBarRemoveEntry||" otherBtn, 0)
       Return
    }
 
@@ -27565,7 +27581,7 @@ quickBarGoBack(givenIndex:="") {
    If (givenIndex!="")
    {
       jumpedTo := givenIndex "|" getIDimage(givenIndex)
-      CreateTempGuiButton("Go back,,quickBarGoBack", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Go back,,quickBarGoBack", 0)
       Return
    }
 
@@ -27595,13 +27611,13 @@ quickBarNextColorMode() {
 quickBarSaveList() {
 ; Save list bar after entries left a saved .SLD files list [the condition of the menu item]; an Undo delete bar stays
    If (SLDtypeLoaded=2 && currentFilesListModified=1 && CurrentSLD && maxFilesIndex>1 && !quickBarFileUndo(""))
-      CreateTempGuiButton("Save list,,BTNsaveCurrentSlideshow", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Save list,,BTNsaveCurrentSlideshow", 0)
 }
 
 quickBarHiddenUI() {
 ; bar once the menu bar and the toolbar are both hidden; full screen and a hidden title bar have their own
    If (showMainMenuBar!=1 && ShowAdvToolbar!=1 && getCaptionStyle(PVhwnd)=0 && drawingShapeNow!=1)
-      CreateTempGuiButton("Interface options,,OpenUImenu||Show menu bar,,ToggleMenuBaru", "force", msgDisplayTime + 500)
+      CreateTempGuiButton("Interface options,,OpenUImenu||Show menu bar,,ToggleMenuBaru", "forced")
 }
 
 quickBarApplyColorMode() {
@@ -36958,7 +36974,7 @@ dbSortingCached(SortCriterion, userAct:=0) {
       currentFileIndex := detectFileID(prevImgPath)
       IDshowImage(currentFileIndex)
       If (userAct=1)
-         CreateTempGuiButton("Reverse order,,ReverseListNow||Sort options,,InvokeMenuBarSort", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Reverse order,,ReverseListNow||Sort options,,InvokeMenuBarSort", 0)
       ; MsgBox, % maxFilesIndex "=" CurrentSLD
   }
   ; MsgBox, % ("Files: " maxFilesIndex "Query: " . SQL . " done in " . (A_TickCount - Start) . " ms`n`n" resultedFilesList[10])
@@ -37422,7 +37438,7 @@ SortFilesList(SortCriterion, userAct:=0) {
          IDshowImage(currentFileIndex)
 
       If (userAct=1 && maxFilesIndex>0)
-         CreateTempGuiButton("Reverse order,,ReverseListNow||Sort options,,InvokeMenuBarSort", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Reverse order,,ReverseListNow||Sort options,,InvokeMenuBarSort", 0)
    }
 }
 
@@ -38790,7 +38806,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
      {
         msgBeepTimer("WARNING: You have reached the maximum allowed favourite images: " maxFavesEntries " entries.", 300, msgDisplayTime//2)
         If (directCall=1)
-           CreateTempGuiButton("Manage favourites,,retrieveFavesAsList", 0, msgDisplayTime//1.5 + 500)
+           CreateTempGuiButton("Manage favourites,,retrieveFavesAsList", 0)
         Return
      }
 
@@ -38943,7 +38959,7 @@ ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   If (thumbsDisplaying=1)
      QPV_ListViewGridHUDoverlay()
   If (directCall=1)
-     CreateTempGuiButton("Favourites,,InvokeFavesMenu", 0, msgDisplayTime//1.5 + 500)
+     CreateTempGuiButton("Favourites,,InvokeFavesMenu", 0)
 }
 
 retrieveFavesAsArray(ByRef countItemz) {
@@ -39292,7 +39308,7 @@ invertFilesSelection() {
       dummyTimerDelayiedImageDisplay(50)
 
    If (markedSelectFile>0)
-      CreateTempGuiButton("File actions,,invokeFileOptionsMenu||Select none,,dropFilesSelection", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("File actions,,invokeFileOptionsMenu||Select none,,dropFilesSelection", 0)
 }
 
 dropFilesSelection(silentMode:=0) {
@@ -39610,7 +39626,7 @@ searchNextIndex(direction, inLoop:=0) {
    If (!newIndex && inLoop=1)
    {
       msgBeepTimer("WARNING: No indexed file matched the search criteria:`n" userSearchString, 900)
-      CreateTempGuiButton("Search again,,PanelSearchIndex", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Search again,,PanelSearchIndex", 0)
       userSearchString := ""
       Return
    }
@@ -39619,7 +39635,7 @@ searchNextIndex(direction, inLoop:=0) {
    currentFileIndex := newIndex ? newIndex : originalIndex
    dummyTimerDelayiedImageDisplay(25)
    SetTimer, ResetImgLoadStatus, -100
-   CreateTempGuiButton("Previous match,,MenuSearchPrevIndex||Next match,,MenuSearchNextIndex||Search,,PanelSearchIndex", 0, msgDisplayTime//1.5 + 500)
+   CreateTempGuiButton("Previous match,,MenuSearchPrevIndex||Next match,,MenuSearchNextIndex||Search,,PanelSearchIndex", 0)
 }
 
 setContaintFolderAsProtected(givenPath:=0) {
@@ -45839,7 +45855,7 @@ BtnChangeHamDistThreshold() {
    {
       currentFileIndex := 1
       dummyTimerDelayiedImageDisplay(150)
-      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0)
    }
 }
 
@@ -48426,9 +48442,9 @@ stopDrawingShape(dummy:="") {
        If (isNumber(freeformPanel) && freeformPanel>0)
        {
           quickBarReopenPanel(freeformPanel)
-          CreateTempGuiButton("Reopen panel,,quickBarReopenPanel||Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+          CreateTempGuiButton("Reopen panel,,quickBarReopenPanel||Selection options,,invokeSelectionAreaMenu", 0)
        } Else
-          CreateTempGuiButton("Crop to selection,,CropImageInViewPortToSelection||Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+          CreateTempGuiButton("Crop to selection,,CropImageInViewPortToSelection||Selection options,,invokeSelectionAreaMenu", 0)
     }
 }
 
@@ -59022,7 +59038,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
          showTOOLtip("Failed to save image file`n" OutFileName "`n" sOutDir "\")
          SoundBeep 300, 100
          msgBoxWrapper(appTitle ": ERROR", appTitle " was unable to save the image file due to an undetermined cause.`n`n" OutFileName "`n" OutDir "\`nError code: " r, 0, 0, "error")
-         CreateTempGuiButton("Save as...,,quickBarSaveImage", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Save as...,,quickBarSaveImage", 0)
       } Else
       {
          RecordImagesOpenedManager(file2save)
@@ -63443,7 +63459,7 @@ RefreshImageFileAction() {
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
-         CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0)
    } Else If (thumbsDisplaying=1)
       RefreshFilesList()
 }
@@ -63731,7 +63747,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       }
 
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
-         CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+         CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0)
    } Else If (StrLen(LastOpenedImg)>3)
    {
       zPlitPath(LastOpenedImg, 0, OutFileName, OutDir, OutNameNoExt)
@@ -63773,7 +63789,7 @@ OpenArgFile(inputu) {
     SLDtypeLoaded := 1
     SetTimer, createGUItoolbar, -100
     If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
-       CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0)
 
     SetTimer, TriggerMenuBarUpdate, -90
     ; Else resetMainWin2Welcome()
@@ -65064,10 +65080,10 @@ msgBeepTimer(msg:="", freq:=300, delay:="") {
    If msg
       showTOOLtip(msg)
 
-   If freq
+   If (freq && isNumber(freq))
       SoundBeep, % freq, 100
 
-   If (delay="")
+   If (!delay || !isNumber(delay))
       delay := msgDisplayTime
 
    SetTimer, RemoveTooltip, % -delay
@@ -70906,7 +70922,7 @@ dummyFullScreenButtons() {
      2ndLabel := "||Hide viewport elements,,turnOffViewportStuff"
 
   msgBeepTimer(friendly, 0)
-  CreateTempGuiButton("Interface options,,OpenUImenu" 2ndLabel, "force", msgDisplayTime + 500)
+  CreateTempGuiButton("Interface options,,OpenUImenu" 2ndLabel, "forced")
 }
 
 turnOffViewportStuff() {
@@ -71133,7 +71149,7 @@ ToggleInfoBoxu() {
        SetTimer, dummyRefreshImgSelectionWindow, -50
     ; dummyTimerDelayiedImageDisplay(50)
     If (wasOff && showInfoBoxHUD>0)
-       CreateTempGuiButton("File information,,PanelImageInfos", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("File information,,PanelImageInfos", 0)
 }
 
 ToggleImgCaptions() {
@@ -71175,7 +71191,7 @@ ToggleMultiLineStatus() {
     multilineStatusBar := !multilineStatusBar
     INIaction(1, "multilineStatusBar", "General")
     dummyTimerDelayiedImageDisplay(50)
-    CreateTempGuiButton("File options,,invokeFileOptionsMenu", 0, msgDisplayTime//1.5 + 500)
+    CreateTempGuiButton("File options,,invokeFileOptionsMenu", 0)
 }
 
 invokeFileOptionsMenu(givenCoords:=0) {
@@ -71542,7 +71558,7 @@ toggleEllipseSelection(modus:=-1) {
 
    If (ShowAdvToolbar=1)
       decideIconBTNselectShape()
-   CreateTempGuiButton("Draw new form,,MenuStartDrawingSelectionArea" dummy, 0, msgDisplayTime//1.5 + 500)
+   CreateTempGuiButton("Draw new form,,MenuStartDrawingSelectionArea" dummy, 0)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -71807,7 +71823,7 @@ dummyToggleTitleBarActionBtns() {
   friendly := Trimmer(friendly)
   msgBeepTimer(friendly, 0)
   If (getCaptionStyle(PVhwnd)!=1)
-     CreateTempGuiButton("Interface options,,OpenUImenu", "force", msgDisplayTime + 500)
+     CreateTempGuiButton("Interface options,,OpenUImenu", "forced")
 }
 
 ToggleMenuBaru() {
@@ -72028,7 +72044,7 @@ ToggleImgHistogram(direction:=1, dummy:=0) {
     }
     lastInvoked := A_TickCount
     If (dummy="bar" && showHistogram>1)
-       CreateTempGuiButton("Histogram options,,invokeHistoMenu", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Histogram options,,invokeHistoMenu", 0)
 }
 
 ToggleHistogramMode() {
@@ -72399,7 +72415,7 @@ ToggleTouchMode() {
     msgBeepTimer("Touch screen mode: " friendly, 0)
     INIaction(1, "TouchScreenMode", "General")
     If (TouchScreenMode=1)
-       CreateTempGuiButton("Show touch areas,,MenuDrawViewportHelpMap", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Show touch areas,,MenuDrawViewportHelpMap", 0)
 }
 
 defineWinTitlePrefix() {
@@ -77385,7 +77401,7 @@ preventColorChange() {
        If (BrushToolType=3)
        {
           msgBeepTimer("WARNING: You are currently using the cloner brush tool`nTo define the source pattern, press S.")
-          CreateTempGuiButton("Define cloner source,,BtnSetClonerBrushSource", 0, msgDisplayTime//1.5 + 500)
+          CreateTempGuiButton("Define cloner source,,BtnSetClonerBrushSource", 0)
        } Else
           msgBeepTimer("WARNING: You are currently using a brush that does not rely on a given color")
 
@@ -82726,7 +82742,7 @@ selectAllFiles() {
     updateFilesSelectionInfos(this)
     SetTimer, QPV_ListViewGridHUDoverlay, -10
     If (selMode=1 && thumbsDisplaying=1)
-       CreateTempGuiButton("File actions,,invokeFileOptionsMenu||Select none,,dropFilesSelection", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("File actions,,invokeFileOptionsMenu||Select none,,dropFilesSelection", 0)
     warnFramesActionPrevented("SELECT ALL")
 }
 
@@ -82804,7 +82820,7 @@ ToggleEditImgSelection(modus:=0) {
 
   clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
   If (modus="key" && editingSelectionNow=1)
-     CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0, msgDisplayTime//1.5 + 500)
+     CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0)
 
   If (modus="key" && !ojk && editingSelectionNow=1 && isSelEntireOutside())
      SetTimer, focusImgSelArea, -100
@@ -86953,7 +86969,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
    If !SortCriterion
-      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0, msgDisplayTime//1.5 + 500)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0)
 }
 
 keepSelectedDupeInGroup() {
