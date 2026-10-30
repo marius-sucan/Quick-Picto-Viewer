@@ -725,18 +725,37 @@ setMenuBarState(modus, mena:="PVbar") {
   If (showMainMenuBar!=1)
      Return
 
-  ; causes a lot of flickers
+  hBar := DllCall("user32\GetMenu", "UPtr", PVhwnd, "UPtr")
+  If (!hBar || MenuGetName(hBar)!=mena)
+  {
+     ; the bar is not attached: AHK only records the states, nothing is redrawn
+     Loop, % menuTotalIndex
+     {
+        labelu := menuArray[A_Index, 3]
+        If (menuArray[A_Index, 4]!=modus)
+        {
+           Try Menu, % mena, % modus, % labelu
+           menuArray[A_Index, 4] := modus
+        }
+     }
+     Return
+  }
+
+  ; on an attached bar, AHK's Menu command repaints the whole window for each item
+  flags := (modus="Disable") ? 0x403 : 0x400 ; MF_BYPOSITION|MF_GRAYED|MF_DISABLED or MF_BYPOSITION|MF_ENABLED
+  changed := 0
   Loop, % menuTotalIndex
   {
-     labelu := menuArray[A_Index, 3]
-     s := menuArray[A_Index, 4]
-     If (s!=modus)
-     {
-        Try Menu, % mena, % modus, % labelu
-        menuArray[A_Index, 4] := modus
-        Sleep, -1
-     }
+     If (menuArray[A_Index, 4]=modus)
+        Continue
+
+     DllCall("user32\EnableMenuItem", "UPtr", hBar, "UInt", A_Index - 1, "UInt", flags)
+     menuArray[A_Index, 4] := modus
+     changed := 1
   }
+
+  If changed
+     DllCall("user32\DrawMenuBar", "UPtr", PVhwnd)
   ; ToolTip, % modus " s=" menuTotalIndex , , , 2
 }
 
@@ -2430,9 +2449,9 @@ UpdateMenuBar(modus:=0, tt:=0) {
 
    ; Sleep, -1
    BuildMenuBar(modus)
-   Gui, PVwin: Menu, PVbar
    actu := (AnyWindowOpen && !imgEditPanelOpened || runningLongOperation=1) ? "Disable" : "Enable"
-   setMenuBarState(actu)
+   setMenuBarState(actu)   ; before attaching, so the bar is created already in this state
+   Gui, PVwin: Menu, PVbar
    prevState := thisState
    SetTimer, updateTlbrPosition, -300
 }
