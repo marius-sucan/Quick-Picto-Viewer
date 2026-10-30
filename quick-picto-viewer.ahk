@@ -27926,7 +27926,8 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
        clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
        vpWinClientSize(mainWidth, mainHeight)
        drawImgSelectionOnWindow("faker", "-", "-", "-", mainWidth, mainHeight)
-    } ; Else CloseWindow()
+    }
+
     If (folderTreeWinOpen=1)
        fdTreeClose()
 
@@ -48111,7 +48112,7 @@ showLEDgui(clr, pX, pY) {
    Gui, LEDgui: Color, %clr%
    Gui, LEDgui: Show, NoActivate x%pX% y%pY%
    Gui, LEDgui: +AlwaysOnTop
-   return prev_clr
+   Return prev_clr
 }
 
 StopColorPicker() {
@@ -71558,7 +71559,7 @@ toggleEllipseSelection(modus:=-1) {
 
    If (ShowAdvToolbar=1)
       decideIconBTNselectShape()
-   CreateTempGuiButton("Draw new form,,MenuStartDrawingSelectionArea" dummy, 0)
+   CreateTempGuiButton("Cycle shapes,,MenuCycleSelectionShapes||Draw new form,,MenuStartDrawingSelectionArea" dummy, 0)
    SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -82820,7 +82821,7 @@ ToggleEditImgSelection(modus:=0) {
 
   clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIinfosWin)
   If (modus="key" && editingSelectionNow=1)
-     CreateTempGuiButton("Selection options,,invokeSelectionAreaMenu", 0)
+     CreateTempGuiButton("Cycle shapes,,MenuCycleSelectionShapes||Select all,,selectEntireImage||||Options,,invokeSelectionAreaMenu", 0)
 
   If (modus="key" && !ojk && editingSelectionNow=1 && isSelEntireOutside())
      SetTimer, focusImgSelArea, -100

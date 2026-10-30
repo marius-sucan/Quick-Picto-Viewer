@@ -234,7 +234,7 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
       Return 0
    }
 
-   If (whileLoopExec=1 || animGIFplaying=1 || slideShowRunning=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
+   If (whileLoopExec=1 || animGIFplaying=1 || slideShowRunning=1 || AnyWindowOpen && !imgEditPanelOpened || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
    {
       If (slideShowRunning=1 || animGIFplaying=1 || colorPickerModeNow=1)
          ProcessCriticalKeys("Enter")
@@ -303,16 +303,19 @@ uiMenuBarJITrebuild(hMenu) {
       ; OutputDebug, % "QPV: MERGE: menu JIT not run for hMenu=" hMenu " busy=" busy " mapped=" (IsObject(menuJITmap) ? menuJITmap.HasKey(hMenu) : "no-map")
       Return
    }
+
    If (barMenuSession!=1)
    {
       ; OutputDebug, % "QPV: MERGE: menu JIT skipped [popup session] " menuJITmap[hMenu]
       Return
    }
+
    busy := 1
    funcu := menuJITmap[hMenu]
    ; OutputDebug, % "QPV: MERGE: menu JIT rebuild " funcu
    If (VisibleQuickMenuSearchWin=1)
       Try closeQuickSearch()
+
    mouseTurnOFFtooltip()
    lastOtherWinClose := A_TickCount
    ; justBuild=1: refresh the dropdown content in place, no Menu-Show - the popup
@@ -403,6 +406,7 @@ uiMenuLoopExit() {
       DllCall("user32\UnhookWindowsHookEx", "UPtr", hLLmouseHook)
       hLLmouseHook := 0
    }
+
    hideMenuFlyOut()
    mouseTurnOFFtooltip()
    ; self-healing pass, deferred until the loop is fully gone [timers work again]:
@@ -583,7 +587,6 @@ uiMenuMouseLL(nCode, wP, lP) {
    Return r
 }
 
-
 pumpPenMessages() {
 ; Checkpoint for the brush loop, which holds Critical: reads the queued WM_POINTER*
 ; messages directly for their side effect on penPressureRaw, then hands each one to
@@ -602,6 +605,7 @@ pumpPenMessages() {
 ; along the hover path for as long as the lifted pen kept moving [2026-09-02].
    If (hasPenPressureAPI!=1)
       Return
+
    VarSetCapacity(msgu, 48, 0)
    Loop, 20
    {
@@ -737,13 +741,11 @@ setMenuBarState(modus, mena:="PVbar") {
 }
 
 initAppBusyMode() {
-     mustAbandonCurrentOperations := 0
-     userPendingAbortOperations := 0
-     lastCloseInvoked := 0
-     imageLoading := 1
-     runningLongOperation := 1
+     mustAbandonCurrentOperations := userPendingAbortOperations := 0
+     imageLoading := runningLongOperation := 1
      executingCanceableOperation := A_TickCount
      lastLongOperationStart := A_TickCount
+     lastCloseInvoked := 0
      setTaskbarIconState("anim")
      ; setMenuBarState("Disable")
 }
@@ -2429,6 +2431,8 @@ UpdateMenuBar(modus:=0, tt:=0) {
    ; Sleep, -1
    BuildMenuBar(modus)
    Gui, PVwin: Menu, PVbar
+   actu := (AnyWindowOpen && !imgEditPanelOpened || runningLongOperation=1) ? "Disable" : "Enable"
+   setMenuBarState(actu)
    prevState := thisState
    SetTimer, updateTlbrPosition, -300
 }
