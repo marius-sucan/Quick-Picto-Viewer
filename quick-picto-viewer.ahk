@@ -6077,13 +6077,11 @@ dummyAutoClearSelectionHighlight() {
 }
 
 applyIMGeditKeepWin() {
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
    o := closeEditPanelOnApply
    closeEditPanelOnApply := 0
    GuiControl, SettingsGUIA:, closeEditPanelOnApply, 0
    applyIMGeditFunction()
    Sleep, 2
-   quickBarUndoReopen(panelFunc, stamp)
    closeEditPanelOnApply := o
    GuiControl, SettingsGUIA:, closeEditPanelOnApply, % o
 }
@@ -6092,7 +6090,6 @@ applyIMGeditFunction() {
     ; recordSelUndoLevelNow()
     panelID := AnyWindowOpen
     panelFunc := getHostPanelFunc()
-    stamp := quickBarEditStamp()
     GuiControl, SettingsGUIA: Disable, btnLiveApplyTool
     If isNowAlphaPainting()
     {
@@ -6132,7 +6129,7 @@ applyIMGeditFunction() {
     If AnyWindowOpen
        GuiControl, SettingsGUIA: Enable, btnLiveApplyTool
     If isVarEqualTo(panelID, 23, 24, 25, 30, 31, 32, 55, 65, 68, 74, 81, 89)
-       quickBarUndoReopen(panelFunc, stamp)
+       quickBarUndoReopen(panelFunc)
 }
 
 livePreviewPasteInPlace() {
@@ -17454,11 +17451,10 @@ CutSelectedArea() {
    ; erase the copied area itself, whatever the Erase panel options
    eraseOpts := [EraseAreaInvert, EraseAreaFader, EraseAreaUseAlpha]
    EraseAreaInvert := EraseAreaFader := EraseAreaUseAlpha := 0
-   stamp := quickBarEditStamp()
    EraseSelectedArea()
    EraseAreaInvert := eraseOpts[1], EraseAreaFader := eraseOpts[2], EraseAreaUseAlpha := eraseOpts[3]
-   If (!viewportQPVimage.imgHandle && quickBarEditStamp()!=stamp)
-      quickBarUndoBar("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace")
+   If (!viewportQPVimage.imgHandle)
+      CreateTempGuiButton("Undo,,quickBarImgUndo||Paste in place,,PanelPasteInPlace", 0, msgDisplayTime//1.5 + 500)
 }
 
 ApplyVPcolorAdjustSelectedArea(modus:=0) {
@@ -19720,12 +19716,11 @@ GraySelectedArea() {
 }
 
 InvertSelectedArea() {
-   stamp := quickBarEditStamp()
    If (viewportQPVimage.imgHandle)
       HugeImagesFlipHVinvert("i")
    Else
       EraseOrInvertOrGraySelectedArea("invert", A_ThisFunc)
-   quickBarUndoReopen("", stamp)
+   quickBarUndoReopen()
 }
 
 EraseSelectedArea() {
@@ -19733,21 +19728,19 @@ EraseSelectedArea() {
 }
 
 FlipSelectedAreaH() {
-   stamp := quickBarEditStamp()
    If (viewportQPVimage.imgHandle)
       HugeImagesFlipHVinvert("h")
    Else
       EraseOrInvertOrGraySelectedArea("flip-h", A_ThisFunc)
-   quickBarUndoReopen("", stamp)
+   quickBarUndoReopen()
 }
 
 FlipSelectedAreaV() {
-   stamp := quickBarEditStamp()
    If (viewportQPVimage.imgHandle)
       HugeImagesFlipHVinvert("v")
    Else
       EraseOrInvertOrGraySelectedArea("flip-v", A_ThisFunc)
-   quickBarUndoReopen("", stamp)
+   quickBarUndoReopen()
 }
 
 FillBehindSelectedArea() {
@@ -22518,9 +22511,8 @@ ResizeIMGviewportSelection() {
 
     If (viewportQPVimage.imgHandle)
     {
-       stamp := quickBarEditStamp()
        HugeImagesCropResizeRotate(imgSelW, imgSelH, "resize", 0, 0, 0, 0, userimgQuality)
-       Return quickBarUndoReopen("", stamp)
+       Return quickBarUndoReopen()
     }
 
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
@@ -22551,7 +22543,7 @@ ResizeIMGviewportSelection() {
     dummyTimerDelayiedImageDisplay(50)
     SetTimer, ResetImgLoadStatus, -150
     SetTimer, dummyInfoImgResizeVP, -125
-    quickBarUndoReopen("", "")
+    quickBarUndoReopen()
 }
 
 dummyInfoImgResizeVP() {
@@ -24986,10 +24978,8 @@ RotateEditedImage(modus:=0) {
     rotateBar := "Undo,,quickBarImgUndo||Rotate again,," ((modus=90) ? "MenuRotateEditImagePlus" : "MenuRotateEditImageMinus")
     If (viewportQPVimage.imgHandle)
     {
-       stamp := quickBarEditStamp()
        HugeImagesCropResizeRotate(0, 0, "rotate" modus)
-       If (quickBarEditStamp()!=stamp)
-          quickBarUndoBar(rotateBar)
+       CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
        Return
     }
 
@@ -25003,7 +24993,7 @@ RotateEditedImage(modus:=0) {
        vpIMGrotation := 0
        SoundBeep 900, 100
        dummyTimerDelayiedImageDisplay(50)
-       quickBarUndoBar(rotateBar)
+       CreateTempGuiButton(rotateBar, 0, msgDisplayTime//1.5 + 500)
     } Else
     {
        If (preventUndoLevels!=1)
@@ -25025,7 +25015,6 @@ CropImageInViewPortToSelection(modus:=0) {
     If (throwErrorSelectionOutsideBounds(whichBitmap) || testEntireImgSelected(0, 0, 1))
        Return
 
-    stamp := quickBarEditStamp()
     If (viewportQPVimage.imgHandle)
     {
        trGdip_GetImageDimensions(useGdiBitmap(), imgW, imgH)
@@ -25044,8 +25033,8 @@ CropImageInViewPortToSelection(modus:=0) {
        calcImgSelection2bmp(0, imgW, imgH, imgW, imgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        If (imgSelW!=imgW || imgSelH!=imgH)
           HugeImagesCropResizeRotate(Round(x2), Round(y2), "crop", Round(x1), Round(y1), imgSelW, imgSelH)
-       If (!isVarEqualTo(modus, "simplex", "no-bar") && quickBarEditStamp()!=stamp)
-          quickBarUndoBar(cropBar)
+       If (!isVarEqualTo(modus, "simplex", "no-bar"))
+          CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
        Return
     }
 
@@ -25081,7 +25070,7 @@ CropImageInViewPortToSelection(modus:=0) {
           dummyTimerDelayiedImageDisplay(50)
           SetTimer, dummyInfoImgCropVP, -150
           If (modus!="no-bar")
-             quickBarUndoBar(cropBar)
+             CreateTempGuiButton(cropBar, 0, msgDisplayTime//1.5 + 500)
        }
     } Else
        msgBeepTimer("Failed to crop image to selected area")
@@ -25385,10 +25374,7 @@ PasteClipboardIMG(modus:=0, clipBMP:=0) {
     Else If (modus="scanner")
        pasteBar .= "||Scan again,,AcquireWIAimage"
 
-    If (isImgOpen=2)
-       quickBarUndoBar(pasteBar)
-    Else
-       CreateTempGuiButton(pasteBar, 0, msgDisplayTime//1.5 + 500)
+    CreateTempGuiButton(pasteBar, 0, msgDisplayTime//1.5 + 500)
 }
 
 thumbsSelector(keyu, aKey, prevFileIndex) {
@@ -27408,36 +27394,14 @@ quickBarLater(btnList, killWin:=0, waitMs:=300) {
    SetTimer, % fn, % -waitMs
 }
 
-quickBarEditStamp() {
-; changes whenever an edit lands on the image in the viewport
-   Return UserMemBMP "|" undoLevelsArray[currentUndoLevel, 1] "|" viewportQPVimage.imgHandle "|" viewportQPVimage.actions
-}
-
-quickBarUndoBar(btnList) {
-; shows a bar whose Undo button [quickBarImgUndo] undoes the edit just made
-   quickBarImgUndo(quickBarEditStamp())
-   CreateTempGuiButton(btnList, 0, msgDisplayTime//1.5 + 500)
-}
-
-quickBarImgUndo(armStamp:="") {
-; with a stamp: arms the Undo button for that edit; bare [the button]: undoes it once, while it is still the newest edit
-; never a file action [ImgUndoAction() falls back to those] and never behind a panel that does not edit the image
-   Static editStamp := ""
-   If (armStamp!="")
-   {
-      editStamp := armStamp
-      Return
-   }
-
-   If (editStamp="" || quickBarEditStamp()!=editStamp || thumbsDisplaying=1 || imageLoading=1 || isNowAlphaPainting())
+quickBarImgUndo() {
+; Undo button: never a file action [ImgUndoAction() falls back to those] and never behind a panel that does not edit the image
+   If (thumbsDisplaying=1 || imageLoading=1 || isNowAlphaPainting())
    || (AnyWindowOpen && imgEditPanelOpened!=1)
       Return
 
    If (validBMP(UserMemBMP) || viewportQPVimage.imgHandle && viewportQPVimage.actions>0)
-   {
-      editStamp := ""
       ImgUndoAction()
-   }
 }
 
 quickBarReopenPanel(givenFunc:="") {
@@ -27457,17 +27421,13 @@ quickBarReopenPanel(givenFunc:="") {
       %panelFunc%()
 }
 
-quickBarUndoReopen(panelFunc, stamp) {
+quickBarUndoReopen(panelFunc:="") {
 ; Undo / Reopen panel bar after an edit applied from a panel
-; stamp: quickBarEditStamp() taken before the edit; the bar shows only if it changed [or if stamp is empty]
-   If (stamp!="" && quickBarEditStamp()=stamp)
-      Return
-
    If panelFunc
       quickBarReopenPanel(panelFunc)
 
    btnReopen := (panelFunc && !AnyWindowOpen) ? "||Reopen panel,,quickBarReopenPanel" : ""
-   quickBarUndoBar("Undo action,,quickBarImgUndo" btnReopen)
+   CreateTempGuiButton("Undo action,,quickBarImgUndo" btnReopen, 0, msgDisplayTime//1.5 + 500)
 }
 
 quickBarSaveImage() {
@@ -49711,12 +49671,12 @@ BTNimgResizeEditor() {
     }
 
     WriteSettingsEditorResizePanel()
-    panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+    panelFunc := getHostPanelFunc()
     BtnCloseWindow()
     If (viewportQPVimage.imgHandle)
     {
        HugeImagesCropResizeRotate(imgW, imgH, "resize", 0, 0, 0, 0, ResizeQualityHigh)
-       Return quickBarUndoReopen(panelFunc, stamp)
+       Return quickBarUndoReopen(panelFunc)
     }
 
     showTOOLtip("Resizing image to:`n" groupDigits(tUserNewWidth) " x " groupDigits(tUserNewHeight) " (" Round(cmpx, 1) " MPx)")
@@ -49786,7 +49746,7 @@ BTNimgResizeEditor() {
     SetTimer, createGUItoolbar, -100
     SetTimer, TriggerMenuBarUpdate, -90
     SetTimer, ResetImgLoadStatus, -50
-    quickBarUndoReopen(panelFunc, stamp)
+    quickBarUndoReopen(panelFunc)
 }
 
 updateUIresizeImgEditPanel(dummy:=0) {
@@ -52815,21 +52775,21 @@ BtnIDedgesNow() {
        Return
 
     updateUIedgesPanel("no")
-    panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+    panelFunc := getHostPanelFunc()
     CloseWindow()
     detectEdgesSelectedArea()
-    quickBarUndoReopen(panelFunc, stamp)
+    quickBarUndoReopen(panelFunc)
 }
 
 BtnAddNoiseNow() {
    updateUIaddNoisePanel("no")
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+   panelFunc := getHostPanelFunc()
    CloseWindow()
    If (viewportQPVimage.imgHandle)
       HugeImagesApplyGenericFilters("noise filter")
    Else
       addNoiseSelectedArea()
-   quickBarUndoReopen(panelFunc, stamp)
+   quickBarUndoReopen(panelFunc)
 }
 
 updateUIedgesPanel(dummy:=0, b:=0) {
@@ -55623,11 +55583,11 @@ BtnBlurSelectedArea() {
       Return
 
    updateUIblurPanel("no-preview")
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+   panelFunc := getHostPanelFunc()
    BtnCloseWindow()
    ToggleEditImgSelection("show-edit")
    BlurSelectedArea()
-   quickBarUndoReopen(panelFunc, stamp)
+   quickBarUndoReopen(panelFunc)
 }
 
 BtnPixelizeSelectedArea() {
@@ -55637,17 +55597,17 @@ BtnPixelizeSelectedArea() {
    If (blurAreaPixelizeAmount<2)
       Return msgBeepTimer("WARNING: Pixelation amount is too low")
 
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+   panelFunc := getHostPanelFunc()
    BtnCloseWindow()
    If (viewportQPVimage.imgHandle)
    {
       HugeImagesApplyGenericFilters("pixelate")
-      Return quickBarUndoReopen(panelFunc, stamp)
+      Return quickBarUndoReopen(panelFunc)
    }
 
    ToggleEditImgSelection("show-edit")
    BlurSelectedArea("pixelate")
-   quickBarUndoReopen(panelFunc, stamp)
+   quickBarUndoReopen(panelFunc)
 }
 
 BtnZoomBlurSelectedArea() {
@@ -55655,11 +55615,11 @@ BtnZoomBlurSelectedArea() {
       Return
 
    updateUIzoomBlurPanel("no-preview")
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+   panelFunc := getHostPanelFunc()
    BtnCloseWindow()
    ToggleEditImgSelection("show-edit")
    zoomBlurSelectedArea()
-   quickBarUndoReopen(panelFunc, stamp)
+   quickBarUndoReopen(panelFunc)
 }
 
 BTNresetFillArea() {
@@ -59837,12 +59797,12 @@ BTNdoAutoImgColors() {
       Return
    }
 
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+   panelFunc := getHostPanelFunc()
    BtnCloseWindow()
    If (viewportQPVimage.imgHandle)
    {
       HugeImagesApplyAutoColors()
-      Return quickBarUndoReopen(panelFunc, stamp)
+      Return quickBarUndoReopen(panelFunc)
    }
 
    If (downscaleHugeImagesForEditing()<0)
@@ -59854,7 +59814,7 @@ BTNdoAutoImgColors() {
       PolarRectSelectedArea(A_ThisFunc, 3, 2, userAutoColorAdjustAll)
    } Else
       PolarRectSelectedArea(A_ThisFunc, 3, userAutoColorAdjustMode, userAutoColorAdjustAll)
-   quickBarUndoReopen(panelFunc, stamp)
+   quickBarUndoReopen(panelFunc)
 }
 
 WriteSettingsSharpenPanel() {
@@ -59987,10 +59947,10 @@ BTNdoSharpenFX() {
       Return 1
 
    updateUIsharpenPanel("no")
-   panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+   panelFunc := getHostPanelFunc()
    BtnCloseWindow()
    SharpenSelectedArea()
-   quickBarUndoReopen(panelFunc, stamp)
+   quickBarUndoReopen(panelFunc)
 }
 
 PanelStructuredCopyMoveWindow() {
@@ -91117,7 +91077,7 @@ BTNadjustCanvasAction() {
     WriteSettingsAdjustCanvasPanel()
     thisOpa := (BrushToolUseSecondaryColor=1) ? "BrushToolBopacity" : "BrushToolAopacity"
     %thisOpa% := OutlierFillOpacity
-    panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+    panelFunc := getHostPanelFunc()
     BtnCloseWindow()
     r1 := trGdip_GetImageDimensions(useGdiBitmap(), oImgW, oImgH)
     If (viewportQPVimage.imgHandle)
@@ -91134,7 +91094,7 @@ BTNadjustCanvasAction() {
 
     ToggleEditImgSelection("show-edit")
     ChangeImageCanvasSize(ResultEditWidth, ResultEditHeight, userAddTop, userAddBottom, userAddLeft, userAddRight, userAddCenter)
-    quickBarUndoReopen(panelFunc, stamp)
+    quickBarUndoReopen(panelFunc)
 }
 
 PanelResizeImageWindow() {
@@ -97878,14 +97838,16 @@ batchAutoColorsFiles() {
 BTNautoCropVP() {
   GuiControl, SettingsGUIA: Disable, mainBtnACT
   UpdateUIautoCropParams()
-  panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+  panelFunc := getHostPanelFunc()
   BtnCloseWindow()
   ; define the auto-crop area as a selection [huge images get it at full scale]
   ; and crop the image in the viewport to it; on abort or failure, no crop occurs
   r := BTNautoCropRealtime()
   If (r="ok")
+  {
      CropImageInViewPortToSelection("no-bar")
-  quickBarUndoReopen(panelFunc, stamp)
+     quickBarUndoReopen(panelFunc)
+  }
 }
 
 BTNautoCropRealtime() {
