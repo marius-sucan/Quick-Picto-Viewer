@@ -2123,7 +2123,7 @@ CreateTempGuiButton(btnList, killWin:=0, delayu:=0) {
        Return
     }
 
-    If (TouchScreenMode!=1 && !InStr(killWin, "force"))
+    If (TouchScreenMode!=1 && !InStr(killWin, "force") || runningLongOperation=1)
        Return
 
     btns := []
@@ -2201,7 +2201,7 @@ RepositionTempBtnGui() {
 tempBtnGuiClick(thisFunc) {
 ; g-label of each button, bound to its function; the event arguments AHK appends are dropped
 ; taps in a new bar's first 450 ms are dropped: they belong to the double tap that made the bar
-    If (A_TickCount - tempBtnBuiltAt()<450)
+    If ((A_TickCount - tempBtnBuiltAt()<450) || runningLongOperation=1)
        Return
 
     keepTempBtnGui(defaultTempBtnDisplay)
@@ -2232,7 +2232,7 @@ DestroyTempBtnGui(dummy:=0) {
 ; Every 250 ms: hides the bar once its keepTempBtnGui() time is up; the mouse over the bar adds 4 s.
 ; dummy="now" hides it at once.
     Critical, On
-    If (dummy!="now" && tempBtnVisible!="null")
+    If (dummy!="now" && tempBtnVisible!="null" && runningLongOperation=0)
     {
        MouseGetPos, , , OutputVarWin
        thisWin := WinActive("A")

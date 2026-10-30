@@ -4756,6 +4756,7 @@ ToggleThumbsMode() {
 
    stopGifORslidesPlayback()
    mouseTurnOFFtooltip()
+   DestroyTempBtnGui("now")
    If (StrLen(mustOpenStartFolder)>1 && !ar)
    {
       currentFileIndex := doOpenStartFolder(didSomething)
@@ -6089,7 +6090,9 @@ applyIMGeditKeepWin() {
 
 applyIMGeditFunction() {
     ; recordSelUndoLevelNow()
-    panelID := AnyWindowOpen, panelFunc := getHostPanelFunc(), stamp := quickBarEditStamp()
+    panelID := AnyWindowOpen
+    panelFunc := getHostPanelFunc()
+    stamp := quickBarEditStamp()
     GuiControl, SettingsGUIA: Disable, btnLiveApplyTool
     If isNowAlphaPainting()
     {
@@ -6128,7 +6131,7 @@ applyIMGeditFunction() {
     SetTimer, RemoveTooltip, -300
     If AnyWindowOpen
        GuiControl, SettingsGUIA: Enable, btnLiveApplyTool
-    Else If isVarEqualTo(panelID, 23, 24, 25, 30, 31, 32, 55, 65, 68, 74, 81, 89)
+    If isVarEqualTo(panelID, 23, 24, 25, 30, 31, 32, 55, 65, 68, 74, 81, 89)
        quickBarUndoReopen(panelFunc, stamp)
 }
 
@@ -17503,7 +17506,8 @@ ApplyVPcolorAdjustSelectedArea(modus:=0) {
     If (imgFxMode=1)
     {
        msgBeepTimer("No viewport color adjustments to be applied on image`n`nPress F to cycle through modes`nor press Shift + U to open the viewport color adjustments panel")
-       Return CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0, msgDisplayTime//1.5 + 500)
+       CreateTempGuiButton("Cycle color modes,,quickBarNextColorMode||Adjust colors,,PanelColorsAdjusterVPwindow", 0, msgDisplayTime//1.5 + 500)
+       Return
     }
 
     If (!validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
@@ -27462,7 +27466,7 @@ quickBarUndoReopen(panelFunc, stamp) {
    If panelFunc
       quickBarReopenPanel(panelFunc)
 
-   btnReopen := panelFunc ? "||Reopen panel,,quickBarReopenPanel" : ""
+   btnReopen := (panelFunc && !AnyWindowOpen) ? "||Reopen panel,,quickBarReopenPanel" : ""
    quickBarUndoBar("Undo action,,quickBarImgUndo" btnReopen)
 }
 
@@ -27905,6 +27909,7 @@ createSettingsGUI(IDwin, thisCaller:=0, allowReopen:=1, isImgLiveEditor:=0) {
     setLVrowsCount()
     stopGifORslidesPlayback()
     mouseTurnOFFtooltip()
+    DestroyTempBtnGui("now")
     ; If (editingSelectionNow=1 && imgEditPanelOpened!=1)
     ;    ToggleEditImgSelection()
 
@@ -39645,8 +39650,9 @@ searchNextIndex(direction, inLoop:=0) {
    If (!newIndex && inLoop=1)
    {
       msgBeepTimer("WARNING: No indexed file matched the search criteria:`n" userSearchString, 900)
+      CreateTempGuiButton("Search again,,PanelSearchIndex", 0, msgDisplayTime//1.5 + 500)
       userSearchString := ""
-      Return CreateTempGuiButton("Search again,,PanelSearchIndex", 0, msgDisplayTime//1.5 + 500)
+      Return
    }
 
    RemoveTooltip()
