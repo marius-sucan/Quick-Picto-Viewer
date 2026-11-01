@@ -9915,6 +9915,11 @@ initFreeHandClickResponse(mX, mY, imgW, imgH, mainWidth, mainHeight) {
    defineRelativeSelCoords(imgW, imgH)
    ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, imgW, imgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
    dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize*2, mainWidth, mainHeight, 1)
+   If IsObject(dotActiveObj)
+   {
+      ; the click is the new box's top-left corner, also near the viewport edges where the dots are moved
+      dotActiveObj.n := 1,  dotActiveObj.x := kX,  dotActiveObj.y := kY
+   }
    Return dotActiveObj
 }
 
@@ -10222,7 +10227,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       If (dotActive=10)       ; click the center dot of the selection area
          anotherZeit := A_TickCount
 
-      If (dotActive && imgSelOutViewPort=1)
+      If (dotActive && imgSelOutViewPort=1 && yayFreeMode!=1)
       {
          dotActive := 9 ;       ; anywhere within the selection [makes the entire selection draggable]
          DotPosX := imgSelX1
@@ -10409,16 +10414,28 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
  
           newSelDotX := (FlipImgH=1) ? tDotPosX - changePosX : tDotPosX + changePosX
           newSelDotY := (FlipImgV=1) ? tDotPosY - changePosY : tDotPosY + changePosY
+          snapX := snapY := 1
+          If (freeLine=1)
+          {
+             ; free lines snap only on their main axis, so the sideways end stays at the mouse
+             snapX := (Abs(newSelDotX - freeHandPoints[1])>=Abs(newSelDotY - freeHandPoints[2])) ? 1 : 0
+             snapY := !snapX
+          }
+
           If (showSelectionGrid=1 && shiftState!=1 && lockSelectionAspectRatio<2)
           {
-             newSelDotX := snapToValues(newSelDotX, 0, rImgW//2, snapSizeX, 0)
-             newSelDotY := snapToValues(newSelDotY, 0, rImgH//2, snapSizeY, 0)
+             If (snapX=1)
+                newSelDotX := snapToValues(newSelDotX, 0, rImgW//2, snapSizeX, 0)
+             If (snapY=1)
+                newSelDotY := snapToValues(newSelDotY, 0, rImgH//2, snapSizeY, 0)
           }
 
           If (shiftState!=1 && lockSelectionAspectRatio<2)
           {
-             newSelDotX := snapToValues(newSelDotX, 0, rImgW, snapSizeX, 0)
-             newSelDotY := snapToValues(newSelDotY, 0, rImgH, snapSizeY, 0)
+             If (snapX=1)
+                newSelDotX := snapToValues(newSelDotX, 0, rImgW, snapSizeX, 0)
+             If (snapY=1)
+                newSelDotY := snapToValues(newSelDotY, 0, rImgH, snapSizeY, 0)
           }
 
           If (dotActive=1)
@@ -21602,6 +21619,8 @@ HugeImagesDrawParametricLines() {
       o_imgSelW := imgSelW := max(imgSelX2, imgSelX1) - min(imgSelX2, imgSelX1)
       maxLength := min(o_imgSelW, o_imgSelH)//2
       thisThick := (DrawLineAreaContourThickness > maxLength/1.05) ? maxLength/1.05 : DrawLineAreaContourThickness
+      If (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0)
+         thisThick := DrawLineAreaContourThickness
       oth := thisThick := thisThick * (DrawLineAreaThickScale / 100)
       thisThick := Round(thisThick * 0.495)
       tk := (DrawLineAreaJoinsStyle=1) ? thisThick : thisThick * (DrawLineAreaMitersBorder / 100)
@@ -23501,26 +23520,41 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
        If (freeLine=1)
        {
-          ; no minimum size; each edge is rounded on its own
-          imgSelW := Round(prevDestPosX + nImgSelX2*zoomLevel) - Round(prevDestPosX + nImgSelX1*zoomLevel)
-          imgSelH := Round(prevDestPosY + nImgSelY2*zoomLevel) - Round(prevDestPosY + nImgSelY1*zoomLevel)
+          ; the true box: no minimum size, not pulled into the window, each edge rounded on its own
+          imgSelPx := Round(prevDestPosX + nImgSelX1*zoomLevel)
+          imgSelPy := Round(prevDestPosY + nImgSelY1*zoomLevel)
+          imgSelW := Round(prevDestPosX + nImgSelX2*zoomLevel) - imgSelPx
+          imgSelH := Round(prevDestPosY + nImgSelY2*zoomLevel) - imgSelPy
        }
 
-       tk := (DrawLineAreaContourAlign=2 || freeLine=1) ? thisThick//2 : thisThick
-       If (DrawLineAreaContourAlign=1 && freeLine!=1)
+       tk := (DrawLineAreaContourAlign=2) ? thisThick//2 : thisThick
+       If (DrawLineAreaContourAlign=1)
           tk := 0
+       If (freeLine=1)
+          tk := Ceil(thisThick/2) + 1 ; half the stroke, rounded up: free lines are centered on their path
 
        o_imgSelPx := imgSelPx,        o_imgSelPy := imgSelPy
        o_imgSelW  := imgSelW,         o_imgSelH  := imgSelH
-       getClampedVPselToWindow(1, mainWidth, mainHeight, qimgW, qimgH, imgSelPx, imgSelPy, imgSelW, imgSelH)
-       dw := (o_imgSelW>mainWidth) ? imgSelW : Round(imgSelW + tk * 2)
-       dh := (o_imgSelH>mainHeight) ? imgSelH : Round(imgSelH + tk * 2)
-       If (dw<3)
-          dw := 3
-       If (dh<3)
-          dh := 3
-       tkx := (o_imgSelW>mainWidth) ? 0 : tk
-       tky := (o_imgSelH>mainHeight) ? 0 : tk
+       If (freeLine=1)
+       {
+          ; the stroke's area, cut to the window and to the image
+          tkx := tky := 0
+          imgSelPx := Floor(min(max(o_imgSelPx - tk, 0, prevDestPosX), mainWidth - 1))
+          imgSelPy := Floor(min(max(o_imgSelPy - tk, 0, prevDestPosY), mainHeight - 1))
+          dw := max(Ceil(min(o_imgSelPx + o_imgSelW + tk, mainWidth, prevDestPosX + prevResizedVPimgW)) - imgSelPx, 1)
+          dh := max(Ceil(min(o_imgSelPy + o_imgSelH + tk, mainHeight, prevDestPosY + prevResizedVPimgH)) - imgSelPy, 1)
+       } Else
+       {
+          getClampedVPselToWindow(1, mainWidth, mainHeight, qimgW, qimgH, imgSelPx, imgSelPy, imgSelW, imgSelH)
+          dw := (o_imgSelW>mainWidth) ? imgSelW : Round(imgSelW + tk * 2)
+          dh := (o_imgSelH>mainHeight) ? imgSelH : Round(imgSelH + tk * 2)
+          If (dw<3)
+             dw := 3
+          If (dh<3)
+             dh := 3
+          tkx := (o_imgSelW>mainWidth) ? 0 : tk
+          tky := (o_imgSelH>mainHeight) ? 0 : tk
+       }
        ; ToolTip, % "y=" imgSelPy " | ty=" tky " | h=" dh , , , 2
        bx := by := 0
        If (DrawLineAreaBlendMode>0 && !testSelectOutsideImgEntirely(useGdiBitmap()))
@@ -23534,10 +23568,18 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
 
           G2 := Gdip_GraphicsFromImage(xBitmap, 5, 1, 2, 1)
           Gdip_SetPixelOffsetMode(G2, 1)
-          bx := (prevDestPosX>=o_imgSelPx && prevDestPosX>=0) ? prevDestPosX - o_imgSelPx : 0
-          by := (prevDestPosY>=o_imgSelPy && prevDestPosY>=0) ? prevDestPosY - o_imgSelPy : 0
-          bx := (o_imgSelPx<=0 && prevDestPosX<=0) ? abs(o_imgSelPx) : bx
-          by := (o_imgSelPy<=0 && prevDestPosY<=0) ? abs(o_imgSelPy) : by
+          If (freeLine=1)
+          {
+             ; the copied area's offset from the box
+             bx := imgSelPx - o_imgSelPx
+             by := imgSelPy - o_imgSelPy
+          } Else
+          {
+             bx := (prevDestPosX>=o_imgSelPx && prevDestPosX>=0) ? prevDestPosX - o_imgSelPx : 0
+             by := (prevDestPosY>=o_imgSelPy && prevDestPosY>=0) ? prevDestPosY - o_imgSelPy : 0
+             bx := (o_imgSelPx<=0 && prevDestPosX<=0) ? abs(o_imgSelPx) : bx
+             by := (o_imgSelPy<=0 && prevDestPosY<=0) ? abs(o_imgSelPy) : by
+          }
           imgSelPx := tkx - bx
           imgSelPy := tky - by
        } Else If (userimgGammaCorrect=1 && AnyWindowOpen!=23)
