@@ -22569,6 +22569,9 @@ DrawLinesInSelectedArea(modus) {
     If ((imgSelX1<0 || imgSelY1<0 || imgSelX2>imgW || imgSelY2>imgH) && PasteInPlaceAutoExpandIMG=1 && validBMP(whichBitmap) && imgW && imgH) || (imgW && imgH && AnyWindowOpen=30)
        allowOutside := 1
 
+    If (modus=1 && DrawLineAreaLineGenerator=0)
+       allowOutside := 0
+
     stopNow := mergeViewPortEffectsImgEditing(A_ThisFunc, 0, allowOutside)
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
@@ -22581,7 +22584,7 @@ DrawLinesInSelectedArea(modus) {
     startZeit := A_TickCount
     ; before auto-expanding, which flags an opaque image as having alpha
     thisBlendMode := protectAlphaBlendMode(DrawLineAreaBlendMode)
-    If (allowOutside=1 && PasteInPlaceAutoExpandIMG=1)
+    If (allowOutside=1 && PasteInPlaceAutoExpandIMG=1 && DrawLineAreaLineGenerator=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
 
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
