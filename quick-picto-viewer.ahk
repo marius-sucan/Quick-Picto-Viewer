@@ -9912,6 +9912,8 @@ initFreeHandClickResponse(mX, mY, imgW, imgH, mainWidth, mainHeight) {
    freeHandPoints := [kX, kY, kX, kY]
    imgSelX1 := kX, imgSelY1 := kY
    imgSelX2 := kX + 1, imgSelY2 := kY + 1
+   If (AnyWindowOpen!=30)  ; draw lines keeps 1x1: free lines sit on the box edges
+      capSelectionMinSize(imgW, imgH)
    defineRelativeSelCoords(imgW, imgH)
    ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, imgW, imgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
    dotActiveObj := determineSelAreaClickRect(mX, mY, SelDotsSize*2, mainWidth, mainHeight, 1)
@@ -10509,10 +10511,6 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
                 imgSelY2 := nImgSelY2
           }
 
-          If (imgSelX1=imgSelX2)
-             imgSelX2 += 2
-          If (imgSelY1=imgSelY2)
-             imgSelY2 += 2
           If (freeLine=1)
              setFreeLineSelBox(newSelDotX, newSelDotY)
 
@@ -10579,6 +10577,13 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
                 imgSelX2 := clampInRange(imgSelX2, 0, rImgW)
                 imgSelY2 := clampInRange(imgSelY2, 0, rImgH)
              }
+             imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
+             imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
+          }
+
+          If (freeLine!=1)
+          {
+             capSelectionMinSize(rImgW, rImgH)
              imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
              imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
           }
@@ -15459,18 +15464,19 @@ generateAlphaMaskBitmap(clipBMP, previewMode, offX:=0, offY:=0, offW:=0, offH:=0
        offX := 0
     }
 
-    If (offX>2 && offY>2 && !offW && !offH)
+    If (!offW && !offH && (offX>2 && offY>2 || !validBMP(clipBMP)))
     {
-       rImgW := offX
-       rImgH := offY
+       ; without a bitmap, offX/offY give the mask size
+       rImgW := (offX>1) ? offX : 1
+       rImgH := (offY>1) ? offY : 1
        offX := offY := 0
     } Else trGdip_GetImageDimensions(clipBMP, rImgW, rImgH)
     ; fnOutputDebug(A_ThisFunc "(): " offX "=" offY "|" offW "=" offH  "|" rImgW "=" rImgH)
 
     If IsObject(selObj)
     {
-       rImgW := selObj.zw
-       rImgH := selObj.zh
+       rImgW := (selObj.zw>1) ? selObj.zw : 1
+       rImgH := (selObj.zh>1) ? selObj.zh : 1
        offX := offY := 0
     }
 
@@ -18785,6 +18791,8 @@ getVPselSize(ByRef zW, ByRef zH, capped, invertArea) {
       zW := Round( ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) * zoomLevel )
       zH := Round( ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) * zoomLevel )
    }
+   ; a selection thinner than half a screen pixel still gets 1 px
+   zW := max(1, zW),   zH := max(1, zH)
    If (capped=1)
       capIMGdimensionsFormatlimits("qpv-live", 1, zW, zH)
 }
@@ -18799,6 +18807,10 @@ livePreviewHugeImageFillSelArea() {
    vpWinClientSize(mainWidth, mainHeight)
    trGdip_GetImageDimensions(useGdiBitmap(), thisW, thisH)
    objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, thisW, thisH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+   getVPselSize(zW, zH, 1, FillAreaInverted)
+   If (zW<1 || zH<1)
+      Return
+
    ; pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio)
    pPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, VPselRotation, 1, mainWidth, mainHeight, 0)
    If (FillAreaInverted=1)
@@ -18836,7 +18848,6 @@ livePreviewHugeImageFillSelArea() {
       If isInRange(FillAreaColorMode, 2, 4) ; && FillAreaInverted=0 && !isImgSizeTooLarge(zW, zH))
       {
          gBpp := 32
-         getVPselSize(zW, zH, 1, FillAreaInverted)
          gradientsBMP := drawFillSelGradient(zW, zH, 1, 0, 0, zW, zH, userimgGammaCorrect)
          If (validBMP(gradientsBMP) && (imgSelOutViewPort!=1 || FillAreaInverted=1))
          {
@@ -19111,6 +19122,9 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0, ByRef hasAlph
    trGdip_GetImageDimensions(whichBitmap, oImgW, oImgH)
    vpWinClientSize(mainWidth, mainHeight)
    objSel := ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, oImgW, oImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
+   getVPselSize(zW, zH, 1, FillAreaInverted)
+   If (zW<1 || zH<1)
+      Return
 
    pPath := coreCreateFillAreaShape(imgSelPx, imgSelPy, imgSelW, imgSelH, FillAreaShape, VPselRotation, rotateSelBoundsKeepRatio, 1)
    tx := (imgSelPx > prevDestPosX) ? prevDestPosX : max(imgSelPx, prevDestPosX)
@@ -19143,7 +19157,6 @@ coreFillSelectedArea(previewMode, whichBitmap:=0, brushingMode:=0, ByRef hasAlph
    Else
       getClampedVPselToWindow(!PasteInPlaceAutoExpandIMG, mainWidth, mainHeight, oImgW, oImgH, imgSelPx, imgSelPy, imgSelW, imgSelH)
 
-   getVPselSize(zW, zH, 1, FillAreaInverted)
    objSel.dw := imgSelW,    objSel.dh := imgSelH
    objSel.dx := imgSelPx,   objSel.dy := imgSelPy
    objSel.nw := imgSelW,    objSel.nh := imgSelH
@@ -19489,6 +19502,9 @@ drawFillSelGradient(imgSelW, imgSelH, previewMode, offX, offY, offW, offH, linea
        prevBMPu := trGdip_DisposeImage(prevBMPu, 1)
        Return
     }
+
+    If (imgSelW<1 || imgSelH<1)
+       Return
 
     thisu := (FillAreaInverted=1) ? 0 : "a" getVPselIDs("saiz-vpos") VPselRotation
     thisState := "a" previewMode thisu FillAreaInverted userimgGammaCorrect FillAreaColor FillAreaColorMode FillArea2ndColor FillAreaOpacity FillArea2ndOpacity FillAreaGradientWrapped FillAreaGradientAngle FillAreaGradientPosB FillAreaGradientPosA FillAreaColorReversed FillAreaGradientScale tinyPrevAreaCoordX tinyPrevAreaCoordY clrGradientOffX clrGradientOffY prevDestPosX prevDestPosY zoomLevel FillAreaWelcomePattern clrGradientCoffX clrGradientCoffY linearu bgrBrush
@@ -76212,6 +76228,26 @@ capSelectionRelativeCoords() {
    prcSelY2 := clampInRange(prcSelY2, 0.01, 1)
 }
 
+capSelectionMinSize(imgW, imgH) {
+   ; selections keep the 2 px minimum Apply needs; at the image's right and bottom edges they grow inward
+   Static minSize := 2
+   If (Abs(imgSelX2 - imgSelX1)<minSize)
+   {
+      x := min(imgSelX1, imgSelX2)
+      If (x<imgW && x + minSize>imgW && imgW>=minSize)
+         x := imgW - minSize
+      imgSelX1 := x,  imgSelX2 := x + minSize
+   }
+
+   If (Abs(imgSelY2 - imgSelY1)<minSize)
+   {
+      y := min(imgSelY1, imgSelY2)
+      If (y<imgH && y + minSize>imgH && imgH>=minSize)
+         y := imgH - minSize
+      imgSelY1 := y,  imgSelY2 := y + minSize
+   }
+}
+
 calcRelativeSelCoords(whichBitmap, imgW:=0, imgH:=0) {
    If (imgSelX1=0 && imgSelY1=0 && imgSelX2=-1 && imgSelY2=-1)
       Return
@@ -76225,6 +76261,9 @@ calcRelativeSelCoords(whichBitmap, imgW:=0, imgH:=0) {
    imgSelY1 := Round(prcSelY1*imgH)
    imgSelX2 := Round(prcSelX2*imgW)
    imgSelY2 := Round(prcSelY2*imgH)
+   If !(AnyWindowOpen=30 && isFreeLineMode())  ; free lines keep their exact box
+      capSelectionMinSize(imgW, imgH)
+
    nImgSelX1 := min(imgSelX1, imgSelX2)
    nImgSelY1 := min(imgSelY1, imgSelY2)
    nimgSelX2 := max(imgSelX1, imgSelX2)
