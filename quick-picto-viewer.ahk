@@ -9843,6 +9843,25 @@ isFreeHandModus(dotu) {
    Return r
 }
 
+isFreeLineMode() {
+   ; draw lines panel: one line along the drag, drawn on an edge or a diagonal of the selection box
+   Return (DrawLineAreaLineGenerator=0 || DrawLineAreaBorderCenter=3 && freeHandSelectionMode=1) ? 1 : 0
+}
+
+setFreeLineSelBox(bX, bY) {
+   ; the box spans the click point and the dragged point; the drag direction is read from the box
+   aX := freeHandPoints[1],    aY := freeHandPoints[2]
+   frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
+   left := (bX<aX || bX=aX && (frame=1 || frame=3)) ? 1 : 0
+   up := (bY<aY || bY=aY && (frame=1 || frame=2)) ? 1 : 0
+   bX := (bX!=aX) ? bX : aX + (left ? -2 : 2)
+   bY := (bY!=aY) ? bY : aY + (up ? -2 : 2)
+   imgSelX1 := min(aX, bX),    imgSelX2 := max(aX, bX)
+   imgSelY1 := min(aY, bY),    imgSelY2 := max(aY, bY)
+   frame := up ? (left ? 1 : 2) : (left ? 3 : 4)
+   freeHandPoints[5] := defineFreeHandFrame("flip", FlipImgH, FlipImgV, frame)
+}
+
 endFreeHandModus(rImgW, rImgH) {
 ; unused; meant to track where the click-down ended
    MouseGetPos, mX, mY
@@ -10257,6 +10276,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       o_innerSelectionCavityY := innerSelectionCavityY
       adjustSkewImg := adjustGradientOffset := adjustSelCavity := 0
       parametricWin := (dotActive=9 && AnyWindowOpen=30 && isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 6) && ctrlState!=1 && shiftState!=1 && userAllowsGradientRecentering=1) ? 1 : 0
+      freeLine := (yayFreeMode=1 && dotActive=1 && AnyWindowOpen=30 && altState!=1 && shiftState!=1 && isFreeLineMode()) ? 1 : 0
       selLim := (viewportQPVimage.imgHandle) ? 9876543210 : 199000
       If (isInRange(dotActive, 11, 14) && ctrlState!=1 && shiftState!=1 && (AnyWindowOpen=31 || AnyWindowOpen=24) && !viewportQPVimage.imgHandle)
       {
@@ -10281,14 +10301,6 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       While, (determineLClickState()=1 && o_imageLoading!=1 && dotActive)
       {
           MouseGetPos, mX, mY
-          If yayFreeMode
-          {
-             ; MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
-             ; freeHandPoints[3] := kX,     freeHandPoints[4] := kY
-             freeHandPoints[5] := defineFreeHandFrame(mX, mY, mXo, mYo)
-             freeHandPoints[6] := MouseDeltaAngle180(mXo, mYo, mX, mY)
-          }
-
           skipLoop := isDotInRect(mX, mY, zX - 3, zX + 3, zY - 3, zY + 3) ? 1 : 0
           If (A_TickCount - newPosZeit>750) ; || (mX=oX && mY=oY)
           {
@@ -10298,6 +10310,15 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
                 Continue
           } Else If (skipLoop=1)
              Continue
+
+          If yayFreeMode
+          {
+             ; read here, so it always matches the selection box set below
+             ; MouseCoords2Image(mX, mY, 0, prevDestPosX, prevDestPosY, prevResizedVPimgW, prevResizedVPimgH, kX, kY)
+             ; freeHandPoints[3] := kX,     freeHandPoints[4] := kY
+             freeHandPoints[5] := defineFreeHandFrame(mX, mY, mXo, mYo)
+             freeHandPoints[6] := MouseDeltaAngle180(mXo, mYo, mX, mY)
+          }
 
           Sleep, 1
           zeitSillyPrevent := A_TickCount
@@ -10475,6 +10496,8 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
              imgSelX2 += 2
           If (imgSelY1=imgSelY2)
              imgSelY2 += 2
+          If (freeLine=1)
+             setFreeLineSelBox(newSelDotX, newSelDotY)
 
           imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
           imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
@@ -22559,7 +22582,9 @@ DrawLinesInSelectedArea(modus) {
     allowOutside := 0
     whichBitmap := useGdiBitmap()
     trGdip_GetImageDimensions(whichBitmap, imgW, imgH)
-    tk := (DrawLineAreaContourAlign=1 || PasteInPlaceAutoExpandIMG!=1) ? 0 : DrawLineAreaContourThickness
+    ; free lines are centered on their path, whatever the pen alignment
+    alignInside := (DrawLineAreaContourAlign=1 && !(modus=1 && isFreeLineMode())) ? 1 : 0
+    tk := (alignInside=1 || PasteInPlaceAutoExpandIMG!=1) ? 0 : DrawLineAreaContourThickness
     o_imgSelX1 := imgSelX1,    o_imgSelY1 := imgSelY1
     o_imgSelX2 := imgSelX2,    o_imgSelY2 := imgSelY2
     imgSelX1 := imgSelX1 - tk//2,    imgSelY1 := imgSelY1 - tk//2
@@ -22576,6 +22601,8 @@ DrawLinesInSelectedArea(modus) {
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     If (stopNow=1 || !validBMP(whichBitmap) || thumbsDisplaying=1 || editingSelectionNow!=1)
     {
+       imgSelX1 := o_imgSelX1,    imgSelY1 := o_imgSelY1
+       imgSelX2 := o_imgSelX2,    imgSelY2 := o_imgSelY2
        addJournalEntry(A_ThisFunc "() error - operation abandoned: " whichBitmap "--" stopNow "--" thumbsDisplaying "--" editingSelectionNow)
        SetTimer, ResetImgLoadStatus, -300
        Return
@@ -22584,8 +22611,16 @@ DrawLinesInSelectedArea(modus) {
     startZeit := A_TickCount
     ; before auto-expanding, which flags an opaque image as having alpha
     thisBlendMode := protectAlphaBlendMode(DrawLineAreaBlendMode)
-    If (allowOutside=1 && PasteInPlaceAutoExpandIMG=1 && DrawLineAreaLineGenerator=1)
+    If (allowOutside=1 && PasteInPlaceAutoExpandIMG=1)
        hasRanExpand := performAutoExpandCanvas(imgW, imgH)
+
+    ; the selection was grown only for the auto-expand test
+    If (hasRanExpand!=1)
+       offX := offY := 0
+    imgSelX1 := o_imgSelX1 + offX,    imgSelY1 := o_imgSelY1 + offY
+    imgSelX2 := o_imgSelX2 + offX,    imgSelY2 := o_imgSelY2 + offY
+    If (hasRanExpand=1)
+       defineRelativeSelCoords(imgW, imgH)
 
     whichBitmap := validBMP(UserMemBMP) ? UserMemBMP : gdiBitmap
     trGdip_GetImageDimensions(whichBitmap, rw, rh)
@@ -22604,15 +22639,6 @@ DrawLinesInSelectedArea(modus) {
        SetTimer, ResetImgLoadStatus, -100
        trGdip_DisposeImage(newBitmap)
        Return
-    }
-
-    If (hasRanExpand=1)
-    {
-       imgSelX1 := o_imgSelX1 + offX
-       imgSelY1 := o_imgSelY1 + offY
-       imgSelX2 := o_imgSelX2 + offX
-       imgSelY2 := o_imgSelY2 + offY
-       defineRelativeSelCoords(imgW, imgH)
     }
 
     If (modus=1)
@@ -23326,6 +23352,8 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
     dR := (DrawLineAreaContourAlign=3) ? thisThick//2 : 0
     If (DrawLineAreaContourAlign=1)
        dR := -thisThick//2
+    If isFreeLineMode()
+       dR := 0 ; free lines are centered on their path
 
     x1 := imgSelPx,              y1 := imgSelPy
     x2 := imgSelPx + imgSelW,    y2 := imgSelPy + imgSelH
@@ -23441,11 +23469,12 @@ createDrawLinesPen(thisThick, modus:=1) {
 }
 
 coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
+    freeLine := (modus!="shapes" && isFreeLineMode()) ? 1 : 0
     If (G2)
     {
        previewMode := 0
        trGdip_GetImageDimensions(whichBitmap, oimgW, oimgH)
-       calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
+       calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2, 0, 0, 0, freeLine)
        maxLength := min(imgSelW, imgSelH)//2
        thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
        If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0))
@@ -23470,8 +23499,15 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
 
        thisThick := thisThick*zoomLevel
        ViewPortSelectionManageCoords(mainWidth, mainHeight, prevDestPosX, prevDestPosY, qImgW, qImgH, nImgSelX1, nImgSelY1, nImgSelX2, nImgSelY2, zImgSelX1, zImgSelY1, zImgSelX2, zImgSelY2, imgSelW, imgSelH, imgSelPx, imgSelPy)
-       tk := (DrawLineAreaContourAlign=2) ? thisThick//2 : thisThick
-       If (DrawLineAreaContourAlign=1)
+       If (freeLine=1)
+       {
+          ; no minimum size; each edge is rounded on its own
+          imgSelW := Round(prevDestPosX + nImgSelX2*zoomLevel) - Round(prevDestPosX + nImgSelX1*zoomLevel)
+          imgSelH := Round(prevDestPosY + nImgSelY2*zoomLevel) - Round(prevDestPosY + nImgSelY1*zoomLevel)
+       }
+
+       tk := (DrawLineAreaContourAlign=2 || freeLine=1) ? thisThick//2 : thisThick
+       If (DrawLineAreaContourAlign=1 && freeLine!=1)
           tk := 0
 
        o_imgSelPx := imgSelPx,        o_imgSelPy := imgSelPy
@@ -88128,7 +88164,7 @@ flipBitmapAccordingToViewPort(whichBitmap, ignoreThis:=0) {
    Return whichBitmap
 }
 
-calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef imgSelPy, ByRef imgSelW, ByRef imgSelH, ByRef zImgSelPx, ByRef zImgSelPy, ByRef zImgSelW, ByRef zImgSelH, ByRef nImgSelX1, ByRef nImgSelY1, ByRef nImgSelX2, ByRef nImgSelY2, usePrevious:=0, givenRotation:=0, givenCoords:=0) {
+calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef imgSelPy, ByRef imgSelW, ByRef imgSelH, ByRef zImgSelPx, ByRef zImgSelPy, ByRef zImgSelW, ByRef zImgSelH, ByRef nImgSelX1, ByRef nImgSelY1, ByRef nImgSelX2, ByRef nImgSelY2, usePrevious:=0, givenRotation:=0, givenCoords:=0, keepThin:=0) {
    If (usePrevious=1)
    {
       nImgSelX1 := min(prevImgSelX1, prevImgSelX2)
@@ -88198,14 +88234,14 @@ calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef im
          imgSelH := imgH - imgSelPy
    }
 
-   If (imgSelW<2)
+   If (imgSelW<2 && keepThin!=1) ; keepThin: free lines sit on the box edges
    {
       imgSelW := 2
       imgSelPx := (imgSelPx>=2) ? imgSelPx - 2 : 0
       nImgSelX2 := imgSelPx + imgSelW
    }
 
-   If (imgSelH<2)
+   If (imgSelH<2 && keepThin!=1)
    {
       imgSelH := 2
       imgSelPy := (imgSelPy>=2) ? imgSelPy - 2 : 0
@@ -88250,13 +88286,13 @@ calcImgSelection2bmp(boundLess, imgW, imgH, newW, newH, ByRef imgSelPx, ByRef im
          zimgSelH := newH - zimgSelPy
    }
 
-   If (zImgSelW<2)
+   If (zImgSelW<2 && keepThin!=1)
    {
       zImgSelW := 2
       zImgSelPx := (zImgSelPx>=2) ? zImgSelPx - 2 : 0
    }
 
-   If (zImgSelH<2)
+   If (zImgSelH<2 && keepThin!=1)
    {
       zImgSelH := 2
       zImgSelPy := (zImgSelPy>=2) ? zImgSelPy - 2 : 0
