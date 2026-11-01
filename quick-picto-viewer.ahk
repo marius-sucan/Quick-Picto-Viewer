@@ -119,10 +119,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , multiPageAnimTypesRegEx := "i)(.\.(apng|png|mng|webp|gif|avif|heif|heic|jxl))$", multiPageFilesREGex := "i)(.\.(pdf|tif|tiff|jxl))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxl|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXL, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
-   , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxl|jxr|wdp|hdp|ico|jng|png|tga|tif|tiff|webp))$", userJpegQuality := 90
-   , userJpegSubsampling := 2, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
-   , userSaveImgCompressionLvl := 3
-   , userPaletteDithering := 1, userPaletteTransparency := 0
+   , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxl|jxr|wdp|hdp|ico|jng|png|tga|tif|tiff|webp))$"
    , openFptrn1 := "*.png;*.bmp;*.gif;*.jpg;*.tif;*.tga;*.webp;*.jpeg;*.pdf;*.svg;*.tiff;*.jpe;*.ico", prevLoadedImageIndex := 0, mainExecPath
    , openFptrn2 := "*.dds;*.emf;*.exr;*.g3;*.hdp;*.j2c;*.j2k;*.jbg;*.jif;*.jng;*.jp2;*.jxr;*.koa;*.lbm;*.mng;*.pbm;*.pcd;*.pct;*.pcx;*.pfm;*.pgm;*.pic;*.ppm;*.psd;*.ras;*.sgi;*.wap;*.wbm;*.wbmp;*.wdp;*.wmf;*.xbm;*.xpm"
    , openFptrn3 := "*.3fr;*.arw;*.bay;*.bmq;*.cap;*.cine;*.cr2;*.crw;*.cs1;*.dc2;*.dcr;*.drf;*.dsc;*.erf;*.fff;*.hdr;*.ia;*.iiq;*.k25;*.kc2;*.kdc;*.mdc;*.mef;*.mos;*.mrw;*.nef;*.nrw;*.orf;*.pef;*.ptx;*.pxn;*.qtk;*.raf;*.raw;*.rdc;*.rw2;*.rwz;*.sr2;*.srf;*.x3f"
@@ -134,15 +131,14 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , LargeUIfontValue := 14, AnyWindowOpen := 0, toolTipGuiCreated := 0, panelWinCollapsed :=0
    , PrefsLargeFonts := 0, OSDbgrColor := "252525", OSDtextColor := "FEFDFC", brushAclrAlpha := "ffFFff"
    , PasteFntSize := 35, OSDfontSize := 23, OSDFontName := "Arial", prevOpenFolderPath := ""
-   , lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0, prevFilesSortMode
+   , lastWinDrag := 1, img2resizePath := "", colorPickerModeNow := 0, prevFilesSortMode, cachedAllSessionsSeen := new hashtable()
    , prevFileMovePath := "", lastGIFdestroy := 1, prevAnimGIFwas := "", forcedAnimPlayPath := ""
-   , cachedAllSessionsSeen := new hashtable()
    , thumbsW := 300, thumbsH := 300, thumbsDisplaying := 0, userSeenSessionImagesArray := new hashtable()
    , VPselRotation := 0, hEditMenuSearch := "", prevOmniBoxFolder := "", lastSelPrinterName := ""
    , imgSelLargerViewPort := 0, dynamicLiveObjVisible := 1, prevSelDotX := "", prevSelDotY := "", prevSelDotAx := "", prevSelDotAy := ""
    , userActionConflictingFile := 1, LastWasFastDisplay := 0, FontList := [], prevFileSavePath := ""
    , imgHUDbaseUnit := Round(OSDfontSize*2.5), lastLongOperationAbort := 1, brushBclrAlpha := "010101"
-   , lastOtherWinClose := 1, UsrCopyMoveOperation := 2, editingSelectionNow := 0, EntryMarkedMoveIndex := 0
+   , lastOtherWinClose := 1, editingSelectionNow := 0, EntryMarkedMoveIndex := 0, imgEditPanelOpened := 0, alphaMaskCoffsetY := 0
    , ForceNoColorMatrix := 0, prevFastDisplay := 1, hSNDmediaDuration, lastMenuBarUpdated := 1
    , imgSelX1 := 0, imgSelY1 := 0, imgSelX2 := -1, imgSelY2 := -1, adjustNowSel := 0, hasHamDistCached := 0
    , prevImgSelX1 := 0, prevImgSelY1 := 0, prevImgSelX2 := -1, prevImgSelY2 := -1, selDotCy := "", selDotDx := "", selDotDy := ""
@@ -150,7 +146,6 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, pBrushF := "", lastWasLowQuality := 0
    , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
-   , imgEditPanelOpened := 0, jpegDesiredOperation := 1, copyMoveDoLastOption := 4, alphaMaskCoffsetY := 0
    , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := ""
    , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := ""
    , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
@@ -394,9 +389,13 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userPDFdpi := 430, userActivePDFpage := 0, userThumbsSheetUpscaleSmall := 1, PrintPDFpagesRange := 1
    , PrintPDFpagesGivenEdit :=  "1-5", noQualityWarnings := 0, TLBRinvertColors := 0, userVPpdfDPI := 420
    , userVPsvgScale := 1.00, alphaMaskPreviewOpacity := 255, FloodFillSelectionMode := 1
-   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0
+   , autoApplyVPcolors := 1, zoomBlurHighQuality := 0, userSrcRplcIndexFolder := 0, userJpegQuality := 90
    , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0, userOCRlimitSel := 0
    , userOCRlanguage := "", userOCRupscale := 1, userOCRoutputFmt := 1, userOCRjoinCJK := 1
+   , userJpegSubsampling := 2, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
+   , userSaveImgCompressionLvl := 3, userPaletteDithering := 1, userPaletteTransparency := 0
+   , UsrCopyMoveOperation := 2, jpegDesiredOperation := 1, copyMoveDoLastOption := 4
+   , DrawLineAreaLineGenerator := 0
 
 #Include %A_ScriptDir%\Lib\module-interface.ahk
 EnvGet, realSystemCores, NUMBER_OF_PROCESSORS
@@ -9839,7 +9838,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
 }
 
 isFreeHandModus(dotu) {
-   linez := (AnyWindowOpen=30 && (DrawLineAreaBorderCenter<4 || DrawLineAreaBorderCenter=7)) ? 1 : 0
+   linez := (AnyWindowOpen=30 && (DrawLineAreaBorderCenter<4 || DrawLineAreaBorderCenter=7 || DrawLineAreaLineGenerator=0)) ? 1 : 0
    r := (dotu!=1 && dotu!=2 && dotu!=10 && freeHandSelectionMode=1 && imgEditPanelOpened=1 && (isVarEqualTo(AnyWindowOpen, 23, 65, 68) || linez=1)) ? 1 : 0
    Return r
 }
@@ -21599,7 +21598,9 @@ HugeImagesDrawParametricLines() {
          Return -1
       }
 
-      If (DrawLineAreaBorderCenter=4)
+      If (DrawLineAreaBorderCenter<=3 || DrawLineAreaLineGenerator=0)
+         kPath := xPath
+      Else If (DrawLineAreaBorderCenter=4)
          kPath := coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
       Else If (DrawLineAreaBorderCenter=5)
          kPath := coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, oth, straightLines)
@@ -21609,8 +21610,6 @@ HugeImagesDrawParametricLines() {
          kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, oth, straightLines)
       Else If (DrawLineAreaBorderCenter=8)
          kPath := coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
-      Else If (DrawLineAreaBorderCenter<=3)
-         kPath := xPath
 
       If kPath
       {
@@ -21665,7 +21664,7 @@ HugeImagesDrawParametricLines() {
       Sleep, 50
       roundJoins := DrawLineAreaJoinsStyle
       roundCaps := DrawLineAreaCapsStyle
-      If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7))
+      If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4, 7) && DrawLineAreaLineGenerator=1)
       {
          FillAreaEllipseSection := 1440
          FillAreaShape := (DrawLineAreaCropShape=2) ? 1 : 3
@@ -21679,10 +21678,11 @@ HugeImagesDrawParametricLines() {
          ppkb := 0
          ; ToolTip, % "l=" orYa , , , 2
          QPV_PrepareHugeImgSelectionArea(1, 2, 3, 4, orobju.imgSelW, orobju.imgSelH + ppka, 3, VPselRotation, 0, 0, "a", "a", 1, [orXa, orYa, o_imgSelW, o_imgSelH + ppkb])
-      }
+         doCrop := 1
+      } Else
+         doCrop := 2
 
       skippedLines := 0
-      doCrop := (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7)) ? 1 : 2
       QPV_PrepareHugeImgSelectionArea(obju.x1, obju.y1, obju.x2 - 1, obju.y2 - 1, obju.ImgSelW, obju.ImgSelH, 5, 0, 0, 0, 0, 0, 1)
       rzq := DllCall("qpvmain.dll\prepareDrawLinesMask", "int", thisThick, "int", doCrop, "int", DrawLineAreaAtomizedGrid)
       If (rzq=1)
@@ -23212,7 +23212,7 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH, ByRef
     pPathBrders := Gdip_CreatePath()
     straightLines := "a" DrawLineAreaBorderArcA DrawLineAreaBorderArcB DrawLineAreaBorderArcC DrawLineAreaBorderArcD
     straightLines := InStr(straightLines, "1") ? 0 : 1
-    If (DrawLineAreaBorderCenter=1)
+    If (DrawLineAreaBorderCenter=1 && DrawLineAreaLineGenerator=1)
     {
        ; margins / borders and arcs
        bly2 := (DrawLineAreaBorderConnector=1 && DrawLineAreaBorderArcA=0 && DrawLineAreaBorderArcC=1) ? y2 - imgSelH//2 : y2
@@ -23254,7 +23254,7 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH, ByRef
        Gdip_StartPathFigure(pPathBrders)
        If (DrawLineAreaBorderRight=1)
           Gdip_AddPathLine(pPathBrders, x2, bky1, x2, bky2)
-    } Else If (DrawLineAreaBorderCenter=2)
+    } Else If (DrawLineAreaBorderCenter=2 && DrawLineAreaLineGenerator=1)
     {
        ; mid-lines
        If (DrawLineAreaBorderTop=1)
@@ -23268,7 +23268,7 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH, ByRef
           Gdip_StartPathFigure(pPathBrders)
           Gdip_AddPathLine(pPathBrders, x1 + imgSelW//2, y1, x1 + imgSelW//2, y2)
        }
-    } Else If (DrawLineAreaBorderCenter=3)
+    } Else If (DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0)
     {
        ; diagonals
        frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
@@ -23290,17 +23290,18 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH, ByRef
 
        Gdip_StartPathFigure(pPathBrders)
        ; ToolTip, % thisThick "|" snapping "=" frame " deg=" deg , , , 2
-       If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=1 || frame=2))
+       thisFreeMode := (DrawLineAreaLineGenerator=0) ? 1 : freeHandSelectionMode
+       If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=1 || frame=2))
           Gdip_AddPathLine(pPathBrders, x1, y2, x2, y2)
-       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=3 || frame=4))
+       Else If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=3 || frame=4))
           Gdip_AddPathLine(pPathBrders, x1, y1, x2, y1)
-       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=1 || frame=3))
+       Else If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=1 || frame=3))
           Gdip_AddPathLine(pPathBrders, x2, y1, x2, y2)
-       Else If (freeHandSelectionMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=2 || frame=4))
+       Else If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=2 || frame=4))
           Gdip_AddPathLine(pPathBrders, x1, y1, x1, y2)
-       Else If (freeHandSelectionMode=1 && (frame=1 || frame=4))
+       Else If (thisFreeMode=1 && (frame=1 || frame=4))
           Gdip_AddPathLine(pPathBrders, x1, y1, x2, y2)
-       Else If (freeHandSelectionMode=1 && (frame=2 || frame=3))
+       Else If (thisFreeMode=1 && (frame=2 || frame=3))
           Gdip_AddPathLine(pPathBrders, x1, y2, x2, y1)
        Else
        {
@@ -23341,7 +23342,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Return -1
     }
 
-    If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4,7))
+    If (DrawLineAreaCropShape>1 && isInRange(DrawLineAreaBorderCenter, 4, 7) && DrawLineAreaLineGenerator=1)
     {
        zPath := Gdip_CreatePath()
        If (DrawLineAreaCropShape=3)
@@ -23355,7 +23356,9 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        Gdip_ResetClip(G2)
 
     thisPen := createDrawLinesPen(thisThick, 0)
-    If (DrawLineAreaBorderCenter=4)
+    If (DrawLineAreaBorderCenter<=3 || DrawLineAreaLineGenerator=0)
+       kPath := pPath
+    Else If (DrawLineAreaBorderCenter=4)
        kPath := coreDrawParametricLinesRays(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
     Else If (DrawLineAreaBorderCenter=5)
        kPath := coreDrawParametricLinesGrid(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, straightLines)
@@ -23365,8 +23368,6 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
        kPath := coreDrawParametricLinesPolar(x1, y1, x2, y2, imgSelW, imgSelH, thisThick, straightLines)
     Else If (DrawLineAreaBorderCenter=8)
        kPath := coreDrawParametricLinesRose(x1, y1, x2, y2, imgSelW, imgSelH, straightLines)
-    Else If (DrawLineAreaBorderCenter<=3)
-       kPath := pPath
 
     If kPath
     {
@@ -23386,7 +23387,7 @@ coreDrawParametricLinesTool(G2, previewMode, thisThick, imgSelPx, imgSelPy, imgS
           }
        }
 
-       If (DrawLineAreaAtomizedGrid=1)
+       If (DrawLineAreaAtomizedGrid=1 && DrawLineAreaLineGenerator=1)
        {
           iterator := new Gdip_GraphicsPathIterator(kPath)
           ; ToolTip, % "Total points: " iterator.GetCount() "`nSubpaths: " iterator.GetSubpathCount()  , , , 2
@@ -23444,7 +23445,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        calcImgSelection2bmp(!LimitSelectBoundsImg, oimgW, oimgH, oimgW, oimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        maxLength := min(imgSelW, imgSelH)//2
        thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
-       If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
+       If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0))
           thisThick := DrawLineAreaContourThickness
     } Else
     {
@@ -23459,7 +23460,7 @@ coreDrawLinesStuffTool(modus, G2:=0, whichBitmap:=0) {
        calcImgSelection2bmp(!LimitSelectBoundsImg, qimgW, qimgH, qimgW, qimgH, imgSelPx, imgSelPy, imgSelW, imgSelH, zImgSelPx, zImgSelPy, zImgSelW, zImgSelH, X1, Y1, X2, Y2)
        maxLength := min(imgSelW, imgSelH)//2
        thisThick := (DrawLineAreaContourThickness > maxLength//1.05) ? maxLength//1.05 : DrawLineAreaContourThickness
-       If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3))
+       If (modus!="shapes" && (DrawLineAreaBorderCenter=2 || DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0))
           thisThick := DrawLineAreaContourThickness
        If (viewportQPVimage.imgHandle)
           thisThick := thisThick * (DrawLineAreaThickScale / 100)
@@ -51195,7 +51196,7 @@ PanelDrawParametricLines() {
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Style
 
     Gui, Tab, 1
-    Gui, Add, Text, x+15 y+15 w%btnWid% Section, Line generator
+    Gui, Add, Checkbox, x+15 y+15 w%btnWid% Section gupdateUIdrawParamLinesPanel Checked%DrawLineAreaLineGenerator% vDrawLineAreaLineGenerator, Line generator
     Gui, Add, Text, x+10 wp vtxtLine2, Crop output
     GuiAddDropDownList("xs y+8 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaBorderCenter " vDrawLineAreaBorderCenter", "Margins|Mid lines|Diagonals|Rays|Grid|Spiral|Circular / Polar|Maurer rose", "Lines generator type")
     GuiAddDropDownList("x+10 wp gupdateUIdrawParamLinesPanel AltSubmit Choose" DrawLineAreaCropShape " vDrawLineAreaCropShape", "No cropping|Rectangular|Elliptical", "Crop output")
@@ -54138,10 +54139,10 @@ BtnDrawParametricLinesSelectedArea() {
   updateUIdrawParamLinesPanel("noPreview")
   GuiControlGet, closeEditPanelOnApply, SettingsGUIA:, closeEditPanelOnApply
 
-  If (DrawLineAreaBorderTop=0 && DrawLineAreaBorderBottom=0 && DrawLineAreaBorderLeft=0 && DrawLineAreaBorderRight=0
+  If (DrawLineAreaBorderTop=0 && DrawLineAreaBorderBottom=0 && DrawLineAreaBorderLeft=0 && DrawLineAreaBorderRight=0 && DrawLineAreaLineGenerator=1
   && DrawLineAreaBorderCenter=1 && DrawLineAreaBorderArcA=0 && DrawLineAreaBorderArcB=0 && DrawLineAreaBorderArcC=0 && DrawLineAreaBorderArcD=0)
   {
-     Return msgBeepTimer("WARNING: No lines to draw selected", 300, msgDisplayTime//2)
+     Return msgBeepTimer("WARNING: No lines to draw selected")
   }
 
   ViewPortBMPcache := trGdip_DisposeImage(ViewPortBMPcache, 1)
@@ -54166,18 +54167,23 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
 
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: Submit, NoHide
-    actu := (DrawLineAreaBorderCenter<4) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (DrawLineAreaBorderCenter<4 || DrawLineAreaLineGenerator=0) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, freeHandSelectionMode
 
-    actu := isInRange(DrawLineAreaBorderCenter, 4, 7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    actu := (DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+    GuiControl, % actu, DrawLineAreaBorderCenter
+    GuiControl, % actu, DrawLineAreaAtomizedGrid
+    GuiControl, % actu, PasteInPlaceAutoExpandIMG
+
+    actu := (isInRange(DrawLineAreaBorderCenter, 4, 7) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
     GuiControl, % actu, DrawLineAreaCropShape
     GuiControl, % actu, txtLine2
 
-    actu := (DrawLineAreaBorderCenter<4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (DrawLineAreaBorderCenter<4 && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, DrawLineAreaBorderTop
     GuiControl, % actu, DrawLineAreaBorderLeft
 
-    actu := (DrawLineAreaBorderCenter=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (DrawLineAreaBorderCenter=1 && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, DrawLineAreaBorderArcD
     GuiControl, % actu, DrawLineAreaBorderArcC
     GuiControl, % actu, DrawLineAreaBorderArcB
@@ -54190,10 +54196,10 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     GuiControl, % actu, DrawLineAreaBorderLeft
     GuiControl, % actu, DrawLineAreaBorderTop
 
-    actu := (freeHandSelectionMode=1 && DrawLineAreaBorderCenter=3) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (freeHandSelectionMode=1 && DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, DrawLineAreaSnapLine
 
-    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 7, 8) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 7, 8) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridX")
 
     stringu := (DrawLineAreaBorderCenter=4) ? "Lines density" : "Density X"
@@ -54204,9 +54210,9 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     stringu := (DrawLineAreaBorderCenter>=7) ? "Skew" : "Alternate radius"
     uiSlidersArray["DrawLineAreaAltRays", 5] := stringu
 
-    actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := ((DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter=6) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaRaysLimit")
-    actu := (DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter>=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := ((DrawLineAreaBorderCenter=4 || DrawLineAreaBorderCenter>=6) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaAltRays")
 
     stringu := (DrawLineAreaBorderCenter=8) ? "Lobes" : "Density Y"
@@ -54214,7 +54220,7 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     uiSlidersArray["DrawLineAreaGridY", 10] := isActive
     uiSlidersArray["DrawLineAreaGridY", 5] := stringu
 
-    actu := (DrawLineAreaBorderCenter=5 || DrawLineAreaBorderCenter>=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := ((DrawLineAreaBorderCenter=5 || DrawLineAreaBorderCenter>=7) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaGridY")
 
     isActive := (DrawLineAreaBorderCenter=4) ? 1 : 0
@@ -54223,24 +54229,24 @@ updateUIdrawParamLinesPanel(actionu:=0, b:=0) {
     uiSlidersArray["DrawLineAreaAltRays", 10] := isActive
 
     Sweep := Round(10 * (DrawLineAreaGridX/350))
-    actu := isVarEqualTo(DrawLineAreaBorderCenter, 4, 6, 7, 8) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (isVarEqualTo(DrawLineAreaBorderCenter, 4, 6, 7, 8) && DrawLineAreaLineGenerator=1)? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaCenterCut")
     isActive := (DrawLineAreaPolarMode<3 && DrawLineAreaBorderCenter=7 || DrawLineAreaBorderCenter=8 && Sweep=0 || DrawLineAreaBorderCenter<7) ? 1 : 0
     uiSlidersArray["DrawLineAreaCenterCut", 10] := isActive
 
-    actu := (DrawLineAreaBorderCenter=5) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (DrawLineAreaBorderCenter=5 && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, DrawLineAreaEqualGrid
     GuiControl, % actu, DrawLineAreaGridCenter
 
-    actu := isInRange(DrawLineAreaBorderCenter, 5, 6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (isInRange(DrawLineAreaBorderCenter, 5, 6) && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiControl, % actu, infoLine
     GuiControl, % actu, btn2
 
-    actu := (DrawLineAreaBorderCenter=6) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (DrawLineAreaBorderCenter=6 && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaSpiralLength")
     GuiControl, % actu, DrawLineAreaSpiralCenterMode
 
-    actu := (DrawLineAreaBorderCenter=7) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+    actu := (DrawLineAreaBorderCenter=7 && DrawLineAreaLineGenerator=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
     GuiUpdateVisibilitySliders(actu, "DrawLineAreaPolarSection")
     GuiControl, % actu, DrawLineAreaPolarMode
 
@@ -81420,8 +81426,9 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
      If !identifyThisWin()
         SelDotsSize := dotsSize := dotsSize//2 + 1
 
+     linezMode := (AnyWindowOpen=30 && DrawLineAreaLineGenerator=0 && GetKeyState("LButton", "P")) ? 1 : 0
      trGdip_GetImageDimensions(useGdiBitmap(), maxSelX, maxSelY)
-     allowControls := (isNowAlphaPainting() || (liveDrawingBrushTool=1 && AnyWindowOpen=64) || (FloodFillSelectionAdj!=1 && AnyWindowOpen=66)) ? 0 : 1
+     allowControls := (isNowAlphaPainting() || linezMode=1 || (liveDrawingBrushTool=1 && AnyWindowOpen=64) || (FloodFillSelectionAdj!=1 && AnyWindowOpen=66)) ? 0 : 1
      decideLiveSelectionBasedOnWindow(angleu, isAngleu)
      ; ForceRefreshNowThumbsList()
      If (operation="return" || operation="faker")
@@ -81502,7 +81509,6 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         imgSelX2 := nimgSelX2, imgSelY2 := nimgSelY2 
         If (objSel.selSmall=1)
            dotSize := dotSize/2
-
         tooBig := (imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) ? 1 : 0
         If (o_operation!="faker")
         {
@@ -81605,7 +81611,11 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         imgSelX2 := nimgSelX2, imgSelY2 := nimgSelY2 
         If (objSel.selSmall=1)
            dotSize := dotSize/2
-
+        If (freeHandSelectionMode=1 && imgEditPanelOpened=1 && AnyWindowOpen)
+        {
+           livePreviewsImageEditing("live-selection")
+           Return
+        }
         ImgSelPath := VPcreateSelPath(imgSelPx, imgSelPy, imgSelW, imgSelH, angleu, isAngleu, mainWidth, mainHeight, 1)
         tooBig := (imgSelW>mainWidth*1.5 && imgSelH>mainHeight*1.5 || imgSelW>mainWidth*2.5 || imgSelH>mainHeight*2.5) ? 1 : 0
         If (imgSelLargerViewPort!=1 && tooBig!=1 && StrLen(ImgSelPath)>1)
