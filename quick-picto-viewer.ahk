@@ -75402,7 +75402,10 @@ generalInternalErrorMsgBox(err, baseMsg, silentMode:=0) {
    If (runningLongOperation!=1 && hasInitSpecialMode!=1 && silentMode=0 && forceSilent=0)
    {
       If (imgEditPanelOpened=1)
+      {
          doImgEditLivePreview := 0
+         Try GuiControl, SettingsGUIA:, doImgEditLivePreview, 0   ; not every edit panel has the Live preview button
+      }
       ; SoundBeep, 300, 100
       simpleMsgBoxWrapper(appTitle ": ERROR", baseMsg message friendly, 0, 0, "error")
       If (InStr(baseMsg, glPG) || InStr(baseMsg, 2NDglPG)) && (forceSilent=0)
