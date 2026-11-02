@@ -10572,7 +10572,7 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
 
           imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
           imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
-          If (adjustGradientOffset=0 && altState=1 && (dotActive=1 || dotActive=2 || dotActive=9))
+          If (adjustGradientOffset=0 && altState=1 && (isInRange(dotActive, 1, 4) || dotActive=9))
           {
              ; rectangular selection mode
              avg := (imgSelW+imgSelH)//2
@@ -10583,15 +10583,18 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
                 imgSelY2 := timgSelY2 + cAvg
                 imgSelX1 := timgSelX1 - cAvg
                 imgSelY1 := timgSelY1 - cAvg
-             } Else If (dotActive=2)
-             {
-                imgSelX2 := imgSelX1 + avg
-                imgSelY2 := imgSelY1 + avg
              } Else
              {
-                imgSelX1 := imgSelX2 - avg
-                imgSelY1 := imgSelY2 - avg
+                ; a square on the corner opposite the dragged one
+                If (dotActive=2 || dotActive=3)
+                   imgSelX2 := imgSelX1 + avg
+                Else
+                   imgSelX1 := imgSelX2 - avg
 
+                If (dotActive=2 || dotActive=4)
+                   imgSelY2 := imgSelY1 + avg
+                Else
+                   imgSelY1 := imgSelY2 - avg
              }
              imgSelW := max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2)
              imgSelH := max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2)
