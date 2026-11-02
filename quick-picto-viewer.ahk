@@ -61457,7 +61457,9 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
       If (typu="ico")
       {
          hFIFimgA := FIMrescaleICOmode(hFIFimgA, imgW, imgH, 256, hasIconified)
-         FimBuffer := DestroyMemoryBuffer(FimBuffer)
+         ; a failed ICO canvas leaves hFIFimgA on the WIC buffer
+         If hasIconified
+            FimBuffer := DestroyMemoryBuffer(FimBuffer)
       }
    }
 
@@ -61490,8 +61492,8 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0) {
          }
       } Else
       {
+         ; the WIC buffer is freed at the end: a failed save goes on to the fallbacks, which still read hFIFimgA
          r := FreeImage_Save(hFIFimgA, file2save, saveArg)
-         FimBuffer := DestroyMemoryBuffer(FimBuffer)
       }
    }
 
