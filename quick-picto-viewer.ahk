@@ -20395,21 +20395,8 @@ SymmetrySelectedArea() {
        ; fnOutputDebug(nx "==" ny "|" nw "==" nh)
     }
  
-    hasApplied := 0
     applyBlurColorsFX(zBitmap)
-    If (UserSymmetricaBlendMode>1)
-    {
-       bgrBMP := (UserSymmetricaInvertArea=1) ? trGdip_CloneBitmap(A_ThisFunc, metaBitmap) : Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, nx, ny, nw, nh, 0, 0, 1)
-       zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
-       If zr
-       {
-          hasApplied := 1
-          trGdip_DisposeImage(zBitmap)
-          zBitmap := bgrBMP
-       } Else
-          trGdip_DisposeImage(bgrBMP)
-    }
- 
+    hasMasked := 0
     allowAlphaMasking := decideAlphaMaskingFeaseable(UserSymmetricaUseAlpha)
     If (allowAlphaMasking=1 && validBMP(zBitmap))
     {
@@ -20417,16 +20404,31 @@ SymmetrySelectedArea() {
        realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, 0, 0, 0, 0)
        If validBMP(newBitmap)
        {
-          hasApplied := 1
+          hasMasked := 1
           trGdip_DisposeImage(zBitmap, 1)
           zBitmap := newBitmap
        }
     }
  
-    thisOpacity := UserSymmetricaOpacity/255
+    hasBlended := 0
+    If (UserSymmetricaBlendMode>1 && UserSymmetricaBlendMode!=25)
+    {
+       bgrBMP := (UserSymmetricaInvertArea=1) ? trGdip_CloneBitmap(A_ThisFunc, metaBitmap) : Gdip_CloneBmpPargbArea(A_ThisFunc, metaBitmap, nx, ny, nw, nh, 0, 0, 1)
+       zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, 0, 0, 255 - UserSymmetricaOpacity)
+       If zr
+       {
+          hasBlended := 1
+          trGdip_DisposeImage(zBitmap)
+          zBitmap := bgrBMP
+       } Else
+          trGdip_DisposeImage(bgrBMP)
+    }
+ 
+    ; a blended result already holds the opacity; Replace [25] lays the pattern on the erased area
+    thisOpacity := (hasBlended=1) ? 1 : UserSymmetricaOpacity/255
     px := (UserSymmetricaInvertArea=1) ? 0 : imgSelPx
     py := (UserSymmetricaInvertArea=1) ? 0 : imgSelPy
-    If (!hasApplied && thisOpacity>0.98)
+    If (hasBlended=1 || UserSymmetricaBlendMode=25 || !hasMasked && thisOpacity>0.98)
        Gdip_GraphicsClear(G2)
  
     r1 := trGdip_DrawImage(A_ThisFunc, G2, zBitmap, px, py,,,,,,, thisOpacity)
@@ -20436,6 +20438,8 @@ SymmetrySelectedArea() {
     Gdip_DeleteGraphics(G2)
     If (r1!="fail" && G2 && validBMP(metaBitmap))
     {
+       If (UserSymmetricaBlendMode=25 && (UserSymmetricaOpacity<255 || hasMasked=1))
+          currIMGdetails.HasAlpha := 1
        wrapRecordUndoLevelNow(metaBitmap)
        dummyTimerDelayiedImageDisplay(50)
     } Else
@@ -55329,22 +55333,7 @@ livePreviewSymmetricaImgArea(modus:=0) {
    trGdip_GetImageDimensions(zBitmap, bW, bH)
    ; ToolTip, % imgSelW "|" imgSelH "`n" bW "|" bH "`n" oImgW "|" oImgH , , , 2
    applyBlurColorsFX(zBitmap)
-   If (UserSymmetricaBlendMode>1)
-   {
-      If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
-         bgrBMP := getImgOriginalSelectedAreaEdit(0, imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight, 1)
-      Else
-         bgrBMP := getImgSelectedAreaEditMode(1, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH, 0)
-
-      zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped)
-      If zr
-      {
-         trGdip_DisposeImage(zBitmap)
-         zBitmap := bgrBMP
-      } Else
-         trGdip_DisposeImage(bgrBMP)
-   }
-
+   hasMasked := 0
    allowAlphaMasking := decideAlphaMaskingFeaseable(UserSymmetricaUseAlpha)
    If (allowAlphaMasking=1 && validBMP(zBitmap))
    {
@@ -55352,15 +55341,40 @@ livePreviewSymmetricaImgArea(modus:=0) {
       realtimePasteInPlaceAlphaMasker(1, zBitmap, thisIDu, newBitmap, objSel, 0, 0, 0)
       If validBMP(newBitmap)
       {
+         hasMasked := 1
          trGdip_DisposeImage(zBitmap, 1)
          zBitmap := newBitmap
       }
    }
 
+   hasBlended := 0
+   If (UserSymmetricaBlendMode>1 && UserSymmetricaBlendMode!=25)
+   {
+      If (currIMGdetails.HasAlpha=1 && !viewportQPVimage.imgHandle)
+         bgrBMP := getImgOriginalSelectedAreaEdit(0, imgSelPx, imgSelPy, imgSelW, imgSelH, mainWidth, mainHeight, 1)
+      Else
+         bgrBMP := getImgSelectedAreaEditMode(1, imgSelPx, imgSelPy, imgSelW, imgSelH, imgSelW, imgSelH, 0, imgSelW, imgSelH, 0)
+
+      zr := QPV_BlendBitmaps(bgrBMP, zBitmap, UserSymmetricaBlendMode - 1, BlendModesPreserveAlpha, BlendModesFlipped, 0, 0, 255 - UserSymmetricaOpacity)
+      If zr
+      {
+         hasBlended := 1
+         trGdip_DisposeImage(zBitmap)
+         zBitmap := bgrBMP
+      } Else
+         trGdip_DisposeImage(bgrBMP)
+   }
+
+   ; the area is erased where SymmetrySelectedArea() erases it; the hatch shows its transparency
+   thisOpacity := (hasBlended=1) ? 1 : UserSymmetricaOpacity/255
+   erasesArea := (hasBlended=1 || UserSymmetricaBlendMode=25 || !hasMasked && thisOpacity>0.98)
+   If (erasesArea && (currIMGdetails.HasAlpha=1 || UserSymmetricaBlendMode=25 && (UserSymmetricaOpacity<255 || hasMasked=1)))
+      Gdip_FillPath(2NDglPG, GDIPbrushHatch, whichPath)
+
    liveCarvePathBitmap(pPath, zBitmap, imgSelPx, imgSelPy, UserSymmetricaInvertArea)
    px := imgSelPx,    py := imgSelPy
    pw := imgSelW,     ph := imgSelH
-   r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, px, py, pw, ph,,,,, UserSymmetricaOpacity/255)
+   r1 := trGdip_DrawImage(A_ThisFunc, 2NDglPG, zBitmap, px, py, pw, ph,,,,, thisOpacity)
    ; r2 := doLayeredWinUpdate(A_ThisFunc, hGDIselectWin, 2NDglHDC)
    Gdip_ResetClip(2NDglPG)
    Gdip_DeletePath(pPath)
