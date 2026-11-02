@@ -51526,9 +51526,9 @@ PanelSymmetricaImage() {
     tinyPrevAreaCoordY := lastSymmetryCoords[2] ? lastSymmetryCoords[2] : imgSelY1 + 125
 
     btnWid2 := (PrefsLargeFonts=1) ? btnWid + 60 : btnWid + 20
-    Gui, Add, Tab3, %tabzDarkModus% x+15 y+15 gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
+    Gui, Add, Tab3, %tabzDarkModus% y+15 gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Color options
     Gui, Tab, 1
-    Gui, Add, Text, x+15 y+15 Section +hwndhTemp, Symmetry mode:
+    Gui, Add, Text, x+15 y+15 Section +0x200 +hwndhTemp, Symmetry mode:
     GuiAddDropDownList("x+10 w" btnWid2 " AltSubmit gupdateUIsymmetricaPanel Choose" UserSymmetricaMode " vUserSymmetricaMode", "X|Y|Both X/Y|X/Y and diagonal", [hTemp])
     GuiAddDropDownList("x+5 wp-20 AltSubmit gupdateUIsymmetricaPanel Choose" UserSymmetricaSrcAlign " vUserSymmetricaSrcAlign", "Top, left|Bottom, right", "Symmetry source corner")
     Gui, Add, Checkbox, xs y+10 gupdateUIsymmetricaPanel Checked%UserSymmetricaCenteringMode% vUserSymmetricaCenteringMode, Allo&w symmetry center positioning
@@ -51549,11 +51549,11 @@ PanelSymmetricaImage() {
 
     Gui, Tab, 2
     ml := (PrefsLargeFonts=1) ? 35 : 25
-    Gui, Add, Text, x+15 y+15 Section gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
-    GuiAddDropDownList("x+10 wp+15 gupdateUIsymmetricaPanel AltSubmit Choose" UserSymmetricaBlendMode " vUserSymmetricaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
+    Gui, Add, Text, x+15 y+15 Section +0x200 gBtnResetBlendMode +TabStop +hwndhTemp, Blending mode: 
+    GuiAddDropDownList("x+10 wp+" ml*2 " gupdateUIsymmetricaPanel AltSubmit Choose" UserSymmetricaBlendMode " vUserSymmetricaBlendMode", infoBlend "|" userBlendModesList, [hTemp])
     GuiAddFlipBlendLayers("x+1 yp hp w" ml " gupdateUIsymmetricaPanel")
-    GuiAddCheckbox("x+1 hp wp gupdateUIsymmetricaPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
-    GuiAddSlider("UserSymmetricaOpacity", 3,255, 255, "Opacity", "updateUIsymmetricaPanel", 1, "xs y+15 w" txtWid " hp")
+    GuiAddSlider("UserSymmetricaOpacity", 3,255, 255, "Opacity", "updateUIsymmetricaPanel", 1, "xs y+15 w" txtWid - ml - 1 " hp")
+    GuiAddCheckbox("x+1 hp w" ml " gupdateUIsymmetricaPanel Checked" BlendModesPreserveAlpha " vBlendModesPreserveAlpha", "Protect alpha channel", "P",, "Preserve the alpha channel of the background`nimage unaltered by blend modes")
 
     Gui, Add, Checkbox, xs y+15 hp Checked%BlurAreaApplyFX% gupdateUIsymmetricaPanel vBlurAreaApplyFX, &Apply color adjustments
     GuiAddSlider("BlurAreaHue", -180,180, 0, "Hue: $€°", "updateUIsymmetricaPanel", 2, "xs y+15 w" txtWid " hp")
@@ -52659,7 +52659,7 @@ ReadSettingsSymmetricaPanel(act:=0) {
     RegAction(act, "UserSymmetricaSelOffY",, 2, 0, 200)
     RegAction(act, "UserSymmetricaUseAlpha",, 1)
     RegAction(act, "UserSymmetricaInvertArea",, 1)
-    RegAction(act, "UserSymmetricaBlendMode",, 2, 1, 23)
+    RegAction(act, "UserSymmetricaBlendMode",, 2, 1, 26)
     RegAction(act, "blurAreaApplyFX",, 1)
 }
 
@@ -66019,7 +66019,7 @@ createMenuImageEditSubMenus(modus:=0) {
 
       Menu, PVimgFilters, Add
       kMenu("PVimgFilters", "Add", "&Add noise", "PanelAddNoiserImage", "effects clouds plasma")
-      kMenu("PVimgFilters", "Add", "Create s&ymmetry or patterns", "PanelSymmetricaImage", "generate textures tiles mirroring patterns")
+      kMenu("PVimgFilters", "Add", "S&ymmetry patterns", "PanelSymmetricaImage", "generate textures tiles mirroring patterns")
       kMenu("PVimgFilters", "Add", "&Detect edges", "PanelDetectEdgesImage", "emboss effects")
       If (modus="filters")
          Return
@@ -68884,7 +68884,7 @@ createMenuLiveTools(dummy:=0) {
    kMenu("PVlTools", "Add", "&Draw parametric lines", "PanelDrawParametricLines", "lines arcs diagonals spiral rays spokes grids polar globe spike spirograph circular spikes maurer")
    kMenu("PVlTools", "Add", "Define alpha mas&k", "PanelSoloAlphaMasker")
    kMenu("PVlTools", "Add", "&Insert te&xt`tShift+T", "PanelInsertTextArea")
-   kMenu("PVlTools", "Add", "Create image s&ymmetry or patterns", "PanelSymmetricaImage")
+   kMenu("PVlTools", "Add", "S&ymmetry patterns", "PanelSymmetricaImage")
    kMenu("PVlTools", "Add", "&Adjust image colors`tU", "PanelAdjustColorsSimpleWindow")
    kMenu("PVlTools", "Add", "Adjust vie&wport colors and effects`tShift+U", "PanelColorsAdjusterVPwindow")
    kMenu("PVlTools", "Add", "Desaturate color&s`tCtrl+G", "PanelDesatureSelectedArea")
