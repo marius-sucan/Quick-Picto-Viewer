@@ -20317,7 +20317,7 @@ SymmetrySelectedArea() {
     If (stopNow=1)
        Return 
 
-    If (!testAllowSelInvert && BlurAreaInverted=1)
+    If (!testAllowSelInvert() && UserSymmetricaInvertArea=1)
     {
        btn := !AnyWindowOpen ? "|&Reopen panel" : ""
        msgResult := msgBoxWrapper(appTitle ": WARNING", "The image is entirely selected, however you chose to invert the selection area. Therefore, nothing remains selected. Operation abandoned.", "&OK" btn, 1, "exclamation")
