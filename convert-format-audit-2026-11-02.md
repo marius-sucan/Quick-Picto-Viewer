@@ -48,7 +48,7 @@ Method:
 | 3 | High | After a failed save of a PNG/JPG/TIFF the fallback reads freed memory: on AutoHotkey_H the run stopped responding, stock AutoHotkey reports a failure; Windows outcome unverified | Wine; **fixed, `e040c32`** |
 | 4 | Medium | Float HDR images (EXR, HDR, PFM, float JXL/TIFF/JXR) cannot be converted to PNG, JPEG 2000 or PPM | Wine |
 | 5 | Medium | 16-bit greyscale images cannot be converted to JPG, BMP, WebP, GIF, TGA, PPM, JNG or XPM | Wine |
-| 6 | Medium | Transparency is lost: palette images to WebP/JP2/JXR/TGA/JXL/TIFF/GIF, anything to GIF, HDR with alpha | Wine |
+| 6 | Medium | Transparency is lost: palette images to WebP/JP2/JXR/TGA/JXL/TIFF/GIF, anything to GIF, HDR with alpha | Wine; **fixed, `db6ce3e`** |
 | 7 | Medium | Photos come out rotated twice (FreeImage path: Exif kept after rotating), or with all metadata dropped and unrotated (WIC path) | Wine + reading |
 | 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine |
 | 9 | Medium | Multi-threaded runs load files differently from single-threaded runs, and can switch mid-batch | reading (+ Wine for the two loaders' outputs) |
@@ -256,6 +256,28 @@ decodes it to 24-bit and the conversion works, at 8 bits (finding 14).
   (`Conversion8.cpp:200`), or extend the standard-type step to type 2.
 
 ## 6. Transparency is dropped
+
+**Fixed in `db6ce3e`.**
+- **Palette images with a transparency table** are converted to 32 bits for WebP, JPEG 2000, JPEG XR, TGA, JPEG
+  XL and JNG.
+- **TIFF:** 1/4-bit transparent images are widened to 8 bits with their transparency table. For 1-bit images,
+  the table is remapped, since the second colour moves to index 255.
+- **GIF:** 1/4-bit images are saved as they are. Every other image gets its 256 colours the way Save As makes
+  them: GDI+, with «Dithering» and «Keep transparency». The converter's «Format options» now shows both for GIF,
+  sharing the Save panel's settings. FreeImage's quantizer stays as the fallback.
+- **HDR with alpha:** tone mapping still returns 24 bits, but the RGBA16/RGBAF alpha is scaled to 8 bits and put
+  back when the destination stores alpha.
+
+Wine checks:
+- A 4-bit and a 1-bit transparent GIF keep their transparency in every format that can store it; GIF stays at
+  1/4 bits.
+- The float JXL's alpha comes back identical at the sampled pixels.
+- Of the 127 earlier conversion rows, only the 10 intended ones changed.
+- In the real app, the converter panel shows the two checkboxes for GIF only and saves them. The Save panel
+  behaves as before.
+
+Wine's GDI+ cannot reduce to 256 colours (`GdipBitmapConvertFormat` is not implemented there), so the GDI+ step
+itself was not seen working. There, the fallback ran, with the orientation kept.
 
 **What happens.**
 1. **Palette images.** The fallback chooses 24 bits whenever the colour type lacks "rgba" (`:61511`). A palette
