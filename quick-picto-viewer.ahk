@@ -116,7 +116,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , RegExFilesPattern := "i)^(.\:\\).*(\.(" RegExAllFilesPattern "))$", folderFavesFile := "quick-picto-viewer-folder-faves.ini"
    , RegExFIMformPtrn := "i)(.\\*\.(DNG|DDS|EXR|HDR|JBG|JNG|JP2|JXR|JIF|MNG|PBM|PGM|PPM|PCX|PFM|WEBP|AVIF|HEIC|HEIF|JXL|APNG|PNG|PSD|PCD|SGI|RAS|TGA|WBMP|XBM|XPM|G3|LBM|J2K|J2C|WDP|HDP|KOA|PCT|PICT|PIC|TARGA|WAP|WBM|crw|cr2|nef|raf|mos|kdc|dcr|3fr|arw|bay|bmq|cap|cine|cs1|dc2|drf|dsc|erf|fff|ia|iiq|k25|kc2|mdc|mef|mrw|nrw|orf|pef|ptx|pxn|qtk|raw|rdc|rw2|rwz|sr2|srf|sti|x3f))$"
    , RegExWICfmtPtrn := "i)(.\\*\.(place-holder|webp|bmp|dib|rle|tiff|tif|png|jfif|wdp|jxr|jpg|jpeg|svg|pdf))$", customKbdFile := "quick-picto-viewer-custom-kbd.ini"
-   , multiPageAnimTypesRegEx := "i)(.\.(apng|png|mng|webp|gif|avif|heif|heic|jxl))$", multiPageFilesREGex := "i)(.\.(pdf|tif|tiff|jxl))$"
+   , multiPageAnimTypesRegEx := "i)(.\.(apng|png|mng|webp|gif|avif|heif|heic|jxl))$"
+   , multiPageAllTypesRegEx := "i)(.\.(tif|tiff|pdf|apng|png|mng|webp|gif|avif|heif|heic|jxl))$"
    , saveTypesRegEX := "i)(.\.(bmp|j2k|j2c|jp2|jxl|jxr|wdp|hdp|png|tga|tif|tiff|webp|gif|ico|jng|jif|jpg|jpe|jpeg|ppm|xpm))$"
    , saveTypesFriendly := ".BMP, .GIF, .HDP, .J2K, .JNG, .JP2, .JPG, .JXL, .JXR, .PNG, .PPM, .TGA, .TIF, .WDP, .WEBP, .ICO or .XPM"
    , saveAlphaTypesRegEX := "i)(.\.(j2k|j2c|jp2|jxl|jxr|wdp|hdp|ico|jng|png|tga|tif|tiff|webp))$"
@@ -48112,7 +48113,7 @@ ReadSettingsDrawShapeAreaPanel(act:=0) {
     RegAction(act, "DrawLineAreaContourAlign",, 2, 1, 3)
     RegAction(act, "DrawLineAreaDashStyle",, 2, 1, 4)
     RegAction(act, "DrawLineAreaContourThickness",, 2, 1, 700)
-    RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 24)
+    RegAction(act, "DrawLineAreaBlendMode",, 2, 1, 26)
     RegAction(act, "PasteInPlaceAutoExpandIMG",, 1)
     RegAction(act, "FillAreaClosedPath",, 1)
     RegAction(act, "freeHandSelectionMode",, 1)
@@ -66772,9 +66773,9 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
      {
         Menu, pvMenuBarImage, Add
         imgPath := getIDimage(currentFileIndex)
-        If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageFilesREGex))
+        If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageAllTypesRegEx))
            kMenu("pvMenuBarImage", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs")
-        If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
+        If (RegExMatch(imgPath, multiPageAllTypesRegEx) || markedSelectFile)
            kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
         If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
@@ -66822,9 +66823,9 @@ InvokeMenuBarImage(manuID:=0, justBuild:=0) {
      imgPath := getIDimage(currentFileIndex)
      kMenu("pvMenuBarImage", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
      kMenu("pvMenuBarImage", "Add", "Set as &wallpaper", "PanelSetWallpaper", "desktop image")
-     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageFilesREGex))
+     If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageAllTypesRegEx))
         kMenu("pvMenuBarImage", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
-     If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
+     If (RegExMatch(imgPath, multiPageAllTypesRegEx) || markedSelectFile)
         kMenu("pvMenuBarImage", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
      If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
@@ -68394,7 +68395,7 @@ createMenuCurrentFilesActs(dummy:=0) {
    Menu, PVfilesActs, Add
    imgPath := getIDimage(currentFileIndex)
    kMenu("PVfilesActs", "Add", "Con&vert file format(s) to...`tCtrl+K", "PanelFileFormatConverter", "image conversion")
-   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageFilesREGex))
+   If (InStr(filesFilter, "i)(QPV:PAGES:")!=1 && RegExMatch(imgPath, multiPageAllTypesRegEx))
       kMenu("PVfilesActs", "Add", "Preview all pa&ges", "MenuPreviewFramesFilterList", "animated gifs webp tiffs pdfs thumbnails display")
 
    If (RegExMatch(imgPath, "i)(.\.pdf)$") || markedSelectFile)
@@ -68403,7 +68404,7 @@ createMenuCurrentFilesActs(dummy:=0) {
    If WinOCR_IsSupported()
       kMenu("PVfilesActs", "Add", "Text recognition (&OCR)", "PanelOCRtextRecognition", "optical character recognition extract read texts words clipboard")
 
-   If (RegExMatch(imgPath, multiPageFilesREGex) || RegExMatch(imgPath, multiPageAnimTypesRegEx) || markedSelectFile)
+   If (RegExMatch(imgPath, multiPageAllTypesRegEx) || markedSelectFile)
       kMenu("PVfilesActs", "Add", "Extract frames/pa&ges", "PanelExtractFrames", "animated gifs webp tiffs pdfs")
 
    If (markedSelectFile && InStr(filesFilter, "i)(QPV:PAGES:")!=1)
