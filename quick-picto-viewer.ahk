@@ -6523,7 +6523,21 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
 
    d := dotsSize//2
    transformTool := (AnyWindowOpen=31 || AnyWindowOpen=24) ? 1 : 0
-   If isDotInRect(mX, mY, dotsSize, dotsSize, nSelDotX, nSelDotY, 1)
+   ; a free line's end dots come first: the hidden corners can overlap them
+   corners := (AnyWindowOpen=30 && isFreeLineMode()) ? getFreeLineEnds() : []
+   corners.Push(1, 2, 4, 3)
+   corner := 0
+   For i, n in corners
+   {
+      getSelCornerXY(n, nSelDotX, nSelDotY, nSelDotAx, nSelDotAy, x, y)
+      If isDotInRect(mX, mY, dotsSize, dotsSize, x, y, 1)
+      {
+         corner := n
+         Break
+      }
+   }
+
+   If (corner=1)
    {
       ; top-left corner
       line := nSelDotBx + d "," nSelDotBy + d "|"
@@ -6536,7 +6550,7 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
       dotActive := 1
       DotPosX := imgSelX1
       DotPosY := imgSelY1
-   } Else If isDotInRect(mX, mY, dotsSize, dotsSize, nSelDotAx, nSelDotAy, 1)
+   } Else If (corner=2)
    {
       ; bottom-right corner
       line := nSelDotBx + d "," nSelDotBy + d "|"
@@ -6549,7 +6563,7 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
       dotActive := 2
       DotPosX := imgSelX2
       DotPosY := imgSelY2
-   } Else If isDotInRect(mX, mY, dotsSize, dotsSize, nSelDotCx, nSelDotCy, 1)
+   } Else If (corner=4)
    {
       ; bottom-left corner
       line := nSelDotX + d "," nSelDotY + d "|"
@@ -6562,7 +6576,7 @@ determineSelAreaClickRect(mX, mY, dotsSize, mainWidth, mainHeight, doFlips) {
       dotActive := 4
       DotPosX := imgSelX1
       DotPosY := imgSelY2
-   } Else If isDotInRect(mX, mY, dotsSize, dotsSize, nSelDotBx, nSelDotBy, 1)
+   } Else If (corner=3)
    {
       ; top-right corner
       line := nSelDotX + d "," nSelDotY + d "|"
@@ -9839,7 +9853,8 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
 
 isFreeHandModus(dotu) {
    linez := (AnyWindowOpen=30 && (DrawLineAreaBorderCenter<4 || DrawLineAreaBorderCenter=7 || DrawLineAreaLineGenerator=0)) ? 1 : 0
-   r := (dotu!=1 && dotu!=2 && dotu!=10 && freeHandSelectionMode=1 && imgEditPanelOpened=1 && (isVarEqualTo(AnyWindowOpen, 23, 65, 68) || linez=1)) ? 1 : 0
+   dots := (AnyWindowOpen=30 && isFreeLineMode()) ? getFreeLineEnds() : [1, 2]   ; the two dots shown
+   r := (dotu!=dots[1] && dotu!=dots[2] && dotu!=10 && freeHandSelectionMode=1 && imgEditPanelOpened=1 && (isVarEqualTo(AnyWindowOpen, 23, 65, 68) || linez=1)) ? 1 : 0
    Return r
 }
 
@@ -9860,6 +9875,35 @@ setFreeLineSelBox(bX, bY) {
    imgSelY1 := min(aY, bY),    imgSelY2 := max(aY, bY)
    frame := up ? (left ? 1 : 2) : (left ? 3 : 4)
    freeHandPoints[5] := defineFreeHandFrame("flip", FlipImgH, FlipImgV, frame)
+}
+
+getFreeLineEnds() {
+   ; the two box corners a free line runs between, in drawing order, numbered as in getSelCornerXY()
+   ; the line goes from the click point to the opposite corner; snapped to 0/90°, it lies on the click point's edge
+   frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
+   left := (frame=1 || frame=3) ? 1 : 0
+   up := (frame=1 || frame=2) ? 1 : 0
+   zSelW := ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) * zoomLevel
+   zSelH := ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) * zoomLevel
+   tt :=  (DrawLineAreaContourThickness<15) ?  DrawLineAreaContourThickness : DrawLineAreaContourThickness*zoomLevel
+   If (DrawLineAreaContourAlign=2 && DrawLineAreaContourThickness>30)
+      tt := tt/2
+
+   tt := (tt<24) ? tt * 1.5 : tt * 0.9
+   If (tt<5)
+      tt := 5
+
+   If (DrawLineAreaSnapLine=1 && zSelW<tt && zSelH>tt)
+      Return left ? [3, 2] : [1, 4]   ; vertical
+   If (DrawLineAreaSnapLine=1 && zSelH<tt && zSelW>tt)
+      Return up ? [4, 2] : [1, 3]     ; horizontal
+   Return (left=up) ? [1, 2] : [4, 3]
+}
+
+getSelCornerXY(n, x1, y1, x2, y2, ByRef x, ByRef y) {
+   ; corner n of the box x1,y1 - x2,y2, as numbered by determineSelAreaClickRect(): 1 top-left, 2 bottom-right, 3 top-right, 4 bottom-left
+   x := (n=2 || n=3) ? x2 : x1
+   y := (n=2 || n=4) ? y2 : y1
 }
 
 endFreeHandModus(rImgW, rImgH) {
@@ -10284,6 +10328,18 @@ WinClickAction(winEventu:=0, thisCtrlClicked:=0, mX:=0, mY:=0) {
       adjustSkewImg := adjustGradientOffset := adjustSelCavity := 0
       parametricWin := (dotActive=9 && AnyWindowOpen=30 && isVarEqualTo(DrawLineAreaBorderCenter, 4, 5, 6) && ctrlState!=1 && shiftState!=1 && userAllowsGradientRecentering=1) ? 1 : 0
       freeLine := (yayFreeMode=1 && dotActive=1 && AnyWindowOpen=30 && altState!=1 && shiftState!=1 && isFreeLineMode()) ? 1 : 0
+      If (yayFreeMode!=1 && dotActive && AnyWindowOpen=30 && altState!=1 && shiftState!=1 && isFreeLineMode())
+      {
+         ; grabbing a free line's end: the drag rebuilds the line from the other end, which stays
+         ends := getFreeLineEnds()
+         If (dotActive=ends[1] || dotActive=ends[2])
+         {
+            other := (dotActive=ends[1]) ? ends[2] : ends[1]
+            getSelCornerXY(other, imgSelX1, imgSelY1, imgSelX2, imgSelY2, aX, aY)
+            freeHandPoints[1] := aX,    freeHandPoints[2] := aY
+            freeLine := 1
+         }
+      }
       selLim := (viewportQPVimage.imgHandle) ? 9876543210 : 199000
       If (isInRange(dotActive, 11, 14) && ctrlState!=1 && shiftState!=1 && (AnyWindowOpen=31 || AnyWindowOpen=24) && !viewportQPVimage.imgHandle)
       {
@@ -23335,39 +23391,14 @@ coreDrawParametricLinesMarginsMidsDiagos(x1, y1, x2, y2, imgSelW, imgSelH, ByRef
     } Else If (DrawLineAreaBorderCenter=3 || DrawLineAreaLineGenerator=0)
     {
        ; diagonals
-       frame := defineFreeHandFrame("flip", FlipImgH, FlipImgV, freeHandPoints[5])
-       ; deg := MouseDeltaAngle360(x1, y1, x2, y2)
-       zSelW := ( max(ImgSelX1, ImgSelX2) - min(ImgSelX1, ImgSelX2) ) * zoomLevel
-       zSelH := ( max(ImgSelY1, ImgSelY2) - min(ImgSelY1, ImgSelY2) ) * zoomLevel
-       tt :=  (DrawLineAreaContourThickness<15) ?  DrawLineAreaContourThickness : DrawLineAreaContourThickness*zoomLevel
-       If (DrawLineAreaContourAlign=2 && DrawLineAreaContourThickness>30)
-          tt := tt/2
-
-       tt := (tt<24) ? tt * 1.5 : tt * 0.9
-       If (tt<5)
-          tt := 5
-
-       If (zSelW<tt && zSelH>tt)
-          snapping := "h"
-       Else If (zSelH<tt && zSelW>tt)
-          snapping := "v"
-
        Gdip_StartPathFigure(pPathBrders)
-       ; ToolTip, % thisThick "|" snapping "=" frame " deg=" deg , , , 2
-       thisFreeMode := (DrawLineAreaLineGenerator=0) ? 1 : freeHandSelectionMode
-       If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=1 || frame=2))
-          Gdip_AddPathLine(pPathBrders, x1, y2, x2, y2)
-       Else If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="v" && (frame=3 || frame=4))
-          Gdip_AddPathLine(pPathBrders, x1, y1, x2, y1)
-       Else If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=1 || frame=3))
-          Gdip_AddPathLine(pPathBrders, x2, y1, x2, y2)
-       Else If (thisFreeMode=1 && DrawLineAreaSnapLine=1 && snapping="h" && (frame=2 || frame=4))
-          Gdip_AddPathLine(pPathBrders, x1, y1, x1, y2)
-       Else If (thisFreeMode=1 && (frame=1 || frame=4))
-          Gdip_AddPathLine(pPathBrders, x1, y1, x2, y2)
-       Else If (thisFreeMode=1 && (frame=2 || frame=3))
-          Gdip_AddPathLine(pPathBrders, x1, y2, x2, y1)
-       Else
+       If isFreeLineMode()
+       {
+          ends := getFreeLineEnds()
+          getSelCornerXY(ends[1], x1, y1, x2, y2, ax, ay)
+          getSelCornerXY(ends[2], x1, y1, x2, y2, bx, by)
+          Gdip_AddPathLine(pPathBrders, ax, ay, bx, by)
+       } Else
        {
           If (DrawLineAreaBorderTop=1)
              Gdip_AddPathLine(pPathBrders, x1, y2, x2, y1)
@@ -81691,8 +81722,11 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
         If (imgSelLargerViewPort!=1 && allowControls=1 && o_operation!="faker")
         {
            whichFunc := (VPselRotation!=0) ? "Ellipse" : "Rectangle"
-           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, selDotX, selDotY, dotsSize, dotsSize)
-           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotAx, SelDotAy, dotsSize, dotsSize)
+           ends := (partialCtrls=1 && AnyWindowOpen=30 && isFreeLineMode()) ? getFreeLineEnds() : [1, 2]   ; free lines: the dots sit on the line's ends
+           getSelCornerXY(ends[1], selDotX, selDotY, SelDotAx, SelDotAy, dotAx, dotAy)
+           getSelCornerXY(ends[2], selDotX, selDotY, SelDotAx, SelDotAy, dotBx, dotBy)
+           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, dotAx, dotAy, dotsSize, dotsSize)
+           Gdip_Fill%whichFunc%(2NDglPG, pBrushD, dotBx, dotBy, dotsSize, dotsSize)
            If (partialCtrls!=1)
            {
               Gdip_Fill%whichFunc%(2NDglPG, pBrushD, SelDotBx, SelDotBy, dotsSize, dotsSize)
@@ -81707,8 +81741,8 @@ drawImgSelectionOnWindow(operation, theMsg:="", colorBox:="", dotActive:="", mai
               Gdip_FillEllipse(2NDglPG, pBrushD, SelDotMcX, SelDotMcY, dotsSize, dotsSize)
            }
 
-           Gdip_Draw%whichFunc%C(2NDglPG, zPen, selDotX + dotsSize//2, selDotY + dotsSize//2, dotsSize//2 + 1)
-           Gdip_Draw%whichFunc%C(2NDglPG, zPen, SelDotAx + dotsSize//2, SelDotAy + dotsSize//2, dotsSize//2 + 1)
+           Gdip_Draw%whichFunc%C(2NDglPG, zPen, dotAx + dotsSize//2, dotAy + dotsSize//2, dotsSize//2 + 1)
+           Gdip_Draw%whichFunc%C(2NDglPG, zPen, dotBx + dotsSize//2, dotBy + dotsSize//2, dotsSize//2 + 1)
            If (partialCtrls!=1)
            {
               Gdip_Draw%whichFunc%C(2NDglPG, zPen, SelDotBx + dotsSize//2, SelDotBy + dotsSize//2, dotsSize//2 + 1)
