@@ -44728,10 +44728,7 @@ PanelSaveImg() {
     GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]" bonusChoice, "Color depth")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
-    Gui, Add, Checkbox, xs+15 y+8 w%thisWid% gUIsaveFormatOptionsChanged Checked%userPaletteDithering% vuserPaletteDithering +hwndhTemp, Dithering
-    ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
-    Gui, Add, Checkbox, x+20 gUIsaveFormatOptionsChanged Checked%userPaletteTransparency% vuserPaletteTransparency +hwndhTemp, Keep transparency
-    ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
+    GuiAddPaletteOptions("xs+15 y+8 w" thisWid, "x+20")
     Gui, Add, Text, xs y+10, Image file status
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
     Gui, Add, Text, xp+15 y+7 w%txtWid% -wrap, % "File size: " fileSizu FileDateM "`n" fileStatus
@@ -44758,9 +44755,10 @@ PanelSaveImg() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save image file: " appTitle)
 }
 
-GuiAddSaveFormatOptions(firstPos) {
+GuiAddSaveFormatOptions(firstPos, paletteInSlots:=0) {
 ; Adds the file format options in two slots, beginning at firstPos [Gui option string]. The controls
 ; of all the formats overlap; updateSaveFormatOptions() shows those of the chosen format.
+; paletteInSlots - 1: the slots also hold the GIF palette options, see updateConverterFormatOptions()
     Global uiSaveFmtNoOptions
     slotW := (PrefsLargeFonts=1) ? 190 : 140
     slot2W := (PrefsLargeFonts=1) ? 135 : 95
@@ -44773,6 +44771,27 @@ GuiAddSaveFormatOptions(firstPos) {
     ToolTip2ctrl(hTemp, "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
     slot2W := (PrefsLargeFonts=1) ? 85 : 50
     GuiAddDropDownList("xp yp w" slot2W " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
+    If (paletteInSlots=1)
+       GuiAddPaletteOptions("xp-" (slotW + 5) " yp w" slotW " hp", "x+5 yp hp")
+}
+
+GuiAddPaletteOptions(pos1, pos2) {
+; the «Dithering» and «Keep transparency» checkboxes of the 256 colors palette, at pos1 and pos2 [Gui option strings]
+    Gui, Add, Checkbox, % pos1 " gUIsaveFormatOptionsChanged Checked" userPaletteDithering " vuserPaletteDithering +hwndhTemp", Dithering
+    ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
+    Gui, Add, Checkbox, % pos2 " gUIsaveFormatOptionsChanged Checked" userPaletteTransparency " vuserPaletteTransparency +hwndhTemp", Keep transparency
+    ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
+}
+
+updateConverterFormatOptions(fmt) {
+; updateSaveFormatOptions(), and the palette options the format converter shows for GIF
+   updateSaveFormatOptions(fmt)
+   If (fmt="gif")
+      GuiControl, SettingsGUIA: Hide, uiSaveFmtNoOptions
+
+   actu := (fmt="gif") ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   GuiControl, % actu, userPaletteDithering
+   GuiControl, % actu, userPaletteTransparency
 }
 
 updateSaveFormatOptions(fmt) {
@@ -44800,7 +44819,7 @@ UIsaveFormatOptionsChanged() {
       Gui, SettingsGUIA: Default
       Gui, SettingsGUIA: Submit, NoHide
       RegAction(1, "userDesireWriteFMT")
-      updateSaveFormatOptions(saveImgFormatsList[userDesireWriteFMT])
+      updateConverterFormatOptions(saveImgFormatsList[userDesireWriteFMT])
       GuiRefreshSliders()
    }
 }
@@ -44839,8 +44858,8 @@ saveQualityTip(inSavePanel:=0) {
 btnHelpSaveImgPanel() {
    If (AnyWindowOpen=84)
       f := "`n `nWhen pages are extracted from TIFF(s), QPV will attempt to preserve the original color depth, if the destination file format allows it."
-   If (AnyWindowOpen!=15)
-      p := "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
+   p := (AnyWindowOpen!=15) ? "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use" : "`n`nGIF files use"
+   p .= " a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
 
    msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nProgressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always losslessly storing the image data. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
 }
@@ -61379,9 +61398,70 @@ FIMrescaleICOmode(hFIFimgA, imgW, imgH, icoSize, ByRef hasIconified) {
    Return hFIFimgA
 }
 
+FIMalphaTo8Bits(hImage) {
+; the alpha of an RGBA16 or RGBAF image as 8-bit greyscale; a float alpha runs from 0 to 1
+   alpha := FreeImage_GetChannel(hImage, 4)   ; FICC_ALPHA
+   If (!alpha || FreeImage_GetImageType(alpha)!=6)   ; FIT_FLOAT
+   {
+      ; FIT_UINT16 keeps its high bytes
+      r := alpha ? FreeImage_ConvertTo(alpha, "8Bits") : ""
+      FreeImage_UnLoad(alpha)
+      Return r
+   }
+
+   ; two more columns, at 0 and 1, pin the linear scaling of the conversion to 0-255
+   FreeImage_GetImageDimensions(alpha, w, h)
+   VarSetCapacity(zero, 4, 0)
+   wide := FreeImage_EnlargeCanvas(alpha, 0, 0, 2, 0, &zero)
+   FreeImage_UnLoad(alpha)
+   If !wide
+      Return
+
+   NumPut(1.0, FreeImage_GetScanLine(wide, 0) + (w + 1)*4, 0, "Float")
+   grey := FreeImage_ConvertToStandardType(wide, 1)
+   FreeImage_UnLoad(wide)
+   If grey
+   {
+      r := FreeImage_Copy(grey, 0, 0, w, h)
+      FreeImage_UnLoad(grey)
+   }
+   Return r
+}
+
+FIMsetAlphaChannel(hImage, alpha8) {
+; hImage at 32 bits with alpha8 as its alpha; hImage itself when that fails
+   hImage32 := FreeImage_ConvertTo(hImage, "32Bits")
+   If (hImage32 && FreeImage_SetChannel(hImage32, alpha8, 4))   ; FICC_ALPHA
+   {
+      FreeImage_UnLoad(hImage)
+      Return hImage32
+   }
+
+   FreeImage_UnLoad(hImage32)
+   Return hImage
+}
+
+FIMwidenPaletteTo8Bits(hImage) {
+; a 1 or 4 bits image at 8 bits, with its transparency table
+   hImage8 := FreeImage_ConvertTo(hImage, "8Bits")
+   count := FreeImage_GetTransparencyCount(hImage)
+   pTable := FreeImage_GetTransparencyTable(hImage)
+   If (!hImage8 || !count || !pTable)
+      Return hImage8
+
+   ; FreeImage_ConvertTo8Bits() moves the second color of a 1-bit image to index 255
+   is1bit := (FreeImage_GetBPP(hImage)=1)
+   VarSetCapacity(table, 256, 255)
+   Loop, % Min(count, is1bit ? 2 : 16)
+      NumPut(NumGet(pTable+0, A_Index - 1, "UChar"), table, (is1bit && A_Index=2) ? 255 : A_Index - 1, "UChar")
+
+   FreeImage_SetTransparencyTable(hImage8, &table, 256)
+   Return hImage8
+}
+
 coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOriginal:=0) {
 ; recycleOriginal - 1: a file2save that already exists goes to the Recycle Bin, not deleted
-  Static gifOPT := "-s8-f1-",            ppmOPT := "-s24-f1-f9-"
+  Static gifOPT := "-s8-s4-s1-f1-",      ppmOPT := "-s24-f1-f9-"
        , jngOPT := "-s32-s24-f1-",       xpmOPT := "-s24-f1-"
        , jxlOPT := "-s32-s24-s16-s8-f1-f2-f6-f9-f10-f11-f12-"
        , jpegOPT := "-s24-s8-f1-",       hdrOPT := "-f11-"
@@ -61473,9 +61553,20 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          hdrMode := InStr(formatDepths, "-f10-") ? "RGBA16": "RGB16" ; 10
    }
 
+   ; tone mapping returns 24 bits: the alpha of RGBA16 [10] and RGBAF [12] images is put back afterwards
+   If (!noDepthConvert && isVarEqualTo(imgIDtype, 10, 12) && (RegExMatch(file2save, saveAlphaTypesRegEX) || typu="gif" && userPaletteTransparency=1))
+      hdrAlpha := FIMalphaTo8Bits(hFIFimgA)
+
    hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, !noDepthConvert, hasAppliedToneMap)
    If InStr(hasAppliedToneMap, "TONE-MAPPED")
+   {
       FimBuffer := DestroyMemoryBuffer(FimBuffer)
+      If hdrAlpha
+         hFIFimgA := FIMsetAlphaChannel(hFIFimgA, hdrAlpha)
+   }
+
+   If hdrAlpha
+      FreeImage_UnLoad(hdrAlpha)
 
    If (FileExist(file2save) && hFIFimgA)
    {
@@ -61526,6 +61617,18 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    highestDepth := Trim(formatDepths, "-")
    highestDepth := SubStr(highestDepth, 2, InStr(highestDepth, "-") - 1)
    objDepthOkay := InStr(formatDepths, "-s" objDepth "-") ? 1 : 0
+   ; the TIFF writer keeps the transparency of palette images at 8 bits only
+   If (typu="TIFF" && objDepth<8 && FreeImage_IsTransparent(hFIFimgA))
+   {
+      hFIFimgW := FIMwidenPaletteTo8Bits(hFIFimgA)
+      If hFIFimgW
+      {
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgW
+         objDepth := 8, objDepthOkay := 1
+      }
+   }
+
    If (objDepthOkay=1 || noDepthConvert=1)
    {
       savedMode := "OKAY" ; used for debugging purposes
@@ -61550,16 +61653,18 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    {
       r := 0
       changeMcursor()
+      ; a palette image's transparency table becomes alpha only at 32 bits
+      hasAlpha := (InStr(ColorsType, "rgba") || FreeImage_IsTransparent(hFIFimgA)) ? 1 : 0
       If (typu="gif")
       {
          savedMode := "GIF"
-         hFIFimgX := FIMquantizeImage(hFIFimgA)
+         hFIFimgX := FIMpalettizeLikeSaveAs(hFIFimgA)
          If hFIFimgX
          {
             r := FreeImage_Save(hFIFimgX, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgX)
          }
-      } Else If (!InStr(ColorsType, "rgba") && InStr(formatDepths, "-s24-") || isVarEqualTo(typu, "jpeg", "ppm", "xpm"))
+      } Else If (!hasAlpha && InStr(formatDepths, "-s24-") || isVarEqualTo(typu, "jpeg", "ppm", "xpm"))
       {
          savedMode := "24Bits"
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
@@ -91126,7 +91231,7 @@ PanelFileFormatConverter() {
     zml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Format options:
-    GuiAddSaveFormatOptions("x+5 yp")
+    GuiAddSaveFormatOptions("x+5 yp", 1)
 
     Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, &Use multiple threads (experimental)
     If !(filesElected>1)
@@ -91160,7 +91265,7 @@ PanelFileFormatConverter() {
     sml := (PrefsLargeFonts=1) ? 85 : 60
     Gui, Add, Button, x+%ml% hp w%sml% gBTNhelpConvertImgFmt, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
-    updateSaveFormatOptions(saveImgFormatsList[userDesireWriteFMT])
+    updateConverterFormatOptions(saveImgFormatsList[userDesireWriteFMT])
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Image file format conversion: " appTitle)
     GuiRefreshSliders()
 }
@@ -99528,6 +99633,31 @@ FIMquantizeImage(hFIFimg) {
   If hFIFimgB
      FreeImage_UnLoad(hFIFimgB)
   Return hFIFimgQ
+}
+
+FIMpalettizeLikeSaveAs(hImage) {
+; 256 colors as QPV_SaveImageFile() makes them, through GDI+ with «Dithering» and «Keep transparency»;
+; by FIMquantizeImage() when GDI+ cannot
+   hasAlpha := (InStr(FreeImage_GetColorType(hImage), "rgba") || FreeImage_IsTransparent(hImage)) ? 1 : 0
+   ; a copy: ConvertFIMtoPBITMAP() turns 32 bits images upside down
+   hCopy := FreeImage_ConvertTo(hImage, hasAlpha ? "32Bits" : "24Bits")
+   If hCopy
+   {
+      pBitmap := ConvertFIMtoPBITMAP(hCopy, hasAlpha ? "0x26200A" : "0x21808")   ; PixelFormat32bppARGB, PixelFormat24bppRGB
+      FreeImage_UnLoad(hCopy)
+   }
+
+   If pBitmap
+   {
+      E := QPV_GdipPalettizeBitmap(pBitmap, userPaletteDithering, (userPaletteTransparency=1 && hasAlpha))
+      If !E
+         hImage8 := ConvertIndexedPBITMAPtoFIM(pBitmap)
+      Else
+         addJournalEntry(A_ThisFunc "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without dithering or transparency.")
+      Gdip_DisposeImage(pBitmap)
+   }
+
+   Return hImage8 ? hImage8 : FIMquantizeImage(hImage)
 }
 
 initFIMGmodule() {
