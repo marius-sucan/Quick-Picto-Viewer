@@ -44,8 +44,8 @@ Method:
 | # | Severity | What the user gets | Checked |
 |---|---|---|---|
 | 1 | High | Multi-page and animated files keep only their first page; then the original is recycled | Wine + reading |
-| 2 | High | In-place conversion deletes the original outright, even with «Keep original files» on; an explicit «Skip file» answer is overridden | Wine + reading |
-| 3 | High | After a failed save of a PNG/JPG/TIFF the fallback reads freed memory: on AutoHotkey_H the run stopped responding, stock AutoHotkey reports a failure; Windows outcome unverified | Wine |
+| 2 | High | In-place conversion deletes the original outright, even with «Keep original files» on; an explicit «Skip file» answer is overridden | Wine + reading; **fixed with originals kept, `26dd9d7`** |
+| 3 | High | After a failed save of a PNG/JPG/TIFF the fallback reads freed memory: on AutoHotkey_H the run stopped responding, stock AutoHotkey reports a failure; Windows outcome unverified | Wine; **fixed, `e040c32`** |
 | 4 | Medium | Float HDR images (EXR, HDR, PFM, float JXL/TIFF/JXR) cannot be converted to PNG, JPEG 2000 or PPM | Wine |
 | 5 | Medium | 16-bit greyscale images cannot be converted to JPG, BMP, WebP, GIF, TGA, PPM, JNG or XPM | Wine |
 | 6 | Medium | Transparency is lost: palette images to WebP/JP2/JXR/TGA/JXL/TIFF/GIF, anything to GIF, HDR with alpha | Wine |
@@ -59,7 +59,7 @@ Method:
 | 14 | Low | The colour depth is not kept as the help promises: 1-bit becomes 24-bit; WIC turns 16-bit into 8-bit | Wine + reading |
 | 15 | Low | Smaller issues: 1×1 images rejected, progress below 100 %, 8-bit images to HDR/EXR/PFM fail | Wine + reading |
 
-Findings 1 and 2 can lose files; finding 3 can stop QPV. Findings 4–8 decide whether JXL, HEIC and AVIF convert
+Findings 1 and 2 can lose files; finding 3 could stop QPV. Findings 4–8 decide whether JXL, HEIC and AVIF convert
 correctly.
 
 ---
@@ -97,6 +97,25 @@ QPV already knows which formats can be multi-page: `multiPageAllTypesRegEx` (`:1
 
 ## 2. In-place conversion deletes the original, ignores «Keep original files» and overrides an explicit «Skip file»
 
+**Fixed in `26dd9d7` with «Keep original files» on.** The batch asks once before it starts, and the single-file
+convert asks too, whenever files would be converted onto themselves:
+- **Auto-rename:** the converted file is saved as `name [N].ext` and the original stays untouched.
+- **Continue:** the file is converted in place and its original goes to the Recycle Bin under its own name
+  (`recycleReplacedOriginal()`).
+- **Cancel:** nothing is converted.
+
+The answer replaces the conflict option for those files, so «Skip file» is no longer overridden there.
+Multi-threaded runs pass the answer to their workers. «Auto-rename» as the conflict option, and «Skip files»
+with a destination folder, already keep the originals, so they get no question.
+
+Wine checks:
+- 14 batch and single-file scenarios, two worker-loop runs and one fallback of the swap: each original lands in
+  the trash byte-identical and under its own name, including a 3-page TIFF.
+- Cancel changes nothing, and no `-tmp`/`-new` file is left anywhere.
+
+With «Keep original files» off the behaviour is unchanged by choice: the original is still deleted, not recycled,
+and the «Skip file» override remains there.
+
 **What happens.** With «Auto-skip format» unticked and no destination folder, a file that already has the target
 extension is re-encoded onto itself:
 - `coreConvertImgFormat()` renames the existing destination, which here is the source, to `name.ext-tmp`
@@ -122,14 +141,16 @@ test, and `ResizeDestFolder` is used as stored. A drive root from the folder pic
 trailing backslash, gives `D:\\photo.jpg` for `D:\photo.jpg`. Windows opens both as the same file, but the strings
 differ.
 
-So with «Save in destination folder» on, the destination folder being the source folder written with a
-trailing backslash, auto-skip off, «Overwrite» and originals not kept:
-1. The original is overwritten.
-2. Its `-tmp` copy is deleted.
-3. The batch recycles the file it has just written (`:61097-61099`).
-4. The files list then points to a file that is not there.
+The overwrite does not survive the doubled backslash, though:
+- `FileRexists()` reads the attributes through a `\\?\` path (`PathToExtendedPath()`), which Windows does not
+  normalize, so `D:\\photo.jpg` finds nothing.
+- `coreConvertImgFormat()` takes the save for a failure, puts the original back and returns 1.
+- The batch reports «Failed to convert» and recycles nothing.
 
-This last chain was checked by reading only.
+Wine: in that set-up both in-place files failed and stayed intact. A new file written into the same folder
+(`c.png` → `c.jpg`) converted, because there was no existing file to check. Since `26dd9d7`, with originals kept,
+such files are found by full path and written under the source's spelling, so they convert. With originals not
+kept they still fail this way, without loss.
 
 **Fix options.**
 - Refuse in-place conversion while «Keep original files» is on, or turn it into an «Auto-rename».
@@ -138,6 +159,10 @@ This last chain was checked by reading only.
 - Compare full normalized paths (`GetFullPathName`, then case-insensitive) rather than strings.
 
 ## 3. A failed save of a WIC-loaded image makes the fallback read freed memory
+
+**Fixed in `e040c32`.** The buffer is now freed at the end of the function. After the ICO canvas it is freed only
+when the canvas replaced the bitmap. Wine: the two rows below now reach the fallback with the buffer alive, with no
+access violation and «Failed to convert» reported; the other 127 conversion rows give identical results.
 
 **What happens.** The WIC loader's FreeImage bitmap does not own its pixels. `teleportWICtoFIM()` wraps the DLL's
 buffer with `FreeImage_ConvertFromRawBitsEx(0, buffer, …)` (`:101057`); the 0 means "do not copy". In the first
@@ -514,11 +539,9 @@ AVIF, HEIC (sequence and collection), MNG and ICO; animated WebP takes the same 
   so FreeImage took over in those rows.
 - **A HEIC with Exif Orientation other than 1** (finding 7): no sample exists. The pass-through and `irot`
   application are confirmed separately.
-- **Worker mode, the conflict dialog for a self-collision, and the trailing-backslash chain** (findings 2, 9, 10):
-  read, not run.
-- **What finding 3 does on Windows with AutoHotkey_H.** Under Wine, AutoHotkey_H's exception handler took the access
-  violation and the process stopped responding, while stock AutoHotkey caught it inside `DllCall`. The freed read
-  itself is certain.
+- **Worker processes as a real multi-threaded run starts them** (findings 9 and 10): read, not run. The worker loop
+  itself was run for the `26dd9d7` checks.
+- **The «Ask user» dialog for a self-collision with originals not kept** (finding 2): read, not run.
 
 ## Re-running the checks
 
@@ -530,3 +553,7 @@ The kit is in `.claude/scratch/convert-audit-2026-11-02/`, which git ignores:
 - `run.sh main|extra|latent|uafsmall|uaf` runs a group of rows under the fork's private Wine with AutoHotkey_H;
   `run-stock.sh` runs the same with stock AutoHotkey 1.1.37.02. `out-<mode>.txt` holds the results; the `*-seh.sh`
   variants add Wine's exception trace.
+- `gen2.py` + `driver2.tpl` + `run2.sh` check the `26dd9d7` prompt. They run `batchConvert2format()`,
+  `convert2format()` and the worker loop on real files, with the dialogs answered by a stub. Wine's Recycle Bin is
+  redirected to `xdg/`.
+- `post2.py` then tells which files hold an original's exact bytes, and what reached the trash, from where.
