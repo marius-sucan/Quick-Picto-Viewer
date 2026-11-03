@@ -344,6 +344,14 @@ loops).
 - The viewer opens MNG without the PLAYBACK flag (`LoadFimFile()` :99784), so it shows the
   stored sub-images. mng_anim.mng plays as 16×16 pieces of a 64×48 canvas (Wine run).
   `combineFimOpenPages()` passes 2 and gets the canvas.
+- The viewer's guard against animating GIFs outside FreeImage is dead.
+  `LoadBitmapForScreen()` still tests `isAnimFmt` (:75529) to show only the first frame when
+  a loader other than FreeImage opens a `.gif` or `.webp`. 98e33f0 (2026-09-21) deleted the
+  line that set it, along with `isFIMonlyAnimFile()`, and `isAnimFmt` now occurs only there,
+  so it is always blank. `RegExFIMformPtrn` (:117) lists WEBP but not GIF. With the default
+  settings, a `.gif` therefore opens through WIC and keeps WIC's frame count. WIC hands over
+  stored sub-frames, undisposed, and qpvmain.dll does not compose them. Static analysis only,
+  not run on Windows.
 
 ## Checked and found correct
 
