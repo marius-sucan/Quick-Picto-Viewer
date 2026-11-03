@@ -7,8 +7,10 @@ from PIL import Image, ImageDraw
 
 NAMES = ["rainbow", "gradients", "colorwheel"]
 BLUR_SIGMA = 1.5
-# crop boxes (x, y, w, h) where banding shows most
-CROPS = {"rainbow": (500, 40, 400, 200), "gradients": (700, 1000, 400, 200), "colorwheel": (900, 650, 400, 200)}
+# crop boxes (x, y, w, h) where banding shows most, with the sheet's file name suffix
+CROPS = {"rainbow": [("", (500, 40, 400, 200))],
+         "gradients": [("", (700, 1000, 400, 200)), ("-grey", (800, 30, 400, 200))],
+         "colorwheel": [("", (900, 650, 400, 200))]}
 
 def load(p):
     return np.asarray(Image.open(p).convert("RGB"), dtype=np.float64) / 255
@@ -80,15 +82,20 @@ def measure(orig, res):
     return {"mean": d.mean(), "p95": np.percentile(d, 95), "max": d.max(),
             "bmean": db.mean(), "bp95": np.percentile(db, 95),
             "edges": 100 * np.mean(grow >= 1.0), "maxstep": grow.max(),
-            "colours": len(np.unique((res * 255 + 0.5).astype(np.uint8).reshape(-1, 3), axis=0))}
+            "colours": len(np.unique((res * 255 + 0.5).astype(np.uint8).reshape(-1, 3), axis=0)), "db": db}
 
 def band_rows(img, n=6):
     # distinct colours along the middle row of each gradient band
     h = img.shape[0] // n
     return [len(np.unique((img[i*h + h//2] * 255 + 0.5).astype(np.uint8), axis=0)) for i in range(n)]
 
-def crop_sheet(folder, name, methods, scale=2):
-    x, y, w, h = CROPS[name]
+def band_means(db, n=6, margin=10):
+    # blurred error inside each gradient band, away from the band borders
+    h = db.shape[0] // n
+    return [db[i*h + margin:(i + 1)*h - margin].mean() for i in range(n)]
+
+def crop_sheet(folder, name, methods, suffix, box, scale=2):
+    x, y, w, h = box
     tiles = [("original", os.path.join(folder, name + ".png"))] + [(m, os.path.join(folder, f"{name}-{m}.png")) for m in methods]
     sheet = Image.new("RGB", (len(tiles) * (w*scale + 10) - 10, h*scale + 24), "white")
     dr = ImageDraw.Draw(sheet)
@@ -97,7 +104,7 @@ def crop_sheet(folder, name, methods, scale=2):
         sheet.paste(t, (i * (w*scale + 10), 24))
         dr.text((i * (w*scale + 10) + 4, 5), f"{label}  [{x},{y} {w}x{h}, {scale}x zoom]", fill="black")
     os.makedirs(os.path.join(folder, "crops"), exist_ok=True)
-    sheet.save(os.path.join(folder, "crops", name + "-crops.png"), optimize=True)
+    sheet.save(os.path.join(folder, "crops", name + suffix + "-crops.png"), optimize=True)
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -114,9 +121,11 @@ def main():
             print(f"| {name} | {m} | {r['colours']} | {r['mean']:.2f} | {r['p95']:.2f} | {r['max']:.2f} | "
                   f"{r['bmean']:.2f} | {r['bp95']:.2f} | {r['edges']:.2f} | {r['maxstep']:.2f} |", flush=True)
             if name == "gradients":
-                print(f"|  |  | per band: {' / '.join(map(str, band_rows(res)))} (original {' / '.join(map(str, band_rows(orig)))}) | | | | | | | |")
+                print(f"|  |  | colours per band: {' / '.join(map(str, band_rows(res)))} (original {' / '.join(map(str, band_rows(orig)))}) | | | | | | | |")
+                print(f"|  |  | blurred mean per band: {' / '.join(f'{v:.2f}' for v in band_means(r['db']))} | | | | | | | |")
         if "--crops" in sys.argv:
-            crop_sheet(folder, name, methods)
+            for suffix, box in CROPS[name]:
+                crop_sheet(folder, name, methods, suffix, box)
 
 if __name__ == "__main__":
     main()
