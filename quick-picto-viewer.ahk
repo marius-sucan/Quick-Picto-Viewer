@@ -99625,17 +99625,14 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
 
 FIMquantizeImage(hFIFimg) {
 ; Returns a new 8 bits palettized image: the exact palette for images of up to 256 colors,
-; otherwise NeuQuant up to 16 megapixels and the much faster Wu quantizer above.
+; otherwise the Wu quantizer's.
   If (FreeImage_GetBPP(hFIFimg)!=24)
      hFIFimgB := FreeImage_ConvertTo(hFIFimg, "24Bits")
 
   hSource := hFIFimgB ? hFIFimgB : hFIFimg
   hFIFimgQ := FreeImage_ColorQuantize(hSource, 2)   ; FIQ_LFPQUANT
   If !hFIFimgQ
-  {
-     FreeImage_GetImageDimensions(hSource, imgW, imgH)
-     hFIFimgQ := FreeImage_ColorQuantize(hSource, (imgW*imgH>16000000) ? 0 : 1)   ; FIQ_WUQUANT, FIQ_NNQUANT
-  }
+     hFIFimgQ := FreeImage_ColorQuantize(hSource, 0)   ; FIQ_WUQUANT
 
   If hFIFimgB
      FreeImage_UnLoad(hFIFimgB)
