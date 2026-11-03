@@ -42,7 +42,7 @@ Colours along the middle row of each gradient band (the original has 256 / 476 /
 
 - **colours**: distinct colours in the result. NeuQuant's palettes hold duplicate entries (244–256 distinct of 256).
 - **blurred**: both images blurred first (Gaussian σ 1.5 px, linear light), roughly what is seen at normal viewing distance. This is the fair measure for dithered images, whose per-pixel error is high by design.
-- **false edges %**: share of neighbouring pixel pairs (after the blur) whose colour step grew by 1 ΔE00 or more over the original's step. These are the band edges.
+- **false edges %**: share of neighbouring pixel pairs (after the blur) whose colour step grew by 1 ΔE00 or more over the original's step. These are the band edges. Finer bands stay below that after the blur and are not counted: Wu's 0.00% on the gradients does not mean no bands, the per-band colour counts and the crops show them.
 - **worst step**: the largest such growth.
 - The colour wheel's max ΔE00 comes from the anti-aliased rim pixels; both methods are equally bad there.
 
@@ -51,7 +51,7 @@ Colours along the middle row of each gradient band (the original has 256 / 476 /
 **Wu is closer to the original and smoother on all three images.** Its mean error is 20–60% lower than NeuQuant's (95th percentile 27–72% lower), its band steps are smaller and more even, and it is about 200× faster.
 NeuQuant spends the palette unevenly (13 colours on the orange → teal ramp, 70 on the navy one) and wastes entries on duplicates. Its band edges are jagged (see the crops).
 
-Neither quantizer dithers, so both give visible bands on smooth gradients. Only error diffusion hides them.
+Neither quantizer dithers, so both give visible bands on smooth gradients. Only dithering hides them.
 
 Only synthetic images were tested; photographs were not.
 
