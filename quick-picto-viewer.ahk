@@ -394,7 +394,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , userJoinIMGsW := 0, userJoinIMGsH := 0, userJoinIMGres := 0, userOCRlimitSel := 0
    , userOCRlanguage := "", userOCRupscale := 1, userOCRoutputFmt := 1, userOCRjoinCJK := 1
    , userJpegSubsampling := 2, userJpegProgressive := 0, userSaveImgLossless := 0, userJxlEffort := 7
-   , userSaveImgCompressionLvl := 3, userPaletteDithering := 1, userPaletteTransparency := 0
+   , userSaveImgCompressionLvl := 3, userGifPaletteDithering := 1, userGifPaletteTransparency := 0
    , UsrCopyMoveOperation := 2, jpegDesiredOperation := 1, copyMoveDoLastOption := 4
    , DrawLineAreaLineGenerator := 0
 
@@ -18667,7 +18667,7 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
       pf := Gdip_GetImagePixelFormat(pBitmap, 2)
       If (pf!="8-INDEXED")
       {
-         E := QPV_GdipPalettizeBitmap(pBitmap, userPaletteDithering, (userPaletteTransparency=1 && InStr(pf, "ARGB")))
+         E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, (userGifPaletteTransparency=1 && InStr(pf, "ARGB")))
          If E
             addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without dithering or transparency.")
       }
@@ -38278,12 +38278,13 @@ coreReadSettingsImageProcessing(act) {
 ReadSettingsSaveFormatOptions(act) {
 ; the options of the file formats, used by getFIMsaveArgs() and QPV_SaveImageFile()
     RegAction(act, "userJpegSubsampling",, 2, 1, 3)
+    RegAction(act, "userJpegQuality",, 2, 1, 100)
     RegAction(act, "userJpegProgressive",, 1)
     RegAction(act, "userSaveImgLossless",, 1)
-    RegAction(act, "userJxlEffort",, 2, 1, 9)
     RegAction(act, "userSaveImgCompressionLvl",, 2, 1, 4)
-    RegAction(act, "userPaletteDithering",, 1)
-    RegAction(act, "userPaletteTransparency",, 1)
+    RegAction(act, "userJxlEffort",, 2, 1, 9)
+    RegAction(act, "userGifPaletteDithering",, 1)
+    RegAction(act, "userGifPaletteTransparency",, 1)
 }
 
 multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
@@ -44617,7 +44618,7 @@ BTNsetImgWallpaper() {
 }
 
 PanelSaveImg() {
-    Global userDestinationFolder, editF5, uiSaveFmtChoice, btnSaveImgNow, btnSaveImgAs
+    Global userDestinationFolder, editF5, uiSaveFmtChoice, btnSaveImgNow, btnSaveImgAs, uiSaveFmtNoOptions
     If (thumbsDisplaying=1)
     {
        PanelSaveSlideShowu()
@@ -44640,15 +44641,15 @@ PanelSaveImg() {
     }
 
     btnWid2 := (PrefsLargeFonts=1) ? btnWid - 40 : btnWid - 25
-    RegAction(0, "userDesireWriteFMT",, 2, 1, 16)
     imgPath := getIDimage(currentFileIndex)
     imgPath := StrReplace(imgPath, "||")
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
 
     INIaction(0, "prevFileSavePath", "General", 6)
+    RegAction(0, "userDesireWriteFMT",, 2, 1, 16)
     RegAction(0, "usePrevSaveFolder",, 1)
     RegAction(0, "PreserveDateTimeOnSave",, 1)
-    RegAction(0, "userJpegQuality",, 2, 1, 100)
+    ReadSettingsSaveFormatOptions(0)
 
     entriesList := StrReplace(recentOpenedFolders(), "`n", "|")
     delim := InStr(entriesList, prevFileSavePath "|") ? "|" : ""
@@ -44722,14 +44723,23 @@ PanelSaveImg() {
 
     fmtWid := (PrefsLargeFonts=1) ? 110 : 80
     GuiAddDropDownList("xp y+8 w" fmtWid " AltSubmit gUIsaveFormatOptionsChanged Choose" fmtChoice " vuiSaveFmtChoice", userPossibleWriteFMTs "|.ICO", "File format", "File format: the options shown are those of this format.`nThe save dialog opens with it.")
-    GuiAddSaveFormatOptions("x+10 yp")
+    pkw := (PrefsLargeFonts=1) ? 190 : 140
+    GuiAddDropDownList("x+10 yp w" pkw " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 color details|1/2 color details (recommended)|1/1 full color details", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
+    GuiAddSaveLossless("xp yp wp hp")
+    Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
+    pkw := (PrefsLargeFonts=1) ? 135 : 95
+    Gui, Add, Checkbox, x+5 yp w%pkw% hp gUIsaveFormatOptionsChanged Checked%userJpegProgressive% vuserJpegProgressive +hwndhTemp, Progressive
+    ToolTip2ctrl(hTemp, "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
+    pkw := (PrefsLargeFonts=1) ? 85 : 50
+    GuiAddDropDownList("xp yp w" pkw " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
     GuiAddSlider("userJpegQuality", 2,100, 95, "Quality", "iniSaveJPGquality", 1, "xs+15 y+8 w" thisWid + 10 " hp", saveQualityTip(1))
     GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]" bonusChoice, "Color depth")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
-    GuiAddPaletteDithering("xs+15 y+8 w" thisWid)
-    GuiAddPaletteTransparency("x+20")
+    GuiAddSaveGifPaletteDithering("xs+15 y+8 w" thisWid)
+    GuiAddSavePaletteTransparency("x+20")
     Gui, Add, Text, xs y+10, Image file status
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
     Gui, Add, Text, xp+15 y+7 w%txtWid% -wrap, % "File size: " fileSizu FileDateM "`n" fileStatus
@@ -44756,59 +44766,19 @@ PanelSaveImg() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save image file: " appTitle)
 }
 
-GuiAddSaveFormatOptions(firstPos) {
-; Adds the file format options of the «Save image» panel in two slots, beginning at firstPos [Gui option string].
-; The controls of all the formats overlap; updateSaveFormatOptions() shows those of the chosen format.
-    Global uiSaveFmtNoOptions
-    GuiAddJpegSubsampling(firstPos " w" ((PrefsLargeFonts=1) ? 190 : 140))
-    GuiAddSaveCompressionLvl("xp yp wp")
-    GuiAddSaveLossless("xp yp wp hp")
-    Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
-    GuiAddJpegProgressive("x+5 yp w" ((PrefsLargeFonts=1) ? 135 : 95) " hp")
-    GuiAddJxlEffort("xp yp w" ((PrefsLargeFonts=1) ? 85 : 50))
-}
-
 ; the file format option controls, each placed at pos [Gui option string] by the «Save image» panel and by the format converter
-GuiAddJpegSubsampling(pos, listu:="") {
-    If !listu
-       listu := "1/4 color details|1/2 color details (recommended)|1/1 full color details"
-    GuiAddDropDownList(pos " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", listu, "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
-}
-
-GuiAddSaveCompressionLvl(pos) {
-    GuiAddDropDownList(pos " AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
-}
-
 GuiAddSaveLossless(pos) {
     Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userSaveImgLossless " vuserSaveImgLossless +hwndhTemp", Lossless save
     ToolTip2ctrl(hTemp, "Screenshots and graphics often yield smaller files when saved with «Lossless» activated.")
 }
 
-GuiAddJpegProgressive(pos, toggleLabel:="") {
-; toggleLabel - a push-like button with this label replaces the «Progressive» checkbox
-    Static tip := "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller."
-    pos .= " gUIsaveFormatOptionsChanged Checked" userJpegProgressive " vuserJpegProgressive"
-    If toggleLabel
-    {
-       GuiAddCheckBox(pos, "Progressive", toggleLabel, "SettingsGUIA", tip)
-    } Else
-    {
-       Gui, Add, Checkbox, % pos " +hwndhTemp", Progressive
-       ToolTip2ctrl(hTemp, tip)
-    }
-}
-
-GuiAddJxlEffort(pos) {
-    GuiAddDropDownList(pos " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
-}
-
-GuiAddPaletteDithering(pos) {
-    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userPaletteDithering " vuserPaletteDithering +hwndhTemp", Dithering
+GuiAddSaveGifPaletteDithering(pos) {
+    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userGifPaletteDithering " vuserGifPaletteDithering +hwndhTemp", Dithering
     ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
 }
 
-GuiAddPaletteTransparency(pos) {
-    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userPaletteTransparency " vuserPaletteTransparency +hwndhTemp", Keep transparency
+GuiAddSavePaletteTransparency(pos) {
+    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userGifPaletteTransparency " vuserGifPaletteTransparency +hwndhTemp", Keep transparency
     ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
 }
 
@@ -44820,8 +44790,8 @@ updateConverterFormatOptions(fmt) {
       GuiControl, SettingsGUIA: Hide, uiSaveFmtNoOptions
 
    actu := isGIF ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-   GuiControl, % actu, userPaletteDithering
-   GuiControl, % actu, userPaletteTransparency
+   GuiControl, % actu, userGifPaletteDithering
+   GuiControl, % actu, userGifPaletteTransparency
    actu := isGIF ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
    GuiUpdateVisibilitySliders(actu, "userJpegQuality")
    GuiControl, % actu, btnConvertFmtHelp
@@ -44867,8 +44837,8 @@ updateUIsavePanel() {
    fmt := dialogSaveIndexes[fmtIndex]
    updateSaveFormatOptions(fmt)
    actu := (fmt="gif" || userSaveBitsDepth=4) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
-   GuiControl, % actu, userPaletteDithering
-   GuiControl, % actu, userPaletteTransparency
+   GuiControl, % actu, userGifPaletteDithering
+   GuiControl, % actu, userGifPaletteTransparency
    GuiControl, % (fmt="gif") ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable", userSaveBitsDepth
 
    ; «Save image» writes the file in its own format; an image only in memory always opens the save dialog
@@ -59140,7 +59110,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
       ; GIF files are always 8 bits; the 24, 16 and 8 bits depths lose the alpha channel
       hasAlpha := huge ? alphau : (currIMGdetails.HasAlpha=1)
       If (nExt="gif")
-         lostAlpha := (userPaletteTransparency=1 && wasInitFIMlib=1 && !huge) ? 0 : 1
+         lostAlpha := (userGifPaletteTransparency=1 && wasInitFIMlib=1 && !huge) ? 0 : 1
       Else
          lostAlpha := (!RegExMatch(file2save, saveAlphaTypesRegEX) || isInRange(userSaveBitsDepth, 2, 4)) ? 1 : 0
 
@@ -61587,7 +61557,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    }
 
    ; tone mapping returns 24 bits: the alpha of RGBA16 [10] and RGBAF [12] images is put back afterwards
-   If (!noDepthConvert && isVarEqualTo(imgIDtype, 10, 12) && (RegExMatch(file2save, saveAlphaTypesRegEX) || typu="gif" && userPaletteTransparency=1))
+   If (!noDepthConvert && isVarEqualTo(imgIDtype, 10, 12) && (RegExMatch(file2save, saveAlphaTypesRegEX) || typu="gif" && userGifPaletteTransparency=1))
       hdrAlpha := FIMalphaTo8Bits(hFIFimgA)
 
    hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, !noDepthConvert, hasAppliedToneMap)
@@ -91259,15 +91229,16 @@ PanelFileFormatConverter() {
     GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", saveQualityTip(1))
     zml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel vbtnConvertFmtHelp", " ?", "Help")
-    GuiAddPaletteTransparency("xp-" (pww + 5) " yp w" (pww + zml + 5) " hp")
+    GuiAddSavePaletteTransparency("xp-" (pww + 5) " yp w" (pww + zml + 5) " hp")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Format options:
-    GuiAddJpegSubsampling("x+5 yp w" pww, "1/4 color|1/2 color|Full color")
-    GuiAddSaveCompressionLvl("xp yp wp")
+    GuiAddDropDownList("x+5 yp w" pww " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 color details|1/2 color details|1/1 full color", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
+    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
     GuiAddSaveLossless("xp yp wp hp")
-    GuiAddPaletteDithering("xp yp wp hp")
+    GuiAddSaveGifPaletteDithering("xp yp wp hp")
     Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
-    GuiAddJpegProgressive("x+5 yp w" zml " hp", "P")
-    GuiAddJxlEffort("xp yp w" ((PrefsLargeFonts=1) ? 85 : 50))
+    GuiAddCheckBox("x+5 yp w" zml " hp gUIsaveFormatOptionsChanged Checked" userJpegProgressive " vuserJpegProgressive", "Progressive", "P", "SettingsGUIA", "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
+    pkw := (PrefsLargeFonts=1) ? 85 : 50
+    GuiAddDropDownList("xp yp w" pkw " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
 
     Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, &Use multiple threads (experimental)
     If !(filesElected>1)
@@ -99685,7 +99656,7 @@ FIMpalettizeLikeSaveAs(hImage) {
 
    If pBitmap
    {
-      E := QPV_GdipPalettizeBitmap(pBitmap, userPaletteDithering, (userPaletteTransparency=1 && hasAlpha))
+      E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, (userGifPaletteTransparency=1 && hasAlpha))
       If !E
          hImage8 := ConvertIndexedPBITMAPtoFIM(pBitmap)
       Else
