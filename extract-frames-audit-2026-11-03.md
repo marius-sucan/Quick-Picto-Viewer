@@ -94,7 +94,7 @@ run under Wine with the AutoHotkey_H interpreter QPV uses, give:
 | −4 | failed | failed | failed |
 
 Ten animated GIFs of five frames each therefore end with «0 out of 10 selected files were
-processed … frames extracted: 50 / 50 ( 100% ) … Skipped files: 10». The frame totals stay
+processed … frames extracted: 50 / 50 ( 100.0% ) … Skipped files: 10». The frame totals stay
 right, because the `r>=1` block just above adds them first. PDF text mode goes through the
 same lines, so every PDF without exactly 2 pages counts as skipped. A single-page PDF, which
 the 08-30 fix set out to count as a success, counts as skipped in a batch; single-file mode
