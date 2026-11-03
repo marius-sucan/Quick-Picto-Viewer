@@ -38364,13 +38364,13 @@ multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
       }
 
       recycleOriginal := 0
-      If (inPlaceAction && isSameFormat=1 && isSameFilePath(imgPath, file2save))
+      If (inPlaceAction && isSameFormat=1 && imgPath=file2save)
       {
          file2save := OutDir "\" OutNameNoExt "." rDesireWriteFMT
          If (inPlaceAction="recycle")
             recycleOriginal := 1
          Else
-            file2save := getAutoRenamedPath(file2save)
+            file2save := getAutoRenamedFreePath(file2save)
 
          If !file2save
          {
@@ -43167,7 +43167,7 @@ askAboutFileCollision(srcFile, destFile, allowSkip, doLastOption, forceOption, B
    If InStr(msgR, "rename")
    {
       performOverwrite := 2
-      r := getAutoRenamedPath(destFile)
+      r := getAutoRenamedFreePath(destFile)
    } Else If InStr(msgR, "overwrite")
    {
       performOverwrite := 1
@@ -60975,7 +60975,7 @@ batchConvert2format() {
    inPlaceAction := ""
    If (OnConvertKeepOriginals=1 && convertFormatAutoSkip=0 && (userActionConflictingFile>2 || userActionConflictingFile=1 && ResizeUseDestDir!=1))
    {
-      inPlaceFiles := countFilesConvertedOntoThemselves()
+      inPlaceFiles := countConflictFilesFolder(ResizeUseDestDir, ResizeDestFolder, rDesireWriteFMT)
       If (inPlaceFiles>0)
       {
          inPlaceAction := askConvertInPlaceKeepOriginals(inPlaceFiles)
@@ -61113,15 +61113,14 @@ batchConvert2format() {
       }
 
       recycleOriginal := 0
-      If (inPlaceAction && isSameFormat=1 && isSameFilePath(imgPath, file2save))
+      If (inPlaceAction && isSameFormat=1 && imgPath=file2save)
       {
-         ; converted onto itself: the answer given to askConvertInPlaceKeepOriginals() applies; the path is
-         ; spelled as the source's, because a doubled backslash [D:\photos\ as destination] fails FileRexists()
+         ; converted onto itself: the answer given to askConvertInPlaceKeepOriginals() applies
          file2save := OutDir "\" OutNameNoExt "." rDesireWriteFMT
          If (inPlaceAction="recycle")
             recycleOriginal := 1
          Else
-            file2save := getAutoRenamedPath(file2save)
+            file2save := getAutoRenamedFreePath(file2save)
 
          If !file2save
          {
@@ -61742,25 +61741,10 @@ recycleReplacedOriginal(filePath) {
    Return recycleFailed
 }
 
-isSameFilePath(pathA, pathB) {
-; two spellings of one file, once expanded to full paths: «D:\\a.jpg» and «D:\a.jpg» match
-   Return (getFullPathName(pathA)=getFullPathName(pathB)) ? 1 : 0
-}
-
-getFullPathName(givenPath) {
-   n := DllCall("GetFullPathNameW", "WStr", givenPath, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
-   If !n
-      Return givenPath
-
-   VarSetCapacity(buf, n*2, 0)
-   DllCall("GetFullPathNameW", "WStr", givenPath, "UInt", n, "Ptr", &buf, "Ptr", 0, "UInt")
-   Return StrGet(&buf, "UTF-16")
-}
-
-getAutoRenamedPath(filePath) {
+getAutoRenamedFreePath(filePath) {
 ; the first free «name [N].ext» next to filePath; blank when none is free
    zPlitPath(filePath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
-   Loop, 9501
+   Loop, 9500
    {
       z := OutDir "\" OutNameNoExt " [" A_Index "]." fileEXT
       If !FileExist(z)
@@ -61768,21 +61752,28 @@ getAutoRenamedPath(filePath) {
    }
 }
 
-countFilesConvertedOntoThemselves() {
-; how many of the selected files the format converter would write over themselves
+countConflictFilesFolder(useDir, destDir, dEXTf) {
+; count how many of the selected files would overwrite
+
    n := 0
+   destDir := Trim(destDir, "\")
+   If !dEXTf
+      Return 0
+
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)
          Continue
 
       imgPath := getIDimage(A_Index)
-      If (InStr(imgPath, "||") || !RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$"))
+      If (InStr(imgPath, "||") || !RegExMatch(imgPath, "i)(.\.(" dEXTf "))$"))
          Continue
 
-      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
-      destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
-      n += isSameFilePath(imgPath, destImgPath "\" OutNameNoExt "." rDesireWriteFMT)
+      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      destImgPath := (useDir=1 && destDir) ? destDir : OutDir
+      destImgPath .= "\" OutNameNoExt "." dEXTf
+      If (imgPath=destImgPath)
+         n++
    }
    Return n
 }
@@ -61790,6 +61781,7 @@ countFilesConvertedOntoThemselves() {
 askConvertInPlaceKeepOriginals(filesCount, singleFile:=0) {
 ; Asked when «Keep original files» is on and files would be converted onto themselves.
 ; Returns "rename", "recycle" or blank, when the user cancels.
+
    If (singleFile=1)
       msgInfos := "«Keep original files» is activated, but the file is already a ." rDesireWriteFMT " file and would be converted onto itself."
    Else If (filesCount=1)
@@ -61797,10 +61789,12 @@ askConvertInPlaceKeepOriginals(filesCount, singleFile:=0) {
    Else
       msgInfos := "«Keep original files» is activated, but " groupDigits(filesCount) " of the selected files are already ." rDesireWriteFMT " files and would be converted onto themselves."
 
+   If !singleFile
+      msgInfos .= " The option to skip files already in the same format is deactivated."
+
    thisFile := (singleFile=1 || filesCount=1) ? "file" : "files"
-   msgInfos .= "`n`nAuto-rename: save the converted " thisFile " under a new name; the original " thisFile " stay" ((thisFile="file") ? "s" : "") " untouched."
+   msgInfos .= "`n`nAuto-rename: save the converted " thisFile " under a new name."
    msgInfos .= "`nContinue: convert in place; the original " thisFile " will be moved to the Recycle Bin."
-   msgInfos .= "`nCancel: convert nothing."
    msgResult := msgBoxWrapper(appTitle ": Confirmation", msgInfos, "&Auto-rename|&Continue|C&ancel", 1, "question")
    If InStr(msgResult, "rename")
       Return "rename"
@@ -61878,7 +61872,7 @@ convert2format(givenIndex) {
   }
 
   recycleOriginal := 0
-  If (OnConvertKeepOriginals=1 && isSameFilePath(file2rem, file2save))
+  If (OnConvertKeepOriginals=1 && file2rem=file2save)
   {
      inPlaceAction := askConvertInPlaceKeepOriginals(1, 1)
      If !inPlaceAction
@@ -61891,7 +61885,7 @@ convert2format(givenIndex) {
      If (inPlaceAction="recycle")
         recycleOriginal := 1
      Else
-        file2save := getAutoRenamedPath(file2save)
+        file2save := getAutoRenamedFreePath(file2save)
 
      If !file2save
         Return msgBeepTimer("ERROR: No free file name was found for the converted file.`n" OutFileName "`n" OutDir "\")
