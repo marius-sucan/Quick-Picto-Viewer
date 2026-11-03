@@ -4,7 +4,8 @@ Scope: `batchExtractFramesFromImages()` (:61948) and `coreExtractFramesFromImage
 with the routines they hand files to: `coreExtractFramesFromTiff()` (:62052),
 `coreExtractFramesFromWEBP()` (:62286) and `coreExtractBatchModeTextsFromGivenPDF()` (:62450),
 plus `PanelExtractFrames()` (:43541) and `BTNperformExtractFrames()` (:44103), which drive them.
-Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848.
+Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848. They are unchanged at
+4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below.
 
 This follows the 2026-08-30 audit of the same code (report in 7a00a9c, fixes in 34ae01f). Its
 findings are not repeated; their status is in the table near the end.
@@ -27,8 +28,8 @@ findings are not repeated; their status is in the table near the end.
 
 ## Summary
 
-- **One regression** from the 08-30 fixes: the batch summary counts almost every successful
-  file as skipped (finding 1). It is one missing character.
+- **One regression** from the 08-30 fixes: the batch summary counted almost every successful
+  file as skipped (finding 1). **Fixed in `4c8ec92`.**
 - **None of JXL, APNG, MNG, AVIF or HEIC/HEIF is handled.** The panel advertises JXL, MNG
   and APNG, and the batch filter admits all five. The extractor sends them to GDI+, which
   cannot decode them or reads only one image. The viewer and the join-images tool read
@@ -36,9 +37,10 @@ findings are not repeated; their status is in the table near the end.
 - **Multi-page files**: GIF, TIFF and PDF are extracted, and WebP where Windows has a WebP
   codec. HEIF collections, bursts and sequences, AVIF sequences, multi-size ICO files and
   APNG are not.
-- Two medium defects: saved output formats point at other formats since 0a5b8e1 (finding 3),
-  and PDF text mode writes a file named `abort` when the user cancels (finding 4). One
-  medium-low: TIFF pages ignore «Color depth» (finding 5). Six low or latent items follow.
+- Two medium defects: saved output formats point at other formats since 0a5b8e1 (finding 3,
+  **partly fixed in `4c8ec92`**), and PDF text mode wrote a file named `abort` when the user
+  cancelled (finding 4, **fixed in `4c8ec92`**). One medium-low: TIFF pages ignore «Color
+  depth» (finding 5). Six low or latent items follow.
 
 ## Format coverage
 
@@ -66,6 +68,9 @@ were extracted», −3 «WARNING: The image format does not have support for mul
 ---
 
 ## 1. The batch summary counts almost every successful file as skipped (regression, 34ae01f)
+
+**Fixed in `4c8ec92`:** the line now reads `Else If (r=-3 || r=-2)`, which counts files as in
+the right-hand column of the table below.
 
 `batchExtractFramesFromImages()` :62021
 
@@ -102,8 +107,6 @@ reports it correctly.
 
 Origin: the «clean-ups» commit squashed into 34ae01f (2026-08-30) merged `Else If (r=-3)`
 and `Else If (r=-2)` into one line and dropped the `=`.
-
-**Fix:** `Else If (r=-3 || r=-2)`.
 
 ---
 
@@ -153,7 +156,9 @@ What this means for a fix:
   frame coalescing on, and AVIF and HEIF sequence frames are whole pictures. The flag only
   turns 10- to 16-bit frames into 8-bit RGBA. `combineFimOpenPages()` passes 2 to them,
   which suits joining animations; an extractor may want 0 to keep the depth (decision 3).
-- `LoadFimFile()`'s flag table is not a model: it passes 0 to MNG (see «Seen in passing»).
+- Since `4c8ec92`, `LoadFimFile()` passes 2 to MNG as well, so its flags and
+  `combineFimOpenPages()`'s compose the same formats. They differ only for HEIF (0 against 2),
+  which changes the depth, not the composition.
 - `coreExtractFramesFromTiff()` decodes each page with WIC first (:62103-62109). If that
   routine becomes the general one, the WIC step must stay TIFF-only: WIC hands over GIF
   frames undisposed (finding 7).
@@ -162,10 +167,14 @@ What this means for a fix:
 
 ## 3. Saved output formats point at other formats since 0a5b8e1; two of them write nothing
 
+**Partly fixed in `4c8ec92`:** `RegAction(0, "userExtractFramesFmt",, 2, 1, 13)` (:43550) now
+clamps the stored position to the 13 entries. Stored 14 and 15 become 13, so they write XPM
+frames instead of failing, and the dropdown shows «.XPM». Stored 3 to 15 still mean other
+formats than they did before 10-13.
+
 0a5b8e1 (2026-10-13) shortened the «File format on save» list from 15 entries to 13
 (`saveimgformatslist` :131, `userPossibleWriteFMTs` :130). `userExtractFramesFmt` is stored as
-a position in that list, nothing converts the stored value, and
-`RegAction(0, "userExtractFramesFmt",, 2, 1, 15)` (:43550) still accepts up to 15:
+a position in that list, and nothing converts the stored value:
 
 | Stored | Meant before 10-13 | Means now |
 |---|---|---|
@@ -181,24 +190,28 @@ a position in that list, nothing converts the stored value, and
 | 11 | TGA | TIF |
 | 12 | TIF | WEBP |
 | 13 | WDP | XPM |
-| 14 | WEBP | nothing |
-| 15 | XPM | nothing |
+| 14 | WEBP | XPM (clamped) |
+| 15 | XPM | XPM (clamped) |
 
-For 14 and 15, the dropdown opens with nothing selected and `GuiControlGet` reads it back
-blank (Wine run). The frame names then end in a bare dot (`name_1.`), no writer matches the
-extension, and every frame fails. The single-file message reads «Succesfully extracted 0
-frames out of N». For 3 to 13, the panel shows the remapped format, so a user who looks sees
-it; one who doesn't gets PPM frames where they had chosen PNG.
+Before 4c8ec92, 14 and 15 opened the dropdown with nothing selected, and `GuiControlGet` read
+it back blank (Wine run). The frame names then ended in a bare dot (`name_1.`), no writer
+matched the extension, and every frame failed. The panel shows the remapped format, so a user
+who looks sees it. One who doesn't gets PPM frames where they had chosen PNG, or XPM where
+they had chosen WebP.
 
-The format converter's `userDesireWriteFMT` (`RegAction(…, 2, 1, 16)`) has the same remap. It
-is not analysed here.
+The format converter's `userDesireWriteFMT` has the same remap. 4c8ec92 clamps it to 13 in
+`ReadSettingsAutoCropPanel()` (:97482), but its four other reads (:38263, :44196, :44649,
+:59011) still accept up to 16. It is not analysed further here.
 
-**Fix:** map the old positions once, or store the extension instead of the position
+**What remains:** map the old positions once, or store the extension instead of the position
 (decision 4).
 
 ---
 
 ## 4. PDF text mode: «Cancel» at a name collision writes a file named `abort` and carries on
+
+**Fixed in `4c8ec92`:** the function now returns −5 at that point, so the batch stops with
+«Operation aborted», as the frame routines do.
 
 `coreExtractBatchModeTextsFromGivenPDF()` :62507
 
@@ -220,8 +233,6 @@ and returns the page count as a success. Nothing reads `abandonAll` afterwards, 
 moves on to the next PDF; a second «Cancel» replaces the same `abort` file. Where the program
 folder is read-only, `FileAppend` fails and the PDF counts as failed. Either way, «Cancel»
 never stops the batch. The frame routines all `Break` on `"abort"` and return −5.
-
-**Fix:** `Return -5` where the function now sets `abandonAll := 1`.
 
 ---
 
@@ -274,8 +285,7 @@ it needs a GIF renamed to `.tif`.
 `coreExtractFramesFromTiff()` returns −1 when `FreeImage_OpenMultiBitmap()` fails (:62169).
 `coreExtractFramesFromImage()` returns that straight away; it never falls through to the GDI+
 branch, which reads multi-page TIFFs too. `BTNperformExtractFrames()` has no message for −1,
-so it shows «ERROR: An undefined error has occurred.» (:44145). A batch counts it as skipped
-(finding 1) instead of failed.
+so it shows «ERROR: An undefined error has occurred.» (:44145). A batch counts it as failed.
 
 ---
 
@@ -326,7 +336,7 @@ loops).
 | 08-30 # | Item | Now |
 |---|---|---|
 | 1 | Aborting a batch did not stop it | fixed (:62007) |
-| 2 | A single-page PDF was reported as a failure | fixed in single-file mode; a batch counts it as skipped (finding 1) |
+| 2 | A single-page PDF was reported as a failure | fixed; in a batch too since 4c8ec92 (finding 1) |
 | 3 | The TIFF route leaked the page it rescaled from | fixed (:62144) |
 | 4 | Progress tooltip throttle, none in single-file mode | fixed |
 | 5 | Batch frame totals | fixed |
@@ -341,9 +351,9 @@ loops).
 
 ## Seen in passing
 
-- The viewer opens MNG without the PLAYBACK flag (`LoadFimFile()` :99784), so it shows the
-  stored sub-images. mng_anim.mng plays as 16×16 pieces of a 64×48 canvas (Wine run).
-  `combineFimOpenPages()` passes 2 and gets the canvas.
+- **Fixed in `4c8ec92`:** the viewer opened MNG without the PLAYBACK flag (`LoadFimFile()`
+  :99784), so it showed the stored sub-images; mng_anim.mng played as 16×16 pieces of a 64×48
+  canvas (Wine run). It now passes 2, as `combineFimOpenPages()` does.
 - The viewer's guard against animating GIFs outside FreeImage is dead.
   `LoadBitmapForScreen()` still tests `isAnimFmt` (:75529) to show only the first frame when
   a loader other than FreeImage opens a `.gif` or `.webp`. 98e33f0 (2026-09-21) deleted the
@@ -385,12 +395,14 @@ loops).
    and QPV's own compositing, for GIF_PLAYBACK and WEBP_PLAYBACK?
 3. JXL, AVIF and HEIF frames: keep their own depth (flag 0; RGB16/RGBA16 reaches PNG, TIFF,
    JXL, JXR and JP2), or 8-bit RGBA as the viewer shows them (flag 2)?
-4. Saved output formats: convert the old positions once, or store the extension?
+4. Saved output formats: 4c8ec92's clamp keeps every stored value usable. Should the old
+   positions also be converted once, or the extension stored instead?
 5. «Color depth» on the FreeImage routes: apply it, or disable it where it does not apply?
 6. Same-name source files in one batch: add the source extension to the frame names, use one
    subfolder per source, or leave it?
 
-Suggested order: finding 1 (one character), 4, 3, then 2 with 6 and 7, then 5, then 8 to 11.
+Fixed in 4c8ec92: findings 1 and 4, and the blank-extension half of 3. Suggested order for
+the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
 
 ## How this was checked
 
@@ -405,6 +417,9 @@ Suggested order: finding 1 (one character), 4, 3, then 2 with 6 and 7, then 5, t
   the fork's TestAPI files (GIF, multi-page TIFF, ICO, MNG, JXL, AVIF, and HEIF collections,
   bursts and sequences), plus APNG, WebP and GIF files made with Pillow whose frames 2 to 4
   cover only a 55×25 rectangle.
+- Updated after pulling 4c8ec92: its five changed lines were read, and every cited line
+  number still holds. The «with `r=-2`» column of finding 1's Wine run is the line as it now
+  reads. The same dropdown run shows that a clamped 13 reads back as XPM.
 - Not run on Windows: what GDI+ and WIC do with each format. The −3/−4 outcomes in finding 2
   come from the code and from how those codecs are documented to behave. The test scripts
   were not kept.
