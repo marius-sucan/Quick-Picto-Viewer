@@ -43547,7 +43547,7 @@ PanelExtractFrames() {
 
     thisBtnHeight := createSettingsGUI(84, A_ThisFunc)
     RegAction(0, "ResizeDestFolder",, 6)
-    RegAction(0, "userExtractFramesFmt",, 2, 1, 15)
+    RegAction(0, "userExtractFramesFmt",, 2, 1, 13)
     RegAction(0, "userJpegQuality",, 2, 1, 100)
     RegAction(0, "userPDFdpi",, 2, 72, 3500)
     btnWid := 100
@@ -62020,7 +62020,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
 
       If (r=-4)
          failedFiles++
-      Else If (r=-3 || r-2)
+      Else If (r=-3 || r=-2)
          skippedFiles++
       Else If (r>=1)
          countFilez++
@@ -62505,7 +62505,7 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
       file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
 
    If (file2save="abort")
-      abandonAll := 1
+      Return -5
 
    If !file2save
       Return -3
@@ -97479,7 +97479,7 @@ MenuInvokeSHopenWith() {
 ReadSettingsAutoCropPanel(act:=0) {
     RegAction(act, "AutoCropAdaptiveMode",, 1)
     RegAction(act, "AutoCropStrongAdaptiveMode",, 1)
-    RegAction(act, "userDesireWriteFMT",, 2, 1, 16)
+    RegAction(act, "userDesireWriteFMT",, 2, 1, 13)
     RegAction(act, "ResizeDestFolder",, 6)
     RegAction(act, "ResizeUseDestDir",, 1)
     RegAction(act, "PreserveDateTimeOnSave",, 1)
@@ -99781,7 +99781,7 @@ LoadFimFile(imgPath, noBPPconv, noBMP:=0, frameu:=0, sizesDesired:=0, ByRef newB
   If (isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39, 40) && noBPPconv=0 && noBMP=0)
   {
      ; open multi-page JXL, MNG, GIF, WEBP, APNG, AVIF, HEIC and TIFFs
-     multiFlags := isVarEqualTo(GFT, 25, 37, 39, 40) ? 2 : 0
+     multiFlags := isVarEqualTo(GFT, 6, 25, 37, 39, 40) ? 2 : 0
      If (GFT=35)
         multiFlags := 1
      If (displayICC=1)
