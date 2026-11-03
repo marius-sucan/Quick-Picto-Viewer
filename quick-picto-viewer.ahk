@@ -43566,7 +43566,7 @@ PanelExtractFrames() {
     depthChoice := (currIMGdetails.HasAlpha=1) ? 1 : 2
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     ml := (PrefsLargeFonts=1) ? 190 : 150
-    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF,`nJXL, MNG, APNG or WEBP files.
+    Gui, Add, Text, x15 y15 Section, Extract frames or pages from GIF, TIFF, PDF, WEBP,`nAPNG, MNG, JXL, AVIF, HEIF or ICO files.
     Gui, Add, Text, y+7, Image output options:
     Gui, Add, Text, xp+15 y+7 w%ml% hp+6 +0x200, Render PDF pages (DPI):
     hTemp := GuiAddEdit("x+10 w" thisWid " number -multi limit4 veditF6", userPDFdpi)
@@ -43576,8 +43576,9 @@ PanelExtractFrames() {
     GuiAddEdit("x+10 w" thisWid " number -multi limit3 veditF5", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Color depth:
-    GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
+    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Fallback depth:
+    hTemp := GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
+    ToolTip2ctrl(hTemp, "PDF pages are saved at this color depth.`nOther frames and pages keep their own depth when the file format can store it;`nthis depth applies when it cannot.")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     Gui, Add, Text, xs+15 y+7 w%ml% +0x200 +hwndhTemp -wrap, File format on save:
@@ -61462,8 +61463,41 @@ FIMwidenPaletteTo8Bits(hImage) {
    Return hImage8
 }
 
-coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOriginal:=0) {
+FIMconvertToDepth(hImage, depth) {
+; a new bitmap of hImage at 32, 24, 16 [RGB555] or 8 bits [a palette, as the save panel makes it]
+   If (depth=8)
+      Return FIMpalettizeLikeSaveAs(hImage)
+   If (depth!=16)
+      Return FreeImage_ConvertTo(hImage, depth "Bits")
+
+   ; RGB555 is made from standard bitmaps only
+   If (FreeImage_GetImageType(hImage)=1)
+      Return FreeImage_ConvertTo(hImage, "16Bits555")
+
+   hFIFimgX := FreeImage_ConvertTo(hImage, "24Bits")
+   If hFIFimgX
+   {
+      r := FreeImage_ConvertTo(hFIFimgX, "16Bits555")
+      FreeImage_UnLoad(hFIFimgX)
+   }
+   Return r
+}
+
+FIMcopyICCprofile(hFrom, hTo) {
+; FreeImage's conversions leave the color profile behind; it goes with them when it suits the new pixels
+   pICC := FreeImage_GetICCProfileData(hFrom, iccSize)
+   If (pICC && hTo)
+   {
+      FreeImage_CreateICCProfile(hTo, pICC, iccSize)
+      FIMdropMismatchedICC(hTo)
+   }
+}
+
+coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOriginal:=0, fallbackLevel:=0) {
 ; recycleOriginal - 1: a file2save that already exists goes to the Recycle Bin, not deleted
+; fallbackLevel - the depth of an image the format cannot store at its own, tried before the closest one
+;                 the format allows: 1 = 32 bits, 2 = 24 bits, 3 = 16 bits [RGB555], 4 = 8 bits palette
+  Static fallbackDepths := {1:32, 2:24, 3:16, 4:8}
   Static gifOPT := "-s8-s4-s1-f1-",      ppmOPT := "-s24-f1-f9-"
        , jngOPT := "-s32-s24-f1-",       xpmOPT := "-s24-f1-"
        , jxlOPT := "-s32-s24-s16-s8-f1-f2-f6-f9-f10-f11-f12-"
@@ -61539,11 +61573,13 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    imgType := FreeImage_GetImageType(hFIFimgA, 1)
    imgIDtype := FreeImage_GetImageType(hFIFimgA)
    hdrMode := 0
+   fallbackDepth := fallbackDepths[fallbackLevel]
+   fallbackOkay := (fallbackDepth && InStr(formatDepths, "-s" fallbackDepth "-")) ? 1 : 0
    If (InStr(formatDepths, "-f" imgIDtype "-") && imgIDtype>1)
    {
       ; prevent tone-mapping HDR formats when destination can handle it
       noDepthConvert := 1
-   } Else If (varContains(formatDepths, "-f9-", "-f10-", "-f11-", "-f12-") && imgIDtype>=9)
+   } Else If (varContains(formatDepths, "-f9-", "-f10-", "-f11-", "-f12-") && imgIDtype>=9 && !fallbackOkay)
    {
       noDepthConvert := 1
       If (imgIDtype=9 || isVarEqualTo(typu, "hdr", "pfm"))
@@ -61571,6 +61607,18 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    If hdrAlpha
       FreeImage_UnLoad(hdrAlpha)
 
+   ; 16 bits greyscale [FIT_UINT16=2] reaches the 8 bits formats only by its high bytes, as the viewer shows it
+   If (!noDepthConvert && FreeImage_GetImageType(hFIFimgA)=2)
+   {
+      hFIFimgX := FreeImage_ConvertTo(hFIFimgA, "8Bits")
+      If hFIFimgX
+      {
+         FIMcopyICCprofile(hFIFimgA, hFIFimgX)
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgX
+      }
+   }
+
    If (FileExist(file2save) && hFIFimgA)
    {
       Try FileSetAttrib, -R, % file2save
@@ -61592,6 +61640,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
       hFIFimgX := trFreeImage_Rescale(hFIFimgA, imgW, imgH, resizeFilter)
       If hFIFimgX
       {
+         FIMcopyICCprofile(hFIFimgA, hFIFimgX)
          FreeImage_UnLoad(hFIFimgA)
          hFIFimgA := hFIFimgX
          FimBuffer := DestroyMemoryBuffer(FimBuffer)
@@ -61619,13 +61668,15 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    ; MsgBox, % objDepth "|" userGivenDepth "|" typu
    highestDepth := Trim(formatDepths, "-")
    highestDepth := SubStr(highestDepth, 2, InStr(highestDepth, "-") - 1)
-   objDepthOkay := InStr(formatDepths, "-s" objDepth "-") ? 1 : 0
+   ; only standard bitmaps go by their bits; an image of another type has, once tone mapped, no depth of its own left
+   objDepthOkay := (FreeImage_GetImageType(hFIFimgA)=1 && InStr(formatDepths, "-s" objDepth "-") && !(fallbackOkay && imgIDtype>1)) ? 1 : 0
    ; the TIFF writer keeps the transparency of palette images at 8 bits only
    If (typu="TIFF" && objDepth<8 && FreeImage_IsTransparent(hFIFimgA))
    {
       hFIFimgW := FIMwidenPaletteTo8Bits(hFIFimgA)
       If hFIFimgW
       {
+         FIMcopyICCprofile(hFIFimgA, hFIFimgW)
          FreeImage_UnLoad(hFIFimgA)
          hFIFimgA := hFIFimgW
          objDepth := 8, objDepthOkay := 1
@@ -61642,6 +61693,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, hdrMode)
          If hFIFimgB
          {
+            FIMcopyICCprofile(hFIFimgA, hFIFimgB)
             r := FreeImage_Save(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
@@ -61649,6 +61701,19 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
       {
          ; the WIC buffer is freed at the end: a failed save goes on to the fallbacks, which still read hFIFimgA
          r := FreeImage_Save(hFIFimgA, file2save, saveArg)
+      }
+   }
+
+   If ((!r || r="w") && fallbackOkay)
+   {
+      savedMode := "FALLBACK"
+      changeMcursor()
+      hFIFimgB := FIMconvertToDepth(hFIFimgA, fallbackDepth)
+      If hFIFimgB
+      {
+         FIMcopyICCprofile(hFIFimgA, hFIFimgB)
+         r := FreeImage_Save(hFIFimgB, file2save, saveArg)
+         FreeImage_UnLoad(hFIFimgB)
       }
    }
 
@@ -61673,6 +61738,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "24Bits")
          If hFIFimgB
          {
+            FIMcopyICCprofile(hFIFimgA, hFIFimgB)
             r := FreeImage_Save(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
@@ -61682,6 +61748,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "32Bits")
          If hFIFimgB
          {
+            FIMcopyICCprofile(hFIFimgA, hFIFimgB)
             r := FreeImage_Save(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
@@ -61948,7 +62015,7 @@ convert2format(givenIndex) {
 batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    labelu := (pdfTextMode=1) ? "text page" : "frame"
    alabelu := (pdfTextMode=1) ? "PDFs" : "images"
-   thisRegEX := (pdfTextMode=1) ? "i)(.\.pdf)$" : StrReplace(multiPageAnimTypesRegEx, "|avif", "|avif|pdf|tif|tiff")
+   thisRegEX := (pdfTextMode=1) ? "i)(.\.pdf)$" : StrReplace(multiPageAnimTypesRegEx, "|avif", "|avif|pdf|tif|tiff|ico")
    filesElected := getSelectedFiles(0, 1)
    showTOOLtip("Extracting " labelu "s from " groupDigits(filesElected) " files, please wait")
    prevMSGdisplay := A_TickCount
@@ -62049,304 +62116,26 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       quickBarOpenResult(ResizeDestFolder)
 }
 
-coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
-   extractedFrames := failedFrames := FimBuffer := abandonAll := 0
-   GFT := FreeImage_GetFileType(imgPath)
-   multiFlags := (GFT=25) ? 2 : 0
-   hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
-   If (StrLen(hMultiBMP)>1)
+coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+; Extracts the pages and frames of the multi-page formats FreeImage reads, GIF aside, as the viewer
+; shows them: animations come composed by their PLAYBACK flags. Each page keeps the depth its file
+; stores when the output format holds it. Returns -1 when FreeImage cannot open the file.
+   extractedFrames := failedFrames := abandonAll := 0
+   hMultiBMP := combineFimOpenPages(imgPath, GFT, tFrames, 1)
+   If !hMultiBMP
+      Return (tFrames=1) ? -2 : -1   ; a single page is nothing to extract, the answer the other routes give as well
+
+   ; composed frames arrive at 32 bits; the depth the file stores comes from its first page header,
+   ; or from each page of an icon file [FIF_ICO=1], whose pages are separate images
+   If (GFT!=18)   ; FIF_TIFF pages arrive as stored
    {
-      hasOpenedMulti := 1
-      tFrames := FreeImage_GetPageCount(hMultiBMP)
-      If (tFrames<2)
+      hHeads := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, 0x8000)   ; FIF_LOAD_NOPIXELS
+      fileDepth := FIMpageDepthClass(hHeads, 0)
+      If (GFT!=1 && hHeads)
       {
-         tFrames := 0 ; a single page is nothing to extract, the answer the GIF and WEBP paths give as well
-         FreeImage_CloseMultiBitmap(hMultiBMP, 0)
-         Return -2
+         FreeImage_CloseMultiBitmap(hHeads, 0)
+         hHeads := ""
       }
-
-      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-      If (inLoop!=1)
-      {
-         showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
-         doStartLongOpDance()
-      }
-      If !bonusMsg
-         bonusMsg := ""
-
-      Loop, % tFrames
-      {
-         file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
-         If (determineTerminateOperation()=1)
-         {
-            abandonAll := 1
-            Break
-         }
-
-         If (A_TickCount - prevMSGdisplay>3000)
-         {
-            showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
-            prevMSGdisplay := A_TickCount
-         }
-
-         If (FileExist(file2save) && !FolderExist(file2save))
-            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
-
-         If (file2save="abort")
-         {
-            abandonAll := 1
-            Break
-         } Else If !file2save
-            Continue
-
-         frameu := A_Index - 1
-         If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1)
-         {
-            ; use WIC loader to extract the TIF pages to not miss on color management
-            z := loadWICasFreeImage(imgPath, frameu, userPerformColorManagement)
-            hFIFimgA := z[1]
-            FimBuffer := z[2]
-         }
-
-         If !hFIFimgA
-         {
-            hPage := FreeImage_LockPage(hMultiBMP, frameu)
-            If (hPage!="")
-            {
-               hFIFimgA := FreeImage_Clone(hPage)
-               FreeImage_UnlockPage(hMultiBMP, hPage, 0)
-            } Else hFIFimgA := ""
-         }
-
-         ; msgbox, % a_thisfunc "=" totalFramesIndex "==" desiredFrameIndex
-         If !hFIFimgA
-         {
-            failedFrames++
-            Continue
-         }
-
-         FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
-         If (!imgW || !imgH || imgW=1 && imgH=1)
-         {
-            FreeImage_UnLoad(hFIFimgA)
-            hFIFimgA := ""   ; otherwise the next page reuses the freed handle instead of locking its own
-            FimBuffer := DestroyMemoryBuffer(FimBuffer)
-            failedFrames++
-            Continue
-         }
-
-         If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
-         {
-            capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
-            hFIFimgB := trFreeImage_Rescale(hFIFimgA, imgW, imgH)
-            If hFIFimgB
-            {
-               FreeImage_UnLoad(hFIFimgA)
-               FimBuffer := DestroyMemoryBuffer(FimBuffer)
-               rz := coreConvertImgFormat(imgPath, file2save, hFIFimgB)
-            } Else
-            {
-               rz := "err"
-               FreeImage_UnLoad(hFIFimgA)
-            }
-         } Else rz := coreConvertImgFormat(imgPath, file2save, hFIFimgA)
-
-         ; FreeImage_UnLoad(hFIFimgA) object discarded by coreConvertImgFormat()
-         FimBuffer := DestroyMemoryBuffer(FimBuffer)
-         hFIFimgA := ""
-         If rz
-            failedFrames++
-         Else 
-            extractedFrames++
-      }
-
-      ; ToolTip, % hasMultiTrans "==" frameu "==" frameu , , , 2
-      FreeImage_CloseMultiBitmap(hMultiBMP, 0)
-      If (inLoop!=1)
-         ResetImgLoadStatus()
-
-      Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
-   } Else Return -1
-}
-
-readWEBPuint24(pData, offsetu) {
-; The WEBP container stores its geometry as 24 bits little endian integers.
-   Return NumGet(pData + 0, offsetu, "UChar") | (NumGet(pData + 0, offsetu + 1, "UChar") << 8) | (NumGet(pData + 0, offsetu + 2, "UChar") << 16)
-}
-
-parseWEBPanimation(imgPath, ByRef canvasW, ByRef canvasH) {
-; Walks the RIFF container of a .webp file and returns one object per ANMF chunk: .x and .y
-; place the frame on the canvas, .w and .h are the area it covers, .blend says whether it is
-; alpha blended over what is already there (1) or replaces that rectangle outright (0), and
-; .dispose says whether the rectangle goes back to transparent once the frame has been shown.
-; Returns "" for anything that is not an animation; a still WEBP carries no ANMF chunk at all.
-;
-; The geometry has to come from the container because no decoder hands it over: WIC returns
-; every ANMF payload as a bitmap of its own, with no hint of where it belongs on the canvas.
-; Only the chunk headers are read here, the encoded frames themselves are seeked over.
-
-   canvasW := canvasH := nFrames := 0
-   f := FileOpen(imgPath, "r")
-   If !IsObject(f)
-      Return ""
-
-   fLen := f.Length
-   VarSetCapacity(chunku, 32, 0)
-   If (f.RawRead(chunku, 12)!=12 || NumGet(chunku, 0, "UInt")!=0x46464952 || NumGet(chunku, 8, "UInt")!=0x50424557)
-   {
-      f.Close()   ; the file does not even open with RIFF .... WEBP
-      Return ""
-   }
-
-   frames := []
-   While (f.Pos + 8 <= fLen)
-   {
-      If (f.RawRead(chunku, 8)!=8)
-         Break
-
-      fourCC := NumGet(chunku, 0, "UInt")
-      chunkSize := NumGet(chunku, 4, "UInt")
-      payloadPos := f.Pos
-      If (chunkSize>fLen)
-         Break   ; a corrupt length would walk the reader past the end of the file
-
-      If (fourCC=0x58385056 && chunkSize>=10)          ; VP8X, carries the canvas size
-      {
-         If (f.RawRead(chunku, 10)=10)
-         {
-            canvasW := readWEBPuint24(&chunku, 4) + 1
-            canvasH := readWEBPuint24(&chunku, 7) + 1
-         }
-      } Else If (fourCC=0x464D4E41 && chunkSize>=16)   ; ANMF, one animation frame
-      {
-         If (f.RawRead(chunku, 16)=16)
-         {
-            ; the offsets are stored halved and the sizes decremented; the last byte holds
-            ; the blending method in bit 1 and the disposal method in bit 0
-            flagsu := NumGet(chunku, 15, "UChar")
-            thisFrame := []
-            thisFrame.x := readWEBPuint24(&chunku, 0) * 2
-            thisFrame.y := readWEBPuint24(&chunku, 3) * 2
-            thisFrame.w := readWEBPuint24(&chunku, 6) + 1
-            thisFrame.h := readWEBPuint24(&chunku, 9) + 1
-            thisFrame.blend := (flagsu & 2) ? 0 : 1
-            thisFrame.dispose := (flagsu & 1) ? 1 : 0
-            nFrames++
-            frames[nFrames] := thisFrame
-         }
-      }
-
-      If (nFrames>65500)
-         Break   ; no animation has this many frames
-
-      f.Seek(payloadPos + chunkSize + (chunkSize & 1), 0)   ; chunks are padded to an even length
-   }
-
-   f.Close()
-   If (!canvasW || !canvasH || !nFrames)
-      Return ""
-
-   Return frames
-}
-
-compositeWEBPframeOnCanvas(canvasBMP, frameBMP, frameInfo) {
-; Draws one decoded animation frame onto the canvas, where the container says it belongs.
-; Blending method 1 alpha blends it over whatever the previous frames left there; 0 replaces
-; the rectangle outright, alpha included, which is what GDI+ calls SourceCopy.
-
-   Gu := trGdip_GraphicsFromImage(A_ThisFunc, canvasBMP, 5)   ; nearest neighbour: the blit is 1:1
-   If !Gu
-      Return
-
-   Gdip_SetCompositingMode(Gu, (frameInfo.blend=1) ? 0 : 1)
-   trGdip_DrawImage(A_ThisFunc, Gu, frameBMP, frameInfo.x, frameInfo.y)
-   Gdip_DeleteGraphics(Gu)
-}
-
-disposeWEBPframeArea(canvasBMP, frameInfo) {
-; Applies the frame's disposal method once the frame has been written out: method 1 returns
-; the rectangle it occupied to transparent, ready for the frame that follows. The container
-; may name a background colour, but browsers and libwebp's own decoder both clear animated
-; WEBPs to transparent instead, so the frames extracted here match what a viewer shows.
-
-   If (frameInfo.dispose!=1)
-      Return
-
-   Gu := trGdip_GraphicsFromImage(A_ThisFunc, canvasBMP)
-   If !Gu
-      Return
-
-   pBrushu := Gdip_BrushCreateSolid(0x00000000)
-   Gdip_SetCompositingMode(Gu, 1)
-   Gdip_FillRectangle(Gu, pBrushu, frameInfo.x, frameInfo.y, frameInfo.w, frameInfo.h)
-   Gdip_DeleteBrush(pBrushu)
-   Gdip_DeleteGraphics(Gu)
-}
-
-coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
-   failedFrames := extractedFrames := abandonAll := doComposite := 0
-   thisImgQuality := (userimgQuality=1) ? 6 : 5
-   sizesDesired := []
-   sizesDesired[1] := [32750, 32750, 1, 0, thisImgQuality]
-   If !bonusMsg
-      bonusMsg := ""
-
-   ; every LoadWICimage() below overwrites mainLoadedIMGdetails, which describes the image the
-   ; viewport has open; the caller's copy goes back in place through each of the exits below
-   backupIMGdetails := mainLoadedIMGdetails.Clone()
-
-   ; WIC hands over each animation frame on its own, so an animated WEBP has to be composed
-   ; here; the container is the only thing that says where a frame belongs on the canvas
-   animFrames := parseWEBPanimation(imgPath, canvasW, canvasH)
-   probeFrame := 1
-   If IsObject(animFrames)
-   {
-      doComposite := 1
-      tFrames := animFrames.MaxIndex()
-      ; the first frame the container declares smaller than the canvas is the one that tells
-      ; a raw payload apart from one a decoder has already placed on the canvas itself
-      Loop, % tFrames
-      {
-         If (animFrames[A_Index].w!=canvasW || animFrames[A_Index].h!=canvasH)
-         {
-            probeFrame := A_Index
-            Break
-         }
-      }
-   }
-
-   ; the probe doubles as the check that the file decodes at all
-   oBitmap := LoadWICimage(imgPath, 0, probeFrame - 1, userPerformColorManagement, sizesDesired)
-   If !validBMP(oBitmap)
-   {
-      mainLoadedIMGdetails := backupIMGdetails
-      Return -4
-   }
-
-   trGdip_GetImageDimensions(oBitmap, imgW, imgH)
-   trGdip_DisposeImage(oBitmap)
-   wicFrames := mainLoadedIMGdetails.Frames + 1   ; .Frames is the index of the last frame, not the count
-   If (doComposite=1 && wicFrames!=tFrames)
-   {
-      ; the parser and the decoder disagree about this file, so the decoder wins - but the frames then go out uncomposed
-      addJournalEntry(A_ThisFunc "(): the WEBP container declares " tFrames " animation frames while the decoder reports " wicFrames ". Extracting the decoder's frames uncomposed:`n" imgPath)
-      doComposite := 0
-   }
-
-   If (doComposite=1 && imgW=canvasW && imgH=canvasH && (animFrames[probeFrame].w!=canvasW || animFrames[probeFrame].h!=canvasH))
-   {
-      ; the decoder placed the frame on the canvas itself, so there is nothing left to compose
-      addJournalEntry(A_ThisFunc "(): the WEBP decoder composes the animation frames itself; extracting them as they arrive:`n" imgPath)
-      doComposite := 0
-   }
-
-   If (doComposite!=1)
-      tFrames := wicFrames
-
-   If (tFrames<2)
-   {
-      mainLoadedIMGdetails := backupIMGdetails
-      Return -2
    }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
@@ -62355,17 +62144,12 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
       doStartLongOpDance()
    }
-
-   If (doComposite=1)
-   {
-      ; a fresh 32 bits canvas comes up fully transparent, which is where an animation starts
-      canvasBMP := trGdip_CreateBitmap(A_ThisFunc, canvasW, canvasH, highDesiredPixFmt)
-      If !validBMP(canvasBMP)
-         doComposite := 0
-   }
+   If !bonusMsg
+      bonusMsg := ""
 
    Loop, % tFrames
    {
+      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -62378,7 +62162,6 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          prevMSGdisplay := A_TickCount
       }
 
-      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
 
@@ -62386,65 +62169,151 @@ coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       {
          abandonAll := 1
          Break
+      } Else If !file2save
+         Continue
+
+      hFIFimgA := ""
+      hPage := FreeImage_LockPage(hMultiBMP, A_Index - 1)
+      If hPage
+      {
+         FreeImage_GetImageDimensions(hPage, imgW, imgH)
+         If (imgW>0 && imgH>0 && !(imgW=1 && imgH=1))
+         {
+            If (GFT!=18)
+               hFIFimgA := FIMfitFrameToFileDepth(hPage, hHeads ? FIMpageDepthClass(hHeads, A_Index - 1) : fileDepth)
+            If !hFIFimgA
+               hFIFimgA := FreeImage_Clone(hPage)
+         }
+         FreeImage_UnlockPage(hMultiBMP, hPage, 0)
       }
 
-      nBitmap := LoadWICimage(imgPath, 0, A_Index - 1, userPerformColorManagement, sizesDesired)   ; frames are counted from 0, the files from 1
-      If !validBMP(nBitmap)
+      If !hFIFimgA
       {
          failedFrames++
-      } Else
-      {
-         If (doComposite=1)
-            compositeWEBPframeOnCanvas(canvasBMP, nBitmap, animFrames[A_Index])
-
-         If file2save
-         {
-            sBitmap := (doComposite=1) ? trGdip_CloneBitmapArea(A_ThisFunc, canvasBMP, 0, 0, canvasW, canvasH) : nBitmap
-            If !validBMP(sBitmap)
-            {
-               failedFrames++
-            } Else
-            {
-               trGdip_GetImageDimensions(sBitmap, imgW, imgH)
-               If FileExist(file2save)
-                  FileSetAttrib, -R, % file2save
-
-               If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
-               {
-                  capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
-                  kBitmap := trGdip_ResizeBitmap(A_ThisFunc, sBitmap, imgW, imgH, 1)
-                  If validBMP(kBitmap)
-                  {
-                     r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-                     kBitmap := trGdip_DisposeImage(kBitmap)
-                  } Else r := 1
-               } Else r := QPV_SaveImageFile(A_ThisFunc, sBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-
-               If r
-                  failedFrames++
-               Else
-                  extractedFrames++
-
-               If (sBitmap!=nBitmap)
-                  sBitmap := trGdip_DisposeImage(sBitmap)
-            }
-         }
-
-         nBitmap := trGdip_DisposeImage(nBitmap)
+         Continue
       }
 
-      If (doComposite=1)
-         disposeWEBPframeArea(canvasBMP, animFrames[A_Index])
+      ; hFIFimgA is discarded by coreConvertImgFormat()
+      If coreConvertImgFormat(imgPath, file2save, hFIFimgA, 0, 0, userSaveBitsDepth)
+         failedFrames++
+      Else
+         extractedFrames++
    }
 
-   If canvasBMP
-      canvasBMP := trGdip_DisposeImage(canvasBMP)
-
-   mainLoadedIMGdetails := backupIMGdetails
+   If hHeads
+      FreeImage_CloseMultiBitmap(hHeads, 0)
+   FreeImage_CloseMultiBitmap(hMultiBMP, 0)
    If (inLoop!=1)
       ResetImgLoadStatus()
 
    Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
+}
+
+FIMpageDepthClass(hMultiBMP, page) {
+; What a page holds as its file stores it, read from the page header: "grey", "palette", "rgb"
+; or "rgba", whatever the bits per channel; blank when the page cannot be read
+   hPage := hMultiBMP ? FreeImage_LockPage(hMultiBMP, page) : ""
+   If !hPage
+      Return
+
+   imgType := FreeImage_GetImageType(hPage)
+   bpp := FreeImage_GetBPP(hPage)
+   If isInRange(imgType, 2, 8)   ; FIT_UINT16 to FIT_COMPLEX: one channel
+      r := "grey"
+   Else If isVarEqualTo(imgType, 10, 12)   ; FIT_RGBA16, FIT_RGBAF
+      r := "rgba"
+   Else If (imgType!=1 || bpp=16 || bpp=24)   ; FIT_RGB16, FIT_RGBF
+      r := "rgb"
+   Else If (bpp=32)
+      r := "rgba"
+   Else
+      r := (FreeImage_GetColorType(hPage, 0)<=1) ? "grey" : "palette"   ; FIC_MINISWHITE = 0, FIC_MINISBLACK = 1
+
+   FreeImage_UnlockPage(hMultiBMP, hPage, 0)
+   Return r
+}
+
+FIMfitFrameToFileDepth(hImage, fileDepth) {
+; A frame composed at 32 bits, at the depth its file stores when that loses nothing: 8 bits for the
+; opaque frames of palette or grey files with up to 256 colors, 24 bits for the other opaque frames
+; of files without alpha. fileDepth comes from FIMpageDepthClass(). Returns a new bitmap with
+; the color profile of hImage, or nothing when hImage stays as it is.
+   If (fileDepth="" || fileDepth="rgba" || FreeImage_GetImageType(hImage)!=1 || FreeImage_GetBPP(hImage)!=32)
+      Return
+
+   If (FreeImage_GetColorType(hImage, 0)!=2)   ; FIC_RGB: every pixel is opaque
+      Return
+
+   If (fileDepth!="rgb")
+   {
+      hFit := FreeImage_ColorQuantize(hImage, 2)   ; FIQ_LFPQUANT: the exact palette, for up to 256 colors only
+      If (hFit && fileDepth="grey" && FIMhasGreyPalette(hFit))
+      {
+         hGrey := FreeImage_ConvertToGreyscale(hFit)
+         If hGrey
+         {
+            FreeImage_UnLoad(hFit)
+            hFit := hGrey
+         }
+      }
+   }
+
+   If !hFit
+      hFit := FreeImage_ConvertTo(hImage, "24Bits")
+
+   FIMcopyICCprofile(hImage, hFit)
+   Return hFit
+}
+
+FIMhasGreyPalette(hImage) {
+   pPalette := FreeImage_GetPalette(hImage)
+   If !pPalette
+      Return 0
+
+   Loop, % FreeImage_GetColorsUsed(hImage)
+   {
+      c := NumGet(pPalette + 0, (A_Index - 1)*4, "UInt")   ; RGBQUAD: blue, green, red
+      If ((c & 0xFF)!=((c >> 8) & 0xFF) || (c & 0xFF)!=((c >> 16) & 0xFF))
+         Return 0
+   }
+   Return 1
+}
+
+saveExtractedGdipFrame(funcu, pBitmap, file2save, imgPath:="", fileDepth:="") {
+; Saves a frame or page drawn on a GDI+ bitmap; returns 0 on success. With the depth its file stores,
+; see FIMpageDepthClass(), the frame keeps that depth when nothing is lost and the output format holds
+; it, else it takes the «Fallback depth». PDF pages, and every frame when FreeImage is missing, are
+; saved at the «Fallback depth».
+   If (fileDepth && wasInitFIMlib=1)
+   {
+      hFIFimgA := ConvertPBITMAPtoFIM(pBitmap)
+      If !hFIFimgA
+         Return 1
+
+      hFIFimgB := FIMfitFrameToFileDepth(hFIFimgA, fileDepth)
+      If hFIFimgB
+      {
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgB
+      }
+
+      ; hFIFimgA is discarded by coreConvertImgFormat()
+      Return coreConvertImgFormat(imgPath, file2save, hFIFimgA, 0, 0, userSaveBitsDepth) ? 1 : 0
+   }
+
+   trGdip_GetImageDimensions(pBitmap, imgW, imgH)
+   fmt := saveImgFormatsList[userExtractFramesFmt]
+   If !isImgSizeTooLarge(imgW, imgH, fmt)
+      Return QPV_SaveImageFile(funcu, pBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+
+   capIMGdimensionsFormatlimits(fmt, 1, imgW, imgH)
+   kBitmap := trGdip_ResizeBitmap(funcu, pBitmap, imgW, imgH, 1)
+   If !validBMP(kBitmap)
+      Return 1
+
+   r := QPV_SaveImageFile(funcu, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+   trGdip_DisposeImage(kBitmap)
+   Return r
 }
 
 coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
@@ -62534,19 +62403,25 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
 coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
    failedFrames := extractedFrames := 0
    imgPath := StrReplace(isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu, "||")
-   If RegExMatch(imgPath, "i)(.\.webp)$")
+   isPDF := RegExMatch(imgPath, "i)(.\.pdf)$")
+   If (!isPDF && wasInitFIMlib=1 && allowFIMloader=1)
    {
-      r := coreExtractFramesFromWEBP(imgPath, inLoop, prevMSGdisplay, bonusMsg, thisu, extracted)
-      failedFrames := thisu
-      extractedFrames := extracted
-      Return r
-   } Else If (RegExMatch(imgPath, "i)(.\.(tif|tiff))$") && wasInitFIMlib=1 && allowFIMloader=1)
-   {
-      r := coreExtractFramesFromTiff(imgPath, inLoop, prevMSGdisplay, bonusMsg, thisu, extracted)
-      extractedFrames := extracted
-      failedFrames := thisu
-      Return r
-   } Else If RegExMatch(imgPath, "i)(.\.pdf)$")
+      ; routed by content: an APNG may be named .png, and GIF frames come from GDI+
+      GFT := FreeImage_GetFileType(imgPath)
+      If isVarEqualTo(GFT, 1, 6, 18, 35, 37, 38, 39, 40)   ; FIF_ICO, FIF_MNG, FIF_TIFF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
+      {
+         r := coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, thisu, extracted)
+         extractedFrames := extracted
+         failedFrames := thisu
+         If (r!=-1)
+            Return r
+         If (GFT!=18)   ; of the files FreeImage cannot open, GDI+ reads only TIFF ones
+            Return -4
+      } Else If (GFT>=0 && GFT!=25)   ; FIF_GIF; GDI+ finds frames in GIF and TIFF files only
+         Return -3
+   }
+
+   If isPDF
    {
       extractedFrames := 0
       pwd := PDFpwdsCache[imgPath]
@@ -62616,18 +62491,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Continue
          }
 
-         trGdip_GetImageDimensions(oBitmap, imgW, imgH)
-         If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
-         {
-            capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
-            kBitmap := trGdip_ResizeBitmap(A_ThisFunc, oBitmap, imgW, imgH, 1)
-            If validBMP(kBitmap)
-            {
-               r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-               trGdip_DisposeImage(kBitmap)
-            } Else r := 1
-         } Else r := QPV_SaveImageFile(A_ThisFunc, oBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-
+         r := saveExtractedGdipFrame(A_ThisFunc, oBitmap, file2save)
          oBitmap := trGdip_DisposeImage(oBitmap)
          If r
             failedFrames++
@@ -62648,6 +62512,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
    If RegExMatch(rawFmt, "i)(gif|tiff)$")
    {
+      isGIF := RegExMatch(rawFmt, "i)gif$")
       tFrames := Gdip_GetBitmapFramesCount(oBitmap)
       If (tFrames<2)
       {
@@ -62693,6 +62558,15 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             FileSetAttrib, -R, % file2save
 
          Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)
+         ; the frame is drawn at 32 bits; the depth of the file it comes from decides the one it is saved at
+         If isGIF
+            fileDepth := "palette"
+         Else
+         {
+            pf := Gdip_GetImagePixelFormat(oBitmap, 2)
+            fileDepth := InStr(pf, "INDEXED") ? "palette" : InStr(pf, "GRAY") ? "grey" : InStr(pf, "ARGB") ? "rgba" : "rgb"
+         }
+
          trGdip_GetImageDimensions(oBitmap, imgW, imgH)
          nBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH)
          If !validBMP(nBitmap)
@@ -62711,18 +62585,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
          trGdip_DrawImage(A_ThisFunc, Gu, oBitmap)
          Gdip_DeleteGraphics(Gu)
-         trGdip_GetImageDimensions(nBitmap, imgW, imgH)
-         If isImgSizeTooLarge(imgW, imgH, saveImgFormatsList[userExtractFramesFmt])
-         {
-            capIMGdimensionsFormatlimits(saveImgFormatsList[userExtractFramesFmt], 1, imgW, imgH)
-            kBitmap := trGdip_ResizeBitmap(A_ThisFunc, nBitmap, imgW, imgH, 1)
-            If validBMP(kBitmap)
-            {
-               r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-               trGdip_DisposeImage(kBitmap)
-            } Else r := 1
-         } Else r := QPV_SaveImageFile(A_ThisFunc, nBitmap, file2save, userJpegQuality, userSaveBitsDepth)
-
+         r := saveExtractedGdipFrame(A_ThisFunc, nBitmap, file2save, imgPath, fileDepth)
          trGdip_DisposeImage(nBitmap)
          If r
             failedFrames++
@@ -63322,15 +63185,17 @@ combineImgsTempFile(destFilePath) {
    }
 }
 
-combineFimOpenPages(imgPath, GFT, ByRef tPages) {
+combineFimOpenPages(imgPath, GFT, ByRef tPages, withIcons:=0) {
 ; Opens a file of several pages or frames, to be read one page at a time. Returns nothing
-; for a file of one page, or of a format FreeImage does not read by pages.
+; for a file of one page, then tPages is 1, or of a format FreeImage does not read by pages.
+; withIcons=1 opens ICO files [FIF_ICO=1] too, one page per icon.
    tPages := 0
-   If !isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39, 40)   ; FIF_MNG, FIF_TIFF, FIF_GIF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
+   If !(isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39, 40) || withIcons=1 && GFT=1)   ; FIF_MNG, FIF_TIFF, FIF_GIF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
       Return
 
-   ; animations are read as they are played: WEBP_PLAYBACK = 1, GIF/APNG/MNG/AVIF/HEIF_PLAYBACK = 2
-   multiFlags := (GFT=18) ? 0 : (GFT=35) ? 1 : 2
+   ; animations are read as they are played: WEBP_PLAYBACK = 1, GIF/APNG/MNG/AVIF/HEIF/JXL_PLAYBACK = 2;
+   ; icons as they are shown: ICO_MAKEALPHA = 1 gives those under 32 bits the transparency of their mask
+   multiFlags := (GFT=18) ? 0 : (GFT=35 || GFT=1) ? 1 : 2
    hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
    If hMultiBMP
    {
@@ -63341,7 +63206,7 @@ combineFimOpenPages(imgPath, GFT, ByRef tPages) {
       FreeImage_CloseMultiBitmap(hMultiBMP, 0)
    }
 
-   tPages := 0
+   tPages := (tPages=1) ? 1 : 0
 }
 
 combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) {
