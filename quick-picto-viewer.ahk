@@ -44861,7 +44861,7 @@ saveQualityTip(inSavePanel:=0) {
 
 btnHelpSaveImgPanel() {
    If (AnyWindowOpen=84)
-      f := "`n `nWhen pages are extracted from TIFF(s), QPV will attempt to preserve the original color depth, if the destination file format allows it."
+      f := "`n `nExtracted frames and pages keep the color depth of the file they come from, when the destination file format allows it and nothing is lost; otherwise the «Fallback depth» applies. PDF pages are always saved at the «Fallback depth»."
    p := (AnyWindowOpen!=15) ? "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use" : "`n`nGIF files use"
    p .= " a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
    pj := (AnyWindowOpen=15) ? "Progressive JPEG files («P»)" : "Progressive JPEG files"
