@@ -44728,7 +44728,8 @@ PanelSaveImg() {
     GuiAddDropDownList("x+10 w" thisWid " AltSubmit gUIsaveFormatOptionsChanged Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]" bonusChoice, "Color depth")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
-    GuiAddPaletteOptions("xs+15 y+8 w" thisWid, "x+20")
+    GuiAddPaletteDithering("xs+15 y+8 w" thisWid)
+    GuiAddPaletteTransparency("x+20")
     Gui, Add, Text, xs y+10, Image file status
     ; Gui, Add, Text, xs y+0 wp h2 +0x1007, 
     Gui, Add, Text, xp+15 y+7 w%txtWid% -wrap, % "File size: " fileSizu FileDateM "`n" fileStatus
@@ -44755,43 +44756,75 @@ PanelSaveImg() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Save image file: " appTitle)
 }
 
-GuiAddSaveFormatOptions(firstPos, paletteInSlots:=0) {
-; Adds the file format options in two slots, beginning at firstPos [Gui option string]. The controls
-; of all the formats overlap; updateSaveFormatOptions() shows those of the chosen format.
-; paletteInSlots - 1: the slots also hold the GIF palette options, see updateConverterFormatOptions()
+GuiAddSaveFormatOptions(firstPos) {
+; Adds the file format options of the «Save image» panel in two slots, beginning at firstPos [Gui option string].
+; The controls of all the formats overlap; updateSaveFormatOptions() shows those of the chosen format.
     Global uiSaveFmtNoOptions
-    slotW := (PrefsLargeFonts=1) ? 190 : 140
-    slot2W := (PrefsLargeFonts=1) ? 135 : 95
-    GuiAddDropDownList(firstPos " w" slotW " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", "1/4 color details|1/2 color details (recommended)|1/1 full color details", "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
-    GuiAddDropDownList("xp yp wp AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
-    Gui, Add, Checkbox, xp yp wp hp gUIsaveFormatOptionsChanged Checked%userSaveImgLossless% vuserSaveImgLossless +hwndhTemp, Lossless save
-    ToolTip2ctrl(hTemp, "Screenshots and graphics often yield smaller files when saved with «Lossless» activated.")
+    GuiAddJpegSubsampling(firstPos " w" ((PrefsLargeFonts=1) ? 190 : 140))
+    GuiAddSaveCompressionLvl("xp yp wp")
+    GuiAddSaveLossless("xp yp wp hp")
     Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
-    Gui, Add, Checkbox, x+5 yp w%slot2W% hp gUIsaveFormatOptionsChanged Checked%userJpegProgressive% vuserJpegProgressive +hwndhTemp, Progressive
-    ToolTip2ctrl(hTemp, "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller.")
-    slot2W := (PrefsLargeFonts=1) ? 85 : 50
-    GuiAddDropDownList("xp yp w" slot2W " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
-    If (paletteInSlots=1)
-       GuiAddPaletteOptions("xp-" (slotW + 5) " yp w" slotW " hp", "x+5 yp hp")
+    GuiAddJpegProgressive("x+5 yp w" ((PrefsLargeFonts=1) ? 135 : 95) " hp")
+    GuiAddJxlEffort("xp yp w" ((PrefsLargeFonts=1) ? 85 : 50))
 }
 
-GuiAddPaletteOptions(pos1, pos2) {
-; the «Dithering» and «Keep transparency» checkboxes of the 256 colors palette, at pos1 and pos2 [Gui option strings]
-    Gui, Add, Checkbox, % pos1 " gUIsaveFormatOptionsChanged Checked" userPaletteDithering " vuserPaletteDithering +hwndhTemp", Dithering
+; the file format option controls, each placed at pos [Gui option string] by the «Save image» panel and by the format converter
+GuiAddJpegSubsampling(pos, listu:="") {
+    If !listu
+       listu := "1/4 color details|1/2 color details (recommended)|1/1 full color details"
+    GuiAddDropDownList(pos " AltSubmit gUIsaveFormatOptionsChanged Choose" userJpegSubsampling " vuserJpegSubsampling", listu, "JPEG chroma subsampling", "JPEG chroma subsampling: the resolution at which the colors are stored.`n1/4 | 4:2:0 - a quarter of the image resolution: the smallest files.`n1/2 | 4:2:2 - half of the horizontal resolution.`n1/1 | 4:4:4 - full resolution: sharp colored text and lines, larger files.")
+}
+
+GuiAddSaveCompressionLvl(pos) {
+    GuiAddDropDownList(pos " AltSubmit gUIsaveFormatOptionsChanged Choose" userSaveImgCompressionLvl " vuserSaveImgCompressionLvl", "No compression|Fast compression|Normal compression|Best compression", "PNG and TIFF compression", "Lossless image format.`n`nThe compression level only trades the saving speed for the file size.`nPNG uses zlib for compression.`nTIFF: LZW is used with Fast and Normal, and ZIP Deflate for Best.`n«Best» can be very slow on large PNG photos.`nTIFFs with no compression open in more applications.")
+}
+
+GuiAddSaveLossless(pos) {
+    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userSaveImgLossless " vuserSaveImgLossless +hwndhTemp", Lossless save
+    ToolTip2ctrl(hTemp, "Screenshots and graphics often yield smaller files when saved with «Lossless» activated.")
+}
+
+GuiAddJpegProgressive(pos, toggleLabel:="") {
+; toggleLabel - a push-like button with this label replaces the «Progressive» checkbox
+    Static tip := "A progressive JPEG shows a coarse version of the image first, while it loads.`nThe files are usually a few percent smaller."
+    pos .= " gUIsaveFormatOptionsChanged Checked" userJpegProgressive " vuserJpegProgressive"
+    If toggleLabel
+    {
+       GuiAddCheckBox(pos, "Progressive", toggleLabel, "SettingsGUIA", tip)
+    } Else
+    {
+       Gui, Add, Checkbox, % pos " +hwndhTemp", Progressive
+       ToolTip2ctrl(hTemp, tip)
+    }
+}
+
+GuiAddJxlEffort(pos) {
+    GuiAddDropDownList(pos " AltSubmit gUIsaveFormatOptionsChanged Choose" userJxlEffort " vuserJxlEffort", "E-1|E-2|E-3|E-4|E-5|E-6|E-7|E-8|E-9", "JPEG XL compression effort", "JPEG XL encoder compression effort:`n1 is the fastest, 9 gives the smallest files and is much slower.`n7 is the default.")
+}
+
+GuiAddPaletteDithering(pos) {
+    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userPaletteDithering " vuserPaletteDithering +hwndhTemp", Dithering
     ToolTip2ctrl(hTemp, "GIF files and the 8 bits color depth use a palette of 256 colors.`nDithering mixes them in patterns to imitate the missing colors.`nTurn it off for screenshots, text and flat graphics.")
-    Gui, Add, Checkbox, % pos2 " gUIsaveFormatOptionsChanged Checked" userPaletteTransparency " vuserPaletteTransparency +hwndhTemp", Keep transparency
+}
+
+GuiAddPaletteTransparency(pos) {
+    Gui, Add, Checkbox, % pos " gUIsaveFormatOptionsChanged Checked" userPaletteTransparency " vuserPaletteTransparency +hwndhTemp", Keep transparency
     ToolTip2ctrl(hTemp, "For the 256 colors palette: the pixels more than half transparent become fully transparent,`nthe others opaque. GIF, PNG, TIFF and ICO files keep the transparency.")
 }
 
 updateConverterFormatOptions(fmt) {
-; updateSaveFormatOptions(), and the palette options the format converter shows for GIF
+; updateSaveFormatOptions() and the GIF palette options; «Keep transparency» takes the place of the quality slider and of its «?»
    updateSaveFormatOptions(fmt)
-   If (fmt="gif")
+   isGIF := (fmt="gif")
+   If isGIF
       GuiControl, SettingsGUIA: Hide, uiSaveFmtNoOptions
 
-   actu := (fmt="gif") ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   actu := isGIF ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userPaletteDithering
    GuiControl, % actu, userPaletteTransparency
+   actu := isGIF ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
+   GuiUpdateVisibilitySliders(actu, "userJpegQuality")
+   GuiControl, % actu, btnConvertFmtHelp
 }
 
 updateSaveFormatOptions(fmt) {
@@ -44860,8 +44893,9 @@ btnHelpSaveImgPanel() {
       f := "`n `nWhen pages are extracted from TIFF(s), QPV will attempt to preserve the original color depth, if the destination file format allows it."
    p := (AnyWindowOpen!=15) ? "`n`nThe color depth option is not applicable to all of the supported image file formats. GIF files and the 8 bits color depth use" : "`n`nGIF files use"
    p .= " a palette of 256 colors: «Dithering» mixes them in patterns to imitate the missing colors, and «Keep transparency» makes the pixels more than half transparent fully transparent."
+   pj := (AnyWindowOpen=15) ? "Progressive JPEG files («P»)" : "Progressive JPEG files"
 
-   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`nProgressive JPEG files show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always losslessly storing the image data. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "The quality applies to JPG, JNG, WEBP, JXL, JXR and JP2 files; 100 gives the best lossy quality. WEBP, JXL, JXR and JP2 files can also be saved without any loss, with the «Lossless» option; it is one option for these four formats.`n`n" pj " show a coarse version of the image first, while they load.`n`nJPEG XL compression effort: 1 is the fastest; 9 gives the smallest files and is the slowest.`n`nPNG and TIFF files are always losslessly storing the image data. The compression option for both only trades the saving speed for the file size. TIFF files use LZW at the fast and normal levels, and ZIP at the best one. PNG relies on Zlib for compression. `n`nThe file format options are set in the «Save image» panel and in the file format converter. They apply to every image file " appTitle " saves." p f, -1, 0, 0)
 }
 
 PanelBrushTool(dummy:=0, modus:=0) {
@@ -91183,7 +91217,7 @@ livePreviewColorsAdjustVP() {
 }
 
 PanelFileFormatConverter() {
-    Global btnFldr, editF5
+    Global btnFldr, editF5, btnConvertFmtHelp, uiSaveFmtNoOptions
     filesElected := getSelectedFiles(0, 1)
     initFIMGmodule()
     If !wasInitFIMlib
@@ -91220,12 +91254,20 @@ PanelFileFormatConverter() {
 
     Gui, Add, Text, xs y+10 w%sml% hp +0x200 +hwndhTemp, On file name conflicts:
     GuiAddDropDownList("x+5 w" pww " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
+    ; the options of all the formats overlap; updateConverterFormatOptions() shows those of the chosen format
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
     GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", saveQualityTip(1))
     zml := (PrefsLargeFonts=1) ? 40 : 30
-    GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel", " ?", "Help")
+    GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel vbtnConvertFmtHelp", " ?", "Help")
+    GuiAddPaletteTransparency("xp-" (pww + 5) " yp w" (pww + zml + 5) " hp")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Format options:
-    GuiAddSaveFormatOptions("x+5 yp", 1)
+    GuiAddJpegSubsampling("x+5 yp w" pww, "1/4 color|1/2 color|Full color")
+    GuiAddSaveCompressionLvl("xp yp wp")
+    GuiAddSaveLossless("xp yp wp hp")
+    GuiAddPaletteDithering("xp yp wp hp")
+    Gui, Add, Text, xp yp wp hp +0x200 Disabled vuiSaveFmtNoOptions, -
+    GuiAddJpegProgressive("x+5 yp w" zml " hp", "P")
+    GuiAddJxlEffort("xp yp w" ((PrefsLargeFonts=1) ? 85 : 50))
 
     Gui, Add, Checkbox, xs y+10 Checked%convertFormatUseMultiThreads% vconvertFormatUseMultiThreads, &Use multiple threads (experimental)
     If !(filesElected>1)
@@ -91265,7 +91307,7 @@ PanelFileFormatConverter() {
 }
 
 BTNhelpConvertImgFmt() {
-    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JNG, WEBP, JXL, JXR and JP2 file formats. The options of the destination format are shown under «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JNG, WEBP, JXL, JXR and JP2 file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
 }
 
 TglKeepOriginals() {
