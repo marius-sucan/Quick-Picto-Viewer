@@ -5,7 +5,8 @@ with the routines they hand files to: `coreExtractFramesFromTiff()` (:62052),
 `coreExtractFramesFromWEBP()` (:62286) and `coreExtractBatchModeTextsFromGivenPDF()` (:62450),
 plus `PanelExtractFrames()` (:43541) and `BTNperformExtractFrames()` (:44103), which drive them.
 Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848. They are unchanged at
-4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below.
+4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below. Findings 2 and 5
+to 8 were fixed in `6065e4f`, after Marius's decisions; see «What `6065e4f` changed on purpose».
 
 This follows the 2026-08-30 audit of the same code (report in 7a00a9c, fixes in 34ae01f). Its
 findings are not repeated; their status is in the table near the end.
@@ -34,13 +35,63 @@ findings are not repeated; their status is in the table near the end.
   and APNG, and the batch filter admits all five. The extractor sends them to GDI+, which
   cannot decode them or reads only one image. The viewer and the join-images tool read
   their frames through FreeImage, and the shipped FreeImage.dll reports every frame (finding 2).
+  **Fixed in `6065e4f`.**
 - **Multi-page files**: GIF, TIFF and PDF are extracted, and WebP where Windows has a WebP
   codec. HEIF collections, bursts and sequences, AVIF sequences, multi-size ICO files and
-  APNG are not.
+  APNG are not. **Since `6065e4f` all of them are, and WebP needs no Windows codec.**
 - Two medium defects: saved output formats point at other formats since 0a5b8e1 (finding 3,
   **partly fixed in `4c8ec92`**), and PDF text mode wrote a file named `abort` when the user
   cancelled (finding 4, **fixed in `4c8ec92`**). One medium-low: TIFF pages ignore «Color
-  depth» (finding 5). Six low or latent items follow.
+  depth» (finding 5, **fixed in `6065e4f`**). Six low or latent items follow; 6 to 8 are
+  **fixed in `6065e4f`**.
+
+## What `6065e4f` changed on purpose
+
+Marius's decisions of 2026-11-03, and what follows from them. Check here before calling any
+of it a regression.
+
+- **Routes.** `coreExtractFramesFromImage()` asks `FreeImage_GetFileType()` first, so files go
+  by content, not by extension. ICO, MNG, TIFF, WebP, AVIF, HEIF, APNG and JXL go to
+  `coreExtractFramesFromFIMfiles()`, which replaces `coreExtractFramesFromTiff()`. GIF still
+  goes to GDI+. Any other format FreeImage knows answers −3 without being decoded, so plain
+  PNGs in a batch cost nothing. A TIFF that FreeImage cannot open goes to GDI+. With FreeImage
+  missing or «Allow FreeImage loader» off, only GIF, TIFF and PDF files are extracted.
+- **Flags.** Pages open through `combineFimOpenPages()`, the join tool's opener: TIFF with no
+  flag, WebP with WEBP_PLAYBACK (1), the other animations with their PLAYBACK flag (2), ICO
+  with ICO_MAKEALPHA (1). JXL, AVIF and HEIF frames therefore arrive at 8 bits per channel,
+  as the viewer shows them. ICO is opened by pages for the extractor only (`withIcons=1`);
+  the join tool still reads the first icon.
+- **Depth.** A frame keeps its own depth when the output format holds it; otherwise it takes
+  the panel's depth, now labelled «Fallback depth» with a tooltip; otherwise the closest
+  depth the format allows. `coreConvertImgFormat()` applies this through its new
+  `fallbackLevel` parameter, which only the extractor passes.
+  - TIFF pages come from FreeImage at their stored depth; the WIC step, and its conversion
+    to sRGB, are gone. The embedded colour profile goes into the output: PNG, TIFF, JPG,
+    WebP, JXL and BMP keep it, GIF cannot.
+  - Frames composed at 32 bits go back to the depth their file stores, when nothing is lost
+    (`FIMfitFrameToFileDepth()`). The depth comes from the first page header, or from each
+    page of an ICO file. Opaque frames of files without alpha become 24 bits. Opaque frames
+    of palette or grey files with up to 256 colours become 8 bits, with an exact palette;
+    grey ones stay greyscale. Everything else stays at 32 bits, palette files with
+    transparency included.
+  - GIF frames, still drawn by GDI+, follow the palette rule: 8 bits when opaque, 32 bits
+    with transparency. PDF pages keep using the panel's depth.
+  - 1-bit pages still become the fallback depth, except in GIF output: the depth tables
+    have no 1-bit entry, and Marius chose to leave them so.
+  - A page whose pixel type the format cannot store takes the fallback depth before the
+    nearest high-depth type. A float TIFF page saved as PNG with «24 bits» is tone mapped to
+    24 bits, not written as RGB16 as the format converter does.
+- **Format converter, all callers of `coreConvertImgFormat()`.** The colour profile is kept
+  across its rescale and depth conversions, where it suits the new pixels. 16-bit greyscale
+  goes to 8-bit grey by its high bytes for formats without a 16-bit grey type, which fixes
+  finding 5 of the 2026-11-02 converter audit. Without `fallbackLevel`, the 2026-11-02
+  converter suites give the same results as before in every other case.
+- **Removed:** the WIC WebP route, `coreExtractFramesFromWEBP()`, and its helpers
+  `parseWEBPanimation()`, `compositeWEBPframeOnCanvas()`, `disposeWEBPframeArea()` and
+  `readWEBPuint24()`. WEBP_PLAYBACK composes the frames.
+- **Size caps.** The extractor no longer rescales oversized pages itself; `coreConvertImgFormat()`
+  caps them per format. This ends the 715 MPx full-size rescale on the FreeImage and GIF
+  routes. PDF pages, and frames saved without FreeImage, still go through `isImgSizeTooLarge()`.
 
 ## Format coverage
 
@@ -111,6 +162,10 @@ and `Else If (r=-2)` into one line and dropped the `=`.
 ---
 
 ## 2. JXL, APNG, MNG, AVIF and HEIC/HEIF frames are never extracted
+
+**Fixed in `6065e4f`:** files are routed by `FreeImage_GetFileType()`, and JXL, APNG
+(under either name), MNG, AVIF, HEIF, ICO, WebP and TIFF go to `coreExtractFramesFromFIMfiles()`,
+with the PLAYBACK flags. See «What `6065e4f` changed on purpose».
 
 `coreExtractFramesFromImage()` picks its route from the extension: `.webp` goes to WIC
 (:62537), `.tif`/`.tiff` to FreeImage (:62543) and `.pdf` to PDFium (:62549). Everything
@@ -238,6 +293,9 @@ never stops the batch. The frame routines all `Break` on `"abort"` and return �
 
 ## 5. TIFF pages ignore «Color depth»
 
+**Fixed in `6065e4f`:** on every route but PDF, the panel's depth, now «Fallback depth», applies
+only where the output format cannot store a page's own depth.
+
 The panel's «Color depth» (32 bits RGBA, 24 bits, 16 bits [32768 colors], 8 bits [256
 colors]) reaches `QPV_SaveImageFile()` in the WebP, PDF and GDI+ routes (:62418/:62421,
 :62626/:62629, :62721/:62724). The TIFF route saves through `coreConvertImgFormat()`
@@ -251,6 +309,9 @@ Any FreeImage route added for finding 2 inherits this if it also saves through
 ---
 
 ## 6. WebP extraction needs a WIC WebP codec; the viewer doesn't
+
+**Fixed in `6065e4f`:** WebP goes through FreeImage with WEBP_PLAYBACK, and the WIC route and
+its compositing helpers are removed.
 
 `coreExtractFramesFromWEBP()` decodes only through `LoadWICimage()` (:62319). That needs WIC
 (:101400) and a Windows WebP codec, and it ignores `allowWICloader`. The viewer and the join
@@ -271,6 +332,9 @@ have nothing left to do.
 
 ## 7. A GIF renamed to .tif gets undisposed frames while WIC is on
 
+**Fixed in `6065e4f`:** a GIF named .tif is routed to GDI+ by its content, and TIFF pages no
+longer go through WIC.
+
 `coreExtractFramesFromTiff()` opens a file whose content is a GIF with GIF_PLAYBACK (:62055,
 the 08-30 fix), then decodes every page with WIC first (:62103-62109). WIC hands over GIF
 frames as stored, so the composed FreeImage page is used only when WIC fails. This is narrow:
@@ -281,6 +345,9 @@ it needs a GIF renamed to `.tif`.
 ---
 
 ## 8. When FreeImage cannot open a .tif, nothing else is tried and the message says «undefined error»
+
+**Fixed in `6065e4f`:** a TIFF that FreeImage cannot open goes to GDI+; any other format then
+answers −4, «Failed to load the image».
 
 `coreExtractFramesFromTiff()` returns −1 when `FreeImage_OpenMultiBitmap()` fails (:62169).
 `coreExtractFramesFromImage()` returns that straight away; it never falls through to the GDI+
@@ -327,7 +394,8 @@ loops).
 - `isImgSizeTooLarge()` applies its 715.3 MPx limit (`extraLimit=1`) in the TIFF route
   (:62138) to formats that `getIMGformatLimits()` does not cap. That now includes JXL, the
   default output format. A larger page is rescaled to its own size, which is a full extra
-  copy, before it is saved.
+  copy, before it is saved. **Gone from the FreeImage and GIF routes in `6065e4f`**; PDF
+  pages, and frames saved without FreeImage, still take it.
 - «Action on file name collisions» (`OnExtractConflictOverwrite`) has no `RegAction`, so it
   goes back to «Ask user» on every start.
 
@@ -341,11 +409,11 @@ loops).
 | 4 | Progress tooltip throttle, none in single-file mode | fixed |
 | 5 | Batch frame totals | fixed |
 | 6 | The WebP route overwrote `mainLoadedIMGdetails` | fixed; the PDF route does the same, latent (finding 11) |
-| 7 | WebP frames were written as raw sub-frames | fixed by composing them; depends on WIC (finding 6) |
-| 8 | 715 MPx extra limit | open |
+| 7 | WebP frames were written as raw sub-frames | fixed by composing them; FreeImage composes them since `6065e4f` |
+| 8 | 715 MPx extra limit | open on the PDF route; gone elsewhere since `6065e4f` |
 | 9 | Collision choice not saved | open |
 | 10 | Read-only destination files | fixed |
-| 11 | GIF_PLAYBACK in the TIFF route | fixed for the FreeImage step; WIC runs first (finding 7) |
+| 11 | GIF_PLAYBACK in the TIFF route | GIF content goes to GDI+ since `6065e4f` (finding 7) |
 | 12 | `teleportWICtoFIM()` buffer leak | fixed |
 | 13 | `\|\|` marker in single-file mode | fixed (:62536) |
 
@@ -404,6 +472,18 @@ loops).
 Fixed in 4c8ec92: findings 1 and 4, and the blank-extension half of 3. Suggested order for
 the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
 
+**Marius's answers, 2026-11-03, implemented in `6065e4f`:**
+- 1: by content, for every file the FreeImage route could take.
+- 2: every multi-page format FreeImage reads, ICO included, except GIF, which stays on GDI+.
+  WebP leaves WIC. The frames are read with the PLAYBACK flags.
+- 3: settled by the PLAYBACK flags: 8 bits per channel.
+- 5: the panel's depth is a fallback: a frame's own depth first, when the output format holds
+  it, then the panel's, then the closest the format allows. For composed frames, «own» is the
+  depth the file stores, when that loses nothing. GIF frames follow it too; PDF pages do not.
+- Also decided: TIFF pages from FreeImage only, without WIC; 1-bit stays out of the depth
+  tables; ICO pages in the extractor only, not in the join tool; the label reads «Fallback
+  depth». Decisions 4 and 6 are still open.
+
 ## How this was checked
 
 - Static reading of `development` at 622f848, of `QPV DLL source code/lib/wic-loader.h`, and
@@ -423,3 +503,25 @@ the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
 - Not run on Windows: what GDI+ and WIC do with each format. The −3/−4 outcomes in finding 2
   come from the code and from how those codecs are documented to behave. The test scripts
   were not kept.
+- `6065e4f`, under Wine with AutoHotkey_H x64 and the shipped FreeImage.dll and qpvmain.dll:
+  - Both interpreters (AutoHotkey_H and stock 1.1) load the script.
+  - `coreExtractFramesFromImage()` was sliced with its call closure and run on 21 sources:
+    Pillow-made APNG (RGBA, RGB, RGB with an ICC profile, palette, palette with transparency,
+    grey), WebP (lossless RGBA, lossy RGB, still), GIF (transparent, opaque, one named .tif),
+    a TIFF with 1-bit, grey, palette, RGB, RGBA and 16-bit grey pages, an ICO and a plain
+    PNG, plus the fork's TestAPI multi-page TIFF, ICO, MNG, JXL, AVIF and HEIF files. Each ran
+    into PNG, JPG, WebP, TIFF, BMP, GIF and JXL, and into JPG, GIF, WebP, BMP and PNG with
+    «32 bits» and «8 bits».
+  - Every frame was compared with the one FreeImage composes with the PLAYBACK flags. Every
+    PNG, TIFF, BMP, lossless WebP and lossless JXL output matched. GIF output matched too,
+    except for frames of more than 256 colours and frames with transparency: Wine's GDI+
+    cannot palettize (`GdipBitmapConvertFormat` returns 6), so the Wu fallback runs and
+    drops the transparency.
+  - The depths are as listed in «What `6065e4f` changed on purpose». The sRGB profile
+    survived the 32 → 24 reduction.
+  - HEAD's code, run on the same sources, gave −3 or −4 for every APNG, JXL, AVIF, HEIF, MNG,
+    ICO and WebP (Wine has no WebP codec). It wrote transparent GIF frames at 24 bits without
+    their transparency, and frames 2 to 4 of the GIF named .tif undisposed (finding 7).
+  - The 2026-11-02 converter suites (main, trans, extra, latent) were run on HEAD's and the
+    new `coreConvertImgFormat()`. They differ only in the 20 conversions of 16-bit grey
+    sources that used to fail (converter finding 5).

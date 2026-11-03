@@ -47,7 +47,7 @@ Method:
 | 2 | High | In-place conversion deletes the original outright, even with «Keep original files» on; an explicit «Skip file» answer is overridden | Wine + reading; **fixed with originals kept, `26dd9d7`** |
 | 3 | High | After a failed save of a PNG/JPG/TIFF the fallback reads freed memory: on AutoHotkey_H the run stopped responding, stock AutoHotkey reports a failure; Windows outcome unverified | Wine; **fixed, `e040c32`** |
 | 4 | Medium | Float HDR images (EXR, HDR, PFM, float JXL/TIFF/JXR) cannot be converted to PNG, JPEG 2000 or PPM | Wine |
-| 5 | Medium | 16-bit greyscale images cannot be converted to JPG, BMP, WebP, GIF, TGA, PPM, JNG or XPM | Wine |
+| 5 | Medium | 16-bit greyscale images cannot be converted to JPG, BMP, WebP, GIF, TGA, PPM, JNG or XPM | Wine; **fixed, `6065e4f`** |
 | 6 | Medium | Transparency is lost: palette images to WebP/JP2/JXR/TGA/JXL/TIFF/GIF, anything to GIF, HDR with alpha | Wine; **fixed, `db6ce3e`** |
 | 7 | Medium | Photos come out rotated twice (FreeImage path: Exif kept after rotating), or with all metadata dropped and unrotated (WIC path) | Wine + reading |
 | 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine |
@@ -232,6 +232,13 @@ So the same EXR converts to BMP but not to PNG.
 - Or convert float to RGB16 with an explicit curve and clamp.
 
 ## 5. 16-bit greyscale images cannot be converted to 8-bit formats
+
+**Fixed in `6065e4f`** (with the frame extractor's depth rule) by the first fix option below.
+`coreConvertImgFormat()` converts UINT16 to 8-bit grey by its high bytes, as the viewer shows
+it, whenever the destination has no 16-bit grey type. Wine run: the 20 conversions of
+`grey16_lossless.jxl`, `L_12__128x128.heif` and `grey16.png` that failed now write 8-bit grey
+JPG, BMP, GIF and TGA files, 24-bit WebP, PPM and JNG files, and XPM files that read back as
+palette images. PNG, TIFF, JXL and JP2 still keep 16 bits.
 
 **What happens.** A FIT_UINT16 image (16-bit grey) has no route to 8 bits:
 - `FIMapplyToneMapper()` converts only pixel types 3–8 to a standard bitmap (`:61293`); UINT16 is type 2.
