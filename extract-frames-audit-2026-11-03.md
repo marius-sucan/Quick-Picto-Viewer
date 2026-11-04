@@ -8,7 +8,10 @@ Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848. They are 
 4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below. Findings 2 and 5
 to 8 were fixed in `6065e4f`, after Marius's decisions; see «What `6065e4f` changed on purpose».
 Findings 9 and 11 were fixed in `3a2d852`, and 10 in `ba279b1`, with the batch summary's
-counts in `a4b909c` (2026-11-04).
+counts in `a4b909c` (2026-11-04). Since `7552479` (2026-11-04), `coreExtractFramesFromImage()`
+only picks the route: PDF pages go to `coreExtractFramesFromPDF()`, GIF frames and the TIFF
+pages FreeImage cannot open to `coreExtractFramesFromGdipFiles()`, the other multi-page
+formats to `coreExtractFramesFromFIMfiles()`. The findings quote the code as audited.
 
 This follows the 2026-08-30 audit of the same code (report in 7a00a9c, fixes in 34ae01f). Its
 findings are not repeated; their status is in the table near the end.
@@ -52,12 +55,14 @@ findings are not repeated; their status is in the table near the end.
 Marius's decisions of 2026-11-03, and what follows from them. Check here before calling any
 of it a regression.
 
-- **Routes.** `coreExtractFramesFromImage()` asks `FreeImage_GetFileType()` first, so files go
-  by content, not by extension. ICO, MNG, TIFF, WebP, AVIF, HEIF, APNG and JXL go to
+- **Routes.** `coreExtractFramesFromImage()` sends `.pdf` files to `coreExtractFramesFromPDF()`
+  and asks `FreeImage_GetFileType()` about every other file, so files go by content, not by
+  extension. ICO, MNG, TIFF, WebP, AVIF, HEIF, APNG and JXL go to
   `coreExtractFramesFromFIMfiles()`, which replaces `coreExtractFramesFromTiff()`. GIF still
-  goes to GDI+. Any other format FreeImage knows answers −3 without being decoded, so plain
-  PNGs in a batch cost nothing. A TIFF that FreeImage cannot open goes to GDI+. With FreeImage
-  missing or «Allow FreeImage loader» off, only GIF, TIFF and PDF files are extracted.
+  goes to GDI+, `coreExtractFramesFromGdipFiles()`. Any other format FreeImage knows answers −3
+  without being decoded, so plain PNGs in a batch cost nothing. A TIFF that FreeImage cannot
+  open goes to GDI+. With FreeImage missing or «Allow FreeImage loader» off, only GIF, TIFF and
+  PDF files are extracted.
 - **Flags.** Pages open through `combineFimOpenPages()`, the join tool's opener: TIFF with no
   flag, WebP with WEBP_PLAYBACK (1), the other animations with their PLAYBACK flag (2), ICO
   with ICO_MAKEALPHA (1). JXL, AVIF and HEIF frames therefore arrive at 8 bits per channel,
@@ -387,8 +392,9 @@ it needs a GIF renamed to `.tif`.
 
 ## 8. When FreeImage cannot open a .tif, nothing else is tried and the message says «undefined error»
 
-**Fixed in `6065e4f`:** a TIFF that FreeImage cannot open goes to GDI+; any other format then
-answers −4, «Failed to load the image».
+**Fixed in `6065e4f`:** a TIFF that FreeImage cannot open goes to GDI+
+(`coreExtractFramesFromGdipFiles()`); any other format then answers −4, «Failed to load the
+image».
 
 `coreExtractFramesFromTiff()` returns −1 when `FreeImage_OpenMultiBitmap()` fails (:62169).
 `coreExtractFramesFromImage()` returns that straight away; it never falls through to the GDI+
@@ -399,9 +405,10 @@ so it shows «ERROR: An undefined error has occurred.» (:44145). A batch counts
 
 ## 9. A frame GDI+ cannot select is saved as a copy of the previous one
 
-**Fixed in `3a2d852`:** such a frame counts as failed and nothing is written for it. A journal
-line gives the frame number, GDI+'s error and the file. The next frames are still tried, as the
-FreeImage route does for a page it cannot lock.
+**Fixed in `3a2d852`, now in `coreExtractFramesFromGdipFiles()`:** such a frame counts as failed
+and nothing is written for it. The frame number, GDI+'s error and the file go to the debug
+output (`fnOutputDebug()`), not the journal, since `2c80443`. The next frames are still tried, as
+the FreeImage route does for a page it cannot lock.
 
 The GDI+ loop ignores the −1 that `Gdip_BitmapSelectActiveFrame()` returns on failure
 (:62695). The bitmap then stays on the previous frame, and that frame is drawn, saved under
@@ -465,9 +472,9 @@ as skipped otherwise. «Skipped frames: N» gives the frames the collision setti
 
 ## 11. Latent: PDF extraction rewrites the viewer's image details
 
-**Fixed in `3a2d852`:** the PDF route clones the global before its pages and puts it back
-after them, on every exit, as the 08-30 fix did on the WebP route. While the pages render, the
-global still describes the current page.
+**Fixed in `3a2d852`:** the PDF route, now `coreExtractFramesFromPDF()`, clones the global
+before its pages and puts it back after them, on every exit, as the 08-30 fix did on the WebP
+route. While the pages render, the global still describes the current page.
 
 `RenderPDFpage()` rebuilds the `mainLoadedIMGdetails` global for every page (:100914). After
 a PDF extraction, the global describes the last rendered page, not the image in the viewport.
@@ -484,7 +491,8 @@ loops).
   (:62138) to formats that `getIMGformatLimits()` does not cap. That now includes JXL, the
   default output format. A larger page is rescaled to its own size, which is a full extra
   copy, before it is saved. **Gone from the FreeImage and GIF routes in `6065e4f`**; PDF
-  pages, and frames saved without FreeImage, still take it.
+  pages (`coreExtractFramesFromPDF()`), and the frames `coreExtractFramesFromGdipFiles()` saves
+  without FreeImage, still take it.
 - «Action on file name collisions» (`OnExtractConflictOverwrite`) has no `RegAction`, so it
   goes back to «Ask user» on every start.
 
@@ -499,7 +507,7 @@ loops).
 | 5 | Batch frame totals | fixed |
 | 6 | The WebP route overwrote `mainLoadedIMGdetails` | fixed; the PDF route did the same (finding 11), fixed in `3a2d852` |
 | 7 | WebP frames were written as raw sub-frames | fixed by composing them; FreeImage composes them since `6065e4f` |
-| 8 | 715 MPx extra limit | open on the PDF route; gone elsewhere since `6065e4f` |
+| 8 | 715 MPx extra limit | open on the PDF route (`coreExtractFramesFromPDF()`); gone elsewhere since `6065e4f` |
 | 9 | Collision choice not saved | open |
 | 10 | Read-only destination files | fixed |
 | 11 | GIF_PLAYBACK in the TIFF route | GIF content goes to GDI+ since `6065e4f` (finding 7) |
@@ -679,3 +687,14 @@ listed in the journal. Decision 4 is still open.
   - The other batches read as before, and every run wrote the same files as before the fix.
   - The failing GIF still took the name `clip`, so the WebP's frames came out as `clip [1]`.
     A file takes its name when its frame loop starts, before anything is written.
+- `7552479`, under Wine with AutoHotkey_H x64, the commit before it against the split:
+  - Both interpreters load the script.
+  - The finding 9 and 11 test, the 11-03 extraction suite (the same 1105 lines) and the batch
+    test of finding 10 gave the same output, the batch's elapsed time aside.
+  - A further driver ran 26 paths those leave out. PDF route: a failing page count, a password
+    asked and typed or declined, one and zero pages, WebP output (pages rendered within
+    16350 px), a single-file call, an abort. GDI+ route: −3, −2 and −4, a TIFF FreeImage cannot
+    open, an abort, «Cancel» at a collision, `prevMSGdisplay`, a single-file call, a failed
+    frame select. FreeImage route: the counters, «Cancel» at a collision, a WebP it cannot
+    open (−4). Return values, counters, files, tooltips and `mainLoadedIMGdetails` came out the
+    same. Only the journal and debug lines differ: they name the new functions.
