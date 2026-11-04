@@ -61583,17 +61583,15 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    {
       ; prevent tone-mapping HDR formats when destination can handle it
       noDepthConvert := 1
-   } Else If (varContains(formatDepths, "-f9-", "-f10-", "-f11-", "-f12-") && imgIDtype>=9 && !fallbackOkay)
+   } Else If (varContains(formatDepths, "-f9-", "-f10-", "-f11-", "-f12-") && imgIDtype>=9 && !fallbackOkay && (imgIDtype<=10 || InStr(formatDepths, "-f11-")))
    {
+      ; FreeImage converts floating point [FIT_RGBF=11, FIT_RGBAF=12] to no 16 bits type: the formats
+      ; without floating point get it tone mapped
       noDepthConvert := 1
       If (imgIDtype=9 || isVarEqualTo(typu, "hdr", "pfm"))
          hdrMode := "RGBF"   ; 11
       Else If (imgIDtype=10)
          hdrMode := InStr(formatDepths, "-f12-") ? "RGBAF" : "RGBF"  ; 12
-      Else If (imgIDtype=11)
-         hdrMode := "RGB16"  ; 9
-      Else If (imgIDtype=12)
-         hdrMode := InStr(formatDepths, "-f10-") ? "RGBA16": "RGB16" ; 10
    }
 
    ; tone mapping returns 24 bits: the alpha of RGBA16 [10] and RGBAF [12] images is put back afterwards
