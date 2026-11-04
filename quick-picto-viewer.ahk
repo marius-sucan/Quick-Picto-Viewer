@@ -62212,7 +62212,9 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
                hFIFimgA := FIMfitFrameToFileDepth(hPage, hHeads ? FIMpageDepthClass(hHeads, A_Index - 1) : fileDepth)
 
             ; a CMYK page kept as inks is no RGB image to save
-            If (!hFIFimgA && !isCMYK)
+            If (!hFIFimgA && isCMYK)
+               addJournalEntry(A_ThisFunc "(): page " A_Index " could not be converted from CMYK to sRGB, so it was not extracted:`n" imgPath)
+            Else If !hFIFimgA
                hFIFimgA := FreeImage_Clone(hPage)
          }
          FreeImage_UnlockPage(hMultiBMP, hPage, 0)

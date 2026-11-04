@@ -124,9 +124,13 @@ of it a regression.
     without profiles, and their profiled sources keep their pixels in the formats they test.
   - Not run: CMYK pages with alpha and 16-bit CMYK pages; float images with a profile saved
     as HDR, EXR or PFM; the workers' INI read; WIC's own conversion (Wine applies none), and
-    whether it leaves no profile behind, which rests on reading `teleportWICtoFIM()`. A CMYK
-    page whose conversion fails counts as failed, without a journal line. A profiled huge
-    image saved without a profile is cloned in full once.
+    whether it leaves no profile behind, which rests on reading `teleportWICtoFIM()`. A
+    profiled huge image saved without a profile is cloned in full once.
+  - A CMYK page whose conversion fails counts as failed and gets a journal line naming the
+    page and the file. Wine run with the fork's broken test profiles (bad, bad_mpe, toosmall,
+    test3, test5): the conversion never failed, since an unusable profile gives way to the
+    default CMYK. With `FreeImage_ConvertCMYKToRGB()` made to fail, the journal line appeared
+    and the file's RGB page was still extracted.
 
 ## Format coverage
 
