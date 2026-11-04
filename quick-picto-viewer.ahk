@@ -61391,6 +61391,8 @@ FIMrescaleICOmode(hFIFimgA, imgW, imgH, icoSize, ByRef hasIconified) {
       If zz
       {
          hasIconified := 1
+         ; the profile stays with the icon for the sRGB conversion in coreConvertImgFormat()
+         FIMcopyICCprofile(hFIFimgA, newBitmap)
          FreeImage_UnLoad(hFIFimgA)
          hFIFimgA := newBitmap
       }
@@ -100353,6 +100355,8 @@ initExternalCoreMode(coreThread) {
  
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
    initFIMGmodule()
+   ; the batches save with the main window's color management, see coreConvertImgFormat()
+   INIaction(0, "userPerformColorManagement", "General", 1)
    SetTimer, watchExternalCoreAbort, 750
    RegRead, hGDIwin, %QPVregEntry%\multicore, mainWindowID
    If (args[2]="batch-jpegll")
