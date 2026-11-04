@@ -109,11 +109,23 @@ of it a regression.
   - The extractor opens TIFFs with TIFF_CMYK and converts CMYK pages to sRGB through their
     own profile (`FreeImage_ConvertCMYKToRGB()`), for every output format. A CMYK page
     without a profile comes out as FreeImage's plain ink formula makes it, as before.
+  - `e39834b`: the batch workers (`initExternalCoreMode()`) read the setting from the INI,
+    as the main window does; they used to keep its default, on. `FIMrescaleICOmode()`
+    copies the profile onto its 256 px canvas, so a larger image saved as ICO is converted
+    too; with the setting off, that profile now goes into the icon's PNG entry.
   - Wine run: Adobe RGB (200,60,40) and (40,90,200) reach GIF, TGA, PPM and XPM as
     (231,57,34) and (0,90,204), what Pillow's Little CMS gives, and every frame equals
     FreeImage's own sRGB conversion of it. PNG and JPG keep the profile and the pixels. The
-    image behind a view was left unchanged. The 2026-11-02 converter suites and the
-    extraction test show no other difference.
+    image behind a view was left unchanged. A 400×300 Adobe RGB image saved as ICO reads
+    (230,56,33) at the icon's centre, one level under because `FIMrescaleICOmode()` pastes
+    with a 255/256 blend, as before. The 2026-11-02 converter suites and the extraction test
+    show no unintended change of depth or type; they do not compare pixels for formats
+    without profiles, and their profiled sources keep their pixels in the formats they test.
+  - Not run: CMYK pages with alpha and 16-bit CMYK pages; float images with a profile saved
+    as HDR, EXR or PFM; the workers' INI read; WIC's own conversion (Wine applies none), and
+    whether it leaves no profile behind, which rests on reading `teleportWICtoFIM()`. A CMYK
+    page whose conversion fails counts as failed, without a journal line. A profiled huge
+    image saved without a profile is cloned in full once.
 
 ## Format coverage
 
