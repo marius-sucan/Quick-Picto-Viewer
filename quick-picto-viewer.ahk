@@ -61388,7 +61388,6 @@ FIMrescaleICOmode(hFIFimgA, imgW, imgH, icoSize, ByRef hasIconified) {
    {
       xpos := clampInRange((icoSize - imgW)//2, 0, icoSize//2)
       ypos := clampInRange((icoSize - imgH)//2, 0, icoSize//2)
-      ; an alpha above 255 copies the pixels; 0 to 255 would blend them over the empty canvas
       zz := FreeImage_Paste(newBitmap, hFIFimgX, xpos, ypos, 256)
       If zz
       {
@@ -62557,9 +62556,9 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          If FileExist(file2save)
             FileSetAttrib, -R, % file2save
 
-         if (saveImgFormatsList[userExtractFramesFmt]="webp")
+         If (saveImgFormatsList[userExtractFramesFmt]="webp")
             oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 16350, 16350, userPDFdpi)
-         else
+         Else
             oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 0, 0, userPDFdpi)
 
          If !validBMP(oBitmap)
@@ -62639,15 +62638,16 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          ; on failure, GDI+ stays on the previous frame
          If (Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)<0)
          {
-            addJournalEntry(A_ThisFunc "(): frame " A_Index " could not be selected, so it was not extracted. " Gdip_ErrorHandler(gdipLastError, 0) "`n" imgPath)
+            fnOutputDebug(A_ThisFunc "(): frame " A_Index " could not be extracted. " Gdip_ErrorHandler(gdipLastError, 0) "`n" imgPath)
             failedFrames++
             Continue
          }
 
          ; the frame is drawn at 32 bits; the depth of the file it comes from decides the one it is saved at
          If isGIF
+         {
             fileDepth := "palette"
-         Else
+         } Else
          {
             pf := Gdip_GetImagePixelFormat(oBitmap, 2)
             fileDepth := InStr(pf, "INDEXED") ? "palette" : InStr(pf, "GRAY") ? "grey" : InStr(pf, "ARGB") ? "rgba" : "rgb"
