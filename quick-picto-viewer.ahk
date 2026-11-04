@@ -61655,6 +61655,27 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
       }
    }
 
+   ; a file without a color profile is read as sRGB, so its pixels go there from their profile, as the viewer
+   ; converts them [FICMS_INTENT_RELATIVE_COLORIMETRIC=1 | FICMS_BLACKPOINT_COMPENSATION=0x100]; on a copy,
+   ; because hFIFimgA may be a view of the image on screen
+   If (userPerformColorManagement=1 && FreeImage_GetICCProfileData(hFIFimgA, iccSize) && !FreeImage_FIFSupportsICCProfiles(FreeImage_GetFIFFromFilename(file2save)))
+   {
+      hFIFimgX := FreeImage_Clone(hFIFimgA)
+      If (hFIFimgX && !FreeImage_ApplyICCProfile(hFIFimgX, 0, 0, 0x101))
+      {
+         ; a conversion that changes the pixel format, eg., of RGB555, needs a new bitmap
+         FreeImage_UnLoad(hFIFimgX)
+         hFIFimgX := FreeImage_ConvertToICCProfile(hFIFimgA, 0, 0, 0x101)
+      }
+
+      If hFIFimgX
+      {
+         FreeImage_UnLoad(hFIFimgA)
+         hFIFimgA := hFIFimgX
+         FimBuffer := DestroyMemoryBuffer(FimBuffer)
+      } Else addJournalEntry(A_ThisFunc "(): the colors could not be converted to sRGB for a file format without color profiles:`n" file2save)
+   }
+
    ColorsType := FreeImage_GetColorType(hFIFimgA)
    If (GFT=0 && InStr(ColorsType, "rgba"))
    {
@@ -62121,7 +62142,9 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
 ; shows them: animations come composed by their PLAYBACK flags. Each page keeps the depth its file
 ; stores when the output format holds it. Returns -1 when FreeImage cannot open the file.
    extractedFrames := failedFrames := abandonAll := 0
-   hMultiBMP := combineFimOpenPages(imgPath, GFT, tFrames, 1)
+   ; with color management, CMYK pages are read as inks [TIFF_CMYK=1] and get sRGB through their own profile
+   cmykFlag := (GFT=18 && userPerformColorManagement=1) ? 1 : 0
+   hMultiBMP := combineFimOpenPages(imgPath, GFT, tFrames, 1, cmykFlag)
    If !hMultiBMP
       Return (tFrames=1) ? -2 : -1   ; a single page is nothing to extract, the answer the other routes give as well
 
@@ -62179,9 +62202,14 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
          FreeImage_GetImageDimensions(hPage, imgW, imgH)
          If (imgW>0 && imgH>0 && !(imgW=1 && imgH=1))
          {
-            If (GFT!=18)
+            isCMYK := (cmykFlag && FreeImage_GetColorType(hPage, 0)=5)   ; FIC_CMYK
+            If isCMYK   ; to sRGB [0] by FICMS_INTENT_RELATIVE_COLORIMETRIC=1 | FICMS_BLACKPOINT_COMPENSATION=0x100
+               hFIFimgA := FreeImage_ConvertCMYKToRGB(hPage, 0, 0, 0x101)
+            Else If (GFT!=18)
                hFIFimgA := FIMfitFrameToFileDepth(hPage, hHeads ? FIMpageDepthClass(hHeads, A_Index - 1) : fileDepth)
-            If !hFIFimgA
+
+            ; a CMYK page kept as inks is no RGB image to save
+            If (!hFIFimgA && !isCMYK)
                hFIFimgA := FreeImage_Clone(hPage)
          }
          FreeImage_UnlockPage(hMultiBMP, hPage, 0)
@@ -63185,17 +63213,18 @@ combineImgsTempFile(destFilePath) {
    }
 }
 
-combineFimOpenPages(imgPath, GFT, ByRef tPages, withIcons:=0) {
+combineFimOpenPages(imgPath, GFT, ByRef tPages, withIcons:=0, moreFlags:=0) {
 ; Opens a file of several pages or frames, to be read one page at a time. Returns nothing
 ; for a file of one page, then tPages is 1, or of a format FreeImage does not read by pages.
-; withIcons=1 opens ICO files [FIF_ICO=1] too, one page per icon.
+; withIcons=1 opens ICO files [FIF_ICO=1] too, one page per icon. moreFlags join the format's
+; own flags, eg., TIFF_CMYK.
    tPages := 0
    If !(isVarEqualTo(GFT, 6, 18, 25, 35, 37, 38, 39, 40) || withIcons=1 && GFT=1)   ; FIF_MNG, FIF_TIFF, FIF_GIF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
       Return
 
    ; animations are read as they are played: WEBP_PLAYBACK = 1, GIF/APNG/MNG/AVIF/HEIF/JXL_PLAYBACK = 2;
    ; icons as they are shown: ICO_MAKEALPHA = 1 gives those under 32 bits the transparency of their mask
-   multiFlags := (GFT=18) ? 0 : (GFT=35 || GFT=1) ? 1 : 2
+   multiFlags := ((GFT=18) ? 0 : (GFT=35 || GFT=1) ? 1 : 2) | moreFlags
    hMultiBMP := FreeImage_OpenMultiBitmap(imgPath, GFT, 0, 1, 1, multiFlags)
    If hMultiBMP
    {
