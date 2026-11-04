@@ -7,6 +7,7 @@ plus `PanelExtractFrames()` (:43541) and `BTNperformExtractFrames()` (:44103), w
 Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848. They are unchanged at
 4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below. Findings 2 and 5
 to 8 were fixed in `6065e4f`, after Marius's decisions; see «What `6065e4f` changed on purpose».
+Findings 9 and 11 were fixed in `3a2d852` (2026-11-04).
 
 This follows the 2026-08-30 audit of the same code (report in 7a00a9c, fixes in 34ae01f). Its
 findings are not repeated; their status is in the table near the end.
@@ -43,7 +44,7 @@ findings are not repeated; their status is in the table near the end.
   **partly fixed in `4c8ec92`**), and PDF text mode wrote a file named `abort` when the user
   cancelled (finding 4, **fixed in `4c8ec92`**). One medium-low: TIFF pages ignore «Color
   depth» (finding 5, **fixed in `6065e4f`**). Six low or latent items follow; 6 to 8 are
-  **fixed in `6065e4f`**.
+  **fixed in `6065e4f`**, 9 and 11 in **`3a2d852`**.
 
 ## What `6065e4f` changed on purpose
 
@@ -397,6 +398,10 @@ so it shows «ERROR: An undefined error has occurred.» (:44145). A batch counts
 
 ## 9. A frame GDI+ cannot select is saved as a copy of the previous one
 
+**Fixed in `3a2d852`:** such a frame counts as failed and nothing is written for it. A journal
+line gives the frame number, GDI+'s error and the file. The next frames are still tried, as the
+FreeImage route does for a page it cannot lock.
+
 The GDI+ loop ignores the −1 that `Gdip_BitmapSelectActiveFrame()` returns on failure
 (:62695). The bitmap then stays on the previous frame, and that frame is drawn, saved under
 the new number and counted as extracted. A damaged GIF or TIFF is where this would show.
@@ -415,9 +420,39 @@ collision setting cannot tell these apart from leftovers of an earlier run:
   processed.
 - «Auto-rename» and «Ask user» keep both sets.
 
+**Fix options** (2026-11-04, none chosen yet):
+
+- **Names claimed by the run.** The batch remembers the base names it has given out,
+  ignoring case. A source whose name is already taken gets auto-rename's « [N]» on all its
+  frames, `clip [1]_1.png` to `clip [1]_4.png`. The collision setting is then left to files
+  that were in the folder before the run. This covers both cases, and PDF text mode's
+  `<name>.txt`. A batch without repeated names keeps its names. It needs a helper with a
+  static list, reset where the collision dialog's memory is (:44126, :61962), called where
+  each route builds `OutNameNoExt`. Only a file that reaches its frame loop claims a name, so
+  a plain PNG (−3) does not push the next `clip` to « [1]». The list's order decides which
+  source gets the suffix.
+- **The source extension, on a clash only.** The same list, with `clip.webp_1.png` for the
+  second file. The name says where the frames came from, but two `clip.gif` files from two
+  folders still need a number.
+- **The source extension in every name.** `clip.gif_1.png` for every file, with no list.
+  Every output is renamed, and two `clip.gif` files from two folders still collide.
+- **One folder per source.** `<dest>\clip\clip_1.png`. This groups the frames of large
+  batches, but changes every layout, and same-name sources still meet in one folder unless
+  the list names it. It could be a panel option rather than the default.
+- **Ask once.** Before the loop, count the selected files whose name repeats, as
+  `countConflictFilesFolder()` does for the converter, and ask once how to name them. Every
+  batch with repeats gets a dialog. It goes with the first two options.
+
+With any of them, a file whose frames were all skipped could count as skipped rather than
+processed in the batch summary.
+
 ---
 
 ## 11. Latent: PDF extraction rewrites the viewer's image details
+
+**Fixed in `3a2d852`:** the PDF route clones the global before its pages and puts it back
+after them, on every exit, as the 08-30 fix did on the WebP route. While the pages render, the
+global still describes the current page.
 
 `RenderPDFpage()` rebuilds the `mainLoadedIMGdetails` global for every page (:100914). After
 a PDF extraction, the global describes the last rendered page, not the image in the viewport.
@@ -447,7 +482,7 @@ loops).
 | 3 | The TIFF route leaked the page it rescaled from | fixed (:62144) |
 | 4 | Progress tooltip throttle, none in single-file mode | fixed |
 | 5 | Batch frame totals | fixed |
-| 6 | The WebP route overwrote `mainLoadedIMGdetails` | fixed; the PDF route does the same, latent (finding 11) |
+| 6 | The WebP route overwrote `mainLoadedIMGdetails` | fixed; the PDF route did the same (finding 11), fixed in `3a2d852` |
 | 7 | WebP frames were written as raw sub-frames | fixed by composing them; FreeImage composes them since `6065e4f` |
 | 8 | 715 MPx extra limit | open on the PDF route; gone elsewhere since `6065e4f` |
 | 9 | Collision choice not saved | open |
@@ -505,8 +540,8 @@ loops).
 4. Saved output formats: 4c8ec92's clamp keeps every stored value usable. Should the old
    positions also be converted once, or the extension stored instead?
 5. «Color depth» on the FreeImage routes: apply it, or disable it where it does not apply?
-6. Same-name source files in one batch: add the source extension to the frame names, use one
-   subfolder per source, or leave it?
+6. Same-name source files in one batch: which of the fix options under finding 10, or leave
+   it?
 
 Fixed in 4c8ec92: findings 1 and 4, and the blank-extension half of 3. Suggested order for
 the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
@@ -522,6 +557,11 @@ the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
 - Also decided: TIFF pages from FreeImage only, without WIC; 1-bit stays out of the depth
   tables; ICO pages in the extractor only, not in the join tool; the label reads «Fallback
   depth». Decisions 4 and 6 are still open.
+
+**Marius's answers, 2026-11-04, implemented in `3a2d852`:** a frame GDI+ cannot select counts as
+failed, with a journal line, and the next frames are still tried (finding 9). The PDF route backs
+up and restores `mainLoadedIMGdetails` instead of giving `RenderPDFpage()` a parameter that
+leaves it alone (finding 11).
 
 ## How this was checked
 
@@ -564,3 +604,17 @@ the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
   - The 2026-11-02 converter suites (main, trans, extra, latent) were run on HEAD's and the
     new `coreConvertImgFormat()`. They differ only in the 20 conversions of 16-bit grey
     sources that used to fail (converter finding 5).
+- `3a2d852`, under Wine with AutoHotkey_H x64, `coreExtractFramesFromImage()` sliced from the
+  commit before it and from the fix:
+  - Both interpreters load the script.
+  - A copy of `Gdip_All.ahk` made `Gdip_BitmapSelectActiveFrame()` fail at one frame index
+    without selecting it. The sources were a 4-frame GIF and a 3-page TIFF, the TIFF read by
+    GDI+ with «Allow FreeImage loader» off. Before the fix, the previous frame was saved
+    under the failed number and counted as extracted. When the first select failed, the
+    first frame came out right, since the bitmap starts on it. With the fix, no file was
+    written for the failed frame, it counted as failed, the journal line appeared, and the
+    other frames equalled FreeImage's.
+  - `RenderPDFpage()` was stubbed to replace the global as it does. Before the fix, the
+    global described the last rendered page after a full run, after an abort at page 2 and
+    after «Cancel» at a collision on page 2. With the fix, the caller's copy came back in all
+    three cases.
