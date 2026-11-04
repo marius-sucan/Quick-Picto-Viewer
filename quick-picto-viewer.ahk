@@ -44125,6 +44125,7 @@ BTNperformExtractFrames(a) {
    BtnCloseWindow()
    filesElected := getSelectedFiles(0, 1)
    nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
+   claimExtractedBaseName(0, 1)
    If (filesElected>1 && !InStr(c, "active"))
    {
       batchExtractFramesFromImages(0)
@@ -62043,7 +62044,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    filesElected := getSelectedFiles(0, 1)
    showTOOLtip("Extracting " labelu "s from " groupDigits(filesElected) " files, please wait")
    prevMSGdisplay := A_TickCount
-   tFramFailed := tFrames := failedFiles := countFilez := countTFilez := skippedFiles := 0
+   tFramFailed := tFrames := failedFiles := countFilez := countTFilez := skippedFiles := renamedFiles := 0
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    prevMSGdisplay := 1
@@ -62051,6 +62052,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    doStartLongOpDance()
    CurrentSLD := ""
    nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
+   claimExtractedBaseName(0, 1)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -62090,10 +62092,15 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
 
       percS := Round((countTFilez / filesElected) * 100, 1)
       bonusMsg := "`nTotal files: " groupDigits(countTFilez) " / " groupDigits(filesElected) " ( " percS "% ) "
+      renamedBefore := claimExtractedBaseName(0, 2)
       If (pdfTextMode=1)
          r := coreExtractBatchModeTextsFromGivenPDF(pdfModus, thisFileIndex, prevMSGdisplay, bonusMsg, failedFrames, totalz)
       Else
          r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz)
+
+      ; counted only when something was written under the « [N]» name
+      If (totalz>0 && claimExtractedBaseName(0, 2)>renamedBefore)
+         renamedFiles++
 
       If (r=-5) ; abort signal
       {
@@ -62127,6 +62134,8 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       someErrors .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+   If (renamedFiles>0)
+      someErrors .= "`nFiles whose " ((pdfTextMode=1) ? "text file" : "frames") " got a [N] suffix: " groupDigits(renamedFiles)
 
    If (abandonAll=1)
       msgBeepTimer("Operation aborted. " groupDigits(countFilez) " out of " groupDigits(filesElected) " selected files were processed until now" someErrors)
@@ -62138,6 +62147,33 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    SetTimer, ResetImgLoadStatus, -100
    If (tFrames - tFramFailed>0)
       quickBarOpenResult(ResizeDestFolder)
+}
+
+claimExtractedBaseName(nameNoExt, mode:=0) {
+; The base name of a file's frames or text file, unique in the extraction run: a name an earlier
+; file took gets « [N]». Mode 1 starts a run, mode 2 returns how many files got a suffix.
+   Static claimed := [], renamed := 0
+   If (mode=1)
+   {
+      claimed := [], renamed := 0
+      Return
+   } Else If (mode=2)
+      Return renamed
+
+   r := nameNoExt
+   Loop
+   {
+      ; file names are case-insensitive; the n keeps names such as 01 and 1 apart, as string keys
+      k := "n" Format("{:L}", r)
+      If !claimed.HasKey(k)
+         Break
+      r := nameNoExt " [" A_Index "]"
+   }
+
+   claimed[k] := 1
+   If (r!=nameNoExt)
+      renamed++
+   Return r
 }
 
 coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
@@ -62165,6 +62201,7 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
    }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+   OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
    If (inLoop!=1)
    {
       showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
@@ -62402,7 +62439,7 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
    Else If (abandonAll=1)
       Return -5
 
-   file2save := ResizeDestFolder "\" OutNameNoExt ".txt"
+   file2save := ResizeDestFolder "\" claimExtractedBaseName(OutNameNoExt) ".txt"
    If (FileExist(file2save) && !FolderExist(file2save))
       file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
 
@@ -62473,6 +62510,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
       tFrames := pageCount
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
       If (inLoop!=1)
       {
          showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
@@ -62557,6 +62595,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       }
 
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+      OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
       If !bonusMsg
          bonusMsg := ""
       If (inLoop!=1)
