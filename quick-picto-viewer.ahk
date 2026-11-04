@@ -62477,16 +62477,16 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
 coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
    failedFrames := extractedFrames := 0
    imgPath := StrReplace(isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu, "||")
-   isPDF := RegExMatch(imgPath, "i)(.\.pdf)$")
-   If (!isPDF && wasInitFIMlib=1 && allowFIMloader=1)
+   If RegExMatch(imgPath, "i)(.\.pdf)$")
+      Return coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, failedFrames, extractedFrames)
+
+   If (wasInitFIMlib=1 && allowFIMloader=1)
    {
       ; routed by content: an APNG may be named .png, and GIF frames come from GDI+
       GFT := FreeImage_GetFileType(imgPath)
       If isVarEqualTo(GFT, 1, 6, 18, 35, 37, 38, 39, 40)   ; FIF_ICO, FIF_MNG, FIF_TIFF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
       {
-         r := coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, thisu, extracted)
-         extractedFrames := extracted
-         failedFrames := thisu
+         r := coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames)
          If (r!=-1)
             Return r
          If (GFT!=18)   ; of the files FreeImage cannot open, GDI+ reads only TIFF ones
@@ -62495,201 +62495,207 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          Return -3
    }
 
-   If isPDF
-   {
-      extractedFrames := 0
-      pwd := PDFpwdsCache[imgPath]
+   Return coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames)
+}
+
+coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+; Extracts the pages of a PDF, rendered at «Render PDF pages (DPI)» and saved at the «Fallback depth».
+   failedFrames := extractedFrames := 0
+   pwd := PDFpwdsCache[imgPath]
+   errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
+   If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
       errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
-      If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
-         errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
 
-      If (errorType)
-      {
-         addJournalEntry(A_ThisFunc "(): ERROR." friendlyPDFerrorCodes(errorType, pwd))
-         Return -4
-      }
-
-      If (asked=1)
-         PDFpwdsCache[imgPath] := pwd
-
-      tFrames := pageCount
-      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-      OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
-      If (inLoop!=1)
-      {
-         showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
-         doStartLongOpDance()
-      } 
-      If !bonusMsg
-         bonusMsg := ""
-
-      prevMSGdisplay := A_TickCount
-      startOperation := A_TickCount
-      fname := PathCompact(imgPath, "a", 1, OSDfontSize)
-      ; each RenderPDFpage() replaces mainLoadedIMGdetails; it is put back after the pages
-      backupIMGdetails := mainLoadedIMGdetails.Clone()
-      Loop, % tFrames
-      {
-         file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
-         If (determineTerminateOperation()=1)
-         {
-            abandonAll := 1
-            Break
-         }
-
-         If (A_TickCount - prevMSGdisplay>2500)
-         {
-            etaTime := ETAinfos(A_Index, tFrames, startOperation)
-            showTOOLtip("Extracting frames:" etaTime bonusMsg "`nCurrent file:`n" fname, 0, 0, A_Index / tFrames)
-            prevMSGdisplay := A_TickCount
-         }
-
-         If (FileExist(file2save) && !FolderExist(file2save))
-            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
-
-         If (file2save="abort")
-         {
-            abandonAll := 1
-            Break
-         } Else If !file2save
-            Continue
-
-         If FileExist(file2save)
-            FileSetAttrib, -R, % file2save
-
-         If (saveImgFormatsList[userExtractFramesFmt]="webp")
-            oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 16350, 16350, userPDFdpi)
-         Else
-            oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 0, 0, userPDFdpi)
-
-         If !validBMP(oBitmap)
-         {
-            failedFrames++
-            Continue
-         }
-
-         r := saveExtractedGdipFrame(oBitmap, file2save)
-         oBitmap := trGdip_DisposeImage(oBitmap)
-         If r
-            failedFrames++
-         Else
-            extractedFrames++
-      }
-
-      mainLoadedIMGdetails := backupIMGdetails
-      If (inLoop!=1)
-         ResetImgLoadStatus()
-
-      Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
+   If (errorType)
+   {
+      addJournalEntry(A_ThisFunc "(): ERROR." friendlyPDFerrorCodes(errorType, pwd))
+      Return -4
    }
 
+   If (asked=1)
+      PDFpwdsCache[imgPath] := pwd
+
+   tFrames := pageCount
+   zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+   OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
+   If (inLoop!=1)
+   {
+      showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
+      doStartLongOpDance()
+   } 
+   If !bonusMsg
+      bonusMsg := ""
+
+   prevMSGdisplay := A_TickCount
+   startOperation := A_TickCount
+   fname := PathCompact(imgPath, "a", 1, OSDfontSize)
+   ; each RenderPDFpage() replaces mainLoadedIMGdetails; it is put back after the pages
+   backupIMGdetails := mainLoadedIMGdetails.Clone()
+   Loop, % tFrames
+   {
+      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (A_TickCount - prevMSGdisplay>2500)
+      {
+         etaTime := ETAinfos(A_Index, tFrames, startOperation)
+         showTOOLtip("Extracting frames:" etaTime bonusMsg "`nCurrent file:`n" fname, 0, 0, A_Index / tFrames)
+         prevMSGdisplay := A_TickCount
+      }
+
+      If (FileExist(file2save) && !FolderExist(file2save))
+         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+
+      If (file2save="abort")
+      {
+         abandonAll := 1
+         Break
+      } Else If !file2save
+         Continue
+
+      If FileExist(file2save)
+         FileSetAttrib, -R, % file2save
+
+      If (saveImgFormatsList[userExtractFramesFmt]="webp")
+         oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 16350, 16350, userPDFdpi)
+      Else
+         oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 0, 0, userPDFdpi)
+
+      If !validBMP(oBitmap)
+      {
+         failedFrames++
+         Continue
+      }
+
+      r := saveExtractedGdipFrame(oBitmap, file2save)
+      oBitmap := trGdip_DisposeImage(oBitmap)
+      If r
+         failedFrames++
+      Else
+         extractedFrames++
+   }
+
+   mainLoadedIMGdetails := backupIMGdetails
+   If (inLoop!=1)
+      ResetImgLoadStatus()
+
+   Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
+}
+
+coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+; Extracts GIF frames and TIFF pages through GDI+, the route for GIF files, for files FreeImage does not
+; recognize, for TIFF files it cannot open, and for every file but PDF when the FreeImage loader is off.
+   failedFrames := extractedFrames := 0
    oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, userPerformColorManagement)
    If !validBMP(oBitmap)
       Return -4
 
    rawFmt := Gdip_GetImageRawFormat(oBitmap)
-   If RegExMatch(rawFmt, "i)(gif|tiff)$")
-   {
-      isGIF := RegExMatch(rawFmt, "i)gif$")
-      tFrames := Gdip_GetBitmapFramesCount(oBitmap)
-      If (tFrames<2)
-      {
-         trGdip_DisposeImage(oBitmap)
-         Return -2
-      }
-
-      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-      OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
-      If !bonusMsg
-         bonusMsg := ""
-      If (inLoop!=1)
-      {
-         showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
-         doStartLongOpDance()
-      } 
-
-      Loop, % tFrames
-      {
-         file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
-         If (determineTerminateOperation()=1)
-         {
-            abandonAll := 1
-            Break
-         }
-
-         If (A_TickCount - prevMSGdisplay>3000)
-         {
-            showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
-            prevMSGdisplay := A_TickCount
-         }
-
-         If (FileExist(file2save) && !FolderExist(file2save))
-            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
-
-         If (file2save="abort")
-         {
-            abandonAll := 1
-            Break
-         } Else If !file2save
-            Continue
-
-         If FileExist(file2save)
-            FileSetAttrib, -R, % file2save
-
-         ; on failure, GDI+ stays on the previous frame
-         If (Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)<0)
-         {
-            fnOutputDebug(A_ThisFunc "(): frame " A_Index " could not be extracted. " Gdip_ErrorHandler(gdipLastError, 0) "`n" imgPath)
-            failedFrames++
-            Continue
-         }
-
-         ; the frame is drawn at 32 bits; the depth of the file it comes from decides the one it is saved at
-         If isGIF
-         {
-            fileDepth := "palette"
-         } Else
-         {
-            pf := Gdip_GetImagePixelFormat(oBitmap, 2)
-            fileDepth := InStr(pf, "INDEXED") ? "palette" : InStr(pf, "GRAY") ? "grey" : InStr(pf, "ARGB") ? "rgba" : "rgb"
-         }
-
-         trGdip_GetImageDimensions(oBitmap, imgW, imgH)
-         nBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH)
-         If !validBMP(nBitmap)
-         {
-            failedFrames++
-            Continue
-         }
-
-         Gu := trGdip_GraphicsFromImage(A_ThisFunc, nBitmap)
-         If !Gu
-         {
-            trGdip_DisposeImage(nBitmap)
-            failedFrames++
-            Continue
-         }
-
-         trGdip_DrawImage(A_ThisFunc, Gu, oBitmap)
-         Gdip_DeleteGraphics(Gu)
-         r := saveExtractedGdipFrame(nBitmap, file2save, imgPath, fileDepth)
-         trGdip_DisposeImage(nBitmap)
-         If r
-            failedFrames++
-         Else 
-            extractedFrames++
-      }
-
-      If (inLoop!=1)
-         ResetImgLoadStatus()
-
-      trGdip_DisposeImage(oBitmap)
-      Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
-   } Else
+   If !RegExMatch(rawFmt, "i)(gif|tiff)$")
    {
       trGdip_DisposeImage(oBitmap)
       Return -3
    }
+
+   isGIF := RegExMatch(rawFmt, "i)gif$")
+   tFrames := Gdip_GetBitmapFramesCount(oBitmap)
+   If (tFrames<2)
+   {
+      trGdip_DisposeImage(oBitmap)
+      Return -2
+   }
+
+   zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
+   OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
+   If !bonusMsg
+      bonusMsg := ""
+   If (inLoop!=1)
+   {
+      showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
+      doStartLongOpDance()
+   } 
+
+   Loop, % tFrames
+   {
+      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      If (A_TickCount - prevMSGdisplay>3000)
+      {
+         showTOOLtip("Extracting frames: " groupDigits(A_Index) " / " groupDigits(tFrames) " ( " Round((A_Index / tFrames) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" OutFileName, 0, 0, A_Index / tFrames)
+         prevMSGdisplay := A_TickCount
+      }
+
+      If (FileExist(file2save) && !FolderExist(file2save))
+         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+
+      If (file2save="abort")
+      {
+         abandonAll := 1
+         Break
+      } Else If !file2save
+         Continue
+
+      If FileExist(file2save)
+         FileSetAttrib, -R, % file2save
+
+      ; on failure, GDI+ stays on the previous frame
+      If (Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)<0)
+      {
+         fnOutputDebug(A_ThisFunc "(): frame " A_Index " could not be extracted. " Gdip_ErrorHandler(gdipLastError, 0) "`n" imgPath)
+         failedFrames++
+         Continue
+      }
+
+      ; the frame is drawn at 32 bits; the depth of the file it comes from decides the one it is saved at
+      If isGIF
+      {
+         fileDepth := "palette"
+      } Else
+      {
+         pf := Gdip_GetImagePixelFormat(oBitmap, 2)
+         fileDepth := InStr(pf, "INDEXED") ? "palette" : InStr(pf, "GRAY") ? "grey" : InStr(pf, "ARGB") ? "rgba" : "rgb"
+      }
+
+      trGdip_GetImageDimensions(oBitmap, imgW, imgH)
+      nBitmap := trGdip_CreateBitmap(A_ThisFunc, imgW, imgH)
+      If !validBMP(nBitmap)
+      {
+         failedFrames++
+         Continue
+      }
+
+      Gu := trGdip_GraphicsFromImage(A_ThisFunc, nBitmap)
+      If !Gu
+      {
+         trGdip_DisposeImage(nBitmap)
+         failedFrames++
+         Continue
+      }
+
+      trGdip_DrawImage(A_ThisFunc, Gu, oBitmap)
+      Gdip_DeleteGraphics(Gu)
+      r := saveExtractedGdipFrame(nBitmap, file2save, imgPath, fileDepth)
+      trGdip_DisposeImage(nBitmap)
+      If r
+         failedFrames++
+      Else 
+         extractedFrames++
+   }
+
+   If (inLoop!=1)
+      ResetImgLoadStatus()
+
+   trGdip_DisposeImage(oBitmap)
+   Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
 }
 
 askOverwriteDestFile(destFilePath, removeIt:=1) {
