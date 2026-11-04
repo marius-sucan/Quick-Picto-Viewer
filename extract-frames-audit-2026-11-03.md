@@ -117,8 +117,9 @@ of it a regression.
     (231,57,34) and (0,90,204), what Pillow's Little CMS gives, and every frame equals
     FreeImage's own sRGB conversion of it. PNG and JPG keep the profile and the pixels. The
     image behind a view was left unchanged. A 400×300 Adobe RGB image saved as ICO reads
-    (230,56,33) at the icon's centre, one level under because `FIMrescaleICOmode()` pastes
-    with a 255/256 blend, as before. The 2026-11-02 converter suites and the extraction test
+    (231,57,34), alpha 255, at the icon's centre. `FIMrescaleICOmode()` pastes with alpha 256,
+    which copies the pixels; with 255, as it did before 2026-11-04, FreeImage blended them over
+    the empty canvas at 255/256, one level under with alpha 254. The 2026-11-02 converter suites and the extraction test
     show no unintended change of depth or type; they do not compare pixels for formats
     without profiles, and their profiled sources keep their pixels in the formats they test.
   - Not run: CMYK pages with alpha and 16-bit CMYK pages; float images with a profile saved

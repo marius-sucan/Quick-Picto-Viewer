@@ -61387,7 +61387,8 @@ FIMrescaleICOmode(hFIFimgA, imgW, imgH, icoSize, ByRef hasIconified) {
    {
       xpos := clampInRange((icoSize - imgW)//2, 0, icoSize//2)
       ypos := clampInRange((icoSize - imgH)//2, 0, icoSize//2)
-      zz := FreeImage_Paste(newBitmap, hFIFimgX, xpos, ypos, 255)
+      ; an alpha above 255 copies the pixels; 0 to 255 would blend them over the empty canvas
+      zz := FreeImage_Paste(newBitmap, hFIFimgX, xpos, ypos, 256)
       If zz
       {
          hasIconified := 1
