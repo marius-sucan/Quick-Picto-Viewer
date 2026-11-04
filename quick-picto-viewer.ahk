@@ -18667,7 +18667,8 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
       pf := Gdip_GetImagePixelFormat(pBitmap, 2)
       If (pf!="8-INDEXED")
       {
-         E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, (userGifPaletteTransparency=1 && InStr(pf, "ARGB")))
+         keepTrans := (userGifPaletteTransparency=1 && InStr(pf, "ARGB")) ? 1 : 0
+         E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, keepTrans)
          If E
             addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without dithering or transparency.")
       }
@@ -43576,9 +43577,9 @@ PanelExtractFrames() {
     GuiAddEdit("x+10 w" thisWid " number -multi limit3 veditF5", userJpegQuality)
     Gui, Add, UpDown, vuserJpegQuality Range1-100, % userJpegQuality
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
-    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Fallback depth:
+    Gui, Add, Text, xs+15 y+7 w%ml% hp +0x200 +hwndhTemp, Fallback color depth:
     hTemp := GuiAddDropDownList("x+10 w" thisWid " AltSubmit Choose" depthChoice " vuserSaveBitsDepth", "32 bits RGBA|24 bits RGB|16 bits RGB [32768 colors]|8 bits RGB [256 colors]", [hTemp])
-    ToolTip2ctrl(hTemp, "PDF pages are saved at this color depth.`nOther frames and pages keep their own depth when the file format can store it;`nthis depth applies when it cannot.")
+    ToolTip2ctrl(hTemp, "PDF pages are saved at selected color depth.`nOther frames and pages keep their own depth when the file format can store it,`nthe selected color depth applies when it cannot.")
     sml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" sml " hp gbtnHelpSaveImgPanel", " ?", "Help")
     Gui, Add, Text, xs+15 y+7 w%ml% +0x200 +hwndhTemp -wrap, File format on save:
@@ -44648,7 +44649,7 @@ PanelSaveImg() {
     zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, oExt)
 
     INIaction(0, "prevFileSavePath", "General", 6)
-    RegAction(0, "userDesireWriteFMT",, 2, 1, 16)
+    RegAction(0, "userDesireWriteFMT",, 2, 1, 14)
     RegAction(0, "usePrevSaveFolder",, 1)
     RegAction(0, "PreserveDateTimeOnSave",, 1)
     ReadSettingsSaveFormatOptions(0)
@@ -62352,7 +62353,7 @@ FIMhasGreyPalette(hImage) {
    Return 1
 }
 
-saveExtractedGdipFrame(funcu, pBitmap, file2save, imgPath:="", fileDepth:="") {
+saveExtractedGdipFrame(pBitmap, file2save, imgPath:="", fileDepth:="") {
 ; Saves a frame or page drawn on a GDI+ bitmap; returns 0 on success. With the depth its file stores,
 ; see FIMpageDepthClass(), the frame keeps that depth when nothing is lost and the output format holds
 ; it, else it takes the «Fallback depth». PDF pages, and every frame when FreeImage is missing, are
@@ -62377,14 +62378,14 @@ saveExtractedGdipFrame(funcu, pBitmap, file2save, imgPath:="", fileDepth:="") {
    trGdip_GetImageDimensions(pBitmap, imgW, imgH)
    fmt := saveImgFormatsList[userExtractFramesFmt]
    If !isImgSizeTooLarge(imgW, imgH, fmt)
-      Return QPV_SaveImageFile(funcu, pBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+      Return QPV_SaveImageFile(A_ThisFunc, pBitmap, file2save, userJpegQuality, userSaveBitsDepth)
 
    capIMGdimensionsFormatlimits(fmt, 1, imgW, imgH)
-   kBitmap := trGdip_ResizeBitmap(funcu, pBitmap, imgW, imgH, 1)
+   kBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, imgW, imgH, 1)
    If !validBMP(kBitmap)
       Return 1
 
-   r := QPV_SaveImageFile(funcu, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+   r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
    trGdip_DisposeImage(kBitmap)
    Return r
 }
@@ -62567,7 +62568,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             Continue
          }
 
-         r := saveExtractedGdipFrame(A_ThisFunc, oBitmap, file2save)
+         r := saveExtractedGdipFrame(oBitmap, file2save)
          oBitmap := trGdip_DisposeImage(oBitmap)
          If r
             failedFrames++
@@ -62671,7 +62672,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
 
          trGdip_DrawImage(A_ThisFunc, Gu, oBitmap)
          Gdip_DeleteGraphics(Gu)
-         r := saveExtractedGdipFrame(A_ThisFunc, nBitmap, file2save, imgPath, fileDepth)
+         r := saveExtractedGdipFrame(nBitmap, file2save, imgPath, fileDepth)
          trGdip_DisposeImage(nBitmap)
          If r
             failedFrames++

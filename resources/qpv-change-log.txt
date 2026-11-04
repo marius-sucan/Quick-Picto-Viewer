@@ -9,8 +9,9 @@
   - [new] added support for JPEG XL (JXL), APNG, MNG, HEIC and AVIF images and animations, in addition to WEBP and GIF
   - [new] ability to join images as animated JXL, WEBP, APNG or MNG, in addition to the GIF, TIFF and PDF formats
   - [new] ability to set delay per frame when creating animated images
-  - much improved joining images as PDF
-  - color management works through FreeImage loaded files as well 
+  - color management now works through FreeImage loaded files as well 
+  - PDF joiner much improved
+  - fixed bugs in convert image file formats and extract frames from multi-page image files
   - fixed the animations playback
   - fixed the brushes not painting correctly in selection areas
   - no longer using AHK-H, it is now all in AHK-L v1.1
