@@ -43,19 +43,19 @@ Method:
 
 | # | Severity | What the user gets | Checked |
 |---|---|---|---|
-| 1 | High | Multi-page and animated files keep only their first page; then the original is recycled | Wine + reading |
-| 2 | High | In-place conversion deletes the original outright, even with «Keep original files» on; an explicit «Skip file» answer is overridden | Wine + reading; **fixed with originals kept, `26dd9d7`** |
+| 1 | High | Multi-page and animated files keep only their first page; then the original is recycled | Wine + reading; **fixed, `a2ec48c`** |
+| 2 | High | In-place conversion deletes the original outright, even with «Keep original files» on; an explicit «Skip file» answer is overridden | Wine + reading; **fixed with originals kept, `26dd9d7`**; in-place conversion removed, `a2ec48c` |
 | 3 | High | After a failed save of a PNG/JPG/TIFF the fallback reads freed memory: on AutoHotkey_H the run stopped responding, stock AutoHotkey reports a failure; Windows outcome unverified | Wine; **fixed, `e040c32`** |
-| 4 | Medium | Float HDR images (EXR, HDR, PFM, float JXL/TIFF/JXR) cannot be converted to PNG, JPEG 2000 or PPM | Wine |
+| 4 | Medium | Float HDR images (EXR, HDR, PFM, float JXL/TIFF/JXR) cannot be converted to PNG, JPEG 2000 or PPM | Wine; **fixed, `69b1bed`** |
 | 5 | Medium | 16-bit greyscale images cannot be converted to JPG, BMP, WebP, GIF, TGA, PPM, JNG or XPM | Wine; **fixed, `6065e4f`** |
 | 6 | Medium | Transparency is lost: palette images to WebP/JP2/JXR/TGA/JXL/TIFF/GIF, anything to GIF, HDR with alpha | Wine; **fixed, `db6ce3e`** |
 | 7 | Medium | Photos come out rotated twice (FreeImage path: Exif kept after rotating), or with all metadata dropped and unrotated (WIC path) | Wine + reading |
 | 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine |
-| 9 | Medium | Multi-threaded runs load files differently from single-threaded runs, and can switch mid-batch | reading (+ Wine for the two loaders' outputs) |
+| 9 | Medium | Multi-threaded runs load files differently from single-threaded runs, and can switch mid-batch | reading (+ Wine for the two loaders' outputs); **fixed, `a2ec48c`** |
 | 10 | Medium | Multi-threaded runs race on shared destination names; the conflict option is bypassed | reading |
 | 11 | Low | The destination format is read from an existing file's content, not from its extension | Wine |
-| 12 | Low | «Auto-skip format» compares extension text: `.jpeg`, `.jpe`, `.jfif`, `.tiff` are re-encoded | reading |
-| 13 | Low | PDF and SVG files always fail, although the panel shows PDF and SVG sliders | Wine |
+| 12 | Low | «Auto-skip format» compares extension text: `.jpeg`, `.jpe`, `.jfif`, `.tiff` are re-encoded | reading; **fixed, `a2ec48c`** |
+| 13 | Low | PDF and SVG files always fail, although the panel shows PDF and SVG sliders | Wine; **fixed, `a2ec48c`**; SVG not verifiable under Wine |
 | 14 | Low | The colour depth is not kept as the help promises: 1-bit becomes 24-bit; WIC turns 16-bit into 8-bit | Wine + reading |
 | 15 | Low | Smaller issues: 1×1 images rejected, progress below 100 %, 8-bit images to HDR/EXR/PFM fail | Wine + reading |
 
@@ -65,6 +65,27 @@ correctly.
 ---
 
 ## 1. Multi-page and animated files keep only their first page, then the original is recycled
+
+**Fixed in `a2ec48c`** (Marius's decisions of 2026-11-04). The converter has two options under its format row:
+- «Convert multipage files to the multipage file format selected», for GIF, WebP, JXL, TIF and PDF: a multipage
+  source becomes one file with all its pages. Frames keep their delays and the animation its loop count; pages
+  without a delay (TIFF, PDF) get the frame delay of the «Join images» panel. GIF frames get their palette as Save As
+  makes it, and the format options of the panel apply to the file.
+- «Extract pages/frames on conversion»: for the other formats, or with the first option off, each page becomes a file
+  of its own, `name_1.ext`, `name_2.ext`…, and every page follows the conflict option.
+- With neither, only the first page is converted, as before, and the original is kept.
+
+An original is removed only when every page was written; after an extraction its list entry points to the first
+page. The summary counts the multipage files not converted whole. Icons still convert their first image, by choice.
+
+Wine checks:
+- An animated GIF with frames of 120, 40, 250 and 60 ms, played twice, became WebP and JXL files with the same delays
+  and loop count.
+- APNG, JXL, AVIF, MNG and HEIF animations, a 16-page TIFF and a 3-page PDF became WebP, GIF, TIFF and PDF files with
+  every page.
+- Extractions wrote every page. With pages skipped by the conflict option, the original stayed.
+- A real two-worker run converted the same kinds of files.
+- Wine's GDI+ cannot reduce to 256 colours, so the Save As palette of GIF frames ran only as its FreeImage fallback.
 
 **What happens.** Every source is loaded as one image: WIC frame 0 (`:61364`, `:61378`) or `FreeImage_Load()`,
 which asks for page −1, that is page 0 (`:61371`). Neither function looks at the page count anywhere. After a
@@ -96,6 +117,11 @@ QPV already knows which formats can be multi-page: `multiPageAllTypesRegEx` (`:1
 - (c) For single-page destinations, write one file per page, as «Extract frames/pages» does.
 
 ## 2. In-place conversion deletes the original, ignores «Keep original files» and overrides an explicit «Skip file»
+
+**Superseded in `a2ec48c`**: no file is converted onto itself any more. A file already in the destination format, as
+its content tells, is skipped, or copied or moved to the destination folder. A file whose name gives another format
+than it holds, and would map onto itself, is skipped too. «Auto-skip format», the prompt below and
+`recycleReplacedOriginal()` are gone.
 
 **Fixed in `26dd9d7` with «Keep original files» on.** The batch asks once before it starts, and the single-file
 convert asks too, whenever files would be converted onto themselves:
@@ -208,6 +234,10 @@ A second path frees the same buffer while the bitmap still uses it: `.ico` desti
 - Or clone the bitmap before the first save.
 
 ## 4. Float HDR images cannot be converted to PNG, JPEG 2000 or PPM
+
+**Fixed in `69b1bed`** by the first fix option: a float source reaches the tone mapper whenever the format has no
+floating point type. Wine: the nine PNG, JP2 and PPM rows of the three sources now write 24-bit files. The RGBAF source
+gives 32-bit PNG and JP2 files whose alpha matches the source at the sampled pixels. No other row of the suites changed.
 
 **What happens.**
 1. For an RGBF or RGBAF source, the PNG, JP2 and PPM tables list `-f9-`/`-f10-` (RGB16, RGBA16). So
@@ -391,6 +421,11 @@ AVIF and HEIC. HLG files get verdict 0 on purpose and are written as they are.
 
 ## 9. Multi-threaded runs load files differently from single-threaded runs
 
+**Fixed in `a2ec48c`**: `initExternalCoreMode()` calls `initQPVmainDLL(1)`, which starts WIC as the main window does,
+without the window hook and the pen settings. Workers also render PDF and SVG files and write PDFs. They ask for no PDF
+password, so a protected PDF fails there, and show no tooltips. Wine: in a real two-worker run, a PDF became a 3-page
+WebP and every other file a PDF.
+
 **What happens.** A worker starts in `initExternalCoreMode()` (`:100106`), which never calls `initQPVmainDLL()`.
 So `WICmoduleHasInit` keeps its global default of 0, and `RegExWICfmtPtrn` still holds its placeholder.
 
@@ -457,6 +492,11 @@ at `:99291`.
 
 ## 12. «Auto-skip format» compares extension text
 
+**Fixed in `a2ec48c`** by the second fix option: the format is told by the file's content, `FreeImage_GetFileType()`
+against the destination's FIF. PDF and PPM go by their signatures, because FreeImage numbers no PDF and gives every PNM
+format one number. So `.jpeg`, `.jpe` and `.jfif` files count as JPG and `.tiff` files as TIF. A JPEG named `.png` is
+converted to PNG in a destination folder, and skipped in place.
+
 **What happens.** `isSameFormat` is `RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$")` (`:61018`, and
 `:38321` in the worker).
 
@@ -473,6 +513,11 @@ The panel ticks «Auto-skip format» every time it opens (`:90940`), so this is 
 - Or compare `FreeImage_GetFileType(imgPath)` with the destination's format number.
 
 ## 13. PDF and SVG files always fail, despite the panel's sliders
+
+**Fixed in `a2ec48c`**: PDF and SVG files are rendered by `loadRenderedFileAsFIM()`, at «Render PDF pages» and «SVG
+rendered resolution». A PDF of several pages follows the multipage options of finding 1, and PDF is also the
+converter's last destination format. Wine: the `test.pdf` row now gives a 583×350 PNG. Wine's Direct2D renders no SVG
+(`LoadSVGimage` returns nothing there), so SVG files still fail under Wine; Windows is unverified.
 
 **What happens.** The converter panel shows «Render PDF pages: DPI» and «SVG rendered resolution»
 (`:90947-90950`). No converter path reads them:
@@ -537,6 +582,9 @@ Pages beyond the first are never converted, whatever the format: finding 1, and 
 AVIF, HEIC (sequence and collection), MNG and ICO; animated WebP takes the same path. PDF does not convert at all
 (finding 13).
 
+Since `a2ec48c` they convert whole, page by page, or to their first page with the original kept; see finding 1. ICO
+files still convert their first image, by choice.
+
 ## Related, outside the two functions
 
 - **`convert2format()`** (`:61597`), the «Active file only» button, calls `coreConvertImgFormat()` too. It shares
@@ -560,7 +608,7 @@ AVIF, HEIC (sequence and collection), MNG and ICO; animated WebP takes the same 
   - The page entries are copies of the file's entry, selection flag included. If that file was selected before
     entering the mode, the batch converts the same file once per page.
 
-  Checked by reading.
+  Checked by reading. **Blocked since `a2ec48c`**: the converter panel shows the illegal-operation warning there.
 
 ## Not verified here
 
@@ -586,3 +634,11 @@ The kit is in `.claude/scratch/convert-audit-2026-11-02/`, which git ignores:
   `convert2format()` and the worker loop on real files, with the dialogs answered by a stub. Wine's Recycle Bin is
   redirected to `xdg/`.
 - `post2.py` then tells which files hold an original's exact bytes, and what reached the trash, from where.
+
+The checks of `69b1bed` and `a2ec48c` are in `.claude/scratch/convert-multipage-2026-11-04/`:
+- `t1/run_t1.sh quick|batch|full` slices the converter's batch, single-file and worker functions and runs them on
+  real files, with the trash under `t1/xdg`.
+- `app/shots.sh` screenshots the panel in the real app; `QPV_CALL=testWorkers` runs a real multi-threaded batch and
+  `QPV_CALL=testPagesMode` checks pages mode.
+- `xfim/` and `split/` are the 11-03 and 11-04 suites, adapted to the new signatures: `xfim/conv/run-head-vs-new.sh`,
+  `xfim/xt/run-head-vs-new.sh`, `xfim/f911/run.sh`, `xfim/f10/run.sh`, `split/gap/run.sh`.
