@@ -1893,6 +1893,23 @@ FreeImage_GetFrameTime(hImage) {
    Return NumGet(pValue+0, 0, "UInt")
 }
 
+FreeImage_GetLoopCount(hImage) {
+; How many times the animation plays, 0 for ever, from the "Loop" value its first frame carries.
+; It returns blank when the frame declares none.
+
+   Static FIMD_ANIMATION := 9
+        , FIDT_LONG := 4
+
+   If (!FreeImage_GetMetadata(hImage, FIMD_ANIMATION, "Loop", fiTag) || !fiTag)
+      Return
+
+   pValue := FreeImage_GetTagValue(fiTag)
+   If (!pValue || FreeImage_GetTagType(fiTag)!=FIDT_LONG)
+      Return
+
+   Return NumGet(pValue+0, 0, "UInt")
+}
+
 FreeImage_GetFrameDelays(ImgPath, ByRef delaysArray, ByRef totalTime:=0) {
 ; Every frame's duration, to tell the animation's length and
 ; which frame belongs to a moment.

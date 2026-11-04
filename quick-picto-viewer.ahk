@@ -359,7 +359,7 @@ Global PasteInPlaceGamma := 0, PasteInPlaceSaturation := 0, PasteInPlaceHue := 0
    , DrawLineAreaGridCenter := 2, DrawLineAreaCropShape := 1, OutlierFillColor := "eeFFaa"
    , OutlierFillOpacity := 200, alphaMaskBMPbright := 0, alphaMaskBMPcontrast := 0, FillAreaWelcomePattern := 1
    , toolbarViewerMode := 1, userCustomizedToolbar := 0, userThumbsToolbarList, userImgViewToolbarList
-   , thumbsModeItemHighlight := 1, convertFormatUseMultiThreads := 0, convertFormatAutoSkip := 1
+   , thumbsModeItemHighlight := 1, convertFormatUseMultiThreads := 0, convertFormatExtractFrames := 0, convertFormatMultiPages := 1
    , BlendModesFlipped := 0, allowToneMappingImg := 1, userThumbsSheetWidth := 300, userThumbsSheetHeight := 300
    , userThumbsSheetColumns := 10, userThumbsSheetSpacing := 50, userThumbsSheetFrame := 100
    , userThumbsSheetBgrColor := "FFffFF", userThumbsSheetShowLabel := 0, userThumbsSheetHideExt := 1
@@ -2326,6 +2326,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
 ;____________ Functions __________________
 
 initQPVmainDLL(modus:=0) {
+; modus=1 for the worker processes, which have no windows or menus of their own
    Static attempts := 0
 
    If (qpvMainDll || attempts>2)
@@ -2356,10 +2357,12 @@ initQPVmainDLL(modus:=0) {
       Return
    }
 
-   ; the menu machinery's WH_CALLWNDPROC hook, see callwndproc-hook.h and lib/module-interface.ahk
-   uiInstallSentMsgHook()
    If (modus!=1)
+   {
+      ; the menu machinery's WH_CALLWNDPROC hook, see callwndproc-hook.h and lib/module-interface.ahk
+      uiInstallSentMsgHook()
       disableWindowPenServices(PVhwnd)
+   }
 
    dupesDCTcoeffsInit := DllCall("qpvmain.dll\calculateDCTcoeffs", "int", 32)
    If !dupesDCTcoeffsInit
@@ -12202,7 +12205,7 @@ getIMGformatLimits(typu, ByRef dimLimit, ByRef mpxLimit) {
        , "jp2"  : [32760, 1073], "j2k"  : [32760, 1073]
        , "jpeg" : [65530, 4294], "jpg"  : [65530, 4294], "jfif": [65530, 4294]
        , "jpe"  : [65530, 4294], "jng"  : [65530, 4294], "gif" : [65530, 4294]
-       , "tga"  : [65530, 4294], "targa": [65530, 4294]}
+       , "tga"  : [65530, 4294], "targa": [65530, 4294], "pdf"  : [65530, 4294]}   ; PDF pages are stored as JPEG
 
     dimLimit := mpxLimit := 0
     z := fmtLimits[Format("{:L}", typu)]
@@ -37772,8 +37775,8 @@ scanExternalCoreThreads(pidsArray, spawnZeit, ByRef jobsRunning, ByRef jobDone, 
 countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
 ; Files a worker never reached: what its slot was given minus what its ThreadJob counters
 ; account for. Non-zero only after a thread crashed, was closed or was told to stop early.
-; The format conversion counters carry an extra field - originals that could not be removed
-; after converting - which is not a count of files and is left out.
+; The format conversion counters carry two extra fields, the third and the fifth, which
+; count files already counted, or no files, and are left out.
   leftoverFiles := 0
   Loop, % systemCores
   {
@@ -37791,7 +37794,7 @@ countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
      RegRead, filesStatus, %QPVregEntry%\multicore, ThreadJob%slotu%
      For fieldIndex, fieldu in StrSplit(filesStatus, "/")
      {
-        If (hasRemovalField=1 && fieldIndex=3)
+        If (hasRemovalField=1 && (fieldIndex=3 || fieldIndex=5))
            Continue
         If (fieldu>0)
            accountedFiles += fieldu
@@ -37803,10 +37806,11 @@ countExternalCoreThreadsLeftovers(filesListu, hasRemovalField:=0) {
   Return leftoverFiles
 }
 
-sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef failedFiles, ByRef theseFailures, ByRef skippedFiles) {
+sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef failedFiles, ByRef theseFailures, ByRef skippedFiles, ByRef partialFiles:=0) {
 ; The ThreadJob counters of every slot added up: processed/failed/skipped, with the format
-; conversion's extra third field - originals that could not be removed - in between.
-  processedFiles := failedFiles := theseFailures := skippedFiles := 0
+; conversion's extra third field - originals that could not be removed - in between, and its
+; fifth: the files of which only some pages were converted, also counted as processed.
+  processedFiles := failedFiles := theseFailures := skippedFiles := partialFiles := 0
   Loop, % systemCores
   {
      Sleep, 1
@@ -37822,6 +37826,8 @@ sumExternalCoreThreadsCounters(hasRemovalField, ByRef processedFiles, ByRef fail
            theseFailures += filesStatusArr[3]
         If (filesStatusArr[4]>0)
            skippedFiles += filesStatusArr[4]
+        If (filesStatusArr[5]>0)
+           partialFiles += filesStatusArr[5]
      } Else If (filesStatusArr[3]>0)
         skippedFiles += filesStatusArr[3]
   }
@@ -37846,7 +37852,7 @@ flagDispatchedFilesForThumbsRefresh(filesListu) {
   ForceRefreshNowThumbsList()
 }
 
-multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles) {
+multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles, partialFiles:=0) {
   infos := ""
   If (failedFiles>0)
      infos .= "`nFailed to " job.failVerb " " groupDigits(failedFiles) " files"
@@ -37854,6 +37860,8 @@ multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles) {
      infos .= "`nUnable to remove " groupDigits(theseFailures) " original files after conversion"
   If (skippedFiles>0)
      infos .= "`nSkipped files: " groupDigits(skippedFiles)
+  If (partialFiles>0)
+     infos .= "`nMultipage files not converted whole: " groupDigits(partialFiles) ((OnConvertKeepOriginals!=1) ? ". Their originals were kept." : "")
   Return infos
 }
 
@@ -37897,11 +37905,12 @@ calculateCoresRequired(filesElected) {
    Return filesPerCore
 }
 
-initWorkLoadMultiCoresConvertFormat(maxList, inPlaceAction:="") {
+initWorkLoadMultiCoresConvertFormat(maxList) {
   job := {}
   job.maxList := maxList
   job.mode := "batch-fmtconv"
-  job.args := inPlaceAction
+  ; the frame delay of the «Join images» panel, not saved, goes to the pages without a delay
+  job.args := userCombineGIFframeDelay
   job.hasRemovalField := 1
   job.failVerb := "convert"
   job.progressMsg := "Converting to ." rDesireWriteFMT " format, please wait"
@@ -38014,7 +38023,7 @@ WorkLoadMultiCoreHandler(job) {
       Sleep, 200
       If (A_TickCount - prevMSGdisplay>1500)
       {
-         sumExternalCoreThreadsCounters(job.hasRemovalField, processedFiles, failedFiles, theseFailures, skippedFiles)
+         sumExternalCoreThreadsCounters(job.hasRemovalField, processedFiles, failedFiles, theseFailures, skippedFiles, partialFiles)
          skippedFiles += excludedFiles
          If (abandonAll=1)
          {
@@ -38027,7 +38036,7 @@ WorkLoadMultiCoreHandler(job) {
             etaTime .= "`nUsing " jobsRunning " / " systemCores " execution threads"
             If (threadsCrashed>0)
                etaTime .= "`n" threadsCrashed " threads have crashed"
-            etaTime .= multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles)
+            etaTime .= multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles, partialFiles)
             showTOOLtip(job.progressMsg etaTime, 0, 0, processedFiles / countTFilez)
          }
          prevMSGdisplay := A_TickCount
@@ -38043,7 +38052,7 @@ WorkLoadMultiCoreHandler(job) {
       closedThreads += closeUnresponsiveCoreThreads(pidsArray, abortRequestedZeit, jobsRunning)
   }
 
-  sumExternalCoreThreadsCounters(job.hasRemovalField, processedFiles, failedFiles, theseFailures, skippedFiles)
+  sumExternalCoreThreadsCounters(job.hasRemovalField, processedFiles, failedFiles, theseFailures, skippedFiles, partialFiles)
   skippedFiles += excludedFiles
   theFinalList := ""
   Loop, % systemCores
@@ -38063,7 +38072,7 @@ WorkLoadMultiCoreHandler(job) {
   zeitOperation := A_TickCount - startOperation
   percDone := " ( " Round((processedFiles / countTFilez) * 100) "% )"
   someErrors := "`nElapsed time: " SecToHHMMSS(Round(zeitOperation/1000, 3)) percDone
-  someErrors .= multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles)
+  someErrors .= multiCoresCountersInfos(job, failedFiles, theseFailures, skippedFiles, partialFiles)
   If (leftoverFiles>0 && threadsCrashed>0)
      someErrors .= "`n" groupDigits(leftoverFiles) " files were left unprocessed by threads that crashed or were stopped"
 
@@ -38253,7 +38262,8 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "ResizeRotationUser",, 2, -180, 180)
     RegAction(act, "ResizeUseDestDir",, 1)
     RegAction(act, "ResizeWithCrop",, 1)
-    RegAction(act, "convertFormatAutoSkip",, 1)
+    RegAction(act, "convertFormatExtractFrames",, 1)
+    RegAction(act, "convertFormatMultiPages",, 1)
     RegAction(act, "SimpleOperationsDoCrop",, 1)
     RegAction(act, "SimpleOperationsFlipH",, 1)
     RegAction(act, "SimpleOperationsFlipV",, 1)
@@ -38261,7 +38271,7 @@ coreReadSettingsImageProcessing(act) {
     RegAction(act, "SimpleOperationsScaleXimgFactor",, 2, 1, 32750)
     RegAction(act, "SimpleOperationsScaleYimgFactor",, 2, 1, 32750)
     RegAction(act, "userActionConflictingFile",, 2, 1, 4)
-    RegAction(act, "userDesireWriteFMT",, 2, 1, 16)
+    RegAction(act, "userDesireWriteFMT",, 2, 1, 14)
     RegAction(act, "userJpegQuality",, 2, 1, 100)
     RegAction(act, "userVPsvgScale",, 2, 1, 10)
     RegAction(act, "userVPpdfDPI",, 2, 72, 3500)
@@ -38272,7 +38282,7 @@ coreReadSettingsImageProcessing(act) {
     {
        calculateToneMappingAlgoParams(cmrRAWtoneMapAlgo, UIuserToneMapParamA, UIuserToneMapParamB, UIuserToneMapParamC, UIuserToneMapParamD, UIuserToneMapOCVparamA, UIuserToneMapOCVparamB)
        decideUserImgRotationOption()
-       rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
+       rDesireWriteFMT := getConverterWriteFmt(userDesireWriteFMT)
     }
 }
 
@@ -38288,14 +38298,16 @@ ReadSettingsSaveFormatOptions(act) {
     RegAction(act, "userGifPaletteTransparency",, 1)
 }
 
-multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
-; inPlaceAction - the answer given to askConvertInPlaceKeepOriginals() by the main thread
+multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
+; frameDelay - for the pages without a delay, given by the main thread [see initWorkLoadMultiCoresConvertFormat()]
   resultsList := ""
-  failedFiles := theseFailures := countFilez := operationDone := 0
+  failedFiles := theseFailures := countFilez := skippedFiles := partialFiles := operationDone := 0
   ; FileRead, filesList, %thumbsCacheFolder%\tempList%coreThread%.txt
   ReadSettingsFormatConvert()
   initFIMGmodule()
-  ; fnOutputDebug(A_ThisHotkey "|" coreThread "|" convertFormatAutoSkip)
+  If !(frameDelay>0)
+     frameDelay := userCombineGIFframeDelay
+
   Loop, Parse, filesList,`n,`r
   {
       If A_LoopField
@@ -38306,6 +38318,8 @@ multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
             Continue
       } Else Continue
 
+      ; the counters of the files done: converted / failed / originals not removed / skipped / converted in part
+      RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles "/" partialFiles
       RegRead, mustAbortAllOperations, %QPVregEntry%\multicore, mustAbortAllOperations
       If (mustAbortAllOperations=1 || (mainThreadHwnd && !WinExist("ahk_id " mainThreadHwnd)))
       {
@@ -38322,10 +38336,10 @@ multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
          Continue
       }
 
-      isSameFormat := RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") ? 1 : 0
-      If (isSameFormat=1 && convertFormatAutoSkip=1)
+      If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
-         If (ResizeUseDestDir=1)
+         ; a file already in the format is not converted again: it only goes to the destination folder
+         If (ResizeUseDestDir=1 && !isSameFilePath(imgPath, file2save))
          {
             If (FileExist(file2save) && !FolderExist(file2save))
                file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
@@ -38349,7 +38363,6 @@ multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
                {
                   countFilez++
                   resultsList .= lineArr[1] "?" file2save "`n"
-                  RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles
                   If originalMtime
                   {
                      FileSetTime, % originalMtime, % file2save, M
@@ -38357,79 +38370,61 @@ multiCoreThreadFormatConvert(coreThread, filesList, inPlaceAction:="") {
                   }
                } Else failedFiles++
             } Else skippedFiles++
-            Continue
-         } Else
+         } Else skippedFiles++
+         Continue
+      }
+
+      mode := converterPagesMode(imgPath, rDesireWriteFMT, pages)
+      If (mode!="extract")
+      {
+         ; a file whose name gives another format than it holds would be converted onto itself
+         If isSameFilePath(imgPath, file2save)
+            file2save := ""
+         Else If (FileExist(file2save) && !FolderExist(file2save))
+            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+
+         If (file2save="abort")
+         {
+            abandonAll := 1
+            Break
+         } Else If !file2save
          {
             skippedFiles++
             Continue
          }
       }
 
-      recycleOriginal := 0
-      If (inPlaceAction && isSameFormat=1 && imgPath=file2save)
-      {
-         file2save := OutDir "\" OutNameNoExt "." rDesireWriteFMT
-         If (inPlaceAction="recycle")
-            recycleOriginal := 1
-         Else
-            file2save := getAutoRenamedFreePath(file2save)
-
-         If !file2save
-         {
-            skippedFiles++
-            Continue
-         }
-      }
-
-      of := file2save
-      If (!recycleOriginal && FileExist(file2save) && !FolderExist(file2save))
-         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
-
-      If !file2save
-      {
-         If (ResizeUseDestDir!=1 && convertFormatAutoSkip=0 && isSameFormat=1)
-         {
-            file2save := of
-         } Else
-         {
-            skippedFiles++
-            Continue
-         }
-      } Else If (file2save="abort")
+      r := coreConvertImgFilePages(imgPath, file2save, mode, pages, frameDelay, keepOriginal, savedFile)
+      If (r=-5)
       {
          abandonAll := 1
          Break
-      }
-
-      r := coreConvertImgFormat(imgPath, file2save, 0, 0, recycleOriginal)
-      If r
-         failedFiles++
-      Else
-         countFilez++
-
-      If (recycleOriginal=1 && !r && FileExist(file2save "-tmp"))
-         theseFailures++
-
-      wasSucces := r ? 0 : 1
-      If (OnConvertKeepOriginals!=1 && !r)
+      } Else If (r=2)
       {
-         If (imgPath!=file2save)
+         skippedFiles++
+      } Else If r
+      {
+         failedFiles++
+      } Else
+      {
+         countFilez++
+         If keepOriginal
+         {
+            partialFiles++
+         } Else If (OnConvertKeepOriginals!=1)
          {
             FileSetAttrib, -R, %imgPath%
             Sleep, 2
             FileRecycle, %imgPath%
             If ErrorLevel
                theseFailures++
+
+            resultsList .= lineArr[1] "?" savedFile "`n"
          }
-
-         If (wasSucces=1)
-            resultsList .= lineArr[1] "?" file2save "`n"
       }
-
-      RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles
    }
 
-   RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles
+   RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles "/" partialFiles
    If resultsList
       Try FileAppend, % resultsList, %thumbsCacheFolder%\tempList%coreThread%.txt, UTF-16
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 2
@@ -43823,17 +43818,39 @@ convertFocusedFileToPDF() {
        Return msgBeepTimer("ERROR: The selected file seems to no longer exist:`n" OutFileName "`n" OutDir "\")
 
     file2save := OutDir "\" OutFileNameNoExt ".pdf"
-    UserCombinePDFpageSize := 9
-    userCombinePDFkeepJpegs := 1
-    ResizeApplyEffects := 0
-    userCombineSubFrames := 1
-    userCombineFramesFmt := 2
-    CombineImgsIntoPDF(file2save, currentFileIndex)
+    CombineImgsIntoPDF(file2save, currentFileIndex, pdfPageOptions(1))
 }
 
-CombineImgsIntoPDF(file2save, forcedIndex:=0) {
+pdfPageOptions(asConvertToPDF:=0) {
+; The options of PDF pages: those of the «Join images» panel or, with asConvertToPDF=1, those of
+; «Convert active file to PDF»: each page the size of its image, every frame, JPEG files as they are, no viewport effects.
+   If (asConvertToPDF=1)
+   {
+      ; the resolution and background color saved in the «Join images» panel
+      RegAction(0, "userCombinePDFdpi",, 2, 50, 1200)
+      RegAction(0, "UserCombinePDFbgrColor",, 3)
+   }
+
+   pdf := {dpi: clampInRange(userCombinePDFdpi, 50, 1200), quality: clampInRange(userJpegQuality, 1, 100), bgColor: "0x" UserCombinePDFbgrColor}
+   ; of the loaders, only FreeImage turns JPEGs by their EXIF orientation [FIMdecideLoadArgs]
+   pdf.exifTurns := (alwaysOpenWithFIM=1 && allowFIMloader=1 && wasInitFIMlib=1) ? 1 : 0
+   If (asConvertToPDF=1)
+   {
+      pdf.pageSize := 9, pdf.frames := 1, pdf.doFX := 0, pdf.keepJpegs := 1
+      Return pdf
+   }
+
+   pdf.pageSize := UserCombinePDFpageSize, pdf.landscape := combinePDFpageLandscape, pdf.enlarge := userCombinePDFenlarge
+   pdf.alignH := userCombinePDFalignH, pdf.alignV := userCombinePDFalignV, pdf.frames := userCombineSubFrames
+   pdf.doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
+   pdf.keepJpegs := (userCombinePDFkeepJpegs=1 && pdf.doFX=0) ? 1 : 0
+   Return pdf
+}
+
+CombineImgsIntoPDF(file2save, forcedIndex:=0, pdf:="") {
 ; The pages are written one at a time by the PDF writer of qpvmain.dll [pdf-writer.h], to a
 ; file next to the destination that replaces it only once the document is complete.
+; pdf - the page options, see pdfPageOptions(); those of the «Join images» panel when omitted
    If (forcedIndex=0)
    {
       filesElected := getSelectedFiles(0, 1)
@@ -43865,13 +43882,8 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
       Return msgBeepTimer("ERROR: " msgu)
    }
 
-   dpi := clampInRange(userCombinePDFdpi, 50, 1200)
-   quality := clampInRange(userJpegQuality, 1, 100)
-   bgColor := "0x" UserCombinePDFbgrColor
-   ; of the loaders, only FreeImage turns JPEGs by their EXIF orientation [FIMdecideLoadArgs]
-   exifTurns := (alwaysOpenWithFIM=1 && allowFIMloader=1 && wasInitFIMlib=1) ? 1 : 0
-   doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
-   keepJpegs := (userCombinePDFkeepJpegs=1 && doFX=0) ? 1 : 0
+   If !IsObject(pdf)
+      pdf := pdfPageOptions()
 
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
@@ -43913,69 +43925,11 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
          prevMSGdisplay := A_TickCount
       }
 
-      If (keepJpegs=1 && RegExMatch(imgPath, "i)\.(jpg|jpeg|jpe|jfif)$"))
-      {
-         r := pdfAddOriginalJpeg(hPdf, imgPath, dpi, bgColor, exifTurns)
-         If (r=0)
-         {
-            pagesAdded++
-            keptJpegs++
-            Continue
-         } Else If (r=2)
-         {
-            writeFailed := 1
-            Break
-         }
-      }
-
-      pBitmap := LoadBitmapFromFileu(imgPath)
-      If !validBMP(pBitmap)
-      {
-         failedPages++
-         Continue
-      }
-
-      totalFrames := (userCombineSubFrames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
-      If (totalFrames<1)   ; a loader that reported no frame at all leaves .Frames at -1
-         totalFrames := 1
-
-      thisZeit := A_TickCount
-      Loop, % totalFrames
-      {
-         If (A_Index>1)
-         {
-            If (determineTerminateOperation()=1)
-            {
-               abandonAll := 1
-               Break
-            }
-
-            pBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
-            If !validBMP(pBitmap)
-            {
-               failedPages++
-               Continue
-            }
-         }
-
-         r := pdfAddBitmapPage(hPdf, pBitmap, dpi, quality, bgColor, doFX, mainLoadedIMGdetails.HasAlpha)
-         If (r=0)
-         {
-            pagesAdded++
-         } Else If (r=2)
-         {
-            writeFailed := 1
-            Break
-         } Else
-            failedPages++
-
-         If ((A_TickCount - prevMSGdisplay>1500) && A_Index>4)
-         {
-            etaTime := ETAinfos(A_Index, totalFrames, thisZeit)
-            showTOOLtip("Creating the PDF file, please wait`n" OutFileName etaTime "`nPages added: " groupDigits(pagesAdded) "`nPages in current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
-            prevMSGdisplay := A_TickCount
-         }
-      }
+      r := pdfAddFilePages(hPdf, imgPath, pdf, pagesAdded, keptJpegs, failedPages, prevMSGdisplay, OutFileName)
+      If (r=2)
+         writeFailed := 1
+      Else If (r=-5)
+         abandonAll := 1
 
       If (writeFailed=1 || abandonAll=1 || forcedIndex>0)
          Break
@@ -44008,14 +43962,84 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0) {
       msgBeepTimer("ERROR: Failed to finish the PDF file. Unknown error.`n" OutFileName)
 }
 
-pdfPlaceImage(imgW, imgH, dpi) {
-; Where an image of imgW x imgH pixels, shown at dpi, goes on the page set in the panel, in
-; PDF points [1/72 inch] from the bottom left corner. rw x rh is the size its pixels are stored
-; at: never more than the image has, as the PDF reader does any enlarging.
+pdfAddFilePages(hPdf, imgPath, pdf, ByRef pagesAdded, ByRef keptJpegs, ByRef failedPages, ByRef prevMSGdisplay, pdfName:="") {
+; Adds the image file to the PDF document hPdf: its first image, or every frame with pdf.frames=1,
+; see pdfPageOptions(). The counters grow by what was added. Returns 0, 2 when writing failed,
+; or -5 when the user aborted.
+   If (pdf.keepJpegs=1 && RegExMatch(imgPath, "i)\.(jpg|jpeg|jpe|jfif)$"))
+   {
+      r := pdfAddOriginalJpeg(hPdf, imgPath, pdf)
+      If (r=0)
+      {
+         pagesAdded++
+         keptJpegs++
+         Return 0
+      } Else If (r=2)
+         Return 2
+   }
+
+   ; the loaders describe each file in mainLoadedIMGdetails, which belongs to the image on screen
+   backupIMGdetails := mainLoadedIMGdetails.Clone()
+   pBitmap := LoadBitmapFromFileu(imgPath)
+   If !validBMP(pBitmap)
+   {
+      mainLoadedIMGdetails := backupIMGdetails
+      failedPages++
+      Return 0
+   }
+
+   totalFrames := (pdf.frames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
+   If (totalFrames<1)   ; a loader that reported no frame at all leaves .Frames at -1
+      totalFrames := 1
+
+   r := 0
+   thisZeit := A_TickCount
+   Loop, % totalFrames
+   {
+      If (A_Index>1)
+      {
+         If (determineTerminateOperation()=1)
+         {
+            r := -5
+            Break
+         }
+
+         pBitmap := LoadBitmapFromFileu(imgPath, 0, 0, A_Index - 1)
+         If !validBMP(pBitmap)
+         {
+            failedPages++
+            Continue
+         }
+      }
+
+      r := pdfAddBitmapPage(hPdf, pBitmap, pdf, mainLoadedIMGdetails.HasAlpha)
+      If (r=0)
+         pagesAdded++
+      Else If (r=2)
+         Break
+      Else
+         failedPages++
+
+      If ((A_TickCount - prevMSGdisplay>1500) && A_Index>4)
+      {
+         etaTime := ETAinfos(A_Index, totalFrames, thisZeit)
+         showTOOLtip("Creating the PDF file, please wait`n" pdfName etaTime "`nPages added: " groupDigits(pagesAdded) "`nPages in current file: " groupDigits(A_Index) " / " groupDigits(totalFrames), 0, 0, A_Index / totalFrames)
+         prevMSGdisplay := A_TickCount
+      }
+   }
+
+   mainLoadedIMGdetails := backupIMGdetails
+   Return (r=2 || r=-5) ? r : 0
+}
+
+pdfPlaceImage(imgW, imgH, pdf) {
+; Where an image of imgW x imgH pixels, shown at pdf.dpi, goes on the page the options of pdf
+; describe, in PDF points [1/72 inch] from the bottom left corner. rw x rh is the size its pixels
+; are stored at: never more than the image has, as the PDF reader does any enlarging.
    Static paperSizes := {1:[595.28, 841.89], 2:[246.24, 155.52], 3:[1080, 1440], 4:[612, 792], 5:[792, 1224], 6:[612, 1008], 7:[841.89, 1190.55], 8:[419.53, 595.28]}
-   natW := imgW * 72 / dpi
-   natH := imgH * 72 / dpi
-   If (UserCombinePDFpageSize=9)   ; same as the image
+   natW := imgW * 72 / pdf.dpi
+   natH := imgH * 72 / pdf.dpi
+   If (pdf.pageSize=9)   ; same as the image
    {
       ; PDF readers want pages between 3 and 14400 points [200 inches] a side
       s := (natW>14400 || natH>14400) ? 14400 / max(natW, natH) : 1
@@ -44027,18 +44051,18 @@ pdfPlaceImage(imgW, imgH, dpi) {
       x := y := 0
    } Else
    {
-      paper := paperSizes[UserCombinePDFpageSize]
+      paper := paperSizes[pdf.pageSize]
       If !IsObject(paper)
          paper := paperSizes[1]
 
-      pw := (combinePDFpageLandscape=1) ? paper[2] : paper[1]
-      ph := (combinePDFpageLandscape=1) ? paper[1] : paper[2]
+      pw := (pdf.landscape=1) ? paper[2] : paper[1]
+      ph := (pdf.landscape=1) ? paper[1] : paper[2]
       s := min(pw / natW, ph / natH)
-      If (userCombinePDFenlarge!=1 && s>1)
+      If (pdf.enlarge!=1 && s>1)
          s := 1
 
-      x := (userCombinePDFalignH=2) ? (pw - natW*s)/2 : (userCombinePDFalignH=3) ? pw - natW*s : 0
-      y := (userCombinePDFalignV=2) ? (ph - natH*s)/2 : (userCombinePDFalignV=1) ? ph - natH*s : 0
+      x := (pdf.alignH=2) ? (pw - natW*s)/2 : (pdf.alignH=3) ? pw - natW*s : 0
+      y := (pdf.alignV=2) ? (ph - natH*s)/2 : (pdf.alignV=1) ? ph - natH*s : 0
    }
 
    rw := (s<1) ? max(Round(imgW * s), 1) : imgW
@@ -44046,7 +44070,7 @@ pdfPlaceImage(imgW, imgH, dpi) {
    Return {pw: pw, ph: ph, x: x, y: y, w: natW*s, h: natH*s, scale: s, rw: rw, rh: rh}
 }
 
-pdfAddOriginalJpeg(hPdf, imgPath, dpi, bgColor, exifTurns) {
+pdfAddOriginalJpeg(hPdf, imgPath, pdf) {
 ; Embeds a JPEG file as it is. Returns 0 when the page was added, 1 when the file does not
 ; suit [the caller decodes it instead] and 2 when writing failed.
    VarSetCapacity(info, 20, 0)
@@ -44055,21 +44079,21 @@ pdfAddOriginalJpeg(hPdf, imgPath, dpi, bgColor, exifTurns) {
 
    imgW := NumGet(info, 0, "UInt")
    imgH := NumGet(info, 4, "UInt")
-   If (exifTurns=1 && NumGet(info, 12, "UInt")>4)   ; EXIF orientations 5 to 8 turn the image by 90°
+   If (pdf.exifTurns=1 && NumGet(info, 12, "UInt")>4)   ; EXIF orientations 5 to 8 turn the image by 90°
    {
       imgW := NumGet(info, 4, "UInt")
       imgH := NumGet(info, 0, "UInt")
    }
 
-   L := pdfPlaceImage(imgW, imgH, dpi)
+   L := pdfPlaceImage(imgW, imgH, pdf)
    ; a file more than 1.5 times as dense as the chosen DPI is resampled instead
    If (L.scale*1.5<1)
       Return 1
 
-   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", exifTurns, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", bgColor, "Int")
+   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", pdf.exifTurns, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdf.bgColor, "Int")
 }
 
-pdfAddBitmapPage(hPdf, pBitmap, dpi, quality, bgColor, doFX, hasAlpha) {
+pdfAddBitmapPage(hPdf, pBitmap, pdf, hasAlpha) {
 ; Adds a page showing a loaded bitmap, which it disposes. Returns 0 when the page was added,
 ; 1 when it could not be and 2 when writing failed.
    trGdip_GetImageDimensions(pBitmap, imgW, imgH)
@@ -44079,8 +44103,8 @@ pdfAddBitmapPage(hPdf, pBitmap, dpi, quality, bgColor, doFX, hasAlpha) {
       Return 1
    }
 
-   L := pdfPlaceImage(imgW, imgH, dpi)
-   If (doFX=1)
+   L := pdfPlaceImage(imgW, imgH, pdf)
+   If (pdf.doFX=1)
    {
       ; at the size the page shows the image, as the viewport applies them
       If (L.rw<imgW || L.rh<imgH)
@@ -44097,9 +44121,59 @@ pdfAddBitmapPage(hPdf, pBitmap, dpi, quality, bgColor, doFX, hasAlpha) {
       flipBitmapAccordingToViewPort(pBitmap)
    }
 
-   r := DllCall("qpvmain.dll\PdfWriterAddBitmap", "UPtr", hPdf, "UPtr", pBitmap, "Int", L.rw, "Int", L.rh, "Int", quality, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", bgColor, "Int")
+   r := DllCall("qpvmain.dll\PdfWriterAddBitmap", "UPtr", hPdf, "UPtr", pBitmap, "Int", L.rw, "Int", L.rh, "Int", pdf.quality, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdf.bgColor, "Int")
    trGdip_DisposeImage(pBitmap, 1)
    Return r
+}
+
+coreConvertImgToPDF(imgPath, file2save, allFrames:=0, ByRef pagesAdded:=0, pBitmap:=0) {
+; Writes file2save as «Convert active file to PDF» does, see pdfPageOptions(): from the image file imgPath,
+; all its frames with allFrames=1, or from the GDI+ bitmap pBitmap, which it disposes.
+; Returns 0 on success, 1 on failure, or -5 when the user aborted.
+   pagesAdded := keptJpegs := failedPages := 0
+   initQPVmainDLL()
+   hPdf := DllCall("qpvmain.dll\PdfWriterBegin", "WStr", file2save, "Int*", errCode, "UPtr")
+   If !hPdf
+   {
+      trGdip_DisposeImage(pBitmap, 1)
+      addJournalEntry(A_ThisFunc "(): the PDF file could not be started [error " errCode "]:`n" file2save)
+      Return 1
+   }
+
+   pdf := pdfPageOptions(1)
+   pdf.frames := allFrames
+   zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt)
+   If pBitmap
+   {
+      r := pdfAddBitmapPage(hPdf, pBitmap, pdf, 0)
+      pagesAdded := (r=0) ? 1 : 0
+   } Else
+   {
+      prevMSGdisplay := A_TickCount
+      r := pdfAddFilePages(hPdf, imgPath, pdf, pagesAdded, keptJpegs, failedPages, prevMSGdisplay, OutFileName)
+   }
+
+   commit := (r!=2 && r!=-5 && pagesAdded>0) ? 1 : 0
+   e := DllCall("qpvmain.dll\PdfWriterEnd", "UPtr", hPdf, "Int", commit, "WStr", OutNameNoExt, "WStr", appTitle " v" appVersion, "WStr", "D:" A_Now, "Int")
+   If (commit=1 && e=0)
+   {
+      If (PreserveDateTimeOnSave=1 && !pBitmap)
+         copyFileTimes(imgPath, file2save)
+      Return 0
+   }
+
+   Return (r=-5) ? -5 : 1
+}
+
+copyFileTimes(fromPath, toPath) {
+; the modification and creation times of fromPath given to toPath
+   FileGetTime, mTime, % fromPath, M
+   FileGetTime, cTime, % fromPath, C
+   If mTime
+   {
+      FileSetTime, % mTime, % toPath, M
+      FileSetTime, % cTime, % toPath, C
+   }
 }
 
 BTNperformExtractFrames(a) {
@@ -44133,7 +44207,7 @@ BTNperformExtractFrames(a) {
    } Else
    {
       extractedFrames := failedFrames := 0
-      r := coreExtractFramesFromImage(currentFileIndex, 0, 0, 0, failedFrames, extractedFrames)
+      r := coreExtractFramesFromImage(currentFileIndex, 0, 0, 0, failedFrames, extractedFrames, extractFramesOptions())
       If (r=-5)
          msgBeepTimer("WARNING: User abandoned operation.`n" extractedFrames " frames or pages were already extracted in:`n" PathCompact(ResizeDestFolder "\", 51), 0)
       Else If (r=-4)
@@ -44713,7 +44787,7 @@ PanelSaveImg() {
     isMemoryImg := (InStr(imgPath, "Q:\temporary memory object\") || !imgPath) ? 1 : 0
     fmtChoice := isMemoryImg ? 0 : saveFormatIndexFromPath(getIMGsaveDestination(currentFileIndex))
     If !fmtChoice
-       fmtChoice := isInRange(userDesireWriteFMT, 1, 14) ? userDesireWriteFMT : saveFormatIndexFromPath(".png")
+       fmtChoice := getSharedWriteFmtIndex()
 
     thisWid := (PrefsLargeFonts=1) ? 70 : 45
     Gui, Add, Checkbox, x15 y15 Section gTglUsePrevSaveFolderu Checked%usePrevSaveFolder% vusePrevSaveFolder, &Open dialog in:
@@ -44798,6 +44872,7 @@ updateConverterFormatOptions(fmt) {
    actu := isGIF ? "SettingsGUIA: Hide" : "SettingsGUIA: Show"
    GuiUpdateVisibilitySliders(actu, "userJpegQuality")
    GuiControl, % actu, btnConvertFmtHelp
+   GuiControl, % converterHoldsPages(fmt) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable", convertFormatMultiPages
 }
 
 updateSaveFormatOptions(fmt) {
@@ -44812,7 +44887,8 @@ updateSaveFormatOptions(fmt) {
       GuiControl, % InStr(shown, "|" A_LoopField "|") ? "SettingsGUIA: Show" : "SettingsGUIA: Hide", % A_LoopField
 
    hasLossless := isVarEqualTo(fmt, "webp", "jxl", "jxr", "jp2")
-   uiSlidersArray["userJpegQuality", 10] := (isVarEqualTo(fmt, "jpg", "jng") || hasLossless && userSaveImgLossless!=1) ? 1 : 0
+   ; the converter's PDF pages are stored as JPEG files
+   uiSlidersArray["userJpegQuality", 10] := (isVarEqualTo(fmt, "jpg", "jng", "pdf") || hasLossless && userSaveImgLossless!=1) ? 1 : 0
    ReadSettingsSaveFormatOptions(1)
 }
 
@@ -44825,7 +44901,7 @@ UIsaveFormatOptionsChanged() {
       Gui, SettingsGUIA: Default
       Gui, SettingsGUIA: Submit, NoHide
       RegAction(1, "userDesireWriteFMT")
-      updateConverterFormatOptions(saveImgFormatsList[userDesireWriteFMT])
+      updateConverterFormatOptions(getConverterWriteFmt(userDesireWriteFMT))
       GuiRefreshSliders()
    }
 }
@@ -59023,7 +59099,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
    If FolderExist(dummy)
       defaultu := dummy "\" OutNameNoExt
 
-   getSaveDialogIndexForFile(imgPath, defFMTindex, 0, userDesireWriteFMT)
+   getSaveDialogIndexForFile(imgPath, defFMTindex, 0, getSharedWriteFmtIndex())
    If (fmtIndex>0)
       defFMTindex := fmtIndex
 
@@ -60977,20 +61053,6 @@ batchConvert2format() {
          Return
    }
 
-   ; with «Keep original files» on, files converted onto themselves are asked about once; the
-   ; «Auto-rename» option keeps their originals anyway, and «Skip files» skips them in a destination folder
-   inPlaceAction := ""
-   If (OnConvertKeepOriginals=1 && convertFormatAutoSkip=0 && (userActionConflictingFile>2 || userActionConflictingFile=1 && ResizeUseDestDir!=1))
-   {
-      inPlaceFiles := countConflictFilesFolder(ResizeUseDestDir, ResizeDestFolder, rDesireWriteFMT)
-      If (inPlaceFiles>0)
-      {
-         inPlaceAction := askConvertInPlaceKeepOriginals(inPlaceFiles)
-         If !inPlaceAction
-            Return
-      }
-   }
-
    BtnCloseWindow()
    If (!FolderExist(ResizeDestFolder) && ResizeUseDestDir=1)
    {
@@ -61009,7 +61071,7 @@ batchConvert2format() {
    {
       setPriorityThread(-2)
       addJournalEntry("Preparing " systemCores " threads to start. " filesPerCore " files per thread.")
-      infoResult := initWorkLoadMultiCoresConvertFormat(filesElected, inPlaceAction)
+      infoResult := initWorkLoadMultiCoresConvertFormat(filesElected)
       setPriorityThread(0)
       If (infoResult!="single-core")
          Return
@@ -61025,7 +61087,7 @@ batchConvert2format() {
 
    doStartLongOpDance()
    initFIMGmodule()
-   skippedFiles := theseFailures := failedFiles := countTFilez := filesConverted := 0
+   skippedFiles := theseFailures := failedFiles := countTFilez := filesConverted := partialFiles := 0
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
@@ -61068,13 +61130,11 @@ batchConvert2format() {
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-      isSameFormat := RegExMatch(imgPath, "i)(.\.(" rDesireWriteFMT "))$") ? 1 : 0
-      If (isSameFormat=1 && convertFormatAutoSkip=1)
+      If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
-         If (ResizeUseDestDir=1)
+         ; a file already in the format is not converted again: it only goes to the destination folder
+         If (ResizeUseDestDir=1 && !isSameFilePath(imgPath, file2save))
          {
-            ; if the user defined destination format is the same with the initial file format
-            ; perform only a move file, ONLY IF ResizeUseDestDir=1 and convertFormatAutoSkip=1
             If (FileExist(file2save) && !FolderExist(file2save))
                file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
 
@@ -61111,61 +61171,54 @@ batchConvert2format() {
                   }
                } Else failedFiles++
             } Else skippedFiles++
-            Continue
-         } Else
-         {
-            skippedFiles++
-            Continue
-         }
+         } Else skippedFiles++
+         Continue
       }
 
-      recycleOriginal := 0
-      If (inPlaceAction && isSameFormat=1 && imgPath=file2save)
+      mode := converterPagesMode(imgPath, rDesireWriteFMT, pages)
+      If (mode!="extract")
       {
-         ; converted onto itself: the answer given to askConvertInPlaceKeepOriginals() applies
-         file2save := OutDir "\" OutNameNoExt "." rDesireWriteFMT
-         If (inPlaceAction="recycle")
-            recycleOriginal := 1
-         Else
-            file2save := getAutoRenamedFreePath(file2save)
+         ; a file whose name gives another format than it holds would be converted onto itself
+         If isSameFilePath(imgPath, file2save)
+         {
+            skippedFiles++
+            Continue
+         }
 
-         If !file2save
+         If (FileExist(file2save) && !FolderExist(file2save))
+            file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
+
+         If (file2save="abort")
+         {
+            abandonAll := 1
+            Break
+         } Else If !file2save
          {
             skippedFiles++
             Continue
          }
       }
 
-      of := file2save
-      If (!recycleOriginal && FileExist(file2save) && !FolderExist(file2save))
-         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite)
-
-      If (file2save="abort")
+      r := coreConvertImgFilePages(imgPath, file2save, mode, pages, userCombineGIFframeDelay, keepOriginal, savedFile,, prevMSGdisplay, "`nTotal files: " groupDigits(countTFilez) " / " groupDigits(filesElected))
+      If (r=-5)
       {
          abandonAll := 1
          Break
-      } Else If !file2save
+      } Else If (r=2)
       {
-         If (ResizeUseDestDir!=1 && convertFormatAutoSkip=0 && isSameFormat=1)
-         {
-            file2save := of
-         } Else
-         {
-            skippedFiles++
-            Continue
-         }
+         skippedFiles++
+         Continue
+      } Else If r
+      {
+         failedFiles++
+         Continue
       }
 
-      r := coreConvertImgFormat(imgPath, file2save, 0, 0, recycleOriginal)
-      If r
-         failedFiles++
-      Else
-         filesConverted++
-
-      If (recycleOriginal=1 && !r && FileExist(file2save "-tmp"))
-         theseFailures++
-
-      If (OnConvertKeepOriginals=0 && !r && imgPath!=file2save)
+      filesConverted++
+      If keepOriginal
+      {
+         partialFiles++
+      } Else If (OnConvertKeepOriginals=0 && imgPath!=savedFile)
       {
          FileSetAttrib, -R, % imgPath
          Sleep, 2
@@ -61174,11 +61227,10 @@ batchConvert2format() {
             theseFailures++
 
          currentFilesListModified := 1
-         resultedFilesList[thisFileIndex, 1] := file2save
-         ; resultedFilesList[thisFileIndex, 2] := 1
-         updateMainUnfilteredList(thisFileIndex, 1, file2save)
+         resultedFilesList[thisFileIndex, 1] := savedFile
+         updateMainUnfilteredList(thisFileIndex, 1, savedFile)
          If (SLDtypeLoaded=3)
-            updateSQLdbEntry(imgPath, file2save, 1, resultedFilesList[thisFileIndex, 12])
+            updateSQLdbEntry(imgPath, savedFile, 1, resultedFilesList[thisFileIndex, 12])
       }
    }
 
@@ -61195,6 +61247,8 @@ batchConvert2format() {
       someErrors .= "`nUnable to remove " groupDigits(theseFailures) " original files after conversion"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+   If (partialFiles>0)
+      someErrors .= "`nMultipage files not converted whole: " groupDigits(partialFiles) ((OnConvertKeepOriginals!=1) ? ". Their originals were kept." : "")
 
    CurrentSLD := backCurrentSLD
    ForceRefreshNowThumbsList()
@@ -61497,10 +61551,10 @@ FIMcopyICCprofile(hFrom, hTo) {
    }
 }
 
-coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOriginal:=0, fallbackLevel:=0) {
-; recycleOriginal - 1: a file2save that already exists goes to the Recycle Bin, not deleted
+coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLevel:=0) {
 ; fallbackLevel - the depth of an image the format cannot store at its own, tried before the closest one
 ;                 the format allows: 1 = 32 bits, 2 = 24 bits, 3 = 16 bits [RGB555], 4 = 8 bits palette
+; A PDF file2save is made as «Convert active file to PDF» makes it, see coreConvertImgToPDF().
   Static fallbackDepths := {1:32, 2:24, 3:16, 4:8}
   Static gifOPT := "-s8-s4-s1-f1-",      ppmOPT := "-s24-f1-f9-"
        , jngOPT := "-s32-s24-f1-",       xpmOPT := "-s24-f1-"
@@ -61515,6 +61569,11 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
        , targaOPT := "-s32-s24-*s16-s8-f1-"
        , jp2OPT := "-s32-s24-*s8-f1-f2-f9-f10-"
        , j2kOPT := "-s32-s24-*s8-f1-f2-f9-f10-"
+       , pdfOPT := "-s32-s24-f1-"
+
+   isPDFdest := RegExMatch(file2save, "i)\.pdf$") ? 1 : 0
+   If (isPDFdest=1 && !externBMP)
+      Return coreConvertImgToPDF(imgPath, file2save)
 
    If (PreserveDateTimeOnSave=1 && !externBMP)
    {
@@ -61525,10 +61584,14 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    thisu := 0
    loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
    hFIFimgA := externBMP
+   isRendered := (!externBMP && RegExMatch(imgPath, "i)\.(pdf|svg)$")) ? 1 : 0
    If !hFIFimgA
    {
       changeMcursor()
-      If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && userPerformColorManagement=1 && RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") )
+      If isRendered
+      {
+         hFIFimgA := loadRenderedFileAsFIM(imgPath)
+      } Else If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && userPerformColorManagement=1 && RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") )
       {
          ; use WIC loader to not miss on color management
          z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
@@ -61537,11 +61600,11 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          thisu := 1
       }
 
-      If !hFIFimgA
+      If (!hFIFimgA && !isRendered)
          hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
    }
 
-   If !hFIFimgA
+   If (!hFIFimgA && !isRendered)
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && thisu=0)
       {
@@ -61570,7 +61633,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    }
 
    noDepthConvert := 0
-   typu := FreeImage_GetFileType(file2save, 1)
+   typu := isPDFdest ? "pdf" : FreeImage_GetFileType(file2save, 1)
    formatDepths := %typu%OPT
    imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
    ColorsType := FreeImage_GetColorType(hFIFimgA)
@@ -61717,13 +61780,13 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          If hFIFimgB
          {
             FIMcopyICCprofile(hFIFimgA, hFIFimgB)
-            r := FreeImage_Save(hFIFimgB, file2save, saveArg)
+            r := FIMsaveImageFile(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
       } Else
       {
          ; the WIC buffer is freed at the end: a failed save goes on to the fallbacks, which still read hFIFimgA
-         r := FreeImage_Save(hFIFimgA, file2save, saveArg)
+         r := FIMsaveImageFile(hFIFimgA, file2save, saveArg)
       }
    }
 
@@ -61735,7 +61798,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
       If hFIFimgB
       {
          FIMcopyICCprofile(hFIFimgA, hFIFimgB)
-         r := FreeImage_Save(hFIFimgB, file2save, saveArg)
+         r := FIMsaveImageFile(hFIFimgB, file2save, saveArg)
          FreeImage_UnLoad(hFIFimgB)
       }
    }
@@ -61752,7 +61815,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          hFIFimgX := FIMpalettizeLikeSaveAs(hFIFimgA)
          If hFIFimgX
          {
-            r := FreeImage_Save(hFIFimgX, file2save, saveArg)
+            r := FIMsaveImageFile(hFIFimgX, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgX)
          }
       } Else If (!hasAlpha && InStr(formatDepths, "-s24-") || isVarEqualTo(typu, "jpeg", "ppm", "xpm"))
@@ -61762,7 +61825,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          If hFIFimgB
          {
             FIMcopyICCprofile(hFIFimgA, hFIFimgB)
-            r := FreeImage_Save(hFIFimgB, file2save, saveArg)
+            r := FIMsaveImageFile(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
       } Else If (InStr(formatDepths, "-s32-"))
@@ -61772,7 +61835,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
          If hFIFimgB
          {
             FIMcopyICCprofile(hFIFimgA, hFIFimgB)
-            r := FreeImage_Save(hFIFimgB, file2save, saveArg)
+            r := FIMsaveImageFile(hFIFimgB, file2save, saveArg)
             FreeImage_UnLoad(hFIFimgB)
          }
       }
@@ -61788,9 +61851,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
       FileDelete, % file2save
       Sleep, 1
       FileMove, % file2save "-tmp", % file2save
-   } Else If (tempFileExists=1 && recycleOriginal=1)
-      recycleReplacedOriginal(file2save)
-   Else If (tempFileExists=1)
+   } Else If (tempFileExists=1)
       FileDelete, % file2save "-tmp"
 
    r := !r
@@ -61804,35 +61865,22 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, recycleOrig
    Return r
 }
 
-recycleReplacedOriginal(filePath) {
-; filePath was just written over its original, which waits as filePath "-tmp". The two swap names
-; so that the original goes to the Recycle Bin under its own name. Returns 1 when the original
-; could not be recycled; it then stays on the disk as filePath "-tmp".
-   tmpPath := filePath "-tmp", newPath := filePath "-new"
-   FileMove, % filePath, % newPath
-   If ErrorLevel
-   {
-      FileRecycle, % tmpPath
-      Return ErrorLevel ? 1 : 0
-   }
+FIMsaveImageFile(hImage, file2save, saveArg) {
+; FreeImage_Save(), or the page of a PDF file2save, which FreeImage does not write; see coreConvertImgToPDF()
+   If !RegExMatch(file2save, "i)\.pdf$")
+      Return FreeImage_Save(hImage, file2save, saveArg)
 
-   FileMove, % tmpPath, % filePath
-   If ErrorLevel
-   {
-      FileMove, % newPath, % filePath
-      FileRecycle, % tmpPath
-      Return ErrorLevel ? 1 : 0
-   }
+   ; ConvertFIMtoPBITMAP() turns 32 bits images upside down: those go on a copy
+   is32 := (FreeImage_GetBPP(hImage)=32)
+   hCopy := is32 ? FreeImage_Clone(hImage) : hImage
+   pBitmap := hCopy ? ConvertFIMtoPBITMAP(hCopy, is32 ? "0x26200A" : "0x21808") : ""   ; PixelFormat32bppARGB, PixelFormat24bppRGB
+   If is32
+      FreeImage_UnLoad(hCopy)
+   If !pBitmap
+      Return 0
 
-   FileRecycle, % filePath
-   recycleFailed := ErrorLevel ? 1 : 0
-   If recycleFailed
-      FileMove, % filePath, % tmpPath
-
-   FileMove, % newPath, % filePath
-   If ErrorLevel
-      addJournalEntry(A_ThisFunc "(): the converted file was left as:`n" newPath)
-   Return recycleFailed
+   recordGdipBitmaps(pBitmap, A_ThisFunc)
+   Return !coreConvertImgToPDF("", file2save, 0, pagesAdded, pBitmap)
 }
 
 getAutoRenamedFreePath(filePath) {
@@ -61846,54 +61894,125 @@ getAutoRenamedFreePath(filePath) {
    }
 }
 
-countConflictFilesFolder(useDir, destDir, dEXTf) {
-; count how many of the selected files would overwrite
-
-   n := 0
-   destDir := Trim(destDir, "\")
-   If !dEXTf
-      Return 0
-
-   Loop, % maxFilesIndex
-   {
-      If (resultedFilesList[A_Index, 2]!=1)
-         Continue
-
-      imgPath := getIDimage(A_Index)
-      If (InStr(imgPath, "||") || !RegExMatch(imgPath, "i)(.\.(" dEXTf "))$"))
-         Continue
-
-      zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-      destImgPath := (useDir=1 && destDir) ? destDir : OutDir
-      destImgPath .= "\" OutNameNoExt "." dEXTf
-      If (imgPath=destImgPath)
-         n++
-   }
-   Return n
+getConverterWriteFmt(index) {
+; The extension of the format converter's choice: its list ends with PDF, which the other panels
+; sharing userDesireWriteFMT do not offer
+   Return (index=14) ? "pdf" : saveImgFormatsList[index]
 }
 
-askConvertInPlaceKeepOriginals(filesCount, singleFile:=0) {
-; Asked when «Keep original files» is on and files would be converted onto themselves.
-; Returns "rename", "recycle" or blank, when the user cancels.
+getSharedWriteFmtIndex() {
+; userDesireWriteFMT for the panels that list no PDF: the converter's PDF [14] counts as PNG [8]
+   Return isInRange(userDesireWriteFMT, 1, 13) ? userDesireWriteFMT : 8
+}
 
-   If (singleFile=1)
-      msgInfos := "«Keep original files» is activated, but the file is already a ." rDesireWriteFMT " file and would be converted onto itself."
-   Else If (filesCount=1)
-      msgInfos := "«Keep original files» is activated, but one of the selected files is already a ." rDesireWriteFMT " file and would be converted onto itself."
-   Else
-      msgInfos := "«Keep original files» is activated, but " groupDigits(filesCount) " of the selected files are already ." rDesireWriteFMT " files and would be converted onto themselves."
+converterHoldsPages(fmt) {
+; the formats the converter writes multipage files in
+   Return isVarEqualTo(fmt, "gif", "webp", "jxl", "tif", "pdf")
+}
 
-   If !singleFile
-      msgInfos .= " The option to skip files already in the same format is deactivated."
+isSameImageFormat(imgPath, fmt) {
+; Whether imgPath holds an image of the format fmt by its content, whatever its name says. FreeImage
+; numbers no PDF and gives every PNM format one number, so these two go by their signatures.
+   Static signatures := {"pdf": "^%PDF-", "ppm": "^P[36]\s"}
+   If signatures.HasKey(fmt)
+   {
+      f := FileOpen(imgPath, "r", "CP0")
+      Return (IsObject(f) && RegExMatch(f.Read(5), signatures[fmt])) ? 1 : 0
+   }
+   Return (FreeImage_GetFileType(imgPath)=FreeImage_GetFIFFromFilename("a." fmt)) ? 1 : 0
+}
 
-   thisFile := (singleFile=1 || filesCount=1) ? "file" : "files"
-   msgInfos .= "`n`nAuto-rename: save the converted " thisFile " under a new name."
-   msgInfos .= "`nContinue: convert in place; the original " thisFile " will be moved to the Recycle Bin."
-   msgResult := msgBoxWrapper(appTitle ": Confirmation", msgInfos, "&Auto-rename|&Continue|C&ancel", 1, "question")
-   If InStr(msgResult, "rename")
-      Return "rename"
-   Else If InStr(msgResult, "continue")
-      Return "recycle"
+isSameFilePath(pathA, pathB) {
+; the paths name one file whatever their case, or the doubled backslash of a folder spelled with a trailing one
+   Return (RegExReplace(pathA, "(?<=.)\\{2,}", "\")=RegExReplace(pathB, "(?<=.)\\{2,}", "\")) ? 1 : 0
+}
+
+countImageFilePages(imgPath) {
+; The pages or frames of imgPath as the format converter reads them: 1 for an image alone or an icon
+; file, -1 for a PDF that cannot be opened
+   If RegExMatch(imgPath, "i)\.pdf$")
+   {
+      pwd := PDFpwdsCache[imgPath]
+      errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
+      If (asked := promptUserPDFpassword(A_ThisFunc, imgPath, errorType, pwd))
+         errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
+
+      If errorType
+         Return -1
+
+      If (asked=1)
+         PDFpwdsCache[imgPath] := pwd
+      Return pageCount
+   }
+
+   GFT := FreeImage_GetFileType(imgPath)
+   hMultiBMP := combineFimOpenPages(imgPath, GFT, tPages)
+   FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+   If (GFT=18 && !tPages)   ; FIF_TIFF: GDI+ reads the pages FreeImage cannot open, as the frame extractor does
+   {
+      oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, 0)
+      tPages := validBMP(oBitmap) ? Gdip_GetBitmapFramesCount(oBitmap) : 0
+      trGdip_DisposeImage(oBitmap)
+   }
+   Return Max(tPages, 1)
+}
+
+converterPagesMode(imgPath, fmt, ByRef pages) {
+; How the format converter writes imgPath in the format fmt: "single" for an image of one page,
+; "multi" for one multipage file, "extract" for one file per page, "first" for its first page alone
+   pages := countImageFilePages(imgPath)
+   If (pages<2)
+      Return "single"
+   If (convertFormatMultiPages=1 && converterHoldsPages(fmt))
+      Return "multi"
+   Return (convertFormatExtractFrames=1) ? "extract" : "first"
+}
+
+coreConvertImgFilePages(imgPath, file2save, mode, pages, frameDelay, ByRef keepOriginal, ByRef savedFile, ByRef pagesWritten:=0, prevMSGdisplay:=0, bonusMsg:="") {
+; Converts imgPath to file2save by the mode converterPagesMode() gave for its pages. The pages of an
+; extraction go to the folder of file2save as name_1.ext, name_2.ext... and follow the conflict option.
+; keepOriginal is 1 when not every page was written; savedFile is the file written, the first page
+; of an extraction. Returns 0 on success, 1 on failure, 2 when every page was skipped for the conflict
+; option, -5 when the user aborted.
+   keepOriginal := pagesWritten := 0
+   savedFile := file2save
+   zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, fmt)
+   If (mode="extract")
+   {
+      xt := {dir: OutDir, fmt: fmt, conflict: userActionConflictingFile, depth: 0, dpi: userVPpdfDPI, claim: 0, written: []}
+      r := coreExtractFramesFromImage(imgPath, 1, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames, xt)
+      pagesWritten := extractedFrames
+      ; the frame extractor may count the pages otherwise, eg., GIF frames by GDI+
+      keepOriginal := (extractedFrames<Max(pages, r)) ? 1 : 0
+      savedFile := xt.written[1]
+      If (PreserveDateTimeOnSave=1)
+      {
+         For each, thisFile in xt.written
+            copyFileTimes(imgPath, thisFile)
+      }
+
+      If (r=-5)
+         Return -5
+      Else If (extractedFrames>0)
+         Return 0
+      Return (r<0 || failedFrames>0) ? 1 : 2
+   }
+
+   If (mode="multi")
+   {
+      If (fmt="pdf")
+         r := coreConvertImgToPDF(imgPath, file2save, 1, pagesWritten)
+      Else
+         r := coreConvertImgToMultiPage(imgPath, file2save, frameDelay, pagesWritten, prevMSGdisplay, bonusMsg)
+
+      keepOriginal := (pagesWritten<pages) ? 1 : 0
+      Return r
+   }
+
+   keepOriginal := (mode="first") ? 1 : 0
+   r := coreConvertImgFormat(imgPath, file2save) ? 1 : 0
+   pagesWritten := !r
+   Return r
 }
 
 getFIMsaveArgs(file2save, quality:="") {
@@ -61943,46 +62062,33 @@ convert2format(givenIndex) {
      Return "err"
 
   stopSlideshow()
-  file2rem := getIDimage(givenIndex)
-  If (RegExMatch(file2rem, "i)(.\.(" rDesireWriteFMT "))$") && convertFormatAutoSkip=1)
+  file2rem := StrReplace(getIDimage(givenIndex), "||")
+  If isSameImageFormat(file2rem, rDesireWriteFMT)
   {
      SoundBeep, 300, 100
      msgBoxWrapper(appTitle ": WARNING", "The image file seems to be already in the given file format: ." rDesireWriteFMT ". Please choose another format.", 0, 0, "exclamation")
      Return "err"
   }
 
-  file2rem := StrReplace(file2rem, "||")
   zPlitPath(file2rem, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
   destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
   file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
   ToolTip
-  If (convertFormatAutoSkip=1)
+  mode := converterPagesMode(file2rem, rDesireWriteFMT, pages)
+  If (mode!="extract")
   {
+     If isSameFilePath(file2rem, file2save)
+     {
+        SoundBeep, 300, 100
+        msgBoxWrapper(appTitle ": WARNING", "The image file holds another format than its ." fileEXT " name says, so it cannot be converted onto itself. Please choose a destination folder.", 0, 0, "exclamation")
+        Return "err"
+     }
+
      If askOverwriteDestFile(file2save, 0)
      {
         SetTimer, ResetImgLoadStatus, -150
         Return
      }
-  }
-
-  recycleOriginal := 0
-  If (OnConvertKeepOriginals=1 && file2rem=file2save)
-  {
-     inPlaceAction := askConvertInPlaceKeepOriginals(1, 1)
-     If !inPlaceAction
-     {
-        SetTimer, ResetImgLoadStatus, -150
-        Return
-     }
-
-     file2save := OutDir "\" OutNameNoExt "." rDesireWriteFMT
-     If (inPlaceAction="recycle")
-        recycleOriginal := 1
-     Else
-        file2save := getAutoRenamedFreePath(file2save)
-
-     If !file2save
-        Return msgBeepTimer("ERROR: No free file name was found for the converted file.`n" OutFileName "`n" OutDir "\")
   }
 
   BtnCloseWindow()
@@ -61998,41 +62104,54 @@ convert2format(givenIndex) {
      FileSetAttrib, -R, %file2save%
 
   changeMcursor()
-  r := coreConvertImgFormat(file2rem, file2save, 0, 0, recycleOriginal)
+  ; the pages of an extraction follow the conflict option
+  nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
+  r := coreConvertImgFilePages(file2rem, file2save, mode, pages, userCombineGIFframeDelay, keepOriginal, savedFile, pagesWritten)
   SetTimer, ResetImgLoadStatus, -50
-  FileGetSize, OutputVar, % file2save
-  If (OutputVar>2 && !r)
+  FileGetSize, OutputVar, % savedFile
+  If (OutputVar>2 && !r && mode!="extract")
      friendly := "`nFile size: " fileSizeFriendly(OutputVar)
 
-  zPlitPath(file2save, 0, savedFileName, savedDir)
-  If r
+  zPlitPath(savedFile, 0, savedFileName, savedDir)
+  If (keepOriginal=1 && OnConvertKeepOriginals!=1)
+     friendly .= "`nThe original file was kept: it holds " groupDigits(pages) " pages."
+
+  If (r=-5)
+     showTOOLtip("Operation aborted by user. Pages converted: " groupDigits(pagesWritten) " / " groupDigits(pages))
+  Else If (r=2)
+     showTOOLtip("No page was extracted: their files already exist in`n" destImgPath "\")
+  Else If r
      showTOOLtip("Failed to convert file`n" OutFileName "`n" OutDir "\")
-  Else If (recycleOriginal=1 && FileExist(file2save "-tmp"))
-     showTOOLtip("The file was converted, but its original could not be moved to the Recycle Bin. It was kept as:`n" savedFileName "-tmp`n" savedDir "\")
+  Else If (mode="extract")
+     showTOOLtip("Extracted " groupDigits(pagesWritten) " / " groupDigits(pages) " pages as ." rDesireWriteFMT " files in:`n" savedDir "\" friendly)
+  Else If (mode="first")
+     showTOOLtip("Only the first page of the file was converted to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\" friendly)
+  Else If (mode="multi")
+     showTOOLtip("File converted succesfully to ." rDesireWriteFMT ", " groupDigits(pagesWritten) " / " groupDigits(pages) " pages`n" savedFileName "`n" savedDir "\" friendly)
   Else
      showTOOLtip("File converted succesfully to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\" friendly)
 
   SoundBeep, % r ? 300 : 900, 100
-  If (OnConvertKeepOriginals!=1 && !r && file2rem!=file2save)
+  If (OnConvertKeepOriginals!=1 && !r && !keepOriginal && file2rem!=savedFile)
   {
      currentFilesListModified := 1
      Try FileSetAttrib, -R, %file2rem%
      Sleep, 1
      FileRecycle, %file2rem%
      If ErrorLevel
-        showTOOLtip("Failed to remove original file, however the file was converted succesfully to ." rDesireWriteFMT "`n" OutNameNoExt "." rDesireWriteFMT "`n" destImgPath "\")
+        showTOOLtip("Failed to remove original file, however the file was converted succesfully to ." rDesireWriteFMT "`n" savedFileName "`n" savedDir "\")
 
-     resultedFilesList[givenIndex, 1] := file2save
+     resultedFilesList[givenIndex, 1] := savedFile
      resultedFilesList[givenIndex, 4] := 1
      If (SLDtypeLoaded=3)
-        updateSQLdbEntry(file2rem, file2save, 1, resultedFilesList[givenIndex, 12])
+        updateSQLdbEntry(file2rem, savedFile, 1, resultedFilesList[givenIndex, 12])
 
-     updateMainUnfilteredList(givenIndex, 1, file2save)
+     updateMainUnfilteredList(givenIndex, 1, savedFile)
   }
   SetTimer, RemoveTooltip, % -msgDisplayTime
   SetTimer, ResetImgLoadStatus, -150
   If (!r && ResizeUseDestDir=1)
-     quickBarOpenResult(file2save)
+     quickBarOpenResult(savedFile)
 }
 
 batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
@@ -62094,7 +62213,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       If (pdfTextMode=1)
          r := coreExtractBatchModeTextsFromGivenPDF(pdfModus, thisFileIndex, prevMSGdisplay, bonusMsg, failedFrames, totalz)
       Else
-         r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz)
+         r := coreExtractFramesFromImage(thisFileIndex, 1, prevMSGdisplay, bonusMsg, failedFrames, totalz, extractFramesOptions())
 
       ; counted only when something was written under the « [N]» name
       If (totalz>0 && claimExtractedBaseName(0, 2)>renamedBefore)
@@ -62178,10 +62297,11 @@ claimExtractedBaseName(nameNoExt, mode:=0) {
    Return r
 }
 
-coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames, xt) {
 ; Extracts the pages and frames of the multi-page formats FreeImage reads, GIF aside, as the viewer
 ; shows them: animations come composed by their PLAYBACK flags. Each page keeps the depth its file
 ; stores when the output format holds it. Returns -1 when FreeImage cannot open the file.
+; xt - the options, see extractFramesOptions()
    extractedFrames := failedFrames := abandonAll := 0
    ; with color management, CMYK pages are read as inks [TIFF_CMYK=1] and get sRGB through their own profile
    cmykFlag := (GFT=18 && userPerformColorManagement=1) ? 1 : 0
@@ -62203,7 +62323,7 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
    }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-   OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
+   OutNameNoExt := xt.claim ? claimExtractedBaseName(OutNameNoExt) : OutNameNoExt
    If (inLoop!=1)
    {
       showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
@@ -62214,7 +62334,7 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
 
    Loop, % tFrames
    {
-      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
+      file2save := xt.dir "\" OutNameNoExt "_" A_Index "." xt.fmt
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -62228,7 +62348,7 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
       }
 
       If (FileExist(file2save) && !FolderExist(file2save))
-         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
 
       If (file2save="abort")
       {
@@ -62266,10 +62386,14 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
       }
 
       ; hFIFimgA is discarded by coreConvertImgFormat()
-      If coreConvertImgFormat(imgPath, file2save, hFIFimgA, 0, 0, userSaveBitsDepth)
+      If coreConvertImgFormat(imgPath, file2save, hFIFimgA, 0, xt.depth)
+      {
          failedFrames++
-      Else
+      } Else
+      {
          extractedFrames++
+         xt.written.Push(file2save)
+      }
    }
 
    If hHeads
@@ -62351,11 +62475,11 @@ FIMhasGreyPalette(hImage) {
    Return 1
 }
 
-saveExtractedGdipFrame(pBitmap, file2save, imgPath:="", fileDepth:="") {
+saveExtractedGdipFrame(pBitmap, file2save, xt, imgPath:="", fileDepth:="") {
 ; Saves a frame or page drawn on a GDI+ bitmap; returns 0 on success. With the depth its file stores,
 ; see FIMpageDepthClass(), the frame keeps that depth when nothing is lost and the output format holds
-; it, else it takes the «Fallback depth». PDF pages, and every frame when FreeImage is missing, are
-; saved at the «Fallback depth».
+; it, else it takes the fallback depth of xt, see extractFramesOptions(). Without fileDepth, and for
+; every frame when FreeImage is missing, the frame is saved at the fallback depth.
    If (fileDepth && wasInitFIMlib=1)
    {
       hFIFimgA := ConvertPBITMAPtoFIM(pBitmap)
@@ -62370,20 +62494,20 @@ saveExtractedGdipFrame(pBitmap, file2save, imgPath:="", fileDepth:="") {
       }
 
       ; hFIFimgA is discarded by coreConvertImgFormat()
-      Return coreConvertImgFormat(imgPath, file2save, hFIFimgA, 0, 0, userSaveBitsDepth) ? 1 : 0
+      Return coreConvertImgFormat(imgPath, file2save, hFIFimgA, 0, xt.depth) ? 1 : 0
    }
 
    trGdip_GetImageDimensions(pBitmap, imgW, imgH)
-   fmt := saveImgFormatsList[userExtractFramesFmt]
+   fmt := xt.fmt
    If !isImgSizeTooLarge(imgW, imgH, fmt)
-      Return QPV_SaveImageFile(A_ThisFunc, pBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+      Return QPV_SaveImageFile(A_ThisFunc, pBitmap, file2save, userJpegQuality, xt.depth)
 
    capIMGdimensionsFormatlimits(fmt, 1, imgW, imgH)
    kBitmap := trGdip_ResizeBitmap(A_ThisFunc, pBitmap, imgW, imgH, 1)
    If !validBMP(kBitmap)
       Return 1
 
-   r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, userSaveBitsDepth)
+   r := QPV_SaveImageFile(A_ThisFunc, kBitmap, file2save, userJpegQuality, xt.depth)
    trGdip_DisposeImage(kBitmap)
    Return r
 }
@@ -62472,11 +62596,21 @@ coreExtractBatchModeTextsFromGivenPDF(modus, thisFileIndex, prevMSGdisplay, bonu
    Return clampInRange(tFrames, 0, 9892899)
 }
 
-coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+extractFramesOptions() {
+; The options coreExtractFramesFromImage() extracts with, set in the «Extract frames» panel:
+; dir - destination folder, fmt - file format, conflict - the action on file name conflicts,
+; depth - the fallback color depth [1 to 4; 0 = the closest one the format holds], dpi - of the
+; PDF pages, claim - 1 gives the frames of a file a name not taken in the run, see
+; claimExtractedBaseName(); written - the files saved are added to it
+   Return {dir: ResizeDestFolder, fmt: saveImgFormatsList[userExtractFramesFmt], conflict: OnExtractConflictOverwrite, depth: userSaveBitsDepth, dpi: userPDFdpi, claim: 1, written: []}
+}
+
+coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames, xt) {
+; xt - the options, see extractFramesOptions()
    failedFrames := extractedFrames := 0
    imgPath := StrReplace(isNumber(indexu) ? resultedFilesList[indexu, 1] : indexu, "||")
    If RegExMatch(imgPath, "i)(.\.pdf)$")
-      Return coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, failedFrames, extractedFrames)
+      Return coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, failedFrames, extractedFrames, xt)
 
    If (wasInitFIMlib=1 && allowFIMloader=1)
    {
@@ -62484,7 +62618,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       GFT := FreeImage_GetFileType(imgPath)
       If isVarEqualTo(GFT, 1, 6, 18, 35, 37, 38, 39, 40)   ; FIF_ICO, FIF_MNG, FIF_TIFF, FIF_WEBP, FIF_AVIF, FIF_HEIF, FIF_APNG, FIF_JXL
       {
-         r := coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames)
+         r := coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames, xt)
          If (r!=-1)
             Return r
          If (GFT!=18)   ; of the files FreeImage cannot open, GDI+ reads only TIFF ones
@@ -62493,11 +62627,12 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          Return -3
    }
 
-   Return coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames)
+   Return coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, failedFrames, extractedFrames, xt)
 }
 
-coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
-; Extracts the pages of a PDF, rendered at «Render PDF pages (DPI)» and saved at the «Fallback depth».
+coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef extractedFrames, xt) {
+; Extracts the pages of a PDF, rendered at the DPI of xt and saved at its fallback depth, or at 24 bits
+; without one; see extractFramesOptions().
    failedFrames := extractedFrames := 0
    pwd := PDFpwdsCache[imgPath]
    errorType := getPDFpageCountProtectState(imgPath, pwd, isProtectedPDF, pageCount)
@@ -62515,7 +62650,7 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
 
    tFrames := pageCount
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-   OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
+   OutNameNoExt := xt.claim ? claimExtractedBaseName(OutNameNoExt) : OutNameNoExt
    If (inLoop!=1)
    {
       showTOOLtip("Extracting " groupDigits(tFrames) " frames from:`n" OutFileName)
@@ -62531,7 +62666,7 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
    backupIMGdetails := mainLoadedIMGdetails.Clone()
    Loop, % tFrames
    {
-      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
+      file2save := xt.dir "\" OutNameNoExt "_" A_Index "." xt.fmt
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -62546,7 +62681,7 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
       }
 
       If (FileExist(file2save) && !FolderExist(file2save))
-         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
 
       If (file2save="abort")
       {
@@ -62558,10 +62693,10 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
       If FileExist(file2save)
          FileSetAttrib, -R, % file2save
 
-      If (saveImgFormatsList[userExtractFramesFmt]="webp")
-         oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 16350, 16350, userPDFdpi)
+      If (xt.fmt="webp")
+         oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 16350, 16350, xt.dpi)
       Else
-         oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 0, 0, userPDFdpi)
+         oBitmap := RenderPDFpage(imgPath, 2, A_Index - 1, pwd, 0, 0, xt.dpi)
 
       If !validBMP(oBitmap)
       {
@@ -62569,12 +62704,17 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
          Continue
       }
 
-      r := saveExtractedGdipFrame(oBitmap, file2save)
+      ; without a fallback depth, the page rendered on white keeps 24 bits
+      r := saveExtractedGdipFrame(oBitmap, file2save, xt, imgPath, xt.depth ? "" : "rgb")
       oBitmap := trGdip_DisposeImage(oBitmap)
       If r
+      {
          failedFrames++
-      Else
+      } Else
+      {
          extractedFrames++
+         xt.written.Push(file2save)
+      }
    }
 
    mainLoadedIMGdetails := backupIMGdetails
@@ -62584,9 +62724,10 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
    Return (abandonAll=1) ? -5 : clampInRange(tFrames, 0, 9892899)
 }
 
-coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames) {
+coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef failedFrames, ByRef extractedFrames, xt) {
 ; Extracts GIF frames and TIFF pages through GDI+, the route for GIF files, for files FreeImage does not
 ; recognize, for TIFF files it cannot open, and for every file but PDF when the FreeImage loader is off.
+; xt - the options, see extractFramesOptions()
    failedFrames := extractedFrames := 0
    oBitmap := trGdip_CreateBitmapFromFile(A_ThisFunc, imgPath, userPerformColorManagement)
    If !validBMP(oBitmap)
@@ -62608,7 +62749,7 @@ coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef 
    }
 
    zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt)
-   OutNameNoExt := claimExtractedBaseName(OutNameNoExt)
+   OutNameNoExt := xt.claim ? claimExtractedBaseName(OutNameNoExt) : OutNameNoExt
    If !bonusMsg
       bonusMsg := ""
    If (inLoop!=1)
@@ -62619,7 +62760,7 @@ coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef 
 
    Loop, % tFrames
    {
-      file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
+      file2save := xt.dir "\" OutNameNoExt "_" A_Index "." xt.fmt
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
@@ -62633,7 +62774,7 @@ coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef 
       }
 
       If (FileExist(file2save) && !FolderExist(file2save))
-         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, OnExtractConflictOverwrite, performOverwrite)
+         file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
 
       If (file2save="abort")
       {
@@ -62681,12 +62822,16 @@ coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef 
 
       trGdip_DrawImage(A_ThisFunc, Gu, oBitmap)
       Gdip_DeleteGraphics(Gu)
-      r := saveExtractedGdipFrame(nBitmap, file2save, imgPath, fileDepth)
+      r := saveExtractedGdipFrame(nBitmap, file2save, xt, imgPath, fileDepth)
       trGdip_DisposeImage(nBitmap)
       If r
+      {
          failedFrames++
-      Else 
+      } Else
+      {
          extractedFrames++
+         xt.written.Push(file2save)
+      }
    }
 
    If (inLoop!=1)
@@ -63110,36 +63255,11 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
    }
 
    CurrentSLD := backCurrentSLD
-   If (abandonAll=1 || addedPages<2)
-   {
-      ; nothing is kept, so FreeImage should not encode every page into the file first
-      Loop, % FreeImage_GetPageCount(multiFim) - 1   ; the last page cannot be deleted
-         FreeImage_DeletePage(multiFim, 0)
-   } Else
+   commit := (abandonAll!=1 && addedPages>1) ? 1 : 0
+   If commit
       showTOOLtip("Saving the ." fmt " file: " groupDigits(addedPages) " pages, please wait`n" OutFileName)
 
-   ; FALSE whenever a page was refused, even when the file holds all the others
-   r := FreeImage_CloseMultiBitmap(multiFim, 0)
-   If (abandonAll!=1 && addedPages>1 && FileExist(tmpFile))
-   {
-      ; the formats assembled at the close can fail there without saying so
-      hCheck := FreeImage_OpenMultiBitmap(tmpFile, fif, 0, 1, 1)
-      If hCheck
-      {
-         savedPages := FreeImage_GetPageCount(hCheck)
-         FreeImage_CloseMultiBitmap(hCheck, 0)
-      }
-
-      If (savedPages=addedPages)
-      {
-         FileMove, % tmpFile, % destFilePath, 1
-         moveFailed := ErrorLevel
-      }
-   }
-
-   If FileExist(tmpFile)
-      FileDelete, % tmpFile
-
+   e := combineFimMultiPageFinish(multiFim, tmpFile, destFilePath, fif, commit, addedPages, 0, savedPages, closed)
    SetTimer, ResetImgLoadStatus, -50
    If (failedPages>0)
       moreInfos := "`nFailed to add " groupDigits(failedPages) " images or frames"
@@ -63150,11 +63270,11 @@ combineImagesFimMultiPage(modus, userFmt, destFilePath, setW, setH, setRes) {
       msgBeepTimer("Operation aborted by user. No ." fmt " file was created.")
    Else If (addedPages<2)
       msgBeepTimer(((addedPages=1) ? "ERROR: At least two images are required to create a multipage file." : "ERROR: Failed to load the selected images. No ." fmt " file was created.") moreInfos)
-   Else If (savedPages!=addedPages)
+   Else If (e=1)
    {
       msgBeepTimer("ERROR: Failed to write the ." fmt " file. The disk may be full.`n" OutFileName)
-      addJournalEntry("Failed to write the multipage image file: " destFilePath ". Pages added: " addedPages ". Pages in the file: " savedPages ". Closed: " r)
-   } Else If moveFailed
+      addJournalEntry("Failed to write the multipage image file: " destFilePath ". Pages added: " addedPages ". Pages in the file: " savedPages ". Closed: " closed)
+   } Else If (e=2)
       msgBeepTimer("ERROR: The new ." fmt " file could not replace the existing one, which may be in use.`n" OutFileName)
    Else
    {
@@ -63184,6 +63304,23 @@ loadWICasFreeImage(imgPath, frameu, useICM) {
    DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
    resultsArray := ""
    return z
+}
+
+loadRenderedFileAsFIM(imgPath, page:=0, maxSide:=0) {
+; A PDF page or an SVG drawing as a FreeImage bitmap, rendered by qpvmain.dll at the format converter's
+; «Render PDF pages» DPI or «SVG rendered resolution». maxSide caps the size of the PDF page.
+   isPDF := RegExMatch(imgPath, "i)\.pdf$") ? 1 : 0
+   ; the renderers describe the file in mainLoadedIMGdetails, which belongs to the image on screen
+   backupIMGdetails := mainLoadedIMGdetails.Clone()
+   ; PDF pages are rendered on white: 24 bits hold them
+   pBitmap := isPDF ? RenderPDFpage(imgPath, 2, page, pwd, maxSide, maxSide, userVPpdfDPI) : RenderSVGfile(imgPath, 0, 0)
+   mainLoadedIMGdetails := backupIMGdetails
+   If !validBMP(pBitmap)
+      Return
+
+   hFIFimgA := ConvertPBITMAPtoFIM(pBitmap, isPDF)
+   trGdip_DisposeImage(pBitmap)
+   Return hFIFimgA
 }
 
 LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP) {
@@ -63276,6 +63413,138 @@ combineImgsTempFile(destFilePath) {
    }
 }
 
+combineFimMultiPageFinish(multiFim, tmpFile, destFilePath, fif, commit, addedPages, flags, ByRef savedPages, ByRef closed) {
+; Closes the multi-page bitmap multiFim, opened on tmpFile. With commit=1 the file is written with the
+; save flags, checked to hold every page added and moved over destFilePath; otherwise it is dropped.
+; Returns 0 when destFilePath holds the file, 1 when it was not written whole, 2 when it could not
+; replace destFilePath, 3 with commit=0.
+   savedPages := 0
+   If !commit
+   {
+      ; nothing is kept, so FreeImage should not encode every page into the file first
+      Loop, % FreeImage_GetPageCount(multiFim) - 1   ; the last page cannot be deleted
+         FreeImage_DeletePage(multiFim, 0)
+   }
+
+   ; FALSE whenever a page was refused, even when the file holds all the others
+   closed := FreeImage_CloseMultiBitmap(multiFim, flags)
+   r := commit ? 1 : 3
+   If (commit && FileExist(tmpFile))
+   {
+      ; the formats assembled at the close can fail there without saying so
+      hCheck := FreeImage_OpenMultiBitmap(tmpFile, fif, 0, 1, 1)
+      If hCheck
+      {
+         savedPages := FreeImage_GetPageCount(hCheck)
+         FreeImage_CloseMultiBitmap(hCheck, 0)
+      }
+
+      If (savedPages=addedPages)
+      {
+         FileMove, % tmpFile, % destFilePath, 1
+         r := ErrorLevel ? 2 : 0
+      }
+   }
+
+   If FileExist(tmpFile)
+      FileDelete, % tmpFile
+   Return r
+}
+
+coreConvertImgToMultiPage(imgPath, file2save, frameDelay, ByRef pagesAdded, prevMSGdisplay:=0, bonusMsg:="") {
+; Converts every page or frame of imgPath into one multi-page file2save [GIF, WebP, JXL or TIFF],
+; built as the «Join images» panel builds it, with the save options of the format. The frames keep
+; their delays and the animation its loop count; frameDelay goes to the pages without a delay.
+; Returns 0 when the file was written, 1 on failure, -5 when the user aborted.
+   pagesAdded := 0
+   fif := FreeImage_GetFIFFromFilename(file2save)
+   zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt, fmt)
+   zPlitPath(imgPath, 0, srcFileName, srcDir)
+   isPDF := RegExMatch(imgPath, "i)\.pdf$") ? 1 : 0
+   If isPDF
+   {
+      GFT := -1
+      tPages := countImageFilePages(imgPath)
+   } Else
+   {
+      GFT := FreeImage_GetFileType(imgPath)
+      hMultiBMP := combineFimOpenPages(imgPath, GFT, tPages)
+   }
+
+   If (tPages>maxMultiPagesAllowed)
+   {
+      FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+      addJournalEntry(A_ThisFunc "(): the file holds more pages than a multipage file is allowed [" groupDigits(maxMultiPagesAllowed) "], so it was not converted:`n" imgPath)
+      Return 1
+   }
+
+   tmpFile := (hMultiBMP || isPDF && tPages>0) ? combineImgsTempFile(file2save) : ""
+   ; keep_cache=1: on Windows the cache file seeks with 32-bit offsets, and breaks past 2 GB
+   multiFim := tmpFile ? FreeImage_OpenMultiBitmap(tmpFile, fif, 1, 0, 1) : ""
+   If !multiFim
+   {
+      FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+      Return 1
+   }
+
+   memStart := GetProcessMemoryUsage(QPVpid).PrivateUsage
+   Loop, % tPages
+   {
+      If (determineTerminateOperation()=1)
+      {
+         abandonAll := 1
+         Break
+      }
+
+      memUsed := (memStart>0) ? GetProcessMemoryUsage(QPVpid).PrivateUsage - memStart : 0
+      If (memUsed>maxMemLimitMultiPage)
+      {
+         addJournalEntry(A_ThisFunc "(): the memory allowed for a multipage file [" fileSizeFriendly(maxMemLimitMultiPage) "] was used up, so the file was not converted:`n" imgPath)
+         limitReached := 1
+         Break
+      }
+
+      If (A_TickCount - prevMSGdisplay>3000)
+      {
+         showTOOLtip("Converting pages: " groupDigits(A_Index) " / " groupDigits(tPages) " ( " Round((A_Index / tPages) * 100, 1) "% )" bonusMsg "`nCurrent file:`n" srcFileName, 0, 0, A_Index / tPages)
+         prevMSGdisplay := A_TickCount
+      }
+
+      k := ""
+      If isPDF
+      {
+         k := loadRenderedFileAsFIM(imgPath, A_Index - 1, (fif=35) ? 16350 : 0)   ; FIF_WEBP
+      } Else
+      {
+         hPage := FreeImage_LockPage(hMultiBMP, A_Index - 1)
+         If hPage
+         {
+            k := FreeImage_Clone(hPage)
+            FreeImage_UnlockPage(hMultiBMP, hPage, 0)
+         }
+      }
+
+      thisDelay := k ? FreeImage_GetFrameTime(k) : 0
+      loops := (k && !pagesAdded) ? FreeImage_GetLoopCount(k) : ""
+      If combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, 0, 0, 0, (thisDelay>0) ? thisDelay : frameDelay, loops)
+         pagesAdded++
+   }
+
+   FreeImage_CloseMultiBitmap(hMultiBMP, 0)
+   commit := (abandonAll!=1 && limitReached!=1 && pagesAdded>0) ? 1 : 0
+   r := combineFimMultiPageFinish(multiFim, tmpFile, file2save, fif, commit, pagesAdded, getFIMsaveArgs(file2save), savedPages, closed)
+   If (r=0)
+   {
+      If (PreserveDateTimeOnSave=1)
+         copyFileTimes(imgPath, file2save)
+      Return 0
+   }
+
+   If (r=1)
+      addJournalEntry(A_ThisFunc "(): failed to write the multipage file. Pages added: " pagesAdded ". Pages in the file: " savedPages ". Closed: " closed "`n" file2save)
+   Return (abandonAll=1) ? -5 : 1
+}
+
 combineFimOpenPages(imgPath, GFT, ByRef tPages, withIcons:=0, moreFlags:=0) {
 ; Opens a file of several pages or frames, to be read one page at a time. Returns nothing
 ; for a file of one page, then tPages is 1, or of a format FreeImage does not read by pages.
@@ -63301,9 +63570,11 @@ combineFimOpenPages(imgPath, GFT, ByRef tPages, withIcons:=0, moreFlags:=0) {
    tPages := (tPages=1) ? 1 : 0
 }
 
-combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) {
+combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime, loops:="") {
 ; Prepares one page and appends it to multiFim. It takes ownership of k: everything is
-; unloaded here. setW and setH are 0 when the page keeps its size. Returns 1 on succes.
+; unloaded here. setW and setH are 0 when the page keeps its size. modus is the depth, see
+; combineFimImgsConvertDepth(). loops - how many times the animation plays [0 = for ever],
+; given with the first page. Returns 1 on succes.
 
    If !k
       Return 0
@@ -63359,6 +63630,12 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
       FreeImage_SetTagLength(tag, 4)
       FreeImage_SetTagValue(tag, frameTime)
       FreeImage_SetMetadata(k, tag, 9, "FrameTime")   ; FIMD_ANIMATION = 9
+      If (loops!="")
+      {
+         FreeImage_SetTagKey(tag, "Loop")
+         FreeImage_SetTagValue(tag, loops)
+         FreeImage_SetMetadata(k, tag, 9, "Loop")
+      }
       ; BlendMethod 1: the page replaces the one before, instead of being blended over it [the WebP, JPEG XL and MNG default]
       ; DisposalMethod 2: the page is cleared after it is shown, so none of it stays around a smaller next page
       FreeImage_SetTagType(tag, 1)        ; FIDT_BYTE = 1
@@ -63381,13 +63658,20 @@ combineFimImgsAddPage(multiFim, k, GFT, fif, fmt, modus, setW, setH, frameTime) 
 }
 
 combineFimImgsConvertDepth(k, modus, fif) {
-; Returns the page at the colour depth chosen in the panel, or nothing when k can go in as it
-; is. GIF [FIF_GIF=25] holds 1, 4 or 8 bits only and ignores the choice. TIFF [FIF_TIFF=18]
-; ignores it too, and converts only the pages it cannot store. A depth the format cannot
-; hold [16 bits in any, 8 bits in WebP] goes in as 24 bits, with its colours reduced.
+; Returns the page at the colour depth chosen in the panel [modus 1 to 4], or nothing when k can
+; go in as it is; with modus=0 the page keeps its depth where the format holds it. GIF [FIF_GIF=25]
+; holds 1, 4 or 8 bits only and ignores the choice. TIFF [FIF_TIFF=18] ignores it too, and converts
+; only the pages it cannot store. A depth the format cannot hold [16 bits in any, 8 bits in WebP]
+; goes in as 24 bits, with its colours reduced.
    bpp := FreeImage_GetBPP(k)
    If (fif=25)
-      Return (bpp=1 || bpp=4 || bpp=8) ? "" : combineFimQuantize(k)
+   {
+      If (bpp=1 || bpp=4 || bpp=8)
+         Return
+
+      ; without a depth chosen, the palette is made as Save As makes it, with its transparency
+      Return modus ? combineFimQuantize(k) : FIMpalettizeLikeSaveAs(k)
+   }
 
    If (fif=18)
    {
@@ -65431,6 +65715,9 @@ showDelayedTooltip(msg, perc:=0, delayu:=450, expire:=0) {
 showTOOLtip(msg, funcu:=0, typeFuncu:=0, perc:=0) {
    Critical, on
    Static prevMsg
+   If (hasInitSpecialMode=1)   ; worker processes show nothing
+      Return
+
    hudBTNfuncu := ""
    If (msg="nully" && prevMsg)
       msg := prevMsg
@@ -91145,6 +91432,10 @@ livePreviewColorsAdjustVP() {
 
 PanelFileFormatConverter() {
     Global btnFldr, editF5, btnConvertFmtHelp, uiSaveFmtNoOptions
+    ; in the mode that lists every page as an entry, each entry would convert the whole file
+    If warnFramesActionPrevented("CONVERT")
+       Return
+
     filesElected := getSelectedFiles(0, 1)
     initFIMGmodule()
     If !wasInitFIMlib
@@ -91168,13 +91459,18 @@ PanelFileFormatConverter() {
     sml := (PrefsLargeFonts=1) ? 250 : 140
     thisW := (PrefsLargeFonts=1) ? 85 : 75
     ReadSettingsFormatConvert()
-    convertFormatAutoSkip := 1
     pww := (PrefsLargeFonts=1) ? 170 : 120
+    zml := (PrefsLargeFonts=1) ? 40 : 30
     Gui, Add, Text, x15 y15 w%sml% Section +0x200 +hwndhTemp, Destination format:
-    GuiAddDropDownList("x+5 w" thisW " gTglDesiredSaveFormat AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs, [hTemp])
-    Gui, Add, Checkbox, x+5 hp Checked%convertFormatAutoSkip% vconvertFormatAutoSkip +hwndhTemp, Auto-skip format
-    ToolTip2ctrl(hTemp, "The files with the selected file destination extension format will be skipped when this option is selected.")
-    Gui, Add, Text, xs y+10 w%sml% hp +0x200, Render PDF pages:
+    GuiAddDropDownList("x+5 w" thisW " gTglDesiredSaveFormat AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs "|.PDF", [hTemp])
+    ; the rows below are as tall as this one
+    GuiControlGet, fmtRow, Pos, userDesireWriteFMT
+    rowWid := sml + pww + zml + 10
+    Gui, Add, Checkbox, xs y+10 w%rowWid% Checked%convertFormatExtractFrames% vconvertFormatExtractFrames +hwndhTemp, &Extract pages/frames on conversion
+    ToolTip2ctrl(hTemp, "Each page or frame of multipage and animated files is saved as a file of its own: name_1, name_2...`nWith the option below, the formats that hold pages get them all in one file instead.`nWithout either option, only the first page is converted and the original file is kept.")
+    Gui, Add, Checkbox, xs y+5 wp Checked%convertFormatMultiPages% vconvertFormatMultiPages +hwndhTemp, Convert &multipage files to the multipage file format selected
+    ToolTip2ctrl(hTemp, "GIF, WEBP, JXL, TIF and PDF files get every page or frame of multipage and animated files,`nwith the frame delays. An original file is removed only when all its pages were converted.")
+    Gui, Add, Text, xs y+10 w%sml% h%fmtRowH% +0x200, Render PDF pages:
     GuiAddSlider("userVPpdfDPI", 72, 3500, 420, "DPI resolution: $€", "dummy", 1, "x+5 w" pww " hp")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, SVG rendered resolution:
     GuiAddSlider("userVPsvgScale", 1, 9.876, "1.00f", "Scale factor: $€ x", "dummy", 1, "x+5 w" pww " hp")
@@ -91184,7 +91480,6 @@ PanelFileFormatConverter() {
     ; the options of all the formats overlap; updateConverterFormatOptions() shows those of the chosen format
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Output image:
     GuiAddSlider("userJpegQuality", 1, 100, 90, "Quality", "dummy", 1, "x+5 w" pww " hp", saveQualityTip(1))
-    zml := (PrefsLargeFonts=1) ? 40 : 30
     GuiAddButton("x+5 w" zml " hp gbtnHelpSaveImgPanel vbtnConvertFmtHelp", " ?", "Help")
     GuiAddSavePaletteTransparency("xp-" (pww + 5) " yp w" (pww + zml + 5) " hp")
     Gui, Add, Text, xs y+10 w%sml% hp +0x200, Format options:
@@ -91229,13 +91524,13 @@ PanelFileFormatConverter() {
     sml := (PrefsLargeFonts=1) ? 85 : 60
     Gui, Add, Button, x+%ml% hp w%sml% gBTNhelpConvertImgFmt, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
-    updateConverterFormatOptions(saveImgFormatsList[userDesireWriteFMT])
+    updateConverterFormatOptions(getConverterWriteFmt(userDesireWriteFMT))
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Image file format conversion: " appTitle)
     GuiRefreshSliders()
 }
 
 BTNhelpConvertImgFmt() {
-    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JNG, WEBP, JXL, JXR and JP2 file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
+    msgBoxWrapper(appTitle ": HELP", "On file format conversion, QPV will attempt to preserve the color depth of the images. If it is not possible, the images will be converted to 24 bits or 32 bits or to the color depth supported by the destination format.`n`nFiles already in the destination format, as their content tells, are not converted again: they are skipped, or copied or moved unchanged to the destination folder when one is used.`n`nMultipage and animated files: with «Convert multipage files to the multipage file format selected», GIF, WEBP, JXL, TIF and PDF files get all their pages or frames, and the frames keep their delays. Otherwise, «Extract pages/frames on conversion» saves each page as a file of its own: «name_1», «name_2» and so on. Without these options, only the first page is converted. An original file is removed only when all its pages were converted.`n`nPDF files are made as «Convert active file to PDF» makes them: each page is the size of its image, JPEG files go in as they are, and the other images are stored as JPEG at the chosen quality. PDF and SVG files are rendered at the resolutions set above.`n`nFailures can occur if there is insufficient system memory or... if file access is denied when attempting to write files.`n`nThe image quality option applies only for the JPG, JNG, WEBP, JXL, JXR, JP2 and PDF file formats. The options of the destination format are shown under «Output image» and «Format options»; they also apply when images are saved from the «Save image» panel.`n`nSome file formats have image dimensions limited by design. WebP file format is limited to 16350 px in width or height. JPEG, TGA, and GIF formats are limited to 65530 px in width or height and 4294 MPx. Therefore, on format conversions, the resulted image dimensions may reflect the format specific limits.`n`nThis feature relies on the FreeImage library.", -1, 0, 0)
 }
 
 TglKeepOriginals() {
@@ -91281,13 +91576,14 @@ BTNconvertImgFmtNow(modus:=0) {
       Return
    }
 
-   rDesireWriteFMT := saveImgFormatsList[userDesireWriteFMT]
+   rDesireWriteFMT := getConverterWriteFmt(userDesireWriteFMT)
    RegAction(1, "OnConvertKeepOriginals")
    RegAction(1, "PreserveDateTimeOnSave")
    RegAction(1, "ResizeDestFolder")
    RegAction(1, "userActionConflictingFile")
    RegAction(1, "convertFormatUseMultiThreads")
-   RegAction(1, "convertFormatAutoSkip")
+   RegAction(1, "convertFormatExtractFrames")
+   RegAction(1, "convertFormatMultiPages")
    RegAction(1, "userDesireWriteFMT")
    RegAction(1, "userJpegQuality")
    RegAction(1, "userVPsvgScale")
@@ -91648,7 +91944,7 @@ PanelResizeImageWindow() {
     If (multipleFilesMode=1)
     {
        GuiAddDropDownList("xs y+10 w" txtWid " gTglRszUnsprtFrmt AltSubmit Choose" userUnsprtWriteFMT " vuserUnsprtWriteFMT", "Skip files in unsupported write formats|Try to preserve file formats, convert unsupported to...|Convert all the files to...", "Image file formats treatment mode")
-       GuiAddDropDownList("xs y+5 w" thisW " AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs, "File format on save")
+       GuiAddDropDownList("xs y+5 w" thisW " AltSubmit Choose" getSharedWriteFmtIndex() " vuserDesireWriteFMT", userPossibleWriteFMTs, "File format on save")
        Gui, Add, Button, x+5 hp wp gBtnHelpResizePanel, Help
     }
 
@@ -97436,7 +97732,7 @@ MenuInvokeSHopenWith() {
 ReadSettingsAutoCropPanel(act:=0) {
     RegAction(act, "AutoCropAdaptiveMode",, 1)
     RegAction(act, "AutoCropStrongAdaptiveMode",, 1)
-    RegAction(act, "userDesireWriteFMT",, 2, 1, 13)
+    RegAction(act, "userDesireWriteFMT",, 2, 1, 14)
     RegAction(act, "ResizeDestFolder",, 6)
     RegAction(act, "ResizeUseDestDir",, 1)
     RegAction(act, "PreserveDateTimeOnSave",, 1)
@@ -97527,7 +97823,7 @@ PanelImgAutoCrop() {
        GuiAddDropDownList("x+5 w" thisBW A_Space thisW A_Space thisH " AltSubmit gTglOverwriteFiles Choose" userActionConflictingFile " vuserActionConflictingFile", "Skip files|Auto-rename|Overwrite|Ask user", [hTemp])
        Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve files date/time
        Gui, Add, Checkbox, xs y+%ty% %thisW% %thisH2% Checked%convertOnAutoCrop% vconvertOnAutoCrop, &Convert on save to:
-       GuiAddDropDownList("x+5 " thisAW A_Space thisH " gTglDesiredSaveFormat AltSubmit Choose" userDesireWriteFMT " vuserDesireWriteFMT", userPossibleWriteFMTs, "Image file format")
+       GuiAddDropDownList("x+5 " thisAW A_Space thisH " gTglDesiredSaveFormat AltSubmit Choose" getSharedWriteFmtIndex() " vuserDesireWriteFMT", userPossibleWriteFMTs, "Image file format")
     }
 
     thisWid := (PrefsLargeFonts=1) ? 145 : 115
@@ -100416,6 +100712,8 @@ initExternalCoreMode(coreThread) {
  
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 1
    initFIMGmodule()
+   ; WIC loads the files as in the main window, and PDF and SVG files are rendered by it
+   initQPVmainDLL(1)
    ; the batches save with the main window's color management, see coreConvertImgFormat()
    INIaction(0, "userPerformColorManagement", "General", 1)
    SetTimer, watchExternalCoreAbort, 750
@@ -100794,6 +101092,9 @@ GetTextsFromPDF(imgPath, frameu, linkz, pwd:="", ByRef pageCount:=0, ByRef error
 
 promptUserPDFpassword(funcu, imgPath, errorType, ByRef pwd) {
     Static prevImgPath, lastPwd, lastInvoked := 1
+    If (hasInitSpecialMode=1)   ; a worker process asks nothing
+       Return
+
     isOkay := (prevImgPath=imgPath && (A_TickCount - lastInvoked>950) || prevImgPath!=imgPath) ? 1 : 0
     If (A_TickCount - prevFullThumbsUpdate<950 && (thumbsDisplaying=1 && runningLongOperation=1) && (A_TickCount - executingCanceableOperation<950))
        isOkay := 0
