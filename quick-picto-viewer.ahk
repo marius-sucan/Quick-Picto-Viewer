@@ -62044,7 +62044,7 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
    filesElected := getSelectedFiles(0, 1)
    showTOOLtip("Extracting " labelu "s from " groupDigits(filesElected) " files, please wait")
    prevMSGdisplay := A_TickCount
-   tFramFailed := tFrames := failedFiles := countFilez := countTFilez := skippedFiles := renamedFiles := 0
+   tFramFailed := tFrames := tFramSkipped := failedFiles := countFilez := countTFilez := skippedFiles := renamedFiles := 0
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
    prevMSGdisplay := 1
@@ -62114,11 +62114,13 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       {
          tFrames += totalz + failedFrames
          tFramFailed += failedFrames
+         tFramSkipped += r - totalz - failedFrames   ; left out by the collision setting
       }
 
-      If (r=-4)
+      ; a file counts as processed once it wrote something
+      If (r=-4 || (r>=1 && totalz=0 && failedFrames>0))
          failedFiles++
-      Else If (r=-3 || r=-2)
+      Else If (r=-3 || r=-2 || (r>=1 && totalz=0))
          skippedFiles++
       Else If (r>=1)
          countFilez++
@@ -62134,6 +62136,8 @@ batchExtractFramesFromImages(pdfTextMode, pdfModus:=0) {
       someErrors .= "`nFor " groupDigits(failedFiles) " files, the operations failed"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+   If (tFramSkipped>0)
+      someErrors .= "`nSkipped " labelu "s: " groupDigits(tFramSkipped)
    If (renamedFiles>0)
       someErrors .= "`nFiles whose " ((pdfTextMode=1) ? "text file" : "frames") " got a [N] suffix: " groupDigits(renamedFiles)
 
