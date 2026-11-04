@@ -7,7 +7,7 @@ plus `PanelExtractFrames()` (:43541) and `BTNperformExtractFrames()` (:44103), w
 Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848. They are unchanged at
 4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below. Findings 2 and 5
 to 8 were fixed in `6065e4f`, after Marius's decisions; see «What `6065e4f` changed on purpose».
-Findings 9 and 11 were fixed in `3a2d852` (2026-11-04).
+Findings 9 and 11 were fixed in `3a2d852`, and 10 in `ba279b1` (2026-11-04).
 
 This follows the 2026-08-30 audit of the same code (report in 7a00a9c, fixes in 34ae01f). Its
 findings are not repeated; their status is in the table near the end.
@@ -44,7 +44,7 @@ findings are not repeated; their status is in the table near the end.
   **partly fixed in `4c8ec92`**), and PDF text mode wrote a file named `abort` when the user
   cancelled (finding 4, **fixed in `4c8ec92`**). One medium-low: TIFF pages ignore «Color
   depth» (finding 5, **fixed in `6065e4f`**). Six low or latent items follow; 6 to 8 are
-  **fixed in `6065e4f`**, 9 and 11 in **`3a2d852`**.
+  **fixed in `6065e4f`**, 9 and 11 in **`3a2d852`**, 10 in **`ba279b1`**.
 
 ## What `6065e4f` changed on purpose
 
@@ -410,6 +410,16 @@ the new number and counted as extracted. A damaged GIF or TIFF is where this wou
 
 ## 10. Two selected files with the same name write the same frame names
 
+**Fixed in `ba279b1`, by the first fix option below:** `claimExtractedBaseName()` keeps the
+base names given out since the run started. A file whose name is taken gets the first free
+« [N]» on all its frames, or on its text file in PDF text mode. The batch summary adds «Files
+whose frames got a [N] suffix: N» («text file» in PDF text mode), counting only files that
+wrote something under such a name. The list is emptied where the collision dialog's memory is,
+at both entry points. Its keys are lower-cased with `Format("{:L}")`, because AHK v1 object keys
+ignore case for ASCII letters only. They carry a letter prefix, because AutoHotkey_H makes a
+numeric name read from a variable an integer key: without it, `01` and `1` would be one name,
+and so would `0x10` and `16`.
+
 Frames are named `<name>_<N>.<ext>` in one destination folder (:62079, :62381, :62581,
 :62669). Two selected files with the same name and different extensions (clip.gif and
 clip.webp), or with the same name in two folders, produce the same frame names. The
@@ -420,7 +430,7 @@ collision setting cannot tell these apart from leftovers of an earlier run:
   processed.
 - «Auto-rename» and «Ask user» keep both sets.
 
-**Fix options** (2026-11-04, none chosen yet):
+**Fix options** (2026-11-04; Marius chose the first):
 
 - **Names claimed by the run.** The batch remembers the base names it has given out,
   ignoring case. A source whose name is already taken gets auto-rename's « [N]» on all its
@@ -443,8 +453,8 @@ collision setting cannot tell these apart from leftovers of an earlier run:
   `countConflictFilesFolder()` does for the converter, and ask once how to name them. Every
   batch with repeats gets a dialog. It goes with the first two options.
 
-With any of them, a file whose frames were all skipped could count as skipped rather than
-processed in the batch summary.
+Still open: a file whose frames were all skipped counts as processed in the batch summary,
+for example every file of a batch run a second time with «Skip files».
 
 ---
 
@@ -541,7 +551,7 @@ loops).
    positions also be converted once, or the extension stored instead?
 5. «Color depth» on the FreeImage routes: apply it, or disable it where it does not apply?
 6. Same-name source files in one batch: which of the fix options under finding 10, or leave
-   it?
+   it? **Answered 2026-11-04, see below.**
 
 Fixed in 4c8ec92: findings 1 and 4, and the blank-extension half of 3. Suggested order for
 the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
@@ -562,6 +572,10 @@ the rest: 2 with 6 and 7, then the rest of 3, then 5, then 8 to 11.
 failed, with a journal line, and the next frames are still tried (finding 9). The PDF route backs
 up and restores `mainLoadedIMGdetails` instead of giving `RenderPDFpage()` a parameter that
 leaves it alone (finding 11).
+
+**Decision 6, answered 2026-11-04, implemented in `ba279b1`:** the first fix option of finding
+10, names claimed by the run, with the renamed files counted in the batch summary rather than
+listed in the journal. Decision 4 is still open.
 
 ## How this was checked
 
@@ -618,3 +632,32 @@ leaves it alone (finding 11).
     global described the last rendered page after a full run, after an abort at page 2 and
     after «Cancel» at a collision on page 2. With the fix, the caller's copy came back in all
     three cases.
+- `ba279b1`, under Wine with AutoHotkey_H x64:
+  - Both interpreters load the script.
+  - `batchExtractFramesFromImages()` was sliced from the commit before it and from the fix,
+    with the real collision function in its forced modes. The selection, in this order: a
+    plain PNG, then `clip.gif`, `clip.webp`, `clip.gif` from a second folder, `CLIP.tif`, a
+    file really named `clip [1].gif`, `0001.gif` and `1.gif`, `Été.gif` and `été.gif`, two
+    `doc.pdf` (pages stubbed), and a single-frame `one.gif` followed by a 3-frame `one.gif`.
+    Each output was traced to the source frame it holds.
+  - Before the fix, an empty folder and «Overwrite» gave 17 files for the 32 frames
+    reported extracted. `clip.webp`, the first `clip.gif`, the first `doc.pdf` and `Été.gif`
+    left no frame; `CLIP.tif` overwrote `clip_1` to `clip_3`, since Wine matches names
+    without case as Windows does. In PDF text mode, one `doc.txt` held the second PDF's text.
+  - With the fix: 32 files, each holding its own source's frame. `clip.webp` got `clip [1]`,
+    the second `clip.gif` `clip [2]`, `CLIP.tif` `CLIP [3]`, the real `clip [1].gif`
+    `clip [1] [1]`, `été.gif` `été [1]` and the second `doc.pdf` `doc [1]`. `0001` and `1`
+    kept their names, and the plain PNG and the single-frame `one.gif` took no name, so the
+    3-frame one became `one`. The summary read «Files whose frames got a [N] suffix: 6».
+    Text mode wrote `doc.txt` and `doc [1].txt`, with «Files whose text file got a [N]
+    suffix: 1».
+  - Run again into the same folder, «Overwrite» rewrote every set under the same name with
+    the same frames. «Skip files» wrote nothing and printed no suffix line. With two
+    renamed frames deleted, it wrote only those two, from the right sources, and counted 2.
+    A batch without repeated names printed no suffix line.
+  - The 11-03 extraction suite (21 sources, every output format) gave the same 1105 lines
+    on the commit before and on the fix.
+  - Read, not run: the reset in `BTNperformExtractFrames()`, so that a single file extracted
+    after a batch keeps its plain name. Every call of the extractor functions goes through it
+    or through `batchExtractFramesFromImages()`. Not run: re-runs with «Ask user» or
+    «Auto-rename», and Windows itself.
