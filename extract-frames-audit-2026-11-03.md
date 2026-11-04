@@ -67,7 +67,8 @@ of it a regression.
   `fallbackLevel` parameter, which only the extractor passes.
   - TIFF pages come from FreeImage at their stored depth; the WIC step, and its conversion
     to sRGB, are gone. The embedded colour profile goes into the output: PNG, TIFF, JPG,
-    WebP, JXL and BMP keep it, GIF cannot.
+    WebP, JXL and BMP keep it, GIF cannot. Since `2b3d5da`, see «Colour management» below,
+    formats without profiles get sRGB pixels instead, and CMYK pages go through their profile.
   - Frames composed at 32 bits go back to the depth their file stores, when nothing is lost
     (`FIMfitFrameToFileDepth()`). The depth comes from the first page header, or from each
     page of an ICO file. Opaque frames of files without alpha become 24 bits. Opaque frames
@@ -92,6 +93,27 @@ of it a regression.
 - **Size caps.** The extractor no longer rescales oversized pages itself; `coreConvertImgFormat()`
   caps them per format. This ends the 715 MPx full-size rescale on the FreeImage and GIF
   routes. PDF pages, and frames saved without FreeImage, still go through `isImgSizeTooLarge()`.
+- **Colour management, `2b3d5da` (Marius, 2026-11-04).** Only with «Color management» on
+  (`userPerformColorManagement=1`):
+  - `coreConvertImgFormat()` converts an image that carries a profile to sRGB before saving
+    it to a format that cannot store one (`FreeImage_FIFSupportsICCProfiles()` is false: GIF,
+    TGA, PPM, XPM, J2K, ICO, HDR, EXR, PFM). The conversion uses relative colorimetric with
+    black point compensation, as the viewer does; untagged files are read as sRGB. This
+    applies to every caller: converter, extractor, huge-image save, resize panel, clipboard save.
+  - The conversion runs on a clone (`FreeImage_ApplyICCProfile()`), so palettes keep 8 bits
+    and the view of the huge image that `saveHugeVPimageFile()` hands over is not touched.
+    `FreeImage_ConvertToICCProfile()` takes over when the pixel format must change.
+  - Not FIF_LOAD_DISPLAY_ICC, which Marius proposed: QPV pins no display profile, so that
+    flag converts to the monitor profile Windows reports, which is wrong for untagged files
+    read elsewhere.
+  - The extractor opens TIFFs with TIFF_CMYK and converts CMYK pages to sRGB through their
+    own profile (`FreeImage_ConvertCMYKToRGB()`), for every output format. A CMYK page
+    without a profile comes out as FreeImage's plain ink formula makes it, as before.
+  - Wine run: Adobe RGB (200,60,40) and (40,90,200) reach GIF, TGA, PPM and XPM as
+    (231,57,34) and (0,90,204), what Pillow's Little CMS gives, and every frame equals
+    FreeImage's own sRGB conversion of it. PNG and JPG keep the profile and the pixels. The
+    image behind a view was left unchanged. The 2026-11-02 converter suites and the
+    extraction test show no other difference.
 
 ## Format coverage
 
