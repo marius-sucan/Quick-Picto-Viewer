@@ -7,7 +7,8 @@ plus `PanelExtractFrames()` (:43541) and `BTNperformExtractFrames()` (:44103), w
 Line numbers are `quick-picto-viewer.ahk` on `development` at 622f848. They are unchanged at
 4c8ec92 (Marius, 2026-11-03), whose fixes are marked in the findings below. Findings 2 and 5
 to 8 were fixed in `6065e4f`, after Marius's decisions; see «What `6065e4f` changed on purpose».
-Findings 9 and 11 were fixed in `3a2d852`, and 10 in `ba279b1` (2026-11-04).
+Findings 9 and 11 were fixed in `3a2d852`, and 10 in `ba279b1`, with the batch summary's
+counts in `a4b909c` (2026-11-04).
 
 This follows the 2026-08-30 audit of the same code (report in 7a00a9c, fixes in 34ae01f). Its
 findings are not repeated; their status is in the table near the end.
@@ -453,8 +454,12 @@ collision setting cannot tell these apart from leftovers of an earlier run:
   `countConflictFilesFolder()` does for the converter, and ask once how to name them. Every
   batch with repeats gets a dialog. It goes with the first two options.
 
-Still open: a file whose frames were all skipped counts as processed in the batch summary,
-for example every file of a batch run a second time with «Skip files».
+The batch summary also counted a file whose frames were all skipped as processed, for example
+every file of a batch run a second time with «Skip files», and one whose every frame failed.
+**Fixed in `a4b909c`** (Marius's choices, 2026-11-04): a file counts as processed once it
+wrote something. One that wrote nothing counts as failed when any of its frames failed, and
+as skipped otherwise. «Skipped frames: N» gives the frames the collision setting left out;
+«frames extracted: X / Y» still leaves them out of Y.
 
 ---
 
@@ -661,3 +666,16 @@ listed in the journal. Decision 4 is still open.
     after a batch keeps its plain name. Every call of the extractor functions goes through it
     or through `batchExtractFramesFromImages()`. Not run: re-runs with «Ask user» or
     «Auto-rename», and Windows itself.
+- `a4b909c`, the same batch test, with the copy of `Gdip_All.ahk` that can fail every frame
+  selection. Both interpreters load the script.
+  - Before the fix, the «Skip files» re-run read «12 out of 14 selected files were
+    processed», with 0 frames extracted and 2 files skipped. With the fix: 0 processed, 14
+    skipped, «Skipped frames: 32».
+  - With two renamed frames deleted, the fix reads 2 processed, 12 skipped, «Skipped frames:
+    30».
+  - A GIF whose every frame failed, beside a WebP that extracted, counted as processed
+    before; it now counts as failed, «1 out of 2». A GIF with two frames already there under
+    «Skip files» and the other two failing counts as failed, with «Skipped frames: 2».
+  - The other batches read as before, and every run wrote the same files as before the fix.
+  - The failing GIF still took the name `clip`, so the WebP's frames came out as `clip [1]`.
+    A file takes its name when its frame loop starts, before anything is written.
