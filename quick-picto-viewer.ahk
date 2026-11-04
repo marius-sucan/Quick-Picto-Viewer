@@ -62484,6 +62484,8 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
       prevMSGdisplay := A_TickCount
       startOperation := A_TickCount
       fname := PathCompact(imgPath, "a", 1, OSDfontSize)
+      ; each RenderPDFpage() replaces mainLoadedIMGdetails; it is put back after the pages
+      backupIMGdetails := mainLoadedIMGdetails.Clone()
       Loop, % tFrames
       {
          file2save := ResizeDestFolder "\" OutNameNoExt "_" A_Index "." saveImgFormatsList[userExtractFramesFmt]
@@ -62532,6 +62534,7 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
             extractedFrames++
       }
 
+      mainLoadedIMGdetails := backupIMGdetails
       If (inLoop!=1)
          ResetImgLoadStatus()
 
@@ -62590,7 +62593,14 @@ coreExtractFramesFromImage(indexu, inLoop, prevMSGdisplay, bonusMsg, ByRef faile
          If FileExist(file2save)
             FileSetAttrib, -R, % file2save
 
-         Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)
+         ; on failure, GDI+ stays on the previous frame
+         If (Gdip_BitmapSelectActiveFrame(oBitmap, A_Index - 1)<0)
+         {
+            addJournalEntry(A_ThisFunc "(): frame " A_Index " could not be selected, so it was not extracted. " Gdip_ErrorHandler(gdipLastError, 0) "`n" imgPath)
+            failedFrames++
+            Continue
+         }
+
          ; the frame is drawn at 32 bits; the depth of the file it comes from decides the one it is saved at
          If isGIF
             fileDepth := "palette"
