@@ -70500,6 +70500,14 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    If (mustPreventMenus=1 || runningLongOperation=1 || imageLoading=1)
       Return
 
+   If (AnyWindowOpen && imgEditPanelOpened!=1 && isVarEqualTo(WinActive("A"), PVhwnd, hGDIwin, hGDIthumbsWin, hGDIinfosWin, hGDIselectWin))
+   {
+      ; no main window menus while a regular panel is open
+      SoundPlay, *-1
+      WinActivate, ahk_id %hSetWinGui%
+      Return
+   }
+
    If (VisibleQuickMenuSearchWin=1 && mustPreventMenus!=1 && forceIT!=1 && omniBoxMode=0)
       closeQuickSearch()
 
@@ -70512,7 +70520,6 @@ showThisMenu(menarg, forceIT:=0, manubarMode:=0, manuID:=0) {
    Global lastOtherWinClose := A_TickCount
    prevItems := items
    prevMenu := menarg
-   okay := (!AnyWindowOpen || imgEditPanelOpened=1) && (drawingShapeNow!=1) ? 1 : 0
    idu := (manubarMode=1) ? klop[2] : "reset"
    flyoutAnchorMenu := MenuGetHandle(menarg)
    menusflyOutVisible := 0

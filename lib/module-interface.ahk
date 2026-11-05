@@ -144,7 +144,7 @@ uiInstallSentMsgHook() {
       If fnAddr
       {
          If !cbSentMsg
-            cbSentMsg := RegisterCallback("uiCallWndProcWork", "F")
+            cbSentMsg := RegisterCallback("uiCallWndProcWork", "F", 4)  ; without the count, the optional hwnd is never passed
          VarSetCapacity(msgList, 20, 0)
          NumPut(0x117, msgList, 0, "UInt")   ; WM_INITMENUPOPUP - JIT dropdown rebuild
          NumPut(0x11F, msgList, 4, "UInt")   ; WM_MENUSELECT - reader tracking, flyout
@@ -234,7 +234,9 @@ uiCallWndProcWork(msg, wP, lP, hwnd:=0) {
       Return 0
    }
 
-   If (whileLoopExec=1 || animGIFplaying=1 || slideShowRunning=1 || AnyWindowOpen && !imgEditPanelOpened || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
+   ; a regular panel ends only the menus owned by the main window [bar, system menu]; script
+   ; popups are all owned by A_ScriptHwnd, showThisMenu() refuses the main window's ones
+   If (whileLoopExec=1 || animGIFplaying=1 || slideShowRunning=1 || AnyWindowOpen && !imgEditPanelOpened && hwnd=PVhwnd || mustCaptureCloneBrush=1 || colorPickerModeNow>=1 || runningLongOperation=1 || imageLoading=1) && (msg!=0x212)
    {
       If (slideShowRunning=1 || animGIFplaying=1 || colorPickerModeNow=1)
          ProcessCriticalKeys("Enter")
@@ -481,6 +483,12 @@ uiMenuTimerProc(hwnd:=0, msg:=0, idEvent:=0, tickCount:=0) {
 uiTryPlaceFlyout(anchor:=0) {
    If (menusflyOutVisible=1)
       Return
+
+   If (AnyWindowOpen && !imgEditPanelOpened || drawingShapeNow=1)
+   {
+      uiStopMenuTimer()  ; no flyout while a regular panel is open or a vector shape is drawn
+      Return
+   }
 
    If anchor
       flyoutAnchorMenu := anchor
