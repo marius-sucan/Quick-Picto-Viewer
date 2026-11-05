@@ -43818,10 +43818,10 @@ convertFocusedFileToPDF() {
        Return msgBeepTimer("ERROR: The selected file seems to no longer exist:`n" OutFileName "`n" OutDir "\")
 
     file2save := OutDir "\" OutFileNameNoExt ".pdf"
-    CombineImgsIntoPDF(file2save, currentFileIndex, pdfPageOptions(1))
+    CombineImgsIntoPDF(file2save, currentFileIndex, pdfJoinerGetPdfUserOptions(1))
 }
 
-pdfPageOptions(asConvertToPDF:=0) {
+pdfJoinerGetPdfUserOptions(asConvertToPDF:=0) {
 ; The options of PDF pages: those of the «Join images» panel or, with asConvertToPDF=1, those of
 ; «Convert active file to PDF»: each page the size of its image, every frame, JPEG files as they are, no viewport effects.
    If (asConvertToPDF=1)
@@ -43836,21 +43836,23 @@ pdfPageOptions(asConvertToPDF:=0) {
    pdf.exifTurns := (alwaysOpenWithFIM=1 && allowFIMloader=1 && wasInitFIMlib=1) ? 1 : 0
    If (asConvertToPDF=1)
    {
-      pdf.pageSize := 9, pdf.frames := 1, pdf.doFX := 0, pdf.keepJpegs := 1
+      pdf.pageSize := 9,      pdf.frames := 1
+      pdf.doFX := 0,          pdf.keepJpegs := 1
       Return pdf
    }
 
-   pdf.pageSize := UserCombinePDFpageSize, pdf.landscape := combinePDFpageLandscape, pdf.enlarge := userCombinePDFenlarge
-   pdf.alignH := userCombinePDFalignH, pdf.alignV := userCombinePDFalignV, pdf.frames := userCombineSubFrames
-   pdf.doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
+   pdf.pageSize := UserCombinePDFpageSize,   pdf.landscape := combinePDFpageLandscape
+   pdf.enlarge := userCombinePDFenlarge,     pdf.alignH := userCombinePDFalignH
+   pdf.alignV := userCombinePDFalignV,       pdf.frames := userCombineSubFrames
    pdf.keepJpegs := (userCombinePDFkeepJpegs=1 && pdf.doFX=0) ? 1 : 0
+   pdf.doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
    Return pdf
 }
 
-CombineImgsIntoPDF(file2save, forcedIndex:=0, pdf:="") {
+CombineImgsIntoPDF(file2save, forcedIndex:=0, pdfOptions:="") {
 ; The pages are written one at a time by the PDF writer of qpvmain.dll [pdf-writer.h], to a
 ; file next to the destination that replaces it only once the document is complete.
-; pdf - the page options, see pdfPageOptions(); those of the «Join images» panel when omitted
+; pdfOptions - the page options, see pdfJoinerGetPdfUserOptions(); those of the «Join images» panel when omitted
    If (forcedIndex=0)
    {
       filesElected := getSelectedFiles(0, 1)
@@ -43882,8 +43884,8 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0, pdf:="") {
       Return msgBeepTimer("ERROR: " msgu)
    }
 
-   If !IsObject(pdf)
-      pdf := pdfPageOptions()
+   If !IsObject(pdfOptions)
+      pdfOptions := pdfJoinerGetPdfUserOptions()
 
    destroyGDIfileCache()
    backCurrentSLD := CurrentSLD
@@ -43925,7 +43927,7 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0, pdf:="") {
          prevMSGdisplay := A_TickCount
       }
 
-      r := pdfAddFilePages(hPdf, imgPath, pdf, pagesAdded, keptJpegs, failedPages, prevMSGdisplay, OutFileName)
+      r := pdfJoinerAddFilePages(hPdf, imgPath, pdfOptions, pagesAdded, keptJpegs, failedPages, prevMSGdisplay, OutFileName)
       If (r=2)
          writeFailed := 1
       Else If (r=-5)
@@ -43962,13 +43964,13 @@ CombineImgsIntoPDF(file2save, forcedIndex:=0, pdf:="") {
       msgBeepTimer("ERROR: Failed to finish the PDF file. Unknown error.`n" OutFileName)
 }
 
-pdfAddFilePages(hPdf, imgPath, pdf, ByRef pagesAdded, ByRef keptJpegs, ByRef failedPages, ByRef prevMSGdisplay, pdfName:="") {
-; Adds the image file to the PDF document hPdf: its first image, or every frame with pdf.frames=1,
-; see pdfPageOptions(). The counters grow by what was added. Returns 0, 2 when writing failed,
+pdfJoinerAddFilePages(hPdf, imgPath, pdfOptions, ByRef pagesAdded, ByRef keptJpegs, ByRef failedPages, ByRef prevMSGdisplay, pdfName:="") {
+; Adds the image file to the PDF document hPdf: its first image, or every frame with pdfOptions.frames=1,
+; see pdfJoinerGetPdfUserOptions(). The counters grow by what was added. Returns 0, 2 when writing failed,
 ; or -5 when the user aborted.
-   If (pdf.keepJpegs=1 && RegExMatch(imgPath, "i)\.(jpg|jpeg|jpe|jfif)$"))
+   If (pdfOptions.keepJpegs=1 && RegExMatch(imgPath, "i)\.(jpg|jpeg|jpe|jfif)$"))
    {
-      r := pdfAddOriginalJpeg(hPdf, imgPath, pdf)
+      r := pdfJoinerAddOriginalJpeg(hPdf, imgPath, pdfOptions)
       If (r=0)
       {
          pagesAdded++
@@ -43988,7 +43990,7 @@ pdfAddFilePages(hPdf, imgPath, pdf, ByRef pagesAdded, ByRef keptJpegs, ByRef fai
       Return 0
    }
 
-   totalFrames := (pdf.frames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
+   totalFrames := (pdfOptions.frames=1) ? mainLoadedIMGdetails.Frames + 1 : 1
    If (totalFrames<1)   ; a loader that reported no frame at all leaves .Frames at -1
       totalFrames := 1
 
@@ -44012,7 +44014,7 @@ pdfAddFilePages(hPdf, imgPath, pdf, ByRef pagesAdded, ByRef keptJpegs, ByRef fai
          }
       }
 
-      r := pdfAddBitmapPage(hPdf, pBitmap, pdf, mainLoadedIMGdetails.HasAlpha)
+      r := pdfJoinerAddBitmapPage(hPdf, pBitmap, pdfOptions, mainLoadedIMGdetails.HasAlpha)
       If (r=0)
          pagesAdded++
       Else If (r=2)
@@ -44032,14 +44034,14 @@ pdfAddFilePages(hPdf, imgPath, pdf, ByRef pagesAdded, ByRef keptJpegs, ByRef fai
    Return (r=2 || r=-5) ? r : 0
 }
 
-pdfPlaceImage(imgW, imgH, pdf) {
-; Where an image of imgW x imgH pixels, shown at pdf.dpi, goes on the page the options of pdf
-; describe, in PDF points [1/72 inch] from the bottom left corner. rw x rh is the size its pixels
+pdfJoinerPlaceImageOnPage(imgW, imgH, pdfOptions) {
+; Where an image of imgW x imgH pixels, shown at pdf.dpi, goes on the page based on the propeties of pdfOptions,
+; in PDF points [1/72 inch] from the bottom left corner. rw x rh is the size its pixels
 ; are stored at: never more than the image has, as the PDF reader does any enlarging.
    Static paperSizes := {1:[595.28, 841.89], 2:[246.24, 155.52], 3:[1080, 1440], 4:[612, 792], 5:[792, 1224], 6:[612, 1008], 7:[841.89, 1190.55], 8:[419.53, 595.28]}
-   natW := imgW * 72 / pdf.dpi
-   natH := imgH * 72 / pdf.dpi
-   If (pdf.pageSize=9)   ; same as the image
+   natW := imgW * 72 / pdfOptions.dpi
+   natH := imgH * 72 / pdfOptions.dpi
+   If (pdfOptions.pageSize=9)   ; same as the image
    {
       ; PDF readers want pages between 3 and 14400 points [200 inches] a side
       s := (natW>14400 || natH>14400) ? 14400 / max(natW, natH) : 1
@@ -44051,18 +44053,18 @@ pdfPlaceImage(imgW, imgH, pdf) {
       x := y := 0
    } Else
    {
-      paper := paperSizes[pdf.pageSize]
+      paper := paperSizes[pdfOptions.pageSize]
       If !IsObject(paper)
          paper := paperSizes[1]
 
-      pw := (pdf.landscape=1) ? paper[2] : paper[1]
-      ph := (pdf.landscape=1) ? paper[1] : paper[2]
+      pw := (pdfOptions.landscape=1) ? paper[2] : paper[1]
+      ph := (pdfOptions.landscape=1) ? paper[1] : paper[2]
       s := min(pw / natW, ph / natH)
-      If (pdf.enlarge!=1 && s>1)
+      If (pdfOptions.enlarge!=1 && s>1)
          s := 1
 
-      x := (pdf.alignH=2) ? (pw - natW*s)/2 : (pdf.alignH=3) ? pw - natW*s : 0
-      y := (pdf.alignV=2) ? (ph - natH*s)/2 : (pdf.alignV=1) ? ph - natH*s : 0
+      x := (pdfOptions.alignH=2) ? (pw - natW*s)/2 : (pdfOptions.alignH=3) ? pw - natW*s : 0
+      y := (pdfOptions.alignV=2) ? (ph - natH*s)/2 : (pdfOptions.alignV=1) ? ph - natH*s : 0
    }
 
    rw := (s<1) ? max(Round(imgW * s), 1) : imgW
@@ -44070,7 +44072,7 @@ pdfPlaceImage(imgW, imgH, pdf) {
    Return {pw: pw, ph: ph, x: x, y: y, w: natW*s, h: natH*s, scale: s, rw: rw, rh: rh}
 }
 
-pdfAddOriginalJpeg(hPdf, imgPath, pdf) {
+pdfJoinerAddOriginalJpeg(hPdf, imgPath, pdfOptions) {
 ; Embeds a JPEG file as it is. Returns 0 when the page was added, 1 when the file does not
 ; suit [the caller decodes it instead] and 2 when writing failed.
    VarSetCapacity(info, 20, 0)
@@ -44079,21 +44081,21 @@ pdfAddOriginalJpeg(hPdf, imgPath, pdf) {
 
    imgW := NumGet(info, 0, "UInt")
    imgH := NumGet(info, 4, "UInt")
-   If (pdf.exifTurns=1 && NumGet(info, 12, "UInt")>4)   ; EXIF orientations 5 to 8 turn the image by 90°
+   If (pdfOptions.exifTurns=1 && NumGet(info, 12, "UInt")>4)   ; EXIF orientations 5 to 8 turn the image by 90°
    {
       imgW := NumGet(info, 4, "UInt")
       imgH := NumGet(info, 0, "UInt")
    }
 
-   L := pdfPlaceImage(imgW, imgH, pdf)
+   L := pdfJoinerPlaceImageOnPage(imgW, imgH, pdfOptions)
    ; a file more than 1.5 times as dense as the chosen DPI is resampled instead
    If (L.scale*1.5<1)
       Return 1
 
-   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", pdf.exifTurns, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdf.bgColor, "Int")
+   Return DllCall("qpvmain.dll\PdfWriterAddJpegFile", "UPtr", hPdf, "WStr", imgPath, "Int", pdfOptions.exifTurns, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdfOptions.bgColor, "Int")
 }
 
-pdfAddBitmapPage(hPdf, pBitmap, pdf, hasAlpha) {
+pdfJoinerAddBitmapPage(hPdf, pBitmap, pdfOptions, hasAlpha) {
 ; Adds a page showing a loaded bitmap, which it disposes. Returns 0 when the page was added,
 ; 1 when it could not be and 2 when writing failed.
    trGdip_GetImageDimensions(pBitmap, imgW, imgH)
@@ -44103,8 +44105,8 @@ pdfAddBitmapPage(hPdf, pBitmap, pdf, hasAlpha) {
       Return 1
    }
 
-   L := pdfPlaceImage(imgW, imgH, pdf)
-   If (pdf.doFX=1)
+   L := pdfJoinerPlaceImageOnPage(imgW, imgH, pdfOptions)
+   If (pdfOptions.doFX=1)
    {
       ; at the size the page shows the image, as the viewport applies them
       If (L.rw<imgW || L.rh<imgH)
@@ -44121,13 +44123,13 @@ pdfAddBitmapPage(hPdf, pBitmap, pdf, hasAlpha) {
       flipBitmapAccordingToViewPort(pBitmap)
    }
 
-   r := DllCall("qpvmain.dll\PdfWriterAddBitmap", "UPtr", hPdf, "UPtr", pBitmap, "Int", L.rw, "Int", L.rh, "Int", pdf.quality, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdf.bgColor, "Int")
+   r := DllCall("qpvmain.dll\PdfWriterAddBitmap", "UPtr", hPdf, "UPtr", pBitmap, "Int", L.rw, "Int", L.rh, "Int", pdfOptions.quality, "Double", L.pw, "Double", L.ph, "Double", L.x, "Double", L.y, "Double", L.w, "Double", L.h, "UInt", pdfOptions.bgColor, "Int")
    trGdip_DisposeImage(pBitmap, 1)
    Return r
 }
 
 coreConvertImgToPDF(imgPath, file2save, allFrames:=0, ByRef pagesAdded:=0, pBitmap:=0) {
-; Writes file2save as «Convert active file to PDF» does, see pdfPageOptions(): from the image file imgPath,
+; Writes file2save as «Convert active file to PDF» does, see pdfJoinerGetPdfUserOptions(): from the image file imgPath,
 ; all its frames with allFrames=1, or from the GDI+ bitmap pBitmap, which it disposes.
 ; Returns 0 on success, 1 on failure, or -5 when the user aborted.
    pagesAdded := keptJpegs := failedPages := 0
@@ -44140,17 +44142,17 @@ coreConvertImgToPDF(imgPath, file2save, allFrames:=0, ByRef pagesAdded:=0, pBitm
       Return 1
    }
 
-   pdf := pdfPageOptions(1)
-   pdf.frames := allFrames
+   pdfOptions := pdfJoinerGetPdfUserOptions(1)
+   pdfOptions.frames := allFrames
    zPlitPath(file2save, 0, OutFileName, OutDir, OutNameNoExt)
    If pBitmap
    {
-      r := pdfAddBitmapPage(hPdf, pBitmap, pdf, 0)
+      r := pdfJoinerAddBitmapPage(hPdf, pBitmap, pdfOptions, 0)
       pagesAdded := (r=0) ? 1 : 0
    } Else
    {
       prevMSGdisplay := A_TickCount
-      r := pdfAddFilePages(hPdf, imgPath, pdf, pagesAdded, keptJpegs, failedPages, prevMSGdisplay, OutFileName)
+      r := pdfJoinerAddFilePages(hPdf, imgPath, pdfOptions, pagesAdded, keptJpegs, failedPages, prevMSGdisplay, OutFileName)
    }
 
    commit := (r!=2 && r!=-5 && pagesAdded>0) ? 1 : 0
