@@ -62481,7 +62481,18 @@ saveExtractedGdipFrame(pBitmap, file2save, xt, imgPath:="", fileDepth:="") {
 ; Saves a frame or page drawn on a GDI+ bitmap; returns 0 on success. With the depth its file stores,
 ; see FIMpageDepthClass(), the frame keeps that depth when nothing is lost and the output format holds
 ; it, else it takes the fallback depth of xt, see extractFramesOptions(). Without fileDepth, and for
-; every frame when FreeImage is missing, the frame is saved at the fallback depth.
+; every frame when FreeImage is missing, the frame is saved at the fallback depth. A PDF page takes
+; no depth: the frame goes to the PDF writer as it is, see coreConvertImgToPDF().
+   If (xt.fmt="pdf")
+   {
+      ; the PDF writer disposes the bitmap it is given, and pBitmap belongs to the caller
+      cBitmap := trGdip_CloneBitmap(A_ThisFunc, pBitmap)
+      If !validBMP(cBitmap)
+         Return 1
+
+      Return coreConvertImgToPDF("", file2save, 0, pagesAdded, cBitmap) ? 1 : 0
+   }
+
    If (fileDepth && wasInitFIMlib=1)
    {
       hFIFimgA := ConvertPBITMAPtoFIM(pBitmap)
