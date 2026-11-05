@@ -43844,8 +43844,8 @@ pdfJoinerGetPdfUserOptions(asConvertToPDF:=0) {
    pdf.pageSize := UserCombinePDFpageSize,   pdf.landscape := combinePDFpageLandscape
    pdf.enlarge := userCombinePDFenlarge,     pdf.alignH := userCombinePDFalignH
    pdf.alignV := userCombinePDFalignV,       pdf.frames := userCombineSubFrames
-   pdf.keepJpegs := (userCombinePDFkeepJpegs=1 && pdf.doFX=0) ? 1 : 0
    pdf.doFX := (ResizeApplyEffects=1 && (imgFxMode>1 || usrColorDepth>1 || FlipImgH=1 || FlipImgV=1 || vpIMGrotation=180)) ? 1 : 0
+   pdf.keepJpegs := (userCombinePDFkeepJpegs=1 && pdf.doFX=0) ? 1 : 0
    Return pdf
 }
 
@@ -44035,7 +44035,7 @@ pdfJoinerAddFilePages(hPdf, imgPath, pdfOptions, ByRef pagesAdded, ByRef keptJpe
 }
 
 pdfJoinerPlaceImageOnPage(imgW, imgH, pdfOptions) {
-; Where an image of imgW x imgH pixels, shown at pdf.dpi, goes on the page based on the propeties of pdfOptions,
+; Where an image of imgW x imgH pixels, shown at pdfOptions.dpi, goes on the page based on the properties of pdfOptions,
 ; in PDF points [1/72 inch] from the bottom left corner. rw x rh is the size its pixels
 ; are stored at: never more than the image has, as the PDF reader does any enlarging.
    Static paperSizes := {1:[595.28, 841.89], 2:[246.24, 155.52], 3:[1080, 1440], 4:[612, 792], 5:[792, 1224], 6:[612, 1008], 7:[841.89, 1190.55], 8:[419.53, 595.28]}
