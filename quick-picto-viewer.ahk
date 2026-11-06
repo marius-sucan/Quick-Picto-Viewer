@@ -61558,6 +61558,29 @@ FIMcopyICCprofile(hFrom, hTo) {
    }
 }
 
+FIMiccNamesPQ(hImage) {
+; the cicp tag of the image's ICC profile names the PQ curve [transfer characteristics 16]
+   pData := FreeImage_GetICCProfileData(hImage, size)
+   If (!pData || size<132)
+      Return 0
+
+   ; the tag count at byte 128, then 12-byte entries: signature, offset, size
+   Loop, % Min(getUInt32BE(pData + 128), (size - 132)//12)
+   {
+      pEntry := pData + 120 + A_Index*12
+      If (getUInt32BE(pEntry)!=0x63696370) ; 'cicp'
+         Continue
+
+      offset := getUInt32BE(pEntry + 4)
+      Return (getUInt32BE(pEntry + 8)>=12 && offset + 12<=size && NumGet(pData + offset, 9, "UChar")=16) ? 1 : 0
+   }
+   Return 0
+}
+
+getUInt32BE(p) {
+   Return (NumGet(p+0, 0, "UChar") << 24) | (NumGet(p+0, 1, "UChar") << 16) | (NumGet(p+0, 2, "UChar") << 8) | NumGet(p+0, 3, "UChar")
+}
+
 FIMcmykToSRGB(hImage, imgPath) {
 ; a CMYK image [FIC_CMYK=5] is replaced by its sRGB conversion through its own profile; 0 when that fails
    ; the flag first: FreeImage_GetColorType() reads every alpha of an opaque 32-bit image
@@ -61649,6 +61672,24 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
    noDepthConvert := 0
    typu := isPDFdest ? "pdf" : FreeImage_GetFileType(file2save, 1)
    formatDepths := %typu%OPT
+   ; the PQ curve [FreeImage_MustTonemap() = 3] stays in JXL, and in PNG, TIFF and JXR with an ICC profile that names it;
+   ; the floating point formats get its linear light, the other formats tone mapping
+   pqTone := 0
+   If (FreeImage_GetImageType(hFIFimgA)>1 && typu!="jxl" && FreeImage_MustTonemap(hFIFimgA, GFT)=3)
+   {
+      If (InStr(formatDepths, "-f11-") && !InStr(formatDepths, "-f9-"))
+      {
+         hFIFimgL := FreeImage_ConvertToLinear(hFIFimgA, 1) ; FI_LINEAR_SRGB_PRIMARIES
+         If hFIFimgL
+         {
+            FreeImage_UnLoad(hFIFimgA)
+            hFIFimgA := hFIFimgL
+            FimBuffer := DestroyMemoryBuffer(FimBuffer)
+         } Else pqTone := 1
+      } Else If !(isVarEqualTo(typu, "png", "tiff", "jxr") && FIMiccNamesPQ(hFIFimgA))
+         pqTone := 1
+   }
+
    imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
    ColorsType := FreeImage_GetColorType(hFIFimgA)
    imgType := FreeImage_GetImageType(hFIFimgA, 1)
@@ -61656,11 +61697,11 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
    hdrMode := 0
    fallbackDepth := fallbackDepths[fallbackLevel]
    fallbackOkay := (fallbackDepth && InStr(formatDepths, "-s" fallbackDepth "-")) ? 1 : 0
-   If (InStr(formatDepths, "-f" imgIDtype "-") && imgIDtype>1)
+   If (!pqTone && InStr(formatDepths, "-f" imgIDtype "-") && imgIDtype>1)
    {
       ; prevent tone-mapping HDR formats when destination can handle it
       noDepthConvert := 1
-   } Else If (varContains(formatDepths, "-f9-", "-f10-", "-f11-", "-f12-") && imgIDtype>=9 && !fallbackOkay && (imgIDtype<=10 || InStr(formatDepths, "-f11-")))
+   } Else If (!pqTone && varContains(formatDepths, "-f9-", "-f10-", "-f11-", "-f12-") && imgIDtype>=9 && !fallbackOkay && (imgIDtype<=10 || InStr(formatDepths, "-f11-")))
    {
       ; FreeImage converts floating point [FIT_RGBF=11, FIT_RGBAF=12] to no 16 bits type: the formats
       ; without floating point get it tone mapped
