@@ -99892,10 +99892,8 @@ FIMquantizeImage(hFIFimg, dither) {
 
   hSource := hFIFimgB ? hFIFimgB : hFIFimg
   hFIFimgQ := FreeImage_ColorQuantize(hSource, 2)   ; FIQ_LFPQUANT
-  If (!hFIFimgQ && dither=1)
-     hFIFimgQ := FreeImage_ColorQuantize(hSource, 3)   ; FIQ_MCQUANT
   If !hFIFimgQ
-     hFIFimgQ := FreeImage_ColorQuantize(hSource, 0)   ; FIQ_WUQUANT; also when FreeImage.dll lacks FIQ_MCQUANT
+     hFIFimgQ := FreeImage_ColorQuantize(hSource, (dither=1) ? 3 : 0)   ; FIQ_MCQUANT or FIQ_WUQUANT
 
   If hFIFimgB
      FreeImage_UnLoad(hFIFimgB)
