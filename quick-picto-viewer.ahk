@@ -18668,10 +18668,10 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
    {
       depth := 8
       pf := Gdip_GetImagePixelFormat(pBitmap, 2)
-      If (pf!="8-INDEXED")
+      ; GDI+ makes the palette's transparent entry; SaveFIMfile() quantizes the other images with FreeImage
+      If (pf!="8-INDEXED" && userGifPaletteTransparency=1 && InStr(pf, "ARGB"))
       {
-         keepTrans := (userGifPaletteTransparency=1 && InStr(pf, "ARGB")) ? 1 : 0
-         E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, keepTrans)
+         E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, 1)
          If E
             addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without transparency.")
       }
@@ -21200,7 +21200,7 @@ HugeImagesConvertClrDepth(modus) {
    Else If (modus="gray")
       hFIFimgA := FreeImage_ConvertToGreyscale(thisu)
    Else If (modus=8)
-      hFIFimgA := FreeImage_ColorQuantize(thisu, 0)
+      hFIFimgA := FIMquantizeImage(thisu, 1)
 
    If (hFIFimgZ && hFIFimgA)
    {
@@ -43620,7 +43620,8 @@ BtnChangeMultiPageFmt() {
    GuiControl, % actu, userJoinIMGsW
    GuiControl, % actu, userJoinIMGsH
 
-   actu := (userCombineFramesFmt=1 && userSaveBitsDepth>2 && userCombineTiffKeepOrig=0) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
+   ; «Dithering» counts for TIFF at 16 or 8 bits, for GIF at any depth, and for the other formats at 8 bits
+   actu := ((userCombineFramesFmt=1 && userSaveBitsDepth>2 && userCombineTiffKeepOrig=0) || userCombineFramesFmt=4 || (userCombineFramesFmt>2 && userSaveBitsDepth=4)) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
    GuiControl, % actu, userCombineDepthDithering
 
    actu := (userCombineFramesFmt=1) ? "SettingsGUIA: Show" : "SettingsGUIA: Hide"
@@ -59020,7 +59021,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
       Else If (depth=16 && objDepth!=16)
          hFIFimgB := FreeImage_ConvertTo(hFIFimgA, "16Bits")
       Else If (depth=8 && objDepth!=8)
-         hFIFimgB := FIMquantizeImage(hFIFimgA)
+         hFIFimgB := FIMquantizeImage(hFIFimgA, userGifPaletteDithering)
    }
 
    If hFIFimgB
@@ -63683,7 +63684,7 @@ combineFimImgsConvertDepth(k, modus, fif) {
          Return
 
       ; without a depth chosen, the palette is made as Save As makes it, with its transparency
-      Return modus ? combineFimQuantize(k) : FIMpalettizeLikeSaveAs(k)
+      Return modus ? FIMquantizeImage(k, userCombineDepthDithering) : FIMpalettizeLikeSaveAs(k)
    }
 
    If (fif=18)
@@ -63706,7 +63707,7 @@ combineFimImgsConvertDepth(k, modus, fif) {
    Else If (modus=3 && bpp!=16)
       hFIFimgC := FreeImage_ConvertTo(k, "16bits")
    Else If (modus=4 && bpp!=8)
-      hFIFimgC := combineFimQuantize(k)
+      hFIFimgC := FIMquantizeImage(k, userCombineDepthDithering)
 
    thisImg := hFIFimgC ? hFIFimgC : k
    If !FreeImage_FIFSupportsExportBPP(fif, FreeImage_GetBPP(thisImg))
@@ -63717,21 +63718,6 @@ combineFimImgsConvertDepth(k, modus, fif) {
       hFIFimgC := hFIFimgX
    }
 
-   Return hFIFimgC
-}
-
-combineFimQuantize(k) {
-; FreeImage_ColorQuantize() takes 24 or 32 bits only
-   bpp := FreeImage_GetBPP(k)
-   If (bpp=24 || bpp=32)
-      Return FreeImage_ColorQuantize(k)
-
-   hFIFimgD := FreeImage_ConvertTo(k, "24Bits")
-   If hFIFimgD
-   {
-      hFIFimgC := FreeImage_ColorQuantize(hFIFimgD)
-      FreeImage_UnLoad(hFIFimgD)
-   }
    Return hFIFimgC
 }
 
@@ -99851,7 +99837,7 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
   {
      If (objDepth!=8)
      {
-        hFIFimgB := FIMquantizeImage(hFIFimgA)
+        hFIFimgB := FIMquantizeImage(hFIFimgA, userGifPaletteDithering)
         If hFIFimgB
         {
            FreeImage_UnLoad(hFIFimgA)
@@ -99896,15 +99882,17 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
   Return !r
 }
 
-FIMquantizeImage(hFIFimg) {
+FIMquantizeImage(hFIFimg, dither) {
 ; Returns a new 8 bits palettized image: the exact palette for images of up to 256 colors,
-; otherwise median cut with dithering when «Dithering» is on, else the Wu quantizer's.
-  If (FreeImage_GetBPP(hFIFimg)!=24)
+; otherwise median cut with dithering when dither=1, else the Wu quantizer's.
+  ; FreeImage_ColorQuantize() takes 24 or 32 bits standard bitmaps and ignores their alpha
+  bpp := FreeImage_GetBPP(hFIFimg)
+  If ((bpp!=24 && bpp!=32) || FreeImage_GetImageType(hFIFimg)!=1)   ; FIT_BITMAP
      hFIFimgB := FreeImage_ConvertTo(hFIFimg, "24Bits")
 
   hSource := hFIFimgB ? hFIFimgB : hFIFimg
   hFIFimgQ := FreeImage_ColorQuantize(hSource, 2)   ; FIQ_LFPQUANT
-  If (!hFIFimgQ && userGifPaletteDithering=1)
+  If (!hFIFimgQ && dither=1)
      hFIFimgQ := FreeImage_ColorQuantize(hSource, 3)   ; FIQ_MCQUANT
   If !hFIFimgQ
      hFIFimgQ := FreeImage_ColorQuantize(hSource, 0)   ; FIQ_WUQUANT; also when FreeImage.dll lacks FIQ_MCQUANT
@@ -99915,20 +99903,23 @@ FIMquantizeImage(hFIFimg) {
 }
 
 FIMpalettizeLikeSaveAs(hImage) {
-; 256 colors as QPV_SaveImageFile() makes them, through GDI+ with «Dithering» and «Keep transparency»;
-; by FIMquantizeImage() when GDI+ cannot
+; 256 colors as QPV_SaveImageFile() makes them: by FIMquantizeImage() with «Dithering»,
+; or through GDI+ when «Keep transparency» is on and the image has alpha
    hasAlpha := (InStr(FreeImage_GetColorType(hImage), "rgba") || FreeImage_IsTransparent(hImage)) ? 1 : 0
+   If (userGifPaletteTransparency!=1 || !hasAlpha)
+      Return FIMquantizeImage(hImage, userGifPaletteDithering)
+
    ; a copy: ConvertFIMtoPBITMAP() turns 32 bits images upside down
-   hCopy := FreeImage_ConvertTo(hImage, hasAlpha ? "32Bits" : "24Bits")
+   hCopy := FreeImage_ConvertTo(hImage, "32Bits")
    If hCopy
    {
-      pBitmap := ConvertFIMtoPBITMAP(hCopy, hasAlpha ? "0x26200A" : "0x21808")   ; PixelFormat32bppARGB, PixelFormat24bppRGB
+      pBitmap := ConvertFIMtoPBITMAP(hCopy, "0x26200A")   ; PixelFormat32bppARGB
       FreeImage_UnLoad(hCopy)
    }
 
    If pBitmap
    {
-      E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, (userGifPaletteTransparency=1 && hasAlpha))
+      E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, 1)
       If !E
          hImage8 := ConvertIndexedPBITMAPtoFIM(pBitmap)
       Else
@@ -99936,7 +99927,7 @@ FIMpalettizeLikeSaveAs(hImage) {
       Gdip_DisposeImage(pBitmap)
    }
 
-   Return hImage8 ? hImage8 : FIMquantizeImage(hImage)
+   Return hImage8 ? hImage8 : FIMquantizeImage(hImage, userGifPaletteDithering)
 }
 
 initFIMGmodule() {

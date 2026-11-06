@@ -14,8 +14,8 @@ GDI+ with dithering and three FreeImage quantizers (median cut with dithering, N
 
 ## How the results were made
 
-- **GDI+**: made on Windows with GDI+ dithering (7ebddb9). QPV's 8-bit save with «Dithering» runs `QPV_GdipPalettizeBitmap()`: `GdipInitializePalette` (PaletteTypeOptimal, 256 colours), then `GdipBitmapConvertFormat` with DitherTypeErrorDiffusion.
-- **Median cut, NeuQuant, Wu**: the repo's FreeImage.dll (3.20.0 fork, x64, from 51bc95b), run under Wine through `lib/freeimage-wrapper.ahk`, as `FIMquantizeImage()` uses it: `FreeImage_ConvertTo(…, "24Bits")`, then `FreeImage_ColorQuantize()` with FIQ_MCQUANT, FIQ_NNQUANT (sampling 1) or FIQ_WUQUANT, saved as PNG with PNG_Z_BEST_COMPRESSION. Median cut always dithers (Floyd-Steinberg, in serpentine order); the FreeImage fork's `TestAPI/Quantize/README.md` describes it step by step. NeuQuant and Wu do not dither. Time per image: median cut about 24 ms, Wu about 20 ms, NeuQuant about 4 s.
+- **GDI+**: made on Windows with GDI+ dithering (7ebddb9), as `QPV_GdipPalettizeBitmap()` does it: `GdipInitializePalette` (PaletteTypeOptimal, 256 colours), then `GdipBitmapConvertFormat` with DitherTypeErrorDiffusion. QPV's 8-bit saves use it only with «Keep transparency», for images with alpha.
+- **Median cut, NeuQuant, Wu**: the repo's FreeImage.dll (3.20.0 fork, x64, from 51bc95b), run under Wine through `lib/freeimage-wrapper.ahk`: `FreeImage_ColorQuantize()` on the 24-bit original with FIQ_MCQUANT, FIQ_NNQUANT (sampling 1) or FIQ_WUQUANT, as `FIMquantizeImage()` calls it, saved as PNG with PNG_Z_BEST_COMPRESSION. Median cut always dithers (Floyd-Steinberg, in serpentine order); the FreeImage fork's `TestAPI/Quantize/README.md` describes it step by step. NeuQuant and Wu do not dither. Time per image: median cut about 24 ms, Wu about 20 ms, NeuQuant about 4 s.
 
 ## Results
 
