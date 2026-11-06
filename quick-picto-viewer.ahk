@@ -47850,7 +47850,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
           frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? givenIndex : 0
           If (viewportQPVimage.imgHandle)
           {
-             hFIFimgA := LoadBitmapAsFreeImage(dummy, -1, oImgW, oImgH, imgBPP)
+             hFIFimgA := LoadBitmapAsFreeImage(dummy, -1, 0, oImgW, oImgH, imgBPP)
              userClipBMPpaste := rescaleFIMbmpGDIp(hFIFimgA, mainWidth, mainHeight)
           } Else
              userClipBMPpaste := LoadBitmapFromFileu(dummy, 0, 0, frameLoad)
@@ -61592,16 +61592,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
    {
       changeMcursor()
       If isRendered
-      {
          hFIFimgA := loadRenderedFileAsFIM(imgPath)
-      } Else If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && userPerformColorManagement=1 && RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") )
-      {
-         ; use WIC loader to not miss on color management
-         z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
-         hFIFimgA := z[1]
-         FimBuffer := z[2]
-         thisu := 1
-      }
 
       If (!hFIFimgA && !isRendered)
          hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
@@ -61611,6 +61602,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && WICmoduleHasInit=1 && allowWICloader=1 && thisu=0)
       {
+         ; fallback loader
          z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
          hFIFimgA := z[1]
          FimBuffer := z[2]
@@ -63337,10 +63329,14 @@ loadRenderedFileAsFIM(imgPath, page:=0, maxSide:=0) {
    Return hFIFimgA
 }
 
-LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP) {
+LoadBitmapAsFreeImage(imgPath, allowHDR, allowFallback, ByRef oImgW, ByRef oImgH, ByRef imgBPP) {
    loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
+   displayICC := FIMdisplayICCmode(GFT, loadArgs)
+   If (displayICC=1 && allowHDR=0)
+      loadArgs := loadArgs | 0x4000  ; FIF_LOAD_DISPLAY_ICC
+
    hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
-   If !hFIFimgA
+   If (!hFIFimgA && allowFallback=1)
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1)
       {
@@ -63362,13 +63358,20 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
       Return
    }
 
+   If (displayICC=2 && FreeImage_GetImageType(hFIFimgA)=2)
+   {
+      ; FIT_UINT16, a monochrome RAW: greyed below, never tone mapped
+      FreeImage_ApplyDisplayICCProfile(hFIFimgA)
+      displayICC := 1
+   }
+
    imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
    ColorsType := FreeImage_GetColorType(hFIFimgA)
    imgType := FreeImage_GetImageType(hFIFimgA, 1)
    imgIDtype := FreeImage_GetImageType(hFIFimgA)
    If (allowHDR=-1)
    {
-      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
+      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap, displayICC)
       imgBPP := Trimmer(StrReplace(FreeImage_GetBPP(hFIFimgA), "-"))
       ColorsType := FreeImage_GetColorType(hFIFimgA)
       If (GFT=0 && InStr(ColorsType, "rgba"))
@@ -63408,7 +63411,7 @@ LoadBitmapAsFreeImage(imgPath, allowHDR, ByRef oImgW, ByRef oImgH, ByRef imgBPP)
          }
       }
    } Else If (allowHDR=0)
-      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap)
+      hFIFimgA := FIMapplyToneMapper(hFIFimgA, GFT, imgBPP, ColorsType, 1, hasAppliedToneMap, displayICC)
 
    Return hFIFimgA
 }
@@ -98743,18 +98746,16 @@ DestroyMemoryBuffer(buffer) {
 coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFactor, YscaleImgFactor, doConversion:=0) {
     Sleep, 0
     changeMcursor()
-    If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && (userPerformColorManagement=1 && RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") || !RegExMatch(imgPath, RegExFIMformPtrn)))
+    hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, 0, imgW, imgH, bpp)
+    If (!hFIFimgA && allowWICloader=1 && WICmoduleHasInit=1)
     {
-       ; use WIC loader to not miss on color management
+       ; fallback loader
        z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
        hFIFimgA := z[1]
        FimBuffer := z[2]
        bpp := FreeImage_GetBPP(hFIFimgA)
        FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
     }
-
-    If !hFIFimgA
-       hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
 
     If (!hFIFimgA || !imgW || !imgH || imgH=1 && imgW=1)
     {
@@ -98887,9 +98888,10 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
 coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
     Sleep, 0
     changeMcursor()
-    If (allowWICloader=1 && WICmoduleHasInit=1 && alwaysOpenWithFIM!=1 && (RegExMatch(imgPath, "i)(.\.(png|jpeg|jpe|jpg|tiff|tif))$") || !RegExMatch(imgPath, RegExFIMformPtrn)))
+    hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, 0, imgW, imgH, bpp)
+    If (!hFIFimgA && allowWICloader=1 && WICmoduleHasInit=1)
     {
-       ; use WIC loader to not miss on color management
+       ; fallback loader
        z := loadWICasFreeImage(imgPath, 0, userPerformColorManagement)
        hFIFimgA := z[1]
        FimBuffer := z[2]
@@ -98897,9 +98899,6 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
        FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
        ; fnOutputDebug(A_ThisFunc ": load wic: " hFIFimgA "|" imgPath)
     }
-
-    If !hFIFimgA
-       hFIFimgA := LoadBitmapAsFreeImage(imgPath, 1, imgW, imgH, bpp)
 
     If (!hFIFimgA || !imgW || !imgH || imgH=1 && imgW=1)
     {
