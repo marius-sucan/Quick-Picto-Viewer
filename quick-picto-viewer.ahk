@@ -38200,6 +38200,12 @@ multiCoreThreadSimpleImgProcessing(coreThread, arguments, filesList) {
        zPlitPath(imgPath, 0, OutFileName, OutDir)
        destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
        file2save := destImgPath "\" OutFileName
+       If !lockDestinationName(file2save, 2)
+       {
+          abandonAll := 1
+          Break
+       }
+
        If (ResizeUseDestDir=1)
        {
           If (FileExist(file2save) && !FolderExist(file2save))
@@ -38225,6 +38231,7 @@ multiCoreThreadSimpleImgProcessing(coreThread, arguments, filesList) {
        RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" skippedFiles
    }
 
+   lockDestinationName("", 2)
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" skippedFiles
    Sleep, 1
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 2
@@ -38336,6 +38343,12 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
          Continue
       }
 
+      If !lockDestinationName(file2save, 2)
+      {
+         abandonAll := 1
+         Break
+      }
+
       If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
          ; a file already in the format is not converted again: it only goes to the destination folder
@@ -38424,12 +38437,71 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
       }
    }
 
+   lockDestinationName("", 2)
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles "/" partialFiles
    If resultsList
       Try FileAppend, % resultsList, %thumbsCacheFolder%\tempList%coreThread%.txt, UTF-16
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 2
    operationDone := 1
    ; cleanupThread()
+}
+
+lockDestinationName(filePath, mode:=0) {
+; In a worker of a multi-threaded batch, a destination name is taken before it is checked and kept until the
+; worker's next file, so workers that share a name write it one after another: a mutex named after the path.
+; Outside the workers [no mainThreadHwnd] it does nothing and returns 1.
+; mode 0 - waits while another worker has filePath; 0 when the batch is aborted meanwhile
+; mode 1 - 0 at once when another worker has filePath
+; mode 2 - lets go of every name, then takes filePath, if given, as mode 0 does
+; A worker waits for its output name holding nothing, or for a page name, longer than the output name it
+; holds, and mode 1 never waits: no deadlock.
+   Static held := {}
+   If !mainThreadHwnd
+      Return 1
+
+   If (mode=2)
+   {
+      For name, h in held
+      {
+         DllCall("ReleaseMutex", "UPtr", h)
+         DllCall("CloseHandle", "UPtr", h)
+      }
+      held := {}
+      If !filePath
+         Return 1
+   }
+
+   ; a mutex name takes no backslash and 260 characters at most [MAX_PATH]; CALG_MD5 = 0x8003
+   hash := CalcStringHash(Format("{:L}", RegExReplace(filePath, "\\+", "\")), 0x8003)
+   name := "Local\QPVdestination-" hash
+   If (!hash || held.HasKey(name))
+      Return 1
+
+   h := DllCall("CreateMutexW", "UPtr", 0, "Int", 0, "WStr", name, "UPtr")
+   If !h
+      Return 1
+
+   Loop
+   {
+      r := DllCall("WaitForSingleObject", "UPtr", h, "UInt", (mode=1) ? 0 : 250, "UInt")
+      ; WAIT_OBJECT_0 = 0; WAIT_ABANDONED = 0x80, when the worker that had it ended without letting go
+      If (r=0 || r=0x80)
+      {
+         held[name] := h
+         Return 1
+      }
+
+      If (r=0x102 && mode!=1)   ; WAIT_TIMEOUT
+      {
+         RegRead, abortFlag, %QPVregEntry%\multicore, mustAbortAllOperations
+         If (abortFlag!=1 && WinExist("ahk_id " mainThreadHwnd))
+            Continue
+      }
+
+      DllCall("CloseHandle", "UPtr", h)
+      ; WAIT_FAILED goes on without the name, as before the locks
+      Return (r=0x102) ? 0 : 1
+   }
 }
 
 readSlideSettingsINI(readThisFile, act:=0) {
@@ -61940,11 +62012,13 @@ FIMsaveImageFile(hImage, file2save, saveArg) {
 
 getAutoRenamedFreePath(filePath) {
 ; the first free «name [N].ext» next to filePath; blank when none is free
+; in a worker, a name another worker holds is not free, and the name returned stays held, see lockDestinationName()
    zPlitPath(filePath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
    Loop, 9500
    {
       z := OutDir "\" OutNameNoExt " [" A_Index "]." fileEXT
-      If !FileExist(z)
+      ; checked again once held: another worker may have written it meanwhile
+      If (!FileExist(z) && lockDestinationName(z, 1) && !FileExist(z))
          Return z
    }
 }
@@ -62402,7 +62476,9 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
          prevMSGdisplay := A_TickCount
       }
 
-      If (FileExist(file2save) && !FolderExist(file2save))
+      If !lockDestinationName(file2save)
+         file2save := "abort"
+      Else If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
 
       If (file2save="abort")
@@ -62746,7 +62822,9 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
          prevMSGdisplay := A_TickCount
       }
 
-      If (FileExist(file2save) && !FolderExist(file2save))
+      If !lockDestinationName(file2save)
+         file2save := "abort"
+      Else If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
 
       If (file2save="abort")
@@ -62839,7 +62917,9 @@ coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef 
          prevMSGdisplay := A_TickCount
       }
 
-      If (FileExist(file2save) && !FolderExist(file2save))
+      If !lockDestinationName(file2save)
+         file2save := "abort"
+      Else If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
 
       If (file2save="abort")
