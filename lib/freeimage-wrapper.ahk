@@ -17,7 +17,8 @@
 ;   FreeImage_GetICCProfileDescription(), FreeImage_GetICCProfileColorSpace() and FreeImage_GetICCProfileData()
 ;
 ; - added the FIF_LOAD_DISPLAY_ICC load flag, FreeImage_SetDisplayICCProfile() and FreeImage_GetDisplayICCProfile():
-;   images loaded in the display's colors
+;   images loaded in sRGB, or in the colors of a display profile set via FreeImage_SetDisplayICCProfile()
+;
 ; - added FreeImage_ApplyDisplayICCProfile(): what FIF_LOAD_DISPLAY_ICC does, done to an image loaded without it
 ; - APNG_LINEAR_BLEND flag for FreeImage_OpenMultiBitmap(): animated PNG frames blended in linear light
 ; - added FreeImage_MustTonemap(): whether an image needs tone mapping to be displayed
@@ -294,7 +295,7 @@ FreeImage_AllocateHeaderForBits(pBits, pitch, imageType, width, height, bpp, red
 FreeImage_Load(ImgPath, GFT:=-1, flag:=0, ByRef dGFT:=0) {
 ; flag - 0, or the flags of the file's format below, combined with |:
 ; FIF_LOAD_NOPIXELS = 0x8000; retrieve only the image properties: size, type, metadata, ICC profile, thumbnail; see FreeImage_FIFSupportsNoPixels()
-; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to the display's colors, see FreeImage_SetDisplayICCProfile(); ignored with FIF_LOAD_NOPIXELS
+; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to sRGB, or to the profile set with FreeImage_SetDisplayICCProfile(); flag ignored with FIF_LOAD_NOPIXELS
 ;
 ; GIF_LOAD256 = 1; a GIF with a palette of 16 colours or fewer loads as 8-bit, not as 1-bit or 4-bit
 ; ICO_MAKEALPHA = 1; load an icon of under 32 bits as 32-bit, with an alpha channel made from its AND mask
@@ -1075,6 +1076,8 @@ FreeImage_ColorQuantize(hImage, quantizeAlgo:=0) {
    ; 0 = FIQ_WUQUANT  - Xiaolin Wu color quantization algorithm
    ; 1 = FIQ_NNQUANT  - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
    ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
+   ; 3 = FIQ_MCQUANT  - Median cut quantization with Floyd-Steinberg dithering [best, recommended]
+
 ; the function returns an 8 bit image
    Return DllCall(getFIMfunc("ColorQuantize"), "UPtr", hImage, "Int", quantizeAlgo, "UPtr")
 }
@@ -1271,9 +1274,11 @@ FreeImage_GetICCProfileColorSpace(pProfile, profileSize) {
 }
 
 FreeImage_SetDisplayICCProfile(pProfile:=0, profileSize:=0, flags:=0x101) {
-; the profile the FIF_LOAD_DISPLAY_ICC load flag converts images to; images carry it afterwards
-; pProfile - an RGB profile, e.g. of the monitor showing the images; 0 - detect it: on Windows the primary monitor's profile,
-;   on Linux the X11 screen's; sRGB when there is none, or when Windows' HDR or Auto Color Management is on
+; The function sets the profile the FIF_LOAD_DISPLAY_ICC load flag converts images to, sRGB by default; images carry it afterwards.
+;
+; pProfile - an RGB profile, e.g. of the monitor showing the images; 0 - sRGB
+; a monitor's profile goes into the files saved from such images; for display alone, convert a copy with FreeImage_ConvertToICCProfile()
+;
 ; CMYK JPEG, TIFF and PSD files are read as CMYK first and come back as RGB, or RGBA with their alpha channel; grey images stay grey; float images are not changed
 ; flags - a rendering intent, with FICMS_BLACKPOINT_COMPENSATION or not; see FreeImage_ConvertToICCProfile()
 ; Return value: 1 -- success; 0 -- not an RGB profile Little CMS can convert to, the last one stays
@@ -1370,7 +1375,7 @@ FreeImage_OpenMultiBitmap(ImgPath, imgFormat, create_new:=0, read_only:=1, keep_
 ;
 ; flags - 0, or these combined with |; a single-page format takes its FreeImage_Load() flags:
 ; FIF_LOAD_NOPIXELS = 0x8000; retrieve only the properties: each page's size, type, metadata and frame time; no pixels
-; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to the display's colors, see FreeImage_SetDisplayICCProfile(); ignored with FIF_LOAD_NOPIXELS
+; FIF_LOAD_DISPLAY_ICC = 0x4000; convert to sRGB, or to the profile set with FreeImage_SetDisplayICCProfile(); ignored with FIF_LOAD_NOPIXELS
 ;
 ; APNG_LINEAR_BLEND = 4; APNG, with APNG_PLAYBACK: translucent frames blended in linear light, not on the stored values
 ; APNG_PLAYBACK = 2; APNG: every frame as a viewer shows it, composited on the canvas, as 32-bit
