@@ -52,7 +52,7 @@ Method:
 | 7 | Medium | Photos come out rotated twice (FreeImage path: Exif kept after rotating), or with all metadata dropped and unrotated (WIC path) | Wine + reading; **fixed in the FreeImage fork, `7ae5e15`** (needs FreeImage.dll rebuilt); WIC fallback turned, `e6d64f2` (needs qpvmain.dll rebuilt) |
 | 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine; **fixed, `44e12c7`** |
 | 9 | Medium | Multi-threaded runs load files differently from single-threaded runs, and can switch mid-batch | reading (+ Wine for the two loaders' outputs); **fixed, `a2ec48c`** |
-| 10 | Medium | Multi-threaded runs race on shared destination names; the conflict option is bypassed | reading |
+| 10 | Medium | Multi-threaded runs race on shared destination names; the conflict option is bypassed | reading, then Wine; **fixed, `51ed06e`** |
 | 11 | Low | The destination format is read from an existing file's content, not from its extension | Wine; **fixed, `2fd9bc7`** |
 | 12 | Low | «Auto-skip format» compares extension text: `.jpeg`, `.jpe`, `.jfif`, `.tiff` are re-encoded | reading; **fixed, `a2ec48c`** |
 | 13 | Low | PDF and SVG files always fail, although the panel shows PDF and SVG sliders | Wine; **fixed, `a2ec48c`**; SVG not verifiable under Wine |
@@ -477,6 +477,22 @@ differences listed above.
 
 ## 10. Multi-threaded runs race on shared destination names
 
+**Fixed in `51ed06e`** (Marius's decisions, 2026-11-06), by a lock per destination name shared by the worker
+processes: `lockDestinationName()`, a mutex named after the MD5 of the lowercased path. A worker takes its file's
+name before it checks it and keeps it until its next file. A second worker with the same name waits, then finds the
+file written and applies the conflict option, as a single-threaded run does.
+- His choices: the batch resize/rotate/crop worker is covered as well; so are auto-rename candidates (a name another
+  worker holds is not free) and extracted pages; a waiting worker stops on an abort or when the main window closes.
+- The locks work only in worker processes (`mainThreadHwnd` set), so single-threaded runs are unchanged.
+- The race was wider than reported below. The copy/move of files already in the format (`a2ec48c`) and the resize
+  worker with a destination folder had it too. Under Wine, two workers also wrote into one open file: with
+  «Overwrite», each of six outputs was one worker's JPEG followed by the last 15 332 bytes of the other's.
+- Wine, real batches of two workers meeting each name at the same time, before → after: «Skip» on six names,
+  9 conversions → 6, with 6 skipped; «Auto-rename», 6 outputs → 12; «Overwrite», six mixed files → six whole ones; a
+  file named like an extracted page, and the resize worker, no longer lose outputs.
+- Not changed: «Overwrite» between two files of one batch still replaces the first one's output, as a
+  single-threaded run does.
+
 **What happens.** `getSelectedFilesListString()` shuffles the selection (`:37613`) and splits it into one chunk per
 worker. Each worker checks `FileExist(file2save)` on its own (`:38365`).
 
@@ -658,7 +674,8 @@ files still convert their first image, by choice.
   application are confirmed separately. Found since: `arrow.heic` in the fork's
   `.claude/scratch/heic-support-wt/heic/samples/real`, checked with the 2026-11-06 fix.
 - **Worker processes as a real multi-threaded run starts them** (findings 9 and 10): read, not run. The worker loop
-  itself was run for the `26dd9d7` checks.
+  itself was run for the `26dd9d7` checks. Since: real multi-threaded batches ran for the `a2ec48c` and `51ed06e`
+  checks.
 - **The «Ask user» dialog for a self-collision with originals not kept** (finding 2): read, not run.
 
 ## Re-running the checks
@@ -691,3 +708,6 @@ planted bugs and sanitizer runs. Their paths name a job folder and worktrees tha
 The checks of `2fd9bc7` are in `.claude/scratch/dest-by-extension-2026-11-06/` (`README.txt`): the 11-02 suites,
 `015d439` against a checkout, and a test of `FreeImage_GetFileType()`'s `byExtension` on AutoHotkey_H and stock
 AutoHotkey.
+
+The checks of `51ed06e` are in `.claude/scratch/name-locks-2026-11-06/` (`README.txt`): `lockDestinationName()`
+across processes, and real two-worker batches in a scratch copy of the app that splits the selection unshuffled.
