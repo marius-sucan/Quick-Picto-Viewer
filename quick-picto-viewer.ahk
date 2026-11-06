@@ -63366,10 +63366,38 @@ loadWICasFreeImage(imgPath, frameu, useICM) {
          z := teleportWICtoFIM(Width, Height, cBPP, useICM, 1)
       ; fnOutputDebug(A_ThisFunc ": wicca " hFIFimgA)
       ; ToolTip, % z[1] "|" pBitmap "|" cBPP "|" Gdip_GetImagePixelFormat(pBitmap, 2) , , , 2
+      ; the Exif orientation, applied for the JPEG [4] and TIFF [5] decoders of WIC, which never turn the pixels
+      If isVarEqualTo(NumGet(resultsArray, 4 * 5, "uInt"), 4, 5)
+         orientation := NumGet(resultsArray, 4 * 9, "uInt")
    }
    DllCall("qpvmain.dll\WICdestroyPreloadedImage", "Int", 12, "Int")
    resultsArray := ""
+   If (z[1] && orientation>=2 && orientation<=8)
+   {
+      hTurned := FIMturnByExifOrientation(z[1], orientation)
+      If (hTurned!=z[1])
+      {
+         ; a turned copy owns its pixels: the WIC buffer goes
+         FreeImage_UnLoad(z[1])
+         DestroyMemoryBuffer(z[2])
+         z := hTurned ? [hTurned, 0] : ""
+      }
+   }
    return z
+}
+
+FIMturnByExifOrientation(hImage, orientation) {
+; turns the pixels as an Exif Orientation of 2 to 8 asks, as FreeImage's JPEG_EXIFROTATE does: flips are made
+; in place, turns return a new bitmap, or 0 when that fails
+   Static angles := {3:180, 5:90, 6:-90, 7:-90, 8:90}
+   If angles.HasKey(orientation)
+      hImage := FreeImage_Rotate(hImage, angles[orientation])
+
+   If (hImage && orientation=2)
+      FreeImage_FlipHorizontal(hImage)
+   Else If (hImage && isVarEqualTo(orientation, 4, 5, 7))
+      FreeImage_FlipVertical(hImage)
+   Return hImage
 }
 
 loadRenderedFileAsFIM(imgPath, page:=0, maxSide:=0) {

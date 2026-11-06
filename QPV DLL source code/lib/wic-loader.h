@@ -538,6 +538,31 @@ static int WICguardedPaletteHasAlpha(IWICImagingFactory *fac, IWICBitmapFrameDec
     return hasAlpha ? 1 : 0;
 }
 
+// the frame's Exif orientation [System.Photo.Orientation], 1 to 8, which WIC leaves to its caller; 0 without one
+static UINT WICguardedOrientation(IWICBitmapFrameDecode *frame, DWORD *sehCode) {
+    IWICMetadataQueryReader *pReader = NULL;
+    PROPVARIANT value;
+    UINT orientation = 0;
+    *sehCode = 0;
+    PropVariantInit(&value);
+    __try
+    {
+        if (SUCCEEDED(frame->GetMetadataQueryReader(&pReader)) && pReader!=NULL
+            && SUCCEEDED(pReader->GetMetadataByName(L"System.Photo.Orientation", &value))
+            && value.vt==VT_UI2 && value.uiVal>=1 && value.uiVal<=8)
+           orientation = value.uiVal;
+    }
+    __except (WICcodecCrashFilter(GetExceptionCode()))
+    {
+        *sehCode = GetExceptionCode();
+        return 0;   // the reader and the value are abandoned on purpose
+    }
+
+    PropVariantClear(&value);
+    WICguardedRelease(pReader);
+    return orientation;
+}
+
 // size and pixel format of whatever is at the end of a scaler/converter chain; the call
 // walks back down that chain into the codec
 static HRESULT WICguardedSourceInfo(IWICBitmapSource *src, UINT *width, UINT *height,
@@ -1227,6 +1252,11 @@ DLL_API int DLL_CALLCONV WICpreLoadImage(const wchar_t *szFileName, int givenFra
             resultsArray[6] = facts.activeFrame;
             resultsArray[7] = bpp;
             resultsArray[8] = channels;
+            // the callers' arrays hold 18 UINTs
+            DWORD orientSehCode = 0;
+            resultsArray[9] = WICguardedOrientation(pWICclassFrameDecoded, &orientSehCode);
+            if (orientSehCode!=0)
+               QPV_DBG("WICpreLoadImage: the codec faulted on the Exif orientation");
          }
       }
 
