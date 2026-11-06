@@ -47850,7 +47850,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
           frameLoad := (InStr(filesFilter, "i)(QPV:PAGES:")=1) ? givenIndex : 0
           If (viewportQPVimage.imgHandle)
           {
-             hFIFimgA := LoadBitmapAsFreeImage(dummy, -1, 0, oImgW, oImgH, imgBPP)
+             hFIFimgA := LoadBitmapAsFreeImage(dummy, -1, 1, oImgW, oImgH, imgBPP)
              userClipBMPpaste := rescaleFIMbmpGDIp(hFIFimgA, mainWidth, mainHeight)
           } Else
              userClipBMPpaste := LoadBitmapFromFileu(dummy, 0, 0, frameLoad)
@@ -61345,7 +61345,8 @@ FIMdropMismatchedICC(hImage) {
       FreeImage_DestroyICCProfile(hImage)
 }
 
-FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
+FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT, cmykInks:=0) {
+; cmykInks=1 - with color management, CMYK JPEGs and TIFFs load as inks, for FIMcmykToSRGB()
    loadArgs := 0
    GFT := FreeImage_GetFileType(imgPath)
    If (GFT=34 && RegExMatch(imgPath, "i)(.\.(dng))$"))
@@ -61354,6 +61355,9 @@ FIMdecideLoadArgs(imgPath, qualityRaw, ByRef GFT) {
       loadArgs := (qualityRaw=1) ? 0 : 2
    Else If (GFT=2)
       loadArgs := 8
+
+   If (cmykInks=1 && userPerformColorManagement=1)
+      loadArgs |= (GFT=2) ? 4 : (GFT=18) ? 1 : 0   ; JPEG_CMYK, TIFF_CMYK
    Return loadArgs
 }
 
@@ -61554,6 +61558,21 @@ FIMcopyICCprofile(hFrom, hTo) {
    }
 }
 
+FIMcmykToSRGB(hImage, imgPath) {
+; a CMYK image [FIC_CMYK=5] is replaced by its sRGB conversion through its own profile; 0 when that fails
+   ; the flag first: FreeImage_GetColorType() reads every alpha of an opaque 32-bit image
+   pProfile := hImage ? FreeImage_GetICCProfile(hImage, iccSize) : 0
+   If (!pProfile || !(NumGet(pProfile+0, 0, "UShort") & 1) || FreeImage_GetColorType(hImage, 0)!=5)   ; FIICC_COLOR_IS_CMYK
+      Return hImage
+
+   ; to sRGB [0] by FICMS_INTENT_RELATIVE_COLORIMETRIC=1 | FICMS_BLACKPOINT_COMPENSATION=0x100
+   hRGB := FreeImage_ConvertCMYKToRGB(hImage, 0, 0, 0x101)
+   FreeImage_UnLoad(hImage)
+   If !hRGB
+      addJournalEntry(A_ThisFunc "(): the image could not be converted from CMYK to sRGB:`n" imgPath)
+   Return hRGB
+}
+
 coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLevel:=0) {
 ; fallbackLevel - the depth of an image the format cannot store at its own, tried before the closest one
 ;                 the format allows: 1 = 32 bits, 2 = 24 bits, 3 = 16 bits [RGB555], 4 = 8 bits palette
@@ -61585,7 +61604,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
    }
 
    thisu := 0
-   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
+   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT, 1)
    hFIFimgA := externBMP
    isRendered := (!externBMP && RegExMatch(imgPath, "i)\.(pdf|svg)$")) ? 1 : 0
    If !hFIFimgA
@@ -61595,7 +61614,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
          hFIFimgA := loadRenderedFileAsFIM(imgPath)
 
       If (!hFIFimgA && !isRendered)
-         hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+         hFIFimgA := FIMcmykToSRGB(FreeImage_Load(imgPath, -1, loadArgs), imgPath)
    }
 
    If (!hFIFimgA && !isRendered)
@@ -63330,12 +63349,12 @@ loadRenderedFileAsFIM(imgPath, page:=0, maxSide:=0) {
 }
 
 LoadBitmapAsFreeImage(imgPath, allowHDR, allowFallback, ByRef oImgW, ByRef oImgH, ByRef imgBPP) {
-   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT)
+   loadArgs := FIMdecideLoadArgs(imgPath, userHQraw, GFT, 1)
    displayICC := FIMdisplayICCmode(GFT, loadArgs)
    If (displayICC=1 && allowHDR=0)
       loadArgs := loadArgs | 0x4000  ; FIF_LOAD_DISPLAY_ICC
 
-   hFIFimgA := FreeImage_Load(imgPath, -1, loadArgs)
+   hFIFimgA := FIMcmykToSRGB(FreeImage_Load(imgPath, -1, loadArgs), imgPath)
    If (!hFIFimgA && allowFallback=1)
    {
       If (RegExMatch(imgPath, RegExWICfmtPtrn) && allowWICloader=1)
@@ -98836,6 +98855,7 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
 
        If hFIFimgB
        {
+          FIMcopyICCprofile(hFIFimgA, hFIFimgB)
           FreeImage_UnLoad(hFIFimgA)
           hFIFimgA := hFIFimgB
           FimBuffer := DestroyMemoryBuffer(FimBuffer)
@@ -98937,6 +98957,7 @@ coreFreeImageSimpleColorsAdjust(imgPath, file2save) {
 
           If hFIFimgB
           {
+             FIMcopyICCprofile(hFIFimgA, hFIFimgB)
              FreeImage_UnLoad(hFIFimgA)
              hFIFimgA := hFIFimgB
              FimBuffer := DestroyMemoryBuffer(FimBuffer)
