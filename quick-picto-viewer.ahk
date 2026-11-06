@@ -18673,7 +18673,7 @@ QPV_SaveImageFile(funcu, pBitmap, file2save, jpegQuality, depthLevel:=1) {
          keepTrans := (userGifPaletteTransparency=1 && InStr(pf, "ARGB")) ? 1 : 0
          E := QPV_GdipPalettizeBitmap(pBitmap, userGifPaletteDithering, keepTrans)
          If E
-            addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without dithering or transparency.")
+            addJournalEntry(A_ThisFunc "() invoked by " funcu "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without transparency.")
       }
    } Else If (depth=16)
    {
@@ -99898,14 +99898,16 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
 
 FIMquantizeImage(hFIFimg) {
 ; Returns a new 8 bits palettized image: the exact palette for images of up to 256 colors,
-; otherwise the Wu quantizer's.
+; otherwise median cut with dithering when «Dithering» is on, else the Wu quantizer's.
   If (FreeImage_GetBPP(hFIFimg)!=24)
      hFIFimgB := FreeImage_ConvertTo(hFIFimg, "24Bits")
 
   hSource := hFIFimgB ? hFIFimgB : hFIFimg
   hFIFimgQ := FreeImage_ColorQuantize(hSource, 2)   ; FIQ_LFPQUANT
+  If (!hFIFimgQ && userGifPaletteDithering=1)
+     hFIFimgQ := FreeImage_ColorQuantize(hSource, 3)   ; FIQ_MCQUANT
   If !hFIFimgQ
-     hFIFimgQ := FreeImage_ColorQuantize(hSource, 0)   ; FIQ_WUQUANT
+     hFIFimgQ := FreeImage_ColorQuantize(hSource, 0)   ; FIQ_WUQUANT; also when FreeImage.dll lacks FIQ_MCQUANT
 
   If hFIFimgB
      FreeImage_UnLoad(hFIFimgB)
@@ -99930,7 +99932,7 @@ FIMpalettizeLikeSaveAs(hImage) {
       If !E
          hImage8 := ConvertIndexedPBITMAPtoFIM(pBitmap)
       Else
-         addJournalEntry(A_ThisFunc "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without dithering or transparency.")
+         addJournalEntry(A_ThisFunc "(): GDI+ failed to reduce the image to 256 colors [error " E "]. FreeImage reduces it instead, without transparency.")
       Gdip_DisposeImage(pBitmap)
    }
 
