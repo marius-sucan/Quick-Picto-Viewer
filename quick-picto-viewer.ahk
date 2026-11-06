@@ -57801,7 +57801,7 @@ PanelPreferencesWindow() {
 
     Gui, Tab, 2
     Gui, Add, Checkbox, x+15 y+15 Section gupdateUIsettings Checked%userPerformColorManagement% vuserPerformColorManagement hwndhTemp, Apply color management
-    ToolTip2ctrl(hTemp, "Convert images from their embedded color profile, or from sRGB when none is embedded, to the primary monitor's color profile")
+    ToolTip2ctrl(hTemp, "Convert images from their embedded color profile to sRGB")
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%userimgGammaCorrect% vuserimgGammaCorrect +hwndhTemp, Apply gamma correction (image editing)
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%ColorDepthDithering% vColorDepthDithering, Perform dithering on color depth changes
     Gui, Add, Checkbox, xs y+7 gupdateUIsettings Checked%preventUndoLevels% vpreventUndoLevels, Record undo levels
