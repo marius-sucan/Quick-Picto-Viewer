@@ -7,9 +7,9 @@ from PIL import Image, ImageDraw
 
 NAMES = ["rainbow", "gradients", "colorwheel"]
 BLUR_SIGMA = 1.5
-# crop boxes (x, y, w, h) where banding shows most, with the sheet's file name suffix
+# crop boxes (x, y, w, h) where banding or dither specks show most, with the sheet's file name suffix
 CROPS = {"rainbow": [("", (500, 40, 400, 200))],
-         "gradients": [("", (700, 1000, 400, 200)), ("-grey", (800, 30, 400, 200))],
+         "gradients": [("", (700, 1000, 400, 200)), ("-grey", (800, 30, 400, 200)), ("-teal", (1600, 770, 400, 200))],
          "colorwheel": [("", (900, 650, 400, 200))]}
 
 def load(p):
