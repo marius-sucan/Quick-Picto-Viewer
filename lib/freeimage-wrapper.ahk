@@ -1076,8 +1076,8 @@ FreeImage_ColorQuantize(hImage, quantizeAlgo:=0) {
    ; 0 = FIQ_WUQUANT  - Xiaolin Wu color quantization algorithm
    ; 1 = FIQ_NNQUANT  - NeuQuant neural-net quantization algorithm by Anthony Dekker (24-bit only)
    ; 2 = FIQ_LFPQUANT - Lossless Fast Pseudo-Quantization Algorithm by Carsten Klein
+   ;                    It only succeeds when the image has at most 256 distinct colours. Then it returns exactly those colours, with no changes.
    ; 3 = FIQ_MCQUANT  - Median cut quantization with Floyd-Steinberg dithering [best, recommended]
-
 ; the function returns an 8 bit image
    Return DllCall(getFIMfunc("ColorQuantize"), "UPtr", hImage, "Int", quantizeAlgo, "UPtr")
 }
