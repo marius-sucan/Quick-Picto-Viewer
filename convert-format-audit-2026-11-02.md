@@ -490,8 +490,10 @@ file written and applies the conflict option, as a single-threaded run does.
 - Wine, real batches of two workers meeting each name at the same time, before → after: «Skip» on six names,
   9 conversions → 6, with 6 skipped; «Auto-rename», 6 outputs → 12; «Overwrite», six mixed files → six whole ones; a
   file named like an extracted page, and the resize worker, no longer lose outputs.
-- Not changed: «Overwrite» between two files of one batch still replaces the first one's output, as a
-  single-threaded run does.
+- Since `f71c89d` (Marius's decisions, 2026-11-06), «Overwrite» no longer replaces a file its own batch wrote: that
+  file gets a new name («name [1]»), in single- and multi-threaded runs of the converter and of batch
+  resize/rotate/crop. Files from before the batch are still overwritten, and an Overwrite chosen in the «Ask user»
+  dialog still overwrites. Wine: six names shared by two folders gave 6 outputs, now 12.
 
 **What happens.** `getSelectedFilesListString()` shuffles the selection (`:37613`) and splits it into one chunk per
 worker. Each worker checks `FileExist(file2save)` on its own (`:38365`).
@@ -709,5 +711,6 @@ The checks of `2fd9bc7` are in `.claude/scratch/dest-by-extension-2026-11-06/` (
 `015d439` against a checkout, and a test of `FreeImage_GetFileType()`'s `byExtension` on AutoHotkey_H and stock
 AutoHotkey.
 
-The checks of `51ed06e` are in `.claude/scratch/name-locks-2026-11-06/` (`README.txt`): `lockDestinationName()`
-across processes, and real two-worker batches in a scratch copy of the app that splits the selection unshuffled.
+The checks of `51ed06e` and `f71c89d` are in `.claude/scratch/name-locks-2026-11-06/` (`README.txt`):
+`lockDestinationName()` across processes, and real batches, two workers or one thread, in a scratch copy of the app
+that splits the selection unshuffled.
