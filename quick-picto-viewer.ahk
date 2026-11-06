@@ -59004,7 +59004,7 @@ saveHugeVPimageFile(imgPath, file2save, hFIFimgA, depth) {
       }
    }
 
-   typu := FreeImage_GetFileType(file2save, 1)
+   typu := FreeImage_GetFileType(file2save, 1, 1)   ; by its extension
    ; as in SaveFIMfile(): GIF is always 8 bits and JPEG has no 32 bits mode
    If (typu="gif")
       depth := 8
@@ -61670,7 +61670,7 @@ coreConvertImgFormat(imgPath, file2save, externBMP:=0, doVPflips:=0, fallbackLev
    }
 
    noDepthConvert := 0
-   typu := isPDFdest ? "pdf" : FreeImage_GetFileType(file2save, 1)
+   typu := isPDFdest ? "pdf" : FreeImage_GetFileType(file2save, 1, 1)   ; by its extension
    formatDepths := %typu%OPT
    ; the PQ curve [FreeImage_MustTonemap() = 3] stays in JXL, and in PNG, TIFF and JXR with an ICC profile that names it;
    ; the floating point formats get its linear light, the other formats tone mapping
@@ -98909,7 +98909,7 @@ coreFreeImageSimpleFileProcessing(imgPath, file2save, rotateAngle, XscaleImgFact
 
     If (ResizeMustPerform=1 && XscaleImgFactor>0 && YscaleImgFactor>0 && (XscaleImgFactor!=1 || YscaleImgFactor!=1))
     {
-       typu := FreeImage_GetFileType(file2save, 1)
+       typu := FreeImage_GetFileType(file2save, 1, 1)   ; by its extension
        resizeFilter := (ResizeQualityHigh=1) ? 4 : 0
        FreeImage_GetImageDimensions(hFIFimgA, imgW, imgH)
        obju := calcIMGuserResizer(imgW, imgH, XscaleImgFactor, YscaleImgFactor, ResizeInPercentage, ResizeKeepAratio)
@@ -99919,7 +99919,7 @@ SaveFIMfile(file2save, pBitmap, userGivenDepth:=32, quality:="") {
   }
 
   saveArg := getFIMsaveArgs(file2save, quality)
-  typu := FreeImage_GetFileType(file2save, 1)
+  typu := FreeImage_GetFileType(file2save, 1, 1)   ; by its extension
   formatDepths := %typu%bitDp
   objDepth := FreeImage_GetBPP(hFIFimgA)
   If (typu="gif" || userGivenDepth=8)
