@@ -53,7 +53,7 @@ Method:
 | 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine; **fixed, `44e12c7`** |
 | 9 | Medium | Multi-threaded runs load files differently from single-threaded runs, and can switch mid-batch | reading (+ Wine for the two loaders' outputs); **fixed, `a2ec48c`** |
 | 10 | Medium | Multi-threaded runs race on shared destination names; the conflict option is bypassed | reading |
-| 11 | Low | The destination format is read from an existing file's content, not from its extension | Wine |
+| 11 | Low | The destination format is read from an existing file's content, not from its extension | Wine; **fixed, `2fd9bc7`** |
 | 12 | Low | «Auto-skip format» compares extension text: `.jpeg`, `.jpe`, `.jfif`, `.tiff` are re-encoded | reading; **fixed, `a2ec48c`** |
 | 13 | Low | PDF and SVG files always fail, although the panel shows PDF and SVG sliders | Wine; **fixed, `a2ec48c`**; SVG not verifiable under Wine |
 | 14 | Low | The colour depth is not kept as the help promises: 1-bit becomes 24-bit; WIC turns 16-bit into 8-bit | Wine + reading |
@@ -496,6 +496,18 @@ file meets the conflict option.
 
 ## 11. The destination format is read from an existing file's content
 
+**Fixed in `2fd9bc7`** (Marius's decision, 2026-11-06), by the fix option. `coreConvertImgFormat()`,
+`saveHugeVPimageFile()`, `coreFreeImageSimpleFileProcessing()` and `SaveFIMfile()` type the destination by its
+extension only: `FreeImage_GetFileType(file2save, 1, 1)`, whose new `byExtension` parameter skips reading the file.
+That is the format `FreeImage_Save()` writes, and the type a destination that does not exist already got.
+- An `apngOPT` table would not have done it: a `.png` is always written by the PNG writer, because the fork's
+  extension lookup reaches PNG (FIF 13) before APNG (39, extensions `apng,png`).
+- Wine, the three existing-destination rows below: the APNG is replaced by a 32-bit RGBA PNG, the JPEG wearing `.png`
+  gives a 32-bit RGBA PNG, and the PNG wearing `.bmp` gives an 8-bit grey BMP (finding 5's rule for the 16-bit grey
+  source). The other rows of the 11-02 suites are unchanged.
+- The other three functions were not run end to end. `SaveFIMfile()` moves the old file to `-tmp` before typing it,
+  so there only a failed move went by the content.
+
 **What happens.** `typu := FreeImage_GetFileType(file2save, 1)` (`:61403`) reads the signature of an existing
 destination. It falls back to the extension only when the file does not exist. The save itself goes by extension
 (`FreeImage_Save()` → `GetFIFFromFilenameU`), so the depth table and the size cap can belong to another format:
@@ -675,3 +687,7 @@ The checks of `69b1bed` and `a2ec48c` are in `.claude/scratch/convert-multipage-
 The checks of `44e12c7`, `e6d64f2` and the fork's `7ae5e15`/`b77cd02` are in `.claude/scratch/orient-pq-2026-11-06/`
 (`README.txt`): the PQ, orientation, alpha and WIC-fallback driver modes, the MinGW test-DLL build, and the fork's
 planted bugs and sanitizer runs. Their paths name a job folder and worktrees that are gone.
+
+The checks of `2fd9bc7` are in `.claude/scratch/dest-by-extension-2026-11-06/` (`README.txt`): the 11-02 suites,
+`015d439` against a checkout, and a test of `FreeImage_GetFileType()`'s `byExtension` on AutoHotkey_H and stock
+AutoHotkey.
