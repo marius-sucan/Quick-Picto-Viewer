@@ -49,8 +49,8 @@ Method:
 | 4 | Medium | Float HDR images (EXR, HDR, PFM, float JXL/TIFF/JXR) cannot be converted to PNG, JPEG 2000 or PPM | Wine; **fixed, `69b1bed`** |
 | 5 | Medium | 16-bit greyscale images cannot be converted to JPG, BMP, WebP, GIF, TGA, PPM, JNG or XPM | Wine; **fixed, `6065e4f`** |
 | 6 | Medium | Transparency is lost: palette images to WebP/JP2/JXR/TGA/JXL/TIFF/GIF, anything to GIF, HDR with alpha | Wine; **fixed, `db6ce3e`** |
-| 7 | Medium | Photos come out rotated twice (FreeImage path: Exif kept after rotating), or with all metadata dropped and unrotated (WIC path) | Wine + reading |
-| 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine |
+| 7 | Medium | Photos come out rotated twice (FreeImage path: Exif kept after rotating), or with all metadata dropped and unrotated (WIC path) | Wine + reading; **fixed in the FreeImage fork, `7ae5e15`** (needs FreeImage.dll rebuilt); WIC fallback turned, `e6d64f2` (needs qpvmain.dll rebuilt) |
+| 8 | Medium | PQ HDR AVIF/HEIC become flat, washed-out 16-bit PNG/TIFF/JPEG 2000 files | Wine; **fixed, `44e12c7`** |
 | 9 | Medium | Multi-threaded runs load files differently from single-threaded runs, and can switch mid-batch | reading (+ Wine for the two loaders' outputs); **fixed, `a2ec48c`** |
 | 10 | Medium | Multi-threaded runs race on shared destination names; the conflict option is bypassed | reading |
 | 11 | Low | The destination format is read from an existing file's content, not from its extension | Wine |
@@ -346,6 +346,23 @@ PNG-8 files should not be affected on the default path, because WIC hands over p
 
 ## 7. Photo orientation and metadata
 
+**Fixed in the FreeImage fork, `7ae5e15`, and in `e6d64f2`** (Marius's decisions, 2026-11-06). Since `0cf41ba`
+FreeImage loads first on every path, so the rotated-twice half below became the default; the WIC half happens only
+when FreeImage cannot open the file.
+- The fork's loaders that turn the pixels set the orientation to 1 in the Exif tags, the raw Exif block and XMP's
+  `tiff:Orientation`: `JPEG_EXIFROTATE` loads, full and header-only (a camera RAW decode takes its Exif data from a
+  header-only load of its JPEG preview), and every HEIF, AVIF and JPEG XL load, whose `irot`/`imir` or codestream
+  orientation outrank the Exif one. QPV's code is unchanged; the fix reaches it with a FreeImage.dll rebuilt from the
+  fork. The fork's `TestAPI/EXIF/orientation.c` has 94 checks; the previous build fails 57 of them.
+- Wine, with a MinGW-built test DLL: `arrow.heic` (an iPhone-style HEIC, `irot` plus Exif Orientation 6, which
+  confirms the HEIC double rotation), `exif6.jpg` and a JXL with Exif Orientation 5 convert to JPG, WebP and JXL with
+  Orientation 1, upright in a viewer that honours the tag.
+- The WIC fallback: qpvmain.dll reports the frame's orientation, and `loadWICasFreeImage()` turns JPEG and TIFF images
+  by it, for the converter and the batch resize/rotate/crop and colour adjustment. Their metadata is still dropped.
+  Checked under Wine with the orientation fed in; the DLL side by a harness with COM fakes.
+- Left as they are: the Exif thumbnail keeps its stored orientation; a HEIF, AVIF or JXL file whose Exif orientation
+  disagrees with its own transforms converts as those formats' decoders, and QPV, show it.
+
 **What happens.** The two loaders handle camera metadata in opposite ways.
 
 **FreeImage loader: rotated twice** (workers, colour management off, `.jfif` and other non-WIC extensions). This is
@@ -395,6 +412,17 @@ in the JPG). No test HEIC has an Orientation other than 1, so the double rotatio
   FreeImage load (`FIF_LOAD_NOPIXELS`).
 
 ## 8. PQ HDR AVIF/HEIC/JXL become washed-out 16-bit PNG, TIFF and JPEG 2000 files
+
+**Fixed in `44e12c7`** (Marius's decisions, 2026-11-06), by the first fix option. PQ stays only where a writer
+records it: JXL, and PNG, TIFF and JXR when an ICC profile names PQ in its own `cicp` tag, as libjxl's profile of
+every PQ JXL does. EXR, HDR and PFM get linear light (`FreeImage_ConvertToLinear()` with `FI_LINEAR_SRGB_PRIMARIES`,
+1.0 = 203 cd/m²). Every other format, JXR, J2K and PPM included, gets the tone mapping JPG and WebP got.
+- The problem was wider than the rows below: JXR, J2K and PPM got raw PQ values too, and EXR, HDR and PFM stored the
+  PQ values as if they were linear light.
+- Wine: `seine_hdr_rec2020.avif` to PNG, TIFF, JP2, J2K, JXR and PPM gives 24-bit files with the tone-mapped JPG's
+  mean (0.675); RGBA16 PQ keeps its alpha at 32 bits. Only the three PQ rows of the 11-02 suites changed.
+- Radiance HDR files wrote the negative linear samples of colours outside the sRGB gamut as noise; fixed in the fork,
+  `b77cd02`.
 
 **What happens.** A 10/12-bit PQ image loads as RGB16 with its curve described only by the CICP tag. PNG, TIFF and
 JP2 accept RGB16 (`-f9-`), so `noDepthConvert` skips tone mapping (`:61410-61413`, comment «prevent tone-mapping
@@ -615,7 +643,8 @@ files still convert their first image, by choice.
 - **Windows WIC decoding of 16-bit grey and 48-bit PNGs** (findings 5 and 14): Wine's WIC could not convert them,
   so FreeImage took over in those rows.
 - **A HEIC with Exif Orientation other than 1** (finding 7): no sample exists. The pass-through and `irot`
-  application are confirmed separately.
+  application are confirmed separately. Found since: `arrow.heic` in the fork's
+  `.claude/scratch/heic-support-wt/heic/samples/real`, checked with the 2026-11-06 fix.
 - **Worker processes as a real multi-threaded run starts them** (findings 9 and 10): read, not run. The worker loop
   itself was run for the `26dd9d7` checks.
 - **The «Ask user» dialog for a self-collision with originals not kept** (finding 2): read, not run.
@@ -642,3 +671,7 @@ The checks of `69b1bed` and `a2ec48c` are in `.claude/scratch/convert-multipage-
   `QPV_CALL=testPagesMode` checks pages mode.
 - `xfim/` and `split/` are the 11-03 and 11-04 suites, adapted to the new signatures: `xfim/conv/run-head-vs-new.sh`,
   `xfim/xt/run-head-vs-new.sh`, `xfim/f911/run.sh`, `xfim/f10/run.sh`, `split/gap/run.sh`.
+
+The checks of `44e12c7`, `e6d64f2` and the fork's `7ae5e15`/`b77cd02` are in `.claude/scratch/orient-pq-2026-11-06/`
+(`README.txt`): the PQ, orientation, alpha and WIC-fallback driver modes, the MinGW test-DLL build, and the fork's
+planted bugs and sanitizer runs. Their paths name a job folder and worktrees that are gone.
