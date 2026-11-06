@@ -37659,6 +37659,7 @@ spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
   pidsArray := []
   failedSlot := 0
   startZeit := A_TickCount
+  Try FileDelete, %thumbsCacheFolder%\tempNames*.txt   ; the names a batch wrote, see lockDestinationName()
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 0
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mainWindowID, % hGDIwin
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
@@ -38064,6 +38065,7 @@ WorkLoadMultiCoreHandler(job) {
      Try FileDelete, %thumbsCacheFolder%\tempList%A_Index%.txt
   }
 
+  Try FileDelete, %thumbsCacheFolder%\tempNames*.txt
   If (job.mode="batch-fmtconv")
      applyMultiCoresConvertResults(theFinalList)
 
@@ -38447,37 +38449,78 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
 }
 
 lockDestinationName(filePath, mode:=0) {
-; In a worker of a multi-threaded batch, a destination name is taken before it is checked and kept until the
-; worker's next file, so workers that share a name write it one after another: a mutex named after the path.
-; Outside the workers [no mainThreadHwnd] it does nothing and returns 1.
+; The destination names of a batch loop, from its first mode 2 call to the one without filePath: a file's names
+; are taken before they are checked and kept until the next file, then count as written by the batch. In a
+; worker of a multi-threaded batch, a name taken is a mutex named after the path, so workers that share a name
+; write it one after another, and the names written also go to a file the other workers read.
+; Outside a batch loop it does nothing and returns 1, or 0 in mode 3.
 ; mode 0 - waits while another worker has filePath; 0 when the batch is aborted meanwhile
 ; mode 1 - 0 at once when another worker has filePath
-; mode 2 - lets go of every name, then takes filePath, if given, as mode 0 does
+; mode 2 - lets go of every name, then takes filePath as mode 0 does; without filePath, ends the batch
+; mode 3 - 1 when filePath was written earlier in the batch
 ; A worker waits for its output name holding nothing, or for a page name, longer than the output name it
 ; holds, and mode 1 never waits: no deadlock.
-   Static held := {}
-   If !mainThreadHwnd
-      Return 1
-
+   Static held := {}, written := {}, isOn := 0
    If (mode=2)
    {
-      For name, h in held
+      names := ""
+      For hash in held
+         written[hash] := 1, names .= hash "`n"
+      ; on file before the other workers can take them
+      If (names && mainThreadHwnd)
+         FileAppend, % names, %thumbsCacheFolder%\tempNames%QPVpid%.txt
+      For hash, h in held
       {
-         DllCall("ReleaseMutex", "UPtr", h)
-         DllCall("CloseHandle", "UPtr", h)
+         If h
+         {
+            DllCall("ReleaseMutex", "UPtr", h)
+            DllCall("CloseHandle", "UPtr", h)
+         }
       }
+
       held := {}
       If !filePath
-         Return 1
+         isOn := 0, written := {}
+      Else If !isOn
+         isOn := 1, written := {}
    }
+
+   If (!isOn || !filePath)
+      Return (mode=3) ? 0 : 1
 
    ; a mutex name takes no backslash and 260 characters at most [MAX_PATH]; CALG_MD5 = 0x8003
    hash := CalcStringHash(Format("{:L}", RegExReplace(filePath, "\\+", "\")), 0x8003)
-   name := "Local\QPVdestination-" hash
-   If (!hash || held.HasKey(name))
+   If !hash
+      Return (mode=3) ? 0 : 1
+
+   If (mode=3)
+   {
+      If written.HasKey(hash)
+         Return 1
+
+      If mainThreadHwnd
+      {
+         Loop, Files, %thumbsCacheFolder%\tempNames*.txt
+         {
+            FileRead, names, % A_LoopFileFullPath
+            If InStr(names, hash)
+               Return 1
+         }
+      }
+      Return 0
+   }
+
+   If held.HasKey(hash)
       Return 1
 
-   h := DllCall("CreateMutexW", "UPtr", 0, "Int", 0, "WStr", name, "UPtr")
+   ; the main process holds the names of its single-threaded batches without a mutex
+   If !mainThreadHwnd
+   {
+      held[hash] := 0
+      Return 1
+   }
+
+   h := DllCall("CreateMutexW", "UPtr", 0, "Int", 0, "WStr", "Local\QPVdestination-" hash, "UPtr")
    If !h
       Return 1
 
@@ -38487,7 +38530,7 @@ lockDestinationName(filePath, mode:=0) {
       ; WAIT_OBJECT_0 = 0; WAIT_ABANDONED = 0x80, when the worker that had it ended without letting go
       If (r=0 || r=0x80)
       {
-         held[name] := h
+         held[hash] := h
          Return 1
       }
 
@@ -43233,7 +43276,8 @@ askAboutFileCollision(srcFile, destFile, allowSkip, doLastOption, forceOption, B
    r := ""
    performOverwrite := 0
    msgR := IsObject(msgResult) ? msgResult.btn : msgResult
-   If InStr(msgR, "rename")
+   ; with «Overwrite» set, a file its batch wrote earlier gets a new name, see lockDestinationName()
+   If (InStr(msgR, "rename") || forceOption=3 && lockDestinationName(destFile, 3))
    {
       performOverwrite := 2
       r := getAutoRenamedFreePath(destFile)
@@ -61205,6 +61249,7 @@ batchConvert2format() {
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
+      lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
          ; a file already in the format is not converted again: it only goes to the destination folder
@@ -61309,6 +61354,7 @@ batchConvert2format() {
       }
    }
 
+   lockDestinationName("", 2)
    If (SLDtypeLoaded=3)
    {
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -99606,6 +99652,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       zPlitPath(imgPath, 0, OutFileName, OutDir)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutFileName
+      lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       If (ResizeUseDestDir=1)
       {
          If (FileExist(file2save) && !FolderExist(file2save))
@@ -99634,6 +99681,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       }
    }
 
+   lockDestinationName("", 2)
    If failedFiles
       someErrors := "`nFailed to process " groupDigits(failedFiles) " files"
    If skippedFiles
