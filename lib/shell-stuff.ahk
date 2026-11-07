@@ -76,20 +76,20 @@
       opts |= 0x1000 ; FOS_FILEMUSTEXIST
    If (dlgMode="multi")
       opts |= 0x200 ; FOS_ALLOWMULTISELECT
-   DllCall(NumGet(vt+9*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", opts) ; IFileDialog::SetOptions
+   DllCall(NumGet(vt+9*A_PtrSize, "UPtr"), "UPtr", pDlg, "UInt", opts) ; IFileDialog::SetOptions
 
    VarSetCapacity(iidItem, 16, 0)
-   DllCall("ole32\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &iidItem) ; IID_IShellItem
-   If (startDir!="" && !DllCall("shell32\SHCreateItemFromParsingName", "WStr", startDir, "Ptr", 0, "Ptr", &iidItem, "Ptr*", pItem))
+   DllCall("ole32\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "UPtr", &iidItem) ; IID_IShellItem
+   If (startDir!="" && !DllCall("shell32\SHCreateItemFromParsingName", "WStr", startDir, "UPtr", 0, "UPtr", &iidItem, "Ptr*", pItem))
    {
-      DllCall(NumGet(vt+12*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", pItem) ; IFileDialog::SetFolder
+      DllCall(NumGet(vt+12*A_PtrSize, "UPtr"), "UPtr", pDlg, "UPtr", pItem) ; IFileDialog::SetFolder
       ObjRelease(pItem)
    }
 
    If (dlgMode!="folder" && fileName!="")
-      DllCall(NumGet(vt+15*A_PtrSize, "UPtr"), "Ptr", pDlg, "WStr", fileName) ; IFileDialog::SetFileName
+      DllCall(NumGet(vt+15*A_PtrSize, "UPtr"), "UPtr", pDlg, "WStr", fileName) ; IFileDialog::SetFileName
    If (dlgTitle!="")
-      DllCall(NumGet(vt+17*A_PtrSize, "UPtr"), "Ptr", pDlg, "WStr", dlgTitle) ; IFileDialog::SetTitle
+      DllCall(NumGet(vt+17*A_PtrSize, "UPtr"), "UPtr", pDlg, "WStr", dlgTitle) ; IFileDialog::SetTitle
 
    If (dlgMode!="folder")
    {
@@ -101,13 +101,13 @@
       p := &strBuf
       For i, spec in specs
       {
-         NumPut(p, specBuf, (2*i - 2)*A_PtrSize, "Ptr")
+         NumPut(p, specBuf, (2*i - 2)*A_PtrSize, "UPtr")
          p += 2*StrPut(names[i], p, "UTF-16")
-         NumPut(p, specBuf, (2*i - 1)*A_PtrSize, "Ptr")
+         NumPut(p, specBuf, (2*i - 1)*A_PtrSize, "UPtr")
          p += 2*StrPut(spec, p, "UTF-16")
       }
-      DllCall(NumGet(vt+4*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", specs.Length(), "Ptr", &specBuf) ; IFileDialog::SetFileTypes
-      DllCall(NumGet(vt+5*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", typeIndex) ; IFileDialog::SetFileTypeIndex
+      DllCall(NumGet(vt+4*A_PtrSize, "UPtr"), "UPtr", pDlg, "UInt", specs.Length(), "UPtr", &specBuf) ; IFileDialog::SetFileTypes
+      DllCall(NumGet(vt+5*A_PtrSize, "UPtr"), "UPtr", pDlg, "UInt", typeIndex) ; IFileDialog::SetFileTypeIndex
       If (dlgMode="save")
       {
          ; names typed without an extension get the one of the chosen file type
@@ -118,7 +118,7 @@
                   Break
          }
          If (m1!="")
-            DllCall(NumGet(vt+22*A_PtrSize, "UPtr"), "Ptr", pDlg, "WStr", m1) ; IFileDialog::SetDefaultExtension
+            DllCall(NumGet(vt+22*A_PtrSize, "UPtr"), "UPtr", pDlg, "WStr", m1) ; IFileDialog::SetDefaultExtension
       }
    }
 
@@ -140,22 +140,22 @@
    {
       ; labelled "name (parent)" through PKEY_ItemNameDisplay; each FDAP_TOP place goes above the previous one
       VarSetCapacity(pkey, 20, 0), VarSetCapacity(pv, 24, 0)
-      DllCall("ole32\IIDFromString", "WStr", "{B725F130-47EF-101A-A5F1-02608C9EEBAC}", "Ptr", &pkey) ; FMTID_Storage
+      DllCall("ole32\IIDFromString", "WStr", "{B725F130-47EF-101A-A5F1-02608C9EEBAC}", "UPtr", &pkey) ; FMTID_Storage
       NumPut(10, pkey, 16, "UInt") ; PKEY_ItemNameDisplay = FMTID_Storage, PID 10
       Loop, % placesCount
       {
          folder := folders[placesCount - A_Index + 1]
-         If DllCall("shell32\SHCreateItemFromParsingName", "WStr", folder, "Ptr", 0, "Ptr", &iidItem, "Ptr*", pItem)
+         If DllCall("shell32\SHCreateItemFromParsingName", "WStr", folder, "UPtr", 0, "UPtr", &iidItem, "Ptr*", pItem)
             Continue
 
          SplitPath, folder, leaf, parent
          If (leaf!="" && parent!="")
          {
             label := leaf " (" parent ((SubStr(parent, 0)=":") ? "\" : "") ")"
-            NumPut(31, pv, 0, "UShort"), NumPut(&label, pv, 8, "Ptr") ; VT_LPWSTR
-            DllCall("shell32\SHSetTemporaryPropertyForItem", "Ptr", pItem, "Ptr", &pkey, "Ptr", &pv)
+            NumPut(31, pv, 0, "UShort"), NumPut(&label, pv, 8, "UPtr") ; VT_LPWSTR
+            DllCall("shell32\SHSetTemporaryPropertyForItem", "UPtr", pItem, "UPtr", &pkey, "UPtr", &pv)
          }
-         DllCall(NumGet(vt+21*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", pItem, "Int", 1) ; IFileDialog::AddPlace, FDAP_TOP
+         DllCall(NumGet(vt+21*A_PtrSize, "UPtr"), "UPtr", pDlg, "UPtr", pItem, "Int", 1) ; IFileDialog::AddPlace, FDAP_TOP
          ObjRelease(pItem)
       }
    }
@@ -168,47 +168,47 @@
       If choices.Length()
       {
          ; picking an item closes the dialog like the button itself does
-         DllCall(NumGet(cv+3*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2) ; IFileDialogCustomize::EnableOpenDropDown
+         DllCall(NumGet(cv+3*A_PtrSize, "UPtr"), "UPtr", pCust, "UInt", 2) ; IFileDialogCustomize::EnableOpenDropDown
          For i, item in choices
-            DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt", i, "WStr", item) ; IFileDialogCustomize::AddControlItem
+            DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "UPtr", pCust, "UInt", 2, "UInt", i, "WStr", item) ; IFileDialogCustomize::AddControlItem
       }
 
       If folders.Length()
       {
          ; unique per dialog: the menus of nested dialogs share the event sink
          menuId := 1000 + (++dlgCount)
-         DllCall(NumGet(cv+4*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", menuId, "WStr", "Recent folders") ; IFileDialogCustomize::AddMenu
+         DllCall(NumGet(cv+4*A_PtrSize, "UPtr"), "UPtr", pCust, "UInt", menuId, "WStr", "Recent folders") ; IFileDialogCustomize::AddMenu
          VarSetCapacity(buf, 404, 0)
          For i, folder in folders
          {
             label := folder
-            If (StrLen(label)>100 && DllCall("shlwapi\PathCompactPathExW", "Ptr", &buf, "WStr", label, "UInt", 101, "UInt", 0))
+            If (StrLen(label)>100 && DllCall("shlwapi\PathCompactPathExW", "UPtr", &buf, "WStr", label, "UInt", 101, "UInt", 0))
                label := StrGet(&buf, "UTF-16")
-            DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", menuId, "UInt", i, "WStr", StrReplace(label, "&", "&&")) ; IFileDialogCustomize::AddControlItem
+            DllCall(NumGet(cv+19*A_PtrSize, "UPtr"), "UPtr", pCust, "UInt", menuId, "UInt", i, "WStr", StrReplace(label, "&", "&&")) ; IFileDialogCustomize::AddControlItem
          }
-         DllCall(NumGet(cv+28*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", menuId) ; IFileDialogCustomize::MakeProminent
+         DllCall(NumGet(cv+28*A_PtrSize, "UPtr"), "UPtr", pCust, "UInt", menuId) ; IFileDialogCustomize::MakeProminent
          sink := ShellFileDialogSink(0, menuId, {dlg: pDlg, folders: folders})
-         If !DllCall(NumGet(vt+7*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", sink, "UInt*", cookie) ; IFileDialog::Advise
+         If !DllCall(NumGet(vt+7*A_PtrSize, "UPtr"), "UPtr", pDlg, "UPtr", sink, "UInt*", cookie) ; IFileDialog::Advise
             advised := 1
       }
    }
 
-   If !DllCall("IsWindow", "Ptr", ownerHwnd)
+   If !DllCall("IsWindow", "UPtr", ownerHwnd)
       ownerHwnd := 0
 
    r := ""
-   If !DllCall(NumGet(vt+3*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", ownerHwnd) ; IModalWindow::Show
+   If !DllCall(NumGet(vt+3*A_PtrSize, "UPtr"), "UPtr", pDlg, "UPtr", ownerHwnd) ; IModalWindow::Show
    {
       paths := ""
       If (dlgMode="multi")
       {
-         If !DllCall(NumGet(vt+27*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr*", pItems) ; IFileOpenDialog::GetResults
+         If !DllCall(NumGet(vt+27*A_PtrSize, "UPtr"), "UPtr", pDlg, "Ptr*", pItems) ; IFileOpenDialog::GetResults
          {
             av := NumGet(pItems+0, "UPtr")
-            DllCall(NumGet(av+7*A_PtrSize, "UPtr"), "Ptr", pItems, "UInt*", count) ; IShellItemArray::GetCount
+            DllCall(NumGet(av+7*A_PtrSize, "UPtr"), "UPtr", pItems, "UInt*", count) ; IShellItemArray::GetCount
             Loop, % count
             {
-               If DllCall(NumGet(av+8*A_PtrSize, "UPtr"), "Ptr", pItems, "UInt", A_Index - 1, "Ptr*", pItem) ; IShellItemArray::GetItemAt
+               If DllCall(NumGet(av+8*A_PtrSize, "UPtr"), "UPtr", pItems, "UInt", A_Index - 1, "Ptr*", pItem) ; IShellItemArray::GetItemAt
                   Continue
 
                path := ShellItemFileSysPath(pItem)
@@ -218,7 +218,7 @@
             }
             ObjRelease(pItems)
          }
-      } Else If !DllCall(NumGet(vt+20*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr*", pItem) ; IFileDialog::GetResult
+      } Else If !DllCall(NumGet(vt+20*A_PtrSize, "UPtr"), "UPtr", pDlg, "Ptr*", pItem) ; IFileDialog::GetResult
       {
          paths := ShellItemFileSysPath(pItem)
          ObjRelease(pItem)
@@ -227,12 +227,12 @@
       If (paths!="")
       {
          r := {path: paths, type: typeIndex, choice: ""}
-         If (dlgMode!="folder" && !DllCall(NumGet(vt+6*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt*", idx)) ; IFileDialog::GetFileTypeIndex
+         If (dlgMode!="folder" && !DllCall(NumGet(vt+6*A_PtrSize, "UPtr"), "UPtr", pDlg, "UInt*", idx)) ; IFileDialog::GetFileTypeIndex
             r.type := idx
          If (choices.Length() && pCust)
          {
             ; the button itself stands for the first item
-            If (DllCall(NumGet(cv+24*A_PtrSize, "UPtr"), "Ptr", pCust, "UInt", 2, "UInt*", sel) || !choices.HasKey(sel)) ; IFileDialogCustomize::GetSelectedControlItem
+            If (DllCall(NumGet(cv+24*A_PtrSize, "UPtr"), "UPtr", pCust, "UInt", 2, "UInt*", sel) || !choices.HasKey(sel)) ; IFileDialogCustomize::GetSelectedControlItem
                sel := 1
             r.choice := choices[sel]
          }
@@ -240,7 +240,7 @@
    }
 
    If advised
-      DllCall(NumGet(vt+8*A_PtrSize, "UPtr"), "Ptr", pDlg, "UInt", cookie) ; IFileDialog::Unadvise
+      DllCall(NumGet(vt+8*A_PtrSize, "UPtr"), "UPtr", pDlg, "UInt", cookie) ; IFileDialog::Unadvise
    If menuId
       ShellFileDialogSink(0, menuId, "")
    If pCust
@@ -260,13 +260,13 @@ ShellFileDialogSink(this, a:=0, b:=0, c:=0) {
       If !sink
       {
          VarSetCapacity(iidItem, 16, 0)
-         DllCall("ole32\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &iidItem) ; IID_IShellItem
+         DllCall("ole32\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "UPtr", &iidItem) ; IID_IShellItem
          VarSetCapacity(guid, 16, 0)
-         DllCall("ole32\IIDFromString", "WStr", "{00000000-0000-0000-C000-000000000046}", "Ptr", &guid) ; IID_IUnknown
+         DllCall("ole32\IIDFromString", "WStr", "{00000000-0000-0000-C000-000000000046}", "UPtr", &guid) ; IID_IUnknown
          unk1 := NumGet(guid, 0, "Int64"), unk2 := NumGet(guid, 8, "Int64")
-         DllCall("ole32\IIDFromString", "WStr", "{973510db-7d7f-452b-8975-74a85828d354}", "Ptr", &guid) ; IID_IFileDialogEvents
+         DllCall("ole32\IIDFromString", "WStr", "{973510db-7d7f-452b-8975-74a85828d354}", "UPtr", &guid) ; IID_IFileDialogEvents
          ev1 := NumGet(guid, 0, "Int64"), ev2 := NumGet(guid, 8, "Int64")
-         DllCall("ole32\IIDFromString", "WStr", "{36116642-d713-4b97-9b83-7484a9d00433}", "Ptr", &guid) ; IID_IFileDialogControlEvents
+         DllCall("ole32\IIDFromString", "WStr", "{36116642-d713-4b97-9b83-7484a9d00433}", "UPtr", &guid) ; IID_IFileDialogControlEvents
          ct1 := NumGet(guid, 0, "Int64"), ct2 := NumGet(guid, 8, "Int64")
 
          fn := A_ThisFunc
@@ -276,9 +276,9 @@ ShellFileDialogSink(this, a:=0, b:=0, c:=0) {
          ; [IFileDialogEvents vtable ptr][IFileDialogControlEvents vtable ptr][10 + 7 vtable slots]
          VarSetCapacity(mem, 19*A_PtrSize, 0)
          sink := &mem
-         NumPut(sink + 2*A_PtrSize, mem, 0, "Ptr"), NumPut(sink + 12*A_PtrSize, mem, A_PtrSize, "Ptr")
+         NumPut(sink + 2*A_PtrSize, mem, 0, "UPtr"), NumPut(sink + 12*A_PtrSize, mem, A_PtrSize, "UPtr")
          For i, p in [qi, ref, ref, ok2, ok3, ok2, ok2, notImpl, ok2, notImpl, qi, ref, ref, itemSel, ok3, ok4, ok3]
-            NumPut(p, mem, (i + 1)*A_PtrSize, "Ptr")
+            NumPut(p, mem, (i + 1)*A_PtrSize, "UPtr")
       }
 
       If IsObject(b)
@@ -294,13 +294,13 @@ ShellFileDialogSink(this, a:=0, b:=0, c:=0) {
       i1 := NumGet(a+0, 0, "Int64"), i2 := NumGet(a+0, 8, "Int64")
       If (i1=unk1 && i2=unk2) || (i1=ev1 && i2=ev2)
       {
-         NumPut(sink, b+0, "Ptr")
+         NumPut(sink, b+0, "UPtr")
       } Else If (i1=ct1 && i2=ct2)
       {
-         NumPut(sink + A_PtrSize, b+0, "Ptr")
+         NumPut(sink + A_PtrSize, b+0, "UPtr")
       } Else
       {
-         NumPut(0, b+0, "Ptr")
+         NumPut(0, b+0, "UPtr")
          Return 0x80004002 ; E_NOINTERFACE
       }
    } Else If (evt=2) ; AddRef, Release: the object is static
@@ -317,10 +317,10 @@ ShellFileDialogSink(this, a:=0, b:=0, c:=0) {
 
       folder := entry.folders[c & 0xFFFFFFFF]
       pDlg := entry.dlg
-      If (folder!="" && !DllCall("shell32\SHCreateItemFromParsingName", "WStr", folder, "Ptr", 0, "Ptr", &iidItem, "Ptr*", pItem))
+      If (folder!="" && !DllCall("shell32\SHCreateItemFromParsingName", "WStr", folder, "UPtr", 0, "UPtr", &iidItem, "Ptr*", pItem))
       {
          ; SetFolder moves a dialog already on screen
-         DllCall(NumGet(NumGet(pDlg+0, "UPtr")+12*A_PtrSize, "UPtr"), "Ptr", pDlg, "Ptr", pItem) ; IFileDialog::SetFolder
+         DllCall(NumGet(NumGet(pDlg+0, "UPtr")+12*A_PtrSize, "UPtr"), "UPtr", pDlg, "UPtr", pItem) ; IFileDialog::SetFolder
          ObjRelease(pItem)
       } Else SoundBeep, 300, 100
    }
@@ -328,11 +328,11 @@ ShellFileDialogSink(this, a:=0, b:=0, c:=0) {
 }
 
 ShellItemFileSysPath(pItem) {
-   If DllCall(NumGet(NumGet(pItem+0, "UPtr")+5*A_PtrSize, "UPtr"), "Ptr", pItem, "UInt", 0x80058000, "Ptr*", pStr) ; IShellItem::GetDisplayName, SIGDN_FILESYSPATH
+   If DllCall(NumGet(NumGet(pItem+0, "UPtr")+5*A_PtrSize, "UPtr"), "UPtr", pItem, "UInt", 0x80058000, "Ptr*", pStr) ; IShellItem::GetDisplayName, SIGDN_FILESYSPATH
       Return
 
    path := StrGet(pStr, "UTF-16")
-   DllCall("ole32\CoTaskMemFree", "Ptr", pStr)
+   DllCall("ole32\CoTaskMemFree", "UPtr", pStr)
    Return path
 }
 
@@ -464,10 +464,10 @@ SHGetKnownFolderPath(FOLDERID, KF_FLAG:=0) {                  ;   By SKAN on D35
    ; function by Skan: https://www.autohotkey.com/boards/viewtopic.php?f=6&t=75602&sid=f29192e2e8a74e847f62a152afa55aa1
    Local CLSID, pPath:=""                                        ; Thanks teadrinker @ tiny.cc/p286094
    Return Format("{4:}", VarSetCapacity(CLSID, 16, 0)
-        , DllCall("ole32\CLSIDFromString", "Str",FOLDERID, "Ptr",&CLSID)
-        , DllCall("shell32\SHGetKnownFolderPath", "Ptr",&CLSID, "UInt",KF_FLAG, "Ptr",0, "PtrP",pPath)
+        , DllCall("ole32\CLSIDFromString", "Str",FOLDERID, "UPtr",&CLSID)
+        , DllCall("shell32\SHGetKnownFolderPath", "UPtr",&CLSID, "UInt",KF_FLAG, "UPtr",0, "PtrP",pPath)
         , StrGet(pPath, "utf-16")
-        , DllCall("ole32\CoTaskMemFree", "Ptr",pPath))
+        , DllCall("ole32\CoTaskMemFree", "UPtr",pPath))
 
 }
 
@@ -598,9 +598,9 @@ invokeSHopenWith(givenFile) {
   ; OAIF_REGISTER_EXT         0x00000002 - Do the registration after the user hits the OK button.
   ; OAIF_EXEC                 0x00000004 - Execute file after registering.
   VarSetCapacity(OPENASINFO, A_PtrSize * 3, 0)
-  NumPut(&givenFile, OPENASINFO, 0, "Ptr")
+  NumPut(&givenFile, OPENASINFO, 0, "UPtr")
   NumPut(0x04, OPENASINFO, A_PtrSize * 2, "UInt") ; OAIF_EXEC
-  DllCall("Shell32.dll\SHOpenWithDialog", "Ptr", 0, "Ptr", &OPENASINFO)
+  DllCall("Shell32.dll\SHOpenWithDialog", "UPtr", 0, "UPtr", &OPENASINFO)
 }
 
 ; ==================================================================================================================================
@@ -647,9 +647,9 @@ CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenW
       VarSetCapacity(IID_IShellItem, 16, 0)
       VarSetCapacity(BHID_DataObject, 16, 0)
       VarSetCapacity(IID_IDataObject, 16, 0)
-      DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "Ptr", &IID_IShellItem)
-      DllCall("Ole32.dll\IIDFromString", "WStr", "{B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4}", "Ptr", &BHID_DataObject)
-      DllCall("Ole32.dll\IIDFromString", "WStr", "{0000010e-0000-0000-C000-000000000046}", "Ptr", &IID_IDataObject)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{43826d1e-e718-42ee-bc55-a1e261c37bfe}", "UPtr", &IID_IShellItem)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{B8C0BD9F-ED24-455c-83E6-D5390C4FE8C4}", "UPtr", &BHID_DataObject)
+      DllCall("Ole32.dll\IIDFromString", "WStr", "{0000010e-0000-0000-C000-000000000046}", "UPtr", &IID_IDataObject)
    }
 
    ; -------------------------------------------------------------------------------------------------------------------------------
@@ -658,10 +658,10 @@ CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenW
       AssocHandlers := A_ThisMenu = ThisMenuName ? RecommendedHandlers : OtherHandlers
       If (AssocHandler := AssocHandlers[A_ThisMenuItemPos]) && FileExist(FilePath) {
          AssocHandlerInvoke := NumGet(NumGet(AssocHandler + 0, "UPtr"), A_PtrSize * 8, "UPtr")
-         If !DllCall("Shell32.dll\SHCreateItemFromParsingName", "WStr", FilePath, "Ptr", 0, "Ptr", &IID_IShellItem, "PtrP", Item) {
+         If !DllCall("Shell32.dll\SHCreateItemFromParsingName", "WStr", FilePath, "UPtr", 0, "UPtr", &IID_IShellItem, "PtrP", Item) {
             BindToHandler := NumGet(NumGet(Item + 0, "UPtr"), A_PtrSize * 3, "UPtr")
-            If !DllCall(BindToHandler, "Ptr", Item, "Ptr", 0, "Ptr", &BHID_DataObject, "Ptr", &IID_IDataObject, "PtrP", DataObj) {
-               DllCall(AssocHandlerInvoke, "Ptr", AssocHandler, "Ptr", DataObj)
+            If !DllCall(BindToHandler, "UPtr", Item, "UPtr", 0, "UPtr", &BHID_DataObject, "UPtr", &IID_IDataObject, "PtrP", DataObj) {
+               DllCall(AssocHandlerInvoke, "UPtr", AssocHandler, "UPtr", DataObj)
                ObjRelease(DataObj)
             }
             ObjRelease(Item)
@@ -694,7 +694,7 @@ CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenW
    Try Menu, %ThisOthers%, DeleteAll
    ; Try to get the default association
    Size := VarSetCapacity(FriendlyName, 520, 0) // 2
-   DllCall("Shlwapi.dll\AssocQueryString", "UInt", 0, "UInt", 4, "Str", "." . Ext, "Ptr", 0, "Str", FriendlyName, "UIntP", Size)
+   DllCall("Shlwapi.dll\AssocQueryString", "UInt", 0, "UInt", 4, "Str", "." . Ext, "UPtr", 0, "Str", FriendlyName, "UIntP", Size)
    HandlerID := A_TickCount
    HandlerFunc := Func(A_ThisFunc).Bind(FilePath, HandlerID)
    Filter := !!Recommended ; ASSOC_FILTER_NONE = 0, ASSOC_FILTER_RECOMMENDED = 1
@@ -703,35 +703,35 @@ CreateOpenWithMenu(FilePath, Recommended := 1, ShowMenu := 0, MenuName := "OpenW
       Return 0
 
    EnumHandlerNext := NumGet(NumGet(EnumHandler + 0, "UPtr"), A_PtrSize * 3, "UPtr")
-   While (!DllCall(EnumHandlerNext, "Ptr", EnumHandler, "UInt", 1, "PtrP", AssocHandler, "UIntP", Fetched) && Fetched)
+   While (!DllCall(EnumHandlerNext, "UPtr", EnumHandler, "UInt", 1, "PtrP", AssocHandler, "UIntP", Fetched) && Fetched)
    {
       VTBL := NumGet(AssocHandler + 0, "UPtr")
       AssocHandlerGetUIName := NumGet(VTBL + 0, A_PtrSize * 4, "UPtr")
       AssocHandlerGetIconLocation := NumGet(VTBL + 0, A_PtrSize * 5, "UPtr")
       AssocHandlerIsRecommended := NumGet(VTBL + 0, A_PtrSize * 6, "UPtr")
       UIName := ""
-      If !DllCall(AssocHandlerGetUIName, "Ptr", AssocHandler, "PtrP", StrPtr, "UInt")
+      If !DllCall(AssocHandlerGetUIName, "UPtr", AssocHandler, "PtrP", StrPtr, "UInt")
       {
          UIName := StrGet(StrPtr, "UTF-16")
-         DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+         DllCall("Ole32.dll\CoTaskMemFree", "UPtr", StrPtr)
       } Else UIName := AssocHandler
 
       If (UIName!="")
       {
-         If !DllCall(AssocHandlerGetIconLocation, "Ptr", AssocHandler, "PtrP", StrPtr, "IntP", IconIndex := 0, "UInt")
+         If !DllCall(AssocHandlerGetIconLocation, "UPtr", AssocHandler, "PtrP", StrPtr, "IntP", IconIndex := 0, "UInt")
          {
             IconPath := StrGet(StrPtr, "UTF-16")
-            DllCall("Ole32.dll\CoTaskMemFree", "Ptr", StrPtr)
+            DllCall("Ole32.dll\CoTaskMemFree", "UPtr", StrPtr)
          }
 
          If (SubStr(IconPath, 1, 1) = "@")
          {
             VarSetCapacity(Resource, 4096, 0)
-            If !DllCall("Shlwapi.dll\SHLoadIndirectString", "WStr", IconPath, "Ptr", &Resource, "UInt", 2048, "PtrP", 0)
+            If !DllCall("Shlwapi.dll\SHLoadIndirectString", "WStr", IconPath, "UPtr", &Resource, "UInt", 2048, "PtrP", 0)
                IconPath := StrGet(&Resource, "UTF-16")
          }
          ItemName := StrReplace(UIName, "&", "&&")
-         If (Recommended || !DllCall(AssocHandlerIsRecommended, "Ptr", AssocHandler, "UInt"))
+         If (Recommended || !DllCall(AssocHandlerIsRecommended, "UPtr", AssocHandler, "UInt"))
          {
             If (UIName=FriendlyName)
             {
@@ -793,17 +793,17 @@ GetModuleFileNameEx(PID:=0) {
         If A_AhkPath
            Return A_AhkPath
         VarSetCapacity(lpFilename, 2048, 0)
-        DllCall("Kernel32.dll\GetModuleFileName", "Ptr", 0, "Str", lpFilename, "UInt", 1024)
+        DllCall("Kernel32.dll\GetModuleFileName", "UPtr", 0, "Str", lpFilename, "UInt", 1024)
         Return lpFilename
     }
-    hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x1410, "UInt", 0, "UInt", PID, "Ptr")
+    hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x1410, "UInt", 0, "UInt", PID, "UPtr")
     If (!hProcess)
-       hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001FFFFF, "UInt", 0, "UInt", PID, "Ptr")
+       hProcess := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001FFFFF, "UInt", 0, "UInt", PID, "UPtr")
     If (ErrorLevel || !hProcess)
        Return ""
     VarSetCapacity(lpFilename, 2048, 0)
-    DllCall("Psapi.dll\GetModuleFileNameEx", "Ptr", hProcess, "Ptr", 0, "Str", lpFilename, "UInt", 1024)
-    DllCall("Kernel32.dll\CloseHandle", "Ptr", hProcess)
+    DllCall("Psapi.dll\GetModuleFileNameEx", "UPtr", hProcess, "UPtr", 0, "Str", lpFilename, "UInt", 1024)
+    DllCall("Kernel32.dll\CloseHandle", "UPtr", hProcess)
     Return lpFilename
 }
 
@@ -926,7 +926,7 @@ FormatMessage(ctx, msg, arg="") {
   SetFormat, Integer, D
   frmMsg := DllCall("kernel32\FormatMessageW"
           , "UInt" , 0x1100 ; FORMAT_MESSAGE_FROM_SYSTEM/ALLOCATE_BUFFER
-          , "Ptr"  , 0      ; lpSource
+          , "UPtr"  , 0      ; lpSource
           , "UInt" , msg    ; dwMessageId
           , "UInt" , 0      ; dwLanguageId (0x0418=RO)
           , "PtrP" , buf    ; lpBuffer
@@ -934,7 +934,7 @@ FormatMessage(ctx, msg, arg="") {
           , "Str"  , arg)   ; Arguments
 
   txt := StrGet(buf, "UTF-16")
-  lF := DllCall("kernel32\LocalFree", "Ptr", buf)
+  lF := DllCall("kernel32\LocalFree", "UPtr", buf)
   Result := "Error " msg " in " ctx ":`n" txt
   Return Result
 }
@@ -1085,18 +1085,12 @@ SetMenuInfo(hMenu, maxHeight:=0, autoDismiss:=0, modeLess:=0, noCheck:=0) {
    NumPut(fMaskFlags, MENUINFO, 4, "UInt") ; DWORD
    NumPut(dwStyle, MENUINFO, 8, "UInt") ; DWORD
    NumPut(cyMax, MENUINFO, 12, "UInt") ; UINT
-   ; NumPut(hbrBack, MENUINFO, 16, "Ptr") ; HBRUSH
+   ; NumPut(hbrBack, MENUINFO, 16, "UPtr") ; HBRUSH
    ; NumPut(dwContextHelpID, MENUINFO, 20, "UInt") ; DWORD
    ; NumPut(dwMenuData, MENUINFO, 24, "UPtr") ; ULONG_PTR
 
-   Return DllCall("User32\SetMenuInfo","Ptr", hMenu, "Ptr", &MENUINFO)
+   Return DllCall("User32\SetMenuInfo", "UPtr", hMenu, "UPtr", &MENUINFO)
 }
-
-
-
-
-
-
 
 ; ==================================================================
 ; Dlg_FontSelect() by TheArkive
@@ -1200,20 +1194,20 @@ CalcAddrHash(addr, length, algid, byref hash = 0, byref hashlength = 0) {
     Static h := [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, "a", "b", "c", "d", "e", "f"]
          , b := h.minIndex()
     hProv := hHash := o := ""
-    CAC := DllCall("advapi32\CryptAcquireContext", "Ptr*", hProv, "Ptr", 0, "Ptr", 0, "UInt", 24, "UInt", 0xf0000000)
+    CAC := DllCall("advapi32\CryptAcquireContext", "Ptr*", hProv, "UPtr", 0, "UPtr", 0, "UInt", 24, "UInt", 0xf0000000)
     If CAC
     {
-       CCH := DllCall("advapi32\CryptCreateHash", "Ptr", hProv, "UInt", algid, "UInt", 0, "UInt", 0, "Ptr*", hHash)
+       CCH := DllCall("advapi32\CryptCreateHash", "UPtr", hProv, "UInt", algid, "UInt", 0, "UInt", 0, "Ptr*", hHash)
        If CCH
        {
-          CHD := DllCall("advapi32\CryptHashData", "Ptr", hHash, "Ptr", addr, "UInt", length, "UInt", 0)
+          CHD := DllCall("advapi32\CryptHashData", "UPtr", hHash, "UPtr", addr, "UInt", length, "UInt", 0)
           If CHD
           {
-             CGP := DllCall("advapi32\CryptGetHashParam", "Ptr", hHash, "UInt", 2, "Ptr", 0, "UInt*", hashlength, "UInt", 0)
+             CGP := DllCall("advapi32\CryptGetHashParam", "UPtr", hHash, "UInt", 2, "UPtr", 0, "UInt*", hashlength, "UInt", 0)
              If CGP
              {
                 VarSetCapacity(hash, hashlength, 0)
-                CGHP := DllCall("advapi32\CryptGetHashParam", "Ptr", hHash, "UInt", 2, "Ptr", &hash, "UInt*", hashlength, "UInt", 0)
+                CGHP := DllCall("advapi32\CryptGetHashParam", "UPtr", hHash, "UInt", 2, "UPtr", &hash, "UInt*", hashlength, "UInt", 0)
                 If CGHP
                 {
                    Loop, %hashlength%
@@ -1224,9 +1218,9 @@ CalcAddrHash(addr, length, algid, byref hash = 0, byref hashlength = 0) {
                 }
              }
           }
-          CDH := DllCall("advapi32\CryptDestroyHash", "Ptr", hHash)
+          CDH := DllCall("advapi32\CryptDestroyHash", "UPtr", hHash)
        }
-       CRC := DllCall("advapi32\CryptReleaseContext", "Ptr", hProv, "UInt", 0)
+       CRC := DllCall("advapi32\CryptReleaseContext", "UPtr", hProv, "UInt", 0)
     }
     Return o
 }
@@ -1236,9 +1230,9 @@ setMenusTheme(modus) {
       Return
 
    uxtheme := DllCall("GetModuleHandle", "str", "uxtheme", "uptr")
-   SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 135, "uptr")
-   global AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 133, "uptr")
-   FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "ptr", 136, "uptr")
+   SetPreferredAppMode := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 135, "uptr")
+   global AllowDarkModeForWindow := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 133, "uptr")
+   FlushMenuThemes := DllCall("GetProcAddress", "uptr", uxtheme, "Uptr", 136, "uptr")
    DllCall(SetPreferredAppMode, "int", modus) ; Dark
    DllCall(FlushMenuThemes)
    ; [merge] the forward to the interface thread's copy is gone - one interpreter,
@@ -1264,7 +1258,7 @@ LinkUseDefaultColor(hLink, Use, whichGui) {
    NumPut(0x03, LITEM, "UInt")               ; LIF_ITEMINDEX (0x01) | LIF_STATE (0x02)
    NumPut(Use ? 0x10 : 0, LITEM, 8, "UInt")  ; ? LIS_DEFAULTCOLORS : 0
    NumPut(0x10, LITEM, 12, "UInt")           ; LIS_DEFAULTCOLORS
-   While DllCall("SendMessage", "UPtr", hLink, "UInt", 0x0702, "Ptr", 0, "UPtr", &LITEM, "UInt") ; LM_SETITEM
+   While DllCall("SendMessage", "UPtr", hLink, "UInt", 0x0702, "UPtr", 0, "UPtr", &LITEM, "UInt") ; LM_SETITEM
          NumPut(A_Index, LITEM, 4, "Int")
    GuiControl, %whichGUI%: +Redraw, %hLink%
 }
@@ -1293,7 +1287,7 @@ GetScreenResInfos(disp:=0) {
     Static kk := {0:"Landscape", 1:"Portrait", 2:"Landscape (flipped)", 3:"Portrait (flipped)"}
 
     local dm,n:=varSetCapacity(dm,220,0)
-    dllCall("EnumDisplaySettingsW",(disp=0?"Ptr":"WStr"),disp,"Int",-1,"Ptr",&dm)
+    dllCall("EnumDisplaySettingsW",(disp=0?"UPtr":"WStr"),disp,"Int",-1,"UPtr",&dm)
     orr := numGet(dm,84,"UShort")
     ll := kk[orr]
     p := {w:numGet(dm,172,"UInt"),h:numGet(dm,176,"UInt"),hz:numGet(dm,184,"UInt"),o:orr,l:ll}
@@ -1342,9 +1336,9 @@ ChangeDisplaySettings(cD, sW, sH, rR, Perm="")   {
    }
    
    If (Perm=1) ;Resolution change will continue after exiting program.
-      Return DllCall("User32.dll\ChangeDisplaySettings", "Ptr", dmAddr, "UInt", 0, "Int")
+      Return DllCall("User32.dll\ChangeDisplaySettings", "UPtr", dmAddr, "UInt", 0, "Int")
    else ;Resolution change will revert to original after exiting program. 
-      Return DllCall("User32.dll\ChangeDisplaySettings", "Ptr", dmAddr, "UInt", 4, "Int")
+      Return DllCall("User32.dll\ChangeDisplaySettings", "UPtr", dmAddr, "UInt", 4, "Int")
 }
 
 UnregisterTouchWindow(hwnd) {
@@ -1375,10 +1369,10 @@ ClipboardGetDropEffect() {
       Return -2
 
    h := DllCall("User32.dll\GetClipboardData", "UInt", 15, "UPtr") ; CF_HDROP = 15
-   z := DllCall("Kernel32.dll\GlobalLock", "Ptr", h, "Ptr")
+   z := DllCall("Kernel32.dll\GlobalLock", "UPtr", h, "UPtr")
    If z
       r := NumGet(z, 0, "Int")
-   g := DllCall("Kernel32.dll\GlobalUnlock", "Ptr", h, "Ptr")
+   g := DllCall("Kernel32.dll\GlobalUnlock", "UPtr", h, "UPtr")
    DllCall("CloseClipboard")
    Return r
 }
@@ -1440,16 +1434,16 @@ ShowTrackPopupMenu(HMENU, X, Y, HWND, Flags:=0) {
    ; Y-position: TPM_BOTTOMALIGN := 0x0020, TPM_TOPALIGN := 0x0000, TPM_VCENTERALIGN := 0x0010
   
    ; Retrieve the number of items in a menu.
-   item_count := DllCall("GetMenuItemCount", "ptr", MenuGetHandle("MyMenu"))
+   item_count := DllCall("GetMenuItemCount", "Uptr", MenuGetHandle("MyMenu"))
 
    ; Retrieve the ID of the last item.
-   last_id := DllCall("GetMenuItemID", "ptr", MenuGetHandle("MyMenu"), "int", item_count-1)
+   last_id := DllCall("GetMenuItemID", "Uptr", MenuGetHandle("MyMenu"), "int", item_count-1)
    Return DllCall("User32.dll\TrackPopupMenu", "UPtr", HMENU, "UInt", Flags, "Int", X, "Int", Y, "Int", 0
-                                             , "UPtr", HWND, "Ptr", 0, "UInt")
+                                             , "UPtr", HWND, "UPtr", 0, "UInt")
 } 
 
 GetWinHwndAtPoint(nX, nY) {
-    a := DllCall("WindowFromPhysicalPoint", "Uint64", nX|(nY << 32), "Ptr")
+    a := DllCall("WindowFromPhysicalPoint", "Uint64", nX|(nY << 32), "UPtr")
     a := Format("{1:#x}", a)
     WinGetClass, h, ahk_id %a%
     Return [a, h]
@@ -1490,7 +1484,7 @@ TabCtrl_GetItemText(HWND, Index:=0) {
 
    VarSetCapacity(TCITEM, (5 * 4) + (2 * A_PtrSize) + (A_PtrSize - 4), 0)
    NumPut(TCIF_TEXT, TCITEM, 0, "UInt")
-   NumPut(&TCTEXT, TCITEM, TCTXTP, "Ptr")
+   NumPut(&TCTEXT, TCITEM, TCTXTP, "UPtr")
    NumPut(256, TCITEM, TCTXLP, "Int")
 
    SendMessage, % TCM_GETITEM, % Index - 1, &TCITEM, , ahk_id %HWND%
@@ -1532,7 +1526,7 @@ BalloonTip(sText, sTitle:="BalloonTip", Options:="", darkMode:=0) {
         Return
   }
 
-  X:=Y:="", T:=W:=0, I:=C:=Q:=1, Ptr:=(A_PtrSize ? "Ptr" : "UInt"), sTitle:=((StrLen(sTitle)<99) ? sTitle : (SubStr(sTitle,1,95) . " ..."))
+  X:=Y:="", T:=W:=0, I:=C:=Q:=1, Ptr:=(A_PtrSize ? "UPtr" : "UInt"), sTitle:=((StrLen(sTitle)<99) ? sTitle : (SubStr(sTitle,1,95) . " ..."))
   Loop, Parse, Options, %A_Space%=, %A_Space%%A_Tab%`r`n
       A_Index & 1  ? (Var:=A_LoopField) : (%Var%:=A_LoopField)
 
@@ -1541,7 +1535,7 @@ BalloonTip(sText, sTitle:="BalloonTip", Options:="", darkMode:=0) {
   VarSetCapacity(ti,(A_PtrSize ? 28+A_PtrSize*3 : 40),0), ti:=Chr((A_PtrSize ? 28+A_PtrSize*3 : 40)), NumPut(0x20,ti,4,"UInt"), NumPut(&sText,&ti,(A_PtrSize ? 24+A_PtrSize*3 : 36))
   hWnd:=DllCall("CreateWindowEx",Ptr,0x8,"str","tooltips_class32","str","",Ptr,0xC3,"int",0,"int",0,"int",0,"int",0,Ptr,0,Ptr,0,Ptr,0,Ptr,0,Ptr)
   If (darkMode=1)
-     DllCall("uxtheme\SetWindowTheme", "ptr", hwnd, "str", "DarkMode_Explorer", "ptr", 0)
+     DllCall("uxtheme\SetWindowTheme", "Uptr", hwnd, "str", "DarkMode_Explorer", "Uptr", 0)
 
   a:=(Q ? DllCall("SendMessage","UPtr",hWnd,Ptr,0x200b,Ptr,0,Ptr,"") : DllCall("uxtheme\SetWindowTheme","UPtr",hWnd,Ptr,0,"UintP",0)) ; TTM_SETWINDOWTHEME
 
@@ -1570,22 +1564,22 @@ BalloonTip_Kill() {
 }
 
 EM_ISIME(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x4F3, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x4F3, "Int", 0, "Int", 0)
   Return result
 }
 
 EM_CANREDO(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x0455, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x0455, "Int", 0, "Int", 0)
   Return result
 }
 
 EM_CANUNDO(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x00C6, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x00C6, "Int", 0, "Int", 0)
   Return result
 }
 
 EM_GETLINECOUNT(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x00BA, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x00BA, "Int", 0, "Int", 0)
   Return result
 }
 
@@ -1611,26 +1605,26 @@ EM_CHARFROMPOS(hEdit, X, Y, linePos:=0) {
 }
 
 EM_POSFROMCHAR(hCtrl, s1:=0, h:=0) {
-   x := result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xD6, "Int", s1, "UInt", 0)  ; EM_POSFROMCHAR
+   x := result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0xD6, "Int", s1, "UInt", 0)  ; EM_POSFROMCHAR
    If (h=1)
       y := result := (result >> 16) & 0xffff   ; HIWORD
    Return result
 }
 
 WM_GETTEXTLENGTH(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xE, "Ptr", 0, "Ptr", 0)  ; WM_GETTEXTLENGTH
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0xE, "UPtr", 0, "UPtr", 0)  ; WM_GETTEXTLENGTH
   Return result
 }
 
 EM_GETSEL(hCtrl, opt:="b") {
 ; options: [s]tart, [e]nd, [b]oth
-   r := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xB0, "IntP", s1, "IntP", s2)     ; EM_GETSEL
+   r := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0xB0, "IntP", s1, "IntP", s2)     ; EM_GETSEL
    Return (opt="s" ? s1 : opt="e" ? s2 : s1|(s2<<32))
 }
 
 EM_SETSEL(hCtrl, s1:=0, s2:="") {
    s2 := (s2="") ? s1 : s2
-   r:= DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xB1, "Int", s1, "Int", s2)      ; EM_SETSEL
+   r:= DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0xB1, "Int", s1, "Int", s2)      ; EM_SETSEL
    Return r
 }
 
@@ -1646,28 +1640,28 @@ EM_SETCUEBANNER(handle, string, option := true) {
 ; ===============================================================================================================================
    static ECM_FIRST       := 0x1500 
         , EM_SETCUEBANNER := ECM_FIRST + 1
-   if (DllCall("user32\SendMessage", "Ptr", handle, "UInt", EM_SETCUEBANNER, "Int", option, "Str", string, "Int"))
+   if (DllCall("user32\SendMessage", "UPtr", handle, "UInt", EM_SETCUEBANNER, "Int", option, "Str", string, "Int"))
       return 1
    return 0
 }
 
 EM_UNDO(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0xC7, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0xC7, "Int", 0, "Int", 0)
   Return result
 }
 
 EM_REDO(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x454, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x454, "Int", 0, "Int", 0)
   Return result
 }
 
 WM_COPY(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x301, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x301, "Int", 0, "Int", 0)
   Return result
 }
 
 WM_CUT(hCtrl) {
-  result := DllCall("SendMessage", "Ptr", hCtrl, "UInt", 0x300, "Int", 0, "Int", 0)
+  result := DllCall("SendMessage", "UPtr", hCtrl, "UInt", 0x300, "Int", 0, "Int", 0)
   Return result
 }
 
@@ -1923,16 +1917,16 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
         hTT:=DllCall("CreateWindowEx"
             ,"UInt",WS_EX_TOPMOST                       ;-- dwExStyle
             ,"Str","TOOLTIPS_CLASS32"                   ;-- lpClassName
-            ,"Ptr",0                                    ;-- lpWindowName
+            ,"UPtr",0                                    ;-- lpWindowName
             ,"UInt",TTS_ALWAYSTIP|TTS_NOPREFIX          ;-- dwStyle
             ,"UInt",CW_USEDEFAULT                       ;-- x
             ,"UInt",CW_USEDEFAULT                       ;-- y
             ,"UInt",CW_USEDEFAULT                       ;-- nWidth
             ,"UInt",CW_USEDEFAULT                       ;-- nHeight
-            ,"Ptr",HWND_DESKTOP                         ;-- hWndParent
-            ,"Ptr",0                                    ;-- hMenu
-            ,"Ptr",0                                    ;-- hInstance
-            ,"Ptr",0                                    ;-- lpParam
+            ,"UPtr",HWND_DESKTOP                         ;-- hWndParent
+            ,"UPtr",0                                    ;-- hMenu
+            ,"UPtr",0                                    ;-- hInstance
+            ,"UPtr",0                                    ;-- lpParam
             ,"UPtr")                                     ;-- Return type
 
         ;-- Disable visual style
@@ -1940,10 +1934,10 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
         ;   remove the window theme, from the tooltip control.  Since this
         ;   function only uses one tooltip control, all tooltips created by this
         ;   function will be affected.
-        ;   DllCall("uxtheme\SetWindowTheme","Ptr",hTT,"Ptr",0,"UIntP",0)
+        ;   DllCall("uxtheme\SetWindowTheme","UPtr",hTT,"UPtr",0,"UIntP",0)
 
         If (darkMode=1)
-           DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "ptr", 0)
+           DllCall("uxtheme\SetWindowTheme", "uptr", HTT, "str", "DarkMode_Explorer", "Uptr", 0)
         ;-- Set the maximum width for the tooltip window
         ;   Note: This message makes multi-line tooltips possible
         SendMessage, % TTM_SETMAXTIPWIDTH, 0, A_ScreenWidth,, ahk_id %hTT%
@@ -1992,8 +1986,8 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
     cbSize := VarSetCapacity(TOOLINFO,(A_PtrSize=8) ? 64:44,0)
     NumPut(cbSize,      TOOLINFO,0,"UInt")              ;-- cbSize
     NumPut(uFlags,      TOOLINFO,4,"UInt")              ;-- uFlags
-    NumPut(HWND_DESKTOP,TOOLINFO,8,"Ptr")               ;-- hwnd
-    NumPut(p1,          TOOLINFO,(A_PtrSize=8) ? 16:12,"Ptr")
+    NumPut(HWND_DESKTOP,TOOLINFO,8,"UPtr")               ;-- hwnd
+    NumPut(p1,          TOOLINFO,(A_PtrSize=8) ? 16:12,"UPtr")
         ;-- uId
 
     ;-- Check to see if tool has already been registered for the control
@@ -2002,7 +1996,7 @@ AddTooltip2Ctrl(p1, p2:="", p3="", darkMode:=0, largeFont:=0) {
     l_RegisteredTool := ErrorLevel
 
     ;-- Update the TOOLTIP structure
-    NumPut(&p2, TOOLINFO, (A_PtrSize=8) ? 48 : 36,"Ptr")
+    NumPut(&p2, TOOLINFO, (A_PtrSize=8) ? 48 : 36,"UPtr")
         ;-- lpszText
 
     ;-- Add, Update, or Delete tool
@@ -2050,7 +2044,7 @@ WinEnumChild(hwnd:=0, lParam:=0) {
      if hwnd
      {
        ;// not a window handle, could be a WinTitle parameter
-       if !DllCall("IsWindow", "Ptr", hwnd)
+       if !DllCall("IsWindow", "UPtr", hwnd)
        {
           prev_DHW := A_DetectHiddenWindows
           prev_TMM := A_TitleMatchMode
@@ -2063,9 +2057,9 @@ WinEnumChild(hwnd:=0, lParam:=0) {
     }
     out := []
     if hwnd
-       DllCall("EnumChildWindows", "Ptr", hwnd, "Ptr", pWinEnum, "Ptr", &out)
+       DllCall("EnumChildWindows", "UPtr", hwnd, "UPtr", pWinEnum, "UPtr", &out)
     else
-       DllCall("EnumWindows", "Ptr", pWinEnum, "Ptr", &out)
+       DllCall("EnumWindows", "UPtr", pWinEnum, "UPtr", &out)
     return out
   }
 
@@ -2093,7 +2087,7 @@ Win_ShowSysMenu(Hwnd, x, y) {
 GetClientPos(hwnd, ByRef left, ByRef top, ByRef w, ByRef h) {
   ; source http://forum.script-coding.com/viewtopic.php?pid=81833#p81833
   Static r := VarSetCapacity(pwi, 60, 0)
-  s := DllCall("GetWindowInfo", "Ptr", hwnd, "Ptr", &pwi)
+  s := DllCall("GetWindowInfo", "UPtr", hwnd, "UPtr", &pwi)
   left := NumGet(pwi, 20, "Int") - NumGet(pwi, 4, "Int")
   top := NumGet(pwi, 24, "Int") - NumGet(pwi, 8, "Int")
   w := NumGet(pwi, 28, "Int") - NumGet(pwi, 20, "Int")
@@ -2212,9 +2206,9 @@ WinMoveZ(hWnd, C, X, Y, W, H, Redraw:=0) {
   Local V := VarSetCapacity(R, 48, 0), TPM_WORKAREA := 0x10000
       , A := &R + 16, S := &R + 24, E := &R, NR := &R + 32
 
-  C := ( C:=Abs(C) ) ? DllCall("SetRect", "Ptr",&R, "Int",X-C, "Int",Y-C, "Int",X+C, "Int",Y+C) : 0
-  DllCall("SetRect", "Ptr",&R+16, "Int",X, "Int",Y, "Int",W, "Int",H)
-  DllCall("CalculatePopupWindowPosition", "Ptr",A, "Ptr",S, "UInt",TPM_WORKAREA, "Ptr",E, "Ptr",NR)
+  C := ( C:=Abs(C) ) ? DllCall("SetRect", "UPtr",&R, "Int",X-C, "Int",Y-C, "Int",X+C, "Int",Y+C) : 0
+  DllCall("SetRect", "UPtr",&R+16, "Int",X, "Int",Y, "Int",W, "Int",H)
+  DllCall("CalculatePopupWindowPosition", "UPtr",A, "UPtr",S, "UInt",TPM_WORKAREA, "UPtr",E, "UPtr",NR)
   X := NumGet(NR+0,"Int")
   Y := NumGet(NR+4,"Int")
   If (Redraw=2)
@@ -2349,7 +2343,7 @@ GetPhysicalCursorPos(ByRef mX, ByRef mY) {
     lastInvoked := A_TickCount
     Static POINT
          , init := VarSetCapacity(POINT, 8, 0) && NumPut(8, POINT, "Int")
-    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "Ptr", &POINT)
+    GPC := DllCall("user32.dll\GetPhysicalCursorPos", "UPtr", &POINT)
     If (!GPC || A_OSVersion="WIN_XP")
     {
        MouseGetPos, mX, mY
@@ -2425,17 +2419,17 @@ Edit_ShowBalloonTip(hEdit, Text, Title := "", Icon := 0) {
 
     Local EDITBALLOONTIP
     NumPut(VarSetCapacity(EDITBALLOONTIP, 4 * A_PtrSize, 0), EDITBALLOONTIP)
-    NumPut(&Title, EDITBALLOONTIP, A_PtrSize, "Ptr")
-    NumPut(&Text, EDITBALLOONTIP, A_PtrSize * 2, "Ptr")
+    NumPut(&Title, EDITBALLOONTIP, A_PtrSize, "UPtr")
+    NumPut(&Text, EDITBALLOONTIP, A_PtrSize * 2, "UPtr")
     NumPut(Icon, EDITBALLOONTIP, A_PtrSize * 3, "UInt")
     SendMessage, % EM_SHOWBALLOONTIP, 0, &EDITBALLOONTIP,, ahk_id %hEdit%
     Return ErrorLevel
 }
 
 SetWindowRegion(hwnd, x:=0, y:=0, w:=0, h:=0, r:=1) {
-  hR1 := DllCall("gdi32\CreateRoundRectRgn", "Int", x, "Int", y, "Int", w, "Int", h, "Int", r, "Int", r, "Ptr")
+  hR1 := DllCall("gdi32\CreateRoundRectRgn", "Int", x, "Int", y, "Int", w, "Int", h, "Int", r, "Int", r, "UPtr")
   Result := DllCall("user32\SetWindowRgn", "UPtr", hwnd, "UPtr", hR1, "UInt", 1)
-  DllCall("gdi32\DeleteObject", "Ptr", hR1)
+  DllCall("gdi32\DeleteObject", "UPtr", hR1)
   Return Result
 }
 
@@ -2515,7 +2509,7 @@ GetFileAttributesEx(inFile, getAttributes:=0, getAccessTime:=0) {
 
     VarSetCapacity(bFileAttribs,((A_PtrSize=8)?40:36),0) ; AHK v1
     p2 := &bFileAttribs
-    r := DllCall("GetFileAttributesExW", "Str", zFile,"Int", 0, "Ptr", p2)
+    r := DllCall("GetFileAttributesExW", "Str", zFile,"Int", 0, "UPtr", p2)
     If !r
     {
        ; the structure was left untouched by the API; returning it would
@@ -2556,7 +2550,7 @@ FileTimeToSystemTime(ptr) {
        Return
 
     VarSetCapacity(SYSTIME2, 16, 0)
-    r := DllCall("SystemTimeToTzSpecificLocalTime","UPtr",0,"UPtr",&SYSTEMTIME,"Ptr",&SYSTIME2) ; https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-systemtimetotzspecificlocaltime
+    r := DllCall("SystemTimeToTzSpecificLocalTime","UPtr",0,"UPtr",&SYSTEMTIME,"UPtr",&SYSTIME2) ; https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-systemtimetotzspecificlocaltime
     If !r
        Return
 
