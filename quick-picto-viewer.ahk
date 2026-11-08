@@ -92326,6 +92326,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
       Else
          destImgPath := fOutDir "\" OutFileName
 
+      lockDestinationName(destImgPath, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       If (userUnsprtWriteFMT!=1 || ResizeUseDestDir=1)
       {
          If (FileExist(destImgPath) && !FolderExist(destImgPath))
@@ -92379,6 +92380,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
          failedFiles++
    }
 
+   lockDestinationName("", 2)
    If (failedFiles>0)
       someErrors := "`nFailed to process " groupDigits(failedFiles) " files"
    If (skippedFiles>0)
@@ -98679,6 +98681,7 @@ batchAutoCropFiles() {
          destImgPath := OutDir "\" fileNamuNoEXT "." thisWriteFMT
       } Else destImgPath := imgPath
 
+      lockDestinationName(destImgPath, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       ; the conflicts action must also cover convert-to-format outputs saved next to
       ; the originals; only a plain in-place re-save is exempt from collision handling
       If (ResizeUseDestDir=1 || destImgPath!=imgPath)
@@ -98706,6 +98709,7 @@ batchAutoCropFiles() {
          failedFiles++
    }
 
+   lockDestinationName("", 2)
    If failedFiles
       someErrors := "`nErrors occurred for " groupDigits(failedFiles) " files"
    If skippedFiles
@@ -99769,6 +99773,7 @@ batchSimpleColorsAdjusts() {
       {
          zPlitPath(imgPath, 0, OutFileName, OutDir)
          file2save := ResizeDestFolder "\" OutFileName
+         lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
          If (FileExist(file2save) && !FolderExist(file2save))
             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite, !ResizeMustPerform)
       } Else
@@ -99793,6 +99798,7 @@ batchSimpleColorsAdjusts() {
          filesConverted++
    }
 
+   lockDestinationName("", 2)
    If failedFiles
       someErrors := "`nFailed to process " groupDigits(failedFiles) " files"
    If skippedFiles
