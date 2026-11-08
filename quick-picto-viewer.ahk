@@ -37659,7 +37659,7 @@ spawnExternalCoreThreads(argsToGive, filesListu, ByRef pidsArray) {
   pidsArray := []
   failedSlot := 0
   startZeit := A_TickCount
-  Try FileDelete, %thumbsCacheFolder%\tempNames*.txt   ; the names a batch wrote, see lockDestinationName()
+  Try FileDelete, %thumbsCacheFolder%\tempNames*.txt   ; the names a batch wrote, see lockDestinationFileName()
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mustAbortAllOperations, 0
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mainWindowID, % hGDIwin
   RegWrite, REG_SZ, %QPVregEntry%\multicore, mainThreadHwnd, % PVhwnd
@@ -38202,7 +38202,7 @@ multiCoreThreadSimpleImgProcessing(coreThread, arguments, filesList) {
        zPlitPath(imgPath, 0, OutFileName, OutDir)
        destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
        file2save := destImgPath "\" OutFileName
-       If !lockDestinationName(file2save, 2)
+       If !lockDestinationFileName(file2save, 2)
        {
           abandonAll := 1
           Break
@@ -38233,7 +38233,7 @@ multiCoreThreadSimpleImgProcessing(coreThread, arguments, filesList) {
        RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" skippedFiles
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" skippedFiles
    Sleep, 1
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadRunning%coreThread%, 2
@@ -38345,7 +38345,7 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
          Continue
       }
 
-      If !lockDestinationName(file2save, 2)
+      If !lockDestinationFileName(file2save, 2)
       {
          abandonAll := 1
          Break
@@ -38439,7 +38439,7 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
       }
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    RegWrite, REG_SZ, %QPVregEntry%\multicore, ThreadJob%coreThread%, % countFilez "/" failedFiles "/" theseFailures "/" skippedFiles "/" partialFiles
    If resultsList
       Try FileAppend, % resultsList, %thumbsCacheFolder%\tempList%coreThread%.txt, UTF-16
@@ -38448,7 +38448,7 @@ multiCoreThreadFormatConvert(coreThread, filesList, frameDelay:="") {
    ; cleanupThread()
 }
 
-lockDestinationName(filePath, mode:=0) {
+lockDestinationFileName(filePath, mode:=0) {
 ; The destination names of a batch loop, from its first mode 2 call to the one without filePath: a file's names
 ; are taken before they are checked and kept until the next file, then count as written by the batch. In a
 ; worker of a multi-threaded batch, a name taken is a mutex named after the path, so workers that share a name
@@ -41110,7 +41110,7 @@ coreBatchMultiRenameFiles() {
 
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
          file2save := OutDir "\" newFileName "." fileEXTu
-         lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+         lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
          If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
          {
             skippedFiles++
@@ -41195,7 +41195,7 @@ coreBatchMultiRenameFiles() {
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
      }
-     lockDestinationName("", 2)
+     lockDestinationFileName("", 2)
      whileLoopExec := 0
      counterFilez := someErrors := ""
      CurrentSLD := backCurrentSLD
@@ -43278,8 +43278,8 @@ askAboutFileCollision(srcFile, destFile, allowSkip, doLastOption, forceOption, B
    r := ""
    performOverwrite := 0
    msgR := IsObject(msgResult) ? msgResult.btn : msgResult
-   ; with «Overwrite» set, a file its batch wrote earlier gets a new name, see lockDestinationName()
-   If (InStr(msgR, "rename") || forceOption=3 && lockDestinationName(destFile, 3))
+   ; with «Overwrite» set, a file its batch wrote earlier gets a new name, see lockDestinationFileName()
+   If (InStr(msgR, "rename") || forceOption=3 && lockDestinationFileName(destFile, 3))
    {
       performOverwrite := 2
       r := getAutoRenamedFreePath(destFile)
@@ -61046,7 +61046,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
       FileGetTime, originalCtime, % file2rem, C
       file2save := finalDest "\" OldOutFileName
-      lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+      lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, forceConflictOption, performOverwrite)
@@ -61115,7 +61115,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          failedFiles++
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
@@ -61253,7 +61253,7 @@ batchConvert2format() {
       zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutNameNoExt "." rDesireWriteFMT
-      lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+      lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       If isSameImageFormat(imgPath, rDesireWriteFMT)
       {
          ; a file already in the format is not converted again: it only goes to the destination folder
@@ -61358,7 +61358,7 @@ batchConvert2format() {
       }
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    If (SLDtypeLoaded=3)
    {
       If !activeSQLdb.Exec("COMMIT TRANSACTION;")
@@ -62062,13 +62062,13 @@ FIMsaveImageFile(hImage, file2save, saveArg) {
 
 getAutoRenamedFreePath(filePath) {
 ; the first free «name [N].ext» next to filePath; blank when none is free
-; in a worker, a name another worker holds is not free, and the name returned stays held, see lockDestinationName()
+; in a worker, a name another worker holds is not free, and the name returned stays held, see lockDestinationFileName()
    zPlitPath(filePath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
    Loop, 9500
    {
       z := OutDir "\" OutNameNoExt " [" A_Index "]." fileEXT
       ; checked again once held: another worker may have written it meanwhile
-      If (!FileExist(z) && lockDestinationName(z, 1) && !FileExist(z))
+      If (!FileExist(z) && lockDestinationFileName(z, 1) && !FileExist(z))
          Return z
    }
 }
@@ -62526,7 +62526,7 @@ coreExtractFramesFromFIMfiles(imgPath, GFT, inLoop, prevMSGdisplay, bonusMsg, By
          prevMSGdisplay := A_TickCount
       }
 
-      If !lockDestinationName(file2save)
+      If !lockDestinationFileName(file2save)
          file2save := "abort"
       Else If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
@@ -62872,7 +62872,7 @@ coreExtractFramesFromPDF(imgPath, inLoop, bonusMsg, ByRef failedFrames, ByRef ex
          prevMSGdisplay := A_TickCount
       }
 
-      If !lockDestinationName(file2save)
+      If !lockDestinationFileName(file2save)
          file2save := "abort"
       Else If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
@@ -62967,7 +62967,7 @@ coreExtractFramesFromGdipFiles(imgPath, inLoop, prevMSGdisplay, bonusMsg, ByRef 
          prevMSGdisplay := A_TickCount
       }
 
-      If !lockDestinationName(file2save)
+      If !lockDestinationFileName(file2save)
          file2save := "abort"
       Else If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(imgPath, file2save, 1, 0, xt.conflict, performOverwrite)
@@ -92330,7 +92330,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
       Else
          destImgPath := fOutDir "\" OutFileName
 
-      lockDestinationName(destImgPath, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+      lockDestinationFileName(destImgPath, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       If (userUnsprtWriteFMT!=1 || ResizeUseDestDir=1)
       {
          If (FileExist(destImgPath) && !FolderExist(destImgPath))
@@ -92384,7 +92384,7 @@ batchAdvIMGresizer(desiredW, desiredH, isPercntg, dontAsk:=0) {
          failedFiles++
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    If (failedFiles>0)
       someErrors := "`nFailed to process " groupDigits(failedFiles) " files"
    If (skippedFiles>0)
@@ -98685,7 +98685,7 @@ batchAutoCropFiles() {
          destImgPath := OutDir "\" fileNamuNoEXT "." thisWriteFMT
       } Else destImgPath := imgPath
 
-      lockDestinationName(destImgPath, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+      lockDestinationFileName(destImgPath, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       ; the conflicts action must also cover convert-to-format outputs saved next to
       ; the originals; only a plain in-place re-save is exempt from collision handling
       If (ResizeUseDestDir=1 || destImgPath!=imgPath)
@@ -98713,7 +98713,7 @@ batchAutoCropFiles() {
          failedFiles++
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    If failedFiles
       someErrors := "`nErrors occurred for " groupDigits(failedFiles) " files"
    If skippedFiles
@@ -99660,7 +99660,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       zPlitPath(imgPath, 0, OutFileName, OutDir)
       destImgPath := (ResizeUseDestDir=1) ? ResizeDestFolder : OutDir
       file2save := destImgPath "\" OutFileName
-      lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+      lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       If (ResizeUseDestDir=1)
       {
          If (FileExist(file2save) && !FolderExist(file2save))
@@ -99689,7 +99689,7 @@ batchSimpleProcessing(rotateAngle, XscaleImgFactor, YscaleImgFactor, losslessJpe
       }
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    If failedFiles
       someErrors := "`nFailed to process " groupDigits(failedFiles) " files"
    If skippedFiles
@@ -99777,7 +99777,7 @@ batchSimpleColorsAdjusts() {
       {
          zPlitPath(imgPath, 0, OutFileName, OutDir)
          file2save := ResizeDestFolder "\" OutFileName
-         lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
+         lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
          If (FileExist(file2save) && !FolderExist(file2save))
             file2save := askAboutFileCollision(imgPath, file2save, 1, 0, userActionConflictingFile, performOverwrite, !ResizeMustPerform)
       } Else
@@ -99802,7 +99802,7 @@ batchSimpleColorsAdjusts() {
          filesConverted++
    }
 
-   lockDestinationName("", 2)
+   lockDestinationFileName("", 2)
    If failedFiles
       someErrors := "`nFailed to process " groupDigits(failedFiles) " files"
    If skippedFiles
