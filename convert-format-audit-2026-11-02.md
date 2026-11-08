@@ -494,6 +494,10 @@ file written and applies the conflict option, as a single-threaded run does.
   file gets a new name («name [1]»), in single- and multi-threaded runs of the converter and of batch
   resize/rotate/crop. Files from before the batch are still overwritten, and an Overwrite chosen in the «Ask user»
   dialog still overwrites. Wine: six names shared by two folders gave 6 outputs, now 12.
+- Since `5b4d58b` (2026-11-08), the same holds for auto-crop, the advanced resizer and batch colour adjustments,
+  which run only in the main process. Wine, each tool: three names shared by two folders gave 3 outputs, now 6; a
+  file rewritten in place (a selected file in the destination folder, or `x.jpg` beside `x.png` converted to JPEG)
+  no longer loses its image to the next output of that name.
 
 **What happens.** `getSelectedFilesListString()` shuffles the selection (`:37613`) and splits it into one chunk per
 worker. Each worker checks `FileExist(file2save)` on its own (`:38365`).
