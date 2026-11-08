@@ -41110,6 +41110,7 @@ coreBatchMultiRenameFiles() {
 
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
          file2save := OutDir "\" newFileName "." fileEXTu
+         lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
          If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
          {
             skippedFiles++
@@ -41194,6 +41195,7 @@ coreBatchMultiRenameFiles() {
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
      }
+     lockDestinationName("", 2)
      whileLoopExec := 0
      counterFilez := someErrors := ""
      CurrentSLD := backCurrentSLD
@@ -61044,6 +61046,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
       FileGetTime, originalCtime, % file2rem, C
       file2save := finalDest "\" OldOutFileName
+      lockDestinationName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, forceConflictOption, performOverwrite)
@@ -61112,6 +61115,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          failedFiles++
    }
 
+   lockDestinationName("", 2)
    whileLoopExec := 0
    CurrentSLD := backCurrentSLD
    someErrors := "`nElapsed time: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3))
