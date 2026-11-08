@@ -498,6 +498,9 @@ file written and applies the conflict option, as a single-threaded run does.
   which run only in the main process. Wine, each tool: three names shared by two folders gave 3 outputs, now 6; a
   file rewritten in place (a selected file in the destination folder, or `x.jpg` beside `x.png` converted to JPEG)
   no longer loses its image to the next output of that name.
+- Since `7bb9721` (2026-11-08), also for the batch copy/move (with the quick-action bar's) and multi-rename, which
+  sent the replaced file to the Recycle Bin. Wine: copying or moving three names shared by two folders left 3 files
+  and 3 in the Recycle Bin, now 6 and none; two files renamed to one name, likewise.
 
 **What happens.** `getSelectedFilesListString()` shuffles the selection (`:37613`) and splits it into one chunk per
 worker. Each worker checks `FileExist(file2save)` on its own (`:38365`).
