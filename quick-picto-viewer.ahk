@@ -40556,7 +40556,7 @@ readRecentMultiRenameEntries() {
 }
 
 PanelMultiRenameFiles() {
-    Global UsrEditNewFileName
+    Global UsrEditNewFileName, txtMultiRenameSummary
     If warnFramesActionPrevented("RENAME")
        Return
 
@@ -40565,28 +40565,29 @@ PanelMultiRenameFiles() {
        Return
 
     thisBtnHeight := createSettingsGUI(8, A_ThisFunc)
-    btnWid := 100
-    txtWid := 390
-    EditWid := 395
+    btnWid := 100, insWid := 65, exWid := 80, EditWid := 290
     If (PrefsLargeFonts=1)
     {
-       EditWid := EditWid + 220
-       btnWid := btnWid + 70
-       txtWid := txtWid + 220
+       btnWid += 70, insWid += 40, exWid += 45, EditWid += 110
        Gui, Font, s%LargeUIfontValue%
     }
-    lstWid := EditWid
-    EditWid -= btnWid + 10
+    lstWid := EditWid + insWid + exWid + btnWid + 15
     RegAction(0, "PreserveDateTimeOnSave",, 1)
     thisu := groupDigits(markedSelectFile)
     listu := readRecentMultiRenameEntries()
     UImultiRenameChangeLVoffset("reset")
+    multiRenameSummary("reset")
     Gui, SettingsGUIA: +Delimiter`n
-    Gui, Add, Text, x15 y15 w%txtWid% Section, Selected files: %thisu%. Type a pattern to rename the files.
+    Gui, Add, Text, x15 y15 w%lstWid% Section, Selected files: %thisu%. Type a pattern to rename the files.
     Gui, Add, Text, y+10 w1 h1, Files rename pattern.
-    Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditNewFileName, % listu
+    Gui, Add, ComboBox, yp w%EditWid% gUIgenericComboAction vUsrEditNewFileName +hwndhTemp, % listu
+    EM_SETCUEBANNER(GetComboBoxInfo(hTemp)[1], "Holiday [counter]  ·  IMG_//Photo_  ·  $.jpg")
+    Gui, Add, Button, x+5 hp w%insWid% gBtnMultiRenameMenus +hwndhTemp, &Insert
+    ToolTip2ctrl(hTemp, "Opens a menu to insert at the cursor the file name, the folder name, dates, a number or a letter case,`nor to start a find and replace pattern")
+    Gui, Add, Button, x+5 hp w%exWid% gBtnMultiRenameMenus +hwndhTemp, E&xamples
+    ToolTip2ctrl(hTemp, "Opens a menu of ready-made patterns")
     Gui, Add, Button, x+5 hp w%btnWid% gEraseMultiRenameHisto, Erase &history
-    GuiAddListView("xs y+1 w" lstWid " -multi +LV0x10000 +LV0x400 r" uLVr " Grid AltSubmit vLViewOthers gUIlvMultiRenameResponder", "Original`nRenamed`nFolder path`n#", "Renaming files preview")
+    GuiAddListView("xs y+1 w" lstWid " -multi +LV0x10000 +LV0x400 r" uLVr " Grid AltSubmit vLViewOthers gUIlvMultiRenameResponder", "Original`nRenamed`nStatus`nFolder path`n#", "Renaming files preview")
     ml := (PrefsLargeFonts=1) ? 40 : 30
     sml := (PrefsLargeFonts=1) ? 35 : 25
     GuiAddButton("xs y+5 h" thisBtnHeight " w" ml " gUImultiRenameChangeLVoffset", "<<", "First")
@@ -40594,12 +40595,17 @@ PanelMultiRenameFiles() {
     GuiAddButton("x+1 hp wp gUImultiRenameChangeLVoffset", ">", "Next")
     GuiAddButton("x+1 hp w" ml " gUImultiRenameChangeLVoffset", ">>", "Last")
     Gui, Add, Checkbox, x+10 hp Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
+    Gui, Add, Button, xs y+5 h%thisBtnHeight% w%btnWid% gBTNmultiRenameCheckAll +hwndhTemp, &Check all files
+    ToolTip2ctrl(hTemp, "Counts, over all the selected files, the new names that are taken, repeated or invalid,`nthe names that stay unchanged and the files not found. Press Escape to stop.")
+    sumWid := lstWid - btnWid - 10
+    Gui, Add, Text, x+10 yp w%sumWid% r2 vtxtMultiRenameSummary, Not checked yet
     thisW := (PrefsLargeFonts=1) ? 155 : 115
     Gui, Add, Text, xs y+10 +hwndhTemp, Action on file name collisions:
-    GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" onConflictMultiRenameAct " vonConflictMultiRenameAct", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTemp])
+    GuiAddDropDownList("x+10 w" thisW " gUImultiRenameCollisionAction AltSubmit Choose" onConflictMultiRenameAct " vonConflictMultiRenameAct", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTemp])
 
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid% Default gcoreBatchMultiRenameFiles, &Rename files
-    Gui, Add, Button, x+5 hp wp gBTNdoSoloRename, &Solo rename
+    Gui, Add, Button, x+5 hp wp gBTNdoSoloRename +hwndhTemp, &Solo rename
+    ToolTip2ctrl(hTemp, "Renames only the file highlighted in the list, in the single file rename dialog")
     ml := (PrefsLargeFonts=1) ? 85 : 60
     Gui, Add, Button, x+5 hp w%ml% gBtnHelpMultiRename, H&elp
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
@@ -40610,7 +40616,7 @@ BTNdoSoloRename() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    RowNumber := LV_GetNext(0, "F")
-   LV_GetText(idu, RowNumber, 4)
+   LV_GetText(idu, RowNumber, 5)
    If (idu && RowNumber)
       currentFileIndex := clampInRange(idu, 1, maxFilesIndex)
 
@@ -40677,7 +40683,339 @@ UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
 BtnHelpMultiRename() {
     GuiControlGet, PreserveDateTimeOnSave
     RegAction(1, "PreserveDateTimeOnSave")
-    msgBoxWrapper(appTitle ": HELP", "Patterns available to rename the files:`n`na) Whatever file prefix [this] or suffix with tokens`n[this] - file name`n[pfdname] - parent folder name`n[fDateM] or [fDateC] - file modified/created date`n[counter] - count all files, regardless of their location`ntrim{X,Y} - X and Y designate how many letters to trim from the beginning and/or end of the original file name`ncase{U} - change letters to {U}pper, {L}ower or {T}itle case`n`nb) Replace given string//with this one`nUse // to perform search and replace in file names. Begin with \> to use RegEx. Trim function and the tokens mentioned earlier can be used only after //.`n`nc) abcdefgh01234>>any string`nEvery enumerated character before >> will be replaced with a single character or a string specified after >>. The tokens from a) can be used after >>.`n`nd) any file name without tokens`nThe files will be counted according to their containing folder. This is to avoid naming conflicts and applies only if [this], >> and // are not used.`n`ne) $.NewFileExtension`nMust begin with $. and cannot be used in combination with other patterns.", -1, 0, 0)
+    ; the examples use the first selected file; a made-up one in private mode
+    imgPath := (userPrivateMode=1) ? "C:\Photos\Vacation 2024\IMG_0042.jpg" : resultedFilesList[getSelectedFiles(1), 1]
+    zPlitPath(imgPath, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
+    RegExMatch(fileNamuNoEXT, "[^\p{L}\p{N}]", charu)
+    charu := (charu!="") ? charu : SubStr(fileNamuNoEXT, 1, 1)
+    trimu := (StrLen(fileNamuNoEXT)>3) ? "trim{2,1}" : "trim{1,0}"
+    caseu := (fileNamuNoEXT==Format("{:U}", fileNamuNoEXT)) ? "case{L}" : "case{U}"
+    extu := (fileEXTu="jpeg") ? "$.jpg" : "$.jpeg"
+    s := "Patterns shown on the first selected file, «" OutFileName "»:`n`nNEW NAMES WITH TOKENS`n"
+    s .= multiRenameHelpLine("New-[this]", imgPath) " [this] is the file name.`n"
+    s .= multiRenameHelpLine("[pfdname] [counter]", imgPath) " [pfdname] is the parent folder name; [counter] numbers all the selected files, in list order.`n"
+    s .= multiRenameHelpLine("[fDateM] [this]", imgPath) " [fDateM] and [fDateC] are the modified and the created dates.`n"
+    s .= multiRenameHelpLine(trimu, imgPath) " trim{X,Y} cuts X characters from the start of the file name and Y from its end.`n"
+    s .= multiRenameHelpLine(caseu, imgPath) " case{U}, case{L} and case{T} give UPPER, lower or Title case to the whole new name.`n"
+    s .= multiRenameHelpLine("Holiday", imgPath) " A name without [this], trim{} or [counter] gets a number, counted per folder.`n`nFIND AND REPLACE`n"
+    s .= multiRenameHelpLine(SubStr(fileNamuNoEXT, 1, 3) "//Photo", imgPath) " The letter case of the text to find is ignored. Tokens and trim{} work only after //.`n"
+    s .= multiRenameHelpLine("\>^(.)//[$1]", imgPath) " \> makes the text to find a regular expression.`n`nREPLACE SINGLE CHARACTERS`n"
+    s .= multiRenameHelpLine(charu ">>" ((charu="-") ? "_" : "-"), imgPath) " Each character before >> is replaced by the text after it; with nothing after >>, they are removed.`n`nNEW EXTENSION`n"
+    s .= multiRenameHelpLine(extu, imgPath) " Only the name changes, the file format stays. It cannot be combined with other patterns.`n`n"
+    s .= "«Insert» and «Examples» add tokens and ready-made patterns. The Status column checks the files listed; «Check all files» counts the problems over all the selected files."
+    msgBoxWrapper(appTitle ": HELP", s, -1, 0, 0)
+}
+
+multiRenameHelpLine(patternu, imgPath) {
+   ; «pattern» gives «the name the rename writes for imgPath»
+   parentFolderName := zPlitPath(imgPath, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
+   thisPattern := patternu
+   objuTemp := decideMultiRename(thisPattern)
+   If (objuTemp.newName)
+      thisPattern := objuTemp.newName
+   If (StrLen(objuTemp.newExtu)>1)
+      fileEXTu := objuTemp.newExtu
+
+   newFileName := (objuTemp="err") ? fileNamuNoEXT : decideFinalMultiRename(fileNamuNoEXT, thisPattern, 1, parentFolderName, imgPath, objuTemp)
+   Return "«" patternu "» gives «" newFileName "." fileEXTu "»."
+}
+
+UImultiRenameCollisionAction() {
+   SetTimer, uiPopulateLVmultiRename, -150
+}
+
+multiRenameSummary(actu, keyu:="", msgu:="") {
+   ; the counts of «Check all files» stay until the pattern or the collision action changes
+   Static checkedKey := ""
+   If (actu="reset")
+   {
+      checkedKey := ""
+      Return
+   }
+
+   If (actu="checked")
+      checkedKey := keyu
+   Else If (keyu==checkedKey)
+      Return
+   Else
+      checkedKey := ""
+
+   GuiControl, SettingsGUIA:, txtMultiRenameSummary, % msgu
+}
+
+multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, seenNames, thisIndex, ByRef sameAs) {
+; 1 OK, 2 not found, 3 invalid name, 4 same new name as the file at index sameAs, 5 name taken, 6 a folder has the name
+   If !srcAttr
+      Return 2
+
+   If (StrLen(newFileName)>255 || RegExMatch(newFileName, "[\\/:*?""<>|]") || RegExMatch(newFileName, "i)^(CON|PRN|AUX|NUL|COM\d|LPT\d)(\.|$)"))
+      Return 3
+
+   keyu := Format("{:L}", newPath)
+   If (sameAs := seenNames[keyu])
+      Return 4
+
+   seenNames[keyu] := thisIndex
+   If (newPath=srcPath)   ; only the letter case changes
+      Return 1
+
+   attribs := FileExist(newPath)
+   Return !attribs ? 1 : InStr(attribs, "D") ? 6 : 5
+}
+
+BTNmultiRenameCheckAll() {
+   Static isRunning := 0, actWords := ["skip", "auto-rename", "overwrite", "ask"]
+   If isRunning
+      Return
+
+   Critical, on
+   Gui, SettingsGUIA: Default
+   GuiControlGet, UsrEditNewFileName
+   GuiControlGet, onConflictMultiRenameAct
+   keyu := UsrEditNewFileName "|" onConflictMultiRenameAct
+   OriginalNewFileName := Trimmer(UsrEditNewFileName)
+   If (OriginalNewFileName="[this]" || OriginalNewFileName="")
+      Return msgBeepTimer("WARNING: Incorrect multi-rename pattern provided")
+
+   OriginalNewFileName := UsrEditNewFileName
+   objuTemp := decideMultiRename(OriginalNewFileName)
+   If (objuTemp.newName)
+      OriginalNewFileName := objuTemp.newName
+
+   If (objuTemp="err" || StrLen(OriginalNewFileName)<2 || objuTemp.regExRemplaceMode=1 && objuTemp.regExValid!=1)
+      Return msgBeepTimer("WARNING: Incorrect multi-rename pattern provided")
+
+   isRunning := 1
+   filesElected := getSelectedFiles(0, 1)
+   perFolderCount := (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
+   If (objuTemp.IndexModeCount=1)
+      OutDirAsc := "a"
+
+   counterFilez := new hashtable()
+   seenNames := new hashtable()
+   countu := [0, 0, 0, 0, 0, 0], unchanged := countTFilez := 0
+   startOperation := prevMSGdisplay := A_TickCount
+   doStartLongOpDance()
+   showTOOLtip("Checking the new names of " groupDigits(filesElected) " files, please wait`nPress Escape to stop")
+   ; numbered like coreBatchMultiRenameFiles(): every selected file takes its number, found or not
+   Loop, % maxFilesIndex
+   {
+      If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
+         Continue
+
+      If (determineTerminateOperation()=1 || GetKeyState("Escape", "P"))
+      {
+         abandonAll := 1
+         Break
+      }
+
+      imgPath := resultedFilesList[A_Index, 1]
+      srcAttr := FileExist(imgPath)
+      parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
+      If (StrLen(objuTemp.newExtu)>1)
+         fileEXTu := objuTemp.newExtu
+
+      countTFilez++
+      If perFolderCount
+      {
+         OutDirAsc := (objuTemp.IndexModeCount=1) ? "a" : OutDir
+         counterFilez[OutDirAsc] := Round(counterFilez[OutDirAsc]) + 1
+      }
+
+      If (objuTemp.IndexModeCount=1)
+         counterFilez[OutDirAsc] := countTFilez
+
+      If (A_TickCount - prevMSGdisplay>2000)
+      {
+         showTOOLtip("Checking the new names, please wait`nPress Escape to stop" ETAinfos(countTFilez, filesElected, startOperation), 0, 0, countTFilez/filesElected)
+         prevMSGdisplay := A_TickCount
+      }
+
+      If !srcAttr
+      {
+         countu[2]++
+         Continue
+      }
+
+      newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
+      file2save := OutDir "\" newFileName "." fileEXTu
+      If (file2save==imgPath || newFileName="" || newFileName=A_Space || newFileName="  " || newFileName=".")
+      {
+         unchanged++
+         Continue
+      }
+
+      countu[multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, seenNames, A_Index, sameAs)]++
+   }
+
+   counterFilez := seenNames := ""
+   If (abandonAll=1 && GetKeyState("Escape", "P"))
+   {
+      ; the Escape that stopped the check must not close the panel [SettingsGUIAGuiEscape]
+      KeyWait, Escape, T1.5
+      lastZeitOpenWin := A_TickCount
+   }
+
+   msgu := (abandonAll=1) ? "Stopped after " groupDigits(countTFilez) " of " groupDigits(filesElected) " files. " : "Checked " groupDigits(filesElected) " files. "
+   msgu .= "Will be renamed: " groupDigits(countu[1])
+   If (countu[5] + countu[6])
+      msgu .= " · Names taken (" actWords[Round(onConflictMultiRenameAct)] "): " groupDigits(countu[5] + countu[6])
+   If countu[4]
+      msgu .= " · Same new names: " groupDigits(countu[4])
+   If unchanged
+      msgu .= " · Unchanged: " groupDigits(unchanged)
+   If countu[2]
+      msgu .= " · Not found: " groupDigits(countu[2])
+   If countu[3]
+      msgu .= " · Invalid names: " groupDigits(countu[3])
+
+   multiRenameSummary("checked", keyu, msgu)
+   SetTimer, RemoveTooltip, -300
+   SetTimer, ResetImgLoadStatus, -50
+   isRunning := 0
+}
+
+BtnMultiRenameMenus(hwnd:=0) {
+   ; «Insert» and «Examples» open their menus under the button
+   ControlGetText, info, , ahk_id %hwnd%
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewOthers
+   GuiControlGet, hCombo, SettingsGUIA: Hwnd, UsrEditNewFileName
+   GuiControlGet, textu, SettingsGUIA:, UsrEditNewFileName
+   Try Menu, PVmrInsert, DeleteAll
+   Try Menu, PVmrCase, DeleteAll
+   Try Menu, PVmrExamples, DeleteAll
+   If InStr(StrReplace(info, "&"), "Examples")
+   {
+      multiRenameMenuAdd("PVmrExamples", "Text &before the name`tNew-[this]", "example", "New-[this]")
+      multiRenameMenuAdd("PVmrExamples", "Text &after the name`t[this]-edited", "example", "[this]-edited")
+      multiRenameMenuAdd("PVmrExamples", "&Name and a number`tHoliday [counter]", "example", "Holiday [counter]")
+      multiRenameMenuAdd("PVmrExamples", "&Folder name and a number`t[pfdname] [counter]", "example", "[pfdname] [counter]")
+      multiRenameMenuAdd("PVmrExamples", "&Date and name`t[fDateM] [this]", "example", "[fDateM] [this]")
+      multiRenameMenuAdd("PVmrExamples", "&Remove text`tIMG_//", "example", "IMG_//")
+      multiRenameMenuAdd("PVmrExamples", "&Spaces to underscores`t >>_", "example", " >>_")
+      multiRenameMenuAdd("PVmrExamples", "Drop the first &4 characters`ttrim{4,0}", "example", "trim{4,0}")
+      multiRenameMenuAdd("PVmrExamples", "&UPPERCASE`tcase{U}", "example", "case{U}")
+      multiRenameMenuAdd("PVmrExamples", "New &extension`t$.jpeg", "example", "$.jpeg")
+      showThisMenu("PVmrExamples", 0, "hwnd", hwnd)
+      Return
+   }
+
+   ; sample values from the highlighted file, else from the first selected one
+   rowu := LV_GetNext(0, "F")
+   If rowu
+      LV_GetText(idu, rowu, 5)
+   imgPath := resultedFilesList[(idu ? idu : getSelectedFiles(1)), 1]
+   folderu := zPlitPath(imgPath, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
+   FileGetTime, dateM, % imgPath, M
+   FileGetTime, dateC, % imgPath, C
+   If dateM
+      FormatTime, dateM, % dateM, yyyy-MM-dd
+   If dateC
+      FormatTime, dateC, % dateC, yyyy-MM-dd
+   If (userPrivateMode=1)
+      fileNamuNoEXT := folderu := dateM := dateC := ""
+
+   labels := []
+   labels[1] := "File &name" multiRenameMenuSample(fileNamuNoEXT) "`t[this]"
+   labels[2] := "&Parent folder name" multiRenameMenuSample(folderu) "`t[pfdname]"
+   labels[3] := "Date &modified" multiRenameMenuSample(dateM) "`t[fDateM]"
+   labels[4] := "Date &created" multiRenameMenuSample(dateC) "`t[fDateC]"
+   labels[5] := "N&umber across all selected files, in list order`t[counter]"
+   labels[6] := "File name with characters cu&t off...`ttrim{X,Y}"
+   tokens := ["[this]", "[pfdname]", "[fDateM]", "[fDateC]", "[counter]"]
+   Loop, 5
+      multiRenameMenuAdd("PVmrInsert", labels[A_Index], "insert", tokens[A_Index])
+   multiRenameMenuAdd("PVmrInsert", labels[6], "trim", "")
+   multiRenameMenuAdd("PVmrCase", "&UPPERCASE`tcase{U}", "case", "case{U}")
+   multiRenameMenuAdd("PVmrCase", "&lowercase`tcase{L}", "case", "case{L}")
+   multiRenameMenuAdd("PVmrCase", "&Title Case`tcase{T}", "case", "case{T}")
+   Menu, PVmrInsert, Add, &Letter case, :PVmrCase
+   Menu, PVmrInsert, Add
+   multiRenameMenuAdd("PVmrInsert", "&Find and replace...`tIMG_//Photo_", "template", "IMG_//Photo_|0|4")
+   multiRenameMenuAdd("PVmrInsert", "Find and replace with a &regular expression (RegEx)...`t\>...//...", "template", "\>^IMG_(\d+)//Photo $1|2|12")
+   multiRenameMenuAdd("PVmrInsert", "Replace single c&haracters...`t >>_", "template", " >>_|0|1")
+   multiRenameMenuAdd("PVmrInsert", "Change &extension...`t$.jpg", "template", "$.jpg|2|5")
+
+   ; tokens do nothing in the text to find, or in a new extension pattern
+   multiRenameBoxSel(hCombo, textu, selStart, selEnd)
+   isNewExt := RegExMatch(textu, "^\$\.")
+   sepPos := InStr(textu, "//") ? InStr(textu, "//") : InStr(textu, "\\") ? InStr(textu, "\\") : InStr(textu, ">>")
+   If (isNewExt || sepPos && selStart<sepPos + 1)
+   {
+      Loop, 6
+         Menu, PVmrInsert, Disable, % labels[A_Index]
+   }
+
+   If isNewExt
+      Menu, PVmrInsert, Disable, &Letter case
+
+   showThisMenu("PVmrInsert", 0, "hwnd", hwnd)
+}
+
+multiRenameMenuAdd(menuName, labelu, actu, valu) {
+   ; Menu takes a bound function from a variable, not from a call written in its parameter
+   fn := Func("MenuMultiRenameAction").Bind(actu, valu)
+   Menu, % menuName, Add, % labelu, % fn
+}
+
+multiRenameMenuSample(t) {
+   If (t="")
+      Return
+
+   t := (StrLen(t)>40) ? SubStr(t, 1, 38) "..." : t
+   Return ": " StrReplace(t, "&", "&&")
+}
+
+multiRenameBoxSel(hCombo, textu, ByRef selStart, ByRef selEnd) {
+   ; where a token goes; a pattern selected whole, as after picking it from the list, takes it at its end
+   VarSetCapacity(s, 4, 0), VarSetCapacity(e, 4, 0)
+   SendMessage, 0x140, &s, &e, , ahk_id %hCombo%   ; CB_GETEDITSEL
+   selStart := NumGet(s, 0, "UInt"), selEnd := NumGet(e, 0, "UInt")
+   If (selStart=0 && selEnd>0 && selEnd>=StrLen(textu))
+      selStart := selEnd := StrLen(textu)
+}
+
+MenuMultiRenameAction(actu, valu, a:=0, b:=0, c:=0) {
+   Gui, SettingsGUIA: Default
+   GuiControlGet, hCombo, SettingsGUIA: Hwnd, UsrEditNewFileName
+   GuiControlGet, textu, SettingsGUIA:, UsrEditNewFileName
+   If (actu="trim")
+   {
+      r := msgBoxWrapper("Cut characters: " appTitle, "How many characters should be cut from the start and from the end of the file name?`nType two numbers separated by a comma; 4,0 cuts the first four characters.", "&Insert|C&ancel", 1, "question", "", 0, "", "limit7", "0,0")
+      If !InStr(r.btn, "insert")
+         Return
+
+      If !RegExMatch(r.edit, "^\s*(\d{1,3})\s*,\s*(\d{1,3})\s*$", m)
+         Return msgBeepTimer("WARNING: Please type two numbers separated by a comma, for example 4,0")
+
+      actu := "insert", valu := "trim{" m1 "," m2 "}"
+   }
+
+   multiRenameBoxSel(hCombo, textu, selStart, selEnd)
+   casePos := (actu="case") ? RegExMatch(textu, "i)case\{.\}") : 0
+   If casePos
+   {
+      ; one letter case token at a time
+      textu := SubStr(textu, 1, casePos - 1) valu SubStr(textu, casePos + 7)
+      selStart := selEnd := casePos + 6
+   } Else If (actu="template")
+   {
+      partu := StrSplit(valu, "|")
+      textu := partu[1], selStart := partu[2], selEnd := partu[3]
+   } Else If (actu="example")
+   {
+      textu := valu, selStart := selEnd := StrLen(valu)
+   } Else
+   {
+      textu := SubStr(textu, 1, selStart) valu SubStr(textu, selEnd + 1)
+      selStart := selEnd := selStart + StrLen(valu)
+   }
+
+   GuiControl, SettingsGUIA: Text, UsrEditNewFileName, % textu
+   GuiControl, SettingsGUIA: Focus, UsrEditNewFileName
+   SendMessage, 0x142, 0, % (selEnd << 16) | selStart, , ahk_id %hCombo%   ; CB_SETEDITSEL
+   SetTimer, uiPopulateLVmultiRename, -350
 }
 
 UIgenericComboAction(a:=0, b:=0, c:=0) {
@@ -40884,7 +41222,7 @@ UIlvMultiRenameResponder(a, b, c) {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    RowNumber := LV_GetNext(0, "F")
-   LV_GetText(indexu, RowNumber, 4)
+   LV_GetText(indexu, RowNumber, 5)
    If !indexu
    {
       If (b="RightClick")
@@ -40929,11 +41267,15 @@ UIlvMultiRenameResponder(a, b, c) {
 uiPopulateLVmultiRename() {
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewOthers
+  Static actWords := ["skip", "auto-rename", "overwrite", "ask"]
   UImultiRenameChangeLVoffset("covered", uiLVoffset, 1)
   GuiControlGet, UsrEditNewFileName
+  GuiControlGet, onConflictMultiRenameAct
+  summaryKey := UsrEditNewFileName "|" onConflictMultiRenameAct
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
   If (OriginalNewFileName="[this]" || OriginalNewFileName="")
   {
+     multiRenameSummary("pattern", summaryKey, (OriginalNewFileName="") ? "Not checked yet" : "«[this]» alone keeps every name as it is")
      LV_Delete()
      GuiControl, +Redraw, LViewOthers
      Return
@@ -40945,8 +41287,9 @@ uiPopulateLVmultiRename() {
   If (objuTemp.regExRemplaceMode=1 && objuTemp.regExValid!=1)
   {
      ; a malformed «\>...//...» regex would throw inside the preview: show it instead
+     multiRenameSummary("pattern", summaryKey, "The regular expression after «\>» is invalid")
      LV_Delete()
-     LV_Add("", "Invalid", "RegEx", "-", "-")
+     LV_Add("", "Invalid", "RegEx", "-", "-", "-")
      GuiControl, +Redraw, LViewOthers
      Return
   }
@@ -40956,6 +41299,9 @@ uiPopulateLVmultiRename() {
 
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
   {
+     sepu := InStr(UsrEditNewFileName, "//") ? "//" : InStr(UsrEditNewFileName, "\\") ? "\\" : ">>"
+     msgu := (objuTemp!="err") ? "The pattern is too short" : (sepu=">>") ? "No characters to replace: type them before «>>»" : "Nothing to find: type it before «" sepu "»"
+     multiRenameSummary("pattern", summaryKey, msgu)
      LV_Delete()
      GuiControl, +Redraw, LViewOthers
      Return
@@ -40972,6 +41318,7 @@ uiPopulateLVmultiRename() {
         OutDirAsc := "a"
 
      counterFilez := new hashtable()
+     pageNames := new hashtable()
      selCounter := 0
      maxItems := (userPrivateMode=1) ? 100 : 9100
      perFolderCount := (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
@@ -40997,10 +41344,13 @@ uiPopulateLVmultiRename() {
 
          thisFileIndex := A_Index
          imgPath := resultedFilesList[A_Index, 1]
-         parentFolderName := zPlitPath(imgPath, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
+         ; for a file found, fast mode gives the same folder without a second disk read
+         srcAttr := FileExist(imgPath)
+         parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (StrLen(objuTemp.newExtu)>1)
             fileEXTu := objuTemp.newExtu
 
+         statusu := "-"
          If (userPrivateMode=1)
          {
             newFileName := "*********."
@@ -41024,17 +41374,38 @@ uiPopulateLVmultiRename() {
          If (file2save==imgPath || newFileName="" || newFileName=A_Space || newFileName="  " || newFileName=".")
             Continue
 
+         If (userPrivateMode!=1)
+         {
+            c := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, pageNames, A_Index, sameAs)
+            statusu := (c=1) ? "OK" : (c=2) ? "Not found" : (c=3) ? "Invalid name" : (c=4) ? "Same new name as #" sameAs : (c=5) ? "Name taken: " actWords[Round(onConflictMultiRenameAct)] : "A folder has this name"
+         }
+
          loopzu++
-         LV_Add(A_Index, OutFileName, newFileName "." fileEXTu, OutDir "\", A_Index)
+         LV_Add(A_Index, OutFileName, newFileName "." fileEXTu, statusu, OutDir "\", A_Index)
          ; ToolTip, % A_Index , , , 2
          If ((loopzu>=maxItems) || (loopzu>15 && (A_TickCount - startOperation>1000)))
             Break
      }
 
-     UImultiRenameChangeLVoffset("covered", selCounter, (selCounter>=filesElected))
-     counterFilez := ""
+     pageAtEnd := (selCounter>=filesElected)
+     UImultiRenameChangeLVoffset("covered", selCounter, pageAtEnd)
+     multiRenameSummary("pattern", summaryKey, (loopzu=0 && pageAtEnd && uiLVoffset=0) ? "No selected file name would change" : "Not checked yet")
+     counterFilez := pageNames := ""
      LV_ModifyCol(3, "AutoHdr Left")
      LV_ModifyCol(4, "AutoHdr Left")
+     LV_ModifyCol(5, "AutoHdr Left")
+     ; the names fit up to 30% of the list each, so the Status column stays in view
+     GuiControlGet, hLV, SettingsGUIA: Hwnd, LViewOthers
+     VarSetCapacity(rc, 16, 0)
+     DllCall("GetClientRect", "Ptr", hLV, "Ptr", &rc)
+     capu := Round(NumGet(rc, 8, "Int")*0.3)
+     Loop, 2
+     {
+        LV_ModifyCol(A_Index, "AutoHdr")
+        SendMessage, 0x101D, A_Index - 1, 0, , ahk_id %hLV%   ; LVM_GETCOLUMNWIDTH
+        If (ErrorLevel>capu)
+           SendMessage, 0x101E, A_Index - 1, capu, , ahk_id %hLV%   ; LVM_SETCOLUMNWIDTH
+     }
      GuiControl, +Redraw, LViewOthers
   }
 }
