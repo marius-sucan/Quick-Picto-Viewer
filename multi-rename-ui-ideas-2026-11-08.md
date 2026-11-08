@@ -28,6 +28,11 @@ Pattern: [Holiday [counter]               ] [Insert ▾] [Examples ▾]
 
 ## 1. Small additions around the existing box
 
+Status: built in `aa90f56`, without the plain-language line (dropped: the summary line of section 3 says why the
+preview is empty). The buttons read «Insert» and «Examples», without ▾: no button in the app uses the glyph and
+Tahoma may lack it. A pattern selected whole, as after picking it from the list, takes a token at its end. The help
+is the rewritten Help box.
+
 The renaming code stays the same.
 
 - **«Insert ▾» button**, built like the «Possible source paths» triangle button in the structured copy/move panel
@@ -91,6 +96,10 @@ The renaming code stays the same.
 
 ## 3. A preview that explains itself
 
+Status: the Status column (filled while the preview is built; unchanged files stay hidden) and the summary line with
+«Check all files» are built in `aa90f56`; «Solo rename» got a tooltip instead of a new name. Not built: the group
+view, «Show only problems», the rows label, F9–F12 in the tooltips and the undo note.
+
 - Status column: OK / Name exists → the chosen collision action / Same new name as row N / Unchanged. Today unchanged
   files drop out of the list (:40992), and conflicts only show up during the rename.
 - A summary line under the list (see the mock-up).
@@ -133,7 +142,8 @@ patterns exactly as typed, in quotes; «Erase history» empties the list without
 
 ## Open decisions
 
-1. Which scope: the small additions (section 1), the Method layout (section 2), or both in stages?
+1. Which scope: the small additions (section 1), the Method layout (section 2), or both in stages? Answered: section 1
+   and, from section 3, the Status column and the summary line, built in `aa90f56`; section 2 is not built.
 2. With the Method layout, should the raw pattern box stay editable, become read-only, or hide behind an
    «Advanced» toggle?
 3. Keep `[pfdname]`-style tokens with friendly menu labels only, or add new token names?
