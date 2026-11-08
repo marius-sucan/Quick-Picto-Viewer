@@ -40547,9 +40547,9 @@ readRecentMultiRenameEntries() {
 
    Loop, 35
    {
+       ; not trimmed: a pattern may begin or end with spaces
        IniRead, newEntry, % mainRecentsFile, RecentMultiRename, E%A_Index%, @
-       newEntry := Trimmer(newEntry)
-       If (StrLen(newEntry)>1 && !InStr(entriesList, newEntry "`n"))
+       If (StrLen(newEntry)>1 && !InStr("`n" entriesList, "`n" newEntry "`n"))
           entriesList .= newEntry "`n"
    }
    Return entriesList
@@ -40580,7 +40580,7 @@ PanelMultiRenameFiles() {
     RegAction(0, "PreserveDateTimeOnSave",, 1)
     thisu := groupDigits(markedSelectFile)
     listu := readRecentMultiRenameEntries()
-    uiLVoffset := 0
+    UImultiRenameChangeLVoffset("reset")
     Gui, SettingsGUIA: +Delimiter`n
     Gui, Add, Text, x15 y15 w%txtWid% Section, Selected files: %thisu%. Type a pattern to rename the files.
     Gui, Add, Text, y+10 w1 h1, Files rename pattern.
@@ -40621,6 +40621,19 @@ BTNdoSoloRename() {
 }
 
 UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
+   ; uiLVoffset is the count of selected files before the previewed page
+   Static pageStarts := [], pageEnd := 0, pageAtEnd := 1
+   If (a="reset")
+   {
+      uiLVoffset := pageEnd := 0, pageAtEnd := 1, pageStarts := []
+      Return
+   } Else If (a="covered")
+   {
+      ; from uiPopulateLVmultiRename(): selected files up to the page's last one; 1 when none follow
+      pageEnd := b, pageAtEnd := c
+      Return
+   }
+
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
    GuiControlGet, UsrEditNewFileName
@@ -40639,18 +40652,24 @@ UImultiRenameChangeLVoffset(a:=0, b:=0, c:=0) {
          Return msgBeepTimer("WARNING: Nothing to preview at the moment.`nPlease ensure you provided a renaming pattern.", 0)
    }
 
-   totalIndex := markedSelectFile
-   If (totalListed>=totalIndex)
+   If (uiLVoffset=0 && pageAtEnd=1)
       Return msgBeepTimer("All selected entries are listed and previewed in the table", 0)
 
    If (info="first")
-      uiLVoffset := 0
-   Else If (info="previous")
-      uiLVoffset := clampInRange(uiLVoffset - totalListed, 0, totalIndex)
-   Else If (info="next")
-      uiLVoffset := clampInRange(uiLVoffset + totalListed, 0, totalIndex - uLVr*2)
-   Else If (info="last")
-      uiLVoffset := clampInRange(totalIndex - uiLVoffset, 0, totalIndex - uLVr*2)
+   {
+      uiLVoffset := 0, pageStarts := []
+   } Else If (info="previous")
+   {
+      If (uiLVoffset=0)
+         Return
+      uiLVoffset := pageStarts.Length() ? pageStarts.Pop() : 0
+   } Else If (info="next" || info="last")
+   {
+      If (pageAtEnd=1)
+         Return
+      pageStarts.Push(uiLVoffset)
+      uiLVoffset := (info="next") ? pageEnd : Max(0, markedSelectFile - uLVr*2)
+   }
    ; ToolTip, % a "=" b "=" c "=" info , , , 2
    SetTimer, uiPopulateLVmultiRename, -250
 }
@@ -40910,6 +40929,7 @@ UIlvMultiRenameResponder(a, b, c) {
 uiPopulateLVmultiRename() {
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewOthers
+  UImultiRenameChangeLVoffset("covered", uiLVoffset, 1)
   GuiControlGet, UsrEditNewFileName
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
   If (OriginalNewFileName="[this]" || OriginalNewFileName="")
@@ -40954,14 +40974,26 @@ uiPopulateLVmultiRename() {
      counterFilez := new hashtable()
      selCounter := 0
      maxItems := (userPrivateMode=1) ? 100 : 9100
+     perFolderCount := (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
      Loop, % maxFilesIndex
      {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
             Continue
 
          selCounter++
-         If (A_Index<uiLVoffset)
+         If (selCounter<=uiLVoffset)
+         {
+            ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read
+            If perFolderCount
+            {
+               zPlitPath(StrReplace(resultedFilesList[A_Index, 1], "|"), 1, OutFileName, OutDir)
+               counterFilez[OutDir] := Round(counterFilez[OutDir]) + 1
+            }
             Continue
+         }
+
+         If (selCounter=uiLVoffset + 1)
+            startOperation := A_TickCount
 
          thisFileIndex := A_Index
          imgPath := resultedFilesList[A_Index, 1]
@@ -40976,7 +41008,7 @@ uiPopulateLVmultiRename() {
             OutDir := "*:\******\*******"
          } Else
          {
-            If (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
+            If perFolderCount
             {
                OutDirAsc := (objuTemp.IndexModeCount=1) ? "a" : OutDir
                counterFilez[OutDirAsc] := Round(counterFilez[OutDirAsc]) + 1
@@ -40999,6 +41031,7 @@ uiPopulateLVmultiRename() {
             Break
      }
 
+     UImultiRenameChangeLVoffset("covered", selCounter, (selCounter>=filesElected))
      counterFilez := ""
      LV_ModifyCol(3, "AutoHdr Left")
      LV_ModifyCol(4, "AutoHdr Left")
@@ -41041,12 +41074,12 @@ coreBatchMultiRenameFiles() {
 
      BtnCloseWindow()
      backCurrentSLD := CurrentSLD
-     showTOOLtip("Renaming " groupDigits(filesElected) " files, please wait`nPattern: " OriginalNewFileName)
+     showTOOLtip("Renaming " groupDigits(filesElected) " files, please wait`nPattern: " UsrEditNewFileName)
      startOperation := A_TickCount
      prevMSGdisplay := A_TickCount
      startZeit := A_Now
      destroyGDIfileCache()
-     RecordUsedMultiRenamesQueriesManager(OriginalNewFileName)
+     RecordUsedMultiRenamesQueriesManager(UsrEditNewFileName)
      If (SLDtypeLoaded=3)
         activeSQLdb.Exec("BEGIN TRANSACTION;")
 
@@ -41079,6 +41112,12 @@ coreBatchMultiRenameFiles() {
             fileEXTu := objuTemp.newExtu
 
          countTFilez++
+         If (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
+         {
+            OutDirAsc := (objuTemp.IndexModeCount=1) ? "a" : OutDir
+            counterFilez[OutDirAsc] := Round(counterFilez[OutDirAsc]) + 1
+         }
+
          If !FileExist(file2rem)
          {
             failedFiles++
@@ -41095,14 +41134,8 @@ coreBatchMultiRenameFiles() {
             If (overwrittenFiles>0)
                someErrors .= "`nOverwritten files: " groupDigits(overwrittenFiles)
 
-            showTOOLtip("Renaming selected files, please wait`nPattern: " OriginalNewFileName someErrors, 0, 0, countTFilez/filesElected)
+            showTOOLtip("Renaming selected files, please wait`nPattern: " UsrEditNewFileName someErrors, 0, 0, countTFilez/filesElected)
             prevMSGdisplay := A_TickCount
-         }
-
-         If (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
-         {
-            OutDirAsc := (objuTemp.IndexModeCount=1) ? "a" : OutDir
-            counterFilez[OutDirAsc] := Round(counterFilez[OutDirAsc]) + 1
          }
 
          If (objuTemp.IndexModeCount=1)
@@ -41228,11 +41261,10 @@ coreBatchMultiRenameFiles() {
 }
 
 RecordUsedMultiRenamesQueriesManager(entry2add) {
-  entry2add := Trimmer(entry2add)
-  mainListu := readRecentMultiRenameEntries()
-  If (StrLen(entry2add)<3)
+  If (userPrivateMode=1 || StrLen(entry2add)<3)
      Return
 
+  mainListu := readRecentMultiRenameEntries()
   Loop, Parse, mainListu, `n
   {
       If (A_LoopField=entry2add)
@@ -41251,15 +41283,24 @@ RecordUsedMultiRenamesQueriesManager(entry2add) {
          Continue
 
       countItemz++
-      IniWrite, % A_LoopField, % mainRecentsFile, RecentMultiRename, E%countItemz%
+      ; IniRead drops the quotes and keeps the spaces inside them
+      IniWrite, % """" A_LoopField """", % mainRecentsFile, RecentMultiRename, E%countItemz%
   }
 }
 
 EraseMultiRenameHisto() {
   IniDelete, % mainRecentsFile, RecentMultiRename
-  CloseWindow()
-  Sleep, 1
-  PanelRenameThisFile()
+  Gui, SettingsGUIA: Default
+  GuiControlGet, UsrEditNewFileName
+  ; replacing the list empties the box: put the text back
+  GuiControl, SettingsGUIA:, UsrEditNewFileName, % "`n"
+  GuiControl, SettingsGUIA: Text, UsrEditNewFileName, % UsrEditNewFileName
+  GuiControl, SettingsGUIA: Focus, UsrEditNewFileName
+  GuiControlGet, hTemp, SettingsGUIA: Hwnd, UsrEditNewFileName
+  thisLen := StrLen(UsrEditNewFileName)
+  SendMessage, 0x142, 0, % (thisLen << 16) | thisLen, , ahk_id %hTemp%   ; CB_SETEDITSEL: caret after the text
+  highlightActiveCtrl()
+  msgBeepTimer("Rename patterns history erased", 0)
 }
 
 PanelSetFrameDelay() {
