@@ -113,7 +113,12 @@ The renaming code stays the same.
 - Friendlier token names (`[name]`, `[folder]`…), or friendly labels in the menu only. The print panel already uses a
   second style, `{fname}`.
 
-## 5. Bugs noticed along the way (to confirm)
+## 5. Bugs noticed along the way
+
+Status: all three were reproduced in the app under Wine and fixed in `4714558`, with three more found next to them:
+private mode wrote the history over its first entry, an entry that ends another one was hidden as a duplicate, and
+with plain-name numbering a missing file shifted the rename's numbers against the preview's. The history now saves
+patterns exactly as typed, in quotes; «Erase history» empties the list without reopening the panel.
 
 - **History doesn't save what was typed.** `coreBatchMultiRenameFiles()` passes its pattern by reference to
   `decideMultiRename()` (:41022), which removes `case{…}`, and that changed text is what
@@ -133,7 +138,7 @@ The renaming code stays the same.
    «Advanced» toggle?
 3. Keep `[pfdname]`-style tokens with friendly menu labels only, or add new token names?
 4. Are the section 4 changes to the renaming code in scope?
-5. Should the three bugs in section 5 be fixed separately first?
+5. Should the three bugs in section 5 be fixed separately first? Answered: yes, fixed in `4714558`.
 
 ## Appendix: how the pattern box is read
 
