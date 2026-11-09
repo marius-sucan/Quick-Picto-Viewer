@@ -41139,7 +41139,7 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
 
    If (obju.TrimmingMode=1 && obju.origMatchedStringu && obju.renamingCount!=1)
    {
-      clampedL := clampInRange(obju.leftTrimu + 1, 0, StrLen(fileNamuNoEXT) - 1)
+      clampedL := clampInRange(obju.leftTrimu + 1, 1, StrLen(fileNamuNoEXT))
       trimmedFileName := SubStr(fileNamuNoEXT, clampedL)
       clampedR := clampInRange(obju.righttTrimu, 1, StrLen(trimmedFileName) - 1)
       If (obju.righttTrimu>0)
