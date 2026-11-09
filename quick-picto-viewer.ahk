@@ -41063,7 +41063,9 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
          errMsg := forbiddenMsg
  
       obju.charsRemplaceMode := 1 
-   } Else obju.newName := filterFileName(OriginalNewFileName, 0)
+   } Else If RegExMatch(OriginalNewFileName, forbiddenChars)
+      errMsg := forbiddenMsg
+   Else obju.newName := filterFileName(OriginalNewFileName, 0)
  
    If errMsg
       Return "err"
@@ -41446,6 +41448,13 @@ coreBatchMultiRenameFiles() {
          If (file2save==file2rem || newFileName="" || newFileName=A_Space || newFileName="." || newFileName="  ")
          {
             skippedFiles++
+            Continue
+         }
+
+         ; given such a name, FileMove fills «*» and «?» from the old name and follows «\» into another folder
+         If RegExMatch(newFileName "." fileEXTu, "[\\/:*?""<>|]")
+         {
+            failedFiles++
             Continue
          }
 
