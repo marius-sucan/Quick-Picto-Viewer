@@ -40995,6 +40995,11 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
    If RegExMatch(OriginalNewFileName, "i)^(\$\..)")
    {
       obju.newExtu := SubStr(OriginalNewFileName, 3)
+      If (StrLen(obju.newExtu)<2)
+      {
+         errMsg := "The new extension needs at least two characters"
+         Return "err"
+      }
       Return obju
    }
 
@@ -41019,7 +41024,10 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
    Else If (obju.forceCaseChange=1)
       OriginalNewFileName := "[this]"
  
-   matchFoundPosA := RegExMatch(OriginalNewFileName, "i)trim\{..?.?\, ?..?.?\}", matchedStringu)
+   RegExMatch(OriginalNewFileName, "i)trim\{\s*(\d{1,9})\s*,\s*(\d{1,9})\s*\}", matchedStringu)
+   If (!matchedStringu && InStr(OriginalNewFileName, "trim{"))
+      errMsg := "trim{X,Y} takes two whole numbers, as in trim{4,0}"
+
    If InStr(OriginalNewFileName, "//")
       strArr := StrSplit(OriginalNewFileName, "//")
    Else If InStr(OriginalNewFileName, "\\")
@@ -41070,22 +41078,12 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
    If errMsg
       Return "err"
  
-   If (obju.renamingCount!=1)
+   If matchedStringu
    {
       obju.origMatchedStringu := matchedStringu
-      matchedStringu := StrReplace(matchedStringu, A_Space)
-      matchedStringu := StrReplace(matchedStringu, A_Space)
-      matchedStringu := StrReplace(matchedStringu, .)
-      matchedStringu := StrReplace(matchedStringu, "trim{")
-      matchedStringu := StrReplace(matchedStringu, "}")
-      If InStr(matchedStringu, ",")
-      {
-         trimuObj := StrSplit(matchedStringu, ",")
-         obju.leftTrimu := trimuObj[1]
-         obju.righttTrimu := trimuObj[2]
-         obju.TrimmingMode := (isNumber(obju.leftTrimu) && isNumber(obju.righttTrimu)) ? 1 : 0
-      }
-      ; ToolTip, % obju.origMatchedStringu "`n" matchedStringu "`n" trimuObj[1] "==" trimuObj[2] , , , 2
+      obju.leftTrimu := matchedStringu1
+      obju.righttTrimu := matchedStringu2
+      obju.TrimmingMode := 1
    }
  
    Return obju
@@ -41112,7 +41110,7 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
       newFileName := StrReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
    Else If (obju.charsRemplaceMode=1)
       newFileName := ChrReplace(fileNamuNoEXT, obju.strArrA, obju.strArrB)
-   Else If (!InStr(OriginalNewFileName, "[this]") && obju.TrimmingMode!=1 && obju.IndexModeCount!=1)
+   Else If (obju.renamingCount=1)
       newFileName := OriginalNewFileName " (" countFilez ")"
    Else ; If (obju.TrimmingMode=1)
       newFileName := OriginalNewFileName
