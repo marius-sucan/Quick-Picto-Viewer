@@ -31637,7 +31637,7 @@ UIcoreFolderNew(thisFolder, ByRef newFileName) {
       If FolderExist(thisFolder "\" newFileName)
          Return msgBeepTimer("WARNING: A folder with the given name already exists:`n" thisFolder "\`n" newFileName "\", 0)
 
-      newFileName := filterFileName(newFileName)
+      newFileName := filterFileName(newFileName, 0)
       If !newFileName
          Return msgBeepTimer("WARNING: Incorrect folder name given.")
 
@@ -31937,7 +31937,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
          Return
 
       lastChecked := msgResult.check
-      newFileName := filterFileName(newFileName)
+      newFileName := filterFileName(newFileName, 0)
       If !newFileName
          Return msgBeepTimer("WARNING: Incorrect folder name given")
 
@@ -41068,7 +41068,7 @@ decideMultiRename(ByRef OriginalNewFileName) {
          Return "err"
  
       obju.charsRemplaceMode := 1 
-   } Else obju.newName := filterFileName(OriginalNewFileName)
+   } Else obju.newName := filterFileName(OriginalNewFileName, 0)
  
    If (obju.renamingCount!=1)
    {
@@ -47487,10 +47487,11 @@ filterFileName(ostring, allow:=1) {
         Return
   }
 
+  ; a file name with its extension: no spaces around the last dot
   If (InStr(string, ".") && allow=1)
   {
      extu := SubStr(string, InStr(string, ".", 0, -1) + 1)
-     fn := SubStr(string, 1, InStr(string, ".") - 1)
+     fn := SubStr(string, 1, InStr(string, ".", 0, -1) - 1)
      string := Trimmer(fn) "." Trimmer(extu)
   }
 
