@@ -152,26 +152,36 @@ patterns exactly as typed, in quotes; «Erase history» empties the list without
 
 ## Appendix: how the pattern box is read
 
+Status: describes `6efe1a4` (2026-11-09), after the fixes to `decideMultiRename()` and `decideFinalMultiRename()`;
+no line numbers.
+
 In the order `decideMultiRename()` checks:
 
-1. Starts with `$.`: the rest is the new extension for every file; nothing else applies (:40692).
-2. `case{U}`, `case{L}` or `case{T}` anywhere: removed from the pattern, then applied to the whole new name but not
-   the extension (:40698, :40854). If nothing else is left, the pattern becomes `[this]`.
-3. Exactly `[counter]`: becomes `[this] ([counter])` (:40714).
-4. `//`, or else `\\`: find and replace (:40720). `\>` at the start makes the find part a RegEx (:40738). Tokens and
-   `trim{}` work only in the replace part, and anything after a second `//` is ignored. A plain find ignores letter
-   case.
-5. Else `>>`: each character before it is replaced by the text after it, and empty text removes them (:40759,
-   `ChrReplace()` :40794). Tokens work after `>>`.
-6. Otherwise, a new name. Tokens: `[this]`, `[pfdname]`, `[fDateM]`, `[fDateC]` (yyyy-MM-dd), `[counter]`,
-   `trim{X,Y}`.
-   - Without `[this]`, `trim{}` or `[counter]`, " (N)" is appended, N counting per folder (:40726, :40814).
-   - `[counter]` counts all selected files in list order (:40729, :40985).
-   - `trim{X,Y}` is the original name without X characters at the start and Y at the end; both numbers are
-     required (:40719, :40842).
+1. `case{U}`, `case{L}` or `case{T}` anywhere: removed from the pattern together with one space next to it, then
+   applied to the whole new name but not the extension. If nothing else is left, the pattern becomes `[this]`.
+2. Starts with `$.`: the rest is the new extension for every file, two characters or more. Nothing else goes with
+   it: a letter case token, a space inside it or a token after it rejects the pattern.
+3. Exactly `[counter]`: becomes `[this] ([counter])`.
+4. `//`, or else `\\`: find and replace. `\>` at the start makes the find part a RegEx. Tokens and `trim{}` work
+   only in the replace part. A plain find ignores letter case.
+5. Else `>>`: each character before it is replaced by the text after it, in a single pass, and empty text removes
+   them (`ChrReplace()`). Tokens work after `>>`.
+6. Otherwise, a new name. Tokens: `[this]`, `[pfdname]` (the drive letter for a file at a drive root), `[fDateM]`,
+   `[fDateC]` (yyyy-MM-dd), `[counter]`, `trim{X,Y}`.
+   - Without `[this]`, `trim{}` or `[counter]`, " (N)" is appended, N counting per folder.
+   - `[counter]` counts all selected files in list order.
+   - `trim{X,Y}` is the original name without X characters at the start and Y at the end, with at least one
+     character left; both numbers are required.
+   - The dots inside a new name are kept, with the spaces around them.
+
+A pattern is rejected, and the preview's summary line gives the reason, when it has:
+- a character not allowed in file names in the new name, in the replacement text or in the new extension;
+- an empty find part, or a second `//`, `\\` or `>>`;
+- a `trim{` that is not `trim{X,Y}` with two whole numbers, or a second, different `trim{}`;
+- a new extension under two characters, or a name under two characters.
 
 Also:
-- In a plain `//` replace part and after `>>`, text with a character not allowed in file names becomes empty, so
-  the match is deleted (:40750, :40765). A RegEx replace part is not checked.
-- The preview stays blank for an empty pattern or just `[this]` (:40915), for under 2 characters or an empty find
-  part (:40937), and shows a single «Invalid RegEx» row for a bad RegEx (:40925).
+- The replacement text after `//` and `>>` is used as typed, spaces included.
+- The rename does not touch a file whose new name has a character not allowed in file names; it counts as failed.
+- The preview stays blank for an empty pattern or just `[this]`, and shows a single «Invalid RegEx» row for a bad
+  RegEx.
