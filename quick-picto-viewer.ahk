@@ -40742,7 +40742,7 @@ BTNmultiRenameCheckAll() {
 
    OriginalNewFileName := UsrEditNewFileName
    objuTemp := decideMultiRename(OriginalNewFileName)
-   If (objuTemp.newName)
+   If (objuTemp.newName!="")
       OriginalNewFileName := objuTemp.newName
 
    If (objuTemp="err" || StrLen(OriginalNewFileName)<2 || objuTemp.regExRemplaceMode=1 && objuTemp.regExValid!=1)
@@ -41003,7 +41003,7 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
 
       ; the token goes with the one space that sets it apart: the one before it, or after it at the start
       OriginalNewFileName := RegExReplace(OriginalNewFileName, "i)^case\{[ULT]\} ?| ?case\{[ULT]\}")
-      If !Trimmer(OriginalNewFileName)
+      If (Trimmer(OriginalNewFileName)="")
          obju.forceCaseChange := 1
    }
  
@@ -41246,7 +41246,7 @@ uiPopulateLVmultiRename() {
      Return
   }
 
-  If (objuTemp.newName)
+  If (objuTemp.newName!="")
      OriginalNewFileName := objuTemp.newName
 
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
@@ -41362,7 +41362,7 @@ coreBatchMultiRenameFiles() {
 
   OriginalNewFileName := UsrEditNewFileName
   objuTemp := decideMultiRename(OriginalNewFileName)
-  If (objuTemp.newName)
+  If (objuTemp.newName!="")
      OriginalNewFileName := objuTemp.newName
   
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
