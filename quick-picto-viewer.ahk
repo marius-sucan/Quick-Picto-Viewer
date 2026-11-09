@@ -41117,8 +41117,9 @@ decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFol
    Else ; If (obju.TrimmingMode=1)
       newFileName := OriginalNewFileName
 
+   ; a file at a drive root has «C:» for a parent folder: the letter stands for it
    If (InStr(newFileName, "[pfdname]") && InStr(OriginalNewFileName, "[pfdname]"))
-      newFileName := StrReplace(newFileName, "[pfdname]", parentFolderName)
+      newFileName := StrReplace(newFileName, "[pfdname]", StrReplace(parentFolderName, ":"))
 
    If (InStr(newFileName, "[counter]") && InStr(OriginalNewFileName, "[counter]") && obju.IndexModeCount=1)
       newFileName := StrReplace(newFileName, "[counter]", countFilez)
