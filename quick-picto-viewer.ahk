@@ -41029,6 +41029,8 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
    RegExMatch(OriginalNewFileName, "i)trim\{\s*(\d{1,9})\s*,\s*(\d{1,9})\s*\}", matchedStringu)
    If (!matchedStringu && InStr(OriginalNewFileName, "trim{"))
       errMsg := "trim{X,Y} takes two whole numbers, as in trim{4,0}"
+   Else If (matchedStringu && InStr(StrReplace(OriginalNewFileName, matchedStringu), "trim{"))
+      errMsg := "Only one trim{X,Y} can be used in a pattern"
 
    If InStr(OriginalNewFileName, "//")
       strArr := StrSplit(OriginalNewFileName, "//")
@@ -41057,8 +41059,11 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
          obju.strArrA := strArr[1]
  
       obju.strArrB := strArr[2]
+      sepu := InStr(OriginalNewFileName, "//") ? "//" : "\\"
       If (obju.strArrA="")
-         errMsg := "Nothing to find: type it before «" (InStr(OriginalNewFileName, "//") ? "//" : "\\") "»"
+         errMsg := "Nothing to find: type it before «" sepu "»"
+      Else If (strArr.Count()>2)
+         errMsg := "«" sepu "» can be used only once in a pattern"
       Else If RegExMatch(obju.strArrB, forbiddenChars)
          errMsg := forbiddenMsg
  
@@ -41069,6 +41074,8 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
       obju.strArrB := chrStrArr[2]
       If (obju.strArrA="")
          errMsg := "No characters to replace: type them before «>>»"
+      Else If (chrStrArr.Count()>2)
+         errMsg := "«>>» can be used only once in a pattern"
       Else If RegExMatch(obju.strArrB, forbiddenChars)
          errMsg := forbiddenMsg
  
