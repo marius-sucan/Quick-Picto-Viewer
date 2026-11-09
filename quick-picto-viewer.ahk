@@ -40979,7 +40979,10 @@ dummyUIpopulateHelpKbdShortcutsList() {
    UIpopulateHelpKbdShortcutsList(1)
 }
 
-decideMultiRename(ByRef OriginalNewFileName) {
+decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
+   ; returns "err" for a pattern that cannot be used; errMsg then says why
+   Static forbiddenChars := "[\\/:*?""<>|]", forbiddenMsg := "File names cannot contain any of these characters: \ / : * ? "" < > |"
+   errMsg := ""
    obju := []
    obju.renamingCount := 0
    obju.TrimmingMode := 0
@@ -41039,36 +41042,31 @@ decideMultiRename(ByRef OriginalNewFileName) {
       {
          obju.regExRemplaceMode := 1
          obju.strArrA := SubStr(strArr[1], 3)
-         obju.strArrB := strArr[2]
          obju.regExValid := isValidRegEx(obju.strArrA)
       } Else
-      {
          obju.strArrA := strArr[1]
-         If (strArr[2]=A_Space || strArr[2]=0 || strArr[2]="  ")
-            obju.strArrB := strArr[2]
-         Else
-            obju.strArrB := (filterFileName(strArr[2])!="") ? strArr[2] : ""
-      }
  
+      obju.strArrB := strArr[2]
       If (obju.strArrA="")
-         Return "err"
-      ; If (obju.strArrB="" && StrLen(obju.strArr[2])>0)
-      ;    Return "err"
+         errMsg := "Nothing to find: type it before «" (InStr(OriginalNewFileName, "//") ? "//" : "\\") "»"
+      Else If RegExMatch(obju.strArrB, forbiddenChars)
+         errMsg := forbiddenMsg
  
       obju.rechecherRemplaceMode := 1 
    } Else If (IsObject(chrStrArr) && obju.renamingCount!=1)
    {
       obju.strArrA := chrStrArr[1]
-      If (chrStrArr[2]=A_Space || chrStrArr[2]=0 || chrStrArr[2]="  ")
-         obju.strArrB := chrStrArr[2]
-      Else
-         obju.strArrB := filterFileName(chrStrArr[2]) ? chrStrArr[2] : ""
- 
+      obju.strArrB := chrStrArr[2]
       If (obju.strArrA="")
-         Return "err"
+         errMsg := "No characters to replace: type them before «>>»"
+      Else If RegExMatch(obju.strArrB, forbiddenChars)
+         errMsg := forbiddenMsg
  
       obju.charsRemplaceMode := 1 
    } Else obju.newName := filterFileName(OriginalNewFileName, 0)
+ 
+   If errMsg
+      Return "err"
  
    If (obju.renamingCount!=1)
    {
@@ -41226,7 +41224,7 @@ uiPopulateLVmultiRename() {
   }
 
   OriginalNewFileName := UsrEditNewFileName
-  objuTemp := decideMultiRename(OriginalNewFileName)
+  objuTemp := decideMultiRename(OriginalNewFileName, errMsg)
   ; ToolTip, % objuTemp.regExRemplaceMode "||" objuTemp.regExValid , , , 2
   If (objuTemp.regExRemplaceMode=1 && objuTemp.regExValid!=1)
   {
@@ -41243,9 +41241,7 @@ uiPopulateLVmultiRename() {
 
   If (objuTemp="err" || StrLen(OriginalNewFileName)<2)
   {
-     sepu := InStr(UsrEditNewFileName, "//") ? "//" : InStr(UsrEditNewFileName, "\\") ? "\\" : ">>"
-     msgu := (objuTemp!="err") ? "The pattern is too short" : (sepu=">>") ? "No characters to replace: type them before «>>»" : "Nothing to find: type it before «" sepu "»"
-     multiRenameSummary("pattern", summaryKey, msgu)
+     multiRenameSummary("pattern", summaryKey, (objuTemp="err") ? errMsg : "The pattern is too short")
      LV_Delete()
      GuiControl, +Redraw, LViewOthers
      Return
