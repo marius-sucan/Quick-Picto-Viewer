@@ -41012,9 +41012,8 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
       Else If InStr(OriginalNewFileName, "case{T}")
          obju.caseChange := 3
 
-      OriginalNewFileName := StrReplace(OriginalNewFileName, "case{U}")
-      OriginalNewFileName := StrReplace(OriginalNewFileName, "case{L}")
-      OriginalNewFileName := StrReplace(OriginalNewFileName, "case{T}")
+      ; the token goes with the one space that sets it apart: the one before it, or after it at the start
+      OriginalNewFileName := RegExReplace(OriginalNewFileName, "i)^case\{[ULT]\} ?| ?case\{[ULT]\}")
       If !Trimmer(OriginalNewFileName)
          obju.forceCaseChange := 1
    }
