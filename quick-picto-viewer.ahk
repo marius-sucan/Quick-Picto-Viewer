@@ -41092,13 +41092,14 @@ decideMultiRename(ByRef OriginalNewFileName) {
 }
 
 ChrReplace(string, chars, replacer) {
-   If (chars!="")
-   {
-      Loop, Parse, chars
-           string := StrReplace(string, A_LoopField, replacer)
-   }
+   ; in a single pass: the text put in is never replaced again
+   If (chars="")
+      Return string
 
-   Return string
+   Loop, Parse, string
+      newu .= InStr(chars, A_LoopField) ? replacer : A_LoopField
+
+   Return newu
 }
 
 decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, countFilez, parentFolderName, imgPath, obju) {
