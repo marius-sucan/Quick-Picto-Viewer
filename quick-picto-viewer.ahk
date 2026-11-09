@@ -41059,7 +41059,7 @@ decideMultiRename(ByRef OriginalNewFileName) {
    } Else If (IsObject(chrStrArr) && obju.renamingCount!=1)
    {
       obju.strArrA := chrStrArr[1]
-      If (chrStrArr[2]=A_Space || chrStrArr[2]=0 || chrStrArr[2]=" ")
+      If (chrStrArr[2]=A_Space || chrStrArr[2]=0 || chrStrArr[2]="  ")
          obju.strArrB := chrStrArr[2]
       Else
          obju.strArrB := filterFileName(chrStrArr[2]) ? chrStrArr[2] : ""
