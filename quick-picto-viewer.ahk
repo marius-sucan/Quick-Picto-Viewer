@@ -40893,7 +40893,7 @@ BtnMultiRenameMenus(hwnd:=0) {
 
    ; tokens do nothing in the text to find, or in a new extension pattern
    multiRenameBoxSel(hCombo, textu, selStart, selEnd)
-   isNewExt := RegExMatch(textu, "^\$\.")
+   isNewExt := RegExMatch(textu, "^\s*\$\.")
    If isNewExt
    {
       Loop, 6
@@ -40992,17 +40992,6 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
    obju.caseChange := 0
    obju.IndexModeCount := 0
    obju.forceCaseChange := 0
-   If RegExMatch(OriginalNewFileName, "i)^(\$\..)")
-   {
-      obju.newExtu := SubStr(OriginalNewFileName, 3)
-      If (StrLen(obju.newExtu)<2)
-      {
-         errMsg := "The new extension needs at least two characters"
-         Return "err"
-      }
-      Return obju
-   }
-
    If RegExMatch(OriginalNewFileName, "i)(case\{.\})")
    {
       If InStr(OriginalNewFileName, "case{U}")
@@ -41018,6 +41007,20 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
          obju.forceCaseChange := 1
    }
  
+   If RegExMatch(OriginalNewFileName, "^\s*\$\.")
+   {
+      ; the rest is the new extension, and nothing else goes with it
+      obju.newExtu := Trim(SubStr(Trimmer(OriginalNewFileName), 3), ". `t")
+      If RegExMatch(obju.newExtu, forbiddenChars)
+         errMsg := forbiddenMsg
+      Else If (obju.caseChange || RegExMatch(obju.newExtu, "[\s\[\]{}]"))
+         errMsg := "After «$.» type only the new extension, without spaces or tokens"
+      Else If (StrLen(obju.newExtu)<2)
+         errMsg := "The new extension needs at least two characters"
+
+      Return errMsg ? "err" : obju
+   }
+
    If (Trimmer(OriginalNewFileName)="[counter]")
       OriginalNewFileName := "[this] ([counter])"
    Else If (obju.forceCaseChange=1)
