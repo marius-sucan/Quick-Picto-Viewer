@@ -2808,7 +2808,9 @@ OpenThisFileFolder(modus:=0, pathu:=0) {
        Try Run, "%folderu%"
        Catch wasError
        {
-          If !AnyWindowOpen
+          If AnyWindowOpen
+             msgBeepTimer("ERROR: An unknown error occurred opening the folder:`n" folderu "\")
+          Else
              msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu "\", 0, 0, "error")
        }
     }
@@ -95140,7 +95142,7 @@ PanelReviewSelectedFiles() {
     Gui, Add, Button, x+5 hp wp gBTNreviewDropFilesSelection, &None
     Gui, Add, Button, x+5 hp wp gBTNrefreshReviewPanel , &Refresh
     Gui, Add, Button, x+5 hp wp ginvokePanelReviewSelContextMenu , &More
-    Gui, Add, Button, x+5 hp wp gBtnReviewSelClose, C&lose
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&lose
     Gui, Add, Text, xs y+10 vinfoLine w%lstWid% +0x200, Listing items`, please wait . . .
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Review selected files: " appTitle)
     Sleep, 5
@@ -95155,11 +95157,6 @@ PanelReviewSelectedFiles() {
     }
 
     uiPopulateReviewSelectedFiles("init")
-}
-
-BtnReviewSelClose() {
-   reviewSelectedIndexes := []
-   BtnCloseWindow()
 }
 
 BTNreviewDropFilesSelection() {
@@ -95227,8 +95224,8 @@ BTNreviewCutFoldersExplorer() {
 }
 
 BTNreviewFilterListSelPath() {
-   BTNreviewSelFilesInPath("filter")
-   If (maxFilesIndex>0 && filesFilter)
+   rr := BTNreviewSelFilesInPath("filter")
+   If (maxFilesIndex>0 && filesFilter && rr!=-1)
       BtnCloseWindow()
 }
 
@@ -95307,11 +95304,10 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
-   counter := RowNumber := 0
    listu := ""
    newArrayu := []
+   counter := RowNumber := 0
    useArray := (extras="cut" || extras="copy") ? 1 : 0
-
    doStartLongOpDance()
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
@@ -95320,11 +95316,14 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
    Loop, % totalSelected
    {
        RowNumber := LV_GetNext(RowNumber)
-       If (determineTerminateOperation()=1 || !RowNumber)
+       If (determineTerminateOperation()=1)
        {
           abandonAll := 1
           Break
        }
+
+       If !RowNumber
+          Break
 
        If (A_TickCount - prevMSGdisplay>1500)
        {
@@ -95360,6 +95359,13 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
           Else
              listu .= imgPath "`n"
        }
+   }
+
+   If (abandonAll=1)
+   {
+      msgBeepTimer("WARNING: User abandoned the operation.`nNothing was copied to the clipboard.")
+      ResetImgLoadStatus()
+      Return
    }
 
    itemsList := ""
@@ -95525,6 +95531,7 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    {
       SetTimer, dummyuiPopulateReviewSelectedFiles, -250
       ToolTip, List view will further be populated
+      SetTimer, RemoveTooltip, -1000
       Return
    }
 
@@ -95532,7 +95539,6 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    {
       BtnHelpReviewPanel()
       Return
-
    } Else If (b="K" && c=116) ; F5
    {
       BTNrefreshReviewPanel()
@@ -95653,7 +95659,7 @@ uiPopulateReviewSelectedFiles(modus:="") {
     preventAutoSize := 0
     Loop, % totalSelected
     {
-        If (determineTerminateOperation()=1)
+        If (determineTerminateOperation()=1 || !AnyWindowOpen)
         {
            abandonAll := 1
            Break
@@ -95714,6 +95720,9 @@ uiPopulateReviewSelectedFiles(modus:="") {
            Break
         }
     }
+
+    If !AnyWindowOpen
+       Return
 
     If (!hasAutoSized && !preventAutoSize)
     {
@@ -98028,6 +98037,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
     If (AnyWindowOpen=6)
        InitialFilterSettingsPanel(0)
+    Else If (AnyWindowOpen=60)
+       reviewSelectedIndexes := []
     Else If (AnyWindowOpen=82)
        readSettingsToolbar(0)
     Else If (AnyWindowOpen=93)
