@@ -16,11 +16,14 @@ confirmed every finding but 9, which neither raised, and narrowed finding 12. Wh
 is marked **second read**. Six of those points were run (batch J); the others say «read».
 
 **Status, 2026-11-10.** Marius fixed part of this in five commits: `ef705b0`, `16b35ff`,
-`7f0e8cf`, `b302cc9` and `cc34faf`. Findings 1 to 6, 13, 15, 16 and 18 are fixed; 14, 17 and
-19 are partly fixed; 7 to 12 are open. A fixed or partly fixed section ends with a note on
-what the code does now. Those notes cite lines at `07746da`, the commit after `cc34faf`;
-everything else keeps its lines at 5af5eff. Each note was checked by running the earlier
-batches again on `07746da`, with four new ones, K, L, N and O.
+`7f0e8cf`, `b302cc9` and `cc34faf`. Findings 7, 8 and 9 were fixed after them, in `ca918d3`,
+`643541d` and `f6f9fb2`, with his answers to decisions 3 and 7. Findings 1 to 9, 13, 15, 16
+and 18 are fixed; 14, 17 and 19 are partly fixed; 10 to 12 are open. A fixed or partly fixed
+section ends with a note on what the code does now. Those notes cite lines at `07746da`, the
+commit after `cc34faf`; the notes of findings 7, 8 and 9 cite lines at `ca918d3`. Everything
+else keeps its lines at 5af5eff. Each note was checked by running the earlier batches again
+on the commit it cites, with six new ones: K, L, N and O for the first five commits, P and Q
+for the last three.
 
 What the commits changed besides is under «New with the fixes». One narrow point is open
 there: F3 closes the panel when the unsaved-image question stopped it.
@@ -56,9 +59,9 @@ there: F3 closes the panel when the unsaved-image question stopped it.
 | 4 | The «Open» actions and F6 move the viewport; with auto-remove on, index entries vanish under the open panel and its rows then point at the wrong files | high, needs an option | run | **fixed**, `ef705b0` |
 | 5 | A failed «Modify index entry» leaves the panel on screen while QPV believes no panel is open | medium | run | **fixed**, `16b35ff` |
 | 6 | F6 does nothing | medium | run | **fixed**, `ef705b0` |
-| 7 | The «S» column is not kept in step with the index | medium | run | open |
-| 8 | «None» and «Deselect listed items in index» can select instead | medium | run | open |
-| 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run | open |
+| 7 | The «S» column is not kept in step with the index | medium | run | **fixed**, `ca918d3`, for the rows in view |
+| 8 | «None» and «Deselect listed items in index» can select instead | medium | run | **fixed**, `643541d` |
+| 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run | **fixed**, `f6f9fb2` |
 | 10 | A listing the user stopped: no notice, no way to resume, and a filter remembers the partial result as final | medium | run | open |
 | 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table | medium, rare | run | open |
 | 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties»; such paths reach the index only through «Search and replace» | low, narrow | run | open |
@@ -225,7 +228,8 @@ With more than two files selected, `SearchIndexSelectAll()` first asks «Replace
 Fix direction: `(external="aye" && modus!="") ? modus : getIDimage(currentFileIndex)`.
 
 **Fixed in `ef705b0`** by the fix direction (:47167). Run, the same files: the action on the
-`pv\B` row selects the three `pv\B` files. The panel's two rows still show «S» (finding 7).
+`pv\B` row selects the three `pv\B` files. The panel's two rows still showed «S» then;
+since `ca918d3` the row of a1, which the action deselects, shows «_» (finding 7).
 
 ---
 
@@ -400,6 +404,40 @@ Fix direction: refresh the rows in view after every action that changes the sele
 the list's end-of-scroll event, counting from the top row and over the rows actually in view;
 make the filtered table's reuse depend on `lastZeitFileSelect` too.
 
+**Fixed in `ca918d3`** for the rows in view, which settles decision 7. A row's mark is the
+«S» or «_» in its first column.
+
+- **The refresh** (`UIupdateReviewLVinView()` :95405-95428) works on the table that is
+  shown, the filtered one too. It starts at the top row and covers the rows the list reports
+  as in view (LVM_GETCOUNTPERPAGE) and one more, for a row cut by the lower edge. It writes
+  a mark only where the mark differs, and it leaves when this panel is not the open one.
+- **It runs at four more moments**: when the list reports the end of a scroll or a pressed
+  key (:95538), after «Deselect all in index» (the menu item calls
+  `BTNreviewDropAllSelection()` :95186), after «Select files in index in same folder»
+  (:95244), and when a filtered table is shown again for the same text (:95644). The table
+  filled the first time is still reused; its rows in view are refreshed.
+- **«Select» and «Deselect»** rewrite the mark of a row whose flag did not change
+  (:95461).
+
+Run, with the list resized to 21 rows in view: 40 files, «Deselect all in index»: rows 1 to
+22 show «_» at once, and all 40 after a scroll to the end. Opening the context menu
+refreshes the top row too. 400 files deselected from outside the panel, row 200 scrolled
+into view: the 11 rows from the top row on show «_», the three above and the three below
+still «S»; a key refreshes the rows in view the same way. «Select files in index in same
+folder»: the row of the file it deselected shows «_». Filter `\A\`, erase it, deselect
+three of those files, apply `\A\` again: the three rows show «_». The context menu opened
+on a filtered table refreshes it. Every file deselected in the index, then «Deselect» on
+three rows: they show «_».
+
+Left as it is, by decision 7: a row that was never in view keeps its old mark until it is
+scrolled to, so a click on the «S» header sorts by marks that may be old. «Refresh» (F5)
+rewrites them all. The whole column is not rewritten after each action because of its cost:
+on 60 000 rows under Wine, checking it took 3.8 s and rewriting it 11 to 13 s (batch P).
+
+In these runs the scroll and the key were passed to the list's handler by hand. That
+Windows reports each of them to the handler was not seen; the paging relies on the same two
+events.
+
 ---
 
 ## 8. «None» and «Deselect listed items in index» can select instead
@@ -431,6 +469,17 @@ direction, whether or not that text was applied.
 
 Decision 3.
 
+**Fixed in `643541d`**, which settles decision 3 (`BTNreviewDropFilesSelection()`
+:95162-95184). «None» and «Deselect listed items in index» always deselect. The table
+that is shown decides what: the rows of the filtered table, or, for the full table, every
+file the panel was opened with, the pages not listed yet included. The text in the filter
+box is not looked at.
+
+Run, the same cases. The menu item on a filtered table whose first file is not selected: 9
+files selected before, 6 after, none of them among the six listed. «zz» typed and not
+applied, 6 files selected: «None» leaves none selected. Nothing selected in the index:
+«None» selects nothing. 400 files selected, 91 listed: «None» leaves none selected.
+
 ---
 
 ## 9. With 26 or more rows in view, the rest of a long table can never be listed
@@ -453,6 +502,11 @@ It matters only for selections larger than one page.
 
 Fix direction: ask the list for its rows per page (LVM_GETCOUNTPERPAGE, 0x1028) and test
 `topIndex + rowsInView > totalListed - 5`.
+
+**Fixed in `f6f9fb2`** by the fix direction, with a margin of 8 rows instead of 5 (:95546,
+:95549): `topIndex + rowsInView + 8>totalListed`. With 17 rows in view the test passes at
+the same top row as before. Run, with the list control resized: 21 rows in view, the next
+page loads; 29 rows in view, top row 70 of 98, the next page loads too (204 rows listed).
 
 ---
 
@@ -858,8 +912,9 @@ row, which closes the panel first (both run: six entries, four left, the message
 - **«Copy complete path(s) as text»** is the one menu item wired straight to
   `BTNreviewCopyPanel()`. The item's name and position arrive as `modus` and `extras`, match
   nothing, and the complete paths are copied (run).
-- **`dropFilesSelection()` from the menu** gets the item's name as `silentMode`, which is not
-  1, so it behaves as the loud form.
+- **`dropFilesSelection()` from the menu** got the item's name as `silentMode`, which is not
+  1, so it behaved as the loud form. Since `ca918d3` the menu item calls it through
+  `BTNreviewDropAllSelection()`, with no argument: the loud form again.
 - **The counter stays in step with the flags** in «Select» and «Deselect»: the rows' flags
   are 0 or 1, never blank, so `oSel=sel` compares numbers (run after every action).
 - **One file left selected**: «Refresh» then says «There are no selected files to review»
@@ -882,8 +937,8 @@ row, which closes the panel first (both run: six entries, four left, the message
 
 ## Decisions to make before fixing
 
-Decisions 1 and 2 are settled by the commits; in 5 the code kept what it did. The others are
-open.
+Decisions 1, 2, 3 and 7 are settled by the commits; in 5 the code kept what it did. The
+others are open.
 
 1. F3: should it keep the user's selection, and filter the list by the folder path alone?
    **Settled in `16b35ff`**: yes to both.
@@ -892,6 +947,8 @@ open.
    do not move it.
 3. «None»: a toggle, or always «deselect»? The listed rows only, or every file the panel was
    opened with? Should the filter box's text count before it is applied?
+   **Settled in `643541d`**: always «deselect»; the files of the table that is shown, which
+   for the full table is every file the panel was opened with; the text does not count.
 4. «Copy file name(s) as text»: one line per file, or each name once?
 5. «Filter table to selected path»: the folder alone, or its subfolders too? At `07746da`
    the subfolders are listed. F3, on the files list, takes the folder alone.
@@ -899,10 +956,12 @@ open.
 7. Finding 7: is a refresh of the rows in view enough, or should the «S» column be rewritten
    for the whole table after each action? The second is slow on large selections unless
    finding 18 is fixed first.
+   **Settled in `ca918d3`**: the rows in view. With finding 18 fixed, the whole column still
+   takes 11 to 13 s on 60 000 rows under Wine.
 8. «Seen in passing» A is outside the panel. Fix it with this work or apart?
 
-Suggested order for what is left: 9, 10 and 12; then 7 and 8 together; then 11; then what is
-left of 14, 17 and 19, and the open point under «New with the fixes».
+Suggested order for what is left: 10 and 12; then 11; then what is left of 14, 17 and 19,
+and the open point under «New with the fixes».
 
 ## How this was checked
 
@@ -932,6 +991,19 @@ left of 14, 17 and 19, and the open point under «New with the fixes».
   O: F3 with «Cancel» at the unsaved-image question, with and without a filter on, a failed
   «Open folder in Explorer» through the real function, and the panel closed while a filter
   is being listed.
+- The fixes of findings 7, 8 and 9: batches A to D, F to L, N and O were run again on
+  `ca918d3`, and each log was compared with the one of `07746da`. Apart from page sizes,
+  which depend on timing, they differ in the lines of these three findings alone. Batch G
+  was also run on `f6f9fb2`, and batch B on `643541d`. Two batches were added. Batch P
+  times the «S» column of 60 000 rows: checked, rewritten, and rewritten while the list
+  reports no item changes to its handler (AltSubmit off). Batch Q: «Deselect all in index»
+  followed by a scroll, a selection changed from outside the panel followed by a scroll and
+  by a key, «Select files in index in same folder», a filtered table shown again, and the
+  context menu on a filtered table.
+- Batch N's first case depends on timing. After «Modify index entry» the viewport is
+  redrawn about 0.2 s later in some runs and about 0.6 s later in others, on `07746da` as
+  on `ca918d3` (batch R traces it). The case sets up its unsaved image at 0.75 s, where it
+  used 0.45 s.
 - Batch E, the 60 000 rows, ran several times on c5a32d3, `ef705b0` and `7f0e8cf`, in turns;
   the later commits did not touch that part of the handler.
   Batch M times Ctrl+A alone; `QPV_RESP_VARIANT=first` or `none` moves the handler's event
@@ -941,14 +1013,16 @@ left of 14, 17 and 19, and the open point under «New with the fixes».
     (findings 8, 9, 10 and 19);
   - a stop simulated by making the Nth call of `determineTerminateOperation()` answer 1,
     which is what it answers once the user confirms the prompt (findings 10 and 17);
-  - the list control resized to bring 21 and 29 rows into view (finding 9), because Wine's
-    rows are taller than Windows's.
-- Not run on Windows. Two things rest on how Windows behaves and were only seen under Wine:
-  a fresh list view has no focused row (finding 1), and the timings of finding 18.
+  - the list control resized to bring 21 and 29 rows into view (findings 7 and 9), because
+    Wine's rows are taller than Windows's.
+- Not run on Windows. Three things rest on how Windows behaves. Two were only seen under
+  Wine: a fresh list view has no focused row (finding 1), and the timings of findings 7 and
+  18. One was not seen at all: that the list reports the end of every scroll and every key
+  to its handler, which the fix of finding 7 relies on.
 - Not checked: the panel on an .SLDB list, on a duplicates list (the «Dupe ID» column), and
   with an edited, unsaved image in the viewport.
 - Kit: `.claude/scratch/review-selected-panel-2026-11-09/app/`: `run-app.sh <tag> <test
   function> [revision]`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to
-  testReviewO), `results/` (the logs of `ef705b0` end in `-ef7`, those of `7f0e8cf` in
-  `-7f0`, those of `b302cc9` in `-885`, after its merge commit 8851855, and those of
-  `07746da` in `-077`).
+  testReviewR), `results/` (the logs of `ef705b0` end in `-ef7`, those of `7f0e8cf` in
+  `-7f0`, those of `b302cc9` in `-885`, after its merge commit 8851855, those of `07746da`
+  in `-077`, and those of `ca918d3` in `-fix`).
