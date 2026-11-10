@@ -4,7 +4,7 @@ Scope: `PanelReviewSelectedFiles()` (:95096), the panel it builds, its button ac
 keys and its context menu, `invokePanelReviewSelContextMenu()` (:93515). That is every
 function from :95096 to the end of `uiPopulateReviewSelectedFiles()` (:95723), and the helpers
 those functions hand the work to, as far as a panel action reaches them. Line numbers are
-`quick-picto-viewer.ahk` on `development` at 5af5eff. No code was changed.
+`quick-picto-viewer.ahk` on `development` at 5af5eff. The audit itself changed no code.
 
 Nineteen findings. Each one says how it was checked: **run** means the real application did it
 under headless Wine, on AutoHotkey_H 1.1.33.10 (the two largest batches also on stock
@@ -14,6 +14,13 @@ run. Nothing was run on Windows. The test kit is described at the end.
 Two independent reads of the same code followed the first version of this report. They
 confirmed every finding but 9, which neither raised, and narrowed finding 12. What they added
 is marked **second read**. Six of those points were run (batch J); the others say «read».
+
+**Status, 2026-11-10.** Marius fixed part of this in `ef705b0`. Findings 1, 3, 4, 6, 13 and 15
+are fixed; 2, 14 and 18 are partly fixed; 5, 7 to 12, 16, 17 and 19 are open. A fixed or partly
+fixed section ends with a note on what the code does now. Those notes cite lines at `ef705b0`;
+everything else keeps its lines at 5af5eff. Each note was checked by running the earlier
+batches again on `ef705b0`, and a new batch K. Three things the commit changed besides are
+listed under «New with `ef705b0`».
 
 ## Terms
 
@@ -38,31 +45,31 @@ is marked **second read**. Six of those points were run (batch J); the others sa
 
 ## Summary
 
-| # | Finding | Harm | Checked |
-|---|---------|------|---------|
-| 1 | With no focused row, the column header «#» is used as the file index: Enter on a freshly opened panel breaks the view | high | run |
-| 2 | F3 «Filter files list to selected path» drops the whole selection first, and may then do nothing else | high | run |
-| 3 | «Select files in index in same folder» and F3 use the folder of the image in the viewport, not the row's | high | run |
-| 4 | The «Open» actions and F6 move the viewport; with auto-remove on, index entries vanish under the open panel and its rows then point at the wrong files | high, needs an option | run |
-| 5 | A failed «Modify index entry» leaves the panel on screen while QPV believes no panel is open | medium | run |
-| 6 | F6 does nothing | medium | run |
-| 7 | The «S» column is not kept in step with the index | medium | run |
-| 8 | «None» and «Deselect listed items in index» can select instead | medium | run |
-| 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run |
-| 10 | A listing the user stopped: no notice, no way to resume, and a filter remembers the partial result as final | medium | run |
-| 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table | medium, rare | run |
-| 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties»; such paths reach the index only through «Search and replace» | low, narrow | run |
-| 13 | `*` is not a wildcard in the filter box | medium | run |
-| 14 | «Filter table to selected path» also lists folders whose name begins the same; its tick never comes off | low | run |
-| 15 | «Open image with an external app» removes the `\|` from the list's source name | medium | run |
-| 16 | «Modify index entry»: three answers close the panel for good, two bring it back | low | run |
-| 17 | A copy the user stopped is announced as done; equal file names are merged | low | run |
-| 18 | Every changed row runs the list's event handler | low, large selections | run |
-| 19 | Small things: a tooltip that stays, an unapplied filter applied by scrolling, a typed number changed by the arrow keys, memory kept, two items on the same Alt letter | low | run |
+| # | Finding | Harm | Checked | Status at `ef705b0` |
+|---|---------|------|---------|---------------------|
+| 1 | With no focused row, the column header «#» is used as the file index: Enter on a freshly opened panel breaks the view | high | run | **fixed** |
+| 2 | F3 «Filter files list to selected path» drops the whole selection first, and may then do nothing else | high | run | **partly fixed**: the selection is still replaced |
+| 3 | «Select files in index in same folder» and F3 use the folder of the image in the viewport, not the row's | high | run | **fixed** |
+| 4 | The «Open» actions and F6 move the viewport; with auto-remove on, index entries vanish under the open panel and its rows then point at the wrong files | high, needs an option | run | **fixed** |
+| 5 | A failed «Modify index entry» leaves the panel on screen while QPV believes no panel is open | medium | run | open |
+| 6 | F6 does nothing | medium | run | **fixed** |
+| 7 | The «S» column is not kept in step with the index | medium | run | open |
+| 8 | «None» and «Deselect listed items in index» can select instead | medium | run | open |
+| 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run | open |
+| 10 | A listing the user stopped: no notice, no way to resume, and a filter remembers the partial result as final | medium | run | open |
+| 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table | medium, rare | run | open |
+| 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties»; such paths reach the index only through «Search and replace» | low, narrow | run | open |
+| 13 | `*` is not a wildcard in the filter box | medium | run | **fixed** |
+| 14 | «Filter table to selected path» also lists folders whose name begins the same; its tick never comes off | low | run | **partly fixed**: private mode is left |
+| 15 | «Open image with an external app» removes the `\|` from the list's source name | medium | run | **fixed** |
+| 16 | «Modify index entry»: three answers close the panel for good, two bring it back | low | run | open |
+| 17 | A copy the user stopped is announced as done; equal file names are merged | low | run | open |
+| 18 | Every changed row runs the list's event handler | low, large selections | run | **partly fixed**: the handler returns at its fifth line; Ctrl+A on 60 000 rows takes 12 s, not 21 s |
+| 19 | Small things: a tooltip that stays, an unapplied filter applied by scrolling, a typed number changed by the arrow keys, memory kept, two items on the same Alt letter | low | run | open |
 
-Findings 1, 2 and 3 are the ones a user meets in ordinary use. Finding 4 needs «Automatically
-remove index entries pointing to inexistent files» to be on, and a selected file that is
-missing from the disk.
+Findings 1, 2 and 3 are the ones a user meets in ordinary use; 1 and 3 are fixed, and F3 no
+longer picks the wrong folder. Finding 4 needed «Automatically remove index entries pointing
+to inexistent files» to be on, and a selected file that is missing from the disk.
 
 ---
 
@@ -120,6 +127,19 @@ example tests for it (`if not FocusedRowNumber  ; No row is focused.`).
 
 Fix direction: return when `RowNumber` is 0 in the four functions.
 
+**Fixed in `ef705b0`** by the fix direction (:95236, :95249, :95286, :95524). Run:
+
+- Enter on a fresh panel does nothing. The panel stays open, the current file stays the
+  current one, and the «next image» key goes on from it.
+- After Ctrl+A, «Folder properties» and «Filter table to selected path» do nothing, and F2
+  shows no prompt, so no entry can be written under the key «#».
+- «Select files in index in same folder» does nothing in that state (read).
+
+Left as it was: a double-click on empty space opens the focused row (read).
+
+The return in the list's handler also stops F1 and F5, and the menu's F3 item goes a new way
+in that state; both are under «New with `ef705b0`».
+
 ---
 
 ## 2. F3 «Filter files list to selected path» drops the whole selection first
@@ -154,6 +174,20 @@ Finding 3 decides which folder that is.
 Fix direction: filter by the folder path without going through the selection, or put the
 flags back when the filter is in place. Decision 1.
 
+**Partly fixed in `ef705b0`.** The selection is now dropped inside
+`QuickSelectFilesSameFolder()` (:47165), after that function's own early exits, and no longer
+at the first line of the action. So a list of fewer than three files keeps its selection
+(read), and with finding 3 fixed the folder is the row's. Run: a1, a2, b1 and b2 selected, the
+viewport on `pv\C\c1.png`, F3 on the b1 row: the panel closes and the list holds b1, b2 and b3.
+
+What stands:
+
+- **The selection is still replaced** by the folder's files, with the message «Files
+  selection dropped», and cannot be brought back (the run above). Decision 1 is open.
+- **A row whose folder holds a single indexed file** still ends with nothing selected, the
+  panel open and its rows showing «S». Run: a1, a2 and b1 selected, b1 alone in `pv\B`, F3 on
+  the b1 row.
+
 ---
 
 ## 3. «Select files in index in same folder» and F3 use the folder of the image in the viewport
@@ -178,6 +212,9 @@ With more than two files selected, `SearchIndexSelectAll()` first asks «Replace
 «Substract» (:47025); the folder is the wrong one in every case.
 
 Fix direction: `(external="aye" && modus!="") ? modus : getIDimage(currentFileIndex)`.
+
+**Fixed in `ef705b0`** by the fix direction (:47157). Run, the same files: the action on the
+`pv\B` row selects the three `pv\B` files. The panel's two rows still show «S» (finding 7).
 
 ---
 
@@ -218,6 +255,26 @@ then holds six entries against a `maxFilesIndex` of 5.
 
 Fix direction: give the «Open» actions the row's path instead of changing `currentFileIndex`,
 or rebuild the panel whenever `maxFilesIndex` changed since it was filled.
+
+**Fixed in `ef705b0`**, in two ways.
+
+- **The «Open» actions and F6 get the row's path** and leave `currentFileIndex` alone
+  (:95261-95276). Only «Modify index entry» sets it, once the panel is closed (:95269). Run:
+  F6 and the four menu items on rows other than the viewport's file; that file stays the
+  current one. The redraw is still scheduled (:95256); it now repaints the same image.
+- **No entry is removed while a panel is open.** The three places where auto-remove acts
+  now ask for `!AnyWindowOpen` (:32749, :75174, :89109). Run, six files
+  selected, the second one missing: with auto-remove alone, F6 on its row leaves six entries;
+  with both options on, «Folder properties» leaves six, and «Deselect» on the `d3.png` row
+  deselects `d3.png`.
+
+«Modify index entry» gained from the second change. Before the commit, with auto-remove on,
+the menu item on a missing file's row lost the entry it was about to edit (run on c5a32d3:
+six entries when the prompt came up, five after «Cancel»). Now the six entries stay (run).
+A row whose number is past the end of the list no longer comes about this way (run).
+
+The test does not hold in finding 5's state, where the panel is on screen and
+`AnyWindowOpen` is 0 (read).
 
 ---
 
@@ -282,6 +339,9 @@ Run: F6 on a focused row calls nothing; the same menu item calls `OpenThisFileFo
 still has the side effects of finding 4.
 
 Fix direction: `BtnReviewPaneOpenActs("in explorer")`.
+
+**Fixed in `ef705b0`** by the fix direction (:95549). Run: F6 on a focused row calls
+`OpenThisFileFolder()` with the row's path, as the menu item does.
 
 ---
 
@@ -477,6 +537,11 @@ Run, five files named IMG_1.png to IMG_5.png and one other:
 Fix direction: add `InStr(thisString, "*")` to the test. `PopulateFileActsHistory()` has the
 same line (:94364).
 
+**Fixed in `ef705b0`**: `*` is among the characters the test looks for, through
+`varContains()` (:95597). Run, the same files: `IMG*` and `IMG_*.png` list 5 of 6, and the
+other three rows of the table are as before. `PopulateFileActsHistory()` has the same new
+line (:94371, read).
+
 ---
 
 ## 14. «Filter table to selected path»: folders that begin the same, and a tick that stays
@@ -495,6 +560,16 @@ same line (:94364).
 
 Fix direction: put `OutDir "\"` in the box; when the item is ticked, make it erase the
 filter; in private mode, do not offer it or mask the box.
+
+**Partly fixed in `ef705b0`**, by the first two parts of the fix direction.
+
+- **The box gets the folder with a closing backslash** (:95292). Run: the action on a `pv\A`
+  row lists a1, a2 and `pv\A\sub\s1.png`, and no longer `pv\A2\x1.png`. Subfolders are still
+  listed (decision 5). On a file at a drive root the box gets `Q:\`, which lists the whole
+  drive (run).
+- **The tick**: the item is ticked only when the box holds exactly the focused row's folder
+  (:93573), and choosing it then erases the filter (run: the full table is back).
+- **Private mode** is as it was: the real folder is written into the filter box (run).
 
 ---
 
@@ -522,6 +597,10 @@ The same line runs for the «O» key's menu (`OpenThisFileMenu()` :2898), so the
 the panel's alone.
 
 Fix direction: compare against a local copy.
+
+**Fixed in `ef705b0`** by the fix direction (:3030, :3050). Run: `CurrentSLD` is `|…\pv\A`
+before the action and after it. The commit also makes the function leave before it builds the
+menu when the file does not exist (:3025); see «New with `ef705b0`».
 
 ---
 
@@ -579,6 +658,22 @@ slowdown, not a stall.
 Fix direction: make the handler's first line return for every event but `DoubleClick`, `K`,
 `S` and `s`.
 
+**Partly fixed in `ef705b0`.** The handler returns for every event but `DoubleClick`, `K`,
+`S`, `s` and `RightClick` (:95509). That return is its fifth line: `Gui, Default`,
+`GuiControlGet` and `Gui, ListView` still run for each changed row, and so does the call that
+compares the event's name.
+
+Run, 60 000 rows, each revision twice, in turns, Wine's timings:
+
+| Action | c5a32d3 | `ef705b0` | Handler calls |
+|---|---|---|---|
+| Ctrl+A | 21.2 s, 21.6 s | 12.1 s, 12.4 s | 60 000 |
+| «Deselect» on all rows | 15.9 s, 15.6 s | 15.1 s, 15.0 s | 60 000 |
+| the wait after «Deselect», before the panel answers | 10.6 s, 10.6 s | 1.9 s, 1.9 s | |
+
+The handler is still entered once for each row. What is left of the fix direction is to move
+the return to the first line.
+
 ---
 
 ## 19. Small things
@@ -613,6 +708,33 @@ Fix direction: make the handler's first line return for every event but `DoubleC
 
 ---
 
+## New with `ef705b0`
+
+Three things the commit changed besides the fixes. Each was run on c5a32d3 and on `ef705b0`.
+
+- **F1 and F5 need a focused row.** The return added for finding 1 sits above the handler's
+  key tests (:95524). On a fresh panel, and after Ctrl+A, F1 shows no help and F5 does not
+  refresh; before the commit both did. The «Refresh» button and the menu's «Help» item do
+  not pass through the handler (read). Fix direction: test `RowNumber` in the F2, F3, F6 and
+  double-click branches only.
+- **The menu's «Filter files list to selected path», with no focused row, filters the list
+  to the whole selection.** `BTNreviewSelFilesInPath()` returns without a word, and
+  `BTNreviewFilterListSelPath()` then finds `markedSelectFile>1` (:95223), closes the panel
+  and filters. Run: a fresh panel with four selected files, Ctrl+A, the menu item: the panel
+  closes and the list holds those four files; the selection is kept. Before the commit the
+  selection was dropped and the panel stayed. The early exits of
+  `QuickSelectFilesSameFolder()` (:47159-47163) lead the same way (read). The F3 key stops
+  at the handler's own return. Fix direction: have `BTNreviewSelFilesInPath()` say whether
+  it selected, and close the panel only then.
+- **No «Open with» menu for a missing file, and no message** (:3025). Run: «Open image with
+  an external app» on a missing file's row, and the «O» key in the main window with a
+  missing current file. Before the commit the «O» key's menu came up for such a file, with
+  «Explore containing folder» and «Open containing folder in QPV» in it. The test is
+  `FileExist()` on the plain path; the functions around it use `FileRexists()`, which adds
+  the long-path prefix (read).
+
+---
+
 ## Seen in passing
 
 **A. Two index entries removed for one missing file.** `DelayiedImageDisplay()` :25853-25855
@@ -624,7 +746,13 @@ missing, both options on: four entries left, and the message names the healthy `
 same happens on any direct jump to a missing file, not only from this panel. On an .SLDB
 list `remCurrentEntry()` also deletes the healthy file's database record (:33850, read).
 
-**B.** `PopulateFileActsHistory()` :94364 has finding 13's line.
+Open at `ef705b0`. The panel's «Open» actions no longer lead to it (finding 4). A jump with
+no panel open still removes two entries, and so does a double-click on the missing file's
+row, which closes the panel first (both run: six entries, four left, the message names
+`d3.png`).
+
+**B.** `PopulateFileActsHistory()` :94364 has finding 13's line. **Fixed in `ef705b0`**
+(:94371, read).
 
 ## Checked and found correct
 
@@ -657,21 +785,28 @@ list `remCurrentEntry()` also deletes the healthy file's database record (:33850
 
 ## Decisions to make before fixing
 
+Decision 2 is settled by `ef705b0`; in 1 and 5 the commit kept what the code did. The others
+are open.
+
 1. F3: should it keep the user's selection, and filter the list by the folder path alone?
+   At `ef705b0` it still replaces the selection.
 2. The «Open» actions: should they move the viewport to the row's file? If not, F6 and the
-   menu need the row's path, and finding 4 goes away with it.
+   menu need the row's path, and finding 4 goes away with it. **Settled in `ef705b0`**: they
+   do not move it.
 3. «None»: a toggle, or always «deselect»? The listed rows only, or every file the panel was
    opened with? Should the filter box's text count before it is applied?
 4. «Copy file name(s) as text»: one line per file, or each name once?
-5. «Filter table to selected path»: the folder alone, or its subfolders too?
+5. «Filter table to selected path»: the folder alone, or its subfolders too? At `ef705b0`
+   the subfolders are listed.
 6. A stopped listing: a line in the info text and a way to go on, or leave it to «Refresh»?
 7. Finding 7: is a refresh of the rows in view enough, or should the «S» column be rewritten
    for the whole table after each action? The second is slow on large selections unless
    finding 18 is fixed first.
 8. «Seen in passing» A is outside the panel. Fix it with this work or apart?
 
-Suggested order: 1, 3, 6 and 13 are one-line fixes; then 2 and 4 with their decisions; then 5,
-9, 10, 12, 15; then 7, 8 and 18 together; the rest last.
+Suggested order for what is left: the three points under «New with `ef705b0`»; then 5, 9, 10
+and 12; then the rest of 2 with its decision; then 7, 8 and the rest of 18 together; then
+14's private mode, 11, 16, 17 and 19.
 
 ## How this was checked
 
@@ -686,6 +821,12 @@ Suggested order: 1, 3, 6 and 13 are one-line fixes; then 2 and 4 with their deci
   1.1.33.10 and on stock AutoHotkey 1.1.37.02.
 - Two independent reads of the same code, made without the findings above. Batch J ran the
   points they added.
+- `ef705b0`, on 2026-11-10: its diff was read against every finding, and batches A to J were
+  run again on it and compared with the earlier logs. A new batch K ran what the earlier
+  ones did not cover: F1, F5 and the menu's F3 item with no focused row, F3 on a row alone in
+  its folder, «Modify index entry» and the «Open with» menus on a missing file, a jump to a
+  missing file with no panel open, and «Filter table to selected path» chosen twice. Batch
+  K ran on c5a32d3 too, and batch E twice on each revision, in turns.
 - Three aids, each named where it was used:
   - the 3.5 s page limit shortened to 30 ms in the scratch copy, for the paging runs
     (findings 8, 9, 10 and 19);
@@ -698,5 +839,5 @@ Suggested order: 1, 3, 6 and 13 are one-line fixes; then 2 and 4 with their deci
 - Not checked: the panel on an .SLDB list, on a duplicates list (the «Dupe ID» column), and
   with an edited, unsaved image in the viewport.
 - Kit: `.claude/scratch/review-selected-panel-2026-11-09/app/`: `run-app.sh <tag> <test
-  function>`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to testReviewJ),
-  `results/`.
+  function> [revision]`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to
+  testReviewK), `results/` (the logs of `ef705b0` end in `-ef7`).
