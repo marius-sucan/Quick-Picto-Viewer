@@ -13,7 +13,7 @@ run. Nothing was run on Windows. The test kit is described at the end.
 
 Two independent reads of the same code followed the first version of this report. They
 confirmed every finding but 9, which neither raised, and narrowed finding 12. What they added
-is marked **second read**, and each such point was run before it went in.
+is marked **second read**. Six of those points were run (batch J); the others say «read».
 
 ## Terms
 
