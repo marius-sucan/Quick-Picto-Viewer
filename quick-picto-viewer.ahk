@@ -95164,26 +95164,18 @@ BTNreviewDropFilesSelection() {
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
-   RowNumber := 0
-   GuiControlGet, listViewReviewFilteru
-   modus := markedSelectFile ? 0 : 1
-   If listViewReviewFilteru
+   If (whichLV="LViewOthers")
    {
-      LV_GetText(thisFileIndex, RowNumber + 1, 4)
-      modus := resultedFilesList[thisFileIndex, 2] ? 0 : 1
-      ; ToolTip, % thisFileIndex "===" isSelected "===" modus , , , 2
+      ; the pages not listed yet belong to the full table
+      Loop, % reviewSelectedIndexes.Count()
+          resultedFilesList[reviewSelectedIndexes[A_Index, 1], 2] := 0
    }
 
-   modusa := !modus ? "_" : "S"
-   Loop
+   Loop, % LV_GetCount()
    {
-       RowNumber++
-       LV_GetText(thisFileIndex, RowNumber, 4)
-       If !thisFileIndex
-          Break
-
-       resultedFilesList[thisFileIndex, 2] := modus
-       LV_Modify(RowNumber, , modusa)
+       LV_GetText(thisFileIndex, A_Index, 4)
+       resultedFilesList[thisFileIndex, 2] := 0
+       LV_Modify(A_Index, , "_")
    }
 
    lastZeitFileSelect := A_TickCount
