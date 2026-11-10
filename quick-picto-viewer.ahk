@@ -3023,9 +3023,10 @@ InvokeOpenWithMenu(imgPath) {
     Try Menu, OpenWithMenu, Delete
     Global lastWinDrag := 1
     Global lastOtherWinClose := 1
+    zPlitPath(imgPath, 0, OutFileName, OutDir)
     psathu := Trimmer(StrReplace(CurrentSLD, "|"))
     CreateOpenWithMenu(imgPath)
-    Menu, OpenWithMenu, Add,
+    Menu, OpenWithMenu, Add
     If (AnyWindowOpen!=60)
     {
        IniAction(0, "UserExternalApp", "General", 6)
@@ -41904,10 +41905,18 @@ PanelUpdateThisFileIndex(dummy:=0) {
    {
       newFileName := Trimmer(msgResult.edit)
       If (newFileName=imgPath) || (newFileName=currentFileIndex "|" imgPath)
+      {
+         If (dummy="reviewer")
+            SetTimer, PanelReviewSelectedFiles, -100
          Return
+      }
 
       If askAboutFileSave(" and the current index entry will be updated")
+      {
+         If (dummy="reviewer")
+            SetTimer, PanelReviewSelectedFiles, -100
          Return
+      }
 
       If (posu := InStr(newFileName, "|"))
       {
@@ -95219,7 +95228,7 @@ BTNreviewCutFoldersExplorer() {
 
 BTNreviewFilterListSelPath() {
    BTNreviewSelFilesInPath("filter")
-   If (currentFileIndex>1 && filesFilter)
+   If (maxFilesIndex>0 && filesFilter)
       BtnCloseWindow()
 }
 
