@@ -6,7 +6,170 @@ Every finding below was verified by static code inspection (`read`) against `ab1
 
 ---
 
+## Verification (2026-11-10)
+
+This report was written by Gemini 4 Carbon. Claude checked it on 2026-11-10, at Marius's request, against `development` at `902a2ab`; the code there is the code of `ab160cb`, only report files were added since. Gemini's text is unchanged: what was added is this section and one «Verified 2026-11-10» line under each heading.
+
+### How it was checked
+
+- **Read:** the functions the report names were read in the source: in whole, or, for the long shared ones, the parts the claims rest on.
+- **Run:** the real application was started under Wine (a Windows layer on Linux) with AutoHotkey_H 1.1.33.10, the interpreter QPV ships, and a test script appended to a scratch copy of `quick-picto-viewer.ahk`. A test builds a folder tree, opens it as a files list, selects files, opens the panel with `PanelStructuredCopyMoveWindow()`, fills its four controls and posts a click to «Proceed»; the handler and the engine then run as they are. The log keeps the on-screen messages, the files on disk, the recycle bin (Wine's, redirected into the scratch folder), the index and the undo records. «run A2» below means case A2 of batch A; the batches are A, B, C, D, E, F, F3, F5, F7, F8, G and H.
+- **Quoted code:** every line quoted in a code block was searched in the source. 58 of 68 exist word for word. The ten others are paraphrases: the error message in finding 1 (the source says «The source and destination folders cannot be the same.»), seven of the nine lines quoted from `IdentifyFileFolderRoots()` in finding 11 (variable names such as `mList` are not in the source; the steps described are right), and the two `GuiAddDropDownList()` calls in finding 21 (their `Choose` option is left out).
+
+Not run on Windows. Four points rest on Windows itself and were only seen under Wine, or not at all: that a path with a doubled backslash is refused when asked for through the `\\?\` prefix (it decides which spellings of finding 1 delete files); that two spellings of a folder differing in the case of a letter such as «Ș» name one folder (finding 7, run E3); a read-only file moved to another volume (10.3, not checked); a folder name ending in a dot (6.3, not checked).
+
+### Verdict words
+
+| Word | Meaning |
+|---|---|
+| Confirmed | The claim holds as written. «run» = reproduced in the application; «read» = the code does what the claim says, not run. |
+| Partly | The mechanism exists; the details, the reach or the consequences are not as written. |
+| Generic | True, but it is how every panel or every file tool of QPV behaves, or a deliberate choice; not a defect of this panel. |
+| Not a defect | The code is as described and nothing goes wrong because of it. |
+| Not reachable | The code path exists; no route leads to it. |
+| False | The claim is wrong. |
+| Not checked | Needs Windows. |
+
+### Outcome
+
+The 28 findings hold 85 separate claims: 55 confirmed (37 by a run, 18 by reading), 10 partly, 9 generic, 5 not a defect, 4 false, 1 not reachable, 1 not checked.
+
+**Holds, with files or work at stake (all run):**
+
+1. **One folder under two spellings, with «Overwrite»** (findings 1 and 7). The selected files go to the recycle bin and the tool then reports success. It happens when the destination names the source folder through a `.` or `..` component (`C:\temp\.\imgs`), and in a database list when the two fields differ in the case of a letter outside A-Z (`c:\școală` and `C:\Școală`). It does not happen for an ending slash, a space after the backslash or a doubled backslash, the three other spellings finding 1 lists.
+2. **Destination inside the source, or the reverse, on a move with «Overwrite»** (finding 2). One selected file takes the place of another; the index then names a file that no longer exists.
+3. **Undo after a move that overwrote files** (finding 3). The batch undo never tries to bring the overwritten files back.
+4. **An edited, unsaved image among the moved files** (finding 4). Its edits are dropped without a question.
+
+In 1 to 3 the files are in the recycle bin and can be restored by hand, where the volume has one.
+
+**Holds, lesser harm:** network paths cannot be used and a network destination is created beside the script once the user confirms a question that shows the wrong path (5); relative destinations are accepted (6.1); a database row is not updated when a move overwrites a file the list also holds (15.1); the «Possible source paths» button does nothing for folders directly under a drive and offers the parent of the folder one would expect (11, 12); with fewer than two files selected «Proceed» creates the destination, closes the panel and says nothing (14); a destination such as `D:\a` is refused (20); the «Action to perform» list shows a window handle as its tooltip (21).
+
+**Wrong or overstated in the report:**
+
+- Finding 23 is false: a right-click in the two edit fields opens Windows' own menu (run F3).
+- Finding 1, Scenario A: three of its four spellings lose nothing, and its last two steps are wrong. The engine does not report failures; it reports «Finished copying 3 out of 4 files» and writes undo records.
+- Finding 9 is rated High. The error box is real, but 57 of the 74 panels make the same unchecked call, and with a panel open the one route left to it is a user-defined shortcut pressed within one second of a dialog closing.
+- 8.1 needs an index entry that no loader produces (a file without a known extension), and 13.1 cannot be reached: no file can be selected in multi-page preview mode.
+- 15.4, 18.3 and 26.1b are false.
+- Findings 24 and 25 and rows 15.2, 15.3, 17.4, 28.2 and 28.3 describe how every panel or every file operation of QPV works.
+- Names and lines that are not in the source: `IdentifyFileFolderRoots("cleanup")` at `:60760` (it is `"kill"` at `:60741`); `FileRexists(file, AllowZeroSize:=1)` (the parameter is `loose`, and with `loose=1` it is files under 42 bytes that count as absent); `filesElected := markedSelectFile` (it is `getSelectedFiles(0, 1)`); `If (InStr(A_LoopField, ".") && A_Index=max)` in `zPlitPath()` (it is `If (fileExt="")`); `&& !forceIT` in `CloseWindow()` (it is `forceIT!="yes"`); `editFieldSetNewVal()` in finding 24 (no such function exists).
+
+**Severity after the check** (Claude's reading; Gemini rates nine findings High): High for 1 (as narrowed above), 2, 3, 4 and 7. Medium for 5, 6, 11, 12, 14 and 15. Low for the rest, 8, 9 and 10 included.
+
+### Found while checking, not in the report
+
+1. **A copy or a move whose source has vanished counts as done.** AutoHotkey's `FileCopy` and `FileMove` leave `ErrorLevel` at 0 when their single source file does not exist, and `:3335` tests nothing else. That is why the cases of findings 1 and 7 end with «Finished copying 3 out of 3 files» (runs A5-dot, B4, E3).
+2. **The same folder under a doubled-backslash spelling, on a move:** «Finished moving 3 out of 4 files», nothing moved, and the index entries and the undo records now hold the doubled backslash (run A4-move).
+3. **With «Auto-rename»**, a destination that is the source folder under another spelling fills the source folder with copies named `imgA [1].png` (run B4-rename).
+4. **Quick search runs main-window commands while the panel is open.** Clicks, keys and menus of the main window are refused then, but Quick search still lists the command that drops the selection (`dropFilesSelection()`, run F8) and calls the chosen function without looking at the open panel (`GoQuickSearchAction()` `:42574-42583`). The test called the function the same way: the selection was dropped under the open panel. It is the one way found for the selection to change there.
+5. **The regular Copy / Move panel shares two of the findings:** its batch engine `batchCopyMoveFile()` has the lines of finding 4 (`:61482`, `:61515`: no save question, no `updateViewportCachesID()`), and its «Action to perform» list has the handle tooltip of finding 21 (run F6).
+
+### Every claim
+
+| # | Claim | Verdict | Basis and notes |
+|---|---|---|---|
+| 1a | The slash and space handling leaves a backslash at the end of `fS` / `dS` | Confirmed | run A2, A3, A6 |
+| 1b | Doubled backslashes, `.` and `..`, short names and junctions are not resolved | Confirmed | read; `.` and `..` run (A5-dot, B4-dotdot) |
+| 1A | Scenario A: with «Overwrite» the source files are recycled when both fields name one folder | Partly | run. Not for `C:/temp/imgs/`, `C:\temp\imgs\ ` or `C:\temp\\imgs` (A4-copy, A5-space, A5-double: nothing lost). The destination path then holds a doubled backslash, which `FileRexists()` cannot see because it asks through the `\\?\` prefix (`PathToExtendedPath()`); nothing is recycled, the copy fails, the move does nothing. Yes for `C:\temp\.\imgs` and `…\imgs\new\..` (A5-dot, B4, B4-dotdot): every selected file under the source is recycled. Steps 6 and 7 are wrong, see «Found while checking» 1. «Skip files» and «Auto-rename» lose nothing (B4-skip, B4-rename) |
+| 1B | Scenario B: a source typed with an ending slash, or with a space after the backslash, skips every file | Confirmed | run A2, A3. Not silent: «Finished copying 0 out of 4 files … Skipped files: 4» |
+| 1C | Scenario C: doubled backslashes reach the index and the undo records on a move | Confirmed | run A6; the database part read |
+| 2.1 | Files already under the destination are nested again | Confirmed | run A7-nest |
+| 2.2 | Destination inside the source, move with «Overwrite»: one selected file replaces another | Confirmed | run A7-in: the second file is in the recycle bin, the first one's picture sits in `sub\sub`, index entry 1 names a file that no longer exists |
+| 2.2m | The mirror case, source inside the destination | Partly | run. In the order the report gives, shallower file first, nothing collides (A7-out); with the deeper file first it does (B5) |
+| 3.1 | A move's undo record carries no size: the batch undo never recovers an overwritten file, the single-file undo recovers without the size test | Confirmed | run C1 (`restoreFileFromRecycleBin()` is not called; «Failed to recover 2 overwritten files»), C3 (called with an empty size), C5. A copy's record is complete (C2) |
+| 3.2 | Undo of a move fails once the emptied source subfolder is gone | Confirmed | run C4. True of every undone move, not only structured ones |
+| 3.3 | No «Undo move» / «Undo copy» quick-action bar | Confirmed | read: `copyMoveStructuredFolders()` has no `quickBarFileUndo()` call; `batchCopyMoveFile()` has one (`:61534`) |
+| 4 | Unsaved edits of the image on screen are dropped when that image is moved | Confirmed | run G1, with the edited state set by the test (`UserMemBMP`, `undoLevelsRecorded`, `currentImgModified`): `terminateIMGediting()` runs and no «Save image» question comes up |
+| 5.1 | The pre-filled source loses the leading `\\` | Confirmed | read (`zPlitPath()` `:59923-59928`). Latent: no loader admits a `\\server` path into the files list, `RegExFilesPattern` starts with a drive letter |
+| 5.2 | «Browse» does not start in a network folder | Confirmed | read |
+| 5.3 | «Proceed» refuses a network source | Confirmed | run A10-unc-src: «ERROR: Please choose an existing source folder.» |
+| 5.4 | A network destination is created beside the script | Confirmed | run A10-unc: the question shows `nas\archive\`; after «Yes» the files are in `<script folder>\nas\archive` |
+| 5.5 | `zPlitPath()` in the engine would strip `\\` as well | Confirmed | read; never reached, 5.3 and 5.4 strip it first |
+| 6.1 | A relative destination is accepted | Confirmed | run A9-rel (`relout` is created beside the script after the question; on a move the index holds `relout\imgA.png`), A9-dots (`..`: no question at all) |
+| 6.2 | A relative source that exists beside the script matches in mid-path | Partly | run A11: it matches, then every file fails («Failed to perform action on 2 files»); nothing is written |
+| 6.3 | Illegal characters and missing drives are asked about, then fail | Confirmed | read; a question, then an error box. The folder name ending in a dot was not checked |
+| 7.0 | AutoHotkey ignores case for A-Z only; `Format("{:L}")` lowers every letter | Confirmed | run E0 |
+| 7.1 | Every file is skipped when the source differs from the list in the case of such a letter | Confirmed | run E1 (plain list, source chosen from the menu), E2 (database list, source from «Browse»). A message is shown: «Skipped files: 3» |
+| 7.2 | In a database list, with «Overwrite», the source files are recycled | Confirmed | run E3: three files in the recycle bin, reported as «Finished copying 3 out of 3 files» |
+| 8.1 | A file with no extension is moved into a folder of its own name | Partly | The mechanism is real (run B2, the entry written into the index by the test), but `RegExFilesPattern` ends in a known extension: no loader admits such a file; only an index entry rewritten by hand could name one |
+| 8.2 | A folder at the destination that carries a selected file's name receives the file | Confirmed | run B1; the index then names the folder. It needs such a folder to exist |
+| 9 | The result of `createSettingsGUI()` is not checked | Partly | run F5, F5b (the function called by the test under one second after a dialog closed, with panel 77 or panel 9 open): AutoHotkey's error box «The same variable cannot be used for more than one control». With a regular panel open the menu bar is disabled (run F7), the main window's menus are refused (`showThisMenu()` `:71085`) and F8 does nothing; the test that admits a user-defined shortcut still passes (`testFuncIsInMenus()`, run F7). Alpha-mask painting, the other cause named, was not run. After the second, the panel is simply opened again (run F5c) |
+| 10.1a | The destination file is recycled before the move or copy is tried | Confirmed | read (`:3319`, `:3332-3336`) |
+| 10.1b | The «overwritten» mark is set even when recycling failed | Confirmed | read |
+| 10.2 | An empty destination file counts as absent | Partly | run B3. With `loose=0` an empty file does return 0. «Skip files» skips it, «Auto-rename» renames, «Overwrite» replaces the empty file without recycling it |
+| 10.3 | A read-only source moved to another volume leaves a copy behind | Not checked | needs two Windows volumes |
+| 10.4 | `performOverwrite` is not reset for each file | Not a defect | read: it could only matter if a file appeared at the destination between `:3299` and `:3312` |
+| 10.5 | No `lockDestinationFileName()` call | Not a defect | read: every source maps to a destination path of its own. It was left out on purpose when the other batch tools were joined (2026-11-08). The collisions that do exist are those of finding 2 |
+| 11.1 | Nothing happens for folders directly under a drive, or for files in a drive's root | Confirmed | run D2, D2b, D2c: no menu, no message |
+| 11.2 | For one folder two levels deep its parent is offered | Confirmed | run D3, D3b |
+| 11.3 | For the Help text's own example the menu offers only `c:\temp\` | Confirmed | run D1, D1b |
+| 11.4 | A network path yields `\\server\` | Confirmed | run D8; latent, as 5.1 |
+| 12.1 | A deeper tree on another drive is left out | Confirmed | run D4 |
+| 12.2 | `proj-2` sorted between `proj` and `proj\sub` defeats the parent test | Confirmed | run D5: three entries |
+| 12.3 | An unanchored `InStr()`, and one loop pass too many | Not a defect | read: a path that starts with a drive letter cannot be the tail of another line; the extra pass reads an empty entry |
+| 12.4 | The menu is stale when the selection changes while the panel is open | Partly | run D7b, F8: the cached list is kept. Clicks and keys in the main window do nothing while a regular panel is open (`WinClickAction()` `:10148`, `markThisFileNow()` `:39613`, `HKifs()`); only a command run from Quick search still changes the selection, see «Found while checking» 4 |
+| 13.1 | The panel is offered in multi-page preview mode | Not reachable | read: no file can be selected in that mode (`markThisFileNow()`, `selectAllFiles()` and the range selectors refuse), so `markedSelectFile>1` fails and the item is not added |
+| 13.2 | F8 reopens the panel with fewer than two files selected | Confirmed | run F4 (`openPreviousPanel()`, the function F8 runs): «Selected files: 0.» |
+| 13.3 | The menu bar's File menu lacks the item in image view | Confirmed | read |
+| 14.1 | With fewer than two files selected, «Proceed» creates the folder, closes the panel and says nothing | Confirmed | run A12, F8: the state that F8 leaves, or the selection dropped from Quick search |
+| 14.2 | «No» at the 150-files question finds the panel already closed | Confirmed | run A13 |
+| 15.1 | In a database list, a move that overwrites a file the list also holds is not written to the database | Confirmed | run H1: the moved file's row keeps its old path, the overwritten file's row keeps its old size, the index holds the new path twice |
+| 15.2 | Captions, audio links and the folders table are not updated | Generic | read: no move or rename in QPV updates `imagesData` |
+| 15.3 | Favourites are not updated | Generic | read: no move or rename writes the favourites files |
+| 15.4 | A needless save question for a database list | False | read: every such question tests `SLDtypeLoaded=2` (`:27757`, `:43928`, `:64886`, `:68053`, `:70842`); `:2101` is keyboard navigation |
+| 16.1 | Patterns typed in the regular panel show up in «Destination» | Confirmed | read: `BtnCopyMoveAction()` stores the raw text in the shared variable |
+| 16.2 | A folder picked with «Browse» is forgotten on «Cancel», the typed one is kept | Confirmed | run F2 |
+| 17.1 | The conflict setting is not kept across restarts | Confirmed | read; neither is the regular panel's (`copyMoveDoLastOption`) |
+| 17.2 | The action returns to «Choose...» at every opening | Confirmed | run F3 |
+| 17.3 | The destination is not added to the recent ones | Confirmed | run F3, read |
+| 17.4 | Switching dark mode or large fonts resets the fields | Generic | read: the two switches close and reopen whichever panel is open |
+| 18.1 | The pre-filled source is the focused file's folder even when that file is not selected | Confirmed | run F1 |
+| 18.2 | The same when the focused file sits in a subfolder | Confirmed | run E2 |
+| 18.3 | A drive's root behaves inconsistently | False | read: `FolderExist()` turns a bare `C:` into `C:\` (`:44018-44021`) |
+| 18.4 | A removed or virtual entry pre-fills a broken path | Partly | read: the field would hold that entry's text; «Proceed» then answers «Please choose an existing source folder» |
+| 19.1 | The existence test comes before the folder test | Confirmed | read; it matters for offline drives only |
+| 19.2 | A missing file outside the source counts as failed, not as skipped | Confirmed | run B6 |
+| 20 | A destination of four characters that does not exist is refused | Confirmed | run A8-four, A8-five |
+| 21 | The «Action to perform» list shows a window handle as its tooltip | Confirmed | run F1 (`0x10144`) |
+| 22.1 | «Please wait...» stays up while the menu is open | Confirmed | read |
+| 22.2 | An ampersand in a folder name becomes an underline | Confirmed | run D6: the item text holds a single `&` |
+| 22.3 | The chosen path is written in lower case | Confirmed | run D10, E1 |
+| 22.4 | The menu opens at the pointer and ignores dark mode | Partly | read: at the pointer, yes; the dark theme is set for the whole process (`setMenusTheme()`), this menu included |
+| 23 | A right-click in the two edit fields shows QPV's tooltip instead of Windows' menu | False | run F3: the edit field's own menu opens and `SettingsToolTips()` is not called; for the «Help» button it is. AutoHotkey does not raise GuiContextMenu for an Edit control |
+| 24.1 | Escape and the close button do nothing for one second after a dialog and 0.45 s after opening | Generic | read: deliberate delays, the same for every panel |
+| 24.2 | F1 does nothing in the panel | Generic | read: no panel answers F1 |
+| 24.3 | Up and Down change numbers in the path fields | Not a defect | read: only when the whole field is a number (`:853`), which a folder path never is |
+| 24.4 | Quick search opens beside the panel | Generic | read: it does so beside every panel |
+| 25 | Private mode does not hide the paths | Generic | read: no copy or move code tests `userPrivateMode` (no use in `:59840-61545`), the regular panel and the conflict box included |
+| 26.1a | `infoSelection` is empty in the first text; «This panels» | Confirmed | run F1; the count is shown beside the buttons |
+| 26.1b | `getSelectedFiles(0, 1)` scans the list twice | False | read: the second call returns at once, its state has not changed (`:39514-39516`) |
+| 26.2 | `prevuDir` is not set for a folder that exists | Confirmed | read: one more existence test per file |
+| 26.3 | The folder watch is reset on a copy | Not a defect | read: every file operation resets it (ten places, `batchCopyMoveFile()` `:61510` among them); it is needed when the destination lies inside the open folder |
+| 27.1 | `lastInvoked` becomes a global | Confirmed | read: nothing reads it |
+| 27.2 | «Source:» is not centred like «Destination:» | Confirmed | read |
+| 27.3 | «Proceed» is narrow, and enabled on «Choose...» | Confirmed | run F1 (a click then shows «Please select action to perform»); the width read |
+| 27.4 | No Alt letters on the menu item and the labels | Confirmed | read |
+| 27.5 | Unused variables | Partly | read: `btnWid`, `txtWid` and `lstWid` are unused; the second value of `sml` is used (`:60772`), only the first is not |
+| 28.1 | Both «Browse» dialogs carry the same title | Confirmed | read. The missing `Gui, Default` it also names is no defect: a button's thread starts on its own window (run E2, F2) |
+| 28.2 | A needless `ResetImgLoadStatus` timer | Generic | read: the same line ends 265 code paths |
+| 28.3 | The button's image list outlives the panel | Generic | read: it is released by the next clean-up made with no panel open; the same for every panel with icon buttons |
+| S1 | Seen in passing: `recordUndoFileActs()` drops the size for every move | Confirmed | run C5; five more callers pass a move or a rename (`:32299`, `:41541`, `:47605`, `:61243`, `:61478`) |
+| S2 | Seen in passing: the handle tooltip on the regular panel | Confirmed | run F6 (`0x50136`) |
+| S3 | Seen in passing: `FileRexists(…, 0)` and empty files | Confirmed | as 10.2 |
+| S4 | Seen in passing: `zPlitPath()` and `\\` | Confirmed | read |
+| S5 | Seen in passing: the order of the image list clean-up | Generic | as 28.3 |
+| C | The eight items «Checked and found correct» | Agreed | seven read or run (the A-Z case rule: run E0; the menu index: run E1); the Ctrl+Backspace item was not checked |
+
+### Where the tests are
+
+`.claude/scratch/structured-copy-move-2026-11-10/` (not in the repository): `app/setup.sh` once, then `app/run-app.sh <tag> <testScA … testScH> [revision]`; the logs are in `app/results/`. `quotes/check_quotes.py` repeats the quoted-code search.
+
+---
+
 ## Terms
+
+> **Verified 2026-11-10:** the definitions match the source. One caution: the panel is modeless for Windows only. While it is open QPV refuses clicks, keys and menus in the main window (`:10148`, `HKifs()`, `showThisMenu()`), which decides rows 12.4, 13.2 and 14.1.
 
 - **Structured file operations panel** (`PanelStructuredCopyMoveWindow`, `AnyWindowOpen = 77`): modeless `SettingsGUIA` dialog owned by `PVhwnd` that copies or moves all selected files located under a chosen **Source** root directory into a **Destination** root directory while recreating each file's relative subfolder path (`StrReplace(file2rem, srcDir "\", finalDest "\")`).
 - **`UsrEditFileSource`**: global variable bound to the `Source:` `Edit` control (`:60737`, `:60769`), pre-populated on panel open with `OutDir` of `currentFileIndex` (`:60759`).
@@ -19,6 +182,8 @@ Every finding below was verified by static code inspection (`read`) against `ab1
 ---
 
 ## Summary
+
+> **Verified 2026-11-10:** the severities and the «read» marks in this table are Gemini's. The verdict for each claim is in the Verification section above.
 
 Ordered from highest harm (silent data destruction, unrecoverable overwrite, runtime error, index/database corruption) to lowest (UI polish and minor resource leaks).
 
@@ -56,6 +221,8 @@ Ordered from highest harm (silent data destruction, unrecoverable overwrite, run
 ---
 
 ## 1. Wrong path normalization order and raw string check (`dS=fS`) cause silent 100% file skip or catastrophic self-deletion to Recycle Bin
+
+> **Verified 2026-11-10:** partly. An ending slash or space is handled as described and a source typed that way skips every file (runs A2, A3). The self-deletion of Scenario A is reproduced only for a destination spelled with `\.\` or `\..\` (runs A5-dot, B4, B4-dotdot); the three other spellings it lists lose nothing (runs A4, A5-space, A5-double). The engine then reports success, not failures. Rows 1a to 1C.
 
 **Where:** `BTNuiProceedStructuredOperation()` (`:60809–60814`, `:60840`) and `copyMoveStructuredFolders()` (`:3211`, `:3262`, `:3283`, `:3312–3337`).
 
@@ -103,6 +270,8 @@ Three compounding defects sit in these ten lines:
 
 ## 2. No guard when Destination is inside Source (`C:\a` → `C:\a\sub`) or Source is inside Destination (`C:\a\sub` → `C:\a`)
 
+> **Verified 2026-11-10:** confirmed (runs A7-nest, A7-in). The mirror case needs the deeper file first in the list (run B5), not the order given here (run A7-out). Rows 2.1 to 2.2m.
+
 **Where:** `BTNuiProceedStructuredOperation()` (`:60840`) and `copyMoveStructuredFolders()` (`:3262`, `:3283`, `:3313–3335`).
 
 `:60840` checks only `If (dS=fS)`. Neither `InStr(dS "\", fS "\") = 1` (Destination is a subfolder of Source) nor `InStr(fS "\", dS "\") = 1` (Source is a subfolder of Destination) is checked or handled.
@@ -118,6 +287,8 @@ Three compounding defects sit in these ten lines:
 ---
 
 ## 3. Broken Undo recovery for overwritten files on Move, missing subfolder recreation on Undo, and missing `quickBarFileUndo`
+
+> **Verified 2026-11-10:** confirmed (runs C1 to C5; point 3 read). Point 2 is true of every undone move. Rows 3.1 to 3.3.
 
 **Where:** `copyMoveStructuredFolders()` (`:3315–3316`, `:3350–3351`, `:3380–3403`), `recordUndoFileActs()` (`:95019–95034`), `friendlyFileUndoInfos()` (`:95064–95108`), `batchUndoFileActs()` (`:94840–94862`), `corefileUndoAction()` (`:94627–94644`), and `restoreFileFromRecycleBin()` (`lib/shell-stuff.ahk:2571–2634`).
 
@@ -151,6 +322,8 @@ Three compounding defects sit in these ten lines:
 
 ## 4. Unsaved viewport image edits are silently destroyed when Structured Move relocates the active image
 
+> **Verified 2026-11-10:** confirmed (run G1, with the edited state set by the test). The regular panel's batch engine has the same lines. Row 4.
+
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60736`), `BTNuiProceedStructuredOperation()` (`:60800`), `copyMoveStructuredFolders()` (`:3355`, `:3385`), and `ResizeImageGDIwin()` (`:75318–75321`).
 
 Unlike navigation and gallery-reload commands that call `askAboutFileSave()` (`:64909`) when `currentImgModified = 1`, Structured Copy/Move never checks `askAboutFileSave()` at panel open, on `&Proceed`, or inside `copyMoveStructuredFolders()`.
@@ -165,6 +338,8 @@ Unlike navigation and gallery-reload commands that call `askAboutFileSave()` (`:
 
 ## 5. UNC network paths (`\\server\share\...`) are broken across Proceed, Browse, pre-fill, and `zPlitPath`
 
+> **Verified 2026-11-10:** confirmed (points 3 and 4 run in batch A, the rest read). No loader admits a network path into the files list, so point 1 is latent; a network path typed or browsed is what fails. Rows 5.1 to 5.5.
+
 **Where:** `BTNuiProceedStructuredOperation()` (`:60809–60810`), `BtnCpyMvStrctrdChooseFilesDst()` (`:59853`, `:59855`), `BtnCpyMvStrctrdChooseFilesSrc()` (`:59873`, `:59875`), `PanelStructuredCopyMoveWindow()` (`:60759`), `copyMoveStructuredFolders()` (`:3284`), and `zPlitPath()` (`:59906–59928`).
 
 Every path-trimming site uses two-sided `Trim(path, "\")` or `Trimmer(path, "\")` (`Trim(inputString, trimChars)` at `:32663`) instead of `RTrim(path, "\")`, stripping the **leading `\\`** that defines a UNC path:
@@ -178,6 +353,8 @@ Every path-trimming site uses two-sided `Trim(path, "\")` or `Trimmer(path, "\")
 ---
 
 ## 6. Missing absolute-path, illegal-character, and anchored-prefix validation corrupts `%A_ScriptDir%` and `resultedFilesList`
+
+> **Verified 2026-11-10:** point 1 confirmed (runs A9-rel, A9-dots); point 2 only makes every file fail (run A11); point 3 read, a question and an error box. Rows 6.1 to 6.3.
 
 **Where:** `BTNuiProceedStructuredOperation()` (`:60816–60838`), `copyMoveStructuredFolders()` (`:3262`, `:3283`, `:3355–3360`), `SetWorkingDir, %A_ScriptDir%` (`:69`); compare `BtnCopyMoveAction()` (`:61027–61046`).
 
@@ -194,6 +371,8 @@ Unlike `BtnCopyMoveAction()` — which checks `SubStr(dS, 2, 2) = ":\"` (`:61032
 ---
 
 ## 7. Non-ASCII Unicode case mismatch silently skips 100% of files or bypasses `dS=fS` into Overwrite self-deletion
+
+> **Verified 2026-11-10:** confirmed (runs E0 to E3). In run E3 the recycled files are reported as copied. Rows 7.0 to 7.2.
 
 **Where:** `IdentifyFileFolderRoots()` (`:60166`), `menuSetSourceStructuredOper()` (`:60142`), `updateSQLdbEntry()` (`:34195`), `BTNuiProceedStructuredOperation()` (`:60840`), and `copyMoveStructuredFolders()` (`:3262`, `:3283`).
 
@@ -218,6 +397,8 @@ Meanwhile, two subsystems explicitly lowercase full Unicode strings via `Format(
 
 ## 8. Extensionless files or pre-existing folders at `file2save` silently move/copy files inside a subdirectory while corrupting index paths
 
+> **Verified 2026-11-10:** point 1 needs an index entry that no loader produces, a file without a known extension (run B2 wrote one in); point 2 confirmed (run B1), it needs a folder named like the file. Not High. Rows 8.1, 8.2.
+
 **Where:** `copyMoveStructuredFolders()` (`:3284–3360`) and `zPlitPath()` (`:59916`).
 
 1. **Extensionless files (`zPlitPath` `:59916`):**
@@ -231,6 +412,8 @@ Meanwhile, two subsystems explicitly lowercase full Unicode strings via `Format(
 ---
 
 ## 9. Unchecked `createSettingsGUI(77, A_ThisFunc)` return value crashes the thread or adds controls onto GUI `1:`
+
+> **Verified 2026-11-10:** partly. The error box is reproduced by calling the function (runs F5, F5b), but 57 of the 74 panels make the same unchecked call and, with a panel open, the one route left is a user-defined shortcut pressed within one second of a dialog closing. Not High. Row 9.
 
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60742`), `createSettingsGUI()` (`:28011–28026`), and `CloseWindow()` (`:97955`, `:97971`).
 
@@ -246,6 +429,8 @@ Open `CopyMovePanelWindow` (`M` / `C`, `AnyWindowOpen = 9`) or `PanelStructuredC
 ---
 
 ## 10. File-engine edge cases: premature `FileRecycle`, 0-byte `FileRexists` blind spot, `+R` cross-drive partial move, stale `performOverwrite`, and missing `lockDestinationFileName`
+
+> **Verified 2026-11-10:** point 1 confirmed by reading; point 2 partly (run B3; `FileRexists()` is not as described); point 3 not checked; points 4 and 5 are not defects. Rows 10.1a to 10.5.
 
 **Where:** `copyMoveStructuredFolders()` (`:3298–3337`), `FileRexists()` (`:32669–32676`), and `askAboutFileCollision()` (`:43652–43656`) / `lockDestinationFileName()` (`:38454–38485`).
 
@@ -267,6 +452,8 @@ Open `CopyMovePanelWindow` (`M` / `C`, `AnyWindowOpen = 9`) or `PanelStructuredC
 ---
 
 ## 11. `IdentifyFileFolderRoots()` fails on depth-1 and drive-root folders (dead button), suggests parent of single folder, and contradicts QPV's own Help example
+
+> **Verified 2026-11-10:** confirmed (runs D1 to D3b, D8). Seven of the nine quoted lines are a paraphrase; the steps described are right. Rows 11.1 to 11.4.
 
 **Where:** `IdentifyFileFolderRoots()` (`:60181–60241`), `BtnIdentifyFileRoots()` (`:60113–60130`), and `BtnHelpStructuredCopyMove()` (`:60797`).
 
@@ -316,6 +503,8 @@ Loop 3 (`:60194`) **unconditionally strips the leaf folder segment** from every 
 
 ## 12. Four additional bugs inside `IdentifyFileFolderRoots()`: global shallowest-depth `Break`, ASCII sort `< '\'` bug, unanchored `InStr`, and stale `"cached"` list
 
+> **Verified 2026-11-10:** points 1 and 2 confirmed (runs D4, D5); point 3 is not a defect; point 4 holds only through Quick search (runs D7b, F8). Rows 12.1 to 12.4.
+
 **Where:** `IdentifyFileFolderRoots()` (`:60150–60153`, `:60160`, `:60195`, `:60218–60238`) and `BtnIdentifyFileRoots()` (`:60113`, `:60120–60128`).
 
 1. **Global minimum-depth `Break` hides deeper folder trees on other drives/branches (`:60218–60221`):**
@@ -340,6 +529,8 @@ Loop 3 (`:60194`) **unconditionally strips the leaf folder segment** from every 
 
 ## 13. Missing `QPV:PAGES:` virtual-frame guard, `< 2`-selection bypass via `F8`, and menu bar inconsistency
 
+> **Verified 2026-11-10:** point 1 cannot be reached, no file can be selected in that mode; point 2 confirmed (run F4); point 3 confirmed by reading. Rows 13.1 to 13.3.
+
 **Where:** `InvokeMenuBarFile()` (`:67406–67461`), `createMenuCurrentFilesActs()` (`:69536–69548`), `openPreviousPanel()` (`:27537–27545`), `PanelStructuredCopyMoveWindow()` (`:60736`), and `BTNuiProceedStructuredOperation()` (`:60800`).
 
 1. **Multipage preview mode (`QPV:PAGES:`) exposed in `File` menu bar and unguarded in panel/engine:**
@@ -353,6 +544,8 @@ Loop 3 (`:60194`) **unconditionally strips the leaf folder segment** from every 
 ---
 
 ## 14. `FileCreateDir` and `BtnCloseWindow()` run before `filesElected < 2` and `> 150`-file confirmation
+
+> **Verified 2026-11-10:** confirmed (runs A12, A13, F8). Rows 14.1, 14.2.
 
 **Where:** `BTNuiProceedStructuredOperation()` (`:60822–60844`) and `copyMoveStructuredFolders()` (`:3210–3222`).
 
@@ -386,6 +579,8 @@ Notice `:3222` *already* has `BtnCloseWindow()` placed *after* both checks! Call
 
 ## 15. `.SLDB` SQLite database desynchronization on Move + Overwrite, orphaned `imagesData` / `staticfolders`, and broken Favourites
 
+> **Verified 2026-11-10:** point 1 confirmed (run H1); points 2 and 3 are true of every move and rename in QPV; point 4 is false. Rows 15.1 to 15.4.
+
 **Where:** `copyMoveStructuredFolders()` (`:3357–3360`, `:3381–3382`), `updateSQLdbEntry()` (`:34189–34216`), `SLDBinitSQLdb()` (`:74931–74935`), and `ToggleImgFavourites()` (`:39088–39108`).
 
 1. **`UNIQUE(fullPath)` violation silently ignored on Move + Overwrite (`:3358` → `:34207–34214`):**
@@ -404,6 +599,8 @@ Notice `:3222` *already* has `BtnCloseWindow()` placed *after* both checks! Call
 
 ## 16. Cross-panel pollution and desynchronization of shared super-global `UsrEditFileDestination`
 
+> **Verified 2026-11-10:** confirmed (point 1 read, point 2 run F2). Rows 16.1, 16.2.
+
 **Where:** `:169`, `PanelStructuredCopyMoveWindow()` (`:60774`), `BtnCpyMvStrctrdChooseFilesDst()` (`:59851`, `:59855`, `:59864`), `BtnCpyMvStrctrdChooseFilesSrc()` (`:59871`, `:59875`), `BTNlvRecentFileDesties()` (`:60855`), and `BtnMarkFilesExplorer()` (`:60946`).
 
 1. **Invalid tokens leaked from `CopyMovePanelWindow`:**
@@ -415,6 +612,8 @@ Notice `:3222` *already* has `BtnCloseWindow()` placed *after* both checks! Call
 ---
 
 ## 17. Missing settings persistence, clobbered `UsrCopyMoveOperation`, omitted `RecentCopyMoveManager`, and input wipe on Dark Mode / Large Fonts toggle
+
+> **Verified 2026-11-10:** points 1 to 3 confirmed (run F3, read); point 4 is what the two switches do to every panel. Rows 17.1 to 17.4.
 
 **Where:** `:347`, `:398`, `PanelStructuredCopyMoveWindow()` (`:60758`, `:60779`), `BTNuiProceedStructuredOperation()` (`:60804`), `copyMoveStructuredFolders()` (`:3380–3403`), `ToggleLargeUIfonts()` (`:73150–73155`), and `ToggleDarkModus()` (`:73205–73210`).
 
@@ -431,6 +630,8 @@ Notice `:3222` *already* has `BtnCloseWindow()` placed *after* both checks! Call
 
 ## 18. `Source:` pre-fill (`OutDir`) uses `currentFileIndex` even when unselected, soft-deleted, in a leaf subfolder, at a drive root, or virtual
 
+> **Verified 2026-11-10:** points 1 and 2 confirmed (runs F1, E2); point 3 is false; point 4 partly. Rows 18.1 to 18.4.
+
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60759`).
 
 ```ahk
@@ -446,6 +647,8 @@ zPlitPath(getIDimage(currentFileIndex), 1, OldOutFileName, OutDir, OutFileNameNo
 ---
 
 ## 19. `!FileExist(file2rem)` runs before `!InStr(file2rem, srcDir "\")` in `copyMoveStructuredFolders`
+
+> **Verified 2026-11-10:** confirmed (point 1 read, point 2 run B6). Low. Rows 19.1, 19.2.
 
 **Where:** `copyMoveStructuredFolders()` (`:3256–3266`).
 
@@ -470,6 +673,8 @@ Checking `!FileExist(file2rem)` *before* checking whether `file2rem` is even ins
 
 ## 20. Valid 4-character non-existent destination paths (`D:\a`) are falsely rejected
 
+> **Verified 2026-11-10:** confirmed (run A8). Row 20.
+
 **Where:** `BTNuiProceedStructuredOperation()` (`:60822–60838`).
 
 ```ahk
@@ -488,6 +693,8 @@ A 1-character folder on a drive root — such as `D:\a` or `E:\1` — has `StrLe
 ---
 
 ## 21. Raw hex HWND (`zh`) is displayed as the hover tooltip on `"Action to perform:"`
+
+> **Verified 2026-11-10:** confirmed (run F1); the regular Copy / Move panel shows the same (run F6). Row 21.
 
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60779–60781`) and `GuiAddDropDownList()` (`:26604–26613`).
 
@@ -515,6 +722,8 @@ ToolTip2ctrl(hTemp, tipu)
 
 ## 22. `BtnIdentifyFileRoots` / `Menu, Manna` UI bugs: stuck `"Please wait..."` tooltip, unescaped `&`, lowercased paths, cursor-positioned keyboard popup, and unstyled menu
 
+> **Verified 2026-11-10:** points 1 to 3 confirmed (runs D6, D10, E1; point 1 read); in point 4 the position is right, the dark mode part is not. Rows 22.1 to 22.4.
+
 **Where:** `BtnIdentifyFileRoots()` (`:60109–60132`), `menuSetSourceStructuredOper()` (`:60134–60144`), and `IdentifyFileFolderRoots()` (`:60166`).
 
 1. **`"Please wait..."` ToolTip #1 stays stuck onscreen while the menu is open (`:60110`, `:60130–60131`):**
@@ -530,6 +739,8 @@ ToolTip2ctrl(hTemp, tipu)
 
 ## 23. Right-clicking `Source:` or `Destination:` `Edit` boxes blocks Windows' native Cut/Copy/Paste context menu
 
+> **Verified 2026-11-10:** false (run F3). The edit field's own menu opens; QPV's handler is not called for edit fields. Row 23.
+
 **Where:** `SettingsGUIAGuiContextMenu` (`:25922–25945`) and `SettingsToolTips()` (`:27378–27504`).
 
 Because `SettingsGUIAGuiContextMenu:` is defined on `SettingsGUIA`, AutoHotkey intercepts `WM_CONTEXTMENU` (right-click and `AppsKey` / `Shift+F10`) on every control in `SettingsGUIA`, including `Edit` controls (`:25937`). Instead of allowing Win32's standard `Undo | Cut | Copy | Paste | Delete | Select All` `Edit` menu on `Source:` and `Destination:`, `SettingsToolTips()` displays a debug-style OSD tooltip (`"<value> = UsrEditFileSource\n[Edit field]"`) exposing internal variable names and preventing mouse-driven paste!
@@ -537,6 +748,8 @@ Because `SettingsGUIAGuiContextMenu:` is defined on `SettingsGUIA`, AutoHotkey i
 ---
 
 ## 24. Close dead-zones (`Escape` / `X`), broken `F1` help, `Up`/`Down` digit mutation in path `Edit`s, and unguarded `:` Quick Search hotkey
+
+> **Verified 2026-11-10:** nothing here is particular to this panel: points 1, 2 and 4 hold for every panel, point 3 needs a field that holds only a number. Rows 24.1 to 24.4.
 
 **Where:** `SettingsGUIAGuiClose` / `Escape` (`:4321–4324`), `CloseWindow()` (`:97971`), `openFoldersDialogWrapper()` (`:64359`), `msgBoxWrapper()` (`:33311`), `KeyboardResponder()` (`:768–884`), `ShowContextualHelp()` (`:89688–89718`), and `processDefaultKbdCombos()` (`:1035–1040`).
 
@@ -554,6 +767,8 @@ Because `SettingsGUIAGuiContextMenu:` is defined on `SettingsGUIA`, AutoHotkey i
 
 ## 25. `userPrivateMode = 1` is ignored across all Structured Copy/Move UI, menus, dialogs, and OSD tooltips
 
+> **Verified 2026-11-10:** true, and the same in the regular Copy / Move panel and the conflict box: no copy or move code hides paths. Row 25.
+
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60769`, `:60774`), `BtnIdentifyFileRoots()` (`:60121`), `BtnCpyMvStrctrdChooseFilesDst`/`Src` (`:59850–59885`), `copyMoveStructuredFolders()` (`:3279`, `:3300`, `:3389–3398`).
 
 Compare `ToggleImgFavourites()` (`:39100–39104`) and `friendlyFileUndoInfos()` (`:95102–95103`), which mask paths as `*:\******\*****` when `userPrivateMode = 1`. In Structured Copy/Move, `userPrivateMode` is never checked: full folder and file paths are displayed in plain text in `Source:`, `Destination:`, the `Manna` popup menu, conflict dialogs (`askAboutFileCollision` `:43629–43635`), and progress/completion OSD tooltips (`:3279`, `:3389–3398`).
@@ -561,6 +776,8 @@ Compare `ToggleImgFavourites()` (`:39100–39104`) and `friendlyFileUndoInfos()`
 ---
 
 ## 26. Uninitialized `%infoSelection%`, duplicate O(N) `getSelectedFiles(0, 1)`, `"This panels"` typo, `prevuDir` cache miss, and `watchFolderDetails` reset on Copy
+
+> **Verified 2026-11-10:** the empty `infoSelection`, the typo and point 2 confirmed (run F1, read); the second `getSelectedFiles()` call does not scan again; point 3 is not a defect. Rows 26.1a to 26.3.
 
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60763`, `:60767`, `:60782–60783`, `:60792`) and `copyMoveStructuredFolders()` (`:3285–3296`, `:3380`).
 
@@ -591,6 +808,8 @@ Compare `ToggleImgFavourites()` (`:39100–39104`) and `friendlyFileUndoInfos()`
 
 ## 27. Scope leak (`Global ... lastInvoked := 1`), layout misalignment, cramped `&Proceed` enabled on `"Choose..."`, missing mnemonics, and dead locals
 
+> **Verified 2026-11-10:** confirmed (run F1 for the enabled button, the rest read), except that the second value of `sml` is used. Rows 27.1 to 27.5.
+
 **Where:** `PanelStructuredCopyMoveWindow()` (`:60737`, `:60743–60755`, `:60766`, `:60768`, `:60773`, `:60781`, `:60786–60792`), `InvokeMenuBarFile()` (`:67431`), and `createMenuCurrentFilesActs()` (`:69548`).
 
 1. **Accidental `Global ... lastInvoked := 1` (`:60737`):**
@@ -609,6 +828,8 @@ Compare `ToggleImgFavourites()` (`:39100–39104`) and `friendlyFileUndoInfos()`
 
 ## 28. Folder Browse dialog quirks, spurious `ResetImgLoadStatus` timer, and `HIMAGELIST` leak on panel close
 
+> **Verified 2026-11-10:** point 1 confirmed by reading; points 2 and 3 hold for every panel. Rows 28.1 to 28.3.
+
 **Where:** `BtnCpyMvStrctrdChooseFilesDst()` (`:59849–59867`), `BtnCpyMvStrctrdChooseFilesSrc()` (`:59869–59887`), `openFoldersDialogWrapper()` (`:64353–64361`), `PanelStructuredCopyMoveWindow()` (`:60787`), `CloseWindow()` (`:97990–97991`, `:98071`), and `trackImageListButtons()` (`:26742`).
 
 1. **Both `&Browse` and `B&rowse` open identical generic `"Select Folder"` dialogs (`:59861`, `:59881`):**
@@ -622,6 +843,8 @@ Compare `ToggleImgFavourites()` (`:39100–39104`) and `friendlyFileUndoInfos()`
 
 ## Seen in passing
 
+> **Verified 2026-11-10:** confirmed (the undo record: run C5; the tooltip: run F6; the rest read). The image list point is not a leak, the list is released later. Rows S1 to S5.
+
 These bugs live in shared helpers audited while tracing `PanelStructuredCopyMoveWindow()` and affect other QPV features as well:
 
 - **`recordUndoFileActs()` (`:95033`) drops `"|" originalFileInfos` for `actu = 2` (all Moves/Renames):** affects `QuickMoveFile2Dest()` (`:61214`) and `batchCopyMoveFile()` (`:61472`) identically — batch Undo (`batchUndoFileActs` `:94858`) can **never** recover any file overwritten by a Move anywhere in QPV.
@@ -633,6 +856,8 @@ These bugs live in shared helpers audited while tracing `PanelStructuredCopyMove
 ---
 
 ## Checked and found correct
+
+> **Verified 2026-11-10:** agreed for seven of the eight; the Ctrl+Backspace item was not checked. Row C.
 
 - **`askAboutFileCollision` state reset before batch (`:3228`):** `copyMoveStructuredFolders` properly calls `askAboutFileCollision(0, 0, 1, 3, 0, nullvar)` at `:3228` to clear any sticky `"Do not prompt again"` choice (`useLastOption` / `lastOption`) from prior batches, and passes `allowSkip = 1` at `:3300` so `"Do not prompt again"` works across subsequent conflicts within the same structured run.
 - **ASCII case-insensitive path matching and replacement (`:3262`, `:3283`, `:60840`):** for pure ASCII drive letters and folder names (`C:\Temp\Imgs` vs `c:\temp\imgs`), AHK's default `StringCaseSense, Off` matches `InStr` and `StrReplace` case-insensitively and preserves the relative tail's original filesystem casing after `finalDest "\"`.
@@ -646,6 +871,8 @@ These bugs live in shared helpers audited while tracing `PanelStructuredCopyMove
 ---
 
 ## Decisions to make before fixing
+
+> **Verified 2026-11-10:** questions 3 to 6 rest on confirmed claims (findings 11 and 12, 2, 5 and 6, 4). For questions 1 and 2 note that the regular panel does not keep its conflict setting across restarts either.
 
 1. **Separate destination variable vs shared `UsrEditFileDestination` (#16, #17):**
    Should `PanelStructuredCopyMoveWindow` have its own persisted `UsrEditStructuredDestination` (and `UsrEditStructuredSource`?) in `preferences.ini` so `[group-by-...]` / `.\` patterns from `CopyMovePanelWindow` never pollute it, while still pushing confirmed structured destinations into `RecentCopyMoveManager(finalDest)` and `prevFileMovePath`?
