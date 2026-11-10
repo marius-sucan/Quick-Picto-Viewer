@@ -2787,23 +2787,24 @@ OpenThisFilePropFolder() {
        Return
 
     stopSlideshow()
-    resultu := StrReplace(getIDimage(currentFileIndex), "||")
-    If resultu
+    imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+    If imgPath
     {
-       zPlitPath(resultu, 0, fileNamu, folderu)
+       zPlitPath(imgPath, 0, fileNamu, folderu)
        invokeStandardFolderProperties(folderu)
     }
 }
 
-OpenThisFileFolder() {
+OpenThisFileFolder(modus:=0, pathu:=0) {
     If (currentFileIndex=0)
        Return
 
     stopSlideshow()
-    resultu := StrReplace(getIDimage(currentFileIndex), "||")
-    If resultu
+    imgPath := (modus="extern" && pathu) ? pathu : getIDimage(currentFileIndex)
+    imgPath := StrReplace(imgPath, "||")
+    If imgPath
     {
-       zPlitPath(resultu, 0, fileNamu, folderu)
+       zPlitPath(imgPath, 0, fileNamu, folderu)
        Try Run, "%folderu%"
        Catch wasError
        {
@@ -2813,16 +2814,16 @@ OpenThisFileFolder() {
     }
 }
 
-OpenQPVfileFolder() {
+OpenQPVfileFolder(modus:=0, pathu:=0) {
     If (currentFileIndex=0)
        Return
 
     stopSlideshow()
-    imgPath := getIDimage(currentFileIndex)
+    imgPath := (modus="extern" && pathu) ? pathu : getIDimage(currentFileIndex)
     imgPath := StrReplace(imgPath, "||")
     zPlitPath(imgPath, 0, fileNamu, folderu, OutNameNoExt)
     If !FolderExist(folderu)
-       Return msgBeepTimer("ERROR: Folder not found or access denied`n" folderu "\")
+       Return msgBeepTimer("ERROR: Folder not found or access denied:`n" folderu "\")
 
     If askAboutFileSave(" and the containing folder of the selected image will be opened")
        Return
@@ -3020,10 +3021,13 @@ OpenFileProperties() {
 
 InvokeOpenWithMenu(imgPath) {
     Try Menu, OpenWithMenu, Delete
+    zPlitPath(imgPath, 0, OutFileName, OutDir)
+    If !FileExist(imgPath)
+       Return
+
     Global lastWinDrag := 1
     Global lastOtherWinClose := 1
-    zPlitPath(imgPath, 0, OutFileName, OutDir)
-    CurrentSLD := Trimmer(StrReplace(CurrentSLD, "|"))
+    psathu := Trimmer(StrReplace(CurrentSLD, "|"))
     CreateOpenWithMenu(imgPath)
     Menu, OpenWithMenu, Add,
     If (AnyWindowOpen!=60)
@@ -3043,7 +3047,7 @@ InvokeOpenWithMenu(imgPath) {
        Menu, OpenWithMenu, Add, &1. Open with default application, OpenWithDefaultApp
        Menu, OpenWithMenu, Add, &2. System «Open with» dialog, MenuInvokeSHopenWith
        Menu, OpenWithMenu, Add, &4. Explore containing folder`tCtrl+E, OpenThisFileFolder
-       If (CurrentSLD!=OutDir)
+       If (psathu!=OutDir)
           Menu, OpenWithMenu, Add, &5. Open containing folder in QPV`tAlt+E, OpenQPVfileFolder
        Menu, OpenWithMenu, Add,
        Menu, OpenWithMenu, Add, &Choose external application, browseExternalApp
@@ -32742,13 +32746,13 @@ informUserFileMissing(clearScreen:=0) {
 
    setWindowTitle(winTitle, 1)
    SoundBeep, 300, 100
-   If (autoRemDeadEntry=1)
+   If (autoRemDeadEntry=1 && !AnyWindowOpen)
       remCurrentEntry(1)
    If (thumbsDisplaying=1 && maxFilesIndex>0)
       QPV_ListViewGridHUDoverlay()
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
-   If (autoRemDeadEntry!=1 && slideShowRunning!=1)
+   If (autoRemDeadEntry!=1 && slideShowRunning!=1 && !AnyWindowOpen)
       quickBarLoadError("Clean dead entries,,cleanDeadFilesList")
 }
 
@@ -35133,7 +35137,7 @@ countFilesDiskPerStaticFolders() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(folderu, RowNumber, 1)
     folderu := newStaticFoldersListCache[folderu, 1]
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     counter := indexu := RowNumber := 0
@@ -35206,7 +35210,7 @@ BTNcountFilesDiskDynaFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isR, RowNumber, 2)
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     If !thisIndex
@@ -47148,15 +47152,18 @@ SelectFilesDead() {
    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
-QuickSelectFilesSameFolder(modus:=0, external:=0) {
+QuickSelectFilesSameFolder(modus:=0, external:=0, bonusAct:=0) {
     Static lastInvoked := 1
-    imgPath := (isNumber(modus) && modus>0 && external="aye") ? modus : getIDimage(currentFileIndex)
+    imgPath := (modus && external="aye") ? modus : getIDimage(currentFileIndex)
     zPlitPath(imgPath, 0, OutFileName, OutDir)
     If (!OutDir || !currentFileIndex || maxFilesIndex<3)
        Return
 
     If warnFramesActionPrevented("SELECT")
        Return
+
+    If (bonusAct="drop-sel")
+       dropFilesSelection()
 
     o := markSearchMatches
     oz := userSearchString
@@ -47165,7 +47172,7 @@ QuickSelectFilesSameFolder(modus:=0, external:=0) {
     If (resultedFilesList[currentFileIndex, 2]=1 && (A_TickCount - lastInvoked<950))
     {
        ; select from subfolders as well 
-       SoundBeep 900,100
+       ; SoundBeep 900,100
        userSearchWhat := 1
        userSearchString := OutDir "\"
     } Else
@@ -75148,7 +75155,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
             setWindowTitle(pVwinTitle, 1)
             clearGivenGDIwin(A_ThisFunc, 2NDglPG, 2NDglHDC, hGDIwin)
             msgBeepTimer("ERROR: File not found or access denied`n" OutFileName "`n" OutDir "\", 0)
-            If (autoRemDeadEntry!=1 && slideShowRunning!=1)
+            If (autoRemDeadEntry!=1 && slideShowRunning!=1 && !AnyWindowOpen)
                quickBarLoadError("Clean dead entries,,cleanDeadFilesList")
          }
 
@@ -75164,7 +75171,7 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
             }
 
             thisu := (slideShowRunning=1 && SlideHowMode=1) ? 1 : 0
-            If (autoRemDeadEntry=1 && thisu!=1)
+            If (autoRemDeadEntry=1 && thisu!=1 && !AnyWindowOpen)
                remCurrentEntry(1)
 
             lastInvoked := A_TickCount
@@ -75175,8 +75182,8 @@ coreShowTheImage(imgPath, usePrevious:=0, ForceIMGload:=0) {
    }
 
    thisModus := (allowFreeIMGpanning=1 && IMGresizingMode=4) ? 1 : 0
-   If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85)
-   || (slideShowRunning=1 || animGIFplaying=1 || usePrevious=1 || oldZoomLevel || ForceIMGload=1 || diffIMGdecX || diffIMGdecY || LastWasFastDisplay=1)
+   If (A_TickCount - lastInvoked>85) && (A_TickCount - lastInvoked2>85) || (slideShowRunning=1 || animGIFplaying=1 
+   || usePrevious=1 || oldZoomLevel || ForceIMGload=1 || diffIMGdecX || diffIMGdecY || LastWasFastDisplay=1)
    {
        lastInvoked := A_TickCount
        r2 := ResizeImageGDIwin(imgPath, usePrevious, ForceIMGload)
@@ -89099,7 +89106,7 @@ IDshowImage(imgID, opentehFile:=0) {
     {
        If (!FileRexists(imgPath) && opentehFile!=250 && imgPath!=prevImgPath)
        {
-          If (autoRemDeadEntry=1 && imgID=currentFileIndex)
+          If (autoRemDeadEntry=1 && imgID=currentFileIndex && !AnyWindowOpen)
              remCurrentEntry(1)
           Return 0
        }
@@ -93545,7 +93552,6 @@ invokePanelReviewSelContextMenu() {
    kMenu("PVcopy", "Add", "Co&py containing folders (Explorer)", "BTNreviewCopyFoldersExplorer")
    kMenu("PVcopy", "Add", "C&ut containing folders (Explorer)", "BTNreviewCutFoldersExplorer")
 
-
    If totalSelected
    {
       UIupdateReviewLVinView()
@@ -93564,7 +93570,7 @@ invokePanelReviewSelContextMenu() {
          kMenu("MenuRevSelFiles", "Add", "Select entire &table`tCtrl+A", "BTNreviewLVselAll")
 
       kMenu("MenuRevSelFiles", "Add/UnCheck", "&Filter table to selected path", "BTNreviewFilterLVSelPath")
-      If (InStr(folderPath, editu) && OutputVar=1 && editu)
+      If ((folderPath "\"=editu) && OutputVar=1 && editu)
          kMenu("MenuRevSelFiles", "Check", "&Filter table to selected path")
 
       kMenu("MenuRevSelFiles", "Add", "Filter files &list to selected path`tF3", "BTNreviewFilterListSelPath")
@@ -94351,6 +94357,7 @@ uiLVundoFileActsResponder(a:=0, b:=0, c:=0) {
 
 PopulateFileActsHistory() {
     Static initTotals := 0, lastSearch := 0, listedEntries := 0
+    Static whichLV := "LViewOthers"
     If (AnyWindowOpen!=87)
        Return
 
@@ -94360,10 +94367,8 @@ PopulateFileActsHistory() {
     thisString := StrReplace(Trimmer(listViewUndoActsFilteru), "||", "|")
     thisString := Trimmer(thisString, "|")
     thisFilter := processSearchIndexString(thisString)
-    isStrFilter := StrLen(thisString)>1 ? 1 : 0
-    FilterSimple := (InStr(thisString, "|") || InStr(thisString, "/") || InStr(thisString, ">") || InStr(thisString, "?")) ? 0 : 1
-
-    whichLV := "LViewOthers"
+    isStrFilter := (StrLen(thisString)>1) ? 1 : 0
+    FilterSimple := varContains(thisString, "|", "/", ">", "?", "*") ? 0 : 1
     Gui, SettingsGUIA: ListView, % whichLV
     doStartLongOpDance()
     LV_Delete()
@@ -95214,8 +95219,7 @@ BTNreviewCutFoldersExplorer() {
 }
 
 BTNreviewFilterListSelPath() {
-   dropFilesSelection()
-   BTNreviewSelFilesInPath()
+   BTNreviewSelFilesInPath("drop-sel")
    If (markedSelectFile>1)
    {
       BtnCloseWindow()
@@ -95223,15 +95227,17 @@ BTNreviewFilterListSelPath() {
    }
 }
 
-BTNreviewSelFilesInPath() {
+BTNreviewSelFilesInPath(modus:=0) {
    Gui, SettingsGUIA: Default
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
-   RowNumber := 0
-   RowNumber := LV_GetNext(RowNumber, "F")
+   RowNumber := LV_GetNext(0, "F")
+   If !RowNumber
+      Return
+
    LV_GetText(thisFileIndex, RowNumber, 4)
-   QuickSelectFilesSameFolder(resultedFilesList[thisFileIndex, 1], "aye")
+   QuickSelectFilesSameFolder(resultedFilesList[thisFileIndex, 1], "aye", modus)
 }
 
 BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
@@ -95239,11 +95245,11 @@ BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
+   RowNumber := LV_GetNext(0, "F")
+   If !RowNumber
+      Return
 
-   RowNumber := 0
-   RowNumber := LV_GetNext(RowNumber, "F")
    LV_GetText(thisFileIndex, RowNumber, 4)
-   currentFileIndex := thisFileIndex
    imgPath := resultedFilesList[thisFileIndex, 1]
    zPlitPath(imgPath, 1, OutFileName, OutDir)
    ; TulTip(0, "=", a, b, c, thisFileIndex)
@@ -95252,7 +95258,7 @@ BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
    If InStr(a, "folder now")
    {
       BtnCloseWindow()
-      OpenQPVfileFolder()
+      OpenQPVfileFolder("extern", imgPath)
    } Else If InStr(a, "external app")
    {
       lastOtherWinClose := 1
@@ -95260,11 +95266,12 @@ BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
    } Else If InStr(a, "modify")
    {
       BtnCloseWindow()
+      currentFileIndex := thisFileIndex
       PanelUpdateThisFileIndex("reviewer")
    } Else If InStr(a, "new QPV instance")
-      SoloNewQPVinstance()
+      OpenNewQPVinstance(imgPath)
    Else If InStr(a, "in explorer")
-      OpenThisFileFolder()
+      OpenThisFileFolder("extern", imgPath)
    Else If InStr(a, "properties")
       invokeStandardFolderProperties(OutDir)
 }
@@ -95272,14 +95279,18 @@ BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
 BTNreviewFilterLVSelPath() {
    Gui, SettingsGUIA: Default
    GuiControlGet, OutputVar, Visible, LViewFiltered
+   GuiControlGet, editu, , listViewReviewFilteru
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
-   RowNumber := 0
-   RowNumber := LV_GetNext(RowNumber, "F")
+   RowNumber := LV_GetNext(0, "F")
+   If !RowNumber
+      Return
+
    LV_GetText(thisFileIndex, RowNumber, 4)
    imgPath := resultedFilesList[thisFileIndex, 1]
    zPlitPath(imgPath, 1, OutFileName, OutDir)
-   GuiControl, SettingsGUIA:, listViewReviewFilteru, % OutDir
+   diru := (editu=OutDir "\") ? "" : OutDir "\"
+   GuiControl, SettingsGUIA:, listViewReviewFilteru, % diru
    UIeditApplyFilterReviewPanel()
 }
 
@@ -95495,6 +95506,8 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
+   If !isVarEqualTo(b, "DoubleClick", "k", "s", "RightClick")
+      Return
 
    totalListed := LV_GetCount()
    topIndex := LV_EX_GetTopIndex(hLVmainu)
@@ -95506,11 +95519,13 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
       ToolTip, List view will further be populated
       Return
    }
-   ; If (b="k")
-   RowNumber := LV_GetNext(0, "F")
-   LV_GetText(indexu, RowNumber, 4)
-   ;    TulTip(0, "=", a, b, c, indexu, RowNumber)
 
+   RowNumber := LV_GetNext(0, "F")
+   If !RowNumber
+      Return
+
+   LV_GetText(indexu, RowNumber, 4)
+   ; TulTip(0, "=", a, b, c, indexu, RowNumber)
    If (b="K" && c=112) ; F1
    {
       BtnHelpReviewPanel()
@@ -95531,7 +95546,7 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
       Return
    } Else If (b="K" && c=117) ; F6
    {
-      BtnReviewPaneOpenActs()
+      BtnReviewPaneOpenActs("in explorer")
       Return
    } Else If (b!="DoubleClick")
       Return
@@ -95578,9 +95593,8 @@ uiPopulateReviewSelectedFiles(modus:="") {
     thisString := StrReplace(Trimmer(listViewReviewFilteru), "||", "|")
     thisString := Trimmer(thisString, "|")
     thisFilter := processSearchIndexString(thisString)
-    isStrFilter := StrLen(thisString)>1 ? 1 : 0
-    FilterSimple := (InStr(thisString, "|") || InStr(thisString, "/") || InStr(thisString, ">") || InStr(thisString, "?")) ? 0 : 1
-
+    isStrFilter := (StrLen(thisString)>1) ? 1 : 0
+    FilterSimple := varContains(thisString, "|", "/", ">", "?", "*") ? 0 : 1
     whichLV := (isStrFilter=1) ? "LViewFiltered" : "LViewOthers"
     Gui, SettingsGUIA: ListView, % whichLV
     If (whichLV="LViewFiltered")
@@ -95782,7 +95796,7 @@ BTNignoreDateStaticFolder(dummy:=0) {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     If (SLDtypeLoaded!=3)
@@ -95856,7 +95870,7 @@ BTNcopyStaticFolderPath() {
     If (AnyWindowOpen=2)
        folderu := newStaticFoldersListCache[folderu, 1]
 
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     If (AnyWindowOpen=2)
@@ -95902,7 +95916,7 @@ BTNcutCopyStaticFolders(a) {
     If (AnyWindowOpen=2)
        folderu := newStaticFoldersListCache[folderu, 1]
 
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     counter := indexu := RowNumber := 0
@@ -95988,7 +96002,7 @@ BTNremFilesStaticFolder() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     msgResult := msgBoxWrapper(appTitle ": Remove files by folder", "Please confirm that you want to remove the files from the index pertaining to the selected folder(s).", 4, 0, "question")
@@ -96054,7 +96068,7 @@ BTNselFilesStaticFolder(modus:=0) {
       folderu := newStaticFoldersListCache[folderu, 1]
 
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
-   If (StrLen(folderu)<2 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
 
    ToolTip, Selecting matching files
@@ -96162,7 +96176,7 @@ BTNcountFilesDynaFolders() {
    LV_GetText(folderu, RowNumber, 3)
    LV_GetText(onDisk, RowNumber, 7)
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
-   If (StrLen(folderu)<2 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
 
    ToolTip, Identifying matching files
@@ -96279,7 +96293,7 @@ BTNremDynaSelFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isR, RowNumber, 2)
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     If !InStr(isR, "R")
@@ -96354,7 +96368,7 @@ BtnPanelStaticJumpFirst() {
       folderu := newStaticFoldersListCache[folderu, 1]
 
    ; ToolTip, % RowNumber "==" A_GuiEventInfo "`n" folderu , , , 2
-   If (StrLen(folderu)<2 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
 
    winOpen := AnyWindowOpen
@@ -96422,7 +96436,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       folderu := newStaticFoldersListCache[folderu, 1]
 
    ; ToolTip, % RowNumber "==" A_GuiEventInfo "`n" folderu , , , 2
-   If (StrLen(folderu)<2 || folderu="folder path")
+   If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
 
    folderPath := StrReplace(folderu, "|")
@@ -96789,7 +96803,7 @@ BtnToggleRecurseDynaFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isPipe, RowNumber, 2)
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     ; BtnCloseWindow()
@@ -96839,7 +96853,7 @@ BTNrescanDynaFolder() {
     RowNumber := LV_GetNext()
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(recu, RowNumber, 2)
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     BtnCloseWindow()
@@ -97118,7 +97132,7 @@ PanelRenameStaticFolder() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, colNum)
     folderu := (AnyWindowOpen=2) ? newStaticFoldersListCache[indexu, 1] : indexu
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
         Return
 
     If (SLDtypeLoaded=2 && AnyWindowOpen=2)
@@ -97499,7 +97513,7 @@ BTNupdateSelectedStaticFolder() {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<2 || folderu="folder path")
+    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
     If (SLDtypeLoaded=2 && FileExist(CurrentSLD))
