@@ -15,18 +15,19 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-10.** Marius fixed part of this in one commit, `f88e4be`. Findings 1, 5, 6,
-7, 8, 22, 26 and 27 are fixed. Findings 2 and 17 are partly fixed: 2 in a database but not on
-a cached .SLD list, 17 for private mode but not for a missing folder. Finding 4 is not fixed:
-the commit adds a function for the «Ignore all changes» button, and the button does not
-call it. The other nineteen are open. A fixed or partly fixed section ends with a note on
-what the code does now; so do findings 3 and 4, which stay open next to code the commit
-changed. Those notes cite lines at `54a0666`, the merge commit that follows `f88e4be`;
-everything else keeps its lines at ab160cb, and the name `BTNignoreDateStaticFolder()`,
-which the commit changed to `MenuIgnoreDateStaticFolder()`. Each note was checked by
-running the fifteen batches again on `54a0666`, with a new one, P.
+**Status, 2026-11-10.** Marius fixed part of this in one commit, `f88e4be`. It adds a
+function for the «Ignore all changes» button; `256a670` attaches the button to it, at his
+request. Findings 1, 4, 5, 6, 7, 8, 22, 26 and 27 are fixed. Findings 2 and 17 are partly
+fixed: 2 in a database but not on a cached .SLD list, 17 for private mode but not for a
+missing folder. The other nineteen are open. A fixed or partly fixed section ends with a
+note on what the code does now; so does finding 3, which stays open next to code the
+commit changed. Those notes cite lines at `54a0666`, the merge commit that follows
+`f88e4be`; `256a670` changes two lines and moves none. Everything else keeps its lines at
+ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
+`MenuIgnoreDateStaticFolder()`. Each note was checked by running the fifteen batches
+again, with a new one, P: on `54a0666`, and once more on the text of `256a670`.
 
-What the commit changed besides is under «New with the fixes»: two small points.
+What the commits changed besides is under «New with the fixes»: two small points.
 
 ## Terms
 
@@ -58,12 +59,12 @@ What the commit changed besides is under «New with the fixes»: two small point
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `54a0666` |
+| # | Finding | Harm | Checked | Status at `256a670` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **partly fixed**, `f88e4be`: in a database; not on a cached .SLD list |
 | 3 | After any update, the folders list in memory starts at entry 2 and is thrown away: folders added to a cached .SLD list never reach it, ignored changes come back | high | run | open |
-| 4 | «Ignore all changes» updates the highlighted rows only, and nothing without a focused row | medium | run | open: the function added for the button is not called |
+| 4 | «Ignore all changes» updates the highlighted rows only, and nothing without a focused row | medium | run | **fixed**, `f88e4be` and `256a670` |
 | 5 | «Ignore date change» with a filter on: when every listed row is highlighted, the folders that are not listed are updated too | medium | run | **fixed**, `f88e4be` |
 | 6 | On a cached .SLD list an ignored change is not saved, and the list is not marked as modified | medium | run | **fixed**, `f88e4be` |
 | 7 | The filter cannot be removed after the panel reopened with it | medium | run | **fixed**, `f88e4be` |
@@ -296,8 +297,8 @@ What happens (run, batch C, three folders marked):
 Correction: a small function for the button that passes "update-all", and the focused-row
 test skipped in that case. Decision 1 asks what «all» covers when a filter is on.
 
-**Not fixed at `54a0666`.** `f88e4be` renames the function to `MenuIgnoreDateStaticFolder()`
-(:95845) and adds the small function the correction asks for:
+**Fixed in `f88e4be` and `256a670`**, by the correction above. `f88e4be` renames the function
+to `MenuIgnoreDateStaticFolder()` (:95845) and adds the small function for the button:
 
 ```ahk
 BtnIgnoreDateStaticFolder() {                    ; :95841
@@ -305,25 +306,30 @@ BtnIgnoreDateStaticFolder() {                    ; :95841
 }
 ```
 
-Nothing calls it. The button is bound to the renamed function, as the menu item is:
+At `54a0666` nothing called it: the button was bound to the renamed function, as the menu
+item is, and did what it did at ab160cb (run, real clicks). `256a670` attaches the button to
+it and lets "update-all" pass the focused-row test:
 
 ```ahk
-Gui, Add, Button, x+5 hp w%btnWid% gMenuIgnoreDateStaticFolder, I&gnore all changes  ; :94024
+; :94024
+Gui, Add, Button, x+5 hp w%btnWid% gBtnIgnoreDateStaticFolder, I&gnore all changes
+; :95851
+If ((StrLen(folderu)<2 || folderu="folder path" || !RowNumber) && dummy!="update-all")
 ```
 
-Run, with real clicks on the button (batches C and P):
+Run on that text, with real clicks on the button (batches C and P):
 
-- no focused row: nothing, no message, as before;
-- the `Beta` row highlighted: `Beta` alone is cleared, as before;
-- a row with no mark highlighted: the message reads «Folders list information updated» and
-  the two marked folders keep their marks.
+- three folders marked, no focused row: the three marks are cleared, the message reads
+  «Folders list information updated», the panel is opened again and the list counts as
+  modified;
+- two folders marked, a row with no mark highlighted: the two marks are cleared;
+- a filter on that lists one row, no focused row: the mark of a folder that is not listed
+  is cleared too, and the panel comes back with the filter still applied. «All» is every
+  folder of the list (:95896), which settles the first half of decision 1;
+- a folder that is missing from the disk keeps its mark (the rest of finding 17).
 
-Called by hand (run, batch P), `BtnIgnoreDateStaticFolder()` does what the button's name
-says when a row is focused: every mark of the list is cleared and the panel is opened
-again. With no focused row it does nothing, because the test at :95851 comes first. Two
-changes are left: `gBtnIgnoreDateStaticFolder` at :94024, and that test skipped for
-"update-all". With a filter on, the "update-all" branch walks the whole folders list
-(:95896), listed or not: the first half of decision 1.
+The menu item «Ignore date change» is as it was: it asks for a focused row and works on
+the highlighted rows.
 
 ## 5. «Ignore date change» with a filter on updates folders that are not listed
 
@@ -899,9 +905,8 @@ Correction: return from the context-menu handler while Alt is down.
 - **The first line of the panel** says the list «was generated based on the indexed
   files»; for a cached .SLD list it is read from the file.
 
-At `54a0666` one point changed: "update-all" is now passed by
-`BtnIgnoreDateStaticFolder()`, which nothing calls (finding 4). The others are as they
-were.
+One point changed: "update-all" is now passed, by `BtnIgnoreDateStaticFolder()`
+(finding 4). The others are as they were.
 
 ---
 
@@ -951,7 +956,8 @@ they were without the trial (run, batches C, C2, D, M and P).
 
 ## New with the fixes
 
-What `f88e4be` changed besides, run on `54a0666`. Both points are low.
+What `f88e4be` changed besides, run on `54a0666`. Both points are low. `256a670` adds
+nothing to them but the button's share of the second one.
 
 - **Database, a rescanned folder that cannot be reached** (finding 14). Its entries are
   removed as before. The `staticfolders` table now keeps a row for the folder, with an
@@ -961,10 +967,8 @@ What `f88e4be` changed besides, run on `54a0666`. Both points are low.
   panel does not show the row: in a database it lists the folders that have images. The
   row stays until the folders list is regenerated.
 - **«Ignore date change» marks the list as modified when it changed nothing**: on a folder
-  that is missing from the disk (finding 6's note).
-
-Not a new defect, but easy to miss when reading the commit: `BtnIgnoreDateStaticFolder()`
-has no caller (finding 4).
+  that is missing from the disk (finding 6's note). The «Ignore all changes» button does
+  the same when no folder is marked (read).
 
 ## Seen in passing
 
@@ -1005,9 +1009,9 @@ Not part of the panel's own code.
 
 1. **«Ignore all changes»**: every folder of the list, or every listed row when a filter
    is on? And «Ignore date change» with every listed row highlighted: the highlighted rows
-   alone? **The second question is settled by `f88e4be`: the highlighted rows alone.** The
-   first is open; the function written for the button covers every folder of the list
-   (finding 4).
+   alone? **Both are settled.** «Ignore all changes» covers every folder of the list,
+   listed or not: the function `f88e4be` adds for the button, attached in `256a670`. «Ignore
+   date change» covers the highlighted rows alone (`f88e4be`).
 2. **A rescanned folder that cannot be reached**: skip it, ask first, or remove its
    entries as now?
 3. **After a rescan**, which image: the one that was shown, when it is still in the index;
@@ -1027,10 +1031,9 @@ Not part of the panel's own code.
 10. **Lower-case paths after a rescan**: acceptable, or should the index keep the spelling
     it had?
 
-Suggested order, at `54a0666`: finding 3 first (`counter := 0`, with the «Files» cell
+Suggested order, at `256a670`: finding 3 first (`counter := 0`, with the «Files» cell
 looked after and decision 9 answered), which also completes finding 2 on a cached .SLD
-list; with it, the two lines of finding 4; then 9, 13, the rest of 17, and 18; the others
-wait for the decisions.
+list; then 9, 13, the rest of 17, and 18; the others wait for the decisions.
 
 ## How this was checked
 
@@ -1062,6 +1065,10 @@ wait for the decisions.
   answers «Discard» to the save question it now gets; batch E also sorts «Size (MB)»;
   batch J also logs the `staticfolders` table, and was run once more on ab160cb for that
   table.
+- `256a670` was checked the same way, on its text before it was committed: the sixteen
+  batches, with one more step in batch P (the button pressed with a filter on and no
+  focused row). The logs differ from those of `54a0666` in what the button does, in
+  batches C and P, and in the number of a random image, in batches C and D; nowhere else.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11). The layout figures of finding 30 come from widths the
   script sets itself.
@@ -1072,8 +1079,8 @@ wait for the decisions.
   `run-app.sh <tag> <test function> [revision]`; `patch.py`; `test-wrappers-static.ahk`
   (testStaticA to testStaticN, named as in the table below); `results/` (the logs ending
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
-  with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, and `j-ab1` is
-  batch J on ab160cb with the table logged).
+  with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
+  `-fix4` the ones of `256a670`, and `j-ab1` is batch J on ab160cb with the table logged).
 
 | Batch | What it runs |
 |-------|--------------|
@@ -1092,4 +1099,4 @@ wait for the decisions.
 | L | files selected before the first opening, on the three kinds of list |
 | M | cached .SLD: a seed-folder rescan, «Regenerate entire index», «Regenerate this folders list» |
 | N | what one right-click on a row raises |
-| P | cached .SLD, at `54a0666`: the number filters on rows with no count; «Ignore date change», then saved and loaded again; the function added for the button, called by hand, and the button itself; «Rescan folder(s)», then saved and loaded again; a Down key on a row not yet counted; «Ignore date change» on a missing folder |
+| P | cached .SLD, after the fixes: the number filters on rows with no count; «Ignore date change», then saved and loaded again; the function added for the button, called by hand, and the button itself; «Rescan folder(s)», then saved and loaded again; a Down key on a row not yet counted; «Ignore date change» on a missing folder; the button with a filter on and no focused row |
