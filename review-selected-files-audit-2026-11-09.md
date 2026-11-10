@@ -11,6 +11,10 @@ under headless Wine, on AutoHotkey_H 1.1.33.10 (the two largest batches also on 
 AutoHotkey 1.1.37.02, with the same log); **read** means it follows from the code and was not
 run. Nothing was run on Windows. The test kit is described at the end.
 
+Two independent reads of the same code followed the first version of this report. They
+confirmed every finding but 9, which neither raised, and narrowed finding 12. What they added
+is marked **second read**, and each such point was run before it went in.
+
 ## Terms
 
 - **Index**: QPV's files list, `resultedFilesList`. A row's «#» column holds the file's
@@ -47,14 +51,14 @@ run. Nothing was run on Windows. The test kit is described at the end.
 | 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run |
 | 10 | A listing the user stopped: no notice, no way to resume, and a filter remembers the partial result as final | medium | run |
 | 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table | medium, rare | run |
-| 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties» | medium | run |
+| 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties»; such paths reach the index only through «Search and replace» | low, narrow | run |
 | 13 | `*` is not a wildcard in the filter box | medium | run |
 | 14 | «Filter table to selected path» also lists folders whose name begins the same; its tick never comes off | low | run |
 | 15 | «Open image with an external app» removes the `\|` from the list's source name | medium | run |
 | 16 | «Modify index entry»: three answers close the panel for good, two bring it back | low | run |
 | 17 | A copy the user stopped is announced as done; equal file names are merged | low | run |
 | 18 | Every changed row runs the list's event handler | low, large selections | run |
-| 19 | Small things: a tooltip that stays, an unapplied filter applied by scrolling, memory kept, two items on the same Alt letter | low | run |
+| 19 | Small things: a tooltip that stays, an unapplied filter applied by scrolling, a typed number changed by the arrow keys, memory kept, two items on the same Alt letter | low | run |
 
 Findings 1, 2 and 3 are the ones a user meets in ordinary use. Finding 4 needs «Automatically
 remove index entries pointing to inexistent files» to be on, and a selected file that is
@@ -97,6 +101,13 @@ What happens (run):
 - The other focused-row actions fail quietly in that state: «Open folder in Explorer» finds
   no path, «Filter table to selected path» empties the filter box, «Select files in index in
   same folder» falls back to the image in the viewport (finding 3).
+- **F2 in that state, then a real path and «Update entry»** (second read, run): the files
+  list gets an entry under the key «#». The list object then holds six entries against a
+  `maxFilesIndex` of 5.
+- F3 in that state drops the selection and takes the viewport's folder (findings 2 and 3,
+  read).
+- A double-click on empty space while a row is focused opens that row, because the handler
+  never looks at the row the event names (read). The same goes for an empty filtered table.
 
 Enter reaches this code through `decideBlockKbdKeys()` (:666-669), which keeps the key away
 from the «Apply» button while the list has the focus, and `externalinvokedSettingsContextMenu()`
@@ -201,6 +212,10 @@ Run, with **«Automatically skip inexistent files»** on as well: «Folder prope
 same row removed two entries, the missing file and the healthy `d3.png` after it (see «Seen
 in passing», A). Then «Deselect» on the row that shows `d3.png` deselected `d5.png`.
 
+A row whose number is now past the end of the list does more (second read, run): «Deselect»
+on it writes a flag at that position, which creates an entry with no path. The list object
+then holds six entries against a `maxFilesIndex` of 5.
+
 Fix direction: give the «Open» actions the row's path instead of changing `currentFileIndex`,
 or rebuild the panel whenever `maxFilesIndex` changed since it was filled.
 
@@ -236,6 +251,12 @@ in the second prompt. The review panel is on screen and `AnyWindowOpen` is 0. In
 - The main window's keys and clicks are live again while the panel is open, because their
   gates test `AnyWindowOpen` (`HKifs()` :543). The list can then be sorted, filtered or
   shortened under a panel that still holds the old positions (read).
+- **Another panel is built inside this window** (second read, run). `createSettingsGUI()`
+  closes the open panel only when `AnyWindowOpen` is set (:28015). «Manage seed folders»
+  opened in that state: the same window, 18 controls before and 28 after, under the new
+  panel's title.
+- «Erase entry» in the second prompt removes an index entry under the panel that just came
+  back, with finding 4's effect (read).
 
 «Refresh» and «Close» still work and put things right.
 
@@ -284,6 +305,9 @@ The column is the panel's purpose, and five things let it go stale.
 - **The filtered table is reused.** When the same text is applied again, the table filled the
   first time is shown as it is (:95591-95596). Run: filter `\A\`, erase it, deselect three of
   those files in the full table, apply `\A\` again: the three rows show «S».
+- **A stale «S» cannot be cleared with «Deselect»** (second read, run). A row is rewritten
+  only when its flag changes (:95428), and the flag is already 0. Run: every file deselected
+  in the index, then «Deselect» on three rows: they still show «S».
 
 «Refresh» (F5) rebuilds the panel from the index, and loses the filter text and the place in
 the table.
@@ -386,6 +410,10 @@ The second call starts 250 ms after the click, so the listing must still be runn
 be less than 1.5 s old. That takes tens of thousands of selected files. «Apply» with fewer
 than two characters in the box takes the same path.
 
+«Refresh» (F5) during such a listing leaves the interrupted loop adding rows to the new
+panel. A «Select», «Deselect» or «None» loop interrupted the same way goes on over the other
+table (second read; both read, not run).
+
 Fix direction: turn Critical on for the whole listing, as the first listing has it, or name
 the list view before every `LV_Add()` and leave the loop when the other table became visible.
 
@@ -400,6 +428,12 @@ The panel uses that mode for the «Folder path» column (:95668), for «Copy fol
 text» and both «containing folders (Explorer)» actions (:95325), and for «Folder properties»
 (:95248).
 
+**How such a path gets into the index** (second read): folder scans and list files admit
+drive-letter paths only (`RegExFilesPattern` :116, `requireDriveLetter` :88748). «Search and
+replace» in the index can write one, and `repairPathSeparators()` keeps its `\\` on purpose
+(:97224). So the finding concerns that route, or a build with `requireDriveLetter` set to 0.
+A network share mapped to a drive letter is not affected.
+
 Run, with `\\srv\share\dir\u1.png` in the list:
 
 - the column shows `srv\share\dir`;
@@ -407,7 +441,9 @@ Run, with `\\srv\share\dir\u1.png` in the list:
 - «Cut containing folders (Explorer)» puts `srv\share\dir` on the clipboard as a folder to
   paste;
 - «Folder properties» is asked for `srv\share\dir`, and answers «The folder seems to no
-  longer exist».
+  longer exist»;
+- «Open folder in Explorer» fails on it and says nothing: `OpenThisFileFolder()` shows its
+  error only when no panel is open (:2810) (read).
 
 «Copy complete path(s)» and «Copy files (Explorer)» keep the path whole.
 
@@ -449,7 +485,8 @@ same line (:94364).
 
 - **The folder path is searched anywhere in the full path** (:95649). Run: the action on a
   `pv\A` row also lists `pv\A2\x1.png`. It lists `pv\A\sub\s1.png` too; subfolders may be
-  wanted (decision 5), a neighbour folder is not.
+  wanted (decision 5), a neighbour folder is not. A file at a drive root gives `C:` as its
+  folder, which matches the whole drive (second read, read).
 - **The item is drawn as a tick box** (`Add/UnCheck`), and is ticked when the box's text
   occurs in the focused row's folder (run: «(checked)»). Choosing it again applies the same
   filter; nothing unticks it (read). Any typed text that occurs in the folder ticks it too.
@@ -500,7 +537,8 @@ exits leave before that line:
 - «Cancel» at the unsaved-image question (read).
 
 «Cancel» in the prompt and «Erase entry» bring the panel back (both run), so erasing an entry
-has two outcomes, and so has leaving it alone.
+has two outcomes, and so has leaving it alone. «Browse file» does not bring it back either;
+that one is written so (`preventer`, :41950).
 
 ---
 
@@ -560,6 +598,18 @@ Fix direction: make the handler's first line return for every event but `DoubleC
 - **«Select» and «Deselect» with no highlighted row** do nothing and say nothing (run).
 - **Filter text `a|||b`** matches every file (run): one `||` becomes `|`, and the remaining
   empty alternative matches anything.
+- **Up and Down change a number typed in the filter box** (second read, run): «0042» becomes
+  «43». The panels' numeric edit fields answer to the arrow keys (:649-661, :842-859), and
+  only names that begin with `editF` are left out.
+- **A `\>` filter retyped in another letter case shows the earlier table** (second read,
+  run). `thisSearch=lastSearch` compares without regard to case; the expression does not.
+  `\>IMG_1` lists one file, and `\>img_1` right after it lists the same one, where it
+  matches none.
+- **«Open folder in Explorer» says nothing when it fails** while a panel is open (:2810,
+  read).
+- **A listing goes on after the panel is closed.** Its loop runs to the end with nowhere to
+  add rows, and closing the panel has cleared the busy state, so it can no longer be stopped
+  (second read, read).
 
 ---
 
@@ -571,7 +621,8 @@ inexistent files» on, `IDshowImage()` has by then removed the missing entry its
 and moved to the next image. `informUserFileMissing()` then reports the new current file as
 «File not found» and, with auto-remove on, removes it as well (:32745). Run: six entries, one
 missing, both options on: four entries left, and the message names the healthy `d3.png`. The
-same happens on any direct jump to a missing file, not only from this panel.
+same happens on any direct jump to a missing file, not only from this panel. On an .SLDB
+list `remCurrentEntry()` also deletes the healthy file's database record (:33850, read).
 
 **B.** `PopulateFileActsHistory()` :94364 has finding 13's line.
 
@@ -631,8 +682,10 @@ Suggested order: 1, 3, 6 and 13 are one-line fixes; then 2 and 4 with their deci
   popup menus, clipboard writes and the Explorer and new-instance launches write a log line
   instead; `msgBeepTimer()` and `addJournalEntry()` log their text; the list's handler
   counts its calls.
-- Eight batches, about 25 s each. Batches A and B gave the same log on AutoHotkey_H
+- Ten batches, about 25 s each. Batches A and B gave the same log on AutoHotkey_H
   1.1.33.10 and on stock AutoHotkey 1.1.37.02.
+- Two independent reads of the same code, made without the findings above. Batch J ran the
+  points they added.
 - Three aids, each named where it was used:
   - the 3.5 s page limit shortened to 30 ms in the scratch copy, for the paging runs
     (findings 8, 9, 10 and 19);
@@ -645,5 +698,5 @@ Suggested order: 1, 3, 6 and 13 are one-line fixes; then 2 and 4 with their deci
 - Not checked: the panel on an .SLDB list, on a duplicates list (the «Dupe ID» column), and
   with an edited, unsaved image in the viewport.
 - Kit: `.claude/scratch/review-selected-panel-2026-11-09/app/`: `run-app.sh <tag> <test
-  function>`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to testReviewH),
+  function>`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to testReviewJ),
   `results/`.
