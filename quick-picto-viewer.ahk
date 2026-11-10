@@ -95369,6 +95369,9 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
    }
 
    itemsList := ""
+   If (useArray!=1)
+      counter := ST_Count(listu, "`n")
+
    If (useArray=1 && counter>0)
    {
       destroyGDIfileCache()
