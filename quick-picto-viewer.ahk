@@ -94021,7 +94021,7 @@ PanelStaticFolderzManager() {
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid2% gBTNupdateSelectedStaticFolder, &Rescan folder(s)
 
     If isUpdateList
-       Gui, Add, Button, x+5 hp w%btnWid% gMenuIgnoreDateStaticFolder, I&gnore all changes
+       Gui, Add, Button, x+5 hp w%btnWid% gBtnIgnoreDateStaticFolder, I&gnore all changes
     Gui, Add, Button, x+5 hp w%btnWid3% gRegenerateEntireList, R&egenerate entire index
     Gui, Add, Button, x+5 hp w%btnWid4% ginvokePanelStaticFoldersContextMenu, &More
     labelu := isUpdateList ? "Cached folders list: " : "Static folders list: "
@@ -95848,7 +95848,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
     RowNumber := LV_GetNext(0, "F")
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
-    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
+    If ((StrLen(folderu)<2 || folderu="folder path" || !RowNumber) && dummy!="update-all")
        Return
 
     If (SLDtypeLoaded!=3)
