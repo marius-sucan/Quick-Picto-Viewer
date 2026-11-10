@@ -95528,9 +95528,10 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    Gui, SettingsGUIA: ListView, % whichLV
    totalListed := LV_GetCount()
    topIndex := LV_EX_GetTopIndex(hLVmainu)
+   rowsInView := LV_EX_GetRowsPerPage(hLVmainu)
    totalIndex := reviewSelectedIndexes.Count()
    isInputOkay := (b="s" || b="k" && (c=40 || c=35 || c=34)) ? 1 : 0
-   If (whichLV="LViewOthers" && (topIndex>totalListed - 25) && totalIndex>LVitemsPerPage && isInputOkay=1 && reviewSelectedIndexes[1, 2]!=2)
+   If (whichLV="LViewOthers" && (topIndex + rowsInView + 8>totalListed) && totalIndex>LVitemsPerPage && isInputOkay=1 && reviewSelectedIndexes[1, 2]!=2)
    {
       SetTimer, dummyuiPopulateReviewSelectedFiles, -250
       ToolTip, List view will further be populated
