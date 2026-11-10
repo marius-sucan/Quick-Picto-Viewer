@@ -95416,8 +95416,7 @@ UIupdateReviewLVinView() {
    If (RowNumber<2)
       RowNumber := 1
 
-   perPage := (LV_EX_GetRowsPerPage(hLV) + 1) * 3
-   Loop, % perPage
+   Loop, % perPage * 7 + 1
    {
        LV_GetText(thisFileIndex, RowNumber, 4)
        If !thisFileIndex
