@@ -93573,7 +93573,7 @@ invokePanelReviewSelContextMenu() {
       If markedSelectFile
       {
          kMenu("MenuRevSelFiles", "Add", "Deselect &listed items in index", "BTNreviewDropFilesSelection")
-         kMenu("MenuRevSelFiles", "Add", "Deselect &all in index", "dropFilesSelection")
+         kMenu("MenuRevSelFiles", "Add", "Deselect &all in index", "BTNreviewDropAllSelection")
       }
 
       If (total!=totalSelected)
@@ -95183,6 +95183,11 @@ BTNreviewDropFilesSelection() {
    dummyTimerDelayiedImageDisplay(50)
 }
 
+BTNreviewDropAllSelection() {
+   dropFilesSelection()
+   UIupdateReviewLVinView()
+}
+
 BTNreviewApplySelection() {
    BTNreviewToggleSelection(1)
 }
@@ -95234,7 +95239,10 @@ BTNreviewSelFilesInPath(modus:=0) {
    If (modus="filter")
       activateFilesListFilterBasedOnFolder(thisFileIndex)
    Else
+   {
       QuickSelectFilesSameFolder(resultedFilesList[thisFileIndex, 1], "aye")
+      UIupdateReviewLVinView()
+   }
 }
 
 BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
@@ -95395,22 +95403,27 @@ BTNreviewCopyPanel(modus:=0, extras:=0) {
 }
 
 UIupdateReviewLVinView() {
-   Gui, SettingsGUIA: Default
-   GuiControlGet, OutputVar, Visible, LViewFiltered
-   If OutputVar
+   If (AnyWindowOpen!=60)
       Return
 
-   Gui, SettingsGUIA: ListView, LViewOthers
-   RowNumber := LV_EX_GetTopIndex(hLVmainu)
-   If (RowNumber<1 || !RowNumber)
-      RowNumber := 1
-
-   Loop, 18
+   Gui, SettingsGUIA: Default
+   GuiControlGet, OutputVar, Visible, LViewFiltered
+   whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
+   Gui, SettingsGUIA: ListView, % whichLV
+   GuiControlGet, hLV, Hwnd, % whichLV
+   RowNumber := LV_EX_GetTopIndex(hLV)
+   Loop, % LV_EX_GetRowsPerPage(hLV) + 1
    {
-       RowNumber++
        LV_GetText(thisFileIndex, RowNumber, 4)
+       If !thisFileIndex
+          Break
+
+       LV_GetText(mark, RowNumber, 1)
        sel := resultedFilesList[thisFileIndex, 2] ? "S" : "_"
-       LV_Modify(RowNumber, "Col1" , sel)
+       If (mark!=sel)
+          LV_Modify(RowNumber, "Col1", sel)
+
+       RowNumber++
    }
 }
 
@@ -95446,7 +95459,14 @@ BTNreviewToggleSelection(modus:=0) {
        resultedFilesList[thisFileIndex, 2] := sel
        ; sel := (oSel && !sel) ? 0 : 1
        If (oSel=sel)
+       {
+          ; the mark may lag behind the index
+          LV_GetText(mark, RowNumber, 1)
+          If (mark!=(sel ? "S" : "_"))
+             LV_Modify(RowNumber, , sel ? "S" : "_")
+
           Continue
+       }
  
        If sel
        {
@@ -95514,6 +95534,9 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    Gui, SettingsGUIA: Default
    If !isVarEqualTo(b, "DoubleClick", "k", "s", "RightClick")
       Return
+
+   If (b=="s" || b="k")
+      UIupdateReviewLVinView()
 
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
@@ -95618,6 +95641,7 @@ uiPopulateReviewSelectedFiles(modus:="") {
        thisSearch := thisFilter thisString initTotals maxFilesIndex CurrentSLD
        If (thisSearch=lastSearch && listedEntries)
        {
+          UIupdateReviewLVinView()
           GuiControl, SettingsGUIA:, infoLine, % "Filtered table: " groupDigits(listedEntries) " / " groupDigits(initTotals) " (" Round(listedEntries/initTotals*100, 2) "%)"
           Return
        }
