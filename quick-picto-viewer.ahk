@@ -95849,6 +95849,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
     If ((StrLen(folderu)<2 || folderu="folder path" || !RowNumber) && dummy!="update-all")
+    || (dummy="update-all" && !LV_GetCount())
        Return
 
     If (SLDtypeLoaded!=3)
@@ -95892,14 +95893,22 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
        }
     } Else 
     {
-       BtnCloseWindow()
-       Loop, % newStaticFoldersListCache.MaxIndex()
+       listedRows := []
+       Loop, % total
        {
-          folderu := newStaticFoldersListCache[A_Index, 1]
+          LV_GetText(indexu, A_Index, 1)
+          If indexu
+             listedRows.Push(indexu)
+       }
+
+       BtnCloseWindow()
+       For i, indexu in listedRows
+       {
+          folderu := newStaticFoldersListCache[indexu, 1]
           If FolderExist(folderu)
           {
              FileGetTime, dirDateO, % folderu, M
-             newStaticFoldersListCache[A_Index, 2] := dirDateO
+             newStaticFoldersListCache[indexu, 2] := dirDateO
           }
        }
     }
