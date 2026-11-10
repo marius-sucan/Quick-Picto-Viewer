@@ -2683,7 +2683,7 @@ refreshUImainWinElements() {
 }
 
 activateFilesListFilterBasedOnFolder(thisIndex) {
-   If askAboutFileSave(" and the files list will be filtered to the current image containing folder")
+   If askAboutFileSave(" and the files list will be filtered to the image containing folder")
       Return
 
    r := resultedFilesList[thisIndex, 1]
@@ -2695,7 +2695,7 @@ activateFilesListFilterBasedOnFolder(thisIndex) {
    UsrEditFilter := OutDir
    thisFilter := updateUIFiltersPanel("external")
    coreSetFilesFilteru(thisFilter)
-   showDelayedTooltip("Files list filtered to current image file path:`n" OutDir "\", 0, 325)
+   showDelayedTooltip("Files list filtered to image file path:`n" OutDir "\", 0, 325)
    SetTimer, RemoveTooltip, % -msgDisplayTime
    dummyTimerDelayiedImageDisplay(100)
 }
@@ -3021,10 +3021,6 @@ OpenFileProperties() {
 
 InvokeOpenWithMenu(imgPath) {
     Try Menu, OpenWithMenu, Delete
-    zPlitPath(imgPath, 0, OutFileName, OutDir)
-    If !FileExist(imgPath)
-       Return
-
     Global lastWinDrag := 1
     Global lastOtherWinClose := 1
     psathu := Trimmer(StrReplace(CurrentSLD, "|"))
@@ -41930,9 +41926,11 @@ PanelUpdateThisFileIndex(dummy:=0) {
          newFileName := Trimmer(newFileName)
       }
 
-      If (!newFileName && maxFilesIndex>1)
+      If (!newFileName && maxFilesIndex>1 && dummy!="reviewer")
       {
          remCurrentEntry(0)
+         zPlitPath(imgPath, 0, OutFileName, OutDir, OutNameNoExt, fileEXT)
+         showDelayedTooltip("Index entry removed:`n" OutFileName "`n" OutDir "\")
          Return
       } Else If (newFileName!=imgPath && newFileName)
          r := UpdateIndexBTNaction(newFileName, currentFileIndex)
@@ -41940,7 +41938,8 @@ PanelUpdateThisFileIndex(dummy:=0) {
       If (!r && newFileName!=imgPath && newFileName)
       {
          Sleep, 150
-         SetTimer, PanelUpdateThisFileIndex, -150
+         If (dummy!="reviewer")
+            SetTimer, PanelUpdateThisFileIndex, -150
       } Else If (newFileIndex!=currentFileIndex && newFileIndex && friendlyIndex && !filesFilter)
          switchIndexEntries(newFileIndex, currentFileIndex)
    } Else If (InStr(msgResult.btn, "erase") && maxFilesIndex>1)
@@ -95219,12 +95218,9 @@ BTNreviewCutFoldersExplorer() {
 }
 
 BTNreviewFilterListSelPath() {
-   BTNreviewSelFilesInPath("drop-sel")
-   If (markedSelectFile>1)
-   {
+   BTNreviewSelFilesInPath("filter")
+   If (currentFileIndex>1 && filesFilter)
       BtnCloseWindow()
-      filterToFilesSelection()
-   }
 }
 
 BTNreviewSelFilesInPath(modus:=0) {
@@ -95234,10 +95230,13 @@ BTNreviewSelFilesInPath(modus:=0) {
    Gui, SettingsGUIA: ListView, % whichLV
    RowNumber := LV_GetNext(0, "F")
    If !RowNumber
-      Return
+      Return -1
 
    LV_GetText(thisFileIndex, RowNumber, 4)
-   QuickSelectFilesSameFolder(resultedFilesList[thisFileIndex, 1], "aye", modus)
+   If (modus="filter")
+      activateFilesListFilterBasedOnFolder(thisFileIndex)
+   Else
+      QuickSelectFilesSameFolder(resultedFilesList[thisFileIndex, 1], "aye")
 }
 
 BtnReviewPaneOpenActs(a:=0, b:=0, c:=0) {
@@ -95503,12 +95502,12 @@ UIstringEditFilterErase() {
 
 uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    Gui, SettingsGUIA: Default
-   GuiControlGet, OutputVar, Visible, LViewFiltered
-   whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
-   Gui, SettingsGUIA: ListView, % whichLV
    If !isVarEqualTo(b, "DoubleClick", "k", "s", "RightClick")
       Return
 
+   GuiControlGet, OutputVar, Visible, LViewFiltered
+   whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
+   Gui, SettingsGUIA: ListView, % whichLV
    totalListed := LV_GetCount()
    topIndex := LV_EX_GetTopIndex(hLVmainu)
    totalIndex := reviewSelectedIndexes.Count()
