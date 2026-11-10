@@ -95519,17 +95519,24 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
       Return
    }
 
+   If (b="K" && c=112) ; F1
+   {
+      BtnHelpReviewPanel()
+      Return
+
+   } Else If (b="K" && c=116) ; F5
+   {
+      BTNrefreshReviewPanel()
+      Return
+   }
+
    RowNumber := LV_GetNext(0, "F")
    If !RowNumber
       Return
 
    LV_GetText(indexu, RowNumber, 4)
    ; TulTip(0, "=", a, b, c, indexu, RowNumber)
-   If (b="K" && c=112) ; F1
-   {
-      BtnHelpReviewPanel()
-      Return
-   } Else If (b="K" && c=113) ; F2
+   If (b="K" && c=113) ; F2
    {
       BtnCloseWindow()
       currentFileIndex := indexu
@@ -95538,10 +95545,6 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
    } Else If (b="K" && c=114) ; F3
    {
       BTNreviewFilterListSelPath()
-      Return
-   } Else If (b="K" && c=116) ; F5
-   {
-      BTNrefreshReviewPanel()
       Return
    } Else If (b="K" && c=117) ; F6
    {
