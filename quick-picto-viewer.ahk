@@ -34544,7 +34544,7 @@ SQLdbGenerateStaticFolders() {
    {
       SoundBeep, 300, 100
       addJournalEntry("Failed to execute SQL command in order to generate the static folders list from the indexed files.")
-      Return
+      Return 0
    }
 
    activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -34560,10 +34560,15 @@ SQLdbGenerateStaticFolders() {
           addDynamicFolderSQLdb(thisFolder, 0, "staticfolders")
        }
    }
+
    foldersListArray := ""
    RecordSet.Free()
    If !activeSQLdb.Exec("COMMIT TRANSACTION;")
+   {
       throwSQLqueryDBerror(A_ThisFunc)
+      Return 0
+   }
+   Return 1
 }
 
 getDynamicFoldersList(fileu:=0) {
@@ -35109,15 +35114,12 @@ regenerateStaticFoldersList() {
    {
       zr := SQLdbGenerateStaticFolders()
       If !zr
-      {
-         addJournalEntry("ERROR: Failed to regenerate the static folders list in the database")
-         Return
-      }
+         msgBeepTimer("ERROR: Failed to regenerate the static folders list in the database")
 
       lastFilterEditSearch := StaticListViewFilteru := ""
       newStaticFoldersListCache := []
       whileLoopExec := owle
-      PanelStaticFolderzManager()
+      SetTimer, PanelStaticFolderzManager, -250
       Return
    }
 
@@ -35127,7 +35129,7 @@ regenerateStaticFoldersList() {
    lastFilterEditSearch := StaticListViewFilteru := ""
    GenerateStaticFoldersListNow()
    whileLoopExec := owle
-   PanelStaticFolderzManager()
+   SetTimer, PanelStaticFolderzManager, -250
 }
 
 countFilesDiskPerStaticFolders() {
@@ -93452,7 +93454,7 @@ invokePanelStaticFoldersContextMenu() {
          kMenu("PanelStaticMenu", "Check", "&Set as the protected folder")
 
       If (isUpdateList=1 && InStr(changeState, "*"))
-         kMenu("PanelStaticMenu", "Add", "&Ignore date change", "BTNignoreDateStaticFolder")
+         kMenu("PanelStaticMenu", "Add", "&Ignore date change", "MenuIgnoreDateStaticFolder")
       If (SLDtypeLoaded!=3 && isUpdateList=1 && FileExist(CurrentSLD))
          kMenu("PanelStaticMenu", "Add", "Rename inde&x entry`tF2", "PanelRenameStaticFolder")
 
@@ -93480,7 +93482,7 @@ invokePanelStaticFoldersContextMenu() {
 
 SqlWrapPopulateStaticFolderzList() {
    countAllFilesPerStaticFolders("start")
-   PopulateStaticFolderzList()
+   PopulateStaticFolderzList(staticListViewFilteru)
 }
 
 invokePanelDynaFoldersContextMenu() {
@@ -94003,10 +94005,12 @@ PanelStaticFolderzManager() {
     }
 
     totals := newStaticFoldersListCache.Count()
+    lastFilterEditSearch := Trimmer(staticListViewFilteru)
     btnWid2 := (PrefsLargeFonts=1) ? 160 : 95
     btnWid3 := (PrefsLargeFonts=1) ? btnWid + 40 : btnWid + 30
     btnWid4 := (PrefsLargeFonts=1) ? 70 : 60
     sml := (PrefsLargeFonts=1) ? 120 : 90
+
     Gui, Add, Text, x15 y15, This folders list was generated based on the indexed files. Multiple items can be selected.
     hLVmainu := GuiAddListView("+LV0x10000 +LV0x400 r" uLVr " Grid xp y+10 w" lstWid " +multi AltSubmit Count" totals " guiLVfolderzFilterListBTN vLViewOthers", "#|Date|(?)|Folder path|Files|Selected|`%|Files on disk|Difference|Size (MB)", "Referenced folders")
     hEditField := GuiAddEdit("xs y+10 wp-" sml " -multi -wantTab gUIeditsGenericAllowCtrlBksp vStaticListViewFilteru", staticListViewFilteru, "Folders string filter")
@@ -94017,7 +94021,7 @@ PanelStaticFolderzManager() {
     Gui, Add, Button, xs+0 y+20 h%thisBtnHeight% w%btnWid2% gBTNupdateSelectedStaticFolder, &Rescan folder(s)
 
     If isUpdateList
-       Gui, Add, Button, x+5 hp w%btnWid% gBTNignoreDateStaticFolder, I&gnore all changes
+       Gui, Add, Button, x+5 hp w%btnWid% gMenuIgnoreDateStaticFolder, I&gnore all changes
     Gui, Add, Button, x+5 hp w%btnWid3% gRegenerateEntireList, R&egenerate entire index
     Gui, Add, Button, x+5 hp w%btnWid4% ginvokePanelStaticFoldersContextMenu, &More
     labelu := isUpdateList ? "Cached folders list: " : "Static folders list: "
@@ -95834,7 +95838,11 @@ BTNaddNewFolder2list() {
     SetTimer, PanelDynamicFolderzWindow, -50
 }
 
-BTNignoreDateStaticFolder(dummy:=0) {
+BtnIgnoreDateStaticFolder() {
+   MenuIgnoreDateStaticFolder("update-all")
+}
+
+MenuIgnoreDateStaticFolder(dummy:=0) {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
     RowNumber := LV_GetNext(0, "F")
@@ -95858,7 +95866,7 @@ BTNignoreDateStaticFolder(dummy:=0) {
     setImageLoading()
     total := LV_GetCount()
     totalSelected := LV_GetCount("S")
-    doAll := (totalSelected>=total || dummy="update-all") ? 1 : 0
+    doAll := (dummy="update-all") ? 1 : 0
     iF (doAll!=1)
     {
        indexu := RowNumber := 0
@@ -95897,6 +95905,8 @@ BTNignoreDateStaticFolder(dummy:=0) {
     }
     If (SLDtypeLoaded=3)
        SQLDBdumpStaticFoldersList()
+    Else
+       currentFilesListModified := 1
 
     ResetImgLoadStatus()
     msgBeepTimer("Folders list information updated", !AnyWindowOpen ? 900 : 0)
@@ -96605,7 +96615,7 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     {
        BTNunselFilesStaticFolder()
        Return
-    } Else If ((A_GuiEvent="Normal" || A_GuiEvent="K") && files="" && whichLV="LViewOthers")
+    } Else If ((A_GuiEvent="Normal" || b="K") && files="" && whichLV="LViewOthers")
     {
        countedFiles := 0
        countedSelFiles := 0
@@ -96927,7 +96937,8 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
              ; Tooltip, % MoreNewFileFolders
          }
       }
-   }
+   } Else
+      foldersListArray := mainFolderu
 
    counter++
    newArray := []
@@ -97781,7 +97792,8 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
        If !isInRange(A_Index, 2, 4)
           LV_ModifyCol(A_Index, "Integer")
     }
-
+    LV_ModifyCol(7, "Float")
+    LV_ModifyCol(10, "Float")
     doStartLongOpDance()
     startOperation := A_TickCount
     hasAutoSized := thisIndex := foldersCount := 0
@@ -97839,9 +97851,6 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
            showTOOLtip("Populating the list, please wait`n" groupDigits(countStaticFolders) " folders", 0, 0, A_Index/countStaticFolders)
         }
 
-        If (userPrivateMode=1)
-           folderu := "*:\********\******\"
-
         oldDateu := newStaticFoldersListCache[A_Index, 2]
         If (oldDateu="-")
         {
@@ -97853,6 +97862,9 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
            dirDate := SubStr(dirDateO, 1, StrLen(dirDate) - 2)
            FormatTime, dirDate, % dirDate, yyyy/MM/dd ; -HH:mm
         }
+        If (userPrivateMode=1)
+           folderu := "*:\********\******\"
+
         countedSelFiles := markedSelectFile ? Round(newStaticFoldersListCache[A_Index, 4]) : 0
         countFiles := newStaticFoldersListCache[A_Index, 3]
         countTFiles := newStaticFoldersListCache[A_Index, 5]
@@ -97872,8 +97884,11 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
               thisValue := countSize
         }
 
-        If ((thisValue>=givenLimit && limitMode=1) || (thisValue<=givenLimit && limitMode=2) && countFiles && thisValue)
-           Continue
+        If (filterWhat && thisValue!="")
+        {
+           If ((limitMode=1 && thisValue>=givenLimit) || (limitMode=2 && thisValue<=givenLimit))
+              Continue
+        }
 
         ; ToolTip, % "v=" countFiles "=" countedSelFiles , , , 2
         LV_Add(A_Index, A_Index, dirDate, statusu, folderu, countFiles, countedSelFiles, perc, countTFiles, diffu, countSize)
