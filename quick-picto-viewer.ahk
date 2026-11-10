@@ -95411,8 +95411,13 @@ UIupdateReviewLVinView() {
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
    Gui, SettingsGUIA: ListView, % whichLV
    GuiControlGet, hLV, Hwnd, % whichLV
-   RowNumber := LV_EX_GetTopIndex(hLV)
-   Loop, % LV_EX_GetRowsPerPage(hLV) + 1
+   perPage := LV_EX_GetRowsPerPage(hLV)
+   RowNumber := LV_EX_GetTopIndex(hLV) - perPage * 3
+   If (RowNumber<2)
+      RowNumber := 1
+
+   perPage := (LV_EX_GetRowsPerPage(hLV) + 1) * 3
+   Loop, % perPage
    {
        LV_GetText(thisFileIndex, RowNumber, 4)
        If !thisFileIndex
@@ -95536,7 +95541,7 @@ uiLVreviewSelFilesResponder(a:=0, b:=0, c:=0) {
       Return
 
    If (b=="s" || b="k")
-      UIupdateReviewLVinView()
+      SetTimer, UIupdateReviewLVinView, -100
 
    GuiControlGet, OutputVar, Visible, LViewFiltered
    whichLV := (OutputVar=1) ? "LViewFiltered" : "LViewOthers"
