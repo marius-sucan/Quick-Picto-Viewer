@@ -15,29 +15,40 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-11.** Marius fixed part of this in two commits of his own: `f88e4be`
-on 2026-11-10 and `2c501dc` on 2026-11-11. Two commits made at his request sit between
-them: `256a670` attaches the «Ignore all changes» button to the function `f88e4be` added
-for it, and `1813ca9` makes the button act on the rows the table lists.
+**Status, 2026-11-11, at `c389116`.** Marius fixed part of this in four commits of his
+own: `f88e4be` on 2026-11-10, then `2c501dc`, `20d58f9` and `c389116` on 2026-11-11. Two
+commits made at his request follow the first one: `256a670` attaches the «Ignore all
+changes» button to the function `f88e4be` added for it, and `1813ca9` makes the button act
+on the rows the table lists.
 
 - **Fixed, 13:** findings 1, 2, 3, 4, 5, 6, 7, 8, 18, 22, 25, 26 and 27.
 - **Partly fixed, 7:** findings 9, 17, 20, 21, 23, 28 and 30. Each note says what is left.
 - **Open, 10:** findings 10, 11, 12, 13, 14, 15, 16, 19, 24 and 29.
 
 `2c501dc` fixes 3, 18 and 25, completes 2, and fixes part of 9, 20, 21, 23, 28 and 30. It
-also changes what some actions do besides: six points, N1 to N6 under «New with the
-fixes». Three of them are of medium harm: «Erase files from the index» no longer
-refreshes the viewport (N1) and no longer says that the index was left empty (N2), and a
-folder that is not on the disk is now dropped from the folders list whenever another
-folder is rescanned (N3).
+also changed what some actions do besides: six points, N1 to N6 under «New with the
+fixes».
+
+`20d58f9` and `c389116` change no count above. What they do:
+
+- **N1 and N2 are fixed** (`c389116`): «Erase files from the index» loads one image
+  again, which becomes the current file, and the «No files left in the index» box is back.
+- **The refusal of «Set as the protected folder» names the folder that was refused**
+  (`20d58f9`, finding 28).
+- **The pattern change for finding 20 does not reach its case** (`20d58f9`): the
+  application writes a drive root as `d:`, and that line is still skipped when the list
+  is loaded.
+
+N3 to N6 are open. N3 is of medium harm: a folder that is not on the disk is dropped from
+the folders list whenever another folder is rescanned.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
-`f88e4be`), `1813ca9` or `2c501dc`. Everything else keeps its lines at ab160cb, and the
-name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
+`f88e4be`), `1813ca9`, `2c501dc` or `c389116`. Everything else keeps its lines at ab160cb,
+and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
 `MenuIgnoreDateStaticFolder()`. Each note was checked by running the batches again: on
-`54a0666`, on the text of `256a670`, on the text of `1813ca9`, and on `2c501dc`, where a
-seventeenth batch, Q, was added.
+`54a0666`, on the text of `256a670`, on the text of `1813ca9`, on `2c501dc`, where a
+seventeenth batch, Q, was added, and on `c389116`.
 
 ## Terms
 
@@ -69,7 +80,7 @@ seventeenth batch, Q, was added.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `2c501dc` |
+| # | Finding | Harm | Checked | Status at `c389116` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -90,15 +101,15 @@ seventeenth batch, Q, was added.
 | 17 | Private mode marks every folder as changed; a missing folder is dated today | medium | run | **partly fixed**, `f88e4be`: a missing folder is still dated today |
 | 18 | «Regenerate entire index» leaves the marks of a cached .SLD list | medium | run | **fixed**, `2c501dc` |
 | 19 | «Rename index entry» with «Propagate the change to subfolders» unticked still moves the files of the subfolders | low | run | open |
-| 20 | A folder that was offline when the list was saved is dropped when the list is loaded; so are drive roots | low | run, read | **partly fixed**, `2c501dc`: a drive root is still dropped |
+| 20 | A folder that was offline when the list was saved is dropped when the list is loaded; so are drive roots | low | run, read | **partly fixed**, `2c501dc`: a drive root is still dropped; the pattern change of `20d58f9` does not reach it |
 | 21 | A list that was never saved: marks that cannot be cleared | low | run | **partly fixed**, `2c501dc`: the menu item is no longer offered; the mark still comes and stays |
 | 22 | «Count selected files» lists every folder again while the filter box keeps its text | low | run | **fixed**, `f88e4be` |
-| 23 | «Erase files from the index» on N folders rebuilds the index, shuffles it, beeps and picks a random image N times | low | run | **partly fixed**, `2c501dc`: no shuffle, beep or random image; still one pass per folder, and nothing is refreshed (N1, N2) |
+| 23 | «Erase files from the index» on N folders rebuilds the index, shuffles it, beeps and picks a random image N times | low | run | **partly fixed**, `2c501dc` and `c389116`: one shuffle, one beep and one random image; still one pass over the index per folder |
 | 24 | «Rescan folder(s)» turns the folder part of the paths to lower case | low | run | open |
 | 25 | «Count files in folders found on disk»: «Difference» is not updated for a folder with nothing indexed | low | run | **fixed**, `2c501dc` |
 | 26 | «%» and «Size (MB)» are sorted as whole numbers | low | run | **fixed**, `f88e4be` |
 | 27 | F3 on a row that was not counted yet needs two presses | low | run | **fixed**, `f88e4be` |
-| 28 | Actions on a folder that is missing from the disk say nothing; «Set as the protected folder» protects another folder | low | run | **partly fixed**, `2c501dc`: three of the six actions answer; the refusal names the wrong folder |
+| 28 | Actions on a folder that is missing from the disk say nothing; «Set as the protected folder» protects another folder | low | run | **partly fixed**, `2c501dc` and `20d58f9`: three of the six actions answer |
 | 29 | Alt+right-click deselects the files and opens the menu too | low | run | open |
 | 30 | Small things | low | run, read | **partly fixed**, `2c501dc`: three of the fifteen points |
 
@@ -696,9 +707,9 @@ and it is the current one (run, batch C). With N folders it runs N times.
 
 Correction: one refresh after the loop. Decision 3 asks which image it should be.
 
-Open at `2c501dc` (run, batch D: `currentFileIndex` goes from 10 to 1 and `IDshowImage()`
-ran 0 times). «Erase files from the index» now leaves the same state, on every kind of
-list: see N1 under «New with the fixes».
+Open at `c389116` (run, batch D: `currentFileIndex` goes from 10 to 1 and `IDshowImage()`
+ran 0 times). Between `2c501dc` and `c389116` «Erase files from the index» left the same
+state: N1 under «New with the fixes», fixed.
 
 ## 16. F2 in a database opens the rename the menu leaves out
 
@@ -818,10 +829,36 @@ If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:\\.)") && !RegExMa
 - **As before: a drive root.** The line for `q:` is skipped (run, batch Q). The pattern
   still asks for `:\` and one more character.
 
+`20d58f9` makes that last character optional (:35077 at `c389116`):
+
+```ahk
+If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:\\.?)") && !RegExMatch(line, RegExFilesPattern))
+```
+
+A line whose path is `q:\` is now loaded (run, batch Q, a fifth line written by hand).
+That is not how a drive root is stored: the folders list holds it without the `\`. Run on
+`c389116` (batch Q, a scratch folder mapped as drive `P:` for the run, two images in its
+root, one in `P:\a`, two in `P:\Sub`):
+
+- the folders list generated from the index holds `p:`, `p:\a` and `p:\sub`;
+- the save writes `Fi1=-*&*p:`;
+- the saved list loaded again has the five files in its index, and its folders list holds
+  `p:\a` and `p:\sub` only. The pattern still asks for the `\`.
+
+The drive root is therefore still dropped. Correction: end the pattern at the colon,
+`…\*\&\*[a-z]\:)`. The length test of N3 has to follow, or the root is dropped at the next
+rescan.
+
+Seen in the same run: the root's date is «-» from the start, because `FileGetTime` gives
+nothing for `p:` (:35282-35284). The row shows «-» in the «Date» and «(?)» columns and
+can never get the changed mark. Run under Wine; whether Windows reads a date for `d:` was
+not run.
+
 A folder loaded this way does not stay for long. Since `2c501dc` the next «Rescan
 folder(s)», of any folder, drops every folder that is not on the disk and every path under
-five characters, `q:\a` among them (the first run in batch Q, the second read). See N3
-under «New with the fixes».
+five characters. Run (batch Q): the unreachable folder goes; and in the drive `P:` run,
+after «Rescan folder(s)» on `p:\sub` the folders list holds `p:\sub` alone, `p:\a` is
+gone. See N3 under «New with the fixes».
 
 ## 21. A list that was never saved: marks that cannot be cleared
 
@@ -870,17 +907,23 @@ index of one file, and the panel is opened again.
 
 Correction: remove the files of every highlighted folder in one pass, then refresh once.
 
-**Partly fixed in `2c501dc`**: each highlighted folder now goes straight to
-`remFilesFromList()`, with its messages off (:96142 at `2c501dc`), and
-`coreRemFilesStaticFolder()` is no longer called from here. Run (batch D, two folders): 2
-passes over the index, no shuffle, no beep, no random image.
+**Partly fixed in `2c501dc` and `c389116`.** Lines are at `c389116`.
+
+- Since `2c501dc` each highlighted folder goes straight to `remFilesFromList()`, with its
+  messages off (:96141).
+- `c389116` adds one refresh after the loop (:96147-96154). When files are left: one beep,
+  and one random image 300 ms later. When none is left: the «No files left in the index»
+  box. It also removes `coreRemFilesStaticFolder()`, which nothing called any more.
+
+Run on `c389116` (batch D, two folders in a database): 2 passes over the index, 1
+shuffle, 1 random image.
 
 Left: the index is still walked once per highlighted folder, with a 5 ms sleep each, and
-`If (maxFilesIndex>1)` (:96140) still makes the action do nothing on an index of one
+`If (maxFilesIndex>1)` (:96139) still makes the action do nothing on an index of one
 file (read).
 
-New: nothing is refreshed after the loop, and an index left empty is not handled. See N1
-and N2 under «New with the fixes».
+Between `2c501dc` and `c389116` nothing was refreshed after the loop and an index left
+empty was not handled: N1 and N2 under «New with the fixes», both fixed.
 
 ## 24. «Rescan folder(s)» turns the folder part of the paths to lower case
 
@@ -983,7 +1026,7 @@ unsaved list, selection); «Cancel» at any of them leaves no panel.
 
 Correction: one message for a missing folder, before the action.
 
-**Partly fixed in `2c501dc`.** Run (batch H, the same steps):
+**Partly fixed in `2c501dc` and `20d58f9`.** Run (batch H, the same steps):
 
 - «In Explorer» (F6) answers «ERROR: An unknown error occurred opening the folder:» and
   the path. The message is now shown while a panel is open too (:96548-96549 at
@@ -992,10 +1035,11 @@ Correction: one message for a missing folder, before the action.
   the panel stays open (:96564-96565);
 - «Set as the protected folder» is refused with «WARNING: The folder selected no longer
   exists. Action refused.» (`setContaintFolderAsProtected()` :39926-39927), and no other
-  folder is protected in its place. The second line of the message is not the folder that
-  was refused: it is the folder protected until then, or a lone `\` when there is none.
-  Run (batch Q): with `Alpha` protected, the refusal for `Gamma` reads `…\pv\Alpha\`. The
-  message prints `protectedFolderPath` where `givenPath` is meant;
+  folder is protected in its place. At `2c501dc` the second line of the message was the
+  folder protected until then, or a lone `\` when there was none. `20d58f9` makes it the
+  folder that was refused. Run on `c389116` (batches H and Q): with `Alpha` protected, the
+  refusal for `Gamma` reads `…\pv\gamma\`. The message that ends a protection prints the
+  given folder the same way (:39923; run, batch Q);
 - «Copy folder (Explorer mode)», «Cut folder» and «Count files in folders found on disk»
   still do nothing and say nothing.
 
@@ -1130,11 +1174,13 @@ so that the notes above can name them.
 
 ### With `2c501dc`
 
-Run on `2c501dc`. Where it says so, the same steps were run on `1813ca9` too, to tell
-what is new. Lines are at `2c501dc`.
+At `c389116`: N1 and N2 are fixed, N3 to N6 are open.
+
+Each point was run on `2c501dc`. Where it says so, the same steps were run on `1813ca9`
+too, to tell what is new. Lines are at `2c501dc` unless a note says otherwise.
 
 **N1. «Erase files from the index» leaves the viewport on an image that is no longer the
-current file** (medium; run, batch Q).
+current file** (medium; run, batch Q). **Fixed in `c389116`.**
 `BTNremFilesStaticFolder()` :96142, `remFilesFromList()` :97210,
 `renewCurrentFilesList()` :64387
 
@@ -1152,8 +1198,15 @@ This is the state finding 15 describes for a database rescan. It was run on a pl
 a cached .SLD list and a database go through the same lines (read). Correction: one
 refresh after the loop; decision 3 asks which image.
 
+**Fixed in `c389116`** by that correction (:96147-96152 at `c389116`): when files are
+left after the loop, the function empties the random list, beeps once and starts
+`RandomPicture()` 300 ms later. Run (batch Q, the same step): one image is loaded and it
+is the current file (`currentFileIndex` 10, the index shown 10), and the panel is back.
+In a database, two folders erased give one call of `RandomPicture()` (run, batch D). The
+image is a random one, as it was before `2c501dc`.
+
 **N2. «Erase files from the index» on every folder leaves an empty index, and says
-nothing** (medium; run, batch Q).
+nothing** (medium; run, batch Q). **Fixed in `c389116`.**
 `BTNremFilesStaticFolder()` :96138-96152, `remFilesFromList()` :97211
 
 What happens (plain folder, every row highlighted): 5 passes. `maxFilesIndex` is then
@@ -1168,6 +1221,12 @@ list» and «Ignore». That box came from `handleEmptyFilesList()`, which
 
 Correction: after the loop, when `maxFilesIndex<1`, call
 `handleEmptyFilesList(CurrentSLD, "", 2)`, as `coreRemFilesStaticFolder()` does.
+
+**Fixed in `c389116`** by that correction (:96153-96154 at `c389116`). Run (batch Q, the
+same step): the box «No files left in the index of Quick Picto Viewer, please load a files
+list or folder.» comes, with its three buttons. Answered «Ignore», the panel comes back
+with 0 files in every row and `maxFilesIndex` still empty, as on `1813ca9`. The other two
+buttons were not pressed.
 
 **N3. A folder that is not on the disk is dropped from the folders list when any folder
 is rescanned** (medium, decision 9; run, batch Q).
@@ -1194,7 +1253,10 @@ The rebuilt list is now the one that is kept, so this test decides what stays.
   since the table is written from the rebuilt list, and the panel went on listing the
   folder.
 - **Paths under five characters** (`c:\a`, a drive root) are dropped by the same test at
-  every rescan (read).
+  every rescan. Run (batch Q, on `2c501dc` and on `c389116`, a scratch folder mapped as
+  drive `P:`): the folders list holds `p:\a` and `p:\sub`; after «Rescan folder(s)» on
+  `p:\sub` it holds `p:\sub` alone. A drive root does not get that far: it is dropped
+  when the list is loaded (finding 20).
 
 Correction: decision 9. To keep such folders, take `!FolderExist(folderu)` out of the
 test and lower the length to 2, which the second loop already uses (:97023).
@@ -1303,9 +1365,9 @@ Not part of the panel's own code.
 2. **A rescanned folder that cannot be reached**: skip it, ask first, or remove its
    entries as now?
 3. **After a rescan**, which image: the one that was shown, when it is still in the index;
-   a random one, as the other lists do now; or the first? Since `2c501dc` the same
-   question holds after «Erase files from the index», which no longer shows a random one
-   (N1).
+   a random one, as the other lists do now; or the first? «Erase files from the index»
+   shows a random one again since `c389116` (N1). The question stands for the database
+   rescan of finding 15.
 4. **F3 on several folders**: ask before the selection is dropped, or a filter that keeps
    it?
 5. **A plain list's folders list**: regenerate it by itself when the index changed, or
@@ -1323,11 +1385,10 @@ Not part of the panel's own code.
 10. **Lower-case paths after a rescan**: acceptable, or should the index keep the spelling
     it had?
 
-Suggested order, at `2c501dc`: N1 and N2 first, in `BTNremFilesStaticFolder()` (one
-refresh after the loop, and the empty-index box back); then decision 9 with N3, the
-«Files» cell of N4, and the folder named by the refusal message of finding 28; then what
-is left of 9 (the first opening, one selected file), 13 and the rest of 17; the others
-wait for the decisions.
+Suggested order, at `c389116`: decision 9 with N3 first; then the drive root of finding
+20, where the pattern, the length test of N3 and the date of a root go together; then the
+«Files» cell of N4; then what is left of 9 (the first opening, one selected file), 13 and
+the rest of 17; the others wait for the decisions.
 
 ## How this was checked
 
@@ -1379,6 +1440,14 @@ wait for the decisions.
   keeps the folders list of the list opened before; the batch empties that list first, as
   the application's own «open» functions do. The folder that «cannot be reached» is a
   folder moved away and, where the step says so, moved back.
+- `20d58f9` and `c389116` were checked on `c389116`: the seventeen batches again. Batches
+  A, B, C2, D2, E, F, G, I, J, L, M, N and P log what they logged on `2c501dc`. C differs
+  in the number of a random image, D in what the eraser does, H in the refusal message.
+- Batch Q got three more steps for it and was run on `c389116` and again on `2c501dc`: a
+  fifth line written by hand (`q:\`), «Set as the protected folder» on the protected
+  folder itself, and a drive root. For the drive root a scratch folder was mapped as drive
+  `P:` in the Wine prefix for the run and unmapped after it, with images in `P:\`, `P:\a`
+  and `P:\Sub`. The steps Q had before log on `2c501dc` what they logged the first time.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11). The layout figures of finding 30 come from widths the
   script sets itself.
@@ -1391,8 +1460,10 @@ wait for the decisions.
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
   with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
   `-fix4` the ones of `256a670`, those ending in `-flt` the ones of `1813ca9`, those
-  ending in `-2c5` the ones of `2c501dc`, and `j-ab1` is batch J on ab160cb with the table
-  logged).
+  ending in `-2c5` the ones of `2c501dc`, those ending in `-c38` the ones of `c389116`,
+  `q-2c5-v1` is batch Q on `2c501dc` before its three added steps, and `j-ab1` is batch J
+  on ab160cb with the table logged); `run-all-c38.sh` runs the seventeen batches and maps
+  the drive `P:` for batch Q.
 
 | Batch | What it runs |
 |-------|--------------|
@@ -1412,4 +1483,4 @@ wait for the decisions.
 | M | cached .SLD: a seed-folder rescan, «Regenerate entire index», «Regenerate this folders list» |
 | N | what one right-click on a row raises |
 | P | cached .SLD, after the fixes: the number filters on rows with no count; «Ignore date change», then saved and loaded again; the function added for the button, called by hand, and the button itself; «Rescan folder(s)», then saved and loaded again; a Down key on a row not yet counted; «Ignore date change» on a missing folder; the button with no focused row and a filter that lists an unmarked folder, the marked folder, nothing |
-| Q | after `2c501dc`. Plain folder: «Deselect all (files list)»; «Set as the protected folder» on a missing folder while another one is protected; «Erase files from the index» on one folder and on every folder. Cached .SLD: a folder that cannot be reached while another one is rescanned, and rescanned itself, each saved and loaded again; four lines written by hand into `[Folders]`; «Regenerate entire index» with a marked folder. Database: the «Files» cell after a rescan; a folder that cannot be reached while another one is rescanned |
+| Q | after `2c501dc` and `c389116`. Plain folder: «Deselect all (files list)»; «Set as the protected folder» on a missing folder while another one is protected, and on the protected folder itself; «Erase files from the index» on one folder and on every folder. Cached .SLD: a folder that cannot be reached while another one is rescanned, and rescanned itself, each saved and loaded again; five lines written by hand into `[Folders]`; «Regenerate entire index» with a marked folder. Database: the «Files» cell after a rescan; a folder that cannot be reached while another one is rescanned. A drive root, with a drive `P:` mapped for the run: its folders list generated, saved and loaded again, then one of its folders rescanned |
