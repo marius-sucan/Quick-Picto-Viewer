@@ -15,40 +15,37 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-11, at `c389116`.** Marius fixed part of this in four commits of his
-own: `f88e4be` on 2026-11-10, then `2c501dc`, `20d58f9` and `c389116` on 2026-11-11. Two
-commits made at his request follow the first one: `256a670` attaches the «Ignore all
-changes» button to the function `f88e4be` added for it, and `1813ca9` makes the button act
-on the rows the table lists.
+**Status, 2026-11-11, at `bb82c4c`.**
 
-- **Fixed, 13:** findings 1, 2, 3, 4, 5, 6, 7, 8, 18, 22, 25, 26 and 27.
-- **Partly fixed, 7:** findings 9, 17, 20, 21, 23, 28 and 30. Each note says what is left.
+- **Fixed, 14:** findings 1, 2, 3, 4, 5, 6, 7, 8, 18, 20, 22, 25, 26 and 27.
+- **Partly fixed, 6:** findings 9, 17, 21, 23, 28 and 30. Each note says what is left.
 - **Open, 10:** findings 10, 11, 12, 13, 14, 15, 16, 19, 24 and 29.
 
-`2c501dc` fixes 3, 18 and 25, completes 2, and fixes part of 9, 20, 21, 23, 28 and 30. It
-also changed what some actions do besides: six points, N1 to N6 under «New with the
-fixes».
+The fixes are in these commits, in this order:
 
-`20d58f9` and `c389116` change no count above. What they do:
+| Commit | By | What it does here |
+|--------|----|-------------------|
+| `f88e4be` | Marius, 2026-11-10 | fixes 1, 5, 6, 7, 8, 22, 26, 27; part of 2 and 17 |
+| `256a670`, `1813ca9` | at his request | finding 4: the «Ignore all changes» button is attached to its function and acts on the rows the table lists |
+| `2c501dc` | Marius, 2026-11-11 | fixes 3, 18, 25; completes 2; part of 9, 20, 21, 23, 28, 30. Brings N1 to N6 |
+| `20d58f9`, `c389116` | Marius | fix N1 and N2; the refusal message of finding 28 |
+| `596a886` | Marius | finding 28: «Copy folder» and «Cut folder» answer on a missing folder; «Open folder now» closes the panel after its questions |
+| `17d90dd` | Marius | fixes N3 and N6: a folder that is not on the disk stays in the folders list (decision 9). Part of N7. Breaks findings 4 and 6 again (N8, N9) |
+| `5472a48` | at his request | completes finding 20: a drive root is kept when the folders list is loaded |
+| `bb82c4c` | at his request | fixes N8 and N9: findings 4 and 6 hold again |
 
-- **N1 and N2 are fixed** (`c389116`): «Erase files from the index» loads one image
-  again, which becomes the current file, and the «No files left in the index» box is back.
-- **The refusal of «Set as the protected folder» names the folder that was refused**
-  (`20d58f9`, finding 28).
-- **The pattern change for finding 20 does not reach its case** (`20d58f9`): the
-  application writes a drive root as `d:`, and that line is still skipped when the list
-  is loaded.
-
-N3 to N6 are open. N3 is of medium harm: a folder that is not on the disk is dropped from
-the folders list whenever another folder is rescanned.
+The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
+finding. At `bb82c4c`, N1, N2, N3, N6, N8 and N9 are fixed, N7 is partly fixed, and N4,
+N5 and N10 are open, all three of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
-`f88e4be`), `1813ca9`, `2c501dc` or `c389116`. Everything else keeps its lines at ab160cb,
-and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
+`f88e4be`), `1813ca9`, `2c501dc`, `c389116` or `bb82c4c`. Everything else keeps its lines
+at ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
 `MenuIgnoreDateStaticFolder()`. Each note was checked by running the batches again: on
 `54a0666`, on the text of `256a670`, on the text of `1813ca9`, on `2c501dc`, where a
-seventeenth batch, Q, was added, and on `c389116`.
+seventeenth batch, Q, was added, on `c389116`, and on the texts of `5472a48` and
+`bb82c4c`, with an eighteenth batch, R, for a drive root.
 
 ## Terms
 
@@ -80,14 +77,14 @@ seventeenth batch, Q, was added, and on `c389116`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `c389116` |
+| # | Finding | Harm | Checked | Status at `bb82c4c` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
 | 3 | After any update, the folders list in memory starts at entry 2 and is thrown away: folders added to a cached .SLD list never reach it, ignored changes come back | high | run | **fixed**, `2c501dc` |
-| 4 | «Ignore all changes» updates the highlighted rows only, and nothing without a focused row | medium | run | **fixed**, `f88e4be`, `256a670` and `1813ca9` |
+| 4 | «Ignore all changes» updates the highlighted rows only, and nothing without a focused row | medium | run | **fixed**, `f88e4be`, `256a670` and `1813ca9`; broken by `17d90dd`, restored in `bb82c4c` |
 | 5 | «Ignore date change» with a filter on: when every listed row is highlighted, the folders that are not listed are updated too | medium | run | **fixed**, `f88e4be` |
-| 6 | On a cached .SLD list an ignored change is not saved, and the list is not marked as modified | medium | run | **fixed**, `f88e4be` |
+| 6 | On a cached .SLD list an ignored change is not saved, and the list is not marked as modified | medium | run | **fixed**, `f88e4be`; broken by `17d90dd`, restored in `bb82c4c` |
 | 7 | The filter cannot be removed after the panel reopened with it | medium | run | **fixed**, `f88e4be` |
 | 8 | The «greater than» number filters keep every row at 0 | medium | run | **fixed**, `f88e4be` |
 | 9 | «Selected» column: zeros at the first opening of a cached .SLD list or a database, stale after the selection changed | medium | run | **partly fixed**, `2c501dc`: a selection that moved to other files is counted; the first opening and a single selected file are as before |
@@ -101,7 +98,7 @@ seventeenth batch, Q, was added, and on `c389116`.
 | 17 | Private mode marks every folder as changed; a missing folder is dated today | medium | run | **partly fixed**, `f88e4be`: a missing folder is still dated today |
 | 18 | «Regenerate entire index» leaves the marks of a cached .SLD list | medium | run | **fixed**, `2c501dc` |
 | 19 | «Rename index entry» with «Propagate the change to subfolders» unticked still moves the files of the subfolders | low | run | open |
-| 20 | A folder that was offline when the list was saved is dropped when the list is loaded; so are drive roots | low | run, read | **partly fixed**, `2c501dc`: a drive root is still dropped; the pattern change of `20d58f9` does not reach it |
+| 20 | A folder that was offline when the list was saved is dropped when the list is loaded; so are drive roots | low | run, read | **fixed**, `2c501dc` and `5472a48` |
 | 21 | A list that was never saved: marks that cannot be cleared | low | run | **partly fixed**, `2c501dc`: the menu item is no longer offered; the mark still comes and stays |
 | 22 | «Count selected files» lists every folder again while the filter box keeps its text | low | run | **fixed**, `f88e4be` |
 | 23 | «Erase files from the index» on N folders rebuilds the index, shuffles it, beeps and picks a random image N times | low | run | **partly fixed**, `2c501dc` and `c389116`: one shuffle, one beep and one random image; still one pass over the index per folder |
@@ -109,7 +106,7 @@ seventeenth batch, Q, was added, and on `c389116`.
 | 25 | «Count files in folders found on disk»: «Difference» is not updated for a folder with nothing indexed | low | run | **fixed**, `2c501dc` |
 | 26 | «%» and «Size (MB)» are sorted as whole numbers | low | run | **fixed**, `f88e4be` |
 | 27 | F3 on a row that was not counted yet needs two presses | low | run | **fixed**, `f88e4be` |
-| 28 | Actions on a folder that is missing from the disk say nothing; «Set as the protected folder» protects another folder | low | run | **partly fixed**, `2c501dc` and `20d58f9`: three of the six actions answer |
+| 28 | Actions on a folder that is missing from the disk say nothing; «Set as the protected folder» protects another folder | low | run | **partly fixed**, `2c501dc`, `20d58f9` and `596a886`: five of the six actions answer |
 | 29 | Alt+right-click deselects the files and opens the menu too | low | run | open |
 | 30 | Small things | low | run, read | **partly fixed**, `2c501dc`: three of the fifteen points |
 
@@ -376,6 +373,11 @@ Between `256a670` and `1813ca9` the button covered every folder of the list, lis
 The menu item «Ignore date change» is as it was: it asks for a focused row and works on
 the highlighted rows.
 
+`17d90dd` broke the button again: it closed the panel before the listed rows were read, so
+the button updated the focused row alone, or nothing (N8). `bb82c4c` puts the order back
+(:95932-95942 at `bb82c4c`). Run on the text of `bb82c4c` (batches C and P, real clicks):
+every result listed above holds.
+
 ## 5. «Ignore date change» with a filter on updates folders that are not listed
 
 `BTNignoreDateStaticFolder()` :95861, :95888
@@ -418,10 +420,17 @@ a list that is not a database is marked as modified. Run (batches C and P): afte
 date change» on `Beta`, `askAboutSlidesListSave()` asks «Would like to save the currently
 opened files list?»; saved and loaded again, `Beta` has no mark.
 
-One thing is left: the flag is set whenever the function reaches its end, also when no
-date was changed. On a folder that is missing from the disk the mark stays, the message
-reads «Folders list information updated» and the list counts as modified (run, batch P,
-the same on `2c501dc`).
+Until `17d90dd` the flag was set whenever the function reached its end, also when no
+date was changed. `17d90dd` sets it only when a folder found on the disk was updated
+(:95955 at `bb82c4c`). As committed it counted in the button's branch alone, so the menu
+item no longer marked the list at all (N9); `bb82c4c` adds the count to the menu item's
+branch (:95922). Run on the text of `bb82c4c` (batch P): after «Ignore date change» on
+`Beta` the list counts as modified; on a folder that is missing from the disk it does
+not, and the mark stays.
+
+One thing is left (N7): what is counted is the folders found on the disk, not the dates
+that changed. With no marked folder among them the list still counts as modified (run,
+batch P: the button with a filter that lists `Beta`, which has no mark).
 
 Since `2c501dc` a later «Rescan folder(s)» keeps an ignored change that was not saved yet
 (finding 3). Run (batch C): `Gamma`, cleared this way, has no mark after the rescan of
@@ -680,10 +689,9 @@ does the opposite for a seed folder that is not there: it skips it and keeps its
 
 Correction: decision 2.
 
-Open at `2c501dc`: the entries are removed as before (run, batches J and Q). The folder
-itself now keeps a row with no date: in the `staticfolders` table since `f88e4be`, and
-since `2c501dc` also in the panel and in the `[Folders]` section of a cached .SLD list.
-See N6 under «New with the fixes».
+Open at `bb82c4c`: the entries are removed as before (run, batches J and Q). Since
+`17d90dd` the folder keeps its row in the folders list, with its recorded date and the
+changed mark, so the rescan can be run again once the folder is back (N6, fixed).
 
 ## 15. Database: after «Rescan folder(s)» the viewport shows an image that is no longer current
 
@@ -707,7 +715,7 @@ and it is the current one (run, batch C). With N folders it runs N times.
 
 Correction: one refresh after the loop. Decision 3 asks which image it should be.
 
-Open at `c389116` (run, batch D: `currentFileIndex` goes from 10 to 1 and `IDshowImage()`
+Open at `bb82c4c` (run, batch D: `currentFileIndex` goes from 10 to 1 and `IDshowImage()`
 ran 0 times). Between `2c501dc` and `c389116` «Erase files from the index» left the same
 state: N1 under «New with the fixes», fixed.
 
@@ -845,20 +853,36 @@ root, one in `P:\a`, two in `P:\Sub`):
 - the saved list loaded again has the five files in its index, and its folders list holds
   `p:\a` and `p:\sub` only. The pattern still asks for the `\`.
 
-The drive root is therefore still dropped. Correction: end the pattern at the colon,
-`…\*\&\*[a-z]\:)`. The length test of N3 has to follow, or the root is dropped at the next
-rescan.
+The drive root was therefore still dropped at `c389116`. In a database the same loader
+had a second test with the same effect: a row of the `staticfolders` table had to be
+longer than three characters to be taken.
 
-Seen in the same run: the root's date is «-» from the start, because `FileGetTime` gives
-nothing for `p:` (:35282-35284). The row shows «-» in the «Date» and «(?)» columns and
-can never get the changed mark. Run under Wine; whether Windows reads a date for `d:` was
-not run.
+**Fixed in `5472a48`** (:35054 and :35077-35078 at `bb82c4c`): the pattern ends at the
+colon, and a table row of two characters is taken.
 
-A folder loaded this way does not stay for long. Since `2c501dc` the next «Rescan
-folder(s)», of any folder, drops every folder that is not on the disk and every path under
-five characters. Run (batch Q): the unreachable folder goes; and in the drive `P:` run,
-after «Rescan folder(s)» on `p:\sub` the folders list holds `p:\sub` alone, `p:\a` is
-gone. See N3 under «New with the fixes».
+```ahk
+If (StrLen(Rowu[1])>1 && hash[z]!=1) ; a drive root is stored as "d:"
+…
+If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:)") && !RegExMatch(line, RegExFilesPattern))
+```
+
+Run on `17d90dd` and on the text of `5472a48` (batch R, the drive `P:` as above):
+
+- cached .SLD list: the saved list loaded again lists `p:`, `p:\a` and `p:\sub`, where it
+  listed the last two alone. The three rows stay after «Rescan folder(s)» on `p:\sub`,
+  after the same on the root's own row, after a rescan of the root as a seed folder, and
+  after a save and a load;
+- database, opened and a folder rescanned before the panel was ever opened: the
+  `staticfolders` table keeps its row `p:` and the panel lists the three folders. On
+  `17d90dd` the row was gone from the table and the root from the panel, while `images`
+  held its two files;
+- the line written by hand for `q:` is loaded too (batch Q).
+
+That the rows stay after a rescan is owed to `17d90dd` as well. Between `2c501dc` and
+`17d90dd` a folder loaded this way was dropped again at the next «Rescan folder(s)» of any
+folder, with every path under five characters (N3, fixed).
+
+Left, as a point of its own: the root's row has no date (N10).
 
 ## 21. A list that was never saved: marks that cannot be cleared
 
@@ -1026,7 +1050,7 @@ unsaved list, selection); «Cancel» at any of them leaves no panel.
 
 Correction: one message for a missing folder, before the action.
 
-**Partly fixed in `2c501dc` and `20d58f9`.** Run (batch H, the same steps):
+**Partly fixed in `2c501dc`, `20d58f9` and `596a886`.** Run (batch H, the same steps):
 
 - «In Explorer» (F6) answers «ERROR: An unknown error occurred opening the folder:» and
   the path. The message is now shown while a panel is open too (:96548-96549 at
@@ -1040,11 +1064,16 @@ Correction: one message for a missing folder, before the action.
   folder that was refused. Run on `c389116` (batches H and Q): with `Alpha` protected, the
   refusal for `Gamma` reads `…\pv\gamma\`. The message that ends a protection prints the
   given folder the same way (:39923; run, batch Q);
-- «Copy folder (Explorer mode)», «Cut folder» and «Count files in folders found on disk»
-  still do nothing and say nothing.
+- «Copy folder (Explorer mode)» answers «ERROR: Folder(s) not found or access denied:»
+  and the path since `596a886` (`BTNcutCopyStaticFolders()` :96045-96048 at `bb82c4c`;
+  run on the text of `5472a48`). «Cut folder» is the same function. The message comes
+  when none of the highlighted folders is on the disk; when some are, those are put on
+  the clipboard and the missing ones are passed over (read);
+- «Count files in folders found on disk» still does nothing and says nothing.
 
-As before (read): «Open folder now» on a folder that exists closes the panel before its
-three questions (:96567).
+Since `596a886` «Open folder now» on a folder that exists closes the panel after its
+three questions, so «Cancel» at any of them leaves the panel open (:96580 at `bb82c4c`;
+read).
 
 ## 29. Alt+right-click deselects the files and opens the menu too
 
@@ -1164,17 +1193,17 @@ they were without the trial (run, batches C, C2, D, M and P).
 **At `2c501dc`** the third correction is in the code too (:96994), and the four results
 all hold (run, batches C, C2, D, M and P). Of the three points listed as «still as
 before», «Regenerate entire index» is fixed (finding 18); the other two are open. The
-three things the counter correction brings to the surface are now what the application
-does: N3, N4 and N5 below.
+three things the counter correction brings to the surface became what the application
+does: N3, N4 and N5 below. N3 was fixed afterwards, in `17d90dd`.
 
 ## New with the fixes
 
-What the commits changed besides the findings they fix. The points are numbered N1 to N7
-so that the notes above can name them.
+What the commits changed besides the findings they fix. The points are numbered N1 to
+N10 so that the notes above can name them.
 
 ### With `2c501dc`
 
-At `c389116`: N1 and N2 are fixed, N3 to N6 are open.
+At `bb82c4c`: N1, N2, N3 and N6 are fixed; N4 and N5 are open.
 
 Each point was run on `2c501dc`. Where it says so, the same steps were run on `1813ca9`
 too, to tell what is new. Lines are at `2c501dc` unless a note says otherwise.
@@ -1229,7 +1258,7 @@ with 0 files in every row and `maxFilesIndex` still empty, as on `1813ca9`. The 
 buttons were not pressed.
 
 **N3. A folder that is not on the disk is dropped from the folders list when any folder
-is rescanned** (medium, decision 9; run, batch Q).
+is rescanned** (medium, decision 9; run, batch Q). **Fixed in `17d90dd`.**
 `updateCachedStaticFolders()` :97003
 
 ```ahk
@@ -1260,6 +1289,25 @@ The rebuilt list is now the one that is kept, so this test decides what stays.
 
 Correction: decision 9. To keep such folders, take `!FolderExist(folderu)` out of the
 test and lower the length to 2, which the second loop already uses (:97023).
+
+**Fixed in `17d90dd`** by that correction (:97007 at `bb82c4c`):
+
+```ahk
+If (hash[z]=1 || StrLen(folderu)<2)
+   Continue
+```
+
+Run on the text of `5472a48`, the same steps:
+
+- cached .SLD list (batch Q): after «Rescan folder(s)» on `Beta`, `Gamma` is still
+  listed, with the changed mark and today's date (the rest of finding 17), and the saved
+  `[Folders]` section keeps its line. With `Gamma` back on the disk and the saved list
+  loaded again, the panel lists the five folders and `Gamma` has no mark;
+- database (batch Q): after «Rescan folder(s)» on `Alpha`, `Beta` is still in the panel
+  and in the `staticfolders` table, with its recorded date. With `Beta` back and the
+  database opened again, it has no mark;
+- paths under five characters (batch R): `p:\a` stays after «Rescan folder(s)» on
+  `p:\sub`.
 
 **N4. Database: the «Files» cell of a rescanned folder stays empty** (low; run, batches D
 and Q).
@@ -1294,7 +1342,7 @@ gets a row the same way, and so do the folders that «Add seed folder(s)» walks
 Correction: add a folder only when the index holds a file placed directly in it.
 
 **N6. A rescanned folder that cannot be reached keeps a row with no date** (low; run,
-batches J and Q).
+batches J and Q). **Fixed in `17d90dd`.**
 `updateCachedStaticFolders()` :97003, :97020-97028
 
 Its entries are removed as before (finding 14). The first loop drops the folder (N3); the
@@ -1309,6 +1357,17 @@ second one adds it again as a new folder, with the empty date the button read fo
   after the list is loaded again. Once the folder is back on the disk the row has the
   changed mark (run); a rescan then scans its files back (read).
 
+**Fixed in `17d90dd`**: the first loop no longer drops the folder, so the second one has
+nothing to add, and the row keeps the date it had. Run on the text of `5472a48`:
+
+- database (batch J): after «Rescan folder(s)» on `Beta`, which cannot be reached, the
+  panel lists `Beta` with the changed mark, and the `staticfolders` table keeps its row
+  with the recorded date;
+- cached .SLD list (batch Q): the same for `Holiday One`; the save writes its line with
+  the date, and the row has the mark after the list is loaded again.
+
+The entries of the folder are removed from the index all the same (finding 14).
+
 ### With `f88e4be`
 
 Run on `54a0666`, and again on `2c501dc`.
@@ -1317,8 +1376,67 @@ Run on `54a0666`, and again on `2c501dc`.
 batch P): on a folder that is missing from the disk (finding 6's note). The «Ignore all
 changes» button does the same when none of the listed folders is marked.
 
-The other point recorded here for `f88e4be`, the dateless row of a rescanned folder that
-cannot be reached, is now N6.
+**Partly fixed in `17d90dd`**, with `bb82c4c`: the list is marked only when a folder
+found on the disk was updated (:95955 at `bb82c4c`). Run on the text of `bb82c4c` (batch
+P): on a folder that is missing from the disk the list no longer counts as modified. The
+second half is as it was: the button with a filter that lists `Beta`, which has no mark,
+marks the list as modified. What is counted is the folders found, not the dates that
+changed.
+
+### With `17d90dd`
+
+Two regressions in `MenuIgnoreDateStaticFolder()`, both fixed in `bb82c4c`. Run on the
+text of `5472a48`, which holds the function as `17d90dd` left it, then on the text of
+`bb82c4c`. Lines are at `bb82c4c`.
+
+**N8. «Ignore all changes» updates the focused row alone, or nothing** (medium; run,
+batches C and P, real clicks). **Fixed in `bb82c4c`.**
+
+`17d90dd` moved `BtnCloseWindow()` above the loop that reads the «#» of every listed row.
+With the panel closed `LV_GetText()` reads nothing and leaves its variable as it was: the
+«#» of the focused row, read at the top of the function, or the header text when no row
+is focused.
+
+What happened: three folders marked, the button with no focused row: the three marks
+stay, and the message still reads «Folders list information updated». With the `Beta`
+row focused: `Beta` alone is cleared. This is finding 4 again.
+
+`bb82c4c` reads the rows first and closes the panel after (:95932-95941). Run: the three
+marks are cleared in both cases, and the other results of finding 4's note hold.
+
+**N9. «Ignore date change» no longer marks the list as modified** (medium; run, batch P).
+**Fixed in `bb82c4c`.**
+
+The counter that `17d90dd` added for N7 was raised in the button's branch alone, so after
+the menu item it was always 0.
+
+What happened: «Ignore date change» on `Beta`, a cached .SLD list: the mark is cleared
+and `currentFilesListModified` stays 0, so the list can be closed without a question and
+the mark is back when it is loaded again. This is finding 6 again.
+
+`bb82c4c` raises the counter in the menu item's branch too (:95922). Run: the list counts
+as modified after the same step.
+
+### With `5472a48`
+
+**N10. A drive root has no date** (low; run, batches Q and R, under Wine).
+`GenerateStaticFoldersListNow()` :35283-35285, `PopulateStaticFolderzList()`
+
+Not caused by the fix: it shows now that the root's row stays. `FileGetTime` gives
+nothing for `p:`, so the generated list records «-» for the root. The row shows «-» in
+the «Date» and «(?)» columns and can never get the changed mark; «Rescan folder(s)» on
+it leaves the «-» (run, batch R). «Ignore date change» on that row would record an empty
+date, and the row would then show today's date (read).
+
+Whether Windows reads a date for `d:` was not run. By its documentation `FindFirstFile`,
+which `FileGetTime` uses, does not accept a root directory; and `d:` without the `\`
+names the current directory of that drive, which is the root unless the application's
+working folder is on that drive (read).
+
+Correction: a decision. The date of a root can be read from `d:\` with
+`GetFileAttributesEx`; it would have to be used by the five places that read a folder's
+date (the generation, the row filler, «Rescan folder(s)», «Ignore date change» and
+`updateCachedStaticFolders()`), or their dates would disagree.
 
 ## Seen in passing
 
@@ -1331,6 +1449,12 @@ Not part of the panel's own code.
   list the index is emptied first, so a stop leaves a shortened index (read).
 - **C.** After the rename of finding 16 the index holds the new folder as it was typed
   (`pv\BetaNew`) while the database holds it in lower case (run, batch D2).
+- **D.** A saved list whose first seed folder is a drive root loads with an empty seed
+  folders list. `OpenSLD()` takes the list as present only `If (StrLen(testDynaFolderz)>2)`
+  (:2548 at `bb82c4c`), and `p:` is two characters. Run (batch R): the saved file holds
+  `DF1=p:`; after it is loaded the seed folders list is empty. Also (read):
+  `RegenerateEntireList()` answers «No list of dynamic folders found» for a list of
+  under four characters and skips a seed folder of under four (:87216, :87237).
 
 ## Checked and found correct
 
@@ -1380,15 +1504,16 @@ Not part of the panel's own code.
    by `f88e4be`: listed.**
 9. **Folders that are not on the disk** when `updateCachedStaticFolders()` runs: keep
    them in the folders list? The counter correction makes the test at :96941 effective.
-   **Not answered, and in effect since `2c501dc`**: the counter correction is in, so such
-   folders are dropped at every rescan (N3). Whether that is wanted is still the question.
+   **Settled by `17d90dd`: kept.** Between `2c501dc` and `17d90dd` the counter correction
+   was in and such folders were dropped at every rescan (N3); `17d90dd` takes the test out.
 10. **Lower-case paths after a rescan**: acceptable, or should the index keep the spelling
     it had?
+11. **The date of a drive root** (N10): read it from `d:\` in the five places that read a
+    folder's date, or leave the root with «-» and without the changed mark?
 
-Suggested order, at `c389116`: decision 9 with N3 first; then the drive root of finding
-20, where the pattern, the length test of N3 and the date of a root go together; then the
-«Files» cell of N4; then what is left of 9 (the first opening, one selected file), 13 and
-the rest of 17; the others wait for the decisions.
+Suggested order, at `bb82c4c`: the «Files» cell of N4; then what is left of 9 (the first
+opening, one selected file), 13 and the rest of 17; then N5 and the rest of N7; the others
+wait for the decisions.
 
 ## How this was checked
 
@@ -1448,6 +1573,15 @@ the rest of 17; the others wait for the decisions.
   folder itself, and a drive root. For the drive root a scratch folder was mapped as drive
   `P:` in the Wine prefix for the run and unmapped after it, with images in `P:\`, `P:\a`
   and `P:\Sub`. The steps Q had before log on `2c501dc` what they logged the first time.
+- `596a886`, `17d90dd` and `5472a48` were checked on the text of `5472a48`: the seventeen
+  batches, and a new one for a drive root, R, which was also run on `17d90dd`. Batches A,
+  B, C2, D2, E, F, G, I, L, M and N log what they logged on `c389116`. C and P differ in
+  what the button and the menu item of N8 and N9 do; D in the number of a random image; H
+  in the message of «Copy folder»; J in the row of the folder that cannot be reached; Q in
+  that row, in the folders that N3 no longer drops, and in the drive root.
+- `bb82c4c` was checked on its text with batches C and P, the two that reach the lines it
+  changes. Both log what they logged on `c389116`, but for the number of a random image
+  and for the missing folder of N7.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11). The layout figures of finding 30 come from widths the
   script sets itself.
@@ -1456,14 +1590,16 @@ the rest of 17; the others wait for the decisions.
   fonts and the dark mode.
 - Kit: `.claude/scratch/static-folders-panel-2026-11-10/app/`: `setup.sh` once, then
   `run-app.sh <tag> <test function> [revision]`; `patch.py`; `test-wrappers-static.ahk`
-  (testStaticA to testStaticQ, named as in the table below); `results/` (the logs ending
+  (testStaticA to testStaticR, named as in the table below); `results/` (the logs ending
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
   with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
   `-fix4` the ones of `256a670`, those ending in `-flt` the ones of `1813ca9`, those
   ending in `-2c5` the ones of `2c501dc`, those ending in `-c38` the ones of `c389116`,
-  `q-2c5-v1` is batch Q on `2c501dc` before its three added steps, and `j-ab1` is batch J
-  on ab160cb with the table logged); `run-all-c38.sh` runs the seventeen batches and maps
-  the drive `P:` for batch Q.
+  `q-2c5-v1` is batch Q on `2c501dc` before its three added steps, `r-17d` is batch R on
+  `17d90dd`, those ending in `-fix` are the ones of the text of `5472a48`, those ending in
+  `-fx2` the ones of the text of `bb82c4c`, and `j-ab1` is batch J on ab160cb with the
+  table logged); `run-all.sh <suffix> <revision> [batches]` runs the batches with the
+  drive `P:` mapped for Q and R.
 
 | Batch | What it runs |
 |-------|--------------|
@@ -1484,3 +1620,4 @@ the rest of 17; the others wait for the decisions.
 | N | what one right-click on a row raises |
 | P | cached .SLD, after the fixes: the number filters on rows with no count; «Ignore date change», then saved and loaded again; the function added for the button, called by hand, and the button itself; «Rescan folder(s)», then saved and loaded again; a Down key on a row not yet counted; «Ignore date change» on a missing folder; the button with no focused row and a filter that lists an unmarked folder, the marked folder, nothing |
 | Q | after `2c501dc` and `c389116`. Plain folder: «Deselect all (files list)»; «Set as the protected folder» on a missing folder while another one is protected, and on the protected folder itself; «Erase files from the index» on one folder and on every folder. Cached .SLD: a folder that cannot be reached while another one is rescanned, and rescanned itself, each saved and loaded again; five lines written by hand into `[Folders]`; «Regenerate entire index» with a marked folder. Database: the «Files» cell after a rescan; a folder that cannot be reached while another one is rescanned. A drive root, with a drive `P:` mapped for the run: its folders list generated, saved and loaded again, then one of its folders rescanned |
+| R | a drive root, with a drive `P:` mapped for the run. Cached .SLD: the list saved and loaded; «Rescan folder(s)» on another folder and on the root's own row; the root rescanned as a seed folder; saved and loaded again. Database: the panel; «Rescan folder(s)» on a folder; the database opened again and a folder rescanned before the panel was ever opened |
