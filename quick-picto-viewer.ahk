@@ -96015,9 +96015,10 @@ BTNcutCopyStaticFolders(a) {
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
-    counter := indexu := RowNumber := 0
+    counter := indexu := RowNumber := failedFiles := 0
     total := LV_GetCount()
     foldersListArray := []
+    folderu := ""
     Loop, % total
     {
        RowNumber := LV_GetNext(RowNumber)
@@ -96033,14 +96034,20 @@ BTNcutCopyStaticFolders(a) {
        {
           counter++
           foldersListArray[counter] := folderu "\"
-       }
+       } Else failedFiles++
+    }
+    
+    If (counter=0 && failedFiles>0)
+    {
+       pp := (failedFiles=1) ? ":`n" folderu "\" :  "."
+       Return msgBeepTimer("ERROR: Folder(s) not found or access denied" pp)
     }
 
     If (counter<1)
        Return
 
-    userOption := InStr(StrReplace(a, "&"), "cut") ? "CUT" : "COPY"
     destroyGDIfileCache()
+    userOption := InStr(StrReplace(a, "&"), "cut") ? "CUT" : "COPY"
     dataHandle := ClipboardSetFiles(foldersListArray, userOption, 1)
     Sleep, 5
     testClipType := IsClipboardFormatAvailable(15)
@@ -96556,7 +96563,6 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       If !FolderExist(folderPath)
          Return msgBeepTimer("ERROR: Folder not found or access denied:`n" folderPath "\")
 
-      BtnCloseWindow()
       If askAboutFileSave(" and the selected folder will be opened")
          Return
 
@@ -96566,6 +96572,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       If askAboutFilesSelect("discard it")
          Return
 
+      BtnCloseWindow()
       tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex)
       FileExploreSiblingsNav("reset")
    }
