@@ -97682,7 +97682,7 @@ BTNupdateSelectedStaticFolder() {
        wrapperAddNewFolderToList("|" foldar, 0, 1)
     }
 
-    If (SLDtypeLoaded=3)
+    ; If (SLDtypeLoaded=3)
        countFilesGivenStaticFolders(foldersListArray)
 
     setImageLoading()
@@ -97706,7 +97706,7 @@ BTNupdateSelectedStaticFolder() {
     PanelStaticFolderzManager()
 }
 
-countFilesGivenStaticFolders(foldersListArray) {
+countFilesGivenStaticFolders(ByRef foldersListArray) {
 ; foldersListArray maps each folder path, in lower case, to its index in newStaticFoldersListCache[]
     For folderu, indexu in foldersListArray
     {
