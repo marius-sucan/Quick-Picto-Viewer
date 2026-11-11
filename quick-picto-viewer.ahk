@@ -95897,6 +95897,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
        }
     }
 
+    hasChanged := 0
     setImageLoading()
     total := LV_GetCount()
     totalSelected := LV_GetCount("S")
@@ -95926,6 +95927,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
        }
     } Else 
     {
+       BtnCloseWindow()
        listedRows := []
        Loop, % total
        {
@@ -95934,12 +95936,12 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
              listedRows.Push(indexu)
        }
 
-       BtnCloseWindow()
        For i, indexu in listedRows
        {
           folderu := newStaticFoldersListCache[indexu, 1]
           If FolderExist(folderu)
           {
+             hasChanged++
              FileGetTime, dirDateO, % folderu, M
              newStaticFoldersListCache[indexu, 2] := dirDateO
           }
@@ -95947,7 +95949,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
     }
     If (SLDtypeLoaded=3)
        SQLDBdumpStaticFoldersList()
-    Else
+    Else If (hasChanged>0)
        currentFilesListModified := 1
 
     ResetImgLoadStatus()
@@ -96999,7 +97001,7 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
        folderu := newStaticFoldersListCache[A_Index, 1]
        oldDateu := newStaticFoldersListCache[A_Index, 2]
        z := Format("{:L}", folderu)
-       If (!FolderExist(folderu) || hash[z]=1 || StrLen(folderu)<5)
+       If (hash[z]=1 || StrLen(folderu)<2)
           Continue
 
        counter++
@@ -97012,7 +97014,7 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
        } Else If (updateAllDates=1)
        {
           FileGetTime, newDateu, % folderu, M
-          newArray[counter, 2] := newDateu
+          newArray[counter, 2] := FolderExist(folderu) ? newDateu : "-"
        }
    }
 
