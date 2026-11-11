@@ -95919,6 +95919,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
           folderu := newStaticFoldersListCache[indexu, 1]
           If FolderExist(folderu)
           {
+             hasChanged++
              FileGetTime, dirDateO, % folderu, M
              newStaticFoldersListCache[indexu, 2] := dirDateO
              FormatTime, dirDate, % dirDateO, yyyy/MM/dd
@@ -95928,7 +95929,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
        }
     } Else 
     {
-       BtnCloseWindow()
+       ; the rows must be read before the panel is closed
        listedRows := []
        Loop, % total
        {
@@ -95937,6 +95938,7 @@ MenuIgnoreDateStaticFolder(dummy:=0) {
              listedRows.Push(indexu)
        }
 
+       BtnCloseWindow()
        For i, indexu in listedRows
        {
           folderu := newStaticFoldersListCache[indexu, 1]
