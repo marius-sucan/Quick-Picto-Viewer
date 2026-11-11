@@ -15,7 +15,7 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-11, at `bb82c4c`.**
+**Status, 2026-11-11, at `4ac0e69`.**
 
 - **Fixed, 14:** findings 1, 2, 3, 4, 5, 6, 7, 8, 18, 20, 22, 25, 26 and 27.
 - **Partly fixed, 6:** findings 9, 17, 21, 23, 28 and 30. Each note says what is left.
@@ -33,19 +33,20 @@ The fixes are in these commits, in this order:
 | `17d90dd` | Marius | fixes N3 and N6: a folder that is not on the disk stays in the folders list (decision 9). Part of N7. Breaks findings 4 and 6 again (N8, N9) |
 | `5472a48` | at his request | completes finding 20: a drive root is kept when the folders list is loaded |
 | `bb82c4c` | at his request | fixes N8 and N9: findings 4 and 6 hold again |
+| `4ac0e69` | at his request | fixes N4, in a database, and N5 |
 
 The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
-finding. At `bb82c4c`, N1, N2, N3, N6, N8 and N9 are fixed, N7 is partly fixed, and N4,
-N5 and N10 are open, all three of low harm.
+finding. At `4ac0e69`, N1 to N6, N8 and N9 are fixed, N7 is partly fixed, and N10 is
+open, of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
-`f88e4be`), `1813ca9`, `2c501dc`, `c389116` or `bb82c4c`. Everything else keeps its lines
-at ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
-`MenuIgnoreDateStaticFolder()`. Each note was checked by running the batches again: on
-`54a0666`, on the text of `256a670`, on the text of `1813ca9`, on `2c501dc`, where a
-seventeenth batch, Q, was added, on `c389116`, and on the texts of `5472a48` and
-`bb82c4c`, with an eighteenth batch, R, for a drive root.
+`f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c` or `4ac0e69`. Everything else
+keeps its lines at ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be`
+changed to `MenuIgnoreDateStaticFolder()`. Each note was checked by running the batches
+again: on `54a0666`, on the text of `256a670`, on the text of `1813ca9`, on `2c501dc`,
+where a seventeenth batch, Q, was added, on `c389116`, and on the texts of `5472a48`,
+`bb82c4c` and `4ac0e69`, with an eighteenth batch, R, for a drive root.
 
 ## Terms
 
@@ -77,7 +78,7 @@ seventeenth batch, Q, was added, on `c389116`, and on the texts of `5472a48` and
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `bb82c4c` |
+| # | Finding | Harm | Checked | Status at `4ac0e69` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -1194,7 +1195,7 @@ they were without the trial (run, batches C, C2, D, M and P).
 all hold (run, batches C, C2, D, M and P). Of the three points listed as «still as
 before», «Regenerate entire index» is fixed (finding 18); the other two are open. The
 three things the counter correction brings to the surface became what the application
-does: N3, N4 and N5 below. N3 was fixed afterwards, in `17d90dd`.
+does: N3, N4 and N5 below. N3 was fixed afterwards in `17d90dd`, N4 and N5 in `4ac0e69`.
 
 ## New with the fixes
 
@@ -1203,7 +1204,7 @@ N10 so that the notes above can name them.
 
 ### With `2c501dc`
 
-At `bb82c4c`: N1, N2, N3 and N6 are fixed; N4 and N5 are open.
+At `4ac0e69`: N1 to N6 are all fixed.
 
 Each point was run on `2c501dc`. Where it says so, the same steps were run on `1813ca9`
 too, to tell what is new. Lines are at `2c501dc` unless a note says otherwise.
@@ -1310,7 +1311,7 @@ Run on the text of `5472a48`, the same steps:
   `p:\sub`.
 
 **N4. Database: the «Files» cell of a rescanned folder stays empty** (low; run, batches D
-and Q).
+and Q). **Fixed in `4ac0e69`.**
 `BTNupdateSelectedStaticFolder()` :97666
 
 The button empties the folder's count before the rescan, and nothing fills it now that the
@@ -1326,7 +1327,23 @@ both cells are filled when the panel comes back.
 Correction: count the files of each rescanned folder after the rescan, or leave the old
 count in place until then.
 
+**Fixed in `4ac0e69`**, in a database only, which is Marius's choice: on a plain list and
+on a cached .SLD list the cell stays empty until the row is clicked, as it always did.
+Once the rescans end, the button counts the files and the selected files of the rescanned
+folders in one pass over the index (`countFilesGivenStaticFolders()` :97709, called at
+:97685-97686 at `4ac0e69`). It is the count that a click on the row runs.
+
+Run on the text of `4ac0e69`:
+
+- batch Q: after «Rescan folder(s)» on `Gamma` and `Beta` the cells show 1 and 2 when the
+  panel comes back, and `?>1` leaves `Gamma` out;
+- batch D: `Gamma` shows 1; batch R: `p:\sub` shows 2;
+- batch J: a folder that cannot be reached shows 0, its entries being removed (finding
+  14);
+- batches C and P, cached .SLD list: the cell is empty after the rescan, as before.
+
 **N5. The folder given to a rescan becomes a row of its own** (low; run, batch M).
+**Fixed in `4ac0e69`.**
 `updateCachedStaticFolders()` :96980-96988, :97020-97028
 
 When it is handed a folder path, the function notes that folder and every subfolder found
@@ -1340,6 +1357,24 @@ A save before that writes it into `[Folders]` (read). A subfolder with no image 
 gets a row the same way, and so do the folders that «Add seed folder(s)» walks (read).
 
 Correction: add a folder only when the index holds a file placed directly in it.
+
+**Fixed in `4ac0e69`** by that correction (:97030-97038 at `4ac0e69`): the second loop
+asks `retrieveListFoldersIndexed()`, which lists the folders that hold indexed files, and
+passes over a folder it does not know. The list is asked for once, and only when there is
+a folder to add.
+
+Run on `bb82c4c` and on the text of `4ac0e69` (batch Q: `pv\Empty` is created with no
+image, `pv\Deep` with an image in `pv\Deep\Inner` alone, and the seed folder is
+rescanned):
+
+- on `bb82c4c` the folders list gains `pv`, `pv\empty` and `pv\deep`, on a cached .SLD
+  list and in a database, where the `staticfolders` table gets the three rows too;
+- with the fix it holds the six folders that have images, `pv\deep\inner` among them,
+  and the table has six rows.
+
+Batch M: after the seed folder is rescanned the panel lists the five folders, without
+`pv`. Batch C2: a folder added with its subfolders, which hold images, still gets its two
+rows.
 
 **N6. A rescanned folder that cannot be reached keeps a row with no date** (low; run,
 batches J and Q). **Fixed in `17d90dd`.**
@@ -1511,9 +1546,8 @@ Not part of the panel's own code.
 11. **The date of a drive root** (N10): read it from `d:\` in the five places that read a
     folder's date, or leave the root with «-» and without the changed mark?
 
-Suggested order, at `bb82c4c`: the «Files» cell of N4; then what is left of 9 (the first
-opening, one selected file), 13 and the rest of 17; then N5 and the rest of N7; the others
-wait for the decisions.
+Suggested order, at `4ac0e69`: what is left of 9 (the first opening, one selected file),
+13 and the rest of 17; then the rest of N7; the others wait for the decisions.
 
 ## How this was checked
 
@@ -1582,6 +1616,10 @@ wait for the decisions.
 - `bb82c4c` was checked on its text with batches C and P, the two that reach the lines it
   changes. Both log what they logged on `c389116`, but for the number of a random image
   and for the missing folder of N7.
+- `4ac0e69` was checked on its text with the eighteen batches. Batch Q got one more step
+  for N5 and was also run on `bb82c4c`. Batches A, B, C2, D2, E, F, G, H, I, L, N and P
+  log what they logged before the fix; C differs in the number of a random image; D, J, Q
+  and R in the «Files» cells of N4; M and Q in the rows of N5.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11). The layout figures of finding 30 come from widths the
   script sets itself.
@@ -1597,7 +1635,8 @@ wait for the decisions.
   ending in `-2c5` the ones of `2c501dc`, those ending in `-c38` the ones of `c389116`,
   `q-2c5-v1` is batch Q on `2c501dc` before its three added steps, `r-17d` is batch R on
   `17d90dd`, those ending in `-fix` are the ones of the text of `5472a48`, those ending in
-  `-fx2` the ones of the text of `bb82c4c`, and `j-ab1` is batch J on ab160cb with the
+  `-fx2` the ones of the text of `bb82c4c`, those ending in `-n45` the ones of the text of
+  `4ac0e69`, `q-bb8` is batch Q on `bb82c4c`, and `j-ab1` is batch J on ab160cb with the
   table logged); `run-all.sh <suffix> <revision> [batches]` runs the batches with the
   drive `P:` mapped for Q and R.
 
@@ -1619,5 +1658,5 @@ wait for the decisions.
 | M | cached .SLD: a seed-folder rescan, «Regenerate entire index», «Regenerate this folders list» |
 | N | what one right-click on a row raises |
 | P | cached .SLD, after the fixes: the number filters on rows with no count; «Ignore date change», then saved and loaded again; the function added for the button, called by hand, and the button itself; «Rescan folder(s)», then saved and loaded again; a Down key on a row not yet counted; «Ignore date change» on a missing folder; the button with no focused row and a filter that lists an unmarked folder, the marked folder, nothing |
-| Q | after `2c501dc` and `c389116`. Plain folder: «Deselect all (files list)»; «Set as the protected folder» on a missing folder while another one is protected, and on the protected folder itself; «Erase files from the index» on one folder and on every folder. Cached .SLD: a folder that cannot be reached while another one is rescanned, and rescanned itself, each saved and loaded again; five lines written by hand into `[Folders]`; «Regenerate entire index» with a marked folder. Database: the «Files» cell after a rescan; a folder that cannot be reached while another one is rescanned. A drive root, with a drive `P:` mapped for the run: its folders list generated, saved and loaded again, then one of its folders rescanned |
+| Q | after `2c501dc` and `c389116`. Plain folder: «Deselect all (files list)»; «Set as the protected folder» on a missing folder while another one is protected, and on the protected folder itself; «Erase files from the index» on one folder and on every folder. Cached .SLD: a folder that cannot be reached while another one is rescanned, and rescanned itself, each saved and loaded again; five lines written by hand into `[Folders]`; «Regenerate entire index» with a marked folder. Database: the «Files» cell after a rescan; a folder that cannot be reached while another one is rescanned. A drive root, with a drive `P:` mapped for the run: its folders list generated, saved and loaded again, then one of its folders rescanned. Folders with no image directly in them when a seed folder is rescanned, on a cached .SLD list and in a database |
 | R | a drive root, with a drive `P:` mapped for the run. Cached .SLD: the list saved and loaded; «Rescan folder(s)» on another folder and on the root's own row; the root rescanned as a seed folder; saved and loaded again. Database: the panel; «Rescan folder(s)» on a folder; the database opened again and a folder rescanned before the panel was ever opened |
