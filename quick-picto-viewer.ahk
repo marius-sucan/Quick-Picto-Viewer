@@ -27110,7 +27110,7 @@ omniBoxFolderProperties() {
 omniBoxFolderSetProtected() {
    folderPath := OmniBoxGetSelectedFolder()
    If folderPath
-      setContaintFolderAsProtected(folderPath)
+      setContaintFolderAsProtected(folderPath, "given")
 }
 
 omniBoxFolderCreateNew() {
@@ -30714,7 +30714,7 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       invokeStandardFolderProperties(folderPath)
    } Else If (z=4 && folderPath)
    {
-      setContaintFolderAsProtected(folderPath)
+      setContaintFolderAsProtected(folderPath, "given")
    } Else If (z=5 && folderPath)
    {
       addFolderSldATfavorites(folderPath)
@@ -35058,10 +35058,11 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
               newStaticFoldersListCache[countStaticFolders] := [Rowu[1], Rowu[2]]
            }
        }
+
+       iduStaticFoldersListCache := getStaticFoldersListID()
        whileLoopExec := owle
        RecordSet.Free()
        hash := ""
-       iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
        Return
     }
 
@@ -35073,7 +35074,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        If (line="[FilesList]")
           Break
 
-       If (RegExMatch(line, "i)^(Fi[0-9].*\=.{14}\*\&\*[a-z]\:\\..)") && !RegExMatch(line, RegExFilesPattern))
+       If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:\\.)") && !RegExMatch(line, RegExFilesPattern))
        {
           lineArru := StrSplit(line, "*&*")
           folderu := lineArru[2]
@@ -35104,7 +35105,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        }
     }
     whileLoopExec := owle
-    iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
+    iduStaticFoldersListCache := getStaticFoldersListID()
 }
 
 regenerateStaticFoldersList() {
@@ -35192,8 +35193,7 @@ countFilesDiskPerStaticFolders() {
           newStaticFoldersListCache[indexu, 5] := filez
           newStaticFoldersListCache[indexu, 6] := fileSizu
           LV_Modify(RowNumber, "Col8", filez)
-          If newStaticFoldersListCache[indexu, 3]
-             LV_Modify(RowNumber, "Col9", filez - newStaticFoldersListCache[indexu, 3])
+          LV_Modify(RowNumber, "Col9", filez - Round(newStaticFoldersListCache[indexu, 3]))
           LV_Modify(RowNumber, "Col10", Round(Round(fileSizu/1024, 1)/1024, 1))
           If z
              Break
@@ -35292,10 +35292,11 @@ GenerateStaticFoldersListNow() {
           prevMSGdisplay := A_TickCount
        }
    }
-   whileLoopExec := owle
+
    RemoveTooltip()
-   iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
+   whileLoopExec := owle
    foldersListArray := ""
+   iduStaticFoldersListCache := getStaticFoldersListID()
 }
 
 determineTerminateOperation() {
@@ -39914,13 +39915,16 @@ searchNextIndex(direction, inLoop:=0) {
    CreateTempGuiButton("Previous match,,MenuSearchPrevIndex||Next match,,MenuSearchNextIndex||Search,,PanelSearchIndex", 0)
 }
 
-setContaintFolderAsProtected(givenPath:=0) {
+setContaintFolderAsProtected(givenPath:=0,modus:=0) {
      If (givenPath=protectedFolderPath && preventDeleteFromProtectedPath=1)
      {
         preventDeleteFromProtectedPath := 0
         IniAction(1, "preventDeleteFromProtectedPath", "General")
         Return msgBeepTimer("The files in the folder are no longer protected:`n" protectedFolderPath "\", 0)
      }
+
+     If ((modus="given" || InStr(givenPath, ":\")=2) && !FolderExist(givenPath))
+        Return msgBeepTimer("WARNING: The folder selected no longer exists. Action refused.`n" protectedFolderPath "\", 0)
 
      imgPath := FolderExist(givenPath) ? givenPath : getIDimage(currentFileIndex)
      zPlitPath(imgPath, 0, OutFileName, OutDir)
@@ -87300,6 +87304,8 @@ RegenerateEntireList() {
        dummyTimerDelayiedImageDisplay(50)
     }
 
+    If (SLDcacheFilesList=1 && SLDtypeLoaded=2)
+       GenerateStaticFoldersListNow()
     etaTime := "Elapsed time to regenerate files list: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " groupDigits(maxFilesIndex)
     addJournalEntry(etaTime)
 }
@@ -93453,31 +93459,50 @@ invokePanelStaticFoldersContextMenu() {
       If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
          kMenu("PanelStaticMenu", "Check", "&Set as the protected folder")
 
-      If (isUpdateList=1 && InStr(changeState, "*"))
+      If (isUpdateList=1 && InStr(changeState, "*") && FileExist(CurrentSLD))
          kMenu("PanelStaticMenu", "Add", "&Ignore date change", "MenuIgnoreDateStaticFolder")
       If (SLDtypeLoaded!=3 && isUpdateList=1 && FileExist(CurrentSLD))
          kMenu("PanelStaticMenu", "Add", "Rename inde&x entry`tF2", "PanelRenameStaticFolder")
 
       kMenu("PanelStaticMenu", "Add", "&Filter files list to selected folder(s)`tF3", "MenuFilterListSelectedFolder")
+      Menu, PanelStaticMenu, Add
    }
 
-   Menu, PanelStaticMenu, Add,
    kMenu("PanelStaticMenu", "Add", "Re&generate this folders list", "regenerateStaticFoldersList")
    If (SLDtypeLoaded=3)
       kMenu("PanelStaticMenu", "Add", "&Count selected files", "SqlWrapPopulateStaticFolderzList")
    Else
       kMenu("PanelStaticMenu", "Add", "&Count files per folders", "countAllFilesPerStaticFolders")
-   kMenu("PanelStaticMenu", "Add", "&Count files in folders found on disk", "countFilesDiskPerStaticFolders")
-   kMenu("PanelStaticMenu", "Add", "&Copy entire list as text", "BTNcopyAllStaticFolderPaths")
+
+   If total
+   {
+      kMenu("PanelStaticMenu", "Add", "&Count files in folders found on disk", "countFilesDiskPerStaticFolders")
+      kMenu("PanelStaticMenu", "Add", "&Copy entire list as text", "BTNcopyAllStaticFolderPaths")
+   }
+
    If markedSelectFile
-      kMenu("PanelStaticMenu", "Add", "Deselect all (files &list)", "dropFilesSelection")
+      kMenu("PanelStaticMenu", "Add", "Deselect all (files &list)", "MenuStaticFoldersDropFilesSelection")
 
    If (total!=totalSelected)
       kMenu("PanelStaticMenu", "Add", "Select entire &table`tCtrl+A", "BTNreviewLVselAll")
-   kMenu("PanelStaticMenu", "Add", "&View list as a folders tree", "BTNshowStaticFoldersInTreeView")
+
+   If total
+      kMenu("PanelStaticMenu", "Add", "&View list as a folders tree", "BTNshowStaticFoldersInTreeView")
    Menu, PanelStaticMenu, Add
    kMenu("PanelStaticMenu", "Add", "Help`tF1", "BtnHelpStaticFoldersPanel")
    showThisMenu("PanelStaticMenu")
+}
+
+MenuStaticFoldersDropFilesSelection() {
+   dropFilesSelection()
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewOthers
+
+   Loop, % LV_GetCount()
+   {
+      ; to-do;  the «Selected» and «%» cells must be set to 0.
+   }
+
 }
 
 SqlWrapPopulateStaticFolderzList() {
@@ -93993,6 +94018,9 @@ PanelStaticFolderzManager() {
 
     isUpdateList := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? 1 : 0
     thisBtnHeight := createSettingsGUI(2, A_ThisFunc)
+    If !thisBtnHeight
+       Return
+
     btnWid := 115
     txtWid := 360
     lstWid := 545
@@ -94027,10 +94055,15 @@ PanelStaticFolderzManager() {
     labelu := isUpdateList ? "Cached folders list: " : "Static folders list: "
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, labelu appTitle)
     Sleep, 25
-    thisList := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
+    thisList := getStaticFoldersListID()
     If (newStaticFoldersListCache.Count()>0 && markedSelectFile>1 && thisList!=iduStaticFoldersListCache)
        countAllFilesPerStaticFolders("start")
     PopulateStaticFolderzList(staticListViewFilteru, "init")
+}
+
+getStaticFoldersListID() {
+   thisList := "a" maxFilesIndex "|" markedSelectFile "|" newStaticFoldersListCache.Count() "|" lastZeitFileSelect "|" SLDtypeLoaded
+   Return thisList
 }
 
 identifyLastUndoFileAct(ByRef filesListArray, simpleMode) {
@@ -96033,11 +96066,15 @@ BTNcopyAllStaticFolderPaths() {
 }
 
 BTNshowStaticFoldersInTreeView() {
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: ListView, LViewOthers
+    If (LV_GetCount()<1)
+       Return
+
     Loop, % newStaticFoldersListCache.MaxIndex()
           finalListu .= newStaticFoldersListCache[A_Index, 1] "`n"
 
     BtnCloseWindow()
-    ; PanelFoldersTree()
     FolderTreeRepopulate("given", finalListu)
 }
 
@@ -96102,7 +96139,7 @@ BTNremFilesStaticFolder() {
           {
              If (maxFilesIndex>1)
              {
-                r := coreRemFilesStaticFolder(foldar, "|")
+                remFilesFromList("|" foldar, 1)
                 newStaticFoldersListCache[Value, 4] := 0
                 newStaticFoldersListCache[Value, 3] := 0
              }
@@ -96209,7 +96246,7 @@ BTNselFilesStaticFolder(modus:=0) {
    lastZeitFileSelect := A_TickCount
    If (AnyWindowOpen=2)
    {
-      iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
+      iduStaticFoldersListCache := getStaticFoldersListID()
       For Key, Value in foldersListArray
       {
          indexu := Value
@@ -96484,9 +96521,9 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       z := 4
    Else If (modus="properties" && g="yo")
       z := 3
-   Else If GetKeyState("Shift", "P") || (modus="anew" && g="yo") 
+   Else If (GetKeyState("Shift", "P") || (modus="anew" && g="yo") )
       z := 2
-   Else If GetKeyState("Ctrl", "P") || (modus="explorer" && g="yo")
+   Else If (GetKeyState("Ctrl", "P") || (modus="explorer" && g="yo"))
       z := 1
 
    whichLV := (AnyWindowOpen=3) ? "LViewDynas" : "LViewOthers"
@@ -96508,8 +96545,10 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       Try Run, "%folderPath%"
       Catch wasError
       {
-         If !AnyWindowOpen
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu, 0, 0, "error")
+         If AnyWindowOpen
+            msgBeepTimer("ERROR: An unknown error occurred opening the folder:`n" folderu "\")
+         Else
+            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred opening the folder:`n" folderu "\", 0, 0, "error")
       }
    } Else If (z=2 && folderPath)
    {
@@ -96519,9 +96558,12 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       invokeStandardFolderProperties(folderPath)
    } Else If (z=4 && folderPath)
    {
-      setContaintFolderAsProtected(folderPath)
-   } Else If FolderExist(folderPath)
+      setContaintFolderAsProtected(folderPath, "given")
+   } Else
    {
+      If !FolderExist(folderPath)
+         Return msgBeepTimer("ERROR: Folder not found or access denied:`n" folderPath "\")
+
       BtnCloseWindow()
       If askAboutFileSave(" and the selected folder will be opened")
          Return
@@ -96767,7 +96809,7 @@ countAllFilesPerStaticFolders(dummy:=0) {
            newStaticFoldersListCache[thisIndex, 4] := foldersSelListArray[folderu]
     }
 
-    iduStaticFoldersListCache := "a" maxFilesIndex markedSelectFile newStaticFoldersListCache.Count()
+    iduStaticFoldersListCache := getStaticFoldersListID()
     foldersListArray := ""
     foldersSelListArray := ""
     folderMapArray := ""
@@ -96949,7 +96991,7 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
    } Else
       foldersListArray := mainFolderu
 
-   counter++
+   counter := 0
    newArray := []
    hash := new hashtable()
    Loop, % newStaticFoldersListCache.MaxIndex()
@@ -96962,8 +97004,8 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
           Continue
 
        counter++
-       newArray[counter] := newStaticFoldersListCache[A_Index]
        hash[z] := 1
+       newArray[counter] := newStaticFoldersListCache[A_Index]
        If foldersListArray[z]
        {
           newArray[counter, 2] := foldersListArray[z]
@@ -96985,10 +97027,10 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
        newArray[counter] := [folderu, newDateu]
    }
 
-   newStaticFoldersListCache := []
-   newStaticFoldersListCache := newArray.Clone()
    hash := ""
    foldersListArray := ""
+   newStaticFoldersListCache := []
+   newStaticFoldersListCache := newArray.Clone()
    If (SLDtypeLoaded=3 && allowDump=1)
       SQLDBdumpStaticFoldersList()
 }
@@ -97183,7 +97225,7 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
     If (silentus=0)
        showTOOLtip("Finished removing " filesRemoved " files from the list")
 
-    Sleep, 25
+    Sleep, 5
     SetTimer, RemoveTooltip, % -msgDisplayTime
 }
 
@@ -97197,7 +97239,7 @@ PanelRenameStaticFolder() {
     LV_GetText(indexu, RowNumber, colNum)
     folderu := (AnyWindowOpen=2) ? newStaticFoldersListCache[indexu, 1] : indexu
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
-        Return
+       Return
 
     If (SLDtypeLoaded=2 && AnyWindowOpen=2)
     {
