@@ -35051,7 +35051,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        {
            Rowu := RecordSet.Rows[A_Index]
            z := Format("{:L}", Rowu[1])
-           If (StrLen(Rowu[1])>3 && hash[z]!=1)
+           If (StrLen(Rowu[1])>1 && hash[z]!=1) ; a drive root is stored as "d:"
            {
               hash[z] := 1
               countStaticFolders++
@@ -35074,7 +35074,8 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        If (line="[FilesList]")
           Break
 
-       If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:\\.?)") && !RegExMatch(line, RegExFilesPattern))
+       ; the path may end at the colon: a drive root is stored as "d:"
+       If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:)") && !RegExMatch(line, RegExFilesPattern))
        {
           lineArru := StrSplit(line, "*&*")
           folderu := lineArru[2]
