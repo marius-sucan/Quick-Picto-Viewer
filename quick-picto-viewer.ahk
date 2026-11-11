@@ -97027,6 +97027,16 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
        If (hash[folderu]=1 || StrLen(folderu)<2 || newDateu="-")
           Continue
 
+       ; only a folder that holds indexed files gets an entry
+       If !hasIndexedFolders
+       {
+          hasIndexedFolders := 1
+          indexedFolders := retrieveListFoldersIndexed()
+       }
+
+       If !indexedFolders[folderu]
+          Continue
+
        counter++
        newArray[counter] := [folderu, newDateu]
    }
@@ -97672,6 +97682,9 @@ BTNupdateSelectedStaticFolder() {
        wrapperAddNewFolderToList("|" foldar, 0, 1)
     }
 
+    If (SLDtypeLoaded=3)
+       countFilesGivenStaticFolders(foldersListArray)
+
     setImageLoading()
     If (SLDtypeLoaded=3 || SLDtypeLoaded=2 && allGood=1)
     {
@@ -97691,6 +97704,30 @@ BTNupdateSelectedStaticFolder() {
     SetTimer, RemoveTooltip, % -msgDisplayTime
     foldersListArray := ""
     PanelStaticFolderzManager()
+}
+
+countFilesGivenStaticFolders(foldersListArray) {
+; foldersListArray maps each folder path, in lower case, to its index in newStaticFoldersListCache[]
+    For folderu, indexu in foldersListArray
+    {
+       newStaticFoldersListCache[indexu, 3] := 0
+       newStaticFoldersListCache[indexu, 4] := 0
+    }
+
+    Loop, % maxFilesIndex
+    {
+       imgPath := resultedFilesList[A_Index, 1]
+       If (InStr(imgPath, "||") || !imgPath)
+          Continue
+
+       indexu := foldersListArray[Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1))]
+       If !indexu
+          Continue
+
+       newStaticFoldersListCache[indexu, 3] += 1
+       If resultedFilesList[A_Index, 2]
+          newStaticFoldersListCache[indexu, 4] += 1
+    }
 }
 
 UIeditApplyStaticFolderFilter() {
