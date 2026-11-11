@@ -35137,7 +35137,7 @@ regenerateStaticFoldersList() {
 countFilesDiskPerStaticFolders() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(folderu, RowNumber, 1)
     folderu := newStaticFoldersListCache[folderu, 1]
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
@@ -93433,7 +93433,7 @@ invokePanelStaticFoldersContextMenu() {
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
-   RowNumber := LV_GetNext(0, "F")
+   RowNumber := getFocusedOrFirstSelectedRow()
 
    totalSelected := LV_GetCount("S")
    total := LV_GetCount()
@@ -94065,6 +94065,12 @@ PanelStaticFolderzManager() {
 getStaticFoldersListID() {
    thisList := "a" maxFilesIndex "|" markedSelectFile "|" newStaticFoldersListCache.Count() "|" lastZeitFileSelect "|" SLDtypeLoaded
    Return thisList
+}
+
+getFocusedOrFirstSelectedRow() {
+; a freshly filled list view has no focused row, and Ctrl+A focuses none
+   RowNumber := LV_GetNext(0, "F")
+   Return RowNumber ? RowNumber : LV_GetNext(0)
 }
 
 identifyLastUndoFileAct(ByRef filesListArray, simpleMode) {
@@ -95879,7 +95885,7 @@ BtnIgnoreDateStaticFolder() {
 MenuIgnoreDateStaticFolder(dummy:=0) {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
     If ((StrLen(folderu)<2 || folderu="folder path" || !RowNumber) && dummy!="update-all")
@@ -95966,7 +95972,7 @@ BTNcopyStaticFolderPath() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
     colNum := (AnyWindowOpen=3) ? 3 : 1
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(folderu, RowNumber, colNum)
     If (AnyWindowOpen=2)
        folderu := newStaticFoldersListCache[folderu, 1]
@@ -96012,7 +96018,7 @@ BTNcutCopyStaticFolders(a) {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
     colNum := (AnyWindowOpen=3) ? 3 : 1
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(folderu, RowNumber, colNum)
     If (AnyWindowOpen=2)
        folderu := newStaticFoldersListCache[folderu, 1]
@@ -96111,7 +96117,7 @@ BTNshowDynamicFoldersInTreeView() {
 BTNremFilesStaticFolder() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
@@ -96182,7 +96188,7 @@ BTNselFilesStaticFolder(modus:=0) {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, % whichLV
    colNum := (AnyWindowOpen=3) ? 3 : 1
-   RowNumber := LV_GetNext(0, "F")
+   RowNumber := getFocusedOrFirstSelectedRow()
    LV_GetText(folderu, RowNumber, colNum)
    If (AnyWindowOpen=2)
       folderu := newStaticFoldersListCache[folderu, 1]
@@ -96466,7 +96472,7 @@ BtnPanelStaticJumpFirst() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, % whichLV
    colNum := (AnyWindowOpen=3) ? 3 : 1
-   RowNumber := LV_GetNext(0, "F")
+   RowNumber := getFocusedOrFirstSelectedRow()
    LV_GetText(folderu, RowNumber, colNum)
    If (AnyWindowOpen=2)
       folderu := newStaticFoldersListCache[folderu, 1]
@@ -96534,7 +96540,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, % whichLV
    colNum := (AnyWindowOpen=3) ? 3 : 1
-   RowNumber := LV_GetNext(0, "F")
+   RowNumber := getFocusedOrFirstSelectedRow()
    LV_GetText(folderu, RowNumber, colNum)
    If (AnyWindowOpen=2)
       folderu := newStaticFoldersListCache[folderu, 1]
@@ -96601,7 +96607,7 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, % whichLV
     colNum := (AnyWindowOpen=3) ? 3 : 1
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(indexu, RowNumber, colNum)
     folderu := (AnyWindowOpen=2) ? newStaticFoldersListCache[indexu, 1] : indexu
     LV_GetText(files, RowNumber, 5)
@@ -96715,6 +96721,9 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
 }
 
 UIfilterListToSelectStaticFolders() {
+   If askAboutFilesSelect("discard it and filter the files list")
+      Return
+
    showTOOLtip("Filtering list to selected folders, please wait")
    Gui, SettingsGUIA: Hide
    dropFilesSelection(1)
@@ -96828,6 +96837,9 @@ countAllFilesPerStaticFolders(dummy:=0) {
 
 uiFilterListDynaFolder(folderu, modus) {
     ; doExactMatch := (AnyWindowOpen=3) ? 0 : 1
+    If (SLDtypeLoaded=3 && askAboutFilesSelect("discard it and filter the files list"))
+       Return
+
     BtnCloseWindow()
     folderu := Trimmer(StrReplace(folderu, "|"))
     If (modus=3) ; full path recursive
@@ -97249,7 +97261,7 @@ PanelRenameStaticFolder() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
     colNum := (AnyWindowOpen=3) ? 3 : 1
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(indexu, RowNumber, colNum)
     folderu := (AnyWindowOpen=2) ? newStaticFoldersListCache[indexu, 1] : indexu
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
@@ -97630,7 +97642,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
 BTNupdateSelectedStaticFolder() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewOthers
-    RowNumber := LV_GetNext(0, "F")
+    RowNumber := getFocusedOrFirstSelectedRow()
     LV_GetText(indexu, RowNumber, 1)
     folderu := newStaticFoldersListCache[indexu, 1]
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
