@@ -35074,7 +35074,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        If (line="[FilesList]")
           Break
 
-       If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:\\.)") && !RegExMatch(line, RegExFilesPattern))
+       If (RegExMatch(line, "i)^(Fi[0-9].*\=(?:.{14}|.?)\*\&\*[a-z]\:\\.?)") && !RegExMatch(line, RegExFilesPattern))
        {
           lineArru := StrSplit(line, "*&*")
           folderu := lineArru[2]
@@ -39920,11 +39920,11 @@ setContaintFolderAsProtected(givenPath:=0,modus:=0) {
      {
         preventDeleteFromProtectedPath := 0
         IniAction(1, "preventDeleteFromProtectedPath", "General")
-        Return msgBeepTimer("The files in the folder are no longer protected:`n" protectedFolderPath "\", 0)
+        Return msgBeepTimer("The files in the folder are no longer protected:`n" givenPath "\", 0)
      }
 
      If ((modus="given" || InStr(givenPath, ":\")=2) && !FolderExist(givenPath))
-        Return msgBeepTimer("WARNING: The folder selected no longer exists. Action refused.`n" protectedFolderPath "\", 0)
+        Return msgBeepTimer("WARNING: The folder selected no longer exists. Action refused.`n" givenPath "\")
 
      imgPath := FolderExist(givenPath) ? givenPath : getIDimage(currentFileIndex)
      zPlitPath(imgPath, 0, OutFileName, OutDir)
