@@ -96133,7 +96133,6 @@ BTNremFilesStaticFolder() {
        r := 0
        If (foldersListArray.Count()>0)
        {
-          r := 1
           BtnCloseWindow()
           For foldar, Value in foldersListArray
           {
@@ -96144,6 +96143,15 @@ BTNremFilesStaticFolder() {
                 newStaticFoldersListCache[Value, 3] := 0
              }
           }
+
+          If (maxFilesIndex>0)
+          {
+             GenerateRandyList()
+             SoundBeep, 900, 100
+             SetTimer, RandomPicture, -300
+             r := 1
+          } Else
+             r := handleEmptyFilesList(CurrentSLD, "", 2) ? 1 : 0
        }
 
        foldersListArray := ""
@@ -96314,22 +96322,6 @@ BTNcountFilesDynaFolders() {
    LV_Modify(RowNumber, "Col8", diffu)
    ResetImgLoadStatus()
    Return thisIndex
-}
-
-coreRemFilesStaticFolder(folderu, recursive) {
-    remFilesFromList(recursive folderu)
-    If (maxFilesIndex>0)
-    {
-       GenerateRandyList()
-       SoundBeep, 900, 100
-       RandomPicture()
-       Return 1
-    } Else
-    {
-       r := handleEmptyFilesList(CurrentSLD, "", 2)
-       z := r ? 1 : 0
-       Return z
-    }
 }
 
 BTNcopyDynaFoldersList() {
