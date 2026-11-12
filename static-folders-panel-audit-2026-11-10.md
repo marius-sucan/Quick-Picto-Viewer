@@ -867,18 +867,32 @@ Run on the text of `55b2a24`, in a database (batch Y; batch D2 too):
 
 - the menu of a row offers «Rename index entry»;
 - F2, `Beta` → `BetaNew`: no question; both files move, in the index and in the `images`
-  table; the folders list and `staticfolders` hold `pv\betanew` with the recorded date of
-  `Beta`, and so does the panel after the database is opened again;
+  table; `staticfolders` holds `pv\betanew` with the recorded date of `Beta`
+  (`20190102030405`, set apart for the run), so the row is marked «*» against the new
+  folder's own date, also after the database is opened again;
 - `Delta` → `DeltaNew`, propagated: `pv\delta` and `pv\delta\inner` are renamed in both
-  tables; the two captions follow their images; three audio file paths that pointed into
-  the folder are rewritten, one of them held by an image of `Gamma`; the one whose file is
-  not at the new place keeps its path;
+  tables, the subfolder with its own date (`20180203040506`); the two captions follow
+  their images; three audio file paths that pointed into the folder are rewritten, one of
+  them held by an image of `Gamma`; the one whose file is not at the new place keeps its
+  path;
 - `Gamma` → `Holiday One`: «The folder is already in the folders list», the dialog comes
   again, nothing changes;
 - `Holiday One` → `Holiday One\Empty`: refused when propagated; unticked, its four files
   move;
 - with a files filter on (F3 on `Gamma`), `Gamma` → `GammaNew`: the filter goes, the
-  folders list is read again from the database, and `pv\gammanew` keeps its recorded date.
+  folders list is read again from the database, and `pv\gammanew` keeps its recorded date;
+- a file of the same name already indexed in the new folder, which the folders list does
+  not show (a row added to `images` for the run): «Failed to update the files list
+  database: UNIQUE constraint failed: images.fullPath»; the rows, the index, `images` and
+  `staticfolders` stay as they were, and the next rename works.
+
+The refusal counts every row of the folders list, also one whose folder holds no image. A
+seed-folder rescan of a cached .SLD list gives such folders a row (N5 applies to databases
+only), and renaming onto one is refused (run, batch Z: `Gamma` → `EmptyNew`); on `5584ee3`
+the same rename leaves two rows for that path. In a database a row emptied by «Erase files
+from the index» stays in memory until the folders list is read again, with the same effect
+(read). «Regenerate this folders list» drops such rows, but it takes every folder's date
+from the disk again, so the «*» marks go (read).
 
 On `5584ee3` batch D2 logs what this section describes, and batch Y stops at the «Update
 files list» question that a database rename asked there.
@@ -1902,7 +1916,10 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
   entry» in a database; S2 in the current file after an F3, which varies from run to run
   (it varies the same way between the logs of `2da1585` and of the text of `36d4b89`); D2,
   H, Y and Z in what findings 16 and 19 change. On `5584ee3` batch Y stops at the «Update
-  files list» question, which it does not answer. The text of `55b2a24` also loads on
+  files list» question, which it does not answer. Y and Z then got more steps and were run
+  again on the text of `55b2a24`, and Z on `5584ee3`: distinct recorded dates for `Beta`
+  and `Delta\Inner`, a rename whose files cannot move, the rename that follows it, and a
+  rename onto a folder without images that has a row. The text of `55b2a24` also loads on
   stock AutoHotkey 1.1.37.02 (a load check).
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
@@ -1927,7 +1944,8 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
   text of `40bc347`, those ending in `-f7c` the ones of `f7caaac`, those ending in `-f15`
   the ones of the text of `eed5422`, `x-smoke` is batch X on that text, run first, those
   ending in `-558` are the ones of `5584ee3`, those ending in `-f16` the ones of the text
-  of `55b2a24`, and `y-smoke` and `z-smoke` are batches Y and Z on that text, run first);
+  of `55b2a24`, `y-smoke` and `z-smoke` are batches Y and Z on that text, run first, and
+  `y-f16b`, `z-f16b` and `z-558b` are Y and Z with their added steps);
   `run-all.sh <suffix> <revision> [batches]` runs the batches with the drive `P:` mapped
   for Q and R.
 
@@ -1957,5 +1975,5 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
 | V | after `36d4b89`, a cached .SLD list with a marked folder, a freshly opened panel after Ctrl+A: a Down key event, the menu, F2 answered «Cancel», «Ignore date change» |
 | W | after `2dde55b`. «Deselect all (files list)» with no row highlighted and with one, on a plain folder and in a database; the panel opened again with one file selected. With the calls of `retrieveListFoldersIndexed()` counted: «Rescan folder(s)» and the seed folder rescanned with a new folder without images, on a cached .SLD list and in a database |
 | X | after `f7caaac`. «Rescan folder(s)» on one folder, then on two, with file 10 as the current file, on a plain folder, a cached .SLD list and a database: the current file before and after, the calls of `RandomPicture()`, the shuffles of the random list, the images loaded, and whether the last one loaded is the current file |
-| Y | after `5584ee3`, a database with captions and audio notes on four images: the menu of a row; «Rename index entry» propagated, then the database opened again; unticked next to a subfolder; propagated on a folder with a subfolder, captions and audio notes; to a folder already listed; to a folder inside the renamed one, propagated then not; with a files filter on |
-| Z | after `5584ee3`, a cached .SLD list: «Rename index entry» unticked, to a folder already listed, propagated; the seed folders panel's rename of the seed folder, unticked |
+| Y | after `5584ee3`, a database with captions and audio notes on four images: the menu of a row; «Rename index entry» propagated, then the database opened again; unticked next to a subfolder; propagated on a folder with a subfolder, captions and audio notes; to a folder already listed; to a folder inside the renamed one, propagated then not; with a files filter on; a rename whose files cannot move, then an ordinary one |
+| Z | after `5584ee3`, a cached .SLD list: «Rename index entry» unticked, to a folder already listed, propagated; the seed folders panel's rename of the seed folder, unticked; after a seed-folder rescan, a rename onto a folder without images that has a row |
