@@ -15,11 +15,11 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-12, at `40bc347`.**
+**Status, 2026-11-12, at `eed5422`.**
 
-- **Fixed, 16:** findings 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 18, 20, 22, 25, 26 and 27.
+- **Fixed, 17:** findings 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 15, 18, 20, 22, 25, 26 and 27.
 - **Partly fixed, 6:** findings 9, 17, 21, 23, 28 and 30. Each note says what is left.
-- **Open, 8:** findings 10, 13, 14, 15, 16, 19, 24 and 29.
+- **Open, 7:** findings 10, 13, 14, 16, 19, 24 and 29.
 
 The fixes are in these commits, in this order:
 
@@ -38,22 +38,24 @@ The fixes are in these commits, in this order:
 | `36d4b89` | at his request | fixes 11 and 12 |
 | `2dde55b` | Marius, 2026-11-12 | finding 30: «Deselect all (files list)» clears the highlighted rows; N5's check in a database only, his choice; new limits for the question of finding 12 |
 | `40bc347` | at his request | finding 30: «Deselect all (files list)» clears every row and the folders list's counts; N5's query only when there is a folder to add |
+| `eed5422` | at his request | fixes 15: one random image once «Rescan folder(s)» ends, on every kind of list (decision 3) |
 
 The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
-finding. At `40bc347`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
+finding. At `eed5422`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
 choice), N7 is partly fixed, and N10 is open, of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
 `f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585`,
-`36d4b89`, `2dde55b` or `40bc347`. Everything else keeps its lines at ab160cb, and the name
-`BTNignoreDateStaticFolder()`, which `f88e4be` changed to `MenuIgnoreDateStaticFolder()`.
+`36d4b89`, `2dde55b`, `40bc347` or `eed5422`. Everything else keeps its lines at ab160cb,
+and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
+`MenuIgnoreDateStaticFolder()`.
 Each note was checked by running the batches again: on `54a0666`, on the text of
 `256a670`, on the text of `1813ca9`, on `2c501dc`, where a seventeenth batch, Q, was
 added, on `c389116`, on the texts of `5472a48`, `bb82c4c` and `4ac0e69`, with an
 eighteenth batch, R, for a drive root, on `2da1585` and the text of `36d4b89`, with five
-more batches: S1, S2, T, U and V, and on `2dde55b` and the text of `40bc347`, with one
-more, W.
+more batches: S1, S2, T, U and V, on `2dde55b` and the text of `40bc347`, with one more,
+W, and on `f7caaac` and the text of `eed5422`, with one more, X.
 
 ## Terms
 
@@ -86,7 +88,7 @@ more, W.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `40bc347` |
+| # | Finding | Harm | Checked | Status at `eed5422` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -102,7 +104,7 @@ more, W.
 | 12 | F3 on two or more folders drops the files selection | medium | run | **fixed**, `36d4b89`: it asks first (decision 4), when `askAboutFilesSelect()` asks: since `2dde55b`, 25 or more files selected in a list of more than 150, with 25 or more left out |
 | 13 | A stopped «Count files per folders» leaves zeros that pass as counts | medium | run | open |
 | 14 | «Rescan folder(s)» on a folder that cannot be reached removes its entries, in a database with their cached data, without a word | medium, a decision | run | open |
-| 15 | Database: after «Rescan folder(s)» the image in the viewport is no longer the current file | medium | run | open |
+| 15 | Database: after «Rescan folder(s)» the image in the viewport is no longer the current file | medium | run | **fixed**, `eed5422`: one random image once the rescan ends, on every kind of list (decision 3) |
 | 16 | F2 in a database opens the rename the menu leaves out; the folders list is not updated | medium | run | open |
 | 17 | Private mode marks every folder as changed; a missing folder is dated today | medium | run | **partly fixed**, `f88e4be`: a missing folder is still dated today |
 | 18 | «Regenerate entire index» leaves the marks of a cached .SLD list | medium | run | **fixed**, `2c501dc` |
@@ -805,6 +807,26 @@ Correction: one refresh after the loop. Decision 3 asks which image it should be
 Open at `bb82c4c` (run, batch D: `currentFileIndex` goes from 10 to 1 and `IDshowImage()`
 ran 0 times). Between `2c501dc` and `c389116` «Erase files from the index» left the same
 state: N1 under «New with the fixes», fixed.
+
+**Fixed in `eed5422`** by decision 3 as Marius settled it: a random image, on every kind of
+list, once all the folders are rescanned. The button passes a new parameter of
+`wrapperAddNewFolderToList()`, `noRandom`, on to `coreAddNewFolder()`, where 2 skips its
+`RandomPicture()` (:65708-65710, :65984-65985 at `eed5422`). After its loop the button
+starts a new random list and shows one random image, when the index is not empty
+(:97696-97703 at `eed5422`). In a database `coreAddNewFolder()` returns before that line
+anyway; on plain and cached .SLD lists it no longer picks an image for each rescanned
+folder.
+
+Run on `f7caaac`, whose code is that of `40bc347`, and on the text of `eed5422` (batch X:
+file 10 is the current file; «Rescan folder(s)» on `Beta`, then on `Gamma` and `Beta`):
+
+- database: on `f7caaac` `currentFileIndex` goes to 1, `RandomPicture()` runs 0 times and
+  no image is loaded; with the fix `RandomPicture()` runs once, one image is loaded and it
+  is the current file. Batch D's step on `Gamma` shows the same;
+- plain and cached .SLD lists, two folders rescanned: on `f7caaac` `RandomPicture()` runs
+  twice and the random list is shuffled twice, for one image loaded; with the fix it runs
+  once, the list is shuffled once, and the one image loaded is the current file. With one
+  folder rescanned both give one of each.
 
 ## 16. F2 in a database opens the rename the menu leaves out
 
@@ -1670,7 +1692,8 @@ Not part of the panel's own code.
 3. **After a rescan**, which image: the one that was shown, when it is still in the index;
    a random one, as the other lists do now; or the first? «Erase files from the index»
    shows a random one again since `c389116` (N1). The question stands for the database
-   rescan of finding 15.
+   rescan of finding 15. **Settled: a random one** (`eed5422`, Marius's answers), on
+   every kind of list, once all the folders are rescanned.
 4. **F3 on several folders**: ask before the selection is dropped, or a filter that keeps
    it? **Settled: ask** (`36d4b89`, Marius's answers), with `askAboutFilesSelect()` as it
    is; in a database F3 on one folder asks too. Its limits changed in `2dde55b` (finding
@@ -1692,7 +1715,7 @@ Not part of the panel's own code.
 11. **The date of a drive root** (N10): read it from `d:\` in the five places that read a
     folder's date, or leave the root with «-» and without the changed mark?
 
-Suggested order, at `40bc347`: what is left of 9 (the first opening, one selected file),
+Suggested order, at `eed5422`: what is left of 9 (the first opening, one selected file),
 13 and the rest of 17; then the rest of N7; the others wait for the decisions.
 
 ## How this was checked
@@ -1787,6 +1810,14 @@ Suggested order, at `40bc347`: what is left of 9 (the first opening, one selecte
   number of a random image. On the text of `40bc347`, Q differs from `2dde55b` in the
   cells «Deselect all (files list)» sets and in the number of a random image; T and U
   log what they logged on the text of `36d4b89`.
+- `eed5422` was checked on `f7caaac`, whose code is that of `40bc347`, and on the text of
+  `eed5422`: the twenty-four batches and a new one, X, which rescans one folder and then
+  two on a plain folder, a cached .SLD list and a database, and logs the current file,
+  the calls of `RandomPicture()`, the shuffles of the random list and the images loaded.
+  Batches A, B, C2, D2, E, F, G, H, I, J, L, M, N, P, R, S1, S2, T, U, V and W log what
+  they logged on `f7caaac`; C and Q differ in the number of a random image, D and X in
+  what finding 15 changes. The text of `eed5422` also loads on stock AutoHotkey 1.1.37.02
+  (a load check; nothing was run on it).
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
   finding 30 come from widths the script sets itself.
@@ -1795,7 +1826,7 @@ Suggested order, at `40bc347`: what is left of 9 (the first opening, one selecte
   fonts and the dark mode.
 - Kit: `.claude/scratch/static-folders-panel-2026-11-10/app/`: `setup.sh` once, then
   `run-app.sh <tag> <test function> [revision]`; `patch.py`; `test-wrappers-static.ahk`
-  (testStaticA to testStaticW, named as in the table below); `results/` (the logs ending
+  (testStaticA to testStaticX, named as in the table below); `results/` (the logs ending
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
   with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
   `-fix4` the ones of `256a670`, those ending in `-flt` the ones of `1813ca9`, those
@@ -1806,8 +1837,9 @@ Suggested order, at `40bc347`: what is left of 9 (the first opening, one selecte
   `4ac0e69`, `q-bb8` is batch Q on `bb82c4c`, `j-ab1` is batch J on ab160cb with the
   table logged, those ending in `-2da` are the ones of `2da1585`, those ending in `-f12`
   the ones of the text of `36d4b89`, `t-smoke` is batch T on that text, run first, those
-  ending in `-2dd` are the ones of `2dde55b`, and those ending in `-fx3` the ones of the
-  text of `40bc347`);
+  ending in `-2dd` are the ones of `2dde55b`, those ending in `-fx3` the ones of the
+  text of `40bc347`, those ending in `-f7c` the ones of `f7caaac`, those ending in `-f15`
+  the ones of the text of `eed5422`, and `x-smoke` is batch X on that text, run first);
   `run-all.sh <suffix> <revision> [batches]` runs the batches with the drive `P:` mapped
   for Q and R.
 
@@ -1836,3 +1868,4 @@ Suggested order, at `40bc347`: what is left of 9 (the first opening, one selecte
 | U | after `36d4b89`, a database of 262 files with 60 selected: F3 on one folder answered «No», then «Yes»; F3 on two folders; F3 in the seed folders panel |
 | V | after `36d4b89`, a cached .SLD list with a marked folder, a freshly opened panel after Ctrl+A: a Down key event, the menu, F2 answered «Cancel», «Ignore date change» |
 | W | after `2dde55b`. «Deselect all (files list)» with no row highlighted and with one, on a plain folder and in a database; the panel opened again with one file selected. With the calls of `retrieveListFoldersIndexed()` counted: «Rescan folder(s)» and the seed folder rescanned with a new folder without images, on a cached .SLD list and in a database |
+| X | after `f7caaac`. «Rescan folder(s)» on one folder, then on two, with file 10 as the current file, on a plain folder, a cached .SLD list and a database: the current file before and after, the calls of `RandomPicture()`, the shuffles of the random list, the images loaded, and whether the last one loaded is the current file |
