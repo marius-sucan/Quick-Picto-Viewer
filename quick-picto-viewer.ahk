@@ -93463,7 +93463,7 @@ invokePanelStaticFoldersContextMenu() {
 
       If (isUpdateList=1 && InStr(changeState, "*") && FileExist(CurrentSLD))
          kMenu("PanelStaticMenu", "Add", "&Ignore date change", "MenuIgnoreDateStaticFolder")
-      If (SLDtypeLoaded!=3 && isUpdateList=1 && FileExist(CurrentSLD))
+      If (isUpdateList=1 && FileExist(CurrentSLD))
          kMenu("PanelStaticMenu", "Add", "Rename inde&x entry`tF2", "PanelRenameStaticFolder")
 
       kMenu("PanelStaticMenu", "Add", "&Filter files list to selected folder(s)`tF3", "MenuFilterListSelectedFolder")
@@ -97312,50 +97312,69 @@ PanelRenameStaticFolder() {
          Return
       }
 
-      BtnCloseWindow()
-      newName := newFileName
+      isDBrename := (winOpen=2 && SLDtypeLoaded=3) ? 1 : 0
+      If isDBrename
+         newFileName := Format("{:L}", newFileName)
+
       If (winOpen=2)
       {
-         showTOOLtip("Updating static folders list")
-         If (SLDtypeLoaded=3)
+         takenPath := findTakenStaticFolderPath(folderu, newFileName, doPropagate)
+         If takenPath
          {
-            Sleep, 25
-         } Else
+            msgBeepTimer("WARNING: The folder is already in the folders list:`n" takenPath)
+            SetTimer, PanelRenameStaticFolder, -300
+            Return
+         }
+      }
+
+      ; the database pass of the search and replace would move the files of the folder twice
+      If (isDBrename && doPropagate=1 && InStr(newFileName "\", folderu "\")=1)
+      {
+         msgBeepTimer("WARNING: The new folder is inside the renamed one.`nUntick «Propagate the change to subfolders» to move only the files placed directly in it.")
+         SetTimer, PanelRenameStaticFolder, -300
+         Return
+      }
+
+      BtnCloseWindow()
+      newName := newFileName
+      replaceMode := (winOpen=2 && doPropagate!=1) ? 2 : 1
+      If isDBrename
+      {
+         ; a database lists the folders its files are placed in: the files move first, without asking
+         If SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
          {
-            Loop, % newStaticFoldersListCache.MaxIndex()
-            {
-               If (newStaticFoldersListCache[A_Index, 1]=folderu)
-               {
-                  newStaticFoldersListCache[A_Index, 1] := newName
-               } Else If (doPropagate=1)
-               {
-                  If InStr(newStaticFoldersListCache[A_Index, 1], folderu "\")
-                     newStaticFoldersListCache[A_Index, 1] := StrReplace(newStaticFoldersListCache[A_Index, 1], folderu "\", newName "\")
-               }
-            }
+            renameStaticFoldersEntries(folderu, newName, doPropagate)
+            renameStaticFolderSQLdb(folderu, newName, doPropagate)
          }
       } Else
       {
-         finalListu := ""
-         foldersListu := getDynamicFoldersList()
-         Loop, Parse, foldersListu,`n,`r
+         If (winOpen=2)
          {
-            line := StrReplace(A_LoopField, "|")
-            If (line=folderu)
-               finalListu .= StrReplace(A_LoopField, folderu, newName) "`n"
-            Else
-               finalListu .= (doPropagate=1) ? StrReplace(A_LoopField, folderu "\", newName "\") "`n" : A_LoopField "`n"
+            showTOOLtip("Updating static folders list")
+            renameStaticFoldersEntries(folderu, newName, doPropagate)
+         } Else
+         {
+            finalListu := ""
+            foldersListu := getDynamicFoldersList()
+            Loop, Parse, foldersListu,`n,`r
+            {
+               line := StrReplace(A_LoopField, "|")
+               If (line=folderu)
+                  finalListu .= StrReplace(A_LoopField, folderu, newName) "`n"
+               Else
+                  finalListu .= (doPropagate=1) ? StrReplace(A_LoopField, folderu "\", newName "\") "`n" : A_LoopField "`n"
+            }
+
+            DynamicFoldersList := cleanDynamicFoldersList(finalListu)
+            If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+               recreateDynaFoldersSQLdbList(DynamicFoldersList)
          }
 
-         DynamicFoldersList := cleanDynamicFoldersList(finalListu)
-         If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
-            recreateDynaFoldersSQLdbList(DynamicFoldersList)
+         currentFilesListModified := 1
+         msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
+         If (msgResult="Yes")
+            SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
       }
-
-      currentFilesListModified := 1
-      msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
-      If (msgResult="Yes")
-         SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, 1)
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
       ; MsgBox, % firstPart "`n" newName "`n" indexSelected
@@ -97364,6 +97383,102 @@ PanelRenameStaticFolder() {
       Else
          PanelDynamicFolderzWindow()
     }
+}
+
+findTakenStaticFolderPath(oldFolder, newFolder, doPropagate) {
+; returns the first path the rename would give an entry, when another entry of the folders list holds it already
+   oldPrefix := Format("{:L}", oldFolder) "\"
+   listed := new hashtable()
+   newPaths := []
+   Loop, % newStaticFoldersListCache.MaxIndex()
+   {
+      entryFolder := Format("{:L}", newStaticFoldersListCache[A_Index, 1])
+      If (StrLen(entryFolder)<2)
+         Continue
+
+      If (entryFolder "\"=oldPrefix)
+         newPaths.Push(newFolder)
+      Else If (doPropagate=1 && InStr(entryFolder, oldPrefix)=1)
+         newPaths.Push(newFolder SubStr(entryFolder, StrLen(oldPrefix)))
+      Else
+         listed[entryFolder] := 1
+   }
+
+   For i, thisNew in newPaths
+   {
+      If listed[Format("{:L}", thisNew)]
+         Return thisNew
+   }
+}
+
+renameStaticFoldersEntries(oldFolder, newFolder, doPropagate) {
+   Loop, % newStaticFoldersListCache.MaxIndex()
+   {
+      If (newStaticFoldersListCache[A_Index, 1]=oldFolder)
+      {
+         newStaticFoldersListCache[A_Index, 1] := newFolder
+      } Else If (doPropagate=1)
+      {
+         If InStr(newStaticFoldersListCache[A_Index, 1], oldFolder "\")
+            newStaticFoldersListCache[A_Index, 1] := StrReplace(newStaticFoldersListCache[A_Index, 1], oldFolder "\", newFolder "\")
+      }
+   }
+}
+
+renameStaticFolderSQLdb(oldFolder, newFolder, doPropagate) {
+; after the files moved: the recorded dates of the renamed folders, the captions and the audio notes
+; of their images, and the audio files placed in them follow to the new path
+   oldFolder := Format("{:L}", RegExReplace(oldFolder, "\\+$"))
+   newFolder := Format("{:L}", newFolder)
+   oldStr := SQLescapeStr(oldFolder)
+   newStr := SQLescapeStr(newFolder)
+   inside := " LIKE '" SQLescapeStr(oldFolder, 1) "\%' ESCAPE '>'"
+   deeper := " NOT LIKE '" SQLescapeStr(oldFolder, 1) "\%\%' ESCAPE '>'"
+   newPart := "'" newStr "' || substr("
+   SQL := "UPDATE OR REPLACE staticfolders SET imgfolder='" newStr "' WHERE " SQLfolderMatchClause("|" oldFolder) ";"
+   If (doPropagate=1)
+      SQL .= "UPDATE OR REPLACE staticfolders SET imgfolder=" newPart "imgfolder, length('" oldStr "') + 1) WHERE imgfolder" inside ";"
+
+   SQL .= "UPDATE OR REPLACE imagesData SET imgfile=" newPart "imgfile, length('" oldStr "') + 1) WHERE imgfile" inside
+   SQL .= (doPropagate=1) ? ";" : " AND imgfile" deeper ";"
+
+   activeSQLdb.Exec("BEGIN TRANSACTION;")
+   r := activeSQLdb.Exec(SQL)
+   If r
+   {
+      RecordSet := ""
+      r := activeSQLdb.GetTable("SELECT rowid, imgAudio FROM imagesData WHERE length(imgAudio)>" StrLen(oldFolder) ";", RecordSet)
+   }
+
+   If r
+   {
+      oldPrefix := oldFolder "\"
+      SQL := ""
+      Loop, % RecordSet.RowCount
+      {
+         Rowu := RecordSet.Rows[A_Index]
+         If (InStr(Format("{:L}", Rowu[2]), oldPrefix)!=1)
+            Continue
+
+         restu := SubStr(Rowu[2], StrLen(oldPrefix))
+         If (doPropagate!=1 && InStr(restu, "\", 0, 2))
+            Continue
+
+         newAudio := newFolder restu
+         If FileExist(newAudio)
+            SQL .= "UPDATE imagesData SET imgAudio='" SQLescapeStr(newAudio) "' WHERE rowid=" Rowu[1] ";"
+      }
+
+      RecordSet.Free()
+      If SQL
+         r := activeSQLdb.Exec(SQL)
+   }
+
+   If (!r || !activeSQLdb.Exec("COMMIT TRANSACTION;"))
+   {
+      throwSQLqueryDBerror(A_ThisFunc)
+      activeSQLdb.Exec("ROLLBACK TRANSACTION;")
+   }
 }
 
 repairPathSeparators(pathu) {
@@ -97378,6 +97493,8 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     ; in folderMode=1, both strings always cover entire folder paths: 
     ; whole folders are matched
     ; d:\pics\old must never match d:\pics\oldies
+    ; folderMode=2 does the same for the given folder alone, not its subfolders.
+    ; Returns 0 when the database could not be updated
 
     If (silentus=0)
        showTOOLtip("Performing search and replace in the files list index:`n" whatu "`n" replacerz)
@@ -97400,12 +97517,16 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        ; the stored paths carry no trailing separator, see SQLfolderMatchClause()
        replaceru := RegExReplace(replacerz, "\\+$")
        activeSQLdb.Exec("BEGIN TRANSACTION;")
-       If (folderMode=1)
+       If (folderMode=1 || folderMode=2)
           SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(Format("{:L}", replaceru)) "' WHERE " SQLfolderMatchClause("|" whatu) ";"
 
        startOperation := A_TickCount
        prevMSGdisplay := A_TickCount
-       If (activeSQLdb.Exec(SQLStr) || folderMode!=1)
+       If (folderMode=2)
+       {
+          If !activeSQLdb.Exec(SQLStr)
+             errorOccurred := activeSQLdb.ErrorMsg
+       } Else If (activeSQLdb.Exec(SQLStr) || folderMode!=1)
        {
           If (folderMode=1)
              SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE " SQLfolderMatchClause(whatu) ";"
@@ -97468,6 +97589,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           activeSQLdb.Exec("BEGIN TRANSACTION;")
 
        owle := setWhileLoopBusy()
+       whatuBare := RTrim(whatu, "\")
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
@@ -97489,14 +97611,19 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
               }
            }
 
-           If (folderMode=1)
+           If (folderMode=1 || folderMode=2)
            {
               affected := 0
               value := imgPath
               thisPos := InStr(imgPath, "\", 0, -1)
               If (thisPos>1)
               {
-                 newFolder := StrReplace(SubStr(imgPath, 1, thisPos), whatu, replacerz, affected)
+                 fileFolder := SubStr(imgPath, 1, thisPos)
+                 If (folderMode=2)
+                 {
+                    affected := (RTrim(fileFolder, "\")=whatuBare) ? 1 : 0
+                    newFolder := affected ? replacerz : fileFolder
+                 } Else newFolder := StrReplace(fileFolder, whatu, replacerz, affected)
                  value := repairPathSeparators(newFolder "\" SubStr(imgPath, thisPos + 1))
               }
            } Else
@@ -97559,6 +97686,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
     CurrentSLD := backCurrentSLD
     Sleep, 25
     SetTimer, ResetImgLoadStatus, -100
+    Return errorOccurred ? 0 : 1
 }
 
 SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
