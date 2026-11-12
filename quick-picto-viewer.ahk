@@ -65705,9 +65705,9 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
     SetTimer, ResetImgLoadStatus, -150
 }
 
-wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0) {
+wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0, noRandom:=0) {
     showTOOLtip("Preparing files list to import:`n" folderu "\")
-    z := coreAddNewFolder(folderu, forceRemAll, 0, 0, 0, noRemAtAll)
+    z := coreAddNewFolder(folderu, forceRemAll, noRandom, 0, 0, noRemAtAll)
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=2 && isInLoop!=1)
     {
        FileReadLine, firstLine, % CurrentSLD, 1
@@ -65981,7 +65981,8 @@ coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, no
     {
        currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
        dummyTimerDelayiedImageDisplay(150)
-    } Else RandomPicture()
+    } Else If (noRandom!=2) ; 2: the caller refreshes the display
+       RandomPicture()
     Return z
 }
 
@@ -97692,7 +97693,13 @@ BTNupdateSelectedStaticFolder() {
     {
        newStaticFoldersListCache[indexu, 3] := ""
        newStaticFoldersListCache[indexu, 4] := ""
-       wrapperAddNewFolderToList("|" foldar, 0, 1)
+       wrapperAddNewFolderToList("|" foldar, 0, 1, 0, 2)
+    }
+
+    If (maxFilesIndex>0)
+    {
+       GenerateRandyList()
+       RandomPicture()
     }
 
     countFilesGivenStaticFolders(foldersListArray) ; too slow
