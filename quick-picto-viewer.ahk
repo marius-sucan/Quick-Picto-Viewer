@@ -41665,7 +41665,7 @@ PanelSetFrameDelay() {
    }
 }
 
-PanelfolderThanEraseThumbsCache() {
+PanelEraseCachedThumbnails() {
    If AnyWindowOpen
       Return
 
@@ -41676,7 +41676,7 @@ PanelfolderThanEraseThumbsCache() {
    {
       enableThumbsCaching := msgResult.check
       If !remCacheOldDays
-         SetTimer, PanelfolderThanEraseThumbsCache, -150 ; allows for this execution line to cease peacefully ^_^ 
+         SetTimer, PanelEraseCachedThumbnails, -150 ; allows for this execution line to cease peacefully ^_^ 
       Else
          EraseThumbsCache("daysITis", remCacheOldDays)
    } Else If InStr(msgResult.btn, "entire")
@@ -66634,7 +66634,7 @@ exitAppu(dummy:=0) {
 
 askAboutFilesSelect(act) {
    Static doNotAskAgain := 0
-   If (isInRange(markedSelectFile, 50, maxFilesIndex - 3) && maxFilesIndex>250 && doNotAskAgain=0)
+   If (isInRange(markedSelectFile, 25, clampInRange(maxFilesIndex - 25, 0, maxFilesIndex)) && maxFilesIndex>150 && doNotAskAgain=0)
    {
       msgResult := msgBoxWrapper(appTitle ": Discard selection", "The current opened files list has " groupDigits(markedSelectFile) " files selected. Are you sure you want to " act " ?", "&Yes|&No", 2, "question", "Do not ask again in the current session")
       If !InStr(msgResult.btn, "Yes")
@@ -69165,7 +69165,7 @@ createMenuMainPreferences() {
 
    Menu, PVprefs, Add
    If FolderExist(thumbsCacheFolder)
-      kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelfolderThanEraseThumbsCache", "clear remove empty delete")
+      kMenu("PVprefs", "Add", "Erase cached thumbnails", "PanelEraseCachedThumbnails", "clear remove empty delete")
 
    kMenu("PVprefs", "Add/Uncheck", "Cache generated thumbnails", "ToggleThumbsCaching")
    If (enableThumbsCaching=1)
@@ -93499,11 +93499,20 @@ MenuStaticFoldersDropFilesSelection() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
 
-   Loop, % LV_GetCount()
+   total := LV_GetCount()
+   Loop, % total
    {
-      ; to-do;  the «Selected» and «%» cells must be set to 0.
-   }
+       RowNumber := LV_GetNext(RowNumber)
+       If !RowNumber
+          Break
 
+       LV_GetText(indexu, RowNumber, 1)
+       If !indexu
+          Continue
+
+       LV_Modify(RowNumber, "Col6", 0)
+       LV_Modify(RowNumber, "Col7", 0)
+    }
 }
 
 SqlWrapPopulateStaticFolderzList() {
@@ -97033,20 +97042,17 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
        }
    }
 
+   If (SLDtypeLoaded=3)
+      indexedFolders := retrieveListFoldersIndexed()
+
    For folderu, newDateu in foldersListArray
    {
        ; add new folder to main array: newStaticFoldersListCache[]
        If (hash[folderu]=1 || StrLen(folderu)<2 || newDateu="-")
           Continue
 
-       ; only a folder that holds indexed files gets an entry
-       If !hasIndexedFolders
-       {
-          hasIndexedFolders := 1
-          indexedFolders := retrieveListFoldersIndexed()
-       }
-
-       If !indexedFolders[folderu]
+       ; only a folder that holds indexed files gets an entry; too slow for SLDtypeLoaded=2
+       If (SLDtypeLoaded=3 && !indexedFolders[folderu])
           Continue
 
        counter++
@@ -97694,9 +97700,7 @@ BTNupdateSelectedStaticFolder() {
        wrapperAddNewFolderToList("|" foldar, 0, 1)
     }
 
-    ; If (SLDtypeLoaded=3)
-       countFilesGivenStaticFolders(foldersListArray)
-
+    countFilesGivenStaticFolders(foldersListArray) ; too slow
     setImageLoading()
     If (SLDtypeLoaded=3 || SLDtypeLoaded=2 && allGood=1)
     {
