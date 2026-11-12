@@ -97327,14 +97327,6 @@ PanelRenameStaticFolder() {
          }
       }
 
-      ; the database pass of the search and replace would move the files of the folder twice
-      If (isDBrename && doPropagate=1 && InStr(newFileName "\", folderu "\")=1)
-      {
-         msgBeepTimer("WARNING: The new folder is inside the renamed one.`nUntick «Propagate the change to subfolders» to move only the files placed directly in it.")
-         SetTimer, PanelRenameStaticFolder, -300
-         Return
-      }
-
       BtnCloseWindow()
       newName := newFileName
       replaceMode := (winOpen=2 && doPropagate!=1) ? 2 : 1
@@ -97427,20 +97419,24 @@ renameStaticFoldersEntries(oldFolder, newFolder, doPropagate) {
 
 renameStaticFolderSQLdb(oldFolder, newFolder, doPropagate) {
 ; after the files moved: the recorded dates of the renamed folders, the captions and the audio notes
-; of their images, and the audio files placed in them follow to the new path
+; of their images, and the audio files placed in them follow to the new path.
+; The rows are marked first with "?", which begins no path: with the new folder inside the old one,
+; no row moves twice and none replaces a row that has yet to move
    oldFolder := Format("{:L}", RegExReplace(oldFolder, "\\+$"))
    newFolder := Format("{:L}", newFolder)
    oldStr := SQLescapeStr(oldFolder)
    newStr := SQLescapeStr(newFolder)
    inside := " LIKE '" SQLescapeStr(oldFolder, 1) "\%' ESCAPE '>'"
    deeper := " NOT LIKE '" SQLescapeStr(oldFolder, 1) "\%\%' ESCAPE '>'"
+   markedInside := " LIKE '" SQLescapeStr("?" oldFolder, 1) "\%' ESCAPE '>'"
    newPart := "'" newStr "' || substr("
-   SQL := "UPDATE OR REPLACE staticfolders SET imgfolder='" newStr "' WHERE " SQLfolderMatchClause("|" oldFolder) ";"
+   SQL := "UPDATE staticfolders SET imgfolder='?' || imgfolder WHERE " SQLfolderMatchClause(((doPropagate=1) ? "" : "|") oldFolder) ";"
+   SQL .= "UPDATE OR REPLACE staticfolders SET imgfolder='" newStr "' WHERE " SQLfolderMatchClause("|?" oldFolder) ";"
    If (doPropagate=1)
-      SQL .= "UPDATE OR REPLACE staticfolders SET imgfolder=" newPart "imgfolder, length('" oldStr "') + 1) WHERE imgfolder" inside ";"
+      SQL .= "UPDATE OR REPLACE staticfolders SET imgfolder=" newPart "imgfolder, length('?" oldStr "') + 1) WHERE imgfolder" markedInside ";"
 
-   SQL .= "UPDATE OR REPLACE imagesData SET imgfile=" newPart "imgfile, length('" oldStr "') + 1) WHERE imgfile" inside
-   SQL .= (doPropagate=1) ? ";" : " AND imgfile" deeper ";"
+   SQL .= "UPDATE imagesData SET imgfile='?' || imgfile WHERE imgfile" inside ((doPropagate=1) ? "" : " AND imgfile" deeper) ";"
+   SQL .= "UPDATE OR REPLACE imagesData SET imgfile=" newPart "imgfile, length('?" oldStr "') + 1) WHERE imgfile" markedInside ";"
 
    activeSQLdb.Exec("BEGIN TRANSACTION;")
    r := activeSQLdb.Exec(SQL)
@@ -97520,16 +97516,18 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
        If (folderMode=1 || folderMode=2)
           SQLstr := "UPDATE images SET imgfolder='" SQLescapeStr(Format("{:L}", replaceru)) "' WHERE " SQLfolderMatchClause("|" whatu) ";"
 
+       ; a new folder inside the old one: the pass alone moves every file once, the deepest first, so no new path is still taken
+       nested := (folderMode=1 && InStr(Format("{:L}", replaceru) "\", Format("{:L}", RegExReplace(whatu, "\\+$")) "\")=1) ? 1 : 0
        startOperation := A_TickCount
        prevMSGdisplay := A_TickCount
        If (folderMode=2)
        {
           If !activeSQLdb.Exec(SQLStr)
              errorOccurred := activeSQLdb.ErrorMsg
-       } Else If (activeSQLdb.Exec(SQLStr) || folderMode!=1)
+       } Else If (nested || activeSQLdb.Exec(SQLStr) || folderMode!=1)
        {
           If (folderMode=1)
-             SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE " SQLfolderMatchClause(whatu) ";"
+             SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE " SQLfolderMatchClause(whatu) (nested ? " ORDER BY length(imgfolder) DESC" : "") ";"
           Else
              SQLstr := "SELECT imgidu, imgfolder, imgfile FROM images WHERE fullPath LIKE '%" Format("{:L}", SQLescapeStr(whatu, 1)) "%' ESCAPE '>';"
 
