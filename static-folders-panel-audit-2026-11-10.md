@@ -15,11 +15,12 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-12, at `eed5422`.**
+**Status, 2026-11-12, at `55b2a24`.**
 
-- **Fixed, 17:** findings 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 15, 18, 20, 22, 25, 26 and 27.
+- **Fixed, 19:** findings 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 15, 16, 18, 19, 20, 22, 25, 26 and
+  27.
 - **Partly fixed, 6:** findings 9, 17, 21, 23, 28 and 30. Each note says what is left.
-- **Open, 7:** findings 10, 13, 14, 16, 19, 24 and 29.
+- **Open, 5:** findings 10, 13, 14, 24 and 29.
 
 The fixes are in these commits, in this order:
 
@@ -39,23 +40,25 @@ The fixes are in these commits, in this order:
 | `2dde55b` | Marius, 2026-11-12 | finding 30: «Deselect all (files list)» clears the highlighted rows; N5's check in a database only, his choice; new limits for the question of finding 12 |
 | `40bc347` | at his request | finding 30: «Deselect all (files list)» clears every row and the folders list's counts; N5's query only when there is a folder to add |
 | `eed5422` | at his request | fixes 15: one random image once «Rescan folder(s)» ends, on every kind of list (decision 3) |
+| `55b2a24` | at his request | fixes 16 and 19: «Rename index entry» works in a database; unticked, the subfolders keep their files (decisions 6 and 7) |
 
 The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
-finding. At `eed5422`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
+finding. At `55b2a24`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
 choice), N7 is partly fixed, and N10 is open, of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
 `f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585`,
-`36d4b89`, `2dde55b`, `40bc347` or `eed5422`. Everything else keeps its lines at ab160cb,
-and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
+`36d4b89`, `2dde55b`, `40bc347`, `eed5422` or `55b2a24`. Everything else keeps its lines
+at ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
 `MenuIgnoreDateStaticFolder()`.
 Each note was checked by running the batches again: on `54a0666`, on the text of
 `256a670`, on the text of `1813ca9`, on `2c501dc`, where a seventeenth batch, Q, was
 added, on `c389116`, on the texts of `5472a48`, `bb82c4c` and `4ac0e69`, with an
 eighteenth batch, R, for a drive root, on `2da1585` and the text of `36d4b89`, with five
 more batches: S1, S2, T, U and V, on `2dde55b` and the text of `40bc347`, with one more,
-W, and on `f7caaac` and the text of `eed5422`, with one more, X.
+W, on `f7caaac` and the text of `eed5422`, with one more, X, and on `5584ee3` and the text
+of `55b2a24`, with two more, Y and Z.
 
 ## Terms
 
@@ -88,7 +91,7 @@ W, and on `f7caaac` and the text of `eed5422`, with one more, X.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `eed5422` |
+| # | Finding | Harm | Checked | Status at `55b2a24` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -105,10 +108,10 @@ W, and on `f7caaac` and the text of `eed5422`, with one more, X.
 | 13 | A stopped «Count files per folders» leaves zeros that pass as counts | medium | run | open |
 | 14 | «Rescan folder(s)» on a folder that cannot be reached removes its entries, in a database with their cached data, without a word | medium, a decision | run | open |
 | 15 | Database: after «Rescan folder(s)» the image in the viewport is no longer the current file | medium | run | **fixed**, `eed5422`: one random image once the rescan ends, on every kind of list (decision 3) |
-| 16 | F2 in a database opens the rename the menu leaves out; the folders list is not updated | medium | run | open |
+| 16 | F2 in a database opens the rename the menu leaves out; the folders list is not updated | medium | run | **fixed**, `55b2a24`: the rename works in a database (decision 6) |
 | 17 | Private mode marks every folder as changed; a missing folder is dated today | medium | run | **partly fixed**, `f88e4be`: a missing folder is still dated today |
 | 18 | «Regenerate entire index» leaves the marks of a cached .SLD list | medium | run | **fixed**, `2c501dc` |
-| 19 | «Rename index entry» with «Propagate the change to subfolders» unticked still moves the files of the subfolders | low | run | open |
+| 19 | «Rename index entry» with «Propagate the change to subfolders» unticked still moves the files of the subfolders | low | run | **fixed**, `55b2a24`: unticked, the subfolders keep their files (decision 7) |
 | 20 | A folder that was offline when the list was saved is dropped when the list is loaded; so are drive roots | low | run, read | **fixed**, `2c501dc` and `5472a48` |
 | 21 | A list that was never saved: marks that cannot be cleared | low | run | **partly fixed**, `2c501dc`: the menu item is no longer offered; the mark still comes and stays |
 | 22 | «Count selected files» lists every folder again while the filter box keeps its text | low | run | **fixed**, `f88e4be` |
@@ -844,6 +847,42 @@ changes nothing in the folders list (`Sleep, 25` at :97232).
 
 Correction: decision 6.
 
+**Fixed in `55b2a24`** by decision 6 as Marius settled it: the rename works in a database,
+and the menu offers it there (:93466 at `55b2a24`). A database lists the folders its files
+are placed in, so there the files move first, through the search and replace and without
+the question; the function now returns 0 when the database could not be updated (:97689).
+Only then do the entries of the folders list follow, and their recorded dates in the
+`staticfolders` table, by statements on the renamed rows alone (`renameStaticFolderSQLdb()`
+:97428): when a files filter is on, the search and replace removes it, which empties the
+folders list in memory, so the table is never written back from memory. The captions and
+audio notes of the moved images follow, and an audio file path inside a renamed folder is
+rewritten when the file is found at the new place (Marius's choice). The new path is written
+in lower case, as the database stores it, in the files list too («Seen in passing», C). The
+rename refuses a new path that another entry of the folders list holds already, on cached
+.SLD lists too (`findTakenStaticFolderPath()` :97388); in a database with the change
+propagated it also refuses a new path inside the renamed folder (:97331-97336; «Seen in
+passing», G).
+
+Run on the text of `55b2a24`, in a database (batch Y; batch D2 too):
+
+- the menu of a row offers «Rename index entry»;
+- F2, `Beta` → `BetaNew`: no question; both files move, in the index and in the `images`
+  table; the folders list and `staticfolders` hold `pv\betanew` with the recorded date of
+  `Beta`, and so does the panel after the database is opened again;
+- `Delta` → `DeltaNew`, propagated: `pv\delta` and `pv\delta\inner` are renamed in both
+  tables; the two captions follow their images; three audio file paths that pointed into
+  the folder are rewritten, one of them held by an image of `Gamma`; the one whose file is
+  not at the new place keeps its path;
+- `Gamma` → `Holiday One`: «The folder is already in the folders list», the dialog comes
+  again, nothing changes;
+- `Holiday One` → `Holiday One\Empty`: refused when propagated; unticked, its four files
+  move;
+- with a files filter on (F3 on `Gamma`), `Gamma` → `GammaNew`: the filter goes, the
+  folders list is read again from the database, and `pv\gammanew` keeps its recorded date.
+
+On `5584ee3` batch D2 logs what this section describes, and batch Y stops at the «Update
+files list» question that a database rename asked there.
+
 ## 17. Private mode marks every folder as changed; a missing folder is dated today
 
 `PopulateStaticFolderzList()` :97842-97854
@@ -914,6 +953,21 @@ the two of `Alpha\Sub`. The folders list then holds the new folder and the old `
 which no file is in any more; the new subfolder is not listed.
 
 Correction: decision 7.
+
+**Fixed in `55b2a24`** by decision 7 as Marius settled it: unticked, the files of the
+subfolders keep their paths, on cached .SLD lists and in a database. The rename asks the
+search and replace for the folder alone, a new `folderMode=2` (:97340, :97525-97529 and
+:97622-97626 at `55b2a24`). The seed folders panel's rename still moves the files of the
+subfolders: there the tick is about the entries of the seed folders list.
+
+Run on `5584ee3` and on the text of `55b2a24`:
+
+- batch H, the step above: «3 records were modified» instead of 5; `pv\Alpha\Sub` keeps its
+  two files and its entry. Batch Z, the same step, gives the same;
+- in a database (batch Y), `Alpha` → `AlphaNew` unticked: `pv\alpha\sub` keeps its two files
+  and its row in `staticfolders`;
+- the seed folders panel, the seed folder renamed unticked (batch Z): all twelve files move,
+  on both.
 
 ## 20. Folders dropped when a cached .SLD list is loaded
 
@@ -1643,7 +1697,9 @@ Not part of the panel's own code.
 - **B.** `RegenerateEntireList()` starts at once, without a question. On a plain or .SLD
   list the index is emptied first, so a stop leaves a shortened index (read).
 - **C.** After the rename of finding 16 the index holds the new folder as it was typed
-  (`pv\BetaNew`) while the database holds it in lower case (run, batch D2).
+  (`pv\BetaNew`) while the database holds it in lower case (run, batch D2). Settled for
+  this rename by `55b2a24`: in a database the new path is written in lower case, in the
+  files list too (Marius's choice; run, batches D2 and Y).
 - **D.** A saved list whose first seed folder is a drive root loads with an empty seed
   folders list. `OpenSLD()` takes the list as present only `If (StrLen(testDynaFolderz)>2)`
   (:2548 at `bb82c4c`), and `p:` is two characters. Run (batch R): the saved file holds
@@ -1656,6 +1712,19 @@ Not part of the panel's own code.
   reads the whole database again (:33458-33460). Run (batch S2): F3 on one folder, the
   filter then removed, leaves no file selected. The Filter panel's own filters ask
   nothing about it (read). Since `36d4b89` the panel's F3 asks first (finding 12).
+- **F.** In a database the captions and audio notes of the images (the `imagesData` table)
+  are stored under each image's full path. Since `55b2a24` «Rename index entry» carries
+  them over (finding 16); nothing else does: a file renamed or moved
+  (`updateSQLdbEntry()`), the Search and replace panel and the folders tree's «Rename
+  folder» leave them on the old paths, where no image shows them any more (read). The
+  seen-images database is updated by the Search and replace panel alone
+  (`SearchAndReplaceSeenDB()`; read).
+- **G.** In a database `SearchAndReplaceThroughIndex()` in folder mode moves the files of a
+  folder twice when the new path lies inside the old one: its first statement moves them,
+  and its pass over the subfolders finds them again under the old path (read; the files
+  list is replaced once, so the two disagree). «Rename index entry» refuses that case since
+  `55b2a24` when the change is propagated; the Search and replace panel in folder mode does
+  not.
 
 ## Checked and found correct
 
@@ -1701,9 +1770,13 @@ Not part of the panel's own code.
 5. **A plain list's folders list**: regenerate it by itself when the index changed, or
    keep it as generated until «Regenerate this folders list»?
 6. **F2 in a database**: take the key out, as the menu does, or make the rename update
-   the folders list there?
+   the folders list there? **Settled: the rename works there** (`55b2a24`, Marius's
+   answers): the files move first, without the question; the folders list, its recorded
+   dates, and the captions and audio notes follow; the new path in lower case; a path
+   already listed is refused, on cached .SLD lists too.
 7. **«Propagate the change to subfolders» unticked**: should the files of the subfolders
-   keep their paths?
+   keep their paths? **Settled: they keep them** (`55b2a24`, Marius's answer), on cached
+   .SLD lists and in a database; the seed folders panel's rename is as it was.
 8. **Number filters on a row with no count**: list it, as now, or count first? **Settled
    by `f88e4be`: listed.**
 9. **Folders that are not on the disk** when `updateCachedStaticFolders()` runs: keep
@@ -1715,7 +1788,7 @@ Not part of the panel's own code.
 11. **The date of a drive root** (N10): read it from `d:\` in the five places that read a
     folder's date, or leave the root with «-» and without the changed mark?
 
-Suggested order, at `eed5422`: what is left of 9 (the first opening, one selected file),
+Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selected file),
 13 and the rest of 17; then the rest of N7; the others wait for the decisions.
 
 ## How this was checked
@@ -1818,6 +1891,19 @@ Suggested order, at `eed5422`: what is left of 9 (the first opening, one selecte
   they logged on `f7caaac`; C and Q differ in the number of a random image, D and X in
   what finding 15 changes. The text of `eed5422` also loads on stock AutoHotkey 1.1.37.02
   (a load check; nothing was run on it).
+- `55b2a24` was checked on `5584ee3`, whose code is that of `eed5422`, and on the text of
+  `55b2a24`: the twenty-five batches and two new ones. Y runs «Rename index entry» in a
+  database: the menu, a propagated rename and the database opened again, an unticked one,
+  one with captions and audio notes, a path already listed, a path inside the renamed
+  folder, and a rename with a files filter on. Z runs it on a cached .SLD list (unticked, a
+  path already listed, propagated) and in the seed folders panel. Batches A, B, C2, E, F,
+  G, I, J, L, M, N, P, R, S1, T, U, V and W log what they logged on `5584ee3`; C, D, Q and X
+  differ in the number of a random image, D also in its menu, which offers «Rename index
+  entry» in a database; S2 in the current file after an F3, which varies from run to run
+  (it varies the same way between the logs of `2da1585` and of the text of `36d4b89`); D2,
+  H, Y and Z in what findings 16 and 19 change. On `5584ee3` batch Y stops at the «Update
+  files list» question, which it does not answer. The text of `55b2a24` also loads on
+  stock AutoHotkey 1.1.37.02 (a load check).
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
   finding 30 come from widths the script sets itself.
@@ -1826,7 +1912,7 @@ Suggested order, at `eed5422`: what is left of 9 (the first opening, one selecte
   fonts and the dark mode.
 - Kit: `.claude/scratch/static-folders-panel-2026-11-10/app/`: `setup.sh` once, then
   `run-app.sh <tag> <test function> [revision]`; `patch.py`; `test-wrappers-static.ahk`
-  (testStaticA to testStaticX, named as in the table below); `results/` (the logs ending
+  (testStaticA to testStaticZ, named as in the table below); `results/` (the logs ending
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
   with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
   `-fix4` the ones of `256a670`, those ending in `-flt` the ones of `1813ca9`, those
@@ -1839,7 +1925,9 @@ Suggested order, at `eed5422`: what is left of 9 (the first opening, one selecte
   the ones of the text of `36d4b89`, `t-smoke` is batch T on that text, run first, those
   ending in `-2dd` are the ones of `2dde55b`, those ending in `-fx3` the ones of the
   text of `40bc347`, those ending in `-f7c` the ones of `f7caaac`, those ending in `-f15`
-  the ones of the text of `eed5422`, and `x-smoke` is batch X on that text, run first);
+  the ones of the text of `eed5422`, `x-smoke` is batch X on that text, run first, those
+  ending in `-558` are the ones of `5584ee3`, those ending in `-f16` the ones of the text
+  of `55b2a24`, and `y-smoke` and `z-smoke` are batches Y and Z on that text, run first);
   `run-all.sh <suffix> <revision> [batches]` runs the batches with the drive `P:` mapped
   for Q and R.
 
@@ -1869,3 +1957,5 @@ Suggested order, at `eed5422`: what is left of 9 (the first opening, one selecte
 | V | after `36d4b89`, a cached .SLD list with a marked folder, a freshly opened panel after Ctrl+A: a Down key event, the menu, F2 answered «Cancel», «Ignore date change» |
 | W | after `2dde55b`. «Deselect all (files list)» with no row highlighted and with one, on a plain folder and in a database; the panel opened again with one file selected. With the calls of `retrieveListFoldersIndexed()` counted: «Rescan folder(s)» and the seed folder rescanned with a new folder without images, on a cached .SLD list and in a database |
 | X | after `f7caaac`. «Rescan folder(s)» on one folder, then on two, with file 10 as the current file, on a plain folder, a cached .SLD list and a database: the current file before and after, the calls of `RandomPicture()`, the shuffles of the random list, the images loaded, and whether the last one loaded is the current file |
+| Y | after `5584ee3`, a database with captions and audio notes on four images: the menu of a row; «Rename index entry» propagated, then the database opened again; unticked next to a subfolder; propagated on a folder with a subfolder, captions and audio notes; to a folder already listed; to a folder inside the renamed one, propagated then not; with a files filter on |
+| Z | after `5584ee3`, a cached .SLD list: «Rename index entry» unticked, to a folder already listed, propagated; the seed folders panel's rename of the seed folder, unticked |
