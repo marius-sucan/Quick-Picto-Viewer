@@ -15,7 +15,7 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-11, at `36d4b89`.**
+**Status, 2026-11-12, at `40bc347`.**
 
 - **Fixed, 16:** findings 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 18, 20, 22, 25, 26 and 27.
 - **Partly fixed, 6:** findings 9, 17, 21, 23, 28 and 30. Each note says what is left.
@@ -36,21 +36,24 @@ The fixes are in these commits, in this order:
 | `4ac0e69` | at his request | fixes N4, in a database, and N5 |
 | `2da1585` | Marius | N4 on every kind of list: the count after a rescan runs on plain and cached .SLD lists too |
 | `36d4b89` | at his request | fixes 11 and 12 |
+| `2dde55b` | Marius, 2026-11-12 | finding 30: «Deselect all (files list)» clears the highlighted rows; N5's check in a database only; new limits for the question of finding 12 |
+| `40bc347` | at his request | finding 30: «Deselect all (files list)» clears every row and the folders list's counts; N5's query only when there is a folder to add |
 
 The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
-finding. At `36d4b89`, N1 to N6, N8 and N9 are fixed, N7 is partly fixed, and N10 is
-open, of low harm.
+finding. At `40bc347`, N1 to N4, N6, N8 and N9 are fixed, N5 and N7 are partly fixed,
+and N10 is open, of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
-`f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585` or
-`36d4b89`. Everything else keeps its lines at ab160cb, and the name
+`f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585`,
+`36d4b89`, `2dde55b` or `40bc347`. Everything else keeps its lines at ab160cb, and the name
 `BTNignoreDateStaticFolder()`, which `f88e4be` changed to `MenuIgnoreDateStaticFolder()`.
 Each note was checked by running the batches again: on `54a0666`, on the text of
 `256a670`, on the text of `1813ca9`, on `2c501dc`, where a seventeenth batch, Q, was
 added, on `c389116`, on the texts of `5472a48`, `bb82c4c` and `4ac0e69`, with an
-eighteenth batch, R, for a drive root, and on `2da1585` and the text of `36d4b89`, with five
-more batches: S1, S2, T, U and V.
+eighteenth batch, R, for a drive root, on `2da1585` and the text of `36d4b89`, with five
+more batches: S1, S2, T, U and V, and on `2dde55b` and the text of `40bc347`, with one
+more, W.
 
 ## Terms
 
@@ -83,7 +86,7 @@ more batches: S1, S2, T, U and V.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `36d4b89` |
+| # | Finding | Harm | Checked | Status at `40bc347` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -96,7 +99,7 @@ more batches: S1, S2, T, U and V.
 | 9 | «Selected» column: zeros at the first opening of a cached .SLD list or a database, stale after the selection changed | medium | run | **partly fixed**, `2c501dc`: a selection that moved to other files is counted; the first opening and a single selected file are as before |
 | 10 | «Files» column and the folders themselves do not follow the index | medium | run | open |
 | 11 | Ctrl+A on a freshly opened panel leaves every action dead | medium | run, Wine | **fixed**, `36d4b89` |
-| 12 | F3 on two or more folders drops the files selection | medium | run | **fixed**, `36d4b89`: it asks first (decision 4), when `askAboutFilesSelect()` asks: 50 or more files selected in a list of more than 250 |
+| 12 | F3 on two or more folders drops the files selection | medium | run | **fixed**, `36d4b89`: it asks first (decision 4), when `askAboutFilesSelect()` asks: since `2dde55b`, 25 or more files selected in a list of more than 150, with 25 or more left out |
 | 13 | A stopped «Count files per folders» leaves zeros that pass as counts | medium | run | open |
 | 14 | «Rescan folder(s)» on a folder that cannot be reached removes its entries, in a database with their cached data, without a word | medium, a decision | run | open |
 | 15 | Database: after «Rescan folder(s)» the image in the viewport is no longer the current file | medium | run | open |
@@ -114,7 +117,7 @@ more batches: S1, S2, T, U and V.
 | 27 | F3 on a row that was not counted yet needs two presses | low | run | **fixed**, `f88e4be` |
 | 28 | Actions on a folder that is missing from the disk say nothing; «Set as the protected folder» protects another folder | low | run | **partly fixed**, `2c501dc`, `20d58f9` and `596a886`: five of the six actions answer |
 | 29 | Alt+right-click deselects the files and opens the menu too | low | run | open |
-| 30 | Small things | low | run, read | **partly fixed**, `2c501dc`: three of the fifteen points |
+| 30 | Small things | low | run, read | **partly fixed**, `2c501dc`, `2dde55b` and `40bc347`: four of the fifteen points |
 
 Findings 1, 2 and 3 defeat what the panel is for. Finding 1 needs a database and one menu
 item. Findings 2 and 3 meet every user of a cached .SLD list or a database who rescans a
@@ -581,6 +584,13 @@ list already loaded, and more than one selected file.
 - **As before: one selected file** (run, batch B): with one file selected, in `Gamma`,
   the column still shows `Beta` 2 and `Gamma` 0.
 
+`40bc347` touches one path to the stale numbers: «Deselect all (files list)» also sets the
+selected count of every folder in the folders list to 0 (:93499-93500 at `40bc347`). Run
+(batch W): the selection dropped with that menu item, then one file selected in `Gamma`,
+the panel opened again. On `2dde55b` the column shows the earlier counts, `Alpha` 2,
+`Beta` 1 and `Holiday One` 3; on the text of `40bc347` it shows 0 for every folder.
+`Gamma` shows 0 instead of 1 on both: the single selected file is as before.
+
 ## 10. «Files» column and the folders themselves do not follow the index
 
 The folders list of a plain list is generated once and kept. Nothing regenerates it when
@@ -689,9 +699,9 @@ selection too (run, batch S2): there every files filter rebuilds the index from 
 removing it reads the whole database again («Seen in passing», E).
 
 **Fixed in `36d4b89`** by decision 4 as Marius settled it: ask first, with the question QPV
-asks wherever a selection would be discarded, `askAboutFilesSelect()` (:66635). It asks
-only when 50 or more files are selected in a list of more than 250 files, and not nearly
-all of them, and it offers «Do not ask again in the current session». F3 on several
+asks wherever a selection would be discarded, `askAboutFilesSelect()` (:66635). It offers
+«Do not ask again in the current session». At `36d4b89` it asks only when 50 or more
+files are selected in a list of more than 250 files, with 3 or more left out. F3 on several
 folders asks it before anything is changed (`UIfilterListToSelectStaticFolders()` :96724
 at `36d4b89`); in a database F3 on one folder asks it too (`uiFilterListDynaFolder()`
 :96840 at `36d4b89`). The seed folders panel's F3 reaches the same function, so in a
@@ -710,6 +720,17 @@ Run on the text of `36d4b89`:
   ask the same question; «No» changes nothing; «Yes» filters the list to the two files of
   `Beta` and drops the selection, as before. F3 in the seed folders panel asks it too;
 - batches E, S1 and S2, with three files selected: as on `2da1585`.
+
+**At `2dde55b`** Marius changes the limits (:66637 at `2dde55b`): the question comes when 25
+or more files are selected in a list of more than 150 files, with 25 or more left out. A
+selection of nearly every file, with up to 24 left out by hand, is now dropped without a
+question, as is any selection in a list of 150 files or fewer. The `clampInRange()` around
+the upper limit never changes the result: it would only for a list of fewer than 25 files,
+and there the test on the list's size fails anyway (read). The 15 calls of the function
+get the new limits, the exit and the restart of QPV among them. Run on the text of
+`40bc347`: batches T and U log what they logged on the text of `36d4b89`. Their 60 files
+selected in a list of 262 meet the old limits and the new ones, and three files selected in
+a list of 12 meet neither.
 
 A filter on the highlighted paths, which keeps the selection on plain and cached .SLD
 lists, was the other way. It would need a fallback for many folders: AHK's regular
@@ -1188,8 +1209,9 @@ Correction: return from the context-menu handler while Alt is down.
 - **The first line of the panel** says the list «was generated based on the indexed
   files»; for a cached .SLD list it is read from the file.
 
-**Partly fixed.** Three points are fixed in `2c501dc`, and half of one since `f88e4be`.
-The others are as they were. Lines are at `2c501dc`.
+**Partly fixed.** Three points are fixed in `2c501dc`, one in `2dde55b` and `40bc347`, and
+half of one since `f88e4be`. The others are as they were. Lines are at `2c501dc` unless a
+point names another commit.
 
 - **«View list as a folders tree» on an empty list: fixed.** The menu offers the item only
   when the table lists a row (:93489), and the function returns when it lists none
@@ -1200,10 +1222,18 @@ The others are as they were. Lines are at `2c501dc`.
   (:94021-94022; read).
 - **Two parameters that nothing passes**: "update-all" is passed since `f88e4be`, by
   `BtnIgnoreDateStaticFolder()` (finding 4). `updateAllDates` is still passed by nothing.
-- **«Deselect all (files list)»: as before.** `2c501dc` gives the menu item a function of
-  its own, `MenuStaticFoldersDropFilesSelection()` (:93496), whose loop over the rows
-  holds a to-do comment and no code yet. Run (batch Q): the «Selected» and «%» cells keep
-  `Alpha` 3 and 100.0 until the panel is opened again.
+- **«Deselect all (files list)»: fixed in `2dde55b` and `40bc347`.** `2c501dc` gives the
+  menu item a function of its own, `MenuStaticFoldersDropFilesSelection()` (:93496), whose
+  loop over the rows holds a to-do comment and no code. `2dde55b` fills the loop
+  (:93503-93515 at `2dde55b`), but `LV_GetNext()` without a row type walks the
+  highlighted rows alone. `40bc347` sets the two cells of every row in one call,
+  `LV_Modify(0, "Col6", 0, "0.0")`, and the selected count of every folder in the
+  folders list (:93497-93505 at `40bc347`; finding 9). Run (batch W, files selected in
+  `Alpha`, `Beta` and `Holiday One`): on `2dde55b`, with no row highlighted, no cell
+  changes, and with `Beta` highlighted only `Beta`'s cells change; on the text of
+  `40bc347` every row shows 0 and 0.0, on a plain list and in a database. Batch Q, with
+  `Alpha` highlighted: `Alpha` keeps 3 and 100.0 on the text of `36d4b89`, and shows 0 on
+  `2dde55b` and on the text of `40bc347`.
 
 One small thing more, with `2c501dc`: the menu also leaves out «Count files in folders
 found on disk» and «Copy entire list as text» when the table lists no row (:93477-93481;
@@ -1261,7 +1291,8 @@ they were without the trial (run, batches C, C2, D, M and P).
 all hold (run, batches C, C2, D, M and P). Of the three points listed as «still as
 before», «Regenerate entire index» is fixed (finding 18); the other two are open. The
 three things the counter correction brings to the surface became what the application
-does: N3, N4 and N5 below. N3 was fixed afterwards in `17d90dd`, N4 and N5 in `4ac0e69`.
+does: N3, N4 and N5 below. N3 was fixed afterwards in `17d90dd`, N4 and N5 in `4ac0e69`;
+since `2dde55b` N5 is fixed in a database only.
 
 ## New with the fixes
 
@@ -1270,7 +1301,7 @@ N10 so that the notes above can name them.
 
 ### With `2c501dc`
 
-At `4ac0e69`: N1 to N6 are all fixed.
+At `40bc347`: N1 to N4 and N6 are fixed; N5 is fixed in a database only, since `2dde55b`.
 
 Each point was run on `2c501dc`. Where it says so, the same steps were run on `1813ca9`
 too, to tell what is new. Lines are at `2c501dc` unless a note says otherwise.
@@ -1421,8 +1452,13 @@ Run on the text of `4ac0e69`:
 
 The same commit makes the function take its folders list `ByRef`; it only reads it (read).
 
+**At `2dde55b`** the commented-out test gives way to a comment, «too slow» (:97703 at
+`2dde55b`); the count still runs after every rescan, on every kind of list (read). Run on
+`2dde55b` and on the text of `40bc347`: batch Q logs N4's cells as on the text of
+`36d4b89`.
+
 **N5. The folder given to a rescan becomes a row of its own** (low; run, batch M).
-**Fixed in `4ac0e69`.**
+**Fixed in `4ac0e69`; since `2dde55b` in a database only.**
 `updateCachedStaticFolders()` :96980-96988, :97020-97028
 
 When it is handed a folder path, the function notes that folder and every subfolder found
@@ -1454,6 +1490,29 @@ rescanned):
 Batch M: after the seed folder is rescanned the panel lists the five folders, without
 `pv`. Batch C2: a folder added with its subfolders, which hold images, still gets its two
 rows.
+
+**At `2dde55b`** the test applies in a database only (:97045-97056 at `2dde55b`), with the
+comment «too slow for SLDtypeLoaded=2». On a cached .SLD list the folder handed to a
+rescan and its subfolders without images get rows again. In a database
+the same commit asks for the list of indexed folders at every call, before the loop, even
+when there is no folder to add. «Rescan folder(s)» hands the function only folders the
+folders list already has, so there the answer goes unused, after a query over the whole
+`images` table.
+
+**`40bc347`** asks for it once again, and only when there is a folder to add, in a database
+(:97040-97050 at `40bc347`).
+
+Run on `2dde55b` and on the text of `40bc347`:
+
+- batch Q, the seed folder rescanned: on a cached .SLD list the folders list gains `pv`,
+  `pv\empty` and `pv\deep` again, on both; in a database it holds the six folders that
+  have images, on both;
+- batch W, with the calls of `retrieveListFoldersIndexed()` counted: in a database,
+  «Rescan folder(s)» on `Gamma` asks for the list once on `2dde55b` and not at all on the
+  text of `40bc347`. The seed folder rescanned, with a new folder `pv\Newer` holding an
+  image and `pv\NoImages` none, asks once on both and adds `pv\newer` alone, to the
+  folders list and to the `staticfolders` table. On a cached .SLD list nothing asks for
+  it, and the seed folder rescanned adds `pv\noimages` and `pv`, on both.
 
 **N6. A rescanned folder that cannot be reached keeps a row with no date** (low; run,
 batches J and Q). **Fixed in `17d90dd`.**
@@ -1614,7 +1673,8 @@ Not part of the panel's own code.
    rescan of finding 15.
 4. **F3 on several folders**: ask before the selection is dropped, or a filter that keeps
    it? **Settled: ask** (`36d4b89`, Marius's answers), with `askAboutFilesSelect()` as it
-   is; in a database F3 on one folder asks too.
+   is; in a database F3 on one folder asks too. Its limits changed in `2dde55b` (finding
+   12).
 5. **A plain list's folders list**: regenerate it by itself when the index changed, or
    keep it as generated until «Regenerate this folders list»?
 6. **F2 in a database**: take the key out, as the menu does, or make the rename update
@@ -1632,7 +1692,7 @@ Not part of the panel's own code.
 11. **The date of a drive root** (N10): read it from `d:\` in the five places that read a
     folder's date, or leave the root with «-» and without the changed mark?
 
-Suggested order, at `36d4b89`: what is left of 9 (the first opening, one selected file),
+Suggested order, at `40bc347`: what is left of 9 (the first opening, one selected file),
 13 and the rest of 17; then the rest of N7; the others wait for the decisions.
 
 ## How this was checked
@@ -1643,8 +1703,9 @@ Suggested order, at `36d4b89`: what is left of 9 (the first opening, one selecte
   appended to a scratch copy of the script. The copy differs from the source in this:
   popup menus, clipboard writes, «Folder properties» and the new-instance launch write a
   log line instead; `msgBeepTimer()` and `addJournalEntry()` log their text;
-  `RandomPicture()`, `coreGenerateRandomList()`, `IDshowImage()` and `remFilesFromList()`
-  count their calls; the list's handler can log its events.
+  `RandomPicture()`, `coreGenerateRandomList()`, `IDshowImage()`, `remFilesFromList()`
+  and, since batch W, `retrieveListFoldersIndexed()` count their calls; the list's handler
+  can log its events.
 - The three kinds of list were made by the application itself: a folder opened with
   `coreOpenFolder()`, then `SaveFilesList()` or `SaveDBfilesList()` and `OpenSLD()`.
 - Fifteen batches, 20 to 40 s each. Handlers were called from a `Critical` thread, as the
@@ -1716,6 +1777,16 @@ Suggested order, at `36d4b89`: what is left of 9 (the first opening, one selecte
   `36d4b89`, batches B, C2, D2, E, F, G, H, I, J, L, M, N, P, R and S1 log what they logged
   on `2da1585`; A, T and V differ in what finding 11 changes, T and U in the question of
   finding 12, and C, D, Q and S2 in the number of a random image.
+- `2dde55b` and `40bc347` were checked on `2dde55b` and on the text of `40bc347` with
+  batch Q and a new one, W; T and U were also run on the text of `40bc347`. W runs
+  «Deselect all (files list)» on a plain folder and in a database, then the panel opened
+  again with one file selected, and counts the calls of `retrieveListFoldersIndexed()`
+  around «Rescan folder(s)» and a seed-folder rescan, on a cached .SLD list and in a
+  database. On `2dde55b`, batch Q differs from the log of the text of `36d4b89` in what
+  «Deselect all (files list)» does, in the rows of N5 on a cached .SLD list, and in the
+  number of a random image. On the text of `40bc347`, Q differs from `2dde55b` in the
+  cells «Deselect all (files list)» sets and in the number of a random image; T and U
+  log what they logged on the text of `36d4b89`.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
   finding 30 come from widths the script sets itself.
@@ -1724,7 +1795,7 @@ Suggested order, at `36d4b89`: what is left of 9 (the first opening, one selecte
   fonts and the dark mode.
 - Kit: `.claude/scratch/static-folders-panel-2026-11-10/app/`: `setup.sh` once, then
   `run-app.sh <tag> <test function> [revision]`; `patch.py`; `test-wrappers-static.ahk`
-  (testStaticA to testStaticV, named as in the table below); `results/` (the logs ending
+  (testStaticA to testStaticW, named as in the table below); `results/` (the logs ending
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
   with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
   `-fix4` the ones of `256a670`, those ending in `-flt` the ones of `1813ca9`, those
@@ -1734,7 +1805,9 @@ Suggested order, at `36d4b89`: what is left of 9 (the first opening, one selecte
   `-fx2` the ones of the text of `bb82c4c`, those ending in `-n45` the ones of the text of
   `4ac0e69`, `q-bb8` is batch Q on `bb82c4c`, `j-ab1` is batch J on ab160cb with the
   table logged, those ending in `-2da` are the ones of `2da1585`, those ending in `-f12`
-  the ones of the text of `36d4b89`, and `t-smoke` is batch T on that text, run first);
+  the ones of the text of `36d4b89`, `t-smoke` is batch T on that text, run first, those
+  ending in `-2dd` are the ones of `2dde55b`, and those ending in `-fx3` the ones of the
+  text of `40bc347`);
   `run-all.sh <suffix> <revision> [batches]` runs the batches with the drive `P:` mapped
   for Q and R.
 
@@ -1762,3 +1835,4 @@ Suggested order, at `36d4b89`: what is left of 9 (the first opening, one selecte
 | T | after `36d4b89`, plain folders. A freshly opened panel: Enter and F5 with nothing highlighted; after Ctrl+A the menu, «Copy folder path(s) as text», «Copy folder (Explorer mode)», «Count files in folders found on disk», F5, Enter, F3 with three files selected, Delete answered «No». A list of 262 files with 60 selected: F3 on two folders answered «No», then «Yes»; F3 on one folder |
 | U | after `36d4b89`, a database of 262 files with 60 selected: F3 on one folder answered «No», then «Yes»; F3 on two folders; F3 in the seed folders panel |
 | V | after `36d4b89`, a cached .SLD list with a marked folder, a freshly opened panel after Ctrl+A: a Down key event, the menu, F2 answered «Cancel», «Ignore date change» |
+| W | after `2dde55b`. «Deselect all (files list)» with no row highlighted and with one, on a plain folder and in a database; the panel opened again with one file selected. With the calls of `retrieveListFoldersIndexed()` counted: «Rescan folder(s)» and the seed folder rescanned with a new folder without images, on a cached .SLD list and in a database |
