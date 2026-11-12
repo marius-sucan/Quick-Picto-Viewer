@@ -36,12 +36,12 @@ The fixes are in these commits, in this order:
 | `4ac0e69` | at his request | fixes N4, in a database, and N5 |
 | `2da1585` | Marius | N4 on every kind of list: the count after a rescan runs on plain and cached .SLD lists too |
 | `36d4b89` | at his request | fixes 11 and 12 |
-| `2dde55b` | Marius, 2026-11-12 | finding 30: «Deselect all (files list)» clears the highlighted rows; N5's check in a database only; new limits for the question of finding 12 |
+| `2dde55b` | Marius, 2026-11-12 | finding 30: «Deselect all (files list)» clears the highlighted rows; N5's check in a database only, his choice; new limits for the question of finding 12 |
 | `40bc347` | at his request | finding 30: «Deselect all (files list)» clears every row and the folders list's counts; N5's query only when there is a folder to add |
 
 The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
-finding. At `40bc347`, N1 to N4, N6, N8 and N9 are fixed, N5 and N7 are partly fixed,
-and N10 is open, of low harm.
+finding. At `40bc347`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
+choice), N7 is partly fixed, and N10 is open, of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
@@ -1292,7 +1292,7 @@ all hold (run, batches C, C2, D, M and P). Of the three points listed as «still
 before», «Regenerate entire index» is fixed (finding 18); the other two are open. The
 three things the counter correction brings to the surface became what the application
 does: N3, N4 and N5 below. N3 was fixed afterwards in `17d90dd`, N4 and N5 in `4ac0e69`;
-since `2dde55b` N5 is fixed in a database only.
+since `2dde55b` N5 is fixed in a database only, which is Marius's choice.
 
 ## New with the fixes
 
@@ -1301,7 +1301,7 @@ N10 so that the notes above can name them.
 
 ### With `2c501dc`
 
-At `40bc347`: N1 to N4 and N6 are fixed; N5 is fixed in a database only, since `2dde55b`.
+At `40bc347`: N1 to N6 are all fixed, N5 in a database only (Marius's choice, `2dde55b`).
 
 Each point was run on `2c501dc`. Where it says so, the same steps were run on `1813ca9`
 too, to tell what is new. Lines are at `2c501dc` unless a note says otherwise.
@@ -1458,7 +1458,7 @@ The same commit makes the function take its folders list `ByRef`; it only reads 
 `36d4b89`.
 
 **N5. The folder given to a rescan becomes a row of its own** (low; run, batch M).
-**Fixed in `4ac0e69`; since `2dde55b` in a database only.**
+**Fixed in `4ac0e69`; since `2dde55b` in a database only, which is Marius's choice.**
 `updateCachedStaticFolders()` :96980-96988, :97020-97028
 
 When it is handed a folder path, the function notes that folder and every subfolder found
@@ -1492,7 +1492,7 @@ Batch M: after the seed folder is rescanned the panel lists the five folders, wi
 rows.
 
 **At `2dde55b`** the test applies in a database only (:97045-97056 at `2dde55b`), with the
-comment «too slow for SLDtypeLoaded=2». On a cached .SLD list the folder handed to a
+comment «too slow for SLDtypeLoaded=2»: Marius's choice. On a cached .SLD list the folder handed to a
 rescan and its subfolders without images get rows again. In a database
 the same commit asks for the list of indexed folders at every call, before the loop, even
 when there is no folder to add. «Rescan folder(s)» hands the function only folders the
