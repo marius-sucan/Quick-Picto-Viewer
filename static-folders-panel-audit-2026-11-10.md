@@ -1757,7 +1757,7 @@ Not part of the panel's own code.
     `Beta\Deep\` leaves them in `beta\deep\deep`;
   - the seed folder `pv` renamed `pv\Moved`: `root1.png`, placed directly in `pv`, goes to
     `pv\moved\moved` in the database;
-  - the database opened again lists the doubled paths, and their images are not found;
+  - the database opened again lists the doubled paths;
   - with an image of the same name already indexed in the new folder (`Gamma` →
     `Gamma\Inner`, and three levels, `Chain`, `Chain\Sub` and `Chain\Sub\Sub`, each with
     an `f.png`), the first statement stops at «UNIQUE constraint failed: images.fullPath»
@@ -1792,12 +1792,12 @@ Not part of the panel's own code.
     `p:\sub` to `p:\a\sub`.
 
   On a copy of `e6abbc6` with the search and replace corrected and the refusal taken out,
-  but `renameStaticFolderSQLdb()` as it was (batches SG2 and SG3), the files move right,
-  and the rest does not: the recorded date of `Holiday One` goes to `pv\holiday
-  one\empty\empty`; after `Kappa` → `Kappa\Sub` the `staticfolders` table keeps one of
-  the three rows, `pv\kappa\sub\sub` with the date of `Kappa`, and the caption of the
-  image moved to `kappa\sub\sub` is gone; the root's row goes to `p:\a\a`, and the row
-  of `p:\a` is gone.
+  but `renameStaticFolderSQLdb()` as it was (`seen-g/lift-only-v2.diff` in the kit), the
+  files move right and the rest does not (batches SG2 and SG3): the recorded date of
+  `Holiday One` goes to `pv\holiday one\empty\empty`; after `Kappa` → `Kappa\Sub` the
+  `staticfolders` table keeps one of the three rows, `pv\kappa\sub\sub` with the date of
+  `Kappa`, and the caption of the image moved to `kappa\sub\sub` is gone; the root's row
+  goes to `p:\a\a`, and the row of `p:\a` is gone.
 
 ## Checked and found correct
 
@@ -1990,9 +1990,11 @@ Suggested order, at `1451bad`: what is left of 9 (the first opening, one selecte
   a copy of `e6abbc6` with the search and replace corrected and the refusal taken out, but
   `renameStaticFolderSQLdb()` as it was. Batch Y got a 7 s wait after step Y6: when no
   refusal comes, the answer it queues for the dialog the refusal brings back must expire
-  before step Y7. On the text of `1451bad`, D2, H and Z log what they logged on the text of
-  `55b2a24`, and Y differs in step Y6 alone. The text of `1451bad` also
-  loads on stock AutoHotkey 1.1.37.02 (a load check).
+  before step Y7. On the text of `1451bad`, D2, H and Z log what they logged on `e6abbc6`
+  and on the text of `55b2a24`, and Y differs in step Y6 alone. The text of `1451bad` also
+  loads on stock AutoHotkey 1.1.37.02 (a load check). The kit's `seen-g/` folder holds the
+  script that made both copies (`fix_g.py`), their diffs, and `loadcheck.sh`, which runs
+  that load check.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
   finding 30 come from widths the script sets itself.
