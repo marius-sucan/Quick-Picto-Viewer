@@ -93496,23 +93496,12 @@ invokePanelStaticFoldersContextMenu() {
 
 MenuStaticFoldersDropFilesSelection() {
    dropFilesSelection()
+   Loop, % newStaticFoldersListCache.MaxIndex()
+       newStaticFoldersListCache[A_Index, 4] := 0
+
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewOthers
-
-   total := LV_GetCount()
-   Loop, % total
-   {
-       RowNumber := LV_GetNext(RowNumber)
-       If !RowNumber
-          Break
-
-       LV_GetText(indexu, RowNumber, 1)
-       If !indexu
-          Continue
-
-       LV_Modify(RowNumber, "Col6", 0)
-       LV_Modify(RowNumber, "Col7", 0)
-    }
+   LV_Modify(0, "Col6", 0, "0.0") ; every row: «Selected» and «%»
 }
 
 SqlWrapPopulateStaticFolderzList() {
@@ -97042,9 +97031,6 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
        }
    }
 
-   If (SLDtypeLoaded=3)
-      indexedFolders := retrieveListFoldersIndexed()
-
    For folderu, newDateu in foldersListArray
    {
        ; add new folder to main array: newStaticFoldersListCache[]
@@ -97052,8 +97038,17 @@ updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowD
           Continue
 
        ; only a folder that holds indexed files gets an entry; too slow for SLDtypeLoaded=2
-       If (SLDtypeLoaded=3 && !indexedFolders[folderu])
-          Continue
+       If (SLDtypeLoaded=3)
+       {
+          If !hasIndexedFolders
+          {
+             hasIndexedFolders := 1
+             indexedFolders := retrieveListFoldersIndexed()
+          }
+
+          If !indexedFolders[folderu]
+             Continue
+       }
 
        counter++
        newArray[counter] := [folderu, newDateu]
