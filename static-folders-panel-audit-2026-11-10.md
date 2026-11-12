@@ -15,7 +15,7 @@ The three high findings come down to two lines of `updateCachedStaticFolders()` 
 missing `Return`. A scratch copy with those three corrections was run through the same
 batches; what it shows is under «A trial of the three main corrections».
 
-**Status, 2026-11-12, at `55b2a24`.**
+**Status, 2026-11-12, at `1451bad`.**
 
 - **Fixed, 19:** findings 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 15, 16, 18, 19, 20, 22, 25, 26 and
   27.
@@ -41,24 +41,26 @@ The fixes are in these commits, in this order:
 | `40bc347` | at his request | finding 30: «Deselect all (files list)» clears every row and the folders list's counts; N5's query only when there is a folder to add |
 | `eed5422` | at his request | fixes 15: one random image once «Rescan folder(s)» ends, on every kind of list (decision 3) |
 | `55b2a24` | at his request | fixes 16 and 19: «Rename index entry» works in a database; unticked, the subfolders keep their files (decisions 6 and 7) |
+| `1451bad` | at his request | «Seen in passing» G: in a database the search and replace and «Rename index entry» move each file, recorded date and caption once when the new folder lies inside the old one; the rename no longer refuses that case |
 
 The points N1 to N10 are under «New with the fixes»: what a fix changed besides its
-finding. At `55b2a24`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
+finding. At `1451bad`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
 choice), N7 is partly fixed, and N10 is open, of low harm.
 
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
 `f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585`,
-`36d4b89`, `2dde55b`, `40bc347`, `eed5422` or `55b2a24`. Everything else keeps its lines
-at ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed to
-`MenuIgnoreDateStaticFolder()`.
+`36d4b89`, `2dde55b`, `40bc347`, `eed5422`, `55b2a24` or `1451bad`. Everything else keeps
+its lines at ab160cb, and the name `BTNignoreDateStaticFolder()`, which `f88e4be` changed
+to `MenuIgnoreDateStaticFolder()`.
 Each note was checked by running the batches again: on `54a0666`, on the text of
 `256a670`, on the text of `1813ca9`, on `2c501dc`, where a seventeenth batch, Q, was
 added, on `c389116`, on the texts of `5472a48`, `bb82c4c` and `4ac0e69`, with an
 eighteenth batch, R, for a drive root, on `2da1585` and the text of `36d4b89`, with five
 more batches: S1, S2, T, U and V, on `2dde55b` and the text of `40bc347`, with one more,
-W, on `f7caaac` and the text of `eed5422`, with one more, X, and on `5584ee3` and the text
-of `55b2a24`, with two more, Y and Z.
+W, on `f7caaac` and the text of `eed5422`, with one more, X, on `5584ee3` and the text of
+`55b2a24`, with two more, Y and Z, and on `e6abbc6` and the text of `1451bad`, with three
+more, SG, SG2 and SG3.
 
 ## Terms
 
@@ -91,7 +93,7 @@ of `55b2a24`, with two more, Y and Z.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `55b2a24` |
+| # | Finding | Harm | Checked | Status at `1451bad` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -896,6 +898,12 @@ from the disk again, so the «*» marks go (read).
 
 On `5584ee3` batch D2 logs what this section describes, and batch Y stops at the «Update
 files list» question that a database rename asked there.
+
+`1451bad` lifts the refusal of a new path inside the renamed folder: in a database the
+files, the recorded dates and the captions of such a rename move once each («Seen in
+passing», G). Run on its text, batch Y logs what it logged on the text of `55b2a24` but in
+step Y6, where the propagated rename into `Holiday One\Empty` moves the four files and
+the dialog does not come again; D2 logs what it logged.
 
 ## 17. Private mode marks every folder as changed; a missing folder is dated today
 
@@ -1735,10 +1743,61 @@ Not part of the panel's own code.
   (`SearchAndReplaceSeenDB()`; read).
 - **G.** In a database `SearchAndReplaceThroughIndex()` in folder mode moves the files of a
   folder twice when the new path lies inside the old one: its first statement moves them,
-  and its pass over the subfolders finds them again under the old path (read; the files
-  list is replaced once, so the two disagree). «Rename index entry» refuses that case since
-  `55b2a24` when the change is propagated; the Search and replace panel in folder mode does
-  not.
+  and its pass over the subfolders finds them again under the old path; the files list is
+  replaced once, so the two disagree. «Rename index entry» refuses that case since
+  `55b2a24` when the change is propagated. Two places reach it: the Search and replace
+  panel with «Modify folder paths only», and in the seed folders panel the rename of a seed
+  folder answered «Yes» to the search and replace. Run on `e6abbc6` (batch SG), with the
+  files of each folder counted in the index and in the `images` table after each step:
+
+  - `Holiday One` → `Holiday One\Empty`: the index has the four files in `Holiday
+    One\Empty`, the database in `holiday one\empty\empty`;
+  - `Alpha` → `Alpha\Sub`: the database has the three files of `Alpha` and the two of
+    `Alpha\Sub` together in `alpha\sub\sub`; typed with trailing separators, `Beta\` →
+    `Beta\Deep\` leaves them in `beta\deep\deep`;
+  - the seed folder `pv` renamed `pv\Moved`: `root1.png`, placed directly in `pv`, goes to
+    `pv\moved\moved` in the database;
+  - the database opened again lists the doubled paths, and their images are not found;
+  - with an image of the same name already indexed in the new folder (`Gamma` →
+    `Gamma\Inner`, and three levels, `Chain`, `Chain\Sub` and `Chain\Sub\Sub`, each with
+    an `f.png`), the first statement stops at «UNIQUE constraint failed: images.fullPath»
+    and nothing changes.
+
+  **Fixed in `1451bad`** (Marius's choices). When the new folder lies inside the old one, the
+  first statement is left out, and the pass moves every file of the folder and of its
+  subfolders once, the deepest folders first, so that no new path is still taken
+  (`SearchAndReplaceThroughIndex()` :97519-97530 at `1451bad`). Every other case runs as
+  before. «Rename index entry» no longer refuses the case. `renameStaticFolderSQLdb()`,
+  which it calls after the search and replace, had the same defect: its statement for the
+  subfolders found again the row of the folder that its first statement had just renamed,
+  and its `UPDATE OR REPLACE` could delete a recorded date or a caption that had yet to
+  move. It now marks the rows first with «?», which begins no path, then moves them
+  (:97420-97439).
+
+  Run on the text of `1451bad`:
+
+  - batch SG: after every step the index and the database hold the same files in each
+    folder, also once the database is opened again; `Gamma` → `Gamma\Inner` and the three
+    levels move each file once (`chain\sub\f.png`, `chain\sub\sub\f.png`,
+    `chain\sub\sub\sub\f.png`);
+  - batch SG2, «Rename index entry» in a database: `Holiday One` → `Holiday One\Empty`,
+    propagated, moves the four files, the recorded date and the caption of `h1.png`;
+    `Kappa` → `Kappa\Sub`, propagated, over three levels that each hold a `k.png` with a
+    caption and a recorded date of its own: each image, caption and date moves one level
+    down, and the audio note of `Kappa\k.png` follows its file into `kappa\sub\sub`;
+    `Gamma` → `Gamma\New`, unticked: `Gamma\Deep` keeps its image, its date and its
+    caption; the database opened again shows the same;
+  - batch SG3, the drive root `p:` renamed `p:\a`, propagated: the root's two images, its
+    row and the caption of `r1.png` go to `p:\a`, those of `p:\a` to `p:\a\a`, those of
+    `p:\sub` to `p:\a\sub`.
+
+  On a copy of `e6abbc6` with the search and replace corrected and the refusal taken out,
+  but `renameStaticFolderSQLdb()` as it was (batches SG2 and SG3), the files move right,
+  and the rest does not: the recorded date of `Holiday One` goes to `pv\holiday
+  one\empty\empty`; after `Kappa` → `Kappa\Sub` the `staticfolders` table keeps one of
+  the three rows, `pv\kappa\sub\sub` with the date of `Kappa`, and the caption of the
+  image moved to `kappa\sub\sub` is gone; the root's row goes to `p:\a\a`, and the row
+  of `p:\a` is gone.
 
 ## Checked and found correct
 
@@ -1802,7 +1861,7 @@ Not part of the panel's own code.
 11. **The date of a drive root** (N10): read it from `d:\` in the five places that read a
     folder's date, or leave the root with «-» and without the changed mark?
 
-Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selected file),
+Suggested order, at `1451bad`: what is left of 9 (the first opening, one selected file),
 13 and the rest of 17; then the rest of N7; the others wait for the decisions.
 
 ## How this was checked
@@ -1921,6 +1980,19 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
   and `Delta\Inner`, a rename whose files cannot move, the rename that follows it, and a
   rename onto a folder without images that has a row. The text of `55b2a24` also loads on
   stock AutoHotkey 1.1.37.02 (a load check).
+- `1451bad` was checked on `e6abbc6`, whose code is that of `55b2a24`, and on the text of
+  `1451bad`: batches D2, H, Y and Z, the ones that reach the lines it changes, and three new
+  ones. SG runs the Search and replace panel in a database with the new folder inside the
+  old one, then the seed folders panel's rename of the seed folder into a subfolder of it,
+  then the database opened again; after each step it counts the files of each folder in
+  the index and in the `images` table. SG2 runs «Rename index entry» in a database into a
+  subfolder of the renamed folder; SG3 does it on a drive root. SG2 and SG3 were also run on
+  a copy of `e6abbc6` with the search and replace corrected and the refusal taken out, but
+  `renameStaticFolderSQLdb()` as it was. Batch Y got a 7 s wait after step Y6: when no
+  refusal comes, the answer it queues for the dialog the refusal brings back must expire
+  before step Y7. On the text of `1451bad`, D2, H and Z log what they logged on the text of
+  `55b2a24`, and Y differs in step Y6 alone. The text of `1451bad` also
+  loads on stock AutoHotkey 1.1.37.02 (a load check).
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
   finding 30 come from widths the script sets itself.
@@ -1929,7 +2001,8 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
   fonts and the dark mode.
 - Kit: `.claude/scratch/static-folders-panel-2026-11-10/app/`: `setup.sh` once, then
   `run-app.sh <tag> <test function> [revision]`; `patch.py`; `test-wrappers-static.ahk`
-  (testStaticA to testStaticZ, named as in the table below); `results/` (the logs ending
+  (testStaticA to testStaticZ and testStaticSG to testStaticSG3, named as in the table
+  below); `results/` (the logs ending
   in `-stock` are the stock interpreter's, those ending in `-trial` the trial copy's, run
   with `QPV_SRC=<file>`; those ending in `-f88` are the ones of `54a0666`, those ending in
   `-fix4` the ones of `256a670`, those ending in `-flt` the ones of `1813ca9`, those
@@ -1945,9 +2018,12 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
   the ones of the text of `eed5422`, `x-smoke` is batch X on that text, run first, those
   ending in `-558` are the ones of `5584ee3`, those ending in `-f16` the ones of the text
   of `55b2a24`, `y-smoke` and `z-smoke` are batches Y and Z on that text, run first, and
-  `y-f16b`, `z-f16b` and `z-558b` are Y and Z with their added steps);
+  `y-f16b`, `z-f16b` and `z-558b` are Y and Z with their added steps, those ending in
+  `-e6a` are the ones of `e6abbc6`, those ending in `-v3` the ones of the text of `1451bad`,
+  and `sg2-v2` and `sg3-v2` are SG2 and SG3 on the copy with `renameStaticFolderSQLdb()`
+  as it was);
   `run-all.sh <suffix> <revision> [batches]` runs the batches with the drive `P:` mapped
-  for Q and R.
+  for Q, R and SG3.
 
 | Batch | What it runs |
 |-------|--------------|
@@ -1977,3 +2053,6 @@ Suggested order, at `55b2a24`: what is left of 9 (the first opening, one selecte
 | X | after `f7caaac`. «Rescan folder(s)» on one folder, then on two, with file 10 as the current file, on a plain folder, a cached .SLD list and a database: the current file before and after, the calls of `RandomPicture()`, the shuffles of the random list, the images loaded, and whether the last one loaded is the current file |
 | Y | after `5584ee3`, a database with captions and audio notes on four images: the menu of a row; «Rename index entry» propagated, then the database opened again; unticked next to a subfolder; propagated on a folder with a subfolder, captions and audio notes; to a folder already listed; to a folder inside the renamed one, propagated then not; with a files filter on; a rename whose files cannot move, then an ordinary one |
 | Z | after `5584ee3`, a cached .SLD list: «Rename index entry» unticked, to a folder already listed, propagated; the seed folders panel's rename of the seed folder, unticked; after a seed-folder rescan, a rename onto a folder without images that has a row |
+| SG | after `e6abbc6`, a database, the Search and replace panel with «Current files list» and «Modify folder paths only», each new folder inside the old one: a folder without subfolders; onto a subfolder that holds images; onto one that holds an image of the same name; three levels that each hold an image of the same name; both paths typed with a trailing separator. Then the seed folders panel's rename of the seed folder into a subfolder of it, answered «Yes», and the database opened again. After each step, the files of each folder in the index and in the `images` table |
+| SG2 | after `e6abbc6`, a database with recorded dates of their own, captions and an audio note: «Rename index entry» into a subfolder of the renamed folder, propagated on a folder without subfolders and over three levels that each hold an image of the same name, then unticked; the database opened again |
+| SG3 | after `e6abbc6`, a drive root, with a drive `P:` mapped for the run: a database made from it, a caption on two images, the root renamed into its subfolder `p:\a`, propagated; the database opened again |
