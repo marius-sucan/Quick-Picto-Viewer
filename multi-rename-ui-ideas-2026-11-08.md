@@ -152,8 +152,8 @@ patterns exactly as typed, in quotes; «Erase history» empties the list without
 
 ## Appendix: how the pattern box is read
 
-Status: describes `6efe1a4` (2026-11-09), after the fixes to `decideMultiRename()` and `decideFinalMultiRename()`;
-no line numbers.
+Status: describes `6efe1a4` (2026-11-09), after the fixes to `decideMultiRename()` and `decideFinalMultiRename()`,
+and the folder rule of `25c77c6` (2026-11-13); no line numbers.
 
 In the order `decideMultiRename()` checks:
 
@@ -183,5 +183,7 @@ A pattern is rejected, and the preview's summary line gives the reason, when it 
 Also:
 - The replacement text after `//` and `>>` is used as typed, spaces included.
 - The rename does not touch a file whose new name has a character not allowed in file names; it counts as failed.
+- Nor a file whose new name a folder has: it counts as failed, and the preview gives every file with that new name
+  «Name taken by a folder».
 - The preview stays blank for an empty pattern or just `[this]`, and shows a single «Invalid RegEx» row for a bad
   RegEx.
