@@ -40739,8 +40739,9 @@ multiRenameFileStatus(srcPath, srcAttr, newFileName, newPath, ByRef seenNames, t
       Return 3
 
    keyu := Format("{:L}", newPath)
+   ; the later files given a folder's name are refused too
    If (sameAs := seenNames[keyu])
-      Return 4
+      Return InStr(FileExist(newPath), "D") ? 6 : 4
 
    seenNames[keyu] := thisIndex
    If (newPath=srcPath)   ; only the letter case changes
@@ -41551,6 +41552,14 @@ coreBatchMultiRenameFiles() {
             Continue
          }
 
+         ; FileMove would move the file into a folder that has the new name
+         destAttr := FileExist(file2save)
+         If InStr(destAttr, "D")
+         {
+            failedFiles++
+            Continue
+         }
+
          caseOnly := isSameFileOtherCase(file2rem, file2save) ; string case change test
          If (PreserveDateTimeOnSave=1)
          {
@@ -41559,7 +41568,7 @@ coreBatchMultiRenameFiles() {
             FileGetTime, originalCtime, %file2rem%, C
          }
 
-         If (caseOnly!=1 && FileExist(file2save) && !FolderExist(file2save))
+         If (caseOnly!=1 && destAttr)
          {
             file2save := askAboutFileCollision(file2rem, file2save, 1, 0, onConflictMultiRenameAct, performOverwrite)
             If !file2save
