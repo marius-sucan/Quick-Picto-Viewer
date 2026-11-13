@@ -41390,9 +41390,9 @@ uiPopulateLVmultiRename() {
             Break
      }
 
-     ; a row keeps the page buttons working
-     If (cutShort=1 && loopzu=0)
-        LV_Add("", "-", "-", "No new name in files " groupDigits(uiLVoffset + 1) " - " groupDigits(selCounter), "Press Next to continue")
+     ; a row keeps the page buttons working: on a cut page, and on a later page with no new name
+     If (loopzu=0 && (cutShort=1 || uiLVoffset>0))
+        LV_Add("", "-", "-", "No new name in files " groupDigits(uiLVoffset + 1) " - " groupDigits(selCounter), (cutShort=1) ? "Press Next to continue" : "Press First or Previous")
 
      pageAtEnd := (selCounter>=filesElected) ? 1 : 0
      UImultiRenameChangeLVoffset("covered", selCounter, pageAtEnd)
