@@ -41298,7 +41298,7 @@ uiPopulateLVmultiRename() {
         OutDirAsc := "a"
 
      ltop := CSthin
-     selCounter := deletedFiles := 0
+     selCounter := deletedFiles := cutShort := 0
      lti := A_TickCount
      pageNames := new hashtable()
      counterFilez := new hashtable()
@@ -41317,9 +41317,16 @@ uiPopulateLVmultiRename() {
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
             Continue
 
-         selCounter++
-         If (selCounter>A_Year && (A_TickCount - startOperation>5000))
+         ; on the page only, before the count: the file it stops at comes first on the next page
+         If (selCounter>uiLVoffset && selCounter>A_Year && (A_TickCount - startOperation>5000))
+         {
+            cutShort := 1
             Break
+         }
+
+         selCounter++
+         If (selCounter=uiLVoffset + 1)
+            startOperation := A_TickCount
 
          imgPath := resultedFilesList[A_Index, 1]
          If InStr(imgPath, "|")
@@ -41329,21 +41336,20 @@ uiPopulateLVmultiRename() {
             Continue
          }
 
-         srcAttr := FileExist(imgPath)
-         parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (selCounter<=uiLVoffset)
          {
             ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read
             If perFolderCount
+            {
+               zPlitPath(imgPath, 1, OutFileName, OutDir)
                counterFilez[OutDir] := Round(counterFilez[OutDir]) + 1
-
+            }
             Continue
          }
 
-         If (selCounter=uiLVoffset + 1)
-            startOperation := A_TickCount
-
          thisFileIndex := A_Index
+         srcAttr := FileExist(imgPath)
+         parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (StrLen(objuTemp.newExtu)>1)
             fileEXTu := objuTemp.newExtu
 
@@ -41384,9 +41390,13 @@ uiPopulateLVmultiRename() {
             Break
      }
 
+     ; a row keeps the page buttons working
+     If (cutShort=1 && loopzu=0)
+        LV_Add("", "-", "-", "No new name in files " groupDigits(uiLVoffset + 1) " - " groupDigits(selCounter), "Press Next to continue")
+
      pageAtEnd := (selCounter>=filesElected) ? 1 : 0
      UImultiRenameChangeLVoffset("covered", selCounter, pageAtEnd)
-     multiRenameSummary("pattern", summaryKey, (loopzu=0 && pageAtEnd && uiLVoffset=0) ? "No selected file name would change" : "Not checked yet")
+     multiRenameSummary("pattern", summaryKey, (cutShort=1) ? "Stopped after 5 seconds at file " groupDigits(selCounter) " of " groupDigits(filesElected) : (loopzu=0 && pageAtEnd && uiLVoffset=0) ? "No selected file name would change" : "Not checked yet")
      counterFilez := pageNames := ""
      LV_ModifyCol(3, "AutoHdr Left")
      LV_ModifyCol(4, "AutoHdr Left")
