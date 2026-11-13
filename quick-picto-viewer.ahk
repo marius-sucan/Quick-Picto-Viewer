@@ -41094,7 +41094,7 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
       If (testRegEx="\>")
       {
          obju.regExRemplaceMode := 1
-         obju.strArrA := RegExReplace(SubStr(strArr[1], 3), "^[imsxADJUXPOSC \t]*\)$")   ; options alone find nothing
+         obju.strArrA := RegExReplace(SubStr(strArr[1], 3), "^[imsxADJUXPOSC \t]*(?:\)|x[imsxADJUXPOSC \t]*\)\s*)$")   ; options alone, or x) with only blanks, find nothing
          ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
          If (obju.strArrA!="")
          {
