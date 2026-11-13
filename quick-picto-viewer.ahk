@@ -87832,7 +87832,9 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
    thisString := Trimmer(thisString, "|")
    If thisString
    {
-      If InStr(thisString, "/")
+      If (userHamDistStringStringPos=4)   ; RegEx: «/» and «>» belong to the pattern
+         n := 0
+      Else If InStr(thisString, "/")
          n := 2
       Else If InStr(thisString, ">")
          n := 3
