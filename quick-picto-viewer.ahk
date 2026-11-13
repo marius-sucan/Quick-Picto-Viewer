@@ -28452,7 +28452,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
          } Else
          {
             UsrEditFilter := "(\." dateu ")$"
-            userFilterInvertThis := 0
+            userFilterInvertThis := userFilterStringIsNot := 0
             userFilterStringPos := 4
             userFilterProperty := userFilterWhat := userFilterDoString := 1
             coreSetFilesFilteru("\>i)" UsrEditFilter)
