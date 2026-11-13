@@ -147,8 +147,8 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , prcSelX1 := 0, prcSelX2 := 0.5, prcSelY1 := 0, prcSelY2 := 0.5, pBrushF := "", lastWasLowQuality := 0
    , SelDotsSize := imgHUDbaseUnit//4, ViewPortBMPcache := "", startZeitIMGload := 0
    , imageLoading := 0, PrevGuiSizeEvent := 0, imgSelOutViewPort := 0, prevLastImg := [], userUIshapeCavity := 0
-   , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := ""
-   , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := ""
+   , rDesireWriteFMT := "jpg", FIMfailed2init := 0, prevDestPosX := "", prevDestPosY := "", CSdrk := "▓"
+   , totalFramesIndex := 0, pVwinTitle := "", AprevImgCall := "", BprevImgCall := "", CSthin := "░", CSmid := "▒"
    , desiredFrameIndex := 0, sqlFailedInit := 0, currentImgModified := 0, prevSetWinPosX := "", prevSetWinPosY := ""
    , diffIMGdecX := 0, diffIMGdecY := 0, oldZoomLevel := 0, fullPath2exe := "", hasMemThumbsCached := 0
    , scrollBarHy := 0, scrollBarVx := 0, HistogramBMP := "", internalColorDepth := 0, printerDevModeOptions := ""
@@ -40566,7 +40566,7 @@ readRecentMultiRenameEntries() {
 }
 
 PanelMultiRenameFiles() {
-    Global UsrEditNewFileName, txtMultiRenameLblSummary
+    Global UsrEditNewFileName, txtMultiRenameLblSummary, uiLblBusyNow
     If warnFramesActionPrevented("RENAME")
        Return
 
@@ -40603,7 +40603,9 @@ PanelMultiRenameFiles() {
     GuiAddButton("x+1 hp wp gUImultiRenameChangeLVoffset", ">", "Next")
     GuiAddButton("x+1 hp w" ml " gUImultiRenameChangeLVoffset", ">>", "Last")
     Gui, Add, Checkbox, x+10 hp Checked%PreserveDateTimeOnSave% vPreserveDateTimeOnSave, &Preserve original file date and time
-    Gui, Add, Text, xs y+10 w%lstWid% r1 -wrap vtxtMultiRenameLblSummary, Not checked yet
+    pkw := lstWid - ml - 2
+    Gui, Add, Text, xs y+10 w%pkw% r1 -wrap vtxtMultiRenameLblSummary, Not checked yet
+    Gui, Add, Text, x+5 w%ml% Center -wrap vuiLblBusyNow, % CSthin
     thisW := (PrefsLargeFonts=1) ? 155 : 115
     Gui, Add, Text, xs y+10 +0x200 +hwndhTemp, Action on file name collisions:
     GuiAddDropDownList("x+10 w" thisW " gUImultiRenameCollisionAction AltSubmit Choose" onConflictMultiRenameAct " vonConflictMultiRenameAct", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTemp])
@@ -40772,6 +40774,9 @@ BTNmultiRenameCheckAll() {
    doStartLongOpDance()
    showTOOLtip("Checking the new names of " groupDigits(filesElected) " files, please wait`nPress Escape to stop")
    ; numbered like coreBatchMultiRenameFiles(): every selected file takes its number, found or not
+   ltop := CSthin
+   lti := A_TickCount
+   GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -40781,6 +40786,12 @@ BTNmultiRenameCheckAll() {
       {
          abandonAll := 1
          Break
+      }
+      If (A_TickCount - lti>350)
+      {
+         lti := A_TickCount
+         ltop := (ltop=CSthin) ? CSdrk : CSthin
+         GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
       }
 
       imgPath := resultedFilesList[A_Index, 1]
@@ -40824,6 +40835,7 @@ BTNmultiRenameCheckAll() {
    }
 
    counterFilez := seenNames := ""
+   GuiControl, SettingsGUIA:, uiLblBusyNow, % CSthin
    If (abandonAll=1 && GetKeyState("Escape", "P"))
    {
       ; the Escape that stopped the check must not close the panel [SettingsGUIAGuiEscape]
@@ -40897,7 +40909,7 @@ BtnMultiRenameMenus(hwnd:=0) {
    Menu, PVmrInsert, Add, &Letter case, :PVmrCase
    Menu, PVmrInsert, Add
    multiRenameMenuAdd("PVmrInsert", "&Find and replace...`tIMG_//Photo_", "template", "IMG_//Photo_|0|4")
-   multiRenameMenuAdd("PVmrInsert", "Find and replace with a &regular expression (RegEx)...`t\>...//...", "template", "\>^IMG_(\d+)//Photo $1|2|12")
+   multiRenameMenuAdd("PVmrInsert", "Find and replace with a &regular expression (RegEx)...`t\>...//...", "template", "\>(image|img)_.*//Photo")
    multiRenameMenuAdd("PVmrInsert", "Replace single c&haracters...`t >>_", "template", " >>_|0|1")
    multiRenameMenuAdd("PVmrInsert", "Change &extension...`t$.jpg", "template", "$.jpg|2|5")
 
@@ -41235,6 +41247,7 @@ uiPopulateLVmultiRename() {
   GuiControlGet, onConflictMultiRenameAct
   summaryKey := UsrEditNewFileName "|" onConflictMultiRenameAct
   OriginalNewFileName := Trimmer(UsrEditNewFileName)
+  GuiControl, SettingsGUIA:, uiLblBusyNow, % CSthin
   If (OriginalNewFileName="[this]" || OriginalNewFileName="")
   {
      multiRenameSummary("pattern", summaryKey, (OriginalNewFileName="") ? "Not checked yet" : "«[this]» alone keeps every name as it is")
@@ -41277,25 +41290,42 @@ uiPopulateLVmultiRename() {
      If (objuTemp.IndexModeCount=1)
         OutDirAsc := "a"
 
-     counterFilez := new hashtable()
-     pageNames := new hashtable()
+     ltop := CSthin
      selCounter := 0
+     lti := A_TickCount
+     pageNames := new hashtable()
+     counterFilez := new hashtable()
      maxItems := (userPrivateMode=1) ? 100 : 9100
      perFolderCount := (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
+     GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
      Loop, % maxFilesIndex
      {
+         If (A_TickCount - lti>350)
+         {
+            lti := A_TickCount
+            ltop := (ltop=CSthin) ? CSdrk : CSthin
+            GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
+         }
+
          If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
             Continue
 
          selCounter++
+         If (selCounter>A_Year && (A_TickCount - startOperation>5000))
+            Break
+
+         imgPath := resultedFilesList[A_Index, 1]
+         If InStr(imgPath, "|") ; marked deleted 
+            Continue
+
+         srcAttr := FileExist(imgPath)
+         parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (selCounter<=uiLVoffset)
          {
             ; files before the page still take their per-folder numbers; fast mode gives the folder without a disk read
             If perFolderCount
-            {
-               zPlitPath(StrReplace(resultedFilesList[A_Index, 1], "|"), 1, OutFileName, OutDir)
                counterFilez[OutDir] := Round(counterFilez[OutDir]) + 1
-            }
+
             Continue
          }
 
@@ -41303,10 +41333,6 @@ uiPopulateLVmultiRename() {
             startOperation := A_TickCount
 
          thisFileIndex := A_Index
-         imgPath := resultedFilesList[A_Index, 1]
-         ; for a file found, fast mode gives the same folder without a second disk read
-         srcAttr := FileExist(imgPath)
-         parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (StrLen(objuTemp.newExtu)>1)
             fileEXTu := objuTemp.newExtu
 
@@ -41343,7 +41369,7 @@ uiPopulateLVmultiRename() {
          loopzu++
          LV_Add(A_Index, OutFileName, newFileName "." fileEXTu, statusu, OutDir "\", A_Index)
          ; ToolTip, % A_Index , , , 2
-         If ((loopzu>=maxItems) || (loopzu>15 && (A_TickCount - startOperation>1000)))
+         If ((loopzu>=maxItems) || AnyWindowOpen!=8 || (loopzu>15 && (A_TickCount - startOperation>1000)))
             Break
      }
 
@@ -41354,6 +41380,7 @@ uiPopulateLVmultiRename() {
      LV_ModifyCol(3, "AutoHdr Left")
      LV_ModifyCol(4, "AutoHdr Left")
      LV_ModifyCol(5, "AutoHdr Left")
+     GuiControl, SettingsGUIA:, uiLblBusyNow, % CSthin
      GuiControl, +Redraw, LViewOthers
   }
 }
@@ -93624,7 +93651,7 @@ invokePanelReviewSelContextMenu() {
 }
 
 BtnHelpStaticFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify per folder missing files, already seen images or favourited images [if these were selected using the appropriate tools before opening this panel]`n `nFolders marked with (*) are changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index», the files indexed pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify per folder missing files, already seen images or favourited images [if these were selected using the appropriate tools before opening this panel]`n `nFolders marked with (*) are changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index», the files indexed pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.`n`nWhen rescanning a missing or inaccessible folder, QPV will remove the image files from the list of that folder.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
@@ -97791,6 +97818,7 @@ BTNupdateSelectedStaticFolder() {
    indexu := RowNumber := 0
    total := LV_GetCount()
    foldersListArray := new hashtable()
+   aliveOnes := deadOnes := 0
    Loop, % total
    {
        RowNumber := LV_GetNext(RowNumber)
@@ -97803,13 +97831,30 @@ BTNupdateSelectedStaticFolder() {
 
        folderu := Format("{:L}", newStaticFoldersListCache[indexu, 1])
        If (folderu!="")
+       {
           foldersListArray[folderu] := indexu
+          If FolderExist(folderu)
+             aliveOnes++
+          Else
+             deadOnes++
+       }
     }
 
     If (foldersListArray.Count()<1)
     {
        foldersListArray := ""
        Return
+    }
+
+    If deadOnes
+    {
+       pss := (deadOnes>1) ? "s" : ""
+       If (deadOnes=1 && aliveOnes=0)
+          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The folder selected no longer seems to exist. By rescanning the folder, all of the indexed images from this folder and subfolders will be removed from the files list. Do you want to continue?", 4, 0, "question")
+       Else
+          msgResult := msgBoxWrapper(appTitle ": Confirmation", deadOnes " folder" pss " selected no longer seem" pss " to exist. QPV will remove from the files list all of the indexed images from inaccessible or missing folders. Do you want to continue?", 4, 0, "question")
+       If (msgResult!="Yes")
+          Return
     }
 
     BtnCloseWindow()
