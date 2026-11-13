@@ -47384,7 +47384,8 @@ BtnPerformSearchNow(a, b, c) {
       Else If (userSearchPos=4)
          thisString := "\>" thisString
 
-      userSearchString := thisString
+      ; RegEx options alone, as in «i)», are no search criteria
+      userSearchString := RegExMatch(thisString, "^\\>[imsxADJUXPOSC \t\a\n\r]*\)\s*$") ? "" : thisString
       ; givenRegEx := processSearchIndexString(thisString)
    }
 
