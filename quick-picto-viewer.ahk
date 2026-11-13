@@ -47646,6 +47646,13 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      destroyGDIfileCache()
      oMD5name := generateThumbName(file2rem, 1)
      file2save := OutDir "\" newFileName
+     ; FileMove would move the file into that folder
+     If FolderExist(file2save)
+     {
+        msgBeepTimer("WARNING: Rename operation abandoned.`nA folder has the provided name.`n" newFileName)
+        Return 0
+     }
+
      ; the same file spelled in another case: nothing is in the way
      caseOnly := isSameFileOtherCase(file2rem, file2save)
      If (caseOnly!=1 && FileRexists(file2save, 0))
