@@ -33052,8 +33052,9 @@ updateUIFiltersPanel(dummy:=0) {
       thisStringFilter := SQLlikeClauseFromFilter(UsrEditFilter, userFilterWhat, userFilterStringPos, userFilterStringIsNot)
    } Else If (userFilterDoString=1)
    {
+      ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
       If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
-         thisStringFilter := "i)" UsrEditFilter
+         thisStringFilter := (RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") UsrEditFilter
       Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
       Else If (userFilterStringPos=2 && StrLen(UsrEditFilter)>1)
@@ -33136,7 +33137,7 @@ updateUIFiltersPanel(dummy:=0) {
 
    ; live check: in «RegEx» matching mode a malformed pattern is flagged in the query
    ; box here and blocked on Apply, so it never reaches RegExMatch to throw [isValidRegEx()]
-   regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx("i)" UsrEditFilter)) ? 1 : 0
+   regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx(thisStringFilter)) ? 1 : 0
    If (dummy!="external")
       GuiControl, SettingsGUIA:, InternalFilterString, % (regexBad=1) ? "Invalid regular expression provided." : newFilter
 
@@ -33163,7 +33164,7 @@ BtnApplyFilesFilter() {
    GuiControlGet, userFilterInvertThis
    newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
-   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx("i)" UsrEditFilter))
+   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx((RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") UsrEditFilter))
       Return msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
 
    If !newFilter
@@ -35791,8 +35792,9 @@ retrieveAlreadySeenImageFromCurrentList() {
 
    If (userFilterDoString=1)
    {
+      ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
       If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
-         thisStringFilter := "i)" UsrEditFilter
+         thisStringFilter := (RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") UsrEditFilter
       Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
       Else If (userFilterStringPos=2 && StrLen(UsrEditFilter)>1)
