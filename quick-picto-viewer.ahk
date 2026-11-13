@@ -33053,8 +33053,9 @@ updateUIFiltersPanel(dummy:=0) {
    } Else If (userFilterDoString=1)
    {
       ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
+      ; options alone, as in «i)», are not joined: «i)i)» fails the checks
       If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
-         thisStringFilter := (RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") UsrEditFilter
+         thisStringFilter := (RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)(?!\s*$)") ? "i" : "i)") UsrEditFilter
       Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
       Else If (userFilterStringPos=2 && StrLen(UsrEditFilter)>1)
@@ -33164,7 +33165,7 @@ BtnApplyFilesFilter() {
    GuiControlGet, userFilterInvertThis
    newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
-   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx((RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") UsrEditFilter))
+   If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx((RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)(?!\s*$)") ? "i" : "i)") UsrEditFilter))
       Return msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
 
    If !newFilter
