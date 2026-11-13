@@ -28455,7 +28455,7 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
             userFilterInvertThis := 0
             userFilterStringPos := 4
             userFilterProperty := userFilterWhat := userFilterDoString := 1
-            coreSetFilesFilteru("\>" UsrEditFilter)
+            coreSetFilesFilteru("\>i)" UsrEditFilter)
             Return
          }
       }
