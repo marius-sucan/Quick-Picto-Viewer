@@ -33056,7 +33056,7 @@ updateUIFiltersPanel(dummy:=0) {
       ; options alone, as in «i)», are not joined: «i)i)» fails the checks
       If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
       {
-         pku := RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)(?!\s*$)") ? "i" : "i)"
+         pku := RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t]*\)(?!\s*$)") ? "i" : "i)"
          thisStringFilter := pku UsrEditFilter
       } Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
@@ -33167,7 +33167,7 @@ BtnApplyFilesFilter() {
    GuiControlGet, userFilterInvertThis
    newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
-   pku := RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)(?!\s*$)") ? "i" : "i)"
+   pku := RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t]*\)(?!\s*$)") ? "i" : "i)"
    If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx(pku UsrEditFilter))
       Return msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
 
@@ -35799,7 +35799,7 @@ retrieveAlreadySeenImageFromCurrentList() {
       ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
       If (userFilterStringPos=4 && StrLen(UsrEditFilter)>1)
       {
-         pku := RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)"
+         pku := RegExMatch(UsrEditFilter, "^[imsxADJUXPOSC \t]*\)") ? "i" : "i)"
          thisStringFilter := pku UsrEditFilter
       } Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
@@ -39759,7 +39759,7 @@ processSearchIndexString(inputu) {
       thisFilter := SubStr(inputu, 3)
       ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
       ; options alone, as in «i)», are not joined: «i)i)» matches nothing
-      pku := RegExMatch(thisFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)(?!\s*$)") ? "i" : "i)"
+      pku := RegExMatch(thisFilter, "^[imsxADJUXPOSC \t]*\)(?!\s*$)") ? "i" : "i)"
       thisFilter := pku thisFilter
    } Else If (InStr(inputu, ">") && StrLen(inputu)>1)
    {
@@ -41094,11 +41094,11 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
       If (testRegEx="\>")
       {
          obju.regExRemplaceMode := 1
-         obju.strArrA := RegExReplace(SubStr(strArr[1], 3), "^[imsxADJUXPOSC \t\a\n\r]*\)$")   ; options alone find nothing
+         obju.strArrA := RegExReplace(SubStr(strArr[1], 3), "^[imsxADJUXPOSC \t]*\)$")   ; options alone find nothing
          ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
          If (obju.strArrA!="")
          {
-            pku := RegExMatch(obju.strArrA, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)"
+            pku := RegExMatch(obju.strArrA, "^[imsxADJUXPOSC \t]*\)") ? "i" : "i)"
             obju.strArrA := pku obju.strArrA
          }
          obju.regExValid := isValidRegEx(obju.strArrA)
@@ -47395,7 +47395,7 @@ BtnPerformSearchNow(a, b, c) {
          thisString := "\>" thisString
 
       ; RegEx options alone, as in «i)», are no search criteria
-      userSearchString := RegExMatch(thisString, "^\\>[imsxADJUXPOSC \t\a\n\r]*\)\s*$") ? "" : thisString
+      userSearchString := RegExMatch(thisString, "^\\>[imsxADJUXPOSC \t]*\)\s*$") ? "" : thisString
       ; givenRegEx := processSearchIndexString(thisString)
    }
 
