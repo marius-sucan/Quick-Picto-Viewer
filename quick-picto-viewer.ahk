@@ -41269,6 +41269,8 @@ uiPopulateLVmultiRename() {
   Gui, SettingsGUIA: Default
   Gui, SettingsGUIA: ListView, LViewOthers
   Static actWords := ["skip", "auto-rename", "overwrite", "ask"]
+  ; «Overwrite» auto-renames a name the batch itself wrote, see askAboutFileCollision()
+  Static sameNameWords := ["skip", "auto-rename", "auto-rename", "ask"]
   UImultiRenameChangeLVoffset("covered", uiLVoffset, 1)
   GuiControlGet, UsrEditNewFileName
   GuiControlGet, onConflictMultiRenameAct
@@ -41399,7 +41401,7 @@ uiPopulateLVmultiRename() {
          If (userPrivateMode!=1)
          {
             c := multiRenameFileStatus(imgPath, srcAttr, newFileName "." fileEXTu, file2save, pageNames, A_Index, sameAs)
-            statusu := (c=1) ? "OK" : (c=2) ? "Not found" : (c=3) ? "Invalid name" : (c=4) ? "Same new name as #" sameAs : (c=5) ? "Name taken: " actWords[Round(onConflictMultiRenameAct)] : "Name taken by a folder"
+            statusu := (c=1) ? "OK" : (c=2) ? "Not found" : (c=3) ? "Invalid name" : (c=4) ? "Same new name as #" sameAs ": " sameNameWords[Round(onConflictMultiRenameAct)] : (c=5) ? "Name taken: " actWords[Round(onConflictMultiRenameAct)] : "Name taken by a folder"
          }
 
          loopzu++
