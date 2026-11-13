@@ -39748,7 +39748,7 @@ processSearchIndexString(inputu) {
    testRegEx := SubStr(inputu, 1, 2)
    If (testRegEx="\>" && StrLen(inputu)>2)
    {
-      thisFilter := SubStr(inputu, 3)
+      thisFilter := "i)" SubStr(inputu, 3)
    } Else If (InStr(inputu, ">") && StrLen(inputu)>1)
    {
       thisFilter := StrReplace(inputu, ">")
@@ -41082,7 +41082,7 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
       If (testRegEx="\>")
       {
          obju.regExRemplaceMode := 1
-         obju.strArrA := SubStr(strArr[1], 3)
+         obju.strArrA := "i)" SubStr(strArr[1], 3)
          obju.regExValid := isValidRegEx(obju.strArrA)
       } Else
          obju.strArrA := strArr[1]
@@ -41331,7 +41331,6 @@ uiPopulateLVmultiRename() {
          imgPath := resultedFilesList[A_Index, 1]
          If InStr(imgPath, "|")
          {
-            ; deleted in QPV: no row and no number, as in the rename
             deletedFiles++
             Continue
          }
@@ -41475,9 +41474,8 @@ coreBatchMultiRenameFiles() {
          thisFileIndex := A_Index
          file2rem := resultedFilesList[thisFileIndex, 1]
          countTFilez++
-         If InStr(file2rem, "|")
+         If InStr(file2rem, "|") ; index entry marked as deleted file
          {
-            ; deleted in QPV: neither numbered nor reported
             deletedFiles++
             Continue
          }
@@ -47363,15 +47361,20 @@ BtnPerformSearchNow(a, b, c) {
    ; fnOutputDebug(A_ThisFunc "(1): " thisString)
    If (thisString!="")
    {
-      thisString := StrReplace(thisString, "\>")
-      thisString := StrReplace(thisString, "/")
-      thisString := StrReplace(thisString, ">")
+      If (userSearchPos!=4)
+      {
+         thisString := StrReplace(thisString, "\>")
+         thisString := StrReplace(thisString, "/")
+         thisString := StrReplace(thisString, ">")
+      }
+
       If (userSearchPos=2)
          thisString := "/" thisString
       Else If (userSearchPos=3)
          thisString := ">" thisString
       Else If (userSearchPos=4)
          thisString := "\>" thisString
+
       userSearchString := thisString
       ; givenRegEx := processSearchIndexString(thisString)
    }
@@ -97882,6 +97885,7 @@ BTNupdateSelectedStaticFolder() {
           msgu := "1 of the " groupDigits(aliveOnes + 1) " selected folders no longer seems to exist. Rescanning it removes from the files list the images indexed directly in it."
        Else
           msgu := groupDigits(deadOnes) " of the " groupDigits(aliveOnes + deadOnes) " selected folders no longer seem to exist. Rescanning them removes from the files list the images indexed directly in them."
+ 
        msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu, "&Rescan all|&Skip missing|&Cancel", 2, "question")
        If (msgResult="Skip missing")
        {
@@ -97896,6 +97900,7 @@ BTNupdateSelectedStaticFolder() {
           msgu := "The selected folder no longer seems to exist. Rescanning it removes from the files list the images indexed directly in it; those of its subfolders stay."
        Else
           msgu := "The " groupDigits(deadOnes) " selected folders no longer seem to exist. Rescanning them removes from the files list the images indexed directly in them."
+ 
        msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu " Do you want to continue?", 4, 0, "question")
        If (msgResult!="Yes")
           Return
