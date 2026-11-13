@@ -97846,7 +97846,8 @@ BTNupdateSelectedStaticFolder() {
    indexu := RowNumber := 0
    total := LV_GetCount()
    foldersListArray := new hashtable()
-   aliveOnes := deadOnes := 0
+   missingFolders := []
+   aliveOnes := 0
    Loop, % total
    {
        RowNumber := LV_GetNext(RowNumber)
@@ -97864,7 +97865,7 @@ BTNupdateSelectedStaticFolder() {
           If FolderExist(folderu)
              aliveOnes++
           Else
-             deadOnes++
+             missingFolders.Push(folderu)
        }
     }
 
@@ -97874,13 +97875,28 @@ BTNupdateSelectedStaticFolder() {
        Return
     }
 
-    If deadOnes
+    deadOnes := missingFolders.Length()
+    If (deadOnes && aliveOnes)
     {
-       pss := (deadOnes>1) ? "s" : ""
-       If (deadOnes=1 && aliveOnes=0)
-          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The folder selected no longer seems to exist. By rescanning the folder, all of the indexed images from this folder and subfolders will be removed from the files list. Do you want to continue?", 4, 0, "question")
+       If (deadOnes=1)
+          msgu := "1 of the " groupDigits(aliveOnes + 1) " selected folders no longer seems to exist. Rescanning it removes from the files list the images indexed directly in it."
        Else
-          msgResult := msgBoxWrapper(appTitle ": Confirmation", deadOnes " folder" pss " selected no longer seem" pss " to exist. QPV will remove from the files list all of the indexed images from inaccessible or missing folders. Do you want to continue?", 4, 0, "question")
+          msgu := groupDigits(deadOnes) " of the " groupDigits(aliveOnes + deadOnes) " selected folders no longer seem to exist. Rescanning them removes from the files list the images indexed directly in them."
+       msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu, "&Rescan all|&Skip missing|&Cancel", 2, "question")
+       If (msgResult="Skip missing")
+       {
+          ; the missing folders keep their entries
+          For i, folderu in missingFolders
+             foldersListArray.delete(folderu)
+       } Else If (msgResult!="Rescan all")
+          Return
+    } Else If deadOnes
+    {
+       If (deadOnes=1)
+          msgu := "The selected folder no longer seems to exist. Rescanning it removes from the files list the images indexed directly in it; those of its subfolders stay."
+       Else
+          msgu := "The " groupDigits(deadOnes) " selected folders no longer seem to exist. Rescanning them removes from the files list the images indexed directly in them."
+       msgResult := msgBoxWrapper(appTitle ": Confirmation", msgu " Do you want to continue?", 4, 0, "question")
        If (msgResult!="Yes")
           Return
     }
