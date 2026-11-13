@@ -39748,7 +39748,9 @@ processSearchIndexString(inputu) {
    testRegEx := SubStr(inputu, 1, 2)
    If (testRegEx="\>" && StrLen(inputu)>2)
    {
-      thisFilter := "i)" SubStr(inputu, 3)
+      thisFilter := SubStr(inputu, 3)
+      ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
+      thisFilter := (RegExMatch(thisFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") thisFilter
    } Else If (InStr(inputu, ">") && StrLen(inputu)>1)
    {
       thisFilter := StrReplace(inputu, ">")
