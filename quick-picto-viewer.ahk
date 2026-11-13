@@ -41094,7 +41094,9 @@ decideMultiRename(ByRef OriginalNewFileName, ByRef errMsg:="") {
       If (testRegEx="\>")
       {
          obju.regExRemplaceMode := 1
-         obju.strArrA := RegExReplace(SubStr(strArr[1], 3), "^[[:alnum:] \t]*(?:\)|x[[:alnum:] \t]*\)\s*)$")   ; options alone, or x) with only blanks, find nothing
+         obju.strArrA := SubStr(strArr[1], 3)
+         If (RegExMatch(obju.strArrA, "^[[:alnum:] \t]*(?:\)|x[[:alnum:] \t]*\)\s*)$") && isValidRegEx(obju.strArrA))
+            obju.strArrA := ""   ; options alone, or x) with only blanks, find nothing
          ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
          If (obju.strArrA!="")
          {
@@ -47395,7 +47397,9 @@ BtnPerformSearchNow(a, b, c) {
          thisString := "\>" thisString
 
       ; RegEx options alone, as in «i)», are no search criteria
-      userSearchString := RegExMatch(thisString, "^\\>[[:alnum:] \t]*\)\s*$") ? "" : thisString
+      userSearchString := (RegExMatch(thisString, "^\\>[[:alnum:] \t]*\)\s*$") && isValidRegEx(SubStr(thisString, 3))) ? "" : thisString
+      If (userSearchPos=4 && userSearchString!="" && !isValidRegEx(processSearchIndexString(userSearchString)))
+         userSearchString := "", invalidRegEx := 1
       ; givenRegEx := processSearchIndexString(thisString)
    }
 
@@ -47419,7 +47423,7 @@ BtnPerformSearchNow(a, b, c) {
          SearchIndexSelectAll()
       }
    } Else
-      msgBeepTimer("WARNING: no valid search criteria was given.")
+      msgBeepTimer(invalidRegEx ? "WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before searching." : "WARNING: no valid search criteria was given.")
 }
 
 OpenFilterPanelBTNaction() {
