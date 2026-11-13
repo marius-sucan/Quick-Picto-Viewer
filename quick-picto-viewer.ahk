@@ -40769,11 +40769,11 @@ BTNmultiRenameCheckAll() {
    counterFilez := new hashtable()
    seenNames := new hashtable()
    countu := [0, 0, 0, 0, 0, 0]
-   unchanged := countTFilez := 0
+   unchanged := countTFilez := deletedFiles := 0
    startOperation := prevMSGdisplay := A_TickCount
    doStartLongOpDance()
    showTOOLtip("Checking the new names of " groupDigits(filesElected) " files, please wait`nPress Escape to stop")
-   ; numbered like coreBatchMultiRenameFiles(): every selected file takes its number, found or not
+   ; numbered like coreBatchMultiRenameFiles(): every selected file takes its number, found or not, unless it was deleted in QPV
    ltop := CSthin
    lti := A_TickCount
    GuiControl, SettingsGUIA:, uiLblBusyNow, % ltop
@@ -40795,12 +40795,19 @@ BTNmultiRenameCheckAll() {
       }
 
       imgPath := resultedFilesList[A_Index, 1]
+      countTFilez++
+      If InStr(imgPath, "|")
+      {
+         ; deleted in QPV: left out of the numbering and of the summary
+         deletedFiles++
+         Continue
+      }
+
       srcAttr := FileExist(imgPath)
       parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
       If (StrLen(objuTemp.newExtu)>1)
          fileEXTu := objuTemp.newExtu
 
-      countTFilez++
       If perFolderCount
       {
          OutDirAsc := (objuTemp.IndexModeCount=1) ? "a" : OutDir
@@ -40808,7 +40815,7 @@ BTNmultiRenameCheckAll() {
       }
 
       If (objuTemp.IndexModeCount=1)
-         counterFilez[OutDirAsc] := countTFilez
+         counterFilez[OutDirAsc] := countTFilez - deletedFiles
 
       If (A_TickCount - prevMSGdisplay>2000)
       {
@@ -41291,7 +41298,7 @@ uiPopulateLVmultiRename() {
         OutDirAsc := "a"
 
      ltop := CSthin
-     selCounter := 0
+     selCounter := deletedFiles := 0
      lti := A_TickCount
      pageNames := new hashtable()
      counterFilez := new hashtable()
@@ -41315,8 +41322,12 @@ uiPopulateLVmultiRename() {
             Break
 
          imgPath := resultedFilesList[A_Index, 1]
-         If InStr(imgPath, "|") ; marked deleted 
+         If InStr(imgPath, "|")
+         {
+            ; deleted in QPV: no row and no number, as in the rename
+            deletedFiles++
             Continue
+         }
 
          srcAttr := FileExist(imgPath)
          parentFolderName := zPlitPath(imgPath, (srcAttr && !InStr(srcAttr, "D")) ? 1 : 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
@@ -41351,7 +41362,7 @@ uiPopulateLVmultiRename() {
             }
 
             If (objuTemp.IndexModeCount=1)
-               counterFilez[OutDirAsc] := selCounter
+               counterFilez[OutDirAsc] := selCounter - deletedFiles
 
             newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, imgPath, objuTemp)
          }
@@ -41431,7 +41442,7 @@ coreBatchMultiRenameFiles() {
 
      filezRenamed := countFilez := 0
      nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-     countTFilez := skippedFiles := failedFiles := overwrittenFiles := 0
+     countTFilez := skippedFiles := failedFiles := overwrittenFiles := deletedFiles := 0
      if (objuTemp.IndexModeCount=1)
         OutDirAsc := "a"
 
@@ -41453,11 +41464,18 @@ coreBatchMultiRenameFiles() {
          wasError := 0
          thisFileIndex := A_Index
          file2rem := resultedFilesList[thisFileIndex, 1]
+         countTFilez++
+         If InStr(file2rem, "|")
+         {
+            ; deleted in QPV: neither numbered nor reported
+            deletedFiles++
+            Continue
+         }
+
          parentFolderName := zPlitPath(file2rem, 0, OutFileName, OutDir, fileNamuNoEXT, fileEXTu)
          If (StrLen(objuTemp.newExtu)>1)
             fileEXTu := objuTemp.newExtu
 
-         countTFilez++
          If (objuTemp.TrimmingMode!=1 && objuTemp.renamingCount=1)
          {
             OutDirAsc := (objuTemp.IndexModeCount=1) ? "a" : OutDir
@@ -41485,7 +41503,7 @@ coreBatchMultiRenameFiles() {
          }
 
          If (objuTemp.IndexModeCount=1)
-            counterFilez[OutDirAsc] := countTFilez
+            counterFilez[OutDirAsc] := countTFilez - deletedFiles
 
          newFileName := decideFinalMultiRename(fileNamuNoEXT, OriginalNewFileName, counterFilez[OutDirAsc], parentFolderName, file2rem, objuTemp)
          file2save := OutDir "\" newFileName "." fileEXTu
