@@ -47368,7 +47368,8 @@ BtnPerformSearchNow(a, b, c) {
          thisString := StrReplace(thisString, "\>")
          thisString := StrReplace(thisString, "/")
          thisString := StrReplace(thisString, ">")
-      }
+      } Else If (SubStr(thisString, 1, 2)="\>")   ; a past search, refilled or picked from the list, keeps its «\>»
+         thisString := SubStr(thisString, 3)
 
       If (userSearchPos=2)
          thisString := "/" thisString
