@@ -39753,7 +39753,8 @@ processSearchIndexString(inputu) {
    {
       thisFilter := SubStr(inputu, 3)
       ; the «i» joins options of its own, as in «i)…»: «i)i)…» does not compile
-      thisFilter := (RegExMatch(thisFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)") ? "i" : "i)") thisFilter
+      ; options alone, as in «i)», are not joined: «i)i)» matches nothing
+      thisFilter := (RegExMatch(thisFilter, "^[imsxADJUXPOSC \t\a\n\r]*\)(?!\s*$)") ? "i" : "i)") thisFilter
    } Else If (InStr(inputu, ">") && StrLen(inputu)>1)
    {
       thisFilter := StrReplace(inputu, ">")
