@@ -40909,7 +40909,7 @@ BtnMultiRenameMenus(hwnd:=0) {
    Menu, PVmrInsert, Add, &Letter case, :PVmrCase
    Menu, PVmrInsert, Add
    multiRenameMenuAdd("PVmrInsert", "&Find and replace...`tIMG_//Photo_", "template", "IMG_//Photo_|0|4")
-   multiRenameMenuAdd("PVmrInsert", "Find and replace with a &regular expression (RegEx)...`t\>...//...", "template", "\>(image|img)_.*//Photo")
+   multiRenameMenuAdd("PVmrInsert", "Find and replace with a &regular expression (RegEx)...`t\>...//...", "template", "\>^IMG_(\d+)//Photo $1|2|12")
    multiRenameMenuAdd("PVmrInsert", "Replace single c&haracters...`t >>_", "template", " >>_|0|1")
    multiRenameMenuAdd("PVmrInsert", "Change &extension...`t$.jpg", "template", "$.jpg|2|5")
 
