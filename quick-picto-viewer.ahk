@@ -41204,7 +41204,7 @@ UIlvMultiRenameResponder(a, b, c) {
    Gui, SettingsGUIA: ListView, LViewOthers
    RowNumber := LV_GetNext(0, "F")
    LV_GetText(indexu, RowNumber, 5)
-   If !indexu
+   If (!indexu && !(b="k" && isInRange(c, 120, 123)))   ; VK_F9 - VK_F12 page from the placeholder row too
    {
       If (b="RightClick")
          invokePrefsPanelsContextMenu()
