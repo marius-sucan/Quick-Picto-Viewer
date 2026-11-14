@@ -3205,21 +3205,14 @@ fileSizeFriendly(bytez) {
   Return totalSize
 }
 
-copyMoveStructuredFolders(srcDir, finalDest) {
+copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    Static lastInvoked := 1
-   filesElected := getSelectedFiles(0, 1)
    If (srcDir=finalDest || !srcDir || !finalDest || filesElected<2)
       Return
 
-   If (filesElected>150) ; ((A_TickCount - lastInvoked > 29500) && dummy!="quick-actu")
-   {
-      wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " finalDest "\", 4, 0, "question")
-      If (msgResult!="Yes")
-         Return 0
-   }
+   If (errMsg := testStructuredFoldersClash(fS, dS))
+      Return msgBeepTimer(errMsg)
 
-   BtnCloseWindow()
    lastInvoked := A_TickCount
    friendly := (UsrCopyMoveOperation=2) ? "Moving " : "Copying "
    showTOOLtip(friendly groupDigits(filesElected) " files to`n" finalDest "\`nPlease wait")
@@ -60975,7 +60968,7 @@ BTNuiProceedStructuredOperation() {
    GuiControlGet, userCopyMoveStructuredConflictMode
    GuiControlGet, UsrCopyMoveOperation
    If (UsrCopyMoveOperation=1)
-      Return msgBeepTimer("ERROR: Please select action to perform: copy or move files.")
+      Return msgBeepTimer("WARNING: Please select action to perform: copy or move files")
 
    fS := Trim(UsrEditFileSource, "\")
    dS := Trim(UsrEditFileDestination, "\")
@@ -60983,15 +60976,12 @@ BTNuiProceedStructuredOperation() {
    dS := StrReplace(dS, "/", "\")
    fS := Trimmer(fS)
    dS := Trimmer(dS)
-   If !FolderExist(fS)
+   If (!FolderExist(fS) || !fS)
       Return msgBeepTimer("ERROR: Please choose an existing source folder")
 
-   If (errMsg := structuredFoldersClash(fS, dS))
-      Return msgBeepTimer(errMsg)
-
-   If !FolderExist(dS)
+   If (!FolderExist(dS) || !dS)
    {
-      If (StrLen(dS)>4)
+      If (StrLen(dS)>2)
       {
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination folder seems to not exist.`n`n" dS "\`n`nWould you like to create it now?", 4, 0, "question")
          If (msgResult="Yes")
@@ -61013,11 +61003,20 @@ BTNuiProceedStructuredOperation() {
    If askAboutFileSave(" and the files operations will be executed")
       Return
 
+   filesElected := getSelectedFiles(0, 1)
+   If (filesElected>150)
+   {
+      wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " dS "\", 4, 0, "question")
+      If (msgResult!="Yes")
+         Return 0
+   }
+
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS)
 }
 
-structuredFoldersClash(srcDir, destDir) {
+testStructuredFoldersClash(srcDir, destDir) {
 ; why the two folders cannot be used together, or nothing; compared by identity, so any spelling counts.
 ; Nested folders are allowed unless a selected file would be copied or moved onto another one
    srcID := getFileIdentity(srcDir)
@@ -61028,6 +61027,8 @@ structuredFoldersClash(srcDir, destDir) {
    ; the destination folder, or one of its parent folders, is the source folder
    destInSrc := 0
    p := destPath
+   pzs := A_TickCount
+   showTOOLtip("Preparing structured file operations...")
    Loop
    {
       If (getFileIdentity(p)=srcID)
@@ -61042,9 +61043,12 @@ structuredFoldersClash(srcDir, destDir) {
 
       If !(p := parentFolderPath(p))
          Break
+      If (A_TickCount - pzs>5000)
+         Break
    }
 
    ; one of the parent folders of the source folder is the destination folder
+   pzs := A_TickCount
    If !destInSrc
    {
       destID := getFileIdentity(destPath)
@@ -61064,13 +61068,15 @@ structuredFoldersClash(srcDir, destDir) {
             Break
          }
       }
+      If (A_TickCount - pzs>5000)
+         Break
    }
 
-   ; the selected files the engine works on, by their path below the source folder
    relDir := Format("{:L}", relDir) "\"
    relLen := StrLen(relDir)
    n := 0
    srcFiles := new hashtable()
+   ; the selected files the engine works on, by their path below the source folder
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)
