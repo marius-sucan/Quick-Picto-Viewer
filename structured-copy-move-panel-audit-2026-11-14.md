@@ -19,6 +19,11 @@ read (`ab160cb`), and the twelve test batches of 2026-11-10 were run again on `b
 logs are the same, apart from time stamps, window handles and the current file of one
 database list. Four batches are new.
 
+**Status, 2026-11-14.** Finding 3 is fixed in `ed8848c`, by Marius. Findings 1 and 2 are fixed
+in `88aa9fc`, with his answers to decisions 1 and 2. A fixed section ends with a note on what
+the code does now; those notes cite lines at `88aa9fc`. Everything else keeps its lines at
+`b4f374f`.
+
 ## Terms
 
 - **Index**: QPV's files list, `resultedFilesList`.
@@ -48,27 +53,27 @@ database list. Four batches are new.
 
 ## Summary
 
-| # | Finding | Harm | Checked |
-|---|---------|------|---------|
-| 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run |
-| 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run |
-| 3 | An edited, unsaved image among the moved files loses its edits without a question | high, narrow | run |
-| 4 | Undo after a move that overwrote files never brings those files back | high | run |
-| 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run |
-| 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run |
-| 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run |
-| 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run |
-| 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run |
-| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run |
-| 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run |
-| 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run |
-| 13 | Missing files outside the Source are counted as failed, not as skipped | low | run |
-| 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run |
-| 15 | Small things: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read |
+| # | Finding | Harm | Checked | Status at `88aa9fc` |
+|---|---------|------|---------|---------------------|
+| 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
+| 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
+| 3 | An edited, unsaved image among the moved files loses its edits without a question | high, narrow | run | **fixed**, `ed8848c` |
+| 4 | Undo after a move that overwrote files never brings those files back | high | run | open |
+| 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run | open |
+| 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | open |
+| 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | open |
+| 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | open |
+| 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | open |
+| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | open |
+| 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | open |
+| 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | open |
+| 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | open |
+| 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | open |
+| 15 | Small things: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | open |
 
 Findings 10 and 11 are the ones a user meets in ordinary use. Findings 1 and 2 lose files
 (to the recycle bin), but only with «Overwrite» and an unusual pair of paths; finding 3 loses
-work for good, but needs an edited image among the moved files.
+work for good, but needs an edited image among the moved files. All three are fixed.
 
 ---
 
@@ -138,6 +143,31 @@ GetFileInformationByHandle). In the engine, before anything is recycled, skip a 
 destination is the same file as its source. Count a copy or a move as failed when the
 destination file is not there afterwards. Decision 1.
 
+**Fixed in `88aa9fc`** by decision 1: the two folders are compared by identity, and the engine
+checks each file.
+
+- «Proceed» asks `structuredFoldersClash()` (:60989, :61020) before the question that creates
+  the destination folder. It compares the Destination, then each of its parent folders, with
+  the Source by `getFileIdentity()` (:44149): the volume serial number and the file index,
+  which every spelling of a folder shares. When the Destination itself is the Source, the
+  message is «The source and destination folders cannot be the same» and the panel stays
+  open.
+- The engine skips a file whose destination is the file itself (:3299-3309): a spelling the
+  folder test cannot see, such as a link to one subfolder of the Source.
+- A copy or a move counts as failed when its destination is not there afterwards
+  (:3344-3346).
+
+Run, the cases above: `<work>\st\.\src` on a copy and on a move, `<work>\st\src\new\..`,
+the link to the Source folder and the database list with `Școală` are refused; every file
+stays where it was and the recycle bin stays empty. The spellings that lost nothing are
+refused too: an ending slash, a space after the last backslash, a doubled backslash. So are
+«Skip files» and «Auto-rename» with such a Destination, which no longer leave `imgA [1].png`
+copies in the Source folder. The test of each file, with `<QPV's folder>\linkout\new` a link
+to `<work>\st\src\new`: `imgA.png` is copied, `new\img01.png` is skipped («Finished copying 1
+out of 2 files … Skipped files: 1»), nothing is recycled.
+
+The third point was not run: no case is left where a source vanishes before its copy.
+
 ---
 
 ## 2. Destination inside the Source, or the reverse: one selected file replaces another
@@ -168,6 +198,33 @@ deeper. Run: Source `Photos`, Destination `Photos\Backup`: `Photos\Backup\b.png`
 Fix direction: refuse both cases in «Proceed» once the paths are resolved (finding 1), or
 leave out of the run the files that lie under the Destination. Decision 2.
 
+**Fixed in `88aa9fc`** by decision 2: one folder may lie inside the other, unless a selected
+file would be copied or moved onto another one. `structuredFoldersClash()` (:61020) finds the
+nesting by identity as well, so a link or a SUBST drive counts, and it runs before the
+destination folder is created.
+
+- **Destination inside the Source**: refused when a selected file is already inside the
+  Destination, «The destination folder lies inside the source folder and already holds 1 of
+  the selected files».
+- **Source inside the Destination**: refused when a file would land on another selected file,
+  «The source folder lies inside the destination folder, where 1 of the selected files would
+  land on other selected files».
+
+Run:
+
+- `st\a` → `st\a\sub`, and `Photos` → `Photos\Backup` with `b.png` already in it: refused with
+  the first message, nothing moved.
+- `st\a\sub` → `st\a`, with the deeper file first in the index and with the shallower one
+  first: refused with the second message.
+- Allowed and done: `Photos` → a new `Photos\Backup` (the three files copied into it);
+  `st\a` → `st\a\sub` when `sub` holds only files that are not selected; `Photos\Inbox` →
+  `Photos` (both files moved up); a new folder inside the Source, reached through a link.
+- Refused: the Destination `<QPV's folder>\linkdir\new`, where `linkdir` is a link to the
+  Source and `new` holds a selected file.
+
+The test does not look at the conflict setting: `Photos` → `Photos\Backup` is refused with
+«Skip files» too, where nothing would have been lost (run).
+
 ---
 
 ## 3. An edited, unsaved image among the moved files loses its edits
@@ -188,6 +245,15 @@ The regular Copy/Move panel's `batchCopyMoveFile()` (:61396) has no save questio
 
 Fix direction: before the loop, when the image being edited (`imgIndexEditing`) is selected
 and under the Source, call `askAboutFileSave()` and stop on «Cancel».
+
+**Fixed in `ed8848c`** (Marius): «Proceed» calls `askAboutFileSave()` before the panel closes
+(:61013 at `88aa9fc`). Run, the same move: «The currently modified image is about to be
+discarded and the files operations will be executed. Would you like to save the current
+image?»; «Cancel» moves nothing and the edits stay. The panel stays open (read).
+
+The question comes whenever an edited image is open: for a copy as well (run), and when the
+image is not among the selected files (read). A copy keeps the edits, so there the words
+«about to be discarded» do not hold.
 
 ---
 
@@ -661,9 +727,14 @@ question (finding 3), and both its engines recycle before they copy (finding 5) 
 
 ## Decisions to make before fixing
 
+Decisions 1 and 2 are settled; the others are open.
+
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
+   **Settled in `88aa9fc`**: file IDs, and a test of each file in the engine.
 2. Nested folders (finding 2): refuse them, or leave out the files under the Destination?
+   **Settled in `88aa9fc`**: allowed, unless a selected file is already inside the
+   Destination or would land on another selected file.
 3. «Overwrite» (finding 5): copy to a temporary name first, or keep the order and list the
    recycled files in the message?
 4. Destinations (finding 7): drive-letter paths only? Network paths supported or refused with
@@ -679,7 +750,7 @@ question (finding 3), and both its engines recycle before they copy (finding 5) 
 8. Finding 15: keep «On file name conflicts» across restarts? Add the Destination to the recent
    destinations? Start «Action to perform» on the last action?
 
-Suggested order: 1, 2, 4 and 5 together (the engine); then 3, 6 and 12; then 7, 8, 9 and 11
+Suggested order for what is left: 4 and 5 (the engine); then 6 and 12; then 7, 8, 9 and 11
 (the handler); then 10; then the rest.
 
 ## How this was checked
@@ -711,11 +782,18 @@ Suggested order: 1, 2, 4 and 5 together (the engine); then 3, 6 and 12; then 7, 
   that a junction, a short name and a SUBST drive behave as the Linux link did; that two
   spellings of a folder that differ in the case of «Ș» name one folder (finding 1); and the
   timings of finding 10.
+- The fixes, on 2026-11-14: batches A to H, F3, F5, F7, F8, I, K and L were run on `ed8848c`
+  and again on `88aa9fc`, and each log was compared with the one before it. They differ in
+  the cases of findings 1 and 2 alone, apart from the line numbers an error box quotes, a
+  window handle, and the current file of the reopened database list in batch H. Batch M was
+  added: the nestings that are allowed, a collision and a new folder through a link, and the
+  test of each file through a linked subfolder. Batch G, run on `ed8848c`, checks finding 3.
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
-  function>`, `run-k.sh <tag>` (makes the link batch K needs), `run-all-old.sh` (the twelve
-  old batches), `norm.sh` (compares logs), `test-wrappers-sc.ahk` (testScA to testScL),
-  `results/` (`<batch>-hd.txt` for the old batches on `b4f374f`, `i1`, `j1`, `k1`, `l1`),
+  function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
+  `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
+  `test-wrappers-sc.ahk` (testScA to testScM), `results/` (`<batch>-hd.txt` on `b4f374f`,
+  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`; `i1`, `j1`, `k1`, `l1` on `b4f374f`),
   `results-1110/` (the logs of 2026-11-10).
 
 ## Gemini's findings in this report
