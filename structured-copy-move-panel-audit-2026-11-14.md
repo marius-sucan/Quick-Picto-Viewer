@@ -24,7 +24,8 @@ in `88aa9fc`, with his answers to decisions 1 and 2. Finding 14 is fixed in `75e
 Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. Findings 4, 5
 and 6 are fixed in `3df8de3`, with his answers to decisions 3 and 7, in every tool that shares
 them; finding 6 is completed in `86c89e1`, and since `eda5812` the tools that move one file find the
-replaced entry by a scan. A fixed section ends with a note on what the code does now; those notes cite lines at
+replaced entry by a scan. Since `215b243` no batch tool asks for an «Undo» quick-action bar (finding 4).
+A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, and at `3df8de3` for findings 4-6.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
@@ -326,13 +327,17 @@ Under Wine, `restoreFileFromRecycleBin()` cannot take a file back out of the rec
 puts in its place a function that moves the file back out of Wine's trash, matched by path and
 size. That the Windows recycle bin finds the file by its size was not run.
 
-The quick-action bar of the first point is asked for after this tool's run (:3420), the way the
-regular panel's batch asks for it, and so it does not appear either. Every batch tool (this panel,
-the regular panel's batch, pasting, the batch delete, the multi-rename) asks for its bar while
-the long operation is still flagged: `runningLongOperation` is cleared by `ResetImgLoadStatus()`
+The quick-action bar of the first point was asked for after this tool's run, the way the regular
+panel's batch asked for it, and so it did not appear either. Every batch tool (this panel, the
+regular panel's batch, pasting, the batch delete, the multi-rename) asked for its bar while the
+long operation was still flagged: `runningLongOperation` is cleared by `ResetImgLoadStatus()`
 50 ms later, and `CreateTempGuiButton()` builds no bar before that (run, in touch mode, for this
 panel and for `batchCopyMoveFile()`). Asked for from a 150 ms one-shot timer, the bar appears
-(run). Marius chose to keep the call as the regular panel has it.
+(run).
+
+**Removed in `215b243`**, at Marius's request: none of these five tools asks for the bar now. In the
+thumbnails list, Ctrl+Shift+Z (`doUndoFileActsChronos()`, also in the menus) opens the undo panel
+with «Undo last action(s)» chosen. The one-file delete, rename and move keep their bar.
 
 ---
 
@@ -844,8 +849,8 @@ question (finding 3), and both its engines recycled before they copied (finding 
 in `3df8de3`).
 
 **C. No batch tool shows its «Undo» quick-action bar**: the regular panel's batch, pasting, the
-batch delete and the multi-rename ask for it while the long operation is still flagged (run for
-`batchCopyMoveFile()`, read for the others; see finding 4).
+batch delete and the multi-rename asked for it while the long operation was still flagged (run for
+`batchCopyMoveFile()`, read for the others). The calls are removed in `215b243` (see finding 4).
 
 **D. Pasting files** reports «Finished moving 2 out of 1 files»: it counts the line breaks of
 the clipboard text, one fewer than its files (run, batch N).

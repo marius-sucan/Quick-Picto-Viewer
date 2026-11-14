@@ -108,8 +108,8 @@ view, «Show only problems», the rows label, F9–F12 in the tooltips and the u
   is the simpler alternative.
 - A "Rows 1–9 100 of 25 000" label by the paging buttons, and F9–F12 in their tooltips; nothing in the panel
   mentions those keys (`UIlvMultiRenameResponder()`, :40864).
-- Rename «Solo rename» to «Rename highlighted file only…». Add a note that a batch rename can be undone: the
-  quick-action bar offers «Undo rename» afterwards (:41226).
+- Rename «Solo rename» to «Rename highlighted file only…». Add a note that a batch rename can be undone: in the
+  thumbnails list, Ctrl+Shift+Z (`doUndoFileActsChronos()`) offers to undo it afterwards.
 
 ## 4. Changes to the renaming code that a friendlier UI would bring up
 
