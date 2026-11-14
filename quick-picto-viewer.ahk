@@ -60919,12 +60919,8 @@ BTNuiProceedStructuredOperation() {
    dS := StrReplace(dS, "/", "\")
    fS := Trimmer(fS)
    dS := Trimmer(dS)
-
    If !FolderExist(fS)
-   {
-
-      Return msgBeepTimer("ERROR: Please choose an existing source folder.")
-   }
+      Return msgBeepTimer("ERROR: Please choose an existing source folder")
 
    If !FolderExist(dS)
    {
@@ -60941,11 +60937,14 @@ BTNuiProceedStructuredOperation() {
             }
          } Else Return
       } Else
-         Return msgBeepTimer("ERROR: Please choose an existing destination folder.")
+         Return msgBeepTimer("ERROR: Please choose an existing destination folder")
    }
 
    If (dS=fS)
-      Return msgBeepTimer("ERROR: The source and destination folders cannot be the same.")
+      Return msgBeepTimer("ERROR: The source and destination folders cannot be the same")
+
+   If askAboutFileSave(" and the files operations will be executed")
+      Return
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS)
