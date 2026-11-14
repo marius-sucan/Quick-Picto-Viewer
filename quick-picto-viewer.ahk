@@ -61009,7 +61009,7 @@ BTNuiProceedStructuredOperation() {
       If (msgResult!="Yes")
          Return 0
    } Else If !filesElected 
-      msgBeepTimer("WARNING: Insufficient files selected for the operations")
+      Return msgBeepTimer("WARNING: Insufficient files selected for the operations")
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS, filesElected)
