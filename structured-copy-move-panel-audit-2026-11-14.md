@@ -21,11 +21,12 @@ database list. Four batches are new.
 
 **Status, 2026-11-14.** Finding 3 is fixed in `ed8848c`, by Marius. Findings 1 and 2 are fixed
 in `88aa9fc`, with his answers to decisions 1 and 2. Finding 14 is fixed in `75e890d`, by
-Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. A fixed
-section ends with a note on what the code does now; those notes cite lines at `88aa9fc` for
-findings 1-3 and at `5410eed` for findings 11 and 14. Since `75e890d` the folder test of findings
-1 and 2 runs after the panel has closed (finding 11). Everything else keeps its lines at
-`b4f374f`.
+Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. Findings 4, 5
+and 6 are fixed in `3df8de3`, with his answers to decisions 3 and 7, in every tool that shares
+them. A fixed section ends with a note on what the code does now; those notes cite lines at
+`88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, and at `3df8de3` for findings 4-6.
+Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
+Everything else keeps its lines at `b4f374f`.
 
 ## Terms
 
@@ -56,14 +57,14 @@ findings 1-3 and at `5410eed` for findings 11 and 14. Since `75e890d` the folder
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `5410eed` |
+| # | Finding | Harm | Checked | Status at `3df8de3` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 3 | An edited, unsaved image among the moved files loses its edits without a question | high, narrow | run | **fixed**, `ed8848c` |
-| 4 | Undo after a move that overwrote files never brings those files back | high | run | open |
-| 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run | open |
-| 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | open |
+| 4 | Undo after a move that overwrote files never brings those files back | high | run | **fixed**, `3df8de3` |
+| 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run | **fixed**, `3df8de3` |
+| 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | **fixed**, `3df8de3` |
 | 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | open |
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | open |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | open |
@@ -297,6 +298,41 @@ Fix direction: bracket the condition:
 `friendlyFileUndoInfos()` already reads the size from the fourth field of any record
 (:95250). Decision 7.
 
+**Fixed in `3df8de3`** by decision 7, for every tool: the record of a move or a rename keeps the size
+and dates of the file it replaced, as the record of a copy did (:95561 at `3df8de3`).
+
+- The batch undo asks the recycle bin for that file with its size, and brings it back.
+- The one-file undo asks with the size too, and its message now says whether the file came back:
+  it added an unset variable where that text belonged (:95143).
+- Undoing a move or a rename creates the folder the file came from when that folder was deleted
+  in the meantime (:95111, :95337).
+
+Run, on `3df8de3`:
+
+- Batch C, a move with «Overwrite», then the batch undo: the recycle bin is asked for each
+  replaced file with its size, 861 bytes, and «Failed to recover 2 overwritten files» is gone.
+  The one-file undo: the same question, and the message ends «The original file was restored
+  succesfully.».
+- Batches N and O: after a move or a rename with «Overwrite» (this panel, the regular panel's
+  batch and one-file moves, the multi-rename, the single rename), the undo puts each replaced
+  file back in its place and the recycle bin is empty. At `02046f3` the same undos leave it in
+  the recycle bin.
+- The undo after the emptied Source subfolder was deleted (batch C; batch O, with the batch and
+  the one-file undo): the files are back in a new `st\src\new`. At `02046f3`: «Failed to perform
+  UNDO for 2 files».
+
+Under Wine, `restoreFileFromRecycleBin()` cannot take a file back out of the recycle bin. The kit
+puts in its place a function that moves the file back out of Wine's trash, matched by path and
+size. That the Windows recycle bin finds the file by its size was not run.
+
+The quick-action bar of the first point is asked for after this tool's run (:3420), the way the
+regular panel's batch asks for it, and so it does not appear either. Every batch tool (this panel,
+the regular panel's batch, pasting, the batch delete, the multi-rename) asks for its bar while
+the long operation is still flagged: `runningLongOperation` is cleared by `ResetImgLoadStatus()`
+50 ms later, and `CreateTempGuiButton()` builds no bar before that (run, in touch mode, for this
+panel and for `batchCopyMoveFile()`). Asked for from a 150 ms one-shot timer, the bar appears
+(run). Marius chose to keep the call as the regular panel has it.
+
 ---
 
 ## 5. A file that cannot be copied or moved: «Overwrite» recycles the file at the destination anyway
@@ -320,6 +356,43 @@ Fix direction: copy or move to a temporary name in the destination folder, then 
 old file and rename the new one; or make sure the source can be read and deleted before
 anything is recycled. Decision 3.
 
+**Fixed in `3df8de3`** by decision 3, in every tool that recycled first: this panel, the regular
+Copy/Move panel (several files and one file), pasting files, the multi-rename, the single rename
+and both undos. They hand the replacement to `replaceFileByCopyMove()` (:32746), which:
+
+1. copies or moves the source next to the old file, as `<name>-tmp`;
+2. only then recycles the old file, under its own name, where undo looks for it;
+3. gives the new file the name, trying again for half a second, as a virus scanner may hold a
+   new file for a moment.
+
+When a step fails, the old file stays, or comes back from the recycle bin; after a move the
+source goes back where it was; no temporary file is left; the file counts as failed. The
+one-file undo deleted the file in its way with `FileDelete`; it now recycles it. A recycle that
+failed was not looked at, and `FileCopy` or `FileMove` with their overwrite flag could then
+replace the old file without the recycle bin; now both files stay and the file counts as failed.
+
+Run, on `3df8de3`:
+
+- The source held open (batch I, I3): `out\imgA.png` (861 bytes) stays, only `imgB.png` goes to
+  the recycle bin, «Finished copying 1 out of 2 files … Failed to perform action on 1 files»; the
+  same on a move, and the source stays where it was.
+- The destination held open with no sharing (batch N): the copy and the move leave
+  `out\imgA.png` and the source as they were, with no `-tmp` file; `imgB.png` is replaced. Wine
+  asks «Confirm file deletion» inside `FileRecycle` for a file it cannot recycle; the test
+  answers «No».
+- The recycle refused, and the last rename refused, both simulated in the test's copy of the
+  script (batch N): the old files stay or come back, the sources stay, no `-tmp` file, «Failed to
+  perform action on 2 files».
+- The undo of a move whose old place now holds another file, with «Overwrite» (batch O): that
+  file goes to the recycle bin, in the batch undo and in the one-file undo. At `02046f3` the
+  one-file undo deleted it.
+- The copy and rename kit of 2026-11-08 (`batchCopyMoveFile()` and the multi-rename with
+  «Overwrite», with files there from before the batch): the same files and the same recycle bin
+  as at `02046f3`.
+
+Where paths are limited to 260 characters, a destination within four characters of the limit
+now fails where it was replaced: the temporary name is four characters longer (read).
+
 ---
 
 ## 6. A database list: a move that overwrites a listed file leaves a row for a file that is gone
@@ -342,6 +415,44 @@ A plain list gets the duplicate entry as well (read).
 
 Fix direction: when the destination is in the list, drop its entry and its row before the
 moved entry takes the path; report a failed update.
+
+**Fixed in `3df8de3`**, in every tool that moves or renames an index entry: this panel, the regular
+Copy/Move panel (several files and one file), the multi-rename, the single rename and both undos.
+
+- **The database row:** when the database refuses the update, `moveSQLdbEntry()` (:34360)
+  deletes the row that holds the new path, with its pixels row, and updates again. Any row at
+  that path goes, also the row of a file deleted earlier, which kept the moved file's row on its
+  old path as well. A row that still fails is journaled, and the batch tools count it: «Failed to
+  update the database entries of N files».
+- **The index entry:** when a move replaced a file, or a row was in the way,
+  `markReplacedListEntry()` (:33778) gives the other entry with the new path the mark «Delete»
+  leaves (`||` before the path), also in the list behind a filter. It looks the path up in a map
+  of the list, made the first time a run needs it.
+- **Undo:** when an undo brings the replaced file back, its entry loses the mark, and a database
+  list gives the file a new row, whose cached image data starts empty (Marius's choice).
+- A selected entry with the mark counts as skipped in this panel and in the regular panel's
+  batch, where it counted as failed (his choice).
+
+Run, on `3df8de3`:
+
+- Batch H again: the database rows are 1 `st\b\img.png` (361 bytes), 2 `st\b\x.png` and 4
+  `st\b\y.png`; row 3 is gone; the index holds `||…\st\b\img.png` for the replaced file.
+- Batch N, a plain list and a database list, then the batch undo: the replaced entry is marked;
+  after the undo `st\b\img.png` (861 bytes) is back on the disk and in the index, and the
+  database has a new row 5 for it.
+- Batch P, a list filtered to `st\a` («filter to this folder»): the replaced file, filtered out,
+  is marked in the list behind the filter. At `02046f3` the list showed `st\b\img.png` twice once
+  the filter was removed. A marked entry leaves the list when the filter is removed, as the
+  entries of deleted files do.
+- The same mark after the regular panel's batch and one-file moves, the multi-rename and the
+  single rename (batches N and O); the undos that bring the files back take it off.
+- A selected entry with the mark: «Finished copying 2 out of 3 files … Skipped files: 1» in this
+  panel and in the regular panel's batch. At `02046f3`: «Failed to perform action on 1 files».
+
+Not covered: in a plain list, the entry of a file already missing from the disk at the new path
+is not looked for; nothing signals it, and a lookup on every move would cost a pass over the
+list (read). The format converter and «Modify index entry» write a new path into the database
+the same way, and were not changed (read).
 
 ---
 
@@ -699,10 +810,18 @@ creation (run). After «Yes» it would be made in QPV's folder, as `relout` is (
 ## Seen in passing
 
 **A. The regular Copy/Move panel** shares two findings: `batchCopyMoveFile()` has no save
-question (finding 3), and both its engines recycle before they copy (finding 5) (read). Its
-«&Proceed» and «Hel&p» buttons share Alt+P (:60209, :60211) (read).
+question (finding 3), and both its engines recycled before they copied (finding 5, fixed in
+`3df8de3`) (read). Its «&Proceed» and «Hel&p» buttons share Alt+P (:60209, :60211) (read).
 
-**B. `recordUndoFileActs()`** drops the size for every move and rename tool (finding 4).
+**B. `recordUndoFileActs()`** dropped the size for every move and rename tool (finding 4, fixed
+in `3df8de3`).
+
+**C. No batch tool shows its «Undo» quick-action bar**: the regular panel's batch, pasting, the
+batch delete and the multi-rename ask for it while the long operation is still flagged (run for
+`batchCopyMoveFile()`, read for the others; see finding 4).
+
+**D. Pasting files** reports «Finished moving 2 out of 1 files»: it counts the line breaks of
+the clipboard text, one fewer than its files (run, batch N).
 
 ## Checked and found correct
 
@@ -766,7 +885,7 @@ question (finding 3), and both its engines recycle before they copy (finding 5) 
 
 ## Decisions to make before fixing
 
-Decisions 1, 2 and 6 are settled; the others are open.
+Decisions 1, 2, 3, 6 and 7 are settled; the others are open.
 
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
@@ -776,6 +895,7 @@ Decisions 1, 2 and 6 are settled; the others are open.
    Destination or would land on another selected file.
 3. «Overwrite» (finding 5): copy to a temporary name first, or keep the order and list the
    recycled files in the message?
+   **Settled in `3df8de3`**: a temporary name first, in every tool that recycled first.
 4. Destinations (finding 7): drive-letter paths only? Network paths supported or refused with
    a message? Should the Destination start from the regular panel's text, from
    `prevFileMovePath`, or from this panel's last folder?
@@ -787,11 +907,12 @@ Decisions 1, 2 and 6 are settled; the others are open.
    **Settled in `cc45e03` and `5410eed`**: «Proceed» says why, and the panel stays open.
 7. The undo record (finding 4) changes the records of every move and rename tool. Change it
    for all of them?
+   **Settled in `3df8de3`**: yes, for all of them.
 8. Finding 15: keep «On file name conflicts» across restarts? Add the Destination to the recent
    destinations? Start «Action to perform» on the last action?
 
-Suggested order for what is left: 4 and 5 (the engine); then 12; then 7, 8, 9 and 11
-(the handler); then 10; then the rest.
+Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the handler); then
+10; then the rest.
 
 ## How this was checked
 
@@ -828,13 +949,28 @@ Suggested order for what is left: 4 and 5 (the engine); then 12; then 7, 8, 9 an
   window handle, and the current file of the reopened database list in batch H. Batch M was
   added: the nestings that are allowed, a collision and a new folder through a link, and the
   test of each file through a linked subfolder. Batch G, run on `ed8848c`, checks finding 3.
+- The fix of findings 4-6, on 2026-11-14: batches A to H, F3, F5, F7, F8, I, K, L and M were run
+  at `02046f3` and on `3df8de3`. Their logs differ only where findings 4-6 change them (undo records
+  that hold the replaced file's size or `|0`, the undos of batch C, I3, batch H), apart from the
+  line numbers an error box quotes and the current file of the reopened database list in batch
+  H. Three new batches, run at `02046f3` and on `3df8de3`: N (plain and database lists, the
+  destination held open, the refused recycle and rename, the regular panel's two engines, a
+  marked entry, pasting), O (the multi-rename, the single rename, undos onto a listed file, a
+  deleted Source subfolder) and P (a filtered list). Batch Q (the quick-action bar) ran on
+  `3df8de3` and on a copy that asks for the bar from a timer. The copy and rename kit of
+  2026-11-08 gives the same files and the same recycle bin on `3df8de3` as at `02046f3`.
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScM), `results/` (`<batch>-hd.txt` on `b4f374f`,
-  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`; `i1`, `j1`, `k1`, `l1` on `b4f374f`),
-  `results-1110/` (the logs of 2026-11-10).
+  `test-wrappers-sc.ahk` (testScA to testScQ), `results/` (`<batch>-hd.txt` on `b4f374f`,
+  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`; `i1`, `j1`,
+  `k1`, `l1` on `b4f374f`), `results-1110/` (the logs of 2026-11-10). For batches N to Q:
+  `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
+  `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
+  `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
+  native timer (`scArmBoxAnswer()`), as it waits in a Critical loop. `../fix46/apply.py` made
+  `3df8de3` from `02046f3`.
 
 ## Gemini's findings in this report
 
