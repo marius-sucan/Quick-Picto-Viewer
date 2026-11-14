@@ -32210,7 +32210,7 @@ PasteFilesIntoGivenFolder(folderPath) {
    }
 
    isExplorerModeA := IsClipboardFormatAvailable(15)
-   foundFiles := ST_Count(listu, ":\")
+   foundFiles := ST_Count(Trim(listu, "`r`n"), "`n") + 1
    finalDest := folderPath
    filezMoved := countTFilez := 0
    doStartLongOpDance()
