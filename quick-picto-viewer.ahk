@@ -33774,39 +33774,56 @@ updateMainUnfilteredList(indexu, indexProperty, value) {
    }
 }
 
-markReplacedListEntry(filePath, keepIndex, ByRef pathsMap, restore:=0, replaced:=1) {
+markReplacedListEntry(filePath, keepIndex, ByRef pathsMap:="", restore:=0, replaced:=1) {
 ; keepIndex, an entry moved or renamed onto filePath, takes that path next. When the move replaced a
 ; file [replaced=1], the other entry with that path gets the mark of a deleted file, in the files list
 ; or in the list behind its filter. restore=1 takes the mark off again once undo has brought the file
 ; back, and a database list gives the file a new row. pathsMap is the caller's map of lowered paths to
-; entries, made on first use and kept current by these calls. Returns the entry changed
-   If (!replaced && !IsObject(pathsMap))
+; entries, made on first use and kept current by these calls. The tools that move one file pass none:
+; a scan of the lists costs them less than making the map. Returns the entry changed
+   scanu := !IsByRef(pathsMap)
+   If (!replaced && (scanu || !IsObject(pathsMap)))
       Return
 
-   If !IsObject(pathsMap)
+   If (!scanu && IsObject(pathsMap))
+      countLists := pathsMap.Length()
+   Else
    {
-      pathsMap := [mapListPaths(resultedFilesList, maxFilesIndex)]
-      If (StrLen(filesFilter)>1 && !(SLDtypeLoaded=3 && hasHamDistCached!=1 && InStr(filesFilter, "SQL:query:")))
-         pathsMap[2] := mapListPaths(bckpResultedFilesList, bckpMaxFilesIndex)
+      countLists := (StrLen(filesFilter)>1 && !(SLDtypeLoaded=3 && hasHamDistCached!=1 && InStr(filesFilter, "SQL:query:"))) ? 2 : 1
+      If !scanu
+      {
+         pathsMap := [mapListPaths(resultedFilesList, maxFilesIndex)]
+         If (countLists=2)
+            pathsMap[2] := mapListPaths(bckpResultedFilesList, bckpMaxFilesIndex)
+      }
    }
 
    keyu := Format("{:L}", filePath)
    findu := (restore ? "||" : "") keyu
    changed := ""
-   For whichList, thisMap in pathsMap
+   Loop, % countLists
    {
+      whichList := A_Index
       listu := (whichList=1) ? resultedFilesList : bckpResultedFilesList
       keepu := (whichList=1) ? keepIndex : filteredMap2mainList[keepIndex]
-      idx := (replaced && !changed) ? thisMap[findu] : ""
-      If keepu
-         thisMap[keyu] := keepu
+      If scanu
+      {
+         idx := changed ? "" : scanListPath(listu, (whichList=1) ? maxFilesIndex : bckpMaxFilesIndex, findu)
+      } Else
+      {
+         thisMap := pathsMap[whichList]
+         idx := (replaced && !changed) ? thisMap[findu] : ""
+         If keepu
+            thisMap[keyu] := keepu
+      }
 
       If (!idx || idx=keepu || !(Format("{:L}", listu[idx, 1])==findu))
          Continue
 
       newPath := restore ? SubStr(listu[idx, 1], 3) : "||" listu[idx, 1]
       listu[idx, 1] := newPath
-      thisMap[Format("{:L}", newPath)] := idx
+      If !scanu
+         thisMap[Format("{:L}", newPath)] := idx
       If (whichList=1)
          updateMainUnfilteredList(idx, 1, newPath)
       Else
@@ -33841,6 +33858,16 @@ mapListPaths(listu, total) {
          thisMap[Format("{:L}", p)] := A_Index
    }
    Return thisMap
+}
+
+scanListPath(listu, total, findu) {
+; the entry mapListPaths() would give findu: the last one with that lowered path
+   Loop, % total
+   {
+      idx := total - A_Index + 1
+      If (Format("{:L}", listu[idx, 1])==findu)
+         Return idx
+   }
 }
 
 singleInListEntriesRemover() {
@@ -47942,7 +47969,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         Else
            currentFilesListModified := 1
 
-        markReplacedListEntry(file2save, currentFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
+        markReplacedListEntry(file2save, currentFileIndex,, 0, mustReplace=1 || rowFreed=2)
 
         resultedFilesList[currentFileIndex, 1] := file2save
         updateMainUnfilteredList(currentFileIndex, 1, file2save)
@@ -61689,7 +61716,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
           Else
              currentFilesListModified := 1
 
-          markReplacedListEntry(file2save, currentFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
+          markReplacedListEntry(file2save, currentFileIndex,, 0, mustReplace=1 || rowFreed=2)
 
           resultedFilesList[currentFileIndex, 1] := file2save
           updateMainUnfilteredList(currentFileIndex, 1, file2save)
@@ -95153,7 +95180,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
                rowFreed := 0
                If (SLDtypeLoaded=3)
                   rowFreed := moveSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
-               markReplacedListEntry(otherFile, indexu, listPathsMap, 0, mustReplace=1 || rowFreed=2)
+               markReplacedListEntry(otherFile, indexu,, 0, mustReplace=1 || rowFreed=2)
 
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
@@ -95164,7 +95191,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
 
             ; the entry of the file the move had replaced, now back from the recycle bin
             If (rsz=1)
-               markReplacedListEntry(imgPath, 0, listPathsMap, 1)
+               markReplacedListEntry(imgPath, 0,, 1)
          } Else
          {
             zPlitPath(imgPath, 1, OutFileName, OutDir, extname)
