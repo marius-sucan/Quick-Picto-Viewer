@@ -23,7 +23,7 @@ database list. Four batches are new.
 in `88aa9fc`, with his answers to decisions 1 and 2. Finding 14 is fixed in `75e890d`, by
 Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. Findings 4, 5
 and 6 are fixed in `3df8de3`, with his answers to decisions 3 and 7, in every tool that shares
-them. A fixed section ends with a note on what the code does now; those notes cite lines at
+them; finding 6 is completed in `86c89e1`. A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, and at `3df8de3` for findings 4-6.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
@@ -64,7 +64,7 @@ Everything else keeps its lines at `b4f374f`.
 | 3 | An edited, unsaved image among the moved files loses its edits without a question | high, narrow | run | **fixed**, `ed8848c` |
 | 4 | Undo after a move that overwrote files never brings those files back | high | run | **fixed**, `3df8de3` |
 | 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run | **fixed**, `3df8de3` |
-| 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | **fixed**, `3df8de3` |
+| 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | **fixed**, `3df8de3`, `86c89e1` |
 | 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | open |
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | open |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | open |
@@ -427,7 +427,8 @@ Copy/Move panel (several files and one file), the multi-rename, the single renam
 - **The index entry:** when a move replaced a file, or a row was in the way,
   `markReplacedListEntry()` (:33778) gives the other entry with the new path the mark «Delete»
   leaves (`||` before the path), also in the list behind a filter. It looks the path up in a map
-  of the list, made the first time a run needs it.
+  of the list, made the first time a run needs it and given every new path the run gives an
+  entry (since `86c89e1`).
 - **Undo:** when an undo brings the replaced file back, its entry loses the mark, and a database
   list gives the file a new row, whose cached image data starts empty (Marius's choice).
 - A selected entry with the mark counts as skipped in this panel and in the regular panel's
@@ -448,6 +449,15 @@ Run, on `3df8de3`:
   single rename (batches N and O); the undos that bring the files back take it off.
 - A selected entry with the mark: «Finished copying 2 out of 3 files … Skipped files: 1» in this
   panel and in the regular panel's batch. At `02046f3`: «Failed to perform action on 1 files».
+- Batch R, database lists: the regular panel's one-file and batch moves, the single rename and
+  the multi-rename delete the row of the replaced file and move the other; their undos give the
+  file a new row. A row of a file deleted earlier, at the path a move takes without a conflict,
+  is deleted the same way. Making the map of a list of 100 000 entries takes 0.7 s under Wine.
+
+**Completed in `86c89e1`**: at `3df8de3` the map learnt only the entries of replaced files. When a
+batch overwrote its own earlier output («Ask user», then «Overwrite» in the box), the second of
+three entries of one name stayed live beside the third (run, batch R: the regular panel's batch
+and the multi-rename). Every moved or renamed entry now gives the map its new path.
 
 Not covered: in a plain list, the entry of a file already missing from the disk at the new path
 is not looked for; nothing signals it, and a lookup on every move would cost a pass over the
@@ -949,7 +959,9 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   window handle, and the current file of the reopened database list in batch H. Batch M was
   added: the nestings that are allowed, a collision and a new folder through a link, and the
   test of each file through a linked subfolder. Batch G, run on `ed8848c`, checks finding 3.
-- The fix of findings 4-6, on 2026-11-14: batches A to H, F3, F5, F7, F8, I, K, L and M were run
+- The fix of findings 4-6, on 2026-11-14 (`86c89e1` completes it: batch R, then N, O, P, H and C
+  again, as on `3df8de3` but for the marks of batch R and the current file of batch H): batches A
+  to H, F3, F5, F7, F8, I, K, L and M were run
   at `02046f3` and on `3df8de3`. Their logs differ only where findings 4-6 change them (undo records
   that hold the replaced file's size or `|0`, the undos of batch C, I3, batch H), apart from the
   line numbers an error box quotes and the current file of the reopened database list in batch
@@ -963,9 +975,9 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScQ), `results/` (`<batch>-hd.txt` on `b4f374f`,
-  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`), `results-1110/` (the logs of 2026-11-10). For batches N to Q:
+  `test-wrappers-sc.ahk` (testScA to testScR), `results/` (`<batch>-hd.txt` on `b4f374f`,
+  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`; `i1`, `j1`,
+  `k1`, `l1` on `b4f374f`), `results-1110/` (the logs of 2026-11-10). For batches N to R:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
