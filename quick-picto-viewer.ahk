@@ -3297,7 +3297,16 @@ copyMoveStructuredFolders(srcDir, finalDest) {
       ; Tooltip, % file2rem "`n" file2save "`n" OutDir
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
       If (FileExist(file2save) && !FolderExist(file2save))
+      {
+         ; the file itself, reached through another spelling of the source folder or a link
+         fileID := getFileIdentity(file2rem)
+         If (fileID!="" && fileID=getFileIdentity(file2save))
+         {
+            skippedFiles++
+            Continue
+         }
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, forceConflictOption, performOverwrite)
+      }
 
       If !file2save
       {
@@ -3332,7 +3341,8 @@ copyMoveStructuredFolders(srcDir, finalDest) {
             FileMove, %file2rem%, %file2save%, 1
          Else
             FileCopy, %file2rem%, %file2save%, 1
-         If ErrorLevel
+         ; FileMove and FileCopy leave ErrorLevel at 0 when their source no longer exists
+         If (ErrorLevel || !FileExist(file2save))
             wasError := 1
       }
 
@@ -44114,6 +44124,60 @@ FolderExist(filePath) {
    Return InStr(FileExist(filePath), "D")
 }
 
+resolveFullPath(givenPath) {
+; the absolute path as Windows reads it: . and .. resolved, / and repeated backslashes as one backslash
+   If (StrLen(givenPath)=2 && SubStr(givenPath, 2, 1)=":")
+      givenPath .= "\"
+
+   VarSetCapacity(buf, 65536, 0)
+   If !DllCall("GetFullPathNameW", "WStr", givenPath, "UInt", 32767, "UPtr", &buf, "UPtr", 0)
+      Return
+
+   Return StrGet(&buf, "UTF-16")
+}
+
+parentFolderPath(folderPath) {
+; the folder that holds the given one, or nothing for the root of a drive or of a network share
+   k := InStr(RTrim(folderPath, "\"), "\", 0, -1)
+   If (k<3)
+      Return
+
+   p := SubStr(folderPath, 1, k - 1)
+   Return (StrLen(p)=2 && SubStr(p, 2, 1)=":") ? p "\" : p
+}
+
+getFileIdentity(filePath) {
+; volume serial number and file index, the same for every spelling of a file or folder [links, junctions,
+; SUBST drives, short names, letter case]; empty when it cannot be opened
+   fullPath := resolveFullPath(filePath)
+   If (fullPath="")
+      Return
+
+   zPath := PathToExtendedPath(fullPath)
+   If !zPath
+      zPath := fullPath
+
+   h := DllCall("CreateFileW", "WStr", zPath
+              , "UInt", 0x80                ; FILE_READ_ATTRIBUTES
+              , "UInt", 0x7                 ; FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
+              , "UPtr", 0
+              , "UInt", 3                   ; OPEN_EXISTING
+              , "UInt", 0x02000000          ; FILE_FLAG_BACKUP_SEMANTICS, so that folders open too
+              , "UPtr", 0, "UPtr")
+   ; -1 on a 64 bit build, 0xFFFFFFFF on a 32 bit one; see GetFilesList()
+   If (!h || h=-1 || h=0xFFFFFFFF)
+      Return
+
+   VarSetCapacity(info, 52, 0)              ; BY_HANDLE_FILE_INFORMATION
+   r := DllCall("GetFileInformationByHandle", "UPtr", h, "UPtr", &info)
+   DllCall("CloseHandle", "UPtr", h)
+   If !r
+      Return
+
+   ; dwVolumeSerialNumber, nFileIndexHigh, nFileIndexLow
+   Return NumGet(info, 28, "UInt") "-" NumGet(info, 44, "UInt") "-" NumGet(info, 48, "UInt")
+}
+
 PanelExtractFrames() {
     If (thumbsDisplaying!=1)
     {
@@ -60922,6 +60986,9 @@ BTNuiProceedStructuredOperation() {
    If !FolderExist(fS)
       Return msgBeepTimer("ERROR: Please choose an existing source folder")
 
+   If (errMsg := structuredFoldersClash(fS, dS))
+      Return msgBeepTimer(errMsg)
+
    If !FolderExist(dS)
    {
       If (StrLen(dS)>4)
@@ -60948,6 +61015,91 @@ BTNuiProceedStructuredOperation() {
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS)
+}
+
+structuredFoldersClash(srcDir, destDir) {
+; why the two folders cannot be used together, or nothing; compared by identity, so any spelling counts.
+; Nested folders are allowed unless a selected file would be copied or moved onto another one
+   srcID := getFileIdentity(srcDir)
+   destPath := resolveFullPath(destDir)
+   If (srcID="" || destPath="")
+      Return
+
+   ; the destination folder, or one of its parent folders, is the source folder
+   destInSrc := 0
+   p := destPath
+   Loop
+   {
+      If (getFileIdentity(p)=srcID)
+      {
+         If (p=destPath)
+            Return "ERROR: The source and destination folders cannot be the same"
+
+         destInSrc := 1
+         relDir := Trim(SubStr(destPath, StrLen(p) + 1), "\")
+         Break
+      }
+
+      If !(p := parentFolderPath(p))
+         Break
+   }
+
+   ; one of the parent folders of the source folder is the destination folder
+   If !destInSrc
+   {
+      destID := getFileIdentity(destPath)
+      p := resolveFullPath(srcDir)
+      If (destID="" || p="")
+         Return
+
+      srcPath := p
+      Loop
+      {
+         If !(p := parentFolderPath(p))
+            Return
+
+         If (getFileIdentity(p)=destID)
+         {
+            relDir := Trim(SubStr(srcPath, StrLen(p) + 1), "\")
+            Break
+         }
+      }
+   }
+
+   ; the selected files the engine works on, by their path below the source folder
+   relDir := Format("{:L}", relDir) "\"
+   relLen := StrLen(relDir)
+   n := 0
+   srcFiles := new hashtable()
+   Loop, % maxFilesIndex
+   {
+      If (resultedFilesList[A_Index, 2]!=1)
+         Continue
+
+      imgPath := resultedFilesList[A_Index, 1]
+      If !(k := InStr(imgPath, srcDir "\"))
+         Continue
+
+      relPath := Format("{:L}", SubStr(imgPath, k + StrLen(srcDir) + 1))
+      If destInSrc
+         n += (SubStr(relPath, 1, relLen)=relDir) ? 1 : 0
+      Else
+         srcFiles[relPath] := 1
+   }
+
+   If destInSrc
+      Return n ? "ERROR: The destination folder lies inside the source folder and already holds " groupDigits(n) " of the selected files" : ""
+
+   ; a path below the source folder that starts with relDir lands on the selected file with the rest of it
+   For relPath in srcFiles
+   {
+      landPath := SubStr(relPath, relLen + 1)
+      If (SubStr(relPath, 1, relLen)=relDir && srcFiles.hasKey(landPath))
+         n++
+   }
+
+   srcFiles := ""
+   Return n ? "ERROR: The source folder lies inside the destination folder, where " groupDigits(n) " of the selected files would land on other selected files" : ""
 }
 
 BTNlvRecentFileDesties(a, b, c) {
