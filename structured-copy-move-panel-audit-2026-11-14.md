@@ -467,7 +467,10 @@ single lookup, making the map costs more. On 100 000 entries under Wine the scan
 0.1 s and the map 0.7 s. The scan and a map made for each call gave the same entries on
 12 000 random lists (filters, marked entries, É and é, restores, database rows). Batch S (a
 filtered list, names in another case, ASCII and É/é, the single rename, a filtered database
-list) and batches R, N, O, C, M, P and H give the same logs before and after.
+list) and batches R, N, O, C, M, P and H give the same logs before and after. One difference,
+which only the harness reaches: a one-file undo run on an entry that already carries the mark,
+when the undo itself overwrites a file, could leave a second entry with the same mark marked
+although its file came back; the scan takes that mark off.
 
 Not covered: in a plain list, the entry of a file already missing from the disk at the new path
 is not looked for; nothing signals it, and a lookup on every move would cost a pass over the
@@ -987,9 +990,12 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   2026-11-08 gives the same files and the same recycle bin on `3df8de3` as at `02046f3`.
 - The scan of the one-file tools (`eda5812`): batch S was added; batches S, R, N, O, C, M, P and H
   were run on `824cf63` and on `eda5812`, and their logs are the same, apart from the image reloads
-  a timer makes, the names Wine's trash gives, a device context and the times. A harness under
-  Wine ran the old and the new `markReplacedListEntry()` side by side on 12 000 random lists,
-  per call and through a run's map.
+  a timer makes, the image details the conflict box shows when they load in time, the names
+  Wine's trash gives, a device context, the times and the current file of the reopened database
+  list in batch H. A harness under Wine ran the old and the new `markReplacedListEntry()` side
+  by side on 12 000 random lists, per call and through a run's map. A copy that logs each call
+  (batches R and N) shows the batch tools and the batch undo with the map, and the one-file
+  tools and the one-file undo with the scan.
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
@@ -1004,7 +1010,8 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   `3df8de3` from `02046f3`. `../scan/`: `apply3.py` (made `eda5812`), `run-scan.sh` (both sides),
   `norm2.sh` (also drops the run-to-run noise), `b46-stub.ahk` (`02046f3` with a stub
   `mapListPaths()`, which batch R calls), and the harness (`build-parity.py`,
-  `parity-driver.ahk`, `runahk.sh`), the timing and the interpreter probes.
+  `parity-driver.ahk`, `runahk.sh`), `fixed3-trace.ahk` (logs each call; `r-tr`, `n-tr`), the
+  timing and the interpreter probes.
 
 ## Gemini's findings in this report
 
