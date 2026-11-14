@@ -3220,7 +3220,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
    doStartLongOpDance()
-   countTFilez := filezMoved := failedFiles := skippedFiles := 0
+   countTFilez := filezMoved := failedFiles := skippedFiles := failedDBfiles := 0
    forceConflictOption := userCopyMoveStructuredConflictMode
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -3244,6 +3244,12 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       }
 
       countTFilez++
+      If InStr(file2rem, "||")   ; the entry of a deleted file
+      {
+         skippedFiles++
+         Continue
+      }
+
       If !FileExist(file2rem)
       {
          failedFiles++
@@ -3310,14 +3316,11 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       }
 
       thisFileExists := FileRexists(file2save, 0)
-      If (performOverwrite=1 && thisFileExists=1)
+      mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
+      If mustReplace
       {
          jso := GetFileAttributesEx(file2save)
          originalFileInfos := jso.size "|" jso.wtime "|" jso.ctime
-         FileSetAttrib, -R, %file2save%
-         Sleep, 2
-         FileRecycle, %file2save%
-         Sleep, 2
          mustPerformOperation := 1
       } Else If (thisFileExists=1)
       {
@@ -3328,7 +3331,9 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       If (mustPerformOperation=1)
       {
          operationExecuted := 1
-         If (UsrCopyMoveOperation=2)
+         If mustReplace
+            wasError := replaceFileByCopyMove(file2rem, file2save, UsrCopyMoveOperation=2)
+         Else If (UsrCopyMoveOperation=2)
             FileMove, %file2rem%, %file2save%, 1
          Else
             FileCopy, %file2rem%, %file2save%, 1
@@ -3353,11 +3358,19 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
          ; zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
          If (UsrCopyMoveOperation=2)
          {
+            rowFreed := 0
+            If (SLDtypeLoaded=3)
+            {
+               rowFreed := moveSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
+               If !rowFreed
+                  failedDBfiles++
+            }
+
+            If (mustReplace=1 || rowFreed=2)
+               markReplacedListEntry(file2save, thisFileIndex, listPathsMap)
+
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
-            If (SLDtypeLoaded=3)
-               updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
-
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
       } Else If (operationExecuted=1)
@@ -3377,6 +3390,8 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       someErrors .= "`nFailed to perform action on " groupDigits(failedFiles) " files"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+   If (failedDBfiles>0)
+      someErrors .= "`nFailed to update the database entries of " groupDigits(failedDBfiles) " files"
 
    watchFolderDetails := ""
    If (UsrCopyMoveOperation=2 && filezMoved>0)
@@ -3401,6 +3416,8 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    SetTimer, ResetImgLoadStatus, -50
    msgBeepTimer("", (abandonAll=1) ? 300 : 900)
    lastInvoked := A_TickCount
+   If (filezMoved>0)
+      quickBarFileUndo((UsrCopyMoveOperation=2) ? "Undo move" : "Undo copy")
    Return 0
 }
 
@@ -32246,7 +32263,7 @@ PasteFilesIntoGivenFolder(folderPath) {
       }
 
       file2save := finalDest "\" OldOutFileName
-      mustPerformOperation := wasError := operationExecuted := 0
+      originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
       If (FileExist(file2save) && !FolderExist(file2save))
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, 0, performOverwrite)
   
@@ -32261,14 +32278,11 @@ PasteFilesIntoGivenFolder(folderPath) {
       }
 
       thisFileExists := FileRexists(file2save, 0)
-      If (performOverwrite=1 && thisFileExists=1)
+      mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
+      If mustReplace
       {
          jso := GetFileAttributesEx(file2save)
          originalFileInfos := jso.size "|" jso.wtime "|" jso.ctime
-         FileSetAttrib, -R, %file2save%
-         Sleep, 2
-         FileRecycle, %file2save%
-         Sleep, 2
          mustPerformOperation := 1
       } Else If (thisFileExists=1)
       {
@@ -32279,7 +32293,9 @@ PasteFilesIntoGivenFolder(folderPath) {
       If (mustPerformOperation=1)
       {
          operationExecuted := 1
-         If (filesActu=2)
+         If mustReplace
+            wasError := replaceFileByCopyMove(file2rem, file2save, filesActu=2)
+         Else If (filesActu=2)
             FileMove, %file2rem%, %file2save%, 1
          Else
             FileCopy, %file2rem%, %file2save%, 1
@@ -32725,6 +32741,67 @@ renameFileCaseOnly(oldPath, newPath) {
    }
 
    Return 0
+}
+
+replaceFileByCopyMove(srcFile, destFile, isMove) {
+; Copies or moves srcFile over destFile, an existing file that is to be recycled. srcFile first arrives
+; next to destFile under a temporary name; destFile is recycled only after that, under its own name,
+; where undo looks for it, and the new file then takes the name. A failure leaves both files as they
+; were. Returns 0 [ErrorLevel 0] on success and 1 on failure, the way ErrorLevel reads after FileMove
+   tmpPath := destFile "-tmp"
+   Loop
+   {
+      If !FileExist(tmpPath)
+         Break
+
+      tmpPath := destFile "-tmp" A_Index
+   } Until (A_Index>500)
+
+   If FileExist(tmpPath)
+      Return 1
+
+   If isMove
+      FileMove, %srcFile%, %tmpPath%
+   Else
+      FileCopy, %srcFile%, %tmpPath%
+
+   ; FileMove and FileCopy leave ErrorLevel at 0 when their source no longer exists
+   If (!ErrorLevel && FileExist(tmpPath))
+   {
+      destAttr := FileExist(destFile)
+      FileGetSize, destSize, %destFile%
+      FileSetAttrib, -R, %destFile%
+      Sleep, 2
+      FileRecycle, %destFile%
+      recycleFailed := ErrorLevel
+      Sleep, 2
+      If (!recycleFailed && !FileExist(destFile))
+      {
+         ; a virus scanner may hold the new file for a moment
+         Loop, 10
+         {
+            FileMove, %tmpPath%, %destFile%
+            If !ErrorLevel
+               Return 0
+            Sleep, 50
+         }
+         recycled := 1
+      } Else If InStr(destAttr, "R")
+         FileSetAttrib, +R, %destFile%
+   }
+
+   ; the temporary file goes back to srcFile [a move] or away [a copy]
+   If FileExist(tmpPath)
+   {
+      If (isMove && !FileExist(srcFile))
+         FileMove, %tmpPath%, %srcFile%
+      Else
+         FileDelete, %tmpPath%
+   }
+
+   If (recycled=1 && !FileExist(destFile))
+      restoreFileFromRecycleBin(destFile, destSize)
+   Return 1
 }
 
 informUserFileMissing(clearScreen:=0) {
@@ -33698,6 +33775,65 @@ updateMainUnfilteredList(indexu, indexProperty, value) {
    }
 }
 
+markReplacedListEntry(filePath, keepIndex, ByRef pathsMap, restore:=0) {
+; A file moved or renamed onto filePath has replaced the file of another index entry: that entry gets the
+; mark of a deleted file, in the files list or in the list behind its filter. restore=1 takes the mark off
+; again once undo has brought the file back, and a database list gives the file a new row. pathsMap is
+; the caller's map of lowered paths to entries, made on first use. Returns the entry changed
+   If !IsObject(pathsMap)
+   {
+      pathsMap := [mapListPaths(resultedFilesList, maxFilesIndex)]
+      If (StrLen(filesFilter)>1 && !(SLDtypeLoaded=3 && hasHamDistCached!=1 && InStr(filesFilter, "SQL:query:")))
+         pathsMap[2] := mapListPaths(bckpResultedFilesList, bckpMaxFilesIndex)
+   }
+
+   findu := (restore ? "||" : "") Format("{:L}", filePath)
+   For whichList, thisMap in pathsMap
+   {
+      listu := (whichList=1) ? resultedFilesList : bckpResultedFilesList
+      keepu := (whichList=1) ? keepIndex : filteredMap2mainList[keepIndex]
+      idx := thisMap[findu]
+      If (!idx || idx=keepu || !(Format("{:L}", listu[idx, 1])==findu))
+         Continue
+
+      newPath := restore ? SubStr(listu[idx, 1], 3) : "||" listu[idx, 1]
+      listu[idx, 1] := newPath
+      thisMap[Format("{:L}", newPath)] := idx
+      If (whichList=1)
+         updateMainUnfilteredList(idx, 1, newPath)
+      Else
+         currentFilesListModified := 1
+
+      If (restore && SLDtypeLoaded=3)
+      {
+         zPlitPath(newPath, 1, fileNamu, folderu)
+         obju := GetFileAttributesEx(newPath)
+         newID := sqlDBrowID
+         If (addSQLdbEntry(fileNamu, folderu, obju.size, obju.wtime, obju.ctime)!="err")
+         {
+            listu[idx, 12] := newID
+            If (whichList=1)
+               updateMainUnfilteredList(idx, 12, newID)
+         }
+      }
+
+      If restore
+         listu[idx, 4] := 1
+      Return idx
+   }
+}
+
+mapListPaths(listu, total) {
+; lowered path, with the || of a deleted file, -> index entry
+   thisMap := new hashtable()
+   Loop, % total
+   {
+      If (p := listu[A_Index, 1])
+         thisMap[Format("{:L}", p)] := A_Index
+   }
+   Return thisMap
+}
+
 singleInListEntriesRemover() {
    InListMultiEntriesRemover("single")
 }
@@ -34219,6 +34355,25 @@ updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
          Return 0
    }
    Return 1
+}
+
+moveSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex) {
+; updateSQLdbEntry() for a file moved or renamed to newEntry. The database holds each path in one row only,
+; so a row that already holds newEntry, of a file just replaced or deleted before, is deleted first.
+; Returns 1, 2 when such a row was deleted, 0 on failure
+   If updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex)
+      Return 1
+
+   whereu := " WHERE fullPath='" SQLescapeStr(Format("{:L}", newEntry)) "'"
+   activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images" whereu ");")
+   If (activeSQLdb.Exec("DELETE FROM images" whereu ";") && activeSQLdb.Changes>0)
+   {
+      If updateSQLdbEntry(oldEntry, newEntry, updateDates, dbIndex)
+         Return 2
+   }
+
+   addJournalEntry("ERROR: " A_ThisFunc "() failed to update the database entry of a moved file:`n" oldEntry "`n" newEntry "`n" activeSQLdb.ErrorMsg)
+   Return 0
 }
 
 updateSQLdbEntryPath(dbIndex, newFolder, newFileu, oldEntry:="") {
@@ -41475,7 +41630,7 @@ coreBatchMultiRenameFiles() {
 
      filezRenamed := countFilez := 0
      nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-     countTFilez := skippedFiles := failedFiles := overwrittenFiles := deletedFiles := 0
+     countTFilez := skippedFiles := failedFiles := overwrittenFiles := deletedFiles := failedDBfiles := 0
      if (objuTemp.IndexModeCount=1)
         OutDirAsc := "a"
 
@@ -41585,17 +41740,11 @@ coreBatchMultiRenameFiles() {
 
          originalFileInfos := ""
          thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
-         If (performOverwrite=1 && objuTemp.renamingCount!=1 && thisFileExists=1)
+         mustReplace := (performOverwrite=1 && objuTemp.renamingCount!=1 && thisFileExists=1) ? 1 : 0
+         If mustReplace
          {
-            overwrittenFiles++
             jso := GetFileAttributesEx(file2save)
             originalFileInfos := jso.size "|" jso.wtime "|" jso.ctime
-            FileSetAttrib, -R, %file2save%
-            Sleep, 1
-            FileRecycle, %file2save%
-            If ErrorLevel
-               wasError++
-            Sleep, 1
          } Else If (thisFileExists=1)
          {
             skippedFiles++
@@ -41607,6 +41756,9 @@ coreBatchMultiRenameFiles() {
          If (caseOnly=1)
          {
             moveFailed := renameFileCaseOnly(file2rem, file2save)
+         } Else If mustReplace
+         {
+            moveFailed := replaceFileByCopyMove(file2rem, file2save, 1)
          } Else
          {
             FileMove, %file2rem%, %file2save%, 1
@@ -41629,10 +41781,19 @@ coreBatchMultiRenameFiles() {
             } 
 
             filezRenamed++
+            overwrittenFiles += mustReplace
             extraMarker := (thisFileExists=1 && performOverwrite=1 && objuTemp.renamingCount!=1) ? "*" : ""
             recordUndoFileActs(file2save, resultedFilesList[thisFileIndex, 1], extraMarker, 2, startZeit, originalFileInfos)
+            rowFreed := 0
             If (SLDtypeLoaded=3)
-               updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
+            {
+               rowFreed := moveSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
+               If !rowFreed
+                  failedDBfiles++
+            }
+
+            If (mustReplace=1 || rowFreed=2)
+               markReplacedListEntry(file2save, thisFileIndex, listPathsMap)
 
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
@@ -41656,6 +41817,8 @@ coreBatchMultiRenameFiles() {
         someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
      If (overwrittenFiles>0)
         someErrors .= "`nOverwritten files: " groupDigits(overwrittenFiles)
+     If (failedDBfiles>0)
+        someErrors .= "`nFailed to update the database entries of " groupDigits(failedDBfiles) " files"
 
      watchFolderDetails := ""
      ForceRefreshNowThumbsList()
@@ -47722,14 +47885,11 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      FileGetTime, originalMtime, % file2rem, M
      FileGetTime, originalCtime, % file2rem, C
      thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
-     If (performOverwrite=1 && thisFileExists=1)
+     mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
+     If mustReplace
      {
         jso := GetFileAttributesEx(file2save)
         originalFileInfos := jso.size "|" jso.wtime "|" jso.ctime
-        FileSetAttrib, -R, %file2save%
-        Sleep, 2
-        FileRecycle, %file2save%
-        Sleep, 2
      } Else If (thisFileExists=1)
      {
         msgBeepTimer("WARNING: Rename operation abandoned.`nA file with the provided name already exists.`nFile name conflict`n" newFileName)
@@ -47741,6 +47901,9 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
      If (caseOnly=1)
      {
         moveFailed := renameFileCaseOnly(file2rem, file2save)
+     } Else If mustReplace
+     {
+        moveFailed := replaceFileByCopyMove(file2rem, file2save, 1)
      } Else
      {
         FileMove, %file2rem%, %file2save%, 1
@@ -47765,10 +47928,14 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 
         extraMarker := (thisFileExists=1 && performOverwrite=1) ? "*" : ""
         recordUndoFileActs(file2save, resultedFilesList[currentFileIndex, 1], extraMarker, 2, A_Now, originalFileInfos)
+        rowFreed := 0
         If (SLDtypeLoaded=3)
-           updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[currentFileIndex, 12])
+           rowFreed := moveSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[currentFileIndex, 12])
         Else
            currentFilesListModified := 1
+
+        If (mustReplace=1 || rowFreed=2)
+           markReplacedListEntry(file2save, currentFileIndex, listPathsMap)
 
         resultedFilesList[currentFileIndex, 1] := file2save
         updateMainUnfilteredList(currentFileIndex, 1, file2save)
@@ -61457,14 +61624,11 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
     operationExecuted := mustPerformOperation := 0
     thisFileExists := FileRexists(file2save, 0)
-    If (performOverwrite=1 && thisFileExists=1)
+    mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
+    If mustReplace
     {
        jso := GetFileAttributesEx(file2save)
        originalFileInfos := jso.size "|" jso.wtime "|" jso.ctime
-       FileSetAttrib, -R, %file2save%
-       Sleep, 5
-       FileRecycle, %file2save%
-       Sleep, 5
        mustPerformOperation := 1
     } Else If (thisFileExists=1)
     {
@@ -61477,7 +61641,9 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     If (mustPerformOperation=1)
     {
        operationExecuted := 1
-       If (UsrCopyMoveOperation=2)
+       If mustReplace
+          wasError := replaceFileByCopyMove(file2rem, file2save, UsrCopyMoveOperation=2)
+       Else If (UsrCopyMoveOperation=2)
           FileMove, %file2rem%, %file2save%
        Else
           FileCopy, %file2rem%, %file2save%
@@ -61510,12 +61676,17 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        recordUndoFileActs(file2save, resultedFilesList[currentFileIndex, 1], extraMarker, UsrCopyMoveOperation, A_Now, originalFileInfos)
        If (UsrCopyMoveOperation=2)
        {
-          resultedFilesList[currentFileIndex, 1] := file2save
-          updateMainUnfilteredList(currentFileIndex, 1, file2save)
+          rowFreed := 0
           If (SLDtypeLoaded=3)
-             updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[currentFileIndex, 12])
+             rowFreed := moveSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[currentFileIndex, 12])
           Else
              currentFilesListModified := 1
+
+          If (mustReplace=1 || rowFreed=2)
+             markReplacedListEntry(file2save, currentFileIndex, listPathsMap)
+
+          resultedFilesList[currentFileIndex, 1] := file2save
+          updateMainUnfilteredList(currentFileIndex, 1, file2save)
        }
        Sleep, 1
        SetTimer, ResetImgLoadStatus, -25
@@ -61583,7 +61754,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    startOperation := A_TickCount
    startZeit := A_Now
    doStartLongOpDance()
-   failedFolders := countTFilez := filezMoved := failedFiles := skippedFiles := 0
+   failedFolders := countTFilez := filezMoved := failedFiles := skippedFiles := failedDBfiles := 0
    oFinalDest := finalDest
    forceConflictOption := (dummy="quick-actu") ? QuickFileActConflict : copyMoveDoLastOption
    If (SLDtypeLoaded=3)
@@ -61619,6 +61790,12 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       file2rem := getIDimage(thisFileIndex)
       zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
       countTFilez++
+      If InStr(file2rem, "||")   ; the entry of a deleted file
+      {
+         skippedFiles++
+         Continue
+      }
+
       If !FileExist(file2rem)
       {
          failedFiles++
@@ -61704,14 +61881,11 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       }
 
       thisFileExists := FileRexists(file2save, 0)
-      If (performOverwrite=1 && thisFileExists=1)
+      mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
+      If mustReplace
       {
          jso := GetFileAttributesEx(file2save)
          originalFileInfos := jso.size "|" jso.wtime "|" jso.ctime
-         FileSetAttrib, -R, %file2save%
-         Sleep, 2
-         FileRecycle, %file2save%
-         Sleep, 2
          mustPerformOperation := 1
       } Else If (thisFileExists=1)
       {
@@ -61722,7 +61896,9 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       If (mustPerformOperation=1)
       {
          operationExecuted := 1
-         If (UsrCopyMoveOperation=2)
+         If mustReplace
+            wasError := replaceFileByCopyMove(file2rem, file2save, UsrCopyMoveOperation=2)
+         Else If (UsrCopyMoveOperation=2)
             FileMove, %file2rem%, %file2save%, 1
          Else
             FileCopy, %file2rem%, %file2save%, 1
@@ -61746,11 +61922,19 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          ; zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
          If (UsrCopyMoveOperation=2)
          {
+            rowFreed := 0
+            If (SLDtypeLoaded=3)
+            {
+               rowFreed := moveSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
+               If !rowFreed
+                  failedDBfiles++
+            }
+
+            If (mustReplace=1 || rowFreed=2)
+               markReplacedListEntry(file2save, thisFileIndex, listPathsMap)
+
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
-            If (SLDtypeLoaded=3)
-               updateSQLdbEntry(file2rem, file2save, updateDates, resultedFilesList[thisFileIndex, 12])
-
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
       } Else If (operationExecuted=1)
@@ -61773,6 +61957,8 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       someErrors .= "`nFailed to create " groupDigits(failedFolders) " folders"
    If (skippedFiles>0)
       someErrors .= "`nSkipped files: " groupDigits(skippedFiles)
+   If (failedDBfiles>0)
+      someErrors .= "`nFailed to update the database entries of " groupDigits(failedDBfiles) " files"
 
    watchFolderDetails := ""
    If (UsrCopyMoveOperation=2 && filezMoved>0)
@@ -94906,6 +95092,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          ; undoing a rename that changed the case of the name alone: the two spellings are the
          ; same file, nothing is in the way and nothing is there to delete
          caseOnly := isSameFileOtherCase(imgPath, otherFile)
+         mustReplace := 0
          If (caseOnly!=1 && FileRexists(otherFile, 0))
          {
             otherFile := askAboutFileCollision(imgPath, otherFile, 0, 1, 0, performOverwrite, 1, "Undo " obj.typu " operation. ")
@@ -94914,19 +95101,23 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
 
             z := FileRexists(otherFile, 0)
             If (performOverwrite=1 && z=1)
-            {
-               FileSetAttrib, -R, % otherFile
-               Sleep, 2
-               FileDelete, % otherFile
-               Sleep, 2
-            } Else If (z=1)
+               mustReplace := 1
+            Else If (z=1)
                Return
          }
 
          Sleep, 5
+         ; the folder the file came from may have been deleted since
+         otherDir := SubStr(otherFile, 1, InStr(otherFile, "\", 0, -1) - 1)
+         If !FolderExist(otherDir)
+            FileCreateDir, % otherDir
+
          If (caseOnly=1)
          {
             moveFailed := renameFileCaseOnly(imgPath, otherFile)
+         } Else If mustReplace
+         {
+            moveFailed := replaceFileByCopyMove(imgPath, otherFile, 1)
          } Else
          {
             FileMove, % imgPath, % otherFile, 1
@@ -94945,24 +95136,31 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
             {
                Sleep, 1
                rsz := restoreFileFromRecycleBin(imgPath, obj.fsize)
-               w := (rsz=1) ? "The original file was restored succesfully." : "Failed to restore the original file."
+               w := (rsz=1) ? "`nThe original file was restored succesfully." : "`nFailed to restore the original file."
             }
 
             zPlitPath(otherFile, 1, OutFileName, OutDir, extname)
-            msgBeepTimer("Undo " Format("{:U}", obj.typu) " succeded for the selected file:`n" OutFileName "`n" OutDir "\" b, 0)
+            msgBeepTimer("Undo " Format("{:U}", obj.typu) " succeded for the selected file:`n" OutFileName "`n" OutDir "\" w, 0)
             undoFileActUpdateIMGindex(imgPath)
             currentFilesListModified := 1
             If (indexu>0)
             {
+               rowFreed := 0
+               If (SLDtypeLoaded=3)
+                  rowFreed := moveSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
+               If (mustReplace=1 || rowFreed=2)
+                  markReplacedListEntry(otherFile, indexu, listPathsMap)
+
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
-               If (SLDtypeLoaded=3)
-                  updateSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
-
                updateMainUnfilteredList(indexu, 1, otherFile)
                If (thumbsDisplaying!=1 && indexu=currentFileIndex)
                   updateViewportCachesID(oMD5name, indexu, imgPath, otherFile)
             }
+
+            ; the entry of the file the move had replaced, now back from the recycle bin
+            If (rsz=1)
+               markReplacedListEntry(imgPath, 0, listPathsMap, 1)
          } Else
          {
             zPlitPath(imgPath, 1, OutFileName, OutDir, extname)
@@ -95045,7 +95243,7 @@ batchUndoFileActs(modus) {
    doStartLongOpDance()
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
-   failedFiles := failedRecoverFiles := overwrittenFiles := skippedFiles := 0
+   failedFiles := failedRecoverFiles := overwrittenFiles := skippedFiles := failedDBfiles := 0
    showTOOLtip("Performing UNDO " thisuType "on " groupDigits(totalu) " files, please wait")
    If (SLDtypeLoaded=3)
       activeSQLdb.Exec("BEGIN TRANSACTION;")
@@ -95128,24 +95326,33 @@ batchUndoFileActs(modus) {
          }
 
          thisFileExists := FileRexists(otherFile, 0)
-         If (performOverwrite=1 && thisFileExists=1)
-         {
-            FileSetAttrib, -R, % otherFile
-            Sleep, 1
-            FileRecycle, % otherFile
-            Sleep, 1
-         } Else If (thisFileExists=1)
+         mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
+         If (thisFileExists=1 && !mustReplace)
          {
             skippedFiles++
             Continue
          }
 
+         ; the folder the file came from may have been deleted since
+         otherDir := SubStr(otherFile, 1, InStr(otherFile, "\", 0, -1) - 1)
+         If !FolderExist(otherDir)
+            FileCreateDir, % otherDir
+
          FileGetTime, originalMtime, % imgPath, M
          FileGetTime, originalCtime, % imgPath, C
-         FileMove, % imgPath, % otherFile, 1
-         If !ErrorLevel
+         If mustReplace
          {
-            If (performOverwrite=1 && thisFileExists=1)
+            moveFailed := replaceFileByCopyMove(imgPath, otherFile, 1)
+         } Else
+         {
+            FileMove, % imgPath, % otherFile, 1
+            moveFailed := ErrorLevel
+         }
+
+         recoveredOld := 0
+         If !moveFailed
+         {
+            If mustReplace
                overwrittenFiles++
 
             Sleep, 1
@@ -95164,6 +95371,8 @@ batchUndoFileActs(modus) {
                   r := restoreFileFromRecycleBin(imgPath, obj.fsize)
                If (r!=1)
                   failedRecoverFiles++
+               Else
+                  recoveredOld := 1
             }
 
             indexu := filesListArray[A_Index, 2]
@@ -95173,13 +95382,25 @@ batchUndoFileActs(modus) {
             If (indexu>0)
             {
                currentFilesListModified := 1
+               rowFreed := 0
+               If (SLDtypeLoaded=3)
+               {
+                  rowFreed := moveSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
+                  If !rowFreed
+                     failedDBfiles++
+               }
+
+               If (mustReplace=1 || rowFreed=2)
+                  markReplacedListEntry(otherFile, indexu, listPathsMap)
+
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
-               If (SLDtypeLoaded=3)
-                  updateSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
-
                updateMainUnfilteredList(indexu, 1, otherFile)
             }
+
+            ; the entry of the file the move had replaced, now back from the recycle bin
+            If recoveredOld
+               markReplacedListEntry(imgPath, 0, listPathsMap, 1)
          } Else failedFiles++
       } Else If (obj.typu="copy")
       {
@@ -95317,6 +95538,8 @@ batchUndoFileActs(modus) {
       msgu .= "`nFiles overwritten: " groupDigits(overwrittenFiles)
    If skippedFiles
       msgu .= "`nSkipped files: " groupDigits(skippedFiles)
+   If failedDBfiles
+      msgu .= "`nFailed to update the database entries of " groupDigits(failedDBfiles) " files"
 
    msgBeepTimer(msgu, (abandonAll=1) ? 300 : 900)
 } ; //batchUndoFileActs()
@@ -95335,7 +95558,7 @@ recordUndoFileActs(onewPath, oldPath, extraMarker, actu, zeit, originalFileInfos
    If (actu=1)
       fileActsHistoryArray[z] := onewPath "|" zeit "|Recycle-Bin|" extraMarker "|" originalFileInfos
    Else
-      fileActsHistoryArray[z] := (actu=2) ? onewPath "|" zeit "|" oldPath extraMarker : onewPath "|" zeit "|?" oldPath extraMarker "|" originalFileInfos
+      fileActsHistoryArray[z] := onewPath "|" zeit "|" ((actu=2) ? "" : "?") oldPath extraMarker "|" originalFileInfos
 }
 
 hasFileIndexUndo(indexu, imgPath:=0) {
