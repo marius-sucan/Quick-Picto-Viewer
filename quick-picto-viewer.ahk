@@ -3181,9 +3181,7 @@ DecreaseSlideSpeed() {
       If (slideShowDelay<200)
          slideShowDelay := 100
    } Else
-   {
       slideShowDelay -= 1000
-   }
 
    resetSlideshowTimer(1)
    showSlideShowInfosNow(1)
@@ -3207,7 +3205,7 @@ fileSizeFriendly(bytez) {
 
 copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    Static lastInvoked := 1
-   If (srcDir=finalDest || !srcDir || !finalDest || filesElected<2)
+   If (srcDir=finalDest || !srcDir || !finalDest || filesElected<1)
       Return
 
    If (errMsg := testStructuredFoldersClash(srcDir, finalDest))
@@ -61010,7 +61008,8 @@ BTNuiProceedStructuredOperation() {
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " dS "\", 4, 0, "question")
       If (msgResult!="Yes")
          Return 0
-   }
+   } Else If !filesElected 
+      msgBeepTimer("WARNING: Insufficient files selected for the operations")
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS, filesElected)
