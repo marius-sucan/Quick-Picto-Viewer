@@ -25,7 +25,7 @@ Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed
 and 6 are fixed in `3df8de3`, with his answers to decisions 3 and 7, in every tool that shares
 them; finding 6 is completed in `86c89e1`, and since `eda5812` the tools that move one file find the
 replaced entry by a scan. Since `215b243` no batch tool asks for an «Undo» quick-action bar (finding 4).
-Seen in passing D, the count in the paste messages, is fixed in `cfed87c`.
+Seen in passing D, the count in the paste messages, is fixed in `def941f`.
 A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, and at `3df8de3` for findings 4-6.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
@@ -854,12 +854,20 @@ batch delete and the multi-rename asked for it while the long operation was stil
 `batchCopyMoveFile()`, read for the others). The calls are removed in `215b243` (see finding 4).
 
 **D. Pasting files** reported «Finished moving 2 out of 1 files»: it counted the line breaks of
-the clipboard text, one fewer than its files (run, batch N). **Fixed in `cfed87c`**: it counts the
-non-empty lines of the clipboard text, the ones it acts on; the same count drives the progress
-bar and the time left shown during a long paste (read). Run, batch T, on `cfed87c` (at `c088d5d` in
-brackets): two files «2 out of 2» («2 out of 1»); one file «1 out of 1» («1 out of 0»); three
-files with an empty line between and a line break at the end «3 out of 3» («3 out of 4»); a path
-with no file, then one file, «1 out of 2» and one failed («1 out of 1»).
+the clipboard text, one fewer than its files (run, batch N). **Fixed in `def941f`**: the total is the
+number of lines once the line breaks at both ends are trimmed, so a path counts with or without a
+drive letter (a network share gives `\\server\share\…`); the same total drives the progress bar
+and the time left shown during a long paste (read). An empty line between two paths still counts
+as a file (T3). Run, batch T:
+
+| Clipboard text | At `c088d5d` | On `def941f` |
+|---|---|---|
+| T1: two files, no line break at the end | «2 out of 1» | «2 out of 2» |
+| T2: one file | «1 out of 0» | «1 out of 1» |
+| T3: three files, an empty line between, a line break at the end (move) | «3 out of 4» | «3 out of 4» |
+| T4: a path with no file, then one file | «1 out of 1», one failed | «1 out of 2», one failed |
+| T5: two files, one path without a drive letter | «2 out of 1» | «2 out of 2» |
+| T6: two files, neither path with a drive letter | «2 out of 1» | «2 out of 2» |
 
 ## Checked and found correct
 
@@ -1007,15 +1015,18 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   by side on 12 000 random lists, per call and through a run's map. A copy that logs each call
   (batches R and N) shows the batch tools and the batch undo with the map, and the one-file
   tools and the one-file undo with the scan.
-- The paste count (`cfed87c`): batch T was added (four pastes into a new folder); run on `c088d5d`
-  and on `cfed87c`, its logs differ only in the four «out of» messages.
+- The paste count (`def941f`): batch T was added (six pastes into a new folder; in T5 and T6
+  Wine's `\\?\unix\…` paths stand in for a network share's, which have no drive letter either).
+  Run at `c088d5d` and on `cfed87c` (a loop over the non-empty lines: every count right),
+  `cccc913` (a count of `:\`, which leaves out T5 and T6: «2 out of 1», «2 out of 0») and `def941f`;
+  the logs differ only in the «out of» messages.
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
   `test-wrappers-sc.ahk` (testScA to testScT), `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
+  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
