@@ -20,8 +20,11 @@ logs are the same, apart from time stamps, window handles and the current file o
 database list. Four batches are new.
 
 **Status, 2026-11-14.** Finding 3 is fixed in `ed8848c`, by Marius. Findings 1 and 2 are fixed
-in `88aa9fc`, with his answers to decisions 1 and 2. A fixed section ends with a note on what
-the code does now; those notes cite lines at `88aa9fc`. Everything else keeps its lines at
+in `88aa9fc`, with his answers to decisions 1 and 2. Finding 14 is fixed in `75e890d`, by
+Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. A fixed
+section ends with a note on what the code does now; those notes cite lines at `88aa9fc` for
+findings 1-3 and at `5410eed` for findings 11 and 14. Since `75e890d` the folder test of findings
+1 and 2 runs after the panel has closed (finding 11). Everything else keeps its lines at
 `b4f374f`.
 
 ## Terms
@@ -53,7 +56,7 @@ the code does now; those notes cite lines at `88aa9fc`. Everything else keeps it
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `88aa9fc` |
+| # | Finding | Harm | Checked | Status at `5410eed` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -65,10 +68,10 @@ the code does now; those notes cite lines at `88aa9fc`. Everything else keeps it
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | open |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | open |
 | 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | open |
-| 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | open |
+| 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | **partly fixed**, `75e890d`..`5410eed` |
 | 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | open |
 | 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | open |
-| 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | open |
+| 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | **fixed**, `75e890d` |
 | 15 | Small things: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | open |
 
 Findings 10 and 11 are the ones a user meets in ordinary use. Findings 1 and 2 lose files
@@ -551,6 +554,35 @@ Run:
 Fix direction: in «Proceed», test the selection and ask the 150 files question before the
 folder question; close the panel last. Decision 6.
 
+**Partly fixed in `75e890d`..`cc45e03`** (Marius) **and `5410eed`**. «Proceed» counts the
+selected files and asks the 150 files question itself, after the save question and before the
+panel closes (:61004-61010 at `5410eed`), and hands the count to the engine (:3208). With
+nothing selected it says «WARNING: Insufficient files selected for the operations» and stays
+open (:61011-61012).
+
+Run:
+
+- 152 files, «No» at the 150 files question: the panel stays open, with what was typed in it,
+  and nothing is moved.
+- 152 files and a Destination that does not exist, «Yes» to create it, then «No» at the 150
+  files question: the panel stays open.
+- Three files selected when the panel opened and one when «Proceed» is clicked (so none, by
+  the one-file rule), the Destination missing: «Yes» to create it, then the warning, and the
+  panel stays open. At `cc45e03` the panel closed after the warning.
+
+Still open:
+
+- The destination folder is created before the selection is counted (:60980-60996), so the
+  last two runs above leave a new, empty folder (run).
+- The folder test of findings 1 and 2, now `testStructuredFoldersClash()` (:61018), runs in
+  the engine (:3211), after the panel has closed. Its refusals no longer leave the panel open
+  (run: the cases of findings 1 and 2; every file stays where it was). It never refuses a
+  folder made a moment before, which holds neither a selected file nor the Source (read).
+- The folder test lets the operation go ahead when it runs out of time: after 5 s on each walk
+  up the parent folders (:61045, :61069), and after 95 s on the selected files (:61095)
+  (read). A walk takes as many steps as the path has folders, so the 5 s limits are met only
+  on a slow network path.
+
 ---
 
 ## 12. A folder at the destination with a selected file's name receives the file
@@ -617,6 +649,13 @@ characters. Run: `C:\q` gets «Please choose an existing destination folder»; `
 question.
 
 Fix direction: test for a path under a drive root (finding 7) instead of the length.
+
+**Fixed in `75e890d`** (Marius): the test is `StrLen(dS)>2` (:60982 at `5410eed`). Run: `C:\q`
+gets «The destination folder seems to not exist. C:\q\ Would you like to create it now?».
+
+The drive-root test of the fix direction was not made, so shorter paths without a drive letter
+get the question as well: `rel`, which does not exist, was refused and is now offered for
+creation (run). After «Yes» it would be made in QPV's folder, as `relout` is (finding 7).
 
 ---
 
@@ -727,7 +766,7 @@ question (finding 3), and both its engines recycle before they copy (finding 5) 
 
 ## Decisions to make before fixing
 
-Decisions 1 and 2 are settled; the others are open.
+Decisions 1, 2 and 6 are settled; the others are open.
 
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
@@ -745,12 +784,13 @@ Decisions 1 and 2 are settled; the others are open.
    top folder in the Destination, which may be what the code meant.
 6. Fewer than two files (finding 11): work on one file, refuse to open, or say why nothing is
    done?
+   **Settled in `cc45e03` and `5410eed`**: «Proceed» says why, and the panel stays open.
 7. The undo record (finding 4) changes the records of every move and rename tool. Change it
    for all of them?
 8. Finding 15: keep «On file name conflicts» across restarts? Add the Destination to the recent
    destinations? Start «Action to perform» on the last action?
 
-Suggested order for what is left: 4 and 5 (the engine); then 6 and 12; then 7, 8, 9 and 11
+Suggested order for what is left: 4 and 5 (the engine); then 12; then 7, 8, 9 and 11
 (the handler); then 10; then the rest.
 
 ## How this was checked
