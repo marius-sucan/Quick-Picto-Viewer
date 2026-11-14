@@ -23,7 +23,8 @@ database list. Four batches are new.
 in `88aa9fc`, with his answers to decisions 1 and 2. Finding 14 is fixed in `75e890d`, by
 Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. Findings 4, 5
 and 6 are fixed in `3df8de3`, with his answers to decisions 3 and 7, in every tool that shares
-them; finding 6 is completed in `86c89e1`. A fixed section ends with a note on what the code does now; those notes cite lines at
+them; finding 6 is completed in `86c89e1`, and since `eda5812` the tools that move one file find the
+replaced entry by a scan. A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, and at `3df8de3` for findings 4-6.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
@@ -428,7 +429,9 @@ Copy/Move panel (several files and one file), the multi-rename, the single renam
   `markReplacedListEntry()` (:33778) gives the other entry with the new path the mark «Delete»
   leaves (`||` before the path), also in the list behind a filter. It looks the path up in a map
   of the list, made the first time a run needs it and given every new path the run gives an
-  entry (since `86c89e1`).
+  entry (since `86c89e1`). The regular panel's one-file move, the single rename and the one-file
+  undo scan the lists instead (`scanListPath()`, since `eda5812`) and take the last entry with the
+  path, the one a map gives.
 - **Undo:** when an undo brings the replaced file back, its entry loses the mark, and a database
   list gives the file a new row, whose cached image data starts empty (Marius's choice).
 - A selected entry with the mark counts as skipped in this panel and in the regular panel's
@@ -459,10 +462,21 @@ batch overwrote its own earlier output («Ask user», then «Overwrite» in the 
 three entries of one name stayed live beside the third (run, batch R: the regular panel's batch
 and the multi-rename). Every moved or renamed entry now gives the map its new path.
 
+**Since `eda5812`** the tools that move one file look the path up by a scan of the lists: for their
+single lookup, making the map costs more. On 100 000 entries under Wine the scan takes about
+0.1 s and the map 0.7 s. The scan and a map made for each call gave the same entries on
+12 000 random lists (filters, marked entries, É and é, restores, database rows). Batch S (a
+filtered list, names in another case, ASCII and É/é, the single rename, a filtered database
+list) and batches R, N, O, C, M, P and H give the same logs before and after.
+
 Not covered: in a plain list, the entry of a file already missing from the disk at the new path
 is not looked for; nothing signals it, and a lookup on every move would cost a pass over the
 list (read). The format converter and «Modify index entry» write a new path into the database
-the same way, and were not changed (read).
+the same way, and were not changed (read). A database list filtered by an SQL query keeps no
+list behind the filter, so the entry of a replaced file that the filter hides is not in memory:
+an undo that brings the file back gives it no row, and the file leaves the index once the filter
+is removed (run, batch S5, on `824cf63` and on `eda5812`; at `02046f3` the replaced file's row was
+never deleted, and the file stayed). The batch undo takes the same path (read).
 
 ---
 
@@ -971,18 +985,26 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   deleted Source subfolder) and P (a filtered list). Batch Q (the quick-action bar) ran on
   `3df8de3` and on a copy that asks for the bar from a timer. The copy and rename kit of
   2026-11-08 gives the same files and the same recycle bin on `3df8de3` as at `02046f3`.
+- The scan of the one-file tools (`eda5812`): batch S was added; batches S, R, N, O, C, M, P and H
+  were run on `824cf63` and on `eda5812`, and their logs are the same, apart from the image reloads
+  a timer makes, the names Wine's trash gives, a device context and the times. A harness under
+  Wine ran the old and the new `markReplacedListEntry()` side by side on 12 000 random lists,
+  per call and through a run's map.
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScR), `results/` (`<batch>-hd.txt` on `b4f374f`,
-  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`), `results-1110/` (the logs of 2026-11-10). For batches N to R:
+  `test-wrappers-sc.ahk` (testScA to testScS), `results/` (`<batch>-hd.txt` on `b4f374f`,
+  `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
+  `k1`, `l1` on `b4f374f`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
   native timer (`scArmBoxAnswer()`), as it waits in a Critical loop. `../fix46/apply.py` made
-  `3df8de3` from `02046f3`.
+  `3df8de3` from `02046f3`. `../scan/`: `apply3.py` (made `eda5812`), `run-scan.sh` (both sides),
+  `norm2.sh` (also drops the run-to-run noise), `b46-stub.ahk` (`02046f3` with a stub
+  `mapListPaths()`, which batch R calls), and the harness (`build-parity.py`,
+  `parity-driver.ahk`, `runahk.sh`), the timing and the interpreter probes.
 
 ## Gemini's findings in this report
 
