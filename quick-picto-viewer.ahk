@@ -61013,7 +61013,7 @@ BTNuiProceedStructuredOperation() {
    }
 
    BtnCloseWindow()
-   copyMoveStructuredFolders(fS, dS)
+   copyMoveStructuredFolders(fS, dS, filesElected)
 }
 
 testStructuredFoldersClash(srcDir, destDir) {
@@ -61067,15 +61067,16 @@ testStructuredFoldersClash(srcDir, destDir) {
             relDir := Trim(SubStr(srcPath, StrLen(p) + 1), "\")
             Break
          }
+         If (A_TickCount - pzs>5000)
+            Break
       }
-      If (A_TickCount - pzs>5000)
-         Break
    }
 
    relDir := Format("{:L}", relDir) "\"
    relLen := StrLen(relDir)
    n := 0
    srcFiles := new hashtable()
+   pzs := A_TickCount
    ; the selected files the engine works on, by their path below the source folder
    Loop, % maxFilesIndex
    {
@@ -61091,6 +61092,9 @@ testStructuredFoldersClash(srcDir, destDir) {
          n += (SubStr(relPath, 1, relLen)=relDir) ? 1 : 0
       Else
          srcFiles[relPath] := 1
+
+      If (A_TickCount - pzs>95000)
+         Break
    }
 
    If destInSrc
