@@ -3210,7 +3210,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    If (srcDir=finalDest || !srcDir || !finalDest || filesElected<2)
       Return
 
-   If (errMsg := testStructuredFoldersClash(fS, dS))
+   If (errMsg := testStructuredFoldersClash(srcDir, finalDest))
       Return msgBeepTimer(errMsg)
 
    lastInvoked := A_TickCount
