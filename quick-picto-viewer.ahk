@@ -3366,8 +3366,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
                   failedDBfiles++
             }
 
-            If (mustReplace=1 || rowFreed=2)
-               markReplacedListEntry(file2save, thisFileIndex, listPathsMap)
+            markReplacedListEntry(file2save, thisFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
@@ -33775,11 +33774,15 @@ updateMainUnfilteredList(indexu, indexProperty, value) {
    }
 }
 
-markReplacedListEntry(filePath, keepIndex, ByRef pathsMap, restore:=0) {
-; A file moved or renamed onto filePath has replaced the file of another index entry: that entry gets the
-; mark of a deleted file, in the files list or in the list behind its filter. restore=1 takes the mark off
-; again once undo has brought the file back, and a database list gives the file a new row. pathsMap is
-; the caller's map of lowered paths to entries, made on first use. Returns the entry changed
+markReplacedListEntry(filePath, keepIndex, ByRef pathsMap, restore:=0, replaced:=1) {
+; keepIndex, an entry moved or renamed onto filePath, takes that path next. When the move replaced a
+; file [replaced=1], the other entry with that path gets the mark of a deleted file, in the files list
+; or in the list behind its filter. restore=1 takes the mark off again once undo has brought the file
+; back, and a database list gives the file a new row. pathsMap is the caller's map of lowered paths to
+; entries, made on first use and kept current by these calls. Returns the entry changed
+   If (!replaced && !IsObject(pathsMap))
+      Return
+
    If !IsObject(pathsMap)
    {
       pathsMap := [mapListPaths(resultedFilesList, maxFilesIndex)]
@@ -33787,12 +33790,17 @@ markReplacedListEntry(filePath, keepIndex, ByRef pathsMap, restore:=0) {
          pathsMap[2] := mapListPaths(bckpResultedFilesList, bckpMaxFilesIndex)
    }
 
-   findu := (restore ? "||" : "") Format("{:L}", filePath)
+   keyu := Format("{:L}", filePath)
+   findu := (restore ? "||" : "") keyu
+   changed := ""
    For whichList, thisMap in pathsMap
    {
       listu := (whichList=1) ? resultedFilesList : bckpResultedFilesList
       keepu := (whichList=1) ? keepIndex : filteredMap2mainList[keepIndex]
-      idx := thisMap[findu]
+      idx := (replaced && !changed) ? thisMap[findu] : ""
+      If keepu
+         thisMap[keyu] := keepu
+
       If (!idx || idx=keepu || !(Format("{:L}", listu[idx, 1])==findu))
          Continue
 
@@ -33819,8 +33827,9 @@ markReplacedListEntry(filePath, keepIndex, ByRef pathsMap, restore:=0) {
 
       If restore
          listu[idx, 4] := 1
-      Return idx
+      changed := idx
    }
+   Return changed
 }
 
 mapListPaths(listu, total) {
@@ -41792,8 +41801,7 @@ coreBatchMultiRenameFiles() {
                   failedDBfiles++
             }
 
-            If (mustReplace=1 || rowFreed=2)
-               markReplacedListEntry(file2save, thisFileIndex, listPathsMap)
+            markReplacedListEntry(file2save, thisFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
@@ -47934,8 +47942,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
         Else
            currentFilesListModified := 1
 
-        If (mustReplace=1 || rowFreed=2)
-           markReplacedListEntry(file2save, currentFileIndex, listPathsMap)
+        markReplacedListEntry(file2save, currentFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
         resultedFilesList[currentFileIndex, 1] := file2save
         updateMainUnfilteredList(currentFileIndex, 1, file2save)
@@ -61682,8 +61689,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
           Else
              currentFilesListModified := 1
 
-          If (mustReplace=1 || rowFreed=2)
-             markReplacedListEntry(file2save, currentFileIndex, listPathsMap)
+          markReplacedListEntry(file2save, currentFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
           resultedFilesList[currentFileIndex, 1] := file2save
           updateMainUnfilteredList(currentFileIndex, 1, file2save)
@@ -61930,8 +61936,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
                   failedDBfiles++
             }
 
-            If (mustReplace=1 || rowFreed=2)
-               markReplacedListEntry(file2save, thisFileIndex, listPathsMap)
+            markReplacedListEntry(file2save, thisFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
@@ -95148,8 +95153,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
                rowFreed := 0
                If (SLDtypeLoaded=3)
                   rowFreed := moveSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
-               If (mustReplace=1 || rowFreed=2)
-                  markReplacedListEntry(otherFile, indexu, listPathsMap)
+               markReplacedListEntry(otherFile, indexu, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
@@ -95390,8 +95394,7 @@ batchUndoFileActs(modus) {
                      failedDBfiles++
                }
 
-               If (mustReplace=1 || rowFreed=2)
-                  markReplacedListEntry(otherFile, indexu, listPathsMap)
+               markReplacedListEntry(otherFile, indexu, listPathsMap, 0, mustReplace=1 || rowFreed=2)
 
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
