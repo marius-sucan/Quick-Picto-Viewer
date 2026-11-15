@@ -2545,7 +2545,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
      IniRead, testStaticFolderz, % fileNamu, Folders, Fi1, @
      IniRead, tstSLDcacheFilesList, % fileNamu, General, SLDcacheFilesList, @
      IniRead, testDynaFolderz, % fileNamu, DynamicFolderz, DF1, @
-     If (StrLen(testDynaFolderz)>2)
+     If (StrLen(testDynaFolderz)>1) ; a drive root is stored as "d:"
         DynamicFoldersList := "|hexists|"
        ; DynamicFoldersList := coreLoadDynaFolders(fileNamu)
 
@@ -87651,8 +87651,9 @@ coreLoadDynaFolders(fileNamu) {
        If (line="[FilesList]")
           Break
 
-       If (RegExMatch(line, "i)^(DF[0-9].*\=[a-z]\:\\..)") && !RegExMatch(line, RegExFilesPattern))
-          listu .= SubStr(line, InStr(line, "=")+1) "`n"
+       ; "|" marks a folder scanned without its subfolders; a drive root is stored as "d:"
+       If (RegExMatch(line, "i)^DF[0-9]+\s*=\s*\|?[a-z]:") && !RegExMatch(line, RegExFilesPattern))
+          listu .= Trimmer(SubStr(line, InStr(line, "=")+1)) "`n"
     }
  
     DynamicFoldersList := StrReplace(DynamicFoldersList, "|hexists|")
