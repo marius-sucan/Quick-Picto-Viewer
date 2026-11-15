@@ -3226,6 +3226,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       activeSQLdb.Exec("BEGIN TRANSACTION;")
 
    prevuDir := ""
+   srcKey := Format("{:L}", srcDir "\")
    startZeit := A_Now
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
@@ -3256,7 +3257,8 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
          Continue
       }
 
-      If !InStr(file2rem, srcDir "\")
+      relPath := pathBelowFolder(file2rem, srcKey)
+      If (relPath="")
       {
          skippedFiles++
          Continue
@@ -3277,7 +3279,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
          prevMSGdisplay := A_TickCount
       }
 
-      file2save := StrReplace(file2rem, srcDir "\", finalDest "\")
+      file2save := finalDest "\" relPath
       zPlitPath(file2save, 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
       If (prevuDir!=OutDir)
       {
@@ -60516,15 +60518,15 @@ IdentifyFileFolderRoots(modus) {
         If (InStr(imgPath, "||") || !imgPath || resultedFilesList[A_Index, 2]!=1)
            Continue
 
-        OutDir := Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1))
-        foldersListArray[OutDir] := 1
+        OutDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+        foldersListArray[Format("{:L}", OutDir)] := OutDir
    }
 
    listu := ""
    For Key, Value in foldersListArray
    {
-      If (key!="")
-         listu .= key "`n"
+      If (Value!="")
+         listu .= Value "`n"
    }
 
    foldersListArray := ""
@@ -61272,6 +61274,7 @@ testStructuredFoldersClash(srcDir, destDir) {
 
    relDir := Format("{:L}", relDir) "\"
    relLen := StrLen(relDir)
+   srcKey := Format("{:L}", srcDir "\")
    n := 0
    srcFiles := new hashtable()
    pzs := A_TickCount
@@ -61281,11 +61284,10 @@ testStructuredFoldersClash(srcDir, destDir) {
       If (resultedFilesList[A_Index, 2]!=1)
          Continue
 
-      imgPath := resultedFilesList[A_Index, 1]
-      If !(k := InStr(imgPath, srcDir "\"))
+      relPath := Format("{:L}", pathBelowFolder(resultedFilesList[A_Index, 1], srcKey))
+      If (relPath="")
          Continue
 
-      relPath := Format("{:L}", SubStr(imgPath, k + StrLen(srcDir) + 1))
       If destInSrc
          n += (SubStr(relPath, 1, relLen)=relDir) ? 1 : 0
       Else
@@ -61308,6 +61310,13 @@ testStructuredFoldersClash(srcDir, destDir) {
 
    srcFiles := ""
    Return n ? "ERROR: The source folder lies inside the destination folder, where " groupDigits(n) " of the selected files would land on other selected files" : ""
+}
+
+pathBelowFolder(filePath, folderKey) {
+; the rest of filePath below a folder, or nothing; folderKey is the folder in lower case [Format L] with an
+; ending backslash, so the letter case does not count, also for letters outside A-Z, which = tells apart
+   n := StrLen(folderKey)
+   Return (Format("{:L}", SubStr(filePath, 1, n))==folderKey) ? SubStr(filePath, n + 1) : ""
 }
 
 BTNlvRecentFileDesties(a, b, c) {
