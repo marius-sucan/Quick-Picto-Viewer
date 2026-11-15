@@ -60488,9 +60488,13 @@ CopyMovePanelWindow() {
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
 }
 
-BtnIdentifyFileRoots() {
+BtnIdentifyFileRoots(hCtl:=0) {
    ToolTip, Please wait...
    alistu := IdentifyFileFolderRoots("cached")
+   ToolTip
+   If !alistu[2]
+      Return msgBeepTimer(alistu[3] ? "WARNING: None of the selected files is on a drive with a letter; network paths are not supported" : "WARNING: Insufficient files selected for the operations")
+
    listu := alistu[1]
    Try Menu, Manna, Delete
    Loop, Parse, listu, `n
@@ -60500,7 +60504,10 @@ BtnIdentifyFileRoots() {
       If !A_LoopField
          Continue
 
-      entryu := A_Index ". " PathCompact(A_LoopField, 35) "\"
+      k := StrSplit(A_LoopField, "|")
+      entryu := A_Index ". " StrReplace(PathCompact(k[1], 35), "&", "&&") "\"
+      If (k[2]<alistu[3])
+         entryu .= "`t" groupDigits(k[2]) " of " groupDigits(alistu[3]) " files"
       Menu, Manna, Add, % entryu, menuSetSourceStructuredOper
    }
 
@@ -60509,8 +60516,7 @@ BtnIdentifyFileRoots() {
       Try Menu, Manna, Add, % "... and " alistu[2] - 10 " folders more", dummy
       Try Menu, Manna, Disable, % "... and " alistu[2] - 10 " folders more"
    }
-   Try Menu, Manna, Show
-   ToolTip
+   showThisMenu("Manna", 0, hCtl ? "hwnd" : 0, hCtl)
 }
 
 menuSetSourceStructuredOper(menuItem) {
@@ -60521,106 +60527,91 @@ menuSetSourceStructuredOper(menuItem) {
    Loop, Parse, listu, `n
    {
       If (openThisu=A_Index)
-         GuiControl, SettingsGUIA:, UsrEditFileSource, % A_LoopField
+      {
+         p := SubStr(A_LoopField, 1, InStr(A_LoopField, "|") - 1)
+         GuiControl, SettingsGUIA:, UsrEditFileSource, % (StrLen(p)=2) ? p "\" : p
+      }
    }
 }
 
 IdentifyFileFolderRoots(modus) {
-   Static gList, counter
+; for each drive with selected files, the deepest folder that holds them all, then each folder above it up
+; to the drive root; the drive with the most selected files first. Each line is "folder|selected files in
+; it". Folders without a drive letter are left out, as «Proceed» refuses them
+   Static gList, counter, total
    If (modus="kill")
    {
-      counter := 0
+      counter := total := 0
       gList := ""
       Return
    }
 
    If (gList && modus="cached")
-      Return [gList, counter]
+      Return [gList, counter, total]
 
-   foldersListArray := new hashtable()
+   drives := {}
+   prevDir := o := ""
+   total := 0
    owle := setWhileLoopBusy()
    Loop, % maxFilesIndex + 1
    {
-        imgPath := resultedFilesList[A_Index, 1]
-        If (InStr(imgPath, "||") || !imgPath || resultedFilesList[A_Index, 2]!=1)
-           Continue
-
-        OutDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
-        foldersListArray[Format("{:L}", OutDir)] := OutDir
-   }
-
-   listu := ""
-   For Key, Value in foldersListArray
-   {
-      If (Value!="")
-         listu .= Value "`n"
-   }
-
-   foldersListArray := ""
-   flist := ""
-   Loop, Parse, listu, `n
-   {
-      n := ST_Count(A_LoopField, "\")
-      If (n>0)
-         flist .= n "|" A_LoopField "`n"
-   }
-
-   nList := ""
-   Sort, flist, ND`n
-   Loop, Parse, flist, `n
-   {
-      If !A_LoopField
+      imgPath := resultedFilesList[A_Index, 1]
+      If (InStr(imgPath, "||") || !imgPath || resultedFilesList[A_Index, 2]!=1)
          Continue
 
-      k := InStr(A_LoopField, "|") + 1
-      p := SubStr(A_LoopField, k, InStr(A_LoopField, "\", 0, -1) - k)
-      If !InStr(nList, p "`n")
-         nList .= p "`n"
-   }
-
-   flist := ""
-   Loop, Parse, nList, `n
-   {
-      If !A_LoopField
-         Continue
-
-      n := ST_Count(A_LoopField, "\")
-      If (n>0)
-         flist .= n "|" A_LoopField "`n"
-   }
-   Sort, flist, ND`n
-
-   p := 0
-   nList := ""
-   Loop, Parse, flist, `n
-   {
-      If !A_LoopField
-         Continue
-      k := StrSplit(A_LoopField, "|")
-      If (p=0)
-         p := k[1]
-      if (k[1]>p + 1)
-         Break
-      nList .= k[2] "`n"
-   }
-
-   Sort, nList, D`n
-   counter := 0
-   prevu := gList := ""
-   Loop, Parse, nList, `n
-   {
-      If !A_LoopField
-         Continue
-
-      If (!InStr(A_LoopField, prevu "\") || !prevu)
+      total++
+      OutDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+      If !(OutDir==prevDir)
       {
-         gList .= A_LoopField "`n"
-         prevu := A_LoopField
-         counter++
+         prevDir := OutDir
+         o := ""
+         If RegExMatch(OutDir, "i)^[a-z]:(\\|$)")
+         {
+            dirKey := Format("{:L}", OutDir) "\"
+            d := SubStr(dirKey, 1, 1)
+            If !IsObject(drives[d])
+               drives[d] := {n: 0, key: dirKey, path: OutDir}
+
+            ; the drive's common folder, in lower case with an ending backslash, shortened until it holds this one
+            o := drives[d]
+            While !(SubStr(dirKey, 1, StrLen(o.key))==o.key)
+               o.key := RegExReplace(o.key, "[^\\]*\\$")
+         }
       }
+
+      If IsObject(o)
+         o.n := o.n + 1
    }
    whileLoopExec := owle
-   Return [glist, counter]
+
+   counter := 0
+   gList := ""
+   Loop
+   {
+      best := ""
+      For d, o in drives
+      {
+         If (!o.listed && (best="" || o.n>drives[best].n))
+            best := d
+      }
+
+      If (best="")
+         Break
+
+      o := drives[best]
+      o.listed := 1
+      ; Format("{:L}") keeps the length, so the key's length cuts the index's spelling
+      p := SubStr(o.path, 1, StrLen(o.key) - 1)
+      Loop
+      {
+         gList .= p "|" o.n "`n"
+         counter++
+         If (StrLen(p)<3)
+            Break
+         p := SubStr(p, 1, InStr(p, "\", 0, -1) - 1)
+      }
+   }
+   Return [gList, counter, total]
 }
 
 BtnUiSharpenTabsInfoUpdate() {
@@ -61151,7 +61142,7 @@ PanelStructuredCopyMoveWindow() {
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", OutDir)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
     ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
-    GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Automatically identify possible source paths based on the selected files.`nThe number of listed folders in the menu is an indicator`nof how dispersed are the locations of the selected files.")
+    GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders for the selected files: the deepest folder that holds them all`n[one for each drive], then each folder above it. A folder higher up`nrecreates more of the path in the destination folder.")
     Gui, Add, Text, xs y+10 w%ml% hp +0x200, Destination:
     cleanFolderPath(UsrEditFileDestination, destFull)
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination", destFull ? UsrEditFileDestination : "")
