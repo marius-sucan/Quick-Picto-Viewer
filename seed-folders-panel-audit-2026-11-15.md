@@ -12,6 +12,13 @@ it under headless Wine, on AutoHotkey_H 1.1.33.10, with the source of `bf72416`;
 means it follows from the code and was not run. Nothing was run on Windows. The test kit is
 described at the end.
 
+**Status, 2026-11-15, at `32c435d`.** Findings 1 and 2 are fixed, in `fe812ec` and
+`32c435d`, with Marius's choices (decisions 1 and 7, settled below). The question that fixes
+finding 2 also fixes finding 11 for this panel. Finding 5 is partly fixed: a drive root loads
+from a .SLD list and «Paste list» keeps it. The other findings are open. A fixed section ends
+with a note on what the code does now, with its lines at `32c435d`; every other line number
+is at `bf72416`.
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -44,23 +51,23 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked |
-|---|---------|------|---------|
-| 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run |
-| 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run |
-| 3 | «Remove» answered «Yes» on a `\|` entry also removes the files of the seed folders inside it, in a database for good | high | run |
-| 4 | Plain and .SLD lists: a folder name with a capital letter outside A-Z defeats counting, selecting, jumping and removing; «Rescan folder» indexes its files twice; «Set as the protected folder» does not protect it: its files can be deleted from the disk | high | run (plain list), read (.SLD) |
-| 5 | A drive root as a seed folder: not listed, dropped by «Remove» and «Paste list», its files dropped by «Rescan all», not loaded from a .SLD list | medium | run |
-| 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run |
-| 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run |
-| 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run |
-| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run |
-| 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run |
-| 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run |
-| 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read |
-| 13 | «Remove»: the entry is gone before the question, which has no «Cancel»; the box shows the internal `\|` | low | run, read |
-| 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run |
-| 15 | Small things | low | run, read |
+| # | Finding | Harm | Checked | Status at `32c435d` |
+|---|---------|------|---------|---------------------|
+| 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
+| 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
+| 3 | «Remove» answered «Yes» on a `\|` entry also removes the files of the seed folders inside it, in a database for good | high | run | open |
+| 4 | Plain and .SLD lists: a folder name with a capital letter outside A-Z defeats counting, selecting, jumping and removing; «Rescan folder» indexes its files twice; «Set as the protected folder» does not protect it: its files can be deleted from the disk | high | run (plain list), read (.SLD) | open |
+| 5 | A drive root as a seed folder: not listed, dropped by «Remove» and «Paste list», its files dropped by «Rescan all», not loaded from a .SLD list | medium | run | **partly fixed**, `fe812ec` and `32c435d`: loaded from a .SLD list, kept by «Paste list» |
+| 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run | open |
+| 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | open |
+| 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | open |
+| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | open |
+| 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | open |
+| 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed for this panel**, `32c435d`: it asks to keep or purge (decision 7) |
+| 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | open |
+| 13 | «Remove»: the entry is gone before the question, which has no «Cancel»; the box shows the internal `\|` | low | run, read | open |
+| 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run | open; since `32c435d` the quoted path is counted among the lines skipped |
+| 15 | Small things | low | run, read | open |
 
 ---
 
@@ -96,6 +103,26 @@ was widened for the folders list audit's finding 20; it now ends at the colon (:
 Correction: accept an optional `|` and end the pattern at the colon, e.g.
 `i)^(DF[0-9]+=\|?[a-z]\:)`. A database keeps its `|` entries (run, batch E0).
 
+**Fixed in `fe812ec`** (:87657 and :2548 at `32c435d`): the line test takes an optional `|`
+and ends at the colon; the value is trimmed; `OpenSLD()` takes the seed folders list as
+present when `DF1` has two characters or more, as the .SLD import already did (:65707).
+
+```ahk
+If (RegExMatch(line, "i)^DF[0-9]+\s*=\s*\|?[a-z]:") && !RegExMatch(line, RegExFilesPattern))
+```
+
+Run on the text of `32c435d` (batches C and K):
+
+- right after the save the seed folders list is `pv` and `|other`, and the panel lists two
+  rows (C1); saved again, the file keeps `DF2=|other` (C2); opened again, `|other` is listed
+  (C3);
+- the uncached list opened scans `|other`: its two files are in the index (C4);
+- a list of the drive root alone saves `DF1=p:` and opens with `p:` (K3); a list of `P:\a`
+  saves `DF1=p:\a` and opens with it (K3).
+
+The second test of the line, against `RegExFilesPattern`, can never match a `DFn=` line: that
+pattern is anchored on a drive letter at the start. It is left as it was.
+
 ## 2. A missing folder is dropped from the seed folders list
 
 `SaveFilesList()` :35185, `addDynamicFolderSQLdb()` :65213 (through
@@ -126,6 +153,57 @@ folders out as well; «Copy list» then says «Dynamic folders list copied to cl
 
 For the folders list, Marius chose to keep such folders (decision 9 of the folders list
 audit, `17d90dd`). Correction: decision 1.
+
+**Fixed in `32c435d`**, by Marius's answers to decision 1. What the code does now, lines at
+`32c435d`:
+
+- a seed folder that is not on the disk stays: in a saved .SLD list (:35184), in every
+  rewrite of a database's `dynamicfolders` table (:65213), and in «Paste list», which keeps
+  the listed entries as they are (:97026). «Copy list» copies it too (:97007).
+  `addDynamicFolderSQLdb()` dates such a folder «-»; it also writes the folders list's
+  `staticfolders` table, so a database's folders list keeps the rows of such folders when it
+  is rebuilt («Rescan all», «Regenerate this folders list», a save as .SLDB);
+- a pasted folder that is not on the disk is skipped, and the panel then says how many lines
+  were skipped (:97063);
+- «Rescan all» asks once, without listing them, when seed folders are missing: «Keep»,
+  «Purge» or «Cancel» (`RegenerateEntireList()` :87764-87786, `getMissingSeedFolders()`
+  :97864). «Keep» carries their indexed files over to the rebuilt index, after the scanned
+  files (:87795-87804, :87848-87853); in a database their rows were never touched. Their
+  folders list rows stay, dated «-». «Purge» removes them from the seed folders list
+  (`dropSeedFolders()` :97879), with every file indexed under them, subfolders included (in
+  a database `images` and `imagesPixels` rows, inside the rescan's transaction), and the
+  folders list, rebuilt by the rescan, has no row for them. «Cancel» stops before anything
+  changes;
+- «Rescan folder» on a missing seed folder asks «Keep» or «Purge», with the folder's path
+  (`BTNrescanDynaFolder()` :97650-97668). «Purge» goes through `purgeSeedFolder()` (:97674):
+  the entry and the entries inside it leave the seed folders list, its rows leave the folders
+  list (loaded first on a cached list, so a save cannot bring them back) and the
+  `staticfolders` table, and `remFilesFromList()` removes its files.
+
+Run on the text of `32c435d`, with every earlier batch run again and compared line by line
+with the logs before the fix (batches A, B, G and I give the same lines):
+
+- batch C: `third` away while saving: the file keeps `DF2=third`, the list opened again has
+  it (C5); `other` away during «Paste list»: kept (C6); «Copy list» copies `other` and `third`
+  while `third` is away (C7); `fifth\` and a quoted path pasted: «1 pasted line(s) skipped»
+  (C8);
+- batch E3, database: «Recursive folder scan» with `fifth` away keeps `fifth` in the table,
+  and the database opened again lists it;
+- batch J, «Rescan all» with `other` away (one seed folder missing), on a plain list:
+  «Cancel» changes nothing; «Keep» keeps the three files of `other` and `other\sub`, at the
+  end of the index; «Purge» drops the entry and the three files. On a cached .SLD list:
+  «Keep», then a save, gives `DF2=other` and the rows `Fi3=-*&*other`, `Fi8=-*&*other\sub`;
+  «Purge», then a save, gives neither. In a database: «Keep» leaves the three rows, the
+  `dynamicfolders` row and two `staticfolders` rows dated «-»; «Purge» deletes all of them;
+- batch K, F5 on the missing `other`, on a cached .SLD list and in a database: «Keep»
+  changes nothing; «Purge» removes the entry, the three files, the folders list rows and,
+  in a database, the rows of the three tables; the list saved afterwards has neither the
+  entry nor the rows.
+
+Two things to know. Under «Keep» the index holds files that are not on the disk: viewing
+one gives QPV's «File not found» message, as for any missing file. «Purge» leaves the
+captions and audio notes of the purged images in a database's `imagesData` table, as
+«Remove» answered «Yes» does.
 
 ## 3. «Remove» answered «Yes» on a `|` entry also removes the files of the seed folders inside it
 
@@ -223,6 +301,12 @@ What happens (run, batch D, a scratch folder mapped as drive P:, five images in 
 A whole camera card or external drive opened as a folder is a drive root.
 
 Correction: decision 4, then the same form accepted in the eight places above.
+
+**Partly fixed** by `fe812ec` and `32c435d`: a drive root loads from a .SLD list, also as its
+first entry (run, batch K3; D6 now opens with `p:`), and «Paste list» keeps the listed
+entries as they are, `p:\` included (run, batch D5). The panel still hides `p:`, «Remove»
+still drops a root, «Copy list» and the tree view still leave it out, and «Rescan all» still
+skips it and drops its files.
 
 ## 6. The Save panel's «Manage folders» button does nothing
 
@@ -357,6 +441,11 @@ stay; in a plain or .SLD list they go, since the index is emptied first (read).
 
 Correction: decision 7 (decision 2 of the folders list audit, still open).
 
+**Fixed for this panel in `32c435d`**, by Marius's answer to decision 7: «Rescan folder» on a
+missing seed folder asks «Keep» or «Purge» (finding 2's note). Run (batch E2): F5 on the
+missing `third`, «Keep»: its two rows stay in `images`. The folders list panel's «Rescan
+folder(s)» still removes the entries of a folder it cannot reach (its finding 14).
+
 ## 12. The count columns
 
 - **«Difference» 0 for a folder never counted on disk.** F11 writes `diffu := (onDisk!="" &&
@@ -466,7 +555,12 @@ Not part of the panel's own code.
 ## Decisions to make before fixing
 
 1. **A missing seed folder**: keep it in the list, as decision 9 of the folders list audit
-   does for the folders list, drop it as now, or ask?
+   does for the folders list, drop it as now, or ask? **Settled** (`32c435d`, Marius's
+   answers): kept everywhere without a question; «Rescan all» and «Rescan folder» ask once,
+   without listing the folders, «Keep» (its indexed files stay, its folders list rows stay,
+   dated «-», in a database too) or «Purge» (it goes, with every file indexed under it,
+   subfolders included, and its folders list rows); a pasted folder that is not on the disk
+   is skipped and counted; «Copy list» copies every entry.
 2. **The reach of a `|` entry's actions**: the files placed directly in the folder, as the
    entry indexes them, or the subfolders too, as now? It covers «Remove» + «Yes», the two
    counts, «Select files», «Deselect files», «Jump to first indexed file», F3 and «With a new
@@ -482,10 +576,12 @@ Not part of the panel's own code.
    «Back», or take the button out? The `If AnyWindowOpen` test was presumably added for the
    custom shortcuts; it could stay for every other route.
 7. **«Rescan folder» on a missing folder**: skip it, ask first, or remove its entries as
-   now? Same as decision 2 of the folders list audit.
+   now? Same as decision 2 of the folders list audit. **Settled for this panel**
+   (`32c435d`, Marius's answer): ask, «Keep» or «Purge», as in decision 1. Decision 2 of the
+   folders list audit stays open for that panel.
 
-Suggested order: findings 1, 8 and 9 need no decision, nor does sparing the other seed
-folders in finding 3; then 10, 12, 13 and 14; the rest once the decisions are taken.
+Suggested order at `32c435d`: findings 8 and 9 need no decision, nor does sparing the other
+seed folders in finding 3; then 10, 12, 13 and 14; the rest once the decisions are taken.
 
 ## How this was checked
 
@@ -494,8 +590,16 @@ audit's kit. `setup.sh` links the repo DLLs once; `build-wrappers.sh` joins
 `helpers-static.ahk` (that kit's helpers) and `seed-part.ahk` (the batches) into
 `test-wrappers-seed.ahk`; `run-app.sh <tag> testSeed<X> ""` runs one batch on the working
 tree; `run-all.sh <suffix> "" "B C D E G"` runs several, with drive P: mapped for batch D.
-Logs in `results/`: `a-1` to `i-1` are the runs this report cites, all on the source of
-`bf72416`.
+Logs in `results/`: `a-1` to `i-1` are the runs on the source of `bf72416`; `a-2` to `k-2`
+are every batch run again on the fixed text, before two last changes (the wording of the
+«Rescan all» question for one folder, the kept files placed after the scanned ones);
+`j-3` and `k-3` are batches J and K on the text committed as `32c435d`. Compared line by
+line, after the dates and the random current image are blanked out, `a-2`, `b-2`, `g-2` and
+`i-2` give the lines of `a-1`, `b-1`, `g-1` and `i-1`; `c-2`, `d-2`, `e-2` and `h-2` differ
+where the fixes act. In `d-2`, `P:\a` holds two images because batch K, run first, added
+one. The script `loadcheck.sh` (next to `app/`) load-checks the working tree with
+AutoHotkey_H and stock AutoHotkey 1.1.37.02; `split-finding1.py` made the text of `fe812ec`
+from `bf72416` and the tested text.
 
 The app runs under the private Wine of the FreeImage fork, on AutoHotkey_H 1.1.33.10.
 `patch.py` adds the test functions to a scratch copy and turns menus, clipboard writes and
@@ -523,6 +627,11 @@ that one in this panel, its batch F).
 | G | cached .SLD | «Recursive folder scan» and the save question; `|other` and `third` added; both re-dated and rescanned |
 | H | database, plain | the rename of batch E, then the database opened again; private mode, F5, Delete + «Yes» |
 | I | plain, database | «Set as the protected folder» on `ascii`, then on `été`, each followed by «delete selected files» on that folder's files; the rename of batch E, the `staticfolders` table read after the database is opened again and after the folders list panel |
+| J | plain, cached .SLD, database | after `32c435d`: «Rescan all» with `other` moved away, answered «Cancel», «Keep» (the index order logged), «Purge»; on the cached list a save after «Keep» and after «Purge»; in the database the three tables after each |
+| K | cached .SLD, database, drive P: | after `32c435d`: F5 on the missing `other`, «Keep» then «Purge», the cached list saved afterwards, the database's tables; a list of the drive root alone and a list of `P:\a`, each saved and opened |
+
+Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
+H2); on `bf72416` that answer finds no box and expires.
 
 Traps met: a space followed by `;` starts a comment even inside an AutoHotkey string, write
 `` `; ``; `run-all.sh` must be executable before it is started in the background.
