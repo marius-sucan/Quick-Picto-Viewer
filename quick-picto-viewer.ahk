@@ -60535,9 +60535,9 @@ menuSetSourceStructuredOper(menuItem) {
 }
 
 IdentifyFileFolderRoots(modus) {
-; for each drive with selected files, the deepest folder that holds them all, then each folder above it up
-; to the drive root; the drive with the most selected files first. Each line is "folder|selected files in
-; it". Folders without a drive letter are left out, as «Proceed» refuses them
+; the selected files grouped by drive and by the folder under the drive root; for each group, the
+; deepest folder that holds its files, the groups with the most files first, then by path. Each line is
+; "folder|selected files in it". Folders without a drive letter are left out, as «Proceed» refuses them
    Static gList, counter, total
    If (modus="kill")
    {
@@ -60549,8 +60549,9 @@ IdentifyFileFolderRoots(modus) {
    If (gList && modus="cached")
       Return [gList, counter, total]
 
-   drives := {}
-   prevDir := o := ""
+   groups := []
+   groupIdx := new hashtable()
+   prevDir := g := ""
    total := 0
    owle := setWhileLoopBusy()
    Loop, % maxFilesIndex + 1
@@ -60564,52 +60565,58 @@ IdentifyFileFolderRoots(modus) {
       If !(OutDir==prevDir)
       {
          prevDir := OutDir
-         o := ""
+         g := ""
          If RegExMatch(OutDir, "i)^[a-z]:(\\|$)")
          {
             dirKey := Format("{:L}", OutDir) "\"
-            d := SubStr(dirKey, 1, 1)
-            If !IsObject(drives[d])
-               drives[d] := {n: 0, key: dirKey, path: OutDir}
+            k := InStr(dirKey, "\", 0, 4)
+            groupKey := k ? SubStr(dirKey, 1, k) : dirKey
+            If !(gi := groupIdx[groupKey])
+            {
+               groups.Push({n: 0, key: dirKey, path: OutDir, drive: SubStr(dirKey, 1, 1)})
+               gi := groupIdx[groupKey] := groups.Length()
+            }
 
-            ; the drive's common folder, in lower case with an ending backslash, shortened until it holds this one
-            o := drives[d]
-            While !(SubStr(dirKey, 1, StrLen(o.key))==o.key)
-               o.key := RegExReplace(o.key, "[^\\]*\\$")
+            ; the group's common folder, in lower case with an ending backslash, shortened until it holds this one
+            g := groups[Round(gi)]
+            While !(SubStr(dirKey, 1, StrLen(g.key))==g.key)
+               g.key := RegExReplace(g.key, "[^\\]*\\$")
          }
       }
 
-      If IsObject(o)
-         o.n := o.n + 1
+      If IsObject(g)
+         g.n := g.n + 1
    }
    whileLoopExec := owle
+   groupIdx := ""
+
+   ; a drive root holds every selected file of its drive
+   drvTotal := {}
+   For gi, g in groups
+      drvTotal[g.drive] := (drvTotal.HasKey(g.drive) ? drvTotal[g.drive] : 0) + g.n
+
+   order := ""
+   For gi, g in groups
+   {
+      n := (StrLen(g.key)=3) ? drvTotal[g.drive] : g.n
+      ; Chr(1) sorts below any character of a folder name, so set1 comes before set10
+      order .= Format("{:010}", 9999999999 - n) "|" StrReplace(g.key, "\", Chr(1)) "|" gi "`n"
+   }
+   Sort, order, D`n
 
    counter := 0
    gList := ""
-   Loop
+   Loop, Parse, order, `n
    {
-      best := ""
-      For d, o in drives
-      {
-         If (!o.listed && (best="" || o.n>drives[best].n))
-            best := d
-      }
+      If !A_LoopField
+         Continue
 
-      If (best="")
-         Break
-
-      o := drives[best]
-      o.listed := 1
+      k := StrSplit(A_LoopField, "|")
+      g := groups[Round(k[3])]
       ; Format("{:L}") keeps the length, so the key's length cuts the index's spelling
-      p := SubStr(o.path, 1, StrLen(o.key) - 1)
-      Loop
-      {
-         gList .= p "|" o.n "`n"
-         counter++
-         If (StrLen(p)<3)
-            Break
-         p := SubStr(p, 1, InStr(p, "\", 0, -1) - 1)
-      }
+      n := 9999999999 - k[1]
+      gList .= SubStr(g.path, 1, StrLen(g.key) - 1) "|" n "`n"
+      counter++
    }
    Return [gList, counter, total]
 }
@@ -61142,7 +61149,7 @@ PanelStructuredCopyMoveWindow() {
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", OutDir)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
     ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
-    GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders for the selected files: the deepest folder that holds them all`n[one for each drive], then each folder above it. A folder higher up`nrecreates more of the path in the destination folder.")
+    GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders: the deepest folder that holds the selected files.`nFiles on other drives, or in other folders under the drive root,`nget a folder of their own.")
     Gui, Add, Text, xs y+10 w%ml% hp +0x200, Destination:
     cleanFolderPath(UsrEditFileDestination, destFull)
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination", destFull ? UsrEditFileDestination : "")
