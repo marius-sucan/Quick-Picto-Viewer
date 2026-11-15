@@ -30,7 +30,8 @@ Seen in passing D, the count in the paste messages, is fixed in `def941f`. Findi
 are fixed in `81cbbbe`, `f52eaac`, `a5855dc` and `6697b4c`, with his answers to decisions 9 to 12: finding 12 in
 every tool that copies or moves a file into a folder, together with Seen in passing E. Findings 8, 9
 and 14 narrow finding 7, which is fixed in `c5cbfe4` with his answers to decision 4: only full paths
-with a drive letter. Finding 10 is fixed in `77b5d9c`, with his answers to decision 5. The small
+with a drive letter. Finding 10 is fixed in `77b5d9c`, with his answers to decision 5, and its menu shows up to
+fifteen entries since `5c55e6b`. The small
 things of finding 15 are numbered 15.1 to 15.14.
 A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, at
@@ -68,7 +69,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `77b5d9c` |
+| # | Finding | Harm | Checked | Status at `5c55e6b` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -79,7 +80,7 @@ Everything else keeps its lines at `b4f374f`.
 | 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | **fixed**, `c5cbfe4` (narrowed in `81cbbbe`, `f52eaac`, `87c699d`) |
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | **fixed**, `81cbbbe` |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | **fixed**, `f52eaac` |
-| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | **fixed**, `77b5d9c` |
+| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | **fixed**, `77b5d9c`, `5c55e6b` |
 | 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | **partly fixed**, `75e890d`..`5410eed`, `0ad345c` |
 | 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | **fixed**, `6697b4c` |
 | 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | **fixed**, `a5855dc` |
@@ -800,8 +801,8 @@ Run with index entries written by the test (batches D and X), at `5398a53` and o
 Run in the panel (batch X, a tree under `<work>\st\a&b`): the button hands its own handle to the
 handler, and «Please wait...» is gone when the menu opens, where it was still shown (X1). With the
 pointer at 3,3, the real menu opened at 705,359, under the button at 705,338, which is 21 pixels
-high; at `5398a53` it opened at 3,3 (X3). The menu showed the first ten of the twelve entries.
-The menu's handler, called for each of the twelve, filled the Source with that entry's folder, the
+high; at `5398a53` it opened at 3,3 (X3). On `77b5d9c` the menu showed the first ten of the
+twelve entries, and since `5c55e6b` it shows all twelve. The menu's handler, called for each of them, filled the Source with that entry's folder, the
 root as `Z:\` (X2). A Source picked from the menu copies the same files as before (E1), and the
 root as the Source copies every selected file (W3, finding 7). Like the multi-rename panel's menus,
 the menu does not open while an image loads or a long operation runs: `showThisMenu()` returns at
@@ -818,10 +819,14 @@ The first press, under Wine (batch J):
 | 20 000 | 29 093 ms | 110 ms |
 
 Left as it was: the list is kept while the panel is open (his choice), so a selection changed
-through Quick search still gets the first list (D7b). The menu still shows at most ten entries
-and «… and N folders more». A deep tree fills them with its own folders, the ones nearest the root
-left out (X1, X6). A second drive's entries come after the first drive's whole chain, so a deep
-first tree can hide them (read).
+through Quick search still gets the first list (D7b).
+
+**Raised in `5c55e6b`**, his choice: the menu shows up to fifteen entries, where it showed ten,
+then «… and N folders more» (:60502, :60514). Run, batch X: the twelve entries of X1 and the
+thirteen of X6 are all shown, roots included, where `77b5d9c` showed ten of each; two files twenty
+folders deep (X11) give fifteen entries and «... and 6 folders more». A tree deeper than fourteen
+folders still leaves out the folders nearest the root, and a second drive's entries come after the
+first drive's whole chain, so a deep first tree can still hide them (read).
 
 ---
 
@@ -1188,7 +1193,8 @@ Decisions 1 to 7 and 9 to 12 are settled; 8 is open.
    **Settled in `77b5d9c`**: the deepest folder that holds every selected file of a drive, then each
    folder above it; «N of M files» only on entries that hold part of the selection; the menu under
    the button, «Please wait...» removed first, folders without a drive letter left out with a message
-   when nothing is left; the list still kept while the panel is open.
+   when nothing is left; the list still kept while the panel is open. Up to fifteen entries since
+   `5c55e6b`.
 6. Fewer than two files (finding 11): work on one file, refuse to open, or say why nothing is
    done?
    **Settled in `cc45e03` and `5410eed`**: «Proceed» says why, and the panel stays open.
@@ -1301,7 +1307,7 @@ What is left: 11 (the handler), 15 (decision 8).
   `test-wrappers-sc.ahk` (testScA to testScX; `test-wrappers-sc.before-0ad345c.ahk` is the one
   the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X; `w-b07` at `4bda394` and `w-x10` on `77b5d9c`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
+  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X; `w-b07` at `4bda394` and `w-x10` on `77b5d9c`; `x-x15` on `5c55e6b`, batch X with X11), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
