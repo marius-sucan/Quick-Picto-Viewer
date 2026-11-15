@@ -30,11 +30,12 @@ Seen in passing D, the count in the paste messages, is fixed in `def941f`. Findi
 are fixed in `81cbbbe`, `f52eaac`, `a5855dc` and `6697b4c`, with his answers to decisions 9 to 12: finding 12 in
 every tool that copies or moves a file into a folder, together with Seen in passing E. Findings 8, 9
 and 14 narrow finding 7, which is fixed in `c5cbfe4` with his answers to decision 4: only full paths
-with a drive letter.
+with a drive letter. Finding 10 is fixed in `77b5d9c`, with his answers to decision 5. The small
+things of finding 15 are numbered 15.1 to 15.14.
 A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, at
-`6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E), and at
-`c5cbfe4` for the last note of finding 7.
+`6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E), at
+`c5cbfe4` for the last note of finding 7, and at `77b5d9c` for finding 10.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
 
@@ -67,7 +68,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `c5cbfe4` |
+| # | Finding | Harm | Checked | Status at `77b5d9c` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -78,12 +79,12 @@ Everything else keeps its lines at `b4f374f`.
 | 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | **fixed**, `c5cbfe4` (narrowed in `81cbbbe`, `f52eaac`, `87c699d`) |
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | **fixed**, `81cbbbe` |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | **fixed**, `f52eaac` |
-| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | open |
+| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | **fixed**, `77b5d9c` |
 | 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | **partly fixed**, `75e890d`..`5410eed`, `0ad345c` |
 | 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | **fixed**, `6697b4c` |
 | 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | **fixed**, `a5855dc` |
 | 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | **fixed**, `75e890d`, `87c699d` |
-| 15 | Small things: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | open |
+| 15 | Small things, numbered 15.1 to 15.14: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | open |
 
 Findings 10 and 11 are the ones a user meets in ordinary use. Findings 1 and 2 lose files
 (to the recycle bin), but only with «Overwrite» and an unusual pair of paths; finding 3 loses
@@ -692,7 +693,8 @@ Run, at `0ad345c` and on `6697b4c`:
 
 A Source no longer matches in the middle of a path: the relative `lib` of finding 7 skips the files
 it made fail. An index that spells one folder in two ways, which differ in a letter outside A-Z, may
-show both spellings in the menu (read). That `Format("{:L}")` folds letters as NTFS compares names was
+show both spellings in the menu (read; run at `5398a53`, X10: both shown; one since `77b5d9c`,
+finding 10). That `Format("{:L}")` folds letters as NTFS compares names was
 not run on Windows; the two differ for a few letters whose capital and small forms do not pair one to
 one (read).
 
@@ -748,6 +750,63 @@ More (run unless marked):
 Fix direction: offer first the deepest folder that holds every selected file of a drive, then
 the folders one level below it; keep the disk's spelling; double the `&`; keep the seen
 parents in a hash table. Decision 5.
+
+**Fixed in `77b5d9c`** by decision 5: the menu offers, for each drive, the deepest folder that holds
+every selected file of that drive, then each folder above it up to the drive root. Every entry of a
+drive keeps all its selected files; a higher one recreates more of the path in the Destination.
+`IdentifyFileFolderRoots()` (:60537) builds this in one pass over the index: it keeps, for each
+drive, the common folder in lower case and shortens it until it holds the next folder, so its time
+grows with the number of files, no longer with the square of the number of folders. The
+drive with the most selected files comes first, a tie in the drive letters' order. An entry that holds only part of the selection ends with «N of M files»,
+where M counts every selected file (:60491). Folders without a drive letter are left out, as
+«Proceed» refuses them (finding 7). Each entry keeps the index's spelling of the drive's first
+selected file (decision 11). An `&` in a folder name is doubled so that the menu shows it. The
+menu opens under the button, through `showThisMenu()` as the multi-rename panel's menus do, and
+«Please wait...» is removed before it opens. When nothing can be offered, a message says why. A
+chosen root fills the Source as `C:\` (:60522). The button's tooltip describes the new list (:61145).
+
+Run with index entries written by the test (batches D and X), at `5398a53` and on `77b5d9c`:
+
+| The selected files are in | Offered at `5398a53` | Offered on `77b5d9c` |
+|---|---|---|
+| `C:\imgs` (D2) | nothing: no menu, no message | `C:\imgs`, `C:\` |
+| `C:\dir1` and `C:\dir2` (D2b), or the root of `C:` (D2c) | nothing | `C:\` |
+| `C:\work\imgs`, with or without `C:\work\imgs\new` (D3, D3b) | `C:\work` | `C:\work\imgs`, `C:\work`, `C:\` |
+| the files of the «Help» example (D1) | `c:\temp` | `c:\`: one of its files is in `c:\other-files` |
+| the same without its two skipped files (D1b) | `c:\temp` | `c:\temp\imgs`, `c:\temp`, `c:\` |
+| `D:\work\pics` and `C:\Users\…\2026\Trips\Rome` (D4) | `D:\work` | the seven folders from `C:\Users\…\Rome` up to `C:\`, each «2 of 3 files», then `D:\work\pics`, `D:\work`, `D:\`, each «1 of 3 files» |
+| `c:\work\proj\x`, `c:\work\proj-2\y`, `c:\work\proj\sub\z` (D5) | `c:\work\proj`, `c:\work\proj-2`, `c:\work\proj\sub` | `c:\work`, `c:\` |
+| thirteen trees `C:\setN\imgs` (D9) | ten `C:\setN` and «… and 3 folders more» | `C:\` |
+| `C:\photos\yearN\eventM`, 60 000 files (J1) | 150 entries, `C:\photos\year0` first | `C:\photos`, `C:\` |
+| `C:\r&d\imgs` and `C:\r&d\other` (D6) | `C:\r&d\`, which the menu shows as `C:\rd\` (read) | `C:\r&d\`, `C:\` |
+| two files on `C:\a\b`, one on `\\server\share` (X4) | `\\server`, `C:\a` | `C:\a\b`, `C:\a`, `C:\`, each «2 of 3 files» |
+| one file on `E:\x`, one on `D:\y` (X8) | nothing | `D:\y`, `D:\`, `E:\x`, `E:\`, each «1 of 2 files» |
+| one folder spelled `C:\Școală` and `c:\școală` (X10) | both spellings | `C:\Școală`, `C:\` |
+| `\\server\share` and a subfolder (D8) | `\\server` | no menu: «WARNING: None of the selected files is on a drive with a letter; network paths are not supported» |
+| listed, none selected (X7) | nothing | no menu: «WARNING: Insufficient files selected for the operations» |
+
+Run in the panel (batch X, a tree under `<work>\st\a&b`): the button hands its own handle to the
+handler, and «Please wait...» is gone when the menu opens, where it was still shown (X1). With the
+pointer at 3,3, the real menu opened at 705,359, under the button at 705,338, which is 21 pixels
+high; at `5398a53` it opened at 3,3 (X3). Each of the twelve entries, chosen, fills the Source with
+its folder, the last one as `Z:\` (X2). A Source picked from the menu copies the same files as
+before (E1).
+
+The first press, under Wine (batch J):
+
+| Selected files | At `5398a53` | On `77b5d9c` |
+|---|---|---|
+| 60 000 in 3 000 folders under 150 parents | 546 ms | 138 ms |
+| 2 500, each in a folder of its own | 510 ms | 29 ms |
+| 5 000 | 1 823 ms | 33 ms |
+| 10 000 | 6 811 ms | 59 ms |
+| 20 000 | 29 093 ms | 110 ms |
+
+Left as it was: the list is kept while the panel is open (his choice), so a selection changed
+through Quick search still gets the first list (D7b). The menu still shows at most ten entries
+and «… and N folders more». A deep tree fills them with its own folders, the ones nearest the root
+left out (X1, X6). A second drive's entries come after the first drive's whole chain, so a deep
+first tree can hide them (read).
 
 ---
 
@@ -949,37 +1008,37 @@ stays open (decision 4). Settled in `c5cbfe4`: refused, as is every path without
 
 ## 15. Small things
 
-- **The «Action to perform» list shows a window handle as its tooltip** (run: `0x2c0142`).
+- **15.1. The «Action to perform» list shows a window handle as its tooltip** (run: `0x2c0142`).
   `GuiAddDropDownList()` uses the third item of its label list both as the list to align
   with and as the tooltip text (:26604-26613). The regular Copy/Move panel has it too (run).
-- **The first text** reads «This panels allows users…», and it was meant to start with the
+- **15.2. The first text** reads «This panels allows users…», and it was meant to start with the
   selection count: `infoSelection` is filled after the text is added (:60874, :60890) (run).
-- **«Proceed» is enabled while «Action to perform» shows «Choose...»**, where the regular panel
+- **15.3. «Proceed» is enabled while «Action to perform» shows «Choose...»**, where the regular panel
   disables it; a click says «Please select action to perform: copy or move files» (run). It
   is also narrow: 60 pixels (read).
-- **The action is «Choose...» at every opening** (:60865) (run). It may be meant so.
-- **«On file name conflicts» is not kept across restarts** (read). The regular panel's list is
+- **15.4. The action is «Choose...» at every opening** (:60865) (run). It may be meant so.
+- **15.5. «On file name conflicts» is not kept across restarts** (read). The regular panel's list is
   not either.
-- **The destination is not added to the recent destinations** of the regular panel (read:
+- **15.6. The destination is not added to the recent destinations** of the regular panel (read:
   no `RecentCopyMoveManager()` call), and `prevFileMovePath` is not set (run).
-- **«Browse», then «Cancel»**: at the next opening the Destination shows the text typed before
+- **15.7. «Browse», then «Cancel»**: at the next opening the Destination shows the text typed before
   «Browse», not the folder picked with it (run). «Browse» writes the field's text into the
   shared variable (:59958-59962).
-- **The pre-filled Source** is the folder of the focused file, also when that file is not
+- **15.8. The pre-filled Source** is the folder of the focused file, also when that file is not
   selected, or when it sits in a subfolder of the selection (run). For an index entry that
   names no file on the disk the field holds that entry's folder, and «Proceed» answers
   «Please choose an existing source folder» (read).
-- **The destination folder is looked for again for each file** whose folder already exists:
+- **15.9. The destination folder is looked for again for each file** whose folder already exists:
   `prevuDir` is set only after a folder was created (:3285-3295) (read).
-- **An empty file at the destination** is replaced without being recycled and without the
+- **15.10. An empty file at the destination** is replaced without being recycled and without the
   «overwritten» mark in the undo record (run): `FileRexists(…, 0)` counts it as absent.
-- **Both «Browse» dialogs have the same title** (read).
-- **No Alt letters**: «Structured file operations» has none in either menu, and the labels
+- **15.11. Both «Browse» dialogs have the same title** (read).
+- **15.12. No Alt letters**: «Structured file operations» has none in either menu, and the labels
   «Source:», «Destination:», «On file name conflicts:» and «Action to perform:» have none, so
   the fields are reached from the keyboard with Tab alone. The menu bar's File menu offers
   the item only in thumbnails view (read).
-- **The «Source:» label** is not centred on the field's height as «Destination:» is (read).
-- **Unused**: the global `lastInvoked` set at every opening (:60844), and `btnWid`, `txtWid`,
+- **15.13. The «Source:» label** is not centred on the field's height as «Destination:» is (read).
+- **15.14. Unused**: the global `lastInvoked` set at every opening (:60844), and `btnWid`, `txtWid`,
   `lstWid` (read).
 
 ---
@@ -1091,7 +1150,7 @@ source that is a folder counts as failed (:3261, :61635, :61889, :32252). Nothin
 
 ## Decisions to make before fixing
 
-Decisions 1 to 4, 6, 7 and 9 to 12 are settled; 5 and 8 are open.
+Decisions 1 to 7 and 9 to 12 are settled; 8 is open.
 
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
@@ -1111,14 +1170,18 @@ Decisions 1 to 4, 6, 7 and 9 to 12 are settled; 5 and 8 are open.
 5. «Possible source paths» (finding 10): offer the deepest folder that holds the whole
    selection, the selected files' own folders, or their parents? A parent recreates the
    top folder in the Destination, which may be what the code meant.
+   **Settled in `77b5d9c`**: the deepest folder that holds every selected file of a drive, then each
+   folder above it; «N of M files» only on entries that hold part of the selection; the menu under
+   the button, «Please wait...» removed first, folders without a drive letter left out with a message
+   when nothing is left; the list still kept while the panel is open.
 6. Fewer than two files (finding 11): work on one file, refuse to open, or say why nothing is
    done?
    **Settled in `cc45e03` and `5410eed`**: «Proceed» says why, and the panel stays open.
 7. The undo record (finding 4) changes the records of every move and rename tool. Change it
    for all of them?
    **Settled in `3df8de3`**: yes, for all of them.
-8. Finding 15: keep «On file name conflicts» across restarts? Add the Destination to the recent
-   destinations? Start «Action to perform» on the last action?
+8. Finding 15: keep «On file name conflicts» across restarts (15.5)? Add the Destination to the recent
+   destinations (15.6)? Start «Action to perform» on the last action (15.4)?
 9. The two paths (finding 8): clean up the text alone, or also let Windows resolve it?
    **Settled in `81cbbbe`**: clean up, then resolve.
 10. A folder at the destination (finding 12): failed or skipped, and in which tools? With the name of
@@ -1130,7 +1193,7 @@ Decisions 1 to 4, 6, 7 and 9 to 12 are settled; 5 and 8 are open.
     **Settled in `87c699d`**: a path under the root of an existing drive. Since `c5cbfe4` an existing
     folder without a drive letter is refused as well (decision 4).
 
-What is left: 11 (the handler), 10 (decision 5), 15 (decision 8).
+What is left: 11 (the handler), 15 (decision 8).
 
 ## How this was checked
 
@@ -1207,14 +1270,22 @@ What is left: 11 (the handler), 10 (decision 5), 15 (decision 8).
   `6697b4c` itself. Each of the five commits loads with AutoHotkey_H (with and without `/iLib`) and with
   stock AutoHotkey 1.1.37 (`/iLib`).
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
+- The fix of finding 10 (`77b5d9c`): batches D, E, F8, J and X were run at `5398a53` and on
+  `77b5d9c`. Batch X was added: the button pressed in the open panel, each entry chosen, where the
+  real menu opens (a native timer reads the menu window and closes it with `EndMenu`), and more
+  index entries written by the test. In the scratch copy the stubbed menu now also logs the control
+  it opens under and whether «Please wait...» is shown. Batches D, F8, J and X differ where the fix
+  changes them. Batch E differs in its menu and in the current file of the reopened database list,
+  run-to-run noise; E1 copies the same files. `77b5d9c` loads with AutoHotkey_H (with and without
+  `/iLib`) and with stock AutoHotkey 1.1.37 (`/iLib`).
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScW; batch W, the paths of finding 7's last note, has not
+  `test-wrappers-sc.ahk` (testScA to testScX; batch W, the paths of finding 7's last note, has not
   run yet; `test-wrappers-sc.before-0ad345c.ahk` is the one
   the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
+  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
@@ -1226,7 +1297,8 @@ What is left: 11 (the handler), 10 (decision 5), 15 (decision 8).
   timing and the interpreter probes. `../fix15/`: `apply.py` (makes the five commits' files from
   `0ad345c`), `report.py` (this status), `probe-copy.ahk` (`FileCopy` and `FileMove` with folders,
   Seen in passing E) and `check-stages.sh` (the load checks). `../fix07/apply.py` makes `c5cbfe4`
-  from `4bda394`.
+  from `4bda394`; `../fix10/apply.py` makes `77b5d9c` from `5398a53`. `patch.py` stubs the
+  «Possible source paths» menu in both its forms, before and after `77b5d9c`.
 
 ## Gemini's findings in this report
 
@@ -1244,27 +1316,27 @@ are those of its «Every claim» table.
 | 7 | 9, 1 | (7.2) is finding 1 |
 | 8 | 12 | (8.1) is in finding 12; no loader admits a file with no extension |
 | 9 | Checked and found correct | |
-| 10 | 5, 15 | (10.2) is in finding 15; (10.3) not checked; (10.4), (10.5) found correct |
+| 10 | 5, 15.10 | (10.2) is 15.10; (10.3) not checked; (10.4), (10.5) found correct |
 | 11 | 10 | (11.4) in finding 10 |
 | 12 | 10 | (12.3) found correct |
-| 13 | 11, 15 | (13.1) not reachable |
+| 13 | 11, 15.12 | (13.1) not reachable; (13.3) is in 15.12 |
 | 14 | 11 | |
 | 15 | 6 | (15.2), (15.3) generic; (15.4) false |
-| 16 | 7, 15 | |
-| 17 | 15 | (17.4) generic |
-| 18 | 15 | (18.4) in finding 15; (18.3) false |
+| 16 | 7, 15.7 | (16.2) is 15.7 |
+| 17 | 15.4, 15.5, 15.6 | (17.1) is 15.5, (17.2) 15.4, (17.3) 15.6; (17.4) generic |
+| 18 | 15.8 | (18.4) in 15.8; (18.3) false |
 | 19 | 13 | |
 | 20 | 14 | |
-| 21 | 15 | |
+| 21 | 15.1 | |
 | 22 | 10 | (22.4): the menu follows the dark theme, found correct |
 | 23 | Checked and found correct | false: the fields open Windows' menu |
 | 24, 25 | Checked and found correct | generic; (24.3) not a defect |
-| 26 | 15 | (26.2) in finding 15; (26.1b) false; (26.3) found correct |
-| 27 | 15 | |
-| 28 | 15 | (28.2), (28.3) generic |
+| 26 | 15.2, 15.9 | (26.2) is 15.9; (26.1b) false; (26.3) found correct |
+| 27 | 15.3, 15.12, 15.13, 15.14 | (27.1) and (27.5) are 15.14 |
+| 28 | 15.11 | (28.2), (28.3) generic |
 | S1 | 4 | |
-| S2 | 15 | |
-| S3, S4 | 15, 7 | |
+| S2 | 15.1 | |
+| S3, S4 | 15.10, 7 | |
 | S5 | Checked and found correct | generic |
 | «Checked and found correct» | Checked and found correct | agreed; the Ctrl+Backspace item was not checked |
 
