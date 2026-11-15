@@ -32240,7 +32240,8 @@ PasteFilesIntoGivenFolder(folderPath) {
       If (OldOutFileName="")   ; zPlitPath() gives no name to a file with no extension
       {
          k := InStr(file2rem, "\", 0, -1)
-         OldOutFileName := SubStr(file2rem, k + 1), OldOutDir := SubStr(file2rem, 1, k - 1)
+         OldOutFileName := SubStr(file2rem, k + 1)
+         OldOutDir := SubStr(file2rem, 1, k - 1)
       }
 
       If (determineTerminateOperation()=1)
@@ -61629,7 +61630,8 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     If (OldOutFileName="")   ; zPlitPath() gives no name to a file with no extension
     {
        k := InStr(file2rem, "\", 0, -1)
-       OldOutFileName := SubStr(file2rem, k + 1), OldOutDir := SubStr(file2rem, 1, k - 1)
+       OldOutFileName := SubStr(file2rem, k + 1)
+       OldOutDir := SubStr(file2rem, 1, k - 1)
     }
 
     ; a folder: FileCopy and FileMove would take the files inside it
@@ -61644,6 +61646,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
           showTOOLtip(errMsg "`n" OldOutFileName "`n" sOldOutDir "\")
        Else
           msgBoxWrapper(appTitle ": ERROR", errMsg "`n`n" OldOutFileName "`n" OldOutDir "\", 0, 0, "error")
+       SetTimer, RemoveTooltip, % -msgDisplayTime
        Return 0
     }
 
@@ -61876,7 +61879,8 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       If (OldOutFileName="")   ; zPlitPath() gives no name to a file with no extension
       {
          k := InStr(file2rem, "\", 0, -1)
-         OldOutFileName := SubStr(file2rem, k + 1), OldOutDir := SubStr(file2rem, 1, k - 1)
+         OldOutFileName := SubStr(file2rem, k + 1)
+         OldOutDir := SubStr(file2rem, 1, k - 1)
       }
 
       countTFilez++
