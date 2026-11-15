@@ -582,11 +582,23 @@ or `C:\`, is still accepted, and an empty field still gets «Please choose an ex
 Destination field starts empty when `UsrEditFileDestination` holds no full path (:61156), so the
 regular panel's patterns no longer show up in it.
 
-Checked by reading only. The script loads with AutoHotkey_H (with and without `/iLib`) and with
-stock AutoHotkey 1.1.37 (`/iLib`). Batch W, added to the kit for this fix, did not run, and neither
-did the fixed copy: the runs were stopped at Marius's request. The cases of batches A and I that
-named such paths (A8-rel, A9-rel, A9-dots, A10-unc, A10-unc-src, A11, I1, I1b, I1c) should now get
-the new message, and I1, I1b and I1c should open with an empty Destination.
+The script loads with AutoHotkey_H (with and without `/iLib`) and with stock AutoHotkey 1.1.37
+(`/iLib`). Batch W, added to the kit for this fix, ran at `4bda394` and on `77b5d9c`, which holds
+`c5cbfe4`:
+
+| Case | At `4bda394` | On `77b5d9c` |
+|---|---|---|
+| The Source `<work>\st\src`, which exists, typed as `\work\st\src\`, `.\work\st\src\`, `work\st\src`, `Z:work\st\src` or `..\app\work\st\src` (W1) | the four files copied | «ERROR: The source folder must be a full path with a drive letter, such as C:\photos», the panel open, nothing copied |
+| The Destination `<work>\out`, which exists, typed the same five ways (W2) | the four files copied | «ERROR: The destination folder must be a full path with a drive letter, such as C:\photos», nothing copied |
+| The Source `Z:\` or `Z:`, the root of the drive (W3) | «Finished copying 4 out of 4 files», each under `<work>\out\home\…` | the same |
+| An empty Source or Destination (W4) | «Please choose an existing source folder» or «… destination folder» | the same |
+| 152 files, the Destination `.\work\out` (W5) | «Please confirm you want to COPY the selected files» | the destination message, no question |
+| The Destination `Z:made-w6`, which does not exist (W6) | «Please choose an existing destination folder» | the destination message; nothing made in either |
+| The Destination field as the panel opens, with `\subfolder`, `.\`, `.\given-folder`, `[group-by-years]`, `Z:work\out` or `\\nas\archive` in the shared variable (W7) | that text | empty |
+| … with `<work>\out`, `<work>\out\` or `Z:` (W7) | that text | that text |
+
+Batches A and I were not run again; their cases with such paths (A8-rel, A9-rel, A9-dots, A10-unc,
+A10-unc-src, A11, I1, I1b, I1c) are the kinds of W1, W2 and W7.
 
 ---
 
@@ -788,9 +800,12 @@ Run with index entries written by the test (batches D and X), at `5398a53` and o
 Run in the panel (batch X, a tree under `<work>\st\a&b`): the button hands its own handle to the
 handler, and «Please wait...» is gone when the menu opens, where it was still shown (X1). With the
 pointer at 3,3, the real menu opened at 705,359, under the button at 705,338, which is 21 pixels
-high; at `5398a53` it opened at 3,3 (X3). Each of the twelve entries, chosen, fills the Source with
-its folder, the last one as `Z:\` (X2). A Source picked from the menu copies the same files as
-before (E1).
+high; at `5398a53` it opened at 3,3 (X3). The menu showed the first ten of the twelve entries.
+The menu's handler, called for each of the twelve, filled the Source with that entry's folder, the
+root as `Z:\` (X2). A Source picked from the menu copies the same files as before (E1), and the
+root as the Source copies every selected file (W3, finding 7). Like the multi-rename panel's menus,
+the menu does not open while an image loads or a long operation runs: `showThisMenu()` returns at
+once, and the image flag clears about 70 ms after a load (read).
 
 The first press, under Wine (batch J):
 
@@ -1278,14 +1293,15 @@ What is left: 11 (the handler), 15 (decision 8).
   changes them. Batch E differs in its menu and in the current file of the reopened database list,
   run-to-run noise; E1 copies the same files. `77b5d9c` loads with AutoHotkey_H (with and without
   `/iLib`) and with stock AutoHotkey 1.1.37 (`/iLib`).
+- The fix of finding 7 (`c5cbfe4`): batch W ran at `4bda394` and on `77b5d9c` (finding 7's last
+  note).
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScX; batch W, the paths of finding 7's last note, has not
-  run yet; `test-wrappers-sc.before-0ad345c.ahk` is the one
+  `test-wrappers-sc.ahk` (testScA to testScX; `test-wrappers-sc.before-0ad345c.ahk` is the one
   the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X), `results-1110/` (the logs of 2026-11-10). For batches N to S:
+  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X; `w-b07` at `4bda394` and `w-x10` on `77b5d9c`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
