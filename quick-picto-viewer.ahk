@@ -3367,7 +3367,6 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
             }
 
             markReplacedListEntry(file2save, thisFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
-
             resultedFilesList[thisFileIndex, 1] := file2save
             ; resultedFilesList[thisFileIndex, 2] := 1
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
@@ -33782,8 +33781,9 @@ markReplacedListEntry(filePath, keepIndex, ByRef pathsMap:="", restore:=0, repla
       Return
 
    If (!scanu && IsObject(pathsMap))
+   {
       countLists := pathsMap.Length()
-   Else
+   } Else
    {
       countLists := (StrLen(filesFilter)>1 && !(SLDtypeLoaded=3 && hasHamDistCached!=1 && InStr(filesFilter, "SQL:query:"))) ? 2 : 1
       If !scanu
@@ -33820,6 +33820,7 @@ markReplacedListEntry(filePath, keepIndex, ByRef pathsMap:="", restore:=0, repla
       listu[idx, 1] := newPath
       If !scanu
          thisMap[Format("{:L}", newPath)] := idx
+
       If (whichList=1)
          updateMainUnfilteredList(idx, 1, newPath)
       Else
@@ -41823,9 +41824,7 @@ coreBatchMultiRenameFiles() {
             }
 
             markReplacedListEntry(file2save, thisFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
-
             resultedFilesList[thisFileIndex, 1] := file2save
-            ; resultedFilesList[thisFileIndex, 2] := 1
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
      }
@@ -47962,7 +47961,6 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
            currentFilesListModified := 1
 
         markReplacedListEntry(file2save, currentFileIndex,, 0, mustReplace=1 || rowFreed=2)
-
         resultedFilesList[currentFileIndex, 1] := file2save
         updateMainUnfilteredList(currentFileIndex, 1, file2save)
         watchFolderDetails := ""
@@ -61709,7 +61707,6 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
              currentFilesListModified := 1
 
           markReplacedListEntry(file2save, currentFileIndex,, 0, mustReplace=1 || rowFreed=2)
-
           resultedFilesList[currentFileIndex, 1] := file2save
           updateMainUnfilteredList(currentFileIndex, 1, file2save)
        }
@@ -61956,9 +61953,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
             }
 
             markReplacedListEntry(file2save, thisFileIndex, listPathsMap, 0, mustReplace=1 || rowFreed=2)
-
             resultedFilesList[thisFileIndex, 1] := file2save
-            ; resultedFilesList[thisFileIndex, 2] := 1
             updateMainUnfilteredList(thisFileIndex, 1, file2save)
          }
       } Else If (operationExecuted=1)
@@ -95170,8 +95165,8 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
                rowFreed := 0
                If (SLDtypeLoaded=3)
                   rowFreed := moveSQLdbEntry(imgPath, otherFile, 0, resultedFilesList[indexu, 12])
-               markReplacedListEntry(otherFile, indexu,, 0, mustReplace=1 || rowFreed=2)
 
+               markReplacedListEntry(otherFile, indexu,, 0, mustReplace=1 || rowFreed=2)
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
                updateMainUnfilteredList(indexu, 1, otherFile)
@@ -95412,7 +95407,6 @@ batchUndoFileActs(modus) {
                }
 
                markReplacedListEntry(otherFile, indexu, listPathsMap, 0, mustReplace=1 || rowFreed=2)
-
                resultedFilesList[indexu, 1] := otherFile
                resultedFilesList[indexu, 4] := 1
                updateMainUnfilteredList(indexu, 1, otherFile)
