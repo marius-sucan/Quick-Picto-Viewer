@@ -29,10 +29,12 @@ replaced entry by a scan. Since `215b243` no batch tool asks for an «Undo» qui
 Seen in passing D, the count in the paste messages, is fixed in `def941f`. Findings 8, 9, 13 and 12
 are fixed in `81cbbbe`, `f52eaac`, `a5855dc` and `6697b4c`, with his answers to decisions 9 to 12: finding 12 in
 every tool that copies or moves a file into a folder, together with Seen in passing E. Findings 8, 9
-and 14 narrow finding 7.
+and 14 narrow finding 7, which is fixed in `c5cbfe4` with his answers to decision 4: only full paths
+with a drive letter.
 A fixed section ends with a note on what the code does now; those notes cite lines at
-`88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, and at
-`6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E).
+`88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, at
+`6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E), and at
+`c5cbfe4` for the last note of finding 7.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
 
@@ -65,7 +67,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `6697b4c` |
+| # | Finding | Harm | Checked | Status at `c5cbfe4` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -73,7 +75,7 @@ Everything else keeps its lines at `b4f374f`.
 | 4 | Undo after a move that overwrote files never brings those files back | high | run | **fixed**, `3df8de3` |
 | 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run | **fixed**, `3df8de3` |
 | 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | **fixed**, `3df8de3`, `86c89e1` |
-| 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | **partly fixed**, `81cbbbe`, `f52eaac`, `87c699d` |
+| 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | **fixed**, `c5cbfe4` (narrowed in `81cbbbe`, `f52eaac`, `87c699d`) |
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | **fixed**, `81cbbbe` |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | **fixed**, `f52eaac` |
 | 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | open |
@@ -567,6 +569,24 @@ a file's path from its first character (finding 9). Run, batches A and I:
 Still open: an existing folder without a drive letter, network paths, and the Destination pre-filled
 from the regular panel's field (decision 4).
 
+**Fixed in `c5cbfe4`** by decision 4: both fields take only a full path with a drive letter.
+`cleanFolderPath()` (:61241) tells from the text, before Windows resolves it, whether it starts with
+`X:` or `X:\`, and resolves only such a text. «Proceed» (:61183) refuses any other text before the
+save question and the 150 files question, with the panel open: «ERROR: The source folder must be a
+full path with a drive letter, such as C:\photos», and the same for the destination (:61195,
+:61201). This covers a folder relative to QPV's folder, whether it exists or not (`\folder\sub`,
+`.\folder\sub`, `folder`, `..`), a path relative to a drive's current folder (`C:folder`) and
+network paths (`\\nas\archive`, which the trim turned into `nas\archive`). A drive root, typed as `C:`
+or `C:\`, is still accepted, and an empty field still gets «Please choose an existing … folder». The
+Destination field starts empty when `UsrEditFileDestination` holds no full path (:61156), so the
+regular panel's patterns no longer show up in it.
+
+Checked by reading only. The script loads with AutoHotkey_H (with and without `/iLib`) and with
+stock AutoHotkey 1.1.37 (`/iLib`). Batch W, added to the kit for this fix, did not run, and neither
+did the fixed copy: the runs were stopped at Marius's request. The cases of batches A and I that
+named such paths (A8-rel, A9-rel, A9-dots, A10-unc, A10-unc-src, A11, I1, I1b, I1c) should now get
+the new message, and I1, I1b and I1c should open with an empty Destination.
+
 ---
 
 ## 8. A slash or a space at the end of a field
@@ -922,7 +942,8 @@ path. Run: `C:\q` and `C:\qq` get the question; `rel`, `relout`, `B:\made` (Wine
 `Q:\src` (no drive Q:), `\\nas\archive`, `\subfolder` and `.\given-folder` get «ERROR: Please choose an
 existing destination folder», with the panel open (A8-A10, I1, I1c, I4b). A network path is refused
 that way too, where it was made as `nas\archive` in QPV's folder; whether to support network paths
-stays open (decision 4).
+stays open (decision 4). Settled in `c5cbfe4`: refused, as is every path without a drive letter
+(finding 7).
 
 ---
 
@@ -1070,7 +1091,7 @@ source that is a folder counts as failed (:3261, :61635, :61889, :32252). Nothin
 
 ## Decisions to make before fixing
 
-Decisions 1, 2, 3, 6, 7 and 9 to 12 are settled; 4 in part; 5 and 8 are open.
+Decisions 1 to 4, 6, 7 and 9 to 12 are settled; 5 and 8 are open.
 
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
@@ -1084,7 +1105,9 @@ Decisions 1, 2, 3, 6, 7 and 9 to 12 are settled; 4 in part; 5 and 8 are open.
 4. Destinations (finding 7): drive-letter paths only? Network paths supported or refused with
    a message? Should the Destination start from the regular panel's text, from
    `prevFileMovePath`, or from this panel's last folder?
-   **In part, by decision 12**: only a path on an existing drive is offered for creation.
+   **Settled in `c5cbfe4`**: only full paths with a drive letter, in both fields; network paths
+   refused, as in the rest of QPV, with a message that says why; the Destination starts from the
+   shared text only when that is such a path, and empty otherwise.
 5. «Possible source paths» (finding 10): offer the deepest folder that holds the whole
    selection, the selected files' own folders, or their parents? A parent recreates the
    top folder in the Destination, which may be what the code meant.
@@ -1104,10 +1127,10 @@ Decisions 1, 2, 3, 6, 7 and 9 to 12 are settled; 4 in part; 5 and 8 are open.
 11. The spelling of «Possible source paths» (finding 9)?
     **Settled in `f52eaac`**: the index's.
 12. Which destinations may «Proceed» offer to create (finding 14)?
-    **Settled in `87c699d`**: a path under the root of an existing drive; an existing folder without a
-    drive letter still goes through (finding 7).
+    **Settled in `87c699d`**: a path under the root of an existing drive. Since `c5cbfe4` an existing
+    folder without a drive letter is refused as well (decision 4).
 
-What is left: 7 and 11 (the handler), 10 (decision 5), 15 (decision 8).
+What is left: 11 (the handler), 10 (decision 5), 15 (decision 8).
 
 ## How this was checked
 
@@ -1187,7 +1210,8 @@ What is left: 7 and 11 (the handler), 10 (decision 5), 15 (decision 8).
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScV; `test-wrappers-sc.before-0ad345c.ahk` is the one
+  `test-wrappers-sc.ahk` (testScA to testScW; batch W, the paths of finding 7's last note, has not
+  run yet; `test-wrappers-sc.before-0ad345c.ahk` is the one
   the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
   `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
@@ -1201,7 +1225,8 @@ What is left: 7 and 11 (the handler), 10 (decision 5), 15 (decision 8).
   `parity-driver.ahk`, `runahk.sh`), `fixed3-trace.ahk` (logs each call; `r-tr`, `n-tr`), the
   timing and the interpreter probes. `../fix15/`: `apply.py` (makes the five commits' files from
   `0ad345c`), `report.py` (this status), `probe-copy.ahk` (`FileCopy` and `FileMove` with folders,
-  Seen in passing E) and `check-stages.sh` (the load checks).
+  Seen in passing E) and `check-stages.sh` (the load checks). `../fix07/apply.py` makes `c5cbfe4`
+  from `4bda394`.
 
 ## Gemini's findings in this report
 
