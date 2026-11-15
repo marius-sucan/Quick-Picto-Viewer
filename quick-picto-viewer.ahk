@@ -61168,6 +61168,22 @@ BTNuiProceedStructuredOperation() {
    If (!FolderExist(fS) || !fS)
       Return msgBeepTimer("ERROR: Please choose an existing source folder")
 
+   If (dS=fS)
+      Return msgBeepTimer("ERROR: The source and destination folders cannot be the same")
+
+   If askAboutFileSave(" and the files operations will be executed")
+      Return
+
+   filesElected := getSelectedFiles(0, 1)
+   If (filesElected>150)
+   {
+      wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " dS "\", 4, 0, "question")
+      If (msgResult!="Yes")
+         Return 0
+   } Else If !filesElected 
+      Return msgBeepTimer("WARNING: Insufficient files selected for the operations")
+
    If (!FolderExist(dS) || !dS)
    {
       If (StrLen(dS)>2)
@@ -61185,22 +61201,6 @@ BTNuiProceedStructuredOperation() {
       } Else
          Return msgBeepTimer("ERROR: Please choose an existing destination folder")
    }
-
-   If (dS=fS)
-      Return msgBeepTimer("ERROR: The source and destination folders cannot be the same")
-
-   If askAboutFileSave(" and the files operations will be executed")
-      Return
-
-   filesElected := getSelectedFiles(0, 1)
-   If (filesElected>150)
-   {
-      wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected " groupDigits(filesElected) " files`nDestination: " dS "\", 4, 0, "question")
-      If (msgResult!="Yes")
-         Return 0
-   } Else If !filesElected 
-      Return msgBeepTimer("WARNING: Insufficient files selected for the operations")
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS, filesElected)
