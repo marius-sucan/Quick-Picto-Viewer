@@ -61159,12 +61159,8 @@ BTNuiProceedStructuredOperation() {
    If (UsrCopyMoveOperation=1)
       Return msgBeepTimer("WARNING: Please select action to perform: copy or move files")
 
-   fS := Trim(UsrEditFileSource, "\")
-   dS := Trim(UsrEditFileDestination, "\")
-   fS := StrReplace(fS, "/", "\")
-   dS := StrReplace(dS, "/", "\")
-   fS := Trimmer(fS)
-   dS := Trimmer(dS)
+   fS := cleanFolderPath(UsrEditFileSource)
+   dS := cleanFolderPath(UsrEditFileDestination)
    If (!FolderExist(fS) || !fS)
       Return msgBeepTimer("ERROR: Please choose an existing source folder")
 
@@ -61204,6 +61200,16 @@ BTNuiProceedStructuredOperation() {
 
    BtnCloseWindow()
    copyMoveStructuredFolders(fS, dS, filesElected)
+}
+
+cleanFolderPath(givenPath) {
+; a folder path as typed, trimmed of spaces and of backslashes at both ends, / read as \, then resolved
+; by Windows [. and .., repeated backslashes, an ending dot or space], with no ending backslash. A single
+; character stays as typed, so FolderExist() refuses it: resolved, . would be QPV's folder
+   p := Trim(StrReplace(Trimmer(givenPath), "/", "\"), "\")
+   If (StrLen(p)>1)
+      p := resolveFullPath(p)
+   Return RTrim(p, "\")
 }
 
 testStructuredFoldersClash(srcDir, destDir) {
