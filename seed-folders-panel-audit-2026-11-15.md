@@ -198,12 +198,21 @@ with the logs before the fix (batches A, B, G and I give the same lines):
 - batch K, F5 on the missing `other`, on a cached .SLD list and in a database: «Keep»
   changes nothing; «Purge» removes the entry, the three files, the folders list rows and,
   in a database, the rows of the three tables; the list saved afterwards has neither the
-  entry nor the rows.
+  entry nor the rows;
+- batch L, two seed folders missing at once, `|other` and `other\sub` inside it: the box says
+  «2 seed folders are not on the disk now…», without their paths. Plain list: «Keep» keeps
+  the four files, after the scanned ones; «Purge» drops both entries and the four files. In a
+  database: «Keep» leaves the rows of both folders in `images`, both entries in
+  `dynamicfolders` and two `staticfolders` rows dated «-»; «Purge» deletes all of them.
 
-Two things to know. Under «Keep» the index holds files that are not on the disk: viewing
+Three things to know. Under «Keep» the index holds files that are not on the disk: viewing
 one gives QPV's «File not found» message, as for any missing file. «Purge» leaves the
 captions and audio notes of the purged images in a database's `imagesData` table, as
-«Remove» answered «Yes» does.
+«Remove» answered «Yes» does. «Rescan folder» → «Purge» goes through `remFilesFromList()`,
+which finding 4 describes: on a plain or .SLD list, a folder whose name has a capital outside
+A-Z leaves the seed folders list but its files stay in the index (run, batch M: `été` purged,
+the two files of `Été` still indexed). «Rescan all» → «Purge» is not affected: it rebuilds
+the index.
 
 ## 3. «Remove» answered «Yes» on a `|` entry also removes the files of the seed folders inside it
 
@@ -260,7 +269,8 @@ What happens (run, plain list, `Été` and `Ștefan` added as seed folders):
 - Delete («Remove folder from this list»), «Yes», on `ștefan`: the entry goes, its three
   files stay in the index.
 
-The F11 to Delete steps are batch A4.
+The F11 to Delete steps are batch A4. Since `32c435d` the same goes for «Rescan folder» →
+«Purge» on such a folder when it is missing: the entry goes, its files stay (run, batch M).
 
 F3 works: it filters with a case-insensitive regular expression. «Rescan all» works too: it
 empties the index first (read). A .SLD list builds its index the same way as a plain list
@@ -593,7 +603,7 @@ tree; `run-all.sh <suffix> "" "B C D E G"` runs several, with drive P: mapped fo
 Logs in `results/`: `a-1` to `i-1` are the runs on the source of `bf72416`; `a-2` to `k-2`
 are every batch run again on the fixed text, before two last changes (the wording of the
 «Rescan all» question for one folder, the kept files placed after the scanned ones);
-`j-3` and `k-3` are batches J and K on the text committed as `32c435d`. Compared line by
+`j-3`, `k-3`, `l-3` and `m-3` are batches J to M on the text committed as `32c435d`. Compared line by
 line, after the dates and the random current image are blanked out, `a-2`, `b-2`, `g-2` and
 `i-2` give the lines of `a-1`, `b-1`, `g-1` and `i-1`; `c-2`, `d-2`, `e-2` and `h-2` differ
 where the fixes act. In `d-2`, `P:\a` holds two images because batch K, run first, added
@@ -620,15 +630,21 @@ that one in this panel, its batch F).
 | Batch | List | What it does |
 |-------|------|--------------|
 | A | plain | the Save panel's «Manage folders»; the panel from the menu; its context menu with and without a row; `Été` and `Ștefan` added: F11, F10, «Select files», «Jump», F3, F5, Delete + «Yes» |
-| B | plain | seed folders `pv`, `|other`, `other\sub`: F11 and F10, «Select files» and «Deselect files», «Jump», F3, F11 and F10 with a files filter on, «Remove» + «Yes» |
-| C | .SLD | `|other` saved, saved again, opened; an uncached list; a missing folder at save time; «Paste list» with a missing folder; «Copy list» with a missing folder; a pasted trailing separator and a quoted path |
+| B | plain | seed folders `pv`, `\|other`, `other\sub`: F11 and F10, «Select files» and «Deselect files», «Jump», F3, F11 and F10 with a files filter on, «Remove» + «Yes» |
+| C | .SLD | `\|other` saved, saved again, opened; an uncached list; a missing folder at save time; «Paste list» with a missing folder; «Copy list» with a missing folder; a pasted trailing separator and a quoted path |
 | D | plain, .SLD | drive P:: opened, «Copy list», «Rescan all», «Remove» of another entry; `P:\` added, «Rescan all», «Paste list»; saved and opened |
-| E | database | the seed folders kept; «Remove» + «Yes» on `|other`; F5 on a missing folder; «Recursive folder scan» with a missing folder, the database opened again; «Rename index entry» of `pv`; `Été` added, F11, F5 |
-| G | cached .SLD | «Recursive folder scan» and the save question; `|other` and `third` added; both re-dated and rescanned |
+| E | database | the seed folders kept; «Remove» + «Yes» on `\|other`; F5 on a missing folder; «Recursive folder scan» with a missing folder, the database opened again; «Rename index entry» of `pv`; `Été` added, F11, F5 |
+| G | cached .SLD | «Recursive folder scan» and the save question; `\|other` and `third` added; both re-dated and rescanned |
 | H | database, plain | the rename of batch E, then the database opened again; private mode, F5, Delete + «Yes» |
 | I | plain, database | «Set as the protected folder» on `ascii`, then on `été`, each followed by «delete selected files» on that folder's files; the rename of batch E, the `staticfolders` table read after the database is opened again and after the folders list panel |
 | J | plain, cached .SLD, database | after `32c435d`: «Rescan all» with `other` moved away, answered «Cancel», «Keep» (the index order logged), «Purge»; on the cached list a save after «Keep» and after «Purge»; in the database the three tables after each |
 | K | cached .SLD, database, drive P: | after `32c435d`: F5 on the missing `other`, «Keep» then «Purge», the cached list saved afterwards, the database's tables; a list of the drive root alone and a list of `P:\a`, each saved and opened |
+| L | plain, database | after `32c435d`: «Rescan all» with `\|other` and `other\sub` both missing, «Keep» then «Purge»; its step L3 opens a plain folder after the database and is not valid (the kit's known trap), batch M repeats it |
+| M | plain | after `32c435d`: F5 on the missing `été`, «Purge» |
+
+Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
+filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
+load check), and anything on Windows.
 
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.
