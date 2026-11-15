@@ -19,15 +19,20 @@ read (`ab160cb`), and the twelve test batches of 2026-11-10 were run again on `b
 logs are the same, apart from time stamps, window handles and the current file of one
 database list. Four batches are new.
 
-**Status, 2026-11-14.** Finding 3 is fixed in `ed8848c`, by Marius. Findings 1 and 2 are fixed
+**Status, 2026-11-15.** Finding 3 is fixed in `ed8848c`, by Marius. Findings 1 and 2 are fixed
 in `88aa9fc`, with his answers to decisions 1 and 2. Finding 14 is fixed in `75e890d`, by
-Marius; finding 11 is partly fixed in `75e890d`..`cc45e03`, by him, and `5410eed`. Findings 4, 5
+Marius, and completed in `87c699d`; finding 11 is partly fixed in `75e890d`..`cc45e03` and
+`0ad345c`, by him, and `5410eed`. Findings 4, 5
 and 6 are fixed in `3df8de3`, with his answers to decisions 3 and 7, in every tool that shares
 them; finding 6 is completed in `86c89e1`, and since `eda5812` the tools that move one file find the
 replaced entry by a scan. Since `215b243` no batch tool asks for an «Undo» quick-action bar (finding 4).
-Seen in passing D, the count in the paste messages, is fixed in `def941f`.
+Seen in passing D, the count in the paste messages, is fixed in `def941f`. Findings 8, 9, 13 and 12
+are fixed in `81cbbbe`, `f52eaac`, `a5855dc` and `6697b4c`, with his answers to decisions 9 to 12: finding 12 in
+every tool that copies or moves a file into a folder, together with Seen in passing E. Findings 8, 9
+and 14 narrow finding 7.
 A fixed section ends with a note on what the code does now; those notes cite lines at
-`88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, and at `3df8de3` for findings 4-6.
+`88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, and at
+`6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E).
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
 
@@ -60,7 +65,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `3df8de3` |
+| # | Finding | Harm | Checked | Status at `6697b4c` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -68,14 +73,14 @@ Everything else keeps its lines at `b4f374f`.
 | 4 | Undo after a move that overwrote files never brings those files back | high | run | **fixed**, `3df8de3` |
 | 5 | A file that cannot be copied or moved: with «Overwrite» the file at the destination is recycled anyway | medium | run | **fixed**, `3df8de3` |
 | 6 | A database list: a move that overwrites a listed file leaves a database row for a file that is gone | medium, needs «Overwrite» | run | **fixed**, `3df8de3`, `86c89e1` |
-| 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | open |
-| 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | open |
-| 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | open |
+| 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | **partly fixed**, `81cbbbe`, `f52eaac`, `87c699d` |
+| 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | **fixed**, `81cbbbe` |
+| 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | **fixed**, `f52eaac` |
 | 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | open |
-| 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | **partly fixed**, `75e890d`..`5410eed` |
-| 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | open |
-| 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | open |
-| 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | **fixed**, `75e890d` |
+| 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | **partly fixed**, `75e890d`..`5410eed`, `0ad345c` |
+| 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | **fixed**, `6697b4c` |
+| 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | **fixed**, `a5855dc` |
+| 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | **fixed**, `75e890d`, `87c699d` |
 | 15 | Small things: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | open |
 
 Findings 10 and 11 are the ones a user meets in ordinary use. Findings 1 and 2 lose files
@@ -545,6 +550,23 @@ replace», so this part is rare.
 Fix direction: accept only `X:\…` and `\\server\share\…`, as the regular panel does at :61149,
 and keep the leading `\\`; start the Destination from this panel's last folder. Decision 4.
 
+**Partly fixed by findings 8, 9 and 14** (`81cbbbe`, `f52eaac`, `87c699d`). «Proceed» resolves each field to a
+full path (finding 8), so a path without a drive letter names its folder in QPV's folder in full, in
+the questions, the messages, the index and the undo records; the files go where they went. Only a
+path under the root of an existing drive is offered for creation (finding 14), and a Source matches
+a file's path from its first character (finding 9). Run, batches A and I:
+
+- `relout`, `\\nas\archive`, and the regular panel's `\subfolder` and `.\given-folder` left in the
+  field, none of which exists: «ERROR: Please choose an existing destination folder», the panel stays
+  open, nothing is made in QPV's folder.
+- `..` exists, so no question comes: the files go to the folder above QPV's, as before; the messages
+  and the undo records name it in full.
+- The Source `lib`: «Finished copying 0 out of 2 files … Skipped files: 2», where every file failed.
+- `.\` alone is still refused (finding 8).
+
+Still open: an existing folder without a drive letter, network paths, and the Destination pre-filled
+from the regular panel's field (decision 4).
+
 ---
 
 ## 8. A slash or a space at the end of a field
@@ -577,6 +599,26 @@ Run:
 Fix direction: take away the spaces first, then turn `/` into `\`, collapse doubled
 backslashes, and take away the ending backslash last.
 
+**Fixed in `81cbbbe`** by decision 9: «Proceed» hands each field to `cleanFolderPath()` (:61233). It
+trims the spaces at both ends, reads `/` as `\` and trims the backslashes at both ends (a leading
+`\\` too, as before: finding 7), then lets Windows resolve the path (`resolveFullPath()`,
+GetFullPathNameW): `.` and `..`, repeated backslashes, an ending dot or space. The result has no
+ending backslash. A single character stays as typed, so `.\` is still refused: resolved, `.` would
+name QPV's folder.
+
+Run, at `0ad345c` and on `6697b4c`:
+
+| Field | At `0ad345c` | On `6697b4c` |
+|---|---|---|
+| Source `<work>\st\src/` or `<work>\st\src\ ` (A2, A3) | «Finished copying 0 out of 4 files … Skipped files: 4» | «Finished copying 3 out of 4 files … Skipped files: 1» |
+| Source `<work>\st\\src`, `<work>\st\.\src`, `<work>\st\src.` (V8) | «0 out of 4», every file skipped | «3 out of 4» |
+| Destination `<work>\out/` on a move (A6) | index and undo records `<work>\out\\imgA.png` | `<work>\out\imgA.png` |
+| Destination `<work>\\out`, `<work>\st\nothing\..\..\out`, `<work>\out.` on a move (V8) | index `<work>\\out\…`, `<work>\st\nothing\..\..\out\…`, `<work>\out.\…` | `<work>\out\…` |
+| Destination `<work>\out \ ` on a move (V8) | «The destination folder seems to not exist.» for `<work>\out \\` | moved into `<work>\out` |
+| The Source folder typed in the Destination with `/`, `\.\`, `\\`, an ending space, or as `new\..` (A4, A5, B4) | refused by the folder test, after the panel closed | refused by «Proceed», «The source and destination folders cannot be the same», the panel open |
+
+Under Wine, GetFullPathNameW drops an ending dot or space; that Windows does the same was not run.
+
 ---
 
 ## 9. A letter outside A-Z in another case: every file is skipped
@@ -605,6 +647,34 @@ Run, files under `st\Școală\…`:
 
 Fix direction: compare both sides after the same full case folding (`Format("{:L}")` on both,
 or `CompareStringOrdinal` with its ignore-case flag), and give the menu the disk's spelling.
+
+**Fixed in `f52eaac`**: the engine (:3254) and `testStructuredFoldersClash()` (:61313) take the part of a
+file's path below the Source from one helper, `pathBelowFolder()` (:61341). It lowers both sides with
+`Format("{:L}")`, as a database list lowers its paths, and compares from the first character. The
+destination is the Destination with that part of the file's own path after it (:3284):
+`StrReplace()` folded A-Z alone as well, and replaced every place the text was found. «Possible source
+paths» shows each folder as the index spells it (:60548, decision 11): the disk's spelling in a folder
+list, lower case in a database list.
+
+Run, at `0ad345c` and on `6697b4c`:
+
+- E1, a folder list, the Source from the menu: the menu offers `…\st\Școală` and the copy reads
+  «Finished copying 3 out of 3 files», where it offered `…\st\școală` and skipped the three.
+- E2, a database list, the Source from «Browse»: three files copied, where none were.
+- V9: the Source typed `…\st\școală` over `st\Școală\…` copies both files. With the Destination
+  `…\st\Școală\sub`, which holds a selected file, on a move with «Overwrite»: «The destination folder
+  lies inside the source folder and already holds 1 of the selected files». With the Source
+  `…\st\ș\inner` inside the Destination `…\st\Ș`, where one file would land on the other: «The
+  source folder lies inside the destination folder, where 1 of the selected files would land on
+  other selected files». At `0ad345c` the folder test found no file in either case, and the engine
+  skipped every file.
+- D: the menu entries keep their capitals (`C:\Temp\Imgs`), with the same folders and count.
+
+A Source no longer matches in the middle of a path: the relative `lib` of finding 7 skips the files
+it made fail. An index that spells one folder in two ways, which differ in a letter outside A-Z, may
+show both spellings in the menu (read). That `Format("{:L}")` folds letters as NTFS compares names was
+not run on Windows; the two differ for a few letters whose capital and small forms do not pair one to
+one (read).
 
 ---
 
@@ -714,10 +784,21 @@ Run:
   the one-file rule), the Destination missing: «Yes» to create it, then the warning, and the
   panel stays open. At `cc45e03` the panel closed after the warning.
 
+**Fixed in `0ad345c`** (Marius): «Proceed» counts the selection and asks the 150 files question
+before it looks at the Destination, so no folder is made before both are answered. Run at `0ad345c`
+(in batch K, I7 answers the 150 files question first, as it now comes first):
+
+- A12, one file selected when «Proceed» is clicked (so none), the Destination missing: «WARNING:
+  Insufficient files selected for the operations», no folder question, no folder; the panel stays open.
+- I7, 152 files, «No» at the 150 files question: no folder. I7b, «Yes» there, then «No» at «Would you
+  like to create it now?»: no folder, nothing copied, the panel open.
+- V11, an edited image among the files: the save question comes before the Destination is looked at.
+  «Discard» only answers it; the move itself drops the edits. So when the Destination is then refused
+  («No» at the folder question), the edits stay and the panel stays open; at the next «Proceed» the
+  save question comes again (V11b, «Cancel»).
+
 Still open:
 
-- The destination folder is created before the selection is counted (:60980-60996), so the
-  last two runs above leave a new, empty folder (run).
 - The folder test of findings 1 and 2, now `testStructuredFoldersClash()` (:61018), runs in
   the engine (:3211), after the panel has closed. Its refusals no longer leave the panel open
   (run: the cases of findings 1 and 2; every file stays where it was). It never refuses a
@@ -755,6 +836,36 @@ folder, the engine creates the folder `out\rawfile`, and the file ends up at
 Fix direction: treat such a folder as a conflict that cannot be overwritten: skip the file
 and count it.
 
+**Fixed in `6697b4c`** by decision 10, in every tool that copies or moves a file into a folder: a folder
+with the file's name at the destination counts as failed, under every conflict setting, as in the
+multi-rename since `25c77c6`; a source that is a folder counts as failed as well (Seen in passing E).
+
+- This panel (:3301). It takes the destination folder as the text before the last backslash
+  (:3285), where `zPlitPath()` in its fast mode took a name with no extension for a folder.
+- The regular Copy/Move panel, several files (:61963) and one file (:61672). The one-file move says
+  «WARNING: Operation aborted. A folder with the same name already exists in the destination folder.»
+  before the panel closes.
+- Pasting files (:32284).
+- The one-file undo of a move or a rename (:95191), «ERROR: Undo MOVE failed. A folder has the name of
+  the file», and the batch undo (:95418).
+- `zPlitPath()` gives no name to a file with no extension, so in the regular panel and in pasting the
+  destination was the folder itself: `FileCopy` dropped the file in it, and the index and the undo
+  record named the folder. These tools now take the name and the folder from the last backslash
+  (:32240, :61629, :61876), and so does the message of the one-file move (:61758).
+
+Run, at `0ad345c` and on `6697b4c` (batches B, K and V):
+
+| Case | At `0ad345c` | On `6697b4c` |
+|---|---|---|
+| This panel, `out\imgA.png` a folder, move (B1), also with «Ask user» (V12) | the file in `out\imgA.png\imgA.png`, the index names the folder | «Failed to perform action on 1 files», the file stays, no conflict box |
+| The same with «Overwrite», after a file that was replaced (I6) | the file in the folder | the first file replaced, the second failed |
+| A file with no extension (B2) | `out\rawfile\rawfile` | `out\rawfile` |
+| The same, `out\rawfile` a folder (V12) | `out\rawfile\rawfile` | failed |
+| The regular panel, several files: a folder in the way, a file with no extension (V12) | in the folder; the index entry `<work>\out\` | failed; `out\rawfile`, the entry `<work>\out\rawfile` |
+| The regular panel, one file: a folder in the way; a file with no extension (V12) | «File MOVED to», in the folder; the entry `<work>\out\` | the warning above, nothing moved; «File MOVED to rawfile», the entry `<work>\out\rawfile` |
+| Pasting: `out\imgA.png` a folder; `LICENSE` (V12) | in the folder; copied, undo record `<work>\out\` | failed; copied, undo record `<work>\out\LICENSE` |
+| Undo of a move, a folder made at the old place (V12, one file and batch) | «Undo MOVE succeded», the file in the folder | the error above / «Failed to perform UNDO for 1 files», the file stays |
+
 ---
 
 ## 13. Missing files outside the Source are counted as failed
@@ -778,6 +889,10 @@ that is offline, each such file waits for the drive (read).
 
 Fix direction: swap the two tests.
 
+**Fixed in `a5855dc`**: the Source test comes first (:3254). Run: B6 reads «Finished copying 2 out of 3
+files … Skipped files: 1», where it read «Failed to perform action on 1 files»; in V13 a missing file
+inside the Source still fails and one outside is skipped.
+
 ---
 
 ## 14. `D:\a` is refused
@@ -800,6 +915,14 @@ gets «The destination folder seems to not exist. C:\q\ Would you like to create
 The drive-root test of the fix direction was not made, so shorter paths without a drive letter
 get the question as well: `rel`, which does not exist, was refused and is now offered for
 creation (run). After «Yes» it would be made in QPV's folder, as `relout` is (finding 7).
+
+**Completed in `87c699d`** by decision 12: the question comes only for a path under the root of an
+existing drive (:61213), told from the text before it is resolved (finding 8), which completes any
+path. Run: `C:\q` and `C:\qq` get the question; `rel`, `relout`, `B:\made` (Wine has no drive B:),
+`Q:\src` (no drive Q:), `\\nas\archive`, `\subfolder` and `.\given-folder` get «ERROR: Please choose an
+existing destination folder», with the panel open (A8-A10, I1, I1c, I4b). A network path is refused
+that way too, where it was made as `nas\archive` in QPV's folder; whether to support network paths
+stays open (decision 4).
 
 ---
 
@@ -869,6 +992,22 @@ as a file (T3). Run, batch T:
 | T5: two files, one path without a drive letter | «2 out of 1» | «2 out of 2» |
 | T6: two files, neither path with a drive letter | «2 out of 1» | «2 out of 2» |
 
+**E. A folder as the source of a copy or a move.** `FileCopy` and `FileMove` take a folder as the
+files inside it (run, a probe on AutoHotkey_H 1.1.33 under Wine). Onto an existing folder they copy or
+move those files, without the subfolders, and replace files of the same name without the recycle bin.
+Onto a name that does not exist they write every file in turn onto that one name: a copy leaves one
+file with the last file's content, a move keeps only the last file. Run at `0ad345c` (batch V):
+
+- A folder in the clipboard, pasted into `out`: its files are copied into `out`, `out\f1.png` is
+  replaced (861 bytes, now 361, nothing recycled), `sub\` is left behind.
+- An index entry that names a folder, `album.2024`: the regular panel moves its files into the
+  Destination the same way; this panel writes them onto `out\album.2024`, and on a move `f1.png` is
+  lost.
+
+**Fixed in `6697b4c`** with finding 12 (decision 10): in this panel, the regular panel and pasting, a
+source that is a folder counts as failed (:3261, :61635, :61889, :32252). Nothing is copied or moved
+(run, the same cases).
+
 ## Checked and found correct
 
 - **«Proceed» closes the panel right after a question.** `BtnCloseWindow()` passes "yes",
@@ -906,7 +1045,7 @@ as a file (T3). Run, batch T:
 - **The conflict box starts afresh**: the engine clears the «Do not prompt again» answer of an
   earlier run (:3228) (read).
 - **A-Z in another case**: `InStr()` finds `c:\scoala\` in `C:\Scoala\2026\a.jpg` (run); only
-  letters outside A-Z do not match (finding 9).
+  letters outside A-Z do not match (finding 9, fixed in `f52eaac`).
 - **A stopped run on a database list** commits what was done, which keeps the database in step
   with the files already moved (read).
 - **The file dates** are copied onto each copy (:3268-3270, :3342-3346) (read).
@@ -931,7 +1070,7 @@ as a file (T3). Run, batch T:
 
 ## Decisions to make before fixing
 
-Decisions 1, 2, 3, 6 and 7 are settled; the others are open.
+Decisions 1, 2, 3, 6, 7 and 9 to 12 are settled; 4 in part; 5 and 8 are open.
 
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
@@ -945,6 +1084,7 @@ Decisions 1, 2, 3, 6 and 7 are settled; the others are open.
 4. Destinations (finding 7): drive-letter paths only? Network paths supported or refused with
    a message? Should the Destination start from the regular panel's text, from
    `prevFileMovePath`, or from this panel's last folder?
+   **In part, by decision 12**: only a path on an existing drive is offered for creation.
 5. «Possible source paths» (finding 10): offer the deepest folder that holds the whole
    selection, the selected files' own folders, or their parents? A parent recreates the
    top folder in the Destination, which may be what the code meant.
@@ -956,9 +1096,18 @@ Decisions 1, 2, 3, 6 and 7 are settled; the others are open.
    **Settled in `3df8de3`**: yes, for all of them.
 8. Finding 15: keep «On file name conflicts» across restarts? Add the Destination to the recent
    destinations? Start «Action to perform» on the last action?
+9. The two paths (finding 8): clean up the text alone, or also let Windows resolve it?
+   **Settled in `81cbbbe`**: clean up, then resolve.
+10. A folder at the destination (finding 12): failed or skipped, and in which tools? With the name of
+    a file with no extension taken after the last backslash, and a folder as the source refused?
+    **Settled in `6697b4c`**: failed, in every tool that has the test; yes to both.
+11. The spelling of «Possible source paths» (finding 9)?
+    **Settled in `f52eaac`**: the index's.
+12. Which destinations may «Proceed» offer to create (finding 14)?
+    **Settled in `87c699d`**: a path under the root of an existing drive; an existing folder without a
+    drive letter still goes through (finding 7).
 
-Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the handler); then
-10; then the rest.
+What is left: 7 and 11 (the handler), 10 (decision 5), 15 (decision 8).
 
 ## How this was checked
 
@@ -1020,13 +1169,28 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   Run at `c088d5d` and on `cfed87c` (a loop over the non-empty lines: every count right),
   `cccc913` (a count of `:\`, which leaves out T5 and T6: «2 out of 1», «2 out of 0») and `def941f`;
   the logs differ only in the «out of» messages.
+- The fixes of 2026-11-15 (findings 8, 9, 12, 13 and 14; finding 11 at `0ad345c`): batches A to
+  E, G, H, I, K, L, M, N, O and T were run at `0ad345c` and on the fix. In batches A, I and K the
+  cases where a question may or may not come now wait 7 s, so that an answer nobody took expires
+  before the next case, and I7 answers the 150 files question first. Batch V was added: the spellings
+  of finding 8, the letter case of finding 9 with both folder tests, a folder at the destination in
+  the six tools, a file with no extension, a folder as the source, finding 13, and the save question
+  of finding 11. Batches C, G, H, L, M, O and T give the same logs; the others differ where the fixes
+  change them, as the fixed sections list. Batch N differs only in run-to-run noise: the current
+  file of the reopened database list and the image loads that follow from it, a device context, and
+  in one run one more «Confirm file deletion» line from `closer.ahk` (another run gives the same log
+  as `0ad345c`). The batches ran on the text of `6697b4c`
+  but for the message of the one-file move (:61758); batches V and N, which reach it, ran again on
+  `6697b4c` itself. Each of the five commits loads with AutoHotkey_H (with and without `/iLib`) and with
+  stock AutoHotkey 1.1.37 (`/iLib`).
 - Not checked: a read-only file moved to another volume, and a folder name ending in a dot.
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScT), `results/` (`<batch>-hd.txt` on `b4f374f`,
+  `test-wrappers-sc.ahk` (testScA to testScV; `test-wrappers-sc.before-0ad345c.ahk` is the one
+  the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
+  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
@@ -1035,7 +1199,9 @@ Suggested order for what is left: 12 (the engine); then 7, 8, 9 and 11 (the hand
   `norm2.sh` (also drops the run-to-run noise), `b46-stub.ahk` (`02046f3` with a stub
   `mapListPaths()`, which batch R calls), and the harness (`build-parity.py`,
   `parity-driver.ahk`, `runahk.sh`), `fixed3-trace.ahk` (logs each call; `r-tr`, `n-tr`), the
-  timing and the interpreter probes.
+  timing and the interpreter probes. `../fix15/`: `apply.py` (makes the five commits' files from
+  `0ad345c`), `report.py` (this status), `probe-copy.ahk` (`FileCopy` and `FileMove` with folders,
+  Seen in passing E) and `check-stages.sh` (the load checks).
 
 ## Gemini's findings in this report
 
