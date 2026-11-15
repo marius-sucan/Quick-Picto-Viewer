@@ -3251,16 +3251,16 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
          Continue
       }
 
-      If !FileExist(file2rem)
-      {
-         failedFiles++
-         Continue
-      }
-
       relPath := pathBelowFolder(file2rem, srcKey)
       If (relPath="")
       {
          skippedFiles++
+         Continue
+      }
+
+      If !FileExist(file2rem)
+      {
+         failedFiles++
          Continue
       }
 
