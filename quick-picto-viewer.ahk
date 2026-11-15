@@ -60499,7 +60499,7 @@ BtnIdentifyFileRoots(hCtl:=0) {
    Try Menu, Manna, Delete
    Loop, Parse, listu, `n
    {
-      If (A_Index>10)
+      If (A_Index>15)
          Break
       If !A_LoopField
          Continue
@@ -60511,10 +60511,10 @@ BtnIdentifyFileRoots(hCtl:=0) {
       Menu, Manna, Add, % entryu, menuSetSourceStructuredOper
    }
 
-   If (alistu[2]>10)
+   If (alistu[2]>15)
    {
-      Try Menu, Manna, Add, % "... and " alistu[2] - 10 " folders more", dummy
-      Try Menu, Manna, Disable, % "... and " alistu[2] - 10 " folders more"
+      Try Menu, Manna, Add, % "... and " alistu[2] - 15 " folders more", dummy
+      Try Menu, Manna, Disable, % "... and " alistu[2] - 15 " folders more"
    }
    showThisMenu("Manna", 0, hCtl ? "hwnd" : 0, hCtl)
 }
