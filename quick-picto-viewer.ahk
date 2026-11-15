@@ -61153,7 +61153,8 @@ PanelStructuredCopyMoveWindow() {
     ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
     GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Automatically identify possible source paths based on the selected files.`nThe number of listed folders in the menu is an indicator`nof how dispersed are the locations of the selected files.")
     Gui, Add, Text, xs y+10 w%ml% hp +0x200, Destination:
-    GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination", UsrEditFileDestination)
+    cleanFolderPath(UsrEditFileDestination, destFull)
+    GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination", destFull ? UsrEditFileDestination : "")
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesDst hwndhTemp, B&rowse
     ToolTip2ctrl(hTemp, "In the destination folder, the folder structure will be created containing the selected files.")
     thisW := (PrefsLargeFonts=1) ? 190 : 120
@@ -61188,10 +61189,16 @@ BTNuiProceedStructuredOperation() {
    If (UsrCopyMoveOperation=1)
       Return msgBeepTimer("WARNING: Please select action to perform: copy or move files")
 
-   fS := cleanFolderPath(UsrEditFileSource)
-   dS := cleanFolderPath(UsrEditFileDestination, destOnDrive)
+   fS := cleanFolderPath(UsrEditFileSource, srcFull)
+   dS := cleanFolderPath(UsrEditFileDestination, destFull, destOnDrive)
+   If (fS && !srcFull)
+      Return msgBeepTimer("ERROR: The source folder must be a full path with a drive letter, such as C:\photos")
+
    If (!FolderExist(fS) || !fS)
       Return msgBeepTimer("ERROR: Please choose an existing source folder")
+
+   If (dS && !destFull)
+      Return msgBeepTimer("ERROR: The destination folder must be a full path with a drive letter, such as C:\photos")
 
    If (dS=fS)
       Return msgBeepTimer("ERROR: The source and destination folders cannot be the same")
@@ -61231,16 +61238,15 @@ BTNuiProceedStructuredOperation() {
    copyMoveStructuredFolders(fS, dS, filesElected)
 }
 
-cleanFolderPath(givenPath, ByRef onDrive:=0) {
-; a folder path as typed, trimmed of spaces and of backslashes at both ends, / read as \, then resolved
-; by Windows [. and .., repeated backslashes, an ending dot or space], with no ending backslash. A single
-; character stays as typed, so FolderExist() refuses it: resolved, . would be QPV's folder. onDrive: the
-; text names a folder under the root of an existing drive, told before resolving, which completes any path
+cleanFolderPath(givenPath, ByRef isFull:=0, ByRef onDrive:=0) {
+; a folder path as typed, trimmed of spaces and of backslashes at both ends, / read as \. isFull: it starts
+; with a drive letter [C: or C:\...]; only such a path is resolved by Windows [. and .., repeated backslashes,
+; an ending dot or space], with no ending backslash. onDrive: it names a folder under the root of an existing
+; drive. Both are told from the text, since resolving completes any path
    p := Trim(StrReplace(Trimmer(givenPath), "/", "\"), "\")
+   isFull := RegExMatch(p, "i)^[a-z]:(\\|$)") ? 1 : 0
    onDrive := (RegExMatch(p, "i)^[a-z]:\\.") && FolderExist(SubStr(p, 1, 2))) ? 1 : 0
-   If (StrLen(p)>1)
-      p := resolveFullPath(p)
-   Return RTrim(p, "\")
+   Return isFull ? RTrim(resolveFullPath(p), "\") : p
 }
 
 testStructuredFoldersClash(srcDir, destDir) {
