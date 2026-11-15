@@ -30,13 +30,12 @@ Seen in passing D, the count in the paste messages, is fixed in `def941f`. Findi
 are fixed in `81cbbbe`, `f52eaac`, `a5855dc` and `6697b4c`, with his answers to decisions 9 to 12: finding 12 in
 every tool that copies or moves a file into a folder, together with Seen in passing E. Findings 8, 9
 and 14 narrow finding 7, which is fixed in `c5cbfe4` with his answers to decision 4: only full paths
-with a drive letter. Finding 10 is fixed in `77b5d9c`, with his answers to decision 5, and its menu shows up to
-fifteen entries since `5c55e6b`. The small
-things of finding 15 are numbered 15.1 to 15.14.
+with a drive letter. Finding 10 is fixed in `77b5d9c`, `5c55e6b` and `cc16a46`, with his answers to
+decision 5. The small things of finding 15 are numbered 15.1 to 15.14.
 A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, at
 `6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E), at
-`c5cbfe4` for the last note of finding 7, and at `77b5d9c` for finding 10.
+`c5cbfe4` for the last note of finding 7, and at `cc16a46` for finding 10.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
 
@@ -69,7 +68,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `5c55e6b` |
+| # | Finding | Harm | Checked | Status at `cc16a46` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -80,7 +79,7 @@ Everything else keeps its lines at `b4f374f`.
 | 7 | Destinations without a drive letter, the regular panel's patterns and network paths: the files land in QPV's folder | medium | run | **fixed**, `c5cbfe4` (narrowed in `81cbbbe`, `f52eaac`, `87c699d`) |
 | 8 | A slash or a space at the end of a field: every file skipped, or doubled backslashes written into the index | medium | run | **fixed**, `81cbbbe` |
 | 9 | A folder name with a letter outside A-Z in another case: every file is skipped | medium, narrow | run | **fixed**, `f52eaac` |
-| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | **fixed**, `77b5d9c`, `5c55e6b` |
+| 10 | «Possible source paths» rarely offers the folder that holds the selection | medium | run | **fixed**, `77b5d9c`, `5c55e6b`, `cc16a46` |
 | 11 | «Proceed» creates the destination and closes the panel before it checks the selection and asks the 150 files question | medium | run | **partly fixed**, `75e890d`..`5410eed`, `0ad345c` |
 | 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | **fixed**, `6697b4c` |
 | 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | **fixed**, `a5855dc` |
@@ -764,69 +763,66 @@ Fix direction: offer first the deepest folder that holds every selected file of 
 the folders one level below it; keep the disk's spelling; double the `&`; keep the seen
 parents in a hash table. Decision 5.
 
-**Fixed in `77b5d9c`** by decision 5: the menu offers, for each drive, the deepest folder that holds
-every selected file of that drive, then each folder above it up to the drive root. Every entry of a
-drive keeps all its selected files; a higher one recreates more of the path in the Destination.
-`IdentifyFileFolderRoots()` (:60537) builds this in one pass over the index: it keeps, for each
-drive, the common folder in lower case and shortens it until it holds the next folder, so its time
-grows with the number of files, no longer with the square of the number of folders. The
-drive with the most selected files comes first, a tie in the drive letters' order. An entry that holds only part of the selection ends with «N of M files»,
-where M counts every selected file (:60491). Folders without a drive letter are left out, as
-«Proceed» refuses them (finding 7). Each entry keeps the index's spelling of the drive's first
-selected file (decision 11). An `&` in a folder name is doubled so that the menu shows it. The
-menu opens under the button, through `showThisMenu()` as the multi-rename panel's menus do, and
-«Please wait...» is removed before it opens. When nothing can be offered, a message says why. A
-chosen root fills the Source as `C:\` (:60522). The button's tooltip describes the new list (:61145).
+**Fixed in `77b5d9c`, `5c55e6b` and `cc16a46`** by decision 5. The menu groups the selected files by
+drive and by the folder under the drive root, and offers, for each group, the deepest folder that holds
+its files, without the folders above it. A selection that shares a folder below the drive root gets one
+entry; each other drive, and each other folder under the root, adds one. `77b5d9c` also listed each
+folder above the common one, up to the drive root; he did not want those, and since `cc16a46` the menu
+lists the common folders only. The groups with the most selected files come first; equal counts go by
+path, compared folder name by folder name (`set1` before `set10`). An entry that holds only part of the
+selection ends with «N of M files», where M counts every selected file (:60491). A drive root comes
+only for files in the root itself, and then holds every selected file of its drive. Folders without a
+drive letter are left out, as «Proceed» refuses them (finding 7). Each entry keeps the index's spelling
+(decision 11). An `&` in a folder name is doubled so that the menu shows it. The menu opens under the
+button, through `showThisMenu()` as the multi-rename panel's menus do, and «Please wait...» is removed
+before it opens. When nothing can be offered, a message says why. A root entry fills the Source as
+`C:\` (:60522). The menu shows up to fifteen entries, then «… and N folders more» (`5c55e6b`, :60502,
+:60514). `IdentifyFileFolderRoots()` (:60537) builds the groups in one pass over the index, looking each
+one up in a hash table, so its time grows with the number of files, no longer with the square of the
+number of folders. The button's tooltip describes the list (:61152).
 
-Run with index entries written by the test (batches D and X), at `5398a53` and on `77b5d9c`:
+Run with index entries written by the test (batches D and X), at `5398a53` and on `cc16a46`:
 
-| The selected files are in | Offered at `5398a53` | Offered on `77b5d9c` |
+| The selected files are in | Offered at `5398a53` | Offered on `cc16a46` |
 |---|---|---|
-| `C:\imgs` (D2) | nothing: no menu, no message | `C:\imgs`, `C:\` |
-| `C:\dir1` and `C:\dir2` (D2b), or the root of `C:` (D2c) | nothing | `C:\` |
-| `C:\work\imgs`, with or without `C:\work\imgs\new` (D3, D3b) | `C:\work` | `C:\work\imgs`, `C:\work`, `C:\` |
-| the files of the «Help» example (D1) | `c:\temp` | `c:\`: one of its files is in `c:\other-files` |
-| the same without its two skipped files (D1b) | `c:\temp` | `c:\temp\imgs`, `c:\temp`, `c:\` |
-| `D:\work\pics` and `C:\Users\…\2026\Trips\Rome` (D4) | `D:\work` | the seven folders from `C:\Users\…\Rome` up to `C:\`, each «2 of 3 files», then `D:\work\pics`, `D:\work`, `D:\`, each «1 of 3 files» |
-| `c:\work\proj\x`, `c:\work\proj-2\y`, `c:\work\proj\sub\z` (D5) | `c:\work\proj`, `c:\work\proj-2`, `c:\work\proj\sub` | `c:\work`, `c:\` |
-| thirteen trees `C:\setN\imgs` (D9) | ten `C:\setN` and «… and 3 folders more» | `C:\` |
-| `C:\photos\yearN\eventM`, 60 000 files (J1) | 150 entries, `C:\photos\year0` first | `C:\photos`, `C:\` |
-| `C:\r&d\imgs` and `C:\r&d\other` (D6) | `C:\r&d\`, which the menu shows as `C:\rd\` (read) | `C:\r&d\`, `C:\` |
-| two files on `C:\a\b`, one on `\\server\share` (X4) | `\\server`, `C:\a` | `C:\a\b`, `C:\a`, `C:\`, each «2 of 3 files» |
-| one file on `E:\x`, one on `D:\y` (X8) | nothing | `D:\y`, `D:\`, `E:\x`, `E:\`, each «1 of 2 files» |
-| one folder spelled `C:\Școală` and `c:\școală` (X10) | both spellings | `C:\Școală`, `C:\` |
+| `C:\imgs` (D2) | nothing: no menu, no message | `C:\imgs` |
+| `C:\dir1` and `C:\dir2` (D2b) | nothing | `C:\dir1`, `C:\dir2`, each «1 of 2 files» |
+| the root of `C:` (D2c) | nothing | `C:\` |
+| `C:\work\imgs`, with or without `C:\work\imgs\new` (D3, D3b) | `C:\work` | `C:\work\imgs` |
+| the files of the «Help» example (D1) | `c:\temp` | `c:\temp` «6 of 7 files», `c:\other-files` «1 of 7 files» |
+| the same without its two skipped files (D1b) | `c:\temp` | `c:\temp\imgs` |
+| `D:\work\pics` and `C:\Users\…\2026\Trips\Rome` (D4) | `D:\work` | `C:\Users\…\Rome` «2 of 3 files», `D:\work\pics` «1 of 3 files» |
+| `c:\work\proj\x`, `c:\work\proj-2\y`, `c:\work\proj\sub\z` (D5) | `c:\work\proj`, `c:\work\proj-2`, `c:\work\proj\sub` | `c:\work` |
+| thirteen trees `C:\setN\imgs` (D9) | ten `C:\setN` and «… and 3 folders more» | the thirteen `C:\setN\imgs`, each «1 of 13 files»: `C:\set1\imgs`, `C:\set10\imgs` … `C:\set13\imgs`, `C:\set2\imgs` … |
+| `C:\photos\yearN\eventM`, 60 000 files (J1) | 150 entries, `C:\photos\year0` first | `C:\photos` |
+| `C:\r&d\imgs` and `C:\r&d\other` (D6) | `C:\r&d\`, which the menu shows as `C:\rd\` (read) | `C:\r&d\` |
+| two files on `C:\a\b`, one on `\\server\share` (X4) | `\\server`, `C:\a` | `C:\a\b` «2 of 3 files» |
+| one file on `E:\x`, one on `D:\y` (X8) | nothing | `D:\y`, `E:\x`, each «1 of 2 files» |
+| one folder spelled `C:\Școală` and `c:\școală` (X10) | both spellings | `C:\Școală` |
 | `\\server\share` and a subfolder (D8) | `\\server` | no menu: «WARNING: None of the selected files is on a drive with a letter; network paths are not supported» |
 | listed, none selected (X7) | nothing | no menu: «WARNING: Insufficient files selected for the operations» |
 
 Run in the panel (batch X, a tree under `<work>\st\a&b`): the button hands its own handle to the
 handler, and «Please wait...» is gone when the menu opens, where it was still shown (X1). With the
-pointer at 3,3, the real menu opened at 705,359, under the button at 705,338, which is 21 pixels
-high; at `5398a53` it opened at 3,3 (X3). On `77b5d9c` the menu showed the first ten of the
-twelve entries, and since `5c55e6b` it shows all twelve. The menu's handler, called for each of them, filled the Source with that entry's folder, the
-root as `Z:\` (X2). A Source picked from the menu copies the same files as before (E1), and the
-root as the Source copies every selected file (W3, finding 7). Like the multi-rename panel's menus,
-the menu does not open while an image loads or a long operation runs: `showThisMenu()` returns at
-once, and the image flag clears about 70 ms after a load (read).
+pointer at 3,3, the real menu opened at 705,359, under the button at 705,338, which is 21 pixels high;
+at `5398a53` it opened at 3,3 (X3). The chosen entry fills the Source with its folder (X2); a root entry
+filled it as `Z:\` on `77b5d9c`, where every chain ended in a root. A Source picked from the menu copies
+the same files as before (E1), and a root as the Source copies every selected file (W3, finding 7).
+Like the multi-rename panel's menus, the menu does not open while an image loads or a long operation
+runs: `showThisMenu()` returns at once, and the image flag clears about 70 ms after a load (read).
 
 The first press, under Wine (batch J):
 
-| Selected files | At `5398a53` | On `77b5d9c` |
+| Selected files | At `5398a53` | On `cc16a46` |
 |---|---|---|
-| 60 000 in 3 000 folders under 150 parents | 546 ms | 138 ms |
-| 2 500, each in a folder of its own | 510 ms | 29 ms |
-| 5 000 | 1 823 ms | 33 ms |
-| 10 000 | 6 811 ms | 59 ms |
-| 20 000 | 29 093 ms | 110 ms |
+| 60 000 in 3 000 folders under 150 parents | 546 ms, 150 entries | 165 ms, 1 entry |
+| 2 500, each in a folder of its own under the drive root | 510 ms | 88 ms, 2 500 entries |
+| 5 000 | 1 823 ms | 159 ms |
+| 10 000 | 6 811 ms | 327 ms |
+| 20 000 | 29 093 ms | 658 ms; the menu shows fifteen and «... and 19985 folders more» |
 
 Left as it was: the list is kept while the panel is open (his choice), so a selection changed
 through Quick search still gets the first list (D7b).
-
-**Raised in `5c55e6b`**, his choice: the menu shows up to fifteen entries, where it showed ten,
-then «… and N folders more» (:60502, :60514). Run, batch X: the twelve entries of X1 and the
-thirteen of X6 are all shown, roots included, where `77b5d9c` showed ten of each; two files twenty
-folders deep (X11) give fifteen entries and «... and 6 folders more». A tree deeper than fourteen
-folders still leaves out the folders nearest the root, and a second drive's entries come after the
-first drive's whole chain, so a deep first tree can still hide them (read).
 
 ---
 
@@ -1190,11 +1186,12 @@ Decisions 1 to 7 and 9 to 12 are settled; 8 is open.
 5. «Possible source paths» (finding 10): offer the deepest folder that holds the whole
    selection, the selected files' own folders, or their parents? A parent recreates the
    top folder in the Destination, which may be what the code meant.
-   **Settled in `77b5d9c`**: the deepest folder that holds every selected file of a drive, then each
-   folder above it; «N of M files» only on entries that hold part of the selection; the menu under
-   the button, «Please wait...» removed first, folders without a drive letter left out with a message
-   when nothing is left; the list still kept while the panel is open. Up to fifteen entries since
-   `5c55e6b`.
+   **Settled in `77b5d9c`, `5c55e6b` and `cc16a46`**: the selected files grouped by drive and by the
+   folder under the drive root, each group at its deepest common folder, without the folders above it
+   (`77b5d9c` listed those too); the most files first, equal counts by path; «N of M files» only on
+   entries that hold part of the selection; the menu under the button, «Please wait...» removed first,
+   folders without a drive letter left out with a message when nothing is left; up to fifteen entries
+   (`5c55e6b`); the list still kept while the panel is open.
 6. Fewer than two files (finding 11): work on one file, refuse to open, or say why nothing is
    done?
    **Settled in `cc45e03` and `5410eed`**: «Proceed» says why, and the panel stays open.
@@ -1298,7 +1295,10 @@ What is left: 11 (the handler), 15 (decision 8).
   it opens under and whether «Please wait...» is shown. Batches D, F8, J and X differ where the fix
   changes them. Batch E differs in its menu and in the current file of the reopened database list,
   run-to-run noise; E1 copies the same files. `77b5d9c` loads with AutoHotkey_H (with and without
-  `/iLib`) and with stock AutoHotkey 1.1.37 (`/iLib`).
+  `/iLib`) and with stock AutoHotkey 1.1.37 (`/iLib`). The list of common folders (`cc16a46`): the
+  same batches ran at `27a779a` and on `cc16a46`, and D, J and X again once equal counts were ordered
+  folder name by folder name. Batches D, F8, J and X differ where the change shows; E in its menu and
+  in the current file of the reopened database list. `cc16a46` loads the same three ways.
 - The fix of finding 7 (`c5cbfe4`): batch W ran at `4bda394` and on `77b5d9c` (finding 7's last
   note).
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
@@ -1307,7 +1307,8 @@ What is left: 11 (the handler), 15 (decision 8).
   `test-wrappers-sc.ahk` (testScA to testScX; `test-wrappers-sc.before-0ad345c.ahk` is the one
   the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
-  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X; `w-b07` at `4bda394` and `w-x10` on `77b5d9c`; `x-x15` on `5c55e6b`, batch X with X11), `results-1110/` (the logs of 2026-11-10). For batches N to S:
+  `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X; `w-b07` at `4bda394` and `w-x10` on `77b5d9c`; `x-x15` on `5c55e6b`, batch X with X11; `-b10b` at `27a779a`, `-x10b` on `cc16a46` but for the order of
+  equal counts, `-x10c` (D, J, X) on `cc16a46`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
   `closer.ahk`, a second process that answers Wine's «Confirm file deletion» with «No»; in
   `patch.py`, `scRecycleFail` and `scRenameFail` (the simulated refusals) and
   `scRestoreAnswer=2` (the restore from Wine's trash); the conflict box is answered from a
@@ -1319,7 +1320,8 @@ What is left: 11 (the handler), 15 (decision 8).
   timing and the interpreter probes. `../fix15/`: `apply.py` (makes the five commits' files from
   `0ad345c`), `report.py` (this status), `probe-copy.ahk` (`FileCopy` and `FileMove` with folders,
   Seen in passing E) and `check-stages.sh` (the load checks). `../fix07/apply.py` makes `c5cbfe4`
-  from `4bda394`; `../fix10/apply.py` makes `77b5d9c` from `5398a53`. `patch.py` stubs the
+  from `4bda394`; `../fix10/apply.py` makes `77b5d9c` from `5398a53`, `../fix10b/apply.py` makes `cc16a46` from
+  `27a779a`. `patch.py` stubs the
   «Possible source paths» menu in both its forms, before and after `77b5d9c`.
 
 ## Gemini's findings in this report
