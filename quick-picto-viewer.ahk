@@ -3258,7 +3258,9 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
          Continue
       }
 
-      If !FileExist(file2rem)
+      ; a folder: FileCopy and FileMove would take the files inside it
+      srcAttr := FileExist(file2rem)
+      If (!srcAttr || InStr(srcAttr, "D"))
       {
          failedFiles++
          Continue
@@ -3280,7 +3282,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       }
 
       file2save := finalDest "\" relPath
-      zPlitPath(file2save, 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
+      OutDir := SubStr(file2save, 1, InStr(file2save, "\", 0, -1) - 1)
       If (prevuDir!=OutDir)
       {
          If !FolderExist(OutDir)
@@ -3295,7 +3297,15 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       }
       ; Tooltip, % file2rem "`n" file2save "`n" OutDir
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
-      If (FileExist(file2save) && !FolderExist(file2save))
+      destAttr := FileExist(file2save)
+      ; FileMove and FileCopy would put the file inside a folder of that name
+      If InStr(destAttr, "D")
+      {
+         failedFiles++
+         Continue
+      }
+
+      If destAttr
       {
          ; the file itself, reached through another spelling of the source folder or a link
          fileID := getFileIdentity(file2rem)
@@ -32227,13 +32237,21 @@ PasteFilesIntoGivenFolder(folderPath) {
       countTFilez++
       file2rem := A_LoopField
       zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
+      If (OldOutFileName="")   ; zPlitPath() gives no name to a file with no extension
+      {
+         k := InStr(file2rem, "\", 0, -1)
+         OldOutFileName := SubStr(file2rem, k + 1), OldOutDir := SubStr(file2rem, 1, k - 1)
+      }
+
       If (determineTerminateOperation()=1)
       {
          abandonAll := 1
          Break
       }
 
-      If !FileExist(file2rem)
+      ; a folder: FileCopy and FileMove would take the files inside it
+      srcAttr := FileExist(file2rem)
+      If (!srcAttr || InStr(srcAttr, "D"))
       {
          failedFiles++
          Continue
@@ -32262,7 +32280,15 @@ PasteFilesIntoGivenFolder(folderPath) {
 
       file2save := finalDest "\" OldOutFileName
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
-      If (FileExist(file2save) && !FolderExist(file2save))
+      destAttr := FileExist(file2save)
+      ; FileMove and FileCopy would put the file inside a folder of that name
+      If InStr(destAttr, "D")
+      {
+         failedFiles++
+         Continue
+      }
+
+      If destAttr
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, 0, performOverwrite)
   
       If !file2save
@@ -61600,15 +61626,24 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
     file2rem := getIDimage(currentFileIndex)
     zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
-    If !FileExist(file2rem)
+    If (OldOutFileName="")   ; zPlitPath() gives no name to a file with no extension
     {
+       k := InStr(file2rem, "\", 0, -1)
+       OldOutFileName := SubStr(file2rem, k + 1), OldOutDir := SubStr(file2rem, 1, k - 1)
+    }
+
+    ; a folder: FileCopy and FileMove would take the files inside it
+    srcAttr := FileExist(file2rem)
+    If (!srcAttr || InStr(srcAttr, "D"))
+    {
+       errMsg := srcAttr ? "Failed to perform action. The path names a folder, not a file." : "Failed to perform action. File not found or access denied."
        sOldOutDir := PathCompact(OldOutDir, "a", 1, OSDfontSize)
        ResetImgLoadStatus()
        SoundBeep, 300, 100 
        If (dummy="quick-actu")
-          showTOOLtip("Failed to perform action. File not found or access denied.`n" OldOutFileName "`n" sOldOutDir "\")
+          showTOOLtip(errMsg "`n" OldOutFileName "`n" sOldOutDir "\")
        Else
-          msgBoxWrapper(appTitle ": ERROR", "Failed to perform action. File not found or access denied.`n`n" OldOutFileName "`n" OldOutDir "\", 0, 0, "error")
+          msgBoxWrapper(appTitle ": ERROR", errMsg "`n`n" OldOutFileName "`n" OldOutDir "\", 0, 0, "error")
        Return 0
     }
 
@@ -61632,16 +61667,26 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        Return 0
     }
 
+    file2save := finalDest "\" OldOutFileName
+    destAttr := FileExist(file2save)
+    ; FileMove and FileCopy would put the file inside a folder of that name
+    If InStr(destAttr, "D")
+    {
+       OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
+       msgBeepTimer("WARNING: Operation aborted. A folder with the same name already exists in the destination folder.`n" OldOutFileName "`n" OutDir "\")
+       SetTimer, ResetImgLoadStatus, -25
+       Return 0
+    }
+
     BtnCloseWindow()
     Sleep, 2
     destroyGDIfileCache()
-    file2save := finalDest "\" OldOutFileName
     If (mustCreateDupe=1)
        forceConflictOption := 2
     Else
        forceConflictOption := (dummy="quick-actu") ? QuickFileActConflict : copyMoveDoLastOption
 
-    If (FileExist(file2save) && !FolderExist(file2save))
+    If destAttr
     {
        file2save := askAboutFileCollision(file2rem, file2save, 0, 0, forceConflictOption, performOverwrite)
        If !file2save
@@ -61710,7 +61755,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        }
 
        actName := (UsrCopyMoveOperation=2) ? "MOVED" : "COPIED"
-       zPlitPath(file2save, 0, OldOutFileName, OldOutDir)
+       OldOutFileName := SubStr(file2save, InStr(file2save, "\", 0, -1) + 1)
        OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
        msgBeepTimer("File " actName " to`n" OldOutFileName "`n" OutDir "\", 0)
        extraMarker := (thisFileExists=1 && performOverwrite=1) ? "*" : ""
@@ -61828,6 +61873,12 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       thisFileIndex := A_Index
       file2rem := getIDimage(thisFileIndex)
       zPlitPath(file2rem, 0, OldOutFileName, OldOutDir, OutFileNameNoExt, OutFileExt)
+      If (OldOutFileName="")   ; zPlitPath() gives no name to a file with no extension
+      {
+         k := InStr(file2rem, "\", 0, -1)
+         OldOutFileName := SubStr(file2rem, k + 1), OldOutDir := SubStr(file2rem, 1, k - 1)
+      }
+
       countTFilez++
       If InStr(file2rem, "||")   ; the entry of a deleted file
       {
@@ -61835,7 +61886,9 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          Continue
       }
 
-      If !FileExist(file2rem)
+      ; a folder: FileCopy and FileMove would take the files inside it
+      srcAttr := FileExist(file2rem)
+      If (!srcAttr || InStr(srcAttr, "D"))
       {
          failedFiles++
          Continue
@@ -61906,7 +61959,15 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       file2save := finalDest "\" OldOutFileName
       lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
-      If (FileExist(file2save) && !FolderExist(file2save))
+      destAttr := FileExist(file2save)
+      ; FileMove and FileCopy would put the file inside a folder of that name
+      If InStr(destAttr, "D")
+      {
+         failedFiles++
+         Continue
+      }
+
+      If destAttr
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, forceConflictOption, performOverwrite)
   
       If !file2save
@@ -95127,6 +95188,14 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
          ; same file, nothing is in the way and nothing is there to delete
          caseOnly := isSameFileOtherCase(imgPath, otherFile)
          mustReplace := 0
+         ; FileMove would put the file inside a folder of that name
+         If InStr(FileExist(otherFile), "D")
+         {
+            k := InStr(otherFile, "\", 0, -1)
+            msgBeepTimer("ERROR: Undo " Format("{:U}", obj.typu) " failed. A folder has the name of the file:`n" SubStr(otherFile, k + 1) "`n" SubStr(otherFile, 1, k))
+            Return
+         }
+
          If (caseOnly!=1 && FileRexists(otherFile, 0))
          {
             otherFile := askAboutFileCollision(imgPath, otherFile, 0, 1, 0, performOverwrite, 1, "Undo " obj.typu " operation. ")
@@ -95345,7 +95414,15 @@ batchUndoFileActs(modus) {
       If (obj.typu="rename" || obj.typu="move")
       {
          otherFile := obj.initialu
-         If (FileExist(otherFile) && !FolderExist(otherFile))
+         destAttr := FileExist(otherFile)
+         ; FileMove would put the file inside a folder of that name
+         If InStr(destAttr, "D")
+         {
+            failedFiles++
+            Continue
+         }
+
+         If destAttr
             otherFile := askAboutFileCollision(imgPath, otherFile, 1, 0, userUndoMustDoOverwrite, performOverwrite)
 
          If !otherFile
