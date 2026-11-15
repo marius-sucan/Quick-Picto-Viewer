@@ -61160,7 +61160,7 @@ BTNuiProceedStructuredOperation() {
       Return msgBeepTimer("WARNING: Please select action to perform: copy or move files")
 
    fS := cleanFolderPath(UsrEditFileSource)
-   dS := cleanFolderPath(UsrEditFileDestination)
+   dS := cleanFolderPath(UsrEditFileDestination, destOnDrive)
    If (!FolderExist(fS) || !fS)
       Return msgBeepTimer("ERROR: Please choose an existing source folder")
 
@@ -61182,7 +61182,7 @@ BTNuiProceedStructuredOperation() {
 
    If (!FolderExist(dS) || !dS)
    {
-      If (StrLen(dS)>2)
+      If destOnDrive
       {
          msgResult := msgBoxWrapper(appTitle ": Confirmation", "The destination folder seems to not exist.`n`n" dS "\`n`nWould you like to create it now?", 4, 0, "question")
          If (msgResult="Yes")
@@ -61202,11 +61202,13 @@ BTNuiProceedStructuredOperation() {
    copyMoveStructuredFolders(fS, dS, filesElected)
 }
 
-cleanFolderPath(givenPath) {
+cleanFolderPath(givenPath, ByRef onDrive:=0) {
 ; a folder path as typed, trimmed of spaces and of backslashes at both ends, / read as \, then resolved
 ; by Windows [. and .., repeated backslashes, an ending dot or space], with no ending backslash. A single
-; character stays as typed, so FolderExist() refuses it: resolved, . would be QPV's folder
+; character stays as typed, so FolderExist() refuses it: resolved, . would be QPV's folder. onDrive: the
+; text names a folder under the root of an existing drive, told before resolving, which completes any path
    p := Trim(StrReplace(Trimmer(givenPath), "/", "\"), "\")
+   onDrive := (RegExMatch(p, "i)^[a-z]:\\.") && FolderExist(SubStr(p, 1, 2))) ? 1 : 0
    If (StrLen(p)>1)
       p := resolveFullPath(p)
    Return RTrim(p, "\")
