@@ -35181,8 +35181,9 @@ SaveFilesList(enforceFile:=0) {
       whileLoopExec := 1
       Loop, Parse, saveDynaFolders, `n
       {
+          ; a seed folder that is not on the disk now is kept: its drive may be unplugged
           fileTest := StrReplace(A_LoopField, "|")
-          If !FolderExist(fileTest)
+          If (StrLen(fileTest)<2)
              Continue
 
           countDynas++
@@ -65209,11 +65210,12 @@ addDynamicFolderSQLdb(whichFolder, renewList, whichTable) {
     If (renewList=1)
        activeSQLdb.Exec("DELETE FROM dynamicfolders;")
 
+    ; a folder that is not on the disk now is kept, dated "-": its drive may be unplugged
     folderu := Format("{:L}", StrReplace(whichFolder, "|"))
-    If !FolderExist(folderu)
-       Return
+    fileMdate := "-"
+    If FolderExist(folderu)
+       FileGetTime, fileMdate, % folderu, M
 
-    FileGetTime, fileMdate, % folderu, M
     SQLstr := "INSERT INTO " whichTable " (imgfolder, fmodified) VALUES ('" SQLescapeStr(whichFolder) "', '" fileMdate "');"
     If !activeSQLdb.Exec(SQLStr)
     {
@@ -87759,16 +87761,47 @@ RegenerateEntireList() {
     If askAboutFileSave(" and the files list will be reloaded")
        Return
 
-    thisIndex := currentFileIndex
-    newStaticFoldersListCache := []
-    startOperation := A_TickCount
-    showTOOLtip("Preparing to refresh the files list, please wait")
     listu := getDynamicFoldersList()
     If (StrLen(listu)<4)
        Return msgBeepTimer("WARNING: No list of dynamic folders found")
 
+    keptu := purgedu := ""
+    missingu := getMissingSeedFolders(listu)
+    If missingu
+    {
+       countMissing := ST_Count(missingu, "`n")
+       If (countMissing=1)
+          msgu := "One seed folder is not on the disk now, perhaps on a drive that is not plugged in.`n`nKeep it in the list, with the files already indexed from it, or purge it, with every file indexed under it, subfolders included?"
+       Else
+          msgu := groupDigits(countMissing) " seed folders are not on the disk now, perhaps on a drive that is not plugged in.`n`nKeep them in the list, with the files already indexed from them, or purge them, with every file indexed under them, subfolders included?"
+       msgResult := msgBoxWrapper(appTitle ": Missing seed folders", msgu, "&Keep|&Purge|&Cancel", 1, "question")
+       If InStr(msgResult, "keep")
+       {
+          keptu := missingu
+       } Else If InStr(msgResult, "purge")
+       {
+          purgedu := missingu
+          listu := dropSeedFolders(listu, purgedu)
+       } Else Return
+    }
+
+    thisIndex := currentFileIndex
+    newStaticFoldersListCache := []
+    startOperation := A_TickCount
+    showTOOLtip("Preparing to refresh the files list, please wait")
     If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
+
+    keptFiles := []
+    If (keptu && SLDtypeLoaded!=3)
+    {
+       ; the index is rebuilt from scratch: the files of the folders kept are carried over
+       Loop, % maxFilesIndex
+       {
+          If isPathInGivenFolders(Format("{:L}", resultedFilesList[A_Index, 1]), keptu)
+             keptFiles.Push(resultedFilesList[A_Index])
+       }
+    }
 
     mustOpenStartFolder := ""
     bckpResultedFilesList := []
@@ -87778,6 +87811,15 @@ RegenerateEntireList() {
     {
        getMaxRowIDsqlDB()
        activeSQLdb.Exec("BEGIN TRANSACTION;")
+       Loop, Parse, purgedu, `n
+       {
+          If (StrLen(A_LoopField)<2)
+             Continue
+
+          thisClause := SQLfolderMatchClause(StrReplace(A_LoopField, "|"))
+          activeSQLdb.Exec("DELETE FROM imagesPixels WHERE imgidu IN (SELECT imgidu FROM images WHERE " thisClause ");")
+          activeSQLdb.Exec("DELETE FROM images WHERE " thisClause ";")
+       }
     }
 
     countFolders := ST_Count(listu, "`n") + 1
@@ -87801,6 +87843,13 @@ RegenerateEntireList() {
 
        If (r="abandoned")
           Break
+    }
+
+    For i, entry in keptFiles
+    {
+       entry[2] := 0
+       maxFilesIndex++
+       resultedFilesList[maxFilesIndex] := entry
     }
 
     If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, "i)(.\.sldb)$"))
@@ -87829,6 +87878,12 @@ RegenerateEntireList() {
 
        OpenSLD(CurrentSLD, 1)
        Return
+    }
+
+    If (purgedu && r!="abandoned")
+    {
+       DynamicFoldersList := listu
+       currentFilesListModified := 1
     }
 
     thisFolder := StrReplace(CurrentSLD, "|")
@@ -96949,7 +97004,7 @@ BTNcopyDynaFoldersList() {
     {
         line := Trimmer(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)"))
+        If !RegExMatch(fileTest, "i)^(.\:\\.)") ; the folders not on the disk now are copied too
            Continue
 
         newFoldersList .= line "`n"
@@ -96968,14 +97023,22 @@ BTNcopyDynaFoldersList() {
 BTNpasteDynaFoldersList() {
     BtnCloseWindow()
     Sleep, 50
-    foldersListu := getDynamicFoldersList()
-    foldersListu .= SubStr(Clipboard, 1, 50432)
-    Loop, Parse, foldersListu, `n
+    ; the listed seed folders stay as they are, also those not on the disk now
+    newFoldersList := getDynamicFoldersList()
+    pastedList := SubStr(Clipboard, 1, 50432)
+    skippedLines := 0
+    Loop, Parse, pastedList, `n
     {
         line := Trimmer(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)"))
+        If (fileTest="")
            Continue
+
+        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)"))
+        {
+           skippedLines++
+           Continue
+        }
 
         newFoldersList .= line "`n"
     }
@@ -96996,6 +97059,8 @@ BTNpasteDynaFoldersList() {
     Sleep, 50
     ResetImgLoadStatus()
     PanelDynamicFolderzWindow()
+    If skippedLines
+       msgBeepTimer(groupDigits(skippedLines) " pasted line(s) skipped: not a folder found on the disk")
 }
 
 BTNremDynaSelFolder() {
@@ -97582,9 +97647,57 @@ BTNrescanDynaFolder() {
     Sleep, 25
     ; msgbox, % folderu
     recu := InStr(recu, "R") ? "" : "|"
-    coreRescanDynaFolder(recu folderu)
+    If FolderExist(folderu)
+    {
+       coreRescanDynaFolder(recu folderu)
+    } Else
+    {
+       msgu := "The seed folder is not on the disk now, perhaps on a drive that is not plugged in:`n" folderu "\`n`nKeep it in the list, with the files already indexed from it, or purge it, with every file indexed under it, subfolders included?"
+       msgResult := msgBoxWrapper(appTitle ": Missing seed folder", msgu, "&Keep|&Purge", 1, "question")
+       If InStr(msgResult, "purge")
+       {
+          purgeSeedFolder(folderu)
+          If (maxFilesIndex>0)
+          {
+             GenerateRandyList()
+             SoundBeep, 900, 100
+             RandomPicture()
+          } Else If !handleEmptyFilesList(CurrentSLD, "", 2)
+             Return
+       }
+    }
+
     Sleep, 15
     PanelDynamicFolderzWindow()
+}
+
+purgeSeedFolder(folderu) {
+; removes the seed folder with the seed folders placed inside it, every file indexed
+; under it, subfolders included, and its rows in the folders list
+   folderu := StrReplace(folderu, "|")
+   DynamicFoldersList := dropSeedFolders(getDynamicFoldersList(), folderu)
+   If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
+      recreateDynaFoldersSQLdbList(DynamicFoldersList)
+
+   ; a cached list writes its folders list from memory when saved: it must be loaded first
+   If RegExMatch(CurrentSLD, sldsPattern)
+      LoadStaticFoldersCached(CurrentSLD, countStaticFolders, "f")
+
+   prefixu := Format("{:L}", folderu) "\"
+   newArray := []
+   Loop, % newStaticFoldersListCache.MaxIndex()
+   {
+       thisFolder := newStaticFoldersListCache[A_Index, 1]
+       If (StrLen(thisFolder)>1 && InStr(Format("{:L}", thisFolder) "\", prefixu)!=1)
+          newArray.Push(newStaticFoldersListCache[A_Index])
+   }
+
+   newStaticFoldersListCache := newArray
+   If (SLDtypeLoaded=3)
+      activeSQLdb.Exec("DELETE FROM staticfolders WHERE " SQLfolderMatchClause(folderu) ";")
+
+   remFilesFromList(folderu, 1)
+   currentFilesListModified := 1
 }
 
 updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowDump:=1) {
@@ -97746,6 +97859,48 @@ getDynaFoldersInside(mainFolderu) {
           protectu .= linea "`n"
    }
    Return protectu
+}
+
+getMissingSeedFolders(listu) {
+; returns the entries of the seed folders list a rescan would scan, whose folder is not on the disk now
+   missingu := ""
+   Loop, Parse, listu, `n, `r
+   {
+       linea := Trimmer(A_LoopField)
+       If (RegExMatch(linea, RegExFilesPattern) || StrLen(linea)<4)
+          Continue
+
+       If !FolderExist(StrReplace(linea, "|"))
+          missingu .= linea "`n"
+   }
+   Return missingu
+}
+
+dropSeedFolders(listu, foldersu) {
+; returns the seed folders list without the given folders and the entries placed inside them
+   newListu := ""
+   Loop, Parse, listu, `n, `r
+   {
+       linea := Trimmer(A_LoopField)
+       If (linea="")
+          Continue
+
+       thisFolder := Format("{:L}", StrReplace(linea, "|")) "\"
+       isGone := 0
+       Loop, Parse, foldersu, `n, `r
+       {
+           goneFolder := Format("{:L}", StrReplace(Trimmer(A_LoopField), "|"))
+           If (StrLen(goneFolder)>1 && InStr(thisFolder, goneFolder "\")=1)
+           {
+              isGone := 1
+              Break
+           }
+       }
+
+       If !isGone
+          newListu .= linea "`n"
+   }
+   Return newListu
 }
 
 isPathInGivenFolders(filePath, foldersList) {
