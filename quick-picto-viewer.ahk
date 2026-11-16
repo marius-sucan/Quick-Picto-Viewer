@@ -2434,7 +2434,7 @@ initializeAppWithGivenArguments() {
       {
          If FileExist(A_Args[A_Index])
             sldOpened := A_Args[A_Index]
-      } Else If (RegExMatch(A_Args[A_Index], "i)^(fd\=\|?.\:\\..*)") && !folderOpened)
+      } Else If (RegExMatch(A_Args[A_Index], "i)^fd=\|?.:($|\\)") && !folderOpened) ; a drive root may come as fd=d:
       {
          paramSet := SubStr(A_Args[A_Index], 4)
          If FolderExist(StrReplace(paramSet, "|"))
@@ -2981,7 +2981,7 @@ OpenWithNewQPVinstance(modus:=0, givenList:=0, givenCount:=0) {
 OpenNewQPVinstance(imgPath:="") {
    imgPath := StrReplace(imgPath, "||")
    If FolderExist(imgPath)
-      imgPath := "fd=" imgPath
+      imgPath := "fd=" RegExReplace(imgPath, "\\+$") ; a trailing \ would escape the quote that closes the argument
    Else If !FileRexists(imgPath)
       imgPath := ""
 
