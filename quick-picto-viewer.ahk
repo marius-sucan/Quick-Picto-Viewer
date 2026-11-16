@@ -44293,6 +44293,7 @@ BTNhelpSlideshows() {
 }
 
 BTNopenPanelDynamicFolderzWindow() {
+    BtnCloseWindow()
     PanelDynamicFolderzWindow("reopen")
 }
 
@@ -96535,7 +96536,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
     btnWid3 := (PrefsLargeFonts=1) ? 120 : 90
     If (dummy="reopen")
     {
-       Gui, Add, Button, xs+0 y+5 h%thisBtnHeight% w60 gPanelSaveSlideShowu, &Back
+       Gui, Add, Button, xs+0 y+5 h%thisBtnHeight% w60 gBTNdynaFoldersBack, &Back
        Gui, Add, Button, x+5 hp wp gBTNaddNewFolder2list, &Add
     } Else
        Gui, Add, Button, xs+0 y+5 h%thisBtnHeight% w60 gBTNaddNewFolder2list, &Add
@@ -96555,6 +96556,11 @@ BTNaddNewFolder2list() {
     r := addNewFolder2list()
     Sleep, 10
     SetTimer, PanelDynamicFolderzWindow, -50
+}
+
+BTNdynaFoldersBack() {
+    BtnCloseWindow()
+    PanelSaveSlideShowu()
 }
 
 BtnIgnoreDateStaticFolder() {
