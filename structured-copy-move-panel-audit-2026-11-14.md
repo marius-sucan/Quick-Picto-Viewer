@@ -31,11 +31,13 @@ are fixed in `81cbbbe`, `f52eaac`, `a5855dc` and `6697b4c`, with his answers to 
 every tool that copies or moves a file into a folder, together with Seen in passing E. Findings 8, 9
 and 14 narrow finding 7, which is fixed in `c5cbfe4` with his answers to decision 4: only full paths
 with a drive letter. Finding 10 is fixed in `77b5d9c`, `5c55e6b` and `cc16a46`, with his answers to
-decision 5. The small things of finding 15 are numbered 15.1 to 15.14.
+decision 5. The small things of finding 15 are numbered 15.1 to 15.14. Of those, 15.2 is fixed in
+`e17f304`, by Marius, and 15.1, 15.3 and 15.6 to 15.14 are fixed in `d6f105b` to `e4edbb2`, one commit
+each, with his answers to decisions 8 and 13; 15.4 and 15.5 are open.
 A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, at
 `6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E), at
-`c5cbfe4` for the last note of finding 7, and at `cc16a46` for finding 10.
+`c5cbfe4` for the last note of finding 7, at `cc16a46` for finding 10, and at `e4edbb2` for finding 15.
 Since `75e890d` the folder test of findings 1 and 2 runs after the panel has closed (finding 11).
 Everything else keeps its lines at `b4f374f`.
 
@@ -68,7 +70,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `cc16a46` |
+| # | Finding | Harm | Checked | Status at `e4edbb2` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -84,7 +86,7 @@ Everything else keeps its lines at `b4f374f`.
 | 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | **fixed**, `6697b4c` |
 | 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | **fixed**, `a5855dc` |
 | 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | **fixed**, `75e890d`, `87c699d` |
-| 15 | Small things, numbered 15.1 to 15.14: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | open |
+| 15 | Small things, numbered 15.1 to 15.14: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | **partly fixed**: 15.2 `e17f304`; 15.1, 15.3, 15.6 to 15.14 `d6f105b` to `e4edbb2`; 15.4, 15.5 open |
 
 Findings 10 and 11 are the ones a user meets in ordinary use. Findings 1 and 2 lose files
 (to the recycle bin), but only with «Overwrite» and an unusual pair of paths; finding 3 loses
@@ -1027,35 +1029,104 @@ stays open (decision 4). Settled in `c5cbfe4`: refused, as is every path without
 - **15.1. The «Action to perform» list shows a window handle as its tooltip** (run: `0x2c0142`).
   `GuiAddDropDownList()` uses the third item of its label list both as the list to align
   with and as the tooltip text (:26604-26613). The regular Copy/Move panel has it too (run).
+  **Fixed in `d6f105b`**: the third item is the tooltip only when no second item is given (:26638).
+  Neither «Action to perform» list has a tooltip now, as the other lists beside a label; the edge
+  detection mode list keeps «Edge detection mode» (run, Y1).
 - **15.2. The first text** reads «This panels allows users…», and it was meant to start with the
   selection count: `infoSelection` is filled after the text is added (:60874, :60890) (run).
+  **Fixed in `e17f304`**, by Marius: the first text no longer names the selection; the count is the
+  text beside the buttons.
 - **15.3. «Proceed» is enabled while «Action to perform» shows «Choose...»**, where the regular panel
   disables it; a click says «Please select action to perform: copy or move files» (run). It
   is also narrow: 60 pixels (read).
-- **15.4. The action is «Choose...» at every opening** (:60865) (run). It may be meant so.
+  **Fixed in `3e985a2`** (decision 13): «Proceed» is created disabled while the action is «Choose...»
+  and follows the list (:61185, :61193); the handler keeps its own test. It is as wide as «Help» and
+  «Cancel», 72 pixels, 90 with large fonts. Run, Y2: 72 × 24, 90 × 34 with large fonts, disabled on opening
+  and on «Choose...», enabled on «Move file(s)» and «Copy file(s)». Under Wine a click posted to the disabled button
+  still reaches its handler, which answers as before.
+- **15.4. The action is «Choose...» at every opening** (:60865) (run). It may be meant so. Open
+  (decision 8).
 - **15.5. «On file name conflicts» is not kept across restarts** (read). The regular panel's list is
-  not either.
+  not either. Open (decision 8).
 - **15.6. The destination is not added to the recent destinations** of the regular panel (read:
   no `RecentCopyMoveManager()` call), and `prevFileMovePath` is not set (run).
+  **Fixed in `e955979`** (decisions 8 and 13): when the run starts, once the folder test has passed,
+  the engine sets `prevFileMovePath` for the session and adds the Destination to the recent
+  destinations, as the regular panel's batch does (:3217). A drive root is left out: the recent
+  destinations never list one, and the regular panel refuses it. Run, Y3: a copy and a copy that
+  skipped every file are both recorded, a refused copy is not, and the settings file keeps no
+  `prevFileMovePath`.
 - **15.7. «Browse», then «Cancel»**: at the next opening the Destination shows the text typed before
   «Browse», not the folder picked with it (run). «Browse» writes the field's text into the
   shared variable (:59958-59962).
+  **Fixed in `e8cb033`** (decision 13): both «Browse» read the two fields into locals (:60248,
+  :60267), so a panel closed without «Proceed» leaves nothing behind: after «Browse» and «Cancel»
+  the next opening shows the destination the last «Proceed» used (run, Y4).
 - **15.8. The pre-filled Source** is the folder of the focused file, also when that file is not
   selected, or when it sits in a subfolder of the selection (run). For an index entry that
   names no file on the disk the field holds that entry's folder, and «Proceed» answers
   «Please choose an existing source folder» (read).
+  **Fixed in `2d15ef3`** (decision 13): the Source opens on the focused file's folder when that file
+  is selected, once a selection of one file has been dropped, and the folder is on the disk with a
+  drive letter; a drive root shows as `C:\`, as from «Possible source paths». Otherwise the field
+  opens empty (:61147). Run, Y5:
+
+  | The focused file | At `e17f304` | On `e4edbb2` |
+  |---|---|---|
+  | selected, `TripA\a.png` | `<work>\st\TripA` | the same |
+  | not selected, `Other\x.png` | `<work>\st\Other` | empty |
+  | selected, in a subfolder of the selection, `TripA\deep\c.png` | `<work>\st\TripA\deep` | the same |
+  | selected, a file with no extension, `TripA\noext` | `<work>\st\TripA\noext` | `<work>\st\TripA` |
+  | selected, its folder not on the disk | `<work>\st\Gone` | empty |
+  | selected, the entry of a deleted file | `\|\|<work>\st\TripA` | `<work>\st\TripA` |
 - **15.9. The destination folder is looked for again for each file** whose folder already exists:
   `prevuDir` is set only after a folder was created (:3285-3295) (read).
+  **Fixed in `e1af791`**: the folder is remembered once it exists, made or found (:3304). Run, Y9: five
+  files copied into a folder that exists, and `FolderExist()` asked about paths under the Destination
+  3 times instead of 6: once by the handler, once by the engine instead of five times, and once by
+  the recent destinations of 15.6.
 - **15.10. An empty file at the destination** is replaced without being recycled and without the
   «overwritten» mark in the undo record (run): `FileRexists(…, 0)` counts it as absent.
-- **15.11. Both «Browse» dialogs have the same title** (read).
+  **Fixed in `b8d50ba`** (decision 13), in every tool with the same test: `FileExistAnySize()`
+  (:32727) counts any file at the destination, an empty one too, but not a folder. The same test was
+  in the regular Copy/Move panel (one file and several), pasting, the multi-rename, renaming one file
+  and both undo functions; the batch undo of a deletion also left an empty file it had moved aside
+  under its `tmp_QPV_` name (read). `restoreFileFromRecycleBin()` (lib/shell-stuff.ahk:2571) skipped
+  every recycled item of size 0, and a size of 0 meant any size, so a file of the same path and
+  another size could come back instead; it now takes a blank size as any size and any number, 0
+  included, as that size, and skips a recycled folder by its attribute (read: the kit restores from
+  Wine's trash with a stub). The undo asks for a recycled file of 0 bytes as for any other size.
+  Run, Y6 (the moved files have 361 bytes, the file in the way 0):
+
+  | Tool | At `e17f304` | On `e4edbb2` |
+  |---|---|---|
+  | This panel, move + «Overwrite» onto an empty listed file, then the batch undo (Y6a) | replaced, nothing recycled, no «*»; lost after the undo | recycled, «*» with size 0; the undo brings it back |
+  | The regular panel, several files, the same (Y6b) | as this panel | as this panel |
+  | The regular panel, one file, the same, then the one-file undo (Y6c) | «ERROR: Failed to MOVE file», nothing moved | moved, the empty file recycled; the undo brings it back: «The original file was restored succesfully» |
+  | Pasting, move, «Overwrite» at the conflict box (Y6d) | replaced, nothing recycled, no «*» | recycled, «*» |
+  | Multi-rename x>>z, «Overwrite» (Y6e) | «Overwritten files: 1»; the empty file lost after the undo | «Overwritten files: 2»; the undo brings both back |
+  | Renaming one file onto an empty file (Y6f) | no conflict box, replaced; lost after the undo | the conflict box; «Overwrite» recycles it, the undo brings it back |
+  | The batch undo of a move, an empty file at the old place, «Overwrite» (Y6g) | replaced, nothing recycled | recycled, «Files overwritten: 1»; its index entry marked as a deleted file's |
+  | The one-file undo of the same (Y6g) | replaced, no conflict box | the conflict box, then recycled |
+- **15.11. Both «Browse» dialogs have the same title** (read). **Fixed in `b0160a3`** (decision 13):
+  «Select the source folder» and «Select the destination folder» (:60277, :60258) (run, Y4).
 - **15.12. No Alt letters**: «Structured file operations» has none in either menu, and the labels
   «Source:», «Destination:», «On file name conflicts:» and «Action to perform:» have none, so
   the fields are reached from the keyboard with Tab alone. The menu bar's File menu offers
   the item only in thumbnails view (read).
+  **Fixed in `83ac7a0`** (decision 13): the labels read «&Source:», «&Destination:», «On file name
+  &conflicts:» and «Ac&tion to perform:», and the menu item «Structured file o&perations», in the files
+  menu and in the File menu (:68010, :70129), where P is free in every state; the File menu offers it
+  in image view too when two or more files are selected (:68039). Run, Y7: Alt with S, D, C and T,
+  sent as key presses and as WM_SYSCHAR, moves the focus to the Source, the Destination and the two
+  lists; the menus as built in thumbnails view and in image view.
 - **15.13. The «Source:» label** is not centred on the field's height as «Destination:» is (read).
+  **Fixed in `e823449`**: once the field is added, the label gets its height and centres its text
+  (:61162), as `GuiAddDropDownList()` sizes the labels of its lists. Run, Y8: 70 × 13 before, now
+  70 × 21 at the field's top, as «Destination:»; 110 × 31 with large fonts, the field's height.
 - **15.14. Unused**: the global `lastInvoked` set at every opening (:60844), and `btnWid`, `txtWid`,
-  `lstWid` (read).
+  `lstWid` (read). **Fixed in `e4edbb2`**: removed, with the first `sml`, which only fed `lstWid`
+  (:61131); no other function reads that global.
 
 ---
 
@@ -1166,7 +1237,7 @@ source that is a folder counts as failed (:3261, :61635, :61889, :32252). Nothin
 
 ## Decisions to make before fixing
 
-Decisions 1 to 7 and 9 to 12 are settled; 8 is open.
+Decisions 1 to 7 and 9 to 13 are settled; 8 is settled for 15.6 and open for 15.4 and 15.5.
 
 1. The same folder (finding 1): compare the folders' file IDs, or only resolve the text
    (`.`, `..`) and leave links, short names and SUBST drives to the per-file test?
@@ -1200,6 +1271,8 @@ Decisions 1 to 7 and 9 to 12 are settled; 8 is open.
    **Settled in `3df8de3`**: yes, for all of them.
 8. Finding 15: keep «On file name conflicts» across restarts (15.5)? Add the Destination to the recent
    destinations (15.6)? Start «Action to perform» on the last action (15.4)?
+   **Settled for 15.6 in `e955979`**: yes, recorded when the run starts, as the regular panel's batch
+   records it (decision 13). 15.4 and 15.5 are open.
 9. The two paths (finding 8): clean up the text alone, or also let Windows resolve it?
    **Settled in `81cbbbe`**: clean up, then resolve.
 10. A folder at the destination (finding 12): failed or skipped, and in which tools? With the name of
@@ -1210,8 +1283,20 @@ Decisions 1 to 7 and 9 to 12 are settled; 8 is open.
 12. Which destinations may «Proceed» offer to create (finding 14)?
     **Settled in `87c699d`**: a path under the root of an existing drive. Since `c5cbfe4` an existing
     folder without a drive letter is refused as well (decision 4).
+13. The rest of finding 15 (asked on 2026-11-16): how wide «Proceed» is (15.3); when the Destination
+    joins the recent destinations, and whether `prevFileMovePath` is written to the settings (15.6);
+    what a panel closed without «Proceed» leaves behind (15.7); which folder the Source opens on (15.8);
+    which tools count an empty file at the destination, and whether the undo brings it back (15.10);
+    the titles of the two folder dialogs (15.11); which Alt letters, and whether the menu bar's File
+    menu offers the item in image view (15.12)?
+    **Settled in `d6f105b` to `e4edbb2`**: as wide as «Help» and «Cancel»; when the run starts, once
+    the folder test has passed, for the session only, as the regular panel's batch; nothing; the
+    focused file's folder when that file is selected, else none (not the first entry of «Possible
+    source paths», which I recommended); every tool with the same test, and the undo restores it;
+    «Select the source folder» and «Select the destination folder», the regular panel's «Browse»
+    untitled; S, D, C and T for the labels, «Structured file o&perations», and yes.
 
-What is left: 11 (the handler), 15 (decision 8).
+What is left: 11 (the handler), 15.4 and 15.5 (decision 8).
 
 ## How this was checked
 
@@ -1301,11 +1386,31 @@ What is left: 11 (the handler), 15 (decision 8).
   in the current file of the reopened database list. `cc16a46` loads the same three ways.
 - The fix of finding 7 (`c5cbfe4`): batch W ran at `4bda394` and on `77b5d9c` (finding 7's last
   note).
+- The fixes of finding 15 (`d6f105b` to `e4edbb2`, 2026-11-16): every batch but J ran at `e17f304` and
+  on `c3381b3`, which differs from `e4edbb2` by one comment. Batch Y is new: the tooltips given while
+  this panel, the regular Copy/Move panel and the edges panel are built; «Proceed» on each action, and
+  its width; the recent destinations after a copy, a copy that skips every file and a refused copy;
+  «Browse» then «Cancel» for both fields, and the dialogs' titles; the Source at opening in six cases;
+  an empty file in the way in every tool that copies, moves or renames onto a file, with the undos; the
+  two menus as built in thumbnails view and in image view; Alt with each label's letter, sent as key
+  presses and as WM_SYSCHAR, and with «&Browse»'s B; the two labels' places; the `FolderExist()` calls
+  of a copy. The panel lists its items with `+Delimiter`n`, so the kit now chooses an action with a
+  linefeed before its number, which runs the list's g-label as a user's choice does (`|N` chose
+  nothing there). Against `e17f304` the logs differ only where a fix shows: B (B3: the empty file of a copy
+  with «Overwrite» is recycled and marked), E (the dialogs' titles), F (the tooltip, the Source at
+  opening, «Proceed» disabled, «Browse» then «Cancel», `prevFileMovePath` after a copy, the labels'
+  letters), F5 (the tooltip; the line numbers in the error box it provokes) and Y; or in run-to-run
+  noise: H, N, R and S (the current file of a reopened list and the image loads that follow it; in R
+  also the names Wine's trash gives a second file of one name, and whether the conflict box showed the
+  images' sizes yet when the kit's timer read it) and F7 (a menu handle). Two more runs of H on
+  `c3381b3` give either current file, and the Source follows it. A, C, D, F3, F8, G, I, K to Q, T, V,
+  W and X give the same logs. Batch Y ran on `c3381b3` with large fonts too (`y-f16-lf`). Each commit loads with AutoHotkey_H with and without `/iLib`, and
+  `e4edbb2` also with stock AutoHotkey 1.1.37 (`/iLib`).
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
   `run-all-old.sh [tag]` (the twelve old batches), `norm.sh` (compares logs),
-  `test-wrappers-sc.ahk` (testScA to testScX; `test-wrappers-sc.before-0ad345c.ahk` is the one
-  the logs up to `def941f` ran), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
+  `test-wrappers-sc.ahk` (testScA to testScY; `test-wrappers-sc.before-0ad345c.ahk` is the one
+  the logs up to `def941f` ran, `test-wrappers-sc.before-Y.ahk` the one before the logs of 2026-11-16), `run-set.sh <tag> <source> <batches>`, `results/` (`<batch>-hd.txt` on `b4f374f`,
   `-ed8` on `ed8848c`, `-fix` on `88aa9fc`, `-b46` on `02046f3`, `-f46` on `3df8de3`, `r-3df`, `-f2` on `86c89e1`, `-h3` on `824cf63`, `-s3` on `eda5812`; `i1`, `j1`,
   `k1`, `l1` on `b4f374f`; `t-c08` on `c088d5d`, `t-pst` on `cfed87c`, `t-ccc` on `cccc913`, `t-trm` on `def941f`; `-b15` at `0ad345c`, `-f15` and `n-f15b` on the fix but for the one-file move's message, `v-f15c` and `n-f15c` on `6697b4c`; `-b10` at `5398a53` and `-x10` on `77b5d9c`, batches D, E, F8, J and X; `w-b07` at `4bda394` and `w-x10` on `77b5d9c`; `x-x15` on `5c55e6b`, batch X with X11; `-b10b` at `27a779a`, `-x10b` on `cc16a46` but for the order of
   equal counts, `-x10c` (D, J, X) on `cc16a46`), `results-1110/` (the logs of 2026-11-10). For batches N to S:
@@ -1322,7 +1427,11 @@ What is left: 11 (the handler), 15 (decision 8).
   Seen in passing E) and `check-stages.sh` (the load checks). `../fix07/apply.py` makes `c5cbfe4`
   from `4bda394`; `../fix10/apply.py` makes `77b5d9c` from `5398a53`, `../fix10b/apply.py` makes `cc16a46` from
   `27a779a`. `patch.py` stubs the
-  «Possible source paths» menu in both its forms, before and after `77b5d9c`.
+  «Possible source paths» menu in both its forms, before and after `77b5d9c`. For finding 15:
+  `testScY()`, logs `-b16` at `e17f304` and `-f16` on `c3381b3`, the copies they ran in `../base16/` and
+  `../fix16/` (`run-app.sh` takes `QPV_SRC` and now `QPV_LIB`), and `../fix15x/check-stock.sh` (the
+  load check with stock AutoHotkey); `patch.py` counts the `FolderExist()` calls under `<work>\out` and
+  hands the restore stub the size rule of either `restoreFileFromRecycleBin()`.
 
 ## Gemini's findings in this report
 
