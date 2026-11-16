@@ -427,7 +427,10 @@ Run on the text of `d05e990` (batches D and P, drive P: mapped):
 - an uncached .SLD list of `p:` and `other` scans both, as it did before (P8);
 - a database of `p:` and `other`: its `dynamicfolders` table holds `p:` after the save and
   after «Recursive folder scan» wrote the table again; opened again, it lists `p:` (P9; at
-  `e62ea25` the save already left it out).
+  `e62ea25` the save already left it out); then, with `P:\n1.png` new and `P:\r1.png` deleted,
+  «Rescan all» gives the row of `n1.png` and drops the row of `r1.png`; F5 on `p:` adds the new
+  `n2.png` without a second row for the others; «Remove» on `p:`, «Yes», deletes every row of
+  P: and its entry, `|other` stays (P10, log `p-f2`).
 
 The index then holds the root's files as `p:\…`, the drive letter in lower case, as for any
 rescanned folder (seen in passing A). The places outside this panel that do not take a drive
@@ -809,7 +812,7 @@ that one in this panel, its batch F).
 | M | plain | after `32c435d`: F5 on the missing `été`, «Purge» |
 | N | plain, database | for `1e1c2b6`: «Remove» on `\|other` holding the recursive `other\rec` and `\|other\pipe`, with files no seed folder covers: «No», «Yes»; `\|Été` holding `Été\sub`; an index of one file; the same «Yes» in a database |
 | O | plain, database | for `7c031cb`: folders `Ăla`, `Îna`, `Été`, `Ștefan`, `Ûnu`: the protected folder set from this panel, sub-paths off and on, then «delete selected files» and «Remove file entries from the list»; set with the disk spelling: the check mark, the toggle; F11, «Select files», «Jump»; the folders list panel's «Jump»; «Rescan all» with a missing folder, «Keep»; F5; Delete; a database |
-| P | plain, .SLD, database, drive P: | for `592628d`: the root opened, F11, F5, «Copy list», «Rescan all», «View list as a folders tree», «Remove» on another entry and on the root; `P:\` added; «Paste list» of entries with a trailing separator, then of `P:\`; a .SLD list holding `p:\`, `third\` and the missing `q:`; an uncached list; a database |
+| P | plain, .SLD, database, drive P: | for `592628d`: the root opened, F11, F5, «Copy list», «Rescan all», «View list as a folders tree», «Remove» on another entry and on the root; `P:\` added; «Paste list» of entries with a trailing separator, then of `P:\`; a .SLD list holding `p:\`, `third\` and the missing `q:`; an uncached list; a database: its table, «Rescan all», F5 and «Remove» on the root |
 | Q | plain | for `d05e990`: the Save panel's «Manage folders», «Back», «Paste list» after it, the panel from the menu |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
