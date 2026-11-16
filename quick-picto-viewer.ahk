@@ -47053,16 +47053,19 @@ BTNperformIndexSearchReplace() {
    } Else If (performSRindexMode=4)
    {
       listu := getDynamicFoldersList()
-      If !InStr(listu, ":\")
+      If !InStr(listu, ":") ; a drive root is d:
          Return msgBeepTimer("WARNING: The seed folders list is empty")
 
       BtnCloseWindow()
       listu := StrReplace(listu, "`n", "\`n")
-      listu := StrReplaceCaseless(listu, editF5, editF6)
+      listu := StrReplaceCaseless(listu, editF5, editF6, replacedCount)
       listu := StrReplace(listu, "\\", "\")
       DynamicFoldersList := StrReplace(listu, "\`n", "`n")
       If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
          recreateDynaFoldersSQLdbList(DynamicFoldersList)
+
+      If replacedCount
+         currentFilesListModified := 1
    }
 }
 
