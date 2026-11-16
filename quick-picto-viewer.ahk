@@ -97132,6 +97132,7 @@ BTNremDynaSelFolder() {
        recreateDynaFoldersSQLdbList(newFoldersList)
 
     remFilesFromList(folderPath, 0, 1, protectu)
+    dropFoldersListRows(folderPath, protectu)
     If (maxFilesIndex>0)
     {
        GenerateRandyList()
@@ -97708,6 +97709,16 @@ purgeSeedFolder(folderu) {
    If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
       recreateDynaFoldersSQLdbList(DynamicFoldersList)
 
+   remFilesFromList(folderu, 1)
+   dropFoldersListRows(folderu)
+   currentFilesListModified := 1
+}
+
+dropFoldersListRows(folderu, protectu:="") {
+; removes the rows of the folders list placed in the given folder, subfolders included,
+; except those of the folders the given seed folders still index. Called once the files
+; are removed: remFilesFromList() drops a files filter, and a folders list not stored
+; yet is built from the index
    ; a cached list writes its folders list from memory when saved: it must be loaded first
    If RegExMatch(CurrentSLD, sldsPattern)
       LoadStaticFoldersCached(CurrentSLD, countStaticFolders, "f")
@@ -97717,16 +97728,22 @@ purgeSeedFolder(folderu) {
    Loop, % newStaticFoldersListCache.MaxIndex()
    {
        thisFolder := newStaticFoldersListCache[A_Index, 1]
-       If (StrLen(thisFolder)>1 && InStr(Format("{:L}", thisFolder) "\", prefixu)!=1)
+       If (StrLen(thisFolder)>1 && (InStr(Format("{:L}", thisFolder) "\", prefixu)!=1 || isPathInGivenFolders(thisFolder "\x", protectu)))
           newArray.Push(newStaticFoldersListCache[A_Index])
    }
 
    newStaticFoldersListCache := newArray
    If (SLDtypeLoaded=3)
-      activeSQLdb.Exec("DELETE FROM staticfolders WHERE " SQLfolderMatchClause(folderu) ";")
-
-   remFilesFromList(folderu, 1)
-   currentFilesListModified := 1
+   {
+      thisClause := SQLfolderMatchClause(folderu)
+      Loop, Parse, protectu, `n, `r
+      {
+          linea := Trimmer(A_LoopField)
+          If (StrLen(linea)>1)
+             thisClause .= " AND NOT (" SQLfolderMatchClause(linea) ")"
+      }
+      activeSQLdb.Exec("DELETE FROM staticfolders WHERE " thisClause ";")
+   }
 }
 
 updateCachedStaticFolders(mainFolderu, onlyMainFolder, updateAllDates:=0, allowDump:=1) {
