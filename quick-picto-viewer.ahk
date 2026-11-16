@@ -3335,7 +3335,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
          Break
       }
 
-      thisFileExists := FileExistAnySize(file2save)
+      thisFileExists := FileRexists(file2save, 0)
       mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
       If mustReplace
       {
@@ -32311,7 +32311,7 @@ PasteFilesIntoGivenFolder(folderPath) {
          Break
       }
 
-      thisFileExists := FileExistAnySize(file2save)
+      thisFileExists := FileRexists(file2save, 0)
       mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
       If mustReplace
       {
@@ -32722,12 +32722,6 @@ FileRexists(filePath, loose:=1) {
       Return 0
    Else
       Return 1
-}
-
-FileExistAnySize(filePath) {
-; a file at the path, an empty one too; a folder does not count
-   obju := GetFileAttributesEx(filePath)
-   Return (IsObject(obju) && obju.dir!=1) ? 1 : 0
 }
 
 isSameFileOtherCase(fileA, fileB) {
@@ -41815,7 +41809,7 @@ coreBatchMultiRenameFiles() {
          }
 
          originalFileInfos := ""
-         thisFileExists := (caseOnly=1) ? 0 : FileExistAnySize(file2save)
+         thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
          mustReplace := (performOverwrite=1 && objuTemp.renamingCount!=1 && thisFileExists=1) ? 1 : 0
          If mustReplace
          {
@@ -47944,7 +47938,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 
      ; the same file spelled in another case: nothing is in the way
      caseOnly := isSameFileOtherCase(file2rem, file2save)
-     If (caseOnly!=1 && FileExistAnySize(file2save))
+     If (caseOnly!=1 && FileRexists(file2save, 0))
         file2save := askAboutFileCollision(file2rem, file2save, 0, doLastOption + 1, 0, performOverwrite)
 
      If (file2save="abort" || !file2save)
@@ -47955,7 +47949,7 @@ BTNrenameSoloFileAct(newFileName, file2rem, doLastOption) {
 
      FileGetTime, originalMtime, % file2rem, M
      FileGetTime, originalCtime, % file2rem, C
-     thisFileExists := (caseOnly=1) ? 0 : FileExistAnySize(file2save)
+     thisFileExists := (caseOnly=1) ? 0 : FileRexists(file2save, 0)
      mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
      If mustReplace
      {
@@ -61737,7 +61731,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     }
 
     operationExecuted := mustPerformOperation := 0
-    thisFileExists := FileExistAnySize(file2save)
+    thisFileExists := FileRexists(file2save, 0)
     mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
     If mustReplace
     {
@@ -62009,7 +62003,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          Break
       }
 
-      thisFileExists := FileExistAnySize(file2save)
+      thisFileExists := FileRexists(file2save, 0)
       mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
       If mustReplace
       {
@@ -95253,7 +95247,7 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
             If (obj.ovr="yes")
             {
                Sleep, 1
-               If (obj.fsize!="")
+               If (obj.fsize>0)
                   rsz := restoreFileFromRecycleBin(otherFile, obj.fsize)
                w := (rsz=1) ? "`nThe original file was restored succesfully." : "`nFailed to restore the original file."
             }
@@ -95283,13 +95277,13 @@ corefileUndoAction(indexu, givenPath:="", undoHistoIndex:="") {
             Return
          }
 
-         If (caseOnly!=1 && FileExistAnySize(otherFile))
+         If (caseOnly!=1 && FileRexists(otherFile, 0))
          {
             otherFile := askAboutFileCollision(imgPath, otherFile, 0, 1, 0, performOverwrite, 1, "Undo " obj.typu " operation. ")
             If (otherFile="abort" || !otherFile)
                Return
 
-            z := FileExistAnySize(otherFile)
+            z := FileRexists(otherFile, 0)
             If (performOverwrite=1 && z=1)
                mustReplace := 1
             Else If (z=1)
@@ -95522,7 +95516,7 @@ batchUndoFileActs(modus) {
             Break
          }
 
-         thisFileExists := FileExistAnySize(otherFile)
+         thisFileExists := FileRexists(otherFile, 0)
          mustReplace := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
          If (thisFileExists=1 && !mustReplace)
          {
@@ -95564,7 +95558,7 @@ batchUndoFileActs(modus) {
             {
                Sleep, 1
                r := 0
-               If (obj.fsize!="")
+               If (obj.fsize>0)
                   r := restoreFileFromRecycleBin(imgPath, obj.fsize)
                If (r!=1)
                   failedRecoverFiles++
@@ -95620,7 +95614,7 @@ batchUndoFileActs(modus) {
                {
                   Sleep, 1
                   r := 0
-                  If (obj.fsize!="")
+                  If (obj.fsize>0)
                      r := restoreFileFromRecycleBin(otherFile, obj.fsize)
                   If (r!=1)
                      failedRecoverFiles++
@@ -95634,12 +95628,12 @@ batchUndoFileActs(modus) {
          If (r=1)
          {
             otherFile := deleteFileConflictDest
-            If (obj.restora="conflict" && FileExistAnySize(otherFile))
+            If (obj.restora="conflict" && FileRexists(otherFile, 0))
             {
                If !FolderExist(otherFile)
                   otherFile := askAboutFileCollision(imgPath, otherFile, 1, 0, userUndoMustDoOverwrite, performOverwrite, 1, "Undo delete: source file is the file from Recycle Bin, to be restored.`n")
 
-               thisFileExists := FileExistAnySize(otherFile)
+               thisFileExists := FileRexists(otherFile, 0)
                pzo := (performOverwrite=1 && thisFileExists=1) ? 1 : 0
                If (performOverwrite=2) ; auto-rename
                   lolz++
@@ -95697,7 +95691,7 @@ batchUndoFileActs(modus) {
          } Else
          {
             failedFiles++
-            If (obj.restora="conflict" && FileExistAnySize(deleteFileConflictDest))
+            If (obj.restora="conflict" && FileRexists(deleteFileConflictDest, 0))
                FileMove, % deleteFileConflictDest, % imgPath
          }
       }
