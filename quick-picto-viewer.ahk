@@ -97109,7 +97109,7 @@ BTNremDynaSelFolder() {
     If protectu
        msgu .= "`n`nThe files of the seed folders placed inside it stay in the index."
 
-    msgResult := msgBoxWrapper(appTitle ": Remove seed folder", msgu "`n`nDo you want to continue?", 4, 0, "question")
+    msgResult := msgBoxWrapper(appTitle ": Remove seed folder", msgu "`n`nDo you want to continue?", 4, 2, "question")
     If (msgResult!="yes")
        Return
 
