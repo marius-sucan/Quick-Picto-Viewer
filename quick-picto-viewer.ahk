@@ -3214,6 +3214,13 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
    lastInvoked := A_TickCount
    friendly := (UsrCopyMoveOperation=2) ? "Moving " : "Copying "
    showTOOLtip(friendly groupDigits(filesElected) " files to`n" finalDest "\`nPlease wait")
+   ; a drive root is left out, the regular Copy/Move panel refuses it
+   If (StrLen(finalDest)>2)
+   {
+      prevFileMovePath := finalDest
+      RecentCopyMoveManager(finalDest)
+   }
+
    destroyGDIfileCache()
    Sleep, 25
    askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
