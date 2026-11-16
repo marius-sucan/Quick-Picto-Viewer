@@ -12,12 +12,14 @@ it under headless Wine, on AutoHotkey_H 1.1.33.10, with the source of `bf72416`;
 means it follows from the code and was not run. Nothing was run on Windows. The test kit is
 described at the end.
 
-**Status, 2026-11-15, at `32c435d`.** Findings 1 and 2 are fixed, in `fe812ec` and
-`32c435d`, with Marius's choices (decisions 1 and 7, settled below). The question that fixes
-finding 2 also fixes finding 11 for this panel. Finding 5 is partly fixed: a drive root loads
-from a .SLD list and «Paste list» keeps it. The other findings are open. A fixed section ends
-with a note on what the code does now, with its lines at `32c435d`; every other line number
-is at `bf72416`.
+**Status, 2026-11-16, at `d05e990`.** Findings 1 to 6 are fixed: 1 and 2 in `fe812ec` and
+`32c435d`, 3 to 6 in `1e1c2b6`, `7c031cb`, `592628d` and `d05e990`, with Marius's choices
+(decisions 1 and 3 to 7, settled below; decision 2 for «Remove» alone). The question that
+fixes finding 2 also fixes finding 11 for this panel; the one that fixes finding 3 also fixes
+finding 13. Findings 14 and 15 are partly fixed; the others are open. A fixed section ends
+with a note on what the code does now, with its lines at the commit the note names
+(`32c435d` for findings 1 and 2, `d05e990` for findings 3 to 6); every other line number is at
+`bf72416`.
 
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
@@ -30,7 +32,8 @@ as «É» or «Ș».
 - **Seed folders list**: what this panel shows, the folders the index is generated from. The
   code calls them «dynamic folders»: `DynamicFoldersList` in memory, the `[DynamicFolderz]`
   section of a .SLD file (`DF1=`, `DF2=`, …), the `dynamicfolders` table of a database.
-  Every entry is stored in lower case.
+  Every entry is stored in lower case; since `592628d`, without a trailing separator, a drive
+  root as `d:`.
 - **`|` entry**: a seed folder scanned without its subfolders. It is stored with a leading
   `|`; the panel shows it without the `R` in the «(?)» column.
 - **Recursive entry**: a seed folder scanned with its subfolders (`R` in «(?)»). No other
@@ -51,23 +54,23 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `32c435d` |
+| # | Finding | Harm | Checked | Status at `d05e990` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
-| 3 | «Remove» answered «Yes» on a `\|` entry also removes the files of the seed folders inside it, in a database for good | high | run | open |
-| 4 | Plain and .SLD lists: a folder name with a capital letter outside A-Z defeats counting, selecting, jumping and removing; «Rescan folder» indexes its files twice; «Set as the protected folder» does not protect it: its files can be deleted from the disk | high | run (plain list), read (.SLD) | open |
-| 5 | A drive root as a seed folder: not listed, dropped by «Remove» and «Paste list», its files dropped by «Rescan all», not loaded from a .SLD list | medium | run | **partly fixed**, `fe812ec` and `32c435d`: loaded from a .SLD list, kept by «Paste list» |
-| 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run | open |
+| 3 | «Remove» answered «Yes» on a `\|` entry also removes the files of the seed folders inside it, in a database for good | high | run | **fixed**, `1e1c2b6`: asked first; «Yes» spares what the seed folders inside it index (decisions 2, 3) |
+| 4 | Plain and .SLD lists: a folder name with a capital letter outside A-Z defeats counting, selecting, jumping and removing; «Rescan folder» indexes its files twice; «Set as the protected folder» does not protect it: its files can be deleted from the disk | high | run (plain list), read (.SLD) | **fixed**, `7c031cb`: compared in lower case (decision 5) |
+| 5 | A drive root as a seed folder: not listed, dropped by «Remove» and «Paste list», its files dropped by «Rescan all», not loaded from a .SLD list | medium | run | **fixed**, `fe812ec`, `32c435d` and `592628d`: kept as `p:` (decision 4) |
+| 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run | **fixed**, `d05e990`: the panel opens, with «Back» (decision 6) |
 | 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | open |
 | 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | open |
 | 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | open |
 | 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | open |
 | 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed for this panel**, `32c435d`: it asks to keep or purge (decision 7) |
 | 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | open |
-| 13 | «Remove»: the entry is gone before the question, which has no «Cancel»; the box shows the internal `\|` | low | run, read | open |
-| 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run | open; since `32c435d` the quoted path is counted among the lines skipped |
-| 15 | Small things | low | run, read | open |
+| 13 | «Remove»: the entry is gone before the question, which has no «Cancel»; the box shows the internal `\|` | low | run, read | **fixed** by `1e1c2b6`, with finding 3 |
+| 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run | **partly fixed**: the quoted path is counted among the lines skipped (`32c435d`), a trailing separator is trimmed (`592628d`) |
+| 15 | Small things | low | run, read | **partly fixed**: the remove box is «Remove seed folder» (`1e1c2b6`) |
 
 ---
 
@@ -211,8 +214,8 @@ captions and audio notes of the purged images in a database's `imagesData` table
 «Remove» answered «Yes» does. «Rescan folder» → «Purge» goes through `remFilesFromList()`,
 which finding 4 describes: on a plain or .SLD list, a folder whose name has a capital outside
 A-Z leaves the seed folders list but its files stay in the index (run, batch M: `été` purged,
-the two files of `Été` still indexed). «Rescan all» → «Purge» is not affected: it rebuilds
-the index.
+the two files of `Été` still indexed; fixed with finding 4 in `7c031cb`). «Rescan all» →
+«Purge» is not affected: it rebuilds the index.
 
 ## 3. «Remove» answered «Yes» on a `|` entry also removes the files of the seed folders inside it
 
@@ -237,6 +240,41 @@ A recursive entry cannot hold another entry, so it does not meet this.
 
 Correction: keep the `|` and pass `getDynaFoldersInside()`, as the rescan does; see also
 decision 2.
+
+**Fixed in `1e1c2b6`**, by Marius's answers (decision 3, and decision 2 for «Remove»): one
+question before anything changes; «Yes» removes the folder's files with its subfolders, except
+the files another seed folder covers. What the code does now, lines at `d05e990`:
+
+- «Remove» asks every time, also when the index holds one file or none
+  (`BTNremDynaSelFolder()` :97095): «The seed folder will be removed from the list, with every
+  file indexed from it, subfolders included», the path without the `|`, «Do you want to
+  continue?», «Yes» / «No». When seed folders sit inside it, the box adds «The files of the
+  seed folders placed inside it stay in the index.» «No» changes nothing.
+- «Yes» removes the entry, then every file indexed under the folder, subfolders included, for a
+  `|` entry as for a recursive one, except what the seed folders inside it index: a recursive
+  one its whole subtree, a `|` one the files placed directly in it. `getDynaFoldersInside()`
+  (:97869) takes them from the seed folders list the panel shows, and `remFilesFromList()`
+  (:97958) spares them, as a rescan does. A file no seed folder covers goes, also when it sits
+  in a subfolder of a seed folder placed inside. In a database the rows go with their cached
+  data.
+
+Run on the text of `d05e990` (batch N; plain list with the seed folders `pv`, `|other`, the
+recursive `other\rec` and `|other\pipe`; the index also holds `other\orphan\x1.png` and
+`other\pipe\deeper\p2.png`, which no seed folder covers):
+
+- «No» on `|other`: the list and the index unchanged (N1; at `e62ea25` the entry went, its
+  files stayed);
+- «Yes» on `|other`: `other\o1.png`, `other\o2.png`, `other\orphan\x1.png` and
+  `other\pipe\deeper\p2.png` go; `other\pipe\p1.png`, `other\rec\r1.png` and
+  `other\rec\deep\r2.png` stay, with the entries `|other\pipe` and `other\rec` (N2; at `e62ea25`
+  all seven went). In a database the same rows go and the same stay (N5);
+- `|Été` holding the recursive `Été\sub`: «Yes» on `|été` removes `Été\e1.png` and keeps the two
+  files of `Été\sub` (N3). On the text of `1e1c2b6` alone nothing goes: that is finding 4, fixed
+  by the next commit;
+- an index of one file: the question comes; «No» keeps everything; «Yes» empties the index,
+  then QPV's «No files left in the index» box comes, as after any removal that empties it
+  (N4);
+- batches B6 and E1 again: `other\sub` keeps its three files, and in the database its rows.
 
 ## 4. Plain and .SLD lists: a folder name with a capital letter outside A-Z
 
@@ -282,6 +320,47 @@ Correction: compare lower case with lower case, as the folders list panel does
 two protected-folder tests: `InListMultiEntriesRemover()` :33957-33961 (index entries) and
 `batchFileDelete()` :40532-40536 (files); see decision 5.
 
+**Fixed in `7c031cb`**, by Marius's answer to decision 5: the seed folders list stays in lower
+case, and both sides are compared in lower case. Lines at `d05e990`:
+
+- F11 (`BTNcountFilesDynaFolders()` :96983), «Select files» and «Deselect files»
+  (`BTNselFilesStaticFolder()` :96871), «Jump to first indexed file»
+  (`BtnPanelStaticJumpFirst()` :97164, which the folders list panel shares: its jump missed
+  such a folder too);
+- the removal under F5, «Remove» and «Purge» (`remFilesFromList()` :97958), and the seed
+  folders it spares (`isPathInGivenFolders()` :97935, `getDynaFoldersInside()` :97869);
+- the protected folder: «delete selected files» (`batchFileDelete()` :40485), «Remove file
+  entries from the list» (`InListMultiEntriesRemover()` :33912), the on/off test of «Set as the
+  protected folder» (`setContaintFolderAsProtected()` :40160), and its check mark in the menus
+  of both folder panels, of the folders tree and of the omnibox's folders. The protected folder
+  is stored as given: in lower case from the two panels, in the spelling of the disk from the
+  folders tree and the omnibox.
+
+F5 on `Été` now replaces its two entries with `été\e1.png` and `été\e2.png`: the folder part in
+lower case, as for every rescanned folder (seen in passing A).
+
+Run on the text of `d05e990`:
+
+- batch A4 again: F11 on `été` counts 2, and F10 then gives a difference of 0; «Select files»
+  selects its two files; «Jump» shows `Été\e1.png`; F5 leaves 17 entries for 17 files; Delete +
+  «Yes» on `ștefan` removes its three files;
+- batch I1 again: «Set as the protected folder» on `été`, then «delete selected files» on its
+  two files: «Skipped files: 2», both kept;
+- batch M again: «Rescan folder» → «Purge» on the missing `été` removes its two files;
+- batch O (folders `Ăla`, `Îna`, `Été`, `Ștefan`, `Ûnu`): `ăla` protected from this panel,
+  sub-paths off: its two files kept, the one in `Ăla\Sub` deleted (O1); `îna` protected,
+  sub-paths on: both kept (O2), and «Remove file entries from the list» keeps their entries
+  (O3); protected with the disk spelling `Îna`, as the folders tree gives it: the check mark
+  shows in this panel's menu, and «Set as the protected folder» from this panel turns the
+  protection off (O4; at `e62ea25`, no mark, and the protection was set again in lower case);
+  F11, «Select files» and «Jump» on `été` (O5); the folders list panel's «Jump to first indexed
+  file» on `ștefan` shows `Ștefan\s1.png` (O6; at `e62ea25` «No file found»); «Rescan all»
+  with `Ștefan` missing, «Keep»: its three files stay, as before (O7); in a database, `Ûnu`
+  protected with the disk spelling: both files kept (O9; at `e62ea25` deleted).
+
+Left: F2 from this panel renames the index through a search and replace that ignores the case
+of A to Z only (seen in passing D).
+
 ## 5. A drive root as a seed folder
 
 `uiPopulateDynamicFolderzList()` :98808; `BTNremDynaSelFolder()` :97021;
@@ -314,9 +393,45 @@ Correction: decision 4, then the same form accepted in the eight places above.
 
 **Partly fixed** by `fe812ec` and `32c435d`: a drive root loads from a .SLD list, also as its
 first entry (run, batch K3; D6 now opens with `p:`), and «Paste list» keeps the listed
-entries as they are, `p:\` included (run, batch D5). The panel still hides `p:`, «Remove»
-still drops a root, «Copy list» and the tree view still leave it out, and «Rescan all» still
-skips it and drops its files.
+entries as they are, `p:\` included (run, batch D5).
+
+**Fixed in `592628d`**, by Marius's answer to decision 4: a drive root is kept as `p:`. Lines at
+`d05e990`:
+
+- `cleanDynamicFoldersList()` (:87691), which every list goes through when it is read, drops
+  the trailing separators of every entry: `p:\`, as «Add» stored it and older lists hold it,
+  becomes `p:`, and `d:\pics\` becomes `d:\pics`. «Add» (`addNewFolder2list()` :66437) and
+  «Paste list» (:97052) trim them too;
+- the tests that wanted a character after `:\`, or three or four characters, take `p:`: the
+  panel's rows (`uiPopulateDynamicFolderzList()` :98981), «Remove» (:97095), «Copy list»
+  (:97030), «Paste list», also its test for a list without a file name yet, «View list as a
+  folders tree» (:96784), «Rescan all» (`RegenerateEntireList()` :87769: the empty-list test,
+  and the scan, which now asks `FolderExist()`), the missing seed folders question
+  (`getMissingSeedFolders()` :97893), and the database's `dynamicfolders` table, which left
+  `p:` out at every rewrite, the save as .SLDB included (`recreateDynaFoldersSQLdbList()`
+  :34616).
+
+Run on the text of `d05e990` (batches D and P, drive P: mapped):
+
+- the root opened: the panel lists `p:` (D1, P1); F11 counts its five files and F5 rescans them
+  (P1); «Copy list» copies `p:` (D2, P2), and «View list as a folders tree» is handed it (P2);
+  «Rescan all» keeps its files (D3, P2);
+- «Remove» on another seed folder keeps `p:` (P3, «Yes»; D4, «No», now changes nothing);
+  «Remove» on `p:`, «Yes»: its files go (P7);
+- `P:\` added with «Add»: kept as `p:`; «Rescan all» keeps its files (D5, P4);
+- «Paste list» of `P:\a\`, `P:\Sub` and `third\`: `p:\a`, `p:\sub` and `third`; then of `P:\`:
+  `p:`, which takes in the two entries inside it (P5);
+- a .SLD list holding `DF1=p:\`, `DF2=…\third\` and `DF3=q:`, with no drive Q:: it opens with
+  `p:`, `third` and `q:`, all three listed; «Rescan all» asks about `q:`, and «Keep» keeps it
+  (P6; at `e62ea25` `q:` was not listed, nothing was asked, and the files of P: were dropped);
+- an uncached .SLD list of `p:` and `other` scans both, as it did before (P8);
+- a database of `p:` and `other`: its `dynamicfolders` table holds `p:` after the save and
+  after «Recursive folder scan» wrote the table again; opened again, it lists `p:` (P9; at
+  `e62ea25` the save already left it out).
+
+The index then holds the root's files as `p:\…`, the drive letter in lower case, as for any
+rescanned folder (seen in passing A). The places outside this panel that do not take a drive
+root are seen in passing E.
 
 ## 6. The Save panel's «Manage folders» button does nothing
 
@@ -341,6 +456,19 @@ panel's «Back» button exists only in the «reopen» mode (:96457-96460), so it
 shown since. Opened from the menu, the panel has no «Back» (run, batch A2).
 
 Correction: decision 6.
+
+**Fixed in `d05e990`**, by Marius's answer to decision 6: «Manage folders» closes the Save
+panel, then opens this one with «Back» (`BTNopenPanelDynamicFolderzWindow()` :44295); the `If
+AnyWindowOpen` test stays for every other route. «Back» closes this panel, then opens the Save
+panel (`BTNdynaFoldersBack()` :96561), as the caches overview's «Back» does: left to
+`createSettingsGUI()`, the close goes through `CloseWindow()`, which refuses for a second after
+a message box closes, and the Save panel's controls would then land on this one. «Back» is gone
+once an action opens the panel again («Add», «Remove», «Paste list», F5…): those open it the
+plain way.
+
+Run on the text of `d05e990` (batch Q, and A1 again): «Manage folders» opens this panel, with
+«Back» among its buttons (Q1, A1); «Back» opens the Save panel (Q2); «Paste list» opens the
+panel again, without «Back» (Q3); opened from the menu, it has no «Back» (Q4).
 
 ## 7. The actions on a `|` entry reach into its subfolders
 
@@ -490,6 +618,10 @@ folder(s)» still removes the entries of a folder it cannot reach (its finding 1
 
 Correction: decision 3; strip the `|` from the text.
 
+**Fixed in `1e1c2b6`**, with finding 3 (decision 3): the question comes before anything
+changes, also with one file or none in the index; «No» changes nothing; the box is titled
+«Remove seed folder» and shows the folder without the `|`.
+
 ## 14. «Paste list»
 
 `BTNpasteDynaFoldersList()` :96967-96998
@@ -503,14 +635,20 @@ Correction: decision 3; strip the `|` from the text.
   scan» does say so (:97548).
 - The list is marked as modified even when nothing changed (:96994; read).
 
+**Partly fixed**: since `32c435d` a quoted path is counted among the lines skipped; since
+`592628d` a trailing separator is trimmed, from the pasted lines and from every entry when a
+list is read (finding 5; run, batch C8: `fifth\` is listed as `fifth`). The other two points
+are open.
+
 ## 15. Small things
 
 - **Menu letters** (run, batch A3, the menu's labels): `&R` on «Rescan folder», «Recursive
   folder scan» and «Remove folder from this list»; `&C` on «Copy this folder path as text» and
   both «Count…» items. The letter then moves between the items instead of choosing one.
 - **Names.** The rename box is titled «Rename static folder entry» (run, batch E4, :97887);
-  «Copy list» says «Dynamic folders list copied to clipboard» (:96962); the remove box is
-  «Remove dynamic folder» (:97032). The panel calls them seed folders.
+  «Copy list» says «Dynamic folders list copied to clipboard» (:96962); the remove box was
+  «Remove dynamic folder» (:97032), «Remove seed folder» since `1e1c2b6`. The panel calls them
+  seed folders.
 - **F1** does nothing in this panel; the folders list panel opens its help (:97220-97224;
   read).
 - **Insert** («Add») is refused when no row is selected: the row test comes before the keys
@@ -537,10 +675,31 @@ Not part of the panel's own code.
   stored in lower case.
 - **B.** The folders list panel's «Set as the protected folder» hands over its own lower-case
   path as well (`BtnPanelManageFoldersActus()` :97145-97146; the folders list is stored in
-  lower case), so finding 4's protection failure applies there too (read).
+  lower case), so finding 4's protection failure applies there too (read). Fixed with finding
+  4 in `7c031cb`: the tests compare in lower case, whichever menu set the folder.
 - **C.** `cleanDynamicFoldersList()` (:87694) drops every entry inside a recursive one. After
   «Recursive folder scan» makes `|d:\pics` recursive, the entry `d:\pics\sub` disappears from
   the list, and making `d:\pics` a `|` entry again does not bring it back (read).
+- **D.** F2 («Rename index entry») from this panel, on a plain or .SLD list, renames the paths
+  of the index through `SearchAndReplaceThroughIndex()` (:98277 at `d05e990`), whose
+  `StrReplace()` (:98414) ignores the case of A to Z only: for a folder named `Été` the entry
+  is renamed and the index keeps the old paths (read). Finding 4's fix covers the comparisons,
+  not this replacement. Open.
+- **E.** A drive root on routes that finding 5's places did not include (read at `d05e990`,
+  found by a search for the tests that want more than two characters; not run): renaming an entry to a
+  root is refused (`PanelRenameStaticFolder()` :98091); «With a new QPV instance» on a root
+  passes `fd=p:`, which the new instance's argument test refuses
+  (`initializeAppWithGivenArguments()` :2437), so it opens nothing; the main window's refresh
+  of a list opened from a root does nothing (`RefreshFilesList()` :65342,
+  `StrLen(CurrentSLD)>3`); the copy and move panel does not offer `p:` among its destinations
+  (`CopyMovePanelWindow()` :60440); the search and replace on the seed folders list calls a
+  list of roots alone empty (`BTNperformIndexSearchReplace()` :47056); the folder lines of a
+  legacy plain-text list skip roots (`sldGenerateFilesList()` :89142); a dropped drive root is
+  skipped (`GuiDroppedFiles()` :66689); a root kept as the last opened folder is reset at the
+  next start (`INIaction()` :72700, type 6). Open.
+- **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it removes
+  every file: its `countFiles` is never set (run, batch N4: `maxFilesIndex` is blank after
+  «Yes» on the only seed folder). Not followed further. Open.
 
 ## Checked and found correct
 
@@ -574,24 +733,31 @@ Not part of the panel's own code.
 2. **The reach of a `|` entry's actions**: the files placed directly in the folder, as the
    entry indexes them, or the subfolders too, as now? It covers «Remove» + «Yes», the two
    counts, «Select files», «Deselect files», «Jump to first indexed file», F3 and «With a new
-   QPV instance».
+   QPV instance». **Settled for «Remove»** (`1e1c2b6`, Marius's answer): the subfolders too,
+   except the files another seed folder covers. Open for the other actions (finding 7).
 3. **«Remove»**: ask first, with «Cancel», before the entry goes, or keep «Yes» / «No» about
-   the files only?
+   the files only? **Settled** (`1e1c2b6`, Marius's answers): one question before anything
+   changes, «Yes» / «No», asked every time; «No» changes nothing; «Yes» removes the entry with
+   its files.
 4. **A drive root**: `d:` (as «Open folder» stores it and as the folders list keeps it) or
-   `d:\` (as «Add» stores it)?
+   `d:\` (as «Add» stores it)? **Settled** (`592628d`, Marius's answer): `d:`; no entry keeps
+   a trailing separator.
 5. **Letter case**: keep the seed folders list in lower case and compare in lower case
    everywhere, or keep the spelling of the disk (which would also settle decision 10 of the
-   folders list audit for this panel)?
+   folders list audit for this panel)? **Settled** (`7c031cb`, Marius's answer): lower case,
+   both sides compared in lower case.
 6. **The Save panel's «Manage folders»**: close the Save panel and open this one, with
    «Back», or take the button out? The `If AnyWindowOpen` test was presumably added for the
-   custom shortcuts; it could stay for every other route.
+   custom shortcuts; it could stay for every other route. **Settled** (`d05e990`, Marius's
+   answer): the Save panel closes and this one opens, with «Back»; the test stays for every
+   other route.
 7. **«Rescan folder» on a missing folder**: skip it, ask first, or remove its entries as
    now? Same as decision 2 of the folders list audit. **Settled for this panel**
    (`32c435d`, Marius's answer): ask, «Keep» or «Purge», as in decision 1. Decision 2 of the
    folders list audit stays open for that panel.
 
-Suggested order at `32c435d`: findings 8 and 9 need no decision, nor does sparing the other
-seed folders in finding 3; then 10, 12, 13 and 14; the rest once the decisions are taken.
+Suggested order at `d05e990`: findings 8 and 9 need no decision; then 10, 12, and what is
+left of 14 and 15; finding 7 waits for the rest of decision 2.
 
 ## How this was checked
 
@@ -641,13 +807,37 @@ that one in this panel, its batch F).
 | K | cached .SLD, database, drive P: | after `32c435d`: F5 on the missing `other`, «Keep» then «Purge», the cached list saved afterwards, the database's tables; a list of the drive root alone and a list of `P:\a`, each saved and opened |
 | L | plain, database | after `32c435d`: «Rescan all» with `\|other` and `other\sub` both missing, «Keep» then «Purge»; its step L3 opens a plain folder after the database and is not valid (the kit's known trap), batch M repeats it |
 | M | plain | after `32c435d`: F5 on the missing `été`, «Purge» |
+| N | plain, database | for `1e1c2b6`: «Remove» on `\|other` holding the recursive `other\rec` and `\|other\pipe`, with files no seed folder covers: «No», «Yes»; `\|Été` holding `Été\sub`; an index of one file; the same «Yes» in a database |
+| O | plain, database | for `7c031cb`: folders `Ăla`, `Îna`, `Été`, `Ștefan`, `Ûnu`: the protected folder set from this panel, sub-paths off and on, then «delete selected files» and «Remove file entries from the list»; set with the disk spelling: the check mark, the toggle; F11, «Select files», «Jump»; the folders list panel's «Jump»; «Rescan all» with a missing folder, «Keep»; F5; Delete; a database |
+| P | plain, .SLD, database, drive P: | for `592628d`: the root opened, F11, F5, «Copy list», «Rescan all», «View list as a folders tree», «Remove» on another entry and on the root; `P:\` added; «Paste list» of entries with a trailing separator, then of `P:\`; a .SLD list holding `p:\`, `third\` and the missing `q:`; an uncached list; a database |
+| Q | plain | for `d05e990`: the Save panel's «Manage folders», «Back», «Paste list» after it, the panel from the menu |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
 load check), and anything on Windows.
 
+**Runs of 2026-11-16**, for findings 3 to 6. The kit was copied to
+`.claude/scratch/seed-folders-fixes-2026-11-16/`: `app/` as before, plus `seed-part2.ahk` for
+batches N to Q (joined by `build-wrappers.sh`), and `patch.py` turns the folders tree that
+«View list as a folders tree» opens into a log line. Every batch ran on `e62ea25`, before the
+fixes (logs `*-h`), and on the text of `d05e990` (logs `*-f`); batch N also ran on the text of
+`1e1c2b6` alone (`n-f3`). `compare.sh h f` compares the logs line by line, after the dates and
+the random current image are blanked out: G, J and K give the same lines; the others differ
+where the fixes act, and nowhere else. Batch L stops at its last step, L3, the step known not
+to be valid: «Purge» now removes the two files of `Été`, the index is left empty, and QPV's «No
+files left» box waits for an answer the batch does not give; batch M repeats the step in a
+valid state. `snap/` holds the texts tested: `head.ahk` is `e62ea25`, `f3.ahk` to `f6.ahk` are
+`1e1c2b6` to `d05e990`, each committed as tested (sha256 compared). `loadcheck2.sh <file>`
+load-checks a text with AutoHotkey_H (`/iLib`, and a full load) and stock AutoHotkey 1.1.37
+(`/iLib`): all four commits load. Not run: the folder dialog, the folders tree itself, an .SLD
+list for finding 4, Windows.
+
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.
 
 Traps met: a space followed by `;` starts a comment even inside an AutoHotkey string, write
-`` `; ``; `run-all.sh` must be executable before it is started in the background.
+`` `; ``; `run-all.sh` must be executable before it is started in the background. Since
+2026-11-16: a queued answer that finds no box leaves the answers queued after it waiting,
+never scheduled, so the next box of the batch is not answered (batch N clears the queue after
+N4); adding a folder whose files are indexed already asks «Do you want to add it to the list?»;
+the folders list panel of a plain list first asks to generate it.
