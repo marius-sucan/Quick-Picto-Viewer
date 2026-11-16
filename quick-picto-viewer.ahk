@@ -61141,17 +61141,26 @@ PanelStructuredCopyMoveWindow() {
 
     ToolTip, Please wait...,,, 2
     UsrCopyMoveOperation := 1
-    zPlitPath(getIDimage(currentFileIndex), 1, OldOutFileName, OutDir, OutFileNameNoExt, OutFileExt)
-
     pk := (uiUseDarkMode=1) ? "" : "-dark"
     pp := mainExecPath "\resources\toolbar\"
     getSelectedFiles(0, 1)
+    ; the Source starts on the focused file's folder, when that file is selected
+    srcDir := ""
+    If (resultedFilesList[currentFileIndex, 2]=1)
+    {
+       imgPath := StrReplace(getIDimage(currentFileIndex), "||")
+       srcDir := SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)
+       If (!RegExMatch(srcDir, "i)^[a-z]:(\\|$)") || !FolderExist(srcDir))
+          srcDir := ""
+       Else If (StrLen(srcDir)=2)
+          srcDir .= "\"
+    }
     ml := (PrefsLargeFonts=1) ? 110 : 70
     Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
     Gui, Add, Text, x15 y15 Section, This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
     Gui, Add, Text, xs y+10 w%ml%, Source: 
-    GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", OutDir)
+    GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", srcDir)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
     ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
     GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders: the deepest folder that holds the selected files.`nFiles on other drives, or in other folders under the drive root,`nget a folder of their own.")
