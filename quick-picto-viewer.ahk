@@ -27300,7 +27300,7 @@ createOmniBoxFoldersContextMenu(folderPath) {
    kMenu("PVfomni", "Add", "&Rename folder`tF2", "omniBoxFolderRename")
    kMenu("PVfomni", "Add", "&Delete folder`tF8", "omniBoxFolderDelete")
    kMenu("PVfomni", "Add/UnCheck", "Se&t as the protected folder", "omniBoxFolderSetProtected")
-   If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
+   If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
       kMenu("PVfomni", "Check", "Se&t as the protected folder")
 
    kMenu("PVfomni", "Add", "Folder properties (E&xplorer)`tF12", "omniBoxFolderProperties")
@@ -31608,7 +31608,7 @@ folderTreeContextMenu() {
          Menu, PVfdTree, Add
          kMenu("PVfdTree", "Add", "Add to/remove from fa&vorites", "folderTreeAddFolderFaves")
          kMenu("PVfdTree", "Add/UnCheck", "Se&t as the protected folder", "folderTreeSetFolderProtected")
-         If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
+         If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
             kMenu("PVfdTree", "Check", "Se&t as the protected folder")
 
          kMenu("PVfdTree", "Add", "Folder properties (E&xplorer)`tF12", "folderTreePropertiesFolder")
@@ -33942,6 +33942,7 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
    newFilesIndex := 0
    newFilesList := []
    newMappingList := []
+   protectedLow := Format("{:L}", protectedFolderPath)
    updateMainu := (StrLen(filesFilter)>1 && (!InStr(filesFilter, "SQL:query:") || hasHamDistCached=1)) ? 1 : 0
    Loop, % maxFilesIndex + 1
    {
@@ -33963,11 +33964,11 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
       If (preventDeleteFromProtectedPath=1 && protectedFolderPath)
       {
          If (preventDeleteFromProtectedSubPaths=1)
-            OutDir := InStr(imgPath, protectedFolderPath "\") ? protectedFolderPath : 0
+            OutDir := InStr(Format("{:L}", imgPath), protectedLow "\") ? protectedLow : 0
          Else
             zPlitPath(imgPath, 0, OutFileName, OutDir)
 
-         If (protectedFolderPath=OutDir)
+         If (protectedLow=Format("{:L}", OutDir))
             isSelected := 0
       }
 
@@ -40157,7 +40158,7 @@ searchNextIndex(direction, inLoop:=0) {
 }
 
 setContaintFolderAsProtected(givenPath:=0,modus:=0) {
-     If (givenPath=protectedFolderPath && preventDeleteFromProtectedPath=1)
+     If (Format("{:L}", givenPath)=Format("{:L}", protectedFolderPath) && preventDeleteFromProtectedPath=1)
      {
         preventDeleteFromProtectedPath := 0
         IniAction(1, "preventDeleteFromProtectedPath", "General")
@@ -40501,6 +40502,8 @@ batchFileDelete(dontAlterIndex:=0) {
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    whileLoopExec := 1
+   ; = and InStr() ignore the case of A-Z only: both sides are compared in lower case
+   protectedLow := Format("{:L}", protectedFolderPath)
    Loop, % maxFilesIndex
    {
       If (resultedFilesList[A_Index, 2]!=1)  ;  is not selected?
@@ -40538,12 +40541,13 @@ batchFileDelete(dontAlterIndex:=0) {
 
       If (preventDeleteFromProtectedPath=1 && protectedFolderPath)
       {
+         fileLow := Format("{:L}", file2rem)
          If (preventDeleteFromProtectedSubPaths=1)
-            OutDir := InStr(file2rem, protectedFolderPath "\") ? protectedFolderPath : ""
+            OutDir := InStr(fileLow, protectedLow "\") ? protectedLow : ""
          Else
-            OutDir := SubStr(file2rem, 1, InStr(file2rem, "\", 0, -1) - 1)
+            OutDir := SubStr(fileLow, 1, InStr(fileLow, "\", 0, -1) - 1)
 
-         If (protectedFolderPath=OutDir)
+         If (protectedLow=OutDir)
          {
             skippedFiles++
             Continue
@@ -87815,7 +87819,7 @@ RegenerateEntireList() {
        ; the index is rebuilt from scratch: the files of the folders kept are carried over
        Loop, % maxFilesIndex
        {
-          If isPathInGivenFolders(Format("{:L}", resultedFilesList[A_Index, 1]), keptu)
+          If isPathInGivenFolders(resultedFilesList[A_Index, 1], keptu)
              keptFiles.Push(resultedFilesList[A_Index])
        }
     }
@@ -94082,7 +94086,7 @@ invokePanelStaticFoldersContextMenu() {
       kMenu("PanelStaticMenu", "Add", "C&opy folder (Explorer mode)", "BTNcutCopyStaticFolders")
       kMenu("PanelStaticMenu", "Add", "&Copy folder path(s) as text", "BTNcopyStaticFolderPath")
       kMenu("PanelStaticMenu", "Add/UnCheck", "&Set as the protected folder", "BtnPanelManageFoldersProtect")
-      If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
+      If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
          kMenu("PanelStaticMenu", "Check", "&Set as the protected folder")
 
       If (isUpdateList=1 && InStr(changeState, "*") && FileExist(CurrentSLD))
@@ -94164,7 +94168,7 @@ invokePanelDynaFoldersContextMenu() {
       kMenu("PanelDynaMenu", "Add", "&Remove folder from this list`tDelete", "BTNremDynaSelFolder")
       kMenu("PanelDynaMenu", "Add", "Rename inde&x entry`tF2", "PanelRenameStaticFolder")
       kMenu("PanelDynaMenu", "Add/UnCheck", "Set as the &protected folder", "BtnPanelManageFoldersProtect")
-      If (protectedFolderPath=folderPath && preventDeleteFromProtectedPath=1)
+      If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
          kMenu("PanelDynaMenu", "Check", "Set as the &protected folder")
 
       kMenu("PanelDynaMenu", "Add", "&Copy this folder path as text", "BTNcopyStaticFolderPath")
@@ -96902,7 +96906,7 @@ BTNselFilesStaticFolder(modus:=0) {
     }
 
    thisIndex := 0
-   folderu := StrReplace(folderu, "|")
+   folderu := Format("{:L}", StrReplace(folderu, "|"))
    doStartLongOpDance()
    prevMSGdisplay := A_TickCount
    startOperation := A_TickCount
@@ -96925,7 +96929,7 @@ BTNselFilesStaticFolder(modus:=0) {
       If !imgPath
          Continue
 
-      OutDir := (AnyWindowOpen=2) ? Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1)) : imgPath
+      OutDir := Format("{:L}", (AnyWindowOpen=2) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
       If (AnyWindowOpen=2 && foldersListArray[OutDir])
       || (AnyWindowOpen=3 && InStr(OutDir "\", folderu "\"))
       {
@@ -96981,7 +96985,7 @@ BTNcountFilesDynaFolders() {
    ToolTip, Identifying matching files
    setImageLoading()
    thisSelIndex := thisIndex := 0
-   folderu := StrReplace(folderu, "|")
+   folderu := Format("{:L}", StrReplace(folderu, "|"))
    doStartLongOpDance()
    startOperation := A_TickCount
    Loop, % maxFilesIndex
@@ -96996,7 +97000,7 @@ BTNcountFilesDynaFolders() {
       If !imgPath
          Continue
 
-      If InStr(imgPath "\", folderu "\")
+      If InStr(Format("{:L}", imgPath) "\", folderu "\")
       {
          thisIndex++
          If resultedFilesList[A_Index, 2]
@@ -97165,6 +97169,7 @@ BtnPanelStaticJumpFirst() {
 
    winOpen := AnyWindowOpen
    folderPath := StrReplace(folderu, "|")
+   folderLow := Format("{:L}", folderPath)
    BtnCloseWindow()
    thisIndex := 0
    doStartLongOpDance()
@@ -97189,8 +97194,8 @@ BtnPanelStaticJumpFirst() {
       If !imgPath
          Continue
 
-      OutDir := (winOpen=2) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath
-      If (winOpen=2 && OutDir=folderPath) || (winOpen=3 && InStr(OutDir "\", folderPath "\"))
+      OutDir := Format("{:L}", (winOpen=2) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
+      If (winOpen=2 && OutDir=folderLow) || (winOpen=3 && InStr(OutDir "\", folderLow "\"))
       {
          thisIndex := A_Index
          Break
@@ -97862,12 +97867,12 @@ getDynaFoldersInside(mainFolderu, listu:="") {
 ; Without a given list, DynamicFoldersList is read as it is: getDynamicFoldersList()
 ; would reload it through coreLoadDynaFolders(), which reads the file whenever it
 ; is not the CurrentSLD in use, and the rescans blank CurrentSLD
-   mainFolderu := RegExReplace(StrReplace(mainFolderu, "|"), "\\+$")
+   mainFolderu := Format("{:L}", RegExReplace(StrReplace(mainFolderu, "|"), "\\+$"))
    protectu := ""
    Loop, Parse, % StrReplace((listu!="") ? listu : DynamicFoldersList, "|hexists|"), `n, `r
    {
        linea := Trimmer(A_LoopField)
-       thisFolder := RegExReplace(StrReplace(linea, "|"), "\\+$")
+       thisFolder := Format("{:L}", RegExReplace(StrReplace(linea, "|"), "\\+$"))
        If (StrLen(thisFolder)<2 || thisFolder=mainFolderu)
           Continue
 
@@ -97922,6 +97927,7 @@ dropSeedFolders(listu, foldersu) {
 isPathInGivenFolders(filePath, foldersList) {
 ; tells whether the given file belongs to one of the given folders; a "|" prefix
 ; means the file must sit directly in it, not in one of its subfolders
+   filePath := Format("{:L}", filePath)
    Loop, Parse, foldersList, `n, `r
    {
        linea := Trimmer(A_LoopField)
@@ -97929,7 +97935,7 @@ isPathInGivenFolders(filePath, foldersList) {
           Continue
 
        isPipe := InStr(linea, "|") ? 1 : 0
-       thisFolder := RegExReplace(StrReplace(linea, "|"), "\\+$") "\"
+       thisFolder := Format("{:L}", RegExReplace(StrReplace(linea, "|"), "\\+$")) "\"
        If !InStr(filePath, thisFolder)
           Continue
 
@@ -97962,6 +97968,8 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
     }
 
     SelectedDir := StrReplace(SelectedDir, "|")
+    ; the folders lists are stored in lower case, the index keeps the spelling of the disk
+    dirLow := Format("{:L}", SelectedDir) "\"
     newArrayu := []
     Loop, % maxFilesIndex + 1
     {
@@ -97969,10 +97977,11 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
         If (InStr(r, "||") || !r)
            Continue
 
+        rLow := Format("{:L}", r)
         If !isPipe
-           mustRemove := InStr(r, SelectedDir "\") ? 1 : 0
+           mustRemove := InStr(rLow, dirLow) ? 1 : 0
         Else
-           mustRemove := InStr(StrReplace(r, SelectedDir "\"), "\") ? 0 : 1
+           mustRemove := InStr(StrReplace(rLow, dirLow), "\") ? 0 : 1
 
         If (mustRemove=1 && protectedFolders)
            mustRemove := isPathInGivenFolders(r, protectedFolders) ? 0 : 1
