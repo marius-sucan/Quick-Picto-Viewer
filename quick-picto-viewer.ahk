@@ -60255,7 +60255,7 @@ BtnCpyMvStrctrdChooseFilesDst() {
    If !FolderExist(p)
       p := FolderExist(prevFileMovePath) ? prevFileMovePath : prevOpenFolderPath
 
-   SelectedDir := openFoldersDialogWrapper(p)
+   SelectedDir := openFoldersDialogWrapper(p, "Select the destination folder")
    SelectedDir := Trimmer(SelectedDir)
    If FolderExist(SelectedDir)
       GuiControl, SettingsGUIA:, UsrEditFileDestination, % SelectedDir
@@ -60274,7 +60274,7 @@ BtnCpyMvStrctrdChooseFilesSrc() {
    If !FolderExist(p)
       p := FolderExist(prevFileMovePath) ? prevFileMovePath : prevOpenFolderPath
 
-   SelectedDir := openFoldersDialogWrapper(p)
+   SelectedDir := openFoldersDialogWrapper(p, "Select the source folder")
    SelectedDir := Trimmer(SelectedDir)
    If FolderExist(SelectedDir)
       GuiControl, SettingsGUIA:, UsrEditFileSource, % SelectedDir
