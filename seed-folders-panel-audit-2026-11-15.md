@@ -27,7 +27,10 @@ default (`ad55c7f`), and its «Yes» also drops the folder's rows from the folde
 index (`9aecb75`); seen in passing E is partly fixed: a new instance, «Rename index entry» and
 the refresh take a drive root (`08ae6f5`, `c68164c`, `905461a`), and the refresh after a single
 image rescans its folder without the subfolders (decisions 8 and 9). The notes on them cite
-lines at `0ab5622`.
+lines at `0ab5622`. Then the Search and Replace panel's two other targets ignore case too, the
+seen images list (`8cacdee`, decision 10) and the seed folders list (`cce29a6`), and the latter
+takes a list of drive roots alone and marks the list as modified (`557c018`); lines at
+`557c018`.
 
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
@@ -62,7 +65,7 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `0ab5622` |
+| # | Finding | Harm | Checked | Status at `557c018` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
@@ -734,8 +737,22 @@ Not part of the panel's own code.
   still replaces in the middle of the paths (U4); in a database the folders tree's rename of
   `Ûna` moves the subfolder's row too, and the normal mode with `ÛNA2\SUB\` moves the row and
   the index entry together (U5, U6; at `89840b5` the subfolder's row and the index stayed on the
-  old path). The panel's other two targets keep their own replacement, A to Z only: the seen
-  images list and the seed folders list.
+  old path). The panel's other two targets ignore case too since `8cacdee` and `cce29a6`
+  (Marius's answer), lines at `557c018`: the seen images list (`SearchAndReplaceSeenDB()`
+  :98522) selects its records with LIKE, which folds A to Z only, so every other character of
+  the searched text now matches any character there, and `StrReplaceCaseless()` keeps the true
+  matches and replaces them; the list can hold one file under two spellings, one viewed from a
+  plain list and one from a database, and the column skipped without a word an update to a path
+  recorded already, leaving the record on the old path while counting it: the two records now
+  merge under the new path, with the later view date, and the count tells the records really
+  changed (decision 10). The seed folders list (`BTNperformIndexSearchReplace()` :47026)
+  replaces through `StrReplaceCaseless()`. Run on the text of `557c018` (batches W and X; at
+  `8cbe643` in parentheses): `été\` replaced on the records `Été\a.png` and `été\a.png` gives
+  one record, with the later date, «2 records were modified» (one renamed, the other left on the
+  old path); `Ätä\b.png`, which the wildcards select, stays untouched and uncounted; folder mode
+  with `ÉTÉ` renames the folder and keeps the file name `Été.png` (nothing); the needles
+  `pics_1\` and `100%\` and an A to Z one give the same records as before; through the panel,
+  `ÄTÄ\` renames the record (nothing); the seed folders list, `ÉTÉ` renames `été` (nothing).
 - **E.** A drive root on routes that finding 5's places did not include (read at `d05e990`,
   found by a search for the tests that want more than two characters; not run): renaming an entry to a
   root is refused (`PanelRenameStaticFolder()` :98091); «With a new QPV instance» on a root
@@ -770,8 +787,14 @@ Not part of the panel's own code.
     subfolders» toggled after one image of the root, the refresh scans the drive (T4, as asked
     by the toggle); the kit's own start, one image, F5 gives the folder's two files instead of
     ten with the subfolders (R0). Of the three single-image places only `OpenArgFile()` is run.
-  - Still open: the copy and move panel, the seed folders list's search and replace with roots
-    alone, legacy list lines, a dropped root, and the last opened folder.
+  - The Search and Replace panel's seed folders list (`557c018`, :47056): a list of drive roots
+    alone is a list, no longer «empty»; and a replacement that changed the list marks it as
+    modified, which it never did: closing a .SLD list asked nothing and lost the change
+    (Marius's choices). Run (batch X): the list `p:` alone, `P:\` → `P:\Sub\` gives `p:\sub`
+    (at `8cbe643` «The seed folders list is empty»); `\PV` → `\pvX` changes the list and marks
+    it (at `8cbe643` the same change, unmarked); a text that matches nothing marks nothing.
+  - Still open: the copy and move panel, legacy list lines, a dropped root, and the last opened
+    folder.
 - **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it removes
   every file: its `countFiles` is never set (run, batch N4: `maxFilesIndex` is blank after
   «Yes» on the only seed folder). Not followed further. Open.
@@ -835,9 +858,13 @@ Not part of the panel's own code.
    the folder alone, a root or not; this changes the refresh of any folder in that state.
 9. **The reach of the case-blind search and replace** (seen in passing D): the folder modes, the
    panel's normal mode too, or F2 alone? **Settled** (`9aecb75`, Marius's answer): every mode of
-   the search and replace through the index.
+   the search and replace through the index; then the panel's seen images and seed folders
+   targets too (`8cacdee`, `cce29a6`, Marius's answer).
+10. **Two seen records of one file**, which a case-blind replacement gives the same path: merge
+    them, delete the duplicate, or leave it on the old path? **Settled** (`8cacdee`, Marius's
+    answer): merge them, under the new path, with the later view date.
 
-Suggested order at `0ab5622`: findings 8 and 9 need no decision; then 10, 12, and what is
+Suggested order at `557c018`: findings 8 and 9 need no decision; then 10, 12, and what is
 left of 14 and 15; finding 7 waits for the rest of decision 2.
 
 ## How this was checked
@@ -898,6 +925,9 @@ that one in this panel, its batch F).
 | T | one image, plain, drive P: | for `905461a`: F5 after one image of the root, of `pv\Alpha`; the root opened as a folder; «with subfolders» toggled |
 | U | plain, cached .SLD, database, drive P: | for `c68164c` and `9aecb75`: F2 to `P:\`; F2 on `Été`, the folders list panel's F2 unpropagated; the normal and folder modes; the folders tree's rename and the normal mode in a database |
 | V | uncached .SLD | for `0ab5622`: «Remove» + «Yes» while a files filter is on; the length of a lower-cased string |
+| W0 | seen images list | probe at `8cbe643`: one file's two spellings replaced in two passes |
+| W | seen images list | for `8cacdee`: two spellings of one file, a look-alike, folder mode, needles with `_` and `%`, an A to Z one, the panel |
+| X | cached .SLD, drive P: | for `cce29a6` and `557c018`: the panel's seed folders list: a capital outside A-Z, an A to Z change and the modified mark, no match, the root alone |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -932,6 +962,13 @@ texts committed (`g1.ahk` to `g6.ahk` = `ad55c7f` to `0ab5622`, sha256 compared)
 load with AutoHotkey_H and stock AutoHotkey 1.1.37. `argtest/` is the check of a quoted
 argument that ends with `\`. Lower case kept the length of every string tried (`İ` stays one
 character, unchanged under Wine).
+
+**Runs of the panel's two other targets**, 2026-11-16: batches W0, W and X ran on `8cbe643`
+(logs `*-h3`) and W, X and U on the text of `557c018` (logs `*-k`); U gives the lines of `u-g`
+but for the random display. The seen images list lives in the kit's folder
+(`seenImagesList.db`), emptied at the start of W0 and W. `snap3/` holds the three texts
+committed (`k1.ahk` to `k3.ahk` = `8cacdee` to `557c018`, sha256 compared), all three loaded
+with AutoHotkey_H and stock AutoHotkey 1.1.37.
 
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.
