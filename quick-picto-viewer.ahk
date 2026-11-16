@@ -60238,14 +60238,13 @@ BtnCpyMvChooseFilesDest() {
 }
 
 BtnCpyMvStrctrdChooseFilesDst() {
-   GuiControlGet, UsrEditFileSource
-   GuiControlGet, UsrEditFileDestination
-   UsrEditFileSource := Trimmer(UsrEditFileSource)
-   UsrEditFileSource := Trimmer(UsrEditFileSource, "\")
-   UsrEditFileDestination := Trimmer(UsrEditFileDestination)
-   UsrEditFileDestination := Trimmer(UsrEditFileDestination, "\")
+   ; locals: the shared UsrEditFileDestination holds only what «Proceed» used
+   GuiControlGet, srcDir, SettingsGUIA:, UsrEditFileSource
+   GuiControlGet, destDir, SettingsGUIA:, UsrEditFileDestination
+   srcDir := Trimmer(Trimmer(srcDir), "\")
+   destDir := Trimmer(Trimmer(destDir), "\")
 
-   p := FolderExist(UsrEditFileDestination) ? UsrEditFileDestination : UsrEditFileSource
+   p := FolderExist(destDir) ? destDir : srcDir
    If !FolderExist(p)
       p := FolderExist(prevFileMovePath) ? prevFileMovePath : prevOpenFolderPath
 
@@ -60258,14 +60257,13 @@ BtnCpyMvStrctrdChooseFilesDst() {
 }
 
 BtnCpyMvStrctrdChooseFilesSrc() {
-   GuiControlGet, UsrEditFileSource
-   GuiControlGet, UsrEditFileDestination
-   UsrEditFileSource := Trimmer(UsrEditFileSource)
-   UsrEditFileSource := Trimmer(UsrEditFileSource, "\")
-   UsrEditFileDestination := Trimmer(UsrEditFileDestination)
-   UsrEditFileDestination := Trimmer(UsrEditFileDestination, "\")
+   ; locals: the shared UsrEditFileDestination holds only what «Proceed» used
+   GuiControlGet, srcDir, SettingsGUIA:, UsrEditFileSource
+   GuiControlGet, destDir, SettingsGUIA:, UsrEditFileDestination
+   srcDir := Trimmer(Trimmer(srcDir), "\")
+   destDir := Trimmer(Trimmer(destDir), "\")
 
-   p := FolderExist(UsrEditFileSource) ? UsrEditFileSource : UsrEditFileDestination
+   p := FolderExist(srcDir) ? srcDir : destDir
    If !FolderExist(p)
       p := FolderExist(prevFileMovePath) ? prevFileMovePath : prevOpenFolderPath
 
