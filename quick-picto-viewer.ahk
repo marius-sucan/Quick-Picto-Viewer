@@ -26627,7 +26627,8 @@ GuiAddDropDownList(options, listu, labelu:="", tipu:="", guiu:="SettingsGUIA") {
           }
 
           ; GuiControl, %guiu%: MoveDraw, %tipu%, w%w% h%h%
-          If labelu[3]
+          ; the third item is the tooltip, unless a second item makes it the list to line up with
+          If (labelu[3] && !labelu[2])
              labelu := labelu[3]
           Else
              labelu := tipu := ""
