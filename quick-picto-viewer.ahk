@@ -98274,12 +98274,34 @@ repairPathSeparators(pathu) {
    Return RegExReplace(pathu, "(.)\\{2,}", "$1\")
 }
 
+StrReplaceCaseless(haystack, needle, replacement, ByRef countu:=0) {
+; StrReplace() that ignores the case of every letter, not only of A to Z.
+; Lower case keeps the length of a string, so the positions found in it hold in the original
+   countu := 0
+   If (needle="")
+      Return haystack
+
+   lowHaystack := Format("{:L}", haystack)
+   lowNeedle := Format("{:L}", needle)
+   startPos := 1
+   result := ""
+   While (foundPos := InStr(lowHaystack, lowNeedle, 1, startPos))
+   {
+      result .= SubStr(haystack, startPos, foundPos - startPos) replacement
+      startPos := foundPos + StrLen(needle)
+      countu++
+   }
+   Return countu ? result SubStr(haystack, startPos) : haystack
+}
+
 SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlySelected:=0) {
     ; onlySelected=1 limits the operation to the files the user selected.
     ; in folderMode=1, both strings always cover entire folder paths: 
     ; whole folders are matched
     ; d:\pics\old must never match d:\pics\oldies
     ; folderMode=2 does the same for the given folder alone, not its subfolders.
+    ; The matches ignore the case of every letter: a database and the folders lists
+    ; hold their paths in lower case.
     ; Returns 0 when the database could not be updated
 
     If (silentus=0)
@@ -98341,12 +98363,12 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  If (folderMode=1)
                  {
 
-                    newFolder := RegExReplace(repairPathSeparators(StrReplace(Row[2] "\", whatu, replacerz)), "\\+$")
+                    newFolder := RegExReplace(repairPathSeparators(StrReplaceCaseless(Row[2] "\", whatu, replacerz)), "\\+$")
                     newFileu := Row[3]
                     pathOK := (StrLen(newFolder)>1) ? 1 : 0
                  } Else
                  {
-                    thisPath := repairPathSeparators(StrReplace(Row[2] "\" Row[3], whatu, replacerz))
+                    thisPath := repairPathSeparators(StrReplaceCaseless(Row[2] "\" Row[3], whatu, replacerz))
                     thisPos := InStr(thisPath, "\", 0, -1)
                     newFolder := SubStr(thisPath, 1, thisPos - 1)
                     newFileu := SubStr(thisPath, thisPos + 1)
@@ -98377,7 +98399,7 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
           activeSQLdb.Exec("BEGIN TRANSACTION;")
 
        owle := setWhileLoopBusy()
-       whatuBare := RTrim(whatu, "\")
+       whatuBare := Format("{:L}", RTrim(whatu, "\"))
        Loop, % maxFilesIndex + 1
        {
            imgPath := resultedFilesList[A_Index, 1]
@@ -98409,14 +98431,14 @@ SearchAndReplaceThroughIndex(whatu, replacerz, silentus:=0, folderMode:=0, onlyS
                  fileFolder := SubStr(imgPath, 1, thisPos)
                  If (folderMode=2)
                  {
-                    affected := (RTrim(fileFolder, "\")=whatuBare) ? 1 : 0
+                    affected := (Format("{:L}", RTrim(fileFolder, "\"))==whatuBare) ? 1 : 0
                     newFolder := affected ? replacerz : fileFolder
-                 } Else newFolder := StrReplace(fileFolder, whatu, replacerz, affected)
+                 } Else newFolder := StrReplaceCaseless(fileFolder, whatu, replacerz, affected)
                  value := repairPathSeparators(newFolder "\" SubStr(imgPath, thisPos + 1))
               }
            } Else
            {
-              value := StrReplace(imgPath, whatu, replacerz, affected)
+              value := StrReplaceCaseless(imgPath, whatu, replacerz, affected)
               value := repairPathSeparators(value)
            }
 
