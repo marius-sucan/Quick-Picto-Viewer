@@ -61166,8 +61166,11 @@ PanelStructuredCopyMoveWindow() {
     Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
     Gui, Add, Text, x15 y15 Section, This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
-    Gui, Add, Text, xs y+10 w%ml%, &Source: 
-    GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", srcDir)
+    Gui, Add, Text, xs y+10 w%ml% +0x200 +hwndhSrcLbl, &Source: 
+    hSrcEdit := GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", srcDir)
+    ; the label takes the field's height, to be centred beside it [0x200: SS_CENTERIMAGE] as «Destination:»
+    z := GetWindowPlacement(hSrcLbl), r := GetWindowPlacement(hSrcEdit)
+    SetWindowPlacement(hSrcLbl, z.x, z.y, z.w, r.h, 1)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
     ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
     GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders: the deepest folder that holds the selected files.`nFiles on other drives, or in other folders under the drive root,`nget a folder of their own.")
