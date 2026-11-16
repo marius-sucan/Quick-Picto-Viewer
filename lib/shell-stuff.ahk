@@ -2568,7 +2568,7 @@ FileTimeToSystemTime(ptr) {
     ; return {year:year, month:month, day:day, dayOfWeek:dayOfWeek, hour:hour, minute:minute, second:second, mil:mil}
 }
 
-restoreFileFromRecycleBin(userFileFullPath, userFileSize:=0) {
+restoreFileFromRecycleBin(userFileFullPath, userFileSize:="") {
 /*
 userFileFullPath = the full path for the original file to restore
 userFileSize     = match the file to restore by size (in bytes) as well
@@ -2576,7 +2576,8 @@ userFileSize     = match the file to restore by size (in bytes) as well
                    multiple times; today I delete a file which is 2mb, 
                    tomorrow one that is 5mb, but both had the same path;
                    which one to restore then? if you know the exact size 
-                   in bytes, you can restore the file you actually want to
+                   in bytes, you can restore the file you actually want to;
+                   blank: any size; 0: an empty file
 
 Return values:
  0 = file not found in recycle bin
@@ -2610,7 +2611,7 @@ Return values:
    Loop, % folderItemsObj.Count + 1
    {
       fItemObj := folderItemsObj.Item(A_Index - 1)
-      If (fItemObj.Size=0 || fItemObj.isLink!=0)
+      If (fItemObj.isLink!=0)
       {
          ObjRelease(fItemObj)
          Continue
@@ -2622,9 +2623,10 @@ Return values:
          fileName .= ftype
 
       fullPath := recyclerObj.GetDetailsOf(fItemObj, 1) "\" fileName
-      If (fullPath=userFileFullPath)
+      ; a recycled folder of that name is not the file
+      If (fullPath=userFileFullPath && !InStr(FileExist(fItemObj.Path), "D"))
       {
-         If (userFileSize>0)
+         If (userFileSize!="")
          {
             zs := fItemObj.Path
             FileGetSize, size, % zs
