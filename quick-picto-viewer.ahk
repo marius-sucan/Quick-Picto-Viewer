@@ -97084,18 +97084,26 @@ BTNremDynaSelFolder() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewDynas
     RowNumber := LV_GetNext()
-    LV_GetText(folderu, RowNumber, 3)
+    LV_GetText(folderPath, RowNumber, 3)
     LV_GetText(isR, RowNumber, 2)
-    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
+    If (StrLen(folderPath)<2 || folderPath="folder path" || !RowNumber)
        Return
 
-    If !InStr(isR, "R")
-       folderu := "|" folderu
+    folderu := InStr(isR, "R") ? folderPath : "|" folderPath
+    foldersListu := getDynamicFoldersList()
+    ; the seed folders placed inside it index their own files: these stay
+    protectu := getDynaFoldersInside(folderPath, foldersListu)
+    msgu := "The seed folder will be removed from the list, with every file indexed from it, subfolders included:`n" folderPath "\"
+    If protectu
+       msgu .= "`n`nThe files of the seed folders placed inside it stay in the index."
+
+    msgResult := msgBoxWrapper(appTitle ": Remove seed folder", msgu "`n`nDo you want to continue?", 4, 0, "question")
+    If (msgResult!="yes")
+       Return
 
     BtnCloseWindow()
     Sleep, 50
     mustOpenStartFolder := ""
-    foldersListu := getDynamicFoldersList()
     currentFilesListModified := 1
     Loop, Parse, foldersListu, `n
     {
@@ -97111,23 +97119,14 @@ BTNremDynaSelFolder() {
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
        recreateDynaFoldersSQLdbList(newFoldersList)
 
-    If (maxFilesIndex>1)
-       msgResult := msgBoxWrapper(appTitle ": Remove dynamic folder", "Would you like to remove the files from the index/list pertaining to the removed dynamic folder as well ?`n`n" folderu "\", 4, 0, "question")
-
-    If (msgResult="yes")
+    remFilesFromList(folderPath, 0, 1, protectu)
+    If (maxFilesIndex>0)
     {
-       remFilesFromList(StrReplace(folderu, "|"))
-       If (maxFilesIndex>0)
-       {
-          GenerateRandyList()
-          SoundBeep, 900, 100
-          RandomPicture()
-       } Else 
-       {
-          If !handleEmptyFilesList(CurrentSLD, "", 2)
-             Return
-       }
-    }
+       GenerateRandyList()
+       SoundBeep, 900, 100
+       RandomPicture()
+    } Else If !handleEmptyFilesList(CurrentSLD, "", 2)
+       Return
 
     Sleep, 50
     ResetImgLoadStatus()
@@ -97854,18 +97853,18 @@ getDynaFolderCoverage(SelectedDir, foldersListu:=0) {
    Return coverage
 }
 
-getDynaFoldersInside(mainFolderu) {
+getDynaFoldersInside(mainFolderu, listu:="") {
 ; Returns the entries of the dynamic folders list placed inside the given folder.
 ; Rescanning a folder clears its entire subtree, while these entries are indexed
 ; on their own and are not scanned back by it: their files must survive it.
 ; The "|" prefix is kept, so that each entry protects exactly what it indexes.
 ;
-; DynamicFoldersList is read as it is: getDynamicFoldersList() would reload it
-; through coreLoadDynaFolders(), which reads the file whenever it is not the
-; CurrentSLD in use, and the callers of this function blank CurrentSLD
+; Without a given list, DynamicFoldersList is read as it is: getDynamicFoldersList()
+; would reload it through coreLoadDynaFolders(), which reads the file whenever it
+; is not the CurrentSLD in use, and the rescans blank CurrentSLD
    mainFolderu := RegExReplace(StrReplace(mainFolderu, "|"), "\\+$")
    protectu := ""
-   Loop, Parse, % StrReplace(DynamicFoldersList, "|hexists|"), `n, `r
+   Loop, Parse, % StrReplace((listu!="") ? listu : DynamicFoldersList, "|hexists|"), `n, `r
    {
        linea := Trimmer(A_LoopField)
        thisFolder := RegExReplace(StrReplace(linea, "|"), "\\+$")
