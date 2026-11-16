@@ -753,6 +753,13 @@ Not part of the panel's own code.
   with `ÉTÉ` renames the folder and keeps the file name `Été.png` (nothing); the needles
   `pics_1\` and `100%\` and an A to Z one give the same records as before; through the panel,
   `ÄTÄ\` renames the record (nothing); the seed folders list, `ÉTÉ` renames `été` (nothing).
+  `8cacdee` merged a record at once into the one holding its new path, also when that one was
+  about to move on in the same pass: `photos\` → `photos\old\` on `photos\a.png` and
+  `photos\old\a.png` kept one record, as the order of the rows had it, and the chain `zq`,
+  `zqq`, `zqqqq` with `q` → `qq` kept one of three (run, batch W9). Since `ffccbb3` (:98522)
+  such a record waits: the waiting records are tried again after the pass until none moves,
+  and only those still colliding merge. Run: both orders keep the two records, the chain its
+  three, each with its own date; batch W gives the lines of `557c018`.
 - **E.** A drive root on routes that finding 5's places did not include (read at `d05e990`,
   found by a search for the tests that want more than two characters; not run): renaming an entry to a
   root is refused (`PanelRenameStaticFolder()` :98091); «With a new QPV instance» on a root
@@ -928,6 +935,7 @@ that one in this panel, its batch F).
 | W0 | seen images list | probe at `8cbe643`: one file's two spellings replaced in two passes |
 | W | seen images list | for `8cacdee`: two spellings of one file, a look-alike, folder mode, needles with `_` and `%`, an A to Z one, the panel |
 | X | cached .SLD, drive P: | for `cce29a6` and `557c018`: the panel's seed folders list: a capital outside A-Z, an A to Z change and the modified mark, no match, the root alone |
+| W9 | seen images list | for `ffccbb3`: a new path held by a record the same pass moves on, in both orders; a chain of three |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -966,9 +974,10 @@ character, unchanged under Wine).
 **Runs of the panel's two other targets**, 2026-11-16: batches W0, W and X ran on `8cbe643`
 (logs `*-h3`) and W, X and U on the text of `557c018` (logs `*-k`); U gives the lines of `u-g`
 but for the random display. The seen images list lives in the kit's folder
-(`seenImagesList.db`), emptied at the start of W0 and W. `snap3/` holds the three texts
-committed (`k1.ahk` to `k3.ahk` = `8cacdee` to `557c018`, sha256 compared), all three loaded
-with AutoHotkey_H and stock AutoHotkey 1.1.37.
+(`seenImagesList.db`), emptied at the start of W0, W and W9. `snap3/` holds the four texts
+committed (`k1.ahk` to `k4.ahk` = `8cacdee`, `cce29a6`, `557c018`, `ffccbb3`, sha256
+compared), all four loaded with AutoHotkey_H and stock AutoHotkey 1.1.37. W9 ran on
+`557c018` (log `w9-k`), on `8cbe643` (`w9-h3`) and on `ffccbb3` (`w9-k4`, with W in `w-k4`).
 
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.
