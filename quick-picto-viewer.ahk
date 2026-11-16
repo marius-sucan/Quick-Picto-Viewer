@@ -98088,7 +98088,7 @@ PanelRenameStaticFolder() {
          Return
       }
 
-      If (!RegExMatch(newFileName, "i)^(.\:\\.)") || !newFileName)
+      If (!RegExMatch(newFileName, "^.:($|\\.)") || !newFileName) ; a drive root is d:
       {
          msgBeepTimer("WARNING: Incorrect folder path provided")
          SetTimer, PanelRenameStaticFolder, -300
