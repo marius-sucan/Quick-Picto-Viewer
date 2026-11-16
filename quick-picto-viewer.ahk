@@ -98531,7 +98531,13 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
     owle := setWhileLoopBusy()
     changeMcursor()
     seenImagesDB.Exec("BEGIN TRANSACTION;")
-    SQLstr := "SELECT ROWID, imgfile FROM images WHERE imgfile LIKE '%" Trimmer(SQLescapeStr(what, 1)) "%' ESCAPE '>';"
+    ; LIKE ignores the case of A to Z only: every other character matches any character here,
+    ; and StrReplaceCaseless() keeps the true matches. A surrogate pair is one character to SQLite
+    likeu := ""
+    Loop, Parse, % Trimmer(SQLescapeStr(what, 1))
+       likeu .= (Ord(A_LoopField)>127 && (Ord(A_LoopField)<0xD800 || Ord(A_LoopField)>0xDFFF)) ? "_" : A_LoopField
+
+    SQLstr := "SELECT ROWID, imgfile, imgViewDate FROM images WHERE imgfile LIKE '%" likeu "%' ESCAPE '>';"
     If !seenImagesDB.GetTable(SQLstr, RecordSet)
        errorOccurred := seenImagesDB.ErrorMsg
 
@@ -98558,12 +98564,12 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
                  thisPos := InStr(Row[2], "\", 0, -1)
                  If (thisPos>1)
                  {
-                    newFolder := StrReplace(SubStr(Row[2], 1, thisPos), what, replacer, affected)
+                    newFolder := StrReplaceCaseless(SubStr(Row[2], 1, thisPos), what, replacer, affected)
                     newFolderName := repairPathSeparators(newFolder "\" SubStr(Row[2], thisPos + 1))
                  }
               } Else
               {
-                 newFolderName := StrReplace(Row[2], what, replacer, affected)
+                 newFolderName := StrReplaceCaseless(Row[2], what, replacer, affected)
                  newFolderName := repairPathSeparators(newFolderName)
               }
 
@@ -98571,9 +98577,22 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
               {
                  SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newFolderName) "' WHERE ROWID='" Row[1] "';"
                  If !seenImagesDB.Exec(SQLstr)
+                 {
                     failedFiles++
-                 Else
+                 } Else If seenImagesDB.Changes
+                 {
                     totalAffected++
+                 } Else
+                 {
+                    ; the new path is recorded already and the column ignores a duplicate:
+                    ; the two records merge, with the later view date
+                    SQLstr := "UPDATE images SET imgViewDate=max(ifnull(imgViewDate, ''), '" SQLescapeStr(Row[3]) "') WHERE imgfile='" SQLescapeStr(newFolderName) "';"
+                    SQLstr .= "DELETE FROM images WHERE ROWID='" Row[1] "';"
+                    If seenImagesDB.Exec(SQLstr)
+                       totalAffected++
+                    Else
+                       failedFiles++
+                 }
               }
            }
        }
