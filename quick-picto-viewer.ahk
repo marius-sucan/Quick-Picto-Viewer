@@ -47058,7 +47058,7 @@ BTNperformIndexSearchReplace() {
 
       BtnCloseWindow()
       listu := StrReplace(listu, "`n", "\`n")
-      listu := StrReplace(listu, editF5, editF6)
+      listu := StrReplaceCaseless(listu, editF5, editF6)
       listu := StrReplace(listu, "\\", "\")
       DynamicFoldersList := StrReplace(listu, "\`n", "`n")
       If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
