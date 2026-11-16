@@ -61124,12 +61124,10 @@ PanelStructuredCopyMoveWindow() {
     thisBtnHeight := createSettingsGUI(77, A_ThisFunc)
     sml := (PrefsLargeFonts=1) ? 90 : 72
     btnWid := 125
-    btnWid2 := 60
     txtWid := 360
     If (PrefsLargeFonts=1)
     {
        btnWid := btnWid + 70
-       btnWid2 += 60
        txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
     }
@@ -61161,17 +61159,23 @@ PanelStructuredCopyMoveWindow() {
     Gui, Add, Text, xs y+15 hp +0x200 +hwndhTempu, On file name conflicts:
     zh := GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" userCopyMoveStructuredConflictMode " vuserCopyMoveStructuredConflictMode", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
     Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action to perform:
-    GuiAddDropDownList("xp yp w" thisW " AltSubmit Choose" UsrCopyMoveOperation " vUsrCopyMoveOperation", "Choose...`nMove file(s)`nCopy file(s)", [hTemp, hTempu, zh])
+    GuiAddDropDownList("xp yp w" thisW " gupdateUIstructuredCopyMove AltSubmit Choose" UsrCopyMoveOperation " vUsrCopyMoveOperation", "Choose...`nMove file(s)`nCopy file(s)", [hTemp, hTempu, zh])
     getSelectedFiles(0, 1)
     sml := (PrefsLargeFonts=1) ? 90 : 72
     SetTimer, ResetImgLoadStatus, -50
     ToolTip,,,,2
 
-    Gui, Add, Button, xs y+25 h%thisBtnHeight% w%btnWid2% Default gBTNuiProceedStructuredOperation vBtnCpyMv, &Proceed
+    k := (UsrCopyMoveOperation=1) ? "Disabled" : ""
+    Gui, Add, Button, xs y+25 h%thisBtnHeight% w%sml% %k% Default gBTNuiProceedStructuredOperation vBtnCpyMv, &Proceed
     Gui, Add, Button, x+5 hp w%sml% gBtnHelpStructuredCopyMove, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
     Gui, Add, Text, x+5 hp +0x200, % "Selected files: " groupDigits(markedSelectFile) ". "
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Structured copy/move file(s): " appTitle)
+}
+
+updateUIstructuredCopyMove() {
+   GuiControlGet, actu, SettingsGUIA:, UsrCopyMoveOperation
+   GuiControl, % (actu=1) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable", BtnCpyMv
 }
 
 BtnHelpStructuredCopyMove() {
