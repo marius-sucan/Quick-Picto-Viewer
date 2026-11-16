@@ -32,8 +32,9 @@ every tool that copies or moves a file into a folder, together with Seen in pass
 and 14 narrow finding 7, which is fixed in `c5cbfe4` with his answers to decision 4: only full paths
 with a drive letter. Finding 10 is fixed in `77b5d9c`, `5c55e6b` and `cc16a46`, with his answers to
 decision 5. The small things of finding 15 are numbered 15.1 to 15.14. Of those, 15.2 is fixed in
-`e17f304`, by Marius, and 15.1, 15.3 and 15.6 to 15.14 are fixed in `d6f105b` to `e4edbb2`, one commit
-each, with his answers to decisions 8 and 13; 15.4 and 15.5 are open.
+`e17f304`, by Marius, and 15.1, 15.3, 15.6 to 15.9 and 15.11 to 15.14 are fixed in `d6f105b` to
+`e4edbb2`, one commit each, with his answers to decisions 8 and 13. 15.10 was fixed in `b8d50ba` and is
+reverted in `9e0b88f`, at his request; 15.4, 15.5 and 15.10 are open.
 A fixed section ends with a note on what the code does now; those notes cite lines at
 `88aa9fc` for findings 1-3, at `5410eed` for findings 11 and 14, at `3df8de3` for findings 4-6, at
 `6697b4c` for the notes of 2026-11-15 (findings 7, 8, 9, 11, 12, 13, 14 and Seen in passing E), at
@@ -70,7 +71,7 @@ Everything else keeps its lines at `b4f374f`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `e4edbb2` |
+| # | Finding | Harm | Checked | Status at `9e0b88f` |
 |---|---------|------|---------|---------------------|
 | 1 | The Destination names the Source folder in another way: with «Overwrite» the selected files are recycled and the tool reports success | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
 | 2 | Destination inside the Source, or the reverse: on a move with «Overwrite» one selected file replaces another | high, needs «Overwrite» | run | **fixed**, `88aa9fc` |
@@ -86,7 +87,7 @@ Everything else keeps its lines at `b4f374f`.
 | 12 | A folder at the destination with a selected file's name receives the file; the index then names the folder | low, narrow | run | **fixed**, `6697b4c` |
 | 13 | Missing files outside the Source are counted as failed, not as skipped | low | run | **fixed**, `a5855dc` |
 | 14 | A destination of four characters that does not exist, such as `D:\a`, is refused | low | run | **fixed**, `75e890d`, `87c699d` |
-| 15 | Small things, numbered 15.1 to 15.14: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | **partly fixed**: 15.2 `e17f304`; 15.1, 15.3, 15.6 to 15.14 `d6f105b` to `e4edbb2`; 15.4, 15.5 open |
+| 15 | Small things, numbered 15.1 to 15.14: a window handle as a tooltip, the first text, «Proceed» on «Choose...», what the panel remembers | low | run and read | **partly fixed**: 15.2 `e17f304`; 15.1, 15.3, 15.6 to 15.9, 15.11 to 15.14 `d6f105b` to `e4edbb2`; 15.10 fixed in `b8d50ba`, reverted in `9e0b88f`; 15.4, 15.5, 15.10 open |
 
 Findings 10 and 11 are the ones a user meets in ordinary use. Findings 1 and 2 lose files
 (to the recycle bin), but only with «Overwrite» and an unusual pair of paths; finding 3 loses
@@ -1087,18 +1088,20 @@ stays open (decision 4). Settled in `c5cbfe4`: refused, as is every path without
   the recent destinations of 15.6.
 - **15.10. An empty file at the destination** is replaced without being recycled and without the
   «overwritten» mark in the undo record (run): `FileRexists(…, 0)` counts it as absent.
-  **Fixed in `b8d50ba`** (decision 13), in every tool with the same test: `FileExistAnySize()`
-  (:32727) counts any file at the destination, an empty one too, but not a folder. The same test was
-  in the regular Copy/Move panel (one file and several), pasting, the multi-rename, renaming one file
-  and both undo functions; the batch undo of a deletion also left an empty file it had moved aside
-  under its `tmp_QPV_` name (read). `restoreFileFromRecycleBin()` (lib/shell-stuff.ahk:2571) skipped
-  every recycled item of size 0, and a size of 0 meant any size, so a file of the same path and
-  another size could come back instead; it now takes a blank size as any size and any number, 0
-  included, as that size, and skips a recycled folder by its attribute (read: the kit restores from
-  Wine's trash with a stub). The undo asks for a recycled file of 0 bytes as for any other size.
-  Run, Y6 (the moved files have 361 bytes, the file in the way 0):
+  The same test is in the regular Copy/Move panel (one file and several), pasting, the multi-rename,
+  renaming one file and both undo functions; the batch undo of a deletion also leaves an empty file it
+  has moved aside under its `tmp_QPV_` name (read). `restoreFileFromRecycleBin()`
+  (lib/shell-stuff.ahk:2571) skips every recycled item of size 0, and a size of 0 means any size, so a
+  file of the same path and another size can come back instead (read).
+  **Fixed in `b8d50ba`** (decision 13), in every tool with the same test, and **reverted in `9e0b88f`**,
+  at Marius's request: the code is again as at `e17f304`, and this item is open. `b8d50ba` gave the
+  tests `FileExistAnySize()`, any file at the destination, an empty one too, but not a folder; and
+  `restoreFileFromRecycleBin()` took a blank size as any size and any number, 0 included, as that
+  size, and skipped a recycled folder by its attribute (read: the kit restores from Wine's trash with
+  a stub). Run, Y6 (the moved files have 361 bytes, the file in the way 0); since `9e0b88f` the tools
+  do again what the first column shows (run, `y-rev`):
 
-  | Tool | At `e17f304` | On `e4edbb2` |
+  | Tool | At `e17f304`, again since `9e0b88f` | With `b8d50ba` |
   |---|---|---|
   | This panel, move + «Overwrite» onto an empty listed file, then the batch undo (Y6a) | replaced, nothing recycled, no «*»; lost after the undo | recycled, «*» with size 0; the undo brings it back |
   | The regular panel, several files, the same (Y6b) | as this panel | as this panel |
@@ -1292,11 +1295,12 @@ Decisions 1 to 7 and 9 to 13 are settled; 8 is settled for 15.6 and open for 15.
     **Settled in `d6f105b` to `e4edbb2`**: as wide as «Help» and «Cancel»; when the run starts, once
     the folder test has passed, for the session only, as the regular panel's batch; nothing; the
     focused file's folder when that file is selected, else none (not the first entry of «Possible
-    source paths», which I recommended); every tool with the same test, and the undo restores it;
+    source paths», which I recommended); every tool with the same test, and the undo restores it
+    (`b8d50ba`, reverted in `9e0b88f` at his request);
     «Select the source folder» and «Select the destination folder», the regular panel's «Browse»
     untitled; S, D, C and T for the labels, «Structured file o&perations», and yes.
 
-What is left: 11 (the handler), 15.4 and 15.5 (decision 8).
+What is left: 11 (the handler), 15.4 and 15.5 (decision 8), 15.10 (its fix reverted).
 
 ## How this was checked
 
@@ -1404,7 +1408,9 @@ What is left: 11 (the handler), 15.4 and 15.5 (decision 8).
   also the names Wine's trash gives a second file of one name, and whether the conflict box showed the
   images' sizes yet when the kit's timer read it) and F7 (a menu handle). Two more runs of H on
   `c3381b3` give either current file, and the Source follows it. A, C, D, F3, F8, G, I, K to Q, T, V,
-  W and X give the same logs. Batch Y ran on `c3381b3` with large fonts too (`y-f16-lf`). Each commit loads with AutoHotkey_H with and without `/iLib`, and
+  W and X give the same logs. Batch Y ran on `c3381b3` with large fonts too (`y-f16-lf`), and on
+  `9e0b88f` (`y-rev`): its Y6 gives the log of `e17f304` again, but for the dates of the files the test
+  makes and the image loads. Each commit loads with AutoHotkey_H with and without `/iLib`, and
   `e4edbb2` also with stock AutoHotkey 1.1.37 (`/iLib`).
 - Kit: `.claude/scratch/structured-copy-move-2026-11-14/app/`: `run-app.sh <tag> <test
   function>`, `run-k.sh <tag>` and `run-m.sh <tag>` (make the links batches K and M need),
