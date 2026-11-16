@@ -61166,20 +61166,20 @@ PanelStructuredCopyMoveWindow() {
     Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
     Gui, Add, Text, x15 y15 Section, This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
-    Gui, Add, Text, xs y+10 w%ml%, Source: 
+    Gui, Add, Text, xs y+10 w%ml%, &Source: 
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", srcDir)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
     ToolTip2ctrl(hTemp, "Please define the correct source path for the optimal experience.`nYou must choose the root folder of all the images to be copied or moved.`nThe selected files that are not in this source path [or in a sub-folder], will be skipped.")
     GuiAddButton("x+1 w" sml " hp gBtnIdentifyFileRoots", pp "triangle-down" pk ".png", "Possible source paths", "Possible source folders: the deepest folder that holds the selected files.`nFiles on other drives, or in other folders under the drive root,`nget a folder of their own.")
-    Gui, Add, Text, xs y+10 w%ml% hp +0x200, Destination:
+    Gui, Add, Text, xs y+10 w%ml% hp +0x200, &Destination:
     cleanFolderPath(UsrEditFileDestination, destFull)
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileDestination", destFull ? UsrEditFileDestination : "")
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesDst hwndhTemp, B&rowse
     ToolTip2ctrl(hTemp, "In the destination folder, the folder structure will be created containing the selected files.")
     thisW := (PrefsLargeFonts=1) ? 190 : 120
-    Gui, Add, Text, xs y+15 hp +0x200 +hwndhTempu, On file name conflicts:
+    Gui, Add, Text, xs y+15 hp +0x200 +hwndhTempu, On file name &conflicts:
     zh := GuiAddDropDownList("x+5 w" thisW " AltSubmit Choose" userCopyMoveStructuredConflictMode " vuserCopyMoveStructuredConflictMode", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
-    Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action to perform:
+    Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Ac&tion to perform:
     GuiAddDropDownList("xp yp w" thisW " gupdateUIstructuredCopyMove AltSubmit Choose" UsrCopyMoveOperation " vUsrCopyMoveOperation", "Choose...`nMove file(s)`nCopy file(s)", [hTemp, hTempu, zh])
     getSelectedFiles(0, 1)
     sml := (PrefsLargeFonts=1) ? 90 : 72
@@ -68011,7 +68011,7 @@ InvokeMenuBarFile(manuID:=0, justBuild:=0) {
       kMenu("pvMenuBarFile", "Add", "&Delete file(s)`tDelete", "DeletePicture", "erase")
       kMenu("pvMenuBarFile", "Add", "&Rename file(s)`tF2", "PanelRenameThisFile")
       If (markedSelectFile>1)
-         kMenu("pvMenuBarFile", "Add", "Structured file operations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
+         kMenu("pvMenuBarFile", "Add", "Structured file o&perations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
       kMenu("pvMenuBarFile", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
       kMenu("pvMenuBarFile", "Add", "&Copy file(s) to...`tC", "InvokeCopyFiles")
    } Else If FileExist(resultedFilesList[currentFileIndex, 1])
@@ -68039,6 +68039,8 @@ InvokeMenuBarFile(manuID:=0, justBuild:=0) {
       Menu, pvMenuBarFile, Add
       kMenu("pvMenuBarFile", "Add", "&Delete file`tDelete", "DeleteActivePicture")
       kMenu("pvMenuBarFile", "Add", "&Rename file`tShift+F2", "SingularRenameFile")
+      If (markedSelectFile>1)
+         kMenu("pvMenuBarFile", "Add", "Structured file o&perations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
       kMenu("pvMenuBarFile", "Add", "&Move file(s) to...`tM", "PanelMoveCopyFiles")
       kMenu("pvMenuBarFile", "Add", "&Copy file(s) to...`tC", "InvokeCopyFiles")
    }
@@ -70128,7 +70130,7 @@ createMenuCurrentFilesActs(dummy:=0) {
       kMenu("PVfilesActs", "Add", "&Delete file(s)" keyu, "DeletePicture", "erase")
       kMenu("PVfilesActs", "Add", "&Rename file(s)`tF2", "PanelRenameThisFile")
       If (markedSelectFile>1)
-         kMenu("PVfilesActs", "Add", "Structured file operations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
+         kMenu("PVfilesActs", "Add", "Structured file o&perations", "PanelStructuredCopyMoveWindow", "hierarchy backup copy move folders directories dirs")
 
       keyu := (thumbsDisplaying!=1 && editingSelectionNow=1) ? "" : "`tM"
       kMenu("PVfilesActs", "Add", "&Move file(s) to..." keyu, "PanelMoveCopyFiles")
