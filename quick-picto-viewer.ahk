@@ -34618,7 +34618,7 @@ recreateDynaFoldersSQLdbList(saveDynaFolders) {
    activeSQLdb.Exec("DELETE FROM dynamicfolders;")
    Loop, Parse, saveDynaFolders, `n
    {
-       If (StrLen(A_LoopField)>2)
+       If (StrLen(StrReplace(Trimmer(A_LoopField), "|"))>1) ; a drive root is d:
           addDynamicFolderSQLdb(Trimmer(A_LoopField), 0, "dynamicfolders")
    }
 
@@ -66445,7 +66445,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
          Return "cancel"
    }
 
-   SelectedDir := Trimmer(SelectImg)
+   SelectedDir := RegExReplace(Trimmer(SelectImg), "\\+$") ; a drive root is kept as d:
    If SelectedDir
    {
       If askAboutFileSave(" and new files will be added from the selected folder")
@@ -87692,7 +87692,9 @@ cleanDynamicFoldersList(listu) {
     listuArray := StrSplit(listu, "`n", "`r")
     Loop, % listuArray.Count()
     {
-       lineu := Format("{:L}", listuArray[A_Index])
+       ; no entry ends with a separator: a drive root is kept as d:
+       lineu := Format("{:L}", RegExReplace(listuArray[A_Index], "\\+$"))
+       listuArray[A_Index] := lineu
        If (lineu!="")
           newArrayu[lineu] := 1
     }
@@ -87782,7 +87784,7 @@ RegenerateEntireList() {
        Return
 
     listu := getDynamicFoldersList()
-    If (StrLen(listu)<4)
+    If (StrLen(Trim(listu, "`n"))<2)
        Return msgBeepTimer("WARNING: No list of dynamic folders found")
 
     keptu := purgedu := ""
@@ -87848,7 +87850,7 @@ RegenerateEntireList() {
     {
        line := Trimmer(A_LoopField)
        fileTest := StrReplace(line, "|")
-       If (RegExMatch(line, RegExFilesPattern) || StrLen(line)<4 || !FileExist(fileTest))
+       If (RegExMatch(line, RegExFilesPattern) || StrLen(fileTest)<2 || !FolderExist(fileTest))
           Continue
 
        If (SLDtypeLoaded=3)
@@ -96778,7 +96780,7 @@ BTNshowDynamicFoldersInTreeView() {
     Loop, Parse, foldersListu, `n
     {
         fileTest := StrReplace(Trimmer(A_LoopField), "|")
-        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)"))
+        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "^.:($|\\.)"))
            Continue
 
         newFoldersList .= fileTest "`n"
@@ -97025,7 +97027,7 @@ BTNcopyDynaFoldersList() {
     {
         line := Trimmer(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If !RegExMatch(fileTest, "i)^(.\:\\.)") ; the folders not on the disk now are copied too
+        If !RegExMatch(fileTest, "^.:($|\\.)") ; the folders not on the disk now are copied too
            Continue
 
         newFoldersList .= line "`n"
@@ -97050,12 +97052,12 @@ BTNpasteDynaFoldersList() {
     skippedLines := 0
     Loop, Parse, pastedList, `n
     {
-        line := Trimmer(A_LoopField)
+        line := RegExReplace(Trimmer(A_LoopField), "\\+$")
         fileTest := StrReplace(line, "|")
         If (fileTest="")
            Continue
 
-        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "i)^(.\:\\.)"))
+        If (!FolderExist(fileTest) || !RegExMatch(fileTest, "^.:($|\\.)"))
         {
            skippedLines++
            Continue
@@ -97067,7 +97069,7 @@ BTNpasteDynaFoldersList() {
     mustOpenStartFolder := ""
     Sort, newFoldersList, UD`n
     DynamicFoldersList := cleanDynamicFoldersList(newFoldersList)
-    If (InStr(DynamicFoldersList, ":\") && !CurrentSLD)
+    If (InStr(DynamicFoldersList, ":") && !CurrentSLD)
     {
        CurrentSLD := prevOpenFolderPath "\NewFilesList.SLD"
        SLDtypeLoaded := 2
@@ -97113,7 +97115,7 @@ BTNremDynaSelFolder() {
     {
         line := Trimmer(A_LoopField)
         fileTest := StrReplace(line, "|")
-        If (!RegExMatch(fileTest, "i)^(.\:\\.)") || folderu=line)
+        If (!RegExMatch(fileTest, "^.:($|\\.)") || folderu=line)
            Continue
 
         newFoldersList .= line "`n"
@@ -97888,7 +97890,7 @@ getMissingSeedFolders(listu) {
    Loop, Parse, listu, `n, `r
    {
        linea := Trimmer(A_LoopField)
-       If (RegExMatch(linea, RegExFilesPattern) || StrLen(linea)<4)
+       If (RegExMatch(linea, RegExFilesPattern) || StrLen(StrReplace(linea, "|"))<2)
           Continue
 
        If !FolderExist(StrReplace(linea, "|"))
@@ -98986,7 +98988,7 @@ uiPopulateDynamicFolderzList() {
     {
         statusu := InStr(A_LoopField, "|") ? "" : "R"
         line := (userPrivateMode=1) ? "*:\*****\********\" :  Trimmer(A_LoopField)
-        If (StrLen(line)<3)
+        If (StrLen(StrReplace(line, "|"))<2)
            Continue
 
         counteru++
