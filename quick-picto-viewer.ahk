@@ -60603,8 +60603,8 @@ IdentifyFileFolderRoots(modus) {
       ; Chr(1) sorts below any character of a folder name, so set1 comes before set10
       order .= Format("{:010}", 9999999999 - n) "|" StrReplace(g.key, "\", Chr(1)) "|" gi "`n"
    }
-   Sort, order, D`n
 
+   Sort, order, D`n
    counter := 0
    gList := ""
    Loop, Parse, order, `n
@@ -61145,7 +61145,7 @@ PanelStructuredCopyMoveWindow() {
     ml := (PrefsLargeFonts=1) ? 110 : 70
     Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 50 : 30
-    Gui, Add, Text, x15 y15 Section, %infoSelection%This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
+    Gui, Add, Text, x15 y15 Section, This panels allows users to copy or move folder structures.`nPlease select source and destination folders.`nThe files not found in the source folder (and its sub-folders)`, will be skipped.
     Gui, Add, Text, xs y+10 w%ml%, Source: 
     GuiAddEdit("x+5 w" EditWid " gUIeditsGenericAllowCtrlBksp r1 -WantReturn -wantTab -multi vUsrEditFileSource", OutDir)
     Gui, Add, Button, x+1 hp gBtnCpyMvStrctrdChooseFilesSrc hwndhTemp, &Browse
@@ -61162,16 +61162,14 @@ PanelStructuredCopyMoveWindow() {
     Gui, Add, Text, xs y+10 hp +0x200 +hwndhTemp, Action to perform:
     GuiAddDropDownList("xp yp w" thisW " AltSubmit Choose" UsrCopyMoveOperation " vUsrCopyMoveOperation", "Choose...`nMove file(s)`nCopy file(s)", [hTemp, hTempu, zh])
     getSelectedFiles(0, 1)
-    infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
-
-    ToolTip,,,,2
     sml := (PrefsLargeFonts=1) ? 90 : 72
     SetTimer, ResetImgLoadStatus, -50
+    ToolTip,,,,2
 
     Gui, Add, Button, xs y+25 h%thisBtnHeight% w%btnWid2% Default gBTNuiProceedStructuredOperation vBtnCpyMv, &Proceed
     Gui, Add, Button, x+5 hp w%sml% gBtnHelpStructuredCopyMove, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
-    Gui, Add, Text, x+5 hp +0x200, % infoSelection
+    Gui, Add, Text, x+5 hp +0x200, % "Selected files: " groupDigits(markedSelectFile) ". "
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Structured copy/move file(s): " appTitle)
 }
 
@@ -87771,9 +87769,10 @@ RegenerateEntireList() {
     {
        countMissing := ST_Count(missingu, "`n")
        If (countMissing=1)
-          msgu := "One seed folder is not on the disk now, perhaps on a drive that is not plugged in.`n`nKeep it in the list, with the files already indexed from it, or purge it, with every file indexed under it, subfolders included?"
+          msgu := "One seed folder is not on the disk now, perhaps on a drive that is not plugged in.`n`nKeep it in the list, with the files already indexed from it, or purge it recursively, with every file indexed under it, subfolders included?"
        Else
           msgu := groupDigits(countMissing) " seed folders are not on the disk now, perhaps on a drive that is not plugged in.`n`nKeep them in the list, with the files already indexed from them, or purge them, with every file indexed under them, subfolders included?"
+
        msgResult := msgBoxWrapper(appTitle ": Missing seed folders", msgu, "&Keep|&Purge|&Cancel", 1, "question")
        If InStr(msgResult, "keep")
        {
