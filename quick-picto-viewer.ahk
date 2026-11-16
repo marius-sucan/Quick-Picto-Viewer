@@ -3299,8 +3299,9 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
             {
                failedFiles++
                Continue
-            } Else prevuDir := OutDir
+            }
          }
+         prevuDir := OutDir
       }
       ; Tooltip, % file2rem "`n" file2save "`n" OutDir
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
