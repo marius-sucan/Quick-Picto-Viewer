@@ -60216,7 +60216,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
             currentFileIndex := maxFilesIndex := 1
             resultedFilesList[1, 1] := file2save
             lastZeitIMGsaved[7] := file2save
-            DynamicFoldersList := OutDir "`n"
+            DynamicFoldersList := "|" OutDir "`n"
             prevOpenFolderPath := OutDir
             CurrentSLD := "|" OutDir
             SLDtypeLoaded := 1
@@ -65339,7 +65339,7 @@ RefreshFilesList() {
      OpenSLD(CurrentSLD, 1)
      currentFileIndex := clampInRange(thisIndex, 1, maxFilesIndex)
      dummyTimerDelayiedImageDisplay(50)
-  } Else If (StrLen(CurrentSLD)>3)
+  } Else If (StrLen(StrReplace(CurrentSLD, "|"))>1) ; a drive root is d: or |d:
      RegenerateEntireList()
      ; coreOpenFolder(CurrentSLD)
 }
@@ -65559,7 +65559,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       resultedFilesList[1, 1] := LastOpenedImg
       IDshowImage(currentFileIndex)
       zPlitPath(LastOpenedImg, 0, OutFileName, OutDir)
-      DynamicFoldersList := OutDir "`n"
+      DynamicFoldersList := "|" OutDir "`n"
       prevOpenFolderPath := OutDir
       CurrentSLD := "|" OutDir
       SLDtypeLoaded := 1
@@ -65608,7 +65608,7 @@ OpenArgFile(inputu) {
     IDshowImage(currentFileIndex)
     Global scriptStartTime := A_TickCount
     zPlitPath(inputu, 0, OutFileName, OutDir)
-    DynamicFoldersList := OutDir "`n"
+    DynamicFoldersList := "|" OutDir "`n"
     zoomu := " [" Round(zoomLevel * 100) "%" zoomu "]"
     winPrefix := defineWinTitlePrefix()
 
