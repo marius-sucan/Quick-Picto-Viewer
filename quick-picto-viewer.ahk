@@ -61128,23 +61128,16 @@ BTNdoSharpenFX() {
 }
 
 PanelStructuredCopyMoveWindow() {
-    Global BtnCpyMv, UsrEditFileSource, lastInvoked := 1
+    Global BtnCpyMv, UsrEditFileSource
     ; Static prevmainDynaFoldersListu, prevCurrentSLD
 
     openingPanelNow := 1
     IdentifyFileFolderRoots("kill")
     thisBtnHeight := createSettingsGUI(77, A_ThisFunc)
-    sml := (PrefsLargeFonts=1) ? 90 : 72
-    btnWid := 125
-    txtWid := 360
     If (PrefsLargeFonts=1)
-    {
-       btnWid := btnWid + 70
-       txtWid := txtWid + 105
        Gui, Font, s%LargeUIfontValue%
-    }
+
     EditWid := (PrefsLargeFonts=1) ? 455 : 290
-    lstWid := sml + editWid
 
     ToolTip, Please wait...,,, 2
     UsrCopyMoveOperation := 1
