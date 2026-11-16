@@ -98546,6 +98546,7 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
 
     totalAffected := failedFiles := 0
     totalFiles := RecordSet.RowCount
+    collided := []
     If !errorOccurred
     {
        Loop, % RecordSet.RowCount
@@ -98580,26 +98581,43 @@ SearchAndReplaceSeenDB(what, replacer, folderMode:=0) {
               {
                  SQLstr := "UPDATE images SET imgfile='" SQLescapeStr(newFolderName) "' WHERE ROWID='" Row[1] "';"
                  If !seenImagesDB.Exec(SQLstr)
-                 {
                     failedFiles++
-                 } Else If seenImagesDB.Changes
-                 {
+                 Else If seenImagesDB.Changes
                     totalAffected++
-                 } Else
-                 {
-                    ; the new path is recorded already and the column ignores a duplicate:
-                    ; the two records merge, with the later view date
-                    SQLstr := "UPDATE images SET imgViewDate=max(ifnull(imgViewDate, ''), '" SQLescapeStr(Row[3]) "') WHERE imgfile='" SQLescapeStr(newFolderName) "';"
-                    SQLstr .= "DELETE FROM images WHERE ROWID='" Row[1] "';"
-                    If seenImagesDB.Exec(SQLstr)
-                       totalAffected++
-                    Else
-                       failedFiles++
-                 }
+                 Else ; the column ignores a path recorded already
+                    collided.Push([Row[1], newFolderName, Row[3]])
               }
            }
        }
        RecordSet.Free()
+
+       ; a record of this pass may hold the new path until it moves on itself: retry until
+       ; nothing moves; what still collides is one file recorded twice, the two records merge,
+       ; with the later view date
+       Loop
+       {
+          stillTaken := [], moved := 0
+          For i, entry in collided
+          {
+             If !seenImagesDB.Exec("UPDATE images SET imgfile='" SQLescapeStr(entry[2]) "' WHERE ROWID='" entry[1] "';")
+                failedFiles++
+             Else If seenImagesDB.Changes
+                totalAffected++, moved++
+             Else
+                stillTaken.Push(entry)
+          }
+          collided := stillTaken
+       } Until (!moved || !collided.Length())
+
+       For i, entry in collided
+       {
+          SQLstr := "UPDATE images SET imgViewDate=max(ifnull(imgViewDate, ''), '" SQLescapeStr(entry[3]) "') WHERE imgfile='" SQLescapeStr(entry[2]) "';"
+          SQLstr .= "DELETE FROM images WHERE ROWID='" entry[1] "';"
+          If seenImagesDB.Exec(SQLstr)
+             totalAffected++
+          Else
+             failedFiles++
+       }
     }
     whileLoopExec := owle
     k := seenImagesDB.Exec("COMMIT TRANSACTION;")
