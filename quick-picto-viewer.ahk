@@ -25959,7 +25959,16 @@ SettingsGUIAGuiContextMenu(GuiHwnd, CtrlHwnd, EventInfo, IsRightClick, X, Y) {
     If (GuiHwnd!=hSetWinGui)
        Return
 
-    If (AnyWindowOpen=3 && InStr(A_GuiControl, "lview") && IsRightClick=1)
+    If ((AnyWindowOpen=3 || AnyWindowOpen=2) && InStr(A_GuiControl, "lview") && IsRightClick=1 && GetKeyState("Alt", "P"))
+    {
+       ; Alt+right-click deselects the folder's files, without the menu. The list's handler runs
+       ; first and must not deselect them: Alt could be up by now after a long pass there
+       Gui, SettingsGUIA: Default
+       Gui, SettingsGUIA: ListView, % A_GuiControl
+       If LV_GetCount("S")
+          BTNunselFilesStaticFolder()
+       Return
+    } Else If (AnyWindowOpen=3 && InStr(A_GuiControl, "lview") && IsRightClick=1)
     {
        invokePanelDynaFoldersContextMenu()
        Return
@@ -97509,10 +97518,6 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     If (A_GuiEvent="Normal" && GetKeyState("Alt", "P"))
     {
        BTNselFilesStaticFolder()
-       Return
-    } Else If (A_GuiEvent="RightClick" && GetKeyState("Alt", "P"))
-    {
-       BTNunselFilesStaticFolder()
        Return
     } Else If ((A_GuiEvent="Normal" || b="K") && files="" && whichLV="LViewOthers")
     {
