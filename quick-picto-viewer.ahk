@@ -96944,9 +96944,9 @@ BTNselFilesStaticFolder(modus:=0) {
       If !imgPath
          Continue
 
+      fdas := folderAlone ? OutDir=folderu : InStr(OutDir "\", folderu "\")
       OutDir := Format("{:L}", (AnyWindowOpen=2 || folderAlone) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
-      If (AnyWindowOpen=2 && foldersListArray[OutDir])
-      || (AnyWindowOpen=3 && (folderAlone ? OutDir==folderu : InStr(OutDir "\", folderu "\")))
+      If (AnyWindowOpen=2 && foldersListArray[OutDir] || AnyWindowOpen=3 && fdas)
       {
          thisIndex++
          osel := resultedFilesList[A_Index, 2]
@@ -98196,7 +98196,10 @@ PanelRenameStaticFolder() {
 
          currentFilesListModified := 1
          msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
-         If (msgResult="Yes" && SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode) && winOpen=3)
+         If (msgResult="Yes" && winOpen=3)
+            rz := SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
+
+         If (msgResult="Yes" && winOpen=3 && rz)
          {
             ; the files of the subfolders moved too, whatever the tick: the folders list follows them
             If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
