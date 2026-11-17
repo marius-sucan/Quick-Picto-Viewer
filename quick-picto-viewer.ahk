@@ -97636,12 +97636,15 @@ BtnToggleRecurseDynaFolder() {
 
     folderuz := StrReplace(folderu, "|")
     newfolderu := (isPipe!=1) ? "`n|" folderuz "`n" : "`n" folderuz "`n"
-    newFoldersList := StrReplace(foldersListu, "`n" folderu "`n", newFolderu)
+    newFoldersList := StrReplace(foldersListu, "`n" folderu "`n", newFolderu, hasChanged)
     Sort, newFoldersList, UD`n
     ; ToolTip, % folderu "`n" folderuz "`n" newFolderu "Z`n" DynamicFoldersList "`n Z `n" newFoldersList , , , 2
     DynamicFoldersList := newFoldersList
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
        recreateDynaFoldersSQLdbList(newFoldersList)
+
+    If hasChanged
+       currentFilesListModified := 1
 
     ; ToolTip, % newFoldersList , , , 2
     msgBeepTimer("You need to rescan the folder for the effect to take place", 0)
