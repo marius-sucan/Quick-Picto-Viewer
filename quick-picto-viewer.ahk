@@ -98126,7 +98126,7 @@ PanelRenameStaticFolder() {
       }
 
       isDBrename := (winOpen=2 && SLDtypeLoaded=3) ? 1 : 0
-      If isDBrename
+      If (SLDtypeLoaded=3)
          newFileName := Format("{:L}", newFileName)
 
       If (winOpen=2)
@@ -98177,8 +98177,16 @@ PanelRenameStaticFolder() {
 
          currentFilesListModified := 1
          msgResult := msgBoxWrapper(appTitle ": Update files list", "You have renamed a folder entry. Would you like to perform a search and replace in the files list to update the corresponding records?", 4, 0, "question")
-         If (msgResult="Yes")
-            SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode)
+         If (msgResult="Yes" && SearchAndReplaceThroughIndex(folderu "\", newName "\", 0, replaceMode) && winOpen=3)
+         {
+            ; the files of the subfolders moved too, whatever the tick: the folders list follows them
+            If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
+               LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
+
+            renameStaticFoldersEntries(folderu, Format("{:L}", newName), 1)
+            If (SLDtypeLoaded=3)
+               renameStaticFolderSQLdb(folderu, newName, 1)
+         }
       }
 
       SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -98217,16 +98225,15 @@ findTakenStaticFolderPath(oldFolder, newFolder, doPropagate) {
 }
 
 renameStaticFoldersEntries(oldFolder, newFolder, doPropagate) {
+   oldLow := Format("{:L}", oldFolder)
    Loop, % newStaticFoldersListCache.MaxIndex()
    {
-      If (newStaticFoldersListCache[A_Index, 1]=oldFolder)
-      {
+      thisFolder := newStaticFoldersListCache[A_Index, 1]
+      thisLow := Format("{:L}", thisFolder)
+      If (thisLow==oldLow)
          newStaticFoldersListCache[A_Index, 1] := newFolder
-      } Else If (doPropagate=1)
-      {
-         If InStr(newStaticFoldersListCache[A_Index, 1], oldFolder "\")
-            newStaticFoldersListCache[A_Index, 1] := StrReplace(newStaticFoldersListCache[A_Index, 1], oldFolder "\", newFolder "\")
-      }
+      Else If (doPropagate=1 && InStr(thisLow, oldLow "\")=1)
+         newStaticFoldersListCache[A_Index, 1] := newFolder SubStr(thisFolder, StrLen(oldLow) + 1)
    }
 }
 
