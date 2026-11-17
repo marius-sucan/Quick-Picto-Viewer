@@ -41,6 +41,17 @@ scanned without its subfolders the panel's actions reach the files placed direct
 cite lines at `78120a1`, those that name `ce1b5f8` and `caa77ef` too. One question is left
 (decision 13).
 
+**Findings 10 to 14, 2026-11-17, at `2400d23`**, with Marius's answers: a seed folder scanned
+without its subfolders, added or rescanned on a cached .SLD list, gets its row in the folders
+list (`20d9d3b`); the count columns cover the whole index while a files filter is on, keep their
+values when a count is stopped, follow «Select files», «Deselect files» and «Deselect all
+(files list)», leave «Difference» empty until the disk is counted, and sort «%» and «Size
+(MB)» as decimals (`b55b247`, decisions 14 to 16); «Paste list» takes quoted paths, marks the
+list as modified only when it changed, and says that the folders it adds need a rescan
+(`2400d23`, decision 17). Finding 11 needed no change: the folders list panel's «Rescan
+folder(s)» has asked first since `26c47e1` (2026-11-13), before this audit began, which the
+note on finding 11 had missed. The notes on the four cite lines at `2400d23`.
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -74,7 +85,7 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `78120a1` |
+| # | Finding | Harm | Checked | Status at `2400d23` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
@@ -85,11 +96,11 @@ as «É» or «Ș».
 | 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | **fixed**, `78120a1`: the files placed directly in the folder (decision 2) |
 | 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | **fixed**, `ce1b5f8` |
 | 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | **fixed**, `caa77ef`: the folders list follows the files, on a cached .SLD list too (decisions 11, 12) |
-| 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | open |
-| 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed for this panel**, `32c435d`: it asks to keep or purge (decision 7) |
-| 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | open |
+| 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | **fixed**, `20d9d3b` |
+| 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed**, `32c435d`: it asks to keep or purge (decision 7); the folders list panel asks since `26c47e1` |
+| 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | **fixed**, `b55b247`: the whole index, a stopped count kept, the row refreshed, decimals sorted (decisions 14 to 16) |
 | 13 | «Remove»: the entry is gone before the question, which has no «Cancel»; the box shows the internal `\|` | low | run, read | **fixed** by `1e1c2b6`, with finding 3 |
-| 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run | **partly fixed**: the quoted path is counted among the lines skipped (`32c435d`), a trailing separator is trimmed (`592628d`) |
+| 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run | **fixed**: a trailing separator trimmed (`592628d`); quoted paths taken, the list marked only when it changed, a message on the rescan (`2400d23`, decision 17) |
 | 15 | Small things | low | run, read | **partly fixed**: the remove box is «Remove seed folder» (`1e1c2b6`) |
 
 ---
@@ -707,6 +718,28 @@ is one of its causes.
 Correction: let a `|` folder through and pass `onlyMainFolder=1`, as `coreRescanDynaFolder()`
 already computes (:97564).
 
+**Fixed in `20d9d3b`** by that correction: `wrapperAddNewFolderToList()` (:66283) no longer
+answers «null» for a `|` folder on a cached .SLD list (:66290), and both callers already hand
+`updateCachedStaticFolders()` the folder without its `|` and with `onlyMainFolder=1`
+(`addNewFolder2list()` :66504, `coreRescanDynaFolder()` :97775). The test dates from
+`d56cc93` (2019), when the wrapper itself updated the folders list with the folder as it was
+given, `|` included, and with its subfolders. Run (batch Z10, a cached .SLD list of `pv`; at
+`98ea716` in parentheses):
+
+- `|other` and `third` added: the folders list in memory gains `other` and `third` (`third`
+  alone); saved, the `[Folders]` section holds both; the list opened again, the folders list
+  panel lists both (Z10.1, Z10.2);
+- both get another date on the disk: the folders list panel marks both (`third` alone); F5 on
+  each from this panel clears both marks (Z10.3; batch G gives the same);
+- `other\sub` added inside `|other`, `other` dated again, F5 on `|other`: the row of `other`
+  takes the new date (no row), and the file of `other\sub` stays indexed (Z10.4);
+- in a database a `|` folder added gets its row on both texts (Z10.7): that path never had the
+  test.
+
+Not changed: an entry turned non-recursive and rescanned drops the files of its subfolders
+from the index, and their rows stay in the folders list (Z10.5, `third\deep`, on both texts),
+one more case of the folders list audit's finding 10.
+
 ## 11. «Rescan folder» on a missing folder deletes its entries
 
 `BTNrescanDynaFolder()` :97571-97587, `coreRescanDynaFolder()` :97563,
@@ -725,8 +758,18 @@ Correction: decision 7 (decision 2 of the folders list audit, still open).
 
 **Fixed for this panel in `32c435d`**, by Marius's answer to decision 7: «Rescan folder» on a
 missing seed folder asks «Keep» or «Purge» (finding 2's note). Run (batch E2): F5 on the
-missing `third`, «Keep»: its two rows stay in `images`. The folders list panel's «Rescan
-folder(s)» still removes the entries of a folder it cannot reach (its finding 14).
+missing `third`, «Keep»: its two rows stay in `images`.
+
+**Fixed for the folders list panel too**, and before this audit: that panel's «Rescan
+folder(s)» (`BTNupdateSelectedStaticFolder()` :98759 at `2400d23`) asks first since `26c47e1`
+(2026-11-13, Marius's answer to decision 2 of the folders list audit): «Yes» or «No» when
+every selected folder is missing, «Rescan all», «Skip missing» or «Cancel» when some are
+(:98820). The entries of a missing folder go only after «Yes» or «Rescan all». The sentence
+written here at `32c435d`, that the folders list panel «still removes the entries of a folder
+it cannot reach», missed it. Run on `98ea716` (that kit's batch RP, the lines of its run on
+`26c47e1`): «No», «Cancel» and «Skip missing» keep the entries, in a database their `images`
+rows too; «Rescan all» and «Yes» remove them. Nothing was changed for this finding on
+2026-11-17.
 
 ## 12. The count columns
 
@@ -748,6 +791,56 @@ folder(s)» still removes the entries of a folder it cannot reach (its finding 1
 - **Two rows for one action.** F10 counts the disk on the first selected row (:35435) and
   the index through F11's function, which reads the focused row (:96901). In a list that
   allows one selection they are the same row in practice (read).
+
+**Fixed in `b55b247`**, with Marius's answers (decisions 14 to 16), lines at `2400d23`:
+
+- «Difference» stays empty until «Files on disk» is counted (`uiDynaRowCounts()` :97097).
+- While a files filter is on, F11, F10 and the refreshes below count the whole index
+  (`countDynaFolderFiles()` :97060): in a plain or .SLD list the unfiltered list kept in
+  memory, whose entries the filtered list shares, selection marks included; in a database
+  filtered by a query, as F3 filters it there, «Files» comes from the `images` table and
+  «Selected» from the filtered list, the only place where files can be selected then.
+- «Select files» and «Deselect files» write the row from their own pass over the index:
+  «Files», «Selected», «%», and «Difference» once the disk is counted (:97016); with a filter
+  on, the row is counted again over the whole index. «Deselect all (files list)» has its own
+  function in this panel's menu (`MenuDynaFoldersDropFilesSelection()` :94144, :94222): every
+  counted row gets «Selected» 0 and «%» 0, or, with a filter on, is counted again, since the
+  files the filter hides keep their selection.
+- «%» and «Size (MB)» sort as numbers with decimals (:99191).
+- A stopped count leaves the row as it was and says so: «Counting stopped: the row keeps its
+  previous values» (F11 :97038, F10 :35464); F10 does not scan the disk after its index count
+  was stopped (:35453). A stopped «Select files» or «Deselect files» leaves the row too, with
+  «Selection stopped» (:97035); the files it reached stay selected, as before.
+- F10 counts the row F11 counts, the focused one or else the first selected
+  (`getFocusedOrFirstSelectedRow()`, :35446).
+
+Run (batch Z12, a plain list of `pv`, `other\sub` and `|other`; at `98ea716` in parentheses):
+
+- F11 on `other`: «Difference» empty (0); F10: 2 on disk, «Difference» 0 (Z12.1, Z12.2);
+- «Select files» on `other`: 2 selected, 100.0 % (the row unchanged, 0 selected); «Deselect
+  files»: 0; «Select files» on `other\sub`, never counted: 3 files, 3 selected, «Difference»
+  empty (nothing written) (Z12.3);
+- two files of `pv\Alpha` selected, F11 on `pv`: 12 files, 2 selected; «Deselect all»:
+  «Selected» 0 on the three counted rows (unchanged) (Z12.4);
+- 33.3, 90 and 33.7 in «%», sorted highest first: 90, 33.7, 33.3 (90, 33.3, 33.7); 1.5, 10.2
+  and 1.9 in «Size (MB)»: 10.2, 1.9, 1.5 (10.2, 1.5, 1.9) (Z12.5);
+- `pv` counted, 12 files and 12 on the disk, then two files of `pv\Beta` selected; each stop
+  forced at the third check the Escape key feeds (the kit's `tsAbortAfter`): F11 stopped, the
+  row keeps 12 files and 0 selected, with the message (2 files, «Difference» 10); F10 stopped in
+  its index count, the same, the disk not scanned (2 files, then the disk scanned); F10 stopped
+  in its disk scan, the index count written, 2 selected, the disk cells kept (0 on the disk,
+  «Difference» −12); «Select files» stopped, the row kept, «Selection stopped» (the row kept,
+  nothing said) (Z12.6);
+- three files of `pv\Alpha` selected, then F3 on `|other`: F11 and F10 on `pv` give 12 files,
+  3 selected, 25.0 %, «Difference» 0 (0, 0, 12); «Select files» on `other`: 2 files, 2 selected
+  (the row unchanged); «Deselect all»: `other` 0 selected, `pv` still 3, the filter hiding them;
+  with the filter removed, those 3 files are selected (the same, the rows unchanged) (Z12.7);
+- a database, F3 on `|other`, a query filter: F11 and F10 on `pv` give 12 files from the
+  database, «Difference» 0 (0 and 12); «Select files» on `other`: 2 and 2; «Deselect all»: 0
+  selected on both rows (the rows unchanged) (Z12.8).
+
+Batch B gives the lines of `98ea716` but at B1 («Difference» empty), B2 (the row follows
+«Select files») and B5 (12 files with the filter on, «Difference» 0).
 
 ## 13. «Remove»: no way back
 
@@ -781,8 +874,35 @@ changes, also with one file or none in the index; «No» changes nothing; the bo
 
 **Partly fixed**: since `32c435d` a quoted path is counted among the lines skipped; since
 `592628d` a trailing separator is trimmed, from the pasted lines and from every entry when a
-list is read (finding 5; run, batch C8: `fifth\` is listed as `fifth`). The other two points
-are open.
+list is read (finding 5; run, batch C8: `fifth\` is listed as `fifth`).
+
+**Fixed in `2400d23`**, with Marius's answers (decision 17), lines at `2400d23`: «Paste list»
+(`BTNpasteDynaFoldersList()` :97127) removes every quotation mark from the pasted text before
+it reads the lines (:97133), as he asked: a path cannot hold one, and Explorer's «Copy as
+path» puts each path between two. The list is marked as modified, and a database's
+`dynamicfolders` table written again, only when its entries differ from those listed before
+(:97179). A message says how many seed folders were added and that «Rescan folder» (F5) on
+each, or «Rescan all», indexes their files (:97190), in one message with the count of the
+lines skipped.
+
+Run (batch Z14, a plain list of `pv`; at `98ea716` in parentheses):
+
+- `"…\fifth\"`, `"…\sixth"`, `"|…\seventh"`, `|"…\eighth"` and `…\ninth` pasted: `fifth`,
+  `sixth`, `ninth`, `|seventh` and `|eighth` listed, «5 seed folder(s) added to the list…»
+  (`ninth` alone, «4 pasted line(s) skipped»); F5 on `fifth` indexes its file and F11 counts
+  it (no row `fifth`, its line skipped) (Z14.1, Z14.2). Batch C8 still picks `fifth\`, which
+  no row holds since `592628d`: its F5 and F11 act on nothing, on both texts; Z14.2 does what
+  they meant to do;
+- the same lines pasted again: the list is not marked, no message (marked, «4 pasted line(s)
+  skipped») (Z14.3);
+- two quoted folders and a quoted path that is no folder: both listed, one message with both
+  counts (all three skipped) (Z14.4); a line that is no folder, alone: «1 pasted line(s)
+  skipped», the list not marked (marked) (Z14.5);
+- a database, its own seed folder pasted: the list not marked (marked); a quoted new folder:
+  it joins the `dynamicfolders` table (skipped) (Z14.6).
+
+Batch C gives the lines of `98ea716` but at C6 (the message about the folder added) and C8
+(`"sixth"` listed, «2 seed folder(s) added…»).
 
 ## 15. Small things
 
@@ -992,8 +1112,19 @@ Not part of the panel's own code.
 13. **This panel's rename onto a folder that has rows already** (finding 9, run Y9.6): keep it,
     the moved rows replacing that folder's rows and recorded dates, or refuse the new path as
     the folders list panel's rename does? Open.
+14. **The counts while a files filter is on** (finding 12): the whole index, the filtered
+    files with a line in the panel that says so, or as they were? **Settled** (`b55b247`,
+    Marius's answer): the whole index.
+15. **A stopped count** (finding 12): empty the cells, or keep what they showed? **Settled**
+    (`b55b247`, Marius's answer): keep them, with a message; F10 then does not scan the disk.
+16. **The table after «Select files», «Deselect files» and «Deselect all»** (finding 12): the
+    counts of their own pass, «Selected» and «%» alone, or F11 run again? **Settled**
+    (`b55b247`, Marius's answer): the counts of their own pass.
+17. **The folders «Paste list» adds** (finding 14): ask to scan them, say they need a scan, or
+    scan them at once? **Settled** (`2400d23`, Marius's answer): say it; the quotation marks
+    are removed from the pasted text, as he asked.
 
-Suggested order at `78120a1`: decision 13; findings 10 and 12, then what is left of 14 and 15.
+Suggested order at `2400d23`: decision 13; what is left of 15; seen in passing F and G.
 
 ## How this was checked
 
@@ -1060,6 +1191,9 @@ that one in this panel, its batch F).
 | Y7 | plain, database, drive P: | for `78120a1`: `\|other` over `other\sub` and an orphan subfolder, `\|été` over `été\sub`, the recursive `other\sub`: F11 and F10, «Select files», «Deselect files», «With a new QPV instance», «Jump», F3; the folders list panel's «Select files», «Jump», F3 on `other`; the same in a database; the root as `\|p:` |
 | Y8 | cached .SLD, database | for `ce1b5f8`: «Recursive folder scan» and the save question answered «Discard»; then a save; private mode; a database |
 | Y9 | database, cached .SLD, plain | for `caa77ef`: F2 on `pv` renamed `pvNew` on the disk: «No», «Yes» and the database opened again, unticked with `pv\alpha` inside `\|pv`, a files filter on, an image of the same name in the new folder and in a subfolder of it, a new folder that has rows already; a cached .SLD list with its folders list loaded, not loaded, «No»; a plain list |
+| Z10 | cached .SLD, database | for `20d9d3b`: `\|other` and `third` added, the folders list in memory, saved, opened again; both re-dated and rescanned; `other\sub` added inside `\|other`, F5; `third` turned non-recursive, F5; `\|fourth` added in a database |
+| Z12 | plain, database | for `b55b247`: F11 before F10; «Select files», «Deselect files», on a row never counted; «Deselect all»; «%» and «Size (MB)» sorted; F11, F10 in each of its two parts and «Select files» stopped; F3 with files selected outside the filter, then F11, F10, «Select files», «Deselect all»; the same in a database, its filter a query |
+| Z14 | plain, database | for `2400d23`: quoted paths, one with a trailing separator, a `\|` inside or outside the quotes; F5 and F11 on the pasted `fifth`; the same lines again; two quoted folders and a path that is no folder; a line that is no folder; a database: its own folder, then a quoted new one |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -1132,6 +1266,32 @@ logs of the 2026-11-16 kit were made in another folder, where the seed folders l
 another order: only logs of one kit are compared. Not run: Windows; the new instance's launch;
 F3 on a drive root in a database; a rename onto a folder that has rows, on a cached .SLD list.
 
+**Runs of findings 10, 12 and 14**, 2026-11-17. The kit was copied to
+`.claude/scratch/seed-folders-10-14-2026-11-17/`: `app/` as before, plus `seed-part4.ahk` for
+batches Z10, Z12 and Z14 (joined by `build-wrappers.sh`); `snap4/` holds `head.ahk`
+(`98ea716`) and the three texts committed, `f10.ahk`, `f12.ahk` and `f14.ahk`, made from it by
+`mkfix.py` (next to `app/`), each committed as tested (compared byte for byte). Every batch ran
+on `98ea716` (logs `*-b`); each fix's batches ran on its own text: Z10 and G on that of
+`20d9d3b` (`*-f10`), Z12 and B on that of `b55b247` (`*-f12`), Z14 and C on that of `2400d23`
+(`*-f14`). Then every batch ran on the text of `2400d23` (`*-z`), and `compare-all.sh` compared
+the two sets batch by batch:
+
+- H, I, J, K, M, N, Q, R0, R, T, V, W, W9, X, Y8 and Y9 give the same lines;
+- B, C, G and the three new batches differ where the fixes act, as the notes above say;
+- A4, E5, O5, P1 and Y7.5 differ in «Difference» alone, left empty by F11 before F10; D and P
+  also in the message of «Paste list»;
+- L and U differ only in the image the random display then fails to find on the disk; L stops
+  at its known last step, L3, on both.
+
+Batch S was not run: its code did not change. The folders list kit ran its batch RP on
+`98ea716` (`rp-b17`): the lines of `rp-fix4`, its run on the text of `26c47e1`. It also ran F,
+T, U, W, X and Z, the batches that reach this panel or the functions the fixes changed, on
+`98ea716` (`*-b17`) and on the text of `2400d23` (`*-z17`): F, T, U, W and Z give the same
+lines; X differs only in the random image shown after each rescan. The three texts load with
+AutoHotkey_H and stock AutoHotkey 1.1.37 (`/iLib`), and AutoHotkey_H loads each in full. Not
+run: Windows; the Escape key and its prompt during a count (the kit stops a count from inside
+the check the key feeds); the menu items themselves, the kit calling their functions.
+
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.
 
@@ -1145,4 +1305,6 @@ the folders list panel of a plain list first asks to generate it; the kit opens 
 batch R clears it before each step. Since 2026-11-17: a plain folder opened over a database (the
 kit's `tsOpenPlain()`) leaves the database open, and the next database cannot be written («file
 is not a database»): `tsFresh()` closes the list first, through `resetMainWin2Welcome()`; batch
-P deletes `P:\r1.png`, so T, U and X need a `run-all.sh` of their own.
+P deletes `P:\r1.png`, so T, U and X need a `run-all.sh` of their own. A stop forced through
+`tsAbortAfter` stamps the time of the stop, and for one second the panel refuses to close:
+batch Z12 waits 1.1 s after each stop.
