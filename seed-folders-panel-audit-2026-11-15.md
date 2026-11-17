@@ -32,6 +32,15 @@ seen images list (`8cacdee`, decision 10) and the seed folders list (`cce29a6`),
 takes a list of drive roots alone and marks the list as modified (`557c018`); lines at
 `557c018`.
 
+**Findings 7 to 9, 2026-11-17, at `78120a1`**, with Marius's answers: «Recursive folder scan»
+marks the list as modified (`ce1b5f8`); «Rename index entry» carries the folders list along with
+the files, in a database with their recorded dates, captions and audio notes and with the new
+path in lower case, on a cached .SLD list too (`caa77ef`, decisions 11 and 12); on a seed folder
+scanned without its subfolders the panel's actions reach the files placed directly in it, and
+«With a new QPV instance» opens the folder alone (`78120a1`, decision 2). The notes on the three
+cite lines at `78120a1`, those that name `ce1b5f8` and `caa77ef` too. One question is left
+(decision 13).
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -65,7 +74,7 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `557c018` |
+| # | Finding | Harm | Checked | Status at `78120a1` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
@@ -73,9 +82,9 @@ as «É» or «Ș».
 | 4 | Plain and .SLD lists: a folder name with a capital letter outside A-Z defeats counting, selecting, jumping and removing; «Rescan folder» indexes its files twice; «Set as the protected folder» does not protect it: its files can be deleted from the disk | high | run (plain list), read (.SLD) | **fixed**, `7c031cb`: compared in lower case (decision 5) |
 | 5 | A drive root as a seed folder: not listed, dropped by «Remove» and «Paste list», its files dropped by «Rescan all», not loaded from a .SLD list | medium | run | **fixed**, `fe812ec`, `32c435d` and `592628d`: kept as `p:` (decision 4) |
 | 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run | **fixed**, `d05e990`: the panel opens, with «Back» (decision 6) |
-| 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | open |
-| 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | open |
-| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | open |
+| 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | **fixed**, `78120a1`: the files placed directly in the folder (decision 2) |
+| 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | **fixed**, `ce1b5f8` |
+| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | **fixed**, `caa77ef`: the folders list follows the files, on a cached .SLD list too (decisions 11, 12) |
 | 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | open |
 | 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed for this panel**, `32c435d`: it asks to keep or purge (decision 7) |
 | 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | open |
@@ -535,6 +544,38 @@ subfolders (`OpenNewQPVinstance()` :2984, read).
 
 Correction: decision 2.
 
+**Fixed in `78120a1`**, by Marius's answers to the rest of decision 2: on a `|` entry, F11
+(«Files», «Selected», «%», and so «Difference»), «Select files», «Deselect files», «Jump to
+first indexed file» and F3 reach the files placed directly in the folder, as the entry indexes
+them and as F10 counts the disk; F3 applies the folder filter of the folders list panel's F3
+(`uiFilterListDynaFolder()` with mode 2, «Ends with» on «Folder paths», :97431-97437); «With a
+new QPV instance» passes `fd=|`, through a new optional parameter of `OpenNewQPVinstance()`
+(:2981, :97280): the function as committed, its launch turned into an output line, gives
+`fd=|C:\windows` for `C:\windows\` and `fd=|C:` for a root (run alone; the kit's batches log
+the call and start nothing). The functions read the «(?)» column in this panel alone
+(:96891, :97005, :97196); a recursive entry, and the folders list panel, which shares them,
+behave as before. A file indexed in a subfolder that no seed folder covers now belongs to no
+row of this panel; the folders list panel lists its folder.
+
+Run on the text of `78120a1` (batch Y7; at `803a668` in parentheses), plain list, the seed
+folders `|other` (2 files), `other\sub` (3) and `|été` (1; `été\sub` a seed folder of its own),
+and `other\orphan\x1.png` indexed under no seed folder:
+
+- `|other`: F11 and F10 give 2 and 2, «Difference» 0 (6, 2 and -4); «Select files» selects 2
+  (6); the jump lands on `other\o1.png` (`other\sub\s1.png`); F3 leaves 2 files (6); the new
+  instance is called for the folder alone (the kit logs the call instead of starting it);
+- `|été`: F11, «Select files» and F3 give 1 file, F10 1 (2, 2, 2 and 1); the jump lands on
+  `Été\e1.png` (`Été\Sub\e2.png`);
+- the recursive `other\sub`, and the folders list panel's «Select files», jump and F3 on
+  `other`: the lines they gave;
+- in a database, `|other` and `|été`: the same counts; F3 filters with
+  `imgfolder LIKE '%other'` (`fullPath LIKE 'other\%'`, 6 files), as the log shortens them: the
+  clauses hold the full path of the folder;
+- the drive root as `|p:`: 2 files each, F3 `i)(p:)$` (5).
+
+Batch B differs at B1 to B4 alone: 2 files where it counted, selected and filtered 5, and the
+jump on `other\o1.png`.
+
 ## 8. «Recursive folder scan» does not mark a .SLD list as modified
 
 `BtnToggleRecurseDynaFolder()` :97521-97550
@@ -550,6 +591,14 @@ user it would be.
 In a database the change is written at once (:97544-97545).
 
 Correction: set `currentFilesListModified := 1` there.
+
+**Fixed in `ce1b5f8`**, as the correction says, when the toggle changed the list (:97658,
+:97665-97666): a row that matches no entry, as in private mode, marks nothing. Run on its text
+(batches Y8 and G; at `803a668` in parentheses): after «Recursive folder scan» on `pv` the
+cached .SLD list is marked and `askAboutSlidesListSave()` asks (nothing); «Discard», then the
+list opened again: `pv` is recursive, as saved; a save keeps `|pv`; in private mode nothing
+changes and nothing is marked (the same); in a database the list is marked, as «Remove» and
+«Paste list» mark it. Batch G differs at G1 alone, where the question now comes.
 
 ## 9. Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions behind
 
@@ -577,6 +626,60 @@ that leave captions behind.
 
 Correction: in a database, run `renameStaticFolderSQLdb()` here too, for the seed folder and
 its subfolders, after the search and replace succeeded.
+
+The same rename on a cached .SLD list leaves the folders list's rows on the old paths, in
+memory and in the next save, a case of the folders list audit's finding 10 (read, then run in
+batch Y9 below).
+
+**Fixed in `caa77ef`**, with Marius's answers (decisions 11 and 12): once «Yes» was answered
+and the search and replace succeeded, the folders list follows the files (:98199-98208). Its
+rows of the folder and of its subfolders are renamed, whatever the tick, since the search and
+replace moves the subfolders' files in any case; on a cached .SLD list the rows are read from
+the file first when they are not in memory yet, so the next save writes the new paths; in a
+database `renameStaticFolderSQLdb()` moves the `staticfolders` rows with their recorded dates,
+the captions and the audio notes, and the new path reaches the index in lower case, as the
+folders list panel's rename writes it (:98147-98148). «No» renames the seed folder entry alone,
+as before. On a cached .SLD or plain list the rows take the new path in lower case, as the
+folders list is kept, while the index keeps the spelling typed (`pvNew\Alpha`); the folders list
+panel's own rename writes its row as typed there. A plain list's folders list, once generated,
+follows too: it is the same list in memory. `renameStaticFoldersEntries()` (:98246), which both
+folder panels call, compares the paths in lower case, as decision 5 has it, and matches a
+subfolder from the start of its path only. The audio notes are not run from this panel: the
+folders list kit's batch SG2 runs them through the same `renameStaticFolderSQLdb()`.
+
+Run on the text of `caa77ef` (batch Y9; at `803a668` in parentheses), `pv` renamed `pvNew` on
+the disk, then F2 on the seed folder `pv`:
+
+- database, «Yes»: the index holds `pvnew\alpha` (`pvNew\alpha`); `staticfolders` holds the
+  five `pvnew` rows, `pvnew\beta` with the date set apart for the run, so the folders list
+  panel marks that row alone, also after the database is opened again (five rows marked, the
+  table on `pv`); the caption of `a1.png` follows (stays on `pv\alpha\a1.png`);
+- «Propagate» unticked, with the seed folder `pv\alpha` inside `|pv`: that entry keeps its path,
+  the five rows move with the files (they stay);
+- a files filter on (F3 on `pv`): the search and replace drops it, the rows and the caption
+  move (they stay);
+- «No»: nothing moves but the seed folder entry (the same);
+- an image of the same name indexed in the new folder already: «UNIQUE constraint failed»,
+  nothing moves (the same);
+- cached .SLD list, its folders list loaded: the rows become `pvnew\…` with their dates,
+  unmarked, and the save and the list opened again keep them (`pv\…`, marked, saved so); its
+  folders list not loaded yet: read from the file and renamed, saved so (saved on `pv\…`);
+  «No»: the rows stay;
+- plain list with its folders list generated: the rows follow (they stay).
+
+Batches E, H and I differ at E4, E5, H1 and I2 alone, as above. The folders list kit's rename
+batches D2, H, Y, Z, SG2 and SG3 give the same lines on this text, but for which image, if any,
+the display then fails to find on the disk in Y, SG2 and SG3; its step Z4, this panel's rename on
+a cached .SLD list, logs the files alone.
+
+Two cases:
+
+- a rename onto a folder that has rows already, as after two folders were merged on the disk
+  (run, Y9.6): the moved rows replace them, with their own dates, so that folder's recorded
+  date is lost (at `803a668` neither row set changed). The folders list panel's rename refuses
+  a path listed already (`findTakenStaticFolderPath()`); this panel's does not. Decision 13;
+- a search and replace that fails for some files only: the rows and the captions follow (run,
+  Y9.5b), seen in passing G.
 
 ## 10. A `|` folder added or rescanned on a cached .SLD list gets no row in the folders list
 
@@ -805,6 +908,14 @@ Not part of the panel's own code.
 - **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it removes
   every file: its `countFiles` is never set (run, batch N4: `maxFilesIndex` is blank after
   «Yes» on the only seed folder). Not followed further. Open.
+- **G.** In a database, `SearchAndReplaceThroughIndex()` in folder mode moves the files of the
+  subfolders one by one; a file whose new path is held already fails alone, is counted
+  («Failed to modify 1 entries») and the function still reports success, while the index
+  takes the new path for every file, that one included: the index and the database disagree
+  on it. Run (batch Y9, step Y9.5b, an image of the same name indexed in a subfolder of the new
+  folder): `pv\beta\b1.png` stays in the `images` table, the index lists it under `pvnew\beta`.
+  The renames of both folder panels then carry the folders list along, as for a success (run for
+  this panel, Y9.5b; read for the folders list panel). Open.
 
 ## Checked and found correct
 
@@ -839,7 +950,9 @@ Not part of the panel's own code.
    entry indexes them, or the subfolders too, as now? It covers «Remove» + «Yes», the two
    counts, «Select files», «Deselect files», «Jump to first indexed file», F3 and «With a new
    QPV instance». **Settled for «Remove»** (`1e1c2b6`, Marius's answer): the subfolders too,
-   except the files another seed folder covers. Open for the other actions (finding 7).
+   except the files another seed folder covers. **Settled for the other actions** (`78120a1`,
+   Marius's answers): the files placed directly in the folder, as the entry indexes them;
+   «With a new QPV instance» opens the folder alone.
 3. **«Remove»**: ask first, with «Cancel», before the entry goes, or keep «Yes» / «No» about
    the files only? **Settled** (`1e1c2b6`, Marius's answers): one question before anything
    changes, «Yes» / «No», asked every time; «No» changes nothing; «Yes» removes the entry with
@@ -870,9 +983,17 @@ Not part of the panel's own code.
 10. **Two seen records of one file**, which a case-blind replacement gives the same path: merge
     them, delete the duplicate, or leave it on the old path? **Settled** (`8cacdee`, Marius's
     answer): merge them, under the new path, with the later view date.
+11. **The spelling a database's index gets from this panel's rename** (finding 9): as typed,
+    or in lower case, as the folders list panel's rename writes it (note C of the folders list
+    audit)? **Settled** (`caa77ef`, Marius's answer): lower case.
+12. **The folders list after this panel's rename on a cached .SLD list**: databases alone, as
+    finding 9 is worded, or cached .SLD lists too, whose rows stayed on the old paths in memory
+    and in the next save? **Settled** (`caa77ef`, Marius's answer): cached .SLD lists too.
+13. **This panel's rename onto a folder that has rows already** (finding 9, run Y9.6): keep it,
+    the moved rows replacing that folder's rows and recorded dates, or refuse the new path as
+    the folders list panel's rename does? Open.
 
-Suggested order at `557c018`: findings 8 and 9 need no decision; then 10, 12, and what is
-left of 14 and 15; finding 7 waits for the rest of decision 2.
+Suggested order at `78120a1`: decision 13; findings 10 and 12, then what is left of 14 and 15.
 
 ## How this was checked
 
@@ -936,6 +1057,9 @@ that one in this panel, its batch F).
 | W | seen images list | for `8cacdee`: two spellings of one file, a look-alike, folder mode, needles with `_` and `%`, an A to Z one, the panel |
 | X | cached .SLD, drive P: | for `cce29a6` and `557c018`: the panel's seed folders list: a capital outside A-Z, an A to Z change and the modified mark, no match, the root alone |
 | W9 | seen images list | for `ffccbb3`: a new path held by a record the same pass moves on, in both orders; a chain of three |
+| Y7 | plain, database, drive P: | for `78120a1`: `\|other` over `other\sub` and an orphan subfolder, `\|été` over `été\sub`, the recursive `other\sub`: F11 and F10, «Select files», «Deselect files», «With a new QPV instance», «Jump», F3; the folders list panel's «Select files», «Jump», F3 on `other`; the same in a database; the root as `\|p:` |
+| Y8 | cached .SLD, database | for `ce1b5f8`: «Recursive folder scan» and the save question answered «Discard»; then a save; private mode; a database |
+| Y9 | database, cached .SLD, plain | for `caa77ef`: F2 on `pv` renamed `pvNew` on the disk: «No», «Yes» and the database opened again, unticked with `pv\alpha` inside `\|pv`, a files filter on, an image of the same name in the new folder and in a subfolder of it, a new folder that has rows already; a cached .SLD list with its folders list loaded, not loaded, «No»; a plain list |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -979,6 +1103,35 @@ committed (`k1.ahk` to `k4.ahk` = `8cacdee`, `cce29a6`, `557c018`, `ffccbb3`, sh
 compared), all four loaded with AutoHotkey_H and stock AutoHotkey 1.1.37. W9 ran on
 `557c018` (log `w9-k`), on `8cbe643` (`w9-h3`) and on `ffccbb3` (`w9-k4`, with W in `w-k4`).
 
+**Runs of findings 7 to 9**, 2026-11-17. The kit was copied to
+`.claude/scratch/seed-folders-7-9-2026-11-17/`: `app/` as before, plus `seed-part3.ahk` for
+batches Y7, Y8 and Y9 (joined by `build-wrappers.sh`); `patch.py` logs the new parameter of
+`OpenNewQPVinstance()`, and the folders list kit's `patch.py` takes it too. Each fix ran on its
+own text against `803a668` (logs `*-h`): Y8 and G on the text of `ce1b5f8` (`*-f8`), Y9, E, H
+and I on that of `caa77ef` (`*-f9`), Y7 and B on that of `78120a1` (`*-f7`); `snap/` holds the
+three texts, each committed as tested (compared byte for byte). Then every batch ran on
+`803a668` and on the text of `78120a1`, and `compare-all.sh` compared them batch by batch, the
+dates, the random current image and the window-update journal lines blanked out, the jump
+lines compared as they are, since the blanking hides the file a jump lands on:
+
+- A, C, D, K, M, N, O, P, Q, R0, R, T, V, W, X and W9 give the same lines;
+- B, E, G, H and I differ at B1 to B4, E4, E5, G1, H1 and I2 alone, as the notes above say;
+- J, L and U differ only in which image the random display then fails to find on the disk; L
+  stops at its known last step, L3, on both;
+- Y8 and Y9 give, on the text of `78120a1`, the lines they gave on the text of their own fix.
+
+The folders list kit (`.claude/scratch/static-folders-panel-2026-11-10/`) ran D2, E, F, H, I,
+Q, T, U, Y, Z, SG2 and SG3 on `803a668` (logs `*-s17h`) and on the text of `78120a1`
+(`*-s17f`), the six rename batches also on that of `caa77ef` (`*-s17f9`): D2, E, F, H, I, T, U
+and Z give the same lines; Y, SG2 and SG3 differ in the random display alone; Q stops on both
+at the same question, added after the batch was written. `argcheck/` runs
+`OpenNewQPVinstance()` as committed, its launch turned into an output line. The three texts load
+with AutoHotkey_H and stock AutoHotkey 1.1.37 (`/iLib`); AutoHotkey_H ran every batch on the
+text of `78120a1`, and each fix's own batches on its own text. Batch S, the new instance's arguments, was not run again: its code did not change. The
+logs of the 2026-11-16 kit were made in another folder, where the seed folders lists sort in
+another order: only logs of one kit are compared. Not run: Windows; the new instance's launch;
+F3 on a drive root in a database; a rename onto a folder that has rows, on a cached .SLD list.
+
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.
 
@@ -989,4 +1142,7 @@ never scheduled, so the next box of the batch is not answered (batch N clears th
 N4); adding a folder whose files are indexed already asks «Do you want to add it to the list?»;
 the folders list panel of a plain list first asks to generate it; the kit opens folders through
 `coreOpenFolder()`, which keeps the folders list in memory where `OpenFolders()` clears it, so
-batch R clears it before each step.
+batch R clears it before each step. Since 2026-11-17: a plain folder opened over a database (the
+kit's `tsOpenPlain()`) leaves the database open, and the next database cannot be written («file
+is not a database»): `tsFresh()` closes the list first, through `resetMainWin2Welcome()`; batch
+P deletes `P:\r1.png`, so T, U and X need a `run-all.sh` of their own.
