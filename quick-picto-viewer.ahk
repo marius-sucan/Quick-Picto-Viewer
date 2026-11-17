@@ -87771,6 +87771,31 @@ compareFoldersList(mainFoldersListu, foldersListu) {
    Return obju
 }
 
+BTNregenerateEntireList() {
+    ; asked only when the seed folders are to be scanned
+    If !(InStr(CurrentSLD, "\QPV\favourite-images-list.SLD") || InStr(CurrentSLD, "\QPV\file-acts-history.SLD") || InStr(CurrentSLD, "\viewed-images-history-"))
+    {
+       countu := 0
+       listu := getDynamicFoldersList()
+       Loop, Parse, listu, `n
+       {
+           If (StrLen(StrReplace(Trimmer(A_LoopField), "|"))>1)
+              countu++
+       }
+
+       If countu
+       {
+          msgu := (countu=1) ? "The seed folder will be scanned again" : "All " groupDigits(countu) " seed folders will be scanned again"
+          titleu := (AnyWindowOpen=2) ? "Regenerate entire index" : "Rescan all"
+          msgResult := msgBoxWrapper(appTitle ": " titleu, msgu ", to generate the files list index anew. The files selection and any files filter are dropped.`n`nDo you want to continue?", 4, 1, "question")
+          If (msgResult!="yes")
+             Return
+       }
+    }
+
+    RegenerateEntireList()
+}
+
 RegenerateEntireList() {
     If (AnyWindowOpen>0)
        BtnCloseWindow()
@@ -94726,7 +94751,7 @@ PanelStaticFolderzManager() {
 
     If isUpdateList
        Gui, Add, Button, x+5 hp w%btnWid% gBtnIgnoreDateStaticFolder, I&gnore all changes
-    Gui, Add, Button, x+5 hp w%btnWid3% gRegenerateEntireList, R&egenerate entire index
+    Gui, Add, Button, x+5 hp w%btnWid3% gBTNregenerateEntireList, R&egenerate entire index
     Gui, Add, Button, x+5 hp w%btnWid4% ginvokePanelStaticFoldersContextMenu, &More
     labelu := isUpdateList ? "Cached folders list: " : "Static folders list: "
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, labelu appTitle)
@@ -96587,7 +96612,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
        Gui, Add, Button, xs+0 y+5 h%thisBtnHeight% w60 gBTNaddNewFolder2list, &Add
 
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNremDynaSelFolder, &Remove
-    Gui, Add, Button, x+5 hp wp+30 gRegenerateEntireList, R&escan all
+    Gui, Add, Button, x+5 hp wp+30 gBTNregenerateEntireList, R&escan all
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNcopyDynaFoldersList, &Copy list
     Gui, Add, Button, x+5 hp wp+5 gBTNpasteDynaFoldersList, &Paste list
     Gui, Add, Button, x+5 hp wp+5 ginvokePanelDynaFoldersContextMenu, &More
