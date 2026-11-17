@@ -52,6 +52,11 @@ list as modified only when it changed, and says that the folders it adds need a 
 folder(s)» has asked first since `26c47e1` (2026-11-13), before this audit began, which the
 note on finding 11 had missed. The notes on the four cite lines at `2400d23`.
 
+**Decision 13, 2026-11-17, at `f3fb044`**, with Marius's answers: this panel's «Rename index
+entry» refuses a new path whose folder the folders list holds already, as the folders list
+panel's does, and both panels now say why in a message box; the note on finding 9 gives the
+lines at `f3fb044`.
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -85,7 +90,7 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `2400d23` |
+| # | Finding | Harm | Checked | Status at `f3fb044` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
@@ -95,7 +100,7 @@ as «É» or «Ș».
 | 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run | **fixed**, `d05e990`: the panel opens, with «Back» (decision 6) |
 | 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | **fixed**, `78120a1`: the files placed directly in the folder (decision 2) |
 | 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | **fixed**, `ce1b5f8` |
-| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | **fixed**, `caa77ef`: the folders list follows the files, on a cached .SLD list too (decisions 11, 12) |
+| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | **fixed**, `caa77ef`: the folders list follows the files, on a cached .SLD list too (decisions 11, 12); a path the folders list holds is refused since `f3fb044` (decision 13) |
 | 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | **fixed**, `20d9d3b` |
 | 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed**, `32c435d`: it asks to keep or purge (decision 7); the folders list panel asks since `26c47e1` |
 | 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | **fixed**, `b55b247`: the whole index, a stopped count kept, the row refreshed, decimals sorted (decisions 14 to 16) |
@@ -688,9 +693,47 @@ Two cases:
 - a rename onto a folder that has rows already, as after two folders were merged on the disk
   (run, Y9.6): the moved rows replace them, with their own dates, so that folder's recorded
   date is lost (at `803a668` neither row set changed). The folders list panel's rename refuses
-  a path listed already (`findTakenStaticFolderPath()`); this panel's does not. Decision 13;
+  a path listed already (`findTakenStaticFolderPath()`); this panel's does not. Refused since
+  `f3fb044`, decision 13 below;
 - a search and replace that fails for some files only: the rows and the captions follow (run,
   Y9.5b), seen in passing G.
+
+**Decision 13, `f3fb044`** (Marius's answers): the rename is refused at once, before anything
+changes, when the folders list holds a path that the seed folder or one of its subfolders would
+get, also when the files question would then be answered «No». The subfolders count whatever
+the tick, since their rows move in any case (:98247). The folders list is read first when it is
+not in memory (:98239-98245): in a database as the folders list panel builds it, from the
+folders that hold indexed images (`PopulateStaticSQLfolderzList()`); on a cached .SLD list from
+the file. A plain list is checked only when its folders list was generated, so the same rename
+is refused or not depending on that. Every row the folders list panel would show counts, also
+one whose folder holds no image. In both folder panels a message box now says why
+(:98250-98251), and the rename dialog comes back after «OK»:
+
+> This folder is in the folders list already: `<path>\`. The rename would put the folders list
+> rows of «`<old folder>\`» in place of the rows already there, and the dates recorded for them
+> would be lost. Type a path that the folders list does not hold yet. If the images were moved
+> into that folder on the disk, rescan the seed folder that covers it instead.
+
+Run on its text (batch D13; at `4de06dd` in parentheses), the seed folders `pv` and `merge`,
+whose `merge\gamma` holds an image:
+
+- database, `pv` → `merge`: refused, nothing changes (the seed folder entry is renamed, and the
+  list then holds `merge` alone); `pv` → `pvNew` and `pv` → `pv\moved` go through, as before;
+- cached .SLD list, its folders list not loaded yet: read from the file, refused, the box ticked
+  or not (renamed);
+- `other` → `pv\EmptyNew`, the row a rescan made for a folder without images: refused (renamed,
+  then dropped from the list, since `pv\emptynew` lies inside the recursive `pv`);
+- plain list without a folders list: goes through, as before; with one generated: refused
+  (renamed);
+- database, the images of `merge\gamma` erased from the index, its `staticfolders` row kept, the
+  database opened again: the folders list panel would not show that folder, so the rename goes
+  through and replaces the row's date, on both texts (D13.9).
+
+Batch Y9 differs at Y9.5, Y9.5b and Y9.6, each now refused: the image of the same name makes
+its folder part of the folders list, where the search and replace failed whole (Y9.5), failed
+for that image alone (Y9.5b) or replaced the recorded date (Y9.6). The other batches give the
+lines they gave; in the folders list kit the refusals of Y5, Z2 and Z5 show the message box in
+place of the warning line.
 
 ## 10. A `|` folder added or rescanned on a cached .SLD list gets no row in the folders list
 
@@ -1037,7 +1080,11 @@ Not part of the panel's own code.
   on it. Run (batch Y9, step Y9.5b, an image of the same name indexed in a subfolder of the new
   folder): `pv\beta\b1.png` stays in the `images` table, the index lists it under `pvnew\beta`.
   The renames of both folder panels then carry the folders list along, as for a success (run for
-  this panel, Y9.5b; read for the folders list panel). Open.
+  this panel, Y9.5b; read for the folders list panel). Open. From this panel, in a database, the
+  case is refused since `f3fb044`: the image of the same name makes its folder part of the
+  folders list (run, Y9.5b). A folders list built before that image was indexed can still miss
+  it; the folders list panel then shows the renamed rows, and not the folder that kept the
+  image, until it reads the list again (read).
 
 ## Checked and found correct
 
@@ -1114,7 +1161,10 @@ Not part of the panel's own code.
     and in the next save? **Settled** (`caa77ef`, Marius's answer): cached .SLD lists too.
 13. **This panel's rename onto a folder that has rows already** (finding 9, run Y9.6): keep it,
     the moved rows replacing that folder's rows and recorded dates, or refuse the new path as
-    the folders list panel's rename does? Open.
+    the folders list panel's rename does? **Settled** (`f3fb044`, Marius's answers): refused at
+    once, before anything changes, also when the files question would be answered «No»; every
+    row the folders list panel would show counts, also one whose folder holds no image; a
+    message box says why, in both folder panels, and the rename dialog comes back.
 14. **The counts while a files filter is on** (finding 12): the whole index, the filtered
     files with a line in the panel that says so, or as they were? **Settled** (`b55b247`,
     Marius's answer): the whole index.
@@ -1127,7 +1177,7 @@ Not part of the panel's own code.
     scan them at once? **Settled** (`2400d23`, Marius's answer): say it; the quotation marks
     are removed from the pasted text, as he asked.
 
-Suggested order at `2400d23`: decision 13; what is left of 15; seen in passing F and G.
+Suggested order at `f3fb044`: what is left of 15; seen in passing F and G.
 
 ## How this was checked
 
@@ -1197,6 +1247,7 @@ that one in this panel, its batch F).
 | Z10 | cached .SLD, database | for `20d9d3b`: `\|other` and `third` added, the folders list in memory, saved, opened again; both re-dated and rescanned; `other\sub` added inside `\|other`, F5; `third` turned non-recursive, F5; `\|fourth` added in a database |
 | Z12 | plain, database | for `b55b247`: F11 before F10; «Select files», «Deselect files», on a row never counted; «Deselect all»; «%» and «Size (MB)» sorted; F11, F10 in each of its two parts and «Select files» stopped; F3 with files selected outside the filter, then F11, F10, «Select files», «Deselect all»; the same in a database, its filter a query; Z12B: F10 on a pasted folder not scanned yet |
 | Z14 | plain, database | for `2400d23`: quoted paths, one with a trailing separator, a `\|` inside or outside the quotes; F5 and F11 on the pasted `fifth`; the same lines again; two quoted folders and a path that is no folder; a line that is no folder; a database: its own folder, then a quoted new one |
+| D13 | database, cached .SLD, plain | for `f3fb044`: F2 on `pv` onto `merge`, whose `merge\gamma` holds an image; onto a folder not listed and onto `pv\moved`; a cached .SLD list whose folders list is not loaded, ticked and unticked; onto a row without images; a plain list without and with a folders list; a database folder whose images were erased |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -1298,6 +1349,26 @@ lines; X differs only in the random image shown after each rescan. The three tex
 AutoHotkey_H and stock AutoHotkey 1.1.37 (`/iLib`), and AutoHotkey_H loads each in full. Not
 run: Windows; the Escape key and its prompt during a count (the kit stops a count from inside
 the check the key feeds); the menu items themselves, the kit calling their functions.
+
+**Runs of decision 13**, 2026-11-17, in the kit of findings 10 to 14: `seed-part5.ahk` adds
+batch D13. The kit's `tsAnswer()` now answers the new message box «OK» by itself and keeps the
+queued answer for the box after it, so the batches written for the warning line run on both
+texts; the folders list kit's `tsAnswer()` does the same, and its `tsRenameStep()` waits one
+second longer. `snap5/` holds `head.ahk` (`4de06dd`) and `d13.ahk`, the text committed as
+tested (compared byte for byte). D13 ran on `4de06dd` (`d13-h13`) and on the new text
+(`d13-d13`). Every other batch ran on the new text (`*-d13`) and was compared with `*-z`, the
+text of `2400d23`, whose code `4de06dd` carries unchanged: A to I, K, M to R, T, V, W, W9, X,
+Y7, Y8 and Z10 to Z14 give the same lines; J, L and U differ only in the random display, L
+stopping at its known L3 on both; Y9 differs at Y9.5, Y9.5b and Y9.6 alone, as above. The
+folders list kit ran D2, H, Y, Z, SG2 and SG3 on `4de06dd` (`*-h13`) and on the new text
+(`*-d13`): D2, H and SG2 give the same lines; Y and Z differ at their refusals, Y5, Z2 and Z5,
+Y and SG3 also in the random display; its Z on `4de06dd` gives the lines of `z-z17`, so the
+kit's change alters nothing where the box does not come. A first version read a database's
+folders list from its `staticfolders` table; the folders list panel then showed that list,
+without its counts, instead of building its own (batch E, step E4). The version committed
+builds it as that panel does, and E gives the lines it gave. The text loads with AutoHotkey_H
+and stock AutoHotkey 1.1.37 (`/iLib`), and AutoHotkey_H ran every batch on it. Not run:
+Windows; batch Z12B.
 
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.

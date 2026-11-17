@@ -930,6 +930,11 @@ from the index» stays in memory until the folders list is read again, with the 
 (read). «Regenerate this folders list» drops such rows, but it takes every folder's date
 from the disk again, so the «*» marks go (read).
 
+Marius's answer, 2026-11-17 (decision 13 of the seed folders panel audit): every row counts,
+also one whose folder holds no image. Since `f3fb044` the refusal says why in a message box,
+which the seed folders panel's rename shares, and the rename dialog comes back after «OK»
+(run: steps Y5, Z2 and Z5 of this kit's batches Y and Z on the text of `f3fb044`, logs `*-d13`).
+
 On `5584ee3` batch D2 logs what this section describes, and batch Y stops at the «Update
 files list» question that a database rename asked there.
 
