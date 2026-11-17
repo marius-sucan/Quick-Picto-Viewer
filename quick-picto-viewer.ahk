@@ -97128,8 +97128,9 @@ BTNpasteDynaFoldersList() {
     BtnCloseWindow()
     Sleep, 50
     ; the listed seed folders stay as they are, also those not on the disk now
-    newFoldersList := getDynamicFoldersList()
-    pastedList := SubStr(Clipboard, 1, 50432)
+    oldFoldersList := newFoldersList := getDynamicFoldersList()
+    ; Explorer's «Copy as path» puts each path in quotation marks
+    pastedList := StrReplace(SubStr(Clipboard, 1, 50432), """")
     skippedLines := 0
     Loop, Parse, pastedList, `n
     {
@@ -97156,15 +97157,41 @@ BTNpasteDynaFoldersList() {
        SLDtypeLoaded := 2
     }
 
-    If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
-       recreateDynaFoldersSQLdbList(DynamicFoldersList)
+    oldEntries := {}
+    Loop, Parse, oldFoldersList, `n
+    {
+        If A_LoopField
+           oldEntries[A_LoopField] := 1
+    }
 
-    currentFilesListModified := 1
+    addedEntries := keptEntries := 0
+    Loop, Parse, DynamicFoldersList, `n
+    {
+        If !A_LoopField
+           Continue
+
+        If oldEntries[A_LoopField]
+           keptEntries++
+        Else
+           addedEntries++
+    }
+
+    If (addedEntries || keptEntries!=oldEntries.Count())
+    {
+       If (SLDtypeLoaded=3 && RegExMatch(CurrentSLD, sldsPattern))
+          recreateDynaFoldersSQLdbList(DynamicFoldersList)
+       currentFilesListModified := 1
+    }
+
     Sleep, 50
     ResetImgLoadStatus()
     PanelDynamicFolderzWindow()
+    If addedEntries
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list. To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
     If skippedLines
-       msgBeepTimer(groupDigits(skippedLines) " pasted line(s) skipped: not a folder found on the disk")
+       msgu .= (msgu ? "`n" : "") groupDigits(skippedLines) " pasted line(s) skipped: not a folder found on the disk"
+    If msgu
+       msgBeepTimer(msgu, skippedLines ? 300 : 0)
 }
 
 BTNremDynaSelFolder() {
