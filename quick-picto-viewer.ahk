@@ -35443,30 +35443,32 @@ countFilesDiskPerStaticFolders() {
 BTNcountFilesDiskDynaFolder() {
     Gui, SettingsGUIA: Default
     Gui, SettingsGUIA: ListView, LViewDynas
-    RowNumber := LV_GetNext()
+    RowNumber := getFocusedOrFirstSelectedRow() ; the row BTNcountFilesDynaFolders() counts
     LV_GetText(folderu, RowNumber, 3)
     LV_GetText(isR, RowNumber, 2)
     If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
        Return
 
-    If !thisIndex
-       thisIndex := BTNcountFilesDynaFolders()
+    thisIndex := BTNcountFilesDynaFolders()
+    If (thisIndex="") ; the count was stopped
+       Return
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
     doStartLongOpDance()
-    startOperation := A_TickCount
     If FolderExist(folderu)
     {
        friendly := isR ? "recursively " : ""
        showTOOLtip("Scanning folder " friendly "for image files`n" folderu "\")
        onDisk := folderz := fileSizu := 0
-       z := getFolderInfos(folderu, onDisk, folderz, fileSizu, "DF" isR)
-       diffu := (onDisk!="" && thisIndex!="") ? onDisk - thisIndex : 0
-       LV_Modify(RowNumber, "Col7", onDisk)
-       LV_Modify(RowNumber, "Col8", diffu)
-       LV_Modify(RowNumber, "Col9", Round(Round(fileSizu/1024, 1)/1024, 1))
-       RemoveTooltip()
+       If getFolderInfos(folderu, onDisk, folderz, fileSizu, "DF" isR)
+       {
+          msgBeepTimer("Counting stopped: the row keeps its previous values")
+       } Else
+       {
+          LV_Modify(RowNumber, "Col7", onDisk, onDisk - thisIndex, Round(Round(fileSizu/1024, 1)/1024, 1))
+          RemoveTooltip()
+       }
     } Else
     {
        showTOOLtip("ERROR: The folder no longer exists or access denied`n" folderu "\")
@@ -94139,6 +94141,40 @@ MenuStaticFoldersDropFilesSelection() {
    LV_Modify(0, "Col6", 0, "0.0") ; every row: «Selected» and «%»
 }
 
+MenuDynaFoldersDropFilesSelection() {
+   dropFilesSelection()
+   If (AnyWindowOpen!=3)
+      Return
+
+   Gui, SettingsGUIA: Default
+   Gui, SettingsGUIA: ListView, LViewDynas
+   Loop, % LV_GetCount()
+   {
+      LV_GetText(filez, A_Index, 4)
+      If (filez="")
+         Continue
+
+      selected := 0
+      If (StrLen(filesFilter)>1) ; the files the filter hides keep their selection
+      {
+         LV_GetText(folderu, A_Index, 3)
+         LV_GetText(isR, A_Index, 2)
+         filez := countDynaFolderFiles(folderu, !InStr(isR, "R"), selected)
+         If (filez="")
+         {
+            stopped := 1
+            Break
+         }
+      }
+
+      uiDynaRowCounts(A_Index, filez, selected)
+   }
+
+   ResetImgLoadStatus()
+   If stopped
+      msgBeepTimer("Counting stopped: the rows left keep their previous values")
+}
+
 SqlWrapPopulateStaticFolderzList() {
    countAllFilesPerStaticFolders("start")
    PopulateStaticFolderzList(staticListViewFilteru)
@@ -94183,7 +94219,7 @@ invokePanelDynaFoldersContextMenu() {
       Menu, PanelDynaMenu, Add
       kMenu("PanelDynaMenu", "Add", "&Filter list to selected folder`tF3", "MenuFilterListSelectedFolder")
       If markedSelectFile
-         kMenu("PanelDynaMenu", "Add/UnCheck", "Deselect all (files &list)", "dropFilesSelection")
+         kMenu("PanelDynaMenu", "Add/UnCheck", "Deselect all (files &list)", "MenuDynaFoldersDropFilesSelection")
    }
 
    kMenu("PanelDynaMenu", "Add", "&View list as a folders tree", "BTNshowDynamicFoldersInTreeView")
@@ -96977,6 +97013,16 @@ BTNselFilesStaticFolder(modus:=0) {
          LV_Modify(RowNumber, "Col7", perc)
          newStaticFoldersListCache[indexu, 4] := (modus="desel") ? 0 : thisIndex
       }
+   } Else If (AnyWindowOpen=3 && abandonAll!=1)
+   {
+      ; with a files filter on, the row counts the whole index: the files it hides keep their selection
+      If (StrLen(filesFilter)>1)
+         thisIndex := countDynaFolderFiles(folderu, folderAlone, selected)
+      Else
+         selected := (modus="desel") ? 0 : thisIndex
+
+      If (thisIndex!="")
+         uiDynaRowCounts(RowNumber, thisIndex, selected)
    }
 
    ResetImgLoadStatus()
@@ -96985,14 +97031,15 @@ BTNselFilesStaticFolder(modus:=0) {
    foldersSelListArray := ""
    foldersLVs := ""
    dummyTimerDelayiedImageDisplay(50)
+   If (AnyWindowOpen=3 && (abandonAll=1 || thisIndex=""))
+      msgBeepTimer(((abandonAll=1) ? "Selection" : "Counting") " stopped: the row keeps its previous values")
 }
 
 BTNcountFilesDynaFolders() {
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewDynas
-   RowNumber := LV_GetNext(0, "F")
+   RowNumber := getFocusedOrFirstSelectedRow()
    LV_GetText(folderu, RowNumber, 3)
-   LV_GetText(onDisk, RowNumber, 7)
    LV_GetText(isR, RowNumber, 2)
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
@@ -97000,20 +97047,32 @@ BTNcountFilesDynaFolders() {
 
    ToolTip, Identifying matching files
    setImageLoading()
-   thisSelIndex := thisIndex := 0
+   thisIndex := countDynaFolderFiles(folderu, !InStr(isR, "R"), thisSelIndex)
+   ToolTip
+   ResetImgLoadStatus()
+   If (thisIndex="")
+      Return msgBeepTimer("Counting stopped: the row keeps its previous values")
+
+   uiDynaRowCounts(RowNumber, thisIndex, thisSelIndex)
+   Return thisIndex
+}
+
+countDynaFolderFiles(folderu, folderAlone, ByRef selected) {
+; counts the files a seed folder indexes and the selected ones; blank when stopped.
+; With a files filter on, it counts the whole index: the unfiltered list, whose entries
+; the filtered one shares, or, in a database filtered by a query, the database itself,
+; the selection being then in the filtered list alone
    folderu := Format("{:L}", StrReplace(folderu, "|"))
-   folderAlone := InStr(isR, "R") ? 0 : 1
+   sqlCount := (StrLen(filesFilter)>1 && SLDtypeLoaded=3 && InStr(filesFilter, "SQL:query:")) ? 1 : 0
+   useBckp := (StrLen(filesFilter)>1 && !sqlCount && bckpResultedFilesList.MaxIndex()) ? 1 : 0
+   selected := thisIndex := 0
    doStartLongOpDance()
-   startOperation := A_TickCount
-   Loop, % maxFilesIndex
+   Loop, % useBckp ? bckpMaxFilesIndex : maxFilesIndex
    {
       If (determineTerminateOperation()=1)
-      {
-         abandonAll := 1
-         Break
-      }
+         Return
 
-      imgPath := StrReplace(resultedFilesList[A_Index, 1], "|")
+      imgPath := StrReplace(useBckp ? bckpResultedFilesList[A_Index, 1] : resultedFilesList[A_Index, 1], "|")
       If !imgPath
          Continue
 
@@ -97025,20 +97084,22 @@ BTNcountFilesDynaFolders() {
       If isIn
       {
          thisIndex++
-         If resultedFilesList[A_Index, 2]
-            thisSelIndex++
+         If (useBckp ? bckpResultedFilesList[A_Index, 2] : resultedFilesList[A_Index, 2])
+            selected++
       }
    }
 
-   ToolTip
-   LV_Modify(RowNumber, "Col4", thisIndex)
-   LV_Modify(RowNumber, "Col5", thisSelIndex)
-   diffu := (onDisk!="" && thisIndex!="") ? onDisk - thisIndex : 0
-   perc := thisIndex ? Round((Round(thisSelIndex)/thisIndex)*100, 1) : 0
-   LV_Modify(RowNumber, "Col6", perc)
-   LV_Modify(RowNumber, "Col8", diffu)
-   ResetImgLoadStatus()
+   If sqlCount
+      thisIndex := getTotalIMGsSQLdb("WHERE " SQLfolderMatchClause((folderAlone ? "|" : "") folderu))
    Return thisIndex
+}
+
+uiDynaRowCounts(RowNumber, filez, selected) {
+; «Difference» stays empty until the files on disk are counted
+   LV_GetText(onDisk, RowNumber, 7)
+   perc := filez ? Round((Round(selected)/filez)*100, 1) : 0
+   LV_Modify(RowNumber, "Col4", filez, selected, perc)
+   LV_Modify(RowNumber, "Col8", (onDisk!="") ? onDisk - filez : "")
 }
 
 BTNcopyDynaFoldersList() {
@@ -99100,6 +99161,8 @@ uiPopulateDynamicFolderzList() {
        If !isInRange(A_Index, 2, 3)
           LV_ModifyCol(A_Index, "Integer")
     }
+    LV_ModifyCol(6, "Float")
+    LV_ModifyCol(9, "Float")
 
     Loop, Parse, listu, `n
     {
