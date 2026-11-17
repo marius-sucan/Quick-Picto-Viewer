@@ -64,6 +64,15 @@ rules `2659559` then refuses a new path that the seed folders list holds, one th
 scanned with its subfolders covers, and, for an entry scanned with its subfolders, one that would
 cover another seed folder. The note on finding 9 gives the lines at `2659559`.
 
+**The small things, 2026-11-17, at `53422a3`**, with Marius's answers (decisions 18 to 21):
+every point of section 15 is fixed, each in a commit of its own, `e1814dc` to `53422a3`. The menu
+uses each letter once; the panel's texts say seed folders; F1 opens a help box, also from the
+menu, and works in both folder panels with no row selected, as Insert now does in this one; the
+add dialog asks for one folder; «Rescan all», and the folders list panel's «Regenerate entire
+index», ask before they start; private mode lists one row per seed folder; «Recursive folder
+scan» keeps the folder's row selected; Alt+right-click deselects the folder's files without
+opening the menu, in both folder panels. Section 15 gives the lines at `53422a3`.
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -97,7 +106,7 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `2659559` |
+| # | Finding | Harm | Checked | Status at `53422a3` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
@@ -113,7 +122,7 @@ as «É» or «Ș».
 | 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | **fixed**, `b55b247`: the whole index, a stopped count kept, the row refreshed, decimals sorted (decisions 14 to 16) |
 | 13 | «Remove»: the entry is gone before the question, which has no «Cancel»; the box shows the internal `\|` | low | run, read | **fixed** by `1e1c2b6`, with finding 3 |
 | 14 | «Paste list»: a trailing separator makes an entry that matches none of its files; a quoted path is dropped without a word | low | run | **fixed**: a trailing separator trimmed (`592628d`); quoted paths taken, the list marked only when it changed, a message on the rescan (`2400d23`, decision 17) |
-| 15 | Small things | low | run, read | **partly fixed**: the remove box is «Remove seed folder» (`1e1c2b6`) |
+| 15 | Small things | low | run, read | **fixed**: the remove box in `1e1c2b6`, the other points in `e1814dc` to `53422a3`, one commit each (decisions 18 to 21) |
 
 ---
 
@@ -1006,37 +1015,86 @@ Batch C gives the lines of `98ea716` but at C6 (the message about the folder add
 
 ## 15. Small things
 
-Marks, at `2659559`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
+Marks, at `53422a3`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark. Each point
+ends with what the code does now, lines at `53422a3`; «at `ef8fe8c`» gives what the same step
+did before the fixes.
 
-- ○ **Menu letters** (run, batch A3, the menu's labels): `&R` on «Rescan folder», «Recursive
-  folder scan» and «Remove folder from this list»; `&C` on «Copy this folder path as text» and
-  both «Count…» items. The letter then moves between the items instead of choosing one.
-- ◐ `1e1c2b6` **Names.** The rename box is titled «Rename static folder entry» (run, batch E4,
-  :97887); «Copy list» says «Dynamic folders list copied to clipboard» (:96962); the remove box
-  was «Remove dynamic folder» (:97032), «Remove seed folder» since `1e1c2b6`. The panel calls
-  them seed folders.
-- ○ **F1** does nothing in this panel; the folders list panel opens its help (:97220-97224;
-  read).
-- ○ **Insert** («Add») is refused when no row is selected: the row test comes before the keys
-  (:97217; read). An empty seed folders list cannot be filled by key.
-- ○ **The add dialog** says «Add new folder(s) to the list» (:66423) and takes one folder
-  (read).
-- ○ **«Rescan all»** starts at once, next to «Remove» (the folders list audit, note B).
-- ○ **Private mode** lists one more row than there are seed folders: the masking replaces the
-  path before the test that skips empty lines (:98807-98808). Run (batch H2): one seed folder,
-  two rows. F5 and Delete + «Yes» there change nothing; the panel warns that it malfunctions
-  in private mode.
-- ○ **After «Recursive folder scan»** the table is filled again and no row is selected (read,
-  :98796).
-- ○ **Alt+right-click** deselects the folder's files and opens the menu too: the window's
-  right-click handler has no Alt test (:25954), as the folders list audit's finding 29 found
-  for that panel; the handler is shared (read).
+- ✅ `e1814dc` **Menu letters** (run, batch A3, the menu's labels): `&R` on «Rescan folder»,
+  «Recursive folder scan» and «Remove folder from this list»; `&C` on «Copy this folder path as
+  text» and both «Count…» items. The letter then moves between the items instead of choosing
+  one. **Fixed**: «Rec&ursive folder scan», «Re&move folder from this list», «Count &indexed
+  files in folder» and «Count files in folder found on dis&k» (:94236-94252), Marius's letters
+  (decision 19). Run (batch V15, V1): the menus of a row scanned with its subfolders, a file
+  selected, of a `|` row and of no row use each letter once (at `ef8fe8c`: `r` and `c` on three
+  items each).
+- ✅ `1e1c2b6`, `a87a8b1` **Names.** The rename box is titled «Rename static folder entry» (run,
+  batch E4, :97887); «Copy list» says «Dynamic folders list copied to clipboard» (:96962); the
+  remove box was «Remove dynamic folder» (:97032), «Remove seed folder» since `1e1c2b6`. The
+  panel calls them seed folders. **Fixed**, Marius's wording (decision 21): from this panel the
+  rename box is «Rename seed folder entry» (`PanelRenameStaticFolder()` :98255), the folders
+  list panel's keeps its title; «Copy list» says «Seed folders list copied to clipboard», or
+  «Failed to copy the seed folders list to the clipboard» (:97162, :97164); «Rescan all» on an
+  empty list warns «The seed folders list is empty» (`RegenerateEntireList()` :87828), as the
+  Search and Replace panel already does (:47068), also from the menu item and the folders list
+  panel's button, which run the same function. Run (V3, V4; W15, W4); the failure message is
+  read.
+- ✅ `aa2d80e` **F1** does nothing in this panel; the folders list panel opens its help
+  (:97220-97224; read). **Fixed** (decision 20): F1 opens a help box,
+  `BtnHelpDynaFoldersPanel()` (:94336), with the text Marius approved, and the menu ends with
+  «Help F1» (:94261), as the folders list panel's does. The list's handler tests F1 before the
+  row (`uiLVfolderzFilterListBTN()` :97459), so F1 now works with no row selected, in both
+  folder panels. Run (V1, V2, and W15, W1: the box with and without a row; at `ef8fe8c`
+  nothing, and nothing in the folders list panel without a row).
+- ✅ `f5ee2d8` **Insert** («Add») is refused when no row is selected: the row test comes before
+  the keys (:97217; read). An empty seed folders list cannot be filled by key. **Fixed**: Insert
+  is tested before the row (:97466). Run (V3): with no row selected, and on an empty seed
+  folders list, Insert opens the folder dialog (the kit logs its title and answers it with
+  nothing); at `ef8fe8c` nothing.
+- ✅ `6ebcbc8` **The add dialog** says «Add new folder(s) to the list» (:66423) and takes one
+  folder (read). **Fixed**: it says «Select the folder to add to the seed folders list»
+  (:66458), Marius's wording (decision 21), for «Add», Insert and the List menu's «Add seed
+  folder(s)», which open the same dialog. Run (V3, «Add» and Insert).
+- ✅ `fdb0461` **«Rescan all»** starts at once, next to «Remove» (the folders list audit, note
+  B). **Fixed**, Marius's answers (decision 18): «Rescan all» and the folders list panel's
+  «Regenerate entire index» call `BTNregenerateEntireList()` (:87783), which asks first, the box
+  titled after the button: «All N seed folders will be scanned again, to generate the files list
+  index anew. The files selection and any files filter are dropped. Do you want to continue?»,
+  «Yes» by default. «No» leaves the panel open and nothing changes. It does not ask when the
+  seed folders list is empty, which keeps its warning, nor for the favourites and history
+  lists, which a regeneration rebuilds otherwise. The List menu's «Regenerate the entire
+  list», the refresh of an opened folder and the «No files left» box's «Regenerate» start at
+  once, as before. A missing seed folder's question, «Keep», «Purge», «Cancel», follows a
+  «Yes». Only the question was asked for: a stopped rescan of a plain or .SLD list still leaves
+  the index shortened (the folders list audit, note B). Run (V5, W3; batches D, J, O and P, the
+  kit answering «Yes»).
+- ✅ `37df666` **Private mode** lists one more row than there are seed folders: the masking
+  replaces the path before the test that skips empty lines (:98807-98808). Run (batch H2): one
+  seed folder, two rows. F5 and Delete + «Yes» there change nothing; the panel warns that it
+  malfunctions in private mode. **Fixed**: the line is tested, then masked (:99300-99301). Run
+  (V6: two seed folders, two rows, three at `ef8fe8c`; H2: one row).
+- ✅ `ac87209` **After «Recursive folder scan»** the table is filled again and no row is selected
+  (read, :98796). **Fixed**: once the table is filled, the folder's row is selected, focused and
+  scrolled into view (`BtnToggleRecurseDynaFolder()` :97799-97807); the counts of every row are
+  still cleared, as after the panel's other actions, which open it again. Run (V7): the folder's
+  row each way, also when the folder, now scanned with its subfolders, makes the seed folder
+  inside it leave the table (at `ef8fe8c` no row).
+- ✅ `53422a3` **Alt+right-click** deselects the folder's files and opens the menu too: the
+  window's right-click handler has no Alt test (:25954), as the folders list audit's finding 29
+  found for that panel; the handler is shared (read). **Fixed**, in both folder panels: the
+  window's context-menu handler deselects the files itself when Alt is down and opens no menu
+  (`SettingsGUIAGuiContextMenu()` :25962); the list's handler no longer deselects on a
+  right-click. QPV's threads start critical, so the menu event waits for the list's handler to
+  end: a test of Alt there, after a deselection pass in the list's handler, would miss a key
+  released during a long pass. With no row selected nothing happens. Run (V8 and W2; the kit
+  stands in for the key, its reads replaced in the scratch copy): Alt held, the files deselected
+  and no menu (at `ef8fe8c` the menu too); Alt released after its first reading, the same (at
+  `ef8fe8c` the menu); no Alt, the menu, the selection kept.
 
 ## Seen in passing
 
 Not part of the panel's own code.
 
-Marks, at `2659559`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
+Marks, at `53422a3`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
 
 - ○ **A.** «Rescan folder» writes the folder part of the rescanned paths in lower case (`été\…`
   in batch A4), as the folders list audit's finding 24 (open): the seed folders list is stored
@@ -1160,7 +1218,8 @@ Marks, at `2659559`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow t
   `externalinvokedSettingsContextMenu()` (:25928, :25934; read).
 - The functions shared with the folders list panel act on this panel's list (run, batches B2
   and B3), as the folders list audit found.
-- With no row selected, the menu offers «View list as a folders tree» alone (run, batch A3).
+- With no row selected, the menu offers «View list as a folders tree» alone (run, batch A3);
+  since `aa2d80e`, «Help F1» after it (run, batch V15, V1).
 - «Rescan folder» on a reachable recursive entry clears its changed mark in the folders list
   of a cached .SLD list (run, batch G3).
 - Private mode: F5 and Delete + «Yes» change neither the index nor the seed folders list
@@ -1242,8 +1301,19 @@ Marks, at `2659559`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow t
 17. **The folders «Paste list» adds** (finding 14): ask to scan them, say they need a scan, or
     scan them at once? **Settled** (`2400d23`, Marius's answer): say it; the quotation marks
     are removed from the pasted text, as he asked.
+18. **«Rescan all»** (section 15): a question, or the button moved away from «Remove»? Which
+    buttons ask, and which answer does Enter give? **Settled** (`fdb0461`, Marius's answers): a
+    question only, asked by «Rescan all» and by the folders list panel's «Regenerate entire
+    index», «Yes» answering Enter.
+19. **The menu's letters** (section 15). **Settled** (`e1814dc`, Marius's choice): U, M, I and K.
+20. **F1** (section 15): a help box, with a menu item or without? **Settled** (`aa2d80e`,
+    Marius's choice): with «Help F1» at the end of the menu, and the text he approved.
+21. **The wording** (section 15). **Settled** (`a87a8b1`, `6ebcbc8`, Marius's choice):
+    «Rename seed folder entry», «Seed folders list copied to clipboard», «Failed to copy the
+    seed folders list to the clipboard», «The seed folders list is empty», «Select the folder to
+    add to the seed folders list».
 
-Suggested order at `f3fb044`: what is left of 15; seen in passing F and G.
+Suggested order at `53422a3`: seen in passing F and G.
 
 ## How this was checked
 
@@ -1315,6 +1385,8 @@ that one in this panel, its batch F).
 | Z14 | plain, database | for `2400d23`: quoted paths, one with a trailing separator, a `\|` inside or outside the quotes; F5 and F11 on the pasted `fifth`; the same lines again; two quoted folders and a path that is no folder; a line that is no folder; a database: its own folder, then a quoted new one |
 | D13 | database, cached .SLD, plain | for `f3fb044`: F2 on `pv` onto `merge`, whose `merge\gamma` holds an image; onto a folder not listed and onto `pv\moved`; a cached .SLD list whose folders list is not loaded, ticked and unticked; onto a row without images; a plain list without and with a folders list; a database folder whose images were erased |
 | S85 | plain, cached .SLD, database | for `2659559`: F2 onto a folder not on the disk; onto a seed folder, each kind onto each; into a seed folder scanned with its subfolders, into one scanned without them, into its own subfolder; onto the parent of the others; an entry inside a `\|` one, ticked and unticked; «Yes» on a cached .SLD list and in a database |
+| V15 | plain | for `e1814dc` to `53422a3`: the menu of a row scanned with its subfolders, a file selected, of a `\|` row, of no row; F1 with and without a row; Insert with no row and on an emptied seed folders list, «Add», then «Rescan all» on it; «Copy list», F2's box; «Rescan all» answered «No», «Yes», with one seed folder, with a missing one; private mode; «Recursive folder scan» each way, also over a seed folder inside; Alt+right-click with Alt held, released after its first reading, up |
+| W15 | plain, cached .SLD | for `aa2d80e`, `fdb0461` and `53422a3`, the folders list panel: F1 with no row; Alt+right-click as in V15; «Regenerate entire index» answered «No», «Yes»; F2's box on a cached .SLD list |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -1447,6 +1519,34 @@ committed as tested, compared byte for byte), and the folders list kit's D2, H, 
 SG3 likewise; the note on finding 9 gives what they show. The text loads with AutoHotkey_H and
 stock AutoHotkey 1.1.37 (`/iLib`). Not run: Windows; the other batches on the text of
 `2659559`.
+
+**Runs of the small things**, 2026-11-17. The kit was copied to
+`.claude/scratch/seed-folders-15-2026-11-17/`: `app/` as before, plus `seed-part7.ahk` for
+batches V15 and W15 (joined by `build-wrappers.sh`). `patch.py` also turns the folder dialog
+into a log line, which answers with nothing, and sends every `GetKeyState("Alt", "P")` of the
+scratch copy through `tsAltP()`: a batch holds Alt, releases it after its first reading, or
+leaves it up, and the log names the function that read it. `tsClick()` answers the question of
+«Rescan all» and «Regenerate entire index» «Yes» when the text asks it, so the older batches
+run on both texts; V15 and W15 answer it themselves. `snap7/` holds `head.ahk` (`ef8fe8c`) and
+`t1.ahk` to `t9.ahk`, made from it by `mkfix15.py` (next to `app/`), each committed as tested
+(compared byte for byte): `e1814dc` to `53422a3`. V15, W15 and the batches that reach the
+changed code, A, C, D, G, H, J, O, P and Y8, ran on `ef8fe8c` (logs `*-h15`; V15 and W15
+`*-h15b`) and on the text of `53422a3` (`*-f15`; `*-f15b`). `compare.sh h15 f15` compares the
+older ones:
+
+- G and Y8 give the same lines;
+- A, C, D, H, J, O and P differ only where the fixes act: the menu's letters and «Help F1», the
+  message of «Copy list», the rename box's title, one row fewer in private mode, and the
+  question before each «Rescan all», answered «Yes»; the scans, the answers «Keep», «Purge»
+  and «Cancel» that follow, the saves and the database tables give the same lines;
+- A's F11, F10, F3, F5 and Delete, which the list's handler now tests after F1 and Insert, give
+  the same lines.
+
+V8 starts from a fresh list: on `ef8fe8c` V7 leaves `pv` scanned without its subfolders, its
+second toggle finding no row selected. All nine texts load with AutoHotkey_H and stock
+AutoHotkey 1.1.37 (`/iLib`), and AutoHotkey_H loads each in full. Not run: Windows; a real Alt
+key and the real folder dialog; the favourites and history lists, for which «Rescan all» does
+not ask (read).
 
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.

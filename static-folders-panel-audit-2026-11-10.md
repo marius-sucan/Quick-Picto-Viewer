@@ -55,6 +55,12 @@ its findings 1 and 5). Both notes cite lines at `4de06dd`. The other findings we
 checked again: commits of that audit also touch finding 10, the folders list rows that do
 not follow the index (`0ab5622`, `caa77ef`, `20d9d3b`), which this report does not record.
 
+**And at `53422a3` (2026-11-17)**, by commits made for section 15 of the seed folders panel
+audit: finding 29 is fixed (`53422a3`), and «Seen in passing» B partly (`fdb0461`): the panel's
+«Regenerate entire index» asks first. F1 also opens the panel's help with no row selected
+(`aa2d80e`); with none it did nothing, which this audit did not note. Both notes cite lines at
+`53422a3`.
+
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
 `f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585`,
@@ -101,7 +107,7 @@ more, SG, SG2 and SG3.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `1451bad`; 14 at `4de06dd` |
+| # | Finding | Harm | Checked | Status at `1451bad`; 14 at `4de06dd`; 29 at `53422a3` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -131,7 +137,7 @@ more, SG, SG2 and SG3.
 | 26 | «%» and «Size (MB)» are sorted as whole numbers | low | run | **fixed**, `f88e4be` |
 | 27 | F3 on a row that was not counted yet needs two presses | low | run | **fixed**, `f88e4be` |
 | 28 | Actions on a folder that is missing from the disk say nothing; «Set as the protected folder» protects another folder | low | run | **partly fixed**, `2c501dc`, `20d58f9` and `596a886`: five of the six actions answer |
-| 29 | Alt+right-click deselects the files and opens the menu too | low | run | open |
+| 29 | Alt+right-click deselects the files and opens the menu too | low | run | **fixed**, `53422a3` |
 | 30 | Small things | low | run, read | **partly fixed**, `2c501dc`, `2dde55b` and `40bc347`: four of the fifteen points |
 
 Findings 1, 2 and 3 defeat what the panel is for. Finding 1 needs a database and one menu
@@ -1315,6 +1321,17 @@ files; the second one has no Alt test, so the menu opens afterwards.
 
 Correction: return from the context-menu handler while Alt is down.
 
+**Fixed in `53422a3`**, made for section 15 of the seed folders panel audit, in both folder
+panels: the context-menu handler deselects the files itself when Alt is down and opens no menu
+(`SettingsGUIAGuiContextMenu()` :25962); the list's handler no longer deselects on a
+right-click (`uiLVfolderzFilterListBTN()` :97445). The correction above would read the key
+only once the deselection in the list's handler had ended: QPV's threads start critical, so
+the menu event waits for it, and on a large index Alt may be up by then. With no row selected
+nothing happens. Run in the seed folders kit (batch W15, step W2; the kit stands in for the
+key, its reads replaced in the scratch copy): Alt held, the three selected files of `Alpha`
+deselected and no menu (at `ef8fe8c` the menu too); Alt released after its first reading, the
+same (at `ef8fe8c` the menu); no Alt, the menu, the selection kept.
+
 ## 30. Small things
 
 - **The filter row is 17 pixels wider than the table** (run, batch J): the box is the
@@ -1760,7 +1777,14 @@ Not part of the panel's own code.
   the same memory block to the clipboard under two formats («DropEffectFolderList» and
   «Preferred DropEffect»). The clipboard owns a block once it is set (read).
 - **B.** `RegenerateEntireList()` starts at once, without a question. On a plain or .SLD
-  list the index is emptied first, so a stop leaves a shortened index (read).
+  list the index is emptied first, so a stop leaves a shortened index (read). **Partly fixed
+  in `fdb0461`**, made for the seed folders panel audit (its section 15, Marius's answers): this
+  panel's «Regenerate entire index», as the seed folders panel's «Rescan all», asks first,
+  «Yes» answering Enter (`BTNregenerateEntireList()` :87783); «No» leaves the panel open. The
+  List menu's «Regenerate the entire list» starts at once, and a stop still leaves a shortened
+  index: only the question was asked for. Run in the seed folders kit (batch W15, step W3):
+  «No», the panel open and the index unchanged; «Yes», the file added on the disk indexed (at
+  `ef8fe8c` no question).
 - **C.** After the rename of finding 16 the index holds the new folder as it was typed
   (`pv\BetaNew`) while the database holds it in lower case (run, batch D2). Settled for
   this rename by `55b2a24`: in a database the new path is written in lower case, in the
