@@ -47,6 +47,14 @@ The points N1 to N10 are under «New with the fixes»: what a fix changed beside
 finding. At `1451bad`, N1 to N6, N8 and N9 are fixed (N5 in a database only, Marius's
 choice), N7 is partly fixed, and N10 is open, of low harm.
 
+**Since then, at `4de06dd` (2026-11-17).** Finding 14 is fixed, by `26c47e1` (2026-11-13,
+Marius's answer to decision 2): «Rescan folder(s)» asks first before it removes the entries
+of a folder that is not on the disk. «Seen in passing» D is fixed, by `fe812ec` and
+`592628d`, made for the seed folders panel audit (`seed-folders-panel-audit-2026-11-15.md`,
+its findings 1 and 5). Both notes cite lines at `4de06dd`. The other findings were not
+checked again: commits of that audit also touch finding 10, the folders list rows that do
+not follow the index (`0ab5622`, `caa77ef`, `20d9d3b`), which this report does not record.
+
 A fixed or partly fixed section ends with a note on what the code does now. Each note
 names the commit whose lines it cites: `54a0666` (the merge commit that follows
 `f88e4be`), `1813ca9`, `2c501dc`, `c389116`, `bb82c4c`, `4ac0e69`, `2da1585`,
@@ -93,7 +101,7 @@ more, SG, SG2 and SG3.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `1451bad` |
+| # | Finding | Harm | Checked | Status at `1451bad`; 14 at `4de06dd` |
 |---|---------|------|---------|---------------------|
 | 1 | Database: «Regenerate this folders list» does not bring the panel back and leaves the main window deaf to keys, clicks and menus | high | run | **fixed**, `f88e4be` |
 | 2 | «Rescan folder(s)» never clears the changed mark: the dates it gathers are not used | high | run | **fixed**, `f88e4be` and `2c501dc` |
@@ -108,7 +116,7 @@ more, SG, SG2 and SG3.
 | 11 | Ctrl+A on a freshly opened panel leaves every action dead | medium | run, Wine | **fixed**, `36d4b89` |
 | 12 | F3 on two or more folders drops the files selection | medium | run | **fixed**, `36d4b89`: it asks first (decision 4), when `askAboutFilesSelect()` asks: since `2dde55b`, 25 or more files selected in a list of more than 150, with 25 or more left out |
 | 13 | A stopped «Count files per folders» leaves zeros that pass as counts | medium | run | open |
-| 14 | «Rescan folder(s)» on a folder that cannot be reached removes its entries, in a database with their cached data, without a word | medium, a decision | run | open |
+| 14 | «Rescan folder(s)» on a folder that cannot be reached removes its entries, in a database with their cached data, without a word | medium, a decision | run | **fixed**, `26c47e1`: it asks first (decision 2) |
 | 15 | Database: after «Rescan folder(s)» the image in the viewport is no longer the current file | medium | run | **fixed**, `eed5422`: one random image once the rescan ends, on every kind of list (decision 3) |
 | 16 | F2 in a database opens the rename the menu leaves out; the folders list is not updated | medium | run | **fixed**, `55b2a24`: the rename works in a database (decision 6) |
 | 17 | Private mode marks every folder as changed; a missing folder is dated today | medium | run | **partly fixed**, `f88e4be`: a missing folder is still dated today |
@@ -786,6 +794,32 @@ Correction: decision 2.
 Open at `bb82c4c`: the entries are removed as before (run, batches J and Q). Since
 `17d90dd` the folder keeps its row in the folders list, with its recorded date and the
 changed mark, so the rescan can be run again once the folder is back (N6, fixed).
+
+**Fixed in `26c47e1`** (2026-11-13), by Marius's answer to decision 2: «Rescan folder(s)»
+(`BTNupdateSelectedStaticFolder()` :98759 at `4de06dd`) asks first. When every highlighted
+folder is missing: «Yes» or «No» (:98835), «Yes» by default. When some are: «Rescan all»,
+«Skip missing» or «Cancel» (:98820), «Skip missing» by default, which rescans the folders
+found and leaves the missing ones with their entries. The question says that the images
+indexed directly in a missing folder leave the index and that those of its subfolders stay.
+His `428fcca` brought the question; `26c47e1`, at his request, corrected its text and added
+«Skip missing». The folder keeps its row in the folders list, with its recorded date and
+the changed mark (N6).
+
+Run (batch RP, on the text of `26c47e1`, log `rp-fix4`, and again on `98ea716`, where the
+function differs only by two blank lines, log `rp-b17`, with the same lines; `Beta` and
+`Gamma` moved away, a file added to `Alpha` on the disk):
+
+- `Beta` alone, «No»; `Beta` and `Gamma`, «No»: the entries stay (RP1, RP2);
+- `Alpha` and `Beta`, «Cancel»: nothing changes; «Skip missing»: `Alpha` gains its new file,
+  `Beta` keeps its two entries (RP3, RP4);
+- `Alpha`, `Beta` and `Gamma`, «Rescan all»: the entries of `Beta` and `Gamma` leave the
+  index (RP5);
+- a database, `Beta` moved away, a file added to `Gamma`: «Skip missing» keeps the two rows
+  of `Beta` in `images` and adds the new file of `Gamma`; «Rescan all» removes the rows of
+  `Beta` (RP7, RP8).
+
+Still so: the question for one missing folder also comes when its entries are gone already
+(RP6, run); the rescan then has nothing to remove.
 
 ## 15. Database: after «Rescan folder(s)» the viewport shows an image that is no longer current
 
@@ -1728,6 +1762,14 @@ Not part of the panel's own code.
   `DF1=p:`; after it is loaded the seed folders list is empty. Also (read):
   `RegenerateEntireList()` answers «No list of dynamic folders found» for a list of
   under four characters and skips a seed folder of under four (:87216, :87237).
+  **Fixed in `fe812ec` and `592628d`** (findings 1 and 5 of the seed folders panel audit),
+  lines at `4de06dd`: `OpenSLD()` takes a first seed folder of two characters (:2548), a
+  database keeps a drive root in its `dynamicfolders` table, and `RegenerateEntireList()`
+  takes a list and a seed folder of two characters (:87794, :87859; read here, run in that
+  audit's batch P). Run (batch R on `4de06dd`, log `r-z17`): the list of the drive root,
+  saved and loaded again, has the seed folder `p:`, as a cached .SLD list and as a database
+  (none in `r-f16`, the log of the text of `55b2a24`); the other lines of the batch are
+  those of `r-f16`.
 - **E.** In a database a files selection does not survive any files filter. A filter on a
   path or a property builds the index again from an SQL query (`BtnIndexStatsToList()`,
   which also sets `markedSelectFile` to 0, :28614 at `2da1585`), and removing a filter
@@ -1830,7 +1872,9 @@ Not part of the panel's own code.
    filter on, the folders that are not listed are left alone (`1813ca9`, Marius's answer).
    «Ignore date change» covers the highlighted rows alone (`f88e4be`).
 2. **A rescanned folder that cannot be reached**: skip it, ask first, or remove its
-   entries as now?
+   entries as now? **Settled: ask first** (`26c47e1`, Marius's answers, 2026-11-13): «Yes»
+   or «No» when every highlighted folder is missing, «Rescan all», «Skip missing» or
+   «Cancel» when some are.
 3. **After a rescan**, which image: the one that was shown, when it is still in the index;
    a random one, as the other lists do now; or the first? «Erase files from the index»
    shows a random one again since `c389116` (N1). The question stands for the database
@@ -1995,6 +2039,10 @@ Suggested order, at `1451bad`: what is left of 9 (the first opening, one selecte
   loads on stock AutoHotkey 1.1.37.02 (a load check). The kit's `seen-g/` folder holds the
   script that made both copies (`fix_g.py`), their diffs, and `loadcheck.sh`, which runs
   that load check.
+- On 2026-11-17, for finding 14 and «Seen in passing» D: batch RP, written on 2026-11-13
+  for `26c47e1`, ran again on `98ea716` and gave the lines of its log on the text of
+  `26c47e1`; batch R ran on `4de06dd` and differs from its log on the text of `55b2a24` in
+  the two lines that hold D.
 - Not run on Windows. One finding rests on how Windows behaves: that a freshly filled
   list view has no focused row (11); its fix works either way. The layout figures of
   finding 30 come from widths the script sets itself.
@@ -2023,7 +2071,9 @@ Suggested order, at `1451bad`: what is left of 9 (the first opening, one selecte
   `y-f16b`, `z-f16b` and `z-558b` are Y and Z with their added steps, those ending in
   `-e6a` are the ones of `e6abbc6`, those ending in `-v3` the ones of the text of `1451bad`,
   and `sg2-v2` and `sg3-v2` are SG2 and SG3 on the copy with `renameStaticFolderSQLdb()`
-  as it was);
+  as it was; `rp-fix4` is batch RP on the text of `26c47e1`; those ending in `-b17` are the
+  ones of `98ea716`, those ending in `-z17` the ones of `4de06dd`, whose script is that of
+  `2400d23`);
   `run-all.sh <suffix> <revision> [batches]` runs the batches with the drive `P:` mapped
   for Q, R and SG3.
 
@@ -2058,3 +2108,4 @@ Suggested order, at `1451bad`: what is left of 9 (the first opening, one selecte
 | SG | after `e6abbc6`, a database, the Search and replace panel with «Current files list» and «Modify folder paths only», each new folder inside the old one: a folder without subfolders; onto a subfolder that holds images; onto one that holds an image of the same name; three levels that each hold an image of the same name; both paths typed with a trailing separator. Then the seed folders panel's rename of the seed folder into a subfolder of it, answered «Yes», and the database opened again. After each step, the files of each folder in the index and in the `images` table |
 | SG2 | after `e6abbc6`, a database with recorded dates of their own, captions and an audio note: «Rename index entry» into a subfolder of the renamed folder, propagated on a folder without subfolders and over three levels that each hold an image of the same name, then unticked; the database opened again |
 | SG3 | after `e6abbc6`, a drive root, with a drive `P:` mapped for the run: a database made from it, a caption on two images, the root renamed into its subfolder `p:\a`, propagated; the database opened again |
+| RP | after `428fcca` and `26c47e1`. Plain folder, `Beta` and `Gamma` moved away, a file added to `Alpha`: «Rescan folder(s)» on `Beta` answered «No»; on `Beta` and `Gamma`, «No»; on `Alpha` and `Beta`, «Cancel», then «Skip missing»; on all three, «Rescan all»; on `Beta` again, its entries gone, «Yes». Database, `Beta` moved away, a file added to `Gamma`: «Skip missing», then «Rescan all», the `images` table after each |
