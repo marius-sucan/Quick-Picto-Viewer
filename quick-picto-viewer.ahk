@@ -94199,23 +94199,23 @@ invokePanelDynaFoldersContextMenu() {
    {
       kMenu("PanelDynaMenu", "Add", "&Jump to first indexed file in folder`tEnter", "BtnPanelStaticJumpFirst")
       kMenu("PanelDynaMenu", "Add", "&Rescan folder`tF5", "BTNrescanDynaFolder")
-      kMenu("PanelDynaMenu", "Add/UnCheck", "&Recursive folder scan", "BtnToggleRecurseDynaFolder")
+      kMenu("PanelDynaMenu", "Add/UnCheck", "Rec&ursive folder scan", "BtnToggleRecurseDynaFolder")
       If InStr(r, "R")
-         kMenu("PanelDynaMenu", "Check", "&Recursive folder scan")
+         kMenu("PanelDynaMenu", "Check", "Rec&ursive folder scan")
 
       Menu, PanelDynaMenu, Add
       kMenu("PanelDynaMenu", "Add", "&Open folder", ":PVopenF")
       kMenu("PanelDynaMenu", "Add", "&Select files`tAlt+L-Click", "BTNselFilesStaticFolder")
       kMenu("PanelDynaMenu", "Add", "&Deselect files`tAlt+R-Click", "BTNunselFilesStaticFolder")
-      kMenu("PanelDynaMenu", "Add", "&Remove folder from this list`tDelete", "BTNremDynaSelFolder")
+      kMenu("PanelDynaMenu", "Add", "Re&move folder from this list`tDelete", "BTNremDynaSelFolder")
       kMenu("PanelDynaMenu", "Add", "Rename inde&x entry`tF2", "PanelRenameStaticFolder")
       kMenu("PanelDynaMenu", "Add/UnCheck", "Set as the &protected folder", "BtnPanelManageFoldersProtect")
       If (Format("{:L}", protectedFolderPath)=Format("{:L}", folderPath) && preventDeleteFromProtectedPath=1)
          kMenu("PanelDynaMenu", "Check", "Set as the &protected folder")
 
       kMenu("PanelDynaMenu", "Add", "&Copy this folder path as text", "BTNcopyStaticFolderPath")
-      kMenu("PanelDynaMenu", "Add", "&Count indexed files in folder`tF11", "BTNcountFilesDynaFolders")
-      kMenu("PanelDynaMenu", "Add", "&Count files in folder found on disk`tF10", "BTNcountFilesDiskDynaFolder")
+      kMenu("PanelDynaMenu", "Add", "Count &indexed files in folder`tF11", "BTNcountFilesDynaFolders")
+      kMenu("PanelDynaMenu", "Add", "Count files in folder found on dis&k`tF10", "BTNcountFilesDiskDynaFolder")
       Menu, PanelDynaMenu, Add
       kMenu("PanelDynaMenu", "Add", "&Filter list to selected folder`tF3", "MenuFilterListSelectedFolder")
       If markedSelectFile
