@@ -99279,9 +99279,12 @@ uiPopulateDynamicFolderzList() {
     Loop, Parse, listu, `n
     {
         statusu := InStr(A_LoopField, "|") ? "" : "R"
-        line := (userPrivateMode=1) ? "*:\*****\********\" :  Trimmer(A_LoopField)
+        line := Trimmer(A_LoopField)
         If (StrLen(StrReplace(line, "|"))<2)
            Continue
+
+        If (userPrivateMode=1)
+           line := "*:\*****\********\"
 
         counteru++
         LV_Add(A_Index, counteru, statusu, StrReplace(line, "|"))
