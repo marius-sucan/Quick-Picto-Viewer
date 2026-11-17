@@ -97791,6 +97791,15 @@ BtnToggleRecurseDynaFolder() {
     ; ToolTip, % newFoldersList , , , 2
     msgBeepTimer("You need to rescan the folder for the effect to take place", 0)
     uiPopulateDynamicFolderzList()
+    Loop, % LV_GetCount()
+    {
+        LV_GetText(thisFolder, A_Index, 3)
+        If (thisFolder=folderuz)
+        {
+           LV_Modify(A_Index, "Select Focus Vis")
+           Break
+        }
+    }
 }
 
 coreRescanDynaFolder(dynaEntry) {
