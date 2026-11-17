@@ -66285,7 +66285,7 @@ wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0, noRa
     {
        FileReadLine, firstLine, % CurrentSLD, 1
        IniRead, tstSLDcacheFilesList, % CurrentSLD, General, SLDcacheFilesList, @
-       If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1 || InStr(folderu, "|"))
+       If (!InStr(firstLine, "[General]") || tstSLDcacheFilesList!=1)
           good2go := "null"
     } Else good2go := "null"
 
