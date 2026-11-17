@@ -98236,15 +98236,21 @@ PanelRenameStaticFolder() {
       If (SLDtypeLoaded=3)
          newFileName := Format("{:L}", newFileName)
 
-      If (winOpen=2)
+      ; the seed folders panel moves the rows of the subfolders whatever the tick, and its folders list may not be loaded yet
+      If (winOpen=3 && SLDtypeLoaded=3)
       {
-         takenPath := findTakenStaticFolderPath(folderu, newFileName, doPropagate)
-         If takenPath
-         {
-            msgBeepTimer("WARNING: The folder is already in the folders list:`n" takenPath)
-            SetTimer, PanelRenameStaticFolder, -300
-            Return
-         }
+         PopulateStaticSQLfolderzList()
+         Tooltip
+      } Else If (winOpen=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
+         LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
+
+      takenPath := findTakenStaticFolderPath(folderu, newFileName, (winOpen=3) ? 1 : doPropagate)
+      If takenPath
+      {
+         msgu := "This folder is in the folders list already:`n" takenPath "\`n`nThe rename would put the folders list rows of «" folderu "\» in place of the rows already there, and the dates recorded for them would be lost.`n`nType a path that the folders list does not hold yet. If the images were moved into that folder on the disk, rescan the seed folder that covers it instead."
+         msgBoxWrapper(appTitle ": Folder already listed", msgu, 0, 0, "exclamation")
+         SetTimer, PanelRenameStaticFolder, -300
+         Return
       }
 
       BtnCloseWindow()
