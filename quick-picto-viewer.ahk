@@ -66446,7 +66446,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       SelectImg := givenPath
    } Else If (externMode!="yes")
    {
-      SelectImg := openFoldersDialogWrapper(prevOpenFolderPath, "Add new folder(s) to the list")
+      SelectImg := openFoldersDialogWrapper(prevOpenFolderPath, "Select the folder to add to the seed folders list")
       If !Trim(SelectImg)
          Return "cancel"
    }
