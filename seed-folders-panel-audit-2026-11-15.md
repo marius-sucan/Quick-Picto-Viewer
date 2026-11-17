@@ -57,6 +57,13 @@ entry» refuses a new path whose folder the folders list holds already, as the f
 panel's does, and both panels now say why in a message box; the note on finding 9 gives the
 lines at `f3fb044`.
 
+**The rename's rules, 2026-11-17, at `2659559`**: Marius's `85eb185` replaced the check of
+`f3fb044`: this panel's rename is checked against the seed folders list, not the folders list,
+and both panels show their refusal as a warning line again, without the message box. By his
+rules `2659559` then refuses a new path that the seed folders list holds, one that a seed folder
+scanned with its subfolders covers, and, for an entry scanned with its subfolders, one that would
+cover another seed folder. The note on finding 9 gives the lines at `2659559`.
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -90,7 +97,7 @@ as «É» or «Ș».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `f3fb044` |
+| # | Finding | Harm | Checked | Status at `2659559` |
 |---|---------|------|---------|---------------------|
 | 1 | A .SLD list loses every `\|` entry: right after a save, and for good at the next save; an uncached list never scans them | high | run | **fixed**, `fe812ec` |
 | 2 | A missing folder is dropped from the seed folders list by a save, by «Paste list» and by every rewrite of a database's list | high | run | **fixed**, `32c435d`: kept; «Rescan all» and «Rescan folder» ask to keep or purge it (decision 1) |
@@ -100,7 +107,7 @@ as «É» or «Ș».
 | 6 | The Save panel's «Manage folders» button does nothing; the panel's «Back» button is never shown | medium | run | **fixed**, `d05e990`: the panel opens, with «Back» (decision 6) |
 | 7 | The actions on a `\|` entry reach into its subfolders; «Difference» compares two different things | medium | run | **fixed**, `78120a1`: the files placed directly in the folder (decision 2) |
 | 8 | «Recursive folder scan» does not mark a .SLD list as modified: the change is lost without a question | medium | run | **fixed**, `ce1b5f8` |
-| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | **fixed**, `caa77ef`: the folders list follows the files, on a cached .SLD list too (decisions 11, 12); a path the folders list holds is refused since `f3fb044` (decision 13) |
+| 9 | Database: «Rename index entry» from this panel leaves the `staticfolders` table and the captions on the old paths; the folders list marks every renamed folder as changed | medium | run | **fixed**, `caa77ef`: the folders list follows the files, on a cached .SLD list too (decisions 11, 12); since `2659559` a path the seed folders list holds or covers is refused (decision 13, Marius's rules) |
 | 10 | A `\|` folder added or rescanned on a cached .SLD list gets no row in the folders list | low | run | **fixed**, `20d9d3b` |
 | 11 | «Rescan folder» on a missing folder deletes its entries, in a database with their cached data | medium, a decision | run | **fixed**, `32c435d`: it asks to keep or purge (decision 7); the folders list panel asks since `26c47e1` |
 | 12 | The count columns: «Difference» 0 for a folder never counted on disk, counts that follow a files filter, «Selected» not refreshed, «%» and «Size (MB)» sorted as whole numbers | low | run, read | **fixed**, `b55b247`: the whole index, a stopped count kept, the row refreshed, decimals sorted (decisions 14 to 16) |
@@ -693,12 +700,14 @@ Two cases:
 - a rename onto a folder that has rows already, as after two folders were merged on the disk
   (run, Y9.6): the moved rows replace them, with their own dates, so that folder's recorded
   date is lost (at `803a668` neither row set changed). The folders list panel's rename refuses
-  a path listed already (`findTakenStaticFolderPath()`); this panel's does not. Refused since
-  `f3fb044`, decision 13 below;
+  a path listed already (`findTakenStaticFolderPath()`); this panel's does not. Refused by
+  `f3fb044`, decision 13 below; since `85eb185` and `2659559` when the new folder is a seed
+  folder or a seed folder covers it;
 - a search and replace that fails for some files only: the rows and the captions follow (run,
   Y9.5b), seen in passing G.
 
-**Decision 13, `f3fb044`** (Marius's answers): the rename is refused at once, before anything
+**Decision 13, `f3fb044`** (Marius's answers; replaced by `85eb185` and `2659559`, below): the
+rename is refused at once, before anything
 changes, when the folders list holds a path that the seed folder or one of its subfolders would
 get, also when the files question would then be answered «No». The subfolders count whatever
 the tick, since their rows move in any case (:98247). The folders list is read first when it is
@@ -734,6 +743,52 @@ its folder part of the folders list, where the search and replace failed whole (
 for that image alone (Y9.5b) or replaced the recorded date (Y9.6). The other batches give the
 lines they gave; in the folders list kit the refusals of Y5, Z2 and Z5 show the message box in
 place of the warning line.
+
+**Since `85eb185` and `2659559`** (Marius's rules): Marius's `85eb185` took out the reading of
+the folders list and the message box; this panel's rename is checked against the seed folders
+list (`findTakenDynamicFolderPath()` :98345), and both panels show a warning line again. With
+`2659559` it goes, before anything changes:
+
+1. the new folder must be on the disk: «WARNING: Inexistent folder path provided»
+   (:98228-98230), as before;
+2. no entry the rename moves may get the path of a seed folder that stays, whether either is
+   scanned with its subfolders or not: «WARNING: The folder is already in the seed folders
+   list»;
+3. no seed folder scanned with its subfolders may hold the new path: «WARNING: The folder is
+   inside a seed folder scanned with its subfolders»;
+4. an entry scanned with its subfolders may not hold another seed folder at its new path: «WARNING:
+   The folder holds another seed folder, which this one, scanned with its subfolders, would
+   include». A seed folder scanned without its subfolders covers none, so it may be renamed onto
+   a parent of others.
+
+Each warning names the seed folder concerned, and the rename dialog comes back (:98240-98253).
+The entries inside the renamed one count as moved only when «Propagate the change to
+subfolders» is ticked, as the rename then moves them. Once the new path is taken, «Yes» to the
+search and replace moves the files and the folders list's rows, as before.
+
+Run on the text of `2659559` (batch S85; at `85eb185` in parentheses), the seed folders `pv`,
+`third`, `photos` (which holds `photos\sub`) and `lone\inner`, scanned with their subfolders,
+`other` and `lone`, scanned without them, and `newlone\inner`:
+
+- `pv` → `nowhere`, a folder not on the disk: refused (the same);
+- `pv` → `third`: refused (the same); `pv` → `other`, `other` → `third` and `other` → `lone`:
+  refused (renamed, the two entries then merged into one);
+- `other` → `photos\sub` and `third` → `photos\sub`: refused (renamed, then dropped from the
+  list, as `photos` covers them);
+- `third` → `lone\spare`, inside a folder scanned without its subfolders, and `pv` → `pv\Alpha`:
+  taken (the same);
+- `third` → the folder that holds the others: refused (taken, and the seed folders list kept
+  that folder alone);
+- `lone` → `newlone`, ticked: refused, as `lone\inner` would get the path of `newlone\inner`
+  (the same); unticked: taken, `lone\inner` keeps its path (refused);
+- «Yes» after a rename taken, on a cached .SLD list and in a database: the files and the
+  folders list's rows move (the same); in a database `pv` → `merge`, a seed folder: refused
+  (the same).
+
+Batches E, H and I give the lines of `85eb185`; Y9 and D13 differ in the words of the warning,
+and D13 also where `other` → `pv\EmptyNew` is now refused, `pv` covering it; U only in the
+random display. The folders list kit's D2, H, Y and Z give the same lines, SG2 and SG3 differ
+in the random display alone.
 
 ## 10. A `|` folder added or rescanned on a cached .SLD list gets no row in the folders list
 
@@ -951,27 +1006,29 @@ Batch C gives the lines of `98ea716` but at C6 (the message about the folder add
 
 ## 15. Small things
 
-- **Menu letters** (run, batch A3, the menu's labels): `&R` on «Rescan folder», «Recursive
+Marks, at `2659559`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
+
+- ○ **Menu letters** (run, batch A3, the menu's labels): `&R` on «Rescan folder», «Recursive
   folder scan» and «Remove folder from this list»; `&C` on «Copy this folder path as text» and
   both «Count…» items. The letter then moves between the items instead of choosing one.
-- **Names.** The rename box is titled «Rename static folder entry» (run, batch E4, :97887);
-  «Copy list» says «Dynamic folders list copied to clipboard» (:96962); the remove box was
-  «Remove dynamic folder» (:97032), «Remove seed folder» since `1e1c2b6`. The panel calls them
-  seed folders.
-- **F1** does nothing in this panel; the folders list panel opens its help (:97220-97224;
+- ◐ `1e1c2b6` **Names.** The rename box is titled «Rename static folder entry» (run, batch E4,
+  :97887); «Copy list» says «Dynamic folders list copied to clipboard» (:96962); the remove box
+  was «Remove dynamic folder» (:97032), «Remove seed folder» since `1e1c2b6`. The panel calls
+  them seed folders.
+- ○ **F1** does nothing in this panel; the folders list panel opens its help (:97220-97224;
   read).
-- **Insert** («Add») is refused when no row is selected: the row test comes before the keys
+- ○ **Insert** («Add») is refused when no row is selected: the row test comes before the keys
   (:97217; read). An empty seed folders list cannot be filled by key.
-- **The add dialog** says «Add new folder(s) to the list» (:66423) and takes one folder
+- ○ **The add dialog** says «Add new folder(s) to the list» (:66423) and takes one folder
   (read).
-- **«Rescan all»** starts at once, next to «Remove» (the folders list audit, note B).
-- **Private mode** lists one more row than there are seed folders: the masking replaces the
+- ○ **«Rescan all»** starts at once, next to «Remove» (the folders list audit, note B).
+- ○ **Private mode** lists one more row than there are seed folders: the masking replaces the
   path before the test that skips empty lines (:98807-98808). Run (batch H2): one seed folder,
   two rows. F5 and Delete + «Yes» there change nothing; the panel warns that it malfunctions
   in private mode.
-- **After «Recursive folder scan»** the table is filled again and no row is selected (read,
+- ○ **After «Recursive folder scan»** the table is filled again and no row is selected (read,
   :98796).
-- **Alt+right-click** deselects the folder's files and opens the menu too: the window's
+- ○ **Alt+right-click** deselects the folder's files and opens the menu too: the window's
   right-click handler has no Alt test (:25954), as the folders list audit's finding 29 found
   for that panel; the handler is shared (read).
 
@@ -979,67 +1036,72 @@ Batch C gives the lines of `98ea716` but at C6 (the message about the folder add
 
 Not part of the panel's own code.
 
-- **A.** «Rescan folder» writes the folder part of the rescanned paths in lower case (`été\…`
-  in batch A4), as the folders list audit's finding 24 (open): the seed folders list is
-  stored in lower case.
-- **B.** The folders list panel's «Set as the protected folder» hands over its own lower-case
-  path as well (`BtnPanelManageFoldersActus()` :97145-97146; the folders list is stored in
-  lower case), so finding 4's protection failure applies there too (read). Fixed with finding
-  4 in `7c031cb`: the tests compare in lower case, whichever menu set the folder.
-- **C.** `cleanDynamicFoldersList()` (:87694) drops every entry inside a recursive one. After
+Marks, at `2659559`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
+
+- ○ **A.** «Rescan folder» writes the folder part of the rescanned paths in lower case (`été\…`
+  in batch A4), as the folders list audit's finding 24 (open): the seed folders list is stored
+  in lower case.
+- ✅ `7c031cb` **B.** The folders list panel's «Set as the protected folder» hands over its own
+  lower-case path as well (`BtnPanelManageFoldersActus()` :97145-97146; the folders list is
+  stored in lower case), so finding 4's protection failure applies there too (read). Fixed with
+  finding 4 in `7c031cb`: the tests compare in lower case, whichever menu set the folder.
+- ○ **C.** `cleanDynamicFoldersList()` (:87694) drops every entry inside a recursive one. After
   «Recursive folder scan» makes `|d:\pics` recursive, the entry `d:\pics\sub` disappears from
   the list, and making `d:\pics` a `|` entry again does not bring it back (read).
-- **D.** F2 («Rename index entry») from this panel, on a plain or .SLD list, renames the paths
-  of the index through `SearchAndReplaceThroughIndex()` (:98277 at `d05e990`), whose
-  `StrReplace()` (:98414) ignores the case of A to Z only: for a folder named `Été` the entry
-  is renamed and the index keeps the old paths (read). Finding 4's fix covers the comparisons,
-  not this replacement. **Fixed in `9aecb75`**, by Marius's answer to decision 9: every match
-  of `SearchAndReplaceThroughIndex()` (:98314 at `0ab5622`) ignores the case of every letter,
+- ✅ `9aecb75`, `8cacdee`, `cce29a6`, `ffccbb3` **D.** F2 («Rename index entry») from this
+  panel, on a plain or .SLD list, renames the paths of the index through
+  `SearchAndReplaceThroughIndex()` (:98277 at `d05e990`), whose `StrReplace()` (:98414) ignores
+  the case of A to Z only: for a folder named `Été` the entry is renamed and the index keeps
+  the old paths (read). Finding 4's fix covers the comparisons, not this replacement. **Fixed
+  in `9aecb75`**, by Marius's answer to decision 9: every match of
+  `SearchAndReplaceThroughIndex()` (:98314 at `0ab5622`) ignores the case of every letter,
   through `StrReplaceCaseless()` (:98294), which finds the matches in lower case and replaces
   them in the original; the folder-alone mode compares in lower case. In a database the
   subfolder rows follow as well, so after the folders tree's «Rename folder» the rows and the
   index agree. Run on the text of `0ab5622` (batch U): F2 on `été` renamed `Été2` on the disk
-  moves both files (2 records; at `89840b5` 0; U2); the folders list panel's F2 on a cached .SLD list,
-  «Propagate» unticked, moves the folder's own file (U3); the panel's normal mode replaces
-  `ÉTÉ3\` in both entries, the one marked missing included, and a partial string in folder mode
-  still replaces in the middle of the paths (U4); in a database the folders tree's rename of
-  `Ûna` moves the subfolder's row too, and the normal mode with `ÛNA2\SUB\` moves the row and
-  the index entry together (U5, U6; at `89840b5` the subfolder's row and the index stayed on the
-  old path). The panel's other two targets ignore case too since `8cacdee` and `cce29a6`
-  (Marius's answer), lines at `557c018`: the seen images list (`SearchAndReplaceSeenDB()`
-  :98522) selects its records with LIKE, which folds A to Z only, so every other character of
-  the searched text now matches any character there, and `StrReplaceCaseless()` keeps the true
-  matches and replaces them; the list can hold one file under two spellings, one viewed from a
-  plain list and one from a database, and the column skipped without a word an update to a path
-  recorded already, leaving the record on the old path while counting it: the two records now
-  merge under the new path, with the later view date, and the count tells the records really
-  changed (decision 10). The seed folders list (`BTNperformIndexSearchReplace()` :47026)
-  replaces through `StrReplaceCaseless()`. Run on the text of `557c018` (batches W and X; at
-  `8cbe643` in parentheses): `été\` replaced on the records `Été\a.png` and `été\a.png` gives
-  one record, with the later date, «2 records were modified» (one renamed, the other left on the
-  old path); `Ätä\b.png`, which the wildcards select, stays untouched and uncounted; folder mode
-  with `ÉTÉ` renames the folder and keeps the file name `Été.png` (nothing); the needles
-  `pics_1\` and `100%\` and an A to Z one give the same records as before; through the panel,
-  `ÄTÄ\` renames the record (nothing); the seed folders list, `ÉTÉ` renames `été` (nothing).
-  `8cacdee` merged a record at once into the one holding its new path, also when that one was
-  about to move on in the same pass: `photos\` → `photos\old\` on `photos\a.png` and
-  `photos\old\a.png` kept one record, as the order of the rows had it, and the chain `zq`,
-  `zqq`, `zqqqq` with `q` → `qq` kept one of three (run, batch W9). Since `ffccbb3` (:98522)
-  such a record waits: the waiting records are tried again after the pass until none moves,
-  and only those still colliding merge. Run: both orders keep the two records, the chain its
-  three, each with its own date; batch W gives the lines of `557c018`.
-- **E.** A drive root on routes that finding 5's places did not include (read at `d05e990`,
-  found by a search for the tests that want more than two characters; not run): renaming an entry to a
-  root is refused (`PanelRenameStaticFolder()` :98091); «With a new QPV instance» on a root
-  passes `fd=p:`, which the new instance's argument test refuses
-  (`initializeAppWithGivenArguments()` :2437), so it opens nothing; the main window's refresh
-  of a list opened from a root does nothing (`RefreshFilesList()` :65342,
-  `StrLen(CurrentSLD)>3`); the copy and move panel does not offer `p:` among its destinations
-  (`CopyMovePanelWindow()` :60440); the search and replace on the seed folders list calls a
-  list of roots alone empty (`BTNperformIndexSearchReplace()` :47056); the folder lines of a
-  legacy plain-text list skip roots (`sldGenerateFilesList()` :89142); a dropped drive root is
-  skipped (`GuiDroppedFiles()` :66689); a root kept as the last opened folder is reset at the
-  next start (`INIaction()` :72700, type 6). Open. **Partly fixed**, lines at `0ab5622`:
+  moves both files (2 records; at `89840b5` 0; U2); the folders list panel's F2 on a cached
+  .SLD list, «Propagate» unticked, moves the folder's own file (U3); the panel's normal mode
+  replaces `ÉTÉ3\` in both entries, the one marked missing included, and a partial string in
+  folder mode still replaces in the middle of the paths (U4); in a database the folders tree's
+  rename of `Ûna` moves the subfolder's row too, and the normal mode with `ÛNA2\SUB\` moves the
+  row and the index entry together (U5, U6; at `89840b5` the subfolder's row and the index
+  stayed on the old path). The panel's other two targets ignore case too since `8cacdee` and
+  `cce29a6` (Marius's answer), lines at `557c018`: the seen images list
+  (`SearchAndReplaceSeenDB()` :98522) selects its records with LIKE, which folds A to Z only,
+  so every other character of the searched text now matches any character there, and
+  `StrReplaceCaseless()` keeps the true matches and replaces them; the list can hold one file
+  under two spellings, one viewed from a plain list and one from a database, and the column
+  skipped without a word an update to a path recorded already, leaving the record on the old
+  path while counting it: the two records now merge under the new path, with the later view
+  date, and the count tells the records really changed (decision 10). The seed folders list
+  (`BTNperformIndexSearchReplace()` :47026) replaces through `StrReplaceCaseless()`. Run on the
+  text of `557c018` (batches W and X; at `8cbe643` in parentheses): `été\` replaced on the
+  records `Été\a.png` and `été\a.png` gives one record, with the later date, «2 records were
+  modified» (one renamed, the other left on the old path); `Ätä\b.png`, which the wildcards
+  select, stays untouched and uncounted; folder mode with `ÉTÉ` renames the folder and keeps
+  the file name `Été.png` (nothing); the needles `pics_1\` and `100%\` and an A to Z one give
+  the same records as before; through the panel, `ÄTÄ\` renames the record (nothing); the seed
+  folders list, `ÉTÉ` renames `été` (nothing). `8cacdee` merged a record at once into the one
+  holding its new path, also when that one was about to move on in the same pass: `photos\` →
+  `photos\old\` on `photos\a.png` and `photos\old\a.png` kept one record, as the order of the
+  rows had it, and the chain `zq`, `zqq`, `zqqqq` with `q` → `qq` kept one of three (run, batch
+  W9). Since `ffccbb3` (:98522) such a record waits: the waiting records are tried again after
+  the pass until none moves, and only those still colliding merge. Run: both orders keep the
+  two records, the chain its three, each with its own date; batch W gives the lines of
+  `557c018`.
+- ◐ `08ae6f5`, `c68164c`, `905461a`, `557c018` **E.** A drive root on routes that finding 5's
+  places did not include (read at `d05e990`, found by a search for the tests that want more
+  than two characters; not run): renaming an entry to a root is refused
+  (`PanelRenameStaticFolder()` :98091); «With a new QPV instance» on a root passes `fd=p:`,
+  which the new instance's argument test refuses (`initializeAppWithGivenArguments()` :2437),
+  so it opens nothing; the main window's refresh of a list opened from a root does nothing
+  (`RefreshFilesList()` :65342, `StrLen(CurrentSLD)>3`); the copy and move panel does not offer
+  `p:` among its destinations (`CopyMovePanelWindow()` :60440); the search and replace on the
+  seed folders list calls a list of roots alone empty (`BTNperformIndexSearchReplace()`
+  :47056); the folder lines of a legacy plain-text list skip roots (`sldGenerateFilesList()`
+  :89142); a dropped drive root is skipped (`GuiDroppedFiles()` :66689); a root kept as the
+  last opened folder is reset at the next start (`INIaction()` :72700, type 6). Open. **Partly
+  fixed**, lines at `0ab5622`:
   - «With a new QPV instance» (`08ae6f5`): the argument test takes `fd=p:`, `fd=p:\` and
     `fd=|p:` (:2437); `OpenNewQPVinstance()` (:2981) passes a folder without its trailing
     separator, since `"fd=p:\"` reaches the new instance as `fd=p:"` (run: a second AutoHotkey
@@ -1070,21 +1132,21 @@ Not part of the panel's own code.
     it (at `8cbe643` the same change, unmarked); a text that matches nothing marks nothing.
   - Still open: the copy and move panel, legacy list lines, a dropped root, and the last opened
     folder.
-- **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it removes
+- ○ **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it removes
   every file: its `countFiles` is never set (run, batch N4: `maxFilesIndex` is blank after
   «Yes» on the only seed folder). Not followed further. Open.
-- **G.** In a database, `SearchAndReplaceThroughIndex()` in folder mode moves the files of the
+- ○ **G.** In a database, `SearchAndReplaceThroughIndex()` in folder mode moves the files of the
   subfolders one by one; a file whose new path is held already fails alone, is counted
   («Failed to modify 1 entries») and the function still reports success, while the index
   takes the new path for every file, that one included: the index and the database disagree
   on it. Run (batch Y9, step Y9.5b, an image of the same name indexed in a subfolder of the new
   folder): `pv\beta\b1.png` stays in the `images` table, the index lists it under `pvnew\beta`.
   The renames of both folder panels then carry the folders list along, as for a success (run for
-  this panel, Y9.5b; read for the folders list panel). Open. From this panel, in a database, the
-  case is refused since `f3fb044`: the image of the same name makes its folder part of the
-  folders list (run, Y9.5b). A folders list built before that image was indexed can still miss
-  it; the folders list panel then shows the renamed rows, and not the folder that kept the
-  image, until it reads the list again (read).
+  this panel, Y9.5b; read for the folders list panel). Open. `f3fb044` refused the case from
+  this panel, the image of the same name making its folder part of the folders list; since
+  `85eb185` this panel checks the seed folders list instead, and the case happens again when the
+  new folder is not a seed folder and no seed folder covers it (run on `85eb185` and on the
+  text of `2659559`, Y9.5b).
 
 ## Checked and found correct
 
@@ -1164,7 +1226,11 @@ Not part of the panel's own code.
     the folders list panel's rename does? **Settled** (`f3fb044`, Marius's answers): refused at
     once, before anything changes, also when the files question would be answered «No»; every
     row the folders list panel would show counts, also one whose folder holds no image; a
-    message box says why, in both folder panels, and the rename dialog comes back.
+    message box says why, in both folder panels, and the rename dialog comes back. **Then**
+    (`85eb185`, `2659559`, Marius's rules): the check is on the seed folders list. The new
+    folder must be on the disk; refused when it is a seed folder already, when a seed folder
+    scanned with its subfolders covers it, or when the renamed entry, scanned with its
+    subfolders, would cover another seed folder; a warning line says which, not a message box.
 14. **The counts while a files filter is on** (finding 12): the whole index, the filtered
     files with a line in the panel that says so, or as they were? **Settled** (`b55b247`,
     Marius's answer): the whole index.
@@ -1248,6 +1314,7 @@ that one in this panel, its batch F).
 | Z12 | plain, database | for `b55b247`: F11 before F10; «Select files», «Deselect files», on a row never counted; «Deselect all»; «%» and «Size (MB)» sorted; F11, F10 in each of its two parts and «Select files» stopped; F3 with files selected outside the filter, then F11, F10, «Select files», «Deselect all»; the same in a database, its filter a query; Z12B: F10 on a pasted folder not scanned yet |
 | Z14 | plain, database | for `2400d23`: quoted paths, one with a trailing separator, a `\|` inside or outside the quotes; F5 and F11 on the pasted `fifth`; the same lines again; two quoted folders and a path that is no folder; a line that is no folder; a database: its own folder, then a quoted new one |
 | D13 | database, cached .SLD, plain | for `f3fb044`: F2 on `pv` onto `merge`, whose `merge\gamma` holds an image; onto a folder not listed and onto `pv\moved`; a cached .SLD list whose folders list is not loaded, ticked and unticked; onto a row without images; a plain list without and with a folders list; a database folder whose images were erased |
+| S85 | plain, cached .SLD, database | for `2659559`: F2 onto a folder not on the disk; onto a seed folder, each kind onto each; into a seed folder scanned with its subfolders, into one scanned without them, into its own subfolder; onto the parent of the others; an entry inside a `\|` one, ticked and unticked; «Yes» on a cached .SLD list and in a database |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
 filter on, a purge that leaves the index empty, the question on stock AutoHotkey (only its
@@ -1369,6 +1436,17 @@ without its counts, instead of building its own (batch E, step E4). The version 
 builds it as that panel does, and E gives the lines it gave. The text loads with AutoHotkey_H
 and stock AutoHotkey 1.1.37 (`/iLib`), and AutoHotkey_H ran every batch on it. Not run:
 Windows; batch Z12B.
+
+**Runs of the rename's rules**, 2026-11-17, in the same kit: `seed-part6.ahk` adds batch S85,
+one rename per rule and per kind of entry. Each answers «Cancel» on the dialog that a refusal
+brings back, or on the files question when the rename is taken, and the seed folders list is put
+back afterwards. S85 first ran on `85eb185` as pulled (log `s85-s85`, before the two steps on
+the tick were added). Then S85 and the batches that rename from this panel, E, H, I, U, Y9 and
+D13, ran on `85eb185` (logs `*-h85`) and on the text of `2659559` (`*-n85`; `snap6/rules.ahk`,
+committed as tested, compared byte for byte), and the folders list kit's D2, H, Y, Z, SG2 and
+SG3 likewise; the note on finding 9 gives what they show. The text loads with AutoHotkey_H and
+stock AutoHotkey 1.1.37 (`/iLib`). Not run: Windows; the other batches on the text of
+`2659559`.
 
 Batches E and H queue an answer for the question added by `32c435d` («Keep», steps E2 and
 H2); on `bf72416` that answer finds no box and expires.

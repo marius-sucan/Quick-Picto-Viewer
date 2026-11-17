@@ -931,9 +931,13 @@ from the index» stays in memory until the folders list is read again, with the 
 from the disk again, so the «*» marks go (read).
 
 Marius's answer, 2026-11-17 (decision 13 of the seed folders panel audit): every row counts,
-also one whose folder holds no image. Since `f3fb044` the refusal says why in a message box,
-which the seed folders panel's rename shares, and the rename dialog comes back after «OK»
-(run: steps Y5, Z2 and Z5 of this kit's batches Y and Z on the text of `f3fb044`, logs `*-d13`).
+also one whose folder holds no image. `f3fb044` made the refusal a message box that said why,
+shared with the seed folders panel's rename (run: steps Y5, Z2 and Z5 of this kit's batches Y
+and Z, logs `*-d13`). Marius's `85eb185` brought back the warning line, «WARNING: The folder is
+already in the folders list», and gave the seed folders panel's rename a check of its own,
+against the seed folders list, which `2659559` completed with his rules. This panel's check and
+its message are as before `f3fb044`: run on `85eb185` and on the text of `2659559`, batches D2,
+H, Y and Z give the same lines (logs `*-h85`, `*-n85`).
 
 On `5584ee3` batch D2 logs what this section describes, and batch Y stops at the «Update
 files list» question that a database rename asked there.
