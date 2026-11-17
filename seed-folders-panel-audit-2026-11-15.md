@@ -837,7 +837,9 @@ Run (batch Z12, a plain list of `pv`, `other\sub` and `|other`; at `98ea716` in 
   with the filter removed, those 3 files are selected (the same, the rows unchanged) (Z12.7);
 - a database, F3 on `|other`, a query filter: F11 and F10 on `pv` give 12 files from the
   database, «Difference» 0 (0 and 12); «Select files» on `other`: 2 and 2; «Deselect all»: 0
-  selected on both rows (the rows unchanged) (Z12.8).
+  selected on both rows (the rows unchanged) (Z12.8);
+- a folder pasted and not scanned yet, F10 on it: 0 files, 1 on the disk, «Difference» 1, as
+  before: the 0 that F11 hands to F10 is not taken for a stop (batch Z12B).
 
 Batch B gives the lines of `98ea716` but at B1 («Difference» empty), B2 (the row follows
 «Select files») and B5 (12 files with the filter on, «Difference» 0).
@@ -1092,7 +1094,8 @@ Not part of the panel's own code.
 7. **«Rescan folder» on a missing folder**: skip it, ask first, or remove its entries as
    now? Same as decision 2 of the folders list audit. **Settled for this panel**
    (`32c435d`, Marius's answer): ask, «Keep» or «Purge», as in decision 1. Decision 2 of the
-   folders list audit stays open for that panel.
+   folders list audit was settled for that panel before this audit, in `26c47e1`: ask first
+   (finding 11's note).
 8. **The refresh right after a single image**: the folder alone, with its subfolders (a root:
    the whole drive), or roots opened as folders only? **Settled** (`905461a`, Marius's answer):
    the folder alone, a root or not; this changes the refresh of any folder in that state.
@@ -1192,7 +1195,7 @@ that one in this panel, its batch F).
 | Y8 | cached .SLD, database | for `ce1b5f8`: «Recursive folder scan» and the save question answered «Discard»; then a save; private mode; a database |
 | Y9 | database, cached .SLD, plain | for `caa77ef`: F2 on `pv` renamed `pvNew` on the disk: «No», «Yes» and the database opened again, unticked with `pv\alpha` inside `\|pv`, a files filter on, an image of the same name in the new folder and in a subfolder of it, a new folder that has rows already; a cached .SLD list with its folders list loaded, not loaded, «No»; a plain list |
 | Z10 | cached .SLD, database | for `20d9d3b`: `\|other` and `third` added, the folders list in memory, saved, opened again; both re-dated and rescanned; `other\sub` added inside `\|other`, F5; `third` turned non-recursive, F5; `\|fourth` added in a database |
-| Z12 | plain, database | for `b55b247`: F11 before F10; «Select files», «Deselect files», on a row never counted; «Deselect all»; «%» and «Size (MB)» sorted; F11, F10 in each of its two parts and «Select files» stopped; F3 with files selected outside the filter, then F11, F10, «Select files», «Deselect all»; the same in a database, its filter a query |
+| Z12 | plain, database | for `b55b247`: F11 before F10; «Select files», «Deselect files», on a row never counted; «Deselect all»; «%» and «Size (MB)» sorted; F11, F10 in each of its two parts and «Select files» stopped; F3 with files selected outside the filter, then F11, F10, «Select files», «Deselect all»; the same in a database, its filter a query; Z12B: F10 on a pasted folder not scanned yet |
 | Z14 | plain, database | for `2400d23`: quoted paths, one with a trailing separator, a `\|` inside or outside the quotes; F5 and F11 on the pasted `fifth`; the same lines again; two quoted folders and a path that is no folder; a line that is no folder; a database: its own folder, then a quoted new one |
 
 Not run after `32c435d`: a rescan stopped after «Keep» or «Purge», «Rescan all» with a files
@@ -1283,7 +1286,11 @@ the two sets batch by batch:
 - L and U differ only in the image the random display then fails to find on the disk; L stops
   at its known last step, L3, on both.
 
-Batch S was not run: its code did not change. The folders list kit ran its batch RP on
+Batch Z12B, added after the commits, gives the lines of `98ea716` on the text of `2400d23` but
+for the message of «Paste list» (logs `z12b-b`, `z12b-z`). The kit's `results/` also holds the
+logs copied with it from `seed-folders-7-9-2026-11-17`, made in that folder: only `*-b`,
+`*-f10`, `*-f12`, `*-f14` and `*-z` are this kit's. Batch S was not run: its code did not
+change. The folders list kit ran its batch RP on
 `98ea716` (`rp-b17`): the lines of `rp-fix4`, its run on the text of `26c47e1`. It also ran F,
 T, U, W, X and Z, the batches that reach this panel or the functions the fixes changed, on
 `98ea716` (`*-b17`) and on the text of `2400d23` (`*-z17`): F, T, U, W and Z give the same
