@@ -97429,6 +97429,10 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
        Else
           BtnHelpDynaFoldersPanel()
        Return
+    } Else If (b="k" && c=45 && whichLV="LViewDynas") ; Insert
+    {
+       BTNaddNewFolder2list()
+       Return
     }
 
     ; TulTip(0,"|  ", indexu, folderu, files)
@@ -97440,10 +97444,6 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
        isUpdateList := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? 1 : 0
        If (isUpdateList || whichLV="LViewDynas")
           PanelRenameStaticFolder()
-       Return
-    } Else If (b="k" && c=45 && whichLV="LViewDynas") ; Insert
-    {
-       BTNaddNewFolder2list()
        Return
     } Else If (b="k" && c=114) ; F3
     {
