@@ -98237,14 +98237,20 @@ PanelRenameStaticFolder() {
          newFileName := Format("{:L}", newFileName)
 
 
+      takenWhy := ""
       If (winOpen=2)
          takenPath := findTakenStaticFolderPath(folderu, newFileName, doPropagate)
       Else
-         takenPath := findTakenDynamicFolderPath(folderu, newFileName, 1)
+         takenPath := findTakenDynamicFolderPath(folderu, newFileName, doPropagate, takenWhy)
 
       If takenPath
       {
-         msgBeepTimer("WARNING: The folder is already in the folders list:`n" takenPath)
+         If (takenWhy="covered")
+            msgBeepTimer("WARNING: The folder is inside a seed folder scanned with its subfolders:`n" takenPath)
+         Else If (takenWhy="covers")
+            msgBeepTimer("WARNING: The folder holds another seed folder, which this one, scanned with its subfolders, would include:`n" takenPath)
+         Else
+            msgBeepTimer("WARNING: The folder is already in the " ((winOpen=3) ? "seed " : "") "folders list:`n" takenPath)
          SetTimer, PanelRenameStaticFolder, -300
          Return
       }
@@ -98336,31 +98342,45 @@ findTakenStaticFolderPath(oldFolder, newFolder, doPropagate) {
    }
 }
 
-findTakenDynamicFolderPath(oldFolder, newFolder, doPropagate) {
-; returns the first path the rename would give an entry, when another entry of the folders list holds it already
+findTakenDynamicFolderPath(oldFolder, newFolder, doPropagate, ByRef reason:="") {
+; returns the seed folder that refuses the rename, and why: "listed" when a renamed entry would get its path,
+; "covered" when it is scanned with its subfolders and holds a new path, "covers" when a renamed entry
+; scanned with its subfolders would hold it. With doPropagate, the entries inside the renamed one move too
+   reason := ""
    oldPrefix := Format("{:L}", oldFolder) "\"
-   listed := new hashtable()
-   newPaths := []
+   newLow := Format("{:L}", newFolder)
+   moving := []
+   staying := []
    lst := getDynamicFoldersList()
    Loop, Parse, % lst, `n,`r
    {
-      entryFolder := Format("{:L}", A_LoopField)
+      entryFolder := Format("{:L}", StrReplace(A_LoopField, "|"))
       If (StrLen(entryFolder)<2)
          Continue
 
+      isRecursive := InStr(A_LoopField, "|") ? 0 : 1
       If (entryFolder "\"=oldPrefix)
-         newPaths.Push(newFolder)
+         moving.Push([newLow, isRecursive])
       Else If (doPropagate=1 && InStr(entryFolder, oldPrefix)=1)
-         newPaths.Push(newFolder SubStr(entryFolder, StrLen(oldPrefix)))
+         moving.Push([newLow SubStr(entryFolder, StrLen(oldPrefix)), isRecursive])
       Else
-         listed[entryFolder] := 1
+         staying.Push([entryFolder, isRecursive])
    }
 
-   For i, thisNew in newPaths
+   For i, thisMoving in moving
    {
-      pp := Format("{:L}", thisNew)
-      If listed[pp]
-         Return thisNew
+      For j, thisStaying in staying
+      {
+         If (thisMoving[1]==thisStaying[1])
+            reason := "listed"
+         Else If (thisStaying[2]=1 && InStr(thisMoving[1] "\", thisStaying[1] "\")=1)
+            reason := "covered"
+         Else If (thisMoving[2]=1 && InStr(thisStaying[1] "\", thisMoving[1] "\")=1)
+            reason := "covers"
+
+         If reason
+            Return thisStaying[1]
+      }
    }
 }
 
