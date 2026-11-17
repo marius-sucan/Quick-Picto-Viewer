@@ -94223,6 +94223,8 @@ invokePanelDynaFoldersContextMenu() {
    }
 
    kMenu("PanelDynaMenu", "Add", "&View list as a folders tree", "BTNshowDynamicFoldersInTreeView")
+   Menu, PanelDynaMenu, Add
+   kMenu("PanelDynaMenu", "Add", "Help`tF1", "BtnHelpDynaFoldersPanel")
    showThisMenu("PanelDynaMenu")
 }
 
@@ -94295,6 +94297,10 @@ invokePanelReviewSelContextMenu() {
 
 BtnHelpStaticFoldersPanel() {
    msgBoxWrapper(appTitle ": HELP", "This panel lists the folders where the indexed files are located; selected and total files are counted per folder. It is useful to:`n `n- update / rescan folders selectively, in order to avoid entire rescans`n `n- facilitate management of large amounts of files`n `n- identify folders with few or many files`n `n- identify per folder missing files, already seen images or favourited images [if these were selected using the appropriate tools before opening this panel]`n `nFolders marked with (*) are changed since the last scan, based on folder modified date. Right-click on listed entries for more options.`n `nWhen you choose to «Erase files from the index», the files indexed pertaining to the selected folder will be removed ONLY from the index, NOT from the disk.`n`nThe folders can be filtered by selected files (:), percentage (*), files on disk (!), folder size ($), diff (#) or files indexed (?) by typing something like: *>200 or ?<300.`n`nWhen rescanning a missing or inaccessible folder, QPV will remove the image files from the list of that folder.", -1, 0, 0)
+}
+
+BtnHelpDynaFoldersPanel() {
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Add» (Insert) adds a folder and indexes its files.`n `n- «Copy list» copies the seed folders as text. «Paste list» adds the folders of such a list; their files are indexed after a rescan: «Rescan folder» (F5) or «Rescan all».`n `n- «Remove» (Delete) takes the folder out of the list, with the files indexed from it.`n `n- F11 counts the files indexed from a folder, F10 those found in it on the disk.`n `n- Alt+click selects the indexed files of a folder, Alt+right-click deselects them.`n `n- A seed folder not on the disk now, perhaps on a drive that is not plugged in, stays in the list. When it is rescanned, you choose to keep it, with the files indexed from it, or to purge it.`n `nRight-click a folder for more options.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
@@ -97416,16 +97422,20 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     LV_GetText(files, RowNumber, 5)
     totalSelected := LV_GetCount("S")
 
-    ; TulTip(0,"|  ", indexu, folderu, files)
-    If (StrLen(folderu)<2 || !totalSelected || folderu="folder path")
-       Return
-
     If (b="k" && c=112) ; F1
     {
        If (AnyWindowOpen=2)
           BtnHelpStaticFoldersPanel()
+       Else
+          BtnHelpDynaFoldersPanel()
        Return
-    } Else If (b="k" && c=113) ; F2
+    }
+
+    ; TulTip(0,"|  ", indexu, folderu, files)
+    If (StrLen(folderu)<2 || !totalSelected || folderu="folder path")
+       Return
+
+    If (b="k" && c=113) ; F2
     {
        isUpdateList := (FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1) ? 1 : 0
        If (isUpdateList || whichLV="LViewDynas")
