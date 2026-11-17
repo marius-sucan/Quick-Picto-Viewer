@@ -96586,7 +96586,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
     Gui, Add, Button, x+5 hp wp+5 gBTNpasteDynaFoldersList, &Paste list
     Gui, Add, Button, x+5 hp wp+5 ginvokePanelDynaFoldersContextMenu, &More
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage seed folders list: " appTitle)
-    uiPopulateDynamicFolderzList()
+    SetTimer, uiPopulateDynamicFolderzList, -500
 }
 
 BTNaddNewFolder2list() {
@@ -98236,19 +98236,15 @@ PanelRenameStaticFolder() {
       If (SLDtypeLoaded=3)
          newFileName := Format("{:L}", newFileName)
 
-      ; the seed folders panel moves the rows of the subfolders whatever the tick, and its folders list may not be loaded yet
-      If (winOpen=3 && SLDtypeLoaded=3)
-      {
-         PopulateStaticSQLfolderzList()
-         Tooltip
-      } Else If (winOpen=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
-         LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
 
-      takenPath := findTakenStaticFolderPath(folderu, newFileName, (winOpen=3) ? 1 : doPropagate)
+      If (winOpen=2)
+         takenPath := findTakenStaticFolderPath(folderu, newFileName, doPropagate)
+      Else
+         takenPath := findTakenDynamicFolderPath(folderu, newFileName, 1)
+
       If takenPath
       {
-         msgu := "This folder is in the folders list already:`n" takenPath "\`n`nThe rename would put the folders list rows of «" folderu "\» in place of the rows already there, and the dates recorded for them would be lost.`n`nType a path that the folders list does not hold yet. If the images were moved into that folder on the disk, rescan the seed folder that covers it instead."
-         msgBoxWrapper(appTitle ": Folder already listed", msgu, 0, 0, "exclamation")
+         msgBeepTimer("WARNING: The folder is already in the folders list:`n" takenPath)
          SetTimer, PanelRenameStaticFolder, -300
          Return
       }
@@ -98336,6 +98332,34 @@ findTakenStaticFolderPath(oldFolder, newFolder, doPropagate) {
    For i, thisNew in newPaths
    {
       If listed[Format("{:L}", thisNew)]
+         Return thisNew
+   }
+}
+
+findTakenDynamicFolderPath(oldFolder, newFolder, doPropagate) {
+; returns the first path the rename would give an entry, when another entry of the folders list holds it already
+   oldPrefix := Format("{:L}", oldFolder) "\"
+   listed := new hashtable()
+   newPaths := []
+   lst := getDynamicFoldersList()
+   Loop, Parse, % lst, `n,`r
+   {
+      entryFolder := Format("{:L}", A_LoopField)
+      If (StrLen(entryFolder)<2)
+         Continue
+
+      If (entryFolder "\"=oldPrefix)
+         newPaths.Push(newFolder)
+      Else If (doPropagate=1 && InStr(entryFolder, oldPrefix)=1)
+         newPaths.Push(newFolder SubStr(entryFolder, StrLen(oldPrefix)))
+      Else
+         listed[entryFolder] := 1
+   }
+
+   For i, thisNew in newPaths
+   {
+      pp := Format("{:L}", thisNew)
+      If listed[pp]
          Return thisNew
    }
 }
@@ -99194,9 +99218,9 @@ uiPopulateDynamicFolderzList() {
        If !isInRange(A_Index, 2, 3)
           LV_ModifyCol(A_Index, "Integer")
     }
+
     LV_ModifyCol(6, "Float")
     LV_ModifyCol(9, "Float")
-
     Loop, Parse, listu, `n
     {
         statusu := InStr(A_LoopField, "|") ? "" : "R"
