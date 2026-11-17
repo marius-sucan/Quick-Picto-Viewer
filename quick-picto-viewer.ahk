@@ -2978,10 +2978,10 @@ OpenWithNewQPVinstance(modus:=0, givenList:=0, givenCount:=0) {
    }
 }
 
-OpenNewQPVinstance(imgPath:="") {
+OpenNewQPVinstance(imgPath:="", folderAlone:=0) {
    imgPath := StrReplace(imgPath, "||")
    If FolderExist(imgPath)
-      imgPath := "fd=" RegExReplace(imgPath, "\\+$") ; a trailing \ would escape the quote that closes the argument
+      imgPath := "fd=" (folderAlone ? "|" : "") RegExReplace(imgPath, "\\+$") ; a trailing \ would escape the quote that closes the argument
    Else If !FileRexists(imgPath)
       imgPath := ""
 
@@ -96880,11 +96880,15 @@ BTNselFilesStaticFolder(modus:=0) {
    LV_GetText(folderu, RowNumber, colNum)
    If (AnyWindowOpen=2)
       folderu := newStaticFoldersListCache[folderu, 1]
+   Else
+      LV_GetText(isR, RowNumber, 2)
 
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
 
+   ; a seed folder scanned without its subfolders reaches the files placed directly in it
+   folderAlone := (AnyWindowOpen=3 && !InStr(isR, "R")) ? 1 : 0
    ToolTip, Selecting matching files
    setImageLoading()
    If (AnyWindowOpen=2)
@@ -96940,9 +96944,9 @@ BTNselFilesStaticFolder(modus:=0) {
       If !imgPath
          Continue
 
-      OutDir := Format("{:L}", (AnyWindowOpen=2) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
+      OutDir := Format("{:L}", (AnyWindowOpen=2 || folderAlone) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
       If (AnyWindowOpen=2 && foldersListArray[OutDir])
-      || (AnyWindowOpen=3 && InStr(OutDir "\", folderu "\"))
+      || (AnyWindowOpen=3 && (folderAlone ? OutDir==folderu : InStr(OutDir "\", folderu "\")))
       {
          thisIndex++
          osel := resultedFilesList[A_Index, 2]
@@ -96989,6 +96993,7 @@ BTNcountFilesDynaFolders() {
    RowNumber := LV_GetNext(0, "F")
    LV_GetText(folderu, RowNumber, 3)
    LV_GetText(onDisk, RowNumber, 7)
+   LV_GetText(isR, RowNumber, 2)
    ; ToolTip, % folderu "=" colNum "=" RowNumber "=" whichLV , , , 2
    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
@@ -96997,6 +97002,7 @@ BTNcountFilesDynaFolders() {
    setImageLoading()
    thisSelIndex := thisIndex := 0
    folderu := Format("{:L}", StrReplace(folderu, "|"))
+   folderAlone := InStr(isR, "R") ? 0 : 1
    doStartLongOpDance()
    startOperation := A_TickCount
    Loop, % maxFilesIndex
@@ -97011,7 +97017,12 @@ BTNcountFilesDynaFolders() {
       If !imgPath
          Continue
 
-      If InStr(Format("{:L}", imgPath) "\", folderu "\")
+      If folderAlone
+         isIn := (Format("{:L}", SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1))==folderu)
+      Else
+         isIn := InStr(Format("{:L}", imgPath) "\", folderu "\")
+
+      If isIn
       {
          thisIndex++
          If resultedFilesList[A_Index, 2]
@@ -97174,12 +97185,15 @@ BtnPanelStaticJumpFirst() {
    LV_GetText(folderu, RowNumber, colNum)
    If (AnyWindowOpen=2)
       folderu := newStaticFoldersListCache[folderu, 1]
+   Else
+      LV_GetText(isR, RowNumber, 2)
 
    ; ToolTip, % RowNumber "==" A_GuiEventInfo "`n" folderu , , , 2
    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
       Return
 
    winOpen := AnyWindowOpen
+   folderAlone := (winOpen=3 && !InStr(isR, "R")) ? 1 : 0
    folderPath := StrReplace(folderu, "|")
    folderLow := Format("{:L}", folderPath)
    BtnCloseWindow()
@@ -97206,8 +97220,8 @@ BtnPanelStaticJumpFirst() {
       If !imgPath
          Continue
 
-      OutDir := Format("{:L}", (winOpen=2) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
-      If (winOpen=2 && OutDir=folderLow) || (winOpen=3 && InStr(OutDir "\", folderLow "\"))
+      OutDir := Format("{:L}", (winOpen=2 || folderAlone) ? SubStr(imgPath, 1, InStr(imgPath, "\", 0, -1) - 1) : imgPath)
+      If (winOpen=2 && OutDir=folderLow) || (winOpen=3 && (folderAlone ? OutDir==folderLow : InStr(OutDir "\", folderLow "\")))
       {
          thisIndex := A_Index
          Break
@@ -97243,6 +97257,8 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
    LV_GetText(folderu, RowNumber, colNum)
    If (AnyWindowOpen=2)
       folderu := newStaticFoldersListCache[folderu, 1]
+   Else
+      LV_GetText(isR, RowNumber, 2)
 
    ; ToolTip, % RowNumber "==" A_GuiEventInfo "`n" folderu , , , 2
    If (StrLen(folderu)<2 || folderu="folder path" || !RowNumber)
@@ -97261,7 +97277,7 @@ BtnPanelManageFoldersActus(modus:=0, g:=0) {
       }
    } Else If (z=2 && folderPath)
    {
-      OpenNewQPVinstance(folderPath)
+      OpenNewQPVinstance(folderPath, (AnyWindowOpen=3 && !InStr(isR, "R")) ? 1 : 0)
    } Else If (z=3 && folderPath)
    {
       invokeStandardFolderProperties(folderPath)
@@ -97412,10 +97428,13 @@ uiLVfolderzFilterListBTN(a:=0, b:=0, c:=0) {
     } Else If (a="menu-mode")
     {
        selu := LV_GetCount("S")
+       If (AnyWindowOpen=3)
+          LV_GetText(isR, RowNumber, 2)
+
        If (a="menu-mode" && AnyWindowOpen=2 && selu>1)
           UIfilterListToSelectStaticFolders()
        Else
-          uiFilterListDynaFolder(folderu, AnyWindowOpen)
+          uiFilterListDynaFolder(folderu, (AnyWindowOpen=3 && !InStr(isR, "R")) ? 2 : AnyWindowOpen)
     }
 }
 
