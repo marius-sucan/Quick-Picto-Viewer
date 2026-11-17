@@ -87791,7 +87791,7 @@ RegenerateEntireList() {
 
     listu := getDynamicFoldersList()
     If (StrLen(Trim(listu, "`n"))<2)
-       Return msgBeepTimer("WARNING: No list of dynamic folders found")
+       Return msgBeepTimer("WARNING: The seed folders list is empty")
 
     keptu := purgedu := ""
     missingu := getMissingSeedFolders(listu)
@@ -97119,9 +97119,9 @@ BTNcopyDynaFoldersList() {
        Return
 
     If copyTextToClippy(newFoldersList)
-       msgBeepTimer("Dynamic folders list copied to clipboard", 900)
+       msgBeepTimer("Seed folders list copied to clipboard", 900)
     Else
-       msgBeepTimer("Failed to copy to clipboard the dynamic folders list")
+       msgBeepTimer("Failed to copy the seed folders list to the clipboard")
 }
 
 BTNpasteDynaFoldersList() {
@@ -98203,7 +98203,7 @@ PanelRenameStaticFolder() {
 
    Sleep, 15
    folderu := StrReplace(folderu, "|")
-   msgResult := msgBoxWrapper("Rename static folder entry: " appTitle, "Please type the new folder path.", "&Rename folder entry|C&ancel", 1, "modify-entry", "Propagate the change to subfolders", 1, 0, "limit9050 w850", folderu)
+   msgResult := msgBoxWrapper(((winOpen=3) ? "Rename seed folder entry: " : "Rename static folder entry: ") appTitle, "Please type the new folder path.", "&Rename folder entry|C&ancel", 1, "modify-entry", "Propagate the change to subfolders", 1, 0, "limit9050 w850", folderu)
    If InStr(msgResult.btn, "Rename")
    {
       doPropagate := msgResult.check
