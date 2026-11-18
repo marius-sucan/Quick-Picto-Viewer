@@ -65173,6 +65173,9 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
       If (r="cancel")
       {
          FileExploreSiblingsNav("reset") ; thisLevel already points at the sibling left unopened
+      } Else If (r="declined")
+      {
+         thisLevel := initialLevel
       } Else If (r=1)
       {
          subFoldersArray[thisLevel] := ""
@@ -73344,7 +73347,8 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
       {
          coreOpenFolder(thisFolder, 0, 0, 0, 1)
          CurrentSLD := thisFolder
-      }
+      } Else
+         hasDeclined := 1
    } Else CurrentSLD := "|" thisFolder
 
    hasFailed := 0
@@ -73360,7 +73364,10 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
       OpenSLD(oldFolder, 1)
       hasFailed := 1
    } Else If (maxFilesIndex<1)
+   {
       resetMainWin2Welcome()
+      hasFailed := 1
+   }
 
    If (maxFilesIndex>1 && SLDtypeLoaded=1)
       prevOpenFolderPath := StrReplace(CurrentSLD, "|")
@@ -73379,7 +73386,7 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
       showDelayedTooltip("WARNING: No image files found in the folder:`n" initially)
       SoundBeep , 300, 100
    } Else RemoveTooltip()
-   Return hasFailed
+   Return hasDeclined ? "declined" : hasFailed
 }
 
 folderzNavInvokeSib(menuItem) {
