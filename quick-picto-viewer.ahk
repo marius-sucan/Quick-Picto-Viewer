@@ -94334,7 +94334,7 @@ BtnHelpStaticFoldersPanel() {
 }
 
 BtnHelpDynaFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Folders dropped on the list are added the same way, scanned with their subfolders; a drop without folders adds the folders of its first five image files.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
@@ -96610,7 +96610,8 @@ PanelDynamicFolderzWindow(dummy:=0) {
     }
 
     Gui, Add, Text, x15 y15, The seed folders are what generate the files list index.
-    hLVmainu := GuiAddListView("y+10 w" lstWid " +LV0x10000 r" uLVr " Grid +LV0x400 guiLVfolderzFilterListBTN +ReadOnly -multi AltSubmit vLViewDynas", "#|(?)|Folder path|Files|Selected|`%|Files on disk|Difference|Size (MB)", "Folders to scan")
+    ; E0x10 = WS_EX_ACCEPTFILES: the folders dropped on the list are added by uiWM_DROPFILES()
+    hLVmainu := GuiAddListView("y+10 w" lstWid " +LV0x10000 r" uLVr " Grid +LV0x400 guiLVfolderzFilterListBTN +ReadOnly -multi AltSubmit +E0x10 vLViewDynas", "#|(?)|Folder path|Files|Selected|`%|Files on disk|Difference|Size (MB)", "Folders to scan")
     btnWid2 := (PrefsLargeFonts=1) ? 95 : 60
     btnWid3 := (PrefsLargeFonts=1) ? 120 : 90
     If (dummy="reopen")
@@ -97188,6 +97189,20 @@ BTNpasteDynaFoldersList() {
         newFoldersList .= line "`n"
     }
 
+    addedEntries := addSeedFoldersEntries(oldFoldersList, newFoldersList)
+    Sleep, 50
+    ResetImgLoadStatus()
+    PanelDynamicFolderzWindow()
+    If addedEntries
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list. To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
+    If skippedLines
+       msgu .= (msgu ? "`n" : "") groupDigits(skippedLines) " pasted line(s) skipped: not a folder found on the disk"
+    If msgu
+       msgBeepTimer(msgu, skippedLines ? 300 : 0)
+}
+
+addSeedFoldersEntries(oldFoldersList, newFoldersList, ByRef addedList:="") {
+    ; returns how many entries are new; addedList gets them, one per line
     mustOpenStartFolder := ""
     Sort, newFoldersList, UD`n
     DynamicFoldersList := cleanDynamicFoldersList(newFoldersList)
@@ -97204,6 +97219,7 @@ BTNpasteDynaFoldersList() {
            oldEntries[A_LoopField] := 1
     }
 
+    addedList := ""
     addedEntries := keptEntries := 0
     Loop, Parse, DynamicFoldersList, `n
     {
@@ -97211,9 +97227,13 @@ BTNpasteDynaFoldersList() {
            Continue
 
         If oldEntries[A_LoopField]
+        {
            keptEntries++
-        Else
+        } Else
+        {
            addedEntries++
+           addedList .= A_LoopField "`n"
+        }
     }
 
     If (addedEntries || keptEntries!=oldEntries.Count())
@@ -97222,16 +97242,77 @@ BTNpasteDynaFoldersList() {
           recreateDynaFoldersSQLdbList(DynamicFoldersList)
        currentFilesListModified := 1
     }
+    Return addedEntries
+}
 
-    Sleep, 50
-    ResetImgLoadStatus()
-    PanelDynamicFolderzWindow()
+addDroppedSeedFolders(droppedList) {
+    ; the items dropped on the seed folders list, from uiWM_DROPFILES(); added as «Paste list» does,
+    ; scanned with their subfolders. A drop without folders gives the folders of its first five image files
+    If (AnyWindowOpen!=3)
+       Return
+
+    If (MsgBox2hwnd || whileLoopExec=1 || runningLongOperation=1 || imageLoading=1)
+    {
+       showDelayedTooltip("WARNING: QPV is busy, the dropped folders are ignored.")
+       Return
+    }
+
+    foldersList := imgFolders := ""
+    imgFiles := skippedItems := 0
+    Loop, Parse, droppedList, `n
+    {
+        line := RegExReplace(Trimmer(A_LoopField), "\\+$")
+        If (line="")
+           Continue
+
+        If (FolderExist(line) && RegExMatch(line, "^.:($|\\.)"))
+        {
+           foldersList .= line "`n"
+           Continue
+        }
+
+        skippedItems++
+        If (imgFiles<5 && RegExMatch(line, RegExFilesPattern))
+        {
+           imgFiles++
+           thisFolder := SubStr(line, 1, InStr(line, "\", 0, -1) - 1)
+           If FolderExist(thisFolder)
+              imgFolders .= thisFolder "`n"
+        }
+    }
+
+    fromImages := (foldersList="" && imgFolders!="") ? 1 : 0
+    If fromImages
+       foldersList := imgFolders
+
+    If (foldersList="")
+    {
+       msgBeepTimer("Nothing was added to the seed folders list: no folder or image file found on a drive was dropped", 300)
+       Return
+    }
+
+    oldFoldersList := getDynamicFoldersList()
+    addedEntries := addSeedFoldersEntries(oldFoldersList, oldFoldersList foldersList, addedList)
+    uiPopulateDynamicFolderzList()
+    Loop, % LV_GetCount()
+    {
+        LV_GetText(thisFolder, A_Index, 3)
+        If InStr("`n" addedList, "`n" thisFolder "`n")
+        {
+           LV_Modify(A_Index, "Select Focus Vis")
+           Break
+        }
+    }
+
     If addedEntries
-       msgu := groupDigits(addedEntries) " seed folder(s) added to the list. To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
-    If skippedLines
-       msgu .= (msgu ? "`n" : "") groupDigits(skippedLines) " pasted line(s) skipped: not a folder found on the disk"
-    If msgu
-       msgBeepTimer(msgu, skippedLines ? 300 : 0)
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list" (fromImages ? ": the folders of the dropped image files" : "") ". To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
+    Else
+       msgu := "The dropped folder(s) are already in the seed folders list, or inside a seed folder scanned with its subfolders"
+
+    mustBeep := (skippedItems && !fromImages) ? 1 : 0
+    If mustBeep
+       msgu .= "`n" groupDigits(skippedItems) " dropped item(s) skipped: not a folder found on a drive"
+    msgBeepTimer(msgu, mustBeep ? 300 : 0)
 }
 
 BTNremDynaSelFolder() {

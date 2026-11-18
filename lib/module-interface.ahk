@@ -27,6 +27,7 @@ initInterfaceModule() {
    OnMessage(0x0A1, "uiWM_NCLBUTTONDOWN") ; WM_NCLBUTTONDOWN (title-bar close button)
    OnMessage(0x112, "uiWM_SYSCOMMAND")    ; WM_SYSCOMMAND (SC_CLOSE from sysmenu/taskbar)
    OnMessage(0x010, "uiWM_CLOSE")         ; WM_CLOSE
+   OnMessage(0x233, "uiWM_DROPFILES")     ; WM_DROPFILES (the seed folders list)
 
    ; pen pressure [requires Windows 8 or newer].
    ; Critical - see pumpPenMessages() / getBrushPenPressure().
@@ -1998,6 +1999,30 @@ dummyTimerProcessDroppedFiles() {
    groppedFiles := []
    GuiDroppedFiles(imgFiles, foldersList, sldFile, countFiles, isCtrlDown)
    lastInvoked := A_TickCount
+}
+
+uiWM_DROPFILES(wParam, lParam, msg, hwnd) {
+   ; the drops on the seed folders list; those on the main window go on to PVwinGuiDropFiles()
+   If (hwnd!=hLVmainu)
+      Return
+
+   droppedList := ""
+   ; 0xFFFFFFFF: DragQueryFile() gives the count of dropped items
+   Loop, % DllCall("shell32\DragQueryFileW", "Ptr", wParam, "UInt", 0xFFFFFFFF, "Ptr", 0, "UInt", 0, "UInt")
+   {
+      size := DllCall("shell32\DragQueryFileW", "Ptr", wParam, "UInt", A_Index - 1, "Ptr", 0, "UInt", 0, "UInt") + 1
+      VarSetCapacity(pathu, size*2, 0)
+      If DllCall("shell32\DragQueryFileW", "Ptr", wParam, "UInt", A_Index - 1, "Str", pathu, "UInt", size, "UInt")
+         droppedList .= pathu "`n"
+   }
+
+   DllCall("shell32\DragFinish", "Ptr", wParam)
+   If (AnyWindowOpen=3)
+   {
+      fn := Func("addDroppedSeedFolders").Bind(droppedList)
+      SetTimer, % fn, -50
+   }
+   Return 0
 }
 
 uiWM_NCLBUTTONDOWN(wParam, lParam, msg, hwnd) {
