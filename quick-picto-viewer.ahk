@@ -65087,7 +65087,7 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
 
    newFolder := Trimmer(newFolder, "\")
    If (initialLevel!=thisLevel)
-      tryOpenGivenFolder(newFolder, oldFolder, oldIndex)
+      tryOpenGivenFolder(newFolder, oldFolder, oldIndex, 1)
 }
 
 FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) {
@@ -65169,8 +65169,10 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
 
    If (initialLevel!=thisLevel && FolderExist(newFolder))
    {
-      r := tryOpenGivenFolder(newFolder, oldFolder, oldIndex)
-      If (r=1)
+      r := tryOpenGivenFolder(newFolder, oldFolder, oldIndex, 1)
+      If (r="cancel")
+         FileExploreSiblingsNav("reset") ; thisLevel already points at the sibling left unopened
+      Else If (r=1)
       {
          subFoldersArray[thisLevel] := ""
          thisLevel := initialLevel
@@ -73287,10 +73289,10 @@ folderzNavInvokeSubs(menuItem) {
     If (hasFound!=1)
        Return
 
-    tryOpenGivenFolder(thisFolder, oldFolder, currentFileIndex)
+    tryOpenGivenFolder(thisFolder, oldFolder, currentFileIndex, 1)
 }
 
-tryOpenGivenFolder(thisFolder, oldFolder, oldIndex) {
+tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
    oldFolderu := StrReplace(oldFolder, "|")
    thisFolder := StrReplace(thisFolder, "|")
    thisFolder := StrReplace(Trimmer(thisFolder, "\"), "\\", "\")
@@ -73299,6 +73301,18 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex) {
       msgBeepTimer("ERROR: Folder not found or access denied:`n" thisFolder)
       TriggerMenuBarUpdate()
       Return
+   }
+
+   If (askFirst=1)
+   {
+      If askAboutFileSave(" and the selected folder will be opened")
+         Return "cancel"
+
+      If askAboutSlidesListSave()
+         Return "cancel"
+
+      If askAboutFilesSelect("discard it")
+         Return "cancel"
    }
 
    If (SLDtypeLoaded=3)
