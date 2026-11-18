@@ -21,8 +21,11 @@ fix of finding 1 and settled the same day: the «`\\`» menu's moves from a list
 has its file (`548359a`, batch F4). Two effects of that on the sibling navigation, found by a check
 of `548359a`, are fixed in `67d7343`: a sibling answered «No» keeps its name in «Sibling folders»,
 and the navigation's tooltip comes only for a folder that was opened. «Seen in passing» E and F, the
-position and the current folder of the sibling navigation, are fixed in `1cb0ba9`. The line numbers
-below stay those of `7802a22`.
+position and the current folder of the sibling navigation, are fixed in `1cb0ba9`. Of the nine small
+things of section 17, b, h and i are fixed in `ca8109b`; f was changed there and is not fixed. «Seen
+in passing» G, the list type after a database is imported from the welcome screen, is fixed in
+`bb730af`. The runs of batches S and I (small thing f, «Seen in passing» G to I) were on AutoHotkey
+1.1.37.02. The line numbers below stay those of `7802a22`.
 
 ## Terms
 
@@ -55,7 +58,7 @@ below stay those of `7802a22`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `67d7343` |
+| # | Finding | Harm | Checked | Shared with | Status at `ca8109b` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
@@ -73,7 +76,7 @@ below stay those of `7802a22`.
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — | open |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu | open |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run (part), read | omnibox F7 | open |
-| 17 | Small things (nine points) | low | read | | open |
+| 17 | Small things (nine points) | low | read; f run | | b, h, i **fixed**, `ca8109b`; f changed there, not fixed; a, c, d, e, g open |
 
 ---
 
@@ -618,6 +621,9 @@ without a word.
 
 ## 17. Small things
 
+At `ca8109b`: b, h and i are fixed, f was changed and is not fixed, and a, c, d, e and g are as
+described.
+
 a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` (:31967) sorts the
    children of the renamed element (that is AutoHotkey's `Sort` option), not the element among its
    siblings: it keeps its old place.
@@ -625,7 +631,7 @@ a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` 
 b. **«Paste clipboard file(s) into...» brings the tree back only after Cancel.**
    `PasteFilesIntoGivenFolder()` returns 1 for Cancel (:32228) and nothing after a paste (it ends
    with `msgBeepTimer()` at :32391), and `folderTreePasteClippy()` activates the tree when the result
-   is true (:32201-32203).
+   is true (:32201-32203). **Fixed in `ca8109b`**: the tree is activated after every outcome.
 
 c. **«Scan for sub-folders» can stay on a missing folder.** The item is removed by its label,
    ``&Scan for sub-folders`tSpace`` (:31636). `kMenu()` drops the key from a label when the user's
@@ -641,7 +647,13 @@ e. **Alt+D opens the selected folder.** The hidden default button is labelled «
 
 f. **«Show folder details» on a folder with no images and no sub-folders** shows its parent's path
    instead of its counts: the counts are shown only when one is not zero (`If (dirs || sizu)`
-   :31127).
+   :31127). **Changed in `ca8109b`, not fixed**: the test gained `deadFolder`, which is set when the
+   folder is not on the disk, the other case. Run, batch S, at `cd42beb` and at `ca8109b`: a folder
+   on the disk with no image and no sub-folder shows its parent's path at both; a folder removed
+   from the disk showed its parent's path, and now shows «`\Gone | 0 KB |  images |  folders`», the
+   counts blank because nothing was counted. Correction: set the flag where the folder exists. Run
+   on a trial text, not committed: the first shows «`\Empty | 0 KB | 0 images | 0 folders`», the
+   second its parent's path again.
 
 g. **«Open folder now» on a missing folder** asks about the edited image, the list and the
    selection (:30767-30774), and only then finds the folder gone (`tryOpenGivenFolder()`
@@ -650,10 +662,12 @@ g. **«Open folder now» on a missing folder** asks about the edited image, the 
 h. **The rebuild test** `thisSize := 300 + PrefsLargeFonts + uiUseDarkMode` (:30625) gives 301 for
    large fonts in light mode and for normal fonts in dark mode: if both settings change while the
    tree is hidden, it comes back with the old look. A change of the large font size
-   (`LargeUIfontValue`) is not in the test either.
+   (`LargeUIfontValue`) is not in the test either. **Fixed in `ca8109b`**: the test compares the
+   three settings, each on its own.
 
 i. **«Paste folder(s) into...» with no folder found** shows the whole clipboard text in its warning
-   (:31904).
+   (:31904). **Fixed in `ca8109b`**: the warning names the action alone. It ends with `pku`, a
+   variable that nothing sets in that function, so nothing shows of it.
 
 ## Decisions to make before fixing
 
@@ -774,6 +788,32 @@ Outside the panel's own code, found while tracing its actions.
   folder still not found counts as no current sibling. The folder with the check mark stays inert
   when picked, as the open folder is. Run, batch G: at `3e7ad12` eleven of twelve checks fail, with
   the fix the twelve pass. Not run: a drive root, whose branch is unchanged.
+- **G. A database imported from the welcome screen left the list without its type.** Insert, or
+  «Insert file(s)» in the «File» menu, with a database picked while no list is loaded, runs
+  `importSLDBintoPlainText()`: the files of the database become an unsaved list, named
+  `newFile.SLD` in the folder of the database. The function named the list and left the list type
+  (`SLDtypeLoaded`) at 0, its value on the welcome screen; the five other places that name an
+  unsaved list set 2, the type of a .SLD list. With 0, «Save files list now» was missing from the
+  «Files list» menu and from the context menu, the image information box had no «Files list opened»
+  line, and the save panel said «No saved files list currently opened». Found while fixing the
+  names of the unsaved lists (`ae07174`). **Fixed in `bb730af`**: the function sets 2 where it names
+  the list. Run, batch I: at `ca8109b` four of nine checks fail, with the fix the nine pass. The
+  list now behaves as the other unsaved lists do, also where they are refused: in the folders list
+  panel, the rename of a folder entry answers «The loaded .SLD file does not seem to be in the
+  correct format» until the list is saved; before, the rename box came. The same import with a
+  saved .SLD list or a folder open keeps the name and the type of what was open, and a file that is
+  not a database, or a database without images, loads nothing: as before, run.
+- **H. A .SLD list picked with Insert is imported only into a .SLD list or an unsaved list.**
+  `importSLDplainText()` returns at once, with no message, unless the name of what is open ends in
+  `.sld`: on the welcome screen (run), and by the same test with a folder or a database open
+  (read). A database picked the same way is imported. Found while fixing G.
+- **I. «Save settings into current .SLD file» and «Load settings from current .SLD file» always
+  refuse.** `WritePrefsIntoSLD()` and `LoadPrefsFromSLD()` begin with the test under which the
+  «Preferences» menu offers the two items, a .SLD list or a database of more than one file, and
+  return «ERROR: No valid files list currently opened» when that test holds, since `1c3b9c3`
+  (v6.1.75). Run, `WritePrefsIntoSLD()` with a saved list of two files open: the error comes and
+  the file is unchanged. Found while fixing G, after which the two items are offered for one more
+  list.
 
 ## Checked and found correct
 
@@ -844,3 +884,16 @@ Outside the panel's own code, found while tracing its actions.
   With the text of `1cb0ba9`, batches G, D and F4 pass; with the text of `ae07174`, batches G, H, D,
   E, F1, F2 and F4 pass, and batch R, which only logs, returns the nine values it returned at
   `67d7343`. Both interpreters load both texts, with and without `/iLib`.
+- The list type after a database import (`bb730af`) was run in the application under headless Wine,
+  on AutoHotkey 1.1.37.02, at `ca8109b` and with the fixed text, by
+  `.claude/scratch/import-sldb-list-type-2026-11-18/` (`fix3-tests.ahk`, `run-i.sh`; the logs in
+  `results/`). Batch I goes through `addNewFile2list()`, the function of the Insert key, with its
+  file dialog answered by the kit: a database picked on the welcome screen, with and without a
+  saved list named `newFile.SLD` next to it, then with a saved list open and with a folder open; a
+  file that is not a database and a database without images, both from the welcome screen. It
+  reads the list type, the type text of the information box, the «Files list» menu and the context
+  menu as built, the save panel's text and the box that the folders list panel's rename brings,
+  and compares them with those of an unsaved list made by `coreAddNewFiles()`. Batch H
+  passes with the fixed text. Batch S, for small thing f, selects elements of the tree and reads
+  its status line, at `cd42beb`, at `ca8109b` and on a trial text with the correction. AutoHotkey
+  1.1.37.02 loads the fixed text, with and without `/iLib`.
