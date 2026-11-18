@@ -64907,28 +64907,34 @@ combineFimImgsConvertDepth(k, modus, fif) {
    Return hFIFimgC
 }
 
-OpenFolders(dummy:="") {
+OpenFolders(dummy:="", allowDialog:=1) {
    If (AnyWindowOpen || imageLoading=1)
-      Return
+      Return -1
 
    initQPVmainDLL()
    stopSlideshow()
    If FolderExist(StrReplace(dummy, "|"))
       SelectedDir := dummy
-   Else
+   Else If (allowDialog=1)
       SelectedDir := openFoldersDialogWrapper(prevOpenFolderPath, "Select the folder to open recursively")
 
-   If (SelectedDir!="")
+   If SelectedDir
    {
+      If !FolderExist(StrReplace(SelectedDir, "|"))
+      {
+         msgBeepTimer("ERROR: The folder does not seem to exist:`n" SelectedDir)
+         Return -1
+      }
+
       SelectedDir := Trimmer(StrReplace(SelectedDir, "\\", "\"), "\")
       If askAboutFileSave(" and another image will be loaded")
-         Return
+         Return -1
 
       If askAboutSlidesListSave()
-         Return
+         Return -1
 
       If askAboutFilesSelect("discard it")
-         Return
+         Return -1
 
       newStaticFoldersListCache := []
       prevOpenFolderPath := StrReplace(SelectedDir, "|")
