@@ -31602,8 +31602,8 @@ folderTreeContextMenu() {
       {
          Try Menu, PVopenF, Delete
          kMenu("PVopenF", "Add", "Open folder now`tEnter", "folderTreeDefaultAction")
-         kMenu("PVopenF", "Add", "In Explorer`tShift+Enter", "folderTreeOpenInExplorer")
-         kMenu("PVopenF", "Add", "With a new QPV instance`tCtrl+Enter", "folderTreeOpenInNewInstance")
+         kMenu("PVopenF", "Add", "In Explorer`tCtrl+Enter", "folderTreeOpenInExplorer")
+         kMenu("PVopenF", "Add", "With a new QPV instance`tShift+Enter", "folderTreeOpenInNewInstance")
          Menu, PVfdTree, Add
          kMenu("PVfdTree", "Add", "Open", ":PVopenF")
          kMenu("PVfdTree", "Add", "&Import images into the list`tF3", "folderTreeAppendFiles")
