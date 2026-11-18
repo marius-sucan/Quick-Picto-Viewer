@@ -27068,7 +27068,7 @@ addFolderSldATfavorites(givenPath) {
    If !givenPath
       Return
 
-   If (InStr(givenPath, "\newFile.SLD") && !FileRexists(givenPath))
+   If (RegExMatch(givenPath, "i)\\newFile[^\\]*\.sld$") && !FileRexists(givenPath))
       Return msgBeepTimer("WARNING: This file list seems to be inexistend.`nIt was not added to favourites.")
 
    thisu := RegExMatch(givenPath, sldsPattern) ? ".SLD file" : "Folder"
@@ -66211,6 +66211,16 @@ importSLDBintoSLDB(whichFile) {
    SetTimer, ResetImgLoadStatus, -200
 }
 
+getUnsavedListPath(folderu, fileNamu) {
+; the name of a files list that was never saved: one that no file in the folder has
+   listu := folderu "\" fileNamu
+   If !FileExist(listu)
+      Return listu
+
+   freeu := getAutoRenamedFreePath(listu)
+   Return freeu ? freeu : listu
+}
+
 importSLDBintoPlainText(whichFile) {
    If !RegExMatch(whichFile, "i)(.\.sldb)$")
       Return
@@ -66229,7 +66239,7 @@ importSLDBintoPlainText(whichFile) {
     Sort, DynamicFoldersList, UD`n
     DynamicFoldersList := cleanDynamicFoldersList(DynamicFoldersList)
     If (!CurrentSLD && maxFilesIndex>0)
-       CurrentSLD := SelectedDir "\newFile.SLD"
+       CurrentSLD := getUnsavedListPath(SelectedDir, "newFile.SLD")
 
     GenerateRandyList()
     RandomPicture()
@@ -66317,7 +66327,7 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
        If !SelectedDir
           SelectedDir := "\UnsavedList"
        SLDtypeLoaded := 2
-       CurrentSLD := SelectedDir "\NewFile.SLD"
+       CurrentSLD := getUnsavedListPath(SelectedDir, "NewFile.SLD")
     }
 
     mustOpenStartFolder := ""
@@ -66519,7 +66529,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
          If !CurrentSLD
          {
             SLDtypeLoaded := 2
-            CurrentSLD := SelectedDir "\NewFilesList.SLD"
+            CurrentSLD := getUnsavedListPath(SelectedDir, "NewFilesList.SLD")
          }
 
          ResetImgLoadStatus()
@@ -66562,7 +66572,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
       If !CurrentSLD
       {
          SLDtypeLoaded := 2
-         CurrentSLD := SelectedDir "\NewFilesList.SLD"
+         CurrentSLD := getUnsavedListPath(SelectedDir, "NewFilesList.SLD")
          RandomPicture()
       }
    }
@@ -66833,7 +66843,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
          } Else
          {
             SLDtypeLoaded := 2
-            CurrentSLD := lastOne "\newFile.SLD"
+            CurrentSLD := getUnsavedListPath(lastOne, "newFile.SLD")
          }
       }
 
@@ -97278,7 +97288,7 @@ addSeedFoldersEntries(oldFoldersList, newFoldersList, ByRef addedList:="") {
     DynamicFoldersList := cleanDynamicFoldersList(newFoldersList)
     If (InStr(DynamicFoldersList, ":") && !CurrentSLD)
     {
-       CurrentSLD := prevOpenFolderPath "\NewFilesList.SLD"
+       CurrentSLD := getUnsavedListPath(prevOpenFolderPath, "NewFilesList.SLD")
        SLDtypeLoaded := 2
     }
 
