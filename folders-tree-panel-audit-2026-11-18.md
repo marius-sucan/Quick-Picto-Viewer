@@ -16,8 +16,9 @@ recursively?» no longer scans, and the box can reopen the .SLD list or the data
 (`6d419b7`, decision 2 kept); the «`\\`» menu's folder items and Ctrl/Alt+Page Up/Down ask the three
 questions of «Open folder now» first (`9daf923`); the «Open» submenu's hints follow the code (`dc69bd9`,
 decision 1). The three were run in the application under headless Wine, before and after the fixes
-(batches F1 to F3 of `.claude/scratch/folders-tree-fixes-2026-11-18/`). The line numbers below stay
-those of `7802a22`.
+(batches F1 to F3 of `.claude/scratch/folders-tree-fixes-2026-11-18/`). Decision 11, raised by the
+fix of finding 1 and settled the same day: the «`\\`» menu's moves from a list pass the list when it
+has its file (`548359a`, batch F4). The line numbers below stay those of `7802a22`.
 
 ## Terms
 
@@ -50,9 +51,9 @@ those of `7802a22`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `6d419b7` |
+| # | Finding | Harm | Checked | Shared with | Status at `548359a` |
 |---|---------|------|---------|-------------|--------|
-| 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database |
+| 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11) |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
 | 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code | **fixed**, `dc69bd9`: the hints change (decision 1) |
 | 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — | open |
@@ -131,12 +132,13 @@ finds nothing reopens that list with `OpenSLD()`, at the file shown before; unti
 screen comes. With no list loaded, a previous folder that is gone, or a list with no file behind it
 (the favourites, the histories), the box has no checkbox and «No» ends on the welcome screen. After
 a reopen, `prevOpenFolderPath` keeps the list's folder, which `OpenSLD()` records, instead of the
-list file. Decision 2: kept; with a plain folder open there is still no question. Left as it was,
-and open (decision 11): with a .SLD list or a database open, the items of the «`\\`» menu's
-«Sibling folders», «Sub-folders» and «Breadcrumb folders hierarchy» pass the current file's folder
-as the previous one, so the box never comes and its checkbox cannot act, and a scan that finds
-nothing opens that folder with its sub-folders in place of the list; Ctrl/Alt+Page Up/Down and the
-menu's other moves need a plain folder. Run, batch F1 (eleven cases, each box answered from a
+list file. Decision 2: kept; with a plain folder open there is still no question. Decision 11, by
+Marius's answer (`548359a`): with a .SLD list or a database open whose file exists, the items of the
+«`\\`» menu's «Sibling folders», «Sub-folders» and «Breadcrumb folders hierarchy» pass the list
+too, so the box comes there with its checkbox; with the favourites, a history list or a list whose
+file was deleted they still pass the current file's folder, so there is no question, and a scan that
+finds nothing opens that folder with its sub-folders. Ctrl/Alt+Page Up/Down and the menu's other
+moves need a plain folder. Run, batch F1 (eleven cases, each box answered from a
 timer): at `0013f5f` seven fail, «No» scanning in each of the six cases that answer it and no list
 being reopened; with the text of `6d419b7` the eleven pass, the checkbox comes up as described, and
 the reopened database answers a query.
@@ -677,6 +679,8 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
     (`FileExploreSiblingsNav()`, `FileExploreUpDownLevel()`, `folderzNavInvokeSubs()`). Pass the
     list instead, so that they ask «Scan recursively?» with the checkbox and can reopen the list, or
     leave them?
+    **Settled**: pass the list when its file exists (`548359a`); the favourites, the histories and a
+    deleted list file keep the current file's folder.
 
 ## Unverified leads
 
@@ -774,3 +778,8 @@ Outside the panel's own code, found while tracing its actions.
   called as the tree calls it once its own questions are answered, the navigation through its menu
   functions, the tree's menu as built, every box answered from a timer. AutoHotkey_H 1.1.33.10 and
   AutoHotkey 1.1.37.02 load the fixed text, with and without `/iLib`.
+- Decision 11 (`548359a`) was run the same way, batch F4, at `e30c3e7` and with the new text: with a .SLD
+  list, the «Breadcrumb folders hierarchy», «Sub-folders» and «Sibling folders» items to folders
+  without images directly in them; with a database, a sibling; then a favourites-like list and a
+  plain folder, which behave as before. At `e30c3e7` the four list cases fail, with no box; with the
+  new text the six pass, and batches F1 and F2 pass again.
