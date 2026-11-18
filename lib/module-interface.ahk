@@ -2007,7 +2007,10 @@ uiWM_DROPFILES(wParam, lParam, msg, hwnd) {
       Return
 
    If (MsgBox2hwnd || whileLoopExec=1 || runningLongOperation=1 || imageLoading=1)
-      Return
+   {
+      DllCall("shell32\DragFinish", "UPtr", wParam)
+      Return 0
+   }
 
    droppedList := ""
    ; 0xFFFFFFFF: DragQueryFile() gives the count of dropped items
