@@ -87776,7 +87776,6 @@ compareFoldersList(mainFoldersListu, foldersListu) {
    mainFoldersListu .= "`n" obju.newEntries
    Sort, mainFoldersListu, UD`n
    obju.newListu := mainFoldersListu
-
    Return obju
 }
 
@@ -87792,7 +87791,7 @@ BTNregenerateEntireList() {
               countu++
        }
 
-       If countu
+       If (countu && maxFilesIndex)
        {
           msgu := (countu=1) ? "The seed folder will be scanned again" : "All " groupDigits(countu) " seed folders will be scanned again"
           titleu := (AnyWindowOpen=2) ? "Regenerate entire index" : "Rescan all"
@@ -94334,7 +94333,7 @@ BtnHelpStaticFoldersPanel() {
 }
 
 BtnHelpDynaFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Folders dropped on the list are added the same way, scanned with their subfolders; a drop without folders adds the folders of its first five image files, without their subfolders.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Dropping folders from Explorer on the list is also supported.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
@@ -96621,11 +96620,15 @@ PanelDynamicFolderzWindow(dummy:=0) {
     } Else
        Gui, Add, Button, xs+0 y+5 h%thisBtnHeight% w60 gBTNaddNewFolder2list, &Add
 
+    btnWid3 := (PrefsLargeFonts=1) ? 40 : 20
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNremDynaSelFolder, &Remove
-    Gui, Add, Button, x+5 hp wp+30 gBTNregenerateEntireList, R&escan all
+    Gui, Add, Button, x+5 hp wp gBTNregenerateEntireList +hwndhTemp, R&escan
+    ToolTip2ctrl(hTemp, "Rescan selected folder")
+    Gui, Add, Button, x+0 hp w%btnWid3% gBTNregenerateEntireList +hwndhTemp, all
+    ToolTip2ctrl(hTemp, "Rescan all folders")
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNcopyDynaFoldersList, &Copy list
     Gui, Add, Button, x+5 hp wp+5 gBTNpasteDynaFoldersList, &Paste list
-    Gui, Add, Button, x+5 hp wp+5 ginvokePanelDynaFoldersContextMenu, &More
+    Gui, Add, Button, x+5 hp wp-10 ginvokePanelDynaFoldersContextMenu, &More
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Manage seed folders list: " appTitle)
     SetTimer, uiPopulateDynamicFolderzList, -500
 }
@@ -97172,12 +97175,15 @@ BTNpasteDynaFoldersList() {
     oldFoldersList := newFoldersList := getDynamicFoldersList()
     ; Explorer's «Copy as path» puts each path in quotation marks
     pastedList := StrReplace(SubStr(Clipboard, 1, 50432), """")
-    skippedLines := 0
+    added := skippedLines := 0
     Loop, Parse, pastedList, `n
     {
+        If (A_Index>2000 || added>=100)
+           Break
+
         line := RegExReplace(Trimmer(A_LoopField), "\\+$")
         fileTest := StrReplace(line, "|")
-        If (fileTest="")
+        If !fileTest
            Continue
 
         If (!FolderExist(fileTest) || !RegExMatch(fileTest, "^.:($|\\.)"))
@@ -97186,6 +97192,7 @@ BTNpasteDynaFoldersList() {
            Continue
         }
 
+        added++
         newFoldersList .= line "`n"
     }
 
@@ -97194,11 +97201,11 @@ BTNpasteDynaFoldersList() {
     ResetImgLoadStatus()
     PanelDynamicFolderzWindow()
     If addedEntries
-       msgu := groupDigits(addedEntries) " seed folder(s) added to the list. To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
-    If skippedLines
-       msgu .= (msgu ? "`n" : "") groupDigits(skippedLines) " pasted line(s) skipped: not a folder found on the disk"
-    If msgu
-       msgBeepTimer(msgu, skippedLines ? 300 : 0)
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list.`nTo index their files, rescan the newly added folder."
+    Else
+       msgu := "WARNING: No new folder paths identified in the clipboard."
+
+    msgBeepTimer(msgu, addedEntries ? 0 : 300)
 }
 
 addSeedFoldersEntries(oldFoldersList, newFoldersList, ByRef addedList:="") {
@@ -97259,21 +97266,28 @@ addDroppedSeedFolders(droppedList) {
     }
 
     foldersList := imgFolders := ""
-    imgFiles := skippedItems := 0
+    imgFiles := added := skippedItems := 0
     Loop, Parse, droppedList, `n
     {
+        If (A_Index>2000 || added>=100)
+           Break
+
         line := RegExReplace(Trimmer(A_LoopField), "\\+$")
-        If (line="")
+        If !line
            Continue
 
         If (FolderExist(line) && RegExMatch(line, "^.:($|\\.)"))
         {
+           added++
            foldersList .= line "`n"
            Continue
         }
 
         skippedItems++
-        If (imgFiles<5 && RegExMatch(line, RegExFilesPattern))
+        If (imgFiles>5)
+        {
+           Continue
+        } Else If (imgFiles<5 && RegExMatch(line, RegExFilesPattern))
         {
            imgFiles++
            thisFolder := SubStr(line, 1, InStr(line, "\", 0, -1) - 1)
@@ -97288,7 +97302,7 @@ addDroppedSeedFolders(droppedList) {
 
     If (foldersList="")
     {
-       msgBeepTimer("Nothing was added to the seed folders list: no folder or image file found on a drive was dropped", 300)
+       msgBeepTimer("WARNING: Nothing was added to the seed folders list: no new folder found to add.")
        Return
     }
 
@@ -97309,14 +97323,11 @@ addDroppedSeedFolders(droppedList) {
     }
 
     If addedEntries
-       msgu := groupDigits(addedEntries) " seed folder(s) added to the list" (fromImages ? ": the folders of the dropped image files, without their subfolders" : "") ". To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list.`nTo index their files, please rescan the newly added folders."
     Else
-       msgu := (fromImages ? "The folder(s) of the dropped image files are" : "The dropped folder(s) are") " already in the seed folders list, or inside a seed folder scanned with its subfolders"
+       msgu := "The dropped folder(s) are already in the seed folders list, or inside a seed folder scanned with its subfolders."
 
-    mustBeep := (skippedItems && !fromImages) ? 1 : 0
-    If mustBeep
-       msgu .= "`n" groupDigits(skippedItems) " dropped item(s) skipped: not a folder found on a drive"
-    msgBeepTimer(msgu, mustBeep ? 300 : 0)
+    msgBeepTimer(msgu, addedEntries ? 0 : 300)
 }
 
 BTNremDynaSelFolder() {
