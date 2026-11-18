@@ -97200,7 +97200,7 @@ BTNpasteDynaFoldersList() {
     ResetImgLoadStatus()
     PanelDynamicFolderzWindow()
     If addedEntries
-       msgu := groupDigits(addedEntries) " seed folder(s) added to the list.`nTo index their files, rescan the newly added folder."
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list.`nTo index their files, rescan the newly added folders."
     Else
        msgu := "WARNING: No new folder paths identified in the clipboard."
 
