@@ -11,6 +11,14 @@ follows from the code and was not run. Two facts were run (findings 11 and 16); 
 else is read. Nothing was run on Windows, and the application itself was not run for this
 audit.
 
+**Findings 1 to 3, 2026-11-18, fixed at `6d419b7`**, with Marius's answers: «No» to «Scan
+recursively?» no longer scans, and the box can reopen the .SLD list or the database that was open
+(`6d419b7`, decision 2 kept); the «`\\`» menu's folder items and Ctrl/Alt+Page Up/Down ask the three
+questions of «Open folder now» first (`9daf923`); the «Open» submenu's hints follow the code (`dc69bd9`,
+decision 1). The three were run in the application under headless Wine, before and after the fixes
+(batches F1 to F3 of `.claude/scratch/folders-tree-fixes-2026-11-18/`). The line numbers below stay
+those of `7802a22`.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -42,25 +50,25 @@ audit.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with |
-|---|---------|------|---------|-------------|
-| 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` |
-| 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu |
-| 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code |
-| 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — |
-| 5 | «Rename folder» looks for the new name inside the folder instead of beside it | medium | read | omnibox F2 |
-| 6 | «Rename folder» with «Perform search and replace»: the opened folder, the seed folders list and the folders list keep the old path | medium | read | omnibox F2 |
-| 7 | A folder dropped on a missing folder: the destination is recreated, then nothing is copied or moved | medium | read | the omnibox's drags |
-| 8 | «Copy/Move selected file(s) into...» and file drops: a destination of four characters or fewer opens the quick file actions panel | medium | read | the omnibox's copy and move |
-| 9 | Files Alt+dragged from the main window: Alt still held half a second after the drop opens Explorer instead | low | read | drops on the omnibox |
-| 10 | «Import images into the list» moves the current file to the end of the list, also when nothing was imported | low | read | — |
-| 11 | A label whose case differs from the disk's: the tree lists the folder twice (every database list) | medium | run (part), read | — |
-| 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read | — |
-| 13 | A folder moved by a drag stays in the tree at its old place | low | read | — |
-| 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — |
-| 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu |
-| 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run (part), read | omnibox F7 |
-| 17 | Small things (nine points) | low | read | |
+| # | Finding | Harm | Checked | Shared with | Status at `6d419b7` |
+|---|---------|------|---------|-------------|--------|
+| 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database |
+| 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
+| 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code | **fixed**, `dc69bd9`: the hints change (decision 1) |
+| 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — | open |
+| 5 | «Rename folder» looks for the new name inside the folder instead of beside it | medium | read | omnibox F2 | open |
+| 6 | «Rename folder» with «Perform search and replace»: the opened folder, the seed folders list and the folders list keep the old path | medium | read | omnibox F2 | open |
+| 7 | A folder dropped on a missing folder: the destination is recreated, then nothing is copied or moved | medium | read | the omnibox's drags | open |
+| 8 | «Copy/Move selected file(s) into...» and file drops: a destination of four characters or fewer opens the quick file actions panel | medium | read | the omnibox's copy and move | open |
+| 9 | Files Alt+dragged from the main window: Alt still held half a second after the drop opens Explorer instead | low | read | drops on the omnibox | open |
+| 10 | «Import images into the list» moves the current file to the end of the list, also when nothing was imported | low | read | — | open |
+| 11 | A label whose case differs from the disk's: the tree lists the folder twice (every database list) | medium | run (part), read | — | open |
+| 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read | — | open |
+| 13 | A folder moved by a drag stays in the tree at its old place | low | read | — | open |
+| 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — | open |
+| 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu | open |
+| 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run (part), read | omnibox F7 | open |
+| 17 | Small things (nine points) | low | read | | open |
 
 ---
 
@@ -115,6 +123,22 @@ Correction: `If (msgResult="Yes")`. A list file could be reopened with `OpenSLD(
 `coreOpenFolder(oldFolder, …)` reopens a folder. Whether the scan without a question should stay
 when a folder was open is decision 2.
 
+**Fixed in `6d419b7`**, by Marius's answers. Only «Yes» scans with the sub-folders. When the list open
+before is a .SLD or .SLDB file that still exists, the box has the checkbox «Reopen the initial files
+list if no images are found», ticked the first time and then as the user last left it until QPV
+closes (a `Static` in `tryOpenGivenFolder()`). Ticked, «No» or a scan with the sub-folders that
+finds nothing reopens that list with `OpenSLD()`, at the file shown before; unticked, the welcome
+screen comes. With no list loaded, a previous folder that is gone, or a list with no file behind it
+(the favourites, the histories), the box has no checkbox and «No» ends on the welcome screen. After
+a reopen, `prevOpenFolderPath` keeps the list's folder, which `OpenSLD()` records, instead of the
+list file. Decision 2: kept; with a plain folder open there is still no question. Unchanged as well:
+when a list is open, the «`\\`» menu's items and Ctrl/Alt+Page Up/Down pass the current file's
+folder as the previous one, so they never ask, and a scan that finds nothing opens that folder with
+its sub-folders. Run, batch F1 (eleven cases, each box answered from a timer): at `0013f5f` seven
+fail, «No» scanning in each of the six cases that answer it and no list being reopened; with the
+text of `6d419b7` the eleven pass, the checkbox comes up as described, and the reopened database
+answers a query.
+
 ## 2. The «`\\`» button's folder items open folders without the save and selection questions
 
 `invokeFoldersListerMenu()` :73094; its items run `folderzNavInvokeSib()` :73356,
@@ -154,6 +178,20 @@ in the thumbnails view on a plain list (:2225-2238).
 Correction: ask the three questions before these items open a folder, at one place that all of
 them pass through before `tryOpenGivenFolder()`.
 
+**Fixed in `9daf923`**, by Marius's answer: `tryOpenGivenFolder()` has a fourth parameter, `askFirst`.
+With 1 it asks «Save image», «Save files list» and «Discard selection» once it found the folder and
+before it closes the database or the list, and it returns «cancel» when one of them stops it.
+`FileExploreSiblingsNav()`, `FileExploreUpDownLevel()` and `folderzNavInvokeSubs()` pass 1, so the
+«`\\`» button, Shift+F4, the toolbar's folders button and Ctrl/Alt+Page Up/Down ask. The tree, the
+omnibox and the folders list panels ask on their own and pass nothing: «Discard selection» has no
+300 ms memo, and it would come twice. After «cancel» the sibling navigation forgets the position it
+had moved to, so the next step starts from the folder still open. Run, batch F2: at `0013f5f` no
+question comes on any of the seven moves; with the text of `6d419b7`, «Discard selection» and «Save
+files list» come up for «Open next sibling», for the «Sub-folders», «Breadcrumb folders hierarchy»
+and «Sibling folders» items and for «Breadcrumb higher level»; «No» and «Cancel» leave the list and
+the selection as they were, the next «Open next sibling» opens the sibling after the open folder,
+and `tryOpenGivenFolder()` called as the tree calls it still asks nothing.
+
 ## 3. Shift and Ctrl do the reverse of the menu's hints
 
 `folderTreeDefaultAction()` :30728; the menu's «Open» submenu :31603-31608
@@ -186,6 +224,16 @@ Elsewhere: the main window's menus give Ctrl+Enter to «Open file in a new QPV i
 :70019); the folders list panels' `BtnPanelManageFoldersActus()` (:97465) reads Shift and Ctrl as
 the tree does, and their menu shows no key for these two items (:94114-94116). Which side to
 change is decision 1.
+
+**Fixed in `dc69bd9`**, by Marius's answer to decision 1: «In Explorer» shows Ctrl+Enter and «With a
+new QPV instance» Shift+Enter, as the code reads the keys and as
+`resources/help-keyboard-shortcuts.txt` (:255-256) has said since v5.2.0; the hints came with
+v5.6.5. The keys are unchanged. Keys pressed in the tree reach only its hidden default button:
+`identifyParentWind()` counts the tree as a child of the main window, and that branch of
+`KeyboardResponder()` has nothing for Enter in the tree, so the main window's Shift+Enter (crop) and
+Ctrl+Enter (new instance) never run from it. Run, batch F3: the menu as built reads «In Explorer
+[Ctrl+Enter]» and «With a new QPV instance [Shift+Enter]» (at `0013f5f`: Shift+Enter and
+Ctrl+Enter). Lead C is still not run.
 
 ## 4. No list loaded: Shift+F3, or a drop with Shift held, opens a new QPV instance
 
@@ -583,9 +631,11 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
 1. **Shift and Ctrl** (finding 3): keep the code (Shift = new instance, Ctrl = Explorer, as the
    folders list panels do) and change the hints, or keep the hints (Ctrl+Enter = new instance, as in
    the main window's menus) and swap the code?
+   **Settled**: the hints change (`dc69bd9`).
 2. **The scan with sub-folders without a question** (finding 1): when a plain folder was open and
    the new folder holds no image directly, `tryOpenGivenFolder()` scans it with its sub-folders
    without asking. Keep, or ask every time? Six other callers share it.
+   **Settled**: kept (`6d419b7`).
 3. **What the rename's tick carries** (finding 6): the opened folder (`CurrentSLD`), the seed folders
    list, the folders list (in a database its tables, with the captions and audio notes), or a part of
    these? And should the tick be offered when no list is loaded?
@@ -642,7 +692,7 @@ before any fix.
   resolves against QPV's working folder (`SetWorkingDir` :69). F7 on such an element offers to
   recreate it (:31708-31721), and would create `server\share\dir` inside QPV's folder. Needs a share.
 - **C. Shift+Enter and Ctrl+Enter** (finding 3): whether the dialog manager hands them to the hidden
-  default button was not run.
+  default button was not run, and still is not: the fix of finding 3 changes only the hints.
 
 ## Seen in passing
 
@@ -659,6 +709,17 @@ Outside the panel's own code, found while tracing its actions.
   replaced by any open (finding 1's callers) without a word.
 - **C. The comment `; F3` on `c=186`** (:30858): the key is `;` (VK_OEM_1), which opens the omnibox
   at the element.
+- **D. «Selected file folder» asks two of the three questions.** `OpenQPVfileFolder()` (:2819), the
+  «`\\`» menu's item for the current file's folder with a .SLD list or a database, also Alt+E in the
+  thumbnails view, asks «Save image» and «Save files list» but not «Discard selection» before it
+  replaces the list (read; found while fixing finding 2).
+- **E. The sibling navigation after a sibling with no images.** When `tryOpenGivenFolder()` reports
+  a failure, `FileExploreSiblingsNav()` sets its position back to `initialLevel` (:65175-65176), the
+  value it held when the call began. That value is blank on the first move after QPV starts and
+  after the tree, the omnibox or a folders list panel opened a folder; the next step then computes a
+  blank level (`"" + 1` is blank), and `clampInRange()` with wrap-around turns blank into the last
+  sibling. So the next Alt+Page Down after a sibling with no images jumps to the last sibling (read;
+  found while fixing finding 2).
 
 ## Checked and found correct
 
@@ -699,3 +760,9 @@ Outside the panel's own code, found while tracing its actions.
 - Not run: the application itself, and with it every key, menu item and drag. The folders list
   audit's kit (`.claude/scratch/static-folders-panel-2026-11-10/app/`) can drive the tree if these
   findings need runs.
+- The fixes of findings 1 to 3 were run in the application itself under headless Wine, at `0013f5f`
+  and with the fixed text, by `.claude/scratch/folders-tree-fixes-2026-11-18/` (that kit with new
+  test wrappers, `tree-tests.ahk`; `run-all.sh`; the logs in `app/results/`): `tryOpenGivenFolder()`
+  called as the tree calls it once its own questions are answered, the navigation through its menu
+  functions, the tree's menu as built, every box answered from a timer. AutoHotkey_H 1.1.33.10 and
+  AutoHotkey 1.1.37.02 load the fixed text, with and without `/iLib`.
