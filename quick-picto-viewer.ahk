@@ -97192,7 +97192,9 @@ BTNpasteDynaFoldersList() {
            Continue
         }
 
-        added++
+        ; only the folders not listed yet count toward the cap
+        If !InStr("`n" oldFoldersList, "`n" Format("{:L}", line) "`n")
+           added++
         newFoldersList .= line "`n"
     }
 
@@ -97265,6 +97267,7 @@ addDroppedSeedFolders(droppedList) {
        Return
     }
 
+    oldFoldersList := getDynamicFoldersList()
     foldersList := imgFolders := ""
     imgFiles := added := skippedItems := 0
     Loop, Parse, droppedList, `n
@@ -97278,7 +97281,9 @@ addDroppedSeedFolders(droppedList) {
 
         If (FolderExist(line) && RegExMatch(line, "^.:($|\\.)"))
         {
-           added++
+           ; only the folders not listed yet count toward the cap
+           If !InStr("`n" oldFoldersList, "`n" Format("{:L}", line) "`n")
+              added++
            foldersList .= line "`n"
            Continue
         }
@@ -97306,7 +97311,6 @@ addDroppedSeedFolders(droppedList) {
        Return
     }
 
-    oldFoldersList := getDynamicFoldersList()
     addedEntries := addSeedFoldersEntries(oldFoldersList, oldFoldersList foldersList, addedList)
     If addedEntries
     {
