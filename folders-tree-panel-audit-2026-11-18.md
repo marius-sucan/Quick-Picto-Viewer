@@ -20,8 +20,9 @@ decision 1). The three were run in the application under headless Wine, before a
 fix of finding 1 and settled the same day: the «`\\`» menu's moves from a list pass the list when it
 has its file (`548359a`, batch F4). Two effects of that on the sibling navigation, found by a check
 of `548359a`, are fixed in `67d7343`: a sibling answered «No» keeps its name in «Sibling folders»,
-and the navigation's tooltip comes only for a folder that was opened. The line numbers below stay
-those of `7802a22`.
+and the navigation's tooltip comes only for a folder that was opened. «Seen in passing» E and F, the
+position and the current folder of the sibling navigation, are fixed in `1cb0ba9`. The line numbers
+below stay those of `7802a22`.
 
 ## Terms
 
@@ -161,6 +162,11 @@ opened. Run, batches R and D of `.claude/scratch/commit-548359a-check-2026-11-18
 `tryOpenGivenFolder()` the end state is the same before and after, and only «No», a closed box and
 the welcome screen after a scan that found nothing return another value; of ten checks through the
 «Sibling folders» items, seven fail at `68bf562` and the ten pass with the text of `67d7343`.
+
+An unsaved list that carried the name of a saved list of its folder (`NewFilesList.SLD`,
+`NewFile.SLD`) passed for that file in the test above, so the box had the checkbox and reopened the
+saved list. Since `ae07174` an unsaved list takes a name that no file has, the first free
+«name [N].SLD», and the box comes without the checkbox.
 
 ## 2. The «`\\`» button's folder items open folders without the save and selection questions
 
@@ -751,7 +757,23 @@ Outside the panel's own code, found while tracing its actions.
   after the tree, the omnibox or a folders list panel opened a folder; the next step then computes a
   blank level (`"" + 1` is blank), and `clampInRange()` with wrap-around turns blank into the last
   sibling. So the next Alt+Page Down after a sibling with no images jumps to the last sibling (read;
-  found while fixing finding 2).
+  found while fixing finding 2). **Fixed in `1cb0ba9`**: the position a move starts from is taken
+  after the current folder is looked up (F), so it is never blank. Run, batch G: at `3e7ad12` the
+  step after a failed first move opens the last sibling; with the fix it opens the next one, and
+  the sibling with no images is skipped in both directions.
+- **F. The sibling navigation keeps a stale current folder.** `FileExploreSiblingsNav()` looked for
+  the current folder among its siblings only when their parent folder changed. With a .SLD list or a
+  database open, a move to a file in another folder under the same parent left the check mark of
+  «Sibling folders» on the folder left behind, and picking that folder did nothing. With a plain
+  folder opened by a route that does not reset the navigation (the tree, the omnibox and the folders
+  list panels reset it), next and previous stepped from the folder left behind. A database also
+  missed a folder named with an accented capital: its paths are in lower case, and `=` folds only A
+  to Z. Found by the check of `548359a`. **Fixed in `1cb0ba9`**: at every call from outside, the name
+  is looked up among the siblings remembered, with no disk read, and compared with `Format("{:L}")`;
+  when it is not among them, a folder made since, the parent folder is read again, once, and a
+  folder still not found counts as no current sibling. The folder with the check mark stays inert
+  when picked, as the open folder is. Run, batch G: at `3e7ad12` eleven of twelve checks fail, with
+  the fix the twelve pass. Not run: a drive root, whose branch is unchanged.
 
 ## Checked and found correct
 
@@ -810,3 +832,15 @@ Outside the panel's own code, found while tracing its actions.
   closed, and the checkbox ticked or not. Batches F1, F2 and F4 pass with the fixed text, F1 once
   its two cases that answer «No» with a list open expect «declined» in place of 1. AutoHotkey_H
   1.1.33.10 and AutoHotkey 1.1.37.02 load the fixed text, with and without `/iLib`.
+- The current sibling (`1cb0ba9`) and the unsaved lists (`ae07174`) were run the same way, at
+  `3e7ad12` and with the fixed texts, by the same kit (`fix2-tests.ahk`). Batch G: a list whose
+  current file changes folder, a folder opened by another route (`OpenFolders()`, as the folder
+  favourites and the omnibox open one), a first move that fails, a folder made since, a folder gone
+  from the disk, a database with a folder named «Été». Batch H names an
+  unsaved list through `coreAddNewFiles()`, `addNewFolder2list()`, `addSeedFoldersEntries()` and
+  `importSLDBintoPlainText()`, with and without a saved list of that name in the folder, then saves
+  it, opens a folder over it and offers it to the folder favourites; the rescan branch of
+  `addNewFolder2list()` and the drop of several folders name the list the same way and were read.
+  With the text of `1cb0ba9`, batches G, D and F4 pass; with the text of `ae07174`, batches G, H, D,
+  E, F1, F2 and F4 pass, and batch R, which only logs, returns the nine values it returned at
+  `67d7343`. Both interpreters load both texts, with and without `/iLib`.
