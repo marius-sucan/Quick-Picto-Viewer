@@ -22,7 +22,7 @@ audit.
 - **Selected element**: the one every action works on (`TV_GetSelection()`).
 - **The menu**: the tree's own menu, `PVfdTree`. A right-click on an element, the Menu key
   and the «>» button («Menu options») show it.
-- **The «\\» button**: the first button under the tree (tooltip «Folder tree»). It runs
+- **The «`\\`» button**: the first button under the tree (tooltip «Folder tree»). It runs
   `invokeFoldersListerMenu()` (:73094), the menu of the current folder's siblings,
   sub-folders and parents, which Shift+F4 opens in the main window
   (`chainInvokerFoldersListMenu()` :69305). With no folder to show, it shows the menu instead
@@ -45,7 +45,7 @@ audit.
 | # | Finding | Harm | Checked | Shared with |
 |---|---------|------|---------|-------------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` |
-| 2 | The «\\» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu |
+| 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu |
 | 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code |
 | 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — |
 | 5 | «Rename folder» looks for the new name inside the folder instead of beside it | medium | read | omnibox F2 |
@@ -58,7 +58,7 @@ audit.
 | 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read | — |
 | 13 | A folder moved by a drag stays in the tree at its old place | low | read | — |
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — |
-| 15 | The «\\» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu |
+| 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run (part), read | omnibox F7 |
 | 17 | Small things (nine points) | low | read | |
 
@@ -103,9 +103,10 @@ open is opened again; a .SLD list or a database is not (`FolderExist()` of the l
 false), and the welcome screen comes instead. A database was closed at the start (:73304-73305),
 before anything was found.
 
-Shared helper: `tryOpenGivenFolder()` also opens a folder given on the command line
-(`initializeAppWithGivenArguments()` :2469, which is how «With a new QPV instance» opens a
-folder without its sub-folders), the omnibox's «Open folder» (:27133), the sibling and parent
+Shared helper: `tryOpenGivenFolder()` also opens a folder given on the command line with a
+leading `|` (`initializeAppWithGivenArguments()` :2469; the seed folders panel's «With a new QPV
+instance» sends one for an entry scanned without its sub-folders, :97504), the omnibox's «Open
+folder» (:27133), the sibling and parent
 navigation (`FileExploreUpDownLevel()` :65090, `FileExploreSiblingsNav()` :65172), the
 «Sub-folders» items (`folderzNavInvokeSubs()` :73290) and the folders list panels' «Open folder
 now» (`BtnPanelManageFoldersActus()` :97526).
@@ -114,7 +115,7 @@ Correction: `If (msgResult="Yes")`. A list file could be reopened with `OpenSLD(
 `coreOpenFolder(oldFolder, …)` reopens a folder. Whether the scan without a question should stay
 when a folder was open is decision 2.
 
-## 2. The «\\» button's folder items open folders without the save and selection questions
+## 2. The «`\\`» button's folder items open folders without the save and selection questions
 
 `invokeFoldersListerMenu()` :73094; its items run `folderzNavInvokeSib()` :73356,
 `folderzNavInvokeSubs()` :73267, `folderzNavInvokeParents()` :73364 and the four
@@ -133,7 +134,7 @@ If askAboutFilesSelect("discard it")
    Return
 ```
 
-The «\\» menu's items reach `tryOpenGivenFolder()` through `FileExploreSiblingsNav()` (:65093),
+The «`\\`» menu's items reach `tryOpenGivenFolder()` through `FileExploreSiblingsNav()` (:65093),
 `FileExploreUpDownLevel()` (:64988) or directly (:73290), and none of them asks any of the
 three (read: `FileExploreSiblingsNav()`, `FileExploreUpDownLevel()`, `folderzNavInvokeSubs()`,
 `tryOpenGivenFolder()` and `coreOpenFolder()` :65185 call none of them). The «Sibling folders», «Sub-folders» and «Breadcrumb folders hierarchy» submenus are
@@ -482,7 +483,7 @@ Correction: `If folderTreeIsDriveRoot(thisFolder) Return` in `folderTreeCutCopyF
 F12, Enter and `;` also work on a drive element, while the menu offers none of them there
 (decision 5).
 
-## 15. The «\\» menu: the «more folders» notes land in the wrong submenu, and the count is one short
+## 15. The «`\\`» menu: the «more folders» notes land in the wrong submenu, and the count is one short
 
 `invokeFoldersListerMenu()` :73113-73177
 
@@ -593,7 +594,7 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
    drive element or a missing folder is selected (`addBonus`, :31598-31657; this split dates from
    `e0b347a`, v5.6.7). With a folder selected, which is almost always, the «>» button («Menu
    options») shows the folder actions alone, and «Dark mode» and «Close panel» can then be reached
-   only by selecting a drive. The «\\» button offers three of them when a list is loaded
+   only by selecting a drive. The «`\\`» button offers three of them when a list is loaded
    (:73233-73244). Show them always, for example in a submenu?
 5. **Drive elements**: the menu offers no folder action on a drive (:31598), while the keys F3
    (import), F7 (create a folder), F12 (properties), Enter (open) and `;` (omnibox) work on one, and
@@ -671,9 +672,12 @@ Outside the panel's own code, found while tracing its actions.
 - The three drag routes keep «Do not ask again» in a `Static` (:9611, :30827, :42450).
 - The message box results compared with «delete», «Yes» and «Copy» are the button texts without
   `&` (lib/msgbox2.ahk:469).
-- The quick search does not list the tree's menu (`buildQuickSearchMenus()` :43081 builds the main
-  menus). The tree's functions it can reach are those of the «\\» menu while the tree is open
-  (:73233-73244); «Copy folder tree path» there passes its name, which holds «copy» (:30691).
+- The quick search lists neither the tree's menu nor the «`\\`» menu's items: `buildQuickSearchMenus()`
+  (:43081) builds the main menus, and the «`\\`» menu is built only when it is shown
+  (`invokeFoldersListerMenu()` is called from :2088, :30684, :69307 and :105532-105534). From the
+  quick search the tree is reached through «Show folders tree panel» (`MenuPanelFoldersTree()`) and
+  «Folders explorer menu for active file» (`chainInvokerFoldersListMenu()` :69305, which shows the
+  «`\\`» menu). In that menu, «Copy folder tree path» passes its name, which holds «copy» (:30691).
 - `FolderExist("C:")` is the root of the drive (:44356-44357), so drive elements open and scan.
 - The «Sub-folders» items carry the index of a `Loop, Files` over files and folders, and
   `folderzNavInvokeSubs()` counts the same way (:73161-73168, :73277-73284): the right folder opens,
