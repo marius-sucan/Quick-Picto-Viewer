@@ -66242,7 +66242,10 @@ importSLDBintoPlainText(whichFile) {
     Sort, DynamicFoldersList, UD`n
     DynamicFoldersList := cleanDynamicFoldersList(DynamicFoldersList)
     If (!CurrentSLD && maxFilesIndex>0)
+    {
+       SLDtypeLoaded := 2
        CurrentSLD := getUnsavedListPath(SelectedDir, "newFile.SLD")
+    }
 
     GenerateRandyList()
     RandomPicture()
