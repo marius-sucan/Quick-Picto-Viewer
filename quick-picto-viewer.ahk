@@ -97289,10 +97289,10 @@ addDroppedSeedFolders(droppedList) {
         }
 
         skippedItems++
-        If (imgFiles>5)
+        If (imgFiles>=5)
         {
            Continue
-        } Else If (imgFiles<5 && RegExMatch(line, RegExFilesPattern))
+        } Else If RegExMatch(line, RegExFilesPattern)
         {
            imgFiles++
            thisFolder := SubStr(line, 1, InStr(line, "\", 0, -1) - 1)
