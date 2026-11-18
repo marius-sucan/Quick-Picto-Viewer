@@ -31122,13 +31122,14 @@ folderTreeInfoStatusLineUpdater(modus:=0) {
        GuiControl, fdTreeGuia:, fdTreeInfoLine, %thisVfolder% | Gathering folder details...
        pathu := folderTreeNormalizePath(thisFolder)
        If FolderExist(pathu)
+       {
           getFolderInfos(pathu, itemz, dirs, sizu)
-       Else
-          deadFolder := 1
+          liveFolder := 1
+       }
        ResetImgLoadStatus()
     }
 
-    If (dirs || sizu || deadFolder)
+    If (dirs || sizu || liveFolder)
     {
        fbytes := fileSizeFriendly(sizu) " | " groupDigits(itemz) " images | " groupDigits(dirs) " folders"
        GuiControl, fdTreeGuia:, fdTreeInfoLine, % thisVFolder " | " fbytes
