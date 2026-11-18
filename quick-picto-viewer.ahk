@@ -65171,12 +65171,14 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
    {
       r := tryOpenGivenFolder(newFolder, oldFolder, oldIndex, 1)
       If (r="cancel")
+      {
          FileExploreSiblingsNav("reset") ; thisLevel already points at the sibling left unopened
-      Else If (r=1)
+      } Else If (r=1)
       {
          subFoldersArray[thisLevel] := ""
          thisLevel := initialLevel
-      } Else showDelayedTooltip("Sibling folders navigation: " thisLevel " / " maxLevels "`n.\" subFoldersArray[thisLevel] "\")
+      } Else
+         showDelayedTooltip("Sibling folders navigation: " thisLevel " / " maxLevels "`n.\" subFoldersArray[thisLevel] "\")
    } Else If !FolderExist(newFolder)
    {
       ; subFoldersArray[thisLevel] := ""
