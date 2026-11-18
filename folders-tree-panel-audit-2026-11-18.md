@@ -18,7 +18,10 @@ questions of «Open folder now» first (`9daf923`); the «Open» submenu's hints
 decision 1). The three were run in the application under headless Wine, before and after the fixes
 (batches F1 to F3 of `.claude/scratch/folders-tree-fixes-2026-11-18/`). Decision 11, raised by the
 fix of finding 1 and settled the same day: the «`\\`» menu's moves from a list pass the list when it
-has its file (`548359a`, batch F4). The line numbers below stay those of `7802a22`.
+has its file (`548359a`, batch F4). Two effects of that on the sibling navigation, found by a check
+of `548359a`, are fixed in `67d7343`: a sibling answered «No» keeps its name in «Sibling folders»,
+and the navigation's tooltip comes only for a folder that was opened. The line numbers below stay
+those of `7802a22`.
 
 ## Terms
 
@@ -51,9 +54,9 @@ has its file (`548359a`, batch F4). The line numbers below stay those of `7802a2
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `548359a` |
+| # | Finding | Harm | Checked | Shared with | Status at `67d7343` |
 |---|---------|------|---------|-------------|--------|
-| 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11) |
+| 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
 | 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code | **fixed**, `dc69bd9`: the hints change (decision 1) |
 | 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — | open |
@@ -142,6 +145,22 @@ moves need a plain folder. Run, batch F1 (eleven cases, each box answered from a
 timer): at `0013f5f` seven fail, «No» scanning in each of the six cases that answer it and no list
 being reopened; with the text of `6d419b7` the eleven pass, the checkbox comes up as described, and
 the reopened database answers a query.
+
+**The sibling navigation after `548359a`, fixed in `67d7343`**, by Marius's answer.
+`FileExploreSiblingsNav()` reads the return value 1 of `tryOpenGivenFolder()` as «no images there»:
+it drops the sibling's name from its list and goes back to the position it had. With the list
+passed, 1 also came back after «No» with the list reopened, so «Sibling folders» listed that folder
+as a number without a name, and picking that item opened another sibling in place of the list. With
+the checkbox unticked, «No» or a scan that found nothing ended on the welcome screen with 0, the
+value of an opened folder, so the «Sibling folders navigation» tooltip replaced the «No image files
+found» warning. Now `tryOpenGivenFolder()` returns «declined» when the box is answered with anything
+but «Yes», closing it included, and 1 whenever a scan found nothing, the welcome screen included.
+After «declined» the sibling navigation keeps the name and only goes back to its position; it drops
+a name only after a scan that found nothing, and shows its tooltip only for a folder that was
+opened. Run, batches R and D of `.claude/scratch/commit-548359a-check-2026-11-18/`: in nine calls of
+`tryOpenGivenFolder()` the end state is the same before and after, and only «No», a closed box and
+the welcome screen after a scan that found nothing return another value; of ten checks through the
+«Sibling folders» items, seven fail at `68bf562` and the ten pass with the text of `67d7343`.
 
 ## 2. The «`\\`» button's folder items open folders without the save and selection questions
 
@@ -680,7 +699,8 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
     list instead, so that they ask «Scan recursively?» with the checkbox and can reopen the list, or
     leave them?
     **Settled**: pass the list when its file exists (`548359a`); the favourites, the histories and a
-    deleted list file keep the current file's folder.
+    deleted list file keep the current file's folder. The sibling navigation tells «No» from a scan
+    that found nothing since `67d7343` (finding 1).
 
 ## Unverified leads
 
@@ -783,3 +803,10 @@ Outside the panel's own code, found while tracing its actions.
   without images directly in them; with a database, a sibling; then a favourites-like list and a
   plain folder, which behave as before. At `e30c3e7` the four list cases fail, with no box; with the
   new text the six pass, and batches F1 and F2 pass again.
+- The sibling navigation's fix (`67d7343`) was run the same way, at `68bf562` and with the fixed
+  text, by `.claude/scratch/commit-548359a-check-2026-11-18/` (`fix-tests.ahk`, `run-fix.sh`; the
+  logs in `app/results/`): batch R calls `tryOpenGivenFolder()` as the tree does and logs what it
+  returns; batch D goes through the «Sibling folders» items, with the box answered «Yes», «No» or
+  closed, and the checkbox ticked or not. Batches F1, F2 and F4 pass with the fixed text, F1 once
+  its two cases that answer «No» with a list open expect «declined» in place of 1. AutoHotkey_H
+  1.1.33.10 and AutoHotkey 1.1.37.02 load the fixed text, with and without `/iLib`.
