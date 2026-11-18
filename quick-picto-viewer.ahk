@@ -2468,7 +2468,7 @@ initializeAppWithGivenArguments() {
       If InStr(folderOpened, "|")
          tryOpenGivenFolder(folderOpened, 0, 1)
       Else
-         OpenFolders(folderOpened)
+         OpenFolders(folderOpened, 0)
    } Else If (thisCounter=1 && !sldOpened && !folderOpened)
       OpenArgFile(Trimmer(filesListu))
    Else If (thisCounter>1 && !sldOpened && !folderOpened)
@@ -27038,7 +27038,7 @@ OpenDirsFavedEntry(a, b, c) {
    isList := RegExMatch(folderu, sldsPattern) ? 1 : 0
 
    If FolderExist(StrReplace(folderu, "|"))
-      OpenFolders(folderu)
+      OpenFolders(folderu, 0)
    Else If (FileExist(folderu) && isList=1)
       OpenSLD(folderu)
    Else If (FileRexists(folderu) && RegExMatch(folderu, RegExFilesPattern))
@@ -42812,7 +42812,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          dummyTimerDelayiedImageDisplay(50)
       } Else If (funcu="!OmniOpenRfolder")
       {
-         OpenFolders(userQuickMenusEdit)
+         OpenFolders(userQuickMenusEdit, 0)
       } Else If (funcu="!OmniNavigateFolder")
       {
          LV_GetText(folderu, RowNumber, 1)
@@ -42828,7 +42828,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          newLabelu := SubStr(userQuickMenusEdit, 1, InStr(userQuickMenusEdit, "\", 0, -1))
       } Else If (funcu="!OmniOpenFolder")
       {
-         OpenFolders("|" userQuickMenusEdit)
+         OpenFolders("|" userQuickMenusEdit, 0)
       } Else If (funcu="!OmniImportFolder")
       {
          addNewFolder2list(userQuickMenusEdit, "yes", "not")
@@ -73100,8 +73100,7 @@ folderzNavLoadAllSiblings() {
 
    baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
    baseFolder := StrReplace(baseFolder, "|")
-   If FolderExist(baseFolder)
-      OpenFolders(baseFolder)
+   OpenFolders(baseFolder, 0)
 }
 
 invokeFoldersListerMenu() {
