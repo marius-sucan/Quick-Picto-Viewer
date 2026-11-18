@@ -2003,7 +2003,7 @@ dummyTimerProcessDroppedFiles() {
 
 uiWM_DROPFILES(wParam, lParam, msg, hwnd) {
    ; the drops on the seed folders list; those on the main window go on to PVwinGuiDropFiles()
-   If (hwnd!=hLVmainu && AnyWindowOpen=3) ; PanelDynamicFolderzWindow()
+   If (hwnd!=hLVmainu)
       Return
 
    If (MsgBox2hwnd || whileLoopExec=1 || runningLongOperation=1 || imageLoading=1)
