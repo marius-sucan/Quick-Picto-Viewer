@@ -65112,10 +65112,30 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
    initialLevel := thisLevel
    oldFolder := (RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD)) ? CurrentSLD : baseFolder
    thisFolder := StrReplace(Trimmer(baseFolder), "|")
-   initialSibling := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
+   initialSibling := Format("{:L}", SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1))
    If !(SubStr(thisFolder, 2, 1)=":" && StrLen(thisFolder)=2)
+   {
       thisFolder := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1) - 1)
-   Else 
+      If (isInLoop=0 && initialSibling!="")
+      {
+         ; the current folder changes while its parent stays: inside a list, or when another route opens a folder
+         thisLevel := 0
+         If (thisFolder=prevFolder)
+         {
+            For i, sibling in subFoldersArray
+            {
+               If (Format("{:L}", sibling)==initialSibling)
+               {
+                  thisLevel := i
+                  Break
+               }
+            }
+         }
+
+         If !thisLevel
+            prevFolder := "" ; not among the siblings remembered: they are read again
+      }
+   } Else
       initialLevel := thisLevel := 1
 
    If (thisFolder!=prevFolder)
@@ -65133,7 +65153,7 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
             Continue
 
          thisIndex++
-         If (A_LoopFileName=initialSibling)
+         If (Format("{:L}", A_LoopFileName)==initialSibling)
             thisLevel := thisIndex
 
          If (A_LoopFileName!="")
@@ -65141,6 +65161,9 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
       }
       ResetImgLoadStatus()
    }
+
+   If (isInLoop=0)
+      initialLevel := thisLevel
 
    oldIndex := currentFileIndex
    maxLevels := subFoldersArray.Count()
