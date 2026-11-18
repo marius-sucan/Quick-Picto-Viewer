@@ -131,13 +131,15 @@ finds nothing reopens that list with `OpenSLD()`, at the file shown before; unti
 screen comes. With no list loaded, a previous folder that is gone, or a list with no file behind it
 (the favourites, the histories), the box has no checkbox and «No» ends on the welcome screen. After
 a reopen, `prevOpenFolderPath` keeps the list's folder, which `OpenSLD()` records, instead of the
-list file. Decision 2: kept; with a plain folder open there is still no question. Unchanged as well:
-when a list is open, the «`\\`» menu's items and Ctrl/Alt+Page Up/Down pass the current file's
-folder as the previous one, so they never ask, and a scan that finds nothing opens that folder with
-its sub-folders. Run, batch F1 (eleven cases, each box answered from a timer): at `0013f5f` seven
-fail, «No» scanning in each of the six cases that answer it and no list being reopened; with the
-text of `6d419b7` the eleven pass, the checkbox comes up as described, and the reopened database
-answers a query.
+list file. Decision 2: kept; with a plain folder open there is still no question. Left as it was,
+and open (decision 11): with a .SLD list or a database open, the items of the «`\\`» menu's
+«Sibling folders», «Sub-folders» and «Breadcrumb folders hierarchy» pass the current file's folder
+as the previous one, so the box never comes and its checkbox cannot act, and a scan that finds
+nothing opens that folder with its sub-folders in place of the list; Ctrl/Alt+Page Up/Down and the
+menu's other moves need a plain folder. Run, batch F1 (eleven cases, each box answered from a
+timer): at `0013f5f` seven fail, «No» scanning in each of the six cases that answer it and no list
+being reopened; with the text of `6d419b7` the eleven pass, the checkbox comes up as described, and
+the reopened database answers a query.
 
 ## 2. The «`\\`» button's folder items open folders without the save and selection questions
 
@@ -669,6 +671,12 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
 10. **The index after «Delete folder» or a drag move**: the index keeps the entries of a folder that
     the tree deleted or moved. Leave them, as after a deletion in Explorer, drop them, or rewrite
     them after a move?
+11. **The «`\\`» menu's moves from a list** (finding 1, raised by its fix in `6d419b7`): with a
+    .SLD list or a database open, the «Sibling folders», «Sub-folders» and «Breadcrumb folders
+    hierarchy» items give `tryOpenGivenFolder()` the current file's folder as the previous one
+    (`FileExploreSiblingsNav()`, `FileExploreUpDownLevel()`, `folderzNavInvokeSubs()`). Pass the
+    list instead, so that they ask «Scan recursively?» with the checkbox and can reopen the list, or
+    leave them?
 
 ## Unverified leads
 
