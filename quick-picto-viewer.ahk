@@ -98140,7 +98140,7 @@ remFilesFromList(SelectedDir, silentus:=0, forReal:=1, protectedFolders:="") {
 
     backCurrentSLD := CurrentSLD
     CurrentSLD := ""
-    selectedFiles := markedSelectFile := 0
+    selectedFiles := markedSelectFile := countFiles := 0
     If (StrLen(filesFilter)>1)
        remFilesListFilter("simple")
 
