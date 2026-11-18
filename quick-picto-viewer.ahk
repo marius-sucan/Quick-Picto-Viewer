@@ -30624,7 +30624,7 @@ PanelFoldersTree() {
 
     mouseTurnOFFtooltip()
     setLVrowsCount()
-    thisSize := 300 + PrefsLargeFonts + uiUseDarkMode
+    thisSize := "a" PrefsLargeFonts "|" uiUseDarkMode "|" LargeUIfontValue
     If (hasRan=1 && prevSize!=thisSize)
     {
        hasRan := 0
@@ -31123,10 +31123,12 @@ folderTreeInfoStatusLineUpdater(modus:=0) {
        pathu := folderTreeNormalizePath(thisFolder)
        If FolderExist(pathu)
           getFolderInfos(pathu, itemz, dirs, sizu)
+       Else
+          deadFolder := 1
        ResetImgLoadStatus()
     }
 
-    If (dirs || sizu)
+    If (dirs || sizu || deadFolder)
     {
        fbytes := fileSizeFriendly(sizu) " | " groupDigits(itemz) " images | " groupDigits(dirs) " folders"
        GuiControl, fdTreeGuia:, fdTreeInfoLine, % thisVFolder " | " fbytes
@@ -31903,7 +31905,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    If (!zr && !loopsCount)
    {
       friendly2 := InStr(msgResult, "Copy") ? "COPY" : "MOVE"
-      msgBeepTimer("WARNING: Found no folder to " friendly2 ":`n" Trimmer(listu))
+      msgBeepTimer("WARNING: Found no folder to " friendly2 pku)
    } Else If zr
    {
       friendly2 := InStr(msgResult, "Copy") ? "COPY" : "MOVE"
@@ -32201,8 +32203,7 @@ folderTreePasteClippy() {
       Return
 
    r := PasteFilesIntoGivenFolder(thisFolder)
-   If r
-      WinActivate, ahk_id %hfdTreeWinGui%
+   WinActivate, ahk_id %hfdTreeWinGui%
 }
 
 PasteFilesIntoGivenFolder(folderPath) {
