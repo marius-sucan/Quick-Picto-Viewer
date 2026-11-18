@@ -27069,7 +27069,7 @@ addFolderSldATfavorites(givenPath) {
       Return
 
    If (RegExMatch(givenPath, "i)\\newFile[^\\]*\.sld$") && !FileRexists(givenPath))
-      Return msgBeepTimer("WARNING: This file list seems to be inexistend.`nIt was not added to favourites.")
+      Return msgBeepTimer("WARNING: This file list seems to be inexistent.`nIt was not added to favourites.")
 
    thisu := RegExMatch(givenPath, sldsPattern) ? ".SLD file" : "Folder"
    FileRead, OutputVar, % " *t " folderFavesFile
@@ -27084,11 +27084,12 @@ addFolderSldATfavorites(givenPath) {
       ; remove entry
       OutputVar := StrReplace(OutputVar, "`n" givenPath "`n", "`n")
       OutputVar := StrReplace(OutputVar, "`n`n`n", "`n`n")
-      FileAppend, % OutputVar, % folderFavesFile, UTF-8
       givenPath := PathCompact(givenPath, "a", 1, OSDfontSize)
+      FileAppend, % OutputVar, % folderFavesFile, UTF-8
       If ErrorLevel
          msgBeepTimer("ERROR: Failed to update the folder favorites list file. " thisu " was not removed from the favorites list.")
-      Else msgBeepTimer(thisu " removed from the favorites list:`n" givenPath, 0)
+      Else 
+         msgBeepTimer(thisu " removed from the favorites list:`n" givenPath, 0)
    } Else
    {
       OutputVar := "`n" givenPath "`n" OutputVar
@@ -27096,7 +27097,8 @@ addFolderSldATfavorites(givenPath) {
       FileAppend, % OutputVar, % folderFavesFile, UTF-8
       If ErrorLevel
          msgBeepTimer("ERROR: Failed to update the folder favorites list file. " thisu " was not added to the favorites list.")
-      Else msgBeepTimer(thisu " added to the favorites list:`n" givenPath, 0)
+      Else
+         msgBeepTimer(thisu " added to the favorites list:`n" givenPath, 0)
    }
 }
 
