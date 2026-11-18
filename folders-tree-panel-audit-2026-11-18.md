@@ -22,10 +22,10 @@ has its file (`548359a`, batch F4). Two effects of that on the sibling navigatio
 of `548359a`, are fixed in `67d7343`: a sibling answered «No» keeps its name in «Sibling folders»,
 and the navigation's tooltip comes only for a folder that was opened. «Seen in passing» E and F, the
 position and the current folder of the sibling navigation, are fixed in `1cb0ba9`. Of the nine small
-things of section 17, b, h and i are fixed in `ca8109b`; f was changed there and is not fixed. «Seen
-in passing» G, the list type after a database is imported from the welcome screen, is fixed in
-`bb730af`. The runs of batches S and I (small thing f, «Seen in passing» G to I) were on AutoHotkey
-1.1.37.02. The line numbers below stay those of `7802a22`.
+things of section 17, b, h and i are fixed in `ca8109b`, and f in `5624fa8`. «Seen in passing» G, the
+list type after a database is imported from the welcome screen, is fixed in `bb730af`. The runs of
+batches S and I (small thing f, «Seen in passing» G to I) were on AutoHotkey 1.1.37.02. The line
+numbers below stay those of `7802a22`.
 
 ## Terms
 
@@ -58,7 +58,7 @@ in passing» G, the list type after a database is imported from the welcome scre
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `ca8109b` |
+| # | Finding | Harm | Checked | Shared with | Status at `5624fa8` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
@@ -76,7 +76,7 @@ in passing» G, the list type after a database is imported from the welcome scre
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — | open |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu | open |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run (part), read | omnibox F7 | open |
-| 17 | Small things (nine points) | low | read; f run | | b, h, i **fixed**, `ca8109b`; f changed there, not fixed; a, c, d, e, g open |
+| 17 | Small things (nine points) | low | read; f run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; a, c, d, e, g open |
 
 ---
 
@@ -621,8 +621,7 @@ without a word.
 
 ## 17. Small things
 
-At `ca8109b`: b, h and i are fixed, f was changed and is not fixed, and a, c, d, e and g are as
-described.
+b, h and i are fixed in `ca8109b`, and f in `5624fa8`; a, c, d, e and g are as described.
 
 a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` (:31967) sorts the
    children of the renamed element (that is AutoHotkey's `Sort` option), not the element among its
@@ -647,13 +646,16 @@ e. **Alt+D opens the selected folder.** The hidden default button is labelled «
 
 f. **«Show folder details» on a folder with no images and no sub-folders** shows its parent's path
    instead of its counts: the counts are shown only when one is not zero (`If (dirs || sizu)`
-   :31127). **Changed in `ca8109b`, not fixed**: the test gained `deadFolder`, which is set when the
-   folder is not on the disk, the other case. Run, batch S, at `cd42beb` and at `ca8109b`: a folder
-   on the disk with no image and no sub-folder shows its parent's path at both; a folder removed
-   from the disk showed its parent's path, and now shows «`\Gone | 0 KB |  images |  folders`», the
-   counts blank because nothing was counted. Correction: set the flag where the folder exists. Run
-   on a trial text, not committed: the first shows «`\Empty | 0 KB | 0 images | 0 folders`», the
-   second its parent's path again.
+   :31127). `ca8109b` added a flag to that test, `deadFolder`, set when the folder is not on the
+   disk, the other case: the folder with nothing to count kept its parent's path, a folder removed
+   from the disk showed «`\Gone | 0 KB |  images |  folders`», and with no element selected the
+   line read «` | 0.0% free | 0 KB |  images |  folders`» in place of the count of the tree's
+   elements («Folder tree: 20 elements» in the run); the counts are blank where nothing was counted.
+   **Fixed in `5624fa8`**: the flag is set where the folder is on the disk and was counted. Run,
+   batch S, at `cd42beb`, at `a560074` and with the fixed text: the folder with nothing to count
+   shows «`\Empty | 0 KB | 0 images | 0 folders`», the removed folder its parent's path and no
+   selection the count of elements, both as at `cd42beb`; a drive and the folders with images or
+   sub-folders show their counts at all three.
 
 g. **«Open folder now» on a missing folder** asks about the edited image, the list and the
    selection (:30767-30774), and only then finds the folder gone (`tryOpenGivenFolder()`
@@ -894,6 +896,11 @@ Outside the panel's own code, found while tracing its actions.
   reads the list type, the type text of the information box, the «Files list» menu and the context
   menu as built, the save panel's text and the box that the folders list panel's rename brings,
   and compares them with those of an unsaved list made by `coreAddNewFiles()`. Batch H
-  passes with the fixed text. Batch S, for small thing f, selects elements of the tree and reads
-  its status line, at `cd42beb`, at `ca8109b` and on a trial text with the correction. AutoHotkey
-  1.1.37.02 loads the fixed text, with and without `/iLib`.
+  passes with the fixed text. AutoHotkey 1.1.37.02 loads the fixed text, with and without `/iLib`.
+- Small thing f (`5624fa8`) was run the same way, on the same interpreter and by the same kit, at
+  `cd42beb` (before `ca8109b`), at `a560074` and with the fixed text. Batch S opens the tree with a
+  folder open in QPV and selects in turn a folder with images, one with images and sub-folders, one
+  on the disk with nothing to count, one removed from the disk after the tree was built, and the
+  drive, then no element; after each it reads the status line, filled as the Space key and «Show
+  folder details» fill it. Batch I passes with the fixed text, and AutoHotkey 1.1.37.02 loads it,
+  with and without `/iLib`.
