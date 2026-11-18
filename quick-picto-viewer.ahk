@@ -97175,7 +97175,7 @@ BTNpasteDynaFoldersList() {
     oldFoldersList := newFoldersList := getDynamicFoldersList()
     ; Explorer's «Copy as path» puts each path in quotation marks
     pastedList := StrReplace(SubStr(Clipboard, 1, 50432), """")
-    added := skippedLines := 0
+    added := 0
     Loop, Parse, pastedList, `n
     {
         If (A_Index>2000 || added>=100)
@@ -97187,10 +97187,7 @@ BTNpasteDynaFoldersList() {
            Continue
 
         If (!FolderExist(fileTest) || !RegExMatch(fileTest, "^.:($|\\.)"))
-        {
-           skippedLines++
            Continue
-        }
 
         ; only the folders not listed yet count toward the cap
         If !InStr("`n" oldFoldersList, "`n" Format("{:L}", line) "`n")
@@ -97269,7 +97266,7 @@ addDroppedSeedFolders(droppedList) {
 
     oldFoldersList := getDynamicFoldersList()
     foldersList := imgFolders := ""
-    imgFiles := added := skippedItems := 0
+    imgFiles := added := 0
     Loop, Parse, droppedList, `n
     {
         If (A_Index>2000 || added>=100)
@@ -97288,7 +97285,6 @@ addDroppedSeedFolders(droppedList) {
            Continue
         }
 
-        skippedItems++
         If (imgFiles>=5)
         {
            Continue
