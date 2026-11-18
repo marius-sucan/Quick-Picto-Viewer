@@ -73,6 +73,11 @@ index», ask before they start; private mode lists one row per seed folder; «Re
 scan» keeps the folder's row selected; Alt+right-click deselects the folder's files without
 opening the menu, in both folder panels. Section 15 gives the lines at `53422a3`.
 
+**Seen in passing F, 2026-11-18, at `8c79dfd`**: `remFilesFromList()` starts its count of the
+files it keeps at 0, so a removal that leaves no file sets the count of indexed files to 0, not
+blank; its message then gives the number of files removed, and it marks the list as modified.
+The note on F gives the line and the runs.
+
 Findings 1 to 4 lose data: seed folders vanish from the list for good; index entries and
 database rows of folders the user did not touch are deleted; a protected folder's files can
 be deleted from the disk. Each needs nothing unusual: a seed folder scanned without its
@@ -1094,7 +1099,7 @@ did before the fixes.
 
 Not part of the panel's own code.
 
-Marks, at `53422a3`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
+Marks, at `8c79dfd`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow the mark.
 
 - ○ **A.** «Rescan folder» writes the folder part of the rescanned paths in lower case (`été\…`
   in batch A4), as the folders list audit's finding 24 (open): the seed folders list is stored
@@ -1190,9 +1195,22 @@ Marks, at `53422a3`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow t
     it (at `8cbe643` the same change, unmarked); a text that matches nothing marks nothing.
   - Still open: the copy and move panel, legacy list lines, a dropped root, and the last opened
     folder.
-- ○ **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it removes
-  every file: its `countFiles` is never set (run, batch N4: `maxFilesIndex` is blank after
-  «Yes» on the only seed folder). Not followed further. Open.
+- ✅ `8c79dfd` **F.** `remFilesFromList()` leaves the count of indexed files blank, not 0, when it
+  removes every file: its `countFiles` is never set (run, batch N4: `maxFilesIndex` is blank after
+  «Yes» on the only seed folder). Its `filesRemoved` is then blank too, so the function says
+  «Finished removing 0 files from the list» and does not mark the list as modified. Only the
+  folders list panel's «Remove files» relies on it for that mark (the other callers, or the scan
+  that follows them, mark the list), and a list with fewer than two files is never saved. The
+  other readers of the count take a blank as 0 (read: the comparisons, the loops, and every
+  place that adds files, through `maxFilesIndex++`). **Fixed in `8c79dfd`**: the count starts at
+  0 (`remFilesFromList()` :98143). Run on the text of `8c79dfd` (batch N, in the kit of section
+  15): the same lines as on `2fc8ffb` except N4, where `maxFilesIndex` is 0 after «Yes» (blank at
+  `2fc8ffb`); with one log line added to the function in both texts, that call reports 1 file
+  removed (0 at `2fc8ffb`), and the other fourteen calls of the batch give the same values. The
+  function alone, sliced from the source, on AutoHotkey_H 1.1.33.10 and AutoHotkey 1.1.37:
+  removing every file gives 0, «Finished removing 2 files from the list» and the list marked,
+  also for a `|` entry without the message (blank, «0 files» and unmarked at `2fc8ffb`); one file
+  kept, the same as before.
 - ○ **G.** In a database, `SearchAndReplaceThroughIndex()` in folder mode moves the files of the
   subfolders one by one; a file whose new path is held already fails alone, is counted
   («Failed to modify 1 entries») and the function still reports success, while the index
@@ -1313,7 +1331,7 @@ Marks, at `53422a3`: ✅ fixed, ◐ partly fixed, ○ open; the commits follow t
     seed folders list to the clipboard», «The seed folders list is empty», «Select the folder to
     add to the seed folders list».
 
-Suggested order at `53422a3`: seen in passing F and G.
+Suggested order at `8c79dfd`: seen in passing G.
 
 ## How this was checked
 
@@ -1564,3 +1582,13 @@ is not a database»): `tsFresh()` closes the list first, through `resetMainWin2W
 P deletes `P:\r1.png`, so T, U and X need a `run-all.sh` of their own. A stop forced through
 `tsAbortAfter` stamps the time of the stop, and for one second the panel refuses to close:
 batch Z12 waits 1.1 s after each stop.
+
+Seen in passing F, 2026-11-18: `.claude/scratch/remfiles-countfiles-2026-11-18/`.
+`mkprobe.py <text> <probe.ahk>` slices `remFilesFromList()` and its helpers out of a text, next
+to a copy that starts the count at 0, and `runahk.sh h|stock <probe.ahk> <tag>` runs it under
+the private Wine (`probe-out-*` on `2fc8ffb`, `probe-fix-out-*` on `8c79dfd`); `classify.py` and
+`guards.py` sort the lines that read `maxFilesIndex`. `chainN.sh` runs batch N in the kit of
+section 15 on `snap/head.ahk` (`2fc8ffb`), `snap/fix.ahk` (`8c79dfd`, sha256 checked) and both
+with the log line (`snap/*-i.ahk`): logs `n-r18head`, `n-r18fix`, `n-r18head-i` and
+`n-r18fix-i` in that kit's `app/results/`. `8c79dfd` loads with AutoHotkey_H and stock
+AutoHotkey 1.1.37 (`/iLib`), and AutoHotkey_H loads it in full.

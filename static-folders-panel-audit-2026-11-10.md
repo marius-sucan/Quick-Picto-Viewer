@@ -1511,7 +1511,9 @@ Correction: after the loop, when `maxFilesIndex<1`, call
 same step): the box «No files left in the index of Quick Picto Viewer, please load a files
 list or folder.» comes, with its three buttons. Answered «Ignore», the panel comes back
 with 0 files in every row and `maxFilesIndex` still empty, as on `1813ca9`. The other two
-buttons were not pressed.
+buttons were not pressed. Since `8c79dfd` (seen in passing F of the seed folders panel audit)
+the count is 0 there, and the list is marked as modified: run for the function alone, with this
+panel's call; the panel itself not run.
 
 **N3. A folder that is not on the disk is dropped from the folders list when any folder
 is rescanned** (medium, decision 9; run, batch Q). **Fixed in `17d90dd`.**
