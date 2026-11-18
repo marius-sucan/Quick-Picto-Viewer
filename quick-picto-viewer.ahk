@@ -96622,7 +96622,7 @@ PanelDynamicFolderzWindow(dummy:=0) {
 
     btnWid3 := (PrefsLargeFonts=1) ? 40 : 20
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNremDynaSelFolder, &Remove
-    Gui, Add, Button, x+5 hp wp gBTNregenerateEntireList +hwndhTemp, R&escan
+    Gui, Add, Button, x+5 hp wp gBTNrescanDynaFolder +hwndhTemp, R&escan
     ToolTip2ctrl(hTemp, "Rescan selected folder")
     Gui, Add, Button, x+0 hp w%btnWid3% gBTNregenerateEntireList +hwndhTemp, all
     ToolTip2ctrl(hTemp, "Rescan all folders")
