@@ -2569,7 +2569,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
 
   If InStr(firstLine, "[General]") 
   {
-     If (maxFilesIndex<3 && DynamicFoldersList="|hexists|")
+     If (maxFilesIndex<1 && DynamicFoldersList="|hexists|")
         ReloadDynamicFolderz(fileNamu)
 
      If (MustLoadSLDprefs=1)
