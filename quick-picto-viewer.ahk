@@ -64991,7 +64991,7 @@ FileExploreUpDownLevel(direction, returnObj:=0, ByRef iLevel:=0, forceLevel:=0) 
    If (SLDtypeLoaded!=1)
       baseFolder := InStr(baseFolder, "\") ? SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1) : ""
 
-   oldFolder := baseFolder
+   oldFolder := (RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD)) ? CurrentSLD : baseFolder
    thisFolder := StrReplace(Trimmer(baseFolder), "|")
    thisFolder := Trimmer(StrReplace(thisFolder, "\\", "\"), "\")
    baseArray := StrSplit(thisFolder, "\")
@@ -65104,7 +65104,7 @@ FileExploreSiblingsNav(direction, isInLoop:=0, returnObj:=0, ByRef iLevel:=0, fo
       baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
 
    initialLevel := thisLevel
-   oldFolder := baseFolder
+   oldFolder := (RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD)) ? CurrentSLD : baseFolder
    thisFolder := StrReplace(Trimmer(baseFolder), "|")
    initialSibling := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
    If !(SubStr(thisFolder, 2, 1)=":" && StrLen(thisFolder)=2)
@@ -73273,7 +73273,7 @@ folderzNavInvokeSubs(menuItem) {
     If (SLDtypeLoaded!=1)
        baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
 
-    oldFolder := baseFolder
+    oldFolder := (RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD)) ? CurrentSLD : baseFolder
     openThisu := SubStr(menuItem, 1, InStr(menuItem, ". ")-1)
     thisFolder := StrReplace(Trimmer(baseFolder), "|")
     If FolderExist(thisFolder)
