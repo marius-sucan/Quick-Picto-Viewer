@@ -73293,6 +73293,7 @@ folderzNavInvokeSubs(menuItem) {
 }
 
 tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
+   Static reopenList := 1
    oldFolderu := StrReplace(oldFolder, "|")
    thisFolder := StrReplace(thisFolder, "|")
    thisFolder := StrReplace(Trimmer(thisFolder, "\"), "\\", "\")
@@ -73315,6 +73316,7 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
          Return "cancel"
    }
 
+   canReopen := (RegExMatch(oldFolder, sldsPattern) && FileExist(oldFolder)) ? 1 : 0
    If (SLDtypeLoaded=3)
       activeSQLdb.CloseDB()
 
@@ -73327,10 +73329,16 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
    {
       addJournalEntry("Failed to find image files in: |" thisFolder)
       If !FolderExist(oldFolderu)
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have attempted to open: " thisFolder "\. QPV found no supported image files in the folder.`n`nWould you like to recursively scan the given folder for supported image files?", 4, 0, "question")
-      Else msgResult := "Yes"
+      {
+         zpk := canReopen ? "Reopen the initial files list if no images are found" : ""
+         msgResult := msgBoxWrapper(appTitle ": Confirmation", "You have attempted to open: " thisFolder "\. QPV found no supported image files in the folder.`n`nWould you like to recursively scan the given folder for supported image files?", 4, 0, "question", zpk, reopenList)
+         If IsObject(msgResult)
+            reopenList := msgResult.check
 
-      If (msgResult="Yes" || !FolderExist(oldFolderu))
+         btnu := zpk ? msgResult.btn : msgResult
+      } Else btnu := "Yes"
+
+      If (btnu="Yes")
       {
          coreOpenFolder(thisFolder, 0, 0, 0, 1)
          CurrentSLD := thisFolder
@@ -73344,10 +73352,15 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
       coreOpenFolder(oldFolder, 0, 0, 0, 1)
       CurrentSLD := oldFolder
       hasFailed := 1
+   } Else If (maxFilesIndex<1 && canReopen=1 && reopenList=1)
+   {
+      addJournalEntry("No image files opened from: " thisFolder "\`nReopening initial files list: " oldFolder)
+      OpenSLD(oldFolder, 1)
+      hasFailed := 1
    } Else If (maxFilesIndex<1)
       resetMainWin2Welcome()
 
-   If (maxFilesIndex>1)
+   If (maxFilesIndex>1 && SLDtypeLoaded=1)
       prevOpenFolderPath := StrReplace(CurrentSLD, "|")
 
    currentFilesListModified := 0
