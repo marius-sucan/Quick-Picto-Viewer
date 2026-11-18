@@ -97293,15 +97293,18 @@ addDroppedSeedFolders(droppedList) {
 
     oldFoldersList := getDynamicFoldersList()
     addedEntries := addSeedFoldersEntries(oldFoldersList, oldFoldersList foldersList, addedList)
-    uiPopulateDynamicFolderzList()
-    Loop, % LV_GetCount()
+    If addedEntries
     {
-        LV_GetText(thisFolder, A_Index, 3)
-        If InStr("`n" addedList, "`n" thisFolder "`n")
-        {
-           LV_Modify(A_Index, "Select Focus Vis")
-           Break
-        }
+       uiPopulateDynamicFolderzList()
+       Loop, % LV_GetCount()
+       {
+           LV_GetText(thisFolder, A_Index, 3)
+           If InStr("`n" addedList, "`n" thisFolder "`n")
+           {
+              LV_Modify(A_Index, "Select Focus Vis")
+              Break
+           }
+       }
     }
 
     If addedEntries
