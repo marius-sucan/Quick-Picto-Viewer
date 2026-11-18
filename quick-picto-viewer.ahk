@@ -94334,7 +94334,7 @@ BtnHelpStaticFoldersPanel() {
 }
 
 BtnHelpDynaFoldersPanel() {
-   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Folders dropped on the list are added the same way, scanned with their subfolders; a drop without folders adds the folders of its first five image files.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel lists the seed folders: the folders from which the files list index is generated. An «R» in the (?) column marks a folder scanned with its subfolders; the others are scanned for the files placed directly in them. A seed folder placed inside one scanned with its subfolders is dropped from the list.`n `n- «Copy list» copies the seed folders as text to the clipboard. «Paste list» adds the folder paths found in the clipboard to the list; their files are indexed after a rescan. Folders dropped on the list are added the same way, scanned with their subfolders; a drop without folders adds the folders of its first five image files, without their subfolders.`n `n- «Remove» takes the folder out of the list, this may also remove the files indexed from the files list.`n`nRight-click a folder for more options.", -1, 0, 0)
 }
 
 BtnHelpReviewPanel() {
@@ -97247,7 +97247,8 @@ addSeedFoldersEntries(oldFoldersList, newFoldersList, ByRef addedList:="") {
 
 addDroppedSeedFolders(droppedList) {
     ; the items dropped on the seed folders list, from uiWM_DROPFILES(); added as «Paste list» does,
-    ; scanned with their subfolders. A drop without folders gives the folders of its first five image files
+    ; scanned with their subfolders. A drop without folders gives the folders of its first five image files,
+    ; without their subfolders
     If (AnyWindowOpen!=3)
        Return
 
@@ -97277,7 +97278,7 @@ addDroppedSeedFolders(droppedList) {
            imgFiles++
            thisFolder := SubStr(line, 1, InStr(line, "\", 0, -1) - 1)
            If FolderExist(thisFolder)
-              imgFolders .= thisFolder "`n"
+              imgFolders .= "|" thisFolder "`n"
         }
     }
 
@@ -97299,7 +97300,7 @@ addDroppedSeedFolders(droppedList) {
        Loop, % LV_GetCount()
        {
            LV_GetText(thisFolder, A_Index, 3)
-           If InStr("`n" addedList, "`n" thisFolder "`n")
+           If InStr("`n" StrReplace(addedList, "|"), "`n" thisFolder "`n")
            {
               LV_Modify(A_Index, "Select Focus Vis")
               Break
@@ -97308,9 +97309,9 @@ addDroppedSeedFolders(droppedList) {
     }
 
     If addedEntries
-       msgu := groupDigits(addedEntries) " seed folder(s) added to the list" (fromImages ? ": the folders of the dropped image files" : "") ". To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
+       msgu := groupDigits(addedEntries) " seed folder(s) added to the list" (fromImages ? ": the folders of the dropped image files, without their subfolders" : "") ". To index their files, use «Rescan folder» (F5) on each one, or «Rescan all»."
     Else
-       msgu := "The dropped folder(s) are already in the seed folders list, or inside a seed folder scanned with its subfolders"
+       msgu := (fromImages ? "The folder(s) of the dropped image files are" : "The dropped folder(s) are") " already in the seed folders list, or inside a seed folder scanned with its subfolders"
 
     mustBeep := (skippedItems && !fromImages) ? 1 : 0
     If mustBeep
