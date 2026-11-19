@@ -59,6 +59,15 @@ moved by any paste or drag leaves its place in the tree, the removal made where 
 (`4de0385`, decision 21); the scan tooltips show a folder without its sub-folders by its path, and
 say so (`5c2853b`, decision 22).
 
+**The open «small things» and «Seen in passing», checked 2026-11-19 at `15e9716`.** Small thing e is
+fixed by Marius in `a4c35d0`; the effect it described could not be shown, and its entry says why.
+The fourteen other open items hold as described: «Seen in passing» C, a comment, by reading, and the
+thirteen others by runs in the application under headless Wine, on AutoHotkey 1.1.37.02 (batches WSa
+to WPQ, T10, T14 and VNx, «How this was checked»). The runs changed two entries: the drag of «Seen
+in passing» A moves the omnibox's selection to its last row, the omnibox's list taking one selected
+row, rather than selecting every row; and B holds for an unsaved list as well. They found two new
+leads, «Seen in passing» R and S.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -90,7 +99,7 @@ say so (`5c2853b`, decision 22).
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `80b75e0` |
+| # | Finding | Harm | Checked | Shared with | Status at `15e9716` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
@@ -108,7 +117,7 @@ say so (`5c2853b`, decision 22).
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read, then run | — | **fixed**, `f4bbf01`: both keys refuse a drive element (decision 17) |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read, then run | Shift+F4 menu | **fixed**, `43bee47`: each note in its own submenu, counting the folders not listed; 200 sub-folders listed |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run | omnibox F7 | **fixed**, `80b75e0`: the name the filter gives is checked, for a folder or a file (decision 18) |
-| 17 | Small things (nine points) | low | read; f run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; a, c, d, e, g open |
+| 17 | Small things (nine points) | low | read, then run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; e **fixed**, `a4c35d0`; a, c, d, g open, each confirmed by a run |
 
 ---
 
@@ -832,12 +841,15 @@ folder was made at either (batch U16x).
 
 ## 17. Small things
 
-b, h and i are fixed in `ca8109b`, and f in `5624fa8`; a, c, d, e and g are as described. ✅ marks a
-fixed one.
+b, h and i are fixed in `ca8109b`, f in `5624fa8` and e in `a4c35d0`; a, c, d and g are as described,
+at `15e9716` too, each confirmed by a run (2026-11-19, batches WSa, WSc, WSd and WSg). ✅ marks a fixed
+one.
 
 a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` (:31967) sorts the
    children of the renamed element (that is AutoHotkey's `Sort` option), not the element among its
-   siblings: it keeps its old place.
+   siblings: it keeps its old place. Still so at `15e9716`. Run, batch WSa: once «Rename folder» gave
+   `\Alpha` the name `Zeta`, the children of `\pv` read `\Zeta`, `\Beta`, `\Gamma`, `\Holiday One`;
+   F5 then lists `\Zeta` last.
 
 b. ✅ **«Paste clipboard file(s) into...» brings the tree back only after Cancel.**
    `PasteFilesIntoGivenFolder()` returns 1 for Cancel (:32228) and nothing after a paste (it ends
@@ -847,14 +859,31 @@ b. ✅ **«Paste clipboard file(s) into...» brings the tree back only after Can
 c. **«Scan for sub-folders» can stay on a missing folder.** The item is removed by its label,
    ``&Scan for sub-folders`tSpace`` (:31636). `kMenu()` drops the key from a label when the user's
    own shortcuts give that key to another function (:71547-71561), and the removal then misses.
+   Still so at `15e9716`. Run, batch WSc, with a custom keys file that the kit writes for the image
+   view's key context: with Space given to «Next image», and again with the default Space shortcut
+   disabled, the menu on a folder removed from the disk still offers «Scan for sub-folders», without
+   its key; with no custom key the item is not there. The same rewrite takes the key off the item
+   on the other elements too («Seen in passing» R).
 
 d. **The «7» and «Shift+7» hints** of «Copy/Move selected file(s) into...» (:31628-31629): in the
    tree, 7 goes to the tree's own type-ahead search; in the main window, 7 runs the copy only with
    the quick file actions option on (`allowUserQuickFileActions`, off by default; :2052-2060,
-   :47222).
+   :47222). Still so at `15e9716`. Run, batch WSd: the main window's 7 and Shift+7 go to
+   `triggerQuickFileAction()`, which copies nothing while the quick file actions are off and copies
+   the current file into the selected element once they are on; the 7 key posted to the tree, the
+   tree being the active window, reaches no quick file action, the quick file actions on.
 
-e. **Alt+D opens the selected folder.** The hidden default button is labelled «&Default» (:30673),
-   so its mnemonic runs «Open folder now».
+e. ✅ **Alt+D opens the selected folder.** The hidden default button is labelled «&Default» (:30673),
+   so its mnemonic runs «Open folder now». **Fixed in `a4c35d0`** (Marius): the button is labelled
+   «Default», with no `&`. The effect was not seen, though. Run, batch WSe, at `a6b57e0` (the text
+   before the fix) and at `15e9716`: Alt+D posted to the tree, as WM_SYSCHAR and as WM_SYSKEYDOWN,
+   ran «Open folder now» at neither. The button is 0 pixels wide, its option `-wantTab` setting the
+   width to 0 after `w1`, and under Wine the dialog manager clicks a button for its mnemonic with
+   BM_CLICK, which a button 0 pixels wide ignores: a BM_CLICK to it ran nothing in the application
+   either. A copy of the panel's layout in a bare AutoHotkey window shows both: with `-wantTab` the
+   button is 0×1 and neither Alt+D nor BM_CLICK runs it; without, it is 1×1 and both do. Enter does
+   not click the button: the dialog manager sends its command to the window, and Enter sent to the
+   tree opened the folder (run). Not run on Windows, where the old Alt+D most likely did nothing.
 
 f. ✅ **«Show folder details» on a folder with no images and no sub-folders** shows its parent's path
    instead of its counts: the counts are shown only when one is not zero (`If (dirs || sizu)`
@@ -871,7 +900,12 @@ f. ✅ **«Show folder details» on a folder with no images and no sub-folders**
 
 g. **«Open folder now» on a missing folder** asks about the edited image, the list and the
    selection (:30767-30774), and only then finds the folder gone (`tryOpenGivenFolder()`
-   :73297-73302).
+   :73297-73302). Still so at `15e9716`. Run, batch WSg: with a .SLD list of 212 files, modified, 30
+   of them selected, Enter on the element of a folder removed from the disk asked «Save files list»
+   and «Discard selection», then said «ERROR: Folder not found or access denied»; answered «Discard»
+   and «Yes», the list stayed as it was. The menu offers no «Open» on such an element, so Enter and
+   a double-click are the ways there. The «`\\`» menu's moves, which ask once `tryOpenGivenFolder()`
+   has found the folder (finding 2), ask nothing for the same folder.
 
 h. ✅ **The rebuild test** `thisSize := 300 + PrefsLargeFonts + uiUseDarkMode` (:30625) gives 301 for
    large fonts in light mode and for normal fonts in dark mode: if both settings change while the
@@ -1006,21 +1040,33 @@ before any fix.
 
 Outside the panel's own code, found while tracing its actions. ✅ marks a fixed one.
 
-- **A. The main window's Alt+drag over the tree selects every row of the omnibox.** In the
-  thumbnails click handler (:9611), the drag's tree branch calls `LV_Modify(initialRow, "select")`
-  (:9757). `initialRow` exists only in the omnibox's handler (:42517); here it is blank, which
-  counts as row 0, every row. With the omnibox open in folder mode, the default window there is the
-  omnibox's (:9714-9716), so hovering the tree selects all its rows. The tooltip says «Move or copy
-  folder into another one» while files are dragged (:9758).
+- **A. The main window's Alt+drag over the tree moves the omnibox's selection to its last row.** In
+  the thumbnails click handler (:9611), the drag's tree branch calls `LV_Modify(initialRow,
+  "select")` (:9757). `initialRow` exists only in the omnibox's handler (:42517); here it is blank,
+  which counts as row 0, every row. With the omnibox open in folder mode, the default window there
+  is the omnibox's (:9714-9716), so hovering the tree selects the rows of its list in turn; the list
+  keeps one selected row (`-multi`), the last, and the omnibox's folder actions then work on that
+  row. The tooltip says «Move or copy folder into another one» while files are dragged (:9758).
+  Still so at `15e9716`. Run, batch WPA: with the omnibox open on `pv` and its row `\Gamma`
+  selected, an Alt+drag of a file over the tree's `\Beta`, answered «No», left the row `\Holiday
+  One` selected (`OmniBoxGetSelectedFolder()` gave `pv\Holiday One`), and the drag's tooltip read
+  «Move or copy folder into another one. Hold SHIFT to MOVE.».
 - **B. A plain list grown by imports is replaced without a question.** `askAboutSlidesListSave()`
   (:65471) asks only for a .SLD list and the favourites; a plain list that the tree's F3 grew is
-  replaced by any open (finding 1's callers) without a word.
+  replaced by any open (finding 1's callers) without a word. Still so at `15e9716`, and for an
+  unsaved list too: the function asks only when the list's name is a file on the disk, and an
+  unsaved list has no file yet. Run, batch WPB: a plain folder of five files grown to seven by F3,
+  and an unsaved list of three files added on the welcome screen, were each replaced by «Open
+  folder now» with no question; a modified .SLD list got the question, and «Cancel» kept it.
 - **C. The comment `; F3` on `c=186`** (:30858): the key is `;` (VK_OEM_1), which opens the omnibox
-  at the element.
+  at the element. Still so at `15e9716` (read).
 - **D. «Selected file folder» asks two of the three questions.** `OpenQPVfileFolder()` (:2819), the
   «`\\`» menu's item for the current file's folder with a .SLD list or a database, also Alt+E in the
   thumbnails view, asks «Save image» and «Save files list» but not «Discard selection» before it
-  replaces the list (read; found while fixing finding 2).
+  replaces the list (read; found while fixing finding 2). Still so at `15e9716`. Run, batch WPD: with
+  a .SLD list of 212 files, 30 of them selected, «Open folder now» asked about the selection and
+  «No» kept the list; «Selected file folder» (`OpenQPVfileFolder()`) asked nothing and opened the
+  current file's folder in place of the list, the selection gone.
 - ✅ **E. The sibling navigation after a sibling with no images.** When `tryOpenGivenFolder()` reports
   a failure, `FileExploreSiblingsNav()` sets its position back to `initialLevel` (:65175-65176), the
   value it held when the call began. That value is blank on the first move after QPV starts and
@@ -1062,32 +1108,47 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
 - **H. A .SLD list picked with Insert is imported only into a .SLD list or an unsaved list.**
   `importSLDplainText()` returns at once, with no message, unless the name of what is open ends in
   `.sld`: on the welcome screen (run), and by the same test with a folder or a database open
-  (read). A database picked the same way is imported. Found while fixing G.
+  (read). A database picked the same way is imported. Found while fixing G. Still so at `15e9716`,
+  now run in the three cases. Run, batch WPH: a .SLD list of two files picked with Insert brought
+  nothing in, with no message, on the welcome screen, with a plain folder open and with a database
+  open; with a .SLD list open its two files came in, and a database picked with a folder open came
+  in too.
 - **I. «Save settings into current .SLD file» and «Load settings from current .SLD file» always
   refuse.** `WritePrefsIntoSLD()` and `LoadPrefsFromSLD()` begin with the test under which the
   «Preferences» menu offers the two items, a .SLD list or a database of more than one file, and
   return «ERROR: No valid files list currently opened» when that test holds, since `1c3b9c3`
   (v6.1.75). Run, `WritePrefsIntoSLD()` with a saved list of two files open: the error comes and
   the file is unchanged. Found while fixing G, after which the two items are offered for one more
-  list.
+  list. Still so at `15e9716`. Run, batch WPI: with a .SLD list of five files open, the context menu
+  offers both items; «Save settings into current .SLD file» answered «ERROR: No valid files list
+  currently opened» and left the list's `hueAdjust` at 0 (123 in memory), and «Load settings from
+  current .SLD file» answered the same and left 50 in memory (0 in the list); with a database of
+  five files open, both answered it too.
 - **J. The protected folder keeps the old path after «Rename folder».** The deletions compare the
   path of each file with `protectedFolderPath` (`batchFileDelete()`, `InListMultiEntriesRemover()`).
   Once the tree or the omnibox has renamed the protected folder, or a folder that holds it, the
   setting names a folder that is gone: its files are no longer skipped, and the check mark of «Set
   as the protected folder» is gone too (read; found while fixing finding 6, whose tick carries the
-  lists and not this setting).
+  lists and not this setting). Still so at `15e9716`. Run, batch WPJ, through the tree's «Rename
+  folder» with the tick: before the rename, a file of the protected folder `pv\Beta` selected for
+  deletion is skipped («Skipped files: 1»); once `\Beta` is renamed `Beta2`, the list follows, the
+  setting still names `pv\Beta`, the menu no longer checks «Set as the protected folder» on
+  `\Beta2`, and the same file is deleted («1 out of 1 selected files deleted»). The omnibox's
+  rename was not run.
 - **K. «Use Alt to open it in Explorer», in the quick file actions panel, is not reached from the
   keys.** The keys 1 to 7 and Shift+1 to Shift+7 are sent to `triggerQuickFileAction()`; Alt+1,
   Alt+6, Alt+7 and Ctrl+Alt+1 are sent to no function (run, batch T14, through
   `processDefaultKbdCombos()` in the mode that only names the function of a key). The function's Alt
   test, and its Ctrl+Alt test for a new QPV instance, therefore run only when Alt is held while a
-  menu item calls it. Found while fixing finding 9.
+  menu item calls it. Found while fixing finding 9. Still so at `15e9716`: batch T14 again gives the
+  same routing.
 - **L. A seed folder scanned back lists its files under a folder path in lower case.** The seed
   folders list is kept in lower case (`cleanDynamicFoldersList()`), a rescan scans the entry as the
   list holds it (`coreRescanDynaFolder()`), and `Loop, Files` returns each file under the folder
   path it was given. Run, batch T10: after «Rescan» in a plain list, the four files of `Holiday One`
   are listed as `holiday one\h1.png` and so on. Such paths are what finding 11 met in plain and .SLD
-  lists. Found while fixing finding 10.
+  lists. Found while fixing finding 10. Still so at `15e9716`: batch T10 again lists them so after
+  «Rescan».
 - ✅ **M. The omnibox's drop on the main window, with no list loaded.** A row of the omnibox dragged
   onto the main window imports the folder (`LVquickSearchMenusResponder()` →
   `omniBoxFolderImport()`); with no list loaded that opens it with `omniBoxFolderOpen()`, as «Open
@@ -1147,6 +1208,25 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   its drags, a destination that the tree shows without having it selected keeps its old children
   until Space or F5 (read). With the tree never opened, the same scan leaves an empty tree window
   behind, hidden (run, batch VNx, at `35a7c94` and with the last text). Found while fixing N.
+  Still so at `15e9716`. Run, batch WPQ: with the tree's `\zz` selected and `\dst` showing its
+  sub-folder `\old`, the omnibox's paste of `\m1` into its row `\dst` and a drag of its row `\m2`
+  onto that row, both copies, left the tree's `\dst` with `\old` alone; Space on `\dst` then
+  listed `\m1` and `\m2`. Batch VNx again: the hidden tree window is still left behind.
+- **R. A custom key of the main window takes the key off an item of the tree's menu, while the
+  tree keeps the key.** `kMenu()` drops the key from a label when the user's custom keys give that
+  key, in the current key context, to another function or disable it (small thing c); the tree's
+  menu is built the same way, but the tree reads its keys itself (`FolderTreeResponder()`),
+  whatever the custom keys say. Run, batch WSc: with Space given to «Next image», «Scan for
+  sub-folders» shows no key on `\Beta`, and Space in the tree still scans `\Beta`. The other keys
+  of the menu go through the same code (read). Found while checking small thing c.
+- **S. Four drag confirmations put a dot before a full path.** The boxes of a drag from the main
+  window onto the tree, from the tree onto the omnibox, from the omnibox onto the tree, and inside
+  the tree between elements that are not siblings write «Source: .» and «Destination: .» before the
+  folder's full path (`thumbsListClickResponder()`, `FolderTreeResponder()` twice,
+  `LVquickSearchMenusResponder()`), so a folder reads, for example, «.C:\Photos\Beta\». Between
+  siblings, inside the omnibox and from the main window onto the omnibox the boxes give a name,
+  «.\Beta\», as meant. Run: the logs of batches T9, T12, T13, U13 and WPA show the dot before each
+  such path (the kits shorten a path to its part under their work folder). Found while checking A.
 
 ## Checked and found correct
 
@@ -1291,3 +1371,18 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   I («Seen in passing» G) give the same results with the last text as at `35a7c94`: every check
   passes at both, and R, U4x and U16x, which only log, log the same lines. AutoHotkey 1.1.37.02
   loads each of the four texts, with and without `/iLib`.
+- The open «small things» and «Seen in passing» were checked on 2026-11-19 at `15e9716`, in the
+  application under headless Wine, on AutoHotkey 1.1.37.02, by
+  `.claude/scratch/folders-tree-open-items-2026-11-19/` (`tests-open.ahk`, `run.sh`, `run-all.sh`;
+  the logs in `app/results/`), with the helpers of the earlier kits. One batch per item: WSa, WSc,
+  WSd, WSe and WSg for the small things, WPA, WPB, WPD, WPH, WPI, WPJ and WPQ for «Seen in
+  passing»; K, L and the hidden window of Q by batches T14, T10 and VNx again. Each check states
+  what should happen once the item is fixed, so it fails where the item holds; the controls of each
+  batch pass, but for the click of the default button in batch WSe (small thing e). The kit writes
+  a custom keys file in its own folder (c), turns the quick file actions on (d), posts the 7 key
+  and Alt+D to the tree as window messages (d, e), marks lists as edited (g, «Seen in passing» B),
+  deletes files in its work folder (J), and simulates the drags and the clipboard as the earlier
+  kits do. Batch WSe ran at `a6b57e0` too, the text before small thing e's fix; `mnemonic/` holds a
+  bare AutoHotkey window with the panel's layout (`layout.ahk`), which shows why Alt+D did nothing
+  there. Not run: Windows itself, real keys and a real drag, the omnibox's rename (J), «Seen in
+  passing» C.
