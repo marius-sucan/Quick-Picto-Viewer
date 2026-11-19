@@ -73296,7 +73296,7 @@ invokeFoldersListerMenu() {
     {
        If (A_Index>200)
        {
-          Try Menu, PVmFsibs, Add, % "and " sibsObj.Count()  - A_Index " more folders", PanelFoldersTree
+          Try Menu, PVmFsibs, Add, % "and " sibsObj.Count() - 200 " more folders", PanelFoldersTree
           Break
        }
 
@@ -73309,7 +73309,7 @@ invokeFoldersListerMenu() {
     {
        If (A_Index>200)
        {
-          Try Menu, PVmFsibs, Add, % "and " parentsObj.Count()  - A_Index " more folders", PanelFoldersTree
+          Try Menu, PVmFparents, Add, % "and " parentsObj.Count() - 200 " more folders", PanelFoldersTree
           Break
        }
 
@@ -73341,13 +73341,14 @@ invokeFoldersListerMenu() {
 
           If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
           {
-             Try Menu, PVmFsubs, Add, % A_Index ". " A_LoopFileName, folderzNavInvokeSubs
-             hasAddedSubs++
-             If (hasAddedSubs>200)
+             If (hasAddedSubs>=200)
              {
-                Try Menu, PVmFsibs, Add, ... more folders can be listed, PanelFoldersTree
+                Try Menu, PVmFsubs, Add, ... more folders can be listed, PanelFoldersTree
                 Break
              }
+
+             Try Menu, PVmFsubs, Add, % A_Index ". " A_LoopFileName, folderzNavInvokeSubs
+             hasAddedSubs++
           }
        }
     }
