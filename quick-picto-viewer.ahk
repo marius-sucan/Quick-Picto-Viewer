@@ -31833,9 +31833,9 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    {
       friendly_name := (quickMode!=1) ? "paste the folder(s) inside it" : "perform the intended folder action"
       If (StrLen(thisFolder)>1)
-         msgResult := msgBoxWrapper(appTitle ": Confirmation", "Destination folder: " thisFolder "\`n`nIt seems to no longer exist. Would you like to recreate it? By choosing yes, QPV will " friendly_name, 4, 0, "question")
+         recreateIt := msgBoxWrapper(appTitle ": Confirmation", "Destination folder: " thisFolder "\`n`nIt seems to no longer exist. Would you like to recreate it? By choosing yes, QPV will " friendly_name, 4, 0, "question")
 
-      If (msgResult="Yes")
+      If (recreateIt="Yes")
       {
          FileCreateDir, %thisFolder%
          If ErrorLevel
