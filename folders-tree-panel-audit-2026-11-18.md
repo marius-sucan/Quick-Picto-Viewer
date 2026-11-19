@@ -97,7 +97,7 @@ in v5.6.7 (2022); S's entry gives the history. Run in the application under head
 AutoHotkey 1.1.37.02, at `6fb2abd` and with the fixed text (batch SDA); AA was found while checking
 S.
 
-**«Seen in passing» H, I and J, 2026-11-19, fixed at `2e29a57`**, with Marius's answers (decisions
+**«Seen in passing» H, I and J, 2026-11-19, fixed at `6dc2635`**, with Marius's answers (decisions
 28 to 32). With nothing loaded, Insert opens the .SLD list or the database it is given, as a drop
 does; with a plain folder or a database open, a .SLD list given to Insert or to a drop answered
 «Import» is imported (`5b77af3`, decisions 28 and 29). «Save settings into current .SLD file» and
@@ -1274,6 +1274,9 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   and by a drag with Shift held. A copy, a move that fails and the rename of a folder whose name
   begins with the protected folder's leave the setting as it is, and a file of the renamed protected
   folder is skipped by the deletion.
+  Since `6dc2635` the line that names where a moved folder went takes its name with `SubStr()`, as
+  the rest of the file does, in place of an index holding a method call; batches XH, XI and XJ pass
+  at that commit.
 - **K. «Use Alt to open it in Explorer», in the quick file actions panel, is not reached from the
   keys.** The keys 1 to 7 and Shift+1 to Shift+7 are sent to `triggerQuickFileAction()`; Alt+1,
   Alt+6, Alt+7 and Ctrl+Alt+1 are sent to no function (run, batch T14, through
@@ -1728,9 +1731,10 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
 - «Seen in passing» H, I and J (`5b77af3`, `07d88b3`, `2e29a57`) were run in the application under
   headless Wine, on AutoHotkey 1.1.37.02, at `7178c08` and with the fixed texts, by
   `.claude/scratch/folders-tree-seen-hij-2026-11-19/` (`tests-hij.ahk`, `run.sh`, `run-regs.sh`;
-  `mkfixes-hij.py` writes the three texts; the logs in `results/`, named `h-` at `7178c08` and `f-`
-  or `f2-` with the fixed texts), with the helpers of the earlier kits. Batch XH gives Insert a .SLD
-  list and a database on the welcome screen, a .SLD list with a plain folder of five files, a
+  `mkfixes-hij.py` writes the three texts; the logs in `results/`, named `h-` at `7178c08`, `f-`
+  or `f2-` with the fixed texts and `c-` at `6dc2635`), with the helpers of the earlier kits. Batch
+  XH gives Insert a .SLD list and a database on the welcome screen, a .SLD list with a plain folder
+  of five files, a
   database of four files, a .SLD list or a folder of one file open, the open list itself, and an
   image; it drops a .SLD list on the main window, answered «Import» with a database open, and on the
   welcome screen; it runs the omnibox's «Import files list» through a row it adds to the omnibox's
@@ -1753,6 +1757,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   of a database that its own step H3 now grows by two. FixI's checks I1, I1b, I1c, I1d and I2 fail
   now, as they should: they expect a database given to Insert on the welcome screen to become an
   unsaved list, and it opens; its observation I8 now reads «Settings saved into the files list»,
-  where the error came. AutoHotkey 1.1.37.02 loads each of the three texts, with and without
+  where the error came. Batches XH, XI and XJ pass at `6dc2635`, the last commit of the three fixes.
+  AutoHotkey 1.1.37.02 loads each of the three texts and the text of `6dc2635`, with and without
   `/iLib`. Not run: Windows itself, real menus, keys and dialogs, a real drag, and a move that
   Windows merges into a folder of the same name.
