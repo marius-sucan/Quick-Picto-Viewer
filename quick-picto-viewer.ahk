@@ -31702,13 +31702,16 @@ UIcoreFolderNew(thisFolder, ByRef newFileName) {
    msgResult := msgBoxWrapper("Create new folder: " appTitle, "Create new folder in:`n" thisFolder "\`n`nPlease type the new folder name.", "&Create folder|C&ancel", 1, "modify-file", 0, 0, 0, "limit9050", "")
    If InStr(msgResult.btn, "Create")
    {
-      newFileName := Trimmer(msgResult.edit)
-      If FolderExist(thisFolder "\" newFileName)
-         Return msgBeepTimer("WARNING: A folder with the given name already exists:`n" thisFolder "\`n" newFileName "\", 0)
-
-      newFileName := filterFileName(newFileName, 0)
+      newFileName := filterFileName(msgResult.edit, 0)
       If !newFileName
          Return msgBeepTimer("WARNING: Incorrect folder name given.")
+
+      takenBy := FileExist(thisFolder "\" newFileName)
+      If takenBy
+      {
+         isDir := InStr(takenBy, "D")
+         Return msgBeepTimer("WARNING: A " (isDir ? "folder" : "file") " with the given name already exists:`n" thisFolder "\`n" newFileName (isDir ? "\" : ""), 0)
+      }
 
       FileCreateDir, %thisFolder%\%newFileName%
       If !ErrorLevel
