@@ -27121,17 +27121,14 @@ omniBoxFolderOpen(modus:=0, isGiven:=0) {
    If !folderPath
       Return
 
-   If askAboutFileSave(" and the selected folder will be opened")
-      Return
-
-   If askAboutSlidesListSave()
-      Return
-
-   If askAboutFilesSelect("discard it")
-      Return
-
+   oldPrevOmni := prevOmniBoxFolder
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
-   tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 0, (modus="recursive" && isGiven="yes"))
+   If (tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 1, (modus="recursive" && isGiven="yes"))="cancel")
+   {
+      prevOmniBoxFolder := oldPrevOmni
+      Return
+   }
+
    FileExploreSiblingsNav("reset")
    userQuickMenusEdit := folderPath
    If !VisibleQuickMenuSearchWin
