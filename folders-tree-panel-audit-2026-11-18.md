@@ -68,6 +68,14 @@ in passing» A moves the omnibox's selection to its last row, the omnibox's list
 row, rather than selecting every row; and B holds for an unsaved list as well. They found three new
 leads, «Seen in passing» R, S and T.
 
+**Small thing g, 2026-11-19, fixed at `4c6a16d`.** «Open folder now», by Enter or a double-click,
+finds a folder removed from the disk gone before it asks about the edited image, the list or the
+selection, as the «`\\`» menu's moves do: the tree leaves the three questions to
+`tryOpenGivenFolder()`, which asks them once it has found the folder. Run in the application under
+headless Wine, on AutoHotkey 1.1.37.02, at `8ee6fef` and with the fixed text (batches WSg and WGa).
+The omnibox's «Open folder now» still asks before it finds the folder gone, a new lead, «Seen in
+passing» U.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -99,7 +107,7 @@ leads, «Seen in passing» R, S and T.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `15e9716` |
+| # | Finding | Harm | Checked | Shared with | Status at `4c6a16d` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
@@ -117,7 +125,7 @@ leads, «Seen in passing» R, S and T.
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read, then run | — | **fixed**, `f4bbf01`: both keys refuse a drive element (decision 17) |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read, then run | Shift+F4 menu | **fixed**, `43bee47`: each note in its own submenu, counting the folders not listed; 200 sub-folders listed |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run | omnibox F7 | **fixed**, `80b75e0`: the name the filter gives is checked, for a folder or a file (decision 18) |
-| 17 | Small things (nine points) | low | read, then run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; e **fixed**, `a4c35d0`; a, c, d, g open, each confirmed by a run |
+| 17 | Small things (nine points) | low | read, then run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; e **fixed**, `a4c35d0`; g **fixed**, `4c6a16d`; a, c, d open, each confirmed by a run at `15e9716` |
 
 ---
 
@@ -841,9 +849,9 @@ folder was made at either (batch U16x).
 
 ## 17. Small things
 
-b, h and i are fixed in `ca8109b`, f in `5624fa8` and e in `a4c35d0`; a, c, d and g are as described,
-at `15e9716` too, each confirmed by a run (2026-11-19, batches WSa, WSc, WSd and WSg). ✅ marks a fixed
-one.
+b, h and i are fixed in `ca8109b`, f in `5624fa8`, e in `a4c35d0` and g in `4c6a16d`; a, c and d are as
+described, at `15e9716` too, each confirmed by a run (2026-11-19, batches WSa, WSc and WSd). ✅ marks a
+fixed one.
 
 a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` (:31967) sorts the
    children of the renamed element (that is AutoHotkey's `Sort` option), not the element among its
@@ -897,7 +905,7 @@ f. ✅ **«Show folder details» on a folder with no images and no sub-folders**
    selection the count of elements, both as at `cd42beb`; a drive and the folders with images or
    sub-folders show their counts at all three.
 
-g. **«Open folder now» on a missing folder** asks about the edited image, the list and the
+g. ✅ **«Open folder now» on a missing folder** asks about the edited image, the list and the
    selection (:30767-30774), and only then finds the folder gone (`tryOpenGivenFolder()`
    :73297-73302). Still so at `15e9716`. Run, batch WSg: with a .SLD list of 212 files, modified, 30
    of them selected, Enter on the element of a folder removed from the disk asked «Save files list»
@@ -905,6 +913,14 @@ g. **«Open folder now» on a missing folder** asks about the edited image, the 
    and «Yes», the list stayed as it was. The menu offers no «Open» on such an element, so Enter and
    a double-click are the ways there. The «`\\`» menu's moves, which ask once `tryOpenGivenFolder()`
    has found the folder (finding 2), ask nothing for the same folder.
+   **Fixed in `4c6a16d`**: `folderTreeDefaultAction()` no longer asks the three questions itself; it
+   calls `tryOpenGivenFolder()` with its argument `askFirst` set to 1, as the «`\\`» menu's moves do,
+   and stops when that returns "cancel". Run, batch WSg, at `8ee6fef` and with the fixed text: Enter
+   on the missing folder now says «ERROR: Folder not found or access denied» with no question, the
+   list as it was. Batch WGa, at both texts, Enter on an existing folder with the same list: the
+   questions come in the same order, «Cancel» to the first and «No» to the second keep the list,
+   «Discard» and «Yes» open the folder, and the tree is the active window after it. The «Save image»
+   question, the first of the three, was not run: it moved with the other two (read).
 
 h. ✅ **The rebuild test** `thisSize := 300 + PrefsLargeFonts + uiUseDarkMode` (:30625) gives 301 for
    large fonts in light mode and for normal fonts in dark mode: if both settings change while the
@@ -1234,6 +1250,16 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   WSex, WSex2 and WSex3 in the application; a bare AutoHotkey window with the panel's layout gives
   the button 0×1 with `-wantTab` and 1×1 without, and only the 1×1 one answers Alt+D and BM_CLICK
   (`mnemonic/layout.ahk` of the kit). Found while checking small thing e.
+- **U. The omnibox's «Open folder now» asks before it finds a missing folder gone.**
+  `omniBoxFolderOpen()` (:27118) asks the three questions of «Open folder now», then calls
+  `tryOpenGivenFolder()`, which finds the folder gone: small thing g, before its fix, in the
+  omnibox. A row listed before its folder was removed from the disk stays in the omnibox's list,
+  and Insert (:42494), Ctrl+Enter or Shift+Enter (:42719) and «Open folder now» of its menu
+  (:27297) open it. Run, batch WGu, at `8ee6fef` and with the text of g's fix: with the .SLD list of
+  212 files, modified, 30 of them selected, and the omnibox's row `\GoneU` selected, its folder then
+  removed from the disk, `omniBoxFolderOpen()` asked «Save files list» and «Discard selection»,
+  answered «Discard» and «Yes», then said «ERROR: Folder not found or access denied»; the list
+  stayed as it was. Found while fixing g.
 
 ## Checked and found correct
 
@@ -1393,3 +1419,19 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   bare AutoHotkey window with the panel's layout (`layout.ahk`), which shows why Alt+D did nothing
   there. Not run: Windows itself, real keys and a real drag, the omnibox's rename (J), «Seen in
   passing» C.
+- Small thing g (`4c6a16d`) was run in the application under headless Wine, on AutoHotkey 1.1.37.02,
+  at `8ee6fef` and with the fixed text, by `.claude/scratch/folders-tree-small-g-2026-11-19/`
+  (`tests-g.ahk`, `run.sh`, `run-regs.sh`; `mkfix-g.py` writes the text; the logs in `results/`),
+  with the helpers of the earlier kits. Batch WSg of the open-items kit; batch WGa, Enter on an
+  existing folder through `folderTreeDefaultAction()`, with the modified .SLD list of 212 files, 30
+  selected, and the three answers in turn; batch WGu, the omnibox's «Open folder now» on a missing
+  folder («Seen in passing» U). At `8ee6fef` WSg fails its check g1 and WGu its check gu1; with the
+  fixed text WSg passes and WGu still fails, as U says; WGa passes at both, and its logs differ only
+  by the logged call of `tryOpenGivenFolder()`, now made before the questions, with `askFirst` set
+  to 1. Batches T6, T7, T9, T10, T12, T13, T15, U4, U4n, U4x, U13, VM, VP, WPB, WPD, WPQ, WSc and
+  WSex of the earlier kits, the ones that go through the tree's and the omnibox's opens, imports and
+  drags, give the same checks with the fixed text as at `8ee6fef`: those of WPB, WPD, WPQ and WSc
+  fail at both, for «Seen in passing» B, D and Q and small thing c, which they check; U4n, U4x and
+  WSex, which only log, log the same lines, but for that call and, in WSex, the window handles.
+  AutoHotkey 1.1.37.02 loads the fixed text, with and without `/iLib`. Not run: Windows itself, real
+  keys, the «Save image» question.
