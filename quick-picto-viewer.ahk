@@ -31233,7 +31233,9 @@ FolderTreeFindActiveFile(givenPath:=0) {
     If (hasAdded!=1 && z)
        TV_Modify(z, "Expand Select VisFirst")
 
-    initialSibling := InStr(imgPath, "\") ? SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1) : ""
+    ; names are compared in lower case, since a list may hold a path in another case than the disk's,
+    ; and behind a \, which has them compared as text: 1 is not 01
+    initialSibling := InStr(imgPath, "\") ? "\" Format("{:L}", SubStr(imgPath, InStr(imgPath, "\", 0, -1) + 1)) : ""
     If z
        w := TV_GetParent(z)
 
@@ -31265,9 +31267,9 @@ FolderTreeFindActiveFile(givenPath:=0) {
           {
              labelu := ""
              TV_GetText(labelu, r)
-             If (Trimmer(labelu, "\")!=initialSibling)
+             h := "\" Format("{:L}", Trimmer(labelu, "\"))
+             If (h!=initialSibling)
              {
-                h := Trimmer(labelu, "\")
                 mustSkip[h] := 1
                 Continue
              }
@@ -31298,11 +31300,12 @@ FolderTreeFindActiveFile(givenPath:=0) {
 
           If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
           {
-             If mustSkip.hasKey(A_LoopFileName)
+             lowName := "\" Format("{:L}", A_LoopFileName)
+             If mustSkip.hasKey(lowName)
                 Continue
 
              P%A_Index% := TV_Add("\" A_LoopFileName, w)
-             If (A_LoopFileName=initialSibling)
+             If (lowName==initialSibling)
                 subsParent := P%A_Index%
           }
        }
@@ -31339,7 +31342,8 @@ iterateFDtreeView(lvl, z, sliced) {
        If z
           TV_GetText(labelu, z)
 
-       If (labelu!="" && Trimmer(labelu, "\")=sliced[lvl])
+       ; in lower case and behind a \, as in FolderTreeFindActiveFile()
+       If (labelu!="" && ("\" Format("{:L}", Trimmer(labelu, "\")))==("\" Format("{:L}", sliced[lvl])))
        {
           gu := z
           lvl++
@@ -31471,6 +31475,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
     } Else
     {
        ; add the sibling folders of the current folder
+       currentLow := "\" Format("{:L}", sliced[maxLevels])   ; behind a \ the names are compared as text
        Loop, Files, % parentPath "\*", DF
        {
           If determineTerminateOperation()
@@ -31479,7 +31484,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
           If (A_LoopFileName="" || !InStr(A_LoopFileAttrib, "D"))
              Continue
 
-          If (A_LoopFileName=sliced[maxLevels])
+          If (("\" Format("{:L}", A_LoopFileName))==currentLow)
              subsParent := TV_Add("\" A_LoopFileName, parentu, "Expand Bold")
           Else
              TV_Add("\" A_LoopFileName, parentu)
@@ -32218,7 +32223,7 @@ folderTreeScanSubbies(prevent:="") {
           TV_GetText(labelu, r)
           If (Trimmer(labelu, "\") && FolderExist(thisFolder labelu))
           {
-             h := Trimmer(labelu, "\")
+             h := Format("{:L}", Trimmer(labelu, "\"))
              mustSkip[h] := 1
              Continue
           }
@@ -32242,7 +32247,8 @@ folderTreeScanSubbies(prevent:="") {
 
          If (A_LoopFileName!="" && InStr(A_LoopFileAttrib, "D"))
          {
-            If (mustSkip.hasKey(A_LoopFileName))
+            lowName := Format("{:L}", A_LoopFileName)
+            If (mustSkip.hasKey(lowName))
                Continue
 
             P%A_Index% := TV_Add("\" A_LoopFileName, c)
