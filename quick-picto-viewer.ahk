@@ -30732,6 +30732,10 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       z := 4
    Else If (modus="properties" && g="yo")
       z := 3
+   Else If (modus="open-recursive" && g="yo")   ; F3 or a drop with no list loaded: the keys are not read
+      z := 6
+   Else If (modus="open" && g="yo")
+      z := 0
    Else If (GetKeyState("Shift", "P") || (modus="anew" && g="yo") )
       z := 2
    Else If (GetKeyState("Ctrl", "P") || (modus="explorer" && g="yo"))
@@ -30772,7 +30776,7 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       If askAboutFilesSelect("discard it")
          Return
 
-      tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex)
+      tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 0, (z=6))
       FileExploreSiblingsNav("reset")
       Sleep, 1
       WinActivate, ahk_id %hfdTreeWinGui%
@@ -30937,7 +30941,8 @@ FolderTreeResponder(a, b, c) {
             r := nc := ""
             TV_Modify(c)
             r := GetKeyState("Shift", "P") ? "`nFolder is to be RECURSIVELY scanned." : "`nHold SHIFT for recursive scanning."
-            friendly := "`nDrop folder here to import it into the current list." r
+            friendly := (maxFilesIndex>0 && CurrentSLD) ? "`nDrop folder here to import it into the current list." : "`nDrop folder here to open it."
+            friendly .= r
             ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
          } Else If InStr(info, "omnibox window")
          {
@@ -32127,7 +32132,9 @@ fromFolderTreeToOmniBox(modus:=0,imgPath:=0) {
 folderTreeAppendFiles(modus:="") {
    If (maxFilesIndex<1 || !CurrentSLD)
    {
-      folderTreeDefaultAction()
+      ; no list to import into: the folder is opened, with its sub-folders when Shift is held
+      openu := (modus="recursive" || GetKeyState("Shift", "P")) ? "open-recursive" : "open"
+      folderTreeDefaultAction(openu, "yo")
       Return
    }
 
@@ -73446,7 +73453,7 @@ folderzNavInvokeSubs(menuItem) {
     tryOpenGivenFolder(thisFolder, oldFolder, currentFileIndex, 1)
 }
 
-tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
+tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0, recursive:=0) {
    Static reopenList := 1
    oldFolderu := StrReplace(oldFolder, "|")
    thisFolder := StrReplace(thisFolder, "|")
@@ -73478,8 +73485,9 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
    newStaticFoldersListCache := []
    maxFilesIndex := 0
    SLDtypeLoaded := 1
-   coreOpenFolder("|" thisFolder, 0, 0, 0, 1)
-   If (maxFilesIndex<1)
+   prefixu := (recursive=1) ? "" : "|"
+   coreOpenFolder(prefixu thisFolder, 0, 0, 0, 1)
+   If (maxFilesIndex<1 && recursive!=1)
    {
       addJournalEntry("Failed to find image files in: |" thisFolder)
       If !FolderExist(oldFolderu)
@@ -73498,7 +73506,8 @@ tryOpenGivenFolder(thisFolder, oldFolder, oldIndex, askFirst:=0) {
          CurrentSLD := thisFolder
       } Else
          hasDeclined := 1
-   } Else CurrentSLD := "|" thisFolder
+   } Else
+      CurrentSLD := prefixu thisFolder
 
    hasFailed := 0
    If (maxFilesIndex<1 && FolderExist(oldFolderu))
