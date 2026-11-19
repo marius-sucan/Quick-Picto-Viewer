@@ -26936,7 +26936,9 @@ OmniBoxGetSelectedFolder(givenRow:=0, isGiven:=0, givenPath:=0) {
 omniBoxFolderImport(dummy:=0, isGiven:=0) {
    If (maxFilesIndex<1 || !CurrentSLD)
    {
-      omniBoxFolderOpen()
+      ; no list to import into: the folder is opened, with its sub-folders when Shift is held
+      openu := ((dummy="recursive" && isGiven="yes") || GetKeyState("Shift", "P")) ? "recursive" : "not"
+      omniBoxFolderOpen(openu, "yes")
       Return
    } Else
       folderPath := OmniBoxGetSelectedFolder()
@@ -27114,7 +27116,7 @@ omniBoxFolderExplorerOpen() {
    }
 }
 
-omniBoxFolderOpen() {
+omniBoxFolderOpen(modus:=0, isGiven:=0) {
    folderPath := OmniBoxGetSelectedFolder()
    If !folderPath
       Return
@@ -27129,7 +27131,7 @@ omniBoxFolderOpen() {
       Return
 
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
-   tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex)
+   tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 0, (modus="recursive" && isGiven="yes"))
    FileExploreSiblingsNav("reset")
    userQuickMenusEdit := folderPath
    If !VisibleQuickMenuSearchWin
@@ -30989,7 +30991,7 @@ FolderTreeResponder(a, b, c) {
       If InStr(info, "main")
       {
          z := InStr(r, "scanned") ? "recursive" : "not"
-         externTooltiput("Importing folder - please wait")
+         externTooltiput(((maxFilesIndex>0 && CurrentSLD) ? "Importing" : "Opening") " folder - please wait")
          folderTreeAppendFiles(z)
       } Else If (InStr(info, "omnibox") && dc && thisFolder)
       {
@@ -42658,7 +42660,8 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             r := dc := nc := ""
             LV_Modify(initialRow, "select")
             r := GetKeyState("Shift", "P") ? "`nFolder is to be RECURSIVELY scanned." : "`nHold SHIFT for recursive scanning."
-            friendly := "`nDrop folder here to import it into the current list." r
+            friendly := (maxFilesIndex>0 && CurrentSLD) ? "`nDrop folder here to import it into the current list." : "`nDrop folder here to open it."
+            friendly .= r
             ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
          } Else If InStr(info, "omnibox list")
          {
@@ -42699,7 +42702,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
       If InStr(info, "main")
       {
          z := InStr(r, "scanned") ? "recursive" : "not"
-         externTooltiput("Importing folder - please wait")
+         externTooltiput(((maxFilesIndex>0 && CurrentSLD) ? "Importing" : "Opening") " folder - please wait")
          omniBoxFolderImport(z, "yes")
       } Else If (InStr(info, "omnibox") && dc && thisFolder)
       {
