@@ -9825,9 +9825,9 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             {
                externTooltiput("Please wait - performing action")
                If InStr(r, "copy")
-                  func2exec := "omniBoxFolderCopyFiles"
+                  func2exec := Func("triggerQuickFileAction").Bind("vk38", 1, 1)
                Else If InStr(r, "move")
-                  func2exec := "omniBoxFolderMoveFiles"
+                  func2exec := Func("triggerQuickFileAction").Bind("+vk38", 1, 1)
             }
             externTooltiput("-hide-")
          } Else If (InStr(info, "tree") && r && nc)
@@ -9848,9 +9848,9 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             If (InStr(r, "_") && InStr(dest, ":\"))
             {
                If InStr(r, "copy")
-                  func2exec := "FolderTreeMenuCopyFiles"
+                  func2exec := Func("triggerQuickFileAction").Bind("vk37", 1, 1)
                Else If InStr(r, "move")
-                  func2exec := "FolderTreeMenuMoveFiles"
+                  func2exec := Func("triggerQuickFileAction").Bind("+vk37", 1, 1)
             }
          }
 
@@ -47296,7 +47296,7 @@ BTNchooseQuickActDestFolder(CtrlHwnd) {
    }
 }
 
-triggerQuickFileAction(keyu, forceIT:=0) {
+triggerQuickFileAction(keyu, forceIT:=0, fromDrop:=0) {
    Static hasLoadedSettings := 0, lastInvoked := 1
    If (allowUserQuickFileActions=0 && forceIT=0)
       Return
@@ -47373,7 +47373,8 @@ triggerQuickFileAction(keyu, forceIT:=0) {
       Return
    }
 
-   altState := GetKeyState("Alt", "P")
+   ; a drop of files begins with Alt held, and Alt may still be down when it gets here
+   altState := (fromDrop=1) ? 0 : GetKeyState("Alt", "P")
    ctrlState := GetKeyState("Ctrl", "P")
    lastInvoked := A_TickCount
    If (altState=1 && ctrlState!=1)
