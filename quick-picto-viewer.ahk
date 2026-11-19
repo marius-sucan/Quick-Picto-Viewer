@@ -31012,7 +31012,6 @@ FolderTreeResponder(a, b, c) {
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
             externTooltiput("Please wait - performing folder action")
-            actu := r
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
          }
          externToolTiput("-hide-")
@@ -31047,19 +31046,10 @@ FolderTreeResponder(a, b, c) {
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
             externTooltiput("Please wait - performing folder action")
-            actu := r
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
             If (r=2)
                folderTreeScanSubbies()
          }
-      }
-
-      ; a folder moved away: its element at the old place goes
-      If (InStr(actu, "MOVE") && !FolderExist(src))
-      {
-         Gui, fdTreeGuia: Default
-         Gui, fdTreeGuia: TreeView, TVlistFolders
-         TV_Delete(c)
       }
       externToolTiput("-hide-")
       prevent := 1
@@ -31923,6 +31913,8 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
         {
            loopsCount++
            r := ShellFileOperation(filesActu, line "\", thisFolder "\", "FOF_ALLOWUNDO|FOF_NOCONFIRMMKDIR", PVhwnd)
+           If (filesActu="FO_MOVE")
+              movedAway .= line "`n"
            If (r["aborted"] || r["error"])
            {
               zr := r["error"] ? 1 : 2
@@ -31932,6 +31924,15 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    }
 
    folderTreeScanSubbies()
+   ; a folder moved away leaves its place in the tree
+   Loop, Parse, movedAway, `n
+   {
+      sliced := StrSplit(A_LoopField, "\")
+      g := (A_LoopField!="" && !FolderExist(A_LoopField)) ? iterateFDtreeView(1, 0, sliced) : []
+      If (g[2] && g[1]>sliced.Count())
+         TV_Delete(g[2])
+   }
+
    whileLoopExec := 0
    If (!zr && !loopsCount)
    {
