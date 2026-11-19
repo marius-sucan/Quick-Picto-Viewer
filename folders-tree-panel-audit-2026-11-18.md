@@ -27,6 +27,19 @@ list type after a database is imported from the welcome screen, is fixed in `bb7
 batches S and I (small thing f, «Seen in passing» G to I) were on AutoHotkey 1.1.37.02. The line
 numbers below stay those of `7802a22`.
 
+**Findings 5 to 12, 2026-11-18, fixed at `1313a18`**, with Marius's answers. Each was first run in
+the application under headless Wine, on AutoHotkey 1.1.37.02, at `54c1996`, and each of the eight
+did what the audit describes; the same batches were then run with the fixes. «Rename folder» looks
+for the new name beside the folder (`e1ca39e`) and, with its tick, carries the opened folder, the
+seed folders list and the folders list (`de9725d`, decision 3); a folder dropped on a missing folder
+is copied or moved once that folder is recreated (`d57df45`); «Copy/Move selected file(s) into...»
+takes a folder of any length and asks before it recreates a missing one (`292aadd`); files dropped
+with Alt still held are copied or moved (`cc36dc1`); an import that brings no file in leaves the
+current file where it was (`0fb1617`); a folder is listed once whatever the case of its label
+(`5b0ac28`); and the confirmation of a drag between siblings names the dragged folder as the source
+(`1313a18`). The omnibox's side of findings 5 and 7 to 10, which shares the corrected functions, was
+run as well (batch T13). Decisions 12 to 15 were raised by these runs and settled the same day.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -58,20 +71,20 @@ numbers below stay those of `7802a22`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `5624fa8` |
+| # | Finding | Harm | Checked | Shared with | Status at `1313a18` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
 | 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code | **fixed**, `dc69bd9`: the hints change (decision 1) |
 | 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — | open |
-| 5 | «Rename folder» looks for the new name inside the folder instead of beside it | medium | read | omnibox F2 | open |
-| 6 | «Rename folder» with «Perform search and replace»: the opened folder, the seed folders list and the folders list keep the old path | medium | read | omnibox F2 | open |
-| 7 | A folder dropped on a missing folder: the destination is recreated, then nothing is copied or moved | medium | read | the omnibox's drags | open |
-| 8 | «Copy/Move selected file(s) into...» and file drops: a destination of four characters or fewer opens the quick file actions panel | medium | read | the omnibox's copy and move | open |
-| 9 | Files Alt+dragged from the main window: Alt still held half a second after the drop opens Explorer instead | low | read | drops on the omnibox | open |
-| 10 | «Import images into the list» moves the current file to the end of the list, also when nothing was imported | low | read | — | open |
-| 11 | A label whose case differs from the disk's: the tree lists the folder twice (every database list) | medium | run (part), read | — | open |
-| 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read | — | open |
+| 5 | «Rename folder» looks for the new name inside the folder instead of beside it | medium | read, then run | omnibox F2 | **fixed**, `e1ca39e`: the name is looked for beside the folder, a file of that name included; a change of case alone passes, an unchanged name does nothing (decision 12) |
+| 6 | «Rename folder» with «Perform search and replace»: the opened folder, the seed folders list and the folders list keep the old path | medium | read, then run | omnibox F2 | **fixed**, `de9725d`: the tick carries the three, in a database its tables too; it is offered only when a list is loaded (decision 3) |
+| 7 | A folder dropped on a missing folder: the destination is recreated, then nothing is copied or moved | medium | read, then run | the omnibox's drags | **fixed**, `d57df45`: the folder is copied or moved into the recreated folder |
+| 8 | «Copy/Move selected file(s) into...» and file drops: a destination of four characters or fewer opens the quick file actions panel | medium | read, then run | the omnibox's copy and move | **fixed**, `292aadd`: a folder of the tree or the omnibox is taken at any length; a missing one is asked about first (decision 13) |
+| 9 | Files Alt+dragged from the main window: Alt still held half a second after the drop opens Explorer instead | low | read, then run | drops on the omnibox | **fixed**, `cc36dc1`: a drop does not read Alt; the menu items still do (decision 14) |
+| 10 | «Import images into the list» moves the current file to the end of the list, also when nothing was imported | low | read, then run | the omnibox's F3 and its two import rows | **fixed**, `0fb1617`: the current file moves only when files came in or the folder was rescanned (decision 15) |
+| 11 | A label whose case differs from the disk's: the tree lists the folder twice (every database list) | medium | run | — | **fixed**, `5b0ac28`: names are compared, and kept as keys, in lower case |
+| 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read, then run | — | **fixed**, `1313a18`: the box names the dragged folder as the source |
 | 13 | A folder moved by a drag stays in the tree at its old place | low | read | — | open |
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — | open |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu | open |
@@ -324,6 +337,22 @@ Shared helper: the omnibox's F2 (`omniBoxFolderRename()` :27203).
 Correction: check `oldPath "\" newFileName`, and let a change of case alone through (the folder
 itself passes that test).
 
+**Confirmed by a run, then fixed in `e1ca39e`**, with Marius's answer to decision 12. Run at
+`54c1996`, batch T5: `2024` renamed to «old» while `2024\old` exists is refused with «A folder with
+the given name already exists»; `2025` renamed to «taken», the name of a folder beside it, ends in
+«ERROR: An unknown error occurred renaming the folder»; F2 in the tree and the omnibox's F2 (batch
+T13) do the same. The run added two cases: a name left unchanged counted as a rename, and with the
+tick it ran the search and replace; a file of the new name beside the folder gave the same unknown
+error. `UIcoreFolderRename()` now looks beside the folder with `FileExist()`, so the warning also
+comes for a file and says which of the two holds the name. A name that differs from the old one by
+its case alone, in É as in A to Z, is not looked for, since the folder itself would be found. An
+unchanged name closes the box and nothing else. The names are compared as text: `7` renamed to `07`
+is a rename, refused when a folder `07` is beside it; `==` alone takes two such names, equal as
+numbers, for one (run with a first text of the fix: the rename of `7` to `07` did nothing). With the
+fix the ten checks of batch T5 pass; at `54c1996` six fail. Under Wine a rename that changes the
+case alone leaves the name on the disk as it was, so the two checks on it show only that the rename
+is no longer refused; what Windows does with it was not run.
+
 ## 6. «Rename folder» with «Perform search and replace in current list»: the lists keep the old path
 
 `UIcoreFolderRename()` :31996-32000 → `SearchAndReplaceThroughIndex()` :98632
@@ -352,6 +381,25 @@ With no list loaded the tick is offered too, and ticked it runs on the empty ind
 updating the files list, 0 records were modified».
 
 Shared helper: the omnibox's F2.
+
+**Confirmed by a run, then fixed in `de9725d`**, with Marius's answers to decision 3: the tick
+carries all three, and it is offered only when a list is loaded. Run at `54c1996`, batch T6: after a
+rename with the tick the files list holds the new path, while the opened folder of a plain list, the
+seed folders list, the folders list and, in a database, the `staticfolders` table hold the old one;
+F5 then lists `\Alpha` in bold beside `\Alpha9`; with no list loaded the box offers the tick.
+`renameFolderInLists()` now runs the search and replace and, when it succeeded, three more steps. It
+gives `CurrentSLD` the new path when that names the renamed folder or something inside it: the
+opened folder of a plain list, which keeps its `|` when it was opened without its sub-folders, or
+the file of a .SLD list saved in that folder. It rewrites the seed folders that are the folder or
+are inside it (`renameDynamicFoldersEntries()`), in a database through
+`recreateDynaFoldersSQLdbList()`. It renames the rows of the folders list with
+`renameStaticFoldersEntries()` and, in a database, `renameStaticFolderSQLdb()`, which also moves the
+captions and the audio notes. These are the steps of the seed folders panel's «Rename index entry»
+(`PanelRenameStaticFolder()`). In a database the new path goes into the files list in lower case, as
+the database holds its paths. Without the tick nothing follows the folder, as before. With the fix
+the seventeen checks of batch T6 pass; at `54c1996` fourteen fail. Not carried, as after a rename
+made in Explorer (read): the recent folders, the folder favourites, the six folders of the quick
+file actions and the protected folder («Seen in passing» J).
 
 ## 7. A folder dropped on a missing folder: recreated, then nothing copied or moved
 
@@ -382,6 +430,17 @@ menu does not offer «Paste folder(s) into...» on one (:31631-31639), and the m
 «Copy | Move» after the recreate question, so it works.
 
 Correction: keep the drop's action in a variable of its own.
+
+**Confirmed by a run, then fixed in `d57df45`.** Run at `54c1996`, batch T7: a copy and a move onto
+a folder that is gone, answered «Yes», recreate the folder and do nothing else, without a message;
+so do a drag inside the tree and a drag from the omnibox onto the tree (batch T13).
+`UIcoreFolderPasteFoldersInto()` now keeps the answer to «recreate?» apart from the action the drop
+passed (since `292aadd` the question is asked by `askRecreateFolder()`), and the folder is copied or
+moved into the recreated folder. With the fix the five checks of batch T7 pass; at `54c1996` three
+fail. The copy and the move themselves were done by the kit: the Windows shell call that QPV makes
+(`SHFileOperation`) asks, under Wine, a question that a run without a display cannot answer. The
+runs therefore show which operation QPV asks for and on which two folders, not what Windows then
+does.
 
 ## 8. «Copy/Move selected file(s) into...»: a short destination opens the quick file actions panel
 
@@ -416,6 +475,23 @@ Shared helper: the omnibox's «Copy/Move selected file(s)» and its drop (`omniB
 
 Correction: for destinations 7 and 8, test that the folder exists instead of its length.
 
+**Confirmed by a run, then fixed in `292aadd`**, with Marius's answer to decision 13. Run at
+`54c1996`, batch T8: with the element `C:\` → `\q` selected (the folder `C:\q`, four characters,
+made for the run in Wine's own `C:` drive), «Copy selected file(s) into...» and «Move selected
+file(s) into...» open the quick file actions panel, the tree closes, and no file is copied or moved;
+the omnibox's «Copy selected file(s) into...» on that folder does the same (batch T13). The run also
+showed that a destination of five characters or more that is not on the disk was created without a
+word and the file copied into it. For a folder picked in the tree or in the omnibox,
+`triggerQuickFileAction()` now tests that the folder exists instead of the length of its path. When
+it does not exist, it asks what the folder paste asks, «Destination folder: … It seems to no longer
+exist. Would you like to recreate it? By choosing yes, QPV will copy the selected file(s) into it»
+(or «move»): «Yes» recreates the folder and goes on, any other answer stops. Both ask through
+`askRecreateFolder()`. The six destinations of the quick file actions keep the length test and are
+still created without a question. With the fix the seven checks of batch T8 pass; at `54c1996` six
+fail. A drive element still receives no file: past the test, the copy and move code itself refuses
+the root of a drive with «WARNING: Incorrect file path given: C:» (run); what a drive should accept
+is part of decision 5.
+
 ## 9. Files Alt+dragged from the main window: Alt still held opens Explorer
 
 The main window's thumbnails click handler (Alt + drag, :9712) → `SetTimer, % func2exec, -500`
@@ -445,6 +521,18 @@ Shared: files Alt+dragged onto the omnibox (`omniBoxFolderCopyFiles()` :27265).
 Correction: let the drop tell `triggerQuickFileAction()` to skip the Alt and Ctrl tests, which
 are meant for the keys 1 to 7.
 
+**Confirmed by a run, then fixed in `cc36dc1`**, with Marius's answer to decision 14. The run
+simulates the drag: the kit reports the button as held for three checks, the pointer as over the
+tree, and the Alt key that `triggerQuickFileAction()` reads as held or released. Run at `54c1996`,
+batch T9: a file Alt+dragged from the main window onto `\Gamma` is copied when Alt is released; with
+Alt still down when the timer runs, Explorer is asked to open `\Gamma` and nothing is copied. A drop
+on a row of the omnibox does the same (batch T13). `triggerQuickFileAction()` has a third parameter,
+`fromDrop`: with 1 it does not read Alt, so neither the Explorer branch nor the new instance branch
+runs. The two drops of `thumbsListClickResponder()` pass it through a bound function given to their
+timer. The menu items «Copy/Move selected file(s) into...» keep the two tests: with Alt held, the
+menu item still opens the folder in Explorer (run). With the fix the four checks of batch T9 pass;
+at `54c1996` one fails.
+
 ## 10. «Import images into the list» moves the current file to the end of the list
 
 `folderTreeAppendFiles()` :32045-32070
@@ -471,6 +559,19 @@ place. After an import it shows the next-to-last of the new files. (read)
 
 Correction: move the current file only after an import; the first new file would show what came
 in.
+
+**Confirmed by a run, then fixed in `0fb1617`**, with Marius's answer to decision 15. Run at
+`54c1996`, batch T10: «Cancel» in the scan question moves the current file from 2 to 4 of 5, in a
+plain list, a .SLD list and a database; «Cancel» in the box that says the folder is listed already
+moves it too. The omnibox carries the same line: its two «import folder» rows after every outcome
+(run, batch T13), and its F3 after Cancel in «Save image», where `addNewFolder2list()` returned no
+value (read). `importFolderIntoList()`, which the tree, the omnibox's F3 and the two rows now call,
+shows the next-to-last file when the list grew or ends in another file, or when the folder was
+rescanned. After a cancel it leaves the file shown. When the folder brought no file in, a folder
+without images, it shows the file shown before again: by then the import itself has picked a file at
+random. `addNewFolder2list()` returns «cancel» after Cancel in «Save image» as well. As before, a
+database shows a file picked at random after an import that brought files in. With the fix the
+eleven checks of batch T10 pass; at `54c1996` six fail.
 
 ## 11. A label whose case differs from the disk's: the tree lists the folder twice
 
@@ -507,6 +608,20 @@ folder renamed in case only, a path typed in the omnibox. (read)
 Correction: compare, and key the `hashTable`, in lower case (`Format("{:L}")`), as the seed
 folders panel does since `7c031cb`.
 
+**Confirmed by a run, then fixed in `5b0ac28`.** Run at `54c1996`, batch T11, on a database of
+`Photos\Summer`, `Photos\Winter` and `Photos\Été`: Space on the parent of `\photos` adds `\Photos`
+beside it; F9 with another branch of the tree open adds `\Summer` beside `\summer`; F5 with the
+current file in `été` lists `\Été` and a bold `\été`, and F9 then selects the parent in place of the
+folder; a plain list opened as `photos\été` shows the same. `FolderTreeRepopulate()`,
+`FolderTreeFindActiveFile()`, `iterateFDtreeView()` and `folderTreeScanSubbies()` now compare the
+names in lower case, with `Format("{:L}")`, and give the `hashTable` its keys in lower case. They
+also compare them as text: with a plain list on `nums\01` beside a folder `nums\1`, F5 marked both
+as the current folder (run), two names that are equal as numbers being equal for `=`; it marks `\01`
+alone now. The labels are as before: an element made from a path of the list keeps the list's case,
+an element read from the disk the disk's. With the fix the eleven checks of batch T11 pass; at
+`54c1996` seven fail. A plain or a .SLD list comes by such a path when a seed folder is scanned back
+(«Seen in passing» L).
+
 ## 12. A drag between sibling elements: the confirmation box swaps source and destination
 
 `FolderTreeResponder()` :31015-31038
@@ -533,6 +648,13 @@ Two drive elements are siblings too: the box shows them swapped, then the copy i
 drives are never copied (:31884).
 
 Correction: `TV_GetText(sr, c)` and `TV_GetText(dst, nc)`.
+
+**Confirmed by a run, then fixed in `1313a18`.** The run simulates the drag as for finding 9. Run at
+`54c1996`, batch T12: for `\Beta` dragged onto its sibling `\Gamma` the box reads «Source: .\Gamma\»
+and «Destination: .\Beta\»; for two elements that are not siblings it shows both whole paths, the
+source first; after «Yes», `\Beta` is copied into `\Gamma`. The two `TV_GetText()` calls now read
+the dragged element into the source and the element under the drop into the destination. With the
+fix the four checks of batch T12 pass; at `54c1996` one fails.
 
 ## 13. A folder moved by a drag stays in the tree at its old place
 
@@ -684,6 +806,7 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
 3. **What the rename's tick carries** (finding 6): the opened folder (`CurrentSLD`), the seed folders
    list, the folders list (in a database its tables, with the captions and audio notes), or a part of
    these? And should the tick be offered when no list is loaded?
+   **Settled**: all of them, and the tick is offered only when a list is loaded (`de9725d`).
 4. **The panel's own options in the menu**: «Show folder details», «Collapse/expand entire folder
    tree», «Large UI fonts», «Dark mode» and «Close panel» are in the menu only when no element, a
    drive element or a missing folder is selected (`addBonus`, :31598-31657; this split dates from
@@ -723,6 +846,22 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
     **Settled**: pass the list when its file exists (`548359a`); the favourites, the histories and a
     deleted list file keep the current file's folder. The sibling navigation tells «No» from a scan
     that found nothing since `67d7343` (finding 1).
+12. **«Rename folder»: a name left unchanged, and a file of the new name** (finding 5, raised by its
+    run): the first counted as a rename and ran the search and replace, the second gave «unknown
+    error». Handle the two, or keep to the check beside the folder?
+    **Settled**: both are handled (`e1ca39e`).
+13. **A destination that is not on the disk** (finding 8, raised by its run): a drop of files on an
+    element whose folder is gone created a folder of five characters or more without a word. Warn
+    and stop, create it as before, or ask?
+    **Settled**: ask «recreate?», as the folder paste does (`292aadd`).
+14. **Who ignores Alt after a drop of files** (finding 9): the drops alone, or the menu items
+    «Copy/Move selected file(s) into...» as well?
+    **Settled**: the drops alone (`cc36dc1`).
+15. **The current file after an import** (finding 10): leave it when nothing came in and show the
+    next-to-last file after an import, as now, or show the first file that came in? In the tree
+    alone, or in the omnibox too, which has the same line?
+    **Settled**: it stays when nothing came in, in the tree and in the omnibox; after an import the
+    next-to-last file is shown, as before (`0fb1617`).
 
 ## Unverified leads
 
@@ -816,6 +955,24 @@ Outside the panel's own code, found while tracing its actions.
   (v6.1.75). Run, `WritePrefsIntoSLD()` with a saved list of two files open: the error comes and
   the file is unchanged. Found while fixing G, after which the two items are offered for one more
   list.
+- **J. The protected folder keeps the old path after «Rename folder».** The deletions compare the
+  path of each file with `protectedFolderPath` (`batchFileDelete()`, `InListMultiEntriesRemover()`).
+  Once the tree or the omnibox has renamed the protected folder, or a folder that holds it, the
+  setting names a folder that is gone: its files are no longer skipped, and the check mark of «Set
+  as the protected folder» is gone too (read; found while fixing finding 6, whose tick carries the
+  lists and not this setting).
+- **K. «Use Alt to open it in Explorer», in the quick file actions panel, is not reached from the
+  keys.** The keys 1 to 7 and Shift+1 to Shift+7 are sent to `triggerQuickFileAction()`; Alt+1,
+  Alt+6, Alt+7 and Ctrl+Alt+1 are sent to no function (run, batch T14, through
+  `processDefaultKbdCombos()` in the mode that only names the function of a key). The function's Alt
+  test, and its Ctrl+Alt test for a new QPV instance, therefore run only when Alt is held while a
+  menu item calls it. Found while fixing finding 9.
+- **L. A seed folder scanned back lists its files under a folder path in lower case.** The seed
+  folders list is kept in lower case (`cleanDynamicFoldersList()`), a rescan scans the entry as the
+  list holds it (`coreRescanDynaFolder()`), and `Loop, Files` returns each file under the folder
+  path it was given. Run, batch T10: after «Rescan» in a plain list, the four files of `Holiday One`
+  are listed as `holiday one\h1.png` and so on. Such paths are what finding 11 met in plain and .SLD
+  lists. Found while fixing finding 10.
 
 ## Checked and found correct
 
@@ -904,3 +1061,23 @@ Outside the panel's own code, found while tracing its actions.
   drive, then no element; after each it reads the status line, filled as the Space key and «Show
   folder details» fill it. Batch I passes with the fixed text, and AutoHotkey 1.1.37.02 loads it,
   with and without `/iLib`.
+- Findings 5 to 12 were run in the application under headless Wine, on AutoHotkey 1.1.37.02, at
+  `54c1996` and with the fixed texts, by `.claude/scratch/folders-tree-5-12-2026-11-18/`
+  (`tests-5-12.ahk`, `run.sh`, `run-all.sh`; `mkfixes.py` writes one text per fix; the logs in
+  `app/results/`). Batches T5 to T12, one per finding, call what the tree calls:
+  `UIcoreFolderRename()` and F2, `UIcoreFolderPasteFoldersInto()`, the menu's two «selected file(s)»
+  items, `folderTreeAppendFiles()`, F5, F9 and Space, with every box answered from a timer. Batch
+  T13 goes through the omnibox: its F2, its F3 and «import folder» rows, its «Copy selected file(s)
+  into...», a drop of files on one of its rows and a drag of one of its rows onto the tree. Four
+  things are simulated by the kit. A drag: the button is reported as held for three checks, the
+  pointer as over the tree or the omnibox, and the element or row under it is given;
+  `FolderTreeResponder()`, `thumbsListClickResponder()` and `LVquickSearchMenusResponder()` then run
+  as after a real drag; `thumbsListClickResponder()` was called with the image view showing, not the
+  thumbnails view. The Alt key that `triggerQuickFileAction()` reads. Explorer, which is logged in
+  place of being started. And the shell's copy or move of a folder, which the kit logs and does
+  itself (finding 7). The folder of four characters is `C:\q`, in Wine's own `C:` drive, made and
+  removed by the batch. Each batch was run at the text of its own fix, and all of them with the last
+  text; of the seven checks of batch T13, five fail at `54c1996` and none with the last text;
+  batches S, F3, H, I and G of the earlier kits give the same results with the last text as at
+  `54c1996`. AutoHotkey 1.1.37.02 loads each of the eight texts, with and without `/iLib`. Not run:
+  Windows itself, a real drag, a real Alt key.
