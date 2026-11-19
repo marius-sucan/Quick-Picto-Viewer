@@ -31993,15 +31993,23 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       If !newFileName
          Return msgBeepTimer("WARNING: Incorrect folder name given")
 
-      If FolderExist(thisFolder "\" newFileName)
-         Return msgBeepTimer("WARNING: A folder with the given name already exists:`n" thisFolder "\`n" newFileName "\", 0)
+      ; behind a \ the names are compared as text: 7 is not 07
+      If (("\" newFileName)==("\" restu))
+         Return
 
-      oldPath := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1) - 1)
-      FileMoveDir, % thisFolder, % oldPath "\" newFileName, R
+      ; a change of case alone finds the folder itself
+      takenBy := FileExist(baseu newFileName)
+      If (takenBy && ("\" Format("{:L}", newFileName))!=("\" Format("{:L}", restu)))
+      {
+         isDir := InStr(takenBy, "D")
+         Return msgBeepTimer("WARNING: A " (isDir ? "folder" : "file") " with the given name already exists:`n" baseu "`n" newFileName (isDir ? "\" : ""), 0)
+      }
+
+      FileMoveDir, % thisFolder, % baseu newFileName, R
       If !ErrorLevel
       {
          If (lastChecked=1)
-            SearchAndReplaceThroughIndex(thisFolder "\", oldPath "\" newFileName "\", 0, 1)
+            SearchAndReplaceThroughIndex(thisFolder "\", baseu newFileName "\", 0, 1)
          Return 1
       } Else
          msgBeepTimer("ERROR: An unknown error occurred renaming the folder:`n" thisFolder "\")
