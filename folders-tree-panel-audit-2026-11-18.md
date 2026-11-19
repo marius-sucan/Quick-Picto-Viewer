@@ -88,6 +88,15 @@ first, and an image opened from the favourites or the recent images asks «Save 
 V, W, Y and Z were run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `96ec767`
 and with the fixed texts (batches WGu, WUd, WUe, WUo, WUr, WUs, WUv, WUw and WUx); X was read.
 
+**«Seen in passing» S and AA, 2026-11-19, fixed at `b246de9`**, with Marius's answers (decisions 26
+and 27). The four drag boxes that put a dot before a full path, «.Z:\…\Beta\», give it without the
+dot, and a drive as «Z:\», no longer «.Z:\\»; the boxes of siblings and those of the omnibox's
+rows keep «.\Beta\». The drag tooltips name an omnibox row «.\Gamma\», no longer «.Gamma\», and a
+drive element «Z:\». The dot has stood before every full path since these boxes first showed one,
+in v5.6.7 (2022); S's entry gives the history. Run in the application under headless Wine, on
+AutoHotkey 1.1.37.02, at `6fb2abd` and with the fixed text (batch SDA); AA was found while checking
+S.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -1051,6 +1060,13 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
     `retrieveFavesAsList()`?
     **Settled**: the image is tested first, and a cycle asks only through `retrieveFavesAsList()`
     (`30bef5d`).
+26. **What the drag boxes show for a folder** («Seen in passing» S): its full path without the dot,
+    its name as the boxes of siblings give it («.\Beta\»), or full paths in every drag box?
+    **Settled**: the full path without the dot, a drive as «Z:\»; the boxes of siblings and those of
+    the omnibox's rows keep «.\Beta\» (`b246de9`).
+27. **The tree's drag tooltips over a drive element** («Seen in passing» AA): «Z:\», as the boxes,
+    or left as they are?
+    **Settled**: «Z:\», in the same commit (`b246de9`).
 
 ## Unverified leads
 
@@ -1259,7 +1275,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   whatever the custom keys say. Run, batch WSc: with Space given to «Next image», «Scan for
   sub-folders» shows no key on `\Beta`, and Space in the tree still scans `\Beta`. The other keys
   of the menu go through the same code (read). Found while checking small thing c.
-- **S. Four drag confirmations put a dot before a full path.** The boxes of a drag from the main
+- ✅ **S. Four drag confirmations put a dot before a full path.** The boxes of a drag from the main
   window onto the tree, from the tree onto the omnibox, from the omnibox onto the tree, and inside
   the tree between elements that are not siblings write «Source: .» and «Destination: .» before the
   folder's full path (`thumbsListClickResponder()`, `FolderTreeResponder()` twice,
@@ -1267,6 +1283,26 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   siblings, inside the omnibox and from the main window onto the omnibox the boxes give a name,
   «.\Beta\», as meant. Run: the logs of batches T9, T12, T13, U13 and WPA show the dot before each
   such path (the kits shorten a path to its part under their work folder). Found while checking A.
+  The history, from git: the first of these boxes, that of a drag inside the tree in v5.6.5
+  (`dfe4c8b`, 2022-03-11), always named the two elements, behind `.\`, and a label starts with `\`:
+  «.\\Beta\». v5.6.7 (`e0b347a`, 2022-03-31) made that `.\` a `.`, which gave «.\Beta\», and in the
+  same release gave elements that are not siblings their full paths and added the box of a drag
+  between the tree and the omnibox, both behind that `.`; v5.7.0 (`5e1a365`, 2022-04-22) split that
+  box in two and added the box of the main window, the same way. A full path never showed without
+  the dot. A drive showed as «.Z:\\»: its label already ends with `\`, and the box adds one.
+  **Fixed in `b246de9`** (decision 26): the four boxes give the full path without the dot and with one
+  `\` at its end (`Trimmer(path, "\") "\"`), so a drive reads «Z:\». In the tree's box, siblings
+  keep their names through the new `folderTreeLabelForMsg()`, which gives a folder's label behind
+  the dot and a drive's label as it is: two drive elements, siblings with no parent, read «Z:\» and
+  «C:\», no longer «.Z:\\» and «.C:\\». Run, batch SDA, at `6fb2abd` and with the fixed text, every
+  box answered «No»: at `6fb2abd` the boxes read «Source: selected files | Destination:
+  .pv\Beta\» (the main window onto the tree's `\Beta`), «Destination: .Z:\\» (onto its drive
+  element), «Source: .pv\Beta\ | Destination: .pv\Gamma\» (the tree onto the omnibox, and the
+  omnibox onto the tree), «Source: .pv\Alpha\Sub\ | Destination: .pv\Gamma\» (inside the tree, not
+  siblings), «Source: .Z:\\ | Destination: .C:\\» (a drive element onto a second one, `C:\`, that the
+  kit adds); with the fixed text «pv\Beta\», «Z:\», «pv\Alpha\Sub\» and «Source: Z:\ |
+  Destination: C:\», the whole box text holding the full path from `Z:\`. The boxes of siblings,
+  «Source: .\Beta\ | Destination: .\Gamma\», and those of the omnibox's rows read the same at both.
 - **T. The hidden default button is 0 pixels wide.** `PanelFoldersTree()` adds it with `w1 h1
   -wantTab -TabStop Default`, and `-wantTab`, an option of edit fields, sets its width to 0 after
   `w1`: in the application the button is 0×1 pixels. Clicked by BM_CLICK or ControlClick, it runs
@@ -1354,6 +1390,18 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   recent image each asked «Save files list», «Discard selection», then «Save files list» again
   before the image opened; the repeated «Save image» was not run (read). Found while running V and
   W.
+- ✅ **AA. The drag tooltips write an omnibox row without its backslash, and a drive element with two.**
+  The tooltip of a drag over a row of the omnibox, from the main window (:9781), from the tree
+  (:30963) and inside the omnibox (:42683), takes the part of the row's path after its last `\` and
+  writes it behind a `.`: «Destination: .Gamma\». The tooltip of a drag over a drive element of the
+  tree, from the main window (:9768), inside the tree (:30931) and from the omnibox (:42651), writes
+  the element's label behind the `.`: «Destination: .Z:\\». Over a folder of the tree it reads
+  «.\Beta\», as meant. Lines at `6fb2abd`. Run, batch SDA, at `6fb2abd`: «.Gamma\» in the three
+  tooltips over an omnibox row, «.Z:\\» and «.C:\\» over the drive elements; the logs of batches T13
+  and U13 show «.Gamma\» and «.dst2\» too. **Fixed in `b246de9`**, with S (decision 27 for the
+  drives): the omnibox's tooltips write «.\Gamma\», and the tree's go through
+  `folderTreeLabelForMsg()`: «Z:\» over a drive, «.\Beta\» over a folder as before. Run with the
+  fixed text: batch SDA passes. Found while checking S.
 
 ## Checked and found correct
 
@@ -1546,3 +1594,22 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   the last text as at `96ec767`: those of WPA and WPQ fail at both, for «Seen in passing» A and Q,
   which they check. AutoHotkey 1.1.37.02 loads each of the three texts, with and without `/iLib`.
   Not run: Windows itself, real keys and menus, the «Save image» question.
+- «Seen in passing» S and AA (`b246de9`) were run in the application under headless Wine, on
+  AutoHotkey 1.1.37.02, at `6fb2abd` and with the fixed text, by
+  `.claude/scratch/folders-tree-seen-s-2026-11-19/` (`tests-s.ahk`, `run.sh`, `run-regs.sh`;
+  `mkfix-s.py` writes the text; the logs in `results/`, named `h-` and `f-`), with the helpers of
+  the earlier kits. Batch SDA simulates eleven drags, each box answered «No»: files from the main
+  window onto the tree's `\Beta`, onto its drive element and onto the omnibox's row `\Gamma`; the
+  tree's `\Beta` and its drive element onto that row; inside the tree, `\Sub` onto `\Gamma` (not
+  siblings), `\Beta` onto `\Gamma` (siblings), `\Beta` onto the drive element, and the drive element
+  onto a second drive element `C:\` that the kit adds; the omnibox's row `\Beta` onto its row
+  `\Gamma`, onto the tree's `\Gamma` and onto its drive element. It keeps each box's whole text, not
+  shortened, and the drag's tooltips. At `6fb2abd` its sixteen checks of S and AA fail and its eight
+  controls pass; with the fixed text all twenty-four pass; nothing was copied at either. Batches T7,
+  T9, T12, T13, U13, U16, U16x, VM, VN, VNx, VO, WPA and WPQ of the earlier kits, those that go
+  through the drags and the omnibox, give the same checks with the fixed text as at `6fb2abd`, but
+  T12's check 12b, which asserted the dot before the full paths and now fails, as it should: its box
+  reads «Source: pv\Alpha\Sub\ | Destination: pv\Gamma\»; those of WPA and WPQ fail at both, for
+  «Seen in passing» A and Q, which they check. The tooltips logged by T13 and U13 read «.\Gamma\»
+  and «.\dst2\» with the fixed text, and their copies and moves pass as before. AutoHotkey 1.1.37.02
+  loads the fixed text, with and without `/iLib`. Not run: Windows itself, a real drag.
