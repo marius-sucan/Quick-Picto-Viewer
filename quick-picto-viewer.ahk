@@ -30769,16 +30769,9 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       addFolderSldATfavorites(folderPath)
    } Else If folderPath
    {
-      If askAboutFileSave(" and the selected folder will be opened")
+      If (tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 1, (z=6))="cancel")
          Return
 
-      If askAboutSlidesListSave()
-         Return
-
-      If askAboutFilesSelect("discard it")
-         Return
-
-      tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 0, (z=6))
       FileExploreSiblingsNav("reset")
       Sleep, 1
       WinActivate, ahk_id %hfdTreeWinGui%
