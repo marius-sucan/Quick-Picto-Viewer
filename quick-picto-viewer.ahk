@@ -31010,6 +31010,7 @@ FolderTreeResponder(a, b, c) {
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
             externTooltiput("Please wait - performing folder action")
+            actu := r
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
          }
          externToolTiput("-hide-")
@@ -31044,10 +31045,19 @@ FolderTreeResponder(a, b, c) {
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
             externTooltiput("Please wait - performing folder action")
+            actu := r
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
             If (r=2)
                folderTreeScanSubbies()
          }
+      }
+
+      ; a folder moved away: its element at the old place goes
+      If (InStr(actu, "MOVE") && !FolderExist(src))
+      {
+         Gui, fdTreeGuia: Default
+         Gui, fdTreeGuia: TreeView, TVlistFolders
+         TV_Delete(c)
       }
       externToolTiput("-hide-")
       prevent := 1
