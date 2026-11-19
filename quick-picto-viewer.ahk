@@ -9765,7 +9765,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                   TV_GetText(thisFolder, nc)
                   TV_Modify(nc)
                }
-               friendly .= "`nDestination: ." thisFolder "\"
+               friendly .= "`nDestination: " folderTreeLabelForMsg(thisFolder) "\"
                r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
                friendly .= A_Space r
             } Else If InStr(info, "omnibox list")
@@ -9778,7 +9778,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
                friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
                r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
-               friendly2 := "`nDestination: ." restu "\ " r
+               friendly2 := "`nDestination: .\" restu "\ " r
                friendly .= thisFolder ? friendly2 : "`nNo folder is currently underneath."
                ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
             } Else 
@@ -9836,7 +9836,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             dest := folderTreeGetSelectedPath(nc)
             If (doNotAskAgain=0 && InStr(dest, ":\") && r)
             {
-               msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the folders tree panel: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+               msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the main window into the folders tree panel: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: selected files`nDestination: " Trimmer(dest, "\") "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
                If !InStr(msgResult.btn, "Yes")
                {
                   SetTimer, folderTreeInfoStatusLineUpdater, -125
@@ -30928,7 +30928,7 @@ FolderTreeResponder(a, b, c) {
 
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             If thisFolder
-               friendly .= "`nDestination: ." thisFolder "\ " r
+               friendly .= "`nDestination: " folderTreeLabelForMsg(thisFolder) "\ " r
             Else
                friendly .= "`nNo defined destination."
          } Else If InStr(info, "main")
@@ -30960,7 +30960,7 @@ FolderTreeResponder(a, b, c) {
 
             restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
             friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
-            friendly .= "`nDestination: ." restu "\"
+            friendly .= "`nDestination: .\" restu "\"
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             friendly .= A_Space r
             If !thisFolder
@@ -30994,7 +30994,7 @@ FolderTreeResponder(a, b, c) {
          dest := OmniBoxGetSelectedFolder()
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the folders tree panel into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the folders tree panel into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: " Trimmer(src, "\") "\`nDestination: " Trimmer(dest, "\") "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, uiPopulateQuickMenuSearch, -200
@@ -31020,15 +31020,17 @@ FolderTreeResponder(a, b, c) {
          {
             TV_GetText(sr, c)
             TV_GetText(dst, nc)
+            sr := folderTreeLabelForMsg(sr)
+            dst := folderTreeLabelForMsg(dst)
          } Else
          {
-            sr := src
-            dst := dest
+            sr := Trimmer(src, "\")
+            dst := Trimmer(dest, "\")
          }
 
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action inside the folders tree: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." sr "\`nDestination: ." dst "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action inside the folders tree: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: " sr "\`nDestination: " dst "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, folderTreeInfoStatusLineUpdater, -125
@@ -31179,6 +31181,11 @@ folderTreeGetSelectedPath(c) {
       folderPath := ""
 
    Return folderPath
+}
+
+folderTreeLabelForMsg(label) {
+   ; drive elements are labelled X:\, folders \name
+   Return InStr(label, ":\") ? Trimmer(label, "\") : "." label
 }
 
 FolderTreeFindActiveFile(givenPath:=0) {
@@ -42648,7 +42655,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
                TV_Modify(nc)
             }
 
-            friendly .= nc ? "`nDestination: ." thisFolder "\" : "No destination folder."
+            friendly .= nc ? "`nDestination: " folderTreeLabelForMsg(thisFolder) "\" : "No destination folder."
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
             If nc
                friendly .= A_Space r
@@ -42680,7 +42687,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
             friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
             r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
-            friendly2 := "`nDestination: ." restu "\ " r
+            friendly2 := "`nDestination: .\" restu "\ " r
             friendly .= thisFolder ? friendly2 : "`nNo destination folder is currently underneath."
             ; r := GetKeyState("Shift", "P") ? "[MOVE]" : "[COPY]"
          } Else 
@@ -42732,7 +42739,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          dest := folderTreeGetSelectedPath(nc)
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
-            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the omnibox to the folders tree panel: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
+            msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the omnibox to the folders tree panel: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: " Trimmer(src, "\") "\`nDestination: " Trimmer(dest, "\") "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
             If !InStr(msgResult.btn, "Yes")
             {
                SetTimer, folderTreeInfoStatusLineUpdater, -125
