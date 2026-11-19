@@ -66453,7 +66453,8 @@ coreAddNewFiles(imgsListu, countFiles, SelectedDir, selectNewOnes:=0) {
 }
 
 wrapperAddNewFolderToList(folderu, forceRemAll, isInLoop:=0, noRemAtAll:=0, noRandom:=0) {
-    showTOOLtip("Preparing files list to import:`n" folderu "\")
+    modeu := InStr(folderu, "|") ? "`n(without its sub-folders)" : ""
+    showTOOLtip("Preparing files list to import:`n" StrReplace(folderu, "|") "\" modeu)
     z := coreAddNewFolder(folderu, forceRemAll, noRandom, 0, 0, noRemAtAll)
     If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=2 && isInLoop!=1)
     {
@@ -89461,8 +89462,10 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   performSQLgetTable(), dbSortingCached(), SortFilesList() and others.
 */
 
-  OutDir := PathCompact(Trim(StrReplace(strDir, "*"), "\"), "a", 1, OSDfontSize)
+  OutDir := PathCompact(Trim(StrReplace(StrReplace(strDir, "*"), "|"), "\"), "a", 1, OSDfontSize)
   friendly := (userPrivateMode=1) ? "*:\********\****" : OutDir
+  If InStr(strDir, "|")
+     friendly .= "`n(without its sub-folders)"
   showTOOLtip("Loading files from`n" friendly "`n", 0, 0, progressInfo)
   If InStr(strDir, "|")
   {
@@ -89661,8 +89664,10 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 
    origArg := strDir
    startOperation := A_TickCount
-   OutDir := PathCompact(Trim(StrReplace(strDir, "*"), "\"), "a", 1, OSDfontSize)
+   OutDir := PathCompact(Trim(StrReplace(StrReplace(strDir, "*"), "|"), "\"), "a", 1, OSDfontSize)
    friendly := (userPrivateMode=1) ? "*:\********\****" : OutDir
+   If InStr(strDir, "|")
+      friendly .= "`n(without its sub-folders)"
    showTOOLtip("Loading files from`n" friendly "`n", 0, 0, progressInfo)
    If InStr(strDir, "|")
    {
