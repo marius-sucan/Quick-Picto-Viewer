@@ -31819,6 +31819,24 @@ folderTreePasteFoldersInto() {
       folderTreeScanSubbies()
 }
 
+askRecreateFolder(thisFolder, friendly) {
+; returns 1 once the missing folder is recreated; friendly ends the question: what QPV does next
+   If (StrLen(thisFolder)>1)
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Destination folder: " thisFolder "\`n`nIt seems to no longer exist. Would you like to recreate it? By choosing yes, QPV will " friendly, 4, 0, "question")
+
+   If (msgResult!="Yes")
+      Return 0
+
+   FileCreateDir, %thisFolder%
+   If ErrorLevel
+   {
+      msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while creating the folder:`n`n" thisFolder "\`n`nPossibly access denied.", 0, 0, "error")
+      Return 0
+   }
+
+   Return 1
+}
+
 UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:="") {
    If (dummy="given" && InStr(gactu, "_") && InStr(fSrc, ":\") && InStr(fDest, ":\"))
    {
@@ -31832,18 +31850,8 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    If !FolderExist(thisFolder)
    {
       friendly_name := (quickMode!=1) ? "paste the folder(s) inside it" : "perform the intended folder action"
-      If (StrLen(thisFolder)>1)
-         recreateIt := msgBoxWrapper(appTitle ": Confirmation", "Destination folder: " thisFolder "\`n`nIt seems to no longer exist. Would you like to recreate it? By choosing yes, QPV will " friendly_name, 4, 0, "question")
-
-      If (recreateIt="Yes")
-      {
-         FileCreateDir, %thisFolder%
-         If ErrorLevel
-         {
-            msgBoxWrapper(appTitle ": ERROR", "An unknown error occurred while creating the folder:`n`n" thisFolder "\`n`nPossibly access denied.", 0, 0, "error")
-            Return
-         }
-      } Else Return
+      If !askRecreateFolder(thisFolder, friendly_name)
+         Return
    }
 
    If (quickMode!=1)
@@ -47347,7 +47355,19 @@ triggerQuickFileAction(keyu, forceIT:=0) {
       }
    }
 
-   If (StrLen(UsrEditFileDestination)<5)
+   If (thisVar=7 || thisVar=8)
+   {
+      ; a folder picked in the tree or in the omnibox, of any length
+      If !FolderExist(UsrEditFileDestination)
+      {
+         friendly := (UsrCopyMoveOperation=2) ? "move" : "copy"
+         If !askRecreateFolder(UsrEditFileDestination, friendly " the selected file(s) into it")
+         {
+            UsrEditFileDestination := ""
+            Return
+         }
+      }
+   } Else If (StrLen(UsrEditFileDestination)<5)
    {
       PanelQuickMoveConfigure()
       Return
