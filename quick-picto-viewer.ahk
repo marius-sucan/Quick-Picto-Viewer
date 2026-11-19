@@ -30990,15 +30990,15 @@ FolderTreeResponder(a, b, c) {
 
       If InStr(info, "main")
       {
+         pkuz := (maxFilesIndex>0 && CurrentSLD) ? "Importing" : "Opening"
          z := InStr(r, "scanned") ? "recursive" : "not"
-         externTooltiput(((maxFilesIndex>0 && CurrentSLD) ? "Importing" : "Opening") " folder - please wait")
+         externTooltiput(pkuz " folder - please wait")
          folderTreeAppendFiles(z)
       } Else If (InStr(info, "omnibox") && dc && thisFolder)
       {
          externTooltiput("-hide-")
          src := folderTreeGetSelectedPath(c)
          dest := OmniBoxGetSelectedFolder()
-
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
             msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action from the folders tree panel into the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: ." src "\`nDestination: ." dest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
@@ -31924,9 +31924,12 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    }
 
    folderTreeScanSubbies()
-   ; a folder moved away leaves its place in the tree
    Loop, Parse, movedAway, `n
    {
+      ; a folder moved away leaves its place in the tree
+      If (A_LoopField="")
+         Continue
+
       sliced := StrSplit(A_LoopField, "\")
       g := (A_LoopField!="" && !FolderExist(A_LoopField)) ? iterateFDtreeView(1, 0, sliced) : []
       If (g[2] && g[1]>sliced.Count())
@@ -42702,8 +42705,9 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
 
       If InStr(info, "main")
       {
+         pkuz := (maxFilesIndex>0 && CurrentSLD) ? "Importing" : "Opening"
          z := InStr(r, "scanned") ? "recursive" : "not"
-         externTooltiput(((maxFilesIndex>0 && CurrentSLD) ? "Importing" : "Opening") " folder - please wait")
+         externTooltiput(pkuz " folder - please wait")
          omniBoxFolderImport(z, "yes")
       } Else If (InStr(info, "omnibox") && dc && thisFolder)
       {
@@ -42712,7 +42716,6 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          dest := OmniBoxGetSelectedFolder(dc, "yes", edithu)
          rSrc := SubStr(src, InStr(src, "\", 0, -1) + 1)
          rDest := SubStr(dest, InStr(dest, "\", 0, -1) + 1)
-
          If (doNotAskAgain=0 && src!=dest && InStr(src, ":\") && InStr(dest, ":\") && r)
          {
             msgResult := msgBoxWrapper(appTitle ": Drag and drop action", "You have performed a drag and drop action inside the omnibox: " SubStr(r, 3, 4) ". Please confirm with Yes that this was not accidental.`n`nSource: .\" rSrc "\`nDestination: .\" rDest "\", "&Yes|&No", 2, "question", "Do not ask again in this session")
