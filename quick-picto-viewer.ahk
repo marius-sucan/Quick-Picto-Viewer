@@ -72791,15 +72791,6 @@ OpenFavesEntry(menuItem) {
      Return
   }
 
-  If askAboutFileSave(" and the selected image from favourites will be loaded")
-     Return
-
-  If askAboutSlidesListSave()
-     Return
-
-  If askAboutFilesSelect("discard it")
-     Return
-
   startZeit := A_TickCount
   contentu := readMiniFavesEntries()
   Loop, Parse, contentu, `n, `r
@@ -72823,6 +72814,15 @@ OpenFavesEntry(menuItem) {
      Return
   } Else If (newEntry!="@" && StrLen(newEntry)>2)
   {
+     If askAboutFileSave(" and the selected image from favourites will be loaded")
+        Return
+
+     If askAboutSlidesListSave()
+        Return
+
+     If askAboutFilesSelect("discard it")
+        Return
+
      RecordImagesOpenedManager(newEntry)
      MenuOpenLastImg(newEntry)
      resultedFilesList[currentFileIndex, 5] := 1
