@@ -34684,22 +34684,22 @@ openFileDialogWrapper(p_Type, optionz, startPath, msg, pattern, ByRef n_FilterIn
 LoadPrefsFromSLD() {
    Critical, on
    stopSlideshow()
-   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
+   If !((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD))
       Return msgBeepTimer("ERROR: No valid files list currently opened")
 
    If (SLDtypeLoaded=2)
    {
       FileReadLine, firstLine, % CurrentSLD, 1
-      If InStr(firstLine, "[General]")
-      {
-         Sleep, 10
-         readSlideSettingsINI(CurrentSLD)
-         showTOOLtip("Settings loaded from the files list")
-      }
+      If !InStr(firstLine, "[General]")
+         Return msgBeepTimer("WARNING: The .SLD file has no settings section, only the list of files")
+
+      Sleep, 10
+      readSlideSettingsINI(CurrentSLD)
+      showTOOLtip("Settings loaded from the files list")
    } Else If (SLDtypeLoaded=3)
    {
       Sleep, 10
-      readSlideSettingsInDB()
+      readSlideSettingsInDB("*")
       showTOOLtip("Settings loaded from the database")
    }
    dummyTimerDelayiedImageDisplay(50)
@@ -34709,18 +34709,18 @@ LoadPrefsFromSLD() {
 WritePrefsIntoSLD() {
    Critical, on
    stopSlideshow()
-   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
+   If !((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD))
       Return msgBeepTimer("ERROR: No valid files list currently opened")
 
    If (SLDtypeLoaded=2)
    {
       FileReadLine, firstLine, % CurrentSLD, 1
-      If InStr(firstLine, "[General]")
-      {
-         Sleep, 10
-         writeSlideSettingsINI(CurrentSLD)
-         showTOOLtip("Settings saved into the files list")
-      }
+      If !InStr(firstLine, "[General]")
+         Return msgBeepTimer("WARNING: The .SLD file has no settings section, only the list of files. Save the files list to give it one")
+
+      Sleep, 10
+      writeSlideSettingsINI(CurrentSLD)
+      showTOOLtip("Settings saved into the files list")
    } Else If (SLDtypeLoaded=3)
    {
       Sleep, 10
@@ -34742,8 +34742,8 @@ recreateDynaFoldersSQLdbList(saveDynaFolders) {
    activeSQLdb.Exec("COMMIT TRANSACTION;")
 }
 
-readSlideSettingsInDB() {
-   r := IniSLDBreadGiven()
+readSlideSettingsInDB(givenFilter:="") {
+   r := IniSLDBreadGiven(givenFilter)
    Return r
 }
 
@@ -34871,7 +34871,8 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
       {
          paramu := Rowu[1]
          valu := Rowu[2]
-         If (StrLen(valu)>0 && (MustLoadSLDprefs=1 || paramu=givenFilter))
+         ; "*" loads every setting; appVersion is the running QPV's own
+         If (StrLen(valu)>0 && paramu!="appVersion" && (MustLoadSLDprefs=1 || givenFilter="*" || paramu=givenFilter))
             %paramu% := valu
       }
   }
@@ -69888,7 +69889,7 @@ createMenuMainPreferences() {
    If (userHQraw=1)
       kMenu("PVperfs", "Check", "&Load Camera RAW files at high quality")
 
-   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && CurrentSLD RegExMatch(CurrentSLD, sldsPattern))
+   If ((SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 && RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD))
    {
       kMenu("PVprefs", "Add", "Save settings into current .SLD file", "WritePrefsIntoSLD")
       kMenu("PVprefs", "Add", "Load settings from current .SLD file", "LoadPrefsFromSLD")
