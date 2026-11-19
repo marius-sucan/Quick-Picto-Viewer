@@ -335,7 +335,10 @@ loaded the tooltip reads «Drop folder here to open it.» above its Shift line. 
 import is unchanged. On a drive element, Shift+F3 with no list now opens the whole drive with its
 sub-folders, as the import does with a list (decision 5; read). The omnibox's F3 and its own drop on
 the main window still open the folder without its sub-folders («Seen in passing» M). With the fix
-the thirteen checks of batch U4 pass; at `b8b45c5` eight fail.
+the thirteen checks of batch U4 pass; at `b8b45c5` eight fail. Batch U4x calls
+`folderTreeAppendFiles()` as a drop calls it, with Shift and Ctrl up: «recursive» now opens the
+folder with its sub-folders, where at `b8b45c5` it opened it without them; «not» opens it without
+them at both.
 
 ## 5. «Rename folder» looks for the new name inside the folder
 
@@ -811,7 +814,10 @@ nothing. `UIcoreFolderNew()` now filters the name first and looks for it with `F
 «Rename folder» does: «A folder with the given name already exists» or «A file with the given name
 already exists», with the name as it would be created. The filter is unchanged: «.config» still
 becomes «config» without a word. With the fix the nine checks of batch U16 pass; at `b8b45c5` five
-fail. A folder cannot be named `0` («Seen in passing» O).
+fail. A folder cannot be named `0` («Seen in passing» O). Names that the filter empties now get
+«WARNING: Incorrect folder name given.»: at `b8b45c5` a blank name, «.» and «..» were refused with
+«A folder with the given name already exists», the check finding the folder itself or its parent; no
+folder was made at either (batch U16x).
 
 ## 17. Small things
 
@@ -1186,19 +1192,19 @@ Outside the panel's own code, found while tracing its actions.
 - Findings 4 and 13 to 16 were run in the application under headless Wine, on AutoHotkey 1.1.37.02,
   at `b8b45c5` and with the fixed texts, by `.claude/scratch/folders-tree-4-13-16-2026-11-19/`
   (`tests-4-16.ahk`, `run.sh`, `run-all.sh`; `mkfixes.py` writes one text per fix; the logs in
-  `app/results/`). Batches U4 and U13 to U16, one per finding, call what the tree calls: F3 through
-  `FolderTreeResponder()`, the drags as for findings 7 to 12, `folderTreeCutCopyFolder()` and the
-  key Ctrl+X through `KeyboardResponder()`, `invokeFoldersListerMenu()` with the menus it builds
-  read back, `folderTreeCreateFolder()` and the omnibox's F7, every box answered from a timer. The
-  kit gives the Shift and Ctrl keys the tree reads; it logs Explorer and a new QPV instance in place
-  of starting them, and the clipboard writes in place of making them; it does the shell's move
-  itself. The tree was never built with no list loaded: batch U4 builds it with a folder open, then
-  closes the list. In batch U4 «ERROR: Unable to display the image» follows some of the opens, other
-  ones at each of three runs, and it follows plain opens at `b8b45c5` too (batch U4n): it is the
-  display of the image under headless Wine, not the fixes. Each batch was run at the text of its own
-  fix, and all of them with the last text; batches T5 to T13 (findings 5 to 12), F1, F2 and F4
-  (findings 1 and 2, decision 11), R, D, E, G and H (the sibling navigation, the short lists and the
-  unsaved lists), S (small thing f) and I («Seen in passing» G) give the same results with the last
-  text as at `b8b45c5`: every check passes at both, and batch R, which only logs, returns the same
-  nine values. AutoHotkey 1.1.37.02 loads each of the five texts, with and without `/iLib`. Not run:
-  Windows itself, a real drag, real keys.
+  `app/results/`). Batches U4 and U13 to U16, one per finding, and U4x and U16x, two more cases of
+  findings 4 and 16, call what the tree calls: F3 through `FolderTreeResponder()`, the drags as for
+  findings 7 to 12, `folderTreeCutCopyFolder()` and the key Ctrl+X through `KeyboardResponder()`,
+  `invokeFoldersListerMenu()` with the menus it builds read back, `folderTreeCreateFolder()` and the
+  omnibox's F7, every box answered from a timer. The kit gives the Shift and Ctrl keys the tree
+  reads; it logs Explorer and a new QPV instance in place of starting them, and the clipboard writes
+  in place of making them; it does the shell's move itself. The tree was never built with no list
+  loaded: batch U4 builds it with a folder open, then closes the list. In batch U4 «ERROR: Unable to
+  display the image» follows some of the opens, other ones at each of three runs, and it follows
+  plain opens at `b8b45c5` too (batch U4n): it is the display of the image under headless Wine, not
+  the fixes. Each batch was run at the text of its own fix, and all of them with the last text;
+  batches T5 to T13 (findings 5 to 12), F1, F2 and F4 (findings 1 and 2, decision 11), R, D, E, G
+  and H (the sibling navigation, the short lists and the unsaved lists), S (small thing f) and I
+  («Seen in passing» G) give the same results with the last text as at `b8b45c5`: every check passes
+  at both, and batch R, which only logs, returns the same nine values. AutoHotkey 1.1.37.02 loads
+  each of the five texts, with and without `/iLib`. Not run: Windows itself, a real drag, real keys.
