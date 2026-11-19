@@ -1117,9 +1117,14 @@ Outside the panel's own code, found while tracing its actions.
   takes out the element of each that is no longer on the disk, found by its path with
   `iterateFDtreeView()`, the walk F9 uses; a copy keeps it. The deletion that finding 13's fix put
   in `FolderTreeResponder()` is gone. With the fix the nine checks of batch VN pass; at `35a7c94`
-  four fail. The destination's element is scanned again only when it is the tree's selected one, as
-  before: after the omnibox's paste or drags, a destination shown in the tree but not selected lists
-  the moved folder after Space or F5 (read).
+  four fail. With the folders tree never opened, an omnibox row moved onto another row is moved as
+  before (batch VNx). The destination's element is another matter («Seen in passing» Q).
+- **Q. After the omnibox's paste or drags, the destination's element in the tree is not scanned
+  again.** `UIcoreFolderPasteFoldersInto()` scans the tree's selected element after a copy or a
+  move, which for the tree's own paste and drags is the destination. After the omnibox's paste or
+  its drags, a destination that the tree shows without having it selected keeps its old children
+  until Space or F5 (read). With the tree never opened, the same scan leaves an empty tree window
+  behind, hidden (run, batch VNx, at `35a7c94` and with the last text). Found while fixing N.
 - **O. A folder named `0` can be neither created nor given by «Rename folder».** `UIcoreFolderNew()`
   and `UIcoreFolderRename()` test the name with `If !newFileName`, and AutoHotkey takes `0` for
   false: «Create new folder» answers «WARNING: Incorrect folder name given.», and «Rename folder»
@@ -1130,15 +1135,17 @@ Outside the panel's own code, found while tracing its actions.
   and with that test alone corrected it selected `\0` for `0000` (run on a trial text). The two
   folder functions test for a blank name; the omnibox's selection tests the same way and compares
   the names behind a `\`, as text. With the fix the seven checks of batch VO pass; at `35a7c94` six
-  fail.
+  fail. A rename to «0» with «Perform search and replace in current list» ticked carries the files
+  list to the new path (batch VOx).
 - **P. The import's tooltip shows the `|` of a folder scanned without its sub-folders.**
   `wrapperAddNewFolderToList()` shows «Preparing files list to import:» with the entry as it is
   given, so a folder imported without its sub-folders reads `|D:\…\` there (run, batch U4: a folder
   dropped on the main window with a list loaded). Found while fixing finding 4. **Fixed in
   `5c2853b`**, with Marius's answer to decision 22. The same `|` showed in «Loading files from»
   (`GetFilesList()` and its fallback `oldGetFilesList()`), which every plain folder open shows too
-  (run, batch VP). The three tooltips show the path without it, and «(without its sub-folders)»
-  under it. With the fix the three checks of batch VP pass; at `35a7c94` two fail.
+  (run, batch VP; the fallback by batch VPx, the kit making `GetFilesList()` hand over to it). The
+  three tooltips show the path without it, and «(without its sub-folders)» under it. With the fix
+  the three checks of batch VP and the one of batch VPx pass; at `35a7c94` three of the four fail.
 
 ## Checked and found correct
 
@@ -1272,12 +1279,14 @@ Outside the panel's own code, found while tracing its actions.
   one per entry, go through the omnibox's drags (`LVquickSearchMenusResponder()`, simulated as the
   tree's are), its F2, F3 and paste, the tree's «Cut folder» and «Paste folder(s) into...»,
   `folderTreeCreateFolder()`, the omnibox's list as `uiPopulateQuickMenuSearch()` builds it again,
-  and the tooltips of an import and of a plain folder open. The kit also gives the Shift key that
-  the omnibox reads and the paste's clipboard text, and logs the emptying of the clipboard after a
-  move in place of making it. Each batch was run at the text of its own fix, and all of them with
-  the last text; batches U4, U4x, U13 to U16 and U16x (findings 4 and 13 to 16), T5 to T13 (findings
-  5 to 12), F1, F2 and F4 (findings 1 and 2, decision 11), R, D, E, G and H (the sibling navigation,
-  the short lists and the unsaved lists), S (small thing f) and I («Seen in passing» G) give the
-  same results with the last text as at `35a7c94`: every check passes at both, and R, U4x and U16x,
-  which only log, log the same lines. AutoHotkey 1.1.37.02 loads each of the four texts, with and
-  without `/iLib`.
+  and the tooltips of an import and of a plain folder open; batches VPx, VNx and VOx, run at
+  `35a7c94` and with the last text only, cover three more cases: the fallback scan, an omnibox move
+  with the folders tree never opened, and a rename to «0» with the search and replace tick. The kit
+  also gives the Shift key that the omnibox reads and the paste's clipboard text, and logs the
+  emptying of the clipboard after a move in place of making it. Each batch was run at the text of
+  its own fix, and all of them with the last text; batches U4, U4x, U13 to U16 and U16x (findings 4
+  and 13 to 16), T5 to T13 (findings 5 to 12), F1, F2 and F4 (findings 1 and 2, decision 11), R, D,
+  E, G and H (the sibling navigation, the short lists and the unsaved lists), S (small thing f) and
+  I («Seen in passing» G) give the same results with the last text as at `35a7c94`: every check
+  passes at both, and R, U4x and U16x, which only log, log the same lines. AutoHotkey 1.1.37.02
+  loads each of the four texts, with and without `/iLib`.
