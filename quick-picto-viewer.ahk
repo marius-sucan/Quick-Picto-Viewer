@@ -31926,7 +31926,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
    folderTreeScanSubbies()
    Loop, Parse, movedAway, `n
    {
-      ; a folder moved away leaves its place in the tree
+      ; a folder moved away leaves its place in the tree; the protected folder follows it
       If (A_LoopField="")
          Continue
 
@@ -31934,6 +31934,10 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
       g := (A_LoopField!="" && !FolderExist(A_LoopField)) ? iterateFDtreeView(1, 0, sliced) : []
       If (g[2] && g[1]>sliced.Count())
          TV_Delete(g[2])
+
+      movedTo := thisFolder "\" sliced[sliced.Count()]
+      If (!FolderExist(A_LoopField) && FolderExist(movedTo))
+         followProtectedFolder(A_LoopField, movedTo)
    }
 
    whileLoopExec := 0
@@ -32048,6 +32052,7 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       FileMoveDir, % thisFolder, % baseu newFileName, R
       If !ErrorLevel
       {
+         followProtectedFolder(thisFolder, baseu newFileName)
          If (lastChecked=1 && hasList)
             renameFolderInLists(thisFolder, baseu newFileName)
          Return 1
@@ -32063,11 +32068,9 @@ renameFolderInLists(oldFolder, newFolder) {
    If !SearchAndReplaceThroughIndex(oldFolder "\", ((SLDtypeLoaded=3) ? newLow : newFolder) "\", 0, 1)
       Return
 
-   oldLow := Format("{:L}", oldFolder)
-   opened := StrReplace(CurrentSLD, "|")
-   openedLow := Format("{:L}", opened)
-   If (openedLow==oldLow || InStr(openedLow, oldLow "\")=1)
-      CurrentSLD := (InStr(CurrentSLD, "|") ? "|" : "") newFolder SubStr(opened, StrLen(oldLow) + 1)
+   newOpened := movedFolderPath(StrReplace(CurrentSLD, "|"), oldFolder, newFolder)
+   If (newOpened!="")
+      CurrentSLD := (InStr(CurrentSLD, "|") ? "|" : "") newOpened
 
    If renameDynamicFoldersEntries(oldFolder, newFolder, 1)
       currentFilesListModified := 1
@@ -32078,6 +32081,23 @@ renameFolderInLists(oldFolder, newFolder) {
    renameStaticFoldersEntries(oldFolder, newLow, 1)
    If (SLDtypeLoaded=3)
       renameStaticFolderSQLdb(oldFolder, newFolder, 1)
+}
+
+movedFolderPath(pathu, oldFolder, newFolder) {
+; the path once oldFolder is renamed or moved to newFolder; blank when it is neither that folder nor inside it
+   oldLow := Format("{:L}", oldFolder)
+   pathLow := Format("{:L}", pathu)
+   If (pathLow!="" && (pathLow==oldLow || InStr(pathLow, oldLow "\")=1))
+      Return newFolder SubStr(pathu, StrLen(oldLow) + 1)
+}
+
+followProtectedFolder(oldFolder, newFolder) {
+   newPath := movedFolderPath(protectedFolderPath, oldFolder, newFolder)
+   If (newPath="")
+      Return
+
+   protectedFolderPath := newPath
+   IniAction(1, "protectedFolderPath", "General")
 }
 
 renameDynamicFoldersEntries(oldFolder, newFolder, doPropagate) {
