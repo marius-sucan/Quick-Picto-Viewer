@@ -31935,7 +31935,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
       If (g[2] && g[1]>sliced.Count())
          TV_Delete(g[2])
 
-      movedTo := thisFolder "\" sliced[sliced.Count()]
+      movedTo := thisFolder SubStr(A_LoopField, InStr(A_LoopField, "\", 0, -1))
       If (!FolderExist(A_LoopField) && FolderExist(movedTo))
          followProtectedFolder(A_LoopField, movedTo)
    }
