@@ -50,6 +50,15 @@ notes count the folders not listed and sit in their own submenus (`43bee47`); «
 checks the name the filter gives it, for a folder or a file (`80b75e0`, decision 18). Decisions 16
 to 18 were settled the same day, before the fixes.
 
+**«Seen in passing» M to P, 2026-11-19, fixed at `5c2853b`**, with Marius's answers. Each was first
+run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `35a7c94`, and each did what
+its entry describes. With no list loaded, the omnibox's F3 and its drop on the main window open the
+folder as the tree's do, with its sub-folders when Shift is held (`748004d`, decision 19); a folder
+moved by any paste or drag leaves its place in the tree, the removal made where every move is made
+(`181ed2b`, decision 20); a folder can be named `0`, and the omnibox finds such a folder again
+(`4de0385`, decision 21); the scan tooltips show a folder without its sub-folders by its path, and
+say so (`5c2853b`, decision 22).
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -95,7 +104,7 @@ to 18 were settled the same day, before the fixes.
 | 10 | «Import images into the list» moves the current file to the end of the list, also when nothing was imported | low | read, then run | the omnibox's F3 and its two import rows | **fixed**, `0fb1617`: the current file moves only when files came in or the folder was rescanned (decision 15) |
 | 11 | A label whose case differs from the disk's: the tree lists the folder twice (every database list) | medium | run | — | **fixed**, `5b0ac28`: names are compared, and kept as keys, in lower case |
 | 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read, then run | — | **fixed**, `1313a18`: the box names the dragged folder as the source |
-| 13 | A folder moved by a drag stays in the tree at its old place | low | read, then run | — | **fixed**, `068c7fa`: the dragged element goes once its folder has moved |
+| 13 | A folder moved by a drag stays in the tree at its old place | low | read, then run | — | **fixed**, `068c7fa`: the dragged element goes once its folder has moved; since `181ed2b` for every move («Seen in passing» N) |
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read, then run | — | **fixed**, `f4bbf01`: both keys refuse a drive element (decision 17) |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read, then run | Shift+F4 menu | **fixed**, `43bee47`: each note in its own submenu, counting the folders not listed; 200 sub-folders listed |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run | omnibox F7 | **fixed**, `80b75e0`: the name the filter gives is checked, for a folder or a file (decision 18) |
@@ -709,7 +718,9 @@ dragged element, for both routes. A copy keeps it, and so does a move that faile
 that name was already in the destination, and the kit's move does not overwrite it). With the fix
 the six checks of batch U13 pass; at `b8b45c5` two fail. A move made by «Paste folder(s) into...»
 after «Cut folder», or by a drag of an omnibox row onto the tree, keeps the old element of a folder
-the tree shows («Seen in passing» N).
+the tree shows («Seen in passing» N). Since `181ed2b` the element is taken out by
+`UIcoreFolderPasteFoldersInto()`, for every move and with the same test, and `FolderTreeResponder()`
+no longer deletes it itself («Seen in passing» N); batch U13 passes with that text too.
 
 ## 14. Ctrl+X and Ctrl+C put a whole drive on the clipboard
 
@@ -950,6 +961,21 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
 18. **A name already taken in «Create new folder»** (finding 16): once the name is filtered, report
     a file of that name too, as the rename does, or folders only?
     **Settled**: a folder or a file, as the rename does; the filter stays as it is (`80b75e0`).
+19. **The omnibox with no list loaded** («Seen in passing» M): open as the tree does since
+    `34e7c56`, for the drop and F3; for the drop only; or change the tooltip alone?
+    **Settled**: as the tree, for the drop and F3; after a drop with no list loaded, the tree's and
+    the omnibox's tooltip says «Opening folder - please wait» (`748004d`).
+20. **Where the element of a moved folder goes** («Seen in passing» N): in
+    `UIcoreFolderPasteFoldersInto()`, for every move, in place of finding 13's deletion; only in the
+    routes that lack it; or there, with the destination's element scanned again as well?
+    **Settled**: in `UIcoreFolderPasteFoldersInto()`, for every move; finding 13's deletion in
+    `FolderTreeResponder()` is gone (`181ed2b`).
+21. **How far the names read as false go** («Seen in passing» O): the create and the rename only, or
+    the omnibox's selection of the renamed folder too?
+    **Settled**: both; the omnibox compares the names as text (`4de0385`).
+22. **What the scan tooltips show for a folder without its sub-folders** («Seen in passing» P): the
+    path alone, or the path and the mode?
+    **Settled**: the path, with «(without its sub-folders)» under it (`5c2853b`).
 
 ## Unverified leads
 
@@ -1067,20 +1093,52 @@ Outside the panel's own code, found while tracing its actions.
   folder now» does, whatever Shift says, while the tooltip reads «Drop folder here to import it into
   the current list.» and «Hold SHIFT for recursive scanning.» (read). The tree's twin is finding 4,
   where Marius chose that Shift opens the sub-folders; the omnibox was left as it is. Found while
-  fixing finding 4.
+  fixing finding 4. **Fixed in `748004d`**, with Marius's answer to decision 19. Run, batch VM, at
+  `35a7c94`: with no list loaded, an omnibox row dropped on the main window with Shift held opened
+  `\Alpha` without its sub-folders (three files of five) under «Drop folder here to import it into
+  the current list.» and «Folder is to be RECURSIVELY scanned.»; the omnibox's Shift+F3 on a folder
+  with images only in a sub-folder asked «scan recursively?». `omniBoxFolderImport()` now hands
+  «recursive» to `omniBoxFolderOpen()` when Shift is held, or the drop was made with Shift held, and
+  `omniBoxFolderOpen()` passes it on to `tryOpenGivenFolder()`; it takes a mode only together with
+  «yes», as the omnibox's other functions do, since its menu item calls it with the item's name.
+  With no list loaded the drop's tooltip reads «Drop folder here to open it.», and after a drop from
+  the omnibox or from the tree «Opening folder - please wait». With the fix the eight checks of
+  batch VM pass; at `35a7c94` four fail.
 - **N. A folder moved by «Paste folder(s) into...», or by a drag of an omnibox row, stays in the
   tree.** After «Cut folder» and «Paste folder(s) into...» with «Move», or after a drag of an
   omnibox row onto the tree with Shift, `UIcoreFolderPasteFoldersInto()` scans the destination
   element again, and an element of the moved folder, when the tree shows one, stays at its old place
   (read). Finding 13's fix covers the drags that start in the tree. Found while fixing finding 13.
+  **Fixed in `181ed2b`**, with Marius's answer to decision 20. Run, batch VN, at `35a7c94`, the
+  clipboard's text given by the kit: after the tree's «Paste folder(s) into...» with «Move», the
+  omnibox's, an omnibox row dragged onto the tree and one dragged onto another row, each with Shift,
+  the tree listed the moved folder under `\dst` and still at its old place.
+  `UIcoreFolderPasteFoldersInto()` now notes every folder it moves and, after its scan of the tree,
+  takes out the element of each that is no longer on the disk, found by its path with
+  `iterateFDtreeView()`, the walk F9 uses; a copy keeps it. The deletion that finding 13's fix put
+  in `FolderTreeResponder()` is gone. With the fix the nine checks of batch VN pass; at `35a7c94`
+  four fail. The destination's element is scanned again only when it is the tree's selected one, as
+  before: after the omnibox's paste or drags, a destination shown in the tree but not selected lists
+  the moved folder after Space or F5 (read).
 - **O. A folder named `0` can be neither created nor given by «Rename folder».** `UIcoreFolderNew()`
   and `UIcoreFolderRename()` test the name with `If !newFileName`, and AutoHotkey takes `0` for
   false: «Create new folder» answers «WARNING: Incorrect folder name given.», and «Rename folder»
-  closes and does nothing (run, batch U16). Found while fixing finding 16.
+  closes and does nothing (run, batch U16). Found while fixing finding 16. **Fixed in `4de0385`**,
+  with Marius's answer to decision 21. Run, batch VO, at `35a7c94`: «0» and «00» were refused, and
+  «000» given to «Rename folder» in the tree and «0000» in the omnibox did nothing; with folders `0`
+  and `0000` side by side, the omnibox listed again to select `0000` or `0` selected its first row,
+  and with that test alone corrected it selected `\0` for `0000` (run on a trial text). The two
+  folder functions test for a blank name; the omnibox's selection tests the same way and compares
+  the names behind a `\`, as text. With the fix the seven checks of batch VO pass; at `35a7c94` six
+  fail.
 - **P. The import's tooltip shows the `|` of a folder scanned without its sub-folders.**
   `wrapperAddNewFolderToList()` shows «Preparing files list to import:» with the entry as it is
   given, so a folder imported without its sub-folders reads `|D:\…\` there (run, batch U4: a folder
-  dropped on the main window with a list loaded). Found while fixing finding 4.
+  dropped on the main window with a list loaded). Found while fixing finding 4. **Fixed in
+  `5c2853b`**, with Marius's answer to decision 22. The same `|` showed in «Loading files from»
+  (`GetFilesList()` and its fallback `oldGetFilesList()`), which every plain folder open shows too
+  (run, batch VP). The three tooltips show the path without it, and «(without its sub-folders)»
+  under it. With the fix the three checks of batch VP pass; at `35a7c94` two fail.
 
 ## Checked and found correct
 
@@ -1208,3 +1266,18 @@ Outside the panel's own code, found while tracing its actions.
   («Seen in passing» G) give the same results with the last text as at `b8b45c5`: every check passes
   at both, and batch R, which only logs, returns the same nine values. AutoHotkey 1.1.37.02 loads
   each of the five texts, with and without `/iLib`. Not run: Windows itself, a real drag, real keys.
+- «Seen in passing» M to P were run the same way, at `35a7c94` and with the fixed texts, by
+  `.claude/scratch/folders-tree-seen-m-p-2026-11-19/` (`tests-m-p.ahk`, `run.sh`, `run-all.sh`;
+  `mkfixes-mp.py` writes one text per fix; the logs in `app/results/`). Batches VM, VN, VO and VP,
+  one per entry, go through the omnibox's drags (`LVquickSearchMenusResponder()`, simulated as the
+  tree's are), its F2, F3 and paste, the tree's «Cut folder» and «Paste folder(s) into...»,
+  `folderTreeCreateFolder()`, the omnibox's list as `uiPopulateQuickMenuSearch()` builds it again,
+  and the tooltips of an import and of a plain folder open. The kit also gives the Shift key that
+  the omnibox reads and the paste's clipboard text, and logs the emptying of the clipboard after a
+  move in place of making it. Each batch was run at the text of its own fix, and all of them with
+  the last text; batches U4, U4x, U13 to U16 and U16x (findings 4 and 13 to 16), T5 to T13 (findings
+  5 to 12), F1, F2 and F4 (findings 1 and 2, decision 11), R, D, E, G and H (the sibling navigation,
+  the short lists and the unsaved lists), S (small thing f) and I («Seen in passing» G) give the
+  same results with the last text as at `35a7c94`: every check passes at both, and R, U4x and U16x,
+  which only log, log the same lines. AutoHotkey 1.1.37.02 loads each of the four texts, with and
+  without `/iLib`.
