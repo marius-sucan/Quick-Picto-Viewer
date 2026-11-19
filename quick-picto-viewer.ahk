@@ -32042,7 +32042,7 @@ renameFolderInLists(oldFolder, newFolder) {
    If (openedLow==oldLow || InStr(openedLow, oldLow "\")=1)
       CurrentSLD := (InStr(CurrentSLD, "|") ? "|" : "") newFolder SubStr(opened, StrLen(oldLow) + 1)
 
-   If renameDynamicFoldersEntries(oldFolder, newFolder)
+   If renameDynamicFoldersEntries(oldFolder, newFolder, 1)
       currentFilesListModified := 1
 
    If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
@@ -32053,8 +32053,8 @@ renameFolderInLists(oldFolder, newFolder) {
       renameStaticFolderSQLdb(oldFolder, newFolder, 1)
 }
 
-renameDynamicFoldersEntries(oldFolder, newFolder) {
-; the seed folders that are the given folder, or placed inside it, get the new path; returns 1 when an entry changed
+renameDynamicFoldersEntries(oldFolder, newFolder, doPropagate) {
+; the seed folder that is the given folder gets the new path and, with doPropagate, those placed inside it; returns 1 when an entry changed
    oldLow := Format("{:L}", oldFolder)
    finalListu := ""
    changed := 0
@@ -32066,7 +32066,7 @@ renameDynamicFoldersEntries(oldFolder, newFolder) {
 
       thisFolder := StrReplace(A_LoopField, "|")
       thisLow := Format("{:L}", thisFolder)
-      If (thisLow==oldLow || InStr(thisLow, oldLow "\")=1)
+      If (thisLow==oldLow || (doPropagate=1 && InStr(thisLow, oldLow "\")=1))
       {
          thisFolder := newFolder SubStr(thisFolder, StrLen(oldLow) + 1)
          changed := 1
@@ -98604,20 +98604,7 @@ PanelRenameStaticFolder() {
             renameStaticFoldersEntries(folderu, newName, doPropagate)
          } Else
          {
-            finalListu := ""
-            foldersListu := getDynamicFoldersList()
-            Loop, Parse, foldersListu,`n,`r
-            {
-               line := StrReplace(A_LoopField, "|")
-               If (line=folderu)
-                  finalListu .= StrReplace(A_LoopField, folderu, newName) "`n"
-               Else
-                  finalListu .= (doPropagate=1) ? StrReplace(A_LoopField, folderu "\", newName "\") "`n" : A_LoopField "`n"
-            }
-
-            DynamicFoldersList := cleanDynamicFoldersList(finalListu)
-            If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
-               recreateDynaFoldersSQLdbList(DynamicFoldersList)
+            renameDynamicFoldersEntries(folderu, newName, doPropagate)
          }
 
          currentFilesListModified := 1
