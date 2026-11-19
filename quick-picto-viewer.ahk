@@ -72715,15 +72715,6 @@ OpenRecentImage(menuItem) {
 OpenRecentEntry(menuItem, modus:=0) {
   testOs := SubStr(menuItem, 1, 3)
   initQPVmainDLL()
-  If askAboutFileSave(" and another image will be loaded")
-     Return
-
-  If askAboutSlidesListSave()
-     Return
-
-  If askAboutFilesSelect("discard it")
-     Return
-
   startZeit := A_TickCount
   If (testOs="O1.")
      openThisu := prevFileSavePath
@@ -72746,6 +72737,29 @@ OpenRecentEntry(menuItem, modus:=0) {
   newEntry := Trimmer(newEntry)
   If (StrLen(newEntry)>4)
   {
+     zPlitPath(newEntry, 0, OutFileName, OutDir)
+     If RegExMatch(newEntry, RegExFilesPattern)
+     {
+        If !FileRexists(newEntry)
+           Return msgBeepTimer("ERROR: File not found or access denied.`n" OutFileName "`n" OutDir "\")
+     } Else If RegExMatch(newEntry, sldsPattern)
+     {
+        If !FileExist(newEntry)
+           Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
+     } Else If !FolderExist(StrReplace(newEntry, "|"))
+     {
+        Return msgBeepTimer("ERROR: Folder not found or access denied:`n" StrReplace(newEntry, "|"))
+     }
+
+     If askAboutFileSave(" and another image will be loaded")
+        Return
+
+     If askAboutSlidesListSave()
+        Return
+
+     If askAboutFilesSelect("discard it")
+        Return
+
      If (SLDtypeLoaded=3)
      {
         SLDtypeLoaded := 0
