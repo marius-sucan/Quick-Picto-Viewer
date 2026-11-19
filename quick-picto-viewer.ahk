@@ -26947,18 +26947,15 @@ omniBoxFolderImport(dummy:=0, isGiven:=0) {
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
    changeMcursor()
    If ((dummy="not" || dummy="recursive") && isGiven="yes")
-      r := addNewFolder2list(folderPath, "yes", dummy)
+      r := importFolderIntoList(folderPath, dummy)
    Else If GetKeyState("Shift", "P")
-      r := addNewFolder2list(folderPath, "yes", "recursive")
+      r := importFolderIntoList(folderPath, "recursive")
    Else
-      r := addNewFolder2list(folderPath, "yes")
+      r := importFolderIntoList(folderPath)
 
-   ResetImgLoadStatus()
    If (r="cancel")
       Return
 
-   currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
-   dummyTimerDelayiedImageDisplay(50)
    If !VisibleQuickMenuSearchWin
       PanelQuickSearchMenuOptions()
 
@@ -32140,13 +32137,10 @@ folderTreeAppendFiles(modus:="") {
    ; ignored here: addNewFolder2list() tells the user about it
    changeMcursor()
    If GetKeyState("Shift", "P")
-      addNewFolder2list(linea, "yes", "recursive")
+      importFolderIntoList(linea, "recursive")
    Else
-      addNewFolder2list(linea, "yes", modus)
+      importFolderIntoList(linea, modus)
    ; SoundBeep 900, 100
-   ResetImgLoadStatus()
-   currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
-   dummyTimerDelayiedImageDisplay(50)
 }
 
 folderTreeExpandCollapseAll(forceMode:=0) {
@@ -42910,18 +42904,12 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          OpenFolders("|" userQuickMenusEdit, 0)
       } Else If (funcu="!OmniImportFolder")
       {
-         addNewFolder2list(userQuickMenusEdit, "yes", "not")
-         currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
-         ResetImgLoadStatus()
-         dummyTimerDelayiedImageDisplay(50)
+         importFolderIntoList(userQuickMenusEdit, "not")
          SetTimer, TriggerMenuBarUpdate, -90
          SetTimer, createGUItoolbar, -100
       } Else If (funcu="!OmniImportRfolder")
       {
-         addNewFolder2list(userQuickMenusEdit, "yes", "recursive")
-         currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
-         ResetImgLoadStatus()
-         dummyTimerDelayiedImageDisplay(50)
+         importFolderIntoList(userQuickMenusEdit, "recursive")
          SetTimer, TriggerMenuBarUpdate, -90
          SetTimer, createGUItoolbar, -100
       } Else If (funcu="!OmniNewInstance")
@@ -66605,7 +66593,7 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
    If SelectedDir
    {
       If askAboutFileSave(" and new files will be added from the selected folder")
-         Return
+         Return "cancel"
 
       decisionu := askFolderImportMode(SelectedDir, getDynamicFoldersList(), actu)
       If (decisionu.action="cancel")
@@ -66671,6 +66659,28 @@ addNewFolder2list(givenPath:=0, externMode:=0, actu:=0) {
          RandomPicture()
       }
    }
+}
+
+importFolderIntoList(folderPath, actu:=0) {
+; adds the folder to the list; when files came in, or the folder was rescanned, the next-to-last file is shown,
+; otherwise the file shown before
+   prevIndex := currentFileIndex
+   prevMax := maxFilesIndex
+   prevLast := resultedFilesList[maxFilesIndex, 1]
+   r := addNewFolder2list(folderPath, "yes", actu)
+   ResetImgLoadStatus()
+   If (r="cancel")
+      Return r
+
+   If (r!="rescan" && maxFilesIndex=prevMax && resultedFilesList[maxFilesIndex, 1]=prevLast)
+   {
+      SetTimer, RandomPicture, Off
+      currentFileIndex := prevIndex
+   } Else
+      currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
+
+   dummyTimerDelayiedImageDisplay(50)
+   Return r
 }
 
 coreAddNewFolder(SelectedDir, forceRemAll, noRandom:=0, forReal:=1, fastu:=1, noRemAtAll:=0) {
