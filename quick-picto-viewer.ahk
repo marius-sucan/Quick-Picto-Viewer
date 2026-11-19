@@ -31018,8 +31018,8 @@ FolderTreeResponder(a, b, c) {
          dest := folderTreeGetSelectedPath(nc)
          If (TV_GetParent(nc) = TV_GetParent(c))
          {
-            TV_GetText(sr, nc)
-            TV_GetText(dst, c)
+            TV_GetText(sr, c)
+            TV_GetText(dst, nc)
          } Else
          {
             sr := src
