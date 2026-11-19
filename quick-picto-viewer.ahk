@@ -65836,7 +65836,10 @@ addNewFile2list() {
       INIaction(1, "prevOpenFolderPath", "General")
    }
 
-   If (RegExMatch(firstFile, "i)(.\.sldb)$") && SLDtypeLoaded!=3)
+   If ((maxFilesIndex<1 || !CurrentSLD) && RegExMatch(firstFile, sldsPattern))
+   {
+      OpenSLD(firstFile)
+   } Else If (RegExMatch(firstFile, "i)(.\.sldb)$") && SLDtypeLoaded!=3)
    {
       importSLDBintoPlainText(firstFile)
    } Else If (RegExMatch(firstFile, "i)(.\.sldb)$") && SLDtypeLoaded=3)
@@ -65864,7 +65867,7 @@ addNewFile2list() {
 }
 
 importSLDplainText(whichFile) {
-   If (!RegExMatch(whichFile, "i)(.\.sld)$") || !RegExMatch(CurrentSLD, "i)(.\.sld)$"))
+   If !RegExMatch(whichFile, "i)(.\.sld)$")
       Return
 
    If (whichFile=CurrentSLD)
