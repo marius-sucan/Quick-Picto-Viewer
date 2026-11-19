@@ -1283,13 +1283,16 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   siblings, inside the omnibox and from the main window onto the omnibox the boxes give a name,
   «.\Beta\», as meant. Run: the logs of batches T9, T12, T13, U13 and WPA show the dot before each
   such path (the kits shorten a path to its part under their work folder). Found while checking A.
-  The history, from git: the first of these boxes, that of a drag inside the tree in v5.6.5
-  (`dfe4c8b`, 2022-03-11), always named the two elements, behind `.\`, and a label starts with `\`:
-  «.\\Beta\». v5.6.7 (`e0b347a`, 2022-03-31) made that `.\` a `.`, which gave «.\Beta\», and in the
-  same release gave elements that are not siblings their full paths and added the box of a drag
-  between the tree and the omnibox, both behind that `.`; v5.7.0 (`5e1a365`, 2022-04-22) split that
-  box in two and added the box of the main window, the same way. A full path never showed without
-  the dot. A drive showed as «.Z:\\»: its label already ends with `\`, and the box adds one.
+  The history, from git, every revision of `quick-picto-viewer.ahk` read: the first of these boxes,
+  that of a drag inside the tree, came in v5.6.0 (`8687372`, 2022-02-25) and stayed so up to v5.6.5
+  (`dfe4c8b`, 2022-03-11); it always named the two elements, behind `.\`, and a label starts with
+  `\`: «.\\Beta\». v5.6.7 (`e0b347a`, 2022-03-31) made that `.\` a `.`, which gave «.\Beta\», and in
+  the same release gave elements that are not siblings their full paths and added the box of a drag
+  between the tree and the omnibox, one wording for both ways, behind that `.`, and the box of a drag
+  inside the omnibox, which names its rows «.\Beta\». v5.7.0 (`5e1a365`, 2022-04-22) gave each way
+  its own wording and added the two boxes of the main window: onto the tree, behind the same `.`,
+  and onto the omnibox, with a name. A full path never showed without the dot. A drive showed as
+  «.Z:\\»: its label already ends with `\`, and the box adds one.
   **Fixed in `b246de9`** (decision 26): the four boxes give the full path without the dot and with one
   `\` at its end (`Trimmer(path, "\") "\"`), so a drive reads «Z:\». In the tree's box, siblings
   keep their names through the new `folderTreeLabelForMsg()`, which gives a folder's label behind
