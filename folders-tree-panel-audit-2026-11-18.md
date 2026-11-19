@@ -40,6 +40,16 @@ current file where it was (`0fb1617`); a folder is listed once whatever the case
 (`1313a18`). The omnibox's side of findings 5 and 7 to 10, which shares the corrected functions, was
 run as well (batch T13). Decisions 12 to 15 were raised by these runs and settled the same day.
 
+**Findings 4 and 13 to 16, 2026-11-19, fixed at `80b75e0`**, with Marius's answers. Each was first
+run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `b8b45c5`, and each of the
+five did what the audit describes; the same batches were then run with the fixes. With no list
+loaded, F3 and a drop on the main window open the folder in QPV, with its sub-folders when Shift is
+held (`34e7c56`, decision 16); a folder moved by a drag leaves its old place in the tree
+(`068c7fa`); Ctrl+X and Ctrl+C refuse a drive element (`f4bbf01`, decision 17); the «`\\`» menu's
+notes count the folders not listed and sit in their own submenus (`43bee47`); «Create new folder»
+checks the name the filter gives it, for a folder or a file (`80b75e0`, decision 18). Decisions 16
+to 18 were settled the same day, before the fixes.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -71,12 +81,12 @@ run as well (batch T13). Decisions 12 to 15 were raised by these runs and settle
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `1313a18` |
+| # | Finding | Harm | Checked | Shared with | Status at `80b75e0` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
 | 3 | Shift and Ctrl with Enter or a double-click do the reverse of the menu's hints | medium | read | the folders list panels' open code | **fixed**, `dc69bd9`: the hints change (decision 1) |
-| 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read | — | open |
+| 4 | No list loaded: Shift+F3, or a drop on the main window with Shift held, opens a new QPV instance | medium | read, then run | — | **fixed**, `34e7c56`: the folder opens in QPV, with its sub-folders when Shift is held; Ctrl is not read (decision 16) |
 | 5 | «Rename folder» looks for the new name inside the folder instead of beside it | medium | read, then run | omnibox F2 | **fixed**, `e1ca39e`: the name is looked for beside the folder, a file of that name included; a change of case alone passes, an unchanged name does nothing (decision 12) |
 | 6 | «Rename folder» with «Perform search and replace»: the opened folder, the seed folders list and the folders list keep the old path | medium | read, then run | omnibox F2 | **fixed**, `de9725d`: the tick carries the three, in a database its tables too; it is offered only when a list is loaded (decision 3) |
 | 7 | A folder dropped on a missing folder: the destination is recreated, then nothing is copied or moved | medium | read, then run | the omnibox's drags | **fixed**, `d57df45`: the folder is copied or moved into the recreated folder |
@@ -85,10 +95,10 @@ run as well (batch T13). Decisions 12 to 15 were raised by these runs and settle
 | 10 | «Import images into the list» moves the current file to the end of the list, also when nothing was imported | low | read, then run | the omnibox's F3 and its two import rows | **fixed**, `0fb1617`: the current file moves only when files came in or the folder was rescanned (decision 15) |
 | 11 | A label whose case differs from the disk's: the tree lists the folder twice (every database list) | medium | run | — | **fixed**, `5b0ac28`: names are compared, and kept as keys, in lower case |
 | 12 | A drag between two sibling elements: the confirmation box swaps source and destination | medium | read, then run | — | **fixed**, `1313a18`: the box names the dragged folder as the source |
-| 13 | A folder moved by a drag stays in the tree at its old place | low | read | — | open |
-| 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read | — | open |
-| 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read | Shift+F4 menu | open |
-| 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run (part), read | omnibox F7 | open |
+| 13 | A folder moved by a drag stays in the tree at its old place | low | read, then run | — | **fixed**, `068c7fa`: the dragged element goes once its folder has moved |
+| 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read, then run | — | **fixed**, `f4bbf01`: both keys refuse a drive element (decision 17) |
+| 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read, then run | Shift+F4 menu | **fixed**, `43bee47`: each note in its own submenu, counting the folders not listed; 200 sub-folders listed |
+| 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run | omnibox F7 | **fixed**, `80b75e0`: the name the filter gives is checked, for a folder or a file (decision 18) |
 | 17 | Small things (nine points) | low | read; f run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; a, c, d, e, g open |
 
 ---
@@ -308,6 +318,24 @@ The tooltip says «Drop folder here to import it into the current list» while t
 
 Correction: let the fallback open the folder without reading the keys, and decide whether Shift
 should then mean a scan with the sub-folders.
+
+**Confirmed by a run, then fixed in `34e7c56`**, with Marius's answer to decision 16. Run at
+`b8b45c5`, batch U4. The tree was built while a folder was open and the list was then closed, so
+that the tree was never built with no list loaded, a build that reads every drive; the kit gave the
+Shift and Ctrl keys. With no list loaded, Shift+F3 and a drop with Shift held asked for a new QPV
+instance and opened nothing in QPV; Ctrl+F3 and a drop with Ctrl held opened Explorer (logged by the
+kit in place of being started); the tooltip over the main window said «Drop folder here to import it
+into the current list.» all the same. `folderTreeAppendFiles()` now passes «open» or
+«open-recursive» to `folderTreeDefaultAction()`, which then reads no key. With Shift held, or for a
+drop made with Shift held, the folder opens with its sub-folders and without «scan recursively?»,
+through the new last parameter of `tryOpenGivenFolder()`, `recursive`; a folder with no image
+anywhere leaves the welcome screen as it was, with «No image files found in the folder». Without
+Shift the folder opens as «Open folder now» opens it, «scan recursively?» included. With no list
+loaded the tooltip reads «Drop folder here to open it.» above its Shift line. With a list loaded the
+import is unchanged. On a drive element, Shift+F3 with no list now opens the whole drive with its
+sub-folders, as the import does with a list (decision 5; read). The omnibox's F3 and its own drop on
+the main window still open the folder without its sub-folders («Seen in passing» M). With the fix
+the thirteen checks of batch U4 pass; at `b8b45c5` eight fail.
 
 ## 5. «Rename folder» looks for the new name inside the folder
 
@@ -669,6 +697,17 @@ was over the omnibox (:30949); its folder is gone, so it loses its children and 
 
 Correction: after a move, delete the dragged element.
 
+**Confirmed by a run, then fixed in `068c7fa`.** The run simulates the drag as for finding 9, and
+the kit does the shell's move (finding 7). Run at `b8b45c5`, batch U13: after `\m1` was moved onto
+`\dst` with Shift, the tree listed `\m1` under `\dst` and still at its old place, with its child;
+after `\m2` was moved onto an omnibox row, its old element stayed, without its child. Once a move by
+a drag is done and the folder is no longer at its old path, `FolderTreeResponder()` now deletes the
+dragged element, for both routes. A copy keeps it, and so does a move that failed (run: a folder of
+that name was already in the destination, and the kit's move does not overwrite it). With the fix
+the six checks of batch U13 pass; at `b8b45c5` two fail. A move made by «Paste folder(s) into...»
+after «Cut folder», or by a drag of an omnibox row onto the tree, keeps the old element of a folder
+the tree shows («Seen in passing» N).
+
 ## 14. Ctrl+X and Ctrl+C put a whole drive on the clipboard
 
 `KeyboardResponder()` :880-883 → `folderTreeCutCopyFolder()` :31926 →
@@ -684,6 +723,16 @@ a pasted drive was not checked. (read)
 Correction: `If folderTreeIsDriveRoot(thisFolder) Return` in `folderTreeCutCopyFolder()`. F3, F7,
 F12, Enter and `;` also work on a drive element, while the menu offers none of them there
 (decision 5).
+
+**Confirmed by a run, then fixed in `f4bbf01`**, with Marius's answer to decision 17. Run at
+`b8b45c5`, batch U14, the clipboard writes logged by the kit in place of being made: on the drive
+element `Z:\`, Ctrl+X and Ctrl+C, through `folderTreeCutCopyFolder()` and through the key itself
+with the tree active (`KeyboardResponder()`), asked for `Z:\` on the clipboard and said «CUT action:
+the folder can now be pasted in any file manager or in QPV»; the menu on that element offers
+neither. `folderTreeCutCopyFolder()` now asks `folderTreeIsDriveRoot()` first, as the rename and the
+delete do, and the warning reads «An entire drive cannot be renamed, deleted, moved or copied», for
+the three of them. F3, F7, F12, Enter and `;` on a drive are as before (decision 5). With the fix
+the six checks of batch U14 pass; at `b8b45c5` three fail.
 
 ## 15. The «`\\`» menu: the «more folders» notes land in the wrong submenu, and the count is one short
 
@@ -706,6 +755,18 @@ Shared: Shift+F4 in the main window.
 
 Correction: `Count() - 200`, `PVmFparents` and `PVmFsubs`, and the sub-folders test before the
 `Add`.
+
+**Confirmed by a run, then fixed in `43bee47`.** Run at `b8b45c5`, batch U15, the menus as built and
+read back, for a plain list on a folder with 200, 201 and 250 sibling folders and as many
+sub-folders: with 201 siblings «Sibling folders» listed 200 and said «and 0 more folders», with 250
+«and 49 more folders»; 201 sub-folders were listed with no note after them, and the note «... more
+folders can be listed» was the last item of «Sibling folders»; with 200 of each there was no note,
+as there should be. The siblings' and the parents' notes now count the folders not listed, the
+parents' note goes into «Breadcrumb folders hierarchy», and the sub-folders' test comes before the
+item is added, so that 200 are listed and the note follows them in «Sub-folders». The items keep
+their numbers, which `folderzNavInvokeSubs()` reads back. With the fix the six checks of batch U15
+pass; at `b8b45c5` four fail. More than 200 parents, and a folder with no sibling folders, were not
+run.
 
 ## 16. «Create new folder»: a name the filter changes can land on an existing folder
 
@@ -740,6 +801,17 @@ Shared helper: the omnibox's F7 (`omniBoxFolderCreateNew()` :27160).
 
 Correction: filter first, then check. The filter also turns a requested `.config` into `config`
 without a word.
+
+**Confirmed by a run, then fixed in `80b75e0`**, with Marius's answer to decision 18. Run at
+`b8b45c5`, batch U16: beside `photos`, «,photos» and «.photos» each added one more `\photos` element
+and said nothing; «photos.» was refused, Wine finding the folder as the audit expected Windows to,
+but the warning named `photos.\`; for «notes», the name of a file beside, the message was «ERROR: An
+unknown error occurred creating the new folder»; the omnibox's F7 with «,Sub» beside `Sub` said
+nothing. `UIcoreFolderNew()` now filters the name first and looks for it with `FileExist()`, as
+«Rename folder» does: «A folder with the given name already exists» or «A file with the given name
+already exists», with the name as it would be created. The filter is unchanged: «.config» still
+becomes «config» without a word. With the fix the nine checks of batch U16 pass; at `b8b45c5` five
+fail. A folder cannot be named `0` («Seen in passing» O).
 
 ## 17. Small things
 
@@ -862,6 +934,16 @@ i. **«Paste folder(s) into...» with no folder found** shows the whole clipboar
     alone, or in the omnibox too, which has the same line?
     **Settled**: it stays when nothing came in, in the tree and in the omnibox; after an import the
     next-to-last file is shown, as before (`0fb1617`).
+16. **With no list loaded, what F3 and a drop on the main window do** (finding 4): open the folder
+    with the keys not read, as the omnibox's F3 does; open it with its sub-folders when Shift is
+    held; or import it into a new unsaved list?
+    **Settled**: open it; Shift opens it with its sub-folders, without «scan recursively?»; Ctrl is
+    not read (`34e7c56`).
+17. **Ctrl+X and Ctrl+C on a drive element** (finding 14): refuse both, or Ctrl+X alone?
+    **Settled**: both are refused, and the drives warning names copying too (`f4bbf01`).
+18. **A name already taken in «Create new folder»** (finding 16): once the name is filtered, report
+    a file of that name too, as the rename does, or folders only?
+    **Settled**: a folder or a file, as the rename does; the filter stays as it is (`80b75e0`).
 
 ## Unverified leads
 
@@ -973,6 +1055,26 @@ Outside the panel's own code, found while tracing its actions.
   path it was given. Run, batch T10: after «Rescan» in a plain list, the four files of `Holiday One`
   are listed as `holiday one\h1.png` and so on. Such paths are what finding 11 met in plain and .SLD
   lists. Found while fixing finding 10.
+- **M. The omnibox's drop on the main window, with no list loaded.** A row of the omnibox dragged
+  onto the main window imports the folder (`LVquickSearchMenusResponder()` →
+  `omniBoxFolderImport()`); with no list loaded that opens it with `omniBoxFolderOpen()`, as «Open
+  folder now» does, whatever Shift says, while the tooltip reads «Drop folder here to import it into
+  the current list.» and «Hold SHIFT for recursive scanning.» (read). The tree's twin is finding 4,
+  where Marius chose that Shift opens the sub-folders; the omnibox was left as it is. Found while
+  fixing finding 4.
+- **N. A folder moved by «Paste folder(s) into...», or by a drag of an omnibox row, stays in the
+  tree.** After «Cut folder» and «Paste folder(s) into...» with «Move», or after a drag of an
+  omnibox row onto the tree with Shift, `UIcoreFolderPasteFoldersInto()` scans the destination
+  element again, and an element of the moved folder, when the tree shows one, stays at its old place
+  (read). Finding 13's fix covers the drags that start in the tree. Found while fixing finding 13.
+- **O. A folder named `0` can be neither created nor given by «Rename folder».** `UIcoreFolderNew()`
+  and `UIcoreFolderRename()` test the name with `If !newFileName`, and AutoHotkey takes `0` for
+  false: «Create new folder» answers «WARNING: Incorrect folder name given.», and «Rename folder»
+  closes and does nothing (run, batch U16). Found while fixing finding 16.
+- **P. The import's tooltip shows the `|` of a folder scanned without its sub-folders.**
+  `wrapperAddNewFolderToList()` shows «Preparing files list to import:» with the entry as it is
+  given, so a folder imported without its sub-folders reads `|D:\…\` there (run, batch U4: a folder
+  dropped on the main window with a list loaded). Found while fixing finding 4.
 
 ## Checked and found correct
 
@@ -1081,3 +1183,22 @@ Outside the panel's own code, found while tracing its actions.
   batches S, F3, H, I and G of the earlier kits give the same results with the last text as at
   `54c1996`. AutoHotkey 1.1.37.02 loads each of the eight texts, with and without `/iLib`. Not run:
   Windows itself, a real drag, a real Alt key.
+- Findings 4 and 13 to 16 were run in the application under headless Wine, on AutoHotkey 1.1.37.02,
+  at `b8b45c5` and with the fixed texts, by `.claude/scratch/folders-tree-4-13-16-2026-11-19/`
+  (`tests-4-16.ahk`, `run.sh`, `run-all.sh`; `mkfixes.py` writes one text per fix; the logs in
+  `app/results/`). Batches U4 and U13 to U16, one per finding, call what the tree calls: F3 through
+  `FolderTreeResponder()`, the drags as for findings 7 to 12, `folderTreeCutCopyFolder()` and the
+  key Ctrl+X through `KeyboardResponder()`, `invokeFoldersListerMenu()` with the menus it builds
+  read back, `folderTreeCreateFolder()` and the omnibox's F7, every box answered from a timer. The
+  kit gives the Shift and Ctrl keys the tree reads; it logs Explorer and a new QPV instance in place
+  of starting them, and the clipboard writes in place of making them; it does the shell's move
+  itself. The tree was never built with no list loaded: batch U4 builds it with a folder open, then
+  closes the list. In batch U4 «ERROR: Unable to display the image» follows some of the opens, other
+  ones at each of three runs, and it follows plain opens at `b8b45c5` too (batch U4n): it is the
+  display of the image under headless Wine, not the fixes. Each batch was run at the text of its own
+  fix, and all of them with the last text; batches T5 to T13 (findings 5 to 12), F1, F2 and F4
+  (findings 1 and 2, decision 11), R, D, E, G and H (the sibling navigation, the short lists and the
+  unsaved lists), S (small thing f) and I («Seen in passing» G) give the same results with the last
+  text as at `b8b45c5`: every check passes at both, and batch R, which only logs, returns the same
+  nine values. AutoHotkey 1.1.37.02 loads each of the five texts, with and without `/iLib`. Not run:
+  Windows itself, a real drag, real keys.
