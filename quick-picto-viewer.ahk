@@ -31595,12 +31595,12 @@ folderTreeNormalizePath(folderPath) {
 }
 
 folderTreeIsDriveRoot(folderPath) {
-   ; entire drives must never be renamed, deleted or moved
+   ; entire drives must never be renamed, deleted, moved or copied
    folderPath := folderTreeNormalizePath(folderPath)
    If (StrLen(folderPath)>2 || SubStr(folderPath, 2, 1)!=":")
       Return 0
 
-   msgBeepTimer("WARNING: An entire drive cannot be renamed, deleted or moved:`n" folderPath "\")
+   msgBeepTimer("WARNING: An entire drive cannot be renamed, deleted, moved or copied:`n" folderPath "\")
    Return 1
 }
 
@@ -31959,6 +31959,9 @@ folderTreeCutCopyFolder(a) {
    c := TV_GetSelection()
    thisFolder := folderTreeGetSelectedPath(c)
    If !thisFolder
+      Return
+
+   If folderTreeIsDriveRoot(thisFolder)
       Return
 
    UIcoreFolderCutCopyExplorer(a, thisFolder)
