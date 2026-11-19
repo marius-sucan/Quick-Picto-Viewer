@@ -31981,14 +31981,17 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
 
    baseu := SubStr(thisFolder, 1, InStr(thisFolder, "\", 0, -1))
    restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
-   msgResult := msgBoxWrapper("Rename folder: " appTitle, "Please type the new folder name for \" restu "`n`nFolder found in:`n" baseu, "&Rename folder|C&ancel", 1, "modify-file", "&Perform search and replace in current list", lastChecked, 0, "limit9050", restu)
+   hasList := (maxFilesIndex>0 && CurrentSLD) ? 1 : 0
+   msgResult := msgBoxWrapper("Rename folder: " appTitle, "Please type the new folder name for \" restu "`n`nFolder found in:`n" baseu, "&Rename folder|C&ancel", 1, "modify-file", hasList ? "&Perform search and replace in current list" : "", lastChecked, 0, "limit9050", restu)
    If InStr(msgResult.btn, "Rename")
    {
       newFileName := Trimmer(msgResult.edit)
       If !newFileName
          Return
 
-      lastChecked := msgResult.check
+      If hasList
+         lastChecked := msgResult.check
+
       newFileName := filterFileName(newFileName, 0)
       If !newFileName
          Return msgBeepTimer("WARNING: Incorrect folder name given")
@@ -32008,12 +32011,68 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
       FileMoveDir, % thisFolder, % baseu newFileName, R
       If !ErrorLevel
       {
-         If (lastChecked=1)
-            SearchAndReplaceThroughIndex(thisFolder "\", baseu newFileName "\", 0, 1)
+         If (lastChecked=1 && hasList)
+            renameFolderInLists(thisFolder, baseu newFileName)
          Return 1
       } Else
          msgBeepTimer("ERROR: An unknown error occurred renaming the folder:`n" thisFolder "\")
    }
+}
+
+renameFolderInLists(oldFolder, newFolder) {
+; a folder renamed on the disk: the files list, the opened folder or the list file placed in it,
+; the seed folders list and the folders list follow it
+   newLow := Format("{:L}", newFolder)
+   If !SearchAndReplaceThroughIndex(oldFolder "\", ((SLDtypeLoaded=3) ? newLow : newFolder) "\", 0, 1)
+      Return
+
+   oldLow := Format("{:L}", oldFolder)
+   opened := StrReplace(CurrentSLD, "|")
+   openedLow := Format("{:L}", opened)
+   If (openedLow==oldLow || InStr(openedLow, oldLow "\")=1)
+      CurrentSLD := (InStr(CurrentSLD, "|") ? "|" : "") newFolder SubStr(opened, StrLen(oldLow) + 1)
+
+   If renameDynamicFoldersEntries(oldFolder, newFolder)
+      currentFilesListModified := 1
+
+   If (SLDtypeLoaded!=3 && FileExist(CurrentSLD) && RegExMatch(CurrentSLD, sldsPattern) && SLDcacheFilesList=1)
+      LoadStaticFoldersCached(CurrentSLD, countStaticFolders)
+
+   renameStaticFoldersEntries(oldFolder, newLow, 1)
+   If (SLDtypeLoaded=3)
+      renameStaticFolderSQLdb(oldFolder, newFolder, 1)
+}
+
+renameDynamicFoldersEntries(oldFolder, newFolder) {
+; the seed folders that are the given folder, or placed inside it, get the new path; returns 1 when an entry changed
+   oldLow := Format("{:L}", oldFolder)
+   finalListu := ""
+   changed := 0
+   foldersListu := getDynamicFoldersList()
+   Loop, Parse, foldersListu, `n, `r
+   {
+      If (A_LoopField="")
+         Continue
+
+      thisFolder := StrReplace(A_LoopField, "|")
+      thisLow := Format("{:L}", thisFolder)
+      If (thisLow==oldLow || InStr(thisLow, oldLow "\")=1)
+      {
+         thisFolder := newFolder SubStr(thisFolder, StrLen(oldLow) + 1)
+         changed := 1
+      }
+
+      finalListu .= (InStr(A_LoopField, "|") ? "|" : "") thisFolder "`n"
+   }
+
+   If !changed
+      Return 0
+
+   DynamicFoldersList := cleanDynamicFoldersList(finalListu)
+   If (RegExMatch(CurrentSLD, sldsPattern) && SLDtypeLoaded=3)
+      recreateDynaFoldersSQLdbList(DynamicFoldersList)
+
+   Return 1
 }
 
 invokeOmniBoxCurrentFile() {
