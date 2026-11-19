@@ -832,13 +832,14 @@ folder was made at either (batch U16x).
 
 ## 17. Small things
 
-b, h and i are fixed in `ca8109b`, and f in `5624fa8`; a, c, d, e and g are as described.
+b, h and i are fixed in `ca8109b`, and f in `5624fa8`; a, c, d, e and g are as described. ✅ marks a
+fixed one.
 
 a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` (:31967) sorts the
    children of the renamed element (that is AutoHotkey's `Sort` option), not the element among its
    siblings: it keeps its old place.
 
-b. **«Paste clipboard file(s) into...» brings the tree back only after Cancel.**
+b. ✅ **«Paste clipboard file(s) into...» brings the tree back only after Cancel.**
    `PasteFilesIntoGivenFolder()` returns 1 for Cancel (:32228) and nothing after a paste (it ends
    with `msgBeepTimer()` at :32391), and `folderTreePasteClippy()` activates the tree when the result
    is true (:32201-32203). **Fixed in `ca8109b`**: the tree is activated after every outcome.
@@ -855,7 +856,7 @@ d. **The «7» and «Shift+7» hints** of «Copy/Move selected file(s) into...»
 e. **Alt+D opens the selected folder.** The hidden default button is labelled «&Default» (:30673),
    so its mnemonic runs «Open folder now».
 
-f. **«Show folder details» on a folder with no images and no sub-folders** shows its parent's path
+f. ✅ **«Show folder details» on a folder with no images and no sub-folders** shows its parent's path
    instead of its counts: the counts are shown only when one is not zero (`If (dirs || sizu)`
    :31127). `ca8109b` added a flag to that test, `deadFolder`, set when the folder is not on the
    disk, the other case: the folder with nothing to count kept its parent's path, a folder removed
@@ -872,13 +873,13 @@ g. **«Open folder now» on a missing folder** asks about the edited image, the 
    selection (:30767-30774), and only then finds the folder gone (`tryOpenGivenFolder()`
    :73297-73302).
 
-h. **The rebuild test** `thisSize := 300 + PrefsLargeFonts + uiUseDarkMode` (:30625) gives 301 for
+h. ✅ **The rebuild test** `thisSize := 300 + PrefsLargeFonts + uiUseDarkMode` (:30625) gives 301 for
    large fonts in light mode and for normal fonts in dark mode: if both settings change while the
    tree is hidden, it comes back with the old look. A change of the large font size
    (`LargeUIfontValue`) is not in the test either. **Fixed in `ca8109b`**: the test compares the
    three settings, each on its own.
 
-i. **«Paste folder(s) into...» with no folder found** shows the whole clipboard text in its warning
+i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clipboard text in its warning
    (:31904). **Fixed in `ca8109b`**: the warning names the action alone. It ends with `pku`, a
    variable that nothing sets in that function, so nothing shows of it.
 
@@ -1003,7 +1004,7 @@ before any fix.
 
 ## Seen in passing
 
-Outside the panel's own code, found while tracing its actions.
+Outside the panel's own code, found while tracing its actions. ✅ marks a fixed one.
 
 - **A. The main window's Alt+drag over the tree selects every row of the omnibox.** In the
   thumbnails click handler (:9611), the drag's tree branch calls `LV_Modify(initialRow, "select")`
@@ -1020,7 +1021,7 @@ Outside the panel's own code, found while tracing its actions.
   «`\\`» menu's item for the current file's folder with a .SLD list or a database, also Alt+E in the
   thumbnails view, asks «Save image» and «Save files list» but not «Discard selection» before it
   replaces the list (read; found while fixing finding 2).
-- **E. The sibling navigation after a sibling with no images.** When `tryOpenGivenFolder()` reports
+- ✅ **E. The sibling navigation after a sibling with no images.** When `tryOpenGivenFolder()` reports
   a failure, `FileExploreSiblingsNav()` sets its position back to `initialLevel` (:65175-65176), the
   value it held when the call began. That value is blank on the first move after QPV starts and
   after the tree, the omnibox or a folders list panel opened a folder; the next step then computes a
@@ -1030,7 +1031,7 @@ Outside the panel's own code, found while tracing its actions.
   after the current folder is looked up (F), so it is never blank. Run, batch G: at `3e7ad12` the
   step after a failed first move opens the last sibling; with the fix it opens the next one, and
   the sibling with no images is skipped in both directions.
-- **F. The sibling navigation keeps a stale current folder.** `FileExploreSiblingsNav()` looked for
+- ✅ **F. The sibling navigation keeps a stale current folder.** `FileExploreSiblingsNav()` looked for
   the current folder among its siblings only when their parent folder changed. With a .SLD list or a
   database open, a move to a file in another folder under the same parent left the check mark of
   «Sibling folders» on the folder left behind, and picking that folder did nothing. With a plain
@@ -1043,7 +1044,7 @@ Outside the panel's own code, found while tracing its actions.
   folder still not found counts as no current sibling. The folder with the check mark stays inert
   when picked, as the open folder is. Run, batch G: at `3e7ad12` eleven of twelve checks fail, with
   the fix the twelve pass. Not run: a drive root, whose branch is unchanged.
-- **G. A database imported from the welcome screen left the list without its type.** Insert, or
+- ✅ **G. A database imported from the welcome screen left the list without its type.** Insert, or
   «Insert file(s)» in the «File» menu, with a database picked while no list is loaded, runs
   `importSLDBintoPlainText()`: the files of the database become an unsaved list, named
   `newFile.SLD` in the folder of the database. The function named the list and left the list type
@@ -1087,7 +1088,7 @@ Outside the panel's own code, found while tracing its actions.
   path it was given. Run, batch T10: after «Rescan» in a plain list, the four files of `Holiday One`
   are listed as `holiday one\h1.png` and so on. Such paths are what finding 11 met in plain and .SLD
   lists. Found while fixing finding 10.
-- **M. The omnibox's drop on the main window, with no list loaded.** A row of the omnibox dragged
+- ✅ **M. The omnibox's drop on the main window, with no list loaded.** A row of the omnibox dragged
   onto the main window imports the folder (`LVquickSearchMenusResponder()` →
   `omniBoxFolderImport()`); with no list loaded that opens it with `omniBoxFolderOpen()`, as «Open
   folder now» does, whatever Shift says, while the tooltip reads «Drop folder here to import it into
@@ -1104,7 +1105,7 @@ Outside the panel's own code, found while tracing its actions.
   With no list loaded the drop's tooltip reads «Drop folder here to open it.», and after a drop from
   the omnibox or from the tree «Opening folder - please wait». With the fix the eight checks of
   batch VM pass; at `35a7c94` four fail.
-- **N. A folder moved by «Paste folder(s) into...», or by a drag of an omnibox row, stays in the
+- ✅ **N. A folder moved by «Paste folder(s) into...», or by a drag of an omnibox row, stays in the
   tree.** After «Cut folder» and «Paste folder(s) into...» with «Move», or after a drag of an
   omnibox row onto the tree with Shift, `UIcoreFolderPasteFoldersInto()` scans the destination
   element again, and an element of the moved folder, when the tree shows one, stays at its old place
@@ -1125,7 +1126,7 @@ Outside the panel's own code, found while tracing its actions.
   its drags, a destination that the tree shows without having it selected keeps its old children
   until Space or F5 (read). With the tree never opened, the same scan leaves an empty tree window
   behind, hidden (run, batch VNx, at `35a7c94` and with the last text). Found while fixing N.
-- **O. A folder named `0` can be neither created nor given by «Rename folder».** `UIcoreFolderNew()`
+- ✅ **O. A folder named `0` can be neither created nor given by «Rename folder».** `UIcoreFolderNew()`
   and `UIcoreFolderRename()` test the name with `If !newFileName`, and AutoHotkey takes `0` for
   false: «Create new folder» answers «WARNING: Incorrect folder name given.», and «Rename folder»
   closes and does nothing (run, batch U16). Found while fixing finding 16. **Fixed in `4de0385`**,
@@ -1137,7 +1138,7 @@ Outside the panel's own code, found while tracing its actions.
   the names behind a `\`, as text. With the fix the seven checks of batch VO pass; at `35a7c94` six
   fail. A rename to «0» with «Perform search and replace in current list» ticked carries the files
   list to the new path (batch VOx).
-- **P. The import's tooltip shows the `|` of a folder scanned without its sub-folders.**
+- ✅ **P. The import's tooltip shows the `|` of a folder scanned without its sub-folders.**
   `wrapperAddNewFolderToList()` shows «Preparing files list to import:» with the entry as it is
   given, so a folder imported without its sub-folders reads `|D:\…\` there (run, batch U4: a folder
   dropped on the main window with a list loaded). Found while fixing finding 4. **Fixed in
