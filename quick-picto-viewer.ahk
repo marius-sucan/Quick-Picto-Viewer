@@ -31695,7 +31695,7 @@ UIcoreFolderNew(thisFolder, ByRef newFileName) {
    If InStr(msgResult.btn, "Create")
    {
       newFileName := filterFileName(msgResult.edit, 0)
-      If !newFileName
+      If (newFileName="")
          Return msgBeepTimer("WARNING: Incorrect folder name given.")
 
       takenBy := FileExist(thisFolder "\" newFileName)
@@ -32020,14 +32020,14 @@ UIcoreFolderRename(thisFolder, ByRef newFileName) {
    If InStr(msgResult.btn, "Rename")
    {
       newFileName := Trimmer(msgResult.edit)
-      If !newFileName
+      If (newFileName="")
          Return
 
       If hasList
          lastChecked := msgResult.check
 
       newFileName := filterFileName(newFileName, 0)
-      If !newFileName
+      If (newFileName="")
          Return msgBeepTimer("WARNING: Incorrect folder name given")
 
       ; behind a \ the names are compared as text: 7 is not 07
@@ -43313,7 +43313,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
             hasAddedSubs++
             hasAddedItems++
             LV_Add(A_Index, "\" A_LoopFileName, xu, "-", "Change folder", "", "!OmniNavigateFolder", 0, 0)
-            If (A_LoopFileName=prevOmniBoxFolder && prevOmniBoxFolder!="")
+            If (("\" A_LoopFileName)=("\" prevOmniBoxFolder) && prevOmniBoxFolder!="")   ; compared as text: 0 is not 0000
                mustReselect := hasAddedItems
          } Else If RegExMatch(A_LoopFileFullPath, RegExFilesPattern)
             filesFound++
@@ -43504,7 +43504,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    LV_ModifyCol(8, "Integer")
    LV_ModifyCol(lastLVquickSearchSortCol[1], lastLVquickSearchSortCol[2])
 
-   If (allowMenuSearch=0 && pathModus=1 && mustReselect>0 && prevOmniBoxFolder)
+   If (allowMenuSearch=0 && pathModus=1 && mustReselect>0 && prevOmniBoxFolder!="")
    {
       ; the rows were just re-sorted, the index recorded while adding them is now stale
       mustReselect := omniBoxFindFolderRow(prevOmniBoxFolder)
@@ -43531,7 +43531,7 @@ omniBoxFindFolderRow(folderName) {
 ; the omnibox list is sorted after it was populated, therefore the row indexes recorded
 ; while adding the entries cannot be used to select a given folder; look it up by name
    folderName := Trim(Trimmer(folderName), "\")
-   If !folderName
+   If (folderName="")
       Return 0
 
    Gui, QuickMenuSearchGUIA: Default
@@ -43543,7 +43543,8 @@ omniBoxFindFolderRow(folderName) {
          Continue
 
       LV_GetText(folderu, A_Index, 1)
-      If (Trim(Trimmer(folderu), "\")=folderName)
+      ; behind a \ the names are compared as text: 0 is not 0000
+      If (("\" Trim(Trimmer(folderu), "\"))=("\" folderName))
          Return A_Index
    }
    Return 0
