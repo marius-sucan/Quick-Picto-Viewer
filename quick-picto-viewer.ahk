@@ -27123,7 +27123,9 @@ omniBoxFolderOpen(modus:=0, isGiven:=0) {
 
    oldPrevOmni := prevOmniBoxFolder
    prevOmniBoxFolder := SubStr(folderPath, InStr(folderPath, "\", 0, -1) + 1)
-   If (tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 1, (modus="recursive" && isGiven="yes"))="cancel")
+   recur := (modus="recursive" && isGiven="yes") ? 1 : 0
+   rr := tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 1, recur)
+   If (rr="cancel")
    {
       prevOmniBoxFolder := oldPrevOmni
       Return
@@ -30766,7 +30768,8 @@ folderTreeDefaultAction(modus:=0, g:=0) {
       addFolderSldATfavorites(folderPath)
    } Else If folderPath
    {
-      If (tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 1, (z=6))="cancel")
+      r := tryOpenGivenFolder(folderPath, CurrentSLD, currentFileIndex, 1, (z=6) ? 1 : 0)
+      If (r="cancel")
          Return
 
       FileExploreSiblingsNav("reset")
