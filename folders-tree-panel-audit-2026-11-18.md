@@ -97,6 +97,19 @@ in v5.6.7 (2022); S's entry gives the history. Run in the application under head
 AutoHotkey 1.1.37.02, at `6fb2abd` and with the fixed text (batch SDA); AA was found while checking
 S.
 
+**«Seen in passing» H, I and J, 2026-11-19, fixed at `2e29a57`**, with Marius's answers (decisions
+28 to 32). With nothing loaded, Insert opens the .SLD list or the database it is given, as a drop
+does; with a plain folder or a database open, a .SLD list given to Insert or to a drop answered
+«Import» is imported (`5b77af3`, decisions 28 and 29). «Save settings into current .SLD file» and
+«Load settings from current .SLD file» work, and the «Preferences» menu offers them only for a .SLD
+list or a database that has its file; a .SLD file without settings is said to have none, and the
+settings of a database are loaded whatever «Auto-load settings from QPV slideshows when opened»
+says, but never its `appVersion` (`07d88b3`, decisions 30 and 31). The protected folder follows a
+rename or a move of itself or of a folder that holds it (`2e29a57`, decision 32). Each was first run
+in the application under headless Wine, on AutoHotkey 1.1.37.02, at `7178c08`, then with the fixed
+texts (batches XH, XI and XJ). Four new leads, «Seen in passing» AB to AE, were found while fixing
+them.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -1067,6 +1080,28 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
 27. **The tree's drag tooltips over a drive element** («Seen in passing» AA): «Z:\», as the boxes,
     or left as they are?
     **Settled**: «Z:\», in the same commit (`b246de9`).
+28. **What Insert does with a .SLD list or a database while nothing is loaded** («Seen in passing»
+    H): import it, as a database became a new unsaved list, or open it?
+    **Settled**: it opens, the .SLD list as the database; Marius gave this with the request
+    (`5b77af3`).
+29. **A .SLD list given to Insert, to a drop or to the omnibox with a plain folder or a database
+    open** («Seen in passing» H): import it in both, import it into a folder only, or refuse both
+    with a warning?
+    **Settled**: imported in both (`5b77af3`).
+30. **The two settings items for an unsaved list and for a .SLD file without settings** («Seen in
+    passing» I): offer neither for an unsaved list and warn for the other, warn in both, or leave
+    both doing nothing?
+    **Settled**: an unsaved list gets neither item and is refused; a .SLD file without a settings
+    section gets a warning (`07d88b3`).
+31. **Loading the settings of a database** («Seen in passing» I): always, whatever «Auto-load
+    settings from QPV slideshows when opened» says, with or without its `appVersion`, or only under
+    that option?
+    **Settled**: always, and `appVersion` is never taken from a database, also when one opens with
+    the option on (`07d88b3`).
+32. **When the protected folder follows a folder** («Seen in passing» J): every rename and move, the
+    renames only, or only with the rename's tick?
+    **Settled**: every rename and move made by QPV, with or without the tick and with or without a
+    list (`2e29a57`).
 
 ## Unverified leads
 
@@ -1161,7 +1196,11 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   correct format» until the list is saved; before, the rename box came. The same import with a
   saved .SLD list or a folder open keeps the name and the type of what was open, and a file that is
   not a database, or a database without images, loads nothing: as before, run.
-- **H. A .SLD list picked with Insert is imported only into a .SLD list or an unsaved list.**
+  Since `5b77af3` («Seen in passing» H), Insert opens a database picked while nothing is loaded, as
+  a drop already did, and the drop and the omnibox import only into a list of two files or more: the
+  place where `importSLDBintoPlainText()` names the unsaved list is no longer reached from the
+  menus, the keys or a drop. It is kept (read).
+- ✅ **H. A .SLD list picked with Insert is imported only into a .SLD list or an unsaved list.**
   `importSLDplainText()` returns at once, with no message, unless the name of what is open ends in
   `.sld`: on the welcome screen (run), and by the same test with a folder or a database open
   (read). A database picked the same way is imported. Found while fixing G. Still so at `15e9716`,
@@ -1169,7 +1208,20 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   nothing in, with no message, on the welcome screen, with a plain folder open and with a database
   open; with a .SLD list open its two files came in, and a database picked with a folder open came
   in too.
-- **I. «Save settings into current .SLD file» and «Load settings from current .SLD file» always
+  **Fixed in `5b77af3`**, with Marius's answers (decisions 28 and 29). With nothing loaded, the test
+  under which the «File» and «Open» menus offer «Insert file(s)» (`maxFilesIndex<1 || !CurrentSLD`),
+  Insert opens the .SLD list or the database it is given with `OpenSLD()`, as a drop does; an image
+  still starts an unsaved list. `importSLDplainText()` tests only the file it is given: with a plain
+  folder open, the list's files and seed folders join the folder's, which keeps its name and type,
+  as a database picked there does; with a database open, its files become rows of the database and
+  its seed folders join the database's, through the function's database branch, which the test of
+  v4.9.2 (`5874821`) had cut off. A list of one file counts as a list: Insert imports into it. Run,
+  batch XH: at `7178c08` eleven of its eighteen checks fail; with the fixed text the eighteen pass,
+  the database reopened lists the new files and both seed folders, and the open list given to Insert
+  is still refused. The omnibox's «Import files list» was run through a row the kit adds to the
+  omnibox's list, which never shows it («Seen in passing» AC); the drop answered «Import» was run
+  with a database open.
+- ✅ **I. «Save settings into current .SLD file» and «Load settings from current .SLD file» always
   refuse.** `WritePrefsIntoSLD()` and `LoadPrefsFromSLD()` begin with the test under which the
   «Preferences» menu offers the two items, a .SLD list or a database of more than one file, and
   return «ERROR: No valid files list currently opened» when that test holds, since `1c3b9c3`
@@ -1180,7 +1232,24 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   currently opened» and left the list's `hueAdjust` at 0 (123 in memory), and «Load settings from
   current .SLD file» answered the same and left 50 in memory (0 in the list); with a database of
   five files open, both answered it too.
-- **J. The protected folder keeps the old path after «Rename folder».** The deletions compare the
+  **Fixed in `07d88b3`**, with Marius's answers (decisions 30 and 31). The menu and both functions
+  share one test, now `(SLDtypeLoaded=2 || SLDtypeLoaded=3) && maxFilesIndex>1 &&
+  RegExMatch(CurrentSLD, sldsPattern) && FileExist(CurrentSLD)`, and the functions refuse when it
+  does not hold. Its `CurrentSLD RegExMatch(…)` was two values side by side, which AutoHotkey joins
+  into one text, true for any name: it is now an «and». The list's file must exist, so an unsaved
+  list gets neither item. A .SLD file without a settings section, a list of paths only, gets «The
+  .SLD file has no settings section, only the list of files» from both, the save adding «Save the
+  files list to give it one»; before, both did nothing. The load from a database took a setting only
+  while «Auto-load settings from QPV slideshows when opened» was on, the test inside
+  `IniSLDBreadGiven()` (:34857); the item now loads them all whatever the option says, and the
+  reader never takes `appVersion`, which the update check, the window title and the «About» box
+  read: with the option on, a database that stored «1.0.0» set the running QPV's version to «1.0.0».
+  Lines at `7178c08`. Run, batch XI: at `7178c08` ten of its eighteen checks fail; with the fixed
+  text the eighteen pass. The rest of the list's file, its seed folders, folders and files, is
+  unchanged by the save, and the list reopens with its five files; the database reopens with no
+  version warning; a list of one file, a plain folder and nothing loaded are refused, as the menu's
+  test says.
+- ✅ **J. The protected folder keeps the old path after «Rename folder».** The deletions compare the
   path of each file with `protectedFolderPath` (`batchFileDelete()`, `InListMultiEntriesRemover()`).
   Once the tree or the omnibox has renamed the protected folder, or a folder that holds it, the
   setting names a folder that is gone: its files are no longer skipped, and the check mark of «Set
@@ -1191,6 +1260,20 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   setting still names `pv\Beta`, the menu no longer checks «Set as the protected folder» on
   `\Beta2`, and the same file is deleted («1 out of 1 selected files deleted»). The omnibox's
   rename was not run.
+  **Fixed in `2e29a57`**, with Marius's answer (decision 32). `followProtectedFolder()` gives the
+  setting the new path, in memory and in the settings file, when the protected folder or a folder
+  that holds it is renamed by `UIcoreFolderRename()`, the rename of the tree and of the omnibox,
+  with or without the tick and with or without a list, or moved by `UIcoreFolderPasteFoldersInto()`,
+  which every paste and drag of folders goes through, once the folder has left its old place; it
+  does so whatever «Skip the files found in the protected folder» says. The test of the path is
+  `movedFolderPath()`, which `renameFolderInLists()` now uses for the opened folder too, the test it
+  had inline. Run, batch XJ: at `7178c08` its twelve checks fail, the three that expect the setting
+  to stay among them, since it never reached the path they expect; with the fixed text the twelve
+  pass: the renames with and without the tick, of the folder and of a folder that holds it, from the
+  omnibox, and with nothing loaded and the protection off; the moves by «Paste folder(s) into...»
+  and by a drag with Shift held. A copy, a move that fails and the rename of a folder whose name
+  begins with the protected folder's leave the setting as it is, and a file of the renamed protected
+  folder is skipped by the deletion.
 - **K. «Use Alt to open it in Explorer», in the quick file actions panel, is not reached from the
   keys.** The keys 1 to 7 and Shift+1 to Shift+7 are sent to `triggerQuickFileAction()`; Alt+1,
   Alt+6, Alt+7 and Ctrl+Alt+1 are sent to no function (run, batch T14, through
@@ -1405,6 +1488,32 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   drives): the omnibox's tooltips write «.\Gamma\», and the tree's go through
   `folderTreeLabelForMsg()`: «Z:\» over a drive, «.\Beta\» over a folder as before. Run with the
   fixed text: batch SDA passes. Found while checking S.
+- **AB. The omnibox's «Import files list» never remembers the list's folder.** In
+  `GoQuickSearchAction()` (:42890), its branch tests `StrLen(SelectedDir)>1` (:42965) before
+  `zPlitPath()` sets `SelectedDir`, a variable of the function that is still blank there, so
+  `prevOpenFolderPath`, the folder where the next file dialog opens, is not set to the list's
+  folder; the image import below it sets `SelectedDir` first. Lines at `7178c08`. Run, batch XH,
+  through the row the kit adds (AC): `prevOpenFolderPath`, set to «Z:\nowhere» before the import,
+  was unchanged after it. Found while fixing H.
+- **AC. The omnibox never shows «Open files list file» or «Import files list».**
+  `uiPopulateQuickMenuSearch()` tests a typed path for a folder (:43274) before it tests it for a
+  .SLD list (:43370): the first test takes every path that is not an image and whose folder exists,
+  so a .SLD list, whose folder exists whenever the list does, never reaches the second. The two
+  tests came in that order in v5.6.7 (`e0b347a`). Lines at `7178c08`. Run, batch XH: with a plain
+  folder open, the omnibox given the path of `work\other.sld` scanned it as a folder and listed a
+  single row, «...\», the folder above. Found while fixing H.
+- **AD. The settings of a database are loaded as they are stored.** `IniSLDBreadGiven()` (:34857)
+  assigns each row of the database's settings as it is. `readSlideSettingsINI()` (:38913), the
+  reader of the .SLD lists, brings each value into its range through `INIaction()` and then calls
+  `updateWindowColor()`, `refreshWinBGRbrush()`, `defineColorDepth()` and `recalculateThumbsSizes()`
+  (:38974-38977). The settings of a database, loaded by «Load settings from current .SLD file» or by
+  «Auto-load settings from QPV slideshows when opened», get neither (read). Lines at `7178c08`.
+  Found while fixing I.
+- **AE. A .SLD list never holds its «Image transparency background».** In `readSlideSettingsINI()`,
+  which reads the settings of a .SLD list and, with `act=1`, writes them, the line of
+  `UserVPalphaBgrStyle` (:38964) gives no file, so `INIaction()` reads and writes that setting in
+  the main settings file; a database stores it (:34800) (read). Lines at `7178c08`. Found while
+  fixing I.
 
 ## Checked and found correct
 
@@ -1616,3 +1725,34 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   «Seen in passing» A and Q, which they check. The tooltips logged by T13 and U13 read «.\Gamma\»
   and «.\dst2\» with the fixed text, and their copies and moves pass as before. AutoHotkey 1.1.37.02
   loads the fixed text, with and without `/iLib`. Not run: Windows itself, a real drag.
+- «Seen in passing» H, I and J (`5b77af3`, `07d88b3`, `2e29a57`) were run in the application under
+  headless Wine, on AutoHotkey 1.1.37.02, at `7178c08` and with the fixed texts, by
+  `.claude/scratch/folders-tree-seen-hij-2026-11-19/` (`tests-hij.ahk`, `run.sh`, `run-regs.sh`;
+  `mkfixes-hij.py` writes the three texts; the logs in `results/`, named `h-` at `7178c08` and `f-`
+  or `f2-` with the fixed texts), with the helpers of the earlier kits. Batch XH gives Insert a .SLD
+  list and a database on the welcome screen, a .SLD list with a plain folder of five files, a
+  database of four files, a .SLD list or a folder of one file open, the open list itself, and an
+  image; it drops a .SLD list on the main window, answered «Import» with a database open, and on the
+  welcome screen; it runs the omnibox's «Import files list» through a row it adds to the omnibox's
+  list. Batch XI saves and loads the settings with a .SLD list of five files, a database of five
+  files, an unsaved list of three, a .SLD file of three paths without a settings section, a .SLD
+  file of one path, a plain folder and nothing loaded; it compares the rest of the list's file
+  before and after the save, reopens the list and the database, and sets the database's stored
+  `appVersion` to «1.0.0». Batch XJ renames the protected folder from the tree with and without the
+  tick, a folder that holds it, the same from the omnibox, and with nothing loaded; it moves it by
+  «Paste folder(s) into...» and by a drag with Shift held, and copies it, moves it where a folder of
+  its name is, and renames a folder whose name begins with its name; the kit's move does not merge
+  folders, so that move fails. Every check of the three batches that fails at `7178c08` passes with
+  the fixed texts, and the others pass at both. Batches FixH, SDA, T5, T6, T12, T13, T15, U13, VN,
+  VNx, VO, VOx and WPB of the earlier kits, those that rename, move or paste folders or start an
+  unsaved list, give the same checks with the fixed text as at `7178c08`: T12's check 12b fails at
+  both, as since S, and two of WPB's checks fail at both, for «Seen in passing» B, which it checks.
+  They ran with the text before the database half of I's load was settled, which changes only what a
+  database's settings load and which none of them reaches; XI, WPI and FixI ran with the final text.
+  WPI and WPJ pass with the fixed texts, and WPH too but for its control H5, which counts the files
+  of a database that its own step H3 now grows by two. FixI's checks I1, I1b, I1c, I1d and I2 fail
+  now, as they should: they expect a database given to Insert on the welcome screen to become an
+  unsaved list, and it opens; its observation I8 now reads «Settings saved into the files list»,
+  where the error came. AutoHotkey 1.1.37.02 loads each of the three texts, with and without
+  `/iLib`. Not run: Windows itself, real menus, keys and dialogs, a real drag, and a move that
+  Windows merges into a folder of the same name.
