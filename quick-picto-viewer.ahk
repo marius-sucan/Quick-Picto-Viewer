@@ -30671,7 +30671,7 @@ PanelFoldersTree() {
     GuiAddButton("xp y+1 w" thisBtnHeight " h" thisBtnHeight " gfolderTreeMiniBtn vBTNfdTreeMenu", "\\", "Folder tree",, "fdTreeGuia")
     GuiAddButton("xp y+1 wp hp gfolderTreeContextMenu vBTNfdTreeMainMenu", ">", "Menu options",, "fdTreeGuia")
     Gui, Add, Text, x+2 vfdTreeInfoLine +0x200 gfolderTreeCopyPath -wrap +TabStop, Folder tree status bar...
-    Gui, Add, Button, x+1 y+1 w1 h1 -wantTab -TabStop Default gfolderTreeDefaultAction, &Default
+    Gui, Add, Button, x+1 y+1 w1 h1 -wantTab -TabStop Default gfolderTreeDefaultAction, Default
 
     winPos := (prevSetWinPosX && prevSetWinPosY) ? " x" prevSetWinPosX " y" prevSetWinPosY : ""
     repositionWindowCenter("fdTreeGuia", hfdTreeWinGui, 0, "Folders tree view: " appTitle, winPos)
@@ -89469,6 +89469,7 @@ oldGetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
   friendly := (userPrivateMode=1) ? "*:\********\****" : OutDir
   If InStr(strDir, "|")
      friendly .= "`n(without its sub-folders)"
+
   showTOOLtip("Loading files from`n" friendly "`n", 0, 0, progressInfo)
   If InStr(strDir, "|")
   {
