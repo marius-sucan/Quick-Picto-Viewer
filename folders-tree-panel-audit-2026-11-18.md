@@ -65,8 +65,8 @@ The fourteen other open items hold as described: «Seen in passing» C, a commen
 thirteen others by runs in the application under headless Wine, on AutoHotkey 1.1.37.02 (batches WSa
 to WPQ, T10, T14 and VNx, «How this was checked»). The runs changed two entries: the drag of «Seen
 in passing» A moves the omnibox's selection to its last row, the omnibox's list taking one selected
-row, rather than selecting every row; and B holds for an unsaved list as well. They found two new
-leads, «Seen in passing» R and S.
+row, rather than selecting every row; and B holds for an unsaved list as well. They found three new
+leads, «Seen in passing» R, S and T.
 
 ## Terms
 
@@ -878,12 +878,11 @@ e. ✅ **Alt+D opens the selected folder.** The hidden default button is labelle
    «Default», with no `&`. The effect was not seen, though. Run, batch WSe, at `a6b57e0` (the text
    before the fix) and at `15e9716`: Alt+D posted to the tree, as WM_SYSCHAR and as WM_SYSKEYDOWN,
    ran «Open folder now» at neither. The button is 0 pixels wide, its option `-wantTab` setting the
-   width to 0 after `w1`, and under Wine the dialog manager clicks a button for its mnemonic with
-   BM_CLICK, which a button 0 pixels wide ignores: a BM_CLICK to it ran nothing in the application
-   either. A copy of the panel's layout in a bare AutoHotkey window shows both: with `-wantTab` the
-   button is 0×1 and neither Alt+D nor BM_CLICK runs it; without, it is 1×1 and both do. Enter does
-   not click the button: the dialog manager sends its command to the window, and Enter sent to the
-   tree opened the folder (run). Not run on Windows, where the old Alt+D most likely did nothing.
+   width to 0 after `w1` («Seen in passing» T), and a BM_CLICK to it ran nothing in the application
+   either. A copy of the panel's layout in a bare AutoHotkey window shows that the two go together:
+   with `-wantTab` the button is 0×1 and neither Alt+D nor BM_CLICK runs it; without, it is 1×1 and
+   both do. Enter does not depend on the button's size: Enter sent to the tree opened the folder
+   (run). Not run on Windows.
 
 f. ✅ **«Show folder details» on a folder with no images and no sub-folders** shows its parent's path
    instead of its counts: the counts are shown only when one is not zero (`If (dirs || sizu)`
@@ -1227,6 +1226,14 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   siblings, inside the omnibox and from the main window onto the omnibox the boxes give a name,
   «.\Beta\», as meant. Run: the logs of batches T9, T12, T13, U13 and WPA show the dot before each
   such path (the kits shorten a path to its part under their work folder). Found while checking A.
+- **T. The hidden default button is 0 pixels wide.** `PanelFoldersTree()` adds it with `w1 h1
+  -wantTab -TabStop Default`, and `-wantTab`, an option of edit fields, sets its width to 0 after
+  `w1`: in the application the button is 0×1 pixels. Clicked by BM_CLICK or ControlClick, it runs
+  nothing; it ran nothing on Alt+D either while its label had the `&` (small thing e). Enter still
+  opens the folder, so nothing visible depends on it now. Run: batch WSe and the debug batches
+  WSex, WSex2 and WSex3 in the application; a bare AutoHotkey window with the panel's layout gives
+  the button 0×1 with `-wantTab` and 1×1 without, and only the 1×1 one answers Alt+D and BM_CLICK
+  (`mnemonic/layout.ahk` of the kit). Found while checking small thing e.
 
 ## Checked and found correct
 
