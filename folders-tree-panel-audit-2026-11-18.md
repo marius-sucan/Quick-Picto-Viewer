@@ -76,6 +76,18 @@ headless Wine, on AutoHotkey 1.1.37.02, at `8ee6fef` and with the fixed text (ba
 The omnibox's «Open folder now» still asks before it finds the folder gone, a new lead, «Seen in
 passing» U.
 
+**«Seen in passing» U, V, W and Y, 2026-11-19, fixed at `89d2c1f`**, with Marius's answers
+(decisions 23 to 25). The omnibox's «Open folder now» finds a missing folder gone before it asks, as
+the tree does, and a «Cancel» changes nothing (`ac42a83`, decision 23). A favourite image gone from
+the disk gets only the box that offers to remove it from the favourites, and with «cycle favourites»
+on the questions come once (`30bef5d`, decision 25). A recent folder, list or image is tested before
+the questions and before an open database is closed (`89d2c1f`, decision 24). U was found while
+fixing g; V, W and X by a deep analysis of U's fix that Marius asked for, Y and Z while running V
+and W. X and Z stay open: the reload of a .SLD list gone from the disk asks about the edited image
+first, and an image opened from the favourites or the recent images asks «Save files list» twice. U,
+V, W, Y and Z were run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `96ec767`
+and with the fixed texts (batches WGu, WUd, WUe, WUo, WUr, WUs, WUv, WUw and WUx); X was read.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -107,7 +119,7 @@ passing» U.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Shared with | Status at `4c6a16d` |
+| # | Finding | Harm | Checked | Shared with | Status at `89d2c1f` |
 |---|---------|------|---------|-------------|--------|
 | 1 | «Scan recursively?»: the answer «No» is ignored; after a failed open a .SLD list or a database is not reopened | high | read | six other callers of `tryOpenGivenFolder()` | **fixed**, `6d419b7`: only «Yes» scans; a checkbox reopens a .SLD list or a database, from the «`\\`» menu too since `548359a` (decision 11); there a sibling answered «No» keeps its name since `67d7343` |
 | 2 | The «`\\`» button's folder items replace an edited image, a modified .SLD list or a selection without the questions «Open folder now» asks | high | read | Shift+F4 menu | **fixed**, `9daf923`: the three questions, for the keys too |
@@ -1026,6 +1038,19 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
 22. **What the scan tooltips show for a folder without its sub-folders** («Seen in passing» P): the
     path alone, or the path and the mode?
     **Settled**: the path, with «(without its sub-folders)» under it (`5c2853b`).
+23. **The omnibox's remembered row after «Cancel»** («Seen in passing» U): `omniBoxFolderOpen()`
+    sets `prevOmniBoxFolder`, the name of the row that the omnibox's next list of folders selects,
+    before the open; with the questions inside `tryOpenGivenFolder()`, a «Cancel» sets it too. Keep
+    it so, or put the old name back?
+    **Settled**: the old name is put back (`ac42a83`).
+24. **Which recent entries are tested before the questions** («Seen in passing» W): the folders
+    only, or the folders, the .SLD lists and the images?
+    **Settled**: all three kinds, each with the error its own open gives (`89d2c1f`).
+25. **The favourites entry with «cycle favourites» on** («Seen in passing» V and Y): test the image
+    first and keep the questions as they are, or test it first and leave the questions of a cycle to
+    `retrieveFavesAsList()`?
+    **Settled**: the image is tested first, and a cycle asks only through `retrieveFavesAsList()`
+    (`30bef5d`).
 
 ## Unverified leads
 
@@ -1250,7 +1275,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   WSex, WSex2 and WSex3 in the application; a bare AutoHotkey window with the panel's layout gives
   the button 0×1 with `-wantTab` and 1×1 without, and only the 1×1 one answers Alt+D and BM_CLICK
   (`mnemonic/layout.ahk` of the kit). Found while checking small thing e.
-- **U. The omnibox's «Open folder now» asks before it finds a missing folder gone.**
+- ✅ **U. The omnibox's «Open folder now» asks before it finds a missing folder gone.**
   `omniBoxFolderOpen()` (:27118) asks the three questions of «Open folder now», then calls
   `tryOpenGivenFolder()`, which finds the folder gone: small thing g, before its fix, in the
   omnibox. A row listed before its folder was removed from the disk stays in the omnibox's list,
@@ -1260,6 +1285,75 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   removed from the disk, `omniBoxFolderOpen()` asked «Save files list» and «Discard selection»,
   answered «Discard» and «Yes», then said «ERROR: Folder not found or access denied»; the list
   stayed as it was. Found while fixing g.
+  **Fixed in `ac42a83`** (decision 23): `omniBoxFolderOpen()` leaves the three questions to
+  `tryOpenGivenFolder()`, with `askFirst` set to 1, as the tree does since `4c6a16d`, and on
+  "cancel" puts back the row name it set for the omnibox's next list. Run, at `96ec767` and with the
+  fixed text: batch WGu passes. Batch WUo, an existing folder: the questions come as before,
+  «Cancel» and «No» keep the list, «Discard» and «Yes» open the folder, and the omnibox is shown and
+  active after it; the menu item's call finds a missing folder gone with no question; after «Cancel»
+  the remembered name is the one from before, so the omnibox typed to another folder opens on its
+  first row, as at `96ec767`. A first text that left the name set (not committed) selected there the
+  sub-folder of the same name, `\Beta`. Batch WUd, a database of 212 files, 30 of them selected: the
+  tree (since `4c6a16d`) and the omnibox find a missing folder gone before the selection question,
+  the database still open; on an existing folder «No» keeps it open, and «Yes» to the omnibox closes
+  it and opens the folder.
+- ✅ **V. A favourite image gone from the disk: the three questions come before «…no longer exist».**
+  The favourites menu lists its entries without testing them (:72229). `OpenFavesEntry()` (:72605)
+  asked «Save image», «Save files list» and «Discard selection», and only then found the image gone
+  and offered to remove it from the favourites. Run, batch WUv, at `96ec767`: with the .SLD list of
+  212 files, modified, 30 selected, entry 1 of the favourites, its image removed, asked «Save files
+  list» and «Discard selection», answered «Discard» and «Yes», then «The file you are trying to open
+  seems to no longer exist. Would you like to remove it from the favourites list?». **Fixed in
+  `30bef5d`** (decision 25): the image is looked up and tested first; a missing one gets only that
+  box, and the three questions come only before the image is opened. Run with the fixed text: that
+  box is the first, the list as it was. Batch WUx, an image that exists, «cycle favourites» off:
+  «Cancel» to the save question keeps the list, «Discard» and «Yes» open the image once the repeated
+  «Save files list» of Z is answered, at both texts. Found by the deep analysis of U's fix.
+- ✅ **W. A recent folder, list or image gone from the disk: the questions, then the database closed,
+  then the error.** `OpenRecentEntry()` (:72536) asked the three questions (:72539-72546) before it
+  read the entry, then closed an open database (:72573) before any test. The «Recent» menus leave
+  out the entries that are gone when they are built (:72110, :72127), so this comes when the file or
+  folder goes while the menu is open. For a folder, `coreOpenFolder()` then said «The folder seems
+  to be inexistent», and `OpenRecentEntry()` went on: it set the previous folder to the missing one,
+  marked the list as not modified (:72591) and, the old list being still loaded, gave it the type of
+  a folder (:72594). Run at `96ec767`: batch WUr, with the modified .SLD list of 212 files, 30
+  selected, a missing recent folder asked both questions, gave the error, and left `big.sld` loaded
+  as a folder (type 1), not modified, with the previous folder set to the missing one; batch WUs,
+  with a database of 212 files, 30 selected, a missing recent folder, .SLD list and image each asked
+  «Discard selection», closed the database and gave their error, the 212 entries left loaded with no
+  database behind them (type 1 after the folder, 0 after the list and the image). **Fixed in
+  `89d2c1f`** (decision 24): the entry is tested first, an image with `FileRexists()`, a list with
+  `FileExist()`, a folder with `FolderExist()`, each with the error its own open gives («File not
+  found or access denied», «Unable to load the files list… missing or access denied», «Folder not
+  found or access denied»); the questions and the database's close follow. Run with the fixed text:
+  WUr and WUs give no question, the error, and the list or the database as it was; batch WUe,
+  entries that exist: a folder, a .SLD list and an image still ask both questions and open (the
+  image once the repeated «Save files list» of Z is answered), and «Cancel» keeps the list, at both
+  texts. Found by the deep analysis of U's fix.
+- **X. «Reload .SLD file» (Shift+F5) on a list gone from the disk asks about the edited image
+  first.** `RefreshFilesList()` (:65328) asks «Save image» (:65346) before `OpenSLD()` (:65353)
+  finds the file missing («Unable to load the files list»); «Save files list» does not come, since
+  it asks only when the list's file exists (read). Found by the deep analysis of U's fix; not run:
+  an edited image needs undo levels the kit does not make.
+- ✅ **Y. With «cycle favourites» on, a favourite asks the questions twice.** `OpenFavesEntry()`
+  asked its three questions, then `retrieveFavesAsList()` (:39519) asked its own: «Discard
+  selection» again (:39532), and «Save files list» again once 300 ms had passed since the last
+  answer (the time `askAboutSlidesListSave()` repeats an answer). Run, batch WUw, at `96ec767`:
+  «Save files list», «Discard selection», then «Save files list» again; the kit's third answer,
+  «Yes», counts as «Cancel» there, and the favourites list was not opened. **Fixed in `30bef5d`**,
+  with V (decision 25): a cycle asks only through `retrieveFavesAsList()`. Its «Save image» question
+  has that function's wording («…The current files list will be discarded as well»), and it closes
+  an open panel before its other two questions (read). Run with the fixed text: each question once,
+  and the favourites list opens. Found while running V.
+- **Z. An image opened from the favourites or the «Recent» images asks «Save files list» twice.**
+  `OpenFavesEntry()` and `OpenRecentEntry()` ask their questions, then `MenuOpenLastImg()` (:65534),
+  which opens the image, asks «Save image» and «Save files list» again; each repeat is skipped only
+  within 300 ms of the last answer, so «Save files list» comes back whenever «Discard selection»
+  took longer than that. Run, batches WUx and WUe, at `96ec767` and with the fixed texts: with the
+  modified .SLD list of 212 files, 30 selected, a favourite image («cycle favourites» off) and a
+  recent image each asked «Save files list», «Discard selection», then «Save files list» again
+  before the image opened; the repeated «Save image» was not run (read). Found while running V and
+  W.
 
 ## Checked and found correct
 
@@ -1435,3 +1529,20 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   WSex, which only log, log the same lines, but for that call and, in WSex, the window handles.
   AutoHotkey 1.1.37.02 loads the fixed text, with and without `/iLib`. Not run: Windows itself, real
   keys, the «Save image» question.
+- «Seen in passing» U, V, W and Y (`ac42a83`, `30bef5d`, `89d2c1f`) were run in the application
+  under headless Wine, on AutoHotkey 1.1.37.02, at `96ec767`, at the text of each fix and with the
+  last text, by the same kit (`tests-u.ahk`, `run-uvw.sh`; `mkfix-uvw.py` writes the three texts;
+  the logs in `results/`, named `h-`, `own-` and `fin-`). Batches WGu, WUo and WUd for U: the
+  omnibox's «Open folder now» on a missing and an existing folder, its menu item's call, the omnibox
+  typed to another folder after «Cancel», and a database of 212 files through the tree and the
+  omnibox; WUv, WUw and WUx for V and Y: a favourite image removed from the disk, a favourite with
+  «cycle favourites» on, and one with it off; WUr, WUs and WUe for W: a missing recent folder with a
+  .SLD list, missing recent folders, lists and images with a database, and entries that exist. The
+  kit writes the favourites and recents files in its own folder, calls the menu items' functions
+  with the arguments AutoHotkey gives them, and answers the repeated «Save files list» of Z in
+  batches WUx and WUe. Every check that fails at `96ec767` passes at the text of its fix and with
+  the last text, and the others pass at all three. Batches T12, T13, U13, U16, U16x, VM, VN, VNx,
+  VO, WPA and WPQ of the earlier kits, those that go through the omnibox, give the same checks with
+  the last text as at `96ec767`: those of WPA and WPQ fail at both, for «Seen in passing» A and Q,
+  which they check. AutoHotkey 1.1.37.02 loads each of the three texts, with and without `/iLib`.
+  Not run: Windows itself, real keys and menus, the «Save image» question.
