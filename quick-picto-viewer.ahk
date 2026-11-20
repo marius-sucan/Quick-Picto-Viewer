@@ -65738,7 +65738,7 @@ askAboutSlidesListSave() {
       Return prevAnswer
 
    r := 0
-   ; also a list without its file, but not the \QPV\ history lists, and a plain folder once a folder was imported into it
+   ; also a list without its file, but not the \QPV\ history lists
    If (currentFilesListModified=1 && RegExMatch(CurrentSLD, "i)(.\.sld)$") && InStr(CurrentSLD, "\QPV\")!=1 && maxFilesIndex>1 && SLDtypeLoaded=2)
    || (currentFilesListModified=1 && maxFilesIndex>1 && InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
    {
