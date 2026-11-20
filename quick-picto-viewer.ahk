@@ -38984,7 +38984,7 @@ readSlideSettingsINI(readThisFile, act:=0) {
      IniAction(act, "WindowBgrColor", "General", 3,0,0,, readThisFile)
      IniAction(act, "zatAdjust", "General", 2,-300,300,, readThisFile)
      IniAction(act, "zoomLevel", "General", 2,0.01,20,, readThisFile)
-     IniAction(act, "UserVPalphaBgrStyle", "General", 2, 1, 5)
+     IniAction(act, "UserVPalphaBgrStyle", "General", 2, 1, 5,, readThisFile)
 
      If (act=0)
      {
