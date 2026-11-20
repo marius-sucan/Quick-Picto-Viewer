@@ -2827,14 +2827,17 @@ OpenQPVfileFolder(modus:=0, pathu:=0) {
     If !FolderExist(folderu)
        Return msgBeepTimer("ERROR: Folder not found or access denied:`n" folderu "\")
 
-    If askAboutFileSave(" and the containing folder of the selected image will be opened")
-       Return
-
-    If askAboutSlidesListSave()
+    If askAboutDiscards(" and the containing folder of the selected image will be opened")
        Return
 
     If imgPath
     {
+       If (SLDtypeLoaded=3)
+       {
+          SLDtypeLoaded := 0
+          activeSQLdb.CloseDB()
+       }
+
        renewCurrentFilesList()
        mustOpenStartFolder := folderu
        currentFileIndex := 1
@@ -65694,6 +65697,18 @@ OpenDialogFiles() {
    SetTimer, createGUItoolbar, -100
    SetTimer, TriggerMenuBarUpdate, -90
    lastInvoked := A_TickCount
+}
+
+askAboutDiscards(msg:="", act:="discard it") {
+; the questions asked before the edited image, the modified list and the selection are discarded; 1 = cancelled
+   If askAboutFileSave(msg)
+      Return 1
+
+   If askAboutSlidesListSave()
+      Return 1
+
+   If askAboutFilesSelect(act)
+      Return 1
 }
 
 askAboutSlidesListSave() {
