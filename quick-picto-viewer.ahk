@@ -42994,9 +42994,9 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          If askAboutFileSave(" and the selected files list will be imported to the list")
             Return
 
+         zPlitPath(userQuickMenusEdit, 1, fileu, SelectedDir)
          If (StrLen(SelectedDir)>1)
          {
-            zPlitPath(userQuickMenusEdit, 1, fileu, SelectedDir)
             prevOpenFolderPath := SelectedDir
             INIaction(1, "prevOpenFolderPath", "General")
          }
