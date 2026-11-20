@@ -2152,9 +2152,8 @@ external app» (:96430), but without these two items, which sit inside `If (AnyW
     and «Centered alignment»; of these, only the quick search's custom key was pressed (batch RS), and
     each still has to pass `testFuncIsInMenus()`. A custom key of a function without a default key
     never runs under a regular panel, there being no default key to probe: that is most of the index
-    (323 items, 149 of them with a key), «Dark mode UI» given Ctrl+Alt+D for one. It follows from the
-    rule as settled; none of the options Marius chose from spoke of these functions, so it is his to
-    confirm.
+    (323 items, 149 of them with a key), «Dark mode UI» given Ctrl+Alt+D for one. Marius confirmed it:
+    they should never run there.
 56. **The Preferences panel's «More options»**: it opens the main window's own «Interface» menu
     (`PvUIprefs`, `createMenuInterfaceOptions()`), whose hints are main-window keys. Does it keep
     following the custom keys, as the «`\\`» menu does from the tree?
