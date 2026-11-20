@@ -27057,10 +27057,15 @@ OpenDirsFavedEntry(a, b, c) {
    isList := RegExMatch(folderu, sldsPattern) ? 1 : 0
 
    If FolderExist(StrReplace(folderu, "|"))
+   {
       OpenFolders(folderu, 0)
-   Else If (FileExist(folderu) && isList=1)
+   } Else If (FileExist(folderu) && isList=1)
+   {
+      If askAboutDiscards(" and the selected files list will be opened")
+         Return
+
       OpenSLD(folderu)
-   Else If (FileRexists(folderu) && RegExMatch(folderu, RegExFilesPattern))
+   } Else If (FileRexists(folderu) && RegExMatch(folderu, RegExFilesPattern))
    {
       If MenuOpenLastImg(folderu)
       {
@@ -27069,10 +27074,12 @@ OpenDirsFavedEntry(a, b, c) {
          SlidesMusicSong := ""
       }
    } Else If (folderu="\QPV\favourite-images-list.SLD")
+   {
       retrieveFavesAsList()
-   Else If (folderu="\QPV\viewed-images-history|current-session.SLD")
+   } Else If (folderu="\QPV\viewed-images-history|current-session.SLD")
+   {
       BtnViewedImages2List()
-   Else If InStr(folderu, "\QPV\viewed-images-history|")
+   } Else If InStr(folderu, "\QPV\viewed-images-history|")
    {
       g := StrReplace(folderu, ".sld")
       p := InStr(folderu, "|")
