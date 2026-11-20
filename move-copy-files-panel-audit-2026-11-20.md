@@ -76,8 +76,8 @@ reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `crea
 | 16 | Small things, numbered 16.1 to 16.12 | low | run and read | open |
 
 Finding 1 loses work for good. Findings 2 to 5 and 7 send files to a folder the user did not name,
-or fail on a folder the Help promises; the files themselves stay whole. Finding 11 is the one most
-users meet: a click in the empty part of the list.
+or fail on a folder the Help promises; the files themselves stay whole. Finding 11 needs nothing more
+than a click or a double-click in the empty part of the list.
 
 ---
 
@@ -187,15 +187,16 @@ Run, two files selected unless one is named:
 
 | Destination | Action | Result |
 |---|---|---|
-| `<work>\st\src\new\..`, meaning `<work>\st\src`; one file in each of the two folders (A5-dotdot) | copy, «Skip files» | `a.png` is copied **into `<work>\st\src\new`**; `c.png`, already there, meets itself: «Finished copying 1 out of 2 files to …\st\src\new\\ … Skipped files: 1». The undo record names `…\new\\a.png` |
+| `<work>\st\src\new\..`, meaning `<work>\st\src`; one file in each of the two folders (A5-dotdot) | copy, «Skip files» | `a.png` is copied **into `<work>\st\src\new`**; `c.png`, already there, meets itself: «Finished copying 1 out of 2 files to `…\st\src\new\\` … Skipped files: 1». The undo record names `…\new\\a.png` |
 | `<work>\st\src\.`, the files' own folder (A5-dot-copy-over) | copy, «Overwrite» | «Finished copying 0 out of 2 files … Failed to perform action on 2 files»; one file: «ERROR: Failed to COPY file». Nothing changes |
 | the same (A5-dot-move-over) | move, «Overwrite» | «Finished moving 2 out of 2 files»; the files stay where they were, but the index now names `<work>\st\src\\a.png` with a doubled backslash and QPV answers «ERROR: File not found or access denied» for them. One file: «File MOVED to», then the same error |
 | the same (A5-dot-move-rename) | move, «Auto-rename» | «Finished moving 2 out of 2 files»: both renamed in place, `a [1].png` and `b [1].png` |
 
-Why «Overwrite» fails on a copy and moves on a move: the conflict test `FileRexists()` looks through
-the `\\?\` prefix, where a doubled backslash names nothing (as the structured report found), so the
-file in the way counts as absent; `FileCopy` then copies the file onto itself and fails, `FileMove`
-moves it onto itself and succeeds (run under Wine; read for Windows).
+Why «Overwrite» fails on a copy and moves on a move (read: the runs show the outcomes, the code gives
+the cause): the conflict test `FileRexists()` looks through the `\\?\` prefix, where a doubled
+backslash names nothing (as the structured report found), so the file in the way counts as absent;
+`FileCopy` then copies the file onto itself and fails, `FileMove` moves it onto itself and succeeds.
+Windows was not checked.
 
 **A database list** (batch C): the list keeps `…\st\școală\a.png` and `…\st\școală\b.png`, in lower
 case; the destination is the folder as the disk spells it, `<work>\st\Școală`, as «Browse» returns
@@ -205,7 +206,7 @@ finding 9 is the same comparison). Run, both files selected:
 | Action, setting | Result |
 |---|---|
 | copy, «Overwrite» | «Finished copying 2 out of 2 files»: both files are recycled and replaced by copies of themselves |
-| move, «Overwrite» | «Finished moving 2 out of 2 files»: each file goes to a temporary name and back to its own, and the index then holds the folder as typed. On the way Wine's shell asked «Confirm file deletion» twice (the kit's second process answered «No»); without that process the run waited for the timeout |
+| move, «Overwrite» | «Finished moving 2 out of 2 files»: the files are where they were, nothing is recycled, and the index then holds the folder as typed. Wine's shell asked «Confirm file deletion» twice on the way, and the kit's second process answered «No»; without it the run waited for the timeout. By the code, `replaceFileByCopyMove()` moves each file to a temporary name and back to its own (read) |
 | copy, «Auto-rename» | «Finished copying 2 out of 2 files»: duplicates `a [1].png` and `b [1].png` beside the files |
 | move, «Auto-rename» | «Finished moving 2 out of 2 files»: both renamed in place, `a [1].png` and `b [1].png` |
 
@@ -284,8 +285,8 @@ destinations got nothing: `RecentCopyMoveManager()` runs before the copy (:62082
 does not exist yet, and it keeps only existing folders (:61859) (run: the list is empty after A4).
 
 The messages name one folder for files that go to many (run, A10-group-rel, two files in two folders
-with `\[group-by-years]`): the progress tip «Copying 2 files to …\st\one\[group-by-years]\», the final
-one «Finished copying 2 out of 2 files to …\st\two\2026\», the last file's folder. With a grouping
+with `\[group-by-years]`): the progress tip «Copying 2 files to `…\st\one\[group-by-years]\`», the final
+one «Finished copying 2 out of 2 files to `…\st\two\2026\`», the last file's folder. With a grouping
 word the batch path stores the word in the path, `…\st\one\[group-by-years]` (read, from the logged
 call), and the 150 files question shows the current file's folder (read).
 
@@ -356,13 +357,15 @@ If (b="DoubleClick")
 ```
 
 The handler takes the focused row, whatever the click hit. A list view sends its click also for a
-click below the rows, where no row is hit; `LV_GetNext()` then gives the row focused before, or 0
-when none was, and `LV_GetText()` of row 0 reads the column title.
+click below the rows, where no row is hit, and `LV_GetNext()` then gives the row that has the focus.
+Under Wine no row has it until one is clicked or reached with a key, and `LV_GetText()` of row 0
+reads the column title. Whether the Windows list view gives its first row the focus when it receives
+the focus was not checked; there the field would take that row's folder.
 
 Run (B1), clicks posted to the list, the field holding «typed text»:
 
-- **A click below the rows, no row focused yet**: the field reads «Recent destination folders», the
-  column title.
+- **A click below the rows, no row focused yet** (Wine): the field reads «Recent destination
+  folders», the column title.
 - **A click on row 2**: the field gets row 2's folder (correct).
 - **A click below the rows, row 2 focused**: the field gets row 2's folder again, over what was typed.
 - **A double-click below the rows**, row 2 focused: «Proceed» runs: «File COPIED to | a.png |
@@ -524,6 +527,10 @@ file alone goes the same way (read, :3699).
   `BtnCopyMoveAction("quick-actu")` (read).
 - **C. The conflict box shows sizes in whole kilobytes**: «0 Kilobytes» for the 361-byte test files
   (run, B5) (`FileGetSize … K`, :44152-44153).
+- **D. The keyboard's menu key opens the panel menu only when pressed twice within 250 ms**: for the
+  Apps key or Shift+F10 (`IsRightClick=0`) `SettingsGUIAGuiContextMenu()` returns unless its last
+  call was less than 250 ms before (:26023) (read). It is the same in every regular panel, and it may
+  be meant so.
 
 ---
 
@@ -549,6 +556,13 @@ file alone goes the same way (read, :3699).
   Ctrl+Backspace types; the literal in the source is that character (read).
 - **«Erase history», «Mark» and «Proceed» close the panel with `BtnCloseWindow()`**, which passes
   «yes» and skips the second during which `CloseWindow()` refuses after a dialog (read).
+- **Right-clicks** (`SettingsGUIAGuiContextMenu()` :25990-26027, read): on a row of the list the
+  field takes the row's folder and no menu opens; below the rows it is the click of finding 11; on
+  another control QPV shows a line that describes it, with its text, type and Alt key
+  (`SettingsToolTips()` :27465); on the panel's background the generic panel menu opens
+  (`invokePrefsPanelsContextMenu()` :27379: «Close panel», «Dark mode UI», «Large UI fonts», the
+  settings folder, «Restore ALL defaults», the site, a donation, a new instance, a restart). Its two
+  toggles rebuild the panel (finding 14). The panel has no menu of its own.
 
 ---
 
@@ -604,9 +618,10 @@ file alone goes the same way (read, :3699).
   deleted file's entry marked by the test (finding 15); clicks and key presses posted to the list and
   the controls (findings 11, 12); the conflict box answered from a native timer (finding 14); a second
   process that answers dialogs Wine's shell shows during a recycle (batch C).
-- Not run on Windows. Three points rest on Windows itself: how its dialog manager handles a letter two
-  buttons share (finding 12); that a file moved onto itself under a doubled backslash stays whole and
-  a copy fails (finding 4); and what Windows shows when the recycle bin is asked for a file that is not
+- Not run on Windows. Four points rest on Windows itself: how its dialog manager handles a letter two
+  buttons share (finding 12); whether its list view gives the first row the focus when it receives
+  the focus (finding 11); that a file moved onto itself under a doubled backslash stays whole and a
+  copy fails (finding 4); and what Windows shows when the recycle bin is asked for a file that is not
   there (batch C).
 - Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE
   [revision]` (stock interpreter by default; `QPV_SRC=<file>` runs a modified source), the test
