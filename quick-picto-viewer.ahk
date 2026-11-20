@@ -34902,6 +34902,8 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
       paramu := Rowu[1]
       valu := Rowu[2]
       s := known[paramu]
+      If (paramu="prevFilesSortMode" && !RegExMatch(valu, "^[\w, ]*$"))
+         valu := 0   ; it goes into SQL text: column names only
       If (IsObject(s) && StrLen(valu)>0 && (loadAll || paramu=givenFilter))
          %paramu% := settingValueChecked(valu, s[2], s[3], s[4], %paramu%)
   }
