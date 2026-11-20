@@ -934,10 +934,15 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           If isFunc(userCustomKeysDefined[ckbd, 1])
           {
              thisu := userCustomKeysDefined[ckbd, 1]
-             ; a regular panel blocks a custom key where it blocks the default key of the same function
+             ; While a regular panel is open, the main window blocks most of its default keys, and a custom key
+             ; is blocked the same way: it runs only when the default key of its function, element 5 of the
+             ; entry [from the custom keys file], would now run that very function, as the probe mode of
+             ; processDefaultKbdCombos() tells. The function must be the same one: under a panel, Ctrl+F4
+             ; runs CloseWindow(), so a custom key of closeDocuments(), whose default key is Ctrl+F4, stays
+             ; blocked. A live image editing panel blocks no custom key.
              If (AnyWindowOpen && imgEditPanelOpened!=1 && userCustomKeysDefined[ckbd, 5]!="")
                 defaultRun := processDefaultKbdCombos(userCustomKeysDefined[ckbd, 5], PVhwnd, 0, PVhwnd, 1, 1)
-             If ((!AnyWindowOpen || imgEditPanelOpened=1 || StrLen(defaultRun[1])>2 && defaultRun[1]!="dummy") && testFuncIsInMenus(thisu)) ; prevent execution of functions that are no available in the current context
+             If ((!AnyWindowOpen || imgEditPanelOpened=1 || defaultRun[1]=thisu) && testFuncIsInMenus(thisu)) ; prevent execution of functions that are no available in the current context
                 %thisu%()
           }
        } Else If (allowLoop := processDefaultKbdCombos(givenKey, thisWin, abusive, Az, 0, 0))
