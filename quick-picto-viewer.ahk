@@ -30855,7 +30855,7 @@ FolderTreeResponder(a, b, c) {
    } Else If (b="K" && c=114) ; F3
    {
       folderTreeAppendFiles()
-   } Else If (b="K" && c=186) ; F3
+   } Else If (b="K" && c=186) ; semi-colon [VK_OEM_1]
    {
       fromFolderTreeToOmniBox()
    } Else If (b="K" && c=118) ; F7
