@@ -34892,7 +34892,7 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
          paramu := Rowu[1]
          valu := Rowu[2]
          ; "*" loads every setting; appVersion is the running QPV's own
-         If (StrLen(valu)>0 && paramu!="appVersion" && (MustLoadSLDprefs=1 || givenFilter="*" || paramu=givenFilter))
+         If (StrLen(valu)>0 && paramu!="appVersion" && paramu && (MustLoadSLDprefs=1 || givenFilter="*" || paramu=givenFilter))
             %paramu% := valu
       }
   }
