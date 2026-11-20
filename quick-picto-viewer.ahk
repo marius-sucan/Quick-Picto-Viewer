@@ -3049,9 +3049,9 @@ InvokeOpenWithMenu(imgPath) {
           Menu, OpenWithMenu, Add, &0. Open file(s) in a new QPV instance, SoloNewQPVinstance
        Menu, OpenWithMenu, Add, &1. Open with default application, OpenWithDefaultApp
        Menu, OpenWithMenu, Add, &2. System «Open with» dialog, MenuInvokeSHopenWith
-       Menu, OpenWithMenu, Add, &4. Explore containing folder`tCtrl+E, OpenThisFileFolder
+       kMenu("OpenWithMenu", "Add", "&4. Explore containing folder`tCtrl+E", "OpenThisFileFolder")
        If (psathu!=OutDir)
-          Menu, OpenWithMenu, Add, &5. Open containing folder in QPV`tAlt+E, OpenQPVfileFolder
+          kMenu("OpenWithMenu", "Add", "&5. Open containing folder in QPV`tAlt+E", "OpenQPVfileFolder")
        Menu, OpenWithMenu, Add,
        Menu, OpenWithMenu, Add, &Choose external application, browseExternalApp
        Menu, OpenWithMenu, Add, %pathu%, OpenImgWithUserExternApp
