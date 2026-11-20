@@ -141,6 +141,17 @@ database first (`8db8595`, decision 45). D and AH ask through a new helper, `ask
 AM, a plain folder opened by Shift+O or «Selected file folder» is marked as modified from the start;
 AN, the menu items that open a folder recursively show no folder dialog.
 
+**«Seen in passing» AM and AN, 2026-11-20, evening, fixed at `942890c`**, with Marius's answers
+(decisions 47 to 50). Both were first run in the application under headless Wine, on AutoHotkey
+1.1.37.02, at `df49b13`, Marius's edit that takes the plain folder with an imported folder out of
+«Save files list» again (B's entry), and both did what their entries describe; AN was run through the
+real menus, and the sweep for its twins found two, fixed with it. A folder or a database just opened
+is not marked as modified, so the toolbar's save button no longer says «MODIFIED» for it (`1bb0117`,
+decision 49). The menu items that open a folder recursively show the folder dialog again, the
+favourites' menu item adds the image itself, and «Cycle histogram modes» steps forward from the menus
+(`942890c`, decisions 47 and 48). The comment of the question follows `df49b13` (`2d8465e`, decision 50).
+A new lead stays open, AO: a folder dropped on the main window with no list loaded is still marked.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -1174,6 +1185,7 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
     plain folder too?
     **Settled**: a modified .SLD list without its file, the `\QPV\` history lists excepted, and a
     modified plain folder whose seed folders list holds more than the folder it opened (`453662f`).
+    Marius took the plain folder out again in `df49b13`.
 43. **The box for a list never saved** («Seen in passing» B): the same box, or a first sentence of its
     own?
     **Settled**: the same box (`453662f`).
@@ -1188,6 +1200,21 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
     as the other functions write them, or through a helper?
     **Settled**: as listed, through a helper, `askAboutDiscards()`, which D and AH call; the 14 other
     functions that ask the three questions keep their own lines for now (`7b5bfc3`, `792c709`).
+
+47. **How `OpenFolders()` tells a menu's call from its callers'** («Seen in passing» AN): a dialog
+    unless the second argument is 0, the argument taken only as «yes», or a function of its own for
+    the menu items?
+    **Settled**: only as «yes», as `omniBoxFolderOpen()` takes its mode; the five callers with a
+    folder pass «yes» (`942890c`).
+48. **AN's twins** («Seen in passing» AN): «Add/remove current image to favourites» and «Cycle
+    histogram modes» from the menus: fixed with AN, the favourites alone, or left as leads?
+    **Settled**: both, with AN (`942890c`).
+49. **Where the mark of a list just opened is cleared** («Seen in passing» AM): where folders and
+    databases are opened, in each route, or for folders only?
+    **Settled**: where they are opened, in `coreOpenFolder()` and `OpenSLD()` (`1bb0117`).
+50. **The comment of `askAboutSlidesListSave()` after `df49b13`**: drop its clause about the plain
+    folder, or leave it?
+    **Settled**: dropped (`2d8465e`).
 
 ## Unverified leads
 
@@ -1264,6 +1291,9 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   the list whose file was deleted get the question, «Cancel» keeps each, and «Discard» lets the grown
   folder go; a plain folder only reversed and the file-actions history list are replaced with no
   question, as at `80964a3`.
+  Marius took the condition for a plain folder out again in `df49b13` (2026-11-20): the question comes
+  for a modified list without its file, as above, and for no plain folder, grown or not. The comment
+  above the condition follows since `2d8465e` (decision 50).
 - ✅ **C. The comment `; F3` on `c=186`** (:30858): the key is `;` (VK_OEM_1), which opens the omnibox
   at the element. Still so at `15e9716` (read). **Fixed by Marius in `80964a3`**: the comment names the
   key, «semi-colon [VK_OEM_1]».
@@ -1801,7 +1831,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   `8db8595`**, with Marius's answer to decision 45: `OpenFolders()` closes an open database before the
   folder is scanned. Run with the fixed text: batch ZL passes: after the omnibox's «Open folder» and
   after the folder favourites' folder entry, the database keeps its five files and is closed.
-- **AM. A plain folder opened by Shift+O or by «Selected file folder» is marked as modified from the
+- ✅ **AM. A plain folder opened by Shift+O or by «Selected file folder» is marked as modified from the
   start.** `GetFilesList()` sets the mark at the end of every scan (:90003); the tree's «Open folder
   now» (`tryOpenGivenFolder()`), Ctrl+O and the «Recent» entries clear it after their open, while
   `OpenFolders()` and `doOpenStartFolder()` do not. Run, batches ZB2 and ZD, at `d2061f5` and with the
@@ -1812,7 +1842,19 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   (`tlbrDecideTooltips()`, read). The folder of an image opened by Ctrl+O's «Open» or from the
   «Recent» images is indexed by `doOpenStartFolder()` at the first move to another file, and is marked
   then too (read). Lines at `80964a3`. Found while confirming B.
-- **AN. The menu items that open a folder recursively show no folder dialog.**
+  Run again on 2026-11-20 at `df49b13`, batch ZM, the save button's tooltip read in the thumbnails view
+  through `tlbrDecideTooltips()`: a folder opened by Shift+O (`OpenFolders()`), the file's folder opened
+  by «Selected file folder» and the folder of an image opened by Ctrl+O's «Open», once the next image
+  indexed it, were each marked, and the tooltip read «The files list has been MODIFIED»; a folder
+  opened by the tree's «Open folder now» was not, and a reversed folder was, the two controls. A twin:
+  a database opened after a marked list kept the mark, since the branch of `OpenSLD()` for a database
+  never clears it. Since `df49b13` «Save files list» comes for no plain folder, so the tooltip is all
+  the mark shows of one. **Fixed in `1bb0117`**, with Marius's answer to decision 49: `coreOpenFolder()`,
+  through which Shift+O, the tree, Ctrl+O, the «Recent» entries and «Selected file folder» open a
+  folder, clears the mark once the folder is open, and `OpenSLD()` once a database is; an import or a
+  rescan still marks the list. Run with the fixed text: batch ZM passes. A folder dropped on the main
+  window with no list loaded is opened another way and stays marked (AO).
+- ✅ **AN. The menu items that open a folder recursively show no folder dialog.**
   `OpenFolders(dummy, allowDialog:=1)` (:65075) shows its dialog only when `allowDialog` is 1. A menu
   item calls its function with the item's name and position, as many as the function takes
   (`kMenu()` adds it with `Menu, …, Add`), so the item's position lands in `allowDialog`: «Folder
@@ -1823,6 +1865,38 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   the list stayed as it was. The other two menus by reading. The second parameter came in `3bd0b6f`
   (2026-11-18); before it, the item's name went to `dummy`, which is no folder, and the dialog came
   (read). Lines at `80964a3`. Found while redoing Q's fix, which met the same trap.
+  Run again on 2026-11-20 at `df49b13`, batch ZN, through the real menus, each built by its own
+  function and its item fired as a click fires it, by a WM_COMMAND of the item's ID to the script's
+  window: «Folder recursively» of the «Open» menu (item 2), «Open folder recursively» of the «File»
+  menu (item 5) and «Open folder» of the context menu on the welcome screen (item 4) showed no dialog,
+  while Shift+O, which the key table calls with no argument (read), did. A bare script on AutoHotkey 1.1.37.02 shows the mechanism: a menu item's function
+  gets the item's name, its position and the menu's name, as many as it declares, and the default of a
+  second parameter gives way to the position. The sweep of the 40 menu functions with two parameters
+  or more found two twins, run the same way: «Add/remove current image to favourites» of the
+  «Favourites» menu (and «… favourites list» of the file actions menu, read) wrote its own label into
+  the favourites file in place of the image's path, and in the favourites list an entry removed by B
+  and added back through it took the label as its path, «File not found»; «Cycle histogram modes»
+  from its menu stepped backwards, the G key forwards. The other functions of two parameters or more
+  compare the extra arguments with fixed texts («yes», «yo», «given», «recursive», «cut», «copy») or
+  test them first (read); the menu functions of one parameter, which get the item's name, were not
+  swept. **Fixed in `942890c`**, with
+  Marius's answers to decisions 47 and 48: `OpenFolders(dummy, noDialog)` takes its second argument
+  only as «yes», which its five callers with a folder pass, so a menu's call shows the dialog;
+  `ToggleImgFavourites()` takes a given image only with «rem», as its three callers pass it;
+  `ToggleImgHistogram()` steps back only for -1. Run with the fixed text: batches ZN, ZF and ZG pass:
+  the three menu items show the dialog and open the folder picked, the favourites' item adds the
+  image's path and, in the favourites list, the entry added back keeps its path, and the histogram's
+  item steps forward.
+- **AO. A folder dropped on the main window with no list loaded is marked as modified.**
+  `GuiDroppedFiles()` (:66891) imports the dropped folders into the empty list through the path of the
+  seed folders, where `GetFilesList()` marks the list, and then makes a single folder a plain folder
+  (`SLDtypeLoaded := 1`, `CurrentSLD` the folder, :67100-67101); nothing clears the mark there, as
+  `coreOpenFolder()` does since AM's fix. Run, batch ZM2, at `df49b13` and with the fixed texts:
+  `pv\Alpha` dropped on the welcome screen, «Yes» to «scan recursively?», opened as a plain folder of
+  five files marked as modified, the save button reading «The files list has been MODIFIED»; its
+  `CurrentSLD` is the lower-case `pv\alpha` of the seed folders list (the case of L). «New list»,
+  answered to the drop's question with a list loaded, takes the same path (read). Lines at `df49b13`.
+  Found by the review of AM's fix.
 
 ## Checked and found correct
 
@@ -2154,3 +2228,24 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   new commits (`c-`), and VN, VNx, U13, T13, XJ, WPQ, T12, SDA, VO, VM and T7, which paste, drag or
   scan folders, with the last text (`r2-`): the same checks. AutoHotkey 1.1.37.02 loads each of the
   eight texts, with and without `/iLib`. Not run: Windows itself, real menus, keys, drags and dialogs.
+- «Seen in passing» AM and AN (`1bb0117`, `942890c`) and the comment (`2d8465e`) were run in the
+  application under headless Wine, on AutoHotkey 1.1.37.02, at `df49b13` and with the fixed texts, by
+  the same kit (batches ZM, ZN, ZF and ZG of `tests-a-ak.ahk`; `run-amn.sh`; `mkfixes2.py` writes the
+  three cumulative texts into `v2/`; the logs named `p-` at `df49b13`, `c2-` with the text of each
+  item's own commit, `f2-` with the last, `g3-` and `r3-` the kits' batches at `df49b13` and with the
+  last), its `app/patch.py` also answering the folder dialog from the kit. ZM reads the save button's
+  tooltip through `tlbrDecideTooltips()` in the thumbnails view after each open; ZM2, for lead AO,
+  drops a folder on the main window on the welcome screen. ZN, ZF and ZG build the menus with their
+  own functions (`createMenuOpenRecents()`, `InvokeMenuBarFile()`, `BuildSecondMenu()`,
+  `createMenuFavourites()`, `createMenuVPhudHisto()`) and fire an item by a WM_COMMAND of its ID to
+  the script's window, as a click does (`zfMenuFire()`); `menutest/menutest.ahk` of the kit, a bare
+  script, shows what a menu passes. At `df49b13` four of ZM's six checks fail, four of ZN's five, two
+  of ZF's three and one of ZG's two; the others are controls, which pass at both; ZM2's one check, AO,
+  fails at both texts. With the text of its own commit each item's batches pass, and with the last
+  text every batch passes. Batches T7, T8, T9, T12, T13, U13, VM, VN, VO, SDA, XJ, XH, WPA, WPB, WPD,
+  WPQ, WSg, WGa, WGu, WUo, WUd, WUx, WUe, WUr, WUs, WUv, WUw, YO, YS, YZ, YC, YB and YX of the earlier
+  kits, and ZA, ZB, ZB2, ZD, ZQ, ZQ2, ZH, ZI, ZK, ZL and VNx of this one, give the same checks with
+  the last text as at `df49b13`: T12's check 12b fails at both, as since S, and so do WPB's B1 and
+  ZB's B1 and B7, which expect the question for a plain folder grown by F3 that `df49b13` took out.
+  AutoHotkey 1.1.37.02 loads each of the three texts, with and without `/iLib`. Not run: Windows
+  itself and a real click.
