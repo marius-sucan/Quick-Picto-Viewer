@@ -65668,6 +65668,7 @@ OpenDialogFiles() {
       {
          RecordImagesOpenedManager(imgPath)
          MenuOpenLastImg(imgPath, 1)
+         Return
       } Else 
       {
          coreOpenFolder(doNotRecursive SelectedDir, 0, 0, 1)
