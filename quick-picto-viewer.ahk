@@ -43052,7 +43052,6 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          Else If RegExMatch(userQuickMenusEdit, "i)(.\.sld)$")
             importSLDplainText(userQuickMenusEdit)
 
-         currentFilesListModified := 1
          SetTimer, TriggerMenuBarUpdate, -90
          SetTimer, createGUItoolbar, -100
          SetTimer, ResetImgLoadStatus, -200
