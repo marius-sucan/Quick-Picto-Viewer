@@ -65567,6 +65567,12 @@ OpenDialogFiles() {
     {
        If askAboutFileSave(" and another image will be loaded")
           Return
+
+       If askAboutSlidesListSave()
+          Return
+
+       If askAboutFilesSelect("discard it")
+          Return
     }
 
    zPlitPath(imgPath, 0, OutFileName, SelectedDir)
@@ -65605,10 +65611,8 @@ OpenDialogFiles() {
       doNotRecursive := InStr(chosenOption, "perform") ? "" : "|"
       If (RegExMatch(imgPath, RegExFilesPattern) && FileRexists(imgPath) && chosenOption="&Open")
       {
-         SLDtypeLoaded := 1
          RecordImagesOpenedManager(imgPath)
-         MenuOpenLastImg(imgPath)
-         currentFilesListModified := 0
+         MenuOpenLastImg(imgPath, 1)
       } Else 
       {
          coreOpenFolder(doNotRecursive SelectedDir, 0, 0, 1)
