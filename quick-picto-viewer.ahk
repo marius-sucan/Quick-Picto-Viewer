@@ -65130,6 +65130,12 @@ OpenFolders(dummy:="", allowDialog:=1) {
       If askAboutFilesSelect("discard it")
          Return -1
 
+      If (SLDtypeLoaded=3)
+      {
+         SLDtypeLoaded := 0
+         activeSQLdb.CloseDB()
+      }
+
       newStaticFoldersListCache := []
       prevOpenFolderPath := StrReplace(SelectedDir, "|")
       INIaction(1, "prevOpenFolderPath", "General")
