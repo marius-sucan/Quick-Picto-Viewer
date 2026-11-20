@@ -42979,6 +42979,15 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
             OpenNewQPVinstance(userQuickMenusEdit)
       } Else If (funcu="!OmniOpenSLD")
       {
+         If askAboutFileSave(" and the selected files list will be opened")
+            Return
+
+         If askAboutSlidesListSave()
+            Return
+
+         If askAboutFilesSelect("discard it")
+            Return
+
          OpenSLD(userQuickMenusEdit)
       } Else If (funcu="!OmniImportSLD")
       {
@@ -43286,6 +43295,8 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
    }
 
    OutDir := (StrLen(oqme)=3 && pathModus=1) ? userQuickMenusEdit : SubStr(userQuickMenusEdit, 1, InStr(userQuickMenusEdit, "\", 0, -1))
+   ; the folder of a list always exists: a list is told apart before the folder test
+   isListFile := (pathModus=1 && RegExMatch(userQuickMenusEdit, sldsPattern) && FileRexists(userQuickMenusEdit))
    ; ToolTip, %  OutDir "|" pathModus "|" FolderExist(OutDir) "`n|" userQuickMenusEdit , , , 2
    If (IndexJump=1)
    {
@@ -43294,7 +43305,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
       xu := resultedFilesList[ndiaz, 2] ? "■" : "○"
       If labelu
          LV_Add(1, labelu, xu, "-", "Files list index", "", "!IndexJump", 1, 1)
-   } Else If ((FolderExist(OutDir) || FolderExist(userQuickMenusEdit)) && pathModus=1 && !RegExMatch(userQuickMenusEdit, RegExFilesPattern))
+   } Else If ((FolderExist(OutDir) || FolderExist(userQuickMenusEdit)) && pathModus=1 && !RegExMatch(userQuickMenusEdit, RegExFilesPattern) && !isListFile)
    {
       hasAddedItems := 0
       allowMenuSearch := 0
@@ -43390,7 +43401,7 @@ uiPopulateQuickMenuSearch(a:=0, b:=0, c:=0) {
          labelu2 := "Import image into list"
          LV_Add(1, labelu2, xu, "-", "-", "", "!OmniImportImage", 1, 9)
       }
-   } Else If (FileRexists(userQuickMenusEdit) && pathModus=1 && RegExMatch(userQuickMenusEdit, sldsPattern))
+   } Else If (isListFile)
    {
       allowMenuSearch := 0
       labelu1 := "Open files list file"
