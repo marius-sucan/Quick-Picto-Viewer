@@ -2573,7 +2573,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
         ReloadDynamicFolderz(fileNamu)
 
      If (MustLoadSLDprefs=1)
-        readSlideSettingsINI(fileNamu)
+        INIreadSlideSettings(fileNamu)
   }
 
   GenerateRandyList()
@@ -34716,7 +34716,7 @@ LoadPrefsFromSLD() {
          Return msgBeepTimer("WARNING: The .SLD file has no settings section, only the list of files")
 
       Sleep, 10
-      readSlideSettingsINI(CurrentSLD)
+      INIreadSlideSettings(CurrentSLD)
       showTOOLtip("Settings loaded from the files list")
    } Else If (SLDtypeLoaded=3)
    {
@@ -34886,9 +34886,9 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
      Return -1
   }
 
-  ; only rows that name a setting of slideSettingsList() are taken, each value checked as the .SLD reader checks it
+  ; only rows that name a setting of INIslideSettingsList() are taken, each value checked as the .SLD reader checks it
   known := {}
-  l := slideSettingsList()
+  l := INIslideSettingsList()
   For i, entry in l
   {
      s := StrSplit(entry, "|")
@@ -34905,7 +34905,7 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
       If (paramu="prevFilesSortMode" && !RegExMatch(valu, "^[\w, ]*$"))
          valu := 0   ; it goes into SQL text: column names only
       If (IsObject(s) && StrLen(valu)>0 && (loadAll || paramu=givenFilter))
-         %paramu% := settingValueChecked(valu, s[2], s[3], s[4], %paramu%)
+         %paramu% := INIsettingsValueChecker(valu, s[2], s[3], s[4], %paramu%)
   }
 
   If loadAll
@@ -38942,31 +38942,55 @@ lockDestinationFileName(filePath, mode:=0) {
    }
 }
 
-slideSettingsList() {
-; the settings that a .SLD list and a database store: name|INIaction() type|minimum|maximum;
-; a database alone stores those marked db, and appVersion, which is never read from either
-   Static l := ["allowGIFsPlayEntirely|1|0|0", "ambiTexBrushSize|2|25|950", "animGIFsSupport|1|0|0"
-      , "UserGIFsDelayu|2|-9500|9500", "autoPlaySlidesAudio|1|0|0", "autoPlaySNDs|1|0|0"
-      , "borderAroundImage|1|0|0", "bwDithering|1|0|0", "chnBdecalage|2|-30|30", "chnGdecalage|2|-30|30"
-      , "chnRdecalage|2|-30|30", "ColorDepthDithering|1|0|0", "doSlidesTransitions|1|0|0", "FlipImgH|1|0|0"
-      , "FlipImgV|1|0|0", "GammosAdjust|2|-25|1", "GammosGrayAdjust|2|-25|1", "hueAdjust|2|-300|300"
-      , "imageAlignVPtopLeft|1|0|0", "imgFxMode|2|1|10", "IMGresizingMode|2|1|5", "imgThreshold|2|0|1"
-      , "IntensityAlphaChannel|2|1|30", "isAlwaysOnTop|1|0|0", "lummyAdjust|2|-300|300"
-      , "lumosAdjust|2|0.001|25", "lumosGrayAdjust|2|0.001|25", "mediaSNDvolume|2|1|100"
-      , "realGammos|2|0.01|10", "resetImageViewOnChange|1|0|0", "satAdjust|2|0|3", "showHUDnavIMG|1|0|0"
-      , "showImgAnnotations|1|0|0", "skipDeadFiles|1|0|0", "SLDcacheFilesList|1|0|0", "SlideHowMode|2|1|3"
-      , "slidesFXrandomize|1|0|0", "slideShowDelay|2|90|25000", "SlidesMusicSong|0|0|0"
-      , "specialColorFXmode|2|1|7", "syncSlideShow2Audios|1|0|0", "TouchScreenMode|1|0|0"
-      , "uiColorCurveFXchannel|2|1|4", "uiColorCurveFXmode|2|1|7", "usrColorDepth|2|0|9"
-      , "usrTextureBGR|1|0|0", "vpIMGrotation|2|0|359", "WindowBgrColor|3|0|0", "zatAdjust|2|-300|300"
-      , "zoomLevel|2|0.01|20", "UserVPalphaBgrStyle|2|1|5", "thumbsAratio|2|1|3|db"
-      , "thumbsZoomLevel|2|0.35|3|db", "reverseOrderOnSort|1|0|0|db", "hamDistInterpolation|1|0|0|db"
-      , "userpHashMode|1|0|0|db", "dbVersion|0|0|0|db", "prevFilesSortMode|0|0|0|db"]
+INIslideSettingsList() {
+; the settings that a .SLD list and a database store
+; format:
+;   varName|varType|minimumValue|maximumValue;
+; a database alone stores those marked by |db
+; varTypes:
+;   0 = irrelevant
+;   1 = binary [0/1]
+;   2 = range min/max
+;   3 = HEX colour
+;   4 = is number
+;   5 = non-error
+;   6 = file/folder path such as Z:\a
+; see INIaction() and INIsettingsValueChecker()
+
+   Static l := ["allowGIFsPlayEntirely|1|0|0"           , "ambiTexBrushSize|2|25|950"
+            , "animGIFsSupport|1|0|0"                   , "UserGIFsDelayu|2|-9500|9500"
+            , "autoPlaySlidesAudio|1|0|0"               , "autoPlaySNDs|1|0|0"
+            , "borderAroundImage|1|0|0"                 , "bwDithering|1|0|0"
+            , "chnBdecalage|2|-30|30"                   , "chnGdecalage|2|-30|30"
+            , "chnRdecalage|2|-30|30"                   , "ColorDepthDithering|1|0|0"
+            , "doSlidesTransitions|1|0|0"               , "FlipImgH|1|0|0"
+            , "FlipImgV|1|0|0"                          , "GammosAdjust|2|-25|1"
+            , "GammosGrayAdjust|2|-25|1"                , "hueAdjust|2|-300|300"
+            , "imageAlignVPtopLeft|1|0|0"               , "imgFxMode|2|1|10"
+            , "IMGresizingMode|2|1|5"                   , "imgThreshold|2|0|1"
+            , "IntensityAlphaChannel|2|1|30"            , "isAlwaysOnTop|1|0|0"
+            , "lummyAdjust|2|-300|300"                  , "lumosAdjust|2|0.001|25"
+            , "lumosGrayAdjust|2|0.001|25"              , "mediaSNDvolume|2|1|100"
+            , "realGammos|2|0.01|10"                    , "resetImageViewOnChange|1|0|0"
+            , "satAdjust|2|0|3"                         , "showHUDnavIMG|1|0|0"
+            , "showImgAnnotations|1|0|0"                , "skipDeadFiles|1|0|0"
+            , "SLDcacheFilesList|1|0|0"                 , "SlideHowMode|2|1|3"
+            , "slidesFXrandomize|1|0|0"                 , "slideShowDelay|2|90|25000"
+            , "SlidesMusicSong|0|0|0"                   , "specialColorFXmode|2|1|7"
+            , "syncSlideShow2Audios|1|0|0"              , "TouchScreenMode|1|0|0"
+            , "uiColorCurveFXchannel|2|1|4"             , "uiColorCurveFXmode|2|1|7"
+            , "usrColorDepth|2|0|9"                     , "usrTextureBGR|1|0|0"
+            , "vpIMGrotation|2|0|359"                   , "WindowBgrColor|3|0|0"
+            , "zatAdjust|2|-300|300"                    , "zoomLevel|2|0.01|20"
+            , "UserVPalphaBgrStyle|2|1|5"               , "thumbsAratio|2|1|3|db"
+            , "thumbsZoomLevel|2|0.35|3|db"             , "reverseOrderOnSort|1|0|0|db"
+            , "hamDistInterpolation|1|0|0|db"           , "userpHashMode|1|0|0|db"
+            , "dbVersion|0|0|0|db"                      , "prevFilesSortMode|0|0|0|db"]
    Return l
 }
 
-readSlideSettingsINI(readThisFile, act:=0) {
-   l := slideSettingsList()
+INIreadSlideSettings(readThisFile, act:=0) {
+   l := INIslideSettingsList()
    For i, entry in l
    {
       s := StrSplit(entry, "|")
@@ -39116,7 +39140,7 @@ restoreDefaultCustomUserKbds(keyu, funcu, contextu, modus) {
 
 readMainSettingsApp(act) {
     EnvGet, thisSystemCores, NUMBER_OF_PROCESSORS
-    readSlideSettingsINI(mainSettingsFile, act)
+    INIreadSlideSettings(mainSettingsFile, act)
     IniAction(act, "userPerformColorManagement", "General", 1)
     IniAction(act, "allowFreeIMGpanning", "General", 1)
     IniAction(act, "allowMultiCoreMode", "General", 1)
@@ -39226,7 +39250,7 @@ calcHUDsize() {
 }
 
 writeSlideSettingsINI(file2save) {
-    readSlideSettingsINI(file2save, 1)
+    INIreadSlideSettings(file2save, 1)
     ; throwMSGwriteError()
 }
 
@@ -72935,7 +72959,7 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
 
       If (type>=1 && type<=4)
       {
-         %var% := settingValueChecked(loadedValue, type, mini, maxy, defaultu)
+         %var% := INIsettingsValueChecker(loadedValue, type, mini, maxy, defaultu)
       } Else If (!(loadedValue ~= "i)^(.\:\\.)") && type=6)
       {
          %var% := defaultu
@@ -72944,7 +72968,7 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
    }
 }
 
-settingValueChecked(value, type, mini, maxy, defaultu) {
+INIsettingsValueChecker(value, type, mini, maxy, defaultu) {
 ; the checks of INIaction() types 1 to 4: an invalid value gives defaultu
    If (type=1) ; binary
    {
