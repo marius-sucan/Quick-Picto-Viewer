@@ -27324,9 +27324,9 @@ createOmniBoxFoldersContextMenu(folderPath) {
    deleteMenus()
    Try Menu, PVopenF, Delete
    Try Menu, PVfomni, Delete
-   kMenu("PVopenF", "Add", "Open folder now`tCtrl+Enter", "omniBoxFolderOpen")
-   kMenu("PVopenF", "Add", "In Explorer", "omniBoxFolderExplorerOpen")
-   kMenu("PVopenF", "Add", "With a new QPV instance", "omniBoxFolderNewInstance")
+   kMenu("PVopenF", "Add", "Open folder now`tCtrl+Enter", "omniBoxFolderOpen",,,, 1)
+   kMenu("PVopenF", "Add", "In Explorer", "omniBoxFolderExplorerOpen",,,, 1)
+   kMenu("PVopenF", "Add", "With a new QPV instance", "omniBoxFolderNewInstance",,,, 1)
 
    kMenu("PVfomni", "Add", "Open", ":PVopenF")
    kMenu("PVfomni", "Add", "&Import images into the list`tF3", "omniBoxFolderImport")
@@ -31643,9 +31643,9 @@ folderTreeContextMenu() {
       If FolderExist(folderPath)
       {
          Try Menu, PVopenF, Delete
-         kMenu("PVopenF", "Add", "Open folder now`tEnter", "folderTreeDefaultAction")
-         kMenu("PVopenF", "Add", "In Explorer`tCtrl+Enter", "folderTreeOpenInExplorer")
-         kMenu("PVopenF", "Add", "With a new QPV instance`tShift+Enter", "folderTreeOpenInNewInstance")
+         kMenu("PVopenF", "Add", "Open folder now`tEnter", "folderTreeDefaultAction",,,, 1)
+         kMenu("PVopenF", "Add", "In Explorer`tCtrl+Enter", "folderTreeOpenInExplorer",,,, 1)
+         kMenu("PVopenF", "Add", "With a new QPV instance`tShift+Enter", "folderTreeOpenInNewInstance",,,, 1)
          Menu, PVfdTree, Add
          kMenu("PVfdTree", "Add", "Open", ":PVopenF")
          kMenu("PVfdTree", "Add", "&Import images into the list`tF3", "folderTreeAppendFiles")
@@ -31667,8 +31667,8 @@ folderTreeContextMenu() {
          kMenu("PVfdTree", "Add", "Paste clip&board file(s) into...", "folderTreePasteClippy")
          If (maxFilesIndex>0 && CurrentSLD)
          {
-            kMenu("PVfdTree", "Add", "Cop&y selected file(s) into...`t7", "FolderTreeMenuCopyFiles")
-            kMenu("PVfdTree", "Add", "&Move selected file(s) into...`tShift+7", "FolderTreeMenuMoveFiles")
+            kMenu("PVfdTree", "Add", "Cop&y selected file(s) into...`t7", "FolderTreeMenuCopyFiles",,,, 0)
+            kMenu("PVfdTree", "Add", "&Move selected file(s) into...`tShift+7", "FolderTreeMenuMoveFiles",,,, 0)
          }
       } Else
       {
@@ -67733,22 +67733,23 @@ createMenuSelectionRotationAspectRatio() {
 
 createMenuSelectionAlign(modus:=0) {
    labelu := (modus="selProp") ? "Selection alignment" : "Inside"
-   kMenu("PVselAlign", "Add", labelu, "dummy")
+   ownu := (modus="selProp") ? 1 : ""
+   kMenu("PVselAlign", "Add", labelu, "dummy",,,, ownu)
    kMenu("PVselAlign", "Disable", labelu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 8" : ""
-   kMenu("PVselAlign", "Add", "&Top" kbdu, "alignImgSelectTop",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Top" kbdu, "alignImgSelectTop",, "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 2" : ""
-   kMenu("PVselAlign", "Add", "&Bottom" kbdu, "alignImgSelectBottom",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Bottom" kbdu, "alignImgSelectBottom",, "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 4" : ""
-   kMenu("PVselAlign", "Add", "&Left" kbdu, "alignImgSelectLeft",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Left" kbdu, "alignImgSelectLeft",, "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 6" : ""
-   kMenu("PVselAlign", "Add", "&Right" kbdu, "alignImgSelectRight",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Right" kbdu, "alignImgSelectRight",, "Align selection: " sillySeparator,, ownu)
    Menu, PVselAlign, Add
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 5" : ""
-   kMenu("PVselAlign", "Add", "&Center horizontally" kbdu, "alignImgSelectCenterH",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "&Center horizontally" kbdu, "alignImgSelectCenterH",, "Align selection: " sillySeparator,, ownu)
    kbdu := (modus!="selProp") ? "`tCtrl+NumPad 0" : ""
-   kMenu("PVselAlign", "Add", "Center &vertically" kbdu, "alignImgSelectCenterV",, "Align selection: " sillySeparator)
-   kMenu("PVselAlign", "Add", "Centere&d", "alignImgSelectCentered",, "Align selection: " sillySeparator)
+   kMenu("PVselAlign", "Add", "Center &vertically" kbdu, "alignImgSelectCenterV",, "Align selection: " sillySeparator,, ownu)
+   kMenu("PVselAlign", "Add", "Centere&d", "alignImgSelectCentered",, "Align selection: " sillySeparator,, ownu)
    If (isVarEqualTo(AnyWindowOpen, 74, 65, 32, 31, 24, 23) && !viewportQPVimage.imgHandle)
    {
       Menu, PVselAlign, Add
@@ -71782,17 +71783,20 @@ createMenuSeenImages() {
    kMenu("PVmenu", "Add", "&Already seen images statistics", "PanelSeenStats", "stats")
 }
 
-kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
+kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0, ownKeys:="") {
    ; mena = menu name to add to
    ; actu = menu actions to perform, eg. add, disable, check
    ; labelu = menu item label
    ; funcu = the function to perform on menu click
    ; keywords for the menu when searched
+   ; ownKeys = 1: an item of a folders tree, omnibox or panel menu, its keyboard shortcut never altered by custom keys;
+   ; 0: an item whose shortcut follows the custom keys; blank: decided by the menu name, ownKeysMenus
 
    Static objuA := [], indexu := 0
         , objuB := new hashtable()
         , objuC := [], funcListu := []
         , separators := []
+        , ownKeysMenus := "|PVfdTree|PVfomni|ContextMenu|PanelStaticMenu|PanelDynaMenu|MenuRevSelFiles|"
 
    If (actu="AddSeparator")
    {
@@ -71834,7 +71838,9 @@ kMenu(mena, actu, labelu, funcu:=0, keywords:="", altLabel:="", keepUp:=0) {
 
    ; simulateMenusMode is used when a user presses a keyboard key, and it is a custom defined one
    ; funcListu is used to determine if the function is allowed to execute or not, in KeyboardResponder()
-   If (!InStr(funcu, ":") && simulateMenusMode!=1)
+   If (ownKeys="")
+      ownKeys := InStr(ownKeysMenus, "|" mena "|") ? 1 : 0
+   If (!InStr(funcu, ":") && simulateMenusMode!=1 && ownKeys!=1)
    {
       ; rename the menus to reflect the custom shortcut[s]
       ckbd := testCustomKBDcontexts("." funcu)
@@ -94469,10 +94475,10 @@ invokePanelStaticFoldersContextMenu() {
    LV_GetText(changeState, RowNumber, 3)
    folderPath := newStaticFoldersListCache[indexu, 1]
 
-   kMenu("PVopenF", "Add", "Open folder now", "BtnPanelManageFoldersActus")
-   kMenu("PVopenF", "Add", "In Explorer`tF6", "BtnPanelManageFoldersExplorer")
-   kMenu("PVopenF", "Add", "With a new QPV instance", "BtnPanelManageFoldersNewInstance")
-   kMenu("PVopenF", "Add", "Folder properties (Explorer)", "BtnPanelManageFoldersProperties")
+   kMenu("PVopenF", "Add", "Open folder now", "BtnPanelManageFoldersActus",,,, 1)
+   kMenu("PVopenF", "Add", "In Explorer`tF6", "BtnPanelManageFoldersExplorer",,,, 1)
+   kMenu("PVopenF", "Add", "With a new QPV instance", "BtnPanelManageFoldersNewInstance",,,, 1)
+   kMenu("PVopenF", "Add", "Folder properties (Explorer)", "BtnPanelManageFoldersProperties",,,, 1)
    If (folderPath!="" && totalSelected)
    {
       kMenu("PanelStaticMenu", "Add", "&Jump to first indexed file in folder`tEnter", "BtnPanelStaticJumpFirst")
@@ -94581,10 +94587,10 @@ invokePanelDynaFoldersContextMenu() {
    Try Menu, PanelDynaMenu, Delete
    Sleep, 2
    Try Menu, PVopenF, Delete
-   kMenu("PVopenF", "Add", "Open folder now", "BtnPanelManageFoldersActus")
-   kMenu("PVopenF", "Add", "In Explorer`tF6", "BtnPanelManageFoldersExplorer")
-   kMenu("PVopenF", "Add", "With a new QPV instance", "BtnPanelManageFoldersNewInstance")
-   kMenu("PVopenF", "Add", "Folder properties (Explorer)", "BtnPanelManageFoldersProperties")
+   kMenu("PVopenF", "Add", "Open folder now", "BtnPanelManageFoldersActus",,,, 1)
+   kMenu("PVopenF", "Add", "In Explorer`tF6", "BtnPanelManageFoldersExplorer",,,, 1)
+   kMenu("PVopenF", "Add", "With a new QPV instance", "BtnPanelManageFoldersNewInstance",,,, 1)
+   kMenu("PVopenF", "Add", "Folder properties (Explorer)", "BtnPanelManageFoldersProperties",,,, 1)
 
    If (folderPath && totalSelected)
    {
@@ -94624,7 +94630,7 @@ invokePanelReviewSelContextMenu() {
    Sleep, 2
    Try Menu, PVopenF, Delete
    If (RegExMatch(CurrentSLD, sldsPattern) || InStr(CurrentSLD, "\qpv\favourite-images-list") || InStr(CurrentSLD, "\qpv\viewed-images-history"))
-      kMenu("PVopenF", "Add", "Open folder now", "BtnReviewPaneOpenActs")
+      kMenu("PVopenF", "Add", "Open folder now", "BtnReviewPaneOpenActs",,,, 1)
 
    Gui, SettingsGUIA: Default
    GuiControlGet, OutputVar, Visible, LViewFiltered
@@ -94637,20 +94643,20 @@ invokePanelReviewSelContextMenu() {
    totalSelected := LV_GetCount("S")
    total := LV_GetCount()
 
-   kMenu("PVopenF", "Add", "Open folder in &Explorer`tF6", "BtnReviewPaneOpenActs")
-   kMenu("PVopenF", "Add", "Open image with a new &QPV instance", "BtnReviewPaneOpenActs")
-   kMenu("PVopenF", "Add", "Open image with an e&xternal app", "BtnReviewPaneOpenActs")
-   kMenu("PVopenF", "Add", "Folder &properties (Explorer)", "BtnReviewPaneOpenActs")
+   kMenu("PVopenF", "Add", "Open folder in &Explorer`tF6", "BtnReviewPaneOpenActs",,,, 1)
+   kMenu("PVopenF", "Add", "Open image with a new &QPV instance", "BtnReviewPaneOpenActs",,,, 1)
+   kMenu("PVopenF", "Add", "Open image with an e&xternal app", "BtnReviewPaneOpenActs",,,, 1)
+   kMenu("PVopenF", "Add", "Folder &properties (Explorer)", "BtnReviewPaneOpenActs",,,, 1)
 
    Try Menu, PVcopy, Delete
-   kMenu("PVcopy", "Add", "Copy f&older path(s) as text", "BTNreviewCopyDirs")
-   kMenu("PVcopy", "Add", "Copy &file name(s) as text", "BTNreviewCopyNames")
-   kMenu("PVcopy", "Add", "Copy &complete path(s) as text", "BTNreviewCopyPanel")
+   kMenu("PVcopy", "Add", "Copy f&older path(s) as text", "BTNreviewCopyDirs",,,, 1)
+   kMenu("PVcopy", "Add", "Copy &file name(s) as text", "BTNreviewCopyNames",,,, 1)
+   kMenu("PVcopy", "Add", "Copy &complete path(s) as text", "BTNreviewCopyPanel",,,, 1)
    Menu, PVcopy, Add, 
-   kMenu("PVcopy", "Add", "Cop&y files (Explorer)", "BTNreviewCopyExplorer")
-   kMenu("PVcopy", "Add", "Cu&t files (Explorer)", "BTNreviewCutExplorer")
-   kMenu("PVcopy", "Add", "Co&py containing folders (Explorer)", "BTNreviewCopyFoldersExplorer")
-   kMenu("PVcopy", "Add", "C&ut containing folders (Explorer)", "BTNreviewCutFoldersExplorer")
+   kMenu("PVcopy", "Add", "Cop&y files (Explorer)", "BTNreviewCopyExplorer",,,, 1)
+   kMenu("PVcopy", "Add", "Cu&t files (Explorer)", "BTNreviewCutExplorer",,,, 1)
+   kMenu("PVcopy", "Add", "Co&py containing folders (Explorer)", "BTNreviewCopyFoldersExplorer",,,, 1)
+   kMenu("PVcopy", "Add", "C&ut containing folders (Explorer)", "BTNreviewCutFoldersExplorer",,,, 1)
 
    If totalSelected
    {
