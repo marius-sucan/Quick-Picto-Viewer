@@ -113,7 +113,7 @@ them.
 **«Seen in passing» X, Z and AB to AE, 2026-11-20, fixed at `d0fa7ed`**, with Marius's answers
 (decisions 33 to 38). Each was first run in the application under headless Wine, on AutoHotkey
 1.1.37.02, at `44f9eaf`, and each did what its entry describes; the runs found two more, AF and AG,
-fixed with them, and three leads left open, AH to AJ. «Reload .SLD file» finds a list's file gone
+fixed with them, and four leads left open, AH to AK. «Reload .SLD file» finds a list's file gone
 before it asks about the edited image (`2bffe6a`, decision 33). An image opened from the favourites or
 the «Recent» images asks each question once, and a cancelled open leaves the list as it was
 (`620a1a8`, decision 34); Ctrl+O asks about the modified list and the selection too (`730b1fd`, decision
@@ -1660,6 +1660,14 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   and «Save files list» but not «Discard selection». Run, batch YZ, check Z7, with the fixed text: a
   list with 30 files selected was replaced by the omnibox's «Open image» after the two questions.
   Found while fixing Z, with decision 34.
+- **AK. The omnibox's «Import files list» marks the open list as modified when it refuses it.**
+  After the import, the branch of `GoQuickSearchAction()` sets `currentFilesListModified := 1`
+  (:43000), whatever the import did, and `importSLDplainText()` refuses the list that is open, with
+  «WARNING: Illegal operation. You cannot import the already opened files list», bringing nothing
+  in. Run, batch YS, check S6, with the text of `d0fa7ed`: `other.sld` open and not modified, typed
+  into the omnibox, «Import files list» gave the warning and left the list marked as modified, so
+  «Save files list» would then ask about a list that has not changed. The row is listed only since
+  AC's fix (`4cac3c0`). Lines at `44f9eaf`. Found by the review of AC's fix.
 
 ## Checked and found correct
 
@@ -1937,7 +1945,12 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   valid, invalid, blank and missing values: the texts of `4e828fe` and `d0fa7ed` give the same results
   as the text before `4e828fe`. A first text of AD, which turned each bound of the list into a number,
   wrote a clamped 0.001 as «0.001000»; YQ showed it, and the committed text passes the bounds as
-  they are written. Batches XH, XI, VM, VO, WGu, WUe, WUo, WUr, WUs, WUv, WUw and WUx of the earlier
+  they are written.
+  Batch YS, with the last text, opens through Ctrl+O's three routes and through the omnibox's «Open
+  files list file» after «Discard» and «Yes», and through Ctrl+O with a database open after «Yes»:
+  each opens what it is given, with the list type, the count of files and the modified state
+  expected, the database closed; its check S6 is lead AK.
+  Batches XH, XI, VM, VO, WGu, WUe, WUo, WUr, WUs, WUv, WUw and WUx of the earlier
   kits, those that import lists, load a database's settings, or open from the omnibox, the
   favourites and the «Recent» menus, give the same checks with the last text as at `44f9eaf`, all
   passing; WUx and WUe now count «Save files list» once, where they counted it twice. AutoHotkey
