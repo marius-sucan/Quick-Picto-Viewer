@@ -2146,9 +2146,15 @@ external app» (:96430), but without these two items, which sit inside `If (AnyW
     **Settled**: blocked where the default key of the same function is blocked, not all of them
     (Marius's choice; I had recommended all) (`d3b3fe6`, `42a9a27`). Run (batch RS2), under the folders
     list panel in the image view: of the 135 functions with a default key in the quick search's index,
-    the custom keys of 11 keep working there, as their default keys do: «Search menu options», «Open
-    omnibox to file location», «Show menu bar», «Show toolbar», «Restart», «Increase/Decrease viewport
-    text size», «Increase/Decrease audio volume», «Show viewport info-box» and «Centered alignment».
+    the probe lets through the custom keys of the 11 whose default keys still run them there: «Search
+    menu options», «Open omnibox to file location», «Show menu bar», «Show toolbar», «Restart»,
+    «Increase/Decrease viewport text size», «Increase/Decrease audio volume», «Show viewport info-box»
+    and «Centered alignment»; of these, only the quick search's custom key was pressed (batch RS), and
+    each still has to pass `testFuncIsInMenus()`. A custom key of a function without a default key
+    never runs under a regular panel, there being no default key to probe: that is most of the index
+    (323 items, 149 of them with a key), «Dark mode UI» given Ctrl+Alt+D for one. It follows from the
+    rule as settled; none of the options Marius chose from spoke of these functions, so it is his to
+    confirm.
 56. **The Preferences panel's «More options»**: it opens the main window's own «Interface» menu
     (`PvUIprefs`, `createMenuInterfaceOptions()`), whose hints are main-window keys. Does it keep
     following the custom keys, as the «`\\`» menu does from the tree?
