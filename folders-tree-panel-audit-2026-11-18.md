@@ -110,6 +110,20 @@ in the application under headless Wine, on AutoHotkey 1.1.37.02, at `7178c08`, t
 texts (batches XH, XI and XJ). Four new leads, «Seen in passing» AB to AE, were found while fixing
 them.
 
+**«Seen in passing» X, Z and AB to AE, 2026-11-20, fixed at `d0fa7ed`**, with Marius's answers
+(decisions 33 to 38). Each was first run in the application under headless Wine, on AutoHotkey
+1.1.37.02, at `44f9eaf`, and each did what its entry describes; the runs found two more, AF and AG,
+fixed with them, and three leads left open, AH to AJ. «Reload .SLD file» finds a list's file gone
+before it asks about the edited image (`2bffe6a`, decision 33). An image opened from the favourites or
+the «Recent» images asks each question once, and a cancelled open leaves the list as it was
+(`620a1a8`, decision 34); Ctrl+O asks about the modified list and the selection too (`730b1fd`, decision
+37). The omnibox shows its rows for a typed .SLD list or database, and «Open files list file» asks
+the three questions first (`4cac3c0`, decision 35); its «Import files list» makes the list's folder the
+next file dialog's (`bce526f`). A .SLD list keeps its «Image transparency background» (`3401b43`). A
+database's settings are taken only under the names a database stores, each value checked as a .SLD
+list's is, and the view is redrawn after them (`4e828fe`, decision 36); a stored sort mode is taken
+only when it names columns (`d0fa7ed`, decision 38).
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -1103,6 +1117,30 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
     **Settled**: every rename and move made by QPV, with or without the tick and with or without a
     list (`2e29a57`).
 
+33. **An unsaved list and «Reload .SLD file»** («Seen in passing» X): with the list's file tested
+    first, an unsaved list, which has no file, takes the same route, and the menus offer the item for
+    it. The same error, a message of its own, or no menu item?
+    **Settled**: the same error, with no question (`2bffe6a`).
+34. **How `MenuOpenLastImg()` stops asking twice** («Seen in passing» Z): a parameter that tells it
+    the caller asked, with a return value that says whether the image opened; the parameter alone; or
+    the three questions inside it, the callers asking none?
+    **Settled**: the parameter and the return value; the favourites and the folder favourites mark
+    the entry only when the image opened (`620a1a8`).
+35. **What the omnibox's «Open files list file» asks** («Seen in passing» AC): the three questions,
+    as its «Open folder» asks, or nothing, as the branch was written?
+    **Settled**: the three questions (`4cac3c0`).
+36. **How far a database's settings are checked** («Seen in passing» AD): one list of the settings,
+    their names and ranges, for both readers, with the redraw after a full load; the names and the
+    redraw; or the redraw alone?
+    **Settled**: one list for both readers (`4e828fe`).
+37. **Ctrl+O and a modified list** («Seen in passing» AF): ask «Save files list» and «Discard
+    selection» for every open mode, mend the image's route alone, or report it?
+    **Settled**: both questions, for every open mode but «Open in a new QPV instance» (`730b1fd`).
+38. **A database's stored sort mode** («Seen in passing» AG): take plain column names, take only the
+    sort columns QPV writes, or report it?
+    **Settled**: plain names, letters, digits, «_», commas and spaces, checked where the stored value
+    is read (`d0fa7ed`).
+
 ## Unverified leads
 
 These follow from the code but depend on a runtime state that was not reproduced. Each needs a run
@@ -1455,11 +1493,20 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   entries that exist: a folder, a .SLD list and an image still ask both questions and open (the
   image once the repeated «Save files list» of Z is answered), and «Cancel» keeps the list, at both
   texts. Found by the deep analysis of U's fix.
-- **X. «Reload .SLD file» (Shift+F5) on a list gone from the disk asks about the edited image
+- ✅ **X. «Reload .SLD file» (Shift+F5) on a list gone from the disk asks about the edited image
   first.** `RefreshFilesList()` (:65328) asks «Save image» (:65346) before `OpenSLD()` (:65353)
   finds the file missing («Unable to load the files list»); «Save files list» does not come, since
-  it asks only when the list's file exists (read). Found by the deep analysis of U's fix; not run:
-  an edited image needs undo levels the kit does not make.
+  it asks only when the list's file exists (read). Found by the deep analysis of U's fix; not run
+  then: an edited image needs undo levels the kit did not make.
+  Run on 2026-11-20 at `44f9eaf`, batch YX, the image on screen edited by «Invert colours» three
+  times, so that `askAboutFileSave()`'s own test holds (four undo levels): with the list's file
+  moved away, «Reload .SLD file» asked «Save image», answered «Discard», then said «ERROR: Unable to
+  load the files list. The file is missing or access denied.»; the list stayed loaded and the image
+  edited, so the «Discard» discarded nothing. An unsaved list of three files, made by Insert, which
+  has no file, did the same. **Fixed in `2bffe6a`**, with Marius's answer to decision 33:
+  `RefreshFilesList()` tests the list's file first and gives `OpenSLD()`'s error with no question,
+  for an unsaved list too. Run with the fixed text: batch YX passes; with the file on the disk,
+  «Save image» still comes first, and «Cancel» keeps the edit and the list.
 - ✅ **Y. With «cycle favourites» on, a favourite asks the questions twice.** `OpenFavesEntry()`
   asked its three questions, then `retrieveFavesAsList()` (:39519) asked its own: «Discard
   selection» again (:39532), and «Save files list» again once 300 ms had passed since the last
@@ -1470,7 +1517,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   has that function's wording («…The current files list will be discarded as well»), and it closes
   an open panel before its other two questions (read). Run with the fixed text: each question once,
   and the favourites list opens. Found while running V.
-- **Z. An image opened from the favourites or the «Recent» images asks «Save files list» twice.**
+- ✅ **Z. An image opened from the favourites or the «Recent» images asks «Save files list» twice.**
   `OpenFavesEntry()` and `OpenRecentEntry()` ask their questions, then `MenuOpenLastImg()` (:65534),
   which opens the image, asks «Save image» and «Save files list» again; each repeat is skipped only
   within 300 ms of the last answer, so «Save files list» comes back whenever «Discard selection»
@@ -1479,6 +1526,20 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   recent image each asked «Save files list», «Discard selection», then «Save files list» again
   before the image opened; the repeated «Save image» was not run (read). Found while running V and
   W.
+  Run on 2026-11-20 at `44f9eaf`, batch YZ, the image edited as for X: a favourite and a recent
+  image each asked «Save image», «Save files list» and «Discard selection», then «Save image» and
+  «Save files list» again. A «Cancel» to the second «Save image» kept the list, its 30 files still
+  selected, but `OpenFavesEntry()` went on: the image was no longer marked as edited
+  (`currentImgModified` 0, its undo levels still there) and the list's current entry was marked as a
+  favourite. From a recent image with a database of 212 files open, the same «Cancel» left the 212
+  entries loaded, list type 0, with the database already closed, as W did before its fix. The folder
+  favourites' image entry, which asks nothing itself, did as the favourites after a «Cancel» to
+  «Save image». **Fixed in `620a1a8`**, with Marius's answer to decision 34: `MenuOpenLastImg()` takes
+  `alreadyAsked`, which the favourites and the «Recent» images pass, and returns 1 once the image is
+  open; the favourites and the folder favourites mark the entry and clear the edited flag only then.
+  Run with the fixed text: batch YZ passes, each question comes once and the image opens; the
+  omnibox's «Open image», which asks nothing itself, still gets «Save image» and «Save files list»
+  once each (check Z7).
 - ✅ **AA. The drag tooltips write an omnibox row without its backslash, and a drive element with two.**
   The tooltip of a drag over a row of the omnibox, from the main window (:9781), from the tree
   (:30963) and inside the omnibox (:42683), takes the part of the row's path after its last `\` and
@@ -1491,32 +1552,114 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   drives): the omnibox's tooltips write «.\Gamma\», and the tree's go through
   `folderTreeLabelForMsg()`: «Z:\» over a drive, «.\Beta\» over a folder as before. Run with the
   fixed text: batch SDA passes. Found while checking S.
-- **AB. The omnibox's «Import files list» never remembers the list's folder.** In
+- ✅ **AB. The omnibox's «Import files list» never remembers the list's folder.** In
   `GoQuickSearchAction()` (:42890), its branch tests `StrLen(SelectedDir)>1` (:42965) before
   `zPlitPath()` sets `SelectedDir`, a variable of the function that is still blank there, so
   `prevOpenFolderPath`, the folder where the next file dialog opens, is not set to the list's
   folder; the image import below it sets `SelectedDir` first. Lines at `7178c08`. Run, batch XH,
   through the row the kit adds (AC): `prevOpenFolderPath`, set to «Z:\nowhere» before the import,
   was unchanged after it. Found while fixing H.
-- **AC. The omnibox never shows «Open files list file» or «Import files list».**
+  Run again on 2026-11-20 at `44f9eaf`, batch YB, the list in a folder of its own: «Z:\nowhere» stayed,
+  in memory and in the settings file, while Insert of the same list set its folder. **Fixed in
+  `bce526f`**: `zPlitPath()` comes first, as in `addNewFile2list()`. Run with the fixed text, through
+  the omnibox's own row since AC's fix: the list's folder, in memory and in the settings file.
+- ✅ **AC. The omnibox never shows «Open files list file» or «Import files list».**
   `uiPopulateQuickMenuSearch()` tests a typed path for a folder (:43274) before it tests it for a
   .SLD list (:43370): the first test takes every path that is not an image and whose folder exists,
   so a .SLD list, whose folder exists whenever the list does, never reaches the second. The two
   tests came in that order in v5.6.7 (`e0b347a`). Lines at `7178c08`. Run, batch XH: with a plain
   folder open, the omnibox given the path of `work\other.sld` scanned it as a folder and listed a
   single row, «...\», the folder above. Found while fixing H.
-- **AD. The settings of a database are loaded as they are stored.** `IniSLDBreadGiven()` (:34857)
+  Run again on 2026-11-20 at `44f9eaf`, batch YC: a .SLD list and a database typed, with a folder of
+  five files loaded and with nothing loaded, each gave that single row; a folder named `fold.sld`
+  was listed as a folder. Through a row the kit adds, «Open files list file» replaced a modified list
+  of 214 files, 30 of them selected, with no question. **Fixed in `4cac3c0`**, with Marius's answer to
+  decision 35: a list on the disk (`FileRexists()`) is told apart before the folder test, so a typed
+  list gets «Open files list file», and «Import files list» when a list of two files or more is
+  loaded; a folder whose name ends in .sld, and a list name not on the disk, are listed as before.
+  «Open files list file» asks «Save image», «Save files list» and «Discard selection» before
+  `OpenSLD()`, as the omnibox's «Open folder» asks through `OpenFolders()`. Run with the fixed text:
+  batch YC passes; «Cancel» to «Save files list» keeps the list.
+- ✅ **AD. The settings of a database are loaded as they are stored.** `IniSLDBreadGiven()` (:34857)
   assigns each row of the database's settings as it is. `readSlideSettingsINI()` (:38913), the
   reader of the .SLD lists, brings each value into its range through `INIaction()` and then calls
   `updateWindowColor()`, `refreshWinBGRbrush()`, `defineColorDepth()` and `recalculateThumbsSizes()`
   (:38974-38977). The settings of a database, loaded by «Load settings from current .SLD file» or by
   «Auto-load settings from QPV slideshows when opened», get neither (read). Lines at `7178c08`.
   Found while fixing I.
-- **AE. A .SLD list never holds its «Image transparency background».** In `readSlideSettingsINI()`,
+  Run on 2026-11-20 at `44f9eaf`, batch YD. «Load settings from current .SLD file» on a database
+  whose rows held hueAdjust 999, mediaSNDvolume 500, slideShowDelay 5, FlipImgH 7, ambiTexBrushSize
+  5000 and WindowBgrColor «xyz» set them as stored, where a .SLD list's load gives 300, 100, 90, the
+  previous 0, 950 and the previous colour. The redraws did not run: with WindowBgrColor 336699 and
+  UserVPalphaBgrStyle 3 stored, `refreshWinBGRbrush()`, `updateWindowColor()` and
+  `recalculateThumbsSizes()` were not called, the window's brush kept 141414 and the transparency
+  brush its checkers, also when the database was opened with «Auto-load settings…» on;
+  `defineColorDepth()` ran only through the display of the image. A .SLD list's load ran each of
+  the four once. And a row of any name was assigned: a row askDeleteFiles=0 turned off the confirmation
+  of deletions, and a row prevOpenFolderPath set that folder. **Fixed in `4e828fe`**, with Marius's
+  answer to decision 36: `slideSettingsList()` holds the 51 settings of the .SLD reader, in its
+  order, with their `INIaction()` types and ranges, and the seven that a database alone stores:
+  thumbsAratio and thumbsZoomLevel with the ranges of the main settings, reverseOrderOnSort,
+  hamDistInterpolation and userpHashMode as yes or no, dbVersion and prevFilesSortMode as stored.
+  `readSlideSettingsINI()` reads and writes through that list. `IniSLDBreadGiven()` takes only its
+  names, so never `appVersion` and never a blank name, which `44f9eaf` had excluded; it checks each
+  value with `settingValueChecked()`, the checks of `INIaction()` types 1 to 4 moved out of it, and
+  after a full load calls `applySlideSettings()`, the redraw of the .SLD reader. Run with the fixed
+  text: batch YD passes. Batch YQ writes the slide settings and the main settings into new files,
+  reads a file of invalid values back and drives `INIaction()` through every type with valid,
+  invalid, blank and missing values: the same results as with the text before `4e828fe`.
+- ✅ **AE. A .SLD list never holds its «Image transparency background».** In `readSlideSettingsINI()`,
   which reads the settings of a .SLD list and, with `act=1`, writes them, the line of
   `UserVPalphaBgrStyle` (:38964) gives no file, so `INIaction()` reads and writes that setting in
   the main settings file; a database stores it (:34800) (read). Lines at `7178c08`. Found while
   fixing I.
+  The history: v6.1.60 (`2f57cdf`) put the line in `readMainSettingsApp()`, where no line names a
+  file; v6.1.75 (`f6b7c06`) moved it into the slideshow settings without the file argument that
+  every line there has, and in the same release the database began to store it (`1c3b9c3`). Run on
+  2026-11-20 at `44f9eaf`, batch YE: a list saved with its settings held no `UserVPalphaBgrStyle`;
+  «Save settings into current .SLD file» wrote 3 into the main settings file, not into the list;
+  «Load settings from current .SLD file», and the list opened with «Auto-load settings…» on, took
+  the main settings file's 2 over the list's 4. **Fixed in `3401b43`**: the line names the list's
+  file, as the others do. Run with the fixed text: batch YE passes; a list saved before, without the
+  setting, leaves it as it is; the main settings file is written and read as before.
+- ✅ **AF. Ctrl+O replaces a modified list and a selection without a question.** `OpenDialogFiles()`
+  (:65535) asks only «Save image». Run on 2026-11-20 at `44f9eaf`, batch YO: with a modified .SLD
+  list of 212 files, 30 of them selected, a .SLD list, an image opened with «Index all images in
+  current folder as well» and an image opened with «Open» each replaced it with no «Save files list»
+  and no «Discard selection». For «Open», `MenuOpenLastImg()` would ask «Save files list», but
+  `OpenDialogFiles()` sets the list type to a folder's, 1, just before (:65600), and the question
+  asks only for a .SLD list, type 2; that line came in v6.1.00 (`40b59c0`). Lines at `44f9eaf`.
+  Found while checking Z. **Fixed in `730b1fd`**, with Marius's answer to decision 37: Ctrl+O asks
+  «Save files list» and «Discard selection» after «Save image», for every open mode but «Open in a
+  new QPV instance», and tells `MenuOpenLastImg()` that it asked; the early change of the list type
+  is gone. Run with the fixed text: batch YO passes, «Cancel» keeping the list, its type, its
+  selection and its modified state.
+- ✅ **AG. A database's stored sort mode goes into SQL text unchecked.** `prevFilesSortMode` is read
+  from a database at every open (:88334), whatever «Auto-load settings from QPV slideshows when
+  opened» says, and by «Load settings from current .SLD file»; it goes into the SQL text that lists
+  the files (`OpenSLDBdataBase()` :88345, `BtnIndexStatsToList()` :28522), and SQLite's
+  `sqlite3_get_table()` runs every statement in that text. Run on 2026-11-20 at `44f9eaf`, batch YD:
+  a stored value «imgfile; CREATE TABLE kitprobe(a);--» created that table when the database opened.
+  A crafted .SLDB could so run SQL of its own when it is opened; an ATTACH statement creates a file
+  wherever the user can write (read). Lines at `44f9eaf`. Found while checking AD. **Fixed in
+  `d0fa7ed`**, with Marius's answer to decision 38: `IniSLDBreadGiven()`, where every stored value is
+  read, takes it only when it holds letters, digits, «_», commas and spaces; anything else counts
+  as no sort mode, and a blank one is skipped as before. Run with the fixed text: the database
+  opens with its five files and no table is made.
+- **AH. The folder favourites open a .SLD list with no question.** `OpenDirsFavedEntry()` (:27033)
+  opens a list entry with `OpenSLD()` (:27042) and asks nothing, so a modified list or a selection
+  is replaced as AC's and AF's runs showed for the omnibox and Ctrl+O (read). Its folder entries go
+  through `OpenFolders()`, which asks the three questions, and its image entry through
+  `MenuOpenLastImg()`, which asks two. Lines at `44f9eaf`. Found while fixing Z.
+- **AI. Ctrl+O's «Open» shows and records the image twice.** Once `MenuOpenLastImg()` has opened
+  the image, `OpenDialogFiles()` goes on to its block for an image found in a folder (:65617), which
+  sets the list type again, looks the image up, records it among the recent images again and shows
+  it again (read). Lines at `44f9eaf`. Found while fixing AF.
+- **AJ. Two image opens still do not ask «Discard selection».** The omnibox's «Open image» and the
+  folder favourites' image entry leave the questions to `MenuOpenLastImg()`, which asks «Save image»
+  and «Save files list» but not «Discard selection». Run, batch YZ, check Z7, with the fixed text: a
+  list with 30 files selected was replaced by the omnibox's «Open image» after the two questions.
+  Found while fixing Z, with decision 34.
 
 ## Checked and found correct
 
@@ -1761,3 +1904,42 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   AutoHotkey 1.1.37.02 loads each of the three texts and the text of `6dc2635`, with and without
   `/iLib`. Not run: Windows itself, real menus, keys and dialogs, a real drag, and a move that
   Windows merges into a folder of the same name.
+- «Seen in passing» X, Z, AB to AE and the new AF and AG (`2bffe6a`, `620a1a8`, `730b1fd`,
+  `4cac3c0`, `bce526f`, `3401b43`, `4e828fe`, `d0fa7ed`) were run in the application under headless Wine,
+  on AutoHotkey 1.1.37.02, at `44f9eaf` and with the fixed texts, by
+  `.claude/scratch/folders-tree-seen-x-ae-2026-11-20/` (`tests-xae.ahk`, `run.sh`, `run-batches.sh`, `run-all.sh`, `compare-regs.sh`; `mkfixes.py` writes
+  the eight cumulative texts into `v1/`; the logs in `results/`, named `h-` and `h2-` at `44f9eaf`,
+  `c-` and `c2-` with the text of each item's own commit, `f-` with the last), with the helpers of
+  the earlier kits, in an application folder of its own whose settings files are put back before
+  each batch; its `app/patch.py` also counts the calls of the four redraws of the .SLD reader and
+  lets the file dialog's stub hand back an open mode. An image is edited by «Invert colours»
+  (`InvertSelectedArea()`) three times, which gives the undo levels that `askAboutFileSave()` tests.
+  Batch YX reloads a .SLD list whose file was moved away and an unsaved list, the image edited, and
+  as a control the list on the disk. Batch YZ opens an image from the favourites, from the «Recent»
+  images with a .SLD list of 212 files and with a database of 212 files, from the folder favourites,
+  Ctrl+O and the omnibox, the list modified, 30 of its files selected and the image edited; it
+  answers every question to go on, then «Cancel» to the repeated «Save image». Batch YO gives Ctrl+O
+  a .SLD list, an image with «Index all images in current folder as well» and an image with «Open».
+  Batch YC types .SLD lists and databases, a folder, an image, part of a name, a folder named
+  `fold.sld` and a list name not on the disk into the omnibox, with a list loaded and with nothing
+  loaded, and opens a list through «Open files list file». Batch YB imports a .SLD list through the
+  omnibox and through Insert. Batch YD loads a database's settings with values outside the ranges,
+  with valid values that differ and with rows of names that a database does not store, and opens it
+  with «Auto-load settings…» on and with a stored sort mode that holds a statement; the same values
+  in a .SLD list are its control. Batch YE saves and loads `UserVPalphaBgrStyle` with a .SLD list,
+  with and without the option, and writes and reads the main settings file. At `44f9eaf` two of
+  YX's six checks fail, nine of YZ's fourteen, YO's three, four of YC's eight, one of YB's three,
+  six of YD's eight and five of YE's six; with the last text all pass (YZ checks thirteen: the
+  fourteenth applies only to a list kept by a «Cancel»). With the text of its own commit each
+  item's batch passes, but for the checks that a later commit settles: Z6 of YZ (Ctrl+O, AF) and D5
+  of YD (the sort mode, AG). Batch YQ writes the slide settings and the main settings into new
+  files, reads a file of invalid values back and drives `INIaction()` through its types 0 to 6 with
+  valid, invalid, blank and missing values: the texts of `4e828fe` and `d0fa7ed` give the same results
+  as the text before `4e828fe`. A first text of AD, which turned each bound of the list into a number,
+  wrote a clamped 0.001 as «0.001000»; YQ showed it, and the committed text passes the bounds as
+  they are written. Batches XH, XI, VM, VO, WGu, WUe, WUo, WUr, WUs, WUv, WUw and WUx of the earlier
+  kits, those that import lists, load a database's settings, or open from the omnibox, the
+  favourites and the «Recent» menus, give the same checks with the last text as at `44f9eaf`, all
+  passing; WUx and WUe now count «Save files list» once, where they counted it twice. AutoHotkey
+  1.1.37.02 loads each of the eight texts, with and without `/iLib`. Not run: Windows itself, real
+  menus, keys and dialogs, and an ATTACH statement.
