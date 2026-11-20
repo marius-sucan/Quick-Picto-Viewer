@@ -934,7 +934,10 @@ KeyboardResponder(givenKey, thisWin, abusive) {
           If isFunc(userCustomKeysDefined[ckbd, 1])
           {
              thisu := userCustomKeysDefined[ckbd, 1]
-             If testFuncIsInMenus(thisu) ; prevent execution of functions that are no available in the current context
+             ; a regular panel blocks a custom key where it blocks the default key of the same function
+             If (AnyWindowOpen && imgEditPanelOpened!=1 && userCustomKeysDefined[ckbd, 5]!="")
+                defaultRun := processDefaultKbdCombos(userCustomKeysDefined[ckbd, 5], PVhwnd, 0, PVhwnd, 1, 1)
+             If ((!AnyWindowOpen || imgEditPanelOpened=1 || StrLen(defaultRun[1])>2 && defaultRun[1]!="dummy") && testFuncIsInMenus(thisu)) ; prevent execution of functions that are no available in the current context
                 %thisu%()
           }
        } Else If (allowLoop := processDefaultKbdCombos(givenKey, thisWin, abusive, Az, 0, 0))
