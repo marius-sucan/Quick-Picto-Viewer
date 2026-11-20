@@ -2468,7 +2468,7 @@ initializeAppWithGivenArguments() {
       If InStr(folderOpened, "|")
          tryOpenGivenFolder(folderOpened, 0, 1)
       Else
-         OpenFolders(folderOpened, 0)
+         OpenFolders(folderOpened, "yes")
    } Else If (thisCounter=1 && !sldOpened && !folderOpened)
       OpenArgFile(Trimmer(filesListu))
    Else If (thisCounter>1 && !sldOpened && !folderOpened)
@@ -27059,7 +27059,7 @@ OpenDirsFavedEntry(a, b, c) {
 
    If FolderExist(StrReplace(folderu, "|"))
    {
-      OpenFolders(folderu, 0)
+      OpenFolders(folderu, "yes")
    } Else If (FileExist(folderu) && isList=1)
    {
       If askAboutDiscards(" and the selected files list will be opened")
@@ -39467,6 +39467,8 @@ KbdToggleImgFavourites() {
 
 ToggleImgFavourites(thisImg:=0, actu:=0, directCall:=0) {
   Static lastInvoked := 1, prevImg, prevRemSpeed := 1
+  If (actu!="rem")
+     thisImg := 0   ; a menu item passes its label: an image is given only with «rem»
   imgPath := thisImg ? thisImg : getIDimage(currentFileIndex)
   isPipe := InStr(imgPath, "||")
   imgPath := StrReplace(imgPath, "||")
@@ -42989,7 +42991,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          dummyTimerDelayiedImageDisplay(50)
       } Else If (funcu="!OmniOpenRfolder")
       {
-         OpenFolders(userQuickMenusEdit, 0)
+         OpenFolders(userQuickMenusEdit, "yes")
       } Else If (funcu="!OmniNavigateFolder")
       {
          LV_GetText(folderu, RowNumber, 1)
@@ -43005,7 +43007,7 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          newLabelu := SubStr(userQuickMenusEdit, 1, InStr(userQuickMenusEdit, "\", 0, -1))
       } Else If (funcu="!OmniOpenFolder")
       {
-         OpenFolders("|" userQuickMenusEdit, 0)
+         OpenFolders("|" userQuickMenusEdit, "yes")
       } Else If (funcu="!OmniImportFolder")
       {
          importFolderIntoList(userQuickMenusEdit, "not")
@@ -65102,7 +65104,8 @@ combineFimImgsConvertDepth(k, modus, fif) {
    Return hFIFimgC
 }
 
-OpenFolders(dummy:="", allowDialog:=1) {
+OpenFolders(dummy:="", noDialog:=0) {
+; noDialog is taken only as «yes», since a menu item passes its name and position
    If (AnyWindowOpen || imageLoading=1)
       Return -1
 
@@ -65110,7 +65113,7 @@ OpenFolders(dummy:="", allowDialog:=1) {
    stopSlideshow()
    If FolderExist(StrReplace(dummy, "|"))
       SelectedDir := dummy
-   Else If (allowDialog=1)
+   Else If (noDialog!="yes")
       SelectedDir := openFoldersDialogWrapper(prevOpenFolderPath, "Select the folder to open recursively")
 
    If SelectedDir
@@ -73406,7 +73409,7 @@ folderzNavLoadAllSiblings() {
 
    baseFolder := SubStr(baseFolder, 1, InStr(baseFolder, "\", 0, -1) - 1)
    baseFolder := StrReplace(baseFolder, "|")
-   OpenFolders(baseFolder, 0)
+   OpenFolders(baseFolder, "yes")
 }
 
 invokeFoldersListerMenu() {
@@ -74239,7 +74242,7 @@ ToggleImgHistogram(direction:=1, dummy:=0) {
        Return
 
     ; HistogramBMP := trGdip_DisposeImage(HistogramBMP, 1)
-    showHistogram := (direction=1) ? showHistogram + 1 : showHistogram - 1
+    showHistogram := (direction=-1) ? showHistogram - 1 : showHistogram + 1   ; a menu item passes its label
     showHistogram := clampInRange(showHistogram, 1, 6, 1)
     If (dummy="normal" && showHistogram=1)
        showHistogram := 2
