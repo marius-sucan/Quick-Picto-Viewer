@@ -152,10 +152,10 @@ favourites' menu item adds the image itself, and «Cycle histogram modes» steps
 (`942890c`, decisions 47 and 48). The comment of the question follows `df49b13` (`2d8465e`, decision 50).
 A new lead stays open, AO: a folder dropped on the main window with no list loaded is still marked.
 
-**«Seen in passing» R, 2026-11-20, analysed, not fixed.** Marius's rule: a custom key never acts in
-the tree, the omnibox or a panel while it has the focus, and the menus of these windows never change
-with the custom keys. The keys already follow it. The menus do not, in the omnibox and the panels as
-in the tree: hints of the windows' own keys go when the main window's custom keys take those keys,
+**«Seen in passing» R, 2026-11-20, analysed, not fixed.** Marius's rule: custom keys do not apply to
+the tree, the omnibox or a panel while it has the focus, and their context menus are not affected by
+custom keys. The keys already follow it. The menus do not, in the omnibox and the panels as in the
+tree: hints of the windows' own keys go when the main window's custom keys take those keys,
 and the menu the panels and the omnibox share shows custom keys of the main window that do nothing
 there. Run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `3efb00f` (batches RK
 and RM). The section «Custom keys in the tree, the omnibox and the panels», after «Seen in passing»,
@@ -1918,10 +1918,12 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
 
 ## Custom keys in the tree, the omnibox and the panels («Seen in passing» R)
 
-Marius's rule, 2026-11-20: a custom key never acts in the folders tree, the omnibox or a panel made
-by `createSettingsGUI()` while that window has the keyboard focus, and the menus of these windows
-never change with the custom keys. This section checks the rule against `3efb00f` (`development`);
-its line numbers are those of `3efb00f`. No code was changed.
+Marius's rule, 2026-11-20, in his words: «Customized keys should not apply to the folders tree or
+omnibox windows, or panels created via createSettingsGUI(), when they are focused. Their context
+menus should not be affected by customized keys.» This section checks the rule against `3efb00f`
+(`development`); its line numbers are those of `3efb00f`. No code was changed. Section 2 also lists
+the menus these windows show from a button, such as the «Align» menu of panel 34, which are not
+context menus; whether the rule covers them is decision 51.
 
 Terms of this section:
 - **Custom key**: a key the user gives to a menu function with «Customize keyboard shortcut» (F2 in
@@ -1939,10 +1941,10 @@ Terms of this section:
 active window (run). The menus do not, and R is not the tree's alone: every menu these windows build
 through `kMenu()` loses a hint when the custom keys take its key in the main window, and the menu
 the panels and the omnibox share also shows the custom keys of the main-menu functions it lists,
-keys that do nothing there (run). Two things in these windows must keep following the custom keys:
-the quick search's «Shortcut» column and the «`\\`» menu, both made of main-window items. A few items
-of these windows' menus name keys of the main window; the rule has to settle them (decisions 51 to
-55, at the end of this section).
+keys that do nothing there (run). The quick search's «Shortcut» column, made of main-window items,
+must keep following the custom keys, and so must the «`\\`» menu where the main window shows it
+(Shift+F4). A few items of these windows' menus name keys of the main window; the rule has to settle
+them (decisions 51 to 55, at the end of this section).
 
 ### 1. Keys: a custom key acts only in the main window
 
@@ -1966,15 +1968,15 @@ control of the active window:
 - in the main window, F9 and Space run «Next image» (the control);
 - in the tree, F9 and Space do not, while the tree's own F9 selects the current file's folder and its
   Space scans `\Beta`: R's own case, Space, keeps the tree's key and leaves the custom key out;
-- in the omnibox, in menu search mode and in folder mode, in its search field and in its list, F9
-  does not, while its own F2 opens «Customize keyboard shortcut» and its own F12 asks for the selected
-  folder's properties;
+- in the omnibox F9 does not, in its search field in menu search mode, and in its search field and
+  its list in folder mode, while its own F2 opens «Customize keyboard shortcut» (menu search mode)
+  and its own F12 asks for the selected folder's properties (folder mode);
 - in the folders list panel (ID 2), F9 does not, while its own Menu key shows its list's menu.
 
 Outside the rule, also run (check k8): with the folders list panel open and the main window made the
 active window, F9 ran «Next image» under the panel. A regular panel blocks the main window's default
-keys (`HKifs()` :543), not its custom keys, which only `testFuncIsInMenus()` (:43190) checks; this was
-known (decision 55).
+keys (`HKifs()` :543), not its custom keys, which only `testFuncIsInMenus()` (:43190) checks, as
+`structured-copy-move-audit-2026-11-10.md` found (finding 9, run F7); decision 55.
 
 ### 2. Menus: R is shared by every menu these windows build with `kMenu()`
 
@@ -2008,7 +2010,12 @@ Run, batch RM, key context 2 (the image view), the menus read as their builders 
 without custom keys, then with six lines: F2 given to «Previous image»; the main window's F5
 function (`RefreshImageFileAction`) moved to Ctrl+Shift+F5; the main window's F3
 (`MenuSearchNextIndex`) disabled; «Exit» (`exitAppu`) moved from Escape to Ctrl+Shift+F11;
-Ctrl+Alt+D given to «Dark mode UI»; Ctrl+Alt+N given to «New QPV instance»:
+Ctrl+Alt+D given to «Dark mode UI»; Ctrl+Alt+N given to «New QPV instance». The kit wrote the lines
+itself, in the shape «Customize keyboard shortcut» writes them (read): a new key, through
+`BtnApplyNewKbdShortcut()` (:26172), takes its fields from `PanelDefineKbdShortcut()` (:26574-26576),
+the sixth being the function's default key, so a function moved off its key leaves that key there;
+«Disable» (`MenuDisableKbdShortcut()` :26027-26046) writes `?function`. Only the item and location
+fields hold the kit's own words, and the rewrite does not read them:
 - without custom keys, every hint is a key of the window that shows the menu, and «Dark mode UI» and
   «New instance» have none (the control);
 - with them, F2 leaves «Rename folder» in the tree and in the omnibox's folder menu, and «Customize
@@ -2036,10 +2043,11 @@ custom keys, it always finds its item.
   built while the omnibox has the focus. It must keep the custom keys, which are the main window's
   keys. Run (RM): «Dark mode UI» shows «Ctrl+Alt+D» there. So the rule cannot be applied as "while the
   tree, the omnibox or a panel is the active window": `kMenu()` has to know which menu it builds.
-- **The «`\\`» menu.** The tree's first button shows it, but it is the main window's Shift+F4 menu
-  (`invokeFoldersListerMenu()` :73415). Its hints, Ctrl+Page Up/Down and Alt+Page Up/Down in the
-  thumbnails view, F4 and Shift+;, are main-window keys and should keep following the custom keys;
-  the tree does not handle them (read).
+- **The «`\\`» menu.** The tree's first button shows it, but one builder makes it for the main
+  window's Shift+F4 too (`invokeFoldersListerMenu()` :73415). Its hints, Ctrl+Page Up/Down and
+  Alt+Page Up/Down in the thumbnails view, F4 and Shift+;, are main-window keys, and there they keep
+  following the custom keys. When the tree's button opens it, only the Page Up/Down hints can show,
+  keys the tree does not handle (read): the question of the tree's 7 and Shift+7 (decision 53).
 - **The tree's 7 and Shift+7** (small thing d). «Copy selected file(s) into...» and «Move selected
   file(s) into...» show keys of the main window, its quick file actions, not keys of the tree. Under
   the rule they would keep showing 7 when 7 does something else in the main window (decision 53).
@@ -2067,15 +2075,16 @@ external app» (:96430), and handles neither key.
 ### Decisions before a fix
 
 51. **Which menus the rule covers**: those of the table above, with their submenus, the «Align» menu
-    of panel 34 included, or without it? In every case the quick search's «Shortcut» column and the
-    «`\\`» menu keep following the custom keys.
+    of panel 34 included, or without it? In every case the quick search's «Shortcut» column keeps
+    following the custom keys, and so does the «`\\`» menu where Shift+F4 opens it in the main window.
 52. **How `kMenu()` tells these menus**: a list of menu names in `kMenu()`, with the shared names
     split first (`PVopenF` of the tree, the omnibox and panels 2, 3 and 60; `PVselAlign` of panel
     34); a switch kept in a `Static` of `kMenu()`, set by these builders through `kMenu()` itself and
     cleared at their end and by its «Reset», with no new super-global; or a new last parameter on each
     `kMenu()` call of these builders?
-53. **The tree's 7 and Shift+7** (small thing d): drop the two hints, or keep them as main-window keys
-    that go on following the custom keys, an exception to the rule?
+53. **Main-window keys in the tree's menus**: the tree's 7 and Shift+7 (small thing d), and the
+    «`\\`» menu's Page Up/Down hints when the tree's button opens it: drop those hints there, or keep
+    them as main-window keys that go on following the custom keys, an exception to the rule?
 54. **«Open with»**: leave it as it is, drop its two hints, or have its hints follow the custom keys in
     the main window and drop them when panel 60 shows it?
 55. **Custom keys in the main window while a regular panel is open** (check k8): keep them acting
@@ -2087,7 +2096,7 @@ AutoHotkey 1.1.37.02, at `3efb00f`: batches RK and RM of `.claude/scratch/folder
 (`tests-r.ahk`; `run.sh <tag> <test function> <revision | file>`; logs `results/h-RK.txt` and
 `results/h-RM.txt`). RK posts each key to the focused control of the active window; in each window an
 own key of that window is posted too, so a key that runs nothing there is known to have arrived. RM
-writes the custom keys file as the custom keys panel writes its lines and reads each menu as its
+writes the custom keys file in the shape of the panel's lines (section 2) and reads each menu as its
 builder makes it (`tiMenu()`). RK passes in full. In RM the controls pass, and the five checks of the
 rule fail, each a case of R. Not run: key contexts 1 and 3 to 5 for the menus, the live image editing
 panels, panel 34's «Align» menu, «Open with», and Windows itself.
