@@ -65736,7 +65736,6 @@ askAboutSlidesListSave() {
    ; also a list without its file, but not the \QPV\ history lists, and a plain folder once a folder was imported into it
    If (currentFilesListModified=1 && RegExMatch(CurrentSLD, "i)(.\.sld)$") && InStr(CurrentSLD, "\QPV\")!=1 && maxFilesIndex>1 && SLDtypeLoaded=2)
    || (currentFilesListModified=1 && maxFilesIndex>1 && InStr(CurrentSLD, "\QPV\favourite-images-list.SLD"))
-   || (currentFilesListModified=1 && maxFilesIndex>1 && SLDtypeLoaded=1 && InStr(Trim(DynamicFoldersList, "`n"), "`n"))
    {
       stopSlideshow()
       zPlitPath(CurrentSLD, 0, OutFileName, OutDir)
