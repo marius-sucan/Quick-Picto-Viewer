@@ -65517,6 +65517,12 @@ RefreshFilesList() {
 
   If RegExMatch(CurrentSLD, sldsPattern)
   {
+     If !FileExist(CurrentSLD)
+     {
+        zPlitPath(CurrentSLD, 0, OutFileName, OutDir)
+        Return msgBeepTimer("ERROR: Unable to load the files list.`nThe file is missing or access denied.`n" OutFileName "`n" OutDir "\")
+     }
+
      If askAboutFileSave(" and the files list will be reloaded")
         Return
 
