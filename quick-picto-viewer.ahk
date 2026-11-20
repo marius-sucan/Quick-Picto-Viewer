@@ -3059,7 +3059,7 @@ InvokeOpenWithMenu(imgPath) {
        Menu, OpenWithMenu, Add, &2. System «Open with» dialog, MenuInvokeSHopenWith
        kMenu("OpenWithMenu", "Add", "&4. Explore containing folder`tCtrl+E", "OpenThisFileFolder")
        If (psathu!=OutDir)
-          kMenu("OpenWithMenu", "Add", "&5. Open containing folder in QPV`tAlt+E", "OpenQPVfileFolder")
+          kMenu("OpenWithMenu", "Add", "&5. Open containing folder in QPV", "OpenQPVfileFolder")
        Menu, OpenWithMenu, Add,
        Menu, OpenWithMenu, Add, &Choose external application, browseExternalApp
        Menu, OpenWithMenu, Add, %pathu%, OpenImgWithUserExternApp
@@ -68350,12 +68350,11 @@ InvokeMenuBarFile(manuID:=0, justBuild:=0) {
       zPlitPath(resultedFilesList[currentFileIndex, 1], 0, OutFileName, OutDir)
       kMenu("PVtActFile", "Add", "Open with default application", "OpenWithDefaultApp")
       kMenu("PVtActFile", "Add", "&Open with external app`tO", "OpenThisFileMenu")
-      kbdu := (thumbsDisplaying=1) ? "`tAlt+E" : ""
       kMenu("PVtActFile", "Add", "Open file in a new &QPV instance`tCtrl+Enter", "SoloNewQPVinstance")
-      kMenu("PVtActFile", "Add", "Open in QPV the containin&g folder" kbdu, "OpenQPVfileFolder")
+      kMenu("PVtActFile", "Add", "Open in QPV the containin&g folder", "OpenQPVfileFolder")
       kMenu("PVtActFile", "Add", "&Explore containing folder`tCtrl+E", "OpenThisFileFolder")
       If ((!FolderExist(OutDir) || StrReplace(CurrentSLD, "|")=OutDir) && !mustOpenStartFolder)
-         kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+         kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder")
       If !FolderExist(OutDir)
          kMenu("PVtActFile", "Disable", "&Explore containing folder`tCtrl+E")
 
@@ -69576,16 +69575,15 @@ createMenuSoloFile(modus:=0) {
    kMenu("PVtActFile", "Add", "&Open with external app`tO", "OpenThisFileMenu")
    kMenu("PVtActFile", "Add", "Open file in a new &QPV instance", "SoloNewQPVinstance")
    zPlitPath(resultedFilesList[currentFileIndex, 1], 0, OutFileName, OutDir)
-   kbdu := (thumbsDisplaying=1) ? "`tAlt+E" : ""
-   kMenu("PVtActFile", "Add", "Open in QPV the containin&g folder" kbdu, "OpenQPVfileFolder")
+   kMenu("PVtActFile", "Add", "Open in QPV the containin&g folder", "OpenQPVfileFolder")
    kMenu("PVtActFile", "Add", "&Explore containing folder`tCtrl+E", "OpenThisFileFolder")
    If !FolderExist(OutDir)
    {
-      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder")
       kMenu("PVtActFile", "Disable", "&Explore containing folder`tCtrl+E")
    }
    If (StrReplace(CurrentSLD, "|")=OutDir)
-      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder" kbdu)
+      kMenu("PVtActFile", "Disable", "Open in QPV the containin&g folder")
 
    kMenu("PVtActFile", "Add", "Set containing folder as the &protected folder", "setContaintFolderAsProtected")
    If (mustPreventMenus=1)
@@ -70338,10 +70336,9 @@ createMenuOpenFileOptions(modus:=0) {
       kMenu("PVtFileOpen", "Add", "Open file in a new &QPV instance`tCtrl+Enter", "SoloNewQPVinstance")
 
    zPlitPath(resultedFilesList[currentFileIndex, 1], 0, OutFileName, OutDir)
-   kbdu := (thumbsDisplaying=1) ? "`tAlt+E" : ""
-   kMenu("PVtFileOpen", "Add", "&Open in QPV the containing folder" kbdu, "OpenQPVfileFolder")
+   kMenu("PVtFileOpen", "Add", "&Open in QPV the containing folder", "OpenQPVfileFolder")
    If (StrReplace(CurrentSLD, "|")=OutDir)
-      kMenu("PVtFileOpen", "Disable", "&Open in QPV the containing folder" kbdu)
+      kMenu("PVtFileOpen", "Disable", "&Open in QPV the containing folder")
 
    If !markedSelectFile
    {
