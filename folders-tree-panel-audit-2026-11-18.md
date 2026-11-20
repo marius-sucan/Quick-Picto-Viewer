@@ -161,6 +161,18 @@ there. Run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `
 and RM). The section «Custom keys in the tree, the omnibox and the panels», after «Seen in passing»,
 has the details and decisions 51 to 55.
 
+**«Seen in passing» R and decisions 51 to 55, 2026-11-20, fixed at `d3b3fe6`**, with Marius's answers
+(decisions 51 to 58). Each was first run in the application under headless Wine, on AutoHotkey
+1.1.37.02, at `05efa1a`, and each did what the section says; panel 34's «Align» menu and «Open with»,
+read until then, were run too (batch RC), and the same batches were then run with the fixed texts.
+The menus of the tree, the omnibox and the panels keep their own keys whatever the custom keys, but
+for the tree's 7 and Shift+7 and the main window's menus these windows open (`6cb7d19`, decisions 51 to
+53, 56 and 58), which also fixes small thing c; «Open with» follows the custom keys (`8aada08`, decision
+54); under a regular panel a custom key runs only where the default key of its function would
+(`d3b3fe6`, decisions 55 and 57). The section's paragraph on «Open with» was wrong about panel 60, which
+never shows the two items with keys; it is corrected. New lead AP: Alt+E opens the containing folder
+in neither view.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -210,7 +222,7 @@ has the details and decisions 51 to 55.
 | 14 | Ctrl+X and Ctrl+C put a whole drive on the clipboard | low | read, then run | — | **fixed**, `f4bbf01`: both keys refuse a drive element (decision 17) |
 | 15 | The «`\\`» menu: the «more folders» notes land in the siblings submenu, and the count is one short | low | read, then run | Shift+F4 menu | **fixed**, `43bee47`: each note in its own submenu, counting the folders not listed; 200 sub-folders listed |
 | 16 | «Create new folder»: a name the filter changes can land on an existing folder, listed twice | low | run | omnibox F7 | **fixed**, `80b75e0`: the name the filter gives is checked, for a folder or a file (decision 18) |
-| 17 | Small things (nine points) | low | read, then run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; e **fixed**, `a4c35d0`; g **fixed**, `4c6a16d`; a, c, d open, each confirmed by a run at `15e9716` |
+| 17 | Small things (nine points) | low | read, then run | | b, h, i **fixed**, `ca8109b`; f **fixed**, `5624fa8`; e **fixed**, `a4c35d0`; g **fixed**, `4c6a16d`; c **fixed**, `6cb7d19`; a, d open, each confirmed by a run at `15e9716` |
 
 ---
 
@@ -934,9 +946,9 @@ folder was made at either (batch U16x).
 
 ## 17. Small things
 
-b, h and i are fixed in `ca8109b`, f in `5624fa8`, e in `a4c35d0` and g in `4c6a16d`; a, c and d are as
-described, at `15e9716` too, each confirmed by a run (2026-11-19, batches WSa, WSc and WSd). ✅ marks a
-fixed one.
+b, h and i are fixed in `ca8109b`, f in `5624fa8`, e in `a4c35d0`, g in `4c6a16d` and c in `6cb7d19`; a and d
+are as described, at `15e9716` too, each confirmed by a run (2026-11-19, batches WSa, WSc and WSd). ✅
+marks a fixed one.
 
 a. **Rename does not sort.** `TV_Modify(c, "Select Vis Sort", "\" newFileName)` (:31967) sorts the
    children of the renamed element (that is AutoHotkey's `Sort` option), not the element among its
@@ -949,7 +961,7 @@ b. ✅ **«Paste clipboard file(s) into...» brings the tree back only after Can
    with `msgBeepTimer()` at :32391), and `folderTreePasteClippy()` activates the tree when the result
    is true (:32201-32203). **Fixed in `ca8109b`**: the tree is activated after every outcome.
 
-c. **«Scan for sub-folders» can stay on a missing folder.** The item is removed by its label,
+c. ✅ **«Scan for sub-folders» can stay on a missing folder.** The item is removed by its label,
    ``&Scan for sub-folders`tSpace`` (:31636). `kMenu()` drops the key from a label when the user's
    own shortcuts give that key to another function (:71547-71561), and the removal then misses.
    Still so at `15e9716`. Run, batch WSc, with a custom keys file that the kit writes for the image
@@ -958,7 +970,10 @@ c. **«Scan for sub-folders» can stay on a missing folder.** The item is remove
    its key; with no custom key the item is not there. The same rewrite takes the key off the item
    on the other elements too («Seen in passing» R). Once the tree's menu stops following the custom
    keys, the removal always finds its item (section «Custom keys in the tree, the omnibox and the
-   panels»).
+   panels»). **Fixed in `6cb7d19`**: the tree's menu no longer follows the custom keys, so its labels are
+   the ones the removal names. Run, batch WSc, at `05efa1a` and with the fixed text: its checks c1 and
+   c2, Space given to «Next image» and the default Space shortcut disabled, fail at `05efa1a` and pass
+   with the fix.
 
 d. **The «7» and «Shift+7» hints** of «Copy/Move selected file(s) into...» (:31628-31629): in the
    tree, 7 goes to the tree's own type-ahead search; in the main window, 7 runs the copy only with
@@ -1539,7 +1554,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   tree's `\dst` lists the folders of the four routes, `\zz` stays collapsed, a selected `\dst\old`
   stays selected, the tree's own paste and «Scan for sub-folders» called as the menu calls it list
   their folder under the selected `\dst`, as at `80964a3`, and a tree never opened gets no window.
-- **R. A custom key of the main window takes the key off an item of the tree's menu, while the
+- ✅ **R. A custom key of the main window takes the key off an item of the tree's menu, while the
   tree keeps the key.** `kMenu()` drops the key from a label when the user's custom keys give that
   key, in the current key context, to another function or disable it (small thing c); the tree's
   menu is built the same way, but the tree reads its keys itself (`FolderTreeResponder()`),
@@ -1549,7 +1564,12 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   Analysed on 2026-11-20 against Marius's rule, open: the omnibox's and the panels' menus share R, a
   default key moved to another key causes it too, and the menu the panels and the omnibox share also
   gains hints; F5, F2, F3 and Escape were run as well. See the section «Custom keys in the tree, the
-  omnibox and the panels».
+  omnibox and the panels». **Fixed in `6cb7d19`** (decisions 51 to 53, 56 and 58): the menus of the tree,
+  the omnibox and the panels keep their own keys, the tree's 7 and Shift+7 excepted, which are keys
+  of the main window and keep following the custom keys; «Open with» and the custom keys under a
+  regular panel were fixed with it (`8aada08`, `d3b3fe6`). Run, batches RM and RC, at `05efa1a` and with
+  the fixed texts: the five checks of the rule and panel 34's «Align» fail at `05efa1a` and pass
+  with the fix, the controls pass at both.
 - ✅ **S. Four drag confirmations put a dot before a full path.** The boxes of a drag from the main
   window onto the tree, from the tree onto the omnibox, from the omnibox onto the tree, and inside
   the tree between elements that are not siblings write «Source: .» and «Destination: .» before the
@@ -1915,6 +1935,16 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   `CurrentSLD` is the lower-case `pv\alpha` of the seed folders list (the case of L). «New list»,
   answered to the drop's question with a list loaded, takes the same path (read). Lines at `df49b13`.
   Found by the review of AM's fix.
+- **AP. Alt+E never opens the containing folder in QPV.** `processDefaultKbdCombos()` (:1188-1194 at
+  `05efa1a`) gives Alt+E to «Selection properties» (`PanelIMGselProperties()`) when
+  `HKifs("imgEditSolo")`, `HKifs("imgsLoaded")` or `HKifs("liveEdit")` holds, and to «Open in QPV the
+  containing folder» (`OpenQPVfileFolder()`) only after that, in the thumbnails view. With a list
+  loaded `HKifs("imgsLoaded")` holds in both views, so the second branch is never reached, and
+  `PanelIMGselProperties()` returns at once in the thumbnails view (read). Yet the main menus show
+  Alt+E beside «Open in QPV the containing folder» in the thumbnails view (:68344), and «Open with»
+  in both views (:3054). Run, batch RC, at `05efa1a`: the default keys' probe gives
+  `PanelIMGselProperties` for Alt+E in the image view and in the thumbnails view. Found while
+  checking decision 54; not fixed.
 
 ## Custom keys in the tree, the omnibox and the panels («Seen in passing» R)
 
@@ -1945,6 +1975,18 @@ keys that do nothing there (run). The quick search's «Shortcut» column, made o
 must keep following the custom keys, and so must the «`\\`» menu where the main window shows it
 (Shift+F4). A few items of these windows' menus name keys of the main window; the rule has to settle
 them (decisions 51 to 55, at the end of this section).
+
+**Fixed at `d3b3fe6`** (decisions 51 to 58, settled at the end of this section). `kMenu()` takes a last
+parameter, `ownKeys` (:71789 at `d3b3fe6`). Left blank it is decided by the menu's name: the six menus only
+these windows build (`PVfdTree`, `PVfomni`, `ContextMenu`, `PanelStaticMenu`, `PanelDynaMenu`,
+`MenuRevSelFiles`) are never altered by custom keys, and every other menu follows them as before. The
+items of the submenus whose names the main window's menus use too pass 1: the five «Open» submenus
+(`PVopenF`, 19 items), panel 60's «Copy» (`PVcopy`, 7 items) and panel 34's «Align» in its panel mode
+(`PVselAlign`, 8 items). The tree's «Copy selected file(s) into...» and «Move selected file(s)
+into...», whose 7 and Shift+7 are main-window keys, pass 0 and keep following the custom keys
+(`6cb7d19`). «Open with» adds its two items with keys through `kMenu()` (`8aada08`). Under a regular panel,
+`KeyboardResponder()` probes the default key of the custom key's function (`d3b3fe6`). The «`\\`» menu,
+the Preferences panel's «More options» and the quick search's «Shortcut» column are unchanged.
 
 ### 1. Keys: a custom key acts only in the main window
 
@@ -2070,26 +2112,54 @@ commands, writes «Ctrl+E» and «Alt+E» (:3052, :3054) whatever the custom key
 folder» and «Open in QPV the containing folder» (`OpenThisFileFolder`, `OpenQPVfileFolder`, main-menu
 items, :68346-68347), and Alt+E in every view, where the main menus show it in the thumbnails view
 only (:68344). The review selected files panel (ID 60) shows that menu too, for «Open image with an
-external app» (:96430), and handles neither key.
+external app» (:96430), but without these two items, which sit inside `If (AnyWindowOpen!=60)`
+(:3036); an earlier text of this paragraph said that panel 60 showed them, wrongly.
 
 ### Decisions before a fix
 
 51. **Which menus the rule covers**: those of the table above, with their submenus, the «Align» menu
     of panel 34 included, or without it? In every case the quick search's «Shortcut» column keeps
     following the custom keys, and so does the «`\\`» menu where Shift+F4 opens it in the main window.
+    **Settled**: covered, the menus of these windows' buttons too, panel 34's «Align» included
+    (`6cb7d19`).
 52. **How `kMenu()` tells these menus**: a list of menu names in `kMenu()`, with the shared names
     split first (`PVopenF` of the tree, the omnibox and panels 2, 3 and 60; `PVselAlign` of panel
     34); a switch kept in a `Static` of `kMenu()`, set by these builders through `kMenu()` itself and
     cleared at their end and by its «Reset», with no new super-global; or a new last parameter on each
     `kMenu()` call of these builders?
+    **Settled**: by name or by a new parameter, whichever changes the fewest lines (Marius), then by
+    both: the six own menus by name, the items of the submenus with shared names by the new last
+    parameter `ownKeys` (`6cb7d19`).
 53. **Main-window keys in the tree's menus**: the tree's 7 and Shift+7 (small thing d), and the
     «`\\`» menu's Page Up/Down hints when the tree's button opens it: drop those hints there, or keep
     them as main-window keys that go on following the custom keys, an exception to the rule?
+    **Settled**: kept as main-window keys that follow the custom keys, also where the tree's
+    «`\\`» button opens the menu (`6cb7d19`: the tree's two items pass 0).
 54. **«Open with»**: leave it as it is, drop its two hints, or have its hints follow the custom keys in
     the main window and drop them when panel 60 shows it?
+    **Settled**: they follow the custom keys, the change being two lines (`8aada08`). Panel 60 never shows
+    them (section 3, corrected), so nothing is dropped there.
 55. **Custom keys in the main window while a regular panel is open** (check k8): keep them acting
     under the panel, as now, or block them as the default keys are blocked? This is outside the rule
     as worded.
+    **Settled**: blocked where the default key of the same function is blocked, not all of them
+    (Marius's choice; I had recommended all): a custom key of the quick search, the omnibox, the quick
+    help, the menu bar, the toolbar, restart or the OSD zoom keeps working under a regular panel, as
+    their default keys do (`d3b3fe6`).
+56. **The Preferences panel's «More options»**: it opens the main window's own «Interface» menu
+    (`PvUIprefs`, `createMenuInterfaceOptions()`), whose hints are main-window keys. Does it keep
+    following the custom keys, as the «`\\`» menu does from the tree?
+    **Settled**: it keeps following them; nothing changes.
+57. **How decision 55 is checked**: probe the default key of the custom key's function, which the
+    custom keys file keeps, with `processDefaultKbdCombos()`'s simulacrum, as `forbiddenAltKeys()`
+    does, or a fixed list of the functions whose default keys run under a panel?
+    **Settled**: the probe (`d3b3fe6`). The placeholder of Escape in that table (`dummy`) counts as not
+    run: under a regular panel Escape closes the panel (`byeByeRoutine()`), and «Exit» does not run.
+58. **Where the new parameter goes in the five «Open» submenus**: only on the 7 items that show a key,
+    or on all 19?
+    **Settled**: all 19 (Marius's choice; I had recommended the 7). Beyond the question, the same was
+    done for panel 60's «Copy» submenu (7 items; `PVcopy` is a main-window name too) and for the 8
+    items of panel 34's «Align» menu in its panel mode (`6cb7d19`).
 
 **How this was checked.** Read at `3efb00f`. Run in the application under headless Wine, on
 AutoHotkey 1.1.37.02, at `3efb00f`: batches RK and RM of `.claude/scratch/folders-tree-seen-r-2026-11-20/`
@@ -2100,6 +2170,21 @@ writes the custom keys file in the shape of the panel's lines (section 2) and re
 builder makes it (`tiMenu()`). RK passes in full. In RM the controls pass, and the five checks of the
 rule fail, each a case of R. Not run: key contexts 1 and 3 to 5 for the menus, the live image editing
 panels, panel 34's «Align» menu, «Open with», and Windows itself.
+Then, for the fix, at `05efa1a` and with the fixed texts (`v1/` of the kit, made by `mkfixes-r.py`;
+`run-batches.sh <prefix> <revision | file> <batches>`): batches RK and RM; RC (panel 34's «Align» menu,
+«Open with», the main window's «Align» menu as the control, and lead AP's probe); RS (custom keys with
+no panel, under the folders list panel, the default Right there as the control, the quick search
+moved from «:» to F12 there, and with «Desaturate selected area», a live image editing panel, open).
+RM also reads the «`\\`» menu with the tree closed and gives 7 to another function. At `05efa1a` (logs
+`h2-`) RK passes in full, and in RM, RC and RS the controls pass while the checks of decisions 51 to
+55 fail (five in RM, two in RC, one in RS); with the text of each commit its own checks pass (`c1-`,
+`c2-`), and with the last text every check passes (`f-`). Nine batches of the earlier kits that build
+menus, route keys or read the custom keys (WSc, WSd, T14, ZN, ZF, ZG, XI, ZQ and ZM; `run-regs.sh`,
+logs `g-` at `05efa1a` and `r-` with the last text) give the same checks at both but WSc, whose checks
+c1 and c2, small thing c, now pass; WSd's d1 and d3 fail at both, small thing d being open, and XI's
+log differs only in the file that a reopened database picks at random. AutoHotkey 1.1.37.02 loads each
+of the three texts, with and without `/iLib`. Not run: key contexts 4 and 5, the «`\\`» menu from the
+tree's button, Windows itself.
 
 ## Checked and found correct
 
@@ -2456,3 +2541,7 @@ panels, panel 34's «Align» menu, «Open with», and Windows itself.
   headless Wine, on AutoHotkey 1.1.37.02, at `3efb00f`, batches RK and RM of
   `.claude/scratch/folders-tree-seen-r-2026-11-20/`; the end of the section «Custom keys in the tree,
   the omnibox and the panels» says how.
+- «Seen in passing» R and decisions 51 to 55 were fixed on 2026-11-20 (`6cb7d19`, `8aada08`,
+  `d3b3fe6`): run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `05efa1a` and
+  with the fixed texts, by the same kit (batches RK, RM, RC and RS, and nine batches of the earlier
+  kits); the end of that section says how.
