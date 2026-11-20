@@ -15,15 +15,17 @@ Two independent reads of the same code followed the first version of this report
 confirmed every finding but 9, which neither raised, and narrowed finding 12. What they added
 is marked **second read**. Six of those points were run (batch J); the others say «read».
 
-**Status, 2026-11-10.** Marius fixed part of this in five commits: `ef705b0`, `16b35ff`,
+**Status, 2026-11-20.** Marius fixed part of this in five commits: `ef705b0`, `16b35ff`,
 `7f0e8cf`, `b302cc9` and `cc34faf`. Findings 7, 8 and 9 were fixed after them, in `ca918d3`,
-`643541d` and `f6f9fb2`, with his answers to decisions 3 and 7. Findings 1 to 9, 13, 15, 16
-and 18 are fixed; 14, 17 and 19 are partly fixed; 10 to 12 are open. A fixed or partly fixed
-section ends with a note on what the code does now. Those notes cite lines at `07746da`, the
-commit after `cc34faf`; the notes of findings 7, 8 and 9 cite lines at `ca918d3`. Everything
-else keeps its lines at 5af5eff. Each note was checked by running the earlier batches again
-on the commit it cites, with six new ones: K, L, N and O for the first five commits, P and Q
-for the last three.
+`643541d` and `f6f9fb2`, with his answers to decisions 3 and 7. Finding 11 does not happen
+the way it was first described; the one route found for its harm is closed in `d3373a2`.
+Findings 1 to 9, 11, 13, 15, 16 and 18 are fixed; 14, 17 and 19 are partly fixed; 10 and 12
+are open. A fixed or partly fixed section ends with a note on what the code does now. Those
+notes cite lines at `07746da`, the commit after `cc34faf`; the notes of findings 7, 8 and 9
+cite lines at `ca918d3`, and the note of finding 11 at `d3373a2`. Everything else keeps its
+lines at 5af5eff. Each note was checked by running the earlier batches again on the commit
+it cites, with seven new ones: K, L, N and O for the first five commits, P and Q for the
+last three, and W for finding 11, on stock AutoHotkey 1.1.37.02 alone.
 
 What the commits changed besides is under «New with the fixes». One narrow point is open
 there: F3 closes the panel when the unsaved-image question stopped it.
@@ -63,7 +65,7 @@ there: F3 closes the panel when the unsaved-image question stopped it.
 | 8 | «None» and «Deselect listed items in index» can select instead | medium | run | **fixed**, `643541d` |
 | 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run | **fixed**, `f6f9fb2` |
 | 10 | A listing the user stopped: no notice, no way to resume, and a filter remembers the partial result as final | medium | run | open |
-| 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table | medium, rare | run | open |
+| 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table: not as first described, only through a stalled mouse-move handler | medium, rare | run | **fixed**, `d3373a2` |
 | 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties»; such paths reach the index only through «Search and replace» | low, narrow | run | open |
 | 13 | `*` is not a wildcard in the filter box | medium | run | **fixed**, `ef705b0` |
 | 14 | «Filter table to selected path» also lists folders whose name begins the same; its tick never comes off | low | run | **partly fixed**, `ef705b0`: private mode is left |
@@ -533,27 +535,55 @@ let the scroll test pass whenever `reviewSelectedIndexes[1, 2]` is not 2.
 
 ## 11. «X» pressed while a filter is being listed puts the filtered rows into the full table
 
-`uiPopulateReviewSelectedFiles()` :95629-95691, `UIstringEditFilterErase()` :95479-95484
+`uiPopulateReviewSelectedFiles()` :95629-95691, `UIstringEditFilterErase()` :95479-95484,
+`WM_MOUSEMOVE()` (:108320 at `aafd458`)
 
-A filter is listed from a timer, and that thread can be interrupted until its first progress
-message at 1.5 s (`showTOOLtip()` turns Critical on). «X» starts a second call 250 ms later.
-That call shows the full table and makes it the window's current list view (:95585). The
-interrupted loop goes on, and its `LV_Add()` calls now land in the full table.
+Not through the route first described here. It said the listing, started from a timer, could
+be interrupted until its first progress message at 1.5 s. It cannot: every new thread starts
+Critical, because `BuildGUI()` leaves Critical on at the end of the start-up code. The
+listing, «Apply», «X», «Deselect» and a plain timer all start with `A_IsCritical=16` (run,
+2026-11-20, stock AutoHotkey 1.1.37.02), so a click on «X» waits until the listing has
+ended. The first run called the listing straight from the test's own thread after
+`Critical, Off`, which no real route does.
 
-Run: 60 000 selected files, a filter that matches 33 000 of them, «X» 124 ms into the
-listing. The full table grew from 60 000 to 92 018 rows, the filtered table stopped at 982,
-and the info line reads «Filtered table: 92 018 / 60 000 (153.36%)» over an empty filter box.
+Run at `aafd458`: 12 000 selected files, a filter that matches 6 600, «X» clicked at the
+listing's 800th step (button down and up posted to it), then a mouse move over the panel at
+every step of the system clock (16 ms under Wine). In four runs of four, «X» ran after the
+listing, and both tables were right.
 
-The second call starts 250 ms after the click, so the listing must still be running then and
-be less than 1.5 s old. That takes tens of thousands of selected files. «Apply» with fewer
-than two characters in the box takes the same path.
+The harm has one route left, the panel's mouse-move handler. `WM_MOUSEMOVE()` turned Critical
+off on its first line, and it runs on top of the listing whenever the mouse moves over the
+panel. A thread that is not Critical looks at its queue once the system clock shows more
+than 5 ms since the handler started, and the queued «X» then runs inside the listing. A
+second such look, 250 ms later or more, runs the full table's listing, which makes the full
+table the window's current list view (:95585); the interrupted loop goes on, and its
+`LV_Add()` calls land there. The handler takes 24 to 44 µs under Wine, its taskbar call
+included. It starts right after the clock has moved on, so it has to stay busy until the
+clock moves again: held 1 to 14 ms, a test handler let nothing in; held 20 ms, it did. How
+long the taskbar call takes on Windows was not measured.
 
-«Refresh» (F5) during such a listing leaves the interrupted loop adding rows to the new
-panel. A «Select», «Deselect» or «None» loop interrupted the same way goes on over the other
-table (second read; both read, not run).
+Run with each run of the mouse-move handler held 20 ms:
 
-Fix direction: turn Critical on for the whole listing, as the first listing has it, or name
-the list view before every `LV_Add()` and leave the loop when the other table became visible.
+- «X»: the full table grew from 12 000 to 17 658 rows, the filtered table stopped at 942,
+  and the info line read «Filtered table: 17 658 / 12 000 (147.15%)» over an empty box.
+- «X» during «Deselect» on the 6 600 rows of the filtered table, with 3 000 rows of the full
+  table highlighted: 1 650 files were deselected inside the filter and 757 outside it.
+- «Refresh» during the listing: the new panel's full table held 18 104 rows for 12 000
+  files.
+- The same mouse moves with no click: both tables right.
+
+An earlier run, with the hold on the handler's first line, gave 17 778, 730 and 18 111.
+
+«Apply» with fewer than two characters in the box, F5 on the list and «None» are queued the
+same way (read). The pen handler `WM_PENpressure()` turns Critical off as well; a pen over
+the panel was not tried.
+
+**Fixed in `d3373a2`**: `WM_MOUSEMOVE()` turns Critical off below the branch it takes while an
+operation runs (:108333), so that branch stays Critical. Run with the handler held 20 ms:
+«X» ran once the listing had ended, and both tables were right (12 000 and 6 600 rows);
+«X» during «Deselect» left 6 600 files deselected inside the filter and none outside it;
+«Refresh» came after the listing, and the new panel listed its 12 000 rows. Nothing started
+inside the mouse-move handler. The four runs without the hold are as before.
 
 ---
 
@@ -829,8 +859,8 @@ The commits after `7f0e8cf` did not touch this part of the handler.
   does not exist.
 - **A listing stops once the panel is closed** (:95665, :95727). Run: 30 000 selected files,
   a filter being listed, the panel closed 0.3 s in: the listing returns 0.1 s later, with
-  the busy state cleared. At `b302cc9` it went on for 0.5 s. It does not stop when a panel
-  is open again by then, as after F5 (finding 11, read).
+  the busy state cleared. At `b302cc9` it went on for 0.5 s. A panel cannot be open again
+  before it stops: F5 and «Refresh» wait until the listing has ended (finding 11, run).
 
 Left as they were: scrolling applies an unapplied filter, the two items on Alt+L, «Select»
 and «Deselect» with no highlighted row, the `a|||b` filter, a typed number changed by Up and
@@ -960,8 +990,8 @@ others are open.
    takes 11 to 13 s on 60 000 rows under Wine.
 8. «Seen in passing» A is outside the panel. Fix it with this work or apart?
 
-Suggested order for what is left: 10 and 12; then 11; then what is left of 14, 17 and 19,
-and the open point under «New with the fixes».
+Suggested order for what is left: 10 and 12; then what is left of 14, 17 and 19, and the
+open point under «New with the fixes».
 
 ## How this was checked
 
@@ -1005,7 +1035,17 @@ and the open point under «New with the fixes».
   on `ca918d3` (batch R traces it). The case sets up its unsaved image at 0.75 s, where it
   used 0.45 s.
 - Batch E, the 60 000 rows, ran several times on c5a32d3, `ef705b0` and `7f0e8cf`, in turns;
-  the later commits did not touch that part of the handler.
+  the later commits did not touch that part of the handler. Its finding 11 case called the
+  listing straight from the test's thread after `Critical, Off`, which made the listing
+  interruptible; no real route starts it that way (finding 11).
+- Finding 11 again, on 2026-11-20, on stock AutoHotkey 1.1.37.02 alone: batch W on `aafd458`
+  and on `d3373a2`. A click is posted as button down and button up at the 800th step of the
+  listing or of «Deselect», then a mouse move over the panel at every step of the clock;
+  `QPV_W=1` logs when the panel's functions start and whether they started inside the
+  mouse-move handler, times that handler, and holds each of its runs 20 ms when asked. Batch
+  WT times its taskbar call. A probe script without QPV holds a `Critical, Off` mouse-move
+  handler over a Critical loop for 1 to 20 ms (about 990 runs each): only the 20 ms hold let
+  a queued click in, at its third run.
   Batch M times Ctrl+A alone; `QPV_RESP_VARIANT=first` or `none` moves the handler's event
   test to its first line, or leaves the list views without a handler, in the scratch copy.
 - Three aids, each named where it was used:
@@ -1015,14 +1055,18 @@ and the open point under «New with the fixes».
     which is what it answers once the user confirms the prompt (findings 10 and 17);
   - the list control resized to bring 21 and 29 rows into view (findings 7 and 9), because
     Wine's rows are taller than Windows's.
-- Not run on Windows. Three things rest on how Windows behaves. Two were only seen under
-  Wine: a fresh list view has no focused row (finding 1), and the timings of findings 7 and
-  18. One was not seen at all: that the list reports the end of every scroll and every key
-  to its handler, which the fix of finding 7 relies on.
+- Not run on Windows. Four things rest on how Windows behaves. Two were only seen under
+  Wine: a fresh list view has no focused row (finding 1), and the timings of findings 7, 11
+  and 18. Two were not seen at all: that the list reports the end of every scroll and every
+  key to its handler, which the fix of finding 7 relies on, and how long the mouse-move
+  handler's taskbar call takes there (finding 11).
 - Not checked: the panel on an .SLDB list, on a duplicates list (the «Dupe ID» column), and
   with an edited, unsaved image in the viewport.
 - Kit: `.claude/scratch/review-selected-panel-2026-11-09/app/`: `run-app.sh <tag> <test
   function> [revision]`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to
-  testReviewR), `results/` (the logs of `ef705b0` end in `-ef7`, those of `7f0e8cf` in
-  `-7f0`, those of `b302cc9` in `-885`, after its merge commit 8851855, those of `07746da`
-  in `-077`, and those of `ca918d3` in `-fix`).
+  testReviewW, and testReviewWT), `results/` (the logs of `ef705b0` end in `-ef7`, those of
+  `7f0e8cf` in `-7f0`, those of `b302cc9` in `-885`, after its merge commit 8851855, those of
+  `07746da` in `-077`, and those of `ca918d3` in `-fix`; batch W's are `w-head.txt` and
+  `w-head2.txt` for `aafd458`, with the hold on the handler's first line and then in its
+  busy branch, and `w-new.txt` for `d3373a2`); the probe is
+  `.claude/scratch/review-selected-panel-2026-11-09/probe-critical-off/`.
