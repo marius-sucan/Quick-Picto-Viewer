@@ -9714,9 +9714,11 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
          If (omniBoxMode=1 && VisibleQuickMenuSearchWin=1)
          {
             Gui, QuickMenuSearchGUIA: Default
+            Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
             GuiControlGet, userQuickMenusEdit
             edithu := Trimmer(userQuickMenusEdit)
             edithu := Trimmer(StrReplace(edithu, "\\", "\"), "\")
+            initialRow := LV_GetNext(0)
          }
 
          func2exec := r := info := ""
@@ -9754,8 +9756,7 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             } Else If InStr(info, "tree")
             {
                thisFolder := r := dc := nc := ""
-               LV_Modify(initialRow, "select")
-               friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
+               friendly := "`nMove or copy the selected file(s) into a folder. Hold SHIFT to MOVE."
                GetMouseCoord2wind(hTVlistFolders, nX, nY)
                nc := TVH_HitTest(hTVlistFolders, cr, nX, nY)
                If nc
@@ -9765,18 +9766,21 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
                   TV_GetText(thisFolder, nc)
                   TV_Modify(nc)
                }
-               friendly .= "`nDestination: " folderTreeLabelForMsg(thisFolder) "\"
                r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
-               friendly .= A_Space r
+               friendly .= nc ? "`nDestination: " folderTreeLabelForMsg(thisFolder) "\ " r : "`nNo folder is currently underneath."
             } Else If InStr(info, "omnibox list")
             {
                thisFolder := r := dc := nc := ""
                GetMouseCoord2wind(hLVquickSearchMenus, nX, nY)
                dc := LV_EX_ItemHitTest(hLVquickSearchMenus, kp, nX, nY)
-               thisFolder := OmniBoxGetSelectedFolder(dc, "yes", edithu)
-               LV_Modify(dc, "select")
+               thisFolder := dc ? OmniBoxGetSelectedFolder(dc, "yes", edithu) : ""
+               If thisFolder
+                  LV_Modify(dc, "select")
+               Else
+                  dc := ""
+
                restu := SubStr(thisFolder, InStr(thisFolder, "\", 0, -1) + 1)
-               friendly := "`nMove or copy folder into another one. Hold SHIFT to MOVE."
+               friendly := "`nMove or copy the selected file(s) into a folder. Hold SHIFT to MOVE."
                r := GetKeyState("Shift", "P") ? "[_MOVE_]" : "[_COPY_]"
                friendly2 := "`nDestination: .\" restu "\ " r
                friendly .= thisFolder ? friendly2 : "`nNo folder is currently underneath."
@@ -9785,6 +9789,19 @@ thumbsListClickResponder(mX, mY, mainWidth, mainHeight, mainParam, ctrlState, sh
             {
                func2exec := r := dc := nc := ""
                friendly := "`nNo action associated to this pointer location"
+            }
+
+            If (initialRow!="" && !(InStr(info, "omnibox list") && thisFolder))
+            {
+               ; off the omnibox's folder rows, the row it had selected comes back
+               Gui, QuickMenuSearchGUIA: Default
+               Gui, QuickMenuSearchGUIA: ListView, LVsearchMenus
+               If (LV_GetNext(0)!=initialRow)
+               {
+                  LV_Modify(0, "-select")
+                  If initialRow
+                     LV_Modify(initialRow, "select")
+               }
             }
 
             If (A_TickCount - prevMSGdisplay>100)
@@ -30956,7 +30973,7 @@ FolderTreeResponder(a, b, c) {
             If dc
                LV_Modify(dc, "select focus vis")
 
-            thisFolder := OmniBoxGetSelectedFolder()
+            thisFolder := dc ? OmniBoxGetSelectedFolder() : ""
             If !thisFolder
                dc := thisFolder := ""
 
@@ -42709,7 +42726,7 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
             thisFolder := r := dc := nc := ""
             GetMouseCoord2wind(hLVquickSearchMenus, nX, nY)
             dc := LV_EX_ItemHitTest(hLVquickSearchMenus, kp, nX, nY)
-            thisFolder := OmniBoxGetSelectedFolder(dc, "yes", edithu)
+            thisFolder := dc ? OmniBoxGetSelectedFolder(dc, "yes", edithu) : ""
             If (dc=initialRow || !thisFolder || thisFolder=initialFolder)
             {
                dc := thisFolder := ""
