@@ -108318,7 +108318,6 @@ DelayedToolbarTooltips(msgu, idu) {
 }
 
 WM_MOUSEMOVE(wP, lP, msg, hwnd) {
-   Critical, off
    Static lastInvoked := 1, prevCtrlHover, prevState, prevMsg, lkmu
    If (A_TickCount - scriptStartTime < 900)
       Return
@@ -108330,6 +108329,8 @@ WM_MOUSEMOVE(wP, lP, msg, hwnd) {
       Return
    }
 
+   ; the busy branch above runs over Critical loops: off there, it would let queued clicks and timers in
+   Critical, off
    If (drawingShapeNow!=1)
    {
       hwnd := Format("{1:#x}", hwnd)
