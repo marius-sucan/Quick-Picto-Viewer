@@ -27042,10 +27042,12 @@ OpenDirsFavedEntry(a, b, c) {
       OpenSLD(folderu)
    Else If (FileRexists(folderu) && RegExMatch(folderu, RegExFilesPattern))
    {
-      MenuOpenLastImg(folderu)
-      resultedFilesList[currentFileIndex, 5] := 1
-      currentImgModified := 0
-      SlidesMusicSong := ""
+      If MenuOpenLastImg(folderu)
+      {
+         resultedFilesList[currentFileIndex, 5] := 1
+         currentImgModified := 0
+         SlidesMusicSong := ""
+      }
    } Else If (folderu="\QPV\favourite-images-list.SLD")
       retrieveFavesAsList()
    Else If (folderu="\QPV\viewed-images-history|current-session.SLD")
@@ -65711,7 +65713,8 @@ askAboutFileSave(msg:="", dontOpen:=0) {
    Return r
 }
 
-MenuOpenLastImg(forceOpenGiven:=0) {
+MenuOpenLastImg(forceOpenGiven:=0, alreadyAsked:=0) {
+; alreadyAsked=1: the caller asked about the image, the list and the selection; returns 1 once the image is open
    If (thumbsDisplaying=1)
    {
       MenuDummyToggleThumbsMode()
@@ -65731,11 +65734,14 @@ MenuOpenLastImg(forceOpenGiven:=0) {
 
    If (RegExMatch(LastOpenedImg, RegExFilesPattern) && FileRexists(LastOpenedImg))
    {
-      If askAboutFileSave(" and another image will be loaded")
-         Return
+      If (alreadyAsked!=1)
+      {
+         If askAboutFileSave(" and another image will be loaded")
+            Return 0
 
-      If askAboutSlidesListSave()
-         Return
+         If askAboutSlidesListSave()
+            Return 0
+      }
 
       If (thumbsDisplaying=1)
          ToggleThumbsMode()
@@ -65782,6 +65788,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
 
       If (FlipImgH=1 || FlipImgV=1 || vpIMGrotation>0 || imgFxMode>1 || usrColorDepth>1)
          CreateTempGuiButton("Display unaltered image,,HardResetImageView", 0)
+      Return 1
    } Else If (StrLen(LastOpenedImg)>3)
    {
       zPlitPath(LastOpenedImg, 0, OutFileName, OutDir, OutNameNoExt)
@@ -65790,6 +65797,7 @@ MenuOpenLastImg(forceOpenGiven:=0) {
       Else
          msgBeepTimer("ERROR: File not found or access denied.`n" OutFileName "`n" OutDir "\")
    }
+   Return 0
 }
 
 OpenArgFile(inputu) {
@@ -72809,7 +72817,7 @@ OpenRecentEntry(menuItem, modus:=0) {
      If RegExMatch(newEntry, RegExFilesPattern)
      {
         RecordImagesOpenedManager(newEntry)
-        MenuOpenLastImg(newEntry)
+        MenuOpenLastImg(newEntry, 1)
      } Else If RegExMatch(newEntry, sldsPattern)
      {
         OpenSLD(newEntry)
@@ -72878,10 +72886,12 @@ OpenFavesEntry(menuItem) {
         Return
 
      RecordImagesOpenedManager(newEntry)
-     MenuOpenLastImg(newEntry)
-     resultedFilesList[currentFileIndex, 5] := 1
-     currentImgModified := 0
-     SlidesMusicSong := ""
+     If MenuOpenLastImg(newEntry, 1)
+     {
+        resultedFilesList[currentFileIndex, 5] := 1
+        currentImgModified := 0
+        SlidesMusicSong := ""
+     }
   }
 
   ; ToolTip, % (A_TickCount - startZeit) - (A_TickCount - startZeitIMGload) , , , 2
