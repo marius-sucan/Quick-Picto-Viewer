@@ -2523,6 +2523,7 @@ OpenSLD(fileNamu, dontStartSlide:=0) {
         CurrentSLD := fileNamu
         RecordFoldersOpenedManager(CurrentSLD)
         SLDtypeLoaded := 3
+        currentFilesListModified := 0
         prevOpenFolderPath := OutDir
         INIaction(1, "prevOpenFolderPath", "General")
         RandomPicture()
@@ -65446,6 +65447,7 @@ coreOpenFolder(thisFolder, doOptionals:=1, openFirst:=0, doReset:=0, safeMode:=0
       GenerateRandyList()
       DynamicFoldersList := thisFolder "`n"
       CurrentSLD := thisFolder
+      currentFilesListModified := 0   ; GetFilesList() marks every scan; a folder just opened is not modified
       watchFolderDetails := ""
       If (safeMode=0)
          RecordFoldersOpenedManager(CurrentSLD)
