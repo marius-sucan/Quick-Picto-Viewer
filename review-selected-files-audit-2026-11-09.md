@@ -18,14 +18,15 @@ is marked **second read**. Six of those points were run (batch J); the others sa
 **Status, 2026-11-20.** Marius fixed part of this in five commits: `ef705b0`, `16b35ff`,
 `7f0e8cf`, `b302cc9` and `cc34faf`. Findings 7, 8 and 9 were fixed after them, in `ca918d3`,
 `643541d` and `f6f9fb2`, with his answers to decisions 3 and 7. Finding 11 does not happen
-the way it was first described; the one route found for its harm is closed in `d3373a2`.
-Findings 1 to 9, 11, 13, 15, 16 and 18 are fixed; 14, 17 and 19 are partly fixed; 10 and 12
-are open. A fixed or partly fixed section ends with a note on what the code does now. Those
-notes cite lines at `07746da`, the commit after `cc34faf`; the notes of findings 7, 8 and 9
-cite lines at `ca918d3`, and the note of finding 11 at `d3373a2`. Everything else keeps its
-lines at 5af5eff. Each note was checked by running the earlier batches again on the commit
-it cites, with seven new ones: K, L, N and O for the first five commits, P and Q for the
-last three, and W for finding 11, on stock AutoHotkey 1.1.37.02 alone.
+the way it was first described; the one route found for its harm is closed in `d3373a2`,
+except during «None». Findings 1 to 9, 13, 15, 16 and 18 are fixed; 11, 14, 17 and 19 are
+partly fixed; 10 and 12 are open. A fixed or partly fixed section ends with a note on what
+the code does now. Those notes cite lines at `07746da`, the commit after `cc34faf`; the
+notes of findings 7, 8 and 9 cite lines at `ca918d3`, and the note of finding 11 at
+`d3373a2`. Everything else keeps its lines at 5af5eff. Each note was checked by running the
+earlier batches again on the commit it cites, with eight new ones: K, L, N and O for the
+first five commits, P and Q for the last three, and W and WN for finding 11, on stock
+AutoHotkey 1.1.37.02 alone.
 
 What the commits changed besides is under «New with the fixes». One narrow point is open
 there: F3 closes the panel when the unsaved-image question stopped it.
@@ -65,7 +66,7 @@ there: F3 closes the panel when the unsaved-image question stopped it.
 | 8 | «None» and «Deselect listed items in index» can select instead | medium | run | **fixed**, `643541d` |
 | 9 | With 26 or more rows in view, the rest of a long table can never be listed | medium | run | **fixed**, `f6f9fb2` |
 | 10 | A listing the user stopped: no notice, no way to resume, and a filter remembers the partial result as final | medium | run | open |
-| 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table: not as first described, only through a stalled mouse-move handler | medium, rare | run | **fixed**, `d3373a2` |
+| 11 | «X» pressed while a filter is being listed puts the filtered rows into the full table: not as first described, only through a stalled mouse-move handler | medium, rare | run | **partly fixed**, `d3373a2`: «None» is left |
 | 12 | Network paths lose their leading `\\` in the folder column, in two copy actions and in «Folder properties»; such paths reach the index only through «Search and replace» | low, narrow | run | open |
 | 13 | `*` is not a wildcard in the filter box | medium | run | **fixed**, `ef705b0` |
 | 14 | «Filter table to selected path» also lists folders whose name begins the same; its tick never comes off | low | run | **partly fixed**, `ef705b0`: private mode is left |
@@ -578,12 +579,18 @@ An earlier run, with the hold on the handler's first line, gave 17 778, 730 and 
 same way (read). The pen handler `WM_PENpressure()` turns Critical off as well; a pen over
 the panel was not tried.
 
-**Fixed in `d3373a2`**: `WM_MOUSEMOVE()` turns Critical off below the branch it takes while an
-operation runs (:108333), so that branch stays Critical. Run with the handler held 20 ms:
-«X» ran once the listing had ended, and both tables were right (12 000 and 6 600 rows);
-«X» during «Deselect» left 6 600 files deselected inside the filter and none outside it;
-«Refresh» came after the listing, and the new panel listed its 12 000 rows. Nothing started
-inside the mouse-move handler. The four runs without the hold are as before.
+**Partly fixed in `d3373a2`**: `WM_MOUSEMOVE()` turns Critical off below the branch it takes
+while an operation runs (:108333), so that branch stays Critical. Run with the handler held
+20 ms: «X» ran once the listing had ended, and both tables were right (12 000 and 6 600
+rows); «X» during «Deselect» left 6 600 files deselected inside the filter and none outside
+it; «Refresh» came after the listing, and the new panel listed its 12 000 rows. Nothing
+started inside the mouse-move handler. The four runs without the hold are as before.
+
+Left open: «None» (`BTNreviewDropFilesSelection()` :96341) sets no busy state, so a mouse
+move during its loop still reaches `Critical, off`. Run at `68ea27e`, the handler held 20 ms
+there, «X» clicked during «None» on the 6 600 rows of the filtered table: «X» ran inside the
+mouse-move handler, and 3 630 files were deselected inside the filter and 2 350 outside it.
+«Select», «Deselect», the copy actions and the listing set the busy state. See decision 9.
 
 ---
 
@@ -859,8 +866,9 @@ The commits after `7f0e8cf` did not touch this part of the handler.
   does not exist.
 - **A listing stops once the panel is closed** (:95665, :95727). Run: 30 000 selected files,
   a filter being listed, the panel closed 0.3 s in: the listing returns 0.1 s later, with
-  the busy state cleared. At `b302cc9` it went on for 0.5 s. A panel cannot be open again
-  before it stops: F5 and «Refresh» wait until the listing has ended (finding 11, run).
+  the busy state cleared. At `b302cc9` it went on for 0.5 s. A panel open again by then
+  would not stop it, but «Refresh» waits until the listing has ended (finding 11, run), and
+  F5 on the list is queued the same way (read).
 
 Left as they were: scrolling applies an unapplied filter, the two items on Alt+L, «Select»
 and «Deselect» with no highlighted row, the `a|||b` filter, a typed number changed by Up and
@@ -989,9 +997,12 @@ others are open.
    **Settled in `ca918d3`**: the rows in view. With finding 18 fixed, the whole column still
    takes 11 to 13 s on 60 000 rows under Wine.
 8. «Seen in passing» A is outside the panel. Fix it with this work or apart?
+9. Finding 11, «None»: should its loop take the busy state, as «Select» and «Deselect» do
+   (`doStartLongOpDance()` first, `ResetImgLoadStatus()` at the end), so that a mouse move
+   during it stays Critical?
 
-Suggested order for what is left: 10 and 12; then what is left of 14, 17 and 19, and the
-open point under «New with the fixes».
+Suggested order for what is left: 10 and 12; then what is left of 11, 14, 17 and 19, and
+the open point under «New with the fixes».
 
 ## How this was checked
 
@@ -1045,7 +1056,8 @@ open point under «New with the fixes».
   mouse-move handler, times that handler, and holds each of its runs 20 ms when asked. Batch
   WT times its taskbar call. A probe script without QPV holds a `Critical, Off` mouse-move
   handler over a Critical loop for 1 to 20 ms (about 990 runs each): only the 20 ms hold let
-  a queued click in, at its third run.
+  a queued click in, at its third run. Batch WN, on `68ea27e`: «X» clicked during «None»,
+  the handler held 20 ms below its busy branch.
   Batch M times Ctrl+A alone; `QPV_RESP_VARIANT=first` or `none` moves the handler's event
   test to its first line, or leaves the list views without a handler, in the scratch copy.
 - Three aids, each named where it was used:
@@ -1064,9 +1076,9 @@ open point under «New with the fixes».
   with an edited, unsaved image in the viewport.
 - Kit: `.claude/scratch/review-selected-panel-2026-11-09/app/`: `run-app.sh <tag> <test
   function> [revision]`, `patch.py`, `test-wrappers-review.ahk` (testReviewA to
-  testReviewW, and testReviewWT), `results/` (the logs of `ef705b0` end in `-ef7`, those of
-  `7f0e8cf` in `-7f0`, those of `b302cc9` in `-885`, after its merge commit 8851855, those of
-  `07746da` in `-077`, and those of `ca918d3` in `-fix`; batch W's are `w-head.txt` and
-  `w-head2.txt` for `aafd458`, with the hold on the handler's first line and then in its
-  busy branch, and `w-new.txt` for `d3373a2`); the probe is
-  `.claude/scratch/review-selected-panel-2026-11-09/probe-critical-off/`.
+  testReviewW, testReviewWN and testReviewWT), `results/` (the logs of `ef705b0` end in
+  `-ef7`, those of `7f0e8cf` in `-7f0`, those of `b302cc9` in `-885`, after its merge commit
+  8851855, those of `07746da` in `-077`, and those of `ca918d3` in `-fix`; batch W's are
+  `w-head.txt` and `w-head2.txt` for `aafd458`, with the hold on the handler's first line
+  and then in its busy branch, `w-new.txt` for `d3373a2`, and `wn-68e.txt` for batch WN);
+  the probe is `.claude/scratch/review-selected-panel-2026-11-09/probe-critical-off/`.
