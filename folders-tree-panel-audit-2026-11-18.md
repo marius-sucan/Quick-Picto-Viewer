@@ -178,6 +178,13 @@ in QPV the containing folder» no longer shows Alt+E, in the main menus or in «
 keeps what it does. Run in the application under headless Wine, on AutoHotkey 1.1.37.02, at `cbcb3da`
 and with the fixed text (batch RH).
 
+**«Seen in passing» AP, 2026-11-20, fixed at `e8050b6`**, with Marius's answers (decision 61, which
+replaces decision 60): in the thumbnails view Alt+E opens the focused file's folder in QPV, but not the
+folder already opened, and «Open in QPV the containing folder» shows Alt+E there again, in the main
+menus and in «Open with»; in the image view Alt+E still opens «Selection properties». Run in the
+application under headless Wine, on AutoHotkey 1.1.37.02, at `11648f0` and with the fixed text (batches
+RE and RH2).
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -1257,6 +1264,15 @@ section «Custom keys in the tree, the omnibox and the panels».
     **Settled**: the key stays as it is (Marius: «abandon fixing it, we already have it set for
     ctrl+e»); «Open in QPV the containing folder» shows no key, since no key opens the folder in QPV
     (`ac72e73`).
+    **Replaced by decision 61** (Marius, the same night: «alt+e seems to be assigned to
+    OpenQPVfileFolder(), so put the hint back, and fix the function, make it work»).
+61. **Alt+E opening the folder** («Seen in passing» AP, after decision 60): in which views does Alt+E
+    open the focused file's folder in QPV; where does «Open with» show Alt+E beside «Open containing
+    folder in QPV»; and what does Alt+E do when the file's folder is the folder opened, where the menus
+    disable the item?
+    **Settled**: the thumbnails view only, the image view keeping «Selection properties» on Alt+E, as
+    its menus say; «Open with» shows Alt+E where it works, the thumbnails view; for the folder opened,
+    nothing, like the menus (`e8050b6`). All three my recommendation.
 
 ## Unverified leads
 
@@ -1965,6 +1981,20 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   views, and in the file menu and the open options menu in the thumbnails view (the menu bar's «File»
   menu did not list the item in the thumbnails view in that run; its code wrote the same hint); with
   the fix it reads Alt+E in none. «Explore containing folder» keeps Ctrl+E in both views (the control).
+  Decision 61 replaces decision 60. **Fixed in `e8050b6`**: the first branch of Alt+E takes
+  `HKifs("imgsLoaded")` only outside the thumbnails view, so the thumbnails view reaches
+  `OpenQPVfileFolder()`; it passes «fromKey», for which that function returns when the focused file's
+  folder is the folder opened, where the menus disable the item. The check sits in the function, not in
+  the dispatch, so that Alt+E stays bound in the thumbnails view and the menu bar never claims it
+  (`forbiddenAltKeys()` asks the same dispatch). The three menus show Alt+E again in the thumbnails
+  view, their texts as before `ac72e73`, and «Open with» shows it in the thumbnails view only. Run,
+  Alt+E posted to the main window (batch RE) and the menus read (batch RH2), at `11648f0` and with the
+  fixed text: in the image view Alt+E opens «Selection properties» at both; in the thumbnails view,
+  with a file of `pv\Alpha\Sub` focused, it does nothing at `11648f0` and opens `pv\Alpha\Sub` with the
+  fix; with a file of the opened `pv\Alpha` focused, the list stays as it is at both; Alt+E is bound
+  for the menu bar at both. The hint reads Alt+E beside the item in no menu at `11648f0`; with the fix
+  in the file menu, the open options menu and «Open with» in the thumbnails view, and in none in the
+  image view.
 
 ## Custom keys in the tree, the omnibox and the panels («Seen in passing» R)
 
@@ -2597,3 +2627,8 @@ button, Windows itself.
   Wine, on AutoHotkey 1.1.37.02, at `cbcb3da` and with the fixed text, by the same kit (batch RH,
   `mkfix-r5.py`); since `ac72e73` the control rc0 of batch RC, which expects «Open with» to show Alt+E,
   fails by design. AutoHotkey 1.1.37.02 loads the text, with and without `/iLib`.
+- «Seen in passing» AP was fixed on 2026-11-20 (`e8050b6`, decision 61): run in the application under
+  headless Wine, on AutoHotkey 1.1.37.02, at `11648f0` and with the fixed text, by the same kit
+  (batches RE and RH2, `mkfix-r6.py`; the text's three menu builders are byte for byte those of
+  `cbcb3da`); batch RS2 gives the same probe answers with it. AutoHotkey 1.1.37.02 loads the text, with
+  and without `/iLib`.
