@@ -31064,8 +31064,6 @@ FolderTreeResponder(a, b, c) {
          {
             externTooltiput("Please wait - performing folder action")
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
-            If (r=2)
-               folderTreeScanSubbies()
          }
       }
       externToolTiput("-hide-")
@@ -31848,9 +31846,6 @@ folderTreePasteFoldersInto() {
    r := UIcoreFolderPasteFoldersInto(thisFolder)
    If (r=1 || r=2)
       WinActivate, ahk_id %hfdTreeWinGui%
-
-   If (r=2)
-      folderTreeScanSubbies()
 }
 
 askRecreateFolder(thisFolder, friendly) {
@@ -31945,7 +31940,15 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
         }
    }
 
-   folderTreeScanSubbies()
+   If hfdTreeWinGui
+   {
+      ; the tree, open or closed, lists the new folders where it shows the destination
+      sliced := StrSplit(thisFolder, "\")
+      g := iterateFDtreeView(1, 0, sliced)
+      If (g[2] && g[1]>sliced.Count())
+         folderTreeScanSubbies("", g[2], "yes")
+   }
+
    Loop, Parse, movedAway, `n
    {
       ; a folder moved away leaves its place in the tree; the protected folder follows it
@@ -31953,7 +31956,7 @@ UIcoreFolderPasteFoldersInto(thisFolder, dummy:="", gactu:="", fSrc:="", fDest:=
          Continue
 
       sliced := StrSplit(A_LoopField, "\")
-      g := (A_LoopField!="" && !FolderExist(A_LoopField)) ? iterateFDtreeView(1, 0, sliced) : []
+      g := (hfdTreeWinGui && !FolderExist(A_LoopField)) ? iterateFDtreeView(1, 0, sliced) : []
       If (g[2] && g[1]>sliced.Count())
          TV_Delete(g[2])
 
@@ -32249,10 +32252,12 @@ folderTreeExpandCollapseAll(forceMode:=0) {
    msgBeepTimer("Folder tree: " friendly, 0)
 }
 
-folderTreeScanSubbies(prevent:="") {
+folderTreeScanSubbies(prevent:="", givenElement:=0, isGiven:=0) {
+; scans givenElement only with isGiven="yes", since the menu item passes its name and position; the selection stays where it is
    Gui, fdTreeGuia: Default
    Gui, fdTreeGuia: TreeView, TVlistFolders
-   c := TV_GetSelection()
+   sel := TV_GetSelection()
+   c := (isGiven="yes" && givenElement) ? givenElement : sel
    ; c := prevTVelement
 
    If !c
@@ -32288,7 +32293,7 @@ folderTreeScanSubbies(prevent:="") {
        If !r
           Break
 
-       If x
+       If (x || r=sel)
        {
           labelu := ""
           TV_GetText(labelu, r)
@@ -32331,7 +32336,7 @@ folderTreeScanSubbies(prevent:="") {
    ResetImgLoadStatus()
    mustSkip := ""
    RemoveTooltip()
-   TV_Modify(c, "Expand Vis Select Sort")
+   TV_Modify(c, (c=sel) ? "Expand Vis Select Sort" : "Expand Sort")
    GuiControl, fdTreeGuia: +Redraw, TVlistFolders
    If (prevent!="no")
       SetTimer, folderTreeInfoStatusLineUpdater, -100
@@ -42808,8 +42813,6 @@ LVquickSearchMenusResponder(a:=0, b:=0, c:=0) {
          If (InStr(r, "_") && src!=dest && InStr(src, ":\") && InStr(dest, ":\"))
          {
             r := UIcoreFolderPasteFoldersInto(0, "given", r, src, dest)
-            If (r=2)
-               folderTreeScanSubbies()
          }
       }
       externTooltiput("-hide-")
