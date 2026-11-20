@@ -124,6 +124,23 @@ database's settings are taken only under the names a database stores, each value
 list's is, and the view is redrawn after them (`4e828fe`, decision 36); a stored sort mode is taken
 only when it names columns (`d0fa7ed`, decision 38).
 
+**«Seen in passing» A, B, D, Q, AH, AI and AK, 2026-11-20, fixed at `8db8595`**, with Marius's answers
+(decisions 39 to 46). Each was first run in the application under headless Wine, on AutoHotkey
+1.1.37.02, at `d2061f5`, and each did what its entry describes; the runs found twins of A, fixed
+with it, a database that D's route leaves open, closed in D's fix, and a new defect, AL, fixed with
+them: a folder opened by Shift+O or another route of `OpenFolders()` went into an open database. The
+drag of files from the main window leaves the omnibox's selection as it was and speaks of files
+(`f063e71`, decisions 39 to 41). «Save files list» comes for a modified list without its file and for a
+plain folder with an imported folder (`453662f`, decisions 42 and 43). «Selected file folder» asks about
+the selection and closes an open database (`7b5bfc3`). The tree lists what the omnibox's paste and drags
+put into a folder it shows, open or closed, and keeps its selection (`6e9afcb`, decision 44). The folder
+favourites' .SLD entry asks the three questions (`792c709`); Ctrl+O's «Open» shows and records the image
+once (`791e503`); a refused import leaves the list unmarked (`44a7ef1`); `OpenFolders()` closes an open
+database first (`8db8595`, decision 45). D and AH ask through a new helper, `askAboutDiscards()`
+(decision 46). «Seen in passing» C, a comment, is fixed by Marius in `80964a3`. Two new leads stay open:
+AM, a plain folder opened by Shift+O or «Selected file folder» is marked as modified from the start;
+AN, the menu items that open a folder recursively show no folder dialog.
+
 ## Terms
 
 - **The tree**: this panel, the window `fdTreeGuia`. F4, the toolbar button, a click on the
@@ -1141,6 +1158,37 @@ i. ✅ **«Paste folder(s) into...» with no folder found** shows the whole clip
     **Settled**: plain names, letters, digits, «_», commas and spaces, checked where the stored value
     is read (`d0fa7ed`).
 
+39. **The omnibox's selection during a drag of files from the main window** («Seen in passing» A):
+    put back the row selected when the drag began whenever the pointer is off the omnibox's folder
+    rows, or only stop the jumps?
+    **Settled**: put back (`f063e71`).
+40. **A's twins** («Seen in passing» A): the omnibox's own drag and the tree's drag onto the omnibox,
+    below the omnibox's last row: fixed with A, or left as leads?
+    **Settled**: fixed with A (`f063e71`).
+41. **The tooltip of a drag of files** («Seen in passing» A): «Move or copy the selected file(s) into
+    a folder.» or «Move or copy the selected files into this folder.»?
+    **Settled**: «Move or copy the selected file(s) into a folder. Hold SHIFT to MOVE.», and «No folder
+    is currently underneath.» where no folder is under the pointer (`f063e71`).
+42. **Which lists «Save files list» asks about** («Seen in passing» B): the lists without their file
+    and a plain folder with an imported folder, the lists without their file only, or every modified
+    plain folder too?
+    **Settled**: a modified .SLD list without its file, the `\QPV\` history lists excepted, and a
+    modified plain folder whose seed folders list holds more than the folder it opened (`453662f`).
+43. **The box for a list never saved** («Seen in passing» B): the same box, or a first sentence of its
+    own?
+    **Settled**: the same box (`453662f`).
+44. **The tree after the omnibox's paste and drags** («Seen in passing» Q): the destination's element
+    rescanned where it is, or selected too; a closed tree updated, or left as it is?
+    **Settled**: rescanned where it is, the tree's selection unmoved, in an open or a closed tree; a
+    tree never opened is left alone (`6e9afcb`).
+45. **A database replaced by a folder** («Seen in passing» D and AL): close it in both routes now, in
+    `OpenFolders()` only, or report both?
+    **Settled**: both now (`7b5bfc3`, `8db8595`).
+46. **The fixes of AH, AI and AK, and D's third question**: as listed, the questions written inline
+    as the other functions write them, or through a helper?
+    **Settled**: as listed, through a helper, `askAboutDiscards()`, which D and AH call; the 14 other
+    functions that ask the three questions keep their own lines for now (`7b5bfc3`, `792c709`).
+
 ## Unverified leads
 
 These follow from the code but depend on a runtime state that was not reproduced. Each needs a run
@@ -1169,7 +1217,7 @@ before any fix.
 
 Outside the panel's own code, found while tracing its actions. ✅ marks a fixed one.
 
-- **A. The main window's Alt+drag over the tree moves the omnibox's selection to its last row.** In
+- ✅ **A. The main window's Alt+drag over the tree moves the omnibox's selection to its last row.** In
   the thumbnails click handler (:9611), the drag's tree branch calls `LV_Modify(initialRow,
   "select")` (:9757). `initialRow` exists only in the omnibox's handler (:42517); here it is blank,
   which counts as row 0, every row. With the omnibox open in folder mode, the default window there
@@ -1180,22 +1228,61 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   selected, an Alt+drag of a file over the tree's `\Beta`, answered «No», left the row `\Holiday
   One` selected (`OmniBoxGetSelectedFolder()` gave `pv\Holiday One`), and the drag's tooltip read
   «Move or copy folder into another one. Hold SHIFT to MOVE.».
-- **B. A plain list grown by imports is replaced without a question.** `askAboutSlidesListSave()`
+  Run again on 2026-11-20 at `d2061f5`, batch ZA: the same, and the same jump with the pointer below
+  the omnibox's last row, no row under it, where the tooltip also named «Destination: .\Gamma\», the
+  row selected before. Two twins: the omnibox's own drag of its row `\Gamma` over `\Beta`, then below
+  the last row, left `\Holiday One` selected; the tree's drag of `\Beta` below the omnibox's last row
+  showed «Destination: .\Gamma\», while its drop only took the omnibox to `pv\Beta`. **Fixed in
+  `f063e71`**, with Marius's answers to decisions 39 to 41. The drag of files notes the omnibox's
+  selected row when it begins and puts it back whenever the pointer is off the omnibox's folder rows:
+  over the tree, the main window, an action row or no row; over a folder row that row is selected, as
+  before, since the drop copies into the omnibox's selected row. With no row under the pointer no row
+  counts as the destination, in this drag, in the omnibox's own and in the tree's. The tooltip of the
+  drag of files reads «Move or copy the selected file(s) into a folder. Hold SHIFT to MOVE.», over the
+  tree and over the omnibox, and «No folder is currently underneath.» over the tree's empty part,
+  where it read «Destination: .\». Run with the fixed text: batch ZA passes; a file dropped on the
+  omnibox's row `\Beta`, after the pointer crossed `\Holiday One`, is copied into `pv\Beta` (check A7),
+  as at `80964a3`.
+- ✅ **B. A plain list grown by imports is replaced without a question.** `askAboutSlidesListSave()`
   (:65471) asks only for a .SLD list and the favourites; a plain list that the tree's F3 grew is
   replaced by any open (finding 1's callers) without a word. Still so at `15e9716`, and for an
   unsaved list too: the function asks only when the list's name is a file on the disk, and an
   unsaved list has no file yet. Run, batch WPB: a plain folder of five files grown to seven by F3,
   and an unsaved list of three files added on the welcome screen, were each replaced by «Open
   folder now» with no question; a modified .SLD list got the question, and «Cancel» kept it.
-- **C. The comment `; F3` on `c=186`** (:30858): the key is `;` (VK_OEM_1), which opens the omnibox
-  at the element. Still so at `15e9716` (read).
-- **D. «Selected file folder» asks two of the three questions.** `OpenQPVfileFolder()` (:2819), the
+  Run again on 2026-11-20 at `d2061f5`, batches ZB and ZB2: the same. A plain folder's «modified»
+  mark, which `askAboutSlidesListSave()` reads, does not tell the two apart: on a folder of five
+  files opened through the tree, a reverse, a removed entry, Insert of an image and F3 each set it,
+  and so does the open of Shift+O itself (`OpenFolders()`); only F3 added a line to the seed folders
+  list. **Fixed in `453662f`**, with Marius's answers to decisions 42 and 43. The question comes for a
+  modified .SLD list of two files or more whether its file is on the disk or not, so for an unsaved
+  list and for a list whose file was deleted while it was open, but not for the viewed-images and
+  file-actions history lists, whose names begin with `\QPV\`; and for a modified plain folder whose
+  seed folders list holds more than the folder it opened, as a folder imported by F3, a drop or the
+  omnibox makes it. Images added to a plain folder by Insert do not count: nothing records them. The
+  box is the same. Run with the fixed text: batch ZB passes: the grown folder, the unsaved list and
+  the list whose file was deleted get the question, «Cancel» keeps each, and «Discard» lets the grown
+  folder go; a plain folder only reversed and the file-actions history list are replaced with no
+  question, as at `80964a3`.
+- ✅ **C. The comment `; F3` on `c=186`** (:30858): the key is `;` (VK_OEM_1), which opens the omnibox
+  at the element. Still so at `15e9716` (read). **Fixed by Marius in `80964a3`**: the comment names the
+  key, «semi-colon [VK_OEM_1]».
+- ✅ **D. «Selected file folder» asks two of the three questions.** `OpenQPVfileFolder()` (:2819), the
   «`\\`» menu's item for the current file's folder with a .SLD list or a database, also Alt+E in the
   thumbnails view, asks «Save image» and «Save files list» but not «Discard selection» before it
   replaces the list (read; found while fixing finding 2). Still so at `15e9716`. Run, batch WPD: with
   a .SLD list of 212 files, 30 of them selected, «Open folder now» asked about the selection and
   «No» kept the list; «Selected file folder» (`OpenQPVfileFolder()`) asked nothing and opened the
   current file's folder in place of the list, the selection gone.
+  Run again on 2026-11-20 at `d2061f5`, batch ZD: the same; and with a database of 212 files open,
+  «Selected file folder» opened the file's folder and left the database open, its handle kept until
+  another database is opened (`OpenSLDBdataBase()` closes it first, read) or QPV closes. **Fixed in
+  `7b5bfc3`**, with Marius's answers to decisions 45 and 46: `OpenQPVfileFolder()` asks the three
+  questions through `askAboutDiscards()`, new, and closes an open database before it replaces the
+  list, as Ctrl+O and the tree's «Open folder now» do. Run with the fixed text: batch ZD passes: «No»
+  to the selection question keeps the .SLD list; with the database open, «Yes» opens the file's folder
+  and closes the database; with the list modified, 30 of its files selected and its image edited, the
+  three questions come once each, then the folder opens.
 - ✅ **E. The sibling navigation after a sibling with no images.** When `tryOpenGivenFolder()` reports
   a failure, `FileExploreSiblingsNav()` sets its position back to `initialLevel` (:65175-65176), the
   value it held when the call began. That value is blank on the first move after QPV starts and
@@ -1382,7 +1469,7 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   (run, batch VP; the fallback by batch VPx, the kit making `GetFilesList()` hand over to it). The
   three tooltips show the path without it, and «(without its sub-folders)» under it. With the fix
   the three checks of batch VP and the one of batch VPx pass; at `35a7c94` three of the four fail.
-- **Q. After the omnibox's paste or drags, the destination's element in the tree is not scanned
+- ✅ **Q. After the omnibox's paste or drags, the destination's element in the tree is not scanned
   again.** `UIcoreFolderPasteFoldersInto()` scans the tree's selected element after a copy or a
   move, which for the tree's own paste and drags is the destination. After the omnibox's paste or
   its drags, a destination that the tree shows without having it selected keeps its old children
@@ -1392,6 +1479,22 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   sub-folder `\old`, the omnibox's paste of `\m1` into its row `\dst` and a drag of its row `\m2`
   onto that row, both copies, left the tree's `\dst` with `\old` alone; Space on `\dst` then
   listed `\m1` and `\m2`. Batch VNx again: the hidden tree window is still left behind.
+  Run again on 2026-11-20 at `d2061f5`, batches ZQ and ZQ2: the same after the omnibox's paste, a drag
+  of its row onto its row `\dst`, a drag of a tree element onto that row, and the omnibox's paste
+  while the tree was closed, opened again after: each time the tree's `\dst` kept only `\old`, and the
+  tree's selected element, unrelated, was the one scanned, and expanded. With the tree never opened, a
+  move and a copy each created the tree's window, hidden; on a move the removal of the moved folder's
+  element (N) creates it too (read). **Fixed in `6e9afcb`**, with Marius's answer to decision 44:
+  `UIcoreFolderPasteFoldersInto()` scans the destination's element, found by its path with
+  `iterateFDtreeView()`, in the tree open or closed, and the tree's selection stays where it is; a tree
+  never opened is not touched, by the scan or by N's removal. `folderTreeScanSubbies()` takes the
+  element to scan, with a third argument «yes», since the tree's menu item «Scan for sub-folders»
+  calls it with its name and position: one other than the selected element is expanded, not selected,
+  and a selected child of it is kept. The second scan of the same element after the tree's own paste
+  and its two drags onto the tree is gone. Run with the fixed text: batches ZQ and ZQ2 pass: the
+  tree's `\dst` lists the folders of the four routes, `\zz` stays collapsed, a selected `\dst\old`
+  stays selected, the tree's own paste and «Scan for sub-folders» called as the menu calls it list
+  their folder under the selected `\dst`, as at `80964a3`, and a tree never opened gets no window.
 - **R. A custom key of the main window takes the key off an item of the tree's menu, while the
   tree keeps the key.** `kMenu()` drops the key from a label when the user's custom keys give that
   key, in the current key context, to another function or disable it (small thing c); the tree's
@@ -1646,21 +1749,32 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   read, takes it only when it holds letters, digits, «_», commas and spaces; anything else counts
   as no sort mode, and a blank one is skipped as before. Run with the fixed text: the database
   opens with its five files and no table is made.
-- **AH. The folder favourites open a .SLD list with no question.** `OpenDirsFavedEntry()` (:27033)
+- ✅ **AH. The folder favourites open a .SLD list with no question.** `OpenDirsFavedEntry()` (:27033)
   opens a list entry with `OpenSLD()` (:27042) and asks nothing, so a modified list or a selection
   is replaced as AC's and AF's runs showed for the omnibox and Ctrl+O (read). Its folder entries go
   through `OpenFolders()`, which asks the three questions, and its image entry through
   `MenuOpenLastImg()`, which asks two. Lines at `44f9eaf`. Found while fixing Z.
-- **AI. Ctrl+O's «Open» shows and records the image twice.** Once `MenuOpenLastImg()` has opened
+  Run on 2026-11-20 at `d2061f5`, batch ZH: with the .SLD list of 212 files modified, 30 of its files
+  selected and its image edited, the folder favourites' entry `other.sld` opened at once; the folder
+  entry, the control, asked «Save image» and «Save files list». **Fixed in `792c709`**, with Marius's
+  answer to decision 46: the entry asks the three questions through `askAboutDiscards()` once the list
+  is found on the disk, then opens it; the branches of `OpenDirsFavedEntry()` take braces, as one of
+  them had. Run with the fixed text: batch ZH passes: «Cancel» to «Save image» keeps the list;
+  «Discard», «Discard» and «Yes» bring each question once, then `other.sld` opens.
+- ✅ **AI. Ctrl+O's «Open» shows and records the image twice.** Once `MenuOpenLastImg()` has opened
   the image, `OpenDialogFiles()` goes on to its block for an image found in a folder (:65617), which
   sets the list type again, looks the image up, records it among the recent images again and shows
   it again (read). Lines at `44f9eaf`. Found while fixing AF.
+  Run on 2026-11-20 at `d2061f5`, batch ZI: an image picked with «Open» was shown twice and recorded
+  twice among the recent images; with «Index all images in current folder as well», once each.
+  **Fixed in `791e503`** (decision 46): `OpenDialogFiles()` returns once `MenuOpenLastImg()` has opened
+  the image, as it does after a .SLD list. Run with the fixed text: batch ZI passes.
 - **AJ. Two image opens still do not ask «Discard selection».** The omnibox's «Open image» and the
   folder favourites' image entry leave the questions to `MenuOpenLastImg()`, which asks «Save image»
   and «Save files list» but not «Discard selection». Run, batch YZ, check Z7, with the fixed text: a
   list with 30 files selected was replaced by the omnibox's «Open image» after the two questions.
   Found while fixing Z, with decision 34.
-- **AK. The omnibox's «Import files list» marks the open list as modified when it refuses it.**
+- ✅ **AK. The omnibox's «Import files list» marks the open list as modified when it refuses it.**
   After the import, the branch of `GoQuickSearchAction()` sets `currentFilesListModified := 1`
   (:43000), whatever the import did, and `importSLDplainText()` refuses the list that is open, with
   «WARNING: Illegal operation. You cannot import the already opened files list», bringing nothing
@@ -1668,6 +1782,47 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   into the omnibox, «Import files list» gave the warning and left the list marked as modified, so
   «Save files list» would then ask about a list that has not changed. The row is listed only since
   AC's fix (`4cac3c0`). Lines at `44f9eaf`. Found by the review of AC's fix.
+  Run again on 2026-11-20 at `d2061f5`, batch ZK: the same, and the open database, refused the same
+  way («…cannot import the already opened database»), was left marked too; Insert given the open list
+  refuses it and leaves it unmarked. **Fixed in `44a7ef1`** (decision 46): the branch no longer marks the
+  list; the importers do when files come in, as for Insert, so a database merged into the open one
+  through the omnibox is no longer marked either, as with Insert. Run with the fixed text: batch ZK
+  passes, and a list imported through the omnibox still marks the list (check K2).
+- ✅ **AL. A folder opened by `OpenFolders()` while a database is open goes into the database.**
+  `OpenFolders()` (:65075) asks its questions, then calls `coreOpenFolder()` with the database still
+  open: `GetFilesList()` scans in its database mode (`SLDtypeLoaded=3`) and writes the folder's files
+  into the database's table of images, and the database stays open. Shift+O and the menu items that
+  carry it, the omnibox's «Open folder» and «Open folder recursively» rows, the folder favourites'
+  folder entries and «See all» in the «`\\`» menu's siblings go through it; Ctrl+O, the «Recent»
+  entries and the tree's «Open folder now» close the database first. Run on 2026-11-20 at `d2061f5`,
+  batch ZL: with `al.sldb` of five files open, the omnibox's «Open folder» on `pv\Gamma` opened the
+  folder and left the database open, and the database, opened again, held six files, `pv\gamma\g1.png`
+  the new one; the other routes by reading. Lines at `80964a3`. Found while checking D. **Fixed in
+  `8db8595`**, with Marius's answer to decision 45: `OpenFolders()` closes an open database before the
+  folder is scanned. Run with the fixed text: batch ZL passes: after the omnibox's «Open folder» and
+  after the folder favourites' folder entry, the database keeps its five files and is closed.
+- **AM. A plain folder opened by Shift+O or by «Selected file folder» is marked as modified from the
+  start.** `GetFilesList()` sets the mark at the end of every scan (:90003); the tree's «Open folder
+  now» (`tryOpenGivenFolder()`), Ctrl+O and the «Recent» entries clear it after their open, while
+  `OpenFolders()` and `doOpenStartFolder()` do not. Run, batches ZB2 and ZD, at `d2061f5` and with the
+  fixed texts: `pv\Alpha` opened by `OpenFolders()`, as Shift+O opens it, and the file's folder opened
+  by «Selected file folder» were marked as modified, with nothing done to them. «Save files list»
+  does not come for such a folder, which holds one seed folder (B's fix, read), but the toolbar's
+  save button reads «The files list has been MODIFIED» in the thumbnails view for any list so marked
+  (`tlbrDecideTooltips()`, read). The folder of an image opened by Ctrl+O's «Open» or from the
+  «Recent» images is indexed by `doOpenStartFolder()` at the first move to another file, and is marked
+  then too (read). Lines at `80964a3`. Found while confirming B.
+- **AN. The menu items that open a folder recursively show no folder dialog.**
+  `OpenFolders(dummy, allowDialog:=1)` (:65075) shows its dialog only when `allowDialog` is 1. A menu
+  item calls its function with the item's name and position, as many as the function takes
+  (`kMenu()` adds it with `Menu, …, Add`), so the item's position lands in `allowDialog`: «Folder
+  recursively» of the «Open» menu (item 2), «Open folder» of the context menu (item 4) and «Open
+  folder recursively» of the «File» menu show no dialog and open nothing, while Shift+O, which calls
+  it with no argument, works. Run, batch ZN, at `80964a3`: called with no argument, the folder dialog
+  came and the folder picked opened; called as the «Open» menu calls its item 2, no dialog came and
+  the list stayed as it was. The other two menus by reading. The second parameter came in `3bd0b6f`
+  (2026-11-18); before it, the item's name went to `dummy`, which is no folder, and the dialog came
+  (read). Lines at `80964a3`. Found while redoing Q's fix, which met the same trap.
 
 ## Checked and found correct
 
@@ -1956,3 +2111,46 @@ Outside the panel's own code, found while tracing its actions. ✅ marks a fixed
   passing; WUx and WUe now count «Save files list» once, where they counted it twice. AutoHotkey
   1.1.37.02 loads each of the eight texts, with and without `/iLib`. Not run: Windows itself, real
   menus, keys and dialogs, and an ATTACH statement.
+- «Seen in passing» A, B, D, Q, AH, AI and AK, and the new AL (`f063e71`, `453662f`, `7b5bfc3`, `6e9afcb`,
+  `792c709`, `791e503`, `44a7ef1`, `8db8595`), were run in the application under headless Wine, on AutoHotkey
+  1.1.37.02, at `d2061f5` and `80964a3` (which changes a comment only) and with the fixed texts, by
+  `.claude/scratch/folders-tree-seen-a-ak-2026-11-20/` (`tests-a-ak.ahk`, `run.sh`, `run-batches.sh`,
+  `run-all.sh`, `run-regs.sh`; `mkfixes.py` writes the eight cumulative texts into `v1/`; the logs in
+  `results/`, named `h-` at `d2061f5`, `h2-` to `h5-` at `80964a3`, `v0-` with a first text of Q's
+  fix, `c-` with the text of each item's own commit, `f-` with the last, `g-`, `r-` and `r2-` the
+  earlier kits' batches at `80964a3` and with the last), with the helpers of the earlier kits, in an
+  application folder of its own; its `app/patch.py` also lets the omnibox's hit test follow a sequence
+  of rows, one per check of the mouse button, and counts the records of the recent images. Batch ZA
+  drags a file from the main window over the tree, below the omnibox's last row, over the omnibox's
+  rows and onto one of them, and drags the omnibox's row and a tree element below the omnibox's last
+  row. ZB replaces a plain folder grown by F3, an unsaved list, a modified .SLD list, a .SLD list
+  whose file was deleted, a folder only reversed and the file-actions history list; ZB2 logs the mark
+  and the seed folders list of a folder of five files after a reverse, a removed entry, Insert, F3 and
+  Shift+O. ZD opens the file's folder from a .SLD list, from a database and from an edited, modified
+  list with a selection. ZQ pastes and drags into a folder of the tree from the omnibox, with the tree
+  open and closed, with an unrelated element and with a child of the destination selected, and pastes
+  from the tree itself; ZQ2 moves and copies from the omnibox with the tree never opened. ZH opens the
+  folder favourites' .SLD entry and, as a control, its folder entry. ZI opens an image through
+  Ctrl+O's «Open» and «Index all images in current folder as well». ZK imports the open list, another
+  list and the open database through the omnibox, and gives Insert the open list. ZL opens a folder
+  through the omnibox's «Open folder» and the folder favourites with a database open, then opens the
+  database again. ZN, for lead AN, calls `OpenFolders()` with no argument and as the «Open» menu calls
+  its item 2, the folder dialog answered by the kit. At `d2061f5` or `80964a3`, seven of ZA's thirteen
+  checks fail, four of ZB's eight, ZD's four, six of ZQ's thirteen, two of ZQ2's three, two of ZH's
+  five, one of ZI's three, two of ZK's four and three of ZL's four; the others are controls, which
+  pass at both; VNx passes, but its log shows the hidden window created. With the text of its own
+  commit each item's batch passes, and with the last text every batch passes. A first Q8 passed at
+  `80964a3` too, through a folder an earlier step had listed; the committed Q8 pastes a folder no step
+  lists before. ZQ's check Q9 calls «Scan for sub-folders» as the tree's menu calls it, with the
+  item's name, position and menu name, as many as the function takes: a first text of Q's fix, which
+  took the element to scan as its second parameter, failed it (`v0-ZQ`), since the menu's call put the
+  item's position there; the committed text takes the element only with a third argument «yes».
+  Batches T7, T8, T9, T12, T13, U13, VM, VN, VO, SDA, XJ, XH, WSg, WGa, WGu, WUo, WUd, WUx, WUe, WUr,
+  WUs, WUv, WUw, YO, YZ, YC, YB and YX of the earlier kits, those that drag, paste, open or import,
+  give the same checks with the last text as at `80964a3` (T12's check 12b fails at both, as since S);
+  WPA, WPB, WPD, WPQ and YS, which checked A, B, D, Q and AK, pass in full with the last text, where
+  their checks A1, A2, B1, B2, D1, Q1, Q2 and S6 failed. Once Q's fix took its third argument, every
+  batch of this kit ran again with the last text (`f-`), AH's, AI's and AK's with the texts of their
+  new commits (`c-`), and VN, VNx, U13, T13, XJ, WPQ, T12, SDA, VO, VM and T7, which paste, drag or
+  scan folders, with the last text (`r2-`): the same checks. AutoHotkey 1.1.37.02 loads each of the
+  eight texts, with and without `/iLib`. Not run: Windows itself, real menus, keys, drags and dialogs.
