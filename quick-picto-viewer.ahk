@@ -34886,21 +34886,28 @@ IniSLDBreadGiven(givenFilter:="", whichTable:="settings") {
      Return -1
   }
 
+  ; only rows that name a setting of slideSettingsList() are taken, each value checked as the .SLD reader checks it
+  known := {}
+  l := slideSettingsList()
+  For i, entry in l
+  {
+     s := StrSplit(entry, "|")
+     known[s[1]] := s
+  }
+
+  loadAll := (MustLoadSLDprefs=1 || givenFilter="*")
   Loop, % RecordSet.RowCount
   {
       Rowu := RecordSet.Rows[A_Index]
-      If (StrLen(Rowu[1])>2)
-      {
-         paramu := Rowu[1]
-         valu := Rowu[2]
-         ; "*" loads every setting; appVersion is the running QPV's own
-         If (StrLen(valu)>0 && paramu!="appVersion" && paramu && (MustLoadSLDprefs=1 || givenFilter="*" || paramu=givenFilter))
-            %paramu% := valu
-      }
+      paramu := Rowu[1]
+      valu := Rowu[2]
+      s := known[paramu]
+      If (IsObject(s) && StrLen(valu)>0 && (loadAll || paramu=givenFilter))
+         %paramu% := settingValueChecked(valu, s[2], s[3], s[4], %paramu%)
   }
 
-  If (isWinXP=1 || minimizeMemUsage=1)
-     doSlidesTransitions := 0
+  If loadAll
+     applySlideSettings()
 
   RecordSet.Free()
 }
@@ -38933,75 +38940,56 @@ lockDestinationFileName(filePath, mode:=0) {
    }
 }
 
+slideSettingsList() {
+; the settings that a .SLD list and a database store: name|INIaction() type|minimum|maximum;
+; a database alone stores those marked db, and appVersion, which is never read from either
+   Static l := ["allowGIFsPlayEntirely|1|0|0", "ambiTexBrushSize|2|25|950", "animGIFsSupport|1|0|0"
+      , "UserGIFsDelayu|2|-9500|9500", "autoPlaySlidesAudio|1|0|0", "autoPlaySNDs|1|0|0"
+      , "borderAroundImage|1|0|0", "bwDithering|1|0|0", "chnBdecalage|2|-30|30", "chnGdecalage|2|-30|30"
+      , "chnRdecalage|2|-30|30", "ColorDepthDithering|1|0|0", "doSlidesTransitions|1|0|0", "FlipImgH|1|0|0"
+      , "FlipImgV|1|0|0", "GammosAdjust|2|-25|1", "GammosGrayAdjust|2|-25|1", "hueAdjust|2|-300|300"
+      , "imageAlignVPtopLeft|1|0|0", "imgFxMode|2|1|10", "IMGresizingMode|2|1|5", "imgThreshold|2|0|1"
+      , "IntensityAlphaChannel|2|1|30", "isAlwaysOnTop|1|0|0", "lummyAdjust|2|-300|300"
+      , "lumosAdjust|2|0.001|25", "lumosGrayAdjust|2|0.001|25", "mediaSNDvolume|2|1|100"
+      , "realGammos|2|0.01|10", "resetImageViewOnChange|1|0|0", "satAdjust|2|0|3", "showHUDnavIMG|1|0|0"
+      , "showImgAnnotations|1|0|0", "skipDeadFiles|1|0|0", "SLDcacheFilesList|1|0|0", "SlideHowMode|2|1|3"
+      , "slidesFXrandomize|1|0|0", "slideShowDelay|2|90|25000", "SlidesMusicSong|0|0|0"
+      , "specialColorFXmode|2|1|7", "syncSlideShow2Audios|1|0|0", "TouchScreenMode|1|0|0"
+      , "uiColorCurveFXchannel|2|1|4", "uiColorCurveFXmode|2|1|7", "usrColorDepth|2|0|9"
+      , "usrTextureBGR|1|0|0", "vpIMGrotation|2|0|359", "WindowBgrColor|3|0|0", "zatAdjust|2|-300|300"
+      , "zoomLevel|2|0.01|20", "UserVPalphaBgrStyle|2|1|5", "thumbsAratio|2|1|3|db"
+      , "thumbsZoomLevel|2|0.35|3|db", "reverseOrderOnSort|1|0|0|db", "hamDistInterpolation|1|0|0|db"
+      , "userpHashMode|1|0|0|db", "dbVersion|0|0|0|db", "prevFilesSortMode|0|0|0|db"]
+   Return l
+}
+
 readSlideSettingsINI(readThisFile, act:=0) {
-     IniAction(act, "allowGIFsPlayEntirely", "General", 1,0,0,, readThisFile)
-     IniAction(act, "ambiTexBrushSize", "General", 2, 25, 950,, readThisFile)
-     IniAction(act, "animGIFsSupport", "General", 1,0,0,, readThisFile)
-     IniAction(act, "UserGIFsDelayu", "General", 2,-9500,9500,, readThisFile)
-     IniAction(act, "autoPlaySlidesAudio", "General", 1,0,0,, readThisFile)
-     IniAction(act, "autoPlaySNDs", "General", 1,0,0,, readThisFile)
-     IniAction(act, "borderAroundImage", "General", 1,0,0,, readThisFile)
-     IniAction(act, "bwDithering", "General", 1,0,0,, readThisFile)
-     IniAction(act, "chnBdecalage", "General", 2,-30,30,, readThisFile)
-     IniAction(act, "chnGdecalage", "General", 2,-30,30,, readThisFile)
-     IniAction(act, "chnRdecalage", "General", 2,-30,30,, readThisFile)
-     IniAction(act, "ColorDepthDithering", "General", 1,0,0,, readThisFile)
-     IniAction(act, "doSlidesTransitions", "General", 1,0,0,, readThisFile)
-     IniAction(act, "FlipImgH", "General", 1,0,0,, readThisFile)
-     IniAction(act, "FlipImgV", "General", 1,0,0,, readThisFile)
-     IniAction(act, "GammosAdjust", "General", 2,-25,1,, readThisFile)
-     IniAction(act, "GammosGrayAdjust", "General", 2,-25,1,, readThisFile)
-     IniAction(act, "hueAdjust", "General", 2,-300,300,, readThisFile)
-     IniAction(act, "imageAlignVPtopLeft", "General", 1,0,0,, readThisFile)
-     IniAction(act, "imgFxMode", "General", 2,1,10,, readThisFile)
-     IniAction(act, "IMGresizingMode", "General", 2,1,5,, readThisFile)
-     IniAction(act, "imgThreshold", "General", 2,0,1,, readThisFile)
-     IniAction(act, "IntensityAlphaChannel", "General", 2,1,30,, readThisFile)
-     IniAction(act, "isAlwaysOnTop", "General", 1,0,0,, readThisFile)
-     IniAction(act, "lummyAdjust", "General", 2,-300,300,, readThisFile)
-     IniAction(act, "lumosAdjust", "General", 2,0.001,25,, readThisFile)
-     IniAction(act, "lumosGrayAdjust", "General", 2,0.001,25,, readThisFile)
-     IniAction(act, "mediaSNDvolume", "General", 2,1,100,, readThisFile)
-     IniAction(act, "realGammos", "General", 2,0.01,10,, readThisFile)
-     IniAction(act, "resetImageViewOnChange", "General", 1,0,0,, readThisFile)
-     IniAction(act, "satAdjust", "General", 2,0,3,, readThisFile)
-     IniAction(act, "showHUDnavIMG", "General", 1,0,0,, readThisFile)
-     IniAction(act, "showImgAnnotations", "General", 1,0,0,, readThisFile)
-     IniAction(act, "skipDeadFiles", "General", 1,0,0,, readThisFile)
-     IniAction(act, "SLDcacheFilesList", "General", 1,0,0,, readThisFile)
-     IniAction(act, "SlideHowMode", "General", 2,1,3,, readThisFile)
-     IniAction(act, "slidesFXrandomize", "General", 1,0,0,, readThisFile)
-     IniAction(act, "slideShowDelay", "General", 2,90,25000,, readThisFile)
-     IniAction(act, "SlidesMusicSong", "General", 0,0,0,, readThisFile)
-     IniAction(act, "specialColorFXmode", "General", 2,1,7,, readThisFile)
-     IniAction(act, "syncSlideShow2Audios", "General", 1,0,0,, readThisFile)
-     IniAction(act, "TouchScreenMode", "General", 1,0,0,, readThisFile)
-     IniAction(act, "uiColorCurveFXchannel", "General", 2,1,4,, readThisFile)
-     IniAction(act, "uiColorCurveFXmode", "General", 2,1,7,, readThisFile)
-     IniAction(act, "usrColorDepth", "General", 2,0,9,, readThisFile)
-     IniAction(act, "usrTextureBGR", "General", 1,0,0,, readThisFile)
-     IniAction(act, "vpIMGrotation", "General", 2,0,359,, readThisFile)
-     IniAction(act, "WindowBgrColor", "General", 3,0,0,, readThisFile)
-     IniAction(act, "zatAdjust", "General", 2,-300,300,, readThisFile)
-     IniAction(act, "zoomLevel", "General", 2,0.01,20,, readThisFile)
-     IniAction(act, "UserVPalphaBgrStyle", "General", 2, 1, 5,, readThisFile)
+   l := slideSettingsList()
+   For i, entry in l
+   {
+      s := StrSplit(entry, "|")
+      If (s[5]!="db")
+         IniAction(act, s[1], "General", s[2], s[3], s[4],, readThisFile)
+   }
 
-     If (act=0)
-     {
-        If (isWinXP=1 || minimizeMemUsage=1)
-           doSlidesTransitions := 0
+   If (act=0)
+      applySlideSettings()
+   Else
+      IniAction(1, "appVersion", "General", 0,0,0,, readThisFile)
+}
 
-        If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
-           imageAlignVPtopLeft := 0
+applySlideSettings() {
+; what the view needs once the settings of a .SLD list or a database are loaded
+   If (isWinXP=1 || minimizeMemUsage=1)
+      doSlidesTransitions := 0
 
-        updateWindowColor()
-        refreshWinBGRbrush()
-        defineColorDepth()
-        recalculateThumbsSizes()
-    } Else
-    {
-       IniAction(1, "appVersion", "General", 0,0,0,, readThisFile)
-    }
+   If (imageAlignVPtopLeft!=1 && imageAlignVPtopLeft!=0)
+      imageAlignVPtopLeft := 0
+
+   updateWindowColor()
+   refreshWinBGRbrush()
+   defineColorDepth()
+   recalculateThumbsSizes()
 }
 
 writeMainSettingsApp() {
@@ -72943,38 +72931,34 @@ INIaction(act, var, section, type:=0, mini:=0, maxy:=0, forcedDef:="", iniFile:=
       If (ErrorLevel && (A_TickCount - scriptStartTime<2500) && var!="userAddedFavesCount")
          addJournalEntry("Error loading INI settings (" var ") in " thisIniFile " | " section)
 
-      If (type=1) ; binary
+      If (type>=1 && type<=4)
       {
-         loadedValue := (Round(loadedValue)=0 || Round(loadedValue)=1) ? Round(loadedValue) : defaultu
-         %var% := loadedValue
-      } Else If (type=2)  ; range min/max
-      {
-         If !isNumber(loadedValue)
-         {
-            %var% := defaultu
-         } Else
-         {
-            loadedValue := clampInRange(loadedValue, mini, maxy)
-            %var% := loadedValue
-         }
-      } Else If (type=3)  ; HEX colour
-      {
-         loadedValue := Trimmer(loadedValue)
-         If (loadedValue ~= "[^[:xdigit:]]") || (StrLen(loadedValue)!=6)
-            loadedValue := defaultu
-         %var% := loadedValue
-      } Else If (type=4)  ; isNumber
-      {
-         If !isNumber(loadedValue)
-            %var% := defaultu
-         Else
-            %var% := loadedValue
+         %var% := settingValueChecked(loadedValue, type, mini, maxy, defaultu)
       } Else If (!(loadedValue ~= "i)^(.\:\\.)") && type=6)
       {
          %var% := defaultu
       } Else If (loadedValue="error" && type=5)
          %var% := defaultu
    }
+}
+
+settingValueChecked(value, type, mini, maxy, defaultu) {
+; the checks of INIaction() types 1 to 4: an invalid value gives defaultu
+   If (type=1) ; binary
+   {
+      Return (Round(value)=0 || Round(value)=1) ? Round(value) : defaultu
+   } Else If (type=2) ; range min/max
+   {
+      Return isNumber(value) ? clampInRange(value, mini, maxy) : defaultu
+   } Else If (type=3) ; HEX colour
+   {
+      value := Trimmer(value)
+      Return ((value ~= "[^[:xdigit:]]") || StrLen(value)!=6) ? defaultu : value
+   } Else If (type=4) ; isNumber
+   {
+      Return isNumber(value) ? value : defaultu
+   }
+   Return value
 }
 
 ToggleFullScreenMode() {
