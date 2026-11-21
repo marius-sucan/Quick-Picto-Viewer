@@ -3333,8 +3333,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       If destAttr
       {
          ; the file itself, reached through another spelling of the source folder or a link
-         fileID := getFileIdentity(file2rem)
-         If (fileID!="" && fileID=getFileIdentity(file2save))
+         If isSameFile(file2rem, file2save)
          {
             skippedFiles++
             Continue
@@ -44610,6 +44609,15 @@ getFileIdentity(filePath) {
    Return NumGet(info, 28, "UInt") "-" NumGet(info, 44, "UInt") "-" NumGet(info, 48, "UInt")
 }
 
+isSameFile(fileA, fileB) {
+; both paths name one existing file, in any spelling [letter case, links, junctions, SUBST drives, short names]
+   If !FileExist(fileB)
+      Return 0
+
+   fileID := getFileIdentity(fileA)
+   Return (fileID!="" && fileID=getFileIdentity(fileB))
+}
+
 PanelExtractFrames() {
     If (thumbsDisplaying!=1)
     {
@@ -61767,9 +61775,13 @@ BtnCopyMoveAction(dummy:=0) {
      }
   }
 
-  folderu := StrReplace(folderu, "\\", "\")
-  folderu := Trimmer(folderu, "\")
-  folderu := Trimmer(folderu, ".")
+  If relativePath
+  {
+     folderu := StrReplace(folderu, "\\", "\")
+     folderu := Trimmer(folderu, "\")
+     folderu := Trimmer(folderu, ".")
+  } Else
+     folderu := cleanFolderPath(folderu)   ; . and .. resolved, as Windows reads a full path
 
   wrongNames := 0
   testFolderu := SubStr(folderu, 4)
@@ -61902,10 +61914,13 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     If (groupingMode=1)
        finalDest := determineCreateFileGroupFolder(finalDest, originalMtime, OutFileExt)
 
-    If (OldOutDir=finalDest && UsrCopyMoveOperation=3 && dummy!="quick-actu")
+    file2save := finalDest "\" OldOutFileName
+    ; the file's own folder, in any spelling
+    isOwnFolder := (OldOutDir=finalDest || isSameFile(file2rem, file2save))
+    If (isOwnFolder && UsrCopyMoveOperation=3 && dummy!="quick-actu")
        mustCreateDupe := 1
 
-    If (OldOutDir=finalDest && mustCreateDupe!=1)
+    If (isOwnFolder && mustCreateDupe!=1)
     {
        sOldOutDir := PathCompact(OldOutDir, "a", 1, OSDfontSize)
        SetTimer, ResetImgLoadStatus, -200
@@ -61917,7 +61932,6 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        Return 0
     }
 
-    file2save := finalDest "\" OldOutFileName
     destAttr := FileExist(file2save)
     ; FileMove and FileCopy would put the file inside a folder of that name
     If InStr(destAttr, "D")
@@ -62188,7 +62202,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          prevMSGdisplay := A_TickCount
       }
 
-      If (OldOutDir=finalDest || !finalDest)
+      If !finalDest
       {
          skippedFiles++
          Continue
@@ -62199,7 +62213,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
       If (groupingMode=1)
       {
          finalDest := determineCreateFileGroupFolder(oFinalDest, originalMtime, OutFileExt)
-         If (OldOutDir=finalDest || !finalDest)
+         If !finalDest
          {
             skippedFiles++
             Continue
@@ -62208,6 +62222,13 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
       FileGetTime, originalCtime, % file2rem, C
       file2save := finalDest "\" OldOutFileName
+      ; the file's own folder, in any spelling
+      If (OldOutDir=finalDest || isSameFile(file2rem, file2save))
+      {
+         skippedFiles++
+         Continue
+      }
+
       lockDestinationFileName(file2save, 2)   ; with «Overwrite», the batch's own outputs are renamed, not replaced
       originalFileInfos := mustPerformOperation := wasError := operationExecuted := 0
       destAttr := FileExist(file2save)
