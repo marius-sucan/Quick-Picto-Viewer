@@ -89229,17 +89229,24 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    backupFilter := filesFilter
    backupIndexu := currentFileIndex
    renewCurrentFilesList()
-   thisString := StrReplace(dupesStringFilter, "||", "|")
-   thisString := Trimmer(Trimmer(thisString), "|")
-   If thisString
+   givenRegEx := ""
+   thisString := ""
+   Loop, Parse, dupesStringFilter, |
    {
-      thisString := StrReplace(thisString, "/")
-      thisString := StrReplace(thisString, ">")
+      termu := StrReplace(A_LoopField, ">")
+      If (termu="")
+         Continue
+      thisString .= (thisString!="" ? "|" : "") termu
+   }
+
+   If (thisString!="")
+   {
       If (dupesFilterStringPos=2)
-         thisString .= "/"
+         givenRegEx := "i)^(" JEE_StrRegExLiteral(thisString) ")"
       Else If (dupesFilterStringPos=3)
-         thisString .= ">"
-      givenRegEx := processSearchIndexString(thisString)
+         givenRegEx := "i)(" JEE_StrRegExLiteral(thisString) ")$"
+      Else
+         givenRegEx := "i)(" JEE_StrRegExLiteral(thisString) ")"
    }
 
    abandonAll := 0
@@ -89302,7 +89309,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
           }
 
           grpIDu := NumGet(rowsBuf, offu + 24, "UInt")
-          groupies[grpIDu] := 1
+          groupies[grpIDu] := groupies.HasKey(grpIDu) ? groupies[grpIDu] + 1 : 1
           maxFilesIndex++
           resultedFilesList[maxFilesIndex, 1]  := thisPath
           resultedFilesList[maxFilesIndex, 12] := imgIDu   ; sqlDBrowID
@@ -89318,12 +89325,40 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       firstu += gotu
    }
 
-   If (abandonAll!=1 && maxFilesIndex>1)
+   useHashes := (userFindDupesFilterHamDist>1 && includeHash) ? 1 : 0
+   validGroups := 0
+   If (useHashes=1 && abandonAll!=1 && maxFilesIndex>1)
       builtCandidates := DllCall("qpvmain.dll\dupesScanBuildFromQuery", "UPtr", &keepMask, "uint", totalCandidates, "uint", idBase, "int")
+   Else If (useHashes!=1 && abandonAll!=1 && maxFilesIndex>0)
+   {
+      hasSingleton := 0
+      For k, v in groupies
+      {
+         If (v>1)
+            validGroups++
+         Else
+            hasSingleton := 1
+      }
+      If (hasSingleton=1)
+      {
+         newArr := []
+         newIdx := 0
+         Loop, % maxFilesIndex
+         {
+            If (groupies[resultedFilesList[A_Index, 23]]>1)
+            {
+               newIdx++
+               newArr[newIdx] := resultedFilesList[A_Index]
+            }
+         }
+         resultedFilesList := newArr
+         maxFilesIndex := newIdx
+      }
+   }
 
    keepMask := ""
    keptPairs := 0
-   If (userFindDupesFilterHamDist>1 && maxFilesIndex>1 && includeHash && abandonAll!=1)
+   If (useHashes=1 && maxFilesIndex>1 && abandonAll!=1)
    {
       ; builtCandidates=0 means the DLL ran the query but built no candidate set out of it:
       ; the keep mask left fewer than two comparable images. There is nothing to sweep.
@@ -89378,7 +89413,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
 
    ; SetTimer, RemoveTooltip, % -msgDisplayTime
    backupArray := ""
-   showDelayedTooltip("Found " groupDigits(groupies.Count()) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
+   groupsFound := useHashes ? groupies.Count() : validGroups
+   showDelayedTooltip("Found " groupDigits(groupsFound) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
    ; ToolTip, % "x=" x , , , 2
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
@@ -91198,8 +91234,9 @@ PanelFindDupes(dummy:=0) {
        Gui, Font, s%LargeUIfontValue%
     }
 
-    If (StrLen(filesFilter)<3)
-       excludePreviousDupesFromList := 0
+    canExclude := (StrLen(filesFilter)>=3) ? 1 : 0
+    chkExcl := canExclude ? excludePreviousDupesFromList : 0
+    exclOpt := canExclude ? "" : " Disabled"
 
     If (A_PtrSize!=8)
        userFindDupesFilterHamDist := 1
@@ -91298,7 +91335,7 @@ PanelFindDupes(dummy:=0) {
     GuiAddDropDownList("xs+15 y+7 w" btnWid " AltSubmit Choose" dupesFilterStringPos " vdupesFilterStringPos", "Anywhere|Begins with|Ends with", "String filter matching mode")
     GuiAddDropDownList("x+2 w" btnWid " AltSubmit Choose" dupesFilterWhat " vdupesFilterWhat", "Full path|Folder path|File name", "Apply filter based on")
     Gui, Add, Checkbox, xs+15 y+7 Checked%dupesFilterStringIsNot% vdupesFilterStringIsNot, &Must not contain the given string
-    Gui, Add, Checkbox, xs y+20 Checked%excludePreviousDupesFromList% vexcludePreviousDupesFromList, E&xclude the current list of results
+    Gui, Add, Checkbox, xs y+20 Checked%chkExcl%%exclOpt% vexcludePreviousDupesFromList, E&xclude the current list of results
     Gui, Add, Text, xs+15 y+30, The data will be collected only for the matching image files.
 
     Gui, Tab
@@ -91632,12 +91669,14 @@ BTNfindDupesNow() {
       Return
    }
 
+   If (StrLen(filesFilter)<3)
+      excludePreviousDupesFromList := 0
    If (SLDtypeLoaded=3)
       IniSLDBWrite("hamDistInterpolation", hamDistInterpolation)
    InitialFindDupesSettingsPanel(1)
    BtnCloseWindow()
    toBeExcludedIndexes := []
-   If (excludePreviousDupesFromList=1)
+   If (excludePreviousDupesFromList=1 && StrLen(filesFilter)>=3)
    {
       Loop, % maxFilesIndex
          toBeExcludedIndexes[resultedFilesList[A_Index, 12]] := 1
