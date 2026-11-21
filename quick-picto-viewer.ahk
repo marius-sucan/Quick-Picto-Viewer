@@ -61749,9 +61749,6 @@ BtnCopyMoveAction(dummy:=0) {
      ; move files to a given sub-folder
      folderu := Trimmer(folderu, "\")
      folderu := Trimmer(folderu, ".")
-     If (b := InStr(folderu, "; "))
-        folderu := SubStr(folderu, b+2)
-
      If (folderu!="")
      {
         relativePath := "\" folderu
@@ -61793,6 +61790,12 @@ BtnCopyMoveAction(dummy:=0) {
   {
      msgBeepTimer("WARNING: Incorrect file path given:`n" folderu)
      Return 0
+  }
+
+  If (UsrCopyMoveOperation=2) ; on file move
+  {
+     If askAboutFileSave(" and the files operations will be executed")
+        Return 0
   }
 
   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
