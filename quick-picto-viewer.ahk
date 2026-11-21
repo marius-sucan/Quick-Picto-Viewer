@@ -179,6 +179,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , isWinXP := (A_OSVersion="WIN_XP" || A_OSVersion="WIN_2003" || A_OSVersion="WIN_2000") ? 1 : 0
    , QPVpid := GetCurrentProcessId(), preventUndoLevels := 0, maxMemUndoLevels := 979394
    , lastOSDtooltipInvoked := 1, lastTimeToggleThumbs := 1, dupesStringFilter := ""
+   , dupesFilterWhat := 1, dupesFilterStringPos := 1, dupesFilterStringIsNot := 0
    , CurrentPanelTab := 0, debugModa := !A_IsCompiled, createdGDIobjsArray := [], bckpCurrentFileIndex := 0
    , TVlistFolders, hfdTreeWinGui, folderTreeWinOpen := 0, VPstampBMPx := 0, VPstampBMPy := 0
    , reviewSelectedIndexes := [], toBeExcludedIndexes := [], staticListViewFilteru
@@ -28391,17 +28392,6 @@ ToggleFileStatsDating() {
     GuiControlGet, uiPreferedFileStats
     ; ToolTip, % "l=" uiPreferedFileStats , , , 2
     RegAction(1, "uiPreferedFileStats")
-}
-
-UIeditHammingInterpolation() {
-    Gui, SettingsGUIA: Default
-    GuiControlGet, hamDistInterpolation
-
-    ; hamDistInterpolation := (editFr=1) ? 6 : 5
-    ; ToolTip, % "l=" hamDistInterpolation , , , 2
-    ; IniAction(1, "hamDistInterpolation", "General")
-    If (SLDtypeLoaded=3)
-       IniSLDBWrite("hamDistInterpolation", hamDistInterpolation)
 }
 
 PanelWrapperFilesStats() {
@@ -89025,7 +89015,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
       ; the same matching mode and column the hashes below and the results list are filtered
       ; with; the collection used to read "anywhere in the full path" whatever the panel said
-      rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
+      rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
       If (rr=-3)
       {
          RemoveTooltip()
@@ -89035,9 +89025,9 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
 
    If (InStr(thisNOTnullCol, "hash") || userFindDupesFilterHamDist>1 || mustForceHashes>1)
    {
-      generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
+      generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
       If (findFlippedDupes=1)
-         generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 1, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
+         generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 1, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
    }
 
    If (InStr(theseCols, "hash") && userFindDupesFilterHamDist>1)
@@ -89244,9 +89234,9 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    {
       thisString := StrReplace(thisString, "/")
       thisString := StrReplace(thisString, ">")
-      If (userFilterStringPos=2)
+      If (dupesFilterStringPos=2)
          thisString .= "/"
-      Else If (userFilterStringPos=3)
+      Else If (dupesFilterStringPos=3)
          thisString .= ">"
       givenRegEx := processSearchIndexString(thisString)
    }
@@ -89300,7 +89290,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
           If (toBeExcludedIndexes[imgIDu]=1)
              okay := 0
           Else If givenRegEx
-             okay := coreSearchIndex(thisPath, givenRegEx, userFilterWhat, userFilterStringIsNot) ? 1 : 0
+             okay := coreSearchIndex(thisPath, givenRegEx, dupesFilterWhat, dupesFilterStringIsNot) ? 1 : 0
           Else
              okay := 1
 
@@ -91052,6 +91042,113 @@ testIsDupesList() {
       Return 0
 }
 
+InitialFindDupesSettingsPanel(modus) {
+    Global UIcheckimgfile, UIcheckfcreated, UIcheckfmodified, UIcheckfsize, UIcheckkbfsize
+         , UIcheckimgpixfmt, UIcheckimgwidth, UIcheckimgheight, UIcheckimgmegapix
+         , UIcheckimgwhratio, UIcheckimgframes, UIcheckimghpeak, UIcheckimghlow
+         , UIcheckimghrange, UIcheckimgavg, UIcheckimgmedian, UIcheckimghrms
+         , UIcheckimghmode, UIcheckimghminu
+    Static hasSnap := 0, o_userFindDupePresets, o_findDupesPrecision, o_UIfindDupePrecision
+         , o_userFindDupesFilterHamDist, o_hamDistLBorderCrop, o_hamDistRBorderCrop
+         , o_userFindDupesHamDistLvl, o_findFlippedDupes, o_findInvertedDupes
+         , o_BreakDupesGroups, o_PerformMSDonDupes, o_userFindDupesMSElvl
+         , o_hamDistInterpolation, o_dupesApplyBlur, o_userpHashMode, o_graylevelCompressor
+         , o_dupesStringFilter, o_dupesFilterStringPos, o_dupesFilterWhat
+         , o_dupesFilterStringIsNot, o_excludePreviousDupesFromList
+         , o_UIcheckimgfile, o_UIcheckfcreated, o_UIcheckfmodified, o_UIcheckfsize
+         , o_UIcheckkbfsize, o_UIcheckimgpixfmt, o_UIcheckimgwidth, o_UIcheckimgheight
+         , o_UIcheckimgmegapix, o_UIcheckimgwhratio, o_UIcheckimgframes, o_UIcheckimghpeak
+         , o_UIcheckimghlow, o_UIcheckimghrange, o_UIcheckimgavg, o_UIcheckimgmedian
+         , o_UIcheckimghrms, o_UIcheckimghmode, o_UIcheckimghminu
+
+    If (modus=1)
+    {
+       hasSnap := 1
+       o_userFindDupePresets := userFindDupePresets
+       o_findDupesPrecision := findDupesPrecision
+       o_UIfindDupePrecision := UIfindDupePrecision
+       o_userFindDupesFilterHamDist := userFindDupesFilterHamDist
+       o_hamDistLBorderCrop := hamDistLBorderCrop
+       o_hamDistRBorderCrop := hamDistRBorderCrop
+       o_userFindDupesHamDistLvl := userFindDupesHamDistLvl
+       o_findFlippedDupes := findFlippedDupes
+       o_findInvertedDupes := findInvertedDupes
+       o_BreakDupesGroups := BreakDupesGroups
+       o_PerformMSDonDupes := PerformMSDonDupes
+       o_userFindDupesMSElvl := userFindDupesMSElvl
+       o_hamDistInterpolation := hamDistInterpolation
+       o_dupesApplyBlur := dupesApplyBlur
+       o_userpHashMode := userpHashMode
+       o_graylevelCompressor := graylevelCompressor
+       o_dupesStringFilter := dupesStringFilter
+       o_dupesFilterStringPos := dupesFilterStringPos
+       o_dupesFilterWhat := dupesFilterWhat
+       o_dupesFilterStringIsNot := dupesFilterStringIsNot
+       o_excludePreviousDupesFromList := excludePreviousDupesFromList
+       o_UIcheckimgfile := UIcheckimgfile
+       o_UIcheckfcreated := UIcheckfcreated
+       o_UIcheckfmodified := UIcheckfmodified
+       o_UIcheckfsize := UIcheckfsize
+       o_UIcheckkbfsize := UIcheckkbfsize
+       o_UIcheckimgpixfmt := UIcheckimgpixfmt
+       o_UIcheckimgwidth := UIcheckimgwidth
+       o_UIcheckimgheight := UIcheckimgheight
+       o_UIcheckimgmegapix := UIcheckimgmegapix
+       o_UIcheckimgwhratio := UIcheckimgwhratio
+       o_UIcheckimgframes := UIcheckimgframes
+       o_UIcheckimghpeak := UIcheckimghpeak
+       o_UIcheckimghlow := UIcheckimghlow
+       o_UIcheckimghrange := UIcheckimghrange
+       o_UIcheckimgavg := UIcheckimgavg
+       o_UIcheckimgmedian := UIcheckimgmedian
+       o_UIcheckimghrms := UIcheckimghrms
+       o_UIcheckimghmode := UIcheckimghmode
+       o_UIcheckimghminu := UIcheckimghminu
+    } Else If (hasSnap=1)
+    {
+       userFindDupePresets := o_userFindDupePresets
+       findDupesPrecision := o_findDupesPrecision
+       UIfindDupePrecision := o_UIfindDupePrecision
+       userFindDupesFilterHamDist := o_userFindDupesFilterHamDist
+       hamDistLBorderCrop := o_hamDistLBorderCrop
+       hamDistRBorderCrop := o_hamDistRBorderCrop
+       userFindDupesHamDistLvl := o_userFindDupesHamDistLvl
+       findFlippedDupes := o_findFlippedDupes
+       findInvertedDupes := o_findInvertedDupes
+       BreakDupesGroups := o_BreakDupesGroups
+       PerformMSDonDupes := o_PerformMSDonDupes
+       userFindDupesMSElvl := o_userFindDupesMSElvl
+       hamDistInterpolation := o_hamDistInterpolation
+       dupesApplyBlur := o_dupesApplyBlur
+       userpHashMode := o_userpHashMode
+       graylevelCompressor := o_graylevelCompressor
+       dupesStringFilter := o_dupesStringFilter
+       dupesFilterStringPos := o_dupesFilterStringPos
+       dupesFilterWhat := o_dupesFilterWhat
+       dupesFilterStringIsNot := o_dupesFilterStringIsNot
+       excludePreviousDupesFromList := o_excludePreviousDupesFromList
+       UIcheckimgfile := o_UIcheckimgfile
+       UIcheckfcreated := o_UIcheckfcreated
+       UIcheckfmodified := o_UIcheckfmodified
+       UIcheckfsize := o_UIcheckfsize
+       UIcheckkbfsize := o_UIcheckkbfsize
+       UIcheckimgpixfmt := o_UIcheckimgpixfmt
+       UIcheckimgwidth := o_UIcheckimgwidth
+       UIcheckimgheight := o_UIcheckimgheight
+       UIcheckimgmegapix := o_UIcheckimgmegapix
+       UIcheckimgwhratio := o_UIcheckimgwhratio
+       UIcheckimgframes := o_UIcheckimgframes
+       UIcheckimghpeak := o_UIcheckimghpeak
+       UIcheckimghlow := o_UIcheckimghlow
+       UIcheckimghrange := o_UIcheckimghrange
+       UIcheckimgavg := o_UIcheckimgavg
+       UIcheckimgmedian := o_UIcheckimgmedian
+       UIcheckimghrms := o_UIcheckimghrms
+       UIcheckimghmode := o_UIcheckimghmode
+       UIcheckimghminu := o_UIcheckimghminu
+    }
+}
+
 PanelFindDupes(dummy:=0) {
     Global userFindDupesSelectAllDummy := 0, hasOpened, txtLine1, editFc, editFd, txtline2, editFr
     Static userWasWarned := 0
@@ -91087,6 +91184,8 @@ PanelFindDupes(dummy:=0) {
     }
 
     thisBtnHeight := createSettingsGUI(49, A_ThisFunc, 1)
+    If (AnyWindowOpen=49)
+       InitialFindDupesSettingsPanel(1)
     btnWid := 100
     txtWid := 350
     EditWid := 395
@@ -91106,11 +91205,11 @@ PanelFindDupes(dummy:=0) {
 
     If (dummy>0 && isNumber(dummy) && isInRange(dummy, 1, 3))
        thisPanelTab := dummy
-    If (userFilterStringPos>=4)
-       userFilterStringPos := 1
+    If !isInRange(dupesFilterStringPos, 1, 3)
+       dupesFilterStringPos := 1
 
-    If (userFilterWhat>=4)
-       userFilterWhat := 1
+    If !isInRange(dupesFilterWhat, 1, 3)
+       dupesFilterWhat := 1
 
     col := (PrefsLargeFonts=1) ? 285 : 190
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate hwndhCurrTab AltSubmit vCurrentPanelTab Choose%thisPanelTab%, General|Image hashes|Collect data|Filtering
@@ -91176,7 +91275,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Text, x+15 y+15 w%txtWid% Section, These options allow altering how image data is collected. For best results, these settings should be altered only once, before any data is collected. All processes can be interrupted and resumed at any time.
     
     Gui, Add, Text, xs y+15, For these to take effect, refresh image histogram and fingerprints data:
-    Gui, Add, Checkbox, xs+15 y+15 Checked%hamDistInterpolation% vhamDistInterpolation gUIeditHammingInterpolation, High-quality resampling (slower)
+    Gui, Add, Checkbox, xs+15 y+15 Checked%hamDistInterpolation% vhamDistInterpolation, High-quality resampling (slower)
     Gui, Add, Checkbox, xp y+15 Checked%dupesApplyBlur% vdupesApplyBlur, Blur images by 4x4 to weed out artefacts
 
     Gui, Add, Text, xs y+15, For these to take effect, refresh only the image hashes:
@@ -91195,9 +91294,9 @@ PanelFindDupes(dummy:=0) {
     If (StrLen(UsrEditFilter)>0 && userFilterDoString=1 && StrLen(filesFilter)>1)
        GuiAddButton("x+1 hp wp gBtnUIsetDupesCilterCurrentFilter", "+", "Use the current files list filter")
 
-    GuiAddDropDownList("xs+15 y+7 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterStringPos " vuserFilterStringPos", "Anywhere|Begins with|Ends with", "String filter matching mode")
-    GuiAddDropDownList("x+2 w" btnWid " gupdateUIFiltersPanel AltSubmit Choose" userFilterWhat " vuserFilterWhat", "Full path|Folder path|File name", "Apply filter based on")
-    Gui, Add, Checkbox, xs+15 y+7 Checked%userFilterStringIsNot% vuserFilterStringIsNot, &Must not contain the given string
+    GuiAddDropDownList("xs+15 y+7 w" btnWid " AltSubmit Choose" dupesFilterStringPos " vdupesFilterStringPos", "Anywhere|Begins with|Ends with", "String filter matching mode")
+    GuiAddDropDownList("x+2 w" btnWid " AltSubmit Choose" dupesFilterWhat " vdupesFilterWhat", "Full path|Folder path|File name", "Apply filter based on")
+    Gui, Add, Checkbox, xs+15 y+7 Checked%dupesFilterStringIsNot% vdupesFilterStringIsNot, &Must not contain the given string
     Gui, Add, Checkbox, xs y+20 Checked%excludePreviousDupesFromList% vexcludePreviousDupesFromList, E&xclude the current list of results
     Gui, Add, Text, xs+15 y+30, The data will be collected only for the matching image files.
 
@@ -91219,19 +91318,22 @@ BtnCollectDupesData() {
    Gui, SettingsGUIA: Default
    GuiControlGet, UIfindDupePrecision
    GuiControlGet, dupesStringFilter
-   GuiControlGet, userFilterStringIsNot
-   GuiControlGet, userFilterStringPos
-   GuiControlGet, userFilterWhat
+   GuiControlGet, dupesFilterStringIsNot
+   GuiControlGet, dupesFilterStringPos
+   GuiControlGet, dupesFilterWhat
    GuiControlGet, graylevelCompressor
    GuiControlGet, findInvertedDupes
    GuiControlGet, userpHashMode
    GuiControlGet, hamDistInterpolation
    GuiControlGet, dupesApplyBlur
    findDupesPrecision := dupesPrecisionFromUI(UIfindDupePrecision)
+   If (SLDtypeLoaded=3)
+      IniSLDBWrite("hamDistInterpolation", hamDistInterpolation)
+   InitialFindDupesSettingsPanel(1)
    BtnCloseWindow()
    Global findFlippedDupes := 1
    scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
-   collectSQLFileInfosNow(scu, 0, 0, 2, 0, dupesStringFilter, userFilterStringIsNot, userFilterStringPos, userFilterWhat)
+   collectSQLFileInfosNow(scu, 0, 0, 2, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
    PopulateImagesIndexStatsInfos("kill")
    openPreviousPanel()
 }
@@ -91242,12 +91344,10 @@ updateUIimageHashPreview() {
        Return
 
     Gui, SettingsGUIA: Default
-    GuiControlGet, userFindDupePresets
-    GuiControlGet, userFindDupesHamDistLvl
-    GuiControlGet, userFindDupesFilterHamDist
-    GuiControlGet, hamDistLBorderCrop
-    GuiControlGet, hamDistRBorderCrop
-    GuiControlGet, graylevelCompressor
+    GuiControlGet, thisPreset, SettingsGUIA:, userFindDupePresets
+    GuiControlGet, hamType, SettingsGUIA:, userFindDupesFilterHamDist
+    GuiControlGet, lCrop, SettingsGUIA:, hamDistLBorderCrop
+    GuiControlGet, rCrop, SettingsGUIA:, hamDistRBorderCrop
 
     cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSize, uiboxSize, coreDesiredPixFmt)
     If !validBMP(cornersBMP)
@@ -91266,7 +91366,7 @@ updateUIimageHashPreview() {
 
     Loop, 8
     {
-       If (userFindDupePresets!=7)
+       If (thisPreset!=7)
           Continue
 
        pY := A_Index - 1
@@ -91282,8 +91382,8 @@ updateUIimageHashPreview() {
           ;            ConvertBase(2, 16) reads MSB-first, so the FIRST
           ;            comparison lands in bit 63 and the map has to be flipped.
           ; hammingDistance() always crops counting up from the LSB.
-          bitPos := (userFindDupesFilterHamDist=3) ? allLoops : 65 - allLoops
-          If (isInRange(bitPos, hamDistLBorderCrop + 1, 64 - hamDistRBorderCrop) && userFindDupesFilterHamDist>1)
+          bitPos := (hamType=3) ? allLoops : 65 - allLoops
+          If (isInRange(bitPos, lCrop + 1, 64 - rCrop) && hamType>1)
              Gdip_FillRectangle(G, pBrushD, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
        }
     }
@@ -91309,8 +91409,8 @@ updateUIdupesPanel() {
       Return
 
    Gui, SettingsGUIA: Default
-   GuiControlGet, userFindDupePresets
-   actu := (userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControlGet, thisPreset, SettingsGUIA:, userFindDupePresets
+   actu := (thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
    GuiControl, % actu, userFindDupesSelectAllDummy
    GuiControl, % actu, btnFldr6
@@ -91321,7 +91421,7 @@ updateUIdupesPanel() {
    ; the Matching tolerance applies to aspect ratio, megapixels and the histogram values;
    ; presets 5 and 6 have none of those, and presets 3 and 4 group by the exact file size,
    ; for which BTNfindDupesNow() forces an exact match - so only 1, 2 and Custom use UIfindDupePrecision
-   actu2 := isInRange(userFindDupePresets, 3, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
+   actu2 := isInRange(thisPreset, 3, 6) ? "SettingsGUIA: Disable" : "SettingsGUIA: Enable"
    GuiControl, % actu2, UIfindDupePrecision
    GuiControl, % actu2, btnFldr
    UIfindDupesCheckboxes(actu)
@@ -91357,13 +91457,13 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % hactu, UIcheckimghmode, %v%
    GuiControl, % hactu, UIcheckimghminu, %v%
 
-   GuiControlGet, userFindDupePresets
-   GuiControlGet, PerformMSDonDupes
-   GuiControlGet, userFindDupesFilterHamDist
+   GuiControlGet, thisPreset, SettingsGUIA:, userFindDupePresets
+   GuiControlGet, doMSD, SettingsGUIA:, PerformMSDonDupes
+   GuiControlGet, hamType, SettingsGUIA:, userFindDupesFilterHamDist
    If InStr(hactu, "able")
       updateUIimageHashPreview()
 
-   actu := (userFindDupesFilterHamDist>1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (hamType>1 && thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, userFindDupesHamDistLvl
    GuiControl, % actu, editF11
    GuiControl, % actu, editF6
@@ -91373,13 +91473,13 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % actu, txtLine1
    GuiControl, % actu, PerformMSDonDupes
    GuiControl, % actu, BreakDupesGroups
-   actu := (userFindDupesFilterHamDist>1 && userFindDupesFilterHamDist!=2 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (hamType>1 && hamType!=2 && doMSD!=1 && thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, findInvertedDupes
    ; flipped detection needs the H-prefixed hash columns, which only exist once
    ; a hash type is picked: retrieveDupesByProperties() cannot build its query without one
-   actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes!=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (hamType>1 && doMSD!=1 && thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, findFlippedDupes
-   actu := (userFindDupesFilterHamDist>1 && PerformMSDonDupes=1 && userFindDupePresets=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (hamType>1 && doMSD=1 && thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, editFr
    GuiControl, % actu, userFindDupesMSElvl
 }
@@ -91388,13 +91488,16 @@ BTNfindDupesNow() {
    If (AnyWindowOpen!=49)
       Return
 
+   If askAboutFileSave(" and the identification of duplicated images will begin")
+      Return
+
    columnus := ""
    Gui, SettingsGUIA: Default
    GuiControlGet, UIfindDupePrecision
    GuiControlGet, dupesStringFilter
-   GuiControlGet, userFilterStringIsNot
-   GuiControlGet, userFilterStringPos
-   GuiControlGet, userFilterWhat
+   GuiControlGet, dupesFilterStringIsNot
+   GuiControlGet, dupesFilterStringPos
+   GuiControlGet, dupesFilterWhat
    GuiControlGet, excludePreviousDupesFromList
    GuiControlGet, userFindDupesHamDistLvl
    GuiControlGet, userFindDupesFilterHamDist
@@ -91404,6 +91507,7 @@ BTNfindDupesNow() {
    GuiControlGet, findInvertedDupes
    GuiControlGet, findFlippedDupes
    GuiControlGet, userpHashMode
+   GuiControlGet, hamDistInterpolation
    GuiControlGet, PerformMSDonDupes
    GuiControlGet, userFindDupesMSElvl
    GuiControlGet, dupesApplyBlur
@@ -91411,9 +91515,6 @@ BTNfindDupesNow() {
    findDupesPrecision := dupesPrecisionFromUI(UIfindDupePrecision)
    If (PerformMSDonDupes=1)
       findFlippedDupes := findInvertedDupes := 0
-
-   If askAboutFileSave(" and the identification of duplicated images will begin")
-      Return
 
    If GuiCtrlGet("UIcheckimgfile")
       columnus .= "imgfile,"
@@ -91516,16 +91617,23 @@ BTNfindDupesNow() {
    } Else theseCols := columnus
 
    If (StrLen(theseCols)<3)
+   {
+      InitialFindDupesSettingsPanel(0)
       Return msgBeepTimer("WARNING: Insufficient properties selected by which to identify duplicates.")
+   }
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
 
    If (userFindDupesFilterHamDist>1 && dupesPixInitGood!=1)
    {
+      InitialFindDupesSettingsPanel(0)
       msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.`n`nSearching for duplicates by fingerprint (Hamming distance). Searching by file and image properties alone still works: set the fingerprint type to «Ignore».", 0, 0, "error")
       Return
    }
 
+   If (SLDtypeLoaded=3)
+      IniSLDBWrite("hamDistInterpolation", hamDistInterpolation)
+   InitialFindDupesSettingsPanel(1)
    BtnCloseWindow()
    toBeExcludedIndexes := []
    If (excludePreviousDupesFromList=1)
@@ -96711,14 +96819,12 @@ BTNreviewLVselAll() {
 }
 
 BtnUIsetDupesCilterCurrentFilter() {
-   dupesStringFilter := UsrEditFilter
-   GuiControl, SettingsGUIA:, dupesStringFilter, % dupesStringFilter
+   GuiControl, SettingsGUIA:, dupesStringFilter, % UsrEditFilter
 }
 
 UIstringEditFilterErase() {
    If (AnyWindowOpen=49)
    {
-      dupesStringFilter := ""
       GuiControl, SettingsGUIA:, dupesStringFilter, 
    } Else If (AnyWindowOpen=62)
    {
@@ -99929,6 +100035,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
     If (AnyWindowOpen=6)
        InitialFilterSettingsPanel(0)
+    Else If (AnyWindowOpen=49)
+       InitialFindDupesSettingsPanel(0)
     Else If (AnyWindowOpen=60)
        reviewSelectedIndexes := []
     Else If (AnyWindowOpen=82)
