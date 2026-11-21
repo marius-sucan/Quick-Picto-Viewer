@@ -61807,20 +61807,24 @@ BtnCopyMoveAction(dummy:=0) {
   }
 
   nullvara := askAboutFileCollision(0, 0, 1, 3, 0, nullvar)
-  If (FolderExist(folderu) || groupingMode=1 || relativePath)
+  ; a pattern's folder is made by the batch path for two or more files, and below for one existing file
+  If (FolderExist(folderu) || groupingMode=1 || relativePath && (getSelectedFiles(0, 1)>1 || !FileExist(imgPath)))
   {
      Sleep, 2
      r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath)
      dummyTimerDelayiedImageDisplay(50)
-  } Else If (StrLen(folderu)>1)
+  } Else If (relativePath || StrLen(folderu)>1)
   {
-     If (dummy!="quick-actu")
+     ; the folder of a pattern for one file is made without a question
+     If (dummy!="quick-actu" && !relativePath)
         msgResult := msgBoxWrapper(appTitle, "Destination folder does not seem to exist:`n" folderu "\`n`nDo you want to create the folder?", 4, 0, "question")
 
-     If (msgResult="yes" || dummy="quick-actu")
+     If (msgResult="yes" || dummy="quick-actu" || relativePath)
      {
-        FileCreateDir, % folderu
-        If ErrorLevel
+        ; on a drive only: .\ for a file at the root of a drive gives a path without one
+        If (SubStr(folderu, 2, 2)=":\")
+           FileCreateDir, % folderu
+        If !FolderExist(folderu)
         {
            OutDir := PathCompact(folderu, "a", 1, OSDfontSize)
            SoundBeep , 300, 100
@@ -61832,7 +61836,7 @@ BtnCopyMoveAction(dummy:=0) {
         } Else
         {
            Sleep, 2
-           r := QuickMoveFile2Dest(folderu, groupingMode, dummy)
+           r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath)
            dummyTimerDelayiedImageDisplay(50)
         }
      }
