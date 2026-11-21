@@ -2456,10 +2456,6 @@ ProbeDirEnumClass(dirPath, ByRef nameOffset) {
     10 = FileIdBothDirectoryInfo  Windows Vista and above
      0 = neither one of them; the caller has to fall back on FindFirstFile
 
-  Every other field NewGetFilesList() reads - EndOfFile at 40, FileAttributes
-  at 56, FileNameLength at 60, CreationTime at 8 and LastWriteTime at 24 -
-  sits at the very same offset in both structures; only the name moves.
-
   The folder is opened and closed again here, on purpose: the probe is what
   brings the first index blocks of the folder into the cache, so the real
   pass that follows immediately does not pay for them twice.

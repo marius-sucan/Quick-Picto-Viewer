@@ -60667,8 +60667,7 @@ CopyMovePanelWindow() {
     thisW := (PrefsLargeFonts=1) ? 190 : 120
     Gui, Add, Text, xs y+5 +hwndhTempu +0x200 +BackgroundTrans, On file name conflicts:
     zh := GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" copyMoveDoLastOption " vcopyMoveDoLastOption", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
-    Gui, Add, Button, x+5 hp wp-25 gEraseCopyMoveHisto, Erase &history
-
+    Gui, Add, Button, x+5 hp wp-25 gEraseCopyMoveHisto, Erase history
     Loop, Parse, finalListu, `n
     {
        If (StrLen(A_LoopField)>2)
