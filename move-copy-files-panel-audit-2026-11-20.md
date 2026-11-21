@@ -26,8 +26,9 @@ reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `crea
 **Status, 2026-11-21.** Finding 1 is fixed in `db1cb15`, by Marius, with his answer to decision 1.
 Finding 2 is fixed in `db1cb15`, by Marius, and `244b305`, with his answer to decision 2. Findings 4,
 5, 6, 7 and 11 are fixed in `5735d4f`, `5ce0fe8`, `58c1f58`, `16745bf` and `a40adb4`, with his
-answers to decisions 4 to 7 and 11. The other findings are open. A fixed section ends with a note on
-what the code does now; the notes of findings 1 and 2 cite lines at `244b305`, the others at `a40adb4`.
+answers to decisions 4 to 7 and 11; `e5713d0` completes the fix of finding 7. The other findings are open.
+A fixed section ends with a note on what the code does now; the notes of findings 1 and 2 cite lines
+at `244b305`, the others at `a40adb4`, which `e5713d0` leaves in place.
 
 ## Terms
 
@@ -62,7 +63,7 @@ what the code does now; the notes of findings 1 and 2 cite lines at `244b305`, t
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `a40adb4` |
+| # | Finding | Harm | Checked | Status at `e5713d0` |
 |---|---------|------|---------|---------------------|
 | 1 | An edited, unsaved image loses its edits when it is moved, without a question | high, narrow | run | **fixed**, `db1cb15` |
 | 2 | A «; » in the destination: the text before it is dropped, so an existing folder is refused and a pattern fills another, new folder | medium | run | **fixed**, `db1cb15`, `244b305` |
@@ -70,7 +71,7 @@ what the code does now; the notes of findings 1 and 2 cite lines at `244b305`, t
 | 4 | A destination that ends in `\..` or `\.`, or a database list's folder in another case of a letter outside A-Z: the files go to the wrong folder, are recycled and replaced by copies of themselves, are renamed in place, or reach the index with a doubled backslash | medium, narrow | run | **fixed**, `5735d4f` |
 | 5 | One file and a pattern to a folder that does not exist: «Failed to COPY/MOVE file», where two files get the folder | medium | run | **fixed**, `5ce0fe8` |
 | 6 | A copy into the files' own folder: one file is duplicated, also with «Skip files»; two or more are skipped | low | run | **fixed**, `58c1f58` |
-| 7 | A pattern or a grouping word is not remembered: the next opening offers one absolute folder, and the messages name one folder for files that went to many | medium | run | **fixed**, `16745bf` |
+| 7 | A pattern or a grouping word is not remembered: the next opening offers one absolute folder, and the messages name one folder for files that went to many | medium | run | **fixed**, `16745bf`, `e5713d0` |
 | 8 | A grouping word alone gathers the selected files of every folder under the current file's folder | low, maybe meant so | run | open |
 | 9 | «Proceed» creates the destination before the 150 files question; «No» leaves the new folder behind | low | run | open |
 | 10 | A drive root is refused, although «Browse» and the list offer one | low | run | open |
@@ -288,7 +289,10 @@ on the fix (batches A, C, G):
 - The quick file action with `<work>\st\src\.` and «Overwrite», one file: the tip «WARNING: Illegal
   operation. The destination folder is the same with the initial location».
 
-A junction, a SUBST drive and a short name were not run.
+A junction, a SUBST drive and a short name were not run. The structured engine's copy of the test,
+now a call to `isSameFile()`, was run in its own kit (batch M, `run-m.sh`) at `e38222f` and at
+`2b2835f`: the same log, with M4's file, reached through a link to its own subfolder, skipped and
+nothing recycled.
 
 ---
 
@@ -368,7 +372,7 @@ same warning for one file. A move into the own folder and the quick file actions
 Since `5735d4f` the own folder is found in any spelling (finding 4). Run on the fix (batches A, G, H):
 
 - One file, «Skip files» or «Overwrite»: the box, and nothing is copied.
-- Two files, «Auto-rename»: `a [1].png` and `b [1].png`.
+- Two files, «Auto-rename»: `a [1].png` and `b [1].png`. One file: `a [1].png` (batch I).
 - «Ask user», one file: the conflict box shows the file against itself; «Overwrite» gives «WARNING:
   Illegal operation. The destination folder is the same with the initial location» and copies nothing,
   «Auto-rename» makes `a [1].png`. Two files: two boxes; «Overwrite» skips both, «Auto-rename» makes
@@ -414,9 +418,8 @@ existing folder, with one file, the field, the INI and the list hold `<work>\st\
 **Fixed in `16745bf`**, with Marius's answers to decision 7. «Proceed» keeps what was typed for a pattern or
 a grouping word alone (:61756, :61788, :61796-61797), and both engines store it in `prevFileMovePath`
 (:62032, :62115) for the session: only a folder goes to the INI and to the recent destinations, since
-the INI's loader keeps `X:\…` paths only. The Recent menu, the file dialogs' «Recent folders» and the
-welcome screen skip a pattern, as they test that the folder exists, and «Browse» then opens on its
-default folder (read). The batch tips and the 150 files question name a pattern as typed, followed by
+the INI's loader keeps `X:\…` paths only; the places that read it as a folder want a full path since
+`e5713d0` (below). The batch tips and the 150 files question name a pattern as typed, followed by
 «(relative to each file's folder)» (:62099); a grouping word alone is named in the folder that gathers
 the files. Run on the fix (batches A, F, G, H):
 
@@ -428,6 +431,18 @@ the files. Run on the fix (batches A, F, G, H):
   each file's folder)». `[group-by-years]` alone: «Finished copying 2 out of 2 files to |
   …\st\one\[group-by-years]\».
 - 152 files, `\newsub`: «Destination: \newsub | (relative to each file's folder)».
+
+**Completed in `e5713d0`**, with Marius's answer. `FolderExist()` takes `.\` for QPV's own folder, the
+working folder, and `.\name` or `\name` for a folder there when one exists. Run at `2b2835f` (batch I):
+after `.\` the Recent menu listed «O2. .\», which opens QPV's folder, and both «Browse» buttons
+started at `.\`; after `.\resources` the panel's list also had a `.\resources` row. The six places that
+read `prevFileMovePath` as a folder now want a full path as well, `InStr(prevFileMovePath, ":\")`, as
+`RecentCopyMoveManager()` does: `readRecentFileDesties()` (:60587), the folders tree when no list is
+open (:31445), the Recent menu (:72518), the panel's «Browse» (:60470) and the structured panel's two
+(:60487, :60506). The file dialogs' «Recent folders» left a pattern out already, by their own test
+(read). Run on the fix (batch I): after `.\` and `.\resources`, no «O2.» entry and no row; the panel's
+«Browse» passes no start folder, and the structured ones start on the last opened folder; after
+`<work>\out`, all of them as before.
 
 ---
 
@@ -750,7 +765,8 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
    keep refusing it.
 7. Finding 7: keep the pattern or the grouping word as typed in `prevFileMovePath`, and name «each
    file's own folder» in the messages? **Settled in `16745bf`**: both; the typed text lasts for the
-   session, and only a folder reaches the INI and the recent destinations.
+   session, and only a folder reaches the INI and the recent destinations. The places that read it as
+   a folder want a full path since `e5713d0`.
 8. Finding 8: a grouping word alone: the current file's folder, as now, or each file's own folder, as
    `\[group-by-…]`?
 9. Finding 9: the count question before the folder question, as `0ad345c`?
@@ -793,7 +809,11 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
   buttons share (finding 12); whether its list view gives the first row the focus when it receives
   the focus (finding 11); that a file moved onto itself under a doubled backslash stays whole and a
   copy fails (finding 4); and what Windows shows when the recycle bin is asked for a file that is not
-  there (batch C).
+  there (batch C). Since the fixes of findings 4 and 11, the second, third and fourth no longer arise
+  in this panel: the list ignores the focus, and a file never meets itself. Two others take their
+  place: that a click on the empty part of a single-selection list view leaves no row selected
+  (AutoHotkey's documentation says so for a double-click), and that `GetFileInformationByHandle()`
+  gives one file the same identity under each of its spellings.
 - The fixes, on 2026-11-21: batches E and A were run on `db1cb15`; batch F («; » in each kind of
   destination, finding 2) on `db1cb15` and `244b305`; batch A again on `244b305`.
 - The fixes of findings 4 to 7 and 11, on 2026-11-21: batches A, B and C, and the new batch G (the
@@ -801,7 +821,11 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
   link, what the field keeps), run at `e38222f`; batches A, C, G and the new batch H (the fixes' cases)
   again at `e38222f`, with the test file of the fix runs; then A, B, C, E, F, G and H on the fixed
   text. Each of the five commits loads on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
-- Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE|testMcF
+- Finding 7's follow-up and two more checks, on 2026-11-21: batch I (what reads `prevFileMovePath`
+  after `.\`, `.\resources` and a folder; one file with «Auto-rename» into its own folder) at `2b2835f`
+  and on `e5713d0`; batches B and H again on `e5713d0`; the structured kit's batch M at `e38222f` and
+  `2b2835f`. `e5713d0` loads as the others do.
+- Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE|testMcF|testMcI
   [revision]` (stock interpreter by default; `QPV_SRC=<file>` runs a modified source), and
   `run-link.sh <tag> <revision | ""> testMcG|testMcH` for the two batches that need `<app>\linkdir`, a
   Linux symbolic link to `<work>\st\src` that Wine cannot make. The test functions are in
@@ -810,5 +834,7 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
   still up after 3 s, «OK» or a conflict box's «Cancel», and logs it. Logs in `results/` (`a-head`,
   `b-head`, `c-head`, `e-head`; for the fixes `e-db1cb15`, `a-db1cb15`, `f-db1cb15`, `f-fix`, `a-fix`;
   for findings 4 to 7 and 11 `a-e38`, `b-e38`, `c-e38`, `g-e38` and, with the fix runs' test file,
-  `a-e38b`, `c-e38b`, `g-e38b`, `h-e38`, then `a-fx`, `b-fx`, `c-fx`, `e-fx`, `f-fx`, `g-fx`, `h-fx`).
+  `a-e38b`, `c-e38b`, `g-e38b`, `h-e38`, then `a-fx`, `b-fx`, `c-fx`, `e-fx`, `f-fx`, `g-fx`, `h-fx`;
+  for the follow-up `i-2b2`, `i-fx`, `b-fx2`, `h-fx2`, and `m-e38`, `m-2b2` in the structured kit). The
+  scripts that wrote the fixes and the report notes are in `../fix-2026-11-21/`.
   The recent destinations INI is kept from one batch to the next; G and H empty it where they read it.
