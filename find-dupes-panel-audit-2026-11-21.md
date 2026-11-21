@@ -36,6 +36,14 @@ substring check as Finding 12 of `files-filter-panel-audit-2026-11-20.md`. The k
 250 ms gate (`move-copy-files-panel-audit-2026-11-20.md`, Seen in passing D) applies to this panel too
 and is noted briefly under «Seen in passing».
 
+**Status, 2026-11-21.** Finding 1 is partly fixed in `60f52cc` (by Marius): «Find duplicates» asks to
+save an edited image before running, while Sort → «Duplicates ID group» (`ActSortDupeGroups()`) is
+still open. Finding 2 is partly fixed: 2.1 is fixed in `60f52cc` (by Marius), and 2.2 and 2.4 are
+fixed in `d94e991` (with Marius's answers to decisions 2(b) and 2(d), building on `60f52cc`'s
+`"reopen"` cleanup); 2.3 (one selected file in Option 6) stays open. `d94e991` also adds Option 7's
+missing `uiPopulateCachesOverview("kill")` from 16.10. Findings 3 to 16 are otherwise open. A fixed or
+partly fixed section ends with a note on what the code does now; those notes cite lines at `d94e991`.
+
 ## Terms
 
 - **The panel**: panel 49, «Find image duplicates». Its routes: the Find menu's «Find duplicate images»
@@ -80,10 +88,10 @@ and is noted briefly under «Seen in passing».
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `35329bc` |
+| # | Finding | Harm | Checked | Status at `d94e991` |
 |---|---------|------|---------|---------------------|
-| 1 | «Find duplicates» discards an edited, unsaved image without a question — even when no duplicates are found | high | run | open |
-| 2 | «Purge cached data»: «All (modified files only)» clears `CurrentSLD` and ignores the active filter it promises; «All (selected files only)» refuses one selected file; the dialog reopens Statistics instead of this panel | high | run, and read for missing files | open |
+| 1 | «Find duplicates» discards an edited, unsaved image without a question — even when no duplicates are found | high | run | **partly fixed**, `60f52cc` («Find duplicates» fixed; `ActSortDupeGroups()` open) |
+| 2 | «Purge cached data»: «All (modified files only)» clears `CurrentSLD` and ignores the active filter it promises; «All (selected files only)» refuses one selected file; the dialog reopens Statistics instead of this panel | high | run | **partly fixed**, `60f52cc`, `d94e991` (2.1, 2.2, 2.4 fixed; 2.3 open) |
 | 3 | «Collect image pixels data» silently forces flipped-image detection on; Preset 1 runs disabled Tab 2 options, and Custom + dHash runs disabled inverted-image detection | high | run | open |
 | 4 | «Cancel» does not cancel: live handlers mutate globals and write to the `.SLDB` on disk, corrupting Ctrl+F threshold filtering and sorting on an active duplicates list | medium | run | open |
 | 5 | «Auto-select dupes» selects nothing on a single duplicate pair, and leaves `markedSelectFile=0` when re-run while files are already selected | high | run | open |
@@ -99,9 +107,11 @@ and is noted briefly under «Seen in passing».
 | 15 | «Size (kilobytes)» goes stale when «Size (bytes)» is checked, and Tab 2's preview overlaps «Identify images horizontally flipped» in Large UI fonts | low | run | open |
 | 16 | Small things, numbered 16.1 to 16.16 | low | run and read | open |
 
-Finding 1 loses unsaved image edits for good. Finding 2 clears `CurrentSLD` (breaking subsequent
-database panels such as «Overview») and purges cached data outside the active filter that its own
-confirmation box promised to respect. Findings 3 and 5 silently change which images match or get
+Finding 1 loses unsaved image edits for good (fixed for «Find duplicates» in `60f52cc`; Sort →
+«Duplicates ID group» remains open). Finding 2 clears `CurrentSLD` (fixed in `60f52cc`), purges
+cached data outside the active filter that its own confirmation box promised to respect and reopens
+the wrong panel (both fixed in `d94e991`), and refuses a single selected file in Option 6 (open).
+Findings 3 and 5 silently change which images match or get
 selected for deletion: Preset 1 can group unrelated, flipped or inverted images under greyed-out
 controls, while «Auto-select dupes» either clears its own selection on a single pair or leaves rows
 selected with a selection count of zero. Findings 4, 6, 7 and 9 to 12 return wrong results, break
@@ -133,6 +143,25 @@ Run (batch B), with an edited image simulated on index 1 (`undoLevelsRecorded=5`
   reopens the panel; afterwards `undoLevelsRecorded=0`, `currentImgModified=0`, `UserMemBMP=none`.
 
 The same lines run for Sort → «Duplicates ID group» (`ActSortDupeGroups()` :37576, read).
+
+**Partly fixed in `60f52cc`** (Marius). `BTNfindDupesNow()` now calls
+`askAboutFileSave(" and the identification of duplicated images will begin")` (:91415-91416 at
+`d94e991`) before closing the panel or running `retrieveDupesByProperties()`. Run at `d94e991`
+(batch I):
+
+- **Duplicates found, «Cancel»** (I1a) and **0 duplicates, «Cancel»** (I1d): asks «The currently
+  modified image is about to be discarded and the identification of duplicated images will begin.
+  Would you like to save the current image?»; «Cancel» leaves all 5 undo levels intact
+  (`currentImgModified=1`, `UserMemBMP=valid`) and keeps panel 49 open (`AnyWindowOpen=49`).
+- **Duplicates found, «Save»** (I1b): closes panel 49, opens `PanelSaveImg` (`AnyWindowOpen=35`), and
+  keeps all 5 undo levels intact.
+- **Duplicates found, «Discard»** (I1c): proceeds with the search (`maxFilesIndex=2`, `isDupes=1`,
+  `pairs=1`) and discards the edits as confirmed.
+
+**Still open:** Sort → «Duplicates ID group» (`ActSortDupeGroups()` :37574-37577) was not changed.
+Run at `d94e991` (I1e): invoking `ActSortDupeGroups()` on an edited image while viewing a duplicates
+list shows no save question and immediately runs `terminateIMGediting(0)` (`undoLevelsRecorded=0`,
+`currentImgModified=0`, `UserMemBMP=none`).
 
 ---
 
@@ -180,6 +209,45 @@ Four bugs sit on the «Pur&ge cached data» button of Tab 3:
    - «Purge» → «No» at confirmation (C1b): no panel reopens (`AnyWindowOpen=0`).
    - «Purge» → «Yes» on «Image hashes» (C1c): purges `dHash` (4 → 0) and opens Statistics
      (`AnyWindowOpen=58`).
+
+**Partly fixed in `60f52cc` (Marius) and `d94e991`** (with Marius's answers to decisions 2(b) and
+2(d); lines at `d94e991`):
+
+- **2.1 — Fixed in `60f52cc` (Marius):** `PurgeCachedDataModifiedFiles()` restores
+  `CurrentSLD := backCurrentSLD` before returning (:91805).
+- **2.2 — Fixed in `d94e991`:** `PurgeCachedDataModifiedFiles()` applies
+  `extraFilter := extractSQLqueryFromFilter()` to its query (`WHERE (<filter>) AND ifnull(fsize, '')!='' AND isDeleted=0`,
+  :91707-91709) and to `getTotalIMGsSQLdb(extraFilter)` (:91717), marks missing or `< 3`-byte files
+  `isDeleted=1` via `markSQLdbEntryDeleted(Rowu[1], 1)` (:91748) instead of deleting rows out from
+  under `resultedFilesList`, frees `RecordSet` on the 0-row early return (:91720), and calls
+  `uiPopulateCachesOverview("kill")` (:91807).
+- **2.4 — Fixed in `60f52cc` (Marius) and `d94e991`:** `BtnPurgeCachedSQLdata()` passes `"reopen"` to
+  `PanelPurgeCachedSQLdata("reopen")` (:28461-28463); `PanelPurgeCachedSQLdata()` captures
+  `hostPanel := getHostPanelFunc()` before closing the caller (:91571), wraps the purge execution in
+  `If InStr(msgResultu, "yes")` instead of returning early on «No» (:91594-91623), and reopens
+  `PanelFindDupes(3)` when invoked from `PanelFindDupes`, `%hostPanel%()` for another host panel (such
+  as `PanelWrapperFilesStats`), or nothing when opened standalone from the Sort menu (:91626-91634).
+- **2.3 — Still open:** `PurgeCachedDataSelectedFiles()` still calls `getSelectedFiles(0, 1)` (:91812).
+
+Run at `d94e991` (batch I):
+
+- **2.1 and 2.2** (I2a–I2d): on a 4-file database filtered to `dir1` (`dir1\a1.png` deleted,
+  `dir1\b1.png` modified; `dir2\a2.png` modified, `dir2\c1.png` deleted outside the filter), Option 7
+  scans only `dir1` («Scanned files: 2 | Modified files identified: 1 | Missing files: 1»), keeps
+  `CurrentSLD` intact, leaves all 4 rows in `images`, marks `dir1\a1.png` `isDeleted=1`, purges
+  `dir1\b1.png`'s `fsize`, leaves both `dir2` files untouched, and reopens panel 49 on Tab 3 (I2a).
+  Clicking «Overview» immediately opens panel 91 with `Ignored or deleted file entries = 1` (I2b).
+  Re-running Option 7 under the same `dir1` filter finds 0 eligible rows (I2c). Clearing the filter and
+  running Option 7 scans the 2 remaining `dir2` rows, purges `dir2\a2.png`, marks `dir2\c1.png`
+  `isDeleted=1`, and «Overview» updates to `2` (I2d).
+- **2.4** (I3a–I3c): from `PanelFindDupes` opened via Statistics → «Find duplicates panel»
+  (`TabsPerWindow[49]` empty), «Cancel», «Purge» → «No», and «Purge» → «Yes» (hashes `4 → 0`) all
+  reopen `PanelFindDupes` on Tab 3 (`AnyWindowOpen=49`, `tab=3`, I3a). From Statistics
+  (`PanelWrapperFilesStats()`), all three reopen Statistics (`AnyWindowOpen=58`, I3b). Opened
+  standalone with no panel open (`PanelPurgeCachedSQLdata()`, as from the Sort menu), all three leave
+  no panel open (`AnyWindowOpen=0`, I3c).
+- **2.3** (I4): Option 6 with 1 selected file still refuses and deselects (`markedSelectFile=0`,
+  `fsize=4`), and now reopens panel 49 on Tab 3.
 
 ---
 
@@ -660,7 +728,7 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
     `If r failedFiles++` never counts SQL failures (read).
   - Option 7's progress tooltip prints `Files data available for: <totalImages> ( Round(totalFiles/totalImages, 1)% )`
     (:91765): it is missing `* 100` and displays `totalImages` where `totalFiles` belongs (read). Option 7
-    also never calls `uiPopulateCachesOverview("kill")` (:91789-91791, read).
+    also never called `uiPopulateCachesOverview("kill")` (fixed in `d94e991`, :91807).
   - Option 6's completion message reports `markedSelectFile` instead of `countFiles` (:91844, read).
   - Option 8 («File entries marked as dead or ignored») calls `SQLdeleteEntriesMarked()` with default
     `markValue=1` (:91610), skipping `isDeleted=2` rows (unreadable/corrupt files), whereas «Overview»'s
@@ -756,15 +824,13 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
 
 ## Decisions to make before fixing
 
-1. Finding 1: ask `askAboutFileSave()` in `BTNfindDupesNow()` before `BtnCloseWindow()` (keeping the
-   panel open on «Cancel»), and in `ActSortDupeGroups()` too? Or inside `retrieveDupesByProperties()`
-   before `renewCurrentFilesList()`?
-2. Finding 2: (a) restore `CurrentSLD` in `PurgeCachedDataModifiedFiles()`; (b) should «All (modified
-   files only)» honour the active filter (matching the confirmation box), or drop that sentence and
-   always scan the whole database? And should missing files be marked `isDeleted=1` instead of deleted
-   out from under `resultedFilesList`? (c) should «All (selected files only)» allow one selected file?
-   (d) should `PanelPurgeCachedSQLdata()` remember which panel opened it (Statistics vs «Find image
-   duplicates») and reopen that one — also after «No» at the confirmation box?
+1. Finding 1: ~~ask `askAboutFileSave()` in `BTNfindDupesNow()` before `BtnCloseWindow()`~~ (fixed in
+   `60f52cc`); also ask in `ActSortDupeGroups()` (or inside `retrieveDupesByProperties()` before
+   `renewCurrentFilesList()`)?
+2. Finding 2: ~~(a) restore `CurrentSLD` in `PurgeCachedDataModifiedFiles()`~~ (fixed in `60f52cc`);
+   ~~(b) honour the active filter and mark missing files `isDeleted=1`~~ (fixed in `d94e991`); (c) should
+   «All (selected files only)» allow one selected file? ~~(d) reopen the invoking panel — also after
+   «No»~~ (fixed in `d94e991`).
 3. Finding 3: (a) should «Collect image pixels data» respect the current `findFlippedDupes` checkbox
    (or ask/collect flipped pixels without flipping the user's checkbox)? (b) should Preset 1 use fixed
    defaults (`thr`, `flip=0`, `inv=0`, `brk=0`, `msd=0`) instead of inheriting disabled Tab 2 values,
@@ -872,7 +938,11 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   - **H** (`h3-head.txt`): strict monotonic gradient + inverse proving disabled `findInvertedDupes=1`
     matches in both Custom + dHash and Preset 1, `PanelAutoSelectDupes` suffix-hiding, invalid RegEx,
     `getSelectedFiles()` 15.6 ms cache collision (`marked=0` with 2 rows marked), Tab 4 `+` layout,
-    0-file «Collect image pixels data» silent reopen.
+    0-file «Collect image pixels data» silent reopen;
+  - **I** (`i1-fix.txt`, at `d94e991`): re-checks Finding 1 (`BTNfindDupesNow()` «Cancel»/«Save»/«Discard»
+    and `ActSortDupeGroups()` on an edited image) and Finding 2 (2.1 `CurrentSLD` restored, 2.2 active
+    filter + missing files marked `isDeleted=1` + «Overview» refresh, 2.4 reopening `PanelFindDupes(3)`,
+    Statistics, or nothing across «Cancel»/«No»/«Yes», and 2.3 unchanged).
 - **Not run on Windows**:
   - native Windows GDI+ 1.1 pixel collection inside `collectImgDataViaPool()`;
   - whether Windows' Tab3 dialog manager routes `Alt+X` across Tabs 3 and 4 the same way Wine did;
@@ -881,14 +951,13 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   - 32-bit AutoHotkey (`A_PtrSize != 8`, 16.12);
   - `BreakDupesGroups=1` inherited into Preset 1 (Finding 3, read);
   - aborting `generateSQLimageFingerPrintHash()` mid-run (Finding 12, read);
-  - missing-file deletion inside `PurgeCachedDataModifiedFiles()` (Finding 2, read);
   - `collectSQLFileInfosNow()`'s «never ask again» checkbox on «Collect data now» (Seen in passing A,
     read).
 - **Kit**: `.claude/scratch/find-dupes-panel-2026-11-21/app/`.
-  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH [revision]`
+  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
   - Test functions are in `test-fd.ahk`, on top of `test-wrappers-sc.ahk`; `setup.sh` builds the test
     PNGs and `blobs.ini`; `patch.py` and `patch-fd.py` add logging; `closer2.ahk` answers AutoHotkey
     error boxes.
   - Logs are in `results/` (`a2-head.txt`, `b3-head.txt`, `c2-head.txt`, `d2-head.txt`, `e3-head.txt`,
-    `f3-head.txt`, `g3-head.txt`, `h3-head.txt`).
+    `f3-head.txt`, `g3-head.txt`, `h3-head.txt`, `i1-fix.txt`).
