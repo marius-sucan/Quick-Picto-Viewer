@@ -61919,12 +61919,11 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
        finalDest := determineCreateFileGroupFolder(finalDest, originalMtime, OutFileExt)
 
     file2save := finalDest "\" OldOutFileName
-    ; the file's own folder, in any spelling
+    forceConflictOption := (dummy="quick-actu") ? QuickFileActConflict : copyMoveDoLastOption
+    ; the file's own folder, in any spelling: only a copy from the panel goes on, to take a new name
+    ; from «Auto-rename» or from the conflict box
     isOwnFolder := (OldOutDir=finalDest || isSameFile(file2rem, file2save))
-    If (isOwnFolder && UsrCopyMoveOperation=3 && dummy!="quick-actu")
-       mustCreateDupe := 1
-
-    If (isOwnFolder && mustCreateDupe!=1)
+    If (isOwnFolder && (UsrCopyMoveOperation=2 || dummy="quick-actu" || forceConflictOption=1 || forceConflictOption=3))
     {
        sOldOutDir := PathCompact(OldOutDir, "a", 1, OSDfontSize)
        SetTimer, ResetImgLoadStatus, -200
@@ -61949,18 +61948,17 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
     BtnCloseWindow()
     Sleep, 2
     destroyGDIfileCache()
-    If (mustCreateDupe=1)
-       forceConflictOption := 2
-    Else
-       forceConflictOption := (dummy="quick-actu") ? QuickFileActConflict : copyMoveDoLastOption
-
     If destAttr
     {
        file2save := askAboutFileCollision(file2rem, file2save, 0, 0, forceConflictOption, performOverwrite)
-       If !file2save
+       ; «Overwrite» in the box cannot replace the file by itself
+       If (!file2save || isOwnFolder && performOverwrite=1)
        {
           OutDir := PathCompact(finalDest, "a", 1, OSDfontSize)
-          msgBeepTimer("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" OutDir "\`nOperation aborted.")
+          If isOwnFolder
+             msgBeepTimer("WARNING: Illegal operation. The destination folder is the same with the initial location:`n" OutDir "\")
+          Else
+             msgBeepTimer("WARNING: Another file with the same file name already exists in the destination folder:`n" OldOutFileName "`n" OutDir "\`nOperation aborted.")
           SetTimer, ResetImgLoadStatus, -200
           Return 0
        }
@@ -62226,8 +62224,10 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
       FileGetTime, originalCtime, % file2rem, C
       file2save := finalDest "\" OldOutFileName
-      ; the file's own folder, in any spelling
-      If (OldOutDir=finalDest || isSameFile(file2rem, file2save))
+      ; the file's own folder, in any spelling: only a copy from the panel goes on, to take a new name
+      ; from «Auto-rename» or from the conflict box
+      isOwnFolder := (OldOutDir=finalDest || isSameFile(file2rem, file2save))
+      If (isOwnFolder && (UsrCopyMoveOperation=2 || dummy="quick-actu" || forceConflictOption=1 || forceConflictOption=3))
       {
          skippedFiles++
          Continue
@@ -62245,8 +62245,9 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
       If destAttr
          file2save := askAboutFileCollision(file2rem, file2save, 1, 0, forceConflictOption, performOverwrite)
-  
-      If !file2save
+
+      ; «Overwrite» in the box cannot replace the file by itself
+      If (!file2save || isOwnFolder && performOverwrite=1)
       {
          skippedFiles++
          Continue
