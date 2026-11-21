@@ -33201,7 +33201,7 @@ PanelEnableFilesFilter() {
     btnWid := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, x+5 hp w%btnWid% gPanelWrapperFilesStats, S&tats
     Gui, Add, Button, x+5 hp wp gPanelSearchIndex, &Search
-    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, C&ancel
+    Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Files list filtering: " appTitle)
     ; EM_SETCUEBANNER(hEditC, "String to match")
     SetTimer, updateUIFiltersPanel, -300
@@ -33286,9 +33286,10 @@ updateUIFiltersPanel(dummy:=0) {
             Loop, Parse, % ":\"
                UsrEditFilter := StrReplace(UsrEditFilter, A_LoopField)
          }
-         UsrEditFilter := StrReplace(UsrEditFilter, "||")
       }
 
+      UsrEditFilter := StrReplace(UsrEditFilter, "||", "|")
+      UsrEditFilter := Trimmer(UsrEditFilter, "|")
       actu := (userFilterDoString=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, userFilterWhat
       GuiControl, % actu, userFilterStringPos
@@ -33341,9 +33342,9 @@ updateUIFiltersPanel(dummy:=0) {
       {
          pku := RegExMatch(UsrEditFilter, "^[[:alnum:] \t]*\)(?!\s*$)") ? "i" : "i)"
          thisStringFilter := pku UsrEditFilter
-      } Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
+      } Else If (userFilterStringPos=3)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
-      Else If (userFilterStringPos=2 && StrLen(UsrEditFilter)>1)
+      Else If (userFilterStringPos=2)
          thisStringFilter := "i)^(" JEE_StrRegExLiteral(UsrEditFilter) ")"
       Else If (UsrEditFilter!="")
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")"
@@ -33473,16 +33474,14 @@ BtnApplyFilesFilter() {
       Return
    }
 
-   InitialFilterSettingsPanel(1)
-   BtnCloseWindow()
    If askAboutFileSave(" and the files list will be renewed based on the provided filter criteria")
    {
-      userFilterDoString := 0
-      userFilterProperty := 1
       UsrEditFilter := ""
       Return
    }
 
+   InitialFilterSettingsPanel(1)
+   BtnCloseWindow()
    If (userFilterDoString=1 && UsrEditFilter)
       RecordUsedFiltersManager(UsrEditFilter)
 
@@ -36211,9 +36210,9 @@ retrieveAlreadySeenImageFromCurrentList() {
       {
          pku := RegExMatch(UsrEditFilter, "^[[:alnum:] \t]*\)") ? "i" : "i)"
          thisStringFilter := pku UsrEditFilter
-      } Else If (userFilterStringPos=3 && StrLen(UsrEditFilter)>1)
+      } Else If (userFilterStringPos=3)
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")$"
-      Else If (userFilterStringPos=2 && StrLen(UsrEditFilter)>1)
+      Else If (userFilterStringPos=2)
          thisStringFilter := "i)^(" JEE_StrRegExLiteral(UsrEditFilter) ")"
       Else If (UsrEditFilter!="")
          thisStringFilter := "i)(" JEE_StrRegExLiteral(UsrEditFilter) ")"
