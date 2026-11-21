@@ -23,6 +23,11 @@ restarts, open, decision 8 there) and 15.10 (an empty file at the destination; f
 reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `createSettingsGUI()`
 (:60615), which this panel shares with most panels (56 of 74 at `b4f374f`, counted for that report).
 
+**Status, 2026-11-21.** Finding 1 is fixed in `db1cb15`, by Marius, with his answer to decision 1.
+Finding 2 is fixed in `db1cb15`, by Marius, and `244b305`, with his answer to decision 2. The other
+findings are open. A fixed section ends with a note on what the code does now; those notes cite
+lines at `244b305`.
+
 ## Terms
 
 - **The panel**: panel 9. «Move file(s) to...» (`PanelMoveCopyFiles()`, the M key) and «Copy file(s)
@@ -56,10 +61,10 @@ reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `crea
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `e6c63fa` |
+| # | Finding | Harm | Checked | Status at `244b305` |
 |---|---------|------|---------|---------------------|
-| 1 | An edited, unsaved image loses its edits when it is moved, without a question | high, narrow | run | open |
-| 2 | A «; » in the destination: the text before it is dropped, so an existing folder is refused and a pattern fills another, new folder | medium | run | open |
+| 1 | An edited, unsaved image loses its edits when it is moved, without a question | high, narrow | run | **fixed**, `db1cb15` |
+| 2 | A «; » in the destination: the text before it is dropped, so an existing folder is refused and a pattern fills another, new folder | medium | run | **fixed**, `db1cb15`, `244b305` |
 | 3 | A network path becomes a new folder inside each file's own folder | medium | run | open |
 | 4 | A destination that ends in `\..` or `\.`, or a database list's folder in another case of a letter outside A-Z: the files go to the wrong folder, are recycled and replaced by copies of themselves, are renamed in place, or reach the index with a doubled backslash | medium, narrow | run | open |
 | 5 | One file and a pattern to a folder that does not exist: «Failed to COPY/MOVE file», where two files get the folder | medium | run | open |
@@ -77,7 +82,7 @@ reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `crea
 
 Finding 1 loses work for good. Findings 2 to 5 and 7 send files to a folder the user did not name,
 or fail on a folder the Help promises; the files themselves stay whole. Finding 11 needs nothing more
-than a click or a double-click in the empty part of the list.
+than a click or a double-click in the empty part of the list. Findings 1 and 2 are fixed.
 
 ---
 
@@ -101,6 +106,20 @@ Run (batch E), an edited image simulated by setting its state (an edited bitmap,
 - **Move, the edited file one of two selected** (E3): the same, after «Finished moving 2 out of 2
   files».
 - **Copy, the edited file alone** (E2): no question, and the edits are kept.
+
+**Fixed in `db1cb15`** (Marius), with his answer to decision 1: a move is asked, a copy is not.
+«Proceed» calls `askAboutFileSave()` after the destination checks, before the folder question,
+the conflict box and the engines (:61793 at `244b305`). Run at `db1cb15`, the same three cases:
+
+- **Move, the edited file alone** (E1) and **one of two selected** (E3): «The currently modified
+  image is about to be discarded and the files operations will be executed. Would you like to save
+  the current image?»; «Cancel» moves nothing, the five undo levels stay, and the panel stays open.
+- **Copy, the edited file alone** (E2): no question, and the edits are kept, as before.
+
+«Save» moves nothing either, and `askAboutFileSave()` starts `PanelSaveImg` 150 ms later (read).
+A quick file action that moves (Shift and the key) asks too, through the same lines (read). The
+question comes whenever an edited image is open, also when it is not among the files to move
+(read).
 
 ---
 
@@ -131,6 +150,27 @@ Run, the folder `<work>\st\Trip; Paris` on the disk, two files of `<work>\st\src
 
 Read, not run: the quick file actions pass through the same lines, so a quick-action folder, or a
 folder picked in the tree or the omnibox, whose path holds «; » is refused with the text after it.
+
+**Fixed in `db1cb15`** (Marius) **and `244b305`**, with his answer to decision 2: `db1cb15` removes the
+cut of the `\name` branch, `244b305` the two others, so the field reaches the tests as typed
+(:61733-61774 at `244b305`). Run, batch F on both commits, the folder `<work>\st\Trip; Paris` on the
+disk, a copy unless noted:
+
+| Destination | Files | At `db1cb15` | At `244b305` |
+|---|---|---|---|
+| `<work>\st\Trip; Paris` | two (F1) | «Incorrect file path given: Paris» | copied into `st\Trip; Paris` |
+| the same, a move | one (F6) | the same refusal | moved into `st\Trip; Paris` |
+| `\Trip; Paris` | two (F2) | copied into a new `st\src\Trip; Paris`; the «Copying» tooltip names `Paris` | the same, and both tooltips name `st\src\Trip; Paris` |
+| `\Trip; Paris` | one (F3) | «Failed to COPY file», the destination the bare word `Paris` | «Failed to COPY file», the destination `st\src\Trip; Paris` (finding 5) |
+| `.\Trip; Paris` | two (F4) | copied into a new `st\Paris` | copied into `st\Trip; Paris` |
+| `.\Trip; Paris` | one (F5) | «Failed to COPY file», the destination `st\Paris` | copied into `st\Trip; Paris` |
+
+At `db1cb15` the bare `Paris` of F3 is a path relative to QPV's working folder (read: a `Paris`
+folder there would receive the file). Batch A on `244b305` differs from its run on `db1cb15` only in
+A1 to A3, as above, and in A4's recent destinations, which also hold folders saved by the cases
+and batches before it (the INI is kept between batches).
+The quick file actions pass through the same lines, so a folder whose path holds «; » is taken
+as it is (read).
 
 ---
 
@@ -568,9 +608,13 @@ file alone goes the same way (read, :3699).
 
 ## Decisions to make before fixing
 
+Decisions 1 and 2 are settled; the others are open.
+
 1. Finding 1: ask with `askAboutFileSave()` in «Proceed» before the panel closes, as `ed8848c` does for
    the structured panel? For a copy too, as `ed8848c` asks there, although a copy keeps the edits?
+   **Settled in `db1cb15`**: a move only.
 2. Finding 2: remove the three «; » cuts, since nothing writes a number into the list any more?
+   **Settled in `db1cb15` and `244b305`**: yes.
 3. Finding 3: refuse a destination that starts with `\\`, with the structured panel's message?
 4. Finding 4: resolve the field with `cleanFolderPath()` (:61483) before the tests, as the structured
    panel does, and compare folders by file ID (`getFileIdentity()`), as `88aa9fc`, or by lower-cased
@@ -623,8 +667,11 @@ file alone goes the same way (read, :3699).
   the focus (finding 11); that a file moved onto itself under a doubled backslash stays whole and a
   copy fails (finding 4); and what Windows shows when the recycle bin is asked for a file that is not
   there (batch C).
-- Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE
+- The fixes, on 2026-11-21: batches E and A were run on `db1cb15`; batch F («; » in each kind of
+  destination, finding 2) on `db1cb15` and `244b305`; batch A again on `244b305`.
+- Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE|testMcF
   [revision]` (stock interpreter by default; `QPV_SRC=<file>` runs a modified source), the test
   functions in `test-mc.ahk` on top of the structured kit's `test-wrappers-sc.ahk`, `patch.py` and
   `patch-mc.py` for the logging, `closer2.ahk` for Wine's dialogs, logs in `results/` (`a-head`,
-  `b-head`, `c-head`, `e-head`).
+  `b-head`, `c-head`, `e-head`; for the fixes `e-db1cb15`, `a-db1cb15`, `f-db1cb15`, `f-fix`, `a-fix`).
+  The recent destinations INI is kept from one batch to the next.
