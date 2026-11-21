@@ -89008,13 +89008,14 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       thisNOTnullCol := "imgfile"
 
    showTOOLtip("Identifying image duplicates, please wait")
-   ; ToolTip, % theseCols "==" thisNOTnullCol "==" mustForceHashes , , , 2
-   ; BTNfindDupesNow() passes userFindDupesFilterHamDist as mustForceHashes, so "Ignore" arrives here as 1.
+   scu := ""
    If (InStr(thisNOTnullCol, "hash") || mustForceHashes>1 || userFindDupesFilterHamDist>1)
+      scu := (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
+   Else If (thisNOTnullCol!="imgfile")
+      scu := thisNOTnullCol
+
+   If scu
    {
-      scu :=  (findFlippedDupes=1) ? "HpixelzFsmall" : "pixelzFsmall"
-      ; the same matching mode and column the hashes below and the results list are filtered
-      ; with; the collection used to read "anywhere in the full path" whatever the panel said
       rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
       If (rr=-3)
       {
@@ -91589,9 +91590,9 @@ BTNfindDupesNow() {
    Else If (userFindDupePresets=4)
       columnus := "kbfsize,imgframes,imgmegapix,imgwhratio,imgavg,imghpeak,imgmedian,imghlow"
    Else If (userFindDupePresets=5)
-      columnus := "imgfile,imgframes"
+      columnus := "imgfile"
    Else If (userFindDupePresets=6)
-      columnus := "fsize,imgfile,imgframes"
+      columnus := "fsize,imgfile"
 
    ; the Image hashes tab applies only to preset 1 [which pins dHash] and to Custom
    ; mode; the other presets group by file/image properties alone, no matter what
