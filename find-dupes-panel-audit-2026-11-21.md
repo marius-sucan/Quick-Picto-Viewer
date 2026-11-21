@@ -99,7 +99,7 @@ revision named in the note (`d94e991` for Findings 1–2, `2227f02` for Findings
 | 4 | «Cancel» does not cancel: live handlers mutate globals and write to the `.SLDB` on disk, corrupting Ctrl+F threshold filtering and sorting on an active duplicates list | medium | run | **fixed**, `ecddb73` |
 | 5 | «Auto-select dupes» selects nothing on a single duplicate pair, and leaves `markedSelectFile=0` when re-run while files are already selected | high | run | open |
 | 6 | Presets 2 to 6 (including «Identical file names») never collect missing data and report «Found no image duplicates» on a fresh database | medium | run | **fixed**, `6df9c63` |
-| 7 | Tab 4's string filter and «Exclude the current list of results»: singletons in non-hash modes, `|||` matching every file, and «Exclude» enabled with no filter active | medium | run | **fixed**, `2227f02` |
+| 7 | Tab 4's string filter and «Exclude the current list of results»: singletons in non-hash modes, `\|\|\|` matching every file, and «Exclude» enabled with no filter active | medium | run | **fixed**, `2227f02` |
 | 8 | «Main panel» in «Change hashes threshold» within a second of a message box raises an AutoHotkey error; «Overview», Escape and context-menu «Close panel» silently fail for a second after Help | medium | run | open |
 | 9 | The «Found N groups» count is wrong on every hash search, and a failed second search desyncs the selection count and breaks Ctrl+F on the restored list | medium | run, and read for filter globals | open |
 | 10 | The non-SLDB dialog defaults to «Remove duplicate entries», and «Yes» opens «Save indexed files list» on `.SLD` instead of `.SLDB` | medium | run | open |
