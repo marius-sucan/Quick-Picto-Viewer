@@ -61746,6 +61746,7 @@ BtnCopyMoveAction(dummy:=0) {
   {
      ; group files by given criteria
      groupingMode := 1
+     typedDest := folderu
      folderu := OutDir "\" folderu
   } Else If (folderu=".\")
   {
@@ -61777,11 +61778,16 @@ BtnCopyMoveAction(dummy:=0) {
 
   If relativePath
   {
+     typedDest := StrReplace(relativePath, "\\", "\")
      folderu := StrReplace(folderu, "\\", "\")
      folderu := Trimmer(folderu, "\")
      folderu := Trimmer(folderu, ".")
   } Else
      folderu := cleanFolderPath(folderu)   ; . and .. resolved, as Windows reads a full path
+
+  ; what «Proceed» remembers: a pattern or a grouping word as typed, else the folder
+  If (typedDest="")
+     typedDest := folderu
 
   wrongNames := 0
   testFolderu := SubStr(folderu, 4)
@@ -61811,7 +61817,7 @@ BtnCopyMoveAction(dummy:=0) {
   If (FolderExist(folderu) || groupingMode=1 || relativePath && (getSelectedFiles(0, 1)>1 || !FileExist(imgPath)))
   {
      Sleep, 2
-     r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath)
+     r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath, typedDest)
      dummyTimerDelayiedImageDisplay(50)
   } Else If (relativePath || StrLen(folderu)>1)
   {
@@ -61836,7 +61842,7 @@ BtnCopyMoveAction(dummy:=0) {
         } Else
         {
            Sleep, 2
-           r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath)
+           r := QuickMoveFile2Dest(folderu, groupingMode, dummy, relativePath, typedDest)
            dummyTimerDelayiedImageDisplay(50)
         }
      }
@@ -61879,12 +61885,12 @@ RecentCopyMoveManager(entry2add) {
   }
 }
 
-QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
+QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDest:="") {
     stopSlideshow() 
     getSelectedFiles(0, 1)
     If (markedSelectFile>1)
     {
-       batchCopyMoveFile(finalDest, groupingMode, dummy, relativePath)
+       batchCopyMoveFile(finalDest, groupingMode, dummy, relativePath, typedDest)
        Return 0
     } 
 
@@ -62015,9 +62021,13 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
 
        If (dummy!="quick-actu")
        {
-          prevFileMovePath := finalDest
-          INIaction(1, "prevFileMovePath", "General")
-          RecentCopyMoveManager(finalDest)
+          ; a pattern or a grouping word is kept for this session only, and only a folder is a recent destination
+          prevFileMovePath := typedDest
+          If (!relativePath && groupingMode!=1)
+          {
+             INIaction(1, "prevFileMovePath", "General")
+             RecentCopyMoveManager(finalDest)
+          }
        }
 
        actName := (UsrCopyMoveOperation=2) ? "MOVED" : "COPIED"
@@ -62074,15 +62084,17 @@ determineCreateFileGroupFolder(oFinalDest, originalMtime, OutFileExt) {
    Return FinalDest
 }
 
-batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
+batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDest:="") {
    Static lastInvoked := 1
    ; Critical, off
    ; Thread, Priority, -4100
+   ; a pattern names no single folder: each file has its own
+   destLabel := relativePath ? typedDest "`n(relative to each file's folder)" : finalDest "\"
    filesElected := getSelectedFiles(0, 1)
    If (filesElected>150) ; ((A_TickCount - lastInvoked > 29500) && dummy!="quick-actu")
    {
       wording := (UsrCopyMoveOperation=2) ? "MOVE" : "COPY"
-      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected: " groupDigits(filesElected) " files.`nDestination: " finalDest "\", 4, 0, "question")
+      msgResult := msgBoxWrapper(appTitle ": Confirmation", "Please confirm you want to " wording " the selected files.`n`nSelected: " groupDigits(filesElected) " files.`nDestination: " destLabel, 4, 0, "question")
       If (msgResult!="Yes")
          Return 0
    }
@@ -62090,11 +62102,12 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    BtnCloseWindow()
    lastInvoked := A_TickCount
    friendly := (UsrCopyMoveOperation=2) ? "Moving " : "Copying "
-   showTOOLtip(friendly groupDigits(filesElected) " files to`n" finalDest "\`nPlease wait")
+   showTOOLtip(friendly groupDigits(filesElected) " files to`n" destLabel "`nPlease wait")
    If (dummy!="quick-actu")
    {
-      prevFileMovePath := finalDest
-      RecentCopyMoveManager(finalDest)
+      prevFileMovePath := typedDest
+      If (!relativePath && groupingMode!=1)
+         RecentCopyMoveManager(finalDest)
    }
 
    destroyGDIfileCache()
@@ -62200,7 +62213,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
          If (skippedFiles>0)
             etaTime .= "`nSkipped files: " groupDigits(skippedFiles)
 
-         showTOOLtip(friendly " files to`n" finalDest "\" etaTime, 0, 0, countTFilez/filesElected)
+         showTOOLtip(friendly " files to`n" destLabel etaTime, 0, 0, countTFilez/filesElected)
          prevMSGdisplay := A_TickCount
       }
 
@@ -62343,15 +62356,15 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0) {
    If (UsrCopyMoveOperation=2)
    {
       If (abandonAll=1)
-         showTOOLtip("Operation aborted. " groupDigits(filezMoved) " out of " groupDigits(filesElected) " selected files were moved to`n" finalDest "\" someErrors)
+         showTOOLtip("Operation aborted. " groupDigits(filezMoved) " out of " groupDigits(filesElected) " selected files were moved to`n" destLabel someErrors)
       Else
-         showTOOLtip("Finished moving " groupDigits(filezMoved) " out of " groupDigits(filesElected) " files to`n" finalDest "\" someErrors)
+         showTOOLtip("Finished moving " groupDigits(filezMoved) " out of " groupDigits(filesElected) " files to`n" destLabel someErrors)
    } Else
    {
       If (abandonAll=1)
-         showTOOLtip("Operation aborted. " groupDigits(filezMoved) " out of " groupDigits(filesElected) " selected files were copied to`n" finalDest "\" someErrors)
+         showTOOLtip("Operation aborted. " groupDigits(filezMoved) " out of " groupDigits(filesElected) " selected files were copied to`n" destLabel someErrors)
       Else
-         showTOOLtip("Finished copying " groupDigits(filezMoved) " out of " groupDigits(filesElected) " files to`n" finalDest "\" someErrors)
+         showTOOLtip("Finished copying " groupDigits(filezMoved) " out of " groupDigits(filesElected) " files to`n" destLabel someErrors)
    }
 
    SetTimer, ResetImgLoadStatus, -50
