@@ -4202,6 +4202,12 @@ invertCurrentFolderRecursiveness() {
 }
 
 MenuRemNowFilesListFilter() {
+   If !filesFilter
+      Return
+
+   If askAboutFileSave(" and the files list filter will be removed")
+      Return
+
    If (remFilesListFilter()=1)
       dummyTimerDelayiedImageDisplay(50)
 }
@@ -28514,11 +28520,14 @@ BtnIndexStatsToList(RowNumber, dateu, LVvaru, givenQuery) {
 
    ; ToolTip, % RowNumber "==" dateu "==" LVvaru , , , 2
    winOpen := AnyWindowOpen
-   If (AnyWindowOpen && LVvaru!="none")
-      BtnCloseWindow()
+   If (LVvaru!="none")
+   {
+      If AnyWindowOpen
+         BtnCloseWindow()
 
-   If askAboutFileSave(" and the files list will be filtered to given criteria")
-      Return -1
+      If askAboutFileSave(" and the files list will be filtered to given criteria")
+         Return -1
+   }
 
    setImageLoading()
    If (LVvaru="none" && SLDtypeLoaded=3)
@@ -33199,6 +33208,12 @@ PanelEnableFilesFilter() {
 }
 
 BTNuiDiscardFilesFilter() {
+   If !filesFilter
+      Return
+
+   If askAboutFileSave(" and the files list filter will be removed")
+      Return
+
    InitialFilterSettingsPanel(1)
    BtnCloseWindow()
    If (remFilesListFilter()=1)
@@ -35486,6 +35501,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
     }
 
     hash := ""
+    filterRemoved := 0
     If (!countStaticFolders && (allowAsk=1 || allowAsk="f"))
     {
        If (allowAsk!="f")
@@ -35494,13 +35510,14 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        If (msgResult="yes" || allowAsk="f")
        {
           If (StrLen(filesFilter)>2 && msgResult="yes")
-             remFilesListFilter()
+             filterRemoved := (remFilesListFilter()=1) ? 1 : 0
           GenerateStaticFoldersListNow()
           countStaticFolders := newStaticFoldersListCache.MaxIndex()
        }
     }
     whileLoopExec := owle
     iduStaticFoldersListCache := getStaticFoldersListID()
+    Return filterRemoved
 }
 
 regenerateStaticFoldersList() {
@@ -35520,11 +35537,13 @@ regenerateStaticFoldersList() {
    }
 
    If (StrLen(filesFilter)>2)
-      remFilesListFilter()
+      r := remFilesListFilter()
 
    lastFilterEditSearch := StaticListViewFilteru := ""
    GenerateStaticFoldersListNow()
    whileLoopExec := owle
+   If (r=1)
+      dummyTimerDelayiedImageDisplay(50)
    SetTimer, PanelStaticFolderzManager, -250
 }
 
@@ -44448,8 +44467,11 @@ BTNrebuildDBpanel() {
     If !InStr(msgResult, "continue")
        Return
 
-    If askAboutFileSave(" and the files list filter will be removed")
-       Return 0
+    If (StrLen(filesFilter)>1)
+    {
+       If askAboutFileSave(" and the files list filter will be removed")
+          Return
+    }
 
     BtnCloseWindow()
     If (StrLen(filesFilter)>1)
@@ -65794,8 +65816,11 @@ askAboutSlidesListSave() {
       msgResult := msgBoxWrapper(appTitle ": Save files list", "The currently opened files list has been modified and the changes have not been saved. To continue with the action you chose, select the Discard button.`n`nWould like to save the currently opened files list?`n`n" OutFileName, "&Save|&Discard|&Cancel", 0, "question")
       If (msgResult="Save")
       {
-         BtnCloseWindow()
-         Sleep, -1
+         If AnyWindowOpen
+         {
+            BtnCloseWindow()
+            Sleep, -1
+         }
          SetTimer, PanelSaveSlideShowu, -150
          r := 1
       } Else If (msgResult="Discard")
@@ -65832,8 +65857,11 @@ askAboutFileSave(msg:="", dontOpen:=0) {
       {
          If (dontOpen!="yes")
          {
-            BtnCloseWindow()
-            Sleep, -1
+            If AnyWindowOpen
+            {
+               BtnCloseWindow()
+               Sleep, -1
+            }
             SetTimer, PanelSaveImg, -150
          }
          r := 1
@@ -99574,10 +99602,11 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
     startOperation := A_TickCount
     setImageLoading()
     Tooltip, Preparing folders list - please wait
+    filterRemoved := 0
     If (SLDtypeLoaded=3)
        PopulateStaticSQLfolderzList()
     Else 
-       LoadStaticFoldersCached(CurrentSLD, hmmm, 1)
+       filterRemoved := LoadStaticFoldersCached(CurrentSLD, hmmm, 1)
 
     countStaticFolders := newStaticFoldersListCache.MaxIndex()
     Gui, SettingsGUIA: Default
@@ -99713,6 +99742,8 @@ PopulateStaticFolderzList(listFilter:=0, modus:=0) {
     GuiControl, +Redraw, LViewOthers
     RemoveTooltip()
     SetTimer, ResetImgLoadStatus, -25
+    If (filterRemoved=1)
+       dummyTimerDelayiedImageDisplay(50)
     Tooltip
 }
 
