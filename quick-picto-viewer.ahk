@@ -12646,7 +12646,7 @@ doOpenStartFolder(ByRef didSomething:=0) {
       imgPath := getIDimage(currentFileIndex)
       If !FileRexists(imgPath)
       {
-         If askAboutFileSave(" and files found in " mustOpenStartFolder "\ will be indexed.")
+         If askAboutFileSave(" and files found in " mustOpenStartFolder "\ will be indexed")
             Return currentFileIndex
       }
  
@@ -28459,9 +28459,7 @@ OpenFileDupesPanel() {
 }
 
 BtnPurgeCachedSQLdata() {
-   BtnCloseWindow()
-   AnyWindowOpen := 49
-   PanelPurgeCachedSQLdata()
+   PanelPurgeCachedSQLdata("reopen")
 }
 
 SeenStatsLVaction(CtrlHwnd:=0, b:=0, c:=0) {
@@ -91414,6 +91412,9 @@ BTNfindDupesNow() {
    If (PerformMSDonDupes=1)
       findFlippedDupes := findInvertedDupes := 0
 
+   If askAboutFileSave(" and the identification of duplicated images will begin")
+      Return
+
    If GuiCtrlGet("UIcheckimgfile")
       columnus .= "imgfile,"
 
@@ -91566,11 +91567,12 @@ GuiCtrlGet(varu) {
    Return x
 }
 
-PanelPurgeCachedSQLdata() {
-   If (AnyWindowOpen=49)
+PanelPurgeCachedSQLdata(dummy:=0) {
+   If (AnyWindowOpen=49 || dummy="reopen")
    {
       reOpenIT := 1
-      BtnCloseWindow()
+      If AnyWindowOpen
+         BtnCloseWindow()
    }
 
    If (AnyWindowOpen || SLDtypeLoaded!=3)
@@ -91786,6 +91788,7 @@ PurgeCachedDataModifiedFiles() {
    Else
       msgBeepTimer("Finished purging cached data for modified image files" etaTime, 900)
 
+   CurrentSLD := backCurrentSLD
    RecordSet.Free()
    SetTimer, ResetImgLoadStatus, -150
 }
