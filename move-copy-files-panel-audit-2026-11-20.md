@@ -24,9 +24,10 @@ reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `crea
 (:60615), which this panel shares with most panels (56 of 74 at `b4f374f`, counted for that report).
 
 **Status, 2026-11-21.** Finding 1 is fixed in `db1cb15`, by Marius, with his answer to decision 1.
-Finding 2 is fixed in `db1cb15`, by Marius, and `244b305`, with his answer to decision 2. The other
-findings are open. A fixed section ends with a note on what the code does now; those notes cite
-lines at `244b305`.
+Finding 2 is fixed in `db1cb15`, by Marius, and `244b305`, with his answer to decision 2. Findings 4,
+5, 6, 7 and 11 are fixed in `5735d4f`, `5ce0fe8`, `58c1f58`, `16745bf` and `a40adb4`, with his
+answers to decisions 4 to 7 and 11. The other findings are open. A fixed section ends with a note on
+what the code does now; the notes of findings 1 and 2 cite lines at `244b305`, the others at `a40adb4`.
 
 ## Terms
 
@@ -61,19 +62,19 @@ lines at `244b305`.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `244b305` |
+| # | Finding | Harm | Checked | Status at `a40adb4` |
 |---|---------|------|---------|---------------------|
 | 1 | An edited, unsaved image loses its edits when it is moved, without a question | high, narrow | run | **fixed**, `db1cb15` |
 | 2 | A «; » in the destination: the text before it is dropped, so an existing folder is refused and a pattern fills another, new folder | medium | run | **fixed**, `db1cb15`, `244b305` |
 | 3 | A network path becomes a new folder inside each file's own folder | medium | run | open |
-| 4 | A destination that ends in `\..` or `\.`, or a database list's folder in another case of a letter outside A-Z: the files go to the wrong folder, are recycled and replaced by copies of themselves, are renamed in place, or reach the index with a doubled backslash | medium, narrow | run | open |
-| 5 | One file and a pattern to a folder that does not exist: «Failed to COPY/MOVE file», where two files get the folder | medium | run | open |
-| 6 | A copy into the files' own folder: one file is duplicated, also with «Skip files»; two or more are skipped | low | run | open |
-| 7 | A pattern or a grouping word is not remembered: the next opening offers one absolute folder, and the messages name one folder for files that went to many | medium | run | open |
+| 4 | A destination that ends in `\..` or `\.`, or a database list's folder in another case of a letter outside A-Z: the files go to the wrong folder, are recycled and replaced by copies of themselves, are renamed in place, or reach the index with a doubled backslash | medium, narrow | run | **fixed**, `5735d4f` |
+| 5 | One file and a pattern to a folder that does not exist: «Failed to COPY/MOVE file», where two files get the folder | medium | run | **fixed**, `5ce0fe8` |
+| 6 | A copy into the files' own folder: one file is duplicated, also with «Skip files»; two or more are skipped | low | run | **fixed**, `58c1f58` |
+| 7 | A pattern or a grouping word is not remembered: the next opening offers one absolute folder, and the messages name one folder for files that went to many | medium | run | **fixed**, `16745bf` |
 | 8 | A grouping word alone gathers the selected files of every folder under the current file's folder | low, maybe meant so | run | open |
 | 9 | «Proceed» creates the destination before the 150 files question; «No» leaves the new folder behind | low | run | open |
 | 10 | A drive root is refused, although «Browse» and the list offer one | low | run | open |
-| 11 | The list: a click below the rows puts the column title in the field, a double-click there runs «Proceed», and the separator is a row | medium | run | open |
+| 11 | The list: a click below the rows puts the column title in the field, a double-click there runs «Proceed», and the separator is a row | medium | run | **fixed**, `a40adb4` |
 | 12 | «Proceed» and «Help» share Alt+P: from two buttons it presses «Help» | low | run (Wine) | open |
 | 13 | «Erase history» erases only the saved destinations: the last destination and the other folders stay, with no question | low | run | open |
 | 14 | A rebuilt panel forgets the typed destination and the conflict setting, and «Proceed» comes back enabled on «Choose...» | low | run | open |
@@ -82,7 +83,8 @@ lines at `244b305`.
 
 Finding 1 loses work for good. Findings 2 to 5 and 7 send files to a folder the user did not name,
 or fail on a folder the Help promises; the files themselves stay whole. Finding 11 needs nothing more
-than a click or a double-click in the empty part of the list. Findings 1 and 2 are fixed.
+than a click or a double-click in the empty part of the list. Findings 1, 2, 4 to 7 and 11 are
+fixed.
 
 ---
 
@@ -257,6 +259,37 @@ Read, not run: other spellings of one folder are other texts too: an 8.3 short n
 junction, a SUBST drive. The structured panel's finding 1 was this; `88aa9fc` fixed it there by
 comparing the folders' file IDs (`getFileIdentity()` :44581).
 
+Run at `e38222f`, before the fix (batch G): the files' own folder reached through a link,
+`<app>\linkdir` to `<work>\st\src`, does what the database list does. Copy with «Overwrite»: «Finished
+copying 2 out of 2 files», and both originals are recycled and replaced by copies of themselves; copy
+with «Auto-rename»: duplicates beside the files; move with «Auto-rename»: both renamed in place. A
+quick file action reaches the same lines: `<work>\st\src\.` with «Overwrite», one file, gives «ERROR:
+Failed to COPY file».
+
+**Fixed in `5735d4f`**, with Marius's answer to decision 4. «Proceed» resolves a destination that is a full
+path with `cleanFolderPath()` (:61793), as the structured panel does: `.` and `..` are read as Windows
+reads them, and an ending dot goes. Both engines take a file whose destination is the file itself as a
+file in its own folder (:61938, :62249). The new `isSameFile()` (:44612) compares `getFileIdentity()`
+of the two paths, read only when a file of that name is at the destination, so any letter case, a
+link, a junction, a SUBST drive and a short name count. The structured engine calls it where it had
+the same test inline (:3336). What a copy into the own folder then does is decision 6 (finding 6). Run
+on the fix (batches A, C, G):
+
+- `<work>\st\src\new\..`, two files, copy: `c.png` is copied into `<work>\st\src`, and `a.png`, already
+  there, is skipped.
+- `<work>\st\src\.`, two files, copy or move with «Overwrite»: both skipped, and the index keeps its
+  paths. One file, copy with «Overwrite» or move: the box «Illegal operation. The destination folder is
+  the same with the initial location», and the panel stays open.
+- The database list, `<work>\st\Școală`: copy or move with «Overwrite» skips both files, nothing is
+  recycled, and the index keeps its paths; copy with «Auto-rename» makes duplicates, as decision 6
+  wants; move with «Auto-rename» skips them.
+- The link: copy with «Overwrite» skips both files, nothing is recycled; one file with «Skip files» gets
+  the box above; copy with «Auto-rename» makes duplicates; move with «Auto-rename» skips them.
+- The quick file action with `<work>\st\src\.` and «Overwrite», one file: the tip «WARNING: Illegal
+  operation. The destination folder is the same with the initial location».
+
+A junction, a SUBST drive and a short name were not run.
+
 ---
 
 ## 5. One file and a pattern to a folder that does not exist: «Failed»
@@ -276,6 +309,26 @@ Run, nothing selected, the current file `<work>\st\src\a.png`:
 - `.\newsib`, move (A4-sib-one): «ERROR: Failed to MOVE file».
 - The same two with two files selected (A4-sub-two, A4-sib-two): the folders are created and both
   files copied or moved: «Finished copying 2 out of 2 files».
+
+Run at `e38222f`, before the fix (batch G): a quick file action with `\newquick`, one file, gives the
+same «ERROR: Failed to COPY file»; with two files the folder is made.
+
+**Fixed in `5ce0fe8`**, with Marius's answer to decision 5. «Proceed» makes the folder of a pattern for one
+file without a question, as the batch path makes the folder of each file (:61824-61840); the quick file
+actions take the same lines. It makes none for a current file missing from the disk, which the one-file
+path then reports, and only a path with a drive letter is made: `.\` or `.\name` for a file at the root
+of a drive (16.11) stops with «An unknown error occurred while creating the folder», and nothing is
+created under QPV's folder. Run on the fix (batches A, F, G, H):
+
+- One file, `\newsub` copy, `.\newsib` move, `\Trip; Paris` copy: the folder is made, and the file is
+  copied or moved into it («File COPIED to», «File MOVED to»).
+- A quick file action with `\newquick`, one file: the folder is made and the file copied.
+- The current file deleted from the disk, `\newsub`: «Failed to perform action. File not found or access
+  denied», and no `newsub` folder.
+- `C:\qpvmc-root.png`, a file at the root of the Wine prefix's drive C:, with `.\` and `.\newsib`: «An
+  unknown error occurred while creating the folder: C\», and «…: C\newsib\»; the panel stays open, and
+  nothing is created in `<app>` or on C:. At `e38222f` both were «ERROR: Failed to COPY file», after a
+  copy aimed at `C\` and at `C\newsib\` under QPV's folder, the working folder.
 
 ---
 
@@ -299,6 +352,28 @@ Run, copy into `<work>\st\src`, the files' own folder, «Skip files»:
 Read: a move into the own folder is refused both ways (one file: the box «Illegal operation. The
 destination folder is the same with the initial location»; several: skipped). The quick file actions
 refuse a copy of one file too (:61906, `dummy!="quick-actu"`).
+
+Run at `e38222f`, before the fix (batch G): two files with «Auto-rename» are skipped, and one file with
+«Overwrite» is duplicated. A move into the own folder: one file gets the box «Illegal operation…», two
+are skipped. A quick file action: a copy of one file is refused with that line as a tip, two are
+skipped, and a move of one file is refused.
+
+**Fixed in `58c1f58`**, with Marius's answer to decision 6: a copy from the panel into the files' own folder
+follows «On file name conflicts», for one file and several (:61935-61939, :62249-62250, and the
+conflict box's answer at :61968 and :62270). «Auto-rename» makes duplicates. «Skip files» and
+«Overwrite» skip the files, since a file cannot replace itself: one file gets the box «Illegal
+operation. The destination folder is the same with the initial location» while the panel stays open,
+several are counted skipped. «Ask user» shows the conflict box, and its «Overwrite» skips too, with the
+same warning for one file. A move into the own folder and the quick file actions stay as they were.
+Since `5735d4f` the own folder is found in any spelling (finding 4). Run on the fix (batches A, G, H):
+
+- One file, «Skip files» or «Overwrite»: the box, and nothing is copied.
+- Two files, «Auto-rename»: `a [1].png` and `b [1].png`.
+- «Ask user», one file: the conflict box shows the file against itself; «Overwrite» gives «WARNING:
+  Illegal operation. The destination folder is the same with the initial location» and copies nothing,
+  «Auto-rename» makes `a [1].png`. Two files: two boxes; «Overwrite» skips both, «Auto-rename» makes
+  both duplicates.
+- A move, and the quick file actions: as at `e38222f`.
 
 ---
 
@@ -329,6 +404,30 @@ with `\[group-by-years]`): the progress tip «Copying 2 files to `…\st\one\[gr
 one «Finished copying 2 out of 2 files to `…\st\two\2026\`», the last file's folder. With a grouping
 word the batch path stores the word in the path, `…\st\one\[group-by-years]` (read, from the logged
 call), and the 150 files question shows the current file's folder (read).
+
+Run at `e38222f`, before the fix (batch G, the recent destinations emptied first): after `\newsub`
+with two files the field holds `<work>\st\src\newsub`, and the list got nothing; after `\exist`, an
+existing folder, with one file, the field, the INI and the list hold `<work>\st\src\exist`; after
+`[group-by-years]` the field holds `<work>\st\one\[group-by-years]`. The 150 files question reads
+«Destination: <work>\st\src\newsub\».
+
+**Fixed in `16745bf`**, with Marius's answers to decision 7. «Proceed» keeps what was typed for a pattern or
+a grouping word alone (:61756, :61788, :61796-61797), and both engines store it in `prevFileMovePath`
+(:62032, :62115) for the session: only a folder goes to the INI and to the recent destinations, since
+the INI's loader keeps `X:\…` paths only. The Recent menu, the file dialogs' «Recent folders» and the
+welcome screen skip a pattern, as they test that the folder exists, and «Browse» then opens on its
+default folder (read). The batch tips and the 150 files question name a pattern as typed, followed by
+«(relative to each file's folder)» (:62099); a grouping word alone is named in the folder that gathers
+the files. Run on the fix (batches A, F, G, H):
+
+- The field after `\newsub` (two files, and one), `.\newsib`, `.\`, `\exist` and `[group-by-years]`: the
+  text as typed; the INI and the recent destinations unchanged. After `<work>\out`: that folder in the
+  field, the INI and the list, as before.
+- `\[group-by-years]`, two files in two folders: «Copying 2 files to | \[group-by-years] | (relative to
+  each file's folder)», then «Finished copying 2 out of 2 files to | \[group-by-years] | (relative to
+  each file's folder)». `[group-by-years]` alone: «Finished copying 2 out of 2 files to |
+  …\st\one\[group-by-years]\».
+- 152 files, `\newsub`: «Destination: \newsub | (relative to each file's folder)».
 
 ---
 
@@ -414,6 +513,26 @@ Run (B1), clicks posted to the list, the field holding «typed text»:
   double-click answers «WARNING: Incorrect file path given: | --={ other destinations }=--».
 
 Checked and fine: the arrow keys fill the field with the row they move to (run, B1g).
+
+Run at `e38222f`, before the fix (batch G, the selected row logged beside the focused one): a click
+below the rows leaves no row selected, while the focused row stays, and a right-click below the rows
+fills the field as a click does. AutoHotkey passes the focused row with every click (NM_CLICK,
+NM_DBLCLK and NM_RCLICK in its `script_gui.cpp`), so the click event cannot tell.
+
+**Fixed in `a40adb4`**, with Marius's answer to decision 11. The list reads the selected row (:61612), which
+a click below the rows clears, and does nothing without one; it leaves out the separator row (:61617),
+from a click, a double-click, a right-click or the arrow keys. Whether Windows gives the first row the
+focus no longer matters. Run on the fix (batches B, G, H):
+
+- A click, a right-click and a double-click below the rows, with and without a focused row: the field
+  keeps «typed text», «Proceed» does not run, and nothing is copied.
+- A click and a double-click on the separator: the field keeps «typed text», and no «Incorrect file
+  path given» warning.
+- The arrow keys: each row fills the field, and on the separator the field keeps the folder before it.
+- A click on a row fills the field, and a double-click on row 2 runs «Proceed» with its folder.
+
+Windows was not checked; AutoHotkey's documentation gives a selected row of 0 after a double-click on
+empty space.
 
 ---
 
@@ -535,6 +654,7 @@ file alone goes the same way (read, :3699).
   panel next opens on it (read). The quick action itself uses its own setting, `QuickFileActConflict`.
 - **16.7. The Help** names the button «Mark files (Explorer)»; it reads «Mark file(s) (Explorer)»
   (:61615, :60722). Its b) and c) promise new folders, which one file does not get (finding 5) (read).
+  One file gets them since `5ce0fe8`.
 - **16.8. An empty field** answers «WARNING: Incorrect file path given:» with nothing after it (read).
 - **16.9. A destination used again keeps its place** in the recent destinations:
   `RecentCopyMoveManager()` returns when the folder is listed (:61839-61849), so the list is ordered
@@ -547,6 +667,8 @@ file alone goes the same way (read, :3699).
   (`SubStr(OutDir, 1, InStr(OutDir, "\", 0, -1) - 1)` with no backslash, :61746), a name without a
   drive; the one-file path then copies or moves into `C` under QPV's folder, the working directory,
   and fails when there is none; the batch path counts the file as failed (:62158, :62171) (read).
+  Since `5ce0fe8` (finding 5) one file stops with «An unknown error occurred while creating the folder:
+  C\» instead, and nothing reaches QPV's folder (run, batch H); `.\` still has no meaning there.
 - **16.12. «Mark file(s) (Explorer)» writes the field's text into the shared
   `UsrEditFileDestination`** (:61696), though it does not use it; the structured panel's Destination
   opens with that text when it is a full path (:61394-61395) (read). The structured panel's «Browse»
@@ -564,7 +686,8 @@ file alone goes the same way (read, :3699).
   missing files (finding 15).
 - **B. The quick file actions share findings 2 and 10**: the keys 1 to 6, and the tree's and the
   omnibox's «Copy/Move selected file(s) into...», reach the same lines through
-  `BtnCopyMoveAction("quick-actu")` (read).
+  `BtnCopyMoveAction("quick-actu")` (read). They share findings 4 and 5 as well (run, batch G), and
+  the fixes of 2, 4 and 5 reach them through the same lines.
 - **C. The conflict box shows sizes in whole kilobytes**: «0 Kilobytes» for the 361-byte test files
   (run, B5) (`FileGetSize … K`, :44152-44153).
 - **D. The keyboard's menu key opens the panel menu only when pressed twice within 250 ms**: for the
@@ -608,7 +731,7 @@ file alone goes the same way (read, :3699).
 
 ## Decisions to make before fixing
 
-Decisions 1 and 2 are settled; the others are open.
+Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
 
 1. Finding 1: ask with `askAboutFileSave()` in «Proceed» before the panel closes, as `ed8848c` does for
    the structured panel? For a copy too, as `ed8848c` asks there, although a copy keeps the edits?
@@ -618,18 +741,22 @@ Decisions 1 and 2 are settled; the others are open.
 3. Finding 3: refuse a destination that starts with `\\`, with the structured panel's message?
 4. Finding 4: resolve the field with `cleanFolderPath()` (:61483) before the tests, as the structured
    panel does, and compare folders by file ID (`getFileIdentity()`), as `88aa9fc`, or by lower-cased
-   text (`Format("{:L}")`), as `f52eaac`?
+   text (`Format("{:L}")`), as `f52eaac`? **Settled in `5735d4f`**: resolve, and take a file whose
+   destination is the file itself, by `getFileIdentity()`, as in its own folder (`isSameFile()`).
 5. Finding 5: create the folder in the one-file path without a question, as the batch path does, or
-   ask, as an absolute folder is asked?
+   ask, as an absolute folder is asked? **Settled in `5ce0fe8`**: without a question.
 6. Finding 6: a copy into the own folder: duplicate one and several, skip both, or follow the conflict
-   setting?
+   setting? **Settled in `58c1f58`**: follow the setting; «Overwrite» skips, and the quick file actions
+   keep refusing it.
 7. Finding 7: keep the pattern or the grouping word as typed in `prevFileMovePath`, and name «each
-   file's own folder» in the messages?
+   file's own folder» in the messages? **Settled in `16745bf`**: both; the typed text lasts for the
+   session, and only a folder reaches the INI and the recent destinations.
 8. Finding 8: a grouping word alone: the current file's folder, as now, or each file's own folder, as
    `\[group-by-…]`?
 9. Finding 9: the count question before the folder question, as `0ad345c`?
 10. Finding 10: accept a drive root as the destination?
-11. Finding 11: ignore clicks and double-clicks that hit no row, and the separator?
+11. Finding 11: ignore clicks and double-clicks that hit no row, and the separator? **Settled in
+    `a40adb4`**: yes, and the separator stays in the list as a divider.
 12. Finding 12: which of «Proceed» and «Help» gets another letter, and which one?
 13. Finding 13: should «Erase history» also clear the field and the folders the list takes from other
     sources, and ask first?
@@ -669,9 +796,19 @@ Decisions 1 and 2 are settled; the others are open.
   there (batch C).
 - The fixes, on 2026-11-21: batches E and A were run on `db1cb15`; batch F («; » in each kind of
   destination, finding 2) on `db1cb15` and `244b305`; batch A again on `244b305`.
+- The fixes of findings 4 to 7 and 11, on 2026-11-21: batches A, B and C, and the new batch G (the
+  list's clicks with the selected row logged, a move and quick file actions into the own folder, a
+  link, what the field keeps), run at `e38222f`; batches A, C, G and the new batch H (the fixes' cases)
+  again at `e38222f`, with the test file of the fix runs; then A, B, C, E, F, G and H on the fixed
+  text. Each of the five commits loads on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
 - Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE|testMcF
-  [revision]` (stock interpreter by default; `QPV_SRC=<file>` runs a modified source), the test
-  functions in `test-mc.ahk` on top of the structured kit's `test-wrappers-sc.ahk`, `patch.py` and
-  `patch-mc.py` for the logging, `closer2.ahk` for Wine's dialogs, logs in `results/` (`a-head`,
-  `b-head`, `c-head`, `e-head`; for the fixes `e-db1cb15`, `a-db1cb15`, `f-db1cb15`, `f-fix`, `a-fix`).
-  The recent destinations INI is kept from one batch to the next.
+  [revision]` (stock interpreter by default; `QPV_SRC=<file>` runs a modified source), and
+  `run-link.sh <tag> <revision | ""> testMcG|testMcH` for the two batches that need `<app>\linkdir`, a
+  Linux symbolic link to `<work>\st\src` that Wine cannot make. The test functions are in
+  `test-mc.ahk` on top of the structured kit's `test-wrappers-sc.ahk`; `patch.py` and `patch-mc.py` add
+  the logging; `closer2.ahk` answers Wine's dialogs, and `mcAutoBoxArm()` (A, C, G, H) answers any box
+  still up after 3 s, «OK» or a conflict box's «Cancel», and logs it. Logs in `results/` (`a-head`,
+  `b-head`, `c-head`, `e-head`; for the fixes `e-db1cb15`, `a-db1cb15`, `f-db1cb15`, `f-fix`, `a-fix`;
+  for findings 4 to 7 and 11 `a-e38`, `b-e38`, `c-e38`, `g-e38` and, with the fix runs' test file,
+  `a-e38b`, `c-e38b`, `g-e38b`, `h-e38`, then `a-fx`, `b-fx`, `c-fx`, `e-fx`, `f-fx`, `g-fx`, `h-fx`).
+  The recent destinations INI is kept from one batch to the next; G and H empty it where they read it.
