@@ -1930,7 +1930,7 @@ processDefaultKbdCombos(givenKey, thisWin, abusive, Az, simulacrum, deepSim) {
           If (slideShowRunning=1)
              func2Call := ["InformToggledSlideShowu", "stop"]
           Else If (StrLen(filesFilter)>1)
-             func2Call := ["MenuRemFilesListFilter"]
+             func2Call := ["MenuRemNowFilesListFilter"]
        }
     } Else If (givenKey="BackSpace")
     {
@@ -4201,13 +4201,18 @@ invertCurrentFolderRecursiveness() {
    RefreshFilesList()
 }
 
-MenuRemFilesListFilter() {
-   remFilesListFilter()
-   ; SetTimer, RandomPicture, -150
-   dummyTimerDelayiedImageDisplay(50)
+MenuRemNowFilesListFilter() {
+   If remFilesListFilter()
+      dummyTimerDelayiedImageDisplay(50)
 }
 
 remFilesListFilter(modus:=0) {
+   If !filesFilter
+      Return 1
+
+   If askAboutFileSave(" and the files list filter will be removed")
+      Return 0
+
    If (modus="simple")
    {
       addJournalEntry("Removing files list filter:`n" filesFilter)
@@ -4216,7 +4221,10 @@ remFilesListFilter(modus:=0) {
       DllCall("qpvmain.dll\dupesClearPairs")
       FilterFilesListuIndex(0, prevFilter)
       currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
-   } Else coreSetFilesFilteru("")
+   } Else
+      coreSetFilesFilteru("")
+
+   Return 1
 }
 
 dummyTimerReloadThisPicture(timeru:=0) {
@@ -27799,12 +27807,6 @@ quickBarLoadError(otherBtn, deferred:=0) {
    SetTimer, % fn, -300
 }
 
-quickBarRemoveFilter() {
-; Remove filter button: acts only while a filter is set
-   If (StrLen(filesFilter)>1)
-      MenuRemFilesListFilter()
-}
-
 quickBarGoBack(givenIndex:="") {
 ; with the index just jumped to: shows the Go back bar; bare [the button]: goes back once, while that image is still shown
    Static jumpedTo := ""
@@ -29360,16 +29362,13 @@ ETAinfos(countTFilez, filesElected, startOperation) {
 }
 
 collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
-    ; If (StrLen(filesFilter)>1)
-    ;    remFilesListFilter("simple")
-
-    doStartLongOpDance()
     If (simple=1)
     {
        backCurrentSLD := CurrentSLD
        CurrentSLD := ""
     }
 
+    doStartLongOpDance()
     showTOOLtip("Collecting image details, please wait`n0 / " groupDigits(maxFilesIndex))
     startOperation := A_TickCount
     prevMSGdisplay := A_TickCount
@@ -29458,9 +29457,6 @@ collectImageInfosNow(queryString:=0, modus:=0, simple:=0) {
 }
 
 collectFileInfosNow(queryString:=0) {
-    ; If (StrLen(filesFilter)>1)
-    ;    remFilesListFilter("simple")
-
     doStartLongOpDance()
     showTOOLtip("Collecting file details, please wait`n0 / " groupDigits(maxFilesIndex))
     startOperation := A_TickCount
@@ -33195,7 +33191,7 @@ PanelEnableFilesFilter() {
     btnWid := (PrefsLargeFonts=1) ? btnWid - 15 : btnWid - 5
     Gui, Add, Button, xs+0 y+10 h%thisBtnHeight% w%btnWid% Default gBtnApplyFilesFilter, &Apply filter
     If (StrLen(filesFilter)>1)
-       Gui, Add, Button, x+5 hp wp+20 gBTNuiremFilesListFilter, &Remove filters
+       Gui, Add, Button, x+5 hp wp+20 gBTNuiDiscardFilesFilter, &Remove filters
     btnWid := (PrefsLargeFonts=1) ? 85 : 65
     Gui, Add, Button, x+5 hp w%btnWid% gPanelWrapperFilesStats, S&tats
     Gui, Add, Button, x+5 hp wp gPanelSearchIndex, &Search
@@ -33205,7 +33201,7 @@ PanelEnableFilesFilter() {
     SetTimer, updateUIFiltersPanel, -300
 }
 
-BTNuiremFilesListFilter() {
+BTNuiDiscardFilesFilter() {
    InitialFilterSettingsPanel(1)
    BtnCloseWindow()
    remFilesListFilter()
@@ -33731,7 +33727,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   SetTimer, createGUItoolbar, -100
   SetTimer, RemoveTooltip, % -msgDisplayTime
   If (StrLen(filesFilter)>1 && noStringProcessing!=1 && maxFilesIndex>0)
-     quickBarLater("Remove filter,,quickBarRemoveFilter")
+     quickBarLater("Remove filter,,MenuRemNowFilesListFilter")
 }
 
 FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
@@ -33810,7 +33806,8 @@ FilterFilesListuIndex(thereWasFilter:=0, prevFilter:="", ostringu:="") {
          SoundBeep, 300, 100
          msgBoxWrapper(appTitle ": WARNING", "No files matched the provided filter options:`n" filesFilter "`n`nThe application will now restore the complete list of files.", 0, 1, "exclamation")
          remFilesListFilter("simple")
-      } Else bckpResultedFilesList := []
+      } Else
+         bckpResultedFilesList := []
       Return
    } Else If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
    {
@@ -34196,7 +34193,8 @@ InListMultiEntriesRemover(dummy:=0, dontAsk:=0) {
          ; showTOOLtip("Removing files list index filter, please wait")
          remFilesListFilter("simple")
          dummyTimerDelayiedImageDisplay(50)
-      } Else handleEmptyFilesList(CurrentSLD, "", 1)
+      } Else
+         handleEmptyFilesList(CurrentSLD, "", 1)
    } Else
    {
       startPoint--
@@ -34259,7 +34257,8 @@ remCurrentEntry(silentus:=0, whichIndex:=0) {
          remFilesListFilter("simple")
          dummyTimerDelayiedImageDisplay(50)
          ; RandomPicture()
-      } Else handleEmptyFilesList(CurrentSLD, "", 1)
+      } Else
+         handleEmptyFilesList(CurrentSLD, "", 1)
    } Else
    {
       currentFileIndex--
@@ -34990,17 +34989,6 @@ getDynamicFoldersList(fileu:=0) {
    Return listu
 }
 
-rebuildDBfilesList() {
-   If (StrLen(filesFilter)>1)
-      MenuRemFilesListFilter()
-
-   If !activeSQLdb.CloseDB()
-      Return msgBeepTimer("Failed to close active database")
-
-   SLDtypeLoaded := 2
-   SaveDBfilesList(CurrentSLD)
-}
-
 SaveDBfilesList(enforceFile:=0) {
    stopSlideshow()
    If (maxFilesIndex>1)
@@ -35010,7 +34998,7 @@ SaveDBfilesList(enforceFile:=0) {
          msgResult := msgBoxWrapper(appTitle ": Save files list - database", "The files list is filtered down to " groupDigits(maxFilesIndex) " files from " groupDigits(bckpMaxFilesIndex) ".`n`nTo save the entire list of indexed files, you have to deactivate the filter [Ctrl + Space].`n`nPlease choose how to proceed...", "&Deactivate filter|&Save list as is|&Cancel", 0, "info")
          If InStr(msgResult, "deactivate")
          {
-            MenuRemFilesListFilter()
+            MenuRemNowFilesListFilter()
             SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
          } Else If InStr(msgResult, "save")
@@ -35261,7 +35249,7 @@ SaveFilesList(enforceFile:=0) {
          msgResult := msgBoxWrapper(appTitle ": Save files list - plain text", "The files list is filtered down to " groupDigits(maxFilesIndex) " files from " groupDigits(bckpMaxFilesIndex) ".`n`nTo save the entire list of indexed files, you have to deactivate the filter [Ctrl + Space].`n`nPlease choose how to proceed...", "&Deactivate filter|&Save list as is|&Cancel", 0, "info")
          If InStr(msgResult, "deactivate")
          {
-            MenuRemFilesListFilter()
+            MenuRemNowFilesListFilter()
             SetTimer, RemoveTooltip, % -msgDisplayTime
             Return
          } Else If InStr(msgResult, "save")
@@ -35509,7 +35497,7 @@ LoadStaticFoldersCached(fileNamu, ByRef countStaticFolders, allowAsk:=0) {
        If (msgResult="yes" || allowAsk="f")
        {
           If (StrLen(filesFilter)>2 && msgResult="yes")
-             MenuRemFilesListFilter()
+             remFilesListFilter()
           GenerateStaticFoldersListNow()
           countStaticFolders := newStaticFoldersListCache.MaxIndex()
        }
@@ -35535,7 +35523,7 @@ regenerateStaticFoldersList() {
    }
 
    If (StrLen(filesFilter)>2)
-      MenuRemFilesListFilter()
+      remFilesListFilter()
 
    lastFilterEditSearch := StaticListViewFilteru := ""
    GenerateStaticFoldersListNow()
@@ -39817,7 +39805,7 @@ saveFavesListBasedOnIndexList() {
       msgResult := msgBoxWrapper(appTitle ": Confirmation", "The current files list has " groupDigits(maxFilesIndex) " images indexed. It is the result of a filter applied on the favourite images list.`n`nPlease confirm you want to save the favourites list as is, filtered. The total of " groupdigits(bckpMaxFilesIndex) " favourited images will no longer be retrievable.", "&Deactivate filter|&Save list|&Cancel", 0, "question")
       If InStr(msgResult, "deactivate")
       {
-         MenuRemFilesListFilter()
+         MenuRemNowFilesListFilter()
          SetTimer, RemoveTooltip, % -msgDisplayTime
          SetTimer, ResetImgLoadStatus, -150
          Return
@@ -44464,7 +44452,21 @@ BTNrebuildDBpanel() {
        Return
 
     BtnCloseWindow()
-    rebuildDBfilesList()
+    If (StrLen(filesFilter)>1)
+       r := remFilesListFilter()
+    
+    If !activeSQLdb.CloseDB()
+    {
+       msgBeepTimer("Failed to close active database")
+       If r
+          dummyTimerDelayiedImageDisplay(50)
+       Return
+    }
+
+    SLDtypeLoaded := 2
+    SaveDBfilesList(CurrentSLD)
+    If r
+       dummyTimerDelayiedImageDisplay(50)
 }
 
 BTNhelpSlideshows() {
@@ -65858,7 +65860,8 @@ MenuOpenLastImg(forceOpenGiven:=0, alreadyAsked:=0) {
          IniRead, LastOpenedImg, % mainRecentsFile, RecentImgOpened, E1, @
          LastOpenedImg := Trimmer(LastOpenedImg)
       }
-   } Else LastOpenedImg := Trimmer(forceOpenGiven)
+   } Else 
+      LastOpenedImg := Trimmer(forceOpenGiven)
 
    If (RegExMatch(LastOpenedImg, RegExFilesPattern) && FileRexists(LastOpenedImg))
    {
@@ -68953,7 +68956,7 @@ InvokeMenuBarFind(manuID:=0, justBuild:=0) {
      kMenu("pvMenuBarFind", "Add", "&Define index filter(s)`tCtrl+F", "PanelEnableFilesFilter", "files list")
      If (StrLen(filesFilter)>1)
      {
-        kMenu("pvMenuBarFind", "Add", "Remove files list filter`tCtrl+Space", "MenuRemFilesListFilter")
+        kMenu("pvMenuBarFind", "Add", "Remove files list filter`tCtrl+Space", "MenuRemNowFilesListFilter")
         If testIsDupesList()
         {
            If InStr(resultedFilesList[currentFileIndex, 23], "_")
@@ -71781,7 +71784,7 @@ BuildMainMenu(dummy:=0, givenCoords:=0) {
    If (StrLen(filesFilter)>1)
    {
       Menu, PVmenu, Add
-      kMenu("PVmenu", "Add", "Remove files list filter`tCtrl+Space", "MenuRemFilesListFilter")
+      kMenu("PVmenu", "Add", "Remove files list filter`tCtrl+Space", "MenuRemNowFilesListFilter")
       If testIsDupesList()
       {
          kMenu("PVmenu", "Add", "Auto-select &duplicates", "PanelAutoSelectDupes")
@@ -105858,7 +105861,7 @@ processToolbarFunctions(btnID, actu, simulacrum:=0) {
       Else If (btnID="BTNmodifyEntry")
          func2Call := ["PanelUpdateThisFileIndex"]
       Else If (btnID="BTNfilterList")
-         func2Call := ["MenuRemFilesListFilter"]
+         func2Call := ["MenuRemNowFilesListFilter"]
       Else If (btnID="BTNstatsList")
          func2Call := ["PanelFindDupes"]
       Else If (btnID="BTNrefreshList")
