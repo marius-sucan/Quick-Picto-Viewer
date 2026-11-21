@@ -61608,8 +61608,15 @@ BTNlvRecentFileDesties(a, b, c) {
 
    Gui, SettingsGUIA: Default
    Gui, SettingsGUIA: ListView, LViewDynas
-   RowNumber := LV_GetNext(0, "F")
+   ; the selected row: a click below the rows selects none, while the focused row stays
+   RowNumber := LV_GetNext(0)
+   If !RowNumber
+      Return
+
    LV_GetText(givenName, RowNumber, 1)
+   If (givenName="--={ other destinations }=--")
+      Return
+
    GuiControl, SettingsGUIA: , UsrEditFileDestination, % givenName
    If (b="DoubleClick")
       BtnCopyMoveAction()
