@@ -41,8 +41,11 @@ save an edited image before running, while Sort → «Duplicates ID group» (`Ac
 still open. Finding 2 is partly fixed: 2.1 is fixed in `60f52cc` (by Marius), and 2.2 and 2.4 are
 fixed in `d94e991` (with Marius's answers to decisions 2(b) and 2(d), building on `60f52cc`'s
 `"reopen"` cleanup); 2.3 (one selected file in Option 6) stays open. `d94e991` also adds Option 7's
-missing `uiPopulateCachesOverview("kill")` from 16.10. Findings 3 to 16 are otherwise open. A fixed or
-partly fixed section ends with a note on what the code does now; those notes cite lines at `d94e991`.
+missing `uiPopulateCachesOverview("kill")` from 16.10. Findings 4 (`ecddb73`), 6 (`6df9c63`) and 7
+(`2227f02`) are fixed (with Marius's answers to decisions 4, 6 and 7); `ecddb73` also removes the dead
+`gupdateUIFiltersPanel` bindings from 16.3. Findings 3, 5, and 8 to 16 are otherwise open. A fixed or
+partly fixed section ends with a note on what the code does now; those notes cite lines at the
+revision named in the note (`d94e991` for Findings 1–2, `2227f02` for Findings 4, 6 and 7).
 
 ## Terms
 
@@ -88,15 +91,15 @@ partly fixed section ends with a note on what the code does now; those notes cit
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `d94e991` |
+| # | Finding | Harm | Checked | Status at `2227f02` |
 |---|---------|------|---------|---------------------|
 | 1 | «Find duplicates» discards an edited, unsaved image without a question — even when no duplicates are found | high | run | **partly fixed**, `60f52cc` («Find duplicates» fixed; `ActSortDupeGroups()` open) |
 | 2 | «Purge cached data»: «All (modified files only)» clears `CurrentSLD` and ignores the active filter it promises; «All (selected files only)» refuses one selected file; the dialog reopens Statistics instead of this panel | high | run | **partly fixed**, `60f52cc`, `d94e991` (2.1, 2.2, 2.4 fixed; 2.3 open) |
 | 3 | «Collect image pixels data» silently forces flipped-image detection on; Preset 1 runs disabled Tab 2 options, and Custom + dHash runs disabled inverted-image detection | high | run | open |
-| 4 | «Cancel» does not cancel: live handlers mutate globals and write to the `.SLDB` on disk, corrupting Ctrl+F threshold filtering and sorting on an active duplicates list | medium | run | open |
+| 4 | «Cancel» does not cancel: live handlers mutate globals and write to the `.SLDB` on disk, corrupting Ctrl+F threshold filtering and sorting on an active duplicates list | medium | run | **fixed**, `ecddb73` |
 | 5 | «Auto-select dupes» selects nothing on a single duplicate pair, and leaves `markedSelectFile=0` when re-run while files are already selected | high | run | open |
-| 6 | Presets 2 to 6 (including «Identical file names») never collect missing data and report «Found no image duplicates» on a fresh database | medium | run | open |
-| 7 | Tab 4's string filter and «Exclude the current list of results»: singletons in non-hash modes, `|||` matching every file, and «Exclude» enabled with no filter active | medium | run | open |
+| 6 | Presets 2 to 6 (including «Identical file names») never collect missing data and report «Found no image duplicates» on a fresh database | medium | run | **fixed**, `6df9c63` |
+| 7 | Tab 4's string filter and «Exclude the current list of results»: singletons in non-hash modes, `|||` matching every file, and «Exclude» enabled with no filter active | medium | run | **fixed**, `2227f02` |
 | 8 | «Main panel» in «Change hashes threshold» within a second of a message box raises an AutoHotkey error; «Overview», Escape and context-menu «Close panel» silently fail for a second after Help | medium | run | open |
 | 9 | The «Found N groups» count is wrong on every hash search, and a failed second search desyncs the selection count and breaks Ctrl+F on the restored list | medium | run, and read for filter globals | open |
 | 10 | The non-SLDB dialog defaults to «Remove duplicate entries», and «Yes» opens «Save indexed files list» on `.SLD` instead of `.SLDB` | medium | run | open |
@@ -105,7 +108,7 @@ partly fixed section ends with a note on what the code does now; those notes cit
 | 13 | Panel rebuilds («Collect image pixels data», «Overview» → «Back», «Dark mode UI», «Large UI fonts») lose unsaved settings, jump to Tab 1 from Statistics, and drop «Back» inside «Overview» | low | run | open |
 | 14 | Numeric threshold edits (`editF7`, `editFr`, `editFc`) reject `0`, and typing an out-of-range number leaves it on screen while silently reading the old value | low | run | open |
 | 15 | «Size (kilobytes)» goes stale when «Size (bytes)» is checked, and Tab 2's preview overlaps «Identify images horizontally flipped» in Large UI fonts | low | run | open |
-| 16 | Small things, numbered 16.1 to 16.16 | low | run and read | open |
+| 16 | Small things, numbered 16.1 to 16.16 | low | run and read | open (16.3 fixed in `ecddb73`; 16.10 Option 7 overview kill fixed in `d94e991`) |
 
 Finding 1 loses unsaved image edits for good (fixed for «Find duplicates» in `60f52cc`; Sort →
 «Duplicates ID group» remains open). Finding 2 clears `CurrentSLD` (fixed in `60f52cc`), purges
@@ -114,8 +117,9 @@ the wrong panel (both fixed in `d94e991`), and refuses a single selected file in
 Findings 3 and 5 silently change which images match or get
 selected for deletion: Preset 1 can group unrelated, flipped or inverted images under greyed-out
 controls, while «Auto-select dupes» either clears its own selection on a single pair or leaves rows
-selected with a selection count of zero. Findings 4, 6, 7 and 9 to 12 return wrong results, break
-follow-up actions (Ctrl+F, Sort, Rebuild), or ignore an abort.
+selected with a selection count of zero. Findings 4 (`ecddb73`), 6 (`6df9c63`) and 7 (`2227f02`) are
+fixed; Findings 9 to 12 still return wrong results, break follow-up actions (Ctrl+F, Sort, Rebuild), or
+ignore an abort.
 
 ---
 
@@ -347,6 +351,35 @@ even into the `.SLDB` on disk — as the user clicks around:
   action to collect pixels, generate pHashes and convert the histogram list into a pHash Hamming list
   (`g=1_0, 3_0`, `pairs=2`).
 
+**Fixed in `ecddb73`** (lines at `2227f02`):
+
+- Tab 4 now uses its own three super-globals (`dupesFilterWhat`, `dupesFilterStringPos`,
+  `dupesFilterStringIsNot`, :182, :91335-91337, :91359-91361, :91536-91538, :89019, :89029-89031,
+  :89244-89249, :89304) instead of sharing and clamping `PanelEnableFilesFilter()`'s `userFilter*`
+  globals, and drops the dead `gupdateUIFiltersPanel` bindings (16.3).
+- Live UI handlers (`updateUIdupesPanel()` :91445, `UIfindDupesCheckboxes()` :91498-91500,
+  `updateUIimageHashPreview()` :91385-91388) read controls into local variables, and Tab 4's `+`
+  (`BtnUIsetDupesCilterCurrentFilter()` :96861) and `X` (`UIstringEditFilterErase()` :96866-96868)
+  update only the Edit control without touching `dupesStringFilter`.
+- `InitialFindDupesSettingsPanel(modus)` (:91082-91187) snapshots all panel globals (including all 19
+  `UIcheck*` globals) when `PanelFindDupes()` opens (:91224-91225), commits them right before
+  `BtnCloseWindow()` in `BTNfindDupesNow()` (:91676) and `BtnCollectDupesData()` (:91370), and
+  restores them in `CloseWindow()` (:100078-100079) as well as on early validation returns in
+  `BTNfindDupesNow()` (:91659, :91667).
+- Removed live `UIeditHammingInterpolation()`; `BTNfindDupesNow()` now reads `hamDistInterpolation`
+  (:91548), and `IniSLDBWrite("hamDistInterpolation", hamDistInterpolation)` runs only on commit in
+  `BTNfindDupesNow()` (:91674-91675) and `BtnCollectDupesData()` (:91368-91369).
+
+Run under headless Wine at `2227f02` (`testF4`): opening `PanelFindDupes()`, clicking `+`, changing
+Tab 4 and clicking «Cancel» leaves `userFilterWhat=4`, `userFilterStringPos=4`, `userFilterStringIsNot=1`
+and `dupesFilter*` intact; editing Tabs 1–4 (including `hamDistInterpolation=1`, `UIcheckimgwidth=1` and
+`X`) and clicking «Cancel» — or failing «Find duplicates» validation and clicking «Cancel» — restores
+every global and leaves `hamDistInterpolation=0` in the `.SLDB`; Ctrl+F still shows `Cached threshold
+range: 0 - 5.` after raising threshold to 12 and cancelling; `ActSortDupeGroups()` stays on histogram
+mode (`pairs=0`) after cancelling Custom + pHash; committing via «Find duplicates» or «Collect image
+pixels data» writes `hamDistInterpolation` to `.SLDB` without clobbering `userFilter*` or uncommitted
+Tab 2 controls.
+
 ---
 
 ## 5. «Auto-select dupes» selects nothing on a single pair, and leaves `markedSelectFile=0` when re-run over an existing selection
@@ -417,6 +450,22 @@ Run (batch B2), on a newly saved 4-file `.SLDB` containing two identical copies 
 In every case the panel reopens with no hint that data has to be collected first (contrast `BTNhelpFindDupes()`,
 which says «please ensure you allow Quick Picto Viewer to scan the image files», small thing 16.11).
 
+**Fixed in `6df9c63`** (lines at `2227f02`):
+
+- `BTNfindDupesNow()` drops `imgframes` from Preset 5 (`columnus := "imgfile"`, :91629-91630) and
+  Preset 6 (`columnus := "fsize,imgfile"`, :91631-91632), so Preset 5 needs no file scan at all and
+  Preset 6 runs fast file-stat collection (`fsize`) instead of decoding image headers.
+- `retrieveDupesByProperties()` (:89011-89025) invokes `collectSQLFileInfosNow(scu, 0, 1, 2, 0, ...)`
+  whenever `thisNOTnullCol != "imgfile"` (`HpixelzFsmall`/`pixelzFsmall` when a hash is active,
+  otherwise `thisNOTnullCol`: `imgmedian`, `imgwidth`, or `fsize`).
+
+Run under headless Wine at `2227f02` (`testF6`) on a fresh 4-file `.SLDB`: Preset 5 runs with no
+`collectSQLFileInfosNow()` call and finds `dir1\same.png` + `dir2\same.png`; Preset 6 and Custom +
+`kbfsize` call `collectSQLFileInfosNow("fsize", ...)` without touching `imgwidth` and return the
+expected groups; Preset 3 calls `collectSQLFileInfosNow("imgwidth", ...)`, populates all 4 rows, and
+finds all 4 duplicates; Presets 2 and 4 invoke `collectSQLFileInfosNow("imgmedian", ...)` on missing
+data and match all 4 duplicates once histogram data is present.
+
 ---
 
 ## 7. Tab 4's string filter and «Exclude the current list of results»: singletons, `|||`, and «Exclude» on an unfiltered list
@@ -449,6 +498,26 @@ which says «please ensure you allow Quick Picto Viewer to scan the image files�
    checkbox enabled (:91203). Ticking it excludes every image in the database (`toBeExcludedIndexes`
    marks all rows at :91530-91534), runs the full collection, hashing and query, and then fails with
    «Found no image duplicates after filtering the duplicates list» (run, D6: `exclude checkbox enabled=1`).
+
+**Fixed in `2227f02`** (lines at `2227f02`):
+
+- **Singletons in non-hash modes:** `retrieveDupesByProperties()` counts survivors per group in
+  `groupies[grpIDu]` (:89312) and, when hashes are not active, compacts `resultedFilesList` to drop
+  groups with fewer than two survivors (:89332-89357) and reports `validGroups` in the completion
+  tooltip (:89416-89417).
+- **Empty `|` terms:** `retrieveDupesByProperties()` splits `dupesStringFilter` on `|`, strips `>`,
+  drops empty terms without trimming spaces (matching `SQLlikeClauseFromFilter()`), and builds
+  `givenRegEx` directly (:89232-89250).
+- **«Exclude» when unfiltered:** `PanelFindDupes()` renders `excludePreviousDupesFromList` unchecked
+  and `Disabled` whenever `StrLen(filesFilter) < 3` (:91237-91239, :91338), and `BTNfindDupesNow()`
+  guards `toBeExcludedIndexes` with the same check (:91672-91673, :91679).
+
+Run under headless Wine at `2227f02` (`testF7`): Preset 5 with filter `dirB` (leaving only singletons)
+drops them and restores the previous list; Preset 5 with filter `dirA` or with Exclude on a `dirB`
+filter drops the singletons and keeps only the surviving `pair.png` pair (`Found 1 groups | Total
+images: 2`); Preset 1 with `u1|||u2` and `|u1|>|u2|` matches only `u1.png` + `u2.png`; `|||` with
+«Must not» behaves as an empty filter; `Școală` matches `u1.png` + `u2.png`; and with `filesFilter`
+empty, «Exclude» is disabled (`enabled=0 checked=0`) and ignored even if forced via `GuiControl`.
 
 ---
 
@@ -689,7 +758,7 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   `PanelFindDupes()` (run G6).
 - **16.3. Dead `gupdateUIFiltersPanel` on Tab 4's two dropdowns.** Lines :91200-91201 bind
   `gupdateUIFiltersPanel` to `userFilterStringPos` and `userFilterWhat`; `updateUIFiltersPanel()`
-  immediately returns whenever `AnyWindowOpen != 6` (:33262) (read).
+  immediately returns whenever `AnyWindowOpen != 6` (:33262) (read). *(Fixed in `ecddb73`.)*
 - **16.4. `PanelFindDupes(dummy)` rejects Tab 4.** Line :91109 checks `isInRange(dummy, 1, 3)` even
   though the panel has 4 tabs (read).
 - **16.5. 300 ms enable/disable race on open.** `PanelFindDupes()` delays `updateUIdupesPanel` via
@@ -837,21 +906,22 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
    and pass hash/crop as local parameters like `findDupesPrecision` so Presets 1–6 do not overwrite
    Custom mode's settings? (c) should `dHash 8x8` in Custom mode force `inv=0` when passing to the
    engine?
-4. Finding 4: snapshot and restore `PanelFindDupes()`'s settings on «Cancel» (like
-   `InitialFilterSettingsPanel()`), give Tab 4 its own `dupesFilterWhat` / `dupesFilterStringPos`
-   instead of sharing `PanelEnableFilesFilter()`'s globals, and defer `IniSLDBWrite("hamDistInterpolation")`
-   until «Find duplicates» or «Collect image pixels data» runs?
+4. Finding 4: ~~snapshot and restore `PanelFindDupes()`'s settings on «Cancel» (like
+   `InitialFilterSettingsPanel()`), give Tab 4 its own `dupesFilterWhat` / `dupesFilterStringPos` /
+   `dupesFilterStringIsNot` instead of sharing `PanelEnableFilesFilter()`'s globals, read into locals
+   in live handlers, and defer `IniSLDBWrite("hamDistInterpolation")` until «Find duplicates» or
+   «Collect image pixels data» runs~~ (fixed in `ecddb73`).
 5. Finding 5: (a) should `autoSelectDupesInGroups()` bypass the one-file rule (e.g., count selected rows
    directly or add a flag to `getSelectedFiles()`), so a single duplicate pair keeps its 1 selected
    image? (b) invalidate `getSelectedFiles()`'s `lastIDcount` cache in `autoSelectDupesInGroups()` (or
    key it by a monotonic selection counter instead of `A_TickCount`)?
-6. Finding 6: should Presets 2 to 6 (and Custom + «Ignore») trigger `collectSQLFileInfosNow()` for the
-   columns they need, or only collect when missing rows exist? And should Preset 5 («Identical file
-   names») drop `imgframes` so it works on a fresh `.SLDB` without scanning image files at all?
-7. Finding 7: (a) in non-hash modes, drop singleton groups left after Tab 4's string filter or «Exclude»?
-   (b) split/clean empty `|` terms consistently with `SQLlikeClauseFromFilter()` so `|||`, leading `|`
-   or trailing `|` cannot match everything? (c) disable «Exclude the current list of results» when
-   `filesFilter` is empty?
+6. Finding 6: ~~trigger `collectSQLFileInfosNow()` for Presets 2 to 6 and Custom + «Ignore» whenever
+   `thisNOTnullCol != "imgfile"`, and drop `imgframes` from Preset 5 («Identical file names») and
+   Preset 6 («Identical file names and file sizes»)~~ (fixed in `6df9c63`).
+7. Finding 7: ~~(a) in non-hash modes, drop singleton groups left after Tab 4's string filter or
+   «Exclude»; (b) split/clean empty `|` terms consistently with `SQLlikeClauseFromFilter()` without
+   trimming spaces; (c) disable «Exclude the current list of results» when `filesFilter` is empty~~
+   (fixed in `2227f02`).
 8. Finding 8: check `createSettingsGUI()`'s return value in `PanelFindDupes()` (and have
    `PanelChangeHamDistThreshold()`'s «Main panel» and `PanelFindDupes()`'s «Overview» close via
    `BtnCloseWindow()`, or should Help boxes not arm `lastLongOperationAbort`)?
