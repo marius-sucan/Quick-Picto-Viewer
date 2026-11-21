@@ -31442,7 +31442,7 @@ FolderTreeRepopulate(dummy:=0, listuGiven:=0) {
           aListu .= readRecentFileDesties()
           If FolderExist(prevFileSavePath)
              aListu .= "`n" prevFileSavePath "`n"
-          If FolderExist(prevFileMovePath)
+          If (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath))
              aListu .= "`n" prevFileMovePath "`n"
           If FolderExist(prevOpenFolderPath)
              aListu .= "`n" prevOpenFolderPath "`n"
@@ -60467,7 +60467,7 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 }
 
 BtnCpyMvChooseFilesDest() {
-   SelectedDir := openFoldersDialogWrapper(prevFileMovePath)
+   SelectedDir := openFoldersDialogWrapper((InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : "")
    SelectedDir := Trimmer(SelectedDir)
    If FolderExist(SelectedDir)
       GuiControl, SettingsGUIA:, UsrEditFileDestination, % SelectedDir
@@ -60484,7 +60484,7 @@ BtnCpyMvStrctrdChooseFilesDst() {
 
    p := FolderExist(destDir) ? destDir : srcDir
    If !FolderExist(p)
-      p := FolderExist(prevFileMovePath) ? prevFileMovePath : prevOpenFolderPath
+      p := (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : prevOpenFolderPath
 
    SelectedDir := openFoldersDialogWrapper(p, "Select the destination folder")
    SelectedDir := Trimmer(SelectedDir)
@@ -60503,7 +60503,7 @@ BtnCpyMvStrctrdChooseFilesSrc() {
 
    p := FolderExist(srcDir) ? srcDir : destDir
    If !FolderExist(p)
-      p := FolderExist(prevFileMovePath) ? prevFileMovePath : prevOpenFolderPath
+      p := (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : prevOpenFolderPath
 
    SelectedDir := openFoldersDialogWrapper(p, "Select the source folder")
    SelectedDir := Trimmer(SelectedDir)
@@ -60584,7 +60584,7 @@ readRecentFileDesties(modus:=0) {
    listu := ""
    If (modus!=1)
    {
-      If FolderExist(prevFileMovePath)
+      If (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath))
          listu .= prevFileMovePath "`n"
       If FolderExist(prevFileSavePath)
          listu .= prevFileSavePath "`n"
@@ -72515,7 +72515,7 @@ createMenuOpenRecents(modus:=0) {
       kMenu("PVopenF", "AddSeparator", 0)
       If FolderExist(prevFileSavePath)
          aListu := (userPrivateMode=1) ? "O1. *:\*******\******.***`n" : "O1. " PathCompact(prevFileSavePath, 30) "`n"
-      If (FolderExist(prevFileMovePath) && !InStr(aListu, prevFileMovePath "`n"))
+      If (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath) && !InStr(aListu, prevFileMovePath "`n"))
          aListu .= (userPrivateMode=1) ? "O2. *:\*******\******.***`n" : "O2. " PathCompact(prevFileMovePath, 30) "`n"
       If (FolderExist(prevOpenFolderPath) && !InStr(aListu, prevOpenFolderPath "`n"))
          aListu .= (userPrivateMode=1) ? "O3. *:\*******\******.***`n" : "O3. " PathCompact(prevOpenFolderPath, 30) "`n"
