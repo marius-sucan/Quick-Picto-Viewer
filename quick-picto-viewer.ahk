@@ -4202,16 +4202,16 @@ invertCurrentFolderRecursiveness() {
 }
 
 MenuRemNowFilesListFilter() {
-   If remFilesListFilter()
+   If (remFilesListFilter()=1)
       dummyTimerDelayiedImageDisplay(50)
 }
 
 remFilesListFilter(modus:=0) {
    If !filesFilter
-      Return 1
+      Return 0
 
    If askAboutFileSave(" and the files list filter will be removed")
-      Return 0
+      Return -1
 
    If (modus="simple")
    {
@@ -33204,8 +33204,8 @@ PanelEnableFilesFilter() {
 BTNuiDiscardFilesFilter() {
    InitialFilterSettingsPanel(1)
    BtnCloseWindow()
-   remFilesListFilter()
-   SetTimer, RandomPicture, -90
+   If (remFilesListFilter()=1)
+      SetTimer, RandomPicture, -90
 }
 
 SQLescapeStr(str, likeu:=0) {
@@ -36323,7 +36323,7 @@ retrieveAlreadySeenImageFromCurrentList() {
       RandomPicture()
       showDelayedTooltip("Finished the identification process of " friendly2 " images`n" groupDigits(countSeen) " images were found in the initial files list" etaTime)
       SetTimer, RemoveTooltip, % -msgDisplayTime//2
-      quickBarLater("Remove filter,,quickBarRemoveFilter")
+      quickBarLater("Remove filter,,MenuRemNowFilesListFilter")
    }
 }
 
@@ -40802,7 +40802,7 @@ warnFramesActionPrevented(actu) {
   If (InStr(filesFilter, "i)(QPV:PAGES:")=1)
   {
      msgBeepTimer("WARNING: Illegal operation: " actu ".`nThe action is not permitted on image frames/pages.`nYou can deactivate this mode with Ctrl+Space.")
-     quickBarLater("Exit frames mode,,quickBarRemoveFilter")
+     quickBarLater("Exit frames mode,,MenuRemNowFilesListFilter")
      Return 1
   }
 }
@@ -44451,21 +44451,25 @@ BTNrebuildDBpanel() {
     If !InStr(msgResult, "continue")
        Return
 
-    BtnCloseWindow()
     If (StrLen(filesFilter)>1)
+    {
        r := remFilesListFilter()
+       If (r=-1)
+          Return
+    }
     
+    BtnCloseWindow()
     If !activeSQLdb.CloseDB()
     {
        msgBeepTimer("Failed to close active database")
-       If r
+       If (r=1)
           dummyTimerDelayiedImageDisplay(50)
        Return
     }
 
     SLDtypeLoaded := 2
     SaveDBfilesList(CurrentSLD)
-    If r
+    If (r=1)
        dummyTimerDelayiedImageDisplay(50)
 }
 
@@ -47159,7 +47163,7 @@ BtnChangeHamDistThreshold() {
    {
       currentFileIndex := 1
       dummyTimerDelayiedImageDisplay(150)
-      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemNowFilesListFilter", 0)
    }
 }
 
@@ -89361,7 +89365,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    dummyTimerDelayiedImageDisplay(90)
    ; RandomPicture()
    If !SortCriterion
-      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,quickBarRemoveFilter", 0)
+      CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemNowFilesListFilter", 0)
 }
 
 keepSelectedDupeInGroup() {
