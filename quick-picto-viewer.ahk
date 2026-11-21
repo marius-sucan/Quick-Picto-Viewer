@@ -91568,6 +91568,7 @@ GuiCtrlGet(varu) {
 }
 
 PanelPurgeCachedSQLdata(dummy:=0) {
+   hostPanel := getHostPanelFunc()
    If (AnyWindowOpen=49 || dummy="reopen")
    {
       reOpenIT := 1
@@ -91590,40 +91591,47 @@ PanelPurgeCachedSQLdata(dummy:=0) {
  
       dtl := (msgResult.list!=8) ? "`n`nThis data is used for sorting the files list much faster, identify image duplicates or to generate files list statistics." : ""
       msgResultu := msgBoxWrapper(appTitle ": Purge cached data", "Please confirm you want to purge selected cached data from the database." dtl msgInfos, 4, 0, "question")
-      If !InStr(msgResultu, "yes")
-         Return
-
-      If (msgResult.list=1)
-         corePurgeCachedSQLdata("attributes")
-      Else If (msgResult.list=2)
-         corePurgeCachedSQLdata("resolution")
-      Else If (msgResult.list=3)
-         corePurgeCachedSQLdata("histogram")
-      Else If (msgResult.list=4)
-         corePurgeCachedSQLdata("hashes")
-      Else If (msgResult.list=5)
-         corePurgeCachedSQLdata("all")
-      Else If (msgResult.list=6)
-         PurgeCachedDataSelectedFiles()
-      Else If (msgResult.list=7)
-         PurgeCachedDataModifiedFiles()
-      Else If (msgResult.list=8)
+      If InStr(msgResultu, "yes")
       {
-         r := SQLdeleteEntriesMarked()
-         If (r=1)
-            SoundBeep 900, 100
+         If (msgResult.list=1)
+            corePurgeCachedSQLdata("attributes")
+         Else If (msgResult.list=2)
+            corePurgeCachedSQLdata("resolution")
+         Else If (msgResult.list=3)
+            corePurgeCachedSQLdata("histogram")
+         Else If (msgResult.list=4)
+            corePurgeCachedSQLdata("hashes")
+         Else If (msgResult.list=5)
+            corePurgeCachedSQLdata("all")
+         Else If (msgResult.list=6)
+            PurgeCachedDataSelectedFiles()
+         Else If (msgResult.list=7)
+            PurgeCachedDataModifiedFiles()
+         Else If (msgResult.list=8)
+         {
+            r := SQLdeleteEntriesMarked()
+            If (r=1)
+               SoundBeep 900, 100
+         }
+
+         If (SLDtypeLoaded=3)
+            PopulateIndexSQLFilesStatsInfos("kill")
+         Else
+            PopulateIndexFilesStatsInfos("kill")
+
+         PopulateImagesIndexStatsInfos("kill")
       }
-
-      If (SLDtypeLoaded=3)
-         PopulateIndexSQLFilesStatsInfos("kill")
-      Else
-         PopulateIndexFilesStatsInfos("kill")
-
-      PopulateImagesIndexStatsInfos("kill")
    }
 
    If (reOpenIT=1)
-      PanelWrapperFilesStats()
+   {
+      If (hostPanel="PanelFindDupes")
+         PanelFindDupes(3)
+      Else If (hostPanel && IsFunc(hostPanel))
+         %hostPanel%()
+      Else
+         PanelWrapperFilesStats()
+   }
 }
 
 corePurgeCachedSQLdata(mode) {
@@ -91696,7 +91704,9 @@ corePurgeCachedSQLdata(mode) {
 }
 
 PurgeCachedDataModifiedFiles() {
-   SQLstr := "SELECT imgidu, imgfolder||'\'||imgfile, fsize, fmodified, fcreated FROM images WHERE ifnull(fsize, '')!='' ORDER BY fullPath;"
+   extraFilter := extractSQLqueryFromFilter()
+   wherePart := extraFilter ? "WHERE (" Trim(SubStr(extraFilter, 7)) ") AND " : "WHERE "
+   SQLstr := "SELECT imgidu, imgfolder||'\'||imgfile, fsize, fmodified, fcreated FROM images " wherePart "ifnull(fsize, '')!='' AND isDeleted=0 ORDER BY fullPath;"
    If !activeSQLdb.GetTable(SQLstr, RecordSet)
    {
       throwSQLqueryDBerror(A_ThisFunc)
@@ -91704,9 +91714,12 @@ PurgeCachedDataModifiedFiles() {
    }
 
    totalFiles := RecordSet.RowCount
-   totalImages := getTotalIMGsSQLdb()
+   totalImages := getTotalIMGsSQLdb(extraFilter)
    If (totalFiles<1)
+   {
+      RecordSet.Free()
       Return msgBeepTimer("No modified files identified. The file details must be collected first.", 0)
+   }
 
    setImageLoading()
    backCurrentSLD := CurrentSLD
@@ -91732,7 +91745,8 @@ PurgeCachedDataModifiedFiles() {
          countTFiles++
          If (!obj.size || obj.size<3)
          {
-            deleteSQLdbEntry(Rowu[2], Rowu[1])
+            If !markSQLdbEntryDeleted(Rowu[1], 1)
+               failedFiles++
             remFiles++
          } Else If (obj.size!=Rowu[3] || SubStr(obj.wTime, 1, 12)!=Rowu[4] || SubStr(obj.cTime, 1, 12)!=Rowu[5])
          {
@@ -91790,6 +91804,7 @@ PurgeCachedDataModifiedFiles() {
 
    CurrentSLD := backCurrentSLD
    RecordSet.Free()
+   uiPopulateCachesOverview("kill")
    SetTimer, ResetImgLoadStatus, -150
 }
 
