@@ -2433,6 +2433,78 @@ SetWindowRegion(hwnd, x:=0, y:=0, w:=0, h:=0, r:=1) {
   Return Result
 }
 
+resolveFullPath(givenPath) {
+; the absolute path as Windows reads it: . and .. resolved, / and repeated backslashes as one backslash
+   If (StrLen(givenPath)=2 && SubStr(givenPath, 2, 1)=":")
+      givenPath .= "\"
+
+   VarSetCapacity(buf, 65536, 0)
+   If !DllCall("GetFullPathNameW", "WStr", givenPath, "UInt", 32767, "UPtr", &buf, "UPtr", 0)
+      Return
+
+   Return StrGet(&buf, "UTF-16")
+}
+
+ProbeDirEnumClass(dirPath, ByRef nameOffset) {
+/*
+  Finds out which bulk directory information class the file system under
+  [dirPath] is willing to serve, and returns it, together with the offset
+  at which the file name sits inside one of its records:
+
+    14 = FileFullDirectoryInfo    Windows 8 and above; the leanest records,
+                                  so the most entries fit in one buffer
+    10 = FileIdBothDirectoryInfo  Windows Vista and above
+     0 = neither one of them; the caller has to fall back on FindFirstFile
+
+  Every other field NewGetFilesList() reads - EndOfFile at 40, FileAttributes
+  at 56, FileNameLength at 60, CreationTime at 8 and LastWriteTime at 24 -
+  sits at the very same offset in both structures; only the name moves.
+
+  The folder is opened and closed again here, on purpose: the probe is what
+  brings the first index blocks of the folder into the cache, so the real
+  pass that follows immediately does not pay for them twice.
+*/
+   Static probeBuf, probeAddr := 0
+   If !probeAddr
+   {
+      VarSetCapacity(probeBuf, 4096 + 16, 0)
+      probeAddr := (&probeBuf + 15) & -16
+   }
+
+   nameOffset := 0
+   openPath := (StrLen(dirPath)=2 && SubStr(dirPath, 2, 1)=":") ? dirPath "\" : dirPath
+   zPath := PathToExtendedPath(openPath)
+   If !zPath
+      zPath := openPath
+
+   hDir := DllCall("CreateFileW", "WStr", zPath, "UInt", 0x1, "UInt", 0x7, "UPtr", 0
+                 , "UInt", 3, "UInt", 0x02000000, "UPtr", 0, "UPtr")
+   ; -1 on a 64 bit build, 0xFFFFFFFF on a 32 bit one; see GetFilesList()
+   If (!hDir || hDir=-1 || hDir=0xFFFFFFFF)
+      Return 0
+
+   r := 0
+   Loop, 2
+   {
+       thisClass := (A_Index=1) ? 14 : 10
+       ok := DllCall("GetFileInformationByHandleEx", "UPtr", hDir, "Int", thisClass
+                   , "UPtr", probeAddr, "UInt", 4096)
+       ; ErrorLevel is not zero when the call itself could not be made at all,
+       ; which is what happens on Windows XP; A_LastError means nothing then.
+       ; 18 = ERROR_NO_MORE_FILES, an empty folder on a file system that has
+       ; no "." and ".." entries; the class is supported all the same.
+       If (ok || (!ErrorLevel && A_LastError=18))
+       {
+          r := thisClass
+          nameOffset := (thisClass=14) ? 68 : 104
+          Break
+       }
+   }
+
+   DllCall("CloseHandle", "UPtr", hDir)
+   Return r
+}
+
 PathToExtendedPath(inFile) {
 ; The function prepares a file path for the wide [W] file APIs, by prefixing
 ; it with \\?\ , which lifts the MAX_PATH [260 characters] limitation.

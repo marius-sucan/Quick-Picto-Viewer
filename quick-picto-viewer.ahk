@@ -3333,7 +3333,7 @@ copyMoveStructuredFolders(srcDir, finalDest, filesElected) {
       If destAttr
       {
          ; the file itself, reached through another spelling of the source folder or a link
-         If isSameFile(file2rem, file2save)
+         If isSameIdentityFile(file2rem, file2save)
          {
             skippedFiles++
             Continue
@@ -32908,25 +32908,6 @@ FileRexists(filePath, loose:=1) {
       Return 1
 }
 
-isSameFileOtherCase(fileA, fileB) {
-; tells whether two spellings of one path, equal but for the case of their letters, name the
-; same file. That is the rule on Windows, its volumes ignore the case, and there a rename from
-; one spelling to the other only changes the case of the name. A directory can be made case
-; sensitive [fsutil, Windows 10 and later], and there the two spellings can be two files, or the
-; second one can be free; FindFirstFile answers with the name as it is stored on the disk, and
-; only the same file answers with the same stored name for both spellings
-   If (fileA==fileB || !(fileA=fileB))
-      Return 0
-
-   nameA := nameB := ""
-   Loop, Files, %fileA%
-      nameA := A_LoopFileName
-   Loop, Files, %fileB%
-      nameB := A_LoopFileName
-
-   Return (nameA!="" && nameA==nameB) ? 1 : 0
-}
-
 renameFileCaseOnly(oldPath, newPath) {
 ; oldPath and newPath spell the same file with a different case, see isSameFileOtherCase(). The
 ; name is changed through a temporary name, so that neither step has a destination that already
@@ -44555,18 +44536,6 @@ FolderExist(filePath) {
    Return InStr(FileExist(filePath), "D")
 }
 
-resolveFullPath(givenPath) {
-; the absolute path as Windows reads it: . and .. resolved, / and repeated backslashes as one backslash
-   If (StrLen(givenPath)=2 && SubStr(givenPath, 2, 1)=":")
-      givenPath .= "\"
-
-   VarSetCapacity(buf, 65536, 0)
-   If !DllCall("GetFullPathNameW", "WStr", givenPath, "UInt", 32767, "UPtr", &buf, "UPtr", 0)
-      Return
-
-   Return StrGet(&buf, "UTF-16")
-}
-
 parentFolderPath(folderPath) {
 ; the folder that holds the given one, or nothing for the root of a drive or of a network share
    k := InStr(RTrim(folderPath, "\"), "\", 0, -1)
@@ -44595,6 +44564,7 @@ getFileIdentity(filePath) {
               , "UInt", 3                   ; OPEN_EXISTING
               , "UInt", 0x02000000          ; FILE_FLAG_BACKUP_SEMANTICS, so that folders open too
               , "UPtr", 0, "UPtr")
+
    ; -1 on a 64 bit build, 0xFFFFFFFF on a 32 bit one; see GetFilesList()
    If (!h || h=-1 || h=0xFFFFFFFF)
       Return
@@ -44606,16 +44576,8 @@ getFileIdentity(filePath) {
       Return
 
    ; dwVolumeSerialNumber, nFileIndexHigh, nFileIndexLow
-   Return NumGet(info, 28, "UInt") "-" NumGet(info, 44, "UInt") "-" NumGet(info, 48, "UInt")
-}
-
-isSameFile(fileA, fileB) {
-; both paths name one existing file, in any spelling [letter case, links, junctions, SUBST drives, short names]
-   If !FileExist(fileB)
-      Return 0
-
-   fileID := getFileIdentity(fileA)
-   Return (fileID!="" && fileID=getFileIdentity(fileB))
+   rz := NumGet(info, 28, "UInt") "-" NumGet(info, 44, "UInt") "-" NumGet(info, 48, "UInt")
+   Return rz
 }
 
 PanelExtractFrames() {
@@ -60467,7 +60429,8 @@ SaveClipboardImage(dummy:=0, noDialog:=0, fmtIndex:=0) {
 }
 
 BtnCpyMvChooseFilesDest() {
-   SelectedDir := openFoldersDialogWrapper((InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : "")
+   zp := (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : ""
+   SelectedDir := openFoldersDialogWrapper(zp)
    SelectedDir := Trimmer(SelectedDir)
    If FolderExist(SelectedDir)
       GuiControl, SettingsGUIA:, UsrEditFileDestination, % SelectedDir
@@ -60481,7 +60444,6 @@ BtnCpyMvStrctrdChooseFilesDst() {
    GuiControlGet, destDir, SettingsGUIA:, UsrEditFileDestination
    srcDir := Trimmer(Trimmer(srcDir), "\")
    destDir := Trimmer(Trimmer(destDir), "\")
-
    p := FolderExist(destDir) ? destDir : srcDir
    If !FolderExist(p)
       p := (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : prevOpenFolderPath
@@ -60500,7 +60462,6 @@ BtnCpyMvStrctrdChooseFilesSrc() {
    GuiControlGet, destDir, SettingsGUIA:, UsrEditFileDestination
    srcDir := Trimmer(Trimmer(srcDir), "\")
    destDir := Trimmer(Trimmer(destDir), "\")
-
    p := FolderExist(srcDir) ? srcDir : destDir
    If !FolderExist(p)
       p := (InStr(prevFileMovePath, ":\") && FolderExist(prevFileMovePath)) ? prevFileMovePath : prevOpenFolderPath
@@ -60660,7 +60621,6 @@ CopyMovePanelWindow() {
 
     whileLoopExec := 1
     thisDynaList := getDynamicFoldersList()
-    ; DynamicFoldersList := mainDynaFoldersListu
     prevCurrentSLD := CurrentSLD
     lastInvoked := A_TickCount
     whileLoopExec := 1
@@ -60673,7 +60633,7 @@ CopyMovePanelWindow() {
            Continue
 
         folderu := StrReplace(A_LoopField, "|")
-        If InStr(listu, folderu "`n") || !FolderExist(folderu)
+        If (InStr(listu, folderu "`n") || !FolderExist(folderu))
            Continue
 
         listu .= folderu "`n"
@@ -60728,7 +60688,7 @@ CopyMovePanelWindow() {
 
     Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed
     Gui, Add, Button, x+5 hp wp+85 gBtnMarkFilesExplorer, &Mark file(s) (Explorer)
-    Gui, Add, Button, x+5 hp w70 gBtnHelpCopyMovePanel, Hel&p
+    Gui, Add, Button, x+5 hp w70 gBtnHelpCopyMovePanel, &Help
     Gui, Add, Button, x+5 hp wp+10 gBtnCloseWindow, C&ancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
 }
@@ -61935,7 +61895,7 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedD
     forceConflictOption := (dummy="quick-actu") ? QuickFileActConflict : copyMoveDoLastOption
     ; the file's own folder, in any spelling: only a copy from the panel goes on, to take a new name
     ; from «Auto-rename» or from the conflict box
-    isOwnFolder := (OldOutDir=finalDest || isSameFile(file2rem, file2save))
+    isOwnFolder := (OldOutDir=finalDest || isSameIdentityFile(file2rem, file2save))
     If (isOwnFolder && (UsrCopyMoveOperation=2 || dummy="quick-actu" || forceConflictOption=1 || forceConflictOption=3))
     {
        sOldOutDir := PathCompact(OldOutDir, "a", 1, OSDfontSize)
@@ -62246,7 +62206,7 @@ batchCopyMoveFile(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedDe
       file2save := finalDest "\" OldOutFileName
       ; the file's own folder, in any spelling: only a copy from the panel goes on, to take a new name
       ; from «Auto-rename» or from the conflict box
-      isOwnFolder := (OldOutDir=finalDest || isSameFile(file2rem, file2save))
+      isOwnFolder := (OldOutDir=finalDest || isSameIdentityFile(file2rem, file2save))
       If (isOwnFolder && (UsrCopyMoveOperation=2 || dummy="quick-actu" || forceConflictOption=1 || forceConflictOption=3))
       {
          skippedFiles++
@@ -63313,7 +63273,7 @@ isSameImageFormat(imgPath, fmt) {
 ; Whether imgPath holds an image of the format fmt by its content, whatever its name says. FreeImage
 ; numbers no PDF and gives every PNM format one number, so these two go by their signatures.
    Static signatures := {"pdf": "^%PDF-", "ppm": "^P[36]\s"}
-   If signatures.HasKey(fmt)
+   If (signatures.HasKey(fmt))
    {
       f := FileOpen(imgPath, "r", "CP0")
       Return (IsObject(f) && RegExMatch(f.Read(5), signatures[fmt])) ? 1 : 0
@@ -63321,9 +63281,37 @@ isSameImageFormat(imgPath, fmt) {
    Return (FreeImage_GetFileType(imgPath)=FreeImage_GetFIFFromFilename("a." fmt)) ? 1 : 0
 }
 
+isSameIdentityFile(fileA, fileB) {
+; both paths name one existing file, in any spelling [letter case, links, junctions, SUBST drives, short names]
+   If !FileExist(fileB)
+      Return 0
+
+   fileID := getFileIdentity(fileA)
+   Return (fileID!="" && fileID=getFileIdentity(fileB))
+}
+
 isSameFilePath(pathA, pathB) {
 ; the paths name one file whatever their case, or the doubled backslash of a folder spelled with a trailing one
    Return (RegExReplace(pathA, "(?<=.)\\{2,}", "\")=RegExReplace(pathB, "(?<=.)\\{2,}", "\")) ? 1 : 0
+}
+
+isSameFileOtherCase(fileA, fileB) {
+; tells whether two spellings of one path, equal but for the case of their letters, name the
+; same file. That is the rule on Windows, its volumes ignore the case, and there a rename from
+; one spelling to the other only changes the case of the name. A directory can be made case
+; sensitive [fsutil, Windows 10 and later], and there the two spellings can be two files, or the
+; second one can be free; FindFirstFile answers with the name as it is stored on the disk, and
+; only the same file answers with the same stored name for both spellings
+   If (fileA==fileB || !(fileA=fileB))
+      Return 0
+
+   nameA := nameB := ""
+   Loop, Files, %fileA%
+      nameA := A_LoopFileName
+   Loop, Files, %fileB%
+      nameB := A_LoopFileName
+
+   Return (nameA!="" && nameA==nameB) ? 1 : 0
 }
 
 countImageFilePages(imgPath) {
@@ -89894,7 +89882,7 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
       Return oldGetFilesList(origArg, progressInfo, doCommits, factCheck)
    }
 
-   dirInfoClass := QPV_ProbeDirEnumClass(rootDir, nameOffset)
+   dirInfoClass := ProbeDirEnumClass(rootDir, nameOffset)
    If !dirInfoClass    ; this volume cannot do bulk directory reads
       Return oldGetFilesList(origArg, progressInfo, doCommits, factCheck)
 
@@ -89937,7 +89925,6 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
    ; its prefix, so the "^(.\:\\)" anchor only has to be evaluated once
    probeRoot := (StrLen(rootDir)=2 && SubStr(rootDir, 2, 1)=":") ? rootDir "\" : rootDir
    isDriveRooted := RegExMatch(probeRoot, "^.\:\\") ? 1 : 0
-
    dirStack := [rootDir]
    nStack := (requireDriveLetter=1 && !isDriveRooted) ? 0 : 1
    While (nStack>0)
@@ -90129,66 +90116,6 @@ GetFilesList(strDir, progressInfo:=0, doCommits:=1, factCheck:=1) {
 
    SetTimer, RemoveTooltip, % -msgDisplayTime
    Return 1
-}
-
-QPV_ProbeDirEnumClass(dirPath, ByRef nameOffset) {
-/*
-  Finds out which bulk directory information class the file system under
-  [dirPath] is willing to serve, and returns it, together with the offset
-  at which the file name sits inside one of its records:
-
-    14 = FileFullDirectoryInfo    Windows 8 and above; the leanest records,
-                                  so the most entries fit in one buffer
-    10 = FileIdBothDirectoryInfo  Windows Vista and above
-     0 = neither one of them; the caller has to fall back on FindFirstFile
-
-  Every other field NewGetFilesList() reads - EndOfFile at 40, FileAttributes
-  at 56, FileNameLength at 60, CreationTime at 8 and LastWriteTime at 24 -
-  sits at the very same offset in both structures; only the name moves.
-
-  The folder is opened and closed again here, on purpose: the probe is what
-  brings the first index blocks of the folder into the cache, so the real
-  pass that follows immediately does not pay for them twice.
-*/
-   Static probeBuf, probeAddr := 0
-   If !probeAddr
-   {
-      VarSetCapacity(probeBuf, 4096 + 16, 0)
-      probeAddr := (&probeBuf + 15) & -16
-   }
-
-   nameOffset := 0
-   openPath := (StrLen(dirPath)=2 && SubStr(dirPath, 2, 1)=":") ? dirPath "\" : dirPath
-   zPath := PathToExtendedPath(openPath)
-   If !zPath
-      zPath := openPath
-
-   hDir := DllCall("CreateFileW", "WStr", zPath, "UInt", 0x1, "UInt", 0x7, "UPtr", 0
-                 , "UInt", 3, "UInt", 0x02000000, "UPtr", 0, "UPtr")
-   ; -1 on a 64 bit build, 0xFFFFFFFF on a 32 bit one; see GetFilesList()
-   If (!hDir || hDir=-1 || hDir=0xFFFFFFFF)
-      Return 0
-
-   r := 0
-   Loop, 2
-   {
-       thisClass := (A_Index=1) ? 14 : 10
-       ok := DllCall("GetFileInformationByHandleEx", "UPtr", hDir, "Int", thisClass
-                   , "UPtr", probeAddr, "UInt", 4096)
-       ; ErrorLevel is not zero when the call itself could not be made at all,
-       ; which is what happens on Windows XP; A_LastError means nothing then.
-       ; 18 = ERROR_NO_MORE_FILES, an empty folder on a file system that has
-       ; no "." and ".." entries; the class is supported all the same.
-       If (ok || (!ErrorLevel && A_LastError=18))
-       {
-          r := thisClass
-          nameOffset := (thisClass=14) ? 68 : 104
-          Break
-       }
-   }
-
-   DllCall("CloseHandle", "UPtr", hDir)
-   Return r
 }
 
 getIDimage(imgID) {
