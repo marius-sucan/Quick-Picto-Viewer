@@ -61760,8 +61760,6 @@ BtnCopyMoveAction(dummy:=0) {
      OutDir := SubStr(OutDir, 1, InStr(OutDir, "\", 0, -1) - 1)
      folderu := Trimmer(folderu, "\")
      folderu := Trimmer(folderu, ".")
-     If (b := InStr(folderu, "; "))
-        folderu := SubStr(folderu, b+2)
      If (folderu!="")
      {
         relativePath := ".\" folderu
@@ -61772,8 +61770,6 @@ BtnCopyMoveAction(dummy:=0) {
   folderu := StrReplace(folderu, "\\", "\")
   folderu := Trimmer(folderu, "\")
   folderu := Trimmer(folderu, ".")
-  If (b := InStr(folderu, "; "))
-     folderu := SubStr(folderu, b + 2)
 
   wrongNames := 0
   testFolderu := SubStr(folderu, 4)
