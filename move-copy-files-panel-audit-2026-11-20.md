@@ -434,15 +434,17 @@ the files. Run on the fix (batches A, F, G, H):
 
 **Completed in `e5713d0`**, with Marius's answer. `FolderExist()` takes `.\` for QPV's own folder, the
 working folder, and `.\name` or `\name` for a folder there when one exists. Run at `2b2835f` (batch I):
-after `.\` the Recent menu listed «O2. .\», which opens QPV's folder, and both «Browse» buttons
-started at `.\`; after `.\resources` the panel's list also had a `.\resources` row. The six places that
-read `prevFileMovePath` as a folder now want a full path as well, `InStr(prevFileMovePath, ":\")`, as
+after `.\` the Recent menu listed «O2. .\», which opens QPV's folder, and the «Browse» buttons of
+both panels started at `.\`; after `.\resources` the panel's list also had a `.\resources` row.
+The six places that read `prevFileMovePath` as a folder now want a full path as well,
+`InStr(prevFileMovePath, ":\")`, as
 `RecentCopyMoveManager()` does: `readRecentFileDesties()` (:60587), the folders tree when no list is
 open (:31445), the Recent menu (:72518), the panel's «Browse» (:60470) and the structured panel's two
 (:60487, :60506). The file dialogs' «Recent folders» left a pattern out already, by their own test
 (read). Run on the fix (batch I): after `.\` and `.\resources`, no «O2.» entry and no row; the panel's
-«Browse» passes no start folder, and the structured ones start on the last opened folder; after
-`<work>\out`, all of them as before.
+«Browse» passes no start folder, and the structured panel's two start on the last opened folder, with
+its Destination field empty, as it opens after a pattern; after `<work>\out`, all of them as before.
+The folders tree when no list is open was read, not run.
 
 ---
 
@@ -830,11 +832,14 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
   `run-link.sh <tag> <revision | ""> testMcG|testMcH` for the two batches that need `<app>\linkdir`, a
   Linux symbolic link to `<work>\st\src` that Wine cannot make. The test functions are in
   `test-mc.ahk` on top of the structured kit's `test-wrappers-sc.ahk`; `patch.py` and `patch-mc.py` add
-  the logging; `closer2.ahk` answers Wine's dialogs, and `mcAutoBoxArm()` (A, C, G, H) answers any box
+  the logging; `closer2.ahk` answers Wine's dialogs, and `mcAutoBoxArm()` (A, C, G, H, I) answers any box
   still up after 3 s, «OK» or a conflict box's «Cancel», and logs it. Logs in `results/` (`a-head`,
   `b-head`, `c-head`, `e-head`; for the fixes `e-db1cb15`, `a-db1cb15`, `f-db1cb15`, `f-fix`, `a-fix`;
   for findings 4 to 7 and 11 `a-e38`, `b-e38`, `c-e38`, `g-e38` and, with the fix runs' test file,
   `a-e38b`, `c-e38b`, `g-e38b`, `h-e38`, then `a-fx`, `b-fx`, `c-fx`, `e-fx`, `f-fx`, `g-fx`, `h-fx`;
-  for the follow-up `i-2b2`, `i-fx`, `b-fx2`, `h-fx2`, and `m-e38`, `m-2b2` in the structured kit). The
+  for the follow-up `i-2b2`, `i-fx`, `b-fx2`, `h-fx2`, then `i-2b2b`, `i-fx3` with the structured
+  panel's two «Browse» as well, and `m-e38`, `m-2b2` in the structured kit). Batch I presses those
+  with the Move/Copy panel open, and they read its Destination field as their own, so it empties the
+  field first. The
   scripts that wrote the fixes and the report notes are in `../fix-2026-11-21/`.
   The recent destinations INI is kept from one batch to the next; G and H empty it where they read it.
