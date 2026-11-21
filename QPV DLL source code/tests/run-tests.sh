@@ -609,6 +609,65 @@ for mutant in A B C D E; do
 done
 rm -rf pdf_writer_mutant pdf_writer_mutant.h pdf_writer_out
 
+echo
+echo "== GetFilesList(): directory records in, files and database rows out =="
+# dir-scan.h is #included into qpv-main.cpp rather than compiled on its own; dir_scan.cpp
+# compiles the whole shipped file VERBATIM and binds libsqlite3 through the shipped
+# sqlite-dynamic.h. -I../lib is for the mutants below: they are copies kept in this
+# folder, and they #include "sqlite-dynamic.h" the way the original does.
+if g++ $CXXFLAGS -Wno-sign-compare -Ishim -I../lib -pthread -o dir_scan dir_scan.cpp -ldl 2>&1; then
+    ./dir_scan || fail=1
+else
+    echo "  ERROR: dir_scan.cpp did not compile"; fail=1
+fi
+
+echo
+echo "== mutation check: the directory scan's mistakes must be caught =="
+#   A - a file of exactly the size limit is kept;
+#   B - the creation time lands where the modification time belongs;
+#   C - extensions are compared without folding their case;
+#   D - junctions and symbolic links are walked;
+#   E - a record that runs past its block is read all the same;
+#   F - an output buffer that is too small is written into;
+#   G - with factCheck=1, a file already in the database takes a row ID;
+#   H - the times reach the database with their seconds.
+for mutant in A B C D E F G H; do
+    case $mutant in
+      A) sed 's|if (fsize <= biggerThan)|if (fsize < biggerThan)|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="the size limit is off by one" ;;
+      B) sed 's|head\[1\] = qpvFileTimeToLocalStamp(mtime);|head[1] = qpvFileTimeToLocalStamp(ctime);|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="created is stored as modified" ;;
+      C) sed 's|return (c - 65u < 26u) ? c + 32u : c;|return c;|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="JPG is not jpg" ;;
+      D) sed 's/if (!(flags \& 1) || nameChars==0 || (attr \& 0x400))/if (!(flags \& 1) || nameChars==0)/' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="reparse points are walked" ;;
+      E) sed 's|if (nameBytes > (size_t)(blockEnd - e - nameOffset))|if (false)|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="a damaged block is read past its end" ;;
+      F) sed 's|if (need > (UINT64)outBytes)|if (false)|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="a small output buffer is overrun" ;;
+      G) sed 's|if (last!=lastNewRow \&\& last!=0)|if (true)|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="a file brought back counts as new" ;;
+      H) sed 's|SQ.bind_int64(stmt, 5, modified/100);|SQ.bind_int64(stmt, 5, modified);|' ../lib/dir-scan.h > dir_scan_mutant.h
+         label="the seconds are stored" ;;
+    esac
+
+    if cmp -s dir_scan_mutant.h ../lib/dir-scan.h; then
+        echo "  ERROR: mutant $mutant did not apply - the sed pattern no longer matches"; fail=1
+        continue
+    fi
+
+    if ! g++ $CXXFLAGS -Wno-sign-compare -Ishim -I../lib -pthread -DQPV_DIR_SCAN_SOURCE='"dir_scan_mutant.h"' -o dir_scan_mutant dir_scan.cpp -ldl 2>/dev/null; then
+        echo "  ERROR: mutant $mutant did not compile"; fail=1
+        continue
+    fi
+    if ./dir_scan_mutant > /dev/null 2>&1; then
+        echo "  ERROR: mutant $mutant passed ($label) - the test proves nothing"; fail=1
+    else
+        echo "   ok - mutant $mutant is caught ($label)"
+    fi
+done
+rm -f dir_scan_mutant dir_scan_mutant.h
+
 if [ "${1:-}" = "--bench" ]; then
     echo
     echo "== MSD benchmark =="

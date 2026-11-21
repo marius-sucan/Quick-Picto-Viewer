@@ -333,6 +333,24 @@ with restart markers — so no image library is needed.
 kept) and requires the test to fail on each. The `QPV_PDF_WRITER_SOURCE` define exists for
 that; it defaults to the shipped file.
 
+**`dir_scan.cpp`** — `dir-scan.h`, the per-file work of `GetFilesList()`, compiled verbatim:
+the extensions table, the parser of one block of directory records and the rows it inserts.
+The script reads a folder with `GetFileInformationByHandleEx()` and no longer looks at a
+record itself, so what a block yields is decided here. The reference is the loop the script
+ran per record — the size limit, the extension after the last dot looked up without regard
+to ASCII case, `.` and `..`, reparse points left alone — over hand-made cases and 3 000 random
+blocks, for both layouts of the directory records and both layouts of the output. Blocks that
+are cut short or damaged are placed against a page that cannot be read, so one byte too far
+ends the test. For the database, every packed record goes through `DirScanInsertRows()` into
+one SQLite database and through a transcription of `addSQLdbEntry()` into another — the
+interpolated statement, its escaped second attempt and the `factCheck` test — and the two
+must end up with the same rows, the same row IDs and the same refusals.
+
+Two things it cannot show: the time zone arithmetic, which `qpvFileTimeToLocalStamp()` in
+`qpv-main.cpp` does and a stand-in replaces here, and `CharLowerBuffW()`, also a stand-in.
+
+**The mutation check** — eight mistakes in a *copy* of `dir-scan.h`, each of which must fail.
+
 **`import_merge.py`** — the database import, executed by SQLite rather than simulated.
 `importSLDBintoSLDB()` renumbers every `imgidu`, so fingerprints keyed by it have to be
 re-keyed: the old side table is set aside, the imported database is `ATTACH`ed, and one

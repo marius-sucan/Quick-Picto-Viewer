@@ -2594,11 +2594,10 @@ DLL_API int DLL_CALLCONV rotateBlurBitmap(unsigned char *imageData, unsigned cha
 ////////////////////////////////////////////////////////////////////////////////
 // Local time stamps for file times
 //
-// GetFilesList() in the script converts two FILETIMEs per file into the local
+// GetFilesList() in the script takes two FILETIMEs per file in the local
 // "YYYYMMDDHH24MISS" form that A_LoopFileTimeModified produces. At 800 000
-// files that is 1.6 million conversions, and driving them one at a time from
-// the script, through FileTimeToSystemTime() + SystemTimeToTzSpecificLocalTime(),
-// costs many seconds.
+// files that is 1.6 million conversions, and FileTimeToSystemTime() +
+// SystemTimeToTzSpecificLocalTime() for each one of them costs many seconds.
 //
 // The offset between UTC and local time only ever changes twice a year, so it
 // is cached per day here and the calendar arithmetic is done inline.
@@ -2731,20 +2730,5 @@ static INT64 qpvFileTimeToLocalStamp(INT64 ft) {
     return qpvStampFromLocalFileTime(ft + (INT64)offMin * QPV_FT_PER_MIN);
 }
 
-DLL_API int DLL_CALLCONV DirEntryTimesToLocal(const unsigned char *dirEntry, INT64 *out) {
-// Reads the two file times straight out of one directory record as returned by
-// GetFileInformationByHandleEx(), and writes them back as local YYYYMMDDHHMISS
-// numbers: out[0] is the last write time, out[1] the creation time.
-// CreationTime sits at offset 8 and LastWriteTime at offset 24 in both of the
-// record layouts the script asks for, FILE_FULL_DIR_INFO and
-// FILE_ID_BOTH_DIR_INFO, so one entry pointer is all this needs.
-    if (!dirEntry || !out)
-        return 0;
-
-    INT64 ctime, mtime;
-    std::memcpy(&ctime, dirEntry + 8, sizeof(INT64));
-    std::memcpy(&mtime, dirEntry + 24, sizeof(INT64));
-    out[0] = qpvFileTimeToLocalStamp(mtime);
-    out[1] = qpvFileTimeToLocalStamp(ctime);
-    return 1;
-}
+// the per-file work of GetFilesList(): directory records in, files and database rows out
+#include "lib/dir-scan.h"

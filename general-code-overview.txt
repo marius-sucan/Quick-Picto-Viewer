@@ -138,8 +138,8 @@ b) How a files list index is created
   it proceeds to scan for the files using GetFilesList().
 
   In essence, coreOpenFolder() is a wrapper for GetFilesList(),
-  which uses a regular expression held in "RegExFilesPattern"
-  to match supported file types.
+  which matches the supported file types by their extensions,
+  the ones listed in "RegExAllFilesPattern".
 
   QPV internally relies on the resultedFilesList[] array object. 
   Each file entry is defined by various properties:
@@ -183,7 +183,8 @@ b) How a files list index is created
   set the initial file index to the image already loaded.
 
   If a slideshow database is already opened, GetFilesList() will
-  automatically add the files into the database using addSQLdbEntry().
+  automatically add the files into the database, through
+  DirScanInsertRows() of qpvmain.dll.
   In this context, the file names are converted to lower case.
 
   The file details related properties are optional, as previously indicated.

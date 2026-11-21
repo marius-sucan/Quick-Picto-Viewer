@@ -1,5 +1,6 @@
 # regenerated from the shipped sources on every run
 pdf_writer_mutant.h
+dir_scan_mutant.h
 msd_extract.cpp
 decode_extract.cpp
 header_extract.h
@@ -40,6 +41,8 @@ wic_icm
 wic_mutant
 pdf_writer
 pdf_writer_mutant
+dir_scan
+dir_scan_mutant
 hash_bench
 freeimage_gif_oracle
 freeimage_multipage_oracle

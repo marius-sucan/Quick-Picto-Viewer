@@ -190,6 +190,7 @@
     <ClInclude Include="lib\blend-modes.h" />
     <ClInclude Include="lib\callwndproc-hook.h" />
     <ClInclude Include="lib\color-adjust.h" />
+    <ClInclude Include="lib\dir-scan.h" />
     <ClInclude Include="lib\dupes-pixels.h" />
     <ClInclude Include="lib\dupes-search.h" />
     <ClInclude Include="lib\flood-fill.h" />

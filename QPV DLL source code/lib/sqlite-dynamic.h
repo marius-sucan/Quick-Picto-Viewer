@@ -94,6 +94,7 @@ struct SQLiteAPI {
     int          (__cdecl *libversion_number)(void) = NULL;
     int          (__cdecl *threadsafe)(void) = NULL;
     int          (__cdecl *changes)(sqlite3*) = NULL;
+    sqlite3_int64(__cdecl *last_insert_rowid)(sqlite3*) = NULL;
     void         (__cdecl *free_)(void*) = NULL;
 };
 
@@ -140,6 +141,7 @@ static void bindSQLiteOnce() {
         BINDSQ(libversion_number, "sqlite3_libversion_number");
         BINDSQ(threadsafe,        "sqlite3_threadsafe");
         BINDSQ(changes,           "sqlite3_changes");
+        BINDSQ(last_insert_rowid, "sqlite3_last_insert_rowid");
         BINDSQ(free_,             "sqlite3_free");
         #undef BINDSQ
 

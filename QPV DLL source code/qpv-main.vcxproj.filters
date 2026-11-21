@@ -45,6 +45,9 @@
     <ClInclude Include="lib\pdf-writer.h">
       <Filter>Header file</Filter>
     </ClInclude>
+    <ClInclude Include="lib\dir-scan.h">
+      <Filter>Header file</Filter>
+    </ClInclude>
     <ClInclude Include="lib\flood-fill.h">
       <Filter>Header file</Filter>
     </ClInclude>
