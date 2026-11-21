@@ -4210,9 +4210,6 @@ remFilesListFilter(modus:=0) {
    If !filesFilter
       Return 0
 
-   If askAboutFileSave(" and the files list filter will be removed")
-      Return -1
-
    If (modus="simple")
    {
       addJournalEntry("Removing files list filter:`n" filesFilter)
@@ -44451,14 +44448,13 @@ BTNrebuildDBpanel() {
     If !InStr(msgResult, "continue")
        Return
 
-    If (StrLen(filesFilter)>1)
-    {
-       r := remFilesListFilter()
-       If (r=-1)
-          Return
-    }
-    
+    If askAboutFileSave(" and the files list filter will be removed")
+       Return 0
+
     BtnCloseWindow()
+    If (StrLen(filesFilter)>1)
+       r := remFilesListFilter()
+    
     If !activeSQLdb.CloseDB()
     {
        msgBeepTimer("Failed to close active database")
@@ -65798,6 +65794,8 @@ askAboutSlidesListSave() {
       msgResult := msgBoxWrapper(appTitle ": Save files list", "The currently opened files list has been modified and the changes have not been saved. To continue with the action you chose, select the Discard button.`n`nWould like to save the currently opened files list?`n`n" OutFileName, "&Save|&Discard|&Cancel", 0, "question")
       If (msgResult="Save")
       {
+         BtnCloseWindow()
+         Sleep, -1
          SetTimer, PanelSaveSlideShowu, -150
          r := 1
       } Else If (msgResult="Discard")
@@ -65833,7 +65831,11 @@ askAboutFileSave(msg:="", dontOpen:=0) {
       If (msgResult="Save")
       {
          If (dontOpen!="yes")
+         {
+            BtnCloseWindow()
+            Sleep, -1
             SetTimer, PanelSaveImg, -150
+         }
          r := 1
       } Else If (msgResult="Discard")
          r := 0
