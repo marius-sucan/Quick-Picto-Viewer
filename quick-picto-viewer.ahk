@@ -91524,7 +91524,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Text, xs y+15, For these to take effect, refresh only the image hashes:
     Gui, Add, Checkbox, xs+15 y+15 Checked%userpHashMode% vuserpHashMode, pHashes based on averages, instead of the median values
     Gui, Add, Text, xp y+20 hp +0x200, Compress gray levels by a factor of
-    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditFc", graylevelCompressor)
+    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditFc", graylevelCompressor, "Gray levels compression factor")
     Gui, Add, UpDown, vgraylevelCompressor gupdateUIdupesPanel Range1-9, % graylevelCompressor
     Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnPurgeCachedSQLdata, Pur&ge cached data
     Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xels data
