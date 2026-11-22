@@ -23,12 +23,14 @@ restarts, open, decision 8 there) and 15.10 (an empty file at the destination; f
 reverted in `9e0b88f` at Marius's request). Nor is the unchecked result of `createSettingsGUI()`
 (:60615), which this panel shares with most panels (56 of 74 at `b4f374f`, counted for that report).
 
-**Status, 2026-11-21.** Finding 1 is fixed in `db1cb15`, by Marius, with his answer to decision 1.
+**Status, 2026-11-22.** Finding 1 is fixed in `db1cb15`, by Marius, with his answer to decision 1.
 Finding 2 is fixed in `db1cb15`, by Marius, and `244b305`, with his answer to decision 2. Findings 4,
 5, 6, 7 and 11 are fixed in `5735d4f`, `5ce0fe8`, `58c1f58`, `16745bf` and `a40adb4`, with his
-answers to decisions 4 to 7 and 11; `e5713d0` completes the fix of finding 7. The other findings are open.
-A fixed section ends with a note on what the code does now; the notes of findings 1 and 2 cite lines
-at `244b305`, the others at `a40adb4`, which `e5713d0` leaves in place.
+answers to decisions 4 to 7 and 11; `e5713d0` completes the fix of finding 7. Findings 13 and 14 are
+fixed in `736b421` and `a6b87ae`, on 2026-11-22, with his answers to decisions 13 and 14. The other findings
+are open. A fixed section ends with a note on what the code does now; the notes of findings 1 and 2
+cite lines at `244b305`, those of findings 4 to 7 and 11 at `a40adb4`, which `e5713d0` leaves in place,
+and those of findings 13 and 14 at `a6b87ae`.
 
 ## Terms
 
@@ -63,7 +65,7 @@ at `244b305`, the others at `a40adb4`, which `e5713d0` leaves in place.
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `e5713d0` |
+| # | Finding | Harm | Checked | Status at `a6b87ae` |
 |---|---------|------|---------|---------------------|
 | 1 | An edited, unsaved image loses its edits when it is moved, without a question | high, narrow | run | **fixed**, `db1cb15` |
 | 2 | A «; » in the destination: the text before it is dropped, so an existing folder is refused and a pattern fills another, new folder | medium | run | **fixed**, `db1cb15`, `244b305` |
@@ -77,15 +79,15 @@ at `244b305`, the others at `a40adb4`, which `e5713d0` leaves in place.
 | 10 | A drive root is refused, although «Browse» and the list offer one | low | run | open |
 | 11 | The list: a click below the rows puts the column title in the field, a double-click there runs «Proceed», and the separator is a row | medium | run | **fixed**, `a40adb4` |
 | 12 | «Proceed» and «Help» share Alt+P: from two buttons it presses «Help» | low | run (Wine) | open |
-| 13 | «Erase history» erases only the saved destinations: the last destination and the other folders stay, with no question | low | run | open |
-| 14 | A rebuilt panel forgets the typed destination and the conflict setting, and «Proceed» comes back enabled on «Choose...» | low | run | open |
+| 13 | «Erase history» erases only the saved destinations: the last destination and the other folders stay, with no question | low | run | **fixed**, `736b421` |
+| 14 | A rebuilt panel forgets the typed destination and the conflict setting, and «Proceed» comes back enabled on «Choose...» | low | run | **fixed**, `a6b87ae` |
 | 15 | «Mark file(s) (Explorer)» puts deleted files on the clipboard and counts them | low | run | open |
 | 16 | Small things, numbered 16.1 to 16.12 | low | run and read | open |
 
 Finding 1 loses work for good. Findings 2 to 5 and 7 send files to a folder the user did not name,
 or fail on a folder the Help promises; the files themselves stay whole. Finding 11 needs nothing more
-than a click or a double-click in the empty part of the list. Findings 1, 2, 4 to 7 and 11 are
-fixed.
+than a click or a double-click in the empty part of the list. Findings 1, 2, 4 to 7, 11, 13 and 14
+are fixed.
 
 ---
 
@@ -601,6 +603,27 @@ settings section is gone; the rebuilt panel shows the last destination in the fi
 six rows, with the last destination first: only the saved destination that no other source named
 went away.
 
+Run at `3b0fd53`, before the fix (batch K): the same, and the panel is a new window (its handle
+changes), which brings finding 14.
+
+**Fixed in `736b421`**, with Marius's answer to decision 13: the button erases the saved destinations
+only, as before, but it asks first, keeps the panel open and says what it did. `EraseCopyMoveHisto()`
+(:61858) answers «The destination folders history is already empty» when the INI holds no saved
+destination, with no question. Otherwise it asks «Do you want to erase the history of destination
+folders?», with a line that names what goes and what stays (:61864); on «Yes» it deletes the section,
+fills the list again in place with `fillCopyMoveDestiesList()` (:60790), the list builder that
+`CopyMovePanelWindow()` calls too, and shows «Destination folders history erased». The field, the
+conflict setting and the action are left alone. Run on the fix (batch L):
+
+- Nothing saved: the notice and no question; the panel and its fields stay.
+- Two saved destinations, «No»: nothing changes, and the INI keeps both.
+- «Yes»: the same window, still the active one; «typed by the user», «Overwrite» and «Copy file(s)»
+  stay; the INI section is gone, and the list goes from six rows to five: `<work>\st\src`, the saved
+  destination that no other source names, leaves it. A click on a row of the refreshed list fills the
+  field.
+- On «Choose...», «Yes»: «Proceed» stays disabled.
+- Two files selected (batch L2): the list ends with the three grouping words, before «Yes» and after.
+
 ---
 
 ## 14. A rebuilt panel forgets the typed destination and the conflict setting
@@ -626,6 +649,31 @@ B3c): «Choose...» picked, «Proceed» disabled; after «Erase history», and a
 (`openPreviousPanel()` :27624), the list still shows «Choose...» and «Proceed» is enabled; a click
 says «Please choose an action to perform: copy or move». The structured panel had this; `3e985a2`
 fixed it there (its 15.3).
+
+Run at `3b0fd53`, before the fix (batch K): the same on the four routes. «Large UI fonts» and «Dark
+mode UI», read above, run too: the field `<work>\st\other` and «Overwrite» come back as the last
+destination and «Skip files». «Cancel» in the conflict box keeps «Ask user» only because «Proceed» has
+stored it already.
+
+**Fixed in `a6b87ae`**, with Marius's answer to decision 14: every rebuild and F8 show the panel as it
+was when it closed. `CloseWindow()` reads panel 9's field and conflict setting before it destroys the
+window (:100280), into `copyMovePanelState()` (:60861), and `CopyMovePanelWindow()` builds from them
+(:60764). The M and C keys, the menus and the toolbar open the panel through `PanelMoveCopyFiles()` and
+`InvokeCopyFiles()`, which ask for a fresh panel (:60722, :60728): the last destination and the last
+«Proceed»'s setting, as before. A last destination or a conflict setting written after the close, by
+«Proceed» or by a quick file action, wins over the saved one. «Cancel» in the conflict box reopens the
+panel through `CopyMovePanelWindow()` (:62147), and «Proceed» is created disabled on «Choose...»
+(:60782). «Erase history» no longer rebuilds the panel (finding 13). Run on the fix (batch L):
+
+- F8 after «Cancel», with «typed before F8», «Auto-rename» and «Choose...»: all three come back, and
+  «Proceed» is disabled.
+- «Cancel» in the conflict box: the field holds the typed `<work>\out`, the setting «Ask user».
+- «Large UI fonts» and «Dark mode UI», each toggled twice: `<work>\st\other` and «Overwrite» stay.
+- A last destination and «Ask user» set after the close, as a quick file action sets them: F8 shows
+  those two. Only the setting set: F8 shows the typed text with the new setting.
+- The M key after a close, and the C key while the panel is open: the last destination and the last
+  setting, not what was typed.
+- «Proceed» copies, then F8: the field shows the destination used, `<work>\out`, with its setting.
 
 ---
 
@@ -734,21 +782,23 @@ file alone goes the same way (read, :3699).
   which is never «quick-actu» there (read).
 - **Ctrl+Backspace in the field**: `allowCtrlBkspEdit()` looks for the DEL character (0x7F) that
   Ctrl+Backspace types; the literal in the source is that character (read).
-- **«Erase history», «Mark» and «Proceed» close the panel with `BtnCloseWindow()`**, which passes
-  «yes» and skips the second during which `CloseWindow()` refuses after a dialog (read).
+- **«Mark» and «Proceed» close the panel with `BtnCloseWindow()`**, which passes «yes» and skips the
+  second during which `CloseWindow()` refuses after a dialog (read). «Erase history» did too, until
+  `736b421`.
 - **Right-clicks** (`SettingsGUIAGuiContextMenu()` :25990-26027, read): on a row of the list the
   field takes the row's folder and no menu opens; below the rows it is the click of finding 11; on
   another control QPV shows a line that describes it, with its text, type and Alt key
   (`SettingsToolTips()` :27465); on the panel's background the generic panel menu opens
   (`invokePrefsPanelsContextMenu()` :27379: «Close panel», «Dark mode UI», «Large UI fonts», the
   settings folder, «Restore ALL defaults», the site, a donation, a new instance, a restart). Its two
-  toggles rebuild the panel (finding 14). The panel has no menu of its own.
+  toggles rebuild the panel, which since `a6b87ae` comes back as it was (finding 14). The panel has no
+  menu of its own.
 
 ---
 
 ## Decisions to make before fixing
 
-Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
+Decisions 1, 2, 4 to 7, 11, 13 and 14 are settled; the others are open.
 
 1. Finding 1: ask with `askAboutFileSave()` in «Proceed» before the panel closes, as `ed8848c` does for
    the structured panel? For a copy too, as `ed8848c` asks there, although a copy keeps the edits?
@@ -777,9 +827,11 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
     `a40adb4`**: yes, and the separator stays in the list as a divider.
 12. Finding 12: which of «Proceed» and «Help» gets another letter, and which one?
 13. Finding 13: should «Erase history» also clear the field and the folders the list takes from other
-    sources, and ask first?
+    sources, and ask first? **Settled in `736b421`**: it asks first, keeps the panel open and says what it
+    did; it erases the saved destinations only, and the last destination stays.
 14. Finding 14: carry the typed destination and the conflict setting into a rebuilt panel, and create
-    «Proceed» disabled on «Choose...», as `3e985a2` for the structured panel?
+    «Proceed» disabled on «Choose...», as `3e985a2` for the structured panel? **Settled in `a6b87ae`**:
+    both, on every rebuild and on F8; a fresh opening starts as before.
 15. Finding 15: leave out deleted entries and missing files, and count only what goes on the clipboard?
 
 ---
@@ -823,23 +875,32 @@ Decisions 1, 2, 4 to 7 and 11 are settled; the others are open.
   link, what the field keeps), run at `e38222f`; batches A, C, G and the new batch H (the fixes' cases)
   again at `e38222f`, with the test file of the fix runs; then A, B, C, E, F, G and H on the fixed
   text. Each of the five commits loads on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
+- The fixes of findings 13 and 14, on 2026-11-22: the new batch K («Erase history», «Choose...» and F8,
+  «Cancel» in the conflict box, the two toggles) at `3b0fd53`; the new batch L (the fixes' cases) on
+  the fixed text, and on the text of `736b421` alone; batch L2 (two files selected) on `a6b87ae`; batch H
+  at `3b0fd53` and twice on the fixed text: the logs differ only in timestamps, window handles and in
+  which conflict boxes show the destination's dimensions, which varies between runs at `3b0fd53` too.
+  Both commits load on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
 - Finding 7's follow-up and two more checks, on 2026-11-21: batch I (what reads `prevFileMovePath`
   after `.\`, `.\resources` and a folder; one file with «Auto-rename» into its own folder) at `2b2835f`
   and on `e5713d0`; batches B and H again on `e5713d0`; the structured kit's batch M at `e38222f` and
   `2b2835f`. `e5713d0` loads as the others do.
-- Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE|testMcF|testMcI
+- Kit: `.claude/scratch/move-copy-panel-2026-11-20/app/`: `run-mc.sh <tag> testMcA|testMcB|testMcC|testMcE|testMcF|testMcI|testMcK|testMcL|testMcL2
   [revision]` (stock interpreter by default; `QPV_SRC=<file>` runs a modified source), and
   `run-link.sh <tag> <revision | ""> testMcG|testMcH` for the two batches that need `<app>\linkdir`, a
   Linux symbolic link to `<work>\st\src` that Wine cannot make. The test functions are in
   `test-mc.ahk` on top of the structured kit's `test-wrappers-sc.ahk`; `patch.py` and `patch-mc.py` add
-  the logging; `closer2.ahk` answers Wine's dialogs, and `mcAutoBoxArm()` (A, C, G, H, I) answers any box
+  the logging; `closer2.ahk` answers Wine's dialogs, and `mcAutoBoxArm()` (A, C, G, H, I, K, L, L2) answers any box
   still up after 3 s, «OK» or a conflict box's «Cancel», and logs it. Logs in `results/` (`a-head`,
   `b-head`, `c-head`, `e-head`; for the fixes `e-db1cb15`, `a-db1cb15`, `f-db1cb15`, `f-fix`, `a-fix`;
   for findings 4 to 7 and 11 `a-e38`, `b-e38`, `c-e38`, `g-e38` and, with the fix runs' test file,
   `a-e38b`, `c-e38b`, `g-e38b`, `h-e38`, then `a-fx`, `b-fx`, `c-fx`, `e-fx`, `f-fx`, `g-fx`, `h-fx`;
   for the follow-up `i-2b2`, `i-fx`, `b-fx2`, `h-fx2`, then `i-2b2b`, `i-fx3` with the structured
-  panel's two «Browse» as well, and `m-e38`, `m-2b2` in the structured kit). Batch I presses those
+  panel's two «Browse» as well, and `m-e38`, `m-2b2` in the structured kit; for findings 13 and 14
+  `k-head`, `h-head`, then `l-s14b`, `h-s14`, `h-s14b`, `l-s13` and `l2-a6b`). Batch I presses those
   with the Move/Copy panel open, and they read its Destination field as their own, so it empties the
   field first. The
-  scripts that wrote the fixes and the report notes are in `../fix-2026-11-21/`.
-  The recent destinations INI is kept from one batch to the next; G and H empty it where they read it.
+  scripts that wrote the fixes and the report notes are in `../fix-2026-11-21/` and
+  `../fix-2026-11-22/`. The recent destinations INI is kept from one batch to the next; G, H, K and L
+  empty it where they read it. Batch B's B3 presses «Erase &history», the name before `07a7600`, so it
+  finds no button now; K and L cover that button.
