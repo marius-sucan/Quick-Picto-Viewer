@@ -28253,9 +28253,8 @@ PanelIndexedImagesStats() {
     Global LViewMetaD, LViewMetaG, LViewMetaU, LViewMetaM, LViewMetaY, LViewMetaS, LViewMetaT, LViewMetaA, LViewMetaI
          , LViewMetaR, StatsUIhistoThingy := 1
 
-    showTOOLtip("Generating image files statistics, please wait")
     If !(thisBtnHeight := createSettingsGUI(48, A_ThisFunc))
-       Return RemoveTooltip()
+       Return
 
     btnWid := 105
     txtWid := 360
@@ -28269,6 +28268,7 @@ PanelIndexedImagesStats() {
     }
 
     changeMcursor()
+    showTOOLtip("Generating image files statistics, please wait")
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Megapixels|Aspect ratios|DPI|Frames|Pixel formats|Histogram
     Gui, Tab, 1
     GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaD -multi AltSubmit gIndexStatsLVaction", "#|MPx|Images|%", "Megapixels")
@@ -28349,10 +28349,8 @@ SwitchUIdlHistoStats() {
 
 PanelIndexedFilesStats() {
     Global LViewMetaD, LViewMetaM, LViewMetaY, LViewMetaS, LViewMetaT
-    showTOOLtip("Generating statistics, please wait")
-    RegAction(0, "uiPreferedFileStats",, 1)
     If !(thisBtnHeight := createSettingsGUI(59, A_ThisFunc))
-       Return RemoveTooltip()
+       Return
 
     btnWid := 105
     txtWid := 360
@@ -28366,6 +28364,8 @@ PanelIndexedFilesStats() {
     }
 
     changeMcursor()
+    RegAction(0, "uiPreferedFileStats",, 1)
+    showTOOLtip("Generating statistics, please wait")
     Gui, Add, Tab3, %tabzDarkModus% gBtnTabsInfoUpdate AltSubmit vCurrentPanelTab Choose%thisPanelTab% hwndhCurrTab, Days|Months|Years|Sizes|Types
     Gui, Tab, 1 ; Daily
     GuiAddListView("x+15 y+15 w" lstWid " +LV0x10000 r" uLVr " Grid vLViewMetaD -multi AltSubmit gIndexStatsLVaction", "#|Date|Images|%", "Files per days")
@@ -93803,7 +93803,6 @@ BTNadjustCanvasAction() {
 
 PanelResizeImageWindow() {
     Global userEditWidth, userEditHeight, ResultEditWidth, ResultEditHeight, btnFldr, editF5
-
     If warnFramesActionPrevented("IMAGE RESIZE")
        Return
 
@@ -101847,14 +101846,14 @@ PanelSimpleResizeRotate(modus:="") {
        Return
     }
 
+    If !(thisBtnHeight := createSettingsGUI(18, A_ThisFunc))
+       Return
+
     If !markedSelectFile
     {
        showTOOLtip("Retrieving file information, please wait")
        GetImgFileDimension(getIDimage(currentFileIndex), oImgW, oImgH, 1, currentFileIndex)
     }
-
-    If !(thisBtnHeight := createSettingsGUI(18, A_ThisFunc))
-       Return RemoveTooltip()
 
     ReadSettingsImageProcessing()
     btnWid := 100
