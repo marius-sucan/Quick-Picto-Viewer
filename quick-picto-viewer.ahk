@@ -91484,14 +91484,14 @@ PanelFindDupes(dummy:=0) {
 
     Gui, Add, Text, xs ys+%dp% w%fingWid% vtxtLine1, Threshold:
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit2 veditF7", userFindDupesHamDistLvl, "Image hash difference threshold")
-    Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range1-15, % userFindDupesHamDistLvl
+    Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range0-15, % userFindDupesHamDistLvl
     GuiAddButton("x+5 w" sml " hp gBtnHelpDupesHashes", " ?", "Help")
     Gui, Add, Checkbox, xs y+15 Checked%findFlippedDupes% vfindFlippedDupes, Identify images horizontally flipped
     Gui, Add, Checkbox, xp y+15 Checked%findInvertedDupes% vfindInvertedDupes, Attempt to identify color inverted images
     Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on hamming distance [similarity]
     Gui, Add, Checkbox, xp y+15 Checked%PerformMSDonDupes% gupdateUIdupesPanel vPerformMSDonDupes, Filter results using Mean-Squared Difference [32x32]
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit3 veditFr", userFindDupesMSElvl, "MSD hash threshold")
-    Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range1-400, % userFindDupesMSElvl
+    Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range0-400, % userFindDupesMSElvl
 
     Gui, Tab, 3
     Gui, Add, Text, x+15 y+15 w%txtWid% Section, These options allow altering how image data is collected. For best results, these settings should be altered only once, before any data is collected. All processes can be interrupted and resumed at any time.
@@ -91503,7 +91503,7 @@ PanelFindDupes(dummy:=0) {
     Gui, Add, Text, xs y+15, For these to take effect, refresh only the image hashes:
     Gui, Add, Checkbox, xs+15 y+15 Checked%userpHashMode% vuserpHashMode, pHashes based on averages, instead of the median values
     Gui, Add, Text, xp y+20 hp +0x200, Compress gray levels by a factor of
-    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit2 veditFc", graylevelCompressor)
+    GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit1 veditFc", graylevelCompressor)
     Gui, Add, UpDown, vgraylevelCompressor gupdateUIdupesPanel Range1-9, % graylevelCompressor
     Gui, Add, Button, xs y+15 h%thisBtnHeight% gBtnPurgeCachedSQLdata, Pur&ge cached data
     Gui, Add, Button, x+5 hp gBtnCollectDupesData, Collect image pi&xels data
@@ -91543,7 +91543,7 @@ BtnCollectDupesData() {
    GuiControlGet, dupesFilterStringIsNot
    GuiControlGet, dupesFilterStringPos
    GuiControlGet, dupesFilterWhat
-   GuiControlGet, graylevelCompressor
+   graylevelCompressor := clampDupesBuddyEdit("editFc", "graylevelCompressor", 1, 9)
    GuiControlGet, findInvertedDupes
    GuiControlGet, userpHashMode
    GuiControlGet, hamDistInterpolation
@@ -91568,8 +91568,8 @@ updateUIimageHashPreview() {
     Gui, SettingsGUIA: Default
     GuiControlGet, thisPreset, SettingsGUIA:, userFindDupePresets
     GuiControlGet, hamType, SettingsGUIA:, userFindDupesFilterHamDist
-    GuiControlGet, lCrop, SettingsGUIA:, hamDistLBorderCrop
-    GuiControlGet, rCrop, SettingsGUIA:, hamDistRBorderCrop
+    lCrop := clampDupesBuddyEdit("editF11", "hamDistLBorderCrop", 0, 9, 1)
+    rCrop := clampDupesBuddyEdit("editF6", "hamDistRBorderCrop", 0, 9, 1)
 
     cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSize, uiboxSize, coreDesiredPixFmt)
     If !validBMP(cornersBMP)
@@ -91626,11 +91626,30 @@ UIfindDupesChecksu() {
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
 }
 
+clampDupesBuddyEdit(editVar, udVar, lo, hi, allowEmpty:=0) {
+   GuiControlGet, v, SettingsGUIA:, %editVar%
+   If (v="" && allowEmpty=1)
+      Return lo
+
+   c := isNumber(v) ? clampInRange(Floor(v), lo, hi) : lo
+   If (v!=c)
+   {
+      GuiControl, SettingsGUIA:, %editVar%, %c%
+      GuiControl, SettingsGUIA:, %udVar%, %c%
+   }
+   Return c
+}
+
 updateUIdupesPanel() {
    If (AnyWindowOpen!=49)
       Return
 
    Gui, SettingsGUIA: Default
+   clampDupesBuddyEdit("editF11", "hamDistLBorderCrop", 0, 9, 1)
+   clampDupesBuddyEdit("editF6", "hamDistRBorderCrop", 0, 9, 1)
+   clampDupesBuddyEdit("editF7", "userFindDupesHamDistLvl", 0, 15, 1)
+   clampDupesBuddyEdit("editFr", "userFindDupesMSElvl", 0, 400, 1)
+   clampDupesBuddyEdit("editFc", "graylevelCompressor", 1, 9, 1)
    GuiControlGet, thisPreset, SettingsGUIA:, userFindDupePresets
    actu := (thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
@@ -91721,17 +91740,17 @@ BTNfindDupesNow() {
    GuiControlGet, dupesFilterStringPos
    GuiControlGet, dupesFilterWhat
    GuiControlGet, excludePreviousDupesFromList
-   GuiControlGet, userFindDupesHamDistLvl
+   userFindDupesHamDistLvl := clampDupesBuddyEdit("editF7", "userFindDupesHamDistLvl", 0, 15)
    GuiControlGet, userFindDupesFilterHamDist
-   GuiControlGet, hamDistLBorderCrop
-   GuiControlGet, hamDistRBorderCrop
-   GuiControlGet, graylevelCompressor
+   hamDistLBorderCrop := clampDupesBuddyEdit("editF11", "hamDistLBorderCrop", 0, 9)
+   hamDistRBorderCrop := clampDupesBuddyEdit("editF6", "hamDistRBorderCrop", 0, 9)
+   graylevelCompressor := clampDupesBuddyEdit("editFc", "graylevelCompressor", 1, 9)
    GuiControlGet, findInvertedDupes
    GuiControlGet, findFlippedDupes
    GuiControlGet, userpHashMode
    GuiControlGet, hamDistInterpolation
    GuiControlGet, PerformMSDonDupes
-   GuiControlGet, userFindDupesMSElvl
+   userFindDupesMSElvl := clampDupesBuddyEdit("editFr", "userFindDupesMSElvl", 0, 400)
    GuiControlGet, dupesApplyBlur
    GuiControlGet, BreakDupesGroups
    findDupesPrecision := dupesPrecisionFromUI(UIfindDupePrecision)
