@@ -69112,11 +69112,10 @@ InvokeMenuBarFind(manuID:=0, justBuild:=0) {
      kMenu("pvMenuBarFind", "Add", "Search and re&place`tCtrl+H", "PanelSearchAndReplaceIndex", "files index list")
      kMenu("pvMenuBarFind", "Add", "&Find duplicate images", "PanelFindDupes")
      kMenu("pvMenuBarFind", "Add", "&Keywords indexer", "PanelKeywordsDetector")
-     If (maxFilesIndex<4)
-     {
+     If (maxFilesIndex<3 && !filesFilter)
         kMenu("pvMenuBarFind", "Disable", "&Find duplicate images", "PanelFindDupes")
+     If (maxFilesIndex<4)
         kMenu("pvMenuBarFind", "Disable", "&Keywords indexer", "PanelKeywordsDetector")
-     }
 
      Menu, pvMenuBarFind, Add
      kMenu("pvMenuBarFind", "Add", "&Define index filter(s)`tCtrl+F", "PanelEnableFilesFilter", "files list")
@@ -72867,6 +72866,8 @@ createMenuFilesIndexOptions() {
 
       Menu, PVfList, Add, 
       kMenu("PVfList", "Add", "&Find duplicate images", "PanelFindDupes")
+      If (maxFilesIndex<3 && !filesFilter)
+         kMenu("PVfList", "Disable", "&Find duplicate images", "PanelFindDupes")
       If (mustPreventMenus=1)
       {
          createMenuStatistics()
@@ -91383,7 +91384,7 @@ PanelFindDupes(dummy:=0) {
     }
 
     If (maxFilesIndex<3 && !filesFilter)
-       Return msgBeepTimer("WARNING: Insufficient indexed files to activate the list view mode")
+       Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
     If (SLDtypeLoaded!=3)
     {
