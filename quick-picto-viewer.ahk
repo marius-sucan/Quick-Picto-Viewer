@@ -91591,8 +91591,9 @@ updateUIimageHashPreview() {
     lCrop := clampDupesBuddyEdit("editF11", "hamDistLBorderCrop", 0, 9, 1)
     rCrop := clampDupesBuddyEdit("editF6", "hamDistRBorderCrop", 0, 9, 1)
     If (A_PtrSize!=8)
+    {
        hamType := 1
-    Else If (thisPreset=1)
+    } Else If (thisPreset=1)
     {
        hamType := 2
        lCrop := rCrop := 1
@@ -91611,7 +91612,7 @@ updateUIimageHashPreview() {
 
     trGdip_GetImageDimensions(cornersBMP, imgW, imgH)
     Gdip_FillRectangle(G, pBrushA, 0, 0, imgW, imgH)
-
+    Gdip_FillRectangle(G, pBrushA, 0, 0, imgW, imgH)
     If (thisPreset=1 || thisPreset=7)
     {
        Loop, 8
