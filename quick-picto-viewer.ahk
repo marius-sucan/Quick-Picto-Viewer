@@ -89197,14 +89197,10 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
    Return 1
 }
 
-; The SELECT dupesQueryBegin() expects, in the exact column order it documents: imgidu,
-; fullPath, imgmegapix, fsize, then the hash, the flipped hash and the pixel fingerprint if
-; they were asked for, then the grouping keys. In one place because it is built twice - once
-; as requested, and once more without the fingerprints when the database is too old to have
-; them. "imgidu" is the one name both tables carry, so it has to be qualified.
-dupesCandidateSQL(includeHash, includePixels, engSelKeys, engWhere, engOrder) {
-   SQLstr := "SELECT images.imgidu, fullPath, imgmegapix, fsize" includeHash includePixels engSelKeys
-   Return SQLstr " FROM images" (includePixels ? SQLpixelsJoinClause() : "") engWhere " ORDER BY " engOrder ";"
+; Candidate SELECT for dupesQueryBegin(); imagesPixels.big is fetched separately
+; by dupesScanBuildFromQuery() only for surviving multi-image candidates.
+dupesCandidateSQL(includeHash, engSelKeys, engWhere, engOrder) {
+   Return "SELECT images.imgidu, fullPath, imgmegapix, fsize" includeHash engSelKeys " FROM images" engWhere " ORDER BY " engOrder ";"
 }
 
 retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, precision:="") {
@@ -89301,13 +89297,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    If !thisNOTnullCol
       thisNOTnullCol := "imgfile"
 
-   ; The 32x32 fingerprint the MSD filter compares. It lives in imagesPixels, a table that
-   ; a database written before SLDB schema v3 does not have at all - so the join for it can
-   ; fail to prepare, and the query below is retried once without it rather than losing the
-   ; whole search over a filter the user can also switch off.
-   includePixels := ""
-   If (PerformMSDonDupes=1 && includeHash)
-      includePixels := ", p.big"
+   wantPixels := (PerformMSDonDupes=1 && includeHash) ? 1 : 0
 
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
@@ -89381,24 +89371,17 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    engOrder := StrLen(SortCriterion)>1 ? engOrderKeys ", " SortCriterion : engOrderKeys ", imgmegapix, fsize"
    engHasHash := includeHash ? 1 : 0
    engHasFlip := (findFlippedDupes=1 && hashB) ? 1 : 0
-   engHasPix := includePixels ? 1 : 0
-   engineSQL := dupesCandidateSQL(includeHash, includePixels, engSelKeys, engWhere, engOrder)
+   engHasPix := wantPixels
+   engineSQL := dupesCandidateSQL(includeHash, engSelKeys, engWhere, engOrder)
    If !DllCall("qpvmain.dll\dupesQueryBegin", "WStr", engineSQL, "int", engKeyCount, "uint", engNocaseMask, "int", engHasHash, "int", engHasFlip, "int", engHasPix, "int", 1024, "int", graylevelCompressor, "int")
    {
       addJournalEntry(A_ThisFunc "(): qpvmain.dll rejected the candidate query:`n" engineSQL "`n" readDupesEngineError())
-      ; A database written before SLDB schema v3 has no imagesPixels table at all, so the
-      ; join that fetches the fingerprints cannot prepare against it. Only the MSD filter
-      ; needs them - the Hamming sweep does not - so the query is worth exactly one retry
-      ; without them before the search is given up on. Anything else that makes
-      ; dupesQueryBegin() refuse is this SELECT disagreeing with the layout the DLL expects,
-      ; and that must not be papered over by trying again.
       gotQuery := 0
-      If includePixels
+      If (wantPixels=1)
       {
          addJournalEntry(A_ThisFunc "(): retrying the query without the pixel fingerprints - the MSD filter will not be applied.")
-         includePixels := ""
+         wantPixels := 0
          engHasPix := 0
-         engineSQL := dupesCandidateSQL(includeHash, includePixels, engSelKeys, engWhere, engOrder)
          gotQuery := DllCall("qpvmain.dll\dupesQueryBegin", "WStr", engineSQL, "int", engKeyCount, "uint", engNocaseMask, "int", engHasHash, "int", engHasFlip, "int", engHasPix, "int", 1024, "int", graylevelCompressor, "int") ? 1 : 0
          If (gotQuery!=1)
             addJournalEntry(A_ThisFunc "(): the retry was refused as well:`n" engineSQL "`n" readDupesEngineError())

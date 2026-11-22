@@ -44,9 +44,9 @@ slice() {
 }
 
 echo "== slicing the shipped sources =="
-slice msd_extract.cpp    "$SRC" '^QPV_FORCEINLINE INT64 msdSumSquares' '^}' 20 || exit 1
-slice msd_score.part     "$SRC" '^QPV_FORCEINLINE int msdScore'        '^}' 3  || exit 1
-cat msd_score.part >> msd_extract.cpp && rm -f msd_score.part
+slice msd_cpu.part       "$SRC" '^\/\/ qpv-cpu-begin'                  '^\/\/ qpv-cpu-end' 15 || exit 1
+slice msd_extract.cpp    "$SRC" '^\/\/ qpv-msd-begin'                  '^\/\/ qpv-msd-end' 25 || exit 1
+cat msd_cpu.part msd_extract.cpp > msd_extract.tmp && mv msd_extract.tmp msd_extract.cpp && rm -f msd_cpu.part
 slice decode_extract.cpp "$SRC" '^static void decodeFingerprintChunk'  '^}' 20 || exit 1
 slice decode_blob.part   "$SRC" '^static void decodeFingerprintBlob'   '^}' 5  || exit 1
 cat decode_blob.part >> decode_extract.cpp && rm -f decode_blob.part
