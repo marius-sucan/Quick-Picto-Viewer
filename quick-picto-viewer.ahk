@@ -160,7 +160,7 @@ Global PVhwnd := 1, hGDIwin := 1, hGDIthumbsWin := 1, pPen4 := "", pPen5 := "", 
    , ThumbsStatusBarH := 0, activeSQLdb := "", SLDtypeLoaded := 0, sldsPattern := "i)(.\.(sld|sldb))$"
    , imgThumbsCacheIDsArray := [], imgThumbsCacheArray := [], viewportIDstampBMP := 0, qpvMainDll, sqlDBrowID := 1
    , prevVPselRotation, prevrotateSelBoundsKeepRatio, prevEllipseSelectMode, currentSelUndoLevel := 1
-   , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := "", hamLowLim := 0, hamUppLim := 0
+   , seenImagesDB := "", mustRecordSeenImgs := 0, hEditField := "", gdiBMPvPsize := "", hamLowLim := 0, hamUppLim := 0, cachedHamDistLvl := ""
    , GDIcacheSRCfileA := "", idGDIcacheSRCfileA := "", GDIcacheSRCfileB := "", idGDIcacheSRCfileB := "", prevOpenedWindow := []
    , simpleOpRotationAngle := 1, UserTextArea := "", hKbdGuia, GDIPbrushHatch := "", highDesiredPixFmt := "0xE200B"
    , runningLongOperation := 0, hasReachedMaxUndoLevels := 0, GIFframesPlayied := 0, allImagesWereSeen := 0
@@ -2647,6 +2647,7 @@ resetMainWin2Welcome() {
      filteredMap2mainList := [] ; used by PanelEnableFilesFilter() and FilterFilesListuIndex()
      ; used by PanelFindDupes()
      toBeExcludedIndexes := [] ; BTNfindDupesNow() and retrieveDupesByProperties()
+     cachedHamDistLvl := ""
      DllCall("qpvmain.dll\dupesClearPairs") ; the pair list lives in qpvmain.dll
      RandyIMGids := [] ; used by random slideshow mode in coreNextPrevImage()
      calcScreenLimits()
@@ -4222,6 +4223,7 @@ remFilesListFilter(modus:=0) {
       addJournalEntry("Removing files list filter:`n" filesFilter)
       prevFilter := filesFilter
       filesFilter := ""
+      cachedHamDistLvl := ""
       DllCall("qpvmain.dll\dupesClearPairs")
       FilterFilesListuIndex(0, prevFilter)
       currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
@@ -33728,6 +33730,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
      bckpResultedFilesList := []
      filteredMap2mainList := []
      toBeExcludedIndexes := []
+     cachedHamDistLvl := ""
      DllCall("qpvmain.dll\dupesClearPairs")
      ; ToolTip, haha , , , 2
      currentFileIndex := clampInRange(bckpCurrentFileIndex, 1, maxFilesIndex)
@@ -47146,18 +47149,19 @@ PanelChangeHamDistThreshold() {
     }
 
     EditWid := Round(btnWid*2.5)
+    maxHamLvl := (cachedHamDistLvl!="") ? cachedHamDistLvl : userFindDupesHamDistLvl
     If !hamUppLim
-       hamUppLim := userFindDupesHamDistLvl
+       hamUppLim := maxHamLvl
 
     UserHamDistCacheFilterMonoGroups := 1
-    Gui, Add, Text, x15 y15 w%txtWid% Section, Please set the range for the Hamming distance threshold. Lower ranges equate to a stricter criteria - more closely looking images. Cached threshold range: 0 - %userFindDupesHamDistLvl%.
+    Gui, Add, Text, x15 y15 w%txtWid% Section, Please set the range for the Hamming distance threshold. Lower ranges equate to a stricter criteria - more closely looking images. Cached threshold range: 0 - %maxHamLvl%.
     Gui, Add, Text, y+15 w%btnWid%, Lower limit:
     Gui, Add, Text, x+15 wp, Upper limit:
     GuiAddEdit("xs y+5 wp number -multi limit2 veditF5", hamLowLim, "Lower limit")
-    Gui, Add, UpDown, vhamLowLim Range0-%userFindDupesHamDistLvl%, % hamLowLim
+    Gui, Add, UpDown, vhamLowLim Range0-%maxHamLvl%, % hamLowLim
 
     GuiAddEdit("x+15 wp number -multi limit2 veditF6", hamUppLim, "Upper limit")
-    Gui, Add, UpDown, vhamUppLim Range0-%userFindDupesHamDistLvl%, % hamUppLim
+    Gui, Add, UpDown, vhamUppLim Range0-%maxHamLvl%, % hamUppLim
 
     sml := (PrefsLargeFonts=1) ? 35 : 25
     Gui, Add, Text, xs y+%sml% vtxtLine1, Mean-Squared Difference threshold:
@@ -88850,19 +88854,15 @@ throwDupesEngineError(funcu, whatu) {
    SoundBeep, 300, 100
 }
 
-filterDupeResultsByHdist(threshold) {
+filterDupeResultsByHdist(threshold, candList, candCount, hadPriorPairs, ByRef groupsFound) {
    ; Drives dupesScanStep() under a time budget over the candidate set retrieveDupesByProperties()
    ; left in qpvmain.dll, so the sweep walks every group itself.
    ; function invoked by retrieveDupesByProperties()
    ;
-   ; The candidate set is always the DLL's: its hashes, its fingerprints, its group boundaries
-   ; and the row IDs it reports pairs by. This function used to be able to build one out of AHK
-   ; arrays instead, for the runs where the candidate query could not execute inside the DLL -
-   ; that path went with the query fallback it existed to serve. See retrieveDupesByProperties().
-   ;
    ; msBudget: how long one dupesScanStep() may run. determineTerminateOperation() is
    ; throttled to 200 ms, 
    Static msBudget := 350
+   groupsFound := 0
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
 
@@ -88880,7 +88880,8 @@ filterDupeResultsByHdist(threshold) {
    totalGroups := statePtr ? NumGet(statePtr + 0, 32, "Int") : 0
    If (totalRows<2 || totalGroups<1)
    {
-      DllCall("qpvmain.dll\dupesClearPairs")
+      If !hadPriorPairs
+         DllCall("qpvmain.dll\dupesClearPairs")
       Return 2
    }
 
@@ -88939,44 +88940,49 @@ filterDupeResultsByHdist(threshold) {
    ; the groups built out of it would be short members nobody could tell were missing.
    ; Read before dupesScanEnd(), which leaves the phase alone either way.
    sweepFailed := (statePtr && NumGet(statePtr + 0, 0, "Int")=-1) ? 1 : 0
+   foundPairs := statePtr ? NumGet(statePtr + 0, 24, "Int64") : 0
    DllCall("qpvmain.dll\dupesScanEnd")
    If (abandonAll=1)
    {
-      DllCall("qpvmain.dll\dupesClearPairs")
+      If !hadPriorPairs
+         DllCall("qpvmain.dll\dupesClearPairs")
       Return 2
    }
 
    If (sweepFailed=1)
    {
-      DllCall("qpvmain.dll\dupesClearPairs")
+      If !hadPriorPairs
+         DllCall("qpvmain.dll\dupesClearPairs")
       addJournalEntry(A_ThisFunc "(): the duplicates sweep ran out of memory and was abandoned. Nothing was kept.")
       SoundBeep, 300, 100
       Return 3
    }
 
-   changeHdistLevelCached("kill")
-   hamLowLim := mseLowLim := 0
-   mseUppLim := userFindDupesMSElvl
-   hamUppLim := threshold
-   UserHamDistStringFilter := ""
-   UserHamDistCacheFilterMonoGroups := 0
+   If (foundPairs<1)
+   {
+      ResetImgLoadStatus()
+      Return 1
+   }
+
    showTOOLtip("Finishing preparing the duplicate images filtered list, please wait")
-   r := changeHdistLevelCached(0, 0, threshold, 0, userFindDupesMSElvl)
+   r := changeHdistLevelCached(0, 0, threshold, 0, userFindDupesMSElvl, candList, candCount, groupsFound)
    ResetImgLoadStatus()
    If (r<1)
       Return 1
 }
 
-changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:=0) {
+changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:=0, srcList:="", srcCount:=0, ByRef groupsFound:=0) {
    ; The pair list stays in qpvmain.dll after the sweep, so re-filtering it is one DllCall
    ; instead of a full interpreted pass.
    ; imgKeep is the part of the filter that cannot move, one byte per image row index: the
    ; search string is a PCRE, retested only when the filter itself changes, where the old
    ; loop re-tested the regex once per surviving PAIR; and the deleted entries.
    Static maskFor := "", imgKeep, keepCount := 0, fltSize := 20, fltMax := 4096, fltBuf
+   groupsFound := 0
    If (modus="kill")
    {
       hasHamDistCached := 0
+      cachedHamDistLvl := ""
       bckpResultedFilesList := []
       filteredMap2mainList := []
       maskFor := ""
@@ -88984,71 +88990,83 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
       Return -1
    }
 
-   If (bckpResultedFilesList.Count()<3)
+   isFresh := IsObject(srcList) ? 1 : 0
+   If (isFresh=1)
    {
-      hasHamDistCached := 1
-      If markedSelectFile
-         dropFilesSelection()
-
-      bckpResultedFilesList := []
-      bckpResultedFilesList := resultedFilesList.Clone()
-      bckpMaxFilesIndex := maxFilesIndex
-   }
-
-   thisString := StrReplace(Trimmer(UserHamDistStringFilter), "||", "|")
-   thisString := Trimmer(thisString, "|")
-   If thisString
+      localKeepCount := srcCount + 1
+      VarSetCapacity(localKeep, localKeepCount + 1, 0)
+      Loop, % srcCount
+      {
+         imgPath := srcList[A_Index, 1]
+         gone := (!imgPath || InStr(imgPath, "||")) ? 2 : 0
+         NumPut(1 | gone, localKeep, A_Index, "UChar")
+      }
+      newIndex := DllCall("qpvmain.dll\dupesApplyFilter", "int", newLvlA, "int", newLvlB, "int", newLvlMSEa, "int", newLvlMSEb, "int", BreakDupesGroups, "int", 0, "UPtr", &localKeep, "uint", localKeepCount, "uint")
+   } Else
    {
-      If (userHamDistStringStringPos=4)   ; RegEx: «/» and «>» belong to the pattern
-         n := 0
-      Else If InStr(thisString, "/")
-         n := 2
-      Else If InStr(thisString, ">")
-         n := 3
+      If (bckpResultedFilesList.Count()<2)
+      {
+         hasHamDistCached := 1
+         If markedSelectFile
+            dropFilesSelection()
 
-      If (userHamDistStringStringPos=2 && !n)
-         thisString .= "/"
-      Else If (userHamDistStringStringPos=3 && !n)
-         thisString .= ">"
-      Else If (userHamDistStringStringPos=4)
-         thisString := "\>" thisString
-      givenRegEx := processSearchIndexString(thisString)
-      If n
-         userHamDistStringStringPos := n
-   }
+         bckpResultedFilesList := []
+         bckpResultedFilesList := resultedFilesList.Clone()
+         bckpMaxFilesIndex := maxFilesIndex
+      }
 
-   isStrFilter := StrLen(thisString)>1 ? 1 : 0
-   maskKey := isStrFilter "|" thisString "|" userHamDistStringFilterWhat "|" UserHamDistStringInvert "|" bckpMaxFilesIndex
-   If (maskFor!=maskKey)
-   {
-      ; index 0 is unused: image row indexes are 1-based, and the DLL rejects any pair
-      ; whose first image falls outside the mask; bit 1 = the path passes the string filter
-      keepCount := bckpMaxFilesIndex + 1
-      VarSetCapacity(imgKeep, keepCount + 1, 0)
+      thisString := StrReplace(Trimmer(UserHamDistStringFilter), "||", "|")
+      thisString := Trimmer(thisString, "|")
+      If thisString
+      {
+         If (userHamDistStringStringPos=4)   ; RegEx: «/» and «>» belong to the pattern
+            n := 0
+         Else If InStr(thisString, "/")
+            n := 2
+         Else If InStr(thisString, ">")
+            n := 3
+
+         If (userHamDistStringStringPos=2 && !n)
+            thisString .= "/"
+         Else If (userHamDistStringStringPos=3 && !n)
+            thisString .= ">"
+         Else If (userHamDistStringStringPos=4)
+            thisString := "\>" thisString
+         givenRegEx := processSearchIndexString(thisString)
+         If n
+            userHamDistStringStringPos := n
+      }
+
+      isStrFilter := StrLen(thisString)>1 ? 1 : 0
+      maskKey := isStrFilter "|" thisString "|" userHamDistStringFilterWhat "|" UserHamDistStringInvert "|" bckpMaxFilesIndex
+      If (maskFor!=maskKey)
+      {
+         ; index 0 is unused: image row indexes are 1-based, and the DLL rejects any pair
+         ; whose first image falls outside the mask; bit 1 = the path passes the string filter
+         keepCount := bckpMaxFilesIndex + 1
+         VarSetCapacity(imgKeep, keepCount + 1, 0)
+         Loop, % bckpMaxFilesIndex
+         {
+             okay := 1
+             If (isStrFilter=1)
+                okay := coreSearchIndex(bckpResultedFilesList[A_Index, 1], givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert) ? 1 : 0
+
+             NumPut(okay, imgKeep, A_Index, "UChar")
+         }
+         maskFor := maskKey
+      }
+
+      ; bit 2 = a deleted entry, refreshed on every pass: it still links its group, but is not listed
       Loop, % bckpMaxFilesIndex
       {
-          okay := 1
-          If (isStrFilter=1)
-             okay := coreSearchIndex(bckpResultedFilesList[A_Index, 1], givenRegEx, userHamDistStringFilterWhat, UserHamDistStringInvert) ? 1 : 0
-
-          NumPut(okay, imgKeep, A_Index, "UChar")
+          imgPath := bckpResultedFilesList[A_Index, 1]
+          gone := (!imgPath || InStr(imgPath, "||")) ? 2 : 0
+          NumPut((NumGet(imgKeep, A_Index, "UChar") & 1) | gone, imgKeep, A_Index, "UChar")
       }
-      maskFor := maskKey
+
+      newIndex := DllCall("qpvmain.dll\dupesApplyFilter", "int", newLvlA, "int", newLvlB, "int", newLvlMSEa, "int", newLvlMSEb, "int", BreakDupesGroups, "int", UserHamDistCacheFilterMonoGroups, "UPtr", &imgKeep, "uint", keepCount, "uint")
    }
 
-   ; bit 2 = a deleted entry, refreshed on every pass: it still links its group, but is not listed
-   Loop, % bckpMaxFilesIndex
-   {
-       imgPath := bckpResultedFilesList[A_Index, 1]
-       gone := (!imgPath || InStr(imgPath, "||")) ? 2 : 0
-       NumPut((NumGet(imgKeep, A_Index, "UChar") & 1) | gone, imgKeep, A_Index, "UChar")
-   }
-
-   ; BreakDupesGroups deliberately splits the groups by similarity, so the DLL keeps the
-   ; old incremental single-pass labelling for it; otherwise the surviving pairs are
-   ; unioned, with the smallest image index always winning as the root so that two
-   ; identical scans of the same library cannot come back with different groups.
-   newIndex := DllCall("qpvmain.dll\dupesApplyFilter", "int", newLvlA, "int", newLvlB, "int", newLvlMSEa, "int", newLvlMSEb, "int", BreakDupesGroups, "int", UserHamDistCacheFilterMonoGroups, "UPtr", &imgKeep, "uint", keepCount, "uint")
    If (newIndex<2 || newIndex="")
       Return 0
 
@@ -89060,6 +89078,7 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
    newMappingList := []
    thisIndex := 0
    firstu := 0
+   prevGrpID := ""
    Loop
    {
       gotu := DllCall("qpvmain.dll\dupesFetchFiltered", "UPtr", &fltBuf, "uint", firstu, "uint", fltMax, "uint")
@@ -89070,15 +89089,20 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
       {
           offu := (A_Index - 1) * fltSize
           idu := NumGet(fltBuf, offu, "UInt")
-          ; Object.Clone() is shallow, so bckpResultedFilesList shares its row objects with
-          ; resultedFilesList; the row has to be cloned before columns 2/23/33/34 are
-          ; written or the next pass would start from this one's values.
-          rowu := bckpResultedFilesList[idu].Clone()
+          srcRow := isFresh ? srcList[idu] : bckpResultedFilesList[idu]
+          rowu := IsObject(srcRow) ? srcRow.Clone() : ""
           If !IsObject(rowu)
              Continue
 
+          grpID := NumGet(fltBuf, offu + 4, "UInt") "_" NumGet(fltBuf, offu + 8, "UInt")
+          If (grpID!=prevGrpID)
+          {
+             groupsFound++
+             prevGrpID := grpID
+          }
+
           rowu[2] := 0
-          rowu[23] := NumGet(fltBuf, offu + 4, "UInt") "_" NumGet(fltBuf, offu + 8, "UInt")
+          rowu[23] := grpID
           rowu[33] := NumGet(fltBuf, offu + 12, "UInt")
           rowu[34] := NumGet(fltBuf, offu + 16, "UInt")
           If (PerformMSDonDupes=1)
@@ -89096,6 +89120,21 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
 
    If (thisIndex<2)
       Return 0
+
+   If (isFresh=1)
+   {
+      renewCurrentFilesList()
+      bckpResultedFilesList := srcList
+      bckpMaxFilesIndex := srcCount
+      maskFor := ""
+      keepCount := 0
+      hamLowLim := mseLowLim := 0
+      hamUppLim := newLvlB
+      mseUppLim := newLvlMSEb
+      cachedHamDistLvl := newLvlB
+      UserHamDistStringFilter := ""
+      UserHamDistCacheFilterMonoGroups := 0
+   }
 
    maxFilesIndex := thisIndex
    resultedFilesList := []
@@ -89129,9 +89168,11 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    Static prevMode, notFloatsRegEX := "i)(fcreated|fmodified|fsize|imgfile|dHash|lHash|pHash|imgwidth|imgheight|imgframes|imgdpi|imgpixfmt)"
         , rowSize := 32, fetchRows := 2048, rowsBuf, enginePath := "", prevPrecision := 5
    If SortCriterion
+   {
       theseCols := prevMode
-   Else
-      prevPrecision := (precision!="") ? precision : findDupesPrecision
+      usePrecision := prevPrecision
+   } Else
+      usePrecision := (precision!="") ? precision : findDupesPrecision
 
    If (RegExMatch(theseCols, "i)(dHash)") || userFindDupesFilterHamDist=2)
       thisNOTnullCol := "dHash"
@@ -89192,7 +89233,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       theseCols := StrReplace(theseCols, ", ,", ",")
    }
 
-   prevMode := theseCols
+   searchCols := theseCols
    includeHash := (userFindDupesFilterHamDist=2) ? ", dHash" : ""
    If (userFindDupesFilterHamDist=3)
       includeHash := ", pHash"
@@ -89227,6 +89268,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       Return -1
    }
 
+   hadPriorPairs := (hasHamDistCached=1 && DllCall("qpvmain.dll\dupesPairCount", "uint")>0) ? 1 : 0
    If (DllCall("qpvmain.dll\dupesEngineReady", "int")!=1 || enginePath!=activeSQLdb._Path)
    {
       enginePath := ""
@@ -89245,7 +89287,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    engNocaseMask := 0
    engSelKeys := ""
    engOrderKeys := ""
-   Loop, Parse, % prevMode, CSV
+   Loop, Parse, % searchCols, CSV
    {
       If !A_LoopField
          Continue
@@ -89254,7 +89296,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       ; imgmegapix by the schema, the histogram statistics by the collection pool, kbfsize
       ; at one), so 5 leaves every value as it is and only 2 and 1 widen the buckets - the
       ; panel offers exactly those three as Exact / Close / Loose.
-      engExpr := !RegExMatch(A_LoopField, notFloatsRegEX) ? "Round(" A_LoopField "," prevPrecision ")" : A_LoopField
+      engExpr := !RegExMatch(A_LoopField, notFloatsRegEX) ? "Round(" A_LoopField "," usePrecision ")" : A_LoopField
       engSelKeys .= ", " engExpr " AS k" engKeyCount
       engOrderKeys .= (engKeyCount ? ", " : "") "k" engKeyCount
       ; imgfile and imgpixfmt are declared COLLATE NOCASE, so SQLite groups and
@@ -89370,13 +89412,6 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    }
 
    showTOOLtip("Found " groupDigits(totalCandidates) " duplicate images`nGenerating the files list, please wait")
-   If !filesFilter
-      bckpMaxFilesIndex := maxFilesIndex   
-
-   backupArray := resultedFilesList.Clone()
-   backupFilter := filesFilter
-   backupIndexu := currentFileIndex
-   renewCurrentFilesList()
    givenRegEx := ""
    thisString := ""
    Loop, Parse, dupesStringFilter, |
@@ -89403,6 +89438,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    backCurrentSLD := CurrentSLD
    CurrentSLD := ""
    groupies := []
+   candList := []
+   candCount := 0
    totalFiles := totalCandidates
    builtCandidates := 0
    ; The DLL already holds the hashes and the fingerprints, decoded; nothing about
@@ -89417,7 +89454,6 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
 
    VarSetCapacity(keepMask, totalCandidates + 1, 1)
    pathBuf := DllCall("qpvmain.dll\dupesGetPathBuffer", "UPtr")
-   idBase := maxFilesIndex
    firstu := 0
    Loop
    {
@@ -89458,26 +89494,23 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
 
           grpIDu := NumGet(rowsBuf, offu + 24, "UInt")
           groupies[grpIDu] := groupies.HasKey(grpIDu) ? groupies[grpIDu] + 1 : 1
-          maxFilesIndex++
-          resultedFilesList[maxFilesIndex, 1]  := thisPath
-          resultedFilesList[maxFilesIndex, 12] := imgIDu   ; sqlDBrowID
-          resultedFilesList[maxFilesIndex, 17] := NumGet(rowsBuf, offu + 16, "Double")
-          resultedFilesList[maxFilesIndex, 6]  := NumGet(rowsBuf, offu + 8, "Int64")
-          resultedFilesList[maxFilesIndex, 23] := grpIDu   ; initial dupe group ID
-          ; the Hamming distance and the MSD a row starts at, before the sweep scores it.
-          ; Seeded here because filterDupeResultsByHdist() no longer walks the list at all -
-          ; it only drives the sweep over the candidate set the DLL already holds.
-          resultedFilesList[maxFilesIndex, 33] := 100
-          resultedFilesList[maxFilesIndex, 34] := 2500
+          candCount++
+          candList[candCount, 1]  := thisPath
+          candList[candCount, 12] := imgIDu   ; sqlDBrowID
+          candList[candCount, 17] := NumGet(rowsBuf, offu + 16, "Double")
+          candList[candCount, 6]  := NumGet(rowsBuf, offu + 8, "Int64")
+          candList[candCount, 23] := grpIDu   ; initial dupe group ID
+          candList[candCount, 33] := 100
+          candList[candCount, 34] := 2500
       }
       firstu += gotu
    }
 
    useHashes := (userFindDupesFilterHamDist>1 && includeHash) ? 1 : 0
    validGroups := 0
-   If (useHashes=1 && abandonAll!=1 && maxFilesIndex>1)
-      builtCandidates := DllCall("qpvmain.dll\dupesScanBuildFromQuery", "UPtr", &keepMask, "uint", totalCandidates, "uint", idBase, "int")
-   Else If (useHashes!=1 && abandonAll!=1 && maxFilesIndex>0)
+   If (useHashes=1 && abandonAll!=1 && candCount>1)
+      builtCandidates := DllCall("qpvmain.dll\dupesScanBuildFromQuery", "UPtr", &keepMask, "uint", totalCandidates, "uint", 0, "int")
+   Else If (useHashes!=1 && abandonAll!=1 && candCount>0)
    {
       hasSingleton := 0
       For k, v in groupies
@@ -89491,63 +89524,44 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       {
          newArr := []
          newIdx := 0
-         Loop, % maxFilesIndex
+         Loop, % candCount
          {
-            If (groupies[resultedFilesList[A_Index, 23]]>1)
+            If (groupies[candList[A_Index, 23]]>1)
             {
                newIdx++
-               newArr[newIdx] := resultedFilesList[A_Index]
+               newArr[newIdx] := candList[A_Index]
             }
          }
-         resultedFilesList := newArr
-         maxFilesIndex := newIdx
+         candList := newArr
+         candCount := newIdx
       }
    }
 
    keepMask := ""
    DllCall("qpvmain.dll\dupesEngineRelease")
    enginePath := ""
-   keptPairs := 0
-   If (useHashes=1 && maxFilesIndex>1 && abandonAll!=1)
+   r := 0
+   groupsFound := 0
+   If (useHashes=1 && candCount>1 && abandonAll!=1)
    {
-      ; builtCandidates=0 means the DLL ran the query but built no candidate set out of it:
-      ; the keep mask left fewer than two comparable images. There is nothing to sweep.
+      ; builtCandidates=0 means the keep mask left fewer than two comparable images
       If (builtCandidates!=1)
-      {
          r := 1
-      } Else
-      {
-         r := filterDupeResultsByHdist(userFindDupesHamDistLvl)
-         ; "" means the filtered list is live: the pair list has to stay in the DLL so the
-         ; similarity sliders can re-filter it without rescanning
-         keptPairs := (r="") ? 1 : 0
-      }
+      Else
+         r := filterDupeResultsByHdist(userFindDupesHamDistLvl, candList, candCount, hadPriorPairs, groupsFound)
    }
 
-   If (keptPairs!=1)
-      DllCall("qpvmain.dll\dupesClearPairs")
-
-   userFilterInvertThis := userFilterDoString := 0
-   currentFileIndex := userFilterProperty := 1
-   ; testIsDupesList() - and through it every duplicates action in the application -
-   ; recognises a duplicates list by the "SQL:query:JOIN" this string opens with. It used
-   ; to be a slice of the self-join that discovered the groups; that query is gone, so the
-   ; marker is spelled out and the engine's own grouping keys and WHERE say what it stood
-   ; for. Nothing parses it back: only the "SQL:query:WHERE" filters are ever re-executed.
-   filesFilter := "SQL:query:JOIN (GROUP BY " prevMode ")" StrReplace(engWhere, "images.", "")
-   ; ToolTip, % filesFilter , , , 2
    CurrentSLD := backCurrentSLD
-   etaTime := "Elapsed time to identify possible image duplicates: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
-   addJournalEntry(etaTime)
    SetTimer, ResetImgLoadStatus, -100
-   If (maxFilesIndex<2 || abandonAll=1 || r>0)
+   failedSearch := (abandonAll=1 || r>0 || (useHashes=1 && r!="") || (useHashes!=1 && candCount<2)) ? 1 : 0
+   If (failedSearch=1)
    {
-      maxFilesIndex := backupArray.Count()
-      filesFilter := backupFilter
-      currentFileIndex := backupIndexu
-      resultedFilesList := []
-      resultedFilesList := backupArray.Clone()
-      backupArray := ""
+      If !hadPriorPairs
+         DllCall("qpvmain.dll\dupesClearPairs")
+      Else
+         DllCall("qpvmain.dll\dupesScanEnd")
+      etaTime := "Elapsed time to identify possible image duplicates: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: 0"
+      addJournalEntry(etaTime)
       If (abandonAll=1 || r=2)
          msgBeepTimer("User abandoned image duplicates identification")
       Else If (r=3)
@@ -89558,16 +89572,30 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       If !SortCriterion
          SetTimer, PanelFindDupes, -350
       Return
-   } Else
-      SoundBeep , 900, 100
+   }
 
-   ; SetTimer, RemoveTooltip, % -msgDisplayTime
-   backupArray := ""
-   groupsFound := useHashes ? groupies.Count() : validGroups
+   If (useHashes!=1)
+   {
+      If !filesFilter
+         bckpMaxFilesIndex := maxFilesIndex
+      renewCurrentFilesList()
+      changeHdistLevelCached("kill")
+      DllCall("qpvmain.dll\dupesClearPairs")
+      resultedFilesList := candList
+      maxFilesIndex := candCount
+      groupsFound := validGroups
+   }
+
+   prevMode := searchCols
+   prevPrecision := usePrecision
+   userFilterInvertThis := userFilterDoString := 0
+   currentFileIndex := userFilterProperty := 1
+   filesFilter := "SQL:query:JOIN (GROUP BY " prevMode ")" StrReplace(engWhere, "images.", "")
+   etaTime := "Elapsed time to identify possible image duplicates: " SecToHHMMSS(Round((A_TickCount - startOperation)/1000, 3)) ". Files: " maxFilesIndex
+   addJournalEntry(etaTime)
+   SoundBeep , 900, 100
    showDelayedTooltip("Found " groupDigits(groupsFound) " groups of duplicate images`nTotal images: " groupDigits(maxFilesIndex))
-   ; ToolTip, % "x=" x , , , 2
    dummyTimerDelayiedImageDisplay(90)
-   ; RandomPicture()
    If !SortCriterion
       CreateTempGuiButton("Auto-select duplicates,,PanelAutoSelectDupes||Remove filter,,MenuRemNowFilesListFilter", 0)
 }

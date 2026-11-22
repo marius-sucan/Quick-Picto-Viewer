@@ -744,6 +744,98 @@ static void hashGenerationEndsWhenWritesFail(const char *dbPath, bool keyset) {
     if (system(cmd)) {}
 }
 
+static void pairsCacheSurvivesFailedSearch() {
+    const std::vector<std::string> cols = split("imgwhratio,imgframes", ',');
+    const std::wstring sqlMSD = widen(newSQL(cols, 1, "dHash", true, false, true));
+    const std::wstring sqlNoMSD = widen(newSQL(cols, 1, "dHash", true, false, false));
+
+    dupesClearPairs();
+    dupesQueryBegin(sqlMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 1, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesScanBuildFromQuery(NULL, 0, 0)==1, "initial MSD search builds candidates");
+    while (dupesScanStep(12, 0, 0, 0, 0, 50)) {}
+    dupesScanEnd();
+    const UINT initialRows = dupesApplyFilter(0, 12, 0, 400, 0, 0, NULL, 0);
+    const UINT basePairs = dupesPairCount();
+    const int baseMSD = dupesHaveMSD();
+    const std::vector<DupePairRec> baseList = dupesPairsList;
+    check(initialRows >= 2 && basePairs > 0 && baseMSD==1, "initial search leaves a live MSD pair cache");
+
+    // 1. Bad SQL in dupesQueryBegin() keeps existing pairs intact.
+    check(dupesQueryBegin(L"SELECT nope FROM nothing", 1, 0, 0, 0, 0, 0, 1)==0, "bad SQL is rejected");
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD, "bad query preserves cached pairs and MSD flag");
+
+    // 2. Cancelled dupesQueryStep() keeps existing pairs intact.
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    dupesEngineCancel();
+    check(dupesQueryStep(150)==-1, "cancelled query fails");
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD, "cancelled query preserves cached pairs");
+
+    // 3. Empty keep mask (dupesScanBuildFromQuery returns 0) keeps existing pairs intact.
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    std::vector<unsigned char> none(dupesQueryRowCount(), 0);
+    check(dupesScanBuildFromQuery(none.data(), (UINT)none.size(), 0)==0, "empty keep mask refuses build");
+    dupesScanEnd();
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD, "empty keep mask + dupesScanEnd preserves cached pairs");
+
+    // 4. Sweep that finds 0 pairs restores the previous cache on dupesScanEnd().
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesScanBuildFromQuery(NULL, 0, 0)==1, "zero-match sweep builds candidates");
+    while (dupesScanStep(0, 0, 0, 0, 0, 50)) {}
+    check(dupesScanState.pairs==0, "threshold 0 sweep finds zero pairs");
+    dupesScanEnd();
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD && !dupesHasSavedPairs,
+          "zero-match sweep restores cached pairs on dupesScanEnd");
+
+    // 5. Mid-sweep abort (phase != 5 at dupesScanEnd) restores the previous cache.
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesScanBuildFromQuery(NULL, 0, 0)==1, "aborted sweep builds candidates");
+    dupesScanState.phase = 3;
+    dupesScanEnd();
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD && !dupesHasSavedPairs,
+          "aborted sweep restores cached pairs on dupesScanEnd");
+
+    // 6. Sweep with pairs that all fail dupesApplyFilter() restores the previous cache.
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesScanBuildFromQuery(NULL, 0, 0)==1, "post-sweep empty-filter search builds candidates");
+    while (dupesScanStep(12, 0, 0, 0, 0, 50)) {}
+    dupesScanEnd();
+    check(dupesApplyFilter(64, 64, 0, 400, 0, 0, NULL, 0)==0, "impossible filter drops all rows");
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD && !dupesHasSavedPairs &&
+          memcmp(dupesPairsList.data(), baseList.data(), baseList.size() * sizeof(DupePairRec))==0,
+          "failed dupesApplyFilter restores cached pairs byte for byte");
+
+    // 7. Ctrl+F re-filter with 0 matches (no saved backup) keeps the live cache intact.
+    check(dupesApplyFilter(64, 64, 0, 400, 0, 0, NULL, 0)==0, "impossible Ctrl+F filter drops all rows");
+    check(dupesPairCount()==basePairs && dupesHaveMSD()==baseMSD, "failed Ctrl+F filter keeps live cache");
+
+    // 8. A successful second search commits the new pairs and drops the saved backup.
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesScanBuildFromQuery(NULL, 0, 0)==1, "second search builds candidates");
+    while (dupesScanStep(12, 0, 0, 0, 0, 50)) {}
+    dupesScanEnd();
+    check(dupesApplyFilter(0, 12, 0, 400, 0, 0, NULL, 0) >= 2, "second search succeeds");
+    check(dupesHaveMSD()==0 && !dupesHasSavedPairs && dupesSavedPairs.empty(),
+          "successful second search commits new MSD flag and drops backup");
+
+    // 9. Aborted first search with no prior cache clears partial pairs on dupesScanEnd().
+    dupesClearPairs();
+    dupesQueryBegin(sqlNoMSD.c_str(), (int)cols.size(), nocaseMaskFor(cols), 1, 0, 0, 1024, 1);
+    while (dupesQueryStep(150) > 0) {}
+    check(dupesScanBuildFromQuery(NULL, 0, 0)==1, "fresh aborted search builds candidates");
+    dupesPairsList.push_back({1, 2, 0, QPV_MSD_NONE});
+    dupesScanState.phase = 3;
+    dupesScanEnd();
+    check(dupesPairCount()==0 && dupesHaveMSD()==0, "aborted fresh sweep discards partial pairs");
+
+    dupesClearPairs();
+}
+
 int main(int argc, char **argv) {
     const char *dbPath = (argc > 1) ? argv[1] : "testdb.sldb";
 
@@ -773,6 +865,8 @@ int main(int argc, char **argv) {
     printf("  cancellation and bad input\n");
     cancelStopsTheQuery();
     rejectsBadInput();
+    printf("  pairs cache across failed searches\n");
+    pairsCacheSurvivesFailedSearch();
     // both query shapes, every time: the keyset cursor the interpreter sends this build,
     // and the plain LIMIT it falls back to for a qpvmain.dll without dupesHashHasKeyset()
     for ( int pass = 0 ; pass < 2 ; pass++)

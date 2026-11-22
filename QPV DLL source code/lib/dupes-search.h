@@ -71,6 +71,10 @@ struct DupePairRec {      // 16 bytes; AHK NumGet()s the fields at 0/4/8/12
 
 std::vector<DupePairRec>    dupesPairsList;
 int                         dupesPairsMSD = 0;   // 1 when the sweep that filled dupesPairsList computed MSD scores
+std::vector<DupePairRec>    dupesSavedPairs;
+int                         dupesSavedMSD = 0;
+bool                        dupesHasSavedPairs = false;
+bool                        dupesSweepActive = false;
 std::vector<unsigned char>  dupesPixData;   // decoded fingerprints, arraySize * dupesPixStride
 std::vector<unsigned char>  dupesPixOK;     // 1 when that index carries a usable fingerprint
 UINT                        dupesPixStride = 0;
@@ -310,12 +314,30 @@ void dupesQueryFreeRows();
 // down. Forward-declared so the two release paths above the sweep can hand them back.
 static void dupesSweepReleaseScratch();
 
+static void dupesDropSavedPairs() {
+    dupesSavedPairs.clear();
+    dupesSavedPairs.shrink_to_fit();
+    dupesSavedMSD = 0;
+    dupesHasSavedPairs = false;
+}
+
+static void dupesRestoreSavedPairs() {
+    if (!dupesHasSavedPairs)
+       return;
+
+    dupesPairsList.swap(dupesSavedPairs);
+    dupesPairsMSD = dupesSavedMSD;
+    dupesDropSavedPairs();
+}
+
 // Releases everything the duplicate scan holds. AHK calls it on every exit path from
 // filterDupeResultsByHdist(), including the abandoned ones: a partially read pair list
 // would otherwise be handed to the next scan ahead of its own results.
 DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     dupesQueryFreeRows();
     dupesSweepReleaseScratch();
+    dupesDropSavedPairs();
+    dupesSweepActive = false;
     dupesFilterRows.clear();
     dupesFilterRows.shrink_to_fit();
     dupesPairsList.clear();
@@ -1008,6 +1030,8 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
     dupesScanRowEnd.clear();
     dupesPixData.clear();
     dupesPixOK.clear();
+    dupesDropSavedPairs();
+    dupesSweepActive = false;
     dupesPairsList.clear();
     dupesPairsMSD = 0;
     dupesPairsRead = 0;
@@ -1052,6 +1076,7 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
     }
 
     dupesScanRows = rows;
+    dupesSweepActive = true;
     dupesScanState.phase = 1;
     dupesScanState.rows = (LONG)rows;
     return 1;
@@ -1298,6 +1323,18 @@ DLL_API int DLL_CALLCONV dupesScanEnd() {
     dupesScanWantMSD = 0;
     dupesScanOuter = 0;
     dupesScanBlock = 0;
+    if (dupesHasSavedPairs)
+    {
+       if (dupesScanState.phase!=5 || dupesPairsList.empty())
+          dupesRestoreSavedPairs();
+    }
+    else if (dupesSweepActive && dupesScanState.phase!=5)
+    {
+       dupesPairsList.clear();
+       dupesPairsList.shrink_to_fit();
+       dupesPairsMSD = 0;
+    }
+    dupesSweepActive = false;
     if (dupesScanState.phase!=-1)
        dupesScanState.phase = 0;
 
@@ -1374,7 +1411,10 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
     dupesFilterRows.clear();
     const size_t n = dupesPairsList.size();
     if (n < 1)
+    {
+       dupesRestoreSavedPairs();
        return 0;
+    }
 
     // the bounds come in either order, as AHK's isInRange() took them
     if (hamLo > hamHi)
@@ -1411,7 +1451,10 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
     }
 
     if (kept.empty())
+    {
+       dupesRestoreSavedPairs();
        return 0;
+    }
 
     const UINT NONE = 0xFFFFFFFFu;
     std::vector<UINT> rowRoot(maxId + 1, NONE), rowTag(maxId + 1, 0);
@@ -1560,6 +1603,11 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
         row.mse = (imgMSE[idu]!=NONE) ? imgMSE[idu] : QPV_MSD_NONE;
         dupesFilterRows.push_back(row);
     }
+
+    if (dupesFilterRows.size() >= 2)
+       dupesDropSavedPairs();
+    else
+       dupesRestoreSavedPairs();
 
     return (UINT)dupesFilterRows.size();
 }
@@ -1901,8 +1949,8 @@ static void dupesQueryReset() {
     dupesScanRowEnd.clear();
     dupesPixData.clear();
     dupesPixOK.clear();
-    dupesPairsList.clear();
-    dupesPairsMSD = 0;
+    dupesSweepActive = false;
+    dupesRestoreSavedPairs();
     dupesKeyCur.clear();
     dupesKeyPrev.clear();
     dupesPairsRead = 0;
@@ -2311,6 +2359,16 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
         comparisons += m * (m - 1) / 2;
     }
 
+    if (!dupesHasSavedPairs && !dupesPairsList.empty())
+    {
+       dupesSavedPairs.swap(dupesPairsList);
+       dupesSavedMSD = dupesPairsMSD;
+       dupesHasSavedPairs = true;
+    }
+    dupesPairsList.clear();
+    dupesPairsMSD = 0;
+    dupesPairsRead = 0;
+    dupesSweepActive = true;
     dupesScanState.groups = (LONG)(dupesScanGroupStart.size() - 1);
     dupesScanState.total = comparisons;
     dupesScanState.done = 0;
