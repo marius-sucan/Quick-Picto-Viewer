@@ -91504,14 +91504,14 @@ PanelFindDupes(dummy:=0) {
 
     Gui, Add, Text, xs ys+%dp% w%fingWid% vtxtLine1, Threshold:
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit2 veditF7", userFindDupesHamDistLvl, "Image hash difference threshold")
-    Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range1-15, % userFindDupesHamDistLvl
+    Gui, Add, UpDown, vuserFindDupesHamDistLvl gupdateUIdupesPanel Range0-15, % userFindDupesHamDistLvl
     GuiAddButton("x+5 w" sml " hp gBtnHelpDupesHashes", " ?", "Help")
     Gui, Add, Checkbox, xs y+15 Checked%findFlippedDupes% vfindFlippedDupes, Identify images horizontally flipped
     Gui, Add, Checkbox, xp y+15 Checked%findInvertedDupes% vfindInvertedDupes, Attempt to identify color inverted images
     Gui, Add, Checkbox, xs y+15 Checked%BreakDupesGroups%  vBreakDupesGroups, Break the groups based on hamming distance [similarity]
     Gui, Add, Checkbox, xp y+15 Checked%PerformMSDonDupes% gupdateUIdupesPanel vPerformMSDonDupes, Filter results using Mean-Squared Difference [32x32]
     GuiAddEdit("x+5 w" fingEdt " gupdateUIdupesPanel number -multi limit3 veditFr", userFindDupesMSElvl, "MSD hash threshold")
-    Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range1-400, % userFindDupesMSElvl
+    Gui, Add, UpDown, vuserFindDupesMSElvl gupdateUIdupesPanel Range0-400, % userFindDupesMSElvl
 
     Gui, Tab, 3
     Gui, Add, Text, x+15 y+15 w%txtWid% Section, These options allow altering how image data is collected. For best results, these settings should be altered only once, before any data is collected. All processes can be interrupted and resumed at any time.
