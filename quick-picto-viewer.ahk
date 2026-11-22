@@ -50,7 +50,7 @@
 ;___________ Auto Execute Section ____
 
 #Requires AutoHotkey v1.1.33.01+
-#Persistent  ; explicit since the interface-thread merge; the app must never auto-exit
+#Persistent
 #NoEnv
 #NoTrayIcon
 #MaxHotkeysPerInterval, 950
@@ -89596,7 +89596,8 @@ autoSelectDupesInGroups(mode, givenRegEx:=0) {
    }
 
    megaCheck := ""
-   lastZeitFileSelect := A_TickCount
+   Random, J, 100, 500
+   lastZeitFileSelect := A_TickCount + J
    getSelectedFiles(0, 1)
    ForceRefreshNowThumbsList()
    If (thumbsDisplaying=1)
@@ -91237,7 +91238,6 @@ PanelFindDupes(dummy:=0) {
     canExclude := (StrLen(filesFilter)>=3) ? 1 : 0
     chkExcl := canExclude ? excludePreviousDupesFromList : 0
     exclOpt := canExclude ? "" : " Disabled"
-
     If (A_PtrSize!=8)
        userFindDupesFilterHamDist := 1
 
@@ -91511,7 +91511,7 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControl, % actu, txtLine1
    GuiControl, % actu, PerformMSDonDupes
    GuiControl, % actu, BreakDupesGroups
-   actu := (hamType>1 && hamType!=2 && doMSD!=1 && thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   actu := (hamType>1 && doMSD!=1 && thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, % actu, findInvertedDupes
    ; flipped detection needs the H-prefixed hash columns, which only exist once
    ; a hash type is picked: retrieveDupesByProperties() cannot build its query without one
@@ -91617,8 +91617,9 @@ BTNfindDupesNow() {
    GuiControlGet, userFindDupePresets
    If (userFindDupePresets=1)
    {
-      userFindDupesFilterHamDist := 2
-      hamDistLBorderCrop := hamDistRBorderCrop := 1
+      userFindDupesHamDistLvl := userFindDupesFilterHamDist := 2
+      BreakDupesGroups := PerformMSDonDupes := findInvertedDupes := 0
+      findFlippedDupes := hamDistLBorderCrop := hamDistRBorderCrop := 1
       columnus := "imgframes,imgwhratio"
    } Else If (userFindDupePresets=2)
       columnus := "imgavg,imghpeak,imgmedian,imghlow,imghrange,imghmode,imgframes,imgwhratio"
@@ -91659,13 +91660,14 @@ BTNfindDupesNow() {
       InitialFindDupesSettingsPanel(0)
       Return msgBeepTimer("WARNING: Insufficient properties selected by which to identify duplicates.")
    }
+
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
 
    If (userFindDupesFilterHamDist>1 && dupesPixInitGood!=1)
    {
       InitialFindDupesSettingsPanel(0)
-      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.`n`nSearching for duplicates by fingerprint (Hamming distance). Searching by file and image properties alone still works: set the fingerprint type to «Ignore».", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.`n`nSearching by file and image properties alone still works: set the fingerprint type to «Ignore».", 0, 0, "error")
       Return
    }
 
