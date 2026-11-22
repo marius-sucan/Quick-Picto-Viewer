@@ -91426,7 +91426,7 @@ PanelFindDupes(dummy:=0) {
     If (A_PtrSize!=8)
        userFindDupesFilterHamDist := 1
 
-    If (dummy>0 && isNumber(dummy) && isInRange(dummy, 1, 3))
+    If (dummy>0 && isNumber(dummy) && isInRange(dummy, 1, 4))
        thisPanelTab := dummy
     If !isInRange(dupesFilterStringPos, 1, 3)
        dupesFilterStringPos := 1
