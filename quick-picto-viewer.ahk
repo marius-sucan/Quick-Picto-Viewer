@@ -60719,16 +60719,16 @@ readRecentFileDesties(modus:=0) {
 
 PanelMoveCopyFiles() {
    UsrCopyMoveOperation := 2
-   CopyMovePanelWindow()
+   CopyMovePanelWindow(1)
 }
 
 InvokeCopyFiles() {
    UsrCopyMoveOperation := 3
    If (maxFilesIndex>0)
-      CopyMovePanelWindow()
+      CopyMovePanelWindow(1)
 }
 
-CopyMovePanelWindow() {
+CopyMovePanelWindow(isFresh:=0) {
     Global BtnCpyMv, LViewDynas, lastInvoked := 1
     ; Static prevmainDynaFoldersListu, prevCurrentSLD
     If warnFramesActionPrevented("COPY/MOVE")
@@ -60760,15 +60760,17 @@ CopyMovePanelWindow() {
     If (markedSelectFile>1)
        infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
 
+    ; F8, the conflict box's «Cancel» and the menu's toggles rebuild the panel as it was
+    copyMovePanelState(isFresh ? "fresh" : "rebuild", destText, conflictPos)
     Gui, SettingsGUIA: +Delimiter`n
     sml := (PrefsLargeFonts=1) ? 90 : 72
     Gui, Add, Text, x15 y15 Section, Destination folder:
-    GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination r1 -wrap -multi -WantReturn", prevFileMovePath)
+    GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination r1 -wrap -multi -WantReturn", destText)
     Gui, Add, Button, x+1 w%sml% hp gBtnCpyMvChooseFilesDest, &Browse
     hLVmainu := GuiAddListView("xs y+5 w" lstWid " gBTNlvRecentFileDesties -multi r10 Grid AltSubmit vLViewDynas", "Recent destination folders`n#", "Recent destination folders")
     thisW := (PrefsLargeFonts=1) ? 190 : 120
     Gui, Add, Text, xs y+5 +hwndhTempu +0x200 +BackgroundTrans, On file name conflicts:
-    zh := GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" copyMoveDoLastOption " vcopyMoveDoLastOption", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
+    zh := GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" conflictPos " vcopyMoveDoLastOption", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
     Gui, Add, Button, x+5 hp wp-25 gEraseCopyMoveHisto, Erase history
     fillCopyMoveDestiesList()
     btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
@@ -60777,7 +60779,8 @@ CopyMovePanelWindow() {
     If infoSelection
        Gui, Add, Text, xs y+5 hp +0x200 +BackgroundTrans, % infoSelection
 
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed
+    k := (UsrCopyMoveOperation=1) ? "Disabled" : ""
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% %k% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed
     Gui, Add, Button, x+5 hp wp+85 gBtnMarkFilesExplorer, &Mark file(s) (Explorer)
     Gui, Add, Button, x+5 hp w70 gBtnHelpCopyMovePanel, &Help
     Gui, Add, Button, x+5 hp wp+10 gBtnCloseWindow, C&ancel
@@ -60853,6 +60856,26 @@ fillCopyMoveDestiesList() {
 
     ToolTip,,,,2
     SetTimer, ResetImgLoadStatus, -50
+}
+
+copyMovePanelState(modus, ByRef destText:="", ByRef conflictPos:="") {
+; the field and the conflict setting at the panel's last close; newer values from «Proceed» or a quick file action win
+   Static isSaved := 0, savedDest := "", savedConflict := 4, lastDest := "", lastConflict := 4
+   If (modus="save")
+   {
+      GuiControlGet, savedDest, SettingsGUIA:, UsrEditFileDestination
+      GuiControlGet, savedConflict, SettingsGUIA:, copyMoveDoLastOption
+      lastDest := prevFileMovePath
+      lastConflict := copyMoveDoLastOption
+      isSaved := 1
+      Return
+   }
+
+   If (modus="fresh")
+      isSaved := 0
+
+   destText := (isSaved && prevFileMovePath=lastDest) ? savedDest : prevFileMovePath
+   conflictPos := (isSaved && copyMoveDoLastOption=lastConflict) ? savedConflict : copyMoveDoLastOption
 }
 
 BtnIdentifyFileRoots(hCtl:=0) {
@@ -62120,10 +62143,8 @@ QuickMoveFile2Dest(finalDest, groupingMode:=0, dummy:=0, relativePath:=0, typedD
 
     If (file2save="abort" || !file2save)
     {
-       If (UsrCopyMoveOperation!=2 && dummy!="quick-actu")
-          SetTimer, InvokeCopyFiles, -150
-       Else If (dummy!="quick-actu")
-          SetTimer, PanelMoveCopyFiles, -150
+       If (dummy!="quick-actu")
+          SetTimer, CopyMovePanelWindow, -150
        SetTimer, ResetImgLoadStatus, -200
        Return 0
     }
@@ -100255,6 +100276,8 @@ CloseWindow(forceIT:=0, cleanCaches:=1) {
 
     If (AnyWindowOpen=14)
        BtnSavePreferencesClose()
+    Else If (AnyWindowOpen=9)
+       copyMovePanelState("save")
 
     Global lastOtherWinClose := A_TickCount
     panelWinCollapsed := forceLiveAlphaPreviewMode := FloodFillSelectionAdj := liveDrawingBrushTool := isNowFakeWinOpen := ForceNoColorMatrix := 0
