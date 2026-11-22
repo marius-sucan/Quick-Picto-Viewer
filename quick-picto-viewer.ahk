@@ -91435,7 +91435,11 @@ PanelFindDupes(dummy:=0) {
     chkExcl := canExclude ? excludePreviousDupesFromList : 0
     exclOpt := canExclude ? "" : " Disabled"
     If (A_PtrSize!=8)
+    {
        userFindDupesFilterHamDist := 1
+       If (userFindDupePresets=1)
+          userFindDupePresets := 2
+    }
 
     If (dummy>0 && isNumber(dummy) && isInRange(dummy, 1, 4))
        thisPanelTab := dummy
@@ -91582,7 +91586,9 @@ updateUIimageHashPreview() {
     GuiControlGet, hamType, SettingsGUIA:, userFindDupesFilterHamDist
     lCrop := clampDupesBuddyEdit("editF11", "hamDistLBorderCrop", 0, 9, 1)
     rCrop := clampDupesBuddyEdit("editF6", "hamDistRBorderCrop", 0, 9, 1)
-    If (thisPreset=1)
+    If (A_PtrSize!=8)
+       hamType := 1
+    Else If (thisPreset=1)
     {
        hamType := 2
        lCrop := rCrop := 1
@@ -91670,10 +91676,11 @@ updateUIdupesPanel() {
    actu := (thisPreset=7) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
    GuiControl, SettingsGUIA:, userFindDupesSelectAllDummy, 0
    GuiControl, % actu, userFindDupesSelectAllDummy
-   GuiControl, % actu, btnFldr6
-   ; the hash type is honoured only in Custom mode; preset 1 pins dHash and
+   actuHash := (thisPreset=7 && A_PtrSize=8) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
+   GuiControl, % actuHash, btnFldr6
+   ; the hash type is honoured only in Custom mode on 64-bit; preset 1 pins dHash and
    ; the other presets group by properties alone [see BTNfindDupesNow()]
-   GuiControl, % actu, userFindDupesFilterHamDist
+   GuiControl, % actuHash, userFindDupesFilterHamDist
 
    ; the Matching tolerance applies to aspect ratio, megapixels and the histogram values;
    ; presets 5 and 6 have none of those, and presets 3 and 4 group by the exact file size,
@@ -91717,6 +91724,8 @@ UIfindDupesCheckboxes(hactu, v:="") {
    GuiControlGet, thisPreset, SettingsGUIA:, userFindDupePresets
    GuiControlGet, doMSD, SettingsGUIA:, PerformMSDonDupes
    GuiControlGet, hamType, SettingsGUIA:, userFindDupesFilterHamDist
+   If (A_PtrSize!=8)
+      hamType := 1
    If InStr(hactu, "able")
       updateUIimageHashPreview()
 
@@ -91832,6 +91841,14 @@ BTNfindDupesNow() {
       columnus .= "imghminu,"
 
    GuiControlGet, userFindDupePresets
+   If (A_PtrSize!=8 && (userFindDupePresets=1 || (userFindDupePresets=7 && userFindDupesFilterHamDist>1)))
+   {
+      InitialFindDupesSettingsPanel(0)
+      Return msgBeepTimer("WARNING: Identifying duplicates by image fingerprint requires the 64-bit edition of " appTitle ".")
+   }
+   If (A_PtrSize!=8)
+      userFindDupesFilterHamDist := 1
+
    If (userFindDupePresets=1)
    {
       userFindDupesHamDistLvl := userFindDupesFilterHamDist := 2
