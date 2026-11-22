@@ -47125,7 +47125,7 @@ PanelChangeHamDistThreshold() {
     ; The pair list is what changeHdistLevelCached() re-filters, and it lives in
     ; qpvmain.dll: asking the DLL is the only way to know it is there, since the hashes and
     ; the fingerprints never leave it and this script keeps no copy of either.
-    If (DllCall("qpvmain.dll\dupesPairCount", "uint")<2 && !msgu)
+    If (DllCall("qpvmain.dll\dupesPairCount", "uint")<1 && !msgu)
        msgu := "WARNING: The files list does not seem to have cached data to allow changing the similarity threshold"
 
     If msgu
