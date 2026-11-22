@@ -54,10 +54,13 @@ open. `e4daf94` also removes the sentence fragment from `BTNfindDupesNow()`'s DL
 16.11. Finding 8 is partly fixed in `79d0e05`: `PanelFindDupes()` (and all other 54 previously
 unchecked panels, 56 call sites total) now checks `createSettingsGUI()`'s return value and returns
 on failure, eliminating the «Main panel» AutoHotkey error and panel corruption; the 1-second
-post-dialog refusal on «Overview», «Main panel», Escape and «Close panel» stays open. Findings 9 to
-16 are otherwise open. A fixed or partly fixed section ends with a note on what the code does now;
-those notes cite lines at the revision named in the note (`d94e991` for Findings 1–2, `2227f02` for
-Findings 4, 6 and 7, `e4daf94` for Findings 3, 5 and 16.11, `79d0e05` for Finding 8).
+post-dialog refusal on «Overview», «Main panel», Escape and «Close panel» stays open. Findings 9
+(`aeb5681`), 11 (`048bcb5`) and 12 (`481da35`) are fixed (with Marius's answers to decisions 9, 11
+and 12; Finding 9's DLL pairs-cache preservation in `dupes-search.h` takes effect on the next
+`qpvmain.dll` build). Findings 10 and 13 to 16 are otherwise open. A fixed or partly fixed section
+ends with a note on what the code does now; those notes cite lines at the revision named in the note
+(`d94e991` for Findings 1–2, `2227f02` for Findings 4, 6 and 7, `e4daf94` for Findings 3, 5 and
+16.11, `79d0e05` for Finding 8, `aeb5681` for Findings 9, 11 and 12).
 
 ## Terms
 
@@ -103,7 +106,7 @@ Findings 4, 6 and 7, `e4daf94` for Findings 3, 5 and 16.11, `79d0e05` for Findin
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `79d0e05` |
+| # | Finding | Harm | Checked | Status at `aeb5681` |
 |---|---------|------|---------|---------------------|
 | 1 | «Find duplicates» discards an edited, unsaved image without a question — even when no duplicates are found | high | run | **partly fixed**, `60f52cc` («Find duplicates» fixed; `ActSortDupeGroups()` open) |
 | 2 | «Purge cached data»: «All (modified files only)» clears `CurrentSLD` and ignores the active filter it promises; «All (selected files only)» refuses one selected file; the dialog reopens Statistics instead of this panel | high | run | **partly fixed**, `60f52cc`, `d94e991` (2.1, 2.2, 2.4 fixed; 2.3 open) |
@@ -113,10 +116,10 @@ Findings 4, 6 and 7, `e4daf94` for Findings 3, 5 and 16.11, `79d0e05` for Findin
 | 6 | Presets 2 to 6 (including «Identical file names») never collect missing data and report «Found no image duplicates» on a fresh database | medium | run | **fixed**, `6df9c63` |
 | 7 | Tab 4's string filter and «Exclude the current list of results»: singletons in non-hash modes, `\|\|\|` matching every file, and «Exclude» enabled with no filter active | medium | run | **fixed**, `2227f02` |
 | 8 | «Main panel» in «Change hashes threshold» within a second of a message box raises an AutoHotkey error; «Overview», Escape and context-menu «Close panel» silently fail for a second after Help | medium | run | **partly fixed**, `79d0e05` (AutoHotkey error / panel corruption fixed across all panels; 1 s post-dialog refusal open) |
-| 9 | The «Found N groups» count is wrong on every hash search, and a failed second search desyncs the selection count and breaks Ctrl+F on the restored list | medium | run, and read for filter globals | open |
+| 9 | The «Found N groups» count is wrong on every hash search, and a failed second search desyncs the selection count and breaks Ctrl+F on the restored list | medium | run, and read for filter globals | **fixed**, `aeb5681` (DLL pairs cache awaits next `qpvmain.dll` build) |
 | 10 | The non-SLDB dialog defaults to «Remove duplicate entries», and «Yes» opens «Save indexed files list» on `.SLD` instead of `.SLDB` | medium | run | open |
-| 11 | After «Find duplicates» runs once, `qpvmain.dll` keeps the `.SLDB` open, so rebuilding or overwriting the database fails with «Permission denied» and leaves `SLDtypeLoaded=2` | medium | run | open |
-| 12 | Aborting data collection or hash generation mid-run does not stop «Find duplicates» | medium | run, and read for hashing | open |
+| 11 | After «Find duplicates» runs once, `qpvmain.dll` keeps the `.SLDB` open, so rebuilding or overwriting the database fails with «Permission denied» and leaves `SLDtypeLoaded=2` | medium | run | **fixed**, `048bcb5` |
+| 12 | Aborting data collection or hash generation mid-run does not stop «Find duplicates» | medium | run, and read for hashing | **fixed**, `481da35` |
 | 13 | Panel rebuilds («Collect image pixels data», «Overview» → «Back», «Dark mode UI», «Large UI fonts») lose unsaved settings, jump to Tab 1 from Statistics, and drop «Back» inside «Overview» | low | run | open |
 | 14 | Numeric threshold edits (`editF7`, `editFr`, `editFc`) reject `0`, and typing an out-of-range number leaves it on screen while silently reading the old value | low | run | open |
 | 15 | «Size (kilobytes)» goes stale when «Size (bytes)» is checked, and Tab 2's preview overlaps «Identify images horizontally flipped» in Large UI fonts | low | run | open |
@@ -134,8 +137,9 @@ existing selection no longer drops `markedSelectFile` to `0` (`e4daf94`), while 
 pair is still deselected by the one-file rule (5.1). Findings 4 (`ecddb73`), 6 (`6df9c63`) and 7
 (`2227f02`) are fixed. Finding 8's AutoHotkey runtime error and panel corruption are fixed in
 `79d0e05` (all 74 `createSettingsGUI()` call sites now check failure), while the 1-second
-post-dialog refusal remains open; Findings 9 to 12 still return wrong counts, break follow-up
-actions (Ctrl+F, Sort, Rebuild), or ignore an abort.
+post-dialog refusal remains open. Findings 9 (`aeb5681`), 11 (`048bcb5`) and 12 (`481da35`) are
+fixed (with Finding 9's DLL pairs-cache backup/restore in `dupes-search.h` taking effect on the next
+`qpvmain.dll` build). Finding 10 and Findings 13 to 16 remain open.
 
 ---
 
@@ -673,6 +677,50 @@ and leaves panel 49 intact (`AnyWindowOpen=49`, controls `77 → 77`, K2).
      and `userFilterProperty := 1` before the failure return at :89386, losing the previous filter
      panel flags even when the search fails.
 
+**Fixed in `aeb5681`** (lines at `aeb5681`):
+
+- **Post-sweep group count:** `changeHdistLevelCached()` (:89097-89102) counts distinct contiguous
+  `rowRoot "_" grpTag` group IDs while fetching `dupesFetchFiltered()` into `groupsFound`, and
+  `retrieveDupesByProperties()` (:89598) reports that count for hash searches (`validGroups` for
+  non-hash searches).
+- **Deferred AHK state commit & `cachedHamDistLvl`:** `retrieveDupesByProperties()` fetches
+  candidates into a local `candList` (:89438-89539), and `changeHdistLevelCached()` filters fresh
+  searches against `candList` with a local keep mask (:88991-89004) before mutating any live state.
+  `renewCurrentFilesList()`, `bckpResultedFilesList`, `filteredMap2mainList`, `hasHamDistCached`,
+  `hamLowLim`/`hamUppLim`/`mseLowLim`/`mseUppLim`, `prevMode`/`prevPrecision`, `userFilter*`,
+  `filesFilter`, and `dupesClearPairs()` only commit once the new search yields at least two
+  surviving images (:89125-89149, :89578-89594); `filterDupeResultsByHdist()` skips
+  `changeHdistLevelCached()` when `foundPairs < 1` (:88961-88965). New super-global
+  `cachedHamDistLvl` (:163, :89134) records the threshold that built the live pairs cache so
+  `PanelChangeHamDistThreshold()` (:47152-47165) keeps the active cache's range even if a failed
+  second search changed `userFindDupesHamDistLvl`.
+- **DLL pairs-cache backup/restore (`QPV DLL source code/lib/dupes-search.h`, takes effect on the
+  next `qpvmain.dll` build; no export changed):** `dupesQueryReset()` (:1952-1953) no longer clears
+  `dupesPairsList`/`dupesPairsMSD` (restoring any uncommitted backup instead);
+  `dupesScanBuildFromQuery()` (:2362-2371) swaps an existing `dupesPairsList` + `dupesPairsMSD`
+  into `dupesSavedPairs` before a new sweep; `dupesScanEnd()` (:1326-1337) restores the backup on
+  incomplete or zero-pair sweeps (and clears partial pairs when no backup exists); and
+  `dupesApplyFilter()` (:1414-1416, :1454-1456, :1607-1610) commits and drops the backup on `>= 2`
+  rows or restores it on `< 2` rows while leaving Ctrl+F re-filters untouched when no backup is
+  held.
+
+Checked at `aeb5681`:
+
+- **Headless Wine (`l1-fix.txt`, batch L):** L1a (2 pairs sharing 1:1) reports «Found 2 groups of
+  duplicate images | Total images: 4»; L1b (3 pairs sharing 1:1) reports «Found 3 groups | Total
+  images: 6»; L1d (Preset 2) reports «Found 2 groups | Total images: 6». In L2a/L2b/L2d (failed
+  hash filter `nomatch_zzz_999`, failed non-hash Preset 5, and failed 0-pair sweep at threshold 1),
+  `markedSelectFile=2` stays synced with `selRows=2`, `bckpResultedFilesList`, `hasHamDistCached`,
+  `cachedHamDistLvl` and `userFilter*` (`7/1/1`, `9/1/1`) all survive untouched; in L2c (pre-query
+  aborted Search #2 raising `userFindDupesHamDistLvl` from 5 to 12), Ctrl+F opens panel 62 showing
+  «Cached threshold range: 0 - 5.»; in L2e (successful non-hash Search #2), pairs, `hasHamDistCached`
+  and `cachedHamDistLvl` clear cleanly.
+- **C++ DLL test suite (`QPV DLL source code/tests/run-tests.sh`):** `msd_oracle`, `sweep_smoke`,
+  `sweep_serial`, `filter_oracle`, `hash_oracle`, and `query_engine` all pass, including 23 new
+  checks in `pairsCacheSurvivesFailedSearch()` (`query_engine.cpp`) covering bad SQL, cancelled
+  query, empty keep mask, 0-pair sweep, mid-sweep abort, post-sweep 0-row `dupesApplyFilter()`,
+  0-row Ctrl+F re-filter, successful 2nd search commit, and fresh aborted sweep cleanup.
+
 ---
 
 ## 10. The non-SLDB dialog defaults to «Remove duplicate entries», and «Yes» opens «Save indexed files list» on `.SLD`
@@ -719,6 +767,24 @@ Run (G1): after running Preset 1 once on `<work>\list.sldb`, removing the duplic
 - It then opens `PanelSaveSlideShowu()` with `SLDtypeLoaded=2` (no longer a database list), leaving the
   database closed and broken until QPV restarts or `dupesEngineRelease` is called.
 
+**Fixed in `048bcb5`** (lines at `aeb5681`):
+
+- `retrieveDupesByProperties()` calls `DllCall("qpvmain.dll\dupesEngineRelease")` and resets
+  `enginePath := ""` immediately after candidate rows are fetched / passed to
+  `dupesScanBuildFromQuery()` (:89541-89542), as well as clearing `enginePath` on all earlier
+  error/empty-query release paths (:89312, :89359, :89392, :89401). The read-only handle and its
+  64 MB SQLite page cache are released before the sweep runs, while the in-memory pairs cache stays
+  intact for Ctrl+F.
+- `BTNrebuildDBpanel()` (:44504-44505) and `SaveDBfilesList()` (:35068-35069, :35233-35234) also
+  call `dupesEngineRelease()` defensively before `activeSQLdb.CloseDB()` when `dupesPixInitGood=1`.
+
+Run at `aeb5681` (batch L, `l1-fix.txt`, L3a–L3c): after Preset 1 finishes, `dupesEngineReady()=0`
+while `pairs=2` and Ctrl+F opens panel 62 (`AnyWindowOpen=62`); dropping the filter and running
+`BTNrebuildDBpanel()` rebuilds `<work>\list.sldb` without any «Permission denied» dialog
+(`SLDtypeLoaded=3`, `maxFilesIndex=4`); a subsequent Preset 1 search re-initializes the engine,
+finds both groups (`Found 2 groups | Total images: 4`), and leaves `dupesEngineReady()=0`. Non-hash
+Preset 2 (L1d) also leaves `dupesEngineReady()=0`.
+
 ---
 
 ## 12. Aborting data collection or hash generation mid-run does not stop «Find duplicates»
@@ -751,6 +817,23 @@ with missing pixels:
 Read, not run: lines :89040-89042 ignore the return value of `generateSQLimageFingerPrintHash()`
 altogether, so aborting regular hash generation still launches flipped hash generation and the
 duplicate search.
+
+**Fixed in `481da35`** (lines at `aeb5681`):
+
+- `retrieveDupesByProperties()` returns early on any non-zero return from `collectSQLFileInfosNow()`
+  (:89201-89207) — calling `RemoveTooltip()` only on `rr=-3` (pre-scan prompt Abort) so mid-run
+  «Operation aborted» (`1`) and error (`-1`) tooltips remain visible — and checks the return value
+  of both the normal and flipped `generateSQLimageFingerPrintHash()` calls (:89212-89221), returning
+  early on any non-zero result without reopening `PanelFindDupes`.
+- `generateSQLimageFingerPrintHash()` (:37283, :37294-37300, :37372-37377) now records `hashFailed`
+  when `dupesHashStep()` returns `-1`, logs and displays `ErrorMsgS`, and returns `-1` instead of
+  silently returning `0`.
+
+Run at `aeb5681` (batch L, `l1-fix.txt`, L4a–L4e): aborting pixel collection mid-run (L4a) stops
+before `generateSQLimageFingerPrintHash()` and the candidate query (`AnyWindowOpen=0`, `isDupes=0`);
+aborting regular dHash generation with `flip=1` (L4b) stops before flipped hashing and the query;
+aborting flipped dHash generation (L4c) stops before the query; aborting non-hash Preset 3
+`imgwidth` collection (L4d) stops before the query; a clean Preset 1 run afterwards succeeds (L4e).
 
 ---
 
@@ -1028,18 +1111,22 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
    55 previously unchecked panels in `79d0e05`); also have `PanelChangeHamDistThreshold()`'s «Main
    panel» and `PanelFindDupes()`'s «Overview» close via `BtnCloseWindow()`, or should Help boxes not
    arm `lastLongOperationAbort`?
-9. Finding 9: (a) count the actual post-sweep groups in `filterDupeResultsByHdist()` for the «Found N
-   groups» tooltip? (b) on a failed/aborted second search, preserve `markedSelectFile` and the DLL pairs
-   cache (or keep the existing pairs until the new sweep succeeds) and avoid clobbering the filter panel
-   globals before the failure check?
+9. Finding 9: ~~(a) count the actual post-sweep groups in `filterDupeResultsByHdist()` for the
+   «Found N groups» tooltip; (b) on a failed/aborted second search, preserve `markedSelectFile` and
+   the DLL pairs cache (keeping existing pairs until the new sweep succeeds) and avoid clobbering
+   the filter panel globals before the failure check~~ (fixed in `aeb5681`, plus separate
+   `cachedHamDistLvl` for Ctrl+F; DLL pairs-cache backup/restore in `dupes-search.h` takes effect on
+   the next `qpvmain.dll` build).
 10. Finding 10: change the non-SLDB dialog's default button from 2 («Remove duplicate entries») to 1
     («Yes») or 3 («Cancel»), and have `PanelSaveSlideShowu()` pre-select `.SLDB` when invoked from
     `PanelFindDupes()`?
-11. Finding 11: call `dupesEngineRelease()` in `retrieveDupesByProperties()` once the query/sweep
-    finishes (the pairs cache lives in memory, not on the SQLite handle), or release it inside
-    `BTNrebuildDBpanel()` / database-close paths as well?
-12. Finding 12: return early in `retrieveDupesByProperties()` when `collectSQLFileInfosNow()` is aborted
-    or fails (not only `-3`), and check `generateSQLimageFingerPrintHash()`'s return value too?
+11. Finding 11: ~~call `dupesEngineRelease()` in `retrieveDupesByProperties()` once the query/fetch
+    finishes (the pairs cache lives in memory, not on the SQLite handle), plus defensive release
+    before `activeSQLdb.CloseDB()` in `BTNrebuildDBpanel()` / `SaveDBfilesList()`~~ (fixed in
+    `048bcb5`).
+12. Finding 12: ~~return early in `retrieveDupesByProperties()` when `collectSQLFileInfosNow()` is
+    aborted or fails (not only `-3`), check `generateSQLimageFingerPrintHash()`'s return value too,
+    and return `-1` with `ErrorMsgS` on `dupesHashStep()` error~~ (fixed in `481da35`).
 13. Finding 13: (a) read all panel controls before rebuilding on «Collect image pixels data», «Overview»,
     Dark mode and Large UI fonts? (b) write `TabsPerWindow[49] := dummy` when `PanelFindDupes(dummy)` is
     given a tab? (c) keep `hostPanel` across theme/font rebuilds of «Overview» so «Back» does not
@@ -1125,7 +1212,14 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   - **K** (`k1-fix.txt`, plus `f4-fix.txt`, at `79d0e05`): re-checks Finding 8 («Change hashes
     threshold» → «Main panel» within 1 s leaves panel 62 intact with zero AutoHotkey error and opens
     panel 49 after > 1 s) and confirms six other newly guarded panels return cleanly within 1 s without
-    adding controls to an open panel.
+    adding controls to an open panel;
+  - **L** (`l1-fix.txt`, at `aeb5681`): verifies Finding 9 (L1a/L1b/L1d post-sweep group counts,
+    L2a–L2e failed hash/non-hash/0-pair-sweep searches preserving selection, filter globals,
+    `bckpResultedFilesList`, `cachedHamDistLvl` and Ctrl+F range), Finding 11 (L3a–L3c
+    `dupesEngineReady()=0` after search while Ctrl+F stays live, `BTNrebuildDBpanel()` succeeding
+    with `SLDtypeLoaded=3`, and follow-up search working), and Finding 12 (L4a–L4e mid-run aborts in
+    pixel collection, regular hashing, flipped hashing, and non-hash `imgwidth` collection all
+    stopping cleanly before subsequent steps).
 - **Not run on Windows**:
   - native Windows GDI+ 1.1 pixel collection inside `collectImgDataViaPool()`;
   - whether Windows' Tab3 dialog manager routes `Alt+X` across Tabs 3 and 4 the same way Wine did;
@@ -1134,15 +1228,16 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   - 32-bit AutoHotkey (`A_PtrSize != 8`, 16.12);
   - `BreakDupesGroups=1` inherited into Preset 1 before `e4daf94` (Finding 3, read; tested fixed at
     `e4daf94` in J1a);
-  - aborting `generateSQLimageFingerPrintHash()` mid-run (Finding 12, read);
+  - aborting `generateSQLimageFingerPrintHash()` mid-run before `481da35` (Finding 12, read; tested
+    fixed at `aeb5681` in L4b–L4c);
   - `collectSQLFileInfosNow()`'s «never ask again» checkbox on «Collect data now» (Seen in passing A,
     read).
 - **Kit**: `.claude/scratch/find-dupes-panel-2026-11-21/app/`.
-  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI|testFdJ|testFdK [revision]`
+  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI|testFdJ|testFdK|testFdL [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
   - Test functions are in `test-fd.ahk`, on top of `test-wrappers-sc.ahk`; `setup.sh` builds the test
     PNGs and `blobs.ini`; `patch.py` and `patch-fd.py` add logging; `closer2.ahk` answers AutoHotkey
     error boxes.
   - Logs are in `results/` (`a2-head.txt`, `b3-head.txt`, `c2-head.txt`, `d2-head.txt`, `e3-head.txt`,
     `f3-head.txt`, `f4-fix.txt`, `g3-head.txt`, `h3-head.txt`, `i1-fix.txt`, `j2-fix.txt`,
-    `k1-fix.txt`).
+    `k1-fix.txt`, `l1-fix.txt`).
