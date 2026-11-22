@@ -41,7 +41,6 @@ __attribute__((unused)) static void fnOutputDebug(std::string s) {
     if (getenv("QPV_TEST_VERBOSE")) printf("    [dbg] %s\n", s.c_str());
 }
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
-static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "../lib/sqlite-dynamic.h"   // verbatim, the shipped run-time binder
 #include "header_extract.h"      // verbatim from dupes-search.h
@@ -836,6 +835,185 @@ static void pairsCacheSurvivesFailedSearch() {
     dupesClearPairs();
 }
 
+static int __cdecl qeInterruptNow(void*) { return 1; }
+
+// Regression tests for S1, S3, S5, S6, S7, S9, S12.
+static void auditRegressions(const char *dbPath) {
+    // S1 + S6 + S7: run against a small dedicated scratch database
+    const std::string scratch = std::string(dbPath) + ".audit";
+    remove(scratch.c_str());
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(scratch.c_str(), &db, SQLITE_OPEN_READWRITE | 0x00000004 /*CREATE*/, NULL)!=SQLITE_OK || db==NULL)
+    {
+        printf("    could not create audit scratch database\n");
+        failures++;
+        return;
+    }
+
+    const char *setupSQL =
+        "CREATE TABLE images (imgidu INTEGER PRIMARY KEY, fullPath TEXT, imgmegapix REAL, fsize INT,"
+        " dHash TEXT, grp INT, bigkey INTEGER, txt TEXT);"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY, small BLOB);"
+        // Group 1: two valid dupes separated by an unparseable hash
+        "INSERT INTO images VALUES (1, 'a.jpg', 1.0, 100, 'abcdef01', 1, 9223372036854775807, 'ABC');"
+        "INSERT INTO images VALUES (2, 'bad.jpg', 1.0, 200, 'not_hex!', 1, 9223372036854775806, 'abc');"
+        "INSERT INTO images VALUES (3, 'c.jpg', 1.0, 300, 'abcdef01', 1, 9223372036854775807, 'ABC');"
+        // Group 2: four valid dupes separated by an overlong (>16 char) hash
+        "INSERT INTO images VALUES (10, 'd1.jpg', 1.0, 100, '1234', 2, -9223372036854775808, 'XYZ');"
+        "INSERT INTO images VALUES (11, 'd2.jpg', 1.0, 110, '1234', 2, -9223372036854775808, 'XYZ');"
+        "INSERT INTO images VALUES (12, 'bad2.jpg', 1.0, 120, '0123456789abcdef0', 2, 0, 'xyz');"
+        "INSERT INTO images VALUES (13, 'd3.jpg', 1.0, 130, '1234', 2, 18014398509481984, 'QWE');"
+        "INSERT INTO images VALUES (14, 'd4.jpg', 1.0, 140, '1234', 2, 18014398509481984, 'qwe');"
+        // Group 3: bad hash between distinct groups must not merge them
+        "INSERT INTO images VALUES (20, 'e1.jpg', 1.0, 100, 'aaaa', 3, 1, 'k');"
+        "INSERT INTO images VALUES (21, 'e2.jpg', 1.0, 110, 'aaaa', 3, 1, 'k');"
+        "INSERT INTO images VALUES (22, 'bad3.jpg', 1.0, 120, 'zzz', 4, 2, 'k');"
+        "INSERT INTO images VALUES (23, 'f1.jpg', 1.0, 100, 'bbbb', 5, 3, 'k');"
+        "INSERT INTO images VALUES (24, 'f2.jpg', 1.0, 110, 'bbbb', 5, 3, 'k');"
+        "INSERT INTO imagesPixels VALUES (1, zeroblob(72)), (2, zeroblob(72)), (3, zeroblob(72));";
+    check(SQ.exec!=NULL && SQ.exec(db, setupSQL, NULL, NULL, NULL)==SQLITE_OK,
+          "audit: populate scratch database");
+
+    const std::wstring wScratch = widen(scratch);
+    check(dupesEngineInit(wScratch.c_str())==1, "audit: open scratch database");
+
+    // S1: unparseable hashes must not drop or split valid groups
+    {
+        const std::wstring sql =
+            L"SELECT imgidu, fullPath, imgmegapix, fsize, dHash, grp AS k0"
+            L" FROM images ORDER BY k0, imgmegapix, fsize";
+        check(dupesQueryBegin(sql.c_str(), 1, 0, 1, 0, 0, 0, 1)==1, "S1: query begins");
+        while (dupesQueryStep(100) > 0) {}
+        check(dupesQueryRowCount()==10 && dupesQueryGroupCount()==4,
+              "S1: bad hashes inside runs keep 2-row and 4-row groups intact (10 rows, 4 groups)");
+
+        // Verify the 4-row group (grp=2) was not split and groups 3 and 5 stayed separate
+        std::vector<DupeCandRow> rows(dupesQueryRowCount());
+        dupesFetchRows(rows.data(), 0, (UINT)rows.size());
+        bool okS1 = (rows.size()==10
+                  && rows[0].imgidu==1 && rows[1].imgidu==3 && rows[0].groupID==rows[1].groupID
+                  && rows[2].imgidu==10 && rows[5].imgidu==14 && rows[2].groupID==rows[5].groupID
+                  && rows[6].imgidu==20 && rows[7].imgidu==21 && rows[6].groupID==rows[7].groupID
+                  && rows[8].imgidu==23 && rows[9].imgidu==24 && rows[8].groupID==rows[9].groupID
+                  && rows[6].groupID!=rows[8].groupID);
+        check(okS1, "S1: exact group membership preserved across bad hashes");
+
+        // S12: keepMask leaving only 1 image in each group (kept==2, comparisons==0)
+        dupesClearPairs();
+        dupesPairsList.push_back({9, 8, 0, QPV_MSD_NONE});
+        dupesPairsMSD = 1;
+        check(dupesQueryBegin(sql.c_str(), 1, 0, 1, 0, 0, 0, 1)==1, "S12: query restarts");
+        while (dupesQueryStep(100) > 0) {}
+        std::vector<unsigned char> onlySingles(dupesQueryRowCount(), 0);
+        if (onlySingles.size() >= 3)
+        {
+           onlySingles[0] = 1;   // 1 from group 1
+           onlySingles[2] = 1;   // 1 from group 2 -> kept==2, comparisons==0
+        }
+        check(dupesScanBuildFromQuery(onlySingles.data(), (UINT)onlySingles.size(), 0)==0,
+              "S12: all-singleton keepMask returns 0 without starting a no-op sweep");
+        check(dupesScanState.phase==5 && dupesScanState.groups==0 && dupesScanState.total==0,
+              "S12: all-singleton build sets phase=5, groups=0, total=0");
+        check(dupesPairCount()==1 && dupesHaveMSD()==1 && !dupesHasSavedPairs,
+              "S12: all-singleton build leaves prior pairs cache untouched");
+        dupesClearPairs();
+    }
+
+    // S7: near-INT64_MAX integers without UB, plus keyCount >= 32 nocaseMask shift guard
+    {
+        const std::wstring sqlInt =
+            L"SELECT imgidu, fullPath, imgmegapix, fsize, bigkey AS k0"
+            L" FROM images WHERE imgidu IN (1,2,3,10,11,13,14) ORDER BY k0, imgmegapix, fsize";
+        check(dupesQueryBegin(sqlInt.c_str(), 1, 0, 0, 0, 0, 0, 1)==1, "S7: INT64_MAX query begins");
+        while (dupesQueryStep(100) > 0) {}
+        check(dupesQueryRowCount()==6 && dupesQueryGroupCount()==3,
+              "S7: INT64_MAX, INT64_MIN, and 2^54 group accurately (INT64_MAX-1 stays distinct)");
+
+        // 34 key columns with nocaseMask=1u: column 32 (txt) must NOT inherit bit 0 (no UB shift)
+        std::string sel34 = "SELECT imgidu, fullPath, imgmegapix, fsize";
+        std::string ord34;
+        for (int k = 0; k < 32; k++) {
+            sel34 += ", 1 AS k" + std::to_string(k);
+            if (k) ord34 += ", ";
+            ord34 += "k" + std::to_string(k);
+        }
+        sel34 += ", txt AS k32, 1 AS k33 FROM images WHERE imgidu IN (13, 14) ORDER BY " + ord34 + ", k32, k33";
+        const std::wstring wSel34 = widen(sel34);
+        check(dupesQueryBegin(wSel34.c_str(), 34, 1u, 0, 0, 0, 0, 1)==1, "S7: 34-key query begins");
+        while (dupesQueryStep(100) > 0) {}
+        check(dupesQueryRowCount()==0 && dupesQueryGroupCount()==0,
+              "S7: keyCount>=32 does not wrap nocaseMask shift onto column 32");
+    }
+
+    // S9: decodeFingerprintBytes rejects 32-bit UINT wraparound
+    {
+        dupesPixStride = 4;
+        dupesPixScale = 1;
+        dupesPixData.assign(16, 0);
+        dupesPixOK.assign(4, 0);
+        const unsigned char raw[4] = {10, 20, 30, 40};
+        decodeFingerprintBytes(raw, 0xFFFFFFFFu, 1);
+        check(dupesPixOK[0]==0, "S9: decodeFingerprintBytes rejects UINT wraparound");
+        dupesPixData.clear(); dupesPixOK.clear(); dupesPixStride = 0;
+    }
+
+    // S6 + S5: dupesHashStep returns -1 on SQLITE_INTERRUPT (not 0) and handles overflow batch
+    if (SQ.progress_handler!=NULL)
+    {
+        qeExec(db, "UPDATE images SET dHash=NULL WHERE imgidu IN (1,2,3)");
+        const std::wstring sel = L"SELECT images.imgidu, p.small FROM images"
+                                 L" JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
+                                 L" WHERE dHash IS NULL AND images.imgidu>?2 ORDER BY images.imgidu LIMIT ?1";
+        const std::wstring upd = L"UPDATE images SET dHash=?1 WHERE imgidu=?2";
+        check(dupesHashBegin(db, sel.c_str(), upd.c_str(), 2, 72, 1, 1)==1, "S6: dupesHashBegin prepares");
+        SQ.progress_handler(db, 1, qeInterruptNow, NULL);
+        const int rInt = dupesHashStep(64);
+        SQ.progress_handler(db, 0, NULL, NULL);
+        wchar_t err[256] = {};
+        const int elen = dupesEngineLastError(err, 256);
+        check(rInt==-1 && elen > 0, "S6: dupesHashStep returns -1 with message on SQLITE_INTERRUPT");
+        // Resuming after clearing interrupt still hashes all 3 rows because cursor was restored
+        while (dupesHashStep(64) > 0) {}
+        check(dupesHashWrittenCount()==3, "S6: cursor restored after interrupt so resuming hashes all rows");
+        dupesHashEnd();
+    }
+
+    // S3: stale error cleared on dupesEngineInit() + concurrent dupesEngineCancel() vs Init/Release
+    {
+        check(dupesEngineInit(L"/nonexistent/path/that/cannot/open.sldb")==0, "S3: bad path sets error");
+        wchar_t err[256] = {};
+        check(dupesEngineLastError(err, 256) > 0, "S3: bad path left an error message");
+        check(dupesEngineInit(NULL)==0, "S3: dupesEngineInit(NULL) fails");
+        check(dupesEngineLastError(err, 256)==0, "S3: dupesEngineInit(NULL) cleared stale error");
+
+        // Re-init on already-open DB + concurrent cancel stress test
+        std::atomic<bool> stopCancel(false);
+        std::thread canceler([&stopCancel]() {
+            while (!stopCancel.load(std::memory_order_relaxed))
+                dupesEngineCancel();
+        });
+        int initOk = 0;
+        for (int i = 0; i < 80; i++)
+        {
+            if (dupesEngineInit(wScratch.c_str())==1)
+               initOk++;
+            if (i % 3 == 0)
+               dupesEngineRelease();
+        }
+        stopCancel.store(true, std::memory_order_relaxed);
+        canceler.join();
+        check(initOk==80, "S3: concurrent dupesEngineCancel during Init/Release loop succeeds safely");
+    }
+
+    dupesEngineRelease();
+    SQ.close_v2(db);
+    remove(scratch.c_str());
+
+    // Re-open the main test database for callers that follow
+    const std::wstring wmain = widen(dbPath);
+    dupesEngineInit(wmain.c_str());
+}
+
 int main(int argc, char **argv) {
     const char *dbPath = (argc > 1) ? argv[1] : "testdb.sldb";
 
@@ -867,6 +1045,8 @@ int main(int argc, char **argv) {
     rejectsBadInput();
     printf("  pairs cache across failed searches\n");
     pairsCacheSurvivesFailedSearch();
+    printf("  audit regressions (S1, S3, S5, S6, S7, S9, S12)\n");
+    auditRegressions(dbPath);
     // both query shapes, every time: the keyset cursor the interpreter sends this build,
     // and the plain LIMIT it falls back to for a qpvmain.dll without dupesHashHasKeyset()
     for ( int pass = 0 ; pass < 2 ; pass++)

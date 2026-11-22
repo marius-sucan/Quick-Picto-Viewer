@@ -47,15 +47,12 @@ typedef unsigned long long UINT64;
 typedef long long          INT64;
 typedef int                INT;
 typedef int                LONG;      // Windows LONG is 32-bit; "long" here is 64-bit
-typedef void*              HWND;
-typedef const wchar_t*     LPCWSTR;
 #define DLL_API extern "C"
 #define DLL_CALLCONV
 #define QPV_FORCEINLINE inline __attribute__((always_inline))
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
-static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "header_extract.h"    // verbatim from dupes-search.h
 

@@ -50,7 +50,6 @@
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
-static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "../lib/sqlite-dynamic.h"
 #include "header_extract.h"

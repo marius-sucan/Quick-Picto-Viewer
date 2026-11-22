@@ -46,15 +46,12 @@ typedef unsigned long long UINT64;
 typedef long long          INT64;
 typedef int                INT;
 typedef int                LONG;      // Windows LONG is 32-bit; "long" here is 64-bit
-typedef void*              HWND;
-typedef const wchar_t*     LPCWSTR;
 #define DLL_API extern "C"
 #define DLL_CALLCONV
 #define QPV_FORCEINLINE inline __attribute__((always_inline))
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
-static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "header_extract.h"    // verbatim from dupes-search.h
 
@@ -657,6 +654,138 @@ static void sweepReallocatesRarely() {
     dupesClearPairs();
 }
 
+// Regression checks for audit fixes S8, S9, S10, S12.
+static void auditRegressions() {
+    printf("  audit regressions (S8, S9, S10, S12)\n");
+
+    // S8: NULL pointers, signed INT overflow on offsetu + stepping, and flipped==NULL
+    {
+        UINT64 h[4] = {0x1111ULL, 0x1111ULL, 0x1111ULL, 0x1111ULL};
+        UINT ids[4] = {1, 2, 3, 4};
+        int hoff = 99;
+        dupesClearPairs();
+        check(dupesSweepPairs(h, NULL, ids, NULL, 4, 4, 0, 0, 0, 0, 0, 1, 0, 10, 0, NULL) == 0,
+              "S8: hoffset==NULL returns 0 safely");
+        check(dupesSweepPairs(NULL, NULL, ids, NULL, 4, 4, 0, 0, 0, 0, 0, 1, 0, 10, 0, &hoff) == 0 && hoff == 0,
+              "S8: hashes==NULL sets hoffset=0 and returns 0");
+        hoff = 99;
+        check(dupesSweepPairs(h, NULL, NULL, NULL, 4, 4, 0, 0, 0, 0, 0, 1, 0, 10, 0, &hoff) == 0 && hoff == 0,
+              "S8: ids==NULL sets hoffset=0 and returns 0");
+        hoff = 99;
+        check(dupesSweepPairs(h, NULL, ids, NULL, 4, 4, 0, 0, 0, 0, 0, 1, 0, -5, 0, &hoff) == 0 && hoff == 0,
+              "S8: negative stepping sets hoffset=0 and returns 0");
+
+        // offsetu=1, stepping=INT_MAX used to overflow signed INT and return 0 pairs
+        dupesClearPairs();
+        hoff = 0;
+        const UINT gotOvf = dupesSweepPairs(h, NULL, ids, NULL, 4, 4, 0, 0, 0, 0, 0, 1, 0, 0x7FFFFFFF, 1, &hoff);
+        check(gotOvf == 3 && hoff == 3,
+              "S8: offsetu=1, stepping=INT_MAX does not overflow signed INT");
+
+        // checkFlipped=1 with flipped==NULL must not emit every pair twice
+        dupesClearPairs();
+        hoff = 0;
+        const UINT gotNullFlip = dupesSweepPairs(h, NULL, ids, NULL, 2, 4, 0, 0, 0, 1, 0, 1, 0, 10, 0, &hoff);
+        check(gotNullFlip == 1 && dupesPairCount() == 1,
+              "S8: checkFlipped=1 with flipped==NULL emits each pair once");
+    }
+
+    // S9: 32-bit UINT wraparound in decodeFingerprintChunk, dupesScanFeed, dupesScanSetGroups
+    {
+        dupesClearPairs();
+        dupesScanBegin(4, 1, 16, 1, 1);
+        std::vector<wchar_t> oneRec(16, (wchar_t)(161 + 42));
+        decodeFingerprintChunk(oneRec.data(), 0xFFFFFFFFu, 1);
+        check(dupesPixOK.size() == 4 && dupesPixOK[0] == 0,
+              "S9: decodeFingerprintChunk rejects UINT wraparound");
+        UINT64 h1[1] = {1};
+        UINT id1[1] = {1};
+        check(dupesScanFeed(0xFFFFFFFFu, 1, h1, NULL, id1, NULL) == 0,
+              "S9: dupesScanFeed rejects UINT wraparound");
+        UINT dummy[2] = {0, 4};
+        check(dupesScanSetGroups(dummy, 0xFFFFFFFFu) == 0 &&
+              ((const DupesScanState*)dupesScanGetState())->phase == -1,
+              "S9: dupesScanSetGroups rejects groups==UINT_MAX");
+    }
+
+    // S10: single minimum-distance record per pair + inverted/flipped MSD scoring
+    {
+        // Symmetric / colliding flipped match: diff=0, diff3=2 -> 1 pair with hamDist=0
+        UINT64 h[2]  = {0x123456789ABCDEF0ULL, 0x123456789ABCDEF0ULL};
+        UINT64 fh[2] = {0x123456789ABCDEF0ULL ^ 0x3ULL, 0x123456789ABCDEF0ULL ^ 0x3ULL};
+        UINT ids[2]  = {1, 2};
+        dupesClearPairs();
+        int hoff = 0;
+        const UINT got = dupesSweepPairs(h, fh, ids, NULL, 2, 5, 0, 0, 0, 1, 0, 1, 0, 10, 0, &hoff);
+        check(got == 1 && dupesPairsList.size() == 1 && dupesPairsList[0].hamDist == 0,
+              "S10: colliding normal+flipped match emits 1 pair with min distance");
+
+        // BreakDupesGroups=1 preserves hamDist=0 (not overwritten by worse flipped diff3=2)
+        const UINT rows = dupesApplyFilter(0, 5, 0, 400, /*breakGroups*/ 1, 0, NULL, 0);
+        check(rows == 2 && dupesFilterRows[0].hamDist == 0 && dupesFilterRows[1].hamDist == 0,
+              "S10: BreakDupesGroups=1 keeps best distance instead of diff3");
+
+        // Color-inverted pair with wantMSD=1 scores mse==0
+        const int stride = 1024;
+        UINT64 hi[2] = {0x0F0F0F0F0F0F0F0FULL, ~0x0F0F0F0F0F0F0F0FULL};
+        std::vector<wchar_t> invBlob((size_t)2 * stride);
+        for (int i = 0; i < stride; i++)
+        {
+            const int v = (i * 19 + 7) % 256;
+            invBlob[i] = (wchar_t)(161 + v);
+            invBlob[stride + i] = (wchar_t)(161 + (255 - v));
+        }
+        dupesClearPairs();
+        hoff = 0;
+        const UINT gotInv = dupesSweepPairs(hi, NULL, ids, invBlob.data(), 2, 3, 0, 0,
+                                            /*inverted*/ 1, /*flipped*/ 0, /*doMSD*/ 1, 1, stride, 10, 0, &hoff);
+        check(gotInv == 1 && dupesPairsList[0].hamDist == 0 && dupesPairsList[0].mse == 0,
+              "S10: wantMSD + checkInverted scores exact color negative as mse=0");
+
+        // Horizontally mirrored 32x32 pair with wantMSD=1 scores mse==0
+        UINT64 hf[2]  = {0xAAAAAAAAAAAAAAAAULL, 0x5555555555555555ULL};
+        UINT64 hff[2] = {0x5555555555555555ULL, 0xAAAAAAAAAAAAAAAAULL};
+        std::vector<wchar_t> flpBlob((size_t)2 * stride);
+        for (int y = 0; y < 32; y++)
+            for (int x = 0; x < 32; x++)
+            {
+                const int v = (x * 7 + y * 11) % 256;
+                flpBlob[y * 32 + x] = (wchar_t)(161 + v);
+                flpBlob[stride + y * 32 + (31 - x)] = (wchar_t)(161 + v);
+            }
+        dupesClearPairs();
+        hoff = 0;
+        const UINT gotFlp = dupesSweepPairs(hf, hff, ids, flpBlob.data(), 2, 3, 0, 0,
+                                            /*inverted*/ 0, /*flipped*/ 1, /*doMSD*/ 1, 1, stride, 10, 0, &hoff);
+        check(gotFlp == 1 && dupesPairsList[0].hamDist == 0 && dupesPairsList[0].mse == 0,
+              "S10: wantMSD + checkFlipped scores exact horizontal mirror as mse=0");
+    }
+
+    // S12: dupesScanStep finishing without running a block still reports threads >= 1
+    {
+        dupesClearPairs();
+        dupesScanBegin(1, 1, 1024, 1, 0);
+        check(dupesScanStep(4, 0, 0, 0, 0, 10) == 0 &&
+              ((const DupesScanState*)dupesScanGetState())->threads >= 1,
+              "S12: empty dupesScanStep reports threads >= 1");
+
+        dupesClearPairs();
+        UINT64 h[2] = {1, 1};
+        UINT ids[2] = {1, 2};
+        UINT gs[2] = {0, 2};
+        dupesScanBegin(2, 1, 1024, 1, 0);
+        dupesScanFeed(0, 2, h, NULL, ids, NULL);
+        dupesScanSetGroups(gs, 1);
+        dupesScanOuter = dupesScanRows;
+        check(dupesScanStep(4, 0, 0, 0, 0, 10) == 0 &&
+              ((const DupesScanState*)dupesScanGetState())->phase == 5 &&
+              ((const DupesScanState*)dupesScanGetState())->threads >= 1,
+              "S12: dupesScanStep with outer>=rows reports threads >= 1");
+    }
+
+    dupesClearPairs();
+}
+
 int main() {
     resultContract();
     scanMatchesPerGroupSweep();
@@ -665,6 +794,7 @@ int main() {
     scanEdgeCases();
     scanIsThreadCountIndependent();
     sweepReallocatesRarely();
+    auditRegressions();
 
     printf("\n  %s\n", failures ? "SWEEP SMOKE TEST FAILED" : "sweep smoke test passed");
     return failures ? 1 : 0;

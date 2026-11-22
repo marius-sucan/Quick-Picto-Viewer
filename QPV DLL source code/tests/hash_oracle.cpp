@@ -41,7 +41,6 @@
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
-static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "../lib/sqlite-dynamic.h"
 #include "header_extract.h"
@@ -184,9 +183,26 @@ static std::vector<int> shippedDecode(const std::vector<wchar_t> &rec, int level
 }
 
 int main() {
-    if (!calculateDCTcoeffs(32)) {
-        printf("    calculateDCTcoeffs(32) failed\n");
-        return 1;
+    // S4 regressions: must run BEFORE calculateDCTcoeffs(32) is ever called
+    {
+        unsigned char sample[1024];
+        for (int i = 0; i < 1024; i++)
+            sample[i] = (unsigned char)((i * 37 + (i / 32) * 13) & 0xFF);
+
+        check(calcPHashAlgo(NULL, 32, 1) == 0, "S4: calcPHashAlgo(NULL, 32, 1) returns 0 safely");
+        const INT64 beforeInit = calcPHashAlgo(sample, 32, 1);
+        check(beforeInit != 0, "S4: calcPHashAlgo works before calculateDCTcoeffs(32)");
+
+        check(calculateDCTcoeffs(8) == 1, "S4: calculateDCTcoeffs(8) succeeds");
+        const INT64 afterSmall = calcPHashAlgo(sample, 32, 1);
+        check(afterSmall == beforeInit, "S4: calculateDCTcoeffs(8) cannot corrupt 32x32 pHash");
+
+        if (!calculateDCTcoeffs(32)) {
+            printf("    calculateDCTcoeffs(32) failed\n");
+            return 1;
+        }
+        const INT64 afterInit = calcPHashAlgo(sample, 32, 1);
+        check(afterInit == beforeInit, "S4: pre-init pHash matches post-calculateDCTcoeffs(32) bit for bit");
     }
 
     long long cases = 0, badDecode = 0, badD = 0, badL = 0, badP = 0;

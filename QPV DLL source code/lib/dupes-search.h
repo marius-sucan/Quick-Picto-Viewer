@@ -260,6 +260,40 @@ QPV_FORCEINLINE int msdScore(const unsigned char *a, const unsigned char *b, con
     return (int)floor(sqrt((double)sum / ((double)count / 2.0)) + 0.5);
 }
 
+// Color-inverted and horizontally-flipped MSD counterparts for API callers that enable
+// checkInverted or checkFlipped alongside wantMSD. Named away from msdScore() so
+// run-tests.sh's msd_extract slice keeps only msdSumSquares/msdScore.
+static int dupesMsdScoreInverted(const unsigned char *a, const unsigned char *b, const int count, const int scale) {
+    const int invMax = (scale > 1) ? (int)floor(255.0 / (double)scale + 0.5) : 255;
+    INT64 sum = 0;
+    for ( int i = 0 ; i < count ; i++)
+    {
+        const int d = (int)a[i] - (invMax - (int)b[i]);
+        sum += (INT64)d * d;
+    }
+    sum *= (INT64)scale * (INT64)scale;
+    return (int)floor(sqrt((double)sum / ((double)count / 2.0)) + 0.5);
+}
+
+static int dupesMsdScoreFlipped(const unsigned char *a, const unsigned char *b, const int count, const int scale) {
+    if (count!=1024)
+       return msdScore(a, b, count, scale);
+
+    INT64 sum = 0;
+    for ( int y = 0 ; y < 32 ; y++)
+    {
+        const unsigned char *ra = a + y * 32;
+        const unsigned char *rb = b + y * 32;
+        for ( int x = 0 ; x < 32 ; x++)
+        {
+            const int d = (int)ra[x] - (int)rb[31 - x];
+            sum += (INT64)d * d;
+        }
+    }
+    sum *= (INT64)scale * (INT64)scale;
+    return (int)floor(sqrt((double)sum / ((double)count / 2.0)) + 0.5);
+}
+
 // The fingerprints live in the database as Chr(gray + 161), so the AHK string holding
 // them is one UTF-16 code unit per pixel in U+00A1..U+01A0 and needs no conversion on
 // the way in - AHK hands over the pointer and this walks it.
@@ -278,7 +312,11 @@ static void decodeFingerprintChunk(const wchar_t *blob, const UINT firstIndex, c
        return;
 
     const UINT stride = dupesPixStride;
-    if ((size_t)(firstIndex + count) * stride > dupesPixData.size() || firstIndex + count > dupesPixOK.size())
+    if ((size_t)firstIndex > dupesPixOK.size() || (size_t)count > dupesPixOK.size() - (size_t)firstIndex)
+       return;
+
+    const size_t endIndex = (size_t)firstIndex + (size_t)count;
+    if (endIndex > dupesPixData.size() / (size_t)stride)
        return;
 
     for ( UINT rec = 0 ; rec < count ; rec++)
@@ -287,7 +325,8 @@ static void decodeFingerprintChunk(const wchar_t *blob, const UINT firstIndex, c
         if (src[0] < 161)
            continue;
 
-        unsigned char *dst = &dupesPixData[(size_t)(firstIndex + rec) * stride];
+        const size_t slot = (size_t)firstIndex + (size_t)rec;
+        unsigned char *dst = &dupesPixData[slot * (size_t)stride];
         for ( UINT k = 0 ; k < stride ; k++)
         {
             int v = (int)src[k] - 161;
@@ -297,15 +336,31 @@ static void decodeFingerprintChunk(const wchar_t *blob, const UINT firstIndex, c
                v = (int)floor((double)v / dupesPixScale + 0.5);
             dst[k] = (unsigned char)v;
         }
-        dupesPixOK[firstIndex + rec] = 1;
+        dupesPixOK[slot] = 1;
     }
 }
 
 static void decodeFingerprintBlob(const wchar_t *blob, const UINT count, const UINT stride, const int grayCompressor) {
-    dupesPixStride = stride;
+    dupesPixStride = 0;
     dupesPixScale = (grayCompressor > 1) ? grayCompressor : 1;
-    dupesPixData.assign((size_t)count * stride, 0);
-    dupesPixOK.assign(count, 0);
+    if (stride==0 || (size_t)count > ((size_t)-1) / (size_t)stride)
+    {
+       dupesPixData.clear();
+       dupesPixOK.clear();
+       return;
+    }
+    try
+    {
+       dupesPixData.assign((size_t)count * (size_t)stride, 0);
+       dupesPixOK.assign(count, 0);
+    }
+    catch (...)
+    {
+       dupesPixData.clear();
+       dupesPixOK.clear();
+       return;
+    }
+    dupesPixStride = stride;
     decodeFingerprintChunk(blob, 0, count);
 }
 
@@ -315,8 +370,7 @@ void dupesQueryFreeRows();
 static void dupesSweepReleaseScratch();
 
 static void dupesDropSavedPairs() {
-    dupesSavedPairs.clear();
-    dupesSavedPairs.shrink_to_fit();
+    std::vector<DupePairRec>().swap(dupesSavedPairs);
     dupesSavedMSD = 0;
     dupesHasSavedPairs = false;
 }
@@ -362,14 +416,6 @@ DLL_API UINT DLL_CALLCONV dupesClearPairs() {
     memset((void*)&dupesScanState, 0, sizeof(dupesScanState));
 
     return 1;
-}
-
-void setMainWindowTitle(std::string str, HWND pvHwnd) {
-  // std::string str = "Calculating hamming distance: " + std::to_string(yay) + " / " + std::to_string(yoyo);
-  std::wstring temp = std::wstring(str.begin(), str.end());
-  LPCWSTR wideString = temp.c_str();
-
-  SetWindowText(pvHwnd, wideString);
 }
 
 // ---- the parallel pair sweep -----------------------------------------------------------
@@ -617,47 +663,54 @@ static void sweepRowsInto(const DupesSweepCtx &C, const UINT firstRow, const UIN
 
         for ( UINT mainIndex = secondIndex + 1 ; mainIndex < n ; mainIndex++)
         {
-            int diff2 = 900;
-            int diff3 = 900;
+            const int diff  = hammingDistance(givenHashesArray[mainIndex], hashSecond, hamMask);
+            const int diff2 = (checkInverted==1) ? hammingDistance(givenHashesArray[mainIndex], invert2ndindex, hamMask) : 900;
+            const int diff3 = (checkFlipped==1)  ? hammingDistance(givenHashesArray[mainIndex], flipped2ndindex, hamMask) : 900;
 
-            int diff = hammingDistance(givenHashesArray[mainIndex], hashSecond, hamMask);
-            if (checkInverted==1)
-               diff2 = hammingDistance(givenHashesArray[mainIndex], invert2ndindex, hamMask);
-            if (checkFlipped==1)
-               diff3 = hammingDistance(givenHashesArray[mainIndex], flipped2ndindex, hamMask);
-
-            // if (threshold>2 && diff>=threshold)
-            //    diff = hammingDistance(givenHashesArray[mainIndex], reversed2ndindex, hamMask);
+            int bestDiff = diff;
+            if (diff2 < bestDiff) bestDiff = diff2;
+            if (diff3 < bestDiff) bestDiff = diff3;
 
             // matches are rare: skip the bookkeeping for the overwhelming
             // majority of pairs
-            if (diff>=threshold && diff2>=threshold && diff3>=threshold)
+            if (bestDiff >= threshold)
                continue;
 
-            // The two fingerprints are in cache right here, and the pair survives at
-            // most three times, so this is computed once and shared - which is also
-            // what the AHK loop did, one MSE per result row of the same pair.
+            // Compute MSD for whichever enabled match mode(s) passed the Hamming threshold,
+            // taking the tightest score so inverted/flipped matches are scored against the
+            // matching orientation rather than the raw unflipped/uninverted pixels.
             // A pair missing either fingerprint keeps the sentinel: it used to read as
             // MSE 0 (StrSplit("") -> an empty array -> a sum of zeroes), i.e. a perfect
             // match, which is the same phantom-duplicate shape as the "0x" -> 0 hash bug.
             UINT mse = QPV_MSD_NONE;
             if (wantMSD && dupesPixOK[mainIndex] && dupesPixOK[secondIndex])
-               mse = (UINT)msdScore(&dupesPixData[(size_t)mainIndex * dupesPixStride],
-                                    &dupesPixData[(size_t)secondIndex * dupesPixStride],
-                                    (int)dupesPixStride, dupesPixScale);
-
-            const UINT idA = givenIDs[mainIndex], idB = givenIDs[secondIndex];
-            if (diff<threshold)
-               out.push_back({ idA, idB, (UINT)diff, mse });
-
-            if (diff2<threshold)
-               out.push_back({ idA, idB, (UINT)diff2, mse });
-
-            if (diff3<threshold)
             {
-                // fnOutputDebug("c++ dupe pair:" + to_string(givenHashesArray[mainIndex]) + "/" + to_string(givenFlippedHashesArray[secondIndex]));
-                out.push_back({ idA, idB, (UINT)diff3, mse });
+               const unsigned char *pa = &dupesPixData[(size_t)mainIndex * dupesPixStride];
+               const unsigned char *pb = &dupesPixData[(size_t)secondIndex * dupesPixStride];
+               const int stride = (int)dupesPixStride;
+               bool haveMse = false;
+               if (diff < threshold)
+               {
+                  mse = (UINT)msdScore(pa, pb, stride, dupesPixScale);
+                  haveMse = true;
+               }
+               if (diff2 < threshold)
+               {
+                  const UINT m2 = (UINT)dupesMsdScoreInverted(pa, pb, stride, dupesPixScale);
+                  if (!haveMse || m2 < mse) { mse = m2; haveMse = true; }
+               }
+               if (diff3 < threshold)
+               {
+                  const UINT m3 = (UINT)dupesMsdScoreFlipped(pa, pb, stride, dupesPixScale);
+                  if (!haveMse || m3 < mse) { mse = m3; haveMse = true; }
+               }
             }
+
+            // Emit at most one record per pair with the tightest distance across modes so
+            // symmetric images or missing flipped hashes do not double the pair list or
+            // let a worse flipped distance overwrite a better direct match under
+            // BreakDupesGroups=1.
+            out.push_back({ givenIDs[mainIndex], givenIDs[secondIndex], (UINT)bestDiff, mse });
         }
     }
 }
@@ -732,7 +785,17 @@ static INT64 dupesPlanRows(const DupesSweepCtx &C, const UINT firstRow, const UI
         it.failed = 0;
         it.begin  = 0;
         it.count  = 0;
-        dupesSweepPlan.push_back(it);
+        try
+        {
+            dupesSweepPlan.push_back(it);
+        }
+        catch (...)
+        {
+            dupesSweepPlan.clear();
+            dupesSweepAllocFailed = true;
+            stoppedAt = firstRow;
+            return 0;
+        }
         if (costBudget > 0 && cost >= costBudget)
            break;
 
@@ -823,7 +886,28 @@ static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads, int *team
        team = 1;
 
     if ((int)dupesSweepBufs.size() < team)
-       dupesSweepBufs.resize((size_t)team);
+    {
+       try
+       {
+           dupesSweepBufs.resize((size_t)team);
+       }
+       catch (...)
+       {
+           if (dupesSweepBufs.empty())
+           {
+              try
+              {
+                  dupesSweepBufs.resize(1);
+              }
+              catch (...)
+              {
+                  dupesSweepAllocFailed = true;
+                  return 0;
+              }
+           }
+           team = (int)dupesSweepBufs.size();
+       }
+    }
 
     for ( int t = 0 ; t < team ; t++)
         dupesSweepBufs[t].v.clear();    // keeps the capacity: after the first few blocks
@@ -885,13 +969,13 @@ static size_t dupesRunPlan(const DupesSweepCtx &C, const int nThreads, int *team
                dupesPairsList.insert(dupesPairsList.end(), src.begin() + it.begin, src.begin() + it.begin + it.count);
            }
        }
-       catch (const std::bad_alloc&)
-       {
-           dupesSweepAllocFailed = true;
-       }
-    }
+        catch (...)
+        {
+            dupesSweepAllocFailed = true;
+        }
+     }
 
-    return results;
+     return results;
 }
 
 // Compares outer indexes [firstOuter, lastOuter] against everything after them inside the
@@ -950,7 +1034,13 @@ static UINT sweepOuterRange(const DupesSweepCtx &C, const UINT groupFirst, const
 // sweep means. tests/sweep_smoke.cpp asserts the two agree record for record, which is
 // the only guard there is against the cursor arithmetic in dupesScanStep() drifting.
 DLL_API UINT DLL_CALLCONV dupesSweepPairs(UINT64 *givenHashesArray, UINT64 *givenFlippedHashesArray, UINT *givenIDs, const wchar_t *pixelBlob, UINT arraySize, int threshold, UINT hamDistLBorderCrop, UINT hamDistRBorderCrop, int checkInverted, int checkFlipped, int doMSD, int grayCompressor, int pixStride, int stepping, int offsetu, int* hoffset) {
-   UINT n = arraySize;
+    if (hoffset==NULL)
+       return 0;
+
+    *hoffset = 0;
+    const UINT n = arraySize;
+    if (givenHashesArray==NULL || givenIDs==NULL || n < 2 || offsetu < 0 || (UINT)offsetu >= n || stepping < 0)
+       return 0;
 
     // The caller re-enters this for every batch of the same group, so the fingerprints
     // are decoded once on the first batch and reused. A short blob disables MSD rather
@@ -976,27 +1066,28 @@ DLL_API UINT DLL_CALLCONV dupesSweepPairs(UINT64 *givenHashesArray, UINT64 *give
     C.hamMask  = buildHamMask(hamDistLBorderCrop, hamDistRBorderCrop);
     C.threshold = threshold;
     C.checkInverted = checkInverted;
-    C.checkFlipped  = checkFlipped;
+    C.checkFlipped  = (givenFlippedHashesArray!=NULL) ? checkFlipped : 0;
     C.wantMSD  = (doMSD==1 && dupesPixStride > 0 && dupesPixOK.size() >= (size_t)arraySize);
     if (C.wantMSD)
        dupesPairsMSD = 1;
 
     // The caller walks the outer index in batches of "stepping" so it can show
     // progress and stay interruptible; the old code covered offsetu ..
-    // offsetu+stepping inclusive, which is preserved here.
-    const INT firstIndex = offsetu;
-    INT lastIndex = offsetu + stepping;
-    if (lastIndex > (INT)n - 1)
-       lastIndex = (INT)n - 1;
+    // offsetu+stepping inclusive, which is preserved here. Arithmetic stays in
+    // INT64 so large stepping values cannot overflow signed 32-bit INT.
+    const INT64 firstIndex = (INT64)offsetu;
+    INT64 lastIndex = firstIndex + (INT64)stepping;
+    if (lastIndex > (INT64)n - 1)
+       lastIndex = (INT64)n - 1;
 
-    if (firstIndex > lastIndex || firstIndex < 0)
-    {
-       *hoffset = 0;
+    if (lastIndex - firstIndex >= (INT64)0x7FFFFFFF)
+       lastIndex = firstIndex + (INT64)0x7FFFFFFF - 1;
+
+    if (firstIndex > lastIndex)
        return 0;
-    }
 
     const UINT results = sweepOuterRange(C, 0, n, (UINT)firstIndex, (UINT)lastIndex);
-    *hoffset = lastIndex - firstIndex + 1;
+    *hoffset = (int)(lastIndex - firstIndex + 1);
     return results;
 }
 
@@ -1052,20 +1143,24 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
     {
         dupesScanHashes.assign(rows, 0);
         dupesScanIDs.assign(rows, 0);
-        dupesScanGroupStart.reserve((size_t)groups + 1);
+        if (groups < 0xFFFFFFFFu)
+           dupesScanGroupStart.reserve((size_t)groups + 1);
         if (doMSD==1 && pixStride > 0)
         {
+           if ((size_t)rows > ((size_t)-1) / (size_t)pixStride)
+              throw std::bad_alloc();
            dupesPixStride = (UINT)pixStride;
            dupesPixScale = (grayCompressor > 1) ? grayCompressor : 1;
-           dupesPixData.assign((size_t)rows * pixStride, 0);
+           dupesPixData.assign((size_t)rows * (size_t)pixStride, 0);
            dupesPixOK.assign(rows, 0);
            dupesScanWantMSD = 1;
         }
     }
-    catch (const std::bad_alloc&)
+    catch (...)
     {
         dupesScanHashes.clear();
         dupesScanIDs.clear();
+        dupesScanGroupStart.clear();
         dupesPixData.clear();
         dupesPixOK.clear();
         dupesPixStride = 0;
@@ -1086,7 +1181,7 @@ DLL_API int DLL_CALLCONV dupesScanBegin(UINT rows, UINT groups, int pixStride, i
 // when findFlippedDupes=0, pixelBlob when MSD is off; pixelBlob holds count records of
 // pixStride UTF-16 code units, the same Chr(gray+161) encoding the database stores.
 DLL_API int DLL_CALLCONV dupesScanFeed(UINT firstIndex, UINT count, const UINT64 *hashes, const UINT64 *flipped, const UINT *ids, const wchar_t *pixelBlob) {
-    if (count==0 || (size_t)firstIndex + count > dupesScanRows)
+    if (count==0 || firstIndex > dupesScanRows || count > dupesScanRows - firstIndex)
        return 0;
 
     if (hashes!=NULL)
@@ -1098,7 +1193,19 @@ DLL_API int DLL_CALLCONV dupesScanFeed(UINT firstIndex, UINT count, const UINT64
     if (flipped!=NULL)
     {
        if (dupesScanFlipped.size() < dupesScanRows)
-          dupesScanFlipped.assign(dupesScanRows, 0);
+       {
+          try
+          {
+             dupesScanFlipped.assign(dupesScanRows, 0);
+          }
+          catch (...)
+          {
+             dupesScanFlipped.clear();
+             dupesScanState.lastError = 1;
+             dupesScanState.phase = -1;
+             return 0;
+          }
+       }
 
        memcpy(&dupesScanFlipped[firstIndex], flipped, (size_t)count * sizeof(UINT64));
     }
@@ -1161,7 +1268,25 @@ DLL_API int DLL_CALLCONV dupesScanSetGroups(const UINT *groupStart, UINT groups)
        return 0;
     }
 
-    dupesScanGroupStart.assign(groupStart, groupStart + groups + 1);
+    if (groups==0xFFFFFFFFu || groups > dupesScanRows)
+    {
+       dupesScanGroupStart.clear();
+       dupesScanState.lastError = 2;
+       dupesScanState.phase = -1;
+       return 0;
+    }
+
+    try
+    {
+       dupesScanGroupStart.assign(groupStart, groupStart + (size_t)groups + 1);
+    }
+    catch (...)
+    {
+       dupesScanGroupStart.clear();
+       dupesScanState.lastError = 1;
+       dupesScanState.phase = -1;
+       return 0;
+    }
     INT64 total = 0;
     for ( UINT g = 0 ; g < groups ; g++)
     {
@@ -1215,7 +1340,11 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
     if (dupesScanGroupStart.size() < 2 || dupesScanRows < 2 || dupesScanRowEnd.size() < (size_t)dupesScanRows)
     {
        if (dupesScanState.phase!=-1)   // a rejected boundary array stays an error; it
+       {
+          if (dupesScanState.threads < 1)
+             dupesScanState.threads = 1;
           dupesScanState.phase = 5;    // must not read back as a scan that found nothing
+       }
 
        return 0;
     }
@@ -1257,6 +1386,12 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
 
         UINT stoppedAt = dupesScanOuter;
         const INT64 planned = dupesPlanRows(C, dupesScanOuter, dupesScanRows - 1, dupesScanBlock, itemTarget, stoppedAt);
+        if (dupesSweepAllocFailed)
+        {
+           dupesScanState.lastError = 1;
+           dupesScanState.phase = -1;
+           return 0;
+        }
         if (stoppedAt <= dupesScanOuter)   // an empty plan would spin this loop for ever
            break;
 
@@ -1291,6 +1426,8 @@ DLL_API int DLL_CALLCONV dupesScanStep(int threshold, UINT hamDistLBorderCrop, U
            return 1;
     }
 
+    if (dupesScanState.threads < 1)
+       dupesScanState.threads = 1;
     dupesScanState.done = dupesScanState.total;
     dupesScanState.phase = 5;
     return 0;
@@ -1377,18 +1514,33 @@ QPV_FORCEINLINE bool dupesInRange(const UINT v, const int lo, const int hi) {
     return ((int)v >= lo && (int)v <= hi);
 }
 
-// Zero-padded to 9 digits, the way sortDupeGroups() formatted both halves of its sort key:
-// the padding is what keeps the ordering numeric under a lexicographic sort, so group 100
-// does not come before group 12 and row 100 does not come before row 7.
-static void dupesAppendPad9(std::string &out, UINT v) {
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%09u", v);
-    out += buf;
+// Lexicographic comparison of decimal(a)+'z' vs decimal(b)+'z', reproducing the exact
+// middle-key ordering of sortDupeGroups() ("<pad9(root)>y<root>_<tag>z<pad9(pos)>")
+// under BreakDupesGroups=1 without heap-allocating sort keys.
+static int dupesCmpTagLexZ(UINT a, UINT b) {
+    if (a==b)
+       return 0;
+
+    char sa[16], sb[16], rev[16];
+    int na = 0, nb = 0, r = 0;
+    UINT v = a;
+    do { rev[r++] = (char)('0' + (v % 10)); v /= 10; } while (v!=0);
+    while (r > 0) sa[na++] = rev[--r];
+    sa[na++] = 'z';
+    sa[na] = '\0';
+
+    v = b;
+    do { rev[r++] = (char)('0' + (v % 10)); v /= 10; } while (v!=0);
+    while (r > 0) sb[nb++] = rev[--r];
+    sb[nb++] = 'z';
+    sb[nb] = '\0';
+
+    return strcmp(sa, sb);
 }
 
 // The group ID column 23 has always carried: the union-find root, an underscore, and the
-// group's tightest Hamming distance. Not padded - this is the value the user sees.
-static std::string dupesGroupID(UINT root, UINT tag) {
+// group's tightest Hamming distance. Kept inline for tests/filter_oracle.cpp.
+static inline std::string dupesGroupID(UINT root, UINT tag) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%u_%u", root, tag);
     return std::string(buf);
@@ -1424,190 +1576,237 @@ DLL_API UINT DLL_CALLCONV dupesApplyFilter(int hamLo, int hamHi, int mseLo, int 
 
     // the MSD bounds apply when the scan computed scores, as the panel decides its MSD fields
     const bool allowMSE = (dupesHaveMSD()==1);
-
-    UINT maxId = 0;
-    for ( size_t i = 0 ; i < n ; i++)
-    {
-        if (dupesPairsList[i].idA > maxId) maxId = dupesPairsList[i].idA;
-        if (dupesPairsList[i].idB > maxId) maxId = dupesPairsList[i].idB;
-    }
-
-    std::vector<size_t> kept;
-    kept.reserve(n);
-    for ( size_t i = 0 ; i < n ; i++)
-    {
-        const DupePairRec &p = dupesPairsList[i];
-        if (!dupesInRange(p.hamDist, hamLo, hamHi))
-           continue;
-
-        if (allowMSE && !dupesInRange(p.mse, mseLo, mseHi))
-           continue;
-
-        // the string filter was tested against the FIRST image of the pair only
-        if (imgKeep!=NULL && (p.idA >= imgKeepCount || (imgKeep[p.idA] & 1)==0))
-           continue;
-
-        kept.push_back(i);
-    }
-
-    if (kept.empty())
-    {
-       dupesRestoreSavedPairs();
-       return 0;
-    }
-
     const UINT NONE = 0xFFFFFFFFu;
-    std::vector<UINT> rowRoot(maxId + 1, NONE), rowTag(maxId + 1, 0);
-    std::vector<UINT> imgHam(maxId + 1, NONE), imgMSE(maxId + 1, NONE);
 
-    if (breakGroups==1)
+    try
     {
-       // The incremental labelling, walked in pair order: a pair whose images are both
-       // already labelled only re-tags them with its own distance, a pair of two unlabelled
-       // images starts a group at min(idA,idB), and a pair with one of each joins the
-       // labelled one's group. Order-dependent by design - which is why the sweep emits
-       // its pairs in a reproducible order.
-       for ( size_t k = 0 ; k < kept.size() ; k++)
-       {
-           const DupePairRec &p = dupesPairsList[kept[k]];
-           const bool hasA = (rowRoot[p.idA]!=NONE), hasB = (rowRoot[p.idB]!=NONE);
-           if (hasA && hasB)
+        UINT maxId = 0;
+        size_t keptCount = 0;
+        for ( size_t i = 0 ; i < n ; i++)
+        {
+            const DupePairRec &p = dupesPairsList[i];
+            if (!dupesInRange(p.hamDist, hamLo, hamHi))
+               continue;
+
+            if (allowMSE && !dupesInRange(p.mse, mseLo, mseHi))
+               continue;
+
+            // the string filter was tested against the FIRST image of the pair only
+            if (imgKeep!=NULL && (p.idA >= imgKeepCount || (imgKeep[p.idA] & 1)==0))
+               continue;
+
+            // 0xFFFFFFFFu collides with NONE and would wrap maxId + 1 in 32-bit UINT
+            if (p.idA==NONE || p.idB==NONE)
+            {
+               dupesRestoreSavedPairs();
+               return 0;
+            }
+
+            if (p.idA > maxId) maxId = p.idA;
+            if (p.idB > maxId) maxId = p.idB;
+            keptCount++;
+        }
+
+        if (keptCount==0)
+        {
+           dupesRestoreSavedPairs();
+           return 0;
+        }
+
+        const size_t idSlots = (size_t)maxId + 1;
+        std::vector<UINT> rowRoot(idSlots, NONE), rowTag(idSlots, 0);
+        std::vector<UINT> imgHam(idSlots, NONE), imgMSE(idSlots, NONE);
+
+        if (breakGroups==1)
+        {
+           // The incremental labelling, walked in pair order: a pair whose images are both
+           // already labelled only re-tags them with its own distance, a pair of two unlabelled
+           // images starts a group at min(idA,idB), and a pair with one of each joins the
+           // labelled one's group. Order-dependent by design - which is why the sweep emits
+           // its pairs in a reproducible order.
+           for ( size_t i = 0 ; i < n ; i++)
            {
-              rowTag[p.idA] = p.hamDist;
-              imgHam[p.idA] = p.hamDist;
-              imgMSE[p.idA] = p.mse;
-              rowTag[p.idB] = p.hamDist;
-              imgHam[p.idB] = p.hamDist;
-              imgMSE[p.idB] = p.mse;
-              continue;
+               const DupePairRec &p = dupesPairsList[i];
+               if (!dupesInRange(p.hamDist, hamLo, hamHi))
+                  continue;
+
+               if (allowMSE && !dupesInRange(p.mse, mseLo, mseHi))
+                  continue;
+
+               if (imgKeep!=NULL && (p.idA >= imgKeepCount || (imgKeep[p.idA] & 1)==0))
+                  continue;
+
+               const bool hasA = (rowRoot[p.idA]!=NONE), hasB = (rowRoot[p.idB]!=NONE);
+               if (hasA && hasB)
+               {
+                  rowTag[p.idA] = p.hamDist;
+                  imgHam[p.idA] = p.hamDist;
+                  imgMSE[p.idA] = p.mse;
+                  rowTag[p.idB] = p.hamDist;
+                  imgHam[p.idB] = p.hamDist;
+                  imgMSE[p.idB] = p.mse;
+                  continue;
+               }
+
+               if (!hasA && !hasB)
+               {
+                  const UINT root = (p.idA < p.idB) ? p.idA : p.idB;
+                  rowRoot[p.idA] = rowRoot[p.idB] = root;
+                  rowTag[p.idA] = rowTag[p.idB] = p.hamDist;
+                  imgHam[p.idA] = imgHam[p.idB] = p.hamDist;
+                  imgMSE[p.idA] = imgMSE[p.idB] = p.mse;
+                  continue;
+               }
+
+               const UINT root = hasA ? rowRoot[p.idA] : rowRoot[p.idB];
+               // whichever of the two had no row yet gets one seeded at 100/2500, the same
+               // values pullDupeRowFromCache() seeded, so the min() below can only go down
+               if (!hasA) { imgHam[p.idA] = 100; imgMSE[p.idA] = QPV_MSD_NONE; }
+               if (!hasB) { imgHam[p.idB] = 100; imgMSE[p.idB] = QPV_MSD_NONE; }
+               rowRoot[p.idA] = rowRoot[p.idB] = root;
+               rowTag[p.idA] = rowTag[p.idB] = p.hamDist;
+
+               const UINT lowHam = (p.hamDist < imgHam[p.idA]) ? p.hamDist : imgHam[p.idA];
+               const UINT lowHam2 = (lowHam < imgHam[p.idB]) ? lowHam : imgHam[p.idB];
+               const UINT lowMSE = (p.mse < imgMSE[p.idA]) ? p.mse : imgMSE[p.idA];
+               const UINT lowMSE2 = (lowMSE < imgMSE[p.idB]) ? lowMSE : imgMSE[p.idB];
+               imgHam[p.idA] = lowHam2;
+               imgMSE[p.idA] = lowMSE2;
+               imgHam[p.idB] = p.hamDist;   // BreakDupesGroups keeps the pair's own values
+               imgMSE[p.idB] = p.mse;       // on the second image rather than the minimum
+           }
+        }
+        else
+        {
+           std::vector<UINT> parent(idSlots);
+           for ( size_t i = 0 ; i < idSlots ; i++)
+               parent[i] = (UINT)i;
+
+           // col 33/34 hold how close this image is to its nearest surviving match; the group
+           // ID's suffix holds the tightest pair anywhere in the group, which is identical to
+           // the minimum imgHam across that connected component.
+           for ( size_t i = 0 ; i < n ; i++)
+           {
+               const DupePairRec &p = dupesPairsList[i];
+               if (!dupesInRange(p.hamDist, hamLo, hamHi))
+                  continue;
+
+               if (allowMSE && !dupesInRange(p.mse, mseLo, mseHi))
+                  continue;
+
+               if (imgKeep!=NULL && (p.idA >= imgKeepCount || (imgKeep[p.idA] & 1)==0))
+                  continue;
+
+               const UINT ra = dupesFindRoot(parent, p.idA), rb = dupesFindRoot(parent, p.idB);
+               if (ra!=rb)
+                  parent[(ra > rb) ? ra : rb] = (ra < rb) ? ra : rb;
+
+               if (imgHam[p.idA]==NONE || p.hamDist < imgHam[p.idA]) imgHam[p.idA] = p.hamDist;
+               if (imgHam[p.idB]==NONE || p.hamDist < imgHam[p.idB]) imgHam[p.idB] = p.hamDist;
+               if (imgMSE[p.idA]==NONE || p.mse < imgMSE[p.idA])     imgMSE[p.idA] = p.mse;
+               if (imgMSE[p.idB]==NONE || p.mse < imgMSE[p.idB])     imgMSE[p.idB] = p.mse;
            }
 
-           if (!hasA && !hasB)
+           std::vector<UINT> grpHam(idSlots, NONE);
+           for ( size_t idu = 0 ; idu < idSlots ; idu++)
            {
-              const UINT root = (p.idA < p.idB) ? p.idA : p.idB;
-              rowRoot[p.idA] = rowRoot[p.idB] = root;
-              rowTag[p.idA] = rowTag[p.idB] = p.hamDist;
-              imgHam[p.idA] = imgHam[p.idB] = p.hamDist;
-              imgMSE[p.idA] = imgMSE[p.idB] = p.mse;
-              continue;
+               if (imgHam[idu]==NONE)
+                  continue;
+
+               const UINT r = dupesFindRoot(parent, (UINT)idu);
+               rowRoot[idu] = r;
+               if (grpHam[r]==NONE || imgHam[idu] < grpHam[r])
+                  grpHam[r] = imgHam[idu];
            }
 
-           const UINT root = hasA ? rowRoot[p.idA] : rowRoot[p.idB];
-           // whichever of the two had no row yet gets one seeded at 100/2500, the same
-           // values pullDupeRowFromCache() seeded, so the min() below can only go down
-           if (!hasA) { imgHam[p.idA] = 100; imgMSE[p.idA] = QPV_MSD_NONE; }
-           if (!hasB) { imgHam[p.idB] = 100; imgMSE[p.idB] = QPV_MSD_NONE; }
-           rowRoot[p.idA] = rowRoot[p.idB] = root;
-           rowTag[p.idA] = rowTag[p.idB] = p.hamDist;
+           for ( size_t idu = 0 ; idu < idSlots ; idu++)
+           {
+               if (rowRoot[idu]==NONE)
+                  continue;
 
-           const UINT lowHam = (p.hamDist < imgHam[p.idA]) ? p.hamDist : imgHam[p.idA];
-           const UINT lowHam2 = (lowHam < imgHam[p.idB]) ? lowHam : imgHam[p.idB];
-           const UINT lowMSE = (p.mse < imgMSE[p.idA]) ? p.mse : imgMSE[p.idA];
-           const UINT lowMSE2 = (lowMSE < imgMSE[p.idB]) ? lowMSE : imgMSE[p.idB];
-           imgHam[p.idA] = lowHam2;
-           imgMSE[p.idA] = lowMSE2;
-           imgHam[p.idB] = p.hamDist;   // BreakDupesGroups keeps the pair's own values
-           imgMSE[p.idB] = p.mse;       // on the second image rather than the minimum
-       }
+               const UINT r = rowRoot[idu];
+               rowTag[idu] = (grpHam[r]!=NONE) ? grpHam[r] : 0;
+           }
+        }
+
+        // sortDupeGroups(): count members per ROOT but flag survival per FULL group ID, which
+        // only differ under BreakDupesGroups - there the first remSingles members of a root
+        // are left unflagged under whatever label they happen to carry. Reproduced rather
+        // than tidied, because the option's whole point is that odd split.
+        size_t orderCount = 0;
+        for ( size_t idu = 0 ; idu < idSlots ; idu++)
+        {
+            if (rowRoot[idu]==NONE)
+               continue;
+
+            if (imgKeep!=NULL && idu < (size_t)imgKeepCount && (imgKeep[idu] & 2))
+               continue;
+
+            orderCount++;
+        }
+
+        std::vector<UINT> seen(idSlots, 0);
+        struct SortEnt { UINT root; UINT tag; UINT idu; };
+        std::vector<SortEnt> order;
+        std::vector<UINT64> keepIDs;
+        order.reserve(orderCount);
+        const UINT minMembers = (UINT)((remSingles > 0) ? remSingles : 0);
+        for ( size_t idu = 0 ; idu < idSlots ; idu++)
+        {
+            if (rowRoot[idu]==NONE)
+               continue;
+
+            if (imgKeep!=NULL && idu < (size_t)imgKeepCount && (imgKeep[idu] & 2))
+               continue;
+
+            const UINT root = rowRoot[idu];
+            const UINT tag  = rowTag[idu];
+            seen[root]++;
+            if (seen[root] > minMembers)
+               keepIDs.push_back(((UINT64)root << 32) | (UINT64)tag);
+
+            order.push_back({ root, tag, (UINT)idu });
+        }
+
+        std::sort(order.begin(), order.end(), [](const SortEnt &a, const SortEnt &b) {
+            if (a.root!=b.root) return a.root < b.root;
+            if (a.tag!=b.tag)   return dupesCmpTagLexZ(a.tag, b.tag) < 0;
+            return a.idu < b.idu;
+        });
+        std::sort(keepIDs.begin(), keepIDs.end());
+        keepIDs.erase(std::unique(keepIDs.begin(), keepIDs.end()), keepIDs.end());
+
+        dupesFilterRows.reserve(order.size());
+        for ( size_t i = 0 ; i < order.size() ; i++)
+        {
+            const UINT64 gidKey = ((UINT64)order[i].root << 32) | (UINT64)order[i].tag;
+            if (!std::binary_search(keepIDs.begin(), keepIDs.end(), gidKey))
+               continue;
+
+            const UINT idu = order[i].idu;
+            DupeResultRow row;
+            row.imgIndex = idu;
+            row.groupRoot = rowRoot[idu];
+            row.grpTag = rowTag[idu];
+            row.hamDist = (imgHam[idu]!=NONE) ? imgHam[idu] : 100;
+            row.mse = (imgMSE[idu]!=NONE) ? imgMSE[idu] : QPV_MSD_NONE;
+            dupesFilterRows.push_back(row);
+        }
     }
-    else
+    catch (...)
     {
-       std::vector<UINT> parent(maxId + 1);
-       for ( UINT i = 0 ; i <= maxId ; i++)
-           parent[i] = i;
-
-       for ( size_t k = 0 ; k < kept.size() ; k++)
-       {
-           const DupePairRec &p = dupesPairsList[kept[k]];
-           const UINT ra = dupesFindRoot(parent, p.idA), rb = dupesFindRoot(parent, p.idB);
-           if (ra!=rb)
-              parent[(ra > rb) ? ra : rb] = (ra < rb) ? ra : rb;
-       }
-
-       // col 33/34 hold how close this image is to its nearest surviving match; the group
-       // ID's suffix holds the tightest pair anywhere in the group
-       std::vector<UINT> grpHam(maxId + 1, NONE);
-       for ( size_t k = 0 ; k < kept.size() ; k++)
-       {
-           const DupePairRec &p = dupesPairsList[kept[k]];
-           if (imgHam[p.idA]==NONE || p.hamDist < imgHam[p.idA]) imgHam[p.idA] = p.hamDist;
-           if (imgHam[p.idB]==NONE || p.hamDist < imgHam[p.idB]) imgHam[p.idB] = p.hamDist;
-           if (imgMSE[p.idA]==NONE || p.mse < imgMSE[p.idA])     imgMSE[p.idA] = p.mse;
-           if (imgMSE[p.idB]==NONE || p.mse < imgMSE[p.idB])     imgMSE[p.idB] = p.mse;
-
-           const UINT r = dupesFindRoot(parent, p.idA);
-           if (grpHam[r]==NONE || p.hamDist < grpHam[r]) grpHam[r] = p.hamDist;
-       }
-
-       for ( UINT idu = 0 ; idu <= maxId ; idu++)
-       {
-           if (imgHam[idu]==NONE)
-              continue;
-
-           const UINT r = dupesFindRoot(parent, idu);
-           rowRoot[idu] = r;
-           rowTag[idu] = (grpHam[r]!=NONE) ? grpHam[r] : 0;
-       }
-    }
-
-    // sortDupeGroups(): count members per ROOT but flag survival per FULL group ID, which
-    // only differ under BreakDupesGroups - there the first remSingles members of a root
-    // are left unflagged under whatever label they happen to carry. Reproduced rather
-    // than tidied, because the option's whole point is that odd split.
-    std::vector<UINT> seen(maxId + 1, 0);
-    struct SortEnt { std::string key; std::string gid; UINT idu; };
-    std::vector<SortEnt> order;
-    std::vector<std::string> keepIDs;
-    order.reserve(kept.size());
-    UINT position = 0;
-    for ( UINT idu = 0 ; idu <= maxId ; idu++)
-    {
-        if (rowRoot[idu]==NONE)
-           continue;
-
-        if (imgKeep!=NULL && idu < imgKeepCount && (imgKeep[idu] & 2))
-           continue;
-
-        position++;   // the 1-based index of this row in ascending-idu order
-        SortEnt e;
-        e.idu = idu;
-        e.gid = dupesGroupID(rowRoot[idu], rowTag[idu]);
-
-        seen[rowRoot[idu]]++;
-        if (seen[rowRoot[idu]] > (UINT)((remSingles > 0) ? remSingles : 0))
-           keepIDs.push_back(e.gid);
-
-        dupesAppendPad9(e.key, rowRoot[idu]);
-        e.key += 'y';
-        e.key += e.gid;
-        e.key += 'z';
-        dupesAppendPad9(e.key, position);
-        order.push_back(e);
-    }
-
-    std::sort(order.begin(), order.end(), [](const SortEnt &a, const SortEnt &b) { return a.key < b.key; });
-    std::sort(keepIDs.begin(), keepIDs.end());
-
-    dupesFilterRows.reserve(order.size());
-    for ( size_t i = 0 ; i < order.size() ; i++)
-    {
-        if (!std::binary_search(keepIDs.begin(), keepIDs.end(), order[i].gid))
-           continue;
-
-        const UINT idu = order[i].idu;
-        DupeResultRow row;
-        row.imgIndex = idu;
-        row.groupRoot = rowRoot[idu];
-        row.grpTag = rowTag[idu];
-        row.hamDist = (imgHam[idu]!=NONE) ? imgHam[idu] : 100;
-        row.mse = (imgMSE[idu]!=NONE) ? imgMSE[idu] : QPV_MSD_NONE;
-        dupesFilterRows.push_back(row);
+        dupesFilterRows.clear();
+        dupesRestoreSavedPairs();
+        return 0;
     }
 
     if (dupesFilterRows.size() >= 2)
        dupesDropSavedPairs();
-    else
+    else if (dupesHasSavedPairs)
+    {
        dupesRestoreSavedPairs();
+       dupesFilterRows.clear();
+    }
 
     return (UINT)dupesFilterRows.size();
 }
@@ -1677,6 +1876,7 @@ DLL_API int DLL_CALLCONV dupesHaveMSD() {
 //     ORDER BY fold ASCII case on them and the key builder has to fold it too.
 
 static sqlite3      *dupesDB = NULL;      // private, read-only; AHK keeps its own handle
+static std::mutex    dupesDBMutex;        // guards dupesDB lifetime against cross-thread dupesEngineCancel()
 static sqlite3_stmt *dupesStmt = NULL;
 static std::atomic<int> dupesCancelFlag(0);
 static std::wstring  dupesEngineError;
@@ -1706,19 +1906,26 @@ static std::vector<unsigned char> dupesKeyCur, dupesKeyPrev;
 // pixel-collection statements. Its message is added only when its last call really failed;
 // "not an error" and the row/done notices say nothing about the failure.
 static void dupesSetError(const wchar_t *what, sqlite3 *db) {
-    dupesEngineError = (what!=NULL) ? what : L"";
-    if (db==NULL || SQ.errmsg16==NULL)
-       return;
-
-    const int code = (SQ.errcode!=NULL) ? (SQ.errcode(db) & 0xFF) : SQLITE_ERROR;
-    if (code==SQLITE_OK || code==SQLITE_ROW || code==SQLITE_DONE)
-       return;
-
-    const wchar_t *m = (const wchar_t*)SQ.errmsg16(db);
-    if (m!=NULL && m[0]!=0)
+    try
     {
-       dupesEngineError += L": ";
-       dupesEngineError += m;
+        dupesEngineError = (what!=NULL) ? what : L"";
+        if (db==NULL || SQ.errmsg16==NULL)
+           return;
+
+        const int code = (SQ.errcode!=NULL) ? (SQ.errcode(db) & 0xFF) : SQLITE_ERROR;
+        if (code==SQLITE_OK || code==SQLITE_ROW || code==SQLITE_DONE)
+           return;
+
+        const wchar_t *m = (const wchar_t*)SQ.errmsg16(db);
+        if (m!=NULL && m[0]!=0)
+        {
+           dupesEngineError += L": ";
+           dupesEngineError += m;
+        }
+    }
+    catch (...)
+    {
+        dupesEngineError.clear();
     }
 }
 
@@ -1736,39 +1943,65 @@ static int __cdecl dupesProgressCB(void*) {
 // wrong, and leaves AHK's handle free to be used concurrently.
 DLL_API int DLL_CALLCONV dupesEngineInit(const wchar_t *dbPath) {
     bindSQLiteOnce();
+    dupesEngineError.clear();
     if (!SQ.ok || dbPath==NULL || dbPath[0]==0)
        return 0;
 
     if (dupesStmt!=NULL) { SQ.finalize(dupesStmt); dupesStmt = NULL; }
-    if (dupesDB!=NULL)   { SQ.close_v2(dupesDB);   dupesDB = NULL; }
+    {
+       std::lock_guard<std::mutex> lk(dupesDBMutex);
+       if (dupesDB!=NULL)
+       {
+          if (SQ.progress_handler!=NULL)
+             SQ.progress_handler(dupesDB, 0, NULL, NULL);
+
+          SQ.close_v2(dupesDB);
+          dupesDB = NULL;
+       }
+    }
 
     const int need = WideCharToMultiByte(CP_UTF8, 0, dbPath, -1, NULL, 0, NULL, NULL);
     if (need <= 0)
        return 0;
 
-    std::vector<char> utf8((size_t)need);
+    std::vector<char> utf8;
+    try
+    {
+       utf8.resize((size_t)need);
+    }
+    catch (...)
+    {
+       dupesSetError(L"not enough memory to open the database", NULL);
+       return 0;
+    }
     WideCharToMultiByte(CP_UTF8, 0, dbPath, -1, utf8.data(), need, NULL, NULL);
 
     // FULLMUTEX because dupesEngineCancel() reaches this handle from the interface
     // thread; sqlite3_interrupt() is documented as safe either way, but a serialized
     // connection removes the question. A single-threaded build of sqlite3.dll ignores it.
-    const int rc = SQ.open_v2(utf8.data(), &dupesDB, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, NULL);
-    if (rc!=SQLITE_OK || dupesDB==NULL)
+    sqlite3 *newDB = NULL;
+    const int rc = SQ.open_v2(utf8.data(), &newDB, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, NULL);
+    if (rc!=SQLITE_OK || newDB==NULL)
     {
-       dupesSetError(L"could not open the database read-only", dupesDB);
-       if (dupesDB!=NULL) { SQ.close_v2(dupesDB); dupesDB = NULL; }
+       dupesSetError(L"could not open the database read-only", newDB);
+       if (newDB!=NULL) SQ.close_v2(newDB);
        return 0;
     }
 
     dupesCancelFlag.store(0, std::memory_order_relaxed);
     if (SQ.progress_handler!=NULL)
-       SQ.progress_handler(dupesDB, 4096, dupesProgressCB, NULL);
+       SQ.progress_handler(newDB, 4096, dupesProgressCB, NULL);
 
     // The database is opened by AHK with no pragmas at all. These two only affect this
     // connection and only make the scan cheaper: the ORDER BY sorts in RAM, and 64 MB of
     // page cache spares a re-read of the table on a second scan.
     if (SQ.exec!=NULL)
-       SQ.exec(dupesDB, "PRAGMA temp_store=MEMORY; PRAGMA cache_size=-65536;", NULL, NULL, NULL);
+       SQ.exec(newDB, "PRAGMA temp_store=MEMORY; PRAGMA cache_size=-65536;", NULL, NULL, NULL);
+
+    {
+       std::lock_guard<std::mutex> lk(dupesDBMutex);
+       dupesDB = newDB;
+    }
 
     return 1;
 }
@@ -1777,6 +2010,7 @@ DLL_API int DLL_CALLCONV dupesEngineRelease() {
     if (SQ.ok)
     {
        if (dupesStmt!=NULL) { SQ.finalize(dupesStmt); dupesStmt = NULL; }
+       std::lock_guard<std::mutex> lk(dupesDBMutex);
        if (dupesDB!=NULL)
        {
           if (SQ.progress_handler!=NULL)
@@ -1802,7 +2036,8 @@ DLL_API int DLL_CALLCONV dupesEngineRelease() {
 DLL_API int DLL_CALLCONV dupesEngineCancel() {
     dupesCancelFlag.store(1, std::memory_order_relaxed);
     dupesPixCancel.store(1, std::memory_order_relaxed);
-    if (SQ.ok && dupesDB!=NULL && SQ.interrupt!=NULL)
+    std::lock_guard<std::mutex> lk(dupesDBMutex);
+    if (dupesDB!=NULL && SQ.ok && SQ.interrupt!=NULL)
        SQ.interrupt(dupesDB);
 
     return 1;
@@ -1810,6 +2045,7 @@ DLL_API int DLL_CALLCONV dupesEngineCancel() {
 
 DLL_API int DLL_CALLCONV dupesEngineReady() {
     bindSQLiteOnce();
+    std::lock_guard<std::mutex> lk(dupesDBMutex);
     return (SQ.ok && dupesDB!=NULL) ? 1 : 0;
 }
 
@@ -1851,7 +2087,7 @@ static bool buildRowKey(sqlite3_stmt *st, const int firstCol, const int count, c
         {
            const sqlite3_int64 v = SQ.column_int64(st, col);
            const double d = (double)v;
-           if ((sqlite3_int64)d == v)
+           if (d >= -9223372036854775808.0 && d < 9223372036854775808.0 && (sqlite3_int64)d == v)
            {
               out.push_back(1);            // numeric: an INTEGER and a REAL of the same
               appendKeyBytes(out, &d, sizeof(d));   // value compare equal in SQLite
@@ -1877,7 +2113,7 @@ static bool buildRowKey(sqlite3_stmt *st, const int firstCol, const int count, c
            if (n < 0) n = 0;
            out.push_back(3);
            appendKeyBytes(out, &n, sizeof(n));
-           const bool fold = ((nocaseMask >> k) & 1u)!=0;
+           const bool fold = (k < 32) && (((nocaseMask >> k) & 1u)!=0);
            for ( int i = 0 ; i < n ; i++)
            {
                wchar_t c = s[i];
@@ -1973,13 +2209,18 @@ static void decodeFingerprintBytes(const unsigned char *blob, const UINT firstIn
        return;
 
     const UINT stride = dupesPixStride;
-    if ((size_t)(firstIndex + count) * stride > dupesPixData.size() || firstIndex + count > dupesPixOK.size())
+    if ((size_t)firstIndex > dupesPixOK.size() || (size_t)count > dupesPixOK.size() - (size_t)firstIndex)
+       return;
+
+    const size_t endIndex = (size_t)firstIndex + (size_t)count;
+    if (endIndex > dupesPixData.size() / (size_t)stride)
        return;
 
     for ( UINT rec = 0 ; rec < count ; rec++)
     {
         const unsigned char *src = blob + (size_t)rec * stride;
-        unsigned char *dst = &dupesPixData[(size_t)(firstIndex + rec) * stride];
+        const size_t slot = (size_t)firstIndex + (size_t)rec;
+        unsigned char *dst = &dupesPixData[slot * (size_t)stride];
         if (dupesPixScale > 1)
         {
            for ( UINT k = 0 ; k < stride ; k++)
@@ -1987,7 +2228,7 @@ static void decodeFingerprintBytes(const unsigned char *blob, const UINT firstIn
         } else
            memcpy(dst, src, stride);
 
-        dupesPixOK[firstIndex + rec] = 1;
+        dupesPixOK[slot] = 1;
     }
 }
 
@@ -2110,63 +2351,66 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
         if (rc==SQLITE_ROW)
         {
            dupesScanState.scanned++;
-           if (!buildRowKey(dupesStmt, base, dupesQCfg.keyCount, dupesQCfg.nocaseMask, dupesKeyCur))
+           bool appending = false;
+           size_t nPath = 0, nRows = 0, nHash = 0, nFlip = 0, nPixData = 0, nPixOK = 0;
+           try
            {
-              // a NULL key column: not a candidate, and it also breaks the run - two rows
-              // either side of it are not adjacent as far as grouping is concerned
-              dupesCloseRun();
-              dupesKeyPrev.clear();
-           }
-           else
-           {
-              UINT64 hash = 0, flip = 0;
-              bool usable = true;
-              if (colHash >= 0)
+              if (!buildRowKey(dupesStmt, base, dupesQCfg.keyCount, dupesQCfg.nocaseMask, dupesKeyCur))
               {
-                 const wchar_t *h = (const wchar_t*)SQ.column_text16(dupesStmt, colHash);
-                 usable = parseHexHash(h, (h!=NULL) ? SQ.column_bytes16(dupesStmt, colHash) / (int)sizeof(wchar_t) : 0, hash);
-                 flip = hash;
-                 if (usable && colFlip >= 0)
-                 {
-                    const wchar_t *f = (const wchar_t*)SQ.column_text16(dupesStmt, colFlip);
-                    // no flipped hash stored: mirroring its own hash makes the flipped
-                    // comparison degenerate to the ordinary one, which is harmless. A 0
-                    // would have matched every sparse hash in the group.
-                    if (!parseHexHash(f, (f!=NULL) ? SQ.column_bytes16(dupesStmt, colFlip) / (int)sizeof(wchar_t) : 0, flip))
-                       flip = hash;
-                 }
-              }
-
-              if (!usable)
-              {
+                 // a NULL key column: not a candidate, and it also breaks the run - two rows
+                 // either side of it are not adjacent as far as grouping is concerned
                  dupesCloseRun();
                  dupesKeyPrev.clear();
               }
               else
               {
-                 if (!dupesRunOpen || dupesKeyPrev!=dupesKeyCur)
+                 UINT64 hash = 0, flip = 0;
+                 bool usable = true;
+                 if (colHash >= 0)
                  {
-                    dupesCloseRun();
-                    dupesRunStart = dupesCandRows.size();
-                    dupesRunOpen = true;
-                    dupesKeyPrev = dupesKeyCur;
+                    const wchar_t *h = (const wchar_t*)SQ.column_text16(dupesStmt, colHash);
+                    usable = parseHexHash(h, (h!=NULL) ? SQ.column_bytes16(dupesStmt, colHash) / (int)sizeof(wchar_t) : 0, hash);
+                    flip = hash;
+                    if (usable && colFlip >= 0)
+                    {
+                       const wchar_t *f = (const wchar_t*)SQ.column_text16(dupesStmt, colFlip);
+                       // no flipped hash stored: mirroring its own hash makes the flipped
+                       // comparison degenerate to the ordinary one, which is harmless. A 0
+                       // would have matched every sparse hash in the group.
+                       if (!parseHexHash(f, (f!=NULL) ? SQ.column_bytes16(dupesStmt, colFlip) / (int)sizeof(wchar_t) : 0, flip))
+                          flip = hash;
+                    }
                  }
 
-                 DupeCandRow row;
-                 row.imgidu = (INT64)SQ.column_int64(dupesStmt, 0);
-                 row.megapix = SQ.column_double(dupesStmt, 2);
-                 row.fsize = (INT64)SQ.column_int64(dupesStmt, 3);
-                 row.groupID = 0;
-                 row.pathOffset = (UINT)dupesPathBuf.size();
-
-                 const wchar_t *p = (const wchar_t*)SQ.column_text16(dupesStmt, 1);
-                 const int plen = (p!=NULL) ? SQ.column_bytes16(dupesStmt, 1) / (int)sizeof(wchar_t) : 0;
-                 // the parallel arrays must stay the same length, so a row goes in whole or not at
-                 // all: dupesScanBuildFromQuery() indexes them in step
-                 const size_t nPath = dupesPathBuf.size(), nRows = dupesCandRows.size(), nHash = dupesScanHashes.size();
-                 const size_t nFlip = dupesScanFlipped.size(), nPixData = dupesPixData.size(), nPixOK = dupesPixOK.size();
-                 try
+                 // Hashes are not in ORDER BY, so an unparseable hash can sit in the middle
+                 // of an equal-key run. Skipping it without closing the run keeps the group
+                 // intact; if the row belonged to a new key, the next usable row (or EOF)
+                 // will close the previous run cleanly.
+                 if (usable)
                  {
+                    if (!dupesRunOpen || dupesKeyPrev!=dupesKeyCur)
+                    {
+                       dupesCloseRun();
+                       dupesKeyPrev = dupesKeyCur;
+                       dupesRunStart = dupesCandRows.size();
+                       dupesRunOpen = true;
+                    }
+
+                    DupeCandRow row;
+                    row.imgidu = (INT64)SQ.column_int64(dupesStmt, 0);
+                    row.megapix = SQ.column_double(dupesStmt, 2);
+                    row.fsize = (INT64)SQ.column_int64(dupesStmt, 3);
+                    row.groupID = 0;
+                    row.pathOffset = (UINT)dupesPathBuf.size();
+
+                    const wchar_t *p = (const wchar_t*)SQ.column_text16(dupesStmt, 1);
+                    const int plen = (p!=NULL) ? SQ.column_bytes16(dupesStmt, 1) / (int)sizeof(wchar_t) : 0;
+                    // the parallel arrays must stay the same length, so a row goes in whole or not at
+                    // all: dupesScanBuildFromQuery() indexes them in step
+                    nPath = dupesPathBuf.size(); nRows = dupesCandRows.size(); nHash = dupesScanHashes.size();
+                    nFlip = dupesScanFlipped.size(); nPixData = dupesPixData.size(); nPixOK = dupesPixOK.size();
+                    appending = true;
+
                     if (plen > 0)
                        dupesPathBuf.append(p, (size_t)plen);
 
@@ -2188,23 +2432,28 @@ DLL_API int DLL_CALLCONV dupesQueryStep(int msBudget) {
                        if (px!=NULL && pxlen==(int)stride)
                           decodeFingerprintBytes(px, (UINT)slot, 1);
                     }
-                 } catch (...)
-                 {
-                    dupesPathBuf.resize(nPath);
-                    dupesCandRows.resize(nRows);
-                    dupesScanHashes.resize(nHash);
-                    dupesScanFlipped.resize(nFlip);
-                    dupesPixData.resize(nPixData);
-                    dupesPixOK.resize(nPixOK);
-                    SQ.finalize(dupesStmt);
-                    dupesStmt = NULL;
-                    dupesScanState.lastError = 1;
-                    dupesScanState.phase = -1;
-                    // last: the message is a string, which can fail to allocate as well
-                    dupesSetError(L"the duplicates query ran out of memory", NULL);
-                    return -1;
                  }
               }
+           }
+           catch (...)
+           {
+              if (appending)
+              {
+                 dupesPathBuf.resize(nPath);
+                 dupesCandRows.resize(nRows);
+                 dupesScanHashes.resize(nHash);
+                 dupesScanFlipped.resize(nFlip);
+                 dupesPixData.resize(nPixData);
+                 dupesPixOK.resize(nPixOK);
+                 if (dupesRunOpen && dupesRunStart==nRows)
+                    dupesRunOpen = false;
+              }
+              SQ.finalize(dupesStmt);
+              dupesStmt = NULL;
+              dupesScanState.lastError = 1;
+              dupesScanState.phase = -1;
+              dupesSetError(L"the duplicates query ran out of memory", NULL);
+              return -1;
            }
 
            if (++sinceClock >= 256)
@@ -2293,63 +2542,69 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
     UINT prevGroup = 0;
     dupesScanGroupStart.clear();
     dupesScanIDs.clear();
-    dupesScanIDs.reserve(total);
 
-    for ( UINT i = 0 ; i < total ; i++)
+    try
     {
-        if (keepMask!=NULL && keepMask[i]==0)
-           continue;
+        dupesScanIDs.reserve(total);
+        if (dupesCandGroups < 0xFFFFFFFFu)
+           dupesScanGroupStart.reserve((size_t)dupesCandGroups + 1);
 
-        const UINT g = dupesCandRows[i].groupID;
-        if (g!=prevGroup)
+        for ( UINT i = 0 ; i < total ; i++)
         {
-           dupesScanGroupStart.push_back(kept);
-           prevGroup = g;
+            if (keepMask!=NULL && keepMask[i]==0)
+               continue;
+
+            const UINT g = dupesCandRows[i].groupID;
+            if (g!=prevGroup)
+            {
+               dupesScanGroupStart.push_back(kept);
+               prevGroup = g;
+            }
+
+            // compact in place: kept <= i always, so this never overwrites a row it still
+            // has to read
+            dupesScanHashes[kept] = dupesScanHashes[i];
+            if (wantFlip)
+               dupesScanFlipped[kept] = dupesScanFlipped[i];
+
+            if (wantPix)
+            {
+               if (kept!=i)
+                  memmove(&dupesPixData[(size_t)kept * dupesPixStride], &dupesPixData[(size_t)i * dupesPixStride], dupesPixStride);
+
+               dupesPixOK[kept] = dupesPixOK[i];
+            }
+
+            dupesScanIDs.push_back(idBase + kept + 1);
+            kept++;
         }
 
-        // compact in place: kept <= i always, so this never overwrites a row it still
-        // has to read
-        dupesScanHashes[kept] = dupesScanHashes[i];
+        dupesScanHashes.resize(kept);
         if (wantFlip)
-           dupesScanFlipped[kept] = dupesScanFlipped[i];
+           dupesScanFlipped.resize(kept);
 
         if (wantPix)
         {
-           if (kept!=i)
-              memmove(&dupesPixData[(size_t)kept * dupesPixStride], &dupesPixData[(size_t)i * dupesPixStride], dupesPixStride);
-
-           dupesPixOK[kept] = dupesPixOK[i];
+           dupesPixData.resize((size_t)kept * dupesPixStride);
+           dupesPixOK.resize(kept);
         }
 
-        dupesScanIDs.push_back(idBase + kept + 1);
-        kept++;
+        if (kept >= 2 && !dupesScanGroupStart.empty())
+           dupesScanGroupStart.push_back(kept);
     }
-
-    dupesScanHashes.resize(kept);
-    if (wantFlip)
-       dupesScanFlipped.resize(kept);
-
-    if (wantPix)
+    catch (...)
     {
-       dupesPixData.resize((size_t)kept * dupesPixStride);
-       dupesPixOK.resize(kept);
-    }
-
-    dupesScanRows = kept;
-    dupesScanState.rows = (LONG)kept;
-    if (kept < 2 || dupesScanGroupStart.empty())
-    {
-       dupesScanState.phase = 5;
-       return 0;
-    }
-
-    dupesScanGroupStart.push_back(kept);
-    if (!dupesScanBuildRowEnd())
-    {
-       dupesScanGroupStart.clear();
-       dupesScanState.lastError = 1;
-       dupesScanState.phase = -1;
-       return 0;
+        dupesScanGroupStart.clear();
+        dupesScanIDs.clear();
+        dupesScanRowEnd.clear();
+        dupesScanRows = 0;
+        dupesScanState.rows = 0;
+        dupesScanState.groups = 0;
+        dupesScanState.total = 0;
+        dupesScanState.lastError = 1;
+        dupesScanState.phase = -1;
+        dupesSetError(L"not enough memory to prepare the duplicates sweep", NULL);
+        return 0;
     }
 
     INT64 comparisons = 0;
@@ -2357,6 +2612,32 @@ DLL_API int DLL_CALLCONV dupesScanBuildFromQuery(const unsigned char *keepMask, 
     {
         const INT64 m = (INT64)(dupesScanGroupStart[g + 1] - dupesScanGroupStart[g]);
         comparisons += m * (m - 1) / 2;
+    }
+
+    if (kept < 2 || dupesScanGroupStart.size() < 2 || comparisons < 1)
+    {
+       dupesScanGroupStart.clear();
+       dupesScanRowEnd.clear();
+       dupesScanRows = 0;
+       dupesScanState.rows = 0;
+       dupesScanState.groups = 0;
+       dupesScanState.total = 0;
+       dupesScanState.phase = 5;
+       return 0;
+    }
+
+    dupesScanRows = kept;
+    dupesScanState.rows = (LONG)kept;
+    if (!dupesScanBuildRowEnd())
+    {
+       dupesScanGroupStart.clear();
+       dupesScanRows = 0;
+       dupesScanState.rows = 0;
+       dupesScanState.groups = 0;
+       dupesScanState.total = 0;
+       dupesScanState.lastError = 1;
+       dupesScanState.phase = -1;
+       return 0;
     }
 
     if (!dupesHasSavedPairs && !dupesPairsList.empty())
@@ -2620,143 +2901,174 @@ DLL_API int DLL_CALLCONV dupesHashStep(int batch) {
     if (batch < 1)
        batch = 256;
 
-    const INT64 cursorWas = dupesHashCursor, wroteWas = dupesHashWritten, skippedWas = dupesHashSkipped;
-    std::vector<INT64> ids;
-    std::vector<INT64> badIds;    // written back after the SELECT is reset, never during
-    ids.reserve(batch);
-    // sized once and kept: resizing a vector that is already this big does nothing at all,
-    // so only the first batch of a run pays for the 2 MB pHash needs
-    dupesHashPixBuf.resize((size_t)batch * dupesHashPix);
-    int *pix = dupesHashPixBuf.data();
-    bool sawRow = false;
-
-    SQ.reset(dupesHashSel);
-    if (SQ.bind_int64!=NULL)
+    if (dupesHashPix < 1 || (size_t)batch > ((size_t)-1) / (size_t)dupesHashPix)
     {
-       SQ.bind_int64(dupesHashSel, 1, batch);
-       // ?2 is the keyset cursor. A selectSQL that has no ?2 - the older bare-LIMIT form -
-       // makes this a no-op that answers SQLITE_RANGE, which is why one build serves both.
-       SQ.bind_int64(dupesHashSel, 2, dupesHashCursor);
+       dupesSetError(L"the hash generation ran out of memory", NULL);
+       return -1;
     }
 
-    for (;;)
+    const INT64 cursorWas = dupesHashCursor, wroteWas = dupesHashWritten, skippedWas = dupesHashSkipped;
+    try
     {
-        const int rc = SQ.step(dupesHashSel);
-        if (rc==SQLITE_ROW)
+        std::vector<INT64> ids;
+        std::vector<INT64> badIds;    // written back after the SELECT is reset, never during
+        ids.reserve((size_t)batch);
+        // sized once and kept: resizing a vector that is already this big does nothing at all,
+        // so only the first batch of a run pays for the 2 MB pHash needs
+        dupesHashPixBuf.resize((size_t)batch * (size_t)dupesHashPix);
+        int *pix = dupesHashPixBuf.data();
+        bool sawRow = false;
+
+        SQ.reset(dupesHashSel);
+        if (SQ.bind_int64!=NULL)
         {
-           const unsigned char *s = (const unsigned char*)SQ.column_blob(dupesHashSel, 1);
-           const int n = (s!=NULL) ? SQ.column_bytes(dupesHashSel, 1) : 0;
-           const INT64 id = (INT64)SQ.column_int64(dupesHashSel, 0);
-           sawRow = true;
-           // every row read moves the cursor, hashable or not - a fingerprint that cannot
-           // be hashed is still done with, and leaving it in front of the cursor would
-           // hand it back on the next batch
-           if (id > dupesHashCursor)
-              dupesHashCursor = id;
-
-           // a fingerprint of the wrong length was skipped by the AHK too: it tested
-           // arrayChars.Count()=72 before hashing. The row is only remembered here and
-           // written below: stepping an UPDATE against "images" while this SELECT is
-           // still scanning it leaves what the cursor sees next undefined, which is the
-           // very reason the good rows are held back to the end of the batch as well.
-           if (n!=dupesHashPix)
-           {
-              badIds.push_back(id);
-              continue;
-           }
-
-           int *d = pix + ids.size() * (size_t)dupesHashPix;
-           for ( int i = 0 ; i < n ; i++)
-               d[i] = dupesHashLUT[s[i]];
-
-           ids.push_back(id);
-           if ((int)ids.size() >= batch)
-              break;
-
-           continue;
+           SQ.bind_int64(dupesHashSel, 1, batch);
+           // ?2 is the keyset cursor. A selectSQL that has no ?2 - the older bare-LIMIT form -
+           // makes this a no-op that answers SQLITE_RANGE, which is why one build serves both.
+           SQ.bind_int64(dupesHashSel, 2, dupesHashCursor);
         }
 
-        if (rc==SQLITE_DONE || rc==SQLITE_INTERRUPT)
-           break;
+        for (;;)
+        {
+            const int rc = SQ.step(dupesHashSel);
+            if (rc==SQLITE_ROW)
+            {
+               const unsigned char *s = (const unsigned char*)SQ.column_blob(dupesHashSel, 1);
+               const int n = (s!=NULL) ? SQ.column_bytes(dupesHashSel, 1) : 0;
+               const INT64 id = (INT64)SQ.column_int64(dupesHashSel, 0);
+               sawRow = true;
+               // every row read moves the cursor, hashable or not - a fingerprint that cannot
+               // be hashed is still done with, and leaving it in front of the cursor would
+               // hand it back on the next batch
+               if (id > dupesHashCursor)
+                  dupesHashCursor = id;
 
-        dupesSetError(L"the hash-generation query failed", dupesHashDB);
+               // a fingerprint of the wrong length was skipped by the AHK too: it tested
+               // arrayChars.Count()=72 before hashing. The row is only remembered here and
+               // written below: stepping an UPDATE against "images" while this SELECT is
+               // still scanning it leaves what the cursor sees next undefined, which is the
+               // very reason the good rows are held back to the end of the batch as well.
+               if (n!=dupesHashPix)
+               {
+                  badIds.push_back(id);
+                  continue;
+               }
+
+               int *d = pix + ids.size() * (size_t)dupesHashPix;
+               for ( int i = 0 ; i < n ; i++)
+                   d[i] = dupesHashLUT[s[i]];
+
+               ids.push_back(id);
+               if ((int)ids.size() >= batch)
+                  break;
+
+               continue;
+            }
+
+            if (rc==SQLITE_DONE)
+               break;
+
+            dupesHashCursor = cursorWas;
+            dupesSetError((rc==SQLITE_INTERRUPT) ? L"the hash generation was cancelled" : L"the hash-generation query failed", dupesHashDB);
+            SQ.reset(dupesHashSel);
+            return -1;
+        }
+
         SQ.reset(dupesHashSel);
+
+        // A row whose fingerprint cannot be hashed is given an EMPTY hash, not "0". Either
+        // one takes it out of the "hash IS NULL" result set, which is what stops it being
+        // offered again - but "0" is a legitimate hash value (dupesHexHash(0) writes it, and
+        // a uniform image really does hash to zero), and the candidate query keeps every row
+        // for which ifnull(hash,'')!='', so "0" would drop all of these into the duplicates
+        // set at distance 0 from one another and from every flat image in the library. The
+        // empty string is exactly what that filter exists to exclude.
+        // nByte counts BYTES for bind_text16, not characters: 0 is the empty string.
+        if (!badIds.empty() && SQ.bind_text16!=NULL && SQ.bind_int64!=NULL)
+        {
+           for ( size_t i = 0 ; i < badIds.size() ; i++)
+           {
+               SQ.reset(dupesHashUpd);
+               SQ.bind_text16(dupesHashUpd, 1, L"", 0, QPV_SQLITE_STATIC);
+               SQ.bind_int64(dupesHashUpd, 2, badIds[i]);
+               const int urc = SQ.step(dupesHashUpd);
+               if (urc==SQLITE_DONE)
+                  dupesHashSkipped++;
+               else if (urc==SQLITE_INTERRUPT)
+               {
+                  SQ.reset(dupesHashUpd);
+                  dupesSetError(L"the hash generation was cancelled", dupesHashDB);
+                  return -1;
+               }
+               else
+                  dupesHashFailed++;
+           }
+
+           SQ.reset(dupesHashUpd);
+        }
+
+        // Not "there is nothing left to do": the SELECT is capped at `batch` rows, so a batch
+        // that was entirely unhashable says nothing about the rows behind it. Answering 0
+        // here ended the whole run and reported it as finished, leaving every image after
+        // those rows unhashed. They have just been marked, so the next call moves past them.
+        if (ids.empty())
+           return sawRow ? dupesHashStillMoving(cursorWas, wroteWas, skippedWas) : 0;
+
+        const int count = (int)ids.size();
+        std::vector<UINT64> out((size_t)count, 0);
+        const int kind = dupesHashKind, stride = dupesHashPix, mode = dupesHashMode;
+        const int *pixData = pix;
+        UINT64 *outData = out.data();
+
+        // Only pHash is worth a crew. It is 65 536 multiply-adds per image through
+        // calculateDCT(), 19.5 ms for a batch of 512 on one core, and a whole 200 000 image
+        // run goes from 8.0 s to 2.7 s when the crew is let loose on it. dHash and lHash are a
+        // few dozen comparisons over 72 numbers - the same batch is 0.03 ms and 0.06 ms -
+        // while starting and joining the crew costs 0.15 ms whatever it is asked to do, so
+        // threading those made them three to six times SLOWER [tests/hash_bench.cpp].
+        const bool worthATeam = (kind==3);
+        dupesParallelFor(count, [pixData, outData, kind, stride, mode](int i) {
+            const int *p = pixData + (size_t)i * stride;
+            if (kind==2)      outData[i] = dupesDHash(p);
+            else if (kind==4) outData[i] = dupesLHash(p);
+            else              outData[i] = dupesPHash(p, mode);
+        }, worthATeam);
+
+        for ( int i = 0 ; i < count ; i++)
+        {
+            wchar_t hex[32];
+            dupesHexHash(out[i], hex, 32);
+            SQ.reset(dupesHashUpd);
+            if (SQ.bind_text16!=NULL)
+               SQ.bind_text16(dupesHashUpd, 1, hex, -1, QPV_SQLITE_TRANSIENT);
+
+            if (SQ.bind_int64!=NULL)
+               SQ.bind_int64(dupesHashUpd, 2, ids[i]);
+
+            const int rc = SQ.step(dupesHashUpd);
+            if (rc==SQLITE_DONE)
+               dupesHashWritten++;
+            else if (rc==SQLITE_INTERRUPT)
+            {
+               SQ.reset(dupesHashUpd);
+               dupesSetError(L"the hash generation was cancelled", dupesHashDB);
+               return -1;
+            }
+            else
+               dupesHashFailed++;
+        }
+
+        SQ.reset(dupesHashUpd);
+        return dupesHashStillMoving(cursorWas, wroteWas, skippedWas);
+    }
+    catch (...)
+    {
+        dupesHashCursor = cursorWas;
+        if (dupesHashSel!=NULL) SQ.reset(dupesHashSel);
+        if (dupesHashUpd!=NULL) SQ.reset(dupesHashUpd);
+        dupesSetError(L"the hash generation ran out of memory", NULL);
         return -1;
     }
-
-    SQ.reset(dupesHashSel);
-
-    // A row whose fingerprint cannot be hashed is given an EMPTY hash, not "0". Either
-    // one takes it out of the "hash IS NULL" result set, which is what stops it being
-    // offered again - but "0" is a legitimate hash value (dupesHexHash(0) writes it, and
-    // a uniform image really does hash to zero), and the candidate query keeps every row
-    // for which ifnull(hash,'')!='', so "0" would drop all of these into the duplicates
-    // set at distance 0 from one another and from every flat image in the library. The
-    // empty string is exactly what that filter exists to exclude.
-    // nByte counts BYTES for bind_text16, not characters: 0 is the empty string.
-    if (!badIds.empty() && SQ.bind_text16!=NULL && SQ.bind_int64!=NULL)
-    {
-       for ( size_t i = 0 ; i < badIds.size() ; i++)
-       {
-           SQ.reset(dupesHashUpd);
-           SQ.bind_text16(dupesHashUpd, 1, L"", 0, QPV_SQLITE_STATIC);
-           SQ.bind_int64(dupesHashUpd, 2, badIds[i]);
-           if (SQ.step(dupesHashUpd)==SQLITE_DONE)
-              dupesHashSkipped++;
-           else
-              dupesHashFailed++;
-       }
-
-       SQ.reset(dupesHashUpd);
-    }
-
-    // Not "there is nothing left to do": the SELECT is capped at `batch` rows, so a batch
-    // that was entirely unhashable says nothing about the rows behind it. Answering 0
-    // here ended the whole run and reported it as finished, leaving every image after
-    // those rows unhashed. They have just been marked, so the next call moves past them.
-    if (ids.empty())
-       return sawRow ? dupesHashStillMoving(cursorWas, wroteWas, skippedWas) : 0;
-
-    const int count = (int)ids.size();
-    std::vector<UINT64> out((size_t)count, 0);
-    const int kind = dupesHashKind, stride = dupesHashPix, mode = dupesHashMode;
-    const int *pixData = pix;
-    UINT64 *outData = out.data();
-
-    // Only pHash is worth a crew. It is 65 536 multiply-adds per image through
-    // calculateDCT(), 19.5 ms for a batch of 512 on one core, and a whole 200 000 image
-    // run goes from 8.0 s to 2.7 s when the crew is let loose on it. dHash and lHash are a
-    // few dozen comparisons over 72 numbers - the same batch is 0.03 ms and 0.06 ms -
-    // while starting and joining the crew costs 0.15 ms whatever it is asked to do, so
-    // threading those made them three to six times SLOWER [tests/hash_bench.cpp].
-    const bool worthATeam = (kind==3);
-    dupesParallelFor(count, [pixData, outData, kind, stride, mode](int i) {
-        const int *p = pixData + (size_t)i * stride;
-        if (kind==2)      outData[i] = dupesDHash(p);
-        else if (kind==4) outData[i] = dupesLHash(p);
-        else              outData[i] = dupesPHash(p, mode);
-    }, worthATeam);
-
-    for ( int i = 0 ; i < count ; i++)
-    {
-        wchar_t hex[32];
-        dupesHexHash(out[i], hex, 32);
-        SQ.reset(dupesHashUpd);
-        if (SQ.bind_text16!=NULL)
-           SQ.bind_text16(dupesHashUpd, 1, hex, -1, QPV_SQLITE_TRANSIENT);
-
-        if (SQ.bind_int64!=NULL)
-           SQ.bind_int64(dupesHashUpd, 2, ids[i]);
-
-        const int rc = SQ.step(dupesHashUpd);
-        if (rc==SQLITE_DONE)
-           dupesHashWritten++;
-        else
-           dupesHashFailed++;
-    }
-
-    SQ.reset(dupesHashUpd);
-    return dupesHashStillMoving(cursorWas, wroteWas, skippedWas);
 }
 
 DLL_API INT64 DLL_CALLCONV dupesHashWrittenCount() { return dupesHashWritten; }
@@ -2823,6 +3135,26 @@ double calcArrayAvgMedian(std::array<double, 64> givenArray, int modus) {
     }
 }
 
+// Immutable 32x32 DCT table, initialized once on first use (thread-safe in C++11+) so
+// calcPHashAlgo() and dupesHashStep() can never silently produce all-zero hashes when
+// calculateDCTcoeffs(32) has not been called or was called with another size.
+static const std::array<double, 1025>& dupesDCTcoeffs32() {
+    static const std::array<double, 1025> table = []() {
+        std::array<double, 1025> t = {};
+        int idx = 0;
+        for (int i = 0; i < 32; i++)
+        {
+            for (int j = 0; j < 32; j++)
+            {
+                idx++;
+                t[idx] = cos(i * M_PI * (j + 0.5) / 32);
+            }
+        }
+        return t;
+    }();
+    return table;
+}
+
 DLL_API int DLL_CALLCONV calculateDCTcoeffs(int size) {
     // DCTcoeffs is std::array<double, 1025> and is filled 1-based, so size*size
     // must stay within 1024; calculateDCT() is hard-coded to 32 anyway
@@ -2838,6 +3170,9 @@ DLL_API int DLL_CALLCONV calculateDCTcoeffs(int size) {
         }
     }
 
+    if (size == 32)
+       (void)dupesDCTcoeffs32();
+
     return 1;
 }
 
@@ -2846,6 +3181,7 @@ auto calculateDCT(const std::array<double, 32> &matrix, int col, int loopu) {
     std::array<double, 32> transformed;
     // double div2sz = sqrt(2.0 / size);
     // double div2sq = 1 / sqrt(2.0);
+    const std::array<double, 1025> &coeffs = dupesDCTcoeffs32();
 
     int thisIndex = 0;
     for (int i = 0; i < 32; i++)
@@ -2853,7 +3189,7 @@ auto calculateDCT(const std::array<double, 32> &matrix, int col, int loopu) {
         double sum = 0.0;
         for (int j = 0; j < 32; j++) {
             thisIndex++;
-            sum += matrix[j] * DCTcoeffs[thisIndex];
+            sum += matrix[j] * coeffs[thisIndex];
             // sum += matrix[j] * cos(i * M_PI * (j + 0.5) / 32);
         }
 
@@ -2875,22 +3211,22 @@ DLL_API INT64 DLL_CALLCONV calcPHashAlgo(unsigned char *givenArray, UINT size, i
     // givenArray is the pixels fingerprint
     // The buffers below, calculateDCT() and the DCTcoeffs table are all fixed at
     // 32; any other size would run the loops past the end of the stack arrays.
-    if (size != 32)
+    if (givenArray == NULL || size != 32)
        return 0;
 
     // calculate DCT for rows
     double rows[32][32];
     std::array<double, 32>  trow;
     // fnOutputDebug("calcPHashAlgo: init before loop" + to_string(size));
-    for ( int y = 0; y < size; y++)
+    for ( int y = 0; y < 32; y++)
     {
-        for (int x = 0; x < size; x++) 
+        for (int x = 0; x < 32; x++) 
         {
-            trow[x] = givenArray[x + size*y];
+            trow[x] = givenArray[x + 32*y];
         }
 
         auto transformed = calculateDCT(trow, y, 1);
-        for (int x = 0; x < size; x++) 
+        for (int x = 0; x < 32; x++) 
         {
             rows[y][x] = transformed[x];
             // fnOutputDebug("calcPHashAlgo: row DCT=" + to_string(rows[y][x]));
@@ -2904,15 +3240,15 @@ DLL_API INT64 DLL_CALLCONV calcPHashAlgo(unsigned char *givenArray, UINT size, i
     // calculte DCT for columns
     double matrix[32][32];
     std::array<double, 32>  col;
-    for (int x = 0; x < size; x++)
+    for (int x = 0; x < 32; x++)
     {
-        for (int y = 0; y < size; y++)
+        for (int y = 0; y < 32; y++)
         {
             col[y] = rows[y][x];
         }
 
         auto transformed = calculateDCT(col, x, 2);
-        for (int y = 0; y < size; y++)
+        for (int y = 0; y < 32; y++)
         {
             matrix[x][y] = transformed[y];
         }
@@ -2931,22 +3267,20 @@ DLL_API INT64 DLL_CALLCONV calcPHashAlgo(unsigned char *givenArray, UINT size, i
         }
     }
     // fnOutputDebug("calcPHashAlgo: third for-loop" + to_string(fpexels[13]));
-    INT64 one = 0x0000000000000001;
-    INT64 hash = 0x0000000000000000;
+    UINT64 hash = 0;
 
-    // Calculate hash
+    // Calculate hash (unsigned shift avoids C++17 signed left-shift UB at bits 62..63)
     double compareTerm = calcArrayAvgMedian(fpexels, compareMethod);
     // fnOutputDebug("calcPHashAlgo: compareTerm =" + to_string(compareTerm));
     for (int x = 0; x < 64; x++)
     {
         // resultsArray[x] = (fpexels[x] > compareTerm) ? 1 : 0;
         if (fpexels[x] > compareTerm)
-           hash |= one;
-        one = one << 1;
+           hash |= (1ULL << x);
     }
 
     // fnOutputDebug("calcPHashAlgo: ended=" + to_string(hash));
-    return hash;
+    return (INT64)hash;
 }
 // qpv-dct-block-end - tests/run-tests.sh slices calcArrayAvgMedian .. calcPHashAlgo out
 // of here for the hash oracle. Leave the marker in place.

@@ -32,15 +32,12 @@ typedef unsigned long long UINT64;
 typedef long long          INT64;
 typedef int                INT;
 typedef int                LONG;
-typedef void*              HWND;
-typedef const wchar_t*     LPCWSTR;
 #define DLL_API extern "C"
 #define DLL_CALLCONV
 #define QPV_FORCEINLINE inline __attribute__((always_inline))
 
 __attribute__((unused)) static void fnOutputDebug(std::string) {}
 #define QPV_DBG(...) fnOutputDebug(__VA_ARGS__)
-static void SetWindowText(HWND, LPCWSTR) {}
 
 #include "header_extract.h"
 void dupesQueryFreeRows() {}
@@ -416,6 +413,48 @@ int main() {
               "the same thresholds twice give byte-identical results");
         check(tight.size() <= wide.size(), "a narrower threshold cannot add rows");
         check(dupesPairsList.size()==pairs.size(), "the pair list survives being filtered");
+    }
+
+    // S2 + S9 + S11 regressions
+    {
+        // S9: id == UINT_MAX must not wrap maxId+1 or infinite-loop, and must restore saved pairs
+        dupesClearPairs();
+        const std::vector<DupePairRec> saved = {{2, 1, 0, 2500}, {3, 2, 1, 2500}};
+        dupesSavedPairs = saved;
+        dupesSavedMSD = 1;
+        dupesHasSavedPairs = true;
+        dupesPairsList = {{0xFFFFFFFFu, 1, 0, 2500}};
+        dupesPairsMSD = 0;
+        const UINT gotWrap = dupesApplyFilter(0, 12, 0, 400, 0, 0, NULL, 0);
+        check(gotWrap == 0 && dupesFilterRowCount() == 0 &&
+              dupesPairsList.size() == 2 && dupesHaveMSD() == 1 && !dupesHasSavedPairs,
+              "S9: UINT_MAX image ID fails cleanly and restores saved pairs");
+
+        // S11: a failed second search leaving 1 surviving row must clear dupesFilterRows on restore
+        dupesClearPairs();
+        dupesSavedPairs = saved;
+        dupesSavedMSD = 1;
+        dupesHasSavedPairs = true;
+        dupesPairsList = {{2, 1, 0, 2500}};
+        dupesPairsMSD = 0;
+        const unsigned char keepDel[3] = {1, 1, 1 | 2};   // image 2 deleted -> 1 surviving row
+        const UINT gotOne = dupesApplyFilter(0, 12, 0, 400, 0, 0, keepDel, 3);
+        check(gotOne == 0 && dupesFilterRowCount() == 0 &&
+              dupesPairsList.size() == 2 && dupesHaveMSD() == 1 && !dupesHasSavedPairs,
+              "S11: 1-row failed search clears dupesFilterRows when restoring saved pairs");
+
+        // S2: BreakDupesGroups=1 lexicographic tag ordering ("10z" < "2z" and "10z" < "1z")
+        dupesClearPairs();
+        const std::vector<DupePairRec> tagOrder = {
+            {2, 1, 1, 2500}, {3, 1, 10, 2500}, {4, 1, 2, 2500}, {5, 1, 11, 2500}
+        };
+        const std::vector<unsigned char> none;
+        const std::vector<std::pair<long long, RefRow> > refTag =
+            refFilter(tagOrder, 0, 12, 0, 2500, /*breakGroups*/ 1, 0, none, false);
+        const std::vector<DupeResultRow> gotTag =
+            runShipped(tagOrder, 0, 12, 0, 2500, /*breakGroups*/ 1, 0, none, 0);
+        check(sameResult(refTag, gotTag, why),
+              "S2: integer sort preserves BreakDupesGroups lex tag order (10z < 1z < 2z)");
     }
 
     printf("\n  %s\n", failures ? "FILTER ORACLE FAILED" : "filter oracle passed");
