@@ -375,7 +375,7 @@ MsgBox2(sMsg, title, btnList:=0, btnDefault:=1, icon:="", fontFace:="", doBold:=
   If (dropListu && DropListMode=0)
      Gui, Add, DropDownList, xp y+%marginz% w%listWidth% AltSubmit vDropListuChoice, % dropListu
   Else If (dropListu && DropListMode=1)
-     Gui, Add, ComboBox, xp y+%marginz% w%listWidth% gUIgenericComboAction vDropListuChoice, % dropListu
+     Gui, Add, ComboBox, xp y+%marginz% w%listWidth% gUIgenericComboAction vDropListuChoice, % LTrim(dropListu, "`f")
   Else If (dropListu && (DropListMode=2 || DropListMode=3))
      Gui, Add, ListBox, xp y+%marginz% r%listRows% w%listWidth% AltSubmit %multisel% vDropListuChoice, % dropListu
 

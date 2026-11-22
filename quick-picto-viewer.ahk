@@ -47650,17 +47650,28 @@ PanelAutoSelectDupes() {
    }
 
    fakeWinCreator(50, A_ThisFunc, 1)
-   SearchdStringz := Trimmer(SearchdStringz) "`f"
+   SearchdStringz := Trimmer(SearchdStringz)
+   comboList := SearchdStringz ? SearchdStringz : "`f"
    widthu := (PrefsLargeFonts=1) ? 1060 : 560
-   msgResult := msgBoxWrapper("panelu|Auto-select duplicate images " appTitle, "When Automatic mode is selected, the smallest image (in MPx) will be selected. If all dupes in the group have the same resolution, then the smallest file will be selected. If both size and resolution are equal, the images' folder paths that match the string below will NOT be selected.`n`nYou can use | as the OR operator for multiple keywords. Wildcards ? and * are supported as well.`n`nBegin with one of the following symbols to...`n   / match folder paths that begin with given string`n   > match folder paths that end with given string.`n   \> to use Regular Expressions", "&Select files|&Find duplicates|C&ancel", 1, "search", "", 0, SearchdStringz "`f`f", nullEdit,nullEdit, 1, widthu, "Automatic`f`fSmallest files`fSmallest resolution (MPx)", 2)
+   msgResult := msgBoxWrapper("panelu|Auto-select duplicate images " appTitle, "When Automatic mode is selected, the smallest image (in MPx) will be selected. If all dupes in the group have the same resolution, then the smallest file will be selected. If both size and resolution are equal, the images' folder paths that match the string below will NOT be selected.`n`nYou can use | as the OR operator for multiple keywords. Wildcards ? and * are supported as well.`n`nBegin with one of the following symbols to...`n   / match folder paths that begin with given string`n   > match folder paths that end with given string.`n   \> to use Regular Expressions", "&Select files|&Find duplicates|C&ancel", 1, "search", "", 0, comboList, nullEdit,nullEdit, 1, widthu, "Automatic`f`fSmallest files`fSmallest resolution (MPx)", 2)
    If InStr(msgResult.btn, "select")
    {
       thisString := Trimmer(msgResult.list)
-      thisString := StrReplace(thisString, "||", "|")
-      thisString := Trimmer(thisString, "|")
+      isRegEx := (SubStr(thisString, 1, 2)="\>") ? 1 : 0
+      If (isRegEx!=1)
+      {
+         thisString := StrReplace(thisString, "||", "|")
+         thisString := Trimmer(thisString, "|")
+      }
       thisStringo := processSearchIndexString(thisString)
-      If (thisStringo && !InStr(SearchdStringz, thisString "`f"))
-         SearchdStringz .= thisString "`f"
+      If (isRegEx=1 && (StrLen(thisString)<=2 || !isValidRegEx(thisStringo) || (RegExMatch(thisString, "^\\>[[:alnum:] \t]*\)\s*$") && isValidRegEx(SubStr(thisString, 3)))))
+      {
+         msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern.")
+         SetTimer, PanelAutoSelectDupes, -200
+         Return
+      }
+      If (thisStringo && !InStr("`f" SearchdStringz "`f", "`f" thisString "`f"))
+         SearchdStringz .= (SearchdStringz!="" ? "`f" : "") thisString
       autoSelectDupesInGroups(msgResult.2ndlist, thisStringo)
    } Else If InStr(msgResult.btn, "find")
       PanelFindDupes()
