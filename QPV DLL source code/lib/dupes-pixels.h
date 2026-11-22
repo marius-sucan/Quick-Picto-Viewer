@@ -436,10 +436,6 @@ static bool dpJobAbandoned(LONG jobGeneration, const DpPool *pool = NULL) {
     return dupesPixCancel.load()!=0 || jobGeneration!=dpGeneration.load();
 }
 
-static bool dpIsTransientFimStatus(int status) {
-    return status==TP_ERR_RESIZE || status==TP_ERR_CONVERT || status==TP_ERR_TONEMAP;
-}
-
 struct DpBitmapGuard {
     Gdiplus::GpBitmap *p = NULL;
     ~DpBitmapGuard() { if (p!=NULL) Gdiplus::DllExports::GdipDisposeImage(p); }
@@ -525,6 +521,7 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
     {
        hasTriedFim = 1;
        meta = TpSrcMeta();
+       // the status is not looked at: any failure hands the file to the loaders below, as in tpRunJob()
        int status = TP_ERR_LOAD, saved = 0, fw = 0, fh = 0;
        bmp = tpFIMthumb(&tcfg, path, L"", GetTickCount(), fw, fh, status, saved, &meta);
        if (bmp!=NULL)
@@ -535,10 +532,6 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
              srcW = fw;
              srcH = fh;
           }
-       } else if (dpIsTransientFimStatus(status))
-       {
-          transientErr = true;
-          return NULL;
        }
     }
 
@@ -567,20 +560,13 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
                 srcW = fw;
                 srcH = fh;
              }
-          } else
+          } else if (cfg.allowWIC==1 && (ext==L"tif" || ext==L"tiff"))
           {
-             if (dpIsTransientFimStatus(status))
-             {
-                transientErr = true;
-                return NULL;
-             }
-             if (cfg.allowWIC==1 && (ext==L"tif" || ext==L"tiff"))
-             {
-                meta = TpSrcMeta();
-                bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
-                if (bmp!=NULL)
-                   loaderUsed = 1;
-             }
+             // a TIFF WIC handed over that FreeImage cannot read: WIC decodes it after all
+             meta = TpSrcMeta();
+             bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
+             if (bmp!=NULL)
+                loaderUsed = 1;
           }
        }
     }

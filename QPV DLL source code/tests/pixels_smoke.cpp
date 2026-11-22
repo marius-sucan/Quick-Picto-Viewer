@@ -516,29 +516,39 @@ static void jobPipeline() {
         gShimFimFails = 0;
     }
 
-    // FreeImage post-decode failures are transient and do not mark dead or fall through
+    // a FreeImage resize, convert or tone-map failure is a failed loader like a load failure:
+    // the file goes on to WIC and GDI+, and is a failed decode only when none of them reads it
     {
-        const int transientCodes[3] = {TP_ERR_RESIZE, TP_ERR_CONVERT, TP_ERR_TONEMAP};
-        bool allTransient = true;
+        const int laterCodes[3] = {TP_ERR_RESIZE, TP_ERR_CONVERT, TP_ERR_TONEMAP};
+        bool allGoOn = true, allFail = true;
         gShimFimFails = 1;
         for ( int i = 0 ; i < 3 ; i++)
         {
-            gShimFimFailStatus = transientCodes[i];
+            gShimFimFailStatus = laterCodes[i];
             gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
-            DupePixResult resTr;
-            runOne(L"img2.exr", cfg, resTr);
-            if (resTr.status!=DP_ERR_PROCESS || gShimFimCalls!=1 || gShimWicCalls!=0 || gShimGdipCalls!=0)
-               allTransient = false;
+            DupePixResult resGo;
+            runOne(L"img2.exr", cfg, resGo);
+            if (resGo.status!=DP_OK || resGo.loaderUsed!=1 || gShimFimCalls!=1 || gShimWicCalls!=1 || gShimGdipCalls!=0)
+               allGoOn = false;
+
+            gShimWicFails = gShimGdipFails = 1;
+            gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+            DupePixResult resNone;
+            runOne(L"img2.exr", cfg, resNone);
+            if (resNone.status!=DP_ERR_LOAD || gShimFimCalls!=1 || gShimWicCalls!=1 || gShimGdipCalls!=1)
+               allFail = false;
+            gShimWicFails = gShimGdipFails = 0;
         }
-        check(allTransient, "FreeImage resize/convert/tonemap failures return DP_ERR_PROCESS without fallback");
+        check(allGoOn, "a FreeImage resize, convert or tone-map failure goes on to WIC");
+        check(allFail, "and fails the decode when WIC and GDI+ cannot read the file either");
 
         gShimWicFails = 1;
         gShimFimFailStatus = TP_ERR_RESIZE;
         gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
-        DupePixResult resTr2;
-        runOne(L"img1.jpg", cfg, resTr2);
-        check(resTr2.status==DP_ERR_PROCESS && gShimWicCalls==1 && gShimFimCalls==1 && gShimGdipCalls==0,
-              "FreeImage fallback resize failure returns DP_ERR_PROCESS without GDI+");
+        DupePixResult resGdip;
+        runOne(L"img1.jpg", cfg, resGdip);
+        check(resGdip.status==DP_OK && resGdip.loaderUsed==6 && gShimWicCalls==1 && gShimFimCalls==1 && gShimGdipCalls==1,
+              "the same failure of FreeImage as the loader after WIC goes on to GDI+");
         gShimWicFails = 0;
         gShimFimFails = 0;
         gShimFimFailStatus = TP_ERR_LOAD;
