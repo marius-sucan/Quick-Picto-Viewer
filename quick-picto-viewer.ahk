@@ -2618,7 +2618,7 @@ endCaptureCloneBrush() {
    If (mustCaptureCloneBrush=1)
       quickBarPickCancel("end")
    mustCaptureCloneBrush := 0
-   setMenuBarState("Enable", "PVbar")
+   syncMenuBarState()
    createGUItoolbar()
 }
 
@@ -17005,7 +17005,7 @@ recordUndoLevelNow(actionu, recordedBitmap, dX:=0, dY:=0, forceAlpha:="x") {
 
    currentImgModified := 1
    SetTimer, ResetImgLoadStatus, -50
-   SetTimer, TriggerMenuBarUpdate, -50
+   SetTimer, TriggerMenuBarUpdate, -90
    If (A_TickCount - lastInvoked>950) && (liveDrawingBrushTool=0 && AnyWindowOpen!=66)
       SoundBeep , 900, 100
 }
@@ -25374,7 +25374,7 @@ PasteHDropFiles(allowFilesPaste) {
       } Else showTOOLtip("No image files identified in the clipboard`nFiles list unchanged.")
    } Else RemoveTooltip()
 
-   SetTimer, ResetImgLoadStatus, -100
+   SetTimer, ResetImgLoadStatus, -50
    createGUItoolbar()
    SetTimer, TriggerMenuBarUpdate, -90
    SetTimer, RemoveTooltip, % -msgDisplayTime
@@ -33737,7 +33737,7 @@ coreSetFilesFilteru(stringu, noStringProcessing:=0) {
   }
 
   SetTimer, ResetImgLoadStatus, -50
-  SetTimer, TriggerMenuBarUpdate, -50
+  SetTimer, TriggerMenuBarUpdate, -90
   SetTimer, createGUItoolbar, -100
   SetTimer, RemoveTooltip, % -msgDisplayTime
   If (StrLen(filesFilter)>1 && noStringProcessing!=1 && maxFilesIndex>0)
@@ -43072,9 +43072,9 @@ GoQuickSearchAction(dummy:="", isGiven:=0, ef:=0) {
          Else If RegExMatch(userQuickMenusEdit, "i)(.\.sld)$")
             importSLDplainText(userQuickMenusEdit)
 
+         SetTimer, ResetImgLoadStatus, -50
          SetTimer, TriggerMenuBarUpdate, -90
          SetTimer, createGUItoolbar, -100
-         SetTimer, ResetImgLoadStatus, -200
       } Else If (funcu="!OmniOpenImage")
       {
          RecordImagesOpenedManager(userQuickMenusEdit)
@@ -49556,7 +49556,7 @@ StopColorPicker() {
    Gui, LEDgui: Destroy
    colorPickerModeNow := 0
    Global lastOtherWinClose := A_TickCount
-   setMenuBarState("Enable", "PVbar")
+   syncMenuBarState()
 }
 
 StartPickingColor(a:=0, b:=0, c:=0, d:=0) {
@@ -66192,9 +66192,9 @@ addNewFile2list() {
       dummyTimerDelayiedImageDisplay(50)
    }
 
+   SetTimer, ResetImgLoadStatus, -50
    SetTimer, TriggerMenuBarUpdate, -90
    SetTimer, createGUItoolbar, -100
-   SetTimer, ResetImgLoadStatus, -200
    SetTimer, RemoveTooltip, % -msgDisplayTime//2
 }
 
@@ -67331,7 +67331,7 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       {
          currentFileIndex := (maxFilesIndex<2) ? maxFilesIndex : maxFilesIndex - 1
          SetTimer, createGUItoolbar, -100
-         TriggerMenuBarUpdate()
+         SetTimer, TriggerMenuBarUpdate, -90
       }
       dummyTimerDelayiedImageDisplay(10)
    } Else If (imgsListu && countFiles=1 && !CurrentSLD)
@@ -67401,8 +67401,8 @@ GuiDroppedFiles(ByRef imgsListu, foldersListu, sldFile, countFiles, isCtrlDown) 
       SetTimer, ResetImgLoadStatus, -50
       msgBeepTimer("", (A_TickCount - lastInvoked>2000) ? 900 : 0)
       currentFileIndex := maxFilesIndex
-      SetTimer, createGUItoolbar, -10
-      TriggerMenuBarUpdate()
+      SetTimer, createGUItoolbar, -100
+      SetTimer, TriggerMenuBarUpdate, -90
       dummyTimerDelayiedImageDisplay(150)
       If (thumbsDisplaying=1 && thumbsListViewMode=1)
          SetTimer, QPV_ListViewGridHUDoverlay, -100
@@ -71731,7 +71731,7 @@ StopCaptureClickStuff(dummy:=0) {
    msgBeepTimer("Operation abandoned: define source point")
    If (dummy!="escape" && panelWinCollapsed=1 && imgEditPanelOpened=1 && AnyWindowOpen)
       toggleImgEditPanelWindow()
-   setMenuBarState("Enable", "PVbar")
+   syncMenuBarState()
 }
 
 BuildMainMenu(dummy:=0, givenCoords:=0) {
@@ -76163,7 +76163,7 @@ ResetImgLoadStatus() {
      uiChangeMcursor("normal-extra")
      If (ShowAdvToolbar=1 && TouchToolbarGUIcreated=1)
         SetTimer, createGUItoolbar, -100
-  } Else If (imageLoading=1)
+  } Else If (imageLoading=1 || runningLongOperation=1)
      SetTimer, ResetImgLoadStatus, -70
 }
 
@@ -89584,6 +89584,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       resultedFilesList := candList
       maxFilesIndex := candCount
       groupsFound := validGroups
+      ResetImgLoadStatus()
    }
 
    prevMode := searchCols

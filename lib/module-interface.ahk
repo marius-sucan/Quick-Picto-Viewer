@@ -730,9 +730,13 @@ BuildGUI() {
 }
 
 setMenuBarState(modus, mena:="PVbar") {
-  Critical, on 
+  prevCrit := A_IsCritical
+  Critical, on
   If (showMainMenuBar!=1)
+  {
+     Critical, %prevCrit%
      Return
+  }
 
   hBar := DllCall("user32\GetMenu", "UPtr", PVhwnd, "UPtr")
   If (!hBar || MenuGetName(hBar)!=mena)
@@ -747,6 +751,7 @@ setMenuBarState(modus, mena:="PVbar") {
            menuArray[A_Index, 4] := modus
         }
      }
+     Critical, %prevCrit%
      Return
   }
 
@@ -765,7 +770,12 @@ setMenuBarState(modus, mena:="PVbar") {
 
   If changed
      DllCall("user32\DrawMenuBar", "UPtr", PVhwnd)
-  ; ToolTip, % modus " s=" menuTotalIndex , , , 2
+  Critical, %prevCrit%
+}
+
+syncMenuBarState() {
+  actu := (AnyWindowOpen && !imgEditPanelOpened || runningLongOperation=1 || mustCaptureCloneBrush=1 || colorPickerModeNow>=1) ? "Disable" : "Enable"
+  setMenuBarState(actu)
 }
 
 initAppBusyMode() {
@@ -775,7 +785,7 @@ initAppBusyMode() {
      lastLongOperationStart := A_TickCount
      lastCloseInvoked := 0
      setTaskbarIconState("anim")
-     ; setMenuBarState("Disable")
+     syncMenuBarState()
 }
 
 setTaskbarIconState(mode) {
@@ -1708,20 +1718,18 @@ uiChangeMcursor(whichCursor) {
         , hCursCross := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32515, "UPtr")  ; IDC_Cross
         , hCursFinger := DllCall("user32\LoadCursorW", "UPtr", NULL, "Int", 32649, "UPtr")
 
-  If (slideShowRunning=1 || animGIFplaying=1)
-     Return
-
-  If (A_TickCount - lastZeitPanCursor<50)
-     thisCursor := hCursMove
-
   If (whichCursor="normal-extra")
   {
      userPendingAbortOperations := imageLoading := mustAbandonCurrentOperations := 0
      runningLongOperation := lastCloseInvoked := whileLoopExec := 0
      setTaskbarIconState("normal")
-     ; setMenuBarState("Enable")
+     syncMenuBarState()
+     If (slideShowRunning=1 || animGIFplaying=1)
+        Return
      thisCursor := hCursN
-  } Else If (whichCursor="busy-img")
+  } Else If (slideShowRunning=1 || animGIFplaying=1)
+     Return
+  Else If (whichCursor="busy-img")
   {
      lastCloseInvoked := 0
      If (runningLongOperation=1)
@@ -2473,6 +2481,7 @@ UpdateMenuBar(modus:=0, tt:=0) {
    ; ToolTip, % thisState "`n" prevState , , , 2
    If (prevState=thisState)
    {
+      syncMenuBarState()
       SetTimer, updateTlbrPosition, -300
       Return
    }
@@ -2488,8 +2497,7 @@ UpdateMenuBar(modus:=0, tt:=0) {
 
    ; Sleep, -1
    BuildMenuBar(modus)
-   actu := (AnyWindowOpen && !imgEditPanelOpened || runningLongOperation=1) ? "Disable" : "Enable"
-   setMenuBarState(actu)   ; before attaching, so the bar is created already in this state
+   syncMenuBarState()   ; before attaching, so the bar is created already in this state
    Gui, PVwin: Menu, PVbar
    prevState := thisState
    SetTimer, updateTlbrPosition, -300
