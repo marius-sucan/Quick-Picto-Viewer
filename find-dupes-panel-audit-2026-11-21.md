@@ -36,16 +36,28 @@ substring check as Finding 12 of `files-filter-panel-audit-2026-11-20.md`. The k
 250 ms gate (`move-copy-files-panel-audit-2026-11-20.md`, Seen in passing D) applies to this panel too
 and is noted briefly under «Seen in passing».
 
-**Status, 2026-11-21.** Finding 1 is partly fixed in `60f52cc` (by Marius): «Find duplicates» asks to
+**Status, 2026-11-22.** Finding 1 is partly fixed in `60f52cc` (by Marius): «Find duplicates» asks to
 save an edited image before running, while Sort → «Duplicates ID group» (`ActSortDupeGroups()`) is
 still open. Finding 2 is partly fixed: 2.1 is fixed in `60f52cc` (by Marius), and 2.2 and 2.4 are
 fixed in `d94e991` (with Marius's answers to decisions 2(b) and 2(d), building on `60f52cc`'s
 `"reopen"` cleanup); 2.3 (one selected file in Option 6) stays open. `d94e991` also adds Option 7's
-missing `uiPopulateCachesOverview("kill")` from 16.10. Findings 4 (`ecddb73`), 6 (`6df9c63`) and 7
-(`2227f02`) are fixed (with Marius's answers to decisions 4, 6 and 7); `ecddb73` also removes the dead
-`gupdateUIFiltersPanel` bindings from 16.3. Findings 3, 5, and 8 to 16 are otherwise open. A fixed or
-partly fixed section ends with a note on what the code does now; those notes cite lines at the
-revision named in the note (`d94e991` for Findings 1–2, `2227f02` for Findings 4, 6 and 7).
+missing `uiPopulateCachesOverview("kill")` from 16.10. Finding 3 is partly fixed in `e4daf94` (by
+Marius): 3.2 (Preset 1 now pins all Tab 2 options instead of inheriting disabled controls) and 3.3
+(Custom + `dHash 8x8` now enables «Attempt to identify color inverted images») are fixed; 3.1
+(«Collect image pixels data» forcing `findFlippedDupes := 1`) and 3.4 (Presets 1–6 overwriting Custom
+mode's saved Tab 2 globals — now widened for Preset 1) remain open. Findings 4 (`ecddb73`), 6
+(`6df9c63`) and 7 (`2227f02`) are fixed (with Marius's answers to decisions 4, 6 and 7); `ecddb73`
+also removes the dead `gupdateUIFiltersPanel` bindings from 16.3. Finding 5 is partly fixed in
+`e4daf94` (by Marius): 5.2 (re-running «Auto-select dupes» over an existing selection) is fixed via a
+random offset on `lastZeitFileSelect`; 5.1 (one duplicate pair deselected by the one-file rule) stays
+open. `e4daf94` also removes the sentence fragment from `BTNfindDupesNow()`'s DLL failure box in
+16.11. Finding 8 is partly fixed in `79d0e05`: `PanelFindDupes()` (and all other 54 previously
+unchecked panels, 56 call sites total) now checks `createSettingsGUI()`'s return value and returns
+on failure, eliminating the «Main panel» AutoHotkey error and panel corruption; the 1-second
+post-dialog refusal on «Overview», «Main panel», Escape and «Close panel» stays open. Findings 9 to
+16 are otherwise open. A fixed or partly fixed section ends with a note on what the code does now;
+those notes cite lines at the revision named in the note (`d94e991` for Findings 1–2, `2227f02` for
+Findings 4, 6 and 7, `e4daf94` for Findings 3, 5 and 16.11, `79d0e05` for Finding 8).
 
 ## Terms
 
@@ -91,16 +103,16 @@ revision named in the note (`d94e991` for Findings 1–2, `2227f02` for Findings
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `2227f02` |
+| # | Finding | Harm | Checked | Status at `79d0e05` |
 |---|---------|------|---------|---------------------|
 | 1 | «Find duplicates» discards an edited, unsaved image without a question — even when no duplicates are found | high | run | **partly fixed**, `60f52cc` («Find duplicates» fixed; `ActSortDupeGroups()` open) |
 | 2 | «Purge cached data»: «All (modified files only)» clears `CurrentSLD` and ignores the active filter it promises; «All (selected files only)» refuses one selected file; the dialog reopens Statistics instead of this panel | high | run | **partly fixed**, `60f52cc`, `d94e991` (2.1, 2.2, 2.4 fixed; 2.3 open) |
-| 3 | «Collect image pixels data» silently forces flipped-image detection on; Preset 1 runs disabled Tab 2 options, and Custom + dHash runs disabled inverted-image detection | high | run | open |
+| 3 | «Collect image pixels data» silently forces flipped-image detection on; Preset 1 runs disabled Tab 2 options, and Custom + dHash runs disabled inverted-image detection | high | run | **partly fixed**, `e4daf94` (3.2, 3.3 fixed; 3.1, 3.4 open) |
 | 4 | «Cancel» does not cancel: live handlers mutate globals and write to the `.SLDB` on disk, corrupting Ctrl+F threshold filtering and sorting on an active duplicates list | medium | run | **fixed**, `ecddb73` |
-| 5 | «Auto-select dupes» selects nothing on a single duplicate pair, and leaves `markedSelectFile=0` when re-run while files are already selected | high | run | open |
+| 5 | «Auto-select dupes» selects nothing on a single duplicate pair, and leaves `markedSelectFile=0` when re-run while files are already selected | high | run | **partly fixed**, `e4daf94` (5.2 fixed; 5.1 open) |
 | 6 | Presets 2 to 6 (including «Identical file names») never collect missing data and report «Found no image duplicates» on a fresh database | medium | run | **fixed**, `6df9c63` |
 | 7 | Tab 4's string filter and «Exclude the current list of results»: singletons in non-hash modes, `\|\|\|` matching every file, and «Exclude» enabled with no filter active | medium | run | **fixed**, `2227f02` |
-| 8 | «Main panel» in «Change hashes threshold» within a second of a message box raises an AutoHotkey error; «Overview», Escape and context-menu «Close panel» silently fail for a second after Help | medium | run | open |
+| 8 | «Main panel» in «Change hashes threshold» within a second of a message box raises an AutoHotkey error; «Overview», Escape and context-menu «Close panel» silently fail for a second after Help | medium | run | **partly fixed**, `79d0e05` (AutoHotkey error / panel corruption fixed across all panels; 1 s post-dialog refusal open) |
 | 9 | The «Found N groups» count is wrong on every hash search, and a failed second search desyncs the selection count and breaks Ctrl+F on the restored list | medium | run, and read for filter globals | open |
 | 10 | The non-SLDB dialog defaults to «Remove duplicate entries», and «Yes» opens «Save indexed files list» on `.SLD` instead of `.SLDB` | medium | run | open |
 | 11 | After «Find duplicates» runs once, `qpvmain.dll` keeps the `.SLDB` open, so rebuilding or overwriting the database fails with «Permission denied» and leaves `SLDtypeLoaded=2` | medium | run | open |
@@ -108,18 +120,22 @@ revision named in the note (`d94e991` for Findings 1–2, `2227f02` for Findings
 | 13 | Panel rebuilds («Collect image pixels data», «Overview» → «Back», «Dark mode UI», «Large UI fonts») lose unsaved settings, jump to Tab 1 from Statistics, and drop «Back» inside «Overview» | low | run | open |
 | 14 | Numeric threshold edits (`editF7`, `editFr`, `editFc`) reject `0`, and typing an out-of-range number leaves it on screen while silently reading the old value | low | run | open |
 | 15 | «Size (kilobytes)» goes stale when «Size (bytes)» is checked, and Tab 2's preview overlaps «Identify images horizontally flipped» in Large UI fonts | low | run | open |
-| 16 | Small things, numbered 16.1 to 16.16 | low | run and read | open (16.3 fixed in `ecddb73`; 16.10 Option 7 overview kill fixed in `d94e991`) |
+| 16 | Small things, numbered 16.1 to 16.16 | low | run and read | open (16.3 fixed in `ecddb73`; 16.10 Option 7 overview kill fixed in `d94e991`; 16.11 DLL box fragment fixed in `e4daf94`) |
 
 Finding 1 loses unsaved image edits for good (fixed for «Find duplicates» in `60f52cc`; Sort →
 «Duplicates ID group» remains open). Finding 2 clears `CurrentSLD` (fixed in `60f52cc`), purges
 cached data outside the active filter that its own confirmation box promised to respect and reopens
 the wrong panel (both fixed in `d94e991`), and refuses a single selected file in Option 6 (open).
-Findings 3 and 5 silently change which images match or get
-selected for deletion: Preset 1 can group unrelated, flipped or inverted images under greyed-out
-controls, while «Auto-select dupes» either clears its own selection on a single pair or leaves rows
-selected with a selection count of zero. Findings 4 (`ecddb73`), 6 (`6df9c63`) and 7 (`2227f02`) are
-fixed; Findings 9 to 12 still return wrong results, break follow-up actions (Ctrl+F, Sort, Rebuild), or
-ignore an abort.
+In Finding 3, Preset 1's inheritance of disabled Tab 2 options (3.2) and Custom + `dHash 8x8`'s
+disabled inverted-image checkbox (3.3) are fixed in `e4daf94`, while «Collect image pixels data»
+still forces `findFlippedDupes := 1` (3.1) and Presets 1–6 still overwrite Custom mode's saved Tab 2
+settings (3.4, now widened for Preset 1). In Finding 5, re-running «Auto-select dupes» over an
+existing selection no longer drops `markedSelectFile` to `0` (`e4daf94`), while a single duplicate
+pair is still deselected by the one-file rule (5.1). Findings 4 (`ecddb73`), 6 (`6df9c63`) and 7
+(`2227f02`) are fixed. Finding 8's AutoHotkey runtime error and panel corruption are fixed in
+`79d0e05` (all 74 `createSettingsGUI()` call sites now check failure), while the 1-second
+post-dialog refusal remains open; Findings 9 to 12 still return wrong counts, break follow-up
+actions (Ctrl+F, Sort, Rebuild), or ignore an abort.
 
 ---
 
@@ -315,6 +331,45 @@ Run at `d94e991` (batch I):
    Custom's `ham=3 crop=4/4` becomes `ham=2 crop=1/1`), and Presets 2 to 6 overwrite
    `userFindDupesFilterHamDist := 1` («Ignore», :91497-91498; run B3g: `ham=2` becomes `1`).
 
+**Partly fixed in `e4daf94`** (Marius; lines at `e4daf94`):
+
+- **3.2 — Fixed in `e4daf94` (Marius):** `BTNfindDupesNow()` (:91618-91624) now sets every Tab 2
+  option explicitly for Preset 1: `userFindDupesHamDistLvl := userFindDupesFilterHamDist := 2`
+  (`dHash 8x8`, threshold `2`), `BreakDupesGroups := PerformMSDonDupes := findInvertedDupes := 0`,
+  and `findFlippedDupes := hamDistLBorderCrop := hamDistRBorderCrop := 1` (so Preset 1 intentionally
+  matches horizontally flipped images, and with `PerformMSDonDupes=0` the MSD threshold
+  `userFindDupesMSElvl` is unused). Stale disabled Tab 2 controls can no longer leak into Preset 1.
+- **3.3 — Fixed in `e4daf94` (Marius):** `UIfindDupesCheckboxes()` (:91514) drops `hamType!=2`
+  (`actu := (hamType>1 && doMSD!=1 && thisPreset=7) ...`), so «Attempt to identify color inverted
+  images» is enabled and controllable under Custom mode + `dHash 8x8` whenever MSD is off (and stays
+  disabled and forced to `0` by `BTNfindDupesNow()` :91554-91555 when `PerformMSDonDupes=1`).
+- **3.1 — Still open:** `BtnCollectDupesData()` (:91372) still executes `Global findFlippedDupes := 1`,
+  forcing flipped-pixel collection and leaving «Identify images horizontally flipped» ticked in Custom
+  mode when the panel reopens.
+- **3.4 — Still open (and widened for Preset 1):** Because :91620-91622 and :91638-91639 still assign
+  directly to the super-globals before `InitialFindDupesSettingsPanel(1)` (:91678) commits them,
+  running Preset 1 now overwrites all eight Tab 2 Custom settings other than `userFindDupesMSElvl`
+  (`userFindDupesFilterHamDist`, `userFindDupesHamDistLvl`, `hamDistLBorderCrop`, `hamDistRBorderCrop`,
+  `findFlippedDupes`, `findInvertedDupes`, `BreakDupesGroups`, `PerformMSDonDupes`), and Presets 2 to 6
+  still overwrite `userFindDupesFilterHamDist := 1`.
+
+Run at `e4daf94` (batch J):
+
+- **3.2 and 3.4** (J1a, J1b): starting from Custom mode with `pHash`, `crop=4/4`, `thr=12`, `flip=0`,
+  `inv=1`, `brk=1`, `msd=1/300`, switching to Preset 1 (Tab 2 disabled) calls
+  `retrieveDupesByProperties()` with `ham=2 thr=2 crop=1/1 flip=1 inv=0 msd=0/300 brk=0` — excluding
+  `a_edit.png` (`h=4`) and not inverted-matching `g1`/`g1_inv`, while matching `a_flip.png` into
+  `a1`/`a2` as intended — and overwrites all eight Tab 2 globals (`ham=2 thr=2 crop=1/1 flip=1 inv=0
+  brk=0 msd=0`, J1a). Running Preset 2 afterwards still overwrites `userFindDupesFilterHamDist` to `1`
+  (J1b).
+- **3.3** (J2a–J2c): in Custom mode + `dHash 8x8` with `PerformMSDonDupes=0`, Tab 2 shows
+  `findInvertedDupes` enabled (`enabled=1`); ticking it matches `g1.png` + `g1_inv.png`
+  (`maxFilesIndex=4`, `pairs=2`, J2a), unticking it drops them (`maxFilesIndex=2`, `pairs=1`, J2b),
+  and ticking `PerformMSDonDupes=1` disables both `findInvertedDupes` and `findFlippedDupes`
+  (`enabled=0`) and forces both to `0` (J2c).
+- **3.1** (J3): starting with `findFlippedDupes=0`, clicking «Collect image pixels data» calls
+  `collectSQLFileInfosNow("HpixelzFsmall", ...)` and reopens panel 49 with `findFlippedDupes=1`.
+
 ---
 
 ## 4. «Cancel» does not cancel: live handlers mutate globals and write to the `.SLDB`
@@ -417,6 +472,29 @@ Tab 2 controls.
    rows (`dirb\b2.png` and `dirb\g1_inv.png`) are marked selected (`*`) while `markedSelectFile=0`.
    Every action that checks `markedSelectFile` (Delete, Move, Copy, Purge selected) then sees zero
    selected files (read).
+
+**Partly fixed in `e4daf94`** (Marius; lines at `e4daf94`):
+
+- **5.2 — Fixed in `e4daf94` (Marius):** `autoSelectDupesInGroups()` (:89599-89600) now executes
+  `Random, J, 100, 500` and `lastZeitFileSelect := A_TickCount + J` before calling
+  `getSelectedFiles(0, 1)` (:89601). When files are already selected, `dropFilesSelection(1)` →
+  `updateFilesSelectionInfos()` resets `lastZeitFileSelect := A_TickCount` (:85029), so
+  `A_TickCount + J` is guaranteed to be at least 100 ms past that tick and forces
+  `getSelectedFiles(0, 1)` to rescan instead of hitting `lastIDcount`. *(Read caveat: if
+  `autoSelectDupesInGroups()` is re-run within 400 ms while `markedSelectFile=0` — where
+  `dropFilesSelection(1)` returns early — two random `A_TickCount + J` values still have a small
+  chance of colliding; likewise if another zero-based recount such as `invertFilesSelection()` happens
+  to run on that exact future `A_TickCount` tick `J` ms later.)*
+- **5.1 — Still open:** `autoSelectDupesInGroups()` still finishes with `getSelectedFiles(0, 1)`
+  (:89601), whose one-file rule (:39951-39958) unmarks the single selected image of a 1-pair list.
+
+Run at `e4daf94` (batch J):
+
+- **5.2** (J4b): on 2 duplicate pairs, five consecutive back-to-back calls to
+  `autoSelectDupesInGroups(1)` (`dt=9–20 ms`) followed by two UI runs via `PanelAutoSelectDupes()` all
+  finish with `markedSelectFile=2` and 2 rows marked `*` (`b_small.png`, `a_small.png`).
+- **5.1** (J4a): on 1 duplicate pair (`a_small.png` and `a_big.png`), «Auto-select dupes» → «Select
+  files» still finishes with `markedSelectFile=0` and neither file selected.
 
 ---
 
@@ -543,6 +621,25 @@ next 1000 ms, `CloseWindow()` without `"yes"` refuses to close the open panel (:
   pressing Escape (`SettingsGUIAGuiEscape` → `CloseWindow()`), or choosing «Close panel» from the
   panel right-click menu all silently do nothing (`AnyWindowOpen` stays `49`). After 1.1 s, clicking
   «&Overview» opens panel 91 normally.
+
+**Partly fixed in `79d0e05`** (lines at `79d0e05`):
+
+- **AutoHotkey error / panel corruption — Fixed in `79d0e05`:** `PanelFindDupes()` (:91352-91353) —
+  along with all other 54 previously unchecked panels (56 `createSettingsGUI()` call sites in total,
+  bringing all 74 call sites in `quick-picto-viewer.ahk` into line with `PanelCachesOverview()`, with
+  tooltip/state cleanup on failure where pre-GUI setup ran) — now checks
+  `If !(thisBtnHeight := createSettingsGUI(...))` and returns immediately on failure.
+- **1-second post-dialog refusal — Still open:** `CloseWindow()` without `"yes"` still refuses for
+  1000 ms after any `msgBoxWrapper()` dialog, so «Overview», «Main panel», Escape, and context-menu
+  «Close panel» still silently do nothing during that window until > 1 s has elapsed.
+
+Run at `79d0e05` (batches F and K, `f4-fix.txt`, `k1-fix.txt`): clicking «&Main panel» in panel 62
+within 1 s of a message box raises no AutoHotkey error (`closer2` empty) and leaves panel 62 intact
+(`AnyWindowOpen=62`, controls `32 → 32`, K1); clicking «&Main panel» after 1.1 s opens panel 49
+normally (`AnyWindowOpen=49`, K1). Invoking six other newly guarded panels (`PanelSeenStats`,
+`PanelAboutWindow`, `PanelWrapperFilesStats`, `PanelSaveSlideShowu`, `PanelCustomizeToolbar`,
+`PanelHelpWindow`) while panel 49 is open within 1 s of a dialog likewise raises no AutoHotkey error
+and leaves panel 49 intact (`AnyWindowOpen=49`, controls `77 → 77`, K2).
 
 ---
 
@@ -810,7 +907,10 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   line «please ensure you allow Quick Picto Viewer to scan the image files» implies QPV prompts to scan
   for all modes (false for Presets 2–6, Finding 6). The DLL failure box in `BTNfindDupesNow()` (:91524)
   has a sentence fragment («Searching for duplicates by fingerprint (Hamming distance).») and tells the
-  user to set the fingerprint type to «Ignore» (which is disabled on Preset 1) (read).
+  user to set the fingerprint type to «Ignore» (which is disabled on Preset 1) (read). *(Partly fixed:
+  Presets 2–6 scan missing data since `6df9c63`, and `e4daf94` (:91670) removes the «Searching for
+  duplicates by fingerprint (Hamming distance).» sentence fragment from the DLL failure box; the
+  `BTNhelpFindDupes()` wording mismatches and the Preset-1-disabled «Ignore» advice remain open.)*
 - **16.12. 32-bit guard does not disable hashing.** On 32-bit AutoHotkey (`A_PtrSize != 8`, :91106),
   `PanelFindDupes()` resets `userFindDupesFilterHamDist := 1` on open, but does not disable the hash
   dropdown and does not stop Preset 1 from forcing `userFindDupesFilterHamDist := 2` in
@@ -901,11 +1001,12 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
    «All (selected files only)» allow one selected file? ~~(d) reopen the invoking panel — also after
    «No»~~ (fixed in `d94e991`).
 3. Finding 3: (a) should «Collect image pixels data» respect the current `findFlippedDupes` checkbox
-   (or ask/collect flipped pixels without flipping the user's checkbox)? (b) should Preset 1 use fixed
-   defaults (`thr`, `flip=0`, `inv=0`, `brk=0`, `msd=0`) instead of inheriting disabled Tab 2 values,
-   and pass hash/crop as local parameters like `findDupesPrecision` so Presets 1–6 do not overwrite
-   Custom mode's settings? (c) should `dHash 8x8` in Custom mode force `inv=0` when passing to the
-   engine?
+   (or ask/collect flipped pixels without flipping the user's checkbox)? (b) ~~should Preset 1 use fixed
+   defaults instead of inheriting disabled Tab 2 values~~ (fixed in `e4daf94`, pinning `dHash 8x8`,
+   threshold `2`, crops `1/1`, `flip=1`, `inv=0`, `brk=0`, `msd=0`); should Preset 1 and Presets 2–6
+   pass their overrides as local parameters like `findDupesPrecision` so they do not overwrite Custom
+   mode's saved Tab 2 settings? ~~(c) should `dHash 8x8` in Custom mode force `inv=0` when passing to
+   the engine~~ (resolved in `e4daf94` by enabling `findInvertedDupes` for `dHash 8x8` when MSD is off).
 4. Finding 4: ~~snapshot and restore `PanelFindDupes()`'s settings on «Cancel» (like
    `InitialFilterSettingsPanel()`), give Tab 4 its own `dupesFilterWhat` / `dupesFilterStringPos` /
    `dupesFilterStringIsNot` instead of sharing `PanelEnableFilesFilter()`'s globals, read into locals
@@ -913,8 +1014,9 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
    «Collect image pixels data» runs~~ (fixed in `ecddb73`).
 5. Finding 5: (a) should `autoSelectDupesInGroups()` bypass the one-file rule (e.g., count selected rows
    directly or add a flag to `getSelectedFiles()`), so a single duplicate pair keeps its 1 selected
-   image? (b) invalidate `getSelectedFiles()`'s `lastIDcount` cache in `autoSelectDupesInGroups()` (or
-   key it by a monotonic selection counter instead of `A_TickCount`)?
+   image? ~~(b) invalidate `getSelectedFiles()`'s `lastIDcount` cache in `autoSelectDupesInGroups()`~~
+   (fixed in `e4daf94` via `lastZeitFileSelect := A_TickCount + J` with random `J` in `100..500`;
+   switch to a monotonic counter if the remaining theoretical collision window matters?).
 6. Finding 6: ~~trigger `collectSQLFileInfosNow()` for Presets 2 to 6 and Custom + «Ignore» whenever
    `thisNOTnullCol != "imgfile"`, and drop `imgframes` from Preset 5 («Identical file names») and
    Preset 6 («Identical file names and file sizes»)~~ (fixed in `6df9c63`).
@@ -922,9 +1024,10 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
    «Exclude»; (b) split/clean empty `|` terms consistently with `SQLlikeClauseFromFilter()` without
    trimming spaces; (c) disable «Exclude the current list of results» when `filesFilter` is empty~~
    (fixed in `2227f02`).
-8. Finding 8: check `createSettingsGUI()`'s return value in `PanelFindDupes()` (and have
-   `PanelChangeHamDistThreshold()`'s «Main panel» and `PanelFindDupes()`'s «Overview» close via
-   `BtnCloseWindow()`, or should Help boxes not arm `lastLongOperationAbort`)?
+8. Finding 8: ~~check `createSettingsGUI()`'s return value in `PanelFindDupes()`~~ (fixed across all
+   55 previously unchecked panels in `79d0e05`); also have `PanelChangeHamDistThreshold()`'s «Main
+   panel» and `PanelFindDupes()`'s «Overview» close via `BtnCloseWindow()`, or should Help boxes not
+   arm `lastLongOperationAbort`?
 9. Finding 9: (a) count the actual post-sweep groups in `filterDupeResultsByHdist()` for the «Found N
    groups» tooltip? (b) on a failed/aborted second search, preserve `markedSelectFile` and the DLL pairs
    cache (or keep the existing pairs until the new sweep succeeds) and avoid clobbering the filter panel
@@ -1012,22 +1115,34 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   - **I** (`i1-fix.txt`, at `d94e991`): re-checks Finding 1 (`BTNfindDupesNow()` «Cancel»/«Save»/«Discard»
     and `ActSortDupeGroups()` on an edited image) and Finding 2 (2.1 `CurrentSLD` restored, 2.2 active
     filter + missing files marked `isDeleted=1` + «Overview» refresh, 2.4 reopening `PanelFindDupes(3)`,
-    Statistics, or nothing across «Cancel»/«No»/«Yes», and 2.3 unchanged).
+    Statistics, or nothing across «Cancel»/«No»/«Yes», and 2.3 unchanged);
+  - **J** (`j2-fix.txt`, at `e4daf94`): re-checks Finding 3 (3.2 Preset 1 pinning all Tab 2 options
+    including `BreakDupesGroups=0`, 3.3 Custom + `dHash 8x8` enabling `findInvertedDupes` when MSD=0
+    and disabling/forcing `0` when MSD=1, 3.1 `BtnCollectDupesData()` still forcing
+    `findFlippedDupes=1`, 3.4 Preset 1 overwriting 8 Tab 2 globals and Preset 2 overwriting
+    `userFindDupesFilterHamDist`) and Finding 5 (5.2 rapid back-to-back and UI re-runs keeping
+    `markedSelectFile=2`, 5.1 single pair still deselected);
+  - **K** (`k1-fix.txt`, plus `f4-fix.txt`, at `79d0e05`): re-checks Finding 8 («Change hashes
+    threshold» → «Main panel» within 1 s leaves panel 62 intact with zero AutoHotkey error and opens
+    panel 49 after > 1 s) and confirms six other newly guarded panels return cleanly within 1 s without
+    adding controls to an open panel.
 - **Not run on Windows**:
   - native Windows GDI+ 1.1 pixel collection inside `collectImgDataViaPool()`;
   - whether Windows' Tab3 dialog manager routes `Alt+X` across Tabs 3 and 4 the same way Wine did;
   - whether Windows differs on right-click hit-testing inside Tab3 (16.16).
 - **Not run at all**:
   - 32-bit AutoHotkey (`A_PtrSize != 8`, 16.12);
-  - `BreakDupesGroups=1` inherited into Preset 1 (Finding 3, read);
+  - `BreakDupesGroups=1` inherited into Preset 1 before `e4daf94` (Finding 3, read; tested fixed at
+    `e4daf94` in J1a);
   - aborting `generateSQLimageFingerPrintHash()` mid-run (Finding 12, read);
   - `collectSQLFileInfosNow()`'s «never ask again» checkbox on «Collect data now» (Seen in passing A,
     read).
 - **Kit**: `.claude/scratch/find-dupes-panel-2026-11-21/app/`.
-  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI [revision]`
+  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI|testFdJ|testFdK [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
   - Test functions are in `test-fd.ahk`, on top of `test-wrappers-sc.ahk`; `setup.sh` builds the test
     PNGs and `blobs.ini`; `patch.py` and `patch-fd.py` add logging; `closer2.ahk` answers AutoHotkey
     error boxes.
   - Logs are in `results/` (`a2-head.txt`, `b3-head.txt`, `c2-head.txt`, `d2-head.txt`, `e3-head.txt`,
-    `f3-head.txt`, `g3-head.txt`, `h3-head.txt`, `i1-fix.txt`).
+    `f3-head.txt`, `f4-fix.txt`, `g3-head.txt`, `h3-head.txt`, `i1-fix.txt`, `j2-fix.txt`,
+    `k1-fix.txt`).
