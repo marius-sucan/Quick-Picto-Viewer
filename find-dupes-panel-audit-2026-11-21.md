@@ -57,10 +57,16 @@ on failure, eliminating the «Main panel» AutoHotkey error and panel corruption
 post-dialog refusal on «Overview», «Main panel», Escape and «Close panel» stays open. Findings 9
 (`aeb5681`), 11 (`048bcb5`) and 12 (`481da35`) are fixed (with Marius's answers to decisions 9, 11
 and 12; Finding 9's DLL pairs-cache preservation in `dupes-search.h` takes effect on the next
-`qpvmain.dll` build). Findings 10 and 13 to 16 are otherwise open. A fixed or partly fixed section
-ends with a note on what the code does now; those notes cite lines at the revision named in the note
-(`d94e991` for Findings 1–2, `2227f02` for Findings 4, 6 and 7, `e4daf94` for Findings 3, 5 and
-16.11, `79d0e05` for Finding 8, `aeb5681` for Findings 9, 11 and 12).
+`qpvmain.dll` build). Finding 14 (`56643ae`) is fixed, Finding 15 is partly fixed (15.1 fixed in
+`f48a5a0`; 15.2 stays open), and eleven items of Finding 16 are fixed: 16.1 (`c288b71`), 16.2
+(`d30ceff`), 16.4 (`eea5c19`), 16.5 (`f00f47e`), 16.6 (`a2ccc0c`), 16.9 (`d1d42db`), 16.11
+(`ba6c797`), 16.12 (`aaae1db`), 16.13 (`f3dfe34`), 16.14 (`361a3cd`) and 16.15 (`dfee6ed`) (with
+Marius's answers on 14, 16.1, 16.9, 16.11 and 16.12). Findings 10, 13, 15.2, and small things 16.7,
+16.8, the rest of 16.10, and 16.16 remain open (alongside the still-open sub-items of Findings 1, 2,
+3, 5 and 8). A fixed or partly fixed section ends with a note on what the code does now; those notes
+cite lines at the revision named in the note (`d94e991` for Findings 1–2, `2227f02` for Findings 4,
+6 and 7, `e4daf94` for Findings 3 and 5, `79d0e05` for Finding 8, `aeb5681` for Findings 9, 11 and
+12, `dfee6ed` for Findings 14, 15.1 and 16.1–16.15).
 
 ## Terms
 
@@ -106,7 +112,7 @@ ends with a note on what the code does now; those notes cite lines at the revisi
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `aeb5681` |
+| # | Finding | Harm | Checked | Status at `dfee6ed` |
 |---|---------|------|---------|---------------------|
 | 1 | «Find duplicates» discards an edited, unsaved image without a question — even when no duplicates are found | high | run | **partly fixed**, `60f52cc` («Find duplicates» fixed; `ActSortDupeGroups()` open) |
 | 2 | «Purge cached data»: «All (modified files only)» clears `CurrentSLD` and ignores the active filter it promises; «All (selected files only)» refuses one selected file; the dialog reopens Statistics instead of this panel | high | run | **partly fixed**, `60f52cc`, `d94e991` (2.1, 2.2, 2.4 fixed; 2.3 open) |
@@ -121,9 +127,9 @@ ends with a note on what the code does now; those notes cite lines at the revisi
 | 11 | After «Find duplicates» runs once, `qpvmain.dll` keeps the `.SLDB` open, so rebuilding or overwriting the database fails with «Permission denied» and leaves `SLDtypeLoaded=2` | medium | run | **fixed**, `048bcb5` |
 | 12 | Aborting data collection or hash generation mid-run does not stop «Find duplicates» | medium | run, and read for hashing | **fixed**, `481da35` |
 | 13 | Panel rebuilds («Collect image pixels data», «Overview» → «Back», «Dark mode UI», «Large UI fonts») lose unsaved settings, jump to Tab 1 from Statistics, and drop «Back» inside «Overview» | low | run | open |
-| 14 | Numeric threshold edits (`editF7`, `editFr`, `editFc`) reject `0`, and typing an out-of-range number leaves it on screen while silently reading the old value | low | run | open |
-| 15 | «Size (kilobytes)» goes stale when «Size (bytes)» is checked, and Tab 2's preview overlaps «Identify images horizontally flipped» in Large UI fonts | low | run | open |
-| 16 | Small things, numbered 16.1 to 16.16 | low | run and read | open (16.3 fixed in `ecddb73`; 16.10 Option 7 overview kill fixed in `d94e991`; 16.11 DLL box fragment fixed in `e4daf94`) |
+| 14 | Numeric threshold edits (`editF7`, `editFr`, `editFc`) reject `0`, and typing an out-of-range number leaves it on screen while silently reading the old value | low | run | **fixed**, `56643ae` |
+| 15 | «Size (kilobytes)» goes stale when «Size (bytes)» is checked, and Tab 2's preview overlaps «Identify images horizontally flipped» in Large UI fonts | low | run | **partly fixed**, `f48a5a0` (15.1 fixed; 15.2 Large UI fonts overlap open) |
+| 16 | Small things, numbered 16.1 to 16.16 | low | run and read | **partly fixed** (16.1–16.6, 16.9, 16.11–16.15 fixed; 16.10 Option 7 overview kill fixed in `d94e991`; 16.7, 16.8, rest of 16.10, 16.16 open) |
 
 Finding 1 loses unsaved image edits for good (fixed for «Find duplicates» in `60f52cc`; Sort →
 «Duplicates ID group» remains open). Finding 2 clears `CurrentSLD` (fixed in `60f52cc`), purges
@@ -139,7 +145,9 @@ pair is still deselected by the one-file rule (5.1). Findings 4 (`ecddb73`), 6 (
 `79d0e05` (all 74 `createSettingsGUI()` call sites now check failure), while the 1-second
 post-dialog refusal remains open. Findings 9 (`aeb5681`), 11 (`048bcb5`) and 12 (`481da35`) are
 fixed (with Finding 9's DLL pairs-cache backup/restore in `dupes-search.h` taking effect on the next
-`qpvmain.dll` build). Finding 10 and Findings 13 to 16 remain open.
+`qpvmain.dll` build). Finding 14 (`56643ae`), Finding 15.1 (`f48a5a0`), and small things 16.1–16.6,
+16.9 and 16.11–16.15 (`c288b71`..`dfee6ed`, plus `ecddb73` for 16.3) are fixed. Findings 10, 13,
+15.2, and small things 16.7, 16.8, the rest of 16.10, and 16.16 remain open.
 
 ---
 
@@ -891,6 +899,25 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
     `999` and `99`, while the UpDowns read `1`, `50` and `1`. (`editFc` also has `limit2` for a
     `Range1-9` control, inviting two-digit input.)
 
+**Fixed in `56643ae`** (lines at `dfee6ed`):
+
+- `PanelFindDupes()` widens `userFindDupesHamDistLvl` to `Range0-15` (:91507), widens
+  `userFindDupesMSElvl` to `Range0-400` (:91514), and tightens `editFc` from `limit2` to `limit1`
+  (:91526).
+- `clampDupesBuddyEdit(editVar, udVar, lo, hi, allowEmpty:=0)` (:91655-91667) reads the buddy Edit
+  directly, clamps out-of-range integers into `[lo, hi]`, and syncs both the Edit and UpDown when
+  adjusted. `updateUIdupesPanel()` (:91674-91678) and `updateUIimageHashPreview()` (:91591-91592)
+  invoke it with `allowEmpty=1` so clearing a field while typing is not interrupted while any
+  out-of-range number is clamped on screen immediately; `BTNfindDupesNow()` (:91772-91782) and
+  `BtnCollectDupesData()` (:91566) invoke it with `allowEmpty=0` so empty or out-of-range fields
+  always submit clamped values.
+
+Run at `dfee6ed` (batch M, `m3-fix.txt`, M2a–M2c): typing `0` into `editF7` and `editFr` keeps `0` in
+both Edits and UpDowns and a real dHash + MSD search at `0`/`0` returns only the exact `h=0, m=0`
+pair (`a1`+`a2`, excluding `a_edit`); typing `99`/`999`/`99` immediately clamps both Edits and
+UpDowns to `15`/`400`/`9`, and typing `0` into `editFc` clamps to `1`; clearing `editF7`/`editFr`/`editFc`
+leaves them blank while typing and clamps them to `0`/`0`/`1` on «Find duplicates».
+
 ---
 
 ## 15. «Size (kilobytes)» goes stale when «Size (bytes)» is checked; Tab 2's preview overlaps a checkbox in Large UI fonts
@@ -920,6 +947,18 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
    41×9 pixels. Run (E5b, H3): confirmed in both layouts (with and without Tab 4's `+` button); normal
    UI fonts have zero overlaps across all four tabs.
 
+**Partly fixed in `f48a5a0`** (lines at `dfee6ed`):
+
+- **15.1 — Fixed in `f48a5a0`:** `BTNfindDupesNow()` (:91798-91803) reads `chkFsize := GuiCtrlGet("UIcheckfsize")`
+  and `chkKbfsize := GuiCtrlGet("UIcheckkbfsize")` unconditionally before branching on `If chkFsize` /
+  `Else If chkKbfsize`, so `UIcheckkbfsize` always syncs without adding a redundant `kbfsize` column
+  when `fsize` is active. Run at `dfee6ed` (batch M, `m3-fix.txt`, M1a–M1b): clicking «&Select all» →
+  «&Find duplicates» reopens with `UIcheckfsize=1` and `UIcheckkbfsize=1`, and unticking
+  `UIcheckkbfsize` while keeping `UIcheckfsize=1` reopens with `UIcheckfsize=1` and
+  `UIcheckkbfsize=0`.
+- **15.2 — Still open:** under `PrefsLargeFonts=1`, Tab 2's preview still overlaps «Identify images
+  horizontally flipped» by `41×9` pixels (confirmed in M12).
+
 ---
 
 ## 16. Small things
@@ -930,25 +969,39 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   menu bar disables «Find duplicate images» when `maxFilesIndex < 4` (:68982), even on a 3-file `.SLDB`
   where `PanelFindDupes()` opens cleanly (run A1c) and even while a filter has narrowed a larger
   database to 2 or 3 files; the files list context menu (`PVfList`) leaves it enabled in all of those
-  cases (run A1a–A1c).
+  cases (run A1a–A1c). *(Fixed in `c288b71`, lines at `dfee6ed`: `PanelFindDupes()` :91401-91402 now
+  prints «WARNING: Insufficient files are currently indexed.», matching Statistics, Index filters, and
+  Search & replace; `InvokeMenuBarFind()` :69125-69126 and `createMenuFilesIndexOptions()` :72879-72880
+  both disable «&Find duplicate images» on the exact same `maxFilesIndex<3 && !filesFilter` guard. Run
+  in `m3-fix.txt`, M3a–M3c: disabled in both menus on 2 unfiltered files with the new warning; enabled
+  in both menus on a 3-file `.SLDB` and on a filtered 2-file subset.)*
 - **16.2. Ctrl+F («Change hashes threshold») refuses a 1-pair duplicates list.**
   `PanelChangeHamDistThreshold()` checks `dupesPairCount() < 2` (:47090) instead of `< 1`. On a
   duplicates list with exactly one matched pair (`pairs=1`), pressing Ctrl+F answers «WARNING: The files
   list does not seem to have cached data to allow changing the similarity threshold» and bounces back to
-  `PanelFindDupes()` (run G6).
+  `PanelFindDupes()` (run G6). *(Fixed in `d30ceff`, :47127 at `dfee6ed`: checks `< 1`. Run in
+  `m3-fix.txt`, M4a–M4b: on `pairs=1`, `PanelChangeHamDistThreshold()` opens panel 62 and «&Update»
+  re-filters the 1-pair list cleanly.)*
 - **16.3. Dead `gupdateUIFiltersPanel` on Tab 4's two dropdowns.** Lines :91200-91201 bind
   `gupdateUIFiltersPanel` to `userFilterStringPos` and `userFilterWhat`; `updateUIFiltersPanel()`
   immediately returns whenever `AnyWindowOpen != 6` (:33262) (read). *(Fixed in `ecddb73`.)*
 - **16.4. `PanelFindDupes(dummy)` rejects Tab 4.** Line :91109 checks `isInRange(dummy, 1, 3)` even
-  though the panel has 4 tabs (read).
+  though the panel has 4 tabs (read). *(Fixed in `eea5c19`, :91448 at `dfee6ed`: checks
+  `isInRange(dummy, 1, 4)`. Run in `m3-fix.txt`, M5: `PanelFindDupes(4)` opens on Tab 4.)*
 - **16.5. 300 ms enable/disable race on open.** `PanelFindDupes()` delays `updateUIdupesPanel` via
   `SetTimer, updateUIdupesPanel, -300` (:91214). On Preset 1, Tab 1's 19 property checkboxes are enabled
   for the first 300 ms and only grey out afterwards (run E5: at 0 ms `UIcheckimgfile=1`, at 450 ms
-  `UIcheckimgfile=0`).
+  `UIcheckimgfile=0`). *(Fixed in `f00f47e`, :91552 at `dfee6ed`: calls `updateUIdupesPanel()`
+  synchronously right before `repositionWindowCenter()`. Run in `m3-fix.txt`, M6: at 0 ms on Preset 1,
+  `UIcheckimgfile=0`, `hashDDL=0`, `thr=0`, `flip=0`, and the preview bitmap is already drawn.)*
 - **16.6. Blank hash preview on Preset 1, and duplicate fill.** `updateUIimageHashPreview()` skips
   drawing all 64 dots whenever `userFindDupePresets != 7` (:91271), so Preset 1 shows an empty box even
   though it uses `dHash 8x8` with 1/1 crop. Line :91267 also repeats `Gdip_FillRectangle(G, pBrushA, 0,
-  0, imgW, imgH)` identically after :91266 (read).
+  0, imgW, imgH)` identically after :91266 (read). *(Fixed in `a2ccc0c`, :91593-91638 at `dfee6ed`:
+  drops the duplicate fill, pins `hamType := 2` and `lCrop := rCrop := 1` for Preset 1, and draws dots
+  for `thisPreset=1 || thisPreset=7` while keeping Presets 2–6 blank. Run in `m3-fix.txt`, M7: Preset 1
+  draws 62 blue dots with top-left and bottom-right cropped even after Custom `0/0`; Preset 2 and
+  Custom «Ignore» draw 0 dots; Custom `dHash` `0/0` draws 64 dots.)*
 - **16.7. «Collect image pixels data» is silent for 0, 1 or 2 remaining files.**
   `reportCollectSQLoutcome()` only shows its completion message when `filesToBeSorted > 2` (:36912).
   Clicking «Collect image pixels data» when everything is already collected (or 1–2 files remain) closes
@@ -971,6 +1024,16 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
     drops `derA` from the list — the same check as Finding 12 of `files-filter-panel-audit-2026-11-20.md`).
   - A malformed RegEx (e.g. `\>` followed by `(`) is not validated; `RegExMatch()` silently fails to
     match anything without warning the user (run H2).
+  *(Fixed in `d1d42db`, `quick-picto-viewer.ahk` :47652-47676 and `lib/msgbox2.ahk` :378 at `dfee6ed`:
+  `MsgBox2()` strips leading `` `f `` when populating a `DropListMode=1` ComboBox so an empty history
+  passed as `` "`f" `` yields 0 items, `PanelAutoSelectDupes()` passes `SearchdStringz` without
+  trailing `` `f`f `` and checks exact delimiter-bounded membership
+  `!InStr("`f" SearchdStringz "`f", "`f" thisString "`f")`, and RegEx inputs (`\>`) are validated with
+  `isValidRegEx()` — rejecting bare `\>`, options-only `\>i)` and invalid patterns with a warning and
+  reopening `PanelAutoSelectDupes()` without saving to history or selecting files. Run in `m3-fix.txt`,
+  M8: initial ComboBox has 0 items; after `folderA`, `derA`, `folderA` it holds `[1:<folderA>] [2:<derA>]`
+  with no blank entry; `\>(`, `\>` and `\>i)` all warn, skip selection/history, and reopen the dialog;
+  valid `\>dirb` runs and records `[3:<\>dirb>]`.)*
 - **16.10. Inside «Purge cached data» (`PanelPurgeCachedSQLdata()` and helpers):**
   - `selectivePurgeCachedSQLdata(dbIndex, batchMode:=0)` (:91862) only returns `"fail"` when
     `batchMode=1`; Options 6 (:91818) and 7 (:91737) call it without the second argument, so
@@ -990,26 +1053,47 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   line «please ensure you allow Quick Picto Viewer to scan the image files» implies QPV prompts to scan
   for all modes (false for Presets 2–6, Finding 6). The DLL failure box in `BTNfindDupesNow()` (:91524)
   has a sentence fragment («Searching for duplicates by fingerprint (Hamming distance).») and tells the
-  user to set the fingerprint type to «Ignore» (which is disabled on Preset 1) (read). *(Partly fixed:
-  Presets 2–6 scan missing data since `6df9c63`, and `e4daf94` (:91670) removes the «Searching for
-  duplicates by fingerprint (Hamming distance).» sentence fragment from the DLL failure box; the
-  `BTNhelpFindDupes()` wording mismatches and the Preset-1-disabled «Ignore» advice remain open.)*
+  user to set the fingerprint type to «Ignore» (which is disabled on Preset 1) (read). *(Fixed in
+  `6df9c63`, `e4daf94` and `ba6c797`, lines at `dfee6ed`: `BTNhelpFindDupes()` :91949 now names
+  «Custom mode», «Aspect ratio (W/H)», «Matching precision», «dHash 8x8» and the «Image hashes» tab;
+  because `retrieveDupesByProperties()` queries through `qpvmain.dll` for every mode,
+  `BTNfindDupesNow()` :91905-91910 now fails early on `dupesPixInitGood != 1` for all modes without
+  the obsolete «Ignore» fallback advice, and `throwDupesEngineError()` :88864 drops «by fingerprint».
+  Run in `m3-fix.txt`, M9a–M9b.)*
 - **16.12. 32-bit guard does not disable hashing.** On 32-bit AutoHotkey (`A_PtrSize != 8`, :91106),
   `PanelFindDupes()` resets `userFindDupesFilterHamDist := 1` on open, but does not disable the hash
   dropdown and does not stop Preset 1 from forcing `userFindDupesFilterHamDist := 2` in
-  `BTNfindDupesNow()` (read).
+  `BTNfindDupesNow()` (read). *(Fixed in `aaae1db`, lines at `dfee6ed`: when `A_PtrSize != 8`,
+  `PanelFindDupes()` :91441-91446 switches default Preset 1 to Preset 2, `updateUIdupesPanel()`
+  :91682-91686 and `UIfindDupesCheckboxes()` :91731-91732 keep the hash dropdown and all Tab 2 hash
+  controls disabled, `updateUIimageHashPreview()` :91593-91594 leaves the preview blank, and
+  `BTNfindDupesNow()` :91848-91854 refuses Preset 1 or Custom hash modes with a 64-bit warning; read,
+  not run on 32-bit.)*
 - **16.13. `bckpCurrentFileIndex` is never saved before applying a duplicates filter.**
   `retrieveDupesByProperties()` never writes `bckpCurrentFileIndex := currentFileIndex` (unlike
   `coreSetFilesFilteru()` :33692), so removing the duplicates filter later jumps to a stale index from
-  an earlier filter or to `1` (:4226, :33733) (read).
+  an earlier filter or to `1` (:4226, :33733) (read). *(Fixed in `f3dfe34`, lines at `dfee6ed`: saves
+  `bckpCurrentFileIndex := currentFileIndex` when `StrLen(filesFilter) < 2` right before
+  `renewCurrentFilesList()` on both the hash commit path in `changeHdistLevelCached()` (:89137-89138)
+  and the non-hash commit path in `retrieveDupesByProperties()` (:89592-89596). Run in `m3-fix.txt`,
+  M11a–M11c: removing a Preset 1 or Preset 5 filter restores the original index (`4 → 4`, `3 → 3`),
+  stacked searches preserve the original unfiltered index (`3`), and failed searches leave
+  `bckpCurrentFileIndex` untouched.)*
 - **16.14. `editFc` on Tab 3 has no label or tooltip.** `GuiAddEdit()` at :91187 omits the third
   argument (unlike `editF5`, `editF6`, `editF7`, `editFr`), so `editFc` gets no cue banner or tooltip
-  (read).
+  (read). *(Fixed in `361a3cd`, :91526 at `dfee6ed`: passes `"Gray levels compression factor"` to
+  `GuiAddEdit()`. Run in `m3-fix.txt`, M12: `EM_GETCUEBANNER` returns `Gray levels compression factor`
+  and Tab 3 layout has zero overlaps in Normal and Large UI fonts.)*
 - **16.15. Unused variables and dead branches.** `editFd`, `txtline2` and `editFE` are declared global in
   `PanelFindDupes()` (:91058, :91065) and never used; `PanelPurgeCachedSQLdata()` has an unreachable
   `Else PopulateIndexFilesStatsInfos("kill")` (:91617-91618) and an always-true `SLDtypeLoaded=3` check
   (:91581) after :91576 already returned for `SLDtypeLoaded != 3`; `uiCachesOverviewSizeEstimate()`
-  computes `perImage` (:36570) and never uses it (read).
+  computes `perImage` (:36570) and never uses it (read). *(Fixed in `dfee6ed`, lines at `dfee6ed`:
+  removes `editFd` and `editFE` from `PanelFindDupes()` (:91390, :91397) and moves `txtline2` to
+  `PanelChangeHamDistThreshold()` (:47117), which — along with nine other panels — actually uses
+  `vtxtLine2` and relied on that global declaration; inlines Option 8 and drops the unreachable `Else`
+  in `PanelPurgeCachedSQLdata()` (:91972, :92004); removes unused `perImage` from
+  `uiCachesOverviewSizeEstimate()` (:36575). Run in `m3-fix.txt`, M4 and M13a–M13b.)*
 - **16.16. Right-clicking empty space inside a tab page does not open the panel menu.** Inside the Tab3
   client area, `CtrlHwnd` is the `SysTabControl32` control, `SettingsToolTips()` filters it out, and
   `SettingsGUIAGuiContextMenu()` returns at :26033 (`If (CtrlHwnd && IsRightClick=1)`). Only
@@ -1131,12 +1215,13 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
     Dark mode and Large UI fonts? (b) write `TabsPerWindow[49] := dummy` when `PanelFindDupes(dummy)` is
     given a tab? (c) keep `hostPanel` across theme/font rebuilds of «Overview» so «Back» does not
     disappear?
-14. Finding 14: allow `0` in `editF7` and `editFr` (`Range0-15`, `Range0-400`), and read/clamp the Edit
-    text on submit (or clamp on change) instead of silently taking the stale UpDown value?
-15. Finding 15: (a) read `GuiCtrlGet("UIcheckkbfsize")` unconditionally (outside the `Else` of
-    `UIcheckfsize`) so it persists cleanly? (b) move Tab 2's «Image hashing preview» or widen/push the
-    row below it under `PrefsLargeFonts=1` so it no longer overlaps «Identify images horizontally
-    flipped»?
+14. Finding 14: ~~allow `0` in `editF7` and `editFr` (`Range0-15`, `Range0-400`), and read/clamp the
+    Edit text on submit (or clamp on change) instead of silently taking the stale UpDown value~~
+    (fixed in `56643ae`, clamping on change with empty allowed while typing and clamping on submit).
+15. Finding 15: (a) ~~read `GuiCtrlGet("UIcheckkbfsize")` unconditionally (outside the `Else` of
+    `UIcheckfsize`) so it persists cleanly~~ (fixed in `f48a5a0`); (b) move Tab 2's «Image hashing
+    preview» or widen/push the row below it under `PrefsLargeFonts=1` so it no longer overlaps
+    «Identify images horizontally flipped»?
 
 ---
 
@@ -1213,13 +1298,27 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
     threshold» → «Main panel» within 1 s leaves panel 62 intact with zero AutoHotkey error and opens
     panel 49 after > 1 s) and confirms six other newly guarded panels return cleanly within 1 s without
     adding controls to an open panel;
-  - **L** (`l1-fix.txt`, at `aeb5681`): verifies Finding 9 (L1a/L1b/L1d post-sweep group counts,
-    L2a–L2e failed hash/non-hash/0-pair-sweep searches preserving selection, filter globals,
-    `bckpResultedFilesList`, `cachedHamDistLvl` and Ctrl+F range), Finding 11 (L3a–L3c
-    `dupesEngineReady()=0` after search while Ctrl+F stays live, `BTNrebuildDBpanel()` succeeding
-    with `SLDtypeLoaded=3`, and follow-up search working), and Finding 12 (L4a–L4e mid-run aborts in
-    pixel collection, regular hashing, flipped hashing, and non-hash `imgwidth` collection all
-    stopping cleanly before subsequent steps).
+  - **L** (`l1-fix.txt`, at `aeb5681`; re-run as `l2-reg.txt` at `dfee6ed`): verifies Finding 9
+    (L1a/L1b/L1d post-sweep group counts, L2a–L2e failed hash/non-hash/0-pair-sweep searches
+    preserving selection, filter globals, `bckpResultedFilesList`, `cachedHamDistLvl` and Ctrl+F
+    range), Finding 11 (L3a–L3c `dupesEngineReady()=0` after search while Ctrl+F stays live,
+    `BTNrebuildDBpanel()` succeeding with `SLDtypeLoaded=3`, and follow-up search working), and
+    Finding 12 (L4a–L4e mid-run aborts in pixel collection, regular hashing, flipped hashing, and
+    non-hash `imgwidth` collection all stopping cleanly before subsequent steps);
+  - **M** (`m3-fix.txt`, at `dfee6ed`): verifies Finding 15.1 (M1a–M1b `UIcheckkbfsize` persistence
+    both ways when `UIcheckfsize=1`), Finding 14 (M2a–M2c `0` thresholds accepted and real `0`/`0`
+    search returning exact matches only, `99`/`999`/`99` and `0` in `editFc` clamped immediately on
+    screen and UpDown, empty edits allowed while typing and clamped on submit), 16.1 (M3a–M3c
+    updated `< 3` warning and Find/`PVfList` parity across 2 unfiltered, 3-file `.SLDB`, and filtered
+    2-file subset), 16.2 (M4a–M4b Ctrl+F opening panel 62 and updating on `pairs=1`), 16.4 (M5
+    `PanelFindDupes(4)` opening Tab 4), 16.5 (M6 0 ms sync on Preset 1), 16.6 (M7 pixel-probed hash
+    preview: 62 dots on Preset 1, 0 on Preset 2/Ignore, 64 on Custom `dHash` `0/0`), 16.9 (M8 0-item
+    initial ComboBox, suffix-safe `folderA`/`derA` dedup, invalid/bare/options-only RegEx warning +
+    reopen, valid RegEx saved), 16.11 (M9a–M9b updated Help wording and DLL init error on Preset 5
+    without «Ignore» advice), 16.13 (M11a–M11c `bckpCurrentFileIndex` saved/restored across hash,
+    non-hash, stacked, and failed searches), 16.14 (M12 `editFc` cue banner and Tab 3 Normal/Large
+    layout), and 16.15 (M4, M13a–M13b `PanelChangeHamDistThreshold()`, `PanelPurgeCachedSQLdata()` and
+    `uiCachesOverviewSizeEstimate()`).
 - **Not run on Windows**:
   - native Windows GDI+ 1.1 pixel collection inside `collectImgDataViaPool()`;
   - whether Windows' Tab3 dialog manager routes `Alt+X` across Tabs 3 and 4 the same way Wine did;
@@ -1233,11 +1332,11 @@ The three UpDown controls on Tabs 2 and 3 use `Range1-15` (`userFindDupesHamDist
   - `collectSQLFileInfosNow()`'s «never ask again» checkbox on «Collect data now» (Seen in passing A,
     read).
 - **Kit**: `.claude/scratch/find-dupes-panel-2026-11-21/app/`.
-  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI|testFdJ|testFdK|testFdL [revision]`
+  - `run-fd.sh <tag> testFdA|testFdB|testFdC|testFdD|testFdE|testFdF|testFdG|testFdH|testFdI|testFdJ|testFdK|testFdL|testFdM [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
   - Test functions are in `test-fd.ahk`, on top of `test-wrappers-sc.ahk`; `setup.sh` builds the test
     PNGs and `blobs.ini`; `patch.py` and `patch-fd.py` add logging; `closer2.ahk` answers AutoHotkey
     error boxes.
   - Logs are in `results/` (`a2-head.txt`, `b3-head.txt`, `c2-head.txt`, `d2-head.txt`, `e3-head.txt`,
     `f3-head.txt`, `f4-fix.txt`, `g3-head.txt`, `h3-head.txt`, `i1-fix.txt`, `j2-fix.txt`,
-    `k1-fix.txt`, `l1-fix.txt`).
+    `k1-fix.txt`, `l1-fix.txt`, `l2-reg.txt`, `m3-fix.txt`).
