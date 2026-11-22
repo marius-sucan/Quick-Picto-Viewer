@@ -91530,8 +91530,8 @@ PanelFindDupes(dummy:=0) {
     btnWid2 := (PrefsLargeFonts=1) ? 90 : 60
     Gui, Add, Button, x+5 hp w%btnWid2% gBTNhelpFindDupes, &Help
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
+    updateUIdupesPanel()
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Find image duplicates: " appTitle)
-    SetTimer, updateUIdupesPanel, -300
 }
 
 BtnCollectDupesData() {
