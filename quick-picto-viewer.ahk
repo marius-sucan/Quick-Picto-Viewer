@@ -89135,6 +89135,8 @@ changeHdistLevelCached(modus, newLvlA:=0, newLvlB:=0, newLvlMSEa:=0, newLvlMSEb:
 
    If (isFresh=1)
    {
+      If (StrLen(filesFilter)<2)
+         bckpCurrentFileIndex := currentFileIndex
       renewCurrentFilesList()
       bckpResultedFilesList := srcList
       bckpMaxFilesIndex := srcCount
@@ -89588,8 +89590,11 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
 
    If (useHashes!=1)
    {
-      If !filesFilter
+      If (StrLen(filesFilter)<2)
+      {
+         bckpCurrentFileIndex := currentFileIndex
          bckpMaxFilesIndex := maxFilesIndex
+      }
       renewCurrentFilesList()
       changeHdistLevelCached("kill")
       DllCall("qpvmain.dll\dupesClearPairs")
