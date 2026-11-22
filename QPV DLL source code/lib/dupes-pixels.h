@@ -146,21 +146,25 @@ struct DpBusy {
     std::wstring     path;
 };
 
+struct DpPool {
+    std::atomic<bool> stopping{false};
+    size_t            exited = 0;      // guarded by dpMutex
+    DpBusy            busy[DP_MAX_WORKERS];
+};
+
 static std::vector<std::thread>            dpWorkers;
 static std::deque<DupePixJob>              dpQueue;
 static std::deque<DupePixResult>           dpResults;
-static DpBusy                              dpBusy[DP_MAX_WORKERS];
+static std::shared_ptr<DpPool>             dpPool;            // guarded by dpMutex
 static std::mutex                          dpMutex;
 static std::condition_variable             dpJobCV;
 static std::condition_variable             dpExitCV;
-static std::atomic<bool>                   dpStopping(false);
 static std::atomic<LONG>                   dpGeneration(1);
 static std::shared_ptr<const DupePixCfg>   dpConfig = std::make_shared<DupePixCfg>();
 static DupePixState                        dpState = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static size_t                              dpExited = 0;        // guarded by dpMutex
-// the jobs held for the current generation, guarded by dpMutex; dpState.inFlight counts
-// abandoned runs' jobs as well, which a run must not wait for
-static LONG                                dpRunInFlight = 0;
+static LONG                                dpRunInFlight = 0; // guarded by dpMutex
+static LONG                                dpDroppedResults = 0; // guarded by dpMutex
+static bool                                dpHoldsCVclamp = false;
 
 // The names the database stores in imgpixfmt, exactly as the interpreter spells them:
 // dpWicNames is indexed by indexedWICpixelFormats() and holds what WicPixelFormats()
@@ -193,22 +197,26 @@ static void dpSetDrained(bool drained) {
     dpState.drained = drained ? 1 : 0;
 }
 
-// One worker's turn, for dupesPixBusyJob() to report. Called with the path only when the job
-// is taken; the state alone changes as the worker moves from waiting to decoding.
-static void dpMarkBusy(size_t slot, const std::wstring *path, int state) {
-    if (slot >= (size_t)DP_MAX_WORKERS)
+static void dpMarkBusy(DpPool *pool, size_t slot, const std::wstring *path, int state) {
+    if (pool==NULL || slot >= (size_t)DP_MAX_WORKERS)
        return;
 
     if (path==NULL)
     {
-       dpBusy[slot].state.store(state, std::memory_order_relaxed);
+       pool->busy[slot].state.store(state, std::memory_order_relaxed);
        return;
     }
 
     std::lock_guard<std::mutex> lk(dpMutex);
-    dpBusy[slot].startedMs = (state!=0) ? (INT64)GetTickCount64() : 0;
-    dpBusy[slot].state.store(state, std::memory_order_relaxed);
-    dpBusy[slot].path = *path;
+    pool->busy[slot].startedMs = (state!=0) ? (INT64)GetTickCount64() : 0;
+    pool->busy[slot].state.store(state, std::memory_order_relaxed);
+    try
+    {
+        pool->busy[slot].path = *path;
+    } catch (...)
+    {
+        pool->busy[slot].path.clear();
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -240,21 +248,34 @@ static void dpMakeEffects(DpEffects &fx, int blurRadius) {
     if (fx.gray==NULL && Gdiplus::GdipCreateEffect(dpHSLeffectGUID, &fx.gray)==Gdiplus::Ok && fx.gray!=NULL)
     {
        DpHSLparams p = {0, -100, 0};
-       Gdiplus::GdipSetEffectParameters(fx.gray, &p, (UINT)sizeof(p));
+       if (Gdiplus::GdipSetEffectParameters(fx.gray, &p, (UINT)sizeof(p))!=Gdiplus::Ok)
+       {
+          Gdiplus::GdipDeleteEffect(fx.gray);
+          fx.gray = NULL;
+       }
     }
 
-    // Gdip_GaussianBlur(bmp, 4, 0) bumps a radius of 4 to 6 through its offsets table and
-    // then blurs twice at radius//2, rotating the bitmap between the passes. Reproduced
-    // literally: the two passes are what the stored fingerprints were made with.
-    if (blurRadius > 0 && fx.blurA==NULL)
+    if (blurRadius > 0)
     {
        DpBlurParams p;
        p.radius = (float)blurRadius;
        p.expandEdge = FALSE;
-       if (Gdiplus::GdipCreateEffect(dpBlurEffectGUID, &fx.blurA)==Gdiplus::Ok && fx.blurA!=NULL)
-          Gdiplus::GdipSetEffectParameters(fx.blurA, &p, (UINT)sizeof(p));
-       if (Gdiplus::GdipCreateEffect(dpBlurEffectGUID, &fx.blurB)==Gdiplus::Ok && fx.blurB!=NULL)
-          Gdiplus::GdipSetEffectParameters(fx.blurB, &p, (UINT)sizeof(p));
+       if (fx.blurA==NULL && Gdiplus::GdipCreateEffect(dpBlurEffectGUID, &fx.blurA)==Gdiplus::Ok && fx.blurA!=NULL)
+       {
+          if (Gdiplus::GdipSetEffectParameters(fx.blurA, &p, (UINT)sizeof(p))!=Gdiplus::Ok)
+          {
+             Gdiplus::GdipDeleteEffect(fx.blurA);
+             fx.blurA = NULL;
+          }
+       }
+       if (fx.blurB==NULL && Gdiplus::GdipCreateEffect(dpBlurEffectGUID, &fx.blurB)==Gdiplus::Ok && fx.blurB!=NULL)
+       {
+          if (Gdiplus::GdipSetEffectParameters(fx.blurB, &p, (UINT)sizeof(p))!=Gdiplus::Ok)
+          {
+             Gdiplus::GdipDeleteEffect(fx.blurB);
+             fx.blurB = NULL;
+          }
+       }
     }
 }
 
@@ -314,12 +335,13 @@ static bool dpDumpBlue(Gdiplus::GpBitmap *bmp, int w, int h, std::vector<unsigne
     if (bmp==NULL || w < 1 || h < 1)
        return false;
 
+    out.resize((size_t)w * h);
+
     Gdiplus::BitmapData bd;
     Gdiplus::Rect rect(0, 0, w, h);
     if (Gdiplus::DllExports::GdipBitmapLockBits(bmp, &rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bd)!=Gdiplus::Ok)
        return false;
 
-    out.resize((size_t)w * h);
     const unsigned char *base = (const unsigned char*)bd.Scan0;
     for ( int y = 0 ; y < h ; y++)
     {
@@ -408,63 +430,70 @@ static bool dpHistogram(Gdiplus::GpBitmap *bmp, int w, int h, DupePixResult &res
 //  one job
 // ---------------------------------------------------------------------------------------
 
-// the job's run was cancelled, replaced by another, or the pool is shutting down
-static bool dpJobAbandoned(LONG jobGeneration) {
-    return dpStopping.load() || dupesPixCancel.load()!=0 || jobGeneration!=dpGeneration.load();
+static bool dpJobAbandoned(LONG jobGeneration, const DpPool *pool = NULL) {
+    if (pool!=NULL && pool->stopping.load())
+       return true;
+    return dupesPixCancel.load()!=0 || jobGeneration!=dpGeneration.load();
 }
 
-// The decode, and only the decode. The chain is tpRunJob()'s, loader for loader: the two
-// formats that carry a renderer of their own go to it, then FreeImage for the extensions it
-// claims, then WIC for the ones it declares, then GDI+ for whatever is left over - EMF, WMF
-// and the GIFs the two before it refuse. The two pools reading a file the same way is the
-// point - a thumbnail and a stored fingerprint made from different decoders for the same
-// image is exactly the kind of disagreement nobody ever notices.
-//
-// Every attempt after the first starts from a clean TpSrcMeta: whatever the one before it
-// left there describes an image that was not the one finally decoded.
+static bool dpIsTransientFimStatus(int status) {
+    return status==TP_ERR_RESIZE || status==TP_ERR_CONVERT || status==TP_ERR_TONEMAP;
+}
+
+struct DpBitmapGuard {
+    Gdiplus::GpBitmap *p = NULL;
+    ~DpBitmapGuard() { if (p!=NULL) Gdiplus::DllExports::GdipDisposeImage(p); }
+};
+
 static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, const DupePixCfg &cfg,
                                        const std::wstring &path, const ThumbsConfig &tcfg,
-                                       int &srcW, int &srcH, int &loaderUsed, TpSrcMeta &meta, LONG jobGeneration) {
+                                       int &srcW, int &srcH, int &loaderUsed, TpSrcMeta &meta,
+                                       LONG jobGeneration, bool &transientErr,
+                                       const DpPool *pool = NULL, bool pdfLocked = false) {
     Gdiplus::GpBitmap *bmp = NULL;
+    transientErr = false;
     const std::wstring ext = tpFileExtension(path);
-    const bool fimHandles  = (FIM.ok && cfg.allowFIM==1 && tpFimExts.count(ext) > 0);
 
     if (ext==L"svg")
     {
-       // a factory of this worker's own, made on first use; SINGLE_THREADED carries no
-       // internal lock, which is the whole point, and is safe because the factory, its
-       // render target and the document all live and die inside one call on this thread
        if (d2dFac==NULL)
        {
           if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFac)))
-             d2dFac = NULL;      // LoadSVGimageEx() then shares the process wide one
+             d2dFac = NULL;
        }
 
        bmp = tpRenderSVG(path, cfg.boxSize, cfg.boxSize, srcW, srcH, d2dFac, fac);
        if (bmp!=NULL)
        {
           loaderUsed = 3;
-          // what RenderSVGfile() reports: one frame, 96 DPI, and a pixel format that is the
-          // renderer's rather than the file's, since an SVG has none of its own. srcW/srcH
-          // come back as the size the document declares, which is what
-          // mainLoadedIMGdetails.Width/Height holds for an SVG as well.
           meta.frames = 1;
           meta.dpi    = 96;
        }
-    } else if (ext==L"pdf")
+       return bmp;
+    }
+
+    if (ext==L"pdf")
     {
        int maxW = cfg.boxSize, maxH = cfg.boxSize, pageCount = 0, errorType = -100;
        {
-          // PDFium keeps global state; every PDFium caller of the DLL takes this one lock,
-          // so the two pools and AHK's calls serialise against each other
-          std::lock_guard<std::timed_mutex> pdfLock(pdfiumMutex);
-          // the wait for the lock can outlast the run; the other loaders must not try it either
-          if (dpJobAbandoned(jobGeneration))
+          std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::defer_lock);
+          if (!pdfLocked)
+          {
+             while (!pdfLock.try_lock_for(std::chrono::milliseconds(25)))
+             {
+                if (dpJobAbandoned(jobGeneration, pool))
+                {
+                   transientErr = true;
+                   return NULL;
+                }
+             }
+          }
+          if (dpJobAbandoned(jobGeneration, pool))
+          {
+             transientErr = true;
              return NULL;
+          }
 
-          // 32bpp rather than the 24 the thumbnails pool asks for: the chain after the
-          // decode applies a GDI+ effect and reads a histogram, and both want 32bpp.
-          // The white fill behind the page is RenderPDFpage()'s own default.
           bmp = coreRenderPdfPageAsBitmap(path.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff,
                                           &pageCount, &errorType, L"", 0);
        }
@@ -472,24 +501,21 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
        if (bmp!=NULL)
        {
           loaderUsed = 4;
-          // maxW/maxH come back as the size of the PAGE in points - coreRenderPdfPageAsBitmap()
-          // overwrites them with it - which is what RenderPDFpage() leaves in
-          // mainLoadedIMGdetails.Width/Height too, and is independent of the DPI this
-          // render happened to use. The page count is real; the pixel format is not named
-          // at all, for the reason tpRunJob() gives.
           srcW = maxW;
           srcH = maxH;
           meta.frames = (pageCount > 0) ? pageCount : 1;
-       } else if (errorType!=0)
-          QPV_DBG("dupesPixels: PDFium could not render " + WideCharToString(path.c_str())
-                      + ", error " + std::to_string(errorType));
-       // A PDF that will not render is DP_ERR_LOAD like anything else here, so the row is
-       // marked the way markSQLdbEntryDeleted() marks it. That is deliberately unlike
-       // TP_ERR_PDFLOCKED next door, where a password protected document must not cost the
-       // user a thumbnail; here nothing can ever be collected from it until the password is
-       // known, and the caches overview revalidates the entry when it is.
+       } else
+       {
+          if (errorType==-4 || errorType==-5)
+             transientErr = true;
+          if (errorType!=0)
+             QPV_DBG("dupesPixels: PDFium could not render " + WideCharToString(path.c_str())
+                         + ", error " + std::to_string(errorType));
+       }
+       return bmp;
     }
 
+    const bool fimHandles = (FIM.ok && ((cfg.allowFIM==1 && tpFimExts.count(ext) > 0) || cfg.firstFIM==1));
     int hasTriedFim = 0;
     if (bmp==NULL && fimHandles)
     {
@@ -505,13 +531,15 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
              srcW = fw;
              srcH = fh;
           }
+       } else if (dpIsTransientFimStatus(status))
+       {
+          transientErr = true;
+          return NULL;
        }
     }
 
-    if (bmp==NULL && tpWicExts.count(ext) > 0)
+    if (bmp==NULL && (tpWicExts.count(ext) > 0 || hasTriedFim==1))
     {
-       // WIC, unless the user disallowed it; when FreeImage comes next, WIC hands it the high
-       // bit depth TIFFs, as in tpRunJob()
        const int fimNext = (FIM.ok && cfg.allowFIM==1 && hasTriedFim!=1) ? 1 : 0;
        if (cfg.allowWIC==1)
        {
@@ -535,20 +563,26 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
                 srcW = fw;
                 srcH = fh;
              }
-          } else if (cfg.allowWIC==1 && (ext==L"tif" || ext==L"tiff"))
+          } else
           {
-             // a TIFF handed over that FreeImage cannot read: WIC decodes it after all
-             meta = TpSrcMeta();
-             bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
-             if (bmp!=NULL)
-                loaderUsed = 1;
+             if (dpIsTransientFimStatus(status))
+             {
+                transientErr = true;
+                return NULL;
+             }
+             if (cfg.allowWIC==1 && (ext==L"tif" || ext==L"tiff"))
+             {
+                meta = TpSrcMeta();
+                bmp = tpWICload(fac, path.c_str(), cfg.boxSize, cfg.boxSize, 0, cfg.wicQuality, 0, srcW, srcH, &meta);
+                if (bmp!=NULL)
+                   loaderUsed = 1;
+             }
           }
        }
     }
 
     if (bmp==NULL)
     {
-       // EMF, WMF and the GIFs neither of the two above will open; see tpGDIPload()
        meta = TpSrcMeta();
        bmp = tpGDIPload(path, cfg.boxSize, cfg.boxSize, 0, cfg.interpolation, srcW, srcH, &meta);
        if (bmp!=NULL)
@@ -559,19 +593,18 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
 }
 
 static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &fx, const DupePixCfg &cfg,
-                     const ThumbsConfig &tcfg, const DupePixJob &job, DupePixResult &res) {
+                     const ThumbsConfig &tcfg, const DupePixJob &job, DupePixResult &res,
+                     const DpPool *pool = NULL, bool pdfLocked = false) {
     res.imgidu = job.imgidu;
     res.status = DP_ERR_LOAD;
 
-    // GetFileAttributesEx() + the "size below 3 bytes means dead" test collectSQLFileInfosNow()
-    // performed in AHK before touching the decoder
     WIN32_FILE_ATTRIBUTE_DATA fad;
     if (GetFileAttributesExW(job.path.c_str(), GetFileExInfoStandard, &fad))
     {
        res.fsize = ((INT64)fad.nFileSizeHigh << 32) | (INT64)fad.nFileSizeLow;
        INT64 ft;
        memcpy(&ft, &fad.ftLastWriteTime, sizeof(INT64));
-       res.fmodified = qpvFileTimeToLocalStamp(ft)/100;      // YYYYMMDDHHMI, seconds dropped
+       res.fmodified = qpvFileTimeToLocalStamp(ft)/100;
        memcpy(&ft, &fad.ftCreationTime, sizeof(INT64));
        res.fcreated = qpvFileTimeToLocalStamp(ft)/100;
     }
@@ -579,15 +612,16 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
     if (res.fsize < 3)
        return;
 
-    Gdiplus::GpBitmap *bmp = NULL;
     try
     {
         int srcW = 0, srcH = 0;
-        bmp = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta, job.generation);
-        if (bmp==NULL)
+        bool transientErr = false;
+        DpBitmapGuard bmp;
+        bmp.p = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta,
+                             job.generation, transientErr, pool, pdfLocked);
+        if (bmp.p==NULL)
         {
-           // a decode cut short by a cancel says nothing about the file: retried, never marked dead
-           if (dpJobAbandoned(job.generation))
+           if (transientErr || dpJobAbandoned(job.generation, pool))
               res.status = DP_ERR_PROCESS;
            return;
         }
@@ -596,69 +630,46 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
         res.height = srcH;
 
         UINT bw = 0, bh = 0;
-        Gdiplus::DllExports::GdipGetImageWidth(bmp, &bw);
-        Gdiplus::DllExports::GdipGetImageHeight(bmp, &bh);
+        Gdiplus::DllExports::GdipGetImageWidth(bmp.p, &bw);
+        Gdiplus::DllExports::GdipGetImageHeight(bmp.p, &bh);
         if (bw < 1 || bh < 1)
-        {
-           Gdiplus::DllExports::GdipDisposeImage(bmp);
            return;
-        }
 
-        // Every step the run asks for has to work: the fingerprint of a colour image's blue
-        // channel, of an unblurred or of an unmirrored image would be stored as collected and
-        // never taken again. A failure here is DP_ERR_PROCESS, retried by the next run.
         res.status = DP_ERR_PROCESS;
-        bool ok = (fx.gray!=NULL && Gdiplus::DllExports::GdipBitmapApplyEffect(bmp, fx.gray, NULL, FALSE, NULL, NULL)==Gdiplus::Ok);
+        bool ok = (fx.gray!=NULL && Gdiplus::DllExports::GdipBitmapApplyEffect(bmp.p, fx.gray, NULL, FALSE, NULL, NULL)==Gdiplus::Ok);
 
-        // the histogram is measured before the blur, exactly where calcHistoAvgFile()
-        // measures it
-        ok = ok && dpHistogram(bmp, (int)bw, (int)bh, res);
+        ok = ok && dpHistogram(bmp.p, (int)bw, (int)bh, res);
         if (ok && cfg.applyBlur==1)
-           ok = dpApplyGaussian(bmp, fx);
+           ok = dpApplyGaussian(bmp.p, fx);
 
         if (ok)
         {
-           Gdiplus::GpBitmap *x1 = dpResizeBitmap(bmp, cfg.smallW, cfg.smallH, cfg.interpolation);
-           Gdiplus::GpBitmap *x2 = dpResizeBitmap(bmp, cfg.bigW, cfg.bigH, cfg.interpolation);
-           const bool okSmall = dpDumpBlue(x1, cfg.smallW, cfg.smallH, res.small);
-           const bool okBig   = dpDumpBlue(x2, cfg.bigW, cfg.bigH, res.big);
+           DpBitmapGuard x1, x2;
+           x1.p = dpResizeBitmap(bmp.p, cfg.smallW, cfg.smallH, cfg.interpolation);
+           x2.p = dpResizeBitmap(bmp.p, cfg.bigW, cfg.bigH, cfg.interpolation);
+           const bool okSmall = dpDumpBlue(x1.p, cfg.smallW, cfg.smallH, res.small);
+           const bool okBig   = dpDumpBlue(x2.p, cfg.bigW, cfg.bigH, res.big);
            ok = okSmall && okBig;
-           if (x1!=NULL) Gdiplus::DllExports::GdipDisposeImage(x1);
-           if (x2!=NULL) Gdiplus::DllExports::GdipDisposeImage(x2);
         }
 
         if (ok && cfg.wantFlipped==1)
         {
-           // AHK decoded the file a second time with the loader's flip flag; mirroring the
-           // bitmap that is already in hand is the same picture and one decode cheaper.
-           // It is also blurred here, which the AHK path did not manage to do: its call
-           // passed the flipped bitmap POINTER as the blur radius and blurred the wrong
-           // bitmap, so with blur on the flipped fingerprints were the only unblurred ones.
-           ok = (Gdiplus::DllExports::GdipImageRotateFlip(bmp, Gdiplus::RotateNoneFlipX)==Gdiplus::Ok);
+           ok = (Gdiplus::DllExports::GdipImageRotateFlip(bmp.p, Gdiplus::RotateNoneFlipX)==Gdiplus::Ok);
            if (ok)
            {
-              Gdiplus::GpBitmap *x1 = dpResizeBitmap(bmp, cfg.smallW, cfg.smallH, cfg.interpolation);
-              Gdiplus::GpBitmap *x2 = dpResizeBitmap(bmp, cfg.bigW, cfg.bigH, cfg.interpolation);
-              const bool okSmall = dpDumpBlue(x1, cfg.smallW, cfg.smallH, res.smallH);
-              const bool okBig   = dpDumpBlue(x2, cfg.bigW, cfg.bigH, res.bigH);
+              DpBitmapGuard x1, x2;
+              x1.p = dpResizeBitmap(bmp.p, cfg.smallW, cfg.smallH, cfg.interpolation);
+              x2.p = dpResizeBitmap(bmp.p, cfg.bigW, cfg.bigH, cfg.interpolation);
+              const bool okSmall = dpDumpBlue(x1.p, cfg.smallW, cfg.smallH, res.smallH);
+              const bool okBig   = dpDumpBlue(x2.p, cfg.bigW, cfg.bigH, res.bigH);
               ok = okSmall && okBig;
-              if (x1!=NULL) Gdiplus::DllExports::GdipDisposeImage(x1);
-              if (x2!=NULL) Gdiplus::DllExports::GdipDisposeImage(x2);
            }
         }
 
-        Gdiplus::DllExports::GdipDisposeImage(bmp);
-        bmp = NULL;
         if (ok)
            res.status = DP_OK;
     } catch (...)
     {
-        // OpenCV throws out of the FreeImage rescale path, and allocations throw when
-        // memory is scarce; letting either escape would tear this worker down and shrink
-        // the pool for the rest of the session
-        if (bmp!=NULL)
-           Gdiplus::DllExports::GdipDisposeImage(bmp);
-
         res.status = DP_ERR_PROCESS;
         QPV_DBG("dupesPixels: an exception escaped while processing " + WideCharToString(job.path.c_str()));
     }
@@ -690,10 +701,8 @@ static bool dpAcquireJobSlot(LONG jobGeneration) {
     return tpWaitForJobSlot([jobGeneration] { return dpJobAbandoned(jobGeneration); });
 }
 
-static void dpWorkerBody(size_t mySlot) {
+static void dpWorkerBody(std::shared_ptr<DpPool> pool, size_t mySlot) {
     HRESULT hrCo = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    // no omp_set_num_threads(1) - see the note in tpWorkerBody() in thumbs-pool.h for what
-    // it was guarding and why it was costing more than it guarded
 
     IWICImagingFactory *fac = NULL;
     HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory2, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fac));
@@ -706,7 +715,6 @@ static void dpWorkerBody(size_t mySlot) {
 
     DpEffects fx;
     std::shared_ptr<const DupePixCfg> madeFor;
-    // made on the first SVG this worker meets; see the dpDecodeFile() branch that creates it
     ID2D1Factory *d2dFac = NULL;
 
     for (;;)
@@ -715,12 +723,12 @@ static void dpWorkerBody(size_t mySlot) {
         std::shared_ptr<const DupePixCfg> cfg;
         {
             std::unique_lock<std::mutex> lk(dpMutex);
-            dpJobCV.wait(lk, [] {
-                if (dpStopping.load())
+            dpJobCV.wait(lk, [&pool] {
+                if (pool->stopping.load())
                    return true;
                 return !dpQueue.empty() && dpResults.size() < DP_MAX_READY;
             });
-            if (dpStopping.load())
+            if (pool->stopping.load())
                break;
 
             job = std::move(dpQueue.front());
@@ -732,8 +740,6 @@ static void dpWorkerBody(size_t mySlot) {
                dpRunInFlight++;
         }
 
-        // the effect objects belong to the settings they were made with; a new run with
-        // the blur turned on has to remake them
         if (madeFor!=cfg)
         {
            dpFreeEffects(fx);
@@ -760,44 +766,91 @@ static void dpWorkerBody(size_t mySlot) {
         tcfg.tmOCVparamB      = cfg->tmOCVparamB;
         tcfg.tmAltExpo        = cfg->tmAltExpo;
         tcfg.firstFIM         = cfg->firstFIM;
-        // the stored statistics and fingerprints must not depend on the user's display
         tcfg.colorManage      = 0;
 
         DupePixResult res;
         bool ranIt = false;
-        // the memory sample and the count of running decodes are the thumbnails pool's, and
-        // are shared with it; when the machine is tight, decoding narrows to one image at a
-        // time across the whole DLL
-        if (job.generation==dpGeneration.load() && dupesPixCancel.load()==0)
+        try
         {
-           // recorded from before the slot is asked for, not after: a worker that never gets
-           // one is holding a job and doing nothing, and that is the state worth naming
-           dpMarkBusy(mySlot, &job.path, 1);
-           if (dpAcquireJobSlot(job.generation))
-           {
-              dpMarkBusy(mySlot, NULL, 2);
-              TpJobSlot slot;      // released at the end of this block, whatever happens in it
-              dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res);
-              ranIt = true;
-           }
+            if (!dpJobAbandoned(job.generation, pool.get()))
+            {
+               dpMarkBusy(pool.get(), mySlot, &job.path, 1);
+               if (tpFileExtension(job.path)==L"pdf")
+               {
+                  std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::defer_lock);
+                  while (!dpJobAbandoned(job.generation, pool.get()))
+                  {
+                     if (!pdfLock.try_lock_for(std::chrono::milliseconds(25)))
+                        continue;
+                     if (dpJobAbandoned(job.generation, pool.get()))
+                        break;
+                     if (tpTryTakeJobSlot())
+                     {
+                        TpJobSlot slot;
+                        dpMarkBusy(pool.get(), mySlot, NULL, 2);
+                        dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), true);
+                        ranIt = true;
+                        break;
+                     }
+                     pdfLock.unlock();
+                     if (!dpAcquireJobSlot(job.generation))
+                        break;
+                     bool gotPdf = false;
+                     {
+                        TpJobSlot slot;
+                        if (pdfLock.try_lock())
+                        {
+                           gotPdf = true;
+                           if (!dpJobAbandoned(job.generation, pool.get()))
+                           {
+                              dpMarkBusy(pool.get(), mySlot, NULL, 2);
+                              dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), true);
+                              ranIt = true;
+                           }
+                        }
+                     }
+                     if (gotPdf)
+                        break;
+                     std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                  }
+               } else if (dpAcquireJobSlot(job.generation))
+               {
+                  dpMarkBusy(pool.get(), mySlot, NULL, 2);
+                  TpJobSlot slot;
+                  dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), false);
+                  ranIt = true;
+               }
+            }
+        } catch (...)
+        {
+            res.imgidu = job.imgidu;
+            res.status = DP_ERR_PROCESS;
+            ranIt = true;
         }
 
         {
             std::lock_guard<std::mutex> lk(dpMutex);
-            // this worker is holding nothing again. Cleared here rather than through
-            // dpMarkBusy() because the lock is already held
-            dpBusy[mySlot].startedMs = 0;
-            dpBusy[mySlot].state.store(0, std::memory_order_relaxed);
-            dpBusy[mySlot].path.clear();
-            if (dpState.inFlight > 0)
-               dpState.inFlight = dpState.inFlight - 1;
-            if (job.generation==dpGeneration.load() && dpRunInFlight > 0)
-               dpRunInFlight--;
-
-            if (ranIt && job.generation==dpGeneration.load())
+            pool->busy[mySlot].startedMs = 0;
+            pool->busy[mySlot].state.store(0, std::memory_order_relaxed);
+            pool->busy[mySlot].path.clear();
+            if (dpPool==pool)
             {
-               dpResults.push_back(std::move(res));
-               dpState.ready = (LONG)dpResults.size();
+               if (dpState.inFlight > 0)
+                  dpState.inFlight = dpState.inFlight - 1;
+               if (job.generation==dpGeneration.load() && dpRunInFlight > 0)
+                  dpRunInFlight--;
+
+               if (ranIt && job.generation==dpGeneration.load())
+               {
+                  try
+                  {
+                      dpResults.push_back(std::move(res));
+                      dpState.ready = (LONG)dpResults.size();
+                  } catch (...)
+                  {
+                      dpDroppedResults++;
+                  }
+               }
             }
         }
     }
@@ -812,7 +865,7 @@ static void dpWorkerBody(size_t mySlot) {
 
     {
         std::lock_guard<std::mutex> lk(dpMutex);
-        dpExited++;
+        pool->exited++;
     }
     dpExitCV.notify_all();
 }
@@ -822,6 +875,7 @@ static void dpWorkerBody(size_t mySlot) {
 static void dpCancelLocked() {
     dpGeneration.fetch_add(1);
     dpRunInFlight = 0;
+    dpDroppedResults = 0;
     dpQueue.clear();
     dpResults.clear();
     dpState.queued = 0;
@@ -909,20 +963,15 @@ static std::wstring qpvPixelFormatName(int loaderUsed, const TpSrcMeta &meta) {
 static bool dpWriteResult(const DupePixResult &res) {
     if (res.status!=DP_OK)
     {
-       // Only DP_ERR_LOAD is marked: nothing could decode the file, so it is dead or
-       // unreadable and is marked exactly the way markSQLdbEntryDeleted() marked it, so
-       // no later collection run tries to open it again. DP_ERR_PROCESS is a failure of
-       // this attempt rather than of the file - see the comment on the constant - and is
-       // left alone, so the next run picks it up. The keyset cursor in dpTopUpQueue()
-       // already stops it being re-offered inside THIS run, so nothing spins.
        if (res.status==DP_ERR_LOAD && dpMarkDead!=NULL)
        {
           SQ.reset(dpMarkDead);
           SQ.bind_int64(dpMarkDead, 1, res.imgidu);
-          SQ.step(dpMarkDead);
+          const bool ok = (SQ.step(dpMarkDead)==SQLITE_DONE);
           SQ.reset(dpMarkDead);
+          return ok;
        }
-       return false;
+       return true;
     }
 
     bool okay = true;
@@ -1018,58 +1067,81 @@ static int dpTopUpQueue(int want) {
     }
 
     int added = 0, seen = 0;
-    for (;;)
+    std::vector<INT64> deadIds;
+    try
     {
-        const int rc = SQ.step(dpSelect);
-        if (rc!=SQLITE_ROW)
+        for (;;)
         {
-           if (rc!=SQLITE_DONE && rc!=SQLITE_INTERRUPT)
-           {
-              dupesSetError(L"the pixel-collection query failed", dpDB);
-              dpState.lastError = 6;
-              SQ.reset(dpSelect);
-              return -1;
-           }
-           break;
-        }
+            const int rc = SQ.step(dpSelect);
+            if (rc!=SQLITE_ROW)
+            {
+               if (rc!=SQLITE_DONE)
+               {
+                  if (rc==SQLITE_INTERRUPT)
+                  {
+                     dupesSetError(L"the pixel-collection query was cancelled", dpDB);
+                     dpState.lastError = 0;
+                  } else
+                  {
+                     dupesSetError(L"the pixel-collection query failed", dpDB);
+                     dpState.lastError = 6;
+                  }
+                  SQ.reset(dpSelect);
+                  return -1;
+               }
+               break;
+            }
 
-        seen++;
-        DupePixJob job;
-        job.imgidu = (INT64)SQ.column_int64(dpSelect, 0);
-        if (job.imgidu > dpLastID)
-           dpLastID = job.imgidu;
+            seen++;
+            DupePixJob job;
+            job.imgidu = (INT64)SQ.column_int64(dpSelect, 0);
+            if (job.imgidu > dpLastID)
+               dpLastID = job.imgidu;
 
-        const wchar_t *p = (const wchar_t*)SQ.column_text16(dpSelect, 1);
-        const int plen = (p!=NULL) ? SQ.column_bytes16(dpSelect, 1)/(int)sizeof(wchar_t) : 0;
-        if (plen < 1)
-        {
-           // no path: nothing can ever be collected for this row, so mark it dead the way
-           // markSQLdbEntryDeleted() would rather than leave it to be re-offered forever
-           if (dpMarkDead!=NULL)
-           {
-              SQ.reset(dpMarkDead);
-              SQ.bind_int64(dpMarkDead, 1, job.imgidu);
-              SQ.step(dpMarkDead);
-              SQ.reset(dpMarkDead);
-           }
-           dpState.failed = dpState.failed + 1;
-           continue;
-        }
+            const wchar_t *p = (const wchar_t*)SQ.column_text16(dpSelect, 1);
+            const int plen = (p!=NULL) ? SQ.column_bytes16(dpSelect, 1)/(int)sizeof(wchar_t) : 0;
+            if (plen < 1)
+            {
+               deadIds.push_back(job.imgidu);
+               dpState.submitted = dpState.submitted + 1;
+               continue;
+            }
 
-        job.path.assign(p, (size_t)plen);
-        job.generation = dpGeneration.load();
-        {
-            std::lock_guard<std::mutex> lk(dpMutex);
-            dpQueue.push_back(std::move(job));
-            dpState.queued = (LONG)dpQueue.size();
+            job.path.assign(p, (size_t)plen);
+            job.generation = dpGeneration.load();
+            {
+                std::lock_guard<std::mutex> lk(dpMutex);
+                dpQueue.push_back(std::move(job));
+                dpState.queued = (LONG)dpQueue.size();
+            }
+            added++;
+            dpState.submitted = dpState.submitted + 1;
         }
-        added++;
-        dpState.submitted = dpState.submitted + 1;
+    } catch (...)
+    {
+        SQ.reset(dpSelect);
+        dpState.lastError = 1;
+        return -1;
     }
 
     SQ.reset(dpSelect);
-    // fewer rows than the LIMIT allowed means the statement really did run out, rather
-    // than simply reaching its limit for this refill
+
+    for ( size_t i = 0 ; i < deadIds.size() ; i++)
+    {
+        bool marked = true;
+        if (dpMarkDead!=NULL)
+        {
+           SQ.reset(dpMarkDead);
+           SQ.bind_int64(dpMarkDead, 1, deadIds[i]);
+           marked = (SQ.step(dpMarkDead)==SQLITE_DONE);
+           SQ.reset(dpMarkDead);
+        }
+        if (marked)
+           dpState.failed = dpState.failed + 1;
+        else
+           dpState.dbErrors = dpState.dbErrors + 1;
+    }
+
     if (seen < want)
        dpSetDrained(true);
 
@@ -1096,11 +1168,18 @@ DLL_API int DLL_CALLCONV dupesPixInit(int nThreads) {
     }
 
     nThreads = clamp(nThreads, 1, DP_MAX_WORKERS);
-    dpStopping.store(false);
-    dpWorkers.reserve(nThreads);
-    // the slot is the thread's index into dpBusy, and stays its own for as long as it runs
-    for ( int i = 0 ; i < nThreads ; i++)
-        dpWorkers.push_back(std::thread(dpWorkerBody, (size_t)i));
+    try
+    {
+        std::shared_ptr<DpPool> pool = std::make_shared<DpPool>();
+        dpWorkers.reserve(nThreads);
+        dpPool = pool;
+        for ( int i = 0 ; i < nThreads ; i++)
+            dpWorkers.push_back(std::thread(dpWorkerBody, pool, (size_t)i));
+    } catch (...)
+    {
+        if (dpWorkers.empty())
+           dpPool.reset();
+    }
 
     dpState.alive = (LONG)dpWorkers.size();
     QPV_DBG("dupesPixels: started with " + std::to_string(dpWorkers.size()) + " workers");
@@ -1111,16 +1190,6 @@ DLL_API void* DLL_CALLCONV dupesPixGetState() {
     return (void*)&dpState;
 }
 
-// The job that has been in a worker's hands the longest, and for how long.
-//
-// Returns those milliseconds, or -1 when no worker is holding anything. The path goes into
-// out, truncated to cch characters and always terminated, and *state - when asked for - says
-// what the worker is doing with it: 1 waiting for the decode slot the two pools share, 2
-// decoding. It is the question the counters cannot answer. A run whose queue is empty and
-// whose workers are idle is finishing its last few images, and "the last few images" can mean
-// one 200 MB raw that will take another minute, or a worker that tpTryTakeJobSlot() has not
-// let through since the thumbnails pool started drawing a page - the same three numbers
-// either way, and nothing to do about the second one until it is named.
 DLL_API INT64 DLL_CALLCONV dupesPixBusyJob(wchar_t *out, int cch, int *state) {
     if (out!=NULL && cch > 0)
        out[0] = 0;
@@ -1131,9 +1200,12 @@ DLL_API INT64 DLL_CALLCONV dupesPixBusyJob(wchar_t *out, int cch, int *state) {
     INT64 oldest = -1;
     size_t which = 0;
     std::lock_guard<std::mutex> lk(dpMutex);
+    if (!dpPool)
+       return -1;
+
     for ( size_t i = 0 ; i < (size_t)DP_MAX_WORKERS ; i++)
     {
-        const INT64 started = dpBusy[i].startedMs;
+        const INT64 started = dpPool->busy[i].startedMs;
         if (started==0)
            continue;
 
@@ -1149,11 +1221,11 @@ DLL_API INT64 DLL_CALLCONV dupesPixBusyJob(wchar_t *out, int cch, int *state) {
        return -1;
 
     if (state!=NULL)
-       *state = dpBusy[which].state.load(std::memory_order_relaxed);
+       *state = dpPool->busy[which].state.load(std::memory_order_relaxed);
 
     if (out!=NULL && cch > 1)
     {
-       const std::wstring &p = dpBusy[which].path;
+       const std::wstring &p = dpPool->busy[which].path;
        const size_t room = (size_t)cch - 1;
        const size_t n = (p.size() < room) ? p.size() : room;
        if (n > 0)
@@ -1165,37 +1237,24 @@ DLL_API INT64 DLL_CALLCONV dupesPixBusyJob(wchar_t *out, int cch, int *state) {
     return oldest;
 }
 
-// How the workers are spending the jobs they are holding, and what the decode throttle is
-// allowing while they do it. None of the counters in the state block can answer this:
-// inFlight is raised the moment a job leaves the queue - it has to be, see
-// dpAcquireJobSlot() - so a pool holding eight images with one decoder running looks
-// exactly like a pool with eight decoders running, and on a machine short of memory the
-// first is the normal state and the second one cannot happen at all.
-//
-// Which matters well beyond a tooltip. collectImgDataViaPool() gives up on a pool that has
-// delivered nothing for three minutes, and there are two ways to deliver nothing: a decode
-// that has wedged, which is what that limit is for, and every worker queued behind a slot
-// the thumbnails pool is using, which is the throttle working as intended and no reason at
-// all to throw away the user's run.
-//
-//   waiting   jobs a worker holds but has not been let through the shared slot for
-//   decoding  jobs a decoder was actually started for
-//   active    decodes running right now anywhere in the DLL, this pool and the other one
-//   cap       how many the throttle is allowing; 1 means the machine is short of memory
-//
-// Every argument is optional. Always returns 1.
 DLL_API int DLL_CALLCONV dupesPixWorkStates(int *waiting, int *decoding, int *active, int *cap) {
-    int nWait = 0, nDecode = 0;
-    for ( size_t i = 0 ; i < (size_t)DP_MAX_WORKERS ; i++)
+    std::shared_ptr<DpPool> pool;
     {
-        // read without dpMutex, on purpose: these are the states the workers store on their
-        // way past without taking it either, and holding a lock here would not make the
-        // thirty-two of them one single instant
-        const int st = dpBusy[i].state.load(std::memory_order_relaxed);
-        if (st==1)
-           nWait++;
-        else if (st==2)
-           nDecode++;
+        std::lock_guard<std::mutex> lk(dpMutex);
+        pool = dpPool;
+    }
+
+    int nWait = 0, nDecode = 0;
+    if (pool)
+    {
+       for ( size_t i = 0 ; i < (size_t)DP_MAX_WORKERS ; i++)
+       {
+           const int st = pool->busy[i].state.load(std::memory_order_relaxed);
+           if (st==1)
+              nWait++;
+           else if (st==2)
+              nDecode++;
+       }
     }
 
     if (waiting!=NULL)
@@ -1278,7 +1337,12 @@ DLL_API int DLL_CALLCONV qpvGetPixelFormatName(int loaderUsed, int wicFmt, int f
 DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, const wchar_t *packedOptions) {
     bindSQLiteOnce();
     dupesEngineError.clear();
-    if (!SQ.ok || ahkDb==NULL || selectSQL==NULL || dpWorkers.empty())
+    bool hasWorkers = false;
+    {
+        std::lock_guard<std::mutex> lk(dpMutex);
+        hasWorkers = !dpWorkers.empty();
+    }
+    if (!SQ.ok || ahkDb==NULL || selectSQL==NULL || !hasWorkers)
        return 0;
 
     if (SQ.bind_double==NULL || SQ.bind_blob==NULL || SQ.bind_null==NULL)
@@ -1363,7 +1427,12 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
         L" imgpixfmt=COALESCE(?13, imgpixfmt),"
         L" fsize=?14, fmodified=?15, fcreated=?16 WHERE imgidu=?17;";
     static const wchar_t *updPixSQL =
-        L"INSERT OR REPLACE INTO imagesPixels (imgidu, small, big, smallH, bigH) VALUES (?1,?2,?3,?4,?5);";
+        L"INSERT INTO imagesPixels (imgidu, small, big, smallH, bigH) VALUES (?1,?2,?3,?4,?5)"
+        L" ON CONFLICT(imgidu) DO UPDATE SET"
+        L" small=COALESCE(excluded.small, imagesPixels.small),"
+        L" big=COALESCE(excluded.big, imagesPixels.big),"
+        L" smallH=COALESCE(excluded.smallH, imagesPixels.smallH),"
+        L" bigH=COALESCE(excluded.bigH, imagesPixels.bigH);";
     static const wchar_t *markDeadSQL =
         L"UPDATE images SET isDeleted=1 WHERE imgidu=?1;";
 
@@ -1383,6 +1452,12 @@ DLL_API int DLL_CALLCONV dupesPixBegin(void *ahkDb, const wchar_t *selectSQL, co
         dpState.written = dpState.failed = dpState.dbErrors = dpState.submitted = 0;
         dpState.lastError = 0;
         dpState.phase = 1;
+    }
+
+    if (!dpHoldsCVclamp)
+    {
+       dpHoldsCVclamp = true;
+       tpCVclampAcquire();
     }
 
     dupesPixCancel.store(0, std::memory_order_relaxed);
@@ -1434,11 +1509,16 @@ DLL_API int DLL_CALLCONV dupesPixStep(int msBudget) {
 
         // 2. write back whatever is ready
         std::deque<DupePixResult> batch;
+        LONG dropped = 0;
         {
             std::lock_guard<std::mutex> lk(dpMutex);
             batch.swap(dpResults);
             dpState.ready = 0;
+            dropped = dpDroppedResults;
+            dpDroppedResults = 0;
         }
+        if (dropped > 0)
+           dpState.failed = dpState.failed + dropped;
 
         if (!batch.empty())
         {
@@ -1452,8 +1532,10 @@ DLL_API int DLL_CALLCONV dupesPixStep(int msBudget) {
                      dpState.dbErrors = dpState.dbErrors + 1;
                } else
                {
-                  dpWriteResult(batch[i]);
-                  dpState.failed = dpState.failed + 1;
+                  if (dpWriteResult(batch[i]))
+                     dpState.failed = dpState.failed + 1;
+                  else
+                     dpState.dbErrors = dpState.dbErrors + 1;
                }
            }
            dpJobCV.notify_all();   // room was made, parked workers may resume
@@ -1463,7 +1545,7 @@ DLL_API int DLL_CALLCONV dupesPixStep(int msBudget) {
         bool idle;
         {
             std::lock_guard<std::mutex> lk(dpMutex);
-            idle = dpQueue.empty() && dpRunInFlight==0 && dpResults.empty();
+            idle = dpQueue.empty() && dpRunInFlight==0 && dpResults.empty() && dpDroppedResults==0;
         }
         if (idle && dpSelectDrained)
         {
@@ -1495,6 +1577,12 @@ DLL_API int DLL_CALLCONV dupesPixEnd() {
     }
     dpJobCV.notify_all();
 
+    if (dpHoldsCVclamp)
+    {
+       dpHoldsCVclamp = false;
+       tpCVclampRelease();
+    }
+
     dpFinalizeStatements();
     dpDB = NULL;
     dpSetDrained(false);
@@ -1507,29 +1595,37 @@ DLL_API int DLL_CALLCONV dupesPixEnd() {
 
 DLL_API int DLL_CALLCONV dupesPixShutdown() {
     std::vector<std::thread> workers;
+    std::shared_ptr<DpPool> pool;
     {
         std::lock_guard<std::mutex> lk(dpMutex);
         if (dpWorkers.empty())
         {
            dpFinalizeStatements();
            dpDB = NULL;
+           if (dpHoldsCVclamp)
+           {
+              dpHoldsCVclamp = false;
+              tpCVclampRelease();
+           }
            return 1;
         }
 
         dpCancelLocked();
-        dpStopping.store(true);
-        dpExited = 0;
+        pool = dpPool;
+        dpPool.reset();
+        if (pool)
+           pool->stopping.store(true);
         workers.swap(dpWorkers);
     }
 
     dpJobCV.notify_all();
 
-    // a decoder that never returns must not keep the application from closing; the same
-    // bargain thumbsPoolShutdown() makes
     bool allOut = false;
     {
         std::unique_lock<std::mutex> lk(dpMutex);
-        allOut = dpExitCV.wait_for(lk, std::chrono::seconds(5), [&workers] { return dpExited >= workers.size(); });
+        allOut = dpExitCV.wait_for(lk, std::chrono::seconds(5), [&workers, &pool] {
+            return !pool || pool->exited >= workers.size();
+        });
     }
 
     for ( size_t i = 0 ; i < workers.size() ; i++)
@@ -1548,8 +1644,12 @@ DLL_API int DLL_CALLCONV dupesPixShutdown() {
         dpCancelLocked();
         dpState.alive    = 0;
         dpState.inFlight = 0;
-        if (allOut)
-           dpStopping.store(false);
+    }
+
+    if (dpHoldsCVclamp)
+    {
+       dpHoldsCVclamp = false;
+       tpCVclampRelease();
     }
 
     dpFinalizeStatements();

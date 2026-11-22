@@ -209,6 +209,27 @@ static std::unordered_set<std::wstring>  tpWicExts;
 static std::unordered_set<std::wstring>  tpFimExts;
 static ThumbsPoolState                   tpState = {0, 0, 0, 0, 0, 1, 0, 0, 0, 0};
 static int                               tpPrevCVthreads = -1;
+static std::mutex                        tpCVmutex;
+static int                               tpCVclampUsers = 0;
+static bool                              tpHoldsCVclamp = false;
+
+static void tpCVclampAcquire() {
+    std::lock_guard<std::mutex> lk(tpCVmutex);
+    if (tpCVclampUsers++ == 0)
+    {
+       tpPrevCVthreads = cv::getNumThreads();
+       cv::setNumThreads(1);
+    }
+}
+
+static void tpCVclampRelease() {
+    std::lock_guard<std::mutex> lk(tpCVmutex);
+    if (tpCVclampUsers > 0 && --tpCVclampUsers == 0 && tpPrevCVthreads >= 0)
+    {
+       cv::setNumThreads(tpPrevCVthreads);
+       tpPrevCVthreads = -1;
+    }
+}
 static std::atomic<LONG>                 tpActiveJobs{0};
 static std::atomic<LONG>                 tpMemTight{0};
 static std::atomic<ULONGLONG>            tpMemStamp{0};
@@ -2040,10 +2061,10 @@ DLL_API int DLL_CALLCONV thumbsPoolBegin(const wchar_t *packedOptions) {
     // thumbnails are far too small for OpenCV's own threading to pay off, and every worker
     // would otherwise spawn a full team of its own; the viewport value is put back by
     // thumbsPoolEnd()
-    if (tpPrevCVthreads<0)
+    if (!tpHoldsCVclamp)
     {
-       tpPrevCVthreads = cv::getNumThreads();
-       cv::setNumThreads(1);
+       tpHoldsCVclamp = true;
+       tpCVclampAcquire();
     }
 
     tpJobCV.notify_all();
@@ -2109,10 +2130,10 @@ DLL_API int DLL_CALLCONV thumbsPoolCancel() {
 
 DLL_API int DLL_CALLCONV thumbsPoolEnd() {
     thumbsPoolCancel();
-    if (tpPrevCVthreads>=0)
+    if (tpHoldsCVclamp)
     {
-       cv::setNumThreads(tpPrevCVthreads);
-       tpPrevCVthreads = -1;
+       tpHoldsCVclamp = false;
+       tpCVclampRelease();
     }
     return 1;
 }
@@ -2164,10 +2185,10 @@ DLL_API int DLL_CALLCONV thumbsPoolShutdown() {
            tpStopping.store(false);
     }
 
-    if (tpPrevCVthreads>=0)
+    if (tpHoldsCVclamp)
     {
-       cv::setNumThreads(tpPrevCVthreads);
-       tpPrevCVthreads = -1;
+       tpHoldsCVclamp = false;
+       tpCVclampRelease();
     }
 
     if (!allOut)

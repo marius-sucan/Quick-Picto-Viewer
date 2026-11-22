@@ -114,9 +114,9 @@ static IWICImagingFactory *m_pIWICFactory = NULL;
 
 // ---- GDI+ ------------------------------------------------------------------------------
 
-// set by a test: GdipCreateEffect() fails; GdipBitmapApplyEffect() fails for the grey [1] or
+// set by a test: GdipCreateEffect() fails; GdipSetEffectParameters() fails; GdipBitmapApplyEffect() fails for the grey [1] or
 // the blur [2] effect; the mirroring GdipImageRotateFlip() fails
-static int gShimEffectCreateFails = 0, gShimEffectApplyFails = 0, gShimFlipFails = 0;
+static int gShimEffectCreateFails = 0, gShimEffectParamsFails = 0, gShimEffectApplyFails = 0, gShimFlipFails = 0;
 
 // One synthetic bitmap type. It carries real pixels, so dpDumpBlue() and the resize can be
 // checked; the effects and the histogram are driven from the test rather than computed.
@@ -153,6 +153,8 @@ namespace Gdiplus {
         return Ok;
     }
     static inline Status GdipSetEffectParameters(CGpEffect *fx, const void *p, unsigned int size) {
+        if (gShimEffectParamsFails)
+           return GenericError;
         // 12 bytes is the hue/saturation/lightness struct, 8 the blur one
         if (fx!=NULL) fx->kind = (size==12) ? 1 : 2;
         (void)p;
@@ -271,7 +273,14 @@ struct QpvFIMstub { bool ok = false; };
 static QpvFIMstub FIM;
 static inline void bindFreeImageOnce() { }
 
-#define TP_ERR_LOAD 1
+#define TP_ERR_LOAD    1
+#define TP_ERR_RESIZE  2
+#define TP_ERR_CONVERT 3
+#define TP_ERR_TONEMAP 4
+
+static int gShimCVclampCount = 0;
+static inline void tpCVclampAcquire() { gShimCVclampCount++; }
+static inline void tpCVclampRelease() { if (gShimCVclampCount > 0) gShimCVclampCount--; }
 // mirrors TpSrcMeta of thumbs-pool.h; the stubbed loaders below fill it the way the real
 // ones do, so the collector's imgframes/imgdpi/imgpixfmt path is exercised here too
 #define FIC_RGBALPHA 4
@@ -380,6 +389,7 @@ static inline std::wstring tpFileExtension(const std::wstring &path) {
 // fallbacks down the chain get exercised; every one of them records what it was asked for.
 static int gShimWicFails = 0;
 static int gShimFimFails = 0;
+static int gShimFimFailStatus = TP_ERR_LOAD;
 static int gShimWicCalls = 0;
 static int gShimFimCalls = 0;
 static int gShimDecodeW = 40, gShimDecodeH = 30;
@@ -478,6 +488,7 @@ static inline Gdiplus::GpBitmap* tpFIMthumb(const ThumbsConfig*, const std::wstr
     // GIFs its plugin chokes on does; gShimFimFails is the same thing for every file
     if (gShimFimFails || shimPathHas(path.c_str(), L"nofim"))
     {
+       status = gShimFimFailStatus;
        // a failed attempt still touches the record, which is what dpDecodeFile() has to
        // clear before it hands the file to the loader after it
        if (meta!=NULL)

@@ -402,15 +402,32 @@ static void jobPipeline() {
     check(res3b.width==612 && res3b.height==792, "and the page size in points is the recorded one");
     check(qpvPixelFormatName(res3b.loaderUsed, res3b.meta).empty(), "a PDF is left unnamed");
 
-    // a document that will not render is a plain decode failure here - which is what marks
-    // the row - deliberately unlike the thumbnails pool, where TP_ERR_PDFLOCKED spares a
-    // password protected PDF. GDI+ cannot read a PDF either, hence the second switch.
-    gShimPdfFails = gShimGdipFails = 1;
-    gShimFimCalls = gShimGdipCalls = gShimPdfCalls = 0;
-    DupePixResult res3c;
-    runOne(L"locked.pdf", cfg, res3c);
-    check(res3c.status==DP_ERR_LOAD && gShimPdfCalls==1, "a PDF that will not render fails the decode");
-    gShimPdfFails = gShimGdipFails = 0;
+    // a document that will not render fails the decode without falling through to raster loaders
+    gShimPdfFails = 1;
+    gShimFimCalls = gShimWicCalls = gShimGdipCalls = gShimPdfCalls = 0;
+    {
+        DupePixCfg fimFirst = cfg;
+        fimFirst.firstFIM = 1;
+        DupePixResult res3c;
+        runOne(L"locked.pdf", fimFirst, res3c);
+        check(res3c.status==DP_ERR_LOAD && gShimPdfCalls==1, "a PDF that will not render fails the decode");
+        check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "failed PDF does not fall through to raster loaders");
+    }
+    gShimPdfFails = 0;
+
+    // PDFium allocation failures are transient and must not mark the row dead
+    gShimPdfFails = 1;
+    gShimPdfError = -4;
+    {
+        DupePixResult resPdfOom;
+        runOne(L"oom.pdf", cfg, resPdfOom);
+        check(resPdfOom.status==DP_ERR_PROCESS, "PDFium bitmap alloc failure is transient (DP_ERR_PROCESS)");
+        gShimPdfError = -5;
+        runOne(L"oom2.pdf", cfg, resPdfOom);
+        check(resPdfOom.status==DP_ERR_PROCESS, "PDFium FPDF_BITMAP alloc failure is transient (DP_ERR_PROCESS)");
+    }
+    gShimPdfFails = 0;
+    gShimPdfError = 4;
 
     // a PDF whose run was abandoned while it waited for PDFium is not rendered, no other
     // loader is tried, and the row is left for the next run instead of being marked dead
@@ -420,12 +437,75 @@ static void jobPipeline() {
     check(resGone.status==DP_ERR_PROCESS && gShimPdfCalls==0, "an abandoned run's PDF is not rendered and is not marked dead");
     check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "and no other loader is tried");
 
-    // an SVG that will not render fails the decode, which marks it dead like any other file
-    gShimSvgFails = gShimGdipFails = 1;
-    DupePixResult res3d;
-    runOne(L"broken.svg", cfg, res3d);
-    check(res3d.status==DP_ERR_LOAD, "a broken SVG fails the decode");
-    gShimSvgFails = gShimGdipFails = 0;
+    // an SVG that will not render fails the decode without falling through to raster loaders
+    gShimSvgFails = 1;
+    gShimFimCalls = gShimWicCalls = gShimGdipCalls = gShimSvgCalls = 0;
+    {
+        DupePixCfg fimFirst = cfg;
+        fimFirst.firstFIM = 1;
+        DupePixResult res3d;
+        runOne(L"broken.svg", fimFirst, res3d);
+        check(res3d.status==DP_ERR_LOAD && gShimSvgCalls==1, "a broken SVG fails the decode");
+        check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "failed SVG does not fall through to raster loaders");
+    }
+    gShimSvgFails = 0;
+
+    // firstFIM sends raster formats to FreeImage before WIC, matching thumbs-pool
+    {
+        DupePixCfg fimFirst = cfg;
+        fimFirst.firstFIM = 1;
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        DupePixResult resFF;
+        runOne(L"img1.jpg", fimFirst, resFF);
+        check(resFF.status==DP_OK && resFF.loaderUsed==2 && gShimFimCalls==1 && gShimWicCalls==0,
+              "firstFIM=1 sends a WIC format to FreeImage first");
+
+        fimFirst.allowFIM = 0;
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        runOne(L"img1.jpg", fimFirst, resFF);
+        check(resFF.status==DP_OK && resFF.loaderUsed==2 && gShimFimCalls==1 && gShimWicCalls==0,
+              "firstFIM=1 still uses FreeImage when allowFIM=0");
+    }
+
+    // FreeImage decode failure falls back to WIC before GDI+, even when ext is not in tpWicExts
+    {
+        gShimFimFails = 1;
+        gShimFimFailStatus = TP_ERR_LOAD;
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        DupePixResult resFb;
+        runOne(L"img2.exr", cfg, resFb);
+        check(resFb.status==DP_OK && resFb.loaderUsed==1 && gShimFimCalls==1 && gShimWicCalls==1 && gShimGdipCalls==0,
+              "FreeImage decode failure falls back to WIC before GDI+");
+        gShimFimFails = 0;
+    }
+
+    // FreeImage post-decode failures are transient and do not mark dead or fall through
+    {
+        const int transientCodes[3] = {TP_ERR_RESIZE, TP_ERR_CONVERT, TP_ERR_TONEMAP};
+        bool allTransient = true;
+        gShimFimFails = 1;
+        for ( int i = 0 ; i < 3 ; i++)
+        {
+            gShimFimFailStatus = transientCodes[i];
+            gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+            DupePixResult resTr;
+            runOne(L"img2.exr", cfg, resTr);
+            if (resTr.status!=DP_ERR_PROCESS || gShimFimCalls!=1 || gShimWicCalls!=0 || gShimGdipCalls!=0)
+               allTransient = false;
+        }
+        check(allTransient, "FreeImage resize/convert/tonemap failures return DP_ERR_PROCESS without fallback");
+
+        gShimWicFails = 1;
+        gShimFimFailStatus = TP_ERR_RESIZE;
+        gShimFimCalls = gShimWicCalls = gShimGdipCalls = 0;
+        DupePixResult resTr2;
+        runOne(L"img1.jpg", cfg, resTr2);
+        check(resTr2.status==DP_ERR_PROCESS && gShimWicCalls==1 && gShimFimCalls==1 && gShimGdipCalls==0,
+              "FreeImage fallback resize failure returns DP_ERR_PROCESS without GDI+");
+        gShimWicFails = 0;
+        gShimFimFails = 0;
+        gShimFimFailStatus = TP_ERR_LOAD;
+    }
 
     // the thumbnails pool asks for the same name through this export, so that a thumbnail
     // and a collection run put one spelling in front of the user for one file. Loader 3
@@ -510,6 +590,32 @@ static void jobPipeline() {
     check(res7e.status==DP_ERR_PROCESS, "a mirror that fails: retried, not stored unmirrored");
     gShimFlipFails = 0;
     cfg.wantFlipped = 0;
+
+    // GdipSetEffectParameters failure must invalidate effects rather than leave no-op handles
+    gShimEffectParamsFails = 1;
+    {
+        DpEffects fx;
+        dpMakeEffects(fx, 3);
+        check(fx.gray==NULL && fx.blurA==NULL && fx.blurB==NULL,
+              "GdipSetEffectParameters failure deletes and nulls all effects");
+        dpFreeEffects(fx);
+
+        DupePixResult resParamsFail;
+        runOne(L"img7.jpg", cfg, resParamsFail);
+        check(resParamsFail.status==DP_ERR_PROCESS, "effect parameter failure retries instead of storing raw pixels");
+    }
+    gShimEffectParamsFails = 0;
+
+    // blurB is created independently even when blurA already exists
+    {
+        DpEffects fx;
+        dpMakeEffects(fx, 3);
+        Gdiplus::GdipDeleteEffect(fx.blurB);
+        fx.blurB = NULL;
+        dpMakeEffects(fx, 3);
+        check(fx.blurA!=NULL && fx.blurB!=NULL, "dpMakeEffects creates blurB even when blurA is already present");
+        dpFreeEffects(fx);
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1135,6 +1241,206 @@ static void gdipLoaderAndTheColumnsItCannotFill() {
     remove(path);
 }
 
+static int __cdecl shimInterruptNow(void *) { return 1; }
+
+static void preserveFlippedEmptyPathAndDbErrors() {
+    printf("  flipped preservation, empty paths, CV clamp, and mark-dead errors\n");
+    bindSQLiteOnce();
+    if (!SQ.ok || SQ.exec==NULL || SQ.bind_double==NULL || SQ.bind_blob==NULL)
+    {
+       printf("    SKIPPED: libsqlite3.so.0 is not available\n");
+       return;
+    }
+
+    const char *path = "pixels_upsert.sldb";
+    remove(path);
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(path, &db, SQLITE_OPEN_READWRITE | QPV_SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK || db==NULL)
+    {
+       printf("    could not create the scratch database\n");
+       failures++;
+       return;
+    }
+
+    execOrDie(db,
+        "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
+        " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
+        " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
+        " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
+        " smallH BLOB, bigH BLOB);"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (1,'img1.jpg','C:\\p');"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (2,'empty2.jpg','C:\\p');"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (3,'null3.jpg','C:\\p');"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (4,'gone4.jpg','C:\\p');"
+        "INSERT INTO imagesPixels (imgidu, small, big, smallH, bigH) VALUES"
+        " (1, X'010203', X'040506', X'AABBCCDD', X'EEFF1122');",
+        "create schema and seed rows");
+
+    for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 4;
+    tpWicExts.clear();
+    tpFimExts.clear();
+    tpWicExts.insert(L"jpg");
+    FIM.ok = true;
+    m_pIWICFactory = (IWICImagingFactory*)1;
+    gShimCVclampCount = 0;
+
+    check(dupesPixInit(2) >= 1, "the pool starts");
+
+    // rows 2 and 3 produce empty / NULL paths from the query while row 1 re-collects with wantFlipped=0
+    const wchar_t *sel = L"SELECT imgidu,"
+                         L" CASE WHEN imgidu=2 THEN '' WHEN imgidu=3 THEN NULL ELSE fullPath END"
+                         L" FROM images WHERE imgavg IS NULL AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "dupesPixBegin starts with wantFlipped=0");
+    check(gShimCVclampCount==1, "dupesPixBegin acquires OpenCV thread clamp");
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "second dupesPixBegin without End keeps clamp refcount at 1");
+    check(gShimCVclampCount==1, "OpenCV clamp refcount is not double-acquired");
+
+    execOrDie(db, "BEGIN;", "open transaction");
+    int steps = 0;
+    while (dupesPixStep(10)==1)
+        if (++steps > 100000) { failures++; break; }
+    execOrDie(db, "COMMIT;", "commit");
+    dupesPixEnd();
+
+    check(gShimCVclampCount==0, "dupesPixEnd releases OpenCV thread clamp");
+    check(dpState.submitted==4 && dpState.written==1 && dpState.failed==3 && dpState.dbErrors==0,
+          "empty/NULL paths and missing files are counted consistently against submitted");
+    check(scalar(db, "SELECT count(*) FROM images WHERE imgidu IN (2,3,4) AND isDeleted=1")==3,
+          "empty/NULL paths and missing files are all marked isDeleted=1");
+    check(scalar(db, "SELECT count(*) FROM imagesPixels WHERE imgidu=1 AND length(small)=72 AND length(big)=1024")==1,
+          "re-collecting updates small and big fingerprints");
+    check(scalar(db, "SELECT count(*) FROM imagesPixels WHERE imgidu=1 AND smallH=X'AABBCCDD' AND bigH=X'EEFF1122'")==1,
+          "re-collecting with wantFlipped=0 preserves existing smallH and bigH");
+
+    // verify dpMarkDead failures land in dbErrors instead of failed (both empty-path and missing-file paths)
+    execOrDie(db,
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (5,'empty5.jpg','C:\\p');"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (6,'gone6.jpg','C:\\p');"
+        "CREATE TRIGGER block_dead BEFORE UPDATE ON images WHEN NEW.isDeleted=1"
+        " BEGIN SELECT RAISE(ABORT, 'blocked'); END;",
+        "add rows and mark-dead blocking trigger");
+
+    const wchar_t *sel2 = L"SELECT imgidu, CASE WHEN imgidu=5 THEN '' ELSE fullPath END"
+                          L" FROM images WHERE imgidu>=5 AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+    check(dupesPixBegin(db, sel2, L"350|5|0|0|1|1|1|1")==1, "dupesPixBegin starts trigger test");
+    steps = 0;
+    while (dupesPixStep(10)==1)
+        if (++steps > 100000) { failures++; break; }
+    dupesPixEnd();
+
+    check(dpState.submitted==2 && dpState.written==0 && dpState.failed==0 && dpState.dbErrors==2,
+          "failed dpMarkDead updates increment dbErrors rather than failed");
+
+    // verify SQLITE_INTERRUPT during dpTopUpQueue does not mark the query drained
+    if (SQ.progress_handler!=NULL)
+    {
+       check(dupesPixBegin(db, sel2, L"350|5|0|0|1|1|1|1")==1, "dupesPixBegin starts interrupt test");
+       SQ.progress_handler(db, 1, shimInterruptNow, NULL);
+       const int rInt = dupesPixStep(10);
+       SQ.progress_handler(db, 0, NULL, NULL);
+       check(rInt==-1 && dpState.phase==-1 && dpState.lastError==0 && dpState.drained==0 && !dpSelectDrained,
+             "SQLITE_INTERRUPT aborts step without marking query drained");
+       dupesPixEnd();
+    }
+
+    check(dupesPixShutdown()==1, "the pool shuts down cleanly");
+    check(gShimCVclampCount==0, "OpenCV thread clamp stays released after shutdown");
+    SQ.close_v2(db);
+    remove(path);
+}
+
+static void pdfLockWaitAndPoolIsolation() {
+    printf("  PDFium lock contention, shutdown responsiveness, and pool isolation\n");
+    bindSQLiteOnce();
+    if (!SQ.ok || SQ.exec==NULL || SQ.bind_double==NULL || SQ.bind_blob==NULL)
+    {
+       printf("    SKIPPED: libsqlite3.so.0 is not available\n");
+       return;
+    }
+
+    const char *path = "pixels_pdf_lock.sldb";
+    remove(path);
+    sqlite3 *db = NULL;
+    if (SQ.open_v2(path, &db, SQLITE_OPEN_READWRITE | QPV_SQLITE_OPEN_CREATE, NULL)!=SQLITE_OK || db==NULL)
+    {
+       printf("    could not create the scratch database\n");
+       failures++;
+       return;
+    }
+
+    execOrDie(db,
+        "CREATE TABLE images (imgidu NUMERIC PRIMARY KEY NOT NULL, imgfile TEXT COLLATE NOCASE NOT NULL,"
+        " imgfolder TEXT COLLATE NOCASE NOT NULL, fullPath TEXT AS (imgfolder||'\\'||imgfile), fsize INT,"
+        " fmodified INT, fcreated INT, imgwidth INT, imgheight INT, imgframes INT, imgdpi INT,"
+        " imgpixfmt TEXT COLLATE NOCASE, imgmedian FLOAT, imgavg FLOAT,"
+        " imghpeak FLOAT, imghlow FLOAT, imghmode FLOAT, imghrms FLOAT, imghminu FLOAT, imghrange FLOAT,"
+        " isDeleted INT DEFAULT 0, UNIQUE (fullPath));"
+        "CREATE TABLE imagesPixels (imgidu INTEGER PRIMARY KEY NOT NULL, small BLOB, big BLOB,"
+        " smallH BLOB, bigH BLOB);"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (1,'a.pdf','C:\\p');"
+        "INSERT INTO images (imgidu, imgfile, imgfolder) VALUES (2,'b.pdf','C:\\p');",
+        "create PDF test schema");
+
+    for ( int i = 0 ; i < 256 ; i++) gShimHistogram[i] = 4;
+    FIM.ok = true;
+    m_pIWICFactory = (IWICImagingFactory*)1;
+    gShimPdfFails = 0;
+    gShimPdfCalls = 0;
+    gShimMaxActiveJobs.store(0);
+    gShimMemoryTight = false;
+
+    check(dupesPixInit(2)==2, "PDF pool starts with 2 workers");
+
+    const wchar_t *sel = L"SELECT imgidu, fullPath FROM images"
+                         L" WHERE imgidu NOT IN (SELECT imgidu FROM imagesPixels WHERE small IS NOT NULL)"
+                         L" AND isDeleted=0 AND imgidu>?2 ORDER BY imgidu LIMIT ?1;";
+
+    // Hold pdfiumMutex externally: waiting PDF workers must hold zero decode slots and exit quickly on shutdown
+    typedef std::chrono::steady_clock Clock;
+    auto msSince = [](Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); };
+    {
+        std::lock_guard<std::timed_mutex> holdPdf(pdfiumMutex);
+        check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "PDF run begins while pdfiumMutex is locked");
+        const Clock::time_point t0 = Clock::now();
+        while (dpState.inFlight < 2 && msSince(t0) < 1000)
+            dupesPixStep(5);
+        std::this_thread::sleep_for(std::chrono::milliseconds(80));
+        check(dpState.inFlight==2, "both workers picked up PDF jobs and are waiting on pdfiumMutex");
+        check(tpActiveJobs.load()==0 && gShimMaxActiveJobs.load()==0,
+              "waiting on pdfiumMutex holds zero TpJobSlots");
+        check(gShimPdfCalls==0, "neither worker entered PDFium while locked");
+
+        const Clock::time_point tStop = Clock::now();
+        const int shutOk = dupesPixShutdown();
+        const double shutMs = msSince(tStop);
+        check(shutOk==1 && shutMs < 1000.0, "dupesPixShutdown exits promptly even while pdfiumMutex is held");
+    }
+
+    // Re-init after shutdown and run PDFs under tight memory to verify normal completion + pool isolation
+    DpPool stalePool;
+    stalePool.stopping.store(true);
+    check(dpJobAbandoned(dpGeneration.load(), &stalePool), "a stopped pool incarnation always abandons jobs");
+
+    gShimMaxActiveJobs.store(0);
+    gShimMemoryTight = true;
+    check(dupesPixInit(2)==2, "pool re-initializes cleanly after shutdown");
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "PDF run restarts under tight memory");
+    int steps = 0;
+    while (dupesPixStep(10)==1)
+        if (++steps > 100000) { failures++; break; }
+    dupesPixEnd();
+    check(dpState.written==2 && dpState.failed==0 && dpState.dbErrors==0, "both PDFs complete after re-init");
+    check(gShimMaxActiveJobs.load()==1 && tpActiveJobs.load()==0, "PDFs respect tight-memory cap of 1 and release slots");
+    gShimMemoryTight = false;
+
+    check(dupesPixShutdown()==1, "re-initialized pool shuts down cleanly");
+    SQ.close_v2(db);
+    remove(path);
+}
+
 // ---------------------------------------------------------------------------------------
 
 int main() {
@@ -1149,6 +1455,8 @@ int main() {
     abandonedDecodeDoesNotHoldTheNextRun();
     gdipLoaderAndTheColumnsItCannotFill();
     collectionSurvivesMemoryPressure();
+    preserveFlippedEmptyPathAndDbErrors();
+    pdfLockWaitAndPoolIsolation();
 
     printf("\n  %s\n", failures ? "PIXEL COLLECTOR TEST FAILED" : "pixel collector test passed");
     return failures ? 1 : 0;
