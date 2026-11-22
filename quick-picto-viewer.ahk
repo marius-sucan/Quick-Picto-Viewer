@@ -37277,6 +37277,7 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    prevMSGdisplay := A_TickCount
    prevSaveData := A_TickCount
    ErrorMsgS := ""
+   hashFailed := 0
    Loop
    {
        ; one batch: the rows leave the result set as they are updated, so re-running the
@@ -37290,6 +37291,8 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
        If (more=-1)
        {
           ErrorMsgS := "ERROR: " readDupesEngineError() "`n"
+          addJournalEntry(A_ThisFunc "(): " ErrorMsgS)
+          hashFailed := 1
           Break
        }
 
@@ -37358,9 +37361,16 @@ generateSQLimageFingerPrintHash(O_whichHashu, flippedModus, stringu, mustNotHave
    If (abandonAll=1)
    {
       percDone := " ( " Round((countTFilez / filesToBeSorted) * 100, 1) "% )" someErrors
-      msgBeepTimer(ErrorMsg "Operation aborted. " groupDigits(countTFilez) " / " groupDigits(filesToBeSorted) percDone)
+      msgBeepTimer(ErrorMsgS ErrorMsg "Operation aborted. " groupDigits(countTFilez) " / " groupDigits(filesToBeSorted) percDone)
       SetTimer, ResetImgLoadStatus, -200
       Return 1
+   }
+
+   If (hashFailed=1)
+   {
+      msgBeepTimer(ErrorMsgS ErrorMsg "Failed to generate image " fwhichHashu moreInfo " fingerprints." someErrors)
+      SetTimer, ResetImgLoadStatus, -200
+      Return -1
    }
 
    ; showTOOLtip(ErrorMsg "Finished generating hashes for " groupDigits(filesToBeSorted) " files" someErrors)
@@ -89148,18 +89158,26 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    If scu
    {
       rr := collectSQLFileInfosNow(scu, 0, 1, 2, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
-      If (rr=-3)
+      If (rr!=0)
       {
-         RemoveTooltip()
+         If (rr=-3)
+            RemoveTooltip()
          Return
       }
    }
 
    If (InStr(thisNOTnullCol, "hash") || userFindDupesFilterHamDist>1 || mustForceHashes>1)
    {
-      generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
+      rr := generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 0, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
+      If (rr!=0)
+         Return
+
       If (findFlippedDupes=1)
-         generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 1, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
+      {
+         rr := generateSQLimageFingerPrintHash(userFindDupesFilterHamDist, 1, dupesStringFilter, dupesFilterStringIsNot, dupesFilterStringPos, dupesFilterWhat)
+         If (rr!=0)
+            Return
+      }
    }
 
    If (InStr(theseCols, "hash") && userFindDupesFilterHamDist>1)
