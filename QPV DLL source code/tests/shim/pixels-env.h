@@ -173,6 +173,10 @@ static int           gShimGrayCalls = 0;
 static int           gShimBlurCalls = 0;
 static int           gShimResizeCalls = 0;
 static int           gShimFlipCalls = 0;
+// run by the histogram stub when a test sets it; the histogram is taken after the decode,
+// so this is where a test sees what a job still holds by then
+static void        (*gShimHistogramHook)(void*) = NULL;
+static void         *gShimHistogramHookArg = NULL;
 
 namespace Gdiplus { namespace DllExports {
 
@@ -208,6 +212,9 @@ static inline Status GdipBitmapGetHistogram(GpBitmap *b, HistogramFormat, unsign
        return GenericError;
 
     gShimHistogramCalls++;
+    if (gShimHistogramHook!=NULL)
+       gShimHistogramHook(gShimHistogramHookArg);
+
     memcpy(c0, gShimHistogram, sizeof(gShimHistogram));
     return Ok;
 }
@@ -345,6 +352,15 @@ static inline bool tpTryTakeJobSlot() {
     }
 }
 
+// The shipped one refuses a newly arrived worker while anybody is queued for a slot. A test
+// says somebody is by raising tpSlotWaiters; gShimSlotWaits counts the trips through
+// tpWaitForJobSlot().
+static std::atomic<LONG> tpSlotWaiters(0);
+static std::atomic<int>  gShimSlotWaits(0);
+static inline bool tpTryTakeJobSlotNow() {
+    return tpSlotWaiters.load(std::memory_order_acquire)==0 && tpTryTakeJobSlot();
+}
+
 static inline void tpReleaseJobSlot() {
     tpActiveJobs.fetch_sub(1, std::memory_order_acq_rel);
 }
@@ -355,6 +371,7 @@ struct TpJobSlot {
 
 template <class QuitFn>
 static inline bool tpWaitForJobSlot(QuitFn shouldQuit) {
+    gShimSlotWaits++;
     for (;;)
     {
         if (shouldQuit())

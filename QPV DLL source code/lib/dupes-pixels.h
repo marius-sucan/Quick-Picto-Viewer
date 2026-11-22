@@ -449,7 +449,8 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
                                        const std::wstring &path, const ThumbsConfig &tcfg,
                                        int &srcW, int &srcH, int &loaderUsed, TpSrcMeta &meta,
                                        LONG jobGeneration, bool &transientErr,
-                                       const DpPool *pool = NULL, bool pdfLocked = false) {
+                                       const DpPool *pool = NULL,
+                                       std::unique_lock<std::timed_mutex> *heldPdfLock = NULL) {
     Gdiplus::GpBitmap *bmp = NULL;
     transientErr = false;
     const std::wstring ext = tpFileExtension(path);
@@ -476,8 +477,10 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
     {
        int maxW = cfg.boxSize, maxH = cfg.boxSize, pageCount = 0, errorType = -100;
        {
-          std::unique_lock<std::timed_mutex> pdfLock(pdfiumMutex, std::defer_lock);
-          if (!pdfLocked)
+          // PDFium is held for the render alone, whoever took the lock
+          std::unique_lock<std::timed_mutex> ownLock(pdfiumMutex, std::defer_lock);
+          std::unique_lock<std::timed_mutex> &pdfLock = (heldPdfLock!=NULL) ? *heldPdfLock : ownLock;
+          if (!pdfLock.owns_lock())
           {
              while (!pdfLock.try_lock_for(std::chrono::milliseconds(25)))
              {
@@ -496,6 +499,7 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
 
           bmp = coreRenderPdfPageAsBitmap(path.c_str(), 0, 250.0f, &maxW, &maxH, 1, 0xffffffff,
                                           &pageCount, &errorType, L"", 0);
+          pdfLock.unlock();
        }
 
        if (bmp!=NULL)
@@ -594,7 +598,7 @@ static Gdiplus::GpBitmap* dpDecodeFile(IWICImagingFactory *fac, ID2D1Factory *&d
 
 static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &fx, const DupePixCfg &cfg,
                      const ThumbsConfig &tcfg, const DupePixJob &job, DupePixResult &res,
-                     const DpPool *pool = NULL, bool pdfLocked = false) {
+                     const DpPool *pool = NULL, std::unique_lock<std::timed_mutex> *heldPdfLock = NULL) {
     res.imgidu = job.imgidu;
     res.status = DP_ERR_LOAD;
 
@@ -618,7 +622,7 @@ static void dpRunJob(IWICImagingFactory *fac, ID2D1Factory *&d2dFac, DpEffects &
         bool transientErr = false;
         DpBitmapGuard bmp;
         bmp.p = dpDecodeFile(fac, d2dFac, cfg, job.path, tcfg, srcW, srcH, res.loaderUsed, res.meta,
-                             job.generation, transientErr, pool, pdfLocked);
+                             job.generation, transientErr, pool, heldPdfLock);
         if (bmp.p==NULL)
         {
            if (transientErr || dpJobAbandoned(job.generation, pool))
@@ -784,11 +788,12 @@ static void dpWorkerBody(std::shared_ptr<DpPool> pool, size_t mySlot) {
                         continue;
                      if (dpJobAbandoned(job.generation, pool.get()))
                         break;
-                     if (tpTryTakeJobSlot())
+                     // refused while anybody is queued for a slot; the queue below is the way in then
+                     if (tpTryTakeJobSlotNow())
                      {
                         TpJobSlot slot;
                         dpMarkBusy(pool.get(), mySlot, NULL, 2);
-                        dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), true);
+                        dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), &pdfLock);
                         ranIt = true;
                         break;
                      }
@@ -804,7 +809,7 @@ static void dpWorkerBody(std::shared_ptr<DpPool> pool, size_t mySlot) {
                            if (!dpJobAbandoned(job.generation, pool.get()))
                            {
                               dpMarkBusy(pool.get(), mySlot, NULL, 2);
-                              dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), true);
+                              dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), &pdfLock);
                               ranIt = true;
                            }
                         }
@@ -817,7 +822,7 @@ static void dpWorkerBody(std::shared_ptr<DpPool> pool, size_t mySlot) {
                {
                   dpMarkBusy(pool.get(), mySlot, NULL, 2);
                   TpJobSlot slot;
-                  dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get(), false);
+                  dpRunJob(fac, d2dFac, fx, *cfg, tcfg, job, res, pool.get());
                   ranIt = true;
                }
             }

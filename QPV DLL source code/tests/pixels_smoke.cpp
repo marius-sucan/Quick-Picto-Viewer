@@ -262,7 +262,8 @@ static void resizeAsksForTheRightModes() {
 // ---------------------------------------------------------------------------------------
 
 // a worker only runs a job of the current run; abandoned gives it the previous run's generation
-static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &res, bool abandoned = false) {
+static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &res, bool abandoned = false,
+                   std::unique_lock<std::timed_mutex> *heldPdfLock = NULL) {
     DpEffects fx;
     dpMakeEffects(fx, (cfg.applyBlur==1) ? 3 : 0);
     ThumbsConfig tcfg;
@@ -272,11 +273,21 @@ static void runOne(const wchar_t *path, const DupePixCfg &cfg, DupePixResult &re
     job.path = path;
     job.generation = dpGeneration.load() - (abandoned ? 1 : 0);
     ID2D1Factory *d2dFac = NULL;      // the per-worker factory dpWorkerBody() keeps
-    dpRunJob(NULL, d2dFac, fx, cfg, tcfg, job, res);
+    dpRunJob(NULL, d2dFac, fx, cfg, tcfg, job, res, NULL, heldPdfLock);
     if (d2dFac!=NULL)
        delete d2dFac;
 
     dpFreeEffects(fx);
+}
+
+// what the histogram stub reports back about the PDFium lock a job was handed
+struct PdfLockProbe {
+    std::unique_lock<std::timed_mutex> *lock;
+    bool ownedAtHistogram;
+};
+static void probePdfLock(void *p) {
+    PdfLockProbe *probe = (PdfLockProbe*)p;
+    probe->ownedAtHistogram = probe->lock->owns_lock();
 }
 
 static void jobPipeline() {
@@ -436,6 +447,32 @@ static void jobPipeline() {
     runOne(L"doc.pdf", cfg, resGone, true);
     check(resGone.status==DP_ERR_PROCESS && gShimPdfCalls==0, "an abandoned run's PDF is not rendered and is not marked dead");
     check(gShimFimCalls==0 && gShimWicCalls==0 && gShimGdipCalls==0, "and no other loader is tried");
+
+    // the PDFium lock a worker hands down covers the render only: the rest of the job, the
+    // histogram first, runs without it
+    {
+        std::unique_lock<std::timed_mutex> held(pdfiumMutex);
+        PdfLockProbe probe = { &held, true };
+        gShimHistogramHookArg = &probe;
+        gShimHistogramHook = probePdfLock;
+        gShimPdfCalls = 0;
+        DupePixResult resLk;
+        runOne(L"doc.pdf", cfg, resLk, false, &held);
+        gShimHistogramHook = NULL;
+        check(resLk.status==DP_OK && gShimPdfCalls==1 && !probe.ownedAtHistogram,
+              "a PDF job handed the PDFium lock gives it back before the histogram is taken");
+        check(!held.owns_lock(), "and does not hold it when the job returns");
+    }
+
+    // a job abandoned before the render leaves the lock with whoever took it
+    {
+        std::unique_lock<std::timed_mutex> held(pdfiumMutex);
+        gShimPdfCalls = 0;
+        DupePixResult resLk2;
+        runOne(L"doc.pdf", cfg, resLk2, true, &held);
+        check(resLk2.status==DP_ERR_PROCESS && gShimPdfCalls==0 && held.owns_lock(),
+              "an abandoned PDF job handed the lock renders nothing and leaves it to its owner");
+    }
 
     // an SVG that will not render fails the decode without falling through to raster loaders
     gShimSvgFails = 1;
@@ -1435,6 +1472,28 @@ static void pdfLockWaitAndPoolIsolation() {
     check(dpState.written==2 && dpState.failed==0 && dpState.dbErrors==0, "both PDFs complete after re-init");
     check(gShimMaxActiveJobs.load()==1 && tpActiveJobs.load()==0, "PDFs respect tight-memory cap of 1 and release slots");
     gShimMemoryTight = false;
+
+    // a PDF worker that arrives while somebody is queued for a decode slot takes its own
+    // through the queue; with nobody queued it takes a free one directly
+    execOrDie(db, "DELETE FROM imagesPixels;", "clear the fingerprints");
+    tpSlotWaiters.store(1);
+    gShimSlotWaits.store(0);
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "PDF run restarts with a worker queued for a slot");
+    steps = 0;
+    while (dupesPixStep(10)==1)
+        if (++steps > 100000) { failures++; break; }
+    dupesPixEnd();
+    check(dpState.written==2 && gShimSlotWaits.load() >= 2, "with somebody queued, every PDF job goes through the slot queue");
+
+    execOrDie(db, "DELETE FROM imagesPixels;", "clear the fingerprints");
+    tpSlotWaiters.store(0);
+    gShimSlotWaits.store(0);
+    check(dupesPixBegin(db, sel, L"350|5|0|0|1|1|1|1")==1, "PDF run restarts with nobody queued");
+    steps = 0;
+    while (dupesPixStep(10)==1)
+        if (++steps > 100000) { failures++; break; }
+    dupesPixEnd();
+    check(dpState.written==2 && gShimSlotWaits.load()==0, "with nobody queued, a PDF job takes a free slot directly");
 
     check(dupesPixShutdown()==1, "re-initialized pool shuts down cleanly");
     SQ.close_v2(db);
