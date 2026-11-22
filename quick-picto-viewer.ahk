@@ -35062,6 +35062,8 @@ SaveDBfilesList(enforceFile:=0) {
 
       If (SLDtypeLoaded!=3)
       {
+         If (dupesPixInitGood=1)
+            DllCall("qpvmain.dll\dupesEngineRelease")
          activeSQLdb.CloseDB()
          declined := askOverwriteDestFile(file2save)
       } Else declined := (CurrentSLD!=file2save) ? askOverwriteDestFile(file2save, 0) : 0
@@ -35225,6 +35227,8 @@ SaveDBfilesList(enforceFile:=0) {
       msgBeepTimer("Slideshow database saved", 900)
    } Else If (CurrentSLD!=file2save && SLDtypeLoaded=3)
    {
+      If (dupesPixInitGood=1)
+         DllCall("qpvmain.dll\dupesEngineRelease")
       activeSQLdb.CloseDB()
       Sleep, 5
       FileCopy, % CurrentSLD, % file2save, 1
@@ -44484,6 +44488,9 @@ BTNrebuildDBpanel() {
     If (StrLen(filesFilter)>1)
        r := remFilesListFilter()
     
+    If (dupesPixInitGood=1)
+       DllCall("qpvmain.dll\dupesEngineRelease")
+
     If !activeSQLdb.CloseDB()
     {
        msgBeepTimer("Failed to close active database")
@@ -89202,11 +89209,6 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       Return -1
    }
 
-   ; dupesEngineReady() only says that a connection is open, not which file it is on, and
-   ; the DLL keeps its handle from one scan to the next - nothing releases it until the
-   ; application closes. Opening a second .sldb and searching it would otherwise be answered
-   ; out of the first one, silently. Comparing the path is what makes the handle follow
-   ; activeSQLdb; dupesEngineInit() closes the old one before it opens the new.
    If (DllCall("qpvmain.dll\dupesEngineReady", "int")!=1 || enginePath!=activeSQLdb._Path)
    {
       enginePath := ""
@@ -89248,6 +89250,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    If (engKeyCount<1)
    {
       DllCall("qpvmain.dll\dupesEngineRelease")
+      enginePath := ""
       throwDupesEngineError(A_ThisFunc, "no image properties were left to group the images by")
       Return -1
    }
@@ -89294,6 +89297,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
       If (gotQuery!=1)
       {
          DllCall("qpvmain.dll\dupesEngineRelease")
+         enginePath := ""
          throwDupesEngineError(A_ThisFunc, "qpvmain.dll rejected the query that identifies the duplicate candidates")
          Return -1
       }
@@ -89326,6 +89330,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    If (more=-1 && abandonAll!=1)
    {
       DllCall("qpvmain.dll\dupesEngineRelease")
+      enginePath := ""
       throwDupesEngineError(A_ThisFunc, "the query that identifies the duplicate candidates failed")
       Return -1
    }
@@ -89334,6 +89339,7 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    If (totalCandidates<2 || abandonAll=1)
    {
       DllCall("qpvmain.dll\dupesEngineRelease")
+      enginePath := ""
       If (abandonAll=1)
          msgBeepTimer("Operation aborted by user")
       Else
@@ -89481,6 +89487,8 @@ retrieveDupesByProperties(theseCols, SortCriterion:=0, mustForceHashes:=0, preci
    }
 
    keepMask := ""
+   DllCall("qpvmain.dll\dupesEngineRelease")
+   enginePath := ""
    keptPairs := 0
    If (useHashes=1 && maxFilesIndex>1 && abandonAll!=1)
    {
