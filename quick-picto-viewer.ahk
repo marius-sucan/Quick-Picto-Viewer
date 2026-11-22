@@ -91571,6 +91571,11 @@ updateUIimageHashPreview() {
     GuiControlGet, hamType, SettingsGUIA:, userFindDupesFilterHamDist
     lCrop := clampDupesBuddyEdit("editF11", "hamDistLBorderCrop", 0, 9, 1)
     rCrop := clampDupesBuddyEdit("editF6", "hamDistRBorderCrop", 0, 9, 1)
+    If (thisPreset=1)
+    {
+       hamType := 2
+       lCrop := rCrop := 1
+    }
 
     cornersBMP := trGdip_CreateBitmap(A_ThisFunc, uiboxSize, uiboxSize, coreDesiredPixFmt)
     If !validBMP(cornersBMP)
@@ -91585,29 +91590,28 @@ updateUIimageHashPreview() {
 
     trGdip_GetImageDimensions(cornersBMP, imgW, imgH)
     Gdip_FillRectangle(G, pBrushA, 0, 0, imgW, imgH)
-    Gdip_FillRectangle(G, pBrushA, 0, 0, imgW, imgH)
 
-    Loop, 8
+    If (thisPreset=1 || thisPreset=7)
     {
-       If (thisPreset!=7)
-          Continue
-
-       pY := A_Index - 1
        Loop, 8
        {
-          pX := A_Index - 1
-          allLoops++
-          ; The dots are drawn row-major from the top-left, but the three hashes
-          ; do not agree on where that lands in the 64-bit value:
-          ;   pHash  - calcPHashAlgo() shifts a mask left from 1, so DCT
-          ;            coefficient 0 sits in bit 0 and dot 1 is bit position 1.
-          ;   dHash / lHash - the bits are assembled into a binary string that
-          ;            ConvertBase(2, 16) reads MSB-first, so the FIRST
-          ;            comparison lands in bit 63 and the map has to be flipped.
-          ; hammingDistance() always crops counting up from the LSB.
-          bitPos := (hamType=3) ? allLoops : 65 - allLoops
-          If (isInRange(bitPos, lCrop + 1, 64 - rCrop) && hamType>1)
-             Gdip_FillRectangle(G, pBrushD, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
+          pY := A_Index - 1
+          Loop, 8
+          {
+             pX := A_Index - 1
+             allLoops++
+             ; The dots are drawn row-major from the top-left, but the three hashes
+             ; do not agree on where that lands in the 64-bit value:
+             ;   pHash  - calcPHashAlgo() shifts a mask left from 1, so DCT
+             ;            coefficient 0 sits in bit 0 and dot 1 is bit position 1.
+             ;   dHash / lHash - the bits are assembled into a binary string that
+             ;            ConvertBase(2, 16) reads MSB-first, so the FIRST
+             ;            comparison lands in bit 63 and the map has to be flipped.
+             ; hammingDistance() always crops counting up from the LSB.
+             bitPos := (hamType=3) ? allLoops : 65 - allLoops
+             If (isInRange(bitPos, lCrop + 1, 64 - rCrop) && hamType>1)
+                Gdip_FillRectangle(G, pBrushD, pX*(dotu + 3) + 2, pY*(dotu + 3) + 2, dotu, dotu)
+          }
        }
     }
 
