@@ -88862,7 +88862,7 @@ throwDupesEngineError(funcu, whatu) {
    addJournalEntry(funcu "(): " whatu " - " readDupesEngineError())
    userFindDupesFilterHamDist := 1
    SetTimer, ResetImgLoadStatus, -150
-   showDelayedTooltip("ERROR: " whatu ".`nIdentifying duplicates by fingerprint needs qpvmain.dll to query the database directly.")
+   showDelayedTooltip("ERROR: " whatu ".`nIdentifying duplicates needs qpvmain.dll to query the database directly.")
    SoundBeep, 300, 100
 }
 
@@ -91881,10 +91881,10 @@ BTNfindDupesNow() {
    If (dupesPixInitGood!=1)
       initDupesPixelsPool()
 
-   If (userFindDupesFilterHamDist>1 && dupesPixInitGood!=1)
+   If (dupesPixInitGood!=1)
    {
       InitialFindDupesSettingsPanel(0)
-      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.`n`nSearching by file and image properties alone still works: set the fingerprint type to «Ignore».", 0, 0, "error")
+      msgBoxWrapper(appTitle ": ERROR", "Failed to initialize image duplicates detection system. Check the session journal under the Help menu.", 0, 0, "error")
       Return
    }
 
@@ -91925,7 +91925,7 @@ BtnHelpDupesHashes() {
 }
 
 BTNhelpFindDupes() {
-   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results activate aspect ratio, set «Matching» to «Close» and the dHash threshold to 3 in the image hashes tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
+   msgBoxWrapper(appTitle ": HELP", "This panel offers you the possibility to identify duplicate images based on the collected file and image properties, fingerprints and histogram data points.`n`nThe functionality provided in this panel relies on collected data, please ensure you allow " appTitle " to scan the image files.`n`nFor optimal results in «Custom mode», activate «Aspect ratio (W/H)», set «Matching precision» to «Close», and choose «dHash 8x8» with a threshold of 3 in the «Image hashes» tab.`n`nA low threshold for the hashes means stricter matching. Increase it for looser matches. The same applies for MSD.`n`nBefore hashing, images are normalized to 9x8 and 32x32 sizes, grayscale. Optionally, a 4x4 blurring filter can be applied as well, but it may lead to an increase in false positives.", -1, 0, 0)
 }
 
 GuiCtrlGet(varu) {
