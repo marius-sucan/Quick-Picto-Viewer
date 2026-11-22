@@ -36574,7 +36574,6 @@ uiCachesOverviewSizeEstimate(totalz, rowsDef) {
    growthTotal := growthInfos + growthHashes + growthPixels + growthFlipped
    FileGetSize, currentSize, % CurrentSLD
    estimatedSize := currentSize + growthTotal
-   perImage := Round(estimatedSize/totalz/1024, 1)
    ignoredu := rowsDef[1, 5] ? rowsDef[1, 5] : 0
    msgu := "Estimated maximum size of this database: " fileSizeFriendly(estimatedSize)
    msgu .= "`n`nCurrent database size: " fileSizeFriendly(currentSize)
@@ -47115,7 +47114,7 @@ createLivePreviewBrush() {
 }
 
 PanelChangeHamDistThreshold() {
-    Global editFa, editFb, txtline3
+    Global editFa, editFb, txtline2, txtline3
     If !testIsDupesList()
        msgu := "WARNING: The files list does not seem to contain pairs of images identified as duplicates"
 
@@ -91388,14 +91387,14 @@ InitialFindDupesSettingsPanel(modus) {
 }
 
 PanelFindDupes(dummy:=0) {
-    Global userFindDupesSelectAllDummy := 0, hasOpened, txtLine1, editFc, editFd, txtline2, editFr
+    Global userFindDupesSelectAllDummy := 0, hasOpened, txtLine1, editFc, editFr
     Static userWasWarned := 0
 
     userFindDupesSelectAllDummy := 0
     If !hasOpened
     {
        Global UIcheckimgfile := 0, UIcheckfcreated := 0, UIcheckfmodified := 0, UIcheckfsize := 0, UIcheckkbfsize := 0, UIcheckimgpixfmt := 0, UIcheckimgwidth := 0, UIcheckimgheight := 0, UIcheckimgmegapix := 0, UIcheckimgwhratio := 0, UIcheckimgframes := 0, UIcheckimghpeak := 0, UIcheckimghlow := 0
-            , UIcheckimghrange := 0, UIcheckimgavg := 0, UIcheckimgmedian := 0, UIcheckimghrms := 0, UIcheckimghmode := 0, UIcheckimghminu := 0, editFE
+            , UIcheckimghrange := 0, UIcheckimgavg := 0, UIcheckimgmedian := 0, UIcheckimghrms := 0, UIcheckimghmode := 0, UIcheckimghminu := 0
        hasOpened := 1
     }
 
@@ -91970,8 +91969,7 @@ PanelPurgeCachedSQLdata(dummy:=0) {
 
    widthu := (PrefsLargeFonts=1) ? 650 : 450
    fakeWinCreator(46, A_ThisFunc, 1)
-   bonusBtn := (SLDtypeLoaded=3) ? "`fFile entries marked as dead or ignored" : ""
-   msgResult := msgBoxWrapper("panelu|Purge cached data: " appTitle, "Please choose what kind of cached data to erase from the files list database.", "&Purge|C&ancel", 1, "trash", 0, 0, "File details`f`fImage properties`fImage histograms and hashes`fImage hashes`fAll`fAll (selected files only)`fAll (modified files only)" bonusBtn, nullEdit, nullEdit, 2, widthu)
+   msgResult := msgBoxWrapper("panelu|Purge cached data: " appTitle, "Please choose what kind of cached data to erase from the files list database.", "&Purge|C&ancel", 1, "trash", 0, 0, "File details`f`fImage properties`fImage histograms and hashes`fImage hashes`fAll`fAll (selected files only)`fAll (modified files only)`fFile entries marked as dead or ignored", nullEdit, nullEdit, 2, widthu)
    If InStr(msgResult.btn, "purge")
    {
       extraFilter := extractSQLqueryFromFilter()
@@ -92003,11 +92001,7 @@ PanelPurgeCachedSQLdata(dummy:=0) {
                SoundBeep 900, 100
          }
 
-         If (SLDtypeLoaded=3)
-            PopulateIndexSQLFilesStatsInfos("kill")
-         Else
-            PopulateIndexFilesStatsInfos("kill")
-
+         PopulateIndexSQLFilesStatsInfos("kill")
          PopulateImagesIndexStatsInfos("kill")
       }
    }
