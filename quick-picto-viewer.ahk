@@ -60754,6 +60754,37 @@ CopyMovePanelWindow() {
 
     EditWid -= sml
     lstWid := sml + editWid
+    prevCurrentSLD := CurrentSLD
+    lastInvoked := A_TickCount
+    getSelectedFiles(0, 1)
+    If (markedSelectFile>1)
+       infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
+
+    Gui, SettingsGUIA: +Delimiter`n
+    sml := (PrefsLargeFonts=1) ? 90 : 72
+    Gui, Add, Text, x15 y15 Section, Destination folder:
+    GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination r1 -wrap -multi -WantReturn", prevFileMovePath)
+    Gui, Add, Button, x+1 w%sml% hp gBtnCpyMvChooseFilesDest, &Browse
+    hLVmainu := GuiAddListView("xs y+5 w" lstWid " gBTNlvRecentFileDesties -multi r10 Grid AltSubmit vLViewDynas", "Recent destination folders`n#", "Recent destination folders")
+    thisW := (PrefsLargeFonts=1) ? 190 : 120
+    Gui, Add, Text, xs y+5 +hwndhTempu +0x200 +BackgroundTrans, On file name conflicts:
+    zh := GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" copyMoveDoLastOption " vcopyMoveDoLastOption", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
+    Gui, Add, Button, x+5 hp wp-25 gEraseCopyMoveHisto, Erase history
+    fillCopyMoveDestiesList()
+    btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
+    Gui, Add, Text, xs y+5 +hwndhTemp +0x200 +BackgroundTrans, Action to perform:
+    GuiAddDropDownList("x+10 w" thisW " gchangeCopyMoveAction AltSubmit Choose" UsrCopyMoveOperation " vUsrCopyMoveOperation", "Choose...`nMove file(s)`nCopy file(s)", [hTemp, hTempu, zh])
+    If infoSelection
+       Gui, Add, Text, xs y+5 hp +0x200 +BackgroundTrans, % infoSelection
+
+    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed
+    Gui, Add, Button, x+5 hp wp+85 gBtnMarkFilesExplorer, &Mark file(s) (Explorer)
+    Gui, Add, Button, x+5 hp w70 gBtnHelpCopyMovePanel, &Help
+    Gui, Add, Button, x+5 hp wp+10 gBtnCloseWindow, C&ancel
+    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
+}
+
+fillCopyMoveDestiesList() {
     ToolTip, Please wait...,,, 2
     listu := readRecentFileDesties()
     listu .= "--={ other destinations }=--`n"
@@ -60777,8 +60808,6 @@ CopyMovePanelWindow() {
 
     whileLoopExec := 1
     thisDynaList := getDynamicFoldersList()
-    prevCurrentSLD := CurrentSLD
-    lastInvoked := A_TickCount
     whileLoopExec := 1
     Loop, Parse, thisDynaList, `n
     {
@@ -60807,23 +60836,12 @@ CopyMovePanelWindow() {
            finalListu .= "`n"
     }
 
-    getSelectedFiles(0, 1)
     If (markedSelectFile>1)
-    {
        finalListu .= "[group-by-month-year]`n[group-by-years]`n[group-by-file-types]"
-       infoSelection := "Selected files: " groupDigits(markedSelectFile) ". "
-    }
 
-    Gui, SettingsGUIA: +Delimiter`n
-    sml := (PrefsLargeFonts=1) ? 90 : 72
-    Gui, Add, Text, x15 y15 Section, Destination folder:
-    GuiAddEdit("xs y+5 w" EditWid " gUIeditsGenericAllowCtrlBksp vUsrEditFileDestination r1 -wrap -multi -WantReturn", prevFileMovePath)
-    Gui, Add, Button, x+1 w%sml% hp gBtnCpyMvChooseFilesDest, &Browse
-    hLVmainu := GuiAddListView("xs y+5 w" lstWid " gBTNlvRecentFileDesties -multi r10 Grid AltSubmit vLViewDynas", "Recent destination folders`n#", "Recent destination folders")
-    thisW := (PrefsLargeFonts=1) ? 190 : 120
-    Gui, Add, Text, xs y+5 +hwndhTempu +0x200 +BackgroundTrans, On file name conflicts:
-    zh := GuiAddDropDownList("x+10 w" thisW " AltSubmit Choose" copyMoveDoLastOption " vcopyMoveDoLastOption", "Skip files`nAuto-rename`nOverwrite`nAsk user", [hTempu])
-    Gui, Add, Button, x+5 hp wp-25 gEraseCopyMoveHisto, Erase history
+    Gui, SettingsGUIA: Default
+    Gui, SettingsGUIA: ListView, LViewDynas
+    LV_Delete()
     Loop, Parse, finalListu, `n
     {
        If (StrLen(A_LoopField)>2)
@@ -60835,17 +60853,6 @@ CopyMovePanelWindow() {
 
     ToolTip,,,,2
     SetTimer, ResetImgLoadStatus, -50
-    btnName := (UsrCopyMoveOperation=2) ? "Move" : "Copy"
-    Gui, Add, Text, xs y+5 +hwndhTemp +0x200 +BackgroundTrans, Action to perform:
-    GuiAddDropDownList("x+10 w" thisW " gchangeCopyMoveAction AltSubmit Choose" UsrCopyMoveOperation " vUsrCopyMoveOperation", "Choose...`nMove file(s)`nCopy file(s)", [hTemp, hTempu, zh])
-    If infoSelection
-       Gui, Add, Text, xs y+5 hp +0x200 +BackgroundTrans, % infoSelection
-
-    Gui, Add, Button, xs y+20 h%thisBtnHeight% w%btnWid2% Default gBtnCopyMoveAction vBtnCpyMv, &Proceed
-    Gui, Add, Button, x+5 hp wp+85 gBtnMarkFilesExplorer, &Mark file(s) (Explorer)
-    Gui, Add, Button, x+5 hp w70 gBtnHelpCopyMovePanel, &Help
-    Gui, Add, Button, x+5 hp wp+10 gBtnCloseWindow, C&ancel
-    repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, btnName " file(s) to...: " appTitle)
 }
 
 BtnIdentifyFileRoots(hCtl:=0) {
@@ -61826,9 +61833,18 @@ allowCtrlBkspEdit(hwnd, oldValue) {
 }
 
 EraseCopyMoveHisto() {
+  ; the saved destinations only: the list's other folders come from other histories
+  IniRead, savedList, % mainRecentsFile, RecentFDestinations
+  If (savedList="" || savedList="ERROR")
+     Return msgBeepTimer("The destination folders history is already empty")
+
+  msgResult := msgBoxWrapper(appTitle ": Erase history", "Do you want to erase the history of destination folders?`n`nThe saved destination folders will be removed. The other folders in the list, the last destination among them, stay.", 4, 0, "question")
+  If (msgResult!="yes")
+     Return
+
   IniDelete, % mainRecentsFile, RecentFDestinations
-  BtnCloseWindow()
-  CopyMovePanelWindow()
+  fillCopyMoveDestiesList()
+  msgBeepTimer("Destination folders history erased", 900)
 }
 
 BtnMarkFilesExplorer() {
