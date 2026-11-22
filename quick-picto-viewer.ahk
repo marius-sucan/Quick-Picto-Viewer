@@ -28206,7 +28206,9 @@ setLVrowsCount() {
 PanelSeenStats() {
     Global LViewMetaD, LViewMetaM, LViewMetaH, infoLine
     showTOOLtip("Generating statistics, please wait")
-    thisBtnHeight := createSettingsGUI(39, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(39, A_ThisFunc))
+       Return RemoveTooltip()
+
     btnWid := 105
     txtWid := 150
     lstWid := 199
@@ -28252,7 +28254,9 @@ PanelIndexedImagesStats() {
          , LViewMetaR, StatsUIhistoThingy := 1
 
     showTOOLtip("Generating image files statistics, please wait")
-    thisBtnHeight := createSettingsGUI(48, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(48, A_ThisFunc))
+       Return RemoveTooltip()
+
     btnWid := 105
     txtWid := 360
     lstWid := 390
@@ -28347,7 +28351,9 @@ PanelIndexedFilesStats() {
     Global LViewMetaD, LViewMetaM, LViewMetaY, LViewMetaS, LViewMetaT
     showTOOLtip("Generating statistics, please wait")
     RegAction(0, "uiPreferedFileStats",, 1)
-    thisBtnHeight := createSettingsGUI(59, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(59, A_ThisFunc))
+       Return RemoveTooltip()
+
     btnWid := 105
     txtWid := 360
     lstWid := 390
@@ -28401,7 +28407,9 @@ PanelWrapperFilesStats() {
     If (maxFilesIndex<3 && !filesFilter)
        Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
-    thisBtnHeight := createSettingsGUI(58, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(58, A_ThisFunc))
+       Return
+
     btnWid := 105
     txtWid := 370
     lstWid := 390
@@ -30602,7 +30610,9 @@ PanelImageInfos() {
        Return msgBeepTimer("ERROR: File not found or access denied" fileMsg)
     }
 
-    thisBtnHeight := createSettingsGUI(5, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(5, A_ThisFunc))
+       Return
+
     btnWid := 105
     txtWid := 360
     lstWid := 545
@@ -33130,7 +33140,9 @@ PanelEnableFilesFilter() {
     If (maxFilesIndex<3 && !filesFilter)
        Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
-    thisBtnHeight := createSettingsGUI(6, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(6, A_ThisFunc))
+       Return
+
     btnWid := 80
     txtWid := 360
     EditWid := 285
@@ -40373,7 +40385,9 @@ PanelMultiFileDelete() {
        Return
 
     filesElected := getSelectedFiles(0, 1)
-    thisBtnHeight := createSettingsGUI(16, A_ThisFunc, 0)
+    If !(thisBtnHeight := createSettingsGUI(16, A_ThisFunc, 0))
+       Return
+
     btnWid := 130
     txtWid := 290
     If (PrefsLargeFonts=1)
@@ -40991,7 +41005,9 @@ PanelMultiRenameFiles() {
     If (maxFilesIndex<2 || markedSelectFile<2)
        Return
 
-    thisBtnHeight := createSettingsGUI(8, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(8, A_ThisFunc))
+       Return
+
     btnWid := 100, insWid := 65, exWid := 80, EditWid := 290
     If (PrefsLargeFonts=1)
     {
@@ -44278,7 +44294,9 @@ PanelSetThumbColumnOptions() {
        Return
     }
 
-    thisBtnHeight := createSettingsGUI(40, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(40, A_ThisFunc))
+       Return
+
     btnWid := 100, btnHeight := 25
     txtWid := slideWid := 210
     txtWid2 := txtWid + 80
@@ -44388,7 +44406,9 @@ PanelSaveSlideShowu() {
     If (maxFilesIndex<2)
        Return msgBeepTimer("WARNING: Insufficient image files are indexed", 300, msgDisplayTime//2)
 
-    thisBtnHeight := createSettingsGUI(36, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(36, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 360
     EditWid := 360
@@ -44598,7 +44618,9 @@ PanelExtractFrames() {
           Return
     }
 
-    thisBtnHeight := createSettingsGUI(84, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(84, A_ThisFunc))
+       Return
+
     RegAction(0, "ResizeDestFolder",, 6)
     RegAction(0, "userExtractFramesFmt",, 2, 1, 13)
     RegAction(0, "userJpegQuality",, 2, 1, 100)
@@ -44726,7 +44748,9 @@ PanelCombineImagesMultipage() {
     If !filesElected
        Return msgBeepTimer("WARNING: Insufficient files selected to join.")
 
-    thisBtnHeight := createSettingsGUI(75, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(75, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 330
     EditWid := 395
@@ -45554,7 +45578,9 @@ PanelCreateIMGthumbsSheet() {
           Return msgBeepTimer("WARNING: Too many images selected. A thumbnails sheet cannot be created with so many images.")
     }
 
-    thisBtnHeight := createSettingsGUI(86, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(86, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 330
     EditWid := 395
@@ -45669,7 +45695,9 @@ PanelSetWallpaper() {
        Return
     }
 
-    thisBtnHeight := createSettingsGUI(76, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(76, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 330
     EditWid := 395
@@ -45765,7 +45793,9 @@ PanelSaveImg() {
     If throwErrorNoImageLoaded()
        Return
 
-    thisBtnHeight := createSettingsGUI(35, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(35, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 330
     EditWid := 395
@@ -47086,7 +47116,9 @@ PanelChangeHamDistThreshold() {
        Return
     }
 
-    thisBtnHeight := createSettingsGUI(62, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(62, A_ThisFunc))
+       Return
+
     btnWid := 70
     txtWid := 260
     If (PrefsLargeFonts=1)
@@ -47184,7 +47216,9 @@ PanelSearchAndReplaceIndex() {
        Return msgBeepTimer("WARNING: Insufficient files are currently indexed.")
 
     getSelectedFiles(0, 1)
-    thisBtnHeight := createSettingsGUI(56, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(56, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 360
     EditWid := 395
@@ -47305,7 +47339,9 @@ PanelQuickMoveConfigure() {
     Global btnFldr1, btnFldr2, btnFldr3, btnFldr4, btnFldr5, btnFldr6, txtLine5, txtLine6
     Static afterActionsList := "Do nothing after|Go to next image |Go to previous image"
 
-    thisBtnHeight := createSettingsGUI(47, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(47, A_ThisFunc))
+       Return
+
     btnWid := 60
     txtWid := 395
     EditWid := 305
@@ -47823,7 +47859,9 @@ PanelSearchIndex(dummy:="") {
 
     INIaction(0, "markSearchMatches", "General", 1)
     SearchedStringz := Trimmer(SearchedStringz)
-    thisBtnHeight := createSettingsGUI(29, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(29, A_ThisFunc))
+       Return
+
     btnWid := 80
     txtWid := 260
     If (PrefsLargeFonts=1)
@@ -47947,7 +47985,9 @@ PanelEditImgCaption() {
     If !FileExist(imgPath)
        Return msgBeepTimer("ERROR: File not found or access denied`n" OutFileName "`n" OutDir)
 
-    thisBtnHeight := createSettingsGUI(22, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(22, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 360
     EditWid := 395
@@ -49003,6 +49043,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        Return
     }
 
+    wasImgEditOpened := imgEditPanelOpened
     imgEditPanelOpened := 1
     viewportIDstampBMP := A_TickCount
     prevVPselRotation := VPselRotation
@@ -49012,6 +49053,7 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
     previnnerSelectionCavityY := innerSelectionCavityY
     prevImgSelX1 := imgSelX1, prevImgSelX2 := imgSelX2
     prevImgSelY1 := imgSelY1, prevImgSelY2 := imgSelY2
+    thisBtnHeight := 0
     If (toolu="transform")
     {
        recordSelUndoLevelNow()
@@ -49031,6 +49073,29 @@ MainPanelTransformArea(dummy:="", toolu:="", modalia:=0, givenIndex:="") {
        PasteInPlaceToolMode := 0
        flipBitmapAccordingToViewPort(viewportStampBMP)
        thisBtnHeight := createSettingsGUI(24, "PanelPasteInPlace", 1, 1)
+    }
+
+    If !thisBtnHeight
+    {
+       imgEditPanelOpened := wasImgEditOpened
+       openingPanelNow := 0
+       VPselRotation := prevVPselRotation
+       rotateSelBoundsKeepRatio := prevrotateSelBoundsKeepRatio
+       EllipseSelectMode := prevEllipseSelectMode
+       innerSelectionCavityX := previnnerSelectionCavityX
+       innerSelectionCavityY := previnnerSelectionCavityY
+       imgSelX1 := prevImgSelX1, imgSelX2 := prevImgSelX2
+       imgSelY1 := prevImgSelY1, imgSelY2 := prevImgSelY2
+       If (toolu="transform")
+          dummyRefreshImgSelectionWindow()
+       If oldSelectionArea[11]
+          FreeImage_UnLoad(oldSelectionArea[11])
+       oldSelectionArea := []
+       viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
+       userClipBMPpaste := trGdip_DisposeImage(userClipBMPpaste, 1)
+       RemoveTooltip()
+       ResetImgLoadStatus()
+       Return
     }
 
     shearImgX := shearImgY := innerSelectionCavityX := innerSelectionCavityY := EllipseSelectMode := VPselRotation := 0
@@ -50962,7 +51027,9 @@ PanelEditorImgResize() {
        Return msgBeepTimer("ERROR: No image seems to be loaded or it is malformed")
 
     ReadSettingsEditorResizePanel()
-    thisBtnHeight := createSettingsGUI(73, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(73, A_ThisFunc))
+       Return
+
     btnWid := 90
     txtWid := 265
     editWid := 55
@@ -51241,11 +51308,17 @@ calcIMGuserResizer(oImgW, oImgH, givenW, givenH, isPercent, keepRatio) {
 
 PanelManageVectorShapes() {
     Global LViewDynas, LViewShapesIcons
+    oldPost := postVectorWinOpen
     If (imgEditPanelOpened=1 && AnyWindowOpen && thumbsDisplaying=0)
        postVectorWinOpen := AnyWindowOpen
 
     zz := postVectorWinOpen
-    thisBtnHeight := createSettingsGUI(72, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(72, A_ThisFunc))
+    {
+       postVectorWinOpen := oldPost
+       Return
+    }
+
     postVectorWinOpen := zz
     btnWid := 120
     txtWid := 360
@@ -52360,11 +52433,17 @@ PanelConfigVPgrid() {
     If (thumbsDisplaying=1)
        Return
 
+    oldPost := postVectorWinOpen
     If (imgEditPanelOpened=1 && AnyWindowOpen && thumbsDisplaying=0)
        postVectorWinOpen := AnyWindowOpen
 
     zz := postVectorWinOpen
-    thisBtnHeight := createSettingsGUI(63, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(63, A_ThisFunc))
+    {
+       postVectorWinOpen := oldPost
+       Return
+    }
+
     postVectorWinOpen := zz
     btnWid := 100, btnHeight := 25
     txtWid := 285, slideWid := 155
@@ -53531,7 +53610,9 @@ PanelZoomBlurSelectedArea() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(69, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(69, A_ThisFunc))
+       Return
+
     ReadSettingsZoomBlurPanel()
     btnWid := 75
     txtWid := 266
@@ -53627,7 +53708,9 @@ PanelPixelizeSelectedArea() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(78, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(78, A_ThisFunc))
+       Return
+
     ReadSettingsBlurPanel()
     btnWid := 89
     txtWid := 280
@@ -53737,7 +53820,9 @@ PanelBlurSelectedArea() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(26, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(26, A_ThisFunc))
+       Return
+
     ReadSettingsBlurPanel()
     btnWid := 75
     txtWid := 280
@@ -53931,7 +54016,9 @@ PanelDetectEdgesImage() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(43, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(43, A_ThisFunc))
+       Return
+
     ReadSettingsEdgesPanel()
     btnWid := 100
     txtWid := 265
@@ -54053,7 +54140,9 @@ PanelAddNoiserImage() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(44, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(44, A_ThisFunc))
+       Return
+
     ReadSettingsAddNoisePanel()
     btnWid := 70
     txtWid := 266
@@ -54235,7 +54324,9 @@ PanelNewImage() {
     If (thumbsDisplaying=1)
        Return
 
-    thisBtnHeight := createSettingsGUI(27, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(27, A_ThisFunc))
+       Return
+
     RegAction(0, "NewDocUseColor",, 1)
     RegAction(0, "PredefinedDocsSizes",, 2, 1, 13)
     RegAction(0, "NewImageReverseDimensions",, 1)
@@ -54409,7 +54500,12 @@ PanelPrintImage() {
     If !validBMP(viewportStampBMP)
        Return msgBeepTimer("ERROR: Unable to load or prepare the image.`nUnable to print the image.")
 
-    thisBtnHeight := createSettingsGUI(57, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(57, A_ThisFunc))
+    {
+       viewportStampBMP := trGdip_DisposeImage(viewportStampBMP, 1)
+       Return
+    }
+
     ReadSettingsPrintPanel()
     printDims := StrSplit(PrintDimensionsXYWH, "|")
     PrintPosX := printDims[1]
@@ -54797,6 +54893,7 @@ PanelIMGselProperties() {
     If (thumbsDisplaying=1)
        Return
 
+    oldPost := postVectorWinOpen
     If (imgEditPanelOpened=1 && AnyWindowOpen && thumbsDisplaying=0)
        postVectorWinOpen := AnyWindowOpen
 
@@ -54804,7 +54901,12 @@ PanelIMGselProperties() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(34, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(34, A_ThisFunc))
+    {
+       postVectorWinOpen := oldPost
+       Return
+    }
+
     postVectorWinOpen := zz
     btnWid := 100
     txtWid := 350
@@ -57418,7 +57520,9 @@ PanelPDFreadTexts() {
        Return msgBeepTimer("WARNING: The current PDF page is being edited as a bitmap image.`nReload the initial PDF to access this functionality.")
 
     RegAction(0, "ResizeDestFolder",, 6)
-    thisBtnHeight := createSettingsGUI(90, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(90, A_ThisFunc))
+       Return
+
     EditWid := 90
     If (PrefsLargeFonts=1)
     {
@@ -58275,7 +58379,9 @@ PanelJournalWindow(tabu:=1) {
     If (AnyWindowOpen=1)
        CloseWindow()
 
-    thisBtnHeight := createSettingsGUI(33, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(33, A_ThisFunc))
+       Return
+
     EditWid := 60
     If (PrefsLargeFonts=1)
     {
@@ -58837,7 +58943,9 @@ PanelPreferencesWindow() {
     If AnyWindowOpen
        Return
 
-    thisBtnHeight := createSettingsGUI(14, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(14, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := 350
     EditWid := 60
@@ -59004,7 +59112,9 @@ PanelAdjustToneMapping() {
     If AnyWindowOpen
        Return
 
-    thisBtnHeight := createSettingsGUI(42, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(42, A_ThisFunc))
+       Return
+
     ReadSettingsAdjustToneMapPanel()
     btnWid := 100
     txtWid := 500
@@ -59784,7 +59894,9 @@ PanelDefineEntireSlideshowLength() {
     If (maxFilesIndex<3)
        Return
 
-    thisBtnHeight := createSettingsGUI(19, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(19, A_ThisFunc))
+       Return
+
     btnWid := 130
     txtWid := 350
     EditWid := 35
@@ -60592,7 +60704,9 @@ CopyMovePanelWindow() {
        Return
 
     openingPanelNow := 1
-    thisBtnHeight := createSettingsGUI(9, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(9, A_ThisFunc))
+       Return
+
     sml := (PrefsLargeFonts=1) ? 90 : 72
     btnWid := 125
     btnWid2 := 60
@@ -60853,7 +60967,9 @@ iniSaveJPGquality() {
 
 PanelCustomizeToolbar() {
     pp := ((thumbsDisplaying=1 && maxFilesIndex>1 || isImgEditingNow()=1) && !AnyWindowOpen && drawingShapeNow!=1) ? "" : "disabled"
-    thisBtnHeight := createSettingsGUI(82, A_ThisFunc, 1)
+    If !(thisBtnHeight := createSettingsGUI(82, A_ThisFunc, 1))
+       Return
+
     btnWid := 195
     EditWid := 60
     If (PrefsLargeFonts=1)
@@ -60923,7 +61039,9 @@ PanelCustomKeysMiniManager() {
         } Else Return
     }
 
-    thisBtnHeight := createSettingsGUI(83, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(83, A_ThisFunc))
+       Return
+
     btnWid := 195
     EditWid := 60
     If (PrefsLargeFonts=1)
@@ -61106,7 +61224,9 @@ PanelAutoColors() {
     }
 
     initQPVmainDLL()
-    thisBtnHeight := createSettingsGUI(80, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(80, A_ThisFunc))
+       Return
+
     RegAction(0, "PreserveDateTimeOnSave",, 1)
     RegAction(0, "userJpegQuality",, 2, 1, 100)
     btnWid := thisW := 100
@@ -61218,7 +61338,9 @@ PanelSharpenImage() {
     If (editingSelectionNow!=1)
        ToggleEditImgSelection()
 
-    thisBtnHeight := createSettingsGUI(79, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(79, A_ThisFunc))
+       Return
+
     ReadSettingsSharpenPanel()
     btnWid := 100
     txtWid := 205
@@ -61334,7 +61456,9 @@ PanelStructuredCopyMoveWindow() {
 
     openingPanelNow := 1
     IdentifyFileFolderRoots("kill")
-    thisBtnHeight := createSettingsGUI(77, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(77, A_ThisFunc))
+       Return
+
     If (PrefsLargeFonts=1)
        Gui, Font, s%LargeUIfontValue%
 
@@ -90827,7 +90951,9 @@ showQuickHelp() {
 
 PanelAboutWindow() {
     Global LViewOthers, listViewFilteru
-    thisBtnHeight := createSettingsGUI(1, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(1, A_ThisFunc))
+       Return
+
     Gui, Add, Button, x15 y15 h1 w1 Default Section gBtnCloseWindow, Close
     ml := (isWinXP=1 || A_OSVersion="WIN_7") ? 85 : 145
     Gui, SettingsGUIA: -DPIScale
@@ -90894,7 +91020,9 @@ BtnOpenHelpWin() {
 PanelHelpWindow(dummy:=0) {
     Global LViewOthers, listViewFilteru
 
-    thisBtnHeight := createSettingsGUI(61, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(61, A_ThisFunc))
+       Return
+
     Gui, Add, Button, x1 y1 h1 w1 Default gBtnCloseWindow, Close
     lstWid := 490
     btnWid := 60
@@ -91221,9 +91349,10 @@ PanelFindDupes(dummy:=0) {
        msgBoxWrapper(appTitle ": WARNING", appTitle " has failed to properly initialize the main DLL file: qpvmain.dll. Options within this panel and others will likely malfunction.", 0, 0, "error")
     }
 
-    thisBtnHeight := createSettingsGUI(49, A_ThisFunc, 1)
-    If (AnyWindowOpen=49)
-       InitialFindDupesSettingsPanel(1)
+    If !(thisBtnHeight := createSettingsGUI(49, A_ThisFunc, 1))
+       Return
+
+    InitialFindDupesSettingsPanel(1)
     btnWid := 100
     txtWid := 350
     EditWid := 395
@@ -93277,7 +93406,9 @@ PanelFileFormatConverter() {
        Return
     }
 
-    thisBtnHeight := createSettingsGUI(15, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(15, A_ThisFunc))
+       Return
+
     btnWid := 110
     txtWid := 280
     editWid := 45
@@ -93480,7 +93611,9 @@ PanelAdjustImageCanvasSize() {
        }
     }
 
-    thisBtnHeight := createSettingsGUI(28, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(28, A_ThisFunc))
+       Return
+
     ReadSettingsAdjustCanvasPanel()
     btnWid := 110
     txtWid := 265
@@ -93683,7 +93816,12 @@ PanelResizeImageWindow() {
        Return
     }
 
-    thisBtnHeight := createSettingsGUI(4, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(4, A_ThisFunc))
+    {
+       ToolTip
+       Return
+    }
+
     btnWid := 110
     txtWid := 265
     editWid := 45
@@ -94906,7 +95044,9 @@ UIlvFilterEraseStaticPanel() {
 PanelKeywordsDetector() {
     Global LViewOthers, listViewFilteru
 
-    thisBtnHeight := createSettingsGUI(71, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(71, A_ThisFunc))
+       Return
+
     btnWid := 115
     txtWid := 360
     lstWid := 545
@@ -95489,8 +95629,10 @@ doUndoFileActsChronos() {
 }
 
 PanelFileUndoHistory() {
-    thisBtnHeight := createSettingsGUI(87, A_ThisFunc)
     Global listViewUndoActsFilteru
+    If !(thisBtnHeight := createSettingsGUI(87, A_ThisFunc))
+       Return
+
     btnWid := 65
     txtWid := 360
     lstWid := 545
@@ -96469,8 +96611,10 @@ PanelReviewSelectedFiles() {
     If !markedSelectFile
        Return msgBeepTimer("WARNING: There are no selected files to review.")
 
-    thisBtnHeight := createSettingsGUI(60, A_ThisFunc)
     Global LViewFiltered
+    If !(thisBtnHeight := createSettingsGUI(60, A_ThisFunc))
+       Return
+
     btnWid := 65
     txtWid := 360
     lstWid := 545
@@ -97146,7 +97290,9 @@ PanelDynamicFolderzWindow(dummy:=0) {
        hasWarned := 1
     }
 
-    thisBtnHeight := createSettingsGUI(3, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(3, A_ThisFunc))
+       Return
+
     btnWid := 120
     txtWid := 360
     lstWid := 535
@@ -100439,7 +100585,9 @@ PanelImgAutoCrop() {
        Sleep, 250
     }
 
-    thisBtnHeight := createSettingsGUI(17, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(17, A_ThisFunc))
+       Return
+
     btnWid := 100
     txtWid := slideWid := 280
     slide2Wid := 220
@@ -101705,7 +101853,9 @@ PanelSimpleResizeRotate(modus:="") {
        GetImgFileDimension(getIDimage(currentFileIndex), oImgW, oImgH, 1, currentFileIndex)
     }
 
-    thisBtnHeight := createSettingsGUI(18, A_ThisFunc)
+    If !(thisBtnHeight := createSettingsGUI(18, A_ThisFunc))
+       Return RemoveTooltip()
+
     ReadSettingsImageProcessing()
     btnWid := 100
     txtWid := slideWid := 280
