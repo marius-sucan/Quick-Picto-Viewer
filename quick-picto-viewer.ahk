@@ -91747,14 +91747,12 @@ BTNfindDupesNow() {
    If GuiCtrlGet("UIcheckfmodified")
       columnus .= "fmodified,"
 
-   If GuiCtrlGet("UIcheckfsize")
-   {
+   chkFsize := GuiCtrlGet("UIcheckfsize")
+   chkKbfsize := GuiCtrlGet("UIcheckkbfsize")
+   If chkFsize
       columnus .= "fsize,"
-   } Else 
-   {
-      If GuiCtrlGet("UIcheckkbfsize")
-         columnus .= "kbfsize,"
-   }
+   Else If chkKbfsize
+      columnus .= "kbfsize,"
 
    If GuiCtrlGet("UIcheckimgpixfmt")
       columnus .= "imgpixfmt,"
