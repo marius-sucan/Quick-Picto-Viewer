@@ -564,6 +564,44 @@ static void hashGenerationWritesBack(const char *dbPath, bool keyset) {
     SQ.finalize(st);
     check(checked > 10 && bad==0, "the stored hex is this row's own lHash");
 
+    // O2: exercise compact uint8_t pHash path (dupesHashByteBuf + QPV_SQLITE_STATIC) at compressor 2
+    if (keyset)
+    {
+       const std::wstring pclr = widen("UPDATE images SET pHash=NULL");
+       SQ.prepare16_v2(db, pclr.c_str(), -1, &st, NULL);
+       SQ.step(st); SQ.finalize(st);
+       const std::wstring psel = hashSelectSQL("big", "pHash", true);
+       const std::wstring pupd = widen("UPDATE images SET pHash=?1 WHERE imgidu=?2");
+       check(dupesHashBegin(db, psel.c_str(), pupd.c_str(), /*pHash*/ 3, 1024, /*gray*/ 2, 1)==1,
+             "O2: dupesHashBegin prepares pHash with compressor 2");
+       int psteps = 0;
+       while (dupesHashStep(64) > 0 && ++psteps < 10000) {}
+       check(dupesHashWrittenCount() > 100 && dupesHashFailedCount()==0,
+             "O2: pHash byte-buffer loop writes all rows cleanly");
+       dupesHashEnd();
+
+       const std::wstring pchk = widen("SELECT images.imgidu, p.big, pHash FROM images"
+                                       " JOIN imagesPixels AS p ON p.imgidu=images.imgidu"
+                                       " WHERE pHash IS NOT NULL AND length(p.big)=1024 LIMIT 40");
+       int pbad = 0, pchecked = 0;
+       SQ.prepare16_v2(db, pchk.c_str(), -1, &st, NULL);
+       while (SQ.step(st)==SQLITE_ROW) {
+           const unsigned char *pix = (const unsigned char*)SQ.column_blob(st, 1);
+           const int n = SQ.column_bytes(st, 1);
+           if (pix==NULL || n!=1024) continue;
+           int decoded[1024];
+           for (int i = 0; i < 1024; i++)
+               decoded[i] = dupesDiscretize((int)pix[i], 2);
+           wchar_t expect[32];
+           dupesHexHash(dupesPHash(decoded, 1), expect, 32);
+           const wchar_t *stored = (const wchar_t*)SQ.column_text16(st, 2);
+           if (stored==NULL || wcscmp(stored, expect)!=0) pbad++;
+           pchecked++;
+       }
+       SQ.finalize(st);
+       check(pchecked > 10 && pbad==0, "O2: stored pHash matches dupesPHash() at compressor 2");
+    }
+
     SQ.close_v2(db);
     snprintf(cmd, sizeof(cmd), "rm -f '%s'", scratch.c_str());
     if (system(cmd)) {}

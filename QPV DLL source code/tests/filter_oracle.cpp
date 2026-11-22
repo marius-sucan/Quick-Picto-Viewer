@@ -455,6 +455,38 @@ int main() {
             runShipped(tagOrder, 0, 12, 0, 2500, /*breakGroups*/ 1, 0, none, 0);
         check(sameResult(refTag, gotTag, why),
               "S2: integer sort preserves BreakDupesGroups lex tag order (10z < 1z < 2z)");
+
+        // O4: BreakDupesGroups=0 counting-bucket scatter with high idBase, stale maxId hint,
+        // deleted entries, and remSingles=0/1/2; BreakDupesGroups=1 with tags > 64 and <= 64.
+        dupesClearPairs();
+        const std::vector<DupePairRec> hiBase = {
+            {100005, 100001, 2, 2500}, {100009, 100005, 1, 2500},
+            {100020, 100012, 3, 2500}, {100030, 100025, 0, 2500}
+        };
+        std::vector<unsigned char> hiKeep(100031, 1);
+        hiKeep[100005] |= 2;   // deleted bridge inside {100001, 100005, 100009}
+        hiKeep[100020] |= 2;   // leaves {100012} as a singleton
+        dupesPairsMaxId = 5;   // intentionally stale hint to verify dynamic growth
+        dupesPairsMaxIdCount = hiBase.size();
+        bool o4Ok = true;
+        for (int rem = 0; rem <= 2; rem++)
+        {
+            const auto r0 = refFilter(hiBase, 0, 12, 0, 2500, 0, rem, hiKeep, false);
+            const auto g0 = runShipped(hiBase, 0, 12, 0, 2500, 0, rem, hiKeep, 0);
+            if (!sameResult(r0, g0, why)) o4Ok = false;
+        }
+        check(o4Ok, "O4: BreakDupesGroups=0 scatter handles high idBase, stale hint, deleted bridge");
+
+        dupesClearPairs();
+        const std::vector<DupePairRec> bigTags = {
+            {2, 1, 9, 2500}, {3, 1, 70, 2500}, {4, 1, 100, 2500}, {5, 1, 64, 2500}, {6, 1, 65, 2500}
+        };
+        const auto refBig0 = refFilter(bigTags, 0, 120, 0, 2500, 1, 0, none, false);
+        const auto gotBig0 = runShipped(bigTags, 0, 120, 0, 2500, 1, 0, none, 0);
+        const auto refBig2 = refFilter(bigTags, 0, 120, 0, 2500, 1, 2, none, false);
+        const auto gotBig2 = runShipped(bigTags, 0, 120, 0, 2500, 1, 2, none, 0);
+        check(sameResult(refBig0, gotBig0, why) && sameResult(refBig2, gotBig2, why),
+              "O4: BreakDupesGroups=1 LUT + fallback (>64) matches at remSingles=0 and 2");
     }
 
     printf("\n  %s\n", failures ? "FILTER ORACLE FAILED" : "filter oracle passed");

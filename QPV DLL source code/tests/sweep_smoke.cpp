@@ -786,6 +786,156 @@ static void auditRegressions() {
     dupesClearPairs();
 }
 
+static void mihSweepVerification() {
+    printf("  MIH large-group sweep vs per-group brute force (O1)\n");
+    int mismatches = 0;
+    size_t totalPairs = 0;
+
+    // Cover r=0..10 (exact pigeonhole, 1-bit probe, and brute-force > QPV_MIH_MAX_R)
+    // with inverted, flipped, crop, and MSD combinations on M >= QPV_MIH_MIN_GROUP.
+    for (int r = 0; r <= 10; r++)
+    {
+        rngSeed(81000 + (UINT64)r * 131);
+        ScanCase K;
+        K.stride = 1024;
+        K.threshold = r + 1;
+        K.checkInverted = (r % 3 == 1) ? 1 : 0;
+        K.checkFlipped  = (r % 2 == 0) ? 1 : 0;
+        K.doMSD         = (r == 0 || r == 2 || r == 7 || r == 9) ? 1 : 0;
+        K.grayCompressor = (r == 2) ? 2 : 1;
+        K.lCrop = (r == 2 || r == 7) ? 1 : ((r == 4) ? 5 : 0);
+        K.rCrop = (r == 2 || r == 7) ? 1 : ((r == 4) ? 3 : 0);
+
+        const UINT M = 4300;
+        K.groupStart.push_back(0);
+        for (UINT i = 0; i < M; i++)
+        {
+            UINT64 h = rnd64();
+            if (i > 0 && rndBelow(20) == 0)
+            {
+               h = K.hashes[rndBelow(i)];
+               const int flips = (int)rndBelow(10);
+               for (int f = 0; f < flips; f++)
+                   h ^= 1ULL << rndBelow(64);
+            }
+            K.hashes.push_back(h);
+            UINT64 fh = (rndBelow(3) == 0) ? h : rnd64();
+            if (i > 0 && rndBelow(30) == 0)
+               fh = K.hashes[rndBelow(i)] ^ (1ULL << rndBelow(64));
+            K.flipped.push_back(fh);
+            K.ids.push_back(i + 1);
+        }
+        K.groupStart.push_back(M);
+
+        if (K.doMSD)
+        {
+           K.pix.assign((size_t)M * K.stride, 0);
+           for (UINT i = 0; i < M; i++)
+           {
+               if (i % 19 == 0)
+               {
+                  for (int k = 0; k < K.stride; k++) K.pix[(size_t)i * K.stride + k] = (wchar_t)160;
+               }
+               else
+                  fillRecord(K.pix, (int)i, K.stride, (int)i);
+           }
+        }
+
+        const std::vector<DupePairRec> ref = perGroupSweep(K);
+        totalPairs += ref.size();
+        const std::vector<DupePairRec> got = wholeScanSweep(K, M, 350, NULL);
+        const DupesScanState *S = (const DupesScanState*)dupesScanGetState();
+        if (!samePairs(ref, got) || S->phase != 5 || S->done != S->total)
+           mismatches++;
+
+        const std::vector<DupePairRec> got1ms = wholeScanSweep(K, M, 1, NULL);
+        if (!samePairs(ref, got1ms))
+           mismatches++;
+    }
+    char msg[160];
+    snprintf(msg, sizeof(msg), "r=0..10 (M=4300, %zu pairs): byte-identical to brute force", totalPairs);
+    check(mismatches == 0 && totalPairs > 500, msg);
+
+    // Mixed layout: small groups + MIH group with dense >300-member cluster (bitset scan)
+    // + singleton + skewed all-identical group (skew fallback) + second MIH group.
+    {
+        rngSeed(54321);
+        ScanCase K;
+        K.stride = 1024;
+        K.threshold = 4;
+        K.checkInverted = 0;
+        K.checkFlipped = 1;
+        K.doMSD = 0;
+        K.grayCompressor = 1;
+        K.lCrop = 1;
+        K.rCrop = 1;
+        K.groupStart.push_back(0);
+
+        for (int g = 0; g < 20; g++)
+        {
+            const UINT64 base = rnd64();
+            for (int i = 0; i < 3; i++)
+            {
+                K.hashes.push_back(base ^ (1ULL << rndBelow(64)));
+                K.flipped.push_back(base);
+                K.ids.push_back((UINT)K.ids.size() + 1);
+            }
+            K.groupStart.push_back((UINT)K.hashes.size());
+        }
+
+        const UINT64 denseBase = rnd64();
+        for (UINT i = 0; i < 4200; i++)
+        {
+            UINT64 h = (i < 400) ? (denseBase ^ (1ULL << (i & 63))) : rnd64();
+            K.hashes.push_back(h);
+            K.flipped.push_back(h ^ 2ULL);
+            K.ids.push_back((UINT)K.ids.size() + 1);
+        }
+        K.groupStart.push_back((UINT)K.hashes.size());
+
+        K.hashes.push_back(rnd64());
+        K.flipped.push_back(0);
+        K.ids.push_back((UINT)K.ids.size() + 1);
+        K.groupStart.push_back((UINT)K.hashes.size());
+
+        // Skewed group: 2100 identical hashes force skew-check fallback to brute force
+        for (UINT i = 0; i < 4200; i++)
+        {
+            UINT64 h = (i < 2100) ? 0x0102030405060708ULL : rnd64();
+            K.hashes.push_back(h);
+            K.flipped.push_back(h);
+            K.ids.push_back((UINT)K.ids.size() + 1);
+        }
+        K.groupStart.push_back((UINT)K.hashes.size());
+
+        for (UINT i = 0; i < 4200; i++)
+        {
+            UINT64 h = rnd64();
+            if (i > 10 && i % 40 == 0) h = K.hashes[K.hashes.size() - 5] ^ 4ULL;
+            K.hashes.push_back(h);
+            K.flipped.push_back(h);
+            K.ids.push_back((UINT)K.ids.size() + 1);
+        }
+        K.groupStart.push_back((UINT)K.hashes.size());
+
+        const std::vector<DupePairRec> ref = perGroupSweep(K);
+        int teamBad = 0;
+        const int teams[4] = {1, 2, 4, 0};
+        for (int t = 0; t < 4; t++)
+        {
+            dupesSweepSetThreads(teams[t]);
+            const std::vector<DupePairRec> got = wholeScanSweep(K, (UINT)K.hashes.size(), (t == 0) ? 350 : 1, NULL);
+            if (!samePairs(ref, got))
+               teamBad++;
+        }
+        dupesSweepSetThreads(0);
+        check(teamBad == 0 && ref.size() > 2000000,
+              "mixed small+denseMIH+single+skewFallback+MIH matches across teams 1/2/4/0");
+    }
+
+    dupesClearPairs();
+}
+
 int main() {
     resultContract();
     scanMatchesPerGroupSweep();
@@ -795,6 +945,7 @@ int main() {
     scanIsThreadCountIndependent();
     sweepReallocatesRarely();
     auditRegressions();
+    mihSweepVerification();
 
     printf("\n  %s\n", failures ? "SWEEP SMOKE TEST FAILED" : "sweep smoke test passed");
     return failures ? 1 : 0;
