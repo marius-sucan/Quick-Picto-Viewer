@@ -33478,6 +33478,12 @@ BtnApplyFilesFilter() {
    If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && UsrEditFilter!="" && !isValidRegEx(pku UsrEditFilter))
       Return msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
 
+   If ((userFilterProperty=2 || isInRange(userFilterProperty, 5, 18)) && (FilteruMinRange="" || FilteruMaxRange=""))
+   {
+      emptyField := (FilteruMinRange!="") ? "maximum" : ((FilteruMaxRange!="") ? "minimum" : "minimum and maximum")
+      Return msgBeepTimer("WARNING: No " emptyField " defined for the filter criteria.`nPlease fill in both range fields before applying the filter.")
+   }
+
    If !newFilter
       Return msgBeepTimer("WARNING: No filter has been defined")
 
