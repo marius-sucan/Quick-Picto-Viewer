@@ -39,14 +39,26 @@ of `createSettingsGUI()`, which most panels share (56 of 74 at `b4f374f`, counte
   stay as they are, at his choice (decision 4).
 - Findings 5 and 6 are fixed in `35329bc`, by Marius, and completed in `bdc80f1`.
 
-Findings 7 to 16 were not run again, and their status is the one at `0b6cb07`. Three entries changed
-all the same, as the runs of findings 1 to 6 showed: finding 7, small thing 16.5 and «Seen in
-passing» B. Two more commits touch code that open findings cite, and were not run: `35329bc` renames
-«C&ancel» to «&Cancel» (finding 13), and `79d0e05` checks the result of `createSettingsGUI()` in this
-panel (finding 10).
+Findings 8 to 14 were run again at `8cdff2b`, later the same day. What still held was fixed, with
+his answers to decisions 8, 9, 11 and 14.
 
-Each of sections 1 to 7 ends with what was run again and, where fixed, a note on what the code does
-now. Those additions cite lines at `bdc80f1`; the other line numbers stay those of `0b6cb07`. Two
+- Finding 8 is fixed in `07fddfd`: an empty «Minimum» or «Maximum» is refused with a message.
+- Finding 9 is fixed in `91c3834` for «Remove filters». «Apply filter» on database lists keeps its
+  random image, at his choice (decision 9).
+- Finding 10 raises no error since `79d0e05`, by Marius, and «Erase history» no longer closes the
+  panel (`d2ae7c5`). «Stats» still ignores a press within that second.
+- Finding 11 is fixed in `d2ae7c5` («Erase history») and in `08b5a01` (the two rebuilds).
+- Finding 12 is fixed in `26363c7`.
+- Finding 13 is fixed in `35329bc`, by Marius.
+- Finding 14 is fixed in `25429a9`.
+
+Findings 15 and 16 were not run again, and their status is the one at `0b6cb07`. Finding 7, small
+thing 16.5 and «Seen in passing» B changed all the same, as the runs of findings 1 to 6 showed.
+Small thing 16.11 and «Seen in passing» E are new, from the runs of findings 12 and 14.
+
+Each of sections 1 to 14 ends with what was run again and, where fixed, a note on what the code does
+now. Those additions cite lines at `bdc80f1` in sections 1 to 7 and at `25429a9` in sections 8 to 14;
+the other line numbers stay those of `0b6cb07`. Two
 functions were renamed on 2026-11-21 (`97aec41`, `ca44856`): `MenuRemFilesListFilter()` is now
 `MenuRemNowFilesListFilter()`, and `BTNuiremFilesListFilter()` is `BTNuiDiscardFilesFilter()`.
 
@@ -98,23 +110,24 @@ functions were renamed on 2026-11-21 (`97aec41`, `ca44856`): `MenuRemFilesListFi
 | 5 | A bar at the start or the end of the text matches every file | medium | run | **fixed**, `35329bc`, by Marius, and `bdc80f1` |
 | 6 | One character with «Begins with», «Ends with» or «RegEx» is matched anywhere | medium | run, and read for «RegEx» | **fixed**, `35329bc`, by Marius, and `bdc80f1` |
 | 7 | A doubled bar joins the two words around it | low | run | **fixed**, `35329bc`, by Marius; five bars in a row still match every file |
-| 8 | An empty «Minimum» or «Maximum» drops the criterion, silently when a string is ticked | low | run | open |
-| 9 | «Remove filters» shows a random image; on a database list «Apply filter» does too | low | run | open |
-| 10 | A button pressed within a second of a message box raises an AutoHotkey error | low, narrow | run | open |
-| 11 | «Erase history» asks nothing, and the rebuilt panel loses the typed filter; the theme and font toggles too | low | run | open |
-| 12 | The history list hides entries that end another entry's text, and lists the active text twice | low | run | open |
-| 13 | «Apply filter» and «Cancel» share Alt+A | low | run (Wine) | open |
-| 14 | The scales of «Aspect ratio» and of the histogram criteria are not shown; a standard deviation of 0 cannot be reached | low | run | open |
+| 8 | An empty «Minimum» or «Maximum» drops the criterion, silently when a string is ticked | low | run | **fixed**, `07fddfd` |
+| 9 | «Remove filters» shows a random image; on a database list «Apply filter» does too | low | run | **fixed** for «Remove filters», `91c3834`; «Apply filter» on database lists left as it is (decision 9) |
+| 10 | A button pressed within a second of a message box raises an AutoHotkey error | low, narrow | run | **fixed**: `79d0e05`, by Marius, and `d2ae7c5`; «Stats» ignores a press within that second |
+| 11 | «Erase history» asks nothing, and the rebuilt panel loses the typed filter; the theme and font toggles too | low | run | **fixed**, `d2ae7c5` and `08b5a01` |
+| 12 | The history list hides entries that end another entry's text, and lists the active text twice | low | run | **fixed**, `26363c7` |
+| 13 | «Apply filter» and «Cancel» share Alt+A | low | run (Wine) | **fixed**, `35329bc`, by Marius |
+| 14 | The scales of «Aspect ratio» and of the histogram criteria are not shown; a standard deviation of 0 cannot be reached | low | run | **fixed**, `25429a9` |
 | 15 | «Selected files» with one selected file says none is selected, and drops that selection | low | run | open |
-| 16 | Small things, numbered 16.1 to 16.10 | low | run and read | open; 16.5 fixed |
+| 16 | Small things, numbered 16.1 to 16.11 | low | run and read | open; 16.5 fixed |
 
-Rows 1 to 7 give the status at `bdc80f1`. Rows 8 to 16 give the status at `0b6cb07`: they were not run
-again.
+Rows 1 to 7 give the status at `bdc80f1`, and rows 8 to 14 at `25429a9`. Rows 15 and 16 give the status
+at `0b6cb07`: they were not run again.
 
 Finding 1 loses work for good. Finding 2 removes files from the index until the folder or the list is
 opened again. Findings 3 and 5 to 8 filter by something the user did not ask for, and say nothing about
 it. Findings 3 and 6 need nothing more than reopening the panel or typing one character. Findings 1,
-2, 3, 5 and 6 are fixed, finding 4 for «Cancel», and finding 7 for a doubled bar.
+2, 3, 5 and 6 are fixed, finding 4 for «Cancel», and finding 7 for a doubled bar. Findings 8 and 10
+to 14 are fixed, and finding 9 for «Remove filters».
 
 ---
 
@@ -522,6 +535,27 @@ gives `i)(a01||b05)`, and all 5 files are listed (H5.2). That case was not fixed
   message, so s-mid.png and s-small.png are listed although s-small.png is 361 bytes. The query box shows
   the string alone.
 
+Run again at `8cdff2b` (B2, B2b, B2c): the three cases still hold, line for line.
+
+**Fixed in `07fddfd`**, with Marius's answer to decision 8: an empty side is refused.
+`BtnApplyFilesFilter()` looks at the two fields before it looks at the filter (:33511-33515). When
+the criterion uses them («File size», and «Megapixels» to «Standard deviation») and one is empty,
+«Apply filter» says «No maximum defined for the filter criteria. Please fill in both range fields
+before applying the filter.», or «minimum», or «minimum and maximum». It applies nothing, and the
+panel stays open. The query box still shows what the other fields give.
+
+Run on the fix (the new batch W8; B again):
+
+- **Minimum 2, Maximum empty**: the message names the maximum. **Minimum empty, Maximum 10**: the
+  minimum. **Both empty**: both.
+- **The string `s-` ticked, Minimum 2, Maximum empty**: the message. No filter is applied, and the
+  list keeps its 3 files.
+- **«Megapixels» 1 to empty**, and **«Standard deviation» empty to 10**: refused the same way.
+- **The filter `s-` active, then «File size» 2 to empty**: the message, and `s-` stays active. With
+  10 as the maximum, «Apply filter» lists s-mid.png.
+- **Controls**: «File size» 2-10 lists s-mid.png. «Modified date» 2019, a string with no criterion
+  and «Selected files» do not use the two fields, and are not held back when these are empty.
+
 ---
 
 ## 9. «Remove filters» shows a random image
@@ -539,6 +573,24 @@ the filters arrived in v4.7.6 (`6a95534`). The button kept its jump.
 - **Database list** (run): «Apply filter» calls `RandomPicture()` from `BtnIndexStatsToList()` (D2-db,
   D1). On a plain list the first match is shown. In D2-db the result held one file. A random file among
   several is read from the code.
+
+Run again at `8cdff2b` (the new batch W9): files a01 to a10, a10 current, filter `a0`, then a04 made
+current.
+
+- **Plain list**: «Remove filters», three times: a07, a10, a05. Ctrl+Space: a10.
+- **Database list**: «Remove filters», three times: a10, a03, a06. Ctrl+Space: a10.
+- **«Apply filter» on the database list**, 9 matches, three times: a02, a06, a01. This is the first
+  run with several matches. On the plain list it shows a01, the first match, each time.
+
+**Fixed in `91c3834`** for «Remove filters», with Marius's answer to decision 9: the button shows the
+image that was current before the first filter, as Ctrl+Space does
+(`dummyTimerDelayiedImageDisplay(50)` :33244, in place of the timer for `RandomPicture()`). «Apply
+filter» on database lists keeps its random image, at his choice. That call is in
+`BtnIndexStatsToList()` (:28739), which the rows of the Statistics panels run as well.
+
+Run on the fix (W9): «Remove filters» goes back to a10 in the six runs, three on each kind of list,
+and `RandomPicture()` is not called on that route. «Apply filter» on the database list landed on a05,
+a02, a04.
 
 ---
 
@@ -572,6 +624,24 @@ Runs (E): that box, OK, and then at once:
 affected (read). The Move/Copy panel's «Erase history» does the same (yesterday's report, «Checked and
 found correct»).
 
+Run again at `8cdff2b` (the new batch W10; the history holds beach.png and a05): the two error boxes
+are gone. `79d0e05`, by Marius, makes both panels return when `createSettingsGUI()` gives nothing
+(:33154, :28412). What was left:
+
+- **«Erase history»** within the second: the saved history was erased, and the panel stayed open
+  with its 32 controls and with beach.png and a05 still in the list.
+- **«Stats»** within the second: nothing happens, and nothing is said.
+- **Controls**: more than a second after the box, «Erase history» rebuilt the panel, and «Stats»
+  opened the Statistics panel.
+
+**Fixed in `d2ae7c5`** for «Erase history», at Marius's request (2026-11-23: «make it update the user
+interface without open/closing the window»): the button no longer closes the panel, so the refusal
+does not reach it (finding 11). «Stats» still ignores a press within a second of a message box. That
+is the refusal itself, which every panel shares, and it was left as it is.
+
+Run on the fix (W10): «Erase history» pressed within the second asks its question and, after «Yes»,
+empties the list in the panel; the fields stay. «Stats» is as before.
+
 ---
 
 ## 11. «Erase history» asks nothing, and the rebuilt panel loses the typed filter
@@ -589,6 +659,52 @@ the string box when no filter is active (:33175-33179).
   with», and «File size» 5-50. Afterwards every field was back to its default. «Large UI fonts» takes
   the same path (read).
 
+Run again at `8cdff2b` (the new batch W11; P4):
+
+- **«Erase history»**: as described. With the filter `a01|a02` active and `typed` in the field, the
+  rebuilt panel showed `a01|a02` again.
+- **«Dark mode UI»** and **«Large UI fonts»**: every field went back to what the panel opened with.
+  This is the first run of «Large UI fonts».
+
+**Fixed in `d2ae7c5` and `08b5a01`**, with Marius's answer to decision 11.
+
+- **«Erase history»** (`EraseFilterzHisto()` :33088-33103) asks first: «Do you want to erase the
+  history of the files list filters?», with «Yes» and «No». When no filter is saved it says «The
+  files list filters history is already empty» and asks nothing. After «Yes» it deletes the saved
+  filters and empties the list of the string box. The panel is not closed: the typed text and the
+  other fields stay, and «Cancel» still puts back the settings the panel opened with.
+- **The two rebuilds** keep the fields. `CloseWindow()` puts back the settings the panel opened
+  with, as before, and `InitialFilterSettingsPanel(0)` now keeps a copy of the fields as they were
+  (:33131). Each of the two toggles calls `PanelEnableFilesFilter("rebuild")` when this panel is the
+  one that is open (:74440, :74500). A rebuild fills the fields from that copy (:33180, :33187) and
+  leaves alone the settings that «Cancel» puts back. It does not start the query box anew
+  (:33231): a filter the fields cannot rebuild stays in it until a field is changed, as before the
+  rebuild (finding 3).
+
+Run on the fix (W11; P and V3 again):
+
+- **«No»**: nothing changes. **«Yes»**: the list is empty and the saved section is gone; the panel
+  keeps its 32 controls and every field (`typed`, «Ends with», «File size» 5-50, «Invert filter»).
+  **Pressed again**: «already empty». A filter applied afterwards is the first entry of a new
+  history.
+- **A filter active** (`a01|a02`), with `typed` and «Begins with» in the fields: after «Yes» the
+  fields stay, the list is empty, the filter stays active and «Remove filters» is still there. After
+  «Cancel», the reopened panel shows `a01|a02`.
+- **«Dark mode UI»** and **«Large UI fonts»**, each pressed twice: the fields read the same after
+  each rebuild (the string box ticked, `typed`, «Ends with», «Folder paths», «Must not contain»,
+  «File size» 5-50 in megabytes, «Invert filter»). After «Cancel», the reopened panel shows what it
+  showed before the typing.
+- **A rebuild, then «Apply filter»**: `a01|a02` typed, «Dark mode UI», «Apply filter»: a01.png and
+  a02.png are listed.
+- **Typed over an active filter**: `a03` and a «Modified date» typed, then «Dark mode UI»: the
+  fields stay, and the list still starts with the active filter's text. «Cancel» leaves the filter
+  and its settings as they were.
+- **A filter the fields cannot rebuild** (`i)(a0[12])`, set by a call): the query box keeps it across
+  «Large UI fonts», and «Apply filter» says «No filter option was changed». With `a03` typed and the
+  toggle pressed again, the box reads `\>i)(a03)`, and «Apply filter» lists a03.png.
+
+A rebuilt panel opens on its first tab, as before (read).
+
 ---
 
 ## 12. The history list hides entries that end another entry's text
@@ -603,6 +719,24 @@ skipped when an earlier entry ends with its text.
   (`RecordUsedFiltersManager()` :33505), so the hidden entries are overwritten or stay hidden.
 - **Run** (C5): filter a05 active, history a05 and beach.png. The list reads a05, a05, beach.png: the
   active filter's text is put first (:33183-33184) even when the history already holds it.
+
+Run again at `8cdff2b` (the new batch W12): the cases still hold.
+
+- The history beach.png, png, a05, ach.png gives the list beach.png, a05.
+- **The rewrite**, run for the first time: the filter `a01`, applied over that history, leaves the
+  section a01, beach.png, a05, ach.png. «png» is overwritten, and ach.png stays hidden.
+- Filter a05 active: a05, a05, beach.png.
+
+**Fixed in `26363c7`**: `readRecentFiltersEntries()` compares whole entries (:33078), and the active
+filter's text is taken out of the history part of the list before it is put first (:33176-33178).
+
+Run on the fix (W12):
+
+- The four entries are listed. After `a01` is applied, the section holds all five: a01, beach.png,
+  png, a05, ach.png.
+- Filter a05 active: a05, beach.png.
+- Entries that differ only in letter case are listed once, as before (A05 and a05; Beach.PNG and
+  beach.png). The filters do not tell them apart.
 
 ---
 
@@ -621,6 +755,11 @@ Run (K): Alt+A posted as key presses to the focused control, the string box tick
 Wine's dialog manager looks from the focused control onward and presses the first button with the
 letter. How Windows handles a letter that two buttons share was not checked. The other letters, M, H, I
 (on the second tab), R, T and S, are unique (read).
+
+Run again at `8cdff2b` (the new batch W13): fixed. `35329bc`, by Marius, renames «C&ancel» to
+«&Cancel» (:33228). From each of the nine places of the table, Alt+A presses «Apply filter» and
+Alt+C closes the panel. The panel's eight letters are unique: M, H, I, A, R, T, S, C. The keys are
+posted under Wine, as before; Windows was not checked.
 
 ---
 
@@ -644,6 +783,40 @@ Runs, the stored values set by the test:
   criterion 0-10: only the 0.01 file. The query reads `imghrms::0.00391::0.03906`.
 - **Read**: a histogram row of the Statistics panels fills the fields with levels 0-255 (:28636), while
   this panel reads them as 1-256. Applied again from this panel, such a filter moves one level down.
+
+Run again at `8cdff2b` (B5, B6, B6b; the new batch W14): the runs still hold. Two cases were run
+for the first time, with the average levels 99.5, 120 and 150.5 set by the test:
+
+- **«Average» 100 to 150** lists the files at 99.5 and 120: the fields are read as 1-256, one level
+  below what is typed.
+- **A row of the Statistics panel**: the row «100-150» of the averages, run through
+  `BtnIndexStatsToList()`, lists the file at 120 and fills the fields with 100 and 150. This panel,
+  opened on it, keeps that filter in the query box (finding 3). With one field changed and changed
+  back, «Apply filter» lists the files at 99.5 and 120.
+
+**Fixed in `25429a9`**, with Marius's answer to decision 14: the histogram criteria read the two fields
+as levels, and the scale is shown.
+
+- **Levels.** The two fields are clamped to 0-255. The seven criteria stored as (level + 1)/256 add
+  the 1, and the standard deviation does not (:33419-33422). A typed number is that level, as in the
+  rows of the Statistics panels, and a deviation of 0 can be asked for.
+- **The scale.** The text beside the criterion list reads «Ratio x 10: 15 means 1.5» for «Aspect
+  ratio», «Histogram levels: 0 to 255» for the histogram criteria, and «Histogram levels: 0 to 128»
+  for the standard deviation (:33350, :33358). The other criteria keep «File property» and «Image
+  property». The text takes the width that is free beside the list (:33202), and the panel keeps its
+  size.
+- **«Aspect ratio»** is still typed as ten times the ratio. The text now says so.
+
+Run on the fix (W14 and the new batch W15; B again):
+
+- **«Average» 100 to 150** lists the file at 120 alone. 101 to 151 lists the files at 120 and 150.5.
+- **Deviation 0 to 10** lists the files at 0 and 0.01. **0 to 0** lists the file at 0.
+- **The row of the Statistics panel**, then a field changed and changed back: the file at 120, which
+  is what the row itself lists.
+- **The texts fit**: they need 124 and 132 pixels of 200, and 241 and 256 of 330 with large fonts.
+  The panel measures 358 by 354 pixels before and after the fix, and 611 by 464 with large fonts
+  (under Wine).
+- **«Aspect ratio»** 10 to 20 lists the two files, as before (B6b).
 
 ---
 
@@ -695,6 +868,10 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 - **16.9. «Invert filter» takes in the files whose value could not be read.** A blank value fails
   `isInRange()` (:33933) and the inversion turns that into a match (read).
 - **16.10. `FiltersComboAction()` (:33085) is not called anywhere** (read).
+- **16.11. A filter of one or two characters is not recorded in the history.**
+  `RecordUsedFiltersManager()` wants three characters (:33559), while the list shows saved entries
+  from two characters on (:33081). W12: the filter `a0` is applied and leaves the section as it was
+  (run; lines at `25429a9`).
 
 ---
 
@@ -715,6 +892,11 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
   filter now stays, but the settings the action wrote are not put back: «Already seen», and its own
   text in the string field. The panel's query box then keeps the active filter (finding 3) (read;
   lines at `bdc80f1`).
+- **E. A histogram row of the Statistics panel rounds its two limits to three decimals**
+  (`BtnIndexStatsToList()` :28643-28644), while the values are stored with five. The row «100-150»
+  asks for 0.395 to 0.590, so an average between level 100 and 100.1 is left out (W14: the row's
+  query; the gap is read from the numbers). This panel asks for 0.39453 to 0.58984 for the same two
+  numbers (lines at `25429a9`).
 
 ---
 
@@ -726,7 +908,8 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
   with records in the list (P3c).
 - **«No files matched»** shows its box and brings the whole list back (A3, A4c, B6) (run).
 - **«Cancel» at the save question of «Apply filter»** keeps the edits (C3) (run).
-- **«Erase history» more than a second after a box** rebuilds the panel normally (E3) (run).
+- **«Erase history» more than a second after a box** rebuilds the panel normally (E3) (run). Since
+  `d2ae7c5` the button does not rebuild the panel at all (finding 11).
 - **«Search»** closes this panel with `BtnCloseWindow()` (:47838-47839), so the refusal of finding 10
   does not reach it (read).
 - **«Cancel» and Escape** put back the settings the panel opened with (`CloseWindow()` :99902-99903)
@@ -744,7 +927,7 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 
 ## Decisions to make before fixing
 
-Decisions 1 to 7 are settled; the others are open.
+Decisions 1 to 14 are settled; decision 15 is open.
 
 1. Finding 1: should «Remove filters» ask the save question before the list changes, as «Apply filter»
    does? On a database list, should «Cancel» keep the image shown? And Ctrl+Space too?
@@ -770,14 +953,25 @@ Decisions 1 to 7 are settled; the others are open.
 7. Finding 7: should `||` be read as one bar?
    **Settled in `35329bc`**, by Marius: yes.
 8. Finding 8: should an empty side mean «no limit» on that side, or be refused with a message?
+   **Settled in `07fddfd`**: refused with a message (his answer, 2026-11-23).
 9. Finding 9: should the random jump go from «Remove filters», as from Ctrl+Space since 2020? Should it
    stay for «Apply filter» on database lists?
+   **Settled in `91c3834`**: it goes from «Remove filters», and it stays for «Apply filter» on database
+   lists (his answer).
 10. Finding 10: should «Erase history» close with `BtnCloseWindow()`, and «Stats» check
     `createSettingsGUI()`'s result?
+    **Settled**: «Stats» checks the result since `79d0e05`, by Marius. «Erase history» no longer closes
+    the panel (`d2ae7c5`), at his request.
 11. Finding 11: should «Erase history» ask first? Should the typed filter survive a rebuild?
+    **Settled in `d2ae7c5` and `08b5a01`**: yes to both, and «Erase history» changes the list in the open
+    panel (his answer and his request).
 12. Finding 12: should the history compare whole entries?
+    **Settled in `26363c7`**: yes.
 13. Finding 13: which of «Apply filter» and «Cancel» gets another letter, and which one?
+    **Settled in `35329bc`**, by Marius: «Cancel», with Alt+C.
 14. Finding 14: how should the scales be shown? Should a standard deviation of 0 be allowed?
+    **Settled in `25429a9`**: the histogram fields are levels from 0 to 255, so a deviation of 0 is
+    allowed, and the text beside the criterion list shows the scale (his answer).
 15. Finding 15: should «Selected files» accept one file, or say why one is not enough?
 
 ---
@@ -829,8 +1023,33 @@ Decisions 1 to 7 are settled; the others are open.
   the random jump lands. V1 and V2 were also run on `886cdfb` and on `ed7a1a1`: each shows its own finding
   fixed and the later ones as before. Each of the three commits loads on the stock AutoHotkey
   1.1.37.02 (`/iLib`, then in full).
-- **Batches C, D and K** predate `68d5511` and were not run again: C and D leave its save question
-  unanswered, and K looks for «C&ancel». Batch E belongs to finding 10, which was not checked again.
+- **Batches C, D, E and K** predate `68d5511` and were not run again: C and D leave its save question
+  unanswered, and K looks for «C&ancel». The batches W9 to W13 take over their cases for findings 9
+  to 13.
+- **The check of findings 8 to 14, on 2026-11-23**, at `8cdff2b`:
+  - batches B and P as they were;
+  - W9: where «Remove filters», Ctrl+Space and «Apply filter» land, on a plain list and on a
+    database list;
+  - W10: batch E with a history, and the list and the saved section logged afterwards;
+  - W11: «Erase history» with and without an active filter, and the two toggles;
+  - W12: the history list, and the saved section after a filter is recorded;
+  - W13: batch K with «&Cancel», Alt+A and Alt+C;
+  - W14: averages set by the test, and a row of the Statistics panel run through
+    `BtnIndexStatsToList()`, with the panel's number set by the test in place of the open panel.
+- **The fixes of findings 8 to 14, on 2026-11-23**, all on the text of `25429a9`:
+  - the new batch W8 (the refusal), and W9 to W14 again with the fixes' cases added: the answers to
+    the question of «Erase history», a rebuild followed by «Cancel» and by «Apply filter», a filter
+    the fields cannot rebuild, the deviation, the width of the texts;
+  - the new batch W15: the panel's size and the place of the scale text, at both font sizes, before
+    and after the fix;
+  - A, B, B4, P, H1, HD, H4, H5, H6, V1, V2 and V3 again. Against the runs on `bdc80f1`, the logs of
+    A, B4, H4, H6 and V1 are the same. Those of B, P and V3 differ only in what the fixes change.
+    Those of H1 and HD differ only in the image shown after «Remove filters» and in where the random
+    image of the database list lands. H5 and V2 differ by one line of the kit each (a display
+    refresh logged at another place; a queued answer that found no box), with the cases' own lines
+    the same.
+
+  Each of the six commits loads on the stock AutoHotkey 1.1.37.02 (`/iLib`, then in full).
 - **Kit**: `.claude/scratch/files-filter-panel-2026-11-20/app/`.
   - `run-ff.sh <tag> testFfA|testFfB|testFfB4|testFfC|testFfD|testFfE|testFfK|testFfP [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
@@ -844,3 +1063,7 @@ Decisions 1 to 7 are settled; the others are open.
   - Their logs: `a-head2`, `b-head2`, `b4-head2`, `p-head2`, `h1-head`, `hd-head`, `h4-head`,
     `h5-head`, `h6-head` (at `60af1a0`); `v1-fix`, `v2-fix`, `v3-fix` and the same names ending in
     `-fix` (the fixed text).
+  - `test-ff-w.ahk` holds the batches for findings 8 to 14 (`testFfW8` to `testFfW15`). Their logs:
+    `b-head3`, `p-head3` and `w9-head` to `w15-head` (at `8cdff2b`); `w8-fix` to `w15-fix`, and
+    `a-fix2` to `v3-fix2` for the twelve earlier batches (the fixed text). `../commits2/stage.py`
+    rebuilds the six fixes from the text of `8cdff2b`.
