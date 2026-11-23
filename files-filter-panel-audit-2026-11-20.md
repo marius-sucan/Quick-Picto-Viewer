@@ -29,6 +29,27 @@ The RegEx side of this panel was reviewed on 2026-11-13: answered in chat and fi
 finding 6. The cut at `::` is small thing 16.8. Finding 10 is where this panel meets the unchecked result
 of `createSettingsGUI()`, which most panels share (56 of 74 at `b4f374f`, counted for the 11-14 report).
 
+**Status, 2026-11-23.** Findings 1 to 6 were run again at `60af1a0`, after Marius's own fixes of
+2026-11-21. What still held was fixed on 2026-11-23, with his answers to decisions 2, 3 and 6.
+
+- Finding 1 and route a of finding 2 are fixed in `68d5511`, by Marius.
+- Routes b and c of finding 2 are fixed in `886cdfb`.
+- Finding 3 is fixed in `ed7a1a1`.
+- Finding 4 is fixed for «Cancel» in `35329bc`, by Marius. «Save» and the «Already seen» criterion
+  stay as they are, at his choice (decision 4).
+- Findings 5 and 6 are fixed in `35329bc`, by Marius, and completed in `bdc80f1`.
+
+Findings 7 to 16 were not run again, and their status is the one at `0b6cb07`. Three entries changed
+all the same, as the runs of findings 1 to 6 showed: finding 7, small thing 16.5 and «Seen in
+passing» B. Two more commits touch code that open findings cite, and were not run: `35329bc` renames
+«C&ancel» to «&Cancel» (finding 13), and `79d0e05` checks the result of `createSettingsGUI()` in this
+panel (finding 10).
+
+Each of sections 1 to 7 ends with what was run again and, where fixed, a note on what the code does
+now. Those additions cite lines at `bdc80f1`; the other line numbers stay those of `0b6cb07`. Two
+functions were renamed on 2026-11-21 (`97aec41`, `ca44856`): `MenuRemFilesListFilter()` is now
+`MenuRemNowFilesListFilter()`, and `BTNuiremFilesListFilter()` is `BTNuiDiscardFilesFilter()`.
+
 ## Terms
 
 - **The panel**: panel 6, «Files list filtering». Its routes: Ctrl+F (:1876-1877), the Find menu's
@@ -68,15 +89,15 @@ of `createSettingsGUI()`, which most panels share (56 of 74 at `b4f374f`, counte
 
 ## Summary
 
-| # | Finding | Harm | Checked | Status at `0b6cb07` |
+| # | Finding | Harm | Checked | Status |
 |---|---------|------|---------|---------------------|
-| 1 | «Remove filters» discards an edited, unsaved image: with no question on a plain list, and on a database list also after «Cancel» when another file ends up current | high | run | open |
-| 2 | Three routes leave the list filtered while no filter is active, so files leave the index | medium | run | open |
-| 3 | The panel, opened again, shows another filter than the active one, and «Apply filter» then replaces it | medium | run, and read for one case | open |
-| 4 | «Save» or «Cancel» at the save question of «Apply filter» closes the panel and erases the typed filter | low | run | open |
-| 5 | A bar at the start or the end of the text matches every file | medium | run | open |
-| 6 | One character with «Begins with», «Ends with» or «RegEx» is matched anywhere | medium | run, and read for «RegEx» | open |
-| 7 | A doubled bar joins the two words around it | low | run | open |
+| 1 | «Remove filters» discards an edited, unsaved image: with no question on a plain list, and on a database list also after «Cancel» when another file ends up current | high | run | **fixed**, `68d5511`, by Marius |
+| 2 | Three routes leave the list filtered while no filter is active, so files leave the index | medium | run | **fixed**: a in `68d5511`, by Marius; b and c in `886cdfb` |
+| 3 | The panel, opened again, shows another filter than the active one, and «Apply filter» then replaces it | medium | run, and read for one case | **fixed**, `ed7a1a1` |
+| 4 | «Save» or «Cancel» at the save question of «Apply filter» closes the panel and erases the typed filter | low | run | fixed for «Cancel», `35329bc`, by Marius; «Save» and «Already seen» left as they are (decision 4) |
+| 5 | A bar at the start or the end of the text matches every file | medium | run | **fixed**, `35329bc`, by Marius, and `bdc80f1` |
+| 6 | One character with «Begins with», «Ends with» or «RegEx» is matched anywhere | medium | run, and read for «RegEx» | **fixed**, `35329bc`, by Marius, and `bdc80f1` |
+| 7 | A doubled bar joins the two words around it | low | run | **fixed**, `35329bc`, by Marius; five bars in a row still match every file |
 | 8 | An empty «Minimum» or «Maximum» drops the criterion, silently when a string is ticked | low | run | open |
 | 9 | «Remove filters» shows a random image; on a database list «Apply filter» does too | low | run | open |
 | 10 | A button pressed within a second of a message box raises an AutoHotkey error | low, narrow | run | open |
@@ -85,11 +106,15 @@ of `createSettingsGUI()`, which most panels share (56 of 74 at `b4f374f`, counte
 | 13 | «Apply filter» and «Cancel» share Alt+A | low | run (Wine) | open |
 | 14 | The scales of «Aspect ratio» and of the histogram criteria are not shown; a standard deviation of 0 cannot be reached | low | run | open |
 | 15 | «Selected files» with one selected file says none is selected, and drops that selection | low | run | open |
-| 16 | Small things, numbered 16.1 to 16.10 | low | run and read | open |
+| 16 | Small things, numbered 16.1 to 16.10 | low | run and read | open; 16.5 fixed |
+
+Rows 1 to 7 give the status at `bdc80f1`. Rows 8 to 16 give the status at `0b6cb07`: they were not run
+again.
 
 Finding 1 loses work for good. Finding 2 removes files from the index until the folder or the list is
 opened again. Findings 3 and 5 to 8 filter by something the user did not ask for, and say nothing about
-it. Findings 3 and 6 need nothing more than reopening the panel or typing one character.
+it. Findings 3 and 6 need nothing more than reopening the panel or typing one character. Findings 1,
+2, 3, 5 and 6 are fixed, finding 4 for «Cancel», and finding 7 for a doubled bar.
 
 ---
 
@@ -121,6 +146,26 @@ Runs, with the edited image simulated:
   answered «Cancel». Then a02.png, the other file listed, is loaded, and `terminateIMGediting()` runs
   while the five undo levels are there. Afterwards there is no edited bitmap and no undo level. The list
   stays filtered, with no filter (finding 2a).
+
+Run again at `60af1a0`, with the edited image simulated (batches H1, HD):
+
+- **Plain list, «Remove filters»** (H1): the question comes first, as «…and the files list filter will
+  be removed».
+  - «Cancel»: the panel stays open; the edits and the filter are kept.
+  - «Save»: the panel closes and the save panel is started; the edits and the filter are kept.
+  - «Discard»: the filter is removed, the edits are discarded, and another image is shown.
+- **Ctrl+Space** (H1b): the same question; «Cancel» keeps everything, «Discard» removes the filter.
+- **Database list** (HD, HDb): one question, with the same wording. After «Cancel», a01.png is still
+  shown with its five undo levels and the filter is still active, from the button and from
+  Ctrl+Space. After «Discard», all 6 files are listed.
+- **No edited image** (H1c): no question.
+
+**Fixed in `68d5511`**, by Marius. `BTNuiDiscardFilesFilter()` (:33209) and
+`MenuRemNowFilesListFilter()` (:4206) ask before anything changes, and return on «Save» and on
+«Cancel» (:33213, :4210). `BtnIndexStatsToList()` no longer asks when it reads the whole list back
+(:28521), so no question can come after the filter was emptied. The toolbar's filter button, the
+quick-action bar's «Remove filter» and the two menus go through `MenuRemNowFilesListFilter()`. The
+case left unchecked above no longer arises: «Cancel» returns before `currentFileIndex` is touched.
 
 ---
 
@@ -172,6 +217,48 @@ Runs, the abort simulated (the kit's `determineTerminateOperation()` answers «a
 - **B4b**, six files, the same filter (2 files): after the abort, 6 entries behind a count of 2. After
   Ctrl+Space, 3 entries. t-d.png, t-e.png and t-f.png have left the index.
 
+Run again at `60af1a0`:
+
+- **a** (HD): gone. After «Cancel» the 2 files are listed and the filter is still active.
+- **b** (P3): as before, 2 files listed and `filesFilter` empty. Ctrl+Space now does nothing there,
+  because `MenuRemNowFilesListFilter()` returns when no filter is active (:4207).
+- **c** (B4, B4b): as before, and for the same reason Ctrl+Space brings nothing back: 3 entries stay
+  behind a count of 2 in B4, and 6 behind 2 in B4b.
+
+**Route a fixed in `68d5511`**, by Marius: the question is asked before `coreSetFilesFilteru("")` runs
+(finding 1), so «Cancel» changes nothing.
+
+**Routes b and c fixed in `886cdfb`**, with Marius's answer to decision 2: the active filter, its list and
+the panel's settings stay as they were before «Apply filter».
+
+- **b.** The panel calls `retrieveAlreadySeenImageFromCurrentList(1)`. With that 1 the function no
+  longer empties `filesFilter`: it says «No records found matching the criteria. The files list was
+  left unchanged.» and returns -1 (:36267-36285). Without it the filter is emptied as before. That is
+  the call of a database list's sorting, which reads the list again without its filter and then
+  applies the filter anew (`dbSortingCached()`, through `coreSetFilesFilteru()`).
+- **c.** When the collection is aborted, nothing has replaced the list yet. `FilterFilesListuIndex()`
+  puts the previous filter's text back into `filesFilter`, says «Operation abandoned. The files list
+  was left unchanged, because data collection did not complete.» and returns -1 (:33816-33824).
+  `coreSetFilesFilteru()` hands that result to its caller (:33739, :33768).
+- **The settings.** «Apply filter» stores the typed settings before the panel closes. On -1 it puts
+  back the ones the panel opened with, `InitialFilterSettingsPanel(2)` (:33496-33497, :33512-33513).
+  For that, `InitialFilterSettingsPanel()` (:33095-33116) keeps the copy that its last «remember»
+  replaced.
+
+Run on the fix (batches V1, V2, V3; B4, B4b and P3 again):
+
+- **b**: filter `a01|a02` active, no seen record, «Already seen», «Apply filter». The 2 files stay
+  listed and the filter stays active. The settings are the filter's own, and the reopened panel
+  shows it. Ctrl+Space then lists all 5 files. Control, no filter active: the same message, 5 files,
+  no filter.
+- **c**: filter `s-` active (2 of 3 files), «File size» 2-10 KB added, the collection aborted. The 2
+  files stay listed behind a count of 2, and the whole list of 3 waits behind them. The reopened
+  panel shows `s-` with no criterion, and «Remove filters». Ctrl+Space then lists all 3 files (all 6
+  in B4b). Control, no filter active: the abort leaves 3 files and no filter.
+- **A database list sorted** (V3): «Already seen» active with 3 of 5 files, the seen records erased,
+  then a sort by file name. As before the fix: «No records found matching the criteria», all 5 files,
+  no filter.
+
 ---
 
 ## 3. The panel, opened again, shows another filter than the active one
@@ -207,6 +294,61 @@ eyes, and «Apply filter» (or Enter) puts the shown filter in place of the acti
 
   The panel then shows whatever criterion it last had.
 
+Run again at `60af1a0` (B3, P1, H4): the three run cases still hold.
+
+- **Dates** (B3): 2019 applied, 2026/11/23 shown, and «Apply filter» lists the two files modified
+  today.
+- **A search in between** (P1): the field shows `a03`, and «Apply filter» lists a03.png.
+- **After the save question** (H4): the case now comes from «Save», since «Cancel» keeps the panel
+  open (finding 4). Filter `a01|a02|a03` active, «Apply filter», «Save»: reopened, the string box is
+  ticked and the field is empty; the query box empties, and «Apply filter» says «No filter has been
+  defined».
+- **One more route** (H4): «Already seen», then «Cancel» at its save question, leaves the settings on
+  «Already seen» while the string filter is active (finding 4).
+
+**Fixed in `ed7a1a1`**, with Marius's answer to decision 3: the dates are kept with the settings, the
+Search panel has a text of its own, and a filter the fields cannot rebuild stays in the query box
+until a field is changed.
+
+- **Dates.** `InitialFilterSettingsPanel()` remembers and puts back the two dates with the other
+  settings (:33095-33116), and the pickers open on them when they hold a valid date (:33181-33190).
+- **Search.** The Search panel's text box is `UsrEditSearch`, a global declared in the three functions
+  that use it: `EraseSearchEdit()` (:47893), `PanelSearchIndex()` (:47909) and
+  `BtnPerformSearchNow()` (:47971). `UsrEditFilter` holds the filter's text only.
+- **The query box.** The panel builds its query when it opens, with `updateUIFiltersPanel("opened")`
+  (:33206), not 300 ms later, so the box no longer changes after the panel is shown. That call
+  compares the query the fields give with the active filter. When they differ, the box keeps the
+  active filter until a field is changed (:33433-33451), and «Apply filter» then says «No filter
+  option was changed. The active files list filter was left in place.» (:33474). The first changed
+  field ends that for as long as the panel is open: the box shows the fields' query, and «Apply
+  filter» applies it, also when the field is changed back.
+- **Filters made elsewhere** still have no fields: the pixel format and the deleted entries rows of
+  the Statistics panels, a duplicates list, a file's pages. The query box now shows them, and they
+  are not replaced unasked. The same holds for the settings that «Save» and «Already seen» leave
+  (above) and, read from the code, for a histogram row of the Statistics panels, which this panel
+  would otherwise apply one level down (finding 14).
+
+Run on the fix (batches V1, V2, V3; B3, P1 and H4 again):
+
+- **Dates**: «Modified date» 2019 applied. Reopened, the pickers show 2019/01/01 and 2019/12/31, and
+  the query box keeps the 2019 query. «Apply filter» lists s-small.png again. The dates changed to
+  2020, then «Cancel»: reopened, 2019 again.
+- **Search**: filter `a0` active, a search for `a03`. Reopened, the field shows `a0`, and «Apply
+  filter» lists the 4 files of `a0`.
+- **A filter the fields do not describe**, `i)(a0)` set by a call while the string box is unticked:
+  - the box reads `i)(a0)` at opening and 500 ms later;
+  - «Apply filter»: the message; the panel stays open and the filter stays;
+  - «Invert filter» ticked: the box empties, since the fields define no filter; unticked again: it
+    stays empty;
+  - the string `a01` ticked: the box reads `\>i)(a01)`, and «Apply filter» lists a01.png.
+- **The same filter while the fields describe `a01`** (V3): the box reads `i)(a0)`, and «Apply
+  filter» gives the message. «Invert filter» ticked and unticked: the box reads `\>i)(a01)`, and
+  «Apply filter» lists a01.png.
+- **Filters the fields do describe** are applied again as before (V3): «Selected files» on a plain
+  list, and `a01|a02` on a database list.
+- **After «Save»** (H4 again): the reopened panel keeps `i)(a01|a02|a03)` in the box, and «Apply
+  filter» gives the message.
+
 ---
 
 ## 4. «Save» or «Cancel» at the save question closes the panel and erases the typed filter
@@ -241,6 +383,26 @@ string box, the criterion and the text.
 
 The structured panel asks before it closes since `ed8848c`.
 
+Run again at `60af1a0` (batch H4), a01.png edited:
+
+- **«Cancel», no filter active**: the panel stays open with what was typed, and the edits are kept.
+  When the panel is then closed, the settings it opened with come back.
+- **«Cancel», a filter active**: the same; the reopened panel shows the active filter.
+- **«Save», no filter active**: `askAboutFileSave()` closes the panel and starts the save panel
+  (:66053; the kit replaces the save panel by a log line). The typed filter is not kept.
+- **«Save», a filter active**: the same, and the line that remains of the branch, `UsrEditFilter :=
+  ""` (:33503), runs after the close has put the settings back. The active filter's text is erased
+  from them: reopened, the string box is ticked and the field is empty (finding 3).
+- **«Already seen»**: this criterion has a branch of its own (:33492-33499), which still closes the
+  panel before `retrieveAlreadySeenImageFromCurrentList()` asks (:36257). After «Cancel» the panel is
+  closed, the edits are kept, and the settings stay on «Already seen» while the string filter is
+  active.
+
+**Fixed for «Cancel» in `35329bc`**, by Marius: the question is asked before
+`InitialFilterSettingsPanel(1)` and `BtnCloseWindow()` (:33501-33508), and the branch no longer
+resets the string box and the criterion. «Save» and «Already seen» stay as described, at Marius's
+choice (decision 4). Since `ed7a1a1` the query box keeps the active filter in both cases (finding 3).
+
 ---
 
 ## 5. A bar at the start or the end of the text matches every file
@@ -261,6 +423,32 @@ Runs on x1.png, 1x.png, y.png, z.png, «File names»:
 
 Database lists skip empty terms (`SQLlikeClauseFromFilter()` :40246) (read).
 
+Run again at `60af1a0` (A4, A4b, A4c, A4d): fixed. `x1|` and `|x1` list x1.png; with «Must not
+contain», the other three files; with «Begins with», x1.png. On a database list `x1|` lists x1.png
+and x12.png (HD5). Three cases beside them still held (batches H5, H6):
+
+- **«Already seen»** with `a0|`, and a01, a02 and b05 seen: all three were listed. That route builds
+  a pattern of its own (:36239-36252) from the text as typed, which `Gui, Submit` had read again
+  after the clean-up.
+- **The history** and the settings kept `a01|`, as typed.
+- **«RegEx» `a01\|`**: the query box said «Invalid regular expression provided.», but «Apply filter»
+  checked the text as typed and applied `i)a01\`, which matched nothing.
+
+**Fixed in `35329bc`**, by Marius: `updateUIFiltersPanel()` reads `||` as one bar and trims the bars
+at the two ends of the text, in every matching mode (:33294-33295). **Completed in `bdc80f1`**:
+`BtnApplyFilesFilter()` reads the fields first and builds the filter after (:33472-33473), so the
+cleaned text is the one that is checked, recorded in the history and read by «Already seen».
+
+Run on the fix (V2):
+
+- `a01|` lists a01.png, and the history holds `a01`.
+- «Already seen» with `a0|` lists a01.png and a02.png.
+- «RegEx» `a01\|` is refused: «The regular expression you provided is invalid».
+
+The clean-up applies in «RegEx» mode too, so a pattern cannot end in a bar or hold an empty choice:
+`a01||b05` lists a01.png and b05.png, and `a01\||b05` becomes `a01\|b05` (H6). No file name holds a
+bar, so only such patterns change.
+
 ---
 
 ## 6. One character with «Begins with», «Ends with» or «RegEx» is matched anywhere
@@ -279,6 +467,28 @@ through to the last branch, which is «Anywhere».
 
 Database lists build the condition for any length (read).
 
+Run again at `60af1a0` (A1, A2): fixed for the two modes. «Begins with» `1` lists 1x.png, and «Ends
+with» `1` on folder paths lists the two files of a1. Two cases still held (batch H5):
+
+- **«RegEx» `.`** on parent folders: taken as a dot, so no file matched (H6.4).
+- **No text**, new with the fix: «Begins with» or «Ends with» with an empty field, or with a bar
+  alone, built `i)^()` or `i)()$`. That filter lists every file and counts as active (H6.1, H6.2);
+  with «Must not contain», no file matched (H6.3). On a database list the same fields give «No filter
+  has been defined» (HD6).
+
+**Fixed in `35329bc`**, by Marius, for «Begins with» and «Ends with»: the two modes no longer ask for
+two characters. **Completed in `bdc80f1`**, with his answer to decision 6: «RegEx» takes one character as
+a pattern, and no mode builds a pattern from an empty text, in `updateUIFiltersPanel()`
+(:33342-33356) and in `retrieveAlreadySeenImageFromCurrentList()` (:36239-36252). The two checks of
+the pattern follow (:33432, :33478).
+
+Run on the fix (V2):
+
+- «RegEx» `.` on parent folders lists all 5 files; `b` lists b05.png; `(` is refused as invalid.
+- «Begins with» and no text, and «Ends with» and a bar alone: «No filter has been defined».
+- «Already seen» with «RegEx» `.` lists the three seen files.
+- «Begins with» `b` lists b05.png.
+
 ---
 
 ## 7. A doubled bar joins the two words around it
@@ -291,6 +501,10 @@ none is left.
 
 Run (A3): `x1||y` gives the query `i)(x1y)`, no file matches, the box comes up and the whole list
 returns. Database lists pass through the same line (read).
+
+Run again at `60af1a0` (A3): `x1||y` gives `i)(x1|y)`, and x1.png and y.png are listed. `35329bc`, by
+Marius, reads the pair as one bar (:33294). Five bars in a row still leave a pair: `a01|||||b05`
+gives `i)(a01||b05)`, and all 5 files are listed (H5.2). That case was not fixed.
 
 ---
 
@@ -466,8 +680,10 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
   records and none of them in the list (P3b): «No seen images identified. Files list left unchanged, no
   filter applied.», yet the filter `a01|a02` was removed before the check (:36264-36265), and all 5 files
   are listed (run).
-- **16.5. The wrong wording when a filter is removed.** On a database list, the save question asked
+- ✅ **16.5. The wrong wording when a filter is removed.** On a database list, the save question asked
   while removing a filter reads «…the files list will be filtered to given criteria» (:28522) (run, D1).
+  Fixed in `68d5511`, by Marius: the two handlers ask, with «…and the files list filter will be
+  removed» (run, HD).
 - **16.6. Two save questions on a database list.** «Apply filter» asks in `BtnApplyFilesFilter()`
   (:33490) and again in `BtnIndexStatsToList()` (:28522). `askAboutFileSave()` repeats its last answer
   for 300 ms only (:65785), so the question comes back when collecting the data takes longer. «Cancel»
@@ -488,8 +704,17 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 
 - **A. The Search panel's «Filter list» drops the active search.** `OpenFilterPanelBTNaction()` empties
   `userSearchString` (:47953), so F3 has nothing to search for afterwards (read).
-- **B. Ctrl+Space shares findings 1 and 2a**, through the same `remFilesListFilter()`. Finding 1 was
-  run for it (C2b); 2a was read.
+- ✅ **B. Ctrl+Space shares findings 1 and 2a**, through the same `remFilesListFilter()`. Finding 1 was
+  run for it (C2b); 2a was read. Fixed in `68d5511`, by Marius, with the two findings; both were run
+  for it (H1b, HDb).
+- **C. The static folders routes remove the filter without the save question.**
+  `LoadStaticFoldersCached()` (:35544) and `regenerateStaticFoldersList()` (:35571) call
+  `remFilesListFilter()` themselves, so an edited image goes as in finding 1 (read; lines at `bdc80f1`).
+- **D. The «already seen» quick actions share route b of finding 2.** `quickFindSeenImages()` (:33460)
+  calls the same function, with the 1 since `886cdfb`. With fewer than two seen records the active
+  filter now stays, but the settings the action wrote are not put back: «Already seen», and its own
+  text in the string field. The panel's query box then keeps the active filter (finding 3) (read;
+  lines at `bdc80f1`).
 
 ---
 
@@ -505,7 +730,7 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 - **«Search»** closes this panel with `BtnCloseWindow()` (:47838-47839), so the refusal of finding 10
   does not reach it (read).
 - **«Cancel» and Escape** put back the settings the panel opened with (`CloseWindow()` :99902-99903)
-  (read).
+  (read). Since `ed7a1a1` the two dates are among them (run, V1).
 - **The duplicates list**: on pairs filtered by Hamming distance the panel opens the threshold panel
   instead (:33152-33158), and the Find menu disables «Define index filter(s)» there (:68929) (read).
 - **The panel's variables** are super-globals (:296-303); `FilterTypeu` and `InternalFilterString` are
@@ -519,19 +744,31 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 
 ## Decisions to make before fixing
 
+Decisions 1 to 7 are settled; the others are open.
+
 1. Finding 1: should «Remove filters» ask the save question before the list changes, as «Apply filter»
    does? On a database list, should «Cancel» keep the image shown? And Ctrl+Space too?
+   **Settled in `68d5511`**, by Marius: yes to the three.
 2. Finding 2: on each of the three routes, should the active filter and its list stay as they were
    («Cancel» does nothing; «No records» keeps the filter; the abort puts the filtered list back)? Or
    should the filter be removed and the whole list put back?
+   **Settled in `68d5511` and `886cdfb`**: they stay as they were, and the panel's settings with them.
 3. Finding 3: should the panel open on the active filter? That needs the dates kept with the settings,
    and a text variable of its own for the Search panel. Or should the query box keep the active filter
    until a field changes?
+   **Settled in `ed7a1a1`**: both. The dates are kept and the Search panel has its own text; the query box
+   keeps a filter the fields cannot rebuild, and «Apply filter» with nothing changed leaves it in
+   place.
 4. Finding 4: should the question be asked before the panel closes, with the panel kept open on
    «Cancel», as the structured panel does since `ed8848c`? Should the typed filter be kept on «Save»?
+   **Settled**: asked before the close, and the panel kept on «Cancel» (`35329bc`, by Marius). «Save»
+   and the «Already seen» criterion are left as they are (his answer, 2026-11-23).
 5. Finding 5: should empty terms be dropped, as the database lists do, or should the text be refused?
+   **Settled in `35329bc`**, by Marius: dropped.
 6. Finding 6: should «Begins with», «Ends with» and «RegEx» apply to one character too?
+   **Settled in `35329bc`**, by Marius, for the first two, **and in `bdc80f1`** for «RegEx»: yes.
 7. Finding 7: should `||` be read as one bar?
+   **Settled in `35329bc`**, by Marius: yes.
 8. Finding 8: should an empty side mean «no limit» on that side, or be refused with a message?
 9. Finding 9: should the random jump go from «Remove filters», as from Ctrl+Space since 2020? Should it
    stay for «Apply filter» on database lists?
@@ -575,9 +812,25 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
 - **Not run at all**:
   - Quick search actions fired while the panel is open;
   - multi-page preview mode (a file's pages listed as a filter);
-  - the data collection question on database lists (`collectSQLFileInfosNow()` with its question);
-  - finding 2a through Ctrl+Space;
-  - finding 1 when the index left after «Cancel» points at the edited file itself.
+  - the data collection question on database lists (`collectSQLFileInfosNow()` with its question).
+- **The check of findings 1 to 6, on 2026-11-23**, at `60af1a0`:
+  - batches A, B, B4 and P as they were, with Ctrl+Space called under its new name;
+  - the new batches H1 and HD: «Remove filters» and Ctrl+Space with an edited image and each answer
+    to the save question, on a plain list and on a database list. HDb is the run of finding 2a
+    through Ctrl+Space that the audit had left out;
+  - H4: «Apply filter» with an edited image and each answer, and «Already seen»;
+  - H5 and H6: bars, no text, one character, «RegEx» patterns.
+
+  «Save» was run with the save panel replaced by a log line.
+- **The fixes, on 2026-11-23**: the new batches V1, V2 and V3 (the fixes' cases; V3 also runs
+  «Erase history» and the Search panel's «Erase search criteria», which pass through edited code),
+  then A, B, B4, P, H1, HD, H4, H5 and H6 again, all on the text of `bdc80f1`. Against the runs at `60af1a0`, the logs of A, B,
+  B4, P, H4, H5 and H6 differ only in what the fixes change; those of H1 and HD differ only in where
+  the random jump lands. V1 and V2 were also run on `886cdfb` and on `ed7a1a1`: each shows its own finding
+  fixed and the later ones as before. Each of the three commits loads on the stock AutoHotkey
+  1.1.37.02 (`/iLib`, then in full).
+- **Batches C, D and K** predate `68d5511` and were not run again: C and D leave its save question
+  unanswered, and K looks for «C&ancel». Batch E belongs to finding 10, which was not checked again.
 - **Kit**: `.claude/scratch/files-filter-panel-2026-11-20/app/`.
   - `run-ff.sh <tag> testFfA|testFfB|testFfB4|testFfC|testFfD|testFfE|testFfK|testFfP [revision]`
     (stock interpreter; `QPV_SRC=<file>` runs a modified source).
@@ -585,3 +838,9 @@ QPV's rule: a selection of exactly one file does not count, and `getSelectedFile
   - `patch.py` and `patch-ff.py` add the logging; `closer2.ahk` answers the error boxes.
   - Logs are in `results/` (`a-head`, `b-head`, `b4-head`, `c-head`, `d-head`, `e-head`, `k-head`,
     `p-head`).
+  - `test-ff-h.ahk` holds the batches of 2026-11-23 (`testFfH1`, `testFfHD`, `testFfH4`, `testFfH5`,
+    `testFfH6`, `testFfV1`, `testFfV2`, `testFfV3`); `run-ff.sh` appends it. Its `ffNoSavePanel` makes
+    `PanelSaveImg()` a log line (`patch-ff.py`).
+  - Their logs: `a-head2`, `b-head2`, `b4-head2`, `p-head2`, `h1-head`, `hd-head`, `h4-head`,
+    `h5-head`, `h6-head` (at `60af1a0`); `v1-fix`, `v2-fix`, `v3-fix` and the same names ending in
+    `-fix` (the fixed text).
