@@ -33096,7 +33096,7 @@ InitialFilterSettingsPanel(modus) {
 ; modus: 1 = remember the settings; 0 = put them back; 2 = put back those remembered before the last «1»
     Static saved := [], before := []
          , names := "userFilterDoString|userFilterStringPos|userFilterStringIsNot|userFilterInvertThis|userFilterProperty|userFilterWhat"
-                  . "|UsrEditFilter|FilteruMaxRange|FilteruMinRange|userFilterSizeProperty"
+                  . "|UsrEditFilter|FilteruMaxRange|FilteruMinRange|userFilterSizeProperty|FilteruDateMinRange|FilteruDateMaxRange"
 
     If (modus=1)
     {
@@ -33178,8 +33178,16 @@ PanelEnableFilesFilter() {
     GuiAddEdit("xs y+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMinRange", FilteruMinRange, "Minimum")
     GuiAddEdit("x+5 w" btnWid " number limit5 gupdateUIFiltersPanel vFilteruMaxRange", FilteruMaxRange, "Maximum")
     GuiAddDropDownList("x+5 wp gupdateUIFiltersPanel AltSubmit Choose" userFilterSizeProperty " vuserFilterSizeProperty", "Kilobytes`nMegabytes", "File size unit")
-    Gui, Add, DateTime, xs y+7 wp gupdateUIFiltersPanel vFilteruDateMinRange, yyyy/MM/dd
-    Gui, Add, DateTime, x+5 wp gupdateUIFiltersPanel vFilteruDateMaxRange, yyyy/MM/dd
+    dMin := SubStr(FilteruDateMinRange, 1, 8)
+    dMax := SubStr(FilteruDateMaxRange, 1, 8)
+    If dMin is not time
+       dMin := ""
+    If dMax is not time
+       dMax := ""
+    dMin := (StrLen(dMin)=8) ? " Choose" dMin : ""
+    dMax := (StrLen(dMax)=8) ? " Choose" dMax : ""
+    Gui, Add, DateTime, xs y+7 wp gupdateUIFiltersPanel vFilteruDateMinRange%dMin%, yyyy/MM/dd
+    Gui, Add, DateTime, x+5 wp gupdateUIFiltersPanel vFilteruDateMaxRange%dMax%, yyyy/MM/dd
     Gui, Add, Checkbox, xs y+7 gupdateUIFiltersPanel Checked%userFilterInvertThis% vuserFilterInvertThis, &Invert filter
     Gui, Tab
     GuiAddEdit("xs y+10 w" EditWid " r2 +0x0800 vInternalFilterString", filesFilter, "Resulted files list filter query.")
@@ -33195,7 +33203,7 @@ PanelEnableFilesFilter() {
     Gui, Add, Button, x+5 hp wp gBtnCloseWindow, &Cancel
     repositionWindowCenter("SettingsGUIA", hSetWinGui, PVhwnd, "Files list filtering: " appTitle)
     ; EM_SETCUEBANNER(hEditC, "String to match")
-    SetTimer, updateUIFiltersPanel, -300
+    updateUIFiltersPanel("opened")
 }
 
 BTNuiDiscardFilesFilter() {
@@ -33247,6 +33255,10 @@ SQLfolderMatchClause(folderu) {
 
 updateUIFiltersPanel(dummy:=0) {
    Static columnsList := {2:"fsize", 3:"fmodified", 4:"fcreated", 5:"imgmegapix", 6:"imgwidth", 7:"imgheight", 8:"imgwhratio", 9:"imgframes", 10:"imgdpi", 11:"imgavg", 12:"imgmedian", 13:"imghpeak", 14:"imghlow", 15:"imghrange", 16:"imghmode", 17:"imghminu", 18:"imghrms"}
+        , fieldsAtOpen := "", foreignFilter := 0, keepsActiveFilter := 0
+
+   If (dummy="keeps")
+      Return keepsActiveFilter
 
    If (dummy!="external")
    {
@@ -33281,6 +33293,8 @@ updateUIFiltersPanel(dummy:=0) {
 
       UsrEditFilter := StrReplace(UsrEditFilter, "||", "|")
       UsrEditFilter := Trimmer(UsrEditFilter, "|")
+      fieldsNow := userFilterDoString "|" userFilterStringPos "|" userFilterWhat "|" userFilterStringIsNot "|" userFilterProperty "|" userFilterSizeProperty "|" userFilterInvertThis
+                 . "|" FilteruMinRange "|" FilteruMaxRange "|" SubStr(FilteruDateMinRange, 1, 8) "|" SubStr(FilteruDateMaxRange, 1, 8) "|" UsrEditFilter
       actu := (userFilterDoString=1) ? "SettingsGUIA: Enable" : "SettingsGUIA: Disable"
       GuiControl, % actu, userFilterWhat
       GuiControl, % actu, userFilterStringPos
@@ -33417,7 +33431,24 @@ updateUIFiltersPanel(dummy:=0) {
    ; box here and blocked on Apply, so it never reaches RegExMatch to throw [isValidRegEx()]
    regexBad := (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx(thisStringFilter)) ? 1 : 0
    If (dummy!="external")
-      GuiControl, SettingsGUIA:, InternalFilterString, % (regexBad=1) ? "Invalid regular expression provided." : newFilter
+   {
+      ; an active filter the fields cannot rebuild stays in the query box until a field is changed
+      If (dummy="opened")
+      {
+         fieldsAtOpen := fieldsNow
+         thisFilter := (SubStr(newFilter, 1, 2)="\>") ? SubStr(newFilter, 3) : newFilter
+         foreignFilter := (StrLen(filesFilter)>1 && thisFilter!=filesFilter) ? 1 : 0
+      } Else If (fieldsNow!=fieldsAtOpen)
+      {
+         foreignFilter := 0
+      }
+
+      keepsActiveFilter := (foreignFilter=1 && StrLen(filesFilter)>1) ? 1 : 0
+      If (keepsActiveFilter=1)
+         GuiControl, SettingsGUIA:, InternalFilterString, % filesFilter
+      Else
+         GuiControl, SettingsGUIA:, InternalFilterString, % (regexBad=1) ? "Invalid regular expression provided." : newFilter
+   }
 
    Return newFilter
 }
@@ -33442,6 +33473,9 @@ BtnApplyFilesFilter() {
    GuiControlGet, userFilterInvertThis
    newFilter := updateUIFiltersPanel()
    Gui, SettingsGUIA: Submit, NoHide
+   If updateUIFiltersPanel("keeps")
+      Return msgBeepTimer("WARNING: No filter option was changed.`nThe active files list filter was left in place.")
+
    pku := RegExMatch(UsrEditFilter, "^[[:alnum:] \t]*\)(?!\s*$)") ? "i" : "i)"
    If (userFilterDoString=1 && userFilterStringPos=4 && SLDtypeLoaded!=3 && StrLen(UsrEditFilter)>1 && !isValidRegEx(pku UsrEditFilter))
       Return msgBeepTimer("WARNING: The regular expression you provided is invalid.`nPlease correct the pattern before applying the filter.")
@@ -47859,13 +47893,14 @@ SelectFilesSearchIndex() {
 }
 
 EraseSearchEdit() {
+   Global UsrEditSearch
    If (AnyWindowOpen=29)
    {
-      GuiControlGet, UsrEditFilter
+      GuiControlGet, UsrEditSearch
       BtnCloseWindow()
    }
 
-   If (StrLen(UsrEditFilter)<2)
+   If (StrLen(UsrEditSearch)<2)
       SearchedStringz := ""
    userSearchString := ""
    ForceRefreshNowThumbsList()
@@ -47874,7 +47909,7 @@ EraseSearchEdit() {
 }
 
 PanelSearchIndex(dummy:="") {
-    Global editFa, editFb, txtline3
+    Global editFa, editFb, txtline3, UsrEditSearch
     If warnFramesActionPrevented("SEARCH")
        Return
 
@@ -47913,7 +47948,7 @@ PanelSearchIndex(dummy:="") {
     Gui, Add, Picture, x20 y20 h%thisBtnHeight% Icon%iconNum% w-1, %iconFile%
     Gui, Add, Text, x+20 w%txtWid% Section, %infou%. Use | as the OR operator. Wildcards ? and * are supported as well.
     Gui, Add, Text, y+7 wp h1 Hide, Search string
-    Gui, Add, ComboBox, yp wp gUIgenericComboAction vUsrEditFilter, % SearchedStringz "`n" this "`n`n"
+    Gui, Add, ComboBox, yp wp gUIgenericComboAction vUsrEditSearch, % SearchedStringz "`n" this "`n`n"
     GuiAddButton("x+1 w" sml " hp gEraseSearchEdit", "X", "Discard search criteria")
     GuiAddDropDownList("xs y+10 w" lst " AltSubmit Choose" userSearchPos " vuserSearchPos", "Anywhere`nBegins with`nEnds with`nRegEx", "Search matching mode")
     GuiAddDropDownList("x+2 wp AltSubmit Choose" userSearchWhat " vuserSearchWhat", "Full paths`nFolder paths`nFile names`nParent folders", "Limit search to...")
@@ -47936,6 +47971,7 @@ PanelSearchIndex(dummy:="") {
 }
 
 BtnPerformSearchNow(a, b, c) {
+   Global UsrEditSearch
    ; ToolTip, % a "=" b "=" c , , , 2
    If askAboutFileSave(" and the files index search will be performed")
       Return
@@ -47944,12 +47980,12 @@ BtnPerformSearchNow(a, b, c) {
    GuiControlGet, markSearchMatches
    GuiControlGet, userSearchWhat
    GuiControlGet, userSearchPos
-   GuiControlGet, UsrEditFilter
+   GuiControlGet, UsrEditSearch
    ControlGetText, btnText,, ahk_id %a%
 
    userSearchString := ""
    INIaction(1, "markSearchMatches", "General")
-   thisString := StrReplace(UsrEditFilter, "||", "|")
+   thisString := StrReplace(UsrEditSearch, "||", "|")
    thisString := Trim(thisString, "|")
 
    ; fnOutputDebug(A_ThisFunc "(1): " thisString)
