@@ -33075,7 +33075,7 @@ readRecentFiltersEntries() {
    {
        IniRead, newEntry, % mainRecentsFile, RecentFilters, E%A_Index%, @
        newEntry := Trimmer(newEntry)
-       If (InStr(entriesList, newEntry "`n") || !newEntry)
+       If (InStr("`n" entriesList, "`n" newEntry "`n") || !newEntry)
           Continue
 
        If (StrLen(newEntry)>1)
@@ -33153,8 +33153,9 @@ PanelEnableFilesFilter() {
 
     InitialFilterSettingsPanel(1)
     listu := readRecentFiltersEntries()
+    ; the active filter's text comes first and is listed once
     If (!InStr(listu, "`n`n") && StrLen(UsrEditFilter)>0 && userFilterDoString=1 && StrLen(filesFilter)>1)
-       listu := UsrEditFilter "`n`n" listu
+       listu := UsrEditFilter "`n`n" SubStr(StrReplace("`n" listu, "`n" UsrEditFilter "`n", "`n"), 2)
 
     Gui, SettingsGUIA: +Delimiter`n
     Gui, Add, Tab3, %tabzDarkModus%, Text`nFile and image
